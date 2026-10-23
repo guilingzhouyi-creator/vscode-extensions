@@ -188,7 +188,7 @@ function auditFileDensity(filePath, options, contentOverride = undefined) {
     });
   }
 
-  // 3. Horizontal token congestion check (tau <= 20.0 tokens per line)
+  // 3. Horizontal token congestion check (tau <= 22.0 tokens per line)
   if (metrics.tokensPerEloc > options.maxTau) {
     violations.push({
       ruleId: 'GUARD-AST-001',
@@ -211,7 +211,7 @@ function auditFileDensity(filePath, options, contentOverride = undefined) {
         },
         templateSnippet: 'const intermediateVar = expression;\nreturn computeWith(intermediateVar);',
         safeToAutomate: true,
-        rationale: 'Horizontal token density tau exceeds 20.0 tokens/line ceiling, creating single-line cognitive congestion.',
+        rationale: 'Horizontal token density tau exceeds the 22.0 tokens/line ceiling, creating single-line cognitive congestion.',
       },
     });
   }
@@ -319,7 +319,7 @@ function outputJsonDensityReport(allViolations, inspections, totalFiles, exemptC
 
 const RE_IGNORED_DIRS = new Set([
   '.git', '.agents', 'node_modules', 'dist', 'out', 'target', 'fixtures', 'baseline',
-  'reports', 'archive', 'build', '.godot', '.refactor-trajectory'
+  'reports', 'archive', 'build', '.godot', '.refactor-trajectory', 'tmp', 'temp'
 ]);
 
 function findRepoCodeFiles(dir, fileList = []) {

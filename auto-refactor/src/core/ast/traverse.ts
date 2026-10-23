@@ -316,6 +316,7 @@ export class FileMetricCollector {
             por: density?.por,
             columnDensity: density?.columnDensity,
             compositeDensity: density?.compositeDensity,
+            tokensPerEloc: density?.tokensPerEloc,
         };
         return [];
     }

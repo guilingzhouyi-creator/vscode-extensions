@@ -133,7 +133,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
         'UTL',
     ],
     BIG: ['SIZE'],
-    VOL: ['DIL', 'DOC', 'ELOC', 'LOC', 'RATIO'],
+    VOL: ['DIL', 'DOC', 'ELOC', 'LOC', 'POR', 'RATIO', 'TAU'],
     CMP: ['CAL', 'DEN', 'EXP', 'LIN'],
     CMT: ['BAN', 'CON', 'DOC', 'ENG', 'HDR', 'INT', 'LNG', 'MOJI', 'SEP', 'TRM', 'VMD', 'WID'],
     CONST: ['CLU', 'DRF', 'LAY', 'LIB', 'OWN', 'SCP'],

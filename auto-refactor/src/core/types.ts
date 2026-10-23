@@ -252,6 +252,14 @@ export interface FileMetric {
     por?: number;
     columnDensity?: number;
     compositeDensity?: number;
+    /**
+     * Semantic tokens per effective code line (tau).
+     *
+     * Populated from the same token stream that yields tspr/por/columnDensity, so a consumer can
+     * test the tau band without re-tokenizing. Absent only for contexts built outside the engine
+     * pipeline.
+     */
+    tokensPerEloc?: number;
 }
 
 /**

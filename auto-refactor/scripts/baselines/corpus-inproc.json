@@ -1501,7 +1501,8 @@
       "tspr": 0.954374,
       "por": 0.045626,
       "columnDensity": 0.999893,
-      "compositeDensity": 0.762853
+      "compositeDensity": 0.762853,
+      "tokensPerEloc": 7.44
     },
     {
       "file": "src/legacy.js",
@@ -1515,7 +1516,8 @@
       "tspr": 0.917505,
       "por": 0.082495,
       "columnDensity": 0.979961,
-      "compositeDensity": 0.779493
+      "compositeDensity": 0.779493,
+      "tokensPerEloc": 6.7143
     },
     {
       "file": "src/unit_binding_0.ts",
@@ -1529,7 +1531,8 @@
       "tspr": 0.888889,
       "por": 0.111111,
       "columnDensity": 0.883863,
-      "compositeDensity": 0.875488
+      "compositeDensity": 0.875488,
+      "tokensPerEloc": 9.8571
     },
     {
       "file": "src/unit_binding_1.ts",
@@ -1543,7 +1546,8 @@
       "tspr": 0.888889,
       "por": 0.111111,
       "columnDensity": 0.883863,
-      "compositeDensity": 0.875488
+      "compositeDensity": 0.875488,
+      "tokensPerEloc": 9.8571
     },
     {
       "file": "src/unit_binding_2.ts",
@@ -1557,7 +1561,8 @@
       "tspr": 0.888889,
       "por": 0.111111,
       "columnDensity": 0.883863,
-      "compositeDensity": 0.875488
+      "compositeDensity": 0.875488,
+      "tokensPerEloc": 9.8571
     },
     {
       "file": "src/unit_binding_3.ts",
@@ -1571,7 +1576,8 @@
       "tspr": 0.888889,
       "por": 0.111111,
       "columnDensity": 0.883863,
-      "compositeDensity": 0.875488
+      "compositeDensity": 0.875488,
+      "tokensPerEloc": 9.8571
     },
     {
       "file": "src/unit_cls_0.ts",
@@ -1585,7 +1591,8 @@
       "tspr": 0.93837,
       "por": 0.06163,
       "columnDensity": 0.516681,
-      "compositeDensity": 0.78301
+      "compositeDensity": 0.78301,
+      "tokensPerEloc": 14.1111
     },
     {
       "file": "src/unit_cls_1.ts",
@@ -1599,7 +1606,8 @@
       "tspr": 0.93837,
       "por": 0.06163,
       "columnDensity": 0.516681,
-      "compositeDensity": 0.78301
+      "compositeDensity": 0.78301,
+      "tokensPerEloc": 14.1111
     },
     {
       "file": "src/unit_cls_2.ts",
@@ -1613,7 +1621,8 @@
       "tspr": 0.93837,
       "por": 0.06163,
       "columnDensity": 0.516681,
-      "compositeDensity": 0.78301
+      "compositeDensity": 0.78301,
+      "tokensPerEloc": 14.1111
     },
     {
       "file": "src/unit_cls_3.ts",
@@ -1627,7 +1636,8 @@
       "tspr": 0.93837,
       "por": 0.06163,
       "columnDensity": 0.516681,
-      "compositeDensity": 0.78301
+      "compositeDensity": 0.78301,
+      "tokensPerEloc": 14.1111
     },
     {
       "file": "src/unit_complex_0.ts",
@@ -1641,7 +1651,8 @@
       "tspr": 0.960543,
       "por": 0.039457,
       "columnDensity": 0.404004,
-      "compositeDensity": 0.640909
+      "compositeDensity": 0.640909,
+      "tokensPerEloc": 15.7273
     },
     {
       "file": "src/unit_complex_1.ts",
@@ -1655,7 +1666,8 @@
       "tspr": 0.960543,
       "por": 0.039457,
       "columnDensity": 0.404004,
-      "compositeDensity": 0.640909
+      "compositeDensity": 0.640909,
+      "tokensPerEloc": 15.7273
     },
     {
       "file": "src/unit_complex_2.ts",
@@ -1669,7 +1681,8 @@
       "tspr": 0.960543,
       "por": 0.039457,
       "columnDensity": 0.404004,
-      "compositeDensity": 0.640909
+      "compositeDensity": 0.640909,
+      "tokensPerEloc": 15.7273
     },
     {
       "file": "src/unit_complex_3.ts",
@@ -1683,7 +1696,8 @@
       "tspr": 0.960543,
       "por": 0.039457,
       "columnDensity": 0.404004,
-      "compositeDensity": 0.640909
+      "compositeDensity": 0.640909,
+      "tokensPerEloc": 15.7273
     },
     {
       "file": "src/unit_hardStr_0.ts",
@@ -1697,7 +1711,8 @@
       "tspr": 0.929825,
       "por": 0.070175,
       "columnDensity": 0.985778,
-      "compositeDensity": 0.711245
+      "compositeDensity": 0.711245,
+      "tokensPerEloc": 6.8333
     },
     {
       "file": "src/unit_hardStr_1.ts",
@@ -1711,7 +1726,8 @@
       "tspr": 0.929825,
       "por": 0.070175,
       "columnDensity": 0.985778,
-      "compositeDensity": 0.711245
+      "compositeDensity": 0.711245,
+      "tokensPerEloc": 6.8333
     },
     {
       "file": "src/unit_hardStr_2.ts",
@@ -1725,7 +1741,8 @@
       "tspr": 0.929825,
       "por": 0.070175,
       "columnDensity": 0.985778,
-      "compositeDensity": 0.711245
+      "compositeDensity": 0.711245,
+      "tokensPerEloc": 6.8333
     },
     {
       "file": "src/unit_hardStr_3.ts",
@@ -1739,7 +1756,8 @@
       "tspr": 0.929825,
       "por": 0.070175,
       "columnDensity": 0.985778,
-      "compositeDensity": 0.711245
+      "compositeDensity": 0.711245,
+      "tokensPerEloc": 6.8333
     },
     {
       "file": "src/unit_i18n_0.ts",
@@ -1753,7 +1771,8 @@
       "tspr": 0.935673,
       "por": 0.064327,
       "columnDensity": 0.958645,
-      "compositeDensity": 0.835182
+      "compositeDensity": 0.835182,
+      "tokensPerEloc": 8.8
     },
     {
       "file": "src/unit_i18n_1.ts",
@@ -1767,7 +1786,8 @@
       "tspr": 0.935673,
       "por": 0.064327,
       "columnDensity": 0.958645,
-      "compositeDensity": 0.835182
+      "compositeDensity": 0.835182,
+      "tokensPerEloc": 8.8
     },
     {
       "file": "src/unit_i18n_2.ts",
@@ -1781,7 +1801,8 @@
       "tspr": 0.935673,
       "por": 0.064327,
       "columnDensity": 0.958645,
-      "compositeDensity": 0.835182
+      "compositeDensity": 0.835182,
+      "tokensPerEloc": 8.8
     },
     {
       "file": "src/unit_i18n_3.ts",
@@ -1795,7 +1816,8 @@
       "tspr": 0.935673,
       "por": 0.064327,
       "columnDensity": 0.958645,
-      "compositeDensity": 0.835182
+      "compositeDensity": 0.835182,
+      "tokensPerEloc": 8.8
     },
     {
       "file": "src/unit_magicNum_0.ts",
@@ -1809,7 +1831,8 @@
       "tspr": 0.953342,
       "por": 0.046658,
       "columnDensity": 0.843871,
-      "compositeDensity": 0.688243
+      "compositeDensity": 0.688243,
+      "tokensPerEloc": 10.3333
     },
     {
       "file": "src/unit_magicNum_1.ts",
@@ -1823,7 +1846,8 @@
       "tspr": 0.953342,
       "por": 0.046658,
       "columnDensity": 0.843871,
-      "compositeDensity": 0.688243
+      "compositeDensity": 0.688243,
+      "tokensPerEloc": 10.3333
     },
     {
       "file": "src/unit_magicNum_2.ts",
@@ -1837,7 +1861,8 @@
       "tspr": 0.953342,
       "por": 0.046658,
       "columnDensity": 0.843871,
-      "compositeDensity": 0.688243
+      "compositeDensity": 0.688243,
+      "tokensPerEloc": 10.3333
     },
     {
       "file": "src/unit_magicNum_3.ts",
@@ -1851,7 +1876,8 @@
       "tspr": 0.953342,
       "por": 0.046658,
       "columnDensity": 0.843871,
-      "compositeDensity": 0.688243
+      "compositeDensity": 0.688243,
+      "tokensPerEloc": 10.3333
     }
   ]
 }

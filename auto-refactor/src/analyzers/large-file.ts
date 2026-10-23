@@ -37,6 +37,7 @@ import {
     type IntraFileZoneProfile,
 } from '../core/intelligence/zone-partitioner';
 import { isConstantDefinitionFile } from '../core/intelligence/constant-identity';
+import { evaluateTokenDensityBand } from '../core/intelligence/token-density-band';
 
 /** Architectural token representing benign constant library classification. */
 export const ARCH_BENIGN_CONSTANT_LIBRARY = 'ARCH_BENIGN_CONSTANT_LIBRARY';
@@ -198,8 +199,13 @@ function collectVolumeFindings(evalCtx: AnalysisEvaluationContext): VolumeFindin
 /**
  * Collect every breached absolute budget.
  *
- * The two absolute ceilings are independent red lines, so both can fire together. The shape rules
- * are mutually exclusive by precedence, so at most one of them is ever added.
+ * The two absolute ceilings are independent red lines, so both can fire together. The tau band is a
+ * separate axis — it measures tokens per effective line rather than effective lines per physical
+ * line — so it is evaluated before the shape rules rather than as one of them, and it survives the
+ * elasticity exemption: a file whose vertical layout is fragmented is exactly the file elasticity
+ * would otherwise excuse. Only the constant-catalog exemption, where the data itself dictates the
+ * layout, silences the band. The shape rules remain mutually exclusive by precedence, so at most
+ * one of them is ever added.
  *
  * @param evalCtx - Assembled evaluation context.
  * @returns Breached budget findings in precedence order.
@@ -225,7 +231,10 @@ function collectBudgetFindings(evalCtx: AnalysisEvaluationContext): VolumeFindin
             suggestion: VOLUME_SUGGESTION_SPLIT,
         });
     }
-    if (isVolumeEnvelopeExempt(evalCtx) || shouldExemptElastic(evalCtx)) return findings;
+    if (isVolumeEnvelopeExempt(evalCtx)) return findings;
+    const tau = evaluateTokenDensityBand(evalCtx.metrics.tokensPerEloc, eloc);
+    if (tau !== null) findings.push(tau);
+    if (shouldExemptElastic(evalCtx)) return findings;
     const shape = evaluateShapeFindings(evalCtx, eloc, totalLoc);
     if (shape !== null) findings.push(shape);
     return findings;

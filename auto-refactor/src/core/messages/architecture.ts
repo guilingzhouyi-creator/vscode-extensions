@@ -215,4 +215,29 @@ export const ArchitectureMessages = {
             'Modules dominated by import/export wiring and superficial forwarding wrappers obscure real domain logic and dilute codebase density.',
         risk: RISK_MEDIUM,
     }),
+
+    // VOL-POR-001: Plumbing overhead ratio budget
+    /**
+     * Build the VOL-POR-001 descriptor for wiring that exceeds the absolute plumbing budget.
+     *
+     * This is the budget verdict, not the dominance verdict: the module has crossed the ratio line
+     * the workspace gate draws, which is a different statement from ARCH-PLM-001's "almost nothing
+     * is left once the wiring is removed". Reporting both from one measurement lets a consumer see
+     * which line was crossed without measuring the file twice.
+     *
+     * @param file - File path containing the over-budget wiring.
+     * @param por - Measured plumbing overhead ratio.
+     * @param threshold - Maximum allowable plumbing ratio.
+     * @returns Fresh descriptor with Medium risk and wiring reduction guidance.
+     */
+    PLUMBING_RATIO_BUDGET: (file: string, por: number, threshold: number): DiagnosticDescriptor => ({
+        message:
+            `Plumbing overhead ratio budget exceeded: ${(por * 100).toFixed(1)}% in '${file}' ` +
+            `is above the ${(threshold * 100).toFixed(1)}% ceiling; wiring lines outnumber payload lines.`,
+        suggestion:
+            'Collapse forwarding wrappers into their callers, or move the wiring into a dedicated composition root so the module carries logic rather than connections.',
+        rationale:
+            'The plumbing ratio budget is an absolute ceiling, so a module can exceed it while still carrying some payload; the ceiling exists because wiring-heavy modules make every change a cross-file edit.',
+        risk: RISK_MEDIUM,
+    }),
 } as const;

@@ -1027,7 +1027,8 @@
       "tspr": 0.912583,
       "por": 0.087417,
       "columnDensity": 0.999079,
-      "compositeDensity": 0.762332
+      "compositeDensity": 0.762332,
+      "tokensPerEloc": 7.325
     },
     {
       "file": "run-from-script.js",
@@ -1041,7 +1042,8 @@
       "tspr": 0.884507,
       "por": 0.115493,
       "columnDensity": 0.939046,
-      "compositeDensity": 0.748711
+      "compositeDensity": 0.748711,
+      "tokensPerEloc": 9.1154
     },
     {
       "file": "sample.ts",
@@ -1055,7 +1057,8 @@
       "tspr": 0.928365,
       "por": 0.071635,
       "columnDensity": 0.993139,
-      "compositeDensity": 0.744301
+      "compositeDensity": 0.744301,
+      "tokensPerEloc": 8
     }
   ]
 }

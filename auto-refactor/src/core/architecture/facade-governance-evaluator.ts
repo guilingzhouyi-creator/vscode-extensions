@@ -20,6 +20,23 @@ import { calculateWeightedTokenPayload } from '../intelligence/payload-density';
 /** Default minimum effective lines of code for a substantive facade module. */
 export const DEFAULT_MIN_FACADE_ELOC = 15;
 
+/** Rule id: wiring payload above the absolute plumbing-ratio budget. */
+const RULE_PLUMBING_RATIO = 'VOL-POR-001';
+/** Rule id: wiring payload dominant enough that the module carries almost no logic at all. */
+const RULE_PLUMBING_DOMINANT = 'ARCH-PLM-001';
+
+/** Plumbing ratio above which wiring outweighs logic payload. */
+const MAX_PLUMBING_RATIO = 0.6;
+/**
+ * Payload ratio below which a module is treated as having no logic payload at all.
+ *
+ * POR is `1 - TSPR`, so the two thresholds are two points on one axis: the ratio budget is the
+ * gate's line, and this stricter cut marks the modules where the wiring does not merely exceed the
+ * budget but leaves essentially nothing behind. Splitting them keeps a single file from being
+ * reported twice for the same measurement while still naming the two severities of the same defect.
+ */
+const MIN_DOMINANT_PAYLOAD_RATIO = 0.35;
+
 /** Configuration options for facade and trampoline governance audits. */
 export interface FacadeAuditOptions {
     minFacadeEloc?: number;
@@ -34,6 +51,18 @@ export interface FacadeAuditResult {
     trampolineCount: number;
     hollowFacadeCount: number;
     plumbingCount?: number;
+    /** Modules whose wiring payload exceeded the plumbing-ratio budget. */
+    plumbingOverBudgetCount?: number;
+}
+
+/** Plumbing measurement for one module: both budget verdicts plus the ratios they came from. */
+interface PlumbingAssessment {
+    /** Wiring payload above the ratio budget (VOL-POR-001). */
+    readonly overBudget: boolean;
+    /** Wiring payload so dominant that almost no logic remains (ARCH-PLM-001). */
+    readonly dominant: boolean;
+    readonly por: number;
+    readonly tspr: number;
 }
 
 const TRAMPOLINE_REEXPORT_RE =
@@ -123,39 +152,62 @@ function checkHollowFacade(
 }
 
 /**
- * Evaluates whether a module is dominated by wiring and plumbing overhead (ARCH-PLM-001).
+ * Evaluates whether a module is dominated by wiring and plumbing overhead.
+ *
+ * Two verdicts come out of one measurement because POR and TSPR are the same axis read from
+ * opposite ends: `overBudget` is the gate's absolute budget (VOL-POR-001), and `dominant` is the
+ * stricter cut where the wiring has crowded the payload out almost entirely (ARCH-PLM-001). They
+ * are reported under separate ids so a consumer can tell a budget breach from a hollow module,
+ * while a single measurement still decides both.
+ *
+ * @param filePath - Path of the module under audit.
+ * @param content - Source content of the module.
+ * @param codeLines - Non-comment, non-blank lines of the module.
+ * @param minEloc - Minimum effective lines before the ratio is meaningful.
+ * @returns Both budget verdicts plus the measured ratios.
  */
 function checkPlumbingOverhead(
     filePath: string,
     content: string,
     codeLines: string[],
     minEloc: number,
-): { isOverhead: boolean; por: number; tspr: number } {
-    if (codeLines.length < minEloc) {
-        return { isOverhead: false, por: 0, tspr: 1.0 };
-    }
+): PlumbingAssessment {
+    const clean: PlumbingAssessment = { overBudget: false, dominant: false, por: 0, tspr: 1.0 };
+    if (codeLines.length < minEloc) return clean;
+    if (isWiringExemptModule(filePath)) return clean;
+    if (SUBSTANTIVE_PAYLOAD_RE.test(content)) return clean;
+
+    const tokenStream = tokenizeCode(content);
+    if (tokenStream.tokens.length < 30) return clean;
+
+    const { tspr, por } = calculateWeightedTokenPayload(tokenStream.tokens);
+    return {
+        overBudget: por > MAX_PLUMBING_RATIO,
+        dominant: por > MAX_PLUMBING_RATIO && tspr < MIN_DOMINANT_PAYLOAD_RATIO,
+        por,
+        tspr,
+    };
+}
+
+/**
+ * Report whether a module's ratio is dictated by its role rather than by its author.
+ *
+ * Barrel indexes, declaration files, constant tables, token catalogs, and name registries are
+ * wiring by construction: their whole job is to name things other modules define. Charging them a
+ * wiring budget would only teach the reader to ignore the rule.
+ *
+ * @param filePath - Path of the module under audit.
+ * @returns True when the module is exempt from the wiring budget.
+ */
+function isWiringExemptModule(filePath: string): boolean {
     const baseName = path.basename(filePath);
-    if (
+    return (
         baseName.startsWith('index.') ||
         baseName.includes('constants') ||
         baseName.includes('token') ||
         baseName.includes('catalog') ||
         filePath.endsWith('.d.ts')
-    ) {
-        return { isOverhead: false, por: 0, tspr: 1.0 };
-    }
-    if (SUBSTANTIVE_PAYLOAD_RE.test(content)) {
-        return { isOverhead: false, por: 0, tspr: 1.0 };
-    }
-
-    const tokenStream = tokenizeCode(content);
-    if (tokenStream.tokens.length < 30) {
-        return { isOverhead: false, por: 0, tspr: 1.0 };
-    }
-
-    const { tspr, por } = calculateWeightedTokenPayload(tokenStream.tokens);
-    const isOverhead = por > 0.6 && tspr < 0.35;
-    return { isOverhead, por, tspr };
+    );
 }
 
 /**
@@ -175,9 +227,10 @@ export function auditFacadeGovernance(
     let trampolineCount = 0;
     let hollowFacadeCount = 0;
     let plumbingCount = 0;
+    let plumbingOverBudgetCount = 0;
 
     if (isExemptPath(filePath)) {
-        return { issues, trampolineCount, hollowFacadeCount, plumbingCount };
+        return { issues, trampolineCount, hollowFacadeCount, plumbingCount, plumbingOverBudgetCount };
     }
 
     const minEloc = options?.minFacadeEloc ?? DEFAULT_MIN_FACADE_ELOC;
@@ -246,19 +299,18 @@ export function auditFacadeGovernance(
     }
 
     if (checkPlumbing) {
-        const { isOverhead, por, tspr } = checkPlumbingOverhead(
-            filePath,
-            content,
-            codeLines,
-            minEloc,
-        );
-        if (isOverhead) {
-            plumbingCount++;
-            const desc = ArchitectureMessages.PLUMBING_OVERHEAD_RATIO(filePath, por, tspr, 0.6);
+        const assessment = checkPlumbingOverhead(filePath, content, codeLines, minEloc);
+        if (assessment.overBudget) {
+            plumbingOverBudgetCount++;
+            const desc = ArchitectureMessages.PLUMBING_RATIO_BUDGET(
+                filePath,
+                assessment.por,
+                MAX_PLUMBING_RATIO,
+            );
             issues.push({
-                id: `architecture:ARCH-PLM-001:${normPath}:1`,
+                id: `architecture:VOL-POR-001:${normPath}:1`,
                 analyzer: 'architecture',
-                rule: 'ARCH-PLM-001',
+                rule: RULE_PLUMBING_RATIO,
                 severity: SEVERITY_WARNING,
                 location: {
                     file: normPath,
@@ -269,14 +321,43 @@ export function auditFacadeGovernance(
                 suggestion: desc.suggestion,
                 detail: {
                     rationale: desc.rationale,
-                    por,
-                    tspr,
-                    threshold: 0.6,
+                    por: assessment.por,
+                    tspr: assessment.tspr,
+                    threshold: MAX_PLUMBING_RATIO,
+                    eloc: codeLines.length,
+                },
+            });
+        }
+        if (assessment.dominant) {
+            plumbingCount++;
+            const desc = ArchitectureMessages.PLUMBING_OVERHEAD_RATIO(
+                filePath,
+                assessment.por,
+                assessment.tspr,
+                MAX_PLUMBING_RATIO,
+            );
+            issues.push({
+                id: `architecture:ARCH-PLM-001:${normPath}:1`,
+                analyzer: 'architecture',
+                rule: RULE_PLUMBING_DOMINANT,
+                severity: SEVERITY_WARNING,
+                location: {
+                    file: normPath,
+                    start: { line: 1, column: 1 },
+                    end: { line: 1, column: 1 },
+                },
+                message: desc.message,
+                suggestion: desc.suggestion,
+                detail: {
+                    rationale: desc.rationale,
+                    por: assessment.por,
+                    tspr: assessment.tspr,
+                    threshold: MAX_PLUMBING_RATIO,
                     eloc: codeLines.length,
                 },
             });
         }
     }
 
-    return { issues, trampolineCount, hollowFacadeCount, plumbingCount };
+    return { issues, trampolineCount, hollowFacadeCount, plumbingCount, plumbingOverBudgetCount };
 }

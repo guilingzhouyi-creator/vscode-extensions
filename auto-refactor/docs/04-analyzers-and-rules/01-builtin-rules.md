@@ -465,6 +465,9 @@
 | `VOL-ELOC-001` | <a id="vol-eloc-001"></a>`large-file` | `VOL` | `error` | `all` | 单文件有效代码行数超出体积预算上限。 | 按单一职责原则把模块拆分为高内聚子模块。 |
 | `VOL-LOC-001` | <a id="vol-loc-001"></a>`large-file` | `VOL` | `error` | `all` | 单文件物理行数超出预算上限。 | 将文件拆分为多个聚焦单元，降低认知负荷与排版膨胀。 |
 | `VOL-RATIO-001` | <a id="vol-ratio-001"></a>`large-file` | `VOL` | `warning` | `all` | 物理行数超出按目标稀释比反推的动态包络，纵向排版过于稀疏。 | 合并碎片化换行，或把长段散文式文档移入 Markdown 规格说明。 |
+| `VOL-TAU-001` | <a id="vol-tau-001"></a>`large-file` | `VOL` | `warning` | `all` | 令牌密度低于下限：每有效代码行的语义令牌数低于 2.5，说明纵向排版被碎成孤立参数、单括号或单令牌行。 | 把纵向碎裂的调用与声明合并为内聚语句，形参达到四个及以上时改用单个参数对象。 |
+| `VOL-TAU-002` | <a id="vol-tau-002"></a>`large-file` | `VOL` | `warning` | `all` | 令牌密度高于上限：每有效代码行的语义令牌数高于 22，单行承载的概念超出一次阅读可容纳的量。 | 从单体链式表达式中抽取中间变量，把嵌套逻辑摊到独立行上。 |
+| `VOL-POR-001` | <a id="vol-por-001"></a>`architecture` | `VOL` | `warning` | `all` | 接线载荷超出绝对占比预算：模块的导入、再导出与转发胶水行占比超过 60%，而模块职责并不以接线为本务。 | 把转发包装内联回调用方，或把接线集中到独立组装根，让模块承载逻辑而非连接。 |
 | `loop-transient-allocation` | <a id="loop-transient-allocation"></a>`performance` | `PRF` | `warning` | `all` | 循环体内瞬态堆分配（ADV-PRF-002），违背零瞬态分配契约。（计划迁移至 `PRF-TRAN-001`） | 将对象实例化提升到循环外或使用对象池模式（ADV-POOL-001）。 |
 | `nested-constant` | <a id="nested-constant"></a>`constants` | `LEGACY` | `warning` | `all` | 严禁常量化嵌套：禁止冗余常量别名引用、深层嵌套常量对象与作用域内部伪常量。（计划迁移至 `CST-NST-001`） | 将常量直接内联或提升至模块顶层单源声明，消除无意义的间接别名与深层对象嵌套。 |
 | `secret-detected` | <a id="secret-detected"></a>`secrets` | `LEGACY` | `error` | `all` | 疑似硬编码凭据（按模式识别）。（计划迁移至 `SEC-TOK-001`） | 撤销并轮换该凭据；改为从环境/密钥管理读取。 |

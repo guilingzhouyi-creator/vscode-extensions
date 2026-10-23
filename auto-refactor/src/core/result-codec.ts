@@ -26,7 +26,9 @@
  *   Per file:
  *     varint fileLen, file(UTF-8)
  *     u8 hasMetric; if 1: varint lines, nonBlankLines, functions, maxNestingDepth,
- *                    topLevelDeclarations, exportedSymbols
+ *                    topLevelDeclarations, exportedSymbols,
+ *                    then tagged optional floats effectiveDensity, tspr, por,
+ *                    columnDensity, compositeDensity, tokensPerEloc
  *     varint issueCount
  *     Per issue:
  *       varint idLen, id · analyzer · rule (UTF-8)
@@ -380,6 +382,7 @@ export function encodeResults(results: FileResult[]): Buffer {
             writeOptionalMetricField(writer, metric.por);
             writeOptionalMetricField(writer, metric.columnDensity);
             writeOptionalMetricField(writer, metric.compositeDensity);
+            writeOptionalMetricField(writer, metric.tokensPerEloc);
         } else {
             writer.writeU8(0);
         }
@@ -435,6 +438,7 @@ function decodeMetric(reader: Reader, file: string): FileMetric | null {
     const por = decodeOptionalMetricField(reader);
     const columnDensity = decodeOptionalMetricField(reader);
     const compositeDensity = decodeOptionalMetricField(reader);
+    const tokensPerEloc = decodeOptionalMetricField(reader);
     return {
         file,
         lines,
@@ -448,6 +452,7 @@ function decodeMetric(reader: Reader, file: string): FileMetric | null {
         ...(por !== undefined ? { por } : {}),
         ...(columnDensity !== undefined ? { columnDensity } : {}),
         ...(compositeDensity !== undefined ? { compositeDensity } : {}),
+        ...(tokensPerEloc !== undefined ? { tokensPerEloc } : {}),
     };
 }
 

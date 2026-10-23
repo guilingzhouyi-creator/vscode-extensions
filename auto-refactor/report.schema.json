@@ -532,6 +532,11 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "tokensPerEloc": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Semantic tokens per effective code line (tau), measured on the same token stream that yields tspr/por/columnDensity. Absent when the tokenizer produced no tokens."
         }
       },
       "additionalProperties": false
