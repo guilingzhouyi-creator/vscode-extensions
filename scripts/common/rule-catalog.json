@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-23T06:23:48.823Z",
-  "totalRules": 505,
+  "generatedAt": "2026-10-23T07:21:49.722Z",
+  "totalRules": 508,
   "counts": {
-    "autoRefactor": 371,
+    "autoRefactor": 374,
     "workspaceTiming": 49,
     "webGames": 50,
     "fractalGit": 17,
@@ -4097,11 +4097,35 @@
       "canonical": true
     },
     {
+      "id": "VOL-POR-001",
+      "project": "auto-refactor",
+      "family": "VOL",
+      "severity": "warning",
+      "summary": "Plumbing overhead ratio budget: wiring lines (imports, re-exports, forwarding glue) must not exceed 60% of a module whose role does not make wiring its job.",
+      "canonical": true
+    },
+    {
       "id": "VOL-RATIO-001",
       "project": "auto-refactor",
       "family": "VOL",
       "severity": "warning",
       "summary": "Dynamic dilution envelope guard: physical line count must not exceed the 1:3 ratio envelope.",
+      "canonical": true
+    },
+    {
+      "id": "VOL-TAU-001",
+      "project": "auto-refactor",
+      "family": "VOL",
+      "severity": "warning",
+      "summary": "Token density floor: semantic tokens per effective line must not fall below 2.5, so a module cannot be fragmented into lone arguments, isolated brackets, or single-token lines.",
+      "canonical": true
+    },
+    {
+      "id": "VOL-TAU-002",
+      "project": "auto-refactor",
+      "family": "VOL",
+      "severity": "warning",
+      "summary": "Token density ceiling: semantic tokens per effective line must not exceed 22, so a single line cannot pack more concepts than a reader can hold at once.",
       "canonical": true
     },
     {

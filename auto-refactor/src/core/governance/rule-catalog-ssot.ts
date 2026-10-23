@@ -17,36 +17,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-
-/** Regex matching rule ID candidate patterns across 2+ segments. */
-const RULE_ID_CANDIDATE_RE =
-    /(?<![A-Za-z0-9_])([A-Z]{2,4}(?:-[A-Z0-9_]+){2,}|L[0-5](?:-[A-Z0-9_]+)+)(?![A-Za-z0-9_])/g;
+import { loadRuleLexicon } from './rule-lexicon';
+import type { RuleLexicon } from './rule-lexicon';
 
 /** Regex matching terminal status badges, e.g. [WORKTREE_OK], [COMMIT_OK]. */
 const TERMINAL_STATUS_BADGE_RE = /^\[[A-Z][A-Z0-9_]{3,}\]$/;
-
-/** Benign prefixes that look like rule codes but represent external standards. */
-const BENIGN_EXTERNAL_PREFIXES: readonly string[] = Object.freeze([
-    'UTF-',
-    'SHA-',
-    'RFC-',
-    'CVE-',
-    'ISO-',
-    'IEEE-',
-    'POSIX-',
-    'BASE-',
-    'HTTP-',
-    'TCP-',
-    'UDP-',
-    'TLS-',
-    'SSL-',
-]);
-
-/** Layer range pattern, e.g. L1-L3. */
-const LAYER_RANGE_RE = /^L\d-L\d$/;
-
-/** Step ID pattern in scripts, e.g. PC-01-01. */
-const STEP_ID_RE = /^(?:PC|PP)-\d{2}-\d{2}$/;
 
 let cachedCatalogIds: Set<string> | null = null;
 
@@ -130,16 +105,23 @@ export function getRegisteredWorkspaceRuleIds(): ReadonlySet<string> {
 }
 
 /**
- * Checks whether an identifier is an external standard or technical acronym.
+ * Checks whether an identifier is an external standard, semantic step identifier, or date.
+ *
+ * Every shape here comes from the shared lexicon rather than a local copy. The local copy this
+ * replaced recognized only `PC-nn-nn`/`PP-nn-nn` as step identifiers, while the workspace gate
+ * recognized any `<PREFIX>…-<2-digit>` shape; a gate step such as `RULE-CLOSURE-05` was therefore
+ * benign to the gate and a drifted rule id to the engine. One concept, one definition.
  *
  * @param token - Candidate identifier token.
- * @returns `true` for layer ranges, step ids, and known external standard prefixes.
+ * @param lexicon - Compiled shared vocabulary.
+ * @returns `true` for layer ranges, step ids, dates, and external standard prefixes.
  */
-function isBenignAcronym(token: string): boolean {
-    if (LAYER_RANGE_RE.test(token)) return true;
-    if (STEP_ID_RE.test(token)) return true;
-    for (let i = 0; i < BENIGN_EXTERNAL_PREFIXES.length; i++) {
-        if (token.startsWith(BENIGN_EXTERNAL_PREFIXES[i])) {
+function isBenignIdentifier(token: string, lexicon: RuleLexicon): boolean {
+    if (lexicon.layerRange.test(token)) return true;
+    if (lexicon.calendarDate.test(token)) return true;
+    if (lexicon.semanticStepId.test(token)) return true;
+    for (let i = 0; i < lexicon.externalStandardPrefixes.length; i++) {
+        if (token.startsWith(lexicon.externalStandardPrefixes[i])) {
             return true;
         }
     }
@@ -164,6 +146,11 @@ export function isRegisteredWorkspaceRule(candidateId: string): boolean {
 /**
  * Scans a source text snippet for unregistered rule identifier candidates.
  *
+ * Degrades to "no drift" when the lexicon is unreachable. That is the same documented policy the
+ * catalog itself uses, and it is the safe direction here: a consumer outside the workspace tree
+ * has no catalog to resolve against, so reporting every identifier would be noise rather than
+ * signal. A reachable-but-malformed lexicon is caught by the verification harness, not here.
+ *
  * @param text - Source snippet to scan (literal text, comment, or diagnostic message).
  * @returns Unregistered rule ids found, in encounter order; empty when clean or catalog-less.
  */
@@ -172,24 +159,47 @@ export function findUnregisteredRuleDrift(text: string): string[] {
         return [];
     }
 
+    const lexicon = loadRuleLexicon();
+    if (lexicon === null) {
+        return [];
+    }
+
     const catalog = getRegisteredWorkspaceRuleIds();
     if (catalog.size === 0) {
         return [];
     }
 
-    RULE_ID_CANDIDATE_RE.lastIndex = 0;
+    const candidatePattern = lexicon.candidate;
+    candidatePattern.lastIndex = 0;
     const drifted: string[] = [];
     let match: RegExpExecArray | null;
 
-    while ((match = RULE_ID_CANDIDATE_RE.exec(text)) !== null) {
+    while ((match = candidatePattern.exec(text)) !== null) {
         const candidate = match[1];
-        if (isBenignAcronym(candidate)) continue;
+        if (isBenignIdentifier(candidate, lexicon)) continue;
         if (!catalog.has(candidate)) {
             drifted.push(candidate);
         }
     }
 
     return drifted;
+}
+
+/**
+ * Reports whether a token is a benign non-rule identifier under the shared vocabulary.
+ *
+ * Exported so every surface that judges "is this a rule reference" reaches the same verdict from
+ * the same shapes. Before this existed, `GOV-RUL-001` applied its own exemptions and never checked
+ * the layer-range shape, so a JSDoc line documenting `L1-L3` was reported as rule drift while the
+ * workspace closure guard treated the very same token as benign.
+ *
+ * @param token - Candidate identifier token.
+ * @returns True when the token is an external standard, layer range, step id, or date placeholder.
+ */
+export function isBenignIdentifierToken(token: string): boolean {
+    const lexicon = loadRuleLexicon();
+    if (lexicon === null) return false;
+    return isBenignIdentifier(token, lexicon);
 }
 
 /**

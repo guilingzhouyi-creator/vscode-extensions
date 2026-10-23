@@ -25,7 +25,7 @@ import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from 
 import { isToolOrTestScript } from '../pathScope';
 import { getRule, RULE_REGISTRY } from '../../rules/registry';
 import { canonicalRuleId, toCanonicalRuleId, areAliasForms } from '../../rules/aliases';
-import { isRegisteredWorkspaceRule } from '../rule-catalog-ssot';
+import { isRegisteredWorkspaceRule, isBenignIdentifierToken } from '../rule-catalog-ssot';
 
 const IF_TRUE_RE = /^\s*if\s+(.+?)\s*:\s*return\s+true\s*$/i;
 const ELSE_FALSE_RE = /^\s*else\s*:\s*return\s+false\s*$/i;
@@ -393,6 +393,7 @@ function inspectRuleCatalogLine(
     while ((match = CANDIDATE_RULE_RE.exec(line)) !== null) {
         const candidateId = match[1];
         if (isRegisteredOrAliasRule(candidateId)) continue;
+        if (isBenignIdentifierToken(candidateId)) continue;
         if (isExemptRuleFamily(candidateId)) continue;
 
         violations.push({

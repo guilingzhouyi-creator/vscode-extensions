@@ -41,6 +41,8 @@ export const DEFAULT_EXT: readonly string[] = [
     '.psm1',
     '.psd1',
     '.md',
+    '.yml',
+    '.yaml',
 ];
 
 function consumeAsterisk(glob: string, i: number): { token: string; nextIndex: number } {

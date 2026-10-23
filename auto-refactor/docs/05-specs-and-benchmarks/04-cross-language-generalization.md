@@ -21,7 +21,7 @@
 
 ```mermaid
 flowchart TD
-  subgraph L1_Parsers["7 大语言 AST 适配器 (src/core/ast/adapters.ts)"]
+  subgraph L1_Parsers["8 大语言 AST 适配器 (src/core/ast/adapters.ts)"]
     P_TS["TypeScript / JavaScript Adapter\n(ts-compiler API)"]
     P_OXC["OXC Fast Parser Adapter\n(Rust Native / WASM)"]
     P_PY["Python Adapter\n(AST Extractor)"]
@@ -29,6 +29,7 @@ flowchart TD
     P_GD["GDScript Adapter\n(Godot 4 Tree-sitter)"]
     P_GO["Go Adapter\n(Go Parser Extractor)"]
     P_MD["Markdown Adapter\n(Document AST)"]
+    P_YM["YAML Data Adapter\n(Document AST)"]
   end
 
   subgraph IR["统一语法抽象 (NormalizedNode IR)"]
@@ -47,11 +48,11 @@ flowchart TD
     SG["Unified SemanticGraph\n符号索引 / 跨模块依赖图 / 调用拓扑"]
   end
 
-  P_TS & P_OXC & P_PY & P_RS & P_GD & P_GO & P_MD --> NN
+  P_TS & P_OXC & P_PY & P_RS & P_GD & P_GO & P_MD & P_YM --> NN
   S_TS & S_PY & S_RS & S_GO & S_GD --> SG
 ```
 
-### 2.1 7 大语言 AST 适配器矩阵 (`src/core/ast/`)
+### 2.1 8 大语言 AST 适配器矩阵 (`src/core/ast/`)
 
 通过 `src/core/ast/adapters.ts` 的 `LanguageAdapter` 接口，引擎支持按扩展名懒加载物化 AST：
 1. **TypeScript / JavaScript 适配器 (`typescript-adapter.ts`)**：封装 TypeScript 官方编译器 API，支持 TSX/JSX 语法与完整类型推断上下文；
@@ -103,7 +104,7 @@ flowchart TD
 
 ## 5. 关联文档导航
 
-- [01. 四层规则金字塔、31 个内置分析器与 371 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
+- [01. 四层规则金字塔、31 个内置分析器与 374 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
 - [02. 自定义分析器插件与语义模式扩展规范](../04-analyzers-and-rules/02-custom-analyzer-plugin.md)
 - [06. 多语言现代化规则包与常量单源治理](./06-modernization-program.md)
 - [07. 三平面质量量化模型与代码自治度 (CAI) 规范](./07-quantified-quality-standard.md)

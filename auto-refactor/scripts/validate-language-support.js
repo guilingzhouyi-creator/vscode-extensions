@@ -30,6 +30,7 @@ const { GDScriptAdapter } = require('../dist/core/ast/gdscript-adapter');
 const { PythonAdapter } = require('../dist/core/ast/python-adapter');
 const { MarkdownAdapter } = require('../dist/core/ast/markdown-adapter');
 const { GoAdapter } = require('../dist/core/ast/go-adapter');
+const { DataAdapter } = require('../dist/core/ast/data-adapter');
 
 const RULE = 'LANG-UNSUPPORTED';
 
@@ -71,6 +72,7 @@ const ADAPTER_CLASSES = {
   python: PythonAdapter,
   markdown: MarkdownAdapter,
   go: GoAdapter,
+  yaml: DataAdapter,
 };
 
 /**

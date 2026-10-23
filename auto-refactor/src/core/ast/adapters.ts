@@ -48,6 +48,9 @@ const ADAPTER_ID_GO = 'go';
 /** Adapter-registry id of the Markdown adapter. */
 const ADAPTER_ID_MARKDOWN = 'markdown';
 
+/** Adapter-registry id of the YAML structured-data adapter. */
+const ADAPTER_ID_YAML = 'yaml';
+
 /**
  * Extension -> built-in adapter id.
  *
@@ -70,6 +73,8 @@ export const EXTENSION_ADAPTER_IDS: Readonly<Record<string, string>> = {
     '.py': 'python',
     '.md': ADAPTER_ID_MARKDOWN,
     '.go': ADAPTER_ID_GO,
+    '.yml': ADAPTER_ID_YAML,
+    '.yaml': ADAPTER_ID_YAML,
 };
 
 const cache: Record<string, LanguageAdapter> = {};
@@ -83,6 +88,7 @@ const ADAPTER_MODULES = {
     python: './python-adapter',
     markdown: './markdown-adapter',
     go: './go-adapter',
+    [ADAPTER_ID_YAML]: './data-adapter',
 } as const;
 
 const factories: Record<string, () => LanguageAdapter> = {
@@ -93,6 +99,7 @@ const factories: Record<string, () => LanguageAdapter> = {
     python: () => new (require(ADAPTER_MODULES.python).PythonAdapter)(),
     [ADAPTER_ID_MARKDOWN]: () => new (require(ADAPTER_MODULES.markdown).MarkdownAdapter)(),
     [ADAPTER_ID_GO]: () => new (require(ADAPTER_MODULES.go).GoAdapter)(),
+    [ADAPTER_ID_YAML]: () => new (require(ADAPTER_MODULES[ADAPTER_ID_YAML]).DataAdapter)(),
 };
 
 const adapterExtensionSets = new WeakMap<LanguageAdapter, Set<string>>();
