@@ -37,11 +37,19 @@ const MANDATORY_SUBDIRS = Object.freeze(['references', 'templates']);
 
 const WHITELIST_TERMS = new Set([
   'UTF-8',
+  'UTF-16',
   'SHA-256',
+  'SHA-512',
+  'AES-256',
+  'AES-128',
   'RFC-7231',
+  'RFC-3339',
   'HTTP-2',
   'IEEE-754',
+  'ISO-8601',
 ]);
+
+const TEXT_ASSET_EXTS = new Set(['.ts', '.tsx', '.js', '.json', '.gd', '.rs', '.css', '.sh', '.ps1']);
 
 /** Populated when the plugin bundle is absent so the skip reason reaches the log. */
 let pluginBundleSkipReason = null;
@@ -241,7 +249,7 @@ function checkMarkdownLinks(textWithoutFences, filePath) {
     }
 
     if (/^[A-Za-z]:[\\/]/.test(target) || target.startsWith('file:///')) {
-      errors.push(`${filePath}: Disallowed absolute path link '${target}' (LINK-ABS-FILE-URI)`);
+      errors.push(`${filePath}: Disallowed absolute path link '${target}' (DOC-LNK-001)`);
       continue;
     }
 
@@ -267,7 +275,8 @@ function checkMarkdownLinks(textWithoutFences, filePath) {
  */
 function checkRuleCitations(textWithoutFences, filePath, registeredRules) {
   const errors = [];
-  const rulePattern = /(?:^|[^A-Za-z0-9_])([A-Z]{2,4}-[A-Z0-9]+-[0-9]{3})(?:$|[^A-Za-z0-9_])/g;
+  const rulePattern =
+    /(?:^|[^A-Za-z0-9_])([A-Z]{2,6}-[A-Z0-9]+-[0-9]{3}|L[0-5]-[A-Z0-9-]+|LINK-[A-Z0-9-]+)(?:$|[^A-Za-z0-9_])/g;
   const matches = textWithoutFences.matchAll(rulePattern);
   const seen = new Set();
 
@@ -288,6 +297,45 @@ function checkRuleCitations(textWithoutFences, filePath, registeredRules) {
     }
   }
 
+  return errors;
+}
+
+/**
+ * Validate non-markdown code/config assets under `templates/` and `scripts/` for physical hygiene.
+ *
+ * @param {string} skillPath - Absolute skill directory.
+ * @returns {string[]} List of detected violations.
+ */
+function validateSkillCodeAssets(skillPath) {
+  const errors = [];
+  const walk = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      const ext = path.extname(entry.name).toLowerCase();
+      if (!TEXT_ASSET_EXTS.has(ext)) continue;
+      const raw = fs.readFileSync(full, 'utf8');
+      if (raw.trim().length === 0) {
+        errors.push(`${full}: Empty code/template asset file (HYG-EMP-001)`);
+        continue;
+      }
+      if (ext === '.ps1' && !raw.includes('\r\n')) {
+        errors.push(`${full}: PowerShell asset must use CRLF line endings (GUARD-HYG-001)`);
+      } else if (ext !== '.ps1' && raw.includes('\r\n')) {
+        errors.push(`${full}: Asset must use strict LF line endings (GUARD-HYG-001)`);
+      }
+      if (/^\t+/m.test(raw)) {
+        errors.push(`${full}: Disallowed tab indentation in skill asset (HYG-IND-001)`);
+      }
+    }
+  };
+  for (const subdir of ['templates', 'scripts']) {
+    walk(path.join(skillPath, subdir));
+  }
   return errors;
 }
 
@@ -460,6 +508,12 @@ function runSelfProbes() {
     'rule citation checker flags an unregistered id',
     checkRuleCitations('`FAKE-XYZ-999`', '<probe>', new Set()).length === 1,
   );
+  const fakeLayerRule = ['L1', 'PROBE', 'CRASH'].join('-');
+  const fakeStdlibRule = ['STDLIB', 'PROBE', '999'].join('-');
+  probe(
+    'rule citation checker flags an unregistered L0-L5 or 6-letter id',
+    checkRuleCitations(`\`${fakeLayerRule}\` and \`${fakeStdlibRule}\``, '<probe>', new Set()).length === 2,
+  );
 
   const probeRules = [
     { id: 'PROBE-AAA-001', family: 'PROBE', severity: 'error' },
@@ -517,6 +571,7 @@ function main() {
     allErrors.push(...validateFrontmatter(rawSkillMd, folder, skillMd));
     allErrors.push(...validateSkillLineBudget(rawSkillMd, skillMd));
     allErrors.push(...validateSkillLayout(skillPath));
+    allErrors.push(...validateSkillCodeAssets(skillPath));
     for (const orphan of findOrphanAssets(skillPath)) {
       allErrors.push(`${orphan}: orphan asset, not referenced by any Markdown file in its skill`);
     }

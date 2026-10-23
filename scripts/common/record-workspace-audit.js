@@ -98,7 +98,7 @@ const RAW_SUBSYSTEMS = [
   '3|auto-refactor|autoRefactor|CLI静态引擎质量基线',
   '4|workspace-timing|workspaceTiming|VSCode扩展审查门禁',
   '5|WebGames配置架构|webGames|卡拉尔领域配置审查',
-  '6|fractal-git|fractalGit|9微Crate/Rust回归套件',
+  '6|fractal-git|fractalGit|10微Crate/Rust回归套件',
 ].join('\n');
 
 const SUBSYSTEM_DEFINITIONS = Object.freeze(

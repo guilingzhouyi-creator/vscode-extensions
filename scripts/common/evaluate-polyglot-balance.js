@@ -25,6 +25,18 @@ const AUTO_REFACTOR_ROOT = path.join(REPO_ROOT, 'auto-refactor');
 const AR_API_PATH = path.join(AUTO_REFACTOR_ROOT, 'dist/api.js');
 const BASELINE_PATH = path.join(AUTO_REFACTOR_ROOT, 'reports/self-audit-baseline.json');
 
+/**
+ * Popoviciu's Inequality on Variances (Popoviciu, 1935):
+ * For scores bounded in [0, 100], theoretical maximum standard deviation sigma_max = 50.0.
+ */
+const POPOVICIU_MAX_SIGMA = 50.0;
+
+/**
+ * Default maximum dispersion penalty ratio gamma in [0, 1].
+ * Setting gamma = 0.5 limits maximum penalty under extreme bimodal divergence to 50%.
+ */
+const DEFAULT_DISPERSION_PENALTY_RATIO = 0.5;
+
 const LANG_CONFIG = {
   typescript: {
     label: 'TypeScript / JS',
@@ -58,6 +70,11 @@ const EXCLUDED_DIRS = new Set([
   '.git',
   'dist',
   'build',
+  'out',
+  'target',
+  '.venv',
+  'archive',
+  '.agents',
   '.godot',
   '.refactor-trajectory',
   '.audit-logs',
@@ -234,7 +251,14 @@ async function sampleShellScore(fastMode = false) {
     const { scan } = require(AR_API_PATH);
     const scanResult = await scan({
       root: REPO_ROOT,
-      include: ['scripts/**/*.ps1', 'scripts/**/*.sh'],
+      include: [
+        'scripts/**/*.ps1',
+        'scripts/**/*.sh',
+        'WebGames/scripts/**/*.ps1',
+        'WebGames/scripts/**/*.sh',
+        'fractal-git/scripts/**/*.ps1',
+        'fractal-git/scripts/**/*.sh',
+      ],
       logLevel: 'error',
     });
     if (scanResult.qualityScore && typeof scanResult.qualityScore.compositeScore === 'number') {
@@ -383,7 +407,11 @@ async function evaluateWorkspacePolyglotBalance(options = {}) {
   const variance = computeWeightedVariance(activeLanguages, scores, weights, sMean, totalWeight);
   const sigmaS = Math.sqrt(Math.max(0, variance));
 
-  const dispersionPenalty = Math.max(0, 1.0 - sigmaS / 100.0);
+  const normalizedDispersion = sigmaS / POPOVICIU_MAX_SIGMA;
+  const dispersionPenalty = Math.max(
+    0,
+    1.0 - normalizedDispersion * DEFAULT_DISPERSION_PENALTY_RATIO,
+  );
   const polyglotScore = Math.round(sMean * dispersionPenalty * 100) / 100;
 
   const breakdown = {};
@@ -401,6 +429,7 @@ async function evaluateWorkspacePolyglotBalance(options = {}) {
     polyglotIndex: polyglotScore,
     weightedMean: Math.round(sMean * 100) / 100,
     standardDeviation: Math.round(sigmaS * 100) / 100,
+    normalizedDispersion: Math.round(normalizedDispersion * 1000) / 1000,
     dispersionPenalty: Math.round(dispersionPenalty * 1000) / 1000,
     activeLanguageCount: activeLanguages.length,
     breakdown,

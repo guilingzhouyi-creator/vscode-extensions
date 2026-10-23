@@ -155,27 +155,15 @@ $resGateProof = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/t
 # 文档数字：审查必须自己校验 METRICS 区域，否则数字漂移只能靠推送门禁兜底。
 $resDocMetrics = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/sync-doc-metrics.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocMetricsOut -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
-$codeFeedback = $resFeedback.ExitCode
-$codeOrdering = $resOrdering.ExitCode
-$codeSkills = $resSkills.ExitCode
-$codeClosure = $resClosure.ExitCode
-$codeReach = $resReach.ExitCode
-$codeRuleSource = $resRuleSource.ExitCode
-$codeDocs = $resDocs.ExitCode
-$codeLedger = $resLedger.ExitCode
-$codeSubagent = $resSubagent.ExitCode
-$codeDocAnchors = $resDocAnchors.ExitCode
-$codeMetricCoverage = $resMetricCoverage.ExitCode
-$codeFamilyContract = $resFamilyContract.ExitCode
-$codeDocReach = $resDocReach.ExitCode
-$codeCommitHistory = $resCommitHistory.ExitCode
-$codeDestructive = $resDestructive.ExitCode
-$codeChains = $resChains.ExitCode
-$codeCounts = $resCounts.ExitCode
-$codeParity = $resParity.ExitCode
-$codeGateProof = $resGateProof.ExitCode
-$codeDocMetrics = $resDocMetrics.ExitCode
-if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeRuleSource -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 -or $codeSubagent -ne 0 -or $codeDocAnchors -ne 0 -or $codeMetricCoverage -ne 0 -or $codeFamilyContract -ne 0 -or $codeDocReach -ne 0 -or $codeCommitHistory -ne 0 -or $codeDestructive -ne 0 -or $codeChains -ne 0 -or $codeCounts -ne 0 -or $codeParity -ne 0 -or $codeGateProof -ne 0 -or $codeDocMetrics -ne 0) {
+$ruleStepCodes = @(
+    $codeCatalog, $resFeedback.ExitCode, $resOrdering.ExitCode, $resSkills.ExitCode,
+    $resClosure.ExitCode, $resReach.ExitCode, $resRuleSource.ExitCode, $resDocs.ExitCode,
+    $resLedger.ExitCode, $resSubagent.ExitCode, $resDocAnchors.ExitCode, $resMetricCoverage.ExitCode,
+    $resFamilyContract.ExitCode, $resDocReach.ExitCode, $resCommitHistory.ExitCode,
+    $resDestructive.ExitCode, $resChains.ExitCode, $resCounts.ExitCode, $resParity.ExitCode,
+    $resGateProof.ExitCode, $resDocMetrics.ExitCode
+)
+if (@($ruleStepCodes | Where-Object { $_ -ne 0 }).Count -gt 0) {
     $statusRules = "BLOCK"
     $failed = $true
 } else {
@@ -204,6 +192,7 @@ $logArSelfOut = Join-Path $transientDir "audit-ar-self-$randSuffix.out.log"
 $logArSelfErr = Join-Path $transientDir "audit-ar-self-$randSuffix.err.log"
 $logFgOut = Join-Path $transientDir "audit-fg-$randSuffix.out.log"
 $logFgErr = Join-Path $transientDir "audit-fg-$randSuffix.err.log"
+
 
 $procWt = Start-Process -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWtOut -RedirectStandardError $logWtErr -PassThru
 $procWg = if ($Fast) {
@@ -350,7 +339,7 @@ if ($failed) {
     }
 }
 
-Remove-Item -Path $logArOut, $logArErr, $logArSelfOut, $logArSelfErr, $logWtOut, $logWtErr, $logWgOut, $logWgErr, $logFgOut, $logFgErr -Force -ErrorAction SilentlyContinue
+Get-ChildItem -Path $transientDir -Filter "audit-*-$randSuffix*" -File | Remove-Item -Force -ErrorAction SilentlyContinue
 
 $startTime.Stop()
 $elapsedSec = [math]::Round($startTime.Elapsed.TotalSeconds, 2)
@@ -421,6 +410,22 @@ try {
             }
             if ($null -eq $autonomyRate) {
                 $autonomyRate = Get-SafeProp $baselineData 'cai'
+            }
+
+            # 多子系统自研率加权融合 (auto-refactor 与 fractal-git)
+            $fgAuditPath = Join-Path $repoRoot "fractal-git\reports\audit-latest.json"
+            $fgCai = $null
+            if (Test-Path $fgAuditPath) {
+                try {
+                    $fgData = Get-Content -Path $fgAuditPath -Raw -Encoding utf8 | ConvertFrom-Json
+                    if ($fgData -and $fgData.summary) {
+                        $fgCai = Get-SafeProp $fgData.summary 'caiIndex'
+                    }
+                } catch { }
+            }
+            if ($null -ne $autonomyRate -and $null -ne $fgCai) {
+                $arCai = $autonomyRate
+                $autonomyRate = [math]::Round(([double]$arCai * 0.67 + [double]$fgCai * 0.33), 2)
             }
 
             $polyglotData = Get-SafeProp $baselineData 'polyglotGeneralization'
@@ -518,6 +523,8 @@ $DEGRADE_PENALTY = 60.0
 # 物理卫生子项降级权重，取值理由见下方各基石得分段的契约说明。
 $ISO_MISSING_PENALTY = 20.0
 $GITIGNORE_MISSING_PENALTY = 10.0
+$DENSITY_MISSING_PENALTY = 15.0
+$ELOC_MISSING_PENALTY = 15.0
 
 # 1. 物理卫生基石得分（基于八维物理卫生矩阵连续客观计算与同构/.gitignore治理守卫）
 #
@@ -530,6 +537,8 @@ $GITIGNORE_MISSING_PENALTY = 10.0
 $baseHygiene = if ($null -ne $rawHygieneScore) { $rawHygieneScore } else { if ($codeHygiene -eq 0) { 100.0 } else { 50.0 } }
 if ($codeIso -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $ISO_MISSING_PENALTY) }
 if ($codeGi -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $GITIGNORE_MISSING_PENALTY) }
+if ($codeDensity -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $DENSITY_MISSING_PENALTY) }
+if ($codeEloc -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $ELOC_MISSING_PENALTY) }
 $scoreHygiene = [math]::Max($SCORE_FLOOR, [math]::Round($baseHygiene, 1))
 
 # 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性、反馈词表、闭包、可达性与技能集规范动态判定）
@@ -548,7 +557,6 @@ try {
 
 # 规则步骤得分按「通过项 / 总项」比例折算。分母由下方的退出码集合现场测量，
 # 不得写成字面量：新增一项检查而分母不变，会让满分永远不可达且无人察觉。
-$ruleStepCodes = @($codeCatalog, $codeFeedback, $codeSkills, $codeClosure, $codeReach, $codeDocs, $codeLedger)
 $ruleStepTotal = $ruleStepCodes.Count
 $rulesPassedCount = @($ruleStepCodes | Where-Object { $_ -eq 0 }).Count
 
@@ -840,6 +848,16 @@ try {
     # 留痕失败不阻断门禁主流程
 }
 
+
+try {
+    $trajArg = @("scripts/common/record-workspace-trajectory.js")
+    if ($failed) { $trajArg += "--failed" }
+    if ($CommitLedger) { $trajArg += "--commit-ledger" }
+    Start-Process -FilePath $nodeCmd -ArgumentList $trajArg -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait | Out-Null
+} catch {
+    # 轨迹记录失败不阻断门禁主流程
+}
+
 if ($Json) {
     $summary | ConvertTo-Json -Depth 4
     exit $exitCode
@@ -1055,11 +1073,6 @@ if ($env:GITHUB_STEP_SUMMARY) {
     }
 }
 
-# 6. 汇流记录工作区统一质量轨迹（默认写入运行期目录，--CommitLedger 才写入受控账本）
-$trajArg = @("scripts/common/record-workspace-trajectory.js")
-if ($failed) { $trajArg += "--failed" }
-if ($CommitLedger) { $trajArg += "--commit-ledger" }
-Start-Process -FilePath $nodeCmd -ArgumentList $trajArg -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait | Out-Null
 
 if ($failed) {
     Write-GateHost "✖ BLOCK  审查中枢检测到未通过项，请排查修复对应项目" -ForegroundColor Red

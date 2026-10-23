@@ -71,6 +71,7 @@
 | `common/` | JSON | `gate-step-registry.json` | data / ssot（门禁入口、步骤身份、显示顺序与规则归属的单源登记表） | 门禁双实现、`validate-gate-verdicts`、`validate-gate-ordering` |
 | `common/` | JSON | `rule-reachability-exceptions.json` | data / ssot（error 级规则执行入口可达性的显式豁免清单，逐条写明豁免理由） | `validate-rule-reachability` |
 | `common/` | JSON | `rule-catalog.json` | data / ssot（全工作区规则事实真源聚合目录） | 静态审查与门禁工具链 |
+| `common/` | JSON | `rule-lexicon.json` | data / ssot（跨引擎与门禁脚本共享的规则标识符与语义步骤词汇形状单源字典） | 静态审查与提交门禁工具链 |
 | `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与多项前置检查，含 AST 切片） | `.githooks/pre-commit`、本地 CLI |
 | `ps1/` | PowerShell | `pre-commit-gate.ps1` | gate（pre-commit-gate.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `commit-msg-gate.sh` | gate（生产工程级结构化提交信息格式、区块、字数、反虚构与风格求实 8 项门禁） | `.githooks/commit-msg`、本地 CLI |
@@ -272,3 +273,5 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 > | `FAMILY-CONTRACT-34` | 规则族三源一致且层值在六层内 |
 > | `DOC-REACH-35` | 规范文档至少被另一份文档指名 |
 > | `COMMIT-HISTORY-BASELINE-36` | 提交历史冻结清单只能覆盖早于其生效时刻的提交 |
+> | `RULE-SOURCE-37` | 规则源文件内容与目录一致性 |
+> | `DESTRUCTIVE-OPS-38` | 破坏性文件操作静态守卫与溯源 |

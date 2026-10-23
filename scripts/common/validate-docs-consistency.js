@@ -150,7 +150,7 @@ const RULE_RATIO = /(?<![0-9])(\d{2,4})\s*\/\s*(\d{2,4})(?![0-9])/g;
  * the sentence as a whole talks about the catalog, so no local anchor marks it as a rule count. The
  * expected value is that project's own catalog count, not the workspace total.
  */
-const PROJECT_DECOMPOSITION = /(autoRefactor|workspaceTiming|webGames|globalTooling|fractalGit)\s*[:：]\s*(\d{2,4})/g;
+const PROJECT_DECOMPOSITION = /"?(autoRefactor|workspaceTiming|webGames|globalTooling|fractalGit)"?\s*[:：]\s*(\d{2,4})/g;
 
 /**
  * A canonical/legacy split such as `347 规范 + 15 历史别名`.
@@ -495,13 +495,13 @@ function detectorTable(figures) {
     { id: 'skill-count', pattern: /(\d{1,3})\s*项(?:研发)?技能/g, legal: legalSkills },
     { id: 'step-count', pattern: /(\d{1,3})\s*个语义步骤/g, legal: legalSteps },
     { id: 'iso-pairs', pattern: /(\d{1,3})\s*对(?:跨平台)?同构脚本/g, legal: legalPairs },
-    { id: 'analyzer-count', pattern: /(\d{1,3})\s*个内置分析器/g, legal: legalAnalyzers },
+    { id: 'analyzer-count', pattern: /(?<![A-Za-z0-9])(\d{1,3})\s*(?:个)?(?:内置)?分析器/g, legal: legalAnalyzers },
     {
       id: 'test-suite',
       // The suite count is stated three legitimate ways: the executable total, one lane on its own,
       // and the additive decomposition of the lanes. All three figures are legal; a fourth value is
       // a stale claim. The lookahead keeps the quantifier out of unrelated uses such as 「一套方案」.
-      pattern: /(\d{1,3})\s*套(?=测试|并行|串行|vitest|套件)/g,
+      pattern: /(\d{1,3})\s*(?:套(?=测试|并行|串行|vitest|套件)|个(?:并行|串行)\s*套件)/g,
       legal: legalSuites,
     },
   ];

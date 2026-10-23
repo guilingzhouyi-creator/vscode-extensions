@@ -250,6 +250,13 @@ function runGitignoreAudit(options) {
     'archive',
     '.godot',
     '.auto-refactor-cache',
+    '.mypy_cache',
+    '.venv',
+    'venv',
+    'tmp',
+    'temp',
+    '.audit-logs',
+    '.refactor-trajectory',
   ]);
 
   const gitignoreFiles = findGitignoreFiles(REPO_ROOT, ignoredDirNames);

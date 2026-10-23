@@ -822,7 +822,7 @@ function parseArgs(args) {
 }
 
 
-const RE_IGNORED_PATHS = /\/(?:dist|out|target|node_modules|fixtures|baseline|reports|archive)\/|corpus/;
+const RE_IGNORED_PATHS = /\/(?:dist|out|target|node_modules|fixtures|baseline|reports|archive|tmp|temp)\/|corpus/;
 const AUDITABLE_EXTENSIONS = new Set('.ts,.js,.mjs,.cjs,.gd,.py,.sh,.ps1'.split(','));
 
 /**
@@ -839,7 +839,7 @@ function isAuditableCodeFile(file) {
 
 const RE_IGNORED_DIR_NAMES = new Set([
   '.git', '.agents', 'node_modules', 'dist', 'out', 'target', 'fixtures', 'baseline',
-  'reports', 'archive', 'build', '.godot', '.refactor-trajectory',
+  'reports', 'archive', 'build', '.godot', '.refactor-trajectory', 'tmp', 'temp',
 ]);
 
 /**

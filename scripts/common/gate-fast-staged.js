@@ -622,7 +622,7 @@ function isPlumbingExemptFast(file) {
 function validateFileVolume(file, content, volumeViolations) {
   const norm = file.replace(/\\/g, '/');
   if (
-    !/\.(?:ts|gd|js|py|sh|ps1|mjs|cjs)$/i.test(file) ||
+    !/\.(?:ts|tsx|js|jsx|gd|py|sh|ps1|mjs|cjs|rs|go)$/i.test(file) ||
     /(?:dist\/|out\/|fixtures\/|baseline|reports\/|\.d\.ts$|corpus)/.test(norm)
   ) {
     return;

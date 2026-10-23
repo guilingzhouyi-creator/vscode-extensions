@@ -67,29 +67,29 @@ function extractStatuses(line) {
 function indexEntryScript(full) {
     const banners = new Map();
     const verdicts = new Map();
+    const referenced = new Set();
     let genericRunner = false;
-    if (!fs.existsSync(full)) return { banners, verdicts, genericRunner };
+    if (!fs.existsSync(full)) return { banners, verdicts, referenced, genericRunner };
 
     const lines = fs.readFileSync(full, 'utf8').split(/\r?\n/);
     lines.forEach((line, index) => {
         const lineNo = index + 1;
         if (GENERIC_RUNNER_DEF.test(line)) genericRunner = true;
 
-        if (BANNER_CALL.test(line)) {
-            const match = ID_PATTERN.exec(line);
-            if (match) {
+        const match = ID_PATTERN.exec(line);
+        if (match) {
+            referenced.add(match[1]);
+            if (BANNER_CALL.test(line)) {
                 if (!banners.has(match[1])) banners.set(match[1], []);
                 banners.get(match[1]).push(lineNo);
             }
-        }
-        if (VERDICT_CALL.test(line)) {
-            const match = ID_PATTERN.exec(line);
-            if (!match) return;
-            if (!verdicts.has(match[1])) verdicts.set(match[1], []);
-            verdicts.get(match[1]).push({ line: lineNo, statuses: extractStatuses(line) });
+            if (VERDICT_CALL.test(line)) {
+                if (!verdicts.has(match[1])) verdicts.set(match[1], []);
+                verdicts.get(match[1]).push({ line: lineNo, statuses: extractStatuses(line) });
+            }
         }
     });
-    return { banners, verdicts, genericRunner };
+    return { banners, verdicts, referenced, genericRunner };
 }
 
 /**
@@ -119,6 +119,16 @@ function auditStep(step, index, context, findings) {
                 file,
                 line: bannerLine,
                 detail: `${step.id} 由通用 Runner 渲染横幅，调用点又显式宣布一次，进度序号会重复出现`,
+            });
+        }
+        if (!index.referenced.has(step.id)) {
+            findings.push({
+                type: 'GUARD-STEP-001',
+                entry: entryId,
+                platform,
+                file,
+                line: 0,
+                detail: `${step.id} 在通用 Runner 脚本中既未由 Runner 调用也无判定，该步骤从不被执行`,
             });
         }
         return;

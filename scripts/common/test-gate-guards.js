@@ -401,9 +401,15 @@ check(
 
 // 三种形态曾同时逃过全部既有探测器：覆盖率比值、按项目分解、规范/别名拆分。它们都不把
 // 「条」写在数字旁边，因此旧正则连匹配都匹配不到，PASS 只证明守卫没看懂这些写法。
-const liveAutoRefactor = JSON.parse(
+const catalogParsed = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'rule-catalog.json'), 'utf8'),
-).counts.autoRefactor;
+);
+const liveAutoRefactor = catalogParsed.counts.autoRefactor;
+const CANONICAL_RULE_ID_PATTERN = /^[A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9]{2,10}){1,3}-\d{3}$/;
+const liveCanonical = (catalogParsed.rules || []).filter(
+  (r) => r.project === 'auto-refactor' && CANONICAL_RULE_ID_PATTERN.test(r.id),
+).length;
+const staleCanonical = liveCanonical - 1;
 check(
   'docs consistency guard reads a coverage ratio',
   DOCS_CONSISTENCY.scanTextForClaims('| 规则字典覆盖率 | **362 / 362 (100%)** |', claimDetectors).length === 1 &&
@@ -426,13 +432,13 @@ check(
 );
 check(
   'docs consistency guard reads a canonical/legacy split',
-  DOCS_CONSISTENCY.scanTextForClaims('全量规则字典 (347 规范 + 15 历史别名)', claimDetectors).length === 1 &&
-    DOCS_CONSISTENCY.scanTextForClaims('全量规则字典 (348 规范 + 15 历史别名)', claimDetectors).length === 0,
+  DOCS_CONSISTENCY.scanTextForClaims(`全量规则字典 (${staleCanonical} 规范 + 15 历史别名)`, claimDetectors).length === 1 &&
+    DOCS_CONSISTENCY.scanTextForClaims(`全量规则字典 (${liveCanonical} 规范 + 15 历史别名)`, claimDetectors).length === 0,
 );
 check(
   'docs consistency guard leaves a rule-id suffix and a test ratio alone',
   DOCS_CONSISTENCY.scanTextForClaims('对齐 `ADV-RNG-001` 规范后重跑规则自测', claimDetectors).length === 0 &&
-    DOCS_CONSISTENCY.scanTextForClaims('规则自测全通过 (163/163 套测试)', claimDetectors).length === 0,
+    DOCS_CONSISTENCY.scanTextForClaims(`规则自测全通过 (${suiteLanes.total}/${suiteLanes.total} 套测试)`, claimDetectors).length === 0,
 );
 
 // --- 锚点 / 可达性 / 族契约 / 提交历史冻结 / SubAgent 目录 ---

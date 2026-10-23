@@ -7,4 +7,3 @@ if command -v pwsh >/dev/null 2>&1 && [[ -f "$ROOT_DIR/scripts/ps1/commit-msg-ga
 else
     exec bash "$ROOT_DIR/scripts/sh/commit-msg-gate.sh" "$1"
 fi
-

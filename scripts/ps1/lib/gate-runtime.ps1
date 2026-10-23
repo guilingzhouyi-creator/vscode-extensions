@@ -65,34 +65,74 @@ function Resolve-GateCargoCommand {
     [CmdletBinding()]
     param([switch]$Required)
 
+    $resolved = $null
     $override = $env:TAXIS_CARGO_BIN
-    if ($override -and (Test-Path -LiteralPath $override -PathType Leaf)) { return $override }
+    if ($override -and (Test-Path -LiteralPath $override -PathType Leaf)) {
+        $resolved = $override
+    }
 
     $homeRoot = [Environment]::GetFolderPath('UserProfile')
-    if ($homeRoot) {
+    if (-not $resolved -and $homeRoot) {
         $shim = Join-Path $homeRoot ".cargo/bin/cargo.exe"
-        if (Test-Path -LiteralPath $shim -PathType Leaf) { return $shim }
-
-        $toolchains = Join-Path $homeRoot ".rustup/toolchains"
-        if (Test-Path -LiteralPath $toolchains -PathType Container) {
-            $hosts = @(Get-ChildItem -LiteralPath $toolchains -Directory -ErrorAction SilentlyContinue)
-            # 稳定版优先：同一台机器上可能并存 nightly 与 stable，门禁只承诺在稳定版上可复现。
-            $preferred = @($hosts | Where-Object { $_.Name -like "stable-*" })
-            $ordered = @($preferred) + @($hosts | Where-Object { $_.Name -notlike "stable-*" })
-            foreach ($hostDir in $ordered) {
-                $candidate = Join-Path $hostDir.FullName "bin/cargo.exe"
-                if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+        if (Test-Path -LiteralPath $shim -PathType Leaf) {
+            $resolved = $shim
+        } else {
+            $toolchains = Join-Path $homeRoot ".rustup/toolchains"
+            if (Test-Path -LiteralPath $toolchains -PathType Container) {
+                $hosts = @(Get-ChildItem -LiteralPath $toolchains -Directory -ErrorAction SilentlyContinue)
+                # 稳定版优先：同一台机器上可能并存 nightly 与 stable，门禁只承诺在稳定版上可复现。
+                $preferred = @($hosts | Where-Object { $_.Name -like "stable-*" })
+                $ordered = @($preferred) + @($hosts | Where-Object { $_.Name -notlike "stable-*" })
+                foreach ($hostDir in $ordered) {
+                    $candidate = Join-Path $hostDir.FullName "bin/cargo.exe"
+                    if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                        $resolved = $candidate
+                        break
+                    }
+                }
             }
         }
     }
 
-    $onPath = Get-Command cargo.exe -CommandType Application -ErrorAction SilentlyContinue
-    if ($onPath) { return $onPath.Source }
-
-    if ($Required) {
-        throw "cargo was not found through TAXIS_CARGO_BIN, %USERPROFILE%\.cargo\bin, the rustup toolchain root, or PATH."
+    if (-not $resolved) {
+        $onPath = Get-Command cargo.exe -CommandType Application -ErrorAction SilentlyContinue
+        if ($onPath) { $resolved = $onPath.Source }
     }
-    return $null
+
+    if (-not $resolved) {
+        if ($Required) {
+            throw "cargo was not found through TAXIS_CARGO_BIN, %USERPROFILE%\.cargo\bin, the rustup toolchain root, or PATH."
+        }
+        return $null
+    }
+
+    # 环境准备：同构对齐 resolve-cargo.js 的 pinRustc 语义并规避工作区 NTFS 权限冲突
+    $toolchainBin = Split-Path -Parent $resolved
+    $rustcCandidate = Join-Path $toolchainBin "rustc.exe"
+    if (Test-Path -LiteralPath $rustcCandidate -PathType Leaf) {
+        $env:RUSTC = $rustcCandidate
+    }
+    $pathParts = ($env:PATH -split [System.IO.Path]::PathSeparator)
+    if ($pathParts -notcontains $toolchainBin) {
+        $env:PATH = "$toolchainBin$([System.IO.Path]::PathSeparator)$env:PATH"
+    }
+
+    if ($homeRoot) {
+        $mingwBin = Join-Path $homeRoot "DevTools/mingw64/bin"
+        if ((Test-Path -LiteralPath $mingwBin -PathType Container) -and ($pathParts -notcontains $mingwBin)) {
+            $env:PATH = "$mingwBin$([System.IO.Path]::PathSeparator)$env:PATH"
+        }
+    }
+
+    if (-not $env:CARGO_TARGET_DIR) {
+        $defaultTarget = Join-Path ([System.IO.Path]::GetTempPath()) "taxis-cargo-target"
+        if (-not (Test-Path -LiteralPath $defaultTarget)) {
+            New-Item -ItemType Directory -Path $defaultTarget -Force | Out-Null
+        }
+        $env:CARGO_TARGET_DIR = $defaultTarget
+    }
+
+    return $resolved
 }
 
 function Write-GateHost {

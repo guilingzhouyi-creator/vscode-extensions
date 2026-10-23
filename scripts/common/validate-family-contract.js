@@ -97,6 +97,86 @@ function readMapFamilies() {
 }
 
 /**
+ * Verifies each taxonomy row's `族内 N 个 ID` count against the live catalog.
+ *
+ * @param {string} taxonomyText - Raw content of `rule-family-taxonomy.md`.
+ * @param {Array<object>} rules - Catalog rule entries.
+ * @returns {Array<{type: string, id: string, detail: string}>} Violations.
+ */
+function checkTaxonomyCounts(taxonomyText, rules) {
+  const counts = new Map();
+  for (const rule of rules) {
+    counts.set(rule.family, (counts.get(rule.family) || 0) + 1);
+  }
+  const violations = [];
+  const rowRe = /^\| \*\*`([A-Z0-9]+)`\*\* \|[^|]+\|[^|]*族内 (\d+) 个 ID/gm;
+  for (const match of taxonomyText.matchAll(rowRe)) {
+    const family = match[1];
+    const claimed = Number(match[2]);
+    const actual = counts.get(family) || 0;
+    if (claimed !== actual) {
+      violations.push({
+        type: 'TAXONOMY_COUNT_DRIFT',
+        id: family,
+        detail: `claims ${claimed} IDs, catalog has ${actual}`,
+      });
+    }
+  }
+  return violations;
+}
+
+/**
+ * Verifies every rule in `rule-catalog.json` is listed in its family section in `rule-family-map.md`
+ * and placed under the matching severity bucket (`**error**` vs `warning / info`).
+ *
+ * @param {string} mapText - Raw content of `rule-family-map.md`.
+ * @param {Array<object>} rules - Catalog rule entries.
+ * @returns {Array<{type: string, id: string, detail: string}>} Violations.
+ */
+function checkMapCoverageAndSeverity(mapText, rules) {
+  const sections = mapText.split(/^### `/m).slice(1);
+  const mapBuckets = new Map();
+  for (const sec of sections) {
+    const famMatch = sec.match(/^([A-Z0-9]+)`/);
+    if (!famMatch) continue;
+    const family = famMatch[1];
+    let currentBucket = null;
+    for (const line of sec.split('\n')) {
+      if (line.startsWith('## ')) break;
+      if (line.startsWith('- **error**')) currentBucket = 'error';
+      else if (line.startsWith('- warning / info')) currentBucket = 'warning';
+      else if (line.startsWith('#') || line.startsWith('---')) currentBucket = null;
+      if (currentBucket && (line.startsWith('- ') || line.startsWith('  '))) {
+        for (const idMatch of line.matchAll(/`([^`]+)`/g)) {
+          mapBuckets.set(idMatch[1], { family, bucket: currentBucket });
+        }
+      }
+    }
+  }
+  const violations = [];
+  for (const rule of rules) {
+    const entry = mapBuckets.get(rule.id);
+    const expectedBucket = rule.severity === 'error' ? 'error' : 'warning';
+    if (!entry) {
+      violations.push({ type: 'RULE_MISSING_FROM_MAP', id: rule.id, detail: rule.family });
+    } else if (entry.family !== rule.family) {
+      violations.push({
+        type: 'MAP_FAMILY_MISMATCH',
+        id: rule.id,
+        detail: `mapped under ${entry.family}, catalog says ${rule.family}`,
+      });
+    } else if (entry.bucket !== expectedBucket) {
+      violations.push({
+        type: 'MAP_SEVERITY_MISMATCH',
+        id: rule.id,
+        detail: `mapped as ${entry.bucket}, catalog severity is ${rule.severity}`,
+      });
+    }
+  }
+  return violations;
+}
+
+/**
  * Proves every detector discriminates.
  *
  * @returns {string[]} Probe failures.
@@ -134,6 +214,18 @@ function runSelfProbes() {
     compareFamilies(new Set(['A', 'B']), new Set(['B', 'C'])),
     { leftOnly: ['A'], rightOnly: ['C'] },
   );
+  expect(
+    'taxonomy-count-drift-detected',
+    checkTaxonomyCounts('| **`GUARD`** | x | 族内 5 个 ID | y |', [{ id: 'G-1', family: 'GUARD' }]).map((v) => v.type),
+    ['TAXONOMY_COUNT_DRIFT'],
+  );
+  expect(
+    'map-severity-drift-detected',
+    checkMapCoverageAndSeverity('### `GUARD`\n- warning / info：`GUARD-AST-001`\n', [
+      { id: 'GUARD-AST-001', family: 'GUARD', severity: 'error' },
+    ]).map((v) => v.type),
+    ['MAP_SEVERITY_MISMATCH'],
+  );
   return failures;
 }
 
@@ -152,12 +244,18 @@ function main() {
   }
 
   const catalog = JSON.parse(fs.readFileSync(CATALOG_FILE, 'utf8'));
+  const taxonomyText = fs.readFileSync(TAXONOMY_FILE, 'utf8');
+  const mapText = fs.readFileSync(MAP_FILE, 'utf8');
   const taxonomy = readTaxonomyFamilies();
   const mapped = readMapFamilies();
   const catalogFamilies = new Set(catalog.rules.map((rule) => rule.family));
 
   /** @type {Array<object>} */
-  const violations = checkRules(catalog.rules, taxonomy);
+  const violations = [
+    ...checkRules(catalog.rules, taxonomy),
+    ...checkTaxonomyCounts(taxonomyText, catalog.rules),
+    ...checkMapCoverageAndSeverity(mapText, catalog.rules),
+  ];
   const taxonomyVsCatalog = compareFamilies(taxonomy, catalogFamilies);
   const mapVsCatalog = compareFamilies(mapped, catalogFamilies);
   for (const family of taxonomyVsCatalog.leftOnly) {

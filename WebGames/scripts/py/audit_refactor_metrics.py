@@ -275,6 +275,11 @@ def run_refactor_audit(
     except Exception:
         print("【ERROR】auto-refactor 未产出报告文件，审查阻断（fail-closed）。")
         return 2
+    finally:
+        try:
+            report_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
     # 非 JSON 输出直通 (markdown / sarif / badge)
     if cli_format in ("markdown", "sarif", "badge"):

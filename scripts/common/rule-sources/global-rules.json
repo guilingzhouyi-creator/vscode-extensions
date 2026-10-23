@@ -1,32 +1,8 @@
 {
   "schema": "global-tooling-rules/v1",
   "generatedAt": "2026-10-22T11:27:31.751Z",
-  "totalRules": 27,
+  "totalRules": 17,
   "rules": [
-    {
-      "id": "ARCH-ABS-001",
-      "family": "ARCH",
-      "severity": "error",
-      "summary": "Vacuous forwarding trampoline elimination guard: empty forwarding modules with ELOC <= 3 are strictly blocked"
-    },
-    {
-      "id": "ARCH-FAC-001",
-      "family": "ARCH",
-      "severity": "error",
-      "summary": "Substantive facade payload guard: facade module must satisfy ELOC >= 15 or aggregate >= 3 subdomains with immutability"
-    },
-    {
-      "id": "EXT-DIR-001",
-      "family": "HYG",
-      "severity": "error",
-      "summary": "File extension and directory classification guard: scripts and configs must reside in dedicated domain subdirectories matching their file extension (ps1, sh, py, common) and never litter the workspace root."
-    },
-    {
-      "id": "GUARD-AST-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Pre-commit gate staged AST slice complexity (CC <= 15), nesting depth (Depth <= 4), and noise ratio guard"
-    },
     {
       "id": "GUARD-CHAIN-001",
       "family": "GUARD",
@@ -52,12 +28,6 @@
       "summary": "Gate feedback vocabulary guard: operator-facing feedback must carry semantic step identifiers from the single-source registry and a closed four-state status vocabulary, never positional labels"
     },
     {
-      "id": "GUARD-ISO-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Cross-platform script isomorphism guard: dual ps1/sh parity, strict CRLF/LF line endings, and defensive directives"
-    },
-    {
       "id": "GUARD-ORD-001",
       "family": "GUARD",
       "severity": "error",
@@ -70,40 +40,10 @@
       "summary": "Gate step registry binding guard: every step identifier referenced by a gate script must be declared in the single-source registry with a registered rule attribution"
     },
     {
-      "id": "HYG-BOM-001",
-      "family": "HYG",
-      "severity": "error",
-      "summary": "UTF-8 BOM hygiene guard: all workspace text files must be strictly UTF-8 NO-BOM without 0xEF, 0xBB, 0xBF byte prefix"
-    },
-    {
-      "id": "HYG-CLT-001",
-      "family": "HYG",
-      "severity": "error",
-      "summary": "System and transient clutter guard: workspace must remain clean of OS clutter and uncontrolled transient files"
-    },
-    {
       "id": "HYG-DIR-001",
       "family": "HYG",
       "severity": "error",
       "summary": "Lingering empty directory guard: active source and tooling directories must not retain zero-file lingering empty folders"
-    },
-    {
-      "id": "HYG-EMP-002",
-      "family": "HYG",
-      "severity": "error",
-      "summary": "Comment-only hollow file guard: files whose stripped content is empty after removing comments are strictly blocked"
-    },
-    {
-      "id": "HYG-IND-001",
-      "family": "HYG",
-      "severity": "error",
-      "summary": "Pure space indentation guard: non-GDScript and non-Makefile source files must use spaces exclusively without tab characters"
-    },
-    {
-      "id": "HYG-TRL-001",
-      "family": "HYG",
-      "severity": "error",
-      "summary": "POSIX EOF newline guard: text files must end with exactly one standard newline without trailing blank line buildup"
     },
     {
       "id": "RCFG-COUNTS-001",

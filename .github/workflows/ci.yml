@@ -502,6 +502,21 @@ jobs:
           node scripts/common/validate-code-density.js --all
           # 8.6 全仓双轨体积与动态包络（ELOC/LOC）
           node scripts/common/evaluate-eloc-budget.js --all
+          # 8.7 跨平台命令面兼容层与别名优先级契约 (linux-parity)
+          node scripts/common/validate-shell-parity.js
+          # 8.8 泛化 SubAgent 编排与预置目录合规
+          node scripts/common/validate-subagent-catalog.js
+          # 8.9 文档锚点与交叉引用可达性
+          node scripts/common/validate-doc-anchors.js
+          node scripts/common/validate-doc-reachability.js
+          # 8.10 度量指标覆盖率与规则族契约
+          node scripts/common/validate-metric-coverage.js
+          node scripts/common/validate-family-contract.js
+          # 8.11 提交历史冻结清单合规
+          node scripts/common/validate-commit-history-baseline.js
+          # 8.12 规则源跨目录严重级一致性与破坏性文件操作守卫
+          node scripts/common/validate-rule-source-consistency.js
+          node scripts/common/validate-destructive-ops.js
           # 9. 平台级 AST 切片审查自检
           node scripts/common/validate-staged-slice.js scripts/common/validate-staged-slice.js
 
@@ -641,7 +656,7 @@ jobs:
         working-directory: auto-refactor
         run: npm run gate
 
-  # ─── fractal-git 核心引擎门禁（Rust 9大微 Crate 回归套件）───
+  # ─── fractal-git 核心引擎门禁（Rust 10大微 Crate 回归套件）───
   fractal-git:
     name: fractal-git gate (check/tests)
     runs-on: ubuntu-latest
@@ -674,6 +689,14 @@ jobs:
       - name: Setup Rust toolchain
         if: steps.scope.outputs.run == 'true'
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Fractal-git architectural and zero-alloc static validation
+        if: steps.scope.outputs.run == 'true'
+        run: |
+          node fractal-git/scripts/common/validate-crate-topology.js
+          node fractal-git/scripts/common/check-zero-alloc-boundary.js
+          node fractal-git/scripts/common/validate-git-parity.js
+          node fractal-git/scripts/common/validate-gate-bridge.js
 
       - name: Cargo check
         if: steps.scope.outputs.run == 'true'

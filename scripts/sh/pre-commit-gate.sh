@@ -399,8 +399,9 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
         AR_STAGED_TS=$(echo "$STAGED_FILES" | grep -E '^auto-refactor/(src|tests/unit)/.+\.ts$' || true)
         if [[ -n "$AR_STAGED_TS" ]]; then
             AR_REL_FILES=$(echo "$AR_STAGED_TS" | sed 's|^auto-refactor/||' | tr '\n' ' ')
+            read -r -a AR_REL_ARGS <<< "$AR_REL_FILES"
             if [[ "$AGENT_MODE" -eq 1 ]]; then
-                if ! (cd auto-refactor && npx vitest related "$AR_REL_FILES" --run) >"$STEP_LOG" 2>&1; then
+                if ! (cd auto-refactor && npx vitest related "${AR_REL_ARGS[@]}" --run) >"$STEP_LOG" 2>&1; then
                     record_pre_commit_failure "ENGINE-TESTS-08" \
                         "GUARD-SYS-001" \
                         "Impacted unit tests failed in auto-refactor." \
@@ -412,7 +413,7 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
                 fi
             else
                 write_step_banner "ENGINE-TESTS-08"
-                if ! (cd auto-refactor && npx vitest related "$AR_REL_FILES" --run) >"$STEP_LOG" 2>&1; then
+                if ! (cd auto-refactor && npx vitest related "${AR_REL_ARGS[@]}" --run) >"$STEP_LOG" 2>&1; then
                     write_step_verdict "ENGINE-TESTS-08" BLOCK "auto-refactor 增量影响单测未通过"
                     tail -n 15 "$STEP_LOG" | sed 's/^/   /'
                     FAILED=1

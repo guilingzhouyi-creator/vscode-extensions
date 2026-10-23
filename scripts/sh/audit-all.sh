@@ -151,56 +151,6 @@ LOG_AR_SELF=$(mktemp)
 LOG_FG=$(mktemp)
 trap 'rm -f "$LOG_WT" "$LOG_WG" "$LOG_AR" "$LOG_AR_SELF" "$LOG_FG" "$LOG_HYGIENE"' EXIT
 
-# 辅助函数: 带看门狗超时的后台进程等待机制
-wait_with_timeout() {
-    local pid="$1"
-    local timeout="$2"
-    local name="$3"
-    local log_file="${4:-}"
-    local count=0
-    while kill -0 "$pid" 2>/dev/null; do
-        if [[ "$count" -ge "$timeout" ]]; then
-            echo "⚠️ $name 审查执行超时 (${timeout}s，PID: $pid)，强制终止进程..." >&2
-            kill -TERM "$pid" 2>/dev/null || true
-            sleep 1
-            kill -KILL "$pid" 2>/dev/null || true
-
-            local diag_dir="$ROOT_DIR/.audit-logs"
-            mkdir -p "$diag_dir" 2>/dev/null || true
-            local timestamp
-            timestamp=$(date +"%Y%m%d-%H%M%S" 2>/dev/null || echo "unknown")
-            local safe_name
-            safe_name=$(echo "$name" | tr ' ' '_' | tr '[:upper:]' '[:lower:]')
-            local diag_file="$diag_dir/timeout-${safe_name}-${timestamp}.log"
-            {
-                echo "================================================================================"
-                echo "⚠️ WATCHDOG TIMEOUT 诊断快照"
-                echo "================================================================================"
-                echo "目标模块: $name"
-                echo "进程 PID: $pid"
-                echo "超时阈值: ${timeout} 秒"
-                echo "触发时间: $(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)"
-                echo "处置措施: 看门狗已触发 SIGTERM/SIGKILL 级联终止进程"
-                echo "--------------------------------------------------------------------------------"
-                echo "【最后捕获的标准输出与错误日志】:"
-                if [[ -n "$log_file" && -f "$log_file" ]]; then
-                    tail -n 100 "$log_file"
-                else
-                    echo "(日志内容为空或未指定日志文件)"
-                fi
-                echo "================================================================================"
-            } > "$diag_file" 2>/dev/null || true
-            echo "💡 超时诊断快照已落盘至: $diag_file" >&2
-            "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --prune >/dev/null 2>&1 || true
-            return 124
-        fi
-        sleep 1
-        count=$((count + 1))
-    done
-    wait "$pid" 2>/dev/null || return $?
-    return 0
-}
-
 # 3~6. 并行并发调度 workspace-timing、WebGames、auto-refactor 与 fractal-git 四大项目审查
 write_step_banner "EXTENSION-AUDIT-03"
 write_step_banner "DOMAIN-AUDIT-04"
@@ -303,7 +253,9 @@ else
 fi
 
 if command -v "$NODE_BIN" &>/dev/null && [[ -f "fractal-git/scripts/common/run-audit-report.js" ]]; then
-    "$NODE_BIN" fractal-git/scripts/common/run-audit-report.js >>"$LOG_FG" 2>&1 || true
+    FG_REPORT_ARGS=()
+    [[ "$FAST_MODE" -eq 1 ]] && FG_REPORT_ARGS+=("--fast")
+    "$NODE_BIN" fractal-git/scripts/common/run-audit-report.js ${FG_REPORT_ARGS[@]+"${FG_REPORT_ARGS[@]}"} >>"$LOG_FG" 2>&1 || true
 fi
 
 
@@ -381,6 +333,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   const statusWt = process.argv[7];
   const statusWg = process.argv[8];
   const rootDir = process.argv[9];
+  const repoRoot = rootDir;
   const codeHygiene = Number(process.argv[10] || 0);
   const codeIso = Number(process.argv[11] || 0);
   const codeCatalog = Number(process.argv[12] || 0);
@@ -393,6 +346,22 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   const codeReach = Number(process.argv[21] || 0);
   const codeDocs = Number(process.argv[22] || 0);
   const codeLedger = Number(process.argv[23] || 0);
+  const codeDensity = Number(process.argv[24] || 0);
+  const codeEloc = Number(process.argv[25] || 0);
+  const codeOrdering = Number(process.argv[26] || 0);
+  const codeRuleSource = Number(process.argv[27] || 0);
+  const codeSubagent = Number(process.argv[28] || 0);
+  const codeDocAnchors = Number(process.argv[29] || 0);
+  const codeMetricCoverage = Number(process.argv[30] || 0);
+  const codeFamilyContract = Number(process.argv[31] || 0);
+  const codeDocReach = Number(process.argv[32] || 0);
+  const codeCommitHistory = Number(process.argv[33] || 0);
+  const codeDestructive = Number(process.argv[34] || 0);
+  const codeChains = Number(process.argv[35] || 0);
+  const codeCounts = Number(process.argv[36] || 0);
+  const codeParity = Number(process.argv[37] || 0);
+  const codeGateProof = Number(process.argv[38] || 0);
+  const codeDocMetrics = Number(process.argv[39] || 0);
   const baselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.json");
   const wtReportFile = path.join(rootDir, "workspace-timing", "reports", "review", "report-latest.json");
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -414,6 +383,20 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
       grade = m.grade || null;
       totalDebt = m.totalIssues ?? m.unsuppressedIssues ?? null;
       autonomyRate = b.autonomyRate ?? m.autonomyRate ?? b.cai ?? null;
+      // 多子系统自研率加权融合 (auto-refactor 与 fractal-git)
+      const fgAuditPath = path.join(repoRoot, "fractal-git/reports/audit-latest.json");
+      let fgCai = null;
+      if (fs.existsSync(fgAuditPath)) {
+        try {
+          const fgData = JSON.parse(fs.readFileSync(fgAuditPath, "utf8"));
+          if (fgData && fgData.summary && fgData.summary.caiIndex != null) {
+            fgCai = Number(fgData.summary.caiIndex);
+          }
+        } catch (_) {}
+      }
+      if (autonomyRate != null && fgCai != null) {
+        autonomyRate = Number((Number(autonomyRate) * 0.67 + fgCai * 0.33).toFixed(2));
+      }
       if (b.tenDimensions) {
         tenDimensions = b.tenDimensions;
         qualityVector = b.tenDimensions;
@@ -440,6 +423,8 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   }
   if (codeIso !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 20.0);
   if (codeGi !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 10.0);
+  if (codeDensity !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 15.0);
+  if (codeEloc !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 15.0);
   const scoreHygiene = Math.max(SCORE_FLOOR, Number(baseHygiene.toFixed(1)));
 
   // 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性与技能文档字节等价比对动态判定）
@@ -476,14 +461,15 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   } catch (_) {}
 
   // 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性、反馈词表、闭包、可达性与技能集规范动态判定）
-  let rulesPassedCount = 0;
-  if (codeCatalog === 0) rulesPassedCount += 1;
-  if (codeFeedback === 0) rulesPassedCount += 1;
-  if (codeSkills === 0) rulesPassedCount += 1;
-  if (codeClosure === 0) rulesPassedCount += 1;
-  if (codeReach === 0) rulesPassedCount += 1;
-  if (codeDocs === 0) rulesPassedCount += 1;
-  if (codeLedger === 0) rulesPassedCount += 1;
+  const ruleCodes = [
+    codeCatalog, codeFeedback, codeOrdering, codeSkills, codeClosure,
+    codeReach, codeRuleSource, codeDocs, codeLedger, codeSubagent,
+    codeDocAnchors, codeMetricCoverage, codeFamilyContract, codeDocReach, codeCommitHistory,
+    codeDestructive, codeChains, codeCounts, codeParity, codeGateProof,
+    codeDocMetrics
+  ];
+  const rulesPassedCount = ruleCodes.filter((c) => c === 0).length;
+  const ruleStepTotal = ruleCodes.length;
 
   let scoreRules = SCORE_FLOOR;
   // 目录零漂移判定以 generate-rule-catalog.js --check-only 为唯一权威。
@@ -491,7 +477,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   if (statusRules === "PASS" && catalogCountConsistent) {
     scoreRules = 100.0;
   } else {
-    scoreRules = Math.max(SCORE_FLOOR, Number((100.0 * (rulesPassedCount / 7.0)).toFixed(1)));
+    scoreRules = Math.max(SCORE_FLOOR, Number((100.0 * (rulesPassedCount / Math.max(1, ruleStepTotal))).toFixed(1)));
   }
 
   // 3. auto-refactor 质量基线得分（基于自审综合基线动态读取，门禁失败动态连续衰减）
@@ -918,17 +904,17 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
       fs.appendFileSync(summaryFile, md, "utf8");
     } catch (_) {}
   }
-' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_HYGIENE" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE" "$LOG_HYGIENE" "$CODE_GI" "$STATUS_FG" "$CODE_FEEDBACK" "$CODE_CLOSURE" "$CODE_REACH" "$CODE_DOCS" "$CODE_LEDGER"
-
-if [[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]]; then
-    exit "$FAILED"
-fi
+' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_HYGIENE" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE" "$LOG_HYGIENE" "$CODE_GI" "$STATUS_FG" "$CODE_FEEDBACK" "$CODE_CLOSURE" "$CODE_REACH" "$CODE_DOCS" "$CODE_LEDGER" "$CODE_DENSITY" "$CODE_ELOC" "$CODE_ORDERING" "$CODE_RULE_SOURCE" "$CODE_SUBAGENT" "$CODE_DOC_ANCHORS" "$CODE_METRIC_COVERAGE" "$CODE_FAMILY_CONTRACT" "$CODE_DOC_REACH" "$CODE_COMMIT_HISTORY" "$CODE_DESTRUCTIVE" "$CODE_CHAINS" "$CODE_COUNTS" "$CODE_PARITY" "$CODE_GATE_PROOF" "$CODE_DOC_METRICS"
 
 # 6. 汇流记录工作区统一质量轨迹（默认写入运行期目录，--commit-ledger 才写入受控账本）
 TRAJ_ARGS=()
 [[ "$FAILED" -ne 0 ]] && TRAJ_ARGS+=("--failed")
 [[ "$COMMIT_LEDGER" -eq 1 ]] && TRAJ_ARGS+=("--commit-ledger")
 "$NODE_BIN" scripts/common/record-workspace-trajectory.js ${TRAJ_ARGS[@]+"${TRAJ_ARGS[@]}"} >/dev/null 2>&1 || true
+
+if [[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]]; then
+    exit "$FAILED"
+fi
 
 if [[ "$FAILED" -ne 0 ]]; then
     echo "✖ BLOCK  审查中枢检测到未通过项，请排查修复对应项目"

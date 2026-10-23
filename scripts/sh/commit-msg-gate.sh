@@ -114,86 +114,6 @@ print_template_guide() {
     echo "-----------------------------------------------------------------"
 }
 
-fail_commit_msg() {
-    local rule_id="$1"
-    local message="$2"
-    local actual="${3:-}"
-    local expected="${4:-}"
-    local actionable_fix="${5:-}"
-
-    # 失败判定必须绑定到登记的步骤身份：裸文本让操作者无从知道是哪一步阻断。
-    local failed_step_id
-    if [[ "$message" =~ \[([A-Z][A-Z0-9]*(-[A-Z0-9]+)*-[0-9]{2})\] ]]; then
-        failed_step_id="${BASH_REMATCH[1]}"
-        write_step_banner "$failed_step_id"
-        write_step_verdict "$failed_step_id" BLOCK "$message"
-    fi
-
-    DIAG_DIR="$ROOT_DIR/.audit-logs"
-    mkdir -p "$DIAG_DIR" 2>/dev/null || true
-    FAIL_LOG="$DIAG_DIR/last-commit-msg.log"
-    {
-        echo "================================================================="
-        echo "❌ Commit-Msg 门禁拦截现场快照"
-        echo "时间: $(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'unknown')"
-        echo "规则: $rule_id"
-        echo "说明: $message"
-        echo "-----------------------------------------------------------------"
-        echo "【提交信息原内容】:"
-        if [[ -f "$MSG_FILE" ]]; then
-            cat "$MSG_FILE"
-        fi
-        echo "================================================================="
-    } > "$FAIL_LOG" 2>/dev/null || true
-
-    SNAPSHOT_JSON="$DIAG_DIR/last-failure.json"
-    cat <<EOF > "$SNAPSHOT_JSON" 2>/dev/null || true
-{
-  "protocolVersion": "1.0.0",
-  "recordedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo 'unknown')",
-  "status": "BLOCK",
-  "gate": "commit-msg",
-  "step": "Commit-Msg Validation ($rule_id)",
-  "failedCommand": "bash scripts/sh/commit-msg-gate.sh $MSG_FILE",
-  "exitCode": 1,
-  "summary": "$message",
-  "logFile": ".audit-logs/last-commit-msg.log",
-  "violations": [
-    {
-      "ruleId": "$rule_id",
-      "severity": "BLOCK",
-      "file": "$MSG_FILE",
-      "actual": "$actual",
-      "expected": "$expected",
-      "message": "$message",
-      "actionableFix": "$actionable_fix",
-      "verificationCommand": "bash scripts/sh/commit-msg-gate.sh $MSG_FILE"
-    }
-  ],
-  "agentDirectives": {
-    "targetFiles": ["$MSG_FILE"],
-    "remediationPriority": ["$rule_id"],
-    "verificationCommand": "bash scripts/sh/commit-msg-gate.sh $MSG_FILE",
-    "fastRecheckCommand": "bash scripts/sh/commit-msg-gate.sh $MSG_FILE"
-  }
-}
-EOF
-
-    if [[ "$IS_AGENT" -eq 1 ]]; then
-        cat "$SNAPSHOT_JSON"
-        exit 1
-    fi
-
-    echo "✖ BLOCK  ${rule_id}: $message"
-    if [[ -n "$actionable_fix" ]]; then
-        echo "   💡 建议: $actionable_fix"
-    fi
-    print_template_guide
-    echo "💡 失败诊断快照已保留至: .audit-logs/last-commit-msg.log"
-    echo "   (可运行 bash scripts/sh/commit-msg-gate.sh --view-log 快速查看)"
-    exit 1
-}
-
 if [[ "$IS_AGENT" -ne 1 ]]; then
     echo "================================================================="
     echo "📝 执行生产工程级 Commit-Msg 规范与结构化内容门禁"
@@ -217,7 +137,9 @@ STRUCTURE_OUT=$("$NODE_BIN" "$STRUCTURE_SCRIPT" "$RESOLVED_MSG_FILE" --structure
 STRUCTURE_STATUS=${STRUCTURE_STATUS:-0}
 if [[ "$STRUCTURE_STATUS" -ne 0 ]]; then
     echo "$STRUCTURE_OUT"
-    print_template_guide
+    if [[ "${IS_AGENT:-0}" -ne 1 ]]; then
+        print_template_guide
+    fi
     exit "$STRUCTURE_STATUS"
 fi
 

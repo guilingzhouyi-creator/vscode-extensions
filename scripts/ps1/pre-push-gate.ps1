@@ -255,11 +255,7 @@ $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/gener
 $codeClosure = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-id-closure.js") -WorkingDirectory $repoRoot -StepId "RULE-CLOSURE-05" -TimeoutSeconds 30
 $codeDocs = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-docs-consistency.js") -WorkingDirectory $repoRoot -StepId "DOCS-CONSISTENCY-06" -TimeoutSeconds 30
 $codeReach = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-reachability.js") -WorkingDirectory $repoRoot -StepId "RULE-REACHABILITY-07" -TimeoutSeconds 60
-$codeSource = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-source-consistency.js") -WorkingDirectory $repoRoot -StepId "RULE-SOURCE-37" -TimeoutSeconds 30
-# 破坏性删除溯源：事故形态是「变量名与只读自动变量同名 -> 赋值抛错被忽略 -> 删除作用于用户目录」，
-# 两条链路任一处被拦截都不会发生，故静态审查同时覆盖操作数溯源与自动变量遮蔽。
-$codeDestructive = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-destructive-ops.js") -WorkingDirectory $repoRoot -StepId "DESTRUCTIVE-OPS-38" -TimeoutSeconds 60
-if ($code -ne 0 -or $codeClosure -ne 0 -or $codeDocs -ne 0 -or $codeReach -ne 0 -or $codeSource -ne 0 -or $codeDestructive -ne 0) {
+if ($code -ne 0 -or $codeClosure -ne 0 -or $codeDocs -ne 0 -or $codeReach -ne 0) {
     $failed = $true
 }
 
@@ -275,6 +271,10 @@ if ($runAr) {
 }
 } else {
     Write-StepVerdict -StepId "ENGINE-RUST-08" -Status "SKIP" -Detail "auto-refactor 未受影响"
+    Write-StepVerdict -StepId "ENGINE-BUILD-09" -Status "SKIP" -Detail "auto-refactor 未受影响"
+    Write-StepVerdict -StepId "ENGINE-FACADE-10" -Status "SKIP" -Detail "auto-refactor 未受影响"
+    Write-StepVerdict -StepId "ENGINE-SELF-11" -Status "SKIP" -Detail "auto-refactor 未受影响"
+    Write-StepVerdict -StepId "ENGINE-TESTS-12" -Status "SKIP" -Detail "auto-refactor 未受影响"
 }
 
 # --- auto-refactor 多维自审与质量基线 ---
@@ -325,20 +325,22 @@ if ($runWg) {
     $codeMermaid = if (Get-Command pwsh -ErrorAction SilentlyContinue) {
         Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "WebGames/scripts/ps1/check-mermaid.ps1") -WorkingDirectory $repoRoot -StepId "DOMAIN-MERMAID-18" -TimeoutSeconds 120
     } else {
-        Write-GateHost "  ⚠️  未检测到 pwsh，跳过本地 Mermaid 真解析（CI 将严格校验）" -ForegroundColor Yellow
-        0
+        Write-StepVerdict -StepId "DOMAIN-MERMAID-18" -Status "BLOCK" -Detail "未检测到 pwsh，Mermaid 校验无法执行"
+        1
     }
     if ($code -ne 0 -or $codeMermaid -ne 0) {
         $failed = $true
 }
 } else {
     Write-StepVerdict -StepId "DOMAIN-AUDIT-17" -Status "SKIP" -Detail "WebGames 未受影响"
+    Write-StepVerdict -StepId "DOMAIN-MERMAID-18" -Status "SKIP" -Detail "WebGames 未受影响"
 }
 
 # --- fractal-git Rust 门禁 (rustfmt + clippy -D warnings + zero-alloc + test) ---
 if ($runFg) {
     if (-not $cargoCmd) {
-        Write-GateHost "  ⚠️  未检测到 cargo 命令，跳过本地 fractal-git 编译测试（CI 将严格校验）" -ForegroundColor Yellow
+        Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "BLOCK" -Detail "未检测到 cargo 工具链，fractal-git 回归套件无法执行"
+        $failed = $true
     } elseif (Get-Command pwsh -ErrorAction SilentlyContinue) {
         $code = Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "fractal-git/scripts/ps1/gate-rust.ps1") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19" -TimeoutSeconds 300
         if ($code -ne 0) {
@@ -449,6 +451,19 @@ if ($codeDOCREACH35 -ne 0) {
 # 提交历史冻结清单：允许规则收紧后不追溯阻断已写就的历史，但清单本身必须无法用作自我豁免。
 $codeCHB36 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-history-baseline.js") -WorkingDirectory $repoRoot -StepId "COMMIT-HISTORY-BASELINE-36" -TimeoutSeconds 60
 if ($codeCHB36 -ne 0) {
+    $failed = $true
+}
+
+# 规则源一致性：规则源跨目录严重级必须与 SSOT 完全一致。
+$codeSource37 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-source-consistency.js") -WorkingDirectory $repoRoot -StepId "RULE-SOURCE-37" -TimeoutSeconds 30
+if ($codeSource37 -ne 0) {
+    $failed = $true
+}
+
+# 破坏性删除溯源：事故形态是「变量名与只读自动变量同名 -> 赋值抛错被忽略 -> 删除作用于用户目录」，
+# 两条链路任一处被拦截都不会发生，故静态审查同时覆盖操作数溯源与自动变量遮蔽。
+$codeDestructive38 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-destructive-ops.js") -WorkingDirectory $repoRoot -StepId "DESTRUCTIVE-OPS-38" -TimeoutSeconds 60
+if ($codeDestructive38 -ne 0) {
     $failed = $true
 }
 

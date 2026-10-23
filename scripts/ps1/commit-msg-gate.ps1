@@ -91,97 +91,6 @@ function Show-CommitTemplateGuide {
     Write-Host "-----------------------------------------------------------------" -ForegroundColor Gray
 }
 
-function Stop-CommitMsg {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$RuleId,
-        [Parameter(Mandatory = $true)]
-        [string]$Message,
-        [string]$Actual = "",
-        [string]$Expected = "",
-        [string]$ActionableFix = ""
-    )
-
-    # 失败判定必须绑定到登记的步骤身份：裸文本让操作者无从知道是哪一步阻断。
-    $stepMatch = [regex]::Match($Message, '\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{2})\]')
-    if ($stepMatch.Success) {
-        $failedStepId = $stepMatch.Groups[1].Value
-        Write-StepBanner -StepId $failedStepId
-        Write-StepVerdict -StepId $failedStepId -Status "BLOCK" -Detail $Message
-    }
-
-    $diagDir = Join-Path $repoRoot ".audit-logs"
-    if (-not (Test-Path $diagDir)) { [void](New-Item -ItemType Directory -Path $diagDir -Force) }
-    $failLog = Join-Path $diagDir "last-commit-msg.log"
-
-    try {
-        $diagLines = [System.Collections.Generic.List[string]]::new()
-        $diagLines.Add("=================================================================")
-        $diagLines.Add("❌ Commit-Msg 门禁拦截现场快照")
-        $diagLines.Add("时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
-        $diagLines.Add("规则: $RuleId")
-        $diagLines.Add("说明: $Message")
-        $diagLines.Add("-----------------------------------------------------------------")
-        $diagLines.Add("【提交信息原内容】:")
-        if ($MsgFile -and (Test-Path $MsgFile)) {
-            $rawContent = Get-Content -Path $MsgFile -Encoding utf8 -ErrorAction SilentlyContinue
-            if ($rawContent) { $diagLines.AddRange($rawContent) }
-        }
-        $diagLines.Add("=================================================================")
-        [System.IO.File]::WriteAllLines($failLog, $diagLines, [System.Text.UTF8Encoding]::new($false))
-    } catch {}
-
-    $violation = [ordered]@{
-        ruleId = $RuleId
-        severity = "BLOCK"
-        file = $MsgFile
-        actual = $Actual
-        expected = $Expected
-        message = $Message
-        actionableFix = $ActionableFix
-        verificationCommand = "pwsh -File scripts/ps1/commit-msg-gate.ps1 $MsgFile"
-    }
-
-    $envelope = [ordered]@{
-        protocolVersion = "1.0.0"
-        recordedAt = (Get-Date).ToString("o")
-        status = "BLOCK"
-        gate = "commit-msg"
-        step = "Commit-Msg Validation ($RuleId)"
-        failedCommand = "pwsh -File scripts/ps1/commit-msg-gate.ps1 $MsgFile"
-        exitCode = 1
-        summary = $Message
-        logFile = ".audit-logs/last-commit-msg.log"
-        violations = @($violation)
-        agentDirectives = [ordered]@{
-            targetFiles = @($MsgFile)
-            remediationPriority = @($RuleId)
-            verificationCommand = "pwsh -File scripts/ps1/commit-msg-gate.ps1 $MsgFile"
-            fastRecheckCommand = "pwsh -File scripts/ps1/commit-msg-gate.ps1 $MsgFile"
-        }
-    }
-
-    $snapshotJson = $envelope | ConvertTo-Json -Depth 5
-    try {
-        [System.IO.File]::WriteAllText((Join-Path $diagDir "last-failure.json"), $snapshotJson, [System.Text.UTF8Encoding]::new($false))
-    } catch {}
-
-    if ($Agent) {
-        Write-Output $snapshotJson
-        exit 1
-    }
-
-    Write-Host "✖ BLOCK  ${RuleId}: $Message" -ForegroundColor Red
-    if ($ActionableFix) {
-        Write-Host "   💡 建议: $ActionableFix" -ForegroundColor Yellow
-    }
-    Show-CommitTemplateGuide
-    Write-Host "💡 失败诊断快照已保留至: .audit-logs/last-commit-msg.log" -ForegroundColor Yellow
-    Write-Host "   (可运行 pwsh -File scripts/ps1/commit-msg-gate.ps1 -ViewLog 快速查看)" -ForegroundColor Yellow
-    exit 1
-}
-
 if (-not $Agent) {
     Write-Host "=================================================================" -ForegroundColor Cyan
     Write-Host "📝 执行生产工程级 Commit-Msg 规范与结构化内容门禁 (PowerShell 版)" -ForegroundColor Cyan
@@ -220,7 +129,9 @@ if ($structureExit -ne 0) {
     } else {
         Write-Host $structureText -ForegroundColor Red
     }
-    Show-CommitTemplateGuide
+    if (-not $Agent) {
+        Show-CommitTemplateGuide
+    }
     exit $structureExit
 }
 

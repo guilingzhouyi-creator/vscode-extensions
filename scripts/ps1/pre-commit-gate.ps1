@@ -306,9 +306,14 @@ if ($rootClutter) {
     }
 }
 
-# 获取暂存区文件列表
-$stagedFiles = @()
-try { $stagedFiles = @(git diff --cached --name-only "--diff-filter=ACM" 2>$null) } catch { $stagedFiles = @() }
+# 获取当前暂存区中的文件列表（新增、修改、重命名）
+# 暂存区不可读时不得回落为空列表：那会让"git 失败"与"暂存区为空"变成同一个 PASS。
+$stagedFilesRaw = git diff --cached --name-only "--diff-filter=ACM" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-GateHost "✖ BLOCK  无法读取 Git 暂存区 (git diff --cached 退出码 $LASTEXITCODE)，pre-commit 不得在未审查的情况下放行。" -ForegroundColor Red
+    exit 1
+}
+$stagedFiles = @($stagedFilesRaw)
 if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1 -and [string]::IsNullOrWhiteSpace($stagedFiles[0]))) {
     if ($Agent) {
         Write-Output '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"No staged files to check."}'

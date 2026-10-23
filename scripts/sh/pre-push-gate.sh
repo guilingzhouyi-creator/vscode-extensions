@@ -247,17 +247,12 @@ else
 fi
 
 # --- 单源规则目录与引用闭包 ---
-if ! run_gate_step 30 "RULE-CATALOG-04" "$ROOT_DIR" "$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only; then
-    FAILED=1
-elif ! run_gate_step 30 "RULE-CLOSURE-05" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-id-closure.js; then
-    FAILED=1
-elif ! run_gate_step 30 "DOCS-CONSISTENCY-06" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-docs-consistency.js; then
-    FAILED=1
-elif ! run_gate_step 60 "RULE-REACHABILITY-07" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-reachability.js; then
-    FAILED=1
-elif ! run_gate_step 30 "RULE-SOURCE-37" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-source-consistency.js; then
-    FAILED=1
-elif ! run_gate_step 60 "DESTRUCTIVE-OPS-38" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-destructive-ops.js; then
+GATE2_FAIL=0
+run_gate_step 30 "RULE-CATALOG-04" "$ROOT_DIR" "$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only || GATE2_FAIL=1
+run_gate_step 30 "RULE-CLOSURE-05" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-id-closure.js || GATE2_FAIL=1
+run_gate_step 30 "DOCS-CONSISTENCY-06" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-docs-consistency.js || GATE2_FAIL=1
+run_gate_step 60 "RULE-REACHABILITY-07" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-reachability.js || GATE2_FAIL=1
+if [[ "$GATE2_FAIL" -ne 0 ]]; then
     FAILED=1
 else
     log_gate "  ✔ 全工作区单源规则目录同步与规则 ID 闭包校验通过"
@@ -287,6 +282,10 @@ if [[ "$RUN_AR" -eq 1 ]]; then
     fi
 else
     write_step_verdict "ENGINE-RUST-08" SKIP "auto-refactor 未受影响"
+    write_step_verdict "ENGINE-BUILD-09" SKIP "auto-refactor 未受影响"
+    write_step_verdict "ENGINE-FACADE-10" SKIP "auto-refactor 未受影响"
+    write_step_verdict "ENGINE-SELF-11" SKIP "auto-refactor 未受影响"
+    write_step_verdict "ENGINE-TESTS-12" SKIP "auto-refactor 未受影响"
 fi
 
 # --- auto-refactor 多维自审与质量基线 ---
@@ -350,6 +349,7 @@ if [[ "$RUN_WG" -eq 1 ]]; then
     fi
 else
     write_step_verdict "DOMAIN-AUDIT-17" SKIP "WebGames 未受影响"
+    write_step_verdict "DOMAIN-MERMAID-18" SKIP "WebGames 未受影响"
 fi
 
 # --- fractal-git Rust 门禁 (rustfmt + clippy -D warnings + zero-alloc + test) ---
@@ -357,6 +357,7 @@ if [[ "$RUN_FG" -eq 1 ]]; then
     if [[ -z "$CARGO_BIN" ]]; then
         # 缺少原生工具链时不得静默放行：未执行审查与审查通过必须可区分 (GUARD-SYS-001)。
         write_step_verdict "RUST-TAXIS-19" BLOCK "未检测到 cargo 工具链，fractal-git 回归套件无法执行"
+        FAILED=1
     elif [[ -f "$ROOT_DIR/fractal-git/scripts/sh/gate-rust.sh" ]]; then
         if ! run_gate_step 300 "RUST-TAXIS-19" "$ROOT_DIR" bash fractal-git/scripts/sh/gate-rust.sh; then
             FAILED=1
@@ -472,6 +473,16 @@ fi
 
 # 提交历史冻结清单：允许规则收紧后不追溯阻断已写就的历史，但清单本身必须无法用作自我豁免。
 if ! run_gate_step 60 "COMMIT-HISTORY-BASELINE-36" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-history-baseline.js; then
+    FAILED=1
+fi
+
+# 规则源一致性：规则源跨目录严重级必须与 SSOT 完全一致。
+if ! run_gate_step 30 "RULE-SOURCE-37" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-source-consistency.js; then
+    FAILED=1
+fi
+
+# 破坏性删除目标溯源与只读自动变量遮蔽：防止意外破坏代码库或环境边界。
+if ! run_gate_step 60 "DESTRUCTIVE-OPS-38" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-destructive-ops.js; then
     FAILED=1
 fi
 

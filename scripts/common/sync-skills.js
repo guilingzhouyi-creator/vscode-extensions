@@ -91,6 +91,12 @@ function syncDirectories(srcDir, destDir) {
   for (const extra of diff.extra) {
     const targetPath = path.join(destDir, extra);
     fs.unlinkSync(targetPath);
+    let dir = path.dirname(targetPath);
+    while (dir !== destDir && dir.startsWith(destDir) && fs.existsSync(dir)) {
+      if (fs.readdirSync(dir).length > 0) break;
+      fs.rmdirSync(dir);
+      dir = path.dirname(dir);
+    }
   }
 
   const toCopy = [...diff.missing, ...diff.modified];
