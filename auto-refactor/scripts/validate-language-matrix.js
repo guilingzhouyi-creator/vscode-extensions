@@ -5,16 +5,20 @@
  *     an adapter (so its files are really scanned), must flow through the language-agnostic
  *     analyzers, and must expose exactly the modernization pack registered for it
  * Dependencies & Triggers: `npm run validate-language-matrix` (part of `npm test`); imports
- *     ../dist/api (scan) and drives one fixture per language plus one unsupported extension
+ *     ../dist/api (scan, resolveConfig), the adapter extension index, the fail-closed guard and
+ *     the discovery allow-list; drives one fixture per language
  * Responsibilities: Assert per language that (1) filesScanned counts the fixture, (2) a
  *     language-agnostic hygiene rule fires on shared content, (3) the language's modernization
- *     pack reports its key-point rule only when the config declares it, and (4) an unknown
- *     extension stays fail-closed as `LANG-UNSUPPORTED`; print the resulting matrix so a coverage
- *     gap between "can parse" and "can check" is visible instead of implicit
+ *     pack reports its key-point rule only when the config declares it, and (4) the discovery
+ *     allow-list is fully claimed while an unclaimed extension still fails closed as
+ *     `LANG-UNSUPPORTED`; print the resulting matrix so a coverage gap between "can parse" and
+ *     "can check" is visible instead of implicit
  * Exit Semantics & Design Rationale: Rejects on the first failed assertion and exits 1. The
  *     matrix is asserted through the public `scan()` entry point so adapter registration, analyzer
  *     resolution and extension scoping are exercised together; a language whose pack is missing or
- *     mis-scoped therefore fails here rather than silently reporting nothing.
+ *     mis-scoped therefore fails here rather than silently reporting nothing. The fail-closed row
+ *     is asserted through the guard predicate rather than a fixture scan because every extension
+ *     the walker admits is now claimed, so a scan can no longer reach that branch.
  */
 'use strict';
 
@@ -23,7 +27,10 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { scan } = require('../dist/api');
+const { scan, resolveConfig } = require('../dist/api');
+const { EXTENSION_ADAPTER_IDS } = require('../dist/core/ast/adapters');
+const { unsupportedLanguageDiagnostic } = require('../dist/core/ast/language-support');
+const { DEFAULT_EXT } = require('../dist/core/file-discovery');
 
 /**
  * Language-agnostic probe: a marker every content-oriented analyzer can see, whatever
@@ -95,6 +102,22 @@ const MATRIX = [
     packRule: null,
     fixture: (marker) => `# Probe\n\n${marker}\n`,
     agnostic: false,
+  },
+  {
+    language: 'yaml',
+    file: 'config/probe.yml',
+    pack: null,
+    packRule: null,
+    fixture: (marker) => `# ${marker}\nservice:\n  name: probe\n`,
+    agnostic: true,
+  },
+  {
+    language: 'shell',
+    file: 'scripts/probe.sh',
+    pack: null,
+    packRule: null,
+    fixture: (marker) => `#!/usr/bin/env bash\n# ${marker}\necho probe\n`,
+    agnostic: true,
   },
 ];
 
@@ -177,31 +200,23 @@ async function main() {
     }
 
     // ── Fail-closed: an extension no adapter claims must never be parsed as TypeScript ──
-    const unknownRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-language-unknown-'));
-    try {
-      // `.ps1` is inside the discovery set but claimed by no adapter: that is exactly the
-      // fail-closed contract, so discovered-but-unclaimed must be reported, never guessed.
-      fs.writeFileSync(
-        path.join(unknownRoot, 'probe.ps1'),
-        `# ${AGNOSTIC_MARKER}
-`,
-      );
-      const configFile = path.join(unknownRoot, 'auto-refactor.config.json');
-      fs.writeFileSync(configFile, JSON.stringify({ include: ['**/*'] }, null, 2));
-      const report = await scan({
-        root: unknownRoot,
-        configFile,
-        logLevel: 'silent',
-        cache: false,
-      });
-      assert.ok(
-        liveRules(report).has('LANG-UNSUPPORTED'),
-        'an unclaimed extension must stay fail-closed as LANG-UNSUPPORTED',
-      );
-      summary.push('unknown    parse ⛔  LANG-UNSUPPORTED ✅ (fail-closed)');
-    } finally {
-      fs.rmSync(unknownRoot, { recursive: true, force: true });
-    }
+    // Discovery only admits `DEFAULT_EXT`, and every entry there is now claimed, so a scan can no
+    // longer reach the guard through ordinary file discovery. Deleting the row would lose the
+    // contract, so it is asserted at the two surfaces the scan composes: the allow-list must be
+    // fully claimed (otherwise this matrix has a hole), and an unclaimed extension must still
+    // produce the fail-closed error rather than a silent fallback.
+    const unclaimed = DEFAULT_EXT.filter((ext) => EXTENSION_ADAPTER_IDS[ext] === undefined);
+    assert.deepStrictEqual(
+      unclaimed,
+      [],
+      `every discoverable extension must be claimed, unclaimed: ${unclaimed.join(', ')}`,
+    );
+    const syntheticConfig = resolveConfig({ root, unsupportedLanguage: 'error' });
+    const guardIssue = unsupportedLanguageDiagnostic('probe.unknownext', syntheticConfig);
+    assert.ok(guardIssue !== null, 'an unclaimed extension must stay fail-closed as LANG-UNSUPPORTED');
+    assert.strictEqual(guardIssue.rule, 'LANG-UNSUPPORTED');
+    assert.strictEqual(guardIssue.severity, 'error', 'the guard must stay fail-closed by default');
+    summary.push('unknown    parse ⛔  LANG-UNSUPPORTED ✅ (fail-closed)');
 
     console.log('  ✔ every supported language is parsed, checked and pack-scoped');
     console.log('  ✔ an unclaimed extension stays fail-closed');

@@ -16,7 +16,7 @@
 
 ```mermaid
 flowchart TD
-  subgraph Parsers["多语言物理解析适配层 (Language Adapters - 7 类)"]
+  subgraph Parsers["多语言物理解析适配层 (Language Adapters - 9 类)"]
     TS["TypeScript / JavaScript<br/>TypeScriptAdapter (ts 5.3 Compiler API)"]
     OXC["TS / JS 极速快轨<br/>OxcAdapter (oxc-parser Rust 内核)"]
     RS["Rust<br/>RustAdapter (tree-sitter-rust)"]
@@ -24,6 +24,8 @@ flowchart TD
     PY["Python<br/>PythonAdapter (tree-sitter-python)"]
     MD["Markdown<br/>MarkdownAdapter (文档与代码块解析)"]
     GO["Go<br/>GoAdapter (Go 语法适配器)"]
+    YM["YAML<br/>DataAdapter (声明式配置文本)"]
+    SH["Shell<br/>ShellAdapter (POSIX / PowerShell)"]
   end
 
   subgraph IR1["第一层 IR: 归一化语法树 (src/core/ast/multilang.ts)"]
@@ -37,7 +39,7 @@ flowchart TD
     TOPOLOGY["SemanticGraph<br/>(双向邻接索引 / 逆向切片 / SCC 环路检测)"]
   end
 
-  TS & OXC & RS & GD & PY & MD & GO -->|LanguageAdapter.parse| NORM
+  TS & OXC & RS & GD & PY & MD & GO & YM & SH -->|LanguageAdapter.parse| NORM
   NORM -->|extractFileToGraph| TOPOLOGY
   TOPOLOGY --- SEM_NODE
   TOPOLOGY --- SEM_EDGE
@@ -48,9 +50,9 @@ flowchart TD
 
 ---
 
-## 2. 真实 AST 适配器矩阵 (7 类)
+## 2. 真实 AST 适配器矩阵 (9 类)
 
-系统在 [`src/core/ast/adapters.ts`](../../src/core/ast/adapters.ts) 中声明并按需懒加载（Lazy Loading）7 类官方语言适配器：
+系统在 [`src/core/ast/adapters.ts`](../../src/core/ast/adapters.ts) 中声明并按需懒加载（Lazy Loading）9 类官方语言适配器：
 
 | 适配器 ID | 对应类名 | 声明扩展名 | 解析引擎与特点 |
 | :--- | :--- | :--- | :--- |
@@ -61,9 +63,11 @@ flowchart TD
 | `python` | `PythonAdapter` | `.py` | 基于 `tree-sitter-python`，提取 `def`, `class`, 缩进作用域与导入 |
 | `markdown` | `MarkdownAdapter` | `.md` | 文档代码块（Fence）提取、跨文件死链与文档结构解析 |
 | `go` | `GoAdapter` | `.go` | Go 语言结构体、接口与函数签名适配 |
+| `yaml` | `DataAdapter` | `.yml`, `.yaml` | 返回无子节点的文档根，使声明式配置被文本类规则读到，且不伪装成程序结构 |
+| `shell` | `ShellAdapter` | `.sh`, `.bash`, `.zsh`, `.ps1`, `.psm1`, `.psd1` | 返回无子节点的文档根；方言判定由行导向的 shell 分析器按路径自行完成 |
 
 > [!IMPORTANT]
-> **领域分析器澄清**：Shell 脚本审查（`shell-lint.ts`）与配置清单审查（如 `package.json`、`ar.config.json` 的依赖配置检查）属于特定领域的规则分析器（Domain Analyzers），并不在 `LanguageAdapter` 语法适配器注册表中，系统不存在通用的 `ShellAdapter` 或 `ConfigAdapter`。
+> **适配器与领域分析器的分工**：`DataAdapter`/`ShellAdapter` 只负责「认领扩展名 + 提供合法的空文档根」，让文件通过发现与 fail-closed 守卫；具体判定仍由特定领域的规则分析器完成（如 `shell-lint.ts` 对 Shell 的审查、清单配置检查对 `package.json` 的审查）。二者不可互相替代：缺少适配器会让整类文件落入 `LANG-UNSUPPORTED` 兜底，而适配器本身不产出任何结论。
 
 ---
 
@@ -187,7 +191,7 @@ export type SemanticEdgeKind =
 `auto-refactor` 奉行**默认闭锁（Fail-Closed）**安全哲学：
 1. **历史回退机制**：为了向后兼容，[`src/core/ast/adapters.ts`](../../src/core/ast/adapters.ts) 中的 `adapterFor` 在遇到未注册扩展名时默认返回 TypeScript 适配器，而不会抛出异常。
 2. **闭锁断言**：如果引擎直接静默放行未识别的文件，会导致该文件解析产生 0 个 Issue 并产生虚假的“质量合格”假象（Fail-Open）。
-3. **`hasAdapterFor` 与诊断触发**：位于 [`src/core/ast/language-support.ts`](../../src/core/ast/language-support.ts) 的 `hasAdapterFor(filePath, parser)` 会主动核查扩展名是否由 7 类真实适配器显式认领。
+3. **`hasAdapterFor` 与诊断触发**：位于 [`src/core/ast/language-support.ts`](../../src/core/ast/language-support.ts) 的 `hasAdapterFor(filePath, parser)` 会主动核查扩展名是否由 9 类真实适配器显式认领。
 4. **规则发射**：当 `hasAdapterFor` 返回 `false` 且 `ScanConfig.unsupportedLanguage` 未设为 `'off'` 时（默认值为 `'error'`），引擎将发射 `LANG-UNSUPPORTED` 门禁诊断阻断流程：
 
 ```ts

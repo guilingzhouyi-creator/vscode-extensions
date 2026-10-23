@@ -134,13 +134,47 @@ function recordCommitFiles(
     }
 }
 
-function indexProfileAliases(ctx: ProfileAliasContext): void {
-    ctx.profilesMap.set(ctx.absPath, ctx.profile);
-    ctx.profilesMap.set(ctx.absPath.toLowerCase(), ctx.profile);
-    ctx.profilesMap.set(ctx.relCwd, ctx.profile);
-    ctx.profilesMap.set(ctx.relCwd.toLowerCase(), ctx.profile);
-    ctx.profilesMap.set(ctx.relTop, ctx.profile);
-    ctx.profilesMap.set(ctx.relTop.toLowerCase(), ctx.profile);
+/**
+ * Register a profile under every spelling a caller may use for the same file.
+ *
+ * Indexing runs in two passes so the winner is decided by precedence, never by the order commits
+ * happen to be enumerated. Pass one indexes `absPath` and `relCwd`: those are the two reference
+ * frames `mineFileHistory` resolves against (its `targetDir` is a cwd), and they are unique per
+ * file, so they always win. Pass two indexes `relTop`, the spelling relative to the repository top
+ * level; it is only an alias when no cwd-relative spelling already owns that key, because
+ * otherwise a top-level `package.json` would shadow the `auto-refactor/package.json` a caller in
+ * that directory asked for and batch mode would disagree with single-file mode. The lowercase
+ * twins cover case-insensitive filesystems.
+ */
+function indexProfileAliases(contexts: readonly ProfileAliasContext[]): void {
+    for (const ctx of contexts) {
+        ctx.profilesMap.set(ctx.absPath, ctx.profile);
+        ctx.profilesMap.set(ctx.absPath.toLowerCase(), ctx.profile);
+        ctx.profilesMap.set(ctx.relCwd, ctx.profile);
+        ctx.profilesMap.set(ctx.relCwd.toLowerCase(), ctx.profile);
+    }
+    for (const ctx of contexts) {
+        setAliasIfUnclaimed(ctx.profilesMap, ctx.relTop, ctx.profile);
+        setAliasIfUnclaimed(ctx.profilesMap, ctx.relTop.toLowerCase(), ctx.profile);
+    }
+}
+
+/**
+ * Register one alias only when nothing has claimed the key yet.
+ *
+ * @param profilesMap - Inverted index being populated.
+ * @param key - Spelling to register.
+ * @param profile - Profile the spelling refers to.
+ */
+function setAliasIfUnclaimed(
+    profilesMap: Map<string, GitFileHistoryProfile>,
+    key: string,
+    profile: GitFileHistoryProfile,
+): void {
+    if (profilesMap.has(key)) {
+        return;
+    }
+    profilesMap.set(key, profile);
 }
 
 /**
@@ -279,6 +313,7 @@ export class GitHistoryMiner {
             recordCommitFiles(commitsByFile, parsed.record, parsed.fileLines);
         }
 
+        const profiles: ProfileAliasContext[] = [];
         for (const [relTop, commits] of commitsByFile.entries()) {
             const absPath = path
                 .resolve(topLevel, relTop)
@@ -286,8 +321,9 @@ export class GitHistoryMiner {
             const relCwd = path.relative(cwd, absPath).replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH);
             const profile = this.aggregateCommitRecords(absPath, commits);
             profile.isGitAvailable = true;
-            indexProfileAliases({ profilesMap, profile, absPath, relCwd, relTop });
+            profiles.push({ profilesMap, profile, absPath, relCwd, relTop });
         }
+        indexProfileAliases(profiles);
     }
 
     /** Safely extract the file history profile using `git log`. */

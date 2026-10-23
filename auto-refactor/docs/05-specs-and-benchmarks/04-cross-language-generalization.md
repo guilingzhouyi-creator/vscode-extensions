@@ -21,7 +21,7 @@
 
 ```mermaid
 flowchart TD
-  subgraph L1_Parsers["8 大语言 AST 适配器 (src/core/ast/adapters.ts)"]
+  subgraph L1_Parsers["9 大语言 AST 适配器 (src/core/ast/adapters.ts)"]
     P_TS["TypeScript / JavaScript Adapter\n(ts-compiler API)"]
     P_OXC["OXC Fast Parser Adapter\n(Rust Native / WASM)"]
     P_PY["Python Adapter\n(AST Extractor)"]
@@ -30,6 +30,7 @@ flowchart TD
     P_GO["Go Adapter\n(Go Parser Extractor)"]
     P_MD["Markdown Adapter\n(Document AST)"]
     P_YM["YAML Data Adapter\n(Document AST)"]
+    P_SH["Shell Adapter\n(POSIX / PowerShell)"]
   end
 
   subgraph IR["统一语法抽象 (NormalizedNode IR)"]
@@ -48,11 +49,11 @@ flowchart TD
     SG["Unified SemanticGraph\n符号索引 / 跨模块依赖图 / 调用拓扑"]
   end
 
-  P_TS & P_OXC & P_PY & P_RS & P_GD & P_GO & P_MD & P_YM --> NN
+  P_TS & P_OXC & P_PY & P_RS & P_GD & P_GO & P_MD & P_YM & P_SH --> NN
   S_TS & S_PY & S_RS & S_GO & S_GD --> SG
 ```
 
-### 2.1 8 大语言 AST 适配器矩阵 (`src/core/ast/`)
+### 2.1 9 大语言 AST 适配器矩阵 (`src/core/ast/`)
 
 通过 `src/core/ast/adapters.ts` 的 `LanguageAdapter` 接口，引擎支持按扩展名懒加载物化 AST：
 1. **TypeScript / JavaScript 适配器 (`typescript-adapter.ts`)**：封装 TypeScript 官方编译器 API，支持 TSX/JSX 语法与完整类型推断上下文；
@@ -61,7 +62,9 @@ flowchart TD
 4. **Rust 适配器 (`rust-adapter.ts`)**：支持 Rust 2021/2024 edition 语法，具备原始字符串（Raw String）安全脱敏与宏展开捕获能力；
 5. **GDScript 适配器 (`gdscript-adapter.ts`)**：面向 Godot 4.x 现代语法，提取 `@export`、`@onready` 注解与信号 `Callable` 绑定；
 6. **Go 适配器 (`go-adapter.ts`, `go-adapter-parser.ts`)**：覆盖 Go 1.20+ 语法，识别 Goroutine 调度、接口隐式实现与错误包装链；
-7. **Markdown 适配器 (`markdown-adapter.ts`)**：解析文档目录树、未闭合围栏与相对死链，提供统一的文档卫士能力。
+7. **Markdown 适配器 (`markdown-adapter.ts`)**：解析文档目录树、未闭合围栏与相对死链，提供统一的文档卫士能力；
+8. **YAML 数据适配器 (`data-adapter.ts`)**：认领 `.yml`/`.yaml`，返回无子节点的文档根，使流水线与配置文本可被文本类规则审查而不被当作程序结构；
+9. **Shell 适配器 (`shell-adapter.ts`)**：认领 `.sh`/`.bash`/`.zsh`/`.ps1`/`.psm1`/`.psd1`，同样返回无子节点文档根；门禁脚本所在的语言不再落入 fail-closed 兜底，行导向的 shell 规则直接读取原文判定。
 
 ### 2.2 5 大语义拓扑适配器矩阵 (`src/core/semantic/adapters/`)
 

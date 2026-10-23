@@ -5,7 +5,7 @@
 
 ---
 
-## 1. 现代化规则体系架构概览（共 9 个分析器、108 条现代化规则）
+## 1. 现代化规则体系架构概览（共 9 个现代化分析器、108 条现代化规则）
 
 为了消除存量工程中陈旧语法范式引发的性能瓶颈、内存泄漏与安全隐患，`auto-refactor` 将现代化演进机制深度整合于**流水线 Stage 2（单文件语法 AST 与语言现代化）**中。整个体系由 **9 个现代化分析器**组成，涵盖 **108 条受控现代化规则**：
 
@@ -102,7 +102,7 @@ flowchart TD
 
 ## 5. 关联文档导航
 
-- [01. 四层规则金字塔、31 个内置分析器与 371 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
+- [01. 四层规则金字塔、31 个内置分析器与 374 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
 - [02. 自定义分析器插件与语义模式扩展规范](../04-analyzers-and-rules/02-custom-analyzer-plugin.md)
 - [04. 跨语言泛化审查与项目中立性规范](./04-cross-language-generalization.md)
 - [07. 三平面质量量化模型与代码自治度 (CAI) 规范](./07-quantified-quality-standard.md)

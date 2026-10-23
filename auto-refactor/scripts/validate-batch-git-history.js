@@ -164,14 +164,62 @@ function testNonExistentFileFallback() {
   console.log('  ✔  Non-existent file handled cleanly with 0 commits.');
 }
 
+/**
+ * Regression: an alias spelled relative to the repository TOP LEVEL must never shadow the file a
+ * caller asked for by a cwd-relative path. When the cwd is a package subdirectory, the root
+ * `package.json` and the package's own `package.json` share the basename but not the history;
+ * indexing `relTop` unconditionally made the batch index answer with the wrong profile, so batch
+ * mode silently disagreed with single-file mode. Both frames are asserted here so the precedence
+ * cannot be reintroduced by reordering the index.
+ */
+function testRelativeFramePrecedence() {
+  console.log('5. Testing cwd-relative vs repository-top alias precedence...');
+
+  const cwd = path.resolve(__dirname, '..');
+  const miner = new GitHistoryMiner({ repoRoot: cwd, maxCommits: EQUIVALENCE_MAX_COMMITS });
+  miner.preloadRepository(cwd, EQUIVALENCE_MAX_COMMITS);
+
+  // `package.json` resolved from the package cwd must be the package manifest, not a same-named
+  // file that happens to sit at the repository root.
+  const localProfile = miner.mineFileHistory('package.json', cwd);
+  const singleProfile = new GitHistoryMiner({
+    repoRoot: cwd,
+    maxCommits: EQUIVALENCE_MAX_COMMITS,
+  }).mineFileHistory('package.json', cwd);
+  assert.strictEqual(
+    localProfile.totalCommits,
+    singleProfile.totalCommits,
+    `'package.json' from the package cwd must match single-file mining, got ${localProfile.totalCommits} vs ${singleProfile.totalCommits}`,
+  );
+  assert.ok(
+    localProfile.filePath.replace(/\\/g, '/').endsWith('/auto-refactor/package.json'),
+    `'package.json' must resolve inside the cwd, got ${localProfile.filePath}`,
+  );
+
+  // The parent frame stays reachable through its own spelling.
+  const parentProfile = miner.mineFileHistory('../package.json', cwd);
+  assert.ok(
+    parentProfile.filePath.replace(/\\/g, '/').endsWith('/vscode-extensions/package.json'),
+    `'../package.json' must resolve to the repository root manifest, got ${parentProfile.filePath}`,
+  );
+  assert.notStrictEqual(
+    parentProfile.totalCommits,
+    localProfile.totalCommits,
+    'the two frames are different files and must not share one profile',
+  );
+
+  console.log('  ✔  cwd-relative spelling wins over the repository-top alias.');
+}
+
 function runAll() {
   console.log('=== [Git History Batch Mining & Inverted Index Test] ===\n');
   testMockBatchParsing();
   testRealRepoBatchEquivalence();
   testCodeEvolutionAnalyzerBatch();
   testNonExistentFileFallback();
+  testRelativeFramePrecedence();
   console.log('\n================================================================');
-  console.log('🎉 ALL BATCH GIT HISTORY VALIDATIONS PASSED (4/4)!');
+  console.log('🎉 ALL BATCH GIT HISTORY VALIDATIONS PASSED (5/5)!');
   console.log('================================================================\n');
 }
 

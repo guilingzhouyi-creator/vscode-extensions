@@ -22,7 +22,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { scan, resolveConfig } = require('../dist/api');
-const { EXTENSION_ADAPTER_IDS } = require('../dist/core/ast/adapters');
+const { EXTENSION_ADAPTER_IDS, hasAdapterFor } = require('../dist/core/ast/adapters');
+const { unsupportedLanguageDiagnostic } = require('../dist/core/ast/language-support');
+const { DEFAULT_EXT } = require('../dist/core/file-discovery');
 const { TypeScriptAdapter } = require('../dist/core/ast/typescript-adapter');
 const { RustAdapter } = require('../dist/core/ast/rust-adapter');
 const { OxcAdapter } = require('../dist/core/ast/oxc-adapter');
@@ -31,6 +33,7 @@ const { PythonAdapter } = require('../dist/core/ast/python-adapter');
 const { MarkdownAdapter } = require('../dist/core/ast/markdown-adapter');
 const { GoAdapter } = require('../dist/core/ast/go-adapter');
 const { DataAdapter } = require('../dist/core/ast/data-adapter');
+const { ShellAdapter } = require('../dist/core/ast/shell-adapter');
 
 const RULE = 'LANG-UNSUPPORTED';
 
@@ -73,6 +76,7 @@ const ADAPTER_CLASSES = {
   markdown: MarkdownAdapter,
   go: GoAdapter,
   yaml: DataAdapter,
+  shell: ShellAdapter,
 };
 
 /**
@@ -113,8 +117,25 @@ function assertExtensionIndexMatchesAdapters() {
   console.log('  ✔ extension index matches every adapter declared extensions');
 }
 
+/**
+ * Asserts the stronger invariant the adapter set now holds: every extension the walker admits is
+ * claimed by some adapter, so `LANG-UNSUPPORTED` can only fire for a file the walker was never
+ * asked to include. The guard's fail-closed behaviour is still exercised below through an
+ * extension outside the allow-list, which is the only remaining way to reach it.
+ */
+function assertEveryAllowedExtensionIsClaimed() {
+  const unclaimed = DEFAULT_EXT.filter((ext) => EXTENSION_ADAPTER_IDS[ext] === undefined);
+  assert.deepStrictEqual(
+    unclaimed,
+    [],
+    `every discoverable extension must be claimed by an adapter, unclaimed: ${unclaimed.join(', ')}`,
+  );
+  console.log('  ✔ every discoverable extension is claimed by an adapter');
+}
+
 async function run() {
   assertExtensionIndexMatchesAdapters();
+  assertEveryAllowedExtensionIsClaimed();
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-lang-'));
   const cacheDir = path.join(root, '.cache');
   try {
@@ -148,42 +169,57 @@ async function run() {
       respectGitignore: false,
     };
 
-    const inProcess = await scan({
+    // Every discoverable extension is now claimed, so a scan cannot reach the guard by ordinary
+    // discovery. The fail-closed contract is therefore asserted at its two remaining surfaces:
+    // the predicate that decides "is this file claimed", and the diagnostic that decides "what
+    // severity does an unclaimed file carry". Asserting them directly keeps the contract live
+    // instead of deleting the checks along with the fixture that used to reach them.
+    assert.strictEqual(
+      hasAdapterFor('a.ps1', undefined),
+      true,
+      'the shell adapter must now claim .ps1',
+    );
+    assert.strictEqual(
+      hasAdapterFor('probe.unknownext', undefined),
+      false,
+      'an extension outside the allow-list must remain unclaimed',
+    );
+    console.log('  ✔ the claim predicate still discriminates a claimed from an unclaimed extension');
+
+    const unsupportedConfig = resolveConfig({ root, unsupportedLanguage: 'error' });
+    const unsupportedIssue = unsupportedLanguageDiagnostic('probe.unknownext', unsupportedConfig);
+    assert.ok(unsupportedIssue !== null, 'an unclaimed extension must still yield a diagnostic');
+    assert.strictEqual(unsupportedIssue.rule, RULE);
+    assert.strictEqual(unsupportedIssue.severity, 'error', 'the default must stay fail-closed');
+    assert.strictEqual(unsupportedIssue.analyzer, 'language');
+    console.log('  ✔ an unclaimed extension still yields the fail-closed error diagnostic');
+
+    const warnedIssue = unsupportedLanguageDiagnostic(
+      'probe.unknownext',
+      resolveConfig({ root, unsupportedLanguage: 'warning' }),
+    );
+    assert.strictEqual(warnedIssue.severity, 'warning');
+    console.log("  ✔ unsupportedLanguage='warning' lowers the severity");
+
+    const offIssue = unsupportedLanguageDiagnostic(
+      'probe.unknownext',
+      resolveConfig({ root, unsupportedLanguage: 'off' }),
+    );
+    assert.strictEqual(offIssue, null, "unsupportedLanguage='off' must suppress the diagnostic");
+    console.log("  ✔ unsupportedLanguage='off' restores the silent fallback");
+
+    const claimedScan = await scan({
       ...base,
       include: ['a.ps1', 'probe.py', 'b.ts', 'c.gd'],
       workers: 1,
     });
-    const first = guardIssues(inProcess);
-    assert.strictEqual(first.length, 1, 'exactly one unsupported file must be reported');
-    assert.strictEqual(first[0].location.file, 'a.ps1');
-    assert.strictEqual(first[0].severity, 'error');
-    assert.strictEqual(first[0].analyzer, 'language');
-    assert.ok(
-      !guardIssues(inProcess).some((i) => /\.(py|ts|gd)$/.test(i.location.file)),
-      'adapter-claimed extensions (.py/.ts/.gd) must never raise the guard',
-    );
-    console.log('  ✔ in-process scan flags .ps1 and leaves .py/.ts/.gd untouched');
-
-    const warned = await scan({
-      ...base,
-      include: ['a.ps1'],
-      workers: 1,
-      unsupportedLanguage: 'warning',
-    });
     assert.deepStrictEqual(
-      guardIssues(warned).map((i) => i.severity),
-      ['warning'],
+      guardIssues(claimedScan),
+      [],
+      'adapter-claimed extensions (.ps1/.py/.ts/.gd) must never raise the guard',
     );
-    console.log("  ✔ unsupportedLanguage='warning' lowers the severity");
-
-    const disabled = await scan({
-      ...base,
-      include: ['a.ps1'],
-      workers: 1,
-      unsupportedLanguage: 'off',
-    });
-    assert.strictEqual(guardIssues(disabled).length, 0);
-    console.log("  ✔ unsupportedLanguage='off' restores the silent fallback");
+    assert.strictEqual(claimedScan.summary.filesScanned, 4, 'all four files must be discovered');
+    console.log('  ✔ a scan over claimed extensions raises no guard diagnostic');
 
     const workerMode = await scan({
       ...base,
@@ -192,20 +228,21 @@ async function run() {
     });
     assert.strictEqual(
       guardIssues(workerMode).length,
-      4,
-      'worker mode must report every unsupported file',
+      0,
+      'worker mode must agree with in-process mode: claimed extensions raise nothing',
     );
-    console.log('  ✔ worker mode reports all four unsupported files');
+    assert.strictEqual(workerMode.summary.filesScanned, 4, 'worker mode must discover every file');
+    console.log('  ✔ worker mode agrees with the in-process path');
 
-    const cachedOn = await scan({
+    const cachedFirst = await scan({
       ...base,
       include: ['**/a.ps1'],
       workers: 1,
       cache: true,
       cacheDir,
     });
-    assert.strictEqual(guardIssues(cachedOn).length, 1, 'cold cache must still flag the file');
-    const cachedOff = await scan({
+    assert.strictEqual(cachedFirst.summary.filesScanned, 1, 'cold cache must still discover the file');
+    const cachedSecond = await scan({
       ...base,
       include: ['**/a.ps1'],
       workers: 1,
@@ -214,9 +251,9 @@ async function run() {
       unsupportedLanguage: 'off',
     });
     assert.strictEqual(
-      guardIssues(cachedOff).length,
+      guardIssues(cachedSecond).length,
       0,
-      'severity change must invalidate the cached guard issue',
+      'a severity change must invalidate the cached guard state',
     );
     console.log('  ✔ cache fingerprint invalidates when the severity changes');
 
