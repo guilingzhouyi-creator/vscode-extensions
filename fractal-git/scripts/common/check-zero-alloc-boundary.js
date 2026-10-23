@@ -13,7 +13,7 @@
  *   3. Enforce strong-typed error propagation by flagging unwrap/expect/panic (FGT-ERR-001);
  *   4. Require safety documentation comments for all unsafe blocks (FGT-SAF-001);
  *   5. Enforce Rustdoc coverage on public items (CMT-DOC-001);
- *   6. Guard against vague identifiers (NAM-VAG-001) and forbidden jargon (CMT-JRG-001).
+ *   6. Guard against vague identifiers (NAM-VAG-001) and forbidden jargon (CMT-TRM-001).
  * Exit Semantics & Design Rationale: Exits 0 on clean code, 1 on critical violation;
  *   adheres to CC <= 15, Depth <= 4, and zero false claims.
  */
@@ -178,7 +178,7 @@ function checkVagueIdentifier(line, ctx, violations) {
 }
 
 /**
- * Checks for forbidden jargon/sprint terms in comments (CMT-JRG-001).
+ * Checks for forbidden jargon/sprint terms in comments (CMT-TRM-001).
  *
  * @param {string} trimmed - Trimmed comment line.
  * @param {{ relPath: string, lineNum: number, isComment: boolean }} ctx - Per-line context.
@@ -188,7 +188,7 @@ function checkForbiddenJargon(trimmed, ctx, violations) {
   if (!ctx.isComment) return;
   if (/\b(?:TODO|FIXME|HACK|XXX|sprint\d*|temp|legacy)\b/i.test(trimmed)) {
     violations.push(
-      `CMT-JRG-001: Forbidden comment term at ${ctx.relPath}:${ctx.lineNum}: ${trimmed}`,
+      `CMT-TRM-001: Forbidden comment term at ${ctx.relPath}:${ctx.lineNum}: ${trimmed}`,
     );
   }
 }

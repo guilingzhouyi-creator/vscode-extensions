@@ -40,6 +40,7 @@ if (!cargoResolution) {
 const cargoCmd = cargoResolution.command;
 const args = [
   'run',
+  '--release',
   '--manifest-path',
   MANIFEST_PATH,
   '--bin',

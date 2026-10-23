@@ -26,6 +26,7 @@ use fractal_git::constants::cli::CliTag;
 struct InitRequest {
     workspace_root: PathBuf,
     release: bool,
+    git_compat: bool,
     home_root: Option<PathBuf>,
 }
 
@@ -78,6 +79,18 @@ pub fn handle_init(ctx: &CliContext) {
         }
     }
 
+    if request.git_compat {
+        let git_dir = request.workspace_root.join(".git");
+        if let Err(export_err) =
+            fg_storage::export_native_to_git(layout.repo_dir(), &git_dir, false)
+        {
+            reject(
+                CliTag::ERROR,
+                format!("failed to generate --git-compat projection: {export_err}"),
+            );
+        }
+    }
+
     report(ctx, &request, &document, &created);
 }
 
@@ -85,6 +98,7 @@ pub fn handle_init(ctx: &CliContext) {
 fn parse_request(ctx: &CliContext) -> Result<InitRequest, String> {
     let mut release = false;
     let mut dev = false;
+    let mut git_compat = false;
     let mut workspace_root: Option<PathBuf> = None;
     let mut home_root: Option<PathBuf> = None;
 
@@ -94,6 +108,7 @@ fn parse_request(ctx: &CliContext) -> Result<InitRequest, String> {
         match argument {
             "--dev" => dev = true,
             "--release" => release = true,
+            "--git-compat" => git_compat = true,
             "--no-hide" => {}
             "--workspace" => {
                 let value = ctx
@@ -132,6 +147,7 @@ fn parse_request(ctx: &CliContext) -> Result<InitRequest, String> {
     Ok(InitRequest {
         workspace_root: resolved_root,
         release,
+        git_compat,
         home_root,
     })
 }
@@ -192,6 +208,7 @@ fn report(
             "engine": "taxis",
             "operation": "init",
             "layout_mode": layout_class,
+            "git_compat": request.git_compat,
             "workspace_root": request.workspace_root.display().to_string(),
             "repository_dir": created.repo_dir.display().to_string(),
             "container": created.container_path.display().to_string(),
@@ -209,6 +226,12 @@ fn report(
     println!("  Repository dir : {}", created.repo_dir.display());
     println!("  Container      : {}", created.container_path.display());
     println!("  Repository id  : {}", document.meta.repo_id_hex());
+    if request.git_compat {
+        println!(
+            "  Git compat     : projected at {}",
+            request.workspace_root.join(".git").display()
+        );
+    }
     if let Some(hidden) = created.hidden {
         println!("  Hidden         : {}", if hidden { "yes" } else { "no" });
     }

@@ -181,10 +181,16 @@ fn test_myers_diff_minimal_edit_script() {
         .filter(|l| matches!(l, PatchLine::Context(_)))
         .collect();
 
-    // Exactly 1 line added, 0 lines deleted, 4 lines preserved as Context!
+    // Exactly 1 line added, 0 lines deleted, and the 3 unchanged lines after the insert are kept
+    // as context. The default window is -U3, so the trailing context is capped at three lines; the
+    // whole-file hunk this test used to assert was the defect, not the contract.
     assert_eq!(additions.len(), 1);
     assert_eq!(deletions.len(), 0);
-    assert_eq!(contexts.len(), 4);
+    assert_eq!(contexts.len(), 3);
+    assert_eq!(hunk.old_start, 1);
+    assert_eq!(hunk.old_count, 3);
+    assert_eq!(hunk.new_start, 1);
+    assert_eq!(hunk.new_count, 4);
 }
 
 #[test]
@@ -445,27 +451,49 @@ fn test_path_bloom_filter_accuracy_and_history_walk() {
 }
 
 #[test]
-fn test_swar_prefix_suffix_word_alignment() {
-    let a: Vec<u64> = vec![1, 2, 3, 4, 5, 6, 7, 8, 100, 200, 999, 1000, 1001, 1002];
-    let b: Vec<u64> = vec![1, 2, 3, 4, 5, 6, 7, 8, 300, 400, 999, 1000, 1001, 1002];
+fn test_common_prefix_and_suffix_are_trimmed_out_of_the_hunk() {
+    // Fourteen lines that agree on the first eight and the last four, with a two-line replacement in
+    // the middle. The trimming is observed through the patch, not through a helper: what a caller
+    // can depend on is that the unchanged head and tail stay out of the edit script.
+    let old_lines: Vec<String> = [1u64, 2, 3, 4, 5, 6, 7, 8, 100, 200, 999, 1000, 1001, 1002]
+        .iter()
+        .map(u64::to_string)
+        .collect();
+    let new_lines: Vec<String> = [1u64, 2, 3, 4, 5, 6, 7, 8, 300, 400, 999, 1000, 1001, 1002]
+        .iter()
+        .map(u64::to_string)
+        .collect();
+    let old_text = format!("{}\n", old_lines.join("\n"));
+    let new_text = format!("{}\n", new_lines.join("\n"));
 
-    // Common prefix has 8 items (two 4-wide chunks)
-    let p_len = PatchGenerator::swar_trim_prefix(&a, &b);
-    assert_eq!(p_len, 8);
-
-    // Common suffix has 4 items (one 4-wide chunk)
-    let s_len = PatchGenerator::swar_trim_suffix(&a, &b, p_len);
-    assert_eq!(s_len, 4);
-
-    // Identical file fast path
-    let text = "Line 1\nLine 2\nLine 3\n";
-    let patch = PatchGenerator::generate_patch("file.txt", text, text);
+    let patch = PatchGenerator::generate_patch("file.txt", &old_text, &new_text);
     assert_eq!(patch.hunks.len(), 1);
-    assert_eq!(patch.hunks[0].lines.len(), 3);
-    assert!(patch.hunks[0]
+    let hunk = &patch.hunks[0];
+    let additions = hunk
         .lines
         .iter()
-        .all(|l| matches!(l, PatchLine::Context(_))));
+        .filter(|line| matches!(line, PatchLine::Addition(_)))
+        .count();
+    let deletions = hunk
+        .lines
+        .iter()
+        .filter(|line| matches!(line, PatchLine::Deletion(_)))
+        .count();
+    assert_eq!(additions, 2);
+    assert_eq!(deletions, 2);
+
+    // The hunk starts three lines before the change (-U3) and covers three lines after it, so the
+    // eight unchanged leading lines and the trailing lines past the third are trimmed away.
+    assert_eq!(hunk.old_start, 6);
+    assert_eq!(hunk.old_count, 8);
+    assert_eq!(hunk.new_start, 6);
+    assert_eq!(hunk.new_count, 8);
+
+    // Identical file fast path: no edit means no hunk, because a patch that reports the entire file
+    // as unchanged context carries no change a patch tool could apply.
+    let text = "Line 1\nLine 2\nLine 3\n";
+    let patch = PatchGenerator::generate_patch("file.txt", text, text);
+    assert!(patch.hunks.is_empty());
 }
 
 #[test]

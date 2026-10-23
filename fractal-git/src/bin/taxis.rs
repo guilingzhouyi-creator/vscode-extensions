@@ -17,15 +17,17 @@ use std::path::PathBuf;
 
 mod taxis_cmd;
 use taxis_cmd::common::{fail_io, print_json, reject, CliContext};
-use taxis_cmd::{bench, commit, doctor, git_bridge, init, promotion, relocate, worktree};
+use taxis_cmd::{
+    bench, checkout, commit, commit_walk, diff_cmd, doctor, init, log_cmd, projection_cmd,
+    promotion, read_cmd, relocate, status_cmd, worktree,
+};
 
 use fg_native::RepoDocument;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
     ActorIdentity, AgentPushContext, CommitCounter, CommitMessageGuard, CommitTelemetryConfig,
-    ConflictGuard, DiskRefStore, FractalRef, HeadState, IpcCodec, IpcMessage, Oid, OperationGraph,
-    PacketLine, PreReceiveGuard, QuotaGovernor, RefStore, TaxisPolicy, TelemetryCommitNode,
-    TopologyVerifier,
+    ConflictGuard, DiskRefStore, FractalRef, IpcCodec, IpcMessage, Oid, OperationGraph, PacketLine,
+    PreReceiveGuard, QuotaGovernor, RefStore, TaxisPolicy, TelemetryCommitNode, TopologyVerifier,
 };
 
 fn resolve_canonical_subcommand(raw: &str) -> &str {
@@ -40,6 +42,8 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["init"], "init"),
         (&["doctor"], "doctor"),
         (&["relocate"], "relocate"),
+        (&["git-export", "export"], "git-export"),
+        (&["git-import", "import"], "git-import"),
         (&["gc", "clean", "reclaim"], "reclaim"),
         (&["serve", "daemon"], "daemon"),
         (&["lg", "log"], "log"),
@@ -82,9 +86,11 @@ fn print_help() {
         r#"Usage: taxis <command> [options]
 
 Native Fractal Commands (with Git Alias Mappings):
-  init               Create a Taxis-native repository (--dev | --release)
+  init               Create a Taxis-native repository (--dev | --release | --git-compat)
   doctor             Inspect repository layout, guard file & section integrity
   relocate           Move a repository between the workspace and the store layout
+  git-export         Export native .taxis repository into standard .git projection
+  git-import         Import standard .git repository into native .taxis format
   status,   st       Display fractal ref topology, staged index & quota status
   branch,   br       List or verify fractal branch hierarchies (Trunk/Cell/Card/Sub)
   commit,   ci       Create atomic commit with agent metadata
@@ -108,105 +114,6 @@ Flags:
   --json             Output machine-readable JSON format
   --git-dir <path>   Override .git or .taxis directory location
 "#
-    );
-}
-
-/// Renders the resolved `HEAD` position as a machine-readable object.
-fn head_json(head: &HeadState) -> serde_json::Value {
-    match head {
-        HeadState::Absent => serde_json::json!({ "kind": "absent" }),
-        HeadState::Detached(oid) => serde_json::json!({
-            "kind": "detached",
-            "oid": oid.to_hex(),
-        }),
-        HeadState::Symbolic { name, target } => serde_json::json!({
-            "kind": "symbolic",
-            "branch": name,
-            "oid": target.map(|oid| oid.to_hex()),
-        }),
-    }
-}
-
-/// Prints the resolved `HEAD` position in the human-readable status block.
-fn print_head(head: &HeadState) {
-    match head {
-        HeadState::Absent => println!("HEAD: (absent)"),
-        HeadState::Detached(oid) => println!("HEAD: detached at {}", oid.to_hex()),
-        HeadState::Symbolic { name, target } => match target {
-            Some(oid) => println!("HEAD: {} -> {}", name, oid.to_hex()),
-            None => println!("HEAD: {} (unborn)", name),
-        },
-    }
-}
-
-/// Dispatches repository status inspection, displaying the current head, references, and quotas.
-///
-/// A refused reference scan terminates with `EXIT_REJECTED` instead of printing an empty list, so
-/// a permission failure can never be mistaken for a repository that genuinely has no references.
-fn handle_status(ctx: &CliContext) {
-    let ref_store = DiskRefStore::new(&ctx.git_dir);
-    let refs = match ref_store.list_all() {
-        Ok(listed_refs) => listed_refs,
-        Err(scan_err) => fail_io("scan repository references", scan_err),
-    };
-    let head = match ref_store.head() {
-        Ok(head_state) => head_state,
-        Err(head_err) => fail_io("resolve repository HEAD", head_err),
-    };
-    let quota = QuotaGovernor::default();
-
-    if ctx.json_mode {
-        let json_refs: Vec<serde_json::Value> = refs
-            .iter()
-            .map(|(name, oid)| {
-                serde_json::json!({
-                    "ref": name,
-                    "oid": oid.to_hex(),
-                })
-            })
-            .collect();
-
-        let status_payload = serde_json::json!({
-            "engine": "taxis",
-            "git_dir": ctx.git_dir.display().to_string(),
-            "head": head_json(&head),
-            "ref_count": refs.len(),
-            "refs": json_refs,
-            "quota": {
-                "max_worktrees": quota.max_concurrent_worktrees(),
-                "max_disk_mb": quota.max_disk_megabytes(),
-            }
-        });
-        print_json(&status_payload);
-        return;
-    }
-
-    print_banner();
-    println!("Repository: {}", ctx.git_dir.display());
-    print_head(&head);
-    println!("Discovered Fractal References ({}):", refs.len());
-
-    if refs.is_empty() {
-        println!(
-            "  (No fractal references found in {})",
-            ctx.git_dir.join("refs/fractal").display()
-        );
-    } else {
-        for (name, oid) in &refs {
-            let hex = oid.to_hex();
-            let short_oid = if hex.len() >= 10 { &hex[..10] } else { &hex };
-            println!("  ├── {} -> {}", name, short_oid);
-        }
-    }
-
-    println!("\nResource Quota Status:");
-    println!(
-        "  * Max Concurrent Worktrees : {}",
-        quota.max_concurrent_worktrees()
-    );
-    println!(
-        "  * Max Workspace Budget (MB): {}",
-        quota.max_disk_megabytes()
     );
 }
 
@@ -241,7 +148,82 @@ fn handle_branch(ctx: &CliContext) {
         return;
     }
 
-    handle_status(ctx);
+    list_branches(ctx);
+}
+
+/// Prints the local branches, marking the one `HEAD` names with `*`.
+///
+/// This is the only job `branch` has when invoked without arguments; delegating to `status` printed
+/// a worktree report instead, which is a different command's answer to a different question. A
+/// script that runs `branch` to learn its current branch received a list of modified files.
+///
+/// A checkout with no branch — detached `HEAD`, or a repository whose first commit does not exist
+/// yet — prints no `*` line rather than inventing a name, because the absence is the fact the caller
+/// needs to see.
+fn list_branches(ctx: &CliContext) {
+    let view = match taxis_cmd::repo_view::RepoView::open(ctx) {
+        Ok(opened) => opened,
+        Err(open_err) => reject(CliTag::ERROR, open_err),
+    };
+    let current = match view.head_branch() {
+        Ok(state) => state,
+        Err(head_err) => reject(CliTag::ERROR, head_err),
+    };
+    // An unborn branch has no ref file yet, so it is absent from `branches()` but is still the branch
+    // `HEAD` names. Reporting it keeps `branch` usable in a freshly initialised repository.
+    let unborn = current
+        .as_ref()
+        .filter(|(_, target)| target.is_none())
+        .map(|(name, _)| name.clone());
+    let listed = match view.branches() {
+        Ok(branches) => branches,
+        Err(list_err) => reject(CliTag::ERROR, list_err),
+    };
+    let elsewhere: Vec<String> = view.linked_worktree_branches();
+
+    if ctx.json_mode {
+        let rendered: Vec<serde_json::Value> = listed
+            .iter()
+            .map(|(name, oid)| {
+                serde_json::json!({
+                    "name": name,
+                    "oid": oid.to_hex(),
+                    "current": current.as_ref().is_some_and(|(head, _)| head == name),
+                })
+            })
+            .collect();
+        print_json(&serde_json::json!({
+            "engine": "taxis",
+            "operation": "branch",
+            "branch_count": rendered.len(),
+            "branches": rendered,
+        }));
+        return;
+    }
+
+    let mut names: Vec<(String, char)> = listed
+        .iter()
+        .map(|(name, _)| {
+            let marker = if current.as_ref().is_some_and(|(head, _)| head == name) {
+                '*'
+            } else if elsewhere.contains(name) {
+                // Git marks a branch another worktree has checked out with `+`. Two worktrees cannot
+                // hold the same branch at once, so the marker says the name is already live
+                // somewhere else — information a reader gets nowhere else in this listing.
+                '+'
+            } else {
+                ' '
+            };
+            (name.clone(), marker)
+        })
+        .collect();
+    if let Some(name) = unborn {
+        names.push((name, '*'));
+        names.sort_by(|left, right| left.0.cmp(&right.0));
+    }
+    for (name, marker) in names {
+        println!("{marker} {name}");
+    }
 }
 
 /// Dispatches time-travel undo operation, restoring branch heads to previous snapshot.
@@ -355,18 +337,82 @@ fn handle_operation(ctx: &CliContext) {
 
 /// Computes official commit counts using anti-inflation telemetry filters.
 ///
-/// The DAG is read from the host repository through the git bridge. An empty or unreadable
-/// repository is reported as such instead of collapsing to a fixed count, because a synthetic
-/// count is indistinguishable from a real one once printed.
+/// The DAG is walked straight from the object store. An unborn or unreadable repository is reported
+/// as such instead of collapsing to a fixed count, because a synthetic count is indistinguishable
+/// from a real one once printed.
+///
+/// Plain `rev-list` prints one object id per line, which is what every caller of `git rev-list`
+/// parses. The anti-inflation banner is a Taxis-specific report, so it moved behind `--telemetry`:
+/// printing it by default made the command unusable as a Git projection, since a script asking for
+/// revisions received prose. `--count` keeps the telemetry count, which is the number Git prints
+/// once the filtered micro-snapshots are excluded.
 fn handle_rev_list(ctx: &CliContext) {
     let mut count_only = false;
     let mut all_transient = false;
+    let mut telemetry = false;
+    let mut limit: Option<usize> = None;
 
-    for arg in &ctx.args {
-        if arg == "--count" {
-            count_only = true;
-        } else if arg == "--all-transient" {
-            all_transient = true;
+    let mut cursor = 0usize;
+    while cursor < ctx.args.len() {
+        let arg = ctx.args[cursor].as_str();
+        cursor += 1;
+        match arg {
+            "--count" => count_only = true,
+            "--all-transient" => all_transient = true,
+            "--telemetry" => telemetry = true,
+            // Three spellings of the same limit: `-n 5`, `-n5`, and `-5`. Git accepts all three, and
+            // ignoring the two-argument form turns a limited walk into the whole history — the
+            // failure this rewrite of `rev-list` exists to avoid.
+            "-n" => match ctx.args.get(cursor) {
+                Some(text) => match text.parse::<usize>() {
+                    Ok(parsed) => {
+                        limit = Some(parsed);
+                        cursor += 1;
+                    }
+                    Err(_) => reject(
+                        CliTag::ERROR,
+                        format!("rev-list -n expects a count, got '{text}'"),
+                    ),
+                },
+                None => reject(CliTag::ERROR, "rev-list -n requires a count"),
+            },
+            "--max-count" => match ctx.args.get(cursor) {
+                Some(text) => match text.parse::<usize>() {
+                    Ok(parsed) => {
+                        limit = Some(parsed);
+                        cursor += 1;
+                    }
+                    Err(_) => reject(
+                        CliTag::ERROR,
+                        format!("rev-list --max-count expects a count, got '{text}'"),
+                    ),
+                },
+                None => reject(CliTag::ERROR, "rev-list --max-count requires a count"),
+            },
+            other if other.starts_with("--max-count=") => {
+                let text = &other["--max-count=".len()..];
+                match text.parse::<usize>() {
+                    Ok(parsed) => limit = Some(parsed),
+                    Err(_) => reject(
+                        CliTag::ERROR,
+                        format!("rev-list --max-count expects a count, got '{text}'"),
+                    ),
+                }
+            }
+            other if other.starts_with('-') && other.len() > 1 => {
+                let digits = other.strip_prefix("-n").unwrap_or(&other[1..]);
+                match digits.parse::<usize>() {
+                    Ok(parsed) => limit = Some(parsed),
+                    // A flag this walker does not know is refused rather than ignored: silently
+                    // dropping `--all` or `--first-parent` would answer a different question than
+                    // the caller asked.
+                    Err(_) => reject(
+                        CliTag::ERROR,
+                        format!("rev-list does not support the flag '{other}'"),
+                    ),
+                }
+            }
+            _ => {}
         }
     }
 
@@ -377,25 +423,30 @@ fn handle_rev_list(ctx: &CliContext) {
         },
     };
 
-    let work_root = git_bridge::resolve_work_root(&ctx.git_dir);
-    let head = match git_bridge::resolve_revision(&work_root, "HEAD") {
+    let view = match taxis_cmd::repo_view::RepoView::open(ctx) {
+        Ok(opened) => opened,
+        Err(open_err) => reject(CliTag::ERROR, open_err),
+    };
+    let head = match view.head_commit() {
         Ok(Some(head_oid)) => head_oid,
         Ok(None) => reject(
             CliTag::ERROR,
             format!(
-                "no HEAD revision under '{}'; nothing to count",
-                work_root.display()
+                "HEAD is unborn in '{}'; nothing to count",
+                view.git_dir().display()
             ),
         ),
         Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
     };
 
-    let nodes = match git_bridge::read_commit_nodes(&work_root, "HEAD") {
-        Ok(parsed_nodes) => parsed_nodes,
-        Err(read_err) => reject(CliTag::ERROR, read_err),
+    let records = match commit_walk::walk_commits(&view, &[head]) {
+        Ok(walked) => walked,
+        Err(walk_err) => reject(CliTag::ERROR, walk_err),
     };
-    let node_index: std::collections::HashMap<Oid, TelemetryCommitNode> =
-        nodes.into_iter().map(|node| (node.oid, node)).collect();
+    let node_index: std::collections::HashMap<Oid, TelemetryCommitNode> = records
+        .iter()
+        .map(|record| (record.oid, record.to_telemetry_node()))
+        .collect();
 
     let verdict = match CommitCounter::count_commits(Some(head), &config, |oid| {
         Ok(node_index.get(oid).cloned())
@@ -415,6 +466,14 @@ fn handle_rev_list(ctx: &CliContext) {
             print_json(&rev_payload);
         } else {
             println!("{}", verdict.official_count);
+        }
+        return;
+    }
+
+    if !telemetry {
+        let shown = &records[..records.len().min(limit.unwrap_or(records.len()))];
+        for record in shown {
+            println!("{}", record.oid.to_hex());
         }
         return;
     }
@@ -710,96 +769,49 @@ fn probe_packetline_framing() -> bool {
     }
 }
 
-/// Reports the working tree status as structured JSON, or delegates to host Git for text diffs.
-fn handle_diff(ctx: &CliContext) {
-    if ctx.json_mode {
-        let work_root = git_bridge::resolve_work_root(&ctx.git_dir);
-        let entries = match git_bridge::read_status_entries(&work_root) {
-            Ok(status_entries) => status_entries,
-            Err(status_err) => reject(CliTag::ERROR, status_err),
-        };
-
-        let json_entries: Vec<serde_json::Value> = entries
-            .iter()
-            .map(|entry| {
-                serde_json::json!({
-                    "code": entry.code,
-                    "path": entry.path,
-                    "classification": entry.classification(),
-                })
-            })
-            .collect();
-        let status = if entries.is_empty() { "clean" } else { "dirty" };
-
-        let output = serde_json::json!({
-            "engine": "taxis",
-            "operation": "diff",
-            "git_dir": ctx.git_dir.display().to_string(),
-            "status": status,
-            "entry_count": json_entries.len(),
-            "entries": json_entries
-        });
-        print_json(&output);
-        return;
+/// Resolves effective repository directory following §5.1.1 priority:
+/// 1. Explicit `--git-dir` path if provided.
+/// 2. `.taxis/` if it exists and contains a valid container.
+/// 3. `.git/` if it exists.
+fn resolve_effective_repo_dir(explicit: Option<PathBuf>) -> PathBuf {
+    if let Some(path) = explicit {
+        return path;
     }
-    handle_passthrough("diff", ctx);
-}
 
-/// Dispatches switching to fractal reference branches or falls back to host Git checkout.
-fn handle_checkout(ctx: &CliContext) {
-    if ctx.args.is_empty() {
-        reject(
-            CliTag::ERROR,
-            "Expected branch, commit, or fractal ref to checkout.",
-        );
-    }
-    let target = &ctx.args[0];
-    if let Some(fref) = FractalRef::parse(target) {
-        println!(
-            "{} Switched to fractal reference: {:?}",
-            CliTag::TAXIS_CHECKOUT,
-            fref
-        );
-        return;
-    }
-    handle_passthrough("checkout", ctx);
-}
-
-/// Proxies unrecognized commands transparently to the underlying Git binary.
-fn handle_passthrough(cmd: &str, ctx: &CliContext) {
-    let mut command = std::process::Command::new("git");
-    command.arg(cmd);
-    for arg in &ctx.args {
-        command.arg(arg);
-    }
-    // Sandbox & Permission Defense: If global .gitconfig is unreadable, fallback to NUL
-    if std::env::var("GIT_CONFIG_GLOBAL").is_err() {
-        if let Some(home) = std::env::var_os("USERPROFILE") {
-            let cfg = PathBuf::from(home).join(".gitconfig");
-            if std::fs::File::open(&cfg).is_err() {
-                command.env("GIT_CONFIG_GLOBAL", "NUL");
+    if let Ok(cwd) = env::current_dir() {
+        let mut cursor = cwd.as_path();
+        loop {
+            let taxis_candidate = cursor.join(".taxis");
+            if fg_native::container_path(&taxis_candidate).exists() {
+                return taxis_candidate;
+            }
+            if fg_native::container_path(cursor).exists() {
+                return cursor.to_path_buf();
+            }
+            let git_candidate = cursor.join(".git");
+            if git_candidate.join("HEAD").is_file() || git_candidate.is_file() {
+                return git_candidate;
+            }
+            if cursor.join("HEAD").is_file() && cursor.join("objects").is_dir() {
+                return cursor.to_path_buf();
+            }
+            match cursor.parent() {
+                Some(parent) => cursor = parent,
+                None => break,
             }
         }
     }
-    match command.status() {
-        Ok(status) => {
-            if let Some(code) = status.code().filter(|&exit_code| exit_code != 0) {
-                std::process::exit(code);
-            }
-        }
-        Err(cmd_err) => {
-            eprintln!(
-                "[ERROR] Failed to invoke git command '{}': {}",
-                cmd, cmd_err
-            );
-            std::process::exit(1);
-        }
+
+    if std::path::Path::new(".taxis").exists() {
+        PathBuf::from(".taxis")
+    } else {
+        PathBuf::from(".git")
     }
 }
 
 /// Parses global CLI flags (--json, --git-dir) and separates subcommand arguments.
 fn parse_cli_args(raw_args: &[String]) -> (PathBuf, bool, Vec<String>) {
-    let mut git_dir = PathBuf::from(".git");
+    let mut explicit_git_dir: Option<PathBuf> = None;
     let mut json_mode = false;
     let mut filtered_args = Vec::new();
 
@@ -809,13 +821,14 @@ fn parse_cli_args(raw_args: &[String]) -> (PathBuf, bool, Vec<String>) {
             json_mode = true;
             arg_cursor += 1;
         } else if raw_args[arg_cursor] == "--git-dir" && arg_cursor + 1 < raw_args.len() {
-            git_dir = PathBuf::from(&raw_args[arg_cursor + 1]);
+            explicit_git_dir = Some(PathBuf::from(&raw_args[arg_cursor + 1]));
             arg_cursor += 2;
         } else {
             filtered_args.push(raw_args[arg_cursor].clone());
             arg_cursor += 1;
         }
     }
+    let git_dir = resolve_effective_repo_dir(explicit_git_dir);
     (git_dir, json_mode, filtered_args)
 }
 
@@ -844,11 +857,21 @@ fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
         "init" => init::handle_init(ctx),
         "doctor" => doctor::handle_doctor(ctx),
         "relocate" => relocate::handle_relocate(ctx),
-        "status" => handle_status(ctx),
+        "git-export" => projection_cmd::handle_git_export(ctx),
+        "git-import" => projection_cmd::handle_git_import(ctx),
+        "status" => status_cmd::handle_status(ctx),
         "branch" => handle_branch(ctx),
         "commit" => commit::handle_commit(ctx),
-        "diff" => handle_diff(ctx),
-        "checkout" => handle_checkout(ctx),
+        "diff" => diff_cmd::handle_diff(ctx),
+        "cat-file" => read_cmd::handle_cat_file(ctx),
+        "ls-tree" => read_cmd::handle_ls_tree(ctx),
+        "ls-files" => read_cmd::handle_ls_files(ctx),
+        "show-ref" => read_cmd::handle_show_ref(ctx),
+        "for-each-ref" => read_cmd::handle_for_each_ref(ctx),
+        "check-ignore" => read_cmd::handle_check_ignore(ctx),
+        "log" => log_cmd::handle_log(ctx),
+        "show" => log_cmd::handle_show(ctx),
+        "checkout" | "switch" => checkout::handle_checkout(ctx),
         "worktree" => worktree::handle_worktree(ctx),
         "promotion" => promotion::handle_promotion(ctx),
         "bench" => bench::handle_bench(ctx),
@@ -863,8 +886,27 @@ fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
             println!("Version: 0.1.0 (Rust Stable, 10 Micro-Crates)");
         }
         "help" => print_help(),
-        other => handle_passthrough(other, ctx),
+        other => reject_unimplemented(other),
     }
+}
+
+/// Rejects a subcommand that has no native implementation.
+///
+/// Before this existed, the fallback forwarded the name to the host `git` binary. That made a
+/// command appear to work while every byte it printed came from another program, and it made a
+/// missing implementation indistinguishable from a working one. A refusal names the command and the
+/// supported set, so the caller learns what is missing instead of receiving a successful run of a
+/// different tool.
+fn reject_unimplemented(subcommand: &str) -> ! {
+    reject(
+        CliTag::ERROR,
+        format!(
+            "'{subcommand}' has no native implementation in this build. \
+             Implemented: init, doctor, relocate, git-export, git-import, status, branch, commit, diff, cat-file, ls-tree, \
+             ls-files, show-ref, for-each-ref, check-ignore, log, show, checkout, worktree, \
+             promotion, bench, undo, operation, rev-list, verify, reclaim, daemon, version, help."
+        ),
+    )
 }
 
 fn main() {

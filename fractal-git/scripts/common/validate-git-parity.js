@@ -95,7 +95,7 @@ function runGitParityValidation() {
     }
   }
 
-  // Verify tree sorting directory trailing slash invariant (FGT-OBJ-002)
+  // Verify tree sorting directory trailing slash invariant (FGT-OBJ-001)
   const unsortedEntries = [
     { name: 'foo.c', mode: '100644' },
     { name: 'foo', mode: '040000' }, // Directory 'foo' must sort AFTER 'foo.c' because 'foo/' > 'foo.c' ('/' is ASCII 47, '.' is ASCII 46)
@@ -111,7 +111,7 @@ function runGitParityValidation() {
   for (let i = 0; i < expectedOrder.length; i++) {
     if (sortedNames[i] !== expectedOrder[i]) {
       violations.push(
-        `FGT-OBJ-002: Canonical Git tree sorting invariant violated: expected [${expectedOrder.join(', ')}], got [${sortedNames.join(', ')}]`
+        `FGT-OBJ-001: Canonical Git tree sorting invariant violated: expected [${expectedOrder.join(', ')}], got [${sortedNames.join(', ')}]`
       );
       break;
     }

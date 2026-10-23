@@ -10,12 +10,22 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-GAT-001`: Fractal Git domain gate guard
 
+pub mod abbrev;
 pub mod bench;
+pub mod checkout;
 pub mod commit;
+pub mod commit_walk;
 pub mod common;
+pub mod config;
+pub mod diff_cmd;
+pub mod diff_render;
 pub mod doctor;
-pub mod git_bridge;
 pub mod init;
+pub mod log_cmd;
+pub mod projection_cmd;
 pub mod promotion;
+pub mod read_cmd;
 pub mod relocate;
+pub mod repo_view;
+pub mod status_cmd;
 pub mod worktree;

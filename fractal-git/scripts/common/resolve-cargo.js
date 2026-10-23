@@ -136,6 +136,23 @@ function pinRustc(resolution) {
 function prepareCargo() {
   const resolution = resolveCargo();
   pinRustc(resolution);
+  if (process.platform === 'win32') {
+    const homeRoot = os.homedir();
+    const mingwBin = path.join(homeRoot, 'DevTools', 'mingw64', 'bin');
+    if (fs.existsSync(mingwBin)) {
+      const curPath = process.env.PATH || '';
+      if (!curPath.split(path.delimiter).includes(mingwBin)) {
+        process.env.PATH = `${mingwBin}${path.delimiter}${curPath}`;
+      }
+    }
+    if (!process.env.CARGO_TARGET_DIR) {
+      const defaultTarget = path.join(os.tmpdir(), 'taxis-cargo-target');
+      if (!fs.existsSync(defaultTarget)) {
+        try { fs.mkdirSync(defaultTarget, { recursive: true }); } catch {}
+      }
+      process.env.CARGO_TARGET_DIR = defaultTarget;
+    }
+  }
   return resolution;
 }
 

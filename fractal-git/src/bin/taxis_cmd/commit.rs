@@ -13,6 +13,15 @@
 //! - `FGT-GAT-001`: Fractal Git domain gate guard
 //! - `FGT-STO-001`: Storage layer crash safety guard
 
+use std::fs;
+use std::path::Path;
+
+use fg_core::models::{FileMode, IndexStage, Oid};
+use fg_index::{write_dirc_v2, IndexEntry};
+use fg_native::sections::head::HeadState as NativeHeadState;
+use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
+use fg_native::sections::refs::RefRecord;
+use fg_native::RepoDocument;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
     materialize_commit, ActorIdentity, AgentPushContext, CommitMaterializationRequest,
@@ -33,14 +42,29 @@ pub fn handle_commit(ctx: &CliContext) {
     let human_author = find_arg_value(&ctx.args, &["--human"]).map(String::from);
     let auth_token = find_arg_value(&ctx.args, &["--token"]).map(String::from);
     let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or("rust-strict");
-    let target_ref_str =
-        find_arg_value(&ctx.args, &["--target"]).unwrap_or("refs/fractal/cell/cell-default/main");
+    let explicit_target = find_arg_value(&ctx.args, &["--target"]);
+    let target_ref_str = match explicit_target {
+        Some(t) => t.to_string(),
+        None => resolve_active_head_ref(&ctx.git_dir)
+            .unwrap_or_else(|| "refs/fractal/cell/cell-default/main".to_string()),
+    };
 
     let policy = resolve_commit_policy(policy_name);
     let actor = resolve_actor_identity(human_author.as_deref(), auth_token, agent_id, cell_id);
-    let target_ref = FractalRef::parse(target_ref_str).unwrap_or(FractalRef::CellMain {
-        cell_id: cell_id.into(),
-    });
+    let target_ref = match FractalRef::parse(&target_ref_str) {
+        Some(fref) => fref,
+        None => {
+            if let Some(branch) = target_ref_str.strip_prefix("refs/heads/") {
+                FractalRef::SystemTrunk {
+                    branch: branch.to_string(),
+                }
+            } else {
+                FractalRef::CellMain {
+                    cell_id: cell_id.into(),
+                }
+            }
+        }
+    };
 
     if let Err(auth_err) = PreReceiveGuard::assert_actor_authorized(&target_ref, &actor, &policy) {
         reject(
@@ -66,6 +90,82 @@ pub fn handle_commit(ctx: &CliContext) {
         cell_id,
         &target_ref,
     );
+
+    // Synchronize staged index (.taxis/index and doc.indx)
+    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
+    let mut index_entries = Vec::with_capacity(staged_files.len());
+    let mut native_indx = fg_native::IndxSection::new();
+
+    for (i, path) in staged_files.iter().enumerate() {
+        let blob_oid = materialized.blob_oids.get(i).copied().unwrap_or(Oid::ZERO);
+        let full_path = work_root.join(path);
+        let (size, mtime_sec, mtime_nano) = if let Ok(meta) = fs::metadata(&full_path) {
+            let mtime = meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            let duration = mtime
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .unwrap_or_default();
+            (
+                meta.len() as u32,
+                duration.as_secs() as u32,
+                duration.subsec_nanos(),
+            )
+        } else {
+            (0, 0, 0)
+        };
+        index_entries.push(IndexEntry {
+            path: path.clone(),
+            mode: FileMode::RegularFile,
+            oid: blob_oid,
+            stage: IndexStage::Normal,
+            size,
+            mtime_seconds: mtime_sec,
+            mtime_nanos: mtime_nano,
+            assume_valid: false,
+            skip_worktree: false,
+            intent_to_add: false,
+        });
+        let _ = native_indx.upsert(NativeIndexEntry {
+            path: path.clone(),
+            mode: FileMode::RegularFile,
+            oid: blob_oid,
+            stage: IndexStage::Normal,
+            stat: StatCache {
+                size: u64::from(size),
+                mtime_secs: i64::from(mtime_sec),
+                mtime_nanos: mtime_nano,
+                ctime_secs: i64::from(mtime_sec),
+                ctime_nanos: mtime_nano,
+                dev: 0,
+                ino: 0,
+                uid: 0,
+                gid: 0,
+            },
+            flags: 0,
+        });
+    }
+
+    let _ = write_dirc_v2(&ctx.git_dir.join("index"), &index_entries);
+
+    // Synchronize native container (doc.refs & doc.indx) if present
+    let container_path = fg_native::container_path(&ctx.git_dir);
+    if container_path.is_file() {
+        if let Ok(mut doc) = RepoDocument::load(&container_path) {
+            let git_ref = target_ref.to_git_ref();
+            let _ = doc.refs.upsert(RefRecord {
+                name: git_ref.clone(),
+                oid: materialized.commit_oid,
+                peeled: None,
+            });
+            doc.indx = native_indx;
+            let _ = doc.save_atomic(&container_path);
+        }
+    }
+
+    // Ensure HEAD exists on disk
+    let head_path = ctx.git_dir.join("HEAD");
+    if !head_path.is_file() {
+        let _ = fs::write(&head_path, format!("ref: {}\n", target_ref.to_git_ref()));
+    }
 
     record_commit_in_operation_graph(ctx, &materialized.commit_oid, &target_ref, &actor, &witness);
 
@@ -144,13 +244,48 @@ fn resolve_commit_message(args: &[String], card_id: &str) -> String {
         })
 }
 
-/// Collects every path the caller declares as part of this commit.
+/// Collects every path the caller declares as part of this commit, or reads from index.
 fn collect_staged_files(ctx: &CliContext) -> Vec<String> {
     let declared = find_all_arg_values(&ctx.args, &["--file", "--add"]);
-    if declared.is_empty() {
-        return vec![DEFAULT_COMMIT_FILE.to_string()];
+    if !declared.is_empty() {
+        return declared.into_iter().map(String::from).collect();
     }
-    declared.into_iter().map(String::from).collect()
+
+    let index_file = ctx.git_dir.join("index");
+    if let Ok(git_index) = fg_index::GitIndex::load(&index_file) {
+        let files: Vec<String> = git_index.entries().iter().map(|e| e.path.clone()).collect();
+        if !files.is_empty() {
+            return files;
+        }
+    }
+
+    let container_path = fg_native::container_path(&ctx.git_dir);
+    if let Ok(doc) = RepoDocument::load(&container_path) {
+        let files: Vec<String> = doc.indx.entries().iter().map(|e| e.path.clone()).collect();
+        if !files.is_empty() {
+            return files;
+        }
+    }
+
+    vec![DEFAULT_COMMIT_FILE.to_string()]
+}
+
+/// Resolves the symbolic reference currently pointed to by HEAD.
+fn resolve_active_head_ref(git_dir: &Path) -> Option<String> {
+    let head_file = git_dir.join("HEAD");
+    if let Ok(content) = fs::read_to_string(&head_file) {
+        let trimmed = content.trim();
+        if let Some(target) = trimmed.strip_prefix("ref:") {
+            return Some(target.trim().to_string());
+        }
+    }
+    let container_path = fg_native::container_path(git_dir);
+    if let Ok(doc) = RepoDocument::load(&container_path) {
+        if let NativeHeadState::Symbolic { target } = doc.head {
+            return Some(target);
+        }
+    }
+    None
 }
 
 /// Verifies commit message against policy constraints, exiting on failure.
@@ -189,7 +324,7 @@ fn materialize_staged_files(
 
     let request = CommitMaterializationRequest {
         files: staged_files.to_vec(),
-        work_root: super::git_bridge::resolve_work_root(&ctx.git_dir),
+        work_root: super::repo_view::resolve_work_root(&ctx.git_dir),
         message: message.to_string(),
         author,
         target_ref: target_ref.to_git_ref(),

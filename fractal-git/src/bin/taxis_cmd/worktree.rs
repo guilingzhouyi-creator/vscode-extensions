@@ -37,17 +37,14 @@ pub fn handle_worktree(ctx: &CliContext) {
         return;
     }
 
-    // Pass unrecognized worktree arguments directly to host git
-    let mut passthrough_args = vec!["worktree".to_string()];
-    passthrough_args.extend(ctx.args.clone());
-    let status = std::process::Command::new("git")
-        .args(&passthrough_args)
-        .status();
-    match status {
-        Ok(exit_status) if exit_status.success() => {}
-        Ok(exit_status) => std::process::exit(exit_status.code().unwrap_or(1)),
-        Err(cmd_err) => fail_io("invoke host git worktree", cmd_err),
-    }
+    reject(
+        CliTag::ERROR,
+        format!(
+            "worktree subcommand '{}' is not implemented; this build manages allocations through \
+             'worktree list' and 'worktree add'",
+            ctx.args[0]
+        ),
+    )
 }
 
 /// Lists active worktree slots, quota constraints, and trunk projection modes.

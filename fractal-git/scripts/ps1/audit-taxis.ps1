@@ -210,7 +210,9 @@ $auditReportScript = Join-Path $ProjectRoot "scripts/common/run-audit-report.js"
 $auditReportPath = Join-Path $ProjectRoot "reports/audit-latest.json"
 
 if ($nodeCmd -and (Test-Path $auditReportScript)) {
-    $procReport = Invoke-AuditChild -FilePath $nodeCmd -ArgumentList @($auditReportScript) -Label "audit-report"
+    $reportArgs = @($auditReportScript)
+    if ($Fast) { $reportArgs += "--fast" }
+    $procReport = Invoke-AuditChild -FilePath $nodeCmd -ArgumentList $reportArgs -Label "audit-report"
     if ($procReport.ExitCode -eq 0 -and (Test-Path $auditReportPath)) {
         try {
             $reportJson = Get-Content -Path $auditReportPath -Raw -Encoding utf8 | ConvertFrom-Json
@@ -271,8 +273,8 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
     if ($procPromoInit.ExitCode -ne 0) {
         Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "晋级演练仓库初始化失败，无法验证暂存链路"
         $failures.Add("PROMOTION-BRIDGE-05")
-    }
-    $promoArgs = @(
+    } else {
+        $promoArgs = @(
         "run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "promotion", "request",
         "--git-dir", (Join-Path $promoLedgerRoot ".taxis"),
         "--candidate", "1111111111111111111111111111111111111111",
@@ -296,6 +298,7 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
     } else {
         $statusPromotion = "PASS"
         Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "PASS" -Detail "晋级暂存请求已受理并落盘，候选保留于 UAC 暂存账本"
+    }
     }
 }
 

@@ -158,7 +158,17 @@ async function performDeepAstScan(fastMode) {
       return null;
     }
     const caiIndex = report.autonomy?.compositeAutonomyIndex ?? 100.0;
-    const lowerBound = report.autonomy?.confidence?.lowerBound ?? Math.max(0, totalScore - 6.0);
+    let lowerBound = report.autonomy?.confidence?.lowerBound;
+    if (lowerBound == null) {
+      const p = Math.max(0, Math.min(1, totalScore / 100.0));
+      const n = 50.0;
+      const alpha = p * n + 0.5;
+      const beta = (1.0 - p) * n + 0.5;
+      const total = alpha + beta;
+      const variance = (alpha * beta) / (total * total * (total + 1.0));
+      const stdDev = Math.sqrt(variance);
+      lowerBound = Math.max(0, Number(((alpha / total - 1.96 * stdDev) * 100.0).toFixed(2)));
+    }
     const isAntiGamingPassed = !report.isGamingDetected;
 
     return {
@@ -185,9 +195,15 @@ async function performDeepAstScan(fastMode) {
 function computeBayesianCredibleScore(passCount, totalCount) {
   const k = Math.max(0, passCount);
   const n = Math.max(k, totalCount);
-  const posteriorMean = Number(((k + 0.5) / (n + 1.0)).toFixed(4));
+  const alpha = k + 0.5;
+  const beta = n - k + 0.5;
+  const total = alpha + beta;
+  const posteriorMean = Number((alpha / total).toFixed(4));
   const credibleScore = Number((posteriorMean * 100.0).toFixed(2));
-  return { posteriorMean, credibleScore };
+  const variance = (alpha * beta) / (total * total * (total + 1.0));
+  const stdDev = Math.sqrt(variance);
+  const credibleLowerBound = Math.max(0, Number(((alpha / total - 1.96 * stdDev) * 100.0).toFixed(2)));
+  return { posteriorMean, credibleScore, credibleLowerBound };
 }
 
 /**
@@ -217,6 +233,10 @@ function runStaticCheckers(staticCheckers, violations) {
  * @param {string[]} violations - Mutable array of violation messages.
  */
 function evaluateCargoTestResult(testResult, violations) {
+  if (testResult.unresolved) {
+    violations.push(`Cargo toolchain unavailable: ${testResult.output}`);
+    return;
+  }
   if (testResult.unparsed) {
     violations.push(
       'Cargo test telemetry unresolved: no `test result:` summary line was parsed, so suite counts are unknown.',
@@ -276,7 +296,7 @@ async function main() {
   const recordedTotal = testResult.totalTests > 0 ? totalChecks : totalChecks + 1;
   const recordedPass = passChecks;
 
-  const bayesian = computeBayesianCredibleScore(passChecks, totalChecks);
+  const bayesian = computeBayesianCredibleScore(recordedPass, recordedTotal);
 
   // Invoke genuine deep AST analysis via auto-refactor
   const astScan = await performDeepAstScan(isFast);
@@ -285,7 +305,7 @@ async function main() {
   // CAI is only meaningful when the AST scanner actually ran; the surrogate
   // "perfect 100" default masked missing telemetry and is intentionally gone.
   const finalCaiIndex = astScan ? astScan.caiIndex : null;
-  const finalCiLower = astScan ? astScan.credibleLowerBound : bayesian.credibleScore;
+  const finalCiLower = astScan ? astScan.credibleLowerBound : bayesian.credibleLowerBound;
   const finalAntiGaming = astScan ? astScan.antiGamingPassed : null;
   const caiLabel = finalCaiIndex === null ? 'N/A (AST scanner unavailable)' : `${finalCaiIndex}%`;
 
@@ -308,7 +328,7 @@ async function main() {
         warning: warnings.length,
         error: violations.length,
       },
-      gateScore: computeGateScore(isOverallPass, finalCompositeScore, passChecks, totalChecks),
+      gateScore: computeGateScore(isOverallPass, finalCompositeScore, recordedPass, recordedTotal),
       compositeScore: finalCompositeScore,
       caiIndex: finalCaiIndex,
       bayesianConfidence: {

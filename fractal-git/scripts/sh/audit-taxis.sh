@@ -47,10 +47,10 @@ GATE_SUPPRESS=0
 . "${GATE_ROOT_DIR}/scripts/sh/lib/gate-runtime.sh"
 gate_init audit-taxis
 
+write_step_banner "CRATE-TOPOLOGY-01"
 CARGO_CMD="${CARGO_CMD:-cargo}"
 if ! command -v "${CARGO_CMD}" &>/dev/null; then
     # 缺少原生工具链时不得静默放行：未执行审查与审查通过必须可区分 (GUARD-SYS-001)。
-    write_step_banner "CRATE-TOPOLOGY-01"
     write_step_verdict "CRATE-TOPOLOGY-01" BLOCK "未检测到 cargo 工具链，原生审查无法执行"
     exit 1
 fi
@@ -127,7 +127,9 @@ CI_LOWER=""
 # 分数只来自客观报告。报告缺失时保持空值并如实标注 N/A，
 # 绝不以写死常数回填，否则审查输出会给出任何检查都未产出的数字。
 if command -v node &>/dev/null && [[ -f "${AUDIT_SCRIPT}" ]]; then
-    node "${AUDIT_SCRIPT}" >/dev/null 2>&1 || true
+    REPORT_ARGS=()
+    [[ "${FAST_MODE}" -eq 1 ]] && REPORT_ARGS+=("--fast")
+    node "${AUDIT_SCRIPT}" ${REPORT_ARGS[@]+"${REPORT_ARGS[@]}"} >/dev/null 2>&1 || true
     if [[ -f "${REPORT_PATH}" ]]; then
         DYNAMIC_VALUES="$(node -e '
             try {
@@ -166,6 +168,7 @@ else
     # implementations stay byte-equivalent in intent.
     PROMO_ROOT="${TMPDIR:-/tmp}/taxis-promotion-ledger-$$"
     mkdir -p "${PROMO_ROOT}"
+    trap 'rm -rf "${PROMO_ROOT:-}"' EXIT
     PROMO_INIT_STATUS=0
     "${CARGO_CMD}" run --quiet --manifest-path "${MANIFEST_PATH}" --bin taxis -- init --dev --workspace "${PROMO_ROOT}" >/dev/null 2>&1 || PROMO_INIT_STATUS=$?
     if [[ "${PROMO_INIT_STATUS}" -ne 0 ]]; then
