@@ -278,7 +278,7 @@ function getColdScanOptions(corpusDir) {
  *
  * @param corpusDir - Isolated corpus directory.
  * @param baseContent - Original big.ts content.
- * @returns
+ * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
 async function runD1(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -305,7 +305,7 @@ async function runD1(corpusDir, baseContent) {
  *
  * @param corpusDir - Isolated corpus directory.
  * @param baseContent - Original big.ts content.
- * @returns
+ * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
 async function runD2(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -337,7 +337,7 @@ async function runD2(corpusDir, baseContent) {
  * @param corpusDir - Isolated corpus directory.
  * @param baseContent - Original big.ts content.
  * @param smallContent - Original small.ts content.
- * @returns
+ * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
 async function runD3(corpusDir, baseContent, smallContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -371,7 +371,7 @@ async function runD3(corpusDir, baseContent, smallContent) {
  *
  * @param corpusDir - Isolated corpus directory.
  * @param baseContent - Original big.ts content.
- * @returns
+ * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
 async function runD4(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -409,7 +409,7 @@ async function runD4(corpusDir, baseContent) {
  *
  * @param corpusDir - Isolated corpus directory.
  * @param baseContent - Original big.ts content.
- * @returns
+ * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
 async function runD5(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -436,7 +436,7 @@ async function runD5(corpusDir, baseContent) {
  *
  * @param corpusDir - Isolated corpus directory.
  * @param baseContent - Original big.ts content.
- * @returns
+ * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
 async function runD6(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);

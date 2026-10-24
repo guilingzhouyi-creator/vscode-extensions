@@ -76,7 +76,7 @@ const REAL_DRIFT = 'FAKE-XYZ-999';
 /**
  * Reads the lexicon the gate loads, compiling exactly as the gate does.
  *
- * @returns
+ * @returns The candidate and forbidden patterns plus the registered id set, compiled once.
  */
 function loadGateVocabulary() {
   const document = JSON.parse(fs.readFileSync(LEXICON_FILE, 'utf8'));

@@ -387,8 +387,10 @@ export function buildCompactReport(
 
 /**
  * Serialize a compact document; indent is opt-in because the wire format is token-sensitive.
- * @param report
- * @param options
+ *
+ * @param report - Scan result to project; treated as read-only.
+ * @param options - Emission policy plus the optional `pretty` switch.
+ * @returns Serialized CAS v3 document, newline-terminated.
  */
 export function toCompactReportJson(
     report: ScanReport,
@@ -473,7 +475,9 @@ export function hydrateCompactReport(compact: CompactScanReport): HydratedCompac
 
 /**
  * Narrow an unknown payload to a compact document by its protocol discriminator.
- * @param payload
+ *
+ * @param payload - Candidate value of unknown shape.
+ * @returns True when the value declares the CAS v3 schema and carries a vector array.
  */
 export function isCompactReport(payload: unknown): payload is CompactScanReport {
     if (typeof payload !== 'object' || payload === null) return false;

@@ -469,7 +469,7 @@ export class DaemonClient {
  * @param options.cacheCustom - Whether custom-analyzer modules may use the L2 cache.
  * @param options.workers - Optional daemon worker-count override.
  * @param options.parser - Optional parser selection override ('typescript' | 'oxc').
- * @param logger
+ * @param logger - Sink for diagnostic messages while probing the daemon path.
  * @returns Warm-scan result, or null when the daemon path is unusable; this async call resolves
  *          after the client closes.
  */

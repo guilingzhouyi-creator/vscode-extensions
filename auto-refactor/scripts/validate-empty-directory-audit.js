@@ -52,7 +52,7 @@ function tempRoot(prefix) {
  *
  * @param root - Absolute root directory.
  * @param relative - POSIX relative directory path.
- * @returns
+ * @returns Nothing; the directory is created as a side effect.
  */
 function makeDir(root, relative) {
   fs.mkdirSync(path.join(root, relative), { recursive: true });
@@ -64,7 +64,7 @@ function makeDir(root, relative) {
  * @param root - Absolute root directory.
  * @param relative - POSIX relative file path.
  * @param content - File content.
- * @returns
+ * @returns Nothing; the directory is created as a side effect.
  */
 function writeFile(root, relative, content) {
   const absolute = path.join(root, relative);
@@ -85,7 +85,7 @@ function reportedPaths(root) {
 /**
  * Assert the audit reports exactly the expected directory set.
  *
- * @returns
+ * @returns Nothing; the assertions throw on violation and are silent otherwise.
  */
 function verifyAuditDetectsEmptyDirectory() {
   const root = tempRoot('ar-emptydir-detect-');
@@ -108,7 +108,7 @@ function verifyAuditDetectsEmptyDirectory() {
 /**
  * Assert the ignored vocabulary is honoured by both the audit and the name translator.
  *
- * @returns
+ * @returns Nothing; the assertions throw on violation and are silent otherwise.
  */
 function verifyIgnoredTreesStaySilent() {
   const root = tempRoot('ar-emptydir-ignored-');
@@ -135,7 +135,7 @@ function verifyIgnoredTreesStaySilent() {
 /**
  * Assert exemption rules and the exclude-glob translator behave as specified.
  *
- * @returns
+ * @returns Nothing; the assertions throw on violation and are silent otherwise.
  */
 function verifyExemptionsAndTranslator() {
   const root = tempRoot('ar-emptydir-exempt-');
@@ -179,7 +179,7 @@ function verifyExemptionsAndTranslator() {
 /**
  * Assert a populated tree produces nothing, proving the detector is not always-on.
  *
- * @returns
+ * @returns Nothing; the assertions throw on violation and are silent otherwise.
  */
 function verifyPopulatedTreeStaysSilent() {
   const root = tempRoot('ar-emptydir-populated-');

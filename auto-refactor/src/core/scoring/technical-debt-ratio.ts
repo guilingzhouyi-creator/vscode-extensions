@@ -151,7 +151,9 @@ export function resolveIssueRemediationMinutes(
 
 /**
  * Resolves SQALE letter rating from computed Technical Debt Ratio.
- * @param tdr
+ *
+ * @param tdr - Technical Debt Ratio as a percentage of remediation cost over rewrite cost.
+ * @returns Letter rating from A to E; non-finite input degrades to the best rating.
  */
 export function resolveSqaleGrade(tdr: number): SqaleRating {
     if (!Number.isFinite(tdr) || tdr <= SQALE_GRADE_A_THRESHOLD) return SQALE_RATING_A;

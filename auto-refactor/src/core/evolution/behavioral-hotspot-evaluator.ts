@@ -353,8 +353,17 @@ function resolveHotspotSeverity(hotspotScore: number, interestMultiplier: number
 /**
  * Resolves actionable refactoring recommendation for an identified behavioral hotspot.
  *
+ * The metrics argument is an inline object literal at the call site, so its properties are
+ * documented individually: the JSDoc parser resolves `@param` names against the declared
+ * properties rather than accepting the whole object as one opaque name.
+ *
  * @param severity - Classified hotspot severity tier.
  * @param metrics - Cleaned file hotspot metric snapshot.
+ * @param metrics.commits30Days - Commit count inside the trailing 30-day window.
+ * @param metrics.churnLines - Lines added plus removed over the same window.
+ * @param metrics.eloc - Effective code volume of the file.
+ * @param metrics.cyclomaticComplexity - Aggregated cyclomatic complexity of the file.
+ * @param metrics.defectCount - Defects attributed to the file in the observation window.
  * @returns Actionable HotspotRecommendation.
  */
 function resolveHotspotRecommendation(

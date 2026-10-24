@@ -158,12 +158,14 @@ export function generateZoneRecommendation(
 }
 
 /**
- * Computes MacCormack's Propagation Cost (PC) from a directed adjacency matrix.
- * Uses Warshall's algorithm on a flat Uint8Array to minimize heap allocations.
+ * Computes each node's blast radius: the share of nodes that transitively reach it.
  *
- * @param adjacencyMatrix - Flat row-major NxN matrix (1 = direct dependency from i to j).
- * @param nodeCount - Number of nodes N.
- * @returns Propagation Cost outcome.
+ * The docblock above this one describes Propagation Cost and belongs to the caller that assembles
+ * the closure; keeping it here made the names disagree with the signature.
+ *
+ * @param closure - Flat row-major NxN transitive-closure matrix (1 = source reaches target).
+ * @param n - Number of nodes N.
+ * @returns One ratio per node, each the dependent share rounded to four decimals.
  */
 function computeNodeBlastRadii(closure: Uint8Array, n: number): number[] {
     const nodeBlastRadii = new Array<number>(n);
