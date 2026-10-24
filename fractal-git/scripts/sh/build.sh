@@ -55,7 +55,7 @@ fi
 # 2. Git plumbing byte parity validation
 if command -v node >/dev/null 2>&1; then
     echo "Validating Git Plumbing Byte Parity..."
-    node "${PROJECT_ROOT}/scripts/common/validate-git-parity.js"
+    node "${PROJECT_ROOT}/scripts/common/validate-git-parity.js" --require-git
 fi
 
 # 3. TypeScript compilation

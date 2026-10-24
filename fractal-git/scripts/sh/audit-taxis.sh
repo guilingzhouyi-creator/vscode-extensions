@@ -58,7 +58,7 @@ if command -v node &>/dev/null; then
     TOPO_STATUS=0
     node "${PROJECT_ROOT}/scripts/common/validate-crate-topology.js" || TOPO_STATUS=$?
     node "${PROJECT_ROOT}/scripts/common/check-zero-alloc-boundary.js" || TOPO_STATUS=$?
-    node "${PROJECT_ROOT}/scripts/common/validate-git-parity.js" || TOPO_STATUS=$?
+    node "${PROJECT_ROOT}/scripts/common/validate-git-parity.js" --require-git || TOPO_STATUS=$?
     if [[ "${TOPO_STATUS}" -ne 0 ]]; then
         write_step_verdict "CRATE-TOPOLOGY-01" BLOCK "微 Crate 拓扑、零分配边界或 Git 对等校验未通过"
         exit 1

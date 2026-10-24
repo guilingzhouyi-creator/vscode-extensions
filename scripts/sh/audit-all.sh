@@ -228,7 +228,7 @@ CODE_FG=0
 
 CODE_FG_STATIC=0
 "$NODE_BIN" fractal-git/scripts/common/validate-crate-topology.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
-"$NODE_BIN" fractal-git/scripts/common/validate-git-parity.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
+"$NODE_BIN" fractal-git/scripts/common/validate-git-parity.js --require-git >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
 "$NODE_BIN" fractal-git/scripts/common/validate-gate-bridge.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
 "$NODE_BIN" fractal-git/scripts/common/check-zero-alloc-boundary.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
 

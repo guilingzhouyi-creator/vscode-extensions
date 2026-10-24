@@ -725,7 +725,7 @@ jobs:
         run: |
           node fractal-git/scripts/common/validate-crate-topology.js
           node fractal-git/scripts/common/check-zero-alloc-boundary.js
-          node fractal-git/scripts/common/validate-git-parity.js
+          node fractal-git/scripts/common/validate-git-parity.js --require-git
           node fractal-git/scripts/common/validate-gate-bridge.js
 
       - name: Cargo check

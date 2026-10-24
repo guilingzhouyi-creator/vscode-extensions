@@ -1,6 +1,6 @@
 {
   "schema": "fractal-git-rules/v1",
-  "generatedAt": "2026-10-19T18:00:00.000Z",
+  "generatedAt": "2026-10-24T08:32:58.507Z",
   "totalRules": 17,
   "rules": [
     {
@@ -18,38 +18,38 @@
     {
       "id": "FGT-IDX-001",
       "family": "IDX",
-      "severity": "error",
-      "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution and lock-free slot allocation"
+      "severity": "warning",
+      "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution and lock-free slot allocation (advisory: no dedicated executable enforcer yet)"
     },
     {
       "id": "FGT-ALG-001",
       "family": "ALG",
-      "severity": "error",
-      "summary": "Myers diff, 3-way merge, and FastCDC chunking algorithm boundary and determinism guard"
+      "severity": "warning",
+      "summary": "Myers diff, 3-way merge, and FastCDC chunking algorithm boundary and determinism guard (advisory: no dedicated executable enforcer yet)"
     },
     {
       "id": "FGT-POL-001",
       "family": "POL",
-      "severity": "error",
-      "summary": "Resource recycling pool bounded governor: Zero unbounded transient memory allocations and lifecycle reclamation"
+      "severity": "warning",
+      "summary": "Resource recycling pool bounded governor: Zero unbounded transient memory allocations and lifecycle reclamation (advisory: no dedicated executable enforcer yet)"
     },
     {
       "id": "FGT-STO-001",
       "family": "STO",
-      "severity": "error",
-      "summary": "Storage layer crash safety: Append-only WAL journal consistency, loose ODB integrity, and CAS block deduplication"
+      "severity": "warning",
+      "summary": "Storage layer crash safety: Append-only WAL journal consistency, loose ODB integrity, and CAS block deduplication (advisory: no dedicated executable enforcer yet)"
     },
     {
       "id": "FGT-TOP-001",
       "family": "TOP",
-      "severity": "error",
-      "summary": "DAG topology traversal guard: Cycle detection, ancestor generation indexing, and branch divergence safety"
+      "severity": "warning",
+      "summary": "DAG topology traversal guard: Cycle detection, ancestor generation indexing, and branch divergence safety (advisory: no dedicated executable enforcer yet)"
     },
     {
       "id": "FGT-TRN-001",
       "family": "TRN",
-      "severity": "error",
-      "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance guard"
+      "severity": "warning",
+      "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance guard (advisory: no dedicated executable enforcer yet)"
     },
     {
       "id": "FGT-GAT-001",
@@ -60,8 +60,8 @@
     {
       "id": "FGT-CAS-001",
       "family": "CAS",
-      "severity": "error",
-      "summary": "LayerVFS CAS snapshot materializer bridge: Fixed-time O(1) page cache mapping and atomic tree commit"
+      "severity": "warning",
+      "summary": "LayerVFS CAS snapshot materializer bridge: Fixed-time O(1) page cache mapping and atomic tree commit (advisory: no dedicated executable enforcer yet)"
     },
     {
       "id": "FGT-DEP-001",
@@ -78,8 +78,8 @@
     {
       "id": "FGT-LCK-001",
       "family": "LCK",
-      "severity": "error",
-      "summary": "Lock-free in-memory index concurrency guard: Prohibit blocking standard Mutex in virtual staging tree"
+      "severity": "warning",
+      "summary": "Lock-free in-memory index concurrency guard: Prohibit blocking standard Mutex in virtual staging tree (advisory: no dedicated executable enforcer yet)"
     },
     {
       "id": "FGT-SAF-001",
@@ -96,8 +96,8 @@
     {
       "id": "FGT-FAC-001",
       "family": "FAC",
-      "severity": "error",
-      "summary": "Facade substantial burden and immutable freeze guard: Enforce ARCH-FAC-001 with ELOC budget and Object.freeze"
+      "severity": "warning",
+      "summary": "Facade substantial burden and immutable freeze guard: Enforce ARCH-FAC-001 with ELOC budget and Object.freeze (advisory: no dedicated executable enforcer yet)"
     },
     {
       "id": "FGT-BRG-001",

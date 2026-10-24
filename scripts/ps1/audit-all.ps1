@@ -207,7 +207,7 @@ $procAr = if ($Fast) {
     Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
 }
 $resFgTopo = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-crate-topology.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgTopoOut -NoNewWindow -PassThru -Wait
-$resFgParity = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-git-parity.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgParityOut -NoNewWindow -PassThru -Wait
+$resFgParity = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-git-parity.js --require-git" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgParityOut -NoNewWindow -PassThru -Wait
 $resFgBridge = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-gate-bridge.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgBridgeOut -NoNewWindow -PassThru -Wait
 $resFgAlloc = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/check-zero-alloc-boundary.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgAllocOut -NoNewWindow -PassThru -Wait
 

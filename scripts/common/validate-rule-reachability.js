@@ -88,6 +88,20 @@ function loadExceptions() {
 }
 
 /**
+ * Tests whether the corpus mentions `ruleId` as a whole identifier.
+ *
+ * A plain substring test would let a longer identifier sharing the same prefix satisfy a
+ * shorter declaration, so identifier boundaries are asserted on both sides.
+ *
+ * @param {string} corpus - Concatenated scan text.
+ * @param {string} ruleId - Catalog rule identifier.
+ * @returns {boolean} True when the identifier appears with identifier boundaries.
+ */
+function mentionsRule(corpus, ruleId) {
+  return new RegExp(`(?<![A-Za-z0-9_-])${ruleId}(?![A-Za-z0-9_-])`).test(corpus);
+}
+
+/**
  * Runs the reachability audit.
  *
  * @returns {Array<object>} Unreachable error rules with exception status.
@@ -105,7 +119,7 @@ function runAudit() {
   const unreachable = [];
   for (const rule of catalog.rules || []) {
     if (rule.severity !== 'error') continue;
-    if (corpus.includes(rule.id) || exceptions.has(rule.id)) continue;
+    if (mentionsRule(corpus, rule.id) || exceptions.has(rule.id)) continue;
     unreachable.push({ id: rule.id, project: rule.project, family: rule.family });
   }
   return unreachable;
