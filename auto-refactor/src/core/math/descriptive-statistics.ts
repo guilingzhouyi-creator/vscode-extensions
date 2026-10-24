@@ -4,11 +4,15 @@
  * Architecture Role: Foundation operators for descriptive statistical analysis, central tendency,
  *   spatial variance, and dispersion estimation across software metrics and telemetries.
  * Dependencies & Triggers: Consumes numerical-corridor (clampRange, safeDivide); zero external
- * runtime dependencies. Responsibilities:
- *   1. Calculate first and second statistical moments (mean, variance, standard deviation) in single-pass;
+ *   runtime dependencies.
+ * Responsibilities:
+ *   1. Calculate first and second statistical moments (mean, variance, standard deviation)
+ *      in a single pass;
  *   2. Compute quantiles, median, and interquartile range (IQR) for empirical distributions;
- *   3. Enforce deterministic numerical stability with zero NaN/Infinity leakage under empty or degenerate input.
- * Exit Semantics & Design Rationale: CC <= 10; pure functions; zero loop heap allocations; non-throwing fail-safe semantics.
+ *   3. Enforce deterministic numerical stability with zero NaN/Infinity leakage under empty
+ *      or degenerate input.
+ * Exit Semantics & Design Rationale: CC <= 10; pure functions; zero loop heap allocations;
+ *   non-throwing fail-safe semantics.
  */
 
 import { clampRange, safeDivide } from './numerical-corridor';

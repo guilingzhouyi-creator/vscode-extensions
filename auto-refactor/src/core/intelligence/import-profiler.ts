@@ -4,7 +4,8 @@
  * Architecture Role: Extracts import specifiers and symbol-to-package bindings across TypeScript/JS,
  *   Python, Go, Rust, and GDScript files for autonomy ratio quantification.
  * Dependencies & Triggers: Consumes node:path; invoked by autonomy-scorer and
- * dependency-provenance. Responsibilities:
+ *   dependency-provenance.
+ * Responsibilities:
  *   1. Extract raw and canonical import specifiers across polyglot source files;
  *   2. Filter malformed tokens, logical expression fragments, and string literals;
  *   3. Extract local symbol-to-package binding maps (e.g. named and wildcard imports);
