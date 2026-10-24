@@ -18,3 +18,4 @@ export * from './power-resonance';
 export * from './descriptive-statistics';
 export * from './affine-transform';
 export * from './spectral-gamma';
+export * from './vector-space';

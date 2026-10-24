@@ -328,6 +328,37 @@ pub fn measure_line_indent_level(line: &str) -> u32 {
     spaces / 4
 }
 
+/// Detailed count of curly brace delimiters in a line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BraceBalance {
+    pub opens: u32,
+    pub closes: u32,
+    pub delta: i32,
+}
+
+/// Counts curly braces with detailed opens, closes, and net delta (opens - closes).
+pub fn count_braces_detailed(line: &str) -> BraceBalance {
+    let mut opens = 0u32;
+    let mut closes = 0u32;
+    for &b in line.as_bytes() {
+        if b == b'{' {
+            opens += 1;
+        } else if b == b'}' {
+            closes += 1;
+        }
+    }
+    BraceBalance {
+        opens,
+        closes,
+        delta: (opens as i32) - (closes as i32),
+    }
+}
+
+/// Counts net change in curly brace depth within a text line (opens - closes).
+pub fn count_brace_delta(line: &str) -> i32 {
+    count_braces_detailed(line).delta
+}
+
 /// Evaluates Bumpy Road structural irregularity and spatial depth variance across a line span.
 pub fn evaluate_bumpy_road(lines: &[String], start_line: u32, end_line: u32) -> BumpyRoadResult {
     const MIN_BUMPY_LINE_SPAN: usize = 20;
@@ -625,5 +656,20 @@ mod tests {
 
         let empty_results = batch_probe_triggers("", &groups);
         assert_eq!(empty_results, vec![false, false, false, false, true]);
+    }
+
+    #[test]
+    fn test_brace_balance() {
+        let line = "function test() { if (true) { doSomething(); } }";
+        let balance = count_braces_detailed(line);
+        assert_eq!(balance.opens, 2);
+        assert_eq!(balance.closes, 2);
+        assert_eq!(balance.delta, 0);
+
+        let unclosed = "class Foo {";
+        assert_eq!(count_brace_delta(unclosed), 1);
+
+        let closing = "}";
+        assert_eq!(count_brace_delta(closing), -1);
     }
 }

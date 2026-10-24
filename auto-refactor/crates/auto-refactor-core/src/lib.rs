@@ -366,3 +366,87 @@ pub fn evaluate_bumpy_road(
 pub fn batch_probe_triggers(content: String, trigger_groups: Vec<Vec<String>>) -> Vec<bool> {
     ops_pattern::batch_probe_triggers(&content, &trigger_groups)
 }
+
+#[napi(object)]
+pub struct NativeStatisticalMoments {
+    pub mean: f64,
+    pub variance: f64,
+    pub standard_deviation: f64,
+    pub count: u32,
+}
+
+impl From<ops_math::StatisticalMoments> for NativeStatisticalMoments {
+    fn from(m: ops_math::StatisticalMoments) -> Self {
+        Self {
+            mean: m.mean,
+            variance: m.variance,
+            standard_deviation: m.standard_deviation,
+            count: m.count as u32,
+        }
+    }
+}
+
+#[napi(object)]
+pub struct NativeBraceBalance {
+    pub opens: u32,
+    pub closes: u32,
+    pub delta: i32,
+}
+
+impl From<ops_pattern::BraceBalance> for NativeBraceBalance {
+    fn from(b: ops_pattern::BraceBalance) -> Self {
+        Self {
+            opens: b.opens,
+            closes: b.closes,
+            delta: b.delta,
+        }
+    }
+}
+
+#[napi(js_name = "computeShannonEntropy")]
+pub fn compute_shannon_entropy(text: String) -> f64 {
+    ops_math::compute_shannon_entropy(&text)
+}
+
+#[napi(js_name = "computeStatisticalMoments")]
+pub fn compute_statistical_moments(values: Vec<f64>) -> NativeStatisticalMoments {
+    ops_math::compute_statistical_moments(&values).into()
+}
+
+#[napi(js_name = "calculatePopoviciuDispersionPenalty")]
+pub fn calculate_popoviciu_dispersion_penalty(
+    standard_deviation: f64,
+    max_sigma: Option<f64>,
+    gamma: Option<f64>,
+) -> f64 {
+    ops_math::calculate_popoviciu_dispersion_penalty(standard_deviation, max_sigma, gamma)
+}
+
+#[napi(js_name = "countBracesDetailed")]
+pub fn count_braces_detailed(line: String) -> NativeBraceBalance {
+    ops_pattern::count_braces_detailed(&line).into()
+}
+
+#[napi(js_name = "computeWarshallTransitiveClosure")]
+pub fn compute_warshall_transitive_closure(
+    mut matrix: napi::bindgen_prelude::Uint8Array,
+    size: u32,
+) -> napi::bindgen_prelude::Uint8Array {
+    ops_graph::compute_warshall_transitive_closure(matrix.as_mut(), size as usize);
+    matrix
+}
+
+#[napi(js_name = "computeVectorDotProduct")]
+pub fn compute_vector_dot_product(a: Vec<f64>, b: Vec<f64>) -> f64 {
+    ops_vector::dot_product(&a, &b)
+}
+
+#[napi(js_name = "computeVectorCosineSimilarity")]
+pub fn compute_vector_cosine_similarity(a: Vec<f64>, b: Vec<f64>) -> f64 {
+    ops_vector::cosine_similarity(&a, &b)
+}
+
+#[napi(js_name = "computeVectorEuclideanDistance")]
+pub fn compute_vector_euclidean_distance(a: Vec<f64>, b: Vec<f64>) -> f64 {
+    ops_vector::euclidean_distance(&a, &b)
+}

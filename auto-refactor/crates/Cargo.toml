@@ -6,5 +6,7 @@ members = [
     "ops-pattern",
     "ops-mask",
     "ops-clone",
+    "ops-math",
+    "ops-vector",
 ]
 resolver = "2"

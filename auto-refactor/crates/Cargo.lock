@@ -21,7 +21,9 @@ dependencies = [
  "ops-diff",
  "ops-graph",
  "ops-mask",
+ "ops-math",
  "ops-pattern",
+ "ops-vector",
 ]
 
 [[package]]
@@ -148,7 +150,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ops-math"
+version = "0.4.0"
+
+[[package]]
 name = "ops-pattern"
+version = "0.4.0"
+
+[[package]]
+name = "ops-vector"
 version = "0.4.0"
 
 [[package]]

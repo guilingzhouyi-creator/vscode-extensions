@@ -16,6 +16,7 @@
 
 import type {
     INativeCore,
+    NativeBraceBalance,
     NativeBumpyRoadResult,
     NativeCloneBlock,
     NativeClonePair,
@@ -29,6 +30,7 @@ import type {
     NativeMaskConfig,
     NativeMaskedSource,
     NativePatternMatch,
+    NativeStatisticalMoments,
     NativeTemporalCouplingPair,
 } from './native-types';
 import { computeLineStartsAndHashes, linesOf, type LineIndex } from '../diff/edit-diff';
@@ -57,6 +59,19 @@ import {
     HASH_COEFFS,
 } from './native-clone-shim';
 import { computeDominatorTreeShim, solveDataflowShim } from './native-flow-shim';
+import { analyzeDependencyGraphShim } from './native-graph-shim';
+import { fastPatternMatchShim } from './native-pattern-shim';
+import {
+    computeShannonEntropyShim,
+    computeStatisticalMomentsShim,
+    calculatePopoviciuDispersionPenaltyShim,
+    countBracesDetailedShim,
+    computeWarshallTransitiveClosureShim,
+    computeVectorDotProductShim,
+    computeVectorCosineSimilarityShim,
+    computeVectorEuclideanDistanceShim,
+    selectBinding,
+} from './native-math-shim';
 
 export { HASH_COEFFS };
 
@@ -84,6 +99,12 @@ const CAPABILITY_TRIGRAM_COSINE = 'trigram-cosine';
 const CAPABILITY_TEMPORAL_COUPLING = 'temporal-coupling';
 const CAPABILITY_BUMPY_ROAD = 'bumpy-road';
 const CAPABILITY_BATCH_TRIGGER_PROBE = 'batch-trigger-probe';
+const CAPABILITY_SHANNON_ENTROPY = 'shannon-entropy';
+const CAPABILITY_STATISTICAL_MOMENTS = 'statistical-moments';
+const CAPABILITY_POPOVICIU_DISPERSION = 'popoviciu-dispersion';
+const CAPABILITY_BRACE_SCAN = 'brace-scan';
+const CAPABILITY_WARSHALL_CLOSURE = 'warshall-closure';
+const CAPABILITY_VECTOR_MATH = 'vector-math';
 
 const CAPABILITY_SIMD_HISTOGRAM_DIFF = 'simd-histogram-diff';
 const CAPABILITY_PARALLEL_TARJAN_SCC = 'parallel-tarjan-scc';
@@ -105,6 +126,12 @@ const SHIM_CAPABILITIES: readonly string[] = Object.freeze([
     CAPABILITY_TEMPORAL_COUPLING,
     CAPABILITY_BUMPY_ROAD,
     CAPABILITY_BATCH_TRIGGER_PROBE,
+    CAPABILITY_SHANNON_ENTROPY,
+    CAPABILITY_STATISTICAL_MOMENTS,
+    CAPABILITY_POPOVICIU_DISPERSION,
+    CAPABILITY_BRACE_SCAN,
+    CAPABILITY_WARSHALL_CLOSURE,
+    CAPABILITY_VECTOR_MATH,
 ]);
 
 const NATIVE_CORE_CAPABILITIES: readonly string[] = Object.freeze([
@@ -114,198 +141,7 @@ const NATIVE_CORE_CAPABILITIES: readonly string[] = Object.freeze([
     CAPABILITY_ZERO_COPY_BUFFER,
 ]);
 
-const EMPTY_NEIGHBOR_SET: ReadonlySet<string> = Object.freeze(new Set<string>());
 const MICRO_SOURCE_MASK_THRESHOLD = 256;
-
-interface TarjanState {
-    indexCounter: number;
-    indices: Map<string, number>;
-    lowlinks: Map<string, number>;
-    onStack: Set<string>;
-    stack: string[];
-    sccs: string[][];
-    cycles: string[][];
-    nodeToNeighborsMap: Map<string, Set<string>>;
-}
-
-function addDirectedEdge(
-    sourceNode: string,
-    targetNode: string,
-    nodeToNeighborsMap: Map<string, Set<string>>,
-    nodeToInDegreeMap: Map<string, number>,
-): void {
-    let neighbors = nodeToNeighborsMap.get(sourceNode);
-    if (!neighbors) {
-        neighbors = new Set();
-        nodeToNeighborsMap.set(sourceNode, neighbors);
-    }
-    if (!neighbors.has(targetNode)) {
-        neighbors.add(targetNode);
-        nodeToInDegreeMap.set(targetNode, (nodeToInDegreeMap.get(targetNode) || 0) + 1);
-    }
-    if (!nodeToInDegreeMap.has(sourceNode)) {
-        nodeToInDegreeMap.set(sourceNode, 0);
-    }
-}
-
-function traverseStrongConnect(node: string, state: TarjanState): void {
-    state.indices.set(node, state.indexCounter);
-    state.lowlinks.set(node, state.indexCounter);
-    state.indexCounter++;
-    state.stack.push(node);
-    state.onStack.add(node);
-
-    const neighbors = state.nodeToNeighborsMap.get(node) || EMPTY_NEIGHBOR_SET;
-    for (const neighbor of neighbors) {
-        if (!state.indices.has(neighbor)) {
-            traverseStrongConnect(neighbor, state);
-            state.lowlinks.set(
-                node,
-                Math.min(state.lowlinks.get(node)!, state.lowlinks.get(neighbor)!),
-            );
-            continue;
-        }
-        if (state.onStack.has(neighbor)) {
-            state.lowlinks.set(
-                node,
-                Math.min(state.lowlinks.get(node)!, state.indices.get(neighbor)!),
-            );
-        }
-    }
-
-    if (state.lowlinks.get(node) === state.indices.get(node)) {
-        extractConnectedComponent(node, state);
-    }
-}
-
-function extractConnectedComponent(node: string, state: TarjanState): void {
-    const scc: string[] = [];
-    let popped: string;
-    do {
-        popped = state.stack.pop()!;
-        state.onStack.delete(popped);
-        scc.push(popped);
-    } while (popped !== node);
-
-    state.sccs.push(scc);
-    if (scc.length > 1) {
-        state.cycles.push([...scc].reverse());
-        return;
-    }
-    if (scc.length === 1 && state.nodeToNeighborsMap.get(node)?.has(node)) {
-        state.cycles.push([node, node]);
-    }
-}
-
-function computeTarjanCycles(
-    allNodes: Set<string>,
-    nodeToNeighborsMap: Map<string, Set<string>>,
-): { sccs: string[][]; cycles: string[][] } {
-    const state: TarjanState = {
-        indexCounter: 0,
-        indices: new Map(),
-        lowlinks: new Map(),
-        onStack: new Set(),
-        stack: [],
-        sccs: [],
-        cycles: [],
-        nodeToNeighborsMap,
-    };
-    for (const node of allNodes) {
-        if (!state.indices.has(node)) {
-            traverseStrongConnect(node, state);
-        }
-    }
-    return { sccs: state.sccs, cycles: state.cycles };
-}
-
-function computeTopologicalOrder(
-    allNodes: Set<string>,
-    nodeToNeighborsMap: Map<string, Set<string>>,
-    nodeToInDegreeMap: Map<string, number>,
-): string[] {
-    const nodeToInDegreeCopyMap = new Map<string, number>();
-    for (const node of allNodes) {
-        nodeToInDegreeCopyMap.set(node, nodeToInDegreeMap.get(node) || 0);
-    }
-
-    const queue: string[] = [];
-    for (const node of allNodes) {
-        if (nodeToInDegreeCopyMap.get(node) === 0) {
-            queue.push(node);
-        }
-    }
-    queue.sort((a, b) => b.localeCompare(a));
-
-    const topologicalOrder: string[] = [];
-    const orderedSet = new Set<string>();
-    while (queue.length > 0) {
-        const current = queue.pop()!;
-        topologicalOrder.push(current);
-        orderedSet.add(current);
-
-        const neighbors = nodeToNeighborsMap.get(current) || EMPTY_NEIGHBOR_SET;
-        for (const next of neighbors) {
-            const remainingIn = nodeToInDegreeCopyMap.get(next)! - 1;
-            nodeToInDegreeCopyMap.set(next, remainingIn);
-            if (remainingIn === 0) {
-                queue.push(next);
-                queue.sort((a, b) => b.localeCompare(a));
-            }
-        }
-    }
-
-    for (const node of allNodes) {
-        if (!orderedSet.has(node)) {
-            orderedSet.add(node);
-            topologicalOrder.push(node);
-        }
-    }
-    return topologicalOrder;
-}
-
-function isPatternMatchAt(
-    line: string,
-    pattern: string,
-    offset: number,
-    patternLen: number,
-): boolean {
-    for (let patternIdx = 0; patternIdx < patternLen; patternIdx++) {
-        if (line.charCodeAt(offset + patternIdx) !== pattern.charCodeAt(patternIdx)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-function findPatternMatchesInLine(
-    line: string,
-    pattern: string,
-    lineNum: number,
-    results: NativePatternMatch[],
-): void {
-    const patternLen = pattern.length;
-    const maxStart = line.length - patternLen;
-    if (patternLen === 0 || maxStart < 0) {
-        return;
-    }
-
-    const step = Math.max(1, patternLen);
-    let colIdx = 0;
-    while (colIdx <= maxStart) {
-        if (isPatternMatchAt(line, pattern, colIdx, patternLen)) {
-            results.push({
-                pattern,
-                line: lineNum,
-                column: colIdx + 1,
-                matchText: pattern,
-            });
-            colIdx += step;
-        } else {
-            colIdx++;
-        }
-    }
-}
 
 interface HunkBuilderState {
     oldStart: number;
@@ -463,54 +299,14 @@ export class PureJsNativeShim implements INativeCore {
      * Implements Tarjan's SCC algorithm and topological sort.
      */
     public analyzeDependencyGraph(edges: [string, string][]): NativeGraphAnalysis {
-        const nodeToNeighborsMap = new Map<string, Set<string>>();
-        const nodeToInDegreeMap = new Map<string, number>();
-        const allNodes = new Set<string>();
-
-        for (const [sourceNode, targetNode] of edges) {
-            allNodes.add(sourceNode);
-            allNodes.add(targetNode);
-            addDirectedEdge(sourceNode, targetNode, nodeToNeighborsMap, nodeToInDegreeMap);
-        }
-
-        const { sccs, cycles } = computeTarjanCycles(allNodes, nodeToNeighborsMap);
-        const topologicalOrder = computeTopologicalOrder(
-            allNodes,
-            nodeToNeighborsMap,
-            nodeToInDegreeMap,
-        );
-
-        return {
-            cycles,
-            topologicalOrder,
-            stronglyConnectedComponents: sccs,
-            isAcyclic: cycles.length === 0,
-        };
+        return analyzeDependencyGraphShim(edges);
     }
 
     /**
      * Fast multi-pattern textual scanner locating occurrences with 1-based line and column.
      */
     public fastPatternMatch(sourceText: string, patterns: string[]): NativePatternMatch[] {
-        const results: NativePatternMatch[] = [];
-        if (!sourceText || patterns.length === 0) {
-            return results;
-        }
-
-        const lines = sourceText.split(/\r?\n/);
-        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-            const line = lines[lineIndex];
-            const lineNum = lineIndex + 1;
-            for (const pattern of patterns) {
-                findPatternMatchesInLine(line, pattern, lineNum, results);
-            }
-        }
-
-        if (patterns.length > 1) {
-            results.sort((a, b) => a.line - b.line || a.column - b.column);
-        }
-
-        return results;
+        return fastPatternMatchShim(sourceText, patterns);
     }
 
     /**
@@ -661,6 +457,66 @@ export class PureJsNativeShim implements INativeCore {
         triggerGroups: readonly (readonly string[])[],
     ): boolean[] {
         return batchProbeTriggersShim(content, triggerGroups);
+    }
+
+    /**
+     * Computes Shannon Information Entropy H(X) in bits.
+     */
+    public computeShannonEntropy(text: string): number {
+        return computeShannonEntropyShim(text);
+    }
+
+    /**
+     * Computes first and second statistical moments in a single online pass.
+     */
+    public computeStatisticalMoments(values: readonly number[]): NativeStatisticalMoments {
+        return computeStatisticalMomentsShim(values);
+    }
+
+    /**
+     * Calculates Popoviciu's inequality dispersion discount factor in [0.0, 1.0].
+     */
+    public calculatePopoviciuDispersionPenalty(
+        standardDeviation: number,
+        maxSigma?: number,
+        gamma?: number,
+    ): number {
+        return calculatePopoviciuDispersionPenaltyShim(standardDeviation, maxSigma, gamma);
+    }
+
+    /**
+     * Counts opening and closing curly braces in a line with detailed breakdown.
+     */
+    public countBracesDetailed(line: string): NativeBraceBalance {
+        return countBracesDetailedShim(line);
+    }
+
+    /**
+     * Computes transitive closure over a dense boolean adjacency matrix using Warshall's algorithm.
+     */
+    public computeWarshallTransitiveClosure(matrix: Uint8Array, size: number): Uint8Array {
+        return computeWarshallTransitiveClosureShim(matrix, size);
+    }
+
+    /**
+     * Computes inner dot product between two vector slices.
+     */
+    public computeVectorDotProduct(a: readonly number[], b: readonly number[]): number {
+        return computeVectorDotProductShim(a, b);
+    }
+
+    /**
+     * Computes cosine similarity between two vector slices.
+     */
+    public computeVectorCosineSimilarity(a: readonly number[], b: readonly number[]): number {
+        return computeVectorCosineSimilarityShim(a, b);
+    }
+
+    /**
+     * Computes Euclidean distance between two vector slices.
+     */
+    public computeVectorEuclideanDistance(a: readonly number[], b: readonly number[]): number {
+        return computeVectorEuclideanDistanceShim(a, b);
     }
 
     /**
@@ -863,8 +719,37 @@ interface RawNativeBinding {
         content: string,
         triggerGroups: readonly (readonly string[])[],
     ) => boolean[];
+    readonly computeShannonEntropy?: (text: string) => number;
+    readonly computeStatisticalMoments?: (values: readonly number[]) => NativeStatisticalMoments;
+    readonly calculatePopoviciuDispersionPenalty?: (
+        standardDeviation: number,
+        maxSigma?: number,
+        gamma?: number,
+    ) => number;
+    readonly countBracesDetailed?: (line: string) => NativeBraceBalance;
+    readonly computeWarshallTransitiveClosure?: (matrix: Uint8Array, size: number) => Uint8Array;
+    readonly computeVectorDotProduct?: (a: readonly number[], b: readonly number[]) => number;
+    readonly computeVectorCosineSimilarity?: (a: readonly number[], b: readonly number[]) => number;
+    readonly computeVectorEuclideanDistance?: (a: readonly number[], b: readonly number[]) => number;
     readonly version?: string;
     readonly VERSION?: string;
+}
+
+function resolveMinHashBinding(
+    binding: RawNativeBinding,
+    jsShim: PureJsNativeShim,
+): (content: string, numPermutations?: number) => number[] {
+    if (typeof binding.computeMinHash === 'function') {
+        return binding.computeMinHash;
+    }
+    if (typeof binding.computeMinhash === 'function') {
+        return binding.computeMinhash;
+    }
+    return (content, permutations) => jsShim.computeMinHash(content, permutations);
+}
+
+function resolveNativeVersion(binding: RawNativeBinding): string {
+    return binding.version || binding.VERSION || VERSION_NATIVE_FALLBACK;
 }
 
 function assembleNativeBindingCore(
@@ -888,10 +773,7 @@ function assembleNativeBindingCore(
         },
         countDuplicateLines: binding.countDuplicateLines,
         detectCloneBlocks: binding.detectCloneBlocks,
-        computeMinHash:
-            binding.computeMinHash ||
-            binding.computeMinhash ||
-            ((content, permutations) => jsShim.computeMinHash(content, permutations)),
+        computeMinHash: resolveMinHashBinding(binding, jsShim),
         findClonePairs: binding.findClonePairs,
         computeDominatorTree: binding.computeDominatorTree,
         solveDataflow: (params: NativeDataflowParams) =>
@@ -903,30 +785,72 @@ function assembleNativeBindingCore(
                 params.gen ?? {},
                 params.kill ?? {},
             ),
-        computeBitParallelDistance:
-            binding.computeBitParallelDistance ||
-            ((pattern, text) => jsShim.computeBitParallelDistance(pattern, text)),
-        computeSimHash64: binding.computeSimHash64 || ((tokens) => jsShim.computeSimHash64(tokens)),
-        calculateSimHashHammingSimilarity:
-            binding.calculateSimHashHammingSimilarity ||
-            ((hashA, hashB) => jsShim.calculateSimHashHammingSimilarity(hashA, hashB)),
-        calculateTrigramCosineSimilarity:
-            binding.calculateTrigramCosineSimilarity ||
-            ((tokensA, tokensB) => jsShim.calculateTrigramCosineSimilarity(tokensA, tokensB)),
-        computeTemporalCoupling:
-            binding.computeTemporalCoupling ||
-            ((changesets, minShared, minJaccard) =>
-                jsShim.computeTemporalCoupling(changesets, minShared, minJaccard)),
-        evaluateBumpyRoad:
-            binding.evaluateBumpyRoad ||
-            ((lines, startLine, endLine) => jsShim.evaluateBumpyRoad(lines, startLine, endLine)),
-        batchProbeTriggers:
-            binding.batchProbeTriggers ||
-            ((content, groups) => jsShim.batchProbeTriggers(content, groups)),
+        computeBitParallelDistance: selectBinding(
+            binding.computeBitParallelDistance,
+            (pattern, text) => jsShim.computeBitParallelDistance(pattern, text),
+        ),
+        computeSimHash64: selectBinding(
+            binding.computeSimHash64,
+            (tokens) => jsShim.computeSimHash64(tokens),
+        ),
+        calculateSimHashHammingSimilarity: selectBinding(
+            binding.calculateSimHashHammingSimilarity,
+            (hashA, hashB) => jsShim.calculateSimHashHammingSimilarity(hashA, hashB),
+        ),
+        calculateTrigramCosineSimilarity: selectBinding(
+            binding.calculateTrigramCosineSimilarity,
+            (tokensA, tokensB) => jsShim.calculateTrigramCosineSimilarity(tokensA, tokensB),
+        ),
+        computeTemporalCoupling: selectBinding(
+            binding.computeTemporalCoupling,
+            (changesets, minShared, minJaccard) =>
+                jsShim.computeTemporalCoupling(changesets, minShared, minJaccard),
+        ),
+        evaluateBumpyRoad: selectBinding(
+            binding.evaluateBumpyRoad,
+            (lines, startLine, endLine) => jsShim.evaluateBumpyRoad(lines, startLine, endLine),
+        ),
+        batchProbeTriggers: selectBinding(
+            binding.batchProbeTriggers,
+            (content, groups) => jsShim.batchProbeTriggers(content, groups),
+        ),
+        computeShannonEntropy: selectBinding(
+            binding.computeShannonEntropy,
+            (text) => jsShim.computeShannonEntropy(text),
+        ),
+        computeStatisticalMoments: selectBinding(
+            binding.computeStatisticalMoments,
+            (values) => jsShim.computeStatisticalMoments(values),
+        ),
+        calculatePopoviciuDispersionPenalty: selectBinding(
+            binding.calculatePopoviciuDispersionPenalty,
+            (stdDev, maxSigma, gamma) =>
+                jsShim.calculatePopoviciuDispersionPenalty(stdDev, maxSigma, gamma),
+        ),
+        countBracesDetailed: selectBinding(
+            binding.countBracesDetailed,
+            (line) => jsShim.countBracesDetailed(line),
+        ),
+        computeWarshallTransitiveClosure: selectBinding(
+            binding.computeWarshallTransitiveClosure,
+            (matrix, size) => jsShim.computeWarshallTransitiveClosure(matrix, size),
+        ),
+        computeVectorDotProduct: selectBinding(
+            binding.computeVectorDotProduct,
+            (a, b) => jsShim.computeVectorDotProduct(a, b),
+        ),
+        computeVectorCosineSimilarity: selectBinding(
+            binding.computeVectorCosineSimilarity,
+            (a, b) => jsShim.computeVectorCosineSimilarity(a, b),
+        ),
+        computeVectorEuclideanDistance: selectBinding(
+            binding.computeVectorEuclideanDistance,
+            (a, b) => jsShim.computeVectorEuclideanDistance(a, b),
+        ),
         getStatus: () => ({
             isNativeAvailable: true,
             activeEngine: ENGINE_RUST_NATIVE,
-            version: binding.version || binding.VERSION || VERSION_NATIVE_FALLBACK,
+            version: resolveNativeVersion(binding),
             capabilities: [...NATIVE_CORE_CAPABILITIES],
         }),
     };
@@ -1204,6 +1128,110 @@ export function batchProbeNativeTriggers(
     return nativeCore.batchProbeTriggers(content, triggerGroups);
 }
 
+/**
+ * Computes Shannon Information Entropy H(X) in bits.
+ *
+ * @param text - Input string to measure.
+ * @returns Shannon entropy in bits rounded to 2 decimal places.
+ */
+export function computeNativeShannonEntropy(text: string): number {
+    return nativeCore.computeShannonEntropy(text);
+}
+
+/**
+ * Computes first and second statistical moments in a single online pass.
+ *
+ * @param values - Array of numerical values.
+ * @returns NativeStatisticalMoments summary descriptor.
+ */
+export function computeNativeStatisticalMoments(
+    values: readonly number[],
+): NativeStatisticalMoments {
+    return nativeCore.computeStatisticalMoments(values);
+}
+
+/**
+ * Calculates Popoviciu's inequality dispersion discount factor in [0.0, 1.0].
+ *
+ * @param standardDeviation - Sample standard deviation.
+ * @param maxSigma - Theoretical maximum standard deviation (default 50.0).
+ * @param gamma - Penalty elasticity factor (default 0.5).
+ * @returns Discount multiplier in [0.0, 1.0].
+ */
+export function calculateNativePopoviciuDispersionPenalty(
+    standardDeviation: number,
+    maxSigma?: number,
+    gamma?: number,
+): number {
+    return nativeCore.calculatePopoviciuDispersionPenalty(standardDeviation, maxSigma, gamma);
+}
+
+/**
+ * Counts opening and closing curly braces in a line with detailed breakdown.
+ *
+ * @param line - Text line to inspect.
+ * @returns NativeBraceBalance containing opens, closes, and delta.
+ */
+export function countNativeBracesDetailed(line: string): NativeBraceBalance {
+    return nativeCore.countBracesDetailed(line);
+}
+
+/**
+ * Computes transitive closure over a dense boolean adjacency matrix using Warshall's algorithm.
+ *
+ * @param matrix - Row-major Uint8Array flat buffer of size * size.
+ * @param size - Number of vertices in the square matrix.
+ * @returns In-place mutated matrix with full reachability.
+ */
+export function computeNativeWarshallTransitiveClosure(
+    matrix: Uint8Array,
+    size: number,
+): Uint8Array {
+    return nativeCore.computeWarshallTransitiveClosure(matrix, size);
+}
+
+/**
+ * Computes inner dot product between two vector slices.
+ *
+ * @param a - First numerical vector.
+ * @param b - Second numerical vector.
+ * @returns Dot product scalar value.
+ */
+export function computeNativeVectorDotProduct(
+    a: readonly number[],
+    b: readonly number[],
+): number {
+    return nativeCore.computeVectorDotProduct(a, b);
+}
+
+/**
+ * Computes cosine similarity between two vector slices.
+ *
+ * @param a - First numerical vector.
+ * @param b - Second numerical vector.
+ * @returns Cosine similarity bounded in [-1.0, 1.0].
+ */
+export function computeNativeVectorCosineSimilarity(
+    a: readonly number[],
+    b: readonly number[],
+): number {
+    return nativeCore.computeVectorCosineSimilarity(a, b);
+}
+
+/**
+ * Computes Euclidean distance between two vector slices.
+ *
+ * @param a - First numerical vector.
+ * @param b - Second numerical vector.
+ * @returns Euclidean distance scalar.
+ */
+export function computeNativeVectorEuclideanDistance(
+    a: readonly number[],
+    b: readonly number[],
+): number {
+    return nativeCore.computeVectorEuclideanDistance(a, b);
+}
+
 // ─── Substantive Backwards-Compatibility Aliases ────────────────────────────
 
 /** Backward compatibility alias for computeNativeHistogramDiff. */
@@ -1247,3 +1275,27 @@ export const nativeSimHashHammingSimilarity = calculateNativeSimHashHammingSimil
 
 /** Backward compatibility alias for calculateNativeTrigramCosineSimilarity. */
 export const nativeTrigramCosineSimilarity = calculateNativeTrigramCosineSimilarity;
+
+/** Backward compatibility alias for computeNativeShannonEntropy. */
+export const nativeShannonEntropy = computeNativeShannonEntropy;
+
+/** Backward compatibility alias for computeNativeStatisticalMoments. */
+export const nativeStatisticalMoments = computeNativeStatisticalMoments;
+
+/** Backward compatibility alias for calculateNativePopoviciuDispersionPenalty. */
+export const nativePopoviciuDispersionPenalty = calculateNativePopoviciuDispersionPenalty;
+
+/** Backward compatibility alias for countNativeBracesDetailed. */
+export const nativeCountBracesDetailed = countNativeBracesDetailed;
+
+/** Backward compatibility alias for computeNativeWarshallTransitiveClosure. */
+export const nativeWarshallTransitiveClosure = computeNativeWarshallTransitiveClosure;
+
+/** Backward compatibility alias for computeNativeVectorDotProduct. */
+export const nativeVectorDotProduct = computeNativeVectorDotProduct;
+
+/** Backward compatibility alias for computeNativeVectorCosineSimilarity. */
+export const nativeVectorCosineSimilarity = computeNativeVectorCosineSimilarity;
+
+/** Backward compatibility alias for computeNativeVectorEuclideanDistance. */
+export const nativeVectorEuclideanDistance = computeNativeVectorEuclideanDistance;

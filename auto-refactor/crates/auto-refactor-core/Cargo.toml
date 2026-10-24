@@ -14,3 +14,5 @@ ops-graph = { path = "../ops-graph" }
 ops-pattern = { path = "../ops-pattern" }
 ops-mask = { path = "../ops-mask" }
 ops-clone = { path = "../ops-clone" }
+ops-math = { path = "../ops-math" }
+ops-vector = { path = "../ops-vector" }

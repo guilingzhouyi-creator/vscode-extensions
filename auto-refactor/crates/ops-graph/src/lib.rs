@@ -532,6 +532,92 @@ pub fn solve_dataflow(
     }
 }
 
+/// Computes transitive closure over a dense boolean adjacency matrix using Warshall's algorithm.
+/// Operates on a flat row-major slice of size * size in-place with zero intermediate heap allocations.
+pub fn compute_warshall_transitive_closure(matrix: &mut [u8], size: usize) {
+    if size == 0 || matrix.len() < size * size {
+        return;
+    }
+
+    for k in 0..size {
+        let k_row = k * size;
+        for i in 0..size {
+            let i_row = i * size;
+            if matrix[i_row + k] == 1 {
+                for j in 0..size {
+                    if matrix[i_row + j] == 0 && matrix[k_row + j] == 1 {
+                        matrix[i_row + j] = 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Bit-parallel SWAR Warshall transitive closure utilizing 64-bit words for 64x parallel bit operations.
+pub fn compute_bit_parallel_warshall(matrix: &mut [u64], words_per_row: usize, size: usize) {
+    if size == 0 || words_per_row == 0 || matrix.len() < size * words_per_row {
+        return;
+    }
+
+    for k in 0..size {
+        let k_word_idx = k / 64;
+        let k_bit_mask = 1u64 << (k % 64);
+        let k_row = k * words_per_row;
+
+        for i in 0..size {
+            let i_row = i * words_per_row;
+            if (matrix[i_row + k_word_idx] & k_bit_mask) != 0 {
+                for w in 0..words_per_row {
+                    matrix[i_row + w] |= matrix[k_row + w];
+                }
+            }
+        }
+    }
+}
+
+/// Computes forward reachable transitive closure from seeds using an allocation-thin pointer BFS queue.
+pub fn compute_bfs_transitive_closure(
+    seeds: &[String],
+    adjacency: &HashMap<String, Vec<String>>,
+    max_depth: usize,
+) -> Vec<String> {
+    let mut visited: HashSet<String> = HashSet::new();
+    let mut queue_nodes: Vec<String> = Vec::new();
+    let mut queue_depths: Vec<usize> = Vec::new();
+
+    for seed in seeds {
+        if !visited.contains(seed) {
+            visited.insert(seed.clone());
+            queue_nodes.push(seed.clone());
+            queue_depths.push(0);
+        }
+    }
+
+    let mut head = 0usize;
+    while head < queue_nodes.len() {
+        let current_node = queue_nodes[head].clone();
+        let current_depth = queue_depths[head];
+        head += 1;
+
+        if current_depth >= max_depth {
+            continue;
+        }
+
+        if let Some(neighbors) = adjacency.get(&current_node) {
+            for neighbor in neighbors {
+                if !visited.contains(neighbor) {
+                    visited.insert(neighbor.clone());
+                    queue_nodes.push(neighbor.clone());
+                    queue_depths.push(current_depth + 1);
+                }
+            }
+        }
+    }
+
+    queue_nodes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -703,5 +789,47 @@ mod tests {
         let in_merge = res.in_sets.get("Merge").unwrap();
         assert!(in_merge.contains(&"fact_from_p1".to_string()));
         assert!(in_merge.contains(&"fact_from_p2".to_string()));
+    }
+
+    #[test]
+    fn test_warshall_transitive_closure() {
+        // 3 nodes: 0 -> 1, 1 -> 2
+        let mut matrix = vec![
+            1, 1, 0, // row 0
+            0, 1, 1, // row 1
+            0, 0, 1, // row 2
+        ];
+        compute_warshall_transitive_closure(&mut matrix, 3);
+        // After closure: 0 should reach 2
+        assert_eq!(matrix[0 * 3 + 2], 1);
+        assert_eq!(matrix[1 * 3 + 2], 1);
+        assert_eq!(matrix[2 * 3 + 0], 0);
+    }
+
+    #[test]
+    fn test_bit_parallel_warshall() {
+        // 3 nodes packed into 1 u64 word per row
+        let mut matrix = vec![
+            (1 << 0) | (1 << 1), // 0 -> 0, 1
+            (1 << 1) | (1 << 2), // 1 -> 1, 2
+            (1 << 2),             // 2 -> 2
+        ];
+        compute_bit_parallel_warshall(&mut matrix, 1, 3);
+        // 0 should reach 2
+        assert_eq!(matrix[0] & (1 << 2), 1 << 2);
+    }
+
+    #[test]
+    fn test_bfs_transitive_closure() {
+        let mut adj = HashMap::new();
+        adj.insert("A".to_string(), vec!["B".to_string()]);
+        adj.insert("B".to_string(), vec!["C".to_string()]);
+        adj.insert("C".to_string(), vec!["D".to_string()]);
+
+        let reachable_all = compute_bfs_transitive_closure(&["A".to_string()], &adj, 10);
+        assert_eq!(reachable_all, vec!["A", "B", "C", "D"]);
+
+        let reachable_depth_1 = compute_bfs_transitive_closure(&["A".to_string()], &adj, 1);
+        assert_eq!(reachable_depth_1, vec!["A", "B"]);
     }
 }

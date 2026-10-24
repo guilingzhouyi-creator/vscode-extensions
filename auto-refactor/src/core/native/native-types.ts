@@ -152,6 +152,25 @@ export interface NativeDataflowResult {
 }
 
 /**
+ * Summary metrics of central tendency and dispersion.
+ */
+export interface NativeStatisticalMoments {
+    readonly mean: number;
+    readonly variance: number;
+    readonly standardDeviation: number;
+    readonly count: number;
+}
+
+/**
+ * Detailed count of open and closed curly braces in a line.
+ */
+export interface NativeBraceBalance {
+    readonly opens: number;
+    readonly closes: number;
+    readonly delta: number;
+}
+
+/**
  * Unified interface implemented by both native Rust core and pure JS shim.
  */
 export interface INativeCore {
@@ -254,6 +273,50 @@ export interface INativeCore {
      * Fast vectorized batch probe testing multiple trigger groups against target content.
      */
     batchProbeTriggers(content: string, triggerGroups: readonly (readonly string[])[]): boolean[];
+
+    /**
+     * Computes Shannon Information Entropy H(X) in bits.
+     */
+    computeShannonEntropy(text: string): number;
+
+    /**
+     * Computes first and second statistical moments in a single online pass.
+     */
+    computeStatisticalMoments(values: readonly number[]): NativeStatisticalMoments;
+
+    /**
+     * Calculates Popoviciu's inequality dispersion discount factor in [0.0, 1.0].
+     */
+    calculatePopoviciuDispersionPenalty(
+        standardDeviation: number,
+        maxSigma?: number,
+        gamma?: number,
+    ): number;
+
+    /**
+     * Counts opening and closing curly braces in a line with detailed breakdown.
+     */
+    countBracesDetailed(line: string): NativeBraceBalance;
+
+    /**
+     * Computes transitive closure over a dense boolean adjacency matrix using Warshall's algorithm.
+     */
+    computeWarshallTransitiveClosure(matrix: Uint8Array, size: number): Uint8Array;
+
+    /**
+     * Computes inner dot product between two vector slices.
+     */
+    computeVectorDotProduct(a: readonly number[], b: readonly number[]): number;
+
+    /**
+     * Computes cosine similarity between two vector slices.
+     */
+    computeVectorCosineSimilarity(a: readonly number[], b: readonly number[]): number;
+
+    /**
+     * Computes Euclidean distance between two vector slices.
+     */
+    computeVectorEuclideanDistance(a: readonly number[], b: readonly number[]): number;
 
     /**
      * Inspects active engine status and capabilities.

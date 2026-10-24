@@ -293,3 +293,36 @@ fn batch_probe_triggers_reports_matches() {
     let res = batch_probe_triggers(content.to_string(), groups);
     assert_eq!(res, vec![true, true, false]);
 }
+
+#[test]
+fn shannon_entropy_napi_wrapper_matches_contract() {
+    assert_eq!(compute_shannon_entropy("aaaaaaaa".to_string()), 0.0);
+    assert_eq!(compute_shannon_entropy("abcdefgh".to_string()), 3.0);
+}
+
+#[test]
+fn statistical_moments_napi_wrapper_computes_values() {
+    let sample = vec![10.0, 20.0, 30.0, 40.0, 50.0];
+    let res = compute_statistical_moments(sample);
+    assert_eq!(res.count, 5);
+    assert_eq!(res.mean, 30.0);
+    assert_eq!(res.variance, 200.0);
+    assert!((res.standard_deviation - 14.1421).abs() < 1e-3);
+}
+
+#[test]
+fn vector_ops_napi_wrappers_compute_geometry() {
+    let a = vec![1.0, 0.0, 0.0];
+    let b = vec![0.0, 1.0, 0.0];
+    assert_eq!(compute_vector_dot_product(a.clone(), b.clone()), 0.0);
+    assert_eq!(compute_vector_cosine_similarity(a.clone(), b.clone()), 0.0);
+    assert!((compute_vector_euclidean_distance(a, b) - 1.4142).abs() < 1e-3);
+}
+
+#[test]
+fn brace_balance_napi_wrapper_counts_correctly() {
+    let res = count_braces_detailed("function test() { return {}; }".to_string());
+    assert_eq!(res.opens, 2);
+    assert_eq!(res.closes, 2);
+    assert_eq!(res.delta, 0);
+}
