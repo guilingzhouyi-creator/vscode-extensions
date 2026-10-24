@@ -102,6 +102,8 @@ temp/
 .workspace-timing-data/
 .vscode/workspace-timing.json
 .vscode/workspace-timing.journal
+# Taxis 分形版本控制运行时对象库（与 .git 同类，由本机操作生成，不入库）
+**/.taxis/
 
 # 9. 历史版本与文档归档（物理冻结，针对性锚定，避免误伤代码包）
 /archive/

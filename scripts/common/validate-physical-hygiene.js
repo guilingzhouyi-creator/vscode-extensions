@@ -49,6 +49,7 @@ const IGNORED_DIRS = new Set([
   'tmp',
   'temp',
   '.praxis',
+  '.taxis',
   '.venv',
   'venv',
 ]);
