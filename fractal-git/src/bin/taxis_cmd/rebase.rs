@@ -129,7 +129,12 @@ pub fn handle_rebase(ctx: &CliContext) {
         remove_stale_files(view.work_root(), &current_files, &new_files);
         let index_entries = materialize_files(&view, &new_files);
         update_dirc_index(view.git_dir(), &index_entries);
-        update_references(view.git_dir(), upstream_commit, effective_branch.as_deref());
+        update_references(
+            view.git_dir(),
+            view.work_root(),
+            upstream_commit,
+            effective_branch.as_deref(),
+        );
 
         record_rebase_op(
             &view,
@@ -292,7 +297,12 @@ pub fn handle_rebase(ctx: &CliContext) {
     remove_stale_files(view.work_root(), &original_files, &final_files);
     let index_entries = materialize_files(&view, &final_files);
     update_dirc_index(view.git_dir(), &index_entries);
-    update_references(view.git_dir(), current_tip, effective_branch.as_deref());
+    update_references(
+        view.git_dir(),
+        view.work_root(),
+        current_tip,
+        effective_branch.as_deref(),
+    );
     super::git_hooks::run_post_rewrite(&hook_runner, "rebase", &rewritten_pairs);
 
     record_rebase_op(

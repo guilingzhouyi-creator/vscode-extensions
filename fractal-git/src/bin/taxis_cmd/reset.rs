@@ -96,10 +96,20 @@ pub fn handle_reset(ctx: &CliContext) {
 
     match opts.mode {
         ResetMode::Soft => {
-            update_references(view.git_dir(), target_commit, effective_branch.as_deref());
+            update_references(
+                view.git_dir(),
+                view.work_root(),
+                target_commit,
+                effective_branch.as_deref(),
+            );
         }
         ResetMode::Mixed => {
-            update_references(view.git_dir(), target_commit, effective_branch.as_deref());
+            update_references(
+                view.git_dir(),
+                view.work_root(),
+                target_commit,
+                effective_branch.as_deref(),
+            );
             let mut target_files = BTreeMap::new();
             if let Err(diff_err) = flatten_tree_for_diff(&view, &tree_oid, "", &mut target_files) {
                 reject(CliTag::ERROR, diff_err);
@@ -122,7 +132,12 @@ pub fn handle_reset(ctx: &CliContext) {
             remove_stale_files(view.work_root(), &current_files, &target_files);
             let index_entries = materialize_files(&view, &target_files);
             update_dirc_index(view.git_dir(), &index_entries);
-            update_references(view.git_dir(), target_commit, effective_branch.as_deref());
+            update_references(
+                view.git_dir(),
+                view.work_root(),
+                target_commit,
+                effective_branch.as_deref(),
+            );
         }
     }
 

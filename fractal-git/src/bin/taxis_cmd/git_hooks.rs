@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
     hook_argument_path, ActorIdentity, GitHookOutcome, GitHookRunner, GitHookStatus, HookContext,
-    HookPipeline, HookTier, TaxisPolicy,
+    HookPipeline, HookTier, Oid, TaxisPolicy,
 };
 
 use super::common::reject;
@@ -49,6 +49,19 @@ pub fn run_merge_chain(runner: &GitHookRunner, git_dir: &Path, message: &str) {
     run_prepare_commit_msg(runner, &message_file, "merge", &envs);
     let message_argument = hook_argument_path(&message_file);
     run_blocking(runner, "commit-msg", &[message_argument], None, &envs);
+}
+
+/// Runs prepare-commit-msg for a commit reusing an existing message and returns the final text.
+pub fn run_prepare_chain(
+    runner: &GitHookRunner,
+    git_dir: &Path,
+    message: &str,
+    source: &str,
+) -> String {
+    let envs = commit_environment(git_dir);
+    let message_file = write_message_file(git_dir, COMMIT_MESSAGE_FILE, message);
+    run_prepare_commit_msg(runner, &message_file, source, &envs);
+    fs::read_to_string(&message_file).unwrap_or_else(|_| message.to_string())
 }
 
 /// Runs one post-operation hook, reporting failures without aborting the completed operation.
@@ -87,6 +100,56 @@ pub fn run_post_rewrite(runner: &GitHookRunner, kind: &str, pairs: &[(String, St
         .collect();
     let args = [kind.to_string()];
     run_post_hook_with_stdin(runner, "post-rewrite", &args, Some(&stdin));
+}
+
+/// One reference row Git feeds to a reference-transaction hook on stdin.
+#[derive(Debug, Clone)]
+pub struct ReferenceUpdate {
+    /// Previous target, or none when the reference is being created.
+    pub previous: Option<Oid>,
+    /// New target commit, or symbolic body for HEAD rewiring.
+    pub next: String,
+    /// Fully qualified reference name, or HEAD for the symbolic head.
+    pub name: String,
+}
+
+/// Runs one reference-transaction phase and reports whether the hook allowed it.
+///
+/// Git sends the transaction state as the sole argument and one space separated
+/// old, new, name record per updated reference on stdin; a non-zero exit aborts
+/// the transaction during the preparing or prepared phases.
+pub fn run_reference_transaction(
+    runner: &GitHookRunner,
+    state: &str,
+    updates: &[ReferenceUpdate],
+) -> bool {
+    if updates.is_empty() {
+        return true;
+    }
+
+    let stdin: String = updates
+        .iter()
+        .map(|update| {
+            let previous = update
+                .previous
+                .map(|oid| oid.to_hex())
+                .unwrap_or_else(|| "0".repeat(40));
+            format!("{} {} {}\n", previous, update.next, update.name)
+        })
+        .collect();
+    let args = [state.to_string()];
+    let outcome = runner.run(
+        "reference-transaction",
+        &args,
+        Some(&stdin),
+        &BTreeMap::new(),
+    );
+    emit_hook_output(&outcome);
+    if outcome.is_blocked() {
+        eprintln!("{}", outcome.describe());
+        return false;
+    }
+    true
 }
 
 /// Evaluates the built-in fractal hook pipeline before materializing a commit.
@@ -185,4 +248,75 @@ fn run_blocking(
 /// Convenience re-export so dispatchers can build a runner without extra imports.
 pub fn discover(git_dir: &Path, work_root: &Path) -> GitHookRunner {
     GitHookRunner::discover(work_root, git_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Writes one executable hook script into the fixture directory.
+    fn write_hook(path: &Path, body: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create hook directory");
+        }
+        fs::write(path, body).expect("write hook script");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(path).expect("hook metadata").permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(path, permissions).expect("chmod hook script");
+        }
+    }
+
+    /// Builds a runner over an isolated hooks directory and returns its marker path.
+    fn fixture(hook_body: &str) -> (tempfile::TempDir, GitHookRunner, std::path::PathBuf) {
+        let root = tempfile::tempdir().expect("create hook fixture");
+        let hooks = root.path().join("hooks");
+        let marker = root.path().join("reference-transaction.log");
+        let script = hook_body.replace("{marker}", &marker.to_string_lossy());
+        write_hook(&hooks.join("reference-transaction"), &script);
+        let runner = GitHookRunner::with_hooks_dir(root.path(), root.path().join(".git"), &hooks);
+        (root, runner, marker)
+    }
+
+    #[test]
+    fn reference_transaction_receives_state_and_rows() {
+        let (_root, runner, marker) =
+            fixture("#!/bin/sh\nprintf 'state=%s\n' \"$1\" >> \"{marker}\"\ncat >> \"{marker}\"\n");
+        let update = ReferenceUpdate {
+            previous: None,
+            next: "a".repeat(40),
+            name: "refs/heads/main".to_string(),
+        };
+
+        assert!(run_reference_transaction(&runner, "prepared", &[update]));
+
+        let recorded = fs::read_to_string(&marker).expect("read hook marker");
+        assert!(
+            recorded.contains("state=prepared"),
+            "state missing: {recorded}"
+        );
+        assert!(
+            recorded.contains(&format!(
+                "{} {} refs/heads/main",
+                "0".repeat(40),
+                "a".repeat(40)
+            )),
+            "row missing: {recorded}"
+        );
+    }
+
+    #[test]
+    fn blocking_reference_transaction_rejects_the_phase() {
+        let (_root, runner, _marker) = fixture("#!/bin/sh\nexit 1\n");
+        let update = ReferenceUpdate {
+            previous: None,
+            next: "b".repeat(40),
+            name: "HEAD".to_string(),
+        };
+
+        assert!(!run_reference_transaction(&runner, "preparing", &[update]));
+        assert!(run_reference_transaction(&runner, "committed", &[]));
+    }
 }

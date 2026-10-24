@@ -171,12 +171,16 @@ pub fn handle_revert(ctx: &CliContext) {
         target_oid.to_hex()
     );
 
+    let hook_runner = super::git_hooks::discover(view.git_dir(), view.work_root());
+    let commit_message =
+        super::git_hooks::run_prepare_chain(&hook_runner, view.git_dir(), &revert_msg, "message");
+
     let new_commit = GitCommit::new(
         merged_root_tree,
         vec![ours_commit],
         author.clone(),
         author,
-        revert_msg.clone(),
+        commit_message,
         None,
     );
 
@@ -189,7 +193,13 @@ pub fn handle_revert(ctx: &CliContext) {
     remove_stale_files(view.work_root(), &ours_files, &new_files);
     let index_entries = materialize_files(&view, &new_files);
     update_dirc_index(view.git_dir(), &index_entries);
-    update_references(view.git_dir(), new_commit_oid, effective_branch.as_deref());
+    update_references(
+        view.git_dir(),
+        view.work_root(),
+        new_commit_oid,
+        effective_branch.as_deref(),
+    );
+    super::git_hooks::run_post_hook(&hook_runner, "post-commit", &[]);
 
     record_revert_op(
         &view,

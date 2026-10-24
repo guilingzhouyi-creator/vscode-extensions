@@ -23,8 +23,9 @@ use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
 use fg_native::sections::refs::RefRecord;
 use fg_native::RepoDocument;
 use fractal_git::constants::cli::CliTag;
+use fractal_git::RefStore;
 use fractal_git::{
-    materialize_commit, ActorIdentity, AgentPushContext, BlockProvenanceEntry,
+    write_commit_objects, ActorIdentity, AgentPushContext, BlockProvenanceEntry,
     BlockProvenanceParams, CommitMaterializationRequest, CommitMessageGuard, DiskProvenanceStore,
     DiskRefStore, FractalRef, GitSignature, LooseOdb, OperationGraph, PreReceiveGuard,
     RepoViewSnapshot, TaxisPolicy, ValidatedCommitWitness,
@@ -178,7 +179,10 @@ pub fn handle_commit(ctx: &CliContext) {
     // Ensure HEAD exists on disk
     let head_path = ctx.git_dir.join("HEAD");
     if !head_path.is_file() {
-        let _ = fs::write(&head_path, format!("ref: {}\n", target_ref.to_git_ref()));
+        let ref_store = DiskRefStore::new(&ctx.git_dir);
+        if let Err(err) = ref_store.update_head_symbolic(&target_ref.to_git_ref()) {
+            reject(CliTag::ERROR, format!("write symbolic HEAD: {err}"));
+        }
     }
 
     super::git_hooks::run_post_hook(&hook_runner, "post-commit", &[]);
@@ -358,10 +362,52 @@ fn materialize_staged_files(
 
     let odb = LooseOdb::new(&ctx.git_dir);
     let ref_store = DiskRefStore::new(&ctx.git_dir);
-    match materialize_commit(&odb, &ref_store, &request) {
-        Ok(materialized) => materialized,
+    let hook_runner = super::git_hooks::discover(&ctx.git_dir, &request.work_root);
+    let active_head = resolve_active_head_ref(&ctx.git_dir);
+    let previous_head = ref_store.get_ref("HEAD").ok().flatten();
+    let materialized = match write_commit_objects(&odb, &ref_store, &request) {
+        Ok(written) => written,
         Err(materialize_err) => fail_io("materialize commit", materialize_err),
+    };
+
+    let branch_update = super::git_hooks::ReferenceUpdate {
+        previous: materialized.parent_oid,
+        next: materialized.commit_oid.to_hex(),
+        name: request.target_ref.clone(),
+    };
+    let mut head_update: Vec<super::git_hooks::ReferenceUpdate> = Vec::new();
+    if active_head.as_deref() == Some(request.target_ref.as_str()) {
+        head_update.push(super::git_hooks::ReferenceUpdate {
+            previous: previous_head,
+            next: materialized.commit_oid.to_hex(),
+            name: "HEAD".to_string(),
+        });
     }
+    if !super::git_hooks::run_reference_transaction(&hook_runner, "preparing", &head_update) {
+        let _ = super::git_hooks::run_reference_transaction(&hook_runner, "aborted", &head_update);
+        reject(
+            CliTag::ERROR,
+            "reference-transaction hook rejected the commit reference update",
+        );
+    }
+    let branch_rows = std::slice::from_ref(&branch_update);
+    if !super::git_hooks::run_reference_transaction(&hook_runner, "prepared", branch_rows) {
+        let _ = super::git_hooks::run_reference_transaction(&hook_runner, "aborted", branch_rows);
+        reject(
+            CliTag::ERROR,
+            "reference-transaction hook rejected the commit reference update",
+        );
+    }
+    if let Err(update_err) = ref_store.update_ref(
+        &request.target_ref,
+        &materialized.commit_oid,
+        materialized.parent_oid.as_ref(),
+    ) {
+        let _ = super::git_hooks::run_reference_transaction(&hook_runner, "aborted", branch_rows);
+        fail_io("advance commit reference", update_err);
+    }
+    let _ = super::git_hooks::run_reference_transaction(&hook_runner, "committed", branch_rows);
+    materialized
 }
 
 /// Outputs commit creation results as JSON or human-readable text.

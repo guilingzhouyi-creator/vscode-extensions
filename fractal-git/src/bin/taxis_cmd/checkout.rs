@@ -28,6 +28,7 @@ use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
 use fg_native::sections::refs::RefRecord;
 use fg_native::RepoDocument;
 use fractal_git::constants::cli::CliTag;
+use fractal_git::{DiskRefStore, RefStore};
 
 use super::common::{fail_io, reject, CliContext};
 use super::repo_view::RepoView;
@@ -88,7 +89,12 @@ pub fn handle_checkout(ctx: &CliContext) {
     remove_stale_files(view.work_root(), &current_files, &new_files);
     let index_entries = materialize_files(&view, &new_files);
     update_dirc_index(view.git_dir(), &index_entries);
-    update_references(view.git_dir(), target_commit, effective_branch.as_deref());
+    update_references(
+        view.git_dir(),
+        view.work_root(),
+        target_commit,
+        effective_branch.as_deref(),
+    );
 
     let hook_runner = super::git_hooks::discover(view.git_dir(), view.work_root());
     super::git_hooks::run_post_hook(
@@ -284,22 +290,92 @@ pub(crate) fn update_dirc_index(git_dir: &Path, entries: &[IndexEntry]) {
     }
 }
 
-/// Updates HEAD and branch references on disk and within the native container if present.
-pub(crate) fn update_references(git_dir: &Path, target_commit: Oid, branch_name: Option<&str>) {
-    // 1. Update loose refs on disk
-    if let Some(branch) = branch_name {
-        let branch_ref_path = git_dir.join("refs/heads").join(branch);
-        if let Some(parent) = branch_ref_path.parent() {
-            let _ = fs::create_dir_all(parent);
+/// Writes the branch reference and HEAD through the ref store, returning the first failure.
+fn write_references(
+    ref_store: &DiskRefStore,
+    target_commit: Oid,
+    branch_name: Option<&str>,
+) -> Option<String> {
+    match branch_name {
+        Some(branch) => {
+            let reference = format!("refs/heads/{branch}");
+            if let Err(err) = ref_store.update_ref(&reference, &target_commit, None) {
+                return Some(format!("update branch reference '{reference}': {err}"));
+            }
+            if let Err(err) = ref_store.update_head_symbolic(&reference) {
+                return Some(format!("update symbolic HEAD '{reference}': {err}"));
+            }
         }
-        let _ = fs::write(&branch_ref_path, format!("{}\n", target_commit.to_hex()));
-        let _ = fs::write(git_dir.join("HEAD"), format!("ref: refs/heads/{branch}\n"));
-    } else {
-        let _ = fs::write(
-            git_dir.join("HEAD"),
-            format!("{}\n", target_commit.to_hex()),
+        None => {
+            if let Err(err) = ref_store.update_head_detached(&target_commit) {
+                return Some(format!("update detached HEAD: {err}"));
+            }
+        }
+    }
+    None
+}
+
+/// Updates HEAD and branch references on disk and within the native container if present.
+///
+/// A reference-transaction hook may veto the update, so the preparing and prepared
+/// phases run before anything durable changes; a veto records the aborted phase and
+/// fails the command, while I/O errors do the same after the fact.
+pub(crate) fn update_references(
+    git_dir: &Path,
+    work_root: &Path,
+    target_commit: Oid,
+    branch_name: Option<&str>,
+) {
+    let ref_store = DiskRefStore::new(git_dir);
+    let hook_runner = super::git_hooks::discover(git_dir, work_root);
+    let previous_head = ref_store.get_ref("HEAD").ok().flatten();
+    let branch_update = branch_name.map(|branch| {
+        let reference = format!("refs/heads/{branch}");
+        let previous = ref_store.get_ref(&reference).ok().flatten();
+        super::git_hooks::ReferenceUpdate {
+            previous,
+            next: target_commit.to_hex(),
+            name: reference,
+        }
+    });
+    let head_next = branch_update
+        .as_ref()
+        .map(|update| format!("ref: {}", update.name))
+        .unwrap_or_else(|| target_commit.to_hex());
+    let head_update = [super::git_hooks::ReferenceUpdate {
+        previous: previous_head,
+        next: head_next,
+        name: "HEAD".to_string(),
+    }];
+    let prepared_updates = branch_update
+        .clone()
+        .map(|update| vec![update])
+        .unwrap_or_else(|| head_update.to_vec());
+
+    if !super::git_hooks::run_reference_transaction(&hook_runner, "preparing", &head_update) {
+        let _ = super::git_hooks::run_reference_transaction(&hook_runner, "aborted", &head_update);
+        reject(
+            CliTag::ERROR,
+            "reference-transaction hook rejected the reference update",
         );
     }
+    if !super::git_hooks::run_reference_transaction(&hook_runner, "prepared", &prepared_updates) {
+        let _ =
+            super::git_hooks::run_reference_transaction(&hook_runner, "aborted", &prepared_updates);
+        reject(
+            CliTag::ERROR,
+            "reference-transaction hook rejected the reference update",
+        );
+    }
+
+    let write_error = write_references(&ref_store, target_commit, branch_name);
+    if let Some(detail) = write_error {
+        let _ =
+            super::git_hooks::run_reference_transaction(&hook_runner, "aborted", &prepared_updates);
+        reject(CliTag::ERROR, detail);
+    }
+    let _ =
+        super::git_hooks::run_reference_transaction(&hook_runner, "committed", &prepared_updates);
 
     // 2. Synchronize native container (repo.txc) if present
     let container_path = fg_native::container_path(git_dir);

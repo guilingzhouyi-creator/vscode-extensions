@@ -49,11 +49,12 @@ pub struct MaterializedCommit {
     pub parent_oid: Option<Oid>,
 }
 
-/// Materializes `request` into the object database, advancing the target reference on success.
+/// Writes every blob, the tree, and the commit object, leaving the reference untouched.
 ///
-/// Object writes happen before the reference update so that a reader following the ref can
-/// always resolve the full object graph it points at.
-pub fn materialize_commit(
+/// Callers that must surrender control to a reference-transaction hook between the object
+/// writes and the reference update use this phase directly; otherwise prefer
+/// [`materialize_commit`], which performs both steps in one call.
+pub fn write_commit_objects(
     odb: &impl OdbStore,
     ref_store: &impl RefStore,
     request: &CommitMaterializationRequest,
@@ -105,14 +106,30 @@ pub fn materialize_commit(
         });
     }
 
-    ref_store.update_ref(&request.target_ref, &commit_oid, parent_oid.as_ref())?;
-
     Ok(MaterializedCommit {
         commit_oid,
         tree_oid,
         blob_oids,
         parent_oid,
     })
+}
+
+/// Materializes `request` into the object database, advancing the target reference on success.
+///
+/// Object writes happen before the reference update so that a reader following the ref can
+/// always resolve the full object graph it points at.
+pub fn materialize_commit(
+    odb: &impl OdbStore,
+    ref_store: &impl RefStore,
+    request: &CommitMaterializationRequest,
+) -> FractalResult<MaterializedCommit> {
+    let materialized = write_commit_objects(odb, ref_store, request)?;
+    ref_store.update_ref(
+        &request.target_ref,
+        &materialized.commit_oid,
+        materialized.parent_oid.as_ref(),
+    )?;
+    Ok(materialized)
 }
 
 /// Reads one staged file, mapping absence to a distinct diagnostic.

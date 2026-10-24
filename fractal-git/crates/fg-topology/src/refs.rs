@@ -400,6 +400,28 @@ impl DiskRefStore {
         staging.push(format!(".{}-{}.tmp", std::process::id(), sequence));
         PathBuf::from(staging)
     }
+
+    /// Points HEAD at a symbolic branch reference, which is how Git records a checked-out branch.
+    pub fn update_head_symbolic(&self, ref_name: &str) -> FractalResult<()> {
+        self.write_head_body(format!("ref: {ref_name}\n"))
+    }
+
+    /// Points HEAD directly at one commit object, producing a detached head.
+    pub fn update_head_detached(&self, oid: &Oid) -> FractalResult<()> {
+        self.write_head_body(format!("{}\n", oid.to_hex()))
+    }
+
+    /// Writes the HEAD body through the same staging rename protocol as ordinary references.
+    fn write_head_body(&self, body: String) -> FractalResult<()> {
+        let path = self.git_dir.join("HEAD");
+        let staging = Self::staging_path(&path);
+        fs::write(&staging, body)?;
+        if let Err(rename_err) = fs::rename(&staging, &path) {
+            let _ = fs::remove_file(&staging);
+            return Err(FractalError::Io(rename_err));
+        }
+        Ok(())
+    }
 }
 
 impl RefStore for DiskRefStore {

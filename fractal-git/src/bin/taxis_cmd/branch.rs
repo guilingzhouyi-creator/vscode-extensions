@@ -308,8 +308,9 @@ fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &
     // If active branch was renamed, update HEAD
     if let Ok(Some((curr, _))) = view.head_branch() {
         if curr == effective_old {
-            let head_file = git_dir.join("HEAD");
-            let _ = fs::write(head_file, format!("ref: refs/heads/{new_name}\n"));
+            if let Err(err) = ref_store.update_head_symbolic(&new_full_ref) {
+                reject(CliTag::ERROR, format!("write symbolic HEAD: {err}"));
+            }
         }
     }
 

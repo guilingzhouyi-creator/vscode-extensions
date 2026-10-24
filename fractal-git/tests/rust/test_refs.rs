@@ -332,3 +332,23 @@ fn concurrent_updates_leave_no_staging_files() {
     );
     let _ = fs::remove_dir_all(&git_dir);
 }
+
+#[test]
+fn head_writers_record_symbolic_and_detached_targets() {
+    let git_dir = scratch_repo("head_writers");
+    let store = DiskRefStore::new(&git_dir);
+    let oid = oid_from_seed(71);
+
+    store
+        .update_head_symbolic("refs/heads/main")
+        .expect("symbolic HEAD must be writable");
+    let symbolic = fs::read_to_string(git_dir.join("HEAD")).expect("read symbolic HEAD");
+    assert_eq!(symbolic, "ref: refs/heads/main\n");
+
+    store
+        .update_head_detached(&oid)
+        .expect("detached HEAD must be writable");
+    let detached = fs::read_to_string(git_dir.join("HEAD")).expect("read detached HEAD");
+    assert_eq!(detached, format!("{}\n", oid.to_hex()));
+    let _ = fs::remove_dir_all(&git_dir);
+}

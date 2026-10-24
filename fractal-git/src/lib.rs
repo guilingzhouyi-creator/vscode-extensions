@@ -106,7 +106,7 @@ pub use fg_storage::cas_backend::CasBackend;
 pub use fg_storage::cas_bridge::{CasFileDescriptor, CasToGitMaterializer, MaterializeRequest};
 pub use fg_storage::commit_graph::{CommitGraphEntry, CommitGraphReader, CommitGraphWriter};
 pub use fg_storage::commit_materializer::{
-    materialize_commit, serialize_commit_payload, serialize_tree_payload,
+    materialize_commit, serialize_commit_payload, serialize_tree_payload, write_commit_objects,
     CommitMaterializationRequest, MaterializedCommit,
 };
 pub use fg_storage::loose::{write_loose_object, LooseOdb};

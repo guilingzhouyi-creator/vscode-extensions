@@ -263,7 +263,7 @@ fn execute_fast_forward(
     remove_stale_files(view.work_root(), &current_files, &new_files);
     let index_entries = materialize_files(view, &new_files);
     update_dirc_index(view.git_dir(), &index_entries);
-    update_references(view.git_dir(), theirs_commit, branch_name);
+    update_references(view.git_dir(), view.work_root(), theirs_commit, branch_name);
 
     record_merge_operation(view, theirs_commit, &opts.target, branch_name);
 
@@ -493,7 +493,12 @@ fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<Stri
     remove_stale_files(m_ctx.view.work_root(), m_ctx.ours_files, &new_files);
     let index_entries = materialize_files(m_ctx.view, &new_files);
     update_dirc_index(m_ctx.view.git_dir(), &index_entries);
-    update_references(m_ctx.view.git_dir(), commit_oid, m_ctx.branch_name);
+    update_references(
+        m_ctx.view.git_dir(),
+        m_ctx.view.work_root(),
+        commit_oid,
+        m_ctx.branch_name,
+    );
     super::git_hooks::run_post_hook(&hook_runner, "post-merge", &["0".to_string()]);
 
     record_merge_operation(
