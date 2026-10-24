@@ -316,8 +316,13 @@ function validateCompactSidecarOnDisk(report) {
     report.metrics.grade,
     'sidecar grade must match the verbose baseline',
   );
+  assert.ok(
+    !Array.isArray(compact.clusters) || compact.clusters.length > 0,
+    'clusters must be omitted rather than emitted empty, so "no overlap" stays distinguishable from "not measured"',
+  );
   console.log(
-    `✔ CAS v3 sidecar verified (${compact.vectors.length} vectors, verdict ${compact.verdict}).`,
+    `✔ CAS v3 sidecar verified (${compact.vectors.length} vectors, ` +
+      `${compact.clusters?.length ?? 0} claims, verdict ${compact.verdict}).`,
   );
 }
 
