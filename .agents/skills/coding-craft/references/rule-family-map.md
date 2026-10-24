@@ -385,7 +385,7 @@
 
 准则：原生算子必须与参考实现差分等价。
 
-- **error**：`FGT-ALG-001`
+- warning / info：`FGT-ALG-001`
 
 ### `BRG` — 桥接层
 
@@ -397,7 +397,7 @@
 
 准则：CAS 循环必须处理 ABA 与内存序。
 
-- **error**：`FGT-CAS-001`
+- warning / info：`FGT-CAS-001`
 
 ### `COR` — 核心不变量
 
@@ -409,7 +409,7 @@
 
 准则：crate 门面必须实质承载，禁止空壳转发。
 
-- **error**：`FGT-FAC-001`
+- warning / info：`FGT-FAC-001`
 
 ### `GAT` — 门禁自审
 
@@ -421,13 +421,13 @@
 
 准则：索引访问必须边界检查或形式证明。
 
-- **error**：`FGT-IDX-001`
+- warning / info：`FGT-IDX-001`
 
 ### `LCK` — 锁纪律
 
 准则：禁跨 await 持锁、锁粒度最小化。
 
-- **error**：`FGT-LCK-001`
+- warning / info：`FGT-LCK-001`
 
 ### `OBJ` — 对象生命周期
 
@@ -439,7 +439,7 @@
 
 准则：策略必须可替换，禁止硬编码分支。
 
-- **error**：`FGT-POL-001`
+- warning / info：`FGT-POL-001`
 
 ### `SAF` — unsafe 最小化
 
@@ -451,18 +451,18 @@
 
 准则：持久化写入必须原子且可恢复。
 
-- **error**：`FGT-STO-001`
+- warning / info：`FGT-STO-001`
 
 ### `TOP` — 拓扑
 
 准则：模块拓扑单向，禁止反向引用。
 
-- **error**：`FGT-TOP-001`
+- warning / info：`FGT-TOP-001`
 
 ### `TRN` — 事务
 
 准则：事务边界必须显式，失败须回滚。
 
-- **error**：`FGT-TRN-001`
+- warning / info：`FGT-TRN-001`
 
 ---
