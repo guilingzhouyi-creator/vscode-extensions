@@ -23,7 +23,7 @@ if [[ -z "$GIT_ROOT" ]]; then
 fi
 cd "$GIT_ROOT" || exit 1
 
-REQUIRED_HOOKS=(pre-commit commit-msg pre-push)
+REQUIRED_HOOKS=(pre-commit commit-msg pre-merge-commit post-commit post-merge pre-push)
 missing_hooks=()
 for hook in "${REQUIRED_HOOKS[@]}"; do
     if [[ ! -f ".githooks/$hook" ]]; then
@@ -66,11 +66,21 @@ if (( exec_mode_count != ${#REQUIRED_HOOKS[@]} )); then
     exit 1
 fi
 
+if [[ -f scripts/common/gate-receipts.js ]]; then
+    if ! node scripts/common/gate-receipts.js baseline; then
+        echo "✖ BLOCK 门禁收据基线写入失败"
+        exit 1
+    fi
+    echo "✅ 已写入门禁收据基线 (gate-receipts baseline)"
+else
+    echo "⚠️ SKIP 未找到 scripts/common/gate-receipts.js，跳过收据基线"
+fi
+
 echo "✅ 已配置 git config core.hooksPath = $effective_hooks_path"
 echo "✅ 已为 ${REQUIRED_HOOKS[*]} 设置并回读索引可执行位 100755"
-echo "✅ Pre-Commit 门禁 (.githooks/pre-commit -> pwsh / bash 双运行期路由)"
-echo "✅ Commit-Msg 门禁 (.githooks/commit-msg -> pwsh / bash 双运行期路由)"
-echo "✅ Pre-Push 门禁 (.githooks/pre-push -> pwsh / bash 双运行期路由)"
+for hook in "${REQUIRED_HOOKS[@]}"; do
+    echo "✅ $hook 门禁 (.githooks/$hook -> pwsh / bash 双运行期路由)"
+done
 echo "================================================================="
 echo "🎉 本地 Git 提交门禁激活成功！后续每次 commit 将自动执行前置安全自检。"
 echo "================================================================="

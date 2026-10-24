@@ -120,6 +120,39 @@ if [[ "$IS_AGENT" -ne 1 ]]; then
     echo "================================================================="
 fi
 
+# --- 合并提交结构性豁免（MERGE-STRUCTURE-10）---
+# git merge 生成的 "Merge branch ..." 消息不是人工撰写的正文，结构契约与禁词审查对它必然误杀，
+# 过去只能靠 --no-verify 绕过（连带丢掉 pre-commit 门禁）。此处仅在 MERGE_HEAD 存在且首行为
+# Git 生成的合并标题时放行，并登记独立步骤，使收据能区分「结构性合并」与「文本契约通过」。
+IS_MERGE_COMMIT=0
+GIT_DIR_PATH=$(git rev-parse --git-dir 2>/dev/null || echo ".git")
+MERGE_HEAD_PATH="$GIT_DIR_PATH/MERGE_HEAD"
+[[ "$MERGE_HEAD_PATH" = /* ]] || MERGE_HEAD_PATH="$ROOT_DIR/$MERGE_HEAD_PATH"
+if [[ -f "$MERGE_HEAD_PATH" ]]; then
+    MERGE_SUBJECT=$(grep -vE '^[[:space:]]*#' "$MSG_FILE" | head -n 1 | tr -d '\r')
+    if [[ "$MERGE_SUBJECT" =~ ^Merge\ (branch|remote-tracking\ branch|tag|commit|pull\ request) ]]; then
+        IS_MERGE_COMMIT=1
+    fi
+fi
+if [[ "$IS_MERGE_COMMIT" -eq 1 ]]; then
+    write_step_banner "MERGE-STRUCTURE-10"
+    write_step_verdict "MERGE-STRUCTURE-10" PASS "合并提交采用 Git 生成的结构性标题，文本契约由合并来源提交保证"
+    if [[ "$IS_AGENT" -eq 1 ]]; then
+        cat <<EOF
+{
+  "protocolVersion": "1.0.0",
+  "status": "PASS",
+  "gate": "commit-msg",
+  "summary": "Merge commit message accepted through structural exemption."
+}
+EOF
+    else
+        echo "✔ Commit-Msg 检查通过（合并提交结构性豁免）"
+        echo "================================================================="
+    fi
+    exit 0
+fi
+
 # --- 结构契约校验（单一实现：scripts/common/commit-structure-contract.js）---
 # 七项结构判定原先在本文件与 PowerShell 版本各写一份。本文件那一份已经漂移：
 # [[ =~ ]] 的字符类在 C.UTF-8 下按字节匹配，全角句号与中文标题都被误判。

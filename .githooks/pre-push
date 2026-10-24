@@ -1,25 +1,47 @@
 #!/usr/bin/env bash
-# Git Pre-Push Hook — 智能双运行期路由 (pwsh / bash) + 真实推送 refs 采集
+# Git Pre-Push Hook — 智能双运行期路由 (pwsh / bash) + 全量推送 refs 采集 + 门禁收据校验入口
 set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 
-# Git 通过 stdin 传入 "<local ref> <local sha> <remote ref> <remote sha>"。
-# 采集首个非删除推送，供门禁按真实推送范围扫描，而非固定使用当前分支上游。
+# Git 通过 stdin 传入多条 "<local ref> <local sha> <remote ref> <remote sha>"。
+# 全量写入临时文件交给门禁逐 ref 判定（删除/非快进/收据），绝不再只取第一条。
+# 临时文件必须落在仓库 .git 内：Git Bash 的 /tmp 与原生 node/pwsh 看到的路径空间不同，
+# 跨进程传递 POSIX 临时路径会让两侧读到「不存在」而把收据审计静默跳过。
+GIT_DIR_PATH="$(git rev-parse --git-dir 2>/dev/null || echo ".git")"
+[[ "$GIT_DIR_PATH" = /* || "$GIT_DIR_PATH" = ?:* ]] || GIT_DIR_PATH="$ROOT_DIR/$GIT_DIR_PATH"
+RECEIPTS_DIR="$GIT_DIR_PATH/gate-receipts"
+mkdir -p "$RECEIPTS_DIR"
+REFS_FILE="$RECEIPTS_DIR/push-refs-$$.txt"
+trap 'rm -f "$REFS_FILE"' EXIT
 PUSHED_SHA=""
 REMOTE_SHA=""
 if [[ ! -t 0 ]]; then
-    REFS="$(cat)"
-    while read -r _local_ref local_sha _remote_ref remote_sha; do
-        if [[ -n "${local_sha:-}" && "$local_sha" != "0000000000000000000000000000000000000000" ]]; then
+    while read -r local_ref local_sha remote_ref remote_sha; do
+        [[ -n "${local_ref:-}" ]] || continue
+        printf '%s %s %s %s\n' "$local_ref" "$local_sha" "$remote_ref" "$remote_sha" >> "$REFS_FILE"
+        if [[ -z "$PUSHED_SHA" && "$local_sha" != "0000000000000000000000000000000000000000" ]]; then
             PUSHED_SHA="$local_sha"
             REMOTE_SHA="$remote_sha"
-            break
         fi
-    done <<< "$REFS"
+    done
 fi
 
 if command -v pwsh >/dev/null 2>&1 && [[ -f "$ROOT_DIR/scripts/ps1/pre-push-gate.ps1" ]]; then
-    exec pwsh -File "$ROOT_DIR/scripts/ps1/pre-push-gate.ps1" -PushedSha "$PUSHED_SHA" -RemoteSha "$REMOTE_SHA"
+    GATE_ARGS=(-File "$ROOT_DIR/scripts/ps1/pre-push-gate.ps1" -PushedSha "$PUSHED_SHA" -RemoteSha "$REMOTE_SHA")
+    if [[ -s "$REFS_FILE" ]]; then
+        GATE_ARGS+=(-RefsFile "$REFS_FILE")
+    fi
+    if [[ "${GATE_ALLOW_BYPASS:-0}" == "1" ]]; then
+        GATE_ARGS+=(-AllowBypass)
+    fi
+    pwsh "${GATE_ARGS[@]}"
 else
-    exec bash "$ROOT_DIR/scripts/sh/pre-push-gate.sh" --pushed-sha "$PUSHED_SHA" --remote-sha "$REMOTE_SHA"
+    GATE_ARGS=(--pushed-sha "$PUSHED_SHA" --remote-sha "$REMOTE_SHA")
+    if [[ -s "$REFS_FILE" ]]; then
+        GATE_ARGS+=(--refs-file "$REFS_FILE")
+    fi
+    if [[ "${GATE_ALLOW_BYPASS:-0}" == "1" ]]; then
+        GATE_ARGS+=(--allow-bypass)
+    fi
+    bash "$ROOT_DIR/scripts/sh/pre-push-gate.sh" "${GATE_ARGS[@]}"
 fi

@@ -32,7 +32,7 @@ if (-not $gitRoot) {
 
 # 校验 hook 文件完整性
 $hooksDir = Join-Path $gitRoot '.githooks'
-$requiredHooks = @('pre-commit', 'commit-msg', 'pre-push')
+$requiredHooks = @('pre-commit', 'commit-msg', 'pre-merge-commit', 'post-commit', 'post-merge', 'pre-push')
 $missingHooks = @()
 foreach ($hook in $requiredHooks) {
     $hookPath = Join-Path $hooksDir $hook
@@ -73,12 +73,29 @@ foreach ($hook in $requiredHooks) {
     }
 }
 
+$receiptsEngine = Join-Path $gitRoot 'scripts/common/gate-receipts.js'
+if (Test-Path -Path $receiptsEngine -PathType Leaf) {
+    Push-Location $gitRoot
+    try {
+        node $receiptsEngine baseline
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "✖ BLOCK 门禁收据基线写入失败" -ForegroundColor Red
+            exit 1
+        }
+    } finally {
+        Pop-Location
+    }
+    Write-Host "✅ 已写入门禁收据基线 (gate-receipts baseline)" -ForegroundColor Green
+} else {
+    Write-Host "⚠️ SKIP 未找到 scripts/common/gate-receipts.js，跳过收据基线" -ForegroundColor Yellow
+}
+
 $effectiveHooksPath = (git config --get core.hooksPath) -join ''
 Write-Host "✅ 已配置 git config core.hooksPath = $effectiveHooksPath" -ForegroundColor Green
 Write-Host "✅ 已为 $($requiredHooks -join ', ') 设置索引可执行位 (git update-index --chmod=+x)" -ForegroundColor Green
-Write-Host "✅ Pre-Commit 门禁 (.githooks/pre-commit -> pwsh / bash 双运行期路由)" -ForegroundColor Green
-Write-Host "✅ Commit-Msg 门禁 (.githooks/commit-msg -> pwsh / bash 双运行期路由)" -ForegroundColor Green
-Write-Host "✅ Pre-Push 门禁 (.githooks/pre-push -> pwsh / bash 双运行期路由)" -ForegroundColor Green
+foreach ($hook in $requiredHooks) {
+    Write-Host "✅ $hook 门禁 (.githooks/$hook -> pwsh / bash 双运行期路由)" -ForegroundColor Green
+}
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "🎉 本地 Git 提交门禁激活成功！后续每次 commit 将自动执行前置安全自检。" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan

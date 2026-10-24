@@ -1,6 +1,6 @@
 # 门禁系统季度审计清单
 
-- 适用范围：仓库根目录级门禁（`pre-commit` / `commit-msg` / `pre-push` / `audit-all` / CI）
+- 适用范围：仓库根目录级门禁（`pre-commit` / `pre-merge-commit` / `commit-msg` / `post-commit` / `post-merge` / `pre-push` / `audit-all` / CI）
 - 执行频率：每季度一次；重大门禁变更后追加一次
 - 产出：审计结论并入统一审查快照 `.audit-logs/audit-latest.md`（由 `record-workspace-audit.js` 按统一模板渲染）
 
@@ -12,7 +12,7 @@
 | :---: | :--- | :--- | :--- |
 | 1 | 同步主干并确认干净树 | `git status --porcelain` | 输出为空 |
 | 2 | 安装门禁依赖 | `npm run gate:bootstrap` | 钩子激活、依赖与构建就绪 |
-| 3 | 确认三类钩子已激活 | `git config --get core.hooksPath` | 输出 `.githooks` |
+| 3 | 确认六类钩子已激活（pre-commit / pre-merge-commit / commit-msg / post-commit / post-merge / pre-push） | `git config --get core.hooksPath` | 输出 `.githooks` |
 
 ---
 

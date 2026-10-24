@@ -30,11 +30,15 @@ CARGO_BIN=$(command -v cargo 2>/dev/null || command -v cargo.exe 2>/dev/null || 
 AGENT_MODE=0
 PUSHED_SHA=""
 REMOTE_SHA=""
+REFS_FILE=""
+ALLOW_BYPASS=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --pushed-sha) PUSHED_SHA="${2:-}"; shift 2 ;;
         --remote-sha) REMOTE_SHA="${2:-}"; shift 2 ;;
+        --refs-file) REFS_FILE="${2:-}"; shift 2 ;;
+        --allow-bypass) ALLOW_BYPASS=1; shift ;;
         *) break ;;
     esac
 done
@@ -484,6 +488,30 @@ fi
 # 破坏性删除目标溯源与只读自动变量遮蔽：防止意外破坏代码库或环境边界。
 if ! run_gate_step 60 "DESTRUCTIVE-OPS-38" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-destructive-ops.js; then
     FAILED=1
+fi
+
+# 推送 ref 安全性：删除受保护分支与历史改写必须在联网前拦截。
+# 无 refs 输入时显式写 SKIP，绝不静默零判定（静默零判定会让步骤看似执行过）。
+if [[ -n "$REFS_FILE" && -f "$REFS_FILE" && -s "$REFS_FILE" ]]; then
+    if ! run_gate_step 30 "REF-SAFETY-39" "$ROOT_DIR" "$NODE_BIN" scripts/common/gate-receipts.js verify-refs --refs-file "$REFS_FILE"; then
+        FAILED=1
+    fi
+else
+    write_step_verdict "REF-SAFETY-39" SKIP "无推送 refs 输入（手动执行门禁）"
+fi
+
+# 门禁收据审计：每个待推送提交都必须持有本地门禁收据。
+# --no-verify 提交在这里被识别为 bypass 并留痕；显式 --allow-bypass 才放行，且写入 bypass.log。
+if [[ -n "$REFS_FILE" && -f "$REFS_FILE" && -s "$REFS_FILE" ]]; then
+    RECEIPT_ARGS=(scripts/common/gate-receipts.js verify-receipts --refs-file "$REFS_FILE")
+    if [[ "$ALLOW_BYPASS" -eq 1 ]]; then
+        RECEIPT_ARGS+=(--allow-bypass)
+    fi
+    if ! run_gate_step 60 "RECEIPT-AUDIT-40" "$ROOT_DIR" "$NODE_BIN" "${RECEIPT_ARGS[@]}"; then
+        FAILED=1
+    fi
+else
+    write_step_verdict "RECEIPT-AUDIT-40" SKIP "无推送 refs 输入（手动执行门禁）"
 fi
 
 if [[ "$AGENT_MODE" -eq 1 ]]; then

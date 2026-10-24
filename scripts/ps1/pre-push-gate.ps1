@@ -14,7 +14,9 @@ param(
     [switch]$ViewLog,
     [switch]$Agent,
     [string]$PushedSha = "",
-    [string]$RemoteSha = ""
+    [string]$RemoteSha = "",
+    [string]$RefsFile = "",
+    [switch]$AllowBypass
 )
 Set-StrictMode -Version Latest
 
@@ -465,6 +467,36 @@ if ($codeSource37 -ne 0) {
 $codeDestructive38 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-destructive-ops.js") -WorkingDirectory $repoRoot -StepId "DESTRUCTIVE-OPS-38" -TimeoutSeconds 60
 if ($codeDestructive38 -ne 0) {
     $failed = $true
+}
+
+# 推送 ref 安全性：删除受保护分支与历史改写必须在联网前拦截。
+# 无 refs 输入时显式写 SKIP，绝不静默零判定（静默零判定会让步骤看似执行过）。
+$refsLineCount = 0
+if ($RefsFile -ne "" -and (Test-Path $RefsFile -PathType Leaf)) {
+    $refsLineCount = @(Get-Content $RefsFile -Encoding utf8 | Where-Object { $_.Trim() -ne "" }).Count
+}
+if ($refsLineCount -gt 0) {
+    $codeRefSafety = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/gate-receipts.js", "verify-refs", "--refs-file", $RefsFile) -WorkingDirectory $repoRoot -StepId "REF-SAFETY-39" -TimeoutSeconds 30
+    if ($codeRefSafety -ne 0) {
+        $failed = $true
+    }
+} else {
+    Write-StepVerdict -StepId "REF-SAFETY-39" -Status "SKIP" -Detail "无推送 refs 输入（手动执行门禁）"
+}
+
+# 门禁收据审计：每个待推送提交都必须持有本地门禁收据。
+# --no-verify 提交在这里被识别为 bypass 并留痕；显式 -AllowBypass 才放行，且写入 bypass.log。
+if ($refsLineCount -gt 0) {
+    $receiptArgs = @("scripts/common/gate-receipts.js", "verify-receipts", "--refs-file", $RefsFile)
+    if ($AllowBypass) {
+        $receiptArgs += "--allow-bypass"
+    }
+    $codeReceiptAudit = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $receiptArgs -WorkingDirectory $repoRoot -StepId "RECEIPT-AUDIT-40" -TimeoutSeconds 60
+    if ($codeReceiptAudit -ne 0) {
+        $failed = $true
+    }
+} else {
+    Write-StepVerdict -StepId "RECEIPT-AUDIT-40" -Status "SKIP" -Detail "无推送 refs 输入（手动执行门禁）"
 }
 
 if ($Agent) {

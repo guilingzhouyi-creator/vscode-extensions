@@ -97,6 +97,40 @@ if (-not $Agent) {
     Write-Host "=================================================================" -ForegroundColor Cyan
 }
 
+# --- 合并提交结构性豁免（MERGE-STRUCTURE-10）---
+# git merge 生成的 "Merge branch ..." 消息不是人工撰写的正文，结构契约与禁词审查对它必然误杀，
+# 过去只能靠 --no-verify 绕过（连带丢掉 pre-commit 门禁）。此处仅在 MERGE_HEAD 存在且首行为
+# Git 生成的合并标题时放行，并登记独立步骤，使收据能区分「结构性合并」与「文本契约通过」。
+$gitDirRaw = (& git rev-parse --git-dir 2>$null | Select-Object -First 1)
+$gitDirPath = if ([string]::IsNullOrEmpty($gitDirRaw)) { ".git" } else { [string]$gitDirRaw }
+if (-not [System.IO.Path]::IsPathRooted($gitDirPath)) {
+    $gitDirPath = Join-Path $repoRoot $gitDirPath
+}
+$mergeHeadPath = Join-Path $gitDirPath "MERGE_HEAD"
+$isMergeCommit = $false
+if (Test-Path $mergeHeadPath -PathType Leaf) {
+    $mergeSubject = @(Get-Content $MsgFile -Encoding utf8 | Where-Object { $_ -notmatch '^\s*#' } | Select-Object -First 1)
+    if ($mergeSubject.Count -gt 0 -and $mergeSubject[0] -match '^Merge\ (branch|remote-tracking\ branch|tag|commit|pull\ request)') {
+        $isMergeCommit = $true
+    }
+}
+if ($isMergeCommit) {
+    Write-StepVerdict -StepId "MERGE-STRUCTURE-10" -Status "PASS" -Detail "合并提交采用 Git 生成的结构性标题，文本契约由合并来源提交保证"
+    if ($Agent) {
+        Write-Output (@{
+            protocolVersion = "1.0.0"
+            status = "PASS"
+            gate = "commit-msg"
+            summary = "Merge commit message accepted through structural exemption."
+        } | ConvertTo-Json)
+    } else {
+        Write-Host "=================================================================" -ForegroundColor Cyan
+        Write-Host "✔ Commit-Msg 检查通过（合并提交结构性豁免）" -ForegroundColor Green
+        Write-Host "=================================================================" -ForegroundColor Cyan
+    }
+    exit 0
+}
+
 # --- 结构契约校验（单一实现：scripts/common/commit-structure-contract.js）---
 # 七项结构判定原先在本文件与 Bash 版本各写一份，任何修正都要写两遍、验两遍，而 Bash 那份已经漂移。
 # 现在只在这里调度一次 Node，两个平台看到的是同一套规则与同一个步骤归属。

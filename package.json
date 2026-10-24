@@ -21,6 +21,7 @@
     "gate:bootstrap": "node scripts/common/bootstrap-gates.js",
     "gate:verdicts": "node scripts/common/validate-gate-verdicts.js",
     "gate:counts": "node scripts/common/validate-hardcoded-counts.js",
-    "gate:chains": "node scripts/common/validate-block-chains.js"
+    "gate:chains": "node scripts/common/validate-block-chains.js",
+    "gate:receipts": "node scripts/common/gate-receipts.js"
   }
 }

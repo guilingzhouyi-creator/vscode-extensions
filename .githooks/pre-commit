@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Git Pre-Commit Hook — 智能双运行期路由 (pwsh / bash)
+# Git Pre-Commit Hook — 智能双运行期路由 (pwsh / bash) + 门禁收据阶段标记
 set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 if command -v pwsh >/dev/null 2>&1 && [[ -f "$ROOT_DIR/scripts/ps1/pre-commit-gate.ps1" ]]; then
-    exec pwsh -File "$ROOT_DIR/scripts/ps1/pre-commit-gate.ps1"
+    pwsh -File "$ROOT_DIR/scripts/ps1/pre-commit-gate.ps1" || exit 1
 else
-    exec bash "$ROOT_DIR/scripts/sh/pre-commit-gate.sh"
+    bash "$ROOT_DIR/scripts/sh/pre-commit-gate.sh" || exit 1
 fi
+# 门禁通过后记录收据阶段；标记失败视为门禁失败，绝不放行未留痕提交。
+node "$ROOT_DIR/scripts/common/gate-receipts.js" mark --phase pre-commit --ppid "$PPID"
