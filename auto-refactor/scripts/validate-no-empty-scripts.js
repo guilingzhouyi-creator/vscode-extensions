@@ -34,6 +34,13 @@ const IGNORED_DIRS = new Set([
   '.bench-corpus',
   '.vscode-test',
   'coverage',
+  // Content-addressed object store: every entry is an immutable blob, so the
+  // physical-zero-byte invariant says nothing about it, and the tree holds tens of
+  // thousands of files — walking it turns a guard into a full regression stall.
+  '.taxis',
+  // Gitignored scratch scaffolding. Checked-out clones and probe trees are not repo
+  // source; auditing them reports on throwaway copies of files already judged here.
+  'tmp',
 ]);
 
 const BINARY_EXTS = new Set([
