@@ -55,6 +55,9 @@ CAS v3.0 解决的是另一个问题：**在保留全部决策所需事实的前
 - **`location`** 采用 `file:line` 单串，省略 `start`/`end` 对象层级。反水合时统一以第 1 列重建，因为审查修复只需要定位行，不需要精确列区间。
 - **`action`** 取自 `issue.actionable.action`，缺失时为 `null`，使「可自动化」与「需人工判断」在同一位置上即可区分。
 
+> [!IMPORTANT]
+> `counts.issues` **不等于** `vectors.length + truncated`。默认发射策略排除 `info` 级问题，且不把被排除的部分计入 `truncated` —— 它们从来不是合格项。两个字段回答的是不同问题：`counts.issues` 是「全报告存在多少条」（含 info 与已抑制），`truncated` 是「有多少条本可发射却因预算被扣留」。一旦排除 info 级，两者就无法用算术互相推导。
+
 ### 2.3 维度短键
 
 `dimensions` 与 `bottlenecks[].dim` 使用短键，映射定义在 `COMPACT_DIMENSION_KEYS`：
@@ -198,6 +201,8 @@ node auto-refactor/scripts/migrate-report-artifacts.js auto-refactor/reports --w
 cd auto-refactor && npm run build && node scripts/validate-compact-schema.js
 ```
 
-该套件断言八件事：投影保真（判定/计数/维度/瓶颈/截断）、`includeInfo` 策略、向量位置布局与严重度排序、反水合往返一致、体积收益比例、四代历史工件归一与未知形状拒绝、重叠声明的附加性与坐标/簇双域限定、`render(report, 'compact')` 派发可达。
+该套件断言九件事：投影保真（判定/计数/维度/瓶颈/截断）、`includeInfo` 策略、向量位置布局与严重度排序、反水合往返一致、体积收益比例、四代历史工件归一与未知形状拒绝、重叠声明的附加性与坐标/簇双域限定、`render(report, 'compact')` 派发可达、离线回填对生产者侧车的保留。
 
 其中重叠声明一项额外覆盖截断边界：预算落在同一坐标的成员之间时，声明仍须完整报出两个成员，且被扣留的那个确实不在 `vectors` 中。只断言未截断路径会漏掉这个缺陷——声明在真实预算下恒为空也能通过。
+
+回填保留一项在临时目录中运行真实子进程，断言两件事：生产者写出的侧车（含向量与声明）不被覆盖，而空壳侧车仍可被替换以保持命令幂等。这条不对称无法在单元层验证——迁移器只看得到聚合工件，其投影必然无向量，一旦无条件写入就会把更丰富的侧车降级成空壳，而命令本身仍报告成功。

@@ -86,7 +86,15 @@ export type CompactIssueVector = [
 export interface CompactCounts {
     /** Files scanned in the reporting run. */
     files: number;
-    /** Findings carried in `vectors` plus any truncated remainder. */
+    /**
+     * Total findings in the whole report, including the info tier and suppressed matches.
+     *
+     * Not `vectors.length + truncated`: the default emission policy drops info-tier findings
+     * without counting them as truncated, because they were never eligible. A consumer deriving
+     * "how many were withheld" should read `truncated`, and one deriving "how many exist" should
+     * read this field — the two answer different questions and cannot be reconciled arithmetically
+     * once info-tier findings are excluded.
+     */
     issues: number;
     /** Error-tier finding count over the whole report, not just the emitted vectors. */
     errors: number;

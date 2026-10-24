@@ -12,11 +12,12 @@
  *      `--write`.
  *   3. Report per-artifact outcome, and fail the run only on real I/O faults, because an artifact
  *      directory legitimately also holds ledgers and failure snapshots.
- * Exit Semantics & Design Rationale: 0 = no fault and at least one artifact migrated, 1 = an I/O
+ * Exit Semantics & Design Rationale: 0 = no fault and at least one artifact handled, 1 = an I/O
  *   fault, no artifact found, or nothing recognized. Default mode is a dry run that prints the
  *   projection summary, because rewriting persisted audit history in place is a destructive act
  *   that must be asked for. Sources are never deleted: the verbose artifact keeps its role as the
- *   lossless record and the compact sidecar is a derived view.
+ *   lossless record and the compact sidecar is a derived view. A sidecar already written by a
+ *   producer that saw the findings is preserved rather than replaced — see `hasProducerSidecar`.
  */
 'use strict';
 
@@ -88,6 +89,36 @@ function sidecarPath(sourcePath) {
 }
 
 /**
+ * Decide whether an existing sidecar must be preserved rather than overwritten.
+ *
+ * The migrator's job is to give artifacts that have no compact view one. Running it over a
+ * directory that also holds producer-written sidecars is the normal case, not an edge case: the
+ * self-audit writes `*.cas.json` next to `*.json` on every run. Overwriting those would be a
+ * silent downgrade — the migrator sees only an aggregate baseline, so its projection carries no
+ * vectors and no claims, while the producer's carries both. A dry run would report success and
+ * the damage would only appear as a consumer reading a hollow projection later.
+ *
+ * Preservation is decided by provenance, not by quality heuristics: if the sidecar records a
+ * non-zero issue total, it was produced from a payload that carried findings, which a migrator
+ * running over an aggregate never can. An existing zero-vector sidecar is treated as replaceable
+ * so re-running the migrator stays idempotent.
+ *
+ * @param destination - Sidecar path that would be written.
+ * @returns True when the existing sidecar must be left untouched.
+ */
+function hasProducerSidecar(destination) {
+  if (!fs.existsSync(destination)) return false;
+  try {
+    const existing = JSON.parse(fs.readFileSync(destination, 'utf8'));
+    return Array.isArray(existing.vectors) && existing.vectors.length > 0;
+  } catch (parseError) {
+    // An unreadable sidecar cannot be shown to be worth keeping, and refusing to write would
+    // strand the artifact; the write below replaces it.
+    return false;
+  }
+}
+
+/**
  * Migrate one artifact and persist or preview the projection.
  *
  * A JSON file that parses but matches no report shape is reported as skipped rather than failed:
@@ -97,7 +128,7 @@ function sidecarPath(sourcePath) {
  *
  * @param {string} sourcePath - Artifact to migrate.
  * @param {{ write: boolean, pretty: boolean }} options - Output switches.
- * @returns {{ status: 'migrated'|'skipped'|'failed', detail: string }} Outcome for the run report.
+ * @returns {{ status: 'migrated'|'skipped'|'failed'|'preserved', detail: string }} Run outcome.
  */
 function migrateOne(sourcePath, options) {
   const relative = path.relative(process.cwd(), sourcePath);
@@ -121,6 +152,12 @@ function migrateOne(sourcePath, options) {
   if (!options.write) return { status: 'migrated', detail: `${summary} (dry run)` };
 
   const destination = sidecarPath(sourcePath);
+  if (hasProducerSidecar(destination)) {
+    return {
+      status: 'preserved',
+      detail: `${relative}: producer sidecar kept (${summary} would have replaced it)`,
+    };
+  }
   const serialized = JSON.stringify(compact, null, options.pretty ? 2 : 0);
   try {
     fs.writeFileSync(destination, `${serialized}\n`, 'utf8');
@@ -131,7 +168,7 @@ function migrateOne(sourcePath, options) {
 }
 
 /** Symbol per outcome, so a mixed-directory run stays scannable. */
-const OUTCOME_MARK = { migrated: '✔', skipped: '·', failed: '✖' };
+const OUTCOME_MARK = { migrated: '✔', preserved: '=', skipped: '·', failed: '✖' };
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
@@ -146,7 +183,7 @@ function main() {
     process.exit(1);
   }
 
-  const tally = { migrated: 0, skipped: 0, failed: 0 };
+  const tally = { migrated: 0, preserved: 0, skipped: 0, failed: 0 };
   for (const artifact of artifacts) {
     const outcome = migrateOne(artifact, options);
     tally[outcome.status] += 1;
@@ -154,9 +191,10 @@ function main() {
   }
 
   console.log(
-    `\n${tally.migrated} migrated, ${tally.skipped} skipped as non-report, ${tally.failed} failed.`,
+    `\n${tally.migrated} migrated, ${tally.preserved} preserved, ` +
+      `${tally.skipped} skipped as non-report, ${tally.failed} failed.`,
   );
-  process.exit(tally.failed === 0 && tally.migrated > 0 ? 0 : 1);
+  process.exit(tally.failed === 0 && tally.migrated + tally.preserved > 0 ? 0 : 1);
 }
 
 main();
