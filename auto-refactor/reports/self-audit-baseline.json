@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792818979216",
-  "timestamp": "2026-10-24T05:16:30.312Z",
+  "snapshotId": "snapshot-v0.4.0-1792819716431",
+  "timestamp": "2026-10-24T05:28:53.338Z",
   "cai": 78.6,
   "autonomy": {
     "compositeAutonomyIndex": 78.6,
@@ -9,7 +9,7 @@
     "dimensions": {
       "effectiveLocAutonomy": 100,
       "symbolCallAutonomy": 97.46,
-      "domainKernelDensity": 62.57,
+      "domainKernelDensity": 62.56,
       "codeOriginality": 20,
       "supplyChainResilience": 77.27,
       "criticalPathAutonomy": 90
@@ -69,8 +69,8 @@
       "proprietaryFiles": 722,
       "vendorFiles": 0,
       "generatedFiles": 0,
-      "totalEffectiveLoc": 211198,
-      "proprietaryEffectiveLoc": 211198,
+      "totalEffectiveLoc": 211231,
+      "proprietaryEffectiveLoc": 211231,
       "vendorEffectiveLoc": 0,
       "generatedEffectiveLoc": 0,
       "internalSymbolCalls": 1844,
@@ -100,7 +100,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 722,
-    "durationMs": 9152
+    "durationMs": 13966
   },
   "metrics": {
     "compositeScore": 99.03,
@@ -1113,27 +1113,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 165438,
-      "unique": 134025,
-      "changed": 1825,
-      "semantic": 1460,
+      "processed": 165457,
+      "unique": 134042,
+      "changed": 149,
+      "semantic": 119,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 913,
+      "added": 75,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792818979213,
+      "endMs": 1792819716425,
       "totalRuns": 353,
       "eloc": {
-        "processedTotal": 50159953,
-        "uniqueTotal": 134025,
-        "changedTotal": 1011090,
-        "semanticTotal": 808871
+        "processedTotal": 50167983,
+        "uniqueTotal": 134042,
+        "changedTotal": 991025,
+        "semanticTotal": 792819
       },
       "qed": {
         "mean": 0.0001,
