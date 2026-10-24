@@ -35,6 +35,7 @@
 | **顶层蓝图与历史全宗** | Cell 平权自治；一体两面 Diff；归档元数据规范；全景总枢见 [docs](docs/README.md)，系统性规约总索引见 [system-spec](docs/system-spec/README.md) | [blueprint](docs/agent-native-system-blueprint.md) · [docs-archive-governance](.agents/skills/docs-archive-governance/SKILL.md) | — |
 | **技能集与同构治理** | 物理四件套；JIT 渐进披露；双目录 100% 字节等价 | [validate-skills.js](scripts/common/validate-skills.js) · [sync-skills.js](scripts/common/sync-skills.js) · [skill-governance](.agents/skills/skill-governance/SKILL.md) | `node scripts/common/validate-skills.js` |
 | **SubAgent 泛化调度** | (Archetype $\otimes$ Posture) 正交派生；`inherit` 同构继承；独占 Path Jail；<!-- METRICS:BEGIN subagent-archetype-count -->**7 个**<!-- METRICS:END subagent-archetype-count -->领域原型 × 5 姿态派生 <!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count -->预置 | [subagent-catalog.json](.agents/subagents/subagent-catalog.json) · [subagent-orchestration](.agents/skills/subagent-orchestration/SKILL.md) | `node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js` |
+| **并行会话与工作区隔离** | 零全局破坏性还原（`restore .`/`clean -fd`）；零通配暂存（`add .`）；非本会话文件零触碰、零清理、零越界修复；显式白名单精准暂存 | [subagent-orchestration](.agents/skills/subagent-orchestration/SKILL.md) · [batch-commit](.agents/skills/batch-commit/SKILL.md) · [defensive-security-and-taint-safety](.agents/skills/defensive-security-and-taint-safety/SKILL.md) | `git status -s` |
 | **界面工程与交互物理** | 语义明度阶梯；单闭合边框；二阶阻尼谐振子；感知幂律遮罩 | [interaction-design-physics](.agents/skills/interaction-design-physics/SKILL.md) | — |
 
 ---
@@ -51,6 +52,7 @@
 | **规则元治理** | 规则 ID 必登记于 SSOT；跨项目规则零漂移；表现层与底层诊断去重解耦 | [rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) |
 | **Rust 工业级** | 零 panic、`thiserror` 强类型错误、Type-State、零瞬态堆分配、CAS 无锁、`unsafe` 最小化、常量 SSOT、Rustdoc 四要素、Clippy `-D warnings` | [rust-engineering](.agents/skills/rust-engineering/SKILL.md) |
 | **SubAgent 调度** | `Model: "inherit"` 同构、五层契约注入、独占 Zero-Intersection Path Jail、`review`/`explore` 剥夺写权限、主 Agent 交叉复审 | [subagent-orchestration](.agents/skills/subagent-orchestration/SKILL.md) |
+| **会话隔离与并行避让** | 任何运行会话严格以自身任务独占 Path Jail 为界；严禁全局破坏性还原（`git restore .`、`git clean -fd`）；严禁通配暂存（`git add .`/`-A`）；工作区出现非本会话改动时必须识别为外部并行会话活动，坚决保持零干预，严禁擅自修改、顺手修复或清理；交割门禁仅审计本会话变更集，外部告警显式归因并如实上报 | [subagent-orchestration](.agents/skills/subagent-orchestration/SKILL.md) · [batch-commit](.agents/skills/batch-commit/SKILL.md) · [defensive-security-and-taint-safety](.agents/skills/defensive-security-and-taint-safety/SKILL.md) |
 | **路径与引用** | 严禁盘符、绝对路径、`file:///`；重命名须闭环 CI、SubAgent archetype、[rule-catalog.json](scripts/common/rule-catalog.json)、`docs/`、`audit-all` 五维引用 | [gate-governance](.agents/skills/gate-governance/SKILL.md) |
 | **阈值与技术债** | 严禁私改 baseline、linter、naming、门禁阈值；$\text{ELOC}_{semantic}\le 15\%$ 且无真实技术债净消除即触发 `BLOCK_GAMING_DETECTED`；High/Critical Debt 恒为 0 且严禁反弹 | [telemetry-statistical-modeling](.agents/skills/telemetry-statistical-modeling/SKILL.md) |
 | **交付完整性** | 严禁 0 字节文件、占位符、未决 TODO、未获批提前标记完成、未过全量回归的缩水实现；严禁 `--no-verify`、跳过门禁提交/推送、对未跟踪文件 `git rm` | [constraint-driven-development](.agents/skills/constraint-driven-development/SKILL.md) |
@@ -71,7 +73,7 @@
 ## 四、 标准作业闭环
 
 1. **澄清**：意图不完整或疑似 X-Y 问题 → [spec-driven-development](.agents/skills/spec-driven-development/SKILL.md) 逆向单点质询；长会话遵循 [subagent-orchestration](.agents/skills/subagent-orchestration/SKILL.md) 75% 预算与渐进披露。
-2. **定位**：按 §一 精读 SSOT 与 Skill，明确架构边界与红线；方案类改动先立细则获批再编码。
-3. **分流**：单域作业严禁跨项目扩散；委派须注入 Path Jail、领域公理与交割自检命令。
-4. **交叉复审**：① 沙箱越界审计；② 对抗性证伪与独立静态核查（[constraint-driven-development](.agents/skills/constraint-driven-development/SKILL.md)）；③ 本地门禁预审。
-5. **回归**：`pwsh -File scripts/ps1/audit-all.ps1` 与项目全量测试 100% 绿色后方可交割。
+2. **定位与现场侦测**：按 §一 精读 SSOT 与 Skill，明确架构边界与红线；作业前先执行 `git status -s` 探明工作区基线，若存在不属于本会话的外部文件变动，判定为并行会话活动并划定绝对避让界限；方案类改动先立细则获批再编码。
+3. **分流与精准施工**：单域作业严禁跨项目扩散；委派须注入 Path Jail、领域公理与交割自检命令；写入操作严格收口于独占文件，坚决不越界修改或清理并行会话文件。
+4. **交叉复审与精准暂存**：① 沙箱越界审计（比对独占列表）；② 对抗性证伪与独立静态核查（[constraint-driven-development](.agents/skills/constraint-driven-development/SKILL.md)）；③ 显式白名单暂存（`git add <files>`，严禁 `git add .`）；④ 本地门禁预审（仅审计本会话变更集，外部并行引发的全局检查告警显式归因）。
+5. **回归与交付**：`pwsh -File scripts/ps1/audit-all.ps1` 与项目全量测试 100% 绿色后方可交割（如遇外部并行阻塞，如实说明归因，严禁越界强修）。
