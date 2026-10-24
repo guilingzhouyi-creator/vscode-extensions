@@ -316,10 +316,147 @@ function testLegacyMigration() {
 }
 
 /**
+ * Assert the overlap-collapsed claim set is additive and correctly scoped.
+ *
+ * Two properties matter and neither is observable from `vectors` alone: a claim must reference
+ * only findings the consumer actually received, and two findings at *different* lines must never
+ * be collapsed even when their rules share a cluster — otherwise the compact view would report
+ * one defect where the code has two repair sites.
+ */
+function testOverlapClaimProjection() {
+  console.log('\n7. Testing overlap claim projection...');
+
+  const at = (rules, lines) =>
+    rules.map((rule, index) => ({
+      id: `analyzer:${rule}:src/core/report.ts:${lines[index]}`,
+      analyzer: 'complexity',
+      rule,
+      severity: 'warning',
+      message: `${rule} fired`,
+      location: {
+        file: 'src/core/report.ts',
+        start: { line: lines[index], column: 1 },
+        end: { line: lines[index], column: 20 },
+      },
+      detail: {},
+    }));
+
+  // One coordinate carrying three members of the nested-control-flow cluster.
+  const report = createBulkReport();
+  report.issues = at(['CPX-NEST-001', 'CPX-NEST-002', 'SIM-GUARD-001'], [40, 40, 40]);
+  report.summary.issuesTotal = report.issues.length;
+  report.summary.bySeverity = { error: 0, warning: 3, info: 0 };
+
+  const compact = buildCompactReport(report, { includeInfo: true });
+  assert.ok(Array.isArray(compact.clusters), 'a same-coordinate cluster must produce a claim');
+  assert.strictEqual(compact.clusters.length, 1, 'one cluster explains the one coordinate');
+  const claim = compact.clusters[0];
+  assert.strictEqual(claim.at, 'src/core/report.ts:40');
+  assert.strictEqual(claim.cluster, 'nested-control-flow');
+  assert.strictEqual(claim.rules.length, 3);
+  assert.ok(claim.rules.includes(claim.primary), 'the primary rule must be one of the members');
+
+  // Additivity: collapsing must not remove any vector.
+  assert.strictEqual(
+    compact.vectors.length,
+    3,
+    'claim projection is additive; every finding stays in vectors',
+  );
+
+  // Scope: the same rules on different lines are distinct repair sites and must stay unmerged.
+  const splitReport = createBulkReport();
+  splitReport.issues = at(['CPX-NEST-001', 'CPX-NEST-002'], [10, 90]);
+  splitReport.summary.issuesTotal = 2;
+  splitReport.summary.bySeverity = { error: 0, warning: 2, info: 0 };
+  const splitCompact = buildCompactReport(splitReport, { includeInfo: true });
+  assert.strictEqual(
+    splitCompact.clusters,
+    undefined,
+    'findings on different lines must not be collapsed into one claim',
+  );
+
+  // Scope: same coordinate but rules from unrelated clusters must not merge.
+  const unrelatedReport = createBulkReport();
+  unrelatedReport.issues = at(['CPX-NEST-001', 'PRF-MEM-001'], [55, 55]);
+  unrelatedReport.summary.issuesTotal = 2;
+  unrelatedReport.summary.bySeverity = { error: 0, warning: 2, info: 0 };
+  const unrelatedCompact = buildCompactReport(unrelatedReport, { includeInfo: true });
+  assert.strictEqual(
+    unrelatedCompact.clusters,
+    undefined,
+    'rules from unrelated clusters must not be collapsed',
+  );
+
+  testClaimSurvivesEmissionCap();
+  console.log('  ✔ claims are additive, coordinate-scoped and cluster-scoped');
+}
+
+/**
+ * Assert a claim is derived from the eligible set rather than the surviving vector window.
+ *
+ * This is the property that separates a useful claim from a decorative one. Deriving claims from
+ * the capped window makes them vanish under any realistic budget: an overlap sits at one
+ * coordinate, so its members are adjacent in the sorted order and a small `maxVectors` either
+ * drops all of them or keeps only the first — in both cases the report shows no overlap at all.
+ * Asserting only the uncapped path would pass while the shipped budget emitted nothing.
+ */
+function testClaimSurvivesEmissionCap() {
+  const report = createBulkReport();
+  const bulk = [];
+  // Distinct files keep the filler ahead of the overlap in severity-then-file ordering.
+  for (let index = 0; index < 40; index += 1) {
+    const file = `src/filler/${String(index).padStart(2, '0')}.ts`;
+    bulk.push({
+      id: `analyzer:NAM-FUN-001:${file}:1`,
+      analyzer: 'naming',
+      rule: 'NAM-FUN-001',
+      severity: 'warning',
+      message: 'filler',
+      location: { file, start: { line: 1, column: 1 }, end: { line: 1, column: 2 } },
+      detail: {},
+    });
+  }
+  const overlapFile = 'src/zz-tail.ts';
+  const overlap = ['GOV-SAN-001', 'HYG-STB-002'].map((rule) => ({
+    id: `analyzer:${rule}:${overlapFile}:9`,
+    analyzer: 'hygiene',
+    rule,
+    severity: 'warning',
+    message: 'overlap',
+    location: {
+      file: overlapFile,
+      start: { line: 9, column: 1 },
+      end: { line: 9, column: 2 },
+    },
+    detail: {},
+  }));
+  report.issues = [...bulk, ...overlap];
+  report.summary.issuesTotal = report.issues.length;
+  report.summary.bySeverity = { error: 0, warning: report.issues.length, info: 0 };
+
+  // Budget lands strictly between the overlapping members, so only the first one survives.
+  const capped = buildCompactReport(report, { includeInfo: true, maxVectors: 41 });
+  assert.strictEqual(capped.truncated, 1, 'the cap must drop exactly the trailing member');
+  assert.ok(
+    !capped.vectors.some((vector) => vector[2] === `${overlapFile}:9` && vector[0] === 'HYG-STB-002'),
+    'the fixture must actually withhold the trailing member',
+  );
+  assert.ok(
+    Array.isArray(capped.clusters) && capped.clusters.length === 1,
+    'a claim whose members straddle the cap must still be reported',
+  );
+  assert.deepStrictEqual(
+    capped.clusters[0].rules.slice().sort(),
+    ['GOV-SAN-001', 'HYG-STB-002'],
+    'the claim must name both members even though only one vector survived',
+  );
+}
+
+/**
  * Assert the CLI render path resolves the compact format.
  */
 function testRenderDispatch() {
-  console.log('\n7. Testing render dispatch for the compact format...');
+  console.log('\n8. Testing render dispatch for the compact format...');
   const rendered = render(createBulkReport(), 'compact');
   const parsed = JSON.parse(rendered);
   assert.strictEqual(parsed.schema, 'cas-v3');
@@ -335,6 +472,7 @@ function main() {
   testHydrationRoundTrip();
   testTokenFrugality();
   testLegacyMigration();
+  testOverlapClaimProjection();
   testRenderDispatch();
   console.log('\n================================================================');
   console.log('🎉 ALL COMPACT AGENT SCHEMA CHECKS PASSED!');

@@ -978,6 +978,7 @@ export {
     migrateLegacyReport,
     isCompactReport,
 } from './core/reporting/compact-report-migrator';
+export type { CompactClusterClaim } from './core/reporting/compact-report-types';
 
 // ---- Praxis Diff Governance Subsystem Facade & SPI ----
 export * from './core/praxis';

@@ -112,6 +112,18 @@ export interface CompactHealth {
     cai?: number;
 }
 
+/** One representative claim: a coordinate carrying findings from one overlap cluster. */
+export interface CompactClusterClaim {
+    /** `"file:line"` coordinate; matches the location token in the covering vectors. */
+    at: string;
+    /** Overlap cluster key the collapsed members belong to (see `OVERLAP_CLUSTERS`). */
+    cluster: string;
+    /** Member rule ids present at that coordinate, ordered by severity then id. */
+    rules: string[];
+    /** Id of the member the aggregator would present; the rest stay in `rules`. */
+    primary: string;
+}
+
 /** Complete token-frugal projection of one scan. */
 export interface CompactScanReport {
     /** Protocol discriminator: always `cas-v3`. */
@@ -138,6 +150,21 @@ export interface CompactScanReport {
     pal: string[];
     /** Positional findings, highest severity first. */
     vectors: CompactIssueVector[];
+    /**
+     * Overlap-collapsed claims, emitted only when at least one coordinate carries several
+     * findings from one cluster.
+     *
+     * Additive on purpose: `vectors` keeps every finding, so a consumer that ignores this field
+     * sees exactly the previous output, while a consumer that reads it can show one row per
+     * defect instead of one row per rule. Vectors are NOT removed, because the machine face must
+     * keep the full diagnostic set — collapsing there would lose the repair targets.
+     *
+     * Scope is the whole eligible finding set, not the emitted window: a claim whose members
+     * straddle the vector cap is still reported, and its coordinate may therefore be only
+     * partially present in `vectors`. `truncated` remains the authoritative statement of how much
+     * was withheld, so a caller that needs the vectors behind a claim checks it before joining.
+     */
+    clusters?: CompactClusterClaim[];
     /** Anchor code slice per `"file:line"` location, only for blocking findings. */
     anchors?: Record<string, string>;
     /** Count of findings omitted by the emission cap. */
@@ -163,6 +190,20 @@ export interface CompactReportOptions {
      * anchor. Kept as a callback so this module stays free of filesystem access.
      */
     readonly anchorProvider?: (issue: Issue) => string | undefined;
+    /**
+     * Override the headline score block with a caller-computed aggregate.
+     *
+     * A producer may score the project by a path the scan report does not carry: the self-audit
+     * aggregates per-file quality scores, while `qualityScore` holds the engine's own projection.
+     * Both are legitimate and they legitimately differ, so a sidecar that accompanied the
+     * baseline without this override would quote a number the baseline does not contain. Fields
+     * left undefined keep the report's own value.
+     */
+    readonly healthOverride?: {
+        readonly score?: number;
+        readonly grade?: string;
+        readonly cai?: number;
+    };
 }
 
 /** Result of hydrating a compact document back into legacy report shape. */

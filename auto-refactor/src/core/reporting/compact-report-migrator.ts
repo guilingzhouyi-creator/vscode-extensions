@@ -8,8 +8,9 @@
  *   reporter registry (`compact` format), the CLI and the compact-schema verification suite.
  * Responsibilities:
  *   1. Project a ScanReport into CompactScanReport: vectors, palette, bottlenecks, health.
- *   2. Hydrate a CompactScanReport back into Issue records and a summary block.
- *   3. Sniff historical artifact shapes (scan report, workspace snapshot, audit baseline,
+ *   2. Collapse findings one overlap cluster explains into a single representative claim.
+ *   3. Hydrate a CompactScanReport back into Issue records and a summary block.
+ *   4. Sniff historical artifact shapes (scan report, workspace snapshot, audit baseline,
  *      performance baseline, v0.3 baseline generation) and normalize each into the compact
  *      projection.
  * Exit Semantics & Design Rationale: Pure functions over already-loaded payloads; the only throw
@@ -20,12 +21,14 @@
 
 import type { Issue, ScanReport, Severity } from '../types';
 import type { QualityDimension, QualityScoreBreakdown } from '../scoring/scoringTypes';
+import { OVERLAP_CLUSTERS } from '../rules/overlap-clusters';
 import {
     COMPACT_DIMENSION_KEYS,
     COMPACT_SCHEMA_ID,
     COMPACT_SEVERITY_CODE,
     COMPACT_SEVERITY_LABEL,
     type CompactBottleneck,
+    type CompactClusterClaim,
     type CompactCounts,
     type CompactHealth,
     type CompactIssueVector,
@@ -105,19 +108,20 @@ function projectDimensions(breakdown?: QualityScoreBreakdown): Record<string, nu
 }
 
 /** Build the headline quality block, keeping an unmeasured composite distinguishable from zero. */
-function projectHealth(report: ScanReport): CompactHealth {
+function projectHealth(report: ScanReport, options: CompactReportOptions): CompactHealth {
     const breakdown = report.qualityScore;
     const measured =
         breakdown !== undefined && Number.isFinite(breakdown.compositeScore)
             ? breakdown.compositeScore
             : null;
+    const override = options.healthOverride;
     const health: CompactHealth = {
-        score: measured,
-        grade: breakdown?.grade ?? UNKNOWN_GRADE,
+        score: override?.score ?? measured,
+        grade: override?.grade ?? breakdown?.grade ?? UNKNOWN_GRADE,
     };
     if (breakdown?.coverage !== undefined) health.coverage = breakdown.coverage;
     if (breakdown?.confidence !== undefined) health.confidence = breakdown.confidence;
-    const cai = report.autonomy?.compositeAutonomyIndex;
+    const cai = override?.cai ?? report.autonomy?.compositeAutonomyIndex;
     if (typeof cai === 'number' && Number.isFinite(cai)) health.cai = cai;
     return health;
 }
@@ -164,17 +168,25 @@ function compareIssues(left: Issue, right: Issue): number {
     return left.location.start.line - right.location.start.line;
 }
 
-/** Select the findings that fit the emission budget and report how many were dropped. */
+/**
+ * Split the report's findings into the emitted window, the dropped remainder, and the eligible
+ * set the window was cut from.
+ *
+ * `eligible` is returned because the aggregate projections (`clusters`) must describe the whole
+ * report, not the surviving window: a claim covering a coordinate that the cap cut in half would
+ * otherwise disappear entirely, which reads as "no overlap here" when the overlap is real.
+ */
 function selectIssues(
     issues: readonly Issue[],
     options: CompactReportOptions,
-): { emitted: Issue[]; truncated: number } {
+): { emitted: Issue[]; eligible: Issue[]; truncated: number } {
     const includeInfo = options.includeInfo === true;
     const eligible = includeInfo ? [...issues] : issues.filter((i) => i.severity !== SEVERITY_INFO);
     eligible.sort(compareIssues);
     const maxVectors = options.maxVectors ?? DEFAULT_MAX_VECTORS;
     return {
         emitted: eligible.slice(0, maxVectors),
+        eligible,
         truncated: Math.max(0, eligible.length - maxVectors),
     };
 }
@@ -223,6 +235,110 @@ function projectVectors(
     return { pal, vectors, anchors };
 }
 
+/** Cluster keys indexed by member rule id, so a claim lookup never scans the cluster table. */
+const CLUSTER_KEYS_BY_RULE: ReadonlyMap<string, readonly string[]> = (() => {
+    const index = new Map<string, string[]>();
+    for (const cluster of OVERLAP_CLUSTERS) {
+        for (const member of cluster.members) {
+            const keys = index.get(member);
+            if (keys) {
+                keys.push(cluster.key);
+            } else {
+                index.set(member, [cluster.key]);
+            }
+        }
+    }
+    return index;
+})();
+
+/** Bucket accumulator for one (coordinate, cluster) pair, reused across findings. */
+interface ClaimBucket {
+    readonly at: string;
+    readonly cluster: string;
+    readonly rules: string[];
+    readonly ruleSet: Set<string>;
+    /** Highest severity rank seen so far in this bucket. */
+    topRank: number;
+    /** Rule id holding `topRank`; ties resolve to the lexicographically smaller id. */
+    primary: string;
+}
+
+/** Read or create the bucket for one (coordinate, cluster) pair. */
+function claimBucket(
+    buckets: Map<string, ClaimBucket>,
+    order: string[],
+    at: string,
+    cluster: string,
+): ClaimBucket {
+    const key = `${at}|${cluster}`;
+    const existing = buckets.get(key);
+    if (existing) return existing;
+    const created: ClaimBucket = { at, cluster, rules: [], ruleSet: new Set(), topRank: -1, primary: '' };
+    buckets.set(key, created);
+    order.push(key);
+    return created;
+}
+
+/** Fold one finding into its bucket, tracking the representative rule in the same pass. */
+function foldIntoBucket(bucket: ClaimBucket, issue: Issue): void {
+    if (!bucket.ruleSet.has(issue.rule)) {
+        bucket.ruleSet.add(issue.rule);
+        bucket.rules.push(issue.rule);
+    }
+    const rank = severityRank(issue.severity);
+    if (rank > bucket.topRank || (rank === bucket.topRank && issue.rule < bucket.primary)) {
+        bucket.topRank = rank;
+        bucket.primary = issue.rule;
+    }
+}
+
+/**
+ * Collapse findings that one overlap cluster explains into a single representative claim.
+ *
+ * Scope is deliberately narrow — same coordinate, same cluster — because that is exactly the
+ * condition under which two rules describe one defect. Findings at different lines are never
+ * merged: each is a distinct repair site, and hiding the second would make the compact view look
+ * cleaner than the code actually is.
+ *
+ * Single pass: every finding is folded into the buckets its rule participates in, reading the
+ * cluster keys from an index instead of searching the cluster table. The representative rule is
+ * elected during the same fold, so no per-bucket sort or second scan is needed.
+ *
+ * @param issues - The eligible finding set, before the emission cap is applied. Passing the capped
+ *   window instead would tie the claim set to the vector budget: a coordinate whose members
+ *   straddle the cap keeps only its leading member and reports no overlap at all, and a small
+ *   budget drops every claim. Claims are aggregate triage facts, so they describe what was found,
+ *   while `truncated` already tells the consumer how much was withheld.
+ * @returns One claim per (coordinate, cluster) pair that carried at least two distinct members.
+ */
+function projectClusters(issues: readonly Issue[]): CompactClusterClaim[] {
+    const buckets = new Map<string, ClaimBucket>();
+    const order: string[] = [];
+    for (const issue of issues) {
+        const keys = CLUSTER_KEYS_BY_RULE.get(issue.rule);
+        if (!keys) continue;
+        const at = `${issue.location.file}${LOCATION_SEPARATOR}${issue.location.start.line}`;
+        for (const cluster of keys) {
+            foldIntoBucket(claimBucket(buckets, order, at, cluster), issue);
+        }
+    }
+
+    const claims: CompactClusterClaim[] = [];
+    for (const key of order) {
+        const bucket = buckets.get(key) as ClaimBucket;
+        if (bucket.rules.length < 2) continue;
+        claims.push({
+            at: bucket.at,
+            cluster: bucket.cluster,
+            rules: bucket.rules,
+            primary: bucket.primary,
+        });
+    }
+    return claims.sort(
+        (left, right) => left.at.localeCompare(right.at) || left.cluster.localeCompare(right.cluster),
+    );
+}
+
 /**
  * Project a complete ScanReport into the compact CAS v3.0 document.
  *
@@ -245,7 +361,7 @@ export function buildCompactReport(
         root: report.root,
         verdict: resolveVerdict(counts),
         counts,
-        health: projectHealth(report),
+        health: projectHealth(report, options),
         dimensions: projectDimensions(report.qualityScore),
         bottlenecks: projectBottlenecks(
             report.qualityScore,
@@ -255,6 +371,8 @@ export function buildCompactReport(
         vectors: projected.vectors,
     };
     if (Object.keys(projected.anchors).length > 0) compact.anchors = projected.anchors;
+    const claims = projectClusters(selection.eligible);
+    if (claims.length > 0) compact.clusters = claims;
     if (selection.truncated > 0) compact.truncated = selection.truncated;
     const notes = report.summary.warnings;
     if (notes && notes.length > 0) compact.notes = notes;
