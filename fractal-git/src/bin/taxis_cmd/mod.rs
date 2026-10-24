@@ -24,6 +24,7 @@ pub mod daemon;
 pub mod diff;
 pub mod diff_render;
 pub mod doctor;
+pub mod git_hooks;
 pub mod init;
 pub mod log;
 pub mod merge;

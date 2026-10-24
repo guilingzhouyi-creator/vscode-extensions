@@ -470,6 +470,8 @@ fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<Stri
 
     let default_msg = format!("Merge branch '{}'", m_ctx.opts.target);
     let commit_msg = m_ctx.opts.message.as_deref().unwrap_or(&default_msg);
+    let hook_runner = super::git_hooks::discover(m_ctx.view.git_dir(), m_ctx.view.work_root());
+    super::git_hooks::run_merge_chain(&hook_runner, m_ctx.view.git_dir(), commit_msg);
     let timestamp_sec = chrono::Utc::now().timestamp();
     let author = GitSignature::new("Taxis Operator", "operator@taxis.internal", timestamp_sec);
 
@@ -492,6 +494,7 @@ fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<Stri
     let index_entries = materialize_files(m_ctx.view, &new_files);
     update_dirc_index(m_ctx.view.git_dir(), &index_entries);
     update_references(m_ctx.view.git_dir(), commit_oid, m_ctx.branch_name);
+    super::git_hooks::run_post_hook(&hook_runner, "post-merge", &["0".to_string()]);
 
     record_merge_operation(
         m_ctx.view,

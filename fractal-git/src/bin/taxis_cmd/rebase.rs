@@ -113,6 +113,9 @@ pub fn handle_rebase(ctx: &CliContext) {
     }
 
     // Case 2: Fast-forward (ours is an ancestor of upstream)
+    let hook_runner = super::git_hooks::discover(view.git_dir(), view.work_root());
+    super::git_hooks::run_pre_rebase(&hook_runner, upstream_arg, effective_branch.as_deref());
+
     if merge_base == ours_commit {
         let (_, upstream_tree) = match view.resolve_tree(&upstream_commit.to_hex()) {
             Ok(res) => res,
@@ -173,6 +176,7 @@ pub fn handle_rebase(ctx: &CliContext) {
 
     let odb = LooseOdb::new(view.git_dir());
     let mut current_tip = upstream_commit;
+    let mut rewritten_pairs: Vec<(String, String)> = Vec::new();
 
     for rec in &commits_to_replay {
         let parent_oid = match rec.parents.first() {
@@ -272,6 +276,7 @@ pub fn handle_rebase(ctx: &CliContext) {
             Ok(oid) => oid,
             Err(err) => fail_io("persist rebased commit", err),
         };
+        rewritten_pairs.push((rec.oid.to_hex(), current_tip.to_hex()));
     }
 
     // Update worktree & references to the final replayed commit tip
@@ -288,6 +293,7 @@ pub fn handle_rebase(ctx: &CliContext) {
     let index_entries = materialize_files(&view, &final_files);
     update_dirc_index(view.git_dir(), &index_entries);
     update_references(view.git_dir(), current_tip, effective_branch.as_deref());
+    super::git_hooks::run_post_rewrite(&hook_runner, "rebase", &rewritten_pairs);
 
     record_rebase_op(
         &view,

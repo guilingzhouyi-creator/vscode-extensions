@@ -9,12 +9,14 @@
 
 pub mod commit_guard;
 pub mod conflict_guard;
+pub mod git_hook;
 pub mod hook;
 pub mod pre_receive;
 pub mod quota_governor;
 
 pub use commit_guard::CommitMessageGuard;
 pub use conflict_guard::ConflictGuard;
+pub use git_hook::{hook_argument_path, GitHookOutcome, GitHookRunner, GitHookStatus, HookConfig};
 pub use hook::{
     CommitGovernanceHook, FractalHook, HookContext, HookPipeline, HookTier, HookVerdict,
     HygieneConflictHook, UacPromotionGateHook,

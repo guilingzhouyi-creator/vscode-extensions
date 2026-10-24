@@ -73,6 +73,13 @@ pub fn handle_checkout(ctx: &CliContext) {
         .and_then(|head_oid| flatten_commit_tree(&view, &head_oid).ok())
         .unwrap_or_default();
 
+    let previous_head = view
+        .head_commit()
+        .ok()
+        .flatten()
+        .map(|head_oid| head_oid.to_hex())
+        .unwrap_or_else(|| "0".repeat(40));
+
     let mut new_files = BTreeMap::new();
     if let Err(diff_err) = flatten_tree_for_diff(&view, &tree_oid, "", &mut new_files) {
         reject(CliTag::ERROR, diff_err);
@@ -82,6 +89,13 @@ pub fn handle_checkout(ctx: &CliContext) {
     let index_entries = materialize_files(&view, &new_files);
     update_dirc_index(view.git_dir(), &index_entries);
     update_references(view.git_dir(), target_commit, effective_branch.as_deref());
+
+    let hook_runner = super::git_hooks::discover(view.git_dir(), view.work_root());
+    super::git_hooks::run_post_hook(
+        &hook_runner,
+        "post-checkout",
+        &[previous_head, target_commit.to_hex(), "1".to_string()],
+    );
 
     print_checkout_verdict(&opts, target_commit, effective_branch.as_deref());
 }

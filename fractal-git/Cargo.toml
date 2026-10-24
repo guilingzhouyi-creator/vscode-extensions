@@ -117,3 +117,7 @@ path = "tests/rust/test_commit_materializer.rs"
 [[test]]
 name = "test_governance_pipeline"
 path = "tests/rust/test_governance_pipeline.rs"
+
+[[test]]
+name = "test_git_hooks"
+path = "tests/rust/test_git_hooks.rs"

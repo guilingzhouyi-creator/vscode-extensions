@@ -134,6 +134,9 @@ pub use fg_transport::smart_protocol::ProtocolV2Handler;
 // Gate & Policy exports
 pub use fg_gate::commit_guard::CommitMessageGuard;
 pub use fg_gate::conflict_guard::ConflictGuard;
+pub use fg_gate::git_hook::{
+    hook_argument_path, GitHookOutcome, GitHookRunner, GitHookStatus, HookConfig,
+};
 pub use fg_gate::hook::{
     CommitGovernanceHook, FractalHook, HookContext, HookPipeline, HookTier, HookVerdict,
     HygieneConflictHook, UacPromotionGateHook,

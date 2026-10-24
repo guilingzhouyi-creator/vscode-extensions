@@ -82,6 +82,20 @@ pub fn handle_commit(ctx: &CliContext) {
     let staged_files = collect_staged_files(ctx);
     let witness = verify_commit_governance(&message, &policy, &staged_files);
 
+    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
+    let hook_runner = super::git_hooks::discover(&ctx.git_dir, &work_root);
+    let source_ref =
+        resolve_active_head_ref(&ctx.git_dir).unwrap_or_else(|| target_ref.to_git_ref());
+    super::git_hooks::assert_pipeline_approved(
+        &source_ref,
+        &target_ref.to_git_ref(),
+        &actor,
+        &policy,
+        &staged_files,
+        &message,
+    );
+    super::git_hooks::run_commit_chain(&hook_runner, &ctx.git_dir, &message);
+
     let materialized = materialize_staged_files(
         ctx,
         &staged_files,
@@ -93,7 +107,6 @@ pub fn handle_commit(ctx: &CliContext) {
     );
 
     // Synchronize staged index (.taxis/index and doc.indx)
-    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
     let mut index_entries = Vec::with_capacity(staged_files.len());
     let mut native_indx = fg_native::IndxSection::new();
 
@@ -168,6 +181,7 @@ pub fn handle_commit(ctx: &CliContext) {
         let _ = fs::write(&head_path, format!("ref: {}\n", target_ref.to_git_ref()));
     }
 
+    super::git_hooks::run_post_hook(&hook_runner, "post-commit", &[]);
     record_commit_in_operation_graph(ctx, &materialized.commit_oid, &target_ref, &actor, &witness);
     record_block_provenance(ctx, &materialized, &staged_files, agent_id, cell_id);
 

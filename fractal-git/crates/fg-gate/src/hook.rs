@@ -213,7 +213,11 @@ impl HookPipeline {
         Self { hooks: Vec::new() }
     }
 
-    /// Creates a pipeline populated with default industrial gates across L1~L3.
+    /// Creates a pipeline populated with the default industrial gates.
+    ///
+    /// The built-in set covers SubToCard (hygiene and commit governance) and CellToTrunk
+    /// (authority credential); the CardToCell tier stays reserved until a gate for it exists,
+    /// so callers must not assume that every tier has a registered hook.
     pub fn with_defaults() -> Self {
         let mut pipeline = Self::new();
         pipeline.register(Arc::new(HygieneConflictHook));

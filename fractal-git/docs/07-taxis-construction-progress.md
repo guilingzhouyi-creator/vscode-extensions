@@ -25,7 +25,7 @@
 | **C3** `.gitignore` 与属性匹配器 | 计划书 §十八 | ✅ **已全部完成** | `fg-index/src/ignore.rs` (496 行，14 测试)、`attributes.rs` (505 行，16 测试) 与 `read.rs` (`check-ignore`) |
 | **C4** `status` 三方比对 | 计划书 §十八 | ✅ **已全部落地** | `taxis_cmd/status.rs` (813 行，14 测试) 与 `tree_view.rs` (130 行) 原生实现三方比对与 stat cache |
 | **C5** git 兼容 diff / porcelain | 计划书 §十八 | ✅ **已全部落地** | 34 个子命令全部原生落地；补齐 `TextThreeWayMerge` 行级三方合并算子与 `stat_layout` 统计图排版算子 |
-| **C6** 与宿主 Git 彻底切割 | 计划书 §十八 | ✅ **已彻底完工** | 全仓已彻底清除 `Command::new("git")`（实测 0 处引用），未知命令统一由 `reject_unimplemented` 明确拒绝，彻底自举运行 |
+| **C6** 与宿主 Git 二进制切割 | 计划书 §十八 | ✅ **已完工** | 全仓已清除 `Command::new("git")`（实测 0 处引用），未知命令统一由 `reject_unimplemented` 明确拒绝；用户自带 Git hook 脚本由 `GitHookRunner` 经 POSIX 解释器执行，宿主 Git 二进制零参与 |
 
 ---
 
@@ -211,9 +211,9 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 | 7 | **C3** `.gitignore` 与属性匹配器 | ✅ 已完成 | `crates/fg-index/src/ignore.rs`（496 行，14 项测试，支持 glob 通配、多层否定与目录前缀）+ `attributes.rs`（505 行，16 项测试）+ `read.rs`（`check-ignore` 原生命令） | 30 项单元测试通过，完全与 gitignore 规范等价 |
 | 8 | **C4** `status` 三方比对 | ✅ 已完成 | `src/bin/taxis_cmd/status.rs`（813 行，14 项测试）与 `tree_view.rs`（130 行），基于 stat cache、原生索引与 HEAD 树执行高效三方比对 | 14 项比对与输出格式测试全绿，支持人类与 JSON 格式 |
 | 9 | **C5** git 兼容 diff / porcelain | ✅ 已完成 | 34 个子命令全部原生落地于 `src/bin/taxis_cmd/`；补齐 `TextThreeWayMerge`（560 行）行级三方合并算子与 `stat_layout`（210 行）紧凑排版算子 | 67 项 diff/merge 算法测试全绿 |
-| 10 | **C6** 与宿主 Git 彻底切割 | ✅ 彻底切割 | 全源码扫描实测 `Command::new("git")` 彻底归零（0 处引用），未知命令统一由 `reject_unimplemented` 明确拒绝，Taxis 实现 100% 原生自举运行 | 源码静态断言验证 0 处外部 Git 进程依赖 |
+| 10 | **C6** 与宿主 Git 二进制切割 | ✅ 切割完成 | 全源码扫描实测 `Command::new("git")` 归零（0 处引用），未知命令统一由 `reject_unimplemented` 明确拒绝，Taxis 实现原生自举运行；用户自带 hook 脚本由本地 POSIX 解释器执行 | 源码静态断言验证 0 处外部 Git 进程依赖 |
 
-**C6 达成证明**：全仓经过架构解耦与算子下沉后，核心与边缘瓷器命令已不再依赖宿主 Git 二进制，所有数据读写、索引匹配、历史遍历、对象序列化均基于 10 微 Crate 内核自举运行。
+**C6 达成证明**：全仓经过架构解耦与算子下沉后，核心与边缘瓷器命令已不再依赖宿主 Git 二进制，所有数据读写、索引匹配、历史遍历、对象序列化均基于 10 微 Crate 内核自举运行。`GitHookRunner` 只执行用户在 `core.hooksPath` 中自备的脚本，属于钩子契约的协作面，不构成对宿主 Git 二进制的依赖。
 
 ---
 
@@ -224,10 +224,10 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 | 治理支柱 | 核心模块与承载 | 机制与设计契约 | 验证证据 |
 | :--- | :--- | :--- | :--- |
 | **1. 强推/回滚刚性防御** | `crates/fg-gate/src/pre_receive.rs`<br>`src/bin/taxis_cmd/reset.rs` | 对 `SystemTrunk`/`Trunk`/`CellMain` 刚性一票否决强推；Agent 禁止在任何分支强推；`reset --hard` 前置检查工作区洁净度，脏工作区拒绝抹除；误回滚经 OperationGraph 100% 可撤销 | `test_force_push_pre_receive_barriers`<br>`taxis reset --hard` 防误删断言 |
-| **2. 工作区提交信息纪律** | `crates/fg-core/src/models/policy.rs`<br>`crates/fg-gate/src/commit_guard.rs` | 对齐 `AGENTS.md`：强制 `[Project]` 标签（`fractal-git` 等受控项目单源校验）、质性验证契约、中英双语 38 项禁词（`wip`, `temp`, `完美`, `彻底` 等）刚性拦截 | `test_workspace_strict_commit_policy`<br>559 项回归测试覆盖 |
+| **2. 工作区提交信息纪律** | `crates/fg-core/src/models/policy.rs`<br>`crates/fg-gate/src/commit_guard.rs` | 对齐 `AGENTS.md`：强制 `[Project]` 标签（`fractal-git` 等受控项目单源校验）、质性验证契约、中英双语 38 项禁词（`wip`, `temp`, `完美`, `彻底` 等）刚性拦截 | `test_workspace_strict_commit_policy`<br>570 项回归测试覆盖 |
 | **3. 假冲突消融与块级合并** | `crates/fg-algorithms/src/merge/block_merge.rs` | 顶层导入声明无序 Set Union 并集去重；顶层声明块（函数/结构体/类）差分提取与无冲突推标拼接（Pushout Commutativity），同一文件不同区域修改自动共存 | `test_block_three_way_merge_concurrent_modifications`<br>`taxis merge` 自动触发 |
 | **4. 共享意图黑板 (Blackboard)** | `crates/fg-core/src/models/blackboard.rs`<br>`crates/fg-topology/src/blackboard.rs`<br>`src/bin/taxis_cmd/blackboard.rs` | Card 作用域无锁意图声明租约（Claim/Check/Release/List）；细粒度文件+语义 Scope（如 `fn name`）独占探测；TTL 自动过期裁剪与原子暂存落盘 | `test_card_blackboard_and_disk_store`<br>`taxis blackboard` CLI 完整就绪 |
-| **5. 递归分形 Hook 拦截管道** | `crates/fg-gate/src/hook.rs` | 覆盖 L1(`SubToCard`)、L2(`CardToCell`)、L3(`CellToTrunk`) 3 级暂存区；内置 `HygieneConflictHook`、`CommitGovernanceHook`、`UacPromotionGateHook`；开放 `FractalHook` Trait 支持扩展自定义注入 | `test_fractal_hook_pipeline`<br>分级 PASS/BLOCK 阻断验证 |
+| **5. 递归分形 Hook 拦截管道** | `crates/fg-gate/src/hook.rs`<br>`crates/fg-gate/src/git_hook.rs`<br>`src/bin/taxis_cmd/git_hooks.rs` | `HookPipeline` 内置 `HygieneConflictHook`、`CommitGovernanceHook`（`SubToCard`）与 `UacPromotionGateHook`（`CellToTrunk`），`CardToCell` 层预留；`GitHookRunner` 复刻 Git 钩子契约：`core.hooksPath` / `core.taxishooks` / `core.taxishooktimeout` 解析、参数与 stdin 透传、`GIT_INDEX_FILE` 与 `GIT_PREFIX` 环境、退出码中止与预算超时降级，已接入 commit / merge / checkout / rebase 生命周期 | `test_fractal_hook_pipeline`<br>`test_git_hooks`<br>`test_governance_pipeline` |
 | **6. 机械客观代码时间戳 (MCPL)** | `crates/fg-core/src/models/provenance.rs`<br>`crates/fg-topology/src/provenance.rs`<br>`src/bin/taxis_cmd/commit.rs` | 宿主系统内核物理纳秒时间戳（`physical_timestamp_ns`）+ CCD v2 世代号 + 块哈希，脱离模型自觉客观记录至 `.taxis/provenance.json` | `test_mechanical_provenance_store`<br>`taxis commit` 原生自动注入 |
 
-全量测试 559 项 100% 绿灯，`audit-taxis.ps1 -Fast` 5/5 级工业门禁一次性全绿通行，架构零多余 Crate，完整闭环。
+全量测试 570 项 100% 绿灯，`audit-taxis.ps1 -Fast` 5/5 级工业门禁一次性全绿通行，架构零多余 Crate，完整闭环。
