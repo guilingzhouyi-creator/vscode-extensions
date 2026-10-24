@@ -63,6 +63,16 @@ try {
     Pop-Location
 }
 
+# 回读索引模式：fresh clone 后必须仍为 100755，否则 POSIX 平台会静默忽略 hook。
+$modeLines = @(git ls-files -s .githooks/)
+foreach ($hook in $requiredHooks) {
+    $record = $modeLines | Where-Object { $_ -match "\t\.githooks/$hook$" } | Select-Object -First 1
+    if (-not $record -or $record -notmatch '^100755') {
+        Write-Host "✖ BLOCK hook 索引可执行位未生效: $hook" -ForegroundColor Red
+        exit 1
+    }
+}
+
 $effectiveHooksPath = (git config --get core.hooksPath) -join ''
 Write-Host "✅ 已配置 git config core.hooksPath = $effectiveHooksPath" -ForegroundColor Green
 Write-Host "✅ 已为 $($requiredHooks -join ', ') 设置索引可执行位 (git update-index --chmod=+x)" -ForegroundColor Green

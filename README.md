@@ -172,7 +172,7 @@ vscode-extensions/              ← 工作区根目录
 ### 2. 常用操作 | Common Commands
 
 ```bash
-# 激活本地提交检查
+# 激活本地提交检查（core.hooksPath 仅存本地配置，全新克隆后必须执行一次）
 bash scripts/sh/install-hooks.sh        # Linux / macOS
 .\scripts\ps1\install-hooks.ps1         # Windows PowerShell
 

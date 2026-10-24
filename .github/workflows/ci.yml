@@ -323,6 +323,9 @@ jobs:
           set -euo pipefail
           # 1. install-hooks.sh 激活自检
           bash scripts/sh/install-hooks.sh
+          # 1.1 提交树可执行位断言：全新克隆必须保留 100755
+          HOOK_MODES=$(git ls-tree -r HEAD .githooks/ | cut -d' ' -f1 | sort -u)
+          test "$HOOK_MODES" = "100755" || { echo "::error::.githooks 提交树模式异常: $HOOK_MODES"; exit 1; }
           # 2. pre-commit-gate.sh 自检 (无暂存应 exit 0)
           bash scripts/sh/pre-commit-gate.sh
           # 3. commit-msg-gate.sh 生产工程级结构化合规自检

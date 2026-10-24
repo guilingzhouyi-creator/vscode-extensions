@@ -14,6 +14,9 @@
 # shell 脚本强制 LF —— Linux CI / CNB 容器中执行必需，防 Windows CRLF 破坏脚本
 *.sh text eol=lf
 
+# Git Hook 载体无扩展名，单独约束行尾，确保 POSIX 下 shebang 与执行位语义一致
+.githooks/** text eol=lf
+
 # PowerShell 脚本保持 CRLF（Windows 原生体验）
 *.ps1 text eol=crlf
 
