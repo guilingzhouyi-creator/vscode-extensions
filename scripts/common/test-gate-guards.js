@@ -659,7 +659,12 @@ check(
   'docs consistency guard catches every rule figure in the governance corpus after mutation',
   (() => {
     const root = path.join(__dirname, '../..');
-    const skip = new Set(['node_modules', '.git', 'out', 'dist', 'bin', 'obj', 'target', '.venv', '.audit-logs', 'archive']);
+    // The probe must walk exactly the corpus the guard walks. A local copy of the skip list had
+    // already drifted: the guard skipped the scratch directory while the probe kept mutating
+    // throwaway drafts, so it reported unguarded sites the guard was never meant to police.
+    const scope = METRICS.resolveScanScope(metricConfig);
+    const skip = new Set(scope.skipDirectories);
+    const skipPaths = new Set(scope.skipPaths);
     const files = [];
     const walk = (dir) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -667,7 +672,7 @@ check(
         const full = path.join(dir, entry.name);
         const rel = path.relative(root, full).replace(/\\/g, '/');
         if (entry.isDirectory()) {
-          if (rel === 'WebGames/docs' || rel === '.agents/plugins') continue;
+          if (skipPaths.has(rel)) continue;
           walk(full);
         } else if (entry.name.endsWith('.md')) {
           files.push(full);

@@ -83,6 +83,44 @@ function isExemptPath(relPath) {
   );
 }
 
+/** Raised when a path vanished between directory enumeration and being opened. */
+const VANISHED = Symbol('vanished');
+
+/**
+ * Read a file that a concurrent writer may rename away mid-walk.
+ *
+ * A content-addressed store writes through temporary files and renames them into place, so a path
+ * listed by readdir can already be gone by the time it is opened. Vanishing is not a hygiene
+ * defect — the file has no persistent form to judge — so this returns the sentinel instead of
+ * throwing, while every other I/O error still propagates so a real fault is never swallowed.
+ *
+ * @param {string} fullPath - Absolute path to read.
+ * @returns {Buffer|symbol} File bytes, or `VANISHED` when the path no longer exists.
+ */
+function readOrVanished(fullPath) {
+  try {
+    return fs.readFileSync(fullPath);
+  } catch (readError) {
+    if (readError && readError.code === 'ENOENT') return VANISHED;
+    throw readError;
+  }
+}
+
+/**
+ * Return file stats, or the sentinel when the path vanished before it could be inspected.
+ *
+ * @param {string} fullPath - Absolute path to stat.
+ * @returns {import('fs').Stats|symbol} Stats, or `VANISHED`.
+ */
+function statOrVanished(fullPath) {
+  try {
+    return fs.statSync(fullPath);
+  } catch (statError) {
+    if (statError && statError.code === 'ENOENT') return VANISHED;
+    throw statError;
+  }
+}
+
 function detectVacuousTrampoline(fullPath, content) {
   if (!fullPath.endsWith('.ts') && !fullPath.endsWith('.js')) return null;
   const stripped = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '').trim();
@@ -271,7 +309,8 @@ class PhysicalHygieneAuditor {
       return;
     }
     this.totalScannedFiles++;
-    const stat = fs.statSync(fullPath);
+    const stat = statOrVanished(fullPath);
+    if (stat === VANISHED) return;
     const baseName = path.basename(fullPath);
     const ext = path.extname(baseName).toLowerCase();
 
@@ -283,7 +322,9 @@ class PhysicalHygieneAuditor {
       return;
     }
 
-    let buf = fs.readFileSync(fullPath);
+    const readResult = readOrVanished(fullPath);
+    if (readResult === VANISHED) return;
+    let buf = readResult;
     let modified = false;
 
     const bomResult = this.auditBom(buf, relPath);
@@ -330,8 +371,14 @@ class PhysicalHygieneAuditor {
     if (eofResult.modified) modified = true;
 
     if (this.options.fix && modified) {
-      fs.writeFileSync(fullPath, content, 'utf8');
-      this.fixedCount++;
+      try {
+        fs.writeFileSync(fullPath, content, 'utf8');
+        this.fixedCount++;
+      } catch (writeError) {
+        // Rewriting a path a concurrent writer just renamed away would resurrect it as a stray
+        // copy under the old name. The store owns those bytes; hygiene must not recreate them.
+        if (!writeError || writeError.code !== 'ENOENT') throw writeError;
+      }
     }
   }
 
