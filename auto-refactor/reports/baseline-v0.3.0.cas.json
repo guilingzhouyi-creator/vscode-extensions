@@ -1,0 +1,25 @@
+{
+  "schema": "cas-v3",
+  "tool": "auto-refactor",
+  "version": "0.4.0",
+  "ts": "2026-10-06T12:53:31.544Z",
+  "root": "",
+  "verdict": "WARN",
+  "counts": {
+    "files": 0,
+    "issues": 23,
+    "errors": 0,
+    "warns": 23,
+    "info": 0,
+    "suppressed": 2029
+  },
+  "health": {
+    "score": 99.35,
+    "grade": "N/A"
+  },
+  "dimensions": {},
+  "bottlenecks": [],
+  "pal": [],
+  "vectors": [],
+  "truncated": 23
+}
