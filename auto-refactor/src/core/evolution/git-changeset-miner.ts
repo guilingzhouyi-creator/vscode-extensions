@@ -2,7 +2,8 @@
  * Module: Core Evolution — Git ChangeSet & Entropy Miner
  * File Path: src/core/evolution/git-changeset-miner.ts
  * Architecture Role: Evaluates Hassan (ICSE 2009) Change Shannon Entropy H(C) and Kamei JIT
- *   diffusion vectors across Git commits and staged deltas to detect chaotic cross-domain modifications.
+ *   diffusion vectors across Git commits and staged deltas to detect chaotic cross-domain
+ *   modifications.
  * Dependencies & Triggers: Node.js child_process (spawnSync) and path; consumed by
  *   evolutionary quality scoring, gate scripts, and change-risk telemetry.
  * Responsibilities:
@@ -11,7 +12,8 @@
  *   3. Extract Kamei diffusion vectors: Files (NF), Directories (ND), and Subsystems (NS);
  *   4. Flag high-entropy cross-subsystem modifications that exceed cognitive budgets;
  *   5. Provide safe repository mining with non-git graceful degradation.
- * Exit Semantics & Design Rationale: Pure deterministic calculation functions; never throws on malformed input.
+ * Exit Semantics & Design Rationale: Pure deterministic calculation functions;
+ *   never throws on malformed input.
  */
 
 import * as path from 'path';

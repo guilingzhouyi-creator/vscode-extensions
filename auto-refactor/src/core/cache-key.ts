@@ -99,7 +99,9 @@ const ENGINE_DIST_ROOT = path.join(__dirname, '..', '..', 'dist');
 /** Extension of compiled engine modules. */
 const ENGINE_MODULE_EXTENSION = '.js';
 
-/** Cache of the engine digest for the process lifetime (compiled bytes do not change at runtime). */
+/**
+ * Cache of the engine digest for the process lifetime (compiled bytes do not change at runtime).
+ */
 let engineDigestCache: string | null = null;
 
 /**

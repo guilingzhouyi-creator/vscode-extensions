@@ -7,7 +7,8 @@
  * Responsibilities:
  *   1. Calculate exact Jaccard similarity index |A ∩ B| / |A ∪ B| in [0.0, 1.0];
  *   2. Execute symmetric and asymmetric set algebra operations (intersection, difference, union);
- *   3. Enforce deterministic empty set boundaries (empty sets yield 1.0 identical similarity, or 0.0 otherwise).
+ *   3. Enforce deterministic empty set boundaries (empty sets yield 1.0 identical similarity, or
+ *      0.0 otherwise).
  * Exit Semantics & Design Rationale: CC <= 6; pure functions; non-throwing fail-safe semantics.
  */
 

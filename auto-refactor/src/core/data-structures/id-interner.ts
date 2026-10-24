@@ -2,13 +2,15 @@
  * Module: Core Data Structures — Bidirectional Symbol/Entity ID Interner
  * File Path: src/core/data-structures/id-interner.ts
  * Architecture Role: High-performance bidirectional interning structure that maps arbitrary items
- *   (strings, symbols, paths) to compact contiguous integers (0..N-1) for cache efficiency and SoA arrays.
+ *   (strings, symbols, paths) to compact contiguous integers (0..N-1) for cache efficiency and SoA
+ *   arrays.
  * Dependencies & Triggers: Zero external runtime dependencies.
  * Responsibilities:
  *   1. Intern items into unique, monotonically increasing zero-based 32-bit integer indices;
  *   2. Support O(1) reverse lookup by index via direct array indexing;
  *   3. Eliminate duplicated per-module fileToId/idToFile maps across the codebase.
- * Exit Semantics & Design Rationale: CC <= 4; pure data structure; non-throwing fail-safe semantics.
+ * Exit Semantics & Design Rationale: CC <= 4; pure data structure;
+ *   non-throwing fail-safe semantics.
  */
 
 /**

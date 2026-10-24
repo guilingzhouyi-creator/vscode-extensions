@@ -9,7 +9,8 @@
  *   2. Refresh element access position on get() to protect hot entries from eviction;
  *   3. Evict oldest entry in O(1) when capacity is exceeded, dispatching optional onEvict callback;
  *   4. Eliminate memory fragmentation and O(N log N) bulk sorting eviction hazards.
- * Exit Semantics & Design Rationale: CC <= 6; zero transient allocations on reads/writes; non-throwing.
+ * Exit Semantics & Design Rationale: CC <= 6; zero transient allocations on reads/writes;
+ *   non-throwing.
  */
 
 /**
@@ -81,7 +82,8 @@ export class LruCache<K, V> {
     }
 
     /**
-     * Inserts or updates a key-value entry, evicting the least recently used item if capacity is exceeded.
+     * Inserts or updates a key-value entry, evicting the least recently used item if capacity is
+     * exceeded.
      *
      * @param key - Key to insert.
      * @param value - Value to associate.
@@ -149,7 +151,8 @@ export class LruCache<K, V> {
     }
 
     /**
-     * Returns an iterator of cached [key, value] pairs from least recently used to most recently used.
+     * Returns an iterator of cached [key, value] pairs from least recently used to most recently
+     * used.
      */
     public entries(): IterableIterator<[K, V]> {
         return this.map.entries();

@@ -234,7 +234,8 @@ export interface INativeCore {
     computeBitParallelDistance(pattern: Uint32Array, text: Uint32Array): number;
 
     /**
-     * Computes a 64-bit SimHash fingerprint for an array of tokens, returning a 16-character hex string.
+     * Computes a 64-bit SimHash fingerprint for an array of tokens, returning a 16-character hex
+     * string.
      */
     computeSimHash64(tokens: readonly string[]): string;
 
@@ -244,7 +245,8 @@ export interface INativeCore {
     calculateSimHashHammingSimilarity(hashA: string, hashB: string): number;
 
     /**
-     * Calculates cosine similarity [0.0, 1.0] between two token sequences using 3-gram feature vectors.
+     * Calculates cosine similarity [0.0, 1.0] between two token sequences using 3-gram feature
+     * vectors.
      */
     calculateTrigramCosineSimilarity(
         tokensA: readonly string[],

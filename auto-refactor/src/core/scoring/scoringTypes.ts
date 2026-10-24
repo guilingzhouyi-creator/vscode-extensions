@@ -294,7 +294,8 @@ export interface QualityScoreBreakdown {
      */
     polyglotGeneralization?: PolyglotGeneralizationMetrics;
     /**
-     * Optional SQALE technical debt assessment in remediation minutes and technical debt ratio (TDR).
+     * Optional SQALE technical debt assessment in remediation minutes and technical debt ratio
+     * (TDR).
      */
     technicalDebt?: import('./technical-debt-ratio').TechnicalDebtAssessment;
     /**

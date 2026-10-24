@@ -168,7 +168,8 @@ function isExemptPath(file: string): boolean {
 }
 
 /**
- * Checks whether an SVG markup fragment belongs to a standalone SVG graphic rather than a Webview document.
+ * Checks whether an SVG markup fragment belongs to a standalone SVG graphic rather than a Webview
+ * document.
  */
 function isStandaloneSvgLine(line: string, rawLines: string[], index: number): boolean {
     if (

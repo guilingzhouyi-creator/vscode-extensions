@@ -52,7 +52,10 @@ const OBSOLETE_CONTRACT_RE =
 const FRAGILE_FLOAT_ASSERT_RE =
     /\b(?:expect\([^)]+\)\.to(?:Be|Equal|toStrictEqual)\s*\(\s*([0-9]+\.[0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\([^,)]+,\s*([0-9]+\.[0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\(\s*([0-9]+\.[0-9]+)\s*,|assert_true\s*\([^,)]*==\s*([0-9]+\.[0-9]+))/;
 
-/** Pattern identifying entity metrics and physical total counters vulnerable to brittle magic oracles. */
+/**
+ * Pattern identifying entity metrics and physical total counters vulnerable to brittle magic
+ * oracles.
+ */
 const BRITTLE_ORACLE_TARGET_RE =
     /\b(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount|entryCount|testsCount|totalTests)\b/i;
 

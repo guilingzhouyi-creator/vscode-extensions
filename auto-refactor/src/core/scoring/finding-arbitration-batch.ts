@@ -3,14 +3,16 @@
  * File Path: src/core/scoring/finding-arbitration-batch.ts
  * Architecture Role: Batch accumulation, overlapping finding clustering, and noisy-rule suppression
  *   aggregation for FindingConfidenceArbiter.
- * Dependencies & Triggers: Consumes Issue from ../types and types from ./finding-confidence-arbiter;
- *   invoked by FindingConfidenceArbiter during batch issue evaluations.
+ * Dependencies & Triggers: Consumes Issue from ../types and types from
+ *   ./finding-confidence-arbiter; invoked by FindingConfidenceArbiter during batch issue
+ *   evaluations.
  * Responsibilities:
  *   1. Cluster overlapping findings from multiple analyzers on the same file and line span.
  *   2. Identify primary findings within clusters based on tier precedence and confidence score.
  *   3. Track per-rule evaluation and suppression statistics across batches.
  *   4. Demote noisy or auto-quarantined prescriptive rules exceeding developer suppression limits.
- * Exit Semantics & Design Rationale: Deterministic pure evaluation; zero transient allocations in loops.
+ * Exit Semantics & Design Rationale: Deterministic pure evaluation;
+ *   zero transient allocations in loops.
  */
 
 import type { Issue } from '../types';

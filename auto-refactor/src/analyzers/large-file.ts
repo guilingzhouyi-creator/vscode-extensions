@@ -528,7 +528,9 @@ interface VolumeFinding {
     readonly severity: Severity;
     readonly message: string;
     readonly suggestion: string;
-    /** Per-signal band reasons for the aggregate rule; the detail payload reports these verbatim. */
+    /**
+     * Per-signal band reasons for the aggregate rule; the detail payload reports these verbatim.
+     */
     readonly reasons?: readonly string[];
 }
 

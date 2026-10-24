@@ -1,8 +1,8 @@
 /**
  * Module: Core Engine — Multi-Language File Import Profiler
  * File Path: src/core/intelligence/import-profiler.ts
- * Architecture Role: Extracts import specifiers and symbol-to-package bindings across TypeScript/JS,
- *   Python, Go, Rust, and GDScript files for autonomy ratio quantification.
+ * Architecture Role: Extracts import specifiers and symbol-to-package bindings across
+ *   TypeScript/JS, Python, Go, Rust, and GDScript files for autonomy ratio quantification.
  * Dependencies & Triggers: Consumes node:path; invoked by autonomy-scorer and
  *   dependency-provenance.
  * Responsibilities:

@@ -3,8 +3,8 @@
  * File Path: src/core/scoring/technical-debt-ratio.ts
  * Architecture Role: Evaluates objective technical debt effort in remediation minutes,
  *   computing SQALE Technical Debt Ratio (TDR) against standard development baseline.
- * Dependencies & Triggers: Consumes Issue from core/types and PrimaryQualityPillar from eightPillarModel;
- *   called by qualityScorer, reportFinalizer, and governance gates.
+ * Dependencies & Triggers: Consumes Issue from core/types and PrimaryQualityPillar from
+ *   eightPillarModel; called by qualityScorer, reportFinalizer, and governance gates.
  * Responsibilities:
  *   1. Quantify individual finding remediation cost in minutes based on severity and rule family.
  *   2. Compute aggregate remediation effort in hours and person-days (8 hours/day).

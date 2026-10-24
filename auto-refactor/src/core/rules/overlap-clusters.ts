@@ -13,7 +13,8 @@
  *   2. Expose adjacency lookups (clusterKeysOf, rulesSharingCluster, clusterSize).
  *   3. Expose the canonical declared-member list for count rendering and doc verification.
  * Exit Semantics & Design Rationale: Pure frozen data plus pure lookups, no I/O and no mutation.
- *   The table lives here rather than as an optional field on RuleDefinition because rule entries are
+ *   The table lives here rather than as an optional field on RuleDefinition because rule entries
+ *   are
  *   built by positional-argument helpers in eight separate modules, and threading a ninth optional
  *   argument through all of them would cost more coupling than the field buys. Keeping it separate
  *   also preserves the distinction the catalog already makes: RuleDefinition answers "does this

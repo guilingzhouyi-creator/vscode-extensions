@@ -252,7 +252,8 @@ export const HygieneMessages = {
 
     // EXT-DIR-001
     /**
-     * Build the EXT-DIR-001 descriptor for extension-to-directory classification violation or root script pollution.
+     * Build the EXT-DIR-001 descriptor for extension-to-directory classification violation or root
+     * script pollution.
      */
     ROOT_SCRIPT_POLLUTION: (file: string): DiagnosticDescriptor => ({
         message: `Root directory script pollution detected: '${file}' must not reside flatly in workspace root`,

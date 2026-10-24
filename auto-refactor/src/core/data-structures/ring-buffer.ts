@@ -9,7 +9,8 @@
  *   1); 2. Provide O(1) push, pop, peek, and bulk drain operations with zero loop heap allocations;
  *   3. Support customizable overflow policies ('reject' or 'drop_oldest');
  *   4. Export snapshot toArray() in strictly chronological FIFO order.
- * Exit Semantics & Design Rationale: CC <= 7; deterministic memory bounds; non-throwing fail-safe semantics.
+ * Exit Semantics & Design Rationale: CC <= 7; deterministic memory bounds;
+ *   non-throwing fail-safe semantics.
  */
 
 /**
@@ -144,7 +145,8 @@ export class RingBuffer<T> {
     }
 
     /**
-     * Drains all queued elements into a target array in FIFO order without intermediate allocations.
+     * Drains all queued elements into a target array in FIFO order without intermediate
+     * allocations.
      *
      * @param target - Destination array to push drained items into.
      * @returns Number of drained items.

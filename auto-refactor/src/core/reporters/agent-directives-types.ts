@@ -102,7 +102,10 @@ export interface AgentImmutableConstraints {
     readonly zeroHeapAllocationInLoop: boolean;
     /** Immutable state snapshot requirement (Object.freeze / deep freeze / defensive copy) */
     readonly immutableStateSnapshot: boolean;
-    /** Strict adherence to ELOC <= 900 and LOC <= 1400 dual-track budget (VOL-ELOC-001 / VOL-LOC-001) */
+    /**
+     * Strict adherence to ELOC <= 900 and LOC <= 1400 dual-track budget (VOL-ELOC-001 /
+     * VOL-LOC-001)
+     */
     readonly elocBudgetConstraint: boolean;
     /** Structured code density, volume, and plumbing constraint specification */
     readonly densitySpec?: AgentCodeDensityConstraintSpec;

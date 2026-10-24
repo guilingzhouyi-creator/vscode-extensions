@@ -4,8 +4,9 @@
  * Architecture Role: Shared generic execution engine for polyglot language modernization
  *     analyzers (Go, Rust, GDScript, Python, TypeScript); unifies source masking,
  *     line iteration, regex matching, actionable attachment, and canonical issue creation.
- * Dependencies & Triggers: Consumes core types (Analyzer, AnalyzerContext, Issue, Severity, AgentActionablePayload),
- *     source-mask (maskSourceText), and buildCanonicalIssue. Used by polyglot modern analyzers.
+ * Dependencies & Triggers: Consumes core types (Analyzer, AnalyzerContext, Issue, Severity,
+ *     AgentActionablePayload), source-mask (maskSourceText), and buildCanonicalIssue. Used by
+ *     polyglot modern analyzers.
  * Responsibilities:
  *     1. Provide declarative pattern rule interfaces eliminating repetitive scanner loops;
  *     2. Provide immutable LineScanContext reducing parameter bloat and data clumps (SIM-ARGS-001);

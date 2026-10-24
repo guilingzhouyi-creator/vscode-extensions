@@ -464,7 +464,8 @@ export function sanitizeScaleFactor(scaleFactor: number): number {
             ? scaleFactor
             : 1;
     if (safeScale < 1.0) {
-        // Continuous rational smoothing: safeScale in (0, 1) -> (100 * safeScale + 25) / 125 in (0.2, 1.0)
+        // Continuous rational smoothing: safeScale in (0, 1) -> (100 * safeScale + 25) / 125 in
+        // (0.2, 1.0)
         return +(
             (SMOOTHING_SCALE_MULTIPLIER * safeScale + SMOOTHING_SCALE_BIAS) /
             SMOOTHING_SCALE_DIVISOR

@@ -9,7 +9,8 @@
  * Responsibilities:
  *   1. Assert GUARD-DESTR-001 fires for a literal root, a home expression and an alias chain;
  *   2. Assert the loop-alias shape that motivated the rule is caught end to end;
- *   3. Assert GUARD-VAR-001 fires on each PowerShell write shape and never on a writable look-alike;
+ *   3. Assert GUARD-VAR-001 fires on each PowerShell write shape and never on a writable
+ *      look-alike;
  *   4. Assert scratch and fixture deletes stay silent, so the rule is not a blanket prohibition;
  *   5. Assert a non-recursive delete and a non-script file yield nothing;
  *   6. Assert each rule can be switched off without disabling the analyzer.

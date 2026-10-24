@@ -842,7 +842,8 @@ function pushNonFunctionChildren(
 /**
  * Computes maximum control flow nesting depth within a function node using explicit stack.
  *
- * Invariant: Functions declared inside nested scopes are not counted towards the parent nesting depth.
+ * Invariant:
+ * Invariant: depth.
  *
  * @param rootNode - Normalized root function node.
  * @returns Maximum control flow nesting level (0 if no branching).

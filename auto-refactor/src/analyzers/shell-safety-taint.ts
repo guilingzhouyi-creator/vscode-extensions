@@ -113,7 +113,9 @@ const PS_DELETE_RE = /\b(?:Remove-Item|rm|del|erase|rd|rmdir)\b/i;
 /** POSIX shell delete command. */
 const SH_DELETE_RE = /\brm\b/;
 
-/** JavaScript recursive-delete entry points; `rimraf`, `removeSync` and `rmtree` recurse by nature. */
+/**
+ * JavaScript recursive-delete entry points; `rimraf`, `removeSync` and `rmtree` recurse by nature.
+ */
 const JS_DELETE_RE =
     /\b(?:rmSync|rimraf|removeSync)\s*\(|\bfs\s*\.\s*rm\s*\(|\bshutil\s*\.\s*rmtree\s*\(/;
 

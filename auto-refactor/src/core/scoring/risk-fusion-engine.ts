@@ -193,7 +193,8 @@ function classifyFusedRiskLevel(fusedScore: number, isDualConfirmed: boolean): F
  *
  * @param staticRisk - Static finding risk profile.
  * @param dynamicRisk - Optional dynamic execution telemetry risk.
- * @param historicalFactor - Multiplier or TopologicalChurnResult reflecting churn and defect history.
+ * @param historicalFactor - Multiplier or TopologicalChurnResult reflecting churn and defect
+ *                           history.
  * @param customCoeffs - Optional weight coefficients override.
  * @returns Unified fused risk assessment.
  */

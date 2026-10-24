@@ -15,7 +15,8 @@
  *   3. Assert exempt prefixes and fixture segments are never reported;
  *   4. Assert a populated tree produces nothing, so a green run is not vacuous;
  *   5. Assert the full-scan report carries the finding and the incremental scope does not;
- *   6. Assert the pass declares itself in summary.postScanPasses only when the hygiene analyzer runs.
+ *   6. Assert the pass declares itself in summary.postScanPasses only when the hygiene analyzer
+ *      runs.
  * Exit Semantics & Design Rationale: Exits 0 when every assertion holds, exits 1 on the first
  *   failure. Fixtures are built under the OS temp directory so the repository tree is never the
  *   subject of its own assertion, and the ignore list is driven from the audit module rather than

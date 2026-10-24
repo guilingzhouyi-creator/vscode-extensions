@@ -5,7 +5,8 @@
  *   dependency ordering, iterative cycle detection, and reachable closure computation.
  * Dependencies & Triggers: Zero external runtime dependencies.
  * Responsibilities:
- *   1. Detect directed cycles via iterative three-color DFS, eliminating call-stack overflow hazards;
+ *   1. Detect directed cycles via iterative three-color DFS, eliminating call-stack overflow
+ *      hazards;
  *   2. Execute Kahn's algorithm for deterministic in-degree topological sorting on DAG structures;
  *   3. Compute BFS reachable transitive closures using an allocation-thin pointer queue;
  *   4. Compute dense boolean matrix transitive closure via Warshall's algorithm.
@@ -165,7 +166,8 @@ export function computeTopologicalOrder<T>(
 }
 
 /**
- * Computes forward or reverse reachable transitive closure using an allocation-thin pointer BFS queue.
+ * Computes forward or reverse reachable transitive closure using an allocation-thin pointer BFS
+ * queue.
  *
  * @param seeds - Seed nodes to start traversal from.
  * @param getNeighbors - Function returning outgoing or incoming neighbor nodes.
@@ -229,7 +231,8 @@ function relaxWarshallRow(
  * Computes transitive closure over a dense boolean adjacency matrix using Warshall's algorithm.
  * Operates on a flat Uint8Array buffer of size * size with zero intermediate heap allocations.
  *
- * @param matrix - Row-major Uint8Array where matrix[i * size + j] === 1 indicates an edge from i to j.
+ * @param matrix - Row-major Uint8Array where matrix[i * size + j] === 1 indicates an edge from i to
+ *                 j.
  * @param size - Dimension of the square adjacency matrix.
  * @returns The modified matrix in-place with complete transitive reachability.
  */

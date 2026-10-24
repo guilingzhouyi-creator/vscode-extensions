@@ -30,7 +30,10 @@ import {
 const QUERY_CALL_RE =
     /(?:(?:repo|repository|db|database|pool|client|model|dao|collection|prisma|table|session|orm|store)\s*\.\s*(?:find|findAll|select|query|fetch|get)\w*|\.(?:findById|findOne|findFirst|findMany|fetchRecords|getBy\w+|queryAll))\s*\(/i;
 
-/** Excludes in-memory store receivers (caches, AST indexes, token tables) from persistent DB query hazards. */
+/**
+ * Excludes in-memory store receivers (caches, AST indexes, token tables) from persistent DB query
+ * hazards.
+ */
 const MEMORY_STORE_RECEIVER_RE =
     /\b(?:index|cache|memory|map|local|token|entry|ast|symbol)Store\b/i;
 
@@ -234,7 +237,8 @@ export class DataArchitectureAnalyzer implements Analyzer {
             const inLoopBefore = loopTracker.inLoop;
             updateLoopTracker(trimmed, currentIndent, loopTracker);
 
-            // Expressions on the loop header itself (e.g. for (const x of coll)) execute once outside iteration
+            // Expressions on the loop header itself (e.g. for (const x of coll)) execute once
+            // outside iteration
             const inIter =
                 inLoopBefore ||
                 (loopTracker.inLoop && !LOOP_HEADER_RE.test(trimmed)) ||

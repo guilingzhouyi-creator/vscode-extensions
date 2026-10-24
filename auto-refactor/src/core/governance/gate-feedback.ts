@@ -8,7 +8,8 @@
  *   and auditGateArchitecture during repository governance evaluation.
  * Responsibilities:
  *   1. Reject positional step labels (ORDINAL-GATE, ORDINAL-RULE, ORDINAL-STAGE) in gate feedback;
- *   2. Reject bracketed and non-closed status synonyms (STATUS-OK, STATUS-FAIL, etc.) in favor of PASS/BLOCK/SKIP/WARN;
+ *   2. Reject bracketed and non-closed status synonyms (STATUS-OK, STATUS-FAIL, etc.) in favor of
+ *      PASS/BLOCK/SKIP/WARN;
  *   3. Exempt legitimate test fixtures, registry declarations, and explicit allow markers;
  *   4. Emit structured Issue findings with file, line, and remediation instructions.
  * Exit Semantics & Design Rationale: Deterministic pure evaluation returning findings/issues.
@@ -196,7 +197,8 @@ function createFeedbackIssue(relPath: string, finding: FeedbackFinding): Issue {
 }
 
 /**
- * Audits repository gate infrastructure (hooks, gate runner scripts, CI workflows) for feedback vocabulary.
+ * Audits repository gate infrastructure (hooks, gate runner scripts, CI workflows) for feedback
+ * vocabulary.
  *
  * @param context - Repository archetype context.
  * @param issues - Issue accumulator array.
