@@ -16,7 +16,7 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const { runSelfAudit, BASELINE_OUTPUT } = require('./run-self-audit');
+const { runSelfAudit, BASELINE_OUTPUT, BASELINE_COMPACT_OUTPUT } = require('./run-self-audit');
 
 const EXPECTED_PILLARS = [
   'architecture',
@@ -94,7 +94,7 @@ function validateReportSchema(report) {
  * @param report - Self-audit report.
  */
 function validateSnapshotMetadata(report) {
-  console.log('3. Validating Immutable Snapshot Metadata...');
+  console.log('4. Validating Immutable Snapshot Metadata...');
   assert.ok(report.snapshotId && report.snapshotId.startsWith('snapshot-'));
   assert.strictEqual(report.versions.engineVersion, '0.4.0');
   assert.strictEqual(report.versions.ruleVersion, '2026.09-v1');
@@ -115,7 +115,7 @@ function validateSnapshotMetadata(report) {
  * @param elapsedSec - Elapsed wall time in seconds.
  */
 function validateScopeAndPerformance(report, elapsedSec) {
-  console.log('4. Validating Audit Scope & Performance Thresholds...');
+  console.log('5. Validating Audit Scope & Performance Thresholds...');
   assert.ok(
     report.scope.filesScanned >= 250,
     `Must scan >= 250 files: ${report.scope.filesScanned}`,
@@ -132,7 +132,7 @@ function validateScopeAndPerformance(report, elapsedSec) {
  * @param report - Self-audit report.
  */
 function validateEightPillarsAndMetrics(report) {
-  console.log('5. Validating Eight Strategic Pillars Health Model...');
+  console.log('6. Validating Eight Strategic Pillars Health Model...');
   assert.ok(report.eightPillars && typeof report.eightPillars.pillars === 'object');
 
   let weightSum = 0;
@@ -177,7 +177,7 @@ function validateEightPillarsAndMetrics(report) {
  * @param report - Self-audit report.
  */
 function validateTenDimensions(report) {
-  console.log('6. Validating Ten-Dimensional Scoring Subsystem Integration...');
+  console.log('7. Validating Ten-Dimensional Scoring Subsystem Integration...');
   assert.ok(
     report.tenDimensions && typeof report.tenDimensions === 'object',
     'tenDimensions must be object',
@@ -211,7 +211,7 @@ function validateTenDimensions(report) {
  * @param report - Self-audit report.
  */
 function validateDebtLedger(report) {
-  console.log('7. Validating Technical Debt Ledger Tiering...');
+  console.log('8. Validating Technical Debt Ledger Tiering...');
   const tiers = report.metrics.byDebtTier;
   assert.ok(typeof tiers.critical === 'number');
   assert.ok(typeof tiers.high === 'number');
@@ -282,6 +282,45 @@ function validateBaselineFileOnDisk(report) {
   );
 }
 
+/**
+ * Assert the CAS v3 sidecar is written by the producer and stays consistent with the baseline.
+ *
+ * Without this, the sidecar could silently stop being emitted and nothing would notice until a
+ * consumer tried to read it — which is precisely the failure mode that keeps a compatibility
+ * adapter alive years past its usefulness.
+ *
+ * @param report - In-memory report produced by the runner; must expose the scanned file count.
+ */
+function validateCompactSidecarOnDisk(report) {
+  console.log('3. Validating CAS v3 Sidecar Emission & Consistency...');
+  assert.ok(
+    fs.existsSync(BASELINE_COMPACT_OUTPUT),
+    'reports/self-audit-baseline.cas.json must be emitted by the producer',
+  );
+  const compact = JSON.parse(fs.readFileSync(BASELINE_COMPACT_OUTPUT, 'utf8'));
+  assert.strictEqual(compact.schema, 'cas-v3', 'sidecar must declare the CAS v3 discriminator');
+  assert.ok(Array.isArray(compact.vectors), 'sidecar must carry the positional vector array');
+  assert.ok(Array.isArray(compact.pal), 'sidecar must carry the analyzer palette');
+  assert.strictEqual(
+    compact.counts.issues,
+    report.metrics.totalIssues,
+    'sidecar issue count must match the verbose baseline',
+  );
+  assert.strictEqual(
+    compact.health.score,
+    report.metrics.compositeScore,
+    'sidecar composite score must match the verbose baseline',
+  );
+  assert.strictEqual(
+    compact.health.grade,
+    report.metrics.grade,
+    'sidecar grade must match the verbose baseline',
+  );
+  console.log(
+    `✔ CAS v3 sidecar verified (${compact.vectors.length} vectors, verdict ${compact.verdict}).`,
+  );
+}
+
 async function main() {
   console.log('=== [Self-Audit] Testing System Self-Audit Engine (Reviewer -> Reviewer) ===\n');
 
@@ -298,23 +337,26 @@ async function main() {
   // 2. Validate Baseline Report File Output & Disk Parity
   validateBaselineFileOnDisk(report);
 
-  // 3. Validate Immutable Audit Snapshot Quintuple (E, R, C, L, S)
+  // 3. Validate the CAS v3 sidecar the producer must also emit
+  validateCompactSidecarOnDisk(report);
+
+  // 4. Validate Immutable Audit Snapshot Quintuple (E, R, C, L, S)
   validateSnapshotMetadata(report);
 
-  // 4. Validate Scope & Performance
+  // 5. Validate Scope & Performance
   validateScopeAndPerformance(report, elapsedSec);
 
-  // 5. Validate Eight Strategic Pillars Health Model
+  // 6. Validate Eight Strategic Pillars Health Model
   validateEightPillarsAndMetrics(report);
 
-  // 6. Validate Ten-Dimensional Scoring Subsystem Integration
+  // 7. Validate Ten-Dimensional Scoring Subsystem Integration
   validateTenDimensions(report);
 
-  // 7. Validate Technical Debt Ledger Tiering
+  // 8. Validate Technical Debt Ledger Tiering
   validateDebtLedger(report);
 
   console.log('\n================================================================');
-  console.log('🎉 ALL Self-Audit SYSTEM SELF-AUDIT TESTS PASSED (7/7)!');
+  console.log('🎉 ALL Self-Audit SYSTEM SELF-AUDIT TESTS PASSED (8/8)!');
   console.log('================================================================');
 }
 
