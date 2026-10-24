@@ -23,7 +23,7 @@ use fg_core::error::{FractalError, FractalResult};
 use fractal_git::constants::cli::CliTag;
 
 use super::commit_walk::{walk_commits, CommitRecord};
-use super::common::{print_json, reject, CliContext};
+use super::common::{fail_fatal, print_json, reject, CliContext};
 use super::diff;
 use super::repo_view::RepoView;
 
@@ -58,7 +58,7 @@ pub fn handle_log(ctx: &CliContext) {
     };
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     let start = match view.resolve(&request.revision) {
@@ -378,7 +378,7 @@ pub fn handle_show(ctx: &CliContext) {
 
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
     let commit = match view.resolve(&revision) {
         Ok(oid) => oid,

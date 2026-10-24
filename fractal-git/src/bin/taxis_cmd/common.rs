@@ -15,8 +15,20 @@
 use std::fmt::Display;
 use std::path::PathBuf;
 
-/// Process exit status reserved for rejected commands and failed side effects.
+/// Process exit status reserved for policy refusals that are not repository failures.
 pub const EXIT_REJECTED: i32 = 1;
+
+/// Process exit status for fatal repository or side-effect failures.
+///
+/// Git reserves 128 for fatal errors (missing repository, missing object, unreadable index) and
+/// automation depends on telling those apart from a refusal that left the repository intact.
+pub const EXIT_FATAL: i32 = 128;
+
+/// Process exit status for a command line Git rejects as malformed.
+///
+/// Git uses 129 for the usage class (unknown option, missing required argument). It is distinct from
+/// both a refusal (1) and a repository failure (128), and wrapper scripts branch on it.
+pub const EXIT_USAGE: i32 = 129;
 
 /// Execution context holding common flags, repository path, and subcommand arguments.
 #[derive(Debug, Clone)]
@@ -64,8 +76,27 @@ pub fn reject(tag: &str, detail: impl Display) -> ! {
     std::process::exit(EXIT_REJECTED)
 }
 
-/// Reports an I/O or side-effect failure on stderr and terminates with [`EXIT_REJECTED`].
+/// Reports an I/O or side-effect failure on stderr and terminates with [`EXIT_FATAL`].
 pub fn fail_io(action: impl Display, detail: impl Display) -> ! {
     eprintln!("[ERROR] Failed to {}: {}", action, detail);
-    std::process::exit(EXIT_REJECTED)
+    std::process::exit(EXIT_FATAL)
+}
+
+/// Reports a fatal repository-level failure on stderr and terminates with [`EXIT_FATAL`].
+///
+/// Opening a repository that does not exist, or reading an object that is missing, is fatal in
+/// Git rather than a policy refusal; callers rely on the 128 status to separate the two.
+pub fn fail_fatal(detail: impl Display) -> ! {
+    eprintln!("fatal: {}", detail);
+    std::process::exit(EXIT_FATAL)
+}
+
+/// Reports a malformed command line on stderr and terminates with [`EXIT_USAGE`].
+///
+/// The message is a usage line, matching the shape Git prints, because a caller that asked for an
+/// option the command does not implement needs the accepted surface spelled out instead of a
+/// listing that silently ignored the restriction.
+pub fn fail_usage(detail: impl Display) -> ! {
+    eprintln!("usage: {}", detail);
+    std::process::exit(EXIT_USAGE)
 }

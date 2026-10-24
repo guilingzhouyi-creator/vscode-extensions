@@ -88,6 +88,32 @@ pub fn stat_cache_matches(staged: &IndexEntry, metadata: &fs::Metadata) -> bool 
     mtime_matches(staged, metadata)
 }
 
+/// Reports whether the entry is racy against the index file's own timestamp.
+///
+/// An entry whose recorded modification time is not older than the index file was written in the
+/// same second cannot be trusted to the stat cache: a worktree edit made within that second, of the
+/// same size, would reproduce both the size and the timestamp the cache compares. Git calls these
+/// entries racy and falls back to a content comparison for exactly this reason; treating them as
+/// clean is how a same-second rewrite goes unreported.
+pub fn entry_is_racy(staged: &IndexEntry, index_timestamp: Option<u64>) -> bool {
+    match index_timestamp {
+        Some(timestamp) => u64::from(staged.mtime_seconds) >= timestamp,
+        None => false,
+    }
+}
+
+/// Reports whether the stat cache alone may answer unchanged for this entry.
+///
+/// This is the size and timestamp match minus the racy window, which [`stat_cache_matches`] cannot
+/// exclude on its own. Callers that skip hashing when the cache matches must use this predicate.
+pub fn stat_cache_trusted(
+    staged: &IndexEntry,
+    metadata: &fs::Metadata,
+    index_timestamp: Option<u64>,
+) -> bool {
+    stat_cache_matches(staged, metadata) && !entry_is_racy(staged, index_timestamp)
+}
+
 /// Reports whether only the modification time still matches, ignoring the size.
 pub fn mtime_matches(staged: &IndexEntry, metadata: &fs::Metadata) -> bool {
     let mtime = metadata.modified().ok().and_then(|time| {
@@ -140,5 +166,44 @@ pub fn write_record(
         sink.write_all(&[NUL])
     } else {
         sink.write_all(b"\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::entry_is_racy;
+    use fg_core::models::{FileMode, Oid};
+    use fg_index::{IndexEntry, IndexStage};
+
+    fn staged_with_mtime(mtime_seconds: u32) -> IndexEntry {
+        IndexEntry {
+            path: "a.txt".to_string(),
+            mode: FileMode::RegularFile,
+            oid: Oid::from_bytes([0u8; 20]),
+            stage: IndexStage::Normal,
+            size: 4,
+            mtime_seconds,
+            mtime_nanos: 0,
+            assume_valid: false,
+            skip_worktree: false,
+            intent_to_add: false,
+        }
+    }
+
+    #[test]
+    fn entries_not_older_than_the_index_are_racy() {
+        assert!(entry_is_racy(
+            &staged_with_mtime(1_700_000_000),
+            Some(1_700_000_000)
+        ));
+        assert!(entry_is_racy(
+            &staged_with_mtime(1_700_000_005),
+            Some(1_700_000_000)
+        ));
+        assert!(!entry_is_racy(
+            &staged_with_mtime(1_699_999_999),
+            Some(1_700_000_000)
+        ));
+        assert!(!entry_is_racy(&staged_with_mtime(1_700_000_000), None));
     }
 }

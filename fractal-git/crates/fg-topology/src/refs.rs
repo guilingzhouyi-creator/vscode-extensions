@@ -24,7 +24,8 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::io::Write;
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use fg_core::constants::git::REF_HEAD;
@@ -46,6 +47,96 @@ const MAX_SYMBOLIC_DEPTH: usize = 8;
 
 /// Monotonic counter making atomic-write staging names unique within one process.
 static STAGING_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// Characters `git check-ref-format` forbids anywhere in a reference name.
+const FORBIDDEN_REF_CHARS: [char; 8] = [' ', '~', '^', ':', '?', '*', '[', '\\'];
+
+/// Suffix Git reserves for lock files, so no reference component may end with it.
+const LOCK_SUFFIX: &str = ".lock";
+
+/// Names Git stores directly below the git directory instead of below `refs/`.
+const PSEUDO_REFS: [&str; 9] = [
+    "HEAD",
+    "ORIG_HEAD",
+    "FETCH_HEAD",
+    "MERGE_HEAD",
+    "CHERRY_PICK_HEAD",
+    "REVERT_HEAD",
+    "REBASE_HEAD",
+    "AUTO_MERGE",
+    "BISECT_HEAD",
+];
+
+/// Namespaces Git logs by default when `core.logAllRefUpdates` has its default value.
+const REFLOG_NAMESPACES: [&str; 3] = ["refs/heads/", "refs/remotes/", "refs/notes/"];
+
+/// Reference that names the reflog Git maintains for the checked-out position.
+const HEAD_NAME: &str = "HEAD";
+
+/// Directory under the git directory that holds reflog files.
+const LOGS_DIR: &str = "logs";
+
+/// Validates a reference name against Git's `check-ref-format` rules.
+///
+/// The store refuses every name Git refuses, plus every name whose OS path syntax could leave the
+/// git directory: `..`, `//`, absolute paths, Windows drive prefixes, and backslashes are all
+/// rejected before a single path is joined, so a caller-supplied name can never address another
+/// repository or the worktree.
+///
+/// # Errors
+///
+/// Returns [`FractalError::RefConflict`] naming the first violated rule.
+pub fn validate_ref_name(name: &str) -> FractalResult<()> {
+    let refuse = |reason: &str| {
+        FractalError::RefConflict(format!("invalid reference name '{name}': {reason}"))
+    };
+    if name.is_empty() {
+        return Err(refuse("the name is empty"));
+    }
+    if name.chars().any(char::is_control) {
+        return Err(refuse("it contains a control character"));
+    }
+    if let Some(forbidden) = name.chars().find(|ch| FORBIDDEN_REF_CHARS.contains(ch)) {
+        return Err(refuse(&format!("it contains '{forbidden}'")));
+    }
+    if name.contains("..") {
+        return Err(refuse("it contains '..'"));
+    }
+    if name.contains("@{") {
+        return Err(refuse("it contains '@{'"));
+    }
+    if name == "@" {
+        return Err(refuse("'@' alone is not a reference name"));
+    }
+    for component in name.split('/') {
+        if component.is_empty() {
+            return Err(refuse("it contains an empty path component"));
+        }
+        if component.starts_with('.') {
+            return Err(refuse("a path component starts with '.'"));
+        }
+        if component.ends_with('.') {
+            return Err(refuse("a path component ends with '.'"));
+        }
+        if component.ends_with(LOCK_SUFFIX) {
+            return Err(refuse("a path component ends with '.lock'"));
+        }
+    }
+    if !name.starts_with("refs/") && !PSEUDO_REFS.contains(&name) {
+        return Err(refuse(
+            "only 'HEAD'-style pseudo-references or names below 'refs/' are addressable",
+        ));
+    }
+    let escapes_os_path = Path::new(name)
+        .components()
+        .any(|component| !matches!(component, Component::Normal(_)));
+    if escapes_os_path {
+        return Err(refuse(
+            "it carries path syntax that could escape the git directory",
+        ));
+    }
+    Ok(())
+}
 
 /// Enumeration of all valid reference types in the Fractal Git namespace.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -316,7 +407,14 @@ impl DiskRefStore {
     }
 
     /// Reads the parsed body of one loose reference file, when the file exists.
+    ///
+    /// A name Git would never accept is reported as absent rather than joined into a path: the loose
+    /// scan walks the whole `refs/` tree, and one stray filename must not make the listing fail or
+    /// address a file outside the git directory. Write paths validate the name again and reject it.
     fn lookup_body(&self, ref_name: &str) -> FractalResult<Option<LooseBody>> {
+        if validate_ref_name(ref_name).is_err() {
+            return Ok(None);
+        }
         let path = self.git_dir.join(ref_name);
         if !path.is_file() {
             return Ok(None);
@@ -393,6 +491,19 @@ impl DiskRefStore {
         }
     }
 
+    /// Joins a validated reference name onto the git directory and proves the result stays inside it.
+    fn ref_path(&self, ref_name: &str) -> FractalResult<PathBuf> {
+        validate_ref_name(ref_name)?;
+        let path = self.git_dir.join(ref_name);
+        if !path.starts_with(&self.git_dir) {
+            return Err(FractalError::RefConflict(format!(
+                "reference '{ref_name}' resolves outside '{}'",
+                self.git_dir.display()
+            )));
+        }
+        Ok(path)
+    }
+
     /// Builds a staging path unique to this process and call, so writers never share one file.
     fn staging_path(path: &Path) -> PathBuf {
         let sequence = STAGING_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -401,8 +512,197 @@ impl DiskRefStore {
         PathBuf::from(staging)
     }
 
+    /// Publishes `body` at `path` through a staging file and a single rename.
+    fn write_atomic(&self, path: &Path, body: String) -> FractalResult<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let staging = Self::staging_path(path);
+        fs::write(&staging, body)?;
+        if let Err(rename_err) = fs::rename(&staging, path) {
+            let _ = fs::remove_file(&staging);
+            return Err(FractalError::Io(rename_err));
+        }
+        Ok(())
+    }
+
+    /// Reports whether Git logs updates to `ref_name` with its default configuration.
+    fn should_log_ref(ref_name: &str) -> bool {
+        ref_name == HEAD_NAME
+            || ref_name == "refs/stash"
+            || REFLOG_NAMESPACES
+                .iter()
+                .any(|namespace| ref_name.starts_with(namespace))
+    }
+
+    /// Reads the actor Git would attribute a reflog line to, honouring the environment overrides.
+    fn reflog_identity() -> (String, String) {
+        let read = |key: &str, fallback: &str| {
+            std::env::var(key)
+                .ok()
+                .map(|value| value.replace(['\n', '\r', '\t'], " "))
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| fallback.to_string())
+        };
+        (
+            read("GIT_COMMITTER_NAME", "Taxis Operator"),
+            read("GIT_COMMITTER_EMAIL", "operator@taxis.internal"),
+        )
+    }
+
+    /// Formats one reflog line as `<old> <new> <actor> <timestamp> <zone>\t<message>`.
+    fn format_reflog_line(old: Option<&Oid>, new: &Oid, message: &str) -> String {
+        let (actor, email) = Self::reflog_identity();
+        let old_hex = old.map_or_else(|| Oid::ZERO.to_hex(), Oid::to_hex);
+        let timestamp = chrono::Utc::now().timestamp();
+        let offset = chrono::Local::now().offset().local_minus_utc();
+        let sign = if offset < 0 { '-' } else { '+' };
+        let zone = format!(
+            "{}{:02}{:02}",
+            sign,
+            offset.abs() / 3600,
+            (offset.abs() % 3600) / 60
+        );
+        let message = message.replace(['\n', '\r'], " ");
+        let header = format!(
+            "{old_hex} {} {actor} <{email}> {timestamp} {zone}",
+            new.to_hex()
+        );
+        // Git omits the tab entirely when no message was supplied, so an unannotated
+        // update and an annotated one stay distinguishable byte-for-byte.
+        if message.is_empty() {
+            format!("{header}\n")
+        } else {
+            format!("{header}\t{message}\n")
+        }
+    }
+
+    /// Appends one reflog line to `logs/<ref>`, creating the directory tree on demand.
+    fn append_reflog(
+        &self,
+        ref_name: &str,
+        old: Option<&Oid>,
+        new: &Oid,
+        message: &str,
+    ) -> FractalResult<()> {
+        if !Self::should_log_ref(ref_name) {
+            return Ok(());
+        }
+        let path = self.git_dir.join(LOGS_DIR).join(ref_name);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let line = Self::format_reflog_line(old, new, message);
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)?;
+        file.write_all(line.as_bytes())?;
+        Ok(())
+    }
+
+    /// Records one reflog line, reporting a failure as a degradation instead of hiding it.
+    fn record_reflog(&self, ref_name: &str, old: Option<&Oid>, new: &Oid, message: &str) {
+        if let Err(log_err) = self.append_reflog(ref_name, old, new, message) {
+            eprintln!(
+                "warning: '{ref_name}' was updated to {} but its reflog could not be written: {log_err}; the update stands and the reflog is incomplete",
+                new.to_hex()
+            );
+        }
+    }
+
+    /// Deletes the reflog Git deletes together with the reference itself.
+    fn remove_reflog(&self, ref_name: &str) -> FractalResult<()> {
+        if !Self::should_log_ref(ref_name) {
+            return Ok(());
+        }
+        let logs_dir = self.git_dir.join(LOGS_DIR);
+        let path = logs_dir.join(ref_name);
+        match fs::remove_file(&path) {
+            Ok(()) => Self::prune_empty_parents(&path, &logs_dir),
+            Err(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(io_err) => return Err(FractalError::Io(io_err)),
+        }
+        Ok(())
+    }
+
+    /// Removes now-empty directories between `path` and `stop`, leaving `stop` in place.
+    fn prune_empty_parents(path: &Path, stop: &Path) {
+        let mut current = path.parent();
+        while let Some(directory) = current {
+            if directory == stop || !directory.starts_with(stop) {
+                break;
+            }
+            if fs::remove_dir(directory).is_err() {
+                break;
+            }
+            current = directory.parent();
+        }
+    }
+
+    /// Rewrites `packed-refs` without `ref_name`, preserving headers, comments, and other entries.
+    ///
+    /// A packed entry owns the peeled `^` line that follows it, so that line is dropped with the
+    /// entry; every other byte of the table is copied through unchanged and the result is published
+    /// with the same staging rename used for loose references.
+    fn remove_packed_entry(&self, ref_name: &str) -> FractalResult<bool> {
+        let packed_path = self.git_dir.join(PACKED_REFS_FILE);
+        let body = match fs::read_to_string(&packed_path) {
+            Ok(body) => body,
+            Err(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(io_err) => return Err(FractalError::Io(io_err)),
+        };
+        let mut rewritten = String::with_capacity(body.len());
+        let mut removed = false;
+        let mut drop_peeled = false;
+        for line in body.split_inclusive('\n') {
+            let content = line.trim_end_matches(['\r', '\n']);
+            let trimmed = content.trim();
+            let is_peeled = trimmed.starts_with(PEELED_PREFIX);
+            if drop_peeled && is_peeled {
+                continue;
+            }
+            if !is_peeled {
+                drop_peeled = false;
+            }
+            let entry_name = if is_peeled || trimmed.starts_with('#') || trimmed.is_empty() {
+                None
+            } else {
+                trimmed.split_once(' ').map(|(_, name)| name.trim())
+            };
+            if entry_name == Some(ref_name) {
+                removed = true;
+                drop_peeled = true;
+                continue;
+            }
+            rewritten.push_str(line);
+        }
+        if !removed {
+            return Ok(false);
+        }
+        self.write_atomic(&packed_path, rewritten)?;
+        Ok(true)
+    }
+
+    /// Deletes one reference from both on-disk sources and drops the reflog that named it.
+    fn delete_ref_entry(&self, ref_name: &str) -> FractalResult<bool> {
+        let path = self.ref_path(ref_name)?;
+        let mut removed = false;
+        if path.is_file() {
+            fs::remove_file(&path)?;
+            Self::prune_empty_parents(&path, &self.git_dir.join("refs"));
+            removed = true;
+        }
+        if self.remove_packed_entry(ref_name)? {
+            removed = true;
+        }
+        self.remove_reflog(ref_name)?;
+        Ok(removed)
+    }
+
     /// Points HEAD at a symbolic branch reference, which is how Git records a checked-out branch.
     pub fn update_head_symbolic(&self, ref_name: &str) -> FractalResult<()> {
+        validate_ref_name(ref_name)?;
         self.write_head_body(format!("ref: {ref_name}\n"))
     }
 
@@ -411,21 +711,64 @@ impl DiskRefStore {
         self.write_head_body(format!("{}\n", oid.to_hex()))
     }
 
-    /// Writes the HEAD body through the same staging rename protocol as ordinary references.
-    fn write_head_body(&self, body: String) -> FractalResult<()> {
-        let path = self.git_dir.join("HEAD");
-        let staging = Self::staging_path(&path);
-        fs::write(&staging, body)?;
-        if let Err(rename_err) = fs::rename(&staging, &path) {
-            let _ = fs::remove_file(&staging);
-            return Err(FractalError::Io(rename_err));
+    /// Records the pre-reset position in `ORIG_HEAD`, as Git's `reset` does before moving HEAD.
+    pub fn write_orig_head(&self, oid: &Oid) -> FractalResult<()> {
+        self.write_atomic(
+            &self.git_dir.join("ORIG_HEAD"),
+            format!("{}\n", oid.to_hex()),
+        )
+    }
+
+    /// Appends the HEAD reflog line for a move that reaches HEAD through a branch update.
+    ///
+    /// `reset` moves HEAD by rewriting the checked-out branch, which logs the branch but not HEAD;
+    /// Git also keeps the `reset: moving to ...` entry on HEAD for the same move.
+    pub fn record_head_move(&self, previous: &Oid, new: &Oid, message: &str) {
+        self.record_reflog(HEAD_NAME, Some(previous), new, message);
+    }
+
+    /// Updates a reference and records the reflog entries Git would record for the same write.
+    ///
+    /// # Errors
+    ///
+    /// Propagates invalid names, compare-and-swap conflicts, and write failures. A reflog failure is
+    /// reported on stderr instead because the reference has already been published.
+    pub fn update_ref_with_message(
+        &self,
+        ref_name: &str,
+        new_oid: &Oid,
+        expected_old: Option<&Oid>,
+        message: &str,
+    ) -> FractalResult<()> {
+        validate_ref_name(ref_name)?;
+        let target_name = self.write_target(ref_name)?;
+        let previous = self.resolve_name(&target_name)?;
+        if let Some(expected) = expected_old {
+            if previous.as_ref() != Some(expected) {
+                return Err(FractalError::RefConflict(format!(
+                    "CAS ref update conflict on {}: expected {:?}, got {:?}",
+                    target_name, expected, previous
+                )));
+            }
+        }
+        let path = self.ref_path(&target_name)?;
+        self.write_atomic(&path, format!("{}\n", new_oid.to_hex()))?;
+        self.record_reflog(&target_name, previous.as_ref(), new_oid, message);
+        if ref_name == HEAD_NAME && target_name != HEAD_NAME {
+            self.record_reflog(HEAD_NAME, previous.as_ref(), new_oid, message);
         }
         Ok(())
+    }
+
+    /// Writes the HEAD body through the same staging rename protocol as ordinary references.
+    fn write_head_body(&self, body: String) -> FractalResult<()> {
+        self.write_atomic(&self.git_dir.join(REF_HEAD), body)
     }
 }
 
 impl RefStore for DiskRefStore {
     fn get_ref(&self, ref_name: &str) -> FractalResult<Option<Oid>> {
+        validate_ref_name(ref_name)?;
         self.resolve_name(ref_name)
     }
 
@@ -435,37 +778,10 @@ impl RefStore for DiskRefStore {
         new_oid: &Oid,
         expected_old: Option<&Oid>,
     ) -> FractalResult<()> {
-        let target_name = self.write_target(ref_name)?;
-        if let Some(expected) = expected_old {
-            let current = self.resolve_name(&target_name)?;
-            if current.as_ref() != Some(expected) {
-                return Err(FractalError::RefConflict(format!(
-                    "CAS ref update conflict on {}: expected {:?}, got {:?}",
-                    target_name, expected, current
-                )));
-            }
-        }
-
-        let path = self.git_dir.join(&target_name);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let staging = Self::staging_path(&path);
-        fs::write(&staging, format!("{}\n", new_oid.to_hex()))?;
-        if let Err(rename_err) = fs::rename(&staging, &path) {
-            let _ = fs::remove_file(&staging);
-            return Err(FractalError::Io(rename_err));
-        }
-        Ok(())
+        self.update_ref_with_message(ref_name, new_oid, expected_old, "")
     }
 
     fn delete_ref(&self, ref_name: &str) -> FractalResult<bool> {
-        let path = self.git_dir.join(ref_name);
-        if path.is_file() {
-            fs::remove_file(path)?;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        self.delete_ref_entry(ref_name)
     }
 }

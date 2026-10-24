@@ -28,11 +28,11 @@ use fg_core::models::{compute_object_oid, FileMode, IndexStage, ObjectKind};
 use fg_index::{AttributeSet, GitIndex};
 use fractal_git::constants::cli::CliTag;
 
-use super::common::{reject, CliContext};
+use super::common::{fail_fatal, reject, CliContext};
 use super::diff_render::{report_json, report_text};
 use super::repo_view::RepoView;
 use super::tree_view::{
-    flatten_commit_tree, flatten_tree_for_diff, stat_cache_matches, SideBlob, TreeEntry,
+    flatten_commit_tree, flatten_tree_for_diff, stat_cache_trusted, SideBlob, TreeEntry,
 };
 
 /// Default number of context lines around each hunk.
@@ -144,6 +144,8 @@ pub(crate) struct DiffRequest {
     pub(crate) nul_terminated: bool,
     pub(crate) name_only: bool,
     pub(crate) stat_only: bool,
+    /// Whether patch headers print bare paths instead of the a/ and b/ prefixed forms.
+    pub(crate) no_prefix: bool,
     /// Whether a difference should make the process exit with status 1.
     ///
     /// Plain `git diff` prints the patch and exits 0 even when files differ; only `--exit-code`
@@ -163,7 +165,7 @@ pub fn handle_diff(ctx: &CliContext) {
     };
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     let comparisons = match collect_comparisons(&view, &request) {
@@ -218,6 +220,7 @@ fn parse_request(args: &[String]) -> Result<DiffRequest, String> {
         nul_terminated: false,
         name_only: false,
         stat_only: false,
+        no_prefix: false,
         exit_code: false,
         quiet: false,
     };
@@ -235,7 +238,9 @@ fn parse_request(args: &[String]) -> Result<DiffRequest, String> {
                 request.exit_code = true;
                 request.quiet = true;
             }
-            "--no-color" | "--color=never" | "--no-prefix" => {}
+            "--no-prefix" => request.no_prefix = true,
+            "--prefix" => request.no_prefix = false,
+            "--no-color" | "--color=never" => {}
             other if other.starts_with("-U") && other.len() > 2 => {
                 request.context = parse_context(&other[2..])?;
             }
@@ -422,6 +427,7 @@ fn worktree_snapshot<'a>(
     attributes: &'a AttributeSet,
 ) -> FractalResult<Snapshot<'a>> {
     let mut entries = BTreeMap::new();
+    let index_timestamp = view.index_file_timestamp();
     for staged in index.entries_at_stage(IndexStage::Normal) {
         if staged.mode == FileMode::Gitlink {
             continue;
@@ -436,7 +442,7 @@ fn worktree_snapshot<'a>(
             Some(found) => found,
             None => continue,
         };
-        let oid = match stat_cache_matches(staged, &metadata) {
+        let oid = match stat_cache_trusted(staged, &metadata, index_timestamp) {
             true => staged.oid,
             false => {
                 // Hashing goes through the same conversion the comparison renders, so a file whose

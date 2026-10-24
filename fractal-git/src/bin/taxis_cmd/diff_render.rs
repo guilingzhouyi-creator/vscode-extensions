@@ -60,15 +60,21 @@ pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison],
         let new_text = comparison.side_text(false);
 
         if request.stat_only {
-            write_stat_line(&mut sink, comparison, layout, request.nul_terminated);
+            write_stat_line(&mut sink, comparison, layout, false);
             continue;
         }
 
-        let header = format!(
-            "diff --git a/{} b/{}",
-            comparison.old_path, comparison.new_path
-        );
-        let _ = write_record(&mut sink, &header, request.nul_terminated);
+        // --no-prefix drops the a/ and b/ components from every path the patch prints.
+        let header = match request.no_prefix {
+            true => format!("diff --git {} {}", comparison.old_path, comparison.new_path),
+            false => format!(
+                "diff --git a/{} b/{}",
+                comparison.old_path, comparison.new_path
+            ),
+        };
+        // -z terminates path lists with NUL for --name-only and --name-status only. Git keeps
+        // newlines in the patch body, so a patch consumer can still read it line by line.
+        let _ = write_record(&mut sink, &header, false);
 
         // A pure mode change has no content difference, so Git prints the metadata and stops. The
         // `index` line is part of that metadata only when the ids differ; for a mode-only change they
@@ -83,7 +89,7 @@ pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison],
             && comparison.old_text == comparison.new_text
             && comparison.score.is_none()
         {
-            write_mode_only_header(&mut sink, comparison, request.nul_terminated);
+            write_mode_only_header(&mut sink, comparison, false);
             continue;
         }
 
@@ -93,8 +99,8 @@ pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison],
                 &mut sink,
                 &format!(
                     "Binary files {} and {} differ",
-                    side_label(comparison, true),
-                    side_label(comparison, false)
+                    side_label(comparison, true, request.no_prefix),
+                    side_label(comparison, false, request.no_prefix)
                 ),
                 request.nul_terminated,
             );
@@ -118,22 +124,16 @@ pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison],
                 || comparison.new_text.is_none()
                 || comparison.score.is_some()
             {
-                write_file_header(&mut sink, comparison, width, request.nul_terminated);
+                write_file_header(&mut sink, comparison, width, false);
             }
             continue;
         }
-        write_file_header(&mut sink, comparison, width, request.nul_terminated);
-        write_path_lines(&mut sink, comparison, request.nul_terminated);
-        render_patch(
-            &mut sink,
-            &patch,
-            &old_text,
-            &new_text,
-            request.nul_terminated,
-        );
+        write_file_header(&mut sink, comparison, width, false);
+        write_path_lines(&mut sink, comparison, request.no_prefix);
+        render_patch(&mut sink, &patch, &old_text, &new_text, false);
     }
     if request.stat_only && !comparisons.is_empty() {
-        write_stat_summary(&mut sink, comparisons, request.nul_terminated);
+        write_stat_summary(&mut sink, comparisons, false);
     }
 }
 /// Writes the metadata of a comparison whose only change is the recorded mode.
@@ -159,14 +159,21 @@ fn write_mode_only_header(
 }
 
 /// Renders one side's label for a `Binary files` line, using `/dev/null` for an absent side.
-fn side_label(comparison: &FileComparison, old: bool) -> String {
+fn side_label(comparison: &FileComparison, old: bool, no_prefix: bool) -> String {
+    let prefix = match no_prefix {
+        true => "",
+        false => match old {
+            true => "a/",
+            false => "b/",
+        },
+    };
     match old {
         true => match comparison.old_text.is_some() {
-            true => format!("a/{}", comparison.old_path),
+            true => format!("{prefix}{}", comparison.old_path),
             false => DEV_NULL.to_string(),
         },
         false => match comparison.new_text.is_some() {
-            true => format!("b/{}", comparison.new_path),
+            true => format!("{prefix}{}", comparison.new_path),
             false => DEV_NULL.to_string(),
         },
     }
@@ -277,21 +284,11 @@ fn write_file_header(
 /// Git writes the bare `/dev/null` for an absent side, without the `a/` or `b/` prefix. Prefixing it
 /// produces `a//dev/null`, a path that exists nowhere and that no patch tool recognizes as a
 /// creation marker.
-fn write_path_lines(
-    sink: &mut impl std::io::Write,
-    comparison: &FileComparison,
-    nul_terminated: bool,
-) {
-    let old_label = match comparison.old_text.is_some() {
-        true => format!("a/{}", comparison.old_path),
-        false => DEV_NULL.to_string(),
-    };
-    let new_label = match comparison.new_text.is_some() {
-        true => format!("b/{}", comparison.new_path),
-        false => DEV_NULL.to_string(),
-    };
-    let _ = write_record(sink, &format!("{OLD_SIDE} {old_label}"), nul_terminated);
-    let _ = write_record(sink, &format!("{NEW_SIDE} {new_label}"), nul_terminated);
+fn write_path_lines(sink: &mut impl std::io::Write, comparison: &FileComparison, no_prefix: bool) {
+    let old_label = side_label(comparison, true, no_prefix);
+    let new_label = side_label(comparison, false, no_prefix);
+    let _ = write_record(sink, &format!("{OLD_SIDE} {old_label}"), false);
+    let _ = write_record(sink, &format!("{NEW_SIDE} {new_label}"), false);
 }
 
 /// Writes the hunks of one patch, honouring the requested context width.

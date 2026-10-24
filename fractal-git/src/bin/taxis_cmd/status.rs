@@ -39,7 +39,7 @@ use fg_core::models::{compute_object_oid, FileMode, IndexStage, ObjectKind};
 use fg_index::{AttributeSet, GitIndex, IgnoreMatcher, IndexEntry};
 use fractal_git::constants::cli::CliTag;
 
-use super::common::{print_json, reject, CliContext};
+use super::common::{fail_fatal, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 
 /// Status code for an unmodified side.
@@ -159,8 +159,8 @@ impl StatusEntry {
 }
 
 pub use super::tree_view::{
-    flatten_commit_tree, mtime_matches, stat_cache_matches, worktree_mode, write_record, SideBlob,
-    TreeEntry,
+    entry_is_racy, flatten_commit_tree, mtime_matches, stat_cache_trusted, worktree_mode,
+    write_record, SideBlob, TreeEntry,
 };
 
 /// Builds the complete status report for `view`.
@@ -181,6 +181,13 @@ pub fn collect_status(view: &RepoView) -> FractalResult<Vec<StatusEntry>> {
     let matcher = view.ignore_matcher()?;
     let attributes = view.attributes()?;
     let index_map = stage_zero_map(&index);
+    // Every stage counts as tracked. A conflicted path has no stage-zero entry, and consulting only
+    // the stage-zero map would list it as untracked next to its own conflict record.
+    let tracked: BTreeSet<String> = index
+        .entries()
+        .iter()
+        .map(|entry| entry.path.clone())
+        .collect();
 
     let mut changes: BTreeMap<String, StatusEntry> =
         compare_index_to_head(view, &index, &head_tree)?;
@@ -192,7 +199,7 @@ pub fn collect_status(view: &RepoView) -> FractalResult<Vec<StatusEntry>> {
     }
 
     let mut ordered: Vec<StatusEntry> = changes.into_values().collect();
-    ordered.extend(find_untracked(view, &index_map, &matcher)?.into_values());
+    ordered.extend(find_untracked(view, &tracked, &matcher)?.into_values());
     Ok(ordered)
 }
 
@@ -391,6 +398,7 @@ fn compare_worktree_to_index(
     attributes: &AttributeSet,
 ) -> FractalResult<BTreeMap<String, StatusEntry>> {
     let mut entries: BTreeMap<String, StatusEntry> = BTreeMap::new();
+    let index_timestamp = view.index_file_timestamp();
     for (path, staged) in index_map {
         if staged.mode == FileMode::Gitlink {
             continue;
@@ -414,7 +422,8 @@ fn compare_worktree_to_index(
         let mode_changed =
             worktree_mode(&metadata, staged.mode, view.config().trust_executable_bit())
                 != staged.mode;
-        let content_changed = worktree_content_changed(view, staged, &metadata, attributes)?;
+        let content_changed =
+            worktree_content_changed(view, staged, &metadata, attributes, index_timestamp)?;
         if mode_changed || content_changed {
             entries.insert(
                 path.clone(),
@@ -442,14 +451,18 @@ fn worktree_content_changed(
     staged: &IndexEntry,
     metadata: &fs::Metadata,
     attributes: &AttributeSet,
+    index_timestamp: Option<u64>,
 ) -> FractalResult<bool> {
-    if stat_cache_matches(staged, metadata) {
+    if stat_cache_trusted(staged, metadata, index_timestamp) {
         return Ok(false);
     }
     if metadata.len() != u64::from(staged.size) && staged.size != 0 {
         return Ok(true);
     }
-    if metadata.len() == u64::from(staged.size) && mtime_matches(staged, metadata) {
+    if metadata.len() == u64::from(staged.size)
+        && mtime_matches(staged, metadata)
+        && !entry_is_racy(staged, index_timestamp)
+    {
         return Ok(false);
     }
     Ok(!hash_matches(view, staged, attributes)?)
@@ -485,12 +498,12 @@ fn hash_matches(
 /// lists them sends a user to look at paths that no commit would ever include.
 fn find_untracked(
     view: &RepoView,
-    index_map: &BTreeMap<String, IndexEntry>,
+    tracked: &BTreeSet<String>,
     matcher: &IgnoreMatcher,
 ) -> FractalResult<BTreeMap<String, StatusEntry>> {
     let mut untracked: BTreeMap<String, StatusEntry> = BTreeMap::new();
-    let tracked_prefixes: BTreeSet<String> = index_map
-        .keys()
+    let tracked_prefixes: BTreeSet<String> = tracked
+        .iter()
         .filter_map(|path| path.rfind('/').map(|index| path[..index].to_string()))
         .collect();
     let mut recorded: BTreeSet<String> = BTreeSet::new();
@@ -523,7 +536,7 @@ fn find_untracked(
                 child_directories.push((entry.path(), path));
                 continue;
             }
-            if index_map.contains_key(&path) || matcher.is_ignored(&path, false) {
+            if tracked.contains(&path) || matcher.is_ignored(&path, false) {
                 continue;
             }
             untracked.insert(
@@ -534,8 +547,8 @@ fn find_untracked(
 
         for (absolute, path) in child_directories {
             let holds_tracked = tracked_prefixes.contains(&path)
-                || index_map
-                    .keys()
+                || tracked
+                    .iter()
                     .any(|staged| staged.starts_with(&format!("{path}/")));
             if holds_tracked {
                 pending.push((absolute, path));
@@ -634,9 +647,10 @@ pub fn conflict_code(stages: &BTreeSet<u8>) -> (char, char) {
     let has_ours = stages.contains(&2);
     let has_theirs = stages.contains(&3);
     match (has_base, has_ours, has_theirs) {
+        (true, false, false) => ('D', 'D'),
         (false, true, true) => ('A', 'A'),
-        (true, true, false) => ('D', 'U'),
-        (true, false, true) => ('U', 'D'),
+        (true, true, false) => ('U', 'D'),
+        (true, false, true) => ('D', 'U'),
         (false, true, false) => ('A', 'U'),
         (false, false, true) => ('U', 'A'),
         _ => ('U', 'U'),
@@ -647,17 +661,20 @@ pub fn conflict_code(stages: &BTreeSet<u8>) -> (char, char) {
 pub fn handle_status(ctx: &CliContext) {
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     let mut nul_terminated = false;
-    let mut verbose = false;
+    let mut format = StatusFormat::Long;
+    let mut show_branch = false;
     let mut unknown_flags: Vec<String> = Vec::new();
     for argument in &ctx.args {
         match argument.as_str() {
             "-z" => nul_terminated = true,
-            "--long" | "-v" | "--verbose" => verbose = true,
-            "--porcelain" | "--porcelain=v1" | "--short" | "-s" => {}
+            "--long" | "-v" | "--verbose" => format = StatusFormat::Long,
+            "--short" | "-s" => format = StatusFormat::Short,
+            "--porcelain" | "--porcelain=v1" => format = StatusFormat::Porcelain,
+            "-b" | "--branch" => show_branch = true,
             other if other.starts_with('-') => unknown_flags.push(other.to_string()),
             _ => {}
         }
@@ -679,8 +696,41 @@ pub fn handle_status(ctx: &CliContext) {
         return;
     }
 
+    match format {
+        StatusFormat::Long => render_long(&view, &entries),
+        StatusFormat::Short | StatusFormat::Porcelain => {
+            render_records(&view, &entries, nul_terminated, show_branch);
+        }
+    }
+}
+
+/// Output flavour for `taxis status`.
+///
+/// Git changed its default from short to long output decades ago and scripts that parse status
+/// pass an explicit flavour. Defaulting to the machine form made `taxis status` look like a
+/// different command to anyone comparing the two tools by hand, so the default follows Git.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum StatusFormat {
+    /// Human-readable long form, the default.
+    Long,
+    /// One record per path.
+    Short,
+    /// Porcelain v1, the stable machine form.
+    Porcelain,
+}
+
+/// Renders the record-per-line forms, optionally with the branch header Git prints under `--branch`.
+fn render_records(
+    view: &RepoView,
+    entries: &[StatusEntry],
+    nul_terminated: bool,
+    show_branch: bool,
+) {
     let mut sink = std::io::stdout();
-    for entry in &entries {
+    if show_branch {
+        let _ = write_record(&mut sink, &branch_header(view), nul_terminated);
+    }
+    for entry in entries {
         let _ = write_record(
             &mut sink,
             &entry.record_text(nul_terminated),
@@ -695,14 +745,166 @@ pub fn handle_status(ctx: &CliContext) {
             }
         }
     }
-    if verbose {
-        let staged = entries.iter().filter(|entry| entry.is_staged()).count();
-        let unstaged = entries.iter().filter(|entry| entry.is_unstaged()).count();
-        let untracked = entries.iter().filter(|entry| entry.is_untracked()).count();
-        println!(
-            "{} entry(s): {staged} staged, {unstaged} unstaged, {untracked} untracked",
-            entries.len()
-        );
+}
+
+/// Renders the long form Git prints by default.
+///
+/// The sections are printed in the order a commit reads them: what is already staged, what a
+/// merge left unresolved, what the next `git add` would stage, and what no `git add` can reach
+/// yet. A clean tree prints the single sentence Git prints instead of four empty headers.
+fn render_long(view: &RepoView, entries: &[StatusEntry]) {
+    println!("{}", long_branch_line(view));
+    let tracked: Vec<&StatusEntry> = entries
+        .iter()
+        .filter(|entry| !entry.is_untracked())
+        .collect();
+    if tracked.is_empty() && entries.is_empty() {
+        println!("nothing to commit, working tree clean");
+        return;
+    }
+    let staged: Vec<&StatusEntry> = tracked
+        .iter()
+        .copied()
+        .filter(|entry| entry.is_staged() && !entry.is_conflicted())
+        .collect();
+    let conflicted: Vec<&StatusEntry> = tracked
+        .iter()
+        .copied()
+        .filter(|entry| entry.is_conflicted())
+        .collect();
+    let unstaged: Vec<&StatusEntry> = tracked
+        .iter()
+        .copied()
+        .filter(|entry| entry.is_unstaged() && !entry.is_conflicted())
+        .collect();
+    let untracked: Vec<&StatusEntry> = entries
+        .iter()
+        .filter(|entry| entry.is_untracked())
+        .collect();
+    let mut sections = 0usize;
+    if !staged.is_empty() {
+        if sections > 0 {
+            println!();
+        }
+        println!("Changes to be committed:");
+        println!("  (use \"git restore --staged <file>...\" to unstage)");
+        for entry in &staged {
+            println!("\t{}", staged_line(entry));
+        }
+        sections += 1;
+    }
+    if !conflicted.is_empty() {
+        if sections > 0 {
+            println!();
+        }
+        println!("Unmerged paths:");
+        println!("  (use \"git add <file>...\" to mark resolution)");
+        for entry in &conflicted {
+            println!("\t{}", conflict_line(entry));
+        }
+        sections += 1;
+    }
+    if !unstaged.is_empty() {
+        if sections > 0 {
+            println!();
+        }
+        println!("Changes not staged for commit:");
+        println!("  (use \"git add <file>...\" to update what will be committed)");
+        println!("  (use \"git restore <file>...\" to discard changes in working directory)");
+        for entry in &unstaged {
+            println!("\t{}", unstaged_line(entry));
+        }
+        sections += 1;
+    }
+    if !untracked.is_empty() {
+        if sections > 0 {
+            println!();
+        }
+        println!("Untracked files:");
+        println!("  (use \"git add <file>...\" to include in what will be committed)");
+        for entry in &untracked {
+            println!("\t{}", entry.path);
+        }
+        sections += 1;
+    }
+    if sections == 0 {
+        println!("nothing to commit, working tree clean");
+        return;
+    }
+    // Git closes the long form with the one action the user can take next. It only prints the
+    // sentence when nothing is staged, because a pending commit makes the advice redundant.
+    if staged.is_empty() && conflicted.is_empty() {
+        println!();
+        if !unstaged.is_empty() {
+            println!("no changes added to commit (use \"git add\" and/or \"git commit -a\")");
+        } else if !untracked.is_empty() {
+            println!(
+                "nothing added to commit but untracked files present (use \"git add\" to track)"
+            );
+        }
+    }
+}
+
+/// Renders the first line of the long form: the branch, or how `HEAD` is detached.
+fn long_branch_line(view: &RepoView) -> String {
+    let branch = view.head_branch().ok().flatten().map(|(name, _)| name);
+    let detached = view.head_commit().ok().flatten();
+    match (branch, detached) {
+        (Some(name), Some(_)) => format!("On branch {name}"),
+        (Some(name), None) => format!("On branch {name}\n\nNo commits yet"),
+        (None, Some(oid)) => {
+            // Git names the commit the detached HEAD sits on, abbreviated the same way it
+            // abbreviates object ids everywhere else.
+            let hex = oid.to_hex();
+            format!("HEAD detached at {}", &hex[..hex.len().min(7)])
+        }
+        (None, None) => "On an unborn branch".to_string(),
+    }
+}
+
+/// Renders the `## <branch>` header the short and porcelain forms print under `--branch`.
+fn branch_header(view: &RepoView) -> String {
+    let branch = view.head_branch().ok().flatten().map(|(name, _)| name);
+    let detached = view.head_commit().ok().flatten();
+    match (branch, detached) {
+        (Some(name), Some(_)) => format!("## {name}"),
+        (Some(name), None) => format!("## No commits yet on {name}"),
+        (None, Some(_)) => "## HEAD (no branch)".to_string(),
+        (None, None) => "## No commits yet on an unborn branch".to_string(),
+    }
+}
+
+/// Names the index-side change in the words Git prints, padded to the column Git pads to.
+fn staged_line(entry: &StatusEntry) -> String {
+    match entry.index_code {
+        CODE_ADDED => format!("new file:   {}", entry.path),
+        CODE_DELETED => format!("deleted:    {}", entry.path),
+        CODE_RENAMED => match &entry.rename_from {
+            Some(from) => format!("renamed:    {from} -> {}", entry.path),
+            None => format!("renamed:    {}", entry.path),
+        },
+        _ => format!("modified:   {}", entry.path),
+    }
+}
+
+/// Names the worktree-side change in the words Git prints.
+fn unstaged_line(entry: &StatusEntry) -> String {
+    match entry.worktree_code {
+        CODE_DELETED => format!("deleted:    {}", entry.path),
+        _ => format!("modified:   {}", entry.path),
+    }
+}
+
+/// Names the surviving sides of an unmerged path in the words Git prints.
+fn conflict_line(entry: &StatusEntry) -> String {
+    match entry.code().as_str() {
+        "AA" => format!("both added:      {}", entry.path),
+        "DD" => format!("both deleted:    {}", entry.path),
+        "AU" => format!("added by us:     {}", entry.path),
+        "UA" => format!("added by them:   {}", entry.path),
+        "UD" => format!("deleted by them: {}", entry.path),
+        "DU" => format!("deleted by us:   {}", entry.path),
+        _ => format!("both modified:   {}", entry.path),
     }
 }
 
@@ -735,8 +937,9 @@ fn report_json(view: &RepoView, entries: &[StatusEntry]) {
 #[cfg(test)]
 mod tests {
     use super::{
-        classify_staged, conflict_code, empty_index_bytes, merge_side, stage_zero_map, StatusEntry,
-        TreeEntry, CODE_ADDED, CODE_DELETED, CODE_MODIFIED, CODE_RENAMED, CODE_UNCHANGED,
+        classify_staged, conflict_code, conflict_line, empty_index_bytes, merge_side,
+        stage_zero_map, staged_line, unstaged_line, StatusEntry, TreeEntry, CODE_ADDED,
+        CODE_DELETED, CODE_MODIFIED, CODE_RENAMED, CODE_UNCHANGED,
     };
     use fg_core::models::{FileMode, Oid};
     use fg_index::GitIndex;
@@ -815,11 +1018,17 @@ mod tests {
         let both_added: BTreeSet<u8> = [2u8, 3].into_iter().collect();
         assert_eq!(conflict_code(&both_added), ('A', 'A'));
 
+        // Base plus ours means theirs deleted the path, which Git reports as UD.
         let delete_modify: BTreeSet<u8> = [1u8, 2].into_iter().collect();
-        assert_eq!(conflict_code(&delete_modify), ('D', 'U'));
+        assert_eq!(conflict_code(&delete_modify), ('U', 'D'));
 
+        // Base plus theirs means ours deleted the path, which Git reports as DU.
         let their_delete: BTreeSet<u8> = [1u8, 3].into_iter().collect();
-        assert_eq!(conflict_code(&their_delete), ('U', 'D'));
+        assert_eq!(conflict_code(&their_delete), ('D', 'U'));
+
+        // A base-only entry survives when both sides deleted the path elsewhere.
+        let base_only: BTreeSet<u8> = [1u8].into_iter().collect();
+        assert_eq!(conflict_code(&base_only), ('D', 'D'));
     }
 
     #[test]
@@ -881,5 +1090,53 @@ mod tests {
     fn an_unknown_tree_oid_seed_is_stable() {
         assert_eq!(oid_of(7), oid_of(7));
         assert_ne!(oid_of(7), oid_of(8));
+    }
+
+    #[test]
+    fn long_form_names_the_index_side_changes() {
+        assert_eq!(
+            staged_line(&StatusEntry::new(CODE_ADDED, CODE_UNCHANGED, "a.txt")),
+            "new file:   a.txt"
+        );
+        assert_eq!(
+            staged_line(&StatusEntry::new(CODE_DELETED, CODE_UNCHANGED, "a.txt")),
+            "deleted:    a.txt"
+        );
+        assert_eq!(
+            staged_line(&StatusEntry::new(CODE_MODIFIED, CODE_UNCHANGED, "a.txt")),
+            "modified:   a.txt"
+        );
+        let mut renamed = StatusEntry::new(CODE_RENAMED, CODE_UNCHANGED, "b.txt");
+        renamed.rename_from = Some("a.txt".to_string());
+        assert_eq!(staged_line(&renamed), "renamed:    a.txt -> b.txt");
+    }
+
+    #[test]
+    fn long_form_names_the_worktree_side_changes() {
+        assert_eq!(
+            unstaged_line(&StatusEntry::new(CODE_UNCHANGED, CODE_MODIFIED, "a.txt")),
+            "modified:   a.txt"
+        );
+        assert_eq!(
+            unstaged_line(&StatusEntry::new(CODE_UNCHANGED, CODE_DELETED, "a.txt")),
+            "deleted:    a.txt"
+        );
+    }
+
+    #[test]
+    fn long_form_names_every_unmerged_state() {
+        let cases = [
+            (('A', 'A'), "both added:      a.txt"),
+            (('D', 'D'), "both deleted:    a.txt"),
+            (('A', 'U'), "added by us:     a.txt"),
+            (('U', 'A'), "added by them:   a.txt"),
+            (('U', 'D'), "deleted by them: a.txt"),
+            (('D', 'U'), "deleted by us:   a.txt"),
+            (('U', 'U'), "both modified:   a.txt"),
+        ];
+        for ((index_code, worktree_code), expected) in cases {
+            let entry = StatusEntry::new(index_code, worktree_code, "a.txt");
+            assert_eq!(conflict_line(&entry), expected);
+        }
     }
 }

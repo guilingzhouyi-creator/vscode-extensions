@@ -7,7 +7,8 @@
 //! Responsibilities: Worktree materialization, uncommitted change guard, DIRC index synchronization,
 //!   and atomic reference updating.
 //! Exit Semantics & Design Rationale:
-//!   - Refuses to overwrite unstaged or staged modifications unless `--force` / `-f` is provided.
+//!   - Carries uncommitted changes across a switch when the path is identical in both trees and
+//!     refuses only when the switch would overwrite them, matching Git; `--force` / `-f` overrides.
 //!   - Atomically updates worktree files, DIRC index, and HEAD references.
 //!
 //! ### Domain Governance Rules (SSOT):
@@ -15,7 +16,7 @@
 //! - `FGT-GAT-001`: Fractal Git domain gate guard
 //! - `FGT-TOP-001`: DAG topology traversal guard
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
@@ -30,7 +31,7 @@ use fg_native::RepoDocument;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{DiskRefStore, RefStore};
 
-use super::common::{fail_io, reject, CliContext};
+use super::common::{fail_fatal, fail_io, reject, CliContext};
 use super::repo_view::RepoView;
 use super::status::collect_status;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
@@ -55,10 +56,8 @@ pub fn handle_checkout(ctx: &CliContext) {
     let opts = parse_checkout_options(&ctx.args);
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
-
-    assert_worktree_cleanliness(&view, opts.force);
 
     let (target_commit, tree_oid) = match view.resolve_tree(&opts.target) {
         Ok(resolved) => resolved,
@@ -86,8 +85,10 @@ pub fn handle_checkout(ctx: &CliContext) {
         reject(CliTag::ERROR, diff_err);
     }
 
+    let carried = check_switch_conflicts(&view, &current_files, &new_files, opts.force);
     remove_stale_files(view.work_root(), &current_files, &new_files);
-    let index_entries = materialize_files(&view, &new_files);
+    let existing_index = load_index_entries(view.git_dir());
+    let index_entries = materialize_files_preserving(&view, &new_files, &carried, &existing_index);
     update_dirc_index(view.git_dir(), &index_entries);
     update_references(
         view.git_dir(),
@@ -138,6 +139,94 @@ fn parse_checkout_options(args: &[String]) -> CheckoutOptions {
         new_branch,
         force,
     }
+}
+
+/// Refuses a switch that would overwrite local work, returning the paths left untouched.
+///
+/// Git carries uncommitted changes across a branch switch whenever a path is identical in both
+/// trees and refuses only when the switch would replace the edit. Rejecting on any dirty path
+/// forced `--force` for edits that do not intersect the switch at all, and losing them is exactly
+/// what the guard exists to prevent.
+fn check_switch_conflicts(
+    view: &RepoView,
+    current_files: &BTreeMap<String, TreeEntry>,
+    new_files: &BTreeMap<String, TreeEntry>,
+    force: bool,
+) -> BTreeSet<String> {
+    let changed: BTreeSet<String> = current_files
+        .iter()
+        .filter_map(|(path, head)| match new_files.get(path) {
+            Some(target) if same_tree_entry(head, target) => None,
+            _ => Some(path.clone()),
+        })
+        .chain(
+            new_files
+                .keys()
+                .filter(|path| !current_files.contains_key(*path))
+                .cloned(),
+        )
+        .collect();
+    let status = collect_status(view).unwrap_or_default();
+    let untracked_collisions: Vec<&str> = status
+        .iter()
+        .filter(|entry| entry.is_untracked() && new_files.contains_key(&entry.path))
+        .map(|entry| entry.path.as_str())
+        .collect();
+    let overwritten: Vec<&str> = status
+        .iter()
+        .filter(|entry| !entry.is_untracked() && changed.contains(&entry.path))
+        .map(|entry| entry.path.as_str())
+        .collect();
+    if !force {
+        if !overwritten.is_empty() {
+            reject(
+                CliTag::ERROR,
+                format!(
+                    "Your local changes to the following files would be overwritten by checkout:\n  \
+                     {}\nPlease commit your changes or use --force to overwrite them.",
+                    overwritten.join("\n  ")
+                ),
+            );
+        }
+        if !untracked_collisions.is_empty() {
+            reject(
+                CliTag::ERROR,
+                format!(
+                    "The following untracked working tree files would be overwritten by checkout:\n  \
+                     {}\nPlease move or remove them before you switch branches.",
+                    untracked_collisions.join("\n  ")
+                ),
+            );
+        }
+    }
+    new_files
+        .keys()
+        .filter(|path| {
+            current_files
+                .get(*path)
+                .is_some_and(|head| same_tree_entry(head, &new_files[*path]))
+        })
+        .cloned()
+        .collect()
+}
+
+/// Reports whether two tree entries record the same payload and file kind.
+fn same_tree_entry(left: &TreeEntry, right: &TreeEntry) -> bool {
+    left.oid == right.oid && left.mode == right.mode
+}
+
+/// Loads the normal-stage index entries keyed by path, tolerating a missing or unreadable index.
+fn load_index_entries(git_dir: &Path) -> BTreeMap<String, IndexEntry> {
+    fg_index::GitIndex::load(git_dir.join("index"))
+        .map(|index| {
+            index
+                .entries()
+                .iter()
+                .filter(|entry| entry.stage == IndexStage::Normal)
+                .map(|entry| (entry.path.clone(), entry.clone()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Asserts that no unstaged or staged changes exist before checkout proceeds unless force is set.
@@ -221,10 +310,30 @@ pub(crate) fn materialize_files(
     view: &RepoView,
     new_files: &BTreeMap<String, TreeEntry>,
 ) -> Vec<IndexEntry> {
+    materialize_files_preserving(view, new_files, &BTreeSet::new(), &BTreeMap::new())
+}
+
+/// Materializes files while leaving carried paths and their recorded index entries untouched.
+fn materialize_files_preserving(
+    view: &RepoView,
+    new_files: &BTreeMap<String, TreeEntry>,
+    carried: &BTreeSet<String>,
+    existing_index: &BTreeMap<String, IndexEntry>,
+) -> Vec<IndexEntry> {
     let mut index_entries = Vec::with_capacity(new_files.len());
 
     for (path, tree_entry) in new_files {
         let full_path = view.work_root().join(path);
+        if carried.contains(path) && full_path.exists() && !full_path.is_symlink() {
+            // The path is identical in both trees, so the switch has no reason to touch it. Reuse
+            // the recorded entry when there is one, because a staged edit lives in the index and
+            // rewriting the file would discard the worktree side of it.
+            match existing_index.get(path) {
+                Some(existing) => index_entries.push(existing.clone()),
+                None => index_entries.push(describe_worktree_file(&full_path, path, tree_entry)),
+            }
+            continue;
+        }
         if let Some(parent) = full_path.parent() {
             if let Err(err) = fs::create_dir_all(parent) {
                 fail_io(format!("create directory '{}'", parent.display()), err);
@@ -251,19 +360,7 @@ pub(crate) fn materialize_files(
             }
         }
 
-        let (size, mtime_sec, mtime_nano) = if let Ok(meta) = fs::metadata(&full_path) {
-            let mtime = meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-            let duration = mtime
-                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .unwrap_or_default();
-            (
-                meta.len() as u32,
-                duration.as_secs() as u32,
-                duration.subsec_nanos(),
-            )
-        } else {
-            (payload.len() as u32, 0, 0)
-        };
+        let (size, mtime_sec, mtime_nano) = worktree_stat(&full_path, payload.len() as u32);
 
         index_entries.push(IndexEntry {
             path: path.clone(),
@@ -280,6 +377,39 @@ pub(crate) fn materialize_files(
     }
 
     index_entries
+}
+
+/// Records the stat cache of a carried file whose index entry was never written.
+fn describe_worktree_file(full_path: &Path, path: &str, tree_entry: &TreeEntry) -> IndexEntry {
+    let (size, mtime_seconds, mtime_nanos) = worktree_stat(full_path, 0);
+    IndexEntry {
+        path: path.to_string(),
+        mode: tree_entry.mode,
+        oid: tree_entry.oid,
+        stage: IndexStage::Normal,
+        size,
+        mtime_seconds,
+        mtime_nanos,
+        assume_valid: false,
+        skip_worktree: false,
+        intent_to_add: false,
+    }
+}
+
+/// Reads the stat cache tuple for a worktree file, falling back to the payload length.
+fn worktree_stat(full_path: &Path, fallback_size: u32) -> (u32, u32, u32) {
+    let Ok(meta) = fs::metadata(full_path) else {
+        return (fallback_size, 0, 0);
+    };
+    let mtime = meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+    let duration = mtime
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap_or_default();
+    (
+        meta.len() as u32,
+        duration.as_secs() as u32,
+        duration.subsec_nanos(),
+    )
 }
 
 /// Persists the materialized entries into the binary DIRC index file.

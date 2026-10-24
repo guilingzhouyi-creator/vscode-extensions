@@ -2,13 +2,15 @@
  * Module: Fractal Git — Primary TypeScript Public Facade
  * File Path: ts/index.ts
  * Architecture Role: Unified public entry point for the Fractal Git engine. Re-exports
- *   contracts, native bridge bindings, pre-review verification gates, multi-agent orchestration,
- *   and developer CLI diagnostics.
+ *   contracts, the pure-TypeScript Git object engine, pre-review verification gates,
+ *   multi-agent orchestration, and developer CLI diagnostics.
  * Dependencies & Triggers: Consumed by Praxis review clients, VS Code extension, and CLI scripts.
  * Responsibilities: Expose high-level workspace management factories, enforce frozen export
  *   discipline adhering to ARCH-FAC-001, and provide end-to-end atomic commit APIs.
  * Exit Semantics & Design Rationale: Guarantees ELOC >= 15 with deep object freezing; encapsulates
- *   low-level Git object manipulation behind ergonomic agent-native operations.
+ *   low-level Git object manipulation behind ergonomic agent-native operations. The active and only
+ *   engine is the pure-TypeScript reference implementation in ts/native-binding.ts: this package
+ *   compiles and ships no `.node` native binding, so no native shim is probed or claimed.
  */
 
 import type {

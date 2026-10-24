@@ -30,3 +30,20 @@ fn test_git_packet_line_encode_decode() {
     assert_eq!(lines.len(), 1);
     assert_eq!(lines[0], "version 2");
 }
+
+#[test]
+fn test_git_packet_line_control_packets_are_not_panics() {
+    // A delimiter packet is legal wire input and must not be treated as a negative payload slice.
+    let mut stream = PacketLine::delim();
+    stream.extend_from_slice(&PacketLine::encode_line("after-delim\n"));
+    let lines = PacketLine::decode(&stream).expect("delimiter packets must decode cleanly");
+    assert_eq!(lines, vec!["after-delim".to_string()]);
+
+    // 0003 is reserved by the protocol; it must surface as an error, not as a panic.
+    let reserved = PacketLine::decode(b"0003").expect_err("reserved length must be rejected");
+    assert!(reserved.to_string().contains("0003"));
+
+    // A frame that announces more bytes than the buffer holds stays a descriptive error.
+    let truncated = PacketLine::decode(b"0010abc").expect_err("truncated frame must be rejected");
+    assert!(truncated.to_string().contains("Truncated"));
+}

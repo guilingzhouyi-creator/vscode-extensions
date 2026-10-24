@@ -43,9 +43,6 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["serve", "daemon"], "daemon"),
         (&["lg", "log"], "log"),
         (&["sh", "show"], "show"),
-        (&["fe", "fetch"], "fetch"),
-        (&["pu", "push"], "push"),
-        (&["pl", "pull"], "pull"),
         (&["rb", "rebase"], "rebase"),
         (&["mg", "merge"], "merge"),
         (&["cp", "cherry-pick"], "cherry-pick"),
@@ -115,7 +112,7 @@ Native Fractal Commands (with Git Alias Mappings):
   version,  -v       Display version and domain rules SSOT
 
 Transparent Git Command Aliases & Passthrough:
-  sw/switch, lg/log, sh/show, fe/fetch, pu/push, pl/pull, rb/rebase, mg/merge, cp/cherry-pick
+  sw/switch, lg/log, sh/show, rb/rebase, mg/merge, cp/cherry-pick
   Any standard git command runs seamlessly with CAS acceleration.
 
 Flags:

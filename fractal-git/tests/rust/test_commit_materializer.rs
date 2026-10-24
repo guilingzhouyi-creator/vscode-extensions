@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use fractal_git::{
-    materialize_commit, CommitMaterializationRequest, DiskRefStore, GitSignature, LooseOdb,
-    OdbStore, RefStore,
+    materialize_commit, CommitMaterializationRequest, DiskRefStore, FileMode, GitSignature,
+    LooseOdb, OdbStore, RefStore,
 };
 
 /// Monotonic counter keeping scratch directory names unique within one process.
@@ -107,6 +107,9 @@ fn materialize_commit_persists_objects_and_advances_ref() {
     for blob_oid in &materialized.blob_oids {
         assert!(odb.has_object(blob_oid));
     }
+
+    // Modes are reported for every staged path so index rewrites can stay faithful.
+    assert_eq!(materialized.modes, vec![FileMode::RegularFile; 2]);
 
     // Blob payloads round-trip through the loose store with their canonical headers.
     let readme_blob = odb
@@ -228,6 +231,68 @@ fn materialize_commit_tree_contains_nested_paths() {
     let commit_text = String::from_utf8_lossy(&commit_bytes);
     assert!(commit_text.contains(&format!("tree {}", materialized.tree_oid.to_hex())));
     assert!(commit_text.contains("docs: add guide"));
+
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Proves the materializer records executable and symbolic-link modes instead of flattening.
+///
+/// Git derives both distinctions from the working tree when the index carries no overriding
+/// statistics. Losing them would silently demote a script to a plain file and copy the bytes a
+/// symbolic link points at, which changes the committed tree rather than merely its metadata.
+#[cfg(unix)]
+#[test]
+fn materialize_commit_preserves_executable_and_symlink_modes() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = scratch_dir("modes");
+    write_file(&root, "run.sh", "#!/bin/sh\necho hi\n");
+    write_file(&root, "plain.txt", "plain\n");
+    let script_path = root.join("run.sh");
+    let mut permissions = std::fs::metadata(&script_path)
+        .expect("stat script")
+        .permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&script_path, permissions).expect("mark script executable");
+    std::os::unix::fs::symlink("run.sh", root.join("link.sh")).expect("create symlink");
+
+    let git_dir = root.join(".git");
+    let odb = LooseOdb::new(&git_dir);
+    let ref_store = DiskRefStore::new(&git_dir);
+    let request = request_for(
+        &root,
+        &["run.sh", "plain.txt", "link.sh"],
+        "feat(storage): keep working-tree modes\n",
+        "refs/fractal/cell/cell-modes/main",
+    );
+
+    let materialized =
+        materialize_commit(&odb, &ref_store, &request).expect("materialization must succeed");
+
+    // The reported modes mirror the tree, in request order.
+    assert_eq!(
+        materialized.modes,
+        vec![
+            FileMode::ExecutableFile,
+            FileMode::RegularFile,
+            FileMode::Symlink
+        ]
+    );
+    let tree_payload = odb
+        .read_object(&materialized.tree_oid)
+        .expect("read root tree");
+    assert!(tree_payload
+        .windows(b"100755 run.sh".len())
+        .any(|window| window == b"100755 run.sh"));
+    assert!(tree_payload
+        .windows(b"120000 link.sh".len())
+        .any(|window| window == b"120000 link.sh"));
+
+    // A symbolic link stores its target text, never the bytes of the file it points at.
+    let link_blob = odb
+        .read_object(&materialized.blob_oids[2])
+        .expect("read symlink blob");
+    assert!(link_blob.ends_with(b"run.sh"));
 
     let _ = std::fs::remove_dir_all(&root);
 }

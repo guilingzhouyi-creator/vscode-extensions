@@ -19,6 +19,7 @@ pub mod conflict_stage;
 pub mod entry;
 pub mod ignore;
 pub mod index_file;
+pub mod index_tail;
 pub mod lockless_tree;
 
 pub use attributes::{blob_has_crlf, to_git_bytes, AttributeSet, AutoCrlf, CrlfAction};

@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 use fg_native::LayoutMode;
 use fg_storage::projection::{export_native_to_git, import_git_to_native};
 use fractal_git::constants::cli::CliTag;
+use fractal_git::fractal::refs::validate_ref_name;
+use fractal_git::DiskRefStore;
 
 use super::common::{find_arg_value, print_json, reject, CliContext};
 
@@ -35,6 +37,8 @@ pub fn handle_git_export(ctx: &CliContext) {
             work_root.join(".git")
         }
     };
+
+    reject_unaddressable_native_refs(&native_dir);
 
     let report = match export_native_to_git(&native_dir, &target_git, force) {
         Ok(rep) => rep,
@@ -107,6 +111,17 @@ pub fn handle_git_import(ctx: &CliContext) {
 
     let target_native = workspace_root.join(".taxis");
 
+    match DiskRefStore::new(&source_git).list_all() {
+        Ok(refs) => reject_unaddressable_ref_names(
+            refs.iter().map(|(name, _)| name.as_str()),
+            "the source Git repository",
+        ),
+        Err(list_err) => reject(
+            CliTag::ERROR,
+            format!("list source Git references: {list_err}"),
+        ),
+    }
+
     let report = match import_git_to_native(&source_git, &target_native, layout_mode, force) {
         Ok(rep) => rep,
         Err(import_err) => reject(
@@ -137,6 +152,38 @@ pub fn handle_git_import(ctx: &CliContext) {
         println!("  Refs imported     : {}", report.refs_imported);
         println!("  Index entries     : {}", report.index_entries_imported);
         println!("  HEAD              : {}", report.head);
+    }
+}
+
+/// Refuses a native reference table containing a name Git cannot address.
+///
+/// Projection turns every reference name into a file path under the target `.git`; validating the
+/// names here keeps `..`, a drive prefix, a backslash, or a `.lock` suffix from escaping that
+/// directory even when the native container was produced by another tool.
+fn reject_unaddressable_native_refs(native_dir: &Path) {
+    let container = fg_native::container_path(native_dir);
+    let Ok(document) = fg_native::RepoDocument::load(&container) else {
+        return;
+    };
+    reject_unaddressable_ref_names(
+        document
+            .refs
+            .records()
+            .iter()
+            .map(|record| record.name.as_str()),
+        "the native repository",
+    );
+}
+
+/// Rejects every reference name Git would refuse to store.
+fn reject_unaddressable_ref_names<'a>(names: impl Iterator<Item = &'a str>, origin: &str) {
+    for name in names {
+        if let Err(err) = validate_ref_name(name) {
+            reject(
+                CliTag::ERROR,
+                format!("{origin} contains an unaddressable reference: {err}"),
+            );
+        }
     }
 }
 

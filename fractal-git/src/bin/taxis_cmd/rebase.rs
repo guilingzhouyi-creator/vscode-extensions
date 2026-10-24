@@ -37,7 +37,7 @@ use super::checkout::{
     update_references,
 };
 use super::commit_walk::{parse_commit_record, walk_commits};
-use super::common::{fail_io, print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff};
 
@@ -55,7 +55,7 @@ pub fn handle_rebase(ctx: &CliContext) {
     let upstream_arg = &ctx.args[0];
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     assert_worktree_cleanliness(&view, false);

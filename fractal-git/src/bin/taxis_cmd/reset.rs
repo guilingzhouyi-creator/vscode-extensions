@@ -25,10 +25,9 @@ use fractal_git::constants::cli::CliTag;
 use fractal_git::{DiskRefStore, OperationGraph, RepoViewSnapshot};
 
 use super::checkout::{
-    assert_worktree_cleanliness, materialize_files, remove_stale_files, update_dirc_index,
-    update_references,
+    materialize_files, remove_stale_files, update_dirc_index, update_references,
 };
-use super::common::{print_json, reject, CliContext};
+use super::common::{fail_fatal, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
 
@@ -56,7 +55,7 @@ pub fn handle_reset(ctx: &CliContext) {
     let opts = parse_reset_options(&ctx.args);
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     let (target_commit, tree_oid) = match view.resolve_tree(&opts.target) {
@@ -86,13 +85,16 @@ pub fn handle_reset(ctx: &CliContext) {
         }
     }
 
-    // Guard 2: Protect working tree from silent overwrite in --hard mode unless forced
-    if opts.mode == ResetMode::Hard {
-        assert_worktree_cleanliness(&view, opts.force);
-    }
-
     // Record snapshot to OperationGraph BEFORE state mutation for 100% reliable undo
     record_reset_operation(&view, target_commit, &opts, effective_branch.as_deref());
+
+    // Git records the position it is leaving in ORIG_HEAD before it moves HEAD.
+    let previous_head = view.head_commit().ok().flatten();
+    if let Some(previous) = previous_head.as_ref() {
+        if let Err(err) = DiskRefStore::new(view.git_dir()).write_orig_head(previous) {
+            fail_fatal(format!("write ORIG_HEAD: {err}"));
+        }
+    }
 
     match opts.mode {
         ResetMode::Soft => {
@@ -130,6 +132,7 @@ pub fn handle_reset(ctx: &CliContext) {
             }
 
             remove_stale_files(view.work_root(), &current_files, &target_files);
+            remove_index_only_files(&view, &target_files);
             let index_entries = materialize_files(&view, &target_files);
             update_dirc_index(view.git_dir(), &index_entries);
             update_references(
@@ -139,6 +142,12 @@ pub fn handle_reset(ctx: &CliContext) {
                 effective_branch.as_deref(),
             );
         }
+    }
+
+    // The branch update logs the branch it rewrote; Git keeps the matching entry on HEAD too.
+    if let Some(previous) = previous_head.as_ref() {
+        let message = format!("reset: moving to {}", opts.target);
+        DiskRefStore::new(view.git_dir()).record_head_move(previous, &target_commit, &message);
     }
 
     print_reset_feedback(ctx, &opts, target_commit, effective_branch.as_deref());
@@ -167,6 +176,35 @@ fn parse_reset_options(args: &[String]) -> ResetOptions {
         mode,
         target,
         force,
+    }
+}
+
+/// Deletes files that only the index tracks, as `git reset --hard` does for staged additions.
+///
+/// A path staged but absent from both HEAD and the target commit has no history to rebuild it
+/// from, so leaving it behind would keep a file the reset claims to have discarded.
+fn remove_index_only_files(view: &RepoView, target_files: &BTreeMap<String, TreeEntry>) {
+    let Ok(Some(index)) = view.index() else {
+        return;
+    };
+    for entry in index.entries() {
+        if entry.stage != IndexStage::Normal || target_files.contains_key(&entry.path) {
+            continue;
+        }
+        let full_path = view.work_root().join(&entry.path);
+        if full_path.is_file() || full_path.is_symlink() {
+            let _ = fs::remove_file(&full_path);
+        }
+        let mut cursor = full_path.parent();
+        while let Some(parent) = cursor {
+            if parent == view.work_root() || !parent.starts_with(view.work_root()) {
+                break;
+            }
+            if fs::remove_dir(parent).is_err() {
+                break;
+            }
+            cursor = parent.parent();
+        }
     }
 }
 

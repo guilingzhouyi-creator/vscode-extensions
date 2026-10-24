@@ -425,6 +425,21 @@ impl RepoView {
         GitIndex::load(path).map(Some)
     }
 
+    /// Returns the index file's modification time in whole seconds since the Unix epoch.
+    ///
+    /// The value frames the racy window: an entry whose recorded timestamp is not older than this
+    /// was written in the same second the index was saved, so its stat cache cannot prove the
+    /// worktree file is unchanged. A missing index has no racy window and yields None.
+    pub fn index_file_timestamp(&self) -> Option<u64> {
+        let metadata = fs::metadata(self.git_dir.join("index")).ok()?;
+        metadata
+            .modified()
+            .ok()?
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .map(|elapsed| elapsed.as_secs())
+    }
+
     /// Loads the ignore rules that apply to this worktree.
     ///
     /// # Errors

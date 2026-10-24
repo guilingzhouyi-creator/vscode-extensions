@@ -34,7 +34,7 @@ use super::checkout::{
     update_references,
 };
 use super::commit_walk::parse_commit_record;
-use super::common::{fail_io, print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 use super::tree_view::{flatten_tree_for_diff, TreeEntry};
 
@@ -50,7 +50,7 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
     let target_rev = &ctx.args[0];
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     assert_worktree_cleanliness(&view, false);

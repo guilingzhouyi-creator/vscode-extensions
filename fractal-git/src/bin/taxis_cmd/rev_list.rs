@@ -19,7 +19,7 @@ use fractal_git::constants::cli::CliTag;
 use fractal_git::{CommitCounter, CommitTelemetryConfig, FractalRef, Oid, TelemetryCommitNode};
 
 use super::commit_walk::walk_commits;
-use super::common::{print_json, reject, CliContext};
+use super::common::{fail_fatal, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 
 /// Computes official commit counts using anti-inflation telemetry filters or prints commit OIDs.
@@ -96,7 +96,7 @@ pub fn handle_rev_list(ctx: &CliContext) {
 
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
     let head = match view.head_commit() {
         Ok(Some(head_oid)) => head_oid,

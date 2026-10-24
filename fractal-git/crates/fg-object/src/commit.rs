@@ -136,7 +136,9 @@ impl GitCommit {
     ///
     /// The header order (`tree`, then each `parent`, then `author`, then `committer`, then a blank
     /// line) is part of the object identity: reordering headers changes the object id even though
-    /// the parsed fields are identical.
+    /// the parsed fields are identical. The message is copied verbatim after the blank line, because
+    /// Git hashes exactly the bytes it read: appending a newline would change the object id for every
+    /// message that does not already end in one.
     fn serialize_commit_payload(
         tree_oid: &Oid,
         parent_oids: &[Oid],
@@ -162,7 +164,6 @@ impl GitCommit {
                 bytes.extend_from_slice(json_str.as_bytes());
             }
         }
-        bytes.push(b'\n');
         bytes
     }
 

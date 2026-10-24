@@ -47,10 +47,25 @@ impl PacketLine {
                 ))
             })?;
 
-            if len == 0 {
-                // Flush packet
-                bytes = &bytes[4..];
-                continue;
+            // Control packets carry no payload and must be consumed before the length check,
+            // otherwise a length of 1..=3 would drive the payload slice backwards and panic.
+            match len {
+                0 => {
+                    // Flush packet: end of the current section.
+                    bytes = &bytes[4..];
+                    continue;
+                }
+                1 | 2 => {
+                    // Delimiter (0001) and response-end (0002) packets carry no text.
+                    bytes = &bytes[4..];
+                    continue;
+                }
+                3 => {
+                    return Err(FractalError::ObjectCodec(
+                        "Reserved pkt-line length '0003' has no defined meaning".into(),
+                    ));
+                }
+                _ => {}
             }
 
             if bytes.len() < len {

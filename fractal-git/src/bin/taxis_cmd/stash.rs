@@ -30,7 +30,7 @@ use fractal_git::{DiskRefStore, RefStore};
 
 use super::checkout::{materialize_files, remove_stale_files, update_dirc_index};
 use super::commit_walk::parse_commit_record;
-use super::common::{fail_io, print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 use super::status::collect_status;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff};
@@ -40,7 +40,7 @@ pub fn handle_stash(ctx: &CliContext) {
     let subcmd = ctx.args.first().map(|s| s.as_str()).unwrap_or("push");
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     match subcmd {

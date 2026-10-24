@@ -15,17 +15,16 @@
 //! - `FGT-OBJ-001`: Git object model serialization guard
 //! - `FGT-STO-001`: Storage layer crash safety guard
 
-use std::fs;
-
 use fg_core::constants::git::OBJ_TAG;
-use fg_core::models::{GitSignature, ObjectKind, Oid};
+use fg_core::models::{GitSignature, Oid};
 use fg_core::traits::OdbStore;
 use fg_object::GitTag;
 use fg_storage::LooseOdb;
 use fractal_git::constants::cli::CliTag;
+use fractal_git::fractal::refs::validate_ref_name;
 use fractal_git::{DiskRefStore, RefStore};
 
-use super::common::{fail_io, print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 
 /// Options for `taxis tag`.
@@ -43,7 +42,7 @@ pub fn handle_tag(ctx: &CliContext) {
     let opts = parse_tag_options(&ctx.args);
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     let Some(ref tag_name) = opts.name else {
@@ -59,6 +58,10 @@ pub fn handle_tag(ctx: &CliContext) {
         return;
     }
 
+    if tag_name == "HEAD" || validate_ref_name(&format!("refs/tags/{tag_name}")).is_err() {
+        fail_fatal(format!("'{tag_name}' is not a valid tag name."));
+    }
+
     let target_oid = match view.resolve(&opts.target) {
         Ok(oid) => oid,
         Err(err) => reject(
@@ -71,10 +74,7 @@ pub fn handle_tag(ctx: &CliContext) {
     let tag_ref = format!("refs/tags/{tag_name}");
 
     if ref_store.get_ref(&tag_ref).is_ok_and(|opt| opt.is_some()) {
-        reject(
-            CliTag::ERROR,
-            format!("fatal: tag '{tag_name}' already exists"),
-        );
+        fail_fatal(format!("tag '{tag_name}' already exists"));
     }
 
     if opts.annotated {
@@ -162,15 +162,19 @@ fn list_all_tags(view: &RepoView, ctx: &CliContext) {
     }
 }
 
-/// Deletes an existing tag reference.
+/// Deletes an existing tag reference, whether it is stored loose or only in `packed-refs`.
 fn delete_tag(view: &RepoView, tag_name: &str, ctx: &CliContext) {
-    let tag_file = view.git_dir().join("refs/tags").join(tag_name);
-    if !tag_file.is_file() {
-        reject(CliTag::ERROR, format!("error: tag '{tag_name}' not found."));
-    }
+    let ref_store = DiskRefStore::new(view.git_dir());
+    let tag_ref = format!("refs/tags/{tag_name}");
+    let existing_oid = match ref_store.get_ref(&tag_ref) {
+        Ok(Some(oid)) => oid,
+        _ => reject(CliTag::ERROR, format!("error: tag '{tag_name}' not found.")),
+    };
 
-    if let Err(err) = fs::remove_file(&tag_file) {
-        fail_io(format!("delete tag '{tag_name}'"), err);
+    match ref_store.delete_ref(&tag_ref) {
+        Ok(true) => {}
+        Ok(false) => reject(CliTag::ERROR, format!("error: tag '{tag_name}' not found.")),
+        Err(delete_err) => fail_fatal(format!("delete tag '{tag_name}': {delete_err}")),
     }
 
     if ctx.json_mode {
@@ -179,9 +183,14 @@ fn delete_tag(view: &RepoView, tag_name: &str, ctx: &CliContext) {
             "operation": "tag",
             "status": "deleted",
             "tag": tag_name,
+            "deleted_oid": existing_oid.to_hex(),
         }));
     } else {
-        println!("Deleted tag '{tag_name}'");
+        println!(
+            "Deleted tag '{}' (was {})",
+            tag_name,
+            &existing_oid.to_hex()[..7]
+        );
     }
 }
 
@@ -220,10 +229,20 @@ fn create_annotated_tag(
     let timestamp_sec = chrono::Utc::now().timestamp();
     let tagger = GitSignature::new("Taxis Operator", "operator@taxis.internal", timestamp_sec);
     let msg = opts.message.as_deref().unwrap_or(tag_name);
+    let target_kind = match view.object(&target_oid) {
+        Ok(object) => object.kind,
+        Err(kind_err) => reject(
+            CliTag::ERROR,
+            format!(
+                "cannot read tag target '{}': {kind_err}",
+                target_oid.to_hex()
+            ),
+        ),
+    };
 
     let tag_obj = GitTag {
         target_oid,
-        target_kind: ObjectKind::Commit,
+        target_kind,
         name: tag_name.to_string(),
         tagger: Some(tagger),
         message: format!("{msg}\n"),

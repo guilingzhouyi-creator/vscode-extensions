@@ -14,14 +14,15 @@
 //! - `FGT-GAT-001`: Fractal Git domain gate guard
 //! - `FGT-TOP-001`: DAG topology traversal guard
 
-use std::fs;
-
+use fg_algorithms::traverse::DagWalker;
 use fg_native::sections::refs::RefRecord;
 use fg_native::RepoDocument;
 use fractal_git::constants::cli::CliTag;
-use fractal_git::{DiskRefStore, FractalRef, RefStore, TopologyVerifier};
+use fractal_git::fractal::refs::validate_ref_name;
+use fractal_git::{DiskRefStore, FractalRef, Oid, RefStore, TopologyVerifier};
 
-use super::common::{print_json, reject, CliContext};
+use super::commit_walk::parse_commit_record;
+use super::common::{fail_fatal, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 
 /// Options for branch subcommands.
@@ -46,7 +47,7 @@ pub fn handle_branch(ctx: &CliContext) {
 
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     if let Some((old_name, new_name)) = opts.rename {
@@ -153,11 +154,8 @@ fn verify_branch_merge(src: &str, dst: &str) {
 
 /// Creates a new branch reference pointing to the specified start point (or HEAD).
 fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &CliContext) {
-    if name.is_empty() || name.contains(' ') || name.contains('~') || name.contains('^') {
-        reject(
-            CliTag::ERROR,
-            format!("fatal: '{name}' is not a valid branch name."),
-        );
+    if name == "HEAD" || validate_ref_name(&format!("refs/heads/{name}")).is_err() {
+        fail_fatal(format!("'{name}' is not a valid branch name"));
     }
 
     let target_oid = match start_point {
@@ -216,7 +214,7 @@ fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &C
 }
 
 /// Deletes a local branch.
-fn delete_branch(view: &RepoView, name: &str, _force: bool, ctx: &CliContext) {
+fn delete_branch(view: &RepoView, name: &str, force: bool, ctx: &CliContext) {
     let current_branch = view.head_branch().ok().flatten();
     if let Some((curr, _)) = current_branch {
         if curr == name {
@@ -230,18 +228,31 @@ fn delete_branch(view: &RepoView, name: &str, _force: bool, ctx: &CliContext) {
         }
     }
 
-    let git_dir = view.git_dir();
     let full_ref = format!("refs/heads/{name}");
-    let ref_store = DiskRefStore::new(git_dir);
+    let ref_store = DiskRefStore::new(view.git_dir());
+    let git_dir = view.git_dir();
 
     let existing_oid = match ref_store.get_ref(&full_ref) {
         Ok(Some(oid)) => oid,
-        _ => reject(CliTag::ERROR, format!("error: branch '{name}' not found.")),
+        _ => reject(CliTag::ERROR, format!("error: branch '{name}' not found")),
     };
 
-    // Remove loose ref file
-    let loose_ref_path = git_dir.join("refs").join("heads").join(name);
-    let _ = fs::remove_file(loose_ref_path);
+    // Git refuses to drop a branch whose commits no other reference reaches unless it is forced.
+    if !force && !is_branch_merged_into_head(view, &existing_oid) {
+        reject(
+            CliTag::ERROR,
+            format!(
+                "error: the branch '{name}' is not fully merged\nhint: If you are sure you want to delete it, run 'git branch -D {name}'\nhint: Disable this message with \"git config set advice.forceDeleteBranch false\""
+            ),
+        );
+    }
+
+    // Remove the loose file, the packed entry, and the branch reflog in one step.
+    match ref_store.delete_ref(&full_ref) {
+        Ok(true) => {}
+        Ok(false) => reject(CliTag::ERROR, format!("error: branch '{name}' not found")),
+        Err(delete_err) => fail_fatal(format!("delete branch '{name}': {delete_err}")),
+    }
 
     // Remove from native container if present
     let container_path = fg_native::container_path(git_dir);
@@ -267,9 +278,27 @@ fn delete_branch(view: &RepoView, name: &str, _force: bool, ctx: &CliContext) {
         println!(
             "Deleted branch {} (was {}).",
             name,
-            &existing_oid.to_hex()[..8]
+            &existing_oid.to_hex()[..7]
         );
     }
+}
+
+/// Reports whether `branch_oid` is reachable from HEAD, matching `git branch -d`'s check.
+///
+/// A branch that is already reachable from HEAD only removes worktree rows that can be rebuilt
+/// from the surviving history, so Git deletes it without `-D`; every other branch is refused.
+fn is_branch_merged_into_head(view: &RepoView, branch_oid: &Oid) -> bool {
+    let Some(head_oid) = view.head_commit().ok().flatten() else {
+        return false;
+    };
+    let mut parents_of = |oid: &Oid| -> Vec<Oid> {
+        view.object(oid)
+            .ok()
+            .and_then(|object| parse_commit_record(*oid, &object.payload).ok())
+            .map(|record| record.parents)
+            .unwrap_or_default()
+    };
+    DagWalker::is_ancestor(branch_oid, &head_oid, &mut parents_of)
 }
 
 /// Renames a branch reference.
@@ -302,8 +331,15 @@ fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &
         );
     }
 
-    let _ = ref_store.update_ref(&new_full_ref, &oid, None);
-    let _ = fs::remove_file(git_dir.join("refs").join("heads").join(&effective_old));
+    let rename_message = format!("Branch: renamed {old_full_ref} to {new_full_ref}");
+    if let Err(write_err) =
+        ref_store.update_ref_with_message(&new_full_ref, &oid, None, &rename_message)
+    {
+        fail_fatal(format!("rename branch '{new_name}': {write_err}"));
+    }
+    if let Err(delete_err) = ref_store.delete_ref(&old_full_ref) {
+        fail_fatal(format!("rename branch '{effective_old}': {delete_err}"));
+    }
 
     // If active branch was renamed, update HEAD
     if let Ok(Some((curr, _))) = view.head_branch() {

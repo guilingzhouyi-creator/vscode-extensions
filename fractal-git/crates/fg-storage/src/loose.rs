@@ -97,10 +97,12 @@ impl LooseOdb {
             fs::create_dir_all(parent)?;
         }
 
-        // Compress raw object payload with zlib default compression
+        // Compress with zlib level 1: Git writes loose objects at Z_BEST_SPEED. The level is matched
+        // for speed and usual stream parity, but the emitted bytes are still implementation-defined
+        // (flate2 uses miniz_oxide, Git links zlib), so object identity must never depend on them.
         let initial_comp_cap = (raw_payload.len() / 2 + 64).max(256);
         let mut encoder =
-            ZlibEncoder::new(Vec::with_capacity(initial_comp_cap), Compression::default());
+            ZlibEncoder::new(Vec::with_capacity(initial_comp_cap), Compression::new(1));
         encoder.write_all(raw_payload)?;
         let compressed = encoder.finish()?;
 

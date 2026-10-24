@@ -3,7 +3,14 @@
 
 use fractal_git::core::models::FileMode;
 use fractal_git::core::models::Oid;
-use fractal_git::index::{ConflictStageSlot, InMemoryIndexTree, IndexStage};
+use fractal_git::index::index_file::IndexStat;
+use fractal_git::index::{
+    encode_dirc_v2, write_dirc_v2, ConflictStageSlot, GitIndex, InMemoryIndexTree, IndexEntry,
+    IndexStage,
+};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[test]
 fn test_in_memory_index_tree_clean_workflow() {
@@ -270,4 +277,246 @@ fn test_sparse_directory_collapsing_and_reconstruction() {
 
     assert_eq!(vendor_child.mode, FileMode::Directory);
     assert_eq!(vendor_child.oid, vendor_subtree_oid);
+}
+
+/// Returns whether a `git` executable is on `PATH`; differential tests skip without one.
+fn git_available() -> bool {
+    Command::new("git")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+/// Runs `git` in `repo` and returns its raw output.
+fn run_git(repo: &Path, args: &[&str]) -> std::process::Output {
+    Command::new("git")
+        .current_dir(repo)
+        .args(args)
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .output()
+        .expect("git should be runnable when it is on PATH")
+}
+
+/// Runs `git` in `repo` and returns stdout, asserting success.
+fn git_stdout(repo: &Path, args: &[&str]) -> String {
+    let output = run_git(repo, args);
+    assert!(
+        output.status.success(),
+        "git {args:?} failed: stdout={} stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).expect("git stdout should be UTF-8")
+}
+
+/// Builds one stage-0 regular-file entry for checksum fixtures.
+fn sample_entry(path: &str, seed: u8) -> IndexEntry {
+    IndexEntry {
+        path: path.to_string(),
+        mode: FileMode::RegularFile,
+        oid: Oid::from_bytes([seed; 20]),
+        stage: IndexStage::Normal,
+        size: 12,
+        mtime_seconds: 1_700_000_000,
+        mtime_nanos: 0,
+        assume_valid: false,
+        skip_worktree: false,
+        intent_to_add: false,
+    }
+}
+
+/// Parses an index that Git itself wrote with `--index-version 4` and cross-checks every entry
+/// against `git ls-files --stage`.
+#[test]
+fn parses_a_real_git_version_four_index() {
+    if !git_available() {
+        eprintln!("skipping: git is not on PATH");
+        return;
+    }
+    let workspace = tempfile::TempDir::new().expect("temp dir");
+    let repo = workspace.path();
+    git_stdout(repo, &["init", "-q"]);
+    fs::create_dir_all(repo.join("dir").join("nested")).expect("nested dirs");
+    fs::write(repo.join("dir").join("alpha.txt"), b"alpha\n").expect("alpha");
+    fs::write(repo.join("dir").join("alpha2.txt"), b"alpha2\n").expect("alpha2");
+    fs::write(repo.join("dir").join("nested").join("beta.txt"), b"beta\n").expect("beta");
+    fs::write(repo.join("zeta.txt"), b"zeta\n").expect("zeta");
+    git_stdout(repo, &["add", "-A"]);
+    git_stdout(repo, &["update-index", "--index-version", "4"]);
+
+    let index_path = repo.join(".git").join("index");
+    let index = GitIndex::load(&index_path).expect("a Git-written version 4 index must parse");
+    assert_eq!(index.version(), 4);
+
+    let expected = git_stdout(repo, &["ls-files", "--stage"]);
+    let expected_lines: Vec<&str> = expected.lines().collect();
+    assert_eq!(index.entries().len(), expected_lines.len());
+    for (entry, line) in index.entries().iter().zip(expected_lines.iter()) {
+        let (metadata, path) = line.split_once('\t').expect("stage line carries a path");
+        let mut fields = metadata.split(' ');
+        let mode = fields.next().expect("mode column");
+        let oid = fields.next().expect("oid column");
+        let stage = fields.next().expect("stage column");
+        assert_eq!(path, entry.path, "path round-tripped through the v4 varint");
+        assert_eq!(mode, format!("{:o}", entry.mode.to_u32()));
+        assert_eq!(oid, entry.oid.to_hex());
+        assert_eq!(stage, entry.stage.to_u8().to_string());
+    }
+}
+
+/// A held `index.lock` must block writing instead of silently overwriting the index.
+#[test]
+fn refuses_to_write_when_the_index_lock_exists() {
+    let workspace = tempfile::TempDir::new().expect("temp dir");
+    let index_path = workspace.path().join("index");
+    fs::write(
+        workspace.path().join("index.lock"),
+        b"held by another writer\n",
+    )
+    .expect("lock");
+    let error = write_dirc_v2(&index_path, &[]).expect_err("a held lock must block the write");
+    let message = error.to_string();
+    assert!(
+        message.contains("index.lock"),
+        "the error should name the lock file, got: {message}"
+    );
+    assert!(
+        !index_path.exists(),
+        "a blocked write must not publish an index"
+    );
+}
+
+/// A modified trailing checksum or body byte must be rejected, not parsed as a valid index.
+#[test]
+fn rejects_an_index_whose_checksum_or_body_was_modified() {
+    let entries = vec![sample_entry("a.txt", 7)];
+
+    let mut flipped_checksum = encode_dirc_v2(&entries).expect("encode");
+    let last = flipped_checksum.len() - 1;
+    flipped_checksum[last] ^= 0xff;
+    assert!(
+        GitIndex::parse(flipped_checksum, PathBuf::from("index")).is_err(),
+        "the trailing SHA-1 must be verified"
+    );
+
+    let mut flipped_body = encode_dirc_v2(&entries).expect("encode");
+    flipped_body[75] ^= 0x01;
+    assert!(
+        GitIndex::parse(flipped_body, PathBuf::from("index")).is_err(),
+        "a flipped body byte must break the trailing SHA-1"
+    );
+
+    let mut truncated = encode_dirc_v2(&entries).expect("encode");
+    truncated.pop();
+    assert!(
+        GitIndex::parse(truncated, PathBuf::from("index")).is_err(),
+        "an index shorter than its checksum must be rejected"
+    );
+}
+
+/// Writes an index ourselves in version 4 and confirms Git itself reads it back.
+#[test]
+fn git_reads_a_version_four_index_this_crate_wrote() {
+    if !git_available() {
+        eprintln!("skipping: git is not on PATH");
+        return;
+    }
+    let workspace = tempfile::TempDir::new().expect("temp dir");
+    let repo = workspace.path();
+    git_stdout(repo, &["init", "-q"]);
+    fs::create_dir_all(repo.join("dir")).expect("dir");
+    fs::write(repo.join("dir").join("alpha.txt"), b"alpha\n").expect("alpha");
+    fs::write(repo.join("dir").join("alpha2.txt"), b"alpha2\n").expect("alpha2");
+    fs::write(repo.join("zeta.txt"), b"zeta\n").expect("zeta");
+    git_stdout(repo, &["add", "-A"]);
+
+    let index_path = repo.join(".git").join("index");
+    let expected = git_stdout(repo, &["ls-files", "--stage"]);
+    let parsed = GitIndex::load(&index_path).expect("load the Git-written index");
+    let rewritten = GitIndex::new(index_path.clone(), 4, parsed.entries().to_vec())
+        .with_metadata(parsed.stats().to_vec(), parsed.extensions().to_vec());
+    rewritten
+        .write()
+        .expect("write a version 4 index this crate built");
+
+    let bytes = fs::read(&index_path).expect("read the index back");
+    assert_eq!(
+        &bytes[4..8],
+        &4u32.to_be_bytes(),
+        "the header must declare version 4"
+    );
+    let reparsed = GitIndex::load(&index_path).expect("reparse the version 4 index");
+    assert_eq!(reparsed.version(), 4);
+    assert_eq!(reparsed.entries().len(), parsed.entries().len());
+    assert_eq!(
+        git_stdout(repo, &["ls-files", "--stage"]),
+        expected,
+        "git must read the same entries out of the version 4 index"
+    );
+    let status = git_stdout(repo, &["status", "--porcelain"]);
+    assert_eq!(
+        status.lines().count(),
+        expected.lines().count(),
+        "git must report the same staged paths out of the version 4 index"
+    );
+}
+
+/// A version 2 rewrite keeps the caller-supplied stat words and the parsed extension records.
+#[test]
+fn version_two_rewrite_round_trips_stat_words_and_extensions() {
+    if !git_available() {
+        eprintln!("skipping: git is not on PATH");
+        return;
+    }
+    let workspace = tempfile::TempDir::new().expect("temp dir");
+    let repo = workspace.path();
+    git_stdout(repo, &["init", "-q"]);
+    fs::create_dir_all(repo.join("dir")).expect("dir");
+    fs::write(repo.join("dir").join("alpha.txt"), b"alpha\n").expect("alpha");
+    fs::write(repo.join("zeta.txt"), b"zeta\n").expect("zeta");
+    git_stdout(repo, &["add", "-A"]);
+
+    let index_path = repo.join(".git").join("index");
+    let parsed = GitIndex::load(&index_path).expect("load the Git-written index");
+    assert_eq!(parsed.version(), 2);
+    assert_eq!(parsed.stats().len(), parsed.entries().len());
+
+    // The writer is a function of the sidecar it is handed, not of the host platform.
+    let supplied: Vec<IndexStat> = parsed
+        .entries()
+        .iter()
+        .map(|_| IndexStat {
+            ctime_seconds: 11,
+            ctime_nanos: 22,
+            dev: 33,
+            ino: 44,
+            uid: 55,
+            gid: 66,
+        })
+        .collect();
+    let encoded = GitIndex::new(
+        PathBuf::from("synthetic-index"),
+        2,
+        parsed.entries().to_vec(),
+    )
+    .with_metadata(supplied.clone(), Vec::new())
+    .encode()
+    .expect("encode");
+    let reparsed =
+        GitIndex::parse(encoded, PathBuf::from("synthetic-index")).expect("parse the encoding");
+    assert_eq!(
+        reparsed.stats(),
+        supplied.as_slice(),
+        "the stat sidecar must survive an encode and parse"
+    );
+
+    // Rewriting the real file preserves what Git recorded and stays readable by Git.
+    let expected = git_stdout(repo, &["ls-files", "--stage"]);
+    parsed.write().expect("rewrite the version 2 index");
+    let reloaded = GitIndex::load(&index_path).expect("reload the rewritten index");
+    assert_eq!(reloaded.stats(), parsed.stats());
+    assert_eq!(reloaded.extensions(), parsed.extensions());
+    assert_eq!(git_stdout(repo, &["ls-files", "--stage"]), expected);
 }

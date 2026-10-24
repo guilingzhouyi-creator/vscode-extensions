@@ -127,9 +127,14 @@ pub fn handle_commit(ctx: &CliContext) {
         } else {
             (0, 0, 0)
         };
+        let mode = materialized
+            .modes
+            .get(i)
+            .copied()
+            .unwrap_or(FileMode::RegularFile);
         index_entries.push(IndexEntry {
             path: path.clone(),
-            mode: FileMode::RegularFile,
+            mode,
             oid: blob_oid,
             stage: IndexStage::Normal,
             size,
@@ -141,7 +146,7 @@ pub fn handle_commit(ctx: &CliContext) {
         });
         let _ = native_indx.upsert(NativeIndexEntry {
             path: path.clone(),
-            mode: FileMode::RegularFile,
+            mode,
             oid: blob_oid,
             stage: IndexStage::Normal,
             stat: StatCache {

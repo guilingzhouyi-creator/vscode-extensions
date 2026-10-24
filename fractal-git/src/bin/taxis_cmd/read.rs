@@ -26,7 +26,7 @@ use fractal_git::constants::cli::CliTag;
 
 use std::path::Path;
 
-use super::common::{print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_usage, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 
 /// NUL byte, used as the record separator in every `-z` form.
@@ -42,22 +42,31 @@ const DEFAULT_FOR_EACH_REF_FORMAT: &str = "%(objectname) %(objecttype)\t%(refnam
 /// Dispatches `cat-file`.
 ///
 /// Accepted forms: `cat-file -t <rev>`, `cat-file -s <rev>`, `cat-file -p <rev>`,
-/// `cat-file <type> <rev>`, and the batch form `cat-file --batch`.
+/// `cat-file -e <rev>`, `cat-file <type> <rev>`, and the streaming forms `cat-file --batch` and
+/// `cat-file --batch-check`. A custom `--batch=<format>` is rejected rather than approximated: the
+/// placeholder language is broad, and a wrong column is worse than a clear refusal.
 pub fn handle_cat_file(ctx: &CliContext) {
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     let mut mode = CatFileMode::Pretty;
     let mut expect_type: Option<String> = None;
     let mut revision: Option<String> = None;
+    let mut batch: Option<BatchMode> = None;
     for argument in &ctx.args {
         match argument.as_str() {
             "-t" => mode = CatFileMode::Type,
             "-s" => mode = CatFileMode::Size,
             "-p" => mode = CatFileMode::Pretty,
             "-e" => mode = CatFileMode::Exists,
+            "--batch" => batch = Some(BatchMode::Contents),
+            "--batch-check" => batch = Some(BatchMode::Check),
+            other if other.starts_with("--batch=") => reject(
+                CliTag::ERROR,
+                format!("cat-file does not implement the custom batch format in '{other}'"),
+            ),
             other if other.starts_with('-') => reject(
                 CliTag::ERROR,
                 format!("cat-file does not support the flag '{other}'"),
@@ -77,9 +86,13 @@ pub fn handle_cat_file(ctx: &CliContext) {
         }
     }
 
+    if let Some(batch_mode) = batch {
+        run_batch(&view, batch_mode);
+    }
+
     let revision = match revision {
         Some(value) => value,
-        None => reject(CliTag::ERROR, "cat-file requires a revision"),
+        None => fail_usage("taxis cat-file (-t | -s | -p | -e) <object>"),
     };
     let resolved = match view.resolve(&revision) {
         Ok(oid) => oid,
@@ -137,6 +150,56 @@ enum CatFileMode {
     Exists,
 }
 
+/// Which batch answer `cat-file` streams for each stdin line.
+enum BatchMode {
+    /// `--batch`: id, type, size, then the payload.
+    Contents,
+    /// `--batch-check`: id, type, and size only.
+    Check,
+}
+
+/// Streams batch answers for every revision read from stdin.
+///
+/// Git keeps the process alive and answers line by line, reporting `<input> missing` for anything
+/// that does not resolve instead of failing the whole run. A one-shot lookup cannot express that: a
+/// caller feeding a hundred revisions expects ninety-nine answers and one diagnosis, not an abort.
+fn run_batch(view: &RepoView, mode: BatchMode) -> ! {
+    use std::io::{BufRead, Write};
+    let stdin = std::io::stdin();
+    let stdout = std::io::stdout();
+    let mut sink = stdout.lock();
+    for line in stdin.lock().lines() {
+        let Ok(line) = line else { break };
+        let request = line.trim();
+        if request.is_empty() {
+            continue;
+        }
+        let Ok(oid) = view.resolve(request) else {
+            let _ = writeln!(sink, "{request} missing");
+            continue;
+        };
+        let Ok(object) = view.object(&oid) else {
+            let _ = writeln!(sink, "{request} missing");
+            continue;
+        };
+        let _ = writeln!(
+            sink,
+            "{} {} {}",
+            oid.to_hex(),
+            object.kind.as_str(),
+            object.payload.len()
+        );
+        if matches!(mode, BatchMode::Contents) {
+            let _ = sink.write_all(&object.payload);
+            // Git always closes a batch payload with a newline, even when the payload already ends
+            // with one. That unconditional terminator is what lets a reader find the next header.
+            let _ = sink.write_all(b"\n");
+        }
+    }
+    let _ = sink.flush();
+    std::process::exit(0)
+}
+
 /// Reports whether `text` names one of the four object types.
 fn is_object_type_name(text: &str) -> bool {
     matches!(text, "blob" | "tree" | "commit" | "tag")
@@ -187,7 +250,7 @@ fn object_kind_of(mode: fg_core::models::FileMode) -> ObjectKind {
 pub fn handle_ls_tree(ctx: &CliContext) {
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     let mut recursive = false;
@@ -238,7 +301,12 @@ pub fn handle_ls_tree(ctx: &CliContext) {
         include_trees: include_trees || trees_only || !recursive,
     };
 
-    let revision = revision.unwrap_or_else(|| "HEAD".to_string());
+    // Git requires the tree-ish explicitly: `git ls-tree` exits 129 with a usage line. Defaulting
+    // to HEAD invents a listing for an argument the caller never supplied, and a script that
+    // misspelled the revision would read the wrong tree without noticing.
+    let Some(revision) = revision else {
+        fail_usage("taxis ls-tree [<options>] <tree-ish> [<path>...]");
+    };
     let (_, tree_oid) = match view.resolve_tree(&revision) {
         Ok(pair) => pair,
         Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
@@ -397,12 +465,13 @@ fn write_record(
 
 /// Dispatches `ls-files`.
 ///
-/// Supports `-s` (mode, id, stage), `-z`, `-c` (cached, the default), `-d`/`-m`/`-o` as accepted
-/// no-ops that still produce cached output, and `--stage`.
+/// Supports `-s` (mode, id, stage), `-z`, `-c` (cached, the default), and `--stage`. The worktree-side
+/// selectors (`-d`, `-m`, `-o`, `-u`) are not implemented; they are rejected rather than silently
+/// mapped onto cached output, which would answer a different question than the caller asked.
 pub fn handle_ls_files(ctx: &CliContext) {
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
     let mut show_stage = false;
     let mut nul_terminated = false;
@@ -421,20 +490,19 @@ pub fn handle_ls_files(ctx: &CliContext) {
         }
     }
 
+    // Git lists nothing and exits 0 when the index is missing; that is the state of a freshly
+    // initialised repository, and callers run `ls-files` there routinely. Reporting an error turns
+    // an empty answer into a broken pipeline.
     let index = match view.index() {
-        Ok(Some(loaded)) => loaded,
-        Ok(None) => reject(
-            CliTag::ERROR,
-            format!(
-                "no index at '{}'; the repository has nothing staged",
-                view.git_dir().join("index").display()
-            ),
-        ),
+        Ok(loaded) => loaded,
         Err(load_err) => reject(CliTag::ERROR, load_err),
     };
+    let staged: &[fg_index::IndexEntry] = match &index {
+        Some(loaded) => loaded.entries(),
+        None => &[],
+    };
 
-    let mut entries: Vec<&fg_index::IndexEntry> = index
-        .entries()
+    let mut entries: Vec<&fg_index::IndexEntry> = staged
         .iter()
         .filter(|entry| {
             path_filters.is_empty()
@@ -506,11 +574,12 @@ pub fn handle_for_each_ref(ctx: &CliContext) {
 fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
     let mut format: Option<String> = None;
-    let mut pattern: Option<String> = None;
+    let mut patterns: Vec<String> = Vec::new();
     let mut verify_only = false;
+    let mut include_head = false;
     let mut namespace: Option<&str> = None;
 
     for argument in &ctx.args {
@@ -520,19 +589,22 @@ fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
         }
         match argument.as_str() {
             "--verify" => verify_only = true,
-            "--head" => {}
+            // `--head` exists on `show-ref` only. `for-each-ref --head` is an unknown option in Git
+            // (exit 129), so accepting it here would quietly change what the caller sees.
+            "--head" if !is_for_each_ref => include_head = true,
             // `--heads`, `--tags`, and `--branches` restrict the listing to one namespace. They are
             // not cosmetic: a repository that keeps `refs/original/*` backups (what `git filter-branch`
             // leaves behind) lists those under a bare `show-ref` but must not list them under
             // `--heads`, because that backup namespace is not a branch.
             "--heads" | "--branches" => namespace = Some("refs/heads/"),
             "--tags" => namespace = Some("refs/tags/"),
-            other if other.starts_with('-') => {}
+            "--" => {}
+            other if other.starts_with('-') => reject_unknown_ref_option(other, is_for_each_ref),
             other => {
                 if format.is_none() && other.starts_with("%(") {
                     format = Some(other.to_string());
-                } else if pattern.is_none() {
-                    pattern = Some(other.to_string());
+                } else {
+                    patterns.push(other.to_string());
                 }
             }
         }
@@ -541,7 +613,7 @@ fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
         format = Some(DEFAULT_FOR_EACH_REF_FORMAT.to_string());
     }
 
-    let mut refs: Vec<(String, Oid)> = match view_references(&view, pattern.as_deref()) {
+    let mut refs: Vec<(String, Oid)> = match view_references(&view, &patterns) {
         Ok(listed) => listed,
         Err(list_err) => reject(CliTag::ERROR, list_err),
     };
@@ -550,11 +622,15 @@ fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
     }
     refs.sort_by(|left, right| left.0.cmp(&right.0));
 
-    if verify_only && refs.is_empty() {
-        reject(
-            CliTag::ERROR,
-            "show-ref --verify found no matching reference",
-        );
+    if verify_only {
+        refs = verify_exact_refs(&refs, &patterns);
+    }
+    if include_head {
+        match view.head_commit() {
+            Ok(Some(head_oid)) => refs.insert(0, ("HEAD".to_string(), head_oid)),
+            Ok(None) => {}
+            Err(head_err) => fail_fatal(head_err),
+        }
     }
 
     if ctx.json_mode {
@@ -594,16 +670,59 @@ fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
     }
 }
 
-/// Lists references, optionally filtered by a prefix.
-fn view_references(view: &RepoView, pattern: Option<&str>) -> FractalResult<Vec<(String, Oid)>> {
+/// Lists references, optionally filtered by one or more patterns.
+///
+/// Git matches a pattern against the full reference name and against its tail, which is why
+/// `show-ref main` finds `refs/heads/main`. Several patterns are a union, not an intersection; a
+/// caller that passes both `main` and a tag name expects both rows.
+fn view_references(view: &RepoView, patterns: &[String]) -> FractalResult<Vec<(String, Oid)>> {
     let store = fg_topology::DiskRefStore::new(view.git_dir());
     let mut listed = store.list_all()?;
-    if let Some(prefix) = pattern {
-        if !prefix.is_empty() {
-            listed.retain(|(name, _)| name == prefix || name.starts_with(&format!("{prefix}/")));
-        }
+    if !patterns.is_empty() {
+        listed.retain(|(name, _)| {
+            patterns
+                .iter()
+                .any(|pattern| reference_matches(name, pattern))
+        });
     }
     Ok(listed)
+}
+
+/// Reports whether `name` matches one `show-ref` pattern.
+fn reference_matches(name: &str, pattern: &str) -> bool {
+    pattern.is_empty() || name == pattern || name.ends_with(&format!("/{pattern}"))
+}
+
+/// Restricts a listing to the references named exactly.
+///
+/// `show-ref --verify` matches no patterns: the argument must be the full reference name. Git exits
+/// 128 with `not a valid ref` otherwise, and callers rely on that to tell a typo from an absent
+/// reference, so a prefix match here would report success for a name that does not exist.
+fn verify_exact_refs(refs: &[(String, Oid)], patterns: &[String]) -> Vec<(String, Oid)> {
+    if patterns.is_empty() {
+        fail_usage("taxis show-ref --verify [--head] [--] <ref>...");
+    }
+    let mut verified = Vec::with_capacity(patterns.len());
+    for pattern in patterns {
+        match refs.iter().find(|(name, _)| name == pattern) {
+            Some(found) => verified.push(found.clone()),
+            None => fail_fatal(format!("'{pattern}' - not a valid ref")),
+        }
+    }
+    verified
+}
+
+/// Rejects an option the reference listing does not implement.
+///
+/// Git exits 129 with its usage text. Ignoring the option would print a listing that looks complete
+/// while dropping the restriction the caller asked for.
+fn reject_unknown_ref_option(option: &str, is_for_each_ref: bool) -> ! {
+    eprintln!("error: unknown option `{}`", option.trim_start_matches('-'));
+    if is_for_each_ref {
+        fail_usage("taxis for-each-ref [--format=<format>] [<pattern>...]")
+    } else {
+        fail_usage("taxis show-ref [--head] [--heads] [--tags] [--] [<pattern>...]")
+    }
 }
 
 /// Substitutes the `%(...)` placeholders `for-each-ref` supports.
@@ -675,7 +794,7 @@ fn resolve_ref_field(
 pub fn handle_check_ignore(ctx: &CliContext) {
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
     let mut verbose = false;
     let mut stdin_mode = false;
@@ -710,10 +829,7 @@ pub fn handle_check_ignore(ctx: &CliContext) {
     }
 
     if paths.is_empty() {
-        reject(
-            CliTag::ERROR,
-            "check-ignore requires at least one path argument or --stdin",
-        );
+        fail_fatal("no path specified");
     }
 
     let matcher = match view.ignore_matcher() {
@@ -815,7 +931,7 @@ fn report_check_ignore_json(
 
 #[cfg(test)]
 mod tests {
-    use super::{is_object_type_name, render_ref_format};
+    use super::{is_object_type_name, reference_matches, render_ref_format};
     use fg_core::models::Oid;
 
     /// Renders a format template without opening a repository.
@@ -860,5 +976,18 @@ mod tests {
         // Git exits 128 with "unknown field name"; an empty substitution would print a blank column
         // that a caller cannot distinguish from missing data.
         assert!(render_ref_format("%(nonesuch)", "refs/heads/main", &Oid::ZERO, "commit").is_err());
+    }
+
+    #[test]
+    fn recognises_a_reference_by_full_name_or_by_its_tail() {
+        assert!(reference_matches("refs/heads/main", "refs/heads/main"));
+        // `show-ref main` finds `refs/heads/main`: Git matches the tail of the full name, which is
+        // the form a person types, without letting a prefix match a neighbouring branch.
+        assert!(reference_matches("refs/heads/main", "main"));
+        // Git matches the tail of the full name, so a branch nested under another name still
+        // matches: `git show-ref main` lists both refs/heads/main and refs/heads/feature/main.
+        assert!(reference_matches("refs/heads/feature/main", "main"));
+        assert!(!reference_matches("refs/heads/mainline", "main"));
+        assert!(reference_matches("refs/tags/v1.0.0", "v1.0.0"));
     }
 }

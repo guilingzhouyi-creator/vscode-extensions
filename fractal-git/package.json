@@ -5,10 +5,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node ../auto-refactor/node_modules/typescript/bin/tsc -p tsconfig.json",
     "build:native": "cargo build --release",
     "gate:topology": "node scripts/common/validate-crate-topology.js",
-    "gate:parity": "node scripts/common/validate-git-parity.js",
+    "gate:parity": "node scripts/common/validate-git-parity.js --require-git",
     "gate:bridge": "node scripts/common/validate-gate-bridge.js",
     "gate:alloc": "node scripts/common/check-zero-alloc-boundary.js",
     "gate:perf": "node scripts/common/validate-perf-baseline.js",
@@ -18,7 +18,7 @@
     "review": "npm run audit",
     "test": "npm run test:ts",
     "test:rust": "cargo test --workspace",
-    "test:ts": "node --test dist/tests/ts/*.test.js"
+    "test:ts": "npm run build && node --test dist/tests/ts/*.test.js"
   },
   "keywords": [
     "git",

@@ -39,7 +39,7 @@ use super::checkout::{
     update_references,
 };
 use super::commit_walk::parse_commit_record;
-use super::common::{fail_io, print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
 
@@ -58,7 +58,7 @@ pub fn handle_merge(ctx: &CliContext) {
     let opts = parse_merge_options(&ctx.args);
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
-        Err(open_err) => reject(CliTag::ERROR, open_err),
+        Err(open_err) => fail_fatal(open_err),
     };
 
     if opts.abort {
@@ -312,9 +312,35 @@ fn execute_three_way_merge(
     let mut ours_files = BTreeMap::new();
     let mut theirs_files = BTreeMap::new();
 
-    let _ = flatten_tree_for_diff(view, &base_tree_oid, "", &mut base_files);
-    let _ = flatten_tree_for_diff(view, &ours_tree_oid, "", &mut ours_files);
-    let _ = flatten_tree_for_diff(view, &theirs_tree_oid, "", &mut theirs_files);
+    // A tree that cannot be read aborts the merge. Continuing with an empty map would compute a
+    // three-way merge against no base at all, which turns a corrupt object into silent data loss.
+    if let Err(read_err) = flatten_tree_for_diff(view, &base_tree_oid, "", &mut base_files) {
+        reject(
+            CliTag::ERROR,
+            format!(
+                "cannot read merge base tree {}: {read_err}",
+                base_tree_oid.to_hex()
+            ),
+        );
+    }
+    if let Err(read_err) = flatten_tree_for_diff(view, &ours_tree_oid, "", &mut ours_files) {
+        reject(
+            CliTag::ERROR,
+            format!(
+                "cannot read our tree {}: {read_err}",
+                ours_tree_oid.to_hex()
+            ),
+        );
+    }
+    if let Err(read_err) = flatten_tree_for_diff(view, &theirs_tree_oid, "", &mut theirs_files) {
+        reject(
+            CliTag::ERROR,
+            format!(
+                "cannot read their tree {}: {read_err}",
+                theirs_tree_oid.to_hex()
+            ),
+        );
+    }
 
     let base_map: BTreeMap<String, Oid> =
         base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
@@ -657,14 +683,15 @@ fn finish_conflicted_merge(
                 &c_ctx.opts.target,
             );
             merge_res.content
+        } else if conflict.ours_oid.is_some() {
+            // Modify/delete keeps the surviving side verbatim, without markers. Git leaves the
+            // worktree copy of the modified side untouched and records the conflict in the index,
+            // so an editor opening the file does not have to strip markers to get the real text.
+            ours_payload.clone()
+        } else if conflict.theirs_oid.is_some() {
+            theirs_payload.clone()
         } else {
-            let ours_str = String::from_utf8_lossy(&ours_payload);
-            let theirs_str = String::from_utf8_lossy(&theirs_payload);
-            format!(
-                "<<<<<<< HEAD\n{}=======\n{}>>>>>>> {}\n",
-                ours_str, theirs_str, c_ctx.opts.target
-            )
-            .into_bytes()
+            Vec::new()
         };
 
         let target_path = c_ctx.view.work_root().join(&conflict.path);

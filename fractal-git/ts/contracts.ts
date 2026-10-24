@@ -50,11 +50,29 @@ export interface FractalCommitMeta {
 }
 
 /**
+ * Full Git identity facts for one author or committer line.
+ */
+export interface GitSignature {
+    readonly name: string;
+    readonly email: string;
+    readonly timestampSec: number;
+    readonly tzOffset?: string;
+}
+
+/**
  * File descriptor staged for materialization from LayerVFS into Git.
+ *
+ * Regular, executable, and symlink entries carry the blob payload in `content` (a `120000`
+ * entry therefore carries the link target text). A `160000` gitlink entry instead carries the
+ * 40-character hexadecimal commit id of the submodule commit, and no blob object is written.
  */
 export interface StagedFileEntry {
     readonly path: string;
-    readonly mode: typeof GIT_FILE_MODE.REGULAR | typeof GIT_FILE_MODE.EXECUTABLE;
+    readonly mode:
+        | typeof GIT_FILE_MODE.REGULAR
+        | typeof GIT_FILE_MODE.EXECUTABLE
+        | typeof GIT_FILE_MODE.SYMLINK
+        | typeof GIT_FILE_MODE.GITLINK;
     readonly content: Uint8Array | string;
 }
 
@@ -68,6 +86,16 @@ export interface MaterializeCommitRequest {
     readonly message: string;
     readonly authorName: string;
     readonly authorEmail: string;
+    /**
+     * Full author identity override (name, email, timestamp, timezone). Falls back to
+     * `authorName`/`authorEmail` plus the current wall clock when omitted.
+     */
+    readonly authorSignature?: GitSignature;
+    /**
+     * Full committer identity override. Defaults to the resolved author signature, matching
+     * Git's behavior when author and committer coincide.
+     */
+    readonly committerSignature?: GitSignature;
     readonly agentMeta?: FractalCommitMeta;
 }
 

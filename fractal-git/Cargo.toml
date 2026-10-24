@@ -121,3 +121,11 @@ path = "tests/rust/test_governance_pipeline.rs"
 [[test]]
 name = "test_git_hooks"
 path = "tests/rust/test_git_hooks.rs"
+
+[[test]]
+name = "test_git_differential"
+path = "tests/rust/test_git_differential.rs"
+
+[[test]]
+name = "test_read_commands"
+path = "tests/rust/test_read_commands.rs"
