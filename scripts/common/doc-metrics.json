@@ -206,6 +206,20 @@
       "inline": "**{value} 个**"
     },
     {
+      "id": "overlap-cluster-count",
+      "title": "语义重叠聚类族数",
+      "source": "auto-refactor/src/core/rules/overlap-clusters.ts#OVERLAP_CLUSTERS",
+      "template": "**{value} 个语义重叠聚类族**",
+      "inline": "**{value} 个**"
+    },
+    {
+      "id": "overlap-member-count",
+      "title": "语义重叠聚类成员规则数（去重）",
+      "source": "auto-refactor/src/core/rules/overlap-clusters.ts#OVERLAP_CLUSTERS distinct members",
+      "template": "**{value} 条规则参与聚类**",
+      "inline": "**{value} 条**"
+    },
+    {
       "id": "rule-family-count",
       "title": "auto-refactor 受控规则族数",
       "source": "scripts/common/rule-catalog.json family field, project=auto-refactor",

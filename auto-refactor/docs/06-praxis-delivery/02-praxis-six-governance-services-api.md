@@ -38,7 +38,7 @@ flowchart TD
     
     subgraph Payloads["一体两面双载荷交付 (Dual-Faced Delivery)"]
         AGENT_FACE["Agent Face (机器面)<br/>• agentDirectives (CAPP DSL)<br/>• directivesMarkdown (LLM 提示词)<br/>• 100% 完整差分 AST"]
-        HUMAN_FACE["Human Face (人读 UI 面)<br/>• presentationPayload<br/>• 11 组并查集去重卡片 (PraxisDiagnosticCard)<br/>• dualFacedDiff (Badge & 视觉指标)"]
+        HUMAN_FACE["Human Face (人读 UI 面)<br/>• presentationPayload<br/>• <!-- METRICS:BEGIN overlap-cluster-count -->**11 个语义重叠聚类族**<!-- METRICS:END overlap-cluster-count -->并查集去重卡片 (PraxisDiagnosticCard)<br/>• dualFacedDiff (Badge & 视觉指标)"]
     end
     
     M1 --> Payloads

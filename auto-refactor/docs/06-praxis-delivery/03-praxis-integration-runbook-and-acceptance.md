@@ -69,29 +69,39 @@ async function executePraxisReview() {
 
 ---
 
-## 3. `SEMANTIC_OVERLAP_GROUPS` 并查集去重消费规范
+## 3. 语义重叠聚类拓扑与并查集去重消费规范
 
-在密集代码重构中，一个局部坏味道往往会并发触发 3~4 条相关规则（例如深层嵌套同时触发圈复杂度、卫语句缺失与扁平化建议）。为了消除开发者认知疲劳，[`semantic-correlation.ts`](../../src/core/praxis/presentation/semantic-correlation.ts) 维护了 **11 组语义重叠规则族**，并在表现层通过并查集算法聚合：
+在密集代码重构中，一个局部坏味道往往会并发触发 3~4 条相关规则（例如深层嵌套同时触发圈复杂度、卫语句缺失与扁平化建议）。为了消除开发者认知疲劳，聚类拓扑由规则层的单一真源宣告，表现层通过并查集算法聚合并派生消费：
 
-### 3.1 十一组语义重叠规则族权威清单
+- **真源**：[`overlap-clusters.ts`](../../src/core/rules/overlap-clusters.ts) 声明 <!-- METRICS:BEGIN overlap-cluster-count -->**11 个**<!-- METRICS:END overlap-cluster-count -->语义重叠聚类族，覆盖 <!-- METRICS:BEGIN overlap-member-count -->**23 条**<!-- METRICS:END overlap-member-count -->参与聚类的规则；
+- **表现层派生**：[`semantic-correlation.ts`](../../src/core/praxis/presentation/semantic-correlation.ts) 从真源投影出 `SEMANTIC_OVERLAP_GROUPS` 并执行并查集归并，不再自持一份聚类表；
+- **门禁看守**：`validate-rules-registry` 断言聚类成员均为已登记规则，且聚类键唯一。
+
+### 3.1 聚类拓扑读取方式
+
+文档不复制成员清单，避免与真源漂移。查看当前声明：
 
 ```ts
-export const SEMANTIC_OVERLAP_GROUPS: ReadonlyArray<ReadonlySet<string>> = Object.freeze([
-    new Set(['HYG-STB-002', 'GOV-SAN-001']),                              // 1. 空占位符与清理消毒
-    new Set(['NAM-FIL-001', 'GOV-FIL-001']),                              // 2. 文件命名与文件治理
-    new Set(['ARCH-FAC-001', 'ARCH-ABS-001']),                            // 3. 工厂模式与抽象泄漏
-    new Set(['SIM-FLAT-002', 'SIM-GUARD-001', 'CPX-NEST-001', 'CPX-NEST-002']), // 4. 控制流嵌套与扁平卫语句
-    new Set(['HYG-WRAP-001', 'ARCH-FAC-001']),                            // 5. 冗余封装与工厂边界
-    new Set(['HYG-CLN-001', 'CPX-RED-001']),                              // 6. 代码克隆与冗余分支
-    new Set(['SEC-LEAK-001', 'GOV-SAN-001']),                             // 7. 凭据泄露与敏感消毒
-    new Set(['GDM-POOL-001', 'PRF-MEM-001', 'PRF-MEM-002']),              // 8. 对象池与内存瞬态分配
-    new Set(['ARCH-DISP-001', 'ARCH-DSP-002']),                           // 9. 动态分发与调度契约
-    new Set(['NAM-DIR-001', 'ARCH-DIR-001']),                             // 10. 目录命名与架构分层
-    new Set(['NAM-ABR-001', 'NAM-VAG-001']),                              // 11. 模糊缩写与歧义命名
-]);
+import { OVERLAP_CLUSTERS, overlapClusterRows } from './core/rules/overlap-clusters';
+
+// 每条记录形如 { key: 'nested-control-flow', members: [...], rationale: '...' }
+for (const cluster of OVERLAP_CLUSTERS) {
+    console.log(cluster.key, cluster.members.join(', '), '—', cluster.rationale);
+}
+
+// 需要按 key 排序的稳定输出（文档表格、差异对账）
+const rows = overlapClusterRows();
 ```
 
-### 3.2 并查集算法机制与双端消费规范
+### 3.2 聚类语义的三条不变式
+
+聚类族数**不等于**独立缺陷数。以下语义由 `OVERLAP_CLUSTER_SEMANTICS` 以数据形式宣告，避免三处文档各写一份：
+
+1. **成员可跨族共享**：`GOV-SAN-001` 同属「空壳与消毒」和「凭据与消毒」两族，`ARCH-FAC-001` 同属「门面与抽象」和「冗余封装」两族。并查集正是靠共享成员把这些族桥接成连通分量。
+2. **聚合范围限于同一坐标**：仅合并 `file` 与起始行都相同的卡片。跨行聚合会掩盖第二处待修位置，因此不做。
+3. **主卡按严重度选举**：`block (4) > warn (3) > info (2) > pass (1)`，其余成员规则写入主卡的 `correlatedRules` 元数据。
+
+### 3.3 并查集算法机制与双端消费规范
 1. **坐标匹配与并查集归并**：
    - 针对相同文件与相同起始行（`file` + `line`）的多条诊断卡片；
    - 若卡片规则属于同一重叠族，并查集算法执行 `union(cardA, cardB)`。

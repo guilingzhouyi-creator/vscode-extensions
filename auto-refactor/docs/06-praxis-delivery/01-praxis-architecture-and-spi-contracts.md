@@ -21,7 +21,7 @@ flowchart TD
     end
     
     subgraph HumanPlane["【表现层 UI 平面】认知抗疲劳聚合 (Human Ergonomics)"]
-        UNION_FIND["并查集语义聚合 (11 组 SEMANTIC_OVERLAP_GROUPS)"]
+        UNION_FIND["并查集语义聚合 (<!-- METRICS:BEGIN overlap-cluster-count -->**11 个语义重叠聚类族**<!-- METRICS:END overlap-cluster-count -->)"]
         CARDS["富文本本地化诊断卡片 (PraxisDiagnosticCard)"]
     end
     
@@ -123,7 +123,7 @@ flowchart LR
 - **内置实现**：[`DefaultPraxisRollbackGatekeeper`](../../src/core/praxis/defaults.ts)。
 
 ### 3.6 SPI-6：表现层双面载荷适配器 (`IPraxisPresentationService`)
-- **核心职责**：将机器端纯净 CAPP 指令转化为人读 UI 诊断卡片，并执行 11 组语义并查集去重。
+- **核心职责**：将机器端纯净 CAPP 指令转化为人读 UI 诊断卡片，并按规则层宣告的 <!-- METRICS:BEGIN overlap-cluster-count -->**11 个**<!-- METRICS:END overlap-cluster-count -->语义重叠聚类族执行并查集去重。
 - **接口签名**：
   ```ts
   export interface IPraxisPresentationService {

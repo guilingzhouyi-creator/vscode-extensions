@@ -885,6 +885,7 @@ export * from './core/profiler/loadGovernor';
 export * from './core/pipeline/escalationChannel';
 export * from './core/pipeline/dualTrackPipeline';
 export * from './core/rules/registry';
+export * from './core/rules/overlap-clusters';
 export * as messages from './core/messages';
 export * from './core/messages';
 

@@ -322,6 +322,30 @@ function countTopicCatalog() {
 }
 
 /**
+ * Counts the declared semantic overlap clusters and their distinct member rules.
+ *
+ * Read from the compiled rule module, not from the presentation layer: the table used to live in
+ * `semantic-correlation.ts` and every documented figure was a hand-kept copy of it. Reading the
+ * declaration is what makes the rendered number impossible to type by hand.
+ *
+ * @returns {{clusters: number, members: number}} Declared cluster and distinct member counts,
+ *   each -1 when the module cannot be loaded.
+ */
+function countOverlapClusters() {
+  const modulePath = path.join(REPO_ROOT, 'auto-refactor/dist/core/rules/overlap-clusters.js');
+  if (!fs.existsSync(modulePath)) return { clusters: -1, members: -1 };
+  try {
+    const loaded = require(modulePath);
+    return {
+      clusters: loaded.overlapClusterCount(),
+      members: loaded.overlapMemberCount(),
+    };
+  } catch {
+    return { clusters: -1, members: -1 };
+  }
+}
+
+/**
  * Counts distinct rule families in the catalog, optionally narrowed to one project.
  *
  * The `family` field is the authority, not the id prefix: `high-complexity` belongs to `CPX` while
@@ -490,6 +514,8 @@ function buildResolvers() {
     'analyzer-count': () => countBuiltinAnalyzers(),
     'script-inventory': () => countScriptInventory(),
     'test-suite-count': () => countTestSuites(),
+    'overlap-cluster-count': () => countOverlapClusters().clusters,
+    'overlap-member-count': () => countOverlapClusters().members,
     'glossary-count': () => countTopicCatalog().glossary,
     'topic-count': () => countTopicCatalog().topics,
     'rule-family-count': () => countRuleFamilies('auto-refactor'),

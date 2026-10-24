@@ -10,7 +10,8 @@
  *     canonical pattern on canonical entries and a legacy reason on legacy ones; assert canonical
  *     topic taxonomy and sequence continuity across all 32 families; assert the emitted-id set
  *     equals the registered-id set (no orphans in either direction); assert the family prefix of
- *     canonical ids matches their declared family; report documentation coverage
+ *     canonical ids matches their declared family; assert the overlap topology names only
+ *     registered rules; report documentation coverage
  * Exit Semantics & Design Rationale: Rejects on the first structural violation and exits 1 so CI
  *     fails loudly. Documentation coverage is printed instead of failing while the docs generator
  *     is still being rolled out; the coverage number is stable output so a regression is visible
@@ -40,6 +41,11 @@ const { LEGACY_RULE_ALIASES } = require('../dist/core/rules/aliases');
 const { BUILTIN_FACTORIES } = require('../dist/core/analyzer-registry');
 const { BUILTIN_ANALYZERS } = require('../dist/core/config/config');
 const { ALL_BUILTIN_ANALYZERS } = require('../dist/core/router/sparseRuleRouter');
+const {
+  OVERLAP_CLUSTERS,
+  overlapClusterCount,
+  overlapMemberCount,
+} = require('../dist/core/rules/overlap-clusters');
 
 const CANONICAL = new RegExp(RULE_ID_PATTERN.source);
 
@@ -144,9 +150,7 @@ function validateRegistryIntegrity(ids) {
   assert.strictEqual(RULE_ID_PATTERN.test('magic-number'), false, 'pattern must reject legacy');
   assert.strictEqual(getRule('GOV-EXC-001').analyzer, 'governance', 'lookup must resolve owners');
   assert.ok(rulesForAnalyzer('hygiene').length >= 8, 'analyzer lookup must group rules');
-  console.log(
-    `  ✔ registry integrity: ${RULE_REGISTRY.length} rules, unique, fully described`,
-  );
+  console.log(`  ✔ registry integrity: ${RULE_REGISTRY.length} rules, unique, fully described`);
 }
 
 function validateTopicAndSequenceContinuity() {
@@ -267,6 +271,54 @@ function validateNamingAndDocs(ids) {
   }
 }
 
+/**
+ * Assert the semantic overlap topology references only registered rules and is internally sane.
+ *
+ * The cluster table decides which diagnostics a reader sees as one defect. Two failure modes are
+ * invisible without this check: a member id that no rule emits (the cluster then silently never
+ * fires, because no card can carry that id), and a cluster key declared twice (the union-find
+ * aggregator would fold two distinct rationales into one silently).
+ *
+ * @param {string[]} ids - Every registered rule id.
+ * @returns {void} Throws with the full offending list.
+ */
+function validateOverlapClusters(ids) {
+  const registered = new Set(ids);
+  const unknown = [];
+  const seenKeys = new Map();
+  for (const cluster of OVERLAP_CLUSTERS) {
+    if (seenKeys.has(cluster.key)) {
+      assert.fail(`overlap cluster key "${cluster.key}" is declared more than once`);
+    }
+    seenKeys.set(cluster.key, true);
+    assert.ok(
+      cluster.members.length >= 2,
+      `overlap cluster "${cluster.key}" declares ${cluster.members.length} member(s); a cluster needs at least two to collapse anything`,
+    );
+    for (const member of cluster.members) {
+      if (!registered.has(member)) unknown.push(`${cluster.key}:${member}`);
+    }
+  }
+  assert.deepStrictEqual(
+    unknown.sort(),
+    [],
+    `overlap topology references ${unknown.length} unregistered rule id(s): ${unknown.join(', ')}`,
+  );
+  assert.strictEqual(
+    overlapClusterCount(),
+    OVERLAP_CLUSTERS.length,
+    'overlapClusterCount must equal the declared cluster list length',
+  );
+  assert.strictEqual(
+    overlapMemberCount(),
+    new Set(OVERLAP_CLUSTERS.flatMap((cluster) => [...cluster.members])).size,
+    'overlapMemberCount must equal the distinct declared member count',
+  );
+  console.log(
+    `  ✔ overlap topology: ${overlapClusterCount()} clusters over ${overlapMemberCount()} registered rules, no unknown members`,
+  );
+}
+
 function runAll() {
   const ids = RULE_REGISTRY.map((rule) => rule.id);
   validateRegistryIntegrity(ids);
@@ -275,6 +327,7 @@ function runAll() {
   validateEmittedRules(ids);
   validateAnalyzerRegistries();
   validateNamingAndDocs(ids);
+  validateOverlapClusters(ids);
 }
 
 try {

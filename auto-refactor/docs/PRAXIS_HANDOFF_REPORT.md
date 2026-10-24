@@ -16,7 +16,7 @@
 | :---: | :--- | :--- |
 | **专册 01** | [Praxis 对接架构全景与核心 SPI 契约手册](./06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md) | `PraxisCardContext`、`ReviewDiffHunk` 数据模型，身份溯源、语义富集、熔断阈值、环形缓冲 R4 归档、LayerVFS 存储适配与表现层双载荷渲染 SPI |
 | **专册 02** | [Praxis 核心治理服务与开发者 SDK 门面手册](./06-praxis-delivery/02-praxis-six-governance-services-api.md) | 细粒度服务门面，以及核心统一开发者 SDK [`PraxisReviewClient`](../src/core/praxis/praxis-review-client.ts) (`createPraxisClient`) API 规范，含虚拟工作区分叉与沙箱投影接口 |
-| **专册 03** | [Praxis 团队联调操作手册与交付验收矩阵](./06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | 基于 `createPraxisClient` 的双载荷接入范例、11 组 `SEMANTIC_OVERLAP_GROUPS` 并查集去重规范与 <!-- METRICS:BEGIN test-suite-count -->**170 套**<!-- METRICS:END test-suite-count -->自动化门禁矩阵 |
+| **专册 03** | [Praxis 团队联调操作手册与交付验收矩阵](./06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | 基于 `createPraxisClient` 的双载荷接入范例、<!-- METRICS:BEGIN overlap-cluster-count -->**11 个**<!-- METRICS:END overlap-cluster-count -->语义重叠聚类族的并查集去重规范与 <!-- METRICS:BEGIN test-suite-count -->**170 套**<!-- METRICS:END test-suite-count -->自动化门禁矩阵 |
 | **专册 04** | [Praxis-LayerVFS 瞬时工作区对接手册与联调规范](./06-praxis-delivery/04-praxis-layervfs-integration-guide.md) | LayerVFS CAS 内容寻址、FastCDC 动态分块、SQLite WAL 单文件存储、零拷贝分叉 (`< 3ms`)、物理投影与 MCTS 多智能体打擂裁判规范 |
 | **专册 05** | [LayerVFS 虚拟分叉与 MCTS 探索树架构规范](./01-architecture/06-layervfs-virtual-storage-and-mcts.md) | LayerVFS 核心算法拓扑、Gear Hash 滚动切块、UCT 探索树评估模型与沙箱生命周期隔离规范 |
 | **规范 01** | [配置模式与多格式报告契约](./05-specs-and-benchmarks/01-config-and-reports.md) | `auto-refactor.config.json` Schema、31 分析器与 374 规则阈值默认值、`.refactor-trajectory/` 紧凑账本规范 (< 350B, *Ms) |
@@ -51,9 +51,10 @@
    - **CAS 块级去重存储与 SQLite WAL 底座**：Node 24 原生 `node:sqlite` 持久化，微秒级虚拟工作区分叉（Fork $< 3\text{ms}$）、快照原子闪回（Rollback $< 1\text{ms}$）；
    - **沙箱受控物理投影引擎**：全异步零阻塞 I/O，工作目录强制锁定在临时目录，超时 124 退出码强杀守卫，`cleanOnClose()` 零物理残留；
    - **MCTS 重构探索锦标赛**：结合 UCT 树搜索与 $\Delta \text{CC}$ + AST 深度收益多维度量，自动淘汰劣质重构方案，剪枝优选合并。
-3. **11 组语义重叠规则并查集去重 ([`semantic-correlation.ts`](../src/core/praxis/presentation/semantic-correlation.ts))**：
+3. **语义重叠聚类并查集去重 ([`overlap-clusters.ts`](../src/core/rules/overlap-clusters.ts) → [`semantic-correlation.ts`](../src/core/praxis/presentation/semantic-correlation.ts))**：
    - 贯彻「底层 AST 完备性与表现层去重双层解耦公理」；
-   - 11 组语义重叠规则族在同坐标触发时，并查集算法自动选举主卡，将次级违规规约至 `correlatedRules` 元数据，彻底根除 UI 冗余提示。
+   - 聚类拓扑由规则层单一真源宣告 <!-- METRICS:BEGIN overlap-cluster-count -->**11 个**<!-- METRICS:END overlap-cluster-count -->语义重叠聚类族、覆盖 <!-- METRICS:BEGIN overlap-member-count -->**23 条**<!-- METRICS:END overlap-member-count -->参与聚类的规则，表现层仅派生投影；
+   - 同坐标触发时，并查集算法自动选举主卡，将次级违规规约至 `correlatedRules` 元数据，彻底根除 UI 冗余提示。
 4. **客观代码自研率模型 (CAI 2.0 — [`autonomy-scorer.ts`](../src/core/scoring/autonomy-scorer.ts))**：
    - 纯客观 6 大正交自研率维度：`effectiveLocAutonomy` ($R_{loc}$, 0.30)、`symbolCallAutonomy` ($R_{call}$, 0.20)、`domainKernelDensity` ($R_{domain}$, 0.15)、`codeOriginality` ($R_{pure}$, 0.15)、`supplyChainResilience` ($R_{supply}$, 0.10)、`criticalPathAutonomy` ($R_{critical}$, 0.10)；
    - 基于 **Jeffreys 无偏先验 $\text{Beta}(0.5, 0.5)$** 计算 $95\%$ 置信区间与样本充分度 $S$，严格保障小样本不虚标；

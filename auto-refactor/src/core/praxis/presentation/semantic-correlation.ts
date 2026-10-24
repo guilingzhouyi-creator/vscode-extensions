@@ -3,33 +3,36 @@
  * File Path: src/core/praxis/presentation/semantic-correlation.ts
  * Architecture Role: Presentation layer semantic deduplication and correlation aggregator
  *   clustering related diagnostics to reduce developer cognitive fatigue.
- * Dependencies & Triggers: Consumes PraxisDiagnosticCard and PraxisPresentationSeverity;
- *   triggered by PraxisPresentationAdapter during presentation payload assembly.
- * Responsibilities: Maintain SEMANTIC_OVERLAP_GROUPS rule taxonomy sets; identify overlapping
- *   diagnostic cards at identical file and line coordinates; elect primary cards by severity;
- *   aggregate secondary rule identifiers into correlatedRules metadata.
+ * Dependencies & Triggers: Consumes PraxisDiagnosticCard and PraxisPresentationSeverity plus the
+ *   overlap topology from ../../rules/overlap-clusters; triggered by PraxisPresentationAdapter
+ *   during presentation payload assembly.
+ * Responsibilities: Re-export the overlap topology as SEMANTIC_OVERLAP_GROUPS for compatibility;
+ *   identify overlapping diagnostic cards at identical file and line coordinates; elect primary
+ *   cards by severity; aggregate secondary rule identifiers into correlatedRules metadata.
  * Exit Semantics & Design Rationale: Pure functional transformation with zero engine-level side
  *   effects; guarantees underlying AST scan completeness while presenting cohesive human UI cards.
+ *   The cluster table itself is NOT owned here — it is declared once in the rule layer, so the
+ *   documented list, the metric and this aggregator share one definition.
  */
 
 import type { PraxisDiagnosticCard, PraxisPresentationSeverity } from './presentation-types';
+import {
+    OVERLAP_CLUSTERS,
+    rulesShareCluster,
+    type OverlapClusterDefinition,
+} from '../../rules/overlap-clusters';
 
 /**
- * 11 known semantic overlap rule families grouped by underlying root causes.
+ * Overlap topology re-exported for consumers that only need the declaration.
+ *
+ * The former shape was an anonymous `Set<string>[]` living in this file, which meant the cluster
+ * table had a single consumer and no owner: documentation restated it by hand and nothing could
+ * compare the two. The declaration now lives in the rule layer, and this binding keeps the
+ * presentation import path stable.
  */
-export const SEMANTIC_OVERLAP_GROUPS: ReadonlyArray<ReadonlySet<string>> = Object.freeze([
-    new Set(['HYG-STB-002', 'GOV-SAN-001']),
-    new Set(['NAM-FIL-001', 'GOV-FIL-001']),
-    new Set(['ARCH-FAC-001', 'ARCH-ABS-001']),
-    new Set(['SIM-FLAT-002', 'SIM-GUARD-001', 'CPX-NEST-001', 'CPX-NEST-002']),
-    new Set(['HYG-WRAP-001', 'ARCH-FAC-001']),
-    new Set(['HYG-CLN-001', 'CPX-RED-001']),
-    new Set(['SEC-LEAK-001', 'GOV-SAN-001']),
-    new Set(['GDM-POOL-001', 'PRF-MEM-001', 'PRF-MEM-002']),
-    new Set(['ARCH-DISP-001', 'ARCH-DSP-002']),
-    new Set(['NAM-DIR-001', 'ARCH-DIR-001']),
-    new Set(['NAM-ABR-001', 'NAM-VAG-001']),
-]);
+export const SEMANTIC_OVERLAP_GROUPS: ReadonlyArray<ReadonlySet<string>> = Object.freeze(
+    OVERLAP_CLUSTERS.map((cluster: OverlapClusterDefinition) => new Set(cluster.members)),
+);
 
 /**
  * Resolves numerical priority weight for presentation severities.
@@ -56,21 +59,15 @@ function getSeverityWeight(severity: PraxisPresentationSeverity): number {
 /**
  * Checks whether two distinct rule identifiers share at least one semantic overlap family.
  *
+ * Delegates to the overlap topology so the union-find pass and the published cluster table can
+ * never disagree about which rules collide.
+ *
  * @param ruleA - First rule identifier
  * @param ruleB - Second rule identifier
  * @returns True if rules share an overlap family, false otherwise
  */
 function sharesOverlapFamily(ruleA: string, ruleB: string): boolean {
-    if (ruleA === ruleB) {
-        return false;
-    }
-    for (let i = 0; i < SEMANTIC_OVERLAP_GROUPS.length; i++) {
-        const group = SEMANTIC_OVERLAP_GROUPS[i];
-        if (group.has(ruleA) && group.has(ruleB)) {
-            return true;
-        }
-    }
-    return false;
+    return rulesShareCluster(ruleA, ruleB);
 }
 
 /**

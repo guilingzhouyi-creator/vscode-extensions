@@ -43,7 +43,7 @@
 * [PRAXIS_HANDOFF_REPORT.md](./PRAXIS_HANDOFF_REPORT.md)：**Praxis 团队对接交付总报告（Executive Handoff）**（31 分析器、374 规则体系、170 套测试套件、LayerVFS 虚拟分叉与 MCTS 探索树）。
 * [01-praxis-architecture-and-spi-contracts.md](./06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md)：`PraxisCardContext`、`ReviewDiffHunk` 数据模型，底层差分 AST 完备性与表现层去重双层解耦公理，以及**核心 SPI 扩展插槽**（含表现层与 LayerVFS 存储 SPI）。
 * [02-praxis-six-governance-services-api.md](./06-praxis-delivery/02-praxis-six-governance-services-api.md)：核心治理服务与统一开发者 SDK 门面 [`PraxisReviewClient`](../src/core/praxis/praxis-review-client.ts) (`createPraxisClient`) API 完整手册，含虚拟工作区分叉与沙箱投影接口。
-* [03-praxis-integration-runbook-and-acceptance.md](./06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md)：端到端 TypeScript 联调代码范例、11 组 `SEMANTIC_OVERLAP_GROUPS` 并查集去重消费规范与 <!-- METRICS:BEGIN test-suite-count -->**170 套**<!-- METRICS:END test-suite-count -->自动化验收矩阵。
+* [03-praxis-integration-runbook-and-acceptance.md](./06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md)：端到端 TypeScript 联调代码范例、<!-- METRICS:BEGIN overlap-cluster-count -->**11 个**<!-- METRICS:END overlap-cluster-count -->语义重叠聚类族的并查集去重消费规范与 <!-- METRICS:BEGIN test-suite-count -->**170 套**<!-- METRICS:END test-suite-count -->自动化验收矩阵。
 * [04-praxis-layervfs-integration-guide.md](./06-praxis-delivery/04-praxis-layervfs-integration-guide.md)：LayerVFS 虚拟工作区集成实战指南、FastCDC 切块、CAS 零拷贝分叉、沙箱投影执行与 MCTS 重构锦标赛对接手册。
 * [praxis-integration-guide.md](./praxis-integration-guide.md)：**Praxis 统一客户端 SDK (IPraxisReviewClient)、一体两面三层拓扑 Diff 与面向 Agent 结构化指令集成手册**。
 
@@ -51,5 +51,5 @@
 * [class-diagram.mermaid](./diagrams/class-diagram.mermaid)：核心引擎类图（引入 `AutonomyScorer`, `RiskFusionEngine`, `PraxisReviewClient`）。
 * [sequence-diagram.mermaid](./diagrams/sequence-diagram.mermaid)：双轨扫描、三平面风险共振评分与 CAI 自研率终结时序图。
 * [diff-class-diagram.mermaid](./diagrams/diff-class-diagram.mermaid)：Praxis 治理门面、`PraxisReviewClient` SDK 与 `PraxisPresentationAdapter` 类图。
-* [diff-sequence-diagram.mermaid](./diagrams/diff-sequence-diagram.mermaid)：Praxis 多 Agent 切片审计、11 组并查集语义聚合与一体两面双载荷派发时序图。
+* [diff-sequence-diagram.mermaid](./diagrams/diff-sequence-diagram.mermaid)：Praxis 多 Agent 切片审计、语义重叠聚类并查集聚合与一体两面双载荷派发时序图。
 * [layervfs-architecture.mermaid](./diagrams/layervfs-architecture.mermaid)：LayerVFS 毫秒级虚拟分叉、CAS 存储、受控沙箱物理投影与 MCTS 锦标赛时序拓扑图。

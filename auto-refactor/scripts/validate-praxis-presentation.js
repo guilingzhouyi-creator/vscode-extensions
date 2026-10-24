@@ -22,6 +22,10 @@ const {
   formatCompactAgentPrompt,
   aggregateSemanticOverlappingCards,
   SEMANTIC_OVERLAP_GROUPS,
+  OVERLAP_CLUSTERS,
+  overlapClusterCount,
+  clusterKeysOf,
+  rulesShareCluster,
 } = require('../dist/api');
 
 async function testI18nProvider() {
@@ -187,7 +191,20 @@ async function testSemanticOverlapAggregation() {
   console.log('\n4. Testing semantic overlap aggregation and diagnostic deduplication...');
 
   assert.ok(Array.isArray(SEMANTIC_OVERLAP_GROUPS), 'SEMANTIC_OVERLAP_GROUPS should be an array');
-  assert.strictEqual(SEMANTIC_OVERLAP_GROUPS.length, 11, 'Expected exactly 11 overlap groups');
+  assert.ok(
+    SEMANTIC_OVERLAP_GROUPS.length > 0,
+    'overlap topology must declare at least one cluster',
+  );
+  assert.strictEqual(
+    SEMANTIC_OVERLAP_GROUPS.length,
+    overlapClusterCount(),
+    'the presentation projection must carry exactly the declared clusters',
+  );
+  assert.strictEqual(
+    overlapClusterCount(),
+    OVERLAP_CLUSTERS.length,
+    'overlapClusterCount must equal the declared cluster list length',
+  );
   assert.strictEqual(typeof aggregateSemanticOverlappingCards, 'function');
 
   const issues = [
@@ -253,6 +270,60 @@ async function testSemanticOverlapAggregation() {
   // 3. Direct function edge cases
   assert.deepStrictEqual(aggregateSemanticOverlappingCards([]), []);
   assert.strictEqual(aggregateSemanticOverlappingCards([primaryCard]).length, 1);
+
+  // 4. Topology semantics: shared members bridge clusters, distinct rules do not merge.
+  //    GOV-SAN-001 belongs to two clusters and ARCH-FAC-001 to two, which is exactly why the
+  //    aggregate is a connected component rather than an independent-defect count.
+  assert.ok(
+    clusterKeysOf('GOV-SAN-001').length > 1,
+    'GOV-SAN-001 is expected to bridge more than one cluster',
+  );
+  assert.ok(
+    clusterKeysOf('ARCH-FAC-001').length > 1,
+    'ARCH-FAC-001 is expected to bridge more than one cluster',
+  );
+  assert.strictEqual(
+    rulesShareCluster('HYG-STB-002', 'HYG-STB-002'),
+    false,
+    'a rule does not overlap itself',
+  );
+  assert.strictEqual(
+    rulesShareCluster('HYG-STB-002', 'GOV-SAN-001'),
+    true,
+    'stub and sanitize rules share a cluster',
+  );
+  assert.strictEqual(
+    rulesShareCluster('HYG-STB-002', 'PRF-MEM-001'),
+    false,
+    'unrelated rules must not share a cluster',
+  );
+  assert.strictEqual(
+    clusterKeysOf('ARCH-UNREGISTERED-999').length,
+    0,
+    'unknown rules have no clusters',
+  );
+
+  // 5. Distinct rules at the same location must NOT merge, even when a cluster exists elsewhere.
+  const unrelatedCards = aggregateSemanticOverlappingCards([
+    {
+      ...primaryCard,
+      ruleId: 'HYG-STB-002',
+      correlatedRules: undefined,
+      correlationCount: undefined,
+    },
+    {
+      ...primaryCard,
+      ruleId: 'PRF-MEM-001',
+      severity: 'warn',
+      correlatedRules: undefined,
+      correlationCount: undefined,
+    },
+  ]);
+  assert.strictEqual(
+    unrelatedCards.length,
+    2,
+    'cards from different clusters must stay separate at the same location',
+  );
 
   console.log(
     '  ✔ Semantic overlap successfully aggregated cards by severity and collected correlated rules',
