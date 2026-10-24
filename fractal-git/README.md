@@ -71,7 +71,7 @@ fractal-git/
 │
 ├── scripts/                         // 跨平台构建与门禁维护脚本 (ps1 CRLF / sh LF)
 │   ├── README.md                    // 脚本职责与调用契约
-│   ├── build.ps1 / build.sh         // 跨平台全量构建与自测脚本
+│   ├── ps1/build.ps1 / sh/build.sh  // 跨平台全量构建与自测脚本
 │   └── ps1/audit-taxis.ps1          // Taxis 5 级质量与性能门禁总督
 │
 └── tests/                           // 双轨确定性测试套件

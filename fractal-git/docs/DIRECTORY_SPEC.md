@@ -134,4 +134,4 @@ flowchart TD
 
 ### 3.7 场景 G：新增 CLI 命令与 Git 别名映射（如 taxis switch, taxis cherry-pick）
 - **归属位置**：`src/bin/taxis.rs`
-- **契约要求**：必须在 `resolve_canonical_subcommand` 中注册标准别名，优先走分形 CAS 原生处理器，未拦截的标准 Git 命令经由 `handle_passthrough` 自动透明转交系统 `git`，并维持跨平台沙箱配置防御与 `--json` 机器格式输出支持。
+- **契约要求**：必须在 `resolve_canonical_subcommand` 中注册标准别名，并在 `dispatch_command` 的分派表落入对应处理器，优先走分形 CAS 原生实现；尚未实现的 Git 子命令由 `reject_unimplemented` 明确拒绝并列出已实现集合，严禁静默转交系统 `git`，同时维持跨平台沙箱配置防御与 `--json` 机器格式输出支持。
