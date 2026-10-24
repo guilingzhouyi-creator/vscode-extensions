@@ -12,13 +12,14 @@
       "target",
       ".venv",
       ".audit-logs",
-      "archive"
+      "archive",
+      "tmp"
     ],
     "skipPaths": [
       "WebGames/docs",
       ".agents/plugins"
     ],
-    "note": "WebGames/docs holds 936 game design dossiers unrelated to engineering governance; scanning it would fire this gate on every narrative edit. .agents/plugins is a gitignored derived bundle mirrored from .agents/skills by sync-skills.js, so a correction written there would be silently reverted and never committed."
+    "note": "WebGames/docs holds 936 game design dossiers unrelated to engineering governance; scanning it would fire this gate on every narrative edit. .agents/plugins is a gitignored derived bundle mirrored from .agents/skills by sync-skills.js, so a correction written there would be silently reverted and never committed. tmp/ is the gitignored scratch area for local probes, so its throwaway numbers are not governance claims."
   },
   "metrics": [
     {
