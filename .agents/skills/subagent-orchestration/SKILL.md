@@ -16,7 +16,10 @@ description: >-
 1. **五层上下文分级与 75% 阈值脱水预算**：
    - 按持久度从高到低分为：**L1 全局公理 (`AGENTS.md`) $\to$ L2 规格说明 (`SPEC.md` 按需章节) $\to$ L3 目标源码与局部 AST 切片 $\to$ L4 关键错误栈前 5 行 $\to$ L5 会话历史**；
    - **75% 预警脱水**：上下文达 75% 容量时主动淘汰无效试错过程与冗长控制台流水账，仅保留【原始目标、根因结论、刚性红线】；将刚性总规置于开头（Primacy）、当前原子任务与自检命令置于末尾（Recency），规避中间迷失效应（Lost-in-the-Middle）。
-2. **SubAgent 四重立体防御**：
+2. **微分 Token 注入与职责解耦 (消融 3x 机械复述)**：
+   - **System Contract (5 层系统契约)**：收口工作区全局公理、沙箱前缀、领域技术栈公理、专员姿态限定与 Layer 4 自检闭环，作为不可动摇的刚性底座；
+   - **Task Shell (高 SNR 增量任务外壳)**：彻底剔除重复的 7 项通用指标复述与命令列表，仅注入【独占文件列表 (Zero-Intersection Path Jail) $\to$ 核心技术目标 $\to$ 交付前 Layer 4 自检指令】，单次启动净省 ~34% Token，杜绝 Prompt 膨胀与注意力稀释。
+3. **SubAgent 四重立体防御**：
    - **防线 1（平台级规则注入）**：`AGENTS.md` 无条件注入所有主/子 Agent；
    - **防线 2（Runtime 工具物理门控）**：`review` / `explore` 姿态强制 `enable_write_tools: false` 物理拔除写权限，且锁定 `enable_subagent_tools: false`；
    - **防线 3（5 层系统契约 `system_prompt`）**：由 `synthesize-subagent.js` 动态注入全局公理、六大规范性思维约束、Path Jail、领域公理与验证命令；
@@ -44,7 +47,8 @@ description: >-
 
 1. **两两完全正交公理 ($\forall i \ne j,\ \text{Jail}_i \cap \text{Jail}_j = \emptyset$)**：并行派发多个写入专员（`construct`/`refactor`）时，必须在 Task Scope 中列出精确到具名文件的独占列表，严禁整目录宽泛授权或重叠文件授权；跨顶级项目并行时可使用 `Workspace: "branch"`；
 2. **读写协同与可重入章节检查点 (`mark_chapter`)**：复杂任务遵循 `Explore/Review 只读勘测 -> Construct/Refactor 定点施工 -> Guardian 复核`；长程跨层任务必须在关键拓扑节点输出章节检查点（已完成文件基线、已通过自检断言、下一原子任务契约），支持随时无损交接或单章回滚；
-3. **后台 Agent 焦点防抢占守卫**：后台或只读 SubAgent 严禁弹出系统模态框、强制激活窗口或滥用 `element.focus()` 抢夺人类前台光标。
+3. **后台 Agent 焦点防抢占守卫**：后台或只读 SubAgent 严禁弹出系统模态框、强制激活窗口或滥用 `element.focus()` 抢夺人类前台光标；
+4. **多会话与外部并行感知公理 (Session Isolation & Parallel Mutex)**：运行中的会话必须识别共享工作树下的外部并行会话活动；当 `git status` 中检测到不属于本任务的文件变动时，严格保持零触碰、零清理、零顺带修复，严禁运行全局破坏性还原命令（`git restore .`、`git clean -fd`），并坚持显式白名单暂存。
 
 ---
 

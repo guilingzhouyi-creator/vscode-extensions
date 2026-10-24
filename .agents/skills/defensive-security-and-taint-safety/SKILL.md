@@ -31,7 +31,8 @@ description: >-
 | **2. 规范化绝对路径解析** | 必须先经 `path.resolve` / `Resolve-Path` / `realpath -m` 消除 `..` 路径穿越 | `fs.rmSync(path.join(base, userInput), { recursive: true })` 未拦截 `../../` |
 | **3. 沙箱前缀与深度断言** | 规范化路径必须严格以受控沙箱根目录（`REPO_ROOT` 或 `os.tmpdir()`）外加 `/` 开头，且相对深度 $\ge 1$ | 直接对由 `$HOME` 派生的别名变量（如 `$d = $HOME; foreach ($x in $d) { rm -rf $x }`）执行删除 |
 
-- **PowerShell `rm` 包装器双路守卫**：在 `scripts/ps1/lib/linux-parity.ps1` 中，无论走 GNU `rm.exe` 还是降级 `Remove-Item`，都必须在调用前执行 `Assert-SafeRecursiveRemoveTarget` 守卫。
+- **PowerShell `rm` 包装器双路守卫**：在 `scripts/ps1/lib/linux-parity.ps1` 中，无论走 GNU `rm.exe` 还是降级 `Remove-Item`，都必须在调用前执行 `Assert-SafeRecursiveRemoveTarget` 守卫；
+- **多会话并发下的零全局破坏性还原**：在共享工作区中，严禁运行全局性工作树丢弃命令（`git checkout -- .`、`git restore .`、`git clean -fd`、`git reset --hard`）。此类命令属于全仓不可逆破坏性操作，会直接销毁外部并行会话中正在编写但尚未暂存的代码资产；若需放弃改动，必须精确指向本会话的具体文件路径。
 
 ---
 

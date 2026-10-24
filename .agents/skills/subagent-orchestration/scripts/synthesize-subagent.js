@@ -156,7 +156,7 @@ function parseCliArgs(argv) {
 
 function formatExclusiveFilesLine(isReadOnly, exclusiveFiles) {
   if (isReadOnly) {
-    return '- 物理写权限：已剥夺 (只读模式)';
+    return '- 权限与模式：只读审查模式（enable_write_tools: false，严禁创建或修改任何文件）';
   }
   if (!exclusiveFiles || !String(exclusiveFiles).trim()) {
     return '- 独占文件列表：<请在此列出两两正交的独占文件路径>';
@@ -169,7 +169,7 @@ function formatExclusiveFilesLine(isReadOnly, exclusiveFiles) {
     return '- 独占文件列表：<请在此列出两两正交的独占文件路径>';
   }
   const numbered = items.map((f, idx) => `  ${idx + 1}. ${f}`).join('\n');
-  return `- 独占文件列表（Zero-Intersection Path Jail，严禁触碰列表外任何文件）：\n${numbered}`;
+  return `- 独占文件列表 (Zero-Intersection Path Jail，严禁触碰列表外任何文件)：\n${numbered}`;
 }
 
 function buildSystemPrompt(archetypeObj, postureObj) {
@@ -194,12 +194,13 @@ ${verifyCommands}`;
 > 本提示词由工作区 JIT 合成引擎自动生成，代表当前 SubAgent 必须遵守的刚性执行契约。
 
 ## 🏛️ Layer 0: 工作区全局刚性公理 (AGENTS.md)
-1. 物理卫生：全仓严禁创建或遗留 0 字节空文件；脚本必须严格保持换行契约（.ps1 CRLF，其他 LF）；
-2. 复杂度预算：圈复杂度 CC <= 15，控制流深度 Depth <= 4，单行噪声比 Noise <= 4.0；单文件双轨体积 ELOC <= 900 / LOC <= 1400（受 1:3 动态反推包络约束与消除循环内瞬态堆分配 CPX-SPACE-001）；
+1. 物理卫生：全仓严禁创建或遗留 0 字节空文件；脚本必须严格保持换行契约（.ps1 CRLF，其他 LF）；纯空格缩进且单 EOF 换行；
+2. 复杂度预算：圈复杂度 CC <= 15，控制流深度 Depth <= 4，单行噪声比 Noise <= 4.0；单文件双轨体积 ELOC <= 900 / LOC <= 1400；循环体与高频调度消除瞬态堆分配 (CPX-SPACE-001)；
 3. 门面设计：门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，严禁 <= 3 行空包跳板 (ARCH-ABS-001 / ARCH-FAC-001)；
 4. 真实性纪律：单源规则目录 (rule-catalog.json) 权威收录 ${totalRules} 条规则，严禁虚构规则 ID (RCFG-RULE-DRIFT)，禁止敷衍/夸大词汇与施工临时黑话；
 5. 零高危技术债：全工作区 High/Critical 债务历史性归零 (0 项)，严禁引入任何技术债务反弹 (一票否决)；
-6. 六大高级编程规范性思维约束：
+6. 会话隔离与并行避让：严格以自身任务独占 Path Jail 为界；工作区出现非本任务改动时判定为外部并行会话活动，坚决保持零触碰、零清理、零越界修复；严禁执行全局破坏性还原（git restore . / git clean -fd）；严禁通配暂存（git add . / -A）；
+7. 六大高级编程规范性思维约束：
   - 状态空间闭合：先用判别联合/Type-State 让非法状态不可表示，状态扫描成对声明进入与退出归位条件；
   - 单源派生与双向闭包：修改枚举/注册表时同步闭环 SSOT 真源、自动派生投影与双向差集守卫；
   - 反机械应付 (Anti-Gaming)：靠控制流代数化简降复杂度，严禁删注释或拆出 <= 3 行透传跳板凑指标；
@@ -226,39 +227,23 @@ ${verifySection}
 
 function buildTaskPromptTemplate(params) {
   const { taskGoal, archetypeObj, postureObj, exclusiveFiles = null } = params;
-  const totalRules = getTotalRuleCount();
   const goalText = taskGoal || '<请在此处填写针对性技术任务描述与预期验收条件>';
-  const allowed = (archetypeObj.pathJail?.allowedPrefixes || []).join(', ');
-  const forbidden = (archetypeObj.pathJail?.forbiddenPrefixes || []).join(', ');
   const isReadOnly = postureObj?.toolPermissions?.enableWriteTools === false;
-  const verifyCommands = (archetypeObj.localVerification || []).map((c) => `  $ ${c}`).join('\n');
   const exclusiveFilesLine = formatExclusiveFilesLine(isReadOnly, exclusiveFiles);
 
-  const preDeliverySection = isReadOnly
+  const verifyDirective = isReadOnly
     ? `[Pre-Delivery Verification]
-纯只读审查姿态，严禁修改任何代码；汇报前请对照 ${totalRules} 规则库与所属领域刚性公理确认包含文件路径、起始行号与质性依据。`
+只读审查模式，严禁写操作；汇报时必须对照 System Contract Layer 4 提供纯客观文件路径、起始行号与质性技术依据。`
     : `[Pre-Delivery Verification]
-完成改动后，在提交工作前必须自行执行并通过以下本地自检（涵盖构建编译、测试验证及静态分析；确认全量绿色后方可交付主 Agent 交叉复审）：
-${verifyCommands}`;
+交割前必须执行并通过 System Contract Layer 4 规定的本地自检命令（构建 + 测试 + 静态规则三重闭环），确保全量通过且零 High/Critical 技术债务。`;
 
   return `[Task Scope & Zero-Intersection Path Jail]
-- 授权操作范围：严格限定在 ${allowed} 内部，严禁越界修改其他目录。
-- 严禁触碰路径前缀（越界操作立即阻断）：${forbidden}
 ${exclusiveFilesLine}
 
 [Objective]
 ${goalText}
 
-[Quality & Discipline Checklist]
-1. 严禁创建 0 字节物理空文件或未实现占位符；
-2. 资深工程师控制流：卫语句提前返回，单函数圈复杂度 CC <= 15，嵌套深度 Depth <= 4，单行噪声比 Noise <= 4.0；
-3. 内存与结构防线：循环体与高频调度零瞬态堆分配 (CPX-SPACE-001 / ADV-PRF-002)，消融单行透传跳板 (ARCH-ABS-001)，对外门面实质承载 (ARCH-FAC-001)；
-4. 架构契约与自解释性：核心模块配备标准六字段 JSDoc 头部契约，算法边界显式声明退化保护阈值，严禁假分支幽灵注释与敏捷代号黑话；
-5. 提交与汇报保持纯客观技术事实，严禁施工批次代号，引用规则 ID 必须在 rule-catalog.json 中真实登记 (RCFG-RULE-DRIFT)；
-6. 严禁引入任何 High/Critical 技术债务反弹，保持 0 项刚性基线；
-7. 【六大规范性思维与四重防线】落实状态空间闭合、单源双向闭包、反机械应付、负空间污点防御、对称生命周期及可证伪自检探针；测试通过绝不等同于符合 Auto 审查或通过门禁系统，交割前必须自主闭环本地域三重验证（构建 + 测试 + 静态分析）。
-
-${preDeliverySection}
+${verifyDirective}
 `;
 }
 

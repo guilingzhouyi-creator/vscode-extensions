@@ -60,12 +60,17 @@ description: >-
 
 对每个规划批次，必须严格循环执行以下 4 步作业闭环：
 
-### Step 1: 显式精准暂存 (`git add`)
-严禁裸调 `git add .` 或 `git add -A`，防止将未准备就绪的跨层文件或临时残留意外打入暂存区。必须显式列出属于当前批次的文件列表：
+### Step 1: 显式精准暂存与并行会话避让 (`git add`)
+1. **显式文件白名单**：严禁裸调 `git add .` 或 `git add -A`，防止将未准备就绪的跨层文件或临时残留意外打入暂存区。必须显式列出属于当前批次、且在当前会话 Path Jail 授权范围内的文件列表：
 ```powershell
 git add path/to/contract.ts path/to/storage.ts
 ```
 *注：若有处于 `.gitignore` 规则边界但确需入库的治理脚本，使用 `git add -f <file>` 显式添加。*
+
+2. **并行会话零干预与防破坏性还原 (Session Isolation & Parallel Mutex)**：
+   - 当 `git status` 中存在不属于当前会话任务的文件修改或未跟踪文件时，必须识别为**外部并行会话活动**，坚决保持零触碰、零清理、零越界修复；
+   - **绝对禁止执行全局性破坏性还原命令**：严禁运行 `git checkout -- .`、`git restore .`、`git clean -fd` 或 `git reset --hard`，防止彻底销毁并行会话中尚未落盘或暂存的工作成果；
+   - 严禁自作主张对并行会话的文件执行格式化、语法“修复”或将其杂糅进当前提交。
 
 ### Step 2: 编写结构化提交信息与离线预审 (`commit-msg-gate`)
 在本地临时目录中创建提交信息文件 `commit_batch_N.txt`。必须满足以下刚性规范：
