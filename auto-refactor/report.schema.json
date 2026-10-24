@@ -569,7 +569,7 @@
         },
         "format": {
           "type": "string",
-          "enum": ["json", "sarif", "text"]
+          "enum": ["json", "sarif", "text", "agent", "capp", "compact", "praxis"]
         },
         "failOnIssue": {
           "type": "boolean"

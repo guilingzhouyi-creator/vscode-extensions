@@ -342,9 +342,10 @@ export interface Thresholds {
 /**
  * Report serialization format: `json` for structured consumers, `sarif` for CI code scanning,
  * `text` for human-readable stdout, `agent` for LLM Agent context, `capp` for ultra-compact
- * directives, or `praxis` for rich frontend UI payloads.
+ * directives, `compact` for the positional CAS v3 wire document, or `praxis` for rich
+ * frontend UI payloads.
  */
-export type OutputFormat = 'json' | 'sarif' | 'text' | 'agent' | 'capp' | 'praxis';
+export type OutputFormat = 'json' | 'sarif' | 'text' | 'agent' | 'capp' | 'compact' | 'praxis';
 
 /**
  * Depth of the comments analyzer: `off` disables it, `basic` reports header/doc gaps at info

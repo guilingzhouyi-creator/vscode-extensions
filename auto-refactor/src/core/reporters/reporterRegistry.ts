@@ -10,7 +10,8 @@
  * Responsibilities: Key plugins by lower-cased name and register/get/list them; render pretty
  *   (2-space) or compact JSON; emit a Markdown summary with counts, optional quality-score
  *   table and at most 100 issues; emit SARIF 2.1.0 with de-duplicated rules and severity
- *   mapping; emit a 110x20 SVG badge colored by the composite score.
+ *   mapping; emit a 110x20 SVG badge colored by the composite score; delegate the Agent,
+ *   CAPP, CAS v3 compact and Praxis formats to their dedicated serializers.
  * Exit Semantics & Design Rationale: Synchronous in-memory Map operations; an unknown name
  *   returns undefined instead of throwing so format resolution stays fail-soft, and the last
  *   registration for a name wins (Map.set), so external plugins can override built-ins without
@@ -19,6 +20,7 @@
 
 import type { ScanReport } from '../types';
 import type { PraxisPresentationOptions } from '../praxis/presentation/presentation-types';
+import { toCompactReportJson } from '../reporting/compact-report-migrator';
 import {
     toAgentReview,
     toCapp,
@@ -272,6 +274,13 @@ registerReporter({
     name: 'capp',
     format(report: ScanReport): string {
         return toCapp(report);
+    },
+});
+
+registerReporter({
+    name: 'compact',
+    format(report: ScanReport, options?: Record<string, unknown>): string {
+        return toCompactReportJson(report, options ?? {});
     },
 });
 

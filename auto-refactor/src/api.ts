@@ -968,6 +968,16 @@ export * from './core/rules/pyramid';
 export * from './core/governance/standard-terminology';
 export { toAgentReview, toCapp, toPraxisPresentation } from './core/reporters';
 
+// ---- Compact Agent Schema (CAS v3) Projection & Legacy Artifact Migration ----
+export * from './core/reporting/compact-report-types';
+export {
+    buildCompactReport,
+    toCompactReportJson,
+    hydrateCompactReport,
+    migrateLegacyReport,
+    isCompactReport,
+} from './core/reporting/compact-report-migrator';
+
 // ---- Praxis Diff Governance Subsystem Facade & SPI ----
 export * from './core/praxis';
 
