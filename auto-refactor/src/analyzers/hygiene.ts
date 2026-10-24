@@ -336,27 +336,37 @@ function auditTrailingNewline(context: FileBasicsContext): void {
 }
 
 const RE_HOLLOW_SKIP_EXT = /\.(?:md|json|ya?ml)$/i;
-const RE_BLOCK_COMMENT_END = /\*\//;
 const RE_DOCSTRING_START = /^(?:"""|''')/;
 
+/** Terminator token that closes the currently open comment block; '' means no block is open. */
+type HollowBlockTerminator = '' | '*/' | '"""' | "'''";
+
+/**
+ * Classifies one trimmed source line for hollow-file detection while tracking the open block.
+ *
+ * Each block kind is closed only by its own terminator token: C blocks by the star-slash pair,
+ * Python docstrings by the exact triple quote that opened them. A shared boolean state would let
+ * a triple-quoted docstring swallow the rest of a Python file (no C terminator ever arrives) and
+ * misreport every docstring-led module as comment-only.
+ */
 function checkHollowCommentLine(
     line: string,
-    inBlockComment: boolean,
-): { isComment: boolean; nextInBlock: boolean } {
-    if (inBlockComment) {
-        return { isComment: true, nextInBlock: !RE_BLOCK_COMMENT_END.test(line) };
+    openTerminator: HollowBlockTerminator,
+): { isComment: boolean; nextTerminator: HollowBlockTerminator } {
+    if (openTerminator) {
+        return { isComment: true, nextTerminator: line.includes(openTerminator) ? '' : openTerminator };
     }
     if (line.startsWith('/*')) {
-        return { isComment: true, nextInBlock: !RE_BLOCK_COMMENT_END.test(line) };
+        return { isComment: true, nextTerminator: line.includes('*/') ? '' : '*/' };
     }
     if (line.startsWith('//') || line.startsWith('#')) {
-        return { isComment: true, nextInBlock: false };
+        return { isComment: true, nextTerminator: '' };
     }
     if (RE_DOCSTRING_START.test(line)) {
-        const quote = line.slice(0, 3);
-        return { isComment: true, nextInBlock: !line.slice(3).includes(quote) };
+        const quote = line.slice(0, 3) as HollowBlockTerminator;
+        return { isComment: true, nextTerminator: line.slice(3).includes(quote) ? '' : quote };
     }
-    return { isComment: false, nextInBlock: false };
+    return { isComment: false, nextTerminator: '' };
 }
 
 function isHollowCommentOnlyFile(content: string, filePath: string): boolean {
@@ -364,14 +374,14 @@ function isHollowCommentOnlyFile(content: string, filePath: string): boolean {
         return false;
     }
     const lines = content.split('\n');
-    let inBlockComment = false;
+    let openTerminator: HollowBlockTerminator = '';
 
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
         if (line.length === 0) continue;
 
-        const check = checkHollowCommentLine(line, inBlockComment);
-        inBlockComment = check.nextInBlock;
+        const check = checkHollowCommentLine(line, openTerminator);
+        openTerminator = check.nextTerminator;
         if (!check.isComment) {
             return false;
         }

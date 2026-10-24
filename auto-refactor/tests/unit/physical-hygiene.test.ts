@@ -53,6 +53,41 @@ describe('HygieneAnalyzer: Physical Hygiene 8-Dimension Guard', () => {
         expect(issuesDts.some((i) => i.rule === 'HYG-EMP-002')).toBe(false);
     });
 
+    it('does not flag Python files whose module docstring closes before executable code', () => {
+        const pythonWithDocstring = [
+            '"""',
+            'API 动态字段名旋转模块 — 基于时间窗口的 HMAC 字段名映射。',
+            '',
+            "'''",
+            '内部还有一对三引号字面量，终结符必须按种类配对。',
+            "'''",
+            '"""',
+            '',
+            'import hashlib',
+            '',
+            'class FieldMapper:',
+            '    """基于时间窗口的字段名动态映射。"""',
+            '',
+            '    def map(self, field_id):',
+            '        return hashlib.sha256(field_id.encode()).hexdigest()',
+            '',
+        ].join('\n');
+        const issues = analyzer.analyze(undefined, createMockContext('app/api/crypto.py', pythonWithDocstring));
+        expect(issues.some((i) => i.rule === 'HYG-EMP-002')).toBe(false);
+    });
+
+    it('still emits HYG-EMP-002 on Python files that are comment-only after a module docstring', () => {
+        const commentOnlyPy = [
+            '"""',
+            'Module doc for a placeholder module.',
+            '"""',
+            '# TODO: implementation pending',
+            '',
+        ].join('\n');
+        const issues = analyzer.analyze(undefined, createMockContext('app/placeholder.py', commentOnlyPy));
+        expect(issues.some((i) => i.rule === 'HYG-EMP-002')).toBe(true);
+    });
+
     it('emits HYG-BOM-001 when UTF-8 BOM prefix is detected', () => {
         const bomContent = '\uFEFFexport const value = 42;\n';
         const issues = analyzer.analyze(undefined, createMockContext('src/bom-file.ts', bomContent));
