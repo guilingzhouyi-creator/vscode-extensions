@@ -151,10 +151,15 @@ export interface ArbitratedFinding {
 export type RuleLifecycleState =
     'active' | 'canary' | 'experimental' | 'quarantined' | 'deprecated';
 
+/** Lifecycle state of an active rule that fully participates in gating. */
 export const LIFECYCLE_ACTIVE: RuleLifecycleState = 'active';
+/** Lifecycle state of a rule promoted to shadow gating before full enforcement. */
 export const LIFECYCLE_CANARY: RuleLifecycleState = 'canary';
+/** Lifecycle state of a rule still gathering evidence, reported without gating authority. */
 export const LIFECYCLE_EXPERIMENTAL: RuleLifecycleState = 'experimental';
+/** Lifecycle state of a rule held back after suspected false positives. */
 export const LIFECYCLE_QUARANTINED: RuleLifecycleState = 'quarantined';
+/** Lifecycle state of a rule scheduled for retirement, kept for historical continuity. */
 export const LIFECYCLE_DEPRECATED: RuleLifecycleState = 'deprecated';
 
 const RULE_PREFIX_SEC = 'SEC-';

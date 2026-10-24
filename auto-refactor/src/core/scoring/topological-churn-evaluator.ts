@@ -16,9 +16,13 @@
 
 import type { GitFileHistoryProfile } from '../evolution/git-history-miner';
 
+/** Weight of the temporal churn term inside the bounded hyperbolic tangent. */
 export const DEFAULT_ALPHA_CHURN = 0.5;
+/** Normalization midpoint, in commits per window, where churn saturates near half of alpha. */
 export const DEFAULT_MU_CHURN = 4.0;
+/** Soft ceiling applied to the logarithmic fan-in amplifier. */
 export const DEFAULT_MAX_FAN_IN_MULTIPLIER = 6.0;
+/** Days without a commit after which a module qualifies for frozen legacy relaxation. */
 export const DEFAULT_FROZEN_THRESHOLD_DAYS = 180;
 
 const MS_PER_SECOND = 1000;
@@ -44,11 +48,16 @@ const HOTSPOT_RED_CHURN_THRESHOLD = 3;
 const HOTSPOT_YELLOW_IMPACT_THRESHOLD = 1.5;
 const HOTSPOT_YELLOW_CHURN_THRESHOLD = 2;
 
+/** Hotspot band for modules combining high impact amplification with dense recent churn. */
 export const HOTSPOT_CATEGORY_RED = 'red';
+/** Hotspot band for modules showing moderate impact or recurring churn. */
 export const HOTSPOT_CATEGORY_YELLOW = 'yellow';
+/** Hotspot band for modules with neither elevated impact nor sustained churn. */
 export const HOTSPOT_CATEGORY_GREEN = 'green';
 
+/** Proposal token asking for a locked interface contract before touching a central module. */
 export const ACTION_HIGH_CENTRALITY_GUARD = 'high_centrality_refactor_guard';
+/** Proposal token asking for volatile subroutines to be split out of a churning module. */
 export const ACTION_ISOLATE_CHURN_HOTSPOT = 'isolate_churn_hotspot';
 
 /**

@@ -73,6 +73,7 @@ export const DEFAULT_METRIC_LINES = 50;
 export const PERCENT_SCALE = 100;
 /** Confidence calculation scope identifiers. */
 export const CONFIDENCE_SCOPE_PROJECT = 'project';
+/** Per-file confidence scope, where evidence is bounded to statements within one source file. */
 export const CONFIDENCE_SCOPE_FILE = 'file';
 
 const DEFAULT_FALLBACK_RULE = 'metric';

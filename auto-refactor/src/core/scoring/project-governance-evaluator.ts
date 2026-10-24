@@ -30,8 +30,11 @@ import {
  */
 export type ProjectMaturityStage = 'prototype' | 'stable' | 'enterprise';
 
+/** Stage token for early exploration, where redundancy is tolerated at half weight. */
 export const STAGE_PROTOTYPE: ProjectMaturityStage = 'prototype';
+/** Stage token for released code held to standard governance weighting. */
 export const STAGE_STABLE: ProjectMaturityStage = 'stable';
+/** Stage token for large-scale delivery, where redundancy and drift weigh heaviest. */
 export const STAGE_ENTERPRISE: ProjectMaturityStage = 'enterprise';
 
 const MAX_CLEAN_REUSE_BONUS = 10;

@@ -1,18 +1,20 @@
 /**
- * Module:
- * Module: src/analyzers/go-modern.ts Architecture Role: Go-only style analyzer (a language pack
- * Module: bound to Go, never to a project) — the Go counterpart of the Python/Rust/TypeScript
- * Module: modernization packs. Dependencies & Triggers: core types + declarative modern metapack;
- * Module: enabled when a config declares `analyzers.go-modern`; specialized packs are default-off
- * Module: so registering them cannot change an existing gate result. Responsibilities: Report five
- * Module: Go style/modernization findings on `.go` files: GOM-ERR-001 (unchecked errors via `_`
- * Module: discard), GOM-CTX-001 (context not first arg), GOM-STYLE-001 (receiver naming
- * Module: conventions), GOM-STYLE-002 (error variable naming), GOM-STYLE-003 (missing package
- * Module: comment). Exit Semantics & Design Rationale: Built on DeclarativeModernAnalyzer over the
- * Module: shared masked view, never throws and returns [] for every other language. Go uses
- * Module: C-family comment syntax, so the mask uses `//` line comments and `/*` block comments plus
- * Module: double-quoted and backtick-quoted strings. Rules are keyword-anchored; a missed
- * Module: modernization is preferred over a false positive.
+ * Module: Static Analysis Engine — Go Modernization & Style Rules
+ * File Path: src/analyzers/go-modern.ts
+ * Architecture Role: Go-only style analyzer (a language pack bound to Go, never to a
+ *     project) — the Go counterpart of the Python/Rust/TypeScript modernization packs.
+ * Dependencies & Triggers: core types + declarative modern metapack; enabled when a config
+ *     declares `analyzers.go-modern`; specialized packs are default-off so registering
+ *     them cannot change an existing gate result.
+ * Responsibilities: Report five Go style/modernization findings on `.go` files:
+ *     GOM-ERR-001 (unchecked errors via `_` discard), GOM-CTX-001 (context not first arg),
+ *     GOM-STYLE-001 (receiver naming conventions), GOM-STYLE-002 (error variable naming),
+ *     GOM-STYLE-003 (missing package comment).
+ * Exit Semantics & Design Rationale: Built on DeclarativeModernAnalyzer over the shared masked
+ *     view, never throws and returns [] for every other language. Go uses C-family comment
+ *     syntax, so the mask uses `//` line comments and `/*` block comments plus double-quoted and
+ *     backtick-quoted strings. Rules are keyword-anchored; a missed modernization is
+ *     preferred over a false positive.
  */
 
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';

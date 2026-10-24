@@ -1,22 +1,24 @@
 /**
- * Module:
- * Module: Architecture Role: Rust-only style analyzer (a language pack bound to the language, never
- * Module: to a project) — the Rust counterpart of the Python/TypeScript modernization packs.
- * Module: Dependencies & Triggers: core types + declarative modern metapack; enabled when a config
- * Module: declares `analyzers.rust-modern`; specialized packs are default-off, so registering it
- * Module: cannot change an existing gate result. Responsibilities: Report fourteen modernization
- * Module: findings on `.rs` files: RSM-CAST-001 (naked numeric `as` cast), RSM-CLONE-001 (needless
- * Module: `.clone()`), RSM-ELSE-001 (`if let` early exit simplifiable to `let-else`), RSM-EXP-001
- * Module: (naked `.expect()`), RSM-EXTERN-001 (`extern crate`), RSM-FIND-001 (manual `for` search
- * Module: simplifiable to `.find()`), RSM-FORMAT-001 (positional `{}` capture), RSM-LOCK-001 (sync
- * Module: lock held across `.await`), RSM-MACRO-001 (`#[macro_use]`), RSM-PNC-001 (production crash
- * Module: macro), RSM-SAF-001 (undocumented `unsafe`), RSM-STR-001 (`&String` parameter),
- * Module: RSM-TRY-001 (`try!`), and RSM-UNWRAP-001 (`.unwrap()`). Exit Semantics & Design
- * Module: Rationale: Built on DeclarativeModernAnalyzer over masked source with raw string
- * Module: blanking, never throws and returns [] for every other language. Rust's comment syntax
- * Module: matches the C family, so the mask only needs the slash and the C-style block delimiters;
- * Module: char literals and lifetimes are preserved while raw string bodies are zeroed to avoid
- * Module: false positives. Every rule stays keyword-anchored and adheres to canonical naming.
+ * Module: Static Analysis Engine — Rust Modernization Rules
+ * File Path: src/analyzers/rust-modern.ts
+ * Architecture Role: Rust-only style analyzer (a language pack bound to the language, never to a
+ *     project) — the Rust counterpart of the Python/TypeScript modernization packs.
+ * Dependencies & Triggers: core types + declarative modern metapack; enabled when a config declares
+ *     `analyzers.rust-modern`; specialized packs are default-off, so registering it cannot change
+ *     an existing gate result.
+ * Responsibilities: Report fourteen modernization findings on `.rs` files: RSM-CAST-001 (naked
+ *     numeric `as` cast), RSM-CLONE-001 (needless `.clone()`), RSM-ELSE-001 (`if let` early exit
+ *     simplifiable to `let-else`), RSM-EXP-001 (naked `.expect()`), RSM-EXTERN-001
+ *     (`extern crate`), RSM-FIND-001 (manual `for` search simplifiable to `.find()`),
+ *     RSM-FORMAT-001 (positional `{}` capture),
+ *     RSM-LOCK-001 (sync lock held across `.await`), RSM-MACRO-001 (`#[macro_use]`), RSM-PNC-001
+ *     (production crash macro), RSM-SAF-001 (undocumented `unsafe`), RSM-STR-001 (`&String`
+ *     parameter), RSM-TRY-001 (`try!`), and RSM-UNWRAP-001 (`.unwrap()`).
+ * Exit Semantics & Design Rationale: Built on DeclarativeModernAnalyzer over masked source with raw
+ *     string blanking, never throws and returns [] for every other language. Rust's comment syntax
+ *     matches the C family, so the mask only needs the slash and the C-style block delimiters;
+ *     char literals and lifetimes are preserved while raw string bodies are zeroed to avoid false
+ *     positives. Every rule stays keyword-anchored and adheres to canonical naming.
  */
 
 import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';

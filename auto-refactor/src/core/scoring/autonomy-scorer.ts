@@ -996,6 +996,19 @@ export function evaluateProjectAutonomy(
     fileContents?: Map<string, string>,
     symbolIndex?: SymbolIndex,
 ): AutonomyEvaluation;
+/**
+ * Runtime implementation shared by both autonomy evaluation calling conventions.
+ *
+ * Normalizes the bundled and positional argument forms into a single context before the six
+ * dimension computation, so both entry points yield identical results for identical inputs.
+ *
+ * @param metricsOrContext - Bundled context, or the file metric array of the positional form.
+ * @param rawIssues - Positional form: detected issue collection.
+ * @param rawConfig - Positional form: scan configuration holding the project root.
+ * @param rawFileContents - Positional form: optional map of file path to raw content.
+ * @param rawSymbolIndex - Positional form: optional indexed project symbol graph.
+ * @returns Project autonomy evaluation across the six dimensions.
+ */
 export function evaluateProjectAutonomy(
     metricsOrContext: FileMetric[] | AutonomyEvaluationContext,
     rawIssues?: Issue[],

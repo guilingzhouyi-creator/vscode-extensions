@@ -317,6 +317,16 @@ function computePillarDeltas(
     return pillarDeltas;
 }
 
+/**
+ * Scores a candidate patch by comparing file quality before and after the edit.
+ *
+ * Both revisions are run through the same file scorer, so the verdict reflects measured
+ * before/after deltas per pillar plus the cognitive cost of any induced indirection, rather than
+ * the size of the diff. Net-negative patches are reported as rejected with their dominant cause.
+ *
+ * @param params - Candidate patch bundle carrying both revisions and their issue sets.
+ * @returns Per-pillar deltas, composite delta, and the acceptance verdict for the patch.
+ */
 export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityResult {
     const {
         filePath,

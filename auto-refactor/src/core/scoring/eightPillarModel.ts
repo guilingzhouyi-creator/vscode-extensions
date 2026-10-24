@@ -25,13 +25,21 @@ export type PrimaryQualityPillar =
     | 'security'
     | 'extensibility';
 
+/** Pillar token for structural layering, coupling, and dependency direction. */
 export const PILLAR_ARCHITECTURE: PrimaryQualityPillar = 'architecture';
+/** Pillar token for readability, module size, and duplication pressure. */
 export const PILLAR_MAINTAINABILITY: PrimaryQualityPillar = 'maintainability';
+/** Pillar token for hot-path efficiency, allocation discipline, and I/O blocking. */
 export const PILLAR_PERFORMANCE: PrimaryQualityPillar = 'performance';
+/** Pillar token for schema modeling, persistence boundaries, and fixture integrity. */
 export const PILLAR_DATA: PrimaryQualityPillar = 'data';
+/** Pillar token for test coverage shape, determinism, and regression guarding. */
 export const PILLAR_TESTING: PrimaryQualityPillar = 'testing';
+/** Pillar token for failure containment, crash safety, and semantic purity. */
 export const PILLAR_RELIABILITY: PrimaryQualityPillar = 'reliability';
+/** Pillar token for vulnerability class, secret exposure, and input trust boundaries. */
 export const PILLAR_SECURITY: PrimaryQualityPillar = 'security';
+/** Pillar token for extension seams, configuration-driven variation, and plugin surface. */
 export const PILLAR_EXTENSIBILITY: PrimaryQualityPillar = 'extensibility';
 
 /**
@@ -97,8 +105,16 @@ export interface PillarCeilingConstraint {
     reason: string;
 }
 
+/**
+ * Aggregation mode that multiplies pillar scores through a geometric mean.
+ *
+ * A single weak pillar drags the composite down far more than the arithmetic mean would allow,
+ * which is what keeps one fatal deficiency from being diluted by seven strong pillars.
+ */
 export const AGGREGATION_MODE_GEOMETRIC = 'geometric';
+/** Aggregation mode that averages pillar scores with equal weight. */
 export const AGGREGATION_MODE_ARITHMETIC = 'arithmetic';
+/** Aggregation mode applied when the caller does not select one explicitly. */
 export const DEFAULT_AGGREGATION_MODE = 'geometric';
 
 const PILLAR_SCORE_ROUND_FACTOR = 100;

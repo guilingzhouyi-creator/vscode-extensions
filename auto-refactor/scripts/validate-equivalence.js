@@ -1,24 +1,25 @@
 #!/usr/bin/env node
 /**
- * Module:
- * Module: scripts/validate-equivalence.js Architecture Role: Behavioral lock for the refactor:
- * Module: normalizes scan() reports from the current dist build and compares them byte-for-byte
- * Module: with committed golden baselines. Dependencies & Triggers: Requires scan from ../dist/api
- * Module: plus node fs/path; reads samples/ (default and custom configs), the generated
- * Module: scripts/.equivalence-corpus TS corpus, scripts/.equivalence-rust-corpus and
- * Module: scripts/baselines; run manually/CI, or with --update to recapture goldens.
- * Module: Responsibilities: Materializes the TS and Rust corpora plus configs (including the
- * Module: gitignored fixture and the custom no-console analyzer used by samples); runs the scenario
- * Module: matrix samples-default/custom, corpus-inproc/workers, rust-inproc/workers and three oxc
- * Module: parser runs compared against the shared TS goldens; normalizes reports to
- * Module: id/analyzer/rule/severity/message/location/detail plus metrics, sorted by id/file; writes
- * Module: a per-scenario <name>.actual.json under .audit-logs/equivalence-mismatch/ on mismatch
- * Module: (never inside scripts/, where it would trip the physical hygiene clutter gate); honors
- * Module: --update capture. Exit Semantics & Design Rationale: Exits 1 if any scenario is missing a
- * Module: baseline or differs from it, 0 only when all match; --update captures then skips
- * Module: comparison. Byte-identical output is the oracle because the refactor must be
- * Module: behavior-preserving while the legacy mixed build used for capture is no longer runnable
- * Module: in the current tree.
+ * Module: Verification Harness — Single-Pass AST Multiplexing Equivalence Gate
+ * File Path: scripts/validate-equivalence.js
+ * Architecture Role: Behavioral lock for the refactor: normalizes scan() reports from the
+ *   current dist build and compares them byte-for-byte with committed golden baselines.
+ * Dependencies & Triggers: Requires scan from ../dist/api plus node fs/path; reads samples/
+ *   (default and custom configs), the generated scripts/.equivalence-corpus TS corpus,
+ *   scripts/.equivalence-rust-corpus and scripts/baselines; run manually/CI, or with --update to
+ *   recapture goldens.
+ * Responsibilities: Materializes the TS and Rust corpora plus configs (including the
+ *   gitignored fixture and the custom no-console analyzer used by samples); runs the scenario
+ *   matrix samples-default/custom, corpus-inproc/workers, rust-inproc/workers and three oxc
+ *   parser runs compared against the shared TS goldens; normalizes reports to
+ *   id/analyzer/rule/severity/message/location/detail plus metrics, sorted by id/file; writes
+ *   a per-scenario <name>.actual.json under .audit-logs/equivalence-mismatch/ on mismatch
+ *   (never inside scripts/, where it would trip the physical hygiene clutter gate); honors
+ *   --update capture.
+ * Exit Semantics & Design Rationale: Exits 1 if any scenario is missing a baseline or differs
+ *   from it, 0 only when all match; --update captures then skips comparison. Byte-identical
+ *   output is the oracle because the refactor must be behavior-preserving while the legacy
+ *   mixed build used for capture is no longer runnable in the current tree.
  *
  * Baseline intentionality: corpus-inproc.json is byte-identical to corpus-workers.json
  *   (likewise rust-inproc.json to rust-workers.json) BY DESIGN. The pairs are the

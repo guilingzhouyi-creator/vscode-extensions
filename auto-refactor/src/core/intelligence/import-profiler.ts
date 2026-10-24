@@ -16,6 +16,10 @@
 
 import * as path from 'path';
 
+const MAX_SPECIFIER_LENGTH = 200;
+const INVALID_SPECIFIER_PATTERN = /\$\{|\|\||&&|==|[;,()]/;
+const WINDOWS_DRIVE_PREFIX_PATTERN = /^[a-zA-Z]:[\\/]/;
+
 /** File import profile containing extracted specifiers and local symbol bindings */
 export interface FileImportProfile {
     specifiers: string[];
@@ -23,21 +27,39 @@ export interface FileImportProfile {
     symbolToPackageMap: Map<string, string>;
 }
 
+/**
+ * Rejects specifier tokens that cannot denote a module path.
+ *
+ * Filters interposed template interpolations, logical operators, statement punctuation, and
+ * Windows drive prefixes, so that regex over-matching on arbitrary source text does not
+ * inflate the external autonomy ratio.
+ *
+ * @param spec - Raw candidate specifier token as captured from the source line.
+ * @returns True when the token is plausible as an external module specifier.
+ */
 export function isValidPackageSpecifier(spec: string): boolean {
-    if (!spec || spec.length > 200) return false;
-    if (spec.includes('${') || spec.includes('||') || spec.includes('&&') || spec.includes('==')) {
+    if (!spec || spec.length > MAX_SPECIFIER_LENGTH) {
         return false;
     }
-    if (spec.includes(';') || spec.includes(',') || spec.includes('(') || spec.includes(')')) {
+    if (INVALID_SPECIFIER_PATTERN.test(spec)) {
         return false;
     }
     const trimmed = spec.trim().replace(/^['"]|['"]$/g, '');
-    if (!trimmed || trimmed === ':' || /^[a-zA-Z]:[\\/]/.test(trimmed)) {
+    if (!trimmed || trimmed === ':' || WINDOWS_DRIVE_PREFIX_PATTERN.test(trimmed)) {
         return false;
     }
     return true;
 }
 
+/**
+ * Reduces a specifier to the canonical package name used as the autonomy ratio key.
+ *
+ * Strips quotes, drops the `node:` runtime prefix, keeps both segments of a scoped package, and
+ * lowercases the root segment for relative or language-specific paths.
+ *
+ * @param specifier - Import specifier as written in the source file.
+ * @returns Canonical package identifier, or an empty string when nothing usable remains.
+ */
 export function extractModulePackageName(specifier: string): string {
     const trimmed = specifier.trim().replace(/^['"]|['"]$/g, '');
     const clean = trimmed.startsWith('node:') ? trimmed.slice(5) : trimmed;

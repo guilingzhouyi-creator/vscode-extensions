@@ -9,7 +9,7 @@
  *   2. Compute Bernstein DJB2 line hashes for fast line comparisons;
  *   3. Compute Java-style polynomial accumulator hashes for sliding window clone detection.
  * Exit Semantics & Design Rationale: CC <= 6; pure functions; zero heap allocations in loops;
- *   replaces ad-hoc inline hash implementations across the engine.
+ *   single canonical implementation for every hashing call site in the engine.
  */
 
 /** 32-bit FNV-1a initial offset basis (0x811c9dc5). */

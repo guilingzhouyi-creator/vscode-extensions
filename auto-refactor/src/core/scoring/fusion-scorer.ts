@@ -68,7 +68,9 @@ export interface UnifiedQualityAssessment {
     explanation: string;
 }
 
+/** Domain classification for reusable framework code, weighting static structure highest. */
 export const DOMAIN_CORE_FRAMEWORK = 'core_framework';
+/** Stage classification for shipped code, used when no profile stage is supplied. */
 export const STAGE_PRODUCTION = 'production';
 const PERCENT_ROUND_FACTOR = 100;
 const MAX_SCORE_CEILING = 100.0;

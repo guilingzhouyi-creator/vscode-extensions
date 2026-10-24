@@ -53,16 +53,25 @@ export const MINUTES_PER_HOUR = 60.0;
  * Standard SQALE Technical Debt Ratio rating thresholds.
  */
 export const SQALE_GRADE_A_THRESHOLD = 0.05; // <= 5% debt ratio
+/** Upper bound of the SQALE B band: debt ratio at or below ten percent. */
 export const SQALE_GRADE_B_THRESHOLD = 0.1; // <= 10% debt ratio
+/** Upper bound of the SQALE C band: debt ratio at or below twenty percent. */
 export const SQALE_GRADE_C_THRESHOLD = 0.2; // <= 20% debt ratio
+/** Upper bound of the SQALE D band: debt ratio at or below fifty percent. */
 export const SQALE_GRADE_D_THRESHOLD = 0.5; // <= 50% debt ratio
 
+/** SQALE rating letters ordered from lowest to highest remediation burden. */
 export type SqaleRating = 'A' | 'B' | 'C' | 'D' | 'E';
 
+/** Rating emitted when remediation cost stays within five percent of development cost. */
 export const SQALE_RATING_A: SqaleRating = 'A';
+/** Rating emitted when remediation cost stays within ten percent of development cost. */
 export const SQALE_RATING_B: SqaleRating = 'B';
+/** Rating emitted when remediation cost stays within twenty percent of development cost. */
 export const SQALE_RATING_C: SqaleRating = 'C';
+/** Rating emitted when remediation cost stays within fifty percent of development cost. */
 export const SQALE_RATING_D: SqaleRating = 'D';
+/** Rating emitted when remediation cost exceeds half of development cost. */
 export const SQALE_RATING_E: SqaleRating = 'E';
 
 const ERROR_EFFORT_MULTIPLIER = 1.5;

@@ -63,8 +63,11 @@ export interface MineGitNumstatOptions {
     readonly cwd?: string;
 }
 
+/** Normalized entropy ceiling above which a changeset counts as diffused. */
 export const DEFAULT_MAX_DIFFUSION_ENTROPY = 0.85;
+/** Minimum changed-file count before diffusion entropy is evaluated at all. */
 export const DEFAULT_MIN_FILES_FOR_ENTROPY_CHECK = 8;
+/** Minimum distinct subsystem count before a changeset counts as diffused. */
 export const DEFAULT_MIN_SUBSYSTEMS_FOR_DIFFUSION = 2;
 
 /**

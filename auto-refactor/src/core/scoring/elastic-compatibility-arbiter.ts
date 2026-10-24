@@ -47,10 +47,15 @@ export interface ElasticContext {
 export type ElasticEnvelopeType =
     'private_leaf' | 'internal_shared' | 'public_api' | 'hotpath_violation' | 'perimeter_relaxed';
 
+/** Envelope for unreferenced leaf code, which may be retired without notice. */
 export const ENVELOPE_PRIVATE_LEAF: ElasticEnvelopeType = 'private_leaf';
+/** Envelope for code shared inside the module boundary, requiring internal coordination. */
 export const ENVELOPE_INTERNAL_SHARED: ElasticEnvelopeType = 'internal_shared';
+/** Envelope for published API surface, where removal obliges a deprecation window. */
 export const ENVELOPE_PUBLIC_API: ElasticEnvelopeType = 'public_api';
+/** Envelope flagging compatibility edits that would land on a performance hot path. */
 export const ENVELOPE_HOTPATH_VIOLATION: ElasticEnvelopeType = 'hotpath_violation';
+/** Envelope for perimeter adapters and gateways, where the relaxed budget applies. */
 export const ENVELOPE_PERIMETER_RELAXED: ElasticEnvelopeType = 'perimeter_relaxed';
 
 const CHAR_LOWERCASE_V = 118;

@@ -1,18 +1,19 @@
 /**
- * Module:
- * Module: src/analyzers/gdscript-modern.ts Architecture Role: GDScript-only style analyzer (a
- * Module: language pack bound to the language, never to a project) — Godot 3 → 4 migration
- * Module: findings, which no mature external linter covers. Dependencies & Triggers: core types +
- * Module: declarative modern metapack; enabled when a config declares `analyzers.gdscript-modern`;
- * Module: specialized packs are default-off, so registering it cannot change an existing gate
- * Module: result. Responsibilities: Report migration findings on `.gd` files: GDM-YIELD-001
- * Module: (`yield(`), GDM-EXPORT-001 (`export` statement), GDM-ONREADY-001 (`onready var`),
- * Module: GDM-TOOL-001 (bare `tool` line), GDM-POOL-001 (`Pool*Array`), GDM-CONNECT-001 (Godot 3
- * Module: `connect` signature), GDM-RPC-001 (legacy RPC modifiers), plus game architecture
- * Module: discipline rules. Exit Semantics & Design Rationale: Built on DeclarativeModernAnalyzer
- * Module: over masked source, never throws and returns [] for every other language. GDScript
- * Module: comments are `#` only, so the mask needs no block-comment state; triple-quoted docstrings
- * Module: mask correctly because quotes close in pairs.
+ * Module: Static Analysis Engine — GDScript Modernization Rules
+ * File Path: src/analyzers/gdscript-modern.ts
+ * Architecture Role: GDScript-only style analyzer (a language pack bound to the language, never to
+ *     a project) — Godot 3 → 4 migration findings, which no mature external linter covers.
+ * Dependencies & Triggers: core types + declarative modern metapack; enabled when a config declares
+ *     `analyzers.gdscript-modern`; specialized packs are default-off, so registering it cannot
+ *     change an existing gate result.
+ * Responsibilities: Report migration findings on `.gd` files: GDM-YIELD-001 (`yield(`),
+ *     GDM-EXPORT-001 (`export` statement), GDM-ONREADY-001 (`onready var`), GDM-TOOL-001 (bare
+ *     `tool` line), GDM-POOL-001 (`Pool*Array`), GDM-CONNECT-001 (Godot 3 `connect` signature),
+ *     GDM-RPC-001 (legacy RPC modifiers), plus game architecture discipline rules.
+ * Exit Semantics & Design Rationale: Built on DeclarativeModernAnalyzer over masked source,
+ *     never throws and returns [] for every other language. GDScript comments are `#` only, so
+ *     the mask needs no block-comment state; triple-quoted docstrings mask correctly because
+ *     quotes close in pairs.
  */
 
 import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';

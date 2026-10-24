@@ -50,10 +50,15 @@ export const DEFAULT_FUSION_COEFFICIENTS: Readonly<RiskFusionCoefficients> = {
  */
 export type FusedRiskLevel = 'critical' | 'high' | 'medium' | 'low' | 'informational';
 
+/** Fused level for defects that must block delivery regardless of other evidence. */
 export const FUSED_LEVEL_CRITICAL: FusedRiskLevel = 'critical';
+/** Fused level for defects warranting immediate remediation before the next release. */
 export const FUSED_LEVEL_HIGH: FusedRiskLevel = 'high';
+/** Fused level for defects scheduled within the current remediation cycle. */
 export const FUSED_LEVEL_MEDIUM: FusedRiskLevel = 'medium';
+/** Fused level for defects tracked without a scheduling commitment. */
 export const FUSED_LEVEL_LOW: FusedRiskLevel = 'low';
+/** Fused level for findings retained as context with no remediation obligation. */
 export const FUSED_LEVEL_INFORMATIONAL: FusedRiskLevel = 'informational';
 
 const THRESHOLD_CRITICAL = 20.0;

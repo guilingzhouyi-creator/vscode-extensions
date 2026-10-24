@@ -1,12 +1,13 @@
 /**
- * Module:
- * Module: src/core/rules/entries/analyzers-hygiene.ts Architecture Role: Declarative rule metadata
- * Module: for physical hygiene and extension contracts; re-exported into the single ANALYZER_RULES
- * Module: registry. Dependencies & Triggers: core rule types, defineRule(); consumed by
- * Module: ./analyzers.ts. Responsibilities: Declare identity, severity, summary, remediation, and
- * Module: doc anchors for all hygiene (HYG-*) and directory extension (EXT-*) rules. Exit Semantics
- * Module: & Design Rationale: Pure metadata; zero runtime execution logic. Keeps analyzers.ts well
- * Module: within the 900 ELOC volume budget limit.
+ * Module: Core Engine — Rule Registry (hygiene and extension entries)
+ * File Path: src/core/rules/entries/analyzers-hygiene.ts
+ * Architecture Role: Declarative rule metadata for physical hygiene and extension contracts;
+ *   re-exported into the single ANALYZER_RULES registry.
+ * Dependencies & Triggers: core rule types, defineRule(); consumed by ./analyzers.ts.
+ * Responsibilities: Declare identity, severity, summary, remediation, and doc anchors for
+ *   all hygiene (HYG-*) and directory extension (EXT-*) rules.
+ * Exit Semantics & Design Rationale: Pure metadata; zero runtime execution logic. Keeps
+ *   analyzers.ts well within the 900 ELOC volume budget limit.
  */
 import type { RuleDefinition } from '../types';
 import {

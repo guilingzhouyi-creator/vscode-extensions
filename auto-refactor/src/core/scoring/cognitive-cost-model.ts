@@ -15,11 +15,17 @@ import type { Issue } from '../types';
 import { SEVERITY_WARNING } from '../types';
 import { ANALYZER_COMPLEXITY, RULE_CPX_HOP_001 } from './dimensionLiterals';
 
+/** Context role for business workflow orchestration, which tolerates shallow nesting widest. */
 export const ROLE_BUSINESS = 'business' as const;
+/** Context role for grammar and format parsers, which legitimately branch on token classes. */
 export const ROLE_PARSER = 'parser' as const;
+/** Context role for explicit state machines, where transition branching is inherent. */
 export const ROLE_STATE_MACHINE = 'state-machine' as const;
+/** Context role for numerical and combinatorial algorithms with intrinsic loop nesting. */
 export const ROLE_ALGORITHM = 'algorithm' as const;
+/** Context role for adapters, storage, and transport plumbing around external systems. */
 export const ROLE_INFRASTRUCTURE = 'infrastructure' as const;
+/** Context role for single-rule analyzers, where each branch implements one predicate. */
 export const ROLE_RULE = 'rule' as const;
 
 const CFNI_MAX_SCORE = 100;
