@@ -73,6 +73,26 @@ CAS v3.0 解决的是另一个问题：**在保留全部决策所需事实的前
 
 `bottlenecks` 由 `qualityScore.deductionsByDimension` 聚合而来：按 `(rule, dimension)` 分组求和，按扣分降序排列。这条聚合替代了原报告中逐条重复的 `rationales` 文本列表，使「哪个规则在哪个维度上最耗分」一眼可见。
 
+### 2.5 重叠声明 `clusters`
+
+同一坐标上若出现同一语义重叠簇的多个成员，紧凑文档会额外发射一条声明：
+
+```json
+"clusters": [
+  { "at": "src/core/trajectory/eloc-types.ts:187", "cluster": "stub-and-sanitize", "rules": ["GOV-SAN-001", "HYG-STB-002"], "primary": "GOV-SAN-001" }
+]
+```
+
+簇拓扑的单一真源是 [`overlap-clusters.ts`](../../src/core/rules/overlap-clusters.ts) 的 `OVERLAP_CLUSTERS`，本条目不重述成员清单。
+
+- **附加而非替换**：`vectors` 保留全部诊断，`clusters` 只是把「同一点上几个规则在说同一件事」折叠成一行。消费方忽略该字段时看到的输出与旧版完全一致。
+- **聚合范围严格限定 `file + line`**：跨行的成员**永不**合并。不同行是不同修复点，合并会让紧凑视图显得比代码实际更干净。
+- **`primary` 在折叠过程中选举**：严重度更高者优先，同严重度取规则 ID 字典序更小者；其余成员仍完整列在 `rules` 中。
+- **字段仅在至少存在一条声明时出现**：无重叠时不写空数组，避免把「未发现重叠」与「未测量」混为一谈。
+
+> [!IMPORTANT]
+> 声明集由**截断前的合格问题集**派生，而非发射窗口。若由窗口派生，任何真实预算下声明都会恒为空——重叠成员在排序后相邻，小额 `maxVectors` 要么把它们全部丢弃，要么只保留首个成员，两种情况都读作「此处无重叠」。代价是某条声明的坐标可能只部分出现在 `vectors` 中；`truncated` 仍是「被扣留多少」的唯一权威声明，需要回查向量的消费方须先检查它。
+
 ---
 
 ## 三、 发射策略与截断语义
@@ -84,11 +104,29 @@ CAS v3.0 解决的是另一个问题：**在保留全部决策所需事实的前
 | `maxBottlenecks` | `12` | 瓶颈行上限 |
 | `includeInfo` | `false` | 是否包含 `info` 级问题 |
 | `anchorProvider` | 无 | 为阻断级问题提供代码锚点切片 |
+| `healthOverride` | 无 | 用调用方自己的聚合口径覆盖 `health` 块 |
 
 > [!IMPORTANT]
 > 截断**从不静默发生**。被省略的条数写入 `truncated` 字段，反水合时 `partial` 为 `true`。一个看不到 `truncated` 的消费方会把部分报告读成完整报告，这是唯一必须防住的误读。
 
 默认排除 `info` 级问题是刻意的：该级别主要是风格提示，不是待处理项。需要完整清单时显式传 `includeInfo: true`。
+
+`healthOverride` 存在的原因是两套得分口径都合法且确实不同：自审基线聚合逐文件质量分，而 `qualityScore.compositeScore` 是引擎自评投影。生产者若把侧车挂在基线旁边却引用另一个数字，两份文件就会自相矛盾。未提供的字段保留报告自身取值。
+
+---
+
+## 三之一、 生产者与派生视图的分工
+
+自审运行（`scripts/run-self-audit.js`）每次同时写入两份产物：
+
+| 产物 | 形态 | 定位 |
+| :--- | :--- | :--- |
+| `reports/self-audit-baseline.json` | 聚合基线 | **无损记录**，五处既有读取方的唯一依赖 |
+| `reports/self-audit-baseline.cas.json` | CAS v3 侧车 | **派生视图**，供模型上下文与跨会话比对 |
+
+侧车的向量预算固定为 `60`：基线是聚合视图，若侧车发射全量向量，它会比它所伴随的聚合文件大出数倍，反而失去存在意义。差额由 `truncated` 如实登记。
+
+在生产侧车之前，仓内 `*.cas.json` 数量为零——紧凑格式只能由离线迁移器生成。这意味着移除历史适配器会直接删掉唯一读取通路，因此「生产者原生写出侧车」是兼容层退役的前置条件，而非可选优化。
 
 ---
 
@@ -146,4 +184,6 @@ node auto-refactor/scripts/migrate-report-artifacts.js auto-refactor/reports --w
 cd auto-refactor && npm run build && node scripts/validate-compact-schema.js
 ```
 
-该套件断言七件事：投影保真（判定/计数/维度/瓶颈/截断）、`includeInfo` 策略、向量位置布局与严重度排序、反水合往返一致、体积收益比例、四代历史工件归一与未知形状拒绝、`render(report, 'compact')` 派发可达。
+该套件断言八件事：投影保真（判定/计数/维度/瓶颈/截断）、`includeInfo` 策略、向量位置布局与严重度排序、反水合往返一致、体积收益比例、四代历史工件归一与未知形状拒绝、重叠声明的附加性与坐标/簇双域限定、`render(report, 'compact')` 派发可达。
+
+其中重叠声明一项额外覆盖截断边界：预算落在同一坐标的成员之间时，声明仍须完整报出两个成员，且被扣留的那个确实不在 `vectors` 中。只断言未截断路径会漏掉这个缺陷——声明在真实预算下恒为空也能通过。
