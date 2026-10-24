@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
 import sys
@@ -28,48 +29,72 @@ from play_mod_common import (
 )
 
 
+@dataclass(slots=True)
+class ObservationPayloadContext:
+    """观测包构建载荷参数对象 (GOV-DAT-001)。"""
+
+    session_id: str
+    step_index: int
+    current_node_id: str | None
+    node_type: str
+    narrative_key: str
+    text_source: str
+    raw_text: str
+    hydrated_text: str
+    available_choices: list[str]
+    character_snapshot: dict[str, Any]
+    applied_mutations: list[dict[str, Any]]
+    history_depth: int
+    is_terminal: bool
+    error_code: str | None = None
+    error_message: str | None = None
+    background_asset: str | None = None
+    bgm_asset: str | None = None
+
+
+@dataclass(slots=True)
+class InteractivePlayConfig:
+    """长程交互推演配置 (GOV-DAT-001)。"""
+
+    mod_paths: list[Path]
+    player_name: str
+    race_id: str
+    gender: str
+    origin_id_param: str | None = None
+    trait_pair_param: str | None = None
+    reroll_nonce: int = 0
+    seed: str = "kalarmod"
+
+
 def build_observation_payload(
-    session_id: str,
-    step_index: int,
-    current_node_id: str | None,
-    node_type: str,
-    narrative_key: str,
-    text_source: str,
-    raw_text: str,
-    hydrated_text: str,
-    available_choices: list[str],
-    character_snapshot: dict[str, Any],
-    applied_mutations: list[dict[str, Any]],
-    history_depth: int,
-    is_terminal: bool,
-    error_code: str | None = None,
-    error_message: str | None = None,
-    background_asset: str | None = None,
-    bgm_asset: str | None = None,
+    ctx: ObservationPayloadContext | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """构造符合 kalar.mod_sdk.observation.v1 标准契约的单步观测包字典。"""
+    if ctx is None:
+        ctx = ObservationPayloadContext(**kwargs)
     payload: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION_OBSERVATION,
-        "session_id": session_id,
-        "step_index": step_index,
-        "current_node_id": current_node_id,
-        "node_type": node_type,
-        "narrative_key": narrative_key,
-        "text_source": text_source,
-        "raw_text": raw_text,
-        "hydrated_text": hydrated_text,
-        "available_choices": available_choices,
-        "character_snapshot": character_snapshot,
-        "applied_mutations": applied_mutations,
-        "history_depth": history_depth,
-        "is_terminal": is_terminal,
-        "error_code": error_code,
-        "error_message": error_message,
+        "session_id": ctx.session_id,
+        "step_index": ctx.step_index,
+        "current_node_id": ctx.current_node_id,
+        "node_type": ctx.node_type,
+        "narrative_key": ctx.narrative_key,
+        "text_source": ctx.text_source,
+        "raw_text": ctx.raw_text,
+        "hydrated_text": ctx.hydrated_text,
+        "available_choices": ctx.available_choices,
+        "character_snapshot": ctx.character_snapshot,
+        "applied_mutations": ctx.applied_mutations,
+        "history_depth": ctx.history_depth,
+        "is_terminal": ctx.is_terminal,
+        "error_code": ctx.error_code,
+        "error_message": ctx.error_message,
     }
-    if background_asset is not None:
-        payload["background_asset"] = background_asset
-    if bgm_asset is not None:
-        payload["bgm_asset"] = bgm_asset
+    if ctx.background_asset is not None:
+        payload["background_asset"] = ctx.background_asset
+    if ctx.bgm_asset is not None:
+        payload["bgm_asset"] = ctx.bgm_asset
     return payload
 
 
@@ -79,7 +104,9 @@ def emit_json_line(data: dict[str, Any]) -> None:
     sys.stdout.flush()
 
 
-def apply_single_mutation(m: dict[str, Any], char_state: dict[str, Any], context: dict[str, Any]) -> None:
+def apply_single_mutation(
+    m: dict[str, Any], char_state: dict[str, Any], context: dict[str, Any]
+) -> None:
     """结算单个突变事件。"""
     mtype = m.get("type")
     if mtype == "GoldGranted":
@@ -183,7 +210,7 @@ def handle_interactive_rollback(
     s_ctx["visited"] = list(prev_state["visited"])
     s_ctx["all_applied_mutations"] = list(prev_state["mutations"])
     s_ctx["transcript_steps"] = [dict(s) for s in prev_state["transcript_steps"]]
-    s_ctx["is_term"] = (curr in terminals or s_ctx["ntype"] == "TERMINAL_EXIT")
+    s_ctx["is_term"] = curr in terminals or s_ctx["ntype"] == "TERMINAL_EXIT"
 
     rollback_obs = build_observation_payload(
         session_id=session_id,
@@ -239,19 +266,21 @@ def handle_interactive_choose(
         emit_json_line(err_obs)
         return False
 
-    history_stack.append({
-        "step_index": s_ctx["step_index"],
-        "curr": s_ctx["curr"],
-        "raw_text": s_ctx["raw_text"],
-        "text_source": s_ctx["text_source"],
-        "hydrated_text": s_ctx["hydrated_text"],
-        "choices": list(choices),
-        "char": dict(s_ctx["current_char"]),
-        "context": dict(s_ctx["context"]),
-        "visited": list(s_ctx["visited"]),
-        "mutations": list(s_ctx["all_applied_mutations"]),
-        "transcript_steps": [dict(s) for s in s_ctx["transcript_steps"]],
-    })
+    history_stack.append(
+        {
+            "step_index": s_ctx["step_index"],
+            "curr": s_ctx["curr"],
+            "raw_text": s_ctx["raw_text"],
+            "text_source": s_ctx["text_source"],
+            "hydrated_text": s_ctx["hydrated_text"],
+            "choices": list(choices),
+            "char": dict(s_ctx["current_char"]),
+            "context": dict(s_ctx["context"]),
+            "visited": list(s_ctx["visited"]),
+            "mutations": list(s_ctx["all_applied_mutations"]),
+            "transcript_steps": [dict(s) for s in s_ctx["transcript_steps"]],
+        }
+    )
 
     if s_ctx["transcript_steps"]:
         s_ctx["transcript_steps"][-1]["selected_next_node"] = target_node
@@ -276,21 +305,23 @@ def handle_interactive_choose(
     s_ctx["hydrated_text"] = hydrated_text
     s_ctx["choices"] = nxt_choices
 
-    s_ctx["transcript_steps"].append({
-        "step_index": s_ctx["step_index"],
-        "branch_index": 1,
-        "node_id": target_node,
-        "node_type": ntype,
-        "narrative_key": nkey,
-        "text_source": text_source,
-        "raw_text": raw_text,
-        "hydrated_text": hydrated_text,
-        "available_choices": nxt_choices,
-        "selected_next_node": None,
-        "mutations_on_complete": mutations,
-    })
+    s_ctx["transcript_steps"].append(
+        {
+            "step_index": s_ctx["step_index"],
+            "branch_index": 1,
+            "node_id": target_node,
+            "node_type": ntype,
+            "narrative_key": nkey,
+            "text_source": text_source,
+            "raw_text": raw_text,
+            "hydrated_text": hydrated_text,
+            "available_choices": nxt_choices,
+            "selected_next_node": None,
+            "mutations_on_complete": mutations,
+        }
+    )
 
-    is_term = (target_node in terminals or ntype == "TERMINAL_EXIT")
+    is_term = target_node in terminals or ntype == "TERMINAL_EXIT"
     s_ctx["is_term"] = is_term
     step_obs = build_observation_payload(
         session_id=session_id,
@@ -312,31 +343,30 @@ def handle_interactive_choose(
 
 
 def play_mod_interactive(
-    mod_paths: list[Path],
-    player_name: str,
-    race_id: str,
-    gender: str,
-    origin_id_param: str | None,
-    trait_pair_param: str | None,
-    reroll_nonce: int,
-    seed: str,
+    cfg: InteractivePlayConfig | None = None,
+    **kwargs: Any,
 ) -> tuple[dict[str, Any], bool]:
     """启动基于 stdio 的 Agent 长程交互式单步推演会话。"""
-    session_id = f"SESSION_{hashlib.sha256(f'{seed}:{player_name}'.encode('utf-8')).hexdigest()[:12]}"
+    if cfg is None:
+        cfg = InteractivePlayConfig(**kwargs)
+
+    session_id = f"SESSION_{hashlib.sha256(f'{cfg.seed}:{cfg.player_name}'.encode('utf-8')).hexdigest()[:12]}"
 
     bundle, fail_transcript = prepare_session(
-        mod_paths=mod_paths,
-        player_name=player_name,
-        race_id=race_id,
-        gender=gender,
-        origin_id_param=origin_id_param,
-        trait_pair_param=trait_pair_param,
-        reroll_nonce=reroll_nonce,
-        seed=seed,
+        mod_paths=cfg.mod_paths,
+        player_name=cfg.player_name,
+        race_id=cfg.race_id,
+        gender=cfg.gender,
+        origin_id_param=cfg.origin_id_param,
+        trait_pair_param=cfg.trait_pair_param,
+        reroll_nonce=cfg.reroll_nonce,
+        seed=cfg.seed,
         choice_strategy="interactive",
     )
     if bundle is None:
-        err_msg = str(fail_transcript.get("final_state", {}).get("error", "预检或初始化失败"))
+        err_msg = str(
+            fail_transcript.get("final_state", {}).get("error", "预检或初始化失败")
+        )
         err_obs = build_observation_payload(
             session_id=session_id,
             step_index=0,
@@ -408,7 +438,7 @@ def play_mod_interactive(
     mutations = list(nd.get("mutations_on_complete", []))
 
     apply_mutations_to_state(mutations, current_char, context)
-    is_term = (curr in terminals or ntype == "TERMINAL_EXIT")
+    is_term = curr in terminals or ntype == "TERMINAL_EXIT"
 
     s_ctx: dict[str, Any] = {
         "step_index": 0,
@@ -423,19 +453,21 @@ def play_mod_interactive(
         "context": context,
         "visited": [curr],
         "all_applied_mutations": list(mutations),
-        "transcript_steps": [{
-            "step_index": 0,
-            "branch_index": 1,
-            "node_id": curr,
-            "node_type": ntype,
-            "narrative_key": nkey,
-            "text_source": text_source,
-            "raw_text": raw_text,
-            "hydrated_text": hydrated_text,
-            "available_choices": choices,
-            "selected_next_node": None,
-            "mutations_on_complete": mutations,
-        }],
+        "transcript_steps": [
+            {
+                "step_index": 0,
+                "branch_index": 1,
+                "node_id": curr,
+                "node_type": ntype,
+                "narrative_key": nkey,
+                "text_source": text_source,
+                "raw_text": raw_text,
+                "hydrated_text": hydrated_text,
+                "available_choices": choices,
+                "selected_next_node": None,
+                "mutations_on_complete": mutations,
+            }
+        ],
         "history_stack": [],
         "is_term": is_term,
     }
@@ -509,7 +541,11 @@ def play_mod_interactive(
             emit_json_line(err_obs)
             continue
 
-        act_type = str(action_dict.get("action_type") or action_dict.get("action") or "").strip().lower()
+        act_type = (
+            str(action_dict.get("action_type") or action_dict.get("action") or "")
+            .strip()
+            .lower()
+        )
 
         if act_type == "quit":
             break
@@ -519,7 +555,9 @@ def play_mod_interactive(
             continue
 
         if act_type == "choose":
-            handle_interactive_choose(action_dict, session_id, nodes, adj, terminals, i18n_catalog, s_ctx)
+            handle_interactive_choose(
+                action_dict, session_id, nodes, adj, terminals, i18n_catalog, s_ctx
+            )
             continue
 
         err_obs = build_observation_payload(
@@ -547,9 +585,9 @@ def play_mod_interactive(
         visited[-1] in terminals
         or nodes.get(visited[-1], {}).get("node_type") == "TERMINAL_EXIT"
     )
-    prologue_completed = any(
-        m.get("type") == "PrologueCompleted" for m in all_applied
-    ) or reached_term
+    prologue_completed = (
+        any(m.get("type") == "PrologueCompleted" for m in all_applied) or reached_term
+    )
 
     final_state = {
         "prologue_completed": prologue_completed,
@@ -559,7 +597,11 @@ def play_mod_interactive(
         "applied_mutations": all_applied,
         "gold": s_ctx["current_char"].get("gold", 0),
         "location": s_ctx["current_char"].get("birth_region", "CENTRAL_CONTINENT"),
-        "equipment": [s_ctx["current_char"].get("initial_equipment", "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD")],
+        "equipment": [
+            s_ctx["current_char"].get(
+                "initial_equipment", "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD"
+            )
+        ],
     }
     is_success = reached_term and bundle["is_valid"]
     transcript = {

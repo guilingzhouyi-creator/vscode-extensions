@@ -16,8 +16,20 @@ import json
 import sys
 import time
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+
+@dataclass(slots=True)
+class ProtocolRequestContext:
+    """强类型客户端请求信封载荷参数对象 (GOV-DAT-001)。"""
+
+    actor_type: str = "HUMAN_UI"
+    domain: str = "HOME_HUD"
+    action_type: str = "QUERY"
+    payload: Optional[Dict[str, Any]] = None
+    request_id: Optional[str] = None
 
 TOOLS_DIR = Path(__file__).resolve().parent
 MOD_SDK_DIR = TOOLS_DIR.parent
@@ -458,13 +470,24 @@ class KalarProtocolClient:
 
     def build_request(
         self,
-        actor_type: str,
-        domain: str,
-        action_type: str,
-        payload: Optional[Dict[str, Any]] = None,
-        request_id: Optional[str] = None,
+        ctx_or_actor: ProtocolRequestContext | str = "HUMAN_UI",
+        *args: Any,
+        **kwargs: Any,
     ) -> Dict[str, Any]:
         """构建强类型客户端请求信封字典。"""
+        if isinstance(ctx_or_actor, ProtocolRequestContext):
+            actor_type = ctx_or_actor.actor_type
+            domain = ctx_or_actor.domain
+            action_type = ctx_or_actor.action_type
+            payload = ctx_or_actor.payload
+            request_id = ctx_or_actor.request_id
+        else:
+            actor_type = ctx_or_actor
+            domain = args[0] if len(args) > 0 else kwargs.get("domain", "")
+            action_type = args[1] if len(args) > 1 else kwargs.get("action_type", "")
+            payload = args[2] if len(args) > 2 else kwargs.get("payload")
+            request_id = args[3] if len(args) > 3 else kwargs.get("request_id")
+
         now = self.dispatcher.get_current_time_ms()
         req_id = request_id or f"req_{int(now)}_{uuid.uuid4().hex[:8]}"
         lease_nonce = self._lease_counter if actor_type == "HUMAN_UI" else 0

@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,19 @@ from check_mod_common import (
     DiagnosticItem,
     normalize_named_items as _normalize_named_items,
 )
+
+
+@dataclass(slots=True)
+class EntityRegistryContext:
+    """实体 ID 冲突预检登记上下文 (GOV-DAT-001)。"""
+
+    items: list[dict[str, Any]]
+    id_field: str
+    category_label: str
+    pack_id: str
+    rel_file: str
+    seen_registry: dict[str, tuple[str, str]]
+    diags: list[DiagnosticItem]
 
 
 def check_multi_incompatible_packs(
@@ -63,15 +77,28 @@ def check_multi_incompatible_packs(
 
 
 def register_entity_ids(
-    items: list[dict[str, Any]],
-    id_field: str,
-    category_label: str,
-    pack_id: str,
-    rel_file: str,
-    seen_registry: dict[str, tuple[str, str]],
-    diags: list[DiagnosticItem],
+    ctx_or_items: EntityRegistryContext | list[dict[str, Any]],
+    *args: Any,
+    **kwargs: Any,
 ) -> None:
     """登记自定义实体 ID 并拦截跨包同名撞车。"""
+    if isinstance(ctx_or_items, EntityRegistryContext):
+        items = ctx_or_items.items
+        id_field = ctx_or_items.id_field
+        category_label = ctx_or_items.category_label
+        pack_id = ctx_or_items.pack_id
+        rel_file = ctx_or_items.rel_file
+        seen_registry = ctx_or_items.seen_registry
+        diags = ctx_or_items.diags
+    else:
+        items = ctx_or_items
+        id_field = args[0] if len(args) > 0 else kwargs.get("id_field", "")
+        category_label = args[1] if len(args) > 1 else kwargs.get("category_label", "")
+        pack_id = args[2] if len(args) > 2 else kwargs.get("pack_id", "")
+        rel_file = args[3] if len(args) > 3 else kwargs.get("rel_file", "")
+        seen_registry = args[4] if len(args) > 4 else kwargs.get("seen_registry", {})
+        diags = args[5] if len(args) > 5 else kwargs.get("diags", [])
+
     for item in items:
         entity_id = item.get(id_field) or item.get("id")
         if not isinstance(entity_id, str) or not entity_id.strip():
@@ -108,13 +135,37 @@ def check_multi_duplicate_ids(
         rel_file = f"{rec['dir_name']}/destinies.json"
 
         origins = _normalize_named_items(destiny.get("custom_origins"), "origin_id")
-        register_entity_ids(origins, "origin_id", "origin_id", pid, rel_file, seen_origins, diags)
+        register_entity_ids(EntityRegistryContext(
+            items=origins,
+            id_field="origin_id",
+            category_label="origin_id",
+            pack_id=pid,
+            rel_file=rel_file,
+            seen_registry=seen_origins,
+            diags=diags,
+        ))
 
         traits = _normalize_named_items(destiny.get("custom_traits"), "trait_id")
-        register_entity_ids(traits, "trait_id", "trait_id", pid, rel_file, seen_traits, diags)
+        register_entity_ids(EntityRegistryContext(
+            items=traits,
+            id_field="trait_id",
+            category_label="trait_id",
+            pack_id=pid,
+            rel_file=rel_file,
+            seen_registry=seen_traits,
+            diags=diags,
+        ))
 
         kits = _normalize_named_items(destiny.get("custom_starter_kits"), "kit_id")
-        register_entity_ids(kits, "kit_id", "kit_id", pid, rel_file, seen_kits, diags)
+        register_entity_ids(EntityRegistryContext(
+            items=kits,
+            id_field="kit_id",
+            category_label="kit_id",
+            pack_id=pid,
+            rel_file=rel_file,
+            seen_registry=seen_kits,
+            diags=diags,
+        ))
 
 
 def check_multi_ui_policy_conflicts(

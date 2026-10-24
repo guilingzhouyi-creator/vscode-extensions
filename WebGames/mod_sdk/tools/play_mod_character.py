@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import hashlib
 from typing import Any
 
@@ -285,22 +286,33 @@ def pick_starter_kit(
     return all_kits[0]
 
 
+@dataclass(slots=True)
+class CharacterSheetOptions:
+    """创角全量面板解算选项对象 (GOV-DAT-001)。"""
+
+    player_name: str
+    race_id: str
+    gender: str
+    origin_id_param: str | None = None
+    trait_pair_param: str | None = None
+    seed: str = "kalarmod"
+    reroll_nonce: int = 0
+    all_origins: list[dict[str, Any]] = field(default_factory=list)
+    all_traits: list[dict[str, Any]] = field(default_factory=list)
+    all_presets: list[dict[str, Any]] = field(default_factory=list)
+    all_kits: list[dict[str, Any]] = field(default_factory=list)
+
+
 def resolve_character_sheet(
-    player_name: str,
-    race_id: str,
-    gender: str,
-    origin_id_param: str | None,
-    trait_pair_param: str | None,
-    seed: str,
-    reroll_nonce: int,
-    all_origins: list[dict[str, Any]],
-    all_traits: list[dict[str, Any]],
-    all_presets: list[dict[str, Any]],
-    all_kits: list[dict[str, Any]],
+    opts: CharacterSheetOptions | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """解算角色全量面板数据（六维基底 21 点、身世修正、HP/MP/负重、因果天赋与初始行囊）。"""
-    base_attrs = generate_base_attributes(seed, reroll_nonce)
-    selected_origin = pick_origin(all_origins, origin_id_param)
+    if opts is None:
+        opts = CharacterSheetOptions(**kwargs)
+
+    base_attrs = generate_base_attributes(opts.seed, opts.reroll_nonce)
+    selected_origin = pick_origin(opts.all_origins, opts.origin_id_param)
     origin_id = str(selected_origin.get("origin_id") or "IMPERIAL_NOBLE")
     origin_name = str(selected_origin.get("name") or origin_id)
     birth_region = str(selected_origin.get("birth_region") or "CENTRAL_CONTINENT")
@@ -324,9 +336,9 @@ def resolve_character_sheet(
         "max_weight": carry_weight,
     }
 
-    selected_preset, traits_list, trait_summary = pick_trait_pair(all_presets, all_traits, trait_pair_param)
+    selected_preset, traits_list, trait_summary = pick_trait_pair(opts.all_presets, opts.all_traits, opts.trait_pair_param)
     pos_obj, neg_obj = traits_list[0], traits_list[1]
-    selected_kit = pick_starter_kit(all_kits, selected_origin)
+    selected_kit = pick_starter_kit(opts.all_kits, selected_origin)
 
     orig_gold = int(selected_origin.get("initial_gold", 0))
     kit_gold = int(selected_kit.get("initial_gold", 0))
@@ -336,15 +348,15 @@ def resolve_character_sheet(
     initial_items = list(selected_kit.get("initial_items", []))
 
     return {
-        "name": player_name,
-        "player_name": player_name,
-        "character_name": player_name,
-        "character_id": f"CHAR_{origin_id}_{player_name}",
-        "race": race_id.upper(),
-        "race_id": race_id.upper(),
-        "gender": gender.upper(),
-        "seed": seed,
-        "reroll_nonce": reroll_nonce,
+        "name": opts.player_name,
+        "player_name": opts.player_name,
+        "character_name": opts.player_name,
+        "character_id": f"CHAR_{origin_id}_{opts.player_name}",
+        "race": opts.race_id.upper(),
+        "race_id": opts.race_id.upper(),
+        "gender": opts.gender.upper(),
+        "seed": opts.seed,
+        "reroll_nonce": opts.reroll_nonce,
         "origin_id": origin_id,
         "origin_name": origin_name,
         "birth_region": birth_region,

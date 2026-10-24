@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 import re
 import sys
@@ -23,6 +24,7 @@ from play_mod_character import (
     BUILTIN_PAIRED_PRESETS,
     BUILTIN_STARTER_KITS,
     BUILTIN_TRAITS,
+    CharacterSheetOptions,
     build_character_context,
     resolve_character_sheet,
 )
@@ -338,26 +340,37 @@ def load_and_merge_assets(mod_paths: list[Path]) -> dict[str, Any]:
     }
 
 
+@dataclass(slots=True)
+class SessionConfig:
+    """会话准备环境配置参数 (GOV-DAT-001)。"""
+
+    mod_paths: list[Path]
+    player_name: str
+    race_id: str
+    gender: str
+    origin_id_param: str | None = None
+    trait_pair_param: str | None = None
+    reroll_nonce: int = 0
+    seed: str = "kalarmod"
+    choice_strategy: str = "first"
+
+
 def prepare_session(
-    mod_paths: list[Path],
-    player_name: str,
-    race_id: str,
-    gender: str,
-    origin_id_param: str | None,
-    trait_pair_param: str | None,
-    reroll_nonce: int,
-    seed: str,
-    choice_strategy: str,
+    cfg: SessionConfig | None = None,
+    **kwargs: Any,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """准备推演环境、执行静态预检、合并资产、解算创角与解析 DAG 路由。"""
-    if len(mod_paths) > 1:
-        is_valid, diags = validate_multi_mods(mod_paths)
+    if cfg is None:
+        cfg = SessionConfig(**kwargs)
+
+    if len(cfg.mod_paths) > 1:
+        is_valid, diags = validate_multi_mods(cfg.mod_paths)
     else:
-        is_valid, diags = validate_mod(mod_paths[0])
+        is_valid, diags = validate_mod(cfg.mod_paths[0])
 
     precheck_report = {
         "valid": is_valid,
-        "checked_packs": [p.name for p in mod_paths],
+        "checked_packs": [p.name for p in cfg.mod_paths],
         "error_count": len(diags),
         "diagnostics": [d.to_dict() for d in diags],
     }
@@ -375,7 +388,7 @@ def prepare_session(
         }
         return None, fail_transcript
 
-    assets = load_and_merge_assets(mod_paths)
+    assets = load_and_merge_assets(cfg.mod_paths)
     all_origins = assets["all_origins"]
     all_traits = assets["all_traits"]
     all_presets = assets["all_presets"]
@@ -386,19 +399,20 @@ def prepare_session(
     merged_dag_graphs = assets["merged_dag_graphs"]
     merged_i18n_catalog = assets["merged_i18n_catalog"]
 
-    char_sheet = resolve_character_sheet(
-        player_name=player_name,
-        race_id=race_id,
-        gender=gender,
-        origin_id_param=origin_id_param,
-        trait_pair_param=trait_pair_param,
-        seed=seed,
-        reroll_nonce=reroll_nonce,
+    sheet_opts = CharacterSheetOptions(
+        player_name=cfg.player_name,
+        race_id=cfg.race_id,
+        gender=cfg.gender,
+        origin_id_param=cfg.origin_id_param,
+        trait_pair_param=cfg.trait_pair_param,
+        seed=cfg.seed,
+        reroll_nonce=cfg.reroll_nonce,
         all_origins=all_origins,
         all_traits=all_traits,
         all_presets=all_presets,
         all_kits=all_kits,
     )
+    char_sheet = resolve_character_sheet(sheet_opts)
 
     selected_orig = next(
         (o for o in all_origins if str(o.get("origin_id") or o.get("id")) == char_sheet["origin_id"]),
@@ -408,16 +422,16 @@ def prepare_session(
         merged_custom_rules=merged_custom_rules,
         merged_routing_rules=merged_routing_rules,
         selected_origin=selected_orig,
-        race_id=race_id,
+        race_id=cfg.race_id,
     )
 
     dag_routing = {
         "target_dag_id": target_dag_id,
         "dag_id": target_dag_id,
         "routing_source": routing_source,
-        "matched_race_id": race_id.upper(),
+        "matched_race_id": cfg.race_id.upper(),
         "matched_origin_id": char_sheet["origin_id"],
-        "choice_strategy": choice_strategy,
+        "choice_strategy": cfg.choice_strategy,
     }
 
     target_dag_data = merged_dag_graphs.get(target_dag_id)

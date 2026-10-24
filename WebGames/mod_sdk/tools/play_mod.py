@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import hashlib
 import json
 import sys
@@ -216,30 +217,41 @@ def _simulate_steps(
     return steps, final_state, reached_term
 
 
+@dataclass(slots=True)
+class PlaySuiteContext:
+    """MOD 试玩推演参数上下文 (GOV-DAT-001)。"""
+
+    mod_paths: list[Path]
+    player_name: str
+    race_id: str
+    gender: str
+    origin_id_param: str | None = None
+    trait_pair_param: str | None = None
+    reroll_nonce: int = 0
+    seed: str = "kalarmod"
+    choices_param: str | None = None
+    choice_strategy: str = "first"
+    with_hud: bool = False
+
+
 def play_mod_suite(
-    mod_paths: list[Path],
-    player_name: str,
-    race_id: str,
-    gender: str,
-    origin_id_param: str | None,
-    trait_pair_param: str | None,
-    reroll_nonce: int,
-    seed: str,
-    choices_param: str | None,
-    choice_strategy: str,
-    with_hud: bool = False,
+    ctx: PlaySuiteContext | None = None,
+    **kwargs: Any,
 ) -> tuple[dict[str, Any], bool]:
     """执行完整的预检、面板解算、路由装配与批处理推演闭环（100% 向后兼容）。"""
+    if ctx is None:
+        ctx = PlaySuiteContext(**kwargs)
+
     bundle, fail_transcript = prepare_session(
-        mod_paths=mod_paths,
-        player_name=player_name,
-        race_id=race_id,
-        gender=gender,
-        origin_id_param=origin_id_param,
-        trait_pair_param=trait_pair_param,
-        reroll_nonce=reroll_nonce,
-        seed=seed,
-        choice_strategy=choice_strategy,
+        mod_paths=ctx.mod_paths,
+        player_name=ctx.player_name,
+        race_id=ctx.race_id,
+        gender=ctx.gender,
+        origin_id_param=ctx.origin_id_param,
+        trait_pair_param=ctx.trait_pair_param,
+        reroll_nonce=ctx.reroll_nonce,
+        seed=ctx.seed,
+        choice_strategy=ctx.choice_strategy,
     )
     if bundle is None:
         return fail_transcript, False
@@ -248,9 +260,9 @@ def play_mod_suite(
         dag_data=bundle["target_dag_data"],
         i18n_catalog=bundle["merged_i18n_catalog"],
         context=bundle["context"],
-        choices_param=choices_param,
-        choice_strategy=choice_strategy,
-        seed=seed,
+        choices_param=ctx.choices_param,
+        choice_strategy=ctx.choice_strategy,
+        seed=ctx.seed,
     )
 
     is_success = reached_term and bundle["is_valid"]
@@ -264,7 +276,7 @@ def play_mod_suite(
         "transcript_steps": steps,
         "final_state": final_state,
     }
-    if with_hud:
+    if ctx.with_hud:
         char_sheet = bundle.get("char_sheet") or {}
         transcript["initial_hud_snapshot"] = {
             "hp": char_sheet.get("hp", 100.0),

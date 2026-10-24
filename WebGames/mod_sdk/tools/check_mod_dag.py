@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,30 @@ from check_mod_common import (
     DiagnosticItem,
     safe_load_json as _safe_load_json,
 )
+
+
+@dataclass(slots=True)
+class DagCycleDetectionContext:
+    """DAG Kahn 环检测参数上下文 (GOV-DAT-001)。"""
+
+    nodes: dict[str, Any]
+    adj: dict[str, list[str]]
+    in_degree: dict[str, int]
+    rel_name: str
+    diags: list[DiagnosticItem]
+
+
+@dataclass(slots=True)
+class DagReachabilityContext:
+    """DAG 可达性与连通性校验参数上下文 (GOV-DAT-001)。"""
+
+    nodes: dict[str, Any]
+    entry_id: str | None
+    terminals: list[str]
+    adj: dict[str, list[str]]
+    rev_adj: dict[str, list[str]]
+    rel_name: str
+    diags: list[DiagnosticItem]
 
 
 def check_dag_entries_and_terminals(
@@ -109,13 +134,24 @@ def build_dag_graph_structure(
 
 
 def detect_dag_cycle_kahn(
-    nodes: dict[str, Any],
-    adj: dict[str, list[str]],
-    in_degree: dict[str, int],
-    rel_name: str,
-    diags: list[DiagnosticItem],
+    ctx_or_nodes: DagCycleDetectionContext | dict[str, Any],
+    *args: Any,
+    **kwargs: Any,
 ) -> None:
     """使用 Kahn 拓扑排序算法检测死锁有向环。"""
+    if isinstance(ctx_or_nodes, DagCycleDetectionContext):
+        nodes = ctx_or_nodes.nodes
+        adj = ctx_or_nodes.adj
+        in_degree = ctx_or_nodes.in_degree
+        rel_name = ctx_or_nodes.rel_name
+        diags = ctx_or_nodes.diags
+    else:
+        nodes = ctx_or_nodes
+        adj = args[0] if len(args) > 0 else kwargs.get("adj", {})
+        in_degree = args[1] if len(args) > 1 else kwargs.get("in_degree", {})
+        rel_name = args[2] if len(args) > 2 else kwargs.get("rel_name", "")
+        diags = args[3] if len(args) > 3 else kwargs.get("diags", [])
+
     deg_copy = dict(in_degree)
     zero_queue = [nid for nid, d in deg_copy.items() if d == 0]
     visited_count = 0
@@ -139,15 +175,28 @@ def detect_dag_cycle_kahn(
 
 
 def check_reachability(
-    nodes: dict[str, Any],
-    entry_id: str | None,
-    terminals: list[str],
-    adj: dict[str, list[str]],
-    rev_adj: dict[str, list[str]],
-    rel_name: str,
-    diags: list[DiagnosticItem],
+    ctx_or_nodes: DagReachabilityContext | dict[str, Any],
+    *args: Any,
+    **kwargs: Any,
 ) -> None:
     """检查连通性与可达性：所有节点自入口可达，且所有路径均可到达终点。"""
+    if isinstance(ctx_or_nodes, DagReachabilityContext):
+        nodes = ctx_or_nodes.nodes
+        entry_id = ctx_or_nodes.entry_id
+        terminals = ctx_or_nodes.terminals
+        adj = ctx_or_nodes.adj
+        rev_adj = ctx_or_nodes.rev_adj
+        rel_name = ctx_or_nodes.rel_name
+        diags = ctx_or_nodes.diags
+    else:
+        nodes = ctx_or_nodes
+        entry_id = args[0] if len(args) > 0 else kwargs.get("entry_id")
+        terminals = args[1] if len(args) > 1 else kwargs.get("terminals", [])
+        adj = args[2] if len(args) > 2 else kwargs.get("adj", {})
+        rev_adj = args[3] if len(args) > 3 else kwargs.get("rev_adj", {})
+        rel_name = args[4] if len(args) > 4 else kwargs.get("rel_name", "")
+        diags = args[5] if len(args) > 5 else kwargs.get("diags", [])
+
     if not entry_id:
         return
 
@@ -275,5 +324,19 @@ def check_dag_file(
 
     entry_id, terminals = check_dag_entries_and_terminals(nodes, rel_name, diags)
     adj, rev_adj, in_deg = build_dag_graph_structure(nodes, edges, rel_name, diags)
-    detect_dag_cycle_kahn(nodes, adj, in_deg, rel_name, diags)
-    check_reachability(nodes, entry_id, terminals, adj, rev_adj, rel_name, diags)
+    detect_dag_cycle_kahn(DagCycleDetectionContext(
+        nodes=nodes,
+        adj=adj,
+        in_degree=in_deg,
+        rel_name=rel_name,
+        diags=diags,
+    ))
+    check_reachability(DagReachabilityContext(
+        nodes=nodes,
+        entry_id=entry_id,
+        terminals=terminals,
+        adj=adj,
+        rev_adj=rev_adj,
+        rel_name=rel_name,
+        diags=diags,
+    ))
