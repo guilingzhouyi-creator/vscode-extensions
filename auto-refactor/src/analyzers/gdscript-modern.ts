@@ -18,10 +18,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
 import { ANALYZER_GDSCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import type { SourceMaskConfig } from '../core/policy/source-mask';
-import {
-    DeclarativeModernAnalyzer,
-    type DeclarativeLineRule,
-} from './declarative-modern-pack';
+import { DeclarativeModernAnalyzer, type DeclarativeLineRule } from './declarative-modern-pack';
 
 const SEV_WARN: Severity = 'warning';
 const SEV_INFO: Severity = 'info';
