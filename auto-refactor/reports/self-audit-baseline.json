@@ -1,15 +1,15 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792814518460",
-  "timestamp": "2026-10-24T04:02:15.356Z",
-  "cai": 78.62,
+  "snapshotId": "snapshot-v0.4.0-1792818979216",
+  "timestamp": "2026-10-24T05:16:30.312Z",
+  "cai": 78.6,
   "autonomy": {
-    "compositeAutonomyIndex": 78.62,
+    "compositeAutonomyIndex": 78.6,
     "grade": "L3_BALANCED",
     "gradeDescription": "Balanced autonomy: Core business is proprietary with moderate collaboration with mainstream frameworks and cloud ecosystems",
     "dimensions": {
       "effectiveLocAutonomy": 100,
       "symbolCallAutonomy": 97.46,
-      "domainKernelDensity": 62.7,
+      "domainKernelDensity": 62.57,
       "codeOriginality": 20,
       "supplyChainResilience": 77.27,
       "criticalPathAutonomy": 90
@@ -24,9 +24,9 @@
     },
     "confidence": {
       "sampleSufficiency": 1,
-      "lowerBound": 77.33,
-      "upperBound": 79.87,
-      "credibleScore": 78.61,
+      "lowerBound": 77.31,
+      "upperBound": 79.85,
+      "credibleScore": 78.59,
       "isLowConfidence": false
     },
     "supplyChain": {
@@ -65,15 +65,15 @@
       }
     ],
     "stats": {
-      "totalFiles": 721,
-      "proprietaryFiles": 721,
+      "totalFiles": 722,
+      "proprietaryFiles": 722,
       "vendorFiles": 0,
       "generatedFiles": 0,
-      "totalEffectiveLoc": 210514,
-      "proprietaryEffectiveLoc": 210514,
+      "totalEffectiveLoc": 211198,
+      "proprietaryEffectiveLoc": 211198,
       "vendorEffectiveLoc": 0,
       "generatedEffectiveLoc": 0,
-      "internalSymbolCalls": 1842,
+      "internalSymbolCalls": 1844,
       "externalSdkCalls": 48,
       "stdlibCalls": 606,
       "criticalPathFiles": 17,
@@ -82,8 +82,8 @@
     }
   },
   "polyglotGeneralization": {
-    "index": 95.92,
-    "meanScore": 95.92,
+    "index": 95.9,
+    "meanScore": 95.9,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -99,34 +99,34 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 721,
-    "durationMs": 13924
+    "filesScanned": 722,
+    "durationMs": 9152
   },
   "metrics": {
     "compositeScore": 99.03,
     "grade": "A+",
-    "autonomyRate": 78.62,
+    "autonomyRate": 78.6,
     "polyglotGeneralization": {
-      "index": 95.92,
-      "meanScore": 95.92,
+      "index": 95.9,
+      "meanScore": 95.9,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 4806,
+    "totalIssues": 4839,
     "suppressedIssues": 137,
-    "unsuppressedIssues": 4669,
+    "unsuppressedIssues": 4702,
     "bySeverity": {
-      "info": 583,
-      "warning": 4223,
+      "info": 589,
+      "warning": 4250,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
-      "medium": 2444,
-      "low": 2362
+      "medium": 2458,
+      "low": 2381
     }
   },
   "eightPillars": {
@@ -134,11 +134,11 @@
       "architecture": 99.74,
       "maintainability": 97.71,
       "performance": 99.65,
-      "data": 98.03,
+      "data": 98.02,
       "testing": 99.84,
       "reliability": 99.73,
       "security": 99.88,
-      "extensibility": 97.29
+      "extensibility": 97.27
     },
     "compositeScore": 99.03,
     "weights": {
@@ -155,14 +155,14 @@
   },
   "tenDimensions": {
     "architectureConsistency": 99.74,
-    "semanticPurity": 99.56,
+    "semanticPurity": 99.55,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.65,
-    "standardization": 95.35,
+    "standardization": 95.33,
     "modernity": 99.84,
     "maintainability": 97.71,
     "commentQuality": 100,
-    "duplication": 96.5,
+    "duplication": 96.49,
     "techDebtRisk": 99.9
   },
   "topHotspots": [
@@ -176,6 +176,15 @@
       "effectiveDensity": 0.94
     },
     {
+      "filePath": "src/core/reporting/compact-report-migrator.ts",
+      "domain": "reporting",
+      "totalIssues": 39,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 97.27,
+      "effectiveDensity": 0.95
+    },
+    {
       "filePath": "scripts/validate-warm.js",
       "domain": "scripts",
       "totalIssues": 34,
@@ -183,15 +192,6 @@
       "highCount": 0,
       "compositeScore": 96.56,
       "effectiveDensity": 0.94
-    },
-    {
-      "filePath": "src/core/reporting/compact-report-migrator.ts",
-      "domain": "reporting",
-      "totalIssues": 33,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.47,
-      "effectiveDensity": 0.95
     },
     {
       "filePath": "scripts/bench-warm.js",
@@ -261,8 +261,8 @@
     "summary": {
       "critical": 0,
       "high": 0,
-      "medium": 2444,
-      "low": 2362
+      "medium": 2458,
+      "low": 2381
     },
     "criticalItems": [],
     "highItems": []
@@ -271,16 +271,16 @@
     "domains": [
       {
         "domainName": "scripts",
-        "compositeScore": 99.32,
+        "compositeScore": 99.31,
         "pillars": {
           "architecture": 99.82,
-          "maintainability": 98.33,
+          "maintainability": 98.32,
           "performance": 99.65,
           "data": 99.31,
           "testing": 99.99,
           "reliability": 99.75,
           "security": 99.89,
-          "extensibility": 97.65
+          "extensibility": 97.64
         },
         "moduleCount": 1
       },
@@ -541,16 +541,16 @@
       },
       {
         "domainName": "rules",
-        "compositeScore": 98.64,
+        "compositeScore": 98.59,
         "pillars": {
-          "architecture": 99.6,
-          "maintainability": 97.17,
+          "architecture": 99.63,
+          "maintainability": 97.06,
           "performance": 100,
-          "data": 96.56,
-          "testing": 99.87,
-          "reliability": 99.8,
+          "data": 96.37,
+          "testing": 99.88,
+          "reliability": 99.72,
           "security": 99.86,
-          "extensibility": 95.42
+          "extensibility": 95.34
         },
         "moduleCount": 1
       },
@@ -781,14 +781,14 @@
       },
       {
         "domainName": "presentation",
-        "compositeScore": 99.43,
+        "compositeScore": 99.38,
         "pillars": {
           "architecture": 99,
           "maintainability": 99.25,
           "performance": 100,
-          "data": 98.75,
+          "data": 98.5,
           "testing": 99.92,
-          "reliability": 100,
+          "reliability": 99.75,
           "security": 99.92,
           "extensibility": 98.43
         },
@@ -871,7 +871,7 @@
       },
       {
         "domainName": "reporting",
-        "compositeScore": 99.25,
+        "compositeScore": 99.23,
         "pillars": {
           "architecture": 100,
           "maintainability": 98.91,
@@ -880,7 +880,7 @@
           "testing": 100,
           "reliability": 99.63,
           "security": 99.9,
-          "extensibility": 97.25
+          "extensibility": 97.09
         },
         "moduleCount": 1
       },
@@ -1113,27 +1113,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 164989,
-      "unique": 133657,
-      "changed": 399,
-      "semantic": 319,
+      "processed": 165438,
+      "unique": 134025,
+      "changed": 1825,
+      "semantic": 1460,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 200,
+      "added": 913,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792814518457,
+      "endMs": 1792818979213,
       "totalRuns": 353,
       "eloc": {
-        "processedTotal": 50107691,
-        "uniqueTotal": 133657,
-        "changedTotal": 1109454,
-        "semanticTotal": 887563
+        "processedTotal": 50159953,
+        "uniqueTotal": 134025,
+        "changedTotal": 1011090,
+        "semanticTotal": 808871
       },
       "qed": {
         "mean": 0.0001,
@@ -1141,8 +1141,8 @@
         "max": 0.18
       },
       "debt": {
-        "totalAdded": 1707,
-        "totalResolved": 2190,
+        "totalAdded": 1709,
+        "totalResolved": 2106,
         "totalRegressions": 0,
         "netYield": 0.01
       },
