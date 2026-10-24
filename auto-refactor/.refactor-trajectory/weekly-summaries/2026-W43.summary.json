@@ -1,13 +1,13 @@
 {
   "weekId": "2026-W43",
-  "startMs": 1792734989546,
-  "endMs": 1792811724248,
+  "startMs": 1792736314739,
+  "endMs": 1792813043344,
   "totalRuns": 101,
   "eloc": {
-    "processedTotal": 16378559,
+    "processedTotal": 16381824,
     "uniqueTotal": 132856,
-    "changedTotal": 847375,
-    "semanticTotal": 677904
+    "changedTotal": 852702,
+    "semanticTotal": 682165
   },
   "qed": {
     "mean": 0,
