@@ -14,8 +14,8 @@
 
 提供细则正文智能主题词提取、停用词与样板过滤、全宗元数据聚合统计
 以及归档库关键词全量重构与总目录同步功能。"""
-import re
 from pathlib import Path
+import re
 
 from archive.constants import (
     BOILERPLATE_BLACK_LIST,
@@ -28,7 +28,6 @@ from archive.constants import (
     STOP_CLASSES,
 )
 from archive.metadata import minify_markdown_text
-
 _INVENTORY_CACHE: tuple[dict[str, int], int, int] | None = None
 
 

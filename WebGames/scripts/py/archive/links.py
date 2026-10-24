@@ -13,13 +13,12 @@
 """links.py — 归档迁移 Markdown 链接拓扑重算引擎。
 
 提供基于拓扑真实路径与周期改名映射表的相对链接与图片链接动态重算。"""
-import os
-import re
 from pathlib import Path
 from typing import Any
+import os
+import re
 
 from audit_common import resolve_repo_root
-
 ROOT = resolve_repo_root()
 
 

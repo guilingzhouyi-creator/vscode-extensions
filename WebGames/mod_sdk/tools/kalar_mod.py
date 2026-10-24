@@ -20,16 +20,14 @@
 """卡拉尔世界引擎 MOD 统一开发套件 CLI 门面。"""
 
 from __future__ import annotations
-
+from pathlib import Path
+from typing import Any
 import argparse
 import hashlib
 import json
 import os
 import sys
 import zipfile
-from pathlib import Path
-from typing import Any
-
 VERSION_STRING: str = "kalar-mod v1.0.0"
 
 # 确保本工具同级目录在 sys.path 中
@@ -387,8 +385,8 @@ def _handle_pack(args: argparse.Namespace) -> int:
                     zf.write(file_path, arcname)
                     packaged_files.append(arcname)
                     total_uncompressed_bytes += file_path.stat().st_size
-    except OSError as err:
-        err_msg = f"生成 ZIP 压缩包失败: {err}"
+    except OSError as exc:
+        err_msg = f"生成 ZIP 压缩包失败: {exc}"
         if args.as_json:
             print(json.dumps({"success": False, "error": err_msg}, ensure_ascii=False))
         else:

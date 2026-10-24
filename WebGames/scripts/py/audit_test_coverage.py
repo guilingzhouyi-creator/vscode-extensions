@@ -12,16 +12,15 @@
 #   python scripts/py/audit_test_coverage.py --json
 # ==============================================================================
 """审查 backend/domains 各域是否被 tests/unit 单测覆盖（提示级）。"""
-import argparse
-import re
-import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any
+import argparse
+import re
+import sys
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -42,25 +41,25 @@ ROOT_DOMAIN = "(root)"
 class ScanContext:
     """测试文件扫描共享上下文与缓存容器。"""
 
-    class_index: Dict[str, str]
-    domain_set: Set[str]
-    coverage: Dict[str, Set[str]]
+    class_index: dict[str, str]
+    domain_set: set[str]
+    coverage: dict[str, set[str]]
 
 
 @dataclass
 class CoverageReportData:
     """覆盖率报告渲染所需的数据实体包。"""
 
-    domains: List[str]
+    domains: list[str]
     test_files_count: int
     class_index_count: int
-    coverage: Dict[str, Set[str]]
-    uncovered: List[str]
+    coverage: dict[str, set[str]]
+    uncovered: list[str]
 
 
-def build_class_index() -> Dict[str, str]:
+def build_class_index() -> dict[str, str]:
     """建立 class_name 到所属域目录名（相对 domains/ 第一层目录）的索引映射。"""
-    index: Dict[str, str] = {}
+    index: dict[str, str] = {}
     for f in DOMAINS_DIR.rglob(GD_GLOB):
         rel = f.relative_to(DOMAINS_DIR)
         domain = rel.parts[0] if len(rel.parts) > 1 else ROOT_DOMAIN
@@ -92,9 +91,9 @@ def _scan_single_test_file(tf: Path, ctx: ScanContext) -> None:
             ctx.coverage[dom].add(tf.name)
 
 
-def calculate_domain_coverage(test_files: List[Path], class_index: Dict[str, str], domains: List[str]) -> Dict[str, Set[str]]:
+def calculate_domain_coverage(test_files: list[Path], class_index: dict[str, str], domains: list[str]) -> dict[str, set[str]]:
     """统计测试文件对领域目录的覆盖映射字典。"""
-    coverage: Dict[str, Set[str]] = defaultdict(set)
+    coverage: dict[str, set[str]] = defaultdict(set)
     ctx = ScanContext(
         class_index=class_index,
         domain_set=set(domains),

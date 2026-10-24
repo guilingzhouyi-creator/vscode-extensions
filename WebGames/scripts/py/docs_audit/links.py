@@ -11,12 +11,12 @@
 #   check_links(doc, docs_map, add_fn, get_doc_fn, abs_target_fn, rel_fn)
 # ==============================================================================
 """Markdown 相对路径死链、锚点有效性与 file:/// 绝对路径重写。"""
-import os
-import re
-import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
+import os
+import re
+import urllib.parse
 
 from docs_audit.models import (
     ABSLINK_RE,
@@ -24,7 +24,6 @@ from docs_audit.models import (
     RELLINK_RE,
     slugify,
 )
-
 HASH_SEP = "#"
 HYPHEN_SEP = "-"
 

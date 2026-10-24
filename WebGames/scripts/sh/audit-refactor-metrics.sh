@@ -25,12 +25,12 @@ for C in python3 python; do
     break
   fi
 done
-if [ -z "$PY" ]; then
+if [[ -z "$PY" ]]; then
   echo "【audit-refactor-metrics】python3/python 缺失"
   exit 2
 fi
 
-cd "$ROOT_DIR"
+cd "$ROOT_DIR" || exit 1
 "$PY" -X utf8 scripts/py/audit_refactor_metrics.py "$@"
 code=$?
 case "$code" in

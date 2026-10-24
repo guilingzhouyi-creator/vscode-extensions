@@ -11,11 +11,10 @@
 #   check_mermaid(doc, add_fn)
 # ==============================================================================
 """Mermaid 图表语法健康度审查与节点标签特殊符号自动修复。"""
-import re
 from typing import Callable
+import re
 
 from docs_audit.models import Doc, FENCE_RE
-
 NODE_RE = re.compile(r"([\w\u4e00-\u9fff])\s*([\[\(\{])")
 MERMAID_SKIP_RE = re.compile(
     r"^\s*(%%|subgraph\b|end\s*$|classDef\b|class\s|style\s|linkStyle\b|direction\b|"

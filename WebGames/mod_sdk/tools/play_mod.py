@@ -15,15 +15,13 @@
 """卡拉尔世界引擎 MOD 无头试玩推演引擎与结构化战报发生器。"""
 
 from __future__ import annotations
-
-import argparse
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+import argparse
 import hashlib
 import json
 import sys
-from pathlib import Path
-from typing import Any
-
 # 将本脚本所在目录加入 sys.path，以便无缝导入模块
 TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:

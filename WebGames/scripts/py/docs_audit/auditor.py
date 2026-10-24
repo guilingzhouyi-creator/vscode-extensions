@@ -11,10 +11,10 @@
 #   auditor = DocsAuditor(root)
 # ==============================================================================
 """DocsAuditor 调度核心：单趟索引构建、各子域门禁分发与安全自动修复回盘。"""
-import os
-import re
 from pathlib import Path
 from typing import Any
+import os
+import re
 
 from docs_audit.layout import check_layout
 from docs_audit.links import LinkAuditContext, check_links, fix_abs_links, resolve_abs_target
@@ -36,8 +36,6 @@ from docs_audit.models import (
 )
 from docs_audit.naming import NamingAuditContext, check_naming
 from docs_audit.phase import check_formation_date, check_phase_governance
-
-
 class DocsAuditor:
     """全域技术档案审查与原位自愈修复执行器 (Docs Audit & Auto-Fix Engine)。"""
 
@@ -77,8 +75,8 @@ class DocsAuditor:
     def _load_one(self, p: Path) -> None:
         try:
             raw = p.read_bytes().decode("utf-8")
-        except (UnicodeDecodeError, OSError) as e:
-            self.decode_errors[str(p)] = str(e)
+        except (UnicodeDecodeError, OSError) as exc:
+            self.decode_errors[str(p)] = str(exc)
             return
         eol = "\r\n" if "\r\n" in raw else "\n"
         text = raw.replace("\r\n", "\n")

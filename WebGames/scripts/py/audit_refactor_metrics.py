@@ -23,6 +23,9 @@
 5. 架构分层契约（领域层倒置、越层渗透）守卫；
 6. 严格工程化退出语义与报告格式（text/json/markdown/sarif/badge）导出。
 """
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 import argparse
 import json
 import os
@@ -30,12 +33,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -407,8 +406,8 @@ def _execute_refactor_process(cmd: list[str]) -> tuple[int, str, str]:
             errors="replace",
         )
         return r.returncode, r.stdout, r.stderr
-    except Exception as e:
-        print(f"【WARN】调用 auto-refactor 执行异常: {e}，安全降级跳过。")
+    except Exception as exc:
+        print(f"【WARN】调用 auto-refactor 执行异常: {exc}，安全降级跳过。")
         return 0, "", ""
 
 
@@ -450,8 +449,8 @@ def _read_temp_report(report_path: Path) -> str | None:
     finally:
         try:
             report_path.unlink(missing_ok=True)
-        except OSError as unlink_err:
-            print(f"【WARN】清理临时报告失败: {unlink_err}", file=sys.stderr)
+        except OSError as exc:
+            print(f"【WARN】清理临时报告失败: {exc}", file=sys.stderr)
 
 
 def _dispatch_audit_output(report: dict[str, Any], opts: RefactorAuditOptions) -> int:

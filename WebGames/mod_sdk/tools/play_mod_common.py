@@ -10,13 +10,12 @@
 """MOD试玩推演公共基础设施与资产会话装配器。"""
 
 from __future__ import annotations
-
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any
 
 from play_mod_character import (
     BUILTIN_DAG_TEMPLATES,
@@ -28,7 +27,6 @@ from play_mod_character import (
     build_character_context,
     resolve_character_sheet,
 )
-
 TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))

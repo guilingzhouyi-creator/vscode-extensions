@@ -14,13 +14,16 @@
 [CmdletBinding()]
 param(
   [Parameter(ValueFromRemainingArguments = $true)]
-  [string[]]$PassThruArgs
+  [string[]]$PassThruArgs,
+  # 与 audit-docs.sh 的 --baseline 保持同构：显式基准路径（为空则回落到 golden 基线）。
+  [string]$Baseline = ""
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $PSNativeCommandArgumentPassing = 'Standard'
-$ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
@@ -29,6 +32,9 @@ $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 # 传入 -baseline/-Baseline/-update-baseline 未显式给出基准路径时自动指向
 # benchmarks\reports\docs_baseline.json（消除裸跑报 expected one argument 的踩坑）。
 $baselineDefault = "benchmarks\reports\docs_baseline.json"
+if ($Baseline) {
+  $PassThruArgs += @("--baseline", $Baseline)
+}
 $argsLine = " " + ($PassThruArgs -join " ") + " "
 if (($argsLine -match "\s-(?:baseline|update-baseline)\s") -and -not ($argsLine -match "\s-(?:baseline|update-baseline)[ =]+[^ -]")) {
   $PassThruArgs += @("--baseline", $baselineDefault)

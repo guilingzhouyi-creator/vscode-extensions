@@ -14,15 +14,13 @@
 """扫描密钥标记与常见服务 token 特征，防止误提交泄露（提示级）。"""
 
 from __future__ import annotations
-
+from pathlib import Path
 import argparse
 import re
 import subprocess
 import sys
-from pathlib import Path
 
 from audit_common import ensure_utf8_stdout
-
 ensure_utf8_stdout()
 
 HERE = Path(__file__).resolve()

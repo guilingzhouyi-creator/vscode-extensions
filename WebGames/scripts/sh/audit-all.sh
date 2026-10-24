@@ -25,7 +25,7 @@ for C in python3 python; do
     break
   fi
 done
-if [ -z "$PY" ]; then
+if [[ -z "$PY" ]]; then
   echo "【audit-all】python3/python 缺失"
   exit 1
 fi

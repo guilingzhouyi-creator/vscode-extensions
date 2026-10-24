@@ -15,12 +15,11 @@
 """WebGames 全脚本库统一调度入口（audit/bench/archive 异步并行调度门面）。"""
 
 from __future__ import annotations
-
+from dataclasses import replace
+from pathlib import Path
 import argparse
 import os
 import sys
-from dataclasses import replace
-from pathlib import Path
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
 from lib.runner_reporter import (
@@ -42,7 +41,6 @@ from lib.runner_scheduler import (
     execute_audit_pipeline,
     run_single_task,
 )
-
 ensure_utf8_stdout()
 
 ROOT_DIR = resolve_repo_root()

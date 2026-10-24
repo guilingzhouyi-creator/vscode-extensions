@@ -13,20 +13,18 @@
 """MOD SDK 权威真源静态萃取与契约一致性共享核心模块。"""
 
 from __future__ import annotations
-
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 import difflib
 import json
 import re
 import sys
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
 
 from lib.mod_sdk_render import (
     generate_autogen_spec_section,
     render_full_mod_spec,
 )
-
 __all__ = [
     "ContractDriftResult",
     "STANDARD_PLACEHOLDER_DOCS",

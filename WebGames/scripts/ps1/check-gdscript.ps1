@@ -21,7 +21,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $PSNativeCommandArgumentPassing = 'Standard'
-$ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
+$PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
 # 初始化外部命令退出码，防止 StrictMode Latest 下未定义变量检索异常
 $global:LASTEXITCODE = 0

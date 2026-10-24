@@ -12,15 +12,14 @@
 #   python scripts/py/audit_config_unused.py --json
 # ==============================================================================
 """审查 config/ 中未被 backend 代码引用的配置表（提示级）。"""
+from pathlib import Path
+from typing import Any
 import argparse
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()

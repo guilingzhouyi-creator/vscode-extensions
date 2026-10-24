@@ -13,16 +13,14 @@
 """GDScript 质量审计共享缓存与正则常量模块。"""
 
 from __future__ import annotations
-
+from pathlib import Path
+from typing import Any
 import functools
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any
 
 from audit_common import GD_LOOP_HEAD_RE, resolve_repo_root
-
 ROOT = resolve_repo_root()
 CONFIG_RULES_FILE = ROOT / "scripts" / "config" / "code_governance_rules.json"
 

@@ -15,7 +15,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $PSNativeCommandArgumentPassing = 'Standard'
-$ErrorActionPreference = "Continue"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $fail = 0
 
 if (-not $GodotBin) { $GodotBin = "godot" }

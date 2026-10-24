@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Fractal Git Linux / WSL Rust Industrial Quality Gate
-# Adheres strictly to set -euo pipefail, explicit working dir, and non-interactive guards
+# 模块归属: 质量门禁 (Taxis · Rust 工业级门禁)
+# 文件路径: fractal-git/scripts/sh/gate-rust.sh
+# 架构定位: 四级 Rust 质量门禁 Runner (Linux Bash)，与 gate-rust.ps1 保持同构
+# 依赖与触发: 触发方: 本地 CLI / CI / 预推送 | 上游: cargo (rustfmt/clippy/test) 与零分配扫描器 | 下游: 控制台门禁结论 | 运行时: Bash 4+
+# 职责说明: 依次执行 rustfmt 格式检查、clippy -D warnings 静态审计、零分配边界扫描与全量回归测试
+# 退出语义与设计依据: 退出码: 0=四级全通过, 1=存在阻断违规或工具链缺失, 2=用法错误 | 设计依据: AGENTS.md Rust 工业级公理
+# ------------------------------------------------------------------------------
+# 用法示例:
+#   bash fractal-git/scripts/sh/gate-rust.sh
+#   bash fractal-git/scripts/sh/gate-rust.sh --fast
 # ==============================================================================
 set -euo pipefail
 
@@ -30,7 +38,7 @@ echo "================================================================="
 echo "  Fractal Git Rust Industrial Quality Gate (Linux/WSL)"
 echo "================================================================="
 
-cd "${PROJECT_ROOT}"
+cd "${PROJECT_ROOT}" || exit 1
 
 if ! command -v cargo >/dev/null 2>&1; then
     # 缺少原生工具链时不得静默放行：未执行审查与审查通过必须可区分 (GUARD-SYS-001)。

@@ -13,16 +13,14 @@
 # ==============================================================================
 """扫描 backend/ GDScript 的静态性能热点（提示级，供人工复核）。"""
 from __future__ import annotations
-
+from pathlib import Path
+from typing import Any
 import argparse
 import re
 import sys
-from pathlib import Path
-from typing import Any
 
-from audit_common import ensure_utf8_stdout, resolve_repo_root
 from audit_common import GD_LOOP_HEAD_RE, GD_GAMECONFIG_GETTER_RE
-
+from audit_common import ensure_utf8_stdout, resolve_repo_root
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()

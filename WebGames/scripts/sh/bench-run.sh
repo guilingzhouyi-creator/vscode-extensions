@@ -42,7 +42,7 @@ echo "【bench-run】开始运行基准（godot=$GODOT_BIN）..."
 # 显式捕获真实退出码（禁止 if ! 取反吞码）
 "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://benchmarks/bench_runner.gd -- "$REPORT"
 CODE=$?
-if [ "$CODE" -ne 0 ]; then
+if [[ "$CODE" -ne 0 ]]; then
   echo "【bench-run】基准运行失败（真实退出码=$CODE）"
   exit "$CODE"
 fi

@@ -38,6 +38,10 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 REPORT="$OUT_DIR/test_${STAMP}.json"
 LATEST="$OUT_DIR/test_latest.json"
 LOG="$(mktemp)"
+# 临时文件必须在任何退出路径（含超时与中断）被回收，避免 /tmp 遗留脏文件；
+# 失败分支需保留日志供定位，故以 LOG_KEEP 标记豁免回收。
+LOG_KEEP=0
+trap 'if [[ "${LOG_KEEP:-0}" -eq 0 ]]; then rm -f "$LOG"; fi' EXIT INT TERM
 
 echo "【test-run】开始运行单元测试（godot=$GODOT_BIN）..."
 # 显式捕获 Godot 真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
@@ -45,7 +49,7 @@ echo "【test-run】开始运行单元测试（godot=$GODOT_BIN）..."
 if command -v timeout >/dev/null 2>&1; then
   timeout 180s "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://tests/test_runner.gd >"$LOG" 2>&1
   CODE=$?
-  if [ "$CODE" -eq 124 ]; then
+  if [[ "$CODE" -eq 124 ]]; then
     echo "【test-run】测试执行超时（超过 180s 未退出，判定为异常阻塞挂起），进程已被终止，最后输出："
     tail -n 50 "$LOG"
     exit 1
@@ -54,7 +58,7 @@ else
   "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://tests/test_runner.gd >"$LOG" 2>&1
   CODE=$?
 fi
-if [ "$CODE" -ne 0 ]; then
+if [[ "$CODE" -ne 0 ]]; then
   echo "【test-run】Godot 运行异常（真实退出码=$CODE），测试失败项与脚本错误清单："
   grep -E "(\[ FAIL \]|❌|FAILED|SCRIPT ERROR|Parse Error|Compile Error)" "$LOG" | head -150 || true
   echo "--- 最近输出 ---"
@@ -62,6 +66,7 @@ if [ "$CODE" -ne 0 ]; then
   echo "--- 错误与警告明细 ---"
   grep -E "(ERROR|WARNING|SCRIPT ERROR|Parse Error)" "$LOG" | head -100 || true
   echo "【test-run】失败日志已保留: $LOG"
+  LOG_KEEP=1
   exit 1
 fi
 
@@ -72,7 +77,7 @@ PASSED="$(echo "$LINE" | grep -oE '[0-9]+' | head -1)"
 FAILED=$(( ${TOTAL:-0} - ${PASSED:-0} ))
 GODOT_VER="$("$GODOT_BIN" --version 2>/dev/null | head -1)"
 OK=1
-if [ "${TOTAL:-0}" -gt 0 ] && [ "$FAILED" = "0" ]; then OK=0; fi
+if [[ "${TOTAL:-0}" -gt 0 ]] && [[ "$FAILED" = "0" ]]; then OK=0; fi
 
 printf '{\n  "tool": "test_runner.gd",\n  "godot_version": "%s",\n  "timestamp": "%s",\n  "passed": %s,\n  "total": %s,\n  "failed": %s,\n  "ok": %s\n}\n' \
   "$GODOT_VER" "$(date +%Y-%m-%dT%H:%M:%S)" "${PASSED:-0}" "${TOTAL:-0}" "$FAILED" "$OK" > "$REPORT"
@@ -82,11 +87,11 @@ rm -f "$LOG"
 # 滚动淘汰留痕：保留最近 10 份历史快照，清理更早的历史文件。
 # 注意：xargs -r 为 GNU 扩展（BSD/macOS 非法），改用 POSIX 空集守卫写法。
 OLD_FILES="$(ls -t "$OUT_DIR"/test_*.json 2>/dev/null | grep -v 'test_latest.json' | tail -n +11)"
-if [ -n "$OLD_FILES" ]; then
+if [[ -n "$OLD_FILES" ]]; then
   printf '%s\n' "$OLD_FILES" | xargs rm -f
 fi
 
-if [ "$OK" = "0" ]; then
+if [[ "$OK" = "0" ]]; then
   echo "【test-run】通过: $PASSED / $TOTAL 项断言全部通过"
   echo "【test-run】完成: $REPORT"
   exit 0

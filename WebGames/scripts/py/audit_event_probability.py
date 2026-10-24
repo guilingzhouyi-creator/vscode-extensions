@@ -13,21 +13,20 @@
 # ==============================================================================
 """事件流关联动态概率系统审查：校验概率配置值域、无死锁、无执行后门与 DAG 无环。"""
 
+from pathlib import Path
+from typing import Any
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any, Dict, List, Set
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
 CONFIG = ROOT / "config"
 
 
-def load_ast_kind_whitelist_from_code() -> Set[str]:
+def load_ast_kind_whitelist_from_code() -> set[str]:
     """从 narrative_causality_orchestrator.gd 解析 AST 条件 kind 白名单（代码唯一事实源）。"""
     src_file = (
         ROOT
@@ -64,7 +63,7 @@ FORBIDDEN_FIELDS = {
 }
 
 
-def check_kind(node: Any, violations: List[str], path: str) -> None:
+def check_kind(node: Any, violations: list[str], path: str) -> None:
     """递归校验条件 AST 节点：复合节点 type 与叶节点 kind 均在白名单内。"""
     if not isinstance(node, dict):
         return
@@ -85,12 +84,12 @@ def check_kind(node: Any, violations: List[str], path: str) -> None:
 class CycleDetector:
     """事件关联 DAG 环路检测器，消除参数泥团并追踪回溯栈。"""
 
-    def __init__(self, events: Dict[str, Any], violations: List[str]) -> None:
+    def __init__(self, events: dict[str, Any], violations: list[str]) -> None:
         """初始化环路检测器实例。"""
         self.events = events
         self.violations = violations
-        self.visited: Set[str] = set()
-        self.stack: List[str] = []
+        self.visited: set[str] = set()
+        self.stack: list[str] = []
 
     def check(self, start: str) -> None:
         """从起始事件节点递归遍历检测是否存在有向循环链路。"""
@@ -112,7 +111,7 @@ class CycleDetector:
         self.stack.pop()
 
 
-def _validate_event_entry(eid: str, entry: Dict[str, Any], violations: List[str]) -> None:
+def _validate_event_entry(eid: str, entry: dict[str, Any], violations: list[str]) -> None:
     """校验单个事件配置的值域、执行字段禁入与条件 AST 合规性。"""
     base = entry.get("base_probability", None)
     if base is None or not isinstance(base, (int, float)) or not (0.0 <= float(base) <= 1.0):
@@ -137,9 +136,9 @@ def _validate_event_entry(eid: str, entry: Dict[str, Any], violations: List[str]
 
 def _validate_event_links(
     eid: str,
-    entry: Dict[str, Any],
-    events: Dict[str, Any],
-    violations: List[str],
+    entry: dict[str, Any],
+    events: dict[str, Any],
+    violations: list[str],
 ) -> None:
     """校验单个事件的外部引用存在性与概率因数有效性。"""
     for link in entry.get("links", []):
@@ -157,7 +156,7 @@ def run_event_probability_audit() -> int:
     print("🛡️ 卡拉尔世界引擎：事件流关联动态概率系统深度审查报告")
     print("=" * 80)
 
-    violations: List[str] = []
+    violations: list[str] = []
     path = CONFIG / "domains" / "event_probability" / "core.json"
     if not path.exists():
         path = CONFIG / "domains" / "event_probability.json"

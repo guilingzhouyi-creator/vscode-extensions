@@ -13,17 +13,15 @@
 """多份基准报告按指标取中位数聚合为稳定基线（结构兼容聚合/门禁脚本）。"""
 
 from __future__ import annotations
-
+from pathlib import Path
+from typing import Any
 import argparse
 import datetime
 import json
 import statistics
 import sys
-from pathlib import Path
-from typing import Any
 
 from audit_common import ensure_utf8_stdout, load_json
-
 ensure_utf8_stdout()
 
 
@@ -31,8 +29,8 @@ def load(path: Path) -> dict:
     """读取指定路径的 JSON 报告。"""
     try:
         return load_json(path)
-    except Exception as e:
-        print(f"【report-sweep】无法读取报告 {path}: {e}", file=sys.stderr)
+    except Exception as exc:
+        print(f"【report-sweep】无法读取报告 {path}: {exc}", file=sys.stderr)
         sys.exit(1)
 
 

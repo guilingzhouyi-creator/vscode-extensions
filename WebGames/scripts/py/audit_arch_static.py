@@ -13,17 +13,16 @@
 # ==============================================================================
 """架构护栏纯原生静态审计引擎：无需冷启动 Godot 引擎，毫秒级断言全域架构契约。"""
 
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 import argparse
 import json
 import re
 import sys
 import time
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 RES_PREFIX = "res://"
@@ -89,7 +88,7 @@ def is_dynamic_key(key: str) -> bool:
   return False
 
 
-def make_result(test_name: str, violations: List[str]) -> Dict[str, Any]:
+def make_result(test_name: str, violations: list[str]) -> dict[str, Any]:
   """构造统一测试结果字典。"""
   return {
     "test": test_name,
@@ -103,14 +102,14 @@ class ArchitectureAuditContext:
 
   def __init__(self, root: Path) -> None:
     self.root = root
-    self.manifest: List[Dict[str, Any]] = []
-    self.cross_cutting_suites: List[str] = []
-    self.primary_aliases: Dict[str, str] = {}
-    self.domain_subtables: Dict[str, List[str]] = {}
-    self.backend_files: List[Path] = []
-    self.gd_sources: Dict[Path, Tuple[str, str]] = {}
-    self.domain_gd_files: Dict[str, List[Path]] = {}
-    self.table_key_cache: Dict[str, Optional[Dict[str, bool]]] = {}
+    self.manifest: list[dict[str, Any]] = []
+    self.cross_cutting_suites: list[str] = []
+    self.primary_aliases: dict[str, str] = {}
+    self.domain_subtables: dict[str, list[str]] = {}
+    self.backend_files: list[Path] = []
+    self.gd_sources: dict[Path, tuple[str, str]] = {}
+    self.domain_gd_files: dict[str, list[Path]] = {}
+    self.table_key_cache: dict[str, dict[str, bool] | None] = {}
 
   def _load_manifest_config(self) -> None:
     if MANIFEST_FILE.exists():
@@ -163,7 +162,7 @@ class ArchitectureAuditContext:
     self._load_router_tables()
     self._index_backend_files()
 
-  def get_subtables_for_domain(self, domain_name: str) -> List[str]:
+  def get_subtables_for_domain(self, domain_name: str) -> list[str]:
     """获取指定领域下辖的细分子表清单（与 ConfigRouterEngine 一致）。"""
     if domain_name in self.domain_subtables:
       return list(self.domain_subtables[domain_name])
@@ -185,17 +184,17 @@ class ArchitectureAuditContext:
     """检查物理配置表文件是否存在。"""
     return (self.root / self.table_path_rel(table_name)).exists()
 
-  def get_table_keys(self, table_name: str) -> Optional[Dict[str, bool]]:
+  def get_table_keys(self, table_name: str) -> dict[str, bool] | None:
     """递归摊平并缓存配置表全部合法键路径。"""
     if table_name in self.table_key_cache:
       return self.table_key_cache[table_name]
 
-    keys: Optional[Dict[str, bool]] = None
+    keys: dict[str, bool] | None = None
     target_file = self.root / self.table_path_rel(table_name)
     if target_file.exists():
       try:
         data = json.loads(target_file.read_text(encoding="utf-8"))
-        flat: Dict[str, bool] = {}
+        flat: dict[str, bool] = {}
         self._flatten_keys(data, "", flat)
         keys = flat
       except Exception:
@@ -203,7 +202,7 @@ class ArchitectureAuditContext:
     else:
       subtables = self.get_subtables_for_domain(table_name)
       if subtables:
-        merged: Dict[str, bool] = {}
+        merged: dict[str, bool] = {}
         for sub in subtables:
           sub_keys = self.get_table_keys(sub)
           if sub_keys is not None:
@@ -213,7 +212,7 @@ class ArchitectureAuditContext:
     self.table_key_cache[table_name] = keys
     return keys
 
-  def _flatten_keys(self, data: Any, prefix: str, out: Dict[str, bool]) -> None:
+  def _flatten_keys(self, data: Any, prefix: str, out: dict[str, bool]) -> None:
     """递归摊平 JSON 节点（中间路径与数组索引均标记为合法）。"""
     if prefix != "":
       out[prefix] = True
@@ -227,9 +226,9 @@ class ArchitectureAuditContext:
         self._flatten_keys(item, seg, out)
 
 
-def _collect_disk_domain_ids() -> List[str]:
+def _collect_disk_domain_ids() -> list[str]:
   """收集 backend/domains/ 目录下除保留名以外的实际领域目录名。"""
-  disk_ids: List[str] = []
+  disk_ids: list[str] = []
   if DOMAINS_DIR.exists():
     for sub in DOMAINS_DIR.iterdir():
       if sub.is_dir() and sub.name not in ("contract_registry", "lifecycle", "version_governance"):
@@ -238,11 +237,11 @@ def _collect_disk_domain_ids() -> List[str]:
   return disk_ids
 
 
-def _validate_manifest_ids(manifest: List[Dict[str, Any]]) -> Tuple[List[str], List[str], List[str]]:
+def _validate_manifest_ids(manifest: list[dict[str, Any]]) -> tuple[list[str], list[str], list[str]]:
   """从清单解析领域 ID 列表、重复项与缺失项。"""
-  manifest_ids: List[str] = []
-  duplicates: List[str] = []
-  errors: List[str] = []
+  manifest_ids: list[str] = []
+  duplicates: list[str] = []
+  errors: list[str] = []
   for entry in manifest:
     entry_id = str(entry.get("id", ""))
     if not entry_id:
@@ -256,9 +255,9 @@ def _validate_manifest_ids(manifest: List[Dict[str, Any]]) -> Tuple[List[str], L
   return manifest_ids, duplicates, errors
 
 
-def check_tc_arch_01(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
+def check_tc_arch_01(ctx: ArchitectureAuditContext) -> dict[str, Any]:
   """TC-ARCH-01: 领域目录集合与清单 id 集合双向一致（含 depends_on 引用完整性）。"""
-  violations: List[str] = []
+  violations: list[str] = []
   if not ctx.manifest:
     violations.append("领域清单为空或解析失败: res://config/infrastructure/domains.json")
     return make_result("TC-ARCH-01: 领域目录集合与清单 id 集合双向一致", violations)
@@ -286,7 +285,7 @@ def check_tc_arch_01(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   return make_result("TC-ARCH-01: 领域目录集合与清单 id 集合双向一致", violations)
 
 
-def _validate_entry_tables(entry: Dict[str, Any], ctx: ArchitectureAuditContext, violations: List[str]) -> None:
+def _validate_entry_tables(entry: dict[str, Any], ctx: ArchitectureAuditContext, violations: list[str]) -> None:
   """校验单个领域条目的主配置表、子配置表与文案表物理存在性。"""
   eid = str(entry.get("id", ""))
   cfg = str(entry.get("config", ""))
@@ -308,10 +307,10 @@ def _validate_entry_tables(entry: Dict[str, Any], ctx: ArchitectureAuditContext,
     violations.append(f"{eid}: 文案表缺失 {narr} -> res://{ctx.table_path_rel(narr)}")
 
 
-def _check_domain_code_literals(eid: str, ctx: ArchitectureAuditContext, violations: List[str]) -> None:
+def _check_domain_code_literals(eid: str, ctx: ArchitectureAuditContext, violations: list[str]) -> None:
   """扫描并断言特定领域 GDScript 源码中引用的配置表字面量是否均已落地。"""
   files = ctx.domain_gd_files.get(eid, [])
-  scanned_literals: Set[str] = set()
+  scanned_literals: set[str] = set()
   for gd_file in files:
     _, code = ctx.gd_sources[gd_file]
     for m in RE_DOMAIN_LITERAL.finditer(code):
@@ -323,9 +322,9 @@ def _check_domain_code_literals(eid: str, ctx: ArchitectureAuditContext, violati
       violations.append(f"{eid}: 代码引用了不存在的配置表 {table} -> res://{ctx.table_path_rel(table)}")
 
 
-def check_tc_arch_02(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
+def check_tc_arch_02(ctx: ArchitectureAuditContext) -> dict[str, Any]:
   """TC-ARCH-02: 清单声明的配置表/文案表存在，且代码引用的 domains.* 字面量均有落地表。"""
-  violations: List[str] = []
+  violations: list[str] = []
 
   for entry in ctx.manifest:
     eid = str(entry.get("id", ""))
@@ -335,10 +334,10 @@ def check_tc_arch_02(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   return make_result("TC-ARCH-02: 配置表与文案表齐备且代码字面量全部落地", violations)
 
 
-def _parse_registry_symbols(registry_body: str) -> List[str]:
+def _parse_registry_symbols(registry_body: str) -> list[str]:
   """从 get_all_test_classes() 返回数组体解析测试类符号列表。"""
   m_arr = re.search(r"return\s*\[(.*?)\]", registry_body, re.DOTALL)
-  actual_symbols: List[str] = []
+  actual_symbols: list[str] = []
   if not m_arr:
     return actual_symbols
   for line in m_arr.group(1).splitlines():
@@ -360,11 +359,11 @@ class EntryValidationContext:
   registry_body: str
   body_start: int
   ctx: ArchitectureAuditContext
-  violations: List[str]
+  violations: list[str]
 
 
 def _validate_entry_test_registration(
-  entry: Dict[str, Any],
+  entry: dict[str, Any],
   vctx: EntryValidationContext,
 ) -> None:
   """校验单个清单条目的测试文件存在性、preload 预加载与函数注册。"""
@@ -385,9 +384,9 @@ def _validate_entry_test_registration(
     vctx.violations.append(f"{eid}: 测试符号 {symbol} 未出现在 get_all_test_classes()")
 
 
-def check_tc_arch_03(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
+def check_tc_arch_03(ctx: ArchitectureAuditContext) -> dict[str, Any]:
   """TC-ARCH-03: 测试文件存在、已在注册表 preload、已进 get_all_test_classes()，总数自洽。"""
-  violations: List[str] = []
+  violations: list[str] = []
   if not REGISTRY_FILE.exists():
     violations.append(f"无法读取测试注册表: {RES_PREFIX}tests/test_registry.gd")
     return make_result("TC-ARCH-03: 测试套件注册完整且注册表条目数自洽", violations)
@@ -422,11 +421,11 @@ def check_tc_arch_03(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   return make_result("TC-ARCH-03: 测试套件注册完整且注册表条目数自洽", violations)
 
 
-def check_tc_arch_04(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
+def check_tc_arch_04(ctx: ArchitectureAuditContext) -> dict[str, Any]:
   """TC-ARCH-04: 业务代码禁止裸调用 Godot 全局 randf()/randi()/randomize()。"""
-  violations: List[str] = []
+  violations: list[str] = []
   scanned = 0
-  hits: Set[str] = set()
+  hits: set[str] = set()
 
   for gd_file in ctx.backend_files:
     if gd_file.name == RNG_IMPL_FILE:
@@ -451,9 +450,9 @@ def check_tc_arch_04(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   return make_result("TC-ARCH-04: 业务代码零全局随机调用（确定性约定）", violations)
 
 
-def check_tc_arch_05(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
+def check_tc_arch_05(ctx: ArchitectureAuditContext) -> dict[str, Any]:
   """TC-ARCH-05: README 中的领域计数与清单条目数一致。"""
-  violations: List[str] = []
+  violations: list[str] = []
   expected = len(ctx.manifest)
 
   for doc in DOC_FILES:
@@ -481,7 +480,7 @@ def _validate_gd_config_calls(
   ctx: ArchitectureAuditContext,
   eid: str,
   gd_file: Path,
-  violations: List[str],
+  violations: list[str],
 ) -> int:
   """校验单个 GDScript 源码中静态 GameConfig 调用的表与键真实存在。"""
   _, source = ctx.gd_sources[gd_file]
@@ -507,9 +506,9 @@ def _validate_gd_config_calls(
   return checked
 
 
-def check_tc_arch_06(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
+def check_tc_arch_06(ctx: ArchitectureAuditContext) -> dict[str, Any]:
   """TC-ARCH-06: 代码读取的「表 + 键路径」必须在配置表中真实存在。"""
-  violations: List[str] = []
+  violations: list[str] = []
   checked = 0
 
   for entry in ctx.manifest:
@@ -524,7 +523,7 @@ def check_tc_arch_06(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   return make_result("TC-ARCH-06: 代码读取的配置键在表中真实存在", violations)
 
 
-def _check_legacy_deleted_files(ctx: ArchitectureAuditContext, violations: List[str]) -> None:
+def _check_legacy_deleted_files(ctx: ArchitectureAuditContext, violations: list[str]) -> None:
   """断言旧表与废弃定义文件已被物理删除。"""
   if (ctx.root / "config/descriptions/items.json").exists():
     violations.append("config/descriptions/items.json 必须彻底删除")
@@ -536,7 +535,7 @@ def _check_legacy_deleted_files(ctx: ArchitectureAuditContext, violations: List[
     violations.append("domains.json 严禁残留 legacy_test_path 字段")
 
 
-def _check_legacy_source_references(ctx: ArchitectureAuditContext, violations: List[str]) -> None:
+def _check_legacy_source_references(ctx: ArchitectureAuditContext, violations: list[str]) -> None:
   """断言后端源码中无 dispatch_rewards_direct 等历史兼容别名残留。"""
   for gd_file in ctx.backend_files:
     _, code = ctx.gd_sources[gd_file]
@@ -549,9 +548,9 @@ def _check_legacy_source_references(ctx: ArchitectureAuditContext, violations: L
       violations.append(f"{rel}: 含有 _legacy_fallback 残留引用")
 
 
-def check_tc_arch_07(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
+def check_tc_arch_07(ctx: ArchitectureAuditContext) -> dict[str, Any]:
   """TC-ARCH-07: 兼容层退役护栏断言（后端旧表/别名/直发/双路径/死配置彻底清零）。"""
-  violations: List[str] = []
+  violations: list[str] = []
   _check_legacy_deleted_files(ctx, violations)
   _check_legacy_source_references(ctx, violations)
 
@@ -570,10 +569,10 @@ def check_tc_arch_07(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   return make_result("TC-ARCH-07: 兼容层退役护栏断言（后端旧表/别名/直发/双路径/死配置彻底清零）", violations)
 
 
-def check_tc_arch_08(ctx: ArchitectureAuditContext) -> List[Dict[str, Any]]:
+def check_tc_arch_08(ctx: ArchitectureAuditContext) -> list[dict[str, Any]]:
   """TC-ARCH-08A & TC-ARCH-08B: 账号槽位解算器边界隔离护栏。"""
-  violations_a: List[str] = []
-  violations_b: List[str] = []
+  violations_a: list[str] = []
+  violations_b: list[str] = []
   solver_path = ctx.root / "backend/domains/account/account_slot_binding_solver.gd"
 
   if not solver_path.exists():
@@ -592,13 +591,13 @@ def check_tc_arch_08(ctx: ArchitectureAuditContext) -> List[Dict[str, Any]]:
   ]
 
 
-def run_all_checks() -> Tuple[bool, List[Dict[str, Any]], str, float]:
+def run_all_checks() -> tuple[bool, list[dict[str, Any]], str, float]:
   """运行全量 9 大架构合规性断言并统计耗时。"""
   t0 = time.perf_counter()
   ctx = ArchitectureAuditContext(ROOT)
   ctx.initialize()
 
-  results: List[Dict[str, Any]] = [
+  results: list[dict[str, Any]] = [
     check_tc_arch_01(ctx),
     check_tc_arch_02(ctx),
     check_tc_arch_03(ctx),

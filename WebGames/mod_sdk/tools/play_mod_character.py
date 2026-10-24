@@ -10,11 +10,9 @@
 """创角六维属性、因果天赋与初始行囊解算器。"""
 
 from __future__ import annotations
-
 from dataclasses import dataclass, field
-import hashlib
 from typing import Any
-
+import hashlib
 BUILTIN_ORIGINS: list[dict[str, Any]] = [
     {
         "origin_id": "IMPERIAL_NOBLE",

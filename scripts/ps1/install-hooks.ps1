@@ -16,6 +16,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $PSNativeCommandArgumentPassing = 'Standard'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "🔧 正在激活仓库级 Git 本地提交门禁 (.githooks)..." -ForegroundColor Cyan

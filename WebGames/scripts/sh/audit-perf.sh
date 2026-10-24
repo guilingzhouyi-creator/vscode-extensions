@@ -25,7 +25,7 @@ for C in python3 python; do
     break
   fi
 done
-if [ -z "$PY" ]; then
+if [[ -z "$PY" ]]; then
   echo "【audit-perf】python3/python 缺失"
   exit 1
 fi
@@ -37,7 +37,7 @@ echo ""
 echo "=== 2/2 性能回归门禁（阈值 ${GATE_THRESHOLD}%）==="
 (cd "$ROOT_DIR" && "$PY" scripts/py/report_aggregate.py --gate "$GATE_THRESHOLD")
 code=$?
-if [ "$code" -ne 0 ]; then
+if [[ "$code" -ne 0 ]]; then
   echo "【audit-perf】性能回归门禁未通过"
   exit "$code"
 fi

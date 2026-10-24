@@ -11,12 +11,12 @@
 #   python scripts/py/audit_bounds.py
 #   python scripts/py/audit_bounds.py --json
 # ==============================================================================
+from pathlib import Path
 import argparse
 import re
 import sys
-from pathlib import Path
-from audit_common import ensure_utf8_stdout, resolve_repo_root
 
+from audit_common import ensure_utf8_stdout, resolve_repo_root
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()

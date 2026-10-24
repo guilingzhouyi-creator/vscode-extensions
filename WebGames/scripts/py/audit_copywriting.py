@@ -13,13 +13,13 @@
 # ==============================================================================
 """统一文案配置系统深度审查：校验四域文案配置与叙事模板的事实源一致性。"""
 
+from pathlib import Path
+from typing import Any
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any, Dict, List
-from audit_common import ensure_utf8_stdout, resolve_repo_root
 
+from audit_common import ensure_utf8_stdout, resolve_repo_root
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -43,7 +43,7 @@ BRANCH_KEYS = ("base", "text", "success", "failure", "partial")
 PROBABILITY_DOMAIN_FORBIDDEN = JUDGMENT_FIELDS - {"probability"}
 
 
-def _audit_narrative_and_prob(ref_key: str, text: str, violations: List[str], is_prob: bool = False) -> None:
+def _audit_narrative_and_prob(ref_key: str, text: str, violations: list[str], is_prob: bool = False) -> None:
     """审查剧情与概率域判定与执行语义禁入 (GOV-DAT-001)。"""
     forbidden = PROBABILITY_DOMAIN_FORBIDDEN if is_prob else JUDGMENT_FIELDS
     for jf in forbidden:
@@ -51,7 +51,7 @@ def _audit_narrative_and_prob(ref_key: str, text: str, violations: List[str], is
             violations.append(f"[判定禁入] {ref_key} 含判定/执行语义 {jf}")
 
 
-def _audit_item_entry(entry_key: str, entry: Dict[str, Any], text: str, violations: List[str]) -> None:
+def _audit_item_entry(entry_key: str, entry: dict[str, Any], text: str, violations: list[str]) -> None:
     """审查物品文案占位符白名单与触发条件有效性。"""
     for m in PLACEHOLDER_RE.finditer(text):
         param = m.group(1)
@@ -65,7 +65,7 @@ def _audit_item_entry(entry_key: str, entry: Dict[str, Any], text: str, violatio
                     violations.append(f"[白名单外条件] copywriting.item.{entry_key} 条件键 {cond_key} 不在属性白名单")
 
 
-def _audit_domain_entry(domain: str, entry_key: str, entry: Dict[str, Any], violations: List[str]) -> None:
+def _audit_domain_entry(domain: str, entry_key: str, entry: dict[str, Any], violations: list[str]) -> None:
     """审查单条文案条目的各分支模板。"""
     is_prob = (domain == "probability")
     for branch in BRANCH_KEYS:
@@ -81,7 +81,7 @@ def _audit_domain_entry(domain: str, entry_key: str, entry: Dict[str, Any], viol
             _audit_item_entry(entry_key, entry, text, violations)
 
 
-def _audit_backend_inlines(violations: List[str]) -> None:
+def _audit_backend_inlines(violations: list[str]) -> None:
     """审查后端 GDScript 中是否存在硬编码文案模板字面量。"""
     for gd in BACKEND.rglob("*.gd"):
         if gd.name in RESOLVER_FILES:
@@ -94,7 +94,7 @@ def _audit_backend_inlines(violations: List[str]) -> None:
                 violations.append(f"[零内联] {gd.relative_to(ROOT)}:{idx} 代码含文案模板字面量")
 
 
-def _load_copywriting_domains(cw_dir: Path) -> Dict[str, Dict[str, Any]]:
+def _load_copywriting_domains(cw_dir: Path) -> dict[str, dict[str, Any]]:
     """加载所有文案域字典数据。"""
     domains = {"item": {}, "narrative": {}, "probability": {}, "bulletin": {}}
     for f in sorted(cw_dir.glob("*.json")):
@@ -104,7 +104,7 @@ def _load_copywriting_domains(cw_dir: Path) -> Dict[str, Dict[str, Any]]:
     return domains
 
 
-def _print_copywriting_summary(violations: List[str], hints: List[str]) -> int:
+def _print_copywriting_summary(violations: list[str], hints: list[str]) -> int:
     """输出文案审查结论并返回退出码。"""
     print(f"违规总数: {len(violations)} / 提示: {len(hints)}")
     for v in violations:
@@ -126,8 +126,8 @@ def run_copywriting_audit() -> int:
     print("🛡️ 卡拉尔世界引擎：统一文案配置系统深度审查报告")
     print("=" * 80)
 
-    violations: List[str] = []
-    hints: List[str] = []
+    violations: list[str] = []
+    hints: list[str] = []
     cw_dir = CONFIG / "copywriting"
     if not cw_dir.exists():
         print("【审查结论】未通过（config/copywriting/ 缺失，已阻断！）")

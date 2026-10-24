@@ -19,7 +19,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $PSNativeCommandArgumentPassing = 'Standard'
-$ErrorActionPreference = "Continue"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 # Git 沙箱环境加固：隔离全局配置，防止受限沙箱权限异常
 $env:GIT_CONFIG_GLOBAL = "NUL"

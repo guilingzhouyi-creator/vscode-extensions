@@ -15,14 +15,12 @@
 """MOD 无头演习器：离线模拟剧情流转、四级路由分支推演与双轨占位符水化日志输出。"""
 
 from __future__ import annotations
-
+from pathlib import Path
+from typing import Any
 import argparse
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any
-
 PARAM_REGEX: re.Pattern[str] = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
 BUILTIN_ORIGINS: list[dict[str, Any]] = [

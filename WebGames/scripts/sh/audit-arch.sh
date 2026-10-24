@@ -34,7 +34,7 @@ cd "$PROJECT_ROOT" || exit 1
 "$GODOT" --headless -s "res://tests/arch_runner.gd"
 code=$?
 
-if [ $code -eq 0 ]; then
+if [[ $code -eq 0 ]]; then
   echo "✔ 架构护栏审查通过"
 else
   echo "✖ BLOCK  架构护栏存在违规项（退出码 $code）" >&2

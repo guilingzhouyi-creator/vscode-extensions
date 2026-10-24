@@ -13,12 +13,11 @@
 """GDScript 高级架构、强类型标注与领域防腐审查实现。"""
 
 from __future__ import annotations
-
-import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import json
+import re
 
 from gd.gd_common import (
     FILE_NAME_RE,
@@ -29,7 +28,6 @@ from gd.gd_common import (
     get_gd_files,
     get_rules_config,
 )
-
 VAR_DECL_RE = re.compile(r"^\s*(?:static\s+)?var\s+([A-Za-z_][A-Za-z0-9_]*)")
 FUNC_DECL_RE = re.compile(
     r"^\s*(?:static\s+)?func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\((.*?)\)(?:\s*->\s*([A-Za-z0-9_\[\],\s.]+))?:"

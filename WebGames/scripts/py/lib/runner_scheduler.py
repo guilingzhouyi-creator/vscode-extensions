@@ -13,17 +13,15 @@
 """门禁调度执行引擎、超时熔断与 Git 作用域分析模块。"""
 
 from __future__ import annotations
-
+from dataclasses import dataclass, field
+from pathlib import Path
 import concurrent.futures
 import os
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field
-from pathlib import Path
 
 from audit_common import resolve_repo_root
-
 ROOT_DIR = resolve_repo_root()
 TASK_TIMEOUT_SEC = 300
 
@@ -107,22 +105,22 @@ def run_single_task(task: AuditTask, extra_args: list[str], py_exec: str, py_scr
             stderr=proc.stderr,
             elapsed_sec=elapsed,
         )
-    except subprocess.TimeoutExpired as tex:
+    except subprocess.TimeoutExpired as exc:
         elapsed = time.perf_counter() - t0
         return TaskResult(
             task=task,
             returncode=1,
             stdout="",
-            stderr=f"执行超时（>{TASK_TIMEOUT_SEC}s，fail-fast 截断）: {task.task_id}\n{tex}",
+            stderr=f"执行超时（>{TASK_TIMEOUT_SEC}s，fail-fast 截断）: {task.task_id}\n{exc}",
             elapsed_sec=elapsed,
         )
-    except Exception as ex:
+    except Exception as exc:
         elapsed = time.perf_counter() - t0
         return TaskResult(
             task=task,
             returncode=1,
             stdout="",
-            stderr=f"执行异常: {ex}",
+            stderr=f"执行异常: {exc}",
             elapsed_sec=elapsed,
         )
 
@@ -301,8 +299,8 @@ def check_registry_completeness(py_scripts_dir: Path, all_registered_tasks: list
     registered = {t.script_name for t in all_registered_tasks}
     try:
         files = {f for f in os.listdir(py_scripts_dir) if f.endswith(".py")}
-    except OSError as ex:
-        return [f"无法扫描 scripts/py 目录: {ex}"]
+    except OSError as exc:
+        return [f"无法扫描 scripts/py 目录: {exc}"]
 
     engine_files = {
         f

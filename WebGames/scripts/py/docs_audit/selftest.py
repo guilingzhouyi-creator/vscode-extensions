@@ -13,11 +13,10 @@
 """docs_audit 审查引擎内建回归测试与夹具自检。"""
 
 from __future__ import annotations
-
-import shutil
-import tempfile
 from pathlib import Path
 from typing import Any
+import shutil
+import tempfile
 
 from audit_common import KALAR_DEV_PREFIX
 from docs_audit.auditor import DocsAuditor
@@ -26,8 +25,6 @@ from docs_audit.models import (
     load_baseline,
     write_baseline,
 )
-
-
 def _populate_test_fixtures(docs: Path) -> None:
     """在临时测试目录中填充用于自测的多样例文档夹具。"""
     (docs / "域A").mkdir(parents=True)

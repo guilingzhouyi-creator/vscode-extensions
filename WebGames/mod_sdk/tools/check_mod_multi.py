@@ -10,18 +10,15 @@
 """多 MOD 联合冲突与策略互斥预检模块。"""
 
 from __future__ import annotations
-
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import json
 
 from check_mod_common import (
     DiagnosticItem,
     normalize_named_items as _normalize_named_items,
 )
-
-
 @dataclass(slots=True)
 class EntityRegistryContext:
     """实体 ID 冲突预检登记上下文 (GOV-DAT-001)。"""

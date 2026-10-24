@@ -13,12 +13,12 @@
 """inspect.py — 归档系统巡检报告与总索引布局审查。
 
 负责全宗档案资产聚合、短期/长期区在途状态巡检与路线图总索引布局审查。"""
+from pathlib import Path
+from typing import Any
 import json
 import re
 import subprocess
 import sys
-from pathlib import Path
-from typing import Any
 
 from archive.constants import (
     LONG_TERM_DIR,
@@ -28,7 +28,6 @@ from archive.constants import (
 )
 from archive.keywords import count_archived_inventory
 from archive.verify import verify_stage_distinctness
-
 # 常量声明
 GLOB_PHASE_DIR = "Phase_*"
 RE_NON_WORD = r"[^\w]"

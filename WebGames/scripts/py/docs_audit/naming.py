@@ -11,15 +11,13 @@
 #   check_naming(docs_dir, dir_index, naming, docs_map, rel_fn, out)
 # ==============================================================================
 """docs/ 目录与文件命名模式匹配、序号递增与多编号混用检查。"""
-import os
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
+import os
+import re
 
 from docs_audit.models import CN_NUMERALS, Finding
-
-
 @dataclass(frozen=True, slots=True)
 class NamingAuditContext:
     """命名审查环境上下文 (GOV-DAT-001)。"""

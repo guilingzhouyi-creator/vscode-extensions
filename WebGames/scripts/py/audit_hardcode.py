@@ -14,14 +14,12 @@
 """扫描 backend/ 与 frontend/ 中疑似硬编码的数值/文案字面量与调试残留。"""
 
 from __future__ import annotations
-
+from pathlib import Path
 import argparse
 import re
 import sys
-from pathlib import Path
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()

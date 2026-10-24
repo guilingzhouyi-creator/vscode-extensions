@@ -15,15 +15,13 @@
 """MOD 资产预编译与审计工具：扫描 assets/ 目录，校验格式白名单、体积预算与可执行拦截，自动生成或校验 manifest.json。"""
 
 from __future__ import annotations
-
+from pathlib import Path
+from typing import Any
 import argparse
 import hashlib
 import json
 import os
 import sys
-from pathlib import Path
-from typing import Any
-
 # ==============================================================================
 # 一、资产白名单与体积预算常量 (Asset Whitelist & Budgets)
 # ==============================================================================
@@ -160,11 +158,11 @@ def _verify_manifest_consistency(
 
     try:
         on_disk = json.loads(manifest_file.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as err:
+    except (json.JSONDecodeError, OSError) as exc:
         diags.append(DiagnosticItem(
             code="ERR_ASSET_MANIFEST_INVALID",
             file_path="assets/manifest.json",
-            detail=f"assets/manifest.json 解析损坏: {err}",
+            detail=f"assets/manifest.json 解析损坏: {exc}",
             fix_suggestion="请修复 JSON 语法或运行 'kalar-mod cook' 重新生成",
         ))
         return
@@ -269,11 +267,11 @@ def cook_assets(
         content = json.dumps(manifest_data, ensure_ascii=False, indent=2) + "\n"
         with open(manifest_file, "w", encoding="utf-8", newline="\n") as fp:
             fp.write(content)
-    except OSError as err:
+    except OSError as exc:
         diags.append(DiagnosticItem(
             code="ERR_ASSET_MANIFEST_WRITE",
             file_path="assets/manifest.json",
-            detail=f"写入 manifest.json 失败: {err}",
+            detail=f"写入 manifest.json 失败: {exc}",
             fix_suggestion="请检查目录写入权限并重试",
         ))
         return False, diags, manifest_data

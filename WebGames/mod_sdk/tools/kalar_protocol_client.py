@@ -10,17 +10,14 @@
 """卡拉尔世界引擎 MOD 开发者轻量统一协议客户端与本地模拟派发引擎。"""
 
 from __future__ import annotations
-
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 import argparse
 import json
 import sys
 import time
 import uuid
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-
-
 @dataclass(slots=True)
 class ProtocolRequestContext:
     """强类型客户端请求信封载荷参数对象 (GOV-DAT-001)。"""
@@ -28,8 +25,8 @@ class ProtocolRequestContext:
     actor_type: str = "HUMAN_UI"
     domain: str = "HOME_HUD"
     action_type: str = "QUERY"
-    payload: Optional[Dict[str, Any]] = None
-    request_id: Optional[str] = None
+    payload: Optional[dict[str, Any]] = None
+    request_id: str | None = None
 
 TOOLS_DIR = Path(__file__).resolve().parent
 MOD_SDK_DIR = TOOLS_DIR.parent
@@ -47,7 +44,7 @@ def ensure_utf8_stdout() -> None:
             pass
 
 
-def safe_load_json(file_path: Path) -> Dict[str, Any]:
+def safe_load_json(file_path: Path) -> dict[str, Any]:
     """安全读取并解析 JSON 文件。"""
     if not file_path.is_file():
         return {}
@@ -59,9 +56,9 @@ def safe_load_json(file_path: Path) -> Dict[str, Any]:
         return {}
 
 
-def validate_client_request_envelope(data: Dict[str, Any]) -> Tuple[bool, List[str]]:
+def validate_client_request_envelope(data: dict[str, Any]) -> tuple[bool, list[str]]:
     """离线严格校验客户端请求信封 (client_request_envelope.schema.json)。"""
-    errors: List[str] = []
+    errors: list[str] = []
     if not isinstance(data, dict):
         return False, ["请求信封根节点必须为字典对象"]
 
@@ -103,9 +100,9 @@ def validate_client_request_envelope(data: Dict[str, Any]) -> Tuple[bool, List[s
     return len(errors) == 0, errors
 
 
-def validate_unified_response_envelope(data: Dict[str, Any]) -> Tuple[bool, List[str]]:
+def validate_unified_response_envelope(data: dict[str, Any]) -> tuple[bool, list[str]]:
     """离线严格校验服务端响应信封 (unified_response_envelope.schema.json)。"""
-    errors: List[str] = []
+    errors: list[str] = []
     if not isinstance(data, dict):
         return False, ["响应信封根节点必须为字典对象"]
 
@@ -136,9 +133,9 @@ def validate_unified_response_envelope(data: Dict[str, Any]) -> Tuple[bool, List
     return len(errors) == 0, errors
 
 
-def validate_esc_action_payload(data: Dict[str, Any]) -> Tuple[bool, List[str]]:
+def validate_esc_action_payload(data: dict[str, Any]) -> tuple[bool, list[str]]:
     """离线严格校验 ESC 动作载荷 (esc_menu_action_payload.schema.json)。"""
-    errors: List[str] = []
+    errors: list[str] = []
     if not isinstance(data, dict):
         return False, ["ESC 载荷根节点必须为字典对象"]
 
@@ -178,7 +175,7 @@ class LocalMockDispatcher:
 
     def __init__(
         self,
-        capabilities: Optional[Dict[str, Any]] = None,
+        capabilities: Optional[dict[str, Any]] = None,
         lease_window_ms: int = 3000,
     ) -> None:
         self.capabilities = capabilities or safe_load_json(CAPABILITIES_PATH)
@@ -190,7 +187,7 @@ class LocalMockDispatcher:
         self.simulated_clock_offset_ms: int = 0
 
         # 初始化模拟 HUD 状态
-        self.hud_state: Dict[str, Any] = {
+        self.hud_state: dict[str, Any] = {
             "hp": 100.0,
             "hp_max": 100.0,
             "mp": 50.0,
@@ -229,7 +226,7 @@ class LocalMockDispatcher:
             return False
         return True
 
-    def dispatch(self, request_envelope: Dict[str, Any]) -> Dict[str, Any]:
+    def dispatch(self, request_envelope: dict[str, Any]) -> dict[str, Any]:
         """接收客户端请求信封，执行状态机判定并返回规范化响应信封。"""
         now = self.get_current_time_ms()
         req_id = request_envelope.get("request_id", str(uuid.uuid4()))
@@ -304,8 +301,8 @@ class LocalMockDispatcher:
         }
 
     def _handle_esc_menu(
-        self, req_id: str, action_type: str, payload: Dict[str, Any], now: int
-    ) -> Dict[str, Any]:
+        self, req_id: str, action_type: str, payload: dict[str, Any], now: int
+    ) -> dict[str, Any]:
         """处理 ESC 系统菜单相关指令。"""
         valid_esc_actions = [
             "ESC_QUERY_READINESS",
@@ -384,8 +381,8 @@ class LocalMockDispatcher:
         }
 
     def _handle_home_hud(
-        self, req_id: str, action_type: str, payload: Dict[str, Any], now: int
-    ) -> Dict[str, Any]:
+        self, req_id: str, action_type: str, payload: dict[str, Any], now: int
+    ) -> dict[str, Any]:
         """处理主页 HUD 业务指令。"""
         supported_directives = [
             "ALLOCATE_POTENTIAL_STAT",
@@ -458,7 +455,7 @@ class KalarProtocolClient:
 
     def __init__(
         self,
-        dispatcher: Optional[LocalMockDispatcher] = None,
+        dispatcher: LocalMockDispatcher | None = None,
         account_id: str = "kalar_developer_user",
         character_id: str = "CHAR_VALAN_SCOUT",
     ) -> None:
@@ -473,7 +470,7 @@ class KalarProtocolClient:
         ctx_or_actor: ProtocolRequestContext | str = "HUMAN_UI",
         *args: Any,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """构建强类型客户端请求信封字典。"""
         if isinstance(ctx_or_actor, ProtocolRequestContext):
             actor_type = ctx_or_actor.actor_type
@@ -494,7 +491,7 @@ class KalarProtocolClient:
         if actor_type == "HUMAN_UI":
             self._lease_counter += 1
 
-        envelope: Dict[str, Any] = {
+        envelope: dict[str, Any] = {
             "request_id": req_id,
             "session_token": self.session_token,
             "account_id": self.account_id,
@@ -508,7 +505,7 @@ class KalarProtocolClient:
         }
         return envelope
 
-    def send(self, request_envelope: Dict[str, Any]) -> Dict[str, Any]:
+    def send(self, request_envelope: dict[str, Any]) -> dict[str, Any]:
         """发射请求信封并获取经校验的统一响应信封。"""
         response = self.dispatcher.dispatch(request_envelope)
         valid, errs = validate_unified_response_envelope(response)
@@ -517,22 +514,22 @@ class KalarProtocolClient:
         return response
 
     def send_human_esc_action(
-        self, action_type: str, payload: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, action_type: str, payload: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """便捷方法：以人类 UI 身份发射 ESC 系统菜单指令。"""
         req = self.build_request("HUMAN_UI", "ESC_MENU", action_type, payload)
         return self.send(req)
 
     def send_agent_hud_action(
-        self, action_type: str, payload: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, action_type: str, payload: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """便捷方法：以自主 Agent 身份发射主页 HUD 指令。"""
         req = self.build_request("AGENT", "HOME_HUD", action_type, payload)
         return self.send(req)
 
     def send_human_hud_action(
-        self, action_type: str, payload: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, action_type: str, payload: Optional[dict[str, Any]] = None
+    ) -> dict[str, Any]:
         """便捷方法：以人类 UI 身份发射主页 HUD 指令（触发租约续订）。"""
         req = self.build_request("HUMAN_UI", "HOME_HUD", action_type, payload)
         return self.send(req)

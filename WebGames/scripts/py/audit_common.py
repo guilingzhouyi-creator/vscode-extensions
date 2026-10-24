@@ -14,12 +14,12 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any, Pattern
+import io
 import json
 import logging
 import re
 import sys
-from typing import Any, Dict, List, Pattern
-
 CHARSET_UTF8 = "utf-8"
 ERR_IGNORE = "ignore"
 ERR_REPLACE = "replace"
@@ -58,7 +58,7 @@ def ensure_utf8_stdout() -> None:
             LOGGER.debug("Console reconfigure suppressed: %s", exc)
 
 
-def load_json(path: Path) -> Dict[str, Any]:
+def load_json(path: Path) -> dict[str, Any]:
     """容错读取 JSON 文件，路径不存在或解析失败返回空字典。"""
     if not path.is_file():
         return {}
@@ -81,7 +81,7 @@ class Finding:
     suggestion: str = ""
     severity: str = SEVERITY_DEFAULT
     category: str = CATEGORY_DEFAULT
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
     @property
     def rule_id(self) -> str:
@@ -113,7 +113,7 @@ class Finding:
         """设置违规所在行号。"""
         self.line = val
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """将发现条目转换为标准字典表示。"""
         return {
             KEY_RULE: self.rule,
@@ -128,7 +128,7 @@ class Finding:
         }
 
 
-def print_conclusion(violations: List[str], hints: List[str], name: str) -> int:
+def print_conclusion(violations: list[str], hints: list[str], name: str) -> int:
     """统一结论打印，输出标准结论行并返回进程退出码。"""
     count_summary = f"违规总数: {len(violations)} / 提示: {len(hints)}"
     print(count_summary)
@@ -151,7 +151,7 @@ def print_conclusion(violations: List[str], hints: List[str], name: str) -> int:
 LEGACY_PLACEHOLDER_RE = re.compile(r"%[sd]|%\.\d*f|\{\}")
 
 
-def scan_legacy_placeholders(text: str) -> List[str]:
+def scan_legacy_placeholders(text: str) -> list[str]:
     """扫描文本中遗留的旧式占位符（如 %s, %.1f, 空 {}）。"""
     return LEGACY_PLACEHOLDER_RE.findall(text)
 

@@ -10,12 +10,11 @@
 """MOD 因果剧情 DAG 拓扑连通性、Kahn 环检测与节点文案完整性校验器。"""
 
 from __future__ import annotations
-
-import json
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+import json
+import re
 
 from check_mod_common import (
     PARAM_REGEX,
@@ -23,8 +22,6 @@ from check_mod_common import (
     DiagnosticItem,
     safe_load_json as _safe_load_json,
 )
-
-
 @dataclass(slots=True)
 class DagCycleDetectionContext:
     """DAG Kahn 环检测参数上下文 (GOV-DAT-001)。"""

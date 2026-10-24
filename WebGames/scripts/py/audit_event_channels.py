@@ -11,15 +11,14 @@
 #   python scripts/py/audit_event_channels.py
 #   python scripts/py/audit_event_channels.py --json
 # ==============================================================================
+from pathlib import Path
+from typing import Any
 import argparse
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 """audit_event_channels.py — EventBus 频道纪律与叙事契约严格审查。

@@ -11,16 +11,15 @@
 #   from docs_audit.models import Finding, Doc, RULES
 # ==============================================================================
 """文档治理核心领域模型、真源规则加载器与基线棘轮序列化。"""
-import json
-import re
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+import json
+import re
+import sys
 
 from audit_common import KALAR_DEV_PREFIX, resolve_repo_root
-
 ROOT = resolve_repo_root()
 DOCS_DIR = "docs"
 
@@ -37,8 +36,8 @@ def load_doc_rules() -> tuple:
         sys.exit(2)
     try:
         data = json.loads(DOC_RULES_FILE.read_text(encoding="utf-8"))
-    except Exception as e:
-        print(f"[ERROR] 文档治理规则真源解析失败 {DOC_RULES_FILE}: {e}", file=sys.stderr)
+    except Exception as exc:
+        print(f"[ERROR] 文档治理规则真源解析失败 {DOC_RULES_FILE}: {exc}", file=sys.stderr)
         sys.exit(2)
 
     raw_rules = data.get("rules")

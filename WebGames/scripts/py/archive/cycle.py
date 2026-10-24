@@ -14,13 +14,12 @@
 
 负责周期归档前置特化校验、目录移动、文件重命名、14 项头块签发、
 ATT 附件生成、卷内导航注入以及全宗元数据库与总索引同步更新。"""
+from datetime import date, datetime
+from pathlib import Path
 import re
 import subprocess
 import sys
-from datetime import date, datetime
-from pathlib import Path
 
-from audit_common import KALAR_DEV_PREFIX, resolve_repo_root
 from archive.attachment import generate_volume_attachment, inject_att_pointer, inject_volume_navbars
 from archive.constants import (
     MASTER_CATALOG,
@@ -45,7 +44,7 @@ from archive.metadata import (
     strip_existing_frontmatter,
 )
 from archive.verify import verify_stage_distinctness
-
+from audit_common import KALAR_DEV_PREFIX, resolve_repo_root
 ROOT = resolve_repo_root()
 
 

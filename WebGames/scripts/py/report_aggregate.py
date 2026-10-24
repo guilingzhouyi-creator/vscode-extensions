@@ -11,13 +11,13 @@
 #   python scripts/py/report_aggregate.py --input-dir reports/ --output report.md
 # ==============================================================================
 """聚合基准报告为基线表；支持版本对比、性能回归门禁与 golden 基线晋升。"""
+from pathlib import Path
 import argparse
 import datetime
 import json
 import sys
-from pathlib import Path
-from audit_common import ensure_utf8_stdout, resolve_repo_root, load_json
 
+from audit_common import ensure_utf8_stdout, resolve_repo_root, load_json
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -30,8 +30,8 @@ def load(path: Path) -> dict:
     """安全读取基准测试 JSON 报告文件。"""
     try:
         return load_json(path)
-    except Exception as e:
-        print(f"【report-aggregate】无法读取报告 {path}: {e}", file=sys.stderr)
+    except Exception as exc:
+        print(f"【report-aggregate】无法读取报告 {path}: {exc}", file=sys.stderr)
         sys.exit(1)
 
 

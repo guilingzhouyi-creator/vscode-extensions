@@ -18,10 +18,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $PSNativeCommandArgumentPassing = 'Standard'
-$ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 # 六刻度判定纯函数（入参小时 0~23，返回刻度名；与 timestamp.sh resolve_period_by_hour 逐小时一致）
 function Resolve-PeriodByHour {
+  [CmdletBinding()]
   param([int]$Hour)
   if ($Hour -ge 22 -or $Hour -lt 2) {
     return "半夜"

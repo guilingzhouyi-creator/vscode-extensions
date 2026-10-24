@@ -13,17 +13,15 @@
 """门禁结果报告聚合、终端着色看板与 SARIF/JSON 导出支持模块。"""
 
 from __future__ import annotations
-
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 import argparse
 import hashlib
 import json
 import re
 import sys
 import time
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
-
 # ANSI 颜色定义
 C_RESET = "\033[0m"
 C_BOLD = "\033[1m"

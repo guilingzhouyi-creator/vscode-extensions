@@ -13,9 +13,8 @@
 """GDScript 编码风格与基础语法审查规则集。"""
 
 from __future__ import annotations
-
-import re
 from pathlib import Path
+import re
 
 from gd.gd_common import (
     CLASS_NAME_RE,
@@ -26,7 +25,6 @@ from gd.gd_common import (
     GDFileCache,
     get_gd_files,
 )
-
 STYLE_CLASS_NAME_RE = re.compile(r"\bclass_name\s+([A-Za-z_][A-Za-z0-9_]*)")
 STYLE_FUNC_RE = re.compile(r"^\s*(?:static\s+)?func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 STYLE_VAR_RE = re.compile(r"^\s*(?:static\s+)?var\s+([A-Za-z_][A-Za-z0-9_]*)\s*[:=]")
@@ -88,8 +86,8 @@ def audit_file(path: Path, violations: list[str]) -> None:
         violations.append(f"{rel}: 文件名应为 snake_case（{path.name}）")
     try:
         text, lines = GDFileCache.get(path)
-    except (UnicodeDecodeError, OSError) as e:
-        violations.append(f"{rel}: 非 UTF-8 编码或读取失败（{e}）")
+    except (UnicodeDecodeError, OSError) as exc:
+        violations.append(f"{rel}: 非 UTF-8 编码或读取失败（{exc}）")
         return
 
     _audit_file_header(rel, lines, text, violations)

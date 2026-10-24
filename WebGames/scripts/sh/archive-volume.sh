@@ -26,11 +26,11 @@ for C in python3 python; do
     break
   fi
 done
-if [ -z "$PY" ]; then
+if [[ -z "$PY" ]]; then
   echo "【archive-volume】python3/python 缺失"
   exit 2
 fi
 
-cd "$ROOT_DIR"
+cd "$ROOT_DIR" || exit 1
 "$PY" scripts/py/archive_volume.py "$@"
 exit $?

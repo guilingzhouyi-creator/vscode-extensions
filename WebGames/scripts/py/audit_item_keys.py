@@ -12,12 +12,12 @@
 #   python scripts/py/audit_item_keys.py --json
 # ==============================================================================
 """物品注册库键级审计：config 物品键引用 vs items 登记清单。"""
+from pathlib import Path
 import json
 import re
 import sys
-from pathlib import Path
-from audit_common import ensure_utf8_stdout, resolve_repo_root
 
+from audit_common import ensure_utf8_stdout, resolve_repo_root
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()

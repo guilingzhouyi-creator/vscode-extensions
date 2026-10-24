@@ -16,15 +16,15 @@ set -uo pipefail
 # 六刻度判定纯函数（入参小时 0~23，返回刻度名；供逐小时断言复用）
 resolve_period_by_hour() {
   local hour="$1"
-  if [ "$hour" -ge 22 ] || [ "$hour" -lt 2 ]; then
+  if [[ "$hour" -ge 22 ]] || [[ "$hour" -lt 2 ]]; then
     echo "半夜"
-  elif [ "$hour" -lt 6 ]; then
+  elif [[ "$hour" -lt 6 ]]; then
     echo "凌晨"
-  elif [ "$hour" -lt 10 ]; then
+  elif [[ "$hour" -lt 10 ]]; then
     echo "早上"
-  elif [ "$hour" -lt 14 ]; then
+  elif [[ "$hour" -lt 14 ]]; then
     echo "中午"
-  elif [ "$hour" -lt 18 ]; then
+  elif [[ "$hour" -lt 18 ]]; then
     echo "下午"
   else
     echo "晚上"
@@ -32,7 +32,7 @@ resolve_period_by_hour() {
 }
 
 full_mode=0
-if [ "${1:-}" = "--full" ]; then
+if [[ "${1:-}" = "--full" ]]; then
   full_mode=1
 fi
 
@@ -42,7 +42,7 @@ period=$(resolve_period_by_hour "$hour")
 
 day=$(date +%F)
 
-if [ "$full_mode" -eq 1 ]; then
+if [[ "$full_mode" -eq 1 ]]; then
   clock=$(date +%H:%M)
   echo "$day $clock $period"
 else

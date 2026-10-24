@@ -13,14 +13,12 @@
 """attachment.py — 案卷共享附件 (ATT) 生成与卷内导航浮标注入引擎。
 
 负责为归档案卷生成第 5 份共享契约上下文附件及双向快速导航浮标。"""
-import re
 from pathlib import Path
+import re
 
 from archive.constants import ANCHOR_CONVENTIONS, AnchorConventions, KALAR_DEV_PREFIX, build_att_header_template, resolve_responsible
 from archive.keywords import extract_att_keywords
 from archive.metadata import minify_markdown_text, resolve_file_formation_date
-
-
 # 常量声明
 UTF8_ENCODING = "utf-8"
 NEWLINE_LF = "\n"

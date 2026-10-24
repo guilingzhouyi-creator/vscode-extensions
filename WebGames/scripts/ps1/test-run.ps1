@@ -19,7 +19,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 $PSNativeCommandArgumentPassing = 'Standard'
-$ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
+$PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
@@ -42,10 +45,8 @@ Write-Host "【test-run】开始运行单元测试（godot=$GodotBin）..."
 # Godot 常规 WARNING 走 stderr；在 Stop 偏好下会被误判为终止错误，此处放宽为
 # Continue，以真实退出码判定（对齐 test-run.sh 第 40-42 行语义）
 $prevEAP = $ErrorActionPreference
-$ErrorActionPreference = "Continue"
 & $GodotBin --headless --path $RootDir -s res://tests/test_runner.gd 2>&1 | Tee-Object -FilePath $LogPath
 $code = $LASTEXITCODE
-$ErrorActionPreference = $prevEAP
 if ($code -ne 0) {
   Write-Host "【test-run】Godot 运行异常（exit=$code），测试失败项清单："
   Select-String -Path $LogPath -Pattern '\[ FAIL \]|❌|FAILED' | Select-Object -First 100 | ForEach-Object { Write-Host $_.Line }

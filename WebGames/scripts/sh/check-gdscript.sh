@@ -20,6 +20,10 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && { pwd -W 2>/dev/null || pwd; })"
 GODOT_BIN="${GODOT_BIN:-godot}"
 SCOPE="all"
 LOG="$(mktemp)"
+# 临时文件必须在任何退出路径（含早期参数校验 exit 2 与中断）被回收，避免 /tmp 遗留脏文件；
+# 失败分支需保留日志供定位，故以 LOG_KEEP 标记豁免回收。
+LOG_KEEP=0
+trap 'if [[ "${LOG_KEEP:-0}" -eq 0 ]]; then rm -f "$LOG"; fi' EXIT INT TERM
 
 PER_FILE=0
 # ==============================================================================
@@ -29,7 +33,7 @@ PER_FILE=0
 # ==============================================================================
 SCAN_DIRS_RAW="$(grep -A8 '^const SCAN_DIRS' "$ROOT_DIR/tests/batch_syntax_checker.gd" \
   | grep -oE 'res://[A-Za-z0-9_]+' | sed 's|res://||')"
-if [ -z "$SCAN_DIRS_RAW" ]; then
+if [[ -z "$SCAN_DIRS_RAW" ]]; then
   echo "【check-gdscript】无法从 batch_syntax_checker.gd 提取 SCAN_DIRS（单一真源缺失，请先登记）"
   exit 2
 fi
@@ -56,17 +60,17 @@ fi
 
 cd "$ROOT_DIR" || exit 1
 
-if [ "$PER_FILE" -eq 0 ]; then
+if [[ "$PER_FILE" -eq 0 ]]; then
   # 批处理收敛：--scope 单域同样走单进程批处理（batch_syntax_checker.gd 支持
   # 命令行用户参数指定扫描目录），消除单域检查的逐文件冷启动；--per-file 显式
   # 逐文件模式不受影响（故障定位手段）。
   echo "【check-gdscript】执行单进程极速批处理语法检查（scope=$SCOPE）..."
-  if [ "$SCOPE" != "all" ]; then
+  if [[ "$SCOPE" != "all" ]]; then
     "$GODOT_BIN" --headless -s "res://tests/batch_syntax_checker.gd" -- "res://$SCOPE" >"$LOG" 2>&1
   else
     "$GODOT_BIN" --headless -s "res://tests/batch_syntax_checker.gd" >"$LOG" 2>&1
   fi
-  if [ $? -eq 0 ]; then
+  if [[ $? -eq 0 ]]; then
     rm -f "$LOG"
     echo "【check-gdscript】通过"
     exit 0
@@ -76,18 +80,18 @@ if [ "$PER_FILE" -eq 0 ]; then
   # 逐个冷启动的性能浪费；仅当批处理异常退出且无失败明细时才回落全量定位。
   cat "$LOG"
   FAILED_FILES="$(grep -E '^✗ res://' "$LOG" | sed -E 's/^✗ (res:\/\/[^ ]+).*/\1/' | sort -u)"
-  if [ -n "$FAILED_FILES" ]; then
+  if [[ -n "$FAILED_FILES" ]]; then
     echo "【check-gdscript】批处理失败明细 ${#FAILED_FILES} 项，对失败清单逐个复验定位..."
     CHECKED=0
     FAILS=0
     while IFS= read -r res_path; do
-      [ -z "$res_path" ] && continue
+      [[ -z "$res_path" ]] && continue
       rel="${res_path#res://}"
       CHECKED=$((CHECKED + 1))
       # 显式捕获真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
       "$GODOT_BIN" --headless --quiet --check-only -s "$res_path" >"$LOG" 2>&1
       CODE=$?
-      if [ "$CODE" -ne 0 ]; then
+      if [[ "$CODE" -ne 0 ]]; then
         FAILS=$((FAILS + 1))
         echo "✗ $rel (exit=$CODE)"
         grep -E "SCRIPT ERROR|Parse Error|ERROR" "$LOG" | head -3
@@ -95,7 +99,8 @@ if [ "$PER_FILE" -eq 0 ]; then
         echo "✓ $rel (批处理误报，复验通过)"
       fi
     done <<< "$FAILED_FILES"
-    if [ "$FAILS" -ne 0 ]; then
+    if [[ "$FAILS" -ne 0 ]]; then
+      LOG_KEEP=1
       echo "【check-gdscript】失败日志已保留: $LOG"
       echo "【check-gdscript】检查 $CHECKED 个失败文件，复验失败 $FAILS 个"
       echo "【check-gdscript】未通过：存在解析错误，请先修复"
@@ -109,7 +114,7 @@ if [ "$PER_FILE" -eq 0 ]; then
   echo "【check-gdscript】批处理异常退出且无失败明细，切入全量逐文件定位模式..."
 fi
 
-if [ "$SCOPE" != "all" ]; then
+if [[ "$SCOPE" != "all" ]]; then
   DIRS=("$SCOPE")
 fi
 FILES=""
@@ -121,21 +126,22 @@ FILES="$(printf '%b' "$FILES" | sort -u | sed '/^$/d')"
 CHECKED=0
 FAILS=0
 while IFS= read -r f; do
-  [ -z "$f" ] && continue
+  [[ -z "$f" ]] && continue
   rel="${f#"$ROOT_DIR"/}"
   rel_res="res://${rel//\\//}"
   CHECKED=$((CHECKED + 1))
   # 显式捕获真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
   "$GODOT_BIN" --headless --quiet --check-only -s "$rel_res" >"$LOG" 2>&1
   CODE=$?
-  if [ "$CODE" -ne 0 ]; then
+  if [[ "$CODE" -ne 0 ]]; then
     FAILS=$((FAILS + 1))
     echo "✗ $rel (exit=$CODE)"
     grep -E "SCRIPT ERROR|Parse Error|ERROR" "$LOG" | head -3
   fi
 done <<< "$FILES"
 
-if [ "$FAILS" -ne 0 ]; then
+if [[ "$FAILS" -ne 0 ]]; then
+  LOG_KEEP=1
   echo "【check-gdscript】失败日志已保留: $LOG"
   echo "【check-gdscript】检查 $CHECKED 个 .gd，失败 $FAILS 个（scope=$SCOPE）"
   echo "【check-gdscript】未通过：存在解析错误，请先修复"

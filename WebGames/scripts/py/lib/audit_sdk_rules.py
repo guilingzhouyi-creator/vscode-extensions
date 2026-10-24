@@ -13,12 +13,10 @@
 """MOD SDK 门禁审计各个维度的规则断言实现。"""
 
 from __future__ import annotations
-
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
+import json
 SEVERITY_ERROR = "error"
 RULE_STAT_ERROR = "SDK-STAT-ERROR"
 UTF8 = "utf-8"

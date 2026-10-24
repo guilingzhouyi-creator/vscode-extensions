@@ -11,13 +11,11 @@
 #   check_phase_governance(docs_dir, docs_map, rel_fn, out)
 # ==============================================================================
 """短期施工区案卷物理结构、路线图总索引真源登记、时间戳纪律与四段式施工细则深度审查。"""
-import re
 from pathlib import Path
 from typing import Any, Callable
+import re
 
 from docs_audit.models import Finding
-
-
 def check_formation_date(docs_dir: Path, rel_fn: Callable, out: list) -> None:
     """开发期施工细则须含「施工开始日期」时间戳（SOP 落戳约定；归档件由 14 项头块承载）。"""
     active_dir = docs_dir / "路线图" / "01_短期施工区"

@@ -12,17 +12,16 @@
 #   python scripts/py/audit_config.py --fix
 # ==============================================================================
 """审查 config/ 目录与 game_config.gd 必需表清单的一致性。"""
-import argparse
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+import argparse
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root, load_json
-
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -526,8 +525,8 @@ def _audit_single_config_file(
         raw = f.read_bytes()
         raw_text = raw.decode("utf-8-sig")
         data = json.loads(raw_text)
-    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
-        state.violations.append(f"JSON 解析失败: {rel_posix} ({e})")
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError) as exc:
+        state.violations.append(f"JSON 解析失败: {rel_posix} ({exc})")
         state.invalid_tables.add(table)
         return
     if not isinstance(data, dict):
@@ -555,8 +554,8 @@ def _run_arch_checks_if_enabled(enabled: bool) -> tuple[list[dict], list[str]]:
             if not r.get("passed"):
                 for v in r.get("violations", []):
                     arch_violations.append(f"架构护栏违规 [{r.get('test', '')}]: {v}")
-    except Exception as ex:
-        arch_violations.append(f"架构护栏执行异常: {ex}")
+    except Exception as exc:
+        arch_violations.append(f"架构护栏执行异常: {exc}")
     return arch_results, arch_violations
 
 
@@ -615,8 +614,8 @@ def _generate_audit_report(
     try:
         report_dest.parent.mkdir(parents=True, exist_ok=True)
         report_dest.write_text(json.dumps(report_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-    except OSError as oe:
-        print(f"  ⚠ 报告落盘失败 ({report_dest}): {oe}")
+    except OSError as exc:
+        print(f"  ⚠ 报告落盘失败 ({report_dest}): {exc}")
 
     return is_passed
 

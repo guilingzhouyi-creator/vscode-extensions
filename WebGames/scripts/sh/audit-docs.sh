@@ -25,25 +25,44 @@ for C in python3 python; do
     break
   fi
 done
-if [ -z "$PY" ]; then
+if [[ -z "$PY" ]]; then
   echo "【audit-docs】python3/python 缺失"
   exit 2
 fi
 
-cd "$ROOT_DIR"
+cd "$ROOT_DIR" || { echo "【audit-docs】无法进入工作目录: $ROOT_DIR"; exit 2; }
 
 # 基线审查完善：基线棘轮引导——传入 --baseline/--update-baseline 且未显式给出基准路径时，
-# 自动指向 golden 基线 benchmarks/reports/docs_baseline.json（消除裸跑报 expected one argument 的踩坑）
+# 自动指向 golden 基线 benchmarks/reports/docs_baseline.json（消除裸跑报 expected one argument 的踩坑）。
+# 参数以数组承载而非拼接字符串，含空格的基准路径不会被词切分破坏。
 BASELINE_DEFAULT="benchmarks/reports/docs_baseline.json"
-BASELINE_FLAG=""
-case " $* " in
-  *" --baseline "*|*" --update-baseline "*)
-    if ! printf '%s\n' "$*" | grep -qE -- "--(baseline|update-baseline)[ =]+[^ ]+"; then
-      BASELINE_FLAG="--baseline $BASELINE_DEFAULT"
-    fi ;;
-esac
+FORWARD_ARGS=()
+NEED_BASELINE_VALUE=0
+INDEX=0
+ARGV=("$@")
+while [[ "$INDEX" -lt "${#ARGV[@]}" ]]; do
+  ARG="${ARGV[$INDEX]}"
+  case "$ARG" in
+    --baseline|--update-baseline)
+      FOLLOWING="${ARGV[$((INDEX + 1))]:-}"
+      # 后随项缺失或本身是另一个开关（以 - 起头），均视为未提供基准路径。
+      if [[ -z "$FOLLOWING" || "$FOLLOWING" == -* ]]; then
+        NEED_BASELINE_VALUE=1
+      fi ;;
+    --baseline=*|--update-baseline=*) ;;
+  esac
+  INDEX=$((INDEX + 1))
+done
+if [[ "$NEED_BASELINE_VALUE" -eq 1 ]]; then
+  FORWARD_ARGS+=("--baseline" "$BASELINE_DEFAULT")
+fi
+FORWARD_ARGS+=("$@")
 
-"$PY" scripts/py/audit_docs.py $BASELINE_FLAG "$@"
+if [[ "${#FORWARD_ARGS[@]}" -gt 0 ]]; then
+  "$PY" scripts/py/audit_docs.py "${FORWARD_ARGS[@]}"
+else
+  "$PY" scripts/py/audit_docs.py
+fi
 code=$?
 case "$code" in
   0) echo "【audit-docs】审查通过" ;;

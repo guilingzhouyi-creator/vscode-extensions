@@ -13,10 +13,8 @@
 """MOD SDK 规范 Markdown 文档动态章节与全景手册生成器。"""
 
 from __future__ import annotations
-
-import re
 from typing import Any
-
+import re
 COMMA_SEP = ", "
 
 

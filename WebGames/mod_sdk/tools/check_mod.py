@@ -14,14 +14,12 @@
 """纯静态轻量 MOD 检查器与自愈诊断器：专为外部开发者与自主 Agent 打造的门禁工具。"""
 
 from __future__ import annotations
-
+from pathlib import Path
+from typing import Any
 import argparse
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any
-
 TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
@@ -37,15 +35,10 @@ from check_mod_common import (
     WHITELISTED_PLACEHOLDERS,
     PARAM_REGEX,
     REQUIRED_MANIFEST_FIELDS,
-    VALID_ATTRIBUTE_KEYS,
-    VALID_UI_SELECTION_MODES,
     BUILTIN_DAG_IDS,
-    BUILTIN_STARTER_KITS,
-    BUILTIN_TRAIT_COSTS,
     ensure_utf8_stdout as _ensure_utf8_stdout,
     add_diag as _add_diag,
     safe_load_json as _safe_load_json,
-    normalize_named_items as _normalize_named_items,
 )
 from check_mod_dag import (
     check_dag_entries_and_terminals as _check_dag_entries_and_terminals,
@@ -54,6 +47,10 @@ from check_mod_dag import (
     check_reachability as _check_reachability,
     flatten_i18n_dict as _flatten_i18n_dict,
     check_dag_file as _check_dag_file,
+)
+from check_mod_destiny import (
+    check_destinies_file,
+    extract_rules_list,
 )
 from check_mod_multi import (
     check_multi_incompatible_packs as _check_multi_incompatible_packs,
@@ -64,258 +61,12 @@ from check_mod_multi import (
 )
 
 
-
 # ==============================================================================
-# 三、单包命途契约校验器 (Destiny Mod Budget & Causality Validators)
-# - 校验 ui_capabilities 枚举合法性 (INHERIT / ALLOW_MANUAL / FORCE_RANDOM)
-# - 校验 custom_origins 六维预算 [-2, 3]、净和 [-2, 4] 与金币上限 [0, 1000]
-# - 校验 paired_presets 正负因果天赋守恒 (pos > 0, neg < 0, |pos + neg| <= 1)
-# - 校验 custom_starter_kits 初始物品容量 (<= 10 件) 与 canonical_id 非空
+# 三、DAG 拓扑连通性、Kahn 环检测与多包冲突裁决契约 (DAG & Multi-Pack Contracts)
+# - Inv-DAG-TOPOLOGY: 单一 START_ENTRY，至少一个 TERMINAL_EXIT，Kahn 算法零有向环
+# - Inv-DAG-REACHABILITY: 前向全节点可达（零孤儿），反向全路径可达终态（零死胡同）
+# - Inv-MULTI-CONFLICT: 跨包互斥、同名 origin_id/trait_id/kit_id 与 UI 策略互斥静态阻断
 # ==============================================================================
-def _check_destiny_ui_capabilities(destiny_data: dict[str, Any], rel_name: str, diags: list[DiagnosticItem]) -> None:
-    """校验 destinies.json 中的 ui_capabilities 模式枚举合法性。"""
-    ui_cap = destiny_data.get("ui_capabilities")
-    if ui_cap is None:
-        return
-    if not isinstance(ui_cap, dict):
-        _add_diag(diags, "ERR_DESTINY_INVALID_UI_MODE", rel_name, "ui_capabilities 必须为 JSON 对象", "请将 ui_capabilities 声明为包含 origin_selection_mode 等字段的对象")
-        return
-
-    for mode_key in ("origin_selection_mode", "trait_selection_mode"):
-        val = ui_cap.get(mode_key)
-        if val is not None and (not isinstance(val, str) or val not in VALID_UI_SELECTION_MODES):
-            _add_diag(diags, "ERR_DESTINY_INVALID_UI_MODE", rel_name, f"ui_capabilities.{mode_key} 取值非法: '{val}'", f"请将 {mode_key} 修改为合法枚举值: INHERIT, ALLOW_MANUAL 或 FORCE_RANDOM")
-
-    reroll = ui_cap.get("allow_attribute_reroll")
-    if reroll is not None and not isinstance(reroll, bool):
-        _add_diag(diags, "ERR_DESTINY_INVALID_UI_MODE", rel_name, f"ui_capabilities.allow_attribute_reroll 必须为布尔值，实际为: {reroll!r}", "请将 allow_attribute_reroll 设置为 true 或 false")
-
-
-def _is_valid_number(val: Any) -> bool:
-    """判断值是否为合法的 int 或 float（排除 bool）。"""
-    return not isinstance(val, bool) and isinstance(val, (int, float))
-
-
-def _check_origin_stat_bonuses(oid: str, bonuses: dict[str, Any], rel_name: str, diags: list[DiagnosticItem]) -> None:
-    """校验单个身世的六维加成范围 [-2, 3] 与净总和 [-2, 4]。"""
-    net_sum: float = 0.0
-    for stat_key, val in bonuses.items():
-        if stat_key not in VALID_ATTRIBUTE_KEYS or not _is_valid_number(val):
-            _add_diag(diags, "ERR_DESTINY_STAT_BUDGET_EXCEEDED", rel_name, f"自定义身世 '{oid}' 含非法属性键或数值: {stat_key}={val!r}", "属性键仅限 STR/CON/INT/AGI/SPR/VIT，数值必须为 [-2, 3] 内的整数")
-            continue
-        if not (-2 <= val <= 3):
-            _add_diag(diags, "ERR_DESTINY_STAT_BUDGET_EXCEEDED", rel_name, f"自定义身世 '{oid}' 单维属性 '{stat_key}' 加成 {val} 超出 [-2, 3] 红线", f"请将 '{oid}' 的 {stat_key} 加成收敛至 [-2, 3] 范围内")
-        net_sum += val
-
-    if not (-2 <= net_sum <= 4):
-        _add_diag(diags, "ERR_DESTINY_STAT_BUDGET_EXCEEDED", rel_name, f"自定义身世 '{oid}' 六维加成净代数和 {net_sum} 超出 [-2, 4] 预算红线", f"请平衡 '{oid}' 的正负属性加成，使净代数和保持在 [-2, 4] 之间")
-
-
-def _check_single_origin_budget(
-    origin: dict[str, Any],
-    idx: int,
-    rel_name: str,
-    diags: list[DiagnosticItem],
-    valid_dags: set[str],
-    valid_kits: set[str],
-) -> None:
-    """校验单个自定义身世的六维加成预算、初始金币上限与序章DAG/套件引用。"""
-    oid = str(origin.get("origin_id") or origin.get("id") or f"index_{idx}")
-    gold = origin.get("initial_gold", 0)
-    if not _is_valid_number(gold) or not (0 <= gold <= 1000):
-        _add_diag(diags, "ERR_DESTINY_GOLD_CAP_EXCEEDED", rel_name, f"自定义身世 '{oid}' 初始金币 {gold} 超出合法区间 [0, 1000]", "请将 custom_origins 中的 initial_gold 调整至 0 到 1000 之间")
-
-    bonuses = origin.get("attribute_bonus", {})
-    if not isinstance(bonuses, dict):
-        _add_diag(diags, "ERR_DESTINY_STAT_BUDGET_EXCEEDED", rel_name, f"自定义身世 '{oid}' 的 attribute_bonus 必须为对象", "请将 attribute_bonus 声明为六维属性键值对字典")
-    else:
-        _check_origin_stat_bonuses(oid, bonuses, rel_name, diags)
-
-    prologue_dag_id = origin.get("prologue_dag_id")
-    if prologue_dag_id:
-        if not isinstance(prologue_dag_id, str) or prologue_dag_id.strip() not in valid_dags:
-            _add_diag(
-                diags,
-                "ERR_DESTINY_UNKNOWN_DAG_REF",
-                rel_name,
-                f"自定义身世 '{oid}' 引用的 prologue_dag_id '{prologue_dag_id}' 不存在于 declared_dag_ids 或内置序章图中",
-                "请确保引用的 prologue_dag_id 在 dag_graphs/ 中存在或属于内置序章图",
-            )
-
-    starter_kit_id = origin.get("starter_kit_id")
-    if starter_kit_id:
-        if not isinstance(starter_kit_id, str) or starter_kit_id.strip() not in valid_kits:
-            _add_diag(
-                diags,
-                "ERR_DESTINY_UNKNOWN_KIT_REF",
-                rel_name,
-                f"自定义身世 '{oid}' 引用的 starter_kit_id '{starter_kit_id}' 不存在于 custom_starter_kits 或内置套件中",
-                "请确保 starter_kit_id 引用了合法已声明的套件标识符（如 KIT_HUMAN_DEFAULT）",
-            )
-
-
-def _check_destiny_origins(
-    destiny_data: dict[str, Any],
-    rel_name: str,
-    diags: list[DiagnosticItem],
-    valid_dags: set[str],
-    valid_kits: set[str],
-) -> None:
-    """校验 custom_origins 列表中的所有自定义身世。"""
-    for idx, origin in enumerate(_normalize_named_items(destiny_data.get("custom_origins"), "origin_id")):
-        _check_single_origin_budget(origin, idx, rel_name, diags, valid_dags, valid_kits)
-
-
-def _extract_trait_cost_map(destiny_data: dict[str, Any], rel_name: str, diags: list[DiagnosticItem]) -> dict[str, int | float]:
-    """构建内置与自定义天赋的 cost 映射表，并校验自定义天赋基础极性。"""
-    cost_map: dict[str, int | float] = dict(BUILTIN_TRAIT_COSTS)
-    for idx, trait in enumerate(_normalize_named_items(destiny_data.get("custom_traits"), "trait_id")):
-        tid = str(trait.get("trait_id") or trait.get("id") or f"trait_{idx}")
-        cost = trait.get("cost")
-        ttype = str(trait.get("type", "")).upper()
-        if not _is_valid_number(cost) or cost == 0:
-            _add_diag(diags, "ERR_DESTINY_CAUSALITY_IMBALANCE", rel_name, f"自定义天赋 '{tid}' 的 cost ({cost!r}) 必须为非零数值", "正向天赋请设置 cost > 0，负向天赋请设置 cost < 0")
-            continue
-        if (ttype == "POSITIVE" and cost <= 0) or (ttype == "NEGATIVE" and cost >= 0):
-            _add_diag(diags, "ERR_DESTINY_CAUSALITY_IMBALANCE", rel_name, f"自定义天赋 '{tid}' 的极性类型 ({ttype}) 与 cost ({cost}) 符号矛盾", "确保 POSITIVE 天赋 cost > 0 且 NEGATIVE 天赋 cost < 0")
-        cost_map[tid] = cost
-    return cost_map
-
-
-def _resolve_endpoint_cost(endpoint: Any, explicit_cost: Any, cost_map: dict[str, int | float]) -> int | float | None:
-    """解析配对预设中正/负端点的因果点数。"""
-    if _is_valid_number(explicit_cost):
-        return explicit_cost
-    if isinstance(endpoint, dict):
-        c = endpoint.get("cost")
-        if _is_valid_number(c):
-            return c
-        tid = endpoint.get("trait_id") or endpoint.get("id")
-        return cost_map.get(tid) if isinstance(tid, str) else None
-    return cost_map.get(endpoint) if isinstance(endpoint, str) else None
-
-
-def _check_destiny_causality_traits(destiny_data: dict[str, Any], rel_name: str, diags: list[DiagnosticItem]) -> None:
-    """校验 paired_presets 正负因果天赋配对守恒规则。"""
-    cost_map = _extract_trait_cost_map(destiny_data, rel_name, diags)
-    custom_traits = _normalize_named_items(destiny_data.get("custom_traits"), "trait_id")
-    raw_presets = destiny_data.get("paired_presets")
-    presets = [p for p in raw_presets if isinstance(p, dict)] if isinstance(raw_presets, list) else []
-
-    if custom_traits and not presets:
-        _add_diag(diags, "ERR_DESTINY_CAUSALITY_IMBALANCE", rel_name, "定义了 custom_traits 但缺少 paired_presets 正负因果天赋配对声明", "请在 paired_presets 中将正向与负向天赋成对绑定，且净 cost 绝对值 <= 1")
-        return
-
-    for idx, preset in enumerate(presets):
-        pos_ref = preset.get("positive") if "positive" in preset else preset.get("positive_trait")
-        neg_ref = preset.get("negative") if "negative" in preset else preset.get("negative_trait")
-        pos_cost = _resolve_endpoint_cost(pos_ref, preset.get("positive_cost"), cost_map)
-        neg_cost = _resolve_endpoint_cost(neg_ref, preset.get("negative_cost"), cost_map)
-
-        if pos_cost is None or neg_cost is None:
-            _add_diag(diags, "ERR_DESTINY_CAUSALITY_IMBALANCE", rel_name, f"paired_presets[{idx}] 引用了未定义或缺少 cost 的天赋: positive={pos_ref!r}, negative={neg_ref!r}", "请确保配对引用的天赋已在 custom_traits 或内置天赋库中声明合法 cost")
-            continue
-
-        net_delta = abs(pos_cost + neg_cost)
-        if pos_cost <= 0 or neg_cost >= 0 or net_delta > 1:
-            _add_diag(diags, "ERR_DESTINY_CAUSALITY_IMBALANCE", rel_name, f"paired_presets[{idx}] 违反因果守恒: positive_cost={pos_cost}, negative_cost={neg_cost}, 净和绝对值={net_delta} (要求 pos>0, neg<0 且 |pos+neg|<=1)", "请调整正负天赋的 cost 配平，确保一正一负且代数和绝对值不超过 1")
-
-
-def _validate_kit_item_entry(kid: str, item_idx: int, item: Any, rel_name: str, diags: list[DiagnosticItem]) -> int:
-    """校验套件内单条初始物品记录，返回合法物品件数。"""
-    if not isinstance(item, dict):
-        _add_diag(diags, "ERR_DESTINY_KIT_INVALID", rel_name, f"自定义套件 '{kid}' 第 {item_idx} 项物品必须为对象", "每项物品应包含 canonical_id 与 count 字段")
-        return 0
-
-    cid = item.get("canonical_id")
-    if not isinstance(cid, str) or not cid.strip():
-        _add_diag(diags, "ERR_DESTINY_KIT_INVALID", rel_name, f"自定义套件 '{kid}' 第 {item_idx} 项物品的 canonical_id 为空或非法", "请填写非空的权威物品标识符（如 KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD）")
-
-    cnt = item.get("count", 1)
-    if isinstance(cnt, bool) or not isinstance(cnt, int) or cnt <= 0:
-        _add_diag(diags, "ERR_DESTINY_KIT_INVALID", rel_name, f"自定义套件 '{kid}' 第 {item_idx} 项物品数量 count ({cnt!r}) 必须为正整数", "请将该物品的 count 设置为 >= 1 的正整数")
-        return 0
-    return cnt
-
-
-def _check_single_starter_kit(kit: dict[str, Any], idx: int, rel_name: str, diags: list[DiagnosticItem]) -> None:
-    """校验单个自定义初始装备套件。"""
-    kid = str(kit.get("kit_id") or kit.get("id") or f"kit_{idx}")
-    gold = kit.get("initial_gold", 0)
-    if not _is_valid_number(gold) or not (0 <= gold <= 1000):
-        _add_diag(diags, "ERR_DESTINY_GOLD_CAP_EXCEEDED", rel_name, f"自定义套件 '{kid}' 的 initial_gold ({gold}) 超出 [0, 1000] 上限", "请将套件的 initial_gold 调整至 0 到 1000 范围内")
-
-    items = kit.get("initial_items") if "initial_items" in kit else kit.get("items")
-    if not isinstance(items, list) or not items:
-        _add_diag(diags, "ERR_DESTINY_KIT_INVALID", rel_name, f"自定义套件 '{kid}' 的 initial_items 必须为非空数组", "请在套件中配置 initial_items 列表并至少包含 1 件合法初始物品")
-        return
-
-    total_count = sum(_validate_kit_item_entry(kid, item_idx, item, rel_name, diags) for item_idx, item in enumerate(items))
-    if total_count > 10 or len(items) > 10:
-        _add_diag(diags, "ERR_DESTINY_KIT_INVALID", rel_name, f"自定义套件 '{kid}' 物品总件数 ({total_count}) 超过上限 10 件", "请精简 custom_starter_kits 中的初始物品数量，使单套总件数 <= 10")
-
-
-def _check_destiny_starter_kits(destiny_data: dict[str, Any], rel_name: str, diags: list[DiagnosticItem]) -> None:
-    """校验 custom_starter_kits 列表中的所有自定义套件。"""
-    for idx, kit in enumerate(_normalize_named_items(destiny_data.get("custom_starter_kits"), "kit_id")):
-        _check_single_starter_kit(kit, idx, rel_name, diags)
-
-
-def _check_destiny_custom_routing_rules(
-    destiny_data: dict[str, Any],
-    rel_name: str,
-    valid_dags: set[str],
-    diags: list[DiagnosticItem],
-) -> None:
-    """校验 destinies.json 中的 custom_routing_rules 目标 DAG 是否合法。"""
-    raw_rules = destiny_data.get("custom_routing_rules")
-    if not raw_rules:
-        return
-    rules = _extract_rules_list(raw_rules) if not isinstance(raw_rules, list) else [r for r in raw_rules if isinstance(r, dict)]
-    for idx, rule in enumerate(rules):
-        target = rule.get("target_dag_id")
-        if not target or not isinstance(target, str) or target.strip() not in valid_dags:
-            _add_diag(
-                diags,
-                "ERR_DESTINY_UNKNOWN_DAG_REF",
-                rel_name,
-                f"custom_routing_rules[{idx}] 引用的 target_dag_id '{target}' 不存在于 declared_dag_ids 或内置序章图中",
-                "请指定已存在的有效序章 DAG 图元标识符",
-            )
-
-
-def _check_destinies_file(
-    mod_dir: Path,
-    diags: list[DiagnosticItem],
-    rel_prefix: str = "",
-    declared_dag_ids: set[str] | None = None,
-) -> dict[str, Any] | None:
-    """若存在 destinies.json，则校验其 UI 策略、六维预算、正负因果与初始套件。"""
-    destiny_path = mod_dir / "destinies.json"
-    if not destiny_path.is_file():
-        return None
-
-    rel_name = f"{rel_prefix}destinies.json" if rel_prefix else "destinies.json"
-    data = _safe_load_json(destiny_path, rel_name, diags)
-    if not isinstance(data, dict):
-        if data is not None:
-            _add_diag(diags, "ERR_DESTINY_NOT_OBJECT", rel_name, "destinies.json 顶层必须为 JSON 对象", "请将 destinies.json 根节点调整为 JSON 对象 {}")
-        return None
-
-    valid_dags = (declared_dag_ids or set()) | BUILTIN_DAG_IDS
-    declared_kit_ids: set[str] = set()
-    for kit in _normalize_named_items(data.get("custom_starter_kits"), "kit_id"):
-        kid = kit.get("kit_id") or kit.get("id")
-        if isinstance(kid, str) and kid.strip():
-            declared_kit_ids.add(kid.strip())
-    valid_kits = declared_kit_ids | BUILTIN_STARTER_KITS
-
-    _check_destiny_ui_capabilities(data, rel_name, diags)
-    _check_destiny_origins(data, rel_name, diags, valid_dags, valid_kits)
-    _check_destiny_causality_traits(data, rel_name, diags)
-    _check_destiny_starter_kits(data, rel_name, diags)
-    _check_destiny_custom_routing_rules(data, rel_name, valid_dags, diags)
-    return data
 
 
 def _check_manifest(mod_dir: Path, diags: list[DiagnosticItem]) -> dict[str, Any] | None:
@@ -352,18 +103,6 @@ def _check_manifest(mod_dir: Path, diags: list[DiagnosticItem]) -> dict[str, Any
     return data
 
 
-def _extract_rules_list(rules_data: Any) -> list[dict[str, Any]]:
-    """提取路由规则列表。"""
-    if isinstance(rules_data, list):
-        return [r for r in rules_data if isinstance(r, dict)]
-    if isinstance(rules_data, dict):
-        for key in ("routing_rules", "rules", "prologue_routing_rules"):
-            val = rules_data.get(key)
-            if isinstance(val, list):
-                return [r for r in val if isinstance(r, dict)]
-    return []
-
-
 def _check_routing_rules(mod_dir: Path, declared_dag_ids: set[str], diags: list[DiagnosticItem]) -> None:
     """校验 routing_rules.json。"""
     routing_path = mod_dir / "routing_rules.json"
@@ -371,7 +110,7 @@ def _check_routing_rules(mod_dir: Path, declared_dag_ids: set[str], diags: list[
     if data is None:
         return
 
-    rules = _extract_rules_list(data)
+    rules = extract_rules_list(data)
     if not rules:
         diags.append(DiagnosticItem(
             code="ERR_ROUTING_EMPTY",
@@ -408,15 +147,6 @@ def _check_routing_rules(mod_dir: Path, declared_dag_ids: set[str], diags: list[
 # - Inv-DAG-REACHABILITY: 前向全节点可达（零孤儿），反向全路径可达终态（零死胡同）
 # - Inv-MULTI-CONFLICT: 跨包互斥、同名 origin_id/trait_id/kit_id 与 UI 策略互斥静态阻断
 # ==============================================================================
-from check_mod_dag import (
-    check_dag_entries_and_terminals as _check_dag_entries_and_terminals,
-    build_dag_graph_structure as _build_dag_graph_structure,
-    detect_dag_cycle_kahn as _detect_dag_cycle_kahn,
-    check_reachability as _check_reachability,
-    flatten_i18n_dict as _flatten_i18n_dict,
-    check_dag_file as _check_dag_file,
-)
-
 
 def _check_i18n(mod_dir: Path, required_keys: set[str], diags: list[DiagnosticItem]) -> None:
     """校验 i18n 语言包与占位符白名单（当所有节点采用 inline_text 且 i18n 不存在时免校验放行）。"""
@@ -595,11 +325,11 @@ def _check_content_directory(mod_dir: Path, diags: list[DiagnosticItem]) -> None
                     detail=f"{rel_str} 顶层必须为 JSON 对象或列表",
                     fix_suggestion="请将该文件的根结构调整为 {} 或 []",
                 ))
-        except (json.JSONDecodeError, OSError) as err:
+        except (json.JSONDecodeError, OSError) as exc:
             diags.append(DiagnosticItem(
                 code="ERR_CONTENT_JSON_INVALID",
                 file_path=rel_str,
-                detail=f"JSON 解析失败: {err}",
+                detail=f"JSON 解析失败: {exc}",
                 fix_suggestion=f"请检查 {rel_str} 的语法正确性",
             ))
 
@@ -645,22 +375,13 @@ def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:
 
     _check_routing_rules(mod_dir, declared_dag_ids, diags)
     _check_i18n(mod_dir, required_keys, diags)
-    _check_destinies_file(mod_dir, diags, declared_dag_ids=declared_dag_ids)
+    check_destinies_file(mod_dir, diags, declared_dag_ids=declared_dag_ids)
     _check_asset_safety_and_manifest(mod_dir, diags)
     _check_dangling_asset_refs(mod_dir, diags)
     _check_content_directory(mod_dir, diags)
 
     valid = len(diags) == 0
     return valid, diags
-
-
-from check_mod_multi import (
-    check_multi_incompatible_packs as _check_multi_incompatible_packs,
-    register_entity_ids as _register_entity_ids,
-    check_multi_duplicate_ids as _check_multi_duplicate_ids,
-    check_multi_ui_policy_conflicts as _check_multi_ui_policy_conflicts,
-    validate_multi_mods,
-)
 
 
 

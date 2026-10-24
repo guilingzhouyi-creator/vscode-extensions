@@ -15,12 +15,11 @@
 """审查 GDScript 编码规范、高级质量治理与简化防过度工程化（三节统一聚合门面）。"""
 
 from __future__ import annotations
-
+from pathlib import Path
 import argparse
 import json
 import re
 import sys
-from pathlib import Path
 
 from audit_common import ensure_utf8_stdout
 from gd.advanced_rules import AdvancedCodeAuditor, Finding, run_advanced_audit
@@ -31,7 +30,6 @@ from gd.simplification_rules import (
     run_simplification_audit,
 )
 from gd.style_rules import audit_file, run_style_audit
-
 ensure_utf8_stdout()
 
 __all__ = [

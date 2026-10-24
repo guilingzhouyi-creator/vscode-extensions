@@ -13,12 +13,11 @@
 """GDScript 过度工程化防御、简化规范与循环内瞬态分配审查实现。"""
 
 from __future__ import annotations
-
-import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import json
+import re
 
 from gd.gd_common import (
     LOOP_RE,
@@ -27,7 +26,6 @@ from gd.gd_common import (
     get_gd_files,
     get_rules_config,
 )
-
 CLS_DECL_RE = re.compile(r"^\s*class_name\s+([A-Za-z0-9_]+)")
 EXTENDS_RE = re.compile(r"^\s*extends\s+([A-Za-z0-9_]+)")
 FUNC_DEF_RE = re.compile(r"^\s*(?:static\s+)?func\s+([A-Za-z0-9_]+)\s*\(")

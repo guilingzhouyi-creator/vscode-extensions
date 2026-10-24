@@ -11,12 +11,11 @@
 #   python scripts/py/audit_pair_parity.py
 #   python scripts/py/audit_pair_parity.py --json
 # ==============================================================================
+from pathlib import Path
 import re
 import sys
-from pathlib import Path
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()

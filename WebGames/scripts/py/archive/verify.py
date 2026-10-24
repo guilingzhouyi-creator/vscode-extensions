@@ -13,13 +13,11 @@
 """verify.py — 案卷阶段特化校验引擎（归档前置门禁）。
 
 执行案卷 4 阶段文件完整性校验、模板占位符拦截与样板化复制检测。"""
-import re
 from pathlib import Path
+import re
 
 from archive.constants import PENDING_CONTEXT_ALLOWLIST, PENDING_MARKER_RE, TEMPLATE_PLACEHOLDER_RE
 from archive.metadata import strip_existing_frontmatter
-
-
 def verify_stage_distinctness(stage_files: list[Path]) -> tuple[bool, str]:
     """
     验证一个卷内 4 个阶段的文件内容是否完全特化：

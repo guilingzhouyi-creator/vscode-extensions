@@ -10,13 +10,12 @@
 """MOD长程交互式单步推演会话驱动器。"""
 
 from __future__ import annotations
-
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 import hashlib
 import json
 import sys
-from pathlib import Path
-from typing import Any
 
 from play_mod_common import (
     SCHEMA_VERSION,
@@ -27,8 +26,6 @@ from play_mod_common import (
     prepare_session,
     resolve_node_text,
 )
-
-
 @dataclass(slots=True)
 class ObservationPayloadContext:
     """观测包构建载荷参数对象 (GOV-DAT-001)。"""

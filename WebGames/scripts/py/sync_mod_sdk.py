@@ -15,12 +15,10 @@
 """MOD SDK 权威真源静态萃取与契约同步引擎 CLI 入口门面。"""
 
 from __future__ import annotations
-
-import argparse
-import sys
 from pathlib import Path
 from typing import Any
-
+import argparse
+import sys
 # 兼容性导入与共享底盘 re-export
 from lib.mod_sdk_shared import (
     STANDARD_PLACEHOLDER_DOCS,

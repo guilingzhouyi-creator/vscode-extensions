@@ -41,7 +41,7 @@ fi
 if ! command -v "$GODOT_BIN" >/dev/null 2>&1; then
   echo "【bench-sweep】godot 不可用（可用 GODOT_BIN 环境变量指定路径）"; exit 1
 fi
-if [ -z "$PY" ]; then
+if [[ -z "$PY" ]]; then
   echo "【bench-sweep】python3/python 缺失"; exit 1
 fi
 
@@ -54,7 +54,7 @@ for i in $(seq 1 "$RUNS"); do
   # 显式捕获真实退出码（禁止 if ! 取反吞码）
   "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://benchmarks/bench_runner.gd -- "$TMP"
   CODE=$?
-  if [ "$CODE" -ne 0 ]; then
+  if [[ "$CODE" -ne 0 ]]; then
     echo "【bench-sweep】第 ${i} 次基准运行失败（真实退出码=$CODE）"; exit "$CODE"
   fi
   RUN_FILES+=("$TMP")
@@ -63,7 +63,7 @@ done
 MERGED="$OUT_DIR/bench_sweep_${STAMP}.json"
 echo "【bench-sweep】聚合 ${RUNS} 次运行中位数..."
 (cd "$ROOT_DIR" && "$PY" scripts/py/report_sweep.py "${RUN_FILES[@]}" --out "$MERGED" >/dev/null) || exit 1
-if [ "$KEEP" = "0" ]; then
+if [[ "$KEEP" = "0" ]]; then
   rm -f "${RUN_FILES[@]}"
 fi
 cp "$MERGED" "$OUT_DIR/bench_latest.json"
@@ -71,7 +71,7 @@ cp "$MERGED" "$OUT_DIR/bench_latest.json"
 # 滚动淘汰留痕：保留最近 10 份 sweep 快照，清理更早的历史文件。
 # 注意：xargs -r 为 GNU 扩展（BSD/macOS 非法），改用 POSIX 空集守卫写法。
 OLD_FILES="$(ls -t "$OUT_DIR"/bench_sweep_*.json 2>/dev/null | grep -v 'bench_latest.json' | tail -n +11)"
-if [ -n "$OLD_FILES" ]; then
+if [[ -n "$OLD_FILES" ]]; then
   printf '%s\n' "$OLD_FILES" | xargs rm -f
 fi
 

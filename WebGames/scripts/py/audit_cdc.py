@@ -11,13 +11,13 @@
 #   python scripts/py/audit_cdc.py
 #   python scripts/py/audit_cdc.py --json
 # ==============================================================================
+from pathlib import Path
+from typing import Any
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any
-from audit_common import ensure_utf8_stdout, resolve_repo_root
 
+from audit_common import ensure_utf8_stdout, resolve_repo_root
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -37,8 +37,8 @@ def load_registered_canonical_ids() -> set:
                     cid = item.get("canonical_id")
                     if cid:
                         registered.add(cid)
-            except Exception as e:
-                print(f"[WARN] 读取物品配置失败 {f.name}: {e}", file=sys.stderr)
+            except Exception as exc:
+                print(f"[WARN] 读取物品配置失败 {f.name}: {exc}", file=sys.stderr)
     return registered
 
 
@@ -61,8 +61,8 @@ def check_code_canonical_id_references(registered_ids: set, violations: list) ->
                         violations.append(
                             f"[ID引用漂移] {rel_path}:{line_idx} 引用了未在 config/items 中注册的物品ID: {cid}"
                         )
-        except Exception as e:
-            violations.append(f"[文件读取错误] {gd_file}: {e}")
+        except Exception as exc:
+            violations.append(f"[文件读取错误] {gd_file}: {exc}")
 
     return scanned_count
 
@@ -129,8 +129,8 @@ def check_gacha_rates_and_pity(violations: list) -> dict:
 
     try:
         data = json.loads(gacha_file.read_text(encoding="utf-8"))
-    except Exception as e:
-        violations.append(f"[JSON解析失败] gacha.json: {e}")
+    except Exception as exc:
+        violations.append(f"[JSON解析失败] gacha.json: {exc}")
         return {}
 
     _validate_rates(data.get("rates", {}), violations)

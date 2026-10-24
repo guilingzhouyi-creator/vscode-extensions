@@ -14,17 +14,16 @@
 
 提供形成日期/归档日期/时段求解、YAML front-matter 题头剥离、Markdown 致密化
 与 ArchiveRecordDTO 全宗检索总表 11 列标准记录渲染。"""
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
 import hashlib
 import re
 import subprocess
 import unicodedata
-from dataclasses import dataclass
-from datetime import date
-from pathlib import Path
 
-from audit_common import resolve_repo_root
 from archive.constants import resolve_responsible_short_from_context
-
+from audit_common import resolve_repo_root
 ROOT = resolve_repo_root()
 
 # 形成日期内容级缓存：同一内容（改名前后）在一次归档流程内只探测一次 git/文件系统

@@ -11,9 +11,9 @@
 #   check_layout(doc, decode_errors, add_fn)
 # ==============================================================================
 """Markdown 标题规范、代码围栏闭合、后端需求表标准章节与表格排版门禁。"""
+from typing import Any, Callable
 import os
 import re
-from typing import Any, Callable, Dict, List
 
 from audit_common import KALAR_DEV_PREFIX
 from docs_audit.models import (
@@ -22,7 +22,6 @@ from docs_audit.models import (
     LIST_PREFIX_RE,
     TABLE_ROW_RE,
 )
-
 RULE_LAYOUT_FENCE = "LAYOUT-FENCE-UNCLOSED"
 RULE_LAYOUT_H1_MULTI = "LAYOUT-H1-MULTI"
 RULE_LAYOUT_H1_ABSENT = "LAYOUT-H1-ABSENT"
@@ -104,7 +103,7 @@ def _count_table_cols(line: str) -> int:
     return s.count("|") + 1
 
 
-def _check_single_table_block(blk: List[int], doc: Doc, add_fn: Callable) -> None:
+def _check_single_table_block(blk: list[int], doc: Doc, add_fn: Callable) -> None:
     """审查单个连续表格块的列数对齐与前置空行。"""
     if len(blk) == 1:
         add_fn(doc, RULE_LAYOUT_TABLE_COLS, blk[0] + 1, "孤立表格行（缺表头/分隔行）")
@@ -143,7 +142,7 @@ def _check_table_blocks(doc: Doc, add_fn: Callable) -> None:
         for i, (ln, ins) in enumerate(zip(doc.lines, doc.inside))
         if not ins and TABLE_ROW_RE.match(ln)
     ]
-    blocks: List[List[int]] = []
+    blocks: list[list[int]] = []
     for r in rows:
         if blocks and r == blocks[-1][-1] + 1:
             blocks[-1].append(r)
@@ -154,7 +153,7 @@ def _check_table_blocks(doc: Doc, add_fn: Callable) -> None:
         _check_single_table_block(blk, doc, add_fn)
 
 
-def check_layout(doc: Doc, decode_errors: Dict[str, Any], add_fn: Callable) -> None:
+def check_layout(doc: Doc, decode_errors: dict[str, Any], add_fn: Callable) -> None:
     """审查文档排版规范、结构化标准与表格对齐。"""
     if doc.rel == "" and doc.text == "":
         return

@@ -24,16 +24,15 @@
 7. Python 100% 强类型注解覆盖、零裸 except 违规与 AST 注解引用名字绑定完备性。
 """
 
+from pathlib import Path
+from typing import Any, Generator
 import argparse
 import ast
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any, Generator
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -203,11 +202,11 @@ def audit_file(path: Path, fix: bool = False) -> list[dict[str, Any]]:
     try:
         raw_bytes = path.read_bytes()
         text = raw_bytes.decode("utf-8", errors="ignore")
-    except Exception as e:
+    except Exception as exc:
         return [{
             "file": path_str,
             "rule": "HEADER-UNREADABLE",
-            "detail": f"无法读取文件（编码/IO: {e}）"
+            "detail": f"无法读取文件（编码/IO: {exc}）"
         }]
 
     lines = text.splitlines()

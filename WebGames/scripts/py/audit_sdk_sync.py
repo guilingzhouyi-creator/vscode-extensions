@@ -18,12 +18,11 @@ tools/ 统一 CLI 工具链、templates/ 脚手架模板）、核心能力清单
 """
 
 from __future__ import annotations
-
+from dataclasses import asdict
+from pathlib import Path
 import argparse
 import json
 import sys
-from dataclasses import asdict
-from pathlib import Path
 
 from lib.audit_sdk_rules import (
     AuditFinding,
@@ -41,7 +40,6 @@ from lib.mod_sdk_shared import (
     extract_capabilities,
     resolve_webgames_root,
 )
-
 __all__ = [
     "AuditFinding",
     "ModSdkAuditor",

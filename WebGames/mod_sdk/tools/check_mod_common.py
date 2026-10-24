@@ -10,13 +10,11 @@
 """MOD 检查器基础模型、白名单常量与工具函数。"""
 
 from __future__ import annotations
-
+from pathlib import Path
+from typing import Any
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any
-
 # ==============================================================================
 # 一、全局白名单常量与命途数值边界不变量契约 (Constants & Budget Invariants)
 # ==============================================================================
@@ -88,8 +86,8 @@ def safe_load_json(file_path: Path, rel_name: str, diags: list[DiagnosticItem]) 
         return None
     try:
         return json.loads(file_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as err:
-        add_diag(diags, "ERR_JSON_INVALID", rel_name, f"JSON 解析失败: {err}", f"请检查 {rel_name} 的 JSON 语法正确性与逗号/引号匹配")
+    except (json.JSONDecodeError, OSError) as exc:
+        add_diag(diags, "ERR_JSON_INVALID", rel_name, f"JSON 解析失败: {exc}", f"请检查 {rel_name} 的 JSON 语法正确性与逗号/引号匹配")
         return None
 
 

@@ -16,12 +16,11 @@
 
 作为命令行 CLI 入口门面与自测夹具，负责参数解析分发与标准化退出码映射，
 业务逻辑全面收敛至 scripts/py/archive 包中。"""
+from pathlib import Path
 import argparse
 import sys
 import tempfile
-from pathlib import Path
 
-from audit_common import ensure_utf8_stdout
 from archive import (
     extract_keywords_from_stage_file,
     extract_stage_keywords,
@@ -31,7 +30,7 @@ from archive.attachment import inject_att_pointer
 from archive.cycle import archive_short_term_cycle
 from archive.inspect import detect_roadmap_status
 from archive.keywords import reindex_archive_keywords
-
+from audit_common import ensure_utf8_stdout
 ensure_utf8_stdout()
 
 
@@ -217,8 +216,8 @@ def main() -> int:
     if args.cycle:
         try:
             success = archive_short_term_cycle(args.apply)
-        except ValueError as e:
-            print(f"  ❌ 【阻断错误】{e}")
+        except ValueError as exc:
+            print(f"  ❌ 【阻断错误】{exc}")
             sys.exit(1)
         if not success:
             sys.exit(1)

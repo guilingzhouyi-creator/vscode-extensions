@@ -14,15 +14,13 @@
 """魔法双维度体系深度审查：校验魔法阶位配置与双语文案的事实源一致性。"""
 
 from __future__ import annotations
-
+from pathlib import Path
+from typing import Any
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()

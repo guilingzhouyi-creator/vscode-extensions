@@ -13,14 +13,13 @@
 # ==============================================================================
 """全局名称键统一注册表深度审查：校验三段式命名规范、唯一性与 en_US 覆盖。"""
 
+from pathlib import Path
+from typing import Any
 import json
 import re
 import sys
-from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
 
 from audit_common import contains_cjk, ensure_utf8_stdout, resolve_repo_root
-
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -31,7 +30,7 @@ KEY_RE = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
 MAGIC_TABLES = ("rank_tiers", "mana_aptitudes", "magic_forms", "profession_ranks")
 
 
-def collect_magic_keys() -> List[str]:
+def collect_magic_keys() -> list[str]:
     """收集魔法域名称键：magic_tiers.json 四表 entry.name_key。"""
     path = CONFIG / "domains" / "magic_tiers" / "core.json"
     if not path.exists():
@@ -40,7 +39,7 @@ def collect_magic_keys() -> List[str]:
         return []
 
     data = json.loads(path.read_text(encoding="utf-8"))
-    keys: List[str] = []
+    keys: list[str] = []
     for table in MAGIC_TABLES:
         table_dict = data.get(table, {})
         if isinstance(table_dict, dict):
@@ -52,7 +51,7 @@ def collect_magic_keys() -> List[str]:
     return keys
 
 
-def _extract_item_loc_keys(file_path: Path) -> List[str]:
+def _extract_item_loc_keys(file_path: Path) -> list[str]:
     """读取单个物品配置 JSON 文件并提取 loc_name_key。"""
     try:
         data = json.loads(file_path.read_text(encoding="utf-8"))
@@ -65,7 +64,7 @@ def _extract_item_loc_keys(file_path: Path) -> List[str]:
     elif isinstance(raw_items, list):
         items_iter = raw_items
 
-    loc_keys: List[str] = []
+    loc_keys: list[str] = []
     for it in items_iter:
         if isinstance(it, dict):
             nk = str(it.get("loc_name_key", ""))
@@ -74,15 +73,15 @@ def _extract_item_loc_keys(file_path: Path) -> List[str]:
     return loc_keys
 
 
-def collect_item_keys() -> List[str]:
+def collect_item_keys() -> list[str]:
     """收集物品域名称键：config/items/*.json 的 loc_name_key。"""
-    keys: List[str] = []
+    keys: list[str] = []
     for f in sorted((CONFIG / "items").glob("*.json")):
         keys.extend(_extract_item_loc_keys(f))
     return keys
 
 
-def load_en_us_dict() -> Dict[str, Any]:
+def load_en_us_dict() -> dict[str, Any]:
     """加载 en_US 国际化语言词典配置字典。"""
     path = CONFIG / "i18n" / "en_US.json"
     if not path.exists():
@@ -91,13 +90,13 @@ def load_en_us_dict() -> Dict[str, Any]:
 
 
 def _verify_name_keys(
-    all_keys: List[Tuple[str, str]],
-    magic_keys: List[str],
-    en_us_keys: Set[str],
-) -> List[str]:
+    all_keys: list[tuple[str, str]],
+    magic_keys: list[str],
+    en_us_keys: set[str],
+) -> list[str]:
     """执行三段式格式、中文禁入、跨域唯一性与 en_US 覆盖校验。"""
-    violations: List[str] = []
-    seen: Dict[str, str] = {}
+    violations: list[str] = []
+    seen: dict[str, str] = {}
 
     for src, k in all_keys:
         if not KEY_RE.match(k):
@@ -127,7 +126,7 @@ def run_name_keys_audit() -> int:
     en_us = load_en_us_dict()
     en_us_keys = set(en_us.keys())
 
-    all_keys: List[Tuple[str, str]] = []
+    all_keys: list[tuple[str, str]] = []
     for src, keys in (("magic", magic_keys), ("item", item_keys)):
         for k in keys:
             all_keys.append((src, k))

@@ -29,7 +29,6 @@ from archive.constants import (
     ST_ARCHIVE_DIR,
     TESTS_DIR,
 )
-from archive.constants import ArchiveHeaderTemplate, ArchiveGovernanceConfig
 from archive.constants import (
     build_att_header_template,
     build_header_template,
@@ -37,17 +36,7 @@ from archive.constants import (
     resolve_responsible_short,
     resolve_responsible_short_from_context,
 )
-from archive.metadata import (
-    ArchiveRecordDTO,
-    int_to_cn,
-    minify_markdown_text,
-    resolve_file_archive_date,
-    resolve_file_formation_date,
-    resolve_file_formation_period,
-    resolve_period_label,
-    strip_existing_frontmatter,
-)
-from archive.links import rebase_markdown_links
+from archive.constants import ArchiveHeaderTemplate, ArchiveGovernanceConfig
 from archive.keywords import (
     BOILERPLATE_BLACK_LIST,
     NOISE_WORDS,
@@ -59,4 +48,15 @@ from archive.keywords import (
     load_master_keywords,
     normalize_key,
     reindex_archive_keywords,
+)
+from archive.links import rebase_markdown_links
+from archive.metadata import (
+    ArchiveRecordDTO,
+    int_to_cn,
+    minify_markdown_text,
+    resolve_file_archive_date,
+    resolve_file_formation_date,
+    resolve_file_formation_period,
+    resolve_period_label,
+    strip_existing_frontmatter,
 )

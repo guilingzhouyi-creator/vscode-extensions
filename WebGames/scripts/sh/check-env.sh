@@ -42,7 +42,7 @@ for PY in python3 python; do
   fi
 done
 
-if [ -n "$PY_BIN" ]; then
+if [[ -n "$PY_BIN" ]]; then
   PY_VER="$("$PY_BIN" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "未知")"
   echo "【check-env】$PY_BIN: 可用 (v$PY_VER)"
 else
@@ -67,7 +67,7 @@ else
   echo "【check-env】node: 未安装（可选，影响 mermaid 真解析门禁）"
 fi
 
-if [ "$FAIL" = "1" ]; then
+if [[ "$FAIL" = "1" ]]; then
   echo "【check-env】环境未就绪，请先安装或配置缺失项"
   exit 1
 fi

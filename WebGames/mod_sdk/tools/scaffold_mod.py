@@ -13,16 +13,14 @@
 """MOD 项目骨架脚手架 CLI：自动化生成合规的标准卡拉尔剧情 MOD 骨架。"""
 
 from __future__ import annotations
-
+from pathlib import Path
+from typing import Any
 import argparse
 import hashlib
 import json
 import os
 import re
 import sys
-from pathlib import Path
-from typing import Any
-
 TOOLS_DIR = Path(__file__).resolve().parent
 if str(TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(TOOLS_DIR))
@@ -359,8 +357,8 @@ def scaffold_mod(
             content_file = content_dir / "custom_entities.json"
             _write_json(content_file, _build_sample_content_dict(pack_id, pack_name))
 
-    except OSError as io_err:
-        print(f"❌ 写入文件失败: {io_err}", file=sys.stderr)
+    except OSError as exc:
+        print(f"❌ 写入文件失败: {exc}", file=sys.stderr)
         return 1
 
     tier_labels = {

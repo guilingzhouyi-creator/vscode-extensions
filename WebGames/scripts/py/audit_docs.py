@@ -13,15 +13,15 @@
 #   python scripts/py/audit_docs.py --fix
 # ==============================================================================
 """docs/ 文档库静态审查：命名格式、文档布局、链接完整性、mermaid 图表健康度。"""
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 import argparse
 import json
 import os
 import re
 import sys
 import time
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
 
 from audit_common import KALAR_DEV_PREFIX, ensure_utf8_stdout, resolve_repo_root
 from docs_audit import (
@@ -38,7 +38,6 @@ from docs_audit import (
     load_baseline,
     write_baseline,
 )
-
 ROOT = resolve_repo_root()
 MS_PER_SECOND = 1000
 

@@ -13,13 +13,13 @@
 # ==============================================================================
 """架构护栏审查 Python 桥接器：在 headless Godot 中执行 tests/arch_runner.gd 并回传结果。"""
 
+from pathlib import Path
 import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
-from audit_common import ensure_utf8_stdout, resolve_repo_root
 
+from audit_common import ensure_utf8_stdout, resolve_repo_root
 ensure_utf8_stdout()
 ROOT = resolve_repo_root()
 

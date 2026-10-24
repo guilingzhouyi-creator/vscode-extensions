@@ -49,7 +49,7 @@ cd "$ROOT_DIR" || exit 1
 "$GODOT_BIN" --headless --export-pack "Windows Desktop" "$PCK_PATH"
 code=$?
 
-if [ $code -eq 0 ] && [ -f "$PCK_PATH" ]; then
+if [[ $code -eq 0 ]] && [[ -f "$PCK_PATH" ]]; then
   FILE_SIZE=$(wc -c < "$PCK_PATH" | tr -d ' ')
   SHA=$(sha256sum "$PCK_PATH" 2>/dev/null | awk '{print $1}' || echo "N/A")
   echo "【package-webgames】导出成功！"
