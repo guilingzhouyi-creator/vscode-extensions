@@ -25,6 +25,7 @@ scripts/
 │   ├── bootstrap-gates.js         # 钩子激活与依赖/构建一键引导
 │   ├── test-gate-parity.js        # 双实现提交门禁行为差分
 │   ├── test-gate-selftest.js      # 门禁三态自检矩阵
+│   ├── gate-receipts.js           # 本地门禁收据引擎（阶段标记 / 提交落盘 / 推送审计）
 │   ├── rule-catalog.json          # 全仓规则事实真源 (SSOT)
 │   └── rule-sources/              # 受控规则源（auto-refactor / WebGames / global）
 ├── ps1/                           # PowerShell 语言域：Windows 本地交互与门禁同构实现

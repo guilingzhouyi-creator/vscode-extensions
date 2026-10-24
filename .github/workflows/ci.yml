@@ -326,6 +326,33 @@ jobs:
           # 1.1 提交树可执行位断言：全新克隆必须保留 100755
           HOOK_MODES=$(git ls-tree -r HEAD .githooks/ | cut -d' ' -f1 | sort -u)
           test "$HOOK_MODES" = "100755" || { echo "::error::.githooks 提交树模式异常: $HOOK_MODES"; exit 1; }
+          # 1.2 六类载体存在性、语法与索引模式自检
+          for hook in pre-commit commit-msg pre-merge-commit post-commit post-merge pre-push; do
+            test -f ".githooks/$hook" || { echo "::error::缺少钩子载体 .githooks/$hook"; exit 1; }
+            bash -n ".githooks/$hook"
+            MODE=$(git ls-files -s ".githooks/$hook" | cut -d' ' -f1)
+            test "$MODE" = "100755" || { echo "::error::.githooks/$hook 索引模式异常: $MODE"; exit 1; }
+          done
+          # 1.3 门禁收据引擎自测（阶段合并 / 缺失收据阻断 / 基线豁免 / 显式放行留痕 / 引用安全）
+          node scripts/common/gate-receipts.js selftest
+          # 1.4 多 ref 推送引用安全：受保护删除必须阻断，特性分支删除必须放行
+          HEAD_SHA=$(git rev-parse HEAD)
+          REFS_TEMP=$(mktemp)
+          printf "refs/heads/main %s refs/heads/main %s\n" "$HEAD_SHA" "$HEAD_SHA" > "$REFS_TEMP"
+          node scripts/common/gate-receipts.js verify-refs --refs-file "$REFS_TEMP"
+          printf "(delete) %040d refs/heads/feature/ci-probe %s\n" 0 "$HEAD_SHA" >> "$REFS_TEMP"
+          node scripts/common/gate-receipts.js verify-refs --refs-file "$REFS_TEMP"
+          printf "(delete) %040d refs/heads/main %s\n" 0 "$HEAD_SHA" >> "$REFS_TEMP"
+          if node scripts/common/gate-receipts.js verify-refs --refs-file "$REFS_TEMP" >/dev/null 2>&1; then
+            echo "::error::受保护分支删除未被拦截"; exit 1
+          fi
+          rm -f "$REFS_TEMP"
+          # 1.5 合并提交结构性豁免：MERGE_HEAD 存在且标题为 Git 生成的合并格式时放行
+          MERGE_MSG_TEMP=$(mktemp)
+          printf "Merge branch 'ci/probe'\n\nmerge probe\n" > "$MERGE_MSG_TEMP"
+          git rev-parse HEAD > .git/MERGE_HEAD
+          bash scripts/sh/commit-msg-gate.sh "$MERGE_MSG_TEMP"
+          rm -f .git/MERGE_HEAD "$MERGE_MSG_TEMP"
           # 2. pre-commit-gate.sh 自检 (无暂存应 exit 0)
           bash scripts/sh/pre-commit-gate.sh
           # 3. commit-msg-gate.sh 生产工程级结构化合规自检
@@ -720,3 +747,59 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         working-directory: fractal-git
         run: cargo clippy --workspace --all-targets -- -D warnings
+
+  gate-parity-windows:
+    name: Gate parity (Windows dual runtime)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Activate hooks through PowerShell installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          pwsh -NoProfile -File scripts/ps1/install-hooks.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'install-hooks.ps1 执行失败' }
+          $modes = @(git ls-files -s .githooks/ | ForEach-Object { ($_ -split '\s+')[0] })
+          if ($modes.Count -ne 6) { throw "钩子载体数量异常: $($modes.Count)" }
+          $bad = @($modes | Where-Object { $_ -ne '100755' })
+          if ($bad.Count -gt 0) { throw ".githooks 索引模式异常: $($modes -join ',')" }
+
+      - name: PowerShell runtime gate self-check
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msg = Join-Path $env:RUNNER_TEMP 'gate-msg.txt'
+          $good = @(
+            'feat(ci): 校验 PowerShell 运行期提交信息门禁',
+            '',
+            '[Project / 项目归属]',
+            '- governance',
+            '',
+            '[Why / 动机背景]',
+            '- 确保双运行期门禁在 Windows 运行器上行为一致。',
+            '',
+            '[Added / 新增内容]',
+            '- 新增运行期等价性回归任务。',
+            '',
+            '[Verification / 验证结论]',
+            '- 本地门禁脚本自检通过。'
+          ) -join "`n"
+          [System.IO.File]::WriteAllText($msg, $good, (New-Object System.Text.UTF8Encoding($false)))
+          pwsh -NoProfile -File scripts/ps1/commit-msg-gate.ps1 $msg
+          if ($LASTEXITCODE -ne 0) { throw '合规提交信息未通过 PowerShell 门禁' }
+          [System.IO.File]::WriteAllText($msg, 'bad message', (New-Object System.Text.UTF8Encoding($false)))
+          pwsh -NoProfile -File scripts/ps1/commit-msg-gate.ps1 $msg
+          if ($LASTEXITCODE -eq 0) { throw 'PowerShell 门禁未拦截非法提交信息' }
+
+      - name: Dual-runtime behavioural parity
+        run: node scripts/common/test-gate-parity.js --require-parity
+
+      - name: Receipt engine self-test
+        run: node scripts/common/gate-receipts.js selftest
