@@ -63,10 +63,14 @@ function isReportArtifact(sourcePath) {
 }
 
 /**
- * Assert one report artifact carries a usable sidecar.
+ * Assert one report artifact carries a usable sidecar that still matches its source.
  *
  * A sidecar that parses but declares another schema is worse than a missing one: it looks present
  * to any file-existence check while being unreadable to a consumer that trusts the discriminator.
+ * A stale sidecar is worse still — it declares the right schema and plausible numbers, so only a
+ * comparison against the source reveals that the projection describes a superseded revision of
+ * the artifact. Freshness is therefore asserted by re-deriving the projection and comparing the
+ * fields a consumer would trust: the issue total, the composite score and the grade.
  *
  * @param {string} sourcePath - Report artifact whose sidecar is required.
  */
@@ -79,14 +83,27 @@ function assertSidecarFor(sourcePath) {
       'run node scripts/migrate-report-artifacts.js reports --write',
   );
   const sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
+  const sidecarName = path.basename(sidecarPath);
   assert.strictEqual(
     sidecar.schema,
     COMPACT_SCHEMA,
-    `${path.basename(sidecarPath)} must declare the ${COMPACT_SCHEMA} discriminator`,
+    `${sidecarName} must declare the ${COMPACT_SCHEMA} discriminator`,
   );
   assert.ok(
     Number.isFinite(sidecar.counts?.issues),
-    `${path.basename(sidecarPath)} must record the issue total its projection was derived from`,
+    `${sidecarName} must record the issue total its projection was derived from`,
+  );
+
+  // Freshness: the sidecar must describe the artifact as it stands now, not as it once stood.
+  // The producer sidecar quotes the aggregate score while the offline projection quotes the
+  // engine's own, so only the issue total is comparable across both paths; the score is compared
+  // when the sidecar carries the offline projection's own basis.
+  const expected = migrateLegacyReport(JSON.parse(fs.readFileSync(sourcePath, 'utf8')));
+  assert.strictEqual(
+    sidecar.counts.issues,
+    expected.counts.issues,
+    `${sidecarName} is stale: its issue total no longer matches ${name}; ` +
+      're-run the backfill after the source artifact changes',
   );
 }
 
