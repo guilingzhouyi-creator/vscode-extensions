@@ -238,10 +238,16 @@ mod tests {
         assert_eq!(calculate_popoviciu_dispersion_penalty(0.0, None, None), 1.0);
 
         // Maximum standard deviation 50.0 with gamma 0.5 -> 1.0 - 0.5 * (50/50) = 0.5
-        assert_eq!(calculate_popoviciu_dispersion_penalty(50.0, None, None), 0.5);
+        assert_eq!(
+            calculate_popoviciu_dispersion_penalty(50.0, None, None),
+            0.5
+        );
 
         // Half dispersion 25.0 -> 1.0 - 0.5 * (25/50) = 0.75
-        assert_eq!(calculate_popoviciu_dispersion_penalty(25.0, None, None), 0.75);
+        assert_eq!(
+            calculate_popoviciu_dispersion_penalty(25.0, None, None),
+            0.75
+        );
     }
 
     #[test]

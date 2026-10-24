@@ -169,11 +169,7 @@ mod tests {
 
     #[test]
     fn test_centroid_and_outlier() {
-        let ensemble = vec![
-            vec![1.0, 2.0],
-            vec![3.0, 4.0],
-            vec![2.0, 3.0],
-        ];
+        let ensemble = vec![vec![1.0, 2.0], vec![3.0, 4.0], vec![2.0, 3.0]];
         let centroid = compute_centroid(&ensemble);
         assert_eq!(centroid, vec![2.0, 3.0]);
 

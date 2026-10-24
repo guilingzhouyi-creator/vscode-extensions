@@ -316,7 +316,11 @@ fn vector_ops_napi_wrappers_compute_geometry() {
     let b = vec![0.0, 1.0, 0.0];
     assert_eq!(compute_vector_dot_product(a.clone(), b.clone()), 0.0);
     assert_eq!(compute_vector_cosine_similarity(a.clone(), b.clone()), 0.0);
-    assert!((compute_vector_euclidean_distance(a, b) - 1.4142).abs() < 1e-3);
+    // Unit vectors on perpendicular axes are exactly sqrt(2) apart. Deriving the expectation from
+    // the constant rather than quoting a decimal keeps the assertion tied to the true value: a
+    // rounded literal would pass a tolerance-based check even if the implementation drifted.
+    let expected = std::f64::consts::SQRT_2;
+    assert!((compute_vector_euclidean_distance(a, b) - expected).abs() < 1e-12);
 }
 
 #[test]

@@ -800,10 +800,16 @@ mod tests {
             0, 0, 1, // row 2
         ];
         compute_warshall_transitive_closure(&mut matrix, 3);
+        // Indexed as `row * 3 + column` for readability against the row layout above. Clippy
+        // rejects the literal multiplication (`erasing_op`/`identity_op`) because it folds to a
+        // constant, so the stride is named here instead: the expression stays `row + column`
+        // shaped while no longer tripping the fold.
+        const STRIDE: usize = 3;
+        let at = |row: usize, column: usize| matrix[row * STRIDE + column];
         // After closure: 0 should reach 2
-        assert_eq!(matrix[0 * 3 + 2], 1);
-        assert_eq!(matrix[1 * 3 + 2], 1);
-        assert_eq!(matrix[2 * 3 + 0], 0);
+        assert_eq!(at(0, 2), 1);
+        assert_eq!(at(1, 2), 1);
+        assert_eq!(at(2, 0), 0);
     }
 
     #[test]
@@ -812,7 +818,7 @@ mod tests {
         let mut matrix = vec![
             (1 << 0) | (1 << 1), // 0 -> 0, 1
             (1 << 1) | (1 << 2), // 1 -> 1, 2
-            (1 << 2),             // 2 -> 2
+            (1 << 2),            // 2 -> 2
         ];
         compute_bit_parallel_warshall(&mut matrix, 1, 3);
         // 0 should reach 2
