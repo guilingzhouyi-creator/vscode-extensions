@@ -1,6 +1,6 @@
 /**
  * Module: Math Operators — Spectral Noise Floor & Gamma Dynamic Range Compression
- * File Path: src/math/spectral-gamma.ts
+ * File Path: src/core/math/spectral-gamma.ts
  * Architecture Role: Pure TS operator providing 8% noise floor suppression and 0.7-power
  *   Gamma dynamic range compression for audio/frequency spectral buffers.
  * Dependencies & Triggers: Independent pure math module; consumed by frequency analyzers,

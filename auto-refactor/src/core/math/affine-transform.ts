@@ -1,6 +1,6 @@
 /**
  * Module: Math Operators — Cursor Fixed-Point Affine Transformation
- * File Path: src/math/affine-transform.ts
+ * File Path: src/core/math/affine-transform.ts
  * Architecture Role: Pure TS operator performing cursor fixed-point affine coordinate transforms
  *   (scaling, rotation, translation around an arbitrary anchor point) with zero heap allocation.
  * Dependencies & Triggers: Independent pure math module; consumed by UI canvas, vector renderers,

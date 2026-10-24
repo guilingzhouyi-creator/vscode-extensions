@@ -23,6 +23,7 @@ import type {
     PolyglotGeneralizationMetrics,
 } from './scoringTypes';
 import { calculatePolyglotGeneralizationIndex } from './modernization-formulas';
+import { computeStatisticalMoments } from '../math/descriptive-statistics';
 import {
     ALL_QUALITY_DIMENSIONS,
     DEFAULT_QUALITY_WEIGHTS,
@@ -373,13 +374,9 @@ export class QualityScorer {
         if (activeLangKeys.length === 0) return undefined;
 
         const index = calculatePolyglotGeneralizationIndex(langScores);
-        const total = Object.values(langScores).reduce((a, b) => a + b, 0);
-        const meanScore =
-            Math.round((total / activeLangKeys.length) * SCORE_ROUNDING) / SCORE_ROUNDING;
-        const variance =
-            activeLangKeys.reduce((acc, k) => acc + Math.pow(langScores[k] - meanScore, 2), 0) /
-            activeLangKeys.length;
-        const standardDeviation = Math.round(Math.sqrt(variance) * SCORE_ROUNDING) / SCORE_ROUNDING;
+        const moments = computeStatisticalMoments(Object.values(langScores));
+        const meanScore = Math.round(moments.mean * SCORE_ROUNDING) / SCORE_ROUNDING;
+        const standardDeviation = Math.round(moments.standardDeviation * SCORE_ROUNDING) / SCORE_ROUNDING;
         const dispersionPenalty =
             Math.round(Math.max(0, 1.0 - standardDeviation / MAX_DISPERSION_SCORE) * SCORE_ROUNDING) /
             SCORE_ROUNDING;

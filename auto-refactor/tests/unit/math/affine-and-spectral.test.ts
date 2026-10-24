@@ -16,11 +16,11 @@ import {
     transformPoint,
     transformPointsInPlace,
     invertTransform,
-} from '../../../src/math/affine-transform';
+} from '../../../src/core/math/affine-transform';
 import {
     compressSpectralSample,
     compressSpectralBufferInPlace,
-} from '../../../src/math/spectral-gamma';
+} from '../../../src/core/math/spectral-gamma';
 
 describe('Affine Transform Math Operator', () => {
     it('should keep cursor anchor point strictly invariant under scaling and rotation', () => {

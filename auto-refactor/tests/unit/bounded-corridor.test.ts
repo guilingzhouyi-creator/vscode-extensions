@@ -25,7 +25,7 @@ import {
     DEFAULT_CORRIDOR_EPSILON,
     DEFAULT_SCORE_FLOOR,
     MIN_SCORE_FLOOR_LIMIT,
-} from '../../src/core/scoring/bounded-corridor';
+} from '../../src/core/math/numerical-corridor';
 
 describe('boundedCorridor - Mathematical Interval Invariants', () => {
     describe('clamp', () => {

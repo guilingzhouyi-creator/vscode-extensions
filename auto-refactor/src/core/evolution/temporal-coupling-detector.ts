@@ -17,6 +17,7 @@
 
 import * as childProcess from 'child_process';
 import { nativeCore } from '../native/native-bridge';
+import { IdInterner } from '../data-structures/id-interner';
 
 /**
  * Structured commit representation containing all files touched in a single change.
@@ -188,20 +189,9 @@ function buildMappedChangeSets(
     changeSets: readonly CommitChangeSet[],
     maxFiles: number,
 ): { mappedChangeSets: number[][]; idToFile: string[]; totalUniqueFiles: number } {
-    const fileToId = new Map<string, number>();
-    const idToFile: string[] = [];
-
-    const getFileId = (file: string): number => {
-        let id = fileToId.get(file);
-        if (id === undefined) {
-            id = idToFile.length;
-            fileToId.set(file, id);
-            idToFile.push(file);
-        }
-        return id;
-    };
-
+    const interner = new IdInterner<string>();
     const mappedChangeSets: number[][] = [];
+
     for (const cs of changeSets) {
         if (!cs.changedFiles || cs.changedFiles.length > maxFiles) {
             continue;
@@ -210,14 +200,18 @@ function buildMappedChangeSets(
         for (const f of cs.changedFiles) {
             const norm = normalizeEvolutionPath(f);
             if (norm) {
-                ids.push(getFileId(norm));
+                ids.push(interner.intern(norm));
             }
         }
         if (ids.length > 0) {
             mappedChangeSets.push(ids);
         }
     }
-    return { mappedChangeSets, idToFile, totalUniqueFiles: fileToId.size };
+    return {
+        mappedChangeSets,
+        idToFile: interner.toArray() as string[],
+        totalUniqueFiles: interner.size,
+    };
 }
 
 function buildTemporalCouplingPairs(

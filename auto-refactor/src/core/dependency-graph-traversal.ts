@@ -16,6 +16,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Issue, ScanConfig, ScanReport, Severity } from './types';
 import type { ModuleDependencyGraph } from './dependency-graph';
+import { detectGraphCycles } from './algorithms/graph';
 
 const EXPORTED_SYMBOL_DETAIL_LIMIT = 10;
 const MAX_UNUSED_EXPORTS_PER_MODULE = 10;
@@ -54,11 +55,6 @@ export function globToRegex(glob: string): RegExp {
  * @returns Every cycle found, each as a node path whose last element repeats the first.
  */
 export function findImportCycles(edges: Map<string, Set<string>>): string[][] {
-    const WHITE = 0;
-    const GRAY = 1;
-    const BLACK = 2;
-    const color = new Map<string, number>();
-    const cycles: string[][] = [];
     const sortedAdjacency = new Map<string, string[]>();
     const sortedNexts = (n: string): string[] => {
         let cached = sortedAdjacency.get(n);
@@ -69,37 +65,7 @@ export function findImportCycles(edges: Map<string, Set<string>>): string[][] {
         return cached;
     };
 
-    const pathArr: string[] = [];
-    const stack: Array<{ node: string; nexts: string[]; idx: number }> = [];
-
-    for (const start of [...edges.keys()].sort()) {
-        if ((color.get(start) ?? WHITE) !== WHITE) continue;
-        color.set(start, GRAY);
-        pathArr.length = 0;
-        pathArr.push(start);
-        stack.length = 0;
-        stack.push({ node: start, nexts: sortedNexts(start), idx: 0 });
-        while (stack.length > 0) {
-            const top = stack[stack.length - 1];
-            if (top.idx >= top.nexts.length) {
-                color.set(top.node, BLACK);
-                stack.pop();
-                pathArr.pop();
-                continue;
-            }
-            const next = top.nexts[top.idx++];
-            const c = color.get(next) ?? WHITE;
-            if (c === GRAY) {
-                const at = pathArr.indexOf(next);
-                cycles.push([...pathArr.slice(at), next]);
-            } else if (c === WHITE) {
-                color.set(next, GRAY);
-                pathArr.push(next);
-                stack.push({ node: next, nexts: sortedNexts(next), idx: 0 });
-            }
-        }
-    }
-    return cycles;
+    return detectGraphCycles([...edges.keys()].sort(), sortedNexts);
 }
 
 /**

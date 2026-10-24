@@ -5,7 +5,7 @@ import {
     regularizedIncompleteBeta,
     inverseIncompleteBeta,
     computeExactBetaCredibleInterval,
-} from '../../../src/core/scoring/bayesian-beta-solver';
+} from '../../../src/core/math/bayesian-solver';
 
 describe('Bayesian Beta Distribution Solver', () => {
     describe('logGamma and logBeta', () => {

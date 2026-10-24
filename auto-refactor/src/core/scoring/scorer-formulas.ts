@@ -31,7 +31,7 @@ export {
     assertWithinCorridor,
     sanitizeBound,
     DEFAULT_CORRIDOR_EPSILON,
-} from './bounded-corridor';
+} from '../math/numerical-corridor';
 
 /** Maximum clean score a quality dimension starts at before deductions. */
 export const DIMENSION_MAX_SCORE = 100;

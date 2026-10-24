@@ -25,6 +25,7 @@ import { auditVacuousWrappers } from '../core/rules/evolution/wrapperRule';
 import { auditRegexSafety, isRegexSafe } from '../utils/safe-regex';
 import { nativeCore } from '../core/native';
 import { auditPythonHygiene } from './hygiene-python-helper';
+import { fnv1a32Signed } from '../core/algorithms/hash';
 
 interface HygieneOptions {
     checkDeadCode?: boolean;
@@ -99,10 +100,6 @@ const FLOATING_PROMISE_RE =
     /^\s*(?:Promise\.(?:all|allSettled|race|resolve|reject)|new\s+Promise)\s*\(/;
 /** Default number of consecutive meaningful lines that counts as a duplicate block. */
 const DEFAULT_MIN_CLONE_LINES = 6;
-/** 32-bit FNV-1a offset basis used to seed the line hasher. */
-const FNV1A_32_OFFSET_BASIS = 0x811c9dc5;
-/** 32-bit FNV-1a prime multiplied into the hash for each input character. */
-const FNV1A_32_PRIME = 0x01000193;
 /** Character code of '\r' (carriage return), stripped from CRLF line endings. */
 const CHAR_CODE_CR = 13;
 /** Character code of the space character, counted as leading indentation. */
@@ -149,16 +146,6 @@ function buildJargonRe(patterns?: string[]): RegExp {
     } catch {
         return CONSTRUCTION_JARGON_RE;
     }
-}
-
-/** Fast 32-bit integer line hasher to eliminate string concatenations during clone detection */
-function computeHash32(str: string): number {
-    let hashValue = FNV1A_32_OFFSET_BASIS;
-    for (let i = 0; i < str.length; i++) {
-        hashValue ^= str.charCodeAt(i);
-        hashValue = Math.imul(hashValue, FNV1A_32_PRIME);
-    }
-    return hashValue | 0;
 }
 
 const EXEMPT_FILE_NAMES = new Set(['README', 'CHANGELOG', 'LICENSE']);
@@ -225,7 +212,7 @@ function computeLineHashesFallback(content: string): {
             trimmed !== '{' &&
             trimmed !== '}'
         ) {
-            lineHashes.push(computeHash32(trimmed));
+            lineHashes.push(fnv1a32Signed(trimmed));
             meaningfulLineIndices.push(lineIdx);
         }
     }

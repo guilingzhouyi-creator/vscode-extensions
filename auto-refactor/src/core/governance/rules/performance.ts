@@ -19,6 +19,7 @@ import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from 
 import { NEED_RUNTIME_EVIDENCE } from '../../types';
 import { globToRegExp, matchAny } from '../../file-discovery';
 import { safeRegexTest, createPrefixedTest } from '../../../utils/safe-regex';
+import { countBraceDelta } from '../../algorithms/text-metrics';
 
 /** Governance category shared by every performance rule exported from this file. */
 const PERFORMANCE_CATEGORY = 'performance';
@@ -102,22 +103,6 @@ interface LoopContext {
     inLoop: boolean;
     loopIndent: number;
     loopBraces: number;
-}
-
-const CODE_OPEN_BRACE = 123;
-const CODE_CLOSE_BRACE = 125;
-
-/**
- * Counts net change in curly braces within a line.
- */
-function countBraceDelta(line: string): number {
-    let delta = 0;
-    for (let i = 0; i < line.length; i++) {
-        const code = line.charCodeAt(i);
-        if (code === CODE_OPEN_BRACE) delta++;
-        else if (code === CODE_CLOSE_BRACE) delta--;
-    }
-    return delta;
 }
 
 /**

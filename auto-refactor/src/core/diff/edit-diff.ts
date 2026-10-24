@@ -56,11 +56,13 @@ const MIN_LINE_CAPACITY = 16;
 /** Estimated source code units per line when sizing the initial line-table capacity. */
 const SOURCE_CHARS_PER_LINE_SLOT = 32;
 
-/** 32-bit FNV-1a multiplication prime (0x01000193). */
-const FNV1A_32_PRIME = 0x01000193;
-
-/** Initial FNV-1a 32-bit hash state (offset basis), reset at each line start. */
-const FNV1A_32_OFFSET_BASIS = 0x811c9dc5;
+import {
+    FNV1A_32_PRIME,
+    FNV1A_32_OFFSET_BASIS,
+    fnv1a32,
+    hashLines,
+} from '../algorithms/hash';
+export { fnv1a32, hashLines };
 
 /** `typeof` tag for numeric edit-range fields; non-numeric input is rejected. */
 const TYPEOF_NUMBER = 'number';
@@ -216,34 +218,7 @@ export function hashLinesDirect(content: string, starts: number[]): Uint32Array 
     return hashes;
 }
 
-/**
- * Compute the 32-bit FNV-1a hash of a string.
- *
- * @param str - Text to hash.
- * @returns Unsigned 32-bit hash.
- */
-export function fnv1a32(str: string): number {
-    let hash = FNV1A_32_OFFSET_BASIS;
-    for (let i = 0; i < str.length; i++) {
-        hash ^= str.charCodeAt(i);
-        hash = Math.imul(hash, FNV1A_32_PRIME);
-    }
-    return hash >>> 0;
-}
 
-/**
- * Hash every entry of an already-split line array.
- *
- * @param lines - Lines to hash.
- * @returns One unsigned 32-bit FNV-1a hash per input line.
- */
-export function hashLines(lines: string[]): Uint32Array {
-    const hashes = new Uint32Array(lines.length);
-    for (let i = 0; i < lines.length; i++) {
-        hashes[i] = fnv1a32(lines[i]);
-    }
-    return hashes;
-}
 
 /**
  * Diffs two line arrays by trimming their common prefix and suffix, dynamically selecting

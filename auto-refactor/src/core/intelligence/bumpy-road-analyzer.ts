@@ -16,6 +16,7 @@
  */
 
 import { nativeCore } from '../native/native-bridge';
+import { measureIndentationDepth, countBracesDetailed } from '../algorithms/text-metrics';
 
 /**
  * Structural nesting peak within a function body.
@@ -63,18 +64,7 @@ const MIN_BUMPY_LINE_SPAN = 20;
  * @returns Indentation level (1 unit = 4 spaces or 1 tab).
  */
 export function measureLineIndentLevel(line: string): number {
-    let spaces = 0;
-    for (let i = 0; i < line.length; i++) {
-        const ch = line.charCodeAt(i);
-        if (ch === 32) {
-            spaces++;
-        } else if (ch === 9) {
-            spaces += SPACE_INDENT_SIZE;
-        } else {
-            break;
-        }
-    }
-    return Math.floor(spaces / SPACE_INDENT_SIZE);
+    return measureIndentationDepth(line, SPACE_INDENT_SIZE);
 }
 
 /**
@@ -178,20 +168,6 @@ export function computeBumpyRoadIndex(peaks: readonly IndentationPeak[]): number
 const CONTROL_FLOW_BRANCH_RE = /\b(if|for|while|catch|switch)\b|\?\s*[^:]+\s*:/;
 const LOGICAL_OP_RE = /&&|\|\|/;
 
-function countBraceDelta(trimmed: string): { opens: number; closes: number } {
-    let opens = 0;
-    let closes = 0;
-    for (let j = 0; j < trimmed.length; j++) {
-        const code = trimmed.charCodeAt(j);
-        if (code === 123) {
-            opens++;
-        } else if (code === 125) {
-            closes++;
-        }
-    }
-    return { opens, closes };
-}
-
 function computeLineBranchCost(trimmed: string, nestingLevel: number): number {
     let cost = 0;
     if (CONTROL_FLOW_BRANCH_RE.test(trimmed)) {
@@ -233,7 +209,7 @@ export function calculateCognitiveComplexity(
 
         const trimmed = rawLine.trim();
         score += computeLineBranchCost(trimmed, nestingLevel);
-        const { opens, closes } = countBraceDelta(trimmed);
+        const { opens, closes } = countBracesDetailed(trimmed);
         nestingLevel = Math.max(0, nestingLevel + opens - closes);
     }
 

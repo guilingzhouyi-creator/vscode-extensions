@@ -10,35 +10,33 @@
  */
 
 import type { ReviewContextEntry } from './scheduler-types';
+import { LruCache } from '../data-structures/lru-cache';
+import { javaHash } from '../algorithms/hash';
 
 /** Maximum retained in-memory cache entries */
 const MAX_CACHE_ENTRIES = 2000;
 
 /**
- * Computes a fast deterministic content hash string.
+ * Computes a fast deterministic content hash string using Java-style polynomial accumulation.
  *
  * @param content - Source file content
  * @returns Formatted hash string
  */
 export function computeSimpleContentHash(content: string): string {
-    let hash = 0;
-    for (let i = 0; i < content.length; i++) {
-        hash = (hash << 5) - hash + content.charCodeAt(i);
-        hash |= 0;
-    }
-    return `h${hash}_${content.length}`;
+    return `h${javaHash(content)}_${content.length}`;
 }
 
 /**
- * Review context in-memory cache manager.
+ * Review context in-memory cache manager backed by true O(1) LruCache container.
  */
 export class ReviewContextCache {
-    private readonly entries = new Map<string, ReviewContextEntry>();
+    private readonly entries = new LruCache<string, ReviewContextEntry>(MAX_CACHE_ENTRIES);
     private hitCount = 0;
     private missCount = 0;
 
     /**
      * Retrieves a cached context entry if fingerprint matches.
+     * Refreshes entry recency in the LRU eviction order upon hit.
      *
      * @param filePath - Target file path
      * @param contentHash - Expected content fingerprint hash
@@ -56,16 +54,11 @@ export class ReviewContextCache {
 
     /**
      * Stores or updates a review context entry.
+     * Automatically evicts the least recently used item on capacity overflow.
      *
      * @param entry - Context entry payload
      */
     public set(entry: ReviewContextEntry): void {
-        if (this.entries.size >= MAX_CACHE_ENTRIES) {
-            const firstKey = this.entries.keys().next().value;
-            if (firstKey) {
-                this.entries.delete(firstKey);
-            }
-        }
         this.entries.set(entry.filePath, entry);
     }
 

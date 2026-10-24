@@ -4,7 +4,7 @@ import {
     gridRow,
     computeGridRowSpan,
     countStreamLines,
-} from '../../../src/diff/incremental-diff-stream';
+} from '../../../src/core/diff/incremental-diff-stream';
 
 describe('IncrementalDiffStream (Streaming Diff Pipeline & Layout)', () => {
     describe('CSS Grid Row Span Helper (gridRow)', () => {

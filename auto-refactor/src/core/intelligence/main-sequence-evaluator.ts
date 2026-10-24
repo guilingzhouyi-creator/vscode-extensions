@@ -13,6 +13,8 @@
  *   transitive closure; zero transient allocations in hot loops.
  */
 
+import { computeWarshallTransitiveClosure } from '../algorithms/graph';
+
 /**
  * Architectural classification zone along Uncle Bob's Main Sequence.
  */
@@ -167,24 +169,6 @@ export function generateZoneRecommendation(
  * @param nodeCount - Number of nodes N.
  * @returns Propagation Cost outcome.
  */
-function applyTransitiveStep(closure: Uint8Array, iRow: number, kRow: number, n: number): void {
-    for (let j = 0; j < n; j++) {
-        closure[iRow + j] = closure[iRow + j] | closure[kRow + j];
-    }
-}
-
-function computeTransitiveClosure(closure: Uint8Array, n: number): void {
-    for (let k = 0; k < n; k++) {
-        const kRow = k * n;
-        for (let i = 0; i < n; i++) {
-            const iRow = i * n;
-            if (closure[iRow + k] === 1) {
-                applyTransitiveStep(closure, iRow, kRow, n);
-            }
-        }
-    }
-}
-
 function computeNodeBlastRadii(closure: Uint8Array, n: number): number[] {
     const nodeBlastRadii = new Array<number>(n);
     for (let target = 0; target < n; target++) {
@@ -238,7 +222,7 @@ export function computePropagationCost(
     }
 
     // Warshall's algorithm for transitive reachability
-    computeTransitiveClosure(closure, n);
+    computeWarshallTransitiveClosure(closure, n);
 
     const nodeBlastRadii = computeNodeBlastRadii(closure, n);
 

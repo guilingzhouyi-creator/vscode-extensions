@@ -15,3 +15,6 @@ export * from './saturation-curves';
 export * from './information-entropy';
 export * from './statistical-dispersion';
 export * from './power-resonance';
+export * from './descriptive-statistics';
+export * from './affine-transform';
+export * from './spectral-gamma';

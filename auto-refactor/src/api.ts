@@ -723,8 +723,8 @@ function evaluateGateExitCode(report: ScanReport, config: ScanConfig): number {
     const threshold = config.failOnSeverity
         ? SEVERITY_GATE_RANK[config.failOnSeverity]
         : config.failOnIssue
-          ? SEVERITY_GATE_RANK.error
-          : SEVERITY_GATE_RANK.disabled;
+            ? SEVERITY_GATE_RANK.error
+            : SEVERITY_GATE_RANK.disabled;
     // A suppressed finding stays in the report for auditing but never decides a gate: that is
     // the documented contract of `suppression` (report.schema.json) and what gate-self.js
     // already assumed, so the exit code must agree with it instead of counting the finding.
@@ -945,6 +945,9 @@ export type {
 export * from './core/intelligence/dataArchitecture';
 // ---- Quality Quantification & Scoring Engine ----
 export * from './core/scoring';
+export * from './core/math';
+export * from './core/algorithms';
+export * from './core/data-structures';
 
 // ---- Dynamic Analysis Plane Telemetry & Profiling ----
 export * from './core/dynamic';

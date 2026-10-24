@@ -22,7 +22,7 @@ const {
   calculateMarginalDeduction,
   compressDimensionDeductions,
   DEFAULT_CURVE_OPTIONS,
-} = require('../dist/core/scoring/logistic-deduction-curve');
+} = require('../dist/core/math/saturation-curves');
 
 function testZeroAnchorAndRobustness() {
   console.log('1. Testing Zero-Anchor & Numeric Robustness...');

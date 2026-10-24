@@ -20,34 +20,12 @@ import type {
     SemanticSubgraph,
 } from './types';
 import { normalizeCanonicalPath } from './adapters/path-utils';
+import { detectGraphCycles, computeTopologicalOrder } from '../algorithms/graph';
 
 const DIRECTION_FORWARD = 'forward';
 const DIRECTION_BACKWARD = 'backward';
 const DIRECTION_BOTH = 'both';
 type GraphDirection = typeof DIRECTION_FORWARD | typeof DIRECTION_BACKWARD | typeof DIRECTION_BOTH;
-
-function buildInDegreeMap(nodeIds: Iterable<string>, edges: SemanticEdge[]): Map<string, number> {
-    const inDegree = new Map<string, number>();
-    for (const nodeId of nodeIds) {
-        inDegree.set(nodeId, 0);
-    }
-    for (const edge of edges) {
-        if (inDegree.has(edge.toNodeId)) {
-            inDegree.set(edge.toNodeId, (inDegree.get(edge.toNodeId) ?? 0) + 1);
-        }
-    }
-    return inDegree;
-}
-
-function collectZeroDegreeNodes(inDegree: Map<string, number>): string[] {
-    const queue: string[] = [];
-    for (const [nodeId, deg] of inDegree.entries()) {
-        if (deg === 0) {
-            queue.push(nodeId);
-        }
-    }
-    return queue;
-}
 
 /**
  * High-performance language-agnostic code topology graph.
@@ -272,58 +250,7 @@ export class SemanticGraph {
      * Bounded explicit stack prevents native call stack exhaustion on deep dependency graphs.
      */
     public findCycles(): string[][] {
-        const WHITE = 0;
-        const GRAY = 1;
-        const BLACK = 2;
-        const color = new Map<string, number>();
-        const cycles: string[][] = [];
-
-        for (const start of this.nodes.keys()) {
-            if ((color.get(start) ?? WHITE) !== WHITE) {
-                continue;
-            }
-            this.traverseCycleDfs(start, color, cycles, WHITE, GRAY, BLACK);
-        }
-
-        return cycles;
-    }
-
-    private traverseCycleDfs(
-        start: string,
-        color: Map<string, number>,
-        cycles: string[][],
-        white: number,
-        gray: number,
-        black: number,
-    ): void {
-        color.set(start, gray);
-        const pathArr: string[] = [start];
-        const stack: Array<{ node: string; nexts: string[]; idx: number }> = [
-            { node: start, nexts: this.getNodeNextIds(start), idx: 0 },
-        ];
-
-        while (stack.length > 0) {
-            const top = stack[stack.length - 1];
-            if (top.idx >= top.nexts.length) {
-                color.set(top.node, black);
-                stack.pop();
-                pathArr.pop();
-                continue;
-            }
-
-            const next = top.nexts[top.idx++];
-            const c = color.get(next) ?? white;
-            if (c === gray) {
-                const at = pathArr.indexOf(next);
-                if (at >= 0) {
-                    cycles.push([...pathArr.slice(at), next]);
-                }
-            } else if (c === white) {
-                color.set(next, gray);
-                pathArr.push(next);
-                stack.push({ node: next, nexts: this.getNodeNextIds(next), idx: 0 });
-            }
-        }
+        return detectGraphCycles(this.nodes.keys(), (nodeId) => this.getNodeNextIds(nodeId));
     }
 
     private getNodeNextIds(nodeId: string): string[] {
@@ -342,26 +269,7 @@ export class SemanticGraph {
      * Performs a topological sort on DAG structures. Returns null if cycles exist.
      */
     public getTopologicalSort(): string[] | null {
-        const inDegree = buildInDegreeMap(this.nodes.keys(), this.getAllEdges());
-        const queue = collectZeroDegreeNodes(inDegree);
-        const order: string[] = [];
-        let head = 0;
-
-        while (head < queue.length) {
-            const u = queue[head++];
-            order.push(u);
-
-            for (const edge of this.getOutgoingEdges(u)) {
-                const v = edge.toNodeId;
-                const nextDeg = (inDegree.get(v) ?? 1) - 1;
-                inDegree.set(v, nextDeg);
-                if (nextDeg === 0) {
-                    queue.push(v);
-                }
-            }
-        }
-
-        return order.length === this.nodes.size ? order : null;
+        return computeTopologicalOrder(this.nodes.keys(), (nodeId) => this.getNodeNextIds(nodeId));
     }
 
     /**

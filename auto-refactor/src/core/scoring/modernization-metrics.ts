@@ -12,6 +12,12 @@
  */
 
 import { SCORE_ROUNDING, PERCENT_SCALE, safeDivide, clampScore } from './scorer-formulas';
+import { calculateShannonEntropy } from '../math/information-entropy';
+import {
+    POPOVICIU_MAX_SIGMA,
+    DEFAULT_DISPERSION_PENALTY_RATIO,
+} from '../math/statistical-dispersion';
+export { calculateShannonEntropy, POPOVICIU_MAX_SIGMA, DEFAULT_DISPERSION_PENALTY_RATIO };
 
 const SCORE_MAX = 100;
 const SCORE_PERFECT_FLOAT = 100.0;
@@ -592,28 +598,6 @@ export function computeProfileCompositeScore(
 export { computeProfileCompositeScore as calculateProfileCompositeScore };
 
 /**
- * Compute Shannon Information Entropy of identifier tokens for anti-gaming defense.
- *
- * @param text - Source text or identifier sequence.
- * @returns Shannon entropy in bits.
- */
-export function calculateShannonEntropy(text: string): number {
-    if (!text || text.length === 0) return 0.0;
-    const freqMap = new Map<string, number>();
-    for (let i = 0; i < text.length; i += 1) {
-        const ch = text[i];
-        freqMap.set(ch, (freqMap.get(ch) ?? 0) + 1);
-    }
-    const len = text.length;
-    let entropy = 0.0;
-    for (const count of freqMap.values()) {
-        const p = count / len;
-        entropy -= p * Math.log2(p);
-    }
-    return Math.round(entropy * SCORE_ROUNDING) / SCORE_ROUNDING;
-}
-
-/**
  * Compute AST Node to Non-Blank LOC Density Index.
  *
  * @param astNodeCount - Total AST node count.
@@ -717,23 +701,6 @@ function computeWeightedVariance(context: WeightedVarianceContext): number {
     }
     return safeDivide(sum, context.totalWeight, 0);
 }
-
-/**
- * Popoviciu's Inequality on Variances (Popoviciu, 1935):
- * For any bounded random variable X in [a, b], Var(X) <= 1/4 * (b - a)^2,
- * which implies theoretical maximum standard deviation sigma_max = (b - a) / 2.
- * For scores bounded in [0, 100], POPOVICIU_MAX_SIGMA = 50.0.
- */
-export const POPOVICIU_MAX_SIGMA = 50.0;
-
-/**
- * Default maximum dispersion penalty ratio gamma in [0, 1].
- * Setting gamma = 0.5 ensures that even under maximal bimodal divergence
- * (for example, half 100s and half 0s, yielding sigma_S = 50.0),
- * the dispersion discount factor D drops from 1.0 down to 0.5 (a 50% penalty),
- * preserving 50% of the underlying asset quality.
- */
-export const DEFAULT_DISPERSION_PENALTY_RATIO = 0.5;
 
 /**
  * Compute Polyglot Generalization and Modernization Equilibrium Index.

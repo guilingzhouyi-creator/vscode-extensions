@@ -1,6 +1,6 @@
 /**
  * Module: Diff Engine — Incremental Streaming Diff Pipeline & Grid Row Layout
- * File Path: src/diff/incremental-diff-stream.ts
+ * File Path: src/core/diff/incremental-diff-stream.ts
  * Architecture Role: Incremental chunk-slicing diff streaming pipeline with prefix
  *   coherence verification and CSS Grid alignment helper.
  * Dependencies & Triggers: Zero external runtime dependencies; consumed by diff viewers,
