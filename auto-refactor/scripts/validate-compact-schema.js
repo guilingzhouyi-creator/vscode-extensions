@@ -241,7 +241,34 @@ function testHydrationRoundTrip() {
     assert.strictEqual(issue.location.file, source.location.file);
     assert.strictEqual(issue.location.start.line, source.location.start.line);
   }
+  testHydrationPartiality(report);
   console.log('  ✔ ids, rules, severities and locations survive the round trip');
+}
+
+/**
+ * Assert a truncated document hydrates into a report that admits it is incomplete.
+ *
+ * `partial` is the only signal separating "this document described the whole scan" from "this
+ * document described part of it", and the whole round trip passes without ever setting it. A
+ * consumer that reads `summary.issuesTotal` as the length of `issues` would then treat a capped
+ * sidecar as a complete inventory — the failure this compat layer exists to prevent, silently
+ * reproduced by the compat layer itself.
+ */
+function testHydrationPartiality(report) {
+  const capped = buildCompactReport(report, { maxVectors: 2, maxMessageChars: 500 });
+  const hydrated = hydrateCompactReport(capped);
+  assert.strictEqual(capped.truncated > 0, true, 'the fixture must actually truncate');
+  assert.strictEqual(hydrated.partial, true, 'a truncated document must report partiality');
+  assert.strictEqual(
+    hydrated.report.issues.length,
+    2,
+    'hydration returns only the vectors the document carried',
+  );
+  assert.strictEqual(
+    hydrated.report.summary.issuesTotal,
+    report.summary.issuesTotal,
+    'the summary total still reflects the whole scan, which is why partial must be honoured',
+  );
 }
 
 /**
