@@ -37,6 +37,7 @@ from audit_common import ensure_utf8_stdout, resolve_repo_root
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
+STANDARD_SEPARATOR_WIDTH = 78
 
 # 全域扫描目标目录（WebGames 与仓库根目录脚本库）
 SCAN_ROOTS = [
@@ -149,14 +150,14 @@ def _check_separator_lines(
 
         if sep_matched and m:
             width = len(m.group(1))
-            if width != 78:
+            if width != STANDARD_SEPARATOR_WIDTH:
                 violations.append({
                     "file": path_str,
                     "rule": "HEADER-SEPARATOR-WIDTH",
-                    "detail": f"L{i+1} 分隔线宽度 {width} ≠ 78"
+                    "detail": f"L{i+1} 分隔线宽度 {width} ≠ {STANDARD_SEPARATOR_WIDTH}"
                 })
                 if fix:
-                    new_lines[i] = prefix + (sym * 78)
+                    new_lines[i] = prefix + (sym * STANDARD_SEPARATOR_WIDTH)
                     fixed = True
     return violations, fixed
 
@@ -436,6 +437,7 @@ def _check_py_annotation_bindings(text: str, path: Path) -> list[dict[str, Any]]
 
 
 def main() -> int:
+    """CLI 入口：全域脚本库头注释格式与严格规范化静态审计。"""
     parser = argparse.ArgumentParser(description="全域脚本库头注释与严格规范化审计")
     parser.add_argument("--json", action="store_true", help="输出机器可读 JSON")
     parser.add_argument("--fix", action="store_true", help="自动修复等宽线等可安全修复项")

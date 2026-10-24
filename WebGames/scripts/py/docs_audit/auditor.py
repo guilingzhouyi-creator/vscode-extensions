@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from docs_audit.layout import check_layout
-from docs_audit.links import check_links, fix_abs_links, resolve_abs_target
+from docs_audit.links import LinkAuditContext, check_links, fix_abs_links, resolve_abs_target
 from docs_audit.mermaid import check_mermaid, mermaid_fix_line
 from docs_audit.models import (
     BR_TAG_RE,
@@ -34,11 +34,13 @@ from docs_audit.models import (
     slugify,
     split_fences,
 )
-from docs_audit.naming import check_naming
+from docs_audit.naming import NamingAuditContext, check_naming
 from docs_audit.phase import check_formation_date, check_phase_governance
 
 
 class DocsAuditor:
+    """全域技术档案审查与原位自愈修复执行器 (Docs Audit & Auto-Fix Engine)。"""
+
     def __init__(
         self,
         root: Path,
@@ -125,30 +127,59 @@ class DocsAuditor:
     def _abs_target(self, frag: str) -> str:
         return resolve_abs_target(frag, self.docs)
 
-    def _add(self, doc: Any, rule: str, line: int, message: str, suggestion: str = "", extra: Any = None) -> None:
-        self._current_findings.append(Finding(rule, doc.rel, line, message, suggestion, extra or {}))
+    def _add(self, doc: Any, rule: str, line: int, message: str, *args: Any, **kwargs: Any) -> None:
+        suggestion = args[0] if len(args) > 0 else kwargs.get("suggestion", "")
+        extra = args[1] if len(args) > 1 else (kwargs.get("extra") or {})
+        self._current_findings.append(Finding(rule, doc.rel, line, message, suggestion, extra))
 
     # ---------- 审查 ----------
     def check(self) -> list:
         findings: list = []
         self._current_findings = findings
         self._transient = {}   # 按需加载的锚点目标（不并入正式审计集合）
+        link_ctx = LinkAuditContext(
+            docs_map=self.docs_map,
+            add_fn=self._add,
+            get_doc_fn=self._get_doc,
+            abs_target_fn=self._abs_target,
+            rel_fn=self._rel,
+        )
         for doc in list(self.docs_map.values()):
             check_layout(doc, self.decode_errors, self._add)
             check_mermaid(doc, self._add)
-            check_links(
-                doc,
-                self.docs_map,
-                self._add,
-                self._get_doc,
-                self._abs_target,
-                self._rel,
-            )
-        check_naming(self.docs, self.dir_index, self.naming, self.docs_map, self._rel, findings)
+            check_links(doc, link_ctx)
+        naming_ctx = NamingAuditContext(dir_index=self.dir_index, rel_fn=self._rel, out=findings)
+        check_naming(self.docs, self.naming, self.docs_map, naming_ctx)
         check_formation_date(self.docs, self._rel, findings)
         check_phase_governance(self.docs, self.docs_map, self._rel, findings)
         findings.sort(key=lambda f: (f.file, f.line, f.rule))
         return findings
+
+    # ---------- 修复域（仅安全六类） ----------
+    def fix(self, dry_run: bool = False) -> tuple:
+        """应用安全修复。返回 (applied 列表, 修复后残留 findings)。
+
+        演练模式：内存态临时应用以便复检，校验后回滚，磁盘零写入；正式模式才写盘。
+        """
+        applied, changed = [], []
+        for doc in self.docs_map.values():
+            new_lines, n_fix = _process_doc_lines(doc.lines)
+            new_text, n_abs = fix_abs_links("\n".join(new_lines), doc.path, self._abs_target)
+            n_fix += n_abs
+            if n_fix and new_text != doc.text:
+                applied.append({"file": doc.rel, "fixes": n_fix})
+                changed.append((doc, doc.text, doc.lines, doc.inside, new_text))
+                doc.text, doc.lines = new_text, new_text.split("\n")
+                doc.inside = split_fences(doc.lines)
+        residual = self.check()
+        if dry_run:
+            for doc, ot, ol, oi, _nt in changed:
+                doc.text, doc.lines, doc.inside = ot, ol, oi
+        else:
+            for doc, _ot, _ol, _oi, nt in changed:
+                doc.path.write_bytes(nt.replace("\n", doc.eol).encode("utf-8"))
+        return applied, residual
+
 
 def _should_pad_table_row(cur: str, prev_lines: list) -> bool:
     if not (TABLE_ROW_RE.match(cur) and prev_lines):
@@ -200,29 +231,3 @@ def _process_doc_lines(lines: list) -> tuple:
         n_fix += n
         new_lines.append(cur)
     return new_lines, n_fix
-
-
-    # ---------- 修复域（仅安全六类） ----------
-    def fix(self, dry_run: bool = False) -> tuple:
-        """应用安全修复。返回 (applied 列表, 修复后残留 findings)。
-
-        演练模式：内存态临时应用以便复检，校验后回滚，磁盘零写入；正式模式才写盘。
-        """
-        applied, changed = [], []
-        for doc in self.docs_map.values():
-            new_lines, n_fix = _process_doc_lines(doc.lines)
-            new_text, n_abs = fix_abs_links("\n".join(new_lines), doc.path, self._abs_target)
-            n_fix += n_abs
-            if n_fix and new_text != doc.text:
-                applied.append({"file": doc.rel, "fixes": n_fix})
-                changed.append((doc, doc.text, doc.lines, doc.inside, new_text))
-                doc.text, doc.lines = new_text, new_text.split("\n")
-                doc.inside = split_fences(doc.lines)
-        residual = self.check()
-        if dry_run:
-            for doc, ot, ol, oi, _nt in changed:
-                doc.text, doc.lines, doc.inside = ot, ol, oi
-        else:
-            for doc, _ot, _ol, _oi, nt in changed:
-                doc.path.write_bytes(nt.replace("\n", doc.eol).encode("utf-8"))
-        return applied, residual

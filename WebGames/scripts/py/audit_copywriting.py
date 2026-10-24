@@ -43,12 +43,12 @@ BRANCH_KEYS = ("base", "text", "success", "failure", "partial")
 PROBABILITY_DOMAIN_FORBIDDEN = JUDGMENT_FIELDS - {"probability"}
 
 
-def _audit_narrative_and_prob(domain: str, entry_key: str, branch: str, text: str, violations: List[str]) -> None:
-    """审查剧情与概率域判定与执行语义禁入。"""
-    forbidden = PROBABILITY_DOMAIN_FORBIDDEN if domain == "probability" else JUDGMENT_FIELDS
+def _audit_narrative_and_prob(ref_key: str, text: str, violations: List[str], is_prob: bool = False) -> None:
+    """审查剧情与概率域判定与执行语义禁入 (GOV-DAT-001)。"""
+    forbidden = PROBABILITY_DOMAIN_FORBIDDEN if is_prob else JUDGMENT_FIELDS
     for jf in forbidden:
         if jf in text:
-            violations.append(f"[判定禁入] copywriting.{domain}.{entry_key}.{branch} 含判定/执行语义 {jf}")
+            violations.append(f"[判定禁入] {ref_key} 含判定/执行语义 {jf}")
 
 
 def _audit_item_entry(entry_key: str, entry: Dict[str, Any], text: str, violations: List[str]) -> None:
@@ -67,14 +67,16 @@ def _audit_item_entry(entry_key: str, entry: Dict[str, Any], text: str, violatio
 
 def _audit_domain_entry(domain: str, entry_key: str, entry: Dict[str, Any], violations: List[str]) -> None:
     """审查单条文案条目的各分支模板。"""
+    is_prob = (domain == "probability")
     for branch in BRANCH_KEYS:
         text = str(entry.get(branch, ""))
         if not text:
             continue
+        ref_key = f"copywriting.{domain}.{entry_key}.{branch}"
         if LEGACY_PLACEHOLDER_RE.search(text):
-            violations.append(f"[占位符残留] copywriting.{domain}.{entry_key}.{branch} 含 %s/%d/空 {{}}")
+            violations.append(f"[占位符残留] {ref_key} 含 %s/%d/空 {{}}")
         if domain in ("narrative", "probability"):
-            _audit_narrative_and_prob(domain, entry_key, branch, text, violations)
+            _audit_narrative_and_prob(ref_key, text, violations, is_prob)
         if domain == "item":
             _audit_item_entry(entry_key, entry, text, violations)
 
@@ -102,6 +104,22 @@ def _load_copywriting_domains(cw_dir: Path) -> Dict[str, Dict[str, Any]]:
     return domains
 
 
+def _print_copywriting_summary(violations: List[str], hints: List[str]) -> int:
+    """输出文案审查结论并返回退出码。"""
+    print(f"违规总数: {len(violations)} / 提示: {len(hints)}")
+    for v in violations:
+        print(f"  ✗ {v}")
+    for h in hints:
+        print(f"  · {h}")
+
+    print("-" * 80)
+    if violations:
+        print("【审查结论】未通过（存在统一文案违规，已阻断！）")
+        return 1
+    print("【审查结论】通过（统一文案合规、域红线保留、零内联）")
+    return 0
+
+
 def run_copywriting_audit() -> int:
     """执行统一文案配置系统深度审查入口主流程。"""
     print("=" * 80)
@@ -125,19 +143,7 @@ def run_copywriting_audit() -> int:
                     _audit_domain_entry(domain, entry_key, entry, violations)
 
     _audit_backend_inlines(violations)
-
-    print(f"违规总数: {len(violations)} / 提示: {len(hints)}")
-    for v in violations:
-        print(f"  ✗ {v}")
-    for h in hints:
-        print(f"  · {h}")
-
-    print("-" * 80)
-    if violations:
-        print("【审查结论】未通过（存在统一文案违规，已阻断！）")
-        return 1
-    print("【审查结论】通过（统一文案合规、域红线保留、零内联）")
-    return 0
+    return _print_copywriting_summary(violations, hints)
 
 
 if __name__ == "__main__":

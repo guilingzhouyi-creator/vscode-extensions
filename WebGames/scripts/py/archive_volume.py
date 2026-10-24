@@ -186,6 +186,7 @@ def run_self_test() -> bool:
 
 
 def main() -> int:
+    """CLI 入口：短期施工区十卷周期归档、打标与总索引精准清理系统。"""
     parser = argparse.ArgumentParser(description="短期施工区十卷周期归档、打标与总索引精准清理系统")
     parser.add_argument("--detect", action="store_true", help="自动扫描短期施工区与归档库状态及周期进度")
     parser.add_argument("--cycle", action="store_true", help="执行短期施工区满 10 卷周期自动归档")

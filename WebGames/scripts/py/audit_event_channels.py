@@ -33,8 +33,17 @@ BACKEND = ROOT / "backend"
 CHANNEL_RE = re.compile(r"^([a-z][a-z0-9_]*)\.([a-z0-9_]+(?:\.[a-z0-9_]+)*)$")
 CONST_RE = re.compile(r"const\s+([A-Z0-9_]+)\s*:\s*int\s*=\s*(0x[0-9A-Fa-f]+|\d+)")
 
+SEV_WARN = "WARN"
+SEV_ERROR = "ERROR"
+
+
+def get_full_channel_name(ch: dict) -> str:
+    """格式化标准频道全名 (<domain_id>.<event_name>)。"""
+    return f"{ch['domain']}.{ch['event_name']}"
+
 
 def load_json(rel: str) -> dict:
+    """安全读取相对 CONFIG 路径的 JSON 文件为字典对象。"""
     try:
         data = json.loads((CONFIG / rel).read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
@@ -211,7 +220,7 @@ def check_payload_contract() -> list[dict]:
                 findings.append({
                     "detector": "R4",
                     "rule_id": "ADV-EVT-004",
-                    "severity": "WARN",
+                    "severity": SEV_WARN,
                     "channel": m.group(1),
                     "source": str(f.relative_to(ROOT)),
                     "message": "emit_domain_event 字面量载荷缺 category_key（叙事取色契约）",
@@ -220,7 +229,7 @@ def check_payload_contract() -> list[dict]:
                 findings.append({
                     "detector": "R4",
                     "rule_id": "ADV-EVT-004",
-                    "severity": "WARN",
+                    "severity": SEV_WARN,
                     "channel": m.group(1),
                     "source": str(f.relative_to(ROOT)),
                     "message": "emit_domain_event 字面量载荷缺 args（模板占位填充契约，纯结构化事件可忽略）",
@@ -228,20 +237,71 @@ def check_payload_contract() -> list[dict]:
     return findings
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--json", action="store_true", help="输出 JSON 报告")
-    args = ap.parse_args()
+def _check_r1_channel_naming(channels: list[dict], domain_map: dict[str, dict]) -> list[dict]:
+    """R1 频道命名合规：配置驱动频道严格 ERROR；代码频道按首段归属分级。"""
+    findings: list[dict] = []
+    for ch in channels:
+        ch_name = get_full_channel_name(ch)
+        if ch["domain"] not in domain_map:
+            if ch.get("from_config"):
+                findings.append({
+                    "detector": "R1", "rule_id": "ADV-EVT-001", "severity": SEV_ERROR,
+                    "channel": ch_name, "source": ch["source"],
+                    "message": f"配置驱动频道首段 '{ch['domain']}' 非 domains.json 已登记领域 id（<domain_id>.<event_name> 硬约定）",
+                })
+            else:
+                findings.append({
+                    "detector": "R1", "rule_id": "ADV-EVT-001", "severity": SEV_WARN,
+                    "channel": ch_name, "source": ch["source"],
+                    "message": f"存量宽松前缀频道 '{ch['domain']}' 未登记为领域 id——迁移收敛清单（存量跟踪），新代码禁止新增",
+                })
+    return findings
 
-    domain_map = collect_domain_mapping()
-    narrative_tables = collect_narrative_tables(domain_map)
-    registry = collect_channel_registry()
-    consts = collect_channel_constants()
 
-    # 频道候选 = 配置驱动频道 ∪ 代码字面量频道
-    # 分级纪律（对齐存量收敛路线）：配置驱动频道（auth/hud/channels、channel_registry.legacy）
-    # 与首段为已登记域 id 的代码频道走严格判定（ERROR）；存量宽松前缀频道（engine./lifecycle./
-    # prologue. 等历史频道）列入迁移收敛清单（WARN，迁移收敛跟踪），不阻断门禁。
+def _check_r2_narrative_alignment(
+    channels: list[dict], domain_map: dict[str, dict], narrative_tables: dict[str, set[str]]
+) -> list[dict]:
+    """R2 叙事键对齐：配置驱动频道严格 ERROR；存量代码频道缺键列入迁移收敛清单（WARN）。"""
+    findings: list[dict] = []
+    for ch in channels:
+        if ch["exempt_narrative"] or ch["domain"] not in domain_map:
+            continue
+        table = domain_map[ch["domain"]]["narrative"]
+        if table not in narrative_tables:
+            continue
+        if ch["event_name"] not in narrative_tables[table]:
+            ch_name = get_full_channel_name(ch)
+            if ch.get("from_config"):
+                findings.append({
+                    "detector": "R2", "rule_id": "ADV-EVT-002", "severity": SEV_ERROR,
+                    "channel": ch_name, "source": ch["source"],
+                    "message": f"配置驱动频道事件名 '{ch['event_name']}' 在叙事表 {table} 中无对应模板键（缺失或需声明 narrative:false 豁免）",
+                })
+            else:
+                findings.append({
+                    "detector": "R2", "rule_id": "ADV-EVT-002", "severity": SEV_WARN,
+                    "channel": ch_name, "source": ch["source"],
+                    "message": f"存量代码频道 '{ch['event_name']}' 在叙事表 {table} 中无对应模板键——迁移收敛清单（补键或显式结构化豁免），新代码禁止新增",
+                })
+    return findings
+
+
+def _check_r3_registry_constants(registry: dict[int, dict], consts: dict[str, int]) -> list[dict]:
+    """R3 注册表-常量对齐。"""
+    findings: list[dict] = []
+    for cid, entry in registry.items():
+        const_name = entry["name"]
+        if const_name and const_name in consts and consts[const_name] != cid:
+            findings.append({
+                "detector": "R3", "rule_id": "ADV-EVT-003", "severity": SEV_ERROR,
+                "channel": f"registry:{const_name}", "source": "config/infrastructure/event_bus_config.json",
+                "message": f"channel_registry id {cid} 与 EventChannelDefinition.{const_name}（{consts[const_name]}）不一致",
+            })
+    return findings
+
+
+def _collect_all_candidate_channels(domain_map: dict[str, dict], registry: dict[int, dict]) -> list[dict]:
+    """合并配置驱动频道与代码字面量频道，并注入 legacy 豁免标志。"""
     channels: list[dict] = []
     seen: set[tuple] = set()
     for ch in collect_config_channels(domain_map) + collect_code_channels(domain_map):
@@ -252,7 +312,6 @@ def main() -> int:
         ch["exempt_narrative"] = False
         channels.append(ch)
 
-    # channel_registry.legacy 显式叙事豁免
     for entry in registry.values():
         legacy = entry["legacy"]
         if not legacy:
@@ -263,60 +322,30 @@ def main() -> int:
         for ch in channels:
             if ch["domain"] == cm.group(1) and ch["event_name"] == cm.group(2):
                 ch["exempt_narrative"] = not entry["narrative"]
+    return channels
+
+
+def main() -> int:
+    """CLI 入口：全域事件总线频道声明与叙事键一致性静态审查。"""
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--json", action="store_true", help="输出 JSON 报告")
+    args = ap.parse_args()
+
+    domain_map = collect_domain_mapping()
+    narrative_tables = collect_narrative_tables(domain_map)
+    registry = collect_channel_registry()
+    consts = collect_channel_constants()
+
+    channels = _collect_all_candidate_channels(domain_map, registry)
 
     findings: list[dict] = []
+    findings.extend(_check_r1_channel_naming(channels, domain_map))
+    findings.extend(_check_r2_narrative_alignment(channels, domain_map, narrative_tables))
+    findings.extend(_check_r3_registry_constants(registry, consts))
+    findings.extend(check_payload_contract())
 
-    # R1 频道命名合规：配置驱动频道严格 ERROR；代码频道按首段归属分级
-    for ch in channels:
-        if ch["domain"] not in domain_map:
-            if ch.get("from_config"):
-                findings.append({
-                    "detector": "R1", "rule_id": "ADV-EVT-001", "severity": "ERROR",
-                    "channel": f"{ch['domain']}.{ch['event_name']}", "source": ch["source"],
-                    "message": f"配置驱动频道首段 '{ch['domain']}' 非 domains.json 已登记领域 id（<domain_id>.<event_name> 硬约定）",
-                })
-            else:
-                findings.append({
-                    "detector": "R1", "rule_id": "ADV-EVT-001", "severity": "WARN",
-                    "channel": f"{ch['domain']}.{ch['event_name']}", "source": ch["source"],
-                    "message": f"存量宽松前缀频道 '{ch['domain']}' 未登记为领域 id——迁移收敛清单（存量跟踪），新代码禁止新增",
-                })
-
-    # R2 叙事键对齐：配置驱动频道严格 ERROR；存量代码频道缺键列入迁移收敛清单（WARN）
-    for ch in channels:
-        if ch["exempt_narrative"] or ch["domain"] not in domain_map:
-            continue
-        table = domain_map[ch["domain"]]["narrative"]
-        if table not in narrative_tables:
-            continue
-        if ch["event_name"] not in narrative_tables[table]:
-            if ch.get("from_config"):
-                findings.append({
-                    "detector": "R2", "rule_id": "ADV-EVT-002", "severity": "ERROR",
-                    "channel": f"{ch['domain']}.{ch['event_name']}", "source": ch["source"],
-                    "message": f"配置驱动频道事件名 '{ch['event_name']}' 在叙事表 {table} 中无对应模板键（缺失或需声明 narrative:false 豁免）",
-                })
-            else:
-                findings.append({
-                    "detector": "R2", "rule_id": "ADV-EVT-002", "severity": "WARN",
-                    "channel": f"{ch['domain']}.{ch['event_name']}", "source": ch["source"],
-                    "message": f"存量代码频道 '{ch['event_name']}' 在叙事表 {table} 中无对应模板键——迁移收敛清单（补键或显式结构化豁免），新代码禁止新增",
-                })
-
-    # R3 注册表-常量对齐
-    for cid, entry in registry.items():
-        const_name = entry["name"]
-        if const_name and const_name in consts and consts[const_name] != cid:
-            findings.append({
-                "detector": "R3", "rule_id": "ADV-EVT-003", "severity": "ERROR",
-                "channel": f"registry:{const_name}", "source": "config/infrastructure/event_bus_config.json",
-                "message": f"channel_registry id {cid} 与 EventChannelDefinition.{const_name}（{consts[const_name]}）不一致",
-            })
-
-    findings += check_payload_contract()
-
-    errors = [f for f in findings if f["severity"] == "ERROR"]
-    warns = [f for f in findings if f["severity"] == "WARN"]
+    errors = [f for f in findings if f["severity"] == SEV_ERROR]
+    warns = [f for f in findings if f["severity"] == SEV_WARN]
 
     print("=" * 80)
     print("🛡️ 卡拉尔世界引擎：EventBus 频道纪律与叙事契约审查报告")

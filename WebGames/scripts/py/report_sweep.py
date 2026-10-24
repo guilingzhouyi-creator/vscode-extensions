@@ -11,18 +11,24 @@
 #   python scripts/py/report_sweep.py -n 3
 # ==============================================================================
 """多份基准报告按指标取中位数聚合为稳定基线（结构兼容聚合/门禁脚本）。"""
+
+from __future__ import annotations
+
 import argparse
 import datetime
 import json
 import statistics
 import sys
 from pathlib import Path
+from typing import Any
+
 from audit_common import ensure_utf8_stdout, load_json
 
 ensure_utf8_stdout()
 
 
 def load(path: Path) -> dict:
+    """读取指定路径的 JSON 报告。"""
     try:
         return load_json(path)
     except Exception as e:
@@ -30,19 +36,11 @@ def load(path: Path) -> dict:
         sys.exit(1)
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("reports", nargs="+", help="两份或以上的基准报告路径")
-    ap.add_argument("--out", help="合并 JSON 输出路径")
-    ap.add_argument("--md", help="Markdown 中位数表输出路径（缺省打印到 stdout）")
-    args = ap.parse_args()
-
-    runs = [load(Path(r)) for r in args.reports]
-    if len(runs) < 2:
-        print("【report-sweep】至少需要两份报告", file=sys.stderr)
-        return 1
-
-    data: dict[str, dict] = {}
+def _aggregate_runs(
+    runs: list[dict],
+) -> tuple[dict[str, dict[str, list[float]]], dict[str, str], list[str]]:
+    """汇聚多轮运行中的指标样本数据。"""
+    data: dict[str, dict[str, list[float]]] = {}
     cat_of: dict[str, str] = {}
     cat_order: list[str] = []
     for rep in runs:
@@ -57,8 +55,16 @@ def main() -> int:
                 bucket["us"].append(m["elapsed_us"])
                 bucket["ops"].append(m["ops_per_sec"])
                 cat_of.setdefault(name, cname)
+    return data, cat_of, cat_order
 
-    merged_cats: list[dict] = []
+
+def _build_merged_categories(
+    data: dict[str, dict[str, list[float]]],
+    cat_of: dict[str, str],
+    cat_order: list[str],
+) -> list[dict[str, Any]]:
+    """计算各分类指标中位数并构造聚合分类列表。"""
+    merged_cats: list[dict[str, Any]] = []
     for cname in cat_order:
         metrics = []
         for name, bucket in data.items():
@@ -73,17 +79,14 @@ def main() -> int:
             })
         if metrics:
             merged_cats.append({"category": cname, "metrics": metrics})
+    return merged_cats
 
-    merged = {
-        "engine": runs[0].get("engine", "?"),
-        "tool": f"report_sweep.py (median of {len(runs)} runs)",
-        "source_runs": [Path(r).name for r in args.reports],
-        "godot_version": runs[0].get("godot_version", "?"),
-        "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
-        "categories": merged_cats,
-        "summary": {"total_metrics": len(data), "runs": len(runs)},
-    }
 
+def _build_markdown_summary(
+    runs: list[dict],
+    data: dict[str, dict[str, list[float]]],
+) -> list[str]:
+    """生成中位数聚合 Markdown 表格行列表。"""
     rows = sorted(
         ((name, statistics.median(data[name]["ops"])) for name in data),
         key=lambda t: t[1],
@@ -98,7 +101,36 @@ def main() -> int:
     for name, ops in rows:
         vals = ", ".join(f"{v:,.0f}" for v in sorted(data[name]["ops"]))
         md.append(f"| {name} | {ops:,.1f} | {vals} |")
+    return md
 
+
+def main() -> int:
+    """CLI 入口：多轮基准压测横向聚合与中位数评估。"""
+    ap = argparse.ArgumentParser()
+    ap.add_argument("reports", nargs="+", help="两份或以上的基准报告路径")
+    ap.add_argument("--out", help="合并 JSON 输出路径")
+    ap.add_argument("--md", help="Markdown 中位数表输出路径（缺省打印到 stdout）")
+    args = ap.parse_args()
+
+    runs = [load(Path(r)) for r in args.reports]
+    if len(runs) < 2:
+        print("【report-sweep】至少需要两份报告", file=sys.stderr)
+        return 1
+
+    data, cat_of, cat_order = _aggregate_runs(runs)
+    merged_cats = _build_merged_categories(data, cat_of, cat_order)
+
+    merged = {
+        "engine": runs[0].get("engine", "?"),
+        "tool": f"report_sweep.py (median of {len(runs)} runs)",
+        "source_runs": [Path(r).name for r in args.reports],
+        "godot_version": runs[0].get("godot_version", "?"),
+        "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
+        "categories": merged_cats,
+        "summary": {"total_metrics": len(data), "runs": len(runs)},
+    }
+
+    md = _build_markdown_summary(runs, data)
     text = "\n".join(md)
     if args.md:
         Path(args.md).parent.mkdir(parents=True, exist_ok=True)
@@ -106,6 +138,7 @@ def main() -> int:
         print(f"【report-sweep】中位数表已写入: {args.md}")
     else:
         print(text)
+
     if args.out:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         Path(args.out).write_text(json.dumps(merged, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

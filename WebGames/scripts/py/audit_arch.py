@@ -25,6 +25,7 @@ ROOT = resolve_repo_root()
 
 
 def main() -> int:
+    """CLI 入口：无头启动 Godot 执行 GDScript 架构护栏审查。"""
     godot_bin = os.environ.get("GODOT_BIN") or os.environ.get("GODOT") or "godot"
     godot_path = shutil.which(godot_bin)
     if not godot_path:

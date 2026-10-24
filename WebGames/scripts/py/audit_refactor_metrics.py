@@ -30,6 +30,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,43 @@ ROOT = resolve_repo_root()
 WORKSPACE_ROOT = ROOT.parent
 AUTO_REFACTOR_DIR = WORKSPACE_ROOT / "auto-refactor"
 AUTO_REFACTOR_CLI = AUTO_REFACTOR_DIR / "dist" / "index.js"
+
+LINE_WIDTH = 80
+BORDER_HORIZ = "─"
+MINUS_CHAR = "-"
+ARG_ENGINE_ARG = "--engine-arg"
+DEFAULT_TOP_LIMIT = 3
+
+
+@dataclass(slots=True)
+class RefactorAuditOptions:
+    """auto-refactor 分析配置选项（消除 GOV-DAT-001 形参泥团）。"""
+
+    strict: bool = False
+    json_output: bool = False
+    score_only: bool = False
+    report_format: str = "text"
+    slice_name: str = ""
+    diff_mode: bool = False
+    baseline: str = ""
+    update_baseline: str = ""
+    analyzers: str = ""
+    config_path: str = ""
+    maturity_tier: str = ""
+    security_level: str = ""
+    classify_literals: bool = False
+
+
+@dataclass(slots=True)
+class RefactorCommandContext:
+    """底层 CLI 执行命令上下文 (GOV-DAT-001)。"""
+
+    node_bin: str
+    runner: Path
+    target_root: Path
+    cli_format: str
+    report_path: Path
+    opts: RefactorAuditOptions
 
 
 def find_node_executable() -> str:
@@ -68,6 +106,26 @@ def find_node_executable() -> str:
     return ""
 
 
+def _next_string_state(ch: str, esc: bool) -> tuple[bool, bool]:
+    """计算字符串字面量内部的转义与闭合状态 (in_str, esc)。"""
+    if esc:
+        return True, False
+    if ch == "\\":
+        return True, True
+    if ch == '"':
+        return False, False
+    return True, False
+
+
+def _parse_json_dict_candidate(text: str) -> dict[str, Any] | None:
+    """尝试将截取的 JSON 文本切片解析为字典对象。"""
+    try:
+        result = json.loads(text)
+        return result if isinstance(result, dict) else None
+    except Exception:
+        return None
+
+
 def _extract_json_object(raw: str) -> dict[str, Any] | None:
     """括号计数法从 stdout 中截取首个完整 JSON 对象（容忍上游 reporters.ts 转义缺陷/尾随杂讯）。"""
     start = raw.find("{")
@@ -79,12 +137,7 @@ def _extract_json_object(raw: str) -> dict[str, Any] | None:
     for i in range(start, len(raw)):
         ch = raw[i]
         if in_str:
-            if esc:
-                esc = False
-            elif ch == "\\":
-                esc = True
-            elif ch == '"':
-                in_str = False
+            in_str, esc = _next_string_state(ch, esc)
             continue
         if ch == '"':
             in_str = True
@@ -93,13 +146,7 @@ def _extract_json_object(raw: str) -> dict[str, Any] | None:
         elif ch == "}":
             depth -= 1
             if depth == 0:
-                try:
-                    result: Any = json.loads(raw[start:i + 1])
-                    if isinstance(result, dict):
-                        return result
-                    return None
-                except Exception:
-                    return None
+                return _parse_json_dict_candidate(raw[start:i + 1])
     return None
 
 
@@ -151,15 +198,15 @@ def _render_quality_score_card(qs: dict[str, Any], show_detailed: bool = False) 
         "techDebtRisk": "技术债务收敛 (Tech Debt Risk)",
     }
 
-    if show_detailed or composite < 80:
-        print("  ┌" + "─" * 46 + "┬" + "─" * 28 + "┐")
+    if show_detailed or composite < LINE_WIDTH:
+        print("  ┌" + BORDER_HORIZ * 46 + "┬" + BORDER_HORIZ * 28 + "┐")
         print("  │ 评估维度                                     │ 指标得分                   │")
-        print("  ├" + "─" * 46 + "┼" + "─" * 28 + "┤")
+        print("  ├" + BORDER_HORIZ * 46 + "┼" + BORDER_HORIZ * 28 + "┤")
         for dim_key, dim_title in dim_labels.items():
             val = indices.get(dim_key, 100)
             bar = _format_score_bar(val, width=10)
             print(f"  │ {dim_title:<44} │ [{bar}] {val:>3}/100 │")
-        print("  └" + "─" * 46 + "┴" + "─" * 28 + "┘")
+        print("  └" + BORDER_HORIZ * 46 + "┴" + BORDER_HORIZ * 28 + "┘")
 
     if rationales:
         print("  💡 扣分主因与优化导引 (Top Penalties):")
@@ -169,90 +216,187 @@ def _render_quality_score_card(qs: dict[str, Any], show_detailed: bool = False) 
             reason = r.get("reason", "")
             line = r.get("line", 1)
             print(f"    • [{dim_name}] {delta:+d}分 (L{line}): {reason}")
-    print("-" * 80)
+    print(MINUS_CHAR * LINE_WIDTH)
 
 
-def run_refactor_audit(
-    strict: bool = False,
-    json_output: bool = False,
-    score_only: bool = False,
-    report_format: str = "text",
-    slice_name: str = "",
-    diff_mode: bool = False,
-    baseline: str = "",
-    update_baseline: str = "",
-    analyzers: str = "",
-    config_path: str = "",
-    maturity_tier: str = "",
-    security_level: str = "",
-    classify_literals: bool = False,
-) -> int:
-    """执行 auto-refactor 审查流水线。"""
-    mode_tag = "动态增量极速审查 (Dynamic Diff Mode)" if diff_mode else "全量静态深度审查 (Full Static Mode)"
-    print("=" * 80)
-    print(f"🔭 卡拉尔世界引擎：auto-refactor {mode_tag}")
-    print("=" * 80)
+def _resolve_audit_config(opts: RefactorAuditOptions) -> str | None:
+    """解析并校验 auto-refactor 配置文件路径。"""
+    resolved = opts.config_path or str(ROOT / "auto-refactor.config.json")
+    if resolved and Path(resolved).exists():
+        _warn_threshold_divergence(resolved)
+        return resolved
+    if opts.config_path:
+        print(f"【WARN】指定的 --config 不存在: {opts.config_path}，回退引擎默认阈值。")
+    return None
 
+
+def _append_engine_flags(cmd: list[str], opts: RefactorAuditOptions, resolved_config: str | None) -> None:
+    """按选项追加 auto-refactor CLI 运行参数。"""
+    if resolved_config:
+        cmd.extend(["--config", resolved_config])
+    if opts.analyzers:
+        cmd.extend([ARG_ENGINE_ARG, "--analyzers", ARG_ENGINE_ARG, opts.analyzers])
+    if opts.diff_mode:
+        cmd.extend([ARG_ENGINE_ARG, "--diff"])
+    if opts.security_level:
+        cmd.extend([ARG_ENGINE_ARG, "--security-level", ARG_ENGINE_ARG, opts.security_level])
+    if opts.baseline:
+        cmd.extend(["--baseline", opts.baseline])
+    if opts.update_baseline:
+        cmd.extend(["--update-baseline", opts.update_baseline])
+
+
+def _build_refactor_cmd(
+    ctx: RefactorCommandContext | None = None,
+    **kwargs: Any,
+) -> list[str]:
+    """组装底层 auto-refactor CLI 调用命令行数组 (GOV-DAT-001)。"""
+    if ctx is None:
+        ctx = RefactorCommandContext(
+            node_bin=kwargs.get("node_bin", "node"),
+            runner=kwargs.get("runner", Path(".")),
+            target_root=kwargs.get("target_root", Path(".")),
+            cli_format=kwargs.get("cli_format", "json"),
+            report_path=kwargs.get("report_path", Path(".")),
+            opts=kwargs.get("opts", RefactorAuditOptions()),
+        )
+    opts = ctx.opts
+    resolved_config = _resolve_audit_config(opts)
+    if opts.maturity_tier:
+        print("【提示】--maturity-tier 由项目配置 maturityTier 承载（引擎 CLI 无此开关），本次按配置执行。")
+    if opts.classify_literals:
+        print("【提示】--classify-literals 由项目配置 classifyLiterals 承载（引擎 CLI 无此开关），本次按配置执行。")
+
+    cmd = [
+        ctx.node_bin,
+        str(ctx.runner),
+        "--engine", str(AUTO_REFACTOR_DIR),
+        "--root", str(ctx.target_root),
+        "--format", ctx.cli_format,
+        "--out", str(ctx.report_path),
+        "--report-only",
+        "--quiet",
+    ]
+    _append_engine_flags(cmd, opts, resolved_config)
+    return cmd
+
+
+def _render_category_issues(title: str, issues: list[dict[str, Any]], tag: str, limit: int = DEFAULT_TOP_LIMIT) -> None:
+    """渲染特定分析器分类下的问题列表。"""
+    if not issues:
+        return
+    print(f"{title} (Top {limit}):")
+    for iss in issues[:limit]:
+        loc = iss.get("location", {})
+        file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
+        rule_tag = f"{tag}/{iss.get('rule', '')}" if iss.get('rule') else tag
+        print(f"  ⚠️ [{rule_tag}] {file_loc} — {iss.get('message', '')}")
+        if iss.get("suggestion"):
+            print(f"     💡 建议: {iss.get('suggestion')}")
+    print(MINUS_CHAR * LINE_WIDTH)
+
+
+def _render_summary_stats(summary: dict[str, Any]) -> None:
+    """渲染扫描宏观统计与分析器分布。"""
+    files_scanned = summary.get("filesScanned", 0)
+    issues_total = summary.get("issuesTotal", 0)
+    by_sev = summary.get("bySeverity", {})
+    by_analyzer = summary.get("byAnalyzer", {})
+    duration_ms = summary.get("durationMs", 0)
+    suppressed = summary.get("suppressedCount", 0)
+
+    print(f"  • 扫描源文件数: {files_scanned} 个 | 引擎耗时: {duration_ms} ms | 规则抑制: {suppressed} 处")
+    print(f"  • 待优化项总计: {issues_total} 处 (ERROR {by_sev.get('error', 0)} / WARN {by_sev.get('warning', 0)} / INFO {by_sev.get('info', 0)})")
+    analyzer_stats = " | ".join(f"{k}({v})" for k, v in sorted(by_analyzer.items()) if v > 0)
+    if analyzer_stats:
+        print(f"  • 分析器发现: {analyzer_stats}")
+    print(MINUS_CHAR * LINE_WIDTH)
+
+
+def _render_duplicate_literals(issues: list[dict[str, Any]]) -> None:
+    """渲染高频重复字面量常量提炼建议。"""
+    dups = [it for it in issues if it.get("rule") == "duplicate-literal"]
+    if not dups:
+        return
+    print(f"💎 高频重复字面量常量提炼建议 (Top {DEFAULT_TOP_LIMIT}):")
+    for iss in dups[:DEFAULT_TOP_LIMIT]:
+        loc = iss.get("location", {})
+        file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
+        val = iss.get("detail", {}).get("value", "")
+        occ = iss.get("detail", {}).get("occurrences", 0)
+        print(f"  💡 [constants] {file_loc} — 字面量「{val}」在文件中重复出现 {occ} 次")
+        if iss.get("suggestion"):
+            print(f"     ↳ 提炼建议: {iss.get('suggestion')}")
+    print(MINUS_CHAR * LINE_WIDTH)
+
+
+def _partition_issues(issues: list[dict[str, Any]]) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
+    """单趟聚合分析器与重复字面量发现，消除列表推导复杂度 (ADV-PRF-002)。"""
+    by_an: dict[str, list[dict[str, Any]]] = {}
+    dups: list[dict[str, Any]] = []
+    for it in issues:
+        an = it.get("analyzer", "")
+        if an:
+            by_an.setdefault(an, []).append(it)
+        if it.get("rule") == "duplicate-literal":
+            dups.append(it)
+    return by_an, dups
+
+
+def _render_all_issue_categories(issues: list[dict[str, Any]]) -> None:
+    """分流渲染各领域分析器发现。"""
+    by_an, dups = _partition_issues(issues)
+    _render_category_issues("🧠 单函数高圈复杂度发现", by_an.get("complexity", []), "complexity", 5)
+    _render_category_issues("📦 超大文件拆分候选", by_an.get("large-file", []), "large-file")
+    _render_duplicate_literals(dups)
+    _render_category_issues("⚡ 性能与高承压热点隐患", by_an.get("performance", []), "performance")
+    _render_category_issues("🏗️ 架构分层契约守卫发现", by_an.get("architecture", []), "architecture")
+    security_issues = by_an.get("security", []) + by_an.get("secrets", [])
+    _render_category_issues("🛡️ 安全合规与凭据合规发现", security_issues, "security")
+    _render_category_issues("🏛️ 治理规范与静态类型发现", by_an.get("governance", []), "governance")
+    _render_category_issues("🧹 代码卫生与工程整洁度发现", by_an.get("hygiene", []), "hygiene")
+
+
+def _render_audit_console_report(report: dict[str, Any], opts: RefactorAuditOptions) -> int:
+    """输出控制台明细与十维质量大盘。"""
+    summary = report.get("summary", {})
+    by_sev = summary.get("bySeverity", {})
+    quality_score = report.get("qualityScore", {})
+
+    _render_summary_stats(summary)
+    if quality_score:
+        _render_quality_score_card(quality_score, show_detailed=opts.score_only)
+
+    issues: list[dict[str, Any]] = report.get("issues", [])
+    _render_all_issue_categories(issues)
+
+    errors = by_sev.get("error", 0)
+    if opts.strict and errors > 0:
+        print(f"【审查结论】--strict 模式未通过（存在 {errors} 处 error 级发现）")
+        return 1
+
+    print("【审查结论】通过（auto-refactor 静态度量与多维重构建议就绪）")
+    return 0
+
+
+def _resolve_audit_runtime() -> tuple[str, Path] | None:
+    """验证并定位 Node.js 运行时及通用 runner 路径。"""
     node_bin = find_node_executable()
     if not node_bin:
         print("【提示】未检测到 Node.js 运行时环境，自动安全跳过 auto-refactor 分析（优雅降级）。")
-        return 0
-
+        return None
     if not AUTO_REFACTOR_CLI.exists():
         print(f"【提示】auto-refactor 尚未编译构建 ({AUTO_REFACTOR_CLI} 不存在)，自动跳过分析。")
-        return 0
-
-    target_root = ROOT if not slice_name else (ROOT / slice_name)
-    if not target_root.exists():
-        target_root = ROOT
-
-    cli_format = "json"
-    if report_format in ("markdown", "sarif", "badge") and not json_output and not score_only:
-        cli_format = report_format
-
+        return None
     runner = AUTO_REFACTOR_DIR / "templates" / "consumer" / "run.mjs"
     if not runner.exists():
         print(f"【提示】引擎未提供通用 runner ({runner})，自动跳过分析。")
-        return 0
+        return None
+    return node_bin, runner
 
-    resolved_config = config_path or str(ROOT / "auto-refactor.config.json")
-    if resolved_config and Path(resolved_config).exists():
-        _warn_threshold_divergence(resolved_config)
-    elif config_path:
-        print(f"【WARN】指定的 --config 不存在: {config_path}，回退引擎默认阈值。")
 
-    # 已由项目配置承载的开关：引擎 CLI 本就无此参数（旧实现是静默 no-op），这里显式提示
-    if maturity_tier:
-        print("【提示】--maturity-tier 由项目配置 maturityTier 承载（引擎 CLI 无此开关），本次按配置执行。")
-    if classify_literals:
-        print("【提示】--classify-literals 由项目配置 classifyLiterals 承载（引擎 CLI 无此开关），本次按配置执行。")
-
-    # 调用收敛到引擎通用 runner：参数组装、基线粒度与退出码映射由引擎单一真源负责
-    report_path = Path(tempfile.gettempdir()) / f"webgames-auto-refactor-{os.getpid()}.json"
-    cmd = [
-        node_bin,
-        str(runner),
-        "--engine", str(AUTO_REFACTOR_DIR),
-        "--root", str(target_root),
-        "--format", cli_format,
-        "--out", str(report_path),
-        "--report-only",   # 引擎退出码不承载审查结论，本项目自行裁决
-        "--quiet",
-    ]
-    if resolved_config and Path(resolved_config).exists():
-        cmd.extend(["--config", resolved_config])
-    if analyzers:
-        cmd.extend(["--engine-arg", "--analyzers", "--engine-arg", analyzers])
-    if diff_mode:
-        # 引擎 CLI 的 --diff = 基于 git status 的变更集扫描（只扫改动文件），本项目按其透传
-        cmd.extend(["--engine-arg", "--diff"])
-    if security_level:
-        cmd.extend(["--engine-arg", "--security-level", "--engine-arg", security_level])
-    if baseline:
-        cmd.extend(["--baseline", baseline])
-    if update_baseline:
-        cmd.extend(["--update-baseline", update_baseline])
-
+def _execute_refactor_process(cmd: list[str]) -> tuple[int, str, str]:
+    """执行 auto-refactor 引擎子进程并捕获输出。"""
     try:
         r = subprocess.run(
             cmd,
@@ -262,170 +406,102 @@ def run_refactor_audit(
             encoding="utf-8",
             errors="replace",
         )
+        return r.returncode, r.stdout, r.stderr
     except Exception as e:
         print(f"【WARN】调用 auto-refactor 执行异常: {e}，安全降级跳过。")
-        return 0
+        return 0, "", ""
 
-    if r.returncode not in (0, 1):
-        print(f"【WARN】auto-refactor 返回非零码 {r.returncode}: {r.stderr.strip()[:200]}，安全降级跳过。")
-        return 0
 
+def _parse_report_payload(raw_output: str, stderr: str) -> dict[str, Any] | None:
+    """从原始字符串解析 JSON 报告数据结构。"""
     try:
-        raw_output = report_path.read_text(encoding="utf-8")
-    except Exception:
-        print("【ERROR】auto-refactor 未产出报告文件，审查阻断（fail-closed）。")
-        return 2
-    finally:
-        try:
-            report_path.unlink(missing_ok=True)
-        except Exception:
-            pass
-
-    # 非 JSON 输出直通 (markdown / sarif / badge)
-    if cli_format in ("markdown", "sarif", "badge"):
-        print(raw_output)
-        return 0
-
-    try:
-        report: dict[str, Any] = json.loads(raw_output)
+        return json.loads(raw_output)
     except Exception:
         parsed = _extract_json_object(raw_output or "")
         if parsed is None:
             print("【ERROR】auto-refactor 输出无法解析为 JSON，审查阻断（fail-closed）：")
-            print((raw_output or r.stderr or "无输出")[:800])
-            return 2
-        report = parsed
+            print((raw_output or stderr or "无输出")[:800])
+        return parsed
 
-    if json_output:
+
+def _resolve_target_root(slice_name: str | None) -> Path:
+    """计算扫描目标根目录。"""
+    if not slice_name:
+        return ROOT
+    target = ROOT / slice_name
+    return target if target.exists() else ROOT
+
+
+def _resolve_cli_format(opts: RefactorAuditOptions) -> str:
+    """判定传给底层 runner 的输出格式。"""
+    if opts.json_output or opts.score_only:
+        return "json"
+    if opts.report_format in ("markdown", "sarif", "badge"):
+        return opts.report_format
+    return "json"
+
+
+def _read_temp_report(report_path: Path) -> str | None:
+    """读取并安全清理临时报告文件。"""
+    try:
+        return report_path.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    finally:
+        try:
+            report_path.unlink(missing_ok=True)
+        except OSError as unlink_err:
+            print(f"【WARN】清理临时报告失败: {unlink_err}", file=sys.stderr)
+
+
+def _dispatch_audit_output(report: dict[str, Any], opts: RefactorAuditOptions) -> int:
+    """派发审查报告输出或控制台卡片。"""
+    if opts.json_output:
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
+    return _render_audit_console_report(report, opts)
 
-    summary = report.get("summary", {})
-    files_scanned = summary.get("filesScanned", 0)
-    issues_total = summary.get("issuesTotal", 0)
-    by_sev = summary.get("bySeverity", {})
-    by_analyzer = summary.get("byAnalyzer", {})
-    duration_ms = summary.get("durationMs", 0)
-    suppressed = summary.get("suppressedCount", 0)
-    quality_score = report.get("qualityScore", {})
 
-    print(f"  • 扫描源文件数: {files_scanned} 个 | 引擎耗时: {duration_ms} ms | 规则抑制: {suppressed} 处")
-    print(f"  • 待优化项总计: {issues_total} 处 (ERROR {by_sev.get('error', 0)} / WARN {by_sev.get('warning', 0)} / INFO {by_sev.get('info', 0)})")
+def run_refactor_audit(opts: RefactorAuditOptions | None = None, **kwargs: Any) -> int:
+    """执行 auto-refactor 审查流水线。"""
+    active_opts = opts if opts is not None else RefactorAuditOptions(**kwargs)
+    mode_tag = "动态增量极速审查 (Dynamic Diff Mode)" if active_opts.diff_mode else "全量静态深度审查 (Full Static Mode)"
+    print("=" * LINE_WIDTH)
+    print(f"🔭 卡拉尔世界引擎：auto-refactor {mode_tag}")
+    print("=" * LINE_WIDTH)
 
-    analyzer_stats = " | ".join(f"{k}({v})" for k, v in sorted(by_analyzer.items()) if v > 0)
-    if analyzer_stats:
-        print(f"  • 分析器发现: {analyzer_stats}")
-    print("-" * 80)
+    runtime = _resolve_audit_runtime()
+    if not runtime:
+        return 0
+    node_bin, runner = runtime
 
-    # 渲染十维质量看板
-    if quality_score:
-        _render_quality_score_card(quality_score, show_detailed=score_only)
+    target_root = _resolve_target_root(active_opts.slice_name)
+    cli_format = _resolve_cli_format(active_opts)
+    report_path = Path(tempfile.gettempdir()) / f"webgames-auto-refactor-{os.getpid()}.json"
 
-    issues: list[dict[str, Any]] = report.get("issues", [])
-    complexity_issues = [it for it in issues if it.get("analyzer") == "complexity"]
-    large_file_issues = [it for it in issues if it.get("analyzer") == "large-file"]
-    duplicate_literal_issues = [it for it in issues if it.get("rule") == "duplicate-literal"]
-    perf_issues = [it for it in issues if it.get("analyzer") == "performance"]
-    arch_issues = [it for it in issues if it.get("analyzer") == "architecture"]
-    sec_issues = [it for it in issues if it.get("analyzer") in ("security", "secrets")]
-    governance_issues = [it for it in issues if it.get("analyzer") == "governance"]
-    hygiene_issues = [it for it in issues if it.get("analyzer") == "hygiene"]
+    cmd = _build_refactor_cmd(RefactorCommandContext(
+        node_bin=node_bin, runner=runner, target_root=target_root,
+        cli_format=cli_format, report_path=report_path, opts=active_opts,
+    ))
 
-    # 1. 圈复杂度告警
-    if complexity_issues:
-        print("🧠 单函数高圈复杂度发现 (Top 5):")
-        for iss in complexity_issues[:5]:
-            loc = iss.get("location", {})
-            file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
-            print(f"  ⚠️ [complexity] {file_loc} — {iss.get('message', '')}")
-            if iss.get("suggestion"):
-                print(f"     💡 建议: {iss.get('suggestion')}")
-        print("-" * 80)
+    ret_code, _stdout, stderr = _execute_refactor_process(cmd)
+    if ret_code not in (0, 1):
+        print(f"【WARN】auto-refactor 返回非零码 {ret_code}: {stderr.strip()[:200]}，安全降级跳过。")
+        return 0
 
-    # 2. 超大文件拆分建议
-    if large_file_issues:
-        print("📦 超大文件拆分候选 (Top 3):")
-        for iss in large_file_issues[:3]:
-            loc = iss.get("location", {})
-            file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
-            print(f"  ⚠️ [large-file] {file_loc} — {iss.get('message', '')}")
-        print("-" * 80)
+    raw_output = _read_temp_report(report_path)
+    if raw_output is None:
+        print("【ERROR】auto-refactor 未产出报告文件，审查阻断（fail-closed）。")
+        return 2
 
-    # 3. 高频重复字面量常量提炼建议
-    if duplicate_literal_issues:
-        print("💎 高频重复字面量常量提炼建议 (Top 3):")
-        for iss in duplicate_literal_issues[:3]:
-            loc = iss.get("location", {})
-            file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
-            val = iss.get("detail", {}).get("value", "")
-            occ = iss.get("detail", {}).get("occurrences", 0)
-            print(f"  💡 [constants] {file_loc} — 字面量「{val}」在文件中重复出现 {occ} 次")
-            if iss.get("suggestion"):
-                print(f"     ↳ 提炼建议: {iss.get('suggestion')}")
-        print("-" * 80)
+    if cli_format in ("markdown", "sarif", "badge"):
+        print(raw_output)
+        return 0
 
-    # 4. 性能与高承压隐患 (PRF-*)
-    if perf_issues:
-        print("⚡ 性能与高承压热点隐患 (Top 3):")
-        for iss in perf_issues[:3]:
-            loc = iss.get("location", {})
-            file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
-            print(f"  ⚠️ [performance/{iss.get('rule', '')}] {file_loc} — {iss.get('message', '')}")
-            if iss.get("suggestion"):
-                print(f"     💡 建议: {iss.get('suggestion')}")
-        print("-" * 80)
-
-    # 5. 架构分层契约 (ARCH-*)
-    if arch_issues:
-        print("🏗️ 架构分层契约守卫发现 (Top 3):")
-        for iss in arch_issues[:3]:
-            loc = iss.get("location", {})
-            file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
-            print(f"  ⚠️ [architecture/{iss.get('rule', '')}] {file_loc} — {iss.get('message', '')}")
-            if iss.get("suggestion"):
-                print(f"     💡 建议: {iss.get('suggestion')}")
-        print("-" * 80)
-
-    # 6. 安全与凭据合规 (SEC-*)
-    if sec_issues:
-        print("🛡️ 安全合规与凭据合规发现 (Top 3):")
-        for iss in sec_issues[:3]:
-            loc = iss.get("location", {})
-            file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
-            print(f"  ⚠️ [{iss.get('analyzer', '')}/{iss.get('rule', '')}] {file_loc} — {iss.get('message', '')}")
-            if iss.get("suggestion"):
-                print(f"     💡 建议: {iss.get('suggestion')}")
-        print("-" * 80)
-
-    # 7. 治理规则发现（GOV-*）
-    if governance_issues:
-        print("🏛️ 治理规范与静态类型发现 (Top 3):")
-        for iss in governance_issues[:3]:
-            loc = iss.get("location", {})
-            file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
-            print(f"  ⚠️ [governance/{iss.get('rule', '')}] {file_loc} — {iss.get('message', '')}")
-            if iss.get("suggestion"):
-                print(f"     💡 建议: {iss.get('suggestion')}")
-        print("-" * 80)
-
-    # 8. 代码卫生与命名发现 (HYG-*)
-    if hygiene_issues:
-        print("🧹 代码卫生与工程整洁度发现 (Top 3):")
-        for iss in hygiene_issues[:3]:
-            loc = iss.get("location", {})
-            file_loc = f"{loc.get('file', '')}:{loc.get('start', {}).get('line', 1)}"
-            print(f"  ⚠️ [hygiene/{iss.get('rule', '')}] {file_loc} — {iss.get('message', '')}")
-            if iss.get("suggestion"):
-                print(f"     💡 建议: {iss.get('suggestion')}")
-        print("-" * 80)
-
-    errors = by_sev.get("error", 0)
-    if strict and errors > 0:
-        print(f"【审查结论】--strict 模式未通过（存在 {errors} 处 error 级发现）")
-        return 1
-
-    print("【审查结论】通过（auto-refactor 静态度量与多维重构建议就绪）")
-    return 0
+    report = _parse_report_payload(raw_output, stderr)
+    if report is None:
+        return 2
+    return _dispatch_audit_output(report, active_opts)
 
 
 def main() -> int:
@@ -468,7 +544,7 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    return run_refactor_audit(
+    opts = RefactorAuditOptions(
         strict=args.strict,
         json_output=args.json,
         score_only=args.score,
@@ -483,6 +559,7 @@ def main() -> int:
         security_level=args.security_level,
         classify_literals=args.classify_literals,
     )
+    return run_refactor_audit(opts)
 
 
 if __name__ == "__main__":

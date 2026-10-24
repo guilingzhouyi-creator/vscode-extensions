@@ -24,6 +24,25 @@ SHAPE_CLOSE = {"[": "]", "(": ")", "{": "}"}
 SPECIAL_CHARS = set("[]{}()")
 
 
+def _match_bracket_closure(ln: str, start_idx: int, open_ch: str, close_ch: str) -> int | None:
+    """计算成对括号闭合位置，若未闭合返回 None。"""
+    depth, j = 1, start_idx
+    while j < len(ln) and depth:
+        if ln[j] == open_ch:
+            depth += 1
+        elif ln[j] == close_ch:
+            depth -= 1
+        j += 1
+    return j if depth == 0 else None
+
+
+def _is_unquoted_with_special_chars(content: str) -> bool:
+    """判定节点内容是否未整体加引号且含特殊符号。"""
+    if content.startswith('"') and content.endswith('"') and len(content) >= 2:
+        return False
+    return any(c in SPECIAL_CHARS for c in content)
+
+
 def scan_mermaid_line(ln: str) -> list:
     """扫描一行 mermaid 节点定义。
 
@@ -36,21 +55,13 @@ def scan_mermaid_line(ln: str) -> list:
         if not m:
             return hits
         open_ch = m.group(2)
-        close_ch = SHAPE_CLOSE[open_ch]
-        depth, j = 1, m.end()
-        while j < len(ln) and depth:
-            if ln[j] == open_ch:
-                depth += 1
-            elif ln[j] == close_ch:
-                depth -= 1
-            j += 1
-        if depth:                        # 本行括号未闭合：交给人工，不在此误报
+        close_pos = _match_bracket_closure(ln, m.end(), open_ch, SHAPE_CLOSE[open_ch])
+        if close_pos is None:
             return hits
-        content = ln[m.end():j - 1]
-        if not (content.startswith('"') and content.endswith('"') and len(content) >= 2):
-            if any(c in SPECIAL_CHARS for c in content):
-                hits.append((m.start(2), open_ch, content, j))
-        pos = j
+        content = ln[m.end():close_pos - 1]
+        if _is_unquoted_with_special_chars(content):
+            hits.append((m.start(2), open_ch, content, close_pos))
+        pos = close_pos
 
 
 def mermaid_fix_line(ln: str) -> tuple[str, int]:

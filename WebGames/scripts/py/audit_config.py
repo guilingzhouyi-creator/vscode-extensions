@@ -13,6 +13,7 @@
 # ==============================================================================
 """审查 config/ 目录与 game_config.gd 必需表清单的一致性。"""
 import argparse
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 import re
@@ -40,6 +41,7 @@ REQUIRED_RE = re.compile(r'^\s*"([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+)",?\s*$')
 
 
 def parse_required_tables() -> list[str]:
+    """从 game_config.gd 源码中静态解析 _required_tables 声明列表。"""
     if not GAME_CONFIG_GD.exists():
         return []
     tables: list[str] = []
@@ -58,6 +60,7 @@ def parse_required_tables() -> list[str]:
 
 
 def check_keys(obj: Any, path: str, violations: list[str], table: str) -> None:
+    """递归校验配置 JSON 对象的键名命名规范（snake_case）。"""
     if isinstance(obj, dict):
         for k, v in obj.items():
             if not KEY_RE.match(k):
@@ -68,23 +71,34 @@ def check_keys(obj: Any, path: str, violations: list[str], table: str) -> None:
             check_keys(v, f"{path}/{i}", violations, table)
 
 
-def check_format(f: Path, raw: bytes, text: str, obj: Any, rel: str, violations: list[str], fix: bool = False) -> None:
+@dataclass(slots=True)
+class FormatCheckPayload:
+    """配置格式校验入参载荷 (GOV-DAT-001)。"""
+
+    file_path: Path
+    raw_bytes: bytes
+    text: str
+    obj: Any
+    rel: Any
+
+
+def check_format(p: FormatCheckPayload, violations: list[str], fix: bool = False) -> None:
     """格式一致性：对照 .editorconfig（UTF-8 无 BOM / LF / 2 空格规范序列化 / 末行换行）。
 
     规范序列化 = json.dumps(ensure_ascii=False, indent=2)；值等价性由解析比对保证，
     仅约束文本形态（键序保持原样），任何值语义差异不由本规则管辖。
     支持 --fix 原位安全写回。单趟复用已读取 raw 与已解析 obj。
     """
-    rel_posix = str(rel).replace("\\", "/")
-    has_bom = raw.startswith(b"\xef\xbb\xbf")
-    has_crlf = b"\r\n" in raw
-    missing_nl = raw and not raw.endswith(b"\n")
-    canon = json.dumps(obj, ensure_ascii=False, indent=2) + "\n"
+    rel_posix = str(p.rel).replace("\\", "/")
+    has_bom = p.raw_bytes.startswith(b"\xef\xbb\xbf")
+    has_crlf = b"\r\n" in p.raw_bytes
+    missing_nl = p.raw_bytes and not p.raw_bytes.endswith(b"\n")
+    canon = json.dumps(p.obj, ensure_ascii=False, indent=2) + "\n"
     canon_bytes = canon.encode("utf-8")
-    non_canon = (text != canon)
+    non_canon = (p.text != canon)
 
     if fix and (has_bom or has_crlf or missing_nl or non_canon):
-        f.write_bytes(canon_bytes)
+        p.file_path.write_bytes(canon_bytes)
         print(f"  [格式修复] 已原位规范化: {rel_posix}")
         return
 
@@ -111,24 +125,29 @@ class JsonPathResolver:
         return JsonPathResolver._traverse(data, parts, "")
 
     @staticmethod
+    def _traverse_wildcard(node: Any, tail: list[str], current_path: str) -> list[tuple[str, Any]]:
+        results = []
+        if isinstance(node, list):
+            for idx, item in enumerate(node):
+                elem_path = f"{current_path}[{idx}]" if current_path else f"[{idx}]"
+                results.extend(JsonPathResolver._traverse(item, tail, elem_path))
+        elif isinstance(node, dict):
+            for k, v in node.items():
+                elem_path = f"{current_path}/{k}" if current_path else k
+                results.extend(JsonPathResolver._traverse(v, tail, elem_path))
+        return results
+
+    @staticmethod
     def _traverse(node: Any, parts: list[str], current_path: str) -> Any:
         if not parts:
             return [(current_path, node)]
         head, *tail = parts
-        results = []
         if head == "*":
-            if isinstance(node, list):
-                for idx, item in enumerate(node):
-                    elem_path = f"{current_path}[{idx}]" if current_path else f"[{idx}]"
-                    results.extend(JsonPathResolver._traverse(item, tail, elem_path))
-            elif isinstance(node, dict):
-                for k, v in node.items():
-                    elem_path = f"{current_path}/{k}" if current_path else k
-                    results.extend(JsonPathResolver._traverse(v, tail, elem_path))
-        elif isinstance(node, dict) and head in node:
+            return JsonPathResolver._traverse_wildcard(node, tail, current_path)
+        if isinstance(node, dict) and head in node:
             next_path = f"{current_path}/{head}" if current_path else head
-            results.extend(JsonPathResolver._traverse(node[head], tail, next_path))
-        return results
+            return JsonPathResolver._traverse(node[head], tail, next_path)
+        return []
 
 
 MAGIC_CONDITION_OPS = {"AND", "OR", "NOT", "LEAF"}
@@ -167,6 +186,7 @@ class DeclarativeRuleEvaluator:
             self.rules_by_target.setdefault(tf, []).append(r)
 
     def evaluate_file(self, data: dict, rel_posix: str, violations: list[str]) -> None:
+        """针对指定配置表文件分发执行匹配的原语审查规则。"""
         rules = self.rules_by_target.get(rel_posix, [])
         for r in rules:
             self._evaluate_rule(r, data, rel_posix, violations)
@@ -179,16 +199,15 @@ class DeclarativeRuleEvaluator:
             handler(ctx)
 
 
+@dataclass(slots=True)
 class RuleContext:
     """封装单条规则的求值上下文，消除多参代码坏味道。"""
-    __slots__ = ("rule", "data", "rel_posix", "violations", "all_configs")
 
-    def __init__(self, rule: dict, data: dict, rel_posix: str, violations: list[str], all_configs: dict) -> None:
-        self.rule = rule
-        self.data = data
-        self.rel_posix = rel_posix
-        self.violations = violations
-        self.all_configs = all_configs
+    rule: dict
+    data: dict
+    rel_posix: str
+    violations: list[str]
+    all_configs: dict
 
 
 def _eval_positive_num(ctx: RuleContext) -> None:
@@ -241,6 +260,11 @@ def _eval_bounded_range(ctx: RuleContext) -> None:
                 violations.append(f"{rule_id}: {rel_posix} {loc} 必须在 [{min_v}, {max_v}]（实测 {v}）")
 
 
+def _is_valid_numeric(v: Any) -> bool:
+    """判定变量是否为有效数值且非布尔值。"""
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
 def _eval_range_ordered(ctx: RuleContext) -> None:
     rule, data, rel_posix, violations = ctx.rule, ctx.data, ctx.rel_posix, ctx.violations
     params = rule.get("params", {})
@@ -252,7 +276,7 @@ def _eval_range_ordered(ctx: RuleContext) -> None:
     l_val, r_val = lefts[0][1], rights[0][1]
     if l_val is None or r_val is None:
         return
-    if not isinstance(l_val, (int, float)) or not isinstance(r_val, (int, float)) or isinstance(l_val, bool) or isinstance(r_val, bool):
+    if not _is_valid_numeric(l_val) or not _is_valid_numeric(r_val):
         return
     strict = params.get("strict_less", True)
     bad = (l_val >= r_val) if strict else (l_val > r_val)
@@ -306,26 +330,36 @@ def _eval_required_sections(ctx: RuleContext) -> None:
             violations.append(f"{rule_id}: {rel_posix} {sec_name} 必须为数组")
 
 
+def _validate_field_type(
+    val: Any,
+    f_type: str,
+    f_name: str,
+    target_prefix: str,
+    violations: list[str],
+) -> None:
+    """校验单字段强类型约束 (GOV-DAT-001)。"""
+    if val is None:
+        violations.append(f"{target_prefix} 缺 {f_name}")
+    elif f_type == "non_empty_str" and (not isinstance(val, str) or not val.strip()):
+        violations.append(f"{target_prefix}.{f_name} 必须为非空字符串")
+    elif f_type == "str" and not isinstance(val, str):
+        violations.append(f"{target_prefix}.{f_name} 必须为字符串")
+    elif f_type == "list" and not isinstance(val, list):
+        violations.append(f"{target_prefix}.{f_name} 必须为数组")
+
+
 def _validate_single_elem_fields(
     elem: dict,
     req_fields: dict,
     op_whitelist: set | None,
-    loc_prefix: str,
-    rule_id: str,
+    target_prefix: str,
     violations: list[str],
 ) -> None:
+    """校验单元素内必需字段集合与操作符白名单。"""
     for f_name, f_type in req_fields.items():
-        val = elem.get(f_name)
-        if val is None:
-            violations.append(f"{rule_id}: {loc_prefix} 缺 {f_name}")
-        elif f_type == "non_empty_str" and (not isinstance(val, str) or not val.strip()):
-            violations.append(f"{rule_id}: {loc_prefix}.{f_name} 必须为非空字符串")
-        elif f_type == "str" and not isinstance(val, str):
-            violations.append(f"{rule_id}: {loc_prefix}.{f_name} 必须为字符串")
-        elif f_type == "list" and not isinstance(val, list):
-            violations.append(f"{rule_id}: {loc_prefix}.{f_name} 必须为数组")
+        _validate_field_type(elem.get(f_name), f_type, f_name, target_prefix, violations)
     if op_whitelist and elem.get("operator") not in op_whitelist:
-        violations.append(f"{rule_id}: {loc_prefix}.operator 非法: {elem.get('operator')}")
+        violations.append(f"{target_prefix}.operator 非法: {elem.get('operator')}")
 
 
 def _eval_array_elements_schema(ctx: RuleContext) -> None:
@@ -342,11 +376,11 @@ def _eval_array_elements_schema(ctx: RuleContext) -> None:
             continue
         elems = [target] if single_obj and isinstance(target, dict) else (target if isinstance(target, list) else [])
         for idx, elem in enumerate(elems):
-            loc_prefix = f"{rel_posix} {loc}[{idx}]"
+            target_prefix = f"{rule_id}: {rel_posix} {loc}[{idx}]"
             if not isinstance(elem, dict):
-                violations.append(f"{rule_id}: {loc_prefix} 必须为对象")
+                violations.append(f"{target_prefix} 必须为对象")
                 continue
-            _validate_single_elem_fields(elem, req_fields, op_whitelist, loc_prefix, rule_id, violations)
+            _validate_single_elem_fields(elem, req_fields, op_whitelist, target_prefix, violations)
 
 
 def _eval_cross_field_dependency(ctx: RuleContext) -> None:
@@ -394,21 +428,20 @@ def _eval_condition_tree(ctx: RuleContext) -> None:
 
 def _validate_dict_weights(
     d: dict,
-    loc: str,
-    rule_id: str,
-    rel_posix: str,
+    target_prefix: str,
     target_sum: float,
     tol: float,
     violations: list[str],
 ) -> None:
+    """校验字典权重总和是否在公差范围内 (GOV-DAT-001)。"""
     total = 0.0
     for k, w in d.items():
         if not isinstance(w, (int, float)) or isinstance(w, bool) or w < 0.0:
-            violations.append(f"{rule_id}: {rel_posix} {loc}.{k} 必须为非负数值")
+            violations.append(f"{target_prefix}.{k} 必须为非负数值")
         else:
             total += float(w)
     if abs(total - target_sum) > tol:
-        violations.append(f"{rule_id}: {rel_posix} {loc} 合计应 ≈ {target_sum}（实测 {total:.3f}）")
+        violations.append(f"{target_prefix} 合计应 ≈ {target_sum}（实测 {total:.3f}）")
 
 
 def _eval_weights_sum(ctx: RuleContext) -> None:
@@ -420,7 +453,8 @@ def _eval_weights_sum(ctx: RuleContext) -> None:
     tol = params.get("tolerance", 0.01)
     for loc, d in matches:
         if isinstance(d, dict):
-            _validate_dict_weights(d, loc, rule_id, rel_posix, target_sum, tol, violations)
+            target_prefix = f"{rule_id}: {rel_posix} {loc}"
+            _validate_dict_weights(d, target_prefix, target_sum, tol, violations)
 
 
 PRIMITIVE_DISPATCHER = {
@@ -450,40 +484,62 @@ def _preload_all_configs(files: list[Path]) -> dict:
     return all_configs
 
 
+@dataclass(slots=True)
+class FileAuditState:
+    """单个配置文件审计环境状态 (GOV-DAT-001)。"""
+
+    evaluator: DeclarativeRuleEvaluator
+    fix: bool
+    violations: list[str]
+    found_tables: set[str]
+    invalid_tables: set[str]
+
+
+@dataclass(slots=True)
+class AuditReportContext:
+    """审计报告生成参数上下文 (GOV-DAT-001)。"""
+
+    total_tables: int
+    invalid_tables_count: int
+    required_count: int
+    arch_results: list[dict]
+    all_violations: list[str]
+    warnings: list[str]
+    strict: bool
+    report_path: str
+
+
 def _audit_single_config_file(
     f: Path,
-    evaluator: DeclarativeRuleEvaluator,
-    fix: bool,
-    violations: list[str],
-    found_tables: set[str],
-    invalid_tables: set[str],
+    state: FileAuditState,
 ) -> None:
     """审计单张 JSON 格式配置表。"""
     rel = f.relative_to(CONFIG_DIR)
     rel_posix = str(rel).replace("\\", "/")
     layer = rel.parts[0] if len(rel.parts) > 1 else ""
     if layer not in LAYERS:
-        violations.append(f"配置文件层级非法: {rel_posix}（应为 {sorted(LAYERS)} 之一）")
-        invalid_tables.add(rel_posix)
+        state.violations.append(f"配置文件层级非法: {rel_posix}（应为 {sorted(LAYERS)} 之一）")
+        state.invalid_tables.add(rel_posix)
     table = ".".join(rel.with_suffix("").parts)
-    found_tables.add(table)
+    state.found_tables.add(table)
     try:
         raw = f.read_bytes()
         raw_text = raw.decode("utf-8-sig")
         data = json.loads(raw_text)
     except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
-        violations.append(f"JSON 解析失败: {rel_posix} ({e})")
-        invalid_tables.add(table)
+        state.violations.append(f"JSON 解析失败: {rel_posix} ({e})")
+        state.invalid_tables.add(table)
         return
     if not isinstance(data, dict):
-        violations.append(f"顶层必须为 JSON 对象: {rel_posix}")
-        invalid_tables.add(table)
-    v_before = len(violations)
-    check_keys(data, "", violations, table)
-    check_format(f, raw, raw_text, data, rel, violations, fix=fix)
-    evaluator.evaluate_file(data, rel_posix, violations)
-    if len(violations) > v_before:
-        invalid_tables.add(table)
+        state.violations.append(f"顶层必须为 JSON 对象: {rel_posix}")
+        state.invalid_tables.add(table)
+    v_before = len(state.violations)
+    check_keys(data, "", state.violations, table)
+    format_payload = FormatCheckPayload(file_path=f, raw_bytes=raw, text=raw_text, obj=data, rel=rel)
+    check_format(format_payload, state.violations, fix=state.fix)
+    state.evaluator.evaluate_file(data, rel_posix, state.violations)
+    if len(state.violations) > v_before:
+        state.invalid_tables.add(table)
 
 
 def _run_arch_checks_if_enabled(enabled: bool) -> tuple[list[dict], list[str]]:
@@ -505,22 +561,15 @@ def _run_arch_checks_if_enabled(enabled: bool) -> tuple[list[dict], list[str]]:
 
 
 def _generate_audit_report(
-    total_tables: int,
-    invalid_tables_count: int,
-    required_count: int,
-    arch_results: list[dict],
-    all_violations: list[str],
-    warnings: list[str],
-    strict: bool,
-    report_path: str,
+    ctx: AuditReportContext,
 ) -> bool:
     """生成并落盘 JSON 审查聚合报告，计算贝叶斯置信度契约得分。"""
-    arch_checks_count = len(arch_results)
-    total_checks = total_tables + required_count + arch_checks_count
-    err_count = len(all_violations)
-    warn_count = len(warnings)
-    pass_checks = max(0, total_checks - err_count - (warn_count if strict else 0))
-    is_passed = (err_count == 0) and not (strict and warn_count > 0)
+    arch_checks_count = len(ctx.arch_results)
+    total_checks = ctx.total_tables + ctx.required_count + arch_checks_count
+    err_count = len(ctx.all_violations)
+    warn_count = len(ctx.warnings)
+    pass_checks = max(0, total_checks - err_count - (warn_count if ctx.strict else 0))
+    is_passed = (err_count == 0) and not (ctx.strict and warn_count > 0)
 
     bayesian_ratio = (pass_checks + 0.5) / (total_checks + 1.0)
     credible_contract_score = max(0.0, round((100.0 * bayesian_ratio) - (warn_count * 0.035) - (err_count * 5.0), 2))
@@ -543,14 +592,14 @@ def _generate_audit_report(
                 "error": err_count,
             },
             "tables": {
-                "total": total_tables,
-                "required": required_count,
-                "passed": total_tables - invalid_tables_count,
+                "total": ctx.total_tables,
+                "required": ctx.required_count,
+                "passed": ctx.total_tables - ctx.invalid_tables_count,
             },
             "architecture": {
                 "evaluated": arch_checks_count > 0,
                 "totalChecks": arch_checks_count,
-                "passChecks": sum(1 for r in arch_results if r.get("passed")),
+                "passChecks": sum(1 for r in ctx.arch_results if r.get("passed")),
             },
             "bayesianConfidence": {
                 "prior": "Jeffreys Beta(0.5, 0.5)",
@@ -558,11 +607,11 @@ def _generate_audit_report(
                 "credibleScore": credible_contract_score,
             },
         },
-        "violations": all_violations,
-        "warnings": warnings,
+        "violations": ctx.all_violations,
+        "warnings": ctx.warnings,
     }
 
-    report_dest = Path(report_path) if report_path else (ROOT / "reports" / "audit-latest.json")
+    report_dest = Path(ctx.report_path) if ctx.report_path else (ROOT / "reports" / "audit-latest.json")
     try:
         report_dest.parent.mkdir(parents=True, exist_ok=True)
         report_dest.write_text(json.dumps(report_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
@@ -573,6 +622,7 @@ def _generate_audit_report(
 
 
 def main() -> int:
+    """CLI 入口：全域配置表物理格式与架构护栏一致性审查。"""
     ap = argparse.ArgumentParser(description="WebGames 配置表与架构护栏一致性审查引擎")
     ap.add_argument("--strict", action="store_true", help="必需表缺失也视为失败")
     ap.add_argument("--fix", action="store_true", help="自动修复 JSON 格式（无 BOM / LF / 2 空格规范序列化 / 末行换行）")
@@ -593,8 +643,15 @@ def main() -> int:
     all_configs = _preload_all_configs(files)
     evaluator = DeclarativeRuleEvaluator(rule_db, all_configs)
 
+    audit_state = FileAuditState(
+        evaluator=evaluator,
+        fix=args.fix,
+        violations=violations,
+        found_tables=found_tables,
+        invalid_tables=invalid_tables,
+    )
     for f in files:
-        _audit_single_config_file(f, evaluator, args.fix, violations, found_tables, invalid_tables)
+        _audit_single_config_file(f, audit_state)
 
     required = parse_required_tables()
     if not required:
@@ -605,16 +662,17 @@ def main() -> int:
 
     arch_results, arch_violations = _run_arch_checks_if_enabled(args.arch)
     all_violations = violations + arch_violations
-    is_passed = _generate_audit_report(
-        len(found_tables),
-        len(invalid_tables),
-        len(required),
-        arch_results,
-        all_violations,
-        warnings,
-        args.strict,
-        args.report,
+    report_ctx = AuditReportContext(
+        total_tables=len(found_tables),
+        invalid_tables_count=len(invalid_tables),
+        required_count=len(required),
+        arch_results=arch_results,
+        all_violations=all_violations,
+        warnings=warnings,
+        strict=args.strict,
+        report_path=args.report,
     )
+    is_passed = _generate_audit_report(report_ctx)
 
     summary_tag = f"【audit-config】配置表: {len(found_tables)} 张 / 必需表: {len(required)} 张"
     if args.arch:

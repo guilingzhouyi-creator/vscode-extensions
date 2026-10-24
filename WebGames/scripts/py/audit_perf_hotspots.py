@@ -12,10 +12,13 @@
 #   python scripts/py/audit_perf_hotspots.py --json
 # ==============================================================================
 """扫描 backend/ GDScript 的静态性能热点（提示级，供人工复核）。"""
+from __future__ import annotations
+
 import argparse
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
 from audit_common import GD_LOOP_HEAD_RE, GD_GAMECONFIG_GETTER_RE
@@ -44,72 +47,94 @@ CHECKS = {
 
 
 def leading_ws(line: str) -> int:
+    """计算行首缩进空格数。"""
     return len(line) - len(line.lstrip())
 
 
+def _check_in_loop_patterns(ln: str, i: int, note_fn: Any) -> None:
+    """检查循环体内的热点反模式。"""
+    if CONFIG_IN_LOOP_RE.search(ln):
+        note_fn("config", i, ln.strip())
+    if LINEAR_FIND_RE.search(ln):
+        note_fn("find", i, ln.strip())
+    if STRING_BUILD_RE.search(ln):
+        note_fn("strbuild", i, ln.strip())
+    if DEBUG_EMIT_RE.search(ln):
+        note_fn("debug", i, ln.strip())
+    if HEAP_ALLOC_RE.search(ln):
+        note_fn("heap_alloc", i, ln.strip())
+
+
+def _handle_loop_header(ln: str, indent: int, i: int, stack: list[int], note_fn: Any) -> None:
+    """处理循环语句头并维护缩进栈。"""
+    while stack and stack[-1] >= indent:
+        stack.pop()
+    stack.append(indent)
+    if len(stack) >= 2:
+        note_fn("nested", i, ln.strip())
+
+
+def _process_code_line(
+    ln: str, i: int, stack: list[int], note: Callable[[str, int, str], None]
+) -> int:
+    """处理单行代码并追踪循环栈与热点。"""
+    indent = leading_ws(ln)
+    if LOOP_RE.match(ln):
+        _handle_loop_header(ln, indent, i, stack, note)
+        return 1
+
+    while stack and indent <= stack[-1]:
+        stack.pop()
+
+    if stack and indent > stack[-1]:
+        _check_in_loop_patterns(ln, i, note)
+    return 0
+
+
+def _record_hotspot_findings(
+    rel: Path, loop_total: int, counts: dict[str, int], examples: list[str], findings: list[str]
+) -> None:
+    """组装并记录性能热点汇总行。"""
+    total = sum(counts.values())
+    if not (total or loop_total):
+        return
+    detail = "  例: " + "; ".join(examples) if examples else ""
+    findings.append(
+        f"{rel}: 循环 {loop_total} / 嵌套 {counts['nested']} / 配置读取 {counts['config']} "
+        f"/ 线性查找 {counts['find']} / 字符串构建 {counts['strbuild']} / 调试广播 {counts['debug']} "
+        f"/ 瞬态堆分配 {counts['heap_alloc']}{detail}"
+    )
+
+
 def audit_file(path: Path, findings: list[str]) -> None:
+    """扫描单个 GDScript 文件中的循环与热点模式。"""
     rel = path.relative_to(ROOT)
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
-    except UnicodeDecodeError:
+    except (UnicodeDecodeError, OSError):
         return
 
     counts = {k: 0 for k in CHECKS}
     loop_total = 0
-    stack: list[int] = []  # 循环行缩进栈
+    stack: list[int] = []
     examples: list[str] = []
 
     def note(kind: str, lineno: int, snippet: str) -> None:
+        """记录热点统计与前 6 处样例。"""
         counts[kind] += 1
         if len(examples) < 6:
             examples.append(f"L{lineno} {CHECKS[kind]}: {snippet.strip()[:72]}")
 
     for i, ln in enumerate(lines, 1):
         stripped = ln.lstrip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        indent = leading_ws(ln)
+        if stripped and not stripped.startswith("#"):
+            loop_total += _process_code_line(ln, i, stack, note)
 
-        if LOOP_RE.match(ln):
-            loop_total += 1
-            while stack and stack[-1] > indent:
-                stack.pop()
-            # 同缩进的兄弟循环视为并列（先弹掉同层再入栈）
-            while stack and stack[-1] == indent:
-                stack.pop()
-            stack.append(indent)
-            if len(stack) >= 2:
-                note("nested", i, ln.strip())
-            continue
-
-        # 退出循环检测：当前行缩进小于或等于栈顶循环缩进，说明已退出循环体
-        while stack and indent <= stack[-1]:
-            stack.pop()
-
-        # 循环体内检查：栈顶循环的缩进小于当前行缩进
-        if stack and indent > stack[-1]:
-            if CONFIG_IN_LOOP_RE.search(ln):
-                note("config", i, ln.strip())
-            if LINEAR_FIND_RE.search(ln):
-                note("find", i, ln.strip())
-            if STRING_BUILD_RE.search(ln):
-                note("strbuild", i, ln.strip())
-            if DEBUG_EMIT_RE.search(ln):
-                note("debug", i, ln.strip())
-            if HEAP_ALLOC_RE.search(ln):
-                note("heap_alloc", i, ln.strip())
-
-    total = sum(counts.values())
-    if total or loop_total:
-        detail = "  例: " + "; ".join(examples) if examples else ""
-        findings.append(
-            f"{rel}: 循环 {loop_total} / 嵌套 {counts['nested']} / 配置读取 {counts['config']} "
-            f"/ 线性查找 {counts['find']} / 字符串构建 {counts['strbuild']} / 调试广播 {counts['debug']} "
-            f"/ 瞬态堆分配 {counts['heap_alloc']}{detail}"
-        )
+    _record_hotspot_findings(rel, loop_total, counts, examples, findings)
 
 
 def main() -> int:
+    """CLI 入口：扫描 backend/**/*.gd 循环内热点反模式。"""
     ap = argparse.ArgumentParser()
     ap.add_argument("--strict", action="store_true", help="有发现即返回 1")
     args = ap.parse_args()

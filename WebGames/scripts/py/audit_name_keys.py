@@ -52,21 +52,33 @@ def collect_magic_keys() -> List[str]:
     return keys
 
 
+def _extract_item_loc_keys(file_path: Path) -> List[str]:
+    """读取单个物品配置 JSON 文件并提取 loc_name_key。"""
+    try:
+        data = json.loads(file_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    raw_items = data.get("items")
+    items_iter: Any = []
+    if isinstance(raw_items, dict):
+        items_iter = raw_items.values()
+    elif isinstance(raw_items, list):
+        items_iter = raw_items
+
+    loc_keys: List[str] = []
+    for it in items_iter:
+        if isinstance(it, dict):
+            nk = str(it.get("loc_name_key", ""))
+            if nk:
+                loc_keys.append(nk)
+    return loc_keys
+
+
 def collect_item_keys() -> List[str]:
     """收集物品域名称键：config/items/*.json 的 loc_name_key。"""
     keys: List[str] = []
-    item_files = sorted((CONFIG / "items").glob("*.json"))
-    for f in item_files:
-        data = json.loads(f.read_text(encoding="utf-8"))
-        items = data.get("items", [])
-        if isinstance(items, dict):
-            items = list(items.values())
-        if isinstance(items, list):
-            for it in items:
-                if isinstance(it, dict):
-                    nk = str(it.get("loc_name_key", ""))
-                    if nk:
-                        keys.append(nk)
+    for f in sorted((CONFIG / "items").glob("*.json")):
+        keys.extend(_extract_item_loc_keys(f))
     return keys
 
 

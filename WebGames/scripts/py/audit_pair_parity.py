@@ -153,6 +153,7 @@ def check_line_endings(violations: list, hints: list) -> None:
 
 
 def main() -> int:
+    """CLI 入口：检查跨平台脚本同构配对性与行尾换行符一致性。"""
     violations: list = []
     hints: list = []
     pairs = 0

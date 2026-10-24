@@ -15,6 +15,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 from audit_common import ensure_utf8_stdout, resolve_repo_root
 
 ensure_utf8_stdout()
@@ -93,23 +94,28 @@ def _validate_rates(rates: dict, violations: list) -> None:
             violations.append(f"[Gacha概率越界] rates.{key} = {val} 超出 [0.0, 1.0] 合法值域")
 
 
-def _validate_pity_thresholds(pity: dict, violations: list) -> None:
-    """校验保底软硬阈值、步进递增与绝对保底率。"""
-    soft = pity.get("soft_threshold")
-    hard = pity.get("hard_threshold")
-    inc = pity.get("soft_increment_per_pull")
-    guaranteed = pity.get("hard_guaranteed_rate")
-
+def _validate_pity_bounds(soft: Any, hard: Any, violations: list) -> None:
+    """校验保底软硬阈值上下界。"""
     if not isinstance(soft, int) or soft <= 0:
         violations.append(f"[Gacha保底非法] pity.soft_threshold = {soft} 必须为正整数")
     if not isinstance(hard, int) or hard <= 0:
         violations.append(f"[Gacha保底非法] pity.hard_threshold = {hard} 必须为正整数")
     if isinstance(soft, int) and isinstance(hard, int) and soft >= hard:
         violations.append(f"[Gacha保底倒挂] soft_threshold({soft}) 必须严格小于 hard_threshold({hard})")
+
+
+def _validate_pity_rates(inc: Any, guaranteed: Any, violations: list) -> None:
+    """校验保底递增步长与绝对保底率。"""
     if not isinstance(inc, (int, float)) or inc <= 0.0 or inc > 1.0:
         violations.append(f"[Gacha步进越界] pity.soft_increment_per_pull = {inc} 必须在 (0.0, 1.0] 之间")
     if guaranteed != 1.0:
         violations.append(f"[Gacha绝对保底非法] pity.hard_guaranteed_rate = {guaranteed} 必须严格为 1.0")
+
+
+def _validate_pity_thresholds(pity: dict, violations: list) -> None:
+    """校验保底软硬阈值、步进递增与绝对保底率。"""
+    _validate_pity_bounds(pity.get("soft_threshold"), pity.get("hard_threshold"), violations)
+    _validate_pity_rates(pity.get("soft_increment_per_pull"), pity.get("hard_guaranteed_rate"), violations)
 
 
 def check_gacha_rates_and_pity(violations: list) -> dict:
@@ -133,6 +139,7 @@ def check_gacha_rates_and_pity(violations: list) -> dict:
 
 
 def run_cdc_audit() -> int:
+    """CLI 入口：执行全域配置驱动收口与单一真源 (CDC) 完整性审查。"""
     print("=" * 80)
     print("🛡️ 卡拉尔世界引擎：配置驱动收口与单一真源审查")
     print("=" * 80)

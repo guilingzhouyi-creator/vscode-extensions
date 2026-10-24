@@ -23,9 +23,11 @@ ensure_utf8_stdout()
 ROOT = resolve_repo_root()
 REPORTS_DIR = ROOT / "benchmarks" / "reports"
 BASELINE_PATH = REPORTS_DIR / "baseline.json"
+NL = "\n"
 
 
 def load(path: Path) -> dict:
+    """安全读取基准测试 JSON 报告文件。"""
     try:
         return load_json(path)
     except Exception as e:
@@ -34,6 +36,7 @@ def load(path: Path) -> dict:
 
 
 def newest_report() -> Path:
+    """定位 reports/ 目录下修改时间最新的基准测试报告文件。"""
     files = sorted(
         REPORTS_DIR.glob("bench_*.json"),
         key=lambda p: p.stat().st_mtime,
@@ -46,6 +49,7 @@ def newest_report() -> Path:
 
 
 def metric_map(report: dict) -> dict[str, float]:
+    """提取报告中所有压测指标的名称与每秒操作数映射。"""
     out: dict[str, float] = {}
     for cat in report.get("categories", []):
         for m in cat.get("metrics", []):
@@ -54,10 +58,11 @@ def metric_map(report: dict) -> dict[str, float]:
 
 
 def render_table(rows: list[tuple]) -> str:
+    """渲染基准测试指标统计 Markdown 表格。"""
     lines = ["| 指标 | 迭代次数 | 耗时(ms) | 吞吐量 (ops/s) |", "|---|---:|---:|---:|"]
     for name, iters, ms, ops in rows:
         lines.append(f"| {name} | {iters} | {ms:.1f} | {ops:,.1f} |")
-    return "\n".join(lines)
+    return NL.join(lines)
 
 
 def promote() -> int:
@@ -67,7 +72,7 @@ def promote() -> int:
     data["promoted_from"] = cur.name
     data["promoted_at"] = datetime.datetime.now().isoformat(timespec="seconds")
     BASELINE_PATH.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        json.dumps(data, indent=2, ensure_ascii=False) + NL, encoding="utf-8"
     )
     print(f"【report-aggregate】基线已晋升: {cur.name} → {BASELINE_PATH.name}")
     return 0
@@ -107,7 +112,7 @@ def run_gate(base_path: Path, cur_path: Path, threshold: float) -> int:
     for n in removed:
         lines.append(f"| {n} | {bm[n]:,.1f} | — | — | 基线独有 |")
 
-    print("\n".join(lines))
+    print(NL.join(lines))
     if regressions:
         print(f"【性能门禁】未通过: {len(regressions)} 项回退超过 {threshold:g}%")
         for name, o, m, d in regressions:
@@ -117,7 +122,50 @@ def run_gate(base_path: Path, cur_path: Path, threshold: float) -> int:
     return 0
 
 
+def _build_compare_markdown(old_path: Path, new_path: Path) -> str:
+    """构建两份基准报告对比的 Markdown 文本。"""
+    old, new = load(old_path), load(new_path)
+    om, nm = metric_map(old), metric_map(new)
+    names = sorted(set(om) | set(nm))
+    lines = [
+        f"# 基准对比: {old_path.name} → {new_path.name}",
+        "",
+        "| 指标 | 旧 (ops/s) | 新 (ops/s) | 变化 | 判定 |",
+        "|---|---:|---:|---:|:--:|",
+    ]
+    for n in names:
+        o, m = om.get(n), nm.get(n)
+        if o is None or m is None:
+            lines.append(f"| {n} | {o or '—'} | {m or '—'} | — | 新增/缺失 |")
+            continue
+        d = (m - o) / o * 100
+        verdict = "🔺" if d >= 5 else ("🔻" if d <= -5 else "—")
+        lines.append(f"| {n} | {o:,.1f} | {m:,.1f} | {d:+.1f}% | {verdict} |")
+    return NL.join(lines)
+
+
+def _build_latest_markdown() -> str:
+    """构建最新基准报告的吞吐量基线 Markdown 文本。"""
+    rep = load(newest_report())
+    rows: list[tuple] = []
+    for cat in rep.get("categories", []):
+        for m in cat.get("metrics", []):
+            rows.append((m["name"], m["iterations"], m["elapsed_us"] / 1000.0, m["ops_per_sec"]))
+    rows.sort(key=lambda r: r[3], reverse=True)
+    lines = [
+        "# 卡拉尔世界引擎 · 吞吐量基线表",
+        "",
+        f"- 引擎: {rep.get('engine', '?')}  Godot: {rep.get('godot_version', '?')}",
+        f"- 时间: {rep.get('timestamp', '?')}  主机: {rep.get('host', '?')}",
+        f"- 报告: {newest_report().name}",
+        "",
+        render_table(rows),
+    ]
+    return NL.join(lines)
+
+
 def main() -> int:
+    """CLI 入口：基准测试报告聚合、版本差异比对与性能门禁判定。"""
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", help="输出 Markdown 文件路径（缺省输出到 stdout）")
     ap.add_argument("--compare", nargs=2, metavar=("OLD", "NEW"), help="对比两版本报告")
@@ -132,46 +180,15 @@ def main() -> int:
     if args.gate is not None:
         base = Path(args.base) if args.base else BASELINE_PATH
         return run_gate(base, newest_report(), args.gate)
+
     if args.compare:
-        old, new = load(Path(args.compare[0])), load(Path(args.compare[1]))
-        om, nm = metric_map(old), metric_map(new)
-        names = sorted(set(om) | set(nm))
-        lines = [
-            f"# 基准对比: {Path(args.compare[0]).name} → {Path(args.compare[1]).name}",
-            "",
-            "| 指标 | 旧 (ops/s) | 新 (ops/s) | 变化 | 判定 |",
-            "|---|---:|---:|---:|:--:|",
-        ]
-        for n in names:
-            o, m = om.get(n), nm.get(n)
-            if o is None or m is None:
-                lines.append(f"| {n} | {o or '—'} | {m or '—'} | — | 新增/缺失 |")
-                continue
-            d = (m - o) / o * 100
-            verdict = "🔺" if d >= 5 else ("🔻" if d <= -5 else "—")
-            lines.append(f"| {n} | {o:,.1f} | {m:,.1f} | {d:+.1f}% | {verdict} |")
-        text = "\n".join(lines)
+        text = _build_compare_markdown(Path(args.compare[0]), Path(args.compare[1]))
     else:
-        rep = load(newest_report())
-        rows: list[tuple] = []
-        for cat in rep.get("categories", []):
-            for m in cat.get("metrics", []):
-                rows.append((m["name"], m["iterations"], m["elapsed_us"] / 1000.0, m["ops_per_sec"]))
-        rows.sort(key=lambda r: r[3], reverse=True)
-        lines = [
-            "# 卡拉尔世界引擎 · 吞吐量基线表",
-            "",
-            f"- 引擎: {rep.get('engine', '?')}  Godot: {rep.get('godot_version', '?')}",
-            f"- 时间: {rep.get('timestamp', '?')}  主机: {rep.get('host', '?')}",
-            f"- 报告: {newest_report().name}",
-            "",
-            render_table(rows),
-        ]
-        text = "\n".join(lines)
+        text = _build_latest_markdown()
 
     if args.out:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.out).write_text(text + "\n", encoding="utf-8")
+        Path(args.out).write_text(text + NL, encoding="utf-8")
         print(f"【report-aggregate】已写入: {args.out}")
     else:
         print(text)

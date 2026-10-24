@@ -41,10 +41,18 @@ def load_doc_rules() -> tuple:
         print(f"[ERROR] 文档治理规则真源解析失败 {DOC_RULES_FILE}: {e}", file=sys.stderr)
         sys.exit(2)
 
-    rules: dict = {}
-    for rid, meta in (data.get("rules", {}) or {}).items():
-        sev = SEV_ERROR if str(meta.get("severity", "error")) == "error" else SEV_WARN
-        rules[str(rid)] = (sev, bool(meta.get("fixable", False)), str(meta.get("desc", "")))
+    raw_rules = data.get("rules")
+    if not isinstance(raw_rules, dict):
+        raw_rules = {}
+    rules: dict = {
+        str(rid): (
+            SEV_ERROR if str(meta.get("severity", "error")) == "error" else SEV_WARN,
+            bool(meta.get("fixable", False)),
+            str(meta.get("desc", "")),
+        )
+        for rid, meta in raw_rules.items()
+        if isinstance(meta, dict)
+    }
     return rules, data.get("naming_rules", []) or []
 
 

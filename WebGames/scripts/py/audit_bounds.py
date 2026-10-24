@@ -163,6 +163,7 @@ def _print_bounds_report(results: dict) -> None:
 
 
 def run_bounds_audit() -> int:
+    """CLI 入口：执行全域上下界溢出与下界穿透深度审查流水线。"""
     ap = argparse.ArgumentParser(description="上下界溢出与下界穿透全域深度审查与分析工具")
     ap.add_argument("--strict", action="store_true", help="当存在高危上下界穿透风险时阻断退出")
     args = ap.parse_args()

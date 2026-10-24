@@ -14,6 +14,7 @@
 import os
 import re
 import urllib.parse
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -23,6 +24,20 @@ from docs_audit.models import (
     RELLINK_RE,
     slugify,
 )
+
+HASH_SEP = "#"
+HYPHEN_SEP = "-"
+
+
+@dataclass(frozen=True, slots=True)
+class LinkAuditContext:
+    """链接与锚点审计上下文对象 (GOV-DAT-001)。"""
+
+    docs_map: dict
+    add_fn: Callable
+    get_doc_fn: Callable
+    abs_target_fn: Callable
+    rel_fn: Callable
 
 
 def resolve_abs_target(frag: str, docs_dir: Path) -> str:
@@ -40,32 +55,30 @@ def _check_abs_link_match(
     m: Any,
     line_idx: int,
     doc: Doc,
-    add_fn: Callable,
-    get_doc_fn: Callable,
-    abs_target_fn: Callable,
+    ctx: LinkAuditContext,
 ) -> None:
-    frag, _, anchor = m.group()[2:-1].strip().partition("#")
-    target = abs_target_fn(frag)
+    frag, _, anchor = m.group()[2:-1].strip().partition(HASH_SEP)
+    target = ctx.abs_target_fn(frag)
     if not target:
-        add_fn(doc, "LINK-DEAD", line_idx, f"file:/// 链接目标不存在: {urllib.parse.unquote(frag)[:90]}")
+        ctx.add_fn(doc, "LINK-DEAD", line_idx, f"file:/// 链接目标不存在: {urllib.parse.unquote(frag)[:90]}")
         return
-    add_fn(doc, "LINK-ABS-FILE-URI", line_idx, "file:/// 绝对路径链接（目标可解析，可安全转相对链接）", suggestion=target)
+    ctx.add_fn(doc, "LINK-ABS-FILE-URI", line_idx, "file:/// 绝对路径链接（目标可解析，可安全转相对链接）", suggestion=target)
     tpath = Path(target)
     if not (anchor and tpath.suffix == ".md"):
         return
-    tdoc = get_doc_fn(tpath)
+    tdoc = ctx.get_doc_fn(tpath)
     if tdoc is None:
         return
     slug = slugify(urllib.parse.unquote(anchor))
     if slug not in tdoc.heading_slugs:
-        tail = slug.rsplit("-", 1)[-1]
-        cands = [s for s in tdoc.heading_slugs if s.rsplit("-", 1)[-1] == tail][:3]
-        add_fn(
+        tail = slug.rsplit(HYPHEN_SEP, 1)[-1]
+        cands = [s for s in tdoc.heading_slugs if s.rsplit(HYPHEN_SEP, 1)[-1] == tail][:3]
+        ctx.add_fn(
             doc,
             "LINK-ANCHOR-DEAD",
             line_idx,
             f'锚点失效: #{urllib.parse.unquote(anchor)[:60]}（目标 {tpath.name}）',
-            "候选: " + " | ".join(cands) if cands else "无相近候选，需人工核对目标章节",
+            suggestion="候选: " + " | ".join(cands) if cands else "无相近候选，需人工核对目标章节",
         )
 
 
@@ -73,57 +86,47 @@ def _check_rel_link_match(
     m: Any,
     line_idx: int,
     doc: Doc,
-    docs_map: dict,
-    add_fn: Callable,
-    get_doc_fn: Callable,
-    rel_fn: Callable,
+    ctx: LinkAuditContext,
 ) -> None:
     t = m.group(1)
     if t.startswith(("http://", "https://", "file:///")):
         return
-    frag, _, anchor = t.partition("#")
+    frag, _, anchor = t.partition(HASH_SEP)
     frag_norm = urllib.parse.unquote(frag).replace("\\", "/")
     dest = doc.path.parent / frag_norm
     dest_key = str(dest)
-    if dest_key not in docs_map and not dest.exists():
-        add_fn(doc, "LINK-DEAD", line_idx, f"相对链接目标不存在: {frag}")
+    if dest_key not in ctx.docs_map and not dest.exists():
+        ctx.add_fn(doc, "LINK-DEAD", line_idx, f"相对链接目标不存在: {frag}")
         return
     if not anchor or dest.suffix != ".md":
         return
-    target_doc = get_doc_fn(dest)
+    target_doc = ctx.get_doc_fn(dest)
     if target_doc is None:
         return
     slug = slugify(urllib.parse.unquote(anchor))
     if slug not in target_doc.heading_slugs:
-        tail = slug.rsplit("-", 1)[-1]
-        cands = [s for s in target_doc.heading_slugs if s.rsplit("-", 1)[-1] == tail][:3]
-        add_fn(
+        tail = slug.rsplit(HYPHEN_SEP, 1)[-1]
+        cands = [s for s in target_doc.heading_slugs if s.rsplit(HYPHEN_SEP, 1)[-1] == tail][:3]
+        ctx.add_fn(
             doc,
             "LINK-ANCHOR-DEAD",
             line_idx,
-            f'锚点失效: #{urllib.parse.unquote(anchor)[:60]}（目标 {rel_fn(dest)}）',
-            "候选: " + " | ".join(cands) if cands else "无相近候选，需人工核对目标章节",
+            f'锚点失效: #{urllib.parse.unquote(anchor)[:60]}（目标 {ctx.rel_fn(dest)}）',
+            suggestion="候选: " + " | ".join(cands) if cands else "无相近候选，需人工核对目标章节",
         )
 
 
-def check_links(
-    doc: Doc,
-    docs_map: dict,
-    add_fn: Callable,
-    get_doc_fn: Callable,
-    abs_target_fn: Callable,
-    rel_fn: Callable,
-) -> None:
+def check_links(doc: Doc, ctx: LinkAuditContext) -> None:
     """审查文档内的绝对路径、相对路径与目标锚点完整性。"""
     for i, (ln, ins) in enumerate(zip(doc.lines, doc.inside), 1):
         if ins or doc.rel.startswith("docs/模板/"):
             continue
 
         for m in ABSLINK_RE.finditer(ln):
-            _check_abs_link_match(m, i, doc, add_fn, get_doc_fn, abs_target_fn)
+            _check_abs_link_match(m, i, doc, ctx)
 
         for m in RELLINK_RE.finditer(ln):
-            _check_rel_link_match(m, i, doc, docs_map, add_fn, get_doc_fn, rel_fn)
+            _check_rel_link_match(m, i, doc, ctx)
 
 
 def fix_abs_links(text: str, src: Path, abs_target_fn: Callable) -> tuple:
@@ -131,9 +134,10 @@ def fix_abs_links(text: str, src: Path, abs_target_fn: Callable) -> tuple:
     n = 0
 
     def repl(m: Any) -> str:
+        """正则匹配回调：将匹配到的绝对路径替换为相对路径。"""
         nonlocal n
         inner = m.group()[2:-1].strip()
-        frag, _, anchor = inner.partition("#")
+        frag, _, anchor = inner.partition(HASH_SEP)
         target = abs_target_fn(frag)
         if not target:
             return m.group()

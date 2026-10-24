@@ -15,9 +15,10 @@
 import argparse
 import re
 import sys
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Set
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
 
@@ -83,21 +84,17 @@ def _scan_single_test_file(tf: Path, ctx: ScanContext) -> None:
     for ident in found_idents:
         domain = ctx.class_index.get(ident)
         if domain:
-            ctx.coverage.setdefault(domain, set()).add(tf.name)
+            ctx.coverage[domain].add(tf.name)
 
     found_domains = set(PRELOAD_DOMAIN_RE.findall(text))
     for dom in found_domains:
         if dom in ctx.domain_set:
-            ctx.coverage.setdefault(dom, set()).add(tf.name)
+            ctx.coverage[dom].add(tf.name)
 
 
-def calculate_domain_coverage(
-    test_files: List[Path],
-    class_index: Dict[str, str],
-    domains: List[str],
-) -> Dict[str, Set[str]]:
+def calculate_domain_coverage(test_files: List[Path], class_index: Dict[str, str], domains: List[str]) -> Dict[str, Set[str]]:
     """统计测试文件对领域目录的覆盖映射字典。"""
-    coverage: Dict[str, Set[str]] = {}
+    coverage: Dict[str, Set[str]] = defaultdict(set)
     ctx = ScanContext(
         class_index=class_index,
         domain_set=set(domains),
@@ -105,7 +102,7 @@ def calculate_domain_coverage(
     )
     for tf in test_files:
         _scan_single_test_file(tf, ctx)
-    return coverage
+    return dict(coverage)
 
 
 def print_coverage_report(data: CoverageReportData) -> None:
@@ -116,7 +113,8 @@ def print_coverage_report(data: CoverageReportData) -> None:
     )
     print("【audit-test-coverage】覆盖映射（域 → 测试文件）:")
     for d in data.domains:
-        files = sorted(data.coverage.get(d, set()))
+        cov_set = data.coverage.get(d)
+        files = sorted(cov_set) if cov_set else []
         mark = "✓" if files else "✗ 无测试"
         file_list = ", ".join(files) if files else "(未覆盖)"
         print(f"  {mark} {d}: {file_list}")

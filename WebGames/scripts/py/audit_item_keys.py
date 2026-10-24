@@ -44,6 +44,7 @@ def collect_registered() -> set[str]:
 
 
 def main() -> int:
+    """CLI 入口：校验全域配置表引用的物品键是否已在 items/ 目录登记。"""
     registered, duplicates = collect_registered()
     violations: list[str] = []
     for dup in duplicates:

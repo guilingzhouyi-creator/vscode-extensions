@@ -93,6 +93,24 @@ def _extract_channel_candidates(data: dict, subkey: str | None) -> list[str]:
     return candidates
 
 
+def _resolve_channel_narrative_from_source(
+    path: Path, subkey: str | None, domain_ids: set[str]
+) -> set[str]:
+    """读取指定频道配置文件并解析为 narratives.<域> 引用集合。"""
+    if not path.exists():
+        return set()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return set()
+    refs: set[str] = set()
+    for raw in _extract_channel_candidates(data, subkey):
+        m = CHANNEL_RE.match(raw.strip())
+        if m and m.group(1) in domain_ids:
+            refs.add("narratives." + m.group(1))
+    return refs
+
+
 def collect_channel_narrative_refs() -> set[str]:
     """扫描频道声明源契约解析为对 narratives.<域> 的动态引用。"""
     domain_ids = collect_domain_ids()
@@ -110,17 +128,7 @@ def collect_channel_narrative_refs() -> set[str]:
         (CONFIG_DIR / "infrastructure" / "event_bus_config.json", None),
     ]
     for path, subkey in channel_sources:
-        if not path.exists():
-            continue
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        candidates = _extract_channel_candidates(data, subkey)
-        for raw in candidates:
-            m = CHANNEL_RE.match(raw.strip())
-            if m and m.group(1) in domain_ids:
-                refs.add("narratives." + m.group(1))
+        refs.update(_resolve_channel_narrative_from_source(path, subkey, domain_ids))
     return refs
 
 
@@ -133,59 +141,82 @@ def collect_tables() -> list[tuple[str, str]]:
     return out
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--strict", action="store_true", help="存在未引用表即返回 1")
-    args = ap.parse_args()
+def _scan_single_gd_file(
+    f: Path, referenced: set[str], dynamic: set[str], weak: set[str]
+) -> None:
+    """提取单个 GDScript 中的配置引用标记。"""
+    try:
+        text = f.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        return
+    for m in GETTER_RE.finditer(text):
+        referenced.add(m.group(1))
+    for m in MSG_RE.finditer(text):
+        referenced.add("narratives." + m.group(1))
+    for m in NARRATIVE_RE.finditer(text):
+        dynamic.add("narratives." + m.group(1))
+    for m in FULLNAME_RE.finditer(text):
+        weak.add(m.group(0).strip('"'))
 
-    tables = collect_tables()
-    all_names = {name for name, _ in tables}
 
+def _collect_gd_references() -> tuple[set[str], set[str], set[str]]:
+    """扫描 GDScript 源码获取强引用、动态叙事引用与弱引用集合。"""
     referenced: set[str] = set()
     dynamic_narratives: set[str] = set()
     weak: set[str] = set()
     for search_dir in (BACKEND_DIR, FRONTEND_DIR):
         for f in search_dir.rglob("*.gd"):
-            try:
-                text = f.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
-                continue
-            for m in GETTER_RE.finditer(text):
-                referenced.add(m.group(1))
-            for m in MSG_RE.finditer(text):
-                referenced.add("narratives." + m.group(1))
-            for m in NARRATIVE_RE.finditer(text):
-                dynamic_narratives.add("narratives." + m.group(1))
-            for m in FULLNAME_RE.finditer(text):
-                weak.add(m.group(0).strip('"'))
+            _scan_single_gd_file(f, referenced, dynamic_narratives, weak)
+    return referenced, dynamic_narratives, weak
 
-    channel_refs: set[str] = collect_channel_narrative_refs()
-    dynamic_narratives |= channel_refs
-    referenced |= dynamic_narratives | weak
 
+def _collect_sub_tables_from_manifest(manifest_path: Path, referenced: set[str]) -> list[str]:
+    """读取清单并提取匹配领域的 sub_tables。"""
+    if not manifest_path.is_file():
+        return []
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"[WARN] domains.json 解析跳过: {exc}")
+        return []
+
+    collected: list[str] = []
+    for d_entry in data.get("domains", []):
+        if not isinstance(d_entry, dict) or d_entry.get("config") not in referenced:
+            continue
+        for st in d_entry.get("sub_tables", []):
+            collected.append(str(st))
+    return collected
+
+
+def _expand_manifest_references(referenced: set[str], all_names: set[str]) -> None:
+    """根据 domains.json 清单扩展子表引用与 .core 候选表。"""
     manifest_path = CONFIG_DIR / "infrastructure" / "domains.json"
-    if manifest_path.is_file():
-        try:
-            domains_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            for d_entry in domains_manifest.get("domains", []):
-                if isinstance(d_entry, dict) and d_entry.get("config") in referenced:
-                    for st in d_entry.get("sub_tables", []):
-                        referenced.add(str(st))
-        except (json.JSONDecodeError, OSError) as exc:
-            # 基础设施清单读取或解析异常属于非致命错误，记录告警后回退
-            print(f"[WARN] domains.json 解析跳过: {exc}")
+    for st in _collect_sub_tables_from_manifest(manifest_path, referenced):
+        referenced.add(st)
+
     for t in list(referenced):
         core_candidate = f"{t}.core"
         if core_candidate in all_names:
             referenced.add(core_candidate)
-    # 单机聚焦：预留叙事表不计入未引用（需显式保留，避免误删联机文案）
-    unused = [t for t in sorted(all_names) if t not in referenced and t not in RESERVED_NARRATIVES]
-    reserved_hit = sorted(t for t in RESERVED_NARRATIVES if t not in referenced)
 
-    print(f"【audit-config-unused】配置表 {len(all_names)} 张 / "
-          f"强引用 {len(referenced - dynamic_narratives - weak)} / "
-          f"动态叙事 {len(dynamic_narratives)} / 弱引用 {len(weak)} / 未引用 {len(unused)}"
-          + (f" / 预留 {len(reserved_hit)}" if reserved_hit else ""))
+
+def _print_unused_report(
+    all_names: set[str],
+    referenced: set[str],
+    dynamic_narratives: set[str],
+    weak: set[str],
+    unused: list[str],
+    reserved_hit: list[str],
+    tables: list[tuple[str, str]],
+) -> None:
+    """打印未引用配置表详细报告。"""
+    print(
+        f"【audit-config-unused】配置表 {len(all_names)} 张 / "
+        f"强引用 {len(referenced - dynamic_narratives - weak)} / "
+        f"动态叙事 {len(dynamic_narratives)} / 弱引用 {len(weak)} / 未引用 {len(unused)}"
+        + (f" / 预留 {len(reserved_hit)}" if reserved_hit else "")
+    )
     for name, rel in tables:
         if name in unused:
             mark = "⚠ 疑似死配置" if not name.startswith("frontend.") else "⚠ frontend 层（可能被前端消费）"
@@ -194,6 +225,29 @@ def main() -> int:
         for name in reserved_hit:
             rel = next((r for n, r in tables if n == name), name)
             print(f"  · {rel}（{name}）ℹ 单机预留（联机启用时需补 _msg 消费）")
+
+
+def main() -> int:
+    """CLI 入口：静态扫描未引用的死配置表与单机预留表。"""
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--strict", action="store_true", help="存在未引用表即返回 1")
+    args = ap.parse_args()
+
+    tables = collect_tables()
+    all_names = {name for name, _ in tables}
+
+    referenced, dynamic_narratives, weak = _collect_gd_references()
+    channel_refs = collect_channel_narrative_refs()
+    dynamic_narratives |= channel_refs
+    referenced |= dynamic_narratives | weak
+
+    _expand_manifest_references(referenced, all_names)
+
+    unused = [t for t in sorted(all_names) if t not in referenced and t not in RESERVED_NARRATIVES]
+    reserved_hit = sorted(t for t in RESERVED_NARRATIVES if t not in referenced)
+
+    _print_unused_report(all_names, referenced, dynamic_narratives, weak, unused, reserved_hit, tables)
+
     if args.strict and unused:
         print("【审查结论】--strict 模式未通过")
         return 1

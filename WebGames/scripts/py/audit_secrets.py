@@ -2,23 +2,26 @@
 # ==============================================================================
 # 模块归属: 工程效能与质量门禁 (Tooling · 敏感信息安全门禁)
 # 文件路径: WebGames/scripts/py/audit_secrets.py
-# 架构定位: 密钥与凭据泄漏扫描器 (Secret Leak Scanner)
+# 架构定位: 密钥与凭据泄漏高性能扫描器 (High-Performance Secret Leak Scanner)
 # 依赖与触发: 触发方: CI / 本地预检 | 上游: 全仓源码与配置 | 下游: 安全告警 | 运行时: Python 3.10+
 # 职责说明: 扫描硬编码私钥、测试盐明文与高危凭据，防止敏感信息泄漏入库
-# 退出语义与设计依据: 退出码: 0=安全, 1=发现泄露凭据 | 设计依据: 生产安全与隐私合规契约
+# 退出语义与设计依据: 退出码: 0=安全, 1=发现泄露凭据 | 设计依据: 生产安全与第一性原理字节级快速短路漏斗
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   python scripts/py/audit_secrets.py
 #   python scripts/py/audit_secrets.py --json
 # ==============================================================================
 """扫描密钥标记与常见服务 token 特征，防止误提交泄露（提示级）。"""
+
+from __future__ import annotations
+
 import argparse
 import re
 import subprocess
 import sys
 from pathlib import Path
 
-from audit_common import ensure_utf8_stdout, resolve_repo_root
+from audit_common import ensure_utf8_stdout
 
 ensure_utf8_stdout()
 
@@ -27,17 +30,21 @@ WG_REL = "WebGames"
 MAX_BYTES = 2_000_000
 MAX_EXAMPLES_PER_FILE = 4
 
-# (正则, 标签) —— 私钥标记（采用动态特征组装，避免特征扫描器将检查工具自身误报为泄露私钥）
+# (正则, 标签) —— 私钥标记
 _HEADER_PREFIX = "-----" + "BEGIN "
 _PRIVATE_KEY_SUFFIX = "PRIVATE " + "KEY-----"
 _PGP_SUFFIX = "PRIVATE KEY " + "BLOCK-----"
 
-MARKERS = [
-    (rf"{_HEADER_PREFIX}(?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?{_PRIVATE_KEY_SUFFIX}", "私钥标记"),
+MARKERS: list[tuple[str, str]] = [
+    (
+        rf"{_HEADER_PREFIX}(?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?{_PRIVATE_KEY_SUFFIX}",
+        "私钥标记",
+    ),
     (rf"{_HEADER_PREFIX}PGP {_PGP_SUFFIX}", "PGP 私钥"),
 ]
+
 # (正则, 标签) —— 常见服务高熵 token
-TOKENS = [
+TOKENS: list[tuple[str, str]] = [
     (r"\bAKIA[0-9A-Z]{16}\b", "AWS Access Key"),
     (r"\bghp_[0-9A-Za-z]{36}\b", "GitHub PAT"),
     (r"\bgithub_pat_[0-9A-Za-z_]{20,}\b", "GitHub fine-grained PAT"),
@@ -45,21 +52,59 @@ TOKENS = [
     (r"\bsk_live_[0-9a-zA-Z]{16,}\b", "Stripe 密钥"),
     (r"\bAIza[0-9A-Za-z\-_]{35}\b", "Google API Key"),
     (r"\bsk-[A-Za-z0-9]{20,}\b", "OpenAI API Key"),
-    (r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b", "疑似 JWT"),
+    (
+        r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
+        "疑似 JWT",
+    ),
 ]
-BINARY_SUFFIXES = {
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp", ".vsix", ".tgz", ".zip",
-    ".ttf", ".woff", ".woff2", ".bin", ".pyc", ".uid", ".ctex",
+
+BINARY_SUFFIXES: set[str] = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".webp",
+    ".vsix",
+    ".tgz",
+    ".zip",
+    ".ttf",
+    ".woff",
+    ".woff2",
+    ".bin",
+    ".pyc",
+    ".uid",
+    ".ctex",
 }
 
-# 预编译正则与联合快速短路正则（常数级跳过 99.9% 干净文件）
+# 算法第一性原理：二进制快速短路特征探针元组（在 decode 前常数级跳过 99.9% 干净文件）
+FAST_BYTE_PROBES: tuple[bytes, ...] = (
+    b"-----BEGIN ",
+    b"AKIA",
+    b"ghp_",
+    b"github_pat_",
+    b"xox",
+    b"sk_live_",
+    b"AIza",
+    b"sk-",
+    b"eyJ",
+)
+
 ALL_COMPILED = [(re.compile(p), label) for p, label in MARKERS + TOKENS]
 COMBINED_FAST_RE = re.compile("|".join(f"(?:{p})" for p, _ in MARKERS + TOKENS))
 
 
 def git(args: list[str], cwd: Path) -> str:
+    """运行 Git 辅助命令。"""
     try:
-        r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        r = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
         return r.stdout if r.returncode == 0 else ""
     except Exception:
         return ""
@@ -97,26 +142,8 @@ def collect_paths(scan_root: Path) -> list[Path]:
     return paths
 
 
-def _read_text_safely(path: Path) -> str | None:
-    """安全读取文件文本内容，跳过自扫描脚本、二进制后缀、超大文件与非 utf-8 解码错误。"""
-    if path.name == HERE.name and path.resolve() == HERE:
-        return None
-    if path.suffix.lower() in BINARY_SUFFIXES:
-        return None
-    try:
-        data = path.read_bytes()
-    except OSError:
-        return None
-    if len(data) > MAX_BYTES:
-        return None
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
-
-
 def _scan_text_findings(text: str) -> tuple[dict[str, int], list[str]]:
-    """扫描文本中包含的密钥候选并聚合统计量与前 4 个样例片段。"""
+    """扫描文本中包含的密钥候选并聚合统计量与样例片段。"""
     counts = {label: 0 for _, label in ALL_COMPILED}
     examples: list[str] = []
     for i, line in enumerate(text.splitlines(), 1):
@@ -131,9 +158,35 @@ def _scan_text_findings(text: str) -> tuple[dict[str, int], list[str]]:
     return counts, examples
 
 
+def _read_and_prefilter_file(path: Path) -> str | None:
+    """前置快速二进制漏斗，未命中特征直接返回 None。"""
+    if path.name == HERE.name and path.resolve() == HERE:
+        return None
+    if path.suffix.lower() in BINARY_SUFFIXES:
+        return None
+
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+
+    if len(data) > MAX_BYTES or not any(probe in data for probe in FAST_BYTE_PROBES):
+        return None
+
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+    if not COMBINED_FAST_RE.search(text):
+        return None
+    return text
+
+
 def scan_file(path: Path, findings: list[str]) -> int:
-    text = _read_text_safely(path)
-    if not text or not COMBINED_FAST_RE.search(text):
+    """快速扫描单个文件中的疑似凭据，前置二进制快速漏斗。"""
+    text = _read_and_prefilter_file(path)
+    if not text:
         return 0
 
     rel = path.relative_to(HERE.parents[2]).as_posix()
@@ -147,9 +200,12 @@ def scan_file(path: Path, findings: list[str]) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
+    """CLI 入口。"""
+    ap = argparse.ArgumentParser(description="密钥与敏感凭证泄漏扫描器")
     ap.add_argument("--strict", action="store_true", help="有发现即返回 1")
-    ap.add_argument("--repo", action="store_true", help="扫描整个 git 仓库（默认仅 WebGames/）")
+    ap.add_argument(
+        "--repo", action="store_true", help="扫描整个 git 仓库（默认仅 WebGames/）"
+    )
     args = ap.parse_args()
 
     scan_root = HERE.parents[3] if args.repo else HERE.parents[2]
@@ -159,12 +215,16 @@ def main() -> int:
     for p in paths:
         total += scan_file(p, findings)
 
-    print(f"【audit-secrets】扫描 {len(paths)} 个文件（{'全仓库' if args.repo else 'WebGames/'}），"
-          f"发现 {total} 处密钥/凭证候选（提示级）")
+    print(
+        f"【audit-secrets】扫描 {len(paths)} 个文件（{'全仓库' if args.repo else 'WebGames/'}），"
+        f"发现 {total} 处密钥/凭证候选（提示级）"
+    )
     for fd in findings:
         print(f"  ✗ {fd}")
     if args.strict and total:
-        print("【审查结论】--strict 模式未通过：存在疑似密钥，请先清除或轮换后再提交")
+        print(
+            "【审查结论】--strict 模式未通过：存在疑似密钥，请先清除或轮换后再提交"
+        )
         return 1
     print("【审查结论】通过（提示级）")
     return 0
