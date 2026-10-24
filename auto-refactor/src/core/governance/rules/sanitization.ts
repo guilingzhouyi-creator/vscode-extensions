@@ -30,21 +30,6 @@ import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from 
 import { CODE_GOV_PROSE_SANITIZATION } from '../../constants/rule-codes';
 import { isCommentLine } from '../../scanner/text-scanner-utils';
 
-/** ASCII code for a space, skipped while advancing past a line's leading whitespace. */
-const CHAR_CODE_SPACE = 32;
-
-/** ASCII code for a tab, skipped while advancing past a line's leading whitespace. */
-const CHAR_CODE_TAB = 9;
-
-/** ASCII code for `#`, the marker that starts a hash-style comment line. */
-const CHAR_CODE_HASH = 35;
-
-/** ASCII code for `/`, used to recognize `//` and `/*` comment openers. */
-const CHAR_CODE_SLASH = 47;
-
-/** ASCII code for `*`, used to recognize `/*` and bare `*` comment lines. */
-const CHAR_CODE_ASTERISK = 42;
-
 /**
  * Checks whether a line references internal jargon governance identifiers.
  */

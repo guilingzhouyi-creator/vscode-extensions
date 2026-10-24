@@ -30,7 +30,6 @@ const BASELINE = path.join(ROOT, 'baselines', 'self-scan.baseline.json');
 const REPORT = path.join(os.tmpdir(), `auto-refactor-slice-scan-${process.pid}.json`);
 
 const EXIT_PASS = 0;
-const EXIT_FAIL = 1;
 const EXIT_USAGE_ERROR = 2;
 
 const HUNK_HEADER_RE = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;

@@ -55,7 +55,6 @@ export interface CodeSurvivalEvaluation {
 
 const MATURE_SURVIVAL_THRESHOLD = 0.75;
 const INFANT_MORTALITY_TIME_THRESHOLD = 5;
-const INFANT_MORTALITY_SURVIVAL_THRESHOLD = 0.5;
 
 /**
  * Computes the Kaplan-Meier survival estimator S(t) from revision interval data.

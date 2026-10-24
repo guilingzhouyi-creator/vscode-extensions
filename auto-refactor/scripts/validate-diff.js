@@ -29,7 +29,6 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const CORPUS = path.join(__dirname, '.diff-corpus');
 const BIG = path.join(CORPUS, 'src', 'big.ts');
-const SMALL = path.join(CORPUS, 'src', 'small.ts');
 
 const DEFAULT_TMP_DIR = process.env.AUTO_REFACTOR_TMPDIR || path.join(os.tmpdir(), 'ar-temp');
 try {

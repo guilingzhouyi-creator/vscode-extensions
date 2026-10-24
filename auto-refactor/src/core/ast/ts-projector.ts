@@ -607,7 +607,6 @@ export class TsNodeProjector implements NodeProjector {
         const kindMeta = kindInfoFor(astNode);
         const kind = kindMeta.kind;
         const fnLike = kindMeta.fnLike;
-        const isLiteral = kindMeta.literal !== 0;
         const isBinary = astNode.kind === ts.SyntaxKind.BinaryExpression;
         const branchWeight = isBinary ? branchWeightOf(astNode) : kindMeta.branch;
 

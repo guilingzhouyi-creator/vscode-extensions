@@ -88,7 +88,10 @@ export function computeWeightedGeometricMean(
         return 0.0;
     }
 
-    const geometricMean = Math.exp(acc.weightedLogSum / acc.totalWeight);
+    // `safeDivide` rather than a bare quotient: the log accumulator can overflow to a non-finite
+    // sum for extreme score vectors, and `Math.exp` would then silently yield 0 — a plausible
+    // score that hides the overflow. The guard turns that case into the documented zero fallback.
+    const geometricMean = Math.exp(safeDivide(acc.weightedLogSum, acc.totalWeight));
     return Math.round(geometricMean * PRECISION_ROUNDING) / PRECISION_ROUNDING;
 }
 

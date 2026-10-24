@@ -53,7 +53,7 @@ export function computeMean(values: readonly number[]): number {
         }
     }
     if (validCount === 0) return 0;
-    return roundPrecision(sum / validCount);
+    return roundPrecision(safeDivide(sum, validCount));
 }
 
 /**
@@ -81,7 +81,7 @@ export function computeVariance(values: readonly number[], precomputedMean?: num
         }
     }
     if (validCount === 0) return 0;
-    return roundPrecision(squaredSum / validCount);
+    return roundPrecision(safeDivide(squaredSum, validCount));
 }
 
 /**
@@ -124,7 +124,7 @@ export function computeStatisticalMoments(values: readonly number[]): Statistica
         return Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
     }
 
-    const mean = sum / validCount;
+    const mean = safeDivide(sum, validCount);
     let squaredDiffSum = 0;
     for (let i = 0; i < values.length; i++) {
         const val = values[i];
@@ -134,8 +134,8 @@ export function computeStatisticalMoments(values: readonly number[]): Statistica
         }
     }
 
-    const variance = squaredDiffSum / validCount;
-    const standardDeviation = Math.sqrt(variance);
+    const variance = safeDivide(squaredDiffSum, validCount);
+    const standardDeviation = Math.sqrt(Number.isFinite(variance) ? variance : 0);
 
     return Object.freeze({
         mean: roundPrecision(mean),

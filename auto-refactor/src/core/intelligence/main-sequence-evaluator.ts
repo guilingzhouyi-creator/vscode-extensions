@@ -68,7 +68,6 @@ export interface PropagationCostOutcome {
 
 const MAIN_SEQUENCE_DISTANCE_THRESHOLD = 0.5;
 const HYPER_COUPLED_THRESHOLD = 0.4;
-const SAFE_MODULAR_THRESHOLD = 0.15;
 
 /**
  * Calculates Uncle Bob's Main Sequence metrics for a single module.

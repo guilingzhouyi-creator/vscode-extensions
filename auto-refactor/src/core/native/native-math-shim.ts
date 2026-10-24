@@ -21,7 +21,6 @@ import { computeWarshallTransitiveClosure } from '../algorithms/graph';
 import { calculateShannonEntropy } from '../math/information-entropy';
 import { computeStatisticalMoments } from '../math/descriptive-statistics';
 import {
-    computePopoviciuDispersionPenalty,
     POPOVICIU_MAX_SIGMA,
     DEFAULT_DISPERSION_PENALTY_RATIO,
 } from '../math/statistical-dispersion';

@@ -21,7 +21,6 @@ import type { SourceMaskConfig } from '../core/policy/source-mask';
 import {
     DeclarativeModernAnalyzer,
     type DeclarativeLineRule,
-    type LineScanContext,
 } from './declarative-modern-pack';
 
 const SEV_WARN: Severity = 'warning';

@@ -55,7 +55,6 @@ export interface BumpyRoadEvaluation {
 }
 
 const SPACE_INDENT_SIZE = 4;
-const MIN_BUMPY_LINE_SPAN = 20;
 
 /**
  * Calculates effective indentation level of a single source line.

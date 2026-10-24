@@ -18,7 +18,7 @@
  *     [] for non-shell content. Heuristics are conservative — a missed finding is
  *     preferred over a false positive.
  */
-import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
 import {
@@ -31,7 +31,6 @@ import {
     DOLLAR_STAR_RE,
     ECHO_FLAG_RE,
     POWERSHELL_ALIASES,
-    PS_APPROVED_VERBS,
     PS_APPROVED_VERBS_FOLDED,
     PS_FUNCTION_RE,
     PS_CMDLET_BINDING_RE,

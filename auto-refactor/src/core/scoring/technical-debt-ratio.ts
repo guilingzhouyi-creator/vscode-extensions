@@ -16,13 +16,7 @@
 
 import type { Issue, Severity } from '../types';
 import type { PrimaryQualityPillar } from './eightPillarModel';
-import {
-    ALL_PRIMARY_PILLARS,
-    DIMENSION_TO_PILLAR_MAP,
-    PILLAR_MAINTAINABILITY,
-} from './eightPillarModel';
-import type { QualityDimension } from './scoringTypes';
-import { ALL_QUALITY_DIMENSIONS } from './scoringTypes';
+import { ALL_PRIMARY_PILLARS, PILLAR_MAINTAINABILITY } from './eightPillarModel';
 
 const SEV_ERROR: Severity = 'error';
 const SEV_WARNING: Severity = 'warning';
