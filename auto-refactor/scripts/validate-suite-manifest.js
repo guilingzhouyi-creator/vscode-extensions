@@ -36,6 +36,10 @@ const EXEMPT = new Map([
   ['build-native.js', 'native build helper invoked by npm run build:native'],
   ['run-self-audit.js', 'helper invoked by validate-self-audit.js and validate-self-refactor.js'],
   ['test-rust.js', 'invoked by gate:rust rather than by the parallel engine'],
+  [
+    'migrate-report-artifacts.js',
+    'offline maintenance utility that rewrites persisted audit artifacts; not an assertion suite',
+  ],
   // Gate entry points already wired into `npm run gate`; running them again inside
   // `npm test` would apply the severity ratchet twice.
   ['gate-comments.js', 'invoked by the gate chain as gate:comments'],
