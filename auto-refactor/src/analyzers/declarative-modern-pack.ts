@@ -230,26 +230,19 @@ export class DeclarativeModernAnalyzer implements Analyzer {
             return false;
         }
 
-
-        if (
-            rule.pattern &&
-            !rule.pattern.test(ctx.maskedLine) &&
-            !rule.pattern.test(ctx.trimmed)
-        ) {
+        if (rule.pattern && !rule.pattern.test(ctx.maskedLine) && !rule.pattern.test(ctx.trimmed)) {
             return false;
         }
 
         if (
             rule.negativePattern &&
-            (rule.negativePattern.test(ctx.maskedLine) ||
-                rule.negativePattern.test(ctx.trimmed))
+            (rule.negativePattern.test(ctx.maskedLine) || rule.negativePattern.test(ctx.trimmed))
         ) {
             return false;
         }
 
         return true;
     }
-
 
     /**
      * Constructs and formats a canonical issue for a declarative rule.
@@ -291,5 +284,4 @@ export class DeclarativeModernAnalyzer implements Analyzer {
         const detail = rule.detailFactory ? rule.detailFactory(ctx) : { line: ctx.rawLine.trim() };
         return this.emitIssue(rule, ctx.file, ctx.lineNumber, detail);
     }
-
 }

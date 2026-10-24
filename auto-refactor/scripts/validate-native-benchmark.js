@@ -394,7 +394,7 @@ function runBenchmark() {
     const maskRes = results.find((r) => r.operator === 'SIMD Source Mask');
     if (maskRes) {
       assert.ok(
-        maskRes.speedup >= 0.30 ||
+        maskRes.speedup >= 0.3 ||
           (maskRes.nativeThroughputMbSec && maskRes.nativeThroughputMbSec >= 20),
         `SIMD source mask speedup ratio (${maskRes.speedup.toFixed(2)}x) should be >= 0.30x or throughput >= 20 MB/s`,
       );

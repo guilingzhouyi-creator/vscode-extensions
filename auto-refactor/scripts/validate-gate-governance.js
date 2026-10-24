@@ -144,9 +144,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     assert.ok(hookIssue.actionable);
     assert.strictEqual(hookIssue.actionable.code, 'GUARD-HOOK-001');
 
-    console.log(
-      '  ✔ 3. GUARD-HOOK-001: Missing local left-shift Git hooks flagged with warning',
-    );
+    console.log('  ✔ 3. GUARD-HOOK-001: Missing local left-shift Git hooks flagged with warning');
   } finally {
     cleanTempDir(dir);
   }
@@ -329,9 +327,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
       'Expected cargo test for rust archetype',
     );
 
-    console.log(
-      '  ✔ 9. Gate scaffolding generator generates valid archetype-specific templates',
-    );
+    console.log('  ✔ 9. Gate scaffolding generator generates valid archetype-specific templates');
   } finally {
     cleanTempDir(dir);
   }

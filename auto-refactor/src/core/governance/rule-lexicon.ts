@@ -136,7 +136,7 @@ function compileShape(pattern: unknown, label: string, flags: string): RegExp {
  */
 function compilePrefixes(prefixes: unknown): readonly string[] {
     if (!Array.isArray(prefixes) || prefixes.length === 0) {
-        throw new Error('rule-lexicon: \'externalStandardPrefixes\' must be a non-empty array');
+        throw new Error("rule-lexicon: 'externalStandardPrefixes' must be a non-empty array");
     }
     for (const prefix of prefixes) {
         if (typeof prefix !== 'string' || prefix.length === 0) {
@@ -178,7 +178,10 @@ export function loadRuleLexicon(): RuleLexicon | null {
     const lexiconPath = findLexiconPath();
     if (lexiconPath === null) return null;
     try {
-        const parsed = JSON.parse(LexiconIoBarrier.readText(lexiconPath)) as Record<string, unknown>;
+        const parsed = JSON.parse(LexiconIoBarrier.readText(lexiconPath)) as Record<
+            string,
+            unknown
+        >;
         cachedLexicon = compileLexicon(parsed);
     } catch {
         cachedLexicon = null;

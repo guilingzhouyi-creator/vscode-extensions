@@ -301,9 +301,7 @@ function auditBoundaryInteroperability(allFiles) {
     }
     return false;
   }
-  console.log(
-    `  ✔  Boundary Interoperability clean (BIF = 100.0%, 0 reverse dependencies)\n`,
-  );
+  console.log(`  ✔  Boundary Interoperability clean (BIF = 100.0%, 0 reverse dependencies)\n`);
   return true;
 }
 

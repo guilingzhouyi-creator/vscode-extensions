@@ -115,7 +115,10 @@ export async function ensureDaemon(root: string): Promise<boolean> {
 /**
  * Probe whether a daemon is already alive for the project, clearing any stale registry entry.
  */
-async function checkExistingDaemon(root: string, projectHash: string): Promise<DaemonCliResult | null> {
+async function checkExistingDaemon(
+    root: string,
+    projectHash: string,
+): Promise<DaemonCliResult | null> {
     const existing = readRegistry(projectHash);
     if (!existing) return null;
 
@@ -207,7 +210,6 @@ async function startDaemon(root: string, projectHash: string): Promise<DaemonCli
     const detail = readDaemonLogDetail(daemonLog);
     return { code: 1, text: `daemon failed to become ready within 5s (root=${root})${detail}` };
 }
-
 
 /**
  * Polls the daemon registry and probes the socket until successfully connected or timeout.

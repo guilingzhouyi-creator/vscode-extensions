@@ -26,8 +26,31 @@
  * `)`, `]` and `}` all end an expression, so a `/` there divides.
  */
 export const REGEX_PRECEDING_TOKENS: ReadonlySet<string> = new Set<string>([
-    '=', '(', '[', '{', ',', ':', ';', '!', '&&', '||', '?', '??', '=>',
-    'return', 'typeof', 'case', 'in', 'of', 'new', 'delete', 'void', 'do', 'else', 'yield', 'await',
+    '=',
+    '(',
+    '[',
+    '{',
+    ',',
+    ':',
+    ';',
+    '!',
+    '&&',
+    '||',
+    '?',
+    '??',
+    '=>',
+    'return',
+    'typeof',
+    'case',
+    'in',
+    'of',
+    'new',
+    'delete',
+    'void',
+    'do',
+    'else',
+    'yield',
+    'await',
 ]);
 
 /** Single-character escapes and character classes both hide a slash from the closing test. */

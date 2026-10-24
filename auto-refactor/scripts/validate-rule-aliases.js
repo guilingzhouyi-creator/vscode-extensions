@@ -158,9 +158,7 @@ async function main() {
   assert.strictEqual(isCanonical3LetterForm('ARCH-DISP-001'), false);
   assert.strictEqual(isCanonical3LetterForm(''), false);
   assert.strictEqual(isCanonical3LetterForm(null), false);
-  console.log(
-    '  ✔ areAliasForms cross-version equivalence and isCanonical3LetterForm verified',
-  );
+  console.log('  ✔ areAliasForms cross-version equivalence and isCanonical3LetterForm verified');
 }
 
 main()

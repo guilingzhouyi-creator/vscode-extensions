@@ -100,7 +100,6 @@ export function runLegacyPhase(
                 },
                 detail: { error: String(e), stack: e instanceof Error ? e.stack : undefined },
             });
-
         }
     }
     return issues;

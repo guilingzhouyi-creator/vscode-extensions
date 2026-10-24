@@ -161,12 +161,16 @@ export function computeMichaelisMentenRational(
     if (!Number.isFinite(density) || density <= 0) {
         return maxScore;
     }
-    const safeH = Number.isFinite(halfSaturation) && halfSaturation > 0
-        ? halfSaturation
-        : DEFAULT_HALF_SATURATION_CONSTANT;
+    const safeH =
+        Number.isFinite(halfSaturation) && halfSaturation > 0
+            ? halfSaturation
+            : DEFAULT_HALF_SATURATION_CONSTANT;
     const safeMax = Number.isFinite(maxScore) && maxScore > 0 ? maxScore : DEFAULT_CAPACITY_LIMIT;
     const score = safeMax * (safeH / (safeH + density));
-    return Math.max(0, Math.min(safeMax, Math.round(score * SCORE_PERCENT_PRECISION) / SCORE_PERCENT_PRECISION));
+    return Math.max(
+        0,
+        Math.min(safeMax, Math.round(score * SCORE_PERCENT_PRECISION) / SCORE_PERCENT_PRECISION),
+    );
 }
 
 /**

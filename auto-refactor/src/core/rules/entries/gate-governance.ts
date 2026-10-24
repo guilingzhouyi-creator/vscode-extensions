@@ -278,7 +278,8 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         defaultSeverity: SEVERITY_ERROR,
         summary:
             'PowerShell binding writes a read-only automatic variable, so the write throws and the name keeps its previous value.',
-        remediation: 'Rename the binding so it no longer collides with the read-only automatic variable.',
+        remediation:
+            'Rename the binding so it no longer collides with the read-only automatic variable.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#guard-var-001',
     }),
 ];

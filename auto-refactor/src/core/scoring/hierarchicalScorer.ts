@@ -42,8 +42,8 @@ const LOC_SCALE_DIVISOR = 100;
 const LOC_LOG_SMOOTH_BIAS = 10;
 const FATAL_ARCH_CEILING = 45;
 const DENSITY_MIN_LOC = 15;
-const POR_THRESHOLD = 0.60;
-const POR_RANGE = 0.40;
+const POR_THRESHOLD = 0.6;
+const POR_RANGE = 0.4;
 const COMPOSITE_DENSITY_THRESHOLD = 0.35;
 const PENALTY_MAINTAINABILITY_DENSITY = 15;
 const PENALTY_ARCH_POR_MAX = 15;
@@ -165,8 +165,14 @@ function computeDensityDeduction(
         return densityResult.isLowDensity ? PENALTY_MAINTAINABILITY_DENSITY : 0;
     }
     if (dim === DIMENSION_ARCH_CONSISTENCY) {
-        if (!isExemptFacade && typeof densityResult.por === 'number' && densityResult.por > POR_THRESHOLD) {
-            return Math.round(PENALTY_ARCH_POR_MAX * ((densityResult.por - POR_THRESHOLD) / POR_RANGE));
+        if (
+            !isExemptFacade &&
+            typeof densityResult.por === 'number' &&
+            densityResult.por > POR_THRESHOLD
+        ) {
+            return Math.round(
+                PENALTY_ARCH_POR_MAX * ((densityResult.por - POR_THRESHOLD) / POR_RANGE),
+            );
         }
         return 0;
     }
@@ -309,7 +315,8 @@ function evaluateFileQuality(opt: ScoreFileQualityOptions): FileQualityScore {
     const securityCeiling = computeSecurityCeiling(null, scaleFactor);
 
     // 3. Base dimension indices
-    const isExemptFacade = filePath.endsWith(FILE_SUFFIX_INDEX_TS) || filePath.endsWith(FILE_SUFFIX_DTS);
+    const isExemptFacade =
+        filePath.endsWith(FILE_SUFFIX_INDEX_TS) || filePath.endsWith(FILE_SUFFIX_DTS);
     const indices = computeDimensionIndices(
         riskResult,
         densityResult,
@@ -456,7 +463,8 @@ function accumulateScoreItem(
         acc.pillarSums[p] += pillars[p];
     }
     for (const d of ALL_QUALITY_DIMENSIONS) {
-        const fallback = d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        const fallback =
+            d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
         acc.dimSums[d] += dimensions?.[d] ?? fallback;
     }
 }
@@ -467,7 +475,10 @@ function finalizeAverageScores(acc: ScoreAccumulator): {
     tenDimensions: Record<QualityDimension, number>;
 } {
     const count = Math.max(1, acc.count);
-    const pillars: Record<PrimaryQualityPillar, number> = {} as Record<PrimaryQualityPillar, number>;
+    const pillars: Record<PrimaryQualityPillar, number> = {} as Record<
+        PrimaryQualityPillar,
+        number
+    >;
     for (const p of ALL_PRIMARY_PILLARS) {
         pillars[p] = Math.round((acc.pillarSums[p] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
     }
@@ -569,7 +580,9 @@ function computeProjectPillars(
 
     if (fatalCount > 0) {
         const hasFatalArch = fileScores.some((f) =>
-            f.issues.some((i) => i.severity === SEVERITY_ERROR && i.rule.startsWith(PREFIX_RULE_ARCH)),
+            f.issues.some(
+                (i) => i.severity === SEVERITY_ERROR && i.rule.startsWith(PREFIX_RULE_ARCH),
+            ),
         );
         if (hasFatalArch && projectPillars.architecture > FATAL_ARCH_CEILING) {
             projectPillars.architecture = FATAL_ARCH_CEILING;
@@ -588,7 +601,8 @@ function createEmptyProjectScore(): ProjectQualityScore {
         number
     >;
     for (const d of ALL_QUALITY_DIMENSIONS) {
-        emptyDimensions[d] = d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        emptyDimensions[d] =
+            d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
     }
     const emptyPillars = synthesizeEightPillars(emptyDimensions);
     return {
@@ -666,7 +680,8 @@ function accumulateDimensionSums(
 ): void {
     const fDims = file.tenDimensions;
     for (const d of ALL_QUALITY_DIMENSIONS) {
-        const fallback = d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        const fallback =
+            d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
         const dimScore = fDims?.[d] ?? fallback;
         projectDimSums[d] += dimScore * fileWeight;
     }
@@ -775,7 +790,10 @@ function finalizeProjectEightPillars(
     let logSum = 0;
     for (const p of ALL_PRIMARY_PILLARS) {
         const w = synthesized.weights[p];
-        const boundedScore = Math.max(BOUNDED_SCORE_MIN, Math.min(DIMENSION_MAX_SCORE, projectPillars[p]));
+        const boundedScore = Math.max(
+            BOUNDED_SCORE_MIN,
+            Math.min(DIMENSION_MAX_SCORE, projectPillars[p]),
+        );
         logSum += w * Math.log(boundedScore);
         totalWeight += w;
     }
@@ -809,11 +827,23 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
     const synthesized = finalizeProjectEightPillars(projectDimensions, projectPillars);
 
     const count = Math.max(1, fileScores.length);
-    const avgEffective = clampRatio(Math.round((metrics.totalDensity / count) * RATIO_SCALE_HUNDRED) / RATIO_SCALE_HUNDRED);
-    const avgComposite = clampRatio(Math.round((metrics.totalCompositeDensity / count) * RATIO_SCALE_HUNDRED) / RATIO_SCALE_HUNDRED);
-    const avgTspr = clampRatio(Math.round((metrics.totalTspr / count) * RATIO_SCALE_THOUSAND) / RATIO_SCALE_THOUSAND);
-    const avgPor = clampRatio(Math.round((metrics.totalPor / count) * RATIO_SCALE_THOUSAND) / RATIO_SCALE_THOUSAND);
-    const avgCol = clampRatio(Math.round((metrics.totalColumnDensity / count) * RATIO_SCALE_THOUSAND) / RATIO_SCALE_THOUSAND);
+    const avgEffective = clampRatio(
+        Math.round((metrics.totalDensity / count) * RATIO_SCALE_HUNDRED) / RATIO_SCALE_HUNDRED,
+    );
+    const avgComposite = clampRatio(
+        Math.round((metrics.totalCompositeDensity / count) * RATIO_SCALE_HUNDRED) /
+            RATIO_SCALE_HUNDRED,
+    );
+    const avgTspr = clampRatio(
+        Math.round((metrics.totalTspr / count) * RATIO_SCALE_THOUSAND) / RATIO_SCALE_THOUSAND,
+    );
+    const avgPor = clampRatio(
+        Math.round((metrics.totalPor / count) * RATIO_SCALE_THOUSAND) / RATIO_SCALE_THOUSAND,
+    );
+    const avgCol = clampRatio(
+        Math.round((metrics.totalColumnDensity / count) * RATIO_SCALE_THOUSAND) /
+            RATIO_SCALE_THOUSAND,
+    );
 
     return {
         compositeScore: synthesized.compositeScore,

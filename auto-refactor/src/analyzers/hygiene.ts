@@ -354,7 +354,10 @@ function checkHollowCommentLine(
     openTerminator: HollowBlockTerminator,
 ): { isComment: boolean; nextTerminator: HollowBlockTerminator } {
     if (openTerminator) {
-        return { isComment: true, nextTerminator: line.includes(openTerminator) ? '' : openTerminator };
+        return {
+            isComment: true,
+            nextTerminator: line.includes(openTerminator) ? '' : openTerminator,
+        };
     }
     if (line.startsWith('/*')) {
         return { isComment: true, nextTerminator: line.includes('*/') ? '' : '*/' };
@@ -710,7 +713,11 @@ export class HygieneAnalyzer implements Analyzer {
     }): void {
         if (params.reportedState.count >= 3) return;
         const lowerFile = params.file.toLowerCase();
-        if (lowerFile.endsWith('.gd') || lowerFile.includes('makefile') || lowerFile.endsWith('.mk')) {
+        if (
+            lowerFile.endsWith('.gd') ||
+            lowerFile.includes('makefile') ||
+            lowerFile.endsWith('.mk')
+        ) {
             return;
         }
         if (/^\s*\t/.test(params.lineText)) {

@@ -221,8 +221,7 @@ const ACTIVITY_CHURN_WEIGHT = 0.3;
 const ACTIVITY_EXPONENT_FACTOR = 0.8;
 
 // ── Diagnostics and Textual Annotations ─────────────────────────────────────
-const ANNOTATION_BURST_SPIKE =
-    '[BURST SPIKE: Short-term commit frequency accelerating]';
+const ANNOTATION_BURST_SPIKE = '[BURST SPIKE: Short-term commit frequency accelerating]';
 const ANNOTATION_AUTHOR_DIFFUSION =
     '[AUTHOR DIFFUSION: Highly fragmented ownership across concurrent contributors]';
 const ANNOTATION_RAPID_DECAY =
@@ -329,10 +328,7 @@ function sanitizeNonNegative(candidateValue: unknown, fallbackValue = 0): number
  * @param interestMultiplier - Compounding interest multiplier in [1.0, maxCap].
  * @returns HotspotSeverity classification.
  */
-function resolveHotspotSeverity(
-    hotspotScore: number,
-    interestMultiplier: number,
-): HotspotSeverity {
+function resolveHotspotSeverity(hotspotScore: number, interestMultiplier: number): HotspotSeverity {
     if (
         hotspotScore >= SEVERITY_CRITICAL_SCORE_THRESHOLD ||
         interestMultiplier >= SEVERITY_CRITICAL_MULTIPLIER_THRESHOLD
@@ -480,9 +476,10 @@ interface EvolutionModifierParams {
  * @param params - Contextual parameters for burst spike calculation.
  * @returns Object containing burst spike flag and normalized churn acceleration.
  */
-function evaluateBurstSpike(
-    params: BurstSpikeParams,
-): { burstSpike: boolean; churnAcceleration: number } {
+function evaluateBurstSpike(params: BurstSpikeParams): {
+    burstSpike: boolean;
+    churnAcceleration: number;
+} {
     let burstSpike = false;
     let churnAcceleration = ACCELERATION_BASELINE;
     const { accumulator, input, cleanMetrics, maxCap } = params;
@@ -490,9 +487,15 @@ function evaluateBurstSpike(
     if (typeof input.commits7Days === 'number' && input.commits7Days > 0) {
         const safeCommits7 = sanitizeNonNegative(input.commits7Days);
         const rate7 = safeCommits7 / DAYS_IN_WEEK;
-        const rate30 = Math.max(MIN_COMMITS_BASELINE_RATE, cleanMetrics.commits30Days / DAYS_IN_MONTH);
+        const rate30 = Math.max(
+            MIN_COMMITS_BASELINE_RATE,
+            cleanMetrics.commits30Days / DAYS_IN_MONTH,
+        );
         churnAcceleration = +(rate7 / rate30).toFixed(PRECISION_VELOCITY);
-        if (churnAcceleration >= BURST_ACCELERATION_THRESHOLD && safeCommits7 >= BURST_MIN_COMMITS_7_DAYS) {
+        if (
+            churnAcceleration >= BURST_ACCELERATION_THRESHOLD &&
+            safeCommits7 >= BURST_MIN_COMMITS_7_DAYS
+        ) {
             burstSpike = true;
             accumulator.effectiveMultiplier = +Math.min(
                 maxCap,
@@ -510,9 +513,7 @@ function evaluateBurstSpike(
  * @param params - Contextual parameters for author diffusion evaluation.
  * @returns Whether code ownership exhibits high author diffusion.
  */
-function evaluateAuthorDiffusion(
-    params: AuthorDiffusionParams,
-): boolean {
+function evaluateAuthorDiffusion(params: AuthorDiffusionParams): boolean {
     const { accumulator, input, cleanMetrics, maxCap } = params;
     if (
         typeof input.authorEntropy === 'number' &&
@@ -535,9 +536,10 @@ function evaluateAuthorDiffusion(
  * @param params - Contextual parameters for rapid decay calculation.
  * @returns Object containing rapid decay flag and computed decay velocity.
  */
-function evaluateRapidDecay(
-    params: RapidDecayParams,
-): { rapidDecay: boolean; decayVelocity: number } {
+function evaluateRapidDecay(params: RapidDecayParams): {
+    rapidDecay: boolean;
+    decayVelocity: number;
+} {
     let rapidDecay = false;
     let decayVelocity = ACCELERATION_BASELINE;
     const { accumulator, churnAcceleration, cleanMetrics, maxCap } = params;
@@ -547,7 +549,10 @@ function evaluateRapidDecay(
         decayVelocity = +(churnAcceleration * (1.0 + defectRatio * DECAY_DEFECT_WEIGHT)).toFixed(
             PRECISION_VELOCITY,
         );
-        if (decayVelocity >= RAPID_DECAY_VELOCITY_THRESHOLD && cleanMetrics.defectCount >= RAPID_DECAY_MIN_DEFECTS) {
+        if (
+            decayVelocity >= RAPID_DECAY_VELOCITY_THRESHOLD &&
+            cleanMetrics.defectCount >= RAPID_DECAY_MIN_DEFECTS
+        ) {
             rapidDecay = true;
             accumulator.effectiveMultiplier = +Math.min(
                 maxCap,
@@ -565,17 +570,19 @@ function evaluateRapidDecay(
  * @param params - Contextual parameters for developer congestion evaluation.
  * @returns Object containing developer congestion flag and active coordination path count.
  */
-function evaluateDeveloperCongestion(
-    params: DeveloperCongestionParams,
-): { developerCongestion: boolean; coordinationPaths: number } {
+function evaluateDeveloperCongestion(params: DeveloperCongestionParams): {
+    developerCongestion: boolean;
+    coordinationPaths: number;
+} {
     const { accumulator, authorCount, cleanMetrics, maxCap } = params;
     const coordinationPaths =
-        authorCount >= MIN_CONGESTION_AUTHOR_COUNT
-            ? (authorCount * (authorCount - 1)) / 2
-            : 0;
+        authorCount >= MIN_CONGESTION_AUTHOR_COUNT ? (authorCount * (authorCount - 1)) / 2 : 0;
     let developerCongestion = false;
 
-    if (authorCount >= CONGESTION_MIN_AUTHORS && cleanMetrics.commits30Days >= CONGESTION_MIN_COMMITS_30_DAYS) {
+    if (
+        authorCount >= CONGESTION_MIN_AUTHORS &&
+        cleanMetrics.commits30Days >= CONGESTION_MIN_COMMITS_30_DAYS
+    ) {
         developerCongestion = true;
         accumulator.effectiveMultiplier = +Math.min(
             maxCap,
@@ -594,9 +601,7 @@ function evaluateDeveloperCongestion(
  * @param params - Input parameters for computing evolution modifiers.
  * @returns Unified state record of all applied evolution modifiers.
  */
-function computeEvolutionModifiers(
-    params: EvolutionModifierParams,
-): EvolutionModifierState {
+function computeEvolutionModifiers(params: EvolutionModifierParams): EvolutionModifierState {
     const { baseMultiplier, input, cleanMetrics, maxCap } = params;
     const accumulator: ModifierAccumulator = {
         effectiveMultiplier: baseMultiplier,
@@ -727,17 +732,17 @@ export class BehavioralHotspotEvaluator {
         const normDefects = safeDefects / (safeDefects + this.defectHalfPoint);
 
         const totalWeight =
-            this.weightComplexity + this.weightEloc + this.weightDefects || BASE_INTEREST_MULTIPLIER;
+            this.weightComplexity + this.weightEloc + this.weightDefects ||
+            BASE_INTEREST_MULTIPLIER;
         const weightedDebt =
             (this.weightComplexity * normCc +
                 this.weightEloc * normEloc +
                 this.weightDefects * normDefects) /
             totalWeight;
 
-        return +Math.min(
-            ENTROPY_MAX_VALUE,
-            Math.max(ENTROPY_MIN_VALUE, weightedDebt),
-        ).toFixed(PRECISION_STATISTICAL);
+        return +Math.min(ENTROPY_MAX_VALUE, Math.max(ENTROPY_MIN_VALUE, weightedDebt)).toFixed(
+            PRECISION_STATISTICAL,
+        );
     }
 
     /**
@@ -763,11 +768,11 @@ export class BehavioralHotspotEvaluator {
         );
 
         // CodeScene Hotspot principle: Activity x Static Debt
-        const rawScore = SCORE_SCALE_MAX * Math.pow(activityScore, ACTIVITY_EXPONENT_FACTOR) * debtScore;
-        return +Math.min(
-            SCORE_SCALE_MAX,
-            Math.max(SCORE_SCALE_MIN, rawScore),
-        ).toFixed(PRECISION_SCORE);
+        const rawScore =
+            SCORE_SCALE_MAX * Math.pow(activityScore, ACTIVITY_EXPONENT_FACTOR) * debtScore;
+        return +Math.min(SCORE_SCALE_MAX, Math.max(SCORE_SCALE_MIN, rawScore)).toFixed(
+            PRECISION_SCORE,
+        );
     }
 
     /**

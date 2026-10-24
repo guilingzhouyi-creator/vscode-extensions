@@ -499,10 +499,7 @@ async function runDiffRoutingPass(ctx: DiffRoutingPassContext): Promise<void> {
                 ctx,
             );
         } else {
-            await processUnchangedFile(
-                { rel: relPath, fileIndex: fileIdx, statEntry },
-                ctx,
-            );
+            await processUnchangedFile({ rel: relPath, fileIndex: fileIdx, statEntry }, ctx);
         }
     }
 }

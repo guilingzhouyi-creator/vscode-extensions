@@ -36,10 +36,14 @@ function isQuoteCharCode(code: number): boolean {
 
 function isStringPrefixCharCode(code: number): boolean {
     return (
-        code === 114 || code === 82 || // r, R
-        code === 98 || code === 66 ||   // b, B
-        code === 117 || code === 85 ||  // u, U
-        code === 102 || code === 70     // f, F
+        code === 114 ||
+        code === 82 || // r, R
+        code === 98 ||
+        code === 66 || // b, B
+        code === 117 ||
+        code === 85 || // u, U
+        code === 102 ||
+        code === 70 // f, F
     );
 }
 

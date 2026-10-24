@@ -299,9 +299,7 @@ const NEGATIVE_FIXTURES = {
         `(FP rate ${(fpRate * 100).toFixed(2)}%)`,
     );
     assert.strictEqual(cmpOnNegative, 0, 'idiomatic constructs must produce zero CMP findings');
-    console.log(
-      '  ✔ FP rate 0.00% against a negative corpus, with the positive set still firing.',
-    );
+    console.log('  ✔ FP rate 0.00% against a negative corpus, with the positive set still firing.');
 
     // Real-corpus guard: every file below produced a CMP false positive before the rules read the
     // shared masked view. Keeping them silent is the regression this suite exists to catch, and

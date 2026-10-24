@@ -87,6 +87,7 @@ const KIND_FUNCTION: SymbolDeclarationKind = 'function';
  * @param line - Line text containing class declaration.
  * @param lineIdx - 0-indexed line number.
  * @param pCtx - Python naming traversal context.
+ * @param topLevel
  */
 export function auditPythonClass(
     line: string,
@@ -134,6 +135,7 @@ export function auditPythonClass(
  * @param line - Line text containing assignment.
  * @param lineIdx - 0-indexed line number.
  * @param pCtx - Python naming traversal context.
+ * @param topLevel
  */
 export function auditPythonAssignment(
     line: string,
@@ -234,6 +236,7 @@ function checkPythonFunctionLength(
  * @param line - Line text containing function definition.
  * @param lineIdx - 0-indexed line number.
  * @param pCtx - Python naming traversal context.
+ * @param topLevel
  */
 export function auditPythonFunction(
     line: string,

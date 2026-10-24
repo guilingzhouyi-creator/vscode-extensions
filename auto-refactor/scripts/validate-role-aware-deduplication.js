@@ -93,9 +93,7 @@ async function testRoleAwareDeduplication() {
 
     console.log('  ✔ Business module enforces standard duplicate literal extraction');
     console.log('  ✔ Test suite benign tokens are exempt from duplicate literal warnings');
-    console.log(
-      '  ✔ Config schema property tokens are exempt from duplicate literal warnings',
-    );
+    console.log('  ✔ Config schema property tokens are exempt from duplicate literal warnings');
     console.log('\nALL ROLE-AWARE DEDUPLICATION CHECKS PASSED SUCCESSFULLY!\n');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

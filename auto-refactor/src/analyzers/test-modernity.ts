@@ -590,7 +590,9 @@ export class TestModernityAnalyzer implements Analyzer {
         node: ts.CallExpression,
         sf: ts.SourceFile,
     ): { literal: string; target: string } | null {
-        return this.checkBrittleOracleMatcher(node, sf) ?? this.checkBrittleOracleAssertCall(node, sf);
+        return (
+            this.checkBrittleOracleMatcher(node, sf) ?? this.checkBrittleOracleAssertCall(node, sf)
+        );
     }
 
     private checkDirectAssertTautological(node: ts.CallExpression, sf: ts.SourceFile): boolean {
@@ -729,19 +731,22 @@ export class TestModernityAnalyzer implements Analyzer {
         }
     }
 
-    private recordSiteIfSmell(params: {
-        filePath: string;
-        lineNum: number;
-        testName: string;
-        isSkipped: boolean;
-        isTautological: boolean;
-        isMockOnly: boolean;
-        isObsolete: boolean;
-        isFragileFloat?: boolean;
-        fragileFloatLit?: string;
-        isBrittleOracle?: boolean;
-        brittleOracleLit?: string;
-    }, sites: TestSite[]): void {
+    private recordSiteIfSmell(
+        params: {
+            filePath: string;
+            lineNum: number;
+            testName: string;
+            isSkipped: boolean;
+            isTautological: boolean;
+            isMockOnly: boolean;
+            isObsolete: boolean;
+            isFragileFloat?: boolean;
+            fragileFloatLit?: string;
+            isBrittleOracle?: boolean;
+            brittleOracleLit?: string;
+        },
+        sites: TestSite[],
+    ): void {
         const {
             filePath,
             lineNum,

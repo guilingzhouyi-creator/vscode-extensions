@@ -63,10 +63,7 @@ function findPatternMatchesInLine(
  * @param patterns - Pattern strings to locate.
  * @returns Sorted array of NativePatternMatch occurrences.
  */
-export function fastPatternMatchShim(
-    sourceText: string,
-    patterns: string[],
-): NativePatternMatch[] {
+export function fastPatternMatchShim(sourceText: string, patterns: string[]): NativePatternMatch[] {
     const results: NativePatternMatch[] = [];
     if (!sourceText || patterns.length === 0) {
         return results;

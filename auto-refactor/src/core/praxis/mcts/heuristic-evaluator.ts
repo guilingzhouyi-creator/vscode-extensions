@@ -169,12 +169,8 @@ export async function evaluateCandidateStrategy(
         violationCount += countCodeDefects(modStr);
         const newCpx = estimateComplexity(modStr);
         const originalFile = await workspace.getFile(filePath);
-        const origStr = originalFile
-            ? Buffer.from(originalFile.content).toString('utf8')
-            : modStr;
-        const origCpx = originalFile
-            ? estimateComplexity(origStr)
-            : newCpx;
+        const origStr = originalFile ? Buffer.from(originalFile.content).toString('utf8') : modStr;
+        const origCpx = originalFile ? estimateComplexity(origStr) : newCpx;
 
         originalViolationCount += countCodeDefects(origStr);
         complexityDelta += newCpx - origCpx;

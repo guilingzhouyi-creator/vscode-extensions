@@ -97,8 +97,8 @@ const DEFAULT_CONFIG = Object.freeze({
 /**
  * Generates synthetic baseline TypeScript content with repeated functions and tokens.
  *
- * @param {number} lineCount - Number of function blocks to synthesize.
- * @returns {string} Synthesized TypeScript code.
+ * @param lineCount - Number of function blocks to synthesize.
+ * @returns Synthesized TypeScript code.
  */
 function baselineBig(lineCount) {
   const codeBlocks = [];
@@ -110,11 +110,11 @@ function baselineBig(lineCount) {
 
     codeBlocks.push(
       `export function fn${index}(x: number): number {\n` +
-      `  const LIMIT${index} = ${limitOffset};\n` +
-      `  if (x > ${positiveThreshold}) return ${limitOffset};\n` +
-      `  if (x < ${negativeThreshold}) return ${negativeLimit};\n` +
-      `  return x + ${limitOffset};\n` +
-      `}\n`
+        `  const LIMIT${index} = ${limitOffset};\n` +
+        `  if (x > ${positiveThreshold}) return ${limitOffset};\n` +
+        `  if (x < ${negativeThreshold}) return ${negativeLimit};\n` +
+        `  return x + ${limitOffset};\n` +
+        `}\n`,
     );
   }
   codeBlocks.push(`export const TAG = '${SHARED_TOKEN_VALUE}';\n`);
@@ -127,7 +127,7 @@ function baselineBig(lineCount) {
 /**
  * Writes standard test configuration JSON to target path.
  *
- * @param {string} targetConfigPath - Destination file path.
+ * @param targetConfigPath - Destination file path.
  */
 function writeConfig(targetConfigPath = CFG) {
   fs.writeFileSync(targetConfigPath, JSON.stringify(DEFAULT_CONFIG, null, 2));
@@ -136,8 +136,8 @@ function writeConfig(targetConfigPath = CFG) {
 /**
  * Normalizes and sorts scan report issues and metrics for deterministic byte-level comparison.
  *
- * @param {object} scanReport - Raw scan report object.
- * @returns {object} Normalized report subset.
+ * @param scanReport - Raw scan report object.
+ * @returns Normalized report subset.
  */
 function normalize(scanReport) {
   const normalizedIssues = scanReport.issues
@@ -170,7 +170,7 @@ function normalize(scanReport) {
 /**
  * Best-effort file and directory removal with Windows transient lock rename fallback.
  *
- * @param {string} targetPath - Path to remove.
+ * @param targetPath - Path to remove.
  */
 function rmRetry(targetPath) {
   try {
@@ -209,7 +209,7 @@ function daemonStop() {
 /**
  * Spawns background daemon for corpus root.
  *
- * @returns {boolean} True if daemon started successfully.
+ * @returns True if daemon started successfully.
  */
 function daemonStart() {
   try {
@@ -228,9 +228,9 @@ function daemonStart() {
 /**
  * Prepares an isolated diff-corpus folder with config and initial files.
  *
- * @param {string} corpusDir - Destination directory path.
- * @param {string} baseContent - Initial content for big.ts.
- * @param {string} smallContent - Initial content for small.ts.
+ * @param corpusDir - Destination directory path.
+ * @param baseContent - Initial content for big.ts.
+ * @param smallContent - Initial content for small.ts.
  */
 function setupCorpus(corpusDir, baseContent, smallContent) {
   rmRetry(corpusDir);
@@ -243,9 +243,9 @@ function setupCorpus(corpusDir, baseContent, smallContent) {
 /**
  * Creates standard scan options for a corpus folder.
  *
- * @param {string} corpusDir - Target corpus directory.
- * @param {object} [overrides] - Additional option overrides.
- * @returns {object} Scan configuration options.
+ * @param corpusDir - Target corpus directory.
+ * @param [overrides] - Additional option overrides.
+ * @returns Scan configuration options.
  */
 function getScanOptions(corpusDir, overrides = {}) {
   return {
@@ -262,8 +262,8 @@ function getScanOptions(corpusDir, overrides = {}) {
 /**
  * Creates cold scan options for a corpus folder.
  *
- * @param {string} corpusDir - Target corpus directory.
- * @returns {object} Cold scan options.
+ * @param corpusDir - Target corpus directory.
+ * @returns Cold scan options.
  */
 function getColdScanOptions(corpusDir) {
   return {
@@ -277,9 +277,9 @@ function getColdScanOptions(corpusDir) {
 /**
  * Scenario D1: Full file single line edit equivalence.
  *
- * @param {string} corpusDir - Isolated corpus directory.
- * @param {string} baseContent - Original big.ts content.
- * @returns {Promise<{ name: string, ok: boolean, extra: string }>}
+ * @param corpusDir - Isolated corpus directory.
+ * @param baseContent - Original big.ts content.
+ * @returns
  */
 async function runD1(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -304,9 +304,9 @@ async function runD1(corpusDir, baseContent) {
 /**
  * Scenario D2: Range-based single line edit equivalence.
  *
- * @param {string} corpusDir - Isolated corpus directory.
- * @param {string} baseContent - Original big.ts content.
- * @returns {Promise<{ name: string, ok: boolean, extra: string }>}
+ * @param corpusDir - Isolated corpus directory.
+ * @param baseContent - Original big.ts content.
+ * @returns
  */
 async function runD2(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -335,10 +335,10 @@ async function runD2(corpusDir, baseContent) {
 /**
  * Scenario D3: Multi-file concurrent modification equivalence.
  *
- * @param {string} corpusDir - Isolated corpus directory.
- * @param {string} baseContent - Original big.ts content.
- * @param {string} smallContent - Original small.ts content.
- * @returns {Promise<{ name: string, ok: boolean, extra: string }>}
+ * @param corpusDir - Isolated corpus directory.
+ * @param baseContent - Original big.ts content.
+ * @param smallContent - Original small.ts content.
+ * @returns
  */
 async function runD3(corpusDir, baseContent, smallContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -370,9 +370,9 @@ async function runD3(corpusDir, baseContent, smallContent) {
 /**
  * Scenario D4: Out-of-bounds edit range fallback to full scan.
  *
- * @param {string} corpusDir - Isolated corpus directory.
- * @param {string} baseContent - Original big.ts content.
- * @returns {Promise<{ name: string, ok: boolean, extra: string }>}
+ * @param corpusDir - Isolated corpus directory.
+ * @param baseContent - Original big.ts content.
+ * @returns
  */
 async function runD4(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -408,9 +408,9 @@ async function runD4(corpusDir, baseContent) {
 /**
  * Scenario D5: Disk content mismatch fallback to full scan.
  *
- * @param {string} corpusDir - Isolated corpus directory.
- * @param {string} baseContent - Original big.ts content.
- * @returns {Promise<{ name: string, ok: boolean, extra: string }>}
+ * @param corpusDir - Isolated corpus directory.
+ * @param baseContent - Original big.ts content.
+ * @returns
  */
 async function runD5(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -435,9 +435,9 @@ async function runD5(corpusDir, baseContent) {
 /**
  * Scenario D6: Delta subset and ordering consistency.
  *
- * @param {string} corpusDir - Isolated corpus directory.
- * @param {string} baseContent - Original big.ts content.
- * @returns {Promise<{ name: string, ok: boolean, extra: string }>}
+ * @param corpusDir - Isolated corpus directory.
+ * @param baseContent - Original big.ts content.
+ * @returns
  */
 async function runD6(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
@@ -488,10 +488,10 @@ async function runD6(corpusDir, baseContent) {
 /**
  * Formats standard test scenario output line.
  *
- * @param {string} scenarioName - Test scenario name.
- * @param {boolean} passed - Whether scenario succeeded.
- * @param {string} [extraDetails] - Diagnostic metrics string.
- * @returns {string} Formatted output line.
+ * @param scenarioName - Test scenario name.
+ * @param passed - Whether scenario succeeded.
+ * @param [extraDetails] - Diagnostic metrics string.
+ * @returns Formatted output line.
  */
 function formatTestResult(scenarioName, passed, extraDetails = '') {
   const statusPrefix = passed ? STATUS_PASS : STATUS_BLOCK;
@@ -612,7 +612,9 @@ async function main() {
     process.env.AR_INCREMENTAL_MIN_LINES = previousMinLines;
   }
 
-  console.log(failureCount > 0 ? `\n${failureCount} scenario(s) FAILED` : '\nALL DIFF SCENARIOS PASS');
+  console.log(
+    failureCount > 0 ? `\n${failureCount} scenario(s) FAILED` : '\nALL DIFF SCENARIOS PASS',
+  );
   process.exit(failureCount > 0 ? 1 : 0);
 }
 

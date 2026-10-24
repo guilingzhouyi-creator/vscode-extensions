@@ -103,7 +103,10 @@ function stripLiteralsAndComments(line: string): string {
         .replace(/'(?:\\.|[^'\\])*'/g, "''")
         .replace(/"(?:\\.|[^"\\])*"/g, '""')
         .replace(/`(?:\\.|[^`\\])*`/g, '``')
-        .replace(/(^|[(,=:[!&|?{};\s])\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\\n])+\/[gimsuy]*/g, '$1RE')
+        .replace(
+            /(^|[(,=:[!&|?{};\s])\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\\n])+\/[gimsuy]*/g,
+            '$1RE',
+        )
         .replace(/\/\/.*$/, '');
 }
 
@@ -270,7 +273,9 @@ function collectRecursionSites(content: string): RecursionSite[] {
         if (declaration !== null) {
             const openIndex = findBodyBrace(code, declaration.index + declaration[0].length);
             const params =
-                openIndex >= 0 ? declaration[2] + code.slice(declaration.index, openIndex) : declaration[2];
+                openIndex >= 0
+                    ? declaration[2] + code.slice(declaration.index, openIndex)
+                    : declaration[2];
             if (openIndex >= 0) {
                 openFrame(declaration[1], params, depthBefore, code, openIndex, lineNumber);
             } else {

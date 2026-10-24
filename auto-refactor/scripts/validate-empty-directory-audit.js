@@ -40,8 +40,8 @@ const {
 /**
  * Create a fresh temporary directory.
  *
- * @param {string} prefix - Prefix for the directory name.
- * @returns {string} Absolute path of the created directory.
+ * @param prefix - Prefix for the directory name.
+ * @returns Absolute path of the created directory.
  */
 function tempRoot(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -50,9 +50,9 @@ function tempRoot(prefix) {
 /**
  * Create a directory relative to a root, including any missing parents.
  *
- * @param {string} root - Absolute root directory.
- * @param {string} relative - POSIX relative directory path.
- * @returns {void}
+ * @param root - Absolute root directory.
+ * @param relative - POSIX relative directory path.
+ * @returns
  */
 function makeDir(root, relative) {
   fs.mkdirSync(path.join(root, relative), { recursive: true });
@@ -61,10 +61,10 @@ function makeDir(root, relative) {
 /**
  * Write one file relative to a root, creating parent directories.
  *
- * @param {string} root - Absolute root directory.
- * @param {string} relative - POSIX relative file path.
- * @param {string} content - File content.
- * @returns {void}
+ * @param root - Absolute root directory.
+ * @param relative - POSIX relative file path.
+ * @param content - File content.
+ * @returns
  */
 function writeFile(root, relative, content) {
   const absolute = path.join(root, relative);
@@ -75,8 +75,8 @@ function writeFile(root, relative, content) {
 /**
  * Collect the reported directory paths of one audit.
  *
- * @param {string} root - Absolute root directory.
- * @returns {string[]} Reported relative directory paths.
+ * @param root - Absolute root directory.
+ * @returns Reported relative directory paths.
  */
 function reportedPaths(root) {
   return auditEmptyDirectories(root).map((issue) => issue.location.file);
@@ -85,7 +85,7 @@ function reportedPaths(root) {
 /**
  * Assert the audit reports exactly the expected directory set.
  *
- * @returns {void}
+ * @returns
  */
 function verifyAuditDetectsEmptyDirectory() {
   const root = tempRoot('ar-emptydir-detect-');
@@ -108,7 +108,7 @@ function verifyAuditDetectsEmptyDirectory() {
 /**
  * Assert the ignored vocabulary is honoured by both the audit and the name translator.
  *
- * @returns {void}
+ * @returns
  */
 function verifyIgnoredTreesStaySilent() {
   const root = tempRoot('ar-emptydir-ignored-');
@@ -135,7 +135,7 @@ function verifyIgnoredTreesStaySilent() {
 /**
  * Assert exemption rules and the exclude-glob translator behave as specified.
  *
- * @returns {void}
+ * @returns
  */
 function verifyExemptionsAndTranslator() {
   const root = tempRoot('ar-emptydir-exempt-');
@@ -179,7 +179,7 @@ function verifyExemptionsAndTranslator() {
 /**
  * Assert a populated tree produces nothing, proving the detector is not always-on.
  *
- * @returns {void}
+ * @returns
  */
 function verifyPopulatedTreeStaysSilent() {
   const root = tempRoot('ar-emptydir-populated-');
@@ -196,7 +196,7 @@ function verifyPopulatedTreeStaysSilent() {
 /**
  * Assert the rule reaches a full-scan report and stays out of an incremental one.
  *
- * @returns {Promise<void>} Resolves when both entry points have been asserted.
+ * @returns Resolves when both entry points have been asserted.
  */
 async function verifyPostScanChannel() {
   const root = tempRoot('ar-emptydir-scan-');
@@ -263,7 +263,7 @@ async function verifyPostScanChannel() {
 /**
  * Assert the pass is absent when the hygiene analyzer is disabled.
  *
- * @returns {Promise<void>} Resolves when the disabled run has been asserted.
+ * @returns Resolves when the disabled run has been asserted.
  */
 async function verifyDisabledAnalyzerSkipsPass() {
   const root = tempRoot('ar-emptydir-disabled-');

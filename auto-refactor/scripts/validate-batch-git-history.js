@@ -45,11 +45,7 @@ function testMockBatchParsing() {
 function testRealRepoBatchEquivalence() {
   console.log('2. Testing Real Repository Batch vs Single-File Mining Equivalence...');
 
-  const targetFiles = [
-    'package.json',
-    'src/api.ts',
-    'src/core/evolution/git-history-miner.ts',
-  ];
+  const targetFiles = ['package.json', 'src/api.ts', 'src/core/evolution/git-history-miner.ts'];
 
   const cwd = path.resolve(__dirname, '..');
   const minerSingle = new GitHistoryMiner({ repoRoot: cwd, maxCommits: EQUIVALENCE_MAX_COMMITS });
@@ -106,10 +102,7 @@ function testCodeEvolutionAnalyzerBatch() {
   console.log('3. Testing CodeEvolutionAnalyzer Batch Execution & Equivalence...');
 
   const cwd = path.resolve(__dirname, '..');
-  const targetFiles = [
-    'package.json',
-    'src/api.ts',
-  ];
+  const targetFiles = ['package.json', 'src/api.ts'];
 
   const minerSeq = new GitHistoryMiner({ repoRoot: cwd, maxCommits: EQUIVALENCE_MAX_COMMITS });
   const minerBatch = new GitHistoryMiner({ repoRoot: cwd, maxCommits: EQUIVALENCE_MAX_COMMITS });

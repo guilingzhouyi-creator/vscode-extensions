@@ -114,7 +114,8 @@ const PS_DELETE_RE = /\b(?:Remove-Item|rm|del|erase|rd|rmdir)\b/i;
 const SH_DELETE_RE = /\brm\b/;
 
 /** JavaScript recursive-delete entry points; `rimraf`, `removeSync` and `rmtree` recurse by nature. */
-const JS_DELETE_RE = /\b(?:rmSync|rimraf|removeSync)\s*\(|\bfs\s*\.\s*rm\s*\(|\bshutil\s*\.\s*rmtree\s*\(/;
+const JS_DELETE_RE =
+    /\b(?:rmSync|rimraf|removeSync)\s*\(|\bfs\s*\.\s*rm\s*\(|\bshutil\s*\.\s*rmtree\s*\(/;
 
 /** JavaScript delete calls that need no recursion flag because they recurse by definition. */
 const JS_INHERENTLY_RECURSIVE_RE = /\brimraf\b|\bremoveSync\b|\brmtree\b/;
@@ -440,7 +441,11 @@ export function taintChain(operand: string, bindings: Map<string, string[]>): st
  * @returns Normalised operand.
  */
 function normalizeOperand(operand: string): string {
-    return operand.trim().replace(/^["'`]/, '').replace(/["'`]$/, '').trim();
+    return operand
+        .trim()
+        .replace(/^["'`]/, '')
+        .replace(/["'`]$/, '')
+        .trim();
 }
 
 /**

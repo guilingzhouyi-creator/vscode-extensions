@@ -63,8 +63,8 @@ const RULE_SECRET = 'secret-detected';
 /**
  * Creates a scratch tree holding one YAML fixture.
  *
- * @param {string} fileName - File name to create.
- * @returns {string} Absolute scratch root.
+ * @param fileName - File name to create.
+ * @returns Absolute scratch root.
  */
 function scratchWithYaml(fileName) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-yaml-'));
@@ -75,8 +75,8 @@ function scratchWithYaml(fileName) {
 /**
  * Scans one scratch tree.
  *
- * @param {string} root - Absolute scratch root.
- * @returns {Promise<object>} The scan report.
+ * @param root - Absolute scratch root.
+ * @returns The scan report.
  */
 function scanRoot(root) {
   return scan({

@@ -23,11 +23,7 @@ export const DENSITY_SPACE_DIMENSIONS = 5;
 
 /** Five canonical axes of the code density vector space. */
 export type DensityAxis =
-    | 'lineDensity'
-    | 'columnDensity'
-    | 'reuseDensity'
-    | 'sharedDensity'
-    | 'payloadDensity';
+    'lineDensity' | 'columnDensity' | 'reuseDensity' | 'sharedDensity' | 'payloadDensity';
 
 /** Ordered tuple representation of the five canonical density dimensions. */
 export type DensityVector5D = readonly [number, number, number, number, number];
@@ -67,16 +63,16 @@ export interface SpatialDensityEvaluation {
 export const DEFAULT_LOGIT_EPSILON = 1e-4;
 
 /** Mahalanobis variance bandwidth sigma_M regulating the Gaussian density decay. */
-export const OPTIMAL_MAHALANOBIS_BANDWIDTH = 2.50;
+export const OPTIMAL_MAHALANOBIS_BANDWIDTH = 2.5;
 
 /** Mahalanobis distance threshold below which code is declared isotropically optimal. */
-export const OPTIMAL_MAHALANOBIS_TOLERANCE = 0.50;
+export const OPTIMAL_MAHALANOBIS_TOLERANCE = 0.5;
 
 /** Precision rounding multiplier for export metrics. */
 const ROUNDING_PRECISION = 1e6;
 
 /** Target optimal attractor probabilities for clean, well-factored code. */
-const TARGET_PAYLOAD_DENSITY = 0.90;
+const TARGET_PAYLOAD_DENSITY = 0.9;
 
 /**
  * Pre-computed logit coordinates of the optimal target attractor mu_0.
@@ -92,9 +88,9 @@ export const DEFAULT_TARGET_TANGENT_ATTRACTOR: DensityVector5D = [
  */
 const WHITENING_MATRIX_LOWER: readonly (readonly number[])[] = [
     [0.833333, 0.0, 0.0, 0.0, 0.0],
-    [-0.311360, 0.970474, 0.0, 0.0, 0.0],
+    [-0.31136, 0.970474, 0.0, 0.0, 0.0],
     [-0.143511, -0.084912, 0.788092, 0.0, 0.0],
-    [-0.091418, -0.054090, -0.367577, 0.869599, 0.0],
+    [-0.091418, -0.05409, -0.367577, 0.869599, 0.0],
     [-0.304798, -0.111792, -0.069416, -0.069416, 0.926861],
 ] as const;
 
@@ -121,7 +117,10 @@ export function transformLogit(
     probability: number,
     epsilon: number = DEFAULT_LOGIT_EPSILON,
 ): number {
-    const clamped = Math.min(1.0 - epsilon, Math.max(epsilon, Number.isFinite(probability) ? probability : epsilon));
+    const clamped = Math.min(
+        1.0 - epsilon,
+        Math.max(epsilon, Number.isFinite(probability) ? probability : epsilon),
+    );
     return Math.log(clamped / (1.0 - clamped));
 }
 
@@ -152,11 +151,26 @@ export const inverseLogit = computeInverseLogit;
  * @returns 5D density vector in [0.0, 1.0]^5.
  */
 export function toDensityVector5D(inputs: CompositeDensityInputs): DensityVector5D {
-    const line = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.lineDensity) ? inputs.lineDensity : 0.0));
-    const col = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.columnDensity) ? inputs.columnDensity : 0.0));
-    const reuse = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.reuseDensity) ? inputs.reuseDensity : 0.0));
-    const shared = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.sharedDensity) ? inputs.sharedDensity : 0.0));
-    const payload = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.payloadDensity) ? inputs.payloadDensity : 0.0));
+    const line = Math.min(
+        1.0,
+        Math.max(0.0, Number.isFinite(inputs.lineDensity) ? inputs.lineDensity : 0.0),
+    );
+    const col = Math.min(
+        1.0,
+        Math.max(0.0, Number.isFinite(inputs.columnDensity) ? inputs.columnDensity : 0.0),
+    );
+    const reuse = Math.min(
+        1.0,
+        Math.max(0.0, Number.isFinite(inputs.reuseDensity) ? inputs.reuseDensity : 0.0),
+    );
+    const shared = Math.min(
+        1.0,
+        Math.max(0.0, Number.isFinite(inputs.sharedDensity) ? inputs.sharedDensity : 0.0),
+    );
+    const payload = Math.min(
+        1.0,
+        Math.max(0.0, Number.isFinite(inputs.payloadDensity) ? inputs.payloadDensity : 0.0),
+    );
     return [line, col, reuse, shared, payload];
 }
 
@@ -202,12 +216,12 @@ export function computeWhitenedCoordinates(
 
     const deltas: readonly [number, number, number, number, number] = oneSidedDeficit
         ? [
-            Math.min(0.0, raw0),
-            Math.min(0.0, raw1),
-            Math.min(0.0, raw2),
-            Math.min(0.0, raw3),
-            Math.min(0.0, raw4),
-        ]
+              Math.min(0.0, raw0),
+              Math.min(0.0, raw1),
+              Math.min(0.0, raw2),
+              Math.min(0.0, raw3),
+              Math.min(0.0, raw4),
+          ]
         : [raw0, raw1, raw2, raw3, raw4];
 
     const whitenedCoords: [number, number, number, number, number] = [0, 0, 0, 0, 0];
@@ -262,13 +276,20 @@ export function computeFisherSimplexDistance(
     targetPrimary: number = TARGET_PAYLOAD_DENSITY,
     targetSecondary: number = 1.0 - TARGET_PAYLOAD_DENSITY,
 ): number {
-    const safePrimary = Math.min(1.0, Math.max(0.0, Number.isFinite(samplePrimary) ? samplePrimary : 0.0));
-    const safeSecondary = Math.min(1.0, Math.max(0.0, Number.isFinite(sampleSecondary) ? sampleSecondary : 0.0));
+    const safePrimary = Math.min(
+        1.0,
+        Math.max(0.0, Number.isFinite(samplePrimary) ? samplePrimary : 0.0),
+    );
+    const safeSecondary = Math.min(
+        1.0,
+        Math.max(0.0, Number.isFinite(sampleSecondary) ? sampleSecondary : 0.0),
+    );
     const sumPrimarySecondary = safePrimary + safeSecondary;
     const normPrimary = sumPrimarySecondary > 0 ? safePrimary / sumPrimarySecondary : 0.5;
     const normSecondary = sumPrimarySecondary > 0 ? safeSecondary / sumPrimarySecondary : 0.5;
 
-    const bhattacharyya = Math.sqrt(normPrimary * targetPrimary) + Math.sqrt(normSecondary * targetSecondary);
+    const bhattacharyya =
+        Math.sqrt(normPrimary * targetPrimary) + Math.sqrt(normSecondary * targetSecondary);
     const clampedCosine = Math.min(1.0, Math.max(-1.0, bhattacharyya));
     return 2.0 * Math.acos(clampedCosine);
 }
@@ -348,8 +369,16 @@ export function evaluateSpatialDensityManifold(
 ): SpatialDensityEvaluation {
     const rawVector = toDensityVector5D(inputs);
     const tangentVector = toTangentVector5D(rawVector);
-    const whitenedVector = computeWhitenedCoordinates(tangentVector, DEFAULT_TARGET_TANGENT_ATTRACTOR, true);
-    const mahalanobisDistance = computeMahalanobisDistance(tangentVector, DEFAULT_TARGET_TANGENT_ATTRACTOR, true);
+    const whitenedVector = computeWhitenedCoordinates(
+        tangentVector,
+        DEFAULT_TARGET_TANGENT_ATTRACTOR,
+        true,
+    );
+    const mahalanobisDistance = computeMahalanobisDistance(
+        tangentVector,
+        DEFAULT_TARGET_TANGENT_ATTRACTOR,
+        true,
+    );
 
     // Simplex arc length between payloadDensity (TSPR) and plumbing overhead (POR)
     const tspr = rawVector[4];
@@ -359,8 +388,12 @@ export function evaluateSpatialDensityManifold(
     // Continuous Riemannian Gaussian manifold density modulated by entropy bandwidth factor
     const bandwidthSq = 2.0 * OPTIMAL_MAHALANOBIS_BANDWIDTH * OPTIMAL_MAHALANOBIS_BANDWIDTH;
     const gaussianDecay = Math.exp(-(mahalanobisDistance * mahalanobisDistance) / bandwidthSq);
-    const safeFactor = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.entropyFactor) ? inputs.entropyFactor : 1.0));
-    const spatialCompositeDensity = Math.round(gaussianDecay * safeFactor * ROUNDING_PRECISION) / ROUNDING_PRECISION;
+    const safeFactor = Math.min(
+        1.0,
+        Math.max(0.0, Number.isFinite(inputs.entropyFactor) ? inputs.entropyFactor : 1.0),
+    );
+    const spatialCompositeDensity =
+        Math.round(gaussianDecay * safeFactor * ROUNDING_PRECISION) / ROUNDING_PRECISION;
 
     const { gradient, dominantAxis } = computeRefactoringGradient(rawVector, tangentVector);
     const isIsotropicOptimal = mahalanobisDistance <= OPTIMAL_MAHALANOBIS_TOLERANCE;
@@ -369,8 +402,10 @@ export function evaluateSpatialDensityManifold(
         rawVector,
         tangentVector,
         whitenedVector,
-        mahalanobisDistance: Math.round(mahalanobisDistance * ROUNDING_PRECISION) / ROUNDING_PRECISION,
-        fisherSimplexDistance: Math.round(fisherSimplexDistance * ROUNDING_PRECISION) / ROUNDING_PRECISION,
+        mahalanobisDistance:
+            Math.round(mahalanobisDistance * ROUNDING_PRECISION) / ROUNDING_PRECISION,
+        fisherSimplexDistance:
+            Math.round(fisherSimplexDistance * ROUNDING_PRECISION) / ROUNDING_PRECISION,
         spatialCompositeDensity,
         refactoringGradient: gradient,
         dominantDeficitAxis: dominantAxis,

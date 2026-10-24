@@ -15,14 +15,8 @@
 const LANCZOS_G = 7;
 
 const LANCZOS_COEFFICIENTS = [
-    0.99999999999980993,
-    676.5203681218851,
-    -1259.1392167224028,
-    771.32342877765313,
-    -176.61502916214059,
-    12.507343278686905,
-    -0.138571095856524,
-    9.9843695780195716e-6,
+    0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.138571095856524, 9.9843695780195716e-6,
     1.5056327351493116e-7,
 ] as const;
 
@@ -35,6 +29,7 @@ const CONFIDENCE_95_PERCENT = 0.95;
 /**
  * Computes natural logarithm of Gamma function ln Gamma(z) for positive real numbers.
  * Uses Lanczos approximation (g=7, N=9) achieving precision < 1e-14.
+ * @param inputZ
  */
 export function logGamma(inputZ: number): number {
     if (!Number.isFinite(inputZ) || inputZ <= 0) {
@@ -54,12 +49,19 @@ export function logGamma(inputZ: number): number {
     }
 
     const tTerm = adjustedZ + LANCZOS_G + 0.5;
-    return 0.5 * Math.log(2 * Math.PI) + (adjustedZ + 0.5) * Math.log(tTerm) - tTerm + Math.log(baseSum);
+    return (
+        0.5 * Math.log(2 * Math.PI) +
+        (adjustedZ + 0.5) * Math.log(tTerm) -
+        tTerm +
+        Math.log(baseSum)
+    );
 }
 
 /**
  * Computes natural logarithm of Beta function ln B(a, b).
  * Identity: ln B(a, b) = ln Gamma(a) + ln Gamma(b) - ln Gamma(a + b).
+ * @param alphaVal
+ * @param betaVal
  */
 export function logBeta(alphaVal: number, betaVal: number): number {
     return logGamma(alphaVal) + logGamma(betaVal) - logGamma(alphaVal + betaVal);
@@ -78,10 +80,16 @@ function evaluateIncompleteBetaFraction(alphaVal: number, betaVal: number, input
     fractionD = 1.0 / fractionD;
     let fraction = fractionD;
 
-    for (let iterationIndex = 1; iterationIndex <= MAX_CONTINUED_FRACTION_ITERATIONS; iterationIndex++) {
+    for (
+        let iterationIndex = 1;
+        iterationIndex <= MAX_CONTINUED_FRACTION_ITERATIONS;
+        iterationIndex++
+    ) {
         const stepM2 = 2 * iterationIndex;
         // Even step numerator
-        const dNumerator = (iterationIndex * (betaVal - iterationIndex) * inputX) / ((qam + stepM2) * (alphaVal + stepM2));
+        const dNumerator =
+            (iterationIndex * (betaVal - iterationIndex) * inputX) /
+            ((qam + stepM2) * (alphaVal + stepM2));
         fractionD = 1.0 + dNumerator * fractionD;
         if (Math.abs(fractionD) < 1e-30) fractionD = 1e-30;
         fractionC = 1.0 + dNumerator / fractionC;
@@ -90,7 +98,9 @@ function evaluateIncompleteBetaFraction(alphaVal: number, betaVal: number, input
         fraction *= fractionD * fractionC;
 
         // Odd step numerator
-        const oddNumerator = -((alphaVal + iterationIndex) * (qab + iterationIndex) * inputX) / ((alphaVal + stepM2) * (qap + stepM2));
+        const oddNumerator =
+            -((alphaVal + iterationIndex) * (qab + iterationIndex) * inputX) /
+            ((alphaVal + stepM2) * (qap + stepM2));
         fractionD = 1.0 + oddNumerator * fractionD;
         if (Math.abs(fractionD) < 1e-30) fractionD = 1e-30;
         fractionC = 1.0 + oddNumerator / fractionC;
@@ -109,8 +119,15 @@ function evaluateIncompleteBetaFraction(alphaVal: number, betaVal: number, input
 /**
  * Computes regularized incomplete beta function I_x(a, b).
  * Guarantees output strictly bounded in [0.0, 1.0].
+ * @param alphaVal
+ * @param betaVal
+ * @param inputX
  */
-export function computeRegularizedIncompleteBeta(alphaVal: number, betaVal: number, inputX: number): number {
+export function computeRegularizedIncompleteBeta(
+    alphaVal: number,
+    betaVal: number,
+    inputX: number,
+): number {
     if (inputX <= 0 || inputX >= 1.0) {
         return inputX <= 0 ? 0.0 : 1.0;
     }
@@ -123,7 +140,8 @@ export function computeRegularizedIncompleteBeta(alphaVal: number, betaVal: numb
         return 1.0 - computeRegularizedIncompleteBeta(betaVal, alphaVal, 1.0 - inputX);
     }
 
-    const lnFactor = alphaVal * Math.log(inputX) + betaVal * Math.log(1.0 - inputX) - logBeta(alphaVal, betaVal);
+    const lnFactor =
+        alphaVal * Math.log(inputX) + betaVal * Math.log(1.0 - inputX) - logBeta(alphaVal, betaVal);
     const frontFactor = Math.exp(lnFactor) / alphaVal;
     const fraction = evaluateIncompleteBetaFraction(alphaVal, betaVal, inputX);
 
@@ -135,10 +153,19 @@ export const regularizedIncompleteBeta = computeRegularizedIncompleteBeta;
 
 function estimateInitialBetaQuantile(alphaVal: number, betaVal: number, quantileP: number): number {
     if (alphaVal < 1.0 && betaVal >= 1.0) {
-        return Math.pow(quantileP * alphaVal * Math.exp(logBeta(alphaVal, betaVal)), 1.0 / alphaVal);
+        return Math.pow(
+            quantileP * alphaVal * Math.exp(logBeta(alphaVal, betaVal)),
+            1.0 / alphaVal,
+        );
     }
     if (betaVal < 1.0 && alphaVal >= 1.0) {
-        return 1.0 - Math.pow((1.0 - quantileP) * betaVal * Math.exp(logBeta(alphaVal, betaVal)), 1.0 / betaVal);
+        return (
+            1.0 -
+            Math.pow(
+                (1.0 - quantileP) * betaVal * Math.exp(logBeta(alphaVal, betaVal)),
+                1.0 / betaVal,
+            )
+        );
     }
     return alphaVal / (alphaVal + betaVal);
 }
@@ -149,14 +176,18 @@ function computeHalleyRefinementStep(
     xCandidate: number,
     errorVal: number,
 ): number | null {
-    const lnPdf = (alphaVal - 1.0) * Math.log(xCandidate) + (betaVal - 1.0) * Math.log(1.0 - xCandidate) - logBeta(alphaVal, betaVal);
+    const lnPdf =
+        (alphaVal - 1.0) * Math.log(xCandidate) +
+        (betaVal - 1.0) * Math.log(1.0 - xCandidate) -
+        logBeta(alphaVal, betaVal);
     const fPrime = Math.exp(lnPdf);
 
     if (fPrime <= 1e-30) {
         return null;
     }
 
-    const fDoublePrime = fPrime * ((alphaVal - 1.0) / xCandidate - (betaVal - 1.0) / (1.0 - xCandidate));
+    const fDoublePrime =
+        fPrime * ((alphaVal - 1.0) / xCandidate - (betaVal - 1.0) / (1.0 - xCandidate));
     const denominator = fPrime - (errorVal * fDoublePrime) / (2.0 * fPrime);
     const step = errorVal / denominator;
 
@@ -167,8 +198,15 @@ function computeHalleyRefinementStep(
 /**
  * Solves inverse of regularized incomplete beta function I_x(a, b) = p for x.
  * Uses Carter-Kass initial approximation followed by Halley third-order root refinement.
+ * @param alphaVal
+ * @param betaVal
+ * @param quantileP
  */
-export function computeInverseIncompleteBeta(alphaVal: number, betaVal: number, quantileP: number): number {
+export function computeInverseIncompleteBeta(
+    alphaVal: number,
+    betaVal: number,
+    quantileP: number,
+): number {
     if (quantileP <= 0.0 || quantileP >= 1.0) {
         return quantileP <= 0.0 ? 0.0 : 1.0;
     }

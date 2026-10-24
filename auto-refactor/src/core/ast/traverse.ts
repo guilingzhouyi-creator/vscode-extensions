@@ -65,7 +65,9 @@ const TYPEOF_FUNCTION = 'function';
  * Narrow an optional hook to its callable type. Control-flow analysis only narrows a direct
  * `typeof x === 'function'` comparison, so the named tag above needs this explicit predicate.
  */
-function isCallable<T extends (...args: never[]) => unknown>(candidateFn: T | undefined): candidateFn is T {
+function isCallable<T extends (...args: never[]) => unknown>(
+    candidateFn: T | undefined,
+): candidateFn is T {
     return typeof candidateFn === TYPEOF_FUNCTION;
 }
 
@@ -182,11 +184,7 @@ export function runStreaming(
         node: NormalizedNode,
         parent: NormalizedNode | undefined,
         grandparent: NormalizedNode | undefined,
-        ...scope: [
-            depth: number,
-            className: string | null,
-            binding: string | null,
-        ]
+        ...scope: [depth: number, className: string | null, binding: string | null]
     ): void => {
         const [depth, className, binding] = scope;
         if (activeVisits.length > 0) {

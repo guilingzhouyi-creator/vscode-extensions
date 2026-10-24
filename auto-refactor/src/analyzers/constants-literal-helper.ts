@@ -283,7 +283,6 @@ export function isQuoteCharCode(code: number): boolean {
     );
 }
 
-
 /** Result of resolving a literal duplicate issue. */
 export interface LiteralResolution {
     rule: string;

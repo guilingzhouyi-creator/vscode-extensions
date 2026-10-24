@@ -230,7 +230,13 @@ export function auditFacadeGovernance(
     let plumbingOverBudgetCount = 0;
 
     if (isExemptPath(filePath)) {
-        return { issues, trampolineCount, hollowFacadeCount, plumbingCount, plumbingOverBudgetCount };
+        return {
+            issues,
+            trampolineCount,
+            hollowFacadeCount,
+            plumbingCount,
+            plumbingOverBudgetCount,
+        };
     }
 
     const minEloc = options?.minFacadeEloc ?? DEFAULT_MIN_FACADE_ELOC;

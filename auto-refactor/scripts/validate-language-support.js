@@ -184,7 +184,9 @@ async function run() {
       false,
       'an extension outside the allow-list must remain unclaimed',
     );
-    console.log('  ✔ the claim predicate still discriminates a claimed from an unclaimed extension');
+    console.log(
+      '  ✔ the claim predicate still discriminates a claimed from an unclaimed extension',
+    );
 
     const unsupportedConfig = resolveConfig({ root, unsupportedLanguage: 'error' });
     const unsupportedIssue = unsupportedLanguageDiagnostic('probe.unknownext', unsupportedConfig);
@@ -241,7 +243,11 @@ async function run() {
       cache: true,
       cacheDir,
     });
-    assert.strictEqual(cachedFirst.summary.filesScanned, 1, 'cold cache must still discover the file');
+    assert.strictEqual(
+      cachedFirst.summary.filesScanned,
+      1,
+      'cold cache must still discover the file',
+    );
     const cachedSecond = await scan({
       ...base,
       include: ['**/a.ps1'],

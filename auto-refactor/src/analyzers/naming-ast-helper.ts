@@ -271,7 +271,9 @@ export function checkSingleLetterHelper(
     // every scope; the built-in default is a loop-index tolerance and applies only in loops.
     const isExplicitAllowList = aCtx.opts.singleLetterAllowed !== undefined;
     const singleAllowed = aCtx.singleAllowed ?? DEFAULT_SINGLE_LETTER_ALLOWED;
-    const isAllowed = isExplicitAllowList ? singleAllowed.has(name) : inLoop && singleAllowed.has(name);
+    const isAllowed = isExplicitAllowList
+        ? singleAllowed.has(name)
+        : inLoop && singleAllowed.has(name);
     if (name === '_' || isAllowed) return;
 
     pushAstFinding(aCtx, {

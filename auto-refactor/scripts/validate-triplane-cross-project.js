@@ -158,7 +158,10 @@ async function buildProjectIndices(projectId) {
     include = ['src/extension.ts', 'src/domain/**/*.ts'];
   } else if (projectId === 'WebGames') {
     root = path.resolve(__dirname, '../../WebGames');
-    include = ['backend/domains/contract_registry/**/*.gd', 'backend/domains/currency_economy/**/*.gd'];
+    include = [
+      'backend/domains/contract_registry/**/*.gd',
+      'backend/domains/currency_economy/**/*.gd',
+    ];
   }
 
   const report = await scan({

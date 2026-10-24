@@ -209,8 +209,7 @@ export const ANALYZER_HYGIENE_RULES: readonly RuleDefinition[] = [
         defaultSeverity: SEVERITY_ERROR,
         summary:
             'UTF-8 Byte Order Mark (BOM) header prefix presence (files must strictly be UTF-8 NO-BOM).',
-        remediation:
-            'Re-encode file as UTF-8 NO-BOM without 0xEF, 0xBB, 0xBF byte prefix.',
+        remediation: 'Re-encode file as UTF-8 NO-BOM without 0xEF, 0xBB, 0xBF byte prefix.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-bom-001',
     }),
     defineRule({

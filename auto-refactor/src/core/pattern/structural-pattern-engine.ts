@@ -274,11 +274,7 @@ function matchPrefixUnaryExpression(
 /**
  * Fallback matcher recursively traversing child AST nodes in deterministic order.
  */
-function matchGeneralChildren(
-    pNode: ts.Node,
-    tNode: ts.Node,
-    ctx: PatternMatchContext,
-): boolean {
+function matchGeneralChildren(pNode: ts.Node, tNode: ts.Node, ctx: PatternMatchContext): boolean {
     const pChildren: ts.Node[] = [];
     ts.forEachChild(pNode, (child) => {
         pChildren.push(child);
@@ -442,7 +438,9 @@ export function synthesizeRewrite(
     });
 }
 
-function buildBindingsRecord(bindings: Map<string, MetavariableBinding>): Record<string, MetavariableBinding> {
+function buildBindingsRecord(
+    bindings: Map<string, MetavariableBinding>,
+): Record<string, MetavariableBinding> {
     const bindingsRecord: Record<string, MetavariableBinding> = {};
     for (const [key, value] of bindings.entries()) {
         bindingsRecord[key] = value;

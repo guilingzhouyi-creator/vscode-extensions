@@ -113,7 +113,10 @@ function isTrivialForwarder(line: string): boolean {
 export function calculateNoiseIndex(totalLoc: number, usefulLoc: number): number {
     const nonEloc = Math.max(0, totalLoc - usefulLoc);
     const denominator = Math.max(1, usefulLoc);
-    return Math.round((nonEloc / denominator) * THOUSANDTHS_ROUNDING_FACTOR) / THOUSANDTHS_ROUNDING_FACTOR;
+    return (
+        Math.round((nonEloc / denominator) * THOUSANDTHS_ROUNDING_FACTOR) /
+        THOUSANDTHS_ROUNDING_FACTOR
+    );
 }
 
 /**
@@ -234,7 +237,11 @@ export function computeEffectiveCodeDensity(
     }
 
     const usefulLoc = Math.max(0, totalLoc - Math.floor(boilerplateLoc));
-    const effectiveDensity = totalLoc > 0 ? Math.round((usefulLoc / totalLoc) * HUNDREDTHS_ROUNDING_FACTOR) / HUNDREDTHS_ROUNDING_FACTOR : 1.0;
+    const effectiveDensity =
+        totalLoc > 0
+            ? Math.round((usefulLoc / totalLoc) * HUNDREDTHS_ROUNDING_FACTOR) /
+              HUNDREDTHS_ROUNDING_FACTOR
+            : 1.0;
     const noiseIndex = calculateNoiseIndex(totalLoc, usefulLoc);
     const gaussianHealth = calculateGaussianDensityHealth(noiseIndex);
     const isLowDensity = totalLoc >= MIN_EVALUATION_LOC_THRESHOLD && effectiveDensity < 0.55;

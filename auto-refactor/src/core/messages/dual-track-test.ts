@@ -28,8 +28,7 @@ export const DualTrackTestMessages = {
         'Embedded test zone is interleaved before production code. ' +
         'Move embedded test zone to the end of the file.',
     INTERLEAVED_TEST_ZONE_RATIONALE:
-        'Relocate test block to file tail to maintain modern zone ' +
-        'partitioning discipline.',
+        'Relocate test block to file tail to maintain modern zone ' + 'partitioning discipline.',
 
     // 3. Rust embedded tests missing #[cfg(test)]
     RUST_MISSING_CFG_TEST_MESSAGE:

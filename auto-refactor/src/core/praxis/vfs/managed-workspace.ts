@@ -96,13 +96,8 @@ export class ManagedWorkspace implements LayerVFSWorkspace {
             .putFile(this.record.handle.branchId, filePath, content, mode);
     }
 
-    public async applyEdits(
-        filePath: string,
-        edits: readonly FileEditOp[],
-    ): Promise<VfsFileEntry> {
-        return this.delegate
-            .getStore()
-            .applyEdits(this.record.handle.branchId, filePath, edits);
+    public async applyEdits(filePath: string, edits: readonly FileEditOp[]): Promise<VfsFileEntry> {
+        return this.delegate.getStore().applyEdits(this.record.handle.branchId, filePath, edits);
     }
 
     public async getFile(

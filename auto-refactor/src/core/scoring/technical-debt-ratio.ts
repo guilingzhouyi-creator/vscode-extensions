@@ -16,7 +16,11 @@
 
 import type { Issue, Severity } from '../types';
 import type { PrimaryQualityPillar } from './eightPillarModel';
-import { ALL_PRIMARY_PILLARS, DIMENSION_TO_PILLAR_MAP, PILLAR_MAINTAINABILITY } from './eightPillarModel';
+import {
+    ALL_PRIMARY_PILLARS,
+    DIMENSION_TO_PILLAR_MAP,
+    PILLAR_MAINTAINABILITY,
+} from './eightPillarModel';
 import type { QualityDimension } from './scoringTypes';
 import { ALL_QUALITY_DIMENSIONS } from './scoringTypes';
 
@@ -55,9 +59,9 @@ export const MINUTES_PER_HOUR = 60.0;
  * Standard SQALE Technical Debt Ratio rating thresholds.
  */
 export const SQALE_GRADE_A_THRESHOLD = 0.05; // <= 5% debt ratio
-export const SQALE_GRADE_B_THRESHOLD = 0.10; // <= 10% debt ratio
-export const SQALE_GRADE_C_THRESHOLD = 0.20; // <= 20% debt ratio
-export const SQALE_GRADE_D_THRESHOLD = 0.50; // <= 50% debt ratio
+export const SQALE_GRADE_B_THRESHOLD = 0.1; // <= 10% debt ratio
+export const SQALE_GRADE_C_THRESHOLD = 0.2; // <= 20% debt ratio
+export const SQALE_GRADE_D_THRESHOLD = 0.5; // <= 50% debt ratio
 
 export type SqaleRating = 'A' | 'B' | 'C' | 'D' | 'E';
 
@@ -140,7 +144,10 @@ export function resolveIssueRemediationMinutes(
             return Math.round(familyMinutes * ERROR_EFFORT_MULTIPLIER);
         }
         if (issue.severity === SEV_INFO) {
-            return Math.max(MIN_INFO_REMEDIATION_MINUTES, Math.round(familyMinutes * INFO_EFFORT_MULTIPLIER));
+            return Math.max(
+                MIN_INFO_REMEDIATION_MINUTES,
+                Math.round(familyMinutes * INFO_EFFORT_MULTIPLIER),
+            );
         }
         return familyMinutes;
     }
@@ -150,6 +157,7 @@ export function resolveIssueRemediationMinutes(
 
 /**
  * Resolves SQALE letter rating from computed Technical Debt Ratio.
+ * @param tdr
  */
 export function resolveSqaleGrade(tdr: number): SqaleRating {
     if (!Number.isFinite(tdr) || tdr <= SQALE_GRADE_A_THRESHOLD) return SQALE_RATING_A;
@@ -246,7 +254,11 @@ export function evaluateTechnicalDebtAssessment(
         const minutes = resolveIssueRemediationMinutes(issue, customRuleCost);
         totalRemediationMinutes += minutes;
 
-        highDebtRemediationMinutes += accumulateSeverityDebt(issue.severity, minutes, effortBySeverity);
+        highDebtRemediationMinutes += accumulateSeverityDebt(
+            issue.severity,
+            minutes,
+            effortBySeverity,
+        );
 
         const targetPillar = resolveTargetPillar(issue.rule ?? '', issue.analyzer);
         effortByPillar[targetPillar] += minutes;

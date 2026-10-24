@@ -47,12 +47,62 @@ const RELATED_THRESHOLD = 0.55;
 const EXACT_THRESHOLD = 0.05;
 
 const PROGRAMMING_KEYWORDS = new Set([
-    'function', 'func', 'def', 'fn', 'return', 'if', 'else', 'elif', 'for', 'while',
-    'loop', 'match', 'switch', 'case', 'break', 'continue', 'let', 'const', 'var',
-    'class', 'interface', 'struct', 'type', 'enum', 'trait', 'impl', 'import', 'export',
-    'from', 'as', 'new', 'this', 'self', 'super', 'extends', 'implements', 'public',
-    'private', 'protected', 'readonly', 'static', 'async', 'await', 'try', 'catch',
-    'finally', 'throw', 'yield', 'number', 'string', 'boolean', 'void', 'any', 'true', 'false', 'null',
+    'function',
+    'func',
+    'def',
+    'fn',
+    'return',
+    'if',
+    'else',
+    'elif',
+    'for',
+    'while',
+    'loop',
+    'match',
+    'switch',
+    'case',
+    'break',
+    'continue',
+    'let',
+    'const',
+    'var',
+    'class',
+    'interface',
+    'struct',
+    'type',
+    'enum',
+    'trait',
+    'impl',
+    'import',
+    'export',
+    'from',
+    'as',
+    'new',
+    'this',
+    'self',
+    'super',
+    'extends',
+    'implements',
+    'public',
+    'private',
+    'protected',
+    'readonly',
+    'static',
+    'async',
+    'await',
+    'try',
+    'catch',
+    'finally',
+    'throw',
+    'yield',
+    'number',
+    'string',
+    'boolean',
+    'void',
+    'any',
+    'true',
+    'false',
+    'null',
 ]);
 
 /**
@@ -62,10 +112,7 @@ const PROGRAMMING_KEYWORDS = new Set([
  * @param abstractIdentifiers - Whether to abstract local variable names.
  * @returns Cleaned normalized string.
  */
-export function normalizeCodeForCompression(
-    code: string,
-    abstractIdentifiers = true,
-): string {
+export function normalizeCodeForCompression(code: string, abstractIdentifiers = true): string {
     if (!code || code.length === 0) {
         return '';
     }

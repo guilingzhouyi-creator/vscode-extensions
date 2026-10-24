@@ -178,7 +178,11 @@ function handleByteEqual(
     ctx.routingState.byteEqual++;
     const l2 = ctx.fpContext.l2Enabled ? ctx.cache.lookupL2(fph, contentHash) : null;
     if (l2) {
-        const result = remapCachedResult({ issues: l2.issues, metric: l2.metric }, l2.p, params.rel);
+        const result = remapCachedResult(
+            { issues: l2.issues, metric: l2.metric },
+            l2.p,
+            params.rel,
+        );
         ctx.perFile[params.fileIndex] = result;
         ctx.sessionBucket.set(params.rel, result);
         ctx.routingState.l2Hit++;
@@ -225,7 +229,10 @@ export async function processChangedFileHint(
     try {
         buf = await fs.promises.readFile(path.join(ctx.absRoot, params.rel));
     } catch {
-        ctx.perFile[params.fileIndex] = { issues: [] as Issue[], metric: null as FileMetric | null };
+        ctx.perFile[params.fileIndex] = {
+            issues: [] as Issue[],
+            metric: null as FileMetric | null,
+        };
         ctx.routingState.diffFull++;
         return;
     }
@@ -308,10 +315,7 @@ export async function processChangedFileHint(
     );
 }
 
-function tryResolveUnchangedL1(
-    params: UnchangedFileParams,
-    ctx: DiffRoutingContext,
-): boolean {
+function tryResolveUnchangedL1(params: UnchangedFileParams, ctx: DiffRoutingContext): boolean {
     const l1 = ctx.cache.lookupL1(params.rel);
     if (
         !params.statEntry.fp ||
@@ -435,7 +439,10 @@ export async function processUnchangedFile(
     try {
         buf = await fs.promises.readFile(path.join(ctx.absRoot, params.rel));
     } catch {
-        ctx.perFile[params.fileIndex] = { issues: [] as Issue[], metric: null as FileMetric | null };
+        ctx.perFile[params.fileIndex] = {
+            issues: [] as Issue[],
+            metric: null as FileMetric | null,
+        };
         return;
     }
     const contentHash = sha256Hex(buf);

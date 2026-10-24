@@ -353,7 +353,7 @@ const UNBOUNDED_TRIGGER_TEXTS: readonly string[] = [
 ];
 
 function hasUnboundedTriggers(content: string): boolean {
-    return UNBOUNDED_TRIGGER_TEXTS.some(term => content.includes(term));
+    return UNBOUNDED_TRIGGER_TEXTS.some((term) => content.includes(term));
 }
 
 function auditUnboundedLine(line: string, lineIndex: number): GovernanceViolation | null {

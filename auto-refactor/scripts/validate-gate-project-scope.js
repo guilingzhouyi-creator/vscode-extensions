@@ -330,9 +330,7 @@ fi
   assert.notStrictEqual(eqIssue, undefined);
   assert.strictEqual(eqIssue.severity, 'warning');
 
-  console.log(
-    '  ✔ 8. SH-COND-001 catches regex, logical operators, and non-portable equality',
-  );
+  console.log('  ✔ 8. SH-COND-001 catches regex, logical operators, and non-portable equality');
 })();
 
 console.log('\nAll Gate Project Scope & Topology Adaptive Tests Passed successfully.');

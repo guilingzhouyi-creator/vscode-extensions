@@ -342,7 +342,8 @@ function evaluateThresholdSeverity(evalCtx: AnalysisEvaluationContext): {
         return { severity: SEVERITY_ERROR, reasons: [reason], bandReasons: [reason] };
     }
     const failReason = checkFailThreshold(evalCtx);
-    if (failReason) return { severity: SEVERITY_ERROR, reasons: [failReason], bandReasons: [failReason] };
+    if (failReason)
+        return { severity: SEVERITY_ERROR, reasons: [failReason], bandReasons: [failReason] };
     const warnReasons = collectWarnReasons(evalCtx);
     if (warnReasons.length > 0) {
         return { severity: SEVERITY_WARNING, reasons: warnReasons, bandReasons: warnReasons };
@@ -506,7 +507,10 @@ function isVolumeEnvelopeExempt(evalCtx: AnalysisEvaluationContext): boolean {
  * @param evalCtx - Assembled evaluation context.
  * @returns Effective-LOC cap and raw-LOC cap.
  */
-function resolveVolumeCaps(evalCtx: AnalysisEvaluationContext): { maxEloc: number; maxLoc: number } {
+function resolveVolumeCaps(evalCtx: AnalysisEvaluationContext): {
+    maxEloc: number;
+    maxLoc: number;
+} {
     const configuredEloc = evalCtx.thresholds.maxEloc ?? DEFAULT_VOLUME_MAX_ELOC;
     const configuredLoc = evalCtx.thresholds.maxLoc ?? DEFAULT_VOLUME_MAX_LOC;
     if (evalCtx.isBenignConstant) {
@@ -556,7 +560,10 @@ function evaluateShapeFindings(
             suggestion: VOLUME_SUGGESTION_COMPACT,
         };
     }
-    if (totalLoc >= MIN_REPRESENTATIVE_LOC && eloc < Math.floor(totalLoc / evalCtx.densityRatioTarget)) {
+    if (
+        totalLoc >= MIN_REPRESENTATIVE_LOC &&
+        eloc < Math.floor(totalLoc / evalCtx.densityRatioTarget)
+    ) {
         return {
             rule: RULE_VOL_DIL,
             severity: SEVERITY_WARNING,
@@ -690,7 +697,11 @@ export class LargeFileAnalyzer implements Analyzer {
                 start: { line: 1, column: 1 },
                 end: { line: 1, column: 1 },
             },
-            detail: buildDetailPayload(evalCtx, [...(finding.reasons ?? [finding.message])], moduleNames),
+            detail: buildDetailPayload(
+                evalCtx,
+                [...(finding.reasons ?? [finding.message])],
+                moduleNames,
+            ),
             suggestion: `${finding.suggestion} ${buildSplitSuggestions(evalCtx, moduleNames).join(' ')}`,
         }));
     }

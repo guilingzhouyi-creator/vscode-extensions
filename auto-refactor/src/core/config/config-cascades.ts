@@ -512,10 +512,7 @@ export function assembleReportingOptions(
         fileCfg.logLevel ||
         base.logLevel;
     const rawLogFile =
-        overrides.logFile ||
-        process.env.AUTO_REFACTOR_LOG_FILE ||
-        fileCfg.logFile ||
-        base.logFile;
+        overrides.logFile || process.env.AUTO_REFACTOR_LOG_FILE || fileCfg.logFile || base.logFile;
 
     return {
         format: overrides.format || fileCfg.format || base.format,
@@ -526,7 +523,6 @@ export function assembleReportingOptions(
         out: overrides.out || fileCfg.out,
     };
 }
-
 
 /**
  * Merges layered literal governance policies into a single active configuration.

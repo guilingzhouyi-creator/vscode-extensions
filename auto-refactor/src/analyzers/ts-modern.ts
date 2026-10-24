@@ -189,8 +189,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
         pattern: REQUIRE_CALL_RE,
         condition: (ctx: LineScanContext) => ESM_SYNTAX_RE.test(ctx.allMaskedLines.join('\n')),
         message: 'CommonJS `require` in a module that already uses ESM syntax.',
-        suggestion:
-            'Import the binding (`import x from "m"` / `import { y } from "m"`) instead.',
+        suggestion: 'Import the binding (`import x from "m"` / `import { y } from "m"`) instead.',
         actionable: {
             action: 'replace_token',
             codeId: '010',
@@ -203,8 +202,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
         pattern: ANY_TYPE_RE,
         condition: (ctx: LineScanContext) => isTypedPath(ctx.file),
         message: 'Explicit `any` disables checking for every value it touches.',
-        suggestion:
-            'Prefer `unknown` plus a narrowing check, or a precise generic/union type.',
+        suggestion: 'Prefer `unknown` plus a narrowing check, or a precise generic/union type.',
         actionable: {
             action: 'replace_token',
             codeId: '008',

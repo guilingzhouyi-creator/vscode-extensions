@@ -148,9 +148,7 @@ function main() {
   testLanguageVerbosityMatrix();
   testIntraFileZonePartitioner();
   testConfigPenetration();
-  console.log(
-    '✔  All multi-language elastic LOC & zone partitioner tests passed successfully!',
-  );
+  console.log('✔  All multi-language elastic LOC & zone partitioner tests passed successfully!');
 }
 
 main();

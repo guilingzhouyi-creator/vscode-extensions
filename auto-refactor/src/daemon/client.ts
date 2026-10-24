@@ -469,6 +469,7 @@ export class DaemonClient {
  * @param options.cacheCustom - Whether custom-analyzer modules may use the L2 cache.
  * @param options.workers - Optional daemon worker-count override.
  * @param options.parser - Optional parser selection override ('typescript' | 'oxc').
+ * @param logger
  * @returns Warm-scan result, or null when the daemon path is unusable; this async call resolves
  *          after the client closes.
  */
@@ -492,7 +493,9 @@ export async function tryWarmScan(
         return result;
     } catch (e) {
         client.close();
-        logger?.debug(`warm scan fallback to cold scan: ${e instanceof Error ? e.message : String(e)}`);
+        logger?.debug(
+            `warm scan fallback to cold scan: ${e instanceof Error ? e.message : String(e)}`,
+        );
         return null;
     }
 }
@@ -546,7 +549,9 @@ export async function tryWarmScanDiff(
         return result;
     } catch (e) {
         client.close();
-        logger?.debug(`warm scan diff fallback to cold scan: ${e instanceof Error ? e.message : String(e)}`);
+        logger?.debug(
+            `warm scan diff fallback to cold scan: ${e instanceof Error ? e.message : String(e)}`,
+        );
         return null;
     }
 }

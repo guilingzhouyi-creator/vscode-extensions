@@ -569,7 +569,6 @@ function printMainTelemetryTable(
     printTimelineBatches(timingTelemetry.timeline, logger);
 }
 
-
 async function flushWorkerTelemetry(
     timingTelemetry: WorkerTelemetrySnapshot | null,
     workers: Worker[],

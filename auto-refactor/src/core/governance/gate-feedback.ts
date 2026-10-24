@@ -57,19 +57,47 @@ export const ORDINAL_LABEL_PATTERNS: readonly FeedbackPattern[] = Object.freeze(
  */
 export const STATUS_SYNONYMS: readonly FeedbackPattern[] = Object.freeze([
     { id: 'STATUS-OK', pattern: /\[OK\]/, description: 'Bracketed status synonym [OK]' },
-    { id: 'STATUS-PASS-BRACKET', pattern: /\[PASS\]/, description: 'Bracketed status synonym [PASS]' },
+    {
+        id: 'STATUS-PASS-BRACKET',
+        pattern: /\[PASS\]/,
+        description: 'Bracketed status synonym [PASS]',
+    },
     {
         id: 'STATUS-PASS-WITH-WARNING',
         pattern: /(?<![A-Z_])PASS_WITH_WARNING(?![A-Z_])/,
         description: 'Unclosed status token PASS_WITH_WARNING',
     },
-    { id: 'STATUS-FAIL-BRACKET', pattern: /\[FAIL\]/, description: 'Bracketed status synonym [FAIL]' },
-    { id: 'STATUS-FAILED-BRACKET', pattern: /\[FAILED\]/, description: 'Bracketed status synonym [FAILED]' },
-    { id: 'STATUS-ERROR-BRACKET', pattern: /\[ERROR\]/, description: 'Bracketed status synonym [ERROR]' },
+    {
+        id: 'STATUS-FAIL-BRACKET',
+        pattern: /\[FAIL\]/,
+        description: 'Bracketed status synonym [FAIL]',
+    },
+    {
+        id: 'STATUS-FAILED-BRACKET',
+        pattern: /\[FAILED\]/,
+        description: 'Bracketed status synonym [FAILED]',
+    },
+    {
+        id: 'STATUS-ERROR-BRACKET',
+        pattern: /\[ERROR\]/,
+        description: 'Bracketed status synonym [ERROR]',
+    },
     { id: 'STATUS-NA-BRACKET', pattern: /\[N\/A\]/, description: 'Bracketed status synonym [N/A]' },
-    { id: 'STATUS-DONE-BRACKET', pattern: /\[DONE\]/, description: 'Bracketed status synonym [DONE]' },
-    { id: 'STATUS-SUCCESS-BRACKET', pattern: /\[SUCCESS\]/, description: 'Bracketed status synonym [SUCCESS]' },
-    { id: 'STATUS-INFO-BRACKET', pattern: /\[INFO\]/, description: 'Bracketed status synonym [INFO]' },
+    {
+        id: 'STATUS-DONE-BRACKET',
+        pattern: /\[DONE\]/,
+        description: 'Bracketed status synonym [DONE]',
+    },
+    {
+        id: 'STATUS-SUCCESS-BRACKET',
+        pattern: /\[SUCCESS\]/,
+        description: 'Bracketed status synonym [SUCCESS]',
+    },
+    {
+        id: 'STATUS-INFO-BRACKET',
+        pattern: /\[INFO\]/,
+        description: 'Bracketed status synonym [INFO]',
+    },
 ]);
 
 /**
@@ -173,16 +201,15 @@ function createFeedbackIssue(relPath: string, finding: FeedbackFinding): Issue {
  * @param context - Repository archetype context.
  * @param issues - Issue accumulator array.
  */
-export function auditFeedbackVocabulary(
-    context: RepoArchetypeContext,
-    issues: Issue[],
-): void {
+export function auditFeedbackVocabulary(context: RepoArchetypeContext, issues: Issue[]): void {
     const targets: Array<{ relPath: string; content: string }> = [];
 
     // Pre-commit hook
     if (context.hooks.preCommit) {
         targets.push({
-            relPath: path.relative(context.root, context.hooks.preCommit.filePath).replace(/\\/g, '/'),
+            relPath: path
+                .relative(context.root, context.hooks.preCommit.filePath)
+                .replace(/\\/g, '/'),
             content: context.hooks.preCommit.content,
         });
     }
@@ -190,7 +217,9 @@ export function auditFeedbackVocabulary(
     // Commit-msg hook
     if (context.hooks.commitMsg) {
         targets.push({
-            relPath: path.relative(context.root, context.hooks.commitMsg.filePath).replace(/\\/g, '/'),
+            relPath: path
+                .relative(context.root, context.hooks.commitMsg.filePath)
+                .replace(/\\/g, '/'),
             content: context.hooks.commitMsg.content,
         });
     }
@@ -198,7 +227,9 @@ export function auditFeedbackVocabulary(
     // Pre-push hook
     if (context.hooks.prePush) {
         targets.push({
-            relPath: path.relative(context.root, context.hooks.prePush.filePath).replace(/\\/g, '/'),
+            relPath: path
+                .relative(context.root, context.hooks.prePush.filePath)
+                .replace(/\\/g, '/'),
             content: context.hooks.prePush.content,
         });
     }

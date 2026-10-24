@@ -50,8 +50,12 @@ const RULE_HYG_DEAD_CODE = 'HYG-DED-001';
  * @param fragments - Substrings a custom rule name may carry.
  * @returns Predicate over a finding.
  */
-function ruleMatches(rules: readonly string[], fragments: readonly string[]): (issue: Issue) => boolean {
-    return (issue) => rules.includes(issue.rule) || fragments.some((f) => issue.rule && issue.rule.includes(f));
+function ruleMatches(
+    rules: readonly string[],
+    fragments: readonly string[],
+): (issue: Issue) => boolean {
+    return (issue) =>
+        rules.includes(issue.rule) || fragments.some((f) => issue.rule && issue.rule.includes(f));
 }
 
 /**
@@ -133,7 +137,10 @@ export const HYGIENE_DIMENSION_RULES: readonly DimensionRule[] = [
     },
     {
         analyzer: ANALYZER_HYGIENE,
-        covers: ruleMatches([RULE_EXT_DIR_001], ['root script', 'classification', 'domain subdirectory']),
+        covers: ruleMatches(
+            [RULE_EXT_DIR_001],
+            ['root script', 'classification', 'domain subdirectory'],
+        ),
         dimension: DIMENSION_STANDARDIZATION,
         points: DEDUCTION_ROOT_SCRIPT_POLLUTION,
         rationale: ScoringRationales.DIRECTORY_CLASSIFICATION_POLLUTION,

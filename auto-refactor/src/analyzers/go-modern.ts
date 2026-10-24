@@ -56,14 +56,12 @@ const CONTEXT_IN_PARAMS_RE = /context\.Context/;
 const CONTEXT_PACKAGE_TYPE = 'context.Context';
 
 /** Function / method signature start — used to locate parameter lists. */
-const FUNC_SIGNATURE_RE =
-    /^func\s+(?:\([^)]+\)\s+)?[A-Za-z_][A-Za-z0-9_]*\s*(?:\[[^\]]*\])?\s*\(/;
+const FUNC_SIGNATURE_RE = /^func\s+(?:\([^)]+\)\s+)?[A-Za-z_][A-Za-z0-9_]*\s*(?:\[[^\]]*\])?\s*\(/;
 
 /**
  * Receiver naming: `func (self *Foo)` or `func (this Bar)` or overly long receiver names.
  */
-const RECEIVER_RE =
-    /^func\s+\(\s*([A-Za-z_][A-Za-z0-9_]*)\s+\*?([A-Za-z_][A-Za-z0-9_]*)\s*\)/;
+const RECEIVER_RE = /^func\s+\(\s*([A-Za-z_][A-Za-z0-9_]*)\s+\*?([A-Za-z_][A-Za-z0-9_]*)\s*\)/;
 
 /** Receiver names that violate Go conventions. */
 const BAD_RECEIVER_NAMES = new Set(['self', 'this', 'me', 'receiver', 'rec']);
@@ -207,8 +205,7 @@ const GO_MODERN_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'GOM-STYLE-002',
         severity: SEVERITY_INFO,
-        message:
-            'Error variable does not follow Go naming conventions (should start with `err`).',
+        message: 'Error variable does not follow Go naming conventions (should start with `err`).',
         suggestion:
             'Rename the variable to start with `err` (e.g. `errOpen` instead of `openErr` or `err` for a general error).',
         condition: (ctx) => hasBadErrorName(ctx.trimmed),

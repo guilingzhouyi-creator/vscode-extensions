@@ -45,11 +45,7 @@ export const DECLARATIVE_SIMPLIFY_PATTERNS: readonly PatternSpec[] = Object.free
  * @param filePath - Repository-relative file path.
  * @param issues - Target accumulator array for detected issues.
  */
-export function auditStructuralPatterns(
-    content: string,
-    filePath: string,
-    issues: Issue[],
-): void {
+export function auditStructuralPatterns(content: string, filePath: string, issues: Issue[]): void {
     if (!content || !content.includes('?')) {
         return;
     }

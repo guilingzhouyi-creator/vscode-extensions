@@ -273,7 +273,14 @@ function claimBucket(
     const key = `${at}|${cluster}`;
     const existing = buckets.get(key);
     if (existing) return existing;
-    const created: ClaimBucket = { at, cluster, rules: [], ruleSet: new Set(), topRank: -1, primary: '' };
+    const created: ClaimBucket = {
+        at,
+        cluster,
+        rules: [],
+        ruleSet: new Set(),
+        topRank: -1,
+        primary: '',
+    };
     buckets.set(key, created);
     order.push(key);
     return created;
@@ -335,7 +342,8 @@ function projectClusters(issues: readonly Issue[]): CompactClusterClaim[] {
         });
     }
     return claims.sort(
-        (left, right) => left.at.localeCompare(right.at) || left.cluster.localeCompare(right.cluster),
+        (left, right) =>
+            left.at.localeCompare(right.at) || left.cluster.localeCompare(right.cluster),
     );
 }
 
@@ -379,12 +387,20 @@ export function buildCompactReport(
     return compact;
 }
 
-/** Serialize a compact document; indent is opt-in because the wire format is token-sensitive. */
+/**
+ * Serialize a compact document; indent is opt-in because the wire format is token-sensitive.
+ * @param report
+ * @param options
+ */
 export function toCompactReportJson(
     report: ScanReport,
     options: CompactReportOptions & { readonly pretty?: boolean } = {},
 ): string {
-    return JSON.stringify(buildCompactReport(report, options), null, options.pretty === true ? 2 : 0);
+    return JSON.stringify(
+        buildCompactReport(report, options),
+        null,
+        options.pretty === true ? 2 : 0,
+    );
 }
 
 /** Split a `file:line` location token on its last separator, tolerating separator-free input. */
@@ -457,7 +473,10 @@ export function hydrateCompactReport(compact: CompactScanReport): HydratedCompac
     };
 }
 
-/** Narrow an unknown payload to a compact document by its protocol discriminator. */
+/**
+ * Narrow an unknown payload to a compact document by its protocol discriminator.
+ * @param payload
+ */
 export function isCompactReport(payload: unknown): payload is CompactScanReport {
     if (typeof payload !== 'object' || payload === null) return false;
     const candidate = payload as Record<string, unknown>;
@@ -647,9 +666,7 @@ function adaptBaselineSnapshot(payload: Record<string, unknown>): CompactScanRep
  * @param payload - Candidate performance baseline object.
  * @returns Compact projection, or undefined when the shape does not match.
  */
-function adaptPerformanceBaseline(
-    payload: Record<string, unknown>,
-): CompactScanReport | undefined {
+function adaptPerformanceBaseline(payload: Record<string, unknown>): CompactScanReport | undefined {
     const healthRecord = readObject(readObject(payload.dimensions)?.architectureAndHealth);
     if (!healthRecord) return undefined;
     const score = readNumber(healthRecord.qualityScore);

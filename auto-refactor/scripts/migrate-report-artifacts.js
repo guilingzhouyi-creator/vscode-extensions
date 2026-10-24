@@ -35,8 +35,8 @@ const SKIP_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'target']);
 /**
  * Parse CLI arguments into a target list plus output switches.
  *
- * @param {string[]} argv - Process arguments after the script name.
- * @returns {{ targets: string[], write: boolean, pretty: boolean }} Parsed options.
+ * @param argv - Process arguments after the script name.
+ * @returns Parsed options.
  */
 function parseArgs(argv) {
   const options = { targets: [], write: false, pretty: false };
@@ -55,8 +55,8 @@ function parseArgs(argv) {
 /**
  * Collect every candidate JSON artifact under a target, skipping derived compact outputs.
  *
- * @param {string} target - File or directory path.
- * @returns {string[]} Absolute artifact paths.
+ * @param target - File or directory path.
+ * @returns Absolute artifact paths.
  */
 function collectArtifacts(target) {
   const resolved = path.resolve(target);
@@ -81,8 +81,8 @@ function collectArtifacts(target) {
 /**
  * Derive the sidecar path for a compact projection.
  *
- * @param {string} sourcePath - Verbose artifact path.
- * @returns {string} Path ending in `.cas.json`.
+ * @param sourcePath - Verbose artifact path.
+ * @returns Path ending in `.cas.json`.
  */
 function sidecarPath(sourcePath) {
   return sourcePath.slice(0, -JSON_SUFFIX.length) + CAS_SUFFIX;
@@ -111,7 +111,7 @@ function hasProducerSidecar(destination) {
   try {
     const existing = JSON.parse(fs.readFileSync(destination, 'utf8'));
     return Array.isArray(existing.vectors) && existing.vectors.length > 0;
-  } catch (parseError) {
+  } catch {
     // An unreadable sidecar cannot be shown to be worth keeping, and refusing to write would
     // strand the artifact; the write below replaces it.
     return false;
@@ -126,9 +126,9 @@ function hasProducerSidecar(destination) {
  * treating those as errors would make the tool unusable on a real directory. Genuine I/O faults
  * and unrecognized payloads still surface as failures.
  *
- * @param {string} sourcePath - Artifact to migrate.
- * @param {{ write: boolean, pretty: boolean }} options - Output switches.
- * @returns {{ status: 'migrated'|'skipped'|'failed'|'preserved', detail: string }} Run outcome.
+ * @param sourcePath - Artifact to migrate.
+ * @param options - Output switches.
+ * @returns Run outcome.
  */
 function migrateOne(sourcePath, options) {
   const relative = path.relative(process.cwd(), sourcePath);
@@ -142,7 +142,7 @@ function migrateOne(sourcePath, options) {
   let compact;
   try {
     compact = migrateLegacyReport(payload);
-  } catch (shapeError) {
+  } catch {
     return { status: 'skipped', detail: `${relative}: not a report artifact` };
   }
 
@@ -173,7 +173,9 @@ const OUTCOME_MARK = { migrated: '✔', preserved: '=', skipped: '·', failed: '
 function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.targets.length === 0) {
-    console.error('Usage: node scripts/migrate-report-artifacts.js <file|dir> [--write] [--pretty]');
+    console.error(
+      'Usage: node scripts/migrate-report-artifacts.js <file|dir> [--write] [--pretty]',
+    );
     process.exit(1);
   }
 

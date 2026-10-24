@@ -72,8 +72,8 @@ export interface ModularityEvaluation {
 
 const LCOM_STAR_GOD_CLASS_THRESHOLD = 0.85;
 const MIN_METHODS_FOR_GOD_CLASS = 8;
-const MODULARITY_WELL_STRUCTURED_THRESHOLD = 0.30;
-const MODULARITY_INVERTED_THRESHOLD = 0.10;
+const MODULARITY_WELL_STRUCTURED_THRESHOLD = 0.3;
+const MODULARITY_INVERTED_THRESHOLD = 0.1;
 const MIN_EDGES_FOR_INVERSION_WARN = 10;
 
 /**
@@ -88,7 +88,12 @@ export function computeHendersonSellersLcom(input: ClassCohesionInput): ClassCoh
     const a = input.attributesCount;
 
     // Classes with 0 or 1 method or 0 attributes are trivially cohesive
-    if (m <= 1 || a <= 0 || !input.attributeAccessCounts || input.attributeAccessCounts.length === 0) {
+    if (
+        m <= 1 ||
+        a <= 0 ||
+        !input.attributeAccessCounts ||
+        input.attributeAccessCounts.length === 0
+    ) {
         return Object.freeze({
             methodsCount: m,
             attributesCount: a,
@@ -107,7 +112,8 @@ export function computeHendersonSellersLcom(input: ClassCohesionInput): ClassCoh
     // Formula: (m - meanAccess) / (m - 1)
     const rawLcom = (m - meanAccess) / (m - 1);
     const lcomStar = +Math.max(0.0, Math.min(1.0, rawLcom)).toFixed(4);
-    const isGodClassCandidate = lcomStar >= LCOM_STAR_GOD_CLASS_THRESHOLD && m >= MIN_METHODS_FOR_GOD_CLASS;
+    const isGodClassCandidate =
+        lcomStar >= LCOM_STAR_GOD_CLASS_THRESHOLD && m >= MIN_METHODS_FOR_GOD_CLASS;
 
     let recommendation: string | undefined;
     if (isGodClassCandidate) {

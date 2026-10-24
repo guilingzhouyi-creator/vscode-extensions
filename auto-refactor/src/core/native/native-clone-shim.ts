@@ -361,6 +361,8 @@ export function findClonePairsShim(signatures: number[][], threshold: number): N
 
 /**
  * Pure JavaScript fallback for bit-parallel Myers distance.
+ * @param pattern
+ * @param text
  */
 export function computeBitParallelDistanceShim(pattern: Uint32Array, text: Uint32Array): number {
     return bitParallelMyers64Distance(pattern, text);
@@ -368,6 +370,7 @@ export function computeBitParallelDistanceShim(pattern: Uint32Array, text: Uint3
 
 /**
  * Pure JavaScript fallback for SimHash-64 generation.
+ * @param tokens
  */
 export function computeSimHash64Shim(tokens: readonly string[]): string {
     const hash = computeSimHash64(tokens);
@@ -376,6 +379,8 @@ export function computeSimHash64Shim(tokens: readonly string[]): string {
 
 /**
  * Pure JavaScript fallback for SimHash Hamming similarity.
+ * @param hashA
+ * @param hashB
  */
 export function calculateSimHashHammingSimilarityShim(hashA: string, hashB: string): number {
     const parse = (s: string): bigint => {
@@ -390,6 +395,8 @@ export function calculateSimHashHammingSimilarityShim(hashA: string, hashB: stri
 
 /**
  * Pure JavaScript fallback for trigram cosine similarity.
+ * @param tokensA
+ * @param tokensB
  */
 export function calculateTrigramCosineSimilarityShim(
     tokensA: readonly string[],
@@ -405,10 +412,7 @@ interface TemporalMiningState {
     readonly pairSharedCounts: Map<string, number>;
 }
 
-function recordChangeset(
-    cs: number[],
-    state: TemporalMiningState,
-): void {
+function recordChangeset(cs: number[], state: TemporalMiningState): void {
     if (!Array.isArray(cs) || cs.length === 0) {
         return;
     }
@@ -479,6 +483,9 @@ function compareCouplingPairs(
 
 /**
  * Pure JavaScript fallback for temporal coupling co-change mining.
+ * @param changesets
+ * @param minShared
+ * @param minJaccard
  */
 export function computeTemporalCouplingShim(
     changesets: number[][],
@@ -522,6 +529,7 @@ const MIN_BUMPY_SCORE_THRESHOLD = 12.0;
 
 /**
  * Calculates effective indentation level of a single source line.
+ * @param line
  */
 export function measureLineIndentLevelShim(line: string): number {
     let spaces = 0;
@@ -540,6 +548,9 @@ export function measureLineIndentLevelShim(line: string): number {
 
 /**
  * Pure JavaScript fallback for Bumpy Road structural complexity evaluation.
+ * @param lines
+ * @param startLine
+ * @param endLine
  */
 export function evaluateBumpyRoadShim(
     lines: readonly string[],
@@ -657,11 +668,7 @@ function matchesAnyTrigger(content: string, group: readonly string[]): boolean {
     return new RegExp(pattern).test(content);
 }
 
-function probeSingleTriggerGroup(
-    content: string,
-    group: readonly string[],
-    len: number,
-): boolean {
+function probeSingleTriggerGroup(content: string, group: readonly string[], len: number): boolean {
     if (!group || group.length === 0) {
         return true;
     }
@@ -680,6 +687,8 @@ function probeSingleTriggerGroup(
 
 /**
  * Pure JavaScript fallback for vectorized trigger batch probing.
+ * @param content
+ * @param triggerGroups
  */
 export function batchProbeTriggersShim(
     content: string,

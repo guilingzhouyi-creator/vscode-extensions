@@ -46,7 +46,7 @@ const DEFAULT_SEVERITY_WEIGHT = 2;
 /**
  * Formats and writes standard output messages prefixed by gate name.
  *
- * @param {string} message - Message text.
+ * @param message - Message text.
  */
 function logGate(message) {
   process.stdout.write(`[gate:self:slice] ${message}\n`);
@@ -55,7 +55,7 @@ function logGate(message) {
 /**
  * Formats and writes error messages prefixed by gate name.
  *
- * @param {string} message - Error message text.
+ * @param message - Error message text.
  */
 function logGateError(message) {
   process.stderr.write(`[gate:self:slice] ${message}\n`);
@@ -64,7 +64,7 @@ function logGateError(message) {
 /**
  * Get current working directory prefix relative to git repository root.
  *
- * @returns {string} Git subdirectory prefix (e.g. 'auto-refactor/' or '').
+ * @returns Git subdirectory prefix (e.g. 'auto-refactor/' or '').
  */
 function getGitPrefix() {
   try {
@@ -84,8 +84,8 @@ const GIT_PREFIX = getGitPrefix();
 /**
  * Read text content from a file safely.
  *
- * @param {string} absPath - Absolute file path.
- * @returns {string} File content.
+ * @param absPath - Absolute file path.
+ * @returns File content.
  */
 function readTextFile(absPath) {
   return fs.readFileSync(absPath, 'utf8');
@@ -94,8 +94,8 @@ function readTextFile(absPath) {
 /**
  * Normalize git path by stripping any leading subdirectory prefix.
  *
- * @param {string} gitFilePath - Git output path.
- * @returns {string} Local project-relative path.
+ * @param gitFilePath - Git output path.
+ * @returns Local project-relative path.
  */
 function stripGitPrefix(gitFilePath) {
   const normalizedPath = gitFilePath.replace(/\\/g, '/');
@@ -108,7 +108,7 @@ function stripGitPrefix(gitFilePath) {
 /**
  * Discover modified or untracked repository-relative files from git.
  *
- * @returns {string[]} Array of relative file paths.
+ * @returns Array of relative file paths.
  */
 function getGitChangedFiles() {
   try {
@@ -147,8 +147,8 @@ function getGitChangedFiles() {
 /**
  * Parse line ranges from a single hunk header row.
  *
- * @param {string} row - Unified diff line.
- * @param {number[]} lines - Accumulator for line numbers.
+ * @param row - Unified diff line.
+ * @param lines - Accumulator for line numbers.
  */
 function appendHunkLines(row, lines) {
   const match = HUNK_HEADER_RE.exec(row);
@@ -163,9 +163,9 @@ function appendHunkLines(row, lines) {
 /**
  * Extract changed line numbers for a single file using git diff against HEAD.
  *
- * @param {string} relPath - Relative file path.
- * @param {string} currentContent - Current file content.
- * @returns {number[]} Array of changed 1-indexed line numbers.
+ * @param relPath - Relative file path.
+ * @param currentContent - Current file content.
+ * @returns Array of changed 1-indexed line numbers.
  */
 function getChangedLineNumbers(relPath, currentContent) {
   const lineCount = currentContent.split(/\r?\n/).length;
@@ -192,8 +192,8 @@ function getChangedLineNumbers(relPath, currentContent) {
 /**
  * Get old content for file from git HEAD, or empty string if untracked.
  *
- * @param {string} relPath - Relative file path.
- * @returns {string} File content at HEAD.
+ * @param relPath - Relative file path.
+ * @returns File content at HEAD.
  */
 function getHeadContent(relPath) {
   try {
@@ -212,9 +212,9 @@ function getHeadContent(relPath) {
 /**
  * Extract all slices across targeted file paths.
  *
- * @param {string[]} targetFiles - Target file paths.
- * @param {object} extractor - ASTSliceExtractor instance.
- * @returns {object[]} Extracted AST slices.
+ * @param targetFiles - Target file paths.
+ * @param extractor - ASTSliceExtractor instance.
+ * @returns Extracted AST slices.
  */
 function extractAllSlices(targetFiles, extractor) {
   const allSlices = [];
@@ -235,9 +235,9 @@ function extractAllSlices(targetFiles, extractor) {
 /**
  * Resolve target files from CLI overrides, smoke flag, or git diff.
  *
- * @param {string[] | null} explicitFiles - CLI specified files.
- * @param {boolean} isSmoke - Whether smoke mode is active.
- * @returns {string[]} Target file paths.
+ * @param explicitFiles - CLI specified files.
+ * @param isSmoke - Whether smoke mode is active.
+ * @returns Target file paths.
  */
 function resolveTargetFiles(explicitFiles, isSmoke) {
   if (explicitFiles && explicitFiles.length > 0) return explicitFiles;
@@ -253,10 +253,10 @@ function resolveTargetFiles(explicitFiles, isSmoke) {
 /**
  * Read and print blocking summary from temporary report file.
  *
- * @param {object} summaryParams - Summary report parameters.
- * @param {number} summaryParams.fileCount - Scanned file count.
- * @param {string} summaryParams.severity - Configured severity.
- * @param {number} summaryParams.exitCode - CLI exit code.
+ * @param summaryParams - Summary report parameters.
+ * @param summaryParams.fileCount - Scanned file count.
+ * @param summaryParams.severity - Configured severity.
+ * @param summaryParams.exitCode - CLI exit code.
  */
 function reportBlockingSummary({ fileCount, severity, exitCode }) {
   let blockingCount = 0;
@@ -289,11 +289,11 @@ function reportBlockingSummary({ fileCount, severity, exitCode }) {
 /**
  * Execute targeted scan with active analyzers and baseline ratchet.
  *
- * @param {object} scanParams - Scan execution parameters.
- * @param {string[]} scanParams.targetFiles - Files to scan.
- * @param {string[]} scanParams.activeAnalyzers - Selected analyzer subset.
- * @param {string} scanParams.severity - Blocking severity threshold.
- * @returns {number} Process exit code.
+ * @param scanParams - Scan execution parameters.
+ * @param scanParams.targetFiles - Files to scan.
+ * @param scanParams.activeAnalyzers - Selected analyzer subset.
+ * @param scanParams.severity - Blocking severity threshold.
+ * @returns Process exit code.
  */
 function executeTargetedScan({ targetFiles, activeAnalyzers, severity }) {
   const cliArgs = [

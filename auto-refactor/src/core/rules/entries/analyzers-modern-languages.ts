@@ -100,7 +100,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_SHELL_LINT,
         languages: [LANGUAGE_POWERSHELL],
         summary: 'PowerShell script or function lacks standard documentation comment header.',
-        remediation: 'Add standard comment-based help block (<# .SYNOPSIS ... #>) or metadata header.',
+        remediation:
+            'Add standard comment-based help block (<# .SYNOPSIS ... #>) or metadata header.',
     }),
     defineRuleCompact({
         id: 'PS-ERROR-001',
@@ -123,7 +124,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         languages: [LANGUAGE_POWERSHELL],
         defaultSeverity: SEVERITY_ERROR,
         summary: 'Interactive input cmdlet used without non-interactive terminal guard.',
-        remediation: 'Guard interactive input with [Environment]::UserInteractive or support -Force.',
+        remediation:
+            'Guard interactive input with [Environment]::UserInteractive or support -Force.',
     }),
     defineRuleCompact({
         id: 'PS-SEC-001',
@@ -153,7 +155,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_PYTHON_MODERN,
         languages: [LANGUAGE_PYTHON],
         summary: 'Variable or parameter shadows a Python core built-in identifier.',
-        remediation: 'Rename variable to avoid namespace collisions with built-in functions or types.',
+        remediation:
+            'Rename variable to avoid namespace collisions with built-in functions or types.',
     }),
     defineRuleCompact({
         id: 'RSM-CAST-001',
@@ -190,7 +193,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_RUST_MODERN,
         languages: [LANGUAGE_RUST],
         summary: 'Obsolete extern crate declaration detected.',
-        remediation: 'Remove extern crate (deprecated since Rust 2018 edition) and use dependencies directly.',
+        remediation:
+            'Remove extern crate (deprecated since Rust 2018 edition) and use dependencies directly.',
     }),
     defineRuleCompact({
         id: 'RSM-FIND-001',
@@ -212,14 +216,16 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_RUST_MODERN,
         languages: [LANGUAGE_RUST],
         summary: 'std::sync lock guard held across .await in async function.',
-        remediation: 'Avoid holding synchronous lock guards across await; use tokio::sync::Mutex or narrow scope.',
+        remediation:
+            'Avoid holding synchronous lock guards across await; use tokio::sync::Mutex or narrow scope.',
     }),
     defineRuleCompact({
         id: 'RSM-MACRO-001',
         analyzer: ANALYZER_RUST_MODERN,
         languages: [LANGUAGE_RUST],
         summary: 'Deprecated #[macro_use] textual macro import detected.',
-        remediation: 'Explicitly import macros via use statements to maintain provenance traceability.',
+        remediation:
+            'Explicitly import macros via use statements to maintain provenance traceability.',
     }),
     defineRuleCompact({
         id: 'RSM-PNC-001',
@@ -243,7 +249,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_RUST_MODERN,
         languages: [LANGUAGE_RUST],
         summary: 'Function signature accepts &String parameter.',
-        remediation: 'Use &str (or impl AsRef<str>) for idiomatic flexibility without forcing heap allocation.',
+        remediation:
+            'Use &str (or impl AsRef<str>) for idiomatic flexibility without forcing heap allocation.',
     }),
     defineRuleCompact({
         id: 'RSM-TRY-001',
@@ -279,8 +286,10 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         id: 'SH-COND-001',
         analyzer: ANALYZER_SHELL_LINT,
         languages: [LANGUAGE_SHELL],
-        summary: 'Bash script uses fragile single bracket syntax [ ... ] with compound conditions or regex.',
-        remediation: 'Use standard [[ ... ]] syntax for bash scripts or strictly POSIX-compliant test constructs.',
+        summary:
+            'Bash script uses fragile single bracket syntax [ ... ] with compound conditions or regex.',
+        remediation:
+            'Use standard [[ ... ]] syntax for bash scripts or strictly POSIX-compliant test constructs.',
     }),
     defineRuleCompact({
         id: 'SH-DEPR-001',
@@ -295,7 +304,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_SHELL_LINT,
         languages: [LANGUAGE_SHELL],
         summary: 'Shell script lacks standard module documentation contract header.',
-        remediation: 'Add standard module header (# Module:, # Description:, # Usage:) near script start.',
+        remediation:
+            'Add standard module header (# Module:, # Description:, # Usage:) near script start.',
     }),
     defineRuleCompact({
         id: 'SH-ECHO-001',
@@ -325,7 +335,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_SHELL_LINT,
         languages: [LANGUAGE_SHELL],
         summary: 'Command expected to return non-zero exit codes executed bare under set -e.',
-        remediation: 'Capture exit status explicitly: STATUS=0; cmd || STATUS=$? or wrap in if statement.',
+        remediation:
+            'Capture exit status explicitly: STATUS=0; cmd || STATUS=$? or wrap in if statement.',
     }),
     defineRuleCompact({
         id: 'SH-INIT-001',
@@ -355,7 +366,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         languages: [LANGUAGE_SHELL],
         defaultSeverity: SEVERITY_ERROR,
         summary: 'Interactive read command lacks timeout or TTY detection guard.',
-        remediation: 'Add a timeout flag (read -t 10) or verify terminal interactivity ([[ -t 0 ]]).',
+        remediation:
+            'Add a timeout flag (read -t 10) or verify terminal interactivity ([[ -t 0 ]]).',
     }),
     defineRuleCompact({
         id: 'SH-SEC-001',
@@ -409,7 +421,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_TYPESCRIPT_MODERN,
         languages: LANGUAGES_TS_FAMILY,
         summary: 'Legacy arguments object detected.',
-        remediation: 'Use rest parameters (...args) which are statically typed and supported by compilers.',
+        remediation:
+            'Use rest parameters (...args) which are statically typed and supported by compilers.',
     }),
     defineRuleCompact({
         id: 'TSM-CTOR-001',
@@ -423,7 +436,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_TYPESCRIPT_MODERN,
         languages: LANGUAGES_TS_FAMILY,
         summary: 'VS Code event listener or Disposable not registered in subscriptions container.',
-        remediation: 'Register disposable via context.subscriptions.push(...) or lifecycle container to prevent memory leaks.',
+        remediation:
+            'Register disposable via context.subscriptions.push(...) or lifecycle container to prevent memory leaks.',
     }),
     defineRuleCompact({
         id: 'TSM-INCLUDES-001',
@@ -486,8 +500,10 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_VSCODE_EXTENSION,
         languages: [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT],
         defaultSeverity: SEVERITY_ERROR,
-        summary: 'VS Code Disposable resource created without being pushed to context.subscriptions.',
-        remediation: 'Register with context.subscriptions.push(...) or track within composite Disposable.',
+        summary:
+            'VS Code Disposable resource created without being pushed to context.subscriptions.',
+        remediation:
+            'Register with context.subscriptions.push(...) or track within composite Disposable.',
     }),
     defineRuleCompact({
         id: 'VSC-PERF-001',
@@ -500,15 +516,19 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         id: 'VSC-PERF-002',
         analyzer: ANALYZER_VSCODE_EXTENSION,
         languages: [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT],
-        summary: 'Webview CSS transition directly animates geometry layout property triggering browser reflow.',
-        remediation: 'Replace geometry layout transition (width/height/top/left) with transform or opacity.',
+        summary:
+            'Webview CSS transition directly animates geometry layout property triggering browser reflow.',
+        remediation:
+            'Replace geometry layout transition (width/height/top/left) with transform or opacity.',
     }),
     defineRuleCompact({
         id: 'VSC-UI-001',
         analyzer: ANALYZER_VSCODE_EXTENSION,
         languages: [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT],
-        summary: 'Webview collection list rendering lacks bounded density or folding controls (>5 items).',
-        remediation: 'Implement bounded threshold folding or pagination controls for Webview dynamic collections.',
+        summary:
+            'Webview collection list rendering lacks bounded density or folding controls (>5 items).',
+        remediation:
+            'Implement bounded threshold folding or pagination controls for Webview dynamic collections.',
     }),
     defineRuleCompact({
         id: 'VSC-UI-002',
@@ -516,7 +536,8 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         languages: [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT],
         defaultSeverity: SEVERITY_ERROR,
         summary: 'Webview UI contains hardcoded monochrome colors instead of theme CSS variables.',
-        remediation: 'Replace hardcoded hex colors with VS Code CSS theme variables (var(--vscode-*)).',
+        remediation:
+            'Replace hardcoded hex colors with VS Code CSS theme variables (var(--vscode-*)).',
     }),
     defineRuleCompact({
         id: 'VSC-UI-003',
@@ -529,7 +550,9 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         id: 'VSC-UI-004',
         analyzer: ANALYZER_VSCODE_EXTENSION,
         languages: [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT],
-        summary: 'Webview interactive state style changes must not dynamically modify border width triggering layout jitter.',
-        remediation: 'Use box-shadow: inset 0 0 0 <width> <color> or static transparent borders for hover/active states.',
+        summary:
+            'Webview interactive state style changes must not dynamically modify border width triggering layout jitter.',
+        remediation:
+            'Use box-shadow: inset 0 0 0 <width> <color> or static transparent borders for hover/active states.',
     }),
 ];

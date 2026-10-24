@@ -219,7 +219,9 @@ function verifyNumPrecRuleDetection() {
   const issuesGoodBnd = checkBnd(goodBoundedCode);
   assert.strictEqual(issuesGoodBnd, null, 'Must allow bounded condition');
 
-  console.log('  ✔ NUM-BND-001 correctly flags unbounded recursion conditions and passes bounded code.');
+  console.log(
+    '  ✔ NUM-BND-001 correctly flags unbounded recursion conditions and passes bounded code.',
+  );
 }
 
 /**

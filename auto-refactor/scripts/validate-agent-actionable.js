@@ -136,9 +136,7 @@ pub fn do_work() -> Result<(), String> {
   assert.strictEqual(tryIssue.actionable.action, 'replace_token');
   assert.strictEqual(tryIssue.actionable.code, 'AR:RSM:001');
   assert.strictEqual(tryIssue.actionable.templateSnippet, '$1?');
-  console.log(
-    '✔  RustModernAnalyzer emits actionable payload and templateSnippet for try! macro',
-  );
+  console.log('✔  RustModernAnalyzer emits actionable payload and templateSnippet for try! macro');
 
   // 6. Test PythonModernAnalyzer outputting actionable and templateSnippet
   const { PythonModernAnalyzer } = require('../dist/analyzers/python-modern');
@@ -159,9 +157,7 @@ def get_path():
   assert.strictEqual(pathIssue.actionable.action, 'replace_token');
   assert.strictEqual(pathIssue.actionable.code, 'AR:PYM:001');
   assert.ok(pathIssue.actionable.templateSnippet, 'Must provide templateSnippet for PYM-PATH-001');
-  console.log(
-    '✔  PythonModernAnalyzer emits actionable payload and templateSnippet for os.path',
-  );
+  console.log('✔  PythonModernAnalyzer emits actionable payload and templateSnippet for os.path');
 
   // 7. Test ArchitectureAnalyzer outputting actionable and templateSnippet
   const { ArchitectureAnalyzer } = require('../dist/analyzers/architecture');

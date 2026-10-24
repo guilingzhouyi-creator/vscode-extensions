@@ -15,9 +15,9 @@
 const DEFAULT_TAB_WIDTH = 4;
 const CHAR_SPACE = 32;
 const CHAR_TAB = 9;
-const CHAR_OPEN_BRACE = 123;  // '{'
+const CHAR_OPEN_BRACE = 123; // '{'
 const CHAR_CLOSE_BRACE = 125; // '}'
-const CHAR_LINE_FEED = 10;    // '\n'
+const CHAR_LINE_FEED = 10; // '\n'
 
 /**
  * Detailed count of open and closed curly braces.
@@ -39,7 +39,10 @@ export interface BraceBalance {
  * @param tabWidth - Spaces per tab character (default 4).
  * @returns Indentation depth level (0 for non-indented or empty lines).
  */
-export function measureIndentationDepth(line: string, tabWidth: number = DEFAULT_TAB_WIDTH): number {
+export function measureIndentationDepth(
+    line: string,
+    tabWidth: number = DEFAULT_TAB_WIDTH,
+): number {
     if (!line || line.length === 0) return 0;
     const safeTabWidth = tabWidth > 0 ? tabWidth : DEFAULT_TAB_WIDTH;
     let visualSpaces = 0;

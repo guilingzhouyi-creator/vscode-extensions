@@ -582,9 +582,7 @@ func _on_buy():
     'CASE-23 Failed: Analyzer did not emit GDM-LOC-001 on LOC > 450',
   );
 
-  console.log(
-    '  ✔ CASE-23: GdscriptModernAnalyzer live detection correctly triggers all 8 rules',
-  );
+  console.log('  ✔ CASE-23: GdscriptModernAnalyzer live detection correctly triggers all 8 rules');
 }
 
 // CASE-24: Real WebGames presentation views have zero violations across all 8 rules
@@ -758,9 +756,7 @@ func _on_buy():
     'CASE-28 Failed: Recipe ID must start with REC-BND',
   );
 
-  console.log(
-    '  ✔ CASE-28: Trajectory extractor synthesizes REC-VRT, REC-I18N, REC-NOD, REC-BND',
-  );
+  console.log('  ✔ CASE-28: Trajectory extractor synthesizes REC-VRT, REC-I18N, REC-NOD, REC-BND');
 }
 
 // CASE-29: Archetype weight tuner supports frontend, backend, composite profiles
@@ -791,9 +787,7 @@ func _on_buy():
     compWeights.architectureConsistency > 0,
     'CASE-29 Failed: Composite profile must have valid weights',
   );
-  console.log(
-    '  ✔ CASE-29: Archetype weight tuner supports frontend, backend, composite profiles',
-  );
+  console.log('  ✔ CASE-29: Archetype weight tuner supports frontend, backend, composite profiles');
 }
 
 console.log(

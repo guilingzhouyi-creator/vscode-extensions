@@ -40,8 +40,8 @@ const TOPOLOGY_CYCLE = ['src/core/cache.ts', 'src/core/report.ts', 'src/api.ts',
 /**
  * Build one finding for the synthetic bulk report.
  *
- * @param {number} index - Position in the synthetic finding list.
- * @returns {object} Issue-shaped record.
+ * @param index - Position in the synthetic finding list.
+ * @returns Issue-shaped record.
  */
 function bulkIssue(index) {
   const file = TOPOLOGY_CYCLE[index % TOPOLOGY_CYCLE.length];
@@ -72,7 +72,7 @@ function bulkIssue(index) {
 /**
  * Compose a verbose scan report carrying a scored quality breakdown.
  *
- * @returns {object} ScanReport-shaped payload.
+ * @returns ScanReport-shaped payload.
  */
 function createBulkReport() {
   const issues = Array.from({ length: BULK_FINDING_COUNT }, (_unused, index) => bulkIssue(index));
@@ -193,7 +193,8 @@ function testProjectionFidelity() {
  * Assert the info-tier policy can be lifted when a caller asks for the full set.
  */
 function testInfoInclusionPolicy() {
-  console.log('\n2. Testing info-tier inclusion policy...');  const report = createBulkReport();
+  console.log('\n2. Testing info-tier inclusion policy...');
+  const report = createBulkReport();
   const withInfo = buildCompactReport(report, { includeInfo: true, maxVectors: 400 });
   assert.strictEqual(withInfo.vectors.length, BULK_FINDING_COUNT);
   assert.strictEqual(withInfo.truncated, undefined);
@@ -299,7 +300,10 @@ function testTokenFrugality() {
     compactBytes < verboseBytes,
     `compact output (${compactBytes}B) must be smaller than verbose JSON (${verboseBytes}B)`,
   );
-  assert.ok(ratio <= 0.25, `compact output must stay under a quarter of verbose JSON, got ${ratio}`);
+  assert.ok(
+    ratio <= 0.25,
+    `compact output must stay under a quarter of verbose JSON, got ${ratio}`,
+  );
   console.log(
     `  ✔ compact projection is ${Math.round((1 - ratio) * 100)}% smaller than verbose JSON`,
   );
@@ -479,7 +483,9 @@ function testClaimSurvivesEmissionCap() {
   const capped = buildCompactReport(report, { includeInfo: true, maxVectors: 41 });
   assert.strictEqual(capped.truncated, 1, 'the cap must drop exactly the trailing member');
   assert.ok(
-    !capped.vectors.some((vector) => vector[2] === `${overlapFile}:9` && vector[0] === 'HYG-STB-002'),
+    !capped.vectors.some(
+      (vector) => vector[2] === `${overlapFile}:9` && vector[0] === 'HYG-STB-002',
+    ),
     'the fixture must actually withhold the trailing member',
   );
   assert.ok(
@@ -544,7 +550,14 @@ function testMigratorPreservesProducerSidecar() {
       bottlenecks: [],
       pal: ['governance'],
       vectors: [['NAM-LEN-001', 1, 'src/a.ts:1', 'kept', null, 0]],
-      clusters: [{ at: 'src/a.ts:1', cluster: 'stub-and-sanitize', rules: ['NAM-LEN-001', 'GOV-SAN-001'], primary: 'NAM-LEN-001' }],
+      clusters: [
+        {
+          at: 'src/a.ts:1',
+          cluster: 'stub-and-sanitize',
+          rules: ['NAM-LEN-001', 'GOV-SAN-001'],
+          primary: 'NAM-LEN-001',
+        },
+      ],
     };
     fs.writeFileSync(sidecarPath, JSON.stringify(producerSidecar), 'utf8');
 

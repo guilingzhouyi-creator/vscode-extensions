@@ -462,7 +462,11 @@ export class CommentAnalyzer implements Analyzer {
         );
     }
 
-    private scanCommentLine(lineCtx: LineScanContext, state: FileAuditState, isRust: boolean): void {
+    private scanCommentLine(
+        lineCtx: LineScanContext,
+        state: FileAuditState,
+        isRust: boolean,
+    ): void {
         if (state.level === AUDIT_LEVEL.BASIC) return;
         const body = this.extractCommentBody(lineCtx.trimmed, isRust);
         this.checkCommentWidth(lineCtx, body, state);

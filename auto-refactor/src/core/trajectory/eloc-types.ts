@@ -177,7 +177,6 @@ export interface CompactTrajectoryRecord {
         pass: boolean;
         code?: string;
     };
-
 }
 
 /**

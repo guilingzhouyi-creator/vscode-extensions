@@ -108,9 +108,7 @@ function checkFamilyRoutingAgreement() {
     `family routing contradicts the deduction table for ${conflicts.length} rule(s):\n  ` +
       conflicts.join('\n  '),
   );
-  console.log(
-    `  ✔ ${RULE_REGISTRY.length} rule(s) agree with the deduction table on their axis`,
-  );
+  console.log(`  ✔ ${RULE_REGISTRY.length} rule(s) agree with the deduction table on their axis`);
 }
 
 /**
@@ -124,9 +122,7 @@ function checkAnalyzersAreCharged() {
     if (axes.size === 0) uncharged.push(analyzer);
   }
   assert.deepStrictEqual(uncharged, [], `analyzers charged to no axis: ${uncharged.join(', ')}`);
-  console.log(
-    `  ✔ all ${axesByAnalyzer().size} table-owned analyzer(s) deduct at least one axis`,
-  );
+  console.log(`  ✔ all ${axesByAnalyzer().size} table-owned analyzer(s) deduct at least one axis`);
 }
 
 /**

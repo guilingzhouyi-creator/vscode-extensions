@@ -21,7 +21,9 @@ let manifestModule;
 try {
   manifestModule = require(manifestModulePath);
 } catch (err) {
-  console.error('✖ BLOCK Unable to load expert-manifest module from dist. Run npm run build first.');
+  console.error(
+    '✖ BLOCK Unable to load expert-manifest module from dist. Run npm run build first.',
+  );
   console.error(err);
   process.exit(1);
 }

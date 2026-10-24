@@ -730,7 +730,10 @@ interface RawNativeBinding {
     readonly computeWarshallTransitiveClosure?: (matrix: Uint8Array, size: number) => Uint8Array;
     readonly computeVectorDotProduct?: (a: readonly number[], b: readonly number[]) => number;
     readonly computeVectorCosineSimilarity?: (a: readonly number[], b: readonly number[]) => number;
-    readonly computeVectorEuclideanDistance?: (a: readonly number[], b: readonly number[]) => number;
+    readonly computeVectorEuclideanDistance?: (
+        a: readonly number[],
+        b: readonly number[],
+    ) => number;
     readonly version?: string;
     readonly VERSION?: string;
 }
@@ -789,9 +792,8 @@ function assembleNativeBindingCore(
             binding.computeBitParallelDistance,
             (pattern, text) => jsShim.computeBitParallelDistance(pattern, text),
         ),
-        computeSimHash64: selectBinding(
-            binding.computeSimHash64,
-            (tokens) => jsShim.computeSimHash64(tokens),
+        computeSimHash64: selectBinding(binding.computeSimHash64, (tokens) =>
+            jsShim.computeSimHash64(tokens),
         ),
         calculateSimHashHammingSimilarity: selectBinding(
             binding.calculateSimHashHammingSimilarity,
@@ -806,38 +808,32 @@ function assembleNativeBindingCore(
             (changesets, minShared, minJaccard) =>
                 jsShim.computeTemporalCoupling(changesets, minShared, minJaccard),
         ),
-        evaluateBumpyRoad: selectBinding(
-            binding.evaluateBumpyRoad,
-            (lines, startLine, endLine) => jsShim.evaluateBumpyRoad(lines, startLine, endLine),
+        evaluateBumpyRoad: selectBinding(binding.evaluateBumpyRoad, (lines, startLine, endLine) =>
+            jsShim.evaluateBumpyRoad(lines, startLine, endLine),
         ),
-        batchProbeTriggers: selectBinding(
-            binding.batchProbeTriggers,
-            (content, groups) => jsShim.batchProbeTriggers(content, groups),
+        batchProbeTriggers: selectBinding(binding.batchProbeTriggers, (content, groups) =>
+            jsShim.batchProbeTriggers(content, groups),
         ),
-        computeShannonEntropy: selectBinding(
-            binding.computeShannonEntropy,
-            (text) => jsShim.computeShannonEntropy(text),
+        computeShannonEntropy: selectBinding(binding.computeShannonEntropy, (text) =>
+            jsShim.computeShannonEntropy(text),
         ),
-        computeStatisticalMoments: selectBinding(
-            binding.computeStatisticalMoments,
-            (values) => jsShim.computeStatisticalMoments(values),
+        computeStatisticalMoments: selectBinding(binding.computeStatisticalMoments, (values) =>
+            jsShim.computeStatisticalMoments(values),
         ),
         calculatePopoviciuDispersionPenalty: selectBinding(
             binding.calculatePopoviciuDispersionPenalty,
             (stdDev, maxSigma, gamma) =>
                 jsShim.calculatePopoviciuDispersionPenalty(stdDev, maxSigma, gamma),
         ),
-        countBracesDetailed: selectBinding(
-            binding.countBracesDetailed,
-            (line) => jsShim.countBracesDetailed(line),
+        countBracesDetailed: selectBinding(binding.countBracesDetailed, (line) =>
+            jsShim.countBracesDetailed(line),
         ),
         computeWarshallTransitiveClosure: selectBinding(
             binding.computeWarshallTransitiveClosure,
             (matrix, size) => jsShim.computeWarshallTransitiveClosure(matrix, size),
         ),
-        computeVectorDotProduct: selectBinding(
-            binding.computeVectorDotProduct,
-            (a, b) => jsShim.computeVectorDotProduct(a, b),
+        computeVectorDotProduct: selectBinding(binding.computeVectorDotProduct, (a, b) =>
+            jsShim.computeVectorDotProduct(a, b),
         ),
         computeVectorCosineSimilarity: selectBinding(
             binding.computeVectorCosineSimilarity,
@@ -1087,6 +1083,7 @@ export function calculateNativeSimHashHammingSimilarity(hashA: string, hashB: st
  * Calculates cosine similarity [0.0, 1.0] between two token sequences using 3-gram feature vectors.
  *
  * @param tokensA - First token sequence.
+ * @param tokensB
  * @returns Cosine similarity score in [0.0, 1.0] rounded to 6 decimal places.
  */
 export function calculateNativeTrigramCosineSimilarity(
@@ -1098,6 +1095,9 @@ export function calculateNativeTrigramCosineSimilarity(
 
 /**
  * Computes pairwise co-change frequencies and Jaccard similarity between files.
+ * @param changesets
+ * @param minShared
+ * @param minJaccard
  */
 export function computeNativeTemporalCoupling(
     changesets: number[][],
@@ -1109,6 +1109,9 @@ export function computeNativeTemporalCoupling(
 
 /**
  * Measures structural irregularity and spatial variance of indentation/nesting depth.
+ * @param lines
+ * @param startLine
+ * @param endLine
  */
 export function evaluateNativeBumpyRoad(
     lines: readonly string[],
@@ -1120,6 +1123,8 @@ export function evaluateNativeBumpyRoad(
 
 /**
  * Fast vectorized batch probe testing multiple trigger groups against target content.
+ * @param content
+ * @param triggerGroups
  */
 export function batchProbeNativeTriggers(
     content: string,
@@ -1197,10 +1202,7 @@ export function computeNativeWarshallTransitiveClosure(
  * @param b - Second numerical vector.
  * @returns Dot product scalar value.
  */
-export function computeNativeVectorDotProduct(
-    a: readonly number[],
-    b: readonly number[],
-): number {
+export function computeNativeVectorDotProduct(a: readonly number[], b: readonly number[]): number {
     return nativeCore.computeVectorDotProduct(a, b);
 }
 

@@ -104,7 +104,11 @@ async function main() {
   const boundedFloorVector = synthesizeStaticQualityVector(fineGrainedIndices, {
     R: -250.0,
   });
-  assert.strictEqual(boundedFloorVector.R, -100.0, 'Score floor must be strictly clamped at -100.0');
+  assert.strictEqual(
+    boundedFloorVector.R,
+    -100.0,
+    'Score floor must be strictly clamped at -100.0',
+  );
   console.log('✔ Bounded negative score floor (-100.0) verified.');
 
   // 3. Static Issue Risk Confidence Model: S_i = P_i * C_i * I_i

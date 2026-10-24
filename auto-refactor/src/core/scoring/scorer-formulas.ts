@@ -454,6 +454,7 @@ export function computeSecurityCeiling(metric?: FileMetric | null, scaleFactor =
 /**
  * Normalizes input scale factor to a safe positive number using continuous sub-linear
  * rational smoothing for micro-files (LOC < 100), eliminating discontinuous step cliffs.
+ * @param scaleFactor
  */
 export function sanitizeScaleFactor(scaleFactor: number): number {
     const safeScale =

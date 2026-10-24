@@ -325,8 +325,7 @@ export class SqliteBackend implements IPraxisVFSStorage {
     public async getChunk(chunkHash: string): Promise<Uint8Array | null> {
         this.assertOpen();
         const chunkRow = this.stmtGetChunk?.get(chunkHash) as
-            | { data: Uint8Array; base_hash: string | null; encoding: string }
-            | undefined;
+            { data: Uint8Array; base_hash: string | null; encoding: string } | undefined;
         if (!chunkRow || !chunkRow.data) return null;
 
         if (chunkRow.encoding === 'PREFIX_DELTA' && chunkRow.base_hash) {

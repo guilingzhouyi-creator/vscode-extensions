@@ -136,7 +136,10 @@ export const branchWeightOf = computePythonBranchWeight;
  */
 export function isClassMember(syntaxNode: TreeSitterNode): boolean {
     let currentParent = syntaxNode.parent;
-    while (currentParent && (currentParent.type === PY_DECORATED_DEF || currentParent.type === PY_BLOCK)) {
+    while (
+        currentParent &&
+        (currentParent.type === PY_DECORATED_DEF || currentParent.type === PY_BLOCK)
+    ) {
         currentParent = currentParent.parent;
     }
     return Boolean(currentParent && currentParent.type === PY_CLASS_DEFINITION);
@@ -165,12 +168,14 @@ export function isTopLevel(syntaxNode: TreeSitterNode): boolean {
  * @returns `true` when the left-hand side is a single `UPPER_SNAKE_CASE` identifier.
  */
 export function isConstTarget(syntaxNode: TreeSitterNode): boolean {
-    const leftChild = syntaxNode.childForFieldName ? syntaxNode.childForFieldName(FIELD_LEFT) : null;
+    const leftChild = syntaxNode.childForFieldName
+        ? syntaxNode.childForFieldName(FIELD_LEFT)
+        : null;
     return Boolean(
         leftChild &&
-            leftChild.type === PY_IDENTIFIER &&
-            leftChild.text &&
-            CONSTANT_NAME_RE.test(leftChild.text),
+        leftChild.type === PY_IDENTIFIER &&
+        leftChild.text &&
+        CONSTANT_NAME_RE.test(leftChild.text),
     );
 }
 
@@ -211,7 +216,9 @@ function resolveDecoratedName(syntaxNode: TreeSitterNode): string | null {
  * @returns Identifier text, or null.
  */
 function resolveAssignmentName(syntaxNode: TreeSitterNode): string | null {
-    const leftChild = syntaxNode.childForFieldName ? syntaxNode.childForFieldName(FIELD_LEFT) : null;
+    const leftChild = syntaxNode.childForFieldName
+        ? syntaxNode.childForFieldName(FIELD_LEFT)
+        : null;
     if (!leftChild) return null;
     if (leftChild.type === PY_IDENTIFIER) return leftChild.text ?? null;
     const identifierChild = leftChild.namedChildren?.find((child) => child.type === PY_IDENTIFIER);
@@ -227,10 +234,14 @@ function resolveAssignmentName(syntaxNode: TreeSitterNode): string | null {
 export function getPythonNodeName(syntaxNode: TreeSitterNode): string | null {
     if (syntaxNode.type === PY_DECORATED_DEF) return resolveDecoratedName(syntaxNode);
     if (syntaxNode.type === PY_EXPR_STMT) {
-        const innerAssignment = syntaxNode.namedChildren?.find((child) => child.type === PY_ASSIGNMENT);
+        const innerAssignment = syntaxNode.namedChildren?.find(
+            (child) => child.type === PY_ASSIGNMENT,
+        );
         return innerAssignment ? getPythonNodeName(innerAssignment) : null;
     }
-    const nameChild = syntaxNode.childForFieldName ? syntaxNode.childForFieldName(FIELD_NAME) : null;
+    const nameChild = syntaxNode.childForFieldName
+        ? syntaxNode.childForFieldName(FIELD_NAME)
+        : null;
     if (nameChild && nameChild.type === PY_IDENTIFIER) return nameChild.text ?? null;
     if (syntaxNode.type === PY_ASSIGNMENT) return resolveAssignmentName(syntaxNode);
     return null;
@@ -257,7 +268,9 @@ export function isPrivateName(symbolName: string | null): boolean {
  */
 export function introducesBinding(syntaxNode: TreeSitterNode): boolean {
     if (syntaxNode.type !== PY_ASSIGNMENT) return false;
-    const rightChild = syntaxNode.childForFieldName ? syntaxNode.childForFieldName(FIELD_RIGHT) : null;
+    const rightChild = syntaxNode.childForFieldName
+        ? syntaxNode.childForFieldName(FIELD_RIGHT)
+        : null;
     return Boolean(rightChild && rightChild.type === PY_LAMBDA);
 }
 
@@ -269,9 +282,7 @@ export function introducesBinding(syntaxNode: TreeSitterNode): boolean {
  */
 export function isAtomLiteral(syntaxNode: TreeSitterNode): boolean {
     return (
-        syntaxNode.type === PY_TRUE ||
-        syntaxNode.type === PY_FALSE ||
-        syntaxNode.type === PY_NONE
+        syntaxNode.type === PY_TRUE || syntaxNode.type === PY_FALSE || syntaxNode.type === PY_NONE
     );
 }
 
@@ -321,10 +332,7 @@ function isComparisonTolerated(syntaxNode: TreeSitterNode, parentNode: TreeSitte
     return textValue === SPECIAL_MODULE_MAIN || textValue === '';
 }
 
-function isArgumentListTolerated(
-    syntaxNode: TreeSitterNode,
-    parentNode: TreeSitterNode,
-): boolean {
+function isArgumentListTolerated(syntaxNode: TreeSitterNode, parentNode: TreeSitterNode): boolean {
     if (parentNode.type !== PY_ARGUMENT_LIST) return false;
     const textValue = syntaxNode.text ? syntaxNode.text.replace(/^['"]|['"]$/g, '') : '';
     if (textValue && CLI_FLAG_PATTERN.test(textValue)) return true;
@@ -363,7 +371,9 @@ export function isToleratedOf(
         return Boolean(keyNode && keyNode.startIndex === syntaxNode.startIndex);
     }
     if (parentNode.type === PY_BINARY_OP) {
-        const slashOperator = parentNode.children?.find((child) => child.type === '/' || child.text === '/');
+        const slashOperator = parentNode.children?.find(
+            (child) => child.type === '/' || child.text === '/',
+        );
         if (slashOperator) return true;
     }
     if (parentNode.type === PY_INTERPOLATION || parentNode.type === PY_FORMAT_SPECIFIER) {

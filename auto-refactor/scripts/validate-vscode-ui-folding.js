@@ -201,9 +201,7 @@ export function getStyles(): string {
     0,
     'box-shadow inset and border-color transitions must not trigger VSC-UI-004',
   );
-  console.log(
-    '  ✔ 5. VSC-UI-004 flags dynamic border jitter and passes with box-shadow inset',
-  );
+  console.log('  ✔ 5. VSC-UI-004 flags dynamic border jitter and passes with box-shadow inset');
 })();
 
 // ── Test 6: Scoring Dimension Deduction Integration ──

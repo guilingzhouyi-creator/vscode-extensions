@@ -98,7 +98,11 @@ async function testBlockingAndReportOnly() {
     console.log('  ✔ blocking findings exit 1 and the report is written');
 
     // 1b. `--report-only` hands the verdict to the consumer (exit 0 despite findings)
-    const reportOnly = await runRunner(root, ['--report-only', '--out', path.join(root, 'report.json')]);
+    const reportOnly = await runRunner(root, [
+      '--report-only',
+      '--out',
+      path.join(root, 'report.json'),
+    ]);
     assert.strictEqual(reportOnly.status, 0, '--report-only must not gate on findings');
     const passThrough = await runRunner(root, [
       '--report-only',

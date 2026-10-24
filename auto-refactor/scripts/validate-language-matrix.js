@@ -213,7 +213,10 @@ async function main() {
     );
     const syntheticConfig = resolveConfig({ root, unsupportedLanguage: 'error' });
     const guardIssue = unsupportedLanguageDiagnostic('probe.unknownext', syntheticConfig);
-    assert.ok(guardIssue !== null, 'an unclaimed extension must stay fail-closed as LANG-UNSUPPORTED');
+    assert.ok(
+      guardIssue !== null,
+      'an unclaimed extension must stay fail-closed as LANG-UNSUPPORTED',
+    );
     assert.strictEqual(guardIssue.rule, 'LANG-UNSUPPORTED');
     assert.strictEqual(guardIssue.severity, 'error', 'the guard must stay fail-closed by default');
     summary.push('unknown    parse ⛔  LANG-UNSUPPORTED ✅ (fail-closed)');

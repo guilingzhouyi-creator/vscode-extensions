@@ -103,7 +103,6 @@ export async function handleScan(
     }
 }
 
-
 /**
  * Build a deduplicated file-path-to-DiffInput map from raw diff inputs.
  *
@@ -192,7 +191,6 @@ export async function handleScanDiff(
         logger.close();
     }
 }
-
 
 /**
  * Build the default per-daemon scan context: one shared worker-pool manager, one warm

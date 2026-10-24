@@ -57,9 +57,7 @@ console.log('1. Testing Project Profiler & Directory Semantics...');
   const autoRefactorProfile = detectProjectProfile(path.join(__dirname, '..'));
   assert.strictEqual(autoRefactorProfile.primaryLanguage, 'typescript');
   assert.ok(autoRefactorProfile.buildSystems.includes('npm'));
-  console.log(
-    '  ✔ Auto-refactor profile detected: primaryLanguage=typescript, buildSystems=[npm]',
-  );
+  console.log('  ✔ Auto-refactor profile detected: primaryLanguage=typescript, buildSystems=[npm]');
 
   // 1.3 Profiler on WebGames sibling workspace if present
   const webGamesPath = path.join(__dirname, '..', '..', 'WebGames');
@@ -109,9 +107,7 @@ console.log('\n2. Testing Scale Tuner & Dynamic Elastic Thresholds...');
     'enterprise relaxes complexity to avoid noise drowning key defects',
   );
 
-  console.log(
-    '  ✔ Scale grades and dynamic thresholds tuned properly across micro -> enterprise',
-  );
+  console.log('  ✔ Scale grades and dynamic thresholds tuned properly across micro -> enterprise');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -350,9 +346,7 @@ export function pay() { return 0; }
     issuesStrict.some((i) => i.rule === 'CMT-HDR-003'),
     'Must emit CMT-HDR-003 for declared path mismatch',
   );
-  console.log(
-    '  ✔ commentLevel=strict caught 6-field header declared path mismatch (CMT-HDR-003)',
-  );
+  console.log('  ✔ commentLevel=strict caught 6-field header declared path mismatch (CMT-HDR-003)');
 
   // 5.4 Config-level cascade: `--comment-level` / config `commentLevel` must reach the
   //     analyzer. Regression lock: the analyzer's own `options.level` default used to
@@ -363,9 +357,7 @@ export function pay() { return 0; }
   assert.strictEqual(strictCfg.analyzers.comments.enabled, true);
   const offCfg = resolveConfig({ root: projectRoot, commentLevel: 'off' });
   assert.strictEqual(offCfg.analyzers.comments.enabled, false);
-  console.log(
-    '  ✔ commentLevel cascades into comments analyzer (strict enables, off disables)',
-  );
+  console.log('  ✔ commentLevel cascades into comments analyzer (strict enables, off disables)');
 
   // 5.5 Strict mode escalates a missing file header to warning so the ratchet gate can block it.
   const ctxNoHeader = {

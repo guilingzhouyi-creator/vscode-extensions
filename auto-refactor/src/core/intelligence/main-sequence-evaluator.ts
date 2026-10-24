@@ -78,14 +78,11 @@ const SAFE_MODULAR_THRESHOLD = 0.15;
  */
 export function evaluateModuleMainSequence(input: ModuleCouplingInput): ModuleMainSequenceMetric {
     const totalCoupling = input.afferentCoupling + input.efferentCoupling;
-    const instability = totalCoupling > 0
-        ? +(input.efferentCoupling / totalCoupling).toFixed(4)
-        : 0.0;
+    const instability =
+        totalCoupling > 0 ? +(input.efferentCoupling / totalCoupling).toFixed(4) : 0.0;
 
     const totalTypes = input.abstractTypesCount + input.concreteTypesCount;
-    const abstractness = totalTypes > 0
-        ? +(input.abstractTypesCount / totalTypes).toFixed(4)
-        : 0.0;
+    const abstractness = totalTypes > 0 ? +(input.abstractTypesCount / totalTypes).toFixed(4) : 0.0;
 
     const rawDistance = Math.abs(abstractness + instability - 1.0);
     const distance = +rawDistance.toFixed(4);

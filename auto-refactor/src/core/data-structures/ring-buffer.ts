@@ -52,12 +52,10 @@ export class RingBuffer<T> {
     private _size = 0;
 
     public constructor(options?: number | RingBufferConfig) {
-        const rawCap = typeof options === 'number'
-            ? options
-            : (options?.capacity ?? DEFAULT_RING_CAPACITY);
-        const rawPolicy = typeof options === 'object' && options?.policy
-            ? options.policy
-            : 'drop_oldest';
+        const rawCap =
+            typeof options === 'number' ? options : (options?.capacity ?? DEFAULT_RING_CAPACITY);
+        const rawPolicy =
+            typeof options === 'object' && options?.policy ? options.policy : 'drop_oldest';
 
         this._capacity = calculateNextPowerOfTwo(Math.max(MIN_RING_CAPACITY, rawCap));
         this.capacityMask = this._capacity - 1;

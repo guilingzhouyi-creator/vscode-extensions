@@ -373,9 +373,7 @@ const PARALLEL_SUITES = [
 // because their state boundaries are completely independent:
 // - Lane A (Corpus & Daemon): .corpus / .rust-corpus / daemon registry
 // - Lane B (Self-Audit Baseline): reports/self-audit-baseline.json
-const DAEMON_SUITES = [
-  { name: 'validate-warm', script: 'scripts/validate-warm.js' },
-];
+const DAEMON_SUITES = [{ name: 'validate-warm', script: 'scripts/validate-warm.js' }];
 
 const SELF_AUDIT_SUITES = [
   { name: 'validate-self-audit', script: 'scripts/validate-self-audit.js' },
@@ -627,9 +625,13 @@ async function runFilteredSuites(parallelList, sequentialList, vitestPromise, pa
 
 async function runFourLaneConcurrentPipeline(parallelList, vitestPromise, passed, failed) {
   console.log(`--- [Four-Way Fully Pipelined Concurrent Test Execution] ---`);
-  console.log(`    Lane 1: Isolated Worker Pool (${parallelList.length} suites, ${concurrency} workers)`);
+  console.log(
+    `    Lane 1: Isolated Worker Pool (${parallelList.length} suites, ${concurrency} workers)`,
+  );
   console.log(`    Lane 2: Stateful Daemon & Corpus Suites (${DAEMON_SUITES.length} suites)`);
-  console.log(`    Lane 3: Self-Audit & Baseline Radar Suites (${SELF_AUDIT_SUITES.length} suites)`);
+  console.log(
+    `    Lane 3: Self-Audit & Baseline Radar Suites (${SELF_AUDIT_SUITES.length} suites)`,
+  );
   console.log(`    Lane 4: Vitest In-Memory Unit Suites\n`);
 
   parallelList.sort((a, b) => {
@@ -679,7 +681,8 @@ async function main() {
   const passed = [];
   const failed = [];
 
-  const shouldRunUnit = !skipUnit && (!filter || filter.includes('unit') || filter.includes('vitest'));
+  const shouldRunUnit =
+    !skipUnit && (!filter || filter.includes('unit') || filter.includes('vitest'));
   const vitestPromise = shouldRunUnit ? runVitestUnit(false) : Promise.resolve(null);
 
   if (filter) {

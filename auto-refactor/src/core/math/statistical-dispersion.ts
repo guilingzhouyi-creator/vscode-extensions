@@ -108,7 +108,9 @@ export function computePopoviciuDispersionPenalty(
     if (!Number.isFinite(standardDeviation) || standardDeviation <= 0) {
         return 1.0;
     }
-    const safeGamma = Number.isFinite(gamma) ? clamp(gamma, 0.0, 1.0) : DEFAULT_DISPERSION_PENALTY_RATIO;
+    const safeGamma = Number.isFinite(gamma)
+        ? clamp(gamma, 0.0, 1.0)
+        : DEFAULT_DISPERSION_PENALTY_RATIO;
     const normalizedDispersion = standardDeviation / POPOVICIU_MAX_SIGMA;
     const factor = Math.max(0.0, 1.0 - normalizedDispersion * safeGamma);
     return Math.round(factor * PRECISION_ROUNDING) / PRECISION_ROUNDING;

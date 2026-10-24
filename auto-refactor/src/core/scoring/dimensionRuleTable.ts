@@ -669,7 +669,13 @@ export const DIMENSION_RULES: DimensionRule[] = [
     {
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         covers: ruleMatches(
-            ['GUARD-ERR-001', 'GUARD-ROUTE-001', 'GUARD-BUDGET-001', 'GUARD-AST-001', 'GUARD-PROC-001'],
+            [
+                'GUARD-ERR-001',
+                'GUARD-ROUTE-001',
+                'GUARD-BUDGET-001',
+                'GUARD-AST-001',
+                'GUARD-PROC-001',
+            ],
             ['error', 'route', 'budget', 'ast', 'interactive'],
         ),
         dimension: DIMENSION_MAINTAINABILITY,

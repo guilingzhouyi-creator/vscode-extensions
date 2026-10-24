@@ -76,7 +76,7 @@ const REAL_DRIFT = 'FAKE-XYZ-999';
 /**
  * Reads the lexicon the gate loads, compiling exactly as the gate does.
  *
- * @returns {{candidate: RegExp, semanticStepId: RegExp, layerRange: RegExp, calendarDate: RegExp, prefixes: readonly string[]}}
+ * @returns
  */
 function loadGateVocabulary() {
   const document = JSON.parse(fs.readFileSync(LEXICON_FILE, 'utf8'));
@@ -92,9 +92,9 @@ function loadGateVocabulary() {
 /**
  * Reproduces the gate's benign-token decision for one token.
  *
- * @param {string} token - Candidate identifier.
- * @param {ReturnType<typeof loadGateVocabulary>} vocabulary - Gate-side compiled shapes.
- * @returns {boolean} True when the gate treats the token as benign.
+ * @param token - Candidate identifier.
+ * @param vocabulary - Gate-side compiled shapes.
+ * @returns True when the gate treats the token as benign.
  */
 function gateTreatsAsBenign(token, vocabulary) {
   if (vocabulary.layerRange.test(token)) return true;
@@ -106,8 +106,8 @@ function gateTreatsAsBenign(token, vocabulary) {
 /**
  * Builds a scratch workspace holding a copy of the lexicon, for degradation tests.
  *
- * @param {object|null} document - Lexicon document to write, or null to omit the file.
- * @returns {string} Absolute root of the scratch tree.
+ * @param document - Lexicon document to write, or null to omit the file.
+ * @returns Absolute root of the scratch tree.
  */
 function scratchRoot(document) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rule-lexicon-'));
@@ -132,7 +132,9 @@ function checkStepVocabularyParity() {
       `engine must treat '${token}' as a step identifier, not rule drift`,
     );
   }
-  console.log(`  ✔ ${BENIGN_STEP_IDS.length} semantic step identifiers are benign in both surfaces`);
+  console.log(
+    `  ✔ ${BENIGN_STEP_IDS.length} semantic step identifiers are benign in both surfaces`,
+  );
 }
 
 function checkNonStepVocabularyParity() {
@@ -145,7 +147,9 @@ function checkNonStepVocabularyParity() {
       `engine must treat '${token}' as benign`,
     );
   }
-  console.log(`  ✔ ${BENIGN_NON_STEP_TOKENS.length} external-standard/layer/date tokens are benign in both surfaces`);
+  console.log(
+    `  ✔ ${BENIGN_NON_STEP_TOKENS.length} external-standard/layer/date tokens are benign in both surfaces`,
+  );
 }
 
 function checkRegisteredIdsResolve() {
@@ -156,18 +160,25 @@ function checkRegisteredIdsResolve() {
       `'${token}' is registered in the catalog and must resolve, not be excused by a shape`,
     );
   }
-  console.log(`  ✔ ${REGISTERED_RESOLVING_IDS.length} registered identifiers resolve through the catalog`);
+  console.log(
+    `  ✔ ${REGISTERED_RESOLVING_IDS.length} registered identifiers resolve through the catalog`,
+  );
 }
 
 function checkRealDriftStillReported() {
   const gate = loadGateVocabulary();
-  assert.ok(!gateTreatsAsBenign(REAL_DRIFT, gate), 'gate must not treat a fabricated rule id as benign');
+  assert.ok(
+    !gateTreatsAsBenign(REAL_DRIFT, gate),
+    'gate must not treat a fabricated rule id as benign',
+  );
   assert.deepStrictEqual(
     findUnregisteredRuleDrift(REAL_DRIFT),
     [REAL_DRIFT],
     'engine must still report a fabricated rule id',
   );
-  console.log('  ✔ a fabricated rule id is still reported by both surfaces (a green run is not vacuous)');
+  console.log(
+    '  ✔ a fabricated rule id is still reported by both surfaces (a green run is not vacuous)',
+  );
 }
 
 function checkEmbeddedCandidateBoundary() {
@@ -184,10 +195,26 @@ function checkLexiconShapesAreShared() {
   const engine = loadRuleLexicon();
   assert.ok(engine !== null, 'the engine must resolve the workspace lexicon');
   const gate = loadGateVocabulary();
-  assert.strictEqual(engine.candidate.source, gate.candidate.source, 'candidate shape must be identical');
-  assert.strictEqual(engine.semanticStepId.source, gate.semanticStepId.source, 'step shape must be identical');
-  assert.strictEqual(engine.layerRange.source, gate.layerRange.source, 'layer shape must be identical');
-  assert.strictEqual(engine.calendarDate.source, gate.calendarDate.source, 'date shape must be identical');
+  assert.strictEqual(
+    engine.candidate.source,
+    gate.candidate.source,
+    'candidate shape must be identical',
+  );
+  assert.strictEqual(
+    engine.semanticStepId.source,
+    gate.semanticStepId.source,
+    'step shape must be identical',
+  );
+  assert.strictEqual(
+    engine.layerRange.source,
+    gate.layerRange.source,
+    'layer shape must be identical',
+  );
+  assert.strictEqual(
+    engine.calendarDate.source,
+    gate.calendarDate.source,
+    'date shape must be identical',
+  );
   assert.deepStrictEqual(
     [...engine.externalStandardPrefixes],
     [...gate.prefixes],
@@ -205,7 +232,12 @@ function checkDegradationWhenLexiconAbsent() {
   const root = scratchRoot(null);
   const previous = process.env.AUTO_REFACTOR_RULE_LEXICON;
   try {
-    process.env.AUTO_REFACTOR_RULE_LEXICON = path.join(root, 'scripts', 'common', 'rule-lexicon.json');
+    process.env.AUTO_REFACTOR_RULE_LEXICON = path.join(
+      root,
+      'scripts',
+      'common',
+      'rule-lexicon.json',
+    );
     resetRuleLexiconCache();
     assert.strictEqual(loadRuleLexicon(), null, 'an absent pinned lexicon must resolve to null');
     assert.deepStrictEqual(
@@ -229,7 +261,12 @@ function checkMalformedLexiconDegrades() {
   const incomplete = scratchRoot({ semanticStepId: '^x$' });
   const previous = process.env.AUTO_REFACTOR_RULE_LEXICON;
   try {
-    process.env.AUTO_REFACTOR_RULE_LEXICON = path.join(incomplete, 'scripts', 'common', 'rule-lexicon.json');
+    process.env.AUTO_REFACTOR_RULE_LEXICON = path.join(
+      incomplete,
+      'scripts',
+      'common',
+      'rule-lexicon.json',
+    );
     resetRuleLexiconCache();
     assert.strictEqual(
       loadRuleLexicon(),

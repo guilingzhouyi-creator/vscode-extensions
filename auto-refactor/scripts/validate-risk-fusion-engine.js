@@ -154,12 +154,20 @@ async function main() {
   assert.strictEqual(algorithmWeights.Wd, 0.5);
   assert.strictEqual(algorithmWeights.Wf, 0.15);
 
-  const pureStaticWeights = resolveAdaptiveFusionWeights({ domain: 'core_framework' }, false, false);
+  const pureStaticWeights = resolveAdaptiveFusionWeights(
+    { domain: 'core_framework' },
+    false,
+    false,
+  );
   assert.strictEqual(pureStaticWeights.Wd, 0.0);
   assert.strictEqual(pureStaticWeights.Wf, 0.0);
   assert.strictEqual(pureStaticWeights.Ws, 1.0);
 
-  const missingTelemetryWeights = resolveAdaptiveFusionWeights({ domain: 'core_framework' }, false, true);
+  const missingTelemetryWeights = resolveAdaptiveFusionWeights(
+    { domain: 'core_framework' },
+    false,
+    true,
+  );
   assert.strictEqual(missingTelemetryWeights.Wd, 0.0);
   assert.strictEqual(missingTelemetryWeights.Ws, 0.79);
   assert.strictEqual(missingTelemetryWeights.Wf, 0.21);

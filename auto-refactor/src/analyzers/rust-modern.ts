@@ -31,7 +31,6 @@ import {
     type LineScanContext,
 } from './declarative-modern-pack';
 
-
 /** Extension the pack accepts; the content-only path sees every language. */
 const SOURCE_EXTENSION = '.rs';
 
@@ -66,12 +65,10 @@ const NEEDLESS_CLONE_RE = /\.clone\(\)\s*(?:==|!=|\.len\(\)|\.is_empty\(\))/;
 const UNWRAP_RE = /\.unwrap\(\)/;
 
 /** Naked `as` numeric cast susceptible to silent truncation or wrapping. */
-const NUMERIC_CAST_RE =
-    /\bas\s+(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|f32|f64)\b/;
+const NUMERIC_CAST_RE = /\bas\s+(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|f32|f64)\b/;
 
 /** A formatting macro call, detected on the masked line (its format string is blanked). */
-const FORMAT_CALL_RE =
-    /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\(/;
+const FORMAT_CALL_RE = /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\(/;
 
 /** Positional placeholder inside macro call on a single line. */
 const POSITIONAL_PLACEHOLDER_RE = /!\s*\(\s*"[^"]*\{\}/;
@@ -96,8 +93,7 @@ const FOR_FIND_RE = /\bfor\s+[^{]+\{\s*if\s+[^{]+\{\s*return\b/;
 const ASYNC_FN_RE = /\basync\s+(?:unsafe\s+)?(?:extern(?:\s+"[^"]+")?\s+)?fn\b/;
 
 /** Synchronous standard library lock acquisition without `.await`. */
-const STD_LOCK_RE =
-    /(?:std::sync::(?:Mutex|RwLock)|\.(?:lock|read|write)\s*\(\s*\)(?!\s*\.await))/;
+const STD_LOCK_RE = /(?:std::sync::(?:Mutex|RwLock)|\.(?:lock|read|write)\s*\(\s*\)(?!\s*\.await))/;
 
 /** `.await` expression. */
 const AWAIT_RE = /\.await\b/;
@@ -337,7 +333,6 @@ const RULE_LOCK_AWAIT: DeclarativeLineRule = Object.freeze({
     },
 });
 
-
 /**
  * Scan all async functions in file for std guard instances held across `.await`.
  */
@@ -379,8 +374,7 @@ function scanAsyncLockIssues(
 const RULE_UNSAFE_SAFETY: DeclarativeLineRule = Object.freeze({
     rule: 'RSM-SAF-001',
     severity: SEVERITY_WARNING,
-    message:
-        'Unsafe block or function lacks documented `// SAFETY:` invariant proof.',
+    message: 'Unsafe block or function lacks documented `// SAFETY:` invariant proof.',
     suggestion:
         'Document validity, lifetime, and bounds invariants with a preceding `// SAFETY:` comment.',
     actionable: {
@@ -469,8 +463,7 @@ export class RustModernAnalyzer implements Analyzer {
                 rule: 'RSM-MACRO-001',
                 severity: SEVERITY_WARNING,
                 pattern: MACRO_USE_RE,
-                message:
-                    '`#[macro_use]` imports macros textually, so their origin is invisible.',
+                message: '`#[macro_use]` imports macros textually, so their origin is invisible.',
                 suggestion:
                     'Import the macros explicitly (`use crate::m::{a, b};`) and drop the attribute.',
                 actionable: {
@@ -527,8 +520,7 @@ export class RustModernAnalyzer implements Analyzer {
                 severity: SEVERITY_WARNING,
                 message:
                     '`&String` forces every caller to own a String; `&str` borrows either form.',
-                suggestion:
-                    'Take `&str` (or `impl AsRef<str>`) and let callers pass `&my_string`.',
+                suggestion: 'Take `&str` (or `impl AsRef<str>`) and let callers pass `&my_string`.',
                 condition: (ctx) => checkAmpStringInLine(ctx.trimmed, this.fnSigState),
                 actionable: {
                     action: 'replace_token',
@@ -539,10 +531,8 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-FORMAT-001',
                 severity: SEVERITY_WARNING,
-                message:
-                    'Positional `{}` captures drift out of sync with the argument list.',
-                suggestion:
-                    'Inline the binding (`format!("{value}")`) so the compiler checks it.',
+                message: 'Positional `{}` captures drift out of sync with the argument list.',
+                suggestion: 'Inline the binding (`format!("{value}")`) so the compiler checks it.',
                 condition: (ctx) =>
                     FORMAT_CALL_RE.test(ctx.maskedLine) &&
                     isPositionalFormatCall(ctx.allRawLines, ctx.lineIndex),
@@ -571,8 +561,7 @@ export class RustModernAnalyzer implements Analyzer {
                 severity: SEVERITY_INFO,
                 message:
                     'Manual `for ... in` loop searching with an immediate return can be simplified.',
-                suggestion:
-                    'Use iterator methods like `.find()`, `.any()`, or `.position()`.',
+                suggestion: 'Use iterator methods like `.find()`, `.any()`, or `.position()`.',
                 condition: (ctx) => isForFindCandidate(ctx.allMaskedLines, ctx.lineIndex),
                 actionable: {
                     action: 'replace_token',

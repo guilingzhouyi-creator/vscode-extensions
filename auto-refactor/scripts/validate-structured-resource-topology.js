@@ -44,9 +44,7 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
     800,
     'Snapshot core ELOC must remain invariant under resource stuffing',
   );
-  console.log(
-    '  ✔ Invariant 1: Snapshot-Conditioned Invariance (d(ELOC_core)/d(ELOC(r)) == 0)',
-  );
+  console.log('  ✔ Invariant 1: Snapshot-Conditioned Invariance (d(ELOC_core)/d(ELOC(r)) == 0)');
 }
 
 // 2. Semantic Volume (SV) Anti-Packing Test

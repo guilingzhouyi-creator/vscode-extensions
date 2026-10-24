@@ -512,7 +512,6 @@ export class DaemonServer {
     }
 }
 
-
 const FLAG_ROOT = '--root';
 const FLAG_STDIO = '--stdio';
 

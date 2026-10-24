@@ -55,7 +55,7 @@ export interface CodeSurvivalEvaluation {
 
 const MATURE_SURVIVAL_THRESHOLD = 0.75;
 const INFANT_MORTALITY_TIME_THRESHOLD = 5;
-const INFANT_MORTALITY_SURVIVAL_THRESHOLD = 0.50;
+const INFANT_MORTALITY_SURVIVAL_THRESHOLD = 0.5;
 
 /**
  * Computes the Kaplan-Meier survival estimator S(t) from revision interval data.
@@ -96,15 +96,17 @@ export function computeCodeSurvival(
         currentSurvival = +(currentSurvival * (1.0 - hazard)).toFixed(4);
         currentSurvival = Math.max(0.0, Math.min(1.0, currentSurvival));
 
-        if (halfLife === null && currentSurvival <= 0.50) {
+        if (halfLife === null && currentSurvival <= 0.5) {
             halfLife = item.timeStep;
         }
 
-        curve.push(Object.freeze({
-            timeStep: item.timeStep,
-            survival: currentSurvival,
-            hazard,
-        }));
+        curve.push(
+            Object.freeze({
+                timeStep: item.timeStep,
+                survival: currentSurvival,
+                hazard,
+            }),
+        );
     }
 
     const regime = classifySurvivalRegime(currentSurvival, halfLife);

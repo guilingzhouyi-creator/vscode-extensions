@@ -638,9 +638,7 @@ ${Array.from({ length: 130 }, (_, i) => `    out += '<span>tag ${i}</span>';`).j
   assert.strictEqual(archTmpRule.analyzer, 'architecture');
   assert.strictEqual(archTmpRule.canonical, true);
 
-  console.log(
-    `  ✔ Full analyzer integration & registry lookup (${RULE_REGISTRY.length} rules)`,
-  );
+  console.log(`  ✔ Full analyzer integration & registry lookup (${RULE_REGISTRY.length} rules)`);
 }
 
 function run() {

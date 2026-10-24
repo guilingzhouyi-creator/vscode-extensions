@@ -90,9 +90,7 @@ function main() {
     0,
     `Found ${totalViolations} Chinese diagnostic strings in engine core. Human text must live in dictionaries.`,
   );
-  console.log(
-    `✔  Verified ${files.length} engine files: 0 Chinese characters in diagnostics.`,
-  );
+  console.log(`✔  Verified ${files.length} engine files: 0 Chinese characters in diagnostics.`);
 
   // Check presentation dictionary
   const dictFacadePath = path.join(
@@ -123,9 +121,7 @@ function main() {
 
   const ruleCount = Object.keys(ZH_CN_RULES).length;
   assert.ok(ruleCount >= 270, `ZH_CN_RULES must cover at least 270 rules, found: ${ruleCount}`);
-  console.log(
-    `✔  Presentation dictionary is properly populated (${ruleCount} rules decoupled).`,
-  );
+  console.log(`✔  Presentation dictionary is properly populated (${ruleCount} rules decoupled).`);
 
   console.log('✔  Internationalization cleanliness guard passed completely.');
 }

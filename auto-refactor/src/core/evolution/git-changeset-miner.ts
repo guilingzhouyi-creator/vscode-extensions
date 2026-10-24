@@ -174,7 +174,10 @@ export function parseNumstatOutput(numstatText: string): FileChangeRecord[] {
 /**
  * Internal helper to compute raw Shannon entropy for non-zero total changed lines.
  */
-function computeRawShannonEntropy(fileChanges: readonly FileChangeRecord[], sumDelta: number): number {
+function computeRawShannonEntropy(
+    fileChanges: readonly FileChangeRecord[],
+    sumDelta: number,
+): number {
     let rawEntropy = 0.0;
     const count = fileChanges.length;
 
@@ -275,14 +278,11 @@ export function computeChangeEntropy(
 
     const rawEntropy = computeRawShannonEntropy(fileChanges, sumDelta);
     const maxTheoreticalEntropy = Math.log(fileCount) / Math.LN2;
-    const normalizedEntropy = maxTheoreticalEntropy > 0
-        ? Math.min(1.0, rawEntropy / maxTheoreticalEntropy)
-        : 0.0;
+    const normalizedEntropy =
+        maxTheoreticalEntropy > 0 ? Math.min(1.0, rawEntropy / maxTheoreticalEntropy) : 0.0;
 
     const isDiffused =
-        fileCount >= minFiles &&
-        normalizedEntropy > maxDiffusion &&
-        subSet.size >= minSubs;
+        fileCount >= minFiles && normalizedEntropy > maxDiffusion && subSet.size >= minSubs;
 
     const recommendation = isDiffused
         ? formatDiffusionRecommendation(normalizedEntropy, maxDiffusion, fileCount, subSet.size)

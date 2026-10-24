@@ -389,7 +389,7 @@ export class GDScriptAdapter implements LanguageAdapter {
         const clean = rawLine.replace(/#.*$/, '');
         const callRegex = /(?:([a-zA-Z_][a-zA-Z0-9_]*)\.)?([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
         let match: RegExpExecArray | null;
-        const children = stmtNode.children ?? (stmtNode.children = []);
+        const children = (stmtNode.children ??= []);
         while ((match = callRegex.exec(clean)) !== null) {
             const receiver = match[1];
             const callName = match[2];
@@ -459,7 +459,7 @@ export class GDScriptAdapter implements LanguageAdapter {
         const isLegacyToleratedLine =
             /\b(preload|load|get_node|push_error|push_warning|print|printerr)\b|\$/.test(rawLine);
         const tolerantSpans = collectTolerantCallSpans(rawLine);
-        const children = parentNode.children ?? (parentNode.children = []);
+        const children = (parentNode.children ??= []);
 
         // String literals ("..." or '...')
         const strRegex = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'/g;

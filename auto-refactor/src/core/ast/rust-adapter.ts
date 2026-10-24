@@ -211,8 +211,8 @@ export class RustAdapter implements LanguageAdapter {
             callInfo !== undefined
                 ? callInfo.name
                 : fnLike || isClassDefining || isBinding
-                    ? this.getSyntaxNodeName(syntaxNode)
-                    : undefined;
+                  ? this.getSyntaxNodeName(syntaxNode)
+                  : undefined;
 
         const node: NormalizedNode = {
             kind,

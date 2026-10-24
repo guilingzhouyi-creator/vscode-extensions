@@ -171,7 +171,10 @@ function isExemptPath(file: string): boolean {
  * Checks whether an SVG markup fragment belongs to a standalone SVG graphic rather than a Webview document.
  */
 function isStandaloneSvgLine(line: string, rawLines: string[], index: number): boolean {
-    if (line.includes('xmlns="http://www.w3.org/2000/svg"') || line.includes("xmlns='http://www.w3.org/2000/svg'")) {
+    if (
+        line.includes('xmlns="http://www.w3.org/2000/svg"') ||
+        line.includes("xmlns='http://www.w3.org/2000/svg'")
+    ) {
         return true;
     }
     const start = Math.max(0, index - 10);

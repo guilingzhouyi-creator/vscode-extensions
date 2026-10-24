@@ -56,12 +56,7 @@ const MIN_LINE_CAPACITY = 16;
 /** Estimated source code units per line when sizing the initial line-table capacity. */
 const SOURCE_CHARS_PER_LINE_SLOT = 32;
 
-import {
-    FNV1A_32_PRIME,
-    FNV1A_32_OFFSET_BASIS,
-    fnv1a32,
-    hashLines,
-} from '../algorithms/hash';
+import { FNV1A_32_PRIME, FNV1A_32_OFFSET_BASIS, fnv1a32, hashLines } from '../algorithms/hash';
 export { fnv1a32, hashLines };
 
 /** `typeof` tag for numeric edit-range fields; non-numeric input is rejected. */
@@ -217,8 +212,6 @@ export function hashLinesDirect(content: string, starts: number[]): Uint32Array 
     }
     return hashes;
 }
-
-
 
 /**
  * Diffs two line arrays by trimming their common prefix and suffix, dynamically selecting

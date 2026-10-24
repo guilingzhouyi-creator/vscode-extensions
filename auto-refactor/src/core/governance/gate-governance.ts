@@ -517,7 +517,9 @@ function auditHygieneGuard(context: RepoArchetypeContext, issues: Issue[]): void
 
     // Extended hygiene: Check whether gate enforces clutter file and root anti-pollution defense
     const hasClutterGuard =
-        /(?:validate-physical-hygiene|physical-hygiene|clutter|\.actual\.json|\.tmp|\.bak|desktop\.ini|thumbs\.db|\.ds_store|root-script)/i.test(content);
+        /(?:validate-physical-hygiene|physical-hygiene|clutter|\.actual\.json|\.tmp|\.bak|desktop\.ini|thumbs\.db|\.ds_store|root-script)/i.test(
+            content,
+        );
 
     if (!hasClutterGuard) {
         issues.push(

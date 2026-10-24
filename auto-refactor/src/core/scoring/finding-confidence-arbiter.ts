@@ -149,11 +149,7 @@ export interface ArbitratedFinding {
  * Tricorder-inspired Rule Lifecycle States governing gating authority.
  */
 export type RuleLifecycleState =
-    | 'active'
-    | 'canary'
-    | 'experimental'
-    | 'quarantined'
-    | 'deprecated';
+    'active' | 'canary' | 'experimental' | 'quarantined' | 'deprecated';
 
 export const LIFECYCLE_ACTIVE: RuleLifecycleState = 'active';
 export const LIFECYCLE_CANARY: RuleLifecycleState = 'canary';
@@ -591,7 +587,6 @@ function isLineInRanges(lineNo: number, spans: LineRangeSpan[]): boolean {
     return false;
 }
 
-
 /**
  * Applies rule lifecycle policy (quarantine, canary, experimental, deprecated)
  * to decide whether a prescriptive violation has its blocking authority revoked.
@@ -870,7 +865,11 @@ export class FindingConfidenceArbiter {
             return { isSuppressed: false };
         }
 
-        const lines = resolveFileLines(fileContentOrLines, this.fileContentMap, issue.location.file);
+        const lines = resolveFileLines(
+            fileContentOrLines,
+            this.fileContentMap,
+            issue.location.file,
+        );
         if (!lines || lines.length === 0) {
             return { isSuppressed: false };
         }
@@ -993,8 +992,7 @@ export class FindingConfidenceArbiter {
                 );
 
         const inSlice = Boolean(
-            this.differentialSlice?.enabled &&
-            this.isInDifferentialSlice(issue, changedRanges),
+            this.differentialSlice?.enabled && this.isInDifferentialSlice(issue, changedRanges),
         );
         const isPrunedBySlice = Boolean(
             this.differentialSlice?.enabled &&
@@ -1047,8 +1045,11 @@ export class FindingConfidenceArbiter {
             recordFindingMetrics(result, acc);
         }
 
-        const { stats: ruleSuppressionStats, noisyRules, autoQuarantinedRules } =
-            computeRuleSuppressionStats(acc.ruleMap, this.autoQuarantineThreshold);
+        const {
+            stats: ruleSuppressionStats,
+            noisyRules,
+            autoQuarantinedRules,
+        } = computeRuleSuppressionStats(acc.ruleMap, this.autoQuarantineThreshold);
 
         if (this.autoDemoteNoisyRules && noisyRules.length > 0) {
             applyNoisyRuleDemotions(

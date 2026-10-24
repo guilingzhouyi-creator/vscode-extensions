@@ -277,9 +277,7 @@ function testEnterLeaveInvariants() {
     assert.ok(enterIdx < leaveIdx, 'Enter event must precede leave event');
   }
 
-  console.log(
-    `   ✔ LIFO stack and nesting invariants verified (${enterCount} nodes balanced).`,
-  );
+  console.log(`   ✔ LIFO stack and nesting invariants verified (${enterCount} nodes balanced).`);
 }
 
 /**

@@ -65,9 +65,10 @@ export function computeMean(values: readonly number[]): number {
  */
 export function computeVariance(values: readonly number[], precomputedMean?: number): number {
     if (!values || values.length === 0) return 0;
-    const mean = precomputedMean !== undefined && Number.isFinite(precomputedMean)
-        ? precomputedMean
-        : computeMean(values);
+    const mean =
+        precomputedMean !== undefined && Number.isFinite(precomputedMean)
+            ? precomputedMean
+            : computeMean(values);
 
     let squaredSum = 0;
     let validCount = 0;
@@ -90,7 +91,10 @@ export function computeVariance(values: readonly number[], precomputedMean?: num
  * @param precomputedMean - Optional precomputed mean.
  * @returns Rounded population standard deviation.
  */
-export function computeStandardDeviation(values: readonly number[], precomputedMean?: number): number {
+export function computeStandardDeviation(
+    values: readonly number[],
+    precomputedMean?: number,
+): number {
     const variance = computeVariance(values, precomputedMean);
     return roundPrecision(Math.sqrt(variance));
 }

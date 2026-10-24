@@ -311,7 +311,9 @@ function checkTautologicalCommentPadding(
             createGamingIssue({
                 filePath,
                 idSuffix: ID_SUFFIX_DEFAULT,
-                message: AntiGamingMessages.TAUTOLOGICAL_COMMENT_MESSAGE(metrics.effectiveCommentRatio),
+                message: AntiGamingMessages.TAUTOLOGICAL_COMMENT_MESSAGE(
+                    metrics.effectiveCommentRatio,
+                ),
                 suggestion: AntiGamingMessages.TAUTOLOGICAL_COMMENT_SUGGESTION,
                 gamingKind: GAMING_KIND_TAUTOLOGICAL_COMMENT,
                 detail: {

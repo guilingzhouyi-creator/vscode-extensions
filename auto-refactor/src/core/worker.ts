@@ -409,7 +409,6 @@ function executeLegacyAnalyzers(context: LegacyExecutionContext): Issue[] {
                 detail: { error: String(e), stack: e instanceof Error ? e.stack : undefined },
             });
         }
-
     }
 
     return issues;

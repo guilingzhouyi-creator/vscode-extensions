@@ -20,8 +20,11 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { scan } = require('../dist/api');
-const { createTempTestDir, cleanupTempDir, deployFixtures } = require('./common/test-runner-harness');
-
+const {
+  createTempTestDir,
+  cleanupTempDir,
+  deployFixtures,
+} = require('./common/test-runner-harness');
 
 const LEGACY = [
   '"""Module docstring."""',
@@ -178,7 +181,6 @@ function writeWorkspace(root) {
 async function run() {
   const root = createTempTestDir('ar-pymod');
   try {
-
     const configFile = writeWorkspace(root);
     const report = await scan({
       root,
@@ -260,7 +262,6 @@ async function run() {
   } finally {
     cleanupTempDir(root);
   }
-
 }
 
 run()

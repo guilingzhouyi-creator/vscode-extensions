@@ -168,9 +168,7 @@ async function main() {
       0,
       'an acyclic tree must stay silent',
     );
-    console.log(
-      '  ✔ Python circular imports are detected end-to-end, acyclic trees stay silent',
-    );
+    console.log('  ✔ Python circular imports are detected end-to-end, acyclic trees stay silent');
 
     // ── 4. Documented boundary: no unused-export pass for Python ──
     writeFiles(root, { 'app/orphan.py': moduleSource('never_imported') });

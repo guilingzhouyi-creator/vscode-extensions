@@ -72,9 +72,7 @@ function main() {
   }
 
   if (failures.length === 0) {
-    console.log(
-      `  ✔ ${negatives} applied tags still reported, ${positives} listings still exempt`,
-    );
+    console.log(`  ✔ ${negatives} applied tags still reported, ${positives} listings still exempt`);
     console.log('  ALL MARKER SCOPE CHECKS PASSED');
     return 0;
   }

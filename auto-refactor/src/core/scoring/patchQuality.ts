@@ -277,15 +277,13 @@ function computePatchDensityMetrics(
         afterDetails.densityMetrics?.compositeDensity ?? effectiveDensityAfter,
     );
     const compositeDensityDelta =
-        Math.round((compositeDensityAfter - compositeDensityBefore) * PERCENT_SCALE_FACTOR) / PERCENT_SCALE_FACTOR;
+        Math.round((compositeDensityAfter - compositeDensityBefore) * PERCENT_SCALE_FACTOR) /
+        PERCENT_SCALE_FACTOR;
 
-    const tsprBefore = clampRatio(
-        beforeDetails.densityMetrics?.tspr ?? effectiveDensityBefore,
-    );
-    const tsprAfter = clampRatio(
-        afterDetails.densityMetrics?.tspr ?? effectiveDensityAfter,
-    );
-    const tsprDelta = Math.round((tsprAfter - tsprBefore) * THOUSANDTHS_SCALE_FACTOR) / THOUSANDTHS_SCALE_FACTOR;
+    const tsprBefore = clampRatio(beforeDetails.densityMetrics?.tspr ?? effectiveDensityBefore);
+    const tsprAfter = clampRatio(afterDetails.densityMetrics?.tspr ?? effectiveDensityAfter);
+    const tsprDelta =
+        Math.round((tsprAfter - tsprBefore) * THOUSANDTHS_SCALE_FACTOR) / THOUSANDTHS_SCALE_FACTOR;
 
     const porBefore = clampRatio(
         beforeDetails.densityMetrics?.por ?? Math.max(0, 1.0 - effectiveDensityBefore),
@@ -293,7 +291,8 @@ function computePatchDensityMetrics(
     const porAfter = clampRatio(
         afterDetails.densityMetrics?.por ?? Math.max(0, 1.0 - effectiveDensityAfter),
     );
-    const porDelta = Math.round((porAfter - porBefore) * THOUSANDTHS_SCALE_FACTOR) / THOUSANDTHS_SCALE_FACTOR;
+    const porDelta =
+        Math.round((porAfter - porBefore) * THOUSANDTHS_SCALE_FACTOR) / THOUSANDTHS_SCALE_FACTOR;
 
     return {
         compositeDensityBefore,
@@ -312,7 +311,8 @@ function computePillarDeltas(
     for (const pillar of ALL_PRIMARY_PILLARS) {
         const pBefore = beforeDetails.eightPillars.pillars[pillar];
         const pAfter = afterDetails.eightPillars.pillars[pillar];
-        pillarDeltas[pillar] = Math.round((pAfter - pBefore) * PERCENT_SCALE_FACTOR) / PERCENT_SCALE_FACTOR;
+        pillarDeltas[pillar] =
+            Math.round((pAfter - pBefore) * PERCENT_SCALE_FACTOR) / PERCENT_SCALE_FACTOR;
     }
     return pillarDeltas;
 }
@@ -363,7 +363,10 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
     // narrow analyzer selection. Subtracting it would yield NaN, and a NaN delta satisfies
     // neither `> 0.5` nor `< -0.5`, so the patch would be reported as `neutral`.
     const rawDelta = scoreDelta(beforeScore, afterScore);
-    let deltaScore = rawDelta === null ? null : Math.round(rawDelta * PERCENT_SCALE_FACTOR) / PERCENT_SCALE_FACTOR;
+    let deltaScore =
+        rawDelta === null
+            ? null
+            : Math.round(rawDelta * PERCENT_SCALE_FACTOR) / PERCENT_SCALE_FACTOR;
 
     // Pure relocation debouncing: moving constants without quality improvement
     // earns 0 positive score
@@ -374,7 +377,8 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
     const effectiveDensityBefore = beforeDetails.effectiveDensity;
     const effectiveDensityAfter = afterDetails.effectiveDensity;
     const effectiveDensityDelta =
-        Math.round((effectiveDensityAfter - effectiveDensityBefore) * PERCENT_SCALE_FACTOR) / PERCENT_SCALE_FACTOR;
+        Math.round((effectiveDensityAfter - effectiveDensityBefore) * PERCENT_SCALE_FACTOR) /
+        PERCENT_SCALE_FACTOR;
 
     const patchDensity = computePatchDensityMetrics(
         beforeDetails,
@@ -389,7 +393,12 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
     if (relocationAnalysis.hasPureRelocationsOnly && verdict === VERDICT_IMPROVED) {
         verdict = VERDICT_NEUTRAL;
     }
-    if (patchDensity.porDelta >= 0.35 && deltaScore !== null && deltaScore <= 0.5 && verdict === VERDICT_IMPROVED) {
+    if (
+        patchDensity.porDelta >= 0.35 &&
+        deltaScore !== null &&
+        deltaScore <= 0.5 &&
+        verdict === VERDICT_IMPROVED
+    ) {
         verdict = VERDICT_NEUTRAL;
     }
 

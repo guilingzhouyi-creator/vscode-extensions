@@ -31,10 +31,10 @@ const RULE_VAR = 'GUARD-VAR-001';
 /**
  * Build the analyzer context the engine would supply for one synthetic file.
  *
- * @param {string} filePath - Repository-relative path.
- * @param {string} content - File content.
- * @param {Record<string, unknown>} [options] - Analyzer options.
- * @returns {Record<string, unknown>} Context accepted by the analyzer contract.
+ * @param filePath - Repository-relative path.
+ * @param content - File content.
+ * @param [options] - Analyzer options.
+ * @returns Context accepted by the analyzer contract.
  */
 function buildContext(filePath, content, options = {}) {
   return {
@@ -49,11 +49,11 @@ function buildContext(filePath, content, options = {}) {
 /**
  * Run the analyzer and return the findings carrying one rule id.
  *
- * @param {string} filePath - Repository-relative path.
- * @param {string} content - File content.
- * @param {string} rule - Rule id to filter on.
- * @param {Record<string, unknown>} [options] - Analyzer options.
- * @returns {Array<object>} Matching findings.
+ * @param filePath - Repository-relative path.
+ * @param content - File content.
+ * @param rule - Rule id to filter on.
+ * @param [options] - Analyzer options.
+ * @returns Matching findings.
  */
 function runRule(filePath, content, rule, options) {
   return new ShellSafetyAnalyzer()
@@ -66,7 +66,11 @@ function runRule(filePath, content, rule, options) {
  */
 function testDirectOperands() {
   const cases = [
-    ['scripts/sample.ps1', 'Remove-Item -LiteralPath $env:USERPROFILE -Recurse -Force', 'PowerShell home expression'],
+    [
+      'scripts/sample.ps1',
+      'Remove-Item -LiteralPath $env:USERPROFILE -Recurse -Force',
+      'PowerShell home expression',
+    ],
     ['scripts/sample.ps1', 'Remove-Item -Path "C:\\" -Recurse -Force', 'PowerShell drive root'],
     ['scripts/sample.sh', 'rm -rf /', 'POSIX filesystem root'],
     ['scripts/sample.sh', 'rm -rf "$HOME"', 'POSIX home expression'],
@@ -113,7 +117,11 @@ function testTransitiveChain() {
     '}',
   ].join('\n');
   const findings = runRule('scripts/incident.ps1', content, RULE_DESTR);
-  assert.strictEqual(findings.length, 1, 'The transitive alias chain must report exactly one finding');
+  assert.strictEqual(
+    findings.length,
+    1,
+    'The transitive alias chain must report exactly one finding',
+  );
   assert.ok(
     String(findings[0].detail.reason).includes('->'),
     'The finding must carry the alias chain, because the fix depends on which hop introduced the taint',
@@ -227,11 +235,13 @@ function testShadowRuleIsDialectScoped() {
  * Assert each rule can be switched off without disabling the analyzer.
  */
 function testRuleSwitches() {
-  const psContent = ['$home = "x"', 'Remove-Item -LiteralPath $env:USERPROFILE -Recurse -Force'].join(
-    '\n',
-  );
+  const psContent = [
+    '$home = "x"',
+    'Remove-Item -LiteralPath $env:USERPROFILE -Recurse -Force',
+  ].join('\n');
   assert.strictEqual(
-    runRule('scripts/sample.ps1', psContent, RULE_DESTR, { checkDestructiveOperands: false }).length,
+    runRule('scripts/sample.ps1', psContent, RULE_DESTR, { checkDestructiveOperands: false })
+      .length,
     0,
     'Disabling the destructive-operand rule must silence it',
   );

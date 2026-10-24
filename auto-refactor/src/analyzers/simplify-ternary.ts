@@ -182,7 +182,9 @@ function makeSimplifyIssue(ctx: TernaryMatcherContext, opts: SimplifyIssueOption
         detail: {
             opportunity: opts.opportunity,
             canMakeImmutable: opts.canMakeImmutable,
-            cognitiveDelta: opts.canMakeImmutable ? COGNITIVE_DELTA_IMMUTABLE : COGNITIVE_DELTA_SHALLOW,
+            cognitiveDelta: opts.canMakeImmutable
+                ? COGNITIVE_DELTA_IMMUTABLE
+                : COGNITIVE_DELTA_SHALLOW,
             rewardBonus: opts.canMakeImmutable ? REWARD_BONUS_IMMUTABLE : REWARD_BONUS_SHALLOW,
             suggestedCode: opts.candidate,
         },
@@ -220,7 +222,10 @@ function tryFoldTernaryCandidate(
     ctx: TernaryMatcherContext,
     params: FoldCandidateParams,
 ): FoldedCandidate | null {
-    if (!isPureShallowExpression(params.pair.trueExpr) || !isPureShallowExpression(params.pair.falseExpr)) {
+    if (
+        !isPureShallowExpression(params.pair.trueExpr) ||
+        !isPureShallowExpression(params.pair.falseExpr)
+    ) {
         return null;
     }
     const candidate = formatTernaryCandidate({
@@ -246,10 +251,7 @@ interface ReturnBranchPair {
 /**
  * Attempt to fold if (c) return a; else return b; into a ternary return.
  */
-function tryFoldReturnTernary(
-    ctx: TernaryMatcherContext,
-    branches: ReturnBranchPair,
-): boolean {
+function tryFoldReturnTernary(ctx: TernaryMatcherContext, branches: ReturnBranchPair): boolean {
     if (!ts.isReturnStatement(branches.thenStmt) || !ts.isReturnStatement(branches.elseStmt)) {
         return false;
     }
@@ -504,7 +506,8 @@ function checkSequentialReturnTernary(
     ctx.issues.push(
         makeSimplifyIssue(ctx, {
             rule: RULE_SIM_TRN,
-            message: 'Guard conditional return followed by fallthrough return can be simplified to a shallow ternary return.',
+            message:
+                'Guard conditional return followed by fallthrough return can be simplified to a shallow ternary return.',
             suggestion: `Fold into shallow ternary return: \`${candidate}\``,
             pos,
             opportunity: OPPORTUNITY_SEQUENTIAL_RETURN,
@@ -514,10 +517,7 @@ function checkSequentialReturnTernary(
     );
 }
 
-function scanStatements(
-    statements: readonly ts.Statement[],
-    ctx: TernaryMatcherContext,
-): void {
+function scanStatements(statements: readonly ts.Statement[], ctx: TernaryMatcherContext): void {
     for (let i = 0; i < statements.length; i++) {
         const stmt = statements[i];
         if (ts.isIfStatement(stmt)) {
@@ -530,10 +530,7 @@ function scanStatements(
     }
 }
 
-function walkNode(
-    node: ts.Node,
-    ctx: TernaryMatcherContext,
-): void {
+function walkNode(node: ts.Node, ctx: TernaryMatcherContext): void {
     if (ts.isBlock(node) || ts.isSourceFile(node) || ts.isModuleBlock(node)) {
         scanStatements(node.statements, ctx);
     } else if (ts.isCaseClause(node) || ts.isDefaultClause(node)) {

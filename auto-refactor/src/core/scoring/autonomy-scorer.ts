@@ -652,8 +652,8 @@ function synthesizeAutonomyEvaluation(
 }
 
 const COMMON_STDLIB_SYMBOLS: ReadonlySet<string> = new Set(
+    // Common ECMAScript / JS / TS built-ins
     (
-        // Common ECMAScript / JS / TS built-ins
         'push pop shift unshift slice splice join map filter reduce find includes forEach indexOf ' +
         'lastIndexOf some every concat reverse sort keys values entries assign freeze seal create ' +
         'defineProperty hasOwnProperty toString valueOf trim split replace replaceAll toLowerCase ' +

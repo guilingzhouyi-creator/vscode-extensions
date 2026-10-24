@@ -213,17 +213,26 @@ export function fuseIssueRisks(
 
     if (typeof historicalFactor === 'number') {
         baseH = historicalFactor;
-    } else if (historicalFactor && typeof historicalFactor === 'object' && PROPERTY_IMPACT_MULTIPLIER in historicalFactor) {
+    } else if (
+        historicalFactor &&
+        typeof historicalFactor === 'object' &&
+        PROPERTY_IMPACT_MULTIPLIER in historicalFactor
+    ) {
         churnMultiplier = historicalFactor[PROPERTY_IMPACT_MULTIPLIER];
     }
 
     const S = Math.max(MIN_NORMALIZED_STATIC_RISK, staticRisk.normalizedRisk);
-    const H = Math.max(MIN_HISTORICAL_FACTOR, Math.min(MAX_HISTORICAL_FACTOR, baseH * churnMultiplier));
-
-    const { D, isDualConfirmed, suppressionApplied, rationale: baseRationale } = arbitrateCorroboration(
-        staticRisk,
-        dynamicRisk,
+    const H = Math.max(
+        MIN_HISTORICAL_FACTOR,
+        Math.min(MAX_HISTORICAL_FACTOR, baseH * churnMultiplier),
     );
+
+    const {
+        D,
+        isDualConfirmed,
+        suppressionApplied,
+        rationale: baseRationale,
+    } = arbitrateCorroboration(staticRisk, dynamicRisk);
 
     const modifier = suppressionApplied ? 0.35 : isDualConfirmed ? 1.3 : 1.0;
     const fusedScore = computePowerResonance({
@@ -247,7 +256,9 @@ export function fuseIssueRisks(
         issueId: staticRisk.issueId,
         rule: staticRisk.rule,
         staticRisk: Math.round(staticRisk.normalizedRisk * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
-        dynamicRisk: dynamicRisk ? Math.round(dynamicRisk.normalizedRisk * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR : 0.0,
+        dynamicRisk: dynamicRisk
+            ? Math.round(dynamicRisk.normalizedRisk * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR
+            : 0.0,
         historicalFactor: Math.round(H * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
         fusedScore,
         level,
@@ -333,7 +344,9 @@ function buildEffectiveDynamicHotspot(
         F: selfDynamicRisk?.F ?? 2.0,
         R: selfDynamicRisk?.R ?? 2.0,
         V: selfDynamicRisk?.V ?? 2.0,
-        rawRisk: Math.round(effectiveDynamic * DYNAMIC_RAW_RISK_SCALE * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        rawRisk:
+            Math.round(effectiveDynamic * DYNAMIC_RAW_RISK_SCALE * SCORE_ROUND_FACTOR) /
+            SCORE_ROUND_FACTOR,
         normalizedRisk: Math.round(effectiveDynamic * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
         evidenceConfidence: selfDynamicRisk?.evidenceConfidence ?? (callersCount > 0 ? 0.9 : 0.6),
     };
@@ -386,8 +399,10 @@ export function fuseCascadedRisks(
     return {
         ...baseFused,
         rationale: updatedRationale,
-        upstreamCascadedDynamicRisk: Math.round(cascadedDynamicSum * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
-        effectiveDynamicRisk: Math.round(effectiveDynamic * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        upstreamCascadedDynamicRisk:
+            Math.round(cascadedDynamicSum * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        effectiveDynamicRisk:
+            Math.round(effectiveDynamic * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
         contributingCallers,
     };
 }

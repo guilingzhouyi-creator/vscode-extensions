@@ -212,7 +212,9 @@ export function auditEmptyDirectories(
     while (queueHead < queue.length) {
         const absoluteDirectory = queue[queueHead++]!;
         const entries = readEntries(absoluteDirectory);
-        const relativeDirectory = path.relative(resolvedRoot, absoluteDirectory).replace(/\\/g, '/');
+        const relativeDirectory = path
+            .relative(resolvedRoot, absoluteDirectory)
+            .replace(/\\/g, '/');
         let liveEntryCount = 0;
 
         for (const entry of entries) {

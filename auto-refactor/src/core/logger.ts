@@ -155,7 +155,10 @@ export class LogRingBuffer {
      * @param filePath - Destination log file path.
      * @param options - Buffer capacity number or options object.
      */
-    constructor(filePath: string, options: number | LogRingBufferOptions = DEFAULT_BUFFER_CAPACITY) {
+    constructor(
+        filePath: string,
+        options: number | LogRingBufferOptions = DEFAULT_BUFFER_CAPACITY,
+    ) {
         this.filePath = filePath;
         if (typeof options === 'number') {
             this.capacity = options;

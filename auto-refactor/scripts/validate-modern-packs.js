@@ -22,8 +22,11 @@ const fs = require('fs');
 const path = require('path');
 
 const { scan } = require('../dist/api');
-const { createTempTestDir, cleanupTempDir, deployFixtures } = require('./common/test-runner-harness');
-
+const {
+  createTempTestDir,
+  cleanupTempDir,
+  deployFixtures,
+} = require('./common/test-runner-harness');
 
 /** One diagnostic shape per Rust rule; the fixture must produce exactly this id set. */
 const RUST_RULE_IDS = [
@@ -138,7 +141,6 @@ async function main() {
   const root = createTempTestDir('ar-modern-packs');
   const bothPacks = { 'rust-modern': { enabled: true }, 'gdscript-modern': { enabled: true } };
   try {
-
     // ── 1. Every Rust rule fires on its canonical shape ──
     const rustHits = await scanFixture(root, { 'src/main.rs': RUST_POSITIVE }, bothPacks);
     assert.deepStrictEqual(
@@ -199,7 +201,6 @@ async function main() {
   } finally {
     cleanupTempDir(root);
   }
-
 }
 
 main()

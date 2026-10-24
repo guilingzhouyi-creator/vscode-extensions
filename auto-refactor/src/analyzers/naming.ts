@@ -620,7 +620,13 @@ export class NamingAnalyzer implements Analyzer {
             if (aCtx.opts.checkJargon !== false) {
                 checkSymbolJargonHelper(node.name.text, pos, aCtx);
             }
-            this.checkDecouplingSymbol(node.name.text, KIND_FUNCTION, pos, aCtx, node.parent === aCtx.sf);
+            this.checkDecouplingSymbol(
+                node.name.text,
+                KIND_FUNCTION,
+                pos,
+                aCtx,
+                node.parent === aCtx.sf,
+            );
         }
         const isArrow = ts.isArrowFunction(node) || ts.isFunctionExpression(node);
         const isExemptVague = isSimpleArrowFunction(node, aCtx.sf);

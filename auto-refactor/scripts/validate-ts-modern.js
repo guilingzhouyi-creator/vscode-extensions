@@ -22,8 +22,11 @@ const fs = require('fs');
 const path = require('path');
 
 const { scan } = require('../dist/api');
-const { createTempTestDir, cleanupTempDir, deployFixtures } = require('./common/test-runner-harness');
-
+const {
+  createTempTestDir,
+  cleanupTempDir,
+  deployFixtures,
+} = require('./common/test-runner-harness');
 
 /** One diagnostic shape per rule: the pack must report every id in this list exactly once. */
 const ALL_RULE_IDS = [
@@ -114,7 +117,6 @@ async function main() {
   const root = createTempTestDir('ar-ts-modern');
   const packOn = { 'ts-modern': { enabled: true } };
   try {
-
     // ── 1. Every rule fires on its canonical shape ──
     const hits = await scanFixture(root, { 'src/positive.ts': POSITIVE }, packOn);
     const hitIds = [...new Set(hits.map((issue) => issue.rule))].sort();
@@ -171,7 +173,6 @@ async function main() {
   } finally {
     cleanupTempDir(root);
   }
-
 }
 
 main()

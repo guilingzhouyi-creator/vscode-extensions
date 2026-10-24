@@ -103,8 +103,7 @@ const TOOL_RE = /^\s*tool\s*$/;
 const POOL_ARRAY_RE = /\bPool(?:Byte|Int|Real|String|Vector2|Vector3|Color)Array\b/;
 const RPC_MODIFIER_RE =
     /^\s*(?:remote|master|puppet|slave|remotesync|mastersync|puppetsync|sync)\s+func\b/;
-const LEGACY_CONNECT_RE =
-    /\.connect\s*\(\s*"[^"]*"\s*,\s*(?:self|[A-Za-z_]\w*)\s*,\s*"[^"]*"\s*\)/;
+const LEGACY_CONNECT_RE = /\.connect\s*\(\s*"[^"]*"\s*,\s*(?:self|[A-Za-z_]\w*)\s*,\s*"[^"]*"\s*\)/;
 
 const EXTENDS_ANY_RE = /^\s*extends\s+[A-Za-z_]\w*/;
 const RESET_STATE_FUNC_RE = /^\s*func\s+reset_state\s*\(\s*\)/;
@@ -117,12 +116,10 @@ const WEAKREF_TOKEN_RE = /\b([a-zA-Z0-9_]+)\s*\(/;
 const WEAKREF_SAFE_CALLS = new Set(['weakref', 'is_instance_valid']);
 const RESPONSIVE_LAYOUT_RE =
     /position\s*=\s*Vector2\([0-9\s.,-]+\)|size\s*=\s*Vector2\([0-9\s.,-]+\)/;
-const UNIDIRECTIONAL_FLOW_RE =
-    /\b(?:AppState|GameStore|PlayerData)\.[a-zA-Z0-9_]+\s*=[^=]/;
+const UNIDIRECTIONAL_FLOW_RE = /\b(?:AppState|GameStore|PlayerData)\.[a-zA-Z0-9_]+\s*=[^=]/;
 const SCREEN_EXTENDS_RE = /^\s*extends\s+(?:Control|Node2D|CanvasLayer)\s*$/;
 const DESIGN_TOKEN_RE = /\bColor\s*\(/;
-const STATUS_BAR_RE =
-    /\bProgressBar\.new\s*\(|\bfunc\s+_ready\(\):\s*(?:(?!StatusBar).)*$/;
+const STATUS_BAR_RE = /\bProgressBar\.new\s*\(|\bfunc\s+_ready\(\):\s*(?:(?!StatusBar).)*$/;
 const VIRTUAL_LIST_RE =
     /(?:\b(?:list|_list)\.add_child\s*\(\s*item\s*\)|for\s+[a-zA-Z0-9_]+\s+in\s+[a-zA-Z0-9_.]+\s*:\s*.*add_child\()/;
 const I18N_BINDING_RE =
@@ -394,8 +391,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 suggestion:
                     'Route state changes through state_machine.transition_to(State) to preserve lifecycle hooks.',
                 condition: (ctx) =>
-                    !isFsmExemptPath(ctx.file) &&
-                    FSM_STATE_MUTATION_RE.test(ctx.maskedLine),
+                    !isFsmExemptPath(ctx.file) && FSM_STATE_MUTATION_RE.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_SIMPLIFY_CONTROL,
                     codeId: '010',
@@ -455,8 +451,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 message: 'View script does not inherit from BaseScreen.',
                 suggestion:
                     'Inherit from BaseScreen to participate in screen lifecycle and transition protocols.',
-                condition: (ctx) =>
-                    isViewFile(ctx.file) && SCREEN_EXTENDS_RE.test(ctx.maskedLine),
+                condition: (ctx) => isViewFile(ctx.file) && SCREEN_EXTENDS_RE.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_REPLACE_TOKEN,
                     codeId: '015',
@@ -467,10 +462,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 rule: RULE_GDM_TOK_001,
                 severity: SEV_INFO,
                 message: 'Hardcoded color or theme override bypassing design token constants.',
-                suggestion:
-                    'Reference ThemeTokens color constants or use design token overrides.',
-                condition: (ctx) =>
-                    isViewFile(ctx.file) && DESIGN_TOKEN_RE.test(ctx.maskedLine),
+                suggestion: 'Reference ThemeTokens color constants or use design token overrides.',
+                condition: (ctx) => isViewFile(ctx.file) && DESIGN_TOKEN_RE.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_REPLACE_TOKEN,
                     codeId: '016',
@@ -483,8 +476,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 message: 'Screen ready handler missing status bar registration.',
                 suggestion:
                     'Register screen with the status bar coordinator during _ready() setup.',
-                condition: (ctx) =>
-                    isViewFile(ctx.file) && STATUS_BAR_RE.test(ctx.maskedLine),
+                condition: (ctx) => isViewFile(ctx.file) && STATUS_BAR_RE.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_GUARD_CLAUSE,
                     codeId: '017',
@@ -497,8 +489,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 message: 'Unbounded loop child instantiation without virtual recycling.',
                 suggestion:
                     'Use VirtualListContainer recycling to maintain bounded node allocations.',
-                condition: (ctx) =>
-                    isViewFile(ctx.file) && VIRTUAL_LIST_RE.test(ctx.maskedLine),
+                condition: (ctx) => isViewFile(ctx.file) && VIRTUAL_LIST_RE.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_DECOMPOSE_MODULE,
                     codeId: '018',
@@ -510,8 +501,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 severity: SEV_INFO,
                 message: 'Static UI text string bound without tr() translation wrapper.',
                 suggestion: 'Wrap user-facing strings with tr("KEY") for localization.',
-                condition: (ctx) =>
-                    isViewFile(ctx.file) && I18N_BINDING_RE.test(ctx.rawLine),
+                condition: (ctx) => isViewFile(ctx.file) && I18N_BINDING_RE.test(ctx.rawLine),
                 actionable: {
                     action: ACT_REPLACE_TOKEN,
                     codeId: '019',
@@ -522,8 +512,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 rule: RULE_GDM_NOD_001,
                 severity: SEV_INFO,
                 message: 'Brittle relative node path navigation (../) in view.',
-                suggestion:
-                    'Mark target nodes as unique (%NodeName) and access via %Name syntax.',
+                suggestion: 'Mark target nodes as unique (%NodeName) and access via %Name syntax.',
                 condition: (ctx) =>
                     isViewFile(ctx.file) && EXPLICIT_NODE_PATH_RE.test(ctx.maskedLine),
                 actionable: {

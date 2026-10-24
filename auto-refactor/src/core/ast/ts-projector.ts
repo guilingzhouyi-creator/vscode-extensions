@@ -622,13 +622,7 @@ export class TsNodeProjector implements NodeProjector {
         if (fnLike) {
             this.applyCheapFunctionProps(node, astNode);
         } else {
-            this.applyCheapNonFunctionProps(
-                node,
-                astNode,
-                kindMeta,
-                parentRaw,
-                grandparentRaw,
-            );
+            this.applyCheapNonFunctionProps(node, astNode, kindMeta, parentRaw, grandparentRaw);
         }
 
         if (!fnLike) this.subtreeCache.set(astNode, node);

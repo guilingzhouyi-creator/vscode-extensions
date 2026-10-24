@@ -20,7 +20,10 @@ import { globToRegExp } from '../file-discovery';
 import { runCyclePass } from '../dependency-graph';
 import type { ObservedConstantDeclaration } from '../architecture/constant-library-auditor';
 import { inspectConstantLibraryTopology } from '../architecture/constant-library-auditor';
-import { auditEmptyDirectories, toIgnoredDirectoryName } from '../intelligence/empty-directory-audit';
+import {
+    auditEmptyDirectories,
+    toIgnoredDirectoryName,
+} from '../intelligence/empty-directory-audit';
 import {
     BASELINE_GRANULARITY_GROUPED,
     groupCounts,
@@ -383,7 +386,8 @@ function applySemanticComplexityPass(context: PostScanPassContext): void {
  */
 function applyEmptyDirectoryPass(context: PostScanPassContext): void {
     const { report, config, logger, scope, postScanPasses } = context;
-    const targetConfig = scope === POST_SCAN_SCOPE_FULL ? config.analyzers[ANALYZER_HYGIENE] : undefined;
+    const targetConfig =
+        scope === POST_SCAN_SCOPE_FULL ? config.analyzers[ANALYZER_HYGIENE] : undefined;
     const targetOptions = targetConfig?.options as Record<string, unknown> | undefined;
     if (!targetConfig?.enabled || targetOptions?.[OPT_CHECK_EMPTY_DIRECTORIES] === false) {
         return;
@@ -550,7 +554,10 @@ function applySingleIssueSuppression(
  * @param suppressions - Suppression rule collection.
  * @returns Total count of suppressed issues.
  */
-async function applySuppressions(report: ScanReport, suppressions: readonly SuppressionRule[]): Promise<number> {
+async function applySuppressions(
+    report: ScanReport,
+    suppressions: readonly SuppressionRule[],
+): Promise<number> {
     const arbiter = new FindingConfidenceArbiter();
     const index = suppressions.length > 0 ? buildSuppressionIndex(suppressions) : null;
     let suppressedCount = 0;
@@ -758,7 +765,11 @@ function buildHotspotInput(metric: FileMetric, defectCount: number): FileHotspot
  * @param context - Current post-scan execution context.
  */
 function applyEvolutionPass(context: PostScanPassContext): void {
-    if (context.scope !== POST_SCAN_SCOPE_FULL || !context.report.fileMetrics || context.report.fileMetrics.length === 0) {
+    if (
+        context.scope !== POST_SCAN_SCOPE_FULL ||
+        !context.report.fileMetrics ||
+        context.report.fileMetrics.length === 0
+    ) {
         return;
     }
     try {
@@ -787,7 +798,9 @@ function applyEvolutionPass(context: PostScanPassContext): void {
             }
         }
     } catch (evolutionError) {
-        context.logger.info(`Behavioral hotspot evolution pass degraded: ${String(evolutionError)}`);
+        context.logger.info(
+            `Behavioral hotspot evolution pass degraded: ${String(evolutionError)}`,
+        );
     }
 }
 

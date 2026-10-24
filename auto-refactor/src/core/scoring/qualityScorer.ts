@@ -308,7 +308,11 @@ export class QualityScorer {
         // Project scope: totalWeight is the repository's non-blank line total. Passing it
         // through the file-scoped helper capped it at 300 lines, so baseConfidence was always
         // 1.0 and the published confidence collapsed to exactly coverage.
-        const confidence = calculateConfidenceFromVolume(totalWeight, coverage, CONFIDENCE_SCOPE_PROJECT);
+        const confidence = calculateConfidenceFromVolume(
+            totalWeight,
+            coverage,
+            CONFIDENCE_SCOPE_PROJECT,
+        );
         const polyglotGeneralization = this.computePolyglotMetrics(fileQualityScores);
         const technicalDebt = evaluateTechnicalDebtAssessment(allIssues ?? [], totalWeight);
 
@@ -376,10 +380,12 @@ export class QualityScorer {
         const index = calculatePolyglotGeneralizationIndex(langScores);
         const moments = computeStatisticalMoments(Object.values(langScores));
         const meanScore = Math.round(moments.mean * SCORE_ROUNDING) / SCORE_ROUNDING;
-        const standardDeviation = Math.round(moments.standardDeviation * SCORE_ROUNDING) / SCORE_ROUNDING;
+        const standardDeviation =
+            Math.round(moments.standardDeviation * SCORE_ROUNDING) / SCORE_ROUNDING;
         const dispersionPenalty =
-            Math.round(Math.max(0, 1.0 - standardDeviation / MAX_DISPERSION_SCORE) * SCORE_ROUNDING) /
-            SCORE_ROUNDING;
+            Math.round(
+                Math.max(0, 1.0 - standardDeviation / MAX_DISPERSION_SCORE) * SCORE_ROUNDING,
+            ) / SCORE_ROUNDING;
 
         return {
             index,

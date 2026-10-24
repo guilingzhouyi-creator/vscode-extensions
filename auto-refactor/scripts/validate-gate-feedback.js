@@ -33,10 +33,7 @@ const {
   RULE_GUARD_FBK_001,
 } = require('../dist/core/governance/gate-feedback');
 
-const {
-  inspectRepoArchetype,
-  auditGateArchitecture,
-} = require('../dist/core/governance');
+const { inspectRepoArchetype, auditGateArchitecture } = require('../dist/core/governance');
 
 const WORKSPACE_ROOT = path.resolve(__dirname, '../..');
 const WORKSPACE_GUARD = path.join(WORKSPACE_ROOT, 'scripts/common/validate-gate-feedback.js');
@@ -124,12 +121,18 @@ console.log('4. Testing exemption markers and self-probing paths...');
 assert.strictEqual(isExemptedFeedbackFile('scripts/common/validate-gate-feedback.js'), true);
 assert.strictEqual(isExemptedFeedbackFile('scripts/common/gate-step-registry.json'), true);
 assert.strictEqual(isExemptedFeedbackFile('scripts/common/test-gate-guards.js'), true);
-assert.strictEqual(isExemptedFeedbackFile('auto-refactor/src/core/governance/gate-feedback.ts'), true);
+assert.strictEqual(
+  isExemptedFeedbackFile('auto-refactor/src/core/governance/gate-feedback.ts'),
+  true,
+);
 assert.strictEqual(isExemptedFeedbackFile('auto-refactor/scripts/validate-gate-feedback.js'), true);
 assert.strictEqual(isExemptedFeedbackFile('scripts/ps1/pre-commit-gate.ps1'), false);
 
 // Exempted file content should return 0 findings even when containing violations
-const exemptedFindings = auditFeedbackContent(positionalCorpus, 'scripts/common/validate-gate-feedback.js');
+const exemptedFindings = auditFeedbackContent(
+  positionalCorpus,
+  'scripts/common/validate-gate-feedback.js',
+);
 assert.strictEqual(exemptedFindings.length, 0, 'exempted file must return zero findings');
 console.log('  ✔ Exemption rules verified.');
 
@@ -194,7 +197,9 @@ const disabledAudit = auditGateArchitecture(WORKSPACE_ROOT, {
 });
 assert.ok(disabledAudit.passed !== undefined, 'auditGateArchitecture completed');
 
-console.log('  ✔ End-to-end gate architecture integration passed with 0 violations in active workspace.');
+console.log(
+  '  ✔ End-to-end gate architecture integration passed with 0 violations in active workspace.',
+);
 
 console.log('\n================================================================');
 console.log('🎉 ALL Gate Feedback Vocabulary checks PASSED (6/6)!');

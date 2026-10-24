@@ -17,39 +17,39 @@ const path = require('path');
 const { runValidationSuite } = require('./common/test-runner-harness');
 
 async function main() {
-    let observedTempDir = '';
+  let observedTempDir = '';
 
-    await runValidationSuite({
-        name: 'test-runner-harness-isolation',
-        fixtures: {
-            'test-file.txt': 'hello sandbox',
-            'nested/file.txt': ['line 1', 'line 2'],
-        },
-        run: async ({ tempDir }) => {
-            observedTempDir = tempDir;
-            assert.strictEqual(fs.existsSync(path.join(tempDir, 'test-file.txt')), true);
-            assert.strictEqual(
-                fs.readFileSync(path.join(tempDir, 'test-file.txt'), 'utf8'),
-                'hello sandbox',
-            );
-            assert.strictEqual(
-                fs.readFileSync(path.join(tempDir, 'nested/file.txt'), 'utf8'),
-                'line 1\nline 2',
-            );
-        },
-    });
+  await runValidationSuite({
+    name: 'test-runner-harness-isolation',
+    fixtures: {
+      'test-file.txt': 'hello sandbox',
+      'nested/file.txt': ['line 1', 'line 2'],
+    },
+    run: async ({ tempDir }) => {
+      observedTempDir = tempDir;
+      assert.strictEqual(fs.existsSync(path.join(tempDir, 'test-file.txt')), true);
+      assert.strictEqual(
+        fs.readFileSync(path.join(tempDir, 'test-file.txt'), 'utf8'),
+        'hello sandbox',
+      );
+      assert.strictEqual(
+        fs.readFileSync(path.join(tempDir, 'nested/file.txt'), 'utf8'),
+        'line 1\nline 2',
+      );
+    },
+  });
 
-    // Teardown assertion: tempDir must be cleaned up
-    assert.strictEqual(
-        fs.existsSync(observedTempDir),
-        false,
-        'Sandbox directory must be cleaned up after execution',
-    );
+  // Teardown assertion: tempDir must be cleaned up
+  assert.strictEqual(
+    fs.existsSync(observedTempDir),
+    false,
+    'Sandbox directory must be cleaned up after execution',
+  );
 
-    console.log('ALL TEST RUNNER HARNESS CHECKS PASSED SUCCESSFULLY!');
+  console.log('ALL TEST RUNNER HARNESS CHECKS PASSED SUCCESSFULLY!');
 }
 
 main().catch((err) => {
-    console.error(err);
-    process.exit(1);
+  console.error(err);
+  process.exit(1);
 });

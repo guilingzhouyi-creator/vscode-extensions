@@ -122,10 +122,7 @@ function recordTierAndActiveCounts(result: ArbitratedFinding, acc: IssueBatchAcc
  * @param result - The arbitrated finding to incorporate.
  * @param acc - The mutable batch accumulator.
  */
-export function recordFindingMetrics(
-    result: ArbitratedFinding,
-    acc: IssueBatchAccumulator,
-): void {
+export function recordFindingMetrics(result: ArbitratedFinding, acc: IssueBatchAccumulator): void {
     acc.findings.push(result);
     recordRuleStats(result, acc);
     recordTierAndActiveCounts(result, acc);
@@ -148,7 +145,8 @@ export function computeRuleSuppressionStats(
 
     for (const [rule, stat] of ruleMap.entries()) {
         const ratio = stat.total > 0 ? +(stat.suppressed / stat.total).toFixed(2) : 0;
-        const isNoisy = stat.total >= MIN_NOISY_SAMPLE_COUNT && ratio >= NOISY_SUPPRESSION_RATIO_THRESHOLD;
+        const isNoisy =
+            stat.total >= MIN_NOISY_SAMPLE_COUNT && ratio >= NOISY_SUPPRESSION_RATIO_THRESHOLD;
         stats.push({
             rule,
             total: stat.total,
@@ -219,7 +217,11 @@ function resolveClusterPrimary(cluster: ArbitratedFinding[]): {
     }
 
     const tierWeight = (t: FindingConfidenceTier) =>
-        t === TIER_PRESCRIPTIVE ? TIER_WEIGHT_PRESCRIPTIVE : t === TIER_ACTIONABLE ? TIER_WEIGHT_ACTIONABLE : TIER_WEIGHT_ADVISORY;
+        t === TIER_PRESCRIPTIVE
+            ? TIER_WEIGHT_PRESCRIPTIVE
+            : t === TIER_ACTIONABLE
+              ? TIER_WEIGHT_ACTIONABLE
+              : TIER_WEIGHT_ADVISORY;
 
     let bestIdx = 0;
     for (let i = 1; i < cluster.length; i++) {
@@ -257,7 +259,9 @@ function appendFindingToFileMap(
     list.push(finding);
 }
 
-function groupFindingsByFile(candidates: readonly ArbitratedFinding[]): Map<string, ArbitratedFinding[]> {
+function groupFindingsByFile(
+    candidates: readonly ArbitratedFinding[],
+): Map<string, ArbitratedFinding[]> {
     const fileMap = new Map<string, ArbitratedFinding[]>();
     for (let i = 0; i < candidates.length; i++) {
         appendFindingToFileMap(fileMap, candidates[i]);

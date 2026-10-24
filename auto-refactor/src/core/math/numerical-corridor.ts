@@ -152,7 +152,8 @@ export function sanitizeBound(
     min?: number,
     max?: number,
 ): number {
-    const safeBase = typeof rawValue === 'number' && Number.isFinite(rawValue) ? rawValue : fallback;
+    const safeBase =
+        typeof rawValue === 'number' && Number.isFinite(rawValue) ? rawValue : fallback;
     const lower = typeof min === 'number' && Number.isFinite(min) ? min : -Infinity;
     const upper = typeof max === 'number' && Number.isFinite(max) ? max : Infinity;
     return clamp(safeBase, lower, upper);

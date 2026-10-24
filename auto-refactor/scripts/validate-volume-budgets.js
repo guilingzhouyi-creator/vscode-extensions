@@ -33,10 +33,10 @@ const VOL_RULES = new Set([
 /**
  * Build the analyzer context the engine would supply for one synthetic file.
  *
- * @param {string} filePath - Repository-relative path.
- * @param {string} content - File content.
- * @param {Record<string, unknown>} [options] - Analyzer options.
- * @returns {Record<string, unknown>} Context accepted by the analyzer contract.
+ * @param filePath - Repository-relative path.
+ * @param content - File content.
+ * @param [options] - Analyzer options.
+ * @returns Context accepted by the analyzer contract.
  */
 function buildContext(filePath, content, options = {}) {
   return {
@@ -51,10 +51,10 @@ function buildContext(filePath, content, options = {}) {
 /**
  * Run the analyzer and return only the volume-family findings.
  *
- * @param {string} filePath - Repository-relative path.
- * @param {string} content - File content.
- * @param {Record<string, unknown>} [options] - Analyzer options.
- * @returns {Array<{ rule: string, severity: string }>} Volume findings.
+ * @param filePath - Repository-relative path.
+ * @param content - File content.
+ * @param [options] - Analyzer options.
+ * @returns Volume findings.
  */
 function runVolume(filePath, content, options) {
   const analyzer = new LargeFileAnalyzer();
@@ -66,8 +66,8 @@ function runVolume(filePath, content, options) {
 /**
  * Build `count` single-line functions with a documentable shape.
  *
- * @param {number} count - Function count.
- * @returns {string} Source text.
+ * @param count - Function count.
+ * @returns Source text.
  */
 function buildFunctions(count) {
   const lines = [];

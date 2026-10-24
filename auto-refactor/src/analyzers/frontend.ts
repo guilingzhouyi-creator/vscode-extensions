@@ -575,7 +575,11 @@ function mediaTargetsLocalComponent(rawLines: string[], startIndex: number): boo
  * @param globalBraceDepth - Brace depth accumulated before this line.
  * @returns True when the query scopes a local class or id rather than the viewport root.
  */
-function mediaQueryTargetsLocal(rawLines: string[], index: number, globalBraceDepth: number): boolean {
+function mediaQueryTargetsLocal(
+    rawLines: string[],
+    index: number,
+    globalBraceDepth: number,
+): boolean {
     const line = rawLines[index];
     const mediaIndex = line.search(MEDIA_QUERY_RE);
     const prefix = mediaIndex > 0 ? line.slice(0, mediaIndex) : '';

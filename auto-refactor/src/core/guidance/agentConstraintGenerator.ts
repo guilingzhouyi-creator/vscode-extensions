@@ -730,7 +730,7 @@ export function generateImmutableConstraints(
             maxLoc: roleBudget.physicalLinesFail,
             minTau: 2.5,
             maxTau: 22.0,
-            maxPor: 0.60,
+            maxPor: 0.6,
         };
     }
 

@@ -35,7 +35,7 @@ const COMPACT_SCHEMA = 'cas-v3';
 /**
  * Enumerate source artifacts in the reports directory, excluding derived sidecars.
  *
- * @returns {string[]} Absolute paths of candidate source artifacts.
+ * @returns Absolute paths of candidate source artifacts.
  */
 function listSourceArtifacts() {
   if (!fs.existsSync(REPORTS_DIR)) return [];
@@ -50,14 +50,14 @@ function listSourceArtifacts() {
 /**
  * Decide whether an artifact is a report the adapters can normalise.
  *
- * @param {string} sourcePath - Candidate artifact.
- * @returns {boolean} True when the migration layer recognises the shape.
+ * @param sourcePath - Candidate artifact.
+ * @returns True when the migration layer recognises the shape.
  */
 function isReportArtifact(sourcePath) {
   try {
     migrateLegacyReport(JSON.parse(fs.readFileSync(sourcePath, 'utf8')));
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -72,7 +72,7 @@ function isReportArtifact(sourcePath) {
  * the artifact. Freshness is therefore asserted by re-deriving the projection and comparing the
  * fields a consumer would trust: the issue total, the composite score and the grade.
  *
- * @param {string} sourcePath - Report artifact whose sidecar is required.
+ * @param sourcePath - Report artifact whose sidecar is required.
  */
 function assertSidecarFor(sourcePath) {
   const sidecarPath = sourcePath.slice(0, -JSON_SUFFIX.length) + CAS_SUFFIX;
@@ -108,7 +108,9 @@ function assertSidecarFor(sourcePath) {
 }
 
 function main() {
-  console.log('=== [Sidecar Coverage] Guarding the historical-adapter retirement precondition ===\n');
+  console.log(
+    '=== [Sidecar Coverage] Guarding the historical-adapter retirement precondition ===\n',
+  );
 
   const artifacts = listSourceArtifacts();
   assert.ok(
@@ -131,7 +133,9 @@ function main() {
   for (const ledger of other) {
     console.log(`  · ${path.basename(ledger)}: non-report artifact, no sidecar expected`);
   }
-  console.log(`\n✔ ${reports.length} report artifact(s) fully projected, ${other.length} non-report(s) exempt`);
+  console.log(
+    `\n✔ ${reports.length} report artifact(s) fully projected, ${other.length} non-report(s) exempt`,
+  );
   console.log('\n================================================================');
   console.log('🎉 ALL COMPACT SIDECAR COVERAGE CHECKS PASSED!');
   console.log('================================================================');

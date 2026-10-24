@@ -66,7 +66,7 @@ const CHINESE_CONSTRUCTION_JARGON_RE =
 function checkCommentLineJargon(line: string, lineIndex: number): GovernanceViolation | null {
     if (!isCommentLine(line) || isJargonSelfReference(line)) return null;
 
-    let match = CONSTRUCTION_JARGON_RE.exec(line);
+    const match = CONSTRUCTION_JARGON_RE.exec(line);
     let matchedText = match ? match[0] : '';
     let matchIdx = match ? match.index : -1;
 

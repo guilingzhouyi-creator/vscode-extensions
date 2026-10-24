@@ -205,8 +205,7 @@ export const HygieneMessages = {
      */
     UTF8_BOM_DETECTED: (file: string): DiagnosticDescriptor => ({
         message: `UTF-8 Byte Order Mark (BOM) detected in '${file}': file must be strictly encoded as UTF-8 NO-BOM`,
-        suggestion:
-            'Re-save file as UTF-8 NO-BOM to strip 0xEF, 0xBB, 0xBF byte prefix',
+        suggestion: 'Re-save file as UTF-8 NO-BOM to strip 0xEF, 0xBB, 0xBF byte prefix',
         rationale:
             'BOM byte sequences corrupt shebang execution on POSIX systems and break multi-platform compiler toolchains.',
         risk: RISK_HIGH,

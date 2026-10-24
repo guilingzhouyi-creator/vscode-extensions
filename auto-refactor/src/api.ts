@@ -288,15 +288,8 @@ function runLazyWarmScanDiff(
     params: DiffWarmScanParams,
 ): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats } | null> {
     const { tryWarmScanDiff } = loadDaemonModule<DaemonClientModuleExports>(MODULE_DAEMON_CLIENT);
-    return tryWarmScanDiff(
-        params.root,
-        params.config,
-        params.diffs,
-        params.options,
-        params.logger,
-    );
+    return tryWarmScanDiff(params.root, params.config, params.diffs, params.options, params.logger);
 }
-
 
 /**
  * Programmatic entry point. Call `await scan(...)` with root and options; inspect
@@ -344,7 +337,12 @@ export async function scan(options: ScanOptions = {}): Promise<ScanReport> {
         if (options.warm && options.daemon !== DAEMON_MODE_OFF) {
             const mode = options.daemon || DAEMON_MODE_AUTO;
             if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
-            const warm = await runLazyWarmScan(config.root, config, buildWarmOptions(options, false), logger);
+            const warm = await runLazyWarmScan(
+                config.root,
+                config,
+                buildWarmOptions(options, false),
+                logger,
+            );
             if (warm) {
                 report = warm.report;
             } else {
@@ -386,7 +384,12 @@ export async function scanWarm(
     try {
         if (mode !== DAEMON_MODE_OFF) {
             if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
-            const warm = await runLazyWarmScan(config.root, config, buildWarmOptions(options, true), logger);
+            const warm = await runLazyWarmScan(
+                config.root,
+                config,
+                buildWarmOptions(options, true),
+                logger,
+            );
             if (warm) {
                 // Daemon reports arrive unfinalized (the daemon runs the raw scanner), so apply the
                 // same post-scan pipeline here with no in-process graph to reuse.
@@ -399,7 +402,10 @@ export async function scanWarm(
         const scanner = new Scanner(config, logger);
         if (options.cache !== false) {
             const cache = new CacheStore(options.cacheDir, config.root, { logger });
-            const cachedScan = await scanner.scanWithCache({ cache, cacheCustom: options.cacheCustom });
+            const cachedScan = await scanner.scanWithCache({
+                cache,
+                cacheCustom: options.cacheCustom,
+            });
             await finalizeReport(cachedScan.report, config, options, logger, scanner);
             return cachedScan;
         }
@@ -424,7 +430,6 @@ export async function scanWarm(
         logger.close();
     }
 }
-
 
 /** Decode any Buffer content fields in DiffInput[] to UTF-16 strings (JSON-safe for daemon). */
 function decodeDiffs(diffs: DiffInput[]): DiffInput[] {
@@ -536,7 +541,6 @@ async function runDiff(
         logger.close();
     }
 }
-
 
 /**
  * Full diff scan (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.4): returns a report
@@ -723,8 +727,8 @@ function evaluateGateExitCode(report: ScanReport, config: ScanConfig): number {
     const threshold = config.failOnSeverity
         ? SEVERITY_GATE_RANK[config.failOnSeverity]
         : config.failOnIssue
-            ? SEVERITY_GATE_RANK.error
-            : SEVERITY_GATE_RANK.disabled;
+          ? SEVERITY_GATE_RANK.error
+          : SEVERITY_GATE_RANK.disabled;
     // A suppressed finding stays in the report for auditing but never decides a gate: that is
     // the documented contract of `suppression` (report.schema.json) and what gate-self.js
     // already assumed, so the exit code must agree with it instead of counting the finding.
@@ -815,7 +819,6 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
         logger.close();
     }
 }
-
 
 export { finalizeReport, recomputeSummary, groupCounts } from './core/reporting/reportFinalizer';
 

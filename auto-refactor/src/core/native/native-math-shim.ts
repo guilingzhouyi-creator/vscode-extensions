@@ -69,12 +69,12 @@ export function calculatePopoviciuDispersionPenaltyShim(
     if (!Number.isFinite(standardDeviation) || standardDeviation <= 0) {
         return 1.0;
     }
-    const effectiveSigma = maxSigma !== undefined && Number.isFinite(maxSigma) && maxSigma > 0
-        ? maxSigma
-        : POPOVICIU_MAX_SIGMA;
-    const effectiveGamma = gamma !== undefined && Number.isFinite(gamma)
-        ? gamma
-        : DEFAULT_DISPERSION_PENALTY_RATIO;
+    const effectiveSigma =
+        maxSigma !== undefined && Number.isFinite(maxSigma) && maxSigma > 0
+            ? maxSigma
+            : POPOVICIU_MAX_SIGMA;
+    const effectiveGamma =
+        gamma !== undefined && Number.isFinite(gamma) ? gamma : DEFAULT_DISPERSION_PENALTY_RATIO;
     const normalizedDispersion = standardDeviation / effectiveSigma;
     const factor = Math.max(0.0, 1.0 - normalizedDispersion * effectiveGamma);
     return Math.round(factor * SCORE_ROUNDING_FACTOR) / SCORE_ROUNDING_FACTOR;
@@ -97,10 +97,7 @@ export function countBracesDetailedShim(line: string): NativeBraceBalance {
  * @param size - Number of vertices in the square matrix.
  * @returns In-place mutated matrix with full reachability.
  */
-export function computeWarshallTransitiveClosureShim(
-    matrix: Uint8Array,
-    size: number,
-): Uint8Array {
+export function computeWarshallTransitiveClosureShim(matrix: Uint8Array, size: number): Uint8Array {
     return computeWarshallTransitiveClosure(matrix, size);
 }
 

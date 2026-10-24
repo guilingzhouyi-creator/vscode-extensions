@@ -333,7 +333,10 @@ function extractUniqueCommitFiles(files: readonly string[], seenSet: Set<string>
     return result;
 }
 
-function recordCoChangePairs(sortedFiles: readonly string[], pairSharedCounts: Map<string, number>): void {
+function recordCoChangePairs(
+    sortedFiles: readonly string[],
+    pairSharedCounts: Map<string, number>,
+): void {
     const len = sortedFiles.length;
     for (let i = 0; i < len; i++) {
         const fileA = sortedFiles[i];
@@ -378,7 +381,10 @@ export class TemporalCouplingDetector {
         const maxFiles = overrideOptions?.maxFilesPerCommit ?? this.maxFilesPerCommit;
         const moduleResolver = overrideOptions?.resolveModule ?? this.resolveModule;
 
-        const { mappedChangeSets, idToFile, totalUniqueFiles } = buildMappedChangeSets(changeSets, maxFiles);
+        const { mappedChangeSets, idToFile, totalUniqueFiles } = buildMappedChangeSets(
+            changeSets,
+            maxFiles,
+        );
 
         const nativePairs = nativeCore.computeTemporalCoupling(
             mappedChangeSets,

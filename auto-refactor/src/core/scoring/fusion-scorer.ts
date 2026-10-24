@@ -74,17 +74,20 @@ const PERCENT_ROUND_FACTOR = 100;
 const MAX_SCORE_CEILING = 100.0;
 const LABEL_UNOBSERVED = 'unobserved';
 
-const DOMAIN_WEIGHT_MAP: Readonly<Record<string, readonly [number, number, number]>> = Object.freeze({
-    [DOMAIN_CORE_FRAMEWORK]: [0.55, 0.3, 0.15],
-    algorithm_lib: [0.35, 0.5, 0.15],
-    business_app: [0.4, 0.35, 0.25],
-    cli_tool: [0.6, 0.25, 0.15],
-});
+const DOMAIN_WEIGHT_MAP: Readonly<Record<string, readonly [number, number, number]>> =
+    Object.freeze({
+        [DOMAIN_CORE_FRAMEWORK]: [0.55, 0.3, 0.15],
+        algorithm_lib: [0.35, 0.5, 0.15],
+        business_app: [0.4, 0.35, 0.25],
+        cli_tool: [0.6, 0.25, 0.15],
+    });
 
-const STAGE_WEIGHT_MAP: Readonly<Record<string, readonly [number, number, number]>> = Object.freeze({
-    prototype: [0.7, 0.2, 0.1],
-    industrial_infrastructure: [0.45, 0.4, 0.15],
-});
+const STAGE_WEIGHT_MAP: Readonly<Record<string, readonly [number, number, number]>> = Object.freeze(
+    {
+        prototype: [0.7, 0.2, 0.1],
+        industrial_infrastructure: [0.45, 0.4, 0.15],
+    },
+);
 
 const DEFAULT_FUSION_WEIGHTS: readonly [number, number, number] = [0.5, 0.35, 0.15];
 
@@ -165,7 +168,9 @@ export function computeUnifiedQualityScore(
 
     const staticScore = computeStaticQualityScore(staticVector);
     const dynamicScore = hasDynamic ? computeDynamicQualityScore(dynamicVector!) : staticScore;
-    const feedbackScore = hasHistorical ? Math.max(0.0, Math.min(MAX_SCORE_CEILING, historicalScore!)) : staticScore;
+    const feedbackScore = hasHistorical
+        ? Math.max(0.0, Math.min(MAX_SCORE_CEILING, historicalScore!))
+        : staticScore;
 
     const totalRaw =
         weights.Ws * staticScore +
@@ -174,8 +179,12 @@ export function computeUnifiedQualityScore(
 
     const totalScore = Math.round(totalRaw * SCORE_ROUNDING) / SCORE_ROUNDING;
 
-    const dynLabel = hasDynamic ? `${dynamicScore} (${(weights.Wd * PERCENT_ROUND_FACTOR).toFixed(0)}%)` : LABEL_UNOBSERVED;
-    const histLabel = hasHistorical ? `${feedbackScore} (${(weights.Wf * PERCENT_ROUND_FACTOR).toFixed(0)}%)` : LABEL_UNOBSERVED;
+    const dynLabel = hasDynamic
+        ? `${dynamicScore} (${(weights.Wd * PERCENT_ROUND_FACTOR).toFixed(0)}%)`
+        : LABEL_UNOBSERVED;
+    const histLabel = hasHistorical
+        ? `${feedbackScore} (${(weights.Wf * PERCENT_ROUND_FACTOR).toFixed(0)}%)`
+        : LABEL_UNOBSERVED;
     const explanation =
         `Unified quality synthesized: Q_total=${totalScore} ` +
         `[Static (${(weights.Ws * PERCENT_ROUND_FACTOR).toFixed(0)}%): ${staticScore}, ` +

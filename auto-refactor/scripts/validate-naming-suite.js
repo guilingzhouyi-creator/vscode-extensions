@@ -282,9 +282,7 @@ function verifyFunctionLengthRules(byRule) {
     !len2Issues.some((i) => i.detail && i.detail.name === '__init__'),
     'dunder methods such as __init__ should be exempt from NAM-LEN-002',
   );
-  console.log(
-    '  ✔ NAM-LEN-002 flags short/long Python function names, exempting dunder methods',
-  );
+  console.log('  ✔ NAM-LEN-002 flags short/long Python function names, exempting dunder methods');
 }
 
 const { getTunedAnalyzerOptions } = require('../dist/core/profiler/scaleTuner');
@@ -410,29 +408,21 @@ function verifyRustPolyglotNaming(byRule) {
     'Rust bad_rust_const should trigger NAM-GLB-001',
   );
   assert.ok(
-    !glbIssues.some(
-      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'fn',
-    ),
+    !glbIssues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'fn'),
     'const fn should not trigger NAM-GLB-001 on keyword fn',
   );
 
   const sglIssues = byRule('NAM-SGL-001');
   assert.ok(
-    sglIssues.some(
-      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'x',
-    ),
+    sglIssues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'x'),
     'Rust single-letter variable x should trigger NAM-SGL-001',
   );
   assert.ok(
-    !sglIssues.some(
-      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === '_',
-    ),
+    !sglIssues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === '_'),
     'Rust wildcard _ should be exempt from NAM-SGL-001',
   );
   assert.ok(
-    !sglIssues.some(
-      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'i',
-    ),
+    !sglIssues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'i'),
     'Rust loop index i should be exempt from NAM-SGL-001',
   );
   assert.strictEqual(
@@ -443,9 +433,7 @@ function verifyRustPolyglotNaming(byRule) {
 
   const vagIssues = byRule('NAM-VAG-001');
   assert.ok(
-    vagIssues.some(
-      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'data',
-    ),
+    vagIssues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'data'),
     'Rust variable data should trigger NAM-VAG-001',
   );
   assert.strictEqual(

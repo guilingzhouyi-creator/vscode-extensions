@@ -105,11 +105,7 @@ function buildInDegreeAndNeighbors<T>(
     return { inDegree, outgoingMap };
 }
 
-function processKahnQueue<T>(
-    queue: T[],
-    outgoingMap: Map<T, T[]>,
-    inDegree: Map<T, number>,
-): T[] {
+function processKahnQueue<T>(queue: T[], outgoingMap: Map<T, T[]>, inDegree: Map<T, number>): T[] {
     const order: T[] = [];
     let head = 0;
 

@@ -90,7 +90,10 @@ function stripNonExecutableText(line: string): string {
         .replace(/'(?:\\.|[^'\\])*'/g, "''")
         .replace(/"(?:\\.|[^"\\])*"/g, '""')
         .replace(/`(?:\\.|[^`\\])*`/g, '``')
-        .replace(/(^|[(,=:[!&|?{};\s])\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\\n])+\/[gimsuy]*/g, REGEX_PLACEHOLDER_TOKEN)
+        .replace(
+            /(^|[(,=:[!&|?{};\s])\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\\n])+\/[gimsuy]*/g,
+            REGEX_PLACEHOLDER_TOKEN,
+        )
         .replace(/\/\/.*$/, '');
 }
 
@@ -473,11 +476,7 @@ export class DualTrackTestEvaluator {
         // Such a fixture is the subject of the check, not a test suite smuggled into production
         // code, so tooling and fixture paths are out of scope for the production topology track.
         if (isToolOrTestScript(normalizedPath)) {
-            return createPureProductionResult(
-                normalizedPath,
-                ext,
-                countContentLines(content),
-            );
+            return createPureProductionResult(normalizedPath, ext, countContentLines(content));
         }
 
         // 2. Second Track: Production Files with possible Embedded Test Zones

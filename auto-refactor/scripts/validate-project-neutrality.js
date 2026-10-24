@@ -149,9 +149,7 @@ function verifyPresetsLanguageScoped() {
       );
     }
   }
-  console.log(
-    '  ✔ shipped presets are language-scoped (no suppressions, **/-anchored includes)',
-  );
+  console.log('  ✔ shipped presets are language-scoped (no suppressions, **/-anchored includes)');
 }
 
 /**

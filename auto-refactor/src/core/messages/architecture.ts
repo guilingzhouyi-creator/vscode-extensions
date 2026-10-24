@@ -230,7 +230,11 @@ export const ArchitectureMessages = {
      * @param threshold - Maximum allowable plumbing ratio.
      * @returns Fresh descriptor with Medium risk and wiring reduction guidance.
      */
-    PLUMBING_RATIO_BUDGET: (file: string, por: number, threshold: number): DiagnosticDescriptor => ({
+    PLUMBING_RATIO_BUDGET: (
+        file: string,
+        por: number,
+        threshold: number,
+    ): DiagnosticDescriptor => ({
         message:
             `Plumbing overhead ratio budget exceeded: ${(por * 100).toFixed(1)}% in '${file}' ` +
             `is above the ${(threshold * 100).toFixed(1)}% ceiling; wiring lines outnumber payload lines.`,

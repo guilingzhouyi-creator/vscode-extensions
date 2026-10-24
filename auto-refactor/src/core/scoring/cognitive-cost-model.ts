@@ -61,12 +61,7 @@ export interface FunctionDecompositionMetric {
  * Context role for control-flow nesting elasticity.
  */
 export type NestingContextRole =
-    | 'parser'
-    | 'state-machine'
-    | 'algorithm'
-    | 'infrastructure'
-    | 'rule'
-    | 'business';
+    'parser' | 'state-machine' | 'algorithm' | 'infrastructure' | 'rule' | 'business';
 
 /**
  * Result of cognitive cost, CFNI, and anti-gaming evaluation.
@@ -131,7 +126,10 @@ export function calculateControlFlowNestingIndex(
     // CFNI starts at 100, smoothly damped by total penalty
     const cfni = Math.max(
         CFNI_MIN_SCORE,
-        Math.min(CFNI_MAX_SCORE, Math.round(CFNI_MAX_SCORE - totalPenalty * CFNI_PENALTY_MULTIPLIER)),
+        Math.min(
+            CFNI_MAX_SCORE,
+            Math.round(CFNI_MAX_SCORE - totalPenalty * CFNI_PENALTY_MULTIPLIER),
+        ),
     );
     return {
         cfni,

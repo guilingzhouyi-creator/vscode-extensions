@@ -136,7 +136,11 @@ export class DataFacade {
     0,
     'CASE-04 Failed: Frozen facade must be exempted from hollow check',
   );
-  assert.strictEqual(result.issues.length, 0, 'CASE-04 Failed: Frozen facade must produce 0 issues');
+  assert.strictEqual(
+    result.issues.length,
+    0,
+    'CASE-04 Failed: Frozen facade must produce 0 issues',
+  );
   console.log('  ✔ CASE-04: Facade with immutability contracts exempted from hollow check');
 }
 

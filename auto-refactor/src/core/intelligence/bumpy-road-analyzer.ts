@@ -138,11 +138,13 @@ export function extractIndentationPeaks(
         const d = depths[i];
         if (d >= 2 && d > depths[i - 1] && d >= depths[i + 1]) {
             const span = computePeakSpan(depths, i, d);
-            peaks.push(Object.freeze({
-                line: lineIndices[i],
-                depth: d,
-                span,
-            }));
+            peaks.push(
+                Object.freeze({
+                    line: lineIndices[i],
+                    depth: d,
+                    span,
+                }),
+            );
         }
     }
 

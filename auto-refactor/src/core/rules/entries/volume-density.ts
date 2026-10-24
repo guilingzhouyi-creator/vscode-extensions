@@ -11,12 +11,7 @@
  *   reader can tell which side of the budget a module fell on without reading the analyzer.
  */
 import type { RuleDefinition } from '../types';
-import {
-    ALL_LANGUAGES,
-    defineRule,
-    SEVERITY_WARNING,
-    RULE_FAMILY_VOLUME,
-} from '../types';
+import { ALL_LANGUAGES, defineRule, SEVERITY_WARNING, RULE_FAMILY_VOLUME } from '../types';
 import { ANALYZER_ARCHITECTURE, ANALYZER_LARGE_FILE } from '../../scoring/dimensionLiterals';
 
 /** volume-density rules. */

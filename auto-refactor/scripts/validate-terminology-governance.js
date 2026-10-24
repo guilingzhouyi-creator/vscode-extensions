@@ -96,7 +96,10 @@ function testBilingualTerminologyDetection() {
 
   const tempBatchEn = 'Testing with temp fix for pass 1 in w1.';
   const tempBatchFindings = auditTerminologyProse(tempBatchEn);
-  assert(tempBatchFindings.length >= 2, 'Should detect agile passes and temporary markers in English');
+  assert(
+    tempBatchFindings.length >= 2,
+    'Should detect agile passes and temporary markers in English',
+  );
   assert(tempBatchFindings.some((f) => f.category === 'temporary'));
 
   // Category 2: Hyperbolic Affirmative

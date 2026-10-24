@@ -279,8 +279,8 @@ function validateNamingAndDocs(ids) {
  * fires, because no card can carry that id), and a cluster key declared twice (the union-find
  * aggregator would fold two distinct rationales into one silently).
  *
- * @param {string[]} ids - Every registered rule id.
- * @returns {void} Throws with the full offending list.
+ * @param ids - Every registered rule id.
+ * @returns Throws with the full offending list.
  */
 function validateOverlapClusters(ids) {
   const registered = new Set(ids);

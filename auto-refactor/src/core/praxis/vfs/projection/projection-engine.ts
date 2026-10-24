@@ -75,7 +75,11 @@ class DefaultProjectedSandbox implements ProjectedSandbox {
         this.instantBootstrap = options.instantBootstrap ?? true;
     }
 
-    private async trySparseLink(entryPath: string, entrySize: number, destPath: string): Promise<boolean> {
+    private async trySparseLink(
+        entryPath: string,
+        entrySize: number,
+        destPath: string,
+    ): Promise<boolean> {
         if (!this.useSparseLinks || !this.baseDir) return false;
         const hostSourcePath = path.join(this.baseDir, entryPath);
         try {
@@ -90,7 +94,11 @@ class DefaultProjectedSandbox implements ProjectedSandbox {
         return false;
     }
 
-    private async materializeEntry(entry: { path: string; size: number; mode: number }): Promise<boolean> {
+    private async materializeEntry(entry: {
+        path: string;
+        size: number;
+        mode: number;
+    }): Promise<boolean> {
         const destPath = path.join(this.projectedPath, entry.path);
         const parentDir = path.dirname(destPath);
         await fs.promises.mkdir(parentDir, { recursive: true });

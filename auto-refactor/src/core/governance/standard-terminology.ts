@@ -323,7 +323,8 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
                 'Melt a single-target forwarding wrapper or trampoline so callers directly access the underlying target.',
             zhDescription: '消融单目标透明转发跳板使调用方直接引用目标底层实现。',
             safeToAutomateDefault: true,
-            typicalFixTemplate: '// Redirect call directly to destination symbol and eliminate trampoline',
+            typicalFixTemplate:
+                '// Redirect call directly to destination symbol and eliminate trampoline',
         }),
         compact_diluted_lines: Object.freeze({
             verb: 'compact_diluted_lines',
