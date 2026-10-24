@@ -169,8 +169,8 @@ export interface WorkspaceHandle {
  */
 export interface IPraxisVFSStorage {
     /**
-     * Store raw chunk payload under content hash address with optional base hash for delta compression.
-     * Idempotent: duplicate chunks return true immediately without writing.
+     * Store raw chunk payload under content hash address with optional base hash for delta
+     * compression. Idempotent: duplicate chunks return true immediately without writing.
      */
     putChunk(chunkHash: string, data: Uint8Array, baseHash?: string): Promise<boolean>;
 

@@ -4,8 +4,8 @@
  * File Path: scripts/validate-warm.js
  * Architecture Role: End-to-end regression gate comparing the warm path (daemon + two-level
  *                     cache via scanWarm) with the fresh path (scan, no daemon, no cache)
- *                     across canonical cache-equivalence scenarios; documented in docs/01-architecture/
- *                     02-pipeline-and-caching.md Part D.
+ *                     across canonical cache-equivalence scenarios; documented in
+ *                     docs/01-architecture/ 02-pipeline-and-caching.md Part D.
  * Dependencies & Triggers: Run manually via `node scripts/validate-warm.js` or from CI after
  *                     `npm run build`; imports scan/scanWarm from ../dist/api plus
  *                     child_process.spawnSync, fs, and path, and reuses the corpus templates

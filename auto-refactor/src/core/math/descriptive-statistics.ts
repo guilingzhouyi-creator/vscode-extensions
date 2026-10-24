@@ -3,8 +3,8 @@
  * File Path: src/core/math/descriptive-statistics.ts
  * Architecture Role: Foundation operators for descriptive statistical analysis, central tendency,
  *   spatial variance, and dispersion estimation across software metrics and telemetries.
- * Dependencies & Triggers: Consumes numerical-corridor (clampRange, safeDivide); zero external runtime dependencies.
- * Responsibilities:
+ * Dependencies & Triggers: Consumes numerical-corridor (clampRange, safeDivide); zero external
+ * runtime dependencies. Responsibilities:
  *   1. Calculate first and second statistical moments (mean, variance, standard deviation) in single-pass;
  *   2. Compute quantiles, median, and interquartile range (IQR) for empirical distributions;
  *   3. Enforce deterministic numerical stability with zero NaN/Infinity leakage under empty or degenerate input.

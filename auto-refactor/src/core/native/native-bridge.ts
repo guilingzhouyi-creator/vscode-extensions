@@ -404,21 +404,32 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
-     * Computes a 64-bit SimHash fingerprint for an array of tokens, returning a 16-character hex string.
+     * Computes a 64-bit SimHash fingerprint for an array of tokens.
+     *
+     * @param tokens - Token sequence reduced into a single fingerprint.
+     * @returns Zero-padded hexadecimal SimHash of fixed width.
      */
     public computeSimHash64(tokens: readonly string[]): string {
         return computeSimHash64Shim(tokens);
     }
 
     /**
-     * Calculates SimHash Hamming similarity [0.0, 1.0] between two 64-bit SimHash fingerprints.
+     * Calculates SimHash Hamming similarity [0.0, 1.0] between SimHash fingerprints.
+     *
+     * @param hashA - Hexadecimal fingerprint of the first document.
+     * @param hashB - Hexadecimal fingerprint of the second document.
+     * @returns Similarity in `0..1`, where 1 means the fingerprints are identical.
      */
     public calculateSimHashHammingSimilarity(hashA: string, hashB: string): number {
         return calculateSimHashHammingSimilarityShim(hashA, hashB);
     }
 
     /**
-     * Calculates cosine similarity [0.0, 1.0] between two token sequences using 3-gram feature vectors.
+     * Calculates cosine similarity [0.0, 1.0] between token sequences via 3-gram vectors.
+     *
+     * @param tokensA - First token sequence.
+     * @param tokensB - Second token sequence.
+     * @returns Cosine similarity of the two trigram vectors in `0..1`.
      */
     public calculateTrigramCosineSimilarity(
         tokensA: readonly string[],
@@ -1083,7 +1094,7 @@ export function calculateNativeSimHashHammingSimilarity(hashA: string, hashB: st
  * Calculates cosine similarity [0.0, 1.0] between two token sequences using 3-gram feature vectors.
  *
  * @param tokensA - First token sequence.
- * @param tokensB
+ * @param tokensB - Second token sequence, expanded into trigram vectors the same way.
  * @returns Cosine similarity score in [0.0, 1.0] rounded to 6 decimal places.
  */
 export function calculateNativeTrigramCosineSimilarity(
@@ -1095,9 +1106,11 @@ export function calculateNativeTrigramCosineSimilarity(
 
 /**
  * Computes pairwise co-change frequencies and Jaccard similarity between files.
- * @param changesets
- * @param minShared
- * @param minJaccard
+ *
+ * @param changesets - Commit-sized groups of file ids, each listing files changed together.
+ * @param minShared - Floor on how often two files must co-occur before the pair is reported.
+ * @param minJaccard - Floor on the Jaccard overlap of the two files' change sets.
+ * @returns Co-change pairs that clear both thresholds, as reported by the native miner.
  */
 export function computeNativeTemporalCoupling(
     changesets: number[][],
@@ -1109,9 +1122,11 @@ export function computeNativeTemporalCoupling(
 
 /**
  * Measures structural irregularity and spatial variance of indentation/nesting depth.
- * @param lines
- * @param startLine
- * @param endLine
+ *
+ * @param lines - Source lines of the file being inspected.
+ * @param startLine - One-based first line of the function region to evaluate.
+ * @param endLine - One-based last line of that region, inclusive.
+ * @returns Nested-depth profile for the region, including whether it qualifies as bumpy.
  */
 export function evaluateNativeBumpyRoad(
     lines: readonly string[],
@@ -1123,8 +1138,10 @@ export function evaluateNativeBumpyRoad(
 
 /**
  * Fast vectorized batch probe testing multiple trigger groups against target content.
- * @param content
- * @param triggerGroups
+ *
+ * @param content - Text scanned for the trigger groups.
+ * @param triggerGroups - One trigger set per probed group; an empty group always matches.
+ * @returns One flag per group, in the same order as the input groups.
  */
 export function batchProbeNativeTriggers(
     content: string,

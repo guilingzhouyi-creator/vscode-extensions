@@ -3,8 +3,8 @@
  * File Path: src/core/native/native-math-shim.ts
  * Architecture Role: Pure JavaScript fallback implementation of Shannon information entropy,
  *   Welford statistical moments, Popoviciu dispersion, Warshall closure, and vector geometry.
- * Dependencies & Triggers: Consumes ../math and ../algorithms primitives; delegated by ./native-bridge.
- * Responsibilities:
+ * Dependencies & Triggers: Consumes ../math and ../algorithms primitives; delegated by
+ * ./native-bridge. Responsibilities:
  *   1. Calculate Shannon entropy over character streams with 0.0 NaN guard;
  *   2. Compute Welford first and second statistical moments with 4-decimal precision;
  *   3. Calculate Popoviciu inequality dispersion discount factor with bounded gamma;

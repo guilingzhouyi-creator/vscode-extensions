@@ -181,9 +181,9 @@ function getEvaluatedEffectiveLoc(
  *
  * The aggregate `large-file` rule keeps the warn/fail band semantics it has always carried, and the
  * five `VOL-*` rules add the absolute budgets on top. They are additive rather than exclusive
- * because the aggregate reports elastic pressure (band crossing, function count, entanglement) while
- * the `VOL-*` family reports absolute ceilings; a file can cross a band without breaching a ceiling,
- * and it can breach a ceiling while its band stays put if the band was widened by options.
+ * because the aggregate reports elastic pressure (band crossing, function count, entanglement)
+ * while the `VOL-*` family reports absolute ceilings; a file can cross a band without breaching a
+ * ceiling, and it can breach a ceiling while its band stays put if the band was widened by options.
  *
  * @param evalCtx - Assembled evaluation context.
  * @returns Findings in reporting order (aggregate first, then the first breached volume budget).

@@ -29,7 +29,9 @@ const CONFIDENCE_95_PERCENT = 0.95;
 /**
  * Computes natural logarithm of Gamma function ln Gamma(z) for positive real numbers.
  * Uses Lanczos approximation (g=7, N=9) achieving precision < 1e-14.
- * @param inputZ
+ *
+ * @param inputZ - Positive real argument of the Gamma function.
+ * @returns Natural logarithm of Gamma at that argument; finite for every positive input.
  */
 export function logGamma(inputZ: number): number {
     if (!Number.isFinite(inputZ) || inputZ <= 0) {
@@ -60,8 +62,10 @@ export function logGamma(inputZ: number): number {
 /**
  * Computes natural logarithm of Beta function ln B(a, b).
  * Identity: ln B(a, b) = ln Gamma(a) + ln Gamma(b) - ln Gamma(a + b).
- * @param alphaVal
- * @param betaVal
+ *
+ * @param alphaVal - First shape parameter of the Beta function, positive.
+ * @param betaVal - Second shape parameter of the Beta function, positive.
+ * @returns Natural logarithm of the Beta function at those shape parameters.
  */
 export function logBeta(alphaVal: number, betaVal: number): number {
     return logGamma(alphaVal) + logGamma(betaVal) - logGamma(alphaVal + betaVal);
@@ -119,9 +123,11 @@ function evaluateIncompleteBetaFraction(alphaVal: number, betaVal: number, input
 /**
  * Computes regularized incomplete beta function I_x(a, b).
  * Guarantees output strictly bounded in [0.0, 1.0].
- * @param alphaVal
- * @param betaVal
- * @param inputX
+ *
+ * @param alphaVal - First shape parameter of the Beta distribution, positive.
+ * @param betaVal - Second shape parameter of the Beta distribution, positive.
+ * @param inputX - Evaluation point in the closed unit interval.
+ * @returns Probability mass accumulated below that point, clamped into the unit interval.
  */
 export function computeRegularizedIncompleteBeta(
     alphaVal: number,
@@ -198,9 +204,11 @@ function computeHalleyRefinementStep(
 /**
  * Solves inverse of regularized incomplete beta function I_x(a, b) = p for x.
  * Uses Carter-Kass initial approximation followed by Halley third-order root refinement.
- * @param alphaVal
- * @param betaVal
- * @param quantileP
+ *
+ * @param alphaVal - First shape parameter of the Beta distribution, positive.
+ * @param betaVal - Second shape parameter of the Beta distribution, positive.
+ * @param quantileP - Target cumulative probability in the open unit interval.
+ * @returns Point whose regularized incomplete Beta equals the requested probability.
  */
 export function computeInverseIncompleteBeta(
     alphaVal: number,

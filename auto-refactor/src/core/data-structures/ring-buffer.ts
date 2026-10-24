@@ -5,8 +5,8 @@
  *   bitwise masking for zero-division index wrap-around and zero transient allocations.
  * Dependencies & Triggers: Zero external runtime dependencies.
  * Responsibilities:
- *   1. Normalise requested capacity to the next power of two for fast bitwise masking (mask = cap - 1);
- *   2. Provide O(1) push, pop, peek, and bulk drain operations with zero loop heap allocations;
+ *   1. Normalise requested capacity to the next power of two for fast bitwise masking (mask = cap -
+ *   1); 2. Provide O(1) push, pop, peek, and bulk drain operations with zero loop heap allocations;
  *   3. Support customizable overflow policies ('reject' or 'drop_oldest');
  *   4. Export snapshot toArray() in strictly chronological FIFO order.
  * Exit Semantics & Design Rationale: CC <= 7; deterministic memory bounds; non-throwing fail-safe semantics.

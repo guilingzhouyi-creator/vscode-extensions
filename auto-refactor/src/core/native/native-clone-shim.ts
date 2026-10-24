@@ -361,8 +361,10 @@ export function findClonePairsShim(signatures: number[][], threshold: number): N
 
 /**
  * Pure JavaScript fallback for bit-parallel Myers distance.
- * @param pattern
- * @param text
+ *
+ * @param pattern - Packed pattern word set the edit distance is measured against.
+ * @param text - Packed text word set scanned for that pattern.
+ * @returns Minimum number of edits transforming the pattern into the text.
  */
 export function computeBitParallelDistanceShim(pattern: Uint32Array, text: Uint32Array): number {
     return bitParallelMyers64Distance(pattern, text);
@@ -370,7 +372,9 @@ export function computeBitParallelDistanceShim(pattern: Uint32Array, text: Uint3
 
 /**
  * Pure JavaScript fallback for SimHash-64 generation.
- * @param tokens
+ *
+ * @param tokens - Token sequence reduced into a single fingerprint.
+ * @returns Zero-padded lowercase hexadecimal SimHash, widening the numeric hash to a stable width.
  */
 export function computeSimHash64Shim(tokens: readonly string[]): string {
     const hash = computeSimHash64(tokens);
@@ -379,8 +383,10 @@ export function computeSimHash64Shim(tokens: readonly string[]): string {
 
 /**
  * Pure JavaScript fallback for SimHash Hamming similarity.
- * @param hashA
- * @param hashB
+ *
+ * @param hashA - Hexadecimal fingerprint of the first document, with or without a `0x` prefix.
+ * @param hashB - Hexadecimal fingerprint of the second document, same accepted forms.
+ * @returns Similarity in the closed interval `0..1`, where 1 means identical fingerprints.
  */
 export function calculateSimHashHammingSimilarityShim(hashA: string, hashB: string): number {
     const parse = (s: string): bigint => {
@@ -395,8 +401,10 @@ export function calculateSimHashHammingSimilarityShim(hashA: string, hashB: stri
 
 /**
  * Pure JavaScript fallback for trigram cosine similarity.
- * @param tokensA
- * @param tokensB
+ *
+ * @param tokensA - Token sequence of the first document, expanded into trigram vectors.
+ * @param tokensB - Token sequence of the second document, expanded the same way.
+ * @returns Cosine similarity of the two trigram vectors in `0..1`.
  */
 export function calculateTrigramCosineSimilarityShim(
     tokensA: readonly string[],
@@ -483,9 +491,11 @@ function compareCouplingPairs(
 
 /**
  * Pure JavaScript fallback for temporal coupling co-change mining.
- * @param changesets
- * @param minShared
- * @param minJaccard
+ *
+ * @param changesets - Commit-sized groups of file ids, each listing files changed together.
+ * @param minShared - Floor on how often two files must co-occur before the pair is reported.
+ * @param minJaccard - Floor on the Jaccard overlap of the two files' change sets.
+ * @returns Co-change pairs that clear both thresholds, ordered by descending coupling strength.
  */
 export function computeTemporalCouplingShim(
     changesets: number[][],
@@ -529,7 +539,9 @@ const MIN_BUMPY_SCORE_THRESHOLD = 12.0;
 
 /**
  * Calculates effective indentation level of a single source line.
- * @param line
+ *
+ * @param line - Raw source line; only its leading whitespace run is inspected.
+ * @returns Indentation measured in units, where a tab counts as one unit.
  */
 export function measureLineIndentLevelShim(line: string): number {
     let spaces = 0;
@@ -548,9 +560,11 @@ export function measureLineIndentLevelShim(line: string): number {
 
 /**
  * Pure JavaScript fallback for Bumpy Road structural complexity evaluation.
- * @param lines
- * @param startLine
- * @param endLine
+ *
+ * @param lines - Source lines of the file being inspected.
+ * @param startLine - One-based first line of the function region to evaluate.
+ * @param endLine - One-based last line of that region, inclusive.
+ * @returns Nested-depth profile for the region; unrunnable bounds yield a zero, non-bumpy result.
  */
 export function evaluateBumpyRoadShim(
     lines: readonly string[],
@@ -687,8 +701,10 @@ function probeSingleTriggerGroup(content: string, group: readonly string[], len:
 
 /**
  * Pure JavaScript fallback for vectorized trigger batch probing.
- * @param content
- * @param triggerGroups
+ *
+ * @param content - Text scanned for the trigger groups.
+ * @param triggerGroups - One trigger set per probed group; an empty group always matches.
+ * @returns One flag per group, in the same order as the input groups.
  */
 export function batchProbeTriggersShim(
     content: string,

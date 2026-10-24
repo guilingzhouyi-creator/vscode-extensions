@@ -16,8 +16,8 @@
  *   The table lives here rather than as an optional field on RuleDefinition because rule entries are
  *   built by positional-argument helpers in eight separate modules, and threading a ninth optional
  *   argument through all of them would cost more coupling than the field buys. Keeping it separate
- *   also preserves the distinction the catalog already makes: RuleDefinition answers "does this rule
- *   exist", while this table answers "which rules report the same underlying defect".
+ *   also preserves the distinction the catalog already makes: RuleDefinition answers "does this
+ *   rule exist", while this table answers "which rules report the same underlying defect".
  *
  *   A rule may legitimately belong to several clusters: GOV-SAN-001 is redundant with both an empty
  *   stub and a leaked credential, and ARCH-FAC-001 with both an abstraction leak and a redundant
