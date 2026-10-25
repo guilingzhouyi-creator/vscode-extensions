@@ -20,6 +20,7 @@
  */
 import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
 import {
     isShellFile,
@@ -200,21 +201,18 @@ export class ShellLintAnalyzer implements Analyzer {
                       templateSnippet: mapped.templateSnippet,
                   }
                 : undefined;
-            issues.push({
-                id: `shell-lint:${rule}:${file}:${lineIdx + 1}`,
-                analyzer: this.name,
+            const issue = createLineIssue(this.name, file, {
+                lineIdx,
                 rule,
                 severity,
                 message,
-                location: {
-                    file,
-                    start: { line: lineIdx + 1, column: 1 },
-                    end: { line: lineIdx + 1, column: 1 },
-                },
                 detail,
                 suggestion,
-                actionable,
             });
+            if (actionable) {
+                issue.actionable = actionable;
+            }
+            issues.push(issue);
         };
     }
 

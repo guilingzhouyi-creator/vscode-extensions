@@ -30,6 +30,58 @@ export { stripQuotes };
 /** Set of trivial numbers exempt from duplicate constant extraction. */
 export const TRIVIAL_NUMBERS = new Set(['0', '1', '-1']);
 
+/** Benign common token set for scripts, gate runners, and CLI tools. */
+export const SCRIPT_AND_GATE_BENIGN_TOKENS = new Set([
+    'inherit',
+    'pipe',
+    'ignore',
+    'ipc',
+    'utf8',
+    'utf-8',
+    'ascii',
+    'win32',
+    'linux',
+    'darwin',
+    'pass',
+    'fail',
+    'warn',
+    'warning',
+    'error',
+    'skip',
+    'block',
+    'info',
+    'debug',
+    'trace',
+    'critical',
+    'high',
+    'medium',
+    'low',
+    'status',
+    'exit',
+    'root',
+    'dist',
+    'src',
+    'scripts',
+    'reports',
+    'baseline',
+    'check',
+    'fix',
+    'json',
+    'raw',
+]);
+
+const SCRIPT_OR_GATE_FILE_RE = /(?:^|[\\/])(?:scripts|bin|tools|\.githooks)[\\/]/i;
+
+/**
+ * Checks whether a file path points to a tooling script or gate runner.
+ *
+ * @param filePath - Normalized path of target file.
+ * @returns True if file is located in scripts or tools directory.
+ */
+export function isScriptOrGateFile(filePath: string): boolean {
+    return SCRIPT_OR_GATE_FILE_RE.test(filePath);
+}
+
 /** Benign common token set exempt from duplicate-literal flagging in test suites. */
 export const TEST_SUITE_BENIGN_TOKENS = new Set([
     'foo',
@@ -145,6 +197,18 @@ export const CONSTANT_DEFAULT_MAPPING_TOKENS = new Set([
     'custom',
     'initial',
     'reset',
+]);
+
+/** Standard ECMAScript typeof operator result strings exempt from duplicate extraction. */
+export const TYPEOF_RESULT_TOKENS = new Set([
+    'undefined',
+    'boolean',
+    'number',
+    'string',
+    'bigint',
+    'symbol',
+    'function',
+    'object',
 ]);
 
 /** Common web, DOM event, and standard framework tokens exempt from constant extraction. */
@@ -265,9 +329,6 @@ export function computePositionDelta(recordA: LiteralRecord, recordB: LiteralRec
     const startColB = recordB.node.start ? recordB.node.start.column : 0;
     return startColA - startColB;
 }
-
-/** Backward-compatible export alias for computePositionDelta. */
-export const byPosition = computePositionDelta;
 
 /**
  * Checks if a character code is a quote or backtick.
@@ -488,6 +549,7 @@ export interface LiteralDomainContext {
     isDataOrConfig?: boolean;
     isAlgorithm?: boolean;
     isConstantFile?: boolean;
+    isScriptOrGate?: boolean;
 }
 
 /** Parameter bundle configuring duplicate candidate filtering and clustering. */
@@ -506,7 +568,8 @@ function isDomainBenignToken(lowerToken: string, domain: LiteralDomainContext): 
         (domain.isTest && TEST_SUITE_BENIGN_TOKENS.has(lowerToken)) ||
         (domain.isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lowerToken)) ||
         (domain.isAlgorithm && AST_PARSER_BENIGN_TOKENS.has(lowerToken)) ||
-        (domain.isConstantFile && CONSTANT_DEFAULT_MAPPING_TOKENS.has(lowerToken)),
+        (domain.isConstantFile && CONSTANT_DEFAULT_MAPPING_TOKENS.has(lowerToken)) ||
+        (domain.isScriptOrGate && SCRIPT_AND_GATE_BENIGN_TOKENS.has(lowerToken)),
     );
 }
 
@@ -525,7 +588,9 @@ export function isStringDuplicateCandidate(
 ): boolean {
     const unquoted = stripQuotes(literalValueText).trim();
     if (isIgnoredLiteralCandidate(literalValueText, unquoted, ignoreSet)) return false;
-    return !isDomainBenignToken(unquoted.toLowerCase(), domain);
+    const lower = unquoted.toLowerCase();
+    if (TYPEOF_RESULT_TOKENS.has(lower)) return false;
+    return !isDomainBenignToken(lower, domain);
 }
 
 /**
@@ -567,9 +632,6 @@ export function collectDuplicateGroups(
     }
     return groupsByKeyMap;
 }
-
-/** Backward-compatible export alias for collectDuplicateGroups. */
-export const groupDuplicates = collectDuplicateGroups;
 
 /**
  * Builds an actionable Issue object for duplicate literals.

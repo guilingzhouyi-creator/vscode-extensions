@@ -192,10 +192,23 @@ function extractLoopStatementText(trimmed: string): string | null {
     if (trimmed.endsWith(':') && !trimmed.includes('{')) {
         return null;
     }
-    const lastClose = trimmed.lastIndexOf(')');
-    if (lastClose < 0) return null;
+    const openParen = trimmed.indexOf('(');
+    if (openParen < 0) return null;
+    let depth = 0;
+    let headerClose = -1;
+    for (let i = openParen; i < trimmed.length; i++) {
+        if (trimmed[i] === '(') depth++;
+        else if (trimmed[i] === ')') {
+            depth--;
+            if (depth === 0) {
+                headerClose = i;
+                break;
+            }
+        }
+    }
+    if (headerClose < 0) return null;
     const afterParen = trimmed
-        .slice(lastClose + 1)
+        .slice(headerClose + 1)
         .replace(/[{}]/g, '')
         .trim();
     return afterParen.length > 0 ? afterParen : null;

@@ -16,6 +16,7 @@
 import type { Issue, AgentActionablePayload } from '../core/types';
 import { SEVERITY_INFO } from '../core/types';
 import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import type { PatternSpec } from '../core/pattern/types';
 import { matchAndRewrite } from '../core/pattern/structural-pattern-engine';
 
@@ -25,13 +26,13 @@ const RULE_SIM_BOOL_001 = 'SIM-BOOL-001';
 /** Canonical declarative patterns executed by the structural engine. */
 export const DECLARATIVE_SIMPLIFY_PATTERNS: readonly PatternSpec[] = Object.freeze([
     {
-        id: 'SIM-BOOL-TRN-DIRECT',
+        id: 'pattern_bool_trn_direct',
         pattern: '$COND ? true : false',
         rewrite: 'Boolean($COND)',
         kind: 'expression',
     },
     {
-        id: 'SIM-BOOL-TRN-INVERT',
+        id: 'pattern_bool_trn_invert',
         pattern: '$COND ? false : true',
         rewrite: '!($COND)',
         kind: 'expression',
@@ -80,25 +81,26 @@ export function auditStructuralPatterns(content: string, filePath: string, issue
                 safeToAutomate: true,
             };
 
-            issues.push({
-                id: issueId,
-                analyzer: ANALYZER_SIMPLIFY,
+            const issue = createLineIssue(ANALYZER_SIMPLIFY, normalizedPath, {
+                lineIdx: Math.max(0, startLine - 1),
                 rule: RULE_SIM_BOOL_001,
                 severity: SEVERITY_INFO,
                 message: `Ternary boolean expression can be folded declaratively into: ${spec.rewrite}`,
-                location: {
-                    file: normalizedPath,
-                    start: { line: startLine, column: startCol },
-                    end: { line: endLine, column: endCol },
-                },
                 detail: {
                     patternId: spec.id,
                     matchedText: match.matchedText,
                     rewrite: spec.rewrite,
                 },
                 suggestion: `Replace with declarative modern equivalent '${spec.rewrite}'.`,
-                actionable,
             });
+            issue.id = issueId;
+            issue.location = {
+                file: normalizedPath,
+                start: { line: startLine, column: startCol },
+                end: { line: endLine, column: endCol },
+            };
+            issue.actionable = actionable;
+            issues.push(issue);
         }
     }
 }

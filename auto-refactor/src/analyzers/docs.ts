@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { globToRegExp } from '../core/file-discovery';
 import { auditTerminologyProse } from '../core/governance/terminology-engine';
 
@@ -113,20 +114,16 @@ export class DocsAnalyzer implements Analyzer {
             suggestion: string,
             detail: Record<string, unknown>,
         ): void => {
-            issues.push({
-                id: `docs:${rule}:${file}:${lineIdx + 1}`,
-                analyzer: this.name,
-                rule,
-                severity,
-                message,
-                location: {
-                    file,
-                    start: { line: lineIdx + 1, column: 1 },
-                    end: { line: lineIdx + 1, column: 1 },
-                },
-                detail,
-                suggestion,
-            });
+            issues.push(
+                createLineIssue(this.name, file, {
+                    lineIdx,
+                    rule,
+                    severity,
+                    message,
+                    detail,
+                    suggestion,
+                }),
+            );
         };
 
         const options = (ctx.options || {}) as DocsOptions;

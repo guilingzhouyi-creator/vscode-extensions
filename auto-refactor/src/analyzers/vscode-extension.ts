@@ -18,6 +18,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ANALYZER_VSCODE_EXTENSION } from '../core/scoring/dimensionLiterals';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
 import {
     matchResourceLifecycle,
@@ -151,16 +152,14 @@ interface VscIssueParams {
 
 function makeVscIssue(params: VscIssueParams): Issue {
     const { file, line, rule, severity, message, suggestion, detail } = params;
-    return {
-        id: `${ANALYZER_VSCODE_EXTENSION}:${rule}:${file}:${line}`,
-        analyzer: ANALYZER_VSCODE_EXTENSION,
+    return createLineIssue(ANALYZER_VSCODE_EXTENSION, file, {
+        lineIdx: line - 1,
         rule,
         severity,
         message,
-        location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-        detail,
         suggestion,
-    };
+        detail,
+    });
 }
 
 function isExemptPath(file: string): boolean {

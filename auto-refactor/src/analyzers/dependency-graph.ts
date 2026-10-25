@@ -24,6 +24,7 @@
 
 import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 
 interface GroupRules {
     allowGroups?: string[];
@@ -353,16 +354,12 @@ export class DependencyGraphAnalyzer implements Analyzer {
         message: string,
         detail: Record<string, any>,
     ): Issue {
-        const line = lineIdx + 1;
-        const file = ctx.filePath.replace(/\\/g, '/');
-        return {
-            id: `${this.name}:${rule}:${file}:${line}`,
-            analyzer: this.name,
+        return createLineIssue(this.name, ctx.filePath, {
+            lineIdx,
             rule,
             severity: 'error',
             message,
-            location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
             detail,
-        };
+        });
     }
 }

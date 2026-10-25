@@ -38,6 +38,15 @@ import {
 } from '../core/intelligence/zone-partitioner';
 import { isConstantDefinitionFile } from '../core/intelligence/constant-identity';
 import { evaluateTokenDensityBand } from '../core/intelligence/token-density-band';
+import { computeEffectiveCodeDensity } from '../core/scoring/effectiveDensity';
+import {
+    RULE_VOL_ELOC_001 as RULE_VOL_ELOC,
+    RULE_VOL_LOC_001 as RULE_VOL_LOC,
+    RULE_VOL_RATIO_001 as RULE_VOL_RATIO,
+    RULE_VOL_DIL_001 as RULE_VOL_DIL,
+    RULE_VOL_DOC_001 as RULE_VOL_DOC,
+} from '../core/constants/rule-catalog.generated';
+import { DIAGNOSTIC_CATALOG, createLineIssue } from '../core/rules/diagnostic-catalog';
 
 /** Architectural token representing benign constant library classification. */
 export const ARCH_BENIGN_CONSTANT_LIBRARY = 'ARCH_BENIGN_CONSTANT_LIBRARY';
@@ -61,17 +70,6 @@ const DECOUPLED_FUNCTION_MULTIPLIER = 4,
     ROLE_SAMPLE_CHAR_LIMIT = 500,
     STDLIB_MAX_LINE_LIMIT = 3000;
 
-/** Rule id: effective code volume budget (ELOC ceiling). */
-const RULE_VOL_ELOC = 'VOL-ELOC-001';
-/** Rule id: physical line count budget (raw LOC ceiling). */
-const RULE_VOL_LOC = 'VOL-LOC-001';
-/** Rule id: dynamic dilution envelope (physical LOC against the 1:N ratio target). */
-const RULE_VOL_RATIO = 'VOL-RATIO-001';
-/** Rule id: effective logic density floor. */
-const RULE_VOL_DIL = 'VOL-DIL-001';
-/** Rule id: architecture contract documentation floor for high-load modules. */
-const RULE_VOL_DOC = 'VOL-DOC-001';
-
 /** Effective-LOC ceiling applied when the caller supplies no explicit budget. */
 const DEFAULT_VOLUME_MAX_ELOC = 900;
 /** Raw-LOC ceiling applied when the caller supplies no explicit budget. */
@@ -91,12 +89,9 @@ const MIN_CONTRACT_COMMENT_RATIO = 0.08;
 /** Physical lines below which a file is too small for the density floor to mean anything. */
 const MIN_REPRESENTATIVE_LOC = 250;
 
-const VOLUME_SUGGESTION_DECOMPOSE =
-    'Decompose the module into cohesive submodules following the Single Responsibility Principle.';
-const VOLUME_SUGGESTION_SPLIT =
-    'Split the file into smaller focused units to reduce cognitive load and formatting bloat.';
-const VOLUME_SUGGESTION_COMPACT =
-    'Remove redundant blank lines, drop trivial stubs, or move extended prose into a Markdown spec.';
+const VOLUME_SUGGESTION_DECOMPOSE = DIAGNOSTIC_CATALOG[RULE_VOL_ELOC].suggestion;
+const VOLUME_SUGGESTION_SPLIT = DIAGNOSTIC_CATALOG[RULE_VOL_LOC].suggestion;
+const VOLUME_SUGGESTION_COMPACT = DIAGNOSTIC_CATALOG[RULE_VOL_RATIO].suggestion;
 const VOLUME_SUGGESTION_DOCUMENT =
     'Add type contracts, state-machine invariants, or a JSDoc header describing the module responsibilities.';
 
@@ -428,6 +423,15 @@ function buildEvaluationContext(
     const ratioTarget = thresholds.densityRatioTarget ?? DEFAULT_DENSITY_RATIO_TARGET;
     const content = ctx.content || '';
     const density = analyzeCodeDensity(content, ctx.filePath);
+    const effDensity = content ? computeEffectiveCodeDensity(content) : null;
+    if (effDensity) {
+        metrics.tokensPerEloc = effDensity.tokensPerEloc;
+        metrics.effectiveDensity = effDensity.effectiveDensity;
+        metrics.tspr = effDensity.tspr;
+        metrics.por = effDensity.por;
+        metrics.columnDensity = effDensity.columnDensity;
+        metrics.compositeDensity = effDensity.compositeDensity;
+    }
     const roleInference = inferFineGrainedFileRole(
         ctx.filePath,
         content.slice(0, ROLE_SAMPLE_CHAR_LIMIT),
@@ -467,7 +471,13 @@ function buildDetailPayload(
         zoneProfile,
     } = evalCtx;
     const detailPayload: Record<string, unknown> = {
-        ...metrics,
+        file: metrics.file,
+        lines: metrics.lines,
+        nonBlankLines: metrics.nonBlankLines,
+        functions: metrics.functions,
+        maxNestingDepth: metrics.maxNestingDepth,
+        topLevelDeclarations: metrics.topLevelDeclarations,
+        exportedSymbols: metrics.exportedSymbols,
         reasons,
         inferredModules: moduleNames,
     };
@@ -688,23 +698,19 @@ export class LargeFileAnalyzer implements Analyzer {
         if (findings.length === 0) return [];
 
         const moduleNames = [...this.modules];
-        return findings.map((finding: VolumeFinding): Issue => ({
-            id: `large-file:${finding.rule}:${ctx.filePath}:1`,
-            analyzer: 'large-file',
-            rule: finding.rule,
-            severity: finding.severity,
-            message: finding.message,
-            location: {
-                file: ctx.filePath,
-                start: { line: 1, column: 1 },
-                end: { line: 1, column: 1 },
-            },
-            detail: buildDetailPayload(
-                evalCtx,
-                [...(finding.reasons ?? [finding.message])],
-                moduleNames,
-            ),
-            suggestion: `${finding.suggestion} ${buildSplitSuggestions(evalCtx, moduleNames).join(' ')}`,
-        }));
+        return findings.map((finding: VolumeFinding): Issue =>
+            createLineIssue('large-file', ctx.filePath, {
+                lineIdx: 0,
+                rule: finding.rule,
+                severity: finding.severity,
+                message: finding.message,
+                detail: buildDetailPayload(
+                    evalCtx,
+                    [...(finding.reasons ?? [finding.message])],
+                    moduleNames,
+                ),
+                suggestion: `${finding.suggestion} ${buildSplitSuggestions(evalCtx, moduleNames).join(' ')}`,
+            }),
+        );
     }
 }

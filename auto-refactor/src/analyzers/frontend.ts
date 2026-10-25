@@ -20,6 +20,7 @@
 import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_INFO, SEVERITY_WARNING } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { ExposureMessages } from '../core/messages/exposure';
 import { isToolOrTestScript } from '../core/governance/pathScope';
 
@@ -215,20 +216,14 @@ interface FrontendIssueContext {
 }
 
 function makeFrontendIssue(context: FrontendIssueContext): Issue {
-    return {
-        id: `${ANALYZER_FRONTEND_ID}:${context.rule}:${context.file}:${context.line}`,
-        analyzer: ANALYZER_FRONTEND_ID,
+    return createLineIssue(ANALYZER_FRONTEND_ID, context.file, {
+        lineIdx: Math.max(0, context.line - 1),
         rule: context.rule,
         severity: context.severity,
         message: context.message,
-        location: {
-            file: context.file,
-            start: { line: context.line, column: 1 },
-            end: { line: context.line, column: 1 },
-        },
         detail: context.detail,
         suggestion: context.suggestion,
-    };
+    });
 }
 
 /**
@@ -738,5 +733,12 @@ export class FrontendAnalyzer implements Analyzer {
         auditImeCompositionGuard(file, rawLines, issues);
 
         return issues;
+    }
+
+    /**
+     * Streaming lifecycle finalization hook; allows single-pass scanning without SourceFile AST.
+     */
+    finalize(context: AnalyzerContext): Issue[] {
+        return this.analyze(undefined, context);
     }
 }

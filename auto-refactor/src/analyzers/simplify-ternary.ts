@@ -18,6 +18,7 @@ import * as ts from 'typescript';
 import type { AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_INFO } from '../core/types';
 import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import type { SimplifyOptions } from './simplify';
 
 /**
@@ -172,13 +173,11 @@ interface SimplifyIssueOptions {
 function makeSimplifyIssue(ctx: TernaryMatcherContext, opts: SimplifyIssueOptions): Issue {
     const start = { line: opts.pos.start.line + 1, column: opts.pos.start.character + 1 };
     const end = { line: opts.pos.end.line + 1, column: opts.pos.end.character + 1 };
-    return {
-        id: `simplify:${opts.rule}:${ctx.file}:${start.line}`,
-        analyzer: ANALYZER_SIMPLIFY,
+    const issue = createLineIssue(ANALYZER_SIMPLIFY, ctx.file, {
+        lineIdx: opts.pos.start.line,
         rule: opts.rule,
         severity: SEVERITY_INFO,
         message: opts.message,
-        location: { file: ctx.file, start, end },
         detail: {
             opportunity: opts.opportunity,
             canMakeImmutable: opts.canMakeImmutable,
@@ -189,7 +188,9 @@ function makeSimplifyIssue(ctx: TernaryMatcherContext, opts: SimplifyIssueOption
             suggestedCode: opts.candidate,
         },
         suggestion: opts.suggestion,
-    };
+    });
+    issue.location = { file: ctx.file, start, end };
+    return issue;
 }
 
 /**

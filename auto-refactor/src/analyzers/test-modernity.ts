@@ -14,6 +14,7 @@
 
 import * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import type {
     ActiveSemanticUnit,
     TestModernityOptions,
@@ -186,17 +187,11 @@ export class TestModernityAnalyzer implements Analyzer {
         );
 
         for (const finding of dualTrackResult.findings) {
-            issues.push({
-                id: `test-modernity:${finding.rule}:${ctx.filePath}:${finding.line}`,
-                analyzer: 'test-modernity',
+            const issue = createLineIssue('test-modernity', ctx.filePath, {
+                lineIdx: Math.max(0, finding.line - 1),
                 rule: finding.rule,
                 severity: finding.severity,
                 message: finding.message,
-                location: {
-                    file: ctx.filePath,
-                    start: { line: finding.line, column: finding.column },
-                    end: { line: finding.line, column: finding.column },
-                },
                 detail: {
                     track: dualTrackResult.track,
                     language: dualTrackResult.language,
@@ -205,6 +200,9 @@ export class TestModernityAnalyzer implements Analyzer {
                 },
                 suggestion: finding.actionableProposal.rationale,
             });
+            issue.location.start.column = finding.column;
+            issue.location.end.column = finding.column;
+            issues.push(issue);
         }
 
         if (!isTestFilePath(ctx.filePath)) {
@@ -246,6 +244,13 @@ export class TestModernityAnalyzer implements Analyzer {
         }
 
         return issues;
+    }
+
+    /**
+     * Streaming lifecycle finalization hook; allows single-pass scanning without SourceFile AST.
+     */
+    finalize(ctx: AnalyzerContext): Issue[] {
+        return this.analyze(undefined as unknown as ts.SourceFile, ctx);
     }
 
     private analyzeWithAst(

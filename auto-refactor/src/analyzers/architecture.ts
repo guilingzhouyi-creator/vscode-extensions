@@ -21,7 +21,6 @@ import type {
     AnalyzerContext,
     Issue,
     ArchitectureLayer,
-    Severity,
     AgentActionType,
 } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR, SEVERITY_INFO } from '../core/types';
@@ -36,6 +35,11 @@ import {
     extractSpecifiers,
     type SpecifierInfo,
 } from '../core/architecture/import-specifier-extractor';
+import {
+    attachActionableMetadata,
+    createLineIssue,
+    type LineIssueDraft,
+} from '../core/rules/diagnostic-catalog';
 
 /**
  * Threshold keys the architecture rules additionally read from the global `thresholds` block.
@@ -90,19 +94,6 @@ interface LayerDependencyAuditTarget {
     resolvedPath: string;
     targetLayer: ArchitectureLayer;
     lineIdx: number;
-}
-
-/**
- * Intermediate issue creation draft specifying position, severity, message,
- * and actionable remediation.
- */
-interface IssueDraft {
-    lineIdx: number;
-    rule: string;
-    message: string;
-    severity: Severity;
-    detail: Record<string, any>;
-    suggestion?: string;
 }
 
 interface ActionableSpec {
@@ -275,17 +266,7 @@ function shouldSkipArchitectureAnalysis(
 }
 
 function applyActionableSuggestions(issues: Issue[]): void {
-    for (const iss of issues) {
-        if (!iss.actionable && ARCH_ACTIONABLE_MAP[iss.rule]) {
-            const mapped = ARCH_ACTIONABLE_MAP[iss.rule];
-            iss.actionable = {
-                action: mapped.action,
-                code: mapped.code,
-                safeToAutomate: mapped.safeToAutomate,
-                templateSnippet: mapped.templateSnippet,
-            };
-        }
-    }
+    attachActionableMetadata(issues, ARCH_ACTIONABLE_MAP);
 }
 
 function shouldFlagConfigLeakage(opts: ArchitectureOptions, ctx: AnalyzerContext): boolean {
@@ -885,28 +866,7 @@ export class ArchitectureAnalyzer implements Analyzer {
      * Factory constructing a canonical Issue record enriched with actionable remediation
      * directives and standardized source location coordinates.
      */
-    private createIssue(ctx: AnalyzerContext, draft: IssueDraft): Issue {
-        const line = draft.lineIdx + 1;
-        const file = ctx.filePath.replace(/\\/g, '/');
-        const mapped = ARCH_ACTIONABLE_MAP[draft.rule];
-        const actionable = mapped
-            ? {
-                  action: mapped.action,
-                  code: mapped.code,
-                  safeToAutomate: mapped.safeToAutomate,
-                  templateSnippet: mapped.templateSnippet,
-              }
-            : undefined;
-        return {
-            id: `${this.name}:${draft.rule}:${file}:${line}`,
-            analyzer: this.name,
-            rule: draft.rule,
-            severity: draft.severity,
-            message: draft.message,
-            location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-            detail: draft.detail,
-            suggestion: draft.suggestion,
-            actionable,
-        };
+    private createIssue(ctx: AnalyzerContext, draft: LineIssueDraft): Issue {
+        return createLineIssue(this.name, ctx.filePath, draft, ARCH_ACTIONABLE_MAP);
     }
 }

@@ -20,6 +20,7 @@
 
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { ANALYZER_SHELL_SAFETY } from '../core/scoring/dimensionLiterals';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import {
     RULE_GUARD_DESTR_001,
     RULE_GUARD_VAR_001,
@@ -61,19 +62,13 @@ interface DestructiveFinding {
  * @returns The GUARD-DESTR-001 issue.
  */
 function buildDestructiveIssue(file: string, finding: DestructiveFinding): Issue {
-    return {
-        id: `${ANALYZER_SHELL_SAFETY}:${RULE_GUARD_DESTR_001}:${file}:${finding.line}`,
-        analyzer: ANALYZER_SHELL_SAFETY,
+    return createLineIssue(ANALYZER_SHELL_SAFETY, file, {
+        lineIdx: Math.max(0, finding.line - 1),
         rule: RULE_GUARD_DESTR_001,
         severity: SEVERITY_DESTRUCTIVE,
         message:
             `Recursive delete operand is not a path the source accounts for: ${finding.reason}. ` +
             `The delete removes whatever that expression resolves to at run time.`,
-        location: {
-            file,
-            start: { line: finding.line, column: 1 },
-            end: { line: finding.line, column: 1 },
-        },
         detail: {
             operand: finding.operand,
             reason: finding.reason,
@@ -82,7 +77,7 @@ function buildDestructiveIssue(file: string, finding: DestructiveFinding): Issue
         suggestion:
             'Delete a path the source names literally or builds from a directory the script created, ' +
             'and refuse the operation when the resolved path is a root, a home directory, or empty.',
-    };
+    });
 }
 
 /**
@@ -94,25 +89,19 @@ function buildDestructiveIssue(file: string, finding: DestructiveFinding): Issue
  * @returns The GUARD-VAR-001 issue.
  */
 function buildShadowIssue(file: string, name: string, line: number): Issue {
-    return {
-        id: `${ANALYZER_SHELL_SAFETY}:${RULE_GUARD_VAR_001}:${file}:${line}`,
-        analyzer: ANALYZER_SHELL_SAFETY,
+    return createLineIssue(ANALYZER_SHELL_SAFETY, file, {
+        lineIdx: Math.max(0, line - 1),
         rule: RULE_GUARD_VAR_001,
         severity: SEVERITY_SHADOW,
         message:
             `$${name} is a read-only automatic variable. The assignment throws, and the name keeps ` +
             `its previous value, so every later read silently addresses a different object than intended.`,
-        location: {
-            file,
-            start: { line, column: 1 },
-            end: { line, column: 1 },
-        },
         detail: {
             variable: `$${name}`,
             risk: 'high',
         },
         suggestion: `Rename the binding so it no longer collides with $${name}.`,
-    };
+    });
 }
 
 /**

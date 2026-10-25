@@ -17,6 +17,7 @@
  */
 import type { Analyzer, AnalyzerContext, Issue, AgentActionType, Severity } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import {
     PY_STDLIB_NAMES,
     PY_LOCAL_ROOTS,
@@ -469,21 +470,14 @@ export class PythonModernAnalyzer implements Analyzer {
             detail: Record<string, unknown>,
         ): void => {
             const mappedAction = ACTIONABLE_SPECS[spec.rule];
-            const lineNumber = targetLineIndex + 1;
-            const issuePayload: Issue = {
-                id: `python-modern:${spec.rule}:${file}:${lineNumber}`,
-                analyzer: this.name,
+            const issuePayload: Issue = createLineIssue(this.name, file, {
+                lineIdx: targetLineIndex,
                 rule: spec.rule,
                 severity: spec.severity,
                 message: spec.message,
-                location: {
-                    file,
-                    start: { line: lineNumber, column: 1 },
-                    end: { line: lineNumber, column: 1 },
-                },
                 detail,
                 suggestion: spec.suggestion,
-            };
+            });
 
             if (mappedAction) {
                 issuePayload.actionable = {

@@ -43,6 +43,7 @@ import type { NormalizedNode } from '../core/ast/multilang';
 import { NodeKind } from '../core/ast/multilang';
 import { SecurityMessages } from '../core/messages/security';
 import { nativeCore } from '../core/native';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 
 /**
  * Optional per-file configuration for the security analyzer.
@@ -292,25 +293,24 @@ interface IssuePayloadDescriptor {
 }
 
 function emitVulnFinding(issues: Issue[], descriptor: IssuePayloadDescriptor): void {
-    issues.push({
-        id: formatIssueId(descriptor.topic, descriptor.file, descriptor.lineNum),
-        analyzer: ANALYZER_SECURITY,
+    const issue = createLineIssue(ANALYZER_SECURITY, descriptor.file, {
+        lineIdx: Math.max(0, descriptor.lineNum - 1),
         rule: descriptor.rule,
         severity: descriptor.severity,
         message: descriptor.message,
-        location: {
-            file: descriptor.file,
-            start: { line: descriptor.lineNum, column: 1 },
-            end: { line: descriptor.lineNum, column: descriptor.lineText.length },
-        },
         detail: {
             risk: descriptor.risk,
             category: descriptor.category,
             snippet: descriptor.snippet,
         },
         suggestion: descriptor.suggestion,
-        actionable: descriptor.actionable,
     });
+    issue.id = formatIssueId(descriptor.topic, descriptor.file, descriptor.lineNum);
+    issue.location.end.column = descriptor.lineText.length;
+    if (descriptor.actionable) {
+        issue.actionable = descriptor.actionable;
+    }
+    issues.push(issue);
 }
 
 interface ScanSession {

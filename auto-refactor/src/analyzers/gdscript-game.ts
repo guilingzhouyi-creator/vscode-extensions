@@ -14,6 +14,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ANALYZER_GDSCRIPT_GAME } from '../core/scoring/dimensionLiterals';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
 import {
     matchHotPathAllocations,
@@ -157,16 +158,14 @@ interface GameIssueParams {
 
 function makeGameIssue(params: GameIssueParams): Issue {
     const { file, line, rule, severity, message, suggestion, detail } = params;
-    return {
-        id: `${ANALYZER_GDSCRIPT_GAME}:${rule}:${file}:${line}`,
-        analyzer: ANALYZER_GDSCRIPT_GAME,
+    return createLineIssue(ANALYZER_GDSCRIPT_GAME, file, {
+        lineIdx: Math.max(0, line - 1),
         rule,
         severity,
         message,
-        location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
         detail,
         suggestion,
-    };
+    });
 }
 
 function auditPoolContracts(file: string, raw: readonly string[], issues: Issue[]): void {

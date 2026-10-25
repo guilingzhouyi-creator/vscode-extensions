@@ -18,6 +18,7 @@ import * as path from 'path';
 import * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { ANALYZER_NAMING } from '../core/scoring/dimensionLiterals';
 import {
     NamingDecouplingAuditor,
@@ -233,21 +234,20 @@ export class NamingAnalyzer implements Analyzer {
     private formatIssue(ctx: AnalyzerContext, finding: NamingFindingInput): Issue {
         const line = Math.max(1, finding.line);
         const column = Math.max(1, finding.column ?? 1);
-        return {
-            id: `naming:${finding.rule}:${ctx.filePath}:${line}`,
-            analyzer: ANALYZER_NAMING,
+        const issue = createLineIssue(ANALYZER_NAMING, ctx.filePath, {
+            lineIdx: line - 1,
             rule: finding.rule,
             severity: finding.severity ?? SEVERITY_WARNING,
             message: finding.message,
-            location: {
-                file: ctx.filePath,
-                start: { line, column },
-                end: { line, column },
-            },
             detail: finding.detail ?? {},
             suggestion: finding.suggestion,
-            actionable: finding.actionable,
-        };
+        });
+        issue.location.start.column = column;
+        issue.location.end.column = column;
+        if (finding.actionable) {
+            issue.actionable = finding.actionable;
+        }
+        return issue;
     }
 
     /**

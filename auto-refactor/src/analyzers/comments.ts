@@ -26,6 +26,7 @@ import type {
     IssueEvidence,
     Severity,
 } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { CommentMessages, SIX_FIELD_HEADERS_EN, SIX_FIELD_HEADERS_ZH } from '../core/messages';
 import {
     auditCommentLanguage,
@@ -954,19 +955,18 @@ export class CommentAnalyzer implements Analyzer {
     }
 
     private createIssue(ctx: AnalyzerContext, lineIdx: number, descriptor: IssueDescriptor): Issue {
-        const line = lineIdx + 1;
-        const file = ctx.filePath.replace(/\\/g, '/');
-        return {
-            id: `${this.name}:${descriptor.rule}:${file}:${line}`,
-            analyzer: this.name,
+        const issue = createLineIssue(this.name, ctx.filePath, {
+            lineIdx,
             rule: descriptor.rule,
             severity: descriptor.severity,
             message: descriptor.message,
-            location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
             detail: descriptor.detail,
             suggestion: descriptor.suggestion,
-            ...(descriptor.evidence ? { evidence: descriptor.evidence } : {}),
-        };
+        });
+        if (descriptor.evidence) {
+            issue.evidence = descriptor.evidence;
+        }
+        return issue;
     }
 }
 

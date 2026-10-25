@@ -202,6 +202,22 @@ function findFirstPolyglotDeclarationLine(lines: string[], language: string): nu
     return undefined;
 }
 
+function resolveSourceFile(
+    sf: ts.SourceFile | undefined,
+    ctx: AnalyzerContext,
+    language: string,
+): ts.SourceFile | undefined {
+    const existing = sf || (ctx as { sourceFile?: ts.SourceFile }).sourceFile;
+    if (existing || language !== 'typescript' || !ctx.content) {
+        return existing;
+    }
+    try {
+        return ts.createSourceFile(ctx.filePath, ctx.content, ts.ScriptTarget.Latest, true);
+    } catch {
+        return undefined;
+    }
+}
+
 /**
  * Analyzer enforcing file layout, import discipline, and external resource management.
  */
@@ -222,9 +238,19 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         const imports: ImportStatementInfo[] = [];
         const resources: ExternalResourceRef[] = [];
 
-        const firstDeclarationLine = this.resolveFirstDeclarationLine(language, sf, this.fileLines);
-        if (language === 'typescript' && sf && typeof sf.forEachChild === 'function') {
-            this.analyzeTsWithAst(sf, ctx, imports, options);
+        const effectiveSf = resolveSourceFile(sf, ctx, language);
+
+        const firstDeclarationLine = this.resolveFirstDeclarationLine(
+            language,
+            effectiveSf,
+            this.fileLines,
+        );
+        if (
+            language === 'typescript' &&
+            effectiveSf &&
+            typeof effectiveSf.forEachChild === 'function'
+        ) {
+            this.analyzeTsWithAst(effectiveSf, ctx, imports, options);
         } else {
             this.analyzeWithLines(ctx, language, imports, options);
         }
@@ -241,6 +267,13 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         );
 
         return analyzeDependencyLayout(imports, resources, language, enrichedOptions);
+    }
+
+    /**
+     * Streaming lifecycle finalization hook; allows single-pass scanning without SourceFile AST.
+     */
+    finalize(ctx: AnalyzerContext): Issue[] {
+        return this.analyze((ctx as { sourceFile?: ts.SourceFile }).sourceFile!, ctx);
     }
 
     private resolveFirstDeclarationLine(

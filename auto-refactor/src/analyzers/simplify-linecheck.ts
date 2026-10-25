@@ -16,6 +16,7 @@
  */
 import { SEVERITY_INFO, type Issue, type AgentActionType } from '../core/types';
 import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import type { SimplifyOptions } from './simplify';
 
 const DEFAULT_MAX_GUARD_NESTING = 3;
@@ -173,21 +174,23 @@ function makeIssue(spec: SimplifyIssueSpec): Issue {
           }
         : undefined;
 
-    return {
-        id: `simplify:${spec.rule}:${spec.file}:${spec.startLine}`,
-        analyzer: ANALYZER_SIMPLIFY,
+    const issue = createLineIssue(ANALYZER_SIMPLIFY, spec.file, {
+        lineIdx: Math.max(0, spec.startLine - 1),
         rule: spec.rule,
         severity: SEVERITY_INFO,
         message: spec.message,
-        location: {
-            file: spec.file,
-            start: { line: spec.startLine, column: 1 },
-            end: { line: spec.endLine, column: 1 },
-        },
         detail: spec.detail,
         suggestion: spec.suggestion,
-        ...(actionable ? { actionable } : {}),
+    });
+    issue.location = {
+        file: spec.file,
+        start: { line: spec.startLine, column: 1 },
+        end: { line: spec.endLine, column: 1 },
     };
+    if (actionable) {
+        issue.actionable = actionable;
+    }
+    return issue;
 }
 
 // ─── SIM-ELSE-001 ───────────────────────────────────────────────────────────

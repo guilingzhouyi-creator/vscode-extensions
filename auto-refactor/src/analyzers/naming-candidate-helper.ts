@@ -432,9 +432,6 @@ export function getIdentifierTokens(name: string): string[] {
     return tokens.length > 0 ? tokens : [name];
 }
 
-/** Backward-compatible alias for getIdentifierTokens. */
-export const tokenizeIdentifier = getIdentifierTokens;
-
 function formatTokenCase(text: string, isFirst: boolean): string {
     return isFirst ? text.toLowerCase() : text.charAt(0).toUpperCase() + text.slice(1);
 }
@@ -539,7 +536,7 @@ export function findUnapprovedAbbreviation(
         return { unapproved: name, expanded: COMMON_ABBREVIATIONS[lower] };
     }
 
-    const tokens = tokenizeIdentifier(name);
+    const tokens = getIdentifierTokens(name);
     for (const token of tokens) {
         const tokenLower = token.toLowerCase();
         if (UNAPPROVED_ABBREVIATION_SET.has(tokenLower)) {
@@ -620,7 +617,7 @@ export function evaluateNamingAmbiguity(
         return { hasAmbiguity: true, reasons };
     }
 
-    const tokens = tokenizeIdentifier(name);
+    const tokens = getIdentifierTokens(name);
     for (const t of tokens) {
         if (POLYSEMIC_ABBREVIATIONS.has(t.toLowerCase())) {
             reasons.push(`Token '${t}' has multiple domain interpretations`);

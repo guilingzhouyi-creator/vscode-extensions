@@ -14,6 +14,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ExposureMessages } from '../core/messages/exposure';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 /** Canonical analyzer identifier for production bundle artifact and secret hygiene audits. */
 export const ANALYZER_PRODUCTION_HYGIENE_ID = 'production-hygiene';
 
@@ -37,16 +38,14 @@ function makeProdHygieneIssue(
     suggestion: string,
     detail: Record<string, unknown>,
 ): Issue {
-    return {
-        id: `${ANALYZER_PRODUCTION_HYGIENE_ID}:${rule}:${file}:${line}`,
-        analyzer: ANALYZER_PRODUCTION_HYGIENE_ID,
+    return createLineIssue(ANALYZER_PRODUCTION_HYGIENE_ID, file, {
+        lineIdx: line - 1,
         rule,
         severity,
         message,
-        location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-        detail,
         suggestion,
-    };
+        detail,
+    });
 }
 
 /**
@@ -190,5 +189,12 @@ export class ProductionHygieneAnalyzer implements Analyzer {
         auditBackendEnvSecrets(file, rawLines, issues);
 
         return issues;
+    }
+
+    /**
+     * Streaming lifecycle finalization hook; allows single-pass scanning without SourceFile AST.
+     */
+    finalize(context: AnalyzerContext): Issue[] {
+        return this.analyze(undefined, context);
     }
 }

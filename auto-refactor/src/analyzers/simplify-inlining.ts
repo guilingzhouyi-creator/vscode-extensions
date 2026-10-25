@@ -15,6 +15,7 @@
 import * as ts from 'typescript';
 import type { AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_INFO } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { tokenizeCode } from '../core/intelligence/token-entropy';
 import {
     extractTokenTrigrams,
@@ -255,17 +256,11 @@ function evaluateCandidateInlining(
 
     if (inliningUtility < MIN_INLINING_UTILITY) return null;
 
-    return {
-        id: `simplify:${RULE_SIM_INL_001}:${filePath}:${cand.startLine}`,
-        analyzer: 'simplify',
+    const issue = createLineIssue('simplify', filePath, {
+        lineIdx: Math.max(0, cand.startLine - 1),
         rule: RULE_SIM_INL_001,
         severity: SEVERITY_INFO,
         message: `Single-use orphan function "${cand.name}" has high vector similarity (${cosSim.toFixed(2)}) with caller; inlining utility (${inliningUtility.toFixed(2)}) exceeds threshold (${MIN_INLINING_UTILITY.toFixed(2)}).`,
-        location: {
-            file: filePath,
-            start: { line: cand.startLine, column: 1 },
-            end: { line: cand.endLine, column: 1 },
-        },
         detail: {
             function: cand.name,
             fanIn: 1,
@@ -275,15 +270,21 @@ function evaluateCandidateInlining(
         },
         suggestion:
             'Collocate or inline single-use micro-fragments into caller to improve spatial locality.',
-        actionable: {
-            action: ACTION_COLLOCATE,
-            code: CODE_AR_SIM_007,
-            safeToAutomate: false,
-            targetSymbol: cand.name,
-            templateSnippet:
-                '// Inline micro-fragment directly into caller to preserve spatial locality',
-        },
+    });
+    issue.location = {
+        file: filePath,
+        start: { line: cand.startLine, column: 1 },
+        end: { line: cand.endLine, column: 1 },
     };
+    issue.actionable = {
+        action: ACTION_COLLOCATE,
+        code: CODE_AR_SIM_007,
+        safeToAutomate: false,
+        targetSymbol: cand.name,
+        templateSnippet:
+            '// Inline micro-fragment directly into caller to preserve spatial locality',
+    };
+    return issue;
 }
 
 /**

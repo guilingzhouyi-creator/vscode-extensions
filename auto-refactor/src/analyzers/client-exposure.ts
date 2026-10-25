@@ -18,6 +18,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ExposureMessages } from '../core/messages/exposure';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 /** Canonical analyzer identifier for client-side exposure and credential security audits. */
 export const ANALYZER_CLIENT_EXPOSURE_ID = 'client-exposure';
 
@@ -46,25 +47,32 @@ const USER_ACTIVATION_OR_ORIGIN_RE =
 
 const MAX_LISTENER_SCAN_WINDOW = 40;
 
-function makeExposureIssue(
-    file: string,
-    line: number,
-    rule: string,
-    severity: Severity,
-    message: string,
-    suggestion: string,
-    detail: Record<string, unknown>,
-): Issue {
-    return {
-        id: `${ANALYZER_CLIENT_EXPOSURE_ID}:${rule}:${file}:${line}`,
-        analyzer: ANALYZER_CLIENT_EXPOSURE_ID,
-        rule,
-        severity,
-        message,
-        location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-        detail,
-        suggestion,
-    };
+const EXEMPT_PATH_SUBSTRINGS = Object.freeze([
+    '/tests/',
+    '/test/',
+    '/scripts/',
+    '/fixtures/',
+]);
+
+interface ExposureIssueParams {
+    readonly file: string;
+    readonly line: number;
+    readonly rule: string;
+    readonly severity: Severity;
+    readonly message: string;
+    readonly suggestion: string;
+    readonly detail: Record<string, unknown>;
+}
+
+function makeExposureIssue(params: ExposureIssueParams): Issue {
+    return createLineIssue(ANALYZER_CLIENT_EXPOSURE_ID, params.file, {
+        lineIdx: params.line - 1,
+        rule: params.rule,
+        severity: params.severity,
+        message: params.message,
+        suggestion: params.suggestion,
+        detail: params.detail,
+    });
 }
 
 /**
@@ -76,15 +84,15 @@ function auditInternalApiEndpoints(file: string, rawLines: string[], issues: Iss
         for (const pattern of INTERNAL_ENDPOINT_PATTERNS) {
             if (pattern.test(line)) {
                 issues.push(
-                    makeExposureIssue(
+                    makeExposureIssue({
                         file,
-                        i + 1,
-                        'SEC-EXP-001',
-                        SEVERITY_ERROR,
-                        `${ExposureMessages.INTERNAL_API_EXPOSED.message}: Internal endpoint matched on line ${i + 1}`,
-                        ExposureMessages.INTERNAL_API_EXPOSED.suggestion,
-                        { line: i + 1 },
-                    ),
+                        line: i + 1,
+                        rule: 'SEC-EXP-001',
+                        severity: SEVERITY_ERROR,
+                        message: `${ExposureMessages.INTERNAL_API_EXPOSED.message}: Internal endpoint matched on line ${i + 1}`,
+                        suggestion: ExposureMessages.INTERNAL_API_EXPOSED.suggestion,
+                        detail: { line: i + 1 },
+                    }),
                 );
                 break;
             }
@@ -100,15 +108,15 @@ function auditCssAuthorizationBypass(file: string, rawLines: string[], issues: I
         const line = rawLines[i];
         if (CSS_AUTH_BYPASS_RE.test(line)) {
             issues.push(
-                makeExposureIssue(
+                makeExposureIssue({
                     file,
-                    i + 1,
-                    'SEC-EXP-002',
-                    SEVERITY_ERROR,
-                    `${ExposureMessages.CLIENT_CSS_AUTH_BYPASS.message}: Element with privileged actions visually hidden`,
-                    ExposureMessages.CLIENT_CSS_AUTH_BYPASS.suggestion,
-                    { line: i + 1 },
-                ),
+                    line: i + 1,
+                    rule: 'SEC-EXP-002',
+                    severity: SEVERITY_ERROR,
+                    message: `${ExposureMessages.CLIENT_CSS_AUTH_BYPASS.message}: Element with privileged actions visually hidden`,
+                    suggestion: ExposureMessages.CLIENT_CSS_AUTH_BYPASS.suggestion,
+                    detail: { line: i + 1 },
+                }),
             );
         }
     }
@@ -122,15 +130,15 @@ function auditFeatureFlagCodeSplitting(file: string, rawLines: string[], issues:
         const line = rawLines[i];
         if (DISABLED_FEATURE_FLAG_RE.test(line)) {
             issues.push(
-                makeExposureIssue(
+                makeExposureIssue({
                     file,
-                    i + 1,
-                    'SEC-EXP-003',
-                    SEVERITY_WARNING,
-                    `${ExposureMessages.DISABLED_FLAG_LEAKAGE.message}: Disabled feature flag branch bundled to client`,
-                    ExposureMessages.DISABLED_FLAG_LEAKAGE.suggestion,
-                    { line: i + 1 },
-                ),
+                    line: i + 1,
+                    rule: 'SEC-EXP-003',
+                    severity: SEVERITY_WARNING,
+                    message: `${ExposureMessages.DISABLED_FLAG_LEAKAGE.message}: Disabled feature flag branch bundled to client`,
+                    suggestion: ExposureMessages.DISABLED_FLAG_LEAKAGE.suggestion,
+                    detail: { line: i + 1 },
+                }),
             );
         }
     }
@@ -144,15 +152,15 @@ function auditUnreleasedRoutes(file: string, rawLines: string[], issues: Issue[]
         const line = rawLines[i];
         if (UNRELEASED_ROUTE_RE.test(line)) {
             issues.push(
-                makeExposureIssue(
+                makeExposureIssue({
                     file,
-                    i + 1,
-                    'SEC-EXP-004',
-                    SEVERITY_ERROR,
-                    `${ExposureMessages.UNRELEASED_ROUTE_EXPOSED.message}: Unreleased or test route found in router config`,
-                    ExposureMessages.UNRELEASED_ROUTE_EXPOSED.suggestion,
-                    { line: i + 1 },
-                ),
+                    line: i + 1,
+                    rule: 'SEC-EXP-004',
+                    severity: SEVERITY_ERROR,
+                    message: `${ExposureMessages.UNRELEASED_ROUTE_EXPOSED.message}: Unreleased or test route found in router config`,
+                    suggestion: ExposureMessages.UNRELEASED_ROUTE_EXPOSED.suggestion,
+                    detail: { line: i + 1 },
+                }),
             );
         }
     }
@@ -191,15 +199,15 @@ function auditIframeUserActivation(file: string, rawLines: string[], issues: Iss
             continue;
         }
         issues.push(
-            makeExposureIssue(
+            makeExposureIssue({
                 file,
-                i + 1,
-                'SEC-EXP-005',
-                SEVERITY_ERROR,
-                `${ExposureMessages.IFRAME_SYNTHETIC_USER_ACTIVATION.message}: Sensitive action on line ${sensitiveLine} lacks event.userActivation or origin guard`,
-                ExposureMessages.IFRAME_SYNTHETIC_USER_ACTIVATION.suggestion,
-                { listenerLine: i + 1, sensitiveLine },
-            ),
+                line: i + 1,
+                rule: 'SEC-EXP-005',
+                severity: SEVERITY_ERROR,
+                message: `${ExposureMessages.IFRAME_SYNTHETIC_USER_ACTIVATION.message}: Sensitive action on line ${sensitiveLine} lacks event.userActivation or origin guard`,
+                suggestion: ExposureMessages.IFRAME_SYNTHETIC_USER_ACTIVATION.suggestion,
+                detail: { listenerLine: i + 1, sensitiveLine },
+            }),
         );
     }
 }
@@ -210,15 +218,10 @@ function auditIframeUserActivation(file: string, rawLines: string[], issues: Iss
 export class ClientExposureAnalyzer implements Analyzer {
     readonly name = ANALYZER_CLIENT_EXPOSURE_ID;
 
-    analyze(_sf: any, context: AnalyzerContext): Issue[] {
+    analyze(_sf: unknown, context: AnalyzerContext): Issue[] {
         const file = context.filePath.replace(/\\/g, '/');
         const norm = ('/' + file).toLowerCase();
-        if (
-            norm.includes('/tests/') ||
-            norm.includes('/test/') ||
-            norm.includes('/scripts/') ||
-            norm.includes('/fixtures/')
-        ) {
+        if (EXEMPT_PATH_SUBSTRINGS.some((sub) => norm.includes(sub))) {
             return [];
         }
 
@@ -232,5 +235,12 @@ export class ClientExposureAnalyzer implements Analyzer {
         auditIframeUserActivation(file, rawLines, issues);
 
         return issues;
+    }
+
+    /**
+     * Streaming lifecycle finalization hook; allows single-pass scanning without SourceFile AST.
+     */
+    finalize(context: AnalyzerContext): Issue[] {
+        return this.analyze(undefined, context);
     }
 }

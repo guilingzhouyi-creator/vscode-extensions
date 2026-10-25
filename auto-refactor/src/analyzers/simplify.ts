@@ -34,6 +34,7 @@ import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
 import type { NormalizedNode } from '../core/ast/multilang';
 import { NodeKind } from '../core/ast/multilang';
 import { locN } from '../utils/normalized';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { globToRegExp, matchAny } from '../core/file-discovery';
 import { detectTernaryOpportunities } from './simplify-ternary';
 import {
@@ -307,24 +308,22 @@ export class SimplifyAnalyzer implements Analyzer {
         const effectiveLines = countEffectiveFunctionLines(lines, startLine, endLine);
         if (effectiveLines <= limit) return;
 
-        const issue: Issue = {
-            id: `simplify:${RULE_SIM_LONG_001}:${ctx.filePath}:${startLine}`,
-            analyzer: ANALYZER_SIMPLIFY,
-            // rule: 'SIM-LONG-001'
+        const issue: Issue = createLineIssue(ANALYZER_SIMPLIFY, ctx.filePath, {
+            lineIdx: Math.max(0, startLine - 1),
             rule: RULE_SIM_LONG_001,
             severity: this.defaultSeverity,
             message: `Function "${name}" spans ${length} lines (limit ${limit}).`,
-            location: resolveNodeLocation(node, ctx.filePath),
             detail: { function: name, lines: length, limit },
             suggestion:
                 'Extract cohesive steps into named helpers so the top-level flow reads as a short sequence of intent.',
-            actionable: buildSimplifyActionable({
-                action: ACTION_SPLIT_FUNCTION,
-                code: CODE_AR_SIM_001,
-                targetScope: SCOPE_MODULE_TOP_LEVEL,
-                targetSymbol: name,
-            }),
-        };
+        });
+        issue.location = resolveNodeLocation(node, ctx.filePath);
+        issue.actionable = buildSimplifyActionable({
+            action: ACTION_SPLIT_FUNCTION,
+            code: CODE_AR_SIM_001,
+            targetScope: SCOPE_MODULE_TOP_LEVEL,
+            targetSymbol: name,
+        });
 
         attachFunctionLengthSlices(issue, this.getOrParseSourceFile(ctx), startLine);
         this.longFunctions.push(issue);
@@ -342,24 +341,22 @@ export class SimplifyAnalyzer implements Analyzer {
         if (maxNesting <= maxAllowed) return;
 
         const startLine = node.start?.line ?? 1;
-        const issue: Issue = {
-            id: `simplify:${RULE_SIM_FLAT_002}:${ctx.filePath}:${startLine}`,
-            analyzer: ANALYZER_SIMPLIFY,
-            // rule: 'SIM-FLAT-002'
+        const issue: Issue = createLineIssue(ANALYZER_SIMPLIFY, ctx.filePath, {
+            lineIdx: Math.max(0, startLine - 1),
             rule: RULE_SIM_FLAT_002,
             severity: this.defaultSeverity,
             message: `Function "${name}" has nested conditional control-flow depth ${maxNesting} (limit ${maxAllowed}). Flatten with guard clauses.`,
-            location: resolveNodeLocation(node, ctx.filePath),
             detail: { function: name, nestingDepth: maxNesting, limit: maxAllowed },
             suggestion:
                 'Invert deep conditionals and return early with guard clauses to flatten control flow.',
-            actionable: buildSimplifyActionable({
-                action: ACTION_SIMPLIFY_CONTROL_FLOW,
-                code: CODE_AR_SIM_002,
-                targetScope: SCOPE_FUNCTION_LOCAL,
-                targetSymbol: name,
-            }),
-        };
+        });
+        issue.location = resolveNodeLocation(node, ctx.filePath);
+        issue.actionable = buildSimplifyActionable({
+            action: ACTION_SIMPLIFY_CONTROL_FLOW,
+            code: CODE_AR_SIM_002,
+            targetScope: SCOPE_FUNCTION_LOCAL,
+            targetSymbol: name,
+        });
 
         attachGuardClauseInversion(issue, this.getOrParseSourceFile(ctx), startLine);
         this.longFunctions.push(issue);
@@ -386,18 +383,11 @@ export class SimplifyAnalyzer implements Analyzer {
 
             const template = generateParameterObjectSnippet(name, paramInfo);
 
-            issues.push({
-                id: `simplify:${RULE_SIM_ARGS_001}:${file}:${startLine}`,
-                analyzer: ANALYZER_SIMPLIFY,
-                // rule: 'SIM-ARGS-001'
+            const issue = createLineIssue(ANALYZER_SIMPLIFY, file, {
+                lineIdx: Math.max(0, startLine - 1),
                 rule: RULE_SIM_ARGS_001,
                 severity: this.defaultSeverity,
                 message: `Function "${name}" has ${nodeParams.length} parameters (limit ${limit}). Introduce a parameter object.`,
-                location: {
-                    file,
-                    start: { line: startLine, column: startCol },
-                    end: { line: endPos.line + 1, column: endPos.character + 1 },
-                },
                 detail: {
                     function: name,
                     parameters: paramNames,
@@ -406,34 +396,34 @@ export class SimplifyAnalyzer implements Analyzer {
                 },
                 suggestion:
                     'Encapsulate parameter list into a single options/parameter object using introduce_parameter_object.',
-                actionable: buildSimplifyActionable({
-                    action: ACTION_INTRODUCE_PARAM_OBJECT,
-                    code: CODE_AR_SIM_006,
-                    taxonomy: TAXONOMY_CTRL_FLOW,
-                    targetScope: SCOPE_FUNCTION_LOCAL,
-                    targetSymbol: name,
-                    templateSnippet: template,
-                    targetArguments: {
-                        functionName: name,
-                        parameterCount: nodeParams.length,
-                        parameters: paramNames,
-                    },
-                }),
             });
+            issue.location = {
+                file,
+                start: { line: startLine, column: startCol },
+                end: { line: endPos.line + 1, column: endPos.character + 1 },
+            };
+            issue.actionable = buildSimplifyActionable({
+                action: ACTION_INTRODUCE_PARAM_OBJECT,
+                code: CODE_AR_SIM_006,
+                taxonomy: TAXONOMY_CTRL_FLOW,
+                targetScope: SCOPE_FUNCTION_LOCAL,
+                targetSymbol: name,
+                templateSnippet: template,
+                targetArguments: {
+                    functionName: name,
+                    parameterCount: nodeParams.length,
+                    parameters: paramNames,
+                },
+            });
+            issues.push(issue);
         }
 
         if (nodeParams.length === 0 && isSemanticHandlerOrSolver(name)) {
-            issues.push({
-                id: `simplify:${RULE_SIM_ARGS_002}:${file}:${startLine}`,
-                analyzer: ANALYZER_SIMPLIFY,
+            const issue = createLineIssue(ANALYZER_SIMPLIFY, file, {
+                lineIdx: Math.max(0, startLine - 1),
                 rule: RULE_SIM_ARGS_002,
                 severity: this.defaultSeverity,
                 message: `Specialized handler/solver "${name}" declared with 0 parameters. Expected event payload or context parameter.`,
-                location: {
-                    file,
-                    start: { line: startLine, column: startCol },
-                    end: { line: endPos.line + 1, column: endPos.character + 1 },
-                },
                 detail: {
                     function: name,
                     parameterCount: 0,
@@ -442,6 +432,12 @@ export class SimplifyAnalyzer implements Analyzer {
                 suggestion:
                     'Declare required event payload, context, or request parameters to fulfill the handler contract.',
             });
+            issue.location = {
+                file,
+                start: { line: startLine, column: startCol },
+                end: { line: endPos.line + 1, column: endPos.character + 1 },
+            };
+            issues.push(issue);
         }
     }
 
@@ -481,13 +477,11 @@ export class SimplifyAnalyzer implements Analyzer {
 
         // SIM-ARGS-001 for non-TS (TS handles via type signatures in auditTypeScriptFunctions)
         if (!this.getOrParseSourceFile(ctx) && params.length > limit) {
-            this.longFunctions.push({
-                id: `simplify:${RULE_SIM_ARGS_001}:${file}:${startLine}`,
-                analyzer: ANALYZER_SIMPLIFY,
+            const issue = createLineIssue(ANALYZER_SIMPLIFY, file, {
+                lineIdx: Math.max(0, startLine - 1),
                 rule: RULE_SIM_ARGS_001,
                 severity: this.defaultSeverity,
                 message: `Function "${name}" has ${params.length} parameters (limit ${limit}). Introduce a parameter object.`,
-                location: resolveNodeLocation(node, ctx.filePath),
                 detail: {
                     function: name,
                     parameters: params,
@@ -497,6 +491,8 @@ export class SimplifyAnalyzer implements Analyzer {
                 suggestion:
                     'Encapsulate parameter list into a single options/parameter object using introduce_parameter_object.',
             });
+            issue.location = resolveNodeLocation(node, ctx.filePath);
+            this.longFunctions.push(issue);
         }
 
         // SIM-ARGS-002: Minimum parameter count on specialized handlers/solvers
@@ -506,13 +502,11 @@ export class SimplifyAnalyzer implements Analyzer {
             params.length === 0 &&
             isSemanticHandlerOrSolver(name)
         ) {
-            this.longFunctions.push({
-                id: `simplify:${RULE_SIM_ARGS_002}:${file}:${startLine}`,
-                analyzer: ANALYZER_SIMPLIFY,
+            const issue = createLineIssue(ANALYZER_SIMPLIFY, file, {
+                lineIdx: Math.max(0, startLine - 1),
                 rule: RULE_SIM_ARGS_002,
                 severity: this.defaultSeverity,
                 message: `Specialized handler/solver "${name}" declared with 0 parameters. Expected event payload or context parameter.`,
-                location: resolveNodeLocation(node, ctx.filePath),
                 detail: {
                     function: name,
                     parameterCount: 0,
@@ -521,6 +515,8 @@ export class SimplifyAnalyzer implements Analyzer {
                 suggestion:
                     'Declare required event payload, context, or request parameters to fulfill the handler contract.',
             });
+            issue.location = resolveNodeLocation(node, ctx.filePath);
+            this.longFunctions.push(issue);
         }
     }
 
@@ -663,27 +659,26 @@ export class SimplifyAnalyzer implements Analyzer {
         let start = 0;
         const flush = (endIndex: number): void => {
             if (streak >= min) {
-                issues.push({
-                    id: `simplify:${RULE_SIM_COMC_001}:${file}:${start + 1}`,
-                    analyzer: ANALYZER_SIMPLIFY,
-                    // rule: 'SIM-COMC-001'
+                const issue = createLineIssue(ANALYZER_SIMPLIFY, file, {
+                    lineIdx: start,
                     rule: RULE_SIM_COMC_001,
                     severity: this.defaultSeverity,
                     message: `Suspected commented-out code: ${streak} consecutive code-shaped comment lines.`,
-                    location: {
-                        file,
-                        start: { line: start + 1, column: 1 },
-                        end: { line: endIndex, column: 1 },
-                    },
                     detail: { lines: streak, first: lines[start].trim() },
                     suggestion:
                         'Delete the block (history lives in git) or restore it to real code.',
-                    actionable: buildSimplifyActionable({
-                        action: ACTION_REPLACE_TOKEN,
-                        code: CODE_AR_SIM_003,
-                        safeToAutomate: false,
-                    }),
                 });
+                issue.location = {
+                    file,
+                    start: { line: start + 1, column: 1 },
+                    end: { line: endIndex, column: 1 },
+                };
+                issue.actionable = buildSimplifyActionable({
+                    action: ACTION_REPLACE_TOKEN,
+                    code: CODE_AR_SIM_003,
+                    safeToAutomate: false,
+                });
+                issues.push(issue);
             }
             streak = 0;
         };
@@ -725,27 +720,21 @@ export class SimplifyAnalyzer implements Analyzer {
         lineIndex: number,
         issues: Issue[],
     ): void {
-        issues.push({
-            id: `simplify:${RULE_SIM_EMPTY_001}:${file}:${lineIndex + 1}`,
-            analyzer: ANALYZER_SIMPLIFY,
-            // rule: 'SIM-EMPTY-001'
+        const issue = createLineIssue(ANALYZER_SIMPLIFY, file, {
+            lineIdx: lineIndex,
             rule: RULE_SIM_EMPTY_001,
             severity: this.defaultSeverity,
             message: 'Empty implementation: the function body is only a placeholder.',
-            location: {
-                file,
-                start: { line: lineIndex + 1, column: 1 },
-                end: { line: lineIndex + 1, column: 1 },
-            },
             detail: { line: lines[lineIndex].trim() },
             suggestion:
                 'Implement the body, raise an explicit not-implemented error, or remove the declaration.',
-            actionable: buildSimplifyActionable({
-                action: ACTION_REPLACE_TOKEN,
-                code: CODE_AR_SIM_005,
-                safeToAutomate: false,
-            }),
         });
+        issue.actionable = buildSimplifyActionable({
+            action: ACTION_REPLACE_TOKEN,
+            code: CODE_AR_SIM_005,
+            safeToAutomate: false,
+        });
+        issues.push(issue);
     }
 
     private isBraceBlockEmpty(lines: string[], startIndex: number): boolean {
@@ -931,28 +920,22 @@ export class SimplifyAnalyzer implements Analyzer {
             if (!DEBUG_PRINT_RE.test(lines[i])) {
                 continue;
             }
-            issues.push({
-                id: `simplify:${RULE_SIM_PRNT_001}:${file}:${i + 1}`,
-                analyzer: ANALYZER_SIMPLIFY,
-                // rule: 'SIM-PRNT-001'
+            const issue = createLineIssue(ANALYZER_SIMPLIFY, file, {
+                lineIdx: i,
                 rule: RULE_SIM_PRNT_001,
                 severity: this.defaultSeverity,
                 message:
                     'Debug output call in non-CLI code: route diagnostics through the project logger.',
-                location: {
-                    file,
-                    start: { line: i + 1, column: 1 },
-                    end: { line: i + 1, column: 1 },
-                },
                 detail: { line: trimmed },
                 suggestion:
                     'Use the structured logger (or remove the statement); debug output bypasses log levels and leaks to production stdout.',
-                actionable: buildSimplifyActionable({
-                    action: ACTION_REPLACE_TOKEN,
-                    code: CODE_AR_SIM_004,
-                    safeToAutomate: false,
-                }),
             });
+            issue.actionable = buildSimplifyActionable({
+                action: ACTION_REPLACE_TOKEN,
+                code: CODE_AR_SIM_004,
+                safeToAutomate: false,
+            });
+            issues.push(issue);
         }
     }
 

@@ -20,6 +20,7 @@
 
 import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import {
     ANALYZER_STDLIB,
     CODE_STB_PANIC_ESCAPE,
@@ -394,30 +395,23 @@ export class StdlibAnalyzer implements Analyzer {
 
         const targetActionable = actionableMap[rule];
 
-        issues.push({
-            id: `stdlib:${rule}:${file}:${line}`,
-            analyzer: this.name,
+        const issue = createLineIssue(this.name, file, {
+            lineIdx: Math.max(0, line - 1),
             rule,
             severity,
             message,
-            location: {
-                file,
-                start: { line, column: 1 },
-                end: { line, column: 1 },
-            },
             suggestion,
             detail,
-            ...(targetActionable
-                ? {
-                      actionable: {
-                          action: targetActionable.action,
-                          code: targetActionable.code,
-                          targetSymbol: (detail.functionName as string) || undefined,
-                          safeToAutomate: targetActionable.safe,
-                      },
-                  }
-                : {}),
         });
+        if (targetActionable) {
+            issue.actionable = {
+                action: targetActionable.action,
+                code: targetActionable.code,
+                targetSymbol: (detail.functionName as string) || undefined,
+                safeToAutomate: targetActionable.safe,
+            };
+        }
+        issues.push(issue);
     }
 
     /**

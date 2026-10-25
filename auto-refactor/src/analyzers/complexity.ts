@@ -31,6 +31,7 @@ import {
     RULE_CPX_STM_001,
 } from '../core/scoring/dimensionLiterals';
 import { CODE_CPX_HIGH_COMPLEXITY, CODE_CPX_DEEP_NESTING } from '../core/constants/rule-codes';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import type { NormalizedNode } from '../core/ast/multilang';
 import { NodeKind } from '../core/ast/multilang';
 import { locN } from '../utils/normalized';
@@ -309,17 +310,20 @@ function buildComplexityIssue(context: ComplexityIssueContext): Issue {
         clarity,
     };
 
-    return {
-        id: `complexity:high-complexity:${ctx.filePath}:${node.start?.line ?? 1}`,
-        analyzer: ANALYZER_COMPLEXITY,
+    const startLine = node.start?.line ?? 1;
+    const issue = createLineIssue(ANALYZER_COMPLEXITY, ctx.filePath, {
+        lineIdx: Math.max(0, startLine - 1),
         rule: 'high-complexity',
         severity,
         message,
-        location: locN(startNode, ctx.filePath),
         detail: buildComplexityDetail(detailContext),
         suggestion,
-        actionable,
-    };
+    });
+    issue.location = locN(startNode, ctx.filePath);
+    if (actionable) {
+        issue.actionable = actionable;
+    }
+    return issue;
 }
 
 /**
@@ -604,19 +608,13 @@ export class ComplexityAnalyzer implements Analyzer {
         const isShortSpanGuard = loc <= SHORT_SPAN_GUARD_LOC && maxDepth <= SHORT_SPAN_GUARD_DEPTH;
         if (isShortSpanGuard) return;
 
-        this.issues.push({
-            id: `${ANALYZER_COMPLEXITY}:${RULE_CPX_NEST_001}:${ctx.filePath}:${startLine}`,
-            analyzer: ANALYZER_COMPLEXITY,
+        const issue = createLineIssue(ANALYZER_COMPLEXITY, ctx.filePath, {
+            lineIdx: Math.max(0, startLine - 1),
             rule: RULE_CPX_NEST_001,
             severity: SEVERITY_WARNING,
             message:
                 `Unbounded control-flow nesting: function '${name}' has nesting depth ${maxDepth} ` +
                 `exceeding elastic budget ${depthBudget} for context '${contextKind}'.`,
-            location: {
-                file: ctx.filePath,
-                start: { line: startLine, column: 1 },
-                end: { line: startLine, column: 1 },
-            },
             detail: {
                 function: name,
                 maxDepth,
@@ -625,19 +623,20 @@ export class ComplexityAnalyzer implements Analyzer {
                 loc,
             },
             suggestion: SUGGESTION_UNBOUNDED_NESTING,
-            actionable: {
-                action: ACTION_APPLY_GUARD_CLAUSE,
-                code: CODE_CPX_DEEP_NESTING,
-                taxonomy: TAXONOMY_CTRL_FLOW,
-                safeToAutomate: false,
-                templateSnippet: SNIPPET_GUARD_CLAUSE,
-                targetArguments: {
-                    maxDepth,
-                    depthBudget,
-                    functionName: name,
-                },
-            },
         });
+        issue.actionable = {
+            action: ACTION_APPLY_GUARD_CLAUSE,
+            code: CODE_CPX_DEEP_NESTING,
+            taxonomy: TAXONOMY_CTRL_FLOW,
+            safeToAutomate: false,
+            templateSnippet: SNIPPET_GUARD_CLAUSE,
+            targetArguments: {
+                maxDepth,
+                depthBudget,
+                functionName: name,
+            },
+        };
+        this.issues.push(issue);
     }
 
     private checkDeepLongSpanEscapes(context: ComplexityNestingContext, fnLines: string[]): void {
@@ -665,28 +664,24 @@ export class ComplexityAnalyzer implements Analyzer {
 
         if (deepJumpLine <= 0) return;
 
-        this.issues.push({
-            id: `${ANALYZER_COMPLEXITY}:${RULE_CPX_NEST_002}:${ctx.filePath}:${deepJumpLine}`,
-            analyzer: ANALYZER_COMPLEXITY,
-            rule: RULE_CPX_NEST_002,
-            severity: SEVERITY_WARNING,
-            message:
-                `Cognitive jump cost: deep control-flow jump (nesting >= 4) ` +
-                `in function '${name}' over long span (${loc} LOC).`,
-            location: {
-                file: ctx.filePath,
-                start: { line: deepJumpLine, column: 1 },
-                end: { line: deepJumpLine, column: 1 },
-            },
-            detail: {
-                function: name,
-                loc,
-                maxDepth,
-                jumpLine: deepJumpLine,
-                contextKind,
-            },
-            suggestion: SUGGESTION_DEEP_ESCAPE,
-        });
+        this.issues.push(
+            createLineIssue(ANALYZER_COMPLEXITY, ctx.filePath, {
+                lineIdx: Math.max(0, deepJumpLine - 1),
+                rule: RULE_CPX_NEST_002,
+                severity: SEVERITY_WARNING,
+                message:
+                    `Cognitive jump cost: deep control-flow jump (nesting >= 4) ` +
+                    `in function '${name}' over long span (${loc} LOC).`,
+                detail: {
+                    function: name,
+                    loc,
+                    maxDepth,
+                    jumpLine: deepJumpLine,
+                    contextKind,
+                },
+                suggestion: SUGGESTION_DEEP_ESCAPE,
+            }),
+        );
     }
 
     private checkStateMachineDiscipline(
@@ -718,26 +713,22 @@ export class ComplexityAnalyzer implements Analyzer {
         caseLine: number,
         caseLength: number,
     ): void {
-        this.issues.push({
-            id: `${ANALYZER_COMPLEXITY}:${RULE_CPX_STM_001}:${ctx.filePath}:${caseLine}`,
-            analyzer: ANALYZER_COMPLEXITY,
-            rule: RULE_CPX_STM_001,
-            severity: SEVERITY_INFO,
-            message:
-                `State machine branch discipline: case branch at line ${caseLine} in ` +
-                `function '${name}' has length ${caseLength} LOC (threshold: ${MAX_CASE_BRANCH_LINES}).`,
-            location: {
-                file: ctx.filePath,
-                start: { line: caseLine, column: 1 },
-                end: { line: caseLine, column: 1 },
-            },
-            detail: {
-                function: name,
-                branchLine: caseLine,
-                branchLength: caseLength,
-            },
-            suggestion: SUGGESTION_STATE_MACHINE,
-        });
+        this.issues.push(
+            createLineIssue(ANALYZER_COMPLEXITY, ctx.filePath, {
+                lineIdx: Math.max(0, caseLine - 1),
+                rule: RULE_CPX_STM_001,
+                severity: SEVERITY_INFO,
+                message:
+                    `State machine branch discipline: case branch at line ${caseLine} in ` +
+                    `function '${name}' has length ${caseLength} LOC (threshold: ${MAX_CASE_BRANCH_LINES}).`,
+                detail: {
+                    function: name,
+                    branchLine: caseLine,
+                    branchLength: caseLength,
+                },
+                suggestion: SUGGESTION_STATE_MACHINE,
+            }),
+        );
     }
 
     private isTautologyExempt(normFile: string): boolean {
@@ -746,6 +737,9 @@ export class ComplexityAnalyzer implements Analyzer {
             normFile.includes('/tests/') ||
             normFile.includes('/fixtures/') ||
             normFile.includes('/bench') ||
+            normFile.includes('/scripts/') ||
+            normFile.startsWith('scripts/') ||
+            /(?:^|[\\/])(?:gate|validate|bench|test)[-_].*\.[a-z0-9]+$/i.test(normFile) ||
             normFile.endsWith('.test.ts') ||
             normFile.endsWith('.spec.ts')
         );
@@ -759,24 +753,20 @@ export class ComplexityAnalyzer implements Analyzer {
                 if (!loop.isTautological) {
                     continue;
                 }
-                tautologyIssues.push({
-                    id: `${ANALYZER_COMPLEXITY}:${RULE_CPX_TRV_001}:${normFile}:${loop.line}`,
-                    analyzer: ANALYZER_COMPLEXITY,
-                    rule: RULE_CPX_TRV_001,
-                    severity: SEVERITY_WARNING,
-                    message: `Tautological loop traversal detected in '${fnSymbol}': iteration exhibits zero or negligible state mutation entropy delta (deltaEntropy: ${loop.deltaEntropy ?? 0} <= 0.05).`,
-                    location: {
-                        file: normFile,
-                        start: { line: loop.line, column: 1 },
-                        end: { line: loop.line, column: 1 },
-                    },
-                    detail: {
-                        symbol: fnSymbol,
-                        scaleVariable: loop.scaleVariable,
-                        deltaEntropy: loop.deltaEntropy ?? 0,
-                    },
-                    suggestion: SUGGESTION_TAUTOLOGICAL_LOOP,
-                });
+                tautologyIssues.push(
+                    createLineIssue(ANALYZER_COMPLEXITY, normFile, {
+                        lineIdx: Math.max(0, loop.line - 1),
+                        rule: RULE_CPX_TRV_001,
+                        severity: SEVERITY_WARNING,
+                        message: `Tautological loop traversal detected in '${fnSymbol}': iteration exhibits zero or negligible state mutation entropy delta (deltaEntropy: ${loop.deltaEntropy ?? 0} <= 0.05).`,
+                        detail: {
+                            symbol: fnSymbol,
+                            scaleVariable: loop.scaleVariable,
+                            deltaEntropy: loop.deltaEntropy ?? 0,
+                        },
+                        suggestion: SUGGESTION_TAUTOLOGICAL_LOOP,
+                    }),
+                );
             }
         }
         return tautologyIssues;

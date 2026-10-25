@@ -16,16 +16,16 @@
  *   opt-out via HygieneOptions (`!== false`) with minCloneLines defaulting to 6. Raw-content
  *   scanning keeps the analyzer language-agnostic and avoids AST cost for text-level signals.
  */
-import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { HygieneMessages } from '../core/messages';
 import { isVocabularyEnumeration } from '../core/governance/markerScope';
 import { CONSTRUCTION_JARGON_RE } from '../core/governance/terminology-engine';
 import { auditVacuousWrappers } from '../core/rules/evolution/wrapperRule';
 import { auditRegexSafety, isRegexSafe } from '../utils/safe-regex';
-import { nativeCore } from '../core/native';
 import { auditPythonHygiene } from './hygiene-python-helper';
-import { fnv1a32Signed } from '../core/algorithms/hash';
+import { auditFileBasics, auditFileNaming } from './hygiene-file-helper';
+import { auditCloneBlocks, DEFAULT_MIN_CLONE_LINES } from './hygiene-clone-helper';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 
 interface HygieneOptions {
     checkDeadCode?: boolean;
@@ -46,8 +46,6 @@ interface HygieneOptions {
 const SEVERITY_ERROR = 'error' as const;
 const SEVERITY_WARNING: Severity = 'warning';
 const SEVERITY_INFO = 'info' as const;
-const EOL_CRLF = 'CRLF';
-const EOL_LF = 'LF';
 const SHA1_HEX_LENGTH = 40;
 const CONTINUATION_DOT = '.';
 const CONTINUATION_RBRACE = '}';
@@ -65,41 +63,12 @@ const STUB_WORD_TOKENS = Buffer.from(ENCODED_STUB_TOKEN_LIST, ENCODING_BASE64)
 const UNRESOLVED_MARKER_PATTERN = new RegExp(`\\b(?:${STUB_WORD_TOKENS.join('|')})\\b`, 'i');
 const TERMINAL_STMT_RE = /^\s*(?:return\b|throw\s+|break;|continue;|raise\s+|exit\b)/;
 
-const ROOT_SCRIPT_EXTENSIONS: ReadonlySet<string> = new Set([
-    '.js',
-    '.ts',
-    '.mjs',
-    '.cjs',
-    '.py',
-    '.sh',
-    '.ps1',
-    '.bat',
-    '.cmd',
-]);
-
-const EXEMPT_ROOT_BASENAMES: ReadonlySet<string> = new Set([
-    'index.ts',
-    'index.js',
-    'main.ts',
-    'main.js',
-    'app.ts',
-    'app.js',
-    'cli.ts',
-    'cli.js',
-    'api.ts',
-    'api.js',
-    'mod.ts',
-    'mod.js',
-]);
-
 const SUPPRESSION_DIRECTIVE_RE =
     /^\s*(?:\/\/|\/\*|#|\*)\s*(?:@ts-(?:ignore|expect-error|nocheck)|eslint-disable|biome-ignore|#\s*noqa)\b/i;
 const VAGUE_THROW_RE =
     /^\s*(?:throw\s+new\s+[A-Za-z0-9_$]*(?:Error|Exception)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err|invalid|unknown|bad|bug|oops|exception)['"]\s*)?\)|throw\s+['"][a-zA-Z0-9_\-\s]{0,8}['"]\s*;?|raise\s+[A-Za-z0-9_$]*(?:Exception|Error)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err)['"]\s*)?\))/i;
 const FLOATING_PROMISE_RE =
     /^\s*(?:Promise\.(?:all|allSettled|race|resolve|reject)|new\s+Promise)\s*\(/;
-/** Default number of consecutive meaningful lines that counts as a duplicate block. */
-const DEFAULT_MIN_CLONE_LINES = 6;
 /** Character code of '\r' (carriage return), stripped from CRLF line endings. */
 const CHAR_CODE_CR = 13;
 /** Character code of the space character, counted as leading indentation. */
@@ -108,8 +77,6 @@ const CHAR_CODE_SPACE = 32;
 const CHAR_CODE_TAB = 9;
 /** Maximum snippet length in characters attached to an unreachable-code finding. */
 const UNREACHABLE_SNIPPET_MAX_CHARS = 40;
-/** Multiplier applied per meaningful line by the rolling clone-block hash. */
-const CLONE_ROLLING_HASH_MULTIPLIER = 31;
 
 /**
  * Build the transient-jargon matcher for one file scan.
@@ -148,78 +115,6 @@ function buildJargonRe(patterns?: string[]): RegExp {
     }
 }
 
-const EXEMPT_FILE_NAMES = new Set(['README', 'CHANGELOG', 'LICENSE']);
-
-function isExemptFileName(name: string): boolean {
-    return name.startsWith('.') || EXEMPT_FILE_NAMES.has(name);
-}
-
-function checkJsTsNaming(
-    baseName: string,
-    nameWithoutExt: string,
-): ReturnType<typeof HygieneMessages.FILE_NAMING_KEBAB> | null {
-    if (/[A-Z]/.test(nameWithoutExt) && nameWithoutExt.includes('_')) {
-        return HygieneMessages.FILE_NAMING_KEBAB(baseName);
-    }
-    return null;
-}
-
-function checkSnakeNaming(
-    baseName: string,
-    nameWithoutExt: string,
-): ReturnType<typeof HygieneMessages.FILE_NAMING_SNAKE> | null {
-    if (/[A-Z]/.test(nameWithoutExt) || nameWithoutExt.includes('-')) {
-        return HygieneMessages.FILE_NAMING_SNAKE(baseName);
-    }
-    return null;
-}
-
-/**
- * Module: Static Analysis — Hygiene Duplicate Block Detection Fallback
- * File Path: src/analyzers/hygiene.ts
- * Architecture Role: Defensive pure fallback utility computing 32-bit FNV-1a hashes
- *   of meaningful source lines when native clone detection is unavailable or fails.
- * Dependencies & Triggers: Triggered only inside the catch block
- *   of HygieneAnalyzer.auditCloneBlocks.
- * Responsibilities:
- *   1. Extract individual lines from raw file content.
- *   2. Filter out blank lines, comments (// and #), and solitary braces ({ and }).
- *   3. Hash each meaningful line using 32-bit FNV-1a and record line indices.
- * Exit Semantics & Design Rationale: Pure deterministic helper returning parallel arrays
- *   of 32-bit hashes and line numbers without persistent state.
- *
- * @param content - Source file raw text.
- * @returns Object with lineHashes array and meaningfulLineIndices array.
- */
-function computeLineHashesFallback(content: string): {
-    lineHashes: number[];
-    meaningfulLineIndices: number[];
-} {
-    const lineHashes: number[] = [];
-    const meaningfulLineIndices: number[] = [];
-    const lines = content.split('\n');
-
-    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-        let rawLine = lines[lineIdx];
-        if (rawLine.endsWith('\r')) {
-            rawLine = rawLine.slice(0, -1);
-        }
-        const trimmed = rawLine.trim();
-        if (
-            trimmed &&
-            !trimmed.startsWith('//') &&
-            !trimmed.startsWith('#') &&
-            trimmed !== '{' &&
-            trimmed !== '}'
-        ) {
-            lineHashes.push(fnv1a32Signed(trimmed));
-            meaningfulLineIndices.push(lineIdx);
-        }
-    }
-
-    return { lineHashes, meaningfulLineIndices };
-}
-
 /**
  * Context parameters required to construct a canonical hygiene Issue record.
  */
@@ -234,18 +129,6 @@ export interface HygieneIssueContext {
 }
 
 /**
- * Context object carrying source text and diagnostic state for fundamental
- * file hygiene verification.
- */
-export interface FileBasicsContext {
-    readonly content: string;
-    readonly file: string;
-    readonly ctx: AnalyzerContext;
-    readonly issues: Issue[];
-    readonly makeIssue: (options: HygieneIssueContext) => Issue;
-}
-
-/**
  * Context parameters required to audit temporary stubs and transient jargon.
  */
 export interface StubsAuditContext {
@@ -254,233 +137,6 @@ export interface StubsAuditContext {
     readonly jargonRe: RegExp;
     readonly ctx: AnalyzerContext;
     readonly issues: Issue[];
-}
-
-function reportEolMismatch(
-    context: FileBasicsContext,
-    expectedEol: string,
-    actualEol: string,
-): void {
-    const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(context.file, expectedEol, actualEol);
-    context.issues.push(
-        context.makeIssue({
-            ctx: context.ctx,
-            lineIdx: 0,
-            rule: 'HYG-EOL-001',
-            message: desc.message,
-            severity: SEVERITY_ERROR,
-            detail: { file: context.file, expected: expectedEol, actual: actualEol },
-            suggestion: desc.suggestion,
-        }),
-    );
-}
-
-function auditFileBom(context: FileBasicsContext): void {
-    if (context.content.charCodeAt(0) === 0xfeff) {
-        const desc = HygieneMessages.UTF8_BOM_DETECTED(context.file);
-        context.issues.push(
-            context.makeIssue({
-                ctx: context.ctx,
-                lineIdx: 0,
-                rule: 'HYG-BOM-001',
-                message: desc.message,
-                severity: SEVERITY_ERROR,
-                detail: { file: context.file, hasBom: true },
-                suggestion: desc.suggestion,
-            }),
-        );
-    }
-}
-
-function auditTrailingNewline(context: FileBasicsContext): void {
-    const content = context.content;
-    const len = content.length;
-    if (len === 0) return;
-
-    if (!content.endsWith('\n')) {
-        const desc = HygieneMessages.TRAILING_NEWLINE_VIOLATION(
-            context.file,
-            'Missing final EOF newline character',
-        );
-        context.issues.push(
-            context.makeIssue({
-                ctx: context.ctx,
-                lineIdx: 0,
-                rule: 'HYG-TRL-001',
-                message: desc.message,
-                severity: SEVERITY_WARNING,
-                detail: { file: context.file, missingEof: true },
-                suggestion: desc.suggestion,
-            }),
-        );
-        return;
-    }
-
-    if (content.endsWith('\r\n\r\n') || (!content.includes('\r\n') && content.endsWith('\n\n'))) {
-        const desc = HygieneMessages.TRAILING_NEWLINE_VIOLATION(
-            context.file,
-            'Excess trailing blank lines at end of file',
-        );
-        context.issues.push(
-            context.makeIssue({
-                ctx: context.ctx,
-                lineIdx: 0,
-                rule: 'HYG-TRL-001',
-                message: desc.message,
-                severity: SEVERITY_WARNING,
-                detail: { file: context.file, excessTrailingBlanks: true },
-                suggestion: desc.suggestion,
-            }),
-        );
-    }
-}
-
-const RE_HOLLOW_SKIP_EXT = /\.(?:md|json|ya?ml)$/i;
-const RE_DOCSTRING_START = /^(?:"""|''')/;
-
-/** Terminator token that closes the currently open comment block; '' means no block is open. */
-type HollowBlockTerminator = '' | '*/' | '"""' | "'''";
-
-/**
- * Classifies one trimmed source line for hollow-file detection while tracking the open block.
- *
- * Each block kind is closed only by its own terminator token: C blocks by the star-slash pair,
- * Python docstrings by the exact triple quote that opened them. A shared boolean state would let
- * a triple-quoted docstring swallow the rest of a Python file (no C terminator ever arrives) and
- * misreport every docstring-led module as comment-only.
- */
-function checkHollowCommentLine(
-    line: string,
-    openTerminator: HollowBlockTerminator,
-): { isComment: boolean; nextTerminator: HollowBlockTerminator } {
-    if (openTerminator) {
-        return {
-            isComment: true,
-            nextTerminator: line.includes(openTerminator) ? '' : openTerminator,
-        };
-    }
-    if (line.startsWith('/*')) {
-        return { isComment: true, nextTerminator: line.includes('*/') ? '' : '*/' };
-    }
-    if (line.startsWith('//') || line.startsWith('#')) {
-        return { isComment: true, nextTerminator: '' };
-    }
-    if (RE_DOCSTRING_START.test(line)) {
-        const quote = line.slice(0, 3) as HollowBlockTerminator;
-        return { isComment: true, nextTerminator: line.slice(3).includes(quote) ? '' : quote };
-    }
-    return { isComment: false, nextTerminator: '' };
-}
-
-function isHollowCommentOnlyFile(content: string, filePath: string): boolean {
-    if (filePath.endsWith('.d.ts') || RE_HOLLOW_SKIP_EXT.test(filePath)) {
-        return false;
-    }
-    const lines = content.split('\n');
-    let openTerminator: HollowBlockTerminator = '';
-
-    for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (line.length === 0) continue;
-
-        const check = checkHollowCommentLine(line, openTerminator);
-        openTerminator = check.nextTerminator;
-        if (!check.isComment) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-function auditCommentOnlyShell(context: FileBasicsContext): boolean {
-    if (isHollowCommentOnlyFile(context.content, context.file)) {
-        const desc = HygieneMessages.COMMENT_HOLLOW_FILE(context.file);
-        context.issues.push(
-            context.makeIssue({
-                ctx: context.ctx,
-                lineIdx: 0,
-                rule: 'HYG-EMP-002',
-                message: desc.message,
-                severity: SEVERITY_ERROR,
-                detail: { file: context.file, hollow: true },
-                suggestion: desc.suggestion,
-            }),
-        );
-        return true;
-    }
-    return false;
-}
-
-function auditClutterFile(context: FileBasicsContext): boolean {
-    const baseName = path.basename(context.file);
-    const lowerBase = baseName.toLowerCase();
-    const isClutter =
-        lowerBase.endsWith('.log') ||
-        lowerBase.endsWith('.tmp') ||
-        lowerBase.endsWith('.bak') ||
-        lowerBase.endsWith('.actual.json') ||
-        lowerBase === 'thumbs.db' ||
-        lowerBase === '.ds_store' ||
-        lowerBase === 'desktop.ini';
-
-    if (isClutter) {
-        const desc = HygieneMessages.UNCONTROLLED_CLUTTER(context.file);
-        context.issues.push(
-            context.makeIssue({
-                ctx: context.ctx,
-                lineIdx: 0,
-                rule: 'HYG-CLT-001',
-                message: desc.message,
-                severity: SEVERITY_ERROR,
-                detail: { file: context.file, baseName },
-                suggestion: desc.suggestion,
-            }),
-        );
-        return true;
-    }
-    return false;
-}
-
-function auditFileBasics(context: FileBasicsContext): boolean {
-    if (auditClutterFile(context)) {
-        return true;
-    }
-
-    const len = context.content.length;
-    const trimmed = context.content.trim();
-    if (len === 0 || trimmed.length === 0) {
-        context.issues.push(
-            context.makeIssue({
-                ctx: context.ctx,
-                lineIdx: 0,
-                rule: 'HYG-EMP-001',
-                message: `Source file '${context.file}' is empty (0 bytes or whitespace only) and contains no valid executable code.`,
-                severity: SEVERITY_ERROR,
-                detail: { file: context.file, length: len },
-            }),
-        );
-        return true;
-    }
-
-    auditFileBom(context);
-    auditTrailingNewline(context);
-
-    if (auditCommentOnlyShell(context)) {
-        return true;
-    }
-
-    if (context.file.endsWith('.ps1')) {
-        if (!context.content.includes('\r\n') && context.content.includes('\n')) {
-            reportEolMismatch(context, EOL_CRLF, EOL_LF);
-        }
-    } else if (/\.(?:ts|js|json|md|sh|rs|py|gd)$/.test(context.file)) {
-        if (context.content.includes('\r\n')) {
-            reportEolMismatch(context, EOL_LF, EOL_CRLF);
-        }
-    }
-
-    return false;
 }
 
 /**
@@ -496,20 +152,12 @@ export class HygieneAnalyzer implements Analyzer {
         const content = ctx.content || '';
         const file = ctx.filePath.replace(/\\/g, '/');
 
-        if (
-            auditFileBasics({
-                content,
-                file,
-                ctx,
-                issues,
-                makeIssue: this.makeHygieneIssue.bind(this),
-            })
-        ) {
+        if (auditFileBasics(content, file, ctx, issues)) {
             return issues;
         }
 
         if (opts.checkNaming !== false) {
-            this.auditFileNaming(file, ctx, issues);
+            auditFileNaming(file, ctx, issues);
             if (file.endsWith('.py')) this.auditPythonNaming(content, file, ctx, issues);
         }
 
@@ -524,12 +172,7 @@ export class HygieneAnalyzer implements Analyzer {
         });
 
         if (opts.checkDuplicateBlocks !== false) {
-            this.auditCloneBlocks(
-                content,
-                opts.minCloneLines ?? DEFAULT_MIN_CLONE_LINES,
-                ctx,
-                issues,
-            );
+            auditCloneBlocks(content, opts.minCloneLines ?? DEFAULT_MIN_CLONE_LINES, ctx, issues);
         }
 
         if (opts.checkWrappers !== false) {
@@ -566,82 +209,6 @@ export class HygieneAnalyzer implements Analyzer {
             mkIssue: (params) => this.makeHygieneIssue(params),
             issues,
         });
-    }
-
-    private auditFileNaming(file: string, ctx: AnalyzerContext, issues: Issue[]): void {
-        const baseName = path.basename(file);
-        const ext = path.extname(baseName);
-        const nameWithoutExt = baseName.slice(0, baseName.length - ext.length);
-
-        this.auditDirectoryConventions(file, baseName, ext, ctx, issues);
-
-        if (isExemptFileName(nameWithoutExt)) {
-            return;
-        }
-
-        const isJsTs = ext === '.ts' || ext === '.js';
-        const isSnakeLang = ext === '.gd' || ext === '.py' || ext === '.rs';
-        if (!isJsTs && !isSnakeLang) return;
-
-        const desc = isJsTs
-            ? checkJsTsNaming(baseName, nameWithoutExt)
-            : checkSnakeNaming(baseName, nameWithoutExt);
-        if (desc) {
-            issues.push(
-                this.makeHygieneIssue({
-                    ctx,
-                    lineIdx: 0,
-                    rule: 'HYG-NAM-001',
-                    message: desc.message,
-                    severity: isJsTs ? SEVERITY_INFO : SEVERITY_WARNING,
-                    detail: { file, baseName },
-                    suggestion: desc.suggestion,
-                }),
-            );
-        }
-    }
-
-    private auditDirectoryConventions(
-        file: string,
-        baseName: string,
-        ext: string,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        const normalized = file.replace(/^\.\//, '');
-        if (normalized.includes('/')) {
-            return;
-        }
-
-        const lowerExt = ext.toLowerCase();
-        if (!ROOT_SCRIPT_EXTENSIONS.has(lowerExt)) {
-            return;
-        }
-
-        const lowerBase = baseName.toLowerCase();
-        if (this.isExemptRootScript(baseName, lowerBase)) {
-            return;
-        }
-
-        const desc = HygieneMessages.ROOT_SCRIPT_POLLUTION(file);
-        issues.push(
-            this.makeHygieneIssue({
-                ctx,
-                lineIdx: 0,
-                rule: 'EXT-DIR-001',
-                message: desc.message,
-                severity: SEVERITY_ERROR,
-                detail: { file, baseName, rootScript: true },
-                suggestion: desc.suggestion,
-            }),
-        );
-    }
-
-    private isExemptRootScript(baseName: string, lowerBase: string): boolean {
-        if (baseName.startsWith('.')) return true;
-        if (lowerBase.includes('config') || lowerBase.includes('.conf.')) return true;
-        if (lowerBase.endsWith('.d.ts')) return true;
-        return EXEMPT_ROOT_BASENAMES.has(lowerBase);
     }
 
     private auditLineHygiene(params: {
@@ -958,109 +525,18 @@ export class HygieneAnalyzer implements Analyzer {
         checkRule(FLOATING_PROMISE_RE, 'ERR-FLT-001', HygieneMessages.FLOATING_PROMISE);
     }
 
-    private auditCloneBlocks(
-        content: string,
-        minCloneLines: number,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        try {
-            const clones = nativeCore.detectCloneBlocks(content, minCloneLines);
-            if (clones.length > 0) {
-                const clone = clones[0];
-                const desc = HygieneMessages.DUPLICATE_CODE_CLONE(
-                    clone.lineSpan,
-                    clone.originalLine,
-                );
-                issues.push(
-                    this.makeHygieneIssue({
-                        ctx,
-                        lineIdx: clone.startLine - 1,
-                        rule: 'HYG-CLN-001',
-                        message: desc.message,
-                        severity: SEVERITY_WARNING,
-                        detail: {
-                            startLine: clone.startLine,
-                            originalLine: clone.originalLine,
-                            lineSpan: clone.lineSpan,
-                        },
-                        suggestion: desc.suggestion,
-                    }),
-                );
-            }
-            return;
-        } catch (_err) {
-            void _err;
-        }
-
-        this.detectClonesPureJs(content, minCloneLines, ctx, issues);
-    }
-
-    private detectClonesPureJs(
-        content: string,
-        minCloneLines: number,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        const { lineHashes, meaningfulLineIndices } = computeLineHashesFallback(content);
-        if (lineHashes.length < minCloneLines * 2) {
-            return;
-        }
-
-        const blockMap = new Map<number, number>();
-        const total = lineHashes.length;
-
-        for (let i = 0; i <= total - minCloneLines; i++) {
-            let hashValue = 0;
-            for (let k = 0; k < minCloneLines; k++) {
-                hashValue =
-                    (Math.imul(hashValue, CLONE_ROLLING_HASH_MULTIPLIER) + lineHashes[i + k]) | 0;
-            }
-
-            const prevLine = blockMap.get(hashValue);
-            if (prevLine !== undefined && i >= prevLine + minCloneLines) {
-                const actualStartLine = meaningfulLineIndices[i] + 1;
-                const originalLine = meaningfulLineIndices[prevLine] + 1;
-                const desc = HygieneMessages.DUPLICATE_CODE_CLONE(minCloneLines, originalLine);
-                issues.push(
-                    this.makeHygieneIssue({
-                        ctx,
-                        lineIdx: meaningfulLineIndices[i],
-                        rule: 'HYG-CLN-001',
-                        message: desc.message,
-                        severity: SEVERITY_WARNING,
-                        detail: {
-                            startLine: actualStartLine,
-                            originalLine,
-                            lineSpan: minCloneLines,
-                        },
-                        suggestion: desc.suggestion,
-                    }),
-                );
-                break;
-            }
-            if (prevLine === undefined) {
-                blockMap.set(hashValue, i);
-            }
-        }
-    }
-
     finalize(ctx: AnalyzerContext): Issue[] {
         return this.analyze(undefined, ctx);
     }
 
     private makeHygieneIssue(params: HygieneIssueContext): Issue {
-        const line = params.lineIdx + 1;
-        const file = params.ctx.filePath.replace(/\\/g, '/');
-        return {
-            id: `${this.name}:${params.rule}:${file}:${line}`,
-            analyzer: this.name,
+        return createLineIssue(this.name, params.ctx.filePath, {
+            lineIdx: params.lineIdx,
             rule: params.rule,
             severity: params.severity,
             message: params.message,
-            location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
             detail: params.detail,
             suggestion: params.suggestion,
-        };
+        });
     }
 }

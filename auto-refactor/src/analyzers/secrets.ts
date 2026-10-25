@@ -43,6 +43,8 @@ import {
     safeRegexExecLoop,
     safeRegexTest,
 } from '../utils/safe-regex';
+import { scanSecrets } from '../core/native/native-bridge';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 
 /** Named regex source pair used by the built-in and caller-supplied pattern tables. */
 interface PatternDef {
@@ -295,6 +297,12 @@ export class SecretsAnalyzer implements Analyzer {
         const len = content.length;
         const issues: Issue[] = [];
 
+        if (!opts.patterns && !opts.extraPatterns) {
+            const issues = this.scanNative(ctx, content, entropy, cap);
+            this.attachActionableMetadata(issues);
+            return issues;
+        }
+
         let lineStart = 0;
         let line = 1;
 
@@ -312,6 +320,49 @@ export class SecretsAnalyzer implements Analyzer {
             lineStart = nextStart;
         }
 
+        this.attachActionableMetadata(issues);
+        return issues;
+    }
+
+    private scanNative(
+        ctx: AnalyzerContext,
+        content: string,
+        entropy: { enabled: boolean; minLength: number; threshold: number; severity: Severity },
+        cap: number,
+    ): Issue[] {
+        const issues: Issue[] = [];
+        const nativeFindings = scanSecrets(content, {
+            scanEntropy: entropy.enabled,
+            minEntropyLen: entropy.minLength,
+            entropyThreshold: entropy.threshold,
+            maxFindings: cap,
+        });
+        for (let i = 0; i < nativeFindings.length; i++) {
+            const f = nativeFindings[i];
+            const suggestion =
+                f.rule === RULE_HIGH_ENTROPY_TOKEN
+                    ? SecretMessages.HIGH_ENTROPY_TOKEN(f.entropy, f.preview.length).suggestion
+                    : SecretMessages.HARDCODED_SECRET('secret', f.preview).suggestion;
+            issues.push(
+                this.makeSecretIssue({
+                    ctx,
+                    line: f.line,
+                    rule: f.rule,
+                    message: f.message,
+                    detail:
+                        f.entropy > 0
+                            ? { entropy: f.entropy }
+                            : { kind: f.kind, pattern: f.preview },
+                    severity:
+                        f.rule === RULE_HIGH_ENTROPY_TOKEN ? entropy.severity : SEVERITY_ERROR,
+                    suggestion,
+                }),
+            );
+        }
+        return issues;
+    }
+
+    private attachActionableMetadata(issues: Issue[]): void {
         for (const issueItem of issues) {
             if (!issueItem.actionable && SECRETS_ACTIONABLE_MAP[issueItem.rule]) {
                 const mapped = SECRETS_ACTIONABLE_MAP[issueItem.rule];
@@ -323,8 +374,6 @@ export class SecretsAnalyzer implements Analyzer {
                 };
             }
         }
-
-        return issues;
     }
 
     private extractNextLine(
@@ -434,32 +483,20 @@ export class SecretsAnalyzer implements Analyzer {
      * @returns A fully populated `Issue` with 1-based columns and a stable id.
      */
     private makeSecretIssue(params: SecretIssueContext): Issue {
-        const file = params.ctx.filePath.replace(/\\/g, '/');
-        const mapped = SECRETS_ACTIONABLE_MAP[params.rule];
-        const actionable = mapped
-            ? {
-                  action: mapped.action,
-                  code: mapped.code,
-                  safeToAutomate: mapped.safeToAutomate,
-                  templateSnippet: mapped.templateSnippet,
-              }
-            : undefined;
-        return {
-            id: `${this.name}:${params.rule}:${file}:${params.line}`,
-            analyzer: this.name,
-            rule: params.rule,
-            severity: params.severity,
-            message: params.message,
-            location: {
-                file,
-                start: { line: params.line, column: 1 },
-                end: { line: params.line, column: 1 },
+        return createLineIssue(
+            this.name,
+            params.ctx.filePath,
+            {
+                lineIdx: Math.max(0, params.line - 1),
+                rule: params.rule,
+                severity: params.severity,
+                message: params.message,
+                detail: params.detail,
+                suggestion:
+                    params.suggestion ||
+                    'Extract credentials from source code; inject via environment variables or secret managers',
             },
-            detail: params.detail,
-            suggestion:
-                params.suggestion ||
-                'Extract credentials from source code; inject via environment variables or secret managers',
-            actionable,
-        };
+            SECRETS_ACTIONABLE_MAP,
+        );
     }
 }

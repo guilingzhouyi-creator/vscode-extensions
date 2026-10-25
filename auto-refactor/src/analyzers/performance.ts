@@ -34,6 +34,7 @@ import {
     updateBraceLoops,
     extractLinearLookupMethod,
 } from './performance-helpers';
+import { attachActionableMetadata, createLineIssue } from '../core/rules/diagnostic-catalog';
 
 const NAME_FS_READ = 'fs.readFileSync';
 const NAME_FS_WRITE = 'fs.writeFileSync';
@@ -211,17 +212,7 @@ export class PerformanceAnalyzer implements Analyzer {
             issues.push(...detectUnboundedGrowth(ctx.filePath, content));
         }
 
-        for (const iss of issues) {
-            if (!iss.actionable && PRF_ACTIONABLE_MAP[iss.rule]) {
-                const mapped = PRF_ACTIONABLE_MAP[iss.rule];
-                iss.actionable = {
-                    action: mapped.action,
-                    code: mapped.code,
-                    safeToAutomate: mapped.safeToAutomate,
-                    templateSnippet: mapped.templateSnippet,
-                };
-            }
-        }
+        attachActionableMetadata(issues, PRF_ACTIONABLE_MAP);
 
         return issues;
     }
@@ -426,28 +417,18 @@ export class PerformanceAnalyzer implements Analyzer {
      * @returns The issue ready to append to the analyzer result array.
      */
     private mkIssue(ctx: AnalyzerContext, lineIdx: number, finding: PerformanceFinding): Issue {
-        const { rule, message, severity, detail, suggestion } = finding;
-        const line = lineIdx + 1;
-        const file = ctx.filePath.replace(/\\/g, '/');
-        const mapped = PRF_ACTIONABLE_MAP[rule];
-        const actionable = mapped
-            ? {
-                  action: mapped.action,
-                  code: mapped.code,
-                  safeToAutomate: mapped.safeToAutomate,
-                  templateSnippet: mapped.templateSnippet,
-              }
-            : undefined;
-        return {
-            id: `${this.name}:${rule}:${file}:${line}`,
-            analyzer: this.name,
-            rule,
-            severity,
-            message,
-            location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-            detail,
-            suggestion,
-            actionable,
-        };
+        return createLineIssue(
+            this.name,
+            ctx.filePath,
+            {
+                lineIdx,
+                rule: finding.rule,
+                message: finding.message,
+                severity: finding.severity,
+                detail: finding.detail,
+                suggestion: finding.suggestion,
+            },
+            PRF_ACTIONABLE_MAP,
+        );
     }
 }

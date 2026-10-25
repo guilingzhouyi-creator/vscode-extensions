@@ -18,6 +18,7 @@
 import * as ts from 'typescript';
 import type { AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
+import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import type {
     NamingDecouplingAuditor,
     SymbolEntry,
@@ -59,20 +60,18 @@ function pushAstFinding(aCtx: AstNamingContext, finding: AstFindingInput): void 
     const col = finding.column ?? 1;
     const sev = finding.severity ?? SEVERITY_WARNING;
     const det = finding.detail ?? {};
-    aCtx.issues.push({
-        id: `naming:${finding.rule}:${aCtx.ctx.filePath}:${finding.line}`,
-        analyzer: ANALYZER_NAMING,
+    const line = Math.max(1, finding.line);
+    const issue = createLineIssue(ANALYZER_NAMING, aCtx.ctx.filePath, {
+        lineIdx: line - 1,
         rule: finding.rule,
         severity: sev,
         message: finding.message,
-        location: {
-            file: aCtx.ctx.filePath,
-            start: { line: Math.max(1, finding.line), column: Math.max(1, col) },
-            end: { line: Math.max(1, finding.line), column: Math.max(1, col) },
-        },
         detail: det,
         suggestion: finding.suggestion,
     });
+    issue.location.start.column = Math.max(1, col);
+    issue.location.end.column = Math.max(1, col);
+    aCtx.issues.push(issue);
 }
 
 const DEFAULT_VAGUE_WORDS =
