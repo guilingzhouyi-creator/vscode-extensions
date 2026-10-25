@@ -10,11 +10,14 @@ use std::fs;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use fg_core::models::{current_unix_seconds, AuthoritySecret};
+use fg_storage::commit_materializer::write_commit_objects_with_parents;
 use fractal_git::{
-    ActorIdentity, AgentPushContext, BlockProvenanceEntry, BlockProvenanceParams,
-    BlockThreeWayMerge, CommitGovernanceHook, CommitMessageGuard, DiskBlackboardStore,
-    DiskProvenanceStore, FractalRef, HookContext, HookPipeline, HookTier, HygieneConflictHook, Oid,
-    PreReceiveGuard, TaxisPolicy, UacPromotionGateHook,
+    materialize_commit, ActorIdentity, AgentPushContext, BlockProvenanceEntry,
+    BlockProvenanceParams, BlockThreeWayMerge, CommitGovernanceHook, CommitMaterializationRequest,
+    CommitMessageGuard, DiskBlackboardStore, DiskProvenanceStore, DiskRefStore, FractalRef,
+    GitSignature, HookContext, HookPipeline, HookTier, HygieneConflictHook, LooseOdb, Oid,
+    PreReceiveGuard, RefStore, TaxisPolicy, UacPromotionGateHook,
 };
 
 #[test]
@@ -210,8 +213,17 @@ fn test_fractal_hook_pipeline() {
     pipeline.register(Arc::new(CommitGovernanceHook));
     pipeline.register(Arc::new(UacPromotionGateHook));
 
-    let actor = ActorIdentity::human("Guiling", "guiling@example.com", "token-secret");
-    let policy = TaxisPolicy::workspace_strict();
+    let secret = match AuthoritySecret::from_bytes(&[7u8; 32]) {
+        Ok(secret) => secret,
+        Err(secret_err) => panic!("fixture authority secret: {secret_err}"),
+    };
+    let token = match secret.issue("Guiling", 3600, current_unix_seconds()) {
+        Ok(token) => token,
+        Err(issue_err) => panic!("fixture authority token: {issue_err}"),
+    };
+    let actor = ActorIdentity::human("Guiling", "guiling@example.com", token);
+    let mut policy = TaxisPolicy::workspace_strict();
+    policy.authority_secret = Some(secret);
     let staged_clean = vec!["crates/fg-gate/src/hook.rs".to_string()];
 
     let valid_msg = r#"feat(core): add clean hook pipeline
@@ -357,4 +369,278 @@ fn test_mechanical_provenance_store() {
     assert_eq!(latest.agent_uid, "agent-infra");
 
     let _ = fs::remove_dir_all(&temp_dir);
+}
+
+/// Monotonic counter keeping merge scratch directories unique within one process.
+static MERGE_SCRATCH_COUNTER: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+#[test]
+fn test_merge_commit_records_two_ordered_parents() {
+    let count = MERGE_SCRATCH_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let root = std::env::temp_dir().join(format!(
+        "taxis_merge_parents_{}_{}",
+        std::process::id(),
+        count
+    ));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).expect("create scratch root");
+    let git_dir = root.join("repo.git");
+    let work_root = root.join("work");
+    fs::create_dir_all(&work_root).expect("create work root");
+    fs::write(work_root.join("base.txt"), "base\n").expect("write base file");
+
+    let odb = LooseOdb::new(&git_dir);
+    let ref_store = DiskRefStore::new(&git_dir);
+    let author = GitSignature::new("Merge Tester", "merge@example.com", 1_700_000_000);
+
+    let base = materialize_commit(
+        &odb,
+        &ref_store,
+        &CommitMaterializationRequest {
+            files: vec!["base.txt".to_string()],
+            work_root: work_root.clone(),
+            message: "feat: base".to_string(),
+            author: author.clone(),
+            target_ref: "refs/heads/main".to_string(),
+        },
+    )
+    .expect("base commit");
+
+    fs::write(work_root.join("ours.txt"), "ours\n").expect("write ours file");
+    let ours = materialize_commit(
+        &odb,
+        &ref_store,
+        &CommitMaterializationRequest {
+            files: vec!["base.txt".to_string(), "ours.txt".to_string()],
+            work_root: work_root.clone(),
+            message: "feat: ours".to_string(),
+            author: author.clone(),
+            target_ref: "refs/heads/main".to_string(),
+        },
+    )
+    .expect("ours commit");
+    assert_eq!(ours.parent_oid, Some(base.commit_oid));
+
+    fs::write(work_root.join("theirs.txt"), "theirs\n").expect("write theirs file");
+    let theirs = materialize_commit(
+        &odb,
+        &ref_store,
+        &CommitMaterializationRequest {
+            files: vec!["base.txt".to_string(), "theirs.txt".to_string()],
+            work_root: work_root.clone(),
+            message: "feat: theirs".to_string(),
+            author: author.clone(),
+            target_ref: "refs/heads/topic".to_string(),
+        },
+    )
+    .expect("theirs commit");
+    assert!(theirs.parent_oid.is_none());
+
+    let merge = write_commit_objects_with_parents(
+        &odb,
+        &ref_store,
+        &CommitMaterializationRequest {
+            files: vec![
+                "base.txt".to_string(),
+                "ours.txt".to_string(),
+                "theirs.txt".to_string(),
+            ],
+            work_root: work_root.clone(),
+            message: "merge: topic into main".to_string(),
+            author: author.clone(),
+            target_ref: "refs/heads/main".to_string(),
+        },
+        &[theirs.commit_oid],
+    )
+    .expect("merge commit objects");
+    ref_store
+        .update_ref("refs/heads/main", &merge.commit_oid, Some(&ours.commit_oid))
+        .expect("advance main to merge");
+
+    // System Git requires a HEAD file and repository config before it will read objects.
+    fs::create_dir_all(git_dir.join("refs/heads")).expect("create refs directory");
+    fs::write(git_dir.join("HEAD"), "ref: refs/heads/main\n").expect("write HEAD file");
+    fs::write(
+        git_dir.join("config"),
+        "[core]\n\trepositoryformatversion = 0\n\tbare = true\n",
+    )
+    .expect("write repository config");
+
+    // System Git is the independent oracle for parent ordering and ancestry.
+    let cat_file = std::process::Command::new("git")
+        .arg("--git-dir")
+        .arg(&git_dir)
+        .args(["cat-file", "-p", &merge.commit_oid.to_hex()])
+        .output()
+        .expect("run git cat-file");
+    assert!(
+        cat_file.status.success(),
+        "git cat-file failed: {}",
+        String::from_utf8_lossy(&cat_file.stderr)
+    );
+    let commit_text = String::from_utf8_lossy(&cat_file.stdout);
+    let parents: Vec<String> = commit_text
+        .lines()
+        .filter_map(|line| line.strip_prefix("parent "))
+        .map(str::to_string)
+        .collect();
+    let expected_parents = vec![ours.commit_oid.to_hex(), theirs.commit_oid.to_hex()];
+    assert_eq!(
+        parents, expected_parents,
+        "merge commit must declare [ours, theirs] in that order\n{commit_text}"
+    );
+
+    for ancestor in [&ours.commit_oid, &theirs.commit_oid] {
+        let status = std::process::Command::new("git")
+            .arg("--git-dir")
+            .arg(&git_dir)
+            .args([
+                "merge-base",
+                "--is-ancestor",
+                &ancestor.to_hex(),
+                &merge.commit_oid.to_hex(),
+            ])
+            .status()
+            .expect("run git merge-base");
+        assert!(
+            status.success(),
+            "{} must be an ancestor of the merge commit",
+            ancestor.to_hex()
+        );
+    }
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Runs one system Git command inside `repo` and returns trimmed stdout.
+fn run_git_oracle(repo: &std::path::Path, args: &[&str]) -> String {
+    let output = std::process::Command::new("git")
+        .current_dir(repo)
+        .args(args)
+        .output()
+        .expect("spawn git oracle");
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+#[test]
+fn test_merge_commit_matches_git_merge_oracle() {
+    let count = MERGE_SCRATCH_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let repo = std::env::temp_dir().join(format!(
+        "taxis_git_merge_oracle_{}_{}",
+        std::process::id(),
+        count
+    ));
+    let _ = fs::remove_dir_all(&repo);
+    fs::create_dir_all(&repo).expect("create oracle repo");
+    run_git_oracle(&repo, &["init", "-b", "main"]);
+    run_git_oracle(&repo, &["config", "user.name", "Oracle"]);
+    run_git_oracle(&repo, &["config", "user.email", "oracle@example.com"]);
+    run_git_oracle(&repo, &["config", "core.autocrlf", "false"]);
+    run_git_oracle(&repo, &["config", "core.filemode", "false"]);
+    run_git_oracle(&repo, &["config", "commit.gpgsign", "false"]);
+
+    fs::write(repo.join("base.txt"), "base\n").expect("write base file");
+    run_git_oracle(&repo, &["add", "base.txt"]);
+    run_git_oracle(&repo, &["commit", "-m", "feat: base"]);
+    let base_oid = run_git_oracle(&repo, &["rev-parse", "HEAD"]);
+
+    fs::write(repo.join("ours.txt"), "ours\n").expect("write ours file");
+    run_git_oracle(&repo, &["add", "ours.txt"]);
+    run_git_oracle(&repo, &["commit", "-m", "feat: ours"]);
+    let ours_oid = run_git_oracle(&repo, &["rev-parse", "HEAD"]);
+
+    run_git_oracle(&repo, &["checkout", "-b", "topic", base_oid.as_str()]);
+    fs::write(repo.join("theirs.txt"), "theirs\n").expect("write theirs file");
+    run_git_oracle(&repo, &["add", "theirs.txt"]);
+    run_git_oracle(&repo, &["commit", "-m", "feat: theirs"]);
+    let theirs_oid = run_git_oracle(&repo, &["rev-parse", "HEAD"]);
+
+    run_git_oracle(&repo, &["checkout", "main"]);
+    run_git_oracle(
+        &repo,
+        &[
+            "-c",
+            "user.name=Oracle",
+            "-c",
+            "user.email=oracle@example.com",
+            "merge",
+            "--no-ff",
+            "topic",
+            "-m",
+            "merge: topic into main",
+        ],
+    );
+    let real_merge_oid = run_git_oracle(&repo, &["rev-parse", "HEAD"]);
+    let real_first = run_git_oracle(&repo, &["rev-parse", "HEAD^1"]);
+    let real_second = run_git_oracle(&repo, &["rev-parse", "HEAD^2"]);
+    let real_tree = run_git_oracle(&repo, &["rev-parse", "HEAD^{tree}"]);
+    assert_eq!(real_first, ours_oid);
+    assert_eq!(real_second, theirs_oid);
+
+    // Rebuild the very same merge through Taxis plumbing, then compare it with the
+    // system Git commit produced by `git merge --no-ff` above.
+    let odb = LooseOdb::new(repo.join(".git"));
+    let ref_store = DiskRefStore::new(repo.join(".git"));
+    let ours = match Oid::from_hex(&ours_oid) {
+        Ok(oid) => oid,
+        Err(oid_err) => panic!("parse ours oid: {oid_err}"),
+    };
+    let theirs = match Oid::from_hex(&theirs_oid) {
+        Ok(oid) => oid,
+        Err(oid_err) => panic!("parse theirs oid: {oid_err}"),
+    };
+    ref_store
+        .update_ref("refs/heads/oracle-ours", &ours, None)
+        .expect("seed oracle-ours reference");
+    let author = GitSignature::new("Oracle", "oracle@example.com", 1_700_000_000);
+    let taxis_merge = write_commit_objects_with_parents(
+        &odb,
+        &ref_store,
+        &CommitMaterializationRequest {
+            files: vec![
+                "base.txt".to_string(),
+                "ours.txt".to_string(),
+                "theirs.txt".to_string(),
+            ],
+            work_root: repo.clone(),
+            message: "merge: topic into main".to_string(),
+            author,
+            target_ref: "refs/heads/oracle-ours".to_string(),
+        },
+        &[theirs],
+    )
+    .expect("taxis merge commit objects");
+    let taxis_commit_hex = taxis_merge.commit_oid.to_hex();
+    let taxis_commit_text = run_git_oracle(&repo, &["cat-file", "-p", taxis_commit_hex.as_str()]);
+    let taxis_parents: Vec<String> = taxis_commit_text
+        .lines()
+        .filter_map(|line| line.strip_prefix("parent "))
+        .map(str::to_string)
+        .collect();
+    assert_eq!(taxis_parents, vec![ours_oid.clone(), theirs_oid.clone()]);
+    let tree_expression = format!("{taxis_commit_hex}^{{tree}}");
+    let taxis_tree = run_git_oracle(&repo, &["rev-parse", tree_expression.as_str()]);
+    assert_eq!(
+        taxis_tree, real_tree,
+        "Taxis merge tree must equal git merge tree"
+    );
+    let taxis_tree_body = run_git_oracle(&repo, &["cat-file", "-p", taxis_tree.as_str()]);
+    let real_tree_body = run_git_oracle(&repo, &["cat-file", "-p", real_tree.as_str()]);
+    assert_eq!(
+        taxis_tree_body, real_tree_body,
+        "tree payloads must be byte identical to git merge"
+    );
+    let real_commit_text = run_git_oracle(&repo, &["cat-file", "-p", real_merge_oid.as_str()]);
+    assert!(
+        real_commit_text.contains(&format!("tree {real_tree}")),
+        "git merge commit must reference the synthesized tree\n{real_commit_text}"
+    );
+    let _ = fs::remove_dir_all(&repo);
 }

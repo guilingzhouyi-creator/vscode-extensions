@@ -1,267 +1,268 @@
-//! Module: taxis_cmd::config — Repository Configuration Subset
+//! Module: taxis_cmd::config — Repository Configuration CLI Dispatcher
 //! File Path: src/bin/taxis_cmd/config.rs
-//! Architecture Role: Supplies the handful of configuration values that change what `status` and
-//!   `diff` report, read from the repository's own `config` file.
-//! Dependencies & Triggers: Loaded by `RepoView::open`; read by the worktree comparison in `status`
-//!   and by the worktree mode probe in `diff`.
-//! Responsibilities: Parse `[section]` headers and `key = value` pairs, and expose `core.filemode`
-//!   and `core.autocrlf` with Git's own defaults.
+//! Architecture Role: CLI dispatcher for 'taxis config', wrapping the structured fg-index
+//!   configuration model (sections, subsections, quoting, atomic single-entry rewrites).
+//! Dependencies & Triggers: Dispatched by 'taxis config'.
+//! Responsibilities: Provide --list, --get, --get-all, --add, --unset and plain key/value
+//!   updates across any section, including dotted subsection specs such as submodule."q".url.
 //! Exit Semantics & Design Rationale:
-//!   - Only `core.filemode` and `core.autocrlf` are modelled. Neither is a stylistic choice: on a
-//!     platform that cannot represent an executable bit, `git init` writes `filemode = false`, and
-//!     with that set Git stops reporting an executable-bit change as a modification at all; and
-//!     `autocrlf` decides what an unmarked path's line endings mean, which is the difference between
-//!     hashing a file and hashing a normalised copy of it. A tool that ignored either would print
-//!     ` M` for files Git calls clean.
-//!   - The default is `true` for `filemode`, matching Git's compiled-in default. Deriving it from the
-//!     platform instead would silently diverge for a repository created elsewhere and copied in,
-//!     because the value Git honours is the one recorded in that repository, not the one this host
-//!     would write. `autocrlf` defaults to `false` for the same reason.
-//!   - An unreadable or malformed config is not an error. Git treats a missing `config` as "all
-//!     defaults", and a repository cloned without one still works; failing here would make `status`
-//!     refuse to describe a tree it can read perfectly well.
-//!   - `include.path` is deliberately not followed. The setting this module reads is written by
-//!     `git init` into the repository's own file, and following includes would mean resolving
-//!     absolute paths outside the repository for a value that cannot legitimately live there.
+//!   - A missing value exits 1 and garbage input exits 1, matching git config --get.
+//!   - An --unset that matched nothing exits 5, which is the status git config --unset uses
+//!     to mean "the key was not there", so wrappers can branch on it.
+//!   - A rejected conflict.mode value never reaches the file; validation happens before the
+//!     rewrite, and a failed rewrite reports [CONFIG_WRITE_INVALID] instead of leaving a
+//!     half-written config behind.
 
-use std::path::Path;
+use std::process::exit;
 
-use fg_index::AutoCrlf;
+use fg_core::models::ConflictPresentationMode;
+use fg_index::config::{
+    read_config, read_value, set_value, unset_value, ConfigError, ConfigKey, ConfigWriteMode,
+};
+pub use fg_index::config::{write_config_entry, RepoConfig};
+use fractal_git::constants::cli::CliTag;
 
-/// The configuration values that change what a comparison reports.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RepoConfig {
-    trust_executable_bit: bool,
-    auto_crlf: AutoCrlf,
+use super::common::{fail_io, fail_usage, print_json, reject, CliContext, EXIT_REJECTED};
+
+/// The operation a 'taxis config' invocation asks for.
+#[derive(Debug)]
+enum ConfigAction {
+    /// Print every entry in file order.
+    List,
+    /// Print the last value stored for one key.
+    Get(String),
+    /// Print every value stored for one key.
+    GetAll(String),
+    /// Write one value, replacing or appending, in the requested mode.
+    Set {
+        spec: String,
+        value: String,
+        mode: ConfigWriteMode,
+    },
+    /// Remove every entry matching the key, optionally restricted to one literal value.
+    Unset {
+        spec: String,
+        literal: Option<String>,
+    },
 }
 
-impl Default for RepoConfig {
-    fn default() -> Self {
-        Self {
-            trust_executable_bit: true,
-            auto_crlf: AutoCrlf::False,
+/// Git's status for --unset matching no entry.
+const EXIT_NO_MATCH: i32 = 5;
+
+/// Dispatches the 'taxis config' command.
+pub fn handle_config(ctx: &CliContext) {
+    let action = parse_action(&ctx.args);
+    let config_path = ctx.git_dir.join("config");
+    match action {
+        ConfigAction::List => run_list(ctx, &config_path),
+        ConfigAction::Get(spec) => run_get(&config_path, &spec),
+        ConfigAction::GetAll(spec) => run_get_all(&config_path, &spec),
+        ConfigAction::Set { spec, value, mode } => run_set(ctx, &config_path, &spec, &value, mode),
+        ConfigAction::Unset { spec, literal } => {
+            run_unset(ctx, &config_path, &spec, literal.as_deref())
         }
     }
 }
 
-impl RepoConfig {
-    /// Reads the repository's `config` file, falling back to the defaults when it is absent.
-    pub fn load(git_dir: &Path) -> Self {
-        let text = match std::fs::read_to_string(git_dir.join("config")) {
-            Ok(found) => found,
-            Err(_) => return Self::default(),
+/// Parses the argument vector into one [ConfigAction], refusing unknown flags.
+fn parse_action(args: &[String]) -> ConfigAction {
+    let mut list = false;
+    let mut wants_get = false;
+    let mut wants_get_all = false;
+    let mut wants_add = false;
+    let mut wants_unset = false;
+    let mut positional: Vec<&str> = Vec::new();
+    let mut index = 0;
+    while index < args.len() {
+        let arg = args[index].as_str();
+        match arg {
+            "--list" | "-l" => list = true,
+            "--get" => wants_get = true,
+            "--get-all" => wants_get_all = true,
+            "--add" => wants_add = true,
+            "--unset" => wants_unset = true,
+            "--replace-all" => {}
+            other if other.starts_with('-') => {
+                reject(CliTag::ERROR, format!("unknown config flag '{other}'"));
+            }
+            other => positional.push(other),
+        }
+        index += 1;
+    }
+
+    if list {
+        return ConfigAction::List;
+    }
+    if wants_get {
+        return match positional.first() {
+            Some(spec) => ConfigAction::Get((*spec).to_string()),
+            None => fail_usage("taxis config --get <key>"),
         };
-        Self::parse(&text)
     }
-
-    /// Parses config text, honouring only the keys this build models.
-    pub fn parse(text: &str) -> Self {
-        let mut config = Self::default();
-        let mut section = String::new();
-        for raw in text.lines() {
-            let line = strip_comment(raw).trim();
-            if line.is_empty() {
-                continue;
-            }
-            if let Some(name) = section_header(line) {
-                section = name;
-                continue;
-            }
-            if section != "core" {
-                continue;
-            }
-            let (key, value) = split_entry(line);
-            if key.eq_ignore_ascii_case("filemode") {
-                config.trust_executable_bit = parse_bool(value).unwrap_or(true);
-            }
-            if key.eq_ignore_ascii_case("autocrlf") {
-                config.auto_crlf = parse_autocrlf(value);
-            }
-        }
-        config
+    if wants_get_all {
+        return match positional.first() {
+            Some(spec) => ConfigAction::GetAll((*spec).to_string()),
+            None => fail_usage("taxis config --get-all <key>"),
+        };
     }
-
-    /// Reports whether an executable-bit difference between the index and the worktree is a change.
-    ///
-    /// When false, the worktree mode is taken from the index rather than the filesystem, which is
-    /// what Git's `ce_mode_from_stat` does with `trust_executable_bit` clear: it keeps the recorded
-    /// bits and only fills in the file type.
-    pub fn trust_executable_bit(&self) -> bool {
-        self.trust_executable_bit
+    if wants_unset {
+        return match positional.first() {
+            Some(spec) => ConfigAction::Unset {
+                spec: (*spec).to_string(),
+                literal: positional.get(1).map(|value| (*value).to_string()),
+            },
+            None => fail_usage("taxis config --unset <key> [<value>]"),
+        };
     }
-
-    /// Returns `core.autocrlf`, which decides what an unmarked path's line endings mean.
-    ///
-    /// The value is three-valued rather than a boolean because `input` and `true` differ on checkout
-    /// even though they agree on hashing; collapsing them would be a loss the moment this engine
-    /// learns to write a worktree.
-    pub fn auto_crlf(&self) -> AutoCrlf {
-        self.auto_crlf
+    if wants_add {
+        return match (positional.first(), positional.get(1)) {
+            (Some(spec), Some(value)) => ConfigAction::Set {
+                spec: (*spec).to_string(),
+                value: (*value).to_string(),
+                mode: ConfigWriteMode::Add,
+            },
+            _ => fail_usage("taxis config --add <key> <value>"),
+        };
+    }
+    match (positional.first(), positional.get(1)) {
+        (Some(spec), Some(value)) => ConfigAction::Set {
+            spec: (*spec).to_string(),
+            value: (*value).to_string(),
+            mode: ConfigWriteMode::Replace,
+        },
+        (Some(spec), None) => ConfigAction::Get((*spec).to_string()),
+        _ => fail_usage("taxis config [--list] [--get <key>] [--add] [--unset] [<key> [<value>]]"),
     }
 }
 
-/// Parses `core.autocrlf`, which accepts `input` alongside the boolean spellings.
-///
-/// An unrecognised value falls back to `false`, matching `read_convert_config`, which warns and keeps
-/// the previous setting. Guessing `true` would convert line endings the repository never asked for.
-fn parse_autocrlf(value: Option<&str>) -> AutoCrlf {
-    let text = match value {
-        Some(found) => found.trim_matches('"'),
-        None => return AutoCrlf::True,
+/// Parses a key specification or terminates with the same status git uses for a bad key.
+fn resolve_key(spec: &str) -> ConfigKey {
+    match ConfigKey::parse(spec) {
+        Ok(key) => key,
+        Err(error) => reject(CliTag::ERROR, format!("invalid config key: {error}")),
+    }
+}
+
+/// Refuses a conflict.mode value the presentation engine cannot honour.
+fn validate_conflict_mode(key: &ConfigKey, value: &str) {
+    let is_conflict_mode =
+        key.section() == "conflict" && key.subsection().is_none() && key.name() == "mode";
+    if is_conflict_mode && ConflictPresentationMode::parse_str(value).is_none() {
+        reject(
+            CliTag::ERROR,
+            format!(
+                "invalid conflict mode '{value}'; expected agent-algebraic, git-compat, or diff3"
+            ),
+        );
+    }
+}
+
+/// Prints every entry in file order, bare keys without a separator exactly like git --list.
+fn run_list(ctx: &CliContext, config_path: &std::path::Path) {
+    let entries = match read_config(config_path) {
+        Ok(entries) => entries,
+        Err(error) => report_config_error("read configuration", error),
     };
-    if text.eq_ignore_ascii_case("input") {
-        return AutoCrlf::Input;
+    if ctx.json_mode {
+        let rendered: Vec<serde_json::Value> = entries
+            .iter()
+            .map(|entry| {
+                serde_json::json!({
+                    "key": entry.dotted_key(),
+                    "value": entry.value(),
+                })
+            })
+            .collect();
+        print_json(&rendered);
+        return;
     }
-    match parse_bool(Some(text)) {
-        Some(true) => AutoCrlf::True,
-        _ => AutoCrlf::False,
-    }
-}
-
-/// Removes a trailing `#` or `;` comment that is not inside a quoted value.
-fn strip_comment(line: &str) -> &str {
-    let bytes = line.as_bytes();
-    let mut quoted = false;
-    for (index, byte) in bytes.iter().enumerate() {
-        match byte {
-            b'"' => quoted = !quoted,
-            b'\\' if quoted => {}
-            b'#' | b';' if !quoted => return &line[..index],
-            _ => {}
+    for entry in entries {
+        match entry.value() {
+            Some(value) => println!("{}={}", entry.dotted_key(), value),
+            None => println!("{}", entry.dotted_key()),
         }
     }
-    line
 }
 
-/// Returns the lowercased section name when `line` is a `[section]` or `[section "sub"]` header.
-///
-/// A subsection is folded into the name (`core "alias"` becomes `core.alias`) because that is how Git
-/// spells the resulting key. Keeping only `core` would let `[core "alias"] filemode = false` disable
-/// executable-bit tracking for the whole repository, which no Git does.
-fn section_header(line: &str) -> Option<String> {
-    let inner = line.strip_prefix('[')?.strip_suffix(']')?;
-    match inner.split_once(char::is_whitespace) {
-        Some((head, tail)) => {
-            let subsection = tail.trim().trim_matches('"');
-            Some(format!("{}.{subsection}", head.to_ascii_lowercase()))
-        }
-        None => Some(inner.to_ascii_lowercase()),
-    }
-}
-
-/// Splits `key = value` into its two halves, treating a bare key as an implicit `true`.
-fn split_entry(line: &str) -> (&str, Option<&str>) {
-    match line.split_once('=') {
-        Some((key, value)) => (key.trim(), Some(value.trim())),
-        None => (line.trim(), None),
-    }
-}
-
-/// Parses Git's boolean spellings.
-///
-/// A bare key means true, and an empty or `false`-family value means false. Returning `None` for
-/// anything else lets the caller keep the default rather than invent an answer, because Git rejects
-/// an unparsable boolean with an error and continuing with the documented default is the closest
-/// faithful behaviour available without a full config error channel.
-fn parse_bool(value: Option<&str>) -> Option<bool> {
-    let text = match value {
-        Some(found) => found.trim_matches('"'),
-        None => return Some(true),
+/// Prints the last value for one key; a bare key prints an empty line and an absent key exits 1.
+fn run_get(config_path: &std::path::Path, spec: &str) {
+    let key = resolve_key(spec);
+    let stored = match read_value(config_path, &key) {
+        Ok(stored) => stored,
+        Err(error) => report_config_error("read configuration", error),
     };
-    if text.is_empty() {
-        return Some(false);
-    }
-    match text.to_ascii_lowercase().as_str() {
-        "true" | "yes" | "on" => Some(true),
-        "false" | "no" | "off" => Some(false),
-        other => other.parse::<i64>().ok().map(|number| number != 0),
+    match stored {
+        Some(value) => println!("{value}"),
+        None => exit(EXIT_REJECTED),
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::RepoConfig;
-    use fg_index::AutoCrlf;
-
-    #[test]
-    fn an_absent_setting_keeps_the_compiled_in_default() {
-        let config = RepoConfig::parse("[core]\n\trepositoryformatversion = 0\n");
-        assert!(config.trust_executable_bit());
+/// Prints every value for one key in file order; no match exits 1 like git --get-all.
+fn run_get_all(config_path: &std::path::Path, spec: &str) {
+    let key = resolve_key(spec);
+    let entries = match read_config(config_path) {
+        Ok(entries) => entries,
+        Err(error) => report_config_error("read configuration", error),
+    };
+    let mut found = false;
+    for entry in entries.iter().filter(|entry| entry.key() == &key) {
+        println!("{}", entry.value().unwrap_or_default());
+        found = true;
     }
-
-    #[test]
-    fn filemode_false_disables_executable_bit_tracking() {
-        let config = RepoConfig::parse("[core]\n\tfilemode = false\n");
-        assert!(!config.trust_executable_bit());
+    if !found {
+        exit(EXIT_REJECTED);
     }
+}
 
-    #[test]
-    fn a_bare_filemode_key_means_true() {
-        let config = RepoConfig::parse("[core]\n\tfilemode\n");
-        assert!(config.trust_executable_bit());
+/// Writes one entry, reporting a verification failure with its dedicated tag.
+fn run_set(
+    ctx: &CliContext,
+    config_path: &std::path::Path,
+    spec: &str,
+    value: &str,
+    mode: ConfigWriteMode,
+) {
+    let key = resolve_key(spec);
+    validate_conflict_mode(&key, value);
+    if let Err(error) = set_value(config_path, &key, value, mode) {
+        report_config_error("write configuration", error);
     }
-
-    #[test]
-    fn numeric_boolean_spellings_are_understood() {
-        assert!(!RepoConfig::parse("[core]\nfilemode = 0\n").trust_executable_bit());
-        assert!(RepoConfig::parse("[core]\nfilemode = 1\n").trust_executable_bit());
+    if ctx.json_mode {
+        print_json(&serde_json::json!({
+            "status": "updated",
+            "key": key.to_dotted(),
+            "value": value,
+        }));
     }
+}
 
-    #[test]
-    fn a_trailing_comment_is_not_part_of_the_value() {
-        let config = RepoConfig::parse("[core]\nfilemode = false ; set by git init\n");
-        assert!(!config.trust_executable_bit());
+/// Removes matching entries; nothing removed exits 5 so callers see git's --unset contract.
+fn run_unset(ctx: &CliContext, config_path: &std::path::Path, spec: &str, literal: Option<&str>) {
+    let key = resolve_key(spec);
+    let removed = match unset_value(config_path, &key, literal) {
+        Ok(removed) => removed,
+        Err(error) => report_config_error("write configuration", error),
+    };
+    if removed == 0 {
+        exit(EXIT_NO_MATCH);
     }
-
-    #[test]
-    fn the_key_is_matched_case_insensitively() {
-        let config = RepoConfig::parse("[Core]\n\tFileMode = false\n");
-        assert!(!config.trust_executable_bit());
+    if ctx.json_mode {
+        print_json(&serde_json::json!({
+            "status": "unset",
+            "key": key.to_dotted(),
+            "removed": removed,
+        }));
     }
+}
 
-    #[test]
-    fn a_subsection_header_does_not_activate_core() {
-        let config = RepoConfig::parse("[core \"alias\"]\n\tfilemode = false\n");
-        assert!(config.trust_executable_bit());
-    }
-
-    #[test]
-    fn a_setting_outside_the_core_section_is_ignored() {
-        let config = RepoConfig::parse("[status]\n\tfilemode = false\n");
-        assert!(config.trust_executable_bit());
-    }
-
-    #[test]
-    fn autocrlf_defaults_to_false_when_absent() {
-        let config = RepoConfig::parse("[core]\n\trepositoryformatversion = 0\n");
-        assert_eq!(config.auto_crlf(), AutoCrlf::False);
-    }
-
-    #[test]
-    fn autocrlf_understands_input_as_its_own_value() {
-        assert_eq!(
-            RepoConfig::parse("[core]\n\tautocrlf = input\n").auto_crlf(),
-            AutoCrlf::Input
-        );
-    }
-
-    #[test]
-    fn autocrlf_understands_the_boolean_spellings() {
-        assert_eq!(
-            RepoConfig::parse("[core]\n\tautocrlf = true\n").auto_crlf(),
-            AutoCrlf::True
-        );
-        assert_eq!(
-            RepoConfig::parse("[core]\n\tautocrlf = false\n").auto_crlf(),
-            AutoCrlf::False
-        );
-    }
-
-    #[test]
-    fn an_unparsable_autocrlf_keeps_conversion_off() {
-        assert_eq!(
-            RepoConfig::parse("[core]\n\tautocrlf = sometimes\n").auto_crlf(),
-            AutoCrlf::False
-        );
+/// Terminates with EXIT_FATAL, tagging a failed self-verification so operators can spot it.
+fn report_config_error(action: &str, error: ConfigError) -> ! {
+    match error {
+        ConfigError::Verify(detail) => {
+            eprintln!("[CONFIG_WRITE_INVALID] {detail}");
+            exit(EXIT_REJECTED)
+        }
+        ConfigError::InvalidKey(detail) => reject(CliTag::ERROR, detail),
+        ConfigError::Io(io_error) => fail_io(action, io_error),
     }
 }

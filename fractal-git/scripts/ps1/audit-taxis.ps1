@@ -61,6 +61,11 @@ $script:childLogIndex = 0
     子进程继承父进程的标准输出，若直接运行，其横幅会落在 -Json 的 JSON 文档内部。
     本封装始终把子进程两条流接到临时文件：人类模式随后回显，机器模式保持静默，
     因此两种模式的终端行为一致，而机器文档始终可被单一解析。
+    重定向必须由 cmd.exe 在标准流上直接打开日志文件完成，不能使用 PowerShell 的
+    -RedirectStandardOutput：后者建立的是管道，子进程派生的常驻孙进程会继承管道写端
+    （本仓 core.fsmonitor=true 时 git 会拉起 fsmonitor--daemon），于是任何 -Wait 都
+    等不到管道 EOF，步骤 2 会表现为无子进程、无输出的永久挂起。改由文件句柄承接后，
+    等待只取决于 cargo/node 自身是否退出，与孙进程寿命无关。
 .PARAMETER FilePath
     可执行文件路径或命令名。
 .PARAMETER ArgumentList
@@ -68,7 +73,7 @@ $script:childLogIndex = 0
 .PARAMETER Label
     子进程用途标签，用于生成互不覆盖的临时日志名。
 .OUTPUTS
-    System.Diagnostics.Process — 已退出的进程对象，便于读取 ExitCode。
+    PSCustomObject — 含 ExitCode 的已退出进程结果。
 #>
 function Invoke-AuditChild {
     [CmdletBinding()]
@@ -81,13 +86,35 @@ function Invoke-AuditChild {
     $safe = $Label -replace "[^A-Za-z0-9_-]", "-"
     $outLog = Join-Path $TempLogDir "$safe-$($script:childLogIndex).out.log"
     $errLog = Join-Path $TempLogDir "$safe-$($script:childLogIndex).err.log"
-    $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait -RedirectStandardOutput $outLog -RedirectStandardError $errLog
+    $commandShell = $env:ComSpec
+    if ([string]::IsNullOrWhiteSpace($commandShell)) {
+        throw "ComSpec is required to redirect child output to log files."
+    }
+    $tokens = foreach ($item in @($FilePath) + @($ArgumentList)) {
+        $text = [string]$item
+        if ($text.Length -eq 0 -or $text -match '\s') { '"' + $text + '"' } else { $text }
+    }
+    $commandLine = ($tokens -join ' ') + ' > "' + $outLog + '" 2> "' + $errLog + '"'
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $commandShell
+    $startInfo.Arguments = '/d /s /c "' + $commandLine + '"'
+    $startInfo.WorkingDirectory = $ProjectRoot
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    try {
+        $process.WaitForExit()
+        $exitCode = $process.ExitCode
+    }
+    finally {
+        $process.Dispose()
+    }
     if (-not $Json) {
         foreach ($logFile in @($outLog, $errLog)) {
             if (Test-Path $logFile) { Get-Content -Path $logFile -Encoding utf8 | Out-Host }
         }
     }
-    return $proc
+    return [pscustomobject]@{ ExitCode = $exitCode }
 }
 
 <#
@@ -250,10 +277,14 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
 } else {
     # 账本必须落在隔离的临时仓库根内。默认 `.git` 会让自审把晋级账本写进源码树下的
     # 嵌套目录，既不被版本控制跟踪也永不被清理，且下一次自审会读到上次的陈旧候选。
-    # 子进程写入沙箱可能拒绝系统临时根，却放行其下的 Low 子目录；逐级探测可写位置，
-    # 探测全部失败时退回审计临时目录，并由落盘断言兜底，避免把不可写路径当成成功。
+    # 候选顺序以「工作区内 target/」开头：受限令牌把工作区内构建的可执行文件限制在
+    # 工作区内写入，本机实测同一 taxis 二进制复制到系统临时根后可写、留在工作区内则被
+    # 拒绝（os error 5）。此处由 pwsh 发起的写入探测只能证明宿主进程可写，不能代表受限
+    # 令牌下的 taxis 子进程，因此不能把系统临时根排在工作区内路径之前。
+    $workspacePromoRoot = Join-Path $ProjectRoot "target/audit-promotion"
+    $null = New-Item -ItemType Directory -Path $workspacePromoRoot -Force -ErrorAction SilentlyContinue
     $promoBaseRoot = $TempLogDir
-    $promoRootCandidates = @((Join-Path ([System.IO.Path]::GetTempPath()) "Low"), $TempLogDir)
+    $promoRootCandidates = @($workspacePromoRoot, (Join-Path ([System.IO.Path]::GetTempPath()) "Low"), $TempLogDir)
     foreach ($candidateRoot in $promoRootCandidates) {
         if (-not (Test-Path -LiteralPath $candidateRoot)) { continue }
         $probeFile = Join-Path $candidateRoot ".taxis-write-probe"

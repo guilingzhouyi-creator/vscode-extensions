@@ -16,19 +16,21 @@
 use std::fs;
 use std::path::Path;
 
-use fg_core::models::{FileMode, IndexStage, Oid};
+use fg_core::models::{current_unix_seconds, AuthoritySecret, FileMode, IndexStage, Oid};
+use fg_gate::authority::resolve_authority_secret;
 use fg_index::{write_dirc_v2, IndexEntry};
 use fg_native::sections::head::HeadState as NativeHeadState;
 use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
 use fg_native::sections::refs::RefRecord;
 use fg_native::RepoDocument;
+use fg_storage::commit_materializer::write_commit_objects_with_parents;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::RefStore;
 use fractal_git::{
-    write_commit_objects, ActorIdentity, AgentPushContext, BlockProvenanceEntry,
-    BlockProvenanceParams, CommitMaterializationRequest, CommitMessageGuard, DiskProvenanceStore,
-    DiskRefStore, FractalRef, GitSignature, LooseOdb, OperationGraph, PreReceiveGuard,
-    RepoViewSnapshot, TaxisPolicy, ValidatedCommitWitness,
+    ActorIdentity, AgentPushContext, BlockProvenanceEntry, BlockProvenanceParams,
+    CommitMaterializationRequest, CommitMessageGuard, DiskProvenanceStore, DiskRefStore,
+    FractalRef, GitSignature, LooseOdb, OperationGraph, PreReceiveGuard, RepoViewSnapshot,
+    TaxisPolicy, ValidatedCommitWitness,
 };
 
 use super::common::{fail_io, find_all_arg_values, find_arg_value, print_json, reject, CliContext};
@@ -51,8 +53,21 @@ pub fn handle_commit(ctx: &CliContext) {
             .unwrap_or_else(|| "refs/fractal/cell/cell-default/main".to_string()),
     };
 
-    let policy = resolve_commit_policy(policy_name);
-    let actor = resolve_actor_identity(human_author.as_deref(), auth_token, agent_id, cell_id);
+    let mut policy = resolve_commit_policy(policy_name);
+    let authority_secret = human_author.as_deref().map(|_| {
+        resolve_authority_secret(&ctx.git_dir)
+            .unwrap_or_else(|secret_err| reject(CliTag::AUTHORITY_BREACH, format!("{secret_err}")))
+    });
+    if let Some(secret) = authority_secret.as_ref() {
+        policy.authority_secret = Some(secret.clone());
+    }
+    let actor = resolve_actor_identity(
+        human_author.as_deref(),
+        auth_token,
+        agent_id,
+        cell_id,
+        authority_secret.as_ref(),
+    );
     let target_ref = match FractalRef::parse(&target_ref_str) {
         Some(fref) => fref,
         None => {
@@ -221,6 +236,7 @@ fn resolve_actor_identity(
     auth_token: Option<String>,
     agent_id: &str,
     cell_id: &str,
+    authority_secret: Option<&AuthoritySecret>,
 ) -> ActorIdentity {
     match human_author {
         Some(human_name) => {
@@ -234,7 +250,25 @@ fn resolve_actor_identity(
                     ),
                 ),
             };
-            ActorIdentity::human(human_name, human_email(human_name), token)
+            let secret = authority_secret.unwrap_or_else(|| {
+                reject(
+                    CliTag::AUTHORITY_BREACH,
+                    concat!(
+                        "--human requires a configured authority secret; set ",
+                        "TAXIS_AUTHORITY_SECRET or core.authoritysecret"
+                    ),
+                )
+            });
+            let identity = ActorIdentity::human(human_name, human_email(human_name), token);
+            identity
+                .verify_authority(Some(secret), current_unix_seconds())
+                .unwrap_or_else(|verify_err| {
+                    reject(
+                        CliTag::AUTHORITY_BREACH,
+                        format!("--token rejected: {verify_err}"),
+                    )
+                });
+            identity
         }
         None => ActorIdentity::agent(AgentPushContext {
             agent_uid: agent_id.into(),
@@ -244,7 +278,6 @@ fn resolve_actor_identity(
         }),
     }
 }
-
 /// Derives the corporate email address for a human author name.
 fn human_email(human_name: &str) -> String {
     format!(
@@ -370,10 +403,12 @@ fn materialize_staged_files(
     let hook_runner = super::git_hooks::discover(&ctx.git_dir, &request.work_root);
     let active_head = resolve_active_head_ref(&ctx.git_dir);
     let previous_head = ref_store.get_ref("HEAD").ok().flatten();
-    let materialized = match write_commit_objects(&odb, &ref_store, &request) {
-        Ok(written) => written,
-        Err(materialize_err) => fail_io("materialize commit", materialize_err),
-    };
+    let merge_heads = read_merge_heads(&ctx.git_dir);
+    let materialized =
+        match write_commit_objects_with_parents(&odb, &ref_store, &request, &merge_heads) {
+            Ok(written) => written,
+            Err(materialize_err) => fail_io("materialize commit", materialize_err),
+        };
 
     let branch_update = super::git_hooks::ReferenceUpdate {
         previous: materialized.parent_oid,
@@ -412,7 +447,43 @@ fn materialize_staged_files(
         fail_io("advance commit reference", update_err);
     }
     let _ = super::git_hooks::run_reference_transaction(&hook_runner, "committed", branch_rows);
+    clear_merge_state(&ctx.git_dir, !merge_heads.is_empty());
     materialized
+}
+
+/// Reads every pending `MERGE_HEAD` parent recorded by the three-way merge path.
+///
+/// A multi-line file (octopus merge) yields one parent per line; an unparseable line is
+/// rejected instead of silently degrading a merge commit to a single parent.
+fn read_merge_heads(git_dir: &Path) -> Vec<Oid> {
+    let contents = match fs::read_to_string(git_dir.join("MERGE_HEAD")) {
+        Ok(contents) => contents,
+        Err(_) => return Vec::new(),
+    };
+    let mut heads = Vec::new();
+    for line in contents
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+    {
+        match Oid::from_hex(line) {
+            Ok(oid) => heads.push(oid),
+            Err(_) => reject(
+                CliTag::ERROR,
+                format!("MERGE_HEAD contains an invalid object id '{line}'"),
+            ),
+        }
+    }
+    heads
+}
+
+/// Removes the merge bookkeeping files once a merge commit is final.
+fn clear_merge_state(git_dir: &Path, had_merge_head: bool) {
+    if !had_merge_head {
+        return;
+    }
+    let _ = fs::remove_file(git_dir.join("MERGE_HEAD"));
+    let _ = fs::remove_file(git_dir.join("MERGE_MSG"));
 }
 
 /// Outputs commit creation results as JSON or human-readable text.

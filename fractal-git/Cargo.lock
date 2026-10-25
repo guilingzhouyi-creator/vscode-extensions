@@ -140,6 +140,7 @@ version = "0.1.0"
 dependencies = [
  "fg-core",
  "fg-object",
+ "serde",
  "sha1",
 ]
 

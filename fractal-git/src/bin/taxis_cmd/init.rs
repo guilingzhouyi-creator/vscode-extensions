@@ -17,6 +17,7 @@
 
 use std::path::{Path, PathBuf};
 
+use fg_core::models::ConflictPresentationMode;
 use fg_native::{LayoutMode, RepoDocument, RepoLayout};
 
 use super::common::{print_json, reject, CliContext};
@@ -27,6 +28,7 @@ struct InitRequest {
     workspace_root: PathBuf,
     release: bool,
     git_compat: bool,
+    conflict_mode: ConflictPresentationMode,
     home_root: Option<PathBuf>,
 }
 
@@ -43,13 +45,14 @@ pub fn handle_init(ctx: &CliContext) {
         LayoutMode::Dev
     };
 
-    let document = match RepoDocument::for_new_repository(layout_mode) {
+    let mut document = match RepoDocument::for_new_repository(layout_mode) {
         Ok(built) => built,
         Err(create_err) => reject(
             CliTag::ERROR,
             format!("build repository identity: {create_err}"),
         ),
     };
+    document.meta.conflict_mode = request.conflict_mode;
 
     let layout = if request.release {
         match release_layout(&request, &document) {
@@ -64,6 +67,14 @@ pub fn handle_init(ctx: &CliContext) {
         Ok(initialized) => initialized,
         Err(init_err) => reject(CliTag::ERROR, format!("initialize repository: {init_err}")),
     };
+
+    let config_path = created.repo_dir.join("config");
+    let _ = super::config::write_config_entry(
+        &config_path,
+        "conflict",
+        "mode",
+        request.conflict_mode.as_str(),
+    );
 
     if request.release {
         if let Err(link_err) = link_workspace_entry(&request.workspace_root, layout.repo_dir()) {
@@ -99,6 +110,7 @@ fn parse_request(ctx: &CliContext) -> Result<InitRequest, String> {
     let mut release = false;
     let mut dev = false;
     let mut git_compat = false;
+    let mut conflict_mode: Option<ConflictPresentationMode> = None;
     let mut workspace_root: Option<PathBuf> = None;
     let mut home_root: Option<PathBuf> = None;
 
@@ -110,6 +122,16 @@ fn parse_request(ctx: &CliContext) -> Result<InitRequest, String> {
             "--release" => release = true,
             "--git-compat" => git_compat = true,
             "--no-hide" => {}
+            "--conflict-mode" | "--conflict.mode" => {
+                let value = ctx.args.get(argument_cursor + 1).ok_or_else(|| {
+                    "--conflict-mode requires a mode (agent-algebraic, git-compat, diff3)"
+                        .to_owned()
+                })?;
+                conflict_mode = Some(ConflictPresentationMode::parse_str(value).ok_or_else(|| {
+                    format!("invalid conflict mode '{value}'; expected agent-algebraic, git-compat, or diff3")
+                })?);
+                argument_cursor += 1;
+            }
             "--workspace" => {
                 let value = ctx
                     .args
@@ -144,10 +166,17 @@ fn parse_request(ctx: &CliContext) -> Result<InitRequest, String> {
             .map_err(|cwd_err| format!("resolve the current directory: {cwd_err}"))?,
     };
 
+    let resolved_conflict_mode = conflict_mode.unwrap_or(if git_compat {
+        ConflictPresentationMode::GitCompat
+    } else {
+        ConflictPresentationMode::AgentAlgebraic
+    });
+
     Ok(InitRequest {
         workspace_root: resolved_root,
         release,
         git_compat,
+        conflict_mode: resolved_conflict_mode,
         home_root,
     })
 }
@@ -209,6 +238,7 @@ fn report(
             "operation": "init",
             "layout_mode": layout_class,
             "git_compat": request.git_compat,
+            "conflict_mode": request.conflict_mode.as_str(),
             "workspace_root": request.workspace_root.display().to_string(),
             "repository_dir": created.repo_dir.display().to_string(),
             "container": created.container_path.display().to_string(),
@@ -226,6 +256,7 @@ fn report(
     println!("  Repository dir : {}", created.repo_dir.display());
     println!("  Container      : {}", created.container_path.display());
     println!("  Repository id  : {}", document.meta.repo_id_hex());
+    println!("  Conflict mode  : {}", request.conflict_mode.as_str());
     if request.git_compat {
         println!(
             "  Git compat     : projected at {}",

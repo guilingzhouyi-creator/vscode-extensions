@@ -20,7 +20,7 @@
 use std::sync::Arc;
 
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::{ActorIdentity, TaxisPolicy};
+use fg_core::models::{current_unix_seconds, ActorIdentity, TaxisPolicy, AUTHORITY_REMEDIATION};
 
 use crate::commit_guard::CommitMessageGuard;
 
@@ -187,9 +187,13 @@ impl FractalHook for UacPromotionGateHook {
                 });
             }
 
-            if !ctx.actor.has_authority_credential() {
+            let now_secs = current_unix_seconds();
+            if let Err(error) = ctx
+                .actor
+                .verify_authority(ctx.policy.authority_secret.as_ref(), now_secs)
+            {
                 return Ok(HookVerdict::Block {
-                    reason: "Human authority claim carries no credential token; provide a verified --token for System Trunk writes".into(),
+                    reason: format!("Human Control Breach: {error}; {AUTHORITY_REMEDIATION}"),
                 });
             }
         }

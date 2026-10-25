@@ -28,6 +28,7 @@ use fg_core::models::{compute_object_oid, FileMode, IndexStage, ObjectKind};
 use fg_index::{AttributeSet, GitIndex};
 use fractal_git::constants::cli::CliTag;
 
+use super::checkout::plan_worktree_path;
 use super::common::{fail_fatal, reject, CliContext};
 use super::diff_render::{report_json, report_text};
 use super::repo_view::RepoView;
@@ -432,13 +433,16 @@ fn worktree_snapshot<'a>(
         if staged.mode == FileMode::Gitlink {
             continue;
         }
-        let absolute = view.work_root().join(&staged.path);
+        let absolute = match plan_worktree_path(view.work_root(), &staged.path) {
+            Ok(absolute) => absolute,
+            Err(detail) => return Err(FractalError::PolicyViolation(detail)),
+        };
         let metadata = match fs::symlink_metadata(&absolute) {
             Ok(found) => found,
             Err(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => continue,
             Err(io_err) => return Err(FractalError::Io(io_err)),
         };
-        let mode = match worktree_mode(view, &staged.path, staged.mode) {
+        let mode = match worktree_mode(view, &staged.path, staged.mode)? {
             Some(found) => found,
             None => continue,
         };
@@ -588,13 +592,23 @@ fn compare_snapshots(old: &Snapshot<'_>, new: &Snapshot<'_>) -> FractalResult<Ve
 /// file. The classification itself is [`super::tree_view::worktree_mode`]: `status` and `diff` must
 /// agree on whether a file's mode changed, and two implementations would drift on the first
 /// `core.filemode` or platform-specific rule either of them learned.
-fn worktree_mode(view: &RepoView, path: &str, staged: FileMode) -> Option<FileMode> {
-    let metadata = fs::symlink_metadata(view.work_root().join(path)).ok()?;
-    Some(super::tree_view::worktree_mode(
+///
+/// # Errors
+///
+/// Returns [`FractalError::PolicyViolation`] for a staged path that escapes the worktree. Reporting
+/// it as `None` would render the entry as a deletion, which is exactly the silent skip a path
+/// escape relies on to stay unnoticed.
+fn worktree_mode(view: &RepoView, path: &str, staged: FileMode) -> FractalResult<Option<FileMode>> {
+    let absolute =
+        plan_worktree_path(view.work_root(), path).map_err(FractalError::PolicyViolation)?;
+    let Ok(metadata) = fs::symlink_metadata(absolute) else {
+        return Ok(None);
+    };
+    Ok(Some(super::tree_view::worktree_mode(
         &metadata,
         staged,
         view.config().trust_executable_bit(),
-    ))
+    )))
 }
 
 /// Maps every staged path to the tree entry it records.

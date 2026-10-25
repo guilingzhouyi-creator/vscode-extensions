@@ -9,19 +9,25 @@
 //! Exit Semantics & Design Rationale: Exposes high-level state machine interfaces cleanly.
 
 pub mod authorizer;
+pub mod bisect;
 pub mod blackboard;
+pub mod conflict_tree;
 pub mod operation;
 pub mod promotion_ledger;
 pub mod provenance;
 pub mod refs;
 pub mod state_machine;
+pub mod submodule;
 pub mod telemetry;
 pub mod verifier;
 pub mod worktree;
 
 pub use authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
+pub use bisect::{BisectEngine, BisectState, BisectStep};
 pub use blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
+pub use conflict_tree::{AgentConflictSliceReport, ConflictSlice, ConflictTreeManager};
 pub use operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
+pub use submodule::{SubmoduleController, SubmoduleStatus};
 pub use promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use provenance::{DiskProvenanceStore, PROVENANCE_FILE};
 pub use refs::{DiskRefStore, FractalRef, HeadState};

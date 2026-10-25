@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::models::authority::AuthoritySecret;
+
 /// Mode of diff coherence validation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiffCoherenceMode {
@@ -14,6 +16,65 @@ pub enum DiffCoherenceMode {
     Permissive,
     /// Strict: Rust-grade borrow check; out-of-scope mutations or empty commits fail compilation.
     Strict,
+}
+
+/// Conflict presentation mode for unmerged paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum ConflictPresentationMode {
+    /// Agent-Algebraic: Keep working tree files compilable and clean without marker strings,
+    /// storing unmerged stage 1/2/3 entries in index/TAXC and emitting structured JSON conflict slices.
+    #[default]
+    AgentAlgebraic,
+    /// Git Compatible: Inject standard Git 2-way conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
+    GitCompat,
+    /// Diff3 Compatible: Inject standard Git 3-way conflict markers (`<<<<<<<`, `|||||||`, `=======`, `>>>>>>>`).
+    Diff3,
+}
+
+impl ConflictPresentationMode {
+    /// Returns the canonical CLI spelling.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::AgentAlgebraic => "agent-algebraic",
+            Self::GitCompat => "git-compat",
+            Self::Diff3 => "diff3",
+        }
+    }
+
+    /// On-disk byte discriminant for TAXC section encoding.
+    pub const fn as_u8(self) -> u8 {
+        match self {
+            Self::AgentAlgebraic => 0,
+            Self::GitCompat => 1,
+            Self::Diff3 => 2,
+        }
+    }
+
+    /// Decodes on-disk byte discriminant.
+    pub fn from_u8(value: u8) -> Result<Self, u8> {
+        match value {
+            0 => Ok(Self::AgentAlgebraic),
+            1 => Ok(Self::GitCompat),
+            2 => Ok(Self::Diff3),
+            other => Err(other),
+        }
+    }
+
+    /// Parses case-insensitive name.
+    pub fn parse_str(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "agent-algebraic" | "agent" | "algebraic" | "clean" => Some(Self::AgentAlgebraic),
+            "git-compat" | "git" | "compat" | "markers" => Some(Self::GitCompat),
+            "diff3" => Some(Self::Diff3),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ConflictPresentationMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
 }
 
 /// Generalized commit message and authority policy for Taxis.
@@ -61,6 +122,13 @@ pub struct TaxisPolicy {
     pub replacement_score_baseline_delta: f64,
     /// Minimum composite score required to enter the staged promotion queue (default: 80.0).
     pub minimum_promotion_score: f64,
+    /// Conflict presentation mode for working tree during unmerged states.
+    pub conflict_mode: ConflictPresentationMode,
+    /// HMAC secret used to verify human authority credentials. Never serialized:
+    /// secrets belong to the environment (`TAXIS_AUTHORITY_SECRET`) or to
+    /// `core.authoritysecret`, never to a policy file.
+    #[serde(skip)]
+    pub authority_secret: Option<AuthoritySecret>,
 }
 
 impl Default for TaxisPolicy {
@@ -160,6 +228,8 @@ impl TaxisPolicy {
             staged_promotion_ttl_seconds: 3600,
             replacement_score_baseline_delta: 5.0,
             minimum_promotion_score: 80.0,
+            conflict_mode: ConflictPresentationMode::AgentAlgebraic,
+            authority_secret: None,
         }
     }
 
@@ -218,6 +288,8 @@ impl TaxisPolicy {
             staged_promotion_ttl_seconds: 3600,
             replacement_score_baseline_delta: 5.0,
             minimum_promotion_score: 80.0,
+            conflict_mode: ConflictPresentationMode::AgentAlgebraic,
+            authority_secret: None,
         }
     }
 
@@ -257,6 +329,8 @@ impl TaxisPolicy {
             staged_promotion_ttl_seconds: 3600,
             replacement_score_baseline_delta: 5.0,
             minimum_promotion_score: 70.0,
+            conflict_mode: ConflictPresentationMode::GitCompat,
+            authority_secret: None,
         }
     }
 
@@ -283,6 +357,8 @@ impl TaxisPolicy {
             staged_promotion_ttl_seconds: 3600,
             replacement_score_baseline_delta: 0.0,
             minimum_promotion_score: 0.0,
+            conflict_mode: ConflictPresentationMode::GitCompat,
+            authority_secret: None,
         }
     }
 }

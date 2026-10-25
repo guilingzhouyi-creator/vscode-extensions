@@ -14,6 +14,7 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use fg_core::models::SymbolClaim;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::DiskBlackboardStore;
 
@@ -66,6 +67,8 @@ fn handle_claim(
         None => reject(CliTag::ERROR, "missing required flag: --file <path>"),
     };
     let scope = find_arg_value(&ctx.args, &["--scope"]).unwrap_or("*");
+    let symbol = find_arg_value(&ctx.args, &["--symbol"]);
+    let symbol_kind = find_arg_value(&ctx.args, &["--symbol-kind"]);
     let ttl_sec: u64 = find_arg_value(&ctx.args, &["--ttl"])
         .and_then(|v| v.parse().ok())
         .unwrap_or(300);
@@ -75,7 +78,12 @@ fn handle_claim(
         Err(err) => fail_io("load blackboard", err),
     };
 
-    match board.claim(agent, file, scope, ttl_sec, now_ms) {
+    let mut claim = SymbolClaim::new(agent, file, scope, ttl_sec, now_ms);
+    if let Some(name) = symbol {
+        claim = claim.with_symbol(name, symbol_kind);
+    }
+
+    match board.claim_symbol(claim) {
         Ok(lease) => {
             if let Err(err) = store.save(&board) {
                 fail_io("save blackboard", err);
@@ -131,13 +139,14 @@ fn handle_check(
         None => reject(CliTag::ERROR, "missing required flag: --file <path>"),
     };
     let scope = find_arg_value(&ctx.args, &["--scope"]).unwrap_or("*");
+    let symbol = find_arg_value(&ctx.args, &["--symbol"]);
 
     let board = match store.load_or_create(card_id, cell_id) {
         Ok(b) => b,
         Err(err) => fail_io("load blackboard", err),
     };
 
-    if let Some(collision) = board.check_collision(file, scope, now_ms) {
+    if let Some(collision) = board.check_collision_symbol(file, scope, symbol, now_ms) {
         if ctx.json_mode {
             print_json(&serde_json::json!({
                 "status": "conflict",

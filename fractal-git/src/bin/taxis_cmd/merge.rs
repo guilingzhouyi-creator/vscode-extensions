@@ -25,12 +25,15 @@ use fg_algorithms::merge::{
 };
 use fg_algorithms::traverse::DagWalker;
 use fg_core::constants::git::{OBJ_BLOB, OBJ_COMMIT, OBJ_TREE};
-use fg_core::models::{CorrectedCommitDate, FileMode, GitSignature, IndexStage, Oid};
+use fg_core::models::{
+    ConflictPresentationMode, CorrectedCommitDate, FileMode, GitSignature, IndexStage, Oid,
+};
 use fg_core::traits::OdbStore;
 use fg_index::{InMemoryIndexTree, IndexEntry};
 use fg_object::GitCommit;
 use fg_storage::commit_materializer::{serialize_commit_payload, serialize_tree_payload};
 use fg_storage::LooseOdb;
+use fg_topology::conflict_tree::{ConflictSlice, ConflictTreeManager};
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{DiskRefStore, OperationGraph, RepoViewSnapshot};
 
@@ -40,6 +43,7 @@ use super::checkout::{
 };
 use super::commit_walk::parse_commit_record;
 use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
+use super::config::RepoConfig;
 use super::repo_view::RepoView;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
 
@@ -51,6 +55,7 @@ struct MergeOptions {
     ff_only: bool,
     abort: bool,
     message: Option<String>,
+    conflict_mode: Option<ConflictPresentationMode>,
 }
 
 /// Dispatches the `merge` command.
@@ -183,6 +188,7 @@ fn parse_merge_options(args: &[String]) -> MergeOptions {
     let mut ff_only = false;
     let mut abort = false;
     let mut message = None;
+    let mut conflict_mode = None;
 
     let mut cursor = 0;
     while cursor < args.len() {
@@ -191,6 +197,12 @@ fn parse_merge_options(args: &[String]) -> MergeOptions {
             "--no-ff" => no_ff = true,
             "--ff-only" => ff_only = true,
             "--abort" => abort = true,
+            "--conflict-mode" | "--conflict.mode" if cursor + 1 < args.len() => {
+                if let Some(parsed) = ConflictPresentationMode::parse_str(&args[cursor + 1]) {
+                    conflict_mode = Some(parsed);
+                }
+                cursor += 1;
+            }
             "-m" if cursor + 1 < args.len() => {
                 message = Some(args[cursor + 1].clone());
                 cursor += 1;
@@ -209,6 +221,7 @@ fn parse_merge_options(args: &[String]) -> MergeOptions {
         ff_only,
         abort,
         message,
+        conflict_mode,
     }
 }
 
@@ -435,6 +448,9 @@ fn execute_three_way_merge(
                 };
                 finish_clean_merge(&m_ctx, &merged_tree);
             } else {
+                let conflict_mode = opts
+                    .conflict_mode
+                    .unwrap_or_else(|| RepoConfig::load(view.git_dir()).conflict_mode());
                 let c_ctx = ConflictedMergeContext {
                     view,
                     opts,
@@ -442,6 +458,7 @@ fn execute_three_way_merge(
                     ours_files: &ours_files,
                     theirs_files: &theirs_files,
                     theirs_commit,
+                    conflict_mode,
                     ctx,
                 };
                 finish_conflicted_merge(&c_ctx, &merged_tree, &remaining_conflicts);
@@ -559,6 +576,7 @@ struct ConflictedMergeContext<'a> {
     ours_files: &'a BTreeMap<String, TreeEntry>,
     theirs_files: &'a BTreeMap<String, TreeEntry>,
     theirs_commit: Oid,
+    conflict_mode: ConflictPresentationMode,
     ctx: &'a CliContext,
 }
 
@@ -674,25 +692,15 @@ fn finish_conflicted_merge(
             .and_then(|oid| c_ctx.view.blob_payload(&oid).ok())
             .unwrap_or_default();
 
-        let marker_bytes = if conflict.ours_oid.is_some() && conflict.theirs_oid.is_some() {
-            let merge_res = TextThreeWayMerge::merge(
-                &base_payload,
-                &ours_payload,
-                &theirs_payload,
-                "HEAD",
-                &c_ctx.opts.target,
-            );
-            merge_res.content
-        } else if conflict.ours_oid.is_some() {
-            // Modify/delete keeps the surviving side verbatim, without markers. Git leaves the
-            // worktree copy of the modified side untouched and records the conflict in the index,
-            // so an editor opening the file does not have to strip markers to get the real text.
-            ours_payload.clone()
-        } else if conflict.theirs_oid.is_some() {
-            theirs_payload.clone()
-        } else {
-            Vec::new()
-        };
+        let marker_bytes = render_conflict_file_payload(
+            c_ctx.conflict_mode,
+            &base_payload,
+            &ours_payload,
+            &theirs_payload,
+            &c_ctx.opts.target,
+            conflict.ours_oid.is_some(),
+            conflict.theirs_oid.is_some(),
+        );
 
         let target_path = c_ctx.view.work_root().join(&conflict.path);
         if let Some(parent) = target_path.parent() {
@@ -700,6 +708,8 @@ fn finish_conflicted_merge(
         }
         let _ = fs::write(target_path, marker_bytes);
     }
+
+    let agent_slices = build_agent_conflict_slices(conflicts, c_ctx);
 
     update_dirc_index(c_ctx.view.git_dir(), &index_entries);
     let _ = fs::write(
@@ -724,14 +734,95 @@ fn finish_conflicted_merge(
             "engine": "taxis",
             "operation": "merge",
             "status": "conflicted",
+            "conflict_mode": c_ctx.conflict_mode.as_str(),
             "conflict_count": conflicts.len(),
             "conflicts": conflicts.iter().map(|c| &c.path).collect::<Vec<_>>(),
+            "conflict_slices": agent_slices,
         }));
+    } else if c_ctx.conflict_mode == ConflictPresentationMode::AgentAlgebraic {
+        println!("Automatic merge failed; recorded unmerged conflict slices while keeping files clean.\nMode: agent-algebraic (files left compilable). Use 'taxis diff' or 'taxis status' to inspect.");
     } else {
         println!("Automatic merge failed; fix conflicts and then commit the result.");
     }
 
     std::process::exit(1);
+}
+
+/// Renders file content according to active conflict mode.
+fn render_conflict_file_payload(
+    mode: ConflictPresentationMode,
+    base: &[u8],
+    ours: &[u8],
+    theirs: &[u8],
+    target_label: &str,
+    has_ours: bool,
+    has_theirs: bool,
+) -> Vec<u8> {
+    match mode {
+        ConflictPresentationMode::AgentAlgebraic => {
+            if has_ours {
+                ours.to_vec()
+            } else if has_theirs {
+                theirs.to_vec()
+            } else {
+                Vec::new()
+            }
+        }
+        ConflictPresentationMode::GitCompat => {
+            if has_ours && has_theirs {
+                let merge_res = TextThreeWayMerge::merge(base, ours, theirs, "HEAD", target_label);
+                merge_res.content
+            } else if has_ours {
+                ours.to_vec()
+            } else if has_theirs {
+                theirs.to_vec()
+            } else {
+                Vec::new()
+            }
+        }
+        ConflictPresentationMode::Diff3 => {
+            if has_ours && has_theirs {
+                ConflictTreeManager::render_diff3(base, ours, theirs, "HEAD", "base", target_label)
+            } else if has_ours {
+                ours.to_vec()
+            } else if has_theirs {
+                theirs.to_vec()
+            } else {
+                Vec::new()
+            }
+        }
+    }
+}
+
+/// Builds structured agent conflict slice reports for all unmerged paths.
+fn build_agent_conflict_slices(
+    conflicts: &[ConflictEntry],
+    c_ctx: &ConflictedMergeContext<'_>,
+) -> Vec<fg_topology::conflict_tree::AgentConflictSliceReport> {
+    let mut slices = Vec::with_capacity(conflicts.len());
+    for c in conflicts {
+        let ours_len = c
+            .ours_oid
+            .and_then(|oid| c_ctx.view.blob_payload(&oid).ok())
+            .map(|b| b.len())
+            .unwrap_or(0);
+        let theirs_len = c
+            .theirs_oid
+            .and_then(|oid| c_ctx.view.blob_payload(&oid).ok())
+            .map(|b| b.len())
+            .unwrap_or(0);
+        let mode = c_ctx
+            .ours_files
+            .get(&c.path)
+            .or_else(|| c_ctx.theirs_files.get(&c.path))
+            .map(|e| e.mode)
+            .unwrap_or(FileMode::RegularFile);
+        slices.push(
+            ConflictSlice::new(c.path.clone(), mode, c.base_oid, c.ours_oid, c.theirs_oid)
+                .to_agent_report(ours_len, theirs_len),
+        );
+    }
+    slices
 }
 
 /// Records merge operation to the OperationGraph.

@@ -8,15 +8,18 @@
 //! Responsibilities: High-performance algorithmic engine exports and algebraic conflict operators.
 //! Exit Semantics & Design Rationale: Zero-allocation and cache-friendly computational primitives.
 
+pub mod blame;
 pub mod bloom;
 pub mod cdc;
 pub mod diff;
 pub mod math;
 pub mod merge;
+pub mod pack;
 pub mod poset;
 pub mod synthetic;
 pub mod traverse;
 
+pub use blame::{BlameEngine, BlameHunk, BlameLine};
 pub use bloom::PathBloomFilter;
 pub use cdc::{apply_edits, ChunkDescriptor, EditOp, FastCdcChunker, FastCdcIter, GEAR_TABLE};
 pub use diff::{
@@ -31,6 +34,10 @@ pub use merge::{
     AlgebraicMerge, BlockMergeResult, BlockThreeWayMerge, CanonicalConflictEntry,
     CanonicalMergeResult, ConflictEntry, FastPathMerge, TextMergeResult, TextThreeWayMerge,
     ThreeWayMerge, ThreeWayMergeResult, VirtualMergeBaseSynthesizer,
+};
+pub use pack::{
+    encode_git_delta, find_pack_deltas, DeltaResolution, PackDeltaChain, PackDeltaItem,
+    DEFAULT_DELTA_WINDOW, MAX_DELTA_DEPTH,
 };
 pub use poset::CorrectedCommitDate;
 pub use synthetic::{

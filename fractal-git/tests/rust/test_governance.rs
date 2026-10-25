@@ -1,6 +1,7 @@
 //! Test Suite: Taxis Generalized Governance, Rust-Grade Commit Invariants & Human Control Boundary
 //! File Path: tests/rust/test_governance.rs
 
+use fg_core::models::{current_unix_seconds, AuthoritySecret};
 use fractal_git::{
     ActorIdentity, AgentPushContext, CommitCountVerdict, CommitCounter, CommitMessageGuard,
     CommitTelemetryConfig, DiffCoherenceMode, FractalRef, Oid, PreReceiveGuard, TaxisPolicy,
@@ -12,6 +13,7 @@ fn test_generalized_policy_presets() {
     let strict = TaxisPolicy::rust_strict();
     assert_eq!(strict.name, "rust-strict");
     assert!(strict.human_controlled_trunks);
+    assert!(strict.authority_secret.is_none());
     assert!(strict.qualitative_verification_only);
     assert_eq!(strict.diff_coherence, DiffCoherenceMode::Strict);
 
@@ -107,7 +109,17 @@ Valid qualitative assertion."#;
 
 #[test]
 fn test_human_control_boundary() {
-    let policy = TaxisPolicy::rust_strict();
+    let secret = match AuthoritySecret::from_bytes(&[7u8; 32]) {
+        Ok(secret) => secret,
+        Err(secret_err) => panic!("fixture authority secret: {secret_err}"),
+    };
+    let now_secs = current_unix_seconds();
+    let token = match secret.issue("Lead-Architect", 3600, now_secs) {
+        Ok(token) => token,
+        Err(issue_err) => panic!("fixture authority token: {issue_err}"),
+    };
+    let mut policy = TaxisPolicy::rust_strict();
+    policy.authority_secret = Some(secret.clone());
 
     let agent_ctx = AgentPushContext {
         agent_uid: "agent-007".into(),
@@ -118,7 +130,7 @@ fn test_human_control_boundary() {
     let agent_actor = ActorIdentity::agent(agent_ctx);
 
     let human_actor =
-        ActorIdentity::human("Lead Architect", "architect@company.com", "AUTH-TOKEN-123");
+        ActorIdentity::human("Lead-Architect", "architect@company.com", token.clone());
 
     let system_trunk = FractalRef::SystemTrunk {
         branch: "main".into(),
@@ -142,7 +154,7 @@ fn test_human_control_boundary() {
     let err_trunk = format!("{:?}", res_agent_trunk.err().unwrap());
     assert!(err_trunk.contains("Human Control Breach"));
 
-    // Human actor to System Trunk & Integration Trunk is allowed
+    // Human actor holding a valid signed token may write both trunks
     assert!(PreReceiveGuard::assert_actor_authorized(&system_trunk, &human_actor, &policy).is_ok());
     assert!(
         PreReceiveGuard::assert_actor_authorized(&integration_trunk, &human_actor, &policy).is_ok()
@@ -150,7 +162,7 @@ fn test_human_control_boundary() {
 
     // A human claim with no credential must not satisfy the dual-trunk boundary
     let unverified_actor =
-        ActorIdentity::unverified_human("Lead Architect", "architect@company.com");
+        ActorIdentity::unverified_human("Lead-Architect", "architect@company.com");
     let res_unverified =
         PreReceiveGuard::assert_actor_authorized(&system_trunk, &unverified_actor, &policy);
     assert!(res_unverified.is_err());
@@ -158,16 +170,58 @@ fn test_human_control_boundary() {
     assert!(err_unverified.contains("carries no credential"));
 
     // A blank credential is equivalent to no credential
-    let blank_token_actor = ActorIdentity::human("Lead Architect", "architect@company.com", "   ");
+    let blank_token_actor = ActorIdentity::human("Lead-Architect", "architect@company.com", "   ");
     assert!(
         PreReceiveGuard::assert_actor_authorized(&system_trunk, &blank_token_actor, &policy)
             .is_err()
     );
 
+    // A forged MAC is rejected even though the token is structurally well formed
+    let mut tampered = token.clone();
+    if let Some(last) = tampered.pop() {
+        tampered.push(if last == '0' { '1' } else { '0' });
+    }
+    let tampered_actor = ActorIdentity::human("Lead-Architect", "architect@company.com", tampered);
+    let res_tampered =
+        PreReceiveGuard::assert_actor_authorized(&system_trunk, &tampered_actor, &policy);
+    assert!(res_tampered.is_err());
+    assert!(format!("{:?}", res_tampered.err().unwrap()).contains("[AUTHORITY_BREACH]"));
+
+    // A token signed for another subject cannot impersonate the claimed human
+    let foreign_token = match secret.issue("Auditor", 3600, now_secs) {
+        Ok(token) => token,
+        Err(issue_err) => panic!("fixture foreign token: {issue_err}"),
+    };
+    let foreign_actor =
+        ActorIdentity::human("Lead-Architect", "architect@company.com", foreign_token);
+    let res_foreign =
+        PreReceiveGuard::assert_actor_authorized(&system_trunk, &foreign_actor, &policy);
+    assert!(res_foreign.is_err());
+    assert!(format!("{:?}", res_foreign.err().unwrap()).contains("does not match"));
+
+    // An expired token fails closed
+    let expired_token = match secret.issue("Lead-Architect", 0, now_secs - 10) {
+        Ok(token) => token,
+        Err(issue_err) => panic!("fixture expired token: {issue_err}"),
+    };
+    let expired_actor =
+        ActorIdentity::human("Lead-Architect", "architect@company.com", expired_token);
+    assert!(
+        PreReceiveGuard::assert_actor_authorized(&system_trunk, &expired_actor, &policy).is_err()
+    );
+
+    // Without a configured secret even a genuinely signed token cannot authorize trunk writes
+    let secretless_policy = TaxisPolicy::rust_strict();
+    assert!(PreReceiveGuard::assert_actor_authorized(
+        &system_trunk,
+        &human_actor,
+        &secretless_policy
+    )
+    .is_err());
+
     // Agent actor pushing to its own Cell Main is allowed
     assert!(PreReceiveGuard::assert_actor_authorized(&cell_main, &agent_actor, &policy).is_ok());
 }
-
 #[test]
 fn test_anti_inflation_commit_telemetry() {
     // Simulate DAG:

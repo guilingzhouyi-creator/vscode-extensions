@@ -10,11 +10,15 @@
 //!     "read Git repositories" separable from "Taxis has its own format".
 
 pub mod idx_file;
+pub mod idx_writer;
 pub mod midx_file;
 pub mod odb_router;
 pub mod pack_file;
+pub mod pack_writer;
 
 pub use idx_file::PackIndex;
+pub use idx_writer::IdxWriter;
 pub use midx_file::{MultiPackIndex, PackLocation};
 pub use odb_router::{OdbRouter, DEFAULT_ROUTER_CACHE_BYTES};
 pub use pack_file::{DeltaBaseSource, PackFile, PackedObject, MAX_CHAIN_DEPTH};
+pub use pack_writer::{crc32_ieee, PackEntryMeta, PackWriter};

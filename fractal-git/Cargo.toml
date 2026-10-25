@@ -129,3 +129,27 @@ path = "tests/rust/test_git_differential.rs"
 [[test]]
 name = "test_read_commands"
 path = "tests/rust/test_read_commands.rs"
+
+[[test]]
+name = "test_pack_generation"
+path = "tests/rust/test_pack_generation.rs"
+
+[[test]]
+name = "test_conflict_modes"
+path = "tests/rust/test_conflict_modes.rs"
+
+[[test]]
+name = "test_submodules"
+path = "tests/rust/test_submodules.rs"
+
+[[test]]
+name = "test_edge_porcelain"
+path = "tests/rust/test_edge_porcelain.rs"
+
+[[test]]
+name = "test_interactive_operations"
+path = "tests/rust/test_interactive_operations.rs"
+
+[[test]]
+name = "test_config_parity"
+path = "tests/rust/test_config_parity.rs"

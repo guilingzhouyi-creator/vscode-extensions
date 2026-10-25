@@ -14,6 +14,8 @@
 //!   - Unknown discriminants are rejected rather than defaulted: silently treating an unknown
 //!     layout as `Dev` would let a release repository be rewritten in place.
 
+use fg_core::models::ConflictPresentationMode;
+
 use crate::codec::{FieldReader, FieldWriter};
 use crate::error::{NativeError, NativeResult};
 
@@ -103,6 +105,8 @@ pub struct MetaSection {
     pub native_version: u16,
     /// Declared physical layout mode.
     pub layout_mode: LayoutMode,
+    /// Working tree conflict presentation mode.
+    pub conflict_mode: ConflictPresentationMode,
 }
 
 impl MetaSection {
@@ -118,7 +122,14 @@ impl MetaSection {
             object_format: ObjectFormat::Sha1,
             native_version: crate::constants::TAXC_FORMAT_VERSION,
             layout_mode,
+            conflict_mode: ConflictPresentationMode::AgentAlgebraic,
         }
+    }
+
+    /// Sets the conflict presentation mode.
+    pub const fn with_conflict_mode(mut self, conflict_mode: ConflictPresentationMode) -> Self {
+        self.conflict_mode = conflict_mode;
+        self
     }
 
     /// Returns the lowercase hexadecimal repository identifier used as the store directory name.
@@ -138,12 +149,13 @@ impl MetaSection {
     /// Propagates field-write failures; the current field set cannot fail, so this is a
     /// forward-compatibility signature rather than an active failure path.
     pub fn encode(&self) -> NativeResult<Vec<u8>> {
-        let mut writer = FieldWriter::with_capacity(REPO_ID_LEN + 4 + 8 + 1 + 2 + 1);
+        let mut writer = FieldWriter::with_capacity(REPO_ID_LEN + 4 + 8 + 1 + 2 + 1 + 1);
         writer.write_bytes(&self.repo_id);
         writer.write_i64(self.created_at_ms);
         writer.write_u8(self.object_format.as_u8());
         writer.write_u16(self.native_version);
         writer.write_u8(self.layout_mode.as_u8());
+        writer.write_u8(self.conflict_mode.as_u8());
         Ok(writer.finish())
     }
 
@@ -165,6 +177,18 @@ impl MetaSection {
         let native_version = reader.read_u16("native_version")?;
         let layout_mode = LayoutMode::from_u8(reader.read_u8("layout_mode")?)?;
 
+        let conflict_mode = if !reader.is_exhausted() {
+            let disc = reader.read_u8("conflict_mode")?;
+            ConflictPresentationMode::from_u8(disc).map_err(|other| {
+                NativeError::UnknownDiscriminant {
+                    field: "conflict_mode",
+                    value: other,
+                }
+            })?
+        } else {
+            ConflictPresentationMode::AgentAlgebraic
+        };
+
         reader.expect_exhausted(SECTION_TAG)?;
 
         Ok(Self {
@@ -173,6 +197,7 @@ impl MetaSection {
             object_format,
             native_version,
             layout_mode,
+            conflict_mode,
         })
     }
 }
@@ -260,5 +285,33 @@ mod tests {
         let payload = [0u8; 8];
         let error = MetaSection::decode(&payload).expect_err("short payload must fail");
         assert!(matches!(error, NativeError::FieldOverrun { .. }));
+    }
+
+    #[test]
+    fn backward_compatible_decoding_without_conflict_mode() {
+        use fg_core::models::ConflictPresentationMode;
+        let original = sample();
+        let mut encoded = original.encode().expect("encode");
+        // Pop the conflict_mode byte off the end to simulate predecessor version container
+        let popped = encoded.pop().expect("pop conflict mode byte");
+        assert_eq!(popped, ConflictPresentationMode::AgentAlgebraic.as_u8());
+        let decoded = MetaSection::decode(&encoded).expect("backward-compat decode");
+        assert_eq!(decoded.conflict_mode, ConflictPresentationMode::AgentAlgebraic);
+        assert_eq!(decoded.repo_id, original.repo_id);
+    }
+
+    #[test]
+    fn conflict_mode_variants_round_trip() {
+        use fg_core::models::ConflictPresentationMode;
+        for mode in [
+            ConflictPresentationMode::AgentAlgebraic,
+            ConflictPresentationMode::GitCompat,
+            ConflictPresentationMode::Diff3,
+        ] {
+            let meta = sample().with_conflict_mode(mode);
+            let encoded = meta.encode().expect("encode");
+            let decoded = MetaSection::decode(&encoded).expect("decode");
+            assert_eq!(decoded.conflict_mode, mode);
+        }
     }
 }

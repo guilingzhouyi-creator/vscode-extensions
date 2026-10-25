@@ -10,7 +10,9 @@
 //!     `GitDeltaOp` speaks Git's pack format; they are not interchangeable, and a caller that reached
 //!     for the wrong one would corrupt objects without any error.
 
+pub mod archive;
 pub mod backends;
+pub mod bundle;
 pub mod cas_backend;
 pub mod cas_bridge;
 pub mod commit_graph;
@@ -19,12 +21,15 @@ pub mod delta_codec;
 pub mod delta_git;
 pub mod loose;
 pub mod projection;
+pub mod repack;
 pub mod wal_journal;
 
+pub use archive::{ArchiveEntry, ArchiveFormat, ArchiveGenerator, TarWriter, ZipWriter};
 pub use backends::{
-    DeltaBaseSource, MultiPackIndex, OdbRouter, PackFile, PackIndex, PackLocation, PackedObject,
-    DEFAULT_ROUTER_CACHE_BYTES, MAX_CHAIN_DEPTH,
+    crc32_ieee, DeltaBaseSource, IdxWriter, MultiPackIndex, OdbRouter, PackEntryMeta, PackFile,
+    PackIndex, PackLocation, PackWriter, PackedObject, DEFAULT_ROUTER_CACHE_BYTES, MAX_CHAIN_DEPTH,
 };
+pub use bundle::{BundleEngine, BundleHeader, BundleReport, BUNDLE_V2_MAGIC};
 pub use cas_backend::CasBackend;
 pub use cas_bridge::{CasFileDescriptor, CasToGitMaterializer, MaterializeRequest};
 pub use commit_graph::{CommitGraphEntry, CommitGraphReader, CommitGraphWriter};
@@ -39,6 +44,7 @@ pub use delta_codec::{
 pub use delta_git::{apply_git_delta, decode_git_delta, GitDelta, GitDeltaOp};
 pub use loose::{write_loose_object, LooseOdb};
 pub use projection::{export_native_to_git, import_git_to_native, ExportReport, ImportReport};
+pub use repack::{scan_loose_objects, RepackEngine, RepackOptions, RepackReport};
 pub use wal_journal::{WalJournal, WalRecord};
 
 // Re-export InMemoryIndexTree from fg-index for storage convenience

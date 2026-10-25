@@ -8,8 +8,10 @@
 
 pub mod ipc;
 pub mod packetline;
+pub mod remote;
 pub mod smart_protocol;
 
 pub use ipc::{IpcCodec, IpcMessage};
 pub use packetline::{PacketLine, PKT_DELIM, PKT_FLUSH};
+pub use remote::{LoopbackTransport, MockTransport, RemoteRef, RemoteTransport};
 pub use smart_protocol::ProtocolV2Handler;

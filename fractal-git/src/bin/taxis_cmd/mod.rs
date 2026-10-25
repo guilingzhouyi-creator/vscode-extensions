@@ -11,9 +11,13 @@
 //! - `FGT-GAT-001`: Fractal Git domain gate guard
 
 pub mod abbrev;
+pub mod archive;
 pub mod bench;
+pub mod bisect;
 pub mod blackboard;
+pub mod blame;
 pub mod branch;
+pub mod bundle;
 pub mod checkout;
 pub mod cherry_pick;
 pub mod commit;
@@ -33,14 +37,17 @@ pub mod projection;
 pub mod promotion;
 pub mod read;
 pub mod rebase;
+pub mod rebase_state;
 pub mod reclaim;
 pub mod relocate;
+pub mod repack;
 pub mod repo_view;
 pub mod reset;
 pub mod rev_list;
 pub mod revert;
 pub mod stash;
 pub mod status;
+pub mod submodule;
 pub mod tag;
 pub mod tree_view;
 pub mod undo;

@@ -635,6 +635,7 @@ struct CoreHookSettings {
     hooks_path: Option<String>,
     enabled: Option<bool>,
     timeout_millis: Option<u64>,
+    authority_secret: Option<String>,
 }
 
 /// Resolves the hooks directory from config, defaulting to `<git-dir>/hooks`.
@@ -684,10 +685,23 @@ fn read_core_hook_settings(config_path: &Path) -> Option<CoreHookSettings> {
             settings.enabled = Some(parse_config_bool(&value));
         } else if key.eq_ignore_ascii_case("taxishooktimeout") {
             settings.timeout_millis = value.parse::<u64>().ok();
+        } else if key.eq_ignore_ascii_case("authoritysecret") {
+            settings.authority_secret = Some(value);
         }
     }
 
     Some(settings)
+}
+
+/// Reads the configured HMAC authority secret (`core.authoritysecret`).
+///
+/// Values may be 64 hex characters or at least 32 raw bytes; validation and the
+/// fail-closed missing-secret verdict belong to [`fg_core::models::AuthoritySecret`].
+pub fn read_core_authority_secret(config_path: &Path) -> Option<String> {
+    read_core_hook_settings(config_path)
+        .and_then(|settings| settings.authority_secret)
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 /// Interprets one Git boolean config value.

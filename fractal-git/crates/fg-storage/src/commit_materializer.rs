@@ -65,6 +65,31 @@ pub fn write_commit_objects(
     ref_store: &impl RefStore,
     request: &CommitMaterializationRequest,
 ) -> FractalResult<MaterializedCommit> {
+    write_commit_objects_inner(odb, ref_store, request, &[])
+}
+
+/// Writes every blob, the tree, and a commit object, appending extra parents after the
+/// reference's current parent.
+///
+/// A merge commit is the only caller that needs more than one parent: the first parent
+/// stays the tip of the target reference and every entry of additional_parents follows
+/// in order. The reference itself is left untouched, matching write_commit_objects'
+/// contract.
+pub fn write_commit_objects_with_parents(
+    odb: &impl OdbStore,
+    ref_store: &impl RefStore,
+    request: &CommitMaterializationRequest,
+    additional_parents: &[Oid],
+) -> FractalResult<MaterializedCommit> {
+    write_commit_objects_inner(odb, ref_store, request, additional_parents)
+}
+
+fn write_commit_objects_inner(
+    odb: &impl OdbStore,
+    ref_store: &impl RefStore,
+    request: &CommitMaterializationRequest,
+    additional_parents: &[Oid],
+) -> FractalResult<MaterializedCommit> {
     if request.files.is_empty() {
         return Err(FractalError::ObjectCodec(
             "commit must include at least one file".into(),
@@ -98,10 +123,12 @@ pub fn write_commit_objects(
     })?;
 
     let parent_oid = ref_store.get_ref(&request.target_ref)?;
+    let mut parent_oids: Vec<Oid> = parent_oid.iter().copied().collect();
+    parent_oids.extend(additional_parents.iter().copied());
 
     let commit = GitCommit::new(
         tree_oid,
-        parent_oid.iter().copied().collect(),
+        parent_oids,
         request.author.clone(),
         request.author.clone(),
         request.message.clone(),

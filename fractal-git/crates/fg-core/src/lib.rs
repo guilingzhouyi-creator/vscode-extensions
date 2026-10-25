@@ -20,12 +20,15 @@ pub use constants::{
 };
 
 pub use error::{FractalError, FractalResult};
+pub use models::{safe_join, validate_repo_relative_path};
 pub use models::{
-    ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityTier, AutoQualityScoreEnvelope,
-    BlackboardCollision, BlockProvenanceEntry, BlockProvenanceParams, CardBlackboard,
-    DiffCoherenceMode, FastOidHasher, FastOidMap, FastOidSet, FileMode, GitSignature,
-    HumanUacProof, IndexStage, IntentLease, Oid, PraxisCardContext, ProvenanceLedger,
-    StagedPromotionRequest, StagedPromotionStatus, TaxisPolicy, ValidatedCommitWitness,
+    ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityClaims, AuthoritySecret,
+    AuthorityTier, AutoQualityScoreEnvelope, BlackboardCollision, BlockProvenanceEntry,
+    BlockProvenanceParams, CardBlackboard, ConflictPresentationMode, DiffCoherenceMode,
+    FastOidHasher, FastOidMap, FastOidSet, FileMode, GitSignature, HumanUacProof, IndexStage,
+    IntentLease, Oid, PatchHunkChoice, PatchPlan, PraxisCardContext, ProvenanceLedger,
+    RebaseAction, RebaseItem, RebasePlan, RepoPath, StagedPromotionRequest, StagedPromotionStatus,
+    SubmoduleEntry, SubmoduleUpdateStrategy, SymbolClaim, TaxisPolicy, ValidatedCommitWitness,
 };
 pub use traits::{
     GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore, StagedCandidate,

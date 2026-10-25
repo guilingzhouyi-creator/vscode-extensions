@@ -25,7 +25,8 @@ use fractal_git::constants::cli::CliTag;
 use fractal_git::{DiskRefStore, OperationGraph, RepoViewSnapshot};
 
 use super::checkout::{
-    materialize_files, remove_stale_files, update_dirc_index, update_references,
+    materialize_files, plan_worktree_path, preflight_worktree_paths, remove_stale_files,
+    update_dirc_index, update_references,
 };
 use super::common::{fail_fatal, print_json, reject, CliContext};
 use super::repo_view::RepoView;
@@ -62,6 +63,26 @@ pub fn handle_reset(ctx: &CliContext) {
         Ok(resolved) => resolved,
         Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
     };
+
+    // Flatten and validate every path the reset would touch before the first state change: a
+    // hostile tree must fail while HEAD, the index, and the worktree still agree. `--soft` never
+    // touches a path, so it keeps Git's tolerance for a tree it will only point HEAD at.
+    let mut target_files = BTreeMap::new();
+    let mut current_files = BTreeMap::new();
+    if opts.mode != ResetMode::Soft {
+        if let Err(diff_err) = flatten_tree_for_diff(&view, &tree_oid, "", &mut target_files) {
+            reject(CliTag::ERROR, diff_err);
+        }
+        if opts.mode == ResetMode::Hard {
+            current_files = view
+                .head_commit()
+                .ok()
+                .flatten()
+                .and_then(|head_oid| flatten_commit_tree(&view, &head_oid).ok())
+                .unwrap_or_default();
+        }
+        preflight_reset_paths(&view, &target_files, &current_files);
+    }
 
     let effective_branch = view
         .head_branch()
@@ -112,25 +133,9 @@ pub fn handle_reset(ctx: &CliContext) {
                 target_commit,
                 effective_branch.as_deref(),
             );
-            let mut target_files = BTreeMap::new();
-            if let Err(diff_err) = flatten_tree_for_diff(&view, &tree_oid, "", &mut target_files) {
-                reject(CliTag::ERROR, diff_err);
-            }
             rebuild_mixed_dirc_index(&view, &target_files);
         }
         ResetMode::Hard => {
-            let current_files = view
-                .head_commit()
-                .ok()
-                .flatten()
-                .and_then(|head_oid| flatten_commit_tree(&view, &head_oid).ok())
-                .unwrap_or_default();
-
-            let mut target_files = BTreeMap::new();
-            if let Err(diff_err) = flatten_tree_for_diff(&view, &tree_oid, "", &mut target_files) {
-                reject(CliTag::ERROR, diff_err);
-            }
-
             remove_stale_files(view.work_root(), &current_files, &target_files);
             remove_index_only_files(&view, &target_files);
             let index_entries = materialize_files(&view, &target_files);
@@ -179,6 +184,33 @@ fn parse_reset_options(args: &[String]) -> ResetOptions {
     }
 }
 
+/// Rejects a target tree or staged index that would resolve outside the worktree.
+///
+/// Both sides are untrusted input: a tree imported from a remote can name `..` or a device node,
+/// and a corrupted index can too. Checking both here means the reset fails while the worktree and
+/// the index still agree, instead of after one of them has been rewritten.
+fn preflight_reset_paths(
+    view: &RepoView,
+    target_files: &BTreeMap<String, TreeEntry>,
+    current_files: &BTreeMap<String, TreeEntry>,
+) {
+    let paths = target_files
+        .keys()
+        .chain(current_files.keys())
+        .map(String::as_str);
+    if let Err(detail) = preflight_worktree_paths(view.work_root(), paths) {
+        reject(CliTag::ERROR, detail);
+    }
+    let Ok(Some(index)) = view.index() else {
+        return;
+    };
+    for entry in index.entries() {
+        if let Err(detail) = plan_worktree_path(view.work_root(), &entry.path) {
+            reject(CliTag::ERROR, detail);
+        }
+    }
+}
+
 /// Deletes files that only the index tracks, as `git reset --hard` does for staged additions.
 ///
 /// A path staged but absent from both HEAD and the target commit has no history to rebuild it
@@ -191,7 +223,10 @@ fn remove_index_only_files(view: &RepoView, target_files: &BTreeMap<String, Tree
         if entry.stage != IndexStage::Normal || target_files.contains_key(&entry.path) {
             continue;
         }
-        let full_path = view.work_root().join(&entry.path);
+        let full_path = match plan_worktree_path(view.work_root(), &entry.path) {
+            Ok(full_path) => full_path,
+            Err(detail) => reject(CliTag::ERROR, detail),
+        };
         if full_path.is_file() || full_path.is_symlink() {
             let _ = fs::remove_file(&full_path);
         }
@@ -213,7 +248,10 @@ fn rebuild_mixed_dirc_index(view: &RepoView, target_files: &BTreeMap<String, Tre
     let mut index_entries = Vec::with_capacity(target_files.len());
 
     for (path, tree_entry) in target_files {
-        let full_path = view.work_root().join(path);
+        let full_path = match plan_worktree_path(view.work_root(), path) {
+            Ok(full_path) => full_path,
+            Err(detail) => reject(CliTag::ERROR, detail),
+        };
         let (size, mtime_sec, mtime_nano) = if let Ok(meta) = fs::metadata(&full_path) {
             let mtime = meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
             let duration = mtime

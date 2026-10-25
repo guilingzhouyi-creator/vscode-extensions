@@ -4,6 +4,7 @@
 //!   enforcing human-exclusive control on dual trunks and agent sandbox boundary isolation.
 
 use fg_core::error::{FractalError, FractalResult};
+use fg_core::models::{current_unix_seconds, AUTHORITY_REMEDIATION};
 pub use fg_core::models::{ActorIdentity, AgentPushContext, TaxisPolicy};
 use fg_topology::refs::FractalRef;
 
@@ -60,7 +61,7 @@ impl PreReceiveGuard {
                             });
                         }
                         ActorIdentity::Human { .. } => {
-                            Self::assert_human_credential_present(target_ref, actor)?;
+                            Self::assert_human_authority(target_ref, actor, policy)?;
                         }
                     }
                     return Ok(());
@@ -77,7 +78,7 @@ impl PreReceiveGuard {
                             });
                         }
                         ActorIdentity::Human { .. } => {
-                            Self::assert_human_credential_present(target_ref, actor)?;
+                            Self::assert_human_authority(target_ref, actor, policy)?;
                         }
                     }
                     return Ok(());
@@ -158,20 +159,24 @@ impl PreReceiveGuard {
         }
     }
 
-    /// Rejects a human authority claim that carries no credential.
-    fn assert_human_credential_present(
+    /// Verifies a human authority claim cryptographically (fail-closed).
+    ///
+    /// A non-blank token is only a claim: the MAC, expiry, and signed subject are
+    /// all checked here, and a missing configured secret rejects instead of
+    /// disabling verification.
+    fn assert_human_authority(
         target_ref: &FractalRef,
         actor: &ActorIdentity,
+        policy: &TaxisPolicy,
     ) -> FractalResult<()> {
-        if actor.has_authority_credential() {
-            return Ok(());
-        }
-        Err(FractalError::TopologyBreach {
-            source_ref: actor.display_name(),
-            target_ref: target_ref.to_git_ref(),
-            reason: "Human Control Breach: human authority claim carries no credential; \
-                     pass a verified --token for dual trunk writes"
-                .into(),
-        })
+        let now_secs = current_unix_seconds();
+        actor
+            .verify_authority(policy.authority_secret.as_ref(), now_secs)
+            .map(|_| ())
+            .map_err(|error| FractalError::TopologyBreach {
+                source_ref: actor.display_name(),
+                target_ref: target_ref.to_git_ref(),
+                reason: format!("Human Control Breach: {error}; {AUTHORITY_REMEDIATION}"),
+            })
     }
 }

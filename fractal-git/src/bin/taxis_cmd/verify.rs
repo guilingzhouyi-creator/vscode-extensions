@@ -12,12 +12,17 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-GAT-001`: Fractal Git domain gate guard
 
+use fg_core::models::{current_unix_seconds, AuthoritySecret};
+use fractal_git::constants::cli::CliTag;
 use fractal_git::{
     ActorIdentity, AgentPushContext, CommitMessageGuard, ConflictGuard, FractalRef,
     PreReceiveGuard, QuotaGovernor, TaxisPolicy,
 };
 
-use super::common::{print_json, CliContext};
+use super::common::{print_json, reject, CliContext};
+
+/// Fixture secret backing the deterministic `taxis verify` self-test.
+const FIXTURE_SECRET_BYTES: [u8; 32] = [7u8; 32];
 
 /// Runs multi-tier gate verification across authority, message, conflict, and quota checks.
 pub fn handle_verify(ctx: &CliContext) {
@@ -28,12 +33,18 @@ pub fn handle_verify(ctx: &CliContext) {
         is_force_push: false,
     };
     let agent_actor = ActorIdentity::agent(agent_ctx);
-    let human_actor = ActorIdentity::human(
-        "Supervisor",
-        "supervisor@internal",
-        "gate-selftest-credential",
-    );
-    let policy = TaxisPolicy::rust_strict();
+    let secret = match AuthoritySecret::from_bytes(&FIXTURE_SECRET_BYTES) {
+        Ok(secret) => secret,
+        Err(secret_err) => reject(
+            CliTag::ERROR,
+            format!("fixture authority secret: {secret_err}"),
+        ),
+    };
+    let now_secs = current_unix_seconds();
+    let token = issue_token(&secret, "Supervisor", 3600, now_secs);
+    let human_actor = ActorIdentity::human("Supervisor", "supervisor@internal", token.clone());
+    let mut policy = TaxisPolicy::rust_strict();
+    policy.authority_secret = Some(secret.clone());
 
     let trunk_ref = FractalRef::Trunk;
     let subagent_ref = FractalRef::SubAgentWorktree {
@@ -52,7 +63,36 @@ pub fn handle_verify(ctx: &CliContext) {
     let unverified_human = ActorIdentity::unverified_human("Supervisor", "supervisor@internal");
     let credential_ok =
         PreReceiveGuard::assert_actor_authorized(&trunk_ref, &unverified_human, &policy).is_err();
-    let pre_receive_ok = agent_blocked && human_allowed && subagent_allowed && credential_ok;
+    let tampered_human =
+        ActorIdentity::human("Supervisor", "supervisor@internal", tamper_token(&token));
+    let tampered_blocked =
+        PreReceiveGuard::assert_actor_authorized(&trunk_ref, &tampered_human, &policy).is_err();
+    let expired_human = ActorIdentity::human(
+        "Supervisor",
+        "supervisor@internal",
+        issue_token(&secret, "Supervisor", 0, now_secs - 10),
+    );
+    let expired_blocked =
+        PreReceiveGuard::assert_actor_authorized(&trunk_ref, &expired_human, &policy).is_err();
+    let mismatched_human = ActorIdentity::human(
+        "Supervisor",
+        "supervisor@internal",
+        issue_token(&secret, "Auditor", 3600, now_secs),
+    );
+    let subject_mismatch_blocked =
+        PreReceiveGuard::assert_actor_authorized(&trunk_ref, &mismatched_human, &policy).is_err();
+    let secretless_policy = TaxisPolicy::rust_strict();
+    let secretless_blocked =
+        PreReceiveGuard::assert_actor_authorized(&trunk_ref, &human_actor, &secretless_policy)
+            .is_err();
+    let pre_receive_ok = agent_blocked
+        && human_allowed
+        && subagent_allowed
+        && credential_ok
+        && tampered_blocked
+        && expired_blocked
+        && subject_mismatch_blocked
+        && secretless_blocked;
 
     // Tier 2: conventional semantic message validation
     let valid_msg = concat!(
@@ -135,4 +175,24 @@ fn report_verify(
     } else {
         println!("Result: GATE VERIFICATION FAILED (see per-tier verdicts above)");
     }
+}
+
+/// Issues a fixture token or exits with the typed authority rejection tag.
+fn issue_token(secret: &AuthoritySecret, subject: &str, ttl_secs: u64, now_secs: i64) -> String {
+    match secret.issue(subject, ttl_secs, now_secs) {
+        Ok(token) => token,
+        Err(issue_err) => reject(
+            CliTag::AUTHORITY_BREACH,
+            format!("fixture token issuance failed: {issue_err}"),
+        ),
+    }
+}
+
+/// Flips the final MAC nibble to produce a structurally valid but forged token.
+fn tamper_token(token: &str) -> String {
+    let mut tampered = token.to_string();
+    if let Some(last) = tampered.pop() {
+        tampered.push(if last == '0' { '1' } else { '0' });
+    }
+    tampered
 }

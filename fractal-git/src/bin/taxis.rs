@@ -16,13 +16,15 @@ use std::env;
 use std::path::PathBuf;
 
 mod taxis_cmd;
-use taxis_cmd::common::{reject, CliContext};
+use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
-    bench, blackboard, branch, checkout, cherry_pick, commit, daemon, diff, doctor, init, log,
-    merge, operation, projection, promotion, read, rebase, reclaim, relocate, reset, rev_list,
-    revert, stash, status, tag, undo, verify, worktree,
+    archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, commit, config, daemon, diff, doctor, init, log,
+    merge, operation, projection, promotion, read, rebase, reclaim, relocate, repack, reset,
+    rev_list, revert, stash, status, submodule, tag, undo, verify, worktree,
 };
 
+use fg_core::models::current_unix_seconds;
+use fg_gate::authority::resolve_authority_secret;
 use fractal_git::constants::cli::CliTag;
 
 fn resolve_canonical_subcommand(raw: &str) -> &str {
@@ -40,6 +42,13 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["git-export", "export"], "git-export"),
         (&["git-import", "import"], "git-import"),
         (&["gc", "clean", "reclaim"], "reclaim"),
+        (&["repack", "pack-objects"], "repack"),
+        (&["config", "cfg"], "config"),
+        (&["submodule", "sub"], "submodule"),
+        (&["archive"], "archive"),
+        (&["bundle"], "bundle"),
+        (&["blame"], "blame"),
+        (&["bisect"], "bisect"),
         (&["serve", "daemon"], "daemon"),
         (&["lg", "log"], "log"),
         (&["sh", "show"], "show"),
@@ -57,6 +66,7 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["undo"], "undo"),
         (&["op", "operation"], "operation"),
         (&["rev-list"], "rev-list"),
+        (&["authority", "auth"], "authority"),
         (&["version", "-v", "--version"], "version"),
         (&["help", "-h", "--help"], "help"),
     ];
@@ -103,7 +113,9 @@ Native Fractal Commands (with Git Alias Mappings):
   undo               Revert repository state to predecessor operation (Jujutsu-style)
   operation, op      Inspect immutable Operation Log DAG history
   verify,   check    Run pre-receive guard, conflict marker scanner & quota checks
+  authority, auth    Issue or verify HMAC authority credentials (--subject / --token)
   reclaim,  gc       Trigger zero-allocation worktree & sandbox reclamation
+  repack             Consolidate loose objects into Git packfiles and index v2 (--async, --window)
   worktree, wt       Display or allocate scoped projection worktree (--scope / --full)
   blackboard, bb     Manage concurrent SubAgent intent leases (claim, check, release, list)
   promotion, pm      Manage staged promotions to System Trunk with Human GUI UAC gate
@@ -240,7 +252,15 @@ fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
         "operation" => operation::handle_operation(ctx),
         "rev-list" => rev_list::handle_rev_list(ctx),
         "verify" => verify::handle_verify(ctx),
+        "authority" => handle_authority(ctx),
         "reclaim" => reclaim::handle_reclaim(ctx),
+        "repack" | "pack-objects" => repack::handle_repack(ctx),
+        "config" => config::handle_config(ctx),
+        "submodule" => submodule::handle_submodule(ctx),
+        "archive" => archive::handle_archive(ctx),
+        "bundle" => bundle::handle_bundle(ctx),
+        "blame" => blame::handle_blame(ctx),
+        "bisect" => bisect::handle_bisect(ctx),
         "daemon" => daemon::handle_daemon(ctx),
         "version" => {
             print_banner();
@@ -251,6 +271,98 @@ fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
     }
 }
 
+/// Issues and verifies HMAC authority credentials.
+fn handle_authority(ctx: &CliContext) {
+    let action = ctx.args.first().map(String::as_str).unwrap_or("help");
+    match action {
+        "issue" => issue_authority(ctx),
+        "verify" => verify_authority(ctx),
+        "help" | "-h" | "--help" => println!(
+            "Usage: taxis authority <action>\n  \
+             issue  --subject <name> [--ttl <seconds>]  Mint a human authority token\n  \
+             verify --token <credential>                Verify a token against the local secret"
+        ),
+        other => reject(
+            CliTag::ERROR,
+            format!("unknown authority action '{other}'; use 'issue' or 'verify'"),
+        ),
+    }
+}
+
+/// Mints one authority token for a named human subject.
+fn issue_authority(ctx: &CliContext) {
+    let secret = resolve_authority_secret(&ctx.git_dir).unwrap_or_else(|secret_err| {
+        reject(
+            CliTag::AUTHORITY_BREACH,
+            format!("authority secret unavailable: {secret_err}"),
+        )
+    });
+    let subject = find_arg_value(&ctx.args, &["--subject"]).unwrap_or_else(|| {
+        reject(CliTag::ERROR, "authority issue requires --subject <name>")
+    });
+    let ttl_secs = match find_arg_value(&ctx.args, &["--ttl"]).unwrap_or("3600").parse::<u64>() {
+        Ok(ttl) if ttl > 0 => ttl,
+        _ => reject(
+            CliTag::ERROR,
+            "--ttl must be a positive integer number of seconds",
+        ),
+    };
+    let now_secs = current_unix_seconds();
+    let token = match secret.issue(subject, ttl_secs, now_secs) {
+        Ok(token) => token,
+        Err(issue_err) => reject(
+            CliTag::AUTHORITY_BREACH,
+            format!("authority issue failed: {issue_err}"),
+        ),
+    };
+    if ctx.json_mode {
+        print_json(&serde_json::json!({
+            "engine": "taxis",
+            "operation": "authority issue",
+            "token": token,
+            "subject": subject,
+            "issued_at": now_secs,
+            "expires_at": now_secs + (ttl_secs as i64),
+        }));
+        return;
+    }
+    println!("{token}");
+}
+
+/// Verifies one presented authority token against the local secret.
+fn verify_authority(ctx: &CliContext) {
+    let secret = resolve_authority_secret(&ctx.git_dir).unwrap_or_else(|secret_err| {
+        reject(
+            CliTag::AUTHORITY_BREACH,
+            format!("authority secret unavailable: {secret_err}"),
+        )
+    });
+    let token = find_arg_value(&ctx.args, &["--token"]).unwrap_or_else(|| {
+        reject(CliTag::ERROR, "authority verify requires --token <credential>")
+    });
+    let claims = match secret.verify(token, current_unix_seconds()) {
+        Ok(claims) => claims,
+        Err(verify_err) => reject(
+            CliTag::AUTHORITY_BREACH,
+            format!("authority verify failed: {verify_err}"),
+        ),
+    };
+    if ctx.json_mode {
+        print_json(&serde_json::json!({
+            "engine": "taxis",
+            "operation": "authority verify",
+            "valid": true,
+            "subject": claims.subject,
+            "issued_at": claims.issued_at,
+            "expires_at": claims.expires_at,
+        }));
+        return;
+    }
+    println!(
+        "valid: subject={} issued_at={} expires_at={}",
+        claims.subject, claims.issued_at, claims.expires_at
+    );
+}
 /// Rejects a subcommand that has no native implementation.
 fn reject_unimplemented(subcommand: &str) -> ! {
     reject(
@@ -259,7 +371,7 @@ fn reject_unimplemented(subcommand: &str) -> ! {
             "'{subcommand}' has no native implementation in this build. \
              Implemented: init, doctor, relocate, git-export, git-import, status, branch, commit, diff, cat-file, ls-tree, \
              ls-files, show-ref, for-each-ref, check-ignore, log, show, checkout, merge, reset, tag, cherry-pick, revert, \
-             stash, rebase, worktree, blackboard, promotion, bench, undo, operation, rev-list, verify, reclaim, daemon, version, help."
+             stash, rebase, repack, worktree, blackboard, promotion, bench, undo, operation, rev-list, verify, authority, reclaim, daemon, version, help."
         ),
     )
 }

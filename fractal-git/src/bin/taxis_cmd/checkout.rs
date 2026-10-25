@@ -18,12 +18,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[cfg(unix)]
 use fg_core::models::FileMode;
-use fg_core::models::{IndexStage, Oid};
-use fg_index::{write_dirc_v2, IndexEntry};
+use fg_core::models::{safe_join, IndexStage, Oid};
+use fg_index::{write_dirc_v2, DirtyCollision, DirtyCollisionKind, DirtyWorktreeGuard, IndexEntry};
 use fg_native::sections::head::HeadState as NativeHeadState;
 use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
 use fg_native::sections::refs::RefRecord;
@@ -86,6 +86,15 @@ pub fn handle_checkout(ctx: &CliContext) {
     }
 
     let carried = check_switch_conflicts(&view, &current_files, &new_files, opts.force);
+    // Resolve the target tree before deleting anything: one hostile path must abort the switch
+    // while the worktree still describes the old tree, not after the stale files are already
+    // gone. remove_stale_files only guards the paths it deletes, so the target side is checked
+    // here first.
+    if let Err(detail) =
+        preflight_worktree_paths(view.work_root(), new_files.keys().map(String::as_str))
+    {
+        reject(CliTag::ERROR, detail);
+    }
     remove_stale_files(view.work_root(), &current_files, &new_files);
     let existing_index = load_index_entries(view.git_dir());
     let index_entries = materialize_files_preserving(&view, &new_files, &carried, &existing_index);
@@ -167,37 +176,23 @@ fn check_switch_conflicts(
         )
         .collect();
     let status = collect_status(view).unwrap_or_default();
-    let untracked_collisions: Vec<&str> = status
-        .iter()
-        .filter(|entry| entry.is_untracked() && new_files.contains_key(&entry.path))
-        .map(|entry| entry.path.as_str())
-        .collect();
-    let overwritten: Vec<&str> = status
-        .iter()
-        .filter(|entry| !entry.is_untracked() && changed.contains(&entry.path))
-        .map(|entry| entry.path.as_str())
-        .collect();
-    if !force {
-        if !overwritten.is_empty() {
-            reject(
-                CliTag::ERROR,
-                format!(
-                    "Your local changes to the following files would be overwritten by checkout:\n  \
-                     {}\nPlease commit your changes or use --force to overwrite them.",
-                    overwritten.join("\n  ")
-                ),
-            );
+    let mut collisions = Vec::new();
+    for entry in &status {
+        if entry.is_untracked() && new_files.contains_key(&entry.path) {
+            collisions.push(DirtyCollision::new(
+                entry.path.as_str(),
+                DirtyCollisionKind::UntrackedOverwritten,
+            ));
+        } else if !entry.is_untracked() && changed.contains(&entry.path) {
+            collisions.push(DirtyCollision::new(
+                entry.path.as_str(),
+                DirtyCollisionKind::UnstagedModified,
+            ));
         }
-        if !untracked_collisions.is_empty() {
-            reject(
-                CliTag::ERROR,
-                format!(
-                    "The following untracked working tree files would be overwritten by checkout:\n  \
-                     {}\nPlease move or remove them before you switch branches.",
-                    untracked_collisions.join("\n  ")
-                ),
-            );
-        }
+    }
+    if !force && !collisions.is_empty() {
+        let msg = DirtyWorktreeGuard::format_rejection(&collisions, "checkout");
+        reject(CliTag::ERROR, msg);
     }
     new_files
         .keys()
@@ -235,20 +230,23 @@ pub(crate) fn assert_worktree_cleanliness(view: &RepoView, force: bool) {
         return;
     }
     if let Ok(status) = collect_status(view) {
-        let dirty_paths: Vec<&str> = status
-            .iter()
-            .filter(|s| s.is_staged() || s.is_unstaged())
-            .map(|s| s.path.as_str())
-            .collect();
-        if !dirty_paths.is_empty() {
-            reject(
-                CliTag::ERROR,
-                format!(
-                    "Your local changes would be overwritten by checkout:\n  {}\nPlease commit your \
-                     changes or use --force to overwrite them.",
-                    dirty_paths.join("\n  ")
-                ),
-            );
+        let mut collisions = Vec::new();
+        for s in &status {
+            if s.is_staged() {
+                collisions.push(DirtyCollision::new(
+                    s.path.as_str(),
+                    DirtyCollisionKind::StagedModified,
+                ));
+            } else if s.is_unstaged() {
+                collisions.push(DirtyCollision::new(
+                    s.path.as_str(),
+                    DirtyCollisionKind::UnstagedModified,
+                ));
+            }
+        }
+        if !collisions.is_empty() {
+            let msg = DirtyWorktreeGuard::format_rejection(&collisions, "checkout");
+            reject(CliTag::ERROR, msg);
         }
     }
 }
@@ -278,20 +276,55 @@ fn resolve_effective_branch(view: &RepoView, opts: &CheckoutOptions) -> Option<S
     None
 }
 
+/// Resolves a repository-relative tree path under the worktree root through the shared path jail.
+///
+/// A tree imported from an untrusted source can name `..`, an absolute path, a drive letter, or a
+/// Windows device node. Joining such a spelling would place the write or deletion outside the
+/// worktree, so every materialization and reclamation path goes through [`safe_join`] first. The
+/// caller receives a `[PATH_ESCAPE]` rejection instead of a skipped entry: skipping would leave the
+/// index and the worktree describing two different trees without telling anyone.
+pub(crate) fn plan_worktree_path(work_root: &Path, rel: &str) -> Result<PathBuf, String> {
+    safe_join(work_root, rel).map_err(|err| format!("[PATH_ESCAPE] {err}"))
+}
+
+/// Checks every path a command is about to act on before it mutates the worktree or index.
+///
+/// A reset rewrites the whole worktree, so one invalid path discovered late would leave the
+/// repository half-switched. Callers run this first and turn the reported escape into a rejection
+/// while nothing has been touched yet.
+pub(crate) fn preflight_worktree_paths<'a>(
+    work_root: &Path,
+    paths: impl IntoIterator<Item = &'a str>,
+) -> Result<(), String> {
+    for path in paths {
+        plan_worktree_path(work_root, path)?;
+    }
+    Ok(())
+}
+
 /// Removes worktree files and empty parent directories that are absent in the target tree.
 pub(crate) fn remove_stale_files(
     work_root: &Path,
     current_files: &BTreeMap<String, TreeEntry>,
     new_files: &BTreeMap<String, TreeEntry>,
 ) {
-    for old_path in current_files.keys() {
-        if new_files.contains_key(old_path) {
-            continue;
-        }
-        let full_path = work_root.join(old_path);
+    // Resolve every stale entry before deleting the first one: a rejection half-way through the
+    // loop would leave a partially cleaned worktree and an error the caller cannot undo.
+    let stale_paths: Vec<PathBuf> = current_files
+        .keys()
+        .filter(|old_path| !new_files.contains_key(*old_path))
+        .map(|old_path| match plan_worktree_path(work_root, old_path) {
+            Ok(full_path) => full_path,
+            Err(detail) => reject(CliTag::ERROR, detail),
+        })
+        .collect();
+
+    for full_path in stale_paths {
         if full_path.is_file() || full_path.is_symlink() {
             let _ = fs::remove_file(&full_path);
         }
+        // Reuse the jailed path for the empty-parent walk: joining `old_path` again here would
+        // reintroduce exactly the unchecked spelling the planner rejected.
         let mut cursor = full_path.parent();
         while let Some(parent) = cursor {
             if parent == work_root || !parent.starts_with(work_root) {
@@ -320,10 +353,21 @@ fn materialize_files_preserving(
     carried: &BTreeSet<String>,
     existing_index: &BTreeMap<String, IndexEntry>,
 ) -> Vec<IndexEntry> {
+    // Resolve every entry before writing the first byte: with an invalid path anywhere in the
+    // tree, rejecting up front leaves the worktree exactly as it was instead of half-materialized.
+    let planned_paths: Vec<(&String, &TreeEntry, PathBuf)> = new_files
+        .iter()
+        .map(
+            |(path, tree_entry)| match plan_worktree_path(view.work_root(), path) {
+                Ok(full_path) => (path, tree_entry, full_path),
+                Err(detail) => reject(CliTag::ERROR, detail),
+            },
+        )
+        .collect();
+
     let mut index_entries = Vec::with_capacity(new_files.len());
 
-    for (path, tree_entry) in new_files {
-        let full_path = view.work_root().join(path);
+    for (path, tree_entry, full_path) in planned_paths {
         if carried.contains(path) && full_path.exists() && !full_path.is_symlink() {
             // The path is identical in both trees, so the switch has no reason to touch it. Reuse
             // the recorded entry when there is one, because a staged edit lives in the index and
@@ -629,5 +673,89 @@ mod tests {
         let opts2 = parse_checkout_options(&args2);
         assert_eq!(opts2.target, "dev");
         assert!(opts2.force);
+    }
+
+    #[test]
+    fn plan_worktree_path_accepts_ordinary_relative_paths() {
+        let root = Path::new("/work/repo");
+        for rel in ["a.txt", "src/main.rs", "src/deep/mod.rs", ".gitmodules"] {
+            let resolved = plan_worktree_path(root, rel).expect("valid tree path");
+            assert_eq!(resolved, root.join(rel));
+        }
+    }
+
+    #[test]
+    fn plan_worktree_path_rejects_traversal_and_absolute_spellings() {
+        let root = Path::new(concat!("C:", "/work/repo"));
+        for rel in [
+            "../evil",
+            "../../etc/passwd",
+            "/abs",
+            concat!("C:", "/x"),
+            "a\\b",
+            "src/../../evil",
+            "src/./main.rs",
+            "src//main.rs",
+        ] {
+            let failure = plan_worktree_path(root, rel).expect_err("path must be rejected");
+            assert!(
+                failure.starts_with("[PATH_ESCAPE]"),
+                "rejection must carry the PATH_ESCAPE tag, got: {failure}"
+            );
+        }
+    }
+
+    #[test]
+    fn plan_worktree_path_rejects_windows_reinterpretation() {
+        let root = Path::new(concat!("C:", "/work/repo"));
+        for rel in [
+            "CON",
+            "src/aux",
+            "file:stream",
+            "src/trailing.",
+            "src/trailing ",
+        ] {
+            assert!(plan_worktree_path(root, rel).is_err(), "accepted '{rel}'");
+        }
+    }
+
+    #[test]
+    fn preflight_worktree_paths_reports_the_first_escape() {
+        let root = Path::new(concat!("C:", "/work/repo"));
+        assert!(preflight_worktree_paths(root, ["a.txt", "src/main.rs"]).is_ok());
+        let failure = preflight_worktree_paths(root, ["a.txt", "../../escape", "b.txt"])
+            .expect_err("an escape anywhere in the batch must reject the whole batch");
+        assert!(failure.starts_with("[PATH_ESCAPE]"), "got: {failure}");
+    }
+
+    #[test]
+    fn rejected_paths_never_touch_the_filesystem() {
+        let root = tempfile::tempdir().expect("temporary worktree root");
+        let outside = root.path().parent().expect("parent of the temporary root");
+        let canary = outside.join("path-jail-canary.txt");
+        assert!(!canary.exists(), "canary file must not pre-exist");
+
+        for rel in [
+            "../path-jail-canary.txt",
+            "/tmp/path-jail-canary.txt",
+            concat!("C:", "/x"),
+            "a\\b",
+            "CON",
+            "file:stream",
+        ] {
+            assert!(
+                plan_worktree_path(root.path(), rel).is_err(),
+                "accepted '{rel}'"
+            );
+        }
+
+        let entries: Vec<_> = std::fs::read_dir(root.path())
+            .expect("read worktree root")
+            .collect();
+        assert!(
+            entries.is_empty(),
+            "rejected paths created files in the worktree"
+        );
+        assert!(!canary.exists(), "rejected path escaped the worktree");
     }
 }

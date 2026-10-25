@@ -58,9 +58,9 @@ pub use fg_core::error::{FractalError, FractalResult};
 pub use fg_core::models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityTier, AutoQualityScoreEnvelope,
     BlackboardCollision, BlockProvenanceEntry, BlockProvenanceParams, CardBlackboard, ChangeId,
-    DiffCoherenceMode, FileMode, GitSignature, HumanUacProof, IndexStage, IntentLease, Oid,
-    PraxisCardContext, ProvenanceLedger, StagedPromotionRequest, StagedPromotionStatus,
-    TaxisPolicy, ValidatedCommitWitness,
+    ConflictPresentationMode, DiffCoherenceMode, FileMode, GitSignature, HumanUacProof, IndexStage,
+    IntentLease, Oid, PraxisCardContext, ProvenanceLedger, StagedPromotionRequest,
+    StagedPromotionStatus, TaxisPolicy, ValidatedCommitWitness,
 };
 pub use fg_core::traits::{
     GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore, StagedCandidate,
@@ -72,7 +72,10 @@ pub use fg_object::{
 };
 
 // Index exports
-pub use fg_index::{ConflictStageSlot, InMemoryIndexTree, StagingEntry};
+pub use fg_index::{
+    ConflictStageSlot, DirtyCollision, DirtyCollisionKind, DirtyWorktreeGuard, InMemoryIndexTree,
+    StagingEntry,
+};
 
 // Algorithm exports
 pub use fg_algorithms::cdc::{ChunkDescriptor, FastCdcChunker};
@@ -102,6 +105,10 @@ pub use fg_pools::sandbox_pool::{SandboxPool, SandboxSlot};
 pub use fg_pools::worktree_pool::{WorktreeDescriptor, WorktreeMode, WorktreePool};
 
 // Storage exports
+pub use fg_storage::backends::{
+    IdxWriter, MultiPackIndex, OdbRouter, PackFile, PackIndex, PackLocation, PackWriter,
+    PackedObject,
+};
 pub use fg_storage::cas_backend::CasBackend;
 pub use fg_storage::cas_bridge::{CasFileDescriptor, CasToGitMaterializer, MaterializeRequest};
 pub use fg_storage::commit_graph::{CommitGraphEntry, CommitGraphReader, CommitGraphWriter};
@@ -110,11 +117,15 @@ pub use fg_storage::commit_materializer::{
     CommitMaterializationRequest, MaterializedCommit,
 };
 pub use fg_storage::loose::{write_loose_object, LooseOdb};
+pub use fg_storage::repack::{scan_loose_objects, RepackEngine, RepackOptions, RepackReport};
 pub use fg_storage::wal_journal::{WalJournal, WalRecord};
 
 // Topology exports
 pub use fg_topology::authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
 pub use fg_topology::blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
+pub use fg_topology::conflict_tree::{
+    AgentConflictSliceReport, ConflictSlice, ConflictTreeManager,
+};
 pub use fg_topology::operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
 pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use fg_topology::provenance::{DiskProvenanceStore, PROVENANCE_FILE};
