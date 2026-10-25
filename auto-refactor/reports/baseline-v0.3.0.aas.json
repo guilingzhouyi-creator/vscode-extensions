@@ -1,0 +1,32 @@
+{
+  "schema": "aas-v1",
+  "tool": "auto-refactor",
+  "version": "0.4.0",
+  "timestamp": "2026-10-06T12:53:31.544Z",
+  "root": "",
+  "verdict": "WARN",
+  "health": {
+    "score": 99.35,
+    "grade": "N/A",
+    "counts": {
+      "files": 0,
+      "total": 23,
+      "errors": 0,
+      "warns": 23,
+      "info": 0,
+      "suppressed": 2029
+    }
+  },
+  "defaultVerify": "npm test",
+  "dimensions": {},
+  "bottlenecks": [],
+  "topology": {
+    "L1_CONTRACT": [],
+    "L2_INFRA": [],
+    "L3_CONFIG": [],
+    "L4_BUSINESS": [],
+    "L5_GOVERNANCE": []
+  },
+  "files": {},
+  "truncated": 23
+}
