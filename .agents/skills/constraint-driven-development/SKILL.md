@@ -1,8 +1,7 @@
 ---
 name: constraint-driven-development
 description: >-
-  约束驱动开发（Floor Guard 底线守卫与单调棘轮）及交割前五步对抗性证伪复审（Doubt Cycle）规范。
-  指导 Agent 将复杂度、内存、测试与零技术债定义为刚性机器契约，并在交付前主动证伪隐含假设与边界漏洞。
+  【触发：交割/验收/证伪/Doubt/阈值下调/测试弱化/半成品】完成特性交付、声称修复完成或合入前对抗性证伪时必须触发。落实 Floor Guard 刚性底线与单调棘轮，主动推翻边界假设与脆弱实现。
 ---
 
 # constraint-driven-development — 刚性底线守卫、质量棘轮与对抗性证伪规范
@@ -10,6 +9,22 @@ description: >-
 本技能将编码前的**约束驱动底线守卫（Floor Guard & Ratchet Principle）**与编码完成后的**五步怀疑驱动对抗性证伪复审（Doubt Cycle）**合二为一：先以不可妥协的机器量化预算锁死底线，再在交割前假设作者过度自信，主动证伪未言明的边界假设与隐式耦合。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）；门禁与命令面基础设施（领域支援）；技能与规则元治理（领域支援）；工作区元治理与并行交付（链上第 2 步） |
+| **前置** | [batch-commit](../batch-commit/SKILL.md) |
+| **接续** | [docs-archive-governance](../docs-archive-governance/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md)、[test-benchmark-engineering](../test-benchmark-engineering/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 质量契约四大物理支柱与底线守卫 (The Floor Guard)
 

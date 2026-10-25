@@ -1,20 +1,34 @@
 ---
 name: auto-refactor-dev
 description: >-
-  auto-refactor 静态分析重构引擎、Rust+TS 双轨内核与 Praxis 客户端 SDK 开发规范。指导 Agent 在
-  auto-refactor 项目中维护全套内置分析器与规则体系，看守 Rust 与 TS 100% 字节等价、
-  四阶段流水线拓扑、一体两面 Diff 引擎、名义量纲烙印与高精度暂存落盘规范。
+  【触发：auto重构/分析器/内核/Praxis/重构引擎/双轨等价/流水线】开发、修改或测试 auto-refactor 项目代码时必须使用。看守 Rust 与 TS 双轨 100% 字节等价、四阶段流水线拓扑、Diff 引擎与暂存落盘规范。
 ---
 
 # auto-refactor-dev — 静态重构引擎、双轨算子与 Praxis SDK 开发规范
 
-本技能规范了 `auto-refactor/` 的六层架构、Rust+TS 双轨 100% 字节等价、<!-- METRICS:BEGIN analyzer-count -->**31 个**<!-- METRICS:END analyzer-count -->内置分析器四阶段流水线（Stage 0~3）、<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->治理体系（<!-- METRICS:BEGIN test-suite-count -->**170 套**<!-- METRICS:END test-suite-count -->测试）、Praxis 客户端 SDK 与一体两面三层拓扑 Diff 引擎。
+本技能规范了 `auto-refactor/` 的六层架构、Rust+TS 双轨 100% 字节等价、<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器四阶段流水线（Stage 0~3）、<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->治理体系（<!-- METRICS:BEGIN test-suite-count -->**176 套**<!-- METRICS:END test-suite-count -->测试）、Praxis 客户端 SDK 与一体两面三层拓扑 Diff 引擎。
 
 ---
 
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 自动重构内核（领域入口） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | [rust-engineering](../rust-engineering/SKILL.md) |
+| **并行支援** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md) |
+| **领域链** | 自动重构内核：auto-refactor-dev → rust-engineering → algorithmic-operator-engineering → telemetry-statistical-modeling → test-benchmark-engineering |
+
+**何时联动**：新增分析器或规则 → `auto-refactor-dev` + `rule-catalog-governance` + `test-benchmark-engineering`；Rust 与 TypeScript 输出字节不等价 → `auto-refactor-dev` + `rust-engineering` + `debugging-and-error-recovery`
+<!-- SKILL-LINKS:END -->
+
 ## 一、 六层架构、Rust+TS 双轨等价性与项目中立公理
 
-1. **六层架构**：L1 原生算子（`crates/ops-{diff,graph,pattern,mask,clone}`）$\to$ L2 统一语法树与 8 语言 `SemanticGraph` $\to$ L3（<!-- METRICS:BEGIN analyzer-count -->**31 个**<!-- METRICS:END analyzer-count -->分析器与 <!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->）$\to$ L4 Sparse MoE 路由器与 `<10ms` AST 切片 $\to$ L5 10 支柱质量与 CAI 2.0 演化平面 $\to$ L6 Praxis 交付层；
+1. **六层架构**：L1 原生算子（`crates/ops-{diff,graph,pattern,mask,clone}`）$\to$ L2 统一语法树与 8 语言 `SemanticGraph` $\to$ L3（<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->分析器与 <!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->）$\to$ L4 Sparse MoE 路由器与 `<10ms` AST 切片 $\to$ L5 10 支柱质量与 CAI 2.0 演化平面 $\to$ L6 Praxis 交付层；
 2. **Rust+TS 100% 字节等价铁律**：Rust N-API 算子与 `src/core/native/*-shim.ts` 在 JSON 键序、UTF-8/LF 行列偏移、支配树排序与 4 位浮点精度上必须 100% 等价（由 `validate-native-parity.js` 与 `validate-equivalence.js` 看守）；
 3. **项目中立性刚性公理 (`validate-project-neutrality.js`)**：核心分析器与规则严禁硬编码外部特定业务路径（如 `WebGames/` 或 `workspace-timing/` 私有模块名），框架规则仅能通过标准配置指纹（`project.godot`、`package.json`、`go.mod`）推断 `Archetype Context`。
 
@@ -31,7 +45,7 @@ description: >-
 | **Stage 2: 单文件 AST 与现代化** | `simplify`, `complexity`, `stdlib`, `ts-modern`, `python-modern`, `rust-modern`, `gdscript-modern`, `go-modern`, `frontend` | 单文件 AST 与控制流图（`<10ms` 切片）；平铺逻辑、$\text{CC}\le 15 / \text{Depth}\le 4$、多语言现代惯用法 |
 | **Stage 3: 全工程语义图拓扑** | `performance`, `architecture`, `data-architecture`, `dependency-layout`, `dependency-graph`, `gate-architecture`, `gdscript-game`, `vscode-extension`, `client-exposure`, `test-modernity`, `governance` | 跨文件 `SemanticGraph`（Tarjan SCC / 支配树）；循环零分配、门面承载、依赖环、目录隔离、单源规则核验 |
 
-- **规则登记**：遵循 `FAMILY-TOPIC-NNN`，同步注册于 `src/core/rules/`、`dimensionRuleTable.ts`（单 Finding 扣分维度 $\text{AxesPerFinding} \le 4$）与 `scripts/common/rule-catalog.json`；所有 `scripts/validate-*.js` 必须在 `scripts/test-parallel.js`（<!-- METRICS:BEGIN test-suite-count -->**170 套**<!-- METRICS:END test-suite-count -->测试）显式纳管（`validate-suite-manifest.js`）。
+- **规则登记**：遵循 `FAMILY-TOPIC-NNN`，同步注册于 `src/core/rules/`、`dimensionRuleTable.ts`（单 Finding 扣分维度 $\text{AxesPerFinding} \le 4$）与 `scripts/common/rule-catalog.json`；所有 `scripts/validate-*.js` 必须在 `scripts/test-parallel.js`（<!-- METRICS:BEGIN test-suite-count -->**176 套**<!-- METRICS:END test-suite-count -->测试）显式纳管（`validate-suite-manifest.js`）。
 
 ---
 

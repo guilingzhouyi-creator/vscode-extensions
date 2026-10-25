@@ -1,8 +1,7 @@
 ---
 name: test-benchmark-engineering
 description: >-
-  测试驱动开发（红-绿-重构）、确定性隔离、零孤儿用例管理与性能基准耗时棘轮 (TB-REGRESSION) 规范。
-  指导 Agent 先写确定性失败用例，锁定虚拟时钟与伪随机种子，看守 auto-refactor 374 规则自测与单调耗时预算。
+  【触发：写单测/TDD/红绿测试/基准测试/性能回归/耗时棘轮/孤儿用例】编写单元测试、性能压测或实行 TDD 时必须使用。先写失败用例，隔离确定性时钟与伪随机种子，看守单调耗时预算与零孤儿用例。
 ---
 
 # test-benchmark-engineering — 测试驱动开发、确定性隔离与基准棘轮规范
@@ -10,6 +9,22 @@ description: >-
 本技能将**测试驱动开发（TDD 红-绿-重构闭环）**、**确定性环境隔离（时钟/PRNG/沙箱虚拟化）**、**全仓零孤儿用例纳管**以及**性能基准单调耗时棘轮（`TB-REGRESSION`）**整合为统一的测试工程化体系。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（链上第 5 步）；自动重构内核（链上第 5 步）；VS Code 扩展与计时视图（链上第 4 步）；游戏引擎与 Godot 视图（链上第 4 步）；门禁与命令面基础设施（链上第 4 步）；工作区元治理与并行交付（领域支援） |
+| **前置** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[telemetry-statistical-modeling](../telemetry-statistical-modeling/SKILL.md)、[interaction-design-physics](../interaction-design-physics/SKILL.md)、[coding-craft](../coding-craft/SKILL.md) |
+| **接续** | [release-package-workflow](../release-package-workflow/SKILL.md) |
+| **并行支援** | [constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[spec-driven-development](../spec-driven-development/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 
@@ -41,7 +56,7 @@ description: >-
 ## 三、 全仓零孤儿用例纳管 (`TST-ORC-001`) 与耗时棘轮 (`TB-REGRESSION`)
 
 1. **四大受控项目全量纳管**：
-   - **`auto-refactor`**：规则与单元用例必须在 `scripts/test-parallel.js` 注册，保障 <!-- METRICS:BEGIN test-suite-count -->**170 套**<!-- METRICS:END test-suite-count -->测试并发/串行全绿且 TS/Rust 100% 字节等价；
+   - **`auto-refactor`**：规则与单元用例必须在 `scripts/test-parallel.js` 注册，保障 <!-- METRICS:BEGIN test-suite-count -->**176 套**<!-- METRICS:END test-suite-count -->测试并发/串行全绿且 TS/Rust 100% 字节等价；
    - **`workspace-timing`**：`src/test/` 下 <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->单元测试由 `npm run test:fast` 与 `npm run review` 全量覆盖；
    - **`WebGames`**：继承 `TestCase` 并在 `config/infrastructure/domains.json` 与 `test_registry.gd` 双向注册，严禁 `tests/unit/` 根目录散落脚本；
    - **`fractal-git`**：10 微 Crate 测试与并发 CAS/零分配校验统一纳管于 Cargo Workspace 与 `audit-taxis.ps1`。

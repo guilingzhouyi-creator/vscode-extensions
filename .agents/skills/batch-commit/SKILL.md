@@ -1,9 +1,7 @@
 ---
 name: batch-commit
 description: >-
-  工作区大型改动分批原子提交与门禁离线预审工作流。指导 Agent 按 6 层依赖拓扑自底向上拆分批次（底层契约、基础设施、
-  配置、业务、静态治理、文档）、编写高内聚结构化提交信息（严格限定四大受控项目归属、纯技术事实质性断言、
-  6 类风格禁词拦截），并执行离线门禁预审与原子提交闭环。
+  【触发：提交/分批/暂存/commit/git/预审/禁词/原子提交】当准备提交代码、分批原子提交或审查 git commit 信息时必须使用。按 6 层拓扑拆解提交，拦截 6 类黑话禁词，执行离线门禁预审与原子提交闭环。
 ---
 
 # batch-commit — 大型改动分批原子提交与门禁预审工作流
@@ -11,6 +9,22 @@ description: >-
 本技能规范了跨域大型改动的自底向上拓扑分批、高内聚结构化提交信息编写、四大受控项目归属声明、6 类风格禁词拦截、门禁离线预审（Pre-flight Check）以及最终全域双重回归的标准工程化作业流程。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 技能与规则元治理（链上第 4 步）；工作区元治理与并行交付（领域入口） |
+| **前置** | [docs-archive-governance](../docs-archive-governance/SKILL.md) |
+| **接续** | [constraint-driven-development](../constraint-driven-development/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[gate-governance](../gate-governance/SKILL.md)、[rule-catalog-governance](../rule-catalog-governance/SKILL.md) |
+| **领域链** | 技能与规则元治理：skill-governance → rule-catalog-governance → docs-archive-governance → batch-commit；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；新增规则标识并闭合登记 → `rule-catalog-governance` + `skill-governance` + `gate-governance`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 

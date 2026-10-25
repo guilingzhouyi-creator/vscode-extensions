@@ -1,9 +1,7 @@
 ---
 name: docs-archive-governance
 description: >-
-  工作区全宗技术档案归档、顶层自治蓝图演进与文档门禁规范。指导 Agent 在维护顶层设计蓝图
-  （agent-native-system-blueprint.md）、全宗交付物归档（archive/deliverables/）、
-  历史方案案卷封存、相对路径链接健康度与纯粹面向用户文档标准。
+  【触发：文档归档/蓝图/架构演进/README/归档清单/死链/案卷封存】编写、修改顶层架构蓝图、交付物归档、案卷封存或全宗技术档案时触发。维护 agent-native-system-blueprint 与纯正面向用户标准。
 ---
 
 # docs-archive-governance — 全宗技术档案、蓝图演进与文档门禁规范
@@ -11,6 +9,22 @@ description: >-
 本技能规范了工作区顶层多智能体自治系统蓝图演进纪律、全宗技术档案库只读封存规范、四阶段方案案卷元数据及 Markdown 链接健康度守卫的标准作业流程。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 门禁与命令面基础设施（领域支援）；技能与规则元治理（链上第 3 步）；工作区元治理与并行交付（链上第 3 步） |
+| **前置** | [rule-catalog-governance](../rule-catalog-governance/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md) |
+| **接续** | [batch-commit](../batch-commit/SKILL.md)、[release-package-workflow](../release-package-workflow/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[gate-governance](../gate-governance/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
+| **领域链** | 门禁与命令面基础设施：gate-governance → defensive-security-and-taint-safety → coding-craft → test-benchmark-engineering → release-package-workflow；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增门禁步骤并登记语义标识 → `gate-governance` + `rule-catalog-governance` + `test-benchmark-engineering`；pwsh 与 bash 门禁语义漂移 → `gate-governance` + `coding-craft` + `debugging-and-error-recovery`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 

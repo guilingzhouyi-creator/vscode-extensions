@@ -45,6 +45,8 @@ flowchart TD
 | | [**`workspace-timing/docs/architecture.md`**](../workspace-timing/docs/architecture.md) | **workspace-timing 业务架构专册**：时间聚合核心、会话生命周期状态机与暗色高对比度 UI 设计契约 | 计时扩展业务逻辑、报表导出 | `workspace-timing/` |
 | | [**`WebGames/docs/README.md`**](../WebGames/docs/README.md) | **WebGames 游戏世界专册**：卡拉尔沙盒模拟体系、单位与技能配置表、MOD SDK 开发规约与四阶段路线图 | 游戏策划配置、战斗模拟引擎 | `WebGames/` |
 | **Tier 3**<br/>技能规约 | [**`.agents/skills/`**](../.agents/skills/) | **全工作区工程研发技能集（24 个标准技能）**：编码工艺、复杂度控制、防御性安全、多智能体编排、测试基准工程等物理四件套 | 智能体技能加载、工程工艺落地 | `.agents/skills/` |
+| | [├─ `skill-catalog.md`](./skill-catalog.md) | **技能调用说明书**：三层拓扑、领域联动链与逐技能调用卡片（调用含义、触发词、典型情形、验证命令），全部由注册表渲染 | 查“该用哪个技能、和谁联动”、审阅激活命中面 | `scripts/common/skill-registry.json` |
+| | [└─ `skill-activation-and-linkage.md`](../.agents/skills/skill-governance/references/skill-activation-and-linkage.md) | **激活面与联动面运维参考**：Agent 只看得见 description、触发词正反例、前置/接续/并行支援语义与三道看守 | 调整技能描述、触发词或领域链时按图索骥 | `.agents/skills/skill-governance/` |
 | **Tier 4**<br/>历史全宗 | [**`archive/deliverables/README.md`**](../archive/deliverables/README.md) | **全宗技术档案与历史卷只读封存库**：重大架构评审案卷、全量审查报告与里程碑交付物留痕（只读不可变存证） | 历史方案溯源、架构演进比对 | `archive/deliverables/` |
 | **Tier 5**<br/>脚本运行 | [**`scripts/README.md`**](../scripts/README.md) | **双平台脚本工程与门禁运行手册**：预审脚本使用指南、调用契约、隔离环境与参数字典 | 本地门禁执行、CI 流水线维护 | `scripts/` |
 

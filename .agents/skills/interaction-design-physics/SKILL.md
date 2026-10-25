@@ -1,9 +1,7 @@
 ---
 name: interaction-design-physics
 description: >-
-  通用界面工程与交互物理学规范：建立跨项目语义化分层明度拓扑、单闭合边框防套娃原则、
-  二阶阻尼谐振子动效模型、感知幂律渐隐遮罩、不动点仿射变换及跨平台输入法互锁守卫，
-  消除界面视觉噪点、卡顿重排与交互缺陷。
+  【触发：界面/调样式/CSS/边框/暗色模式/输入法/抖动/套娃】编写或调整前端界面、Webview 与动效时触发。落实语义明度阶梯、单闭合边框、二阶阻尼物理模型、感知幂律渐隐及 IME 输入法互锁守卫。
 ---
 
 # interaction-design-physics — 通用界面工程与交互物理学规范
@@ -11,6 +9,22 @@ description: >-
 本技能指导 Web 前端、VS Code Webview 及客户端表现层的界面工程与交互动效研发，依托**第一性原理物理方程、心理感知模型与防御性状态机**构建零套娃噪点、零重排抖动的生产级交互体验。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | VS Code 扩展与计时视图（链上第 3 步）；游戏引擎与 Godot 视图（链上第 3 步） |
+| **前置** | [state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)、[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) |
+| **接续** | [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
+| **领域链** | VS Code 扩展与计时视图：workspace-timing-dev → state-concurrency-and-crash-recovery → interaction-design-physics → test-benchmark-engineering → release-package-workflow；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 界面交互物理学五大刚性公理
 

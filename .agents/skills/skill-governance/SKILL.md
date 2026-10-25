@@ -1,16 +1,30 @@
 ---
 name: skill-governance
 description: >-
-  工作区技能集工程化结构、生命周期与同构分发治理规范。指导 Agent 遵循 JIT 渐进式披露原则，
-  规范维护全工作区研发技能的四件套物理布局（SKILL.md、references、templates、scripts）、
-  YAML Frontmatter 语法契约、双目录（.agents/skills 与插件包）100% 字节等价性同步与自动化门禁验证。
+  【触发：编写技能/新增skill/技能治理/同构同步/双目录同步/四件套/JIT披露】创建、修改技能、维护四件套结构(SKILL/references/templates/scripts)或同步双目录字节等价时触发。贯彻 JIT 渐进披露与 50~200 字描述契约。
 ---
 
 # skill-governance — 技能集工程化结构与生命周期治理规范
 
-本技能确立了全工作区 <!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count -->研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。这些技能共含 <!-- METRICS:BEGIN skill-doc-count -->**62 篇**<!-- METRICS:END skill-doc-count -->技能文档，全部纳入同一份门禁检查。
+本技能确立了全工作区 <!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count -->研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。这些技能共含 <!-- METRICS:BEGIN skill-doc-count -->**63 篇**<!-- METRICS:END skill-doc-count -->技能文档，全部纳入同一份门禁检查。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 技能与规则元治理（领域入口） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | [rule-catalog-governance](../rule-catalog-governance/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[batch-commit](../batch-commit/SKILL.md) |
+| **领域链** | 技能与规则元治理：skill-governance → rule-catalog-governance → docs-archive-governance → batch-commit |
+
+**何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；新增规则标识并闭合登记 → `rule-catalog-governance` + `skill-governance` + `gate-governance`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 
@@ -65,21 +79,24 @@ description: >-
 
 ---
 
-## 四、 YAML Frontmatter 与元数据规范
+## 四、 YAML Frontmatter 与单源注册表契约
 
-每个技能的 `SKILL.md` 必须在首行包含合法的 YAML Frontmatter：
+每份 `SKILL.md` 的 frontmatter 与联动块都由 `scripts/common/skill-registry.json` 渲染，注册表是唯一真源，手改会在下一次同步被覆盖：
 
 ```markdown
 ---
 name: <skill-name>
 description: >-
-  <简明扼要的技能描述，包含意图触发词、适用领域、指导范围与核心规范关键字，长度 50~200 字符>
+  【触发：<triggers 用 / 连接>】<pitch 一句调用含义>
 ---
 ```
 
 **刚性字段要求**：
 - **`name`**：必须与该技能所在的文件夹名称（`kebab-case`）100% 严格一致；
-- **`description`**：必须包含高辨识度的触发词向量（如项目名、核心规则代号、操作意图），禁止留空或敷衍。
+- **`description`**：由注册表 `activation.template` 渲染，命中 50~200 字符窗口；前缀给触发词向量，`pitch` 回答“何时必须用、看守什么”，禁止写成技能名复述或正文摘要；
+- **触发词**：6~9 个，跨技能复用不超过 3 次，必须覆盖意图、症状、技术标识中至少两类，否则索引面无法区分同类技能；
+- **联动块**：正文 `## 联动技能` 由 `SKILL-LINKS:BEGIN/END` 标记包围，声明定位、前置、接续、并行支援与领域链，同样禁止手改；
+- **新增技能**：必须先登记注册表，否则渲染循环不会为它生成描述与联动，激活面永远缺失。
 
 ---
 
@@ -116,16 +133,19 @@ description: >-
 ## 七、 常用维护与验证命令矩阵
 
 ```bash
-# 1. 验证技能 YAML、排版卫生、相对链接与规则真实性
-node scripts/common/validate-skills.js
+# 1. 按注册表重渲染每份 SKILL.md 的描述行与联动块（--check 只比对不写盘）
+node scripts/common/sync-skill-metadata.js
 
-# 2. 静默比对根目录与插件包技能是否 100% 字节等价
-node scripts/common/sync-skills.js --check
+# 2. 重渲染面向读者的技能调用说明书 docs/skill-catalog.md
+node scripts/common/render-skill-catalog.js
 
-# 3. 将根目录技能变更一键同步至插件包镜像
+# 3. 将根目录技能变更一键同步至插件包镜像（--check 静默比对字节等价）
 node scripts/common/sync-skills.js
 
-# 4. 执行包含技能验证的全工作区统一质量审查
+# 4. 验证技能 YAML、排版卫生、相对链接、注册表闭合与规则真实性
+node scripts/common/validate-skills.js
+
+# 5. 执行包含技能验证的全工作区统一质量审查
 pwsh -File scripts/ps1/audit-all.ps1 -Fast
 ```
 
@@ -138,6 +158,8 @@ pwsh -File scripts/ps1/audit-all.ps1 -Fast
 | 资源 | 用途 |
 | :--- | :--- |
 | [progressive-disclosure-patterns.md](references/progressive-disclosure-patterns.md) | 分层披露的完整设计准则：何时把内容下沉至 `references/`、何时抽 `templates/`、入口文件的信噪比预算推导 |
+| [skill-activation-and-linkage.md](references/skill-activation-and-linkage.md) | 激活面与联动面运维参考：Agent 为何只看得见 description、触发词正反例、前置/接续/并行支援的语义、字段改动波及哪些文件、三道看守各自看守什么 |
+| [docs/skill-catalog.md](../../../docs/skill-catalog.md) | 由注册表渲染的技能调用说明书：三层拓扑、领域联动链与逐技能调用卡片（调用含义、典型情形、验证命令） |
 | [skill-entrypoint-skeleton.md](templates/skill-entrypoint-skeleton.md) | `SKILL.md` 入口骨架：Frontmatter、适用场景、公理矩阵、验证命令与资源指针五段式 |
 | [skill-reference-skeleton.md](templates/skill-reference-skeleton.md) | `references/*.md` 骨架：前置不变式、操作步骤、反例与失败模式 |
 

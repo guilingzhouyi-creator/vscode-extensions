@@ -1,8 +1,7 @@
 ---
 name: complexity-budget
 description: >-
-  代码复杂度与体积双轨预算控制工作流。指导 Agent 在编写与审查代码时，看守 AST 局部切片守卫（CC<=15, Depth<=4, Noise<=4.0）、
-  单文件双轨体积（ELOC<=900, LOC<=1400）与 1:3 动态反推包络，落实六字段 JSDoc 契约、ECR 注释密度与循环零堆分配。
+  【触发：重构/拆分文件/CC/Depth/ELOC/LOC/JSDoc/注水】重构大文件、优化认知复杂度(CC<=15)、缩减嵌套深度(Depth<=4)或检查体积包络(ELOC<=900)时触发。落实六字段 JSDoc 契约与循环零堆分配。
 ---
 
 # complexity-budget — 代码复杂度与体积双轨预算控制工作流
@@ -10,6 +9,22 @@ description: >-
 本技能定义了工作区代码复杂度局部切片预算、控制流降维平铺模式、有效代码行（ELOC）与物理行（LOC）双轨体积约束、模块头部六字段 JSDoc 契约、ECR 有效注释密度模型、算法边界声明与高频循环零瞬态堆分配的标准工程规范。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）；技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | —（链路末端，交回提交与验收） |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md)、[test-benchmark-engineering](../test-benchmark-engineering/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 

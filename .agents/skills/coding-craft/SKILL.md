@@ -1,9 +1,7 @@
 ---
 name: coding-craft
 description: >-
-  通用编程工艺与高级工程师写法约束：命名即契约、失败语义显式化、类型收窄与穷尽、
-  接口最小暴露、单向依赖、可测性设计与多语言惯用法。回答「写这段代码该遵守什么」，
-  并以规则族指针表把 508 条 SSOT 规则接入写作现场。
+  【触发：写代码/重构/命名/错误处理/类型设计/SSOT/空捕获】编写、生成或审查任何代码时必须遵循。坚持命名即契约、显式失败语义、类型穷尽、最小接口暴露与单向依赖，对接 508 条 SSOT 规则。
 ---
 
 # coding-craft — 通用编程工艺、多语言惯用法与六大规范性思维约束
@@ -11,6 +9,22 @@ description: >-
 本技能回答**动手写一个函数时，除体积与复杂度预算外必须守住的工艺底线與元认知防线**。规则真源位于 `scripts/common/rule-catalog.json`（<!-- METRICS:BEGIN rule-family-count-all -->**61 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**508 条规则**<!-- METRICS:END rule-total -->）。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）；门禁与命令面基础设施（链上第 3 步）；技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援） |
+| **前置** | [defensive-security-and-taint-safety](../defensive-security-and-taint-safety/SKILL.md) |
+| **接续** | [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md) |
+| **并行支援** | [constraint-driven-development](../constraint-driven-development/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md)、[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 七域编程工艺核心判据矩阵
 

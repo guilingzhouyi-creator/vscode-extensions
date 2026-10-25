@@ -1,8 +1,7 @@
 ---
 name: state-concurrency-and-crash-recovery
 description: >-
-  有界并发状态机、对称资源生命周期与崩溃安全持久化规范。指导 Agent 落实句柄/订阅获取-释放对称律 (PRF-LEAK-001)、
-  异步派发器排空契约 (pump/flush/teardown)、暂存原子落盘与崩溃重放幂等 (UUID-REENTRANT-001)。
+  【触发：并发/状态机/排障/泄漏/原子落盘/幂等/崩溃恢复/Journal】涉及并发调度、句柄生命周期对称释放(PRF-LEAK-001)、异步派发器排空或崩溃恢复幂等性设计时触发。杜绝孤儿句柄与悬挂协程。
 ---
 
 # state-concurrency-and-crash-recovery — 有界并发状态机、对称生命周期与崩溃安全持久化规范
@@ -10,6 +9,22 @@ description: >-
 本技能提炼全工作区四大项目共用的**高可靠状态管理、并发调度与崩溃恢复工程模型**。无论是 `workspace-timing` 的 RingBuffer+Journal 计时账本、`auto-refactor` 的常驻 Daemon 与 Worker 池、`WebGames` 的 `AgentAsyncDispatcher`，还是 `fractal-git` 的原子落盘存储，均受本技能的四大公理约束。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（链上第 3 步）；自动重构内核（领域支援）；VS Code 扩展与计时视图（链上第 2 步）；游戏引擎与 Godot 视图（领域支援） |
+| **前置** | [rust-engineering](../rust-engineering/SKILL.md)、[workspace-timing-dev](../workspace-timing-dev/SKILL.md) |
+| **接续** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[interaction-design-physics](../interaction-design-physics/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 

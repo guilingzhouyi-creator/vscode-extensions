@@ -1,9 +1,7 @@
 ---
 name: telemetry-statistical-modeling
 description: >-
-  度量评估、经典贝叶斯统计建模与反刷分熔断规范。指导 Agent 在 auto-refactor 等分析系统中
-  落实从 0 纯客观统计、Jeffreys Beta(0.5, 0.5) 共轭后验均值与方差置信区间估计、
-  异构系统多语言均衡指数与离散度惩罚模型、基于 AST symbolIndex 的 CAI 符号追踪、以及 BLOCK_GAMING_DETECTED 虚假重构熔断。
+  【触发：评分/度量/跑分/统计模型/贝叶斯/CAI/注水/反刷分】开发评分器、重构度量算法或反刷分时触发。落实从 0 纯客观统计、Jeffreys Beta(0.5,0.5) 共轭后验估计与 BLOCK_GAMING_DETECTED 虚假重构熔断。
 ---
 
 # telemetry-statistical-modeling — 客观度量、贝叶斯统计建模与反刷分规范
@@ -11,6 +9,22 @@ description: >-
 本技能确立全工作区质量度量、代码自研率（CAI）分析与自治评分系统的数学根基，落实**从 0 纯客观统计**、**无信息 Jeffreys $\text{Beta}(0.5, 0.5)$ 共轭后验置信区间**、**异构多语言均衡指数**及**反刷分熔断防御（`BLOCK_GAMING_DETECTED`）**。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 自动重构内核（链上第 4 步） |
+| **前置** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) |
+| **接续** | [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
+| **领域链** | 自动重构内核：auto-refactor-dev → rust-engineering → algorithmic-operator-engineering → telemetry-statistical-modeling → test-benchmark-engineering |
+
+**何时联动**：新增分析器或规则 → `auto-refactor-dev` + `rule-catalog-governance` + `test-benchmark-engineering`；Rust 与 TypeScript 输出字节不等价 → `auto-refactor-dev` + `rust-engineering` + `debugging-and-error-recovery`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 客观统计零注水与 AST 符号溯源公理
 

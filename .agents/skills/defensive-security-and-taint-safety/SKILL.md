@@ -1,8 +1,7 @@
 ---
 name: defensive-security-and-taint-safety
 description: >-
-  防御性安全、污点数据流溯源与破坏性操作守卫规范。指导 Agent 落实递归删除三步污点守卫 (GUARD-DESTR-001)、
-  只读自动变量防遮蔽 (GUARD-VAR-001)、前后端暴露面隔离 (SEC-EXP-001) 与生产构建洁净度 (PROD-HYG-001)。
+  【触发：删除文件/rm/注入/污点追踪/变量遮蔽/路径穿越/清理目录】执行破坏性文件操作、清理目录、暴露端点或处理外部输入时触发。落实递归删除三步污点守卫(GUARD-DESTR-001)与只读自动变量防篡改。
 ---
 
 # defensive-security-and-taint-safety — 防御性安全、污点数据流与破坏性操作守卫规范
@@ -10,6 +9,22 @@ description: >-
 本技能确立了工作区在跨平台脚本、文件系统操作、子进程派生、前后端打包边界与凭证管理中的**零信任污点数据流（Taint Dataflow）思维与刚性安全守卫**。回答「在执行任何不可逆副作用或跨边界暴露前，必须完成哪些安全证明」。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（领域支援）；VS Code 扩展与计时视图（领域支援）；门禁与命令面基础设施（链上第 2 步） |
+| **前置** | [gate-governance](../gate-governance/SKILL.md) |
+| **接续** | [coding-craft](../coding-craft/SKILL.md) |
+| **并行支援** | [constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md)、[test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)、[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 

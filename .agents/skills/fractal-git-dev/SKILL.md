@@ -1,8 +1,7 @@
 ---
 name: fractal-git-dev
 description: >-
-  fractal-git (Taxis) 分形版本控制内核、10 微 Crate 分层拓扑与无锁 CAS 开发规范。指导 Agent 维护
-  Git Plumbing 二进制等价性 (FGT-ALG-001)、偏序集同态冲突检测 (CCD v2)、无锁索引树 (FGT-LCK-001) 与双端门面。
+  【触发：taxis/版本控制内核/CAS/偏序集/实现子命令/字节等价/FGT规则】开发或修改 fractal-git (Taxis) 模块时必须使用。看守 10 微 Crate 分层拓扑、Git Plumbing 二进制等价、偏序集冲突检测与 CAS 无锁索引树。
 ---
 
 # fractal-git-dev — Taxis 分形 Git 高性能版本控制内核开发规范
@@ -12,6 +11,22 @@ description: >-
 > 通用 Rust 语言级范式（Type-State、`thiserror`、`// SAFETY:` 证明）请同步遵循 [rust-engineering](../rust-engineering/SKILL.md)。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（领域入口） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | [rust-engineering](../rust-engineering/SKILL.md) |
+| **并行支援** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 

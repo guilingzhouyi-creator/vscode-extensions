@@ -1,8 +1,7 @@
 ---
 name: webgames-workflow
 description: >-
-  Godot 4 引擎纯逻辑解耦与配置驱动工作流。指导 Agent 在 WebGames 项目中执行先方案后编码施工纪律、
-  全域配置驱动 (GameConfig)、视图表现层单向快照注入 (apply_snapshot) 与对象池循环零堆分配 (ADV-PRF-002)。
+  【触发：WebGames/Godot/GDScript/游戏逻辑/写玩法/对象池/快照注入】开发或修改 WebGames 游戏模块时必须触发。坚持全域 GameConfig 配置驱动、视图表现层单向快照注入(apply_snapshot)与循环零堆分配(ADV-PRF-002)。
 ---
 
 # webgames-workflow — Godot 4.7 引擎纯逻辑解耦与配置驱动开发规范
@@ -13,6 +12,22 @@ description: >-
 > **【非 Web 游戏刚性红线】**：`WebGames/`（历史命名）是**基于 Godot 4.7 引擎与 GDScript 的卡拉尔世界纯逻辑解耦独立系统**，面向桌面与无头架构。**严禁引入任何 DOM、HTML、CSS、浏览器 API 或 JS/TS Web 前端技术栈！**
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 游戏引擎与 Godot 视图（领域入口） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
+| **领域链** | 游戏引擎与 Godot 视图：webgames-workflow → algorithmic-operator-engineering → interaction-design-physics → test-benchmark-engineering |
+
+**何时联动**：新玩法先出四阶段方案 → `spec-driven-development` + `webgames-workflow` + `test-benchmark-engineering`；热路径循环里出现对象分配 → `webgames-workflow` + `algorithmic-operator-engineering` + `complexity-budget`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 两轮施工周期与四阶段案卷铁律
 

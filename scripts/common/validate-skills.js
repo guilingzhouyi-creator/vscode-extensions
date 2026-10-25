@@ -4,8 +4,9 @@
  * Architecture Role: Platform-level governance validator for `.agents/skills/` catalog,
  *   enforcing YAML frontmatter integrity, strict LF line endings, dead link immunity,
  *   and SSOT rule catalog registration alignment.
- * Dependencies & Triggers: Consumes Node.js standard libraries (fs, path);
- *   invoked by scripts/ps1/audit-all.ps1, scripts/sh/audit-all.sh, and local CI.
+ * Dependencies & Triggers: Consumes Node.js standard libraries (fs, path) plus the skill registry
+ *   resolver and the metadata/catalogue renderers; invoked by scripts/ps1/audit-all.ps1,
+ *   scripts/sh/audit-all.sh, and local CI.
  * Responsibilities:
  *   1. Assert every skill directory contains a valid SKILL.md with compliant frontmatter.
  *   2. Assert all markdown files in .agents/skills/ have zero CRLF and non-zero bytes.
@@ -14,17 +15,25 @@
  *   5. Enforce the documented SKILL.md line window and description length window.
  *   6. Enforce the four-part layout (SKILL.md, references/, templates/) and reject orphan assets.
  *   7. Assert every error-severity catalog rule is reachable from at least one skill document.
- *   8. Prove every new detector still fires through in-memory probes.
+ *   8. Assert the authored registry and the on-disk skill entry files close both ways and render identically.
+ *   9. Assert domain chains, scenario links, layers and linkage blocks all resolve to registered skills.
+ *  10. Assert the generated catalogue (`docs/skill-catalog.md`) is byte-identical to the registry render.
+ *  11. Prove every new detector still fires through in-memory probes.
  * Exit Semantics & Design Rationale: Exits 0 on clean pass; exits 1 on detected violations or a
  *   failed probe. Checks 5-7 close a gap where the governance skill documented a budget that nothing
  *   measured: every file stayed inside the window by habit, and an orphaned template could sit
- *   unreferenced indefinitely because no rule looked for it. The probes exist because a detector that
- *   silently matches nothing also exits 0, which is indistinguishable from a clean corpus.
+ *   unreferenced indefinitely because no rule looked for it. Checks 8-10 close the opposite gap: the
+ *   description line, linkage table and manual were rendered from one registry but nothing compared the
+ *   bytes, so a hand-edited entry file could survive a whole release cycle. The probes exist because a
+ *   detector that silently matches nothing also exits 0, which is indistinguishable from a clean corpus.
  */
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
+const skillResolver = require('./skill-registry-resolver');
+const skillSync = require('./sync-skill-metadata');
+const skillCatalog = require('./render-skill-catalog');
 
 /** SKILL.md line window documented in skill-governance §二; the hard cap is the outer bound. */
 const SKILL_LINE_WINDOW = Object.freeze({ min: 50, max: 250, hardMax: 300 });
@@ -34,6 +43,17 @@ const DESCRIPTION_WINDOW = Object.freeze({ min: 50, max: 200 });
 
 /** Directories every skill must carry; `scripts/` is optional because only three skills ship code. */
 const MANDATORY_SUBDIRS = Object.freeze(['references', 'templates']);
+
+/**
+ * Assertion names owned by the three registry guards. Deliberately two segments (no numeric tail) so
+ * they read as diagnostics instead of rule identifiers: rule IDs must be registered in the SSOT
+ * catalog, and an unregistered three-segment label turns the closure gate red for no governance gain.
+ */
+const SKILL_ASSERTIONS = Object.freeze({
+    metadata: 'SKILL-METADATA',
+    linkage: 'SKILL-LINKAGE',
+    document: 'SKILL-CATALOG',
+});
 
 const WHITELIST_TERMS = new Set([
   'UTF-8',
@@ -477,6 +497,332 @@ function findUncoveredErrorRules(corpus, rules) {
 }
 
 /**
+ * Compares the registry skill set with the on-disk skill directories.
+ *
+ * Both directions matter: a registry row without a directory renders nothing, and a directory without
+ * a registry row escapes every trigger, linkage and description check because the guard iterates the
+ * registry rather than the filesystem.
+ *
+ * @param {string[]} registryNames - Skill names declared in the registry.
+ * @param {string[]} diskSkillNames - Skill directory names present under `.agents/skills`.
+ * @returns {string[]} List of closure violations.
+ */
+function checkRegistryClosure(registryNames, diskSkillNames) {
+    const registrySet = new Set(registryNames);
+    const diskSet = new Set(diskSkillNames);
+    const errors = [];
+    for (const name of registryNames) {
+        if (!diskSet.has(name)) {
+            errors.push(`${SKILL_ASSERTIONS.metadata}: registry declares '${name}' but .agents/skills/${name}/SKILL.md is missing`);
+        }
+    }
+    for (const name of diskSkillNames) {
+        if (!registrySet.has(name)) {
+            errors.push(`${SKILL_ASSERTIONS.metadata}: .agents/skills/${name} has no record in scripts/common/skill-registry.json`);
+        }
+    }
+    return errors;
+}
+
+/**
+ * Enforces the activation contract on every authored trigger vector.
+ *
+ * A description-window check alone cannot stop a skill from stuffing ten technical nouns, so the
+ * count, token width, cross-skill reuse ceiling and semantic classes are measured on the registry
+ * before any description is rendered into a SKILL.md.
+ *
+ * @param {object} registry - Loaded registry carrying activation and skills.
+ * @returns {string[]} List of trigger contract violations.
+ */
+function checkTriggerContract(registry) {
+    const activation = registry.activation || {};
+    const window = activation.triggerWindow || { min: 6, max: 9 };
+    const maxReuse = Number.isInteger(activation.maxTriggerReuse) ? activation.maxTriggerReuse : 3;
+    const skills = registry.skills || {};
+    const reuse = new Map();
+    const errors = [];
+    for (const [skillName, skill] of Object.entries(skills)) {
+        const triggers = Array.isArray(skill.triggers) ? skill.triggers : [];
+        if (triggers.length < window.min || triggers.length > window.max) {
+            errors.push(`${SKILL_ASSERTIONS.metadata}: '${skillName}' declares ${triggers.length} triggers, outside the ${window.min}~${window.max} window`);
+        }
+        const seen = new Set();
+        for (const token of triggers) {
+            const label = `'${skillName}' trigger '${token}'`;
+            const width = Array.from(String(token)).length;
+            if (width < 2 || width > 8) {
+                errors.push(`${SKILL_ASSERTIONS.metadata}: ${label} is ${width} characters; the token window is 2~8`);
+            }
+            if (seen.has(token)) {
+                errors.push(`${SKILL_ASSERTIONS.metadata}: ${label} is duplicated inside the skill`);
+            }
+            seen.add(token);
+            if (!reuse.has(token)) reuse.set(token, new Set());
+            reuse.get(token).add(skillName);
+        }
+        const classes = new Set(triggers.map((token) => skillResolver.classifyTrigger(String(token), activation)));
+        const semanticHits = ['intent', 'symptom', 'technical'].filter((name) => classes.has(name)).length;
+        if (classes.size < 3 || semanticHits < 2) {
+            errors.push(`${SKILL_ASSERTIONS.metadata}: '${skillName}' covers ${classes.size} trigger classes (${[...classes].join(', ') || 'none'}); need at least 3 classes and 2 of intent/symptom/technical`);
+        }
+    }
+    for (const [token, users] of reuse.entries()) {
+        if (users.size > maxReuse) {
+            errors.push(`${SKILL_ASSERTIONS.metadata}: trigger '${token}' is shared by ${users.size} skills (${[...users].join(', ')}), over the ${maxReuse} ceiling`);
+        }
+    }
+    return errors;
+}
+
+/**
+ * Reads the associatedSkills list of one subagent archetype file.
+ *
+ * @param {string} repoRoot - Absolute repository root.
+ * @param {object} domain - Domain record carrying the archetype id.
+ * @returns {string[]|null} Listed skills, or null when the file is absent or malformed.
+ */
+function loadArchetypeSkills(repoRoot, domain) {
+    const filePath = path.join(repoRoot, '.agents/subagents/archetypes', `${domain.archetype}.json`);
+    if (!fs.existsSync(filePath)) return null;
+    try {
+        const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        return Array.isArray(parsed.associatedSkills) ? parsed.associatedSkills : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * Validates one domain chain and support list against the registry and its archetype.
+ *
+ * @param {object} domain - Domain record.
+ * @param {object} skills - Registry skill map.
+ * @param {function(object): (string[]|null)} loadArchetype - Archetype lookup.
+ * @returns {{ errors: string[], members: Set<string> }} Violations and declared domain membership.
+ */
+function checkDomainChain(domain, skills, loadArchetype) {
+    const errors = [];
+    const chain = Array.isArray(domain.chain) ? domain.chain : [];
+    const supports = Array.isArray(domain.supports) ? domain.supports : [];
+    const where = `${SKILL_ASSERTIONS.linkage}: domain '${domain.id}'`;
+    if (chain.length < 2) {
+        errors.push(`${where} declares a ${chain.length}-skill chain; a domain chain needs at least 2`);
+    }
+    if (new Set(chain).size !== chain.length) {
+        errors.push(`${where} chain repeats a skill: ${chain.join(', ')}`);
+    }
+    if (new Set(supports).size !== supports.length) {
+        errors.push(`${where} supports repeats a skill: ${supports.join(', ')}`);
+    }
+    const archetypeSkills = loadArchetype(domain);
+    if (archetypeSkills === null) {
+        errors.push(`${where} points at missing archetype '.agents/subagents/archetypes/${domain.archetype}.json' or it declares no associatedSkills`);
+    } else if (chain.length > 0 && !archetypeSkills.includes(chain[0])) {
+        errors.push(`${where} chain head '${chain[0]}' is absent from archetype '${domain.archetype}' associatedSkills`);
+    }
+    const members = new Set([...chain, ...supports]);
+    for (const name of members) {
+        if (!Object.prototype.hasOwnProperty.call(skills, name)) {
+            errors.push(`${where} references unknown skill '${name}' in chain/supports`);
+        }
+    }
+    return { errors, members };
+}
+
+/**
+ * Validates the scenario rows of one domain.
+ *
+ * @param {object} domain - Domain record.
+ * @param {object} skills - Registry skill map.
+ * @param {Set<string>} members - Skills declared in the domain chain and supports.
+ * @returns {string[]} List of scenario violations.
+ */
+function checkDomainScenarios(domain, skills, members) {
+    const errors = [];
+    const where = `${SKILL_ASSERTIONS.linkage}: domain '${domain.id}'`;
+    for (const scenario of domain.scenarios || []) {
+        const scenarioSkills = Array.isArray(scenario.skills) ? scenario.skills : [];
+        const label = `${where} scenario '${scenario.intent}'`;
+        if (scenarioSkills.length < 2) {
+            errors.push(`${label} lists ${scenarioSkills.length} skill(s); at least 2 are required`);
+        }
+        for (const name of scenarioSkills) {
+            if (!Object.prototype.hasOwnProperty.call(skills, name)) {
+                errors.push(`${label} references unknown skill '${name}'`);
+            } else if (!members.has(name)) {
+                errors.push(`${label} references '${name}' outside chain∪supports`);
+            }
+        }
+    }
+    return errors;
+}
+
+/**
+ * Validates that every skill belongs to a domain, sits in a registered layer and has non-empty linkage.
+ *
+ * @param {object} registry - Loaded registry.
+ * @param {Set<string>} domainMembers - Every skill named in a chain or support list.
+ * @returns {string[]} List of placement violations.
+ */
+function checkSkillPlacement(registry, domainMembers) {
+    const errors = [];
+    const skills = registry.skills || {};
+    const layerIds = new Set((registry.layers || []).map((layer) => layer.id));
+    for (const [skillName, skill] of Object.entries(skills)) {
+        if (!domainMembers.has(skillName)) {
+            errors.push(`${SKILL_ASSERTIONS.linkage}: skill '${skillName}' belongs to no domain chain or support list`);
+        }
+        if (!layerIds.has(skill.layer)) {
+            errors.push(`${SKILL_ASSERTIONS.linkage}: skill '${skillName}' declares layer '${skill.layer}' which is absent from registry.layers`);
+        }
+        const linkage = skillResolver.buildLinkage(registry, skillName);
+        if (linkage.predecessors.length === 0 && linkage.successors.length === 0 && linkage.parallel.length === 0) {
+            errors.push(`${SKILL_ASSERTIONS.linkage}: skill '${skillName}' has no predecessor, successor or parallel support; its linkage block would be empty`);
+        }
+    }
+    return errors;
+}
+
+/**
+ * Validates that every registered layer owns at least one skill.
+ *
+ * @param {object} registry - Loaded registry.
+ * @returns {string[]} List of empty-layer violations.
+ */
+function checkLayerOccupancy(registry) {
+    const errors = [];
+    const skills = Object.values(registry.skills || {});
+    for (const layer of registry.layers || []) {
+        if (!skills.some((skill) => skill.layer === layer.id)) {
+            errors.push(`${SKILL_ASSERTIONS.linkage}: layer '${layer.id}' has no member skill`);
+        }
+    }
+    return errors;
+}
+
+/**
+ * Module: Governance Guard — Registry Metadata Supervisor
+ * File Path: scripts/common/validate-skills.js
+ * Architecture Role: Boundary between the authored skill registry and the on-disk entry files, owning
+ *   closure, render parity and the activation trigger contract for every skill.
+ * Dependencies & Triggers: scripts/common/skill-registry.json, skill-registry-resolver.js and
+ *   sync-skill-metadata.js; runs inside validate-skills.js main() and in runSelfProbes() with hooks.
+ * Responsibilities:
+ *   1. Assert the registry skill set and the `.agents/skills/` directories close in both directions.
+ *   2. Assert every SKILL.md is byte-identical to sync-skill-metadata.renderSkillDocument(registry, name, raw).
+ *   3. Assert trigger count, token width, per-skill uniqueness, cross-skill reuse and class coverage.
+ * Exit Semantics & Design Rationale: Returns violations; the caller owns the exit code. The expected
+ *   document is rendered as a whole rather than compared field by field, because a field-level check
+ *   let a hand-edited linkage table survive: only the exact bytes the writer would produce are accepted.
+ *
+ * @param {string} repoRoot - Absolute repository root, used to shorten message paths.
+ * @param {object} registry - Loaded skill registry.
+ * @param {string} skillsDir - Absolute `.agents/skills` directory.
+ * @param {string[]} diskSkillNames - Skill directory names present on disk.
+ * @param {object} [hooks] - Optional readSkillDocument/expectedDocument overrides used by the self probes.
+ * @returns {string[]} List of metadata violations.
+ */
+function validateRegistryMetadata(repoRoot, registry, skillsDir, diskSkillNames, hooks) {
+    const overrides = hooks || {};
+    const readSkillDocument = overrides.readSkillDocument || ((skillName) => {
+        const filePath = path.join(skillsDir, skillName, 'SKILL.md');
+        return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : null;
+    });
+    const expectedDocument = overrides.expectedDocument || ((skillName, raw) => skillSync.renderSkillDocument(registry, skillName, raw));
+    const registryNames = Object.keys(registry.skills || {});
+    const errors = [...checkRegistryClosure(registryNames, diskSkillNames)];
+    const diskSet = new Set(diskSkillNames);
+    for (const skillName of registryNames) {
+        if (!diskSet.has(skillName)) continue;
+        const filePath = path.join(skillsDir, skillName, 'SKILL.md');
+        const label = path.relative(repoRoot, filePath) || filePath;
+        const raw = readSkillDocument(skillName);
+        if (raw === null) continue;
+        try {
+            const expected = expectedDocument(skillName, raw);
+            if (expected !== raw) {
+                errors.push(`${label}: SKILL.md differs from the registry render (${SKILL_ASSERTIONS.metadata}); run 'node scripts/common/sync-skill-metadata.js' to heal`);
+            }
+        } catch (e) {
+            errors.push(`${label}: cannot render expected metadata (${SKILL_ASSERTIONS.metadata}): ${e.message}`);
+        }
+    }
+    errors.push(...checkTriggerContract(registry));
+    return errors;
+}
+
+/**
+ * Module: Governance Guard — Domain Linkage Supervisor
+ * File Path: scripts/common/validate-skills.js
+ * Architecture Role: Topology guard over `skill-registry.json` domains, layers and derived linkage.
+ * Dependencies & Triggers: skill-registry-resolver.js buildLinkage and `.agents/subagents/archetypes/*.json`;
+ *   runs inside validate-skills.js main() and in runSelfProbes() with an injected archetype loader.
+ * Responsibilities:
+ *   1. Assert every domain chain has at least two skills and no repeated member.
+ *   2. Assert the chain head is listed in the matching archetype associatedSkills.
+ *   3. Assert scenario skills exist and stay inside chain∪supports.
+ *   4. Assert every skill has a valid layer, a domain and a non-empty derived linkage.
+ * Exit Semantics & Design Rationale: Returns violations; the caller owns the exit code. Linkage is
+ *   rebuilt through the resolver rather than re-walked here, so the guard cannot disagree with the
+ *   renderer about what a predecessor or a parallel support means.
+ *
+ * @param {string} repoRoot - Absolute repository root.
+ * @param {object} registry - Loaded skill registry.
+ * @param {function(object): (string[]|null)} [archetypeLoader] - Optional archetype lookup override.
+ * @returns {string[]} List of linkage violations.
+ */
+function validateRegistryLinkage(repoRoot, registry, archetypeLoader) {
+    const loadArchetype = archetypeLoader || ((domain) => loadArchetypeSkills(repoRoot, domain));
+    const skills = registry.skills || {};
+    const errors = [];
+    const domainMembers = new Set();
+    for (const domain of registry.domains || []) {
+        const result = checkDomainChain(domain, skills, loadArchetype);
+        errors.push(...result.errors);
+        errors.push(...checkDomainScenarios(domain, skills, result.members));
+        for (const name of result.members) domainMembers.add(name);
+    }
+    errors.push(...checkSkillPlacement(registry, domainMembers));
+    errors.push(...checkLayerOccupancy(registry));
+    return errors;
+}
+
+/**
+ * Module: Governance Guard — Skill Catalogue Parity Supervisor
+ * File Path: scripts/common/validate-skills.js
+ * Architecture Role: Byte-parity guard between the generated invocation manual and its registry render.
+ * Dependencies & Triggers: render-skill-catalog.js renderCatalog and docs/skill-catalog.md; runs inside
+ *   validate-skills.js main() and in runSelfProbes() with injected text.
+ * Responsibilities:
+ *   1. Assert `docs/skill-catalog.md` exists.
+ *   2. Assert its exact bytes equal render-skill-catalog.renderCatalog(registry).
+ * Exit Semantics & Design Rationale: Returns violations; the caller owns the exit code. Comparing the
+ *   rendered text, not a hand-maintained subset of headings, is what makes the manual a derived
+ *   artefact rather than a second source of truth.
+ *
+ * @param {string} repoRoot - Absolute repository root.
+ * @param {object} registry - Loaded skill registry.
+ * @param {{ expectedText?: string, actualText?: (string|null) }} [options] - Overrides for the self probes.
+ * @returns {string[]} List of catalogue violations.
+ */
+function validateSkillCatalogDocument(repoRoot, registry, options) {
+    const settings = options || {};
+    const catalogPath = path.join(repoRoot, skillCatalog.CATALOG_RELATIVE_PATH);
+    const label = path.relative(repoRoot, catalogPath) || skillCatalog.CATALOG_RELATIVE_PATH;
+    const expected = settings.expectedText !== undefined ? settings.expectedText : skillCatalog.renderCatalog(registry);
+    const actual = settings.actualText !== undefined
+        ? settings.actualText
+        : (fs.existsSync(catalogPath) ? fs.readFileSync(catalogPath, 'utf8') : null);
+    if (actual === null) {
+        return [`${label}: generated catalogue is missing (${SKILL_ASSERTIONS.document}); run 'node scripts/common/render-skill-catalog.js'`];
+    }
+    if (expected !== actual) {
+        return [`${label}: content differs from the registry render (${SKILL_ASSERTIONS.document}); run 'node scripts/common/render-skill-catalog.js' to heal`];
+    }
+    return [];
+}
+
+/**
  * Proves each detector fires on a synthetic input whose verdict is known in advance.
  *
  * A guard that matches nothing also exits 0, which looks exactly like a clean corpus. These probes
@@ -526,6 +872,110 @@ function runSelfProbes() {
   probe(
     'error coverage ignores warning rules',
     findUncoveredErrorRules('`PROBE-AAA-001`', probeRules).length === 0,
+  );
+
+  const probeActivation = {
+    template: '【触发：{triggers}】{pitch}',
+    separator: '/',
+    triggerWindow: { min: 6, max: 9 },
+    maxTriggerReuse: 3,
+    classes: { intent: ['写', '重构'], symptom: ['崩溃', '卡顿'], technical: ['CAS', 'ELABORATE'] },
+  };
+  const probeSkill = (triggers) => ({ layer: 'probe-layer', triggers, pitch: 'probe', purpose: 'probe', situations: [], verification: [] });
+  const metadataRegistry = {
+    activation: probeActivation,
+    layers: [{ id: 'probe-layer', order: 1, title: 'probe', positioning: 'probe' }],
+    domains: [{ id: 'probe-domain', archetype: 'probe-archetype', chain: ['probe-a', 'probe-b'], supports: [], scenarios: [] }],
+    skills: {
+      'probe-a': probeSkill(['写代码', '崩溃', 'CAS', '重构', '崩溃', 'ELABORATE']),
+      'probe-b': probeSkill(['排错', '卡顿', '写代码', '重构', '崩溃', 'CAS']),
+      'probe-missing': probeSkill(['排错', '卡顿', 'CAS', '重构', '崩溃', '写代码']),
+    },
+  };
+  const metadataProbe = validateRegistryMetadata('<probe>', metadataRegistry, '<probe>/.agents/skills', ['probe-a', 'stray-dir'], {
+    readSkillDocument: () => 'raw-bytes',
+    expectedDocument: () => 'DRIFTED',
+  });
+  probe(
+    'SKILL-METADATA flags closure gaps, render drift and trigger violations',
+    ['probe-missing', 'stray-dir', 'differs from the registry render', "'ELABORATE'", 'duplicated inside the skill']
+      .every((needle) => metadataProbe.some((message) => message.includes(needle))),
+  );
+
+  const linkageRegistry = {
+    activation: probeActivation,
+    layers: [{ id: 'probe-layer', order: 1, title: 'probe', positioning: 'probe' }],
+    domains: [{
+      id: 'probe-domain',
+      archetype: 'probe-archetype',
+      chain: ['probe-a'],
+      supports: ['probe-x'],
+      scenarios: [{ intent: 'probe scenario', skills: ['probe-a', 'ghost-skill'] }],
+    }],
+    skills: {
+      'probe-a': probeSkill(['写代码', '崩溃', 'CAS', '重构', '排错', '卡顿']),
+      'probe-x': { layer: 'unknown-layer', triggers: [], pitch: 'probe', purpose: 'probe', situations: [], verification: [] },
+      'probe-orphan': probeSkill(['写代码', '崩溃', 'CAS', '重构', '排错', '卡顿']),
+    },
+  };
+  const linkageProbe = validateRegistryLinkage('<probe>', linkageRegistry, () => ['other-skill']);
+  probe(
+    'SKILL-LINKAGE flags chain, archetype, scenario, layer and linkage violations',
+    ['chain needs at least 2', 'absent from archetype', 'unknown skill', "layer 'unknown-layer'", 'belongs to no domain', 'no predecessor, successor or parallel support']
+      .every((needle) => linkageProbe.some((message) => message.includes(needle))),
+  );
+
+  const cleanMetadataRegistry = {
+    activation: probeActivation,
+    layers: [{ id: 'probe-layer', order: 1, title: 'probe', positioning: 'probe' }],
+    domains: [],
+    skills: {
+      'probe-a': probeSkill(['写代码', '崩溃', 'CAS', '重构', '排错', '卡顿']),
+      'probe-b': probeSkill(['写代码', '崩溃', 'CAS', '重构', '排错', '卡顿']),
+    },
+  };
+  probe(
+    'SKILL-METADATA accepts a clean registry and matching entry files',
+    validateRegistryMetadata('<probe>', cleanMetadataRegistry, '<probe>/.agents/skills', ['probe-a', 'probe-b'], {
+      readSkillDocument: () => 'rendered',
+      expectedDocument: () => 'rendered',
+    }).length === 0,
+  );
+
+  const cleanLinkageRegistry = {
+    activation: probeActivation,
+    layers: [{ id: 'probe-layer', order: 1, title: 'probe', positioning: 'probe' }],
+    domains: [{
+      id: 'probe-domain',
+      archetype: 'probe-archetype',
+      chain: ['probe-a', 'probe-b'],
+      supports: [],
+      scenarios: [{ intent: 'probe scenario', skills: ['probe-a', 'probe-b'] }],
+    }],
+    skills: {
+      'probe-a': probeSkill([]),
+      'probe-b': probeSkill([]),
+    },
+  };
+  probe(
+    'SKILL-LINKAGE accepts a clean chain with a matching archetype',
+    validateRegistryLinkage('<probe>', cleanLinkageRegistry, () => ['probe-a']).length === 0,
+  );
+
+  probe(
+    'SKILL-CATALOG accepts a matching catalogue',
+    validateSkillCatalogDocument('<probe>', metadataRegistry, { expectedText: 'same', actualText: 'same' }).length === 0,
+  );
+
+  probe(
+    'SKILL-CATALOG flags catalogue drift',
+    validateSkillCatalogDocument('<probe>', metadataRegistry, { expectedText: 'expected', actualText: 'drifted' })
+      .some((message) => message.includes('SKILL-CATALOG') && message.includes('differs from the registry render')),
+  );
+  probe(
+    'SKILL-CATALOG flags a missing catalogue',
+    validateSkillCatalogDocument('<probe>', metadataRegistry, { expectedText: 'expected', actualText: null })
+      .some((message) => message.includes('SKILL-CATALOG') && message.includes('is missing')),
   );
 
   return failures;
@@ -583,6 +1033,19 @@ function main() {
   }
 
   allErrors.push(...validatePluginBundle(repoRoot));
+
+  let skillRegistry = null;
+  try {
+    skillRegistry = skillResolver.loadRegistry(repoRoot).registry;
+  } catch (e) {
+    allErrors.push(`${SKILL_ASSERTIONS.metadata}: cannot load scripts/common/skill-registry.json: ${e.message}`);
+  }
+  if (skillRegistry) {
+    allErrors.push(...validateRegistryMetadata(repoRoot, skillRegistry, skillsDir, skillFolders));
+    allErrors.push(...validateRegistryLinkage(repoRoot, skillRegistry));
+    allErrors.push(...validateSkillCatalogDocument(repoRoot, skillRegistry));
+  }
+
   allErrors.push(...checkErrorRuleCoverage(skillsDir, catalog.rules || []));
   allErrors.push(...runSelfProbes());
 
@@ -622,4 +1085,7 @@ module.exports = {
   findOrphanAssets,
   findUncoveredErrorRules,
   runSelfProbes,
+  validateRegistryMetadata,
+  validateRegistryLinkage,
+  validateSkillCatalogDocument,
 };

@@ -1,9 +1,7 @@
 ---
 name: algorithmic-operator-engineering
 description: >-
-  算法与高性能算子第一性原理突破工程规范。指导 Agent 跳出传统语法级微调思维，
-  通过五步降维思考协议（代数级零工预筛漏斗、面向数据表示层反转 SoA/CSR、无分支查表 LUT 与位级并行 SWAR/Bitset、
-  单趟结构化磁带算子融合、时代戳 O(1) 零清零复用与自适应多模态退化）实现数量级吞吐跃升与 100% 差分等价验证。
+  【触发：算子/热路径/吞吐优化/降维/SoA/LUT/基准等价/卡顿】当涉及算法瓶颈、吞吐优化、高频循环热路径或数据表示反转(SoA)时触发。执行五步降维协议与100%差分等价基准验证。
 ---
 
 # algorithmic-operator-engineering — 算法与高性能算子第一性原理突破规范
@@ -11,6 +9,22 @@ description: >-
 本技能指导 Agent 在开发或重构核心算法与算子（`auto-refactor` 的 Rust/TS 双轨词法/AST/图/差分算子、`WebGames` 的高频求解器与对象池循环、`workspace-timing` 的时间序列与流式聚合引擎）时，**跳出“仅提炼正则或微调循环”的传统语法级修补思维**，从数据表示、代数预筛、位级并行与单趟融合四个底层维度实现数量级的性能与内存突破。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（链上第 4 步）；自动重构内核（链上第 3 步）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（链上第 2 步） |
+| **前置** | [state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)、[rust-engineering](../rust-engineering/SKILL.md)、[webgames-workflow](../webgames-workflow/SKILL.md) |
+| **接续** | [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)、[telemetry-statistical-modeling](../telemetry-statistical-modeling/SKILL.md)、[interaction-design-physics](../interaction-design-physics/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 
@@ -96,7 +110,7 @@ description: >-
 # 1. 运行 auto-refactor 核心算子热路径微基准 (mask-source / governance-scan / cmp-rules)
 node auto-refactor/scripts/bench-hot-paths.js
 
-# 2. 验证 Rust 原生算子与纯 TS Shim 100% 字节等价及全量 170 套测试
+# 2. 验证 Rust 原生算子与纯 TS Shim 100% 字节等价及全量 174 套测试
 cd auto-refactor && npm run build && npm test
 
 # 3. 验证 WebGames 静态提取与 ADV-PRF-002 零瞬态分配门禁

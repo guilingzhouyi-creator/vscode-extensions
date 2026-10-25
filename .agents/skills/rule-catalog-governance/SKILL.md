@@ -1,8 +1,7 @@
 ---
 name: rule-catalog-governance
 description: >-
-  全工作区单源规则目录（SSOT）、元数据一致性与规则反虚构治理规范。指导 Agent 聚合全仓跨项目规则，
-  落实标准 3-3-3 命名拓扑与权威三字母词典、三阶别名等价网络、底层诊断与表现层去重解耦及 RCFG-RULE-DRIFT 防虚构门禁。
+  【触发：新增规则/修改规则/SSOT/规则目录/规则登记/规则漂移/命名拓扑】增删改规则 ID、治理跨项目规则元数据或维护单源规则目录时触发。看守 3-3-3 命名拓扑与 RCFG-RULE-DRIFT 防虚构闭包。
 ---
 
 # rule-catalog-governance — 全仓单源规则目录与元数据一致性治理
@@ -10,6 +9,22 @@ description: >-
 本技能规范了工作区静态分析与审查规则的单源聚合机制（Single Source of Truth, SSOT）、标准 3-3-3 命名拓扑公理、权威 <!-- METRICS:BEGIN glossary-count -->**113 项**<!-- METRICS:END glossary-count -->三字母映射词典、三阶双轨别名等价网络、底层完备诊断与表现层语义去重双层解耦公理、跨项目规则族命名空间边界、四大受控项目与全局门禁规范注册流程与规则防虚构门禁（`RCFG-RULE-DRIFT`）。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 自动重构内核（领域支援）；门禁与命令面基础设施（领域支援）；技能与规则元治理（链上第 2 步）；工作区元治理与并行交付（领域支援） |
+| **前置** | [skill-governance](../skill-governance/SKILL.md) |
+| **接续** | [docs-archive-governance](../docs-archive-governance/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
+| **领域链** | 自动重构内核：auto-refactor-dev → rust-engineering → algorithmic-operator-engineering → telemetry-statistical-modeling → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增分析器或规则 → `auto-refactor-dev` + `rule-catalog-governance` + `test-benchmark-engineering`；Rust 与 TypeScript 输出字节不等价 → `auto-refactor-dev` + `rust-engineering` + `debugging-and-error-recovery`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 
@@ -53,7 +68,7 @@ description: >-
   ```
 
 ### 规则分布矩阵
-1. **`autoRefactor` (<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->)**：涵盖 <!-- METRICS:BEGIN analyzer-count -->**31 个**<!-- METRICS:END analyzer-count -->与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子、双轨体积预算（`VOL-`）、物理卫生（`HYG-`）与架构质量模型；
+1. **`autoRefactor` (<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->)**：涵盖 <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子、双轨体积预算（`VOL-`）、物理卫生（`HYG-`）与架构质量模型；
 2. **`workspaceTiming` (<!-- METRICS:BEGIN rule-workspace-timing -->**49 条规则**<!-- METRICS:END rule-workspace-timing -->)**：11 个主题族分治 VS Code 扩展审查（编译、测试、lint、分层依赖、硬编码、脚本库、文档发布、审查配置、资源拓扑、测试预算、重构门槛），每条规则另带 `layer` 字段标注其所属的 `L0`~`L5` 执行层；
 3. **`webGames` (<!-- METRICS:BEGIN rule-webgames -->**50 条规则**<!-- METRICS:END rule-webgames -->)**：涵盖 Godot 游戏工程的资产与艺术工单规格（`ART-`）、运行时治理（`GOV-`）、高性能脚本契约（`ADV-`）与资源配置审查规则（`RES-`）；
 4. **`fractalGit` (<!-- METRICS:BEGIN rule-fractal-git -->**17 条规则**<!-- METRICS:END rule-fractal-git -->)**：涵盖 10 微 Crate 分层拓扑、无锁 CAS、循环零堆分配、类型状态机与 `// SAFETY:` 证明契约（`FGT-*`）；
@@ -105,7 +120,7 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 
 | 项目领域 (`Project`) | 规则规模 | 权威合法规则族前缀 / 命名空间 | 治理范围与职责边界 |
 | :--- | :---: | :--- | :--- |
-| **`auto-refactor`** | 374 条 | <!-- METRICS:BEGIN analyzer-count -->**31 个**<!-- METRICS:END analyzer-count -->分析器覆盖的 <!-- METRICS:BEGIN rule-family-count -->**34 个规则族**<!-- METRICS:END rule-family-count -->：`ARCH`, `BIG`, `CMP`, `CMT`, `CONST`, `CPX`, `DAT`, `DEP`, `DOC`, `ENG`, `ERR`, `EXT`, `GDM`, `GOM`, `GOV`, `GUARD`, `HYG`, `MOD`, `NAM`, `NUM`, `PRF`, `PROD`, `PS`, `PYM`, `RSM`, `SEC`, `SH`, `SIM`, `STDLIB`, `TSM`, `TST`, `UI`, `VOL`, `VSC` 及 15 条 Legacy 别名 | 通用多语言代码重构、AST 语法树、Rust 双轨算子、复杂度与架构质量模型 |
+| **`auto-refactor`** | 374 条 | <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->分析器覆盖的 <!-- METRICS:BEGIN rule-family-count -->**34 个规则族**<!-- METRICS:END rule-family-count -->：`ARCH`, `BIG`, `CMP`, `CMT`, `CONST`, `CPX`, `DAT`, `DEP`, `DOC`, `ENG`, `ERR`, `EXT`, `GDM`, `GOM`, `GOV`, `GUARD`, `HYG`, `MOD`, `NAM`, `NUM`, `PRF`, `PROD`, `PS`, `PYM`, `RSM`, `SEC`, `SH`, `SIM`, `STDLIB`, `TSM`, `TST`, `UI`, `VOL`, `VSC` 及 15 条 Legacy 别名 | 通用多语言代码重构、AST 语法树、Rust 双轨算子、复杂度与架构质量模型 |
 | **`workspace-timing`** | 49 条 | 11 个主题族：`ARF`, `BLD`, `DOC`, `HC`, `LAY`, `LINT`, `RCFG`, `RES`, `SCR`, `TB`, `TST`；执行层由每条规则的 `layer` 字段（`L0`~`L5`）表达，不作族名前缀 | VS Code 扩展生命周期、分层存储安全、i18n 对齐、时间守恒与状态栏治理 |
 | **`WebGames`** | 50 条 | Godot 专属契约：`ADV-`（高性能脚本与引擎约束）、`ART-`（艺术工单与资产规格）、`GOV-`、`PRF-`、`RES-`、`UUID-`、`SIM-` | Godot 4 游戏逻辑、节点树信号契约、文档双语归档与配置单源治理 |
 | **`global-tooling`** | <!-- METRICS:BEGIN rule-global-tooling -->**18 条规则**<!-- METRICS:END rule-global-tooling --> | 通用门禁与治理族：`CMG-`（提交说明规范）、`GUARD-`（平台脚本、门禁步骤与文档数字守卫）、`RCFG-`（单源规则计数闭包） | 跨平台工作区门禁、提交说明防虚构、沙箱隔离与文档规模指标同步 |

@@ -1,8 +1,7 @@
 ---
 name: debugging-and-error-recovery
 description: >-
-  系统化故障排查与自愈恢复规范：建立观察-假说-SSCCE探针隔离-最小修复-质性证明的五步科学排错流程。
-  贯彻两次尝试受挫即停（Rule of 2）与 16 步滑动窗口死循环熔断法则，杜绝盲目修改破坏代码基线。
+  【触发：排错/报错/崩溃/单测失败/SSCCE/复现/假说/故障】遇到任何故障、测试报错或异常行为时必须使用。严格遵循观察-假说-SSCCE隔离-最小修复五步法，坚决贯彻两次受挫即停原则，严禁盲目猜修。
 ---
 
 # debugging-and-error-recovery — 科学故障排查与自愈恢复规范
@@ -10,6 +9,22 @@ description: >-
 本技能规范了定位缺陷、构建 SSCCE 最小复现探针与安全实施修复的标准工作流，严禁盲目猜测或在生产代码中乱撞试错。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）；门禁与命令面基础设施（领域支援）；工作区元治理与并行交付（领域支援） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | —（链路末端，交回提交与验收） |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 科学排错五步法与 SSCCE 最小可复现哲学
 

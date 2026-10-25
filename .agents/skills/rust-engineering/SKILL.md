@@ -1,9 +1,7 @@
 ---
 name: rust-engineering
 description: >-
-  Rust 工业级高级编程风格、零成本抽象与强制系统工程规范。指导 Agent 在 fractal-git 与 auto-refactor
-  原生内核中贯彻 Type-State 状态机、零瞬态堆分配 (FGT-PRF-001)、thiserror 错误拓扑、
-  无锁 CAS (FGT-LCK-001)、// SAFETY: 证明 (FGT-SAF-001) 与 Clippy 零容忍门禁。
+  【触发：Rust/Cargo/unsafe/无锁/Clippy/编写Rust/panic】编写或重构 Rust 代码时必须触发。全面贯彻 Type-State 状态机、零瞬态堆分配(FGT-PRF-001)、thiserror 强类型错误、// SAFETY: 严格证明及 Clippy 零容忍门禁。
 ---
 
 # rust-engineering — Rust 工业级高级编程风格与资深系统工程规范
@@ -11,6 +9,22 @@ description: >-
 本技能确立全工作区 Rust 代码库（`fractal-git` 10 大微 Crate 与 `auto-refactor` 原生内核 6 大 Crate：`auto-refactor-core`、`ops-diff`、`ops-graph`、`ops-pattern`、`ops-mask`、`ops-clone`）的**八大资深系统工程支柱**与 **Rust 专属规则矩阵**（涵盖 `FGT-*`、`RSM-*` 与 `STDLIB-*` 规则族），指导 Agent 跳出语法搬运思维，以资深系统级 Rust 架构师标准编写零成本抽象、零瞬态分配与编译期状态闭合代码。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（链上第 2 步）；自动重构内核（链上第 2 步） |
+| **前置** | [fractal-git-dev](../fractal-git-dev/SKILL.md)、[auto-refactor-dev](../auto-refactor-dev/SKILL.md) |
+| **接续** | [state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)、[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 

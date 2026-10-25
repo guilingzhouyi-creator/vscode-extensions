@@ -1,8 +1,7 @@
 ---
 name: gate-governance
 description: >-
-  通用双层门禁架构与跨平台脚本工程治理规范。指导 Agent 落实 Tier 1 本地左移流式判定（内存判定约 1 ms、端到端约 160 ms）、
-  Tier 2 远端同构防御、受影响项目智能分流（auto-refactor 374 规则自测）、子进程工作目录隔离与零黑话纪律。
+  【触发：门禁/全仓审查/提交门禁/脚本编写/跨平台/pwsh/bash/子进程】编写修改门禁脚本、运行全仓审查或处理跨平台脚本兼容时触发。落实 Tier 1 本地左移流式判定、工作目录隔离契约与零黑话规范。
 ---
 
 # gate-governance — 通用双层门禁架构与跨平台脚本工程治理
@@ -10,6 +9,22 @@ description: >-
 本技能规定了跨项目通用的双层同构门禁体系架构标准、受影响项目智能分流机制、跨平台脚本工程契约及子进程执行上下文隔离原则。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | VS Code 扩展与计时视图（领域支援）；门禁与命令面基础设施（领域入口）；技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | [defensive-security-and-taint-safety](../defensive-security-and-taint-safety/SKILL.md) |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
+| **领域链** | VS Code 扩展与计时视图：workspace-timing-dev → state-concurrency-and-crash-recovery → interaction-design-physics → test-benchmark-engineering → release-package-workflow；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 双层同构门禁架构体系 (Two-Tier Isomorphic Gates)
 
@@ -48,7 +63,7 @@ description: >-
 ### 1. 路径特征探测与精准映射
 通过 `git diff --cached --name-only` 提取暂存区文件路径向量，精确映射至五大受控域：
 - **`workspace-timing/**`** $\rightarrow$ 路由至 VS Code 扩展套件：触发快速增量编译（`npm run compile`）、单元测试（`npm run test:fast`）与双语字典审查（`npm run review`）；
-- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 <!-- METRICS:BEGIN analyzer-count -->**31 个**<!-- METRICS:END analyzer-count -->与 <!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->的 auto-refactor 规则自测（`npm test`，套件总数由运行期汇总输出）、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
+- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->与 <!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->的 auto-refactor 规则自测（`npm test`，套件总数由运行期汇总输出）、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
 - **`WebGames/**`** $\rightarrow$ 路由至 Godot 引擎套件：触发 GDScript 语法审查（`check-gdscript.sh`）、无头回归套件（`test-run.ps1`）与配置同构审计；
 - **`fractal-git/**`** $\rightarrow$ 路由至 Rust 原生版本控制内核套件：触发 10 微 Crate 编译与 Clippy 零容忍检查（`cargo clippy --all-targets -- -D warnings`）、内核单元测试（`cargo test`）与 Taxis 专项架构审计（`fractal-git/scripts/ps1/audit-taxis.ps1`）；
 - **`scripts/**` / `.github/**` / `AGENTS.md` / `.agents/skills/**` / 根目录配置** $\rightarrow$ 标记为 `governance` 域：触发工作区单源规则目录一致性、技能集规范性核验与全宗审计（`audit-all.ps1`，内置 `validate-skills.js`）。

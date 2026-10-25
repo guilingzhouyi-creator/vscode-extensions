@@ -1,8 +1,7 @@
 ---
 name: workspace-timing-dev
 description: >-
-  workspace-timing VS Code 计时扩展五层解耦与双写崩溃安全规范。指导 Agent 在扩展开发中维护时间聚合核心、
-  RingBuffer 与 Journal 追加崩溃防护、100% 双语国际化字典 (zh-CN/en) 与暗色高对比度 UI。
+  【触发：计时扩展/VS扩展/计时/UI国际化/环形缓冲/崩溃安全/双语字典】开发或维护 workspace-timing 扩展时触发。落实五层解耦、RingBuffer 与 Journal 双写崩溃安全、双语字典(zh-CN/en)与暗色 UI。
 ---
 
 # workspace-timing-dev — VS Code 扩展五层架构、崩溃安全与双语字典规范
@@ -10,6 +9,22 @@ description: >-
 本技能规范了 `workspace-timing/` 扩展的五层单向解耦、RingBuffer + Journal 崩溃安全持久化、跨自然日原子切分、100% 双语字典覆盖及 L0~L5 审查规则对接。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | VS Code 扩展与计时视图（领域入口） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | [state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md) |
+| **并行支援** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md) |
+| **领域链** | VS Code 扩展与计时视图：workspace-timing-dev → state-concurrency-and-crash-recovery → interaction-design-physics → test-benchmark-engineering → release-package-workflow |
+
+**何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 五层单向解耦架构与无头可测性
 

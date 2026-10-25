@@ -1,8 +1,7 @@
 ---
 name: subagent-orchestration
 description: >-
-  五层上下文预算治理（75% 阈值脱水）、泛化 SubAgent 动态装配 (Archetype x Posture) 与多智能体调度工作流。
-  指导 Agent 同构继承模型、注入独占 Zero-Intersection Path Jail 物理防冲突、可重入章节检查点及 8 步交叉复审闭环。
+  【触发：subagent/派发任务/多agent协同/并发开发/隔离边界/上下文预算/交叉复审】派发或编排 SubAgent、处理五层上下文预算治理(75% 脱水)时必须使用。强制同构模型、独占 Zero-Intersection Path Jail 物理防冲突与交叉复审。
 ---
 
 # subagent-orchestration — 五层上下文治理与泛化 SubAgent 调度规范
@@ -10,6 +9,22 @@ description: >-
 本技能将**五层上下文分级与 75% 预算防衰减治理**与**全工作区 (Archetype × Posture) 泛化 SubAgent 动态装配、独占 Path Jail 防冲突及主 Agent 8 步交叉复审闭环**统一收口。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | —（链路末端，交回提交与验收） |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[batch-commit](../batch-commit/SKILL.md) |
+| **领域链** | 技能与规则元治理：skill-governance → rule-catalog-governance → docs-archive-governance → batch-commit；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；新增规则标识并闭合登记 → `rule-catalog-governance` + `skill-governance` + `gate-governance`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 五层上下文分级架构与四重立体防线
 
@@ -63,7 +78,7 @@ node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
 ```
 
 SubAgent 返回后，主 Agent **严禁盲信其文字汇报**，必须独立执行 **8 步交叉复审**：
-① **沙箱越界审计**（`git status` / `git diff --name-only` 比对独占列表）$\to$ ② **领域编译自检** $\to$ ③ **体积与复杂度预算**（`evaluate-eloc-budget.js` / `validate-code-density.js`）$\to$ ④ **规则目录零漂移**（`validate-rule-id-closure.js`）$\to$ ⑤ **领域专属架构守卫** $\to$ ⑥ **自审棘轮与零 High/Critical 债务防反弹** $\to$ ⑦ **领域回归测试**（`auto-refactor` <!-- METRICS:BEGIN test-suite-count -->**170 套**<!-- METRICS:END test-suite-count -->、`workspace-timing` <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->）$\to$ ⑧ **全仓 <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->统一审查**（`audit-all.ps1 -Fast`）。
+① **沙箱越界审计**（`git status` / `git diff --name-only` 比对独占列表）$\to$ ② **领域编译自检** $\to$ ③ **体积与复杂度预算**（`evaluate-eloc-budget.js` / `validate-code-density.js`）$\to$ ④ **规则目录零漂移**（`validate-rule-id-closure.js`）$\to$ ⑤ **领域专属架构守卫** $\to$ ⑥ **自审棘轮与零 High/Critical 债务防反弹** $\to$ ⑦ **领域回归测试**（`auto-refactor` <!-- METRICS:BEGIN test-suite-count -->**176 套**<!-- METRICS:END test-suite-count -->、`workspace-timing` <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->）$\to$ ⑧ **全仓 <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->统一审查**（`audit-all.ps1 -Fast`）。
 
 ---
 

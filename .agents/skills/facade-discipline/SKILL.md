@@ -1,8 +1,7 @@
 ---
 name: facade-discipline
 description: >-
-  门面实质承载 (ARCH-FAC-001)、单行跳板消融 (ARCH-ABS-001) 与等价代码精简 (SIM-ARGS-001) 规范。
-  指导 Agent 落实门面最低 ELOC 预算与不可变冻结、内联消融 <=3 行透传跳板、收敛多形参对象并消除代码克隆。
+  【触发：门面/跳板/透传/ARCH-ABS/参数收敛/消融/空壳膨胀】消融<=3行纯转发跳板(ARCH-ABS-001)、压缩多形参对象(SIM-ARGS-001)或重构模块导出面时触发。确保门面具备实质承载(ARCH-FAC-001)与不可变冻结。
 ---
 
 # facade-discipline — 门面实质承载、跳板消融与代码精简规范
@@ -10,6 +9,22 @@ description: >-
 本技能将**门面层实质承载契约（`ARCH-FAC-001`）**、**单行空包跳板消融（`ARCH-ABS-001`）**与**100% 行为等价代码精简（`SIM-ARGS-001` / `HYG-CLN-001`）**统一收口，根除无意义的转发间接层、参数泥团与结构克隆。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | —（链路末端，交回提交与验收） |
+| **并行支援** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 

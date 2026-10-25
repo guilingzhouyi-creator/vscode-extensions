@@ -1,8 +1,7 @@
 ---
 name: spec-driven-development
 description: >-
-  交互式需求单点质询、逆向提问（Reverse ESR）与规范先行开发工作流。指导 Agent 在编码前先通过每次一问消除歧义、
-  侦测 X-Y 问题，再建立能力依赖拓扑图（Capability Map）与结构化规格书（Spec），定义接口契约、边界不变式与验收矩阵。
+  【触发：需求澄清/质询/能力拓扑/规格书/X-Y/返工】遇到模糊需求、重大架构重构或开发新特性前触发。通过每次一问消除歧义与 X-Y 问题，先确立能力拓扑图与接口契约规格，再行动手编码。
 ---
 
 # spec-driven-development — 需求单点质询与规范先行开发工作流
@@ -10,6 +9,22 @@ description: >-
 本技能将**交互式需求质询（Reverse ESR）**与**规范先行驱动开发（Spec-Driven Development）**统一收口为编码前的标准前置闭环。规格书是人类工程师与 Agent 之间的单一事实源（SSOT）：先通过单点质询消除模糊假设，再锁定单向能力拓扑与接口契约，经人类确认后方可进入施工。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | 分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援） |
+| **前置** | —（作为领域入口，无前置） |
+| **接续** | —（链路末端，交回提交与验收） |
+| **并行支援** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md) |
+| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用时机与触发条件
 

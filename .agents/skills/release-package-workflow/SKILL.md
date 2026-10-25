@@ -1,8 +1,7 @@
 ---
 name: release-package-workflow
 description: >-
-  VS Code 扩展打包、-HotSync 双端热同步自愈、SemVer 发布与面向用户产品文档（README/CHANGELOG 零黑话隔离）工作流。
-  指导 Agent 执行 package.ps1/sh 轮转、version-bump.sh、Keep-a-Changelog 编写与 check-display-assets.sh 校验。
+  【触发：打包/发布/vsix/HotSync/版本号/发版日志/热同步】打包 VS Code 扩展、执行 -HotSync 热同步或编写 Keep-a-Changelog 发版日志时触发。确保产物自动轮转与用户文档零工程黑话。
 ---
 
 # release-package-workflow — 产品交付文档、扩展打包热同步与发布闭环规范
@@ -10,6 +9,22 @@ description: >-
 本技能将**面向终端用户的产品交付文档（`README.md` / `CHANGELOG.md` 零工程黑话隔离）**与**VS Code 扩展本地编译打包、双端热同步自愈（`-HotSync`）、SemVer 版本递增及自动化发布打标**统一收口为端到端交付闭环。
 
 ---
+
+<!-- SKILL-LINKS:BEGIN -->
+## 联动技能
+
+> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+
+| 联动关系 | 技能 |
+| :--- | :--- |
+| **定位** | VS Code 扩展与计时视图（链上第 5 步）；门禁与命令面基础设施（链上第 5 步）；工作区元治理与并行交付（链上第 4 步） |
+| **前置** | [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)、[docs-archive-governance](../docs-archive-governance/SKILL.md) |
+| **接续** | —（链路末端，交回提交与验收） |
+| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md)、[gate-governance](../gate-governance/SKILL.md) |
+| **领域链** | VS Code 扩展与计时视图：workspace-timing-dev → state-concurrency-and-crash-recovery → interaction-design-physics → test-benchmark-engineering → release-package-workflow；其余领域链见 `docs/skill-catalog.md` |
+
+**何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
+<!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
 
