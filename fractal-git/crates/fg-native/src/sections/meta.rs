@@ -296,7 +296,10 @@ mod tests {
         let popped = encoded.pop().expect("pop conflict mode byte");
         assert_eq!(popped, ConflictPresentationMode::AgentAlgebraic.as_u8());
         let decoded = MetaSection::decode(&encoded).expect("backward-compat decode");
-        assert_eq!(decoded.conflict_mode, ConflictPresentationMode::AgentAlgebraic);
+        assert_eq!(
+            decoded.conflict_mode,
+            ConflictPresentationMode::AgentAlgebraic
+        );
         assert_eq!(decoded.repo_id, original.repo_id);
     }
 

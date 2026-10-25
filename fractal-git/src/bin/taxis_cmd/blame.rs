@@ -38,12 +38,18 @@ pub fn handle_blame(ctx: &CliContext) {
     let target_rev = opts.revision.as_deref().unwrap_or("HEAD");
     let target_commit_oid = match view.resolve(target_rev) {
         Ok(oid) => oid,
-        Err(err) => reject(CliTag::ERROR, format!("resolve revision '{target_rev}': {err}")),
+        Err(err) => reject(
+            CliTag::ERROR,
+            format!("resolve revision '{target_rev}': {err}"),
+        ),
     };
 
     let head_files = match flatten_commit_tree(&view, &target_commit_oid) {
         Ok(files) => files,
-        Err(err) => reject(CliTag::ERROR, format!("read tree for '{target_rev}': {err}")),
+        Err(err) => reject(
+            CliTag::ERROR,
+            format!("read tree for '{target_rev}': {err}"),
+        ),
     };
 
     let target_entry = match head_files.get(&opts.file_path) {
@@ -116,10 +122,7 @@ pub fn handle_blame(ctx: &CliContext) {
             let short_sha = &bl.commit_oid.to_hex()[..8];
             println!(
                 "{} ({:<12} {:>4}) {}",
-                short_sha,
-                bl.author_name,
-                bl.line_no,
-                bl.content
+                short_sha, bl.author_name, bl.line_no, bl.content
             );
         }
     }
@@ -167,7 +170,8 @@ fn run_blame_walk(
                         let parent_bytes = view.blob_payload(&b_oid).unwrap_or_default();
                         let parent_content = String::from_utf8_lossy(&parent_bytes).to_string();
 
-                        let line_map = BlameEngine::compute_line_mapping(&parent_content, &current_content);
+                        let line_map =
+                            BlameEngine::compute_line_mapping(&parent_content, &current_content);
 
                         let mut next_mapping = vec![None; parent_content.lines().count()];
 
@@ -282,7 +286,10 @@ fn parse_blame_options(args: &[String]) -> BlameOptions {
     }
 
     if file_path.is_empty() {
-        reject(CliTag::ERROR, "usage: taxis blame <file> [-L <start>,<end>] [--revision <rev>]");
+        reject(
+            CliTag::ERROR,
+            "usage: taxis blame <file> [-L <start>,<end>] [--revision <rev>]",
+        );
     }
 
     BlameOptions {

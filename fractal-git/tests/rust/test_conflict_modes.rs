@@ -94,7 +94,10 @@ fn test_meta_section_conflict_mode_round_trip() {
     let meta_agent = meta.with_conflict_mode(ConflictPresentationMode::AgentAlgebraic);
     let enc_agent = meta_agent.encode().expect("encode");
     let dec_agent = MetaSection::decode(&enc_agent).expect("decode");
-    assert_eq!(dec_agent.conflict_mode, ConflictPresentationMode::AgentAlgebraic);
+    assert_eq!(
+        dec_agent.conflict_mode,
+        ConflictPresentationMode::AgentAlgebraic
+    );
 }
 
 #[test]
@@ -136,7 +139,8 @@ fn test_git_compat_and_diff3_render_proper_markers() {
         "feature",
     );
     let git_compat_str = String::from_utf8(git_compat_bytes).expect("utf8");
-    assert!(git_compat_str.contains("<<<<<<< HEAD\nours_feature\n=======\ntheirs_feature\n>>>>>>> feature\n"));
+    assert!(git_compat_str
+        .contains("<<<<<<< HEAD\nours_feature\n=======\ntheirs_feature\n>>>>>>> feature\n"));
     assert!(!git_compat_str.contains("|||||||"));
 
     // 2. Diff3 3-way
@@ -166,7 +170,10 @@ fn test_conflict_tree_manager_lifecycle_and_slices() {
     );
 
     assert_eq!(manager.conflict_count(), 1);
-    let slice = manager.conflicts().get("src/core.rs").expect("slice exists");
+    let slice = manager
+        .conflicts()
+        .get("src/core.rs")
+        .expect("slice exists");
     let report = slice.to_agent_report(120, 135);
     assert_eq!(report.path, "src/core.rs");
     assert_eq!(report.status, "unmerged_algebraic");
@@ -182,12 +189,24 @@ fn test_conflict_tree_manager_lifecycle_and_slices() {
 #[test]
 fn test_dirty_worktree_guard_collision_detection() {
     let mut current_tree = BTreeMap::new();
-    current_tree.insert("tracked.rs".to_string(), (FileMode::RegularFile, dummy_oid(1)));
-    current_tree.insert("deleted.rs".to_string(), (FileMode::RegularFile, dummy_oid(2)));
+    current_tree.insert(
+        "tracked.rs".to_string(),
+        (FileMode::RegularFile, dummy_oid(1)),
+    );
+    current_tree.insert(
+        "deleted.rs".to_string(),
+        (FileMode::RegularFile, dummy_oid(2)),
+    );
 
     let mut target_tree = BTreeMap::new();
-    target_tree.insert("tracked.rs".to_string(), (FileMode::RegularFile, dummy_oid(9)));
-    target_tree.insert("untracked_new.rs".to_string(), (FileMode::RegularFile, dummy_oid(3)));
+    target_tree.insert(
+        "tracked.rs".to_string(),
+        (FileMode::RegularFile, dummy_oid(9)),
+    );
+    target_tree.insert(
+        "untracked_new.rs".to_string(),
+        (FileMode::RegularFile, dummy_oid(3)),
+    );
     // deleted.rs is omitted from target_tree
 
     let entry_tracked = dummy_entry("tracked.rs", dummy_oid(1));
@@ -218,16 +237,14 @@ fn test_dirty_worktree_guard_collision_detection() {
     );
 
     let rejection_msg = DirtyWorktreeGuard::format_rejection(
-        &[
-            DirtyWorktreeGuard::check_transition(
-                &current_tree,
-                &target_tree,
-                &index_entries,
-                |p| p == "untracked_new.rs",
-                |p, _| p == "tracked.rs",
-            )[0]
-                .clone(),
-        ],
+        &[DirtyWorktreeGuard::check_transition(
+            &current_tree,
+            &target_tree,
+            &index_entries,
+            |p| p == "untracked_new.rs",
+            |p, _| p == "tracked.rs",
+        )[0]
+        .clone()],
         "checkout",
     );
     assert!(rejection_msg.contains("error:"));
@@ -244,29 +261,28 @@ fn test_config_file_update_and_load() {
     std::fs::write(&config_file, initial).expect("write config");
 
     let repo_config = fg_index::config::RepoConfig::load(test_dir.path());
-    assert_eq!(repo_config.conflict_mode(), ConflictPresentationMode::AgentAlgebraic);
+    assert_eq!(
+        repo_config.conflict_mode(),
+        ConflictPresentationMode::AgentAlgebraic
+    );
 
     // Update conflict.mode
-    fg_index::config::write_config_entry(
-        &config_file,
-        "conflict",
-        "mode",
-        "git-compat",
-    )
-    .expect("write entry");
+    fg_index::config::write_config_entry(&config_file, "conflict", "mode", "git-compat")
+        .expect("write entry");
 
     let updated_config = fg_index::config::RepoConfig::load(test_dir.path());
-    assert_eq!(updated_config.conflict_mode(), ConflictPresentationMode::GitCompat);
+    assert_eq!(
+        updated_config.conflict_mode(),
+        ConflictPresentationMode::GitCompat
+    );
 
     // Update back to diff3
-    fg_index::config::write_config_entry(
-        &config_file,
-        "conflict",
-        "mode",
-        "diff3",
-    )
-    .expect("write diff3 entry");
+    fg_index::config::write_config_entry(&config_file, "conflict", "mode", "diff3")
+        .expect("write diff3 entry");
 
     let diff3_config = fg_index::config::RepoConfig::load(test_dir.path());
-    assert_eq!(diff3_config.conflict_mode(), ConflictPresentationMode::Diff3);
+    assert_eq!(
+        diff3_config.conflict_mode(),
+        ConflictPresentationMode::Diff3
+    );
 }

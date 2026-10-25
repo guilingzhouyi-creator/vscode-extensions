@@ -45,7 +45,12 @@ pub fn handle_submodule(ctx: &CliContext) {
 /// Gathers Gitlink tree entries from the current HEAD commit.
 fn collect_head_tree_gitlinks(view: &RepoView) -> BTreeMap<String, (FileMode, Oid)> {
     let mut gitlinks = BTreeMap::new();
-    let head_tree_oid = match view.head_commit().ok().flatten().and_then(|c| view.resolve_tree(&c.to_hex()).ok()) {
+    let head_tree_oid = match view
+        .head_commit()
+        .ok()
+        .flatten()
+        .and_then(|c| view.resolve_tree(&c.to_hex()).ok())
+    {
         Some((_, tree_oid)) => tree_oid,
         None => return gitlinks,
     };
@@ -73,7 +78,8 @@ fn handle_status(ctx: &CliContext, _args: &[String]) {
     };
 
     let gitlinks = collect_head_tree_gitlinks(&view);
-    let statuses = SubmoduleController::compute_status(view.work_root(), gitmodules.entries(), &gitlinks);
+    let statuses =
+        SubmoduleController::compute_status(view.work_root(), gitmodules.entries(), &gitlinks);
 
     if ctx.json_mode {
         print_json(&serde_json::json!({
@@ -198,7 +204,10 @@ fn handle_sync(ctx: &CliContext, args: &[String]) {
 
 fn handle_add(ctx: &CliContext, args: &[String]) {
     if args.is_empty() {
-        reject(CliTag::ERROR, "usage: taxis submodule add <repository> [<path>]");
+        reject(
+            CliTag::ERROR,
+            "usage: taxis submodule add <repository> [<path>]",
+        );
     }
 
     let url = &args[0];
@@ -217,11 +226,13 @@ fn handle_add(ctx: &CliContext, args: &[String]) {
         Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
     };
 
-    let mut gitmodules = GitModules::load_from_worktree(view.work_root()).unwrap_or_else(|_| GitModules::new());
-    let entry = match SubmoduleEntry::new(candidate_path.clone(), candidate_path.clone(), url.clone()) {
-        Ok(e) => e,
-        Err(err) => reject(CliTag::ERROR, format!("create submodule entry: {err}")),
-    };
+    let mut gitmodules =
+        GitModules::load_from_worktree(view.work_root()).unwrap_or_else(|_| GitModules::new());
+    let entry =
+        match SubmoduleEntry::new(candidate_path.clone(), candidate_path.clone(), url.clone()) {
+            Ok(e) => e,
+            Err(err) => reject(CliTag::ERROR, format!("create submodule entry: {err}")),
+        };
 
     gitmodules.insert(entry);
     if let Err(write_err) = gitmodules.write_to_worktree(view.work_root()) {

@@ -27,11 +27,11 @@ pub use bisect::{BisectEngine, BisectState, BisectStep};
 pub use blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
 pub use conflict_tree::{AgentConflictSliceReport, ConflictSlice, ConflictTreeManager};
 pub use operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
-pub use submodule::{SubmoduleController, SubmoduleStatus};
 pub use promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use provenance::{DiskProvenanceStore, PROVENANCE_FILE};
 pub use refs::{DiskRefStore, FractalRef, HeadState};
 pub use state_machine::{FractalWorkspaceNode, WorktreeState};
+pub use submodule::{SubmoduleController, SubmoduleStatus};
 pub use telemetry::{
     CommitCountVerdict, CommitCounter, CommitTelemetryConfig, TelemetryCommitNode,
 };

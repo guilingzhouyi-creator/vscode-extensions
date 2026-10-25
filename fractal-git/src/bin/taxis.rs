@@ -18,9 +18,10 @@ use std::path::PathBuf;
 mod taxis_cmd;
 use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
-    archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, commit, config, daemon, diff, doctor, init, log,
-    merge, operation, projection, promotion, read, rebase, reclaim, relocate, repack, reset,
-    rev_list, revert, stash, status, submodule, tag, undo, verify, worktree,
+    archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, commit,
+    config, daemon, diff, doctor, init, log, merge, operation, projection, promotion, read, rebase,
+    reclaim, relocate, repack, reset, rev_list, revert, stash, status, submodule, tag, undo,
+    verify, worktree,
 };
 
 use fg_core::models::current_unix_seconds;
@@ -297,10 +298,12 @@ fn issue_authority(ctx: &CliContext) {
             format!("authority secret unavailable: {secret_err}"),
         )
     });
-    let subject = find_arg_value(&ctx.args, &["--subject"]).unwrap_or_else(|| {
-        reject(CliTag::ERROR, "authority issue requires --subject <name>")
-    });
-    let ttl_secs = match find_arg_value(&ctx.args, &["--ttl"]).unwrap_or("3600").parse::<u64>() {
+    let subject = find_arg_value(&ctx.args, &["--subject"])
+        .unwrap_or_else(|| reject(CliTag::ERROR, "authority issue requires --subject <name>"));
+    let ttl_secs = match find_arg_value(&ctx.args, &["--ttl"])
+        .unwrap_or("3600")
+        .parse::<u64>()
+    {
         Ok(ttl) if ttl > 0 => ttl,
         _ => reject(
             CliTag::ERROR,
@@ -338,7 +341,10 @@ fn verify_authority(ctx: &CliContext) {
         )
     });
     let token = find_arg_value(&ctx.args, &["--token"]).unwrap_or_else(|| {
-        reject(CliTag::ERROR, "authority verify requires --token <credential>")
+        reject(
+            CliTag::ERROR,
+            "authority verify requires --token <credential>",
+        )
     });
     let claims = match secret.verify(token, current_unix_seconds()) {
         Ok(claims) => claims,

@@ -75,7 +75,9 @@ impl ConflictSlice {
     pub fn to_agent_report(&self, ours_len: usize, theirs_len: usize) -> AgentConflictSliceReport {
         AgentConflictSliceReport {
             path: self.path.clone(),
-            mode: ConflictPresentationMode::AgentAlgebraic.as_str().to_string(),
+            mode: ConflictPresentationMode::AgentAlgebraic
+                .as_str()
+                .to_string(),
             base_oid: self.base_oid.map(|o| o.to_hex()),
             ours_oid: self.ours_oid.map(|o| o.to_hex()),
             theirs_oid: self.theirs_oid.map(|o| o.to_hex()),
@@ -237,8 +239,8 @@ impl ConflictTreeManager {
 
 #[cfg(test)]
 mod tests {
-    use fg_core::models::{ConflictPresentationMode, FileMode, Oid};
     use super::ConflictTreeManager;
+    use fg_core::models::{ConflictPresentationMode, FileMode, Oid};
 
     fn dummy_oid(byte: u8) -> Oid {
         let mut bytes = [0u8; 20];
@@ -327,6 +329,8 @@ mod tests {
             "feature",
         );
         let text = String::from_utf8(rendered).expect("utf8");
-        assert!(text.contains("<<<<<<< HEAD\nours\n||||||| base\nancestor\n=======\ntheirs\n>>>>>>> feature\n"));
+        assert!(text.contains(
+            "<<<<<<< HEAD\nours\n||||||| base\nancestor\n=======\ntheirs\n>>>>>>> feature\n"
+        ));
     }
 }

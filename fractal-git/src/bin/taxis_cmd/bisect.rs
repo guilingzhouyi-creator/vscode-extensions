@@ -40,7 +40,10 @@ pub fn handle_bisect(ctx: &CliContext) {
         "run" => handle_bisect_run(ctx, sub_args),
         "status" | "log" => handle_bisect_status(ctx),
         "-h" | "--help" | "help" => print_bisect_help(),
-        other => reject(CliTag::ERROR, format!("unknown bisect subcommand '{other}'")),
+        other => reject(
+            CliTag::ERROR,
+            format!("unknown bisect subcommand '{other}'"),
+        ),
     }
 }
 
@@ -72,7 +75,10 @@ fn handle_bisect_start(ctx: &CliContext, args: &[String]) {
     let bad_oid = if !args.is_empty() {
         match view.resolve(&args[0]) {
             Ok(oid) => oid,
-            Err(err) => reject(CliTag::ERROR, format!("resolve bad commit '{}': {err}", args[0])),
+            Err(err) => reject(
+                CliTag::ERROR,
+                format!("resolve bad commit '{}': {err}", args[0]),
+            ),
         }
     } else {
         orig_head
@@ -84,7 +90,10 @@ fn handle_bisect_start(ctx: &CliContext, args: &[String]) {
         for good_arg in &args[1..] {
             match view.resolve(good_arg) {
                 Ok(oid) => state.good.push(oid),
-                Err(err) => reject(CliTag::ERROR, format!("resolve good commit '{good_arg}': {err}")),
+                Err(err) => reject(
+                    CliTag::ERROR,
+                    format!("resolve good commit '{good_arg}': {err}"),
+                ),
             }
         }
     }
@@ -117,7 +126,10 @@ fn handle_bisect_mark(ctx: &CliContext, args: &[String], is_bad: bool) {
 
     let mut state = match BisectState::load(view.git_dir()) {
         Ok(Some(s)) => s,
-        Ok(None) => reject(CliTag::ERROR, "no bisection in progress (use 'taxis bisect start')"),
+        Ok(None) => reject(
+            CliTag::ERROR,
+            "no bisection in progress (use 'taxis bisect start')",
+        ),
         Err(err) => reject(CliTag::ERROR, format!("read bisect state: {err}")),
     };
 
@@ -153,7 +165,10 @@ fn handle_bisect_skip(ctx: &CliContext, args: &[String]) {
 
     let mut state = match BisectState::load(view.git_dir()) {
         Ok(Some(s)) => s,
-        Ok(None) => reject(CliTag::ERROR, "no bisection in progress (use 'taxis bisect start')"),
+        Ok(None) => reject(
+            CliTag::ERROR,
+            "no bisection in progress (use 'taxis bisect start')",
+        ),
         Err(err) => reject(CliTag::ERROR, format!("read bisect state: {err}")),
     };
 
@@ -332,23 +347,18 @@ fn handle_bisect_run(ctx: &CliContext, args: &[String]) {
 fn advance_bisect(ctx: &CliContext, view: &RepoView, state: &mut BisectState) -> BisectStep {
     let mut commit_cache: HashMap<Oid, Vec<Oid>> = HashMap::new();
 
-    let step = BisectEngine::compute_midpoint(
-        &state.bad,
-        &state.good,
-        &state.skipped,
-        |oid| {
-            if let Some(parents) = commit_cache.get(oid) {
-                return Some(parents.clone());
+    let step = BisectEngine::compute_midpoint(&state.bad, &state.good, &state.skipped, |oid| {
+        if let Some(parents) = commit_cache.get(oid) {
+            return Some(parents.clone());
+        }
+        if let Ok(obj) = view.object(oid) {
+            if let Ok(record) = parse_commit_record(*oid, &obj.payload) {
+                commit_cache.insert(*oid, record.parents.clone());
+                return Some(record.parents);
             }
-            if let Ok(obj) = view.object(oid) {
-                if let Ok(record) = parse_commit_record(*oid, &obj.payload) {
-                    commit_cache.insert(*oid, record.parents.clone());
-                    return Some(record.parents);
-                }
-            }
-            None
-        },
-    );
+        }
+        None
+    });
 
     match &step {
         BisectStep::Step {
@@ -376,7 +386,10 @@ fn advance_bisect(ctx: &CliContext, view: &RepoView, state: &mut BisectState) ->
                     "Bisecting: {} revisions left to test after this (roughly {} steps)",
                     remaining_candidates, estimated_steps
                 );
-                println!("[{}] Checking out candidate commit", &candidate.to_hex()[..8]);
+                println!(
+                    "[{}] Checking out candidate commit",
+                    &candidate.to_hex()[..8]
+                );
             }
         }
         BisectStep::Found { first_bad } => {

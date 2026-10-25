@@ -93,7 +93,9 @@ fn test_gitmodules_round_trip_and_persistence() {
     modules.insert(entry1.clone());
     modules.insert(entry2.clone());
 
-    modules.write_to_worktree(test_dir.path()).expect("write gitmodules");
+    modules
+        .write_to_worktree(test_dir.path())
+        .expect("write gitmodules");
 
     let loaded = GitModules::load_from_worktree(test_dir.path()).expect("load gitmodules");
     assert_eq!(loaded.len(), 2);
@@ -114,11 +116,15 @@ fn test_submodule_status_transitions() {
     let work_root = test_dir.path();
 
     let mut modules = BTreeMap::new();
-    let entry = SubmoduleEntry::new("libs/math", "vendor/math", "https://example.com/math.git").expect("entry");
+    let entry = SubmoduleEntry::new("libs/math", "vendor/math", "https://example.com/math.git")
+        .expect("entry");
     modules.insert("vendor/math".to_string(), entry);
 
     let mut tree_gitlinks = BTreeMap::new();
-    tree_gitlinks.insert("vendor/math".to_string(), (FileMode::Gitlink, dummy_oid(0xAA)));
+    tree_gitlinks.insert(
+        "vendor/math".to_string(),
+        (FileMode::Gitlink, dummy_oid(0xAA)),
+    );
 
     // Phase 1: Uninitialized (no local directory) -> '-'
     let status1 = SubmoduleController::compute_status(work_root, &modules, &tree_gitlinks);
@@ -130,7 +136,11 @@ fn test_submodule_status_transitions() {
     // Phase 2: Cloned but checked out different commit -> '+'
     let sub_git = work_root.join("vendor/math/.git");
     fs::create_dir_all(&sub_git).expect("create sub .git");
-    fs::write(sub_git.join("HEAD"), format!("{}\n", dummy_oid(0xBB).to_hex())).expect("write sub HEAD");
+    fs::write(
+        sub_git.join("HEAD"),
+        format!("{}\n", dummy_oid(0xBB).to_hex()),
+    )
+    .expect("write sub HEAD");
 
     let status2 = SubmoduleController::compute_status(work_root, &modules, &tree_gitlinks);
     assert_eq!(status2.len(), 1);
@@ -139,7 +149,11 @@ fn test_submodule_status_transitions() {
     assert_eq!(status2[0].head_oid, Some(dummy_oid(0xBB).to_hex()));
 
     // Phase 3: Checked out exact commit matching parent Gitlink -> ' '
-    fs::write(sub_git.join("HEAD"), format!("{}\n", dummy_oid(0xAA).to_hex())).expect("write matching HEAD");
+    fs::write(
+        sub_git.join("HEAD"),
+        format!("{}\n", dummy_oid(0xAA).to_hex()),
+    )
+    .expect("write matching HEAD");
 
     let status3 = SubmoduleController::compute_status(work_root, &modules, &tree_gitlinks);
     assert_eq!(status3.len(), 1);
