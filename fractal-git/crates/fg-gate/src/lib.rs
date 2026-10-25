@@ -6,6 +6,8 @@
 //! Dependencies & Triggers: Consumed by Taxis CLI pre-receive, promotion, and check commands.
 //! Responsibilities: Commit message governance, conflict marker detection, and pre-receive policy.
 //! Exit Semantics & Design Rationale: Fail-closed verification preventing policy-violating commits.
+//!
+//! Domain Governance Rules: FGT-GAT-001 (protocol gate facade), FGT-COR-001, CMG-STY-001.
 
 pub mod authority;
 pub mod commit_guard;

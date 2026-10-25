@@ -2,6 +2,11 @@
 //! File Path: crates/fg-transport/src/smart_protocol.rs
 //! Architecture Role: Implements Git protocol capability advertisement and command negotiation,
 //!   enabling standard Git CLI (`git clone`, `git fetch`) to interoperate with Fractal Git.
+//! Dependencies & Triggers: Consumed by transport remote server handlers and protocol bridges.
+//! Responsibilities: Formats protocol version 2 advertisements and ref listing lines.
+//! Exit Semantics & Design Rationale: Complies with standard Git Smart Protocol v2 wire specification.
+//!
+//! Domain Governance Rules: FGT-TRN-001 (smart wire protocol), FGT-COR-001.
 
 use crate::packetline::PacketLine;
 

@@ -169,13 +169,13 @@ impl CommitGraphWriter {
             fs::create_dir_all(parent_dir)?;
         }
         let graph_bytes = self.build_bytes()?;
-        let temp_path = target_path.with_extension("tmp");
+        let staging_path = target_path.with_extension("tmp");
         {
-            let mut file = File::create(&temp_path)?;
+            let mut file = File::create(&staging_path)?;
             file.write_all(&graph_bytes)?;
             file.sync_all()?;
         }
-        fs::rename(&temp_path, target_path)?;
+        fs::rename(&staging_path, target_path)?;
         Ok(())
     }
 }

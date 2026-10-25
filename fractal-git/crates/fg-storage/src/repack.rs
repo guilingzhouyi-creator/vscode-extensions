@@ -39,6 +39,10 @@ pub struct RepackOptions {
     pub keep_loose: bool,
     /// Minimum count of loose objects required to trigger an automatic repack (default: 128).
     pub auto_repack_threshold: usize,
+    /// Enable low-disk micro-pack slicing mode (default: false).
+    pub low_disk: bool,
+    /// Maximum byte size of a micro-pack slice in low-disk mode (default: 64MB).
+    pub micro_pack_bytes: u64,
 }
 
 impl Default for RepackOptions {
@@ -48,6 +52,8 @@ impl Default for RepackOptions {
             max_depth: MAX_DELTA_DEPTH,
             keep_loose: false,
             auto_repack_threshold: 128,
+            low_disk: false,
+            micro_pack_bytes: 64 * 1024 * 1024,
         }
     }
 }
@@ -193,53 +199,52 @@ pub fn verify_written_pack(
             .get(position + 1)
             .map_or(pack_payload_end as u64, |next| next.offset);
         if entry_end <= entry.offset || entry_end > pack_payload_end as u64 {
+            let oid_hex = entry.oid.to_hex();
+            let start = entry.offset;
             return Err(blocked_repack(format!(
-                "pack entry {} has invalid extent {}..{}",
-                entry.oid.to_hex(),
-                entry.offset,
-                entry_end
+                "verify pack entry: entry {oid_hex} has invalid extent {start}..{entry_end}"
             )));
         }
         let compressed = &pack_bytes[entry.offset as usize..entry_end as usize];
         if crc32_ieee(compressed) != entry.crc32 {
+            let oid_hex = entry.oid.to_hex();
             return Err(blocked_repack(format!(
-                "pack entry {} CRC32 does not match its index record",
-                entry.oid.to_hex()
+                "verify pack entry: entry {oid_hex} CRC32 does not match its index record"
             )));
         }
         expected_offset = entry_end;
     }
     if expected_offset != pack_payload_end as u64 {
+        let path = pack_path.display();
+        let trailing_bytes = pack_payload_end as u64 - expected_offset;
         return Err(blocked_repack(format!(
-            "pack '{}' leaves {} bytes after the last object",
-            pack_path.display(),
-            pack_payload_end as u64 - expected_offset
+            "verify pack file: pack '{path}' leaves {trailing_bytes} unreferenced bytes after the last object"
         )));
     }
 
     let pack = PackFile::load(pack_path)?;
     if pack.object_count() as usize != entries.len() {
+        let path = pack_path.display();
+        let declared = pack.object_count();
+        let actual = entries.len();
         return Err(blocked_repack(format!(
-            "pack '{}' header declares {} objects but the writer reported {}",
-            pack_path.display(),
-            pack.object_count(),
-            entries.len()
+            "verify pack header: pack '{path}' header declares {declared} objects but the writer reported {actual}"
         )));
     }
     for entry in entries {
         let packed = pack.read_at(entry.offset, &PackOnlyBase).map_err(|error| {
+            let oid_hex = entry.oid.to_hex();
             blocked_repack(format!(
-                "pack entry {} cannot be replayed: {error}",
-                entry.oid.to_hex()
+                "verify pack replay: pack entry {oid_hex} cannot be replayed: {error}"
             ))
         })?;
         let actual = compute_object_oid(packed.kind, &packed.payload);
         if actual != entry.oid {
+            let offset = entry.offset;
+            let actual_hex = actual.to_hex();
+            let expected_hex = entry.oid.to_hex();
             return Err(blocked_repack(format!(
-                "pack entry at offset {} decodes to {} instead of {}",
-                entry.offset,
-                actual.to_hex(),
-                entry.oid.to_hex()
+                "verify pack payload: pack entry at offset {offset} decodes to {actual_hex} instead of expected {expected_hex}"
             )));
         }
     }
@@ -353,6 +358,10 @@ impl RepackEngine {
         git_dir: &Path,
         options: &RepackOptions,
     ) -> FractalResult<Option<RepackReport>> {
+        if options.low_disk {
+            return Self::repack_repository_low_disk(git_dir, options);
+        }
+
         let start_time = Instant::now();
         let loose_objects = scan_loose_objects(git_dir)?;
         if loose_objects.is_empty() {
@@ -372,27 +381,27 @@ impl RepackEngine {
         let pack_dir = git_dir.join("objects").join("pack");
         fs::create_dir_all(&pack_dir)?;
 
-        let temp_pack_path = pack_dir.join(format!("tmp_pack_{}.tmp", std::process::id()));
-        let temp_idx_path = pack_dir.join(format!("tmp_idx_{}.tmp", std::process::id()));
+        let staging_pack_path = pack_dir.join(format!("staging_pack_{}.tmp", std::process::id()));
+        let staging_idx_path = pack_dir.join(format!("staging_idx_{}.tmp", std::process::id()));
 
         // 3. Write and flush the pack stream. The handle stays open because syncing, the replay
         //    pass, and the reported size must all observe the bytes that reached the disk.
-        let pack_file = File::create(&temp_pack_path)?;
+        let pack_file = File::create(&staging_pack_path)?;
         let (pack_oid, entries) = PackWriter::write_pack(&chains, &pack_file)?;
         pack_file.sync_all()?;
         let pack_bytes = pack_file.metadata()?.len();
 
         // 4. Write and flush Index v2 stream
-        let idx_file = File::create(&temp_idx_path)?;
+        let idx_file = File::create(&staging_idx_path)?;
         let idx_oid = IdxWriter::write_idx(entries.clone(), &pack_oid, &idx_file)?;
         idx_file.sync_all()?;
 
         // 5. Replay the fresh pack before publishing it or deleting a single loose object.
-        let replay = match verify_written_pack(&temp_pack_path, &temp_idx_path, &entries) {
+        let replay = match verify_written_pack(&staging_pack_path, &staging_idx_path, &entries) {
             Ok(report) => report,
             Err(error) => {
-                let _ = fs::remove_file(&temp_pack_path);
-                let _ = fs::remove_file(&temp_idx_path);
+                let _ = fs::remove_file(&staging_pack_path);
+                let _ = fs::remove_file(&staging_idx_path);
                 return Err(blocked_repack(format!(
                     "repack replay failed before publishing: {error}"
                 )));
@@ -403,8 +412,8 @@ impl RepackEngine {
         let final_pack_path = pack_dir.join(format!("pack-{}.pack", pack_oid.to_hex()));
         let final_idx_path = pack_dir.join(format!("pack-{}.idx", pack_oid.to_hex()));
 
-        fs::rename(&temp_pack_path, &final_pack_path)?;
-        fs::rename(&temp_idx_path, &final_idx_path)?;
+        fs::rename(&staging_pack_path, &final_pack_path)?;
+        fs::rename(&staging_idx_path, &final_idx_path)?;
         sync_directory(&pack_dir);
 
         // 7. Purge packed loose objects only after the verified pack is published.
@@ -412,8 +421,8 @@ impl RepackEngine {
         if !options.keep_loose {
             for chain in &chains {
                 let hex = chain.oid.to_hex();
-                let (d, f) = hex.split_at(2);
-                let loose_path = git_dir.join("objects").join(d).join(f);
+                let (dir_prefix, file_suffix) = hex.split_at(2);
+                let loose_path = git_dir.join("objects").join(dir_prefix).join(file_suffix);
                 if loose_path.is_file() && fs::remove_file(&loose_path).is_ok() {
                     loose_pruned += 1;
                 }
@@ -429,6 +438,126 @@ impl RepackEngine {
             objects_verified: replay.objects_verified,
             pack_bytes,
             loose_pruned,
+            duration_ms,
+        }))
+    }
+
+    /// Progressively repacks loose objects in micro-pack slices (256MB~512MB default),
+    /// immediately purging each slice's loose objects upon verification to prevent low-disk deadlocks.
+    pub fn repack_repository_low_disk(
+        git_dir: &Path,
+        options: &RepackOptions,
+    ) -> FractalResult<Option<RepackReport>> {
+        let start_time = Instant::now();
+        let loose_objects = scan_loose_objects(git_dir)?;
+        if loose_objects.is_empty() {
+            return Ok(None);
+        }
+
+        let pack_dir = git_dir.join("objects").join("pack");
+        fs::create_dir_all(&pack_dir)?;
+
+        // Partition loose objects into bounded slices based on payload size
+        let slice_limit = options.micro_pack_bytes.max(1024 * 1024);
+        let mut slices: Vec<Vec<(Oid, fg_core::models::ObjectKind, Vec<u8>)>> = Vec::new();
+        let mut current_slice = Vec::new();
+        let mut current_slice_bytes: u64 = 0;
+
+        for (oid, kind, payload) in loose_objects {
+            let item_len = payload.len() as u64;
+            if current_slice_bytes + item_len > slice_limit && !current_slice.is_empty() {
+                slices.push(std::mem::take(&mut current_slice));
+                current_slice_bytes = 0;
+            }
+            current_slice_bytes += item_len;
+            current_slice.push((oid, kind, payload));
+        }
+        if !current_slice.is_empty() {
+            slices.push(current_slice);
+        }
+
+        let mut total_packed = 0;
+        let mut total_verified = 0;
+        let mut total_pack_bytes = 0;
+        let mut total_pruned = 0;
+        let mut last_pack_oid = Oid::from_bytes([0u8; 20]);
+        let mut last_idx_oid = Oid::from_bytes([0u8; 20]);
+
+        let process_id = std::process::id();
+
+        for (slice_idx, slice) in slices.into_iter().enumerate() {
+            let slice_count = slice.len();
+            let mut delta_items = Vec::with_capacity(slice_count);
+            for (oid, kind, payload) in slice {
+                delta_items.push(PackDeltaItem::new(oid, kind, payload, None));
+            }
+
+            let chains = find_pack_deltas(delta_items, options.window_size, options.max_depth);
+
+            let staging_pack_path =
+                pack_dir.join(format!("staging_pack_{process_id}_{slice_idx}.tmp"));
+            let staging_idx_path =
+                pack_dir.join(format!("staging_idx_{process_id}_{slice_idx}.tmp"));
+
+            let pack_file = File::create(&staging_pack_path)?;
+            let (pack_oid, entries) = PackWriter::write_pack(&chains, &pack_file)?;
+            pack_file.sync_all()?;
+            let pack_bytes = pack_file.metadata()?.len();
+
+            let idx_file = File::create(&staging_idx_path)?;
+            let idx_oid = IdxWriter::write_idx(entries.clone(), &pack_oid, &idx_file)?;
+            idx_file.sync_all()?;
+
+            let replay = match verify_written_pack(&staging_pack_path, &staging_idx_path, &entries)
+            {
+                Ok(report) => report,
+                Err(error) => {
+                    let _ = fs::remove_file(&staging_pack_path);
+                    let _ = fs::remove_file(&staging_idx_path);
+                    return Err(blocked_repack(format!(
+                        "repack replay failed in micro-pack slice {slice_idx}: {error}"
+                    )));
+                }
+            };
+
+            let pack_hex = pack_oid.to_hex();
+            let final_pack_path = pack_dir.join(format!("pack-{pack_hex}.pack"));
+            let final_idx_path = pack_dir.join(format!("pack-{pack_hex}.idx"));
+
+            fs::rename(&staging_pack_path, &final_pack_path)?;
+            fs::rename(&staging_idx_path, &final_idx_path)?;
+            sync_directory(&pack_dir);
+
+            // Immediately purge loose objects for this verified micro-pack slice
+            let mut slice_pruned = 0;
+            if !options.keep_loose {
+                for chain in &chains {
+                    let hex = chain.oid.to_hex();
+                    let (dir_prefix, file_suffix) = hex.split_at(2);
+                    let loose_path = git_dir.join("objects").join(dir_prefix).join(file_suffix);
+                    if loose_path.is_file() && fs::remove_file(&loose_path).is_ok() {
+                        slice_pruned += 1;
+                    }
+                }
+            }
+
+            total_packed += slice_count;
+            total_verified += replay.objects_verified;
+            total_pack_bytes += pack_bytes;
+            total_pruned += slice_pruned;
+            last_pack_oid = pack_oid;
+            last_idx_oid = idx_oid;
+        }
+
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+
+        Ok(Some(RepackReport {
+            pack_oid: last_pack_oid,
+            idx_oid: last_idx_oid,
+            objects_packed: total_packed,
+            objects_verified: total_verified,
+            pack_bytes: total_pack_bytes,
+            loose_pruned: total_pruned,
             duration_ms,
         }))
     }
@@ -468,5 +597,78 @@ impl RepackEngine {
             }
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
+        let base = std::env::current_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .join("target")
+            .join("test_tmp");
+        let _ = std::fs::create_dir_all(&base);
+        tempfile::Builder::new()
+            .prefix(prefix)
+            .tempdir_in(&base)
+            .or_else(|_| tempfile::tempdir())
+            .expect("create test tempdir")
+    }
+
+    fn write_test_loose(git_dir: &Path, content: &[u8]) -> Oid {
+        use fg_core::models::compute_object_oid;
+        let oid = compute_object_oid(ObjectKind::Blob, content);
+        let header = format!("blob {}\0", content.len());
+        let mut raw = header.into_bytes();
+        raw.extend_from_slice(content);
+        crate::loose::LooseOdb::write_loose_object_raw(git_dir, &oid, &raw).expect("write loose");
+        oid
+    }
+
+    #[test]
+    fn test_low_disk_micro_pack_slicing() {
+        let dir = test_temp_dir("repack_low_");
+        let git_dir = dir.path().join("test_repo.git");
+        let objects_dir = git_dir.join("objects");
+        fs::create_dir_all(&objects_dir).expect("create objects");
+
+        // Write 4 loose objects
+        let _o1 = write_test_loose(&git_dir, b"Payload object 1");
+        let _o2 = write_test_loose(&git_dir, b"Payload object 2");
+        let _o3 = write_test_loose(&git_dir, b"Payload object 3");
+        let _o4 = write_test_loose(&git_dir, b"Payload object 4");
+
+        let initial_loose = scan_loose_objects(&git_dir).expect("scan loose");
+        assert_eq!(initial_loose.len(), 4);
+
+        // Run progressive low-disk repack with 1MB slice limit
+        let options = RepackOptions {
+            low_disk: true,
+            micro_pack_bytes: 1024,
+            keep_loose: false,
+            ..Default::default()
+        };
+
+        let report_opt =
+            RepackEngine::repack_repository(&git_dir, &options).expect("repack low disk");
+        let report = report_opt.expect("report present");
+
+        assert_eq!(report.objects_packed, 4);
+        assert_eq!(report.objects_verified, 4);
+        assert_eq!(report.loose_pruned, 4);
+
+        // Assert all loose objects have been pruned
+        let after_loose = scan_loose_objects(&git_dir).expect("scan after");
+        assert!(after_loose.is_empty(), "all loose objects should be pruned");
+
+        // Assert packfiles exist in objects/pack/
+        let pack_dir = objects_dir.join("pack");
+        let pack_entries: Vec<_> = fs::read_dir(&pack_dir)
+            .expect("read pack dir")
+            .flatten()
+            .collect();
+        assert!(!pack_entries.is_empty());
     }
 }

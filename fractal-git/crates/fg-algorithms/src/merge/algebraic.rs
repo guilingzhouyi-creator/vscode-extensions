@@ -6,6 +6,8 @@
 //! Responsibilities: Term cancellation, algebraic composition, and conflict resolution testing.
 //! Exit Semantics & Design Rationale: Resolves associativity and commutativity of Git conflicts
 //!   without embedding dirty conflict markers into working directory files.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (algebraic conflict resolution), FGT-COR-001, FGT-LCK-001.
 
 /// Immutable Jujutsu-style algebraic conflict representation.
 /// Invariant: An unresolved conflict has `adds.len() == removes.len() + 1`.

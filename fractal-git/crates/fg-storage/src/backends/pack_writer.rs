@@ -9,6 +9,8 @@
 //!   - `OBJ_OFS_DELTA` uses Git's variable-length distance encoding to save space over `OBJ_REF_DELTA`.
 //!   - IEEE 802.3 CRC32 is computed per object stream for subsequent Index v2 generation.
 //!   - Zero-allocation buffer reuse: object and compression buffers are hoisted out of the write loop.
+//!
+//! Domain Governance Rules: FGT-STO-001 (pack writer stream), FGT-COR-001, FGT-PRF-001.
 
 use flate2::write::ZlibEncoder;
 use flate2::Compression;

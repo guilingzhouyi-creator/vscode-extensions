@@ -11,6 +11,8 @@
 //!     plus dual-mask normalization ($M_s, M_l$).
 //!   - FastCdcIter provides zero-heap streaming chunk iteration over continuous byte buffers.
 //!   - Cyclomatic Complexity CC <= 15 across all chunking routines.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (FastCDC chunking), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::Oid;
 use sha1::{Digest, Sha1};

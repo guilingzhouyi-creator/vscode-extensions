@@ -17,6 +17,8 @@
 //!     transaction the caller was already told had been recorded.
 //!   - The frame carries a magic word so a JSON file from an older build is rejected outright
 //!     rather than being parsed as binary garbage.
+//!
+//! Domain Governance Rules: FGT-STO-001 (crash-safe WAL journal), FGT-COR-001, PRF-LEAK-001.
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;

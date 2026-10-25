@@ -17,6 +17,8 @@
 //!     chain reconstructs different content is reported rather than returned.
 //!   - Physical encoding (raw block or `.pfx` delta) is native; only the identifier is aligned with
 //!     Git.
+//!
+//! Domain Governance Rules: FGT-STO-001 (storage integrity), FGT-COR-001, FGT-PRF-001.
 
 use crate::delta_codec::{decode_block_payload, select_block_encoding, EncodedBlock};
 use fg_core::error::{FractalError, FractalResult};

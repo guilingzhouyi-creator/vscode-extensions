@@ -9,8 +9,10 @@
 //! Exit Semantics & Design Rationale:
 //!   - Each stage slot holds the full [`StagingEntry`], not a `(mode, oid)` pair. A pair loses the
 //!     path and the stage, forcing every consumer to reconstruct them and inviting a mismatch.
-//!   - Resolution returns `Option`, never a synthesized placeholder: a conflict with no "ours" side
+//!   - Resolution returns `Option`, never a synthesized dummy entry: a conflict with no "ours" side
 //!     must be reported as unresolvable rather than silently resolved to an empty entry.
+//!
+//! Domain Governance Rules: FGT-IDX-001 (three-way conflict staging), FGT-COR-001.
 
 use fg_core::models::{FileMode, IndexStage, Oid};
 

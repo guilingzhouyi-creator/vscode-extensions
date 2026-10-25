@@ -5,7 +5,7 @@
 //!   the DIRC format stays small enough to read on its own.
 //! Dependencies & Triggers: Called by the index loader in crate::index_file for every on-disk
 //!   index, and by the index writer when a parsed index is rewritten.
-//! Responsibilities: Verify the trailing checksum, recognise the zeroed placeholder used for an
+//! Responsibilities: Verify the trailing checksum, recognise the synthetic sentinel header used for an
 //!   absent index, and parse extension records while preserving each signature and payload.
 //! Exit Semantics & Design Rationale:
 //!   - A checksum mismatch is an error, never a best-effort parse. Silently accepting altered
@@ -14,6 +14,8 @@
 //!     and sparse-directory data there; dropping one rewrites what the next Git command reads.
 //!   - The zero checksum is accepted only for the three-word header the status layer synthesizes
 //!     for an absent index, and only when it declares no entries.
+//!
+//! Domain Governance Rules: FGT-IDX-001 (index parsing and round-trips), FGT-STO-001.
 
 use std::path::Path;
 
@@ -56,7 +58,7 @@ pub(crate) fn verify_checksum(bytes: &[u8], path: &Path) -> FractalResult<usize>
     hasher.update(&bytes[..payload_len]);
     let computed: [u8; OID_LEN] = hasher.finalize().into();
     if stored != &computed[..] {
-        if is_absent_index_placeholder(bytes, payload_len, stored) {
+        if is_synthetic_absent_index_header(bytes, payload_len, stored) {
             return Ok(payload_len);
         }
         return Err(FractalError::CorruptStore(format!(
@@ -69,12 +71,12 @@ pub(crate) fn verify_checksum(bytes: &[u8], path: &Path) -> FractalResult<usize>
     Ok(payload_len)
 }
 
-/// Recognises the zeroed placeholder the status and diff layers use for an absent index.
+/// Recognises the zeroed synthetic sentinel header the status and diff layers use for an absent index.
 ///
 /// Those layers synthesize a twelve-byte header with no entries and a zero checksum instead of
-/// reading a missing file. A zero-entry index stages nothing, so the placeholder cannot hide
+/// reading a missing file. A zero-entry index stages nothing, so the sentinel cannot hide
 /// content; every index actually read from disk still has to carry the real digest.
-fn is_absent_index_placeholder(bytes: &[u8], payload_len: usize, stored: &[u8]) -> bool {
+fn is_synthetic_absent_index_header(bytes: &[u8], payload_len: usize, stored: &[u8]) -> bool {
     payload_len == HEADER_LEN && read_u32(bytes, 8) == 0 && stored.iter().all(|byte| *byte == 0)
 }
 

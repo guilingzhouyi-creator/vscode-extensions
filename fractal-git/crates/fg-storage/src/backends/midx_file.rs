@@ -15,6 +15,8 @@
 //!     to or above `0x8000_0000` is an error rather than a wrapped value.
 //!   - Only hash version 1 (SHA-1) is accepted. A SHA-256 multi-pack index would yield 32-byte ids
 //!     that this build's 20-byte [`Oid`] cannot hold; refusing is the only honest outcome.
+//!
+//! Domain Governance Rules: FGT-STO-001 (multi-pack index), FGT-COR-001, FGT-PRF-001.
 
 use std::fs;
 use std::path::Path;

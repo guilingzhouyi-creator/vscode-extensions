@@ -2,6 +2,13 @@
 //! File Path: crates/fg-storage/src/cas_bridge.rs
 //! Architecture Role: Bridges LayerVFS content-addressed snapshots into canonical Git Commit
 //!   and Tree objects, persisting directly to `.git/objects/` with zero disk lock contention.
+//! Dependencies & Triggers: Consumed by orchestrator pipeline and variant evaluation winners.
+//! Responsibilities: Materialize blobs into loose ODB, construct directory tree hierarchies,
+//!   and produce signed commit objects with Agent metadata.
+//! Exit Semantics & Design Rationale: Returns the produced commit OID directly upon successful flush;
+//!   fails atomically if loose object creation fails.
+//!
+//! Domain Governance Rules: FGT-STO-001 (storage bridging), FGT-COR-001, FGT-LCK-001.
 
 use std::path::Path;
 

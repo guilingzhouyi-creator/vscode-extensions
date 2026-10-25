@@ -22,6 +22,8 @@
 //!   - Boxes are processed from an explicit stack rather than by recursion. No line belongs to two
 //!     boxes, so visiting order cannot change the result, and an input that splits badly would
 //!     otherwise overflow the stack on data an attacker controls.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (bidirectional Myers/xdiff alignment), FGT-COR-001, FGT-PRF-001.
 
 use crate::diff::xdiff_prepare::{bogo_sqrt, PreparedSide};
 

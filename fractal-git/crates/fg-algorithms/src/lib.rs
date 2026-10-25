@@ -7,6 +7,8 @@
 //! Dependencies & Triggers: Upstream of fg-storage, fg-topology, and Taxis CLI.
 //! Responsibilities: High-performance algorithmic engine exports and algebraic conflict operators.
 //! Exit Semantics & Design Rationale: Zero-allocation and cache-friendly computational primitives.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (algorithm performance and differential parity), FGT-COR-001, FGT-PRF-001.
 
 pub mod blame;
 pub mod bloom;
@@ -16,6 +18,7 @@ pub mod math;
 pub mod merge;
 pub mod pack;
 pub mod poset;
+pub mod space_plan;
 pub mod synthetic;
 pub mod traverse;
 
@@ -40,6 +43,11 @@ pub use pack::{
     DEFAULT_DELTA_WINDOW, MAX_DELTA_DEPTH,
 };
 pub use poset::CorrectedCommitDate;
+pub use space_plan::{
+    check_headroom, compute_adaptive_batch_window, simulate_space_plan, ExtractionUnit,
+    SpacePlanConfig, SpacePlanReport, SpacePlanStep, DEFAULT_BATCH_WINDOW_BYTES,
+    DEFAULT_SAFETY_HEADROOM_BYTES, MAX_BATCH_WINDOW_BYTES, MIN_BATCH_WINDOW_BYTES,
+};
 pub use synthetic::{
     generate_commit_chain, generate_diamond_dag, generate_monorepo_trees, SyntheticCommitChain,
     SyntheticDag, SyntheticMonorepo,

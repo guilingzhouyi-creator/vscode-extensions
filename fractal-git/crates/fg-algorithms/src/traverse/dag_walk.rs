@@ -14,6 +14,8 @@
 //!     below ancestor generation.
 //!   - FastOidHasher directly indexes the first 8 bytes of 20-byte SHA-1 digests, eliminating
 //!     SipHash overhead.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (DAG traversal and generation pruning), FGT-COR-001, FGT-PRF-001.
 
 pub use fg_core::models::{
     CorrectedCommitDate, FastOidHasher, FastOidMap, FastOidSet, Oid, PathBloomFilter,

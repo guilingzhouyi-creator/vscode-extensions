@@ -20,6 +20,8 @@
 //!     cost-derived limits, so a large rewrite degrades the same way `git diff` degrades instead of
 //!     through a threshold invented here — thresholds on line counts were measured producing a
 //!     1,300-line patch for an edit Git renders in 87 lines.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (unified patch generation), FGT-COR-001, FGT-PRF-001.
 
 use crate::diff::compact::{Compaction, Side};
 use crate::diff::xdiff::mark_changed;

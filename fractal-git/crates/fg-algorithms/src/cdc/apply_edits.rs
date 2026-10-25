@@ -10,6 +10,8 @@
 //!   - Zero-panic contract: returns explicit Result with typed validation errors.
 //!   - Reuses chunk OIDs on untouched extents with bitwise equality.
 //!   - Cyclomatic Complexity CC <= 15 across all traversal routines.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (FastCDC localized reconstruction), FGT-COR-001, FGT-PRF-001.
 
 use super::fast_cdc::{ChunkDescriptor, FastCdcChunker};
 use fg_core::error::{FractalError, FractalResult};

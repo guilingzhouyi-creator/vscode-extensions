@@ -7,12 +7,15 @@
 //! Dependencies & Triggers: Upstream of Taxis CLI and test suites.
 //! Responsibilities: Central facade for refs, promotion ledger, worktrees, and operation DAG.
 //! Exit Semantics & Design Rationale: Exposes high-level state machine interfaces cleanly.
+//!
+//! Domain Governance Rules: FGT-TOP-001 (topology state machine facade), FGT-COR-001, FGT-LCK-001.
 
 pub mod authorizer;
 pub mod bisect;
 pub mod blackboard;
 pub mod conflict_tree;
 pub mod operation;
+pub mod project_store;
 pub mod promotion_ledger;
 pub mod provenance;
 pub mod refs;
@@ -27,6 +30,7 @@ pub use bisect::{BisectEngine, BisectState, BisectStep};
 pub use blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
 pub use conflict_tree::{AgentConflictSliceReport, ConflictSlice, ConflictTreeManager};
 pub use operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
+pub use project_store::{DiskProjectStore, PROJECTS_CACHE_FILE, PROJECTS_DIR};
 pub use promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use provenance::{DiskProvenanceStore, PROVENANCE_FILE};
 pub use refs::{DiskRefStore, FractalRef, HeadState};

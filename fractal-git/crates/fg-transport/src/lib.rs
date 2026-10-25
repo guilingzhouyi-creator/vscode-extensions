@@ -5,6 +5,8 @@
 //! Dependencies & Triggers: Consumed by Taxis CLI daemon and local Agent IPC runners.
 //! Responsibilities: Wire packet-line codecs, Git Smart Protocol v2 framing, and IPC messages.
 //! Exit Semantics & Design Rationale: Stream-based framing with deterministic error boundaries.
+//!
+//! Domain Governance Rules: FGT-TRN-001 (transport subsystem facade), FGT-COR-001.
 
 pub mod ipc;
 pub mod packetline;

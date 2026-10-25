@@ -9,6 +9,8 @@
 //!   - Zero worktree disk footprint: streams straight from storage memory/disk objects to target output.
 //!   - Reuses IEEE 802.3 CRC32 from pack_writer for bit-exact Zip checksums.
 //!   - Supports optional `--prefix <prefix>/` path prefixes.
+//!
+//! Domain Governance Rules: FGT-STO-001 (storage streaming), FGT-PRF-001 (zero transient disk alloc).
 
 use std::io::Write;
 
@@ -94,7 +96,7 @@ impl<W: Write> TarWriter<W> {
         let octal_time = format!("{:011o} ", mtime.max(0));
         header[136..148].copy_from_slice(octal_time.as_bytes());
 
-        // Checksum placeholder (8 spaces)
+        // Checksum field reservation (8 spaces per POSIX tar specification)
         header[148..156].copy_from_slice(b"        ");
 
         // Typeflag: '0' for regular file

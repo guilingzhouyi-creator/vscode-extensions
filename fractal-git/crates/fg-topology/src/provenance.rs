@@ -61,14 +61,14 @@ impl DiskProvenanceStore {
         }
 
         let seq = std::process::id();
-        let tmp_path = self.staging_dir.join(format!(".provenance-{seq}.tmp"));
+        let staging_path = self.staging_dir.join(format!(".provenance-{seq}.tmp"));
 
         let json_bytes = serde_json::to_vec_pretty(ledger).map_err(FractalError::Json)?;
 
-        fs::write(&tmp_path, &json_bytes).map_err(FractalError::Io)?;
+        fs::write(&staging_path, &json_bytes).map_err(FractalError::Io)?;
 
-        if let Err(rename_err) = fs::rename(&tmp_path, &self.file_path) {
-            let _ = fs::remove_file(&tmp_path);
+        if let Err(rename_err) = fs::rename(&staging_path, &self.file_path) {
+            let _ = fs::remove_file(&staging_path);
             return Err(FractalError::Io(rename_err));
         }
 

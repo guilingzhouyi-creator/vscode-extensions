@@ -12,6 +12,8 @@
 //!     time without recursive descent.
 //!   - Deterministic ConflictEntry reporting prevents silent data loss during divergent
 //!     parallel edits.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (three-way merge engine), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::{FileMode, Oid};
 use fg_object::{GitTree, GitTreeEntry};

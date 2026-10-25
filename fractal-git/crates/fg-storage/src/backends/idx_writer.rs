@@ -8,6 +8,8 @@
 //!   - Entries must be sorted lexicographically by 20-byte OID.
 //!   - Large offsets (>= 2GB) use the secondary 64-bit table with high bit flagged in the 32-bit table.
 //!   - Two trailing SHA-1 checksums: packfile SHA-1 followed by index file SHA-1.
+//!
+//! Domain Governance Rules: FGT-STO-001 (pack index generation), FGT-COR-001, FGT-PRF-001.
 
 use sha1::{Digest, Sha1};
 use std::io::Write;

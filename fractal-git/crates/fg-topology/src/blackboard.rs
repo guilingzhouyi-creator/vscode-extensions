@@ -1,6 +1,6 @@
 //! Module: fg-topology — Persistent Intent Blackboard Storage
 //! File Path: crates/fg-topology/src/blackboard.rs
-//! Architecture Role: Manages persistent, lockless atomic落盘 for active SubAgent intent leases
+//! Architecture Role: Manages persistent, lockless atomic disk persistence for active SubAgent intent leases
 //!   under `.taxis/blackboard/<card_id>.intent.json`.
 //! Dependencies & Triggers: Consumed by Taxis CLI blackboard commands and orchestrator hooks.
 //! Responsibilities: Load blackboard state, atomic rename write, and expired lease pruning.
@@ -62,14 +62,14 @@ impl DiskBlackboardStore {
 
         let target_path = self.card_path(&board.card_id);
         let seq = std::process::id();
-        let tmp_path = self.base_dir.join(format!(".{}-{seq}.tmp", board.card_id));
+        let staging_path = self.base_dir.join(format!(".{}-{seq}.tmp", board.card_id));
 
         let json_bytes = serde_json::to_vec_pretty(board).map_err(FractalError::Json)?;
 
-        fs::write(&tmp_path, &json_bytes).map_err(FractalError::Io)?;
+        fs::write(&staging_path, &json_bytes).map_err(FractalError::Io)?;
 
-        if let Err(rename_err) = fs::rename(&tmp_path, &target_path) {
-            let _ = fs::remove_file(&tmp_path);
+        if let Err(rename_err) = fs::rename(&staging_path, &target_path) {
+            let _ = fs::remove_file(&staging_path);
             return Err(FractalError::Io(rename_err));
         }
 

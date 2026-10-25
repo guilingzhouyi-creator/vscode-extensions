@@ -8,6 +8,8 @@
 //! Exit Semantics & Design Rationale:
 //!   - Git Bundle v2 Specification compliance: compatible with standard `git bundle verify` and `git clone <bundle>`.
 //!   - Zero-allocation streaming: streams embedded packfile directly into target writer.
+//!
+//! Domain Governance Rules: FGT-STO-001 (storage containers), FGT-TRN-001 (bundle transport parity).
 
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 

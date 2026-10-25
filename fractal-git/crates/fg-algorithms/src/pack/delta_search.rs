@@ -8,6 +8,8 @@
 //!   - Git delta format uses little-endian 7-bit varints for base/target sizes and bitfield copy opcodes.
 //!   - Sliding window sorts objects by (kind, basename_hash, size) to cluster similar objects together.
 //!   - Hard ceiling on delta depth (`MAX_DELTA_DEPTH = 50`) prevents long reconstruction chains.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (pack delta search), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::{ObjectKind, Oid};
 use std::collections::HashMap;

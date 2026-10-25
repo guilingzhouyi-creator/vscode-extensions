@@ -8,6 +8,8 @@
 //! Exit Semantics & Design Rationale:
 //!   - Deterministic seed generation; zero randomness or external network dependencies.
 //!   - O(N) generation complexity, directly producing adjacency and CCD lookup tables.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (synthetic DAG generation), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::{CorrectedCommitDate, Oid};
 use std::collections::HashMap;

@@ -2,6 +2,11 @@
 //! File Path: crates/fg-transport/src/ipc.rs
 //! Architecture Role: Length-prefixed binary frame codec for local autonomous agent loop IPC,
 //!   enabling zero-network-overhead coordination between Praxis and Fractal Git engine.
+//! Dependencies & Triggers: Consumed by Praxis coordination bridges and local agent daemons.
+//! Responsibilities: Encode and decode structured IPC command frames over streaming buffers.
+//! Exit Semantics & Design Rationale: Framing uses 4-byte big-endian length prefix; fails closed on malformed frames.
+//!
+//! Domain Governance Rules: FGT-TRN-001 (transport protocol), FGT-COR-001, PRF-LEAK-001.
 
 use fg_core::error::FractalResult;
 use fg_core::models::{HumanUacProof, StagedPromotionRequest};

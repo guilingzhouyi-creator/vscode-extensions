@@ -13,6 +13,8 @@
 //!   cannot silently disappear just because Taxis replaced the Git porcelain. A hook that exceeds
 //!   the budget is killed and downgraded to `TimedOut` so an unresponsive script degrades rather
 //!   than deadlocks the mutation.
+//!
+//! Domain Governance Rules: FGT-GAT-001 (hook contracts), FGT-COR-001, PRF-LEAK-001.
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -234,6 +236,18 @@ impl GitHookRunner {
         hook_is_executable(&self.hook_path(name))
     }
 
+    /// Reports whether a functional POSIX shell launcher is available on this host.
+    pub fn has_working_shell() -> bool {
+        #[cfg(windows)]
+        {
+            !shell_candidates().is_empty()
+        }
+        #[cfg(not(windows))]
+        {
+            true
+        }
+    }
+
     /// Runs one hook with Git-compatible arguments, optional stdin, and environment overrides.
     pub fn run(
         &self,
@@ -313,7 +327,8 @@ impl GitHookRunner {
         envs: &BTreeMap<String, String>,
     ) -> std::io::Result<(GitHookStatus, String, String)> {
         let timeout_millis = self.config.timeout.as_millis() as u64;
-        match self.spawn(hook_path, args, stdin, envs)? {
+        let spawned = self.spawn(hook_path, args, stdin, envs)?;
+        match spawned {
             SpawnOutcome::TimedOut => Ok((
                 GitHookStatus::TimedOut { timeout_millis },
                 String::new(),
@@ -441,11 +456,15 @@ fn resolve_shell_candidates() -> Vec<String> {
                     .filter(|(position, _)| *position != index)
                     .map(|(_, candidate)| candidate),
             );
-            return ordered;
+            ordered
+        } else {
+            Vec::new()
         }
     }
-
-    discovered
+    #[cfg(not(windows))]
+    {
+        discovered
+    }
 }
 
 /// Reports whether one launcher can start a POSIX shell and exit cleanly within the probe budget.
@@ -509,6 +528,9 @@ fn interpreter_chain() -> Vec<Option<&'static str>> {
 #[cfg(windows)]
 fn windows_shell_candidates() -> Vec<String> {
     let mut candidates = Vec::new();
+    for known_root in well_known_install_roots() {
+        push_shell_candidates(&mut candidates, &known_root);
+    }
     if let Some(path_value) = std::env::var_os("PATH") {
         for directory in std::env::split_paths(&path_value) {
             if is_windows_shim_root(&directory) {
@@ -516,9 +538,6 @@ fn windows_shell_candidates() -> Vec<String> {
             }
             push_shell_candidates(&mut candidates, &directory);
         }
-    }
-    for known_root in well_known_install_roots() {
-        push_shell_candidates(&mut candidates, &known_root);
     }
     for fallback in ["bash", "sh"] {
         candidates.push(fallback.to_string());
@@ -558,7 +577,10 @@ fn well_known_install_roots() -> Vec<PathBuf> {
 #[cfg(windows)]
 fn is_windows_shim_root(directory: &Path) -> bool {
     let lower = directory.to_string_lossy().to_ascii_lowercase();
-    lower.contains("system32") || lower.contains("windowsapps")
+    lower.contains("system32")
+        || lower.contains("windowsapps")
+        || lower.contains("shims")
+        || lower.contains("scoop")
 }
 
 /// Appends the POSIX shells installed in one directory, preserving discovery order.

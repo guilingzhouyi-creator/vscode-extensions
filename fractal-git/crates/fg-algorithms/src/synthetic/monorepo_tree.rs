@@ -10,6 +10,8 @@
 //!   - Deterministic synthetic OIDs based on package & file index to avoid filesystem I/O.
 //!   - Accurately models sparse changes (e.g. 3 files mutated in 1 out of 50 packages).
 //!   - Provides an O(1) in-memory lookup closure to simulate content-addressable storage.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (synthetic monorepo generation), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::{FileMode, Oid};
 use fg_object::{GitTree, GitTreeEntry};

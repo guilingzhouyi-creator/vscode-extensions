@@ -3,6 +3,13 @@
 //! Architecture Role: Implements compile-time strictness verification for commit messages,
 //!   enforcing Conventional Commit formats, qualitative verification contracts,
 //!   diff-to-scope coherence borrow checks, and anti-inflation forbidden patterns.
+//! Dependencies & Triggers: Consumed by Taxis CLI commit pipeline and pre-commit gate hooks.
+//! Responsibilities: Validate conventional header syntax, required multi-line sections,
+//!   forbidden buzzword patterns, and path scope congruence.
+//! Exit Semantics & Design Rationale: Fails closed with structured GateRejection; produces
+//!   non-forgeable ValidatedCommitWitness only on complete verification.
+//!
+//! Domain Governance Rules: FGT-GAT-001 (gate governance), FGT-COR-001, CMG-STY-001..006.
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{DiffCoherenceMode, TaxisPolicy, ValidatedCommitWitness};

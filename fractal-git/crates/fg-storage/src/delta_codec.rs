@@ -10,6 +10,8 @@
 //!   - Strict depth guard: dependency depth cap <= 8 to prevent logical read amplification.
 //!   - Bitwise cryptographic verification: reconstructed canonical bytes must match target Oid.
 //!   - Zero-panic contract with cyclomatic complexity CC <= 15.
+//!
+//! Domain Governance Rules: FGT-STO-001 (storage compression), FGT-PRF-001, FGT-ALG-001.
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;

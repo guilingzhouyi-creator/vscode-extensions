@@ -18,6 +18,8 @@
 //!   - The trailing checksum is validated against the pack's own trailer by the caller, not here:
 //!     this reader never opens the pack, and inventing a second opinion about pack contents would
 //!     duplicate the pack reader's authority.
+//!
+//! Domain Governance Rules: FGT-STO-001 (pack index lookup), FGT-COR-001, FGT-PRF-001.
 
 use std::fs;
 use std::path::{Path, PathBuf};

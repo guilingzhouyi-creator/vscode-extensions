@@ -10,3 +10,5 @@ license = "MIT"
 fg-core = { path = "../fg-core" }
 fg-object = { path = "../fg-object" }
 sha1 = "0.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

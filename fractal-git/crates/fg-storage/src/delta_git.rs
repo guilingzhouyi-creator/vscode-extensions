@@ -19,6 +19,8 @@
 //!     panic would be indistinguishable from a genuine engine fault.
 //!   - A zero opcode is reserved by the format. It is rejected rather than treated as a
 //!     zero-length insert, because accepting it turns a truncated stream into an infinite loop.
+//!
+//! Domain Governance Rules: FGT-STO-001 (pack delta decoder), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::error::{FractalError, FractalResult};
 

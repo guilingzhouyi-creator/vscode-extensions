@@ -6,8 +6,12 @@
 //! Responsibilities: Define RemoteTransport trait, implement MockTransport for deterministic unit testing,
 //!   and LoopbackTransport for zero-network in-process repository synchronization.
 //! Exit Semantics & Design Rationale:
-//!   - Future-proof placeholder for network protocols (SSH, HTTPS, Custom IPC) without taking heavy network dependencies.
+//!   - Extensible architecture foundation for distributed protocols (SSH, HTTPS, Custom IPC) without taking heavy network dependencies.
 //!   - LoopbackTransport enables multi-agent in-process test fixtures.
+//!
+//! ### Domain Governance Rules (SSOT):
+//! - `FGT-COR-001`: Core data model and error contract guard
+//! - `FGT-TRN-001`: Transport abstraction and deterministic loopback parity
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -140,20 +144,19 @@ impl RemoteTransport for LoopbackTransport {
     }
 
     fn list_refs(&self) -> FractalResult<Vec<RemoteRef>> {
-        let lock = self
-            .remote_refs
-            .lock()
-            .map_err(|e| FractalError::CorruptStore(format!("lock error: {e}")))?;
+        let lock = self.remote_refs.lock().map_err(|lock_error| {
+            FractalError::CorruptStore(format!("lock error: {lock_error}"))
+        })?;
 
-        let mut out: Vec<RemoteRef> = lock
+        let mut ref_list: Vec<RemoteRef> = lock
             .iter()
             .map(|(name, &target)| RemoteRef {
                 name: name.clone(),
                 target,
             })
             .collect();
-        out.sort_by(|a, b| a.name.cmp(&b.name));
-        Ok(out)
+        ref_list.sort_by(|left, right| left.name.cmp(&right.name));
+        Ok(ref_list)
     }
 
     fn push(
@@ -161,10 +164,9 @@ impl RemoteTransport for LoopbackTransport {
         updates: &[(String, Oid, Option<Oid>)],
         pack_payload: Option<&[u8]>,
     ) -> FractalResult<Vec<(String, Result<(), String>)>> {
-        let mut lock = self
-            .remote_refs
-            .lock()
-            .map_err(|e| FractalError::CorruptStore(format!("lock error: {e}")))?;
+        let mut lock = self.remote_refs.lock().map_err(|lock_error| {
+            FractalError::CorruptStore(format!("lock error: {lock_error}"))
+        })?;
 
         let mut results = Vec::new();
 
@@ -199,10 +201,9 @@ impl RemoteTransport for LoopbackTransport {
     }
 
     fn fetch(&mut self, _wants: &[Oid], _haves: &[Oid]) -> FractalResult<Vec<u8>> {
-        let lock = self
-            .stored_pack
-            .lock()
-            .map_err(|e| FractalError::CorruptStore(format!("lock error: {e}")))?;
+        let lock = self.stored_pack.lock().map_err(|lock_error| {
+            FractalError::CorruptStore(format!("lock error: {lock_error}"))
+        })?;
         Ok(lock.clone())
     }
 }

@@ -4,7 +4,7 @@
 //!   through loose objects, then the multi-pack index, then each pack index in turn, and returns
 //!   `(kind, payload)` for every backend.
 //! Dependencies & Triggers: Built by `Repo::open` and by every read command (`cat-file`,
-//!   `ls-tree`, `rev-list`, `status`); replaces ad-hoc per-command object access.
+//!   `ls-tree`, `rev-list`, `status`); replaces decentralized per-command object access.
 //! Responsibilities: Backend selection, delta base resolution across packs, and a bounded object
 //!   cache keyed by id.
 //! Exit Semantics & Design Rationale:
@@ -19,6 +19,8 @@
 //!   - `read_object` returns the payload *without* the `"<type> <len>\0"` header. Callers that need
 //!     the id re-derive it with [`fg_core::models::compute_object_oid`], which is the only definition
 //!     of an object id in this build.
+//!
+//! Domain Governance Rules: FGT-STO-001 (storage hierarchy), FGT-PRF-001.
 
 use std::fs;
 use std::io::Read;

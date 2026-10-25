@@ -2,6 +2,11 @@
 //! File Path: crates/fg-transport/src/packetline.rs
 //! Architecture Role: Encodes and decodes canonical Git packet-line binary stream frames,
 //!   supporting flush (0000), delimiter (0001), and standard length-prefixed text/binary lines.
+//! Dependencies & Triggers: Consumed by Git Smart Protocol handlers and transport remotes.
+//! Responsibilities: Format and parse 4-hex-digit length prefixes, flush packets, and payload boundaries.
+//! Exit Semantics & Design Rationale: Complies with Git wire protocol v1 and v2 specifications bit-for-bit.
+//!
+//! Domain Governance Rules: FGT-TRN-001 (pkt-line framing), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::error::{FractalError, FractalResult};
 

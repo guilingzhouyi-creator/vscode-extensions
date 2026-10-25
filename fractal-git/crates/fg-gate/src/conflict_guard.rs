@@ -2,6 +2,11 @@
 //! File Path: crates/fg-gate/src/conflict_guard.rs
 //! Architecture Role: Microsecond-latency content hygiene and conflict marker scanning
 //!   prior to loose object creation, preventing corrupt or conflicted files from entering Git ODB.
+//! Dependencies & Triggers: Consumed by PreReceiveGuard, staged file materializers, and CLI hooks.
+//! Responsibilities: Intercept empty files (HYG-EMP-001) and raw Git conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
+//! Exit Semantics & Design Rationale: Fails immediately upon first marker detection, preventing dirty commits.
+//!
+//! Domain Governance Rules: FGT-GAT-001 (hygiene gating), FGT-COR-001, HYG-EMP-001.
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::traits::{GateVerdict, GateVerifier, StagedCandidate};

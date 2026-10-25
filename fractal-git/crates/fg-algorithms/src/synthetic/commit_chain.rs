@@ -8,6 +8,8 @@
 //! Exit Semantics & Design Rationale:
 //!   - Deterministic generation simulating typical code repo modifications (code, docs, manifests).
 //!   - Supplies standard hit and miss query paths for reproducible pruning benchmarks.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (synthetic benchmark generation), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::PathBloomFilter;
 

@@ -9,6 +9,8 @@
 //! Exit Semantics & Design Rationale: Bypasses flat map traversal via two-pointer pre-sorted
 //!   stream. Identical tree hashes terminate recursive descent in $O(1)$ time, guaranteeing
 //!   microsecond latency on massive trees.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (tree diffing), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::FileMode;
 use fg_core::models::Oid;

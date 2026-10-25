@@ -20,6 +20,8 @@
 //!     reject every valid delta; the check is applied to the stream only.
 //!   - A type code outside the six the format defines is an error. Defaulting to `blob` would make
 //!     a corrupt header read as a valid object with the wrong id.
+//!
+//! Domain Governance Rules: FGT-STO-001 (pack reader and delta chain recursion guard), FGT-COR-001, FGT-PRF-001.
 
 use std::fs;
 use std::io::Read;
@@ -28,8 +30,9 @@ use std::path::{Path, PathBuf};
 use flate2::read::ZlibDecoder;
 
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::{ObjectKind, Oid};
+use fg_core::models::{compute_object_oid, ObjectKind, Oid};
 
+use crate::backends::pack_writer::{crc32_ieee, PackEntryMeta};
 use crate::delta_git::apply_git_delta;
 
 /// Magic at the head of a packfile, ASCII `PACK`.
@@ -97,7 +100,7 @@ pub trait DeltaBaseSource {
     ///
     /// # Errors
     ///
-    /// Returns an error when the id is unknown or unreadable; returning a placeholder base would
+    /// Returns an error when the id is unknown or unreadable; returning a synthetic fallback base would
     /// reconstruct the wrong bytes.
     fn read_base(&self, oid: &Oid) -> FractalResult<(ObjectKind, Vec<u8>)>;
 }
@@ -192,6 +195,72 @@ impl PackFile {
     ) -> FractalResult<PackedObject> {
         let mut budget = MAX_CHAIN_DEPTH;
         self.read_at_depth(offset, resolver, &mut budget)
+    }
+
+    /// Scans and indexes every object in the packfile, returning the pack SHA-1 trailer and entry metadata.
+    pub fn index_objects(
+        &self,
+        resolver: &dyn DeltaBaseSource,
+    ) -> FractalResult<(Oid, Vec<PackEntryMeta>)> {
+        let trailer_start = self.bytes.len().saturating_sub(PACK_TRAILER_LEN);
+        let mut pack_sha_bytes = [0u8; 20];
+        pack_sha_bytes.copy_from_slice(&self.bytes[trailer_start..]);
+        let pack_oid = Oid::from_bytes(pack_sha_bytes);
+
+        let mut entries = Vec::with_capacity(self.object_count as usize);
+        let mut cursor = PACK_HEADER_LEN;
+
+        for _ in 0..self.object_count {
+            let start_offset = cursor as u64;
+            let (type_code, declared_size, post_header) = self.decode_header(cursor)?;
+
+            // Read the object payload to compute canonical OID
+            let object = self.read_at(start_offset, resolver)?;
+            let oid = compute_object_oid(object.kind, &object.payload);
+
+            // Determine compressed extent using ZlibDecoder total_in
+            let slice_start = match type_code {
+                TYPE_OFS_DELTA => {
+                    let (_, after_offset) =
+                        decode_ofs_offset(&self.bytes, post_header, start_offset)?;
+                    after_offset
+                }
+                TYPE_REF_DELTA => post_header + 20,
+                _ => post_header,
+            };
+
+            let slice = self.bytes.get(slice_start..).ok_or_else(|| {
+                FractalError::CorruptStore(format!(
+                    "packfile '{}' payload region missing at {slice_start}",
+                    self.path.display()
+                ))
+            })?;
+
+            let mut decoder = ZlibDecoder::new(slice);
+            let mut sink = Vec::with_capacity(declared_size);
+            decoder.read_to_end(&mut sink).map_err(|e| {
+                FractalError::CorruptStore(format!(
+                    "packfile '{}' failed to inflate during index: {e}",
+                    self.path.display()
+                ))
+            })?;
+
+            let consumed = decoder.total_in() as usize;
+            let end_offset = slice_start + consumed;
+
+            let compressed_slice = &self.bytes[cursor..end_offset];
+            let crc = crc32_ieee(compressed_slice);
+
+            entries.push(PackEntryMeta {
+                oid,
+                offset: start_offset,
+                crc32: crc,
+            });
+
+            cursor = end_offset;
+        }
+
+        Ok((pack_oid, entries))
     }
 
     /// Reads one object, decrementing the shared chain budget for every delta followed.

@@ -12,6 +12,8 @@
 //!   - Complies with workspace governance axiom §3: zero subjective constants like -2.0.
 //!   - Closed-form analytical equations guarantee microsecond execution latency
 //!     and zero memory allocation.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (Bayesian statistical modeling), FGT-COR-001, FGT-PRF-001.
 
 /// Full posterior statistical score estimate.
 #[derive(Debug, Clone, PartialEq)]

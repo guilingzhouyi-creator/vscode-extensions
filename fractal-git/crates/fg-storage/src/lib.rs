@@ -19,6 +19,7 @@ pub mod commit_graph;
 pub mod commit_materializer;
 pub mod delta_codec;
 pub mod delta_git;
+pub mod in_place;
 pub mod loose;
 pub mod projection;
 pub mod repack;
@@ -42,6 +43,12 @@ pub use delta_codec::{
     DeltaOp, EncodedBlock, MAX_DELTA_CHAIN_DEPTH,
 };
 pub use delta_git::{apply_git_delta, decode_git_delta, GitDelta, GitDeltaOp};
+pub use in_place::{
+    extract_tar_in_place, extract_targz_forward_hole_punch, extract_zip_in_place,
+    plan_tar_in_place, plan_zip_in_place, ArchiveRestorer, BundleConsumeReport, HolePuncher,
+    InPlaceBundleConsumer, InPlaceExtractionReport, InPlaceJournal, InPlaceLogEntry,
+    InPlaceResumeState, TailTruncator, TarMember, ZipMember,
+};
 pub use loose::{write_loose_object, LooseOdb};
 pub use projection::{export_native_to_git, import_git_to_native, ExportReport, ImportReport};
 pub use repack::{scan_loose_objects, RepackEngine, RepackOptions, RepackReport};

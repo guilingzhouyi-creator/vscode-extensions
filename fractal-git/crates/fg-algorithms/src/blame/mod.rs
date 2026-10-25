@@ -8,6 +8,8 @@
 //!   - OID-equivalence short-circuit: identical blob OIDs bypass diff computation entirely.
 //!   - Zero transient heap allocations inside traversal iteration loops.
 //!   - Support range filtering `[-L start,end]`.
+//!
+//! Domain Governance Rules: FGT-ALG-001 (algorithm performance and line attribution), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::Oid;
 use serde::{Deserialize, Serialize};
