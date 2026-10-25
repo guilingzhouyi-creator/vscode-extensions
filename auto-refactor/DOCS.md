@@ -13,7 +13,7 @@
 | :--- | :--- | :--- |
 | **L1. Rust N-API 原生加速内核** | `crates/auto-refactor-core`<br/>`crates/ops-{diff,graph,pattern,mask,clone}`<br/>`src/core/native/` | **6 个 Cargo 成员 Crate**：64-bit SWAR 行扫描、Bit-Parallel Myers 差分、Lengauer-Tarjan 支配树、Tarjan SCC、单趟词法脱敏状态机、MinHash+LSH 克隆检测；配齐 `src/core/native/` 纯 TS 100% 字节等价回退桥 |
 | **L2. 跨语言解析与语义图底座** | `src/core/ast/`<br/>`src/core/semantic/`<br/>`src/core/cfg/` | **`NormalizedNode` + `SemanticGraph`**：支持 **TS/JS** (`oxc-parser` 0.144.0 + `typescript` 5.3)、**Python** (`tree-sitter-python`)、**Rust** (`tree-sitter-rust`)、**Go**、**GDScript 4**、**Shell**、**YAML**、**Markdown** 八大生态；按需投影 CFG / DFG / CallGraph |
-| **L3. 四层规则分层体系与分析器** | `src/core/rules/registry.ts`<br/>`src/analyzers/*.ts`<br/>`src/core/messages/` | <!-- METRICS:BEGIN analyzer-count -->**31 个**<!-- METRICS:END analyzer-count -->内置分析器包（完整覆盖包括 `ANALYZER_GO_MODERN`、`ANALYZER_SHELL_LINT`、`ANALYZER_GATE_ARCHITECTURE` 在内的领域专家）、<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->注册规则（<!-- METRICS:BEGIN rule-auto-refactor-canonical -->**359 条**<!-- METRICS:END rule-auto-refactor-canonical --> Canonical `FAMILY-TOPIC-NNN` + <!-- METRICS:BEGIN rule-auto-refactor-legacy -->**15 条**<!-- METRICS:END rule-auto-refactor-legacy --> Legacy Aliases，文档覆盖率 100%（<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->全部有定义行）；全工作区 SSOT 单源目录统一收录 <!-- METRICS:BEGIN rule-total -->**508 条规则**<!-- METRICS:END rule-total -->）；机读纯英文（SARIF 2.1.0 / CAPP）+ 人读标准中文双轨文案解耦 |
+| **L3. 四层规则分层体系与分析器** | `src/core/rules/registry.ts`<br/>`src/analyzers/*.ts`<br/>`src/core/messages/` | <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器包（完整覆盖包括 `ANALYZER_GO_MODERN`、`ANALYZER_SHELL_LINT`、`ANALYZER_GATE_ARCHITECTURE` 在内的领域专家）、<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->注册规则（<!-- METRICS:BEGIN rule-auto-refactor-canonical -->**359 条**<!-- METRICS:END rule-auto-refactor-canonical --> Canonical `FAMILY-TOPIC-NNN` + <!-- METRICS:BEGIN rule-auto-refactor-legacy -->**15 条**<!-- METRICS:END rule-auto-refactor-legacy --> Legacy Aliases，文档覆盖率 100%（<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->全部有定义行）；全工作区 SSOT 单源目录统一收录 <!-- METRICS:BEGIN rule-total -->**508 条规则**<!-- METRICS:END rule-total -->）；机读纯英文（SARIF 2.1.0 / CAPP）+ 人读标准中文双轨文案解耦 |
 | **L4. 稀疏路由与双轨并发调度** | `src/core/router/sparseMoEGate.ts`<br/>`src/core/pipeline/dualTrackPipeline.ts`<br/>`src/core/scheduler/` | **27 专家 Sparse MoE 变更熵密（CED）路由器**（增量分析器绕过率 $\ge 70\%$）、`< 10ms` `ASTSliceExtractor` 局部切片快轨 + 全仓跨文件深轨、L1/L2 两级缓存与跨平台 NDJSON Daemon |
 | **L5. 三平面质量度量与自治度** | `src/core/scoring/`<br/>`src/core/dynamic/`<br/>`src/core/evolution/` | **静态平面**（10 大支柱 + 倒数型密度饱和曲线 + 算术/几何混合短板惩罚）+ **动态遥测平面** (`DynamicEvidenceDTO` + `RiskFusionEngine`) + **演化反馈平面**（Git 挖掘 + 梯度下降调权 + 代码自治度指数 **CAI**） |
 | **L6. Praxis 交付与 LayerVFS 体系** | `src/core/praxis/`<br/>`src/core/praxis/vfs/`<br/>`src/core/ring-buffer.ts`<br/>`src/core/rollback.ts` | **LayerVFS 虚拟分叉与零拷贝沙箱**：FastCDC 动态切块 + SQLite WAL CAS 去重存储（Fork `< 3ms`，Rollback `< 1ms`）、沙箱受控物理投影（零阻塞 I/O，超时 124 退出码）、MCTS 重构探索锦标赛（UCT 剪枝 + 圈复杂度增量评估）；**6 大正式治理门面** + **统一客户端 SDK (`PraxisReviewClient`)** |
@@ -53,7 +53,7 @@
 
 | 文档路径 | 核心主题 | 状态 |
 | :--- | :--- | :---: |
-| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 四层规则分层体系、<!-- METRICS:BEGIN analyzer-count -->**31 个**<!-- METRICS:END analyzer-count -->内置分析器、双轨文案架构与 <!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->全量内置规则字典（全工作区 SSOT 单源收录 <!-- METRICS:BEGIN rule-total -->**508 条规则**<!-- METRICS:END rule-total -->） | ✅ 已对齐 |
+| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 四层规则分层体系、<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器、双轨文案架构与 <!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->全量内置规则字典（全工作区 SSOT 单源收录 <!-- METRICS:BEGIN rule-total -->**508 条规则**<!-- METRICS:END rule-total -->） | ✅ 已对齐 |
 | [docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md](./docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md) | 声明式 `PatternKernel` 与编程式 `Analyzer` 插件契约、`cacheCustom` 隔离与评分表扩展 | ✅ 已对齐 |
 
 ### 📊 第五层：配置契约、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)
@@ -61,7 +61,7 @@
 | 文档路径 | 核心主题 | 状态 |
 | :--- | :--- | :---: |
 | [docs/05-specs-and-benchmarks/01-config-and-reports.md](./docs/05-specs-and-benchmarks/01-config-and-reports.md) | `auto-refactor.config.json` 配置模式、抑制策略、JSON / SARIF 2.1.0 / Text 报告与退出码 | ✅ 已对齐 |
-| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 六大核心算子基准性能台账、热路径消融评测与 <!-- METRICS:BEGIN test-suite-count -->**170 套**<!-- METRICS:END test-suite-count -->测试套件防劣化回归护栏 | ✅ 已对齐 |
+| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 六大核心算子基准性能台账、热路径消融评测与 <!-- METRICS:BEGIN test-suite-count -->**177 套**<!-- METRICS:END test-suite-count -->测试套件防劣化回归护栏 | ✅ 已对齐 |
 | [docs/05-specs-and-benchmarks/03-comment-and-header-standard.md](./docs/05-specs-and-benchmarks/03-comment-and-header-standard.md) | 六字段模块文件头契约、有效注释密度 (ECD-C) 算法与 `gate:comments` 棘轮 | ✅ 已对齐 |
 | [docs/05-specs-and-benchmarks/04-cross-language-generalization.md](./docs/05-specs-and-benchmarks/04-cross-language-generalization.md) | 项目中立性护栏 (`validate-project-neutrality`) 与文件语义角色推导 (`file-role-inference.ts`) | ✅ 已对齐 |
 | [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | `baseline.json` 1.2.0 信用消耗语义、单向棘轮与兄弟工程 (`workspace-timing` / `WebGames`) 接入 | ✅ 已对齐 |
@@ -75,7 +75,7 @@
 | [docs/PRAXIS_HANDOFF_REPORT.md](./docs/PRAXIS_HANDOFF_REPORT.md) | **Praxis 团队对接交付总报告（Executive Handoff Report）** | ✅ 已交付 |
 | [docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md](./docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md) | Praxis 对接架构全景、核心数据契约（`PraxisCardContext` / `ReviewDiffHunk`）与核心 SPI 扩展插槽手册 | ✅ 已交付 |
 | [docs/06-praxis-delivery/02-praxis-six-governance-services-api.md](./docs/06-praxis-delivery/02-praxis-six-governance-services-api.md) | Praxis 治理服务门面、工作区管理器与统一客户端 SDK (`PraxisReviewClient`) API 手册 | ✅ 已交付 |
-| [docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md](./docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | Praxis 团队端到端 TypeScript 联调代码范例、异常降级 SLA 与 <!-- METRICS:BEGIN test-suite-count -->**170 套**<!-- METRICS:END test-suite-count -->自动化验收矩阵 | ✅ 已交付 |
+| [docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md](./docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | Praxis 团队端到端 TypeScript 联调代码范例、异常降级 SLA 与 <!-- METRICS:BEGIN test-suite-count -->**177 套**<!-- METRICS:END test-suite-count -->自动化验收矩阵 | ✅ 已交付 |
 | [docs/06-praxis-delivery/04-praxis-layervfs-integration-guide.md](./docs/06-praxis-delivery/04-praxis-layervfs-integration-guide.md) | LayerVFS 虚拟工作区集成实战指南、FastCDC 切块、CAS 零拷贝分叉、沙箱投影执行与 MCTS 重构锦标赛对接手册 | ✅ 已交付 |
 | [docs/praxis-integration-guide.md](./docs/praxis-integration-guide.md) | **Praxis 统一客户端 SDK (IPraxisReviewClient)、一体两面三层拓扑 Diff 与面向 Agent 结构化指令集成手册** | ✅ 已交付 |
 
@@ -95,7 +95,7 @@
 
 | 命令 | 覆盖范围 | 门禁契约 |
 | :--- | :--- | :--- |
-| `npm run gate` | `gate:rust` $\rightarrow$ `build` $\rightarrow$ `format:check` $\rightarrow$ `lint` $\rightarrow$ `gate:comments` $\rightarrow$ `gate:self` $\rightarrow$ `npm test` | 提交前唯一闭环入口，170 套并行与串行套件任一环失败即阻断 |
+| `npm run gate` | `gate:rust` $\rightarrow$ `build` $\rightarrow$ `format:check` $\rightarrow$ `lint` $\rightarrow$ `gate:comments` $\rightarrow$ `gate:self` $\rightarrow$ `npm test` | 提交前唯一闭环入口，<!-- METRICS:BEGIN test-suite-count -->**177 套**<!-- METRICS:END test-suite-count -->并行与串行套件任一环失败即阻断 |
 | `npm run gate:rust` | `cargo clippy -- -D warnings` + `cargo fmt --check` + `cargo test`（全 6 个 Crate） | Rust 原生算子库零告警、全测试通过 |
 | `npm run gate:self` | 引擎自扫基线棘轮（error 级） | `newBlocking(error)` 必须恒为 `0` |
 | `npm run gate:self:slice` | AST 语义切片增量自审 (`scripts/gate-self-slice.js`) | 毫秒级局部语法树突变自检 |
@@ -115,7 +115,7 @@
 | :--- | :--- | :--- |
 | `scan` | `auto-refactor scan --format <json\|sarif\|text\|agent> [options]` | 全仓/局部静态扫描与质量评估，支持双轨流水线、L1/L2 缓存与自动修复 (`--fix`) |
 | `gate` | `auto-refactor gate [--stage pre-commit\|pre-push\|ci] [--root <dir>]` | 评估 `composite-quality-gate` 复合质量门禁阈值，生成多维结构化门禁裁定报告 |
-| `self-test` | `auto-refactor self-test` | 运行内置已知违规 Corpus 固件测试，校验 31 专精分析器全量触发语义 |
+| `self-test` | `auto-refactor self-test` | 运行内置已知违规 Corpus 固件测试，校验 32 专精分析器全量触发语义 |
 | `daemon` | `auto-refactor daemon start\|stop\|status [--root <dir>]` | 管理跨平台后台常驻守护进程（Named Pipe / UDS），提供毫秒级热扫描加速 |
 | `symbols` | `auto-refactor symbols <name> [--root <dir>]` | 查询 AST 符号定义、跨文件引用拓扑与调用链索引深度 |
 | `guide` | `auto-refactor guide <file> [--domain <d>] [--line <l>]` | 提取当前文件/领域的智能体治理守卫提示词与活动规则引导上下文 |

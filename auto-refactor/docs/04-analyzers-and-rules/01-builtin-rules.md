@@ -1,4 +1,4 @@
-# 01. 四层规则金字塔、31 个内置分析器与 374 条全量规则字典 (359 规范 + 15 历史别名)
+# 01. 四层规则金字塔、32 个内置分析器与 374 条全量规则字典 (359 规范 + 15 历史别名)
 
 > **所属层级**：L4 规则引擎与内置分析器 (`docs/04-analyzers-and-rules/`)  
 > **对应代码真源**：`src/core/rules/registry.ts`、`src/core/rules/entries/*.ts`、`src/core/analyzer-registry.ts`、`src/analyzers/*.ts`
@@ -65,7 +65,7 @@
 
 ## 2. 四阶段分析器流水线拓扑与装配矩阵（共 30 个）
 
-注册于 `src/core/analyzer-registry.ts` 的 31 个内置分析器统一按四阶段流水线拓扑编排装配，具备严格的阶段依赖与短路熔断机制：
+注册于 `src/core/analyzer-registry.ts` 的 32 个内置分析器统一按四阶段流水线拓扑编排装配，具备严格的阶段依赖与短路熔断机制：
 
 ### 2.1 四阶段流水线装配与短路机制
 

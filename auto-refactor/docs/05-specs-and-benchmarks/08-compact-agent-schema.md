@@ -1,221 +1,172 @@
-# CAS v3.0 紧凑审查导出契约 (Compact Agent Schema)
+# 智能体原生审查架构契约 (Agent Audit Schema v1.0 - AAS)
 
 > **适用版本**：`auto-refactor` v0.4.0 及以上  
-> **入口命令**：`auto-refactor scan --format compact`  
-> **核心模块**：[`compact-report-types.ts`](../../src/core/reporting/compact-report-types.ts) · [`compact-report-migrator.ts`](../../src/core/reporting/compact-report-migrator.ts)
+> **入口命令**：`auto-refactor scan --format aas`（别名 `--format compact` 已收敛至 AAS）  
+> **核心模块**：[`aas-types.ts`](../../src/core/reporting/aas-types.ts) · [`aas-reporter.ts`](../../src/core/reporting/aas-reporter.ts)
 
 ---
 
-## 一、 为什么需要独立导出契约
+## 一、 为什么需要智能体原生审查契约
 
-完整 `ScanReport` 是为**可审计性**设计的：每个文件携带十二项结构指标、每条问题携带完整定义域与建议文案、质量分携带逐条扣分审计链。当审查对象是一个数千文件的工作区时，这份报告会达到数百 KB 到数 MB，直接塞进模型上下文既不经济也会稀释真正需要处理的信息。
+在智能体主导的持续工程治理中，传统基于冗余 JSON 的审查结果存在严重痛点：
+1. **Token 浪费严重**：数千个文件的全量 `ScanReport` 会重复携带成千上万次绝对文件路径、冗长的 JSDoc 模板与重复的上下文结构，单次审查倾倒消耗 50k~200k+ Tokens（数 MB），极易撑爆或污染模型注意力窗口。
+2. **缺乏代码定位能力**：早期的纯数组向量（如已退役的 CAS v3 数组元组）虽压缩了体积，但完全剥离了代码上下文，模型必须进行二次读盘和行号对齐，大幅增加了交互延迟与幻觉风险。
+3. **缺乏拓扑修复次序**：扁平的问题列表无法反映软件架构底层的单向依赖拓扑，导致智能体容易颠倒次序（如在修改底层契约前先去修高层业务，引发瀑布式级联报错）。
 
-CAS v3.0 解决的是另一个问题：**在保留全部决策所需事实的前提下，省略重复的结构开销**。它不删除判定依据，只改变表达方式。
+**AAS v1.0 (Agent Audit Schema)** 确立为全工作区智能体审查交互的唯一原生标准：
+- **按文件聚合（File-Grouped）**：消除成千上万条重复路径字符串，以文件为单元聚合所有缺陷。
+- **架构依赖拓扑严格排序（L1 $\to$ L5）**：缺陷文件按系统分层自底向上精准排序，指导智能体顺应单向依赖顺序开展修复。
+- **内联高密度代码锚点（Code Anchor）**：自动提取违规点前后 1~2 行精准代码切片并标注 `> ` 指针，模型无需二次读盘即可直击缺陷核心。
+- **结构化修复配方（Remediation Recipe）与定向复验指令**：每条缺陷内联可落盘的修复动作（`fix: { action, patch, template }`）与局部单测复验命令（`verify`）。
+- **Token 极致节约**：相比原始 Verbose 报告削减 **70% ~ 92%** 体积，将数十万 Token 的报告脱水至十余 KB 级别。
 
-| 载体 | 典型体积 | 适用场景 |
-| :--- | :--- | :--- |
-| `json` (ScanReport) | 数百 KB ~ 数 MB | 归档、离线复算、需要完整扣分审计链 |
-| `capp` (CAPP 2.0) | 十余 KB | 纯文本注入，无结构反序列化能力 |
-| `agent` (Markdown) | 数十 ~ 上百 KB | 人类可读的指令清单 |
-| **`compact` (CAS v3.0)** | **十余 KB** | **模型上下文注入、跨会话基线对比、体积敏感的持久化** |
+| 载体 | 典型体积 | 结构形态 | 适用场景 |
+| :--- | :--- | :--- | :--- |
+| `json` (ScanReport) | 数百 KB ~ 数 MB | 完整 AST 对象树与逐条扣分审计链 | 离线离场归档、全量复盘 |
+| `agent` (Markdown) | 数十 ~ 上百 KB | 渲染后的 Markdown 格式人类可读清单 | 人类审查交割、PR 描述 |
+| **`aas` (AAS v1.0)** | **十余 KB ~ 百余 KB** | **拓扑排序、文件聚合、内联代码锚点与配方** | **智能体上下文注入、门禁前置判定、跨会话基线对比** |
 
 ---
 
-## 二、 结构约定
+## 二、 AAS v1.0 顶层结构约定
 
-### 2.1 顶层信封
+### 2.1 顶层信封规范
 
 ```json
 {
-  "schema": "cas-v3",
+  "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "ts": "2026-10-24T00:00:00.000Z",
-  "root": "/workspace/auto-refactor",
-  "verdict": "BLOCK",
-  "counts": { "files": 721, "issues": 4752, "errors": 0, "warns": 4173, "info": 579, "suppressed": 130 },
-  "health": { "score": 99.03, "grade": "A+", "coverage": 1, "confidence": 0.92, "cai": 78.63 },
-  "dimensions": { "arch": 99.74, "std": 95.37, "debt": 99.9 },
-  "bottlenecks": [{ "rule": "CMT-LNG-001", "dim": "std", "loss": 22, "count": 140 }],
-  "pal": ["governance", "comments"],
-  "vectors": [["CMT-LNG-001", 1, "src/core/cache.ts:243", "注释语言与文件主语言不一致", "align_comment_language", 1]]
+  "timestamp": "2026-10-25T19:40:00.000Z",
+  "root": ".",
+  "verdict": "WARN",
+  "health": {
+    "score": 99.19,
+    "grade": "A+",
+    "cai": 77.98,
+    "counts": {
+      "files": 755,
+      "total": 3963,
+      "errors": 0,
+      "warns": 634,
+      "info": 3329,
+      "suppressed": 130
+    },
+    "tensorSummary": {
+      "compositeDensity": 0.884,
+      "tspr": 0.621,
+      "por": 0.384,
+      "columnDensity": 42.1,
+      "spatialDensity": 0.812,
+      "mahalanobisDistance": 1.15
+    }
+  },
+  "defaultVerify": "npm test",
+  "dimensions": {
+    "arch": 98.22,
+    "sem": 98.46,
+    "sec": 99.79,
+    "perf": 99.58,
+    "std": 83.29,
+    "mod": 98.49,
+    "maint": 93.28,
+    "doc": 99.98,
+    "dup": 95.11,
+    "debt": 100.0
+  },
+  "bottlenecks": [
+    { "rule": "CMT-LNG-001", "dim": "std", "loss": 12.5, "count": 140 }
+  ],
+  "topology": {
+    "L1_CONTRACT": ["src/core/cfg/types.ts"],
+    "L2_INFRA": ["src/core/algorithms/hash.ts"],
+    "L3_CONFIG": ["src/core/config/config-tuning.ts"],
+    "L4_BUSINESS": ["src/analyzers/naming.ts"],
+    "L5_GOVERNANCE": ["scripts/validate-self-audit.js"]
+  },
+  "files": {
+    "src/core/cfg/types.ts": [
+      {
+        "line": 76,
+        "col": 5,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 59",
+        "anchor": "  59: function parseNode(node: AstNode): void {\n> 76: function parseNodeFallback(node: AstNode): void {",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function"
+        },
+        "verify": "npm test -- tests/unit/cfg.test.ts"
+      }
+    ]
+  },
+  "truncated": 0
 }
 ```
 
-### 2.2 位置向量布局
+---
 
-每条问题是一个六元组，取代一个完整对象：
+## 三、 核心架构设计
 
+### 3.1 架构分层自底向上拓扑优先级 (L1 $\to$ L5)
+
+AAS v1.0 将所有文件按其架构依赖拓扑严格分级，并在 `files` 字典中自底向上排序：
+
+1. **`L1_CONTRACT`**：类型定义、接口、常量 SSOT、基础协议。
+2. **`L2_INFRA`**：算子、算法内核、AST 适配器、原生加速库。
+3. **`L3_CONFIG`**：领域配置、规则目录映射、阈值级联。
+4. **`L4_BUSINESS`**：分析器业务逻辑、检查器实现、门面聚合。
+5. **`L5_GOVERNANCE`**：门禁脚本、文档、自审验证、元治理规则。
+
+智能体必须严格按照 `L1 -> L2 -> L3 -> L4 -> L5` 的顺序执行修复，绝不可倒序操作。
+
+### 3.2 高密度代码锚点（Code Anchor）
+
+对于 `WARN` 与 `ERROR` 级缺陷，AAS 自动内联代码切片，格式为：
 ```text
-[ rule, severityRank, "file:line", message, action | null, analyzerIndex | null ]
+  75: const prev = calculateHash(data);
+> 76: const current = calculateHash(data);
+  77: return prev === current;
 ```
+- 带 `> ` 前缀的行即为违规行。
+- 智能体直接利用上下文切片完成 AST 或文本修复，无需额外消耗 Tool Call 读盘。
 
-- **`severityRank`** 是闭区间 `0..2`（`info` / `warning` / `error`）。用数值而非字符串，使调用方可直接以 `sev >= 1` 过滤，不必逐条比较三个字符串。
-- **`analyzerIndex`** 指向 `pal` 数组。分析器名称在数百条问题里高度重复，提取为调色板后每条形如 `0`/`1`，把重复字符串的开销变成一次性成本。
-- **`location`** 采用 `file:line` 单串，省略 `start`/`end` 对象层级。反水合时统一以第 1 列重建，因为审查修复只需要定位行，不需要精确列区间。
-- **`action`** 取自 `issue.actionable.action`，缺失时为 `null`，使「可自动化」与「需人工判断」在同一位置上即可区分。
+### 3.3 5D 黎曼流形代码密度相空间张量
 
-> [!IMPORTANT]
-> `counts.issues` **不等于** `vectors.length + truncated`。默认发射策略排除 `info` 级问题，且不把被排除的部分计入 `truncated` —— 它们从来不是合格项。两个字段回答的是不同问题：`counts.issues` 是「全报告存在多少条」（含 info 与已抑制），`truncated` 是「有多少条本可发射却因预算被扣留」。一旦排除 info 级，两者就无法用算术互相推导。
-
-### 2.3 维度短键
-
-`dimensions` 与 `bottlenecks[].dim` 使用短键，映射定义在 `COMPACT_DIMENSION_KEYS`：
-
-| 短键 | 完整维度 | 短键 | 完整维度 |
-| :--- | :--- | :--- | :--- |
-| `arch` | `architectureConsistency` | `mod` | `modernity` |
-| `sem` | `semanticPurity` | `maint` | `maintainability` |
-| `sec` | `codeSecurity` | `doc` | `commentQuality` |
-| `perf` | `performanceEfficiency` | `dup` | `duplication` |
-| `std` | `standardization` | `debt` | `techDebtRisk` |
-
-未参与评估的维度**不出现在键集中**，而不是以 `null` 占位 —— 缺失即未测量，避免把未测量读成零分。
-
-### 2.4 扣分瓶颈
-
-`bottlenecks` 由 `qualityScore.deductionsByDimension` 聚合而来：按 `(rule, dimension)` 分组求和，按扣分降序排列。这条聚合替代了原报告中逐条重复的 `rationales` 文本列表，使「哪个规则在哪个维度上最耗分」一眼可见。
-
-### 2.5 重叠声明 `clusters`
-
-同一坐标上若出现同一语义重叠簇的多个成员，紧凑文档会额外发射一条声明：
-
-```json
-"clusters": [
-  { "at": "src/core/trajectory/eloc-types.ts:187", "cluster": "stub-and-sanitize", "rules": ["GOV-SAN-001", "HYG-STB-002"], "primary": "GOV-SAN-001" }
-]
-```
-
-簇拓扑的单一真源是 [`overlap-clusters.ts`](../../src/core/rules/overlap-clusters.ts) 的 `OVERLAP_CLUSTERS`，本条目不重述成员清单。
-
-- **附加而非替换**：`vectors` 保留全部诊断，`clusters` 只是把「同一点上几个规则在说同一件事」折叠成一行。消费方忽略该字段时看到的输出与旧版完全一致。
-- **聚合范围严格限定 `file + line`**：跨行的成员**永不**合并。不同行是不同修复点，合并会让紧凑视图显得比代码实际更干净。
-- **`primary` 在折叠过程中选举**：严重度更高者优先，同严重度取规则 ID 字典序更小者；其余成员仍完整列在 `rules` 中。
-- **字段仅在至少存在一条声明时出现**：无重叠时不写空数组，避免把「未发现重叠」与「未测量」混为一谈。
-
-> [!IMPORTANT]
-> 声明集由**截断前的合格问题集**派生，而非发射窗口。若由窗口派生，任何真实预算下声明都会恒为空——重叠成员在排序后相邻，小额 `maxVectors` 要么把它们全部丢弃，要么只保留首个成员，两种情况都读作「此处无重叠」。代价是某条声明的坐标可能只部分出现在 `vectors` 中；`truncated` 仍是「被扣留多少」的唯一权威声明，需要回查向量的消费方须先检查它。
+头部 `health.tensorSummary` 记录全工程在 5D 流形相空间中的坐标位置：
+- $D_{\text{line}}$：行密度（有效代码行占物理行比例）。
+- $D_{\text{col}}$：列密度（单行有效 Token 承载）。
+- $D_{\text{reuse}}$：复用率（函数扇入与模块复用程度）。
+- $D_{\text{shared}}$：接线率与领域集中度 ($\text{POR} \le 0.60, \text{TSPR} \ge 0.40$)。
+- $D_{\text{payload}}$：语义有效载荷占比。
+- **马氏距离 $D_{\text{mahalanobis}}$**：度量离理想引力解 $\mu_0$ 的距离，严防稀释与虚假重构。
 
 ---
 
-## 三、 发射策略与截断语义
+## 四、 历史兼容层全面退役与零遗留保证
 
-| 选项 | 默认 | 语义 |
-| :--- | :--- | :--- |
-| `maxVectors` | `500` | 最多发射的问题条数 |
-| `maxMessageChars` | `160` | 单条消息截断长度 |
-| `maxBottlenecks` | `12` | 瓶颈行上限 |
-| `includeInfo` | `false` | 是否包含 `info` 级问题 |
-| `anchorProvider` | 无 | 为阻断级问题提供代码锚点切片 |
-| `healthOverride` | 无 | 用调用方自己的聚合口径覆盖 `health` 块 |
-
-> [!IMPORTANT]
-> 截断**从不静默发生**。被省略的条数写入 `truncated` 字段，反水合时 `partial` 为 `true`。一个看不到 `truncated` 的消费方会把部分报告读成完整报告，这是唯一必须防住的误读。
-
-默认排除 `info` 级问题是刻意的：该级别主要是风格提示，不是待处理项。需要完整清单时显式传 `includeInfo: true`。
-
-`healthOverride` 存在的原因是两套得分口径都合法且确实不同：自审基线聚合逐文件质量分，而 `qualityScore.compositeScore` 是引擎自评投影。生产者若把侧车挂在基线旁边却引用另一个数字，两份文件就会自相矛盾。未提供的字段保留报告自身取值。
+在本次架构升级中，历史遗留的旧格式与兼容层已**彻底全面退役**：
+1. **CAS v3.0 (`cas-v3`) 彻底废弃**：
+   - 仓内所有历史 `.cas.json` 侧车文件全部移除，并由 `*.aas.json` 100% 平替。
+   - `validate-sidecar-coverage.js` 门禁已切换为严格校验 AAS v1.0，检测到任何 `.cas.json` 即刻阻断。
+2. **导出通道收拢**：
+   - CLI 选项 `--format compact` 内部直接重定向至 `toAasJson`，双轨统一输出 `schema: "aas-v1"`。
+3. **零向后兼容包袱**：
+   - 移除了所有冗余的历史别名（如 `recomputeSummary`、`byPosition`、`groupDuplicates`、`tokenizeIdentifier`）。
+   - 治理文档与门禁措辞中彻底清除「保持向后兼容」与「双轨并存」等过时话语，确立 AAS v1.0 为全仓唯一的智能体审查交换协议。
 
 ---
 
-## 三之一、 生产者与派生视图的分工
-
-自审运行（`scripts/run-self-audit.js`）每次同时写入两份产物：
-
-| 产物 | 形态 | 定位 |
-| :--- | :--- | :--- |
-| `reports/self-audit-baseline.json` | 聚合基线 | **无损记录**，五处既有读取方的唯一依赖 |
-| `reports/self-audit-baseline.cas.json` | CAS v3 侧车 | **派生视图**，供模型上下文与跨会话比对 |
-
-侧车的向量预算固定为 `60`：基线是聚合视图，若侧车发射全量向量，它会比它所伴随的聚合文件大出数倍，反而失去存在意义。差额由 `truncated` 如实登记。
-
-在生产侧车之前，仓内 `*.cas.json` 数量为零——紧凑格式只能由离线迁移器生成。这意味着移除历史适配器会直接删掉唯一读取通路，因此「生产者原生写出侧车」是兼容层退役的前置条件，而非可选优化。
-
----
-
-## 四、 历史工件归一化
-
-工作区里存在四代历史审查产物，形状互不相同。`migrateLegacyReport` 通过结构嗅探逐一归一，使旧数据无需重新扫描即可被当前消费方读取：
-
-```mermaid
-flowchart TD
-    A["历史 JSON 工件"] --> B{"结构嗅探"}
-    B -->|"schema = cas-v3"| C["原样返回"]
-    B -->|"含 summary + issues"| D["ScanReport 投影（完整向量）"]
-    B -->|"含 workspaceHealthScore"| E["工作区审查快照"]
-    B -->|"含 metrics / baselineMetrics"| F["引擎自审基线（两代）"]
-    B -->|"含 dimensions.architectureAndHealth"| G["性能基准台账"]
-    B -->|"均不匹配"| H["显式拒绝"]
-```
-
-- **ScanReport** 走完整投影，产出真实向量。
-- **快照 / 基线 / 性能台账** 只记录聚合读数，不含逐条问题，因此向量为空而 `truncated` 等于其债务总数 —— 如实声明「已知有 N 条未携带」。
-- **无法识别的形状被显式拒绝**，绝不回退成空文档。空文档会被读作「零问题扫描」，这是比报错更危险的失败方式。
-
-各代工件的计数器口径差异也在适配层归一：当前基线用 `totalIssues`，v0.3 基线只有 `blockingWarningCount` + `blockingErrorCount`，性能台账则以 `highDebt` + `criticalDebt` 表达债务规模。
-
----
-
-## 五、 反水合与兼容边界
-
-`hydrateCompactReport` 重建 `Issue[]` 与 `summary`，可回灌给任何只消费这两个字段的既有代码（门禁判定、计数汇总、Markdown 渲染）。
-
-> [!WARNING]
-> 反水合**不可能**恢复以下内容，因为它们已被位置向量压缩掉：逐条 `rationales`、`weights`、`deductionsByDimension` 明细、`fileMetrics` 全量结构指标、问题列区间与 `end` 行。需要这些字段的消费方必须读取原始 `ScanReport`，或从紧凑文档的 `dimensions` / `bottlenecks` 取聚合视图。
-
-### 5.1 三类兼容分层与退役条件
-
-「兼容层」不是同一种东西，混为一谈会导致该保留的被误删、该退役的反而长期存在：
-
-| 类别 | 内容 | 定位 | 处置方向 |
-| :--- | :--- | :--- | :--- |
-| A 类 | 历史工件形态嗅探（快照 / 旧基线 / 性能台账） | 只为读取已归档的旧文件而存在 | 在历史工件自然老化或批量回填后可退役 |
-| B 类 | `ScanReport` → 紧凑投影 | **主链路**，每次扫描都走 | 永久保留 |
-| C 类 | 紧凑文档 → `Issue[]` 反水合 | 桥接层，目前仅契约套件调用 | 收窄，不删除 |
-
-A 类的退役需三件事同时成立：
-
-| 条件 | 状态 | 依据 |
-| :--- | :--- | :--- |
-| 生产者原生写出侧车 | 已成立 | 自审运行每次在基线旁写出 `self-audit-baseline.cas.json` |
-| 全部可识别工件已有侧车 | 已成立 | `validate-sidecar-coverage.js` 断言每个可被嗅探识别的报告工件都有侧车 |
-| 历史工件不再新增旧形态 | 由时间保证 | 两代冻结工件不会重新生成，新工件一律由生产者直接投影 |
-
-> [!IMPORTANT]
-> 退役的判据**不是**「下游消费方改读侧车」，而是「侧车已存在」。后者成立、前者不成立且不应强求：聚合工件的消费方需要投影**没有**保留的字段——四档债务分层、四层 ELOC 轨迹、八支柱分块。这些字段按设计就不在紧凑视图里，强行让消费方改读侧车等于用有损视图替换无损记录，是把兼容层问题换成数据完整性问题。
-
-因此 A 类的处置是：侧车覆盖率成为恒定不变量后，形态嗅探从「每次运行都要走的现场推导」退化为「读取已归档工件的兜底通道」，其存在不再阻碍任何主链路。这也解释了为何 `validate-sidecar-coverage.js` 复用了适配层自身的嗅探函数——能被适配层读懂的工件，正是必须已有投影的工件，守卫因此无法与它所保护的代码漂移。
-
-C 类之所以「收窄」而非「删除」，是因为它承担了一项无法替代的职责：验证位置向量布局是否可逆。删掉它等于放弃对压缩正确性的唯一检验。但它不应被当作通用的「把侧车读回完整报告」通道 —— `partial` 为 `true` 时返回的 `Issue[]` 并不完整，而 `summary.issuesTotal` 仍是全量，二者并存正是为了逼迫调用方显式判断。契约套件对这条截断路径单独断言，原因即在此。
-
----
-
-## 六、 离线批量迁移
+## 五、 验证与自审守卫
 
 ```bash
-# 预演：只打印归一结果，不落盘
-node auto-refactor/scripts/migrate-report-artifacts.js auto-refactor/reports ./.audit-logs
+# 验证 AAS 序列化与协议断言
+node auto-refactor/scripts/validate-aas-reporter.js
 
-# 落盘：在源文件旁生成 <name>.cas.json 侧车文件
-node auto-refactor/scripts/migrate-report-artifacts.js auto-refactor/reports --write --pretty
+# 验证全仓报告工件 100% 覆盖 AAS 侧车（禁止任何遗留 CAS）
+node auto-refactor/scripts/validate-sidecar-coverage.js
+
+# 验证系统自审基线与 AAS 报告生成
+node auto-refactor/scripts/validate-self-audit.js
 ```
-
-- 默认预演，因为原地改写已归档的审查历史是不可逆动作，必须显式请求。
-- **源文件永不删除**：完整工件保留其无损记录地位，紧凑侧车是派生视图。
-- 目录中不含审查报告的文件（账本、失败快照）标记为跳过而非失败；真正的 I/O 故障与全部未识别仍然失败。
-
----
-
-## 七、 验证
-
-```bash
-cd auto-refactor && npm run build && node scripts/validate-compact-schema.js
-```
-
-该套件断言九件事：投影保真（判定/计数/维度/瓶颈/截断）、`includeInfo` 策略、向量位置布局与严重度排序、反水合往返一致、体积收益比例、四代历史工件归一与未知形状拒绝、重叠声明的附加性与坐标/簇双域限定、`render(report, 'compact')` 派发可达、离线回填对生产者侧车的保留。
-
-其中重叠声明一项额外覆盖截断边界：预算落在同一坐标的成员之间时，声明仍须完整报出两个成员，且被扣留的那个确实不在 `vectors` 中。只断言未截断路径会漏掉这个缺陷——声明在真实预算下恒为空也能通过。
-
-回填保留一项在临时目录中运行真实子进程，断言两件事：生产者写出的侧车（含向量与声明）不被覆盖，而空壳侧车仍可被替换以保持命令幂等。这条不对称无法在单元层验证——迁移器只看得到聚合工件，其投影必然无向量，一旦无条件写入就会把更丰富的侧车降级成空壳，而命令本身仍报告成功。
-
-侧车覆盖率由独立守卫 `validate-sidecar-coverage.js` 看守：它用适配层自身的嗅探函数判定哪些文件是可识别工件，再要求每个这样的文件都有声明 `cas-v3` 的侧车。守卫与它保护的代码共用同一判定入口，因此不会出现「守卫认为不需要、适配层却能读」的漂移。

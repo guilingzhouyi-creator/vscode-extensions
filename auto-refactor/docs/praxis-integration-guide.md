@@ -46,7 +46,7 @@
    - **Layer 1**：物理变更行与执行单元映射；
    - **Layer 2**：反向依赖闭包与架构契约冲突（`ARCH-*`, `DEP-*`）；
    - **Layer 3**：循环内堆分配（`ADV-PRF-002`）、破坏性变更与 L3A 升级告警；
-5. **100% 向后兼容**：底层 `IPraxisDiffGovernanceService` 保持完全独立，外部存量调用无感升级。
+5. **架构正交解耦**：底层 `IPraxisDiffGovernanceService` 保持完全独立，支持上层无感知即插即用。
 
 ---
 
