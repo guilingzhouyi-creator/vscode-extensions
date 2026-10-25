@@ -1,17 +1,16 @@
 /**
- * Module: Core Engine — TypeScript AST Utilities & ts-free Helper Re-export Surface
+ * Module: Core Engine — TypeScript AST Utilities & Pure Compiler Operators
  * File Path: src/utils/ast.ts
  * Architecture Role: Shared TypeScript-compiler utility layer below the language adapter;
  *   the single definition site of function-like node classification and parent-pointer-bearing
- *   SourceFile creation, plus the compatibility re-export surface for extracted helpers.
+ *   SourceFile creation.
  * Dependencies & Triggers: `typescript` (hard top-level import); Position / IssueLocation
  *   types from ../core/types and NormalizedNode from ../core/ast/multilang; imported by
  *   core/ast/typescript-adapter.ts and lazy-required by core/analyzer.ts and core/worker.ts only
- *   when a legacy analyzer needs a real SourceFile on the typescript parser path.
+ *   when an analyzer needs a real SourceFile on the typescript parser path.
  * Responsibilities: Detect function-like node kinds (declaration, expression, arrow,
  *   method, constructor, getter, setter); create SourceFiles with ScriptTarget.Latest and
- *   setParentNodes:true; map byte offsets to 1-based Position / IssueLocation values;
- *   re-export countLineStats and locN so existing import sites keep compiling.
+ *   setParentNodes:true; map byte offsets to 1-based Position / IssueLocation values.
  * Exit Semantics & Design Rationale: All helpers are synchronous and side-effect-free;
  *   createSourceFile tolerates syntactically invalid text (the compiler keeps diagnostics in
  *   the tree) while getPos/loc assume valid offsets and nodes. Parent pointers are ON because
@@ -22,14 +21,6 @@
 import * as ts from 'typescript';
 import type { Position, IssueLocation } from '../core/types';
 
-// Re-export the ts-free helpers so existing import sites (main-process consumers, the
-// analyzer `analyze()` contract) keep working unchanged. NOTE: importing these THROUGH
-// this module still loads `typescript` (this module requires it at the top level), so the
-// worker hot path must import them from the ts-free modules directly:
-//   - `countLineStats` from './linestats'
-//   - `locN` from './normalized'
-export { countLineStats } from './linestats';
-export { locN } from './normalized';
 
 /** Function-like node kinds that constitute a separate complexity/unit boundary. */
 const FUNCTION_LIKE = new Set<ts.SyntaxKind>([
