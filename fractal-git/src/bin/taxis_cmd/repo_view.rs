@@ -134,7 +134,7 @@ impl RepoView {
     ///
     /// A gitlink is a commit binding, not file content: Git reports its size as zero and never reads
     /// it, so an empty payload is the faithful projection. Trying to read one would fail on every
-    /// repository that has a submodule, and substituting a placeholder would make two different
+    /// repository that has a submodule, and substituting synthetic dummy bytes would make two different
     /// submodule commits look identical to the similarity score.
     ///
     /// # Errors

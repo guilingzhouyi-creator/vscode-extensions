@@ -32,13 +32,14 @@ pub fn handle_bundle(ctx: &CliContext) {
         return;
     }
 
-    let sub = ctx.args[0].as_str();
-    let sub_args = &ctx.args[1..];
+    let subcommand = ctx.args[0].as_str();
+    let subcommand_args = &ctx.args[1..];
 
-    match sub {
-        "create" => handle_bundle_create(ctx, sub_args),
-        "verify" => handle_bundle_verify(ctx, sub_args),
-        "list-heads" => handle_bundle_list_heads(ctx, sub_args),
+    match subcommand {
+        "create" => handle_bundle_create(ctx, subcommand_args),
+        "verify" => handle_bundle_verify(ctx, subcommand_args),
+        "list-heads" => handle_bundle_list_heads(ctx, subcommand_args),
+        "unbundle" | "apply" => handle_bundle_unbundle(ctx, subcommand_args),
         "-h" | "--help" | "help" => print_bundle_help(),
         other => reject(
             CliTag::ERROR,
@@ -53,8 +54,81 @@ fn print_bundle_help() {
          Subcommands:\n\
            create <file> <git-rev-list-args>...  Create a Git bundle v2 file\n\
            verify <file>                         Verify bundle header, prerequisites, and packfile\n\
-           list-heads <file>                     List references contained in a bundle"
+           list-heads <file>                     List references contained in a bundle\n\
+           unbundle, apply <file>                Ingest Git bundle v2 into repository ODB in-place"
     );
+}
+
+/// Ingests a Git bundle v2 file into the repository ODB in-place, advancing references.
+fn handle_bundle_unbundle(ctx: &CliContext, args: &[String]) {
+    if args.is_empty()
+        || args
+            .iter()
+            .any(|arg| arg == "-h" || arg == "--help" || arg == "help")
+    {
+        println!(
+            "Usage: taxis bundle unbundle <file>\n\n\
+             Ingests Git bundle v2 into repository ODB in-place and advances references."
+        );
+        return;
+    }
+
+    let bundle_file = PathBuf::from(&args[0]);
+    if !bundle_file.is_file() {
+        reject(
+            CliTag::ERROR,
+            format!(
+                "bundle file '{}' does not exist or is not a file",
+                bundle_file.display()
+            ),
+        );
+    }
+
+    let view = match RepoView::open(ctx) {
+        Ok(repo_view) => repo_view,
+        Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
+    };
+
+    let git_dir = view.git_dir();
+    match fg_storage::in_place::InPlaceBundleConsumer::consume_bundle_in_place(
+        &bundle_file,
+        git_dir,
+    ) {
+        Ok(report) => {
+            if ctx.json_mode {
+                print_json(&serde_json::json!({
+                    "status": "success",
+                    "pack_oid": report.pack_oid.to_hex(),
+                    "object_count": report.object_count,
+                    "bundle_bytes_reclaimed": report.bundle_bytes_reclaimed,
+                    "references_advanced": report.references_advanced.iter().map(|(name, oid)| {
+                        serde_json::json!({
+                            "ref": name,
+                            "oid": oid.to_hex(),
+                        })
+                    }).collect::<Vec<_>>(),
+                }));
+            } else {
+                println!("=== Taxis In-Place Bundle Ingestion ===");
+                println!("Ingested Packfile:       {}", report.pack_oid.to_hex());
+                println!("Objects Ingested:        {}", report.object_count);
+                println!(
+                    "Bundle Space Reclaimed:  {} bytes",
+                    report.bundle_bytes_reclaimed
+                );
+                println!("References Advanced:");
+                for (name, oid) in &report.references_advanced {
+                    println!("  {} -> {}", oid.to_hex(), name);
+                }
+            }
+        }
+        Err(err) => {
+            reject(
+                CliTag::ERROR,
+                format!("consume bundle '{}': {err}", bundle_file.display()),
+            );
+        }
+    }
 }
 
 fn handle_bundle_create(ctx: &CliContext, args: &[String]) {
@@ -362,18 +436,18 @@ fn collect_reachable_objects(
                     break;
                 }
                 other => {
+                    let current_hex = current.to_hex();
+                    let kind_str = other.as_str();
                     return Err(FractalError::ObjectCodec(format!(
-                        "revision object {} is a {}, but a bundle ref must name a commit",
-                        current.to_hex(),
-                        other.as_str()
+                        "revision object {current_hex} is a {kind_str}, but a bundle ref must name a commit"
                     )));
                 }
             }
         }
         let commit_oid = commit_oid.ok_or_else(|| {
+            let oid_hex = oid.to_hex();
             FractalError::ObjectCodec(format!(
-                "annotated tag chain starting at {} exceeds {PEEL_LIMIT} links",
-                oid.to_hex()
+                "annotated tag chain starting at {oid_hex} exceeds {PEEL_LIMIT} links"
             ))
         })?;
         if !excluded.contains(&commit_oid) && visited.insert(commit_oid) {
@@ -426,10 +500,10 @@ fn add_tree_oids(view: &RepoView, root: Oid, oids: &mut HashSet<Oid>) -> Fractal
         }
         let object = view.object(&tree_oid)?;
         if object.kind != ObjectKind::Tree {
+            let tree_hex = tree_oid.to_hex();
+            let kind_str = object.kind.as_str();
             return Err(FractalError::ObjectCodec(format!(
-                "object {} is a {}, not a tree",
-                tree_oid.to_hex(),
-                object.kind.as_str()
+                "object {tree_hex} is a {kind_str}, not a tree"
             )));
         }
         for entry in GitTreeRef::from_bytes(&object.payload).iter() {
@@ -459,10 +533,10 @@ fn add_tree_closure(
         }
         let object = view.object(&tree_oid)?;
         if object.kind != ObjectKind::Tree {
+            let tree_hex = tree_oid.to_hex();
+            let kind_str = object.kind.as_str();
             return Err(FractalError::ObjectCodec(format!(
-                "object {} is a {}, not a tree",
-                tree_oid.to_hex(),
-                object.kind.as_str()
+                "object {tree_hex} is a {kind_str}, not a tree"
             )));
         }
         let mut children: Vec<(FileMode, Oid, String)> = Vec::new();

@@ -20,6 +20,23 @@ use serde_json::json;
 
 use super::common::{fail_io, print_json, CliContext, EXIT_REJECTED};
 
+/// Prints usage and options help for `taxis repack`.
+pub fn print_repack_help() {
+    println!(
+        "Usage: taxis repack [options]\n\n\
+         Consolidate loose Git objects into packfiles and Index v2.\n\n\
+         Options:\n\
+           -w, --window <size>     Sliding window size for delta search (default: 10)\n\
+           -d, --max-depth <depth> Maximum delta chain depth (default: 50)\n\
+           --low-disk              Progressively pack and purge loose objects in micro-pack slices (256MB~512MB)\n\
+           -k, --keep-loose        Keep loose objects on disk after creating packfile\n\
+           --auto                  Only repack if loose object count exceeds threshold\n\
+           --threshold <count>     Threshold for auto-repack (default: 50)\n\
+           --async                 Spawn background worker thread\n\
+           -h, --help              Show this help message"
+    );
+}
+
 /// Parses command line options for `taxis repack`.
 fn parse_repack_options(args: &[String]) -> (RepackOptions, bool, bool) {
     let mut options = RepackOptions::default();
@@ -29,6 +46,10 @@ fn parse_repack_options(args: &[String]) -> (RepackOptions, bool, bool) {
     let mut cursor = 0;
     while cursor < args.len() {
         match args[cursor].as_str() {
+            "-h" | "--help" | "help" => {
+                print_repack_help();
+                std::process::exit(0);
+            }
             "--window" | "-w" if cursor + 1 < args.len() => {
                 if let Ok(w) = args[cursor + 1].parse::<usize>() {
                     options.window_size = w;
@@ -49,6 +70,10 @@ fn parse_repack_options(args: &[String]) -> (RepackOptions, bool, bool) {
             }
             "--keep-loose" | "-k" => {
                 options.keep_loose = true;
+                cursor += 1;
+            }
+            "--low-disk" => {
+                options.low_disk = true;
                 cursor += 1;
             }
             "--async" => {
@@ -81,6 +106,15 @@ fn resolve_git_dir(ctx: &CliContext) -> PathBuf {
 
 /// Dispatches the `taxis repack` CLI subcommand.
 pub fn handle_repack(ctx: &CliContext) {
+    if ctx
+        .args
+        .iter()
+        .any(|a| a == "-h" || a == "--help" || a == "help")
+    {
+        print_repack_help();
+        return;
+    }
+
     let (options, is_async, auto_check_only) = parse_repack_options(&ctx.args);
     let target_dir = resolve_git_dir(ctx);
 

@@ -58,13 +58,15 @@ pub use fg_core::error::{FractalError, FractalResult};
 pub use fg_core::models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityTier, AutoQualityScoreEnvelope,
     BlackboardCollision, BlockProvenanceEntry, BlockProvenanceParams, CardBlackboard, ChangeId,
-    ConflictPresentationMode, DiffCoherenceMode, FileMode, GitSignature, HumanUacProof, IndexStage,
-    IntentLease, Oid, PraxisCardContext, ProvenanceLedger, StagedPromotionRequest,
-    StagedPromotionStatus, TaxisPolicy, ValidatedCommitWitness,
+    ConflictPresentationMode, DiffCoherenceMode, FileMode, FileUid, FractalSubLease, GitSignature,
+    HumanUacProof, IndexStage, IntentLease, LeaseStatus, MutationBudget, Oid, PraxisCardContext,
+    ProjectLease, ProjectLeaseCache, ProvenanceLedger, RegistrationOrigin, ReservationStatus,
+    ReservedFileToken, SliceAuthorization, StagedPromotionRequest, StagedPromotionStatus,
+    SubAuthorizationZone, TaxisPolicy, ValidatedCommitWitness,
 };
 pub use fg_core::traits::{
-    GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore, StagedCandidate,
-    WorktreeReclaimer,
+    AgentWorktreeHandle, GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore,
+    StagedCandidate, TaxisEngine, WorktreeReclaimer,
 };
 pub use fg_object::{
     GitBlob, GitCommit, GitCommitRef, GitTag, GitTree, GitTreeEntry, GitTreeEntryRef, GitTreeIter,
@@ -127,6 +129,7 @@ pub use fg_topology::conflict_tree::{
     AgentConflictSliceReport, ConflictSlice, ConflictTreeManager,
 };
 pub use fg_topology::operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
+pub use fg_topology::project_store::{DiskProjectStore, PROJECTS_CACHE_FILE, PROJECTS_DIR};
 pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use fg_topology::provenance::{DiskProvenanceStore, PROVENANCE_FILE};
 pub use fg_topology::refs::{DiskRefStore, FractalRef, HeadState};

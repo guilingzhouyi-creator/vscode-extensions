@@ -271,10 +271,18 @@ mod tests {
 
     /// Builds a runner over an isolated hooks directory and returns its marker path.
     fn fixture(hook_body: &str) -> (tempfile::TempDir, GitHookRunner, std::path::PathBuf) {
-        let root = tempfile::tempdir().expect("create hook fixture");
+        let test_base = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test_tmp");
+        let _ = std::fs::create_dir_all(&test_base);
+        let root = tempfile::Builder::new()
+            .tempdir_in(&test_base)
+            .expect("create hook fixture");
         let hooks = root.path().join("hooks");
         let marker = root.path().join("reference-transaction.log");
-        let script = hook_body.replace("{marker}", &marker.to_string_lossy());
+        let marker_str = marker.to_string_lossy().replace('\\', "/");
+        let script = hook_body.replace("{marker}", &marker_str);
         write_hook(&hooks.join("reference-transaction"), &script);
         let runner = GitHookRunner::with_hooks_dir(root.path(), root.path().join(".git"), &hooks);
         (root, runner, marker)
@@ -282,6 +290,9 @@ mod tests {
 
     #[test]
     fn reference_transaction_receives_state_and_rows() {
+        if !GitHookRunner::has_working_shell() {
+            return;
+        }
         let (_root, runner, marker) =
             fixture("#!/bin/sh\nprintf 'state=%s\n' \"$1\" >> \"{marker}\"\ncat >> \"{marker}\"\n");
         let update = ReferenceUpdate {

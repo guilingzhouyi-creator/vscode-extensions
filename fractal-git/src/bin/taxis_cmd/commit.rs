@@ -16,7 +16,9 @@
 use std::fs;
 use std::path::Path;
 
-use fg_core::models::{current_unix_seconds, AuthoritySecret, FileMode, IndexStage, Oid};
+use fg_core::models::{
+    current_unix_seconds, AuthoritySecret, FileMode, IndexStage, LeaseStatus, Oid,
+};
 use fg_gate::authority::resolve_authority_secret;
 use fg_index::{write_dirc_v2, IndexEntry};
 use fg_native::sections::head::HeadState as NativeHeadState;
@@ -24,6 +26,7 @@ use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
 use fg_native::sections::refs::RefRecord;
 use fg_native::RepoDocument;
 use fg_storage::commit_materializer::write_commit_objects_with_parents;
+use fg_topology::project_store::DiskProjectStore;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::RefStore;
 use fractal_git::{
@@ -97,6 +100,7 @@ pub fn handle_commit(ctx: &CliContext) {
     let message = resolve_commit_message(&ctx.args, card_id);
     let staged_files = collect_staged_files(ctx);
     let witness = verify_commit_governance(&message, &policy, &staged_files);
+    verify_project_lease_authorization(&ctx.git_dir, &staged_files);
 
     let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
     let hook_runner = super::git_hooks::discover(&ctx.git_dir, &work_root);
@@ -208,6 +212,7 @@ pub fn handle_commit(ctx: &CliContext) {
     super::git_hooks::run_post_hook(&hook_runner, "post-commit", &[]);
     record_commit_in_operation_graph(ctx, &materialized.commit_oid, &target_ref, &actor, &witness);
     record_block_provenance(ctx, &materialized, &staged_files, agent_id, cell_id);
+    touch_affected_project_leases(&ctx.git_dir, &staged_files);
 
     output_commit_result(
         ctx,
@@ -619,4 +624,60 @@ fn record_block_provenance(
 
     let store = DiskProvenanceStore::new(&ctx.git_dir);
     let _ = store.record_batch(entries);
+}
+
+/// Asserts that all staged files belong to active controlled projects and no TTL lease has expired.
+fn verify_project_lease_authorization(git_dir: &Path, staged_files: &[String]) {
+    let now_secs = current_unix_seconds() as u64;
+    let store = DiskProjectStore::new(git_dir);
+    let work_root = git_dir.parent().unwrap_or_else(|| Path::new("."));
+
+    let cache = match store.load_or_discover(Some(work_root), now_secs) {
+        Ok(loaded_cache) => loaded_cache,
+        Err(_) => return,
+    };
+
+    let files_to_check: Vec<&str> = if staged_files.is_empty() {
+        vec![DEFAULT_COMMIT_FILE]
+    } else {
+        staged_files.iter().map(|path| path.as_str()).collect()
+    };
+
+    let affected_projects = store.resolve_affected_projects(&cache, &files_to_check);
+    for project_id in &affected_projects {
+        if let Some(lease) = cache.get(project_id) {
+            if lease.status == LeaseStatus::Frozen || lease.is_expired(now_secs) {
+                reject(
+                    CliTag::AUTHORITY_BREACH,
+                    format!(
+                        "Commit authorization locked: TTL lease expired for project '{}'. All human and agent commits are frozen. Run 'taxis project renew {}' to unfreeze.",
+                        project_id, project_id
+                    ),
+                );
+            }
+        }
+    }
+}
+
+/// Touches affected project leases to record commit activity and reset dormant counter.
+fn touch_affected_project_leases(git_dir: &Path, staged_files: &[String]) {
+    let now_secs = current_unix_seconds() as u64;
+    let store = DiskProjectStore::new(git_dir);
+    let work_root = git_dir.parent().unwrap_or_else(|| Path::new("."));
+
+    let cache = match store.load_or_discover(Some(work_root), now_secs) {
+        Ok(loaded_cache) => loaded_cache,
+        Err(_) => return,
+    };
+
+    let files_to_check: Vec<&str> = if staged_files.is_empty() {
+        vec![DEFAULT_COMMIT_FILE]
+    } else {
+        staged_files.iter().map(|path| path.as_str()).collect()
+    };
+
+    let affected_projects = store.resolve_affected_projects(&cache, &files_to_check);
+    for project_id in affected_projects {
+        let _ = store.touch_project(&project_id, now_secs);
+    }
 }

@@ -32,8 +32,33 @@ struct InitRequest {
     home_root: Option<PathBuf>,
 }
 
+/// Prints usage and options help for `taxis init`.
+pub fn print_init_help() {
+    println!(
+        "Usage: taxis init [options]\n\n\
+         Initializes a new Taxis-native or git-compatible repository.\n\n\
+         Options:\n\
+           --dev                       Initialize with dev layout (.taxis in workspace root, default)\n\
+           --release                   Initialize with release layout (global CAS store with link)\n\
+           --git-compat                Generate .git compatibility projection\n\
+           --conflict-mode <mode>      Set conflict mode: agent-algebraic, git-compat, or diff3\n\
+           --workspace <dir>           Specify workspace root directory (default: current directory)\n\
+           --home <dir>                Specify home directory for release stores\n\
+           -h, --help                  Show this help message"
+    );
+}
+
 /// Dispatches `taxis init`.
 pub fn handle_init(ctx: &CliContext) {
+    if ctx
+        .args
+        .iter()
+        .any(|a| a == "-h" || a == "--help" || a == "help")
+    {
+        print_init_help();
+        return;
+    }
+
     let request = match parse_request(ctx) {
         Ok(parsed) => parsed,
         Err(reason) => reject(CliTag::ERROR, reason),

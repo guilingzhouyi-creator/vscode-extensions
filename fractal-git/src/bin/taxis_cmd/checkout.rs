@@ -730,7 +730,14 @@ mod tests {
 
     #[test]
     fn rejected_paths_never_touch_the_filesystem() {
-        let root = tempfile::tempdir().expect("temporary worktree root");
+        let test_base = std::env::current_dir()
+            .unwrap()
+            .join("target")
+            .join("test_tmp");
+        let _ = std::fs::create_dir_all(&test_base);
+        let root = tempfile::Builder::new()
+            .tempdir_in(&test_base)
+            .expect("temporary worktree root");
         let outside = root.path().parent().expect("parent of the temporary root");
         let canary = outside.join("path-jail-canary.txt");
         assert!(!canary.exists(), "canary file must not pre-exist");

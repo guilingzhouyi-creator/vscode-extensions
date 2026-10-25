@@ -243,7 +243,7 @@ fn handle_worktree_add(ctx: &CliContext) {
 /// Creates the scoped envelope directories beneath the worktree root.
 ///
 /// A scoped projection with a trailing separator denotes a directory envelope; a bare path
-/// denotes a file placeholder. Creating the envelope makes the allocation observable on disk
+/// denotes an unmaterialized file envelope. Creating the envelope makes the allocation observable on disk
 /// instead of merely asserted in the output.
 fn materialize_projection(destination: &Path, projection: &ScopeProjection) -> usize {
     if projection.is_full {

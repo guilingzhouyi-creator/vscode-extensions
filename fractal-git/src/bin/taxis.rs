@@ -19,9 +19,9 @@ mod taxis_cmd;
 use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
     archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, commit,
-    config, daemon, diff, doctor, init, log, merge, operation, projection, promotion, read, rebase,
-    reclaim, relocate, repack, reset, rev_list, revert, stash, status, submodule, tag, undo,
-    verify, worktree,
+    config, daemon, diff, doctor, init, log, merge, operation, project, projection, promotion,
+    quarantine, read, rebase, reclaim, relocate, remote, repack, reset, rev_list, revert, stash,
+    status, submodule, tag, unarchive, undo, verify, worktree,
 };
 
 use fg_core::models::current_unix_seconds;
@@ -44,9 +44,15 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["git-import", "import"], "git-import"),
         (&["gc", "clean", "reclaim"], "reclaim"),
         (&["repack", "pack-objects"], "repack"),
+        (&["remote"], "remote"),
+        (&["fetch"], "fetch"),
+        (&["push"], "push"),
+        (&["pull"], "pull"),
         (&["config", "cfg"], "config"),
         (&["submodule", "sub"], "submodule"),
+        (&["project", "pj"], "project"),
         (&["archive"], "archive"),
+        (&["unarchive", "extract"], "unarchive"),
         (&["bundle"], "bundle"),
         (&["blame"], "blame"),
         (&["bisect"], "bisect"),
@@ -62,6 +68,7 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["stash"], "stash"),
         (&["wt", "worktree"], "worktree"),
         (&["pm", "promo", "promotion"], "promotion"),
+        (&["quarantine", "quar"], "quarantine"),
         (&["bb", "blackboard"], "blackboard"),
         (&["bench", "benchmark"], "bench"),
         (&["undo"], "undo"),
@@ -115,8 +122,17 @@ Native Fractal Commands (with Git Alias Mappings):
   operation, op      Inspect immutable Operation Log DAG history
   verify,   check    Run pre-receive guard, conflict marker scanner & quota checks
   authority, auth    Issue or verify HMAC authority credentials (--subject / --token)
+  archive            Package tree-ish object states into streaming Tar, Tar.gz, or Zip archives
+  unarchive, extract Extract Zip, Tar, Tar.gz, or Bundle in-place with SpacePlan preflight (--dry-run, --to-odb)
+  bundle             Create, verify, list-heads, or unbundle Git bundle v2 packages in-place
   reclaim,  gc       Trigger zero-allocation worktree & sandbox reclamation
-  repack             Consolidate loose objects into Git packfiles and index v2 (--async, --window)
+  repack             Consolidate loose objects into Git packfiles and index v2 (--async, --low-disk, --window)
+  remote             Manage set of tracked repositories (list, add, remove, get-url)
+  fetch              Download objects and refs from another repository
+  push               Update remote refs along with associated objects
+  pull               Fetch from and integrate with another repository
+  project,  pj       Manage controlled project leases and hierarchical TTL (list, register, renew, evict)
+  quarantine, quar   Manage elastic quarantine stash for unauthorized changes (list, show, restore, discard)
   worktree, wt       Display or allocate scoped projection worktree (--scope / --full)
   blackboard, bb     Manage concurrent SubAgent intent leases (claim, check, release, list)
   promotion, pm      Manage staged promotions to System Trunk with Human GUI UAC gate
@@ -256,9 +272,16 @@ fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
         "authority" => handle_authority(ctx),
         "reclaim" => reclaim::handle_reclaim(ctx),
         "repack" | "pack-objects" => repack::handle_repack(ctx),
+        "remote" => remote::handle_remote(ctx),
+        "fetch" => remote::handle_fetch(ctx),
+        "push" => remote::handle_push(ctx),
+        "pull" => remote::handle_pull(ctx),
         "config" => config::handle_config(ctx),
         "submodule" => submodule::handle_submodule(ctx),
+        "project" => project::handle_project(ctx),
+        "quarantine" => quarantine::handle_quarantine(ctx),
         "archive" => archive::handle_archive(ctx),
+        "unarchive" => unarchive::handle_unarchive(ctx),
         "bundle" => bundle::handle_bundle(ctx),
         "blame" => blame::handle_blame(ctx),
         "bisect" => bisect::handle_bisect(ctx),
@@ -377,7 +400,7 @@ fn reject_unimplemented(subcommand: &str) -> ! {
             "'{subcommand}' has no native implementation in this build. \
              Implemented: init, doctor, relocate, git-export, git-import, status, branch, commit, diff, cat-file, ls-tree, \
              ls-files, show-ref, for-each-ref, check-ignore, log, show, checkout, merge, reset, tag, cherry-pick, revert, \
-             stash, rebase, repack, worktree, blackboard, promotion, bench, undo, operation, rev-list, verify, authority, reclaim, daemon, version, help."
+             stash, rebase, repack, project, worktree, blackboard, promotion, bench, undo, operation, rev-list, verify, authority, reclaim, daemon, version, help."
         ),
     )
 }
