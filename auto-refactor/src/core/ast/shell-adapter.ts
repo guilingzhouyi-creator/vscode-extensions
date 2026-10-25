@@ -21,13 +21,12 @@
  *   from the path; splitting the adapter by dialect would duplicate the same childless root twice
  *   without changing any verdict.
  */
-import type { NormalizedNode, NormalizedAst, LanguageAdapter } from './multilang';
-import { NodeKind } from './multilang';
+import { BaseAstAdapter, NodeKind, type NormalizedNode, type NormalizedAst } from './multilang';
 
 /**
  * Shell language adapter: an empty document root plus the traversal contract.
  */
-export class ShellAdapter implements LanguageAdapter {
+export class ShellAdapter extends BaseAstAdapter {
     id = 'shell' as const;
     extensions = ['.sh', '.bash', '.zsh', '.ps1', '.psm1', '.psd1'];
 
@@ -40,26 +39,6 @@ export class ShellAdapter implements LanguageAdapter {
      */
     parse(_content: string, _filePath: string): NormalizedAst {
         return { root: this.documentRoot() };
-    }
-
-    /**
-     * Return the root node of a parsed document AST.
-     *
-     * @param ast - Normalized AST produced by `parse`.
-     * @returns The childless document root.
-     */
-    root(ast: NormalizedAst): NormalizedNode {
-        return ast.root;
-    }
-
-    /**
-     * Return the normalized children of a node.
-     *
-     * @param node - Any node produced by this adapter.
-     * @returns An empty array: shell exposes no traversable nodes under this IR.
-     */
-    children(node: NormalizedNode): NormalizedNode[] {
-        return node.children || [];
     }
 
     /**

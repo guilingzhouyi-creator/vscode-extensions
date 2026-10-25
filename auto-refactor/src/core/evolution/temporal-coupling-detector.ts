@@ -101,6 +101,11 @@ const DEFAULT_MIN_JACCARD = 0.6;
 const DEFAULT_MIN_SHARED_COMMITS = 2;
 const DEFAULT_MAX_COMMITS = 500;
 const DEFAULT_MAX_FILES_PER_COMMIT = 50;
+const DEFAULT_PRECISION_SCALE = 100;
+const MIN_MODULE_DEPTH_SUBDIRS = 3;
+const DEFAULT_MODULE_DEPTH = 2;
+const MIN_LOG_HEADER_FIELDS = 4;
+const MS_PER_SECOND = 1000;
 
 const CMD_GIT = 'git';
 const ENCODING_UTF8 = 'utf8';
@@ -111,8 +116,33 @@ const ASCII_RECORD_SEP = '\x1e';
 const ASCII_FIELD_SEP = '\x1f';
 const PAIR_DELIMITER = '\x1d';
 
+const STDIO_IGNORE_PIPE_IGNORE: [childProcess.IOType, childProcess.IOType, childProcess.IOType] = [
+    'ignore',
+    'pipe',
+    'ignore',
+];
+
 const BACKSLASH_GLOBAL_RE = /\\/g;
 const FORWARD_SLASH = '/';
+
+interface NativeCouplingPair {
+    readonly fileA: number;
+    readonly fileB: number;
+    readonly commitsA: number;
+    readonly commitsB: number;
+    readonly sharedCommits: number;
+    readonly jaccardSimilarity: number;
+}
+
+interface CouplingWarningParams {
+    readonly fileA: string;
+    readonly fileB: string;
+    readonly moduleA: string;
+    readonly moduleB: string;
+    readonly sharedCommits: number;
+    readonly couplingPct: number;
+    readonly isCrossModule: boolean;
+}
 
 /**
  * Normalize file path to forward slashes without leading/trailing slashes.
@@ -130,7 +160,7 @@ export function normalizeEvolutionPath(rawPath: string): string {
  * @param filePath - Path to inspect.
  * @returns Inferred module or subsystem identifier string.
  */
-export function defaultModuleResolver(filePath: string): string {
+export function resolveDefaultModule(filePath: string): string {
     const normalized = normalizeEvolutionPath(filePath);
     const parts = normalized.split(FORWARD_SLASH);
     const dirParts = parts.length > 1 ? parts.slice(0, parts.length - 1) : parts;
@@ -138,17 +168,20 @@ export function defaultModuleResolver(filePath: string): string {
     const srcIndex = dirParts.indexOf('src');
     if (srcIndex !== -1) {
         const subDirs = dirParts.slice(srcIndex);
-        if (subDirs.length >= 3) {
-            return subDirs.slice(0, 3).join(FORWARD_SLASH);
+        if (subDirs.length >= MIN_MODULE_DEPTH_SUBDIRS) {
+            return subDirs.slice(0, MIN_MODULE_DEPTH_SUBDIRS).join(FORWARD_SLASH);
         }
         return subDirs.join(FORWARD_SLASH);
     }
 
-    if (dirParts.length >= 2) {
-        return dirParts.slice(0, 2).join(FORWARD_SLASH);
+    if (dirParts.length >= DEFAULT_MODULE_DEPTH) {
+        return dirParts.slice(0, DEFAULT_MODULE_DEPTH).join(FORWARD_SLASH);
     }
     return dirParts[0] || 'root';
 }
+
+/** Backward compatibility alias for resolveDefaultModule. */
+export const defaultModuleResolver = resolveDefaultModule;
 
 function resolveCouplingWarningLevel(
     isCrossModule: boolean,
@@ -163,26 +196,13 @@ function resolveCouplingWarningLevel(
     return 'medium';
 }
 
-function createWarningMessage(
-    fileA: string,
-    fileB: string,
-    moduleA: string,
-    moduleB: string,
-    sharedCommits: number,
-    couplingPct: number,
-    isCrossModule: boolean,
-): string {
-    if (isCrossModule) {
-        return (
-            `Cross-module shotgun surgery detected: '${fileA}' (${moduleA}) and '${fileB}' (${moduleB}) ` +
-            `frequently change together in ${sharedCommits} commits (Jaccard similarity: ${couplingPct}%). ` +
-            `Extract a shared contract or unify module responsibilities.`
-        );
-    }
-    return (
-        `Intra-module temporal coupling detected: '${fileA}' and '${fileB}' ` +
-        `frequently change together in ${sharedCommits} commits (Jaccard similarity: ${couplingPct}%).`
-    );
+function createWarningMessage(params: CouplingWarningParams): string {
+    return params.isCrossModule ?
+        `Cross-module shotgun surgery detected: '${params.fileA}' (${params.moduleA}) and '${params.fileB}' (${params.moduleB}) ` +
+            `frequently change together in ${params.sharedCommits} commits (Jaccard similarity: ${params.couplingPct}%). ` +
+            `Extract a shared contract or unify module responsibilities.` :
+        `Intra-module temporal coupling detected: '${params.fileA}' and '${params.fileB}' ` +
+            `frequently change together in ${params.sharedCommits} commits (Jaccard similarity: ${params.couplingPct}%).`;
 }
 
 function buildMappedChangeSets(
@@ -215,7 +235,7 @@ function buildMappedChangeSets(
 }
 
 function buildTemporalCouplingPairs(
-    nativePairs: readonly any[],
+    nativePairs: readonly NativeCouplingPair[],
     idToFile: readonly string[],
     moduleResolver: (file: string) => string,
 ): { pairs: TemporalCouplingPair[]; crossModuleWarningCount: number } {
@@ -236,17 +256,17 @@ function buildTemporalCouplingPairs(
             crossModuleWarningCount++;
         }
 
-        const couplingPercentage = +(np.jaccardSimilarity * 100).toFixed(1);
+        const couplingPercentage = +(np.jaccardSimilarity * DEFAULT_PRECISION_SCALE).toFixed(2);
         const warningLevel = resolveCouplingWarningLevel(isCrossModule, np.jaccardSimilarity);
-        const warningMessage = createWarningMessage(
+        const warningMessage = createWarningMessage({
             fileA,
             fileB,
             moduleA,
             moduleB,
-            np.sharedCommits,
-            couplingPercentage,
+            sharedCommits: np.sharedCommits,
+            couplingPct: couplingPercentage,
             isCrossModule,
-        );
+        });
 
         pairs.push({
             fileA,
@@ -286,7 +306,7 @@ function parseSingleLogChunk(chunk: string): CommitChangeSet | null {
     const newlineIdx = trimmed.indexOf('\n');
     const header = newlineIdx === -1 ? trimmed : trimmed.slice(0, newlineIdx).trim();
     const fields = header.split(ASCII_FIELD_SEP);
-    if (fields.length < 4) {
+    if (fields.length < MIN_LOG_HEADER_FIELDS) {
         return null;
     }
 
@@ -314,7 +334,7 @@ function parseSingleLogChunk(chunk: string): CommitChangeSet | null {
     return {
         commitHash,
         changedFiles,
-        timestamp: Number.isNaN(timestampSec) ? undefined : timestampSec * 1000,
+        timestamp: Number.isNaN(timestampSec) ? undefined : timestampSec * MS_PER_SECOND,
         author,
         message,
     };
@@ -322,15 +342,15 @@ function parseSingleLogChunk(chunk: string): CommitChangeSet | null {
 
 function extractUniqueCommitFiles(files: readonly string[], seenSet: Set<string>): string[] {
     seenSet.clear();
-    const result: string[] = [];
+    const uniqueFileList: string[] = [];
     for (let i = 0; i < files.length; i++) {
         const norm = normalizeEvolutionPath(files[i]);
         if (norm && !seenSet.has(norm)) {
             seenSet.add(norm);
-            result.push(norm);
+            uniqueFileList.push(norm);
         }
     }
-    return result;
+    return uniqueFileList;
 }
 
 function recordCoChangePairs(
@@ -444,7 +464,7 @@ export class TemporalCouplingDetector {
         const commitLimit = overrideOptions?.maxCommits ?? this.maxCommits;
         try {
             const formatStr = `${ASCII_RECORD_SEP}%H${ASCII_FIELD_SEP}%an${ASCII_FIELD_SEP}%ct${ASCII_FIELD_SEP}%s`;
-            const res = childProcess.spawnSync(
+            const logResult = childProcess.spawnSync(
                 CMD_GIT,
                 ['log', `--max-count=${commitLimit}`, `--format=${formatStr}`, '--name-only'],
                 {
@@ -452,15 +472,15 @@ export class TemporalCouplingDetector {
                     encoding: ENCODING_UTF8,
                     timeout: TIMEOUT_GIT_LOG_MS,
                     maxBuffer: MAX_BUFFER_BYTES,
-                    stdio: ['ignore', 'pipe', 'ignore'],
+                    stdio: STDIO_IGNORE_PIPE_IGNORE,
                 },
             );
 
-            if (res.status !== 0 || !res.stdout) {
+            if (logResult.status !== 0 || !logResult.stdout) {
                 return this.createEmptyReport(false);
             }
 
-            const changeSets = this.parseGitLogOutput(res.stdout);
+            const changeSets = this.parseGitLogOutput(logResult.stdout);
             const report = this.detectFromChangeSets(changeSets, overrideOptions);
             report.isGitAvailable = true;
             return report;
@@ -475,13 +495,13 @@ export class TemporalCouplingDetector {
     public isGitRepository(targetDir?: string): boolean {
         const cwd = targetDir || process.cwd();
         try {
-            const res = childProcess.spawnSync(CMD_GIT, ['rev-parse', '--is-inside-work-tree'], {
+            const probeResult = childProcess.spawnSync(CMD_GIT, ['rev-parse', '--is-inside-work-tree'], {
                 cwd,
                 encoding: ENCODING_UTF8,
                 timeout: TIMEOUT_GIT_PROBE_MS,
-                stdio: ['ignore', 'pipe', 'ignore'],
+                stdio: STDIO_IGNORE_PIPE_IGNORE,
             });
-            return res.status === 0 && res.stdout.trim() === 'true';
+            return probeResult.status === 0 && probeResult.stdout.trim() === 'true';
         } catch {
             return false;
         }

@@ -18,8 +18,7 @@
  *     tolerated so the constants analyzer reports real magic values instead of prose.
  */
 
-import type { NormalizedNode, NormalizedAst, LanguageAdapter } from './multilang';
-import { NodeKind } from './multilang';
+import { BaseAstAdapter, NodeKind, type NormalizedNode, type NormalizedAst } from './multilang';
 import type { TreeSitterNode, TreeSitterParser } from './tree-sitter-types';
 import {
     type MapContext,
@@ -149,7 +148,7 @@ function extractPythonParameters(sn: TreeSitterNode): string[] | undefined {
  * Language adapter projecting Python syntax into normalized
  * language-agnostic AST using Tree-sitter.
  */
-export class PythonAdapter implements LanguageAdapter {
+export class PythonAdapter extends BaseAstAdapter {
     id = 'python' as const;
     extensions = ['.py'];
 
@@ -164,26 +163,6 @@ export class PythonAdapter implements LanguageAdapter {
     parse(content: string, _filePath: string): NormalizedAst {
         const tree = pythonParser().parse(content);
         return { root: this.mapNode(tree.rootNode, undefined, { constBound: false }) };
-    }
-
-    /**
-     * Return the root node of a parsed Python AST.
-     *
-     * @param ast - Normalized AST produced by `parse`.
-     * @returns The module node owning every top-level statement.
-     */
-    root(ast: NormalizedAst): NormalizedNode {
-        return ast.root;
-    }
-
-    /**
-     * Return the normalized children of a node.
-     *
-     * @param node - Any normalized node produced by this adapter.
-     * @returns Child array in source order; leaves yield an empty array.
-     */
-    children(node: NormalizedNode): NormalizedNode[] {
-        return node.children || [];
     }
 
     // ------------------------------------------------------------------ mapping

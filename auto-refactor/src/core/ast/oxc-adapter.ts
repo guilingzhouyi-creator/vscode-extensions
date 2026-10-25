@@ -11,17 +11,17 @@
  *   returned; loads oxc-parser ESM module lazily to avoid overhead when unused.
  */
 
-import type {
-    NormalizedNode,
-    NormalizedAst,
-    Position,
-    LanguageAdapter,
-    NodeProjector,
-    ProjectionPolicy,
-    ProjectionSeed,
-    ReusedSpan,
+import {
+    BaseAstAdapter,
+    NodeKind,
+    type NormalizedNode,
+    type NormalizedAst,
+    type Position,
+    type NodeProjector,
+    type ProjectionPolicy,
+    type ProjectionSeed,
+    type ReusedSpan,
 } from './multilang';
-import { NodeKind } from './multilang';
 import type { OxcNode, Ctx, ParseSyncFn, OxcParseResult } from './oxc-types';
 import {
     computeLineStarts,
@@ -155,7 +155,7 @@ interface ChildTraversalOptions {
  * returns an AST even when oxc reports diagnostics, mirroring `ts.createSourceFile`; an optional
  * incremental `ProjectionSeed` enables reuse of unchanged function subtrees.
  */
-export class OxcAdapter implements LanguageAdapter {
+export class OxcAdapter extends BaseAstAdapter {
     /** Adapter id used by the parser registry and config keys. */
     id = 'oxc' as const;
     /** Lowercase file extensions claimed by this adapter. */
@@ -200,29 +200,13 @@ export class OxcAdapter implements LanguageAdapter {
      * @param policy - Projection policy describing which normalized fields analyzers consume.
      * @returns An `OxcProjector` over the raw program; never `null` for supported extensions.
      */
-    project(content: string, filePath: string, policy: ProjectionPolicy): NodeProjector | null {
+    override project(
+        content: string,
+        filePath: string,
+        policy: ProjectionPolicy,
+    ): NodeProjector | null {
         const parseResult = executeOxcParse(filePath, content);
         return new OxcProjector(parseResult.program, content, policy);
-    }
-
-    /**
-     * Return the root node of a parsed AST.
-     *
-     * @param ast - Normalized AST produced by `parse`.
-     * @returns The normalized source-file node at the top of the tree.
-     */
-    root(ast: NormalizedAst): NormalizedNode {
-        return ast.root;
-    }
-
-    /**
-     * Return the node's direct children for the engine's single-pass descent.
-     *
-     * @param node - Normalized node whose children are requested.
-     * @returns Direct children in source order; nodes without children yield an empty array.
-     */
-    children(node: NormalizedNode): NormalizedNode[] {
-        return node.children || [];
     }
 
     private mapTopStatement(

@@ -40,7 +40,7 @@ import {
     tryCreateProjector,
 } from '../ast/traverse';
 import { materializeSourceFile, runLegacyPhase } from './legacy-analyzers';
-import { shouldExecuteAnalyzer } from './trigger-catalog';
+import { evaluateFilePreflightMask, isFileAnalyzerActive } from './file-preflight-gate';
 
 /** `typeof` tag for callable visit/finalize analyzer methods (streaming vs legacy). */
 const TYPEOF_FUNCTION = 'function';
@@ -86,6 +86,7 @@ interface FileContextBase {
     config: ScanConfig;
     lineStats: { lines: number; nonBlankLines: number };
     seed?: IncrementalFileState;
+    preflightMask: number;
 }
 
 /** Outcome of the streaming phase, including the state the legacy phase must reuse. */
@@ -224,7 +225,7 @@ function buildStreamingEntries(
 ): StreamingEntry[] {
     const entries: StreamingEntry[] = [];
     for (const p of partition.streaming) {
-        if (!shouldExecuteAnalyzer(p.name, base.content)) {
+        if (!isFileAnalyzerActive(base.preflightMask, p.name)) {
             continue;
         }
         entries.push({ analyzer: p.factory(), ctx: makeContext(base, root, p.options) });
@@ -274,19 +275,23 @@ function runStreamingPhase(
     parse: ParseState,
     partition: PlanPartition,
     base: FileContextBase,
+    lineBounds?: readonly [number, number],
 ): StreamingOutcome {
     const issues: Issue[] = [];
     let metric = new FileMetricCollector();
     const entries = buildStreamingEntries(partition, metric, parse.rootForCtx, base);
     if (entries.length === 0) return { issues, metric, ast: parse.ast };
     if (!parse.proj) {
-        issues.push(...runStreaming(adapter, parse.ast!.root!, entries));
+        issues.push(...runStreaming(adapter, parse.ast!.root!, entries, lineBounds));
         return { issues, metric, ast: parse.ast };
     }
     try {
         issues.push(
-            ...runStreamingProjected(parse.proj, entries, (node, caller) =>
-                indexProjectedNode(host, base.rel, node, caller),
+            ...runStreamingProjected(
+                parse.proj,
+                entries,
+                (node, caller) => indexProjectedNode(host, base.rel, node, caller),
+                lineBounds,
             ),
         );
         return { issues, metric, ast: parse.ast };
@@ -303,7 +308,7 @@ function runStreamingPhase(
         const ast = adapter.parse(base.content, base.rel);
         metric = new FileMetricCollector();
         const freshEntries = buildStreamingEntries(partition, metric, ast.root, base);
-        issues.push(...runStreaming(adapter, ast.root, freshEntries));
+        issues.push(...runStreaming(adapter, ast.root, freshEntries, lineBounds));
         return { issues, metric, ast };
     }
 }
@@ -365,6 +370,7 @@ export async function runFileAnalyzers(
     content: string,
     seed?: IncrementalFileState,
     activeAnalyzers?: Set<string>,
+    lineBounds?: readonly [number, number],
 ): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
     const cfg = host.config;
     const adapter = adapterFor(rel, cfg.parser);
@@ -375,6 +381,7 @@ export async function runFileAnalyzers(
         parse.ast?.sourceFile ?? materializeSourceFile(rel, content, partition.legacy, adapter);
     // Compute line stats ONCE per file so every analyzer shares a single pass: the metric
     // collector always needs them, and large-file reads them when enabled.
+    const preflightMask = evaluateFilePreflightMask(content, rel, cfg);
     const base: FileContextBase = {
         rel,
         content,
@@ -383,6 +390,7 @@ export async function runFileAnalyzers(
         config: cfg,
         lineStats: countLineStats(content),
         seed,
+        preflightMask,
     };
 
     const issues: Issue[] = [];
@@ -391,7 +399,7 @@ export async function runFileAnalyzers(
     const languageIssue = unsupportedLanguageDiagnostic(rel, cfg);
     if (languageIssue) issues.push(languageIssue);
 
-    const outcome = runStreamingPhase(host, adapter, parse, partition, base);
+    const outcome = runStreamingPhase(host, adapter, parse, partition, base, lineBounds);
     issues.push(...outcome.issues);
     issues.push(...runLegacyPhase(host, partition.legacy, outcome, parse, base));
     seedIndexes(host, rel, parse.rootForCtx, parse.proj);

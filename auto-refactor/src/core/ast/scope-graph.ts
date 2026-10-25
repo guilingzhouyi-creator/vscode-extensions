@@ -18,6 +18,12 @@
 import type { AnalyzerContext, Issue } from '../types';
 import { NodeKind, type NormalizedNode, type LanguageAdapter } from './multilang';
 import type { StreamingEntry } from './traverse';
+import { nativeCore } from '../native/native-bridge';
+import type {
+    NativeBindingInput,
+    NativeScopeInput,
+    NativeShadowingResult,
+} from '../native/native-types';
 
 /** Kinds of scope boundaries. */
 export type ScopeKind = 'module' | 'function' | 'class';
@@ -145,6 +151,56 @@ export class ScopeGraph {
      */
     isShadowed(name: string, fromScope?: Scope | null): boolean {
         return this.lookup(name, fromScope).shadowed;
+    }
+
+    /**
+     * Leverages native acceleration kernel to execute single-pass batch detection of
+     * all variable shadowing incidents across the entire scope graph.
+     *
+     * @returns Array of detected variable shadowing incidents.
+     */
+    detectAllShadowing(): NativeShadowingResult[] {
+        const scopes: NativeScopeInput[] = [];
+        const scopeIndices = new Map<Scope, number>();
+        for (let i = 0; i < this._allScopes.length; i++) {
+            scopeIndices.set(this._allScopes[i], i);
+        }
+        for (let i = 0; i < this._allScopes.length; i++) {
+            const s = this._allScopes[i];
+            const parentIdx = s.parent ? (scopeIndices.get(s.parent) ?? -1) : -1;
+            const kindCode = s.kind === 'function' ? 1 : s.kind === 'class' ? 2 : 0;
+            scopes.push({
+                parent: parentIdx,
+                kind: kindCode,
+                startLine: s.startLine,
+                endLine: s.endLine,
+            });
+        }
+        const bindings: NativeBindingInput[] = [];
+        for (let i = 0; i < this._allScopes.length; i++) {
+            const s = this._allScopes[i];
+            for (const b of s.bindings.values()) {
+                const bKindCode =
+                    b.kind === 'constant'
+                        ? 1
+                        : b.kind === 'function'
+                          ? 2
+                          : b.kind === 'class'
+                            ? 3
+                            : b.kind === 'parameter'
+                              ? 4
+                              : b.kind === 'import'
+                                ? 5
+                                : 0;
+                bindings.push({
+                    scopeId: i,
+                    name: b.name,
+                    kind: bKindCode,
+                    line: b.node.start?.line ?? 0,
+                });
+            }
+        }
+        return nativeCore.analyzeScopeShadowing(scopes, bindings);
     }
 
     /**

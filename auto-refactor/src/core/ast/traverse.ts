@@ -95,15 +95,12 @@ function dispatchHooks(
     active: ActiveHook[],
     node: NormalizedNode,
     parent: NormalizedNode | undefined,
-    ...scope: [
-        grandparent: NormalizedNode | undefined,
-        depth: number,
-        className: string | null,
-        binding: string | null,
-        pushError: ErrorReporter,
-    ]
+    grandparent: NormalizedNode | undefined,
+    depth: number,
+    className: string | null,
+    binding: string | null,
+    pushError: ErrorReporter,
 ): void {
-    const [grandparent, depth, className, binding, pushError] = scope;
     for (let i = 0; i < active.length; i++) {
         const hook = active[i];
         try {
@@ -112,6 +109,20 @@ function dispatchHooks(
             pushError(hook.name, e, hook.ctx);
         }
     }
+}
+
+/**
+ * Fast AST slice latent range boundary guard for MLA-style range pruning.
+ */
+function isNodeOutsideBounds(
+    node: NormalizedNode,
+    bounds: readonly [number, number] | undefined,
+): boolean {
+    if (!bounds) return false;
+    const [minLine, maxLine] = bounds;
+    if (node.end && node.end.line < minLine) return true;
+    if (node.start && node.start.line > maxLine) return true;
+    return false;
 }
 
 /**
@@ -131,6 +142,7 @@ export function runStreaming(
     adapter: LanguageAdapter,
     root: NormalizedNode,
     entries: StreamingEntry[],
+    lineBounds?: readonly [number, number],
 ): Issue[] {
     const issues: Issue[] = [];
     const errored = new Set<string>();
@@ -184,9 +196,11 @@ export function runStreaming(
         node: NormalizedNode,
         parent: NormalizedNode | undefined,
         grandparent: NormalizedNode | undefined,
-        ...scope: [depth: number, className: string | null, binding: string | null]
+        depth: number,
+        className: string | null,
+        binding: string | null,
     ): void => {
-        const [depth, className, binding] = scope;
+        if (isNodeOutsideBounds(node, lineBounds)) return;
         if (activeVisits.length > 0) {
             dispatchHooks(
                 activeVisits,
@@ -254,16 +268,14 @@ export class FileMetricCollector {
         node: NormalizedNode,
         _ctx: AnalyzerContext,
         parent?: NormalizedNode,
-        ...scope: [
-            _grandparent?: NormalizedNode,
-            depth?: number,
-            _className?: string | null,
-            _binding?: string | null,
-        ]
+        _grandparent?: NormalizedNode,
+        depth?: number,
+        _className?: string | null,
+        _binding?: string | null,
     ): void {
-        const depth = scope[1] ?? 0;
+        const d = depth ?? 0;
         if (node.functionLike) this.functions++;
-        if (depth > this.maxNesting) this.maxNesting = depth;
+        if (d > this.maxNesting) this.maxNesting = d;
         if (parent && parent.kind === NodeKind.SourceFile && node.topLevel) {
             this.topLevelDeclarations++;
             if (node.exported) this.exportedSymbols++;
@@ -348,6 +360,7 @@ export function runStreamingProjected(
     projector: NodeProjector,
     entries: StreamingEntry[],
     onNode?: (node: NormalizedNode, caller: string | null) => void,
+    lineBounds?: readonly [number, number],
 ): Issue[] {
     const issues: Issue[] = [];
     const errored = new Set<string>();
@@ -405,17 +418,15 @@ export function runStreamingProjected(
         raw: unknown,
         parentRaw: unknown | undefined,
         grandparentRaw: unknown | undefined,
-        ...scope: [
-            depth: number,
-            className: string | null,
-            binding: string | null,
-            parentProj: NormalizedNode | undefined,
-            grandparentProj: NormalizedNode | undefined,
-            caller: string | null,
-        ]
+        depth: number,
+        className: string | null,
+        binding: string | null,
+        parentProj: NormalizedNode | undefined,
+        grandparentProj: NormalizedNode | undefined,
+        caller: string | null,
     ): void => {
-        const [depth, className, binding, parentProj, grandparentProj, caller] = scope;
         const node = projector.project(raw, parentRaw, grandparentRaw);
+        if (isNodeOutsideBounds(node, lineBounds)) return;
         // Scan-wide consumers (the cross-file symbol index) observe the SAME projected nodes the
         // analyzers see; this is the only point where the lazy path has a NormalizedNode in hand.
         if (onNode) onNode(node, caller);

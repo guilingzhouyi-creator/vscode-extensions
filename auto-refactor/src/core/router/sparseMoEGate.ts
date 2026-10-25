@@ -12,26 +12,16 @@
  *   to standard core analyzers when features are unclassifiable.
  */
 
-import {
-    ANALYZER_ARCHITECTURE,
-    ANALYZER_COMMENTS,
-    ANALYZER_COMPLEXITY,
-    ANALYZER_CONSTANTS,
-    ANALYZER_DATA_ARCHITECTURE,
-    ANALYZER_DOCS,
-    ANALYZER_GOVERNANCE,
-    ANALYZER_HYGIENE,
-    ANALYZER_PERFORMANCE,
-    ANALYZER_SECRETS,
-    ANALYZER_SECURITY,
-    ANALYZER_SIMPLIFY,
-    ANALYZER_TYPESCRIPT_MODERN,
-} from '../scoring/dimensionLiterals';
-import { ALL_BUILTIN_ANALYZERS } from './sparseRuleRouter';
+import { ALL_BUILTIN_ANALYZERS, popcount32 } from './sparseRuleRouter';
 import type { ASTSliceNode, SliceFeatureVector, SparseRoutingPlan } from './sliceTypes';
+import { dispatchSliceFeatureBitset } from '../experts';
+import { ALL_ANALYZERS_MASK, analyzerMaskToNames } from '../constants/analyzer-bitmask';
 
 /** Total available built-in analyzer count for ratio calculation. */
 const TOTAL_BUILTIN_ANALYZERS = ALL_BUILTIN_ANALYZERS.length;
+
+/** Fixed decimal places for stable reporting of activation ratio. */
+const DECIMAL_PLACES = 3;
 
 /**
  * Select active analyzer ids based on slice feature vector.
@@ -43,83 +33,47 @@ function dispatchSliceExperts(vector: SliceFeatureVector): {
     analyzers: string[];
     reasons: string[];
 } {
-    const activeSet = new Set<string>();
-    const reasons: string[] = [];
-
-    if (vector.isDocOnly) {
-        activeSet.add(ANALYZER_COMMENTS);
-        activeSet.add(ANALYZER_DOCS);
-        reasons.push('Doc-only mutation: cold bypass for all AST logic and complexity analyzers');
-        return { analyzers: Array.from(activeSet), reasons };
-    }
-
-    if (
-        vector.hasLiteralMutation &&
-        !vector.hasControlFlowMutation &&
-        !vector.hasSignatureMutation
-    ) {
-        activeSet.add(ANALYZER_CONSTANTS);
-        activeSet.add(ANALYZER_SECRETS);
-        reasons.push(
-            'Literal-only mutation: targeted constant policy and credential leak inspection',
-        );
-        return { analyzers: Array.from(activeSet), reasons };
-    }
-
-    if (vector.hasSignatureMutation) {
-        activeSet.add(ANALYZER_ARCHITECTURE);
-        activeSet.add(ANALYZER_DATA_ARCHITECTURE);
-        activeSet.add(ANALYZER_GOVERNANCE);
-        activeSet.add(ANALYZER_HYGIENE);
-        reasons.push(
-            'Signature mutation: architectural boundary, layer isolation, and hygiene audit',
-        );
-    }
-
-    if (vector.hasControlFlowMutation) {
-        activeSet.add(ANALYZER_COMPLEXITY);
-        activeSet.add(ANALYZER_SIMPLIFY);
-        activeSet.add(ANALYZER_PERFORMANCE);
-        activeSet.add(ANALYZER_GOVERNANCE);
-        reasons.push(
-            'Control-flow mutation: localized branching, nesting depth, and loop performance',
-        );
-    }
-
-    if (vector.hasIoMutation) {
-        activeSet.add(ANALYZER_SECURITY);
-        activeSet.add(ANALYZER_PERFORMANCE);
-        activeSet.add(ANALYZER_GOVERNANCE);
-        reasons.push('I/O mutation: exception safety, resource leakage, and security audit');
-    }
-
-    if (vector.hasAsyncMutation) {
-        activeSet.add(ANALYZER_PERFORMANCE);
-        activeSet.add(ANALYZER_GOVERNANCE);
-        activeSet.add(ANALYZER_COMPLEXITY);
-        reasons.push('Async mutation: concurrency safety, reentrancy, and promise handling');
-    }
-
-    if (vector.hasTypeMutation) {
-        activeSet.add(ANALYZER_DATA_ARCHITECTURE);
-        activeSet.add(ANALYZER_TYPESCRIPT_MODERN);
-        reasons.push('Type mutation: anti-corruption boundary and type modernity review');
-    }
-
-    if (activeSet.size === 0) {
-        activeSet.add(ANALYZER_COMPLEXITY);
-        activeSet.add(ANALYZER_GOVERNANCE);
-        activeSet.add(ANALYZER_HYGIENE);
-        reasons.push('General mutation: fallback to baseline core quality and governance rules');
-    }
-
-    return { analyzers: Array.from(activeSet), reasons };
+    const { activeAnalyzers, reasons } = dispatchSliceFeatureBitset(vector);
+    return { analyzers: activeAnalyzers, reasons };
 }
 
 /**
  * SparseMoEGateRouter implements Conditional Expert Dispatching for AST slices.
  */
 export class SparseMoEGateRouter {
+    /**
+     * Route an AST slice node directly to 32-bit active and skipped bitmasks.
+     *
+     * Provides zero-heap-allocation, single-cycle CED evaluation for slice audit hot paths.
+     *
+     * @param slice - AST slice node.
+     * @param availableMask - Bitmask of enabled analyzers (default: ALL_ANALYZERS_MASK).
+     * @returns 32-bit activeMask, skippedMask, activationRatio, and reasons.
+     */
+    public routeSliceToBitmask(
+        slice: ASTSliceNode,
+        availableMask: number = ALL_ANALYZERS_MASK,
+    ): {
+        activeMask: number;
+        skippedMask: number;
+        activationRatio: number;
+        reasons: string[];
+    } {
+        const { activeMask: rawMask, reasons } = dispatchSliceFeatureBitset(slice.featureVector);
+        const activeMask = (rawMask & availableMask) >>> 0;
+        const skippedMask = (availableMask & ~activeMask) >>> 0;
+        const totalCount = Math.max(1, popcount32(availableMask));
+        const activeCount = popcount32(activeMask);
+        const activationRatio = Number((activeCount / totalCount).toFixed(DECIMAL_PLACES));
+
+        return {
+            activeMask,
+            skippedMask,
+            activationRatio,
+            reasons,
+        };
+    }
+
     /**
      * Route an ASTSliceNode to a SparseRoutingPlan with active and cold bypassed analyzers.
      *
@@ -131,13 +85,25 @@ export class SparseMoEGateRouter {
         slice: ASTSliceNode,
         allAvailable: readonly string[] = ALL_BUILTIN_ANALYZERS,
     ): SparseRoutingPlan {
+        if (allAvailable === ALL_BUILTIN_ANALYZERS) {
+            const bitResult = this.routeSliceToBitmask(slice, ALL_ANALYZERS_MASK);
+            return {
+                sliceId: slice.sliceId,
+                filePath: slice.filePath,
+                activeAnalyzers: analyzerMaskToNames(bitResult.activeMask),
+                skippedAnalyzers: analyzerMaskToNames(bitResult.skippedMask),
+                activationRatio: bitResult.activationRatio,
+                reasons: bitResult.reasons,
+            };
+        }
+
         const { analyzers, reasons } = dispatchSliceExperts(slice.featureVector);
         const availableSet = new Set(allAvailable);
         const activeAnalyzers = analyzers.filter((a) => availableSet.has(a));
         const activeSet = new Set(activeAnalyzers);
         const skippedAnalyzers = allAvailable.filter((a) => !activeSet.has(a));
         const totalCount = allAvailable.length > 0 ? allAvailable.length : TOTAL_BUILTIN_ANALYZERS;
-        const activationRatio = Number((activeAnalyzers.length / totalCount).toFixed(3));
+        const activationRatio = Number((activeAnalyzers.length / totalCount).toFixed(DECIMAL_PLACES));
 
         return {
             sliceId: slice.sliceId,
@@ -191,7 +157,7 @@ export class SparseMoEGateRouter {
         const activeAnalyzers = Array.from(unionActive);
         const skippedAnalyzers = allAvailable.filter((a) => !unionActive.has(a));
         const totalCount = allAvailable.length > 0 ? allAvailable.length : TOTAL_BUILTIN_ANALYZERS;
-        const activationRatio = Number((activeAnalyzers.length / totalCount).toFixed(3));
+        const activationRatio = Number((activeAnalyzers.length / totalCount).toFixed(DECIMAL_PLACES));
 
         return {
             sliceId: slices.map((s) => s.sliceId).join(','),

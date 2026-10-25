@@ -95,6 +95,7 @@ const ANALYZER_GO_MODERN = 'go-modern';
 const ANALYZER_COMMENTS = 'comments';
 const ANALYZER_CONSTANTS = 'constants';
 const ANALYZER_TOKEN_DENSITY = 'token-density';
+const ANALYZER_CONCURRENCY = 'concurrency';
 
 const SCALE_MODE_DENSITY = 'density';
 const SCALE_MODE_ABSOLUTE = 'absolute';
@@ -145,6 +146,7 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         ANALYZER_VSCODE_EXTENSION,
         ANALYZER_FRONTEND,
         ANALYZER_TOKEN_DENSITY,
+        ANALYZER_CONCURRENCY,
     ],
     standardization: [
         ANALYZER_HYGIENE,
@@ -298,6 +300,18 @@ export interface QualityScoreBreakdown {
      * (TDR).
      */
     technicalDebt?: import('./technical-debt-ratio').TechnicalDebtAssessment;
+    /** Average effective code density ratio across evaluated files. */
+    effectiveCodeDensity?: number;
+    /** 5D Riemannian manifold and tensor density summary. */
+    densityTensorSummary?: {
+        compositeDensity: number;
+        averageTspr: number;
+        averagePor: number;
+        averageColumnDensity: number;
+        averageSpatialDensity?: number;
+        averageMahalanobisDistance?: number;
+        averageFisherSimplexDistance?: number;
+    };
     /**
      * Machine-readable definition of the quantified standard this score was produced under:
      * the composite/coverage/confidence formulas, the per-dimension weights and the grade

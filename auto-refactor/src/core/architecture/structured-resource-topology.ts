@@ -475,12 +475,14 @@ class TarjanSccComputer {
 
     private popComponent(rootNode: string): void {
         const component: string[] = [];
-        let poppedNode: string;
-        do {
-            poppedNode = this.stack.pop()!;
+        while (this.stack.length > 0) {
+            const poppedNode = this.stack.pop()!;
             this.onStack.delete(poppedNode);
             component.push(poppedNode);
-        } while (poppedNode !== rootNode);
+            if (poppedNode === rootNode) {
+                break;
+            }
+        }
         this.sccs.push(component);
     }
 }

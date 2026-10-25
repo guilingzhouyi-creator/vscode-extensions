@@ -17,8 +17,13 @@
  *   are syntax-level, and the documented closure/macro tolerations mirror the TS adapter.
  */
 
-import type { NormalizedNode, NormalizedAst, LanguageAdapter, ProjectionSeed } from './multilang';
-import { NodeKind } from './multilang';
+import {
+    BaseAstAdapter,
+    NodeKind,
+    type NormalizedNode,
+    type NormalizedAst,
+    type ProjectionSeed,
+} from './multilang';
 import type { TreeSitterNode, TreeSitterParser } from './tree-sitter-types';
 
 // Lazily-initialized shared parser (safe: parse is synchronous, workers get their own copy).
@@ -165,21 +170,13 @@ const RUST_TEST_MARKER_RE = /test/;
  * tree-sitter-rust binding cannot be loaded; the require is lazy, so importing this module
  * stays side-effect free and Rust binding failures are confined to Rust scans.
  */
-export class RustAdapter implements LanguageAdapter {
+export class RustAdapter extends BaseAstAdapter {
     id = 'rust' as const;
     extensions = [EXTENSION_RS];
 
     parse(content: string, _filePath: string, _seed?: ProjectionSeed): NormalizedAst {
         const tree = getRustParser().parse(content);
         return { root: this.mapNode(tree.rootNode, undefined) };
-    }
-
-    root(ast: NormalizedAst): NormalizedNode {
-        return ast.root;
-    }
-
-    children(node: NormalizedNode): NormalizedNode[] {
-        return node.children || [];
     }
 
     // ------------------------------------------------------------------ mapping

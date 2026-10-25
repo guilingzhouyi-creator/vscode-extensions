@@ -16,13 +16,29 @@ import type { CandidateStrategy, HeuristicScore } from './mcts-contracts';
 import { projectWorkspace, type ProjectedSandbox } from '../vfs/projection';
 import type { LayerVFSWorkspace } from '../vfs/workspace-manager';
 
+const DEFAULT_VERIFICATION_TIMEOUT_MS = 15_000;
+const FAILED_TEST_BASE_SCORE = 20.0;
+const FAILED_TEST_PENALTY = -40.0;
+const MAX_RULE_PENALTY = 20.0;
+const VIOLATION_PENALTY_MULTIPLIER = 5.0;
+const PASSED_TEST_WEIGHT = 25.0;
+const MAX_COMPLEXITY_WEIGHT = 25.0;
+const MAX_RULE_WEIGHT = 25.0;
+const NET_GAIN_WEIGHT_MULTIPLIER = 10.0;
+const ROUNDING_SCALE_HUNDRED = 100;
+const MAX_COMPLEXITY_DIVISOR = 4.0;
+const CAI_WEIGHT_MULTIPLIER = 15.0;
+const BASELINE_COMPOSITE_SCORE = 50.0;
+const MAX_COMPOSITE_SCORE = 100.0;
+
+const BRANCHING_TOKENS = ['if ', 'for ', 'while ', 'case ', 'catch ', '&&', '||', '?'] as const;
+
 /**
  * Estimates cyclomatic complexity from source code by counting branching tokens.
  */
 function estimateComplexity(content: string): number {
     let count = 1;
-    const tokens = ['if ', 'for ', 'while ', 'case ', 'catch ', '&&', '||', '?'];
-    for (const token of tokens) {
+    for (const token of BRANCHING_TOKENS) {
         let idx = 0;
         while ((idx = content.indexOf(token, idx)) !== -1) {
             count++;
@@ -38,7 +54,7 @@ function estimateComplexity(content: string): number {
 function countCodeDefects(content: string): number {
     let defects = 0;
     const forbiddenPatterns = [
-        /: any\b/,
+        new RegExp(':\\s*any\\b'),
         /catch\s*\([^)]*\)\s*\{\s*\}/,
         /\bTODO\b/i,
         /\bFIXME\b/i,
@@ -73,7 +89,7 @@ async function runVerificationCommand(
         const executionResult = await projectedSandbox.runCommand(
             strategy.verificationCommand.command,
             strategy.verificationCommand.args,
-            { timeoutMs: strategy.verificationCommand.timeoutMs ?? 15000 },
+            { timeoutMs: strategy.verificationCommand.timeoutMs ?? DEFAULT_VERIFICATION_TIMEOUT_MS },
         );
         return executionResult.success;
     } catch {
@@ -96,22 +112,22 @@ function computeScoreBreakdown(
 ): { compositeScore: number; caiScore: number; breakdown: HeuristicScore['breakdown'] } {
     if (!testsPassed) {
         return {
-            compositeScore: 20.0,
+            compositeScore: FAILED_TEST_BASE_SCORE,
             caiScore: 0.0,
             breakdown: {
-                testWeight: -40.0,
+                testWeight: FAILED_TEST_PENALTY,
                 complexityWeight: 0.0,
-                ruleWeight: -Math.min(20.0, violationCount * 5.0),
+                ruleWeight: -Math.min(MAX_RULE_PENALTY, violationCount * VIOLATION_PENALTY_MULTIPLIER),
                 caiWeight: 0.0,
             },
         };
     }
 
-    const testWeight = 25.0;
+    const testWeight = PASSED_TEST_WEIGHT;
     const complexityWeight =
         complexityDelta < 0
-            ? Math.min(25.0, Math.abs(complexityDelta) * 5.0)
-            : -Math.min(25.0, complexityDelta * 5.0);
+            ? Math.min(MAX_COMPLEXITY_WEIGHT, Math.abs(complexityDelta) * VIOLATION_PENALTY_MULTIPLIER)
+            : -Math.min(MAX_COMPLEXITY_WEIGHT, complexityDelta * VIOLATION_PENALTY_MULTIPLIER);
 
     const netDefectGain =
         originalViolationCount > 0
@@ -120,19 +136,29 @@ function computeScoreBreakdown(
               ? 1.0
               : -0.5;
 
-    const rulePenalty = Math.min(25.0, violationCount * 5.0);
-    const ruleWeight = Math.round((Math.max(0, netDefectGain) * 10.0 - rulePenalty) * 10) / 10;
+    const rulePenalty = Math.min(MAX_RULE_WEIGHT, violationCount * VIOLATION_PENALTY_MULTIPLIER);
+    const ruleWeight =
+        Math.round(
+            (Math.max(0, netDefectGain) * NET_GAIN_WEIGHT_MULTIPLIER - rulePenalty) *
+                ROUNDING_SCALE_HUNDRED,
+        ) / ROUNDING_SCALE_HUNDRED;
 
     // CAI (Code Autonomy Index): objective assessment of structural cleanliness & net improvement
     const cleanRatio = 1.0 / (1.0 + violationCount);
-    const cpxGain = complexityDelta < 0 ? Math.min(1.0, Math.abs(complexityDelta) / 4.0) : 0.0;
+    const cpxGain =
+        complexityDelta < 0 ? Math.min(1.0, Math.abs(complexityDelta) / MAX_COMPLEXITY_DIVISOR) : 0.0;
     const rawCai = 0.5 * cleanRatio + 0.3 * Math.max(0, netDefectGain) + 0.2 * cpxGain;
-    const caiScore = Math.max(0.0, Math.min(1.0, Math.round(rawCai * 100) / 100));
-    const caiWeight = Math.round(caiScore * 15.0 * 10) / 10;
+    const caiScore = Math.max(0.0, Math.min(1.0, Math.round(rawCai * ROUNDING_SCALE_HUNDRED) / ROUNDING_SCALE_HUNDRED));
+    const caiWeight =
+        Math.round(caiScore * CAI_WEIGHT_MULTIPLIER * ROUNDING_SCALE_HUNDRED) /
+        ROUNDING_SCALE_HUNDRED;
 
-    const baseScore = 50.0;
+    const baseScore = BASELINE_COMPOSITE_SCORE;
     const rawScore = baseScore + testWeight + complexityWeight + ruleWeight + caiWeight;
-    const compositeScore = Math.max(0.0, Math.min(100.0, Math.round(rawScore * 10) / 10));
+    const compositeScore = Math.max(
+        0.0,
+        Math.min(MAX_COMPOSITE_SCORE, Math.round(rawScore * ROUNDING_SCALE_HUNDRED) / ROUNDING_SCALE_HUNDRED),
+    );
 
     return {
         compositeScore,

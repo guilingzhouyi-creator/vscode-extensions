@@ -37,7 +37,10 @@ export type EscalationType =
     | 'CIRCULAR_DEPENDENCY'
     | 'ARCHITECTURE_BREACH'
     | 'TRANSITIVE_REGRESSION'
-    | 'SPECULATIVE_INVALIDATION';
+    | 'SPECULATIVE_INVALIDATION'
+    | 'COLD_COMPENSATION_VIOLATION';
+
+export const EVENT_COLD_COMPENSATION_VIOLATION: EscalationType = 'COLD_COMPENSATION_VIOLATION';
 
 /**
  * Broadcast payload describing one escalation.

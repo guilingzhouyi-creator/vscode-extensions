@@ -205,6 +205,11 @@ function isPermissiveToken(token: string): boolean {
     return /^(MIT|APACHE|BSD|ISC|0BSD|ZLIB)/.test(token);
 }
 
+const CATEGORY_UNAPPROVED: LicenseCategory = 'unapproved';
+const CATEGORY_VIRAL_COPYLEFT: LicenseCategory = 'viral_copyleft';
+const CATEGORY_WEAK_COPYLEFT: LicenseCategory = 'weak_copyleft';
+const CATEGORY_PERMISSIVE: LicenseCategory = 'permissive';
+
 /**
  * Classifies an individual SPDX license identifier token into a LicenseCategory.
  *
@@ -212,19 +217,10 @@ function isPermissiveToken(token: string): boolean {
  * @returns LicenseCategory classification
  */
 function classifySingleToken(token: string): LicenseCategory {
-    if (!token) {
-        return 'unapproved';
-    }
-    if (isViralToken(token)) {
-        return 'viral_copyleft';
-    }
-    if (isWeakToken(token)) {
-        return 'weak_copyleft';
-    }
-    if (isPermissiveToken(token)) {
-        return 'permissive';
-    }
-    return 'unapproved';
+    if (!token) return CATEGORY_UNAPPROVED;
+    if (isViralToken(token)) return CATEGORY_VIRAL_COPYLEFT;
+    if (isWeakToken(token)) return CATEGORY_WEAK_COPYLEFT;
+    return isPermissiveToken(token) ? CATEGORY_PERMISSIVE : CATEGORY_UNAPPROVED;
 }
 
 /**
@@ -237,12 +233,12 @@ function classifySingleToken(token: string): LicenseCategory {
  */
 export function classifySpdxLicense(licenseSpdx: string): LicenseCategory {
     if (!licenseSpdx || typeof licenseSpdx !== 'string') {
-        return 'unapproved';
+        return CATEGORY_UNAPPROVED;
     }
 
     const trimmed = licenseSpdx.trim();
     if (!trimmed) {
-        return 'unapproved';
+        return CATEGORY_UNAPPROVED;
     }
 
     // Handle disjunctive dual licensing (e.g. "MIT OR GPL-3.0")
@@ -251,16 +247,9 @@ export function classifySpdxLicense(licenseSpdx: string): LicenseCategory {
         const categories = parts.map(classifySingleToken);
 
         // Under dual licensing, licensee may choose the most permissive available branch
-        if (categories.includes('permissive')) {
-            return 'permissive';
-        }
-        if (categories.includes('weak_copyleft')) {
-            return 'weak_copyleft';
-        }
-        if (categories.includes('viral_copyleft')) {
-            return 'viral_copyleft';
-        }
-        return 'unapproved';
+        if (categories.includes(CATEGORY_PERMISSIVE)) return CATEGORY_PERMISSIVE;
+        if (categories.includes(CATEGORY_WEAK_COPYLEFT)) return CATEGORY_WEAK_COPYLEFT;
+        return categories.includes(CATEGORY_VIRAL_COPYLEFT) ? CATEGORY_VIRAL_COPYLEFT : CATEGORY_UNAPPROVED;
     }
 
     // Handle conjunctive compound licensing (e.g. "MIT AND GPL-3.0")
@@ -269,16 +258,9 @@ export function classifySpdxLicense(licenseSpdx: string): LicenseCategory {
         const categories = parts.map(classifySingleToken);
 
         // Must satisfy all terms: most restrictive classification wins
-        if (categories.includes('viral_copyleft')) {
-            return 'viral_copyleft';
-        }
-        if (categories.includes('weak_copyleft')) {
-            return 'weak_copyleft';
-        }
-        if (categories.includes('unapproved')) {
-            return 'unapproved';
-        }
-        return 'permissive';
+        if (categories.includes(CATEGORY_VIRAL_COPYLEFT)) return CATEGORY_VIRAL_COPYLEFT;
+        if (categories.includes(CATEGORY_WEAK_COPYLEFT)) return CATEGORY_WEAK_COPYLEFT;
+        return categories.includes(CATEGORY_UNAPPROVED) ? CATEGORY_UNAPPROVED : CATEGORY_PERMISSIVE;
     }
 
     const token = normalizeToken(trimmed);
@@ -305,11 +287,8 @@ export function isViralCopyleft(licenseSpdx: string): boolean {
     // If expression contains OR with a permissive branch, viral obligations are avoidable
     if (/(?:\s+OR\s+|\)\s*OR\s*|\s*OR\s*\()/i.test(trimmed)) {
         const parts = trimmed.split(/(?:\s+OR\s+|\)\s*OR\s*|\s*OR\s*\()/i).map(normalizeToken);
-        const hasPermissive = parts.some((p) => classifySingleToken(p) === 'permissive');
-        if (hasPermissive) {
-            return false;
-        }
-        return parts.some(isViralToken);
+        const hasPermissive = parts.some((p) => classifySingleToken(p) === CATEGORY_PERMISSIVE);
+        return hasPermissive ? false : parts.some(isViralToken);
     }
 
     // If expression contains AND, viral copyleft on any branch infects the whole
@@ -341,62 +320,93 @@ export function isPermissive(licenseSpdx: string): boolean {
     return classifySpdxLicense(licenseSpdx) === 'permissive';
 }
 
-function evaluateExplicitLists(
-    trimmed: string,
-    normalized: string,
-    category: LicenseCategory,
-    viral: boolean,
-    allowedLicenses: readonly string[],
-    blockedLicenses: readonly string[],
-): LicenseAuditResult | null {
-    if (blockedLicenses.includes(normalized)) {
+/** Core evaluation payload for license audit sub-evaluators. */
+interface LicenseEvalContext {
+    readonly trimmed: string;
+    readonly normalized: string;
+    readonly category: LicenseCategory;
+    readonly isViral: boolean;
+}
+
+interface ExplicitListsEvalParams {
+    readonly ctx: LicenseEvalContext;
+    readonly allowedLicenses: readonly string[];
+    readonly blockedLicenses: readonly string[];
+}
+
+interface ViralCopyleftEvalParams {
+    readonly ctx: LicenseEvalContext;
+    readonly blockViralCopyleft: boolean;
+}
+
+interface CategoryComplianceEvalParams {
+    readonly ctx: LicenseEvalContext;
+    readonly allowWeakCopyleft: boolean;
+    readonly allowedCategories: readonly string[];
+}
+
+function createCompliantResult(
+    ctx: LicenseEvalContext,
+    riskLevel: 'low' | 'none',
+    reason: string,
+): LicenseAuditResult {
+    return {
+        spdxExpression: ctx.trimmed,
+        normalizedSpdx: ctx.normalized,
+        category: ctx.category,
+        compliant: true,
+        isViralCopyleft: false,
+        riskLevel,
+        reason,
+        violations: [],
+    };
+}
+
+function evaluateExplicitLists(params: ExplicitListsEvalParams): LicenseAuditResult | null {
+    const { ctx, allowedLicenses, blockedLicenses } = params;
+    if (blockedLicenses.includes(ctx.normalized)) {
         return {
-            spdxExpression: trimmed,
-            normalizedSpdx: normalized,
-            category,
+            spdxExpression: ctx.trimmed,
+            normalizedSpdx: ctx.normalized,
+            category: ctx.category,
             compliant: false,
-            isViralCopyleft: viral,
+            isViralCopyleft: ctx.isViral,
             riskLevel: 'critical',
-            reason: `License "${trimmed}" is on the prohibited license blacklist.`,
-            violations: [`License "${trimmed}" is explicitly blocked by policy.`],
+            reason: `License "${ctx.trimmed}" is on the prohibited license blacklist.`,
+            violations: [`License "${ctx.trimmed}" is explicitly blocked by policy.`],
             remediation: 'Remove dependency or replace with an approved alternative.',
         };
     }
-    if (allowedLicenses.includes(normalized)) {
+    if (allowedLicenses.includes(ctx.normalized)) {
         return {
-            spdxExpression: trimmed,
-            normalizedSpdx: normalized,
-            category,
+            spdxExpression: ctx.trimmed,
+            normalizedSpdx: ctx.normalized,
+            category: ctx.category,
             compliant: true,
-            isViralCopyleft: viral,
-            riskLevel: viral ? 'medium' : 'none',
-            reason: `License "${trimmed}" is explicitly approved by policy whitelist.`,
+            isViralCopyleft: ctx.isViral,
+            riskLevel: ctx.isViral ? 'medium' : 'none',
+            reason: `License "${ctx.trimmed}" is explicitly approved by policy whitelist.`,
             violations: [],
         };
     }
     return null;
 }
 
-function evaluateViralCopyleft(
-    trimmed: string,
-    normalized: string,
-    category: LicenseCategory,
-    viral: boolean,
-    blockViralCopyleft: boolean,
-): LicenseAuditResult | null {
-    if (!viral || !blockViralCopyleft) return null;
+function evaluateViralCopyleft(params: ViralCopyleftEvalParams): LicenseAuditResult | null {
+    const { ctx, blockViralCopyleft } = params;
+    if (!ctx.isViral || !blockViralCopyleft) return null;
     return {
-        spdxExpression: trimmed,
-        normalizedSpdx: normalized,
-        category,
+        spdxExpression: ctx.trimmed,
+        normalizedSpdx: ctx.normalized,
+        category: ctx.category,
         compliant: false,
         isViralCopyleft: true,
         riskLevel: 'critical',
         reason:
-            `Viral copyleft license "${trimmed}" poses severe intellectual property ` +
+            `Viral copyleft license "${ctx.trimmed}" poses severe intellectual property ` +
             'and closed-source enclosure risks.',
         violations: [
-            `Viral copyleft license "${trimmed}" imposes reciprocal distribution requirements.`,
+            `Viral copyleft license "${ctx.trimmed}" imposes reciprocal distribution requirements.`,
         ],
         remediation:
             'Replace dependency with a permissively licensed alternative (MIT/Apache-2.0) ' +
@@ -404,81 +414,70 @@ function evaluateViralCopyleft(
     };
 }
 
-function evaluateCategoryCompliance(
-    trimmed: string,
-    normalized: string,
-    category: LicenseCategory,
-    allowWeakCopyleft: boolean,
-    allowedCategories: readonly string[],
+interface NonCompliantDetail {
+    readonly riskLevel: 'medium' | 'high' | 'critical';
+    readonly reason: string;
+    readonly violation: string;
+    readonly remediation: string;
+}
+
+function createNonCompliantResult(
+    ctx: LicenseEvalContext,
+    detail: NonCompliantDetail,
 ): LicenseAuditResult {
-    if (category === 'weak_copyleft') {
-        if (allowWeakCopyleft || allowedCategories.includes('weak_copyleft')) {
-            return {
-                spdxExpression: trimmed,
-                normalizedSpdx: normalized,
-                category,
-                compliant: true,
-                isViralCopyleft: false,
-                riskLevel: 'low',
-                reason:
-                    `Weak copyleft license "${trimmed}" is permitted; isolate via dynamic linking ` +
-                    'and preserve library modifications.',
-                violations: [],
-            };
-        }
-        return {
-            spdxExpression: trimmed,
-            normalizedSpdx: normalized,
-            category,
-            compliant: false,
-            isViralCopyleft: false,
-            riskLevel: 'medium',
-            reason: `Weak copyleft license "${trimmed}" requires policy exception or dynamic linking review.`,
-            violations: [
-                `Weak copyleft license "${trimmed}" is not approved under standard permissive policy.`,
-            ],
-            remediation:
-                'Ensure module is linked dynamically without modifications, or request policy exception.',
-        };
-    }
-
-    if (category === 'permissive') {
-        if (allowedCategories.includes('permissive')) {
-            return {
-                spdxExpression: trimmed,
-                normalizedSpdx: normalized,
-                category,
-                compliant: true,
-                isViralCopyleft: false,
-                riskLevel: 'none',
-                reason: `Permissive license "${trimmed}" complies with corporate policy.`,
-                violations: [],
-            };
-        }
-        return {
-            spdxExpression: trimmed,
-            normalizedSpdx: normalized,
-            category,
-            compliant: false,
-            isViralCopyleft: false,
-            riskLevel: 'medium',
-            reason: `License category "permissive" is not in allowed categories list.`,
-            violations: [`Permissive license "${trimmed}" is excluded by category policy.`],
-            remediation: 'Add permissive category to allowed policy categories.',
-        };
-    }
-
     return {
-        spdxExpression: trimmed,
-        normalizedSpdx: normalized,
-        category: 'unapproved',
+        spdxExpression: ctx.trimmed,
+        normalizedSpdx: ctx.normalized,
+        category: ctx.category,
         compliant: false,
         isViralCopyleft: false,
-        riskLevel: 'high',
-        reason: `Unrecognized or proprietary license "${trimmed}" lacks commercial clearance.`,
-        violations: [`License "${trimmed}" is unrecognized or unapproved for commercial use.`],
-        remediation: 'Clarify licensing terms with package authors or seek legal review.',
+        riskLevel: detail.riskLevel,
+        reason: detail.reason,
+        violations: [detail.violation],
+        remediation: detail.remediation,
     };
+}
+
+function evaluateCategoryCompliance(params: CategoryComplianceEvalParams): LicenseAuditResult {
+    const { ctx, allowWeakCopyleft, allowedCategories } = params;
+    if (ctx.category === CATEGORY_WEAK_COPYLEFT) {
+        if (allowWeakCopyleft || allowedCategories.includes(CATEGORY_WEAK_COPYLEFT)) {
+            return createCompliantResult(
+                ctx,
+                'low',
+                `Weak copyleft license "${ctx.trimmed}" is permitted; isolate via dynamic linking and preserve library modifications.`,
+            );
+        }
+        return createNonCompliantResult(ctx, {
+            riskLevel: 'medium',
+            reason: `Weak copyleft license "${ctx.trimmed}" requires policy exception or dynamic linking review.`,
+            violation: `Weak copyleft license "${ctx.trimmed}" is not approved under standard permissive policy.`,
+            remediation: 'Ensure module is linked dynamically without modifications, or request policy exception.',
+        });
+    }
+
+    if (ctx.category === CATEGORY_PERMISSIVE) {
+        if (allowedCategories.includes(CATEGORY_PERMISSIVE)) {
+            return createCompliantResult(
+                ctx,
+                'none',
+                `Permissive license "${ctx.trimmed}" complies with corporate policy.`,
+            );
+        }
+        return createNonCompliantResult(ctx, {
+            riskLevel: 'medium',
+            reason: `License category "permissive" is not in allowed categories list.`,
+            violation: `Permissive license "${ctx.trimmed}" is excluded by category policy.`,
+            remediation: 'Add permissive category to allowed policy categories.',
+        });
+    }
+
+    return createNonCompliantResult(ctx, {
+        riskLevel: 'high',
+        reason: `Unrecognized or proprietary license "${ctx.trimmed}" lacks commercial clearance.`,
+        violation: `License "${ctx.trimmed}" is unrecognized or unapproved for commercial use.`,
+        remediation: 'Clarify licensing terms with package authors or seek legal review.',
+    });
 }
 
 /**
@@ -501,7 +500,7 @@ export function auditLicenseCompliance(
         return {
             spdxExpression: raw,
             normalizedSpdx: '',
-            category: 'unapproved',
+            category: CATEGORY_UNAPPROVED,
             compliant: false,
             isViralCopyleft: false,
             riskLevel: 'high',
@@ -513,39 +512,21 @@ export function auditLicenseCompliance(
 
     const normalized = normalizeToken(trimmed);
     const category = classifySpdxLicense(trimmed);
-    const viral = isViralCopyleft(trimmed);
+    const isViral = isViralCopyleft(trimmed);
+    const ctx: LicenseEvalContext = { trimmed, normalized, category, isViral };
 
     const allowedCategories = policy.allowedCategories ??
-        DEFAULT_LICENSE_POLICY.allowedCategories ?? ['permissive'];
+        DEFAULT_LICENSE_POLICY.allowedCategories ?? [CATEGORY_PERMISSIVE];
     const allowedLicenses = (policy.allowedLicenses ?? []).map((l) => normalizeToken(l));
     const blockedLicenses = (policy.blockedLicenses ?? []).map((l) => normalizeToken(l));
     const allowWeakCopyleft = policy.allowWeakCopyleft ?? false;
     const blockViralCopyleft = policy.blockViralCopyleft ?? true;
 
-    const explicitResult = evaluateExplicitLists(
-        trimmed,
-        normalized,
-        category,
-        viral,
-        allowedLicenses,
-        blockedLicenses,
-    );
+    const explicitResult = evaluateExplicitLists({ ctx, allowedLicenses, blockedLicenses });
     if (explicitResult) return explicitResult;
 
-    const viralResult = evaluateViralCopyleft(
-        trimmed,
-        normalized,
-        category,
-        viral,
-        blockViralCopyleft,
-    );
+    const viralResult = evaluateViralCopyleft({ ctx, blockViralCopyleft });
     if (viralResult) return viralResult;
 
-    return evaluateCategoryCompliance(
-        trimmed,
-        normalized,
-        category,
-        allowWeakCopyleft,
-        allowedCategories,
-    );
+    return evaluateCategoryCompliance({ ctx, allowWeakCopyleft, allowedCategories });
 }

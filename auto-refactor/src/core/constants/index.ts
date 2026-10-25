@@ -25,6 +25,7 @@ export * from './ast-tokens';
 export * from './diagnostic-tokens';
 export * from './system-tokens';
 export * from './rule-codes';
+export * from './analyzer-bitmask';
 
 /**
  * Immutable AST and grammar token namespace.

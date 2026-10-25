@@ -16,8 +16,7 @@
  *                    keeping the adapter project-agnostic and dependency-free.
  */
 
-import type { NormalizedNode, NormalizedAst, LanguageAdapter } from './multilang';
-import { NodeKind } from './multilang';
+import { BaseAstAdapter, NodeKind, type NormalizedNode, type NormalizedAst } from './multilang';
 
 /** String literals shorter than this stay tolerated: they cannot carry a meaningful value. */
 const MIN_SIGNIFICANT_STRING_LENGTH = 3;
@@ -330,7 +329,7 @@ function tryParseStructureStmt(
 /**
  * Language adapter projecting GDScript syntax into normalized language-agnostic AST.
  */
-export class GDScriptAdapter implements LanguageAdapter {
+export class GDScriptAdapter extends BaseAstAdapter {
     id = 'gdscript' as const;
     extensions = ['.gd'];
 
@@ -402,14 +401,6 @@ export class GDScriptAdapter implements LanguageAdapter {
                 end: { line: lineNum, column: match.index + match[0].length + 1 },
             });
         }
-    }
-
-    root(ast: NormalizedAst): NormalizedNode {
-        return ast.root;
-    }
-
-    children(node: NormalizedNode): NormalizedNode[] {
-        return node.children || [];
     }
 
     /**

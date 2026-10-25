@@ -52,6 +52,7 @@ import {
     ANALYZER_SHELL_SAFETY,
     ANALYZER_SIMPLIFY,
     ANALYZER_GO_MODERN,
+    ANALYZER_CONCURRENCY,
     RULE_CPX_TIME_001,
     RULE_CPX_SPACE_001,
     RULE_CPX_AMP_001,
@@ -140,6 +141,7 @@ import {
     DEDUCTION_SIMPLIFY_COMMENT,
     DEDUCTION_SIMPLIFY_STANDARDIZATION,
     DEDUCTION_GO_MODERNITY,
+    DEDUCTION_INEFFICIENT_ALGORITHM,
 } from './dimensionLiterals';
 import { FRONTEND_DIMENSION_RULES, type DimensionRule } from './dimension-rule-table-frontend';
 import { HYGIENE_DIMENSION_RULES } from './dimension-rule-table-hygiene';
@@ -802,6 +804,18 @@ export const DIMENSION_RULES: DimensionRule[] = [
         dimension: DIMENSION_MODERNITY,
         points: DEDUCTION_GO_MODERNITY,
         rationale: ScoringRationales.GO_MODERNITY,
+    },
+
+    // ── Concurrency & Resource Lifecycle Pack ────────────────────────────────────
+    {
+        analyzer: ANALYZER_CONCURRENCY,
+        covers: ruleMatches(
+            ['PRF-LEAK-001', 'RSM-LOCK-001'],
+            ['leak', 'lock', 'reentrant', 'concurrency'],
+        ),
+        dimension: DIMENSION_PERFORMANCE_EFFICIENCY,
+        points: DEDUCTION_INEFFICIENT_ALGORITHM,
+        rationale: ScoringRationales.INEFFICIENT_ALGORITHM_PATH,
     },
 
     ...HYGIENE_DIMENSION_RULES,

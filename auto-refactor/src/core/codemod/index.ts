@@ -33,3 +33,10 @@ export {
     JsDocTemplateOptions,
     JsDocParam,
 } from './transforms/jsdoc-template';
+
+export {
+    createTrampolineInlineFix,
+    detectVacuousTrampoline,
+    TrampolineInlinerOptions,
+    TrampolineDetectionResult,
+} from './transforms/trampoline-inliner';

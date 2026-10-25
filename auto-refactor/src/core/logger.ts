@@ -43,8 +43,17 @@ const DEFAULT_BATCH_THRESHOLD = 128;
 /** Milliseconds of idle time before an unforced batch is asynchronously flushed. */
 const DEFAULT_FLUSH_DEBOUNCE_MS = 50;
 
+/** Number of bytes per kibibyte. */
+const BYTES_PER_KIB = 1024;
+
+/** Number of bytes per mebibyte. */
+const BYTES_PER_MIB = BYTES_PER_KIB * BYTES_PER_KIB;
+
+/** Default single log file capacity ceiling in mebibytes. */
+const DEFAULT_MAX_LOG_MEGABYTES = 10;
+
 /** Default single log file size limit (10MB) before rotation triggers. */
-const DEFAULT_MAX_BYTES_PER_FILE = 10 * 1024 * 1024;
+const DEFAULT_MAX_BYTES_PER_FILE = DEFAULT_MAX_LOG_MEGABYTES * BYTES_PER_MIB;
 
 /** Default maximum number of rotated historical log file archives to retain. */
 const DEFAULT_MAX_ROTATED_FILES = 3;
@@ -262,6 +271,21 @@ export class LogRingBuffer {
     }
 
     /**
+     * Drains all buffered log lines into an ANSI-stripped UTF-8 payload and triggers rotation.
+     */
+    private drainBufferPayload(): string {
+        const linesToFlush: string[] = [];
+        while (this.count > 0) {
+            linesToFlush.push(this.buffer[this.tail]);
+            this.tail = (this.tail + 1) % this.capacity;
+            this.count--;
+        }
+        const payload = this.stripAnsi(linesToFlush.join('\n') + '\n');
+        this.rotateIfNecessary(Buffer.byteLength(payload, 'utf8'));
+        return payload;
+    }
+
+    /**
      * Synchronously flush all buffered log lines to disk immediately.
      */
     public flushSync(): void {
@@ -272,14 +296,7 @@ export class LogRingBuffer {
         this.isSyncFlushing = true;
         try {
             if (this.count === 0) return;
-            const linesToFlush: string[] = [];
-            while (this.count > 0) {
-                linesToFlush.push(this.buffer[this.tail]);
-                this.tail = (this.tail + 1) % this.capacity;
-                this.count--;
-            }
-            const payload = this.stripAnsi(linesToFlush.join('\n') + '\n');
-            this.rotateIfNecessary(Buffer.byteLength(payload, 'utf8'));
+            const payload = this.drainBufferPayload();
             try {
                 LogIoBarrier.appendSync(this.filePath, payload);
             } catch (e) {
@@ -300,14 +317,7 @@ export class LogRingBuffer {
             clearTimeout(this.timer);
             this.timer = null;
         }
-        const linesToFlush: string[] = [];
-        while (this.count > 0) {
-            linesToFlush.push(this.buffer[this.tail]);
-            this.tail = (this.tail + 1) % this.capacity;
-            this.count--;
-        }
-        const payload = this.stripAnsi(linesToFlush.join('\n') + '\n');
-        this.rotateIfNecessary(Buffer.byteLength(payload, 'utf8'));
+        const payload = this.drainBufferPayload();
         try {
             await fs.promises.appendFile(this.filePath, payload);
         } catch (e) {
@@ -319,30 +329,35 @@ export class LogRingBuffer {
 }
 
 /**
+ * Parameter object for diagnostic line formatting.
+ */
+interface FormatLogMessageParams {
+    readonly timestamp: string;
+    readonly level: LogLevel;
+    readonly message: string;
+    readonly errorObj?: Error;
+    readonly contextObj?: LogContext;
+}
+
+/**
  * Format a text diagnostic line with timestamp, level, message, context, and error details.
  */
-function formatTextMessage(
-    timestamp: string,
-    level: LogLevel,
-    message: string,
-    errorObj?: Error,
-    contextObj?: LogContext,
-): string {
-    let line = `${timestamp} ${level.toUpperCase().padEnd(LOG_LEVEL_LABEL_WIDTH)} ${message}`;
-    if (contextObj && Object.keys(contextObj).length > 0) {
+function formatTextMessage(params: FormatLogMessageParams): string {
+    let line = `${params.timestamp} ${params.level.toUpperCase().padEnd(LOG_LEVEL_LABEL_WIDTH)} ${params.message}`;
+    if (params.contextObj && Object.keys(params.contextObj).length > 0) {
         try {
-            line += ` [context: ${JSON.stringify(contextObj)}]`;
+            line += ` [context: ${JSON.stringify(params.contextObj)}]`;
         } catch {
             line += ` [context: [Circular]]`;
         }
     }
-    if (errorObj) {
-        line += ` [Error: ${errorObj.message}]`;
-        if (errorObj.stack) {
-            line += `\n${errorObj.stack}`;
+    if (params.errorObj) {
+        line += ` [Error: ${params.errorObj.message}]`;
+        if (params.errorObj.stack) {
+            line += `\n${params.errorObj.stack}`;
         }
-        if (errorObj.cause != null) {
-            const cause = errorObj.cause;
+        if (params.errorObj.cause != null) {
+            const cause = params.errorObj.cause;
             const causeStr = cause instanceof Error ? cause.stack || cause.message : String(cause);
             line += `\n[Caused by]: ${causeStr}`;
         }
@@ -353,27 +368,21 @@ function formatTextMessage(
 /**
  * Format a structured JSON line containing timestamp, level, message, context, and error.
  */
-function formatJsonMessage(
-    timestamp: string,
-    level: LogLevel,
-    message: string,
-    errorObj?: Error,
-    contextObj?: LogContext,
-): string {
+function formatJsonMessage(params: FormatLogMessageParams): string {
     const record: Record<string, unknown> = {
-        timestamp,
-        level,
-        message,
+        timestamp: params.timestamp,
+        level: params.level,
+        message: params.message,
     };
-    if (contextObj && Object.keys(contextObj).length > 0) {
-        record.context = contextObj;
+    if (params.contextObj && Object.keys(params.contextObj).length > 0) {
+        record.context = params.contextObj;
     }
-    if (errorObj) {
+    if (params.errorObj) {
         record.error = {
-            name: errorObj.name,
-            message: errorObj.message,
-            stack: errorObj.stack,
-            cause: errorObj.cause instanceof Error ? errorObj.cause.message : errorObj.cause,
+            name: params.errorObj.name,
+            message: params.errorObj.message,
+            stack: params.errorObj.stack,
+            cause: params.errorObj.cause instanceof Error ? params.errorObj.cause.message : params.errorObj.cause,
         };
     }
     return JSON.stringify(record);
@@ -471,10 +480,17 @@ export class Logger {
         }
 
         const ts = new Date().toISOString();
+        const formatParams: FormatLogMessageParams = {
+            timestamp: ts,
+            level,
+            message: msg,
+            errorObj,
+            contextObj,
+        };
         const line =
             this.format === 'json'
-                ? formatJsonMessage(ts, level, msg, errorObj, contextObj)
-                : formatTextMessage(ts, level, msg, errorObj, contextObj);
+                ? formatJsonMessage(formatParams)
+                : formatTextMessage(formatParams);
 
         process.stderr.write(line + '\n');
         if (this.ringBuffer) {

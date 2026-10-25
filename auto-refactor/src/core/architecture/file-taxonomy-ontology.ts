@@ -34,6 +34,21 @@ export type FileOntologyRole =
     | 'rule_policy_module'
     | 'resource_pool_component';
 
+const MAX_REGISTRY_LOC = 150;
+const MIN_FAN_IN_SHARED = 3;
+const MIN_SYMBOLS_SHARED_CAPABILITY = 3;
+const MAX_UTILITY_CREEP_EXPORTS = 8;
+const DEFAULT_ISSUE_END_COLUMN = 80;
+
+const ROLE_CONSTANT_REGISTRY: FileOntologyRole = 'constant_registry_library';
+const ROLE_RESOURCE_POOL: FileOntologyRole = 'resource_pool_component';
+const ROLE_RULE_POLICY: FileOntologyRole = 'rule_policy_module';
+const ROLE_ALGORITHM_OPERATOR: FileOntologyRole = 'algorithm_operator_library';
+const ROLE_INFRASTRUCTURE: FileOntologyRole = 'infrastructure_library';
+const ROLE_SHARED_LIBRARY: FileOntologyRole = 'shared_library';
+const ROLE_SHARED_CAPABILITY: FileOntologyRole = 'shared_capability_module';
+const ROLE_BUSINESS_DOMAIN: FileOntologyRole = 'business_domain_module';
+
 /**
  * Multi-dimensional metric vector for a source file.
  */
@@ -78,16 +93,16 @@ export interface FileTaxonomyAuditResult {
 }
 
 interface RoleMatchResult {
-    role: FileOntologyRole;
-    reason: string;
-    confidence: number;
+    readonly role: FileOntologyRole;
+    readonly reason: string;
+    readonly confidence: number;
 }
 
 function isConstantRegistry(metrics: FileBehavioralMetrics): boolean {
     return (
         metrics.hasConstantOrEnumOnly ||
         (metrics.pureFunctionRatio === 1.0 &&
-            metrics.loc <= 150 &&
+            metrics.loc <= MAX_REGISTRY_LOC &&
             !metrics.hasMathOrAlgoKeywords &&
             !metrics.hasRuleOrPolicySymbols &&
             !metrics.isStateful)
@@ -106,35 +121,35 @@ function isAlgorithmOperator(metrics: FileBehavioralMetrics): boolean {
 function matchSpecializedLibraryRole(metrics: FileBehavioralMetrics): RoleMatchResult | null {
     if (isConstantRegistry(metrics)) {
         return {
-            role: 'constant_registry_library',
+            role: ROLE_CONSTANT_REGISTRY,
             reason: 'Primary content consists of immutable constants, enum registries, or type identifiers',
             confidence: 0.95,
         };
     }
     if (metrics.hasPoolOrBufferSymbols) {
         return {
-            role: 'resource_pool_component',
+            role: ROLE_RESOURCE_POOL,
             reason: 'Manages reusable object, buffer, connection, or cache pool instances with lifecycle reset hooks',
             confidence: 0.92,
         };
     }
     if (metrics.hasRuleOrPolicySymbols) {
         return {
-            role: 'rule_policy_module',
+            role: ROLE_RULE_POLICY,
             reason: 'Declares declarative rule definitions, policy constraints, or validation criteria matrices',
             confidence: 0.9,
         };
     }
     if (isAlgorithmOperator(metrics)) {
         return {
-            role: 'algorithm_operator_library',
+            role: ROLE_ALGORITHM_OPERATOR,
             reason: 'High concentration of pure mathematical, numerical, geometrical, or statistical transformations',
             confidence: 0.93,
         };
     }
     if (metrics.hasIoOrSystemImports) {
         return {
-            role: 'infrastructure_library',
+            role: ROLE_INFRASTRUCTURE,
             reason: 'Directly interacts with OS, network sockets, physical I/O, or low-level platform drivers',
             confidence: 0.9,
         };
@@ -143,26 +158,26 @@ function matchSpecializedLibraryRole(metrics: FileBehavioralMetrics): RoleMatchR
 }
 
 function matchSharedOrDomainRole(metrics: FileBehavioralMetrics): RoleMatchResult {
-    if (metrics.crossDomainFanIn >= 3 && !metrics.isStateful && metrics.pureFunctionRatio >= 0.7) {
+    if (metrics.crossDomainFanIn >= MIN_FAN_IN_SHARED && !metrics.isStateful && metrics.pureFunctionRatio >= 0.7) {
         return {
-            role: 'shared_library',
+            role: ROLE_SHARED_LIBRARY,
             reason: 'High cross-domain reuse with stable stateless contract and low domain entity coupling',
             confidence: 0.88,
         };
     }
     if (
         metrics.crossDomainFanIn >= 2 &&
-        metrics.exportedSymbolCount >= 3 &&
+        metrics.exportedSymbolCount >= MIN_SYMBOLS_SHARED_CAPABILITY &&
         !metrics.hasGlobalMutableState
     ) {
         return {
-            role: 'shared_capability_module',
+            role: ROLE_SHARED_CAPABILITY,
             reason: 'Provides high-level cross-domain reusable capability or composite workflow coordination',
             confidence: 0.85,
         };
     }
     return {
-        role: 'business_domain_module',
+        role: ROLE_BUSINESS_DOMAIN,
         reason: 'Cohesive logic encapsulated within specific business domain boundary with low cross-domain leakage',
         confidence: 0.8,
     };
@@ -182,13 +197,13 @@ export function classifyFileOntology(metrics: FileBehavioralMetrics): FileOntolo
     const isPseudoSharedLibrary =
         metrics.crossDomainFanIn >= 2 &&
         (metrics.isStateful || metrics.hasGlobalMutableState) &&
-        match.role !== 'resource_pool_component';
+        match.role !== ROLE_RESOURCE_POOL;
 
     // Deviation 2: Unbounded Utility Creep: Business module directly exporting generic helpers
     const hasUnboundedUtilityCreep =
-        match.role === 'business_domain_module' &&
+        match.role === ROLE_BUSINESS_DOMAIN &&
         metrics.hasMathOrAlgoKeywords &&
-        metrics.exportedSymbolCount >= 8 &&
+        metrics.exportedSymbolCount >= MAX_UTILITY_CREEP_EXPORTS &&
         metrics.pureFunctionRatio >= 0.75;
 
     return {
@@ -201,13 +216,16 @@ export function classifyFileOntology(metrics: FileBehavioralMetrics): FileOntolo
     };
 }
 
-function createRoleDeviationIssue(
-    rule: typeof RULE_ARCH_ROL_001 | typeof RULE_ARCH_ROL_002,
-    filePath: string,
-    message: string,
-    detail: Record<string, unknown>,
-    suggestion: string,
-): Issue {
+interface RoleDeviationIssueParams {
+    readonly rule: typeof RULE_ARCH_ROL_001 | typeof RULE_ARCH_ROL_002;
+    readonly filePath: string;
+    readonly message: string;
+    readonly detail: Record<string, unknown>;
+    readonly suggestion: string;
+}
+
+function createRoleDeviationIssue(params: RoleDeviationIssueParams): Issue {
+    const { rule, filePath, message, detail, suggestion } = params;
     return {
         id: `architecture:${rule}:${filePath}:1`,
         analyzer: ANALYZER_ARCHITECTURE,
@@ -217,7 +235,7 @@ function createRoleDeviationIssue(
         location: {
             file: filePath,
             start: { line: 1, column: 1 },
-            end: { line: 1, column: 80 },
+            end: { line: 1, column: DEFAULT_ISSUE_END_COLUMN },
         },
         detail,
         suggestion,
@@ -225,42 +243,46 @@ function createRoleDeviationIssue(
 }
 
 function collectTaxonomyIssues(
-    f: FileBehavioralMetrics,
-    result: FileOntologyClassification,
+    fileMetric: FileBehavioralMetrics,
+    classificationResult: FileOntologyClassification,
     issues: Issue[],
 ): void {
-    if (result.isPseudoSharedLibrary) {
+    if (classificationResult.isPseudoSharedLibrary) {
         issues.push(
-            createRoleDeviationIssue(
-                RULE_ARCH_ROL_001,
-                f.filePath,
-                `Pseudo-shared library boundary violation: "${f.filePath}" is consumed by ` +
-                    `${f.crossDomainFanIn} distinct domains as a shared library, but holds mutable internal state.`,
-                {
-                    inferredRole: result.inferredRole,
-                    crossDomainFanIn: f.crossDomainFanIn,
-                    isStateful: f.isStateful,
-                    hasGlobalMutableState: f.hasGlobalMutableState,
+            createRoleDeviationIssue({
+                rule: RULE_ARCH_ROL_001,
+                filePath: fileMetric.filePath,
+                message:
+                    `Pseudo-shared library boundary violation: "${fileMetric.filePath}" is consumed by ` +
+                    `${fileMetric.crossDomainFanIn} distinct domains as a shared library, but holds mutable internal state.`,
+                detail: {
+                    inferredRole: classificationResult.inferredRole,
+                    crossDomainFanIn: fileMetric.crossDomainFanIn,
+                    isStateful: fileMetric.isStateful,
+                    hasGlobalMutableState: fileMetric.hasGlobalMutableState,
                 },
-                'Refactor stateful logic into a domain service and extract only pure interfaces into the shared library.',
-            ),
+                suggestion:
+                    'Refactor stateful logic into a domain service and extract only pure interfaces into the shared library.',
+            }),
         );
     }
 
-    if (result.hasUnboundedUtilityCreep) {
+    if (classificationResult.hasUnboundedUtilityCreep) {
         issues.push(
-            createRoleDeviationIssue(
-                RULE_ARCH_ROL_002,
-                f.filePath,
-                `Domain module utility creep: "${f.filePath}" is classified as a business domain module ` +
-                    `but bears ${f.exportedSymbolCount} unbounded generic utility or mathematical exports.`,
-                {
-                    domainName: f.domainName,
-                    exportedCount: f.exportedSymbolCount,
-                    pureRatio: f.pureFunctionRatio,
+            createRoleDeviationIssue({
+                rule: RULE_ARCH_ROL_002,
+                filePath: fileMetric.filePath,
+                message:
+                    `Domain module utility creep: "${fileMetric.filePath}" is classified as a business domain module ` +
+                    `but bears ${fileMetric.exportedSymbolCount} unbounded generic utility or mathematical exports.`,
+                detail: {
+                    domainName: fileMetric.domainName,
+                    exportedCount: fileMetric.exportedSymbolCount,
+                    pureRatio: fileMetric.pureFunctionRatio,
                 },
-                'Relocate generic utilities to an authoritative algorithm/operator library to keep domain modules focused.',
-            ),
+                suggestion:
+                    'Relocate generic utilities to an authoritative algorithm/operator library to keep domain modules focused.',
+            }),
         );
     }
 }
@@ -285,11 +307,11 @@ export function auditFileTaxonomy(files: FileBehavioralMetrics[]): FileTaxonomyA
     };
     const issues: Issue[] = [];
 
-    for (const f of files) {
-        const result = classifyFileOntology(f);
-        classifications.set(f.filePath, result);
-        roleDistribution[result.inferredRole]++;
-        collectTaxonomyIssues(f, result, issues);
+    for (const fileMetric of files) {
+        const taxonomyResult = classifyFileOntology(fileMetric);
+        classifications.set(fileMetric.filePath, taxonomyResult);
+        roleDistribution[taxonomyResult.inferredRole]++;
+        collectTaxonomyIssues(fileMetric, taxonomyResult, issues);
     }
 
     return {

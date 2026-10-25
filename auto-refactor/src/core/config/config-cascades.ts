@@ -24,6 +24,8 @@ import {
     ANALYZER_CONSTANTS,
     ANALYZER_SECRETS,
     ANALYZER_SECURITY,
+} from '../constants/rule-codes';
+import {
     AUTO_TUNE_SECRET_ENTROPY_THRESHOLD,
     AUTO_TUNE_SECRET_MIN_LENGTH,
     type ConfigOverrides,

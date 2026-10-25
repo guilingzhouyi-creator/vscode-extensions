@@ -44,6 +44,7 @@ import { FrontendAnalyzer } from '../analyzers/frontend';
 import { ProductionHygieneAnalyzer } from '../analyzers/production-hygiene';
 import { ClientExposureAnalyzer } from '../analyzers/client-exposure';
 import { ShellSafetyAnalyzer } from '../analyzers/shell-safety';
+import { ConcurrencyAnalyzer } from '../analyzers/concurrency';
 
 /** Resolved metadata and fresh instance factory for a declared analyzer. */
 export interface ResolvedAnalyzer {
@@ -96,6 +97,7 @@ vscode-extension
 client-exposure
 test-modernity
 governance
+concurrency
 `.trim();
 
 const ANALYZER_CLASSES: AnalyzerConstructor[] = [
@@ -130,6 +132,7 @@ const ANALYZER_CLASSES: AnalyzerConstructor[] = [
     ClientExposureAnalyzer,
     TestModernityAnalyzer,
     GovernanceAnalyzer,
+    ConcurrencyAnalyzer,
 ];
 
 function buildBuiltinFactories(): Record<string, () => Analyzer> {

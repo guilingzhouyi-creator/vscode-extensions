@@ -91,6 +91,9 @@ const EVENT_ARCHITECTURE_BREACH = 'ARCHITECTURE_BREACH';
 /** Escalation event type for circular dependencies. */
 const EVENT_CIRCULAR_DEPENDENCY = 'CIRCULAR_DEPENDENCY';
 
+/** Escalation event type for cold expert compensation breaches. */
+const EVENT_COLD_COMPENSATION_VIOLATION = 'COLD_COMPENSATION_VIOLATION';
+
 /** DeepTrack status when escalation events were published. */
 const STATUS_ESCALATED = 'ESCALATED';
 
@@ -154,6 +157,8 @@ export interface DiffFileInput {
     oldContent: string;
     /** Content after this mutation; may be empty for a deletion. */
     newContent: string;
+    /** Optional 1-based [minLine, maxLine] AST slice bounds for MLA-style range pruning. */
+    lineBounds?: readonly [number, number];
 }
 
 /**
@@ -261,6 +266,7 @@ export interface DeepTrackExecutionPlan {
     readonly channel: EscalationChannel;
     readonly memory: ReviewMemoryManager;
     readonly trajectory: ChangeTrajectoryManager;
+    readonly sparseRouting?: Record<string, SparseRouteResult>;
 }
 
 /** Parameter context for checking architecture boundary violations. */
@@ -523,6 +529,15 @@ async function executeDeepTrack(plan: DeepTrackExecutionPlan): Promise<DeepTrack
         });
     }
 
+    if (plan.sparseRouting) {
+        await auditColdCompensationEscalations({
+            plan,
+            sparseRouting: plan.sparseRouting,
+            deepIssues,
+            escalationEvents,
+        });
+    }
+
     const deepLatencyMs = Date.now() - deepTrackStartTimeMs;
     return {
         status: escalationEvents.length > 0 ? STATUS_ESCALATED : STATUS_CONFIRMED,
@@ -583,6 +598,52 @@ async function checkArchitectureLayerBreaches(
     }
 }
 
+/**
+ * Asynchronously execute cold expert compensation scan on background thread for offloaded candidate analyzers.
+ */
+async function auditColdCompensationEscalations(context: {
+    readonly plan: DeepTrackExecutionPlan;
+    readonly sparseRouting: Record<string, SparseRouteResult>;
+    readonly deepIssues: Issue[];
+    readonly escalationEvents: EscalationEvent[];
+}): Promise<void> {
+    const { plan, sparseRouting, deepIssues, escalationEvents } = context;
+    const { scanner, inputs, channel, memory, trajectory, governor } = plan;
+
+    for (const input of inputs) {
+        const route = sparseRouting[input.filePath];
+        if (!route?.overflowAnalyzers || route.overflowAnalyzers.size === 0) {
+            continue;
+        }
+
+        await governor.yieldEventLoop();
+        const coldResult = await scanner.runAnalyzers(
+            input.filePath,
+            input.newContent,
+            undefined,
+            route.overflowAnalyzers,
+        );
+
+        if (coldResult.issues.length > 0) {
+            deepIssues.push(...coldResult.issues);
+            const errorIssues = coldResult.issues.filter((i) => i.severity === SEVERITY_ERROR);
+            if (errorIssues.length > 0) {
+                const escalation: EscalationEvent = {
+                    type: EVENT_COLD_COMPENSATION_VIOLATION,
+                    sourceFile: input.filePath,
+                    affectedFiles: [input.filePath],
+                    issues: errorIssues,
+                    severity: SEVERITY_ERROR,
+                    message: `Cold expert asynchronous compensation detected ${errorIssues.length} error issue(s) in ${input.filePath}`,
+                    timestamp: Date.now(),
+                };
+                escalationEvents.push(escalation);
+                await channel.publish(escalation, memory, trajectory);
+            }
+        }
+    }
+}
+
 /** Mutable state container accumulating foreground speculative audit results. */
 interface FastTrackAccumulator {
     fastIssues: Issue[];
@@ -639,6 +700,7 @@ async function auditSingleFileInput(context: AuditFileInputContext): Promise<voi
         inputTarget.newContent,
         undefined,
         activeAnalyzers,
+        inputTarget.lineBounds,
     );
 
     context.acc.fastIssues.push(...fileResult.issues);
@@ -771,6 +833,7 @@ export async function executeDualTrack(
         channel,
         memory,
         trajectory,
+        sparseRouting: acc.sparseRouting,
     });
 
     return {

@@ -15,17 +15,17 @@
  */
 
 import * as ts from 'typescript';
-import type {
-    NormalizedNode,
-    NormalizedAst,
-    Position,
-    LanguageAdapter,
-    NodeProjector,
-    ProjectionPolicy,
-    ProjectionSeed,
-    ReusedSpan,
+import {
+    BaseAstAdapter,
+    NodeKind,
+    type NormalizedNode,
+    type NormalizedAst,
+    type Position,
+    type NodeProjector,
+    type ProjectionPolicy,
+    type ProjectionSeed,
+    type ReusedSpan,
 } from './multilang';
-import { NodeKind } from './multilang';
 import { createSourceFile, isFunctionLike } from '../../utils/ast';
 import { TsNodeProjector } from './ts-projector';
 import {
@@ -51,7 +51,7 @@ export * from './ts-predicates';
 /**
  * Default LanguageAdapter for TypeScript and JavaScript family files.
  */
-export class TypeScriptAdapter implements LanguageAdapter {
+export class TypeScriptAdapter extends BaseAstAdapter {
     /** Identifier used by the adapter registry. */
     id = 'typescript' as const;
     /** File extensions claimed by this adapter. */
@@ -79,29 +79,13 @@ export class TypeScriptAdapter implements LanguageAdapter {
      * @param policy - Projection policy describing required fields.
      * @returns A TsNodeProjector over the parsed source.
      */
-    project(content: string, filePath: string, policy: ProjectionPolicy): NodeProjector | null {
+    override project(
+        content: string,
+        filePath: string,
+        policy: ProjectionPolicy,
+    ): NodeProjector | null {
         const sf = createSourceFile(filePath, content);
         return new TsNodeProjector(sf, policy);
-    }
-
-    /**
-     * Return the root node of a parsed AST.
-     *
-     * @param ast - Normalized AST produced by parse.
-     * @returns Normalized source-file node.
-     */
-    root(ast: NormalizedAst): NormalizedNode {
-        return ast.root;
-    }
-
-    /**
-     * Return the direct children of a normalized node.
-     *
-     * @param node - Normalized node.
-     * @returns Direct children in source order.
-     */
-    children(node: NormalizedNode): NormalizedNode[] {
-        return node.children || [];
     }
 
     private resolveNodePositions(
@@ -118,7 +102,9 @@ export class TypeScriptAdapter implements LanguageAdapter {
             n.kind === ts.SyntaxKind.FunctionKeyword ||
             n.kind === ts.SyntaxKind.SourceFile ||
             ts.isClassDeclaration(n) ||
-            ts.isClassExpression(n);
+            ts.isClassExpression(n) ||
+            ts.isVariableDeclaration(n) ||
+            ts.isParameter(n);
         if (!needsPos) return {};
         return {
             start: posOf(n.getStart(sf), sf),

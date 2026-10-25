@@ -15,9 +15,9 @@
 
 import type { ScanReport, Issue, Severity, OutputFormat } from './types';
 import { toAgentReview, toCapp, toPraxisPresentation } from './reporters/agent-review-reporter';
-import { toCompactReportJson } from './reporting/compact-report-migrator';
+import { toAasJson } from './reporting/aas-reporter';
 
-export { toAgentReview, toCapp, toPraxisPresentation };
+export { toAgentReview, toCapp, toPraxisPresentation, toAasJson };
 
 const SARIF_LEVEL: Record<Severity, string> = {
     info: 'note',
@@ -48,7 +48,8 @@ export function render(report: ScanReport, format: OutputFormat): string {
         case 'capp':
             return toCapp(report);
         case 'compact':
-            return toCompactReportJson(report);
+        case 'aas':
+            return toAasJson(report);
         case 'praxis':
             return toPraxisPresentation(report);
         case 'text':

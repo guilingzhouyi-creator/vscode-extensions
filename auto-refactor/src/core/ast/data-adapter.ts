@@ -18,13 +18,12 @@
  *   The two claim different languages for different reasons (documentation prose vs. pipeline
  *   configuration), and a shared base would invite one to be changed to suit the other.
  */
-import type { NormalizedNode, NormalizedAst, LanguageAdapter } from './multilang';
-import { NodeKind } from './multilang';
+import { BaseAstAdapter, NodeKind, type NormalizedNode, type NormalizedAst } from './multilang';
 
 /**
  * Structured-data adapter for YAML: an empty document root plus the traversal contract.
  */
-export class DataAdapter implements LanguageAdapter {
+export class DataAdapter extends BaseAstAdapter {
     id = 'yaml' as const;
     extensions = ['.yml', '.yaml'];
 
@@ -37,26 +36,6 @@ export class DataAdapter implements LanguageAdapter {
      */
     parse(_content: string, _filePath: string): NormalizedAst {
         return { root: this.documentRoot() };
-    }
-
-    /**
-     * Return the root node of a parsed document AST.
-     *
-     * @param ast - Normalized AST produced by `parse`.
-     * @returns The childless document root.
-     */
-    root(ast: NormalizedAst): NormalizedNode {
-        return ast.root;
-    }
-
-    /**
-     * Return the normalized children of a node.
-     *
-     * @param node - Any node produced by this adapter.
-     * @returns An empty array: YAML exposes no traversable nodes.
-     */
-    children(node: NormalizedNode): NormalizedNode[] {
-        return node.children || [];
     }
 
     /**

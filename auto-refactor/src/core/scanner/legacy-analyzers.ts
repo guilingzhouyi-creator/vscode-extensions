@@ -20,7 +20,7 @@ import type {
     ParseState,
     StreamingOutcome,
 } from './analyzer-runner';
-import { shouldExecuteAnalyzer } from './trigger-catalog';
+import { isFileAnalyzerActive } from './file-preflight-gate';
 
 /**
  * Materialize the ts.SourceFile, but only when a legacy TS-only plug-in needs it.
@@ -67,7 +67,7 @@ export function runLegacyPhase(
     const sf = base.sourceFile;
     for (const p of legacy) {
         if (!sf && p.instance.requiresSourceFile) continue;
-        if (!shouldExecuteAnalyzer(p.name, base.content)) continue;
+        if (!isFileAnalyzerActive(base.preflightMask, p.name)) continue;
         const ctx: AnalyzerContext = {
             filePath: base.rel,
             content: base.content,

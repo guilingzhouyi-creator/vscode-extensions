@@ -145,6 +145,7 @@ export {
     ANALYZER_PRODUCTION_HYGIENE,
     ANALYZER_CLIENT_EXPOSURE,
     ANALYZER_SHELL_SAFETY,
+    ANALYZER_CONCURRENCY,
 } from '../constants/rule-codes';
 
 /**  */

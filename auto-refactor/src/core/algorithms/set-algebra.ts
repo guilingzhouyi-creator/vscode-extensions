@@ -12,6 +12,8 @@
  * Exit Semantics & Design Rationale: CC <= 6; pure functions; non-throwing fail-safe semantics.
  */
 
+const FOUR_DECIMAL_SCALE = 10_000;
+
 /**
  * Computes Jaccard similarity coefficient |A ∩ B| / |A ∪ B| between two sets.
  *
@@ -38,7 +40,7 @@ export function computeJaccardSimilarity<T>(setA: ReadonlySet<T>, setB: Readonly
     if (unionCount === 0) return 1.0;
 
     const coefficient = intersectionCount / unionCount;
-    return Math.round(coefficient * 10000) / 10000;
+    return Math.round(coefficient * FOUR_DECIMAL_SCALE) / FOUR_DECIMAL_SCALE;
 }
 
 /**
@@ -49,16 +51,16 @@ export function computeJaccardSimilarity<T>(setA: ReadonlySet<T>, setB: Readonly
  * @returns New set containing common elements.
  */
 export function computeSetIntersection<T>(setA: ReadonlySet<T>, setB: ReadonlySet<T>): Set<T> {
-    const result = new Set<T>();
-    if (!setA || !setB || setA.size === 0 || setB.size === 0) return result;
+    const intersectionSet = new Set<T>();
+    if (!setA || !setB || setA.size === 0 || setB.size === 0) return intersectionSet;
 
     const [smaller, larger] = setA.size <= setB.size ? [setA, setB] : [setB, setA];
     for (const item of smaller) {
         if (larger.has(item)) {
-            result.add(item);
+            intersectionSet.add(item);
         }
     }
-    return result;
+    return intersectionSet;
 }
 
 /**
@@ -69,14 +71,13 @@ export function computeSetIntersection<T>(setA: ReadonlySet<T>, setB: ReadonlySe
  * @returns New set containing all unique elements.
  */
 export function computeSetUnion<T>(setA: ReadonlySet<T>, setB: ReadonlySet<T>): Set<T> {
-    const result = new Set<T>();
-    if (setA) {
-        for (const item of setA) result.add(item);
-    }
+    const unionSet = new Set<T>(setA);
     if (setB) {
-        for (const item of setB) result.add(item);
+        for (const item of setB) {
+            unionSet.add(item);
+        }
     }
-    return result;
+    return unionSet;
 }
 
 /**
@@ -87,19 +88,18 @@ export function computeSetUnion<T>(setA: ReadonlySet<T>, setB: ReadonlySet<T>): 
  * @returns New set with remaining elements from A.
  */
 export function computeSetDifference<T>(setA: ReadonlySet<T>, setB: ReadonlySet<T>): Set<T> {
-    const result = new Set<T>();
-    if (!setA || setA.size === 0) return result;
+    if (!setA || setA.size === 0) return new Set<T>();
     if (!setB || setB.size === 0) {
-        for (const item of setA) result.add(item);
-        return result;
+        return new Set<T>(setA);
     }
 
+    const differenceSet = new Set<T>();
     for (const item of setA) {
         if (!setB.has(item)) {
-            result.add(item);
+            differenceSet.add(item);
         }
     }
-    return result;
+    return differenceSet;
 }
 
 /**
@@ -109,7 +109,7 @@ export function computeSetDifference<T>(setA: ReadonlySet<T>, setB: ReadonlySet<
  * @param setB - Second set.
  * @returns True if both sets have identical members.
  */
-export function areSetsEqual<T>(setA: ReadonlySet<T>, setB: ReadonlySet<T>): boolean {
+export function checkSetsEqual<T>(setA: ReadonlySet<T>, setB: ReadonlySet<T>): boolean {
     if (setA === setB) return true;
     if (!setA || !setB) return false;
     if (setA.size !== setB.size) return false;
@@ -119,3 +119,6 @@ export function areSetsEqual<T>(setA: ReadonlySet<T>, setB: ReadonlySet<T>): boo
     }
     return true;
 }
+
+/** Backward compatibility alias for checkSetsEqual. */
+export const areSetsEqual = checkSetsEqual;

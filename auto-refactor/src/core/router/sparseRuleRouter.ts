@@ -22,8 +22,27 @@
 
 import type { DiffClassificationResult } from './diffClassifier';
 import type { ProjectArchetype } from '../types';
-import { EXPERT_MANIFEST } from './expert-manifest';
-import { deriveCategoryMatrix, deriveArchetypeMatrix } from './expert-matrices';
+import { EXPERT_MANIFEST } from '../experts';
+import {
+    CATEGORY_ANALYZER_MAP,
+    ARCHETYPE_ANALYZER_MAP,
+    CATEGORY_BITMASK_MATRIX,
+    ARCHETYPE_BITMASK_MATRIX,
+    SHARED_EXPERTS,
+    SHARED_EXPERTS_MASK,
+    LANGUAGE_EXCLUSIVE_ANALYZERS,
+    LANGUAGE_EXCLUSIVE_SETS,
+    LANGUAGE_EXCLUSIVE_BITMASK,
+    ALL_LANGUAGE_SPECIFIC_ANALYZERS,
+    ALL_LANGUAGE_SPECIFIC_MASK,
+    EXPERT_BASE_SCORES,
+} from '../experts/expert-activation-library';
+import {
+    AnalyzerBit,
+    ALL_ANALYZERS_MASK,
+    analyzerNameToBit,
+    analyzerMaskToNames,
+} from '../constants/analyzer-bitmask';
 import {
     ERR_UNKNOWN_CATEGORY,
     ERR_UNCLASSIFIED_FILE,
@@ -62,6 +81,7 @@ import {
     ANALYZER_PRODUCTION_HYGIENE,
     ANALYZER_CLIENT_EXPOSURE,
     ANALYZER_SHELL_SAFETY,
+    ANALYZER_CONCURRENCY,
 } from '../scoring/dimensionLiterals';
 
 /** Decimal places retained when rounding the activation ratio for stable reporting. */
@@ -112,6 +132,7 @@ export const ALL_BUILTIN_ANALYZERS = [
     ANALYZER_CLIENT_EXPOSURE,
     ANALYZER_TEST_MODERNITY,
     ANALYZER_GOVERNANCE,
+    ANALYZER_CONCURRENCY,
 ] as const;
 
 /**
@@ -132,6 +153,7 @@ export type BuiltinAnalyzerId = (typeof ALL_BUILTIN_ANALYZERS)[number];
 export interface SparseRouteResult {
     activeAnalyzers: Set<string>;
     skippedAnalyzers: Set<string>;
+    overflowAnalyzers?: Set<string>;
     activationRatio: number;
     categories: DiffSemanticCategory[];
     reason: string;
@@ -139,58 +161,134 @@ export interface SparseRouteResult {
 
 /**
  * Category-to-Analyzer Activation Matrix.
- * Dynamically derived from EXPERT_MANIFEST (single source of truth).
+ * Dynamically projected from MoE Expert Activation Library (single source of truth).
  */
 export const CATEGORY_ANALYZER_MATRIX: Record<DiffSemanticCategory, readonly string[]> =
-    deriveCategoryMatrix(EXPERT_MANIFEST) as Record<DiffSemanticCategory, readonly string[]>;
+    CATEGORY_ANALYZER_MAP;
 
 /**
  * Archetype-to-Analyzer activation matrix.
- * Dynamically derived from EXPERT_MANIFEST (single source of truth).
+ * Dynamically projected from MoE Expert Activation Library (single source of truth).
  */
 export const ARCHETYPE_ANALYZER_MATRIX: Record<ProjectArchetype, readonly string[]> =
-    deriveArchetypeMatrix(EXPERT_MANIFEST);
+    ARCHETYPE_ANALYZER_MAP;
 
 /**
- * Shared Experts in DeepSeek-V4.1 MoE architecture.
+ * Re-export authoritative activation matrices, shared masks, and language sets
+ * directly from the centralized MoE Expert Activation Library.
+ */
+export {
+    SHARED_EXPERTS,
+    LANGUAGE_EXCLUSIVE_ANALYZERS,
+    LANGUAGE_EXCLUSIVE_SETS,
+    ALL_LANGUAGE_SPECIFIC_ANALYZERS,
+    CATEGORY_BITMASK_MATRIX,
+    ARCHETYPE_BITMASK_MATRIX,
+    SHARED_EXPERTS_MASK,
+    LANGUAGE_EXCLUSIVE_BITMASK,
+    ALL_LANGUAGE_SPECIFIC_MASK,
+} from '../experts/expert-activation-library';
+
+/**
+ * Result of a 32-bit integer bitmask sparse routing evaluation.
+ */
+export interface SparseBitmaskRouteResult {
+    activeMask: number;
+    skippedMask: number;
+    overflowMask: number;
+    activationRatio: number;
+    categories: DiffSemanticCategory[];
+    reason: string;
+}
+
+/** Hard capacity ceiling for FastTrack active experts (<= 25% of total 32 experts). */
+export const MAX_FAST_TRACK_CAPACITY = 8;
+
+/** Candidate expert bit and computed score tuple. */
+interface ScoredExpertBit {
+    readonly bit: number;
+    readonly score: number;
+}
+
+const TOTAL_ROUTER_EXPERTS = 32;
+const DEFAULT_ROUTER_EXPERT_PRIORITY = 10;
+
+const SWAR_MASK_55 = 0x55555555;
+const SWAR_MASK_33 = 0x33333333;
+const SWAR_MASK_0F = 0x0f0f0f0f;
+const SWAR_MASK_3F = 0x3f;
+const SWAR_SHIFT_1 = 1;
+const SWAR_SHIFT_2 = 2;
+const SWAR_SHIFT_4 = 4;
+const SWAR_SHIFT_8 = 8;
+const SWAR_SHIFT_16 = 16;
+
+/**
+ * Filter and sort candidate routed bits by priority score descending.
+ */
+function scoreAndRankCandidateBits(mask: number): ScoredExpertBit[] {
+    const scored: ScoredExpertBit[] = [];
+    for (let i = 0; i < TOTAL_ROUTER_EXPERTS; i++) {
+        const bit = 1 << i;
+        if ((mask & bit) !== 0) {
+            const score = EXPERT_BASE_SCORES[bit] || DEFAULT_ROUTER_EXPERT_PRIORITY;
+            scored.push({ bit, score });
+        }
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored;
+}
+
+/**
+ * Select the Top-k experts using DeepSeekMoE-style capacity gating and latency-aware scores.
  *
- * Core baseline analyzers that are always retained across any code mutation
- * (hygiene and constants) to ensure ubiquitous code health without redundant activation.
+ * Guarantees that FastTrack active experts never exceed the capacity ceiling (<= 25%),
+ * automatically offloading excess candidates to the overflow mask for asynchronous DeepTrack.
+ *
+ * @param candidateMask - Unbounded union of category-matched candidate analyzer bits.
+ * @param capacity - Hard ceiling of allowed active experts (default: 8).
+ * @returns Partitioned activeMask (<= capacity) and overflowMask.
  */
-export const SHARED_EXPERTS: readonly string[] = [ANALYZER_HYGIENE, ANALYZER_CONSTANTS] as const;
+export function selectTopKBitmask(
+    candidateMask: number,
+    capacity: number = MAX_FAST_TRACK_CAPACITY,
+): { activeMask: number; overflowMask: number } {
+    const totalCount = popcount32(candidateMask);
+    if (totalCount <= capacity) {
+        return { activeMask: candidateMask, overflowMask: 0 };
+    }
+
+    const sharedInCandidate = candidateMask & SHARED_EXPERTS_MASK;
+    const sharedCount = popcount32(sharedInCandidate);
+    const routedQuota = Math.max(1, capacity - sharedCount);
+
+    const nonSharedMask = candidateMask & ~SHARED_EXPERTS_MASK;
+    const ranked = scoreAndRankCandidateBits(nonSharedMask);
+
+    let activeMask = sharedInCandidate;
+    for (let i = 0; i < Math.min(ranked.length, routedQuota); i++) {
+        activeMask |= ranked[i].bit;
+    }
+
+    const overflowMask = candidateMask & ~activeMask;
+    return { activeMask, overflowMask };
+}
 
 /**
- * Mapping from detected programming language to the set of analyzers tailored exclusively for it.
+ * Fast SWAR population count (Hamming weight) of a 32-bit unsigned integer.
+ *
+ * @param v - 32-bit unsigned integer value.
+ * @returns The number of set bits (1s) in the integer.
  */
-export const LANGUAGE_EXCLUSIVE_ANALYZERS: Record<string, readonly string[]> = {
-    typescript: [ANALYZER_TYPESCRIPT_MODERN],
-    javascript: [ANALYZER_TYPESCRIPT_MODERN],
-    python: [ANALYZER_PYTHON_MODERN],
-    rust: [ANALYZER_RUST_MODERN],
-    gdscript: [ANALYZER_GDSCRIPT_MODERN],
-    go: [ANALYZER_GO_MODERN],
-    shell: [ANALYZER_SHELL_LINT],
-};
-
-/** Pre-built read-only Set mapping to eliminate per-call Set allocations in language gating. */
-export const LANGUAGE_EXCLUSIVE_SETS: Record<string, ReadonlySet<string>> = Object.freeze(
-    Object.fromEntries(
-        Object.entries(LANGUAGE_EXCLUSIVE_ANALYZERS).map(([lang, list]) => [lang, new Set(list)]),
-    ),
-);
-
-/**
- * Union of all language-specific specialized modernizer analyzers.
- * Used by the Language Gating Filter to prune non-matching language analyzers.
- */
-export const ALL_LANGUAGE_SPECIFIC_ANALYZERS: readonly string[] = [
-    ANALYZER_TYPESCRIPT_MODERN,
-    ANALYZER_PYTHON_MODERN,
-    ANALYZER_RUST_MODERN,
-    ANALYZER_GDSCRIPT_MODERN,
-    ANALYZER_GO_MODERN,
-    ANALYZER_SHELL_LINT,
-] as const;
+export function popcount32(v: number): number {
+    let x = v >>> 0;
+    x = x - ((x >>> SWAR_SHIFT_1) & SWAR_MASK_55);
+    x = (x & SWAR_MASK_33) + ((x >>> SWAR_SHIFT_2) & SWAR_MASK_33);
+    x = (x + (x >>> SWAR_SHIFT_4)) & SWAR_MASK_0F;
+    x = x + (x >>> SWAR_SHIFT_8);
+    x = x + (x >>> SWAR_SHIFT_16);
+    return x & SWAR_MASK_3F;
+}
 
 /**
  * Optional inputs steering routeDiffToAnalyzers; omitting the object keeps all built-ins.
@@ -299,22 +397,6 @@ export function applyLanguageGating(active: Set<string>, language?: string): voi
 }
 
 /**
- * Activate shared baseline experts across all non-doc code changes.
- *
- * @param active - Active analyzer set mutated in-place.
- * @param allSet - Allow-list of configured analyzers.
- * @param isDocOnly - True if diff is strictly documentation / comments.
- */
-function injectSharedExperts(active: Set<string>, allSet: Set<string>, isDocOnly: boolean): void {
-    if (isDocOnly) return;
-    for (const shared of SHARED_EXPERTS) {
-        if (allSet.has(shared)) {
-            active.add(shared);
-        }
-    }
-}
-
-/**
  * Select the minimum sufficient analyzer subset for a diff classification.
  *
  * Pure and synchronous: forceFull short-circuits to every available analyzer, otherwise the
@@ -328,57 +410,138 @@ function injectSharedExperts(active: Set<string>, allSet: Set<string>, isDocOnly
  *          and a human-readable reason string for reporting.
  */
 /**
- * Resolves and collects active analyzers for a diff classification based on
- * category routing, shared experts, custom extensions, and language gating.
+ * Resolve the bitmask of available analyzers from router options.
  */
-function collectTargetAnalyzers(
-    classification: DiffClassificationResult,
-    options: RouterOptions,
-    all: string[],
-    allSet: Set<string>,
-): Set<string> {
-    const active = new Set<string>();
-
-    for (const cat of classification.categories) {
-        const targets = resolveCategoryTargets(cat, options.archetype);
-        for (const a of targets) {
-            if (allSet.has(a)) {
-                active.add(a);
-            }
-        }
+function resolveAvailableMask(options: RouterOptions): number {
+    if (!options.availableAnalyzers) return ALL_ANALYZERS_MASK;
+    let mask = 0;
+    for (const name of options.availableAnalyzers) {
+        mask |= analyzerNameToBit(name);
     }
-
-    injectSharedExperts(active, allSet, classification.isDocOnly);
-
-    if (options.customAnalyzers) {
-        for (const ca of options.customAnalyzers) {
-            active.add(ca);
-        }
-    }
-
-    applyLanguageGating(active, classification.language);
-
-    if (active.size === 0) {
-        for (const a of all) {
-            active.add(a);
-        }
-        applyLanguageGating(active, classification.language);
-    }
-
-    return active;
+    return mask;
 }
 
 /**
- * Computes the partition of skipped analyzers not included in the active analyzer set.
+ * Filter an active analyzer bitmask according to language exclusivity rules.
  */
-function partitionSkippedAnalyzers(all: string[], active: Set<string>): Set<string> {
-    const skipped = new Set<string>();
-    for (const a of all) {
-        if (!active.has(a)) {
-            skipped.add(a);
+function applyLanguageGatingBitmask(mask: number, language: string): number {
+    if (language === LANG_ARTIFACT) {
+        return mask & ~ALL_LANGUAGE_SPECIFIC_MASK;
+    }
+    const allowedLang = LANGUAGE_EXCLUSIVE_BITMASK[language] || 0;
+    const disallowedOther = ALL_LANGUAGE_SPECIFIC_MASK & ~allowedLang;
+    return mask & ~disallowedOther;
+}
+
+/**
+ * Resolve the category bitmask for a given category and optional archetype.
+ */
+function resolveCategoryMask(cat: DiffSemanticCategory, archetype?: ProjectArchetype): number {
+    if (cat === CATEGORY_GENERAL_CODE && archetype) {
+        const archMask = ARCHETYPE_BITMASK_MATRIX[archetype];
+        if (archMask === undefined) {
+            if (fallbackListener) {
+                fallbackListener({
+                    type: ROUTING_EVENT_UNKNOWN_CATEGORY,
+                    category: cat,
+                    archetype,
+                });
+            }
+            throw new Error(`${ERR_UNKNOWN_CATEGORY} Unknown archetype: ${archetype}`);
+        }
+        return archMask;
+    }
+    const catMask = (CATEGORY_BITMASK_MATRIX as Record<string, number>)[cat];
+    if (catMask === undefined) {
+        if (fallbackListener) {
+            fallbackListener({ type: ROUTING_EVENT_UNKNOWN_CATEGORY, category: cat });
+        }
+        throw new Error(`${ERR_UNKNOWN_CATEGORY} Unknown diff category: ${cat}`);
+    }
+    return catMask;
+}
+
+/**
+ * Select the minimum sufficient analyzer subset as a 32-bit unsigned bitmask.
+ *
+ * Provides single-cycle bitwise evaluation and zero heap allocation on hot Diff review paths.
+ *
+ * @param classification - Diff classification result with categories and language.
+ * @param options - Routing options including available analyzers and archetype.
+ * @returns Sparse bitmask route result containing active mask and metadata.
+ */
+export function routeDiffToBitmask(
+    classification: DiffClassificationResult,
+    options: RouterOptions = {},
+): SparseBitmaskRouteResult {
+    const availableMask = resolveAvailableMask(options);
+
+    if (!classification.language) {
+        if (fallbackListener) {
+            fallbackListener({ type: ROUTING_EVENT_UNCLASSIFIED_LANGUAGE });
+        }
+        throw new Error(`${ERR_UNCLASSIFIED_FILE} File lacks registered language classification`);
+    }
+
+    const matchedCategories = Array.from(classification.categories);
+
+    if (options.forceFull) {
+        return {
+            activeMask: availableMask,
+            skippedMask: 0,
+            overflowMask: 0,
+            activationRatio: 1.0,
+            categories: matchedCategories,
+            reason: 'Forced full scan requested',
+        };
+    }
+
+    let candidateMask = 0;
+    for (const cat of classification.categories) {
+        candidateMask |= resolveCategoryMask(cat, options.archetype);
+    }
+
+    if (!classification.isDocOnly) {
+        candidateMask |= SHARED_EXPERTS_MASK;
+    }
+
+    if (options.customAnalyzers) {
+        for (const ca of options.customAnalyzers) {
+            candidateMask |= analyzerNameToBit(ca);
         }
     }
-    return skipped;
+
+    candidateMask =
+        applyLanguageGatingBitmask(candidateMask, classification.language) & availableMask;
+
+    if (candidateMask === 0) {
+        candidateMask =
+            applyLanguageGatingBitmask(availableMask, classification.language) & availableMask;
+    }
+
+    const { activeMask, overflowMask } = selectTopKBitmask(
+        candidateMask,
+        MAX_FAST_TRACK_CAPACITY,
+    );
+
+    const skippedMask = availableMask & ~activeMask;
+    const activeCount = popcount32(activeMask);
+    const totalCount = Math.max(1, popcount32(availableMask));
+    const ratio = Number((activeCount / totalCount).toFixed(ACTIVATION_RATIO_DECIMALS));
+    const overflowCount = popcount32(overflowMask);
+    const reason =
+        overflowCount > 0
+            ? `Sparse Top-k activation (${activeCount}/${totalCount}, ${Math.round(ratio * PERCENT_SCALE)}%) with ${overflowCount} offloaded for [${matchedCategories.join(', ')}]`
+            : `Sparse activation (${activeCount}/${totalCount}, ${Math.round(ratio * PERCENT_SCALE)}%) for [${matchedCategories.join(', ')}]`;
+
+    return {
+        activeMask,
+        skippedMask,
+        overflowMask,
+        activationRatio: ratio,
+        categories: matchedCategories,
+        reason,
+    };
 }
 
 /**
@@ -398,36 +561,31 @@ export function routeDiffToAnalyzers(
     classification: DiffClassificationResult,
     options: RouterOptions = {},
 ): SparseRouteResult {
+    const bitResult = routeDiffToBitmask(classification, options);
+    const activeAnalyzers = new Set(analyzerMaskToNames(bitResult.activeMask));
+    if (options.customAnalyzers) {
+        for (const ca of options.customAnalyzers) {
+            activeAnalyzers.add(ca);
+        }
+    }
     const all = options.availableAnalyzers
         ? [...options.availableAnalyzers]
         : [...ALL_BUILTIN_ANALYZERS];
-    const allSet = new Set(all);
-
-    if (options.forceFull) {
-        return {
-            activeAnalyzers: allSet,
-            skippedAnalyzers: new Set(),
-            activationRatio: 1.0,
-            categories: Array.from(classification.categories),
-            reason: 'Forced full scan requested',
-        };
+    const skippedAnalyzers = new Set<string>();
+    for (const a of all) {
+        if (!activeAnalyzers.has(a)) {
+            skippedAnalyzers.add(a);
+        }
     }
-
-    const matchedCategories = Array.from(classification.categories);
-    const active = collectTargetAnalyzers(classification, options, all, allSet);
-    const skipped = partitionSkippedAnalyzers(all, active);
-
-    const ratio = Number(
-        (active.size / Math.max(1, all.length)).toFixed(ACTIVATION_RATIO_DECIMALS),
-    );
-    const reason = `Sparse activation (${active.size}/${all.length}, ${Math.round(ratio * PERCENT_SCALE)}%) for [${matchedCategories.join(', ')}]`;
+    const overflowAnalyzers = new Set(analyzerMaskToNames(bitResult.overflowMask));
 
     return {
-        activeAnalyzers: active,
-        skippedAnalyzers: skipped,
-        activationRatio: ratio,
-        categories: matchedCategories,
-        reason,
+        activeAnalyzers,
+        skippedAnalyzers,
+        overflowAnalyzers,
+        activationRatio: bitResult.activationRatio,
+        categories: bitResult.categories,
+        reason: bitResult.reason,
     };
 }
 

@@ -49,7 +49,7 @@ const ALGORITHM_PATTERN =
 
 /** Rule registry and dictionary table pattern */
 const RULES_REGISTRY_PATTERN =
-    /[\\/](?:rules|entries|dictionaries|catalogs?)[\\/]|[\\/][a-z0-9_-]*(?:registry|manifest|rules|catalog|recipe|archetype|terminology|shim|table)\.[a-z0-9]+$/i;
+    /[\\/](?:rules|entries|dictionaries|catalogs?)[\\/]|[\\/][a-z0-9_-]*(?:registry|manifest|rules|catalog|recipe|archetype|terminology|shim|table|vulnerabilit(?:y|ies)|deprecated|licenses?)\.[a-z0-9]+$/i;
 
 /** Configuration and static constants pattern */
 const CONFIG_CONSTANT_PATTERN =
@@ -98,7 +98,7 @@ export function inferFineGrainedFileRole(
         return {
             role: 'gate_infrastructure',
             reason: 'Path identifies Git hooks, gate scripts, or CI workflow definitions',
-            hasRelaxedBudget: false,
+            hasRelaxedBudget: true,
             shouldSkipHeavyAudit: true,
         };
     }

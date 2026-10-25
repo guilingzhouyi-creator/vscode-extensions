@@ -488,6 +488,7 @@ export class Scanner implements ScannerContext {
         content: string,
         seed?: IncrementalFileState,
         activeAnalyzers?: Set<string>,
+        lineBounds?: readonly [number, number],
     ): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
         return runFileAnalyzers(
             {
@@ -502,6 +503,7 @@ export class Scanner implements ScannerContext {
             content,
             seed,
             activeAnalyzers,
+            lineBounds,
         );
     }
 

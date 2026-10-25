@@ -26,7 +26,7 @@ import type { NormalizedNode, LanguageAdapter, Position } from './ast/multilang'
 import type { IncrementalFileState } from './diff/incremental-state';
 import type { DefectTaxonomyCategory, StandardActionVerb } from './governance/standard-terminology';
 
-// Re-exported for backward compatibility (utils/ast and other modules import Position here).
+// Core position type re-exported for scanner, AST, and diff consumers.
 export { Position } from './ast/multilang';
 // EditRange is produced by editDiff.ts (ts-free) and consumed by the diff API (types below).
 export { EditRange } from './diff/edit-diff';
@@ -342,10 +342,11 @@ export interface Thresholds {
 /**
  * Report serialization format: `json` for structured consumers, `sarif` for CI code scanning,
  * `text` for human-readable stdout, `agent` for LLM Agent context, `capp` for ultra-compact
- * directives, `compact` for the positional CAS v3 wire document, or `praxis` for rich
- * frontend UI payloads.
+ * directives, `compact` / `aas` for the token-frugal Agent Audit Schema (AAS v1.0), or `praxis`
+ * for rich frontend UI payloads.
  */
-export type OutputFormat = 'json' | 'sarif' | 'text' | 'agent' | 'capp' | 'compact' | 'praxis';
+export type OutputFormat =
+    'json' | 'sarif' | 'text' | 'agent' | 'capp' | 'compact' | 'praxis' | 'aas';
 
 /**
  * Depth of the comments analyzer: `off` disables it, `basic` reports header/doc gaps at info
@@ -767,6 +768,8 @@ export interface ScanConfig {
     agentUid?: string;
     /** Custom dimension weights for transparent quality scoring. */
     scoringWeights?: Record<string, number>;
+    /** When true, bypasses file-level syntactic and extension preflight filtering. */
+    bypassPreflight?: boolean;
     /** Explicit or auto-detected project archetype ('demo' | 'web' | 'game' | 'library'). */
     archetype?: ProjectArchetype;
     /** Whether to activate sparse rule routing based on project archetype. */

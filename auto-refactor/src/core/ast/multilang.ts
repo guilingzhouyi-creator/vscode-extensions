@@ -193,3 +193,34 @@ export interface LanguageAdapter {
     /** Return direct children of a normalized node in source order. */
     children(node: NormalizedNode): NormalizedNode[];
 }
+
+/**
+ * Abstract base class providing default AST root and child traversal semantics.
+ * Eliminates boilerplate root/children methods across concrete language adapters.
+ */
+export abstract class BaseAstAdapter implements LanguageAdapter {
+    abstract id: string;
+    abstract extensions: string[];
+    abstract parse(content: string, filePath: string, seed?: ProjectionSeed): NormalizedAst;
+    project?(content: string, filePath: string, policy: ProjectionPolicy): NodeProjector | null;
+
+    /**
+     * Default implementation returning the root of the parsed AST.
+     *
+     * @param ast - Normalized AST container.
+     * @returns Root normalized node.
+     */
+    root(ast: NormalizedAst): NormalizedNode {
+        return ast.root;
+    }
+
+    /**
+     * Default implementation returning direct children of a normalized node.
+     *
+     * @param node - Normalized node.
+     * @returns Direct children in source order or an empty array.
+     */
+    children(node: NormalizedNode): NormalizedNode[] {
+        return node.children || [];
+    }
+}

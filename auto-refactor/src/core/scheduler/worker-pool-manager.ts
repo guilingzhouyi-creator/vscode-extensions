@@ -26,6 +26,16 @@ const METRICS_WINDOW_RESET_MS = 5000;
 const DEFAULT_MAX_LATENCY_SAMPLES = 500;
 const MAX_ANALYZER_INSTANCES_PER_BUCKET = 32;
 
+const DEFAULT_FALLBACK_CPU_COUNT = 4;
+const MAX_DEFAULT_CONCURRENCY = 16;
+const MIN_DEFAULT_CONCURRENCY = 2;
+const MIN_QUEUE_DEPTH_LIMIT = 10;
+const MIN_STARVATION_AGE_MS = 500;
+const CRITICAL_TASK_PRIORITY_THRESHOLD = 30;
+const MILLIS_PER_SECOND = 1000;
+const SHUTDOWN_POLL_INTERVAL_MS = 20;
+const PERCENTILE_99_RATIO = 0.99;
+
 /**
  * Configuration options for the WorkerPoolManager.
  */
@@ -74,11 +84,11 @@ export class WorkerPoolManager implements IExecutionScheduler {
     private readonly analyzerInstancePool = new Map<string, unknown[]>();
 
     public constructor(options?: WorkerPoolOptions) {
-        const cpuCount = typeof os.cpus === 'function' ? os.cpus().length : 4;
-        const defaultConcurrency = Math.min(16, Math.max(2, cpuCount));
+        const cpuCount = typeof os.cpus === 'function' ? os.cpus().length : DEFAULT_FALLBACK_CPU_COUNT;
+        const defaultConcurrency = Math.min(MAX_DEFAULT_CONCURRENCY, Math.max(MIN_DEFAULT_CONCURRENCY, cpuCount));
         this.maxConcurrency = Math.max(1, options?.maxConcurrency ?? defaultConcurrency);
-        this.maxQueueDepth = Math.max(10, options?.maxQueueDepth ?? 10_000);
-        this.starvationAgeMs = Math.max(500, options?.starvationAgeMs ?? 3_000);
+        this.maxQueueDepth = Math.max(MIN_QUEUE_DEPTH_LIMIT, options?.maxQueueDepth ?? 10_000);
+        this.starvationAgeMs = Math.max(MIN_STARVATION_AGE_MS, options?.starvationAgeMs ?? 3_000);
         this.defaultTaskTimeoutMs = options?.defaultTaskTimeoutMs ?? 30_000;
     }
 
@@ -90,7 +100,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
             return Promise.reject(new Error('Scheduler is shutting down; cannot accept new tasks'));
         }
 
-        if (this.queue.length >= this.maxQueueDepth && task.priority < 30) {
+        if (this.queue.length >= this.maxQueueDepth && task.priority < CRITICAL_TASK_PRIORITY_THRESHOLD) {
             const queueMsg = `Scheduler queue capacity reached (${this.queue.length} >= ${this.maxQueueDepth})`;
             return Promise.reject(new Error(queueMsg));
         }
@@ -107,7 +117,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
                 }, timeoutMs);
             }
 
-            const item: QueuedTask<TInput, TResult> = {
+            const queuedTaskItem: QueuedTask<TInput, TResult> = {
                 task,
                 resolve,
                 reject,
@@ -115,8 +125,8 @@ export class WorkerPoolManager implements IExecutionScheduler {
                 timer,
             };
 
-            this.insertPrioritized(item);
-            this.pump();
+            this.insertPrioritized(queuedTaskItem);
+            this.pumpExecutionSlots();
         });
     }
 
@@ -127,6 +137,27 @@ export class WorkerPoolManager implements IExecutionScheduler {
         tasks: ExecutionTask<TInput, TResult>[],
     ): Promise<TResult[]> {
         return Promise.all(tasks.map((task) => this.submit(task)));
+    }
+
+    /**
+     * Borrows an analyzer instance according to tiered residency (KTransformers offloading).
+     * Hot resident experts are retained; cold offloaded experts are created on demand.
+     */
+    public acquireTieredAnalyzer<T>(domain: string, isHotResident: boolean, factory: () => T): T {
+        if (!isHotResident) {
+            return factory();
+        }
+        return this.acquireAnalyzer(domain, factory);
+    }
+
+    /**
+     * Returns an analyzer instance to the tiered pool. Cold instances are evicted immediately.
+     */
+    public releaseTieredAnalyzer<T>(domain: string, instance: T, isHotResident: boolean): void {
+        if (!isHotResident) {
+            return;
+        }
+        this.releaseAnalyzer(domain, instance);
     }
 
     /**
@@ -159,18 +190,23 @@ export class WorkerPoolManager implements IExecutionScheduler {
      */
     public getMetrics(): SchedulerMetrics {
         const now = Date.now();
-        const windowElapsedSec = Math.max(0.1, (now - this.windowStartTime) / 1000);
-        const throughput = Number((this.windowCompletedCount / windowElapsedSec).toFixed(1));
+        const windowElapsedSec = Math.max(0.1, (now - this.windowStartTime) / MILLIS_PER_SECOND);
+        const throughput = Math.round((this.windowCompletedCount / windowElapsedSec) * 100) / 100;
 
         let avgLatency = 0;
-        let p99Latency = 0;
+        let percentile99Latency = 0;
 
         if (this.recordedDurations.length > 0) {
             const sum = this.recordedDurations.reduce((acc, val) => acc + val, 0);
             avgLatency = Number((sum / this.recordedDurations.length).toFixed(2));
-            const sorted = [...this.recordedDurations].sort((a, b) => a - b);
-            const p99Index = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.99));
-            p99Latency = sorted[p99Index];
+            const sorted = [...this.recordedDurations].sort(
+                (firstDuration, secondDuration) => firstDuration - secondDuration,
+            );
+            const percentile99Index = Math.min(
+                sorted.length - 1,
+                Math.floor(sorted.length * PERCENTILE_99_RATIO),
+            );
+            percentile99Latency = sorted[percentile99Index];
         }
 
         return {
@@ -181,7 +217,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
             failedTasks: this.failedCount,
             throughputPerSecond: throughput,
             averageLatencyMs: avgLatency,
-            p99LatencyMs: p99Latency,
+            p99LatencyMs: percentile99Latency,
         };
     }
 
@@ -191,27 +227,27 @@ export class WorkerPoolManager implements IExecutionScheduler {
     public async shutdown(drainTimeoutMs = DEFAULT_DRAIN_TIMEOUT_MS): Promise<void> {
         this.isShuttingDown = true;
 
-        for (const item of this.queue) {
-            if (item.timer) {
-                clearTimeout(item.timer);
+        for (const taskEntry of this.queue) {
+            if (taskEntry.timer) {
+                clearTimeout(taskEntry.timer);
             }
-            item.reject(new Error('Scheduler shutdown requested'));
+            taskEntry.reject(new Error('Scheduler shutdown requested'));
         }
         this.queue.length = 0;
         this.oldestStarvableEnqueuedAt = 0;
 
         const start = Date.now();
         while (this.activeWorkersCount > 0 && Date.now() - start < drainTimeoutMs) {
-            await new Promise((resolve) => setTimeout(resolve, 20));
+            await new Promise((resolve) => setTimeout(resolve, SHUTDOWN_POLL_INTERVAL_MS));
         }
 
         this.analyzerInstancePool.clear();
     }
 
     /**
-     * Dispatches queued tasks to available worker execution slots.
+     * Pumps queued tasks into available worker execution slots.
      */
-    private pump(): void {
+    private pumpExecutionSlots(): void {
         if (this.isShuttingDown) {
             return;
         }
@@ -239,12 +275,12 @@ export class WorkerPoolManager implements IExecutionScheduler {
             const startMs = Date.now();
 
             this.executeItem(next)
-                .then((result) => {
+                .then((taskExecutionResult) => {
                     if (next.timer) {
                         clearTimeout(next.timer);
                     }
                     this.recordSuccess(Date.now() - startMs);
-                    next.resolve(result);
+                    next.resolve(taskExecutionResult);
                 })
                 .catch((err) => {
                     if (next.timer) {
@@ -255,7 +291,7 @@ export class WorkerPoolManager implements IExecutionScheduler {
                 })
                 .finally(() => {
                     this.activeWorkersCount--;
-                    this.pump();
+                    this.pumpExecutionSlots();
                 });
         }
     }
@@ -264,9 +300,9 @@ export class WorkerPoolManager implements IExecutionScheduler {
      * Executes the task payload via its designated execution delegate.
      */
     private async executeItem<TInput, TResult>(
-        item: QueuedTask<TInput, TResult>,
+        taskItem: QueuedTask<TInput, TResult>,
     ): Promise<TResult> {
-        const { task } = item;
+        const { task } = taskItem;
         if (typeof task.execute === 'function') {
             return task.execute(task.input);
         }
@@ -276,34 +312,37 @@ export class WorkerPoolManager implements IExecutionScheduler {
     /**
      * Inserts a task item into the priority queue with binary/linear order.
      */
-    private insertPrioritized(item: QueuedTask<any, any>): void {
-        const priority = item.task.priority as number;
+    private insertPrioritized(incomingTask: QueuedTask<any, any>): void {
+        const priority = incomingTask.task.priority as number;
         if (priority < MAX_BOOSTED_PRIORITY) {
             const currentOldest = this.oldestStarvableEnqueuedAt;
             if (
                 currentOldest === 0 ||
                 currentOldest === Number.MAX_SAFE_INTEGER ||
-                item.enqueuedAt < currentOldest
+                incomingTask.enqueuedAt < currentOldest
             ) {
-                this.oldestStarvableEnqueuedAt = item.enqueuedAt;
+                this.oldestStarvableEnqueuedAt = incomingTask.enqueuedAt;
             }
         }
 
         let inserted = false;
         for (let i = 0; i < this.queue.length; i++) {
-            if (item.task.priority > this.queue[i].task.priority) {
-                this.queue.splice(i, 0, item);
+            if (incomingTask.task.priority > this.queue[i].task.priority) {
+                this.queue.splice(i, 0, incomingTask);
                 inserted = true;
                 break;
             }
         }
         if (!inserted) {
-            this.queue.push(item);
+            this.queue.push(incomingTask);
         }
     }
 
-    private static compareTaskPriority(a: QueuedTask<any, any>, b: QueuedTask<any, any>): number {
-        return (b.task.priority as number) - (a.task.priority as number);
+    private static compareTaskPriority(
+        firstTask: QueuedTask<any, any>,
+        secondTask: QueuedTask<any, any>,
+    ): number {
+        return (secondTask.task.priority as number) - (firstTask.task.priority as number);
     }
 
     /**
@@ -327,19 +366,19 @@ export class WorkerPoolManager implements IExecutionScheduler {
         let minStarvableEnqueued = Number.MAX_SAFE_INTEGER;
 
         for (let i = 0; i < this.queue.length; i++) {
-            const item = this.queue[i];
-            let priority = item.task.priority as number;
-            if (priority < MAX_BOOSTED_PRIORITY && now - item.enqueuedAt >= this.starvationAgeMs) {
+            const pendingTask = this.queue[i];
+            let priority = pendingTask.task.priority as number;
+            if (priority < MAX_BOOSTED_PRIORITY && now - pendingTask.enqueuedAt >= this.starvationAgeMs) {
                 priority = Math.min(
                     MAX_BOOSTED_PRIORITY,
                     priority + PRIORITY_BOOST_STEP,
                 ) as TaskPriority;
                 const boostedTask: ExecutionTask<any, any> = {
-                    ...item.task,
+                    ...pendingTask.task,
                     priority: priority as TaskPriority,
                 };
                 this.queue[i] = {
-                    ...item,
+                    ...pendingTask,
                     task: boostedTask,
                 };
                 anyBoosted = true;

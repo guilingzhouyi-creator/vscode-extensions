@@ -27,6 +27,7 @@ import type {
     AgentVerificationDirective,
     AgentClarificationRequest,
 } from '../reporters/agent-directives-types';
+export type { AgentTopologyLayer } from '../reporters/agent-directives-types';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
 import { getRoleBudget } from '../intelligence/elastic-budget-matrix';
 

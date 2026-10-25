@@ -20,7 +20,7 @@
 
 import type { ScanReport } from '../types';
 import type { PraxisPresentationOptions } from '../praxis/presentation/presentation-types';
-import { toCompactReportJson } from '../reporting/compact-report-migrator';
+import { toAasJson, type AasReportOptions } from '../reporting/aas-reporter';
 import {
     toAgentReview,
     toCapp,
@@ -280,7 +280,7 @@ registerReporter({
 registerReporter({
     name: 'compact',
     format(report: ScanReport, options?: Record<string, unknown>): string {
-        return toCompactReportJson(report, options ?? {});
+        return toAasJson(report, options as AasReportOptions | undefined);
     },
 });
 
@@ -288,5 +288,12 @@ registerReporter({
     name: 'praxis',
     format(report: ScanReport, options?: Record<string, unknown>): string {
         return toPraxisPresentation(report, options as PraxisPresentationOptions | undefined);
+    },
+});
+
+registerReporter({
+    name: 'aas',
+    format(report: ScanReport, options?: Record<string, unknown>): string {
+        return toAasJson(report, options as AasReportOptions | undefined);
     },
 });

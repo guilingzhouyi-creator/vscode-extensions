@@ -100,6 +100,10 @@ export interface FileQualityScore {
         columnDensity: number;
         sufr: number;
         gaussianHealth: number;
+        spatialDensity?: number;
+        mahalanobisDistance?: number;
+        dominantDeficitAxis?: string;
+        fisherSimplexDistance?: number;
     };
     functions: FunctionQualityScore[];
     issues: Issue[];
@@ -143,6 +147,9 @@ export interface ProjectQualityScore {
         averageTspr: number;
         averagePor: number;
         averageColumnDensity: number;
+        averageSpatialDensity?: number;
+        averageMahalanobisDistance?: number;
+        averageFisherSimplexDistance?: number;
     };
     domains: DomainQualityScore[];
     totalFiles: number;
@@ -238,6 +245,13 @@ function buildFileDensityMetrics(densityResult: EffectiveDensityResult) {
         columnDensity: clampRatio(densityResult.columnDensity ?? 0),
         sufr: clampRatio(densityResult.sufr ?? 0),
         gaussianHealth: clampRatio(densityResult.gaussianHealth ?? 1.0),
+        spatialDensity:
+            densityResult.spatialDensity !== undefined
+                ? clampRatio(densityResult.spatialDensity)
+                : undefined,
+        mahalanobisDistance: densityResult.mahalanobisDistance,
+        dominantDeficitAxis: densityResult.dominantDeficitAxis,
+        fisherSimplexDistance: densityResult.fisherSimplexDistance,
     };
 }
 
@@ -616,6 +630,9 @@ function createEmptyProjectScore(): ProjectQualityScore {
             averageTspr: 1.0,
             averagePor: 0.0,
             averageColumnDensity: 1.0,
+            averageSpatialDensity: 1.0,
+            averageMahalanobisDistance: 0.0,
+            averageFisherSimplexDistance: 0.0,
         },
         domains: [],
         totalFiles: 0,
@@ -636,6 +653,10 @@ interface AccumulatedProjectMetrics {
     readonly totalTspr: number;
     readonly totalPor: number;
     readonly totalColumnDensity: number;
+    readonly totalSpatialDensity: number;
+    readonly totalMahalanobisDistance: number;
+    readonly totalFisherSimplexDistance: number;
+    readonly countSpatial: number;
     readonly totalLoc: number;
     readonly totalDimWeight: number;
     readonly projectDimSums: Record<QualityDimension, number>;
@@ -699,6 +720,10 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
     let totalTspr = 0;
     let totalPor = 0;
     let totalColumnDensity = 0;
+    let totalSpatialDensity = 0;
+    let totalMahalanobisDistance = 0;
+    let totalFisherSimplexDistance = 0;
+    let countSpatial = 0;
     let totalLoc = 0;
     let totalDimWeight = 0;
 
@@ -718,6 +743,12 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
             totalTspr += d.tspr;
             totalPor += d.por;
             totalColumnDensity += d.columnDensity;
+            if (typeof d.spatialDensity === 'number') {
+                totalSpatialDensity += d.spatialDensity;
+                totalMahalanobisDistance += d.mahalanobisDistance ?? 0;
+                totalFisherSimplexDistance += d.fisherSimplexDistance ?? 0;
+                countSpatial++;
+            }
         } else {
             totalCompositeDensity += file.effectiveDensity;
             totalTspr += file.effectiveDensity;
@@ -746,6 +777,10 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
         totalTspr,
         totalPor,
         totalColumnDensity,
+        totalSpatialDensity,
+        totalMahalanobisDistance,
+        totalFisherSimplexDistance,
+        countSpatial,
         totalLoc,
         totalDimWeight,
         projectDimSums,
@@ -844,6 +879,18 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
         Math.round((metrics.totalColumnDensity / count) * RATIO_SCALE_THOUSAND) /
             RATIO_SCALE_THOUSAND,
     );
+    const safeSpatialCount = Math.max(1, metrics.countSpatial || count);
+    const avgSpatial = clampRatio(
+        Math.round((metrics.totalSpatialDensity / safeSpatialCount) * RATIO_SCALE_THOUSAND) /
+            RATIO_SCALE_THOUSAND,
+    );
+    const avgMahalanobis =
+        Math.round((metrics.totalMahalanobisDistance / safeSpatialCount) * RATIO_SCALE_THOUSAND) /
+        RATIO_SCALE_THOUSAND;
+    const avgFisher =
+        Math.round(
+            (metrics.totalFisherSimplexDistance / safeSpatialCount) * RATIO_SCALE_THOUSAND,
+        ) / RATIO_SCALE_THOUSAND;
 
     return {
         compositeScore: synthesized.compositeScore,
@@ -856,6 +903,9 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
             averageTspr: avgTspr,
             averagePor: avgPor,
             averageColumnDensity: avgCol,
+            averageSpatialDensity: avgSpatial,
+            averageMahalanobisDistance: avgMahalanobis,
+            averageFisherSimplexDistance: avgFisher,
         },
         domains,
         totalFiles: fileScores.length,

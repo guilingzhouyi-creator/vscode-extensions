@@ -11,6 +11,8 @@
  *     and providing the foundational taxonomy for Agent automated patch dispatch.
  */
 
+export * from './rule-catalog.generated';
+
 // ============================================================================
 // Built-in Analyzer Identifiers
 // ============================================================================
@@ -100,7 +102,7 @@ export const ANALYZER_STANDARDIZATION = 'standardization';
 /** Built-in / domain analyzer name for praxis. */
 export const ANALYZER_PRAXIS = 'praxis';
 
-/** Complete collection of built-in analyzer identifiers (31 built-in analyzers). */
+/** Complete collection of built-in analyzer identifiers (32 built-in analyzers). */
 export const BUILTIN_ANALYZERS = Object.freeze([
     ANALYZER_CONSTANTS,
     ANALYZER_LARGE_FILE,
@@ -133,6 +135,7 @@ export const BUILTIN_ANALYZERS = Object.freeze([
     ANALYZER_PRODUCTION_HYGIENE,
     ANALYZER_CLIENT_EXPOSURE,
     ANALYZER_SHELL_SAFETY,
+    ANALYZER_CONCURRENCY,
 ] as const);
 
 // ============================================================================

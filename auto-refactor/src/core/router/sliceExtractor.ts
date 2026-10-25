@@ -12,17 +12,8 @@
  */
 
 import type { ASTSliceNode, SliceFeatureVector, SliceMutationKind } from './sliceTypes';
-
-const DECLARATION_START_RE =
-    /^\s*(?:export\s+)?(?:async\s+)?(?:default\s+)?(?:function\s+([A-Za-z0-9_$]+)|class\s+([A-Za-z0-9_$]+)|interface\s+([A-Za-z0-9_$]+)|type\s+([A-Za-z0-9_$]+)|const\s+([A-Za-z0-9_$]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>|def\s+([A-Za-z0-9_$]+)|fn\s+([A-Za-z0-9_$]+))/;
-
-const CONTROL_FLOW_RE =
-    /\b(if|else|for|while|switch|case|match|return|throw|try|catch|break|continue|yield)\b/;
-const ASYNC_RE = /\b(async|await|Promise|Future|tokio|spawn)\b/;
-const IO_RE = /\b(fs\.|fetch|http|process\.|child_process|exec|spawn|open|socket|read|write)\b/;
-const TYPE_RE = /(:\s*[A-Z][A-Za-z0-9_<>[\]|&]*|\bas\s+[A-Za-z0-9_<>[\]]+|\binterface\b|\btype\b)/;
-const LITERAL_RE = /(^|\s)(['"][^'"]*['"]|\b\d+(\.\d+)?\b|\btrue\b|\bfalse\b)/;
-const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*|\*|#)/;
+import { DECLARATION_START_RE } from '../rules/lexical-pattern-registry';
+import { fastInspectSliceDelta } from './prefix-triage-index';
 
 /**
  * Candidate declaration boundary detected in source code.
@@ -36,11 +27,19 @@ interface DeclarationBoundary {
     declarationLineText: string;
 }
 
+const KIND_CLASS = 'ClassDeclaration';
+const KIND_INTERFACE = 'InterfaceDeclaration';
+const KIND_TYPE_ALIAS = 'TypeAliasDeclaration';
+const KIND_FUNCTION = 'FunctionDeclaration';
+
+const CHAR_CODE_OPEN_BRACE = 123;
+const CHAR_CODE_CLOSE_BRACE = 125;
+
 function extractDeclarationKind(line: string): string {
-    if (line.includes('class ')) return 'ClassDeclaration';
-    if (line.includes('interface ')) return 'InterfaceDeclaration';
-    if (line.includes('type ')) return 'TypeAliasDeclaration';
-    return 'FunctionDeclaration';
+    if (line.includes('class ')) return KIND_CLASS;
+    if (line.includes('interface ')) return KIND_INTERFACE;
+    if (line.includes('type ')) return KIND_TYPE_ALIAS;
+    return KIND_FUNCTION;
 }
 
 function extractMatchedName(match: RegExpExecArray): string {
@@ -71,14 +70,14 @@ function computeBraceDelta(line: string): number {
     let delta = 0;
     for (let i = 0; i < line.length; i++) {
         const ch = line.charCodeAt(i);
-        if (ch === 123) delta++;
-        else if (ch === 125) delta--;
+        if (ch === CHAR_CODE_OPEN_BRACE) delta++;
+        else if (ch === CHAR_CODE_CLOSE_BRACE) delta--;
     }
     return delta;
 }
 
 function isBoundaryClosed(line: string, braceDepth: number, kind: string): boolean {
-    return braceDepth <= 0 && (line.includes('}') || kind === 'TypeAliasDeclaration');
+    return braceDepth <= 0 && (line.includes('}') || kind === KIND_TYPE_ALIAS);
 }
 
 /**
@@ -129,46 +128,7 @@ function scanDeclarationBoundaries(lines: string[]): DeclarationBoundary[] {
  * @returns Populated SliceFeatureVector.
  */
 function inspectSliceDelta(addedLines: string[], signatureChanged: boolean): SliceFeatureVector {
-    let isDocOnly = addedLines.length > 0;
-    let hasControlFlowMutation = false;
-    let hasLiteralMutation = false;
-    let hasAsyncMutation = false;
-    let hasIoMutation = false;
-    let hasTypeMutation = false;
-
-    for (const line of addedLines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        if (!COMMENT_LINE_RE.test(trimmed)) {
-            isDocOnly = false;
-        }
-        if (CONTROL_FLOW_RE.test(trimmed)) {
-            hasControlFlowMutation = true;
-        }
-        if (ASYNC_RE.test(trimmed)) {
-            hasAsyncMutation = true;
-        }
-        if (IO_RE.test(trimmed)) {
-            hasIoMutation = true;
-        }
-        if (TYPE_RE.test(trimmed)) {
-            hasTypeMutation = true;
-        }
-        if (LITERAL_RE.test(trimmed)) {
-            hasLiteralMutation = true;
-        }
-    }
-
-    return {
-        hasSignatureMutation: signatureChanged,
-        hasControlFlowMutation,
-        hasLiteralMutation,
-        hasAsyncMutation,
-        hasIoMutation,
-        hasTypeMutation,
-        isDocOnly,
-    };
+    return fastInspectSliceDelta(addedLines, signatureChanged);
 }
 
 /**

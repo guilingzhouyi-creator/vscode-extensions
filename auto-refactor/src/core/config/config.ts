@@ -32,43 +32,41 @@ import type {
 import { DEFAULT_TOLERATED_CALL_ARGUMENTS } from '../policy/literal-policy-engine';
 import { ERR_INVALID_CUSTOM_ANALYZER } from '../router/sliceTypes';
 
+import { SPECIALIZED_ANALYZERS, applyAutoTuning } from './config-tuning';
 import {
     ANALYZER_ARCHITECTURE,
+    ANALYZER_CLIENT_EXPOSURE,
     ANALYZER_COMMENTS,
+    ANALYZER_COMPLEXITY,
     ANALYZER_CONSTANTS,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_DEPENDENCY_GRAPH,
+    ANALYZER_DEPENDENCY_LAYOUT,
+    ANALYZER_DOCS,
+    ANALYZER_FRONTEND,
+    ANALYZER_GATE_ARCHITECTURE,
+    ANALYZER_GDSCRIPT_GAME,
     ANALYZER_GDSCRIPT_MODERN,
+    ANALYZER_GO_MODERN,
+    ANALYZER_GOVERNANCE,
+    ANALYZER_HYGIENE,
+    ANALYZER_LARGE_FILE,
+    ANALYZER_NAMING,
+    ANALYZER_PERFORMANCE,
+    ANALYZER_PRODUCTION_HYGIENE,
+    ANALYZER_PYTHON_MODERN,
     ANALYZER_RUST_MODERN,
     ANALYZER_SECRETS,
     ANALYZER_SECURITY,
-    ANALYZER_TYPESCRIPT_MODERN,
-    SPECIALIZED_ANALYZERS,
-    applyAutoTuning,
-} from './config-tuning';
-import {
-    ANALYZER_LARGE_FILE,
-    ANALYZER_COMPLEXITY,
-    ANALYZER_GOVERNANCE,
-    ANALYZER_DEPENDENCY_GRAPH,
-    ANALYZER_PERFORMANCE,
-    ANALYZER_HYGIENE,
-    ANALYZER_SIMPLIFY,
-    ANALYZER_PYTHON_MODERN,
-    ANALYZER_DOCS,
-    ANALYZER_DATA_ARCHITECTURE,
-    ANALYZER_TEST_MODERNITY,
-    ANALYZER_DEPENDENCY_LAYOUT,
-    ANALYZER_NAMING,
-    ANALYZER_GO_MODERN,
     ANALYZER_SHELL_LINT,
-    ANALYZER_STDLIB,
-    ANALYZER_GDSCRIPT_GAME,
-    ANALYZER_VSCODE_EXTENSION,
-    ANALYZER_GATE_ARCHITECTURE,
-    ANALYZER_FRONTEND,
-    ANALYZER_PRODUCTION_HYGIENE,
-    ANALYZER_CLIENT_EXPOSURE,
     ANALYZER_SHELL_SAFETY,
-} from '../scoring/dimensionLiterals';
+    ANALYZER_SIMPLIFY,
+    ANALYZER_STDLIB,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_TYPESCRIPT_MODERN,
+    ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_CONCURRENCY,
+} from '../constants/rule-codes';
 import {
     applySemanticAndSecurityLevels,
     assembleGlobalThresholds,
@@ -130,6 +128,7 @@ export const BUILTIN_ANALYZERS = [
     ANALYZER_CLIENT_EXPOSURE,
     ANALYZER_TEST_MODERNITY,
     ANALYZER_GOVERNANCE,
+    ANALYZER_CONCURRENCY,
 ] as const;
 
 // ── Built-in defaults (one definition site shared by thresholds and analyzer options) ──
@@ -319,6 +318,10 @@ function getSpecializedAnalyzerDefaults(): Record<string, Record<string, any>> {
         },
         security: {
             level: LEVEL_BASIC,
+        },
+        concurrency: {
+            checkAsyncLeaks: true,
+            checkLockSafety: true,
         },
     };
 }

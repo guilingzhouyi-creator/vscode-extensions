@@ -62,22 +62,20 @@ const LANGUAGE_ANALYZER_MATRIX: Record<string, readonly LanguageKind[]> = {
     'vscode-extension': ['typescript', 'javascript', 'json'],
 };
 
+const SCORE_SCALE_THOUSAND = 1000;
+const PERCENT_SCALE_HUNDRED = 100;
+const MAX_HISTORICAL_FINDINGS_CAP = 5;
+
 /** Checks if an analyzer is compatible with a file language */
 function isLanguageCompatible(analyzerId: string, lang: LanguageKind): boolean {
     const supported = LANGUAGE_ANALYZER_MATRIX[analyzerId];
-    if (!supported) {
-        // General language-agnostic or broad analyzer
-        // (e.g. hygiene, secrets, architecture, complexity)
-        return true;
-    }
-    return supported.includes(lang);
+    return !supported ? true : supported.includes(lang);
 }
 
 /** Calculate change indicator weight */
 function resolveChangeIndicator(isDirectlyChanged: boolean, isNeighbor: boolean): number {
     if (isDirectlyChanged) return 1.0;
-    if (isNeighbor) return 0.5;
-    return 0.0;
+    return isNeighbor ? 0.5 : 0.0;
 }
 
 /** Calculate dependency proximity weight */
@@ -115,21 +113,23 @@ function resolveScopeAffinity(
     if (fileEntry.role === 'gate_infrastructure' && analyzerId === 'gate-architecture') {
         return 1.0;
     }
-    if (isDirectlyChanged) {
-        return 0.8;
-    }
-    return 0.5;
+    return isDirectlyChanged ? 0.8 : 0.5;
+}
+
+/** Parameter object for single analyzer-file affinity score calculation */
+interface AffinityEvaluationParams {
+    readonly analyzerId: string;
+    readonly fileEntry: AuditIndexEntry;
+    readonly isDirectlyChanged: boolean;
+    readonly isNeighbor: boolean;
+    readonly scopeDecision: AuditScopeDecision;
+    readonly weights: ActivationWeights;
 }
 
 /** Computes single analyzer-file affinity score A(r, f) */
-function computeAffinityScore(
-    analyzerId: string,
-    fileEntry: AuditIndexEntry,
-    isDirectlyChanged: boolean,
-    isNeighbor: boolean,
-    scopeDecision: AuditScopeDecision,
-    weights: ActivationWeights,
-): number {
+function computeAffinityScore(params: AffinityEvaluationParams): number {
+    const { analyzerId, fileEntry, isDirectlyChanged, isNeighbor, scopeDecision, weights } = params;
+
     // Hard boundary: language incompatibility strictly forces zero affinity
     if (!isLanguageCompatible(analyzerId, fileEntry.lang)) {
         return 0.0;
@@ -147,7 +147,7 @@ function computeAffinityScore(
     const iChange = resolveChangeIndicator(isDirectlyChanged, isNeighbor);
     const rRisk = fileEntry.risk.inherentRisk;
     const dDep = resolveDependencyProximity(isDirectlyChanged, fileEntry.deps.fanIn);
-    const hHist = Math.min(1.0, fileEntry.history.recentFindingCount / 5);
+    const hHist = Math.min(1.0, fileEntry.history.recentFindingCount / MAX_HISTORICAL_FINDINGS_CAP);
     const sScope = resolveScopeAffinity(analyzerId, fileEntry, isDirectlyChanged, scopeDecision);
 
     let deltaTerm = 0.0;
@@ -172,7 +172,7 @@ function computeAffinityScore(
         weights.scopeAffinity * sScope +
         deltaTerm;
 
-    return Math.round(rawScore * 1000) / 1000;
+    return Math.round(rawScore * SCORE_SCALE_THOUSAND) / SCORE_SCALE_THOUSAND;
 }
 
 /**
@@ -190,100 +190,134 @@ function appendMatchedAnalyzer(matched: string[] | undefined, aId: string): stri
     return [aId];
 }
 
-function matchFileAnalyzers(
-    entry: AuditIndexEntry,
-    availableAnalyzers: readonly string[],
-    isChanged: boolean,
-    isNeighbor: boolean,
-    scopeDecision: AuditScopeDecision,
-    threshold: number,
-    weights: typeof DEFAULT_ACTIVATION_WEIGHTS,
-    activatedSet: Set<string>,
-    rationaleMap: Record<string, string>,
-): string[] | undefined {
+/** Parameter object for file-analyzer matching execution */
+interface FileMatchingParams {
+    readonly entry: AuditIndexEntry;
+    readonly availableAnalyzers: readonly string[];
+    readonly isChanged: boolean;
+    readonly isNeighbor: boolean;
+    readonly scopeDecision: AuditScopeDecision;
+    readonly threshold: number;
+    readonly weights: ActivationWeights;
+    readonly activatedSet: Set<string>;
+    readonly rationaleMap: Record<string, string>;
+}
+
+function matchFileAnalyzers(params: FileMatchingParams): string[] | undefined {
     let matched: string[] | undefined;
-    for (const aId of availableAnalyzers) {
-        const score = computeAffinityScore(
-            aId,
-            entry,
-            isChanged,
-            isNeighbor,
-            scopeDecision,
-            weights,
-        );
-        if (score >= threshold) {
+    for (const aId of params.availableAnalyzers) {
+        const score = computeAffinityScore({
+            analyzerId: aId,
+            fileEntry: params.entry,
+            isDirectlyChanged: params.isChanged,
+            isNeighbor: params.isNeighbor,
+            scopeDecision: params.scopeDecision,
+            weights: params.weights,
+        });
+        if (score >= params.threshold) {
             matched = appendMatchedAnalyzer(matched, aId);
-            activatedSet.add(aId);
-            if (!rationaleMap[aId]) {
-                rationaleMap[aId] =
-                    `Activated with affinity ${score} on ${entry.role} (${entry.lang})`;
+            params.activatedSet.add(aId);
+            if (!params.rationaleMap[aId]) {
+                params.rationaleMap[aId] =
+                    `Activated with affinity ${score} on ${params.entry.role} (${params.entry.lang})`;
             }
         }
     }
     return matched;
 }
 
+/** Parameters object contract for sparse activation */
+export interface SparseActivationParams {
+    readonly availableAnalyzers: readonly string[];
+    readonly fileEntries: readonly AuditIndexEntry[];
+    readonly scopeDecision: AuditScopeDecision;
+    readonly changedFiles: ReadonlySet<string>;
+    readonly neighborFiles?: ReadonlySet<string>;
+    readonly threshold?: number;
+    readonly weights?: ActivationWeights;
+}
+
 /**
  * Computes sparse analyzer activation mapping across indexed files based on scope decisions,
  * change sets, and domain affinity weights.
- *
- * @param availableAnalyzers List of registered analyzer identifiers
- * @param fileEntries Index entries for candidate files in scope
- * @param scopeDecision Preflight scope determination result
- * @param changedFiles Directly modified file path set
- * @param neighborFiles Topological neighbors of modified files
- * @param threshold Minimum score threshold required for analyzer activation
- * @param weights Dynamic weighting configuration for activation scoring
- * @returns Sparse activation mapping per file, unique activated analyzers, and decision rationales
+ */
+function resolveActivationParameters(
+    paramsOrAnalyzers: SparseActivationParams | readonly string[],
+    legacyArgs: readonly unknown[],
+): Required<SparseActivationParams> {
+    if (!Array.isArray(paramsOrAnalyzers)) {
+        const optionsConfig = paramsOrAnalyzers as SparseActivationParams;
+        return {
+            availableAnalyzers: optionsConfig.availableAnalyzers,
+            fileEntries: optionsConfig.fileEntries,
+            scopeDecision: optionsConfig.scopeDecision,
+            changedFiles: optionsConfig.changedFiles,
+            neighborFiles: optionsConfig.neighborFiles ?? new Set<string>(),
+            threshold: optionsConfig.threshold ?? DEFAULT_ACTIVATION_THRESHOLD,
+            weights: optionsConfig.weights ?? DEFAULT_ACTIVATION_WEIGHTS,
+        };
+    }
+    return {
+        availableAnalyzers: paramsOrAnalyzers,
+        fileEntries: (legacyArgs[0] as readonly AuditIndexEntry[]) ?? [],
+        scopeDecision: legacyArgs[1] as AuditScopeDecision,
+        changedFiles: (legacyArgs[2] as ReadonlySet<string>) ?? new Set<string>(),
+        neighborFiles: (legacyArgs[3] as ReadonlySet<string>) ?? new Set<string>(),
+        threshold: (legacyArgs[4] as number) ?? DEFAULT_ACTIVATION_THRESHOLD,
+        weights: (legacyArgs[5] as ActivationWeights) ?? DEFAULT_ACTIVATION_WEIGHTS,
+    };
+}
+
+/**
+ * Computes sparse analyzer activation mapping across indexed files based on scope decisions,
+ * change sets, and domain affinity weights.
  */
 export function activateSparseAnalyzers(
-    availableAnalyzers: readonly string[],
-    fileEntries: readonly AuditIndexEntry[],
-    scopeDecision: AuditScopeDecision,
-    changedFiles: ReadonlySet<string>,
-    neighborFiles: ReadonlySet<string> = new Set(),
-    threshold = DEFAULT_ACTIVATION_THRESHOLD,
-    weights = DEFAULT_ACTIVATION_WEIGHTS,
+    paramsOrAnalyzers: SparseActivationParams | readonly string[],
+    ...legacyArgs: unknown[]
 ): SparseActivationResult {
+    const config = resolveActivationParameters(paramsOrAnalyzers, legacyArgs);
     const fileAnalyzerMap: Record<string, string[]> = {};
     const activatedSet = new Set<string>();
     const rationaleMap: Record<string, string> = {};
 
-    for (const entry of fileEntries) {
+    for (const entry of config.fileEntries) {
         const fPath = entry.filePath;
-        const matchedAnalyzers = matchFileAnalyzers(
+        const matchedAnalyzers = matchFileAnalyzers({
             entry,
-            availableAnalyzers,
-            changedFiles.has(fPath),
-            neighborFiles.has(fPath),
-            scopeDecision,
-            threshold,
-            weights,
+            availableAnalyzers: config.availableAnalyzers,
+            isChanged: config.changedFiles.has(fPath),
+            isNeighbor: config.neighborFiles.has(fPath),
+            scopeDecision: config.scopeDecision,
+            threshold: config.threshold,
+            weights: config.weights,
             activatedSet,
             rationaleMap,
-        );
+        });
         if (matchedAnalyzers) {
             fileAnalyzerMap[fPath] = matchedAnalyzers;
         }
     }
 
-    const activatedAnalyzers = availableAnalyzers.filter((id) => activatedSet.has(id));
-    const skippedAnalyzers = availableAnalyzers.filter((id) => !activatedSet.has(id));
-    const selectedFiles = fileEntries
+    const activatedAnalyzers = config.availableAnalyzers.filter((id) => activatedSet.has(id));
+    const skippedAnalyzers = config.availableAnalyzers.filter((id) => !activatedSet.has(id));
+    const selectedFiles = config.fileEntries
         .map((e) => e.filePath)
         .filter((f) => (fileAnalyzerMap[f]?.length || 0) > 0);
-    const skippedFiles = fileEntries
+    const skippedFiles = config.fileEntries
         .map((e) => e.filePath)
         .filter((f) => !selectedFiles.includes(f));
 
-    const totalAvail = availableAnalyzers.length;
+    const totalAvail = config.availableAnalyzers.length;
     const activationRatio =
-        totalAvail > 0 ? Math.round((activatedAnalyzers.length / totalAvail) * 1000) / 1000 : 0;
+        totalAvail > 0
+            ? Math.round((activatedAnalyzers.length / totalAvail) * SCORE_SCALE_THOUSAND) / SCORE_SCALE_THOUSAND
+            : 0;
 
     const summaryText =
         `Files Selected: ${selectedFiles.length} / Analyzers Activated: ${activatedAnalyzers.length} ` +
-        `(${Math.round(activationRatio * 100)}%) / Analyzers Skipped: ${skippedAnalyzers.length} / ` +
-        `Files Skipped: ${skippedFiles.length} / Reason: ${scopeDecision.reason}`;
+        `(${Math.round(activationRatio * PERCENT_SCALE_HUNDRED)}%) / Analyzers Skipped: ${skippedAnalyzers.length} / ` +
+        `Files Skipped: ${skippedFiles.length} / Reason: ${config.scopeDecision.reason}`;
 
     return Object.freeze({
         selectedFiles: Object.freeze(selectedFiles),

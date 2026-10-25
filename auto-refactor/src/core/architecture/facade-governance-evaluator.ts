@@ -20,6 +20,14 @@ import { calculateWeightedTokenPayload } from '../intelligence/payload-density';
 /** Default minimum effective lines of code for a substantive facade module. */
 export const DEFAULT_MIN_FACADE_ELOC = 15;
 
+const EXEMPT_PATH_SUBSTRINGS = ['/tests/', '/test/', '/fixtures/'] as const;
+const EXEMPT_PATH_SUFFIXES = ['.test.ts', '.spec.ts', '.d.ts'] as const;
+const MAX_TRAMPOLINE_LINES = 3;
+const INDEX_SUBSTRING = '/index';
+const LOCAL_PREFIX = './';
+const FACADE_KEYWORD = 'Facade';
+const MIN_TOKEN_STREAM_LENGTH = 30;
+
 /** Rule id: wiring payload above the absolute plumbing-ratio budget. */
 const RULE_PLUMBING_RATIO = 'VOL-POR-001';
 /** Rule id: wiring payload dominant enough that the module carries almost no logic at all. */
@@ -89,12 +97,8 @@ function stripComments(content: string): string {
 function isExemptPath(filePath: string): boolean {
     const norm = filePath.split(path.sep).join('/');
     return (
-        norm.includes('/tests/') ||
-        norm.includes('/test/') ||
-        norm.includes('/fixtures/') ||
-        norm.endsWith('.test.ts') ||
-        norm.endsWith('.spec.ts') ||
-        norm.endsWith('.d.ts')
+        EXEMPT_PATH_SUBSTRINGS.some((sub) => norm.includes(sub)) ||
+        EXEMPT_PATH_SUFFIXES.some((suffix) => norm.endsWith(suffix))
     );
 }
 
@@ -105,7 +109,7 @@ function checkVacuousTrampoline(
     filePath: string,
     codeLines: string[],
 ): { isTrampoline: boolean; targetPath: string } {
-    if (codeLines.length > 3 || codeLines.length === 0) {
+    if (codeLines.length > MAX_TRAMPOLINE_LINES || codeLines.length === 0) {
         return { isTrampoline: false, targetPath: '' };
     }
 
@@ -125,7 +129,10 @@ function checkVacuousTrampoline(
         }
     }
 
-    if (targetPath.length > 0 && (targetPath.includes('/index') || targetPath.startsWith('./'))) {
+    if (
+        targetPath.length > 0 &&
+        (targetPath.includes(INDEX_SUBSTRING) || targetPath.startsWith(LOCAL_PREFIX))
+    ) {
         return { isTrampoline: true, targetPath };
     }
 
@@ -142,7 +149,7 @@ function checkHollowFacade(
     minEloc: number,
 ): boolean {
     const baseName = path.basename(filePath);
-    const isFacadeRole = FACADE_PATH_HINT_RE.test(baseName) || content.includes('Facade');
+    const isFacadeRole = FACADE_PATH_HINT_RE.test(baseName) || content.includes(FACADE_KEYWORD);
     if (!isFacadeRole) return false;
 
     if (codeLines.length >= minEloc) return false;
@@ -178,7 +185,7 @@ function checkPlumbingOverhead(
     if (SUBSTANTIVE_PAYLOAD_RE.test(content)) return clean;
 
     const tokenStream = tokenizeCode(content);
-    if (tokenStream.tokens.length < 30) return clean;
+    if (tokenStream.tokens.length < MIN_TOKEN_STREAM_LENGTH) return clean;
 
     const { tspr, por } = calculateWeightedTokenPayload(tokenStream.tokens);
     return {

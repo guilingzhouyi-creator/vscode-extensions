@@ -193,6 +193,30 @@ const REASONABLE_STRINGS = new Set([
     'production',
     'test',
     'staging',
+    // Delimiters, regex captures, comment tags, and sentinels
+    '\n\n',
+    '\r\n\r\n',
+    '\\n\\n',
+    '\\r\\n\\r\\n',
+    '\u0000',
+    '\\u0000',
+    ':memory:',
+    ' -> ',
+    '/*',
+    '*/',
+    '#>',
+    '<#',
+    '\\$&',
+    '$&',
+    '$1-$2',
+    '$1',
+    '$2',
+    '$3',
+    '.test.ts',
+    '.spec.ts',
+    '.test.js',
+    '.spec.js',
+    '.d.ts',
 ]);
 
 /** Minimum length before a spaced/CJK string counts as report prose rather than a value. */
@@ -282,6 +306,200 @@ const CONVENTIONAL_TOKENS = new Set([
     'tree',
     'commit',
     'tag',
+    // Severities & technical debt tiers
+    'error',
+    'info',
+    'debug',
+    'trace',
+    'critical',
+    'high',
+    'medium',
+    'low',
+    'fatal',
+    // Gate closed verdict status words (AGENTS.md GUARD-FBK-001)
+    'pass',
+    'fail',
+    'skip',
+    'block',
+    'passed',
+    'failed',
+    // Eight strategic quality pillars (AGENTS.md)
+    'architecture',
+    'maintainability',
+    'performance',
+    'data',
+    'testing',
+    'reliability',
+    'security',
+    'extensibility',
+    // Ten-dimensional micro-quality indices
+    'architectureconsistency',
+    'semanticpurity',
+    'codesecurity',
+    'performanceefficiency',
+    'standardization',
+    'modernity',
+    'commentquality',
+    'duplication',
+    'techdebtrisk',
+    // Node.js standard builtins & stdio modes
+    'fs',
+    'os',
+    'child_process',
+    'util',
+    'events',
+    'stream',
+    'crypto',
+    'buffer',
+    'url',
+    'http',
+    'https',
+    'module',
+    'inherit',
+    'pipe',
+    'ignore',
+    'ipc',
+    'win32',
+    'linux',
+    'darwin',
+    'src',
+    'scripts',
+    'reports',
+    'docs',
+    'default',
+    // AST keywords, types & language vocabulary
+    'function',
+    'class',
+    'interface',
+    'const',
+    'let',
+    'var',
+    'return',
+    'import',
+    'export',
+    'type',
+    'enum',
+    'switch',
+    'case',
+    'if',
+    'else',
+    'for',
+    'while',
+    'try',
+    'catch',
+    'throw',
+    'break',
+    'continue',
+    'yield',
+    'await',
+    'async',
+    'new',
+    'delete',
+    'typeof',
+    'instanceof',
+    'in',
+    'of',
+    'as',
+    'is',
+    'from',
+    'namespace',
+    'abstract',
+    'implements',
+    'extends',
+    'super',
+    'this',
+    'constructor',
+    'public',
+    'private',
+    'protected',
+    'readonly',
+    'static',
+    'override',
+    'declare',
+    'keyof',
+    'asserts',
+    'infer',
+    // Syntax node names, AST components & actionable actions
+    'identifier',
+    'literal',
+    'expression',
+    'statement',
+    'declaration',
+    'property',
+    'method',
+    'parameter',
+    'parameters',
+    'argument',
+    'arguments',
+    'body',
+    'block',
+    'clause',
+    'condition',
+    'operator',
+    'left',
+    'right',
+    'rename_identifier',
+    'extract_constant',
+    'split_file',
+    'decompose_complexity',
+    'replace_token',
+    'file',
+    // Domain & governance vocabulary
+    'governance',
+    'major_rework_needed',
+    'majorreworkneeded',
+    'minor_fix_needed',
+    'minorfixneeded',
+    'insert',
+    'main',
+    'gate_infrastructure',
+    'powershell',
+    'pwsh',
+    'depends_on',
+    'dependson',
+    'document',
+    'struct',
+    'freeze',
+    'heuristic',
+    'guaranteed',
+    'root',
+    'reject',
+    'byteequal',
+    'materialized',
+    'node_modules',
+    'core_trunk',
+    'added',
+    'modified',
+    'deleted',
+    'auto',
+    'quality-regression',
+    'auto_fix',
+    'gate-architecture',
+    'comments',
+    'naming',
+    'auto-refactor',
+    'projection',
+    '__base__',
+    'active-runs.ndjson',
+    'silent',
+    'compute',
+    'validate',
+    'disallowed-import',
+    'deprecated',
+    'rename_symbol',
+    'insert_comment_contract',
+    'loop_hot',
+    'entry->cond->exit',
+    'secret',
+    'blocked',
+    'lexical_hygiene',
+    'ast_complexity',
+    'architecture_coupling',
+    'modernity_governance',
+    'git',
+    'require',
+    'hoist_declaration',
+    'sh',
 ]);
 
 /** Command-line switches such as `--root` / `-v` are interface vocabulary, not configuration. */
@@ -335,6 +553,21 @@ const FILENAME_PATTERN_TOKENS = new Set([
     '_test.gd',
     '.test.',
     '.spec.',
+    '/tests/',
+    '/test/',
+    '/fixtures/',
+    '/mocks/',
+    '/benchmarks/',
+    '/dist/',
+    '/src/',
+    '/scripts/',
+    '/core/',
+    'test.ts',
+    'spec.ts',
+    'test.js',
+    'spec.js',
+    'index.ts',
+    'index.js',
 ]);
 
 /** Registered MIME types (`application/json`, `text/plain`) are protocol vocabulary. */
@@ -349,6 +582,29 @@ const LOCALE_TAG_RE = /^[a-z]{2}(?:-[A-Za-z]{2})?$/;
 
 /** Timezone offset strings (`+0000`, `-0500`) are standard protocol vocabulary. */
 const TIMEZONE_OFFSET_RE = /^[+-]\d{4}$/;
+
+const RULE_PREFIX_RE = /^[A-Z]{2,6}-$/;
+const ACTION_CODE_RE = /^AR:[A-Z]{3,4}:[0-9]{3}$/;
+const AST_SYNTAX_KIND_RE =
+    /^[A-Z][a-zA-Z0-9]*(?:Keyword|Expression|Statement|Declaration|Literal|Token|Clause|Type)$/;
+const REGEX_REPLACEMENT_RE = /^(?:\\\$&|\$&|\$[0-9]+(?:\s*[-:]\s*\$[0-9]+)?)$/;
+
+function matchesPatternRule(raw: string, lowered: string): boolean {
+    return (
+        RULE_ID_RE.test(raw) ||
+        RULE_PREFIX_RE.test(raw) ||
+        ENUM_TAG_RE.test(raw) ||
+        TEST_PROBE_RE.test(raw) ||
+        CLI_FLAG_RE.test(raw) ||
+        MIME_TYPE_RE.test(lowered) ||
+        FILE_EXTENSION_RE.test(raw) ||
+        LOCALE_TAG_RE.test(raw) ||
+        TIMEZONE_OFFSET_RE.test(raw) ||
+        ACTION_CODE_RE.test(raw) ||
+        AST_SYNTAX_KIND_RE.test(raw) ||
+        REGEX_REPLACEMENT_RE.test(raw)
+    );
+}
 
 /**
  * Checks whether a literal string matches conventional vocabulary or standard tokens.
@@ -365,16 +621,7 @@ export function isConventionalVocabulary(raw: string, lowered: string): boolean 
     ) {
         return true;
     }
-    return (
-        RULE_ID_RE.test(raw) ||
-        ENUM_TAG_RE.test(raw) ||
-        TEST_PROBE_RE.test(raw) ||
-        CLI_FLAG_RE.test(raw) ||
-        MIME_TYPE_RE.test(lowered) ||
-        FILE_EXTENSION_RE.test(raw) ||
-        LOCALE_TAG_RE.test(raw) ||
-        TIMEZONE_OFFSET_RE.test(raw)
-    );
+    return matchesPatternRule(raw, lowered);
 }
 
 /**
@@ -452,6 +699,33 @@ function classifyNumericLiteral(num: number): SemanticClassification {
         };
     }
 
+    if (num === 0xfeff || num === 65279) {
+        return {
+            kind: GENERAL_LITERAL_KIND,
+            isReasonable: true,
+            suggestedConstPrefix: 'BOM_CHAR_CODE',
+            rationale: 'Standard Unicode Byte Order Mark (BOM) sentinel',
+        };
+    }
+
+    if (num === 0x33333333 || num === 0x55555555 || num === 0x0f0f0f0f) {
+        return {
+            kind: GENERAL_LITERAL_KIND,
+            isReasonable: true,
+            suggestedConstPrefix: 'BITMASK',
+            rationale: 'Popcount Hamming weight bitmask constant',
+        };
+    }
+
+    if (num === 3600 || num === 86400 || num === 1e6) {
+        return {
+            kind: GENERAL_LITERAL_KIND,
+            isReasonable: true,
+            suggestedConstPrefix: 'SCALE',
+            rationale: 'Time or magnitude unit scale factor',
+        };
+    }
+
     if (
         COMMON_PORTS.has(num) ||
         (Number.isInteger(num) && num >= EPHEMERAL_PORT_MIN && num <= PORT_MAX)
@@ -518,7 +792,8 @@ function classifyStructuralString(unquoted: string): SemanticClassification | nu
  * @returns Semantic classification result.
  */
 function classifyStringLiteral(unquoted: string): SemanticClassification {
-    if (REASONABLE_STRINGS.has(unquoted.toLowerCase())) {
+    const lowered = unquoted.toLowerCase();
+    if (REASONABLE_STRINGS.has(lowered) || isConventionalVocabulary(unquoted, lowered)) {
         return {
             kind: GENERAL_LITERAL_KIND,
             isReasonable: true,

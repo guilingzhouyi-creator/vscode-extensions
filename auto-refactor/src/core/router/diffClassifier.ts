@@ -6,7 +6,7 @@
  * Architecture Role: Pure leaf classifier feeding sparse analyzer routing; it owns the
  *   shared DiffSemanticCategory vocabulary consumed by the category-to-analyzer policy
  * Dependencies & Triggers: Imports true diff primitives from edit-diff and myers-algorithm,
- *   and MutationSignal from expert-manifest; called by dualTrackPipeline FastTrack loop.
+ *   and MutationSignal from core/experts; called by dualTrackPipeline FastTrack loop.
  * Responsibilities: Compute true Myers line diff between old and new content; flag literal,
  *   control-flow, interface, import/export, doc-only and deletion mutations; emit both
  *   DiffSemanticCategory and MutationSignal sets with zero implicit fallback.
@@ -17,7 +17,7 @@
 
 import { computeEditRangesWithOps, linesOf } from '../diff/edit-diff';
 import { DIFF_OP_DELETE, DIFF_OP_INSERT } from '../diff/myers-algorithm';
-import type { MutationSignal } from './expert-manifest';
+import type { MutationSignal } from '../experts';
 import {
     CATEGORY_LITERAL_ONLY,
     CATEGORY_CONTROL_FLOW,
@@ -87,12 +87,15 @@ export interface DiffOptions {
     filePath?: string;
 }
 
-const CONTROL_FLOW_RE =
-    /\b(if|else|for|while|switch|case|match|return|throw|try|catch|break|continue|yield|await)\b/;
+import {
+    CONTROL_FLOW_RE,
+    IMPORT_EXPORT_RE,
+    COMMENT_LINE_RE,
+    isPredominantlyLiteralLine,
+} from '../rules/lexical-pattern-registry';
+
 const INTERFACE_SIG_RE =
     /\b(export|class|interface|type|struct|enum|impl|function|def|fn)\s+([A-Za-z0-9_$]+)/;
-const IMPORT_EXPORT_RE = /\b(import\b|export\s+(?:\*|\{)|from\s+['"]|require\s*\()/;
-const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*|\*|#)/;
 
 interface DiffLineObservation {
     allComments: boolean;
@@ -101,17 +104,6 @@ interface DiffLineObservation {
     hasImportExport: boolean;
     hasLiteral: boolean;
     hasGeneralCode: boolean;
-}
-
-/**
- * Check whether a trimmed code line is predominantly literal definitions or assignments.
- */
-function isPredominantlyLiteralLine(trimmed: string): boolean {
-    return (
-        /^['"][^'"]*['"][,;]?$/.test(trimmed) ||
-        /^[0-9]+[LUlu]?[,;]?$/.test(trimmed) ||
-        /^(?:const|let|var)\s+[A-Za-z0-9_$]+\s*=\s*(?:['"][^'"]*['"]|[0-9]+)[,;]?$/.test(trimmed)
-    );
 }
 
 const TEST_PATH_RE =

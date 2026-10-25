@@ -149,7 +149,7 @@ export const ExcessiveNestingRule: GovernanceRule = {
 /**
  * Checks whether a line contains the return keyword token using library lookup.
  */
-function lineHasReturnKeyword(line: string): boolean {
+function checkLineHasReturnKeyword(line: string): boolean {
     if (!line.includes(KEYWORD_RETURN)) return false;
     const tokens = line.split(/[^a-zA-Z0-9_$]+/);
     for (let i = 0; i < tokens.length; i++) {
@@ -164,7 +164,7 @@ function lineHasReturnKeyword(line: string): boolean {
 function hasReturnInSpan(lines: string[], startLine: number, endLine: number): boolean {
     const limit = Math.min(endLine, lines.length);
     for (let i = startLine - 1; i < limit; i++) {
-        if (lineHasReturnKeyword(lines[i])) return true;
+        if (checkLineHasReturnKeyword(lines[i])) return true;
     }
     return false;
 }
@@ -179,12 +179,12 @@ function extractPassThroughViolation(
     endLine: number,
 ): GovernanceViolation | null {
     const body = masked.slice(startLine - 1, endLine).join(' ');
-    const m = body.match(PASSTHROUGH_RE);
-    if (!m || !node.name || m[2] !== node.name) return null;
+    const wrapperMatch = body.match(PASSTHROUGH_RE);
+    if (!wrapperMatch || !node.name || wrapperMatch[2] !== node.name) return null;
 
     return {
         ruleId: 'GOV-LOG-002',
-        message: `Method \`${node.name}\` appears to be a trivial pass-through wrapper forwarding directly to \`${m[1]}.${m[2]}\`.`,
+        message: `Method \`${node.name}\` appears to be a trivial pass-through wrapper forwarding directly to \`${wrapperMatch[1]}.${wrapperMatch[2]}\`.`,
         line: startLine,
         column: node.start?.column ?? 1,
         suggestion: 'Consider inline usage or document the explicit interception rationale.',
@@ -236,7 +236,7 @@ function isExemptPrecisionFilePath(filePath: string): boolean {
 /**
  * Detects presence of precision calculation triggers via token library lookup.
  */
-function lineHasPrecisionTrigger(line: string): { hasMath: boolean; hasToFixed: boolean } {
+function checkLineHasPrecisionTrigger(line: string): { hasMath: boolean; hasToFixed: boolean } {
     let hasMath = false;
     let hasToFixed = false;
     const tokens = line.split(/[^a-zA-Z0-9_$]+/);
@@ -262,10 +262,7 @@ function evaluatePrecisionMatch(
         const match = LOSSY_ROUNDING_RE.exec(line) ?? MISMATCHED_SCALING_RE.exec(line);
         if (match) return match;
     }
-    if (hasToFixed) {
-        return LOSSY_NUMBER_TOFIXED_RE.exec(line);
-    }
-    return null;
+    return hasToFixed ? LOSSY_NUMBER_TOFIXED_RE.exec(line) : null;
 }
 
 /**
@@ -273,7 +270,7 @@ function evaluatePrecisionMatch(
  */
 function checkPrecisionLine(line: string, lineIndex: number): GovernanceViolation | null {
     if (!line.includes(TOKEN_MATH) && !line.includes(TOKEN_TO_FIXED)) return null;
-    const { hasMath, hasToFixed } = lineHasPrecisionTrigger(line);
+    const { hasMath, hasToFixed } = checkLineHasPrecisionTrigger(line);
     if (!hasMath && !hasToFixed) return null;
 
     const match = evaluatePrecisionMatch(line, hasMath, hasToFixed);
@@ -295,7 +292,7 @@ function checkPrecisionLine(line: string, lineIndex: number): GovernanceViolatio
         },
         actionable: {
             action: 'align_numeric_precision',
-            code: CODE_NUM_PRECISION_LOSSY,
+            code: (CODE_NUM_PRECISION_LOSSY),
             taxonomy: 'NUM_PREC',
             safeToAutomate: true,
             templateSnippet: 'Math.round(val * 100) / 100 + 0',
@@ -326,8 +323,9 @@ export const LossyPrecisionRoundingRule: GovernanceRule = {
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (isToolOrTestScript(ctx.filePath)) return null;
         if (isExemptPrecisionFilePath(ctx.filePath)) return null;
-        if (!ctx.content.includes(TOKEN_MATH_DOT) && !ctx.content.includes(TOKEN_TO_FIXED))
+        if (!ctx.content.includes(TOKEN_MATH_DOT) && !ctx.content.includes(TOKEN_TO_FIXED)) {
             return null;
+        }
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
@@ -374,7 +372,7 @@ function auditUnboundedLine(line: string, lineIndex: number): GovernanceViolatio
         customDetail: { matchedExpression: match[0] },
         actionable: {
             action: 'apply_guard_clause',
-            code: CODE_NUM_UNBOUNDED_CONDITION,
+            code: (CODE_NUM_UNBOUNDED_CONDITION),
             taxonomy: 'CTRL_FLOW',
             safeToAutomate: false,
             templateSnippet: 'if (val > 0 && val <= MAX_BOUND)',

@@ -289,6 +289,8 @@ const DEFAULT_AUTONOMY_WEIGHTS = {
 /**
  * Assign qualitative grade based on composite autonomy score.
  */
+const GRADE_DESC = AutonomyGradeDescriptions;
+
 function resolveAutonomyGrade(score: number): {
     grade: AutonomyGrade;
     description: string;
@@ -296,30 +298,30 @@ function resolveAutonomyGrade(score: number): {
     if (score >= GRADE_L5_THRESHOLD) {
         return {
             grade: GRADE_L5,
-            description: AutonomyGradeDescriptions.L5_INDEPENDENT,
+            description: GRADE_DESC.L5_INDEPENDENT,
         };
     }
     if (score >= GRADE_L4_THRESHOLD) {
         return {
             grade: GRADE_L4,
-            description: AutonomyGradeDescriptions.L4_HIGH_AUTONOMY,
+            description: GRADE_DESC.L4_HIGH_AUTONOMY,
         };
     }
     if (score >= GRADE_L3_THRESHOLD) {
         return {
             grade: GRADE_L3,
-            description: AutonomyGradeDescriptions.L3_BALANCED,
+            description: GRADE_DESC.L3_BALANCED,
         };
     }
     if (score >= GRADE_L2_THRESHOLD) {
         return {
             grade: GRADE_L2,
-            description: AutonomyGradeDescriptions.L2_FRAMEWORK_DEPENDENT,
+            description: GRADE_DESC.L2_FRAMEWORK_DEPENDENT,
         };
     }
     return {
         grade: GRADE_L1,
-        description: AutonomyGradeDescriptions.L1_SHALLOW_WRAPPER,
+        description: GRADE_DESC.L1_SHALLOW_WRAPPER,
     };
 }
 
@@ -454,16 +456,19 @@ function processImportSpecifiers(specifiers: string[], ctx: ImportAttributionCon
     }
 }
 
+interface FileMetricAccumulationParams {
+    readonly metric: FileMetric;
+    readonly manifestDeps: Set<string>;
+    readonly state: AutonomyScanState;
+    readonly rawContent: string;
+    readonly fileInv?: ProjectManifestInventory;
+}
+
 /**
  * Accumulate provenance and complexity metrics for a single file.
  */
-function accumulateFileMetric(
-    metric: FileMetric,
-    manifestDeps: Set<string>,
-    state: AutonomyScanState,
-    rawContent: string,
-    fileInv?: ProjectManifestInventory,
-): void {
+function accumulateFileMetric(params: FileMetricAccumulationParams): void {
+    const { metric, manifestDeps, state, rawContent, fileInv } = params;
     const headerSlice = rawContent.slice(0, HEADER_PREVIEW_SLICE_500);
     const provenance = classifyFileProvenance(metric.file, headerSlice);
     const eloc = (metric as { nonBlankLines?: number }).nonBlankLines || metric.lines || 1;
@@ -515,11 +520,11 @@ function calculateSupplyChainResilience(supplyChain: SupplyChainProfile): number
     if (supplyChain.directDependencyCount === 0 && supplyChain.totalLockfilePackages === 0) {
         return PERCENT_MAX;
     }
-    const d = supplyChain.directDependencyCount;
-    const t = supplyChain.transitiveDependencyCount;
+    const directCount = supplyChain.directDependencyCount;
+    const transitiveCount = supplyChain.transitiveDependencyCount;
     const depth = supplyChain.estimatedDepth;
 
-    const penalty = d * 0.5 + Math.sqrt(t) * 0.8 + Math.max(0, depth - 1) * 2.0;
+    const penalty = directCount * 0.5 + Math.sqrt(transitiveCount) * 0.8 + Math.max(0, depth - 1) * 2.0;
     const resilience = Math.max(MIN_RESILIENCE_SCORE, Math.min(PERCENT_MAX, PERCENT_MAX - penalty));
     return clampScore(resilience);
 }
@@ -580,14 +585,14 @@ function synthesizeAutonomyEvaluation(
         rCritical = rCall;
     }
 
-    const w = DEFAULT_AUTONOMY_WEIGHTS;
+    const weights = DEFAULT_AUTONOMY_WEIGHTS;
     const compositeScore = +(
-        rLoc * w.effectiveLoc +
-        rCall * w.symbolCall +
-        rDomain * w.domainKernel +
-        rPure * w.codeOriginality +
-        rSupply * w.supplyChainResilience +
-        rCritical * w.criticalPathAutonomy
+        rLoc * weights.effectiveLoc +
+        rCall * weights.symbolCall +
+        rDomain * weights.domainKernel +
+        rPure * weights.codeOriginality +
+        rSupply * weights.supplyChainResilience +
+        rCritical * weights.criticalPathAutonomy
     ).toFixed(2);
 
     const boundedComposite = Math.max(0, Math.min(PERCENT_FACTOR, compositeScore));
@@ -607,7 +612,7 @@ function synthesizeAutonomyEvaluation(
             callCount,
             fileCount: state.sdkFileSets.get(name)?.size || 1,
         }))
-        .sort((a, b) => b.callCount - a.callCount);
+        .sort((firstUsage, secondUsage) => secondUsage.callCount - firstUsage.callCount);
 
     return {
         compositeAutonomyIndex: boundedComposite,
@@ -621,7 +626,7 @@ function synthesizeAutonomyEvaluation(
             supplyChainResilience: +rSupply.toFixed(2),
             criticalPathAutonomy: +rCritical.toFixed(2),
         },
-        weights: w,
+        weights,
         confidence,
         supplyChain: {
             hasLockfile: supplyChain.hasLockfile,
@@ -687,17 +692,20 @@ function selectBalancedSdk(extPkgs: readonly string[], symbolName: string): stri
     return extPkgs[hash % extPkgs.length];
 }
 
+interface BoundImportRefParams {
+    readonly boundPkg: string;
+    readonly file: string;
+    readonly isCritical: boolean;
+    readonly effectiveDeps?: Set<string>;
+    readonly fileInv: ProjectManifestInventory;
+    readonly state: AutonomyScanState;
+}
+
 /**
  * Dispatches an import-bound reference to the appropriate autonomy state bucket.
  */
-function processBoundImportRef(
-    boundPkg: string,
-    file: string,
-    isCritical: boolean,
-    effectiveDeps: Set<string> | undefined,
-    fileInv: ProjectManifestInventory,
-    state: AutonomyScanState,
-): void {
+function processBoundImportRef(params: BoundImportRefParams): void {
+    const { boundPkg, file, isCritical, effectiveDeps, fileInv, state } = params;
     const boundKind = classifyImportProvenance(boundPkg, file, effectiveDeps);
     if (boundKind === KIND_STDLIB) {
         state.stdlibCalls++;
@@ -816,26 +824,23 @@ function resolveMatchedExtPackage(extPkgs: string[], ref: SymbolReference): stri
     return selectBalancedSdk(extPkgs, ref.name);
 }
 
+interface ExternalReferenceCountParams {
+    readonly ref: SymbolReference;
+    readonly isCritical: boolean;
+    readonly inputs: ReferenceScanInputs;
+    readonly caches: ReferenceScanCaches;
+    readonly state: AutonomyScanState;
+}
+
 /**
  * Count a reference that is not backed by an in-project declaration: import-bound packages,
  * common standard-library symbols, or the file's external SDK packages.
  *
  * Contract: a file with no declared external package degrades to a stdlib call rather than an
  * external SDK call, so supply-chain metrics never inflate on unresolved references.
- *
- * @param ref - Indexed call reference.
- * @param isCritical - Whether the referencing file is on a critical path.
- * @param inputs - Immutable scan inputs.
- * @param caches - Per-scan memo tables.
- * @param state - Autonomy evaluation state to update.
  */
-function countExternalReference(
-    ref: SymbolReference,
-    isCritical: boolean,
-    inputs: ReferenceScanInputs,
-    caches: ReferenceScanCaches,
-    state: AutonomyScanState,
-): void {
+function countExternalReference(params: ExternalReferenceCountParams): void {
+    const { ref, isCritical, inputs, caches, state } = params;
     const fileInv = resolveReferenceInventory(ref.file, caches, inputs.rootDir);
     const effectiveDeps =
         fileInv.allDependencies.size > 0 ? fileInv.allDependencies : inputs.manifestDeps;
@@ -845,7 +850,14 @@ function countExternalReference(
         profile?.symbolToPackageMap.get(ref.name) ??
         (ref.calleeReceiver ? profile?.symbolToPackageMap.get(ref.calleeReceiver) : undefined);
     if (boundPkg) {
-        processBoundImportRef(boundPkg, ref.file, isCritical, effectiveDeps, fileInv, state);
+        processBoundImportRef({
+            boundPkg,
+            file: ref.file,
+            isCritical,
+            effectiveDeps,
+            fileInv,
+            state,
+        });
         return;
     }
 
@@ -870,23 +882,28 @@ function countExternalReference(
     recordSdkCall(state, matchedPkg, ref.file, isCritical);
 }
 
+interface SymbolIndexReferenceParams {
+    readonly symbolIndex: SymbolIndex;
+    readonly state: AutonomyScanState;
+    readonly fileToExtPackages: Map<string, string[]>;
+    readonly fileToImportProfiles?: Map<string, FileImportProfile>;
+    readonly rootDir?: string;
+    readonly manifestDeps?: Set<string>;
+}
+
 /**
  * Overwrites call metrics with true AST call references from the indexed symbol graph
  * and local file import binding profiles.
- *
- * @param symbolIndex - Materialized project symbol index.
- * @param state - Autonomy evaluation state to update.
- * @param fileToExtPackages - Mapping of file paths to external package lists.
- * @param fileToImportProfiles - Optional mapping of file paths to local symbol binding profiles.
  */
-function applySymbolIndexReferences(
-    symbolIndex: SymbolIndex,
-    state: AutonomyScanState,
-    fileToExtPackages: Map<string, string[]>,
-    fileToImportProfiles?: Map<string, FileImportProfile>,
-    rootDir = process.cwd(),
-    manifestDeps?: Set<string>,
-): void {
+function applySymbolIndexReferences(params: SymbolIndexReferenceParams): void {
+    const {
+        symbolIndex,
+        state,
+        fileToExtPackages,
+        fileToImportProfiles,
+        rootDir = process.cwd(),
+        manifestDeps,
+    } = params;
     const refs = symbolIndex.getAllReferences();
     if (refs.length === 0) return;
 
@@ -913,7 +930,7 @@ function applySymbolIndexReferences(
     for (const ref of refs) {
         const isCritical = isCriticalFile(ref.file, caches);
         if (countInternalReference(ref, isCritical, symbolIndex, state)) continue;
-        countExternalReference(ref, isCritical, inputs, caches, state);
+        countExternalReference({ ref, isCritical, inputs, caches, state });
     }
 }
 
@@ -953,22 +970,26 @@ export interface AutonomyEvaluationContext {
     readonly symbolIndex?: SymbolIndex;
 }
 
+interface LegacyAutonomyArgs {
+    readonly issues?: Issue[];
+    readonly config?: ScanConfig;
+    readonly fileContents?: Map<string, string>;
+    readonly symbolIndex?: SymbolIndex;
+}
+
 function normalizeAutonomyContext(
     metricsOrContext: FileMetric[] | AutonomyEvaluationContext,
-    rawIssues?: Issue[],
-    rawConfig?: ScanConfig,
-    rawFileContents?: Map<string, string>,
-    rawSymbolIndex?: SymbolIndex,
+    legacy?: LegacyAutonomyArgs,
 ): AutonomyEvaluationContext {
     if (!Array.isArray(metricsOrContext)) {
         return metricsOrContext;
     }
     return {
         fileMetrics: metricsOrContext,
-        issues: rawIssues ?? [],
-        config: rawConfig ?? ({ root: process.cwd() } as unknown as ScanConfig),
-        fileContents: rawFileContents,
-        symbolIndex: rawSymbolIndex,
+        issues: legacy?.issues ?? [],
+        config: legacy?.config ?? ({ root: process.cwd() } as unknown as ScanConfig),
+        fileContents: legacy?.fileContents,
+        symbolIndex: legacy?.symbolIndex,
     };
 }
 
@@ -991,8 +1012,8 @@ export function evaluateProjectAutonomy(context: AutonomyEvaluationContext): Aut
  */
 export function evaluateProjectAutonomy(
     fileMetrics: FileMetric[],
-    issues: Issue[],
-    config: ScanConfig,
+    issues?: Issue[],
+    config?: ScanConfig,
     fileContents?: Map<string, string>,
     symbolIndex?: SymbolIndex,
 ): AutonomyEvaluation;
@@ -1003,26 +1024,22 @@ export function evaluateProjectAutonomy(
  * dimension computation, so both entry points yield identical results for identical inputs.
  *
  * @param metricsOrContext - Bundled context, or the file metric array of the positional form.
- * @param rawIssues - Positional form: detected issue collection.
- * @param rawConfig - Positional form: scan configuration holding the project root.
- * @param rawFileContents - Positional form: optional map of file path to raw content.
- * @param rawSymbolIndex - Positional form: optional indexed project symbol graph.
+ * @param restArgs - Rest positional arguments.
  * @returns Project autonomy evaluation across the six dimensions.
  */
 export function evaluateProjectAutonomy(
     metricsOrContext: FileMetric[] | AutonomyEvaluationContext,
-    rawIssues?: Issue[],
-    rawConfig?: ScanConfig,
-    rawFileContents?: Map<string, string>,
-    rawSymbolIndex?: SymbolIndex,
+    ...restArgs: [Issue[]?, ScanConfig?, Map<string, string>?, SymbolIndex?]
 ): AutonomyEvaluation {
-    const ctx = normalizeAutonomyContext(
-        metricsOrContext,
-        rawIssues,
-        rawConfig,
-        rawFileContents,
-        rawSymbolIndex,
-    );
+    const legacy: LegacyAutonomyArgs | undefined = Array.isArray(metricsOrContext)
+        ? {
+              issues: restArgs[0],
+              config: restArgs[1],
+              fileContents: restArgs[2],
+              symbolIndex: restArgs[3],
+          }
+        : undefined;
+    const ctx = normalizeAutonomyContext(metricsOrContext, legacy);
     const { fileMetrics, issues, config, fileContents, symbolIndex } = ctx;
 
     const rootDir = config.root || process.cwd();
@@ -1049,14 +1066,14 @@ export function evaluateProjectAutonomy(
 
     const fileToExtPackages = new Map<string, string[]>();
     const fileToImportProfiles = new Map<string, FileImportProfile>();
-    const contentCache = new Map<string, string>();
+    const fileToContentCacheMap = new Map<string, string>();
     const emptyProfile: FileImportProfile = {
         specifiers: [],
         symbolToPackageMap: new Map<string, string>(),
     };
 
     for (const metric of fileMetrics) {
-        const raw = loadFileRawContent(metric, config, fileContents, contentCache);
+        const raw = loadFileRawContent(metric, config, fileContents, fileToContentCacheMap);
         const profile = raw ? extractFileImportProfile(raw, metric.file) : emptyProfile;
         fileToImportProfiles.set(metric.file, profile);
 
@@ -1069,18 +1086,24 @@ export function evaluateProjectAutonomy(
             fileToExtPackages.set(metric.file, extPkgs);
         }
         state.currentSpecifiers = profile.specifiers;
-        accumulateFileMetric(metric, effectiveDeps, state, raw, fileInv);
+        accumulateFileMetric({
+            metric,
+            manifestDeps: effectiveDeps,
+            state,
+            rawContent: raw,
+            fileInv,
+        });
     }
 
     if (symbolIndex) {
-        applySymbolIndexReferences(
+        applySymbolIndexReferences({
             symbolIndex,
             state,
             fileToExtPackages,
             fileToImportProfiles,
             rootDir,
             manifestDeps,
-        );
+        });
     }
 
     return synthesizeAutonomyEvaluation(state, fileMetrics.length, issues, supplyChain);
