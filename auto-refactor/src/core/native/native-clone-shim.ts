@@ -154,12 +154,12 @@ function filterMeaningfulLines(lines: string[]): { hashes: number[]; indices: nu
             trimmed !== '{' &&
             trimmed !== '}'
         ) {
-            let h = 0x811c9dc5;
+            let hashVal = 0x811c9dc5;
             for (let c = 0; c < trimmed.length; c++) {
-                h ^= trimmed.charCodeAt(c);
-                h = Math.imul(h, 0x01000193);
+                hashVal ^= trimmed.charCodeAt(c);
+                hashVal = Math.imul(hashVal, 0x01000193);
             }
-            hashes.push(h | 0);
+            hashes.push(hashVal | 0);
             indices.push(i);
         }
     }
@@ -186,12 +186,12 @@ export function detectCloneBlocksShim(content: string, minCloneLines: number): N
     const clones: NativeCloneBlock[] = [];
 
     for (let i = 0; i <= total - minCloneLines; i++) {
-        let h = 0;
+        let combinedHash = 0;
         for (let k = 0; k < minCloneLines; k++) {
-            h = (Math.imul(h, 31) + meaningfulHashes[i + k]) | 0;
+            combinedHash = (Math.imul(combinedHash, 31) + meaningfulHashes[i + k]) | 0;
         }
 
-        const prevIdx = blockMap.get(h);
+        const prevIdx = blockMap.get(combinedHash);
         if (prevIdx !== undefined && i >= prevIdx + minCloneLines) {
             clones.push({
                 startLine: meaningfulLineIndices[i] + 1,
@@ -201,7 +201,7 @@ export function detectCloneBlocksShim(content: string, minCloneLines: number): N
             break;
         }
         if (prevIdx === undefined) {
-            blockMap.set(h, i);
+            blockMap.set(combinedHash, i);
         }
     }
     return clones;
@@ -280,15 +280,18 @@ function addToBucket(buckets: Map<number, number[]>, hash: number, fileIdx: numb
     }
 }
 
-function populateBandBuckets(
-    signatures: number[][],
-    start: number,
-    end: number,
-    n: number,
-    buckets: Map<number, number[]>,
-): void {
+interface PopulateBandBucketsParams {
+    readonly signatures: number[][];
+    readonly start: number;
+    readonly end: number;
+    readonly totalSignatures: number;
+    readonly buckets: Map<number, number[]>;
+}
+
+function populateBandBuckets(params: PopulateBandBucketsParams): void {
+    const { signatures, start, end, totalSignatures, buckets } = params;
     buckets.clear();
-    for (let f = 0; f < n; f++) {
+    for (let f = 0; f < totalSignatures; f++) {
         const sig = signatures[f];
         if (sig.length < end) continue;
         let bandHash = 0x811c9dc5;
@@ -333,8 +336,8 @@ function evaluateCloneCandidates(
  * @returns List of candidate clone pairs exceeding the threshold.
  */
 export function findClonePairsShim(signatures: number[][], threshold: number): NativeClonePair[] {
-    const n = signatures.length;
-    if (n < 2) return [];
+    const totalFiles = signatures.length;
+    if (totalFiles < 2) return [];
 
     const numHashes = signatures[0].length;
     const numBands = 16;
@@ -347,7 +350,13 @@ export function findClonePairsShim(signatures: number[][], threshold: number): N
     for (let band = 0; band < numBands; band++) {
         const start = band * rowsPerBand;
         const end = start + rowsPerBand;
-        populateBandBuckets(signatures, start, end, n, buckets);
+        populateBandBuckets({
+            signatures,
+            start,
+            end,
+            totalSignatures: totalFiles,
+            buckets,
+        });
 
         for (const bucket of buckets.values()) {
             if (bucket.length >= 2) {
@@ -367,6 +376,8 @@ export function findClonePairsShim(signatures: number[][], threshold: number): N
  * @returns Minimum number of edits transforming the pattern into the text.
  */
 export function computeBitParallelDistanceShim(pattern: Uint32Array, text: Uint32Array): number {
+    if (pattern.length === 0) return text.length;
+    if (text.length === 0) return pattern.length;
     return bitParallelMyers64Distance(pattern, text);
 }
 
@@ -388,7 +399,7 @@ export function computeSimHash64Shim(tokens: readonly string[]): string {
  * @param hashB - Hexadecimal fingerprint of the second document, same accepted forms.
  * @returns Similarity in the closed interval `0..1`, where 1 means identical fingerprints.
  */
-export function calculateSimHashHammingSimilarityShim(hashA: string, hashB: string): number {
+export function computeSimHashSimilarityShim(hashA: string, hashB: string): number {
     const parse = (s: string): bigint => {
         const trimmed = s.trim();
         if (trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
@@ -398,6 +409,11 @@ export function calculateSimHashHammingSimilarityShim(hashA: string, hashB: stri
     };
     return calculateSimHashHammingSimilarity(parse(hashA), parse(hashB));
 }
+
+/**
+ * Backward compatibility alias for computeSimHashSimilarityShim.
+ */
+export const calculateSimHashHammingSimilarityShim = computeSimHashSimilarityShim;
 
 /**
  * Pure JavaScript fallback for trigram cosine similarity.
@@ -420,11 +436,11 @@ interface TemporalMiningState {
     readonly pairSharedCounts: Map<string, number>;
 }
 
-function recordChangeset(cs: number[], state: TemporalMiningState): void {
-    if (!Array.isArray(cs) || cs.length === 0) {
+function recordChangeset(changeset: number[], state: TemporalMiningState): void {
+    if (!Array.isArray(changeset) || changeset.length === 0) {
         return;
     }
-    const unique = Array.from(new Set(cs)).sort((a, b) => a - b);
+    const unique = Array.from(new Set(changeset)).sort((firstId, secondId) => firstId - secondId);
     for (const id of unique) {
         state.fileCommitCounts.set(id, (state.fileCommitCounts.get(id) || 0) + 1);
     }
@@ -439,13 +455,18 @@ function recordChangeset(cs: number[], state: TemporalMiningState): void {
     }
 }
 
+interface CouplingPairEvaluationParams {
+    readonly key: string;
+    readonly shared: number;
+    readonly fileCommitCounts: Map<number, number>;
+    readonly minShared: number;
+    readonly minJaccard: number;
+}
+
 function parseAndEvaluateCouplingPair(
-    key: string,
-    shared: number,
-    fileCommitCounts: Map<number, number>,
-    minShared: number,
-    minJaccard: number,
+    params: CouplingPairEvaluationParams,
 ): NativeTemporalCouplingPair | null {
+    const { key, shared, fileCommitCounts, minShared, minJaccard } = params;
     if (shared < minShared) {
         return null;
     }
@@ -474,19 +495,19 @@ function parseAndEvaluateCouplingPair(
 }
 
 function compareCouplingPairs(
-    a: NativeTemporalCouplingPair,
-    b: NativeTemporalCouplingPair,
+    firstPair: NativeTemporalCouplingPair,
+    secondPair: NativeTemporalCouplingPair,
 ): number {
-    if (b.jaccardSimilarity !== a.jaccardSimilarity) {
-        return b.jaccardSimilarity - a.jaccardSimilarity;
+    if (secondPair.jaccardSimilarity !== firstPair.jaccardSimilarity) {
+        return secondPair.jaccardSimilarity - firstPair.jaccardSimilarity;
     }
-    if (b.sharedCommits !== a.sharedCommits) {
-        return b.sharedCommits - a.sharedCommits;
+    if (secondPair.sharedCommits !== firstPair.sharedCommits) {
+        return secondPair.sharedCommits - firstPair.sharedCommits;
     }
-    if (a.fileA !== b.fileA) {
-        return a.fileA - b.fileA;
+    if (firstPair.fileA !== secondPair.fileA) {
+        return firstPair.fileA - secondPair.fileA;
     }
-    return a.fileB - b.fileB;
+    return firstPair.fileB - secondPair.fileB;
 }
 
 /**
@@ -511,19 +532,19 @@ export function computeTemporalCouplingShim(
         pairSharedCounts: new Map<string, number>(),
     };
 
-    for (const cs of changesets) {
-        recordChangeset(cs, state);
+    for (const changeset of changesets) {
+        recordChangeset(changeset, state);
     }
 
     const pairs: NativeTemporalCouplingPair[] = [];
     for (const [key, shared] of state.pairSharedCounts.entries()) {
-        const pair = parseAndEvaluateCouplingPair(
+        const pair = parseAndEvaluateCouplingPair({
             key,
             shared,
-            state.fileCommitCounts,
+            fileCommitCounts: state.fileCommitCounts,
             minShared,
             minJaccard,
-        );
+        });
         if (pair !== null) {
             pairs.push(pair);
         }
@@ -558,59 +579,27 @@ export function measureLineIndentLevelShim(line: string): number {
     return Math.floor(spaces / SPACE_INDENT_SIZE);
 }
 
-/**
- * Pure JavaScript fallback for Bumpy Road structural complexity evaluation.
- *
- * @param lines - Source lines of the file being inspected.
- * @param startLine - One-based first line of the function region to evaluate.
- * @param endLine - One-based last line of that region, inclusive.
- * @returns Nested-depth profile for the region; unrunnable bounds yield a zero, non-bumpy result.
- */
-export function evaluateBumpyRoadShim(
-    lines: readonly string[],
-    startLine: number,
-    endLine: number,
-): NativeBumpyRoadResult {
-    const totalLines = endLine - startLine + 1;
-    if (!lines || totalLines < MIN_BUMPY_LINE_SPAN || startLine < 1 || endLine > lines.length) {
-        return {
-            bumpyScore: 0.0,
-            isBumpy: false,
-            meanDepth: 0.0,
-            varianceDepth: 0.0,
-            spikesCount: 0,
-        };
-    }
+const ZERO_BUMPY_ROAD_RESULT: NativeBumpyRoadResult = Object.freeze({
+    bumpyScore: 0.0,
+    isBumpy: false,
+    meanDepth: 0.0,
+    varianceDepth: 0.0,
+    spikesCount: 0,
+});
 
-    let nonBlankCount = 0;
-    let depthSum = 0;
-    let baseIndent = -1;
+interface DepthVarianceCalculationParams {
+    readonly lines: readonly string[];
+    readonly startLine: number;
+    readonly endLine: number;
+    readonly baseIndent: number;
+    readonly meanDepth: number;
+}
 
-    for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
-        const line = lines[lineNum - 1];
-        if (!line || line.trim().length === 0) {
-            continue;
-        }
-        const depth = measureLineIndentLevelShim(line);
-        if (baseIndent === -1) {
-            baseIndent = depth;
-        }
-        const relativeDepth = Math.max(0, depth - baseIndent);
-        depthSum += relativeDepth;
-        nonBlankCount++;
-    }
-
-    if (nonBlankCount < MIN_BUMPY_LINE_SPAN) {
-        return {
-            bumpyScore: 0.0,
-            isBumpy: false,
-            meanDepth: 0.0,
-            varianceDepth: 0.0,
-            spikesCount: 0,
-        };
-    }
-
-    const meanDepth = depthSum / nonBlankCount;
+function computeDepthVarianceAndSpikes(params: DepthVarianceCalculationParams): {
+    varianceSum: number;
+    spikesCount: number;
+} {
+    const { lines, startLine, endLine, baseIndent, meanDepth } = params;
     let varianceSum = 0;
     let spikesCount = 0;
     let prevDepth = 0;
@@ -631,9 +620,60 @@ export function evaluateBumpyRoadShim(
         prevDepth = relativeDepth;
     }
 
+    return { varianceSum, spikesCount };
+}
+
+/**
+ * Pure JavaScript fallback for Bumpy Road structural complexity evaluation.
+ *
+ * @param lines - Source lines of the file being inspected.
+ * @param startLine - One-based first line of the function region to evaluate.
+ * @param endLine - One-based last line of that region, inclusive.
+ * @returns Nested-depth profile for the region; unrunnable bounds yield a zero, non-bumpy result.
+ */
+export function evaluateBumpyRoadShim(
+    lines: readonly string[],
+    startLine: number,
+    endLine: number,
+): NativeBumpyRoadResult {
+    const totalLines = endLine - startLine + 1;
+    if (!lines || totalLines < MIN_BUMPY_LINE_SPAN || startLine < 1 || endLine > lines.length) {
+        return ZERO_BUMPY_ROAD_RESULT;
+    }
+
+    let nonBlankCount = 0;
+    let depthSum = 0;
+    let baseIndent = -1;
+
+    for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
+        const line = lines[lineNum - 1];
+        if (!line || line.trim().length === 0) {
+            continue;
+        }
+        const depth = measureLineIndentLevelShim(line);
+        if (baseIndent === -1) {
+            baseIndent = depth;
+        }
+        depthSum += Math.max(0, depth - baseIndent);
+        nonBlankCount++;
+    }
+
+    if (nonBlankCount < MIN_BUMPY_LINE_SPAN) {
+        return ZERO_BUMPY_ROAD_RESULT;
+    }
+
+    const meanDepth = depthSum / nonBlankCount;
+    const { varianceSum, spikesCount } = computeDepthVarianceAndSpikes({
+        lines,
+        startLine,
+        endLine,
+        baseIndent,
+        meanDepth,
+    });
+
     const varianceDepth = +(varianceSum / nonBlankCount).toFixed(2);
     const rawScore = spikesCount * varianceDepth * Math.max(1.0, meanDepth);
-    const bumpyScore = +Math.min(100.0, rawScore).toFixed(1);
+    const bumpyScore = +Math.min(100.0, rawScore).toFixed(2);
     const isBumpy = bumpyScore >= MIN_BUMPY_SCORE_THRESHOLD && spikesCount >= 3;
 
     return {

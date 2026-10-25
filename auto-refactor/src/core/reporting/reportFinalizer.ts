@@ -205,8 +205,6 @@ export function computeSummary(report: ScanReport): void {
     report.summary.uncertainty = summarizeUncertainty(report.issues);
 }
 
-/** Exported alias maintaining 100% backward compatibility for callers. */
-export const recomputeSummary = computeSummary;
 
 /**
  * Validates that discovered include globs matched at least one scanned file.

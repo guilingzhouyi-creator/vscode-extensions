@@ -820,7 +820,7 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
     }
 }
 
-export { finalizeReport, recomputeSummary, groupCounts } from './core/reporting/reportFinalizer';
+export { finalizeReport, computeSummary, groupCounts } from './core/reporting/reportFinalizer';
 
 export { resolveConfig, Scanner, Logger, AutoRefactorError, render, CacheStore };
 export { scanDiffStream } from './core/stream';
@@ -849,6 +849,7 @@ export { ArchitectureAnalyzer } from './analyzers/architecture';
 export { PerformanceAnalyzer } from './analyzers/performance';
 export { CommentAnalyzer } from './analyzers/comments';
 export { HygieneAnalyzer } from './analyzers/hygiene';
+export { ConcurrencyAnalyzer } from './analyzers/concurrency';
 export { SecurityAnalyzer } from './analyzers/security';
 export { DataArchitectureAnalyzer } from './analyzers/data-architecture';
 export { TestModernityAnalyzer } from './analyzers/test-modernity';
@@ -951,7 +952,9 @@ export * from './core/intelligence/dataArchitecture';
 export * from './core/scoring';
 export * from './core/math';
 export * from './core/algorithms';
-export * from './core/data-structures';
+export * from './core/data-structures/lru-cache';
+export * from './core/data-structures/ring-buffer';
+export * from './core/data-structures/id-interner';
 
 // ---- Dynamic Analysis Plane Telemetry & Profiling ----
 export * from './core/dynamic';
@@ -971,6 +974,10 @@ export * from './core/rules/pyramid';
 // ---- Standard Terminology SSOT & Dual-Faced Architecture ----
 export * from './core/governance/standard-terminology';
 export { toAgentReview, toCapp, toPraxisPresentation } from './core/reporters';
+
+// ---- Agent Audit Schema (AAS v1.0) & Token-Frugal Reporting ----
+export * from './core/reporting/aas-types';
+export { buildAasReport, toAasJson } from './core/reporting/aas-reporter';
 
 // ---- Compact Agent Schema (CAS v3) Projection & Legacy Artifact Migration ----
 export * from './core/reporting/compact-report-types';
@@ -997,6 +1004,7 @@ export * from './core/architecture';
 export * from './core/trajectory';
 
 // ---- Fine-Grained AST Slice & Sparse MoE Router ----
+export * from './core/experts';
 export * from './core/router/sliceTypes';
 export * from './core/router/sliceExtractor';
 export * from './core/router/sparseMoEGate';
@@ -1027,3 +1035,11 @@ export * from './core/evolution';
 
 // ---- Coverage Telemetry Ingestion & Dynamic Feedback ----
 export * from './core/telemetry';
+
+// ---- DeepInfer Disaggregated Serving & Worker Pool Management ----
+export {
+    handleAsymmetricScan,
+    handleSliceAudit,
+    createDaemonContext,
+} from './daemon/scanHandler';
+export { WorkerPoolManager } from './core/scheduler/worker-pool-manager';

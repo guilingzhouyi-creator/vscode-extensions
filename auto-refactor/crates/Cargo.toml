@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "auto-refactor-core",
+    "auto-refactor-engine",
     "ops-diff",
     "ops-graph",
     "ops-pattern",
@@ -8,5 +9,6 @@ members = [
     "ops-clone",
     "ops-math",
     "ops-vector",
+    "ops-scope",
 ]
 resolver = "2"

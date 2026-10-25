@@ -1,0 +1,17 @@
+[package]
+name = "auto-refactor-engine"
+version = "0.4.0"
+edition = "2021"
+description = "Pure Rust native AST review and static analysis engine for Praxis kernel integration (zero Node/NAPI dependency)."
+authors = ["Google DeepMind Advanced Agentic Coding Pair"]
+license = "MIT"
+
+[dependencies]
+ops-diff = { path = "../ops-diff" }
+ops-graph = { path = "../ops-graph" }
+ops-pattern = { path = "../ops-pattern" }
+ops-mask = { path = "../ops-mask" }
+ops-clone = { path = "../ops-clone" }
+ops-math = { path = "../ops-math" }
+ops-vector = { path = "../ops-vector" }
+ops-scope = { path = "../ops-scope" }

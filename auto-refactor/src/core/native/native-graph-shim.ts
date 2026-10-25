@@ -80,12 +80,14 @@ function traverseStrongConnect(node: string, state: TarjanState): void {
 
 function extractConnectedComponent(node: string, state: TarjanState): void {
     const scc: string[] = [];
-    let popped: string;
-    do {
-        popped = state.stack.pop()!;
+    while (state.stack.length > 0) {
+        const popped = state.stack.pop()!;
         state.onStack.delete(popped);
         scc.push(popped);
-    } while (popped !== node);
+        if (popped === node) {
+            break;
+        }
+    }
 
     state.sccs.push(scc);
     if (scc.length > 1) {

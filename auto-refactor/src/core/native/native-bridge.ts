@@ -16,6 +16,7 @@
 
 import type {
     INativeCore,
+    NativeBindingInput,
     NativeBraceBalance,
     NativeBumpyRoadResult,
     NativeCloneBlock,
@@ -30,18 +31,16 @@ import type {
     NativeMaskConfig,
     NativeMaskedSource,
     NativePatternMatch,
+    NativeScopeInput,
+    NativeSecretFinding,
+    NativeSecretScanOptions,
+    NativeShadowingResult,
     NativeStatisticalMoments,
     NativeTemporalCouplingPair,
 } from './native-types';
-import { computeLineStartsAndHashes, linesOf, type LineIndex } from '../diff/edit-diff';
-import { histogramDiff } from '../diff/histogram-diff';
-import {
-    DIFF_OP_EQUAL,
-    DIFF_OP_DELETE,
-    DIFF_OP_INSERT,
-    DIFF_OP_EQUAL_SPAN,
-    type DiffOp,
-} from '../diff/myers-algorithm';
+import { computeHistogramDiffShim } from './native-diff-shim';
+import { analyzeScopeShadowingShim } from './native-scope-shim';
+import { scanSecretsShim } from './native-secrets-shim';
 import { countLineStats } from '../../utils/linestats';
 import { maskSourceTextJs } from '../policy/source-mask';
 import {
@@ -89,6 +88,7 @@ const CAPABILITY_TARJAN_SCC = 'tarjan-scc';
 const CAPABILITY_TOPOLOGICAL_SORT = 'topological-sort';
 const CAPABILITY_FAST_PATTERN_MATCH = 'fast-pattern-match';
 const CAPABILITY_SIMD_SOURCE_MASK = 'simd-source-mask';
+const CAPABILITY_SIMD_SOURCE_MASK_COMPACT = 'simd-source-mask-compact';
 const CAPABILITY_CLONE_DETECTION = 'clone-detection';
 const CAPABILITY_MINHASH_LSH = 'minhash-lsh';
 const CAPABILITY_DOMINATOR_TREE = 'dominator-tree';
@@ -105,6 +105,7 @@ const CAPABILITY_POPOVICIU_DISPERSION = 'popoviciu-dispersion';
 const CAPABILITY_BRACE_SCAN = 'brace-scan';
 const CAPABILITY_WARSHALL_CLOSURE = 'warshall-closure';
 const CAPABILITY_VECTOR_MATH = 'vector-math';
+const CAPABILITY_SCOPE_SHADOWING = 'scope-shadowing';
 
 const CAPABILITY_SIMD_HISTOGRAM_DIFF = 'simd-histogram-diff';
 const CAPABILITY_PARALLEL_TARJAN_SCC = 'parallel-tarjan-scc';
@@ -116,6 +117,7 @@ const SHIM_CAPABILITIES: readonly string[] = Object.freeze([
     CAPABILITY_TOPOLOGICAL_SORT,
     CAPABILITY_FAST_PATTERN_MATCH,
     CAPABILITY_SIMD_SOURCE_MASK,
+    CAPABILITY_SIMD_SOURCE_MASK_COMPACT,
     CAPABILITY_CLONE_DETECTION,
     CAPABILITY_MINHASH_LSH,
     CAPABILITY_DOMINATOR_TREE,
@@ -132,6 +134,7 @@ const SHIM_CAPABILITIES: readonly string[] = Object.freeze([
     CAPABILITY_BRACE_SCAN,
     CAPABILITY_WARSHALL_CLOSURE,
     CAPABILITY_VECTOR_MATH,
+    CAPABILITY_SCOPE_SHADOWING,
 ]);
 
 const NATIVE_CORE_CAPABILITIES: readonly string[] = Object.freeze([
@@ -142,102 +145,6 @@ const NATIVE_CORE_CAPABILITIES: readonly string[] = Object.freeze([
 ]);
 
 const MICRO_SOURCE_MASK_THRESHOLD = 256;
-
-interface HunkBuilderState {
-    oldStart: number;
-    newStart: number;
-    oldLinesCount: number;
-    newLinesCount: number;
-    lines: string[];
-    firstOldAssigned: boolean;
-    firstNewAssigned: boolean;
-}
-
-function applyDiffOpEqual(op: DiffOp, oldLines: string[], state: HunkBuilderState): void {
-    if (!state.firstOldAssigned) {
-        state.oldStart = op.aIdx + 1;
-        state.firstOldAssigned = true;
-    }
-    if (!state.firstNewAssigned) {
-        state.newStart = op.bIdx + 1;
-        state.firstNewAssigned = true;
-    }
-    state.oldLinesCount++;
-    state.newLinesCount++;
-    state.lines.push(' ' + (oldLines[op.aIdx] ?? ''));
-}
-
-function applyDiffOpDelete(op: DiffOp, oldLines: string[], state: HunkBuilderState): void {
-    if (!state.firstOldAssigned) {
-        state.oldStart = op.aIdx + 1;
-        state.firstOldAssigned = true;
-    }
-    state.oldLinesCount++;
-    state.lines.push('-' + (oldLines[op.aIdx] ?? ''));
-}
-
-function applyDiffOpInsert(op: DiffOp, newLines: string[], state: HunkBuilderState): void {
-    if (!state.firstNewAssigned) {
-        state.newStart = op.bIdx + 1;
-        state.firstNewAssigned = true;
-    }
-    state.newLinesCount++;
-    state.lines.push('+' + (newLines[op.bIdx] ?? ''));
-}
-
-/**
- * Drop the synthetic line start that follows a trailing newline.
- *
- * `computeLineStarts` records an offset immediately after every `\n`, so content ending in a
- * newline yields a final start that denotes an empty final line. The Rust operator does not
- * emit that line, and keeping it made the shim's diff hunks one context line longer and the
- * hunk spans one line larger than the native ones for identical input. The start is removed
- * only when it genuinely points past the last character.
- *
- * @param content - Source text the offsets were computed from.
- * @param starts - Line-start offsets.
- * @returns Offsets without the trailing empty line.
- */
-function trimTrailingLineStart(content: string, starts: number[]): number[] {
-    if (starts.length > 0 && starts[starts.length - 1] >= content.length) {
-        return starts.slice(0, starts.length - 1);
-    }
-    return starts;
-}
-
-/**
- * Split content into lines the way the Rust operator does.
- *
- * `linesOf` derives the last line's end from `content.length`, so a file ending in a newline
- * yields a final line that still carries its `\n`, while every earlier line has already had
- * the terminator removed. The Rust `split_lines` strips the terminator uniformly, so the
- * trailing newline is trimmed here to keep both engines byte-identical.
- *
- * @param content - Source text to split.
- * @param starts - Line-start offsets, already trimmed of any synthetic trailing line.
- * @returns One string per line, without line terminators.
- */
-function splitLinesLikeNative(content: string, starts: number[]): string[] {
-    const out = linesOf(content, starts);
-    if (out.length > 0) {
-        out[out.length - 1] = out[out.length - 1].replace(/\r?\n$/, '');
-    }
-    return out;
-}
-
-/**
- * Line hashes truncated to match a trimmed line count.
- *
- * @param index - Line index produced by `computeLineStartsAndHashes`.
- * @param lineCount - Number of lines after trailing-line trimming.
- * @returns Hash array of exactly `lineCount` entries.
- */
-function trimTrailingHash(index: LineIndex, lineCount: number): Uint32Array {
-    if (index.hashes.length === lineCount) {
-        return index.hashes;
-    }
-    return index.hashes.slice(0, lineCount);
-}
 
 /**
  * Pure JavaScript fallback implementation of INativeCore.
@@ -267,31 +174,7 @@ export class PureJsNativeShim implements INativeCore {
      * Computes line-level histogram diff hunks between oldContent and newContent.
      */
     public computeHistogramDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
-        if (oldContent === newContent) {
-            return [];
-        }
-
-        // The Rust `split_lines` yields one line per '\n' and does not synthesise a trailing
-        // empty line, whereas `computeLineStarts` records a start offset just past a final
-        // newline. Feeding that extra empty line into the diff made the shim report one more
-        // context line and a larger hunk span than the native operator for the same input,
-        // so the trailing start is dropped here to keep the two engines byte-identical.
-        const oldIndex = computeLineStartsAndHashes(oldContent);
-        const newIndex = computeLineStartsAndHashes(newContent);
-        const oldLines = splitLinesLikeNative(
-            oldContent,
-            trimTrailingLineStart(oldContent, oldIndex.starts),
-        );
-        const newLines = splitLinesLikeNative(
-            newContent,
-            trimTrailingLineStart(newContent, newIndex.starts),
-        );
-
-        const oldHashes = trimTrailingHash(oldIndex, oldLines.length);
-        const newHashes = trimTrailingHash(newIndex, newLines.length);
-
-        const ops = histogramDiff(oldLines, newLines, oldHashes, newHashes);
-        return this.assembleHunks(ops, oldLines, newLines, this.defaultContextLines);
+        return computeHistogramDiffShim(oldContent, newContent, this.defaultContextLines);
     }
 
     /**
@@ -330,6 +213,23 @@ export class PureJsNativeShim implements INativeCore {
             lines: stats.lines,
             nonBlankLines: stats.nonBlankLines,
         };
+    }
+
+    /**
+     * Pure JS fallback for compact source code masking, emitting a single joined string.
+     */
+    public maskSourceCodeCompact(content: string, config: NativeMaskConfig): string {
+        const maskedResult = maskSourceTextJs(content, {
+            lineComment: config.lineComment,
+            blockComment:
+                config.blockCommentOpen && config.blockCommentClose
+                    ? { open: config.blockCommentOpen, close: config.blockCommentClose }
+                    : undefined,
+            quoteChars: config.quoteChars,
+            multilineTemplates: config.multilineTemplates,
+            regexLiterals: config.regexLiterals,
+        });
+        return maskedResult.masked.join('\n');
     }
 
     /**
@@ -512,185 +412,55 @@ export class PureJsNativeShim implements INativeCore {
     /**
      * Computes inner dot product between two vector slices.
      */
-    public computeVectorDotProduct(a: readonly number[], b: readonly number[]): number {
-        return computeVectorDotProductShim(a, b);
+    public computeVectorDotProduct(vectorA: readonly number[], vectorB: readonly number[]): number {
+        return computeVectorDotProductShim(vectorA, vectorB);
     }
 
     /**
      * Computes cosine similarity between two vector slices.
      */
-    public computeVectorCosineSimilarity(a: readonly number[], b: readonly number[]): number {
-        return computeVectorCosineSimilarityShim(a, b);
+    public computeVectorCosineSimilarity(vectorA: readonly number[], vectorB: readonly number[]): number {
+        return computeVectorCosineSimilarityShim(vectorA, vectorB);
     }
 
     /**
      * Computes Euclidean distance between two vector slices.
      */
-    public computeVectorEuclideanDistance(a: readonly number[], b: readonly number[]): number {
-        return computeVectorEuclideanDistanceShim(a, b);
+    public computeVectorEuclideanDistance(vectorA: readonly number[], vectorB: readonly number[]): number {
+        return computeVectorEuclideanDistanceShim(vectorA, vectorB);
     }
 
     /**
-     * Finds preceding equal context line count before a cluster start.
+     * Pure JS fallback analyzing variable scope hierarchy and discovering symbol shadowing.
      */
-    private findPrecedingContextCount(
-        ops: DiffOp[],
-        clusterStart: number,
-        contextLines: number,
-    ): number {
-        let count = 0;
-        let ctxIdx = clusterStart - 1;
-        while (ctxIdx >= 0 && ops[ctxIdx].type === DIFF_OP_EQUAL && count < contextLines) {
-            count++;
-            ctxIdx--;
-        }
-        return count;
+    public analyzeScopeShadowing(
+        scopes: readonly NativeScopeInput[],
+        bindings: readonly NativeBindingInput[],
+    ): NativeShadowingResult[] {
+        return analyzeScopeShadowingShim(scopes, bindings);
     }
 
     /**
-     * Determines cluster end index, bridging adjacent change blocks separated by few equal lines.
+     * Pure JS fallback scanning source text for hardcoded secrets and credentials.
      */
-    private findClusterEnd(ops: DiffOp[], clusterStart: number, contextLines: number): number {
-        let clusterEnd = clusterStart;
-        while (clusterEnd < ops.length) {
-            if (
-                ops[clusterEnd].type === DIFF_OP_DELETE ||
-                ops[clusterEnd].type === DIFF_OP_INSERT
-            ) {
-                clusterEnd++;
-                continue;
-            }
-            if (ops[clusterEnd].type === DIFF_OP_EQUAL_SPAN) {
-                break;
-            }
-            let equalLookahead = clusterEnd;
-            while (equalLookahead < ops.length && ops[equalLookahead].type === DIFF_OP_EQUAL) {
-                equalLookahead++;
-            }
-            const canBridge =
-                equalLookahead < ops.length && equalLookahead - clusterEnd <= contextLines * 2;
-            if (canBridge) {
-                clusterEnd = equalLookahead;
-            } else {
-                break;
-            }
-        }
-        return clusterEnd;
-    }
-
-    /**
-     * Finds trailing equal context line count after a cluster end.
-     */
-    private findTrailingContextCount(
-        ops: DiffOp[],
-        clusterEnd: number,
-        contextLines: number,
-    ): number {
-        let count = 0;
-        let trailIdx = clusterEnd;
-        while (
-            trailIdx < ops.length &&
-            ops[trailIdx].type === DIFF_OP_EQUAL &&
-            count < contextLines
-        ) {
-            count++;
-            trailIdx++;
-        }
-        return count;
-    }
-
-    /**
-     * Builds a single NativeDiffHunk from DiffOp operations within the specified range.
-     */
-    private buildHunk(context: {
-        readonly ops: DiffOp[];
-        readonly startIdx: number;
-        readonly endIdx: number;
-        readonly oldLines: string[];
-        readonly newLines: string[];
-    }): NativeDiffHunk {
-        const state: HunkBuilderState = {
-            oldStart: 0,
-            newStart: 0,
-            oldLinesCount: 0,
-            newLinesCount: 0,
-            lines: [],
-            firstOldAssigned: false,
-            firstNewAssigned: false,
-        };
-
-        for (let opIdx = context.startIdx; opIdx < context.endIdx; opIdx++) {
-            const op = context.ops[opIdx];
-            if (op.type === DIFF_OP_EQUAL) {
-                applyDiffOpEqual(op, context.oldLines, state);
-                continue;
-            }
-            if (op.type === DIFF_OP_DELETE) {
-                applyDiffOpDelete(op, context.oldLines, state);
-                continue;
-            }
-            if (op.type === DIFF_OP_INSERT) {
-                applyDiffOpInsert(op, context.newLines, state);
-            }
-        }
-
-        return {
-            oldStart: state.oldStart || 1,
-            oldLines: state.oldLinesCount,
-            newStart: state.newStart || 1,
-            newLines: state.newLinesCount,
-            lines: state.lines,
-        };
-    }
-
-    /**
-     * Clusters DiffOp operations into contiguous unified diff hunks with context lines.
-     */
-    private assembleHunks(
-        ops: DiffOp[],
-        oldLines: string[],
-        newLines: string[],
-        contextLines: number,
-    ): NativeDiffHunk[] {
-        const hunks: NativeDiffHunk[] = [];
-        let opIndex = 0;
-
-        while (opIndex < ops.length) {
-            // Skip leading unchanged lines
-            if (ops[opIndex].type === DIFF_OP_EQUAL || ops[opIndex].type === DIFF_OP_EQUAL_SPAN) {
-                opIndex++;
-                continue;
-            }
-
-            const clusterStart = opIndex;
-            const contextBefore = this.findPrecedingContextCount(ops, clusterStart, contextLines);
-            const hunkOpsStart = clusterStart - contextBefore;
-
-            const clusterEnd = this.findClusterEnd(ops, clusterStart, contextLines);
-            const contextAfter = this.findTrailingContextCount(ops, clusterEnd, contextLines);
-            const hunkOpsEnd = clusterEnd + contextAfter;
-
-            hunks.push(
-                this.buildHunk({
-                    ops,
-                    startIdx: hunkOpsStart,
-                    endIdx: hunkOpsEnd,
-                    oldLines,
-                    newLines,
-                }),
-            );
-            opIndex = hunkOpsEnd;
-        }
-
-        return hunks;
+    public scanSecretsNative(
+        sourceText: string,
+        options?: NativeSecretScanOptions,
+    ): NativeSecretFinding[] {
+        return scanSecretsShim(sourceText, options);
     }
 }
 
 interface RawNativeBinding {
+    readonly scanSecretsNative?: (
+        sourceText: string,
+        options?: NativeSecretScanOptions,
+    ) => NativeSecretFinding[];
     readonly computeHistogramDiff: (oldContent: string, newContent: string) => NativeDiffHunk[];
     readonly analyzeDependencyGraph: (edges: [string, string][]) => NativeGraphAnalysis;
     readonly fastPatternMatch: (sourceText: string, patterns: string[]) => NativePatternMatch[];
     readonly maskSourceCode: (content: string, config: NativeMaskConfig) => NativeMaskedSource;
+    readonly maskSourceCodeCompact?: (content: string, config: NativeMaskConfig) => string;
     readonly countDuplicateLines: (content: string) => number;
     readonly detectCloneBlocks: (content: string, minCloneLines: number) => NativeCloneBlock[];
     readonly computeMinHash?: (content: string, numPermutations?: number) => number[];
@@ -739,12 +509,16 @@ interface RawNativeBinding {
     ) => number;
     readonly countBracesDetailed?: (line: string) => NativeBraceBalance;
     readonly computeWarshallTransitiveClosure?: (matrix: Uint8Array, size: number) => Uint8Array;
-    readonly computeVectorDotProduct?: (a: readonly number[], b: readonly number[]) => number;
-    readonly computeVectorCosineSimilarity?: (a: readonly number[], b: readonly number[]) => number;
+    readonly computeVectorDotProduct?: (vectorA: readonly number[], vectorB: readonly number[]) => number;
+    readonly computeVectorCosineSimilarity?: (vectorA: readonly number[], vectorB: readonly number[]) => number;
     readonly computeVectorEuclideanDistance?: (
-        a: readonly number[],
-        b: readonly number[],
+        vectorA: readonly number[],
+        vectorB: readonly number[],
     ) => number;
+    readonly analyzeScopeShadowing?: (
+        scopes: readonly NativeScopeInput[],
+        bindings: readonly NativeBindingInput[],
+    ) => NativeShadowingResult[];
     readonly version?: string;
     readonly VERSION?: string;
 }
@@ -785,6 +559,9 @@ function assembleNativeBindingCore(
             }
             return binding.maskSourceCode(content, config);
         },
+        maskSourceCodeCompact: selectBinding(binding.maskSourceCodeCompact, (content, config) =>
+            jsShim.maskSourceCodeCompact(content, config),
+        ),
         countDuplicateLines: binding.countDuplicateLines,
         detectCloneBlocks: binding.detectCloneBlocks,
         computeMinHash: resolveMinHashBinding(binding, jsShim),
@@ -843,16 +620,22 @@ function assembleNativeBindingCore(
             binding.computeWarshallTransitiveClosure,
             (matrix, size) => jsShim.computeWarshallTransitiveClosure(matrix, size),
         ),
-        computeVectorDotProduct: selectBinding(binding.computeVectorDotProduct, (a, b) =>
-            jsShim.computeVectorDotProduct(a, b),
+        computeVectorDotProduct: selectBinding(binding.computeVectorDotProduct, (vectorA, vectorB) =>
+            jsShim.computeVectorDotProduct(vectorA, vectorB),
         ),
         computeVectorCosineSimilarity: selectBinding(
             binding.computeVectorCosineSimilarity,
-            (a, b) => jsShim.computeVectorCosineSimilarity(a, b),
+            (vectorA, vectorB) => jsShim.computeVectorCosineSimilarity(vectorA, vectorB),
         ),
         computeVectorEuclideanDistance: selectBinding(
             binding.computeVectorEuclideanDistance,
-            (a, b) => jsShim.computeVectorEuclideanDistance(a, b),
+            (vectorA, vectorB) => jsShim.computeVectorEuclideanDistance(vectorA, vectorB),
+        ),
+        analyzeScopeShadowing: selectBinding(binding.analyzeScopeShadowing, (scopes, bindings) =>
+            jsShim.analyzeScopeShadowing(scopes, bindings),
+        ),
+        scanSecretsNative: selectBinding(binding.scanSecretsNative, (sourceText, options) =>
+            jsShim.scanSecretsNative(sourceText, options),
         ),
         getStatus: () => ({
             isNativeAvailable: true,
@@ -1014,9 +797,10 @@ export function computeNativeMinHash(content: string, numPermutations?: number):
  * @returns Array of detected similar file pairs with similarity scores.
  */
 export function findNativeClonePairs(signatures: number[][], threshold: number): NativeClonePair[] {
-    return !signatures || signatures.length === 0
-        ? []
-        : nativeCore.findClonePairs(signatures, threshold);
+    if (!signatures || signatures.length === 0) {
+        return [];
+    }
+    return nativeCore.findClonePairs(signatures, threshold);
 }
 
 /**
@@ -1215,40 +999,40 @@ export function computeNativeWarshallTransitiveClosure(
 /**
  * Computes inner dot product between two vector slices.
  *
- * @param a - First numerical vector.
- * @param b - Second numerical vector.
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
  * @returns Dot product scalar value.
  */
-export function computeNativeVectorDotProduct(a: readonly number[], b: readonly number[]): number {
-    return nativeCore.computeVectorDotProduct(a, b);
+export function computeNativeVectorDotProduct(vectorA: readonly number[], vectorB: readonly number[]): number {
+    return nativeCore.computeVectorDotProduct(vectorA, vectorB);
 }
 
 /**
  * Computes cosine similarity between two vector slices.
  *
- * @param a - First numerical vector.
- * @param b - Second numerical vector.
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
  * @returns Cosine similarity bounded in [-1.0, 1.0].
  */
 export function computeNativeVectorCosineSimilarity(
-    a: readonly number[],
-    b: readonly number[],
+    vectorA: readonly number[],
+    vectorB: readonly number[],
 ): number {
-    return nativeCore.computeVectorCosineSimilarity(a, b);
+    return nativeCore.computeVectorCosineSimilarity(vectorA, vectorB);
 }
 
 /**
  * Computes Euclidean distance between two vector slices.
  *
- * @param a - First numerical vector.
- * @param b - Second numerical vector.
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
  * @returns Euclidean distance scalar.
  */
 export function computeNativeVectorEuclideanDistance(
-    a: readonly number[],
-    b: readonly number[],
+    vectorA: readonly number[],
+    vectorB: readonly number[],
 ): number {
-    return nativeCore.computeVectorEuclideanDistance(a, b);
+    return nativeCore.computeVectorEuclideanDistance(vectorA, vectorB);
 }
 
 // ─── Substantive Backwards-Compatibility Aliases ────────────────────────────
@@ -1318,3 +1102,23 @@ export const nativeVectorCosineSimilarity = computeNativeVectorCosineSimilarity;
 
 /** Backward compatibility alias for computeNativeVectorEuclideanDistance. */
 export const nativeVectorEuclideanDistance = computeNativeVectorEuclideanDistance;
+
+/**
+ * Scans source code for hardcoded credentials and high-entropy sensitive tokens.
+ *
+ * @param sourceText - Target code text.
+ * @param options - Scanning options.
+ * @returns Array of detected NativeSecretFinding items.
+ */
+export function scanNativeSecrets(
+    sourceText: string,
+    options?: NativeSecretScanOptions,
+): NativeSecretFinding[] {
+    if (typeof nativeCore.scanSecretsNative === 'function') {
+        return nativeCore.scanSecretsNative(sourceText, options);
+    }
+    return scanSecretsShim(sourceText, options);
+}
+
+/** Exported alias for scanNativeSecrets. */
+export const scanSecrets = scanNativeSecrets;

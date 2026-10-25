@@ -51,6 +51,14 @@ const VERDICT_BLOCK = 'BLOCK';
 const VERDICT_WARN = 'WARN';
 const VERDICT_PASS = 'PASS';
 const UNKNOWN_GRADE = 'N/A';
+const PROP_TOTAL_DEBT = 'totalDebt';
+const PROP_BLOCKING_WARNING_COUNT = 'blockingWarningCount';
+const PROP_BLOCKING_ERROR_COUNT = 'blockingErrorCount';
+const PROP_FILES_SCANNED = 'filesScanned';
+const PROP_FILES = 'files';
+const PROP_HIGH_DEBT = 'highDebt';
+const PROP_CRITICAL_DEBT = 'criticalDebt';
+const TOOL_WORKSPACE_AUDIT = 'workspace-audit';
 
 /** Aggregate counters derived from a report summary. */
 function summarize(report: ScanReport): CompactCounts {
@@ -62,9 +70,9 @@ function summarize(report: ScanReport): CompactCounts {
         warns: summary.bySeverity.warning ?? 0,
         info: summary.bySeverity.info ?? 0,
     };
-    return summary.suppressedCount === undefined
-        ? counts
-        : { ...counts, suppressed: summary.suppressedCount };
+    return summary.suppressedCount === undefined ?
+        counts :
+        { ...counts, suppressed: summary.suppressedCount };
 }
 
 /** Map a severity label onto its numeric rank; unknown labels rank as informational. */
@@ -75,11 +83,8 @@ function severityRank(severity: string): number {
 /** Map a numeric rank back onto the canonical severity label. */
 function severityLabel(rank: number): Severity {
     const label = COMPACT_SEVERITY_LABEL[rank] ?? SEVERITY_INFO;
-    return label === SEVERITY_ERROR
-        ? SEVERITY_ERROR
-        : label === SEVERITY_WARNING
-          ? SEVERITY_WARNING
-          : SEVERITY_INFO;
+    if (label === SEVERITY_ERROR) return SEVERITY_ERROR;
+    return label === SEVERITY_WARNING ? SEVERITY_WARNING : SEVERITY_INFO;
 }
 
 /** Derive the triage verdict from unsuppressed severity counters. */
@@ -136,23 +141,23 @@ function projectBottlenecks(
 ): CompactBottleneck[] {
     const groups = breakdown?.deductionsByDimension;
     if (!groups) return [];
-    const aggregated = new Map<string, CompactBottleneck>();
+    const bottleneckByKeyMap = new Map<string, CompactBottleneck>();
     for (const [dimension, audit] of Object.entries(groups)) {
         const dimKey = COMPACT_DIMENSION_KEYS[dimension as QualityDimension] ?? dimension;
         for (const entry of audit?.entries ?? []) {
             const rule = entry.rule || DEFAULT_ANALYZER_NAME;
             const points = Number.isFinite(entry.points) ? entry.points : 0;
             const key = `${rule}|${dimKey}`;
-            const existing = aggregated.get(key);
+            const existing = bottleneckByKeyMap.get(key);
             if (existing) {
                 existing.loss += points;
                 existing.count += 1;
             } else {
-                aggregated.set(key, { rule, dim: dimKey, loss: points, count: 1 });
+                bottleneckByKeyMap.set(key, { rule, dim: dimKey, loss: points, count: 1 });
             }
         }
     }
-    return [...aggregated.values()]
+    return [...bottleneckByKeyMap.values()]
         .sort((left, right) => right.loss - left.loss || left.rule.localeCompare(right.rule))
         .slice(0, maxRows);
 }
@@ -190,12 +195,16 @@ function selectIssues(
 }
 
 /** Resolve the palette index for an analyzer name, appending it on first sight. */
-function paletteIndex(palette: string[], index: Map<string, number>, analyzer: string): number {
-    const known = index.get(analyzer);
+function paletteIndex(
+    palette: string[],
+    analyzerToPaletteIndexMap: Map<string, number>,
+    analyzer: string,
+): number {
+    const known = analyzerToPaletteIndexMap.get(analyzer);
     if (known !== undefined) return known;
     const assigned = palette.length;
     palette.push(analyzer);
-    index.set(analyzer, assigned);
+    analyzerToPaletteIndexMap.set(analyzer, assigned);
     return assigned;
 }
 
@@ -220,10 +229,14 @@ function projectVectors(
 ): { pal: string[]; vectors: CompactIssueVector[]; anchors: Record<string, string> } {
     const maxChars = options.maxMessageChars ?? DEFAULT_MAX_MESSAGE_CHARS;
     const pal: string[] = [];
-    const index = new Map<string, number>();
+    const analyzerToPaletteIndexMap = new Map<string, number>();
     const anchors: Record<string, string> = {};
     const vectors = issues.map((issue) => {
-        const vector = toVector(issue, paletteIndex(pal, index, issue.analyzer), maxChars);
+        const vector = toVector(
+            issue,
+            paletteIndex(pal, analyzerToPaletteIndexMap, issue.analyzer),
+            maxChars,
+        );
         if (issue.severity === SEVERITY_ERROR && options.anchorProvider) {
             const slice = options.anchorProvider(issue);
             if (slice) anchors[vector[2]] = slice;
@@ -235,18 +248,18 @@ function projectVectors(
 
 /** Cluster keys indexed by member rule id, so a claim lookup never scans the cluster table. */
 const CLUSTER_KEYS_BY_RULE: ReadonlyMap<string, readonly string[]> = (() => {
-    const index = new Map<string, string[]>();
+    const clusterKeysByRuleMap = new Map<string, string[]>();
     for (const cluster of OVERLAP_CLUSTERS) {
         for (const member of cluster.members) {
-            const keys = index.get(member);
+            const keys = clusterKeysByRuleMap.get(member);
             if (keys) {
                 keys.push(cluster.key);
             } else {
-                index.set(member, [cluster.key]);
+                clusterKeysByRuleMap.set(member, [cluster.key]);
             }
         }
     }
-    return index;
+    return clusterKeysByRuleMap;
 })();
 
 /** Bucket accumulator for one (coordinate, cluster) pair, reused across findings. */
@@ -499,9 +512,9 @@ function readNumber(value: unknown): number | undefined {
 
 /** Narrow an unknown field to a plain object record, or undefined when it is not one. */
 function readObject(value: unknown): Record<string, unknown> | undefined {
-    return typeof value === 'object' && value !== null
-        ? (value as Record<string, unknown>)
-        : undefined;
+    return typeof value === 'object' && value !== null ?
+        (value as Record<string, unknown>) :
+        undefined;
 }
 
 /** Read a numeric field with a zero fallback, for counters that are legitimately absent. */
@@ -575,9 +588,9 @@ function buildSnapshotEnvelope(params: SnapshotEnvelopeParams): CompactScanRepor
 function adaptWorkspaceSnapshot(payload: Record<string, unknown>): CompactScanReport | undefined {
     const score = readNumber(payload.workspaceHealthScore);
     if (score === undefined) return undefined;
-    const debt = readCount(payload, 'totalDebt');
+    const debt = readCount(payload, PROP_TOTAL_DEBT);
     return buildSnapshotEnvelope({
-        tool: 'workspace-audit',
+        tool: TOOL_WORKSPACE_AUDIT,
         version: String(payload.protocolVersion ?? ''),
         ts: String(payload.recordedAt ?? ''),
         root: String(payload.gitRevision ?? ''),
@@ -602,8 +615,8 @@ function adaptWorkspaceSnapshot(payload: Record<string, unknown>): CompactScanRe
 function readBaselineTotal(metricRecord: Record<string, unknown>): number {
     const explicit = readNumber(metricRecord.totalIssues);
     if (explicit !== undefined) return explicit;
-    const warnings = readCount(metricRecord, 'blockingWarningCount');
-    return warnings + readCount(metricRecord, 'blockingErrorCount');
+    const warnings = readCount(metricRecord, PROP_BLOCKING_WARNING_COUNT);
+    return warnings + readCount(metricRecord, PROP_BLOCKING_ERROR_COUNT);
 }
 
 /**
@@ -620,9 +633,9 @@ function readBaselineCounts(
     const total = readBaselineTotal(metricRecord);
     const suppressed = readNumber(metricRecord.suppressedCount);
     return {
-        files: scope ? readCount(scope, 'filesScanned') : 0,
+        files: scope ? readCount(scope, PROP_FILES_SCANNED) : 0,
         issues: total,
-        errors: readCount(metricRecord, 'blockingErrorCount'),
+        errors: readCount(metricRecord, PROP_BLOCKING_ERROR_COUNT),
         warns: readNumber(metricRecord.blockingWarningCount) ?? total,
         info: 0,
         ...(suppressed !== undefined ? { suppressed } : {}),
@@ -680,10 +693,10 @@ function adaptPerformanceBaseline(payload: Record<string, unknown>): CompactScan
         ts: String(payload.generatedAt ?? ''),
         root: String(payload.commit ?? ''),
         counts: {
-            files: corpus ? readCount(corpus, 'files') : 0,
-            issues: readCount(healthRecord, 'highDebt') + readCount(healthRecord, 'criticalDebt'),
-            errors: readCount(healthRecord, 'criticalDebt'),
-            warns: readCount(healthRecord, 'highDebt'),
+            files: corpus ? readCount(corpus, PROP_FILES) : 0,
+            issues: readCount(healthRecord, PROP_HIGH_DEBT) + readCount(healthRecord, PROP_CRITICAL_DEBT),
+            errors: readCount(healthRecord, PROP_CRITICAL_DEBT),
+            warns: readCount(healthRecord, PROP_HIGH_DEBT),
             info: 0,
         },
         score,

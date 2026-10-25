@@ -16,3 +16,4 @@ ops-mask = { path = "../ops-mask" }
 ops-clone = { path = "../ops-clone" }
 ops-math = { path = "../ops-math" }
 ops-vector = { path = "../ops-vector" }
+ops-scope = { path = "../ops-scope" }

@@ -78,6 +78,29 @@ export interface NativeMaskedSource {
 }
 
 /**
+ * Options controlling native secrets scanning.
+ */
+export interface NativeSecretScanOptions {
+    readonly scanEntropy?: boolean;
+    readonly minEntropyLen?: number;
+    readonly entropyThreshold?: number;
+    readonly maxFindings?: number;
+}
+
+/**
+ * Finding emitted by native secret scan operator.
+ */
+export interface NativeSecretFinding {
+    readonly rule: string;
+    readonly kind: string;
+    readonly line: number;
+    readonly column: number;
+    readonly message: string;
+    readonly preview: string;
+    readonly entropy: number;
+}
+
+/**
  * Detected intra-file code clone block.
  */
 export interface NativeCloneBlock {
@@ -171,6 +194,38 @@ export interface NativeBraceBalance {
 }
 
 /**
+ * Compact input record describing a scope boundary for native scope arena construction.
+ */
+export interface NativeScopeInput {
+    readonly parent?: number | null;
+    readonly kind: number;
+    readonly startLine: number;
+    readonly endLine: number;
+}
+
+/**
+ * Compact input record describing a symbol binding for native scope arena construction.
+ */
+export interface NativeBindingInput {
+    readonly scopeId: number;
+    readonly name: string;
+    readonly kind: number;
+    readonly line: number;
+}
+
+/**
+ * Output diagnostic emitted when variable shadowing is discovered in the native scope arena.
+ */
+export interface NativeShadowingResult {
+    readonly symbol: string;
+    readonly innerScopeId: number;
+    readonly innerLine: number;
+    readonly outerScopeId: number;
+    readonly outerLine: number;
+    readonly bindingKind: number;
+}
+
+/**
  * Unified interface implemented by both native Rust core and pure JS shim.
  */
 export interface INativeCore {
@@ -193,6 +248,11 @@ export interface INativeCore {
      * Masks comment and literal regions using the fast native SIMD masking operator.
      */
     maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource;
+
+    /**
+     * Masks comment and literal regions, returning a single compact string without line splitting.
+     */
+    maskSourceCodeCompact(content: string, config: NativeMaskConfig): string;
 
     /**
      * Counts duplicated non-blank lines in source content.
@@ -319,6 +379,22 @@ export interface INativeCore {
      * Computes Euclidean distance between two vector slices.
      */
     computeVectorEuclideanDistance(a: readonly number[], b: readonly number[]): number;
+
+    /**
+     * Analyzes variable scope hierarchy and detects outer-scope symbol shadowing incidents.
+     */
+    analyzeScopeShadowing(
+        scopes: readonly NativeScopeInput[],
+        bindings: readonly NativeBindingInput[],
+    ): NativeShadowingResult[];
+
+    /**
+     * High-performance native regex and Shannon entropy scanner for hardcoded credentials.
+     */
+    scanSecretsNative?(
+        sourceText: string,
+        options?: NativeSecretScanOptions,
+    ): NativeSecretFinding[];
 
     /**
      * Inspects active engine status and capabilities.

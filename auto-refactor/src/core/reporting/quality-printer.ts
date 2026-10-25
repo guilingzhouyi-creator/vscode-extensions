@@ -27,6 +27,11 @@ const QUALITY_DIMENSION_LABEL_WIDTH = 26;
 /** Maximum number of quality rationales printed by `--score`, highest-impact first. */
 const MAX_QUALITY_RATIONALES = 8;
 
+const DEFAULT_EMPTY_PLACEHOLDER = 'none';
+const DEFAULT_SCALE_GRADE = 'standard';
+const TOP_DEPENDENCIES_LIMIT = 5;
+const SDK_NAME_PAD_WIDTH = 20;
+
 /**
  * Print the resolved project stack profile to stdout: language, build systems, frameworks,
  * scale grade, polyglot flag, and partition names.
@@ -37,9 +42,9 @@ const MAX_QUALITY_RATIONALES = 8;
 export function printProjectStackProfile(profile: ProjectProfile, scaleGrade?: string): void {
     process.stdout.write(`\n=== Project Stack Profile ===\n`);
     process.stdout.write(`Primary Language: ${profile.primaryLanguage}\n`);
-    process.stdout.write(`Build Systems:    ${profile.buildSystems.join(', ') || 'none'}\n`);
-    process.stdout.write(`Frameworks:       ${profile.frameworks.join(', ') || 'none'}\n`);
-    process.stdout.write(`Scale Grade:      ${scaleGrade || 'standard'}\n`);
+    process.stdout.write(`Build Systems:    ${profile.buildSystems.join(', ') || DEFAULT_EMPTY_PLACEHOLDER}\n`);
+    process.stdout.write(`Frameworks:       ${profile.frameworks.join(', ') || DEFAULT_EMPTY_PLACEHOLDER}\n`);
+    process.stdout.write(`Scale Grade:      ${scaleGrade || DEFAULT_SCALE_GRADE}\n`);
     process.stdout.write(`Is Polyglot:      ${profile.isPolyglot}\n`);
     if (profile.partitions.length > 0) {
         process.stdout.write(
@@ -57,21 +62,21 @@ export function printProjectStackProfile(profile: ProjectProfile, scaleGrade?: s
 function renderTriPlaneVector(triPlane: UnifiedQualityAssessment): void {
     process.stdout.write(`-------------------------------------------\n`);
     process.stdout.write(`Tri-Plane Unified Governance Vector:\n`);
-    const sv = triPlane.staticVector;
+    const staticVec = triPlane.staticVector;
     const wsPct = (triPlane.weights.Ws * PERCENT_SCALE).toFixed(0);
     process.stdout.write(
         `  • Static Plane Q_s (${wsPct}% wt)   : ${triPlane.staticScore.toFixed(1)} ` +
-            `[A:${sv.A.toFixed(0)} M:${sv.M.toFixed(0)} P:${sv.P.toFixed(0)} ` +
-            `D:${sv.D.toFixed(0)} T:${sv.T.toFixed(0)} R:${sv.R.toFixed(0)} ` +
-            `E:${sv.E.toFixed(0)}]\n`,
+            `[A:${staticVec.A.toFixed(0)} M:${staticVec.M.toFixed(0)} P:${staticVec.P.toFixed(0)} ` +
+            `D:${staticVec.D.toFixed(0)} T:${staticVec.T.toFixed(0)} R:${staticVec.R.toFixed(0)} ` +
+            `E:${staticVec.E.toFixed(0)}]\n`,
     );
     const wdPct = (triPlane.weights.Wd * PERCENT_SCALE).toFixed(0);
     if (triPlane.dynamicVector) {
-        const dv = triPlane.dynamicVector;
+        const dynamicVec = triPlane.dynamicVector;
         process.stdout.write(
             `  • Dynamic Plane Q_d (${wdPct}% wt)  : ${triPlane.dynamicScore.toFixed(1)} ` +
-                `[L:${dv.L.toFixed(0)} T:${dv.T.toFixed(0)} M:${dv.M.toFixed(0)} ` +
-                `C:${dv.C.toFixed(0)} E:${dv.E.toFixed(0)}]\n`,
+                `[L:${dynamicVec.L.toFixed(0)} T:${dynamicVec.T.toFixed(0)} M:${dynamicVec.M.toFixed(0)} ` +
+                `C:${dynamicVec.C.toFixed(0)} E:${dynamicVec.E.toFixed(0)}]\n`,
         );
     } else {
         process.stdout.write(`  • Dynamic Plane Q_d (${wdPct}% wt)  : N/A (Offline Static Only)\n`);
@@ -88,12 +93,12 @@ function renderTriPlaneVector(triPlane: UnifiedQualityAssessment): void {
 /**
  * Print the transparent code quality assessment breakdown and Tri-Plane vectors to stdout.
  *
- * @param q - Overall project quality score breakdown.
+ * @param scoreBreakdown - Overall project quality score breakdown.
  * @param triPlane - Optional tri-plane unified quality assessment.
  * @param reviewProfile - Optional active review profile name.
  */
 export function printQualityScoreAssessment(
-    q: QualityScoreBreakdown,
+    scoreBreakdown: QualityScoreBreakdown,
     triPlane?: UnifiedQualityAssessment,
     reviewProfile?: string,
 ): void {
@@ -103,27 +108,27 @@ export function printQualityScoreAssessment(
     // A NaN composite means no dimension carried a weight (a narrow scan witnesses none of
     // the ten axes). Printing "NaN / 100" would read as a corrupt number, so state plainly
     // that nothing was measured instead.
-    const compositeText = Number.isNaN(q.compositeScore)
+    const compositeText = Number.isNaN(scoreBreakdown.compositeScore)
         ? 'N/A (no quality dimension was measured)'
-        : `${q.compositeScore.toFixed(1)} / 100`;
+        : `${scoreBreakdown.compositeScore.toFixed(1)} / 100`;
     process.stdout.write(
-        `Composite Quality Index: ${compositeText} [Grade: ${q.grade}] ` +
-            `(Confidence: ${(q.confidence * PERCENT_SCALE).toFixed(0)}%)\n`,
+        `Composite Quality Index: ${compositeText} [Grade: ${scoreBreakdown.grade}] ` +
+            `(Confidence: ${(scoreBreakdown.confidence * PERCENT_SCALE).toFixed(0)}%)\n`,
     );
     process.stdout.write(`-------------------------------------------\n`);
-    const notEvaluatedSet = new Set<QualityDimension>(q.notEvaluated ?? []);
-    for (const [dim, val] of Object.entries(q.indices)) {
+    const notEvaluatedSet = new Set<QualityDimension>(scoreBreakdown.notEvaluated ?? []);
+    for (const [dim, val] of Object.entries(scoreBreakdown.indices)) {
         const isNotEvaluated = notEvaluatedSet.has(dim as QualityDimension);
-        const valText = isNotEvaluated ? 'N/A [NOT EVALUATED]' : (val as number).toFixed(1);
+        const valText = isNotEvaluated ? 'N/A [NOT EVALUATED]' : (val as number).toFixed(2);
         process.stdout.write(`  • ${dim.padEnd(QUALITY_DIMENSION_LABEL_WIDTH)}: ${valText}\n`);
     }
     if (triPlane) {
         renderTriPlaneVector(triPlane);
     }
-    if (q.rationales && q.rationales.length > 0) {
+    if (scoreBreakdown.rationales && scoreBreakdown.rationales.length > 0) {
         process.stdout.write(`-------------------------------------------\n`);
         process.stdout.write(`Key Deductions & Rationales:\n`);
-        for (const r of q.rationales.slice(0, MAX_QUALITY_RATIONALES)) {
+        for (const r of scoreBreakdown.rationales.slice(0, MAX_QUALITY_RATIONALES)) {
             process.stdout.write(
                 `  [${r.delta} pts] ${r.dimension}: ${r.reason}${r.line ? ` (L${r.line})` : ''}\n`,
             );
@@ -135,54 +140,54 @@ export function printQualityScoreAssessment(
 /**
  * Print the In-House Autonomy Index and external SDK breakdown to stdout.
  *
- * @param a - Project autonomy evaluation.
+ * @param autonomyEvaluation - Project autonomy evaluation.
  */
-export function printAutonomyAssessment(a: AutonomyEvaluation): void {
+export function printAutonomyAssessment(autonomyEvaluation: AutonomyEvaluation): void {
     process.stdout.write(`\n=== In-House Self-Development Assessment (CAI 2.0) ===\n`);
     process.stdout.write(
-        `Composite Autonomy Index: ${a.compositeAutonomyIndex.toFixed(1)}% ` +
-            `[Grade: ${a.grade}]\n`,
+        `Composite Autonomy Index: ${autonomyEvaluation.compositeAutonomyIndex.toFixed(1)}% ` +
+            `[Grade: ${autonomyEvaluation.grade}]\n`,
     );
-    process.stdout.write(`Status: ${a.gradeDescription}\n`);
-    if (a.confidence) {
-        const confTag = a.confidence.isLowConfidence ? ' [Sparse Sample - Smoothed]' : '';
+    process.stdout.write(`Status: ${autonomyEvaluation.gradeDescription}\n`);
+    if (autonomyEvaluation.confidence) {
+        const confTag = autonomyEvaluation.confidence.isLowConfidence ? ' [Sparse Sample - Smoothed]' : '';
         process.stdout.write(
-            `Bayesian Credible Bounds : [${a.confidence.lowerBound.toFixed(1)}% ~ ` +
-                `${a.confidence.upperBound.toFixed(1)}%] ` +
-                `(Sample Sufficiency: ${(a.confidence.sampleSufficiency * 100).toFixed(0)}%)${confTag}\n`,
+            `Bayesian Credible Bounds : [${autonomyEvaluation.confidence.lowerBound.toFixed(1)}% ~ ` +
+                `${autonomyEvaluation.confidence.upperBound.toFixed(1)}%] ` +
+                `(Sample Sufficiency: ${(autonomyEvaluation.confidence.sampleSufficiency * PERCENT_SCALE).toFixed(0)}%)${confTag}\n`,
         );
     }
     process.stdout.write(`-------------------------------------------\n`);
     process.stdout.write(
-        `  • Effective LOC Autonomy : ${a.dimensions.effectiveLocAutonomy.toFixed(1)}% ` +
-            `(${a.stats.proprietaryEffectiveLoc} / ${a.stats.totalEffectiveLoc} ELOC)\n`,
+        `  • Effective LOC Autonomy : ${autonomyEvaluation.dimensions.effectiveLocAutonomy.toFixed(1)}% ` +
+            `(${autonomyEvaluation.stats.proprietaryEffectiveLoc} / ${autonomyEvaluation.stats.totalEffectiveLoc} ELOC)\n`,
     );
     process.stdout.write(
-        `  • Symbol Call Autonomy   : ${a.dimensions.symbolCallAutonomy.toFixed(1)}% ` +
-            `(${a.stats.internalSymbolCalls} int vs ${a.stats.externalSdkCalls} ext SDK)\n`,
+        `  • Symbol Call Autonomy   : ${autonomyEvaluation.dimensions.symbolCallAutonomy.toFixed(1)}% ` +
+            `(${autonomyEvaluation.stats.internalSymbolCalls} int vs ${autonomyEvaluation.stats.externalSdkCalls} ext SDK)\n`,
     );
     process.stdout.write(
-        `  • Domain Kernel Density  : ${a.dimensions.domainKernelDensity.toFixed(1)}%\n`,
+        `  • Domain Kernel Density  : ${autonomyEvaluation.dimensions.domainKernelDensity.toFixed(1)}%\n`,
     );
     process.stdout.write(
-        `  • Code Originality       : ${a.dimensions.codeOriginality.toFixed(1)}%\n`,
+        `  • Code Originality       : ${autonomyEvaluation.dimensions.codeOriginality.toFixed(1)}%\n`,
     );
     process.stdout.write(
-        `  • Supply Chain Resilience: ${a.dimensions.supplyChainResilience.toFixed(1)}% ` +
-            `(${a.supplyChain?.directDependencies || 0} direct, ` +
-            `${a.supplyChain?.transitiveDependencies || 0} transitive, ` +
-            `depth: ${a.supplyChain?.estimatedDepth || 1})\n`,
+        `  • Supply Chain Resilience: ${autonomyEvaluation.dimensions.supplyChainResilience.toFixed(1)}% ` +
+            `(${autonomyEvaluation.supplyChain?.directDependencies || 0} direct, ` +
+            `${autonomyEvaluation.supplyChain?.transitiveDependencies || 0} transitive, ` +
+            `depth: ${autonomyEvaluation.supplyChain?.estimatedDepth || 1})\n`,
     );
     process.stdout.write(
-        `  • Critical Path Autonomy : ${a.dimensions.criticalPathAutonomy.toFixed(1)}% ` +
-            `(${a.stats.criticalPathFiles || 0} files in security/runtime core)\n`,
+        `  • Critical Path Autonomy : ${autonomyEvaluation.dimensions.criticalPathAutonomy.toFixed(1)}% ` +
+            `(${autonomyEvaluation.stats.criticalPathFiles || 0} files in security/runtime core)\n`,
     );
-    if (a.externalSdkInventory.length > 0) {
+    if (autonomyEvaluation.externalSdkInventory.length > 0) {
         process.stdout.write(`-------------------------------------------\n`);
         process.stdout.write(`Top External SDK Dependencies:\n`);
-        for (const sdk of a.externalSdkInventory.slice(0, 5)) {
+        for (const sdk of autonomyEvaluation.externalSdkInventory.slice(0, TOP_DEPENDENCIES_LIMIT)) {
             process.stdout.write(
-                `  • ${sdk.name.padEnd(20)}: ${sdk.callCount} calls across ${sdk.fileCount} files\n`,
+                `  • ${sdk.name.padEnd(SDK_NAME_PAD_WIDTH)}: ${sdk.callCount} calls across ${sdk.fileCount} files\n`,
             );
         }
     }

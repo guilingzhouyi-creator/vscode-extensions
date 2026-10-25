@@ -143,6 +143,12 @@ pub fn mask_source_code(content: String, config: NativeMaskConfig) -> NativeMask
     ops_mask::mask_source_code(&content, &mask_config).into()
 }
 
+#[napi(js_name = "maskSourceCodeCompact")]
+pub fn mask_source_code_compact(content: String, config: NativeMaskConfig) -> String {
+    let mask_config: ops_mask::MaskConfig = config.into();
+    ops_mask::mask_source_code_compact(&content, &mask_config)
+}
+
 #[napi(object)]
 pub struct NativeCloneBlock {
     pub start_line: u32,
@@ -449,4 +455,117 @@ pub fn compute_vector_cosine_similarity(a: Vec<f64>, b: Vec<f64>) -> f64 {
 #[napi(js_name = "computeVectorEuclideanDistance")]
 pub fn compute_vector_euclidean_distance(a: Vec<f64>, b: Vec<f64>) -> f64 {
     ops_vector::euclidean_distance(&a, &b)
+}
+
+#[napi(object)]
+pub struct NativeScopeInput {
+    pub parent: Option<i32>,
+    pub kind: u8,
+    pub start_line: u32,
+    pub end_line: u32,
+}
+
+#[napi(object)]
+pub struct NativeBindingInput {
+    pub scope_id: u32,
+    pub name: String,
+    pub kind: u8,
+    pub line: u32,
+}
+
+#[napi(object)]
+pub struct NativeShadowingResult {
+    pub symbol: String,
+    pub inner_scope_id: u32,
+    pub inner_line: u32,
+    pub outer_scope_id: u32,
+    pub outer_line: u32,
+    pub binding_kind: u8,
+}
+
+#[napi(js_name = "analyzeScopeShadowing")]
+pub fn analyze_scope_shadowing(
+    scopes: Vec<NativeScopeInput>,
+    bindings: Vec<NativeBindingInput>,
+) -> Vec<NativeShadowingResult> {
+    let mut arena = ops_scope::FlatScopeArena::with_capacity(scopes.len(), bindings.len());
+    for s in scopes {
+        let parent_id = match s.parent {
+            Some(p) if p >= 0 => Some(p as u32),
+            _ => None,
+        };
+        arena.add_scope(
+            parent_id,
+            ops_scope::ScopeKind::from_u8(s.kind),
+            s.start_line,
+            s.end_line,
+        );
+    }
+    for b in bindings {
+        arena.add_binding(
+            b.scope_id,
+            &b.name,
+            ops_scope::BindingKind::from_u8(b.kind),
+            b.line,
+        );
+    }
+    arena
+        .detect_all_shadowing()
+        .into_iter()
+        .map(|d| NativeShadowingResult {
+            symbol: d.symbol,
+            inner_scope_id: d.inner_scope_id,
+            inner_line: d.inner_line,
+            outer_scope_id: d.outer_scope_id,
+            outer_line: d.outer_line,
+            binding_kind: d.binding_kind,
+        })
+        .collect()
+}
+
+#[napi(object)]
+pub struct NativeSecretScanOptions {
+    pub scan_entropy: Option<bool>,
+    pub min_entropy_len: Option<u32>,
+    pub entropy_threshold: Option<f64>,
+    pub max_findings: Option<u32>,
+}
+
+#[napi(object)]
+pub struct NativeSecretFinding {
+    pub rule: String,
+    pub kind: String,
+    pub line: u32,
+    pub column: u32,
+    pub message: String,
+    pub preview: String,
+    pub entropy: f64,
+}
+
+#[napi(js_name = "scanSecretsNative")]
+pub fn scan_secrets_native(
+    source_text: String,
+    options: Option<NativeSecretScanOptions>,
+) -> Vec<NativeSecretFinding> {
+    let opts = match options {
+        Some(o) => ops_pattern::SecretScanOptions {
+            scan_entropy: o.scan_entropy.unwrap_or(false),
+            min_entropy_len: o.min_entropy_len.unwrap_or(24) as usize,
+            entropy_threshold: o.entropy_threshold.unwrap_or(4.2),
+            max_findings: o.max_findings.unwrap_or(50) as usize,
+        },
+        None => ops_pattern::SecretScanOptions::default(),
+    };
+    ops_pattern::scan_secrets_native(&source_text, &opts)
+        .into_iter()
+        .map(|f| NativeSecretFinding {
+            rule: f.rule,
+            kind: f.kind,
+            line: f.line,
+            column: f.column,
+            message: f.message,
+            preview: f.preview,
+            entropy: f.entropy,
+        })
+        .collect()
 }

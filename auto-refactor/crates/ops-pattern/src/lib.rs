@@ -3,6 +3,11 @@
 //! Architecture Role: Fast line-aware multi-pattern search operator
 //! for forbidden tokens, imports, and AST pattern anchors.
 
+pub mod secrets;
+pub use secrets::{
+    calculate_shannon_entropy, scan_secrets_native, SecretFinding, SecretScanOptions,
+};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatternMatch {
     pub pattern: String,

@@ -87,6 +87,93 @@ pub fn mask_source_code(content: &str, config: &MaskConfig) -> MaskResult {
     }
 }
 
+/// Masks comments and string literals in source code according to the language profile.
+/// Returns the entire masked text as a single compact String with lines separated by `\n`.
+/// This avoids per-line string allocation across the FFI/N-API boundary.
+#[must_use]
+pub fn mask_source_code_compact(content: &str, config: &MaskConfig) -> String {
+    let mut output = String::with_capacity(content.len());
+    let mut buf = Vec::with_capacity(256);
+    let mut state = MaskState::default();
+    let mut first = true;
+
+    for raw_slice in content.split('\n') {
+        if !first {
+            output.push('\n');
+        }
+        first = false;
+        let line = raw_slice.strip_suffix('\r').unwrap_or(raw_slice);
+        mask_line_into(line, &mut state, config, &mut buf, &mut output);
+    }
+
+    output
+}
+
+fn mask_line_into(
+    line: &str,
+    state: &mut MaskState,
+    config: &MaskConfig,
+    buf: &mut Vec<u8>,
+    output: &mut String,
+) {
+    // Fast path: no open quote or block comment, no raw string, and no trigger chars present
+    if state.quote.is_none()
+        && !state.in_block_comment
+        && state.raw_string.is_none()
+        && !has_trigger_char(line, config)
+    {
+        output.push_str(line);
+        return;
+    }
+
+    // Fast path: wholly inside a block comment and contains no closing delimiter
+    if let Some((_, close)) = &config.block_comment {
+        if state.in_block_comment
+            && state.quote.is_none()
+            && state.raw_string.is_none()
+            && !close.is_empty()
+            && !line.contains(close)
+        {
+            let space_count = if line.is_ascii() {
+                line.len()
+            } else {
+                line.encode_utf16().count()
+            };
+            for _ in 0..space_count {
+                output.push(' ');
+            }
+            return;
+        }
+    }
+
+    // Fast path: wholly inside a raw string and contains no quote delimiter
+    if state.raw_string.is_some() && !line.contains('"') {
+        let space_count = if line.is_ascii() {
+            line.len()
+        } else {
+            line.encode_utf16().count()
+        };
+        for _ in 0..space_count {
+            output.push(' ');
+        }
+        return;
+    }
+
+    if line.is_ascii() {
+        mask_line_ascii_into(line.as_bytes(), state, config, buf, output);
+    } else {
+        let masked = mask_line_utf16(line, state, config);
+        output.push_str(&masked);
+    }
+}
+
+fn mask_line(line: &str, state: &mut MaskState, config: &MaskConfig) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut buf = Vec::with_capacity(256);
+    mask_line_into(line, state, config, &mut buf, &mut out);
+    out
+}
+
 fn has_trigger_char(line: &str, config: &MaskConfig) -> bool {
     if config.line_comment.is_empty() {
         return true;
@@ -118,50 +205,6 @@ fn has_trigger_char(line: &str, config: &MaskConfig) -> bool {
     }
 
     false
-}
-
-fn mask_line(line: &str, state: &mut MaskState, config: &MaskConfig) -> String {
-    // Fast path: no open quote or block comment, no raw string, and no trigger chars present
-    if state.quote.is_none()
-        && !state.in_block_comment
-        && state.raw_string.is_none()
-        && !has_trigger_char(line, config)
-    {
-        return line.to_string();
-    }
-
-    // Fast path: wholly inside a block comment and contains no closing delimiter
-    if let Some((_, close)) = &config.block_comment {
-        if state.in_block_comment
-            && state.quote.is_none()
-            && state.raw_string.is_none()
-            && !close.is_empty()
-            && !line.contains(close)
-        {
-            let space_count = if line.is_ascii() {
-                line.len()
-            } else {
-                line.encode_utf16().count()
-            };
-            return " ".repeat(space_count);
-        }
-    }
-
-    // Fast path: wholly inside a raw string and contains no quote delimiter
-    if state.raw_string.is_some() && !line.contains('"') {
-        let space_count = if line.is_ascii() {
-            line.len()
-        } else {
-            line.encode_utf16().count()
-        };
-        return " ".repeat(space_count);
-    }
-
-    if line.is_ascii() {
-        mask_line_ascii(line.as_bytes(), state, config)
-    } else {
-        mask_line_utf16(line, state, config)
-    }
 }
 
 fn opens_regex_literal_ascii(line: &[u8], index: usize) -> bool {
@@ -358,9 +401,16 @@ fn step_open_quote_ascii(
     index + 1
 }
 
-fn mask_line_ascii(line: &[u8], state: &mut MaskState, config: &MaskConfig) -> String {
+fn mask_line_ascii_into(
+    line: &[u8],
+    state: &mut MaskState,
+    config: &MaskConfig,
+    out: &mut Vec<u8>,
+    output: &mut String,
+) {
     let len = line.len();
-    let mut out = line.to_vec();
+    out.clear();
+    out.extend_from_slice(line);
     let mut index = 0;
 
     let lc_bytes = config.line_comment.as_bytes();
@@ -371,24 +421,24 @@ fn mask_line_ascii(line: &[u8], state: &mut MaskState, config: &MaskConfig) -> S
 
     while index < len {
         if let Some(active_quote) = state.quote {
-            index = step_active_quote_ascii(line, &mut out, state, active_quote, index, len);
+            index = step_active_quote_ascii(line, out, state, active_quote, index, len);
             continue;
         }
 
         if let Some(hashes) = state.raw_string {
-            index = step_raw_string_continuation_ascii(line, &mut out, state, hashes, index, len);
+            index = step_raw_string_continuation_ascii(line, out, state, hashes, index, len);
             continue;
         }
 
         if state.in_block_comment {
-            index = step_block_comment_ascii(line, &mut out, state, bc_close_bytes, index);
+            index = step_block_comment_ascii(line, out, state, bc_close_bytes, index);
             continue;
         }
 
         // Code mode: check comments
         if !lc_bytes.is_empty() && line[index..].starts_with(lc_bytes) {
             out[index..len].fill(b' ');
-            return String::from_utf8(out).unwrap_or_default();
+            break;
         }
 
         if let Some(open) = bc_open_bytes {
@@ -404,26 +454,29 @@ fn mask_line_ascii(line: &[u8], state: &mut MaskState, config: &MaskConfig) -> S
 
         let b = line[index];
         if config.regex_literals && b == b'/' && opens_regex_literal_ascii(line, index) {
-            index = mask_regex_body_ascii(line, index, &mut out);
+            index = mask_regex_body_ascii(line, index, out);
             continue;
         }
 
         if has_double_quote && is_raw_string_candidate_ascii(line, index, len) {
-            if let Some(end_idx) = scan_raw_string_ascii(line, index, &mut out, state) {
+            if let Some(end_idx) = scan_raw_string_ascii(line, index, out, state) {
                 index = end_idx;
                 continue;
             }
         }
 
         if quote_bytes.contains(&b) {
-            index = step_open_quote_ascii(&mut out, state, b, config.multiline_templates, index);
+            index = step_open_quote_ascii(out, state, b, config.multiline_templates, index);
             continue;
         }
 
         index += 1;
     }
 
-    String::from_utf8(out).unwrap_or_default()
+    // SAFETY: Input slice was guaranteed valid UTF-8, and masking exclusively substitutes
+    // bytes with ASCII space (0x20), maintaining UTF-8 boundary integrity without allocation.
+    let s = unsafe { std::str::from_utf8_unchecked(out) };
+    output.push_str(s);
 }
 
 fn opens_regex_literal_u16(units: &[u16], index: usize) -> bool {
@@ -883,5 +936,14 @@ mod tests {
         let code = "let b = br#\"hello\"#; let c = cr\"cstr\";";
         let res = mask_source_code(code, &rust_config());
         assert_eq!(res.masked[0], "let b =            ; let c =         ;");
+    }
+
+    #[test]
+    fn test_mask_source_code_compact_equivalence() {
+        let code = "const msg = \"hello\";\n// comment line\nconst x = 42; /* block */\n";
+        let config = c_family_config();
+        let res = mask_source_code(code, &config);
+        let compact = mask_source_code_compact(code, &config);
+        assert_eq!(compact, res.masked.join("\n"));
     }
 }

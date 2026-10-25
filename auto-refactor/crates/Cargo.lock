@@ -23,6 +23,21 @@ dependencies = [
  "ops-mask",
  "ops-math",
  "ops-pattern",
+ "ops-scope",
+ "ops-vector",
+]
+
+[[package]]
+name = "auto-refactor-engine"
+version = "0.4.0"
+dependencies = [
+ "ops-clone",
+ "ops-diff",
+ "ops-graph",
+ "ops-mask",
+ "ops-math",
+ "ops-pattern",
+ "ops-scope",
  "ops-vector",
 ]
 
@@ -155,6 +170,10 @@ version = "0.4.0"
 
 [[package]]
 name = "ops-pattern"
+version = "0.4.0"
+
+[[package]]
+name = "ops-scope"
 version = "0.4.0"
 
 [[package]]
