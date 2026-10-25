@@ -10,6 +10,8 @@
 //!   - The layer holds no git-format knowledge: git compatibility lives in the projection layer,
 //!     so this crate can be tested and evolved without any git semantics in scope.
 //!   - Every fallible entry point returns a strongly-typed NativeError; no production path panics.
+//!
+//! Domain Governance Rules: FGT-COR-001, FGT-PRF-001, FGT-STO-001.
 
 pub mod checksum;
 pub mod codec;

@@ -17,6 +17,8 @@
 //!     Treating it as malformed would reject real repository history.
 //!   - A signature block is captured verbatim rather than verified. Verifying needs the signer's key,
 //!     which this layer does not have; dropping the block instead would silently change the id.
+//!
+//! Domain Governance Rules: FGT-OBJ-001 (annotated tag codec), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::{compute_object_oid, raw_object, GitSignature, ObjectKind, Oid};
 

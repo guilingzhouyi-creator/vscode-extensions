@@ -10,6 +10,8 @@
 //!     allow them to disagree, and a disagreement is undetectable until a push is rejected.
 //!   - `oid()` returns the typed value object; `oid_hex()` is the display projection. There is no
 //!     third `raw_oid` spelling — three names for one field is how call sites drift apart.
+//!
+//! Domain Governance Rules: FGT-OBJ-001 (blob object codec), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::{compute_object_oid, raw_object, ObjectKind, Oid};
 

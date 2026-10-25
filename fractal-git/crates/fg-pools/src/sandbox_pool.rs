@@ -2,6 +2,11 @@
 //! File Path: crates/fg-pools/src/sandbox_pool.rs
 //! Architecture Role: Manages pre-warmed, reusable virtual scratch sandbox slots,
 //!   eliminating directory allocation churn during high-frequency SubAgent spawning.
+//! Dependencies & Triggers: Consumed by orchestrator sandbox dispatchers and test runners.
+//! Responsibilities: Maintain pre-allocated slot descriptors, acquire/release lifecycle state.
+//! Exit Semantics & Design Rationale: Bounded capacity with FIFO recycling; returns None if exhausted.
+//!
+//! Domain Governance Rules: FGT-PRF-001 (slot allocation hygiene), FGT-COR-001, PRF-LEAK-001.
 
 use parking_lot::Mutex;
 use std::collections::VecDeque;

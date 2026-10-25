@@ -5,6 +5,8 @@
 //! Dependencies & Triggers: Consumed by fg-storage, fg-algorithms, fg-topology, and Taxis CLI.
 //! Responsibilities: Buffer size classes, page recycling, object pooling, and worktree slots.
 //! Exit Semantics & Design Rationale: Bounded capacity with reset-state contracts on release.
+//!
+//! Domain Governance Rules: FGT-PRF-001 (resource pooling subsystem), FGT-COR-001, ADV-PRF-002.
 
 pub mod buffer_pool;
 pub mod lru_cache;

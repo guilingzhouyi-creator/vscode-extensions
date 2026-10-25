@@ -7,6 +7,8 @@
 //! Responsibilities: Zero-copy commit and tree parsing, inline small parent list optimization.
 //! Exit Semantics & Design Rationale: Parses borrowed byte slices with sub-microsecond latency,
 //!   returning explicit errors on truncated or malformed binary streams.
+//!
+//! Domain Governance Rules: FGT-OBJ-001 (zero-copy object views), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{AgentCommitMeta, FileMode, Oid};

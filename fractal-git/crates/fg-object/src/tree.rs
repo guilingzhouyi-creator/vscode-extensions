@@ -11,6 +11,8 @@
 //!     let one layer accept a mode the others reject.
 //!   - Entries are sorted with a directory treated as if its name ended in `/`, which is Git's
 //!     documented rule; sorting by plain name produces a different object id for the same content.
+//!
+//! Domain Governance Rules: FGT-OBJ-001 (tree object codec & canonical sorting), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::{compute_object_oid, raw_object, FileMode, ObjectKind, Oid};
 

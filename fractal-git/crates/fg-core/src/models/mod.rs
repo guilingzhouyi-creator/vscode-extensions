@@ -12,6 +12,7 @@ pub mod change_id;
 pub mod commit_witness;
 pub mod context;
 pub mod file_mode;
+pub mod file_uid;
 pub mod generation;
 pub mod git_object_id;
 pub mod identity;
@@ -19,9 +20,11 @@ pub mod index_stage;
 pub mod interactive;
 pub mod oid;
 pub mod policy;
+pub mod project;
 pub mod provenance;
 pub mod repo_path;
 pub mod signature;
+pub mod slice_auth;
 pub mod submodule;
 pub mod uac;
 
@@ -35,6 +38,7 @@ pub use change_id::ChangeId;
 pub use commit_witness::ValidatedCommitWitness;
 pub use context::{AgentCommitMeta, PraxisCardContext};
 pub use file_mode::FileMode;
+pub use file_uid::FileUid;
 pub use generation::CorrectedCommitDate;
 pub use git_object_id::{compute_object_oid, raw_object, ObjectKind};
 pub use identity::{ActorIdentity, AgentPushContext, AuthorityTier};
@@ -42,9 +46,15 @@ pub use index_stage::IndexStage;
 pub use interactive::{PatchHunkChoice, PatchPlan, RebaseAction, RebaseItem, RebasePlan};
 pub use oid::{FastOidHasher, FastOidMap, FastOidSet, Oid};
 pub use policy::{ConflictPresentationMode, DiffCoherenceMode, TaxisPolicy};
+pub use project::{
+    FractalSubLease, LeaseStatus, ProjectLease, ProjectLeaseCache, RegistrationOrigin,
+    SubAuthorizationZone, DEFAULT_EVICTION_DORMANT_CYCLE_THRESHOLD,
+    DEFAULT_PROJECT_MASTER_TTL_SECONDS, DEFAULT_SUBAGENT_TTL_SECONDS,
+};
 pub use provenance::{BlockProvenanceEntry, BlockProvenanceParams, ProvenanceLedger};
 pub use repo_path::{safe_join, validate_repo_relative_path, RepoPath};
 pub use signature::GitSignature;
+pub use slice_auth::{MutationBudget, ReservationStatus, ReservedFileToken, SliceAuthorization};
 pub use submodule::{SubmoduleEntry, SubmoduleUpdateStrategy};
 pub use uac::{
     AutoQualityScoreEnvelope, HumanUacProof, StagedPromotionRequest, StagedPromotionStatus,

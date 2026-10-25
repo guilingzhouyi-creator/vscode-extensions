@@ -2,6 +2,11 @@
 //! File Path: crates/fg-pools/src/object_pool.rs
 //! Architecture Role: Implements high-throughput object recycling for AST and Tree entries,
 //!   eliminating loop-internal heap allocations (ADV-PRF-002) via pre-warmed capacity slots.
+//! Dependencies & Triggers: Consumed by tree builders, diff engines, and index parsing pipelines.
+//! Responsibilities: Pool pre-warmed capacity slots, reset state on reclaim, and guard life cycles via RAII.
+//! Exit Semantics & Design Rationale: Returns cleanly reset instances without reallocating underlying buffers.
+//!
+//! Domain Governance Rules: FGT-PRF-001 (zero heap loop allocation), FGT-COR-001, PRF-LEAK-001.
 
 use parking_lot::Mutex;
 use std::mem::ManuallyDrop;

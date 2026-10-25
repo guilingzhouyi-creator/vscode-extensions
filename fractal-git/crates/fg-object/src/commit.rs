@@ -11,6 +11,8 @@
 //!     hex text alongside the typed value gives two sources for one fact, and they can disagree.
 //!   - `oid()` returns the typed value object; `oid_hex()` is the display projection. There is no
 //!     third `raw_oid` spelling.
+//!
+//! Domain Governance Rules: FGT-OBJ-001 (commit object codec), FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::{
     compute_object_oid, raw_object, AgentCommitMeta, GitSignature, ObjectKind, Oid,

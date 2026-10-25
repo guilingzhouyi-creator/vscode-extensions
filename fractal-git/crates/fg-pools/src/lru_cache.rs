@@ -12,6 +12,8 @@
 //!   - Unlike item-count LRUs, byte-size caps accurately prevent OOM when caching
 //!     heterogeneous objects (2KB tree vs 50MB blob).
 //!   - Thread-safe interior mutability powered by parking_lot Mutex.
+//!
+//! Domain Governance Rules: FGT-PRF-001 (bounded memory caching), FGT-COR-001, PRF-LEAK-001.
 
 use parking_lot::Mutex;
 use std::collections::HashMap;

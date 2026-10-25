@@ -2,6 +2,11 @@
 //! File Path: crates/fg-pools/src/worktree_pool.rs
 //! Architecture Role: Pre-allocates and recycles ephemeral worktree identifiers and scratch spaces,
 //!   reducing initialization latency for dynamic subagent swarms.
+//! Dependencies & Triggers: Consumed by Taxis worktree CLI and subagent orchestration runtime.
+//! Responsibilities: Manage pre-warmed worktree slots, track acquisition epochs, and enforce bounded slot reuse.
+//! Exit Semantics & Design Rationale: Provides sub-millisecond slot provisioning; resets epochs on recycling.
+//!
+//! Domain Governance Rules: FGT-PRF-001 (worktree slot pooling), FGT-COR-001, PRF-LEAK-001.
 
 use parking_lot::Mutex;
 use std::collections::VecDeque;

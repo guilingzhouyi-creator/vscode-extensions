@@ -16,6 +16,8 @@
 //!   - Writing goes to `<path>.tmp` then renames, so a crash can never leave a half-written
 //!     container; the rename is the single atomic publication point.
 //!   - No panic: every index is derived from a validated bound, never from raw arithmetic.
+//!
+//! Domain Governance Rules: FGT-COR-001, FGT-PRF-001, FGT-STO-001.
 
 use std::collections::BTreeMap;
 use std::fs;

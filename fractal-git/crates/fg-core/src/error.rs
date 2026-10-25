@@ -65,6 +65,12 @@ pub enum FractalError {
     #[error("Lease expired: {0}")]
     LeaseExpired(String),
 
+    /// A project's master TTL lease or a subagent's fractal TTL expired, freezing commit privileges.
+    #[error(
+        "Commit authorization locked: TTL lease expired for project '{project_id}' ({reason})"
+    )]
+    CommitLockedTtlExpired { project_id: String, reason: String },
+
     /// On-disk durable state was unreadable or internally inconsistent.
     #[error("Corrupt durable state: {0}")]
     CorruptStore(String),
@@ -83,4 +89,44 @@ pub enum FractalError {
     /// A staging entry carried a merge stage byte outside the closed set `{0, 1, 2, 3}`.
     #[error("Unsupported index stage: {stage}")]
     UnknownIndexStage { stage: u8 },
+
+    /// A mutation was attempted on a file whose invariant FileUid is not in the authorized slice.
+    #[error("Unauthorized file mutation: FileUid '{file_uid}' for path '{rel_path}' is not permitted ({reason})")]
+    UnauthorizedFileMutation {
+        file_uid: String,
+        rel_path: String,
+        reason: String,
+    },
+
+    /// The mutation budget for the current worktree authorization slice has been exceeded.
+    #[error("Mutation budget exceeded: budget '{budget_type}' reached limit (requested: {requested}, limit: {limit})")]
+    MutationBudgetExceeded {
+        budget_type: String,
+        requested: usize,
+        limit: usize,
+    },
+
+    /// An asynchronous pre-declaration reservation token has expired or is invalid.
+    #[error("File reservation invalid or expired: token '{token_id}' for path '{rel_path}'")]
+    FileReservationExpired { token_id: String, rel_path: String },
+
+    /// A path collision occurred in the virtual inode table where another FileUid is already bound.
+    #[error("Virtual inode conflict: path '{rel_path}' is already bound to UID '{existing_uid}', attempted '{attempted_uid}'")]
+    VirtualInodeConflict {
+        rel_path: String,
+        existing_uid: String,
+        attempted_uid: String,
+    },
+
+    /// In-place storage or workspace operation failed due to insufficient disk space headroom.
+    #[error("Insufficient disk space: required {required_bytes} bytes, simulation trough is {trough_bytes} bytes, initial free space was {initial_free_bytes} bytes")]
+    InsufficientDiskSpace {
+        required_bytes: u64,
+        trough_bytes: u64,
+        initial_free_bytes: u64,
+    },
+
+    /// The host filesystem does not support a required capability (e.g. hole punching / sparse files).
+    #[error("Unsupported filesystem capability: {0}")]
+    UnsupportedFilesystemCapability(String),
 }

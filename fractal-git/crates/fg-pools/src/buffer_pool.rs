@@ -11,6 +11,8 @@
 //!     without atomic/mutex locks.
 //!   - Size classes eliminate wasteful re-allocations when alternating
 //!     between small Trees and large Blobs.
+//!
+//! Domain Governance Rules: FGT-PRF-001 (freelist memory reuse), FGT-COR-001, FGT-LCK-001.
 
 use parking_lot::Mutex;
 use std::cell::RefCell;

@@ -6,6 +6,8 @@
 //! Responsibilities: Facade re-exporting owned and zero-copy borrowed Git object models.
 //! Exit Semantics & Design Rationale: Centralizes object model exports with immutable facades.
 //!
+//! Domain Governance Rules: FGT-OBJ-001 (object model facade), FGT-COR-001, FGT-PRF-001.
+//!
 //! `FileMode` is deliberately *not* re-exported here: it lives in `fg_core::models` because the
 //! index and the native container need it without depending on the object codec. Callers that
 //! already depend on `fg-object` should import it from `fg_core::models::FileMode` so there is
