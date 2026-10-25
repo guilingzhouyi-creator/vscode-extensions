@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Universal Performance & Algorithmic Complexity Rules
- * File Path: src/core/rules/pyramid/performanceRules.ts
+ * File Path: src/core/rules/universal-hierarchy/performanceRules.ts
  * Architecture Role: Evaluates deep performance and algorithmic complexity constraints,
  *   detecting loop transient heap allocations (ADV-PRF-002), nested O(N^2)/O(N^3) iteration
  *   hotspots, and expensive operations (e.g. deep cloning and blocking I/O) within loops.

@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Universal Rule Hierarchy & Pyramid Types
- * File Path: src/core/rules/pyramid/types.ts
+ * File Path: src/core/rules/universal-hierarchy/types.ts
  * Architecture Role: Formalizes the three-tier rule pyramid (Layer 1 Universal, Layer 2
  *   Language Family, Layer 3 Dialect Specific) mapping universal architecture and lifecycle
  *   rules cleanly onto the underlying SemanticGraph.

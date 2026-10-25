@@ -21,3 +21,4 @@ export * from './topology-cache-manager';
 export * from './tensor-partitioner';
 export * from './semantic-convergence';
 export * from './agent-quota-gateway';
+export * from './resilience';

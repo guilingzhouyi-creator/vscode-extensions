@@ -1,6 +1,6 @@
 /**
  * Module: Resilience Engine — Quota Exhaustion & Hibernate State Machine
- * File Path: src/resilience/quota-hibernate-machine.ts
+ * File Path: src/core/scheduler/resilience/quota-hibernate-machine.ts
  * Architecture Role: Resilient state machine managing rate-limit (429) backoff, quota exhaustion
  *   hibernation (up to 5 hours / 18,000,000 ms), and deterministic virtual-clock task wakeup.
  * Dependencies & Triggers: Node EventEmitter; consumed by daemon dispatchers, task executors,

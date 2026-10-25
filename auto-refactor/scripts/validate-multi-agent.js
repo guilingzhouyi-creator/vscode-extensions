@@ -29,7 +29,7 @@ const {
   defaultPraxisMultiAgentGovernanceService,
 } = require('../dist/core/praxis');
 
-const { classifyRuleLayer } = require('../dist/core/rules/pyramid/layer1Evaluator');
+const { classifyRuleLayer } = require('../dist/core/rules/universal-hierarchy/layer1Evaluator');
 const { getRule } = require('../dist/core/rules/registry');
 
 function testAgentAttribution() {

@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Generalized Pattern Matching Kernel
- * File Path: src/core/patterns/pattern-matcher.ts
+ * File Path: src/core/domain-matcher/pattern-matcher.ts
  * Architecture Role: High-performance, language-agnostic matcher for semantic rule archetypes.
  * Dependencies & Triggers: Consumed by universal and domain-specialized analyzers.
  * Responsibilities:

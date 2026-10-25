@@ -27,7 +27,7 @@ import {
     type ResourceLifecyclePattern,
     type BlockingCallPattern,
     type PresentationLiteralPattern,
-} from '../core/patterns';
+} from '../core/domain-matcher';
 
 // ── File Extension & Source Masking Constants ──
 const EXT_TS = '.ts';

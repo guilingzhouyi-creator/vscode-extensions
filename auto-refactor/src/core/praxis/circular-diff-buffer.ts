@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Human-Facing Diff Buffer & Persistence
- * File Path: src/core/ring-buffer.ts
+ * File Path: src/core/praxis/circular-diff-buffer.ts
  * Architecture Role: In-memory circular diff store with periodic snapshot persistence and
  *     cold-hunk eviction into R4 archival storage through the Praxis human-storage SPI.
  * Dependencies & Triggers: ./praxis/contracts (ReviewDiffHunk, IPraxisHumanFaceStorage);
@@ -25,7 +25,7 @@
  *   dispatched to R4 archival storage via the Praxis SPI hook.
  */
 
-import type { ReviewDiffHunk, IPraxisHumanFaceStorage } from './praxis/contracts';
+import type { ReviewDiffHunk, IPraxisHumanFaceStorage } from './contracts';
 
 /** Default ring capacity (maximum retained hunks) when `RingBufferOptions.capacity` is omitted. */
 const DEFAULT_RING_CAPACITY = 1000;

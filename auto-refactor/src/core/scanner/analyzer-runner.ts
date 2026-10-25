@@ -39,7 +39,7 @@ import {
     runStreamingProjected,
     tryCreateProjector,
 } from '../ast/traverse';
-import { materializeSourceFile, runLegacyPhase } from './legacy-analyzers';
+import { materializeSourceFile, runLegacyPhase } from './batch-analyzer-runner';
 import { evaluateFilePreflightMask, isFileAnalyzerActive } from './file-preflight-gate';
 
 /** `typeof` tag for callable visit/finalize analyzer methods (streaming vs legacy). */

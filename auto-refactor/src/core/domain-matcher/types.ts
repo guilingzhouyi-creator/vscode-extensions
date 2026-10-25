@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Generalized Pattern Matching Kernel
- * File Path: src/core/patterns/types.ts
+ * File Path: src/core/domain-matcher/types.ts
  * Architecture Role: Strongly typed schemas and contracts for generalized semantic patterns.
  * Dependencies & Triggers: Consumed by pattern-matcher, analyzers, and preset loaders.
  * Responsibilities:

@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Generalized Pattern Matching Kernel & Substantive Facade
- * File Path: src/core/patterns/index.ts
+ * File Path: src/core/domain-matcher/index.ts
  * Architecture Role: Central facade for generalized semantic pattern archetypes;
  *   re-exports pattern types and matchers, validates pattern configurations,
  *   and provides immutability.

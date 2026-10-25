@@ -1,6 +1,6 @@
 /**
  * Module: Resilience Engine — Rate Limit Truncated Exponential Backoff Machine
- * File Path: src/resilience/rate-limit-backoff.ts
+ * File Path: src/core/scheduler/resilience/rate-limit-backoff.ts
  * Architecture Role: Generic rate-limit backoff controller with full jitter and
  *   three-strike circuit breaker state machine for API resilience.
  * Dependencies & Triggers: None (zero external dependencies); consumed by remote

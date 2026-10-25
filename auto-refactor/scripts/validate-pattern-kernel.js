@@ -17,7 +17,7 @@ const assert = require('assert');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const patternsModulePath = path.join(ROOT, 'dist', 'core', 'patterns');
+const patternsModulePath = path.join(ROOT, 'dist', 'core', 'domain-matcher');
 
 let patternsModule;
 try {

@@ -21,7 +21,7 @@ import {
     matchBoundaryIsolation,
     type HotPathPattern,
     type BoundaryIsolationPattern,
-} from '../core/patterns';
+} from '../core/domain-matcher';
 
 const EXT_GD = '.gd';
 const ACCEPTED_EXTENSIONS: readonly string[] = Object.freeze([EXT_GD] as const);

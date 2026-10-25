@@ -1,7 +1,7 @@
 /**
- * Module: Core Engine — Legacy Analyzer Phase
- * File Path: src/core/scanner/legacy-analyzers.ts
- * Architecture Role: Legacy per-analyzer execution stage of the in-process scan path.
+ * Module: Core Engine — Batch Analyzer Runner Phase
+ * File Path: src/core/scanner/batch-analyzer-runner.ts
+ * Architecture Role: Single-pass batch analyzer execution stage of the in-process scan path.
  * Dependencies & Triggers: typescript, ../types, ../analyzerRegistry, ../multilang, and
  *   ./analyzerRunner (shared host and context contracts); invoked by runFileAnalyzers for
  *   analyzers without streaming hooks, such as external TypeScript-only plug-ins.

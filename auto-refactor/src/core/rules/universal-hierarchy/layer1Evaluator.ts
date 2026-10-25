@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Layer 1 Universal Rule Evaluator
- * File Path: src/core/rules/pyramid/layer1Evaluator.ts
+ * File Path: src/core/rules/universal-hierarchy/layer1Evaluator.ts
  * Architecture Role: Evaluates language-agnostic Layer 1 rules directly against the unified
  *   SemanticGraph topology, detecting architecture boundary breaches, circular dependencies,
  *   and resource lifecycle imbalances across any source language.

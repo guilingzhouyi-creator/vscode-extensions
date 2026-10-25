@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Declarative Structural Pattern Rewrite Engine
- * File Path: src/core/pattern/structural-pattern-engine.ts
+ * File Path: src/core/ast-pattern/structural-pattern-engine.ts
  * Architecture Role: High-cohesion engine executing declarative structural pattern matching
  *   and template-based rewriting inspired by GritQL and ast-grep principles.
  * Dependencies & Triggers: TypeScript compiler API (ts) for AST traversal; pure functions.

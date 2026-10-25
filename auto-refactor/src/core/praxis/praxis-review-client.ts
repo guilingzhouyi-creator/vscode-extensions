@@ -30,8 +30,8 @@ import type {
 import { defaultPraxisGovernanceService } from './diffGovernance';
 import { SemanticGraph } from '../semantic/semanticGraph';
 import { defaultSemanticAdapterRegistry } from '../semantic/adapters/registry';
-import { defaultPyramidEvaluator } from '../rules/pyramid/layer1Evaluator';
-import { defaultPerformanceEvaluator } from '../rules/pyramid/performanceRules';
+import { defaultPyramidEvaluator } from '../rules/universal-hierarchy/layer1Evaluator';
+import { defaultPerformanceEvaluator } from '../rules/universal-hierarchy/performanceRules';
 import { defaultDataArchitectureEvaluator } from '../intelligence/dataArchitecture';
 import { defaultTestModernityEvaluator, isTestFilePath } from '../intelligence/testModernity';
 import type { IPraxisSliceAuditService } from './sliceAuditService';

@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Declarative Structural Pattern Facade
- * File Path: src/core/pattern/index.ts
+ * File Path: src/core/ast-pattern/index.ts
  * Architecture Role: Central substantive facade for declarative AST pattern matching,
  *   metavariable capture, and template rewrite synthesis inspired by GritQL/ast-grep.
  * Dependencies & Triggers: Consumed by pattern analyzers, refactoring pipelines, and CLI.

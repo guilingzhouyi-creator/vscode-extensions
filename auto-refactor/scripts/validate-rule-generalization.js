@@ -37,7 +37,7 @@ const {
   isPseudoCatchStatement,
 } = require('../dist/core/rules/evolution');
 
-const { classifyRuleLayer } = require('../dist/core/rules/pyramid/layer1Evaluator');
+const { classifyRuleLayer } = require('../dist/core/rules/universal-hierarchy/layer1Evaluator');
 const { getRule, RULE_REGISTRY } = require('../dist/core/rules/registry');
 const { HygieneAnalyzer } = require('../dist/analyzers/hygiene');
 const { ArchitectureAnalyzer } = require('../dist/analyzers/architecture');

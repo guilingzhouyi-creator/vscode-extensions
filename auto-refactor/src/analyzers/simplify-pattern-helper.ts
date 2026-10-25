@@ -17,8 +17,8 @@ import type { Issue, AgentActionablePayload } from '../core/types';
 import { SEVERITY_INFO } from '../core/types';
 import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
-import type { PatternSpec } from '../core/pattern/types';
-import { matchAndRewrite } from '../core/pattern/structural-pattern-engine';
+import type { PatternSpec } from '../core/ast-pattern/types';
+import { matchAndRewrite } from '../core/ast-pattern/structural-pattern-engine';
 
 /** Rule identifier for boolean simplification. */
 const RULE_SIM_BOOL_001 = 'SIM-BOOL-001';

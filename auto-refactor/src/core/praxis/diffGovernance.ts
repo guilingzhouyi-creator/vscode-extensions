@@ -28,8 +28,8 @@ import {
 } from './defaults';
 import { SemanticPraxisContextEnricher } from './semanticEnricher';
 import { SemanticGraph } from '../semantic/semanticGraph';
-import { defaultPyramidEvaluator } from '../rules/pyramid/layer1Evaluator';
-import { defaultPerformanceEvaluator } from '../rules/pyramid/performanceRules';
+import { defaultPyramidEvaluator } from '../rules/universal-hierarchy/layer1Evaluator';
+import { defaultPerformanceEvaluator } from '../rules/universal-hierarchy/performanceRules';
 import { defaultDataArchitectureEvaluator } from '../intelligence/dataArchitecture';
 import { defaultTestModernityEvaluator, isTestFilePath } from '../intelligence/testModernity';
 import { defaultSemanticAdapterRegistry } from '../semantic/adapters/registry';

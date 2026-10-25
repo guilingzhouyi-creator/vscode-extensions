@@ -1,7 +1,7 @@
 /**
- * Module: Core Engine — Rule Pyramid Subsystem Index & Substantive Facade
- * File Path: src/core/rules/pyramid/index.ts
- * Architecture Role: Central facade for the three-tier rule pyramid subsystem;
+ * Module: Core Engine — Universal Rule Hierarchy Subsystem Index & Substantive Facade
+ * File Path: src/core/rules/universal-hierarchy/index.ts
+ * Architecture Role: Central facade for the three-tier universal rule hierarchy subsystem;
  *   re-exports rule hierarchy models and evaluators, validates rule layers,
  *   and guarantees immutability.
  * Dependencies & Triggers: Re-exports ./types, ./layer1Evaluator, and ./performanceRules.

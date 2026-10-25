@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine — Declarative Structural Pattern & Rewrite Contracts
- * File Path: src/core/pattern/types.ts
+ * File Path: src/core/ast-pattern/types.ts
  * Architecture Role: Canonical contract declarations for structural AST pattern matching,
  *   metavariable capture, template rewrite synthesis, and actionable refactoring patches.
  * Dependencies & Triggers: Pure type definitions consumed by StructuralPatternEngine,
