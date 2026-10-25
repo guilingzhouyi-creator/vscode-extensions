@@ -17,7 +17,7 @@
 | [**`webgames-architecture-spec.md`**](./webgames-architecture-spec.md) | **WebGames 配置驱动解耦规范** | 阐释 Godot 4 纯逻辑引擎解耦、全域 `GameConfig` 单源驱动、`apply_snapshot` 单向快照注入、对象池零堆分配与四阶段方案纪律 | `WebGames/` |
 | [**`gate-audit-checklist.md`**](./gate-audit-checklist.md) | **全域门禁审计核查清单** | 逐入口列出提交、推送与全量审查的判定项、留痕要求与失败处置口径，供人工复核或多智能体交叉复审时逐项打勾 | `scripts/common/gate-step-registry.json` |
 | [**`agent-native-system-blueprint.md`**](../agent-native-system-blueprint.md) | **Agent-Native 顶层自治设计蓝图** | 阐明 Cell 平权自治体系、一体两面三层拓扑 Diff 引擎、R1~R5 记忆提纯管线与分形 Git 门禁体系 | `AGENTS.md` |
-| [**`fractal-git/docs/README.md`**](../../fractal-git/docs/README.md) | **Taxis 分形 Git 高性能版本控制内核** | 10 大微 Crate 架构、偏序集同态 CCD v2、Kirsch-Mitzenmacher 双哈希布隆过滤器、SWAR 差分与自举基准规范 | `fractal-git/`、`fractal-git/docs/` |
+| [**`fractal-git/docs/README.md`**](../../fractal-git/docs/README.md) | **Taxis 分形 Git 高性能版本控制内核** | 10 大微 Crate 架构、偏序集同态 CCD v2、Kirsch-Mitzenmacher 双哈希布隆过滤器、SWAR 差分、TIPSE 原位存储与自举基准规范 | `fractal-git/`、`fractal-git/docs/` |
 
 ---
 

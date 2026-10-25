@@ -40,7 +40,7 @@ flowchart TD
 | | [├─ `workspace-timing-architecture.md`](./system-spec/workspace-timing-architecture.md) | **VS Code 扩展五层解耦架构**：表现/应用/领域/基础设施/工具严格单向流动、RingBuffer + WAL Journal + JSON 三级崩溃恢复持久化 | VS Code 扩展开发、高可靠持久化 | `workspace-timing/` |
 | | [├─ `webgames-architecture-spec.md`](./system-spec/webgames-architecture-spec.md) | **WebGames 配置驱动解耦规范**：全域 `GameConfig` 单源驱动、视图层 `apply_snapshot` 单向快照注入、对象池零堆分配与四阶段方案纪律 | 游戏系统开发、Godot 逻辑解耦 | `WebGames/` |
 | | [└─ `gate-audit-checklist.md`](./system-spec/gate-audit-checklist.md) | **全域门禁审计核查清单**：提交、推送与全量统一审查核查项，失败处置口径与质性复核断言 | 提交前自审、人工/智能体交叉复审 | `scripts/common/gate-step-registry.json` |
-| **Tier 2**<br/>专册全宗 | [**`fractal-git/docs/README.md`**](../fractal-git/docs/README.md) | **Taxis 分形 Git 高性能内核专册**：10 大微 Crate 架构、偏序集同态 CCD v2、路径 Bloom 过滤器、SWAR 差分、自举计划与实测基准 | 底层版本控制内核、无锁 CAS 算法 | `fractal-git/` |
+| **Tier 2**<br/>专册全宗 | [**`fractal-git/docs/README.md`**](../fractal-git/docs/README.md) | **Taxis 分形 Git 高性能内核专册**：10 大微 Crate 架构、偏序集同态 CCD v2、路径 Bloom 过滤器、SWAR 差分、TIPSE 原位存储引擎、自举计划与实测基准 | 底层版本控制内核、无锁 CAS 算法 | `fractal-git/` |
 | | [**`auto-refactor/docs/README.md`**](../auto-refactor/docs/README.md) | **auto-refactor 静态引擎专册**：27 专家 MoE 稀疏路由、一体两面 Diff 引擎、多语言 AST 适配与 Praxis 客户端交付规约 | 静态分析重构、多语言 AST 算子 | `auto-refactor/` |
 | | [**`workspace-timing/docs/architecture.md`**](../workspace-timing/docs/architecture.md) | **workspace-timing 业务架构专册**：时间聚合核心、会话生命周期状态机与暗色高对比度 UI 设计契约 | 计时扩展业务逻辑、报表导出 | `workspace-timing/` |
 | | [**`WebGames/docs/README.md`**](../WebGames/docs/README.md) | **WebGames 游戏世界专册**：卡拉尔沙盒模拟体系、单位与技能配置表、MOD SDK 开发规约与四阶段路线图 | 游戏策划配置、战斗模拟引擎 | `WebGames/` |

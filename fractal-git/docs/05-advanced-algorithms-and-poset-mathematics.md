@@ -1,7 +1,7 @@
 # 顶会数学体系与算法算子第一性原理演进案卷
 
 > **案卷编号**：`05-advanced-algorithms-and-poset-mathematics`  
-> **核心议题**：从 SODA / FAST / ICSE / POPL 顶会算法体系出发，解构 Taxis (`fractal-git`) 在 DAG 偏序集单调时钟、范畴论补丁交换代数、路径 Bloom 过滤器概率剪枝、SWAR 64 位整字并行文本差分与 Elias-Fano 准简洁压缩的第一性原理数学推演与工程落地。
+> **核心议题**：从 SODA / FAST / ICSE / POPL 顶会算法体系出发，解构 Taxis (`fractal-git`) 在 DAG 偏序集单调时钟、范畴论补丁交换代数、路径 Bloom 过滤器概率剪枝、SWAR 64 位整字并行文本差分、Elias-Fano 准简洁压缩与 SpacePlan 离散事件极值槽位推演的第一性原理数学推演与工程落地。
 
 ---
 
@@ -131,3 +131,31 @@ $$\varepsilon \approx \left(1 - e^{-\frac{kn}{m}}\right)^k = \left(1 - e^{-\frac
 $$\text{Bits}(S) \le n \left(2 + \left\lceil \log_2 \frac{U}{n} \right\rceil\right) \approx 2.5 \sim 3.0 \text{ bits/int}$$
 
 相比 64 位原生整数，空间压缩率达 **$95\%$ 以上**，且通过现代 CPU 的 `POPCNT` 指令保持 $O(1)$ 无解引用随机访问能力。
+
+---
+
+## 六、 离散事件动态规划：SpacePlan 极值槽位推演与安全回差模型
+
+在受限存储下的原位逆向解压（In-Place Extraction）与归档微包重打包中，解压数据写入与文件尾部截断交替发生，可用磁盘空间随时间呈现波谷（Trough）水运曲线。
+
+### 1. 离散事件时空演化差分方程
+设初始卷可用空间为 $F_0$。对于包含 $N$ 个成员的解压时序 $\langle u_1, u_2, \dots, u_N \rangle$，每个成员 $u_i$ 包含解压产物体积 $E_i$、截断回收体积 $T_i$ 以及批次窗口门限 $W$。
+
+定义系统在步骤 $i$ 的瞬时可用空间 $F_i$ 与待截断累加器 $P_i$ 的状态转移方程：
+
+$$F_i = F_{i-1} - E_i + \begin{cases} P_{i-1} + T_i, & \text{if } P_{i-1} + T_i \ge W \lor i = N \\ 0, & \text{otherwise} \end{cases}$$
+
+$$P_i = \begin{cases} 0, & \text{if } P_{i-1} + T_i \ge W \lor i = N \\ P_{i-1} + T_i, & \text{otherwise} \end{cases}$$
+
+### 2. 极值槽位（Trough Water-Level）与无溢出安全判定
+定义时序全过程的最低水库槽位：
+
+$$F_{\text{trough}} = \min_{1 \le i \le N} F_i$$
+
+给定 OS 与文件系统安全预留冗余 $H_{\text{safe}}$（默认 100MB），原位提取当且仅当满足下述判定公理时安全可行：
+
+$$\boxed{F_{\text{trough}} \ge H_{\text{safe}}}$$
+
+若 $F_{\text{trough}} < H_{\text{safe}}$，则系统计算精确亏空缺口 $\Delta_{\text{deficit}} = H_{\text{safe}} - F_{\text{trough}}$，在触碰任何物理磁盘字节前抛出 `FractalError::InsufficientDiskSpace`，彻底避免中途 `ENOSPC` 导致的数据撕裂。
+
+在 [`../crates/fg-algorithms/src/space_plan/mod.rs`](../crates/fg-algorithms/src/space_plan/mod.rs) 中，推演全量采用 128 位有符号整型（`i128`），即使 $F_0 < \sum E_i$ 也保证绝对算术闭包与零溢出 panic。

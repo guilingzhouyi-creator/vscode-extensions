@@ -71,3 +71,20 @@ stateDiagram-v2
 | Praxis-Agent-Meta: {"card_id":"...","score":100.0,...}           |
 +------------------------------------------------------------------+
 ```
+
+---
+
+## 5. In-Place Storage Engine & Reversibility (TIPSE)
+
+```
+PeakDiskUsage = max(S_archive, S_extracted) + Delta_batch
+```
+
+TIPSE eliminates the classic $S_{\text{archive}} + S_{\text{extracted}}$ 2x disk space bottleneck during large archive imports and git unbundling:
+- **Discrete Event SpacePlan**: Simulates minimum trough water-level using `i128` wide arithmetic before touching disk.
+- **Reverse Tail-Truncation**: Extracts archive members from high to low physical offsets and commits batched file truncations (`SetEndOfFile` / `ftruncate`).
+- **Forward Hole-Punching**: Sparse file punch hole (`FSCTL_SET_SPARSE` / `FALLOC_FL_PUNCH_HOLE`) for streaming `.tar.gz`.
+- **Micro-Pack Progressive Repack**: Slices large repository repacks into 64MB~256MB micro-packs, immediately verifying each slice and pruning redundant loose objects.
+- **Crash Recovery & Restorer**: Write-Ahead Logging (`InPlaceJournal`) guarantees crash consistency; `ArchiveRestorer` synthesizes valid Central Directory & EOCD headers upon abortion.
+
+Detailed specification: [`08-taxis-in-place-storage-engine.md`](08-taxis-in-place-storage-engine.md).

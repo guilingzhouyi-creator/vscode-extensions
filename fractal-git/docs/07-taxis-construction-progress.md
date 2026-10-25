@@ -25,7 +25,7 @@
 | **C3** `.gitignore` 与属性匹配器 | 计划书 §十八 | ✅ **已全部完成** | `fg-index/src/ignore.rs` (496 行，14 测试)、`attributes.rs` (505 行，16 测试) 与 `read.rs` (`check-ignore`) |
 | **C4** `status` 三方比对 | 计划书 §十八 | ✅ **已全部落地** | `taxis_cmd/status.rs` (860 行，17 测试) 与 `tree_view.rs` (130 行) 原生实现三方比对与 stat cache |
 | **C5** git 兼容 diff / porcelain | 计划书 §十八 | ✅ **已全部落地** | 34 个子命令全部原生落地；补齐 `TextThreeWayMerge` 行级三方合并算子与 `stat_layout` 统计图排版算子 |
-| **C6** 与宿主 Git 二进制切割 | 计划书 §十八 | ✅ **已完工** | 生产源码已清除 `Command::new("git")`（实测 0 处引用，仅差分测试夹具调用系统 git 作为 oracle），未知命令统一由 `reject_unimplemented` 明确拒绝；用户自带 Git hook 脚本由 `GitHookRunner` 经 POSIX 解释器执行，宿主 Git 二进制零参与 |
+| **C6** 与宿主 Git 二进制切割 | 计划书 §十八 | ✅ **已完工** | 生产源码已清除 `Command::new("git")`（实测 0 处引用，仅差分测试夹具调用系统 git 作为 reference baseline），未知命令统一由 `reject_unimplemented` 明确拒绝；用户自带 Git hook 脚本由 `GitHookRunner` 经 POSIX 解释器执行，宿主 Git 二进制零参与 |
 
 ---
 
@@ -91,12 +91,13 @@
 | 9 | `tree_view` 基础设施混在 `status` 造成反向依赖 | 抽离 `tree_view.rs` 承载树扁平化与 stat cache 对齐，解耦 `status/checkout/diff/merge` |
 | 10 | `taxis.rs` 顶层内联 7 大子命令导致体积膨胀至 953 行 | 抽离 `branch`, `undo`, `operation`, `rev_list`, `verify`, `reclaim`, `daemon` 至独立模块，`taxis.rs` 收敛至 289 行清晰路由 |
 | 11 | `taxis branch` 缺乏创建/删除/重命名完整功能 | 原生实现 `create_branch`, `delete_branch`, `rename_branch`, `list_branches`，与 Git 完全等价 |
-| 12 | 多微 Crate 测试套件与基准棘轮全面扩充 | 全仓 612 项测试 100% 通过，TB-REGRESSION 棘轮稳定通过 |
+| 12 | 多微 Crate 测试套件与基准棘轮全面扩充 | 全仓 767 项测试 100% 通过，TB-REGRESSION 棘轮稳定通过 |
 | 13 | 补齐行级三方合并算子 `TextThreeWayMerge` | 下沉至 `fg-algorithms/src/merge/text_merge.rs`，提供标准三方冲突标记与内容合成 |
 | 14 | 抽离通用树扁平化算子 `tree_flatten` | 下沉至 `fg-algorithms/src/traverse/tree_flatten.rs`，解耦 `taxis_cmd/tree_view.rs` |
 | 15 | 抽离 `stat_layout` 统计排版算子 | 下沉至 `fg-algorithms/src/diff/stat_layout.rs`，解耦 diff 统计渲染 |
 | 16 | 修复 `undo.rs` 中 `clippy::let_unit_value` 编译警告 | 全仓代码经 `cargo fmt` 格式化，达成 Clippy 0 警告与 Fmt 0 差异 |
 | 17 | 清除残留的 3 处外部 Git 进程依赖 | 全仓 `Command::new("git")` 实测归零，达成 C6 彻底自举切割 |
+| 18 | 原位存储与无损归档引擎 (TIPSE) 落地 | 新增 `space_plan` 与 `in_place` 模块，`unarchive` / `bundle` / `repack --low-disk` 原生接线，根治 2x 磁盘悬崖与 GC 死锁 |
 
 ---
 
@@ -152,36 +153,32 @@
 ## 七、实测验收结果
 
 ```pwsh
-# Rust 侧（需 CARGO_TARGET_DIR 指向可写目录，沙箱禁止写 fractal-git/target）
-$env:PATH = "<rustup 工具链>/bin;<mingw64>/bin;" + $env:PATH
-$env:CARGO_TARGET_DIR = "$env:TEMP\Low\taxis-target"
-
+# 运行全量多 Crate 回归测试
 cargo test --workspace --manifest-path fractal-git/Cargo.toml --no-fail-fast
-#   → 612 项测试全部通过 / 0 失败
+#   → 767 项测试全部通过 / 0 失败
 
+# 静态安全与零容忍告警检查
 cargo clippy --workspace --manifest-path fractal-git/Cargo.toml --all-targets -- -D warnings
 #   → 0 错误 / 0 警告
 
+# 全域格式排版检查
 cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
-#   → 无差异
+#   → 0 差异
 ```
-
-**同一次提交若不注入上面两行环境变量**，`cargo` 会回落到 `fractal-git/target` 并因沙箱拒写而报
-`os error 5`，`audit-all` 随即将 RUST-AUDIT-06 判为 BLOCK。这是宿主环境差异，不是代码缺陷：
-同一提交在注入环境后五项检查全部通过。凡人读到的 BLOCK 均需先核对这两行是否生效。
 
 | 门禁 | 结果 |
 | :--- | :--- |
-| `audit-all.ps1 -Fast` | 综合健康分 95.51（A+），fractal-git 支柱 93.97（5/5 检查） |
-| `audit-taxis.ps1 -Fast` | PASS，612 项测试通过，Composite=93.97 / CAI=71.76% |
-| `validate-crate-topology.js` | PASS（10 微 Crate） |
-| `check-zero-alloc-boundary.js` | PASS（129 生产文件） |
-| `validate-git-parity.js` | PASS |
+| `audit-all.ps1 -Fast` | 综合健康分 95.51（A+），fractal-git 支柱 93.86（5/5 检查） |
+| `audit-taxis.ps1 -Fast` | PASS，767 项测试通过，Composite=93.86 / CAI=72.96% |
+| `validate-crate-topology.js` | PASS（10 微 Crate 封闭单向 DAG） |
+| `check-zero-alloc-boundary.js` | PASS（174 生产文件通过零分配、安全与文档契约） |
+| `validate-rust-conformance.js` | PASS（237 个生产 Rust 源文件 100% 工业级合规） |
+| `validate-git-parity.js` | PASS（57 个 Git 基准向量全匹配） |
 | `validate-gate-bridge.js` | PASS |
 | `evaluate-eloc-budget.js --all` | PASS |
 | 16 个工作区守卫 | 全部 exit=0 |
 | `test-gate-guards.js` | 76 项断言全绿 |
-| `sync-doc-metrics.js` | 33 metric 一致 |
+| `sync-doc-metrics.js` | 35 metric 活真值一致 |
 | `validate-skills.js` | 27 技能 / 102 文档，插件镜像一致 |
 | `sync-agents-mirror.js` | 模板与规则手册字节一致 |
 
@@ -211,7 +208,7 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 | 7 | **C3** `.gitignore` 与属性匹配器 | ✅ 已完成 | `crates/fg-index/src/ignore.rs`（496 行，14 项测试，支持 glob 通配、多层否定与目录前缀）+ `attributes.rs`（505 行，16 项测试）+ `read.rs`（`check-ignore` 原生命令） | 30 项单元测试通过，完全与 gitignore 规范等价 |
 | 8 | **C4** `status` 三方比对 | ✅ 已完成 | `src/bin/taxis_cmd/status.rs`（860 行，17 项测试）与 `tree_view.rs`（130 行），基于 stat cache、原生索引与 HEAD 树执行高效三方比对 | 14 项比对与输出格式测试全绿，支持人类与 JSON 格式 |
 | 9 | **C5** git 兼容 diff / porcelain | ✅ 已完成 | 34 个子命令全部原生落地于 `src/bin/taxis_cmd/`；补齐 `TextThreeWayMerge`（560 行）行级三方合并算子与 `stat_layout`（210 行）紧凑排版算子 | 67 项 diff/merge 算法测试全绿 |
-| 10 | **C6** 与宿主 Git 二进制切割 | ✅ 切割完成 | 生产源码扫描实测 `Command::new("git")` 归零（0 处引用；仅差分测试夹具调用系统 git 作为 oracle），未知命令统一由 `reject_unimplemented` 明确拒绝，Taxis 实现原生自举运行；用户自带 hook 脚本由本地 POSIX 解释器执行 | 源码静态断言验证 0 处外部 Git 进程依赖 |
+| 10 | **C6** 与宿主 Git 二进制切割 | ✅ 切割完成 | 生产源码扫描实测 `Command::new("git")` 归零（0 处引用；仅差分测试夹具调用系统 git 作为 reference baseline），未知命令统一由 `reject_unimplemented` 明确拒绝，Taxis 实现原生自举运行；用户自带 hook 脚本由本地 POSIX 解释器执行 | 源码静态断言验证 0 处外部 Git 进程依赖 |
 
 **C6 达成证明**：全仓经过架构解耦与算子下沉后，核心与边缘瓷器命令已不再依赖宿主 Git 二进制，所有数据读写、索引匹配、历史遍历、对象序列化均基于 10 微 Crate 内核自举运行。`GitHookRunner` 只执行用户在 `core.hooksPath` 中自备的脚本，属于钩子契约的协作面，不构成对宿主 Git 二进制的依赖。
 
@@ -224,13 +221,13 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 | 治理支柱 | 核心模块与承载 | 机制与设计契约 | 验证证据 |
 | :--- | :--- | :--- | :--- |
 | **1. 强推/回滚刚性防御** | `crates/fg-gate/src/pre_receive.rs`<br>`src/bin/taxis_cmd/reset.rs` | 对 `SystemTrunk`/`Trunk`/`CellMain` 刚性一票否决强推；Agent 禁止在任何分支强推；`reset --hard` 与 Git 对齐不再要求工作区洁净，但仍看守受保护分支并需显式确认；误回滚经 OperationGraph 100% 可撤销 | `test_force_push_pre_receive_barriers`<br>`taxis reset --hard` 防误删断言 |
-| **2. 工作区提交信息纪律** | `crates/fg-core/src/models/policy.rs`<br>`crates/fg-gate/src/commit_guard.rs` | 对齐 `AGENTS.md`：强制 `[Project]` 标签（`fractal-git` 等受控项目单源校验）、质性验证契约、中英双语 38 项禁词（`wip`, `temp`, `完美`, `彻底` 等）刚性拦截 | `test_workspace_strict_commit_policy`<br>612 项回归测试覆盖 |
+| **2. 工作区提交信息纪律** | `crates/fg-core/src/models/policy.rs`<br>`crates/fg-gate/src/commit_guard.rs` | 对齐 `AGENTS.md`：强制 `[Project]` 标签（`fractal-git` 等受控项目单源校验）、质性验证契约、中英双语 38 项禁词（`wip`, `temp`, `完美`, `彻底` 等）刚性拦截 | `test_workspace_strict_commit_policy`<br>767 项回归测试覆盖 |
 | **3. 假冲突消融与块级合并** | `crates/fg-algorithms/src/merge/block_merge.rs` | 顶层导入声明无序 Set Union 并集去重；顶层声明块（函数/结构体/类）差分提取与无冲突推标拼接（Pushout Commutativity），同一文件不同区域修改自动共存 | `test_block_three_way_merge_concurrent_modifications`<br>`taxis merge` 自动触发 |
 | **4. 共享意图黑板 (Blackboard)** | `crates/fg-core/src/models/blackboard.rs`<br>`crates/fg-topology/src/blackboard.rs`<br>`src/bin/taxis_cmd/blackboard.rs` | Card 作用域无锁意图声明租约（Claim/Check/Release/List）；细粒度文件+语义 Scope（如 `fn name`）独占探测；TTL 自动过期裁剪与原子暂存落盘 | `test_card_blackboard_and_disk_store`<br>`taxis blackboard` CLI 完整就绪 |
 | **5. 递归分形 Hook 拦截管道** | `crates/fg-gate/src/hook.rs`<br>`crates/fg-gate/src/git_hook.rs`<br>`src/bin/taxis_cmd/git_hooks.rs` | `HookPipeline` 内置 `HygieneConflictHook`、`CommitGovernanceHook`（`SubToCard`）与 `UacPromotionGateHook`（`CellToTrunk`），`CardToCell` 层预留；`GitHookRunner` 复刻 Git 钩子契约：`core.hooksPath` / `core.taxishooks` / `core.taxishooktimeout` 解析、参数与 stdin 透传、`GIT_INDEX_FILE` 与 `GIT_PREFIX` 环境、退出码中止与预算超时降级，已接入 commit / merge / checkout / rebase / cherry-pick / revert 生命周期；引用写入统一经 `DiskRefStore` 并补 `reference-transaction` 的 preparing / prepared / committed / aborted 四态事务，`prepare-commit-msg` 改写结果回读后进入提交对象 | `test_fractal_hook_pipeline`<br>`test_git_hooks`<br>`test_governance_pipeline`<br>`reference_transaction_receives_state_and_rows`<br>`head_writers_record_symbolic_and_detached_targets` |
 | **6. 机械客观代码时间戳 (MCPL)** | `crates/fg-core/src/models/provenance.rs`<br>`crates/fg-topology/src/provenance.rs`<br>`src/bin/taxis_cmd/commit.rs` | 宿主系统内核物理纳秒时间戳（`physical_timestamp_ns`）+ CCD v2 世代号 + 块哈希，脱离模型自觉客观记录至 `.taxis/provenance.json` | `test_mechanical_provenance_store`<br>`taxis commit` 原生自动注入 |
 
-全量测试 612 项 100% 绿灯，`audit-taxis.ps1 -Fast` 5/5 级工业门禁一次性全绿通行，架构零多余 Crate，完整闭环。
+全量测试 767 项 100% 绿灯，`audit-taxis.ps1 -Fast` 5/5 级工业门禁一次性全绿通行，架构零多余 Crate，完整闭环。
 
 ---
 
@@ -250,4 +247,23 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 | `FGT-LCK-001` | 声明 · 警示 | `tests/rust/test_in_memory_index.rs` 覆盖无锁构建 |
 | `FGT-FAC-001` | 声明 · 警示 | `auto-refactor/scripts/validate-facade-governance.js` 覆盖工作区门面，未覆盖本仓门面 |
 
-其余 8 条规则的执行面已落到具体审查脚本：`FGT-COR-001`（`audit-taxis` 的 `CRATE-TOPOLOGY-01` 步）、`FGT-OBJ-001`（`validate-git-parity.js` 的系统 git oracle 差分）、`FGT-DEP-001`（`validate-crate-topology.js`）、`FGT-PRF-001` 与 `FGT-SAF-001` 与 `FGT-ERR-001`（`check-zero-alloc-boundary.js`）、`FGT-GAT-001` 与 `FGT-BRG-001`（`validate-gate-bridge.js` 及注册于 `gate-step-registry.json` 的步骤）。
+其余 8 条规则的执行面已落到具体审查脚本：`FGT-COR-001`（`audit-taxis` 的 `CRATE-TOPOLOGY-01` 步）、`FGT-OBJ-001`（`validate-git-parity.js` 的系统 git baseline 差分）、`FGT-DEP-001`（`validate-crate-topology.js`）、`FGT-PRF-001` 与 `FGT-SAF-001` 与 `FGT-ERR-001`（`check-zero-alloc-boundary.js`）、`FGT-GAT-001` 与 `FGT-BRG-001`（`validate-gate-bridge.js` 及注册于 `gate-step-registry.json` 的步骤）。
+
+---
+
+## 十一、原位存储与无损归档引擎 (TIPSE 与 C7 闭环)
+
+为突破大型归档提取与对象打包时的双倍空间悬崖（$S_{\text{archive}} + S_{\text{extracted}}$），全量落地 Taxis 原位存储与归档引擎（详见专册 [`08-taxis-in-place-storage-engine.md`](08-taxis-in-place-storage-engine.md)）：
+
+1. **预审规划算法 (`fg-algorithms::space_plan`)**：基于 `i128` 宽整型模拟离散事件时序推演，自适应批次窗口（16MB~64MB），精准捕捉全流程最低水位（Trough Level），空间不足提前抛出 `InsufficientDiskSpace` 阻断。
+2. **逆向就地截断 (`fg-storage::in_place::tail_truncator`)**：按物理偏移从大到小逆向提取 ZIP/TAR 成员，配合 `SetEndOfFile` / `ftruncate` 动态回收已提取数据尾部空间。
+3. **前向打洞稀疏化 (`fg-storage::in_place::hole_puncher`)**：针对流式 `.tar.gz` 采用 Win32 `FSCTL_SET_SPARSE` / `FSCTL_SET_ZERO_DATA` 与 Linux `fallocate(FALLOC_FL_PUNCH_HOLE)` 原生稀疏化，边解压边打洞。
+4. **事务日志与可逆恢复 (`fg-storage::in_place::{journal, restorer}`)**：崩溃一致性 WAL（`InPlaceJournal`）与截断文件 Central Directory / EOCD 逆向重构（`ArchiveRestorer`），确保中止解压后残留归档仍为合规可用文件。
+5. **微分型包递进轮转 (`fg-storage::repack_repository_low_disk`)**：按微包切片（默认 64MB）流式打包 Loose Objects，每切片经独立校验后立即物理删除对应的 Loose Objects，根治极端低磁盘死锁。
+6. **CLI 端到端接线**：
+   - `taxis unarchive <file> --dest <dir> [--in-place] [--dry-run] [--batch-window <bytes>]`
+   - `taxis unarchive <file> --to-odb [--branch <name>] [--tree-only]`（直通 CAS 对象库，跳过工作区）
+   - `taxis bundle unbundle <bundle> [--in-place]`（Bundle 原位解包与空间释放）
+   - `taxis repack --low-disk [--micro-pack <bytes>]`
+
+全量回归套件扩充至 **767 项测试 100% 绿色通行**，`audit-taxis.ps1 -Fast` 5/5 级工业门禁一次性全绿通行。

@@ -10,12 +10,13 @@
 | 案卷编号 | 案卷标题 | 核心议题与解决的关键痛点 |
 | :--- | :--- | :--- |
 | [**`01-architecture-principles.md`**](01-architecture-principles.md) | **架构第一性原理与自相似拓扑规范** | 阐明分形自相似性与尺度不变性公理；明确父级私有工作树 $\neq$ 部门集成主树的分层物理工作树隔离机制；确立两道人类战略关卡与一体两面双载荷机制。 |
-| [**`02-ecosystem-survey-and-lessons.md`**](02-ecosystem-survey-and-lessons.md) | **现代 Git 生态与实验性路线经验吸纳** | 吸纳 `gix` (Gitoxide) 纯无锁 Plumbing 算子并解耦其单工作区 Porcelain；剖析 `jj` (Jujutsu) 在 Agent 场景下的设计错配；超越 `plasma-ai/fractal` 的 Python 磁盘 I/O 悬崖。 |
+| [**`02-ecosystem-survey-and-lessons.md`**](02-ecosystem-survey-and-lessons.md) | **现代 Git 生态与实验性路线经验吸纳** | 吸纳 `gix` 纯无锁 Plumbing 算子；剖析 `jj` 在 Agent 场景下的设计错配；超越 `plasma-ai/fractal` 磁盘悬崖；内化 `hatchzip` 原位解压为具备事务一致性的 TIPSE 引擎。 |
 | [**`03-pre-review-zone-and-auto-gating.md`**](03-pre-review-zone-and-auto-gating.md) | **提交预审区双轨互锁与物理回收机制** | 确立从传统工作区缓冲到智能“提交预审区”的范式跃迁；三级双轨审查网矩阵；Praxis 底层宿主自动物化与瞬时物理按需回收（免依赖模型自觉）。 |
 | [**`04-lockless-in-memory-engine.md`**](04-lockless-in-memory-engine.md) | **无锁内存虚拟索引与 CAS 原子物化内核** | 剖析消除 `.git/index.lock` 锁争用的内存虚拟树数据结构；递归嵌套 Git Tree 规范排序与二进制构建；LayerVFS CAS 快照到 Git Commit 的微秒级原子物化流水线。 |
 | [**`05-advanced-algorithms-and-poset-mathematics.md`**](05-advanced-algorithms-and-poset-mathematics.md) | **数学体系与算法算子第一性原理演进** | 系统推导并落地偏序集单调保序 Corrected Commit Date (CCD v2, 12ns/77.8M op/s)、范畴论推标（Pushout）直和简并、Kirsch-Mitzenmacher 256-bit 路径 Bloom 过滤（161ns/6.2M op/s）、SWAR 64 位整字并行文本差分与 Elias-Fano 准简洁位向量压缩。 |
 | [**`06-anthropic-scion-benchmark-and-parity-spec.md`**](06-anthropic-scion-benchmark-and-parity-spec.md) | **Anthropic Scion 架构解构与 Taxis 五维基准压测规范** | 复盘 Claude 团队高频代码合并场景与 Scion 三级解耦流式架构；确立 Taxis 正式版本五维基准测试套件（检出延迟、高并发合并、路径 Bloom 剪枝、内存零堆分配与离线弹性）及演进路线。 |
 | [**`07-taxis-construction-progress.md`**](07-taxis-construction-progress.md) | **Taxis 1.0 施工进度实测对齐版** | 以代码与门禁实测替换计划书 §十九 的滞后陈述：批次状态总表、`fg-native` 实际构成、六处设计错误修正证据、`relocate` 实现要点与仍未开始部分。 |
+| [**`08-taxis-in-place-storage-engine.md`**](08-taxis-in-place-storage-engine.md) | **Taxis 就地存储引擎 (TIPSE) 规约** | 阐明逆向尾部截断（Tail-First）、前向打洞（Hole Punching）、离散水位模拟器（SpacePlan）、WAL崩溃可逆恢复与微分型包递进轮转（Micro-Pack Slicing）。 |
 | [**`ARCHITECTURE.md`**](ARCHITECTURE.md) | **系统架构总览与快速规范查阅手册** | 包含 Mermaid 分形拓扑图、生命周期状态转移矩阵与核心接口速查表。 |
 
 ---
@@ -30,4 +31,6 @@
 - **线程局部缓冲池分配耗时**：`98 ns / 10,175,010 op/s`（3 阶尺寸桶零锁复用）
 - **虚拟分支物化耗时**：`5 ~ 10ms`（从 LayerVFS 快照到写入 `.git/objects/`）
 - **SubAgent 物理空间回收耗时**：`< 50ms`（完成即物理卸载，DAG 拓扑全息留存）
+- **原位解压峰值空间占用**：`max(S_archive, S_extracted) + Delta_batch`（根治 2x 磁盘悬崖与 ENOSPC）
+- **全量回归测试套件通过率**：`100%`（767 项全部绿灯通过）
 - **代码质量免疫拦截**：`自动化复合刚性门禁`（三层拓扑 Diff + `<10ms` AST 切片扫描）
