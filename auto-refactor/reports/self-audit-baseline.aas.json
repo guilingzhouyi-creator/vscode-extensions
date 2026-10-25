@@ -2,63 +2,63 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-25T12:30:02.191Z",
+  "timestamp": "2026-10-25T15:30:51.578Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
     "score": 99.19,
     "grade": "A+",
-    "cai": 77.98,
+    "cai": 78.12,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.917,
       "averagePor": 0.083,
       "averageColumnDensity": 0.863,
-      "averageSpatialDensity": 0.437,
-      "averageMahalanobisDistance": 4.662,
-      "averageFisherSimplexDistance": 0.096
+      "averageSpatialDensity": 0.438,
+      "averageMahalanobisDistance": 4.679,
+      "averageFisherSimplexDistance": 0.097
     },
     "counts": {
-      "files": 755,
-      "total": 3966,
+      "files": 753,
+      "total": 3946,
       "errors": 0,
-      "warns": 3442,
-      "info": 524,
+      "warns": 3421,
+      "info": 525,
       "suppressed": 139
     }
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 98.22,
-    "semanticPurity": 98.46,
+    "architectureConsistency": 98.21,
+    "semanticPurity": 98.45,
     "codeSecurity": 99.79,
     "performanceEfficiency": 99.58,
-    "standardization": 83.3,
-    "modernity": 98.49,
-    "maintainability": 93.25,
+    "standardization": 83.36,
+    "modernity": 98.48,
+    "maintainability": 93.23,
     "commentQuality": 99.96,
-    "duplication": 95.1,
+    "duplication": 95.07,
     "techDebtRisk": 100
   },
   "bottlenecks": [
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 4000,
-      "count": 400
+      "loss": 4020,
+      "count": 402
     },
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 2970,
-      "count": 208
+      "loss": 2940,
+      "count": 206
     },
     {
       "rule": "metric",
       "dim": "architectureConsistency",
-      "loss": 2340,
-      "count": 234
+      "loss": 2330,
+      "count": 233
     },
     {
       "rule": "NAM-DEC-001",
@@ -69,14 +69,14 @@
     {
       "rule": "SIM-TRN-001",
       "dim": "standardization",
-      "loss": 2100,
-      "count": 210
+      "loss": 2080,
+      "count": 208
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 1940,
-      "count": 194
+      "loss": 1920,
+      "count": 192
     },
     {
       "rule": "hardcoded-string",
@@ -87,8 +87,8 @@
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 1800,
-      "count": 360
+      "loss": 1735,
+      "count": 347
     }
   ],
   "topology": {
@@ -670,7 +670,7 @@
       },
       {
         "line": 18,
-        "col": 68,
+        "col": 47,
         "rule": "hardcoded-string",
         "sev": "WARN",
         "msg": "Hardcoded string should be extracted into a named constant.",
@@ -679,9 +679,9 @@
           "patch": {
             "range": {
               "startLine": 18,
-              "startCol": 68,
+              "startCol": 47,
               "endLine": 18,
-              "endCol": 81
+              "endCol": 60
             },
             "replacementText": "FILE_PATH_DISTAPI_TEXT"
           },
@@ -2388,8 +2388,19 @@
         }
       },
       {
-        "line": 91,
-        "col": 35,
+        "line": 43,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"checkLockBoundary\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface CheckLockBoundaryOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 60,
+        "col": 27,
         "rule": "hardcoded-string",
         "sev": "WARN",
         "msg": "Hardcoded string should be extracted into a named constant.",
@@ -2397,10 +2408,10 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 91,
-              "startCol": 35,
-              "endLine": 91,
-              "endCol": 44
+              "startLine": 60,
+              "startCol": 27,
+              "endLine": 60,
+              "endCol": 36
             },
             "replacementText": "WARNING_TEXT"
           },
@@ -2408,8 +2419,8 @@
         }
       },
       {
-        "line": 97,
-        "col": 34,
+        "line": 66,
+        "col": 26,
         "rule": "hardcoded-string",
         "sev": "WARN",
         "msg": "Hardcoded string should be extracted into a named constant.",
@@ -2417,10 +2428,10 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 97,
-              "startCol": 34,
-              "endLine": 97,
-              "endCol": 44
+              "startLine": 66,
+              "startCol": 26,
+              "endLine": 66,
+              "endCol": 36
             },
             "replacementText": "RELEASE_TEXT"
           },
@@ -2428,8 +2439,8 @@
         }
       },
       {
-        "line": 97,
-        "col": 66,
+        "line": 66,
+        "col": 58,
         "rule": "hardcoded-string",
         "sev": "WARN",
         "msg": "Hardcoded string should be extracted into a named constant.",
@@ -2437,10 +2448,10 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 97,
-              "startCol": 66,
-              "endLine": 97,
-              "endCol": 75
+              "startLine": 66,
+              "startCol": 58,
+              "endLine": 66,
+              "endCol": 67
             },
             "replacementText": "UNLOCK_TEXT"
           },
@@ -2448,7 +2459,7 @@
         }
       },
       {
-        "line": 103,
+        "line": 114,
         "col": 65,
         "rule": "magic-number",
         "sev": "WARN",
@@ -2457,9 +2468,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 103,
+              "startLine": 114,
               "startCol": 65,
-              "endLine": 103,
+              "endLine": 114,
               "endCol": 67
             },
             "replacementText": "CONST_30"
@@ -2468,7 +2479,7 @@
         }
       },
       {
-        "line": 109,
+        "line": 120,
         "col": 31,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -2477,9 +2488,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 109,
+              "startLine": 120,
               "startCol": 31,
-              "endLine": 109,
+              "endLine": 120,
               "endCol": 40
             },
             "replacementText": "WARNING_TEXT"
@@ -4001,6 +4012,178 @@
           "action": "introduce_parameter_object",
           "template": "export interface BuildAuditResultOptions {",
           "safeToAutomate": false
+        }
+      }
+    ],
+    "src/core/ast-pattern/structural-pattern-engine.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 808 >= warn threshold 400; functions 34 >= warn threshold 20).",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        }
+      },
+      {
+        "line": 130,
+        "col": 9,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 130,
+              "startCol": 9,
+              "endLine": 130,
+              "endCol": 26
+            },
+            "replacementText": "PATTERNTSX_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 552,
+        "col": 42,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 3 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 552,
+              "startCol": 42,
+              "endLine": 552,
+              "endCol": 43
+            },
+            "replacementText": "CONST_3"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 553,
+        "col": 58,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 4 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 553,
+              "startCol": 58,
+              "endLine": 553,
+              "endCol": 59
+            },
+            "replacementText": "CONST_4"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 554,
+        "col": 58,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 4 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 554,
+              "startCol": 58,
+              "endLine": 554,
+              "endCol": 59
+            },
+            "replacementText": "CONST_4"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 595,
+        "col": 36,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 595,
+              "startCol": 36,
+              "endLine": 595,
+              "endCol": 42
+            },
+            "replacementText": "NOOP_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 732,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 5 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 732,
+              "startCol": 32,
+              "endLine": 732,
+              "endCol": 33
+            },
+            "replacementText": "CONST_5"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 732,
+        "col": 69,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 5 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 732,
+              "startCol": 69,
+              "endLine": 732,
+              "endCol": 70
+            },
+            "replacementText": "CONST_5"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 757,
+        "col": 36,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 757,
+              "startCol": 36,
+              "endLine": 757,
+              "endCol": 54
+            },
+            "replacementText": "FIXPOINTREWRITE_TEXT"
+          },
+          "safeToAutomate": true
         }
       }
     ],
@@ -7561,119 +7744,9 @@
           "safeToAutomate": true
         }
       }
-    ],
-    "src/core/constants/rules-governance.generated.ts": [
-      {
-        "line": 1,
-        "rule": "GOV-FIL-001",
-        "sev": "WARN",
-        "msg": "File `rules-governance.generated.ts` violates standard `kebab-case` naming convention for typescript.",
-        "fix": {
-          "action": "refactor",
-          "template": "Rename file to kebab-case (e.g. `rules-governance.generated.ts`)."
-        }
-      },
-      {
-        "line": 1,
-        "rule": "NAM-FIL-001",
-        "sev": "WARN",
-        "msg": "File name 'rules-governance.generated.ts' violates strict kebab-case naming convention for TypeScript/JavaScript.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Rename file to 'rules-governance.generated.ts'."
-        }
-      },
-      {
-        "line": 556,
-        "col": 19,
-        "rule": "duplicate-literal",
-        "sev": "WARN",
-        "msg": "Literal 'warning' is repeated 33 times in this file; extract it into a shared constant.",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": true
-        }
-      }
-    ],
-    "src/core/constants/rules-languages.generated.ts": [
-      {
-        "line": 1,
-        "rule": "GOV-FIL-001",
-        "sev": "WARN",
-        "msg": "File `rules-languages.generated.ts` violates standard `kebab-case` naming convention for typescript.",
-        "fix": {
-          "action": "refactor",
-          "template": "Rename file to kebab-case (e.g. `rules-languages.generated.ts`)."
-        }
-      },
-      {
-        "line": 1,
-        "rule": "NAM-FIL-001",
-        "sev": "WARN",
-        "msg": "File name 'rules-languages.generated.ts' violates strict kebab-case naming convention for TypeScript/JavaScript.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Rename file to 'rules-languages.generated.ts'."
-        }
-      },
-      {
-        "line": 565,
-        "col": 19,
-        "rule": "duplicate-literal",
-        "sev": "WARN",
-        "msg": "Literal 'warning' is repeated 57 times in this file; extract it into a shared constant.",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": true
-        }
-      }
-    ],
-    "src/core/constants/rules-quality.generated.ts": [
-      {
-        "line": 1,
-        "rule": "GOV-FIL-001",
-        "sev": "WARN",
-        "msg": "File `rules-quality.generated.ts` violates standard `kebab-case` naming convention for typescript.",
-        "fix": {
-          "action": "refactor",
-          "template": "Rename file to kebab-case (e.g. `rules-quality.generated.ts`)."
-        }
-      },
-      {
-        "line": 1,
-        "rule": "NAM-FIL-001",
-        "sev": "WARN",
-        "msg": "File name 'rules-quality.generated.ts' violates strict kebab-case naming convention for TypeScript/JavaScript.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Rename file to 'rules-quality.generated.ts'."
-        }
-      },
-      {
-        "line": 183,
-        "col": 64,
-        "rule": "GOV-SAN-001",
-        "sev": "WARN",
-        "msg": "Comment contains temporary batch jargon / WIP marker `wip`. Replace with canonical architectural description.",
-        "fix": {
-          "action": "refactor",
-          "template": "Remove temporary phase/task tags and use standard domain terminology."
-        },
-        "verify": "node scripts/validate-governance-exemptions.js"
-      },
-      {
-        "line": 183,
-        "rule": "HYG-STB-002",
-        "sev": "WARN",
-        "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'wip'",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
-        }
-      }
     ]
   },
-  "truncated": 2942,
+  "truncated": 2921,
   "notes": [
     "dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph"
   ]

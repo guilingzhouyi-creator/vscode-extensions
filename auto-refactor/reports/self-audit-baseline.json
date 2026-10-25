@@ -1,18 +1,18 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792931394000",
-  "timestamp": "2026-10-25T12:30:05.805Z",
-  "cai": 77.98,
+  "snapshotId": "snapshot-v0.4.0-1792942244046",
+  "timestamp": "2026-10-25T15:30:54.726Z",
+  "cai": 78.12,
   "autonomy": {
-    "compositeAutonomyIndex": 77.98,
+    "compositeAutonomyIndex": 78.12,
     "grade": "L3_BALANCED",
     "gradeDescription": "Balanced autonomy: Core business is proprietary with moderate collaboration with mainstream frameworks and cloud ecosystems",
     "dimensions": {
-      "effectiveLocAutonomy": 97.51,
-      "symbolCallAutonomy": 97.54,
-      "domainKernelDensity": 61.75,
+      "effectiveLocAutonomy": 97.5,
+      "symbolCallAutonomy": 97.53,
+      "domainKernelDensity": 61.86,
       "codeOriginality": 20,
       "supplyChainResilience": 77.27,
-      "criticalPathAutonomy": 92.31
+      "criticalPathAutonomy": 93.55
     },
     "weights": {
       "effectiveLoc": 0.3,
@@ -24,9 +24,9 @@
     },
     "confidence": {
       "sampleSufficiency": 1,
-      "lowerBound": 76.7,
-      "upperBound": 79.22,
-      "credibleScore": 77.97,
+      "lowerBound": 76.84,
+      "upperBound": 79.36,
+      "credibleScore": 78.11,
       "isLowConfidence": false
     },
     "supplyChain": {
@@ -65,25 +65,25 @@
       }
     ],
     "stats": {
-      "totalFiles": 755,
-      "proprietaryFiles": 748,
+      "totalFiles": 753,
+      "proprietaryFiles": 746,
       "vendorFiles": 0,
       "generatedFiles": 7,
-      "totalEffectiveLoc": 223320,
-      "proprietaryEffectiveLoc": 217769,
+      "totalEffectiveLoc": 221948,
+      "proprietaryEffectiveLoc": 216397,
       "vendorEffectiveLoc": 0,
       "generatedEffectiveLoc": 5551,
-      "internalSymbolCalls": 1943,
+      "internalSymbolCalls": 1938,
       "externalSdkCalls": 49,
-      "stdlibCalls": 618,
-      "criticalPathFiles": 19,
-      "criticalPathInternalCalls": 24,
+      "stdlibCalls": 613,
+      "criticalPathFiles": 22,
+      "criticalPathInternalCalls": 29,
       "criticalPathExternalCalls": 2
     }
   },
   "polyglotGeneralization": {
-    "index": 96.57,
-    "meanScore": 96.57,
+    "index": 96.56,
+    "meanScore": 96.56,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -99,16 +99,16 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 755,
-    "durationMs": 8732
+    "filesScanned": 753,
+    "durationMs": 8028
   },
   "metrics": {
     "compositeScore": 99.19,
     "grade": "A+",
-    "autonomyRate": 77.98,
+    "autonomyRate": 78.12,
     "polyglotGeneralization": {
-      "index": 96.57,
-      "meanScore": 96.57,
+      "index": 96.56,
+      "meanScore": 96.56,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
@@ -119,35 +119,35 @@
       "averageTspr": 0.917,
       "averagePor": 0.083,
       "averageColumnDensity": 0.863,
-      "averageSpatialDensity": 0.437,
-      "averageMahalanobisDistance": 4.662,
-      "averageFisherSimplexDistance": 0.096
+      "averageSpatialDensity": 0.438,
+      "averageMahalanobisDistance": 4.679,
+      "averageFisherSimplexDistance": 0.097
     },
-    "totalIssues": 3966,
+    "totalIssues": 3946,
     "suppressedIssues": 139,
-    "unsuppressedIssues": 3827,
+    "unsuppressedIssues": 3807,
     "bySeverity": {
-      "info": 524,
-      "warning": 3442,
+      "info": 525,
+      "warning": 3421,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
-      "medium": 633,
-      "low": 3333
+      "medium": 630,
+      "low": 3316
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 99.75,
-      "maintainability": 97.93,
+      "maintainability": 97.92,
       "performance": 99.84,
-      "data": 98.56,
+      "data": 98.55,
       "testing": 99.85,
       "reliability": 99.79,
       "security": 99.88,
-      "extensibility": 97.7
+      "extensibility": 97.71
     },
     "compositeScore": 99.19,
     "weights": {
@@ -164,14 +164,14 @@
   },
   "tenDimensions": {
     "architectureConsistency": 99.75,
-    "semanticPurity": 99.59,
+    "semanticPurity": 99.58,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.84,
-    "standardization": 95.56,
+    "standardization": 95.6,
     "modernity": 99.85,
-    "maintainability": 97.93,
+    "maintainability": 97.92,
     "commentQuality": 100,
-    "duplication": 97.53,
+    "duplication": 97.52,
     "techDebtRisk": 99.99
   },
   "topHotspots": [
@@ -270,8 +270,8 @@
     "summary": {
       "critical": 0,
       "high": 0,
-      "medium": 633,
-      "low": 3333
+      "medium": 630,
+      "low": 3316
     },
     "criticalItems": [],
     "highItems": []
@@ -285,26 +285,26 @@
           "architecture": 99.82,
           "maintainability": 98.39,
           "performance": 99.92,
-          "data": 99.31,
+          "data": 99.3,
           "testing": 99.99,
           "reliability": 99.83,
           "security": 99.89,
-          "extensibility": 97.65
+          "extensibility": 97.66
         },
         "moduleCount": 1
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 98.81,
+        "compositeScore": 98.8,
         "pillars": {
           "architecture": 99.83,
-          "maintainability": 96.23,
+          "maintainability": 96.16,
           "performance": 99.83,
           "data": 97.75,
           "testing": 99.75,
           "reliability": 99.59,
           "security": 99.84,
-          "extensibility": 97.63
+          "extensibility": 97.65
         },
         "moduleCount": 1
       },
@@ -355,16 +355,16 @@
       },
       {
         "domainName": "core",
-        "compositeScore": 99.02,
+        "compositeScore": 99,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.62,
-          "performance": 99.37,
-          "data": 98.44,
-          "testing": 99.58,
-          "reliability": 99.89,
+          "maintainability": 97.49,
+          "performance": 99.33,
+          "data": 98.36,
+          "testing": 99.72,
+          "reliability": 99.88,
           "security": 99.85,
-          "extensibility": 97.35
+          "extensibility": 97.29
         },
         "moduleCount": 1
       },
@@ -380,6 +380,21 @@
           "reliability": 99.9,
           "security": 99.88,
           "extensibility": 98.3
+        },
+        "moduleCount": 1
+      },
+      {
+        "domainName": "ast-pattern",
+        "compositeScore": 99.5,
+        "pillars": {
+          "architecture": 100,
+          "maintainability": 99,
+          "performance": 100,
+          "data": 98.02,
+          "testing": 100,
+          "reliability": 100,
+          "security": 99.9,
+          "extensibility": 98.68
         },
         "moduleCount": 1
       },
@@ -445,13 +460,13 @@
       },
       {
         "domainName": "comments",
-        "compositeScore": 99.25,
+        "compositeScore": 99.15,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.82,
+          "maintainability": 98.32,
           "performance": 100,
           "data": 97.43,
-          "testing": 100,
+          "testing": 99.86,
           "reliability": 100,
           "security": 99.91,
           "extensibility": 97.06
@@ -515,6 +530,21 @@
           "reliability": 99.57,
           "security": 99.87,
           "extensibility": 97.6
+        },
+        "moduleCount": 1
+      },
+      {
+        "domainName": "domain-matcher",
+        "compositeScore": 99.22,
+        "pillars": {
+          "architecture": 100,
+          "maintainability": 97.35,
+          "performance": 100,
+          "data": 98.27,
+          "testing": 99.83,
+          "reliability": 100,
+          "security": 99.9,
+          "extensibility": 98.46
         },
         "moduleCount": 1
       },
@@ -699,36 +729,6 @@
         "moduleCount": 1
       },
       {
-        "domainName": "pattern",
-        "compositeScore": 99.5,
-        "pillars": {
-          "architecture": 100,
-          "maintainability": 99,
-          "performance": 100,
-          "data": 98.02,
-          "testing": 100,
-          "reliability": 100,
-          "security": 99.9,
-          "extensibility": 98.68
-        },
-        "moduleCount": 1
-      },
-      {
-        "domainName": "patterns",
-        "compositeScore": 99.22,
-        "pillars": {
-          "architecture": 100,
-          "maintainability": 97.35,
-          "performance": 100,
-          "data": 98.27,
-          "testing": 99.83,
-          "reliability": 100,
-          "security": 99.9,
-          "extensibility": 98.46
-        },
-        "moduleCount": 1
-      },
-      {
         "domainName": "pipeline",
         "compositeScore": 98.97,
         "pillars": {
@@ -759,6 +759,21 @@
         "moduleCount": 1
       },
       {
+        "domainName": "praxis",
+        "compositeScore": 98.69,
+        "pillars": {
+          "architecture": 97.71,
+          "maintainability": 98.48,
+          "performance": 99.81,
+          "data": 97.2,
+          "testing": 99.44,
+          "reliability": 99.47,
+          "security": 99.89,
+          "extensibility": 97.37
+        },
+        "moduleCount": 1
+      },
+      {
         "domainName": "client",
         "compositeScore": 99.75,
         "pillars": {
@@ -770,21 +785,6 @@
           "reliability": 100,
           "security": 99.88,
           "extensibility": 99.67
-        },
-        "moduleCount": 1
-      },
-      {
-        "domainName": "praxis",
-        "compositeScore": 98.64,
-        "pillars": {
-          "architecture": 97.55,
-          "maintainability": 98.37,
-          "performance": 99.8,
-          "data": 97.02,
-          "testing": 99.6,
-          "reliability": 99.44,
-          "security": 99.89,
-          "extensibility": 97.29
         },
         "moduleCount": 1
       },
@@ -925,16 +925,16 @@
       },
       {
         "domainName": "reporting",
-        "compositeScore": 99.5,
+        "compositeScore": 99.52,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.8,
-          "performance": 99.67,
-          "data": 99.27,
+          "maintainability": 98.9,
+          "performance": 99.61,
+          "data": 99.14,
           "testing": 100,
           "reliability": 100,
-          "security": 99.89,
-          "extensibility": 98.18
+          "security": 99.9,
+          "extensibility": 98.47
         },
         "moduleCount": 1
       },
@@ -969,7 +969,7 @@
         "moduleCount": 1
       },
       {
-        "domainName": "pyramid",
+        "domainName": "universal-hierarchy",
         "compositeScore": 99.7,
         "pillars": {
           "architecture": 100,
@@ -1010,6 +1010,21 @@
           "reliability": 99.88,
           "security": 99.9,
           "extensibility": 97.36
+        },
+        "moduleCount": 1
+      },
+      {
+        "domainName": "resilience",
+        "compositeScore": 99.33,
+        "pillars": {
+          "architecture": 100,
+          "maintainability": 99,
+          "performance": 100,
+          "data": 98,
+          "testing": 99.83,
+          "reliability": 100,
+          "security": 99.93,
+          "extensibility": 97.2
         },
         "moduleCount": 1
       },
@@ -1119,21 +1134,6 @@
         "moduleCount": 1
       },
       {
-        "domainName": "resilience",
-        "compositeScore": 99.22,
-        "pillars": {
-          "architecture": 100,
-          "maintainability": 100,
-          "performance": 100,
-          "data": 97,
-          "testing": 99.75,
-          "reliability": 100,
-          "security": 99.91,
-          "extensibility": 95.8
-        },
-        "moduleCount": 1
-      },
-      {
         "domainName": "utils",
         "compositeScore": 99.53,
         "pillars": {
@@ -1152,27 +1152,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 174325,
+      "processed": 173330,
       "unique": 137304,
-      "changed": 15974,
-      "semantic": 12779,
+      "changed": 1404,
+      "semantic": 1123,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 7987,
+      "added": 702,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792931393998,
+      "endMs": 1792942244043,
       "totalRuns": 353,
       "eloc": {
-        "processedTotal": 51085233,
+        "processedTotal": 51154344,
         "uniqueTotal": 137304,
-        "changedTotal": 1152136,
-        "semanticTotal": 921709
+        "changedTotal": 1158003,
+        "semanticTotal": 926402
       },
       "qed": {
         "mean": 0.0001,
@@ -1180,7 +1180,7 @@
         "max": 0.18
       },
       "debt": {
-        "totalAdded": 3048,
+        "totalAdded": 3045,
         "totalResolved": 5091,
         "totalRegressions": 0,
         "netYield": 0.04

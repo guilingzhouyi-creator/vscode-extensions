@@ -3861,21 +3861,21 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/rules/pyramid/layer1Evaluator.ts",
+      "key": "constants|hardcoded-string|src/core/rules/universal-hierarchy/layer1Evaluator.ts",
       "count": 9,
       "severities": {
         "warning": 9
       }
     },
     {
-      "key": "large-file|large-file|src/core/rules/pyramid/performanceRules.ts",
+      "key": "large-file|large-file|src/core/rules/universal-hierarchy/performanceRules.ts",
       "count": 1,
       "severities": {
         "warning": 1
       }
     },
     {
-      "key": "governance|GOV-PRF-004|src/core/rules/pyramid/performanceRules.ts",
+      "key": "governance|GOV-PRF-004|src/core/rules/universal-hierarchy/performanceRules.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -3938,14 +3938,14 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/scanner/legacy-analyzers.ts",
+      "key": "constants|hardcoded-string|src/core/scanner/batch-analyzer-runner.ts",
       "count": 4,
       "severities": {
         "warning": 4
       }
     },
     {
-      "key": "governance|GOV-DAT-001|src/core/scanner/legacy-analyzers.ts",
+      "key": "governance|GOV-DAT-001|src/core/scanner/batch-analyzer-runner.ts",
       "count": 1,
       "severities": {
         "info": 1
