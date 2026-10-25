@@ -552,7 +552,6 @@ export async function runDaemonMain(argv: string[]): Promise<void> {
     });
 }
 
-/** Legacy CLI entry alias for backward compatibility. */
 export const daemonMain = runDaemonMain;
 
 if (require.main === module) {

@@ -58,6 +58,8 @@ const HIGH_LATENCY_SUITES_PRIORITY = new Set([
 // Stage 1: Isolated parallel test suites (no shared daemon or corpus disk state)
 const PARALLEL_SUITES = [
   { name: 'validate-native-operator', script: 'scripts/validate-native-operator.js' },
+  { name: 'validate-file-preflight-gate', script: 'scripts/validate-file-preflight-gate.js' },
+  { name: 'validate-redundancy-governance', script: 'scripts/validate-redundancy-governance.js' },
   { name: 'validate-native-benchmark', script: 'scripts/validate-native-benchmark.js' },
   { name: 'validate-oxc', script: 'scripts/validate-oxc-keypoints.js' },
   { name: 'validate-unified-ast-visitor', script: 'scripts/validate-unified-ast-visitor.js' },
@@ -89,6 +91,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-capp-protocol', script: 'scripts/validate-capp-protocol.js' },
   { name: 'validate-compact-schema', script: 'scripts/validate-compact-schema.js' },
   { name: 'validate-sidecar-coverage', script: 'scripts/validate-sidecar-coverage.js' },
+  { name: 'validate-aas-reporter', script: 'scripts/validate-aas-reporter.js' },
   { name: 'validate-praxis-presentation', script: 'scripts/validate-praxis-presentation.js' },
   {
     name: 'validate-dual-faced-presentation',

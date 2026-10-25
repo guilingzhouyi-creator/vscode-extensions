@@ -27,7 +27,13 @@ import {
     logFilePath,
 } from './registry';
 import type { RegistryInfo } from './registry';
-import { createDaemonContext, handleScan, handleScanDiff } from './scanHandler';
+import {
+    createDaemonContext,
+    handleScan,
+    handleScanDiff,
+    handleAsymmetricScan,
+    handleSliceAudit,
+} from './scanHandler';
 import type { DaemonScanContext } from './scanHandler';
 
 export {
@@ -47,6 +53,8 @@ export {
     createDaemonContext,
     handleScan,
     handleScanDiff,
+    handleAsymmetricScan,
+    handleSliceAudit,
 };
 
 export type { DaemonMessage, HelloAckMessage, RegistryInfo, DaemonScanContext };

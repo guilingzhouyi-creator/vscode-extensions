@@ -36,6 +36,7 @@ const EXEMPT = new Map([
   ['build-native.js', 'native build helper invoked by npm run build:native'],
   ['run-self-audit.js', 'helper invoked by validate-self-audit.js and validate-self-refactor.js'],
   ['test-rust.js', 'invoked by gate:rust rather than by the parallel engine'],
+  ['validate-aas-reporter.js', 'standalone AAS reporter contract verification suite'],
   [
     'migrate-report-artifacts.js',
     'offline maintenance utility that rewrites persisted audit artifacts; not an assertion suite',
@@ -61,6 +62,7 @@ const BENCHMARKS = [
   'bench-fastpath.js',
   'bench-hot-paths.js',
   'bench-oxc-modea.js',
+  'bench-performance-matrix.js',
   'bench-quant.js',
   'bench-warm.js',
 ];

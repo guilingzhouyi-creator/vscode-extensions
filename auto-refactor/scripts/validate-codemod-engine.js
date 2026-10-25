@@ -24,6 +24,8 @@ const {
   createUnusedImportFix,
   createSimplifyBooleanFix,
   createJsDocTemplateFix,
+  createTrampolineInlineFix,
+  detectVacuousTrampoline,
 } = require('../dist/core/codemod');
 
 function testFormatPreserver() {
@@ -131,6 +133,23 @@ function testBuiltinTransforms() {
   assert.ok(
     jsdocFix.edits[0].newText.includes('Concurrency: Single-thread async cooperative execution.'),
   );
+
+  // Trampoline detection & inlining transform
+  const trampolineCode = 'export * from "./sub-module";\n';
+  const detection = detectVacuousTrampoline(trampolineCode);
+  assert.strictEqual(detection.isTrampoline, true);
+  assert.deepStrictEqual(detection.reexports, ['./sub-module']);
+
+  const consumerCode = "import { Item } from './core/data-structures';\n";
+  const consumerContext = PatchEngine.createContext('src/consumer.ts', consumerCode);
+  const inlineFix = createTrampolineInlineFix(consumerContext, {
+    trampolinePath: './core/data-structures',
+    targetModulePath: './core/data-structures/lru-cache',
+  });
+  assert.strictEqual(inlineFix.ruleId, 'ARCH-ABS-001');
+  assert.strictEqual(inlineFix.edits.length, 1);
+  const patched = TextEditApplier.applyEdits(consumerCode, inlineFix.edits);
+  assert.strictEqual(patched.content, "import { Item } from './core/data-structures/lru-cache';\n");
 
   console.log('  ✔  Built-in AST transforms output compliant descriptors.');
 }

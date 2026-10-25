@@ -391,8 +391,8 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
   const factoryKeys = Object.keys(BUILTIN_FACTORIES);
   assert.strictEqual(
     factoryKeys.length,
-    31,
-    `Expected exactly 31 built-in analyzers in BUILTIN_FACTORIES, found ${factoryKeys.length}`,
+    32,
+    `Expected exactly 32 built-in analyzers in BUILTIN_FACTORIES, found ${factoryKeys.length}`,
   );
 
   for (const name of factoryKeys) {
@@ -406,7 +406,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
     assert.ok(hasAnalyzeOrFinalize, `Analyzer ${name} must implement analyze or finalize`);
   }
 
-  // Verify all 31 appear in DIMENSION_ANALYZERS
+  // Verify all 32 appear in DIMENSION_ANALYZERS
   const allDeclaredAnalyzers = new Set();
   for (const analyzers of Object.values(DIMENSION_ANALYZERS)) {
     for (const a of analyzers) allDeclaredAnalyzers.add(a);
@@ -418,7 +418,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
     );
   }
 
-  console.log('  ✔ 5. Analyzer registry completeness & zero fracture (31/31 wired)');
+  console.log('  ✔ 5. Analyzer registry completeness & zero fracture (32/32 wired)');
 })();
 
 // ── Test 6: Anti-Gaming & Composite Quality Gate ──

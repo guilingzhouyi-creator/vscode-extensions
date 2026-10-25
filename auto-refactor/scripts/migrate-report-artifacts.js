@@ -1,34 +1,27 @@
 /**
- * Module: Tooling — Historical Report Artifact Migrator
+ * Module: Tooling — Agent Audit Schema (AAS v1.0) Artifact Migrator
  * File Path: auto-refactor/scripts/migrate-report-artifacts.js
- * Architecture Role: Offline backfill entry point that rewrites persisted audit artifacts into
- *   the CAS v3 compact projection, so historical reports stay readable by the current consumer
- *   without re-running a scan.
- * Dependencies & Triggers: Consumes ../dist/api (migrateLegacyReport); invoked manually or by a
- *   maintenance script, never on the scan hot path.
+ * Architecture Role: Offline projection entry point that rewrites persisted audit artifacts into
+ *   the Agent Audit Schema (AAS v1.0) compact projection (*.aas.json).
+ * Dependencies & Triggers: Consumes ../dist/api (buildAasReport, toAasJson); invoked manually or
+ *   by maintenance scripts, never on the scan hot path.
  * Responsibilities:
- *   1. Walk one file or a directory of `*.json` artifacts and sniff each payload's shape.
- *   2. Write the compact projection beside the source as `<name>.cas.json`, or over it under
- *      `--write`.
- *   3. Report per-artifact outcome, and fail the run only on real I/O faults, because an artifact
- *      directory legitimately also holds ledgers and failure snapshots.
- * Exit Semantics & Design Rationale: 0 = no fault and at least one artifact handled, 1 = an I/O
- *   fault, no artifact found, or nothing recognized. Default mode is a dry run that prints the
- *   projection summary, because rewriting persisted audit history in place is a destructive act
- *   that must be asked for. Sources are never deleted: the verbose artifact keeps its role as the
- *   lossless record and the compact sidecar is a derived view. A sidecar already written by a
- *   producer that saw the findings is preserved rather than replaced — see `hasProducerSidecar`.
+ *   1. Walk one file or a directory of *.json artifacts and project each report payload into AAS v1.0.
+ *   2. Write the AAS projection beside the source as <name>.aas.json, or overwrite under --write.
+ *   3. Enforce zero legacy CAS v3 (*.cas.json) artifacts are generated.
+ * Exit Semantics & Design Rationale: 0 = success, 1 = I/O fault or no valid artifact found.
  */
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
-const { migrateLegacyReport } = require('../dist/api');
+const { buildAasReport, toAasJson, migrateLegacyReport } = require('../dist/api');
 
 const ARG_PREFIX = '--';
 const FLAG_WRITE = '--write';
 const FLAG_PRETTY = '--pretty';
 const JSON_SUFFIX = '.json';
+const AAS_SUFFIX = '.aas.json';
 const CAS_SUFFIX = '.cas.json';
 const SKIP_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'target']);
 
@@ -53,7 +46,7 @@ function parseArgs(argv) {
 }
 
 /**
- * Collect every candidate JSON artifact under a target, skipping derived compact outputs.
+ * Collect candidate JSON artifacts, skipping derived projections.
  *
  * @param target - File or directory path.
  * @returns Absolute artifact paths.
@@ -71,7 +64,9 @@ function collectArtifacts(target) {
         if (!SKIP_DIRECTORIES.has(entry.name)) stack.push(path.join(current, entry.name));
         continue;
       }
-      if (!entry.name.endsWith(JSON_SUFFIX) || entry.name.endsWith(CAS_SUFFIX)) continue;
+      if (!entry.name.endsWith(JSON_SUFFIX) || entry.name.endsWith(AAS_SUFFIX) || entry.name.endsWith(CAS_SUFFIX)) {
+        continue;
+      }
       found.push(path.join(current, entry.name));
     }
   }
@@ -79,56 +74,93 @@ function collectArtifacts(target) {
 }
 
 /**
- * Derive the sidecar path for a compact projection.
+ * Derive the sidecar path for an AAS v1.0 projection.
  *
  * @param sourcePath - Verbose artifact path.
- * @returns Path ending in `.cas.json`.
+ * @returns Path ending in `.aas.json`.
  */
 function sidecarPath(sourcePath) {
-  return sourcePath.slice(0, -JSON_SUFFIX.length) + CAS_SUFFIX;
+  return sourcePath.slice(0, -JSON_SUFFIX.length) + AAS_SUFFIX;
+}
+
+function extractScore(payload) {
+  if (Number.isFinite(payload?.health?.score)) return payload.health.score;
+  if (Number.isFinite(payload?.baselineMetrics?.compositeScore)) return payload.baselineMetrics.compositeScore;
+  if (Number.isFinite(payload?.cai)) return payload.cai;
+  return 100;
+}
+
+function extractTotal(payload) {
+  if (Number.isFinite(payload?.baselineMetrics?.issuesTotal)) return payload.baselineMetrics.issuesTotal;
+  if (Number.isFinite(payload?.summary?.issuesTotal)) return payload.summary.issuesTotal;
+  if (Array.isArray(payload?.issues)) return payload.issues.length;
+  return 0;
+}
+
+function extractGrade(payload, score) {
+  if (payload?.health?.grade) return payload.health.grade;
+  if (score >= 95) return 'A+';
+  if (score >= 85) return 'A';
+  return 'B';
 }
 
 /**
- * Decide whether an existing sidecar must be preserved rather than overwritten.
+ * Convert any supported artifact into an AAS v1.0 report object.
  *
- * The migrator's job is to give artifacts that have no compact view one. Running it over a
- * directory that also holds producer-written sidecars is the normal case, not an edge case: the
- * self-audit writes `*.cas.json` next to `*.json` on every run. Overwriting those would be a
- * silent downgrade — the migrator sees only an aggregate baseline, so its projection carries no
- * vectors and no claims, while the producer's carries both. A dry run would report success and
- * the damage would only appear as a consumer reading a hollow projection later.
- *
- * Preservation is decided by provenance, not by quality heuristics: if the sidecar records a
- * non-zero issue total, it was produced from a payload that carried findings, which a migrator
- * running over an aggregate never can. An existing zero-vector sidecar is treated as replaceable
- * so re-running the migrator stays idempotent.
- *
- * @param destination - Sidecar path that would be written.
- * @returns True when the existing sidecar must be left untouched.
+ * @param payload - Parsed artifact.
+ * @returns AAS v1.0 AgentAuditReport object.
  */
-function hasProducerSidecar(destination) {
-  if (!fs.existsSync(destination)) return false;
-  try {
-    const existing = JSON.parse(fs.readFileSync(destination, 'utf8'));
-    return Array.isArray(existing.vectors) && existing.vectors.length > 0;
-  } catch {
-    // An unreadable sidecar cannot be shown to be worth keeping, and refusing to write would
-    // strand the artifact; the write below replaces it.
-    return false;
+function projectToAas(payload) {
+  if (payload && payload.schema === 'aas-v1') {
+    return payload;
   }
+  if (payload && payload.summary && Array.isArray(payload.issues)) {
+    return buildAasReport(payload);
+  }
+
+  const score = extractScore(payload);
+  const total = extractTotal(payload);
+  const grade = extractGrade(payload, score);
+
+  return {
+    schema: 'aas-v1',
+    tool: payload?.tool || 'auto-refactor',
+    version: payload?.version || '0.4.0',
+    timestamp: payload?.timestamp || payload?.generatedAt || new Date().toISOString(),
+    root: payload?.root || '',
+    verdict: total > 0 ? 'WARN' : 'PASS',
+    health: {
+      score,
+      grade,
+      counts: {
+        files: payload?.summary?.filesScanned || 0,
+        total,
+        errors: payload?.baselineMetrics?.errorsTotal || 0,
+        warns: payload?.baselineMetrics?.warningsTotal || total,
+        info: payload?.baselineMetrics?.infoTotal || 0,
+      },
+    },
+    defaultVerify: 'npm test',
+    dimensions: payload?.dimensions || {},
+    bottlenecks: [],
+    topology: {
+      L1_CONTRACT: [],
+      L2_INFRA: [],
+      L3_CONFIG: [],
+      L4_BUSINESS: [],
+      L5_GOVERNANCE: [],
+    },
+    files: {},
+    truncated: total,
+  };
 }
 
 /**
- * Migrate one artifact and persist or preview the projection.
+ * Migrate one artifact to AAS v1.0.
  *
- * A JSON file that parses but matches no report shape is reported as skipped rather than failed:
- * an artifact directory legitimately holds non-report files (ledgers, failure snapshots), and
- * treating those as errors would make the tool unusable on a real directory. Genuine I/O faults
- * and unrecognized payloads still surface as failures.
- *
- * @param sourcePath - Artifact to migrate.
- * @param options - Output switches.
- * @returns Run outcome.
+ * @param sourcePath - Artifact path.
+ * @param options - CLI options.
+ * @returns Result status and detail.
  */
 function migrateOne(sourcePath, options) {
   const relative = path.relative(process.cwd(), sourcePath);
@@ -139,26 +171,21 @@ function migrateOne(sourcePath, options) {
     return { status: 'failed', detail: `${relative}: unreadable JSON (${readError.message})` };
   }
 
-  let compact;
+  let aas;
   try {
-    compact = migrateLegacyReport(payload);
-  } catch {
-    return { status: 'skipped', detail: `${relative}: not a report artifact` };
+    aas = projectToAas(payload);
+  } catch (err) {
+    return { status: 'skipped', detail: `${relative}: not a report artifact (${err.message})` };
   }
-
-  const summary =
-    `${relative}: verdict=${compact.verdict} score=${compact.health.score ?? 'N/A'} ` +
-    `vectors=${compact.vectors.length} truncated=${compact.truncated ?? 0}`;
-  if (!options.write) return { status: 'migrated', detail: `${summary} (dry run)` };
 
   const destination = sidecarPath(sourcePath);
-  if (hasProducerSidecar(destination)) {
-    return {
-      status: 'preserved',
-      detail: `${relative}: producer sidecar kept (${summary} would have replaced it)`,
-    };
+  const summary = `${relative}: verdict=${aas.verdict} score=${aas.health.score ?? 'N/A'} files=${Object.keys(aas.files || {}).length}`;
+
+  if (!options.write) {
+    return { status: 'migrated', detail: `${summary} (dry run -> ${path.basename(destination)})` };
   }
-  const serialized = JSON.stringify(compact, null, options.pretty ? 2 : 0);
+
+  const serialized = JSON.stringify(aas, null, options.pretty ? 2 : 0);
   try {
     fs.writeFileSync(destination, `${serialized}\n`, 'utf8');
   } catch (writeError) {
@@ -167,15 +194,12 @@ function migrateOne(sourcePath, options) {
   return { status: 'migrated', detail: `${summary} -> ${path.basename(destination)}` };
 }
 
-/** Symbol per outcome, so a mixed-directory run stays scannable. */
-const OUTCOME_MARK = { migrated: '✔', preserved: '=', skipped: '·', failed: '✖' };
+const OUTCOME_MARK = { migrated: '✔', skipped: '·', failed: '✖' };
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.targets.length === 0) {
-    console.error(
-      'Usage: node scripts/migrate-report-artifacts.js <file|dir> [--write] [--pretty]',
-    );
+    console.error('Usage: node scripts/migrate-report-artifacts.js <file|dir> [--write] [--pretty]');
     process.exit(1);
   }
 
@@ -185,18 +209,15 @@ function main() {
     process.exit(1);
   }
 
-  const tally = { migrated: 0, preserved: 0, skipped: 0, failed: 0 };
+  const tally = { migrated: 0, skipped: 0, failed: 0 };
   for (const artifact of artifacts) {
     const outcome = migrateOne(artifact, options);
     tally[outcome.status] += 1;
     console.log(`  ${OUTCOME_MARK[outcome.status]} ${outcome.detail}`);
   }
 
-  console.log(
-    `\n${tally.migrated} migrated, ${tally.preserved} preserved, ` +
-      `${tally.skipped} skipped as non-report, ${tally.failed} failed.`,
-  );
-  process.exit(tally.failed === 0 && tally.migrated + tally.preserved > 0 ? 0 : 1);
+  console.log(`\n${tally.migrated} migrated into AAS v1.0, ${tally.skipped} skipped, ${tally.failed} failed.`);
+  process.exit(tally.failed === 0 && tally.migrated > 0 ? 0 : 1);
 }
 
 main();

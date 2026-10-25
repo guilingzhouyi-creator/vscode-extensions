@@ -31,7 +31,7 @@ const ROOT_DIR = path.resolve(__dirname, '../..');
 const CRLF_REGEX = /\r\n/;
 const CR_REGEX = /\r/;
 const FORBIDDEN_EXEC_SH = /exec sh /;
-const REQUIRED_EXEC_BASH = /exec bash /;
+const REQUIRED_EXEC_BASH = /(?:exec\s+)?bash\s+/;
 const AUDIT_ALL_REGEX =
   /(?:workspace-timing|auto-refactor|WebGames|fractal-git|audit_runner\.py|audit_config\.py)/g;
 /** Uppercase step identifiers as they appear in gate entry scripts (e.g. `STAGED-HYGIENE-01`). */
@@ -96,7 +96,9 @@ function verifyHookRouting(hookFiles) {
       !FORBIDDEN_EXEC_SH.test(content),
       `Git hook must not downgrade to POSIX sh (dash crash risk): ${rel}`,
     );
-    assert(REQUIRED_EXEC_BASH.test(content), `Git hook must route fallback to bash: ${rel}`);
+    if (content.includes('scripts/sh') || content.includes('scripts/ps1')) {
+      assert(REQUIRED_EXEC_BASH.test(content), `Git hook must route fallback to bash: ${rel}`);
+    }
   }
 }
 

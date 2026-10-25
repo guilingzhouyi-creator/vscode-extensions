@@ -26,6 +26,7 @@ export default tseslint.config(
       'testdata/**',
       'samples/**',
       '*.tgz',
+      'src/**/*.generated.ts',
     ],
   },
 

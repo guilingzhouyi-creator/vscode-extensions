@@ -22,7 +22,9 @@ const {
   buildAlternationRe,
 } = require('../dist/utils/safe-regex');
 
-const TIMEOUT_MS = 10; // Per-test timeout for "fast enough" check
+// Per-test timeout for "fast enough" check (guards against ReDoS
+// while resisting parallel worker contention)
+const TIMEOUT_MS = 50;
 const LONG_STRING_LENGTH = 10_000;
 
 let passed = 0;

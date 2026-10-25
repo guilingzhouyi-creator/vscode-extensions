@@ -117,7 +117,7 @@ const NUMBER_VALUE_MAP_DEF = `concurrency:concurrency
 workers:workers`;
 
 const VALID_PROFILES_DEF = 'frontend backend composite';
-const VALID_FORMATS_DEF = 'json sarif text agent capp compact praxis';
+const VALID_FORMATS_DEF = 'json sarif text agent capp compact praxis aas';
 const VALID_COMMENT_LEVELS_DEF = 'off basic standard strict';
 const VALID_SECURITY_LEVELS_DEF = 'off basic full';
 const KNOWN_CLI_SUBCOMMANDS_DEF = 'scan daemon self-test symbols guide trajectory memory stats';
@@ -513,7 +513,7 @@ Options:
   --exclude <glob|dir>        Exclude glob or directory name (repeatable)
   --analyzers <a,b,c>         Allow-list by name (built-in or custom). Declared but
                               unlisted analyzers are disabled for this run.
-  --format <json|sarif|text|agent|capp|compact|praxis>  Output format (default: text)
+  --format <json|sarif|text|agent|capp|compact|praxis|aas>  Output format (default: text)
   --out <file>                Write report to a file instead of stdout
   --fail-on-issue             Exit non-zero if any 'error' issue (CI gate)
   --fail-on-severity <lvl>    Exit non-zero if any issue >= lvl (info|warning|error); with a

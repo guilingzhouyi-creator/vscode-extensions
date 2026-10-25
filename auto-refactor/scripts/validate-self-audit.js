@@ -16,7 +16,7 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const { runSelfAudit, BASELINE_OUTPUT, BASELINE_COMPACT_OUTPUT } = require('./run-self-audit');
+const { runSelfAudit, BASELINE_OUTPUT, BASELINE_AAS_OUTPUT } = require('./run-self-audit');
 
 const EXPECTED_PILLARS = [
   'architecture',
@@ -166,6 +166,19 @@ function validateEightPillarsAndMetrics(report) {
     report.metrics.effectiveCodeDensity >= 0.85 && report.metrics.effectiveCodeDensity <= 1.0,
     `Code density must be in [0.85, 1.0]: ${report.metrics.effectiveCodeDensity}`,
   );
+  if (report.metrics.densityTensorSummary) {
+    const dts = report.metrics.densityTensorSummary;
+    assert.ok(typeof dts.compositeDensity === 'number', 'compositeDensity must be number');
+    assert.ok(typeof dts.averageTspr === 'number', 'averageTspr must be number');
+    assert.ok(typeof dts.averagePor === 'number', 'averagePor must be number');
+    assert.ok(typeof dts.averageColumnDensity === 'number', 'averageColumnDensity must be number');
+    if (typeof dts.averageSpatialDensity === 'number') {
+      assert.ok(
+        dts.averageSpatialDensity >= 0 && dts.averageSpatialDensity <= 1,
+        'averageSpatialDensity in [0, 1]',
+      );
+    }
+  }
   console.log(
     `✔ Eight-pillar scores valid (Composite: ${report.metrics.compositeScore}, Density: ${(report.metrics.effectiveCodeDensity * 100).toFixed(1)}%).`,
   );
@@ -283,47 +296,25 @@ function validateBaselineFileOnDisk(report) {
 }
 
 /**
- * Assert the CAS v3 sidecar is written by the producer and stays consistent with the baseline.
+ * Validate that the producer properly emits the Agent Audit Schema (AAS v1.0) report artifact.
  *
- * Without this, the sidecar could silently stop being emitted and nothing would notice until a
- * consumer tried to read it — which is precisely the failure mode that keeps a compatibility
- * adapter alive years past its usefulness.
- *
- * @param report - In-memory report produced by the runner; must expose the scanned file count.
+ * @param report - In-memory report produced by the runner.
  */
-function validateCompactSidecarOnDisk(report) {
-  console.log('3. Validating CAS v3 Sidecar Emission & Consistency...');
+function validateAasReportOnDisk(report) {
+  console.log('3. Validating AAS v1.0 Agent-Native Report Emission...');
   assert.ok(
-    fs.existsSync(BASELINE_COMPACT_OUTPUT),
-    'reports/self-audit-baseline.cas.json must be emitted by the producer',
+    fs.existsSync(BASELINE_AAS_OUTPUT),
+    'reports/self-audit-baseline.aas.json must be emitted by the producer',
   );
-  const compact = JSON.parse(fs.readFileSync(BASELINE_COMPACT_OUTPUT, 'utf8'));
-  assert.strictEqual(compact.schema, 'cas-v3', 'sidecar must declare the CAS v3 discriminator');
-  assert.ok(Array.isArray(compact.vectors), 'sidecar must carry the positional vector array');
-  assert.ok(Array.isArray(compact.pal), 'sidecar must carry the analyzer palette');
-  assert.strictEqual(
-    compact.counts.issues,
-    report.metrics.totalIssues,
-    'sidecar issue count must match the verbose baseline',
-  );
-  assert.strictEqual(
-    compact.health.score,
-    report.metrics.compositeScore,
-    'sidecar composite score must match the verbose baseline',
-  );
-  assert.strictEqual(
-    compact.health.grade,
-    report.metrics.grade,
-    'sidecar grade must match the verbose baseline',
-  );
-  assert.ok(
-    !Array.isArray(compact.clusters) || compact.clusters.length > 0,
-    'clusters must be omitted rather than emitted empty, so "no overlap" stays distinguishable from "not measured"',
-  );
-  console.log(
-    `✔ CAS v3 sidecar verified (${compact.vectors.length} vectors, ` +
-      `${compact.clusters?.length ?? 0} claims, verdict ${compact.verdict}).`,
-  );
+  const aasDoc = JSON.parse(fs.readFileSync(BASELINE_AAS_OUTPUT, 'utf8'));
+  assert.strictEqual(aasDoc.schema, 'aas-v1', 'AAS document must declare aas-v1 schema');
+  assert.strictEqual(aasDoc.tool, 'auto-refactor');
+  assert.strictEqual(aasDoc.health.score, report.metrics.compositeScore);
+  assert.strictEqual(aasDoc.health.grade, report.metrics.grade);
+  assert.strictEqual(aasDoc.health.counts.files, report.scope.filesScanned);
+  assert.ok(typeof aasDoc.files === 'object' && aasDoc.files !== null);
+  assert.ok(typeof aasDoc.topology === 'object' && aasDoc.topology !== null);
+  console.log(`✔ AAS v1.0 Agent-Native report verified (verdict ${aasDoc.verdict}).`);
 }
 
 async function main() {
@@ -342,8 +333,8 @@ async function main() {
   // 2. Validate Baseline Report File Output & Disk Parity
   validateBaselineFileOnDisk(report);
 
-  // 3. Validate the CAS v3 sidecar the producer must also emit
-  validateCompactSidecarOnDisk(report);
+  // 3. Validate the AAS v1.0 Agent-Native report
+  validateAasReportOnDisk(report);
 
   // 4. Validate Immutable Audit Snapshot Quintuple (E, R, C, L, S)
   validateSnapshotMetadata(report);

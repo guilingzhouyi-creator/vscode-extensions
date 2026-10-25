@@ -170,6 +170,11 @@ function runAll() {
     () => shim.maskSourceCode(SAMPLE, MASK_CONFIG),
   );
   compare(
+    'maskSourceCodeCompact',
+    () => native.maskSourceCodeCompact(SAMPLE, MASK_CONFIG),
+    () => shim.maskSourceCodeCompact(SAMPLE, MASK_CONFIG),
+  );
+  compare(
     'countDuplicateLines',
     () => native.countDuplicateLines(SAMPLE),
     () => shim.countDuplicateLines(SAMPLE),
@@ -336,6 +341,25 @@ function runAll() {
     'batchProbeTriggers',
     () => native.batchProbeTriggers(testContent, testGroups),
     () => shim.batchProbeTriggers(testContent, testGroups),
+  );
+
+  // Scope hierarchy & variable shadowing detection
+  const testScopes = [
+    { parent: -1, kind: 0, startLine: 1, endLine: 100 },
+    { parent: 0, kind: 1, startLine: 10, endLine: 50 },
+    { parent: 1, kind: 1, startLine: 20, endLine: 35 },
+  ];
+  const testBindings = [
+    { scopeId: 0, name: 'globalVar', kind: 0, line: 2 },
+    { scopeId: 0, name: 'shadowedVar', kind: 0, line: 5 },
+    { scopeId: 1, name: 'localVar', kind: 0, line: 12 },
+    { scopeId: 1, name: 'shadowedVar', kind: 0, line: 15 },
+    { scopeId: 2, name: 'shadowedVar', kind: 0, line: 25 },
+  ];
+  compare(
+    'analyzeScopeShadowing',
+    () => native.analyzeScopeShadowing(testScopes, testBindings),
+    () => shim.analyzeScopeShadowing(testScopes, testBindings),
   );
 
   console.log('\nALL NATIVE/SHIM PARITY CHECKS PASSED SUCCESSFULLY!');

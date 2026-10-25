@@ -423,6 +423,28 @@ function testBindingKinds() {
   console.log('  ✔ binding kinds correctly distinguish variable / function / class');
 }
 
+// ─── Test 16: Native/Shim Batch Shadowing Detection ─────────────────
+function testDetectAllShadowing() {
+  const source = [
+    'const x = 1;',
+    'function outer() {',
+    '  const y = 2;',
+    '  function inner() {',
+    '    const x = 3;',
+    '    const z = 4;',
+    '  }',
+    '}',
+  ].join('\n');
+  const graph = buildTS(source);
+  const defects = graph.detectAllShadowing();
+  assert.strictEqual(defects.length, 1, 'must detect exactly 1 shadowed symbol');
+  assert.strictEqual(defects[0].symbol, 'x');
+  assert.strictEqual(defects[0].innerLine, 5);
+  assert.strictEqual(defects[0].outerLine, 1);
+  passCount++;
+  console.log('  ✔ detectAllShadowing finds shadowed symbols with native acceleration');
+}
+
 // ─── Run all tests ───────────────────────────────────────────────────
 function run() {
   console.log('Scope Graph validation\n');
@@ -442,6 +464,7 @@ function run() {
   testDeepNesting();
   testPerformance();
   testBindingKinds();
+  testDetectAllShadowing();
 
   console.log(`\n ALL ${passCount} SCOPE-GRAPH CHECKS PASSED SUCCESSFULLY!`);
 }

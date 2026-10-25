@@ -15,14 +15,14 @@ const assert = require('assert');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const manifestModulePath = path.join(ROOT, 'dist', 'core', 'router', 'expert-manifest');
+const manifestModulePath = path.join(ROOT, 'dist', 'core', 'experts');
 
 let manifestModule;
 try {
   manifestModule = require(manifestModulePath);
 } catch (err) {
   console.error(
-    '✖ BLOCK Unable to load expert-manifest module from dist. Run npm run build first.',
+    '✖ BLOCK Unable to load core/experts module from dist. Run npm run build first.',
   );
   console.error(err);
   process.exit(1);
@@ -36,8 +36,8 @@ console.log('=== Validating MoE Expert Manifest Integrity (C-01, C-02, C-04, N-0
 assert(Array.isArray(EXPERT_MANIFEST), 'EXPERT_MANIFEST must be an array');
 assert.strictEqual(
   EXPERT_MANIFEST.length,
-  31,
-  `Expected exactly 31 experts, found ${EXPERT_MANIFEST.length}`,
+  32,
+  `Expected exactly 32 experts, found ${EXPERT_MANIFEST.length}`,
 );
 
 // 1. Validate manifest integrity constraints

@@ -70,10 +70,12 @@ function buildNativeCore() {
   execSync(command, { cwd: CRATE_DIR, stdio: 'inherit' });
 
   const candidatePaths = resolveCandidatePaths(CRATE_DIR);
-  const builtArtifact = candidatePaths.find((candidate) => fs.existsSync(candidate));
-  if (!builtArtifact) {
+  const existingCandidates = candidatePaths.filter((candidate) => fs.existsSync(candidate));
+  if (existingCandidates.length === 0) {
     throw new Error('Compiled native dynamic library not found in target directories.');
   }
+  existingCandidates.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  const builtArtifact = existingCandidates[0];
 
   console.log(`Deploying artifact to ${DEST_INDEX_NODE}`);
   fs.copyFileSync(builtArtifact, DEST_INDEX_NODE);

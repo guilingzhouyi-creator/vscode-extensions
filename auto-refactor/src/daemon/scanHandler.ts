@@ -33,6 +33,9 @@ import type { WarmSession } from '../core/analyzer';
 import { Scanner, WorkerPoolManager, createWarmSession } from '../core/analyzer';
 import { CacheStore } from '../core/cache';
 import { Logger } from '../core/logger';
+import type { FastTrackVerdict } from '../core/pipeline/dualTrackPipeline';
+import { executeDualTrack } from '../core/pipeline/dualTrackPipeline';
+import { defaultASTSliceExtractor } from '../core/router/sliceExtractor';
 
 /**
  * Long-lived daemon assets shared by every scan request: persistent worker pools, the
@@ -190,6 +193,83 @@ export async function handleScanDiff(
     } finally {
         logger.close();
     }
+}
+
+/**
+ * Execute an asymmetric Prefill-Decode disaggregated scan request.
+ */
+export async function handleAsymmetricScan(
+    ctx: DaemonScanContext,
+    config: ScanConfig,
+    inputs: Array<{
+        filePath: string;
+        oldContent: string;
+        newContent: string;
+        lineBounds?: readonly [number, number];
+    }>,
+    options: {
+        author?: string;
+        forceFull?: boolean;
+        prefillOnly?: boolean;
+    } = {},
+): Promise<{
+    fastVerdict: FastTrackVerdict;
+    deepStatus: string;
+    deepIssuesCount: number;
+    durationMs: number;
+}> {
+    const t0 = Date.now();
+    const cfg = { ...config };
+    const logger = new Logger(cfg.logLevel || 'silent', cfg.logFile);
+    try {
+        const scanner = new Scanner(cfg, logger);
+        const exec = await executeDualTrack(scanner, inputs, {
+            author: options.author,
+            forceFull: options.forceFull,
+        });
+
+        let deepStatus = 'SKIPPED';
+        let deepIssuesCount = 0;
+        if (!options.prefillOnly) {
+            const deepVerdict = await exec.deepPromise;
+            deepStatus = deepVerdict.status;
+            deepIssuesCount = deepVerdict.deepIssues.length;
+        }
+
+        return {
+            fastVerdict: exec.fastVerdict,
+            deepStatus,
+            deepIssuesCount,
+            durationMs: Date.now() - t0,
+        };
+    } finally {
+        logger.close();
+    }
+}
+
+/**
+ * Execute a localized AST slice audit request.
+ */
+export async function handleSliceAudit(
+    filePath: string,
+    oldContent: string,
+    newContent: string,
+    changedLines?: number[],
+): Promise<{
+    slices: ReturnType<typeof defaultASTSliceExtractor.extractSlices>;
+    durationMs: number;
+}> {
+    const t0 = Date.now();
+    const slices = defaultASTSliceExtractor.extractSlices(
+        filePath,
+        oldContent,
+        newContent,
+        changedLines,
+    );
+    return {
+        slices,
+        durationMs: Date.now() - t0,
+    };
 }
 
 /**

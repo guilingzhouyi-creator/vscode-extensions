@@ -343,6 +343,59 @@ function benchmarkTrigramCosine(iterations = 100) {
   };
 }
 
+/**
+ * Benchmark lexical scope graph shadowing detection.
+ */
+function benchmarkScopeShadowing(iterations = 50) {
+  const scopesCount = 100;
+  const scopes = [];
+  for (let i = 0; i < scopesCount; i++) {
+    const parent = i === 0 ? -1 : Math.floor((i - 1) / 3);
+    scopes.push({
+      parent,
+      kind: i === 0 ? 0 : i % 2 === 0 ? 1 : 2,
+      startLine: i * 20 + 1,
+      endLine: (i + 1) * 20,
+    });
+  }
+  const bindings = [];
+  for (let s = 0; s < scopesCount; s++) {
+    for (let b = 0; b < 10; b++) {
+      const name = s % 10 === 0 && b === 0 ? 'shared_sym' : `var_${s}_${b}`;
+      bindings.push({
+        scopeId: s,
+        name,
+        kind: b % 3,
+        line: s * 20 + b + 2,
+      });
+    }
+  }
+
+  // Warmup
+  nativeCore.analyzeScopeShadowing(scopes, bindings);
+  shim.analyzeScopeShadowing(scopes, bindings);
+
+  const t0Native = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    nativeCore.analyzeScopeShadowing(scopes, bindings);
+  }
+  const nativeElapsedMs = (performance.now() - t0Native) / iterations;
+
+  const t0Shim = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    shim.analyzeScopeShadowing(scopes, bindings);
+  }
+  const shimElapsedMs = (performance.now() - t0Shim) / iterations;
+  const speedup = shimElapsedMs / Math.max(0.0001, nativeElapsedMs);
+
+  return {
+    operator: 'Scope Shadowing',
+    nativeElapsedMs,
+    shimElapsedMs,
+    speedup,
+  };
+}
+
 function runBenchmark() {
   console.log('=== [Native Benchmark & Guard] Performance Acceleration Verification ===');
 
@@ -362,6 +415,7 @@ function runBenchmark() {
     benchmarkBitParallelMyers(),
     benchmarkSimHashSemantic(),
     benchmarkTrigramCosine(),
+    benchmarkScopeShadowing(),
   ];
 
   console.log('-----------------------------------------------------------------------------');

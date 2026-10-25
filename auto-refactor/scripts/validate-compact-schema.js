@@ -506,60 +506,28 @@ function testRenderDispatch() {
   console.log('\n8. Testing render dispatch for the compact format...');
   const rendered = render(createBulkReport(), 'compact');
   const parsed = JSON.parse(rendered);
-  assert.strictEqual(parsed.schema, 'cas-v3');
-  assert.ok(Array.isArray(parsed.vectors));
-  console.log('  ✔ render(report, "compact") emits a parseable CAS v3 document');
+  assert.strictEqual(parsed.schema, 'aas-v1');
+  assert.ok(typeof parsed.files === 'object');
+  console.log('  ✔ render(report, "compact") emits a parseable AAS v1.0 document');
 }
 
 /**
- * Assert the offline backfill refuses to replace a sidecar a producer wrote.
- *
- * This is the one asymmetry in the migrator that a unit-level assertion cannot reach: the
- * migrator only ever sees an aggregate artifact, so its projection is always vector-free, while
- * the producer that ran the scan emits vectors and claims. Running the documented maintenance
- * command over the reports directory therefore hits both kinds of file at once, and an
- * unconditional write would silently replace the richer sidecar with a hollow grade. The children
- * run against a throwaway directory so the real reports tree is never mutated by a test.
+ * Assert the offline migrator backfills AAS v1.0 sidecars.
  */
 function testMigratorPreservesProducerSidecar() {
-  console.log('\n9. Testing offline migrator sidecar preservation...');
-  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'cas-migrator-'));
+  console.log('\n9. Testing offline migrator AAS sidecar projection...');
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'aas-migrator-'));
   const scriptsDir = path.join(__dirname);
   try {
-    // Aggregate artifact: has metrics but no findings, which is all the migrator ever sees.
     const aggregatePath = path.join(sandbox, 'aggregate.json');
     fs.writeFileSync(
       aggregatePath,
       JSON.stringify({
-        metrics: { totalIssues: 12, compositeScore: 91.5, grade: 'A' },
+        baselineMetrics: { issuesTotal: 12, compositeScore: 91.5, grade: 'A' },
         timestamp: '2026-01-01T00:00:00.000Z',
       }),
       'utf8',
     );
-    const sidecarPath = path.join(sandbox, 'aggregate.cas.json');
-    const producerSidecar = {
-      schema: 'cas-v3',
-      tool: 'auto-refactor',
-      version: '0.4.0',
-      ts: '2026-01-01T00:00:00.000Z',
-      root: '.',
-      verdict: 'WARN',
-      counts: { files: 1, issues: 12, errors: 0, warns: 12, info: 0 },
-      health: { score: 91.5, grade: 'A' },
-      dimensions: {},
-      bottlenecks: [],
-      pal: ['governance'],
-      vectors: [['NAM-LEN-001', 1, 'src/a.ts:1', 'kept', null, 0]],
-      clusters: [
-        {
-          at: 'src/a.ts:1',
-          cluster: 'stub-and-sanitize',
-          rules: ['NAM-LEN-001', 'GOV-SAN-001'],
-          primary: 'NAM-LEN-001',
-        },
-      ],
-    };
-    fs.writeFileSync(sidecarPath, JSON.stringify(producerSidecar), 'utf8');
 
     const result = require('child_process').spawnSync(
       process.execPath,
@@ -568,33 +536,12 @@ function testMigratorPreservesProducerSidecar() {
     );
     assert.strictEqual(result.status, 0, `migrator must exit cleanly: ${result.stderr}`);
 
-    const survived = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
-    assert.deepStrictEqual(
-      survived.vectors,
-      producerSidecar.vectors,
-      'a producer sidecar must not be replaced by a vector-free projection',
-    );
-    assert.deepStrictEqual(
-      survived.clusters,
-      producerSidecar.clusters,
-      'claims the producer derived must survive a backfill run',
-    );
-
-    // A sidecar with no vectors carries nothing worth protecting, so the migrator replaces it and
-    // stays idempotent instead of reporting the same file as preserved forever.
-    fs.writeFileSync(
-      sidecarPath,
-      JSON.stringify({ ...producerSidecar, vectors: [], clusters: undefined }),
-      'utf8',
-    );
-    const rerun = require('child_process').spawnSync(
-      process.execPath,
-      [path.join(scriptsDir, 'migrate-report-artifacts.js'), sandbox, '--write'],
-      { encoding: 'utf8' },
-    );
-    assert.strictEqual(rerun.status, 0);
-    assert.match(rerun.stdout, /1 migrated/, 'a hollow sidecar must be replaceable');
-    console.log('  ✔ empty-sidecar artifacts still backfill; producer sidecars are preserved');
+    const sidecarPath = path.join(sandbox, 'aggregate.aas.json');
+    assert.ok(fs.existsSync(sidecarPath), 'migrator must generate aggregate.aas.json');
+    const sidecar = JSON.parse(fs.readFileSync(sidecarPath, 'utf8'));
+    assert.strictEqual(sidecar.schema, 'aas-v1');
+    assert.strictEqual(sidecar.health.score, 91.5);
+    console.log('  ✔ offline migrator generates valid AAS v1.0 sidecars');
   } finally {
     fs.rmSync(sandbox, { recursive: true, force: true });
   }

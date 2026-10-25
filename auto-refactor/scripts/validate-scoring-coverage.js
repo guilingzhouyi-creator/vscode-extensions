@@ -63,6 +63,7 @@ const ALL_ANALYZERS = {
   frontend: { enabled: true },
   'shell-safety': { enabled: true },
   'token-density': { enabled: true },
+  concurrency: { enabled: true },
 };
 
 /**

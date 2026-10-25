@@ -112,6 +112,47 @@ export interface ScanDiffMessage {
 }
 
 /**
+ * Asymmetric Dual-Track / DeepInfer serving scan request.
+ * Disaggregates Prefill (AST & line-hash cache) and Decode (Sparse MoE evaluation).
+ */
+export interface ScanAsymmetricMessage {
+    v: number;
+    id: number;
+    type: 'scan_asymmetric';
+    params: {
+        requestId: string;
+        config: Record<string, unknown>;
+        inputs: Array<{
+            filePath: string;
+            oldContent: string;
+            newContent: string;
+            lineBounds?: readonly [number, number];
+        }>;
+        options?: {
+            author?: string;
+            forceFull?: boolean;
+            prefillOnly?: boolean;
+        };
+    };
+}
+
+/**
+ * Fine-grained AST slice audit request.
+ */
+export interface SliceAuditMessage {
+    v: number;
+    id: number;
+    type: 'slice_audit';
+    params: {
+        requestId: string;
+        filePath: string;
+        oldContent: string;
+        newContent: string;
+        changedLines?: number[];
+    };
+}
+
+/**
  * One streamed batch of scan output for a request: `seq` orders chunks, `files` lists the
  * scanned paths covered by the batch, and `issues`/`metrics` carry the incremental payload.
  */
@@ -192,6 +233,8 @@ export type DaemonMessage =
     | HelloAckMessage
     | ScanMessage
     | ScanDiffMessage
+    | ScanAsymmetricMessage
+    | SliceAuditMessage
     | ScanDataMessage
     | ScanDoneMessage
     | ErrorMessage

@@ -44,6 +44,10 @@ const {
   LANGUAGE_EXCLUSIVE_ANALYZERS,
   ALL_LANGUAGE_SPECIFIC_ANALYZERS,
   ModuleDependencyGraph,
+  handleAsymmetricScan,
+  handleSliceAudit,
+  createDaemonContext,
+  WorkerPoolManager,
 } = require('../dist/api');
 
 async function main() {
@@ -167,6 +171,36 @@ async function main() {
   assert(
     routeDoc.activationRatio <= 0.15,
     `Doc activation ratio should be <= 15%, got ${routeDoc.activationRatio}`,
+  );
+
+  // DeepSeekMoE Top-k Capacity Capping & Overflow Offloading Verification
+  const multiDiff = classifyDiff(
+    'import { oldFunc } from "./old";\nexport function run(x: number): number {\n  return x * 2;\n}',
+    'import { newFunc, helper } from "./new";\n// updated doc comments\nexport function run(x: number, flag?: boolean): number {\n  if (flag) return helper(x);\n  return x * 2 + 100;\n}',
+    'src/multi.ts',
+  );
+  const routeMulti = routeDiffToAnalyzers(multiDiff);
+  console.log(
+    `Multi-category active analyzers: [${Array.from(routeMulti.activeAnalyzers).join(', ')}] (Ratio: ${routeMulti.activationRatio})`,
+  );
+  assert(
+    routeMulti.activeAnalyzers.size <= 8,
+    `Active analyzers must strictly cap at <= 8 (<= 25% capacity), got ${routeMulti.activeAnalyzers.size}`,
+  );
+  assert(
+    routeMulti.activationRatio <= 0.25,
+    `Multi-category activation ratio must strictly cap at <= 0.25, got ${routeMulti.activationRatio}`,
+  );
+  assert(
+    routeMulti.overflowAnalyzers instanceof Set,
+    'overflowAnalyzers must be emitted as a Set',
+  );
+  console.log(
+    `Multi-category overflow analyzers: [${Array.from(routeMulti.overflowAnalyzers).join(', ')}]`,
+  );
+  assert(
+    routeMulti.overflowAnalyzers.size > 0,
+    'Overflow analyzers must contain candidates that exceeded the top-k capacity',
   );
 
   console.log('✔ Sparse Rule MoE Router verified.\n');
@@ -384,7 +418,78 @@ async function main() {
   }
 
   console.log('✔ Archetype Sparse Reviewer Activation on Main Scan Path verified.\n');
-  console.log('🎉 ALL ASYMMETRIC AUDIT SCANNING ENGINE CHECKS PASSED (6/6)!');
+
+  console.log('=== [7/7] Testing DeepInfer Disaggregated Serving & Tiered Offloading ===');
+  // 1. Localized slice audit serving
+  const sliceAuditRes = await handleSliceAudit(
+    'src/math.ts',
+    'export function add(a: number, b: number): number { return a + b; }',
+    'export function add(a: number, b: number, c?: number): number { return a + b + (c || 0); }',
+    [1],
+  );
+  assert(sliceAuditRes.slices.length > 0, 'Slice audit must extract affected AST slices');
+  assert.strictEqual(sliceAuditRes.slices[0].symbolName, 'add', 'Symbol name must match');
+  console.log(
+    `Slice audit extracted ${sliceAuditRes.slices.length} slice(s) in ${sliceAuditRes.durationMs}ms`,
+  );
+
+  // 2. Disaggregated Prefill-Decode serving via daemon context
+  const daemonCtx = createDaemonContext();
+  const daemonConfig = {
+    root: process.cwd(),
+    include: ['src/**/*.ts'],
+    analyzers: {
+      constants: { enabled: true },
+      hygiene: { enabled: true },
+    },
+  };
+  const daemonInputs = [
+    {
+      filePath: 'src/demo.ts',
+      oldContent: 'const MSG = "hello";\n',
+      newContent: 'const MSG = "world";\n',
+      lineBounds: [1, 2],
+    },
+  ];
+
+  // Prefill only (FastTrack foreground audit without blocking on DeepTrack)
+  const prefillRes = await handleAsymmetricScan(daemonCtx, daemonConfig, daemonInputs, {
+    prefillOnly: true,
+  });
+  assert.strictEqual(prefillRes.fastVerdict.status, 'SPECULATIVE_PASSED');
+  assert.strictEqual(prefillRes.deepStatus, 'SKIPPED');
+  console.log(`Disaggregated Prefill-only completed in ${prefillRes.durationMs}ms`);
+
+  // Full Prefill + Decode disaggregation
+  const fullRes = await handleAsymmetricScan(daemonCtx, daemonConfig, daemonInputs, {
+    prefillOnly: false,
+  });
+  assert.strictEqual(fullRes.fastVerdict.status, 'SPECULATIVE_PASSED');
+  assert.strictEqual(fullRes.deepStatus, 'CONFIRMED');
+  console.log(`Full Disaggregated Prefill+Decode completed in ${fullRes.durationMs}ms`);
+
+  // 3. KTransformers-style tiered analyzer pool offloading
+  const pool = new WorkerPoolManager({ maxConcurrency: 2 });
+  const hotObj = { kind: 'hot-constants' };
+  pool.releaseTieredAnalyzer('constants', hotObj, true);
+  const acquiredHot = pool.acquireTieredAnalyzer('constants', true, () => ({ kind: 'fresh' }));
+  assert.strictEqual(acquiredHot, hotObj, 'Hot resident analyzer must be pooled and reused');
+
+  const coldObj = { kind: 'cold-concurrency' };
+  pool.releaseTieredAnalyzer('concurrency', coldObj, false);
+  const acquiredCold = pool.acquireTieredAnalyzer('concurrency', false, () => ({
+    kind: 'fresh-cold',
+  }));
+  assert.strictEqual(
+    acquiredCold.kind,
+    'fresh-cold',
+    'Cold offloaded analyzer must be evicted and re-instantiated on demand',
+  );
+  console.log('Tiered residency (hot pooled vs cold evicted) verified.');
+
+  console.log('✔ DeepInfer Disaggregated Serving & Tiered Offloading verified.\n');
+
+  console.log('🎉 ALL ASYMMETRIC AUDIT SCANNING ENGINE CHECKS PASSED (7/7)!');
 }
 
 main().catch((err) => {

@@ -23,7 +23,7 @@ const path = require('path');
 const { FrontendAnalyzer } = require('../dist/analyzers/frontend');
 const { ProductionHygieneAnalyzer } = require('../dist/analyzers/production-hygiene');
 const { ClientExposureAnalyzer } = require('../dist/analyzers/client-exposure');
-const { EXPERT_MANIFEST, validateExpertManifest } = require('../dist/core/router/expert-manifest');
+const { EXPERT_MANIFEST, validateExpertManifest } = require('../dist/core/experts');
 const { getDimensionRulesForAnalyzer } = require('../dist/core/scoring/dimensionRuleTable');
 
 function mockContext(filePath, content) {
