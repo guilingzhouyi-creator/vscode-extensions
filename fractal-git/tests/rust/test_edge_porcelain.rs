@@ -3,6 +3,11 @@
 //! Architecture Role: End-to-end integration and verification for Batch 4 edge porcelain components:
 //!   `blame` (line-by-line attribution), `bisect` (topological centroid regression search),
 //!   `archive` (streaming Tar/Zip generation), and `bundle` (Git bundle v2 serialization & verification).
+//! Dependencies & Triggers: Executed by `cargo test --test test_edge_porcelain`. Requires host system Git for differential parity checks.
+//! Responsibilities: Validate topological line attribution, bisect centroid monotonicity, archive tar/zip stream validity, and bundle header/pack integrity.
+//! Exit Semantics & Design Rationale: Asserts byte-level parity and behavioral equivalence with standard Git semantics.
+//!
+//! Domain Governance Rules: FGT-COR-001 (differential parity), FGT-ALG-001, FGT-STO-001.
 
 use std::collections::HashMap;
 use std::fs;
@@ -246,8 +251,8 @@ fn test_bundle_serialization_and_verification() {
     assert_eq!(verified_checksum, report.pack_checksum);
 }
 
-/// Returns true when the host provides a `git` binary usable as an interoperability oracle.
-fn git_oracle_available() -> bool {
+/// Returns true when the host provides a `git` binary usable as an interoperability reference baseline.
+fn system_git_available() -> bool {
     Command::new("git")
         .arg("--version")
         .output()
@@ -348,7 +353,7 @@ fn assert_tree_listing_matches(source: &Path, clone: &Path, revision: &str) {
 /// every blob. Git verifies the result independently, so any missing subtree object is fatal here.
 #[test]
 fn bundle_head_roundtrips_nested_tree_history_through_git() {
-    if !git_oracle_available() {
+    if !system_git_available() {
         eprintln!("skip: system git is unavailable, so bundle interoperability cannot be asserted");
         return;
     }
@@ -407,7 +412,7 @@ fn bundle_head_roundtrips_nested_tree_history_through_git() {
 /// commit it names. Git must still report the ref type as `tag` after cloning from the bundle.
 #[test]
 fn bundle_annotated_tag_keeps_tag_object_through_git() {
-    if !git_oracle_available() {
+    if !system_git_available() {
         eprintln!("skip: system git is unavailable, so bundle interoperability cannot be asserted");
         return;
     }
@@ -459,7 +464,7 @@ fn bundle_annotated_tag_keeps_tag_object_through_git() {
 /// the same commit with the same tree contents.
 #[test]
 fn bundle_head_on_non_default_branch_roundtrips() {
-    if !git_oracle_available() {
+    if !system_git_available() {
         eprintln!("skip: system git is unavailable, so bundle interoperability cannot be asserted");
         return;
     }
@@ -500,7 +505,7 @@ fn bundle_head_on_non_default_branch_roundtrips() {
 /// The smallest possible history (one commit, no parents) must still produce a complete bundle.
 #[test]
 fn bundle_single_commit_history_clones() {
-    if !git_oracle_available() {
+    if !system_git_available() {
         eprintln!("skip: system git is unavailable, so bundle interoperability cannot be asserted");
         return;
     }
@@ -536,7 +541,7 @@ fn bundle_single_commit_history_clones() {
 /// Git refuses to create a bundle from an unborn HEAD; Taxis must fail without leaving a file.
 #[test]
 fn bundle_refuses_empty_repository() {
-    if !git_oracle_available() {
+    if !system_git_available() {
         eprintln!("skip: system git is unavailable, so bundle interoperability cannot be asserted");
         return;
     }
@@ -566,7 +571,7 @@ fn bundle_refuses_empty_repository() {
 /// that already has them) and their history is excluded from the pack.
 #[test]
 fn bundle_prerequisites_are_recorded_and_fetched() {
-    if !git_oracle_available() {
+    if !system_git_available() {
         eprintln!("skip: system git is unavailable, so bundle interoperability cannot be asserted");
         return;
     }

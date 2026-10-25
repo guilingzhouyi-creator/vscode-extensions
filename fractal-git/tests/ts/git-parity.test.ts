@@ -1,7 +1,7 @@
 /**
  * Test: Git Object Byte-Parity Differential Suite
  * File Path: tests/ts/git-parity.test.ts
- * Architecture Role: Locks the pure-TypeScript object engine to real Git plumbing as an oracle:
+ * Architecture Role: Locks the pure-TypeScript object engine to real Git plumbing as a reference baseline:
  *   identical blobs, trees, and commits prove FGT-ALG-001 Git binary equivalence.
  * Dependencies & Triggers: Requires a git executable on PATH; skips with an explicit reason when
  *   git is unavailable instead of silently claiming parity.
@@ -29,7 +29,7 @@ import type {
 } from '../../ts/contracts';
 import { materializeCommitPure } from '../../ts/native-binding';
 
-/** One differential corpus consumed by both the TypeScript engine and the git oracle. */
+/** One differential corpus consumed by both the TypeScript engine and the reference git baseline. */
 interface ParityCorpus {
     readonly caseName: string;
     readonly files: readonly StagedFileEntry[];
@@ -37,7 +37,7 @@ interface ParityCorpus {
     readonly agentMeta?: FractalCommitMeta;
 }
 
-/** Throwaway repository used either by the git oracle or by the TypeScript engine. */
+/** Throwaway repository used either by the reference git baseline or by the TypeScript engine. */
 interface ParityRepo {
     readonly root: string;
     readonly gitDir: string;
@@ -47,7 +47,7 @@ interface ParityRepo {
 /** Ref advanced by every TypeScript materialization so fsck can reach the produced objects. */
 const PARITY_REF = 'refs/fractal/cell/cell-parity/card/card-parity';
 
-/** Fixed identity shared by the TypeScript implementation and the git oracle. */
+/** Fixed identity shared by the TypeScript implementation and the reference git baseline. */
 const PARITY_AUTHOR: GitSignature = {
     name: 'Parity Agent',
     email: 'parity-agent@fractal-git.local',
@@ -65,7 +65,7 @@ const PARITY_META: FractalCommitMeta = {
 };
 
 /**
- * Detects whether the git CLI oracle is runnable in this environment.
+ * Detects whether the git CLI baseline is runnable in this environment.
  *
  * @returns An explicit skip reason, or false when git is available.
  */
@@ -84,7 +84,7 @@ function detectGitSkipReason(): string | false {
 const GIT_SKIP_REASON = detectGitSkipReason();
 
 /**
- * Builds the deterministic environment shared by every oracle invocation.
+ * Builds the deterministic environment shared by every reference baseline invocation.
  */
 function parityEnv(): NodeJS.ProcessEnv {
     const fixedDate = `@${PARITY_AUTHOR.timestampSec} +0000`;
@@ -159,11 +159,11 @@ function runGit(repo: ParityRepo, args: readonly string[], stdin?: string | Buff
 }
 
 /**
- * Hashes and persists one payload through the git oracle.
+ * Hashes and persists one payload through the reference git baseline.
  *
  * @returns Blob object id computed by git hash-object.
  */
-function oracleBlobOid(repo: ParityRepo, content: Uint8Array | string): string {
+function baselineBlobOid(repo: ParityRepo, content: Uint8Array | string): string {
     const payload = typeof content === 'string' ? Buffer.from(content, 'utf8') : Buffer.from(content);
     return runGit(repo, ['hash-object', '-w', '--stdin'], payload);
 }
@@ -171,32 +171,32 @@ function oracleBlobOid(repo: ParityRepo, content: Uint8Array | string): string {
 /**
  * Resolves the index object id for one staged entry (gitlink target vs content blob).
  */
-function oracleEntryOid(repo: ParityRepo, file: StagedFileEntry): string {
+function baselineEntryOid(repo: ParityRepo, file: StagedFileEntry): string {
     if (file.mode === GIT_FILE_MODE.GITLINK) {
         return String(file.content).trim().toLowerCase();
     }
-    return oracleBlobOid(repo, file.content);
+    return baselineBlobOid(repo, file.content);
 }
 
 /**
- * Stages every corpus file through the git index and returns the oracle root tree id.
+ * Stages every corpus file through the git index and returns the baseline root tree id.
  */
-function oracleTreeOid(repo: ParityRepo, files: readonly StagedFileEntry[]): string {
+function baselineTreeOid(repo: ParityRepo, files: readonly StagedFileEntry[]): string {
     runGit(repo, ['read-tree', '--empty']);
     for (const file of files) {
-        const entryOid = oracleEntryOid(repo, file);
+        const entryOid = baselineEntryOid(repo, file);
         runGit(repo, ['update-index', '--add', '--cacheinfo', `${file.mode},${entryOid},${file.path}`]);
     }
     return runGit(repo, ['write-tree']);
 }
 
 /**
- * Creates the oracle commit for a tree, message section, and parent ids.
+ * Creates the baseline commit for a tree, message section, and parent ids.
  *
  * The message section is fed on stdin followed by exactly one newline, which mirrors the
  * canonical commit payload produced by the TypeScript engine.
  */
-function oracleCommitOid(
+function baselineCommitOid(
     repo: ParityRepo,
     treeOid: string,
     parentOids: readonly string[],
@@ -277,33 +277,33 @@ function assertFsckClean(repo: ParityRepo): void {
 }
 
 /**
- * Asserts git prints the same commit object for the oracle and TypeScript repositories.
+ * Asserts git prints the same commit object for the reference baseline and TypeScript repositories.
  */
-function assertCommitDisplayParity(oracleRepo: ParityRepo, tsRepo: ParityRepo, commitOid: string): void {
-    const oracleDisplay = runGit(oracleRepo, ['cat-file', '-p', commitOid]);
+function assertCommitDisplayParity(baselineRepo: ParityRepo, tsRepo: ParityRepo, commitOid: string): void {
+    const baselineDisplay = runGit(baselineRepo, ['cat-file', '-p', commitOid]);
     const tsDisplay = runGit(tsRepo, ['cat-file', '-p', commitOid]);
-    assert.strictEqual(tsDisplay, oracleDisplay, 'git cat-file rendering diverged from the oracle');
+    assert.strictEqual(tsDisplay, baselineDisplay, 'git cat-file rendering diverged from the baseline');
 }
 
 /**
  * Asserts full object-id, tree-shape, and fsck parity for one corpus.
  */
 function assertCorpusParity(corpus: ParityCorpus): void {
-    let oracleRepo: ParityRepo | undefined;
+    let baselineRepo: ParityRepo | undefined;
     let tsRepo: ParityRepo | undefined;
     try {
-        oracleRepo = createParityRepo(`oracle-${corpus.caseName}`);
+        baselineRepo = createParityRepo(`baseline-${corpus.caseName}`);
         tsRepo = createParityRepo(`ts-${corpus.caseName}`);
-        const treeOid = oracleTreeOid(oracleRepo, corpus.files);
+        const treeOid = baselineTreeOid(baselineRepo, corpus.files);
         const tsResult = materializeWithTs(tsRepo, corpus, []);
         assert.strictEqual(tsResult.treeOid, treeOid, `root tree id diverged for '${corpus.caseName}'`);
-        const commitOid = oracleCommitOid(oracleRepo, treeOid, [], expectedMessageSection(corpus));
+        const commitOid = baselineCommitOid(baselineRepo, treeOid, [], expectedMessageSection(corpus));
         assert.strictEqual(tsResult.commitOid, commitOid, `commit id diverged for '${corpus.caseName}'`);
         assertTreeStructure(tsRepo, tsResult.treeOid, corpus.files);
-        assertCommitDisplayParity(oracleRepo, tsRepo, commitOid);
+        assertCommitDisplayParity(baselineRepo, tsRepo, commitOid);
         assertFsckClean(tsRepo);
     } finally {
-        disposeParityRepo(oracleRepo);
+        disposeParityRepo(baselineRepo);
         disposeParityRepo(tsRepo);
     }
 }
@@ -312,7 +312,7 @@ function assertCorpusParity(corpus: ParityCorpus): void {
  * Asserts parity for a merge-shaped commit whose header carries two parent lines.
  */
 function assertParentChainParity(): void {
-    let oracleRepo: ParityRepo | undefined;
+    let baselineRepo: ParityRepo | undefined;
     let tsRepo: ParityRepo | undefined;
     const baseCorpus: ParityCorpus = {
         caseName: 'parent base',
@@ -331,12 +331,12 @@ function assertParentChainParity(): void {
         agentMeta: PARITY_META,
     };
     try {
-        oracleRepo = createParityRepo('oracle-parents');
+        baselineRepo = createParityRepo('baseline-parents');
         tsRepo = createParityRepo('ts-parents');
-        const baseTreeOid = oracleTreeOid(oracleRepo, baseCorpus.files);
-        const baseCommitOid = oracleCommitOid(oracleRepo, baseTreeOid, [], expectedMessageSection(baseCorpus));
-        const sideTreeOid = oracleTreeOid(oracleRepo, sideCorpus.files);
-        const sideCommitOid = oracleCommitOid(oracleRepo, sideTreeOid, [], expectedMessageSection(sideCorpus));
+        const baseTreeOid = baselineTreeOid(baselineRepo, baseCorpus.files);
+        const baseCommitOid = baselineCommitOid(baselineRepo, baseTreeOid, [], expectedMessageSection(baseCorpus));
+        const sideTreeOid = baselineTreeOid(baselineRepo, sideCorpus.files);
+        const sideCommitOid = baselineCommitOid(baselineRepo, sideTreeOid, [], expectedMessageSection(sideCorpus));
 
         const tsBase = materializeWithTs(tsRepo, baseCorpus, []);
         assert.strictEqual(tsBase.treeOid, baseTreeOid, 'base tree id diverged');
@@ -345,9 +345,9 @@ function assertParentChainParity(): void {
         assert.strictEqual(tsSide.treeOid, sideTreeOid, 'side tree id diverged');
         assert.strictEqual(tsSide.commitOid, sideCommitOid, 'side commit id diverged');
 
-        const mergeTreeOid = oracleTreeOid(oracleRepo, mergeCorpus.files);
-        const mergeCommitOid = oracleCommitOid(
-            oracleRepo,
+        const mergeTreeOid = baselineTreeOid(baselineRepo, mergeCorpus.files);
+        const mergeCommitOid = baselineCommitOid(
+            baselineRepo,
             mergeTreeOid,
             [baseCommitOid, sideCommitOid],
             expectedMessageSection(mergeCorpus),
@@ -355,10 +355,10 @@ function assertParentChainParity(): void {
         const tsMerge = materializeWithTs(tsRepo, mergeCorpus, [baseCommitOid, sideCommitOid]);
         assert.strictEqual(tsMerge.treeOid, mergeTreeOid, 'merge tree id diverged');
         assert.strictEqual(tsMerge.commitOid, mergeCommitOid, 'merge commit id diverged');
-        assertCommitDisplayParity(oracleRepo, tsRepo, mergeCommitOid);
+        assertCommitDisplayParity(baselineRepo, tsRepo, mergeCommitOid);
         assertFsckClean(tsRepo);
     } finally {
-        disposeParityRepo(oracleRepo);
+        disposeParityRepo(baselineRepo);
         disposeParityRepo(tsRepo);
     }
 }

@@ -76,6 +76,9 @@ fn missing_hook_never_blocks_the_operation() {
 
 #[test]
 fn passing_hook_receives_arguments_and_the_worktree_cwd() {
+    if !GitHookRunner::has_working_shell() {
+        return;
+    }
     let (repository, git_dir) = bootstrap_repo();
     write_hook(
         &git_dir.join("hooks").join("commit-msg"),
@@ -102,6 +105,9 @@ fn passing_hook_receives_arguments_and_the_worktree_cwd() {
 
 #[test]
 fn hook_stdin_is_forwarded_verbatim() {
+    if !GitHookRunner::has_working_shell() {
+        return;
+    }
     let (repository, git_dir) = bootstrap_repo();
     write_hook(
         &git_dir.join("hooks").join("pre-push"),
@@ -126,6 +132,9 @@ fn hook_stdin_is_forwarded_verbatim() {
 
 #[test]
 fn non_zero_hook_exit_blocks_and_captures_stderr() {
+    if !GitHookRunner::has_working_shell() {
+        return;
+    }
     let (repository, git_dir) = bootstrap_repo();
     write_hook(
         &git_dir.join("hooks").join("pre-commit"),
@@ -144,6 +153,9 @@ fn non_zero_hook_exit_blocks_and_captures_stderr() {
 
 #[test]
 fn core_hooks_path_overrides_the_default_hooks_directory() {
+    if !GitHookRunner::has_working_shell() {
+        return;
+    }
     let (repository, git_dir) = bootstrap_repo();
     fs::write(
         git_dir.join("config"),
@@ -174,6 +186,9 @@ fn core_hooks_path_overrides_the_default_hooks_directory() {
 
 #[test]
 fn hook_environment_follows_the_git_contract() {
+    if !GitHookRunner::has_working_shell() {
+        return;
+    }
     let (repository, git_dir) = bootstrap_repo();
     let nested = repository.path().join("nested");
     fs::create_dir_all(&nested).expect("create nested directory");
@@ -234,6 +249,9 @@ fn core_taxishooks_false_disables_hook_execution() {
 
 #[test]
 fn hook_timeout_is_read_from_config_and_never_blocks() {
+    if !GitHookRunner::has_working_shell() {
+        return;
+    }
     let (repository, git_dir) = bootstrap_repo();
     fs::write(
         git_dir.join("config"),

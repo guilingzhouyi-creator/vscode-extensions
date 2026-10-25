@@ -44,7 +44,7 @@ if ($nodeCmd -and (Test-Path $topologyScript)) {
 $parityScript = Join-Path $ProjectRoot "scripts\common\validate-git-parity.js"
 if ($nodeCmd -and (Test-Path $parityScript)) {
     Write-Host "Validating Git Plumbing Byte Parity..." -ForegroundColor Gray
-    # 差分校验以系统 git 为 oracle；构建机上缺失 git 必须暴露为失败。
+    # 差分校验以系统 git 为基准；构建机上缺失 git 必须暴露为失败。
     $proc = Start-Process -FilePath $nodeCmd -ArgumentList @($parityScript, "--require-git") -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
     if ($proc.ExitCode -ne 0) { exit $proc.ExitCode }
 } else {

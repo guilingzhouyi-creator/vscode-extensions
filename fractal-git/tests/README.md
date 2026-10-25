@@ -7,37 +7,17 @@
 
 ## 目录分层架构
 
-```
-tests/
-├── README.md                          // 本规范说明
-├── rust/                              // Rust 深度单元与子系统回归测试 (共 21 项子系统测试)
-│   ├── support/git_oracle.rs          // 以系统 git 生成期望对象的差分测试夹具
-│   ├── test_object_codec.rs           // Rust 原生对象编解码与分形拓扑断言测试
-│   ├── test_algorithms.rs             // FastCDC, TreeDiff, 3-way merge, DAG walker 算法测试
-│   ├── test_algebraic_conflicts.rs    // 偏序集冲突代数与化简不变量测试
-│   ├── test_benchmarks.rs             // 微基准耗时包络与性能基线回归测试
-│   ├── test_commit_graph.rs           // 提交图遍历与代数去重测试
-│   ├── test_commit_materializer.rs    // 提交物化、文件模式与工作树写入测试
-│   ├── test_git_differential.rs       // 对象字节与系统 git oracle 逐字节差分测试
-│   ├── test_git_hooks.rs              // Git 钩子契约运行器（参数/stdin/环境/退出码/超时）测试
-│   ├── test_governance.rs             // 提交信息守卫与权限凭证治理测试
-│   ├── test_governance_pipeline.rs    // 分级钩子管道与放行判定测试
-│   ├── test_in_memory_index.rs        // 无锁内存虚拟树多线程并发构建测试
-│   ├── test_index.rs                  // 冲突槽解析、阶段状态与索引版本测试
-│   ├── test_operations.rs             // 操作图与撤销记录测试
-│   ├── test_pools.rs                  // 内存池复用、页面缓冲与 Quota 配额守卫测试
-│   ├── test_read_commands.rs          // 读命令退出码与输出对系统 git 的差分测试
-│   ├── test_refs.rs                   // 引用校验、引用事务、reflog 与 packed-refs 测试
-│   ├── test_relocate.rs               // 仓库迁移与工作树重定位测试
-│   ├── test_self_hosted_ipc.rs        // 本地 IPC 帧协议与 Smart Protocol 编解码测试
-│   ├── test_storage.rs                // CAS 块读写, WAL 日志与 Loose ODB 存储测试
-│   ├── test_tag_codec.rs              // 标签对象编解码与黄金指纹测试
-│   └── test_uac_promotions.rs         // 晋级请求与质量包络测试
-└── ts/                                // TypeScript 端到端生命周期与编排测试 (共 3 项端到端测试)
-    ├── fractal-lifecycle.test.ts      // 基础门禁拦截、原子物化与物理按需回收测试
-    ├── git-parity.test.ts             // Pure-TS 对象物化与系统 git 的逐字节差分测试
-    └── workspace-orchestration.test.ts// 多 Agent MCTS 变体打擂与优胜提拔编排测试
-```
+## 深度测试套件矩阵 (31 项 Rust 集成测试 + 3 项 TypeScript 端到端测试)
+
+| 领域分类 | 测试套件文件 | 覆盖的核心机制与断言重点 |
+| :--- | :--- | :--- |
+| **底层对象与序列化** | `test_object_codec.rs`<br>`test_tag_codec.rs`<br>`test_pack_generation.rs` | Git Blob/Tree/Commit/Tag 规范二进制序列化、黄金指纹、Packfile v2 生成与 delta 压缩往返 |
+| **偏序算法与图遍历** | `test_algorithms.rs`<br>`test_algebraic_conflicts.rs`<br>`test_commit_graph.rs`<br>`test_benchmarks.rs` | FastCDC 变长分块、3-Way Merge、偏序集冲突代数化简、CommitGraph 图链、TB-REGRESSION 耗时棘轮 |
+| **存储底座与原位引擎** | `test_storage.rs`<br>`test_in_place_engine.rs`<br>`test_commit_materializer.rs` | CAS 存储、WAL 事务、**TIPSE 逆向截断/打洞/SpacePlan 水位推演/低磁盘微包 GC 轮转**、Commit 原子物化 |
+| **虚拟索引与工作树** | `test_index.rs`<br>`test_in_memory_index.rs`<br>`test_bounded_worktree.rs`<br>`test_relocate.rs`<br>`test_project_leases.rs` | 无锁内存虚拟树并发构建、冲突槽四阶段解析、有界工作树生命周期、Junction 重定位、租约控制 |
+| **Git 对等与差分** | `test_git_differential.rs`<br>`test_config_parity.rs`<br>`test_read_commands.rs`<br>`test_edge_porcelain.rs`<br>`test_conflict_modes.rs`<br>`test_submodules.rs` | 系统 Git baseline 57 个向量逐字节差分、配置读写、读命令退出码、瓷器命令边缘用例、子模块路径防护 |
+| **治理生命周期与传输** | `test_governance.rs`<br>`test_governance_pipeline.rs`<br>`test_git_hooks.rs`<br>`test_operations.rs`<br>`test_interactive_operations.rs`<br>`test_pools.rs`<br>`test_refs.rs`<br>`test_uac_promotions.rs`<br>`test_self_hosted_ipc.rs`<br>`test_remote_transport.rs` | 提交信息规范与禁词拦截、分级 Hook 管道、Git 钩子执行器、操作图撤销、内存池复用、引用事务、晋级账本、IPC 帧协议与 Smart Protocol |
+| **TypeScript 端到端** | `fractal-lifecycle.test.ts`<br>`git-parity.test.ts`<br>`workspace-orchestration.test.ts` | 门禁拦截与物理回收、Pure-TS 对象物化差分、多 Agent MCTS 变体打擂与提拔编排 |
 
 ---
 

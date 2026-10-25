@@ -467,7 +467,7 @@ fn test_merge_commit_records_two_ordered_parents() {
     )
     .expect("write repository config");
 
-    // System Git is the independent oracle for parent ordering and ancestry.
+    // System Git is the independent baseline comparator for parent ordering and ancestry.
     let cat_file = std::process::Command::new("git")
         .arg("--git-dir")
         .arg(&git_dir)
@@ -514,12 +514,12 @@ fn test_merge_commit_records_two_ordered_parents() {
 }
 
 /// Runs one system Git command inside `repo` and returns trimmed stdout.
-fn run_git_oracle(repo: &std::path::Path, args: &[&str]) -> String {
+fn run_system_git(repo: &std::path::Path, args: &[&str]) -> String {
     let output = std::process::Command::new("git")
         .current_dir(repo)
         .args(args)
         .output()
-        .expect("spawn git oracle");
+        .expect("spawn git baseline command");
     assert!(
         output.status.success(),
         "git {:?} failed: {}",
@@ -530,46 +530,46 @@ fn run_git_oracle(repo: &std::path::Path, args: &[&str]) -> String {
 }
 
 #[test]
-fn test_merge_commit_matches_git_merge_oracle() {
+fn test_merge_commit_matches_system_git_merge() {
     let count = MERGE_SCRATCH_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let repo = std::env::temp_dir().join(format!(
-        "taxis_git_merge_oracle_{}_{}",
+        "taxis_git_merge_baseline_{}_{}",
         std::process::id(),
         count
     ));
     let _ = fs::remove_dir_all(&repo);
-    fs::create_dir_all(&repo).expect("create oracle repo");
-    run_git_oracle(&repo, &["init", "-b", "main"]);
-    run_git_oracle(&repo, &["config", "user.name", "Oracle"]);
-    run_git_oracle(&repo, &["config", "user.email", "oracle@example.com"]);
-    run_git_oracle(&repo, &["config", "core.autocrlf", "false"]);
-    run_git_oracle(&repo, &["config", "core.filemode", "false"]);
-    run_git_oracle(&repo, &["config", "commit.gpgsign", "false"]);
+    fs::create_dir_all(&repo).expect("create git baseline repo");
+    run_system_git(&repo, &["init", "-b", "main"]);
+    run_system_git(&repo, &["config", "user.name", "Git Baseline"]);
+    run_system_git(&repo, &["config", "user.email", "baseline@example.com"]);
+    run_system_git(&repo, &["config", "core.autocrlf", "false"]);
+    run_system_git(&repo, &["config", "core.filemode", "false"]);
+    run_system_git(&repo, &["config", "commit.gpgsign", "false"]);
 
     fs::write(repo.join("base.txt"), "base\n").expect("write base file");
-    run_git_oracle(&repo, &["add", "base.txt"]);
-    run_git_oracle(&repo, &["commit", "-m", "feat: base"]);
-    let base_oid = run_git_oracle(&repo, &["rev-parse", "HEAD"]);
+    run_system_git(&repo, &["add", "base.txt"]);
+    run_system_git(&repo, &["commit", "-m", "feat: base"]);
+    let base_oid = run_system_git(&repo, &["rev-parse", "HEAD"]);
 
     fs::write(repo.join("ours.txt"), "ours\n").expect("write ours file");
-    run_git_oracle(&repo, &["add", "ours.txt"]);
-    run_git_oracle(&repo, &["commit", "-m", "feat: ours"]);
-    let ours_oid = run_git_oracle(&repo, &["rev-parse", "HEAD"]);
+    run_system_git(&repo, &["add", "ours.txt"]);
+    run_system_git(&repo, &["commit", "-m", "feat: ours"]);
+    let ours_oid = run_system_git(&repo, &["rev-parse", "HEAD"]);
 
-    run_git_oracle(&repo, &["checkout", "-b", "topic", base_oid.as_str()]);
+    run_system_git(&repo, &["checkout", "-b", "topic", base_oid.as_str()]);
     fs::write(repo.join("theirs.txt"), "theirs\n").expect("write theirs file");
-    run_git_oracle(&repo, &["add", "theirs.txt"]);
-    run_git_oracle(&repo, &["commit", "-m", "feat: theirs"]);
-    let theirs_oid = run_git_oracle(&repo, &["rev-parse", "HEAD"]);
+    run_system_git(&repo, &["add", "theirs.txt"]);
+    run_system_git(&repo, &["commit", "-m", "feat: theirs"]);
+    let theirs_oid = run_system_git(&repo, &["rev-parse", "HEAD"]);
 
-    run_git_oracle(&repo, &["checkout", "main"]);
-    run_git_oracle(
+    run_system_git(&repo, &["checkout", "main"]);
+    run_system_git(
         &repo,
         &[
             "-c",
-            "user.name=Oracle",
+            "user.name=Git Baseline",
             "-c",
-            "user.email=oracle@example.com",
+            "user.email=baseline@example.com",
             "merge",
             "--no-ff",
             "topic",
@@ -577,10 +577,10 @@ fn test_merge_commit_matches_git_merge_oracle() {
             "merge: topic into main",
         ],
     );
-    let real_merge_oid = run_git_oracle(&repo, &["rev-parse", "HEAD"]);
-    let real_first = run_git_oracle(&repo, &["rev-parse", "HEAD^1"]);
-    let real_second = run_git_oracle(&repo, &["rev-parse", "HEAD^2"]);
-    let real_tree = run_git_oracle(&repo, &["rev-parse", "HEAD^{tree}"]);
+    let real_merge_oid = run_system_git(&repo, &["rev-parse", "HEAD"]);
+    let real_first = run_system_git(&repo, &["rev-parse", "HEAD^1"]);
+    let real_second = run_system_git(&repo, &["rev-parse", "HEAD^2"]);
+    let real_tree = run_system_git(&repo, &["rev-parse", "HEAD^{tree}"]);
     assert_eq!(real_first, ours_oid);
     assert_eq!(real_second, theirs_oid);
 
@@ -597,9 +597,9 @@ fn test_merge_commit_matches_git_merge_oracle() {
         Err(oid_err) => panic!("parse theirs oid: {oid_err}"),
     };
     ref_store
-        .update_ref("refs/heads/oracle-ours", &ours, None)
-        .expect("seed oracle-ours reference");
-    let author = GitSignature::new("Oracle", "oracle@example.com", 1_700_000_000);
+        .update_ref("refs/heads/baseline-ours", &ours, None)
+        .expect("seed baseline-ours reference");
+    let author = GitSignature::new("Git Baseline", "baseline@example.com", 1_700_000_000);
     let taxis_merge = write_commit_objects_with_parents(
         &odb,
         &ref_store,
@@ -612,13 +612,13 @@ fn test_merge_commit_matches_git_merge_oracle() {
             work_root: repo.clone(),
             message: "merge: topic into main".to_string(),
             author,
-            target_ref: "refs/heads/oracle-ours".to_string(),
+            target_ref: "refs/heads/baseline-ours".to_string(),
         },
         &[theirs],
     )
     .expect("taxis merge commit objects");
     let taxis_commit_hex = taxis_merge.commit_oid.to_hex();
-    let taxis_commit_text = run_git_oracle(&repo, &["cat-file", "-p", taxis_commit_hex.as_str()]);
+    let taxis_commit_text = run_system_git(&repo, &["cat-file", "-p", taxis_commit_hex.as_str()]);
     let taxis_parents: Vec<String> = taxis_commit_text
         .lines()
         .filter_map(|line| line.strip_prefix("parent "))
@@ -626,18 +626,18 @@ fn test_merge_commit_matches_git_merge_oracle() {
         .collect();
     assert_eq!(taxis_parents, vec![ours_oid.clone(), theirs_oid.clone()]);
     let tree_expression = format!("{taxis_commit_hex}^{{tree}}");
-    let taxis_tree = run_git_oracle(&repo, &["rev-parse", tree_expression.as_str()]);
+    let taxis_tree = run_system_git(&repo, &["rev-parse", tree_expression.as_str()]);
     assert_eq!(
         taxis_tree, real_tree,
         "Taxis merge tree must equal git merge tree"
     );
-    let taxis_tree_body = run_git_oracle(&repo, &["cat-file", "-p", taxis_tree.as_str()]);
-    let real_tree_body = run_git_oracle(&repo, &["cat-file", "-p", real_tree.as_str()]);
+    let taxis_tree_body = run_system_git(&repo, &["cat-file", "-p", taxis_tree.as_str()]);
+    let real_tree_body = run_system_git(&repo, &["cat-file", "-p", real_tree.as_str()]);
     assert_eq!(
         taxis_tree_body, real_tree_body,
         "tree payloads must be byte identical to git merge"
     );
-    let real_commit_text = run_git_oracle(&repo, &["cat-file", "-p", real_merge_oid.as_str()]);
+    let real_commit_text = run_system_git(&repo, &["cat-file", "-p", real_merge_oid.as_str()]);
     assert!(
         real_commit_text.contains(&format!("tree {real_tree}")),
         "git merge commit must reference the synthesized tree\n{real_commit_text}"

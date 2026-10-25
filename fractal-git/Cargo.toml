@@ -153,3 +153,19 @@ path = "tests/rust/test_interactive_operations.rs"
 [[test]]
 name = "test_config_parity"
 path = "tests/rust/test_config_parity.rs"
+
+[[test]]
+name = "test_project_leases"
+path = "tests/rust/test_project_leases.rs"
+
+[[test]]
+name = "test_bounded_worktree"
+path = "tests/rust/test_bounded_worktree.rs"
+
+[[test]]
+name = "test_remote_transport"
+path = "tests/rust/test_remote_transport.rs"
+
+[[test]]
+name = "test_in_place_engine"
+path = "tests/rust/test_in_place_engine.rs"

@@ -1,4 +1,4 @@
-//! Module: tests::test_read_commands — Read Commands Versus the Git Oracle
+//! Module: tests::test_read_commands — Read Commands Versus the Git Reference Baseline
 //! File Path: tests/rust/test_read_commands.rs
 //! Architecture Role: Proves `cat-file`, `ls-tree`, `ls-files`, `show-ref`, and `for-each-ref`
 //!   answer with Git's bytes, exit statuses, and diagnostics on a repository Git created.
@@ -7,6 +7,8 @@
 //!   and the streaming batch form including its missing-object diagnosis.
 //! Exit Semantics & Design Rationale: Every expectation is produced by running git next to taxis in
 //!   the same checkout. Re-asserting this crate's own conventions would let a shared mistake pass.
+//!
+//! Domain Governance Rules: FGT-COR-001 (differential parity), FGT-CLI-001.
 
 use std::fs;
 use std::path::{Path, PathBuf};

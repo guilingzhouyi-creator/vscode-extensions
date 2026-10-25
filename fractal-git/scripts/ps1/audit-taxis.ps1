@@ -162,7 +162,7 @@ if (-not $nodeCmd) {
     $staticFailures = 0
     foreach ($scriptName in @("validate-crate-topology.js", "check-zero-alloc-boundary.js", "validate-git-parity.js")) {
         $scriptPath = Join-Path $ProjectRoot "scripts/common/$scriptName"
-        # Git 对象对等校验必须显式要求系统 git 作 oracle，缺失即判失败而不是静默降级。
+        # Git 对象对等校验必须显式要求系统 git 作差分基准，缺失即判失败而不是静默降级。
         $scriptArgs = @($scriptPath)
         if ($scriptName -eq "validate-git-parity.js") { $scriptArgs += "--require-git" }
         $proc = Invoke-AuditChild -FilePath $nodeCmd -ArgumentList $scriptArgs -Label $scriptName

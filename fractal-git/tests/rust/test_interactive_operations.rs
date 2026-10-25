@@ -5,7 +5,7 @@
 //!   AST symbol leases, RemoteTransport (MockTransport & LoopbackTransport), and the rebase
 //!   stop/resume/abort state machine driven through the built taxis binary.
 //! Dependencies & Triggers: Run by cargo test; the CLI cases spawn the built taxis binary and use
-//!   the system git binary as the byte-level oracle.
+//!   the system git binary as the byte-level reference baseline.
 //! Responsibilities: First-instruction squash/fixup rejection with zero repository change, edit stop
 //!   followed by --continue, exec failure followed by --abort restoration, committer identity taken
 //!   from the environment, and rewritten history equal to what system git produces for the same input.
@@ -621,9 +621,9 @@ fn test_first_squash_or_fixup_rejected_before_any_repository_change() {
 }
 
 #[test]
-fn test_edit_stop_then_continue_matches_git_oracle() {
+fn test_edit_stop_then_continue_matches_system_git() {
     let seed = seed_branching_history("edit_continue");
-    let oracle = seed_branching_history("edit_continue_oracle");
+    let baseline = seed_branching_history("edit_continue_baseline");
     let committer = committer_identity(1_700_000_500);
     let plan_name = write_plan(
         &seed,
@@ -713,28 +713,28 @@ fn test_edit_stop_then_continue_matches_git_oracle() {
     assert!(!state_dir.exists());
     assert_eq!(git_stdout(&seed.repo, &["status", "--porcelain"]), "");
 
-    // Oracle: system git performs the same rebase (no edit stop) under the same committer identity.
-    run_git_success(&oracle.repo, &["rebase", "main"], &committer);
+    // Reference baseline: system git performs the same rebase (no edit stop) under the same committer identity.
+    run_git_success(&baseline.repo, &["rebase", "main"], &committer);
     assert_eq!(
         git_stdout(&seed.repo, &["rev-parse", "HEAD"]),
-        git_stdout(&oracle.repo, &["rev-parse", "HEAD"])
+        git_stdout(&baseline.repo, &["rev-parse", "HEAD"])
     );
     assert_eq!(
         git_stdout(&seed.repo, &["rev-parse", "HEAD^"]),
-        git_stdout(&oracle.repo, &["rev-parse", "HEAD^"])
+        git_stdout(&baseline.repo, &["rev-parse", "HEAD^"])
     );
     let log_format = "--format=%H|%T|%P|%an|%ae|%at|%cn|%ce|%ct|%s";
     assert_eq!(
         git_stdout(&seed.repo, &["log", "-2", log_format]),
-        git_stdout(&oracle.repo, &["log", "-2", log_format])
+        git_stdout(&baseline.repo, &["log", "-2", log_format])
     );
     assert_eq!(
         git_stdout(&seed.repo, &["cat-file", "commit", "HEAD"]),
-        git_stdout(&oracle.repo, &["cat-file", "commit", "HEAD"])
+        git_stdout(&baseline.repo, &["cat-file", "commit", "HEAD"])
     );
     assert_eq!(
         commit_header_line(&seed.repo, "HEAD", "author "),
-        commit_header_line(&oracle.repo, &oracle.feature_tip, "author ")
+        commit_header_line(&baseline.repo, &baseline.feature_tip, "author ")
     );
 }
 
@@ -810,9 +810,9 @@ fn test_exec_failure_then_abort_restores_original_tip() {
 }
 
 #[test]
-fn test_committer_identity_from_environment_matches_git_oracle() {
+fn test_committer_identity_from_environment_matches_system_git() {
     let seed = seed_branching_history("committer_env");
-    let oracle = seed_branching_history("committer_env_oracle");
+    let baseline = seed_branching_history("committer_env_baseline");
     // A non-UTC zone proves the offset is carried through instead of being normalized to +0000.
     let committer = vec![
         ("GIT_COMMITTER_NAME", "Release Bot".to_string()),
@@ -839,11 +839,11 @@ fn test_committer_identity_from_environment_matches_git_oracle() {
         seed.feature_tip_author_line
     );
 
-    // Byte-level oracle: git rebase under the same environment produces the same commit ids.
-    run_git_success(&oracle.repo, &["rebase", "main"], &committer);
-    assert_eq!(head, git_stdout(&oracle.repo, &["rev-parse", "HEAD"]));
+    // Byte-level baseline: git rebase under the same environment produces the same commit ids.
+    run_git_success(&baseline.repo, &["rebase", "main"], &committer);
+    assert_eq!(head, git_stdout(&baseline.repo, &["rev-parse", "HEAD"]));
     assert_eq!(
         git_stdout(&seed.repo, &["rev-parse", "HEAD^"]),
-        git_stdout(&oracle.repo, &["rev-parse", "HEAD^"])
+        git_stdout(&baseline.repo, &["rev-parse", "HEAD^"])
     );
 }

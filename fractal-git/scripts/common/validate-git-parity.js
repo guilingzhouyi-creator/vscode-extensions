@@ -2,7 +2,7 @@
  * Module: Fractal Git — Git Plumbing Specification & Byte Parity Validator
  * File Path: fractal-git/scripts/common/validate-git-parity.js
  * Architecture Role: Proves that Fractal Git's object framing, canonical tree ordering, and SHA-1
- *   computation match the system Git binary, using Git itself as the oracle rather than a second
+ *   computation match the system Git binary, using Git itself as the reference baseline rather than a second
  *   hand-written expectation.
  * Dependencies & Triggers: Node.js standard library plus the system git binary; invoked by
  *   scripts/ps1/audit-taxis.ps1, npm run gate:parity, and the CI fractal-git job.
@@ -12,9 +12,9 @@
  *      and compare object ids for every vector.
  *   3. Compare canonical tree entry order with git ls-tree, covering mixed case, non-ASCII names,
  *      directory trailing-slash ordering, and mode-specific framing.
- *   4. Exit non-zero on any divergence; refuse to claim equivalence when the oracle is absent and
+ *   4. Exit non-zero on any divergence; refuse to claim equivalence when the reference baseline is absent and
  *      the caller demanded it with --require-git.
- * Exit Semantics & Design Rationale: Exits 0 only after every vector matched the oracle. A missing
+ * Exit Semantics & Design Rationale: Exits 0 only after every vector matched the system git baseline. A missing
  *   git binary is reported explicitly instead of being silently treated as parity, because the
  *   earlier implementation printed an equivalence claim while comparing nothing.
  */
@@ -227,11 +227,11 @@ function runGit(gitDir, args, input, env) {
 }
 
 /**
- * Creates an isolated object database for oracle calls.
+ * Creates an isolated object database for reference baseline validation calls.
  *
- * @returns {{ gitDir: string, dispose: Function }} Oracle environment.
+ * @returns {{ gitDir: string, dispose: Function }} Baseline environment.
  */
-function createOracleRepository() {
+function createBaselineRepository() {
     const gitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fractal-git-parity-'));
     execFileSync('git', ['init', '--quiet', '--bare', gitDir], { stdio: 'ignore' });
     return {
@@ -245,7 +245,7 @@ function createOracleRepository() {
 /**
  * Writes a blob with git hash-object and returns its id.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {Buffer} payload - Blob bytes.
  * @returns {string} Object id assigned by git.
  */
@@ -269,7 +269,7 @@ function objectTypeForMode(mode) {
 /**
  * Writes a tree with git mktree and returns its id.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {Array<{ name: string, mode: string|number, oid: string }>} entries - Unsorted entries.
  * @returns {string} Tree object id assigned by git.
  */
@@ -282,7 +282,7 @@ function gitWriteTree(gitDir, entries) {
 /**
  * Creates a commit through git commit-tree with a fixed identity.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {object} fields - tree, parents, author, committer, message.
  * @returns {string} Commit object id assigned by git.
  */
@@ -305,7 +305,7 @@ function gitWriteCommit(gitDir, fields) {
 /**
  * Writes an annotated tag with git mktag and returns its id.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {object} fields - object, kind, tag, tagger, message.
  * @returns {string} Tag object id assigned by git.
  */
@@ -316,7 +316,7 @@ function gitWriteTag(gitDir, fields) {
 /**
  * Lists tree entries in the order git stores them.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {string} treeOid - Tree object id.
  * @returns {Array<string>} Entry names in canonical order.
  */
@@ -354,7 +354,7 @@ function blobVectors() {
 }
 
 /**
- * Returns nested tree fixtures used by both the encoder and the oracle.
+ * Returns nested tree fixtures used by both the encoder and the reference baseline.
  *
  * @returns {Array<{ label: string, spec: Array<object> }>} Tree fixtures.
  */
@@ -442,7 +442,7 @@ function treeVectors() {
 }
 
 /**
- * Creates a fixed signature for oracle calls.
+ * Creates a fixed signature for baseline validation calls.
  *
  * @param {string} name - Person name.
  * @param {string} tz - Time zone offset text.
@@ -544,7 +544,7 @@ function reportViolation(violations, message) {
 /**
  * Builds a nested tree with the JavaScript encoder and compares it with git at every level.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {Array<object>} spec - Tree specification.
  * @param {string} label - Fixture label for diagnostics.
  * @param {Array<string>} violations - Collected violations.
@@ -586,7 +586,7 @@ function verifyTreeSpec(gitDir, spec, label, violations) {
 /**
  * Verifies blob vectors against git hash-object.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {Array<string>} violations - Collected violations.
  * @returns {number} Number of verified vectors.
  */
@@ -605,7 +605,7 @@ function verifyBlobVectors(gitDir, violations) {
 /**
  * Verifies tree vectors, including nested levels and canonical ordering.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {Array<string>} violations - Collected violations.
  * @returns {{ count: number, firstTreeOid: string }} Vector count and a reusable tree id.
  */
@@ -624,7 +624,7 @@ function verifyTreeVectors(gitDir, violations) {
 /**
  * Verifies commit vectors against git commit-tree.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {string} treeOid - Tree object id usable by every commit vector.
  * @param {Array<string>} parentOids - Parent commit ids.
  * @param {Array<string>} violations - Collected violations.
@@ -646,7 +646,7 @@ function verifyCommitVectors(gitDir, treeOid, parentOids, violations) {
 /**
  * Verifies annotated tag vectors against git mktag.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {object} targets - Object ids available as tag targets.
  * @param {Array<string>} violations - Collected violations.
  * @returns {number} Number of verified vectors.
@@ -687,7 +687,7 @@ function verifyTagVectors(gitDir, targets, violations) {
 /**
  * Writes the required parent commits and returns their ids.
  *
- * @param {string} gitDir - Oracle git directory.
+ * @param {string} gitDir - Baseline git directory.
  * @param {string} treeOid - Tree object id.
  * @param {number} count - Number of parents to create.
  * @returns {Array<string>} Parent commit ids.
@@ -713,7 +713,7 @@ function bootstrapParentCommits(gitDir, treeOid, count) {
  * @returns {void}
  */
 function runGitParityValidation() {
-    console.log('=== [FGT-OBJ-001] Git object parity versus the system git oracle ===');
+    console.log('=== [FGT-OBJ-001] Git object parity versus the system git baseline ===');
     const gitAvailable = isGitAvailable();
     if (!gitAvailable) {
         console.log('SKIP: system git binary is unavailable; no byte parity claim is made.');
@@ -724,21 +724,21 @@ function runGitParityValidation() {
         process.exit(0);
     }
 
-    const oracle = createOracleRepository();
+    const baseline = createBaselineRepository();
     const violations = [];
     let verified = 0;
     try {
-        verified += verifyBlobVectors(oracle.gitDir, violations);
-        const treeResult = verifyTreeVectors(oracle.gitDir, violations);
+        verified += verifyBlobVectors(baseline.gitDir, violations);
+        const treeResult = verifyTreeVectors(baseline.gitDir, violations);
         verified += treeResult.count;
-        const parents = bootstrapParentCommits(oracle.gitDir, treeResult.firstTreeOid, 3);
-        verified += verifyCommitVectors(oracle.gitDir, treeResult.firstTreeOid, parents, violations);
-        const blobOid = gitWriteBlob(oracle.gitDir, Buffer.from('tag target\n', 'utf8'));
+        const parents = bootstrapParentCommits(baseline.gitDir, treeResult.firstTreeOid, 3);
+        verified += verifyCommitVectors(baseline.gitDir, treeResult.firstTreeOid, parents, violations);
+        const blobOid = gitWriteBlob(baseline.gitDir, Buffer.from('tag target\n', 'utf8'));
         const targets = {
             blob: blobOid,
             tree: treeResult.firstTreeOid,
             commit: parents[0],
-            tag: gitWriteTag(oracle.gitDir, {
+            tag: gitWriteTag(baseline.gitDir, {
                 object: parents[0],
                 kind: 'commit',
                 tag: 'bootstrap',
@@ -746,14 +746,14 @@ function runGitParityValidation() {
                 message: 'bootstrap tag\n',
             }),
         };
-        verified += verifyTagVectors(oracle.gitDir, targets, violations);
+        verified += verifyTagVectors(baseline.gitDir, targets, violations);
         const version = execFileSync('git', ['--version'], { stdio: 'pipe' }).toString('utf8').trim();
-        console.log('Oracle: ' + version);
-        console.log('Verified vectors against the oracle: ' + String(verified));
+        console.log('Git Baseline: ' + version);
+        console.log('Verified vectors against the reference baseline: ' + String(verified));
     } catch (error) {
-        reportViolation(violations, 'FGT-OBJ-001 oracle execution failed: ' + error.message);
+        reportViolation(violations, 'FGT-OBJ-001 reference baseline execution failed: ' + error.message);
     } finally {
-        oracle.dispose();
+        baseline.dispose();
     }
 
     if (violations.length > 0) {
@@ -763,7 +763,7 @@ function runGitParityValidation() {
         });
         process.exit(1);
     }
-    console.log('PASS: every blob, tree, commit, and tag vector matched the system git oracle.');
+    console.log('PASS: every blob, tree, commit, and tag vector matched the system git baseline.');
     process.exit(0);
 }
 

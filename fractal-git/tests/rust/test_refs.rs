@@ -358,7 +358,7 @@ fn head_writers_record_symbolic_and_detached_targets() {
 /// Runs one git subcommand inside `repo`, failing the test with the captured output on error.
 ///
 /// The differential suites already require the system git binary, so these reference-manipulation
-/// checks compare against the same oracle instead of re-asserting this crate's own conventions.
+/// checks compare against the same reference baseline instead of re-asserting this crate's own conventions.
 fn run_git(repo: &Path, args: &[&str]) -> Output {
     let output = Command::new("git")
         .arg("-c")

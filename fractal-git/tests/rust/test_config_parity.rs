@@ -1,4 +1,4 @@
-//! Module: tests::test_config_parity — Config Rewrites Versus the Git Oracle
+//! Module: tests::test_config_parity — Config Rewrites Versus the Git Reference Baseline
 //! File Path: tests/rust/test_config_parity.rs
 //! Architecture Role: Proves fg-index config reading and writing agree with the system git binary
 //!   in both directions: values taxis writes are what git reads, and values git writes are what
@@ -10,6 +10,8 @@
 //!   collapse, append and unset semantics, atomic temporary-file cleanup, and subsection wiring.
 //! Exit Semantics & Design Rationale: Every expectation comes from running git on the same file.
 //!   Re-asserting this crate's own quoting rules would let a shared mistake pass unnoticed.
+//!
+//! Domain Governance Rules: FGT-COR-001 (differential parity), FGT-IDX-001.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -24,7 +26,7 @@ use fg_index::config::{
 static SCRATCH_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 /// Values that exercise every quoting decision the Git writer makes.
-const ORACLE_VALUES: [&str; 11] = [
+const REFERENCE_VALUES: [&str; 11] = [
     "plain",
     "a b",
     " a ",
@@ -126,7 +128,7 @@ fn values_written_by_taxis_are_exactly_what_git_reads() {
         return;
     }
     let directory = scratch_dir("taxis_write_git_read");
-    for (index, value) in ORACLE_VALUES.iter().enumerate() {
+    for (index, value) in REFERENCE_VALUES.iter().enumerate() {
         let config = directory.join(format!("config_{index}"));
         set_value(&config, &key("core.k"), value, ConfigWriteMode::Replace)
             .expect("taxis must write the value");
@@ -148,7 +150,7 @@ fn values_written_by_git_are_exactly_what_taxis_reads() {
         return;
     }
     let directory = scratch_dir("git_write_taxis_read");
-    for (index, value) in ORACLE_VALUES.iter().enumerate() {
+    for (index, value) in REFERENCE_VALUES.iter().enumerate() {
         let config = directory.join(format!("config_{index}"));
         let output = git_add(&config, "core.k", value);
         assert!(output.status.success(), "git failed to write {value:?}");
