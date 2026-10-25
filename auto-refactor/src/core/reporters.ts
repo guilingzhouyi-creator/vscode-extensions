@@ -33,7 +33,7 @@ const SARIF_LEVEL: Record<Severity, string> = {
  *
  * @param report - Complete scan result to serialize; its summary and issues are assumed to be
  *   well-formed and are never mutated.
- * @param format - Requested wire format (`json`, `sarif`, `text`, `agent`, `capp`, `compact`,
+ * @param format - Requested wire format (`json`, `sarif`, `text`, `agent`, `capp`, `aas`,
  *   `praxis`); any other value selects the text renderer.
  * @returns The rendered report string in the selected format.
  */
@@ -47,7 +47,6 @@ export function render(report: ScanReport, format: OutputFormat): string {
             return toAgentReview(report);
         case 'capp':
             return toCapp(report);
-        case 'compact':
         case 'aas':
             return toAasJson(report);
         case 'praxis':

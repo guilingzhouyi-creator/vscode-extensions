@@ -89,7 +89,6 @@ const PARALLEL_SUITES = [
   { name: 'validate-python-imports', script: 'scripts/validate-python-imports.js' },
   { name: 'validate-postscan-parity', script: 'scripts/validate-postscan-parity.js' },
   { name: 'validate-capp-protocol', script: 'scripts/validate-capp-protocol.js' },
-  { name: 'validate-compact-schema', script: 'scripts/validate-compact-schema.js' },
   { name: 'validate-sidecar-coverage', script: 'scripts/validate-sidecar-coverage.js' },
   { name: 'validate-aas-reporter', script: 'scripts/validate-aas-reporter.js' },
   { name: 'validate-praxis-presentation', script: 'scripts/validate-praxis-presentation.js' },

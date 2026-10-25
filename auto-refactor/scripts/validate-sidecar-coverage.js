@@ -19,7 +19,6 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { migrateLegacyReport } = require('../dist/api');
 
 const REPORTS_DIR = path.join(__dirname, '..', 'reports');
 const JSON_SUFFIX = '.json';
@@ -64,8 +63,16 @@ function listLegacyCasArtifacts() {
  */
 function isReportArtifact(sourcePath) {
   try {
-    migrateLegacyReport(JSON.parse(fs.readFileSync(sourcePath, 'utf8')));
-    return true;
+    const payload = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+    if (!payload || typeof payload !== 'object') return false;
+    return Boolean(
+      payload.schema === 'aas-v1' ||
+      payload.summary ||
+      payload.baselineMetrics ||
+      Array.isArray(payload.issues) ||
+      payload.cai !== undefined ||
+      payload.health !== undefined
+    );
   } catch {
     return false;
   }

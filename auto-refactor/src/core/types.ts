@@ -342,11 +342,11 @@ export interface Thresholds {
 /**
  * Report serialization format: `json` for structured consumers, `sarif` for CI code scanning,
  * `text` for human-readable stdout, `agent` for LLM Agent context, `capp` for ultra-compact
- * directives, `compact` / `aas` for the token-frugal Agent Audit Schema (AAS v1.0), or `praxis`
+ * directives, `aas` for the token-frugal Agent Audit Schema (AAS v1.0), or `praxis`
  * for rich frontend UI payloads.
  */
 export type OutputFormat =
-    'json' | 'sarif' | 'text' | 'agent' | 'capp' | 'compact' | 'praxis' | 'aas';
+    'json' | 'sarif' | 'text' | 'agent' | 'capp' | 'praxis' | 'aas';
 
 /**
  * Depth of the comments analyzer: `off` disables it, `basic` reports header/doc gaps at info

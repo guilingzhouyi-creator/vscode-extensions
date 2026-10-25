@@ -15,7 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { buildAasReport, toAasJson, migrateLegacyReport } = require('../dist/api');
+const { buildAasReport, toAasJson } = require('../dist/api');
 
 const ARG_PREFIX = '--';
 const FLAG_WRITE = '--write';

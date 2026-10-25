@@ -824,7 +824,7 @@ export { finalizeReport, computeSummary, groupCounts } from './core/reporting/re
 
 export { resolveConfig, Scanner, Logger, AutoRefactorError, render, CacheStore };
 export { scanDiffStream } from './core/stream';
-export { CircularDiffBuffer } from './core/ring-buffer';
+export { CircularDiffBuffer } from './core/praxis/circular-diff-buffer';
 export { PraxisRollbackEngine, revertDiffHunk, revertTaskCard } from './core/rollback';
 export {
     fnv1a32,
@@ -969,7 +969,7 @@ export * from './core/semantic/semanticGraph';
 export * from './core/semantic/adapters';
 
 // ---- Universal Rule Pyramid & Hierarchy ----
-export * from './core/rules/pyramid';
+export * from './core/rules/universal-hierarchy';
 
 // ---- Standard Terminology SSOT & Dual-Faced Architecture ----
 export * from './core/governance/standard-terminology';
@@ -979,19 +979,15 @@ export { toAgentReview, toCapp, toPraxisPresentation } from './core/reporters';
 export * from './core/reporting/aas-types';
 export { buildAasReport, toAasJson } from './core/reporting/aas-reporter';
 
-// ---- Compact Agent Schema (CAS v3) Projection & Legacy Artifact Migration ----
-export * from './core/reporting/compact-report-types';
-export {
-    buildCompactReport,
-    toCompactReportJson,
-    hydrateCompactReport,
-    migrateLegacyReport,
-    isCompactReport,
-} from './core/reporting/compact-report-migrator';
-export type { CompactClusterClaim } from './core/reporting/compact-report-types';
 
 // ---- Praxis Diff Governance Subsystem Facade & SPI ----
 export * from './core/praxis';
+export {
+    IncrementalDiffStream,
+    gridRow,
+    computeGridRowSpan,
+} from './core/diff/incremental-diff-stream';
+export type { IncrementalSliceResult } from './core/diff/incremental-diff-stream';
 
 // ---- Unified AST Visitor Dispatcher & Traversal Core ----
 export { UnifiedAstVisitor } from './core/ast/unified-ast-visitor';
