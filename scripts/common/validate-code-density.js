@@ -1,7 +1,7 @@
 /**
- * Module: Workspace Governance — Multi-Dimensional Code Density & Plumbing Gate
+ * Module: Workspace Governance — 5D Riemannian Manifold Code Density & Plumbing Gate
  * File Path: scripts/common/validate-code-density.js
- * Architecture Role: Gate validator enforcing token column density, vertical dilution
+ * Architecture Role: Gate validator enforcing 5D manifold token column density, vertical dilution
  *   boundaries, and wiring-to-logic payload ratio across source code.
  * Dependencies & Triggers: Node.js standard libraries (fs, path, child_process);
  *   consumes evaluateCodeMetrics from scripts/common/evaluate-eloc-budget.js;
@@ -355,7 +355,7 @@ function printHumanDensityReport(allViolations, uniqueFilesLength, exemptCount) 
   }
 
   console.log(
-    `  ✔ 100% 文件符合五维代码密度与接线载荷约束 (扫描: ${uniqueFilesLength} 文件, 合法豁免: ${exemptCount} 文件, 违规: 0)`,
+    `  ✔ 100% 文件符合五维流形代码密度与接线载荷约束 (扫描: ${uniqueFilesLength} 文件, 合法豁免: ${exemptCount} 文件, 违规: 0)`,
   );
   process.exit(0);
 }
@@ -411,13 +411,13 @@ function run() {
       );
       process.exit(0);
     }
-    console.log('  ✔ 无代码文件需要执行五维代码密度审查');
+    console.log('  ✔ 无代码文件需要执行五维流形代码密度审查');
     process.exit(0);
   }
 
   if (!options.json) {
     console.log(
-      `  ▶ 检查 ${uniqueFiles.length} 个源文件的代码密度与接线载荷 (POR <= ${(options.porLimit * 100).toFixed(0)}%, τ ∈ [${options.minTau}, ${options.maxTau}])...`,
+      `  ▶ 检查 ${uniqueFiles.length} 个源文件的五维流形代码密度与接线载荷 (POR <= ${(options.porLimit * 100).toFixed(0)}%, τ ∈ [${options.minTau}, ${options.maxTau}])...`,
     );
   }
 

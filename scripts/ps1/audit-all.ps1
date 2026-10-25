@@ -370,48 +370,33 @@ function Get-SafeProp {
 }
 
 # 读取 auto-refactor 十维工程质量基线
+$aasBaselinePath = Join-Path $repoRoot "auto-refactor\reports\self-audit-baseline.aas.json"
 $baselinePath = Join-Path $repoRoot "auto-refactor\reports\self-audit-baseline.json"
-$baseline = $null
-$tenDimensions = $null
-$compositeScore = $null
-$totalDebt = $null
-$autonomyRate = $null
-$grade = $null
+$baseline = $null; $tenDimensions = $null; $compositeScore = $null; $totalDebt = $null; $autonomyRate = $null; $grade = $null; $notEvaluatedDims = $null
 
 try {
-    if (Test-Path $baselinePath) {
-        $rawJson = Get-Content -Path $baselinePath -Raw -Encoding utf8
-        $baselineData = $rawJson | ConvertFrom-Json
+    if (Test-Path $aasBaselinePath) {
+        $aasData = (Get-Content -Path $aasBaselinePath -Raw -Encoding utf8) | ConvertFrom-Json
+        if ($aasData -and $aasData.schema -eq "aas-v1" -and $aasData.health) {
+            $h = $aasData.health
+            if ($null -ne $h.score) { $compositeScore = [double]$h.score }
+            if ($null -ne $h.grade) { $grade = [string]$h.grade }
+            if ($h.counts -and $null -ne $h.counts.total) { $totalDebt = [int]$h.counts.total }
+            if ($null -ne $h.cai) { $autonomyRate = [double]$h.cai }
+            $tenDimensions = $aasData.dimensions; $baseline = $aasData
+        }
+    }
+    if ($null -eq $baseline -and (Test-Path $baselinePath)) {
+        $baselineData = (Get-Content -Path $baselinePath -Raw -Encoding utf8) | ConvertFrom-Json
         if ($baselineData) {
-            $metricsData = Get-SafeProp $baselineData 'metrics'
-            $compositeScore = if ($null -ne $metricsData) {
-                $cs = Get-SafeProp $metricsData 'compositeScore'
-                if ($null -ne $cs) { [double]$cs } else { $null }
-            } else {
-                $cs = Get-SafeProp $baselineData 'compositeScore'
-                if ($null -ne $cs) { [double]$cs } else { $null }
-            }
-
-            $grade = if ($null -ne $metricsData) {
-                $g = Get-SafeProp $metricsData 'grade'
-                if ($null -ne $g) { [string]$g } else { $null }
-            } else { $null }
-
-            $totalDebt = if ($null -ne $metricsData) {
-                $ti = Get-SafeProp $metricsData 'totalIssues'
-                if ($null -ne $ti) { [int]$ti } else {
-                    $ui = Get-SafeProp $metricsData 'unsuppressedIssues'
-                    if ($null -ne $ui) { [int]$ui } else { $null }
-                }
-            } else { $null }
-
-            $autonomyRate = Get-SafeProp $baselineData 'autonomyRate'
-            if ($null -eq $autonomyRate -and $null -ne $metricsData) {
-                $autonomyRate = Get-SafeProp $metricsData 'autonomyRate'
-            }
-            if ($null -eq $autonomyRate) {
-                $autonomyRate = Get-SafeProp $baselineData 'cai'
-            }
+            $m = Get-SafeProp $baselineData "metrics"
+            $cs = if ($null -ne $m) { Get-SafeProp $m "compositeScore" } else { Get-SafeProp $baselineData "compositeScore" }
+            if ($null -ne $cs) { $compositeScore = [double]$cs }
+            $g = if ($null -ne $m) { Get-SafeProp $m "grade" } else { $null }
+            if ($null -ne $g) { $grade = [string]$g }
+            $ti = if ($null -ne $m) { (Get-SafeProp $m "totalIssues") ?? (Get-SafeProp $m "unsuppressedIssues") } else { $null }
+            if ($null -ne $ti) { $totalDebt = [int]$ti }
+            $autonomyRate = (Get-SafeProp $baselineData "autonomyRate") ?? (if ($m) { Get-SafeProp $m "autonomyRate" } else { $null }) ?? (Get-SafeProp $baselineData "cai")
 
             # 多子系统自研率加权融合 (auto-refactor 与 fractal-git)
             $fgAuditPath = Join-Path $repoRoot "fractal-git\reports\audit-latest.json"
@@ -882,6 +867,7 @@ if ($Agent) {
     if ($statusFg -ne "PASS") { $failedSubsystems += "fractal-git" }
 
     $envelope = [ordered]@{
+        schema = "aas-v1"
         protocolVersion = "1.0.0"
         recordedAt = (Get-Date).ToString("o")
         status = if ($failed) { "BLOCK" } else { "PASS" }
@@ -999,7 +985,7 @@ if ($null -ne $totalDebt) { $bottomSummary += "  |  技术债: {0}项" -f $total
 $bottomSummary += "  |  全局状态: {0}" -f $globalStatus
 Write-GateHost (Format-DashboardRow $bottomSummary $targetWidth) -ForegroundColor $globalColor
 Write-GateHost ("└" + ("─" * $targetWidth) + "┘") -ForegroundColor Cyan
-Write-GateHost "💡 统一审查快照已落盘至: .audit-logs/audit-latest.json | audit-latest.md" -ForegroundColor Gray
+Write-GateHost "💡 统一审查快照已落盘至: .audit-logs/audit-latest.json | audit-latest.aas.json | audit-latest.md" -ForegroundColor Gray
 Write-GateHost "💡 质量历史轨迹已追加至: .audit-logs/audit-history.jsonl" -ForegroundColor Gray
 
 if ($env:GITHUB_STEP_SUMMARY) {

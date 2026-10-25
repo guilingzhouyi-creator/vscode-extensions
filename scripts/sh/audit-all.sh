@@ -362,6 +362,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   const codeParity = Number(process.argv[37] || 0);
   const codeGateProof = Number(process.argv[38] || 0);
   const codeDocMetrics = Number(process.argv[39] || 0);
+  const aasBaselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.aas.json");
   const baselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.json");
   const wtReportFile = path.join(rootDir, "workspace-timing", "reports", "review", "report-latest.json");
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -376,31 +377,44 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   let qualityVector = null;
 
   try {
-    if (fs.existsSync(baselineFile)) {
+    if (fs.existsSync(aasBaselineFile)) {
+      const aas = JSON.parse(fs.readFileSync(aasBaselineFile, "utf8"));
+      if (aas && aas.schema === "aas-v1" && aas.health) {
+        compositeScore = aas.health.score ?? null;
+        grade = aas.health.grade ?? null;
+        totalDebt = aas.health.counts?.total ?? null;
+        autonomyRate = aas.health.cai ?? null;
+        if (aas.dimensions) {
+          tenDimensions = aas.dimensions;
+          qualityVector = aas.dimensions;
+        }
+      }
+    }
+    if (compositeScore === null && fs.existsSync(baselineFile)) {
       const b = JSON.parse(fs.readFileSync(baselineFile, "utf8"));
       const m = b.metrics || {};
       compositeScore = m.compositeScore ?? b.compositeScore ?? null;
       grade = m.grade || null;
       totalDebt = m.totalIssues ?? m.unsuppressedIssues ?? null;
       autonomyRate = b.autonomyRate ?? m.autonomyRate ?? b.cai ?? null;
-      // 多子系统自研率加权融合 (auto-refactor 与 fractal-git)
-      const fgAuditPath = path.join(repoRoot, "fractal-git/reports/audit-latest.json");
-      let fgCai = null;
-      if (fs.existsSync(fgAuditPath)) {
-        try {
-          const fgData = JSON.parse(fs.readFileSync(fgAuditPath, "utf8"));
-          if (fgData && fgData.summary && fgData.summary.caiIndex != null) {
-            fgCai = Number(fgData.summary.caiIndex);
-          }
-        } catch (_) {}
-      }
-      if (autonomyRate != null && fgCai != null) {
-        autonomyRate = Number((Number(autonomyRate) * 0.67 + fgCai * 0.33).toFixed(2));
-      }
       if (b.tenDimensions) {
         tenDimensions = b.tenDimensions;
         qualityVector = b.tenDimensions;
       }
+    }
+    // 多子系统自研率加权融合 (auto-refactor 与 fractal-git)
+    const fgAuditPath = path.join(repoRoot, "fractal-git/reports/audit-latest.json");
+    let fgCai = null;
+    if (fs.existsSync(fgAuditPath)) {
+      try {
+        const fgData = JSON.parse(fs.readFileSync(fgAuditPath, "utf8"));
+        if (fgData && fgData.summary && fgData.summary.caiIndex != null) {
+          fgCai = Number(fgData.summary.caiIndex);
+        }
+      } catch (_) {}
+    }
+    if (autonomyRate != null && fgCai != null) {
+      autonomyRate = Number((Number(autonomyRate) * 0.67 + fgCai * 0.33).toFixed(2));
     }
   } catch (_) {}
 
@@ -696,6 +710,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
     if (statusFg !== "PASS") failedSubsystems.push("fractal-git");
 
     const envelope = {
+      schema: "aas-v1",
       protocolVersion: "1.0.0",
       recordedAt: new Date().toISOString(),
       status: failed ? "BLOCK" : "PASS",
@@ -858,7 +873,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   const bottomSummary = ` 耗时: ${elapsedSec}s${totalDebt !== null ? `  |  技术债: ${totalDebt}项` : ""}  |  全局状态: ${globalStatus}`;
   console.log(formatDashboardRow(bottomSummary, targetWidth));
   console.log(borderBot);
-  console.log("💡 统一审查快照已落盘至: .audit-logs/audit-latest.json | audit-latest.md");
+  console.log("💡 统一审查快照已落盘至: .audit-logs/audit-latest.json | audit-latest.aas.json | audit-latest.md");
   console.log("💡 质量历史轨迹已追加至: .audit-logs/audit-history.jsonl");
 
   if (summaryFile) {

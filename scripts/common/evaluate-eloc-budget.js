@@ -1,5 +1,5 @@
 /**
- * Module: Workspace Governance — Dual-Scale Code Volume & 5D Code Density Evaluator
+ * Module: Workspace Governance — Dual-Scale Code Volume & 5D Riemannian Manifold Density Evaluator
  * File Path: scripts/common/evaluate-eloc-budget.js
  * Architecture Role: Single source of truth for measuring Effective Lines of Code (ELOC),
  *   Physical Lines of Code (LOC), semantic token column density, and plumbing overhead

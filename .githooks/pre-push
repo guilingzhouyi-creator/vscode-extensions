@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Git Pre-Push Hook — 智能双运行期路由 (pwsh / bash) + 全量推送 refs 采集 + 门禁收据校验入口
+# Description: Git Pre-Push Hook — 智能双运行期路由 (pwsh / bash) + 全量推送 refs 采集 + 门禁收据校验入口
 set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 

@@ -23,6 +23,7 @@ const { execSync } = require('child_process');
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const AUDIT_LOG_DIR = path.join(REPO_ROOT, '.audit-logs');
 const LATEST_JSON_PATH = path.join(AUDIT_LOG_DIR, 'audit-latest.json');
+const LATEST_AAS_PATH = path.join(AUDIT_LOG_DIR, 'audit-latest.aas.json');
 const LATEST_MD_PATH = path.join(AUDIT_LOG_DIR, 'audit-latest.md');
 const HISTORY_JSONL_PATH = path.join(AUDIT_LOG_DIR, 'audit-history.jsonl');
 
@@ -360,6 +361,30 @@ function recordAuditRun(inputPayload) {
   // 1. Persist audit-latest.json snapshot
   fs.writeFileSync(LATEST_JSON_PATH, JSON.stringify(normalized, null, 2), 'utf8');
 
+  // 1.1 Persist audit-latest.aas.json compact agent-native snapshot
+  const aasSnapshot = {
+    schema: 'aas-v1',
+    tool: 'workspace-audit',
+    version: '1.0.0',
+    timestamp: nowIso,
+    root: REPO_ROOT,
+    verdict: normalized.status,
+    health: {
+      score: normalized.workspaceHealthScore,
+      grade: normalized.grade,
+      cai: normalized.autonomyRate,
+      counts: {
+        total: normalized.totalDebt ?? 0,
+        subsystems: Object.keys(normalized.projects || {}).length,
+      },
+    },
+    subsystems: normalized.projects,
+    projectScores: normalized.projectScores,
+    dimensions: normalized.tenDimensions,
+    defaultVerify: 'pwsh -File scripts/ps1/audit-all.ps1 -Fast',
+  };
+  fs.writeFileSync(LATEST_AAS_PATH, JSON.stringify(aasSnapshot, null, 2), 'utf8');
+
   // 2. Persist audit-latest.md dashboard
   const mdContent = renderMarkdownDashboard(normalized);
   fs.writeFileSync(LATEST_MD_PATH, mdContent, 'utf8');
@@ -450,6 +475,16 @@ function main() {
   if (args.includes(FLAG_HISTORY)) {
     displayHistoryLedger();
     return;
+  }
+
+  if (args.includes('--aas')) {
+    if (fs.existsSync(LATEST_AAS_PATH)) {
+      console.log(fs.readFileSync(LATEST_AAS_PATH, 'utf8'));
+      process.exit(0);
+    } else {
+      console.log(JSON.stringify({ schema: 'aas-v1', status: 'NONE', message: 'No AAS snapshot recorded yet.' }, null, 2));
+      process.exit(0);
+    }
   }
 
   if (args.includes(FLAG_JSON)) {

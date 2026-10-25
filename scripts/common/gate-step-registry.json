@@ -72,7 +72,7 @@
         },
         {
           "id": "STAGED-DENSITY-12",
-          "title": "暂存区代码密度与接线载荷审查",
+          "title": "暂存区五维流形代码密度与接线载荷审查",
           "ruleId": "VOL-DIL-001"
         },
         {
@@ -160,7 +160,7 @@
         },
         {
           "id": "WORKSPACE-DENSITY-03",
-          "title": "五维代码密度",
+          "title": "五维流形代码密度与相空间包络审查",
           "ruleId": "VOL-DIL-001"
         },
         {

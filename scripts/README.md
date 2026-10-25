@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**76 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**86 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -22,7 +22,7 @@
 | `common/` | Node.js | `validate-hardcoded-counts.js` | gate / counts（面向操作者的输出语句不得写死规模计数，须由实测数据插值渲染；内置反向探针自检，探针失效即自身阻断） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-block-chains.js` | gate / chains（PowerShell 块链分支合法性：`else`/`elseif`/`catch`/`finally` 必须挂在可接受它的块之后；重复的 `else` 解析器零报错，只在运行时于该行失败） | `pre-push-gate`、CI |
 | `common/` | Node.js | `test-gate-guards.js` | validate / guards（负向自证：逐项证明顺序、词表、同构守卫确实能检出各自缺陷类别） | `pre-push-gate`、CI |
-| `common/` | Node.js | `validate-script-isomorphism.js` | audit / isomorphism（<!-- METRICS:BEGIN iso-pairs -->**27 对跨平台同构脚本**<!-- METRICS:END iso-pairs -->结构对应性、逐行换行一致性、`set -e`/pipefail 与 PowerShell 原生命令开关守卫；WebGames 按已文档化策略豁免 errexit） | `audit-all`、CI |
+| `common/` | Node.js | `validate-script-isomorphism.js` | audit / isomorphism（<!-- METRICS:BEGIN iso-pairs -->**28 对跨平台同构脚本**<!-- METRICS:END iso-pairs -->结构对应性、逐行换行一致性、`set -e`/pipefail 与 PowerShell 原生命令开关守卫；WebGames 按已文档化策略豁免 errexit） | `audit-all`、CI |
 | `common/` | Node.js | `validate-shell-parity.js` | audit / parity（Linux 命令面守卫：断言 AGENTS.md 承诺的每个命令都真实可绑定、兼容层同时具备 GNU 与 PowerShell 降级两条路径，并回报当前宿主解析出的模式 `gnu` / `native`） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-skills.js` | audit / skills（全工作区研发技能规范、死链与镜像等价性守卫） | `pre-commit-gate`、`audit-all` |
 | `common/` | Node.js | `sync-skills.js` | tooling / skills（根目录技能集与 workspace-governance 插件双向同步工具） | 本地 CLI |
@@ -33,6 +33,7 @@
 | `common/` | Node.js | `validate-gitignore-governance.js` | audit / hygiene（全仓 .gitignore 换行、安全底线守卫与防误伤断言门禁） | `pre-push-gate`、`audit-all` |
 | `common/` | Node.js | `evaluate-eloc-budget.js` | audit / complexity（双轨体积 ELOC<=900/LOC<=1400 与 1:3 动态包络；`--all` 全仓扫描 + `eloc-budget-baseline.json` grow-only 棘轮；未识别参数直接 exit 2） | `pre-commit-gate`、`pre-push-gate`、CI |
 | `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区规则单源目录聚合与零漂移核验器；默认只读，`--write` 显式重生成） | 本地 CLI、`pre-push` 门禁、CI |
+| `common/` | Node.js | `generate-rule-catalog-types.js` | tooling / ssot（从 rule-catalog.json SSOT 自动生成 auto-refactor 强类型常量库与领域子模块） | 本地 CLI、CI |
 | `common/` | Node.js | `validate-rule-id-closure.js` | audit / ssot（门禁引用规则 ID 与目录登记的双向闭包守卫） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-docs-consistency.js` | audit / docs（动态对照 `rule-catalog.json` 真实计数拦截规则总数漂移；含治理文档脚本死链守卫） | `pre-push-gate`、CI |
 | `common/` | Node.js | `sync-doc-metrics.js` | audit / metrics（文档规模数字的单源渲染与零漂移守卫：`METRICS:BEGIN/END` 区域由真源求值渲染，`--write` 就地校正，内置反向探针自证检出能力） | `pre-push-gate`、CI、本地 CLI |
@@ -65,6 +66,7 @@
 | `common/` | Node.js | `evaluate-polyglot-balance.js` | audit / balance（异构多语言均衡指数与离散度惩罚度量） | `audit-all` |
 | `common/` | Node.js | `analyze-commit-terminology.js` | audit / terminology（历史提交术语频次与新兴黑话风险诊断，落盘 `.audit-logs/`） | 本地 CLI（诊断报告，不参与门禁裁决） |
 | `common/` | Node.js | `log-rotator.js` | tooling / hygiene（门禁失败快照保留、尾部截断 <=100KB 与 FIFO <=2MB 轮转清理管理器） | `pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`audit-all` |
+| `common/` | Node.js | `workspace-walker.js` | tooling / traversal（全工作区目录迭代遍历、物理黑名单过滤与文件收集 SSOT 工具） | 门禁与体积审查脚本集 |
 | `common/` | JSON | `commit-msg-forbidden-terms.json` | data / ssot（提交信息四维禁词与白名单单源字典） | `validate-commit-msg-style` |
 | `common/` | JSON | `doc-metrics.json` | data / ssot（治理文档规模指标的真源映射、渲染模板与脚本库语义登记表） | `sync-doc-metrics` |
 | `common/` | JSON | `eloc-budget-baseline.json` | data / complexity（双轨体积棘轮基线快照：每份受控源码的 ELOC/LOC 历史最低值，grow-only） | `evaluate-eloc-budget` |
@@ -89,6 +91,14 @@
 | `ps1/` | PowerShell | `release-tag.ps1` | release（release-tag.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `version-bump.sh` | release（全工作区版本号一致性递增工具） | 本地 CLI |
 | `ps1/` | PowerShell | `version-bump.ps1` | release（version-bump.sh 同构双实现） | 本地 CLI（Windows） |
+| `common/` | Node.js | `project-registry-resolver.js` | tooling / registry（全工作区受控项目单源动态发现与路径解析器） | 本地 CLI、CI |
+| `common/` | Node.js | `render-skill-catalog.js` | tooling / skills（将技能注册表渲染为面向人类的技能调用全景清单） | 本地 CLI |
+| `common/` | Node.js | `skill-registry-resolver.js` | tooling / skills（技能注册表单源读取与路径解析引擎） | `render-skill-catalog`、CI |
+| `common/` | JSON | `skill-registry.json` | data / ssot（全工作区技能单一真源元数据与触发词拓扑注册表） | `skill-registry-resolver` |
+| `common/` | Node.js | `staggered-push-orchestrator.js` | tooling / git（错峰分批安全限速推送核心调度编排器） | `run-daily-staggered-push` |
+| `common/` | Node.js | `sync-skill-metadata.js` | tooling / skills（根据注册表向技能文件单源回填激活指令与关联链接） | 本地 CLI |
+| `ps1/` | PowerShell | `run-daily-staggered-push.ps1` | tooling / git（每日错峰分批 Git 提交安全推送脚本，Windows PowerShell 实现） | 本地 CLI、计划任务 |
+| `sh/` | Bash | `run-daily-staggered-push.sh` | tooling / git（每日错峰分批 Git 提交安全推送脚本，POSIX Bash 实现） | 本地 CLI、计划任务 |
 | `py/` | Python | （预留，暂无脚本） | — | 规范见 [`py/README.md`](py/README.md) |
 
 > 职能域语义：`gate`=协作门禁（CNB 流水线触发）、`release`=发布流程、
