@@ -11,7 +11,6 @@ import { PERCENT_MULTIPLIER } from '../domain/models';
 import { TYPEOF_NUMBER, TYPEOF_UNDEFINED } from '../domain/constants';
 
 const DIRECTION_HORIZONTAL = 'horizontal';
-const DIRECTION_VERTICAL = 'vertical';
 
 const EVENT_POINTER_DOWN = 'pointerdown';
 const EVENT_DBLCLICK = 'dblclick';
