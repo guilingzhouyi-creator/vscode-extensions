@@ -1,6 +1,6 @@
 /**
  * Module: Unit Test — Declarative Structural Pattern Rewrite Engine
- * File Path: tests/unit/pattern/structural-pattern-engine.test.ts
+ * File Path: tests/unit/ast-pattern/structural-pattern-engine.test.ts
  * Architecture Role: Deterministic verification of structural AST pattern matching,
  *   metavariable capture ($VAR, $COND, $_), template rewrite synthesis, unified diffs,
  *   actionable patches, and facade governance.
@@ -24,7 +24,7 @@ import {
     matchAndRewrite,
     matchPattern,
     type PatternSpec,
-} from '../../../src/core/pattern';
+} from '../../../src/core/ast-pattern';
 
 describe('StructuralPatternEngine', () => {
     describe('Boolean Double Negation Simplification', () => {

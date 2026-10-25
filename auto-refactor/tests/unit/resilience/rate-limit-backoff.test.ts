@@ -3,7 +3,7 @@ import {
     RateLimitBackoffMachine,
     MAX_BACKOFF_CEILING_MS,
     MIN_BASE_DELAY_MS,
-} from '../../../src/resilience/rate-limit-backoff';
+} from '../../../src/core/scheduler/resilience/rate-limit-backoff';
 
 describe('RateLimitBackoffMachine (API Rate Limiting & Resilience)', () => {
     describe('Truncated Exponential Backoff Formula', () => {

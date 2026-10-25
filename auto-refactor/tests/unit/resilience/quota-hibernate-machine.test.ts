@@ -16,7 +16,7 @@ import {
     QuotaHibernateMachine,
     MAX_HIBERNATION_DURATION_MS,
     VirtualClock,
-} from '../../../src/resilience/quota-hibernate-machine';
+} from '../../../src/core/scheduler/resilience/quota-hibernate-machine';
 
 class MockVirtualClock implements VirtualClock {
     private currentTime = 1000000;

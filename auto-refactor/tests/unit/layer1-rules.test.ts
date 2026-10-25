@@ -18,7 +18,7 @@ import {
     LoopTransientAllocationRule,
     HighAlgorithmicComplexityRule,
     ExpensiveLoopOperationRule,
-} from '../../src/core/rules/pyramid/performanceRules';
+} from '../../src/core/rules/universal-hierarchy/performanceRules';
 import { SemanticGraph } from '../../src/core/semantic/semanticGraph';
 
 let dir: string;
@@ -186,7 +186,7 @@ describe('Layer 1 expensive operation inside loop', () => {
 describe('Layer 1 evaluator registration', () => {
     it('runs all five universal rules without an analyzer error', async () => {
         const { UniversalPyramidEvaluator } =
-            await import('../../src/core/rules/pyramid/layer1Evaluator');
+            await import('../../src/core/rules/universal-hierarchy/layer1Evaluator');
         const evaluator = new UniversalPyramidEvaluator();
         const path = fixture(
             'evaluator.ts',

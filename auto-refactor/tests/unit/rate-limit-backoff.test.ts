@@ -15,7 +15,7 @@ import {
     MAX_BACKOFF_CEILING_MS,
     MAX_JITTER_RATIO,
     THREE_STRIKES_THRESHOLD,
-} from '../../src/resilience/rate-limit-backoff';
+} from '../../src/core/scheduler/resilience/rate-limit-backoff';
 
 describe('RateLimitBackoffMachine', () => {
     it('initializes with defensive defaults and clamps invalid options', () => {

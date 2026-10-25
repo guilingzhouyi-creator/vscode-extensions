@@ -1,6 +1,6 @@
 /**
  * Module: Unit Tests — Structural Pattern Fixpoint Engine
- * File Path: tests/unit/pattern/fixpoint.test.ts
+ * File Path: tests/unit/ast-pattern/fixpoint.test.ts
  * Architecture Role: Verifies GritQL-inspired transitive fixpoint rewriting,
  *   monotonic multi-round convergence, cycle prevention, and diff generation.
  * Dependencies & Triggers: Consumes structural-pattern-engine.ts; executed via vitest.
@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import {
     rewriteUntilFixpoint,
     type PatternSpec,
-} from '../../../src/core/pattern';
+} from '../../../src/core/ast-pattern';
 
 describe('StructuralPatternEngine — Transitive Fixpoint Rewriting', () => {
     it('returns noop result when no patterns match', () => {
