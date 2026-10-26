@@ -43,17 +43,11 @@ const REFERENCE_VALUES: [&str; 11] = [
 /// Creates a unique scratch directory, preferring the DOS 8.3 safe temp root on Windows.
 fn scratch_dir(label: &str) -> PathBuf {
     let count = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let base = if cfg!(windows) {
-        let low = std::env::temp_dir().join("Low");
-        let _ = fs::create_dir_all(&low);
-        if low.exists() {
-            low
-        } else {
-            std::env::temp_dir()
-        }
-    } else {
-        std::env::temp_dir()
-    };
+    let base = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("test_tmp");
+    let _ = fs::create_dir_all(&base);
     let path = base.join(format!(
         "taxis_config_{}_{}_{}",
         std::process::id(),

@@ -284,6 +284,10 @@ fn test_no_in_place_tar_extracts_without_touching_source() {
 
 #[test]
 fn test_repack_rejects_malformed_micro_pack_and_unknown_flags() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let dir = test_temp_dir("tipse_safety_repack_");
     let repo = dir.path().join("repo");
     create_repo(&repo);
@@ -660,4 +664,178 @@ fn test_unarchive_headroom_units_help_default_and_usage_errors() {
         !dest.exists(),
         "dry-run must not create the destination directory"
     );
+}
+
+#[test]
+fn test_unarchive_to_odb_blocked_on_trunk_for_agent() {
+    let dir = test_temp_dir("tipse_to_odb_guard_");
+    let repo_dir = dir.path().join("repo");
+    fs::create_dir_all(&repo_dir).expect("create repo dir");
+    run_taxis_ok(&repo_dir, &["init", "--git-compat"]);
+
+    let zip_path = dir.path().join("source.zip");
+    write_zip(&zip_path, &[("code.rs", b"fn main() {}\n")]);
+
+    // Agent attempt to push directly to System Trunk (main) must be rejected
+    let output = run_taxis(
+        &repo_dir,
+        &[
+            "unarchive",
+            "--to-odb",
+            "--branch",
+            "main",
+            zip_path.to_str().expect("zip path"),
+        ],
+    );
+
+    assert!(
+        !output.status.success(),
+        "unarchive --to-odb to main must be rejected by PreReceiveGuard"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("PreReceiveGuard") || stderr.contains("Human Control Breach") || stderr.contains("AUTHORITY_BREACH"),
+        "stderr must report pre-receive authorization breach: {stderr}"
+    );
+}
+
+#[test]
+fn test_unarchive_to_odb_succeeds_on_feature_branch() {
+    let dir = test_temp_dir("tipse_to_odb_feature_");
+    let repo_dir = dir.path().join("repo");
+    fs::create_dir_all(&repo_dir).expect("create repo dir");
+    run_taxis_ok(&repo_dir, &["init", "--git-compat"]);
+
+    let zip_path = dir.path().join("source.zip");
+    write_zip(&zip_path, &[("lib.rs", b"pub fn add(a: i32, b: i32) -> i32 { a + b }\n")]);
+
+    // Push to an agent-authorized cell card ref
+    let stdout = run_taxis_ok(
+        &repo_dir,
+        &[
+            "unarchive",
+            "--to-odb",
+            "--branch",
+            "refs/fractal/cell/cell-default/card/import-feature",
+            "-m",
+            "feat(core): import library archive into ODB\n\n[Project]\nfractal-git\n\n[Why]\nAdd shared library helpers.\n\n[Changed]\n- Ingested lib.rs\n\n[Verification]\nTested locally.",
+            zip_path.to_str().expect("zip path"),
+        ],
+    );
+
+    assert!(
+        stdout.contains("Target Branch Ref:   refs/fractal/cell/cell-default/card/import-feature"),
+        "stdout must confirm feature branch creation: {stdout}"
+    );
+    assert!(
+        stdout.contains("Created Commit OID:"),
+        "stdout must report created commit: {stdout}"
+    );
+
+    // Verify branch ref can be resolved via taxis show-ref
+    let refs_out = run_taxis_ok(&repo_dir, &["show-ref"]);
+    assert!(
+        refs_out.contains("refs/fractal/cell/cell-default/card/import-feature"),
+        "show-ref must list the advanced branch ref: {refs_out}"
+    );
+}
+
+#[test]
+fn test_archive_restorer_synthesizes_valid_zip() {
+    use fg_storage::in_place::restorer::ArchiveRestorer;
+    use fg_storage::in_place::zip_extractor::{read_zip_central_directory, read_zip_eocd};
+
+    let dir = test_temp_dir("tipse_restorer_");
+    let zip_path = dir.path().join("truncate_test.zip");
+    write_zip(
+        &zip_path,
+        &[
+            ("file1.txt", b"content 1\n"),
+            ("file2.txt", b"content 2\n"),
+            ("file3.txt", b"content 3\n"),
+        ],
+    );
+
+    let mut file = File::options().read(true).write(true).open(&zip_path).expect("open zip");
+    let eocd = read_zip_eocd(&mut file).expect("read eocd");
+    let members = read_zip_central_directory(&mut file, &eocd).expect("read cd");
+    assert_eq!(members.len(), 3);
+
+    // Truncate Central Directory (simulating mid-extraction crash)
+    file.set_len(eocd.central_directory_offset).expect("truncate cd");
+
+    // Restorer should re-synthesize Central Directory for remaining members (e.g. file1 and file2)
+    let remaining = &members[0..2];
+    let new_len = ArchiveRestorer::synthesize_zip_tail(&mut file, remaining)
+        .expect("synthesize zip tail");
+    assert!(new_len > eocd.central_directory_offset);
+
+    // Verify restored ZIP is openable and has exactly 2 members
+    let restored_members = ArchiveRestorer::verify_restored_zip(&mut file)
+        .expect("verify restored zip");
+    assert_eq!(restored_members.len(), 2);
+    assert_eq!(restored_members[0].name, "file1.txt");
+    assert_eq!(restored_members[1].name, "file2.txt");
+}
+
+#[test]
+fn test_in_place_wal_auto_resume() {
+    use fg_storage::in_place::journal::{InPlaceJournal, InPlaceLogEntry};
+
+    let dir = test_temp_dir("tipse_wal_resume_");
+    let zip_path = dir.path().join("two_files.zip");
+    write_zip(
+        &zip_path,
+        &[
+            ("first.txt", b"first file payload\n"),
+            ("second.txt", b"second file payload\n"),
+        ],
+    );
+
+    let dest = dir.path().join("extracted_out");
+    fs::create_dir_all(&dest).expect("create dest dir");
+
+    // Pre-create WAL journal indicating 'first.txt' was already extracted
+    let wal_path = dest.join(".taxis_unarchive.wal");
+    let mut journal = InPlaceJournal::open(&wal_path).expect("open wal");
+    journal
+        .append(&InPlaceLogEntry::SessionInit {
+            archive_path: zip_path.to_string_lossy().to_string(),
+            target_path: dest.to_string_lossy().to_string(),
+            total_members: 2,
+            initial_archive_len: fs::metadata(&zip_path).expect("metadata").len(),
+        })
+        .expect("write init");
+    journal
+        .append(&InPlaceLogEntry::MemberExtracted {
+            name: "first.txt".to_string(),
+            extracted_bytes: 19,
+            local_header_offset: 0,
+            crc32: 0,
+        })
+        .expect("write member");
+
+    // Also write first.txt to dest so auto-resume skips it
+    fs::write(dest.join("first.txt"), b"first file payload\n").expect("write first.txt");
+
+    // Run in-place unarchive
+    let stdout = run_taxis_ok(
+        dir.path(),
+        &[
+            "unarchive",
+            "--in-place",
+            "-C",
+            dest.to_str().expect("dest path"),
+            zip_path.to_str().expect("zip path"),
+        ],
+    );
+
+    assert!(
+        stdout.contains("Notice: Incomplete in-place extraction detected in WAL. Resuming session (1 members already extracted)..."),
+        "stdout must notify about resuming from WAL: {stdout}"
+    );
+
+    assert!(dest.join("first.txt").exists(), "first.txt must exist");
+    assert!(dest.join("second.txt").exists(), "second.txt must exist");
+    assert!(!wal_path.exists(), "WAL journal must be removed on clean completion");
 }

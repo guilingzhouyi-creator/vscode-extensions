@@ -714,3 +714,99 @@ fn log_decodes_a_declared_non_utf8_commit_message_like_git() {
     );
     let _ = fs::remove_dir_all(&repo);
 }
+
+#[test]
+fn diff_cli_parity_working_tree_and_staged() {
+    if skip_without_git("diff parity") {
+        return;
+    }
+    let repo = scratch_dir("diff_parity");
+    build_fixture(&repo);
+
+    // Modify a file in working tree
+    write_file(&repo, "a.txt", "alpha modified\nnew line\n");
+    assert_parity(&repo, &["diff"], &["diff"], "working tree diff");
+    assert_parity(&repo, &["diff", "--stat"], &["diff", "--stat"], "working tree diff --stat");
+    assert_parity(&repo, &["diff", "--name-only"], &["diff", "--name-only"], "working tree diff --name-only");
+
+    // Stage it
+    run_git(&repo, &["add", "a.txt"]);
+    assert_parity(&repo, &["diff", "--cached"], &["diff", "--cached"], "cached diff");
+    assert_parity(&repo, &["diff", "--staged"], &["diff", "--staged"], "staged diff");
+
+    let _ = fs::remove_dir_all(&repo);
+}
+
+#[test]
+fn hash_object_cli_parity() {
+    if skip_without_git("hash-object parity") {
+        return;
+    }
+    let repo = scratch_dir("hash_object_parity");
+    build_fixture(&repo);
+
+    write_file(&repo, "test_blob.txt", "hello fractal world\n");
+    assert_parity(
+        &repo,
+        &["hash-object", "test_blob.txt"],
+        &["hash-object", "test_blob.txt"],
+        "hash-object file",
+    );
+
+    assert_parity(
+        &repo,
+        &["hash-object", "-w", "test_blob.txt"],
+        &["hash-object", "-w", "test_blob.txt"],
+        "hash-object -w file",
+    );
+
+    let _ = fs::remove_dir_all(&repo);
+}
+
+#[test]
+fn tag_cli_parity() {
+    if skip_without_git("tag parity") {
+        return;
+    }
+    let (oracle, candidate) = twin_fixtures("tag_parity");
+
+    let git_created = run_git_raw(&oracle, &["tag", "v1.0"]);
+    let taxis_created = run_taxis(&candidate, &["tag", "v1.0"]);
+    assert_eq!(taxis_created.status.code(), git_created.status.code());
+    assert_eq!(stdout_text(&taxis_created), stdout_text(&git_created));
+    assert_eq!(stderr_text(&taxis_created), stderr_text(&git_created));
+
+    let git_listed = run_git_raw(&oracle, &["tag"]);
+    let taxis_listed = run_taxis(&candidate, &["tag"]);
+    assert_eq!(taxis_listed.status.code(), git_listed.status.code());
+    assert_eq!(stdout_text(&taxis_listed), stdout_text(&git_listed));
+
+    let git_deleted = run_git_raw(&oracle, &["tag", "-d", "v1.0"]);
+    let taxis_deleted = run_taxis(&candidate, &["tag", "-d", "v1.0"]);
+    assert_eq!(taxis_deleted.status.code(), git_deleted.status.code());
+    assert_eq!(stdout_text(&taxis_deleted), stdout_text(&git_deleted));
+
+    let _ = fs::remove_dir_all(&oracle);
+    let _ = fs::remove_dir_all(&candidate);
+}
+
+#[test]
+fn unarchive_dry_run_cli_contract() {
+    let repo = scratch_dir("unarchive_contract");
+    run_taxis(&repo, &["init", "--git-compat"]);
+
+    let zip_path = repo.join("test_sample.zip");
+    let file = fs::File::create(&zip_path).expect("create zip");
+    let mut writer = fg_storage::archive::ZipWriter::new(file);
+    writer.append_file("sample.txt", 0o644, 1700000000, b"content").expect("append");
+    let mut finished = writer.finish().expect("finish");
+    finished.flush().expect("flush");
+
+    let out = run_taxis(&repo, &["unarchive", "--dry-run", zip_path.to_str().unwrap()]);
+    assert!(out.status.success(), "unarchive --dry-run must succeed");
+    let stdout = stdout_text(&out);
+    assert!(stdout.contains("Taxis SpacePlan Projection"), "dry-run header");
+    assert!(stdout.contains("VIABLE (Safe for execution)"), "viable status");
+
+    let _ = fs::remove_dir_all(&repo);
+}

@@ -12,6 +12,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
+    let base = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("test_tmp");
+    let _ = std::fs::create_dir_all(&base);
+    tempfile::Builder::new()
+        .prefix(prefix)
+        .tempdir_in(&base)
+        .or_else(|_| tempfile::tempdir())
+        .expect("create test tempdir")
+}
+
 #[test]
 fn test_in_memory_index_tree_clean_workflow() {
     let mut index = InMemoryIndexTree::new();
@@ -335,7 +348,7 @@ fn parses_a_real_git_version_four_index() {
         eprintln!("skipping: git is not on PATH");
         return;
     }
-    let workspace = tempfile::TempDir::new().expect("temp dir");
+    let workspace = test_temp_dir("index_ws_");
     let repo = workspace.path();
     git_stdout(repo, &["init", "-q"]);
     fs::create_dir_all(repo.join("dir").join("nested")).expect("nested dirs");
@@ -369,7 +382,7 @@ fn parses_a_real_git_version_four_index() {
 /// A held `index.lock` must block writing instead of silently overwriting the index.
 #[test]
 fn refuses_to_write_when_the_index_lock_exists() {
-    let workspace = tempfile::TempDir::new().expect("temp dir");
+    let workspace = test_temp_dir("index_ws_");
     let index_path = workspace.path().join("index");
     fs::write(
         workspace.path().join("index.lock"),
@@ -423,7 +436,7 @@ fn git_reads_a_version_four_index_this_crate_wrote() {
         eprintln!("skipping: git is not on PATH");
         return;
     }
-    let workspace = tempfile::TempDir::new().expect("temp dir");
+    let workspace = test_temp_dir("index_ws_");
     let repo = workspace.path();
     git_stdout(repo, &["init", "-q"]);
     fs::create_dir_all(repo.join("dir")).expect("dir");
@@ -470,7 +483,7 @@ fn version_two_rewrite_round_trips_stat_words_and_extensions() {
         eprintln!("skipping: git is not on PATH");
         return;
     }
-    let workspace = tempfile::TempDir::new().expect("temp dir");
+    let workspace = test_temp_dir("index_ws_");
     let repo = workspace.path();
     git_stdout(repo, &["init", "-q"]);
     fs::create_dir_all(repo.join("dir")).expect("dir");

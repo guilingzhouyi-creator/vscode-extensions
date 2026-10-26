@@ -10,6 +10,25 @@ use std::fs;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+fn system_git_available() -> bool {
+    std::process::Command::new("git")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+fn test_temp_path(prefix: &str) -> std::path::PathBuf {
+    static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let count = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let base = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("target")
+        .join("test_tmp");
+    let _ = std::fs::create_dir_all(&base);
+    base.join(format!("{}_{}_{}", prefix, std::process::id(), count))
+}
+
 use fg_core::models::{current_unix_seconds, AuthoritySecret};
 use fg_storage::commit_materializer::write_commit_objects_with_parents;
 use fractal_git::{
@@ -279,7 +298,7 @@ Assert all hook pipeline assertions succeed."#;
 
 #[test]
 fn test_card_blackboard_and_disk_store() {
-    let temp_dir = std::env::temp_dir().join(format!("taxis-test-bb-{}", std::process::id()));
+    let temp_dir = test_temp_path("taxis-test-bb");
     let _ = fs::remove_dir_all(&temp_dir);
     let _ = fs::create_dir_all(&temp_dir);
 
@@ -319,7 +338,7 @@ fn test_card_blackboard_and_disk_store() {
 
 #[test]
 fn test_mechanical_provenance_store() {
-    let temp_dir = std::env::temp_dir().join(format!("taxis-test-prov-{}", std::process::id()));
+    let temp_dir = test_temp_path("taxis-test-prov");
     let _ = fs::remove_dir_all(&temp_dir);
     let _ = fs::create_dir_all(&temp_dir);
 
@@ -371,18 +390,9 @@ fn test_mechanical_provenance_store() {
     let _ = fs::remove_dir_all(&temp_dir);
 }
 
-/// Monotonic counter keeping merge scratch directories unique within one process.
-static MERGE_SCRATCH_COUNTER: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
-
 #[test]
 fn test_merge_commit_records_two_ordered_parents() {
-    let count = MERGE_SCRATCH_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let root = std::env::temp_dir().join(format!(
-        "taxis_merge_parents_{}_{}",
-        std::process::id(),
-        count
-    ));
+    let root = test_temp_path("taxis_merge_parents");
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).expect("create scratch root");
     let git_dir = root.join("repo.git");
@@ -468,6 +478,12 @@ fn test_merge_commit_records_two_ordered_parents() {
     .expect("write repository config");
 
     // System Git is the independent baseline comparator for parent ordering and ancestry.
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted, skipping git cat-file verification");
+        let _ = fs::remove_dir_all(&root);
+        return;
+    }
+
     let cat_file = std::process::Command::new("git")
         .arg("--git-dir")
         .arg(&git_dir)
@@ -476,7 +492,9 @@ fn test_merge_commit_records_two_ordered_parents() {
         .expect("run git cat-file");
     assert!(
         cat_file.status.success(),
-        "git cat-file failed: {}",
+        "git cat-file failed (code {:?}): stdout: '{}', stderr: '{}'",
+        cat_file.status.code(),
+        String::from_utf8_lossy(&cat_file.stdout),
         String::from_utf8_lossy(&cat_file.stderr)
     );
     let commit_text = String::from_utf8_lossy(&cat_file.stdout);
@@ -522,8 +540,10 @@ fn run_system_git(repo: &std::path::Path, args: &[&str]) -> String {
         .expect("spawn git baseline command");
     assert!(
         output.status.success(),
-        "git {:?} failed: {}",
+        "git {:?} failed (code {:?}): stdout: '{}', stderr: '{}'",
         args,
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
     String::from_utf8_lossy(&output.stdout).trim().to_string()
@@ -531,12 +551,12 @@ fn run_system_git(repo: &std::path::Path, args: &[&str]) -> String {
 
 #[test]
 fn test_merge_commit_matches_system_git_merge() {
-    let count = MERGE_SCRATCH_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let repo = std::env::temp_dir().join(format!(
-        "taxis_git_merge_baseline_{}_{}",
-        std::process::id(),
-        count
-    ));
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted, skipping git baseline comparison");
+        return;
+    }
+
+    let repo = test_temp_path("taxis_git_merge_baseline");
     let _ = fs::remove_dir_all(&repo);
     fs::create_dir_all(&repo).expect("create git baseline repo");
     run_system_git(&repo, &["init", "-b", "main"]);

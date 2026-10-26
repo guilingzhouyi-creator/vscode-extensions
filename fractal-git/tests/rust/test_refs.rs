@@ -25,17 +25,11 @@ static SCRATCH_COUNTER: AtomicUsize = AtomicUsize::new(0);
 /// so that the sandboxed test host can create directories there.
 fn scratch_repo(label: &str) -> PathBuf {
     let count = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let base = if cfg!(windows) {
-        let low = std::env::temp_dir().join("Low");
-        let _ = fs::create_dir_all(&low);
-        if low.exists() {
-            low
-        } else {
-            std::env::temp_dir()
-        }
-    } else {
-        std::env::temp_dir()
-    };
+    let base = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("test_tmp");
+    let _ = fs::create_dir_all(&base);
     let path = base.join(format!(
         "taxis_refs_{}_{}_{}",
         label,
@@ -353,6 +347,15 @@ fn head_writers_record_symbolic_and_detached_targets() {
     let detached = fs::read_to_string(git_dir.join("HEAD")).expect("read detached HEAD");
     assert_eq!(detached, format!("{}\n", oid.to_hex()));
     let _ = fs::remove_dir_all(&git_dir);
+}
+
+/// Returns true when the host provides a `git` binary usable as an interoperability reference baseline.
+fn system_git_available() -> bool {
+    Command::new("git")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 /// Runs one git subcommand inside `repo`, failing the test with the captured output on error.
@@ -704,6 +707,10 @@ fn writing_orig_head_records_the_previous_position() {
 /// `branch -d` removes a packed branch, reports it, and leaves `git show-ref` without it.
 #[test]
 fn deleting_a_packed_branch_is_reported_and_removed_from_git_show_ref() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let repo = init_git_repo("cli_branch_packed", 1);
     run_git(&repo, &["branch", "feat"]);
     run_git(&repo, &["pack-refs", "--all"]);
@@ -734,6 +741,10 @@ fn deleting_a_packed_branch_is_reported_and_removed_from_git_show_ref() {
 /// A branch deletion that still finds the packed entry must fail loudly instead of claiming success.
 #[test]
 fn a_missing_branch_is_refused_with_the_git_message() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let repo = init_git_repo("cli_branch_missing", 1);
     let deleted = run_taxis(&repo, &["branch", "-d", "nope"]);
     assert!(!deleted.status.success());
@@ -748,6 +759,10 @@ fn a_missing_branch_is_refused_with_the_git_message() {
 /// `tag -d` removes a packed tag instead of misreporting it as not found.
 #[test]
 fn deleting_a_packed_tag_is_reported_and_removed_from_git_show_ref() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let repo = init_git_repo("cli_tag_packed", 1);
     run_git(&repo, &["tag", "t1"]);
     run_git(&repo, &["pack-refs", "--all"]);
@@ -773,6 +788,10 @@ fn deleting_a_packed_tag_is_reported_and_removed_from_git_show_ref() {
 /// Creating branches or tags with Git-invalid names is refused and writes nothing outside `.git`.
 #[test]
 fn creating_refs_with_invalid_names_is_refused() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let repo = init_git_repo("cli_invalid_names", 1);
 
     let branch = run_taxis(&repo, &["branch", "a..b"]);
@@ -802,6 +821,10 @@ fn creating_refs_with_invalid_names_is_refused() {
 /// `reset --soft` records the position it moved away from in `.git/ORIG_HEAD`.
 #[test]
 fn reset_writes_orig_head_before_moving_head() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let repo = init_git_repo("cli_reset_orig_head", 2);
     run_git(&repo, &["checkout", "-q", "-b", "feat"]);
     run_git(&repo, &["commit", "-q", "--allow-empty", "-m", "feat only"]);
@@ -829,6 +852,10 @@ fn reset_writes_orig_head_before_moving_head() {
 /// `branch -d` refuses a branch that no other reference reaches, and `-D` forces it.
 #[test]
 fn deleting_an_unmerged_branch_requires_the_force_flag() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let repo = init_git_repo("cli_branch_unmerged", 1);
     run_git(&repo, &["checkout", "-q", "-b", "feat"]);
     run_git(&repo, &["commit", "-q", "--allow-empty", "-m", "feat only"]);
@@ -870,6 +897,10 @@ fn deleting_an_unmerged_branch_requires_the_force_flag() {
 /// Re-creating an existing tag is a fatal error, matching git's exit code 128.
 #[test]
 fn re_creating_an_existing_tag_is_fatal() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let repo = init_git_repo("cli_tag_exists", 1);
     run_git(&repo, &["tag", "t1"]);
 
@@ -894,6 +925,10 @@ fn re_creating_an_existing_tag_is_fatal() {
 /// `reset --hard` discards local edits without a cleanliness gate and drops staged additions.
 #[test]
 fn reset_hard_discards_dirty_edits_and_staged_only_files() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let repo = init_git_repo("cli_reset_hard_dirty", 1);
     fs::write(repo.join("tracked.txt"), "base\n").expect("the tracked file must be writable");
     run_git(&repo, &["add", "tracked.txt"]);

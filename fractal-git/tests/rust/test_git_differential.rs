@@ -22,6 +22,20 @@ use fractal_git::{
     Oid,
 };
 use git_baseline::{BaselineSignature, BaselineTreeEntry, GitBaseline};
+use std::path::PathBuf;
+
+fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
+    let base = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("test_tmp");
+    let _ = std::fs::create_dir_all(&base);
+    tempfile::Builder::new()
+        .prefix(prefix)
+        .tempdir_in(&base)
+        .or_else(|_| tempfile::tempdir())
+        .expect("create test tempdir")
+}
 
 /// Returns a baseline validator when git is executable, panics instead of skipping when the environment
 /// demands a real comparison.
@@ -639,7 +653,7 @@ fn loose_object_storage_round_trips_git_raw_bytes() {
     let Some(baseline) = baseline_or_skip() else {
         return;
     };
-    let local_root = tempfile::tempdir().expect("create local object directory");
+    let local_root = test_temp_dir("diff_local_root_");
     let store = LooseOdb::new(local_root.path());
     for (label, payload) in blob_payloads() {
         let baseline_oid = baseline.write_blob(&payload);

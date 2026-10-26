@@ -24,7 +24,10 @@ impl TestDir {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let count = COUNTER.fetch_add(1, Ordering::Relaxed);
         let pid = std::process::id();
-        let base = std::env::temp_dir().join("Low");
+        let base = std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("target")
+            .join("test_tmp");
         let _ = std::fs::create_dir_all(&base);
         let path = base.join(format!("fg_test_relocate_{prefix}_{pid}_{count}"));
         let _ = std::fs::remove_dir_all(&path);

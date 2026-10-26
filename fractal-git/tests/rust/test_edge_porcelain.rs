@@ -21,7 +21,19 @@ use fg_core::models::{ObjectKind, Oid};
 use fg_storage::archive::{ArchiveEntry, ArchiveFormat, ArchiveGenerator};
 use fg_storage::bundle::BundleEngine;
 use fg_topology::bisect::{BisectEngine, BisectState, BisectStep};
-use tempfile::tempdir;
+
+fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
+    let base = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("test_tmp");
+    let _ = std::fs::create_dir_all(&base);
+    tempfile::Builder::new()
+        .prefix(prefix)
+        .tempdir_in(&base)
+        .or_else(|_| tempfile::tempdir())
+        .expect("create test tempdir")
+}
 
 #[test]
 fn test_blame_line_mapping_and_hunks() {
@@ -144,7 +156,7 @@ fn test_bisect_topological_centroid() {
 
 #[test]
 fn test_bisect_state_persistence() {
-    let dir = tempdir().unwrap();
+    let dir = test_temp_dir("bisect_state_");
     let orig = Oid::from_bytes([1u8; 20]);
     let bad = Oid::from_bytes([2u8; 20]);
     let good1 = Oid::from_bytes([3u8; 20]);
@@ -358,7 +370,7 @@ fn bundle_head_roundtrips_nested_tree_history_through_git() {
         return;
     }
 
-    let dir = tempdir().expect("temp dir");
+    let dir = test_temp_dir("bundle_head_");
     let repo = dir.path().join("repo");
     create_repo(&repo);
     commit_files(
@@ -417,7 +429,7 @@ fn bundle_annotated_tag_keeps_tag_object_through_git() {
         return;
     }
 
-    let dir = tempdir().expect("temp dir");
+    let dir = test_temp_dir("bundle_head_");
     let repo = dir.path().join("repo");
     create_repo(&repo);
     commit_files(&repo, "init", &[("a.txt", "alpha\n")]);
@@ -469,7 +481,7 @@ fn bundle_head_on_non_default_branch_roundtrips() {
         return;
     }
 
-    let dir = tempdir().expect("temp dir");
+    let dir = test_temp_dir("bundle_head_");
     let repo = dir.path().join("repo");
     create_repo(&repo);
     commit_files(&repo, "init", &[("main.txt", "main\n")]);
@@ -510,7 +522,7 @@ fn bundle_single_commit_history_clones() {
         return;
     }
 
-    let dir = tempdir().expect("temp dir");
+    let dir = test_temp_dir("bundle_head_");
     let repo = dir.path().join("repo");
     create_repo(&repo);
     commit_files(&repo, "only", &[("a.txt", "alpha\n")]);
@@ -546,7 +558,7 @@ fn bundle_refuses_empty_repository() {
         return;
     }
 
-    let dir = tempdir().expect("temp dir");
+    let dir = test_temp_dir("bundle_head_");
     let repo = dir.path().join("repo");
     create_repo(&repo);
     let bundle = dir.path().join("empty.bundle");
@@ -576,7 +588,7 @@ fn bundle_prerequisites_are_recorded_and_fetched() {
         return;
     }
 
-    let dir = tempdir().expect("temp dir");
+    let dir = test_temp_dir("bundle_head_");
     let repo = dir.path().join("repo");
     create_repo(&repo);
     commit_files(&repo, "base", &[("base.txt", "base\n")]);

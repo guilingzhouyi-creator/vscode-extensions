@@ -14,7 +14,7 @@ use std::path::Path;
 
 use std::time::{Duration, Instant};
 
-use fractal_git::{GitHookRunner, GitHookStatus};
+use fractal_git::{GitHookRunner, GitHookStatus, OdbStore, RefStore};
 
 /// Writes a hook script with LF endings and an executable bit where the platform needs one.
 fn write_hook(path: &Path, body: &str) {
@@ -281,4 +281,103 @@ fn hook_timeout_is_read_from_config_and_never_blocks() {
         elapsed < Duration::from_millis(2500),
         "the budget must terminate the hook promptly, took {elapsed:?}"
     );
+}
+
+fn run_taxis(repo: &Path, args: &[&str]) -> std::process::Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_taxis"))
+        .current_dir(repo)
+        .args(args)
+        .output()
+        .expect("the built taxis binary must be runnable")
+}
+
+#[test]
+fn test_reference_transaction_blocks_branch_creation() {
+    if !GitHookRunner::has_working_shell() {
+        return;
+    }
+    let (repository, git_dir) = bootstrap_repo();
+    let hook_path = git_dir.join("hooks").join("reference-transaction");
+    write_hook(
+        &hook_path,
+        "#!/bin/sh\n\
+         while read -r old new ref; do\n\
+           case \"$ref\" in\n\
+             *blocked-branch*) exit 1 ;;\n\
+           esac\n\
+         done\n\
+         exit 0\n",
+    );
+
+    // Initial commit so HEAD exists
+    let seed_file = repository.path().join("seed.txt");
+    fs::write(&seed_file, b"seed payload\n").expect("write seed");
+    fs::create_dir_all(git_dir.join("objects")).expect("create objects directory");
+    fs::write(git_dir.join("HEAD"), "ref: refs/heads/main\n").expect("write HEAD");
+
+    // Create a seed commit directly in refs/heads/main
+    let ref_store = fractal_git::DiskRefStore::new(&git_dir);
+    let odb = fractal_git::LooseOdb::new(&git_dir);
+    let dummy_tree = odb.write_object("tree", b"").expect("write dummy tree");
+    let sig = fractal_git::GitSignature::new("Tester", "test@company.com", 1700000000);
+    let commit = fractal_git::GitCommit::new(dummy_tree, vec![], sig.clone(), sig, "feat(core): seed\n", None);
+    let commit_payload = fg_storage::commit_materializer::serialize_commit_payload(&commit);
+    let commit_oid = odb.write_object("commit", &commit_payload).expect("write dummy commit");
+    let _ = ref_store.update_ref("refs/heads/main", &commit_oid, None);
+
+    // Now attempt to branch with blocked name
+    let blocked_out = run_taxis(repository.path(), &["branch", "blocked-branch"]);
+    assert!(
+        !blocked_out.status.success(),
+        "branch creation must fail when blocked by reference-transaction hook"
+    );
+    let stderr = String::from_utf8_lossy(&blocked_out.stderr);
+    assert!(
+        stderr.contains("reference-transaction hook blocked"),
+        "stderr must report reference-transaction hook blockage: {stderr}"
+    );
+
+    // Assert ref was NOT written
+    let check_ref = ref_store.get_ref("refs/heads/blocked-branch").ok().flatten();
+    assert!(check_ref.is_none(), "blocked branch ref must not exist on disk");
+}
+
+#[test]
+fn test_reference_transaction_blocks_tag_creation() {
+    if !GitHookRunner::has_working_shell() {
+        return;
+    }
+    let (repository, git_dir) = bootstrap_repo();
+    let hook_path = git_dir.join("hooks").join("reference-transaction");
+    write_hook(
+        &hook_path,
+        "#!/bin/sh\n\
+         while read -r old new ref; do\n\
+           case \"$ref\" in\n\
+             *blocked-tag*) exit 1 ;;\n\
+           esac\n\
+         done\n\
+         exit 0\n",
+    );
+
+    fs::create_dir_all(git_dir.join("objects")).expect("create objects directory");
+    fs::write(git_dir.join("HEAD"), "ref: refs/heads/main\n").expect("write HEAD");
+
+    let ref_store = fractal_git::DiskRefStore::new(&git_dir);
+    let odb = fractal_git::LooseOdb::new(&git_dir);
+    let dummy_tree = odb.write_object("tree", b"").expect("write dummy tree");
+    let sig = fractal_git::GitSignature::new("Tester", "test@company.com", 1700000000);
+    let commit = fractal_git::GitCommit::new(dummy_tree, vec![], sig.clone(), sig, "feat(core): seed\n", None);
+    let commit_payload = fg_storage::commit_materializer::serialize_commit_payload(&commit);
+    let commit_oid = odb.write_object("commit", &commit_payload).expect("write dummy commit");
+    let _ = ref_store.update_ref("refs/heads/main", &commit_oid, None);
+
+    let blocked_out = run_taxis(repository.path(), &["tag", "blocked-tag", "main"]);
+    assert!(
+        !blocked_out.status.success(),
+        "tag creation must fail when blocked by reference-transaction hook"
+    );
+
+    let check_ref = ref_store.get_ref("refs/tags/blocked-tag").ok().flatten();
+    assert!(check_ref.is_none(), "blocked tag ref must not exist on disk");
 }

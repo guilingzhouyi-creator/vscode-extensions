@@ -46,17 +46,11 @@ const SUBJECT_SECOND: &str = "feat: add charlie";
 /// Creates a unique repository-shaped scratch directory.
 fn scratch_repo(label: &str) -> PathBuf {
     let count = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let base = if cfg!(windows) {
-        let low = std::env::temp_dir().join("Low");
-        let _ = fs::create_dir_all(&low);
-        if low.exists() {
-            low
-        } else {
-            std::env::temp_dir()
-        }
-    } else {
-        std::env::temp_dir()
-    };
+    let base = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("test_tmp");
+    let _ = fs::create_dir_all(&base);
     let path = base.join(format!(
         "taxis_interactive_{}_{}_{}",
         std::process::id(),
@@ -87,6 +81,15 @@ fn committer_identity(date_secs: i64) -> Vec<(&'static str, String)> {
         ("GIT_COMMITTER_EMAIL", COMMITTER_EMAIL.to_string()),
         ("GIT_COMMITTER_DATE", format!("{date_secs} +0000")),
     ]
+}
+
+/// Returns true when the host provides a `git` binary usable as an interoperability reference baseline.
+fn system_git_available() -> bool {
+    Command::new("git")
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 /// Runs one git subcommand inside a repository and returns its captured output.
@@ -554,6 +557,10 @@ fn test_remote_transport_mock_and_loopback() {
 
 #[test]
 fn test_first_squash_or_fixup_rejected_before_any_repository_change() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let seed = seed_branching_history("reject_first_squash");
     let before_head = git_stdout(&seed.repo, &["rev-parse", "HEAD"]);
     assert_eq!(before_head, seed.feature_tip);
@@ -622,6 +629,10 @@ fn test_first_squash_or_fixup_rejected_before_any_repository_change() {
 
 #[test]
 fn test_edit_stop_then_continue_matches_system_git() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let seed = seed_branching_history("edit_continue");
     let baseline = seed_branching_history("edit_continue_baseline");
     let committer = committer_identity(1_700_000_500);
@@ -740,6 +751,10 @@ fn test_edit_stop_then_continue_matches_system_git() {
 
 #[test]
 fn test_exec_failure_then_abort_restores_original_tip() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let seed = seed_branching_history("exec_abort");
     let committer = committer_identity(1_700_000_500);
     let failing_command = if cfg!(windows) { "exit /b 3" } else { "exit 3" };
@@ -811,6 +826,10 @@ fn test_exec_failure_then_abort_restores_original_tip() {
 
 #[test]
 fn test_committer_identity_from_environment_matches_system_git() {
+    if !system_git_available() {
+        eprintln!("skip: system git is unavailable or restricted");
+        return;
+    }
     let seed = seed_branching_history("committer_env");
     let baseline = seed_branching_history("committer_env_baseline");
     // A non-UTC zone proves the offset is carried through instead of being normalized to +0000.

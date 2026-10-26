@@ -92,7 +92,16 @@ impl GitBaseline {
         if !matches!(probe, Ok(status) if status.success()) {
             return None;
         }
-        let git_dir = tempfile::tempdir().expect("create baseline git directory");
+        let base = std::env::current_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .join("target")
+            .join("test_tmp");
+        let _ = std::fs::create_dir_all(&base);
+        let git_dir = tempfile::Builder::new()
+            .prefix("taxis_git_base_")
+            .tempdir_in(&base)
+            .or_else(|_| tempfile::tempdir())
+            .expect("create baseline git directory");
         run_git_output(git_dir.path(), &["init", "--quiet", "--bare"], None, &[]);
         Some(Self { git_dir })
     }

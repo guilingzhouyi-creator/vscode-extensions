@@ -394,12 +394,12 @@ fn test_tipse_cli_unarchive_to_odb_zip() {
             "unarchive",
             "--to-odb",
             "--branch",
-            "feature/in-place-import",
+            "refs/fractal/cell/cell-default/card/in-place-import",
             zip_path.to_str().expect("path"),
         ],
     );
     assert!(out.contains("Root Tree OID"));
-    assert!(out.contains("feature/in-place-import"));
+    assert!(out.contains("refs/fractal/cell/cell-default/card/in-place-import"));
     assert!(out.contains("Working Tree:        Bypassed"));
 
     // Verify zero working tree files were allocated on disk
@@ -420,7 +420,7 @@ fn test_tipse_cli_unarchive_to_odb_zip() {
     );
 
     // Verify git ls-tree or taxis ls-tree can read the tree
-    let ls_tree = run_taxis_ok(&repo, &["ls-tree", "-r", "feature/in-place-import"]);
+    let ls_tree = run_taxis_ok(&repo, &["ls-tree", "-r", "refs/fractal/cell/cell-default/card/in-place-import"]);
     assert!(ls_tree.contains("hello.txt"));
     assert!(ls_tree.contains("nested/module.rs"));
 

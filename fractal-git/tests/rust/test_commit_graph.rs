@@ -22,17 +22,11 @@ impl TestDir {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let count = COUNTER.fetch_add(1, Ordering::Relaxed);
         let pid = std::process::id();
-        let base = if cfg!(windows) {
-            let low = std::env::temp_dir().join("Low");
-            let _ = std::fs::create_dir_all(&low);
-            if low.exists() {
-                low
-            } else {
-                std::env::temp_dir()
-            }
-        } else {
-            std::env::temp_dir()
-        };
+        let base = std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("target")
+            .join("test_tmp");
+        let _ = std::fs::create_dir_all(&base);
         let path = base.join(format!("fg_test_cg_{}_{}_{}", prefix, pid, count));
         std::fs::create_dir_all(&path).expect("Failed to create test directory");
         Self { path }
@@ -268,4 +262,22 @@ fn a_chained_graph_reports_its_base_graph_count() {
     let bytes = chained_graph_bytes(1, 2);
     let reader = CommitGraphReader::from_bytes(bytes).expect("chained graph must parse");
     assert_eq!(reader.base_graph_count(), 1);
+}
+
+#[test]
+fn test_commit_graph_compressed_indices() {
+    let bytes = chained_graph_bytes(0, 5);
+    let reader = CommitGraphReader::from_bytes(bytes).expect("parse graph");
+    assert_eq!(reader.num_commits(), 5);
+
+    let comp_ts = reader.build_compressed_timestamps().expect("compressed timestamps");
+    assert_eq!(comp_ts.len(), 5);
+    assert_eq!(comp_ts.get(0), Some(1_700_000_000));
+    assert_eq!(comp_ts.get(4), Some(1_700_000_004));
+
+    let comp_gen = reader.build_compressed_generations().expect("compressed generations");
+    assert_eq!(comp_gen.len(), 5);
+    assert_eq!(comp_gen.get(0), Some(7));
+    assert_eq!(comp_gen.get(4), Some(11));
+    assert!(comp_gen.bits_per_int() < 64.0);
 }
