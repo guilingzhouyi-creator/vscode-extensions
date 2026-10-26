@@ -889,6 +889,8 @@ export * from './core/constants/analyzer-bitmask';
 export * from './core/profiler/loadGovernor';
 export * from './core/pipeline/escalationChannel';
 export * from './core/pipeline/dualTrackPipeline';
+export * from './core/pipeline/bidirectional-scheduler';
+export * from './core/pipeline';
 export * from './core/rules/registry';
 export * from './core/rules/overlap-clusters';
 export * as messages from './core/messages';
@@ -993,6 +995,7 @@ export type { IncrementalSliceResult } from './core/diff/incremental-diff-stream
 // ---- Unified AST Visitor Dispatcher & Traversal Core ----
 export { UnifiedAstVisitor } from './core/ast/unified-ast-visitor';
 export type { AstNodeListener } from './core/ast/unified-ast-visitor';
+export * from './core/ast/swa-bounded-replay';
 
 // ---- Semantic Architecture Graph & Meta-Architecture Rules ----
 export * from './core/architecture';
