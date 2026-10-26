@@ -20,6 +20,17 @@ import type {
 import { evaluateCandidateStrategy } from './heuristic-evaluator';
 import type { MctsExplorerOptions } from './mcts-explorer';
 import { MctsExplorer } from './mcts-explorer';
+import {
+    DSparkConfidenceScheduler,
+    defaultDSparkConfidenceScheduler,
+    DEFAULT_CONFIDENCE_THRESHOLD,
+} from './dspark-confidence-scheduler';
+import type {
+    EditStepConfidence,
+    SafePrefixRolloutResult,
+    SpeculativeEditStep,
+    DSparkSchedulerOptions,
+} from './dspark-confidence-scheduler';
 
 export type {
     CandidateStrategy,
@@ -27,9 +38,19 @@ export type {
     HeuristicScore,
     MctsExplorerOptions,
     MctsNode,
+    EditStepConfidence,
+    SafePrefixRolloutResult,
+    SpeculativeEditStep,
+    DSparkSchedulerOptions,
 };
 
-export { evaluateCandidateStrategy, MctsExplorer };
+export {
+    evaluateCandidateStrategy,
+    MctsExplorer,
+    DSparkConfidenceScheduler,
+    defaultDSparkConfidenceScheduler,
+    DEFAULT_CONFIDENCE_THRESHOLD,
+};
 
 /**
  * Creates and initializes a new MctsExplorer instance.

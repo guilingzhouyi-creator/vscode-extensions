@@ -996,6 +996,7 @@ export type { IncrementalSliceResult } from './core/diff/incremental-diff-stream
 export { UnifiedAstVisitor } from './core/ast/unified-ast-visitor';
 export type { AstNodeListener } from './core/ast/unified-ast-visitor';
 export * from './core/ast/swa-bounded-replay';
+export * from './core/ast/ast-prefix-radix-cache';
 
 // ---- Semantic Architecture Graph & Meta-Architecture Rules ----
 export * from './core/architecture';
