@@ -1031,6 +1031,7 @@ export * from './core/comments';
 // ---- Native Acceleration Core & Algorithmic Dual-Track Bridge ----
 export * from './core/native';
 export * from './core/reporting/quality-printer';
+export * from './core/protocol/auto-refactor-recipe';
 
 // ---- Code Evolution Quality Model & Git History Mining ----
 export * from './core/evolution';

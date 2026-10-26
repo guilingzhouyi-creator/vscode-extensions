@@ -18,13 +18,19 @@ pub use ops_pattern;
 pub use ops_scope;
 pub use ops_vector;
 
+pub mod recipe;
+
 /// Core trait defining the native AST review and static analysis interface.
 pub trait NativeAstReviewEngine: Send + Sync {
     /// Computes unified histogram diff hunks between old and new source code strings.
     fn compute_diff_slices(&self, old_src: &str, new_src: &str) -> Vec<ops_diff::DiffHunk>;
 
     /// Masks comments and string literals according to the provided language configuration.
-    fn evaluate_mask(&self, source_code: &str, config: &ops_mask::MaskConfig) -> ops_mask::MaskResult;
+    fn evaluate_mask(
+        &self,
+        source_code: &str,
+        config: &ops_mask::MaskConfig,
+    ) -> ops_mask::MaskResult;
 
     /// Computes Shannon Information Entropy H(X) in bits from code or token streams.
     fn compute_entropy(&self, text: &str) -> f64;
@@ -53,7 +59,11 @@ impl NativeAstReviewEngine for DefaultAstReviewEngine {
         ops_diff::run_histogram_diff(old_src, new_src)
     }
 
-    fn evaluate_mask(&self, source_code: &str, config: &ops_mask::MaskConfig) -> ops_mask::MaskResult {
+    fn evaluate_mask(
+        &self,
+        source_code: &str,
+        config: &ops_mask::MaskConfig,
+    ) -> ops_mask::MaskResult {
         ops_mask::mask_source_code(source_code, config)
     }
 
