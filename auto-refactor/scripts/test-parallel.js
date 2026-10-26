@@ -69,6 +69,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-review-memory', script: 'scripts/validate-review-memory.js' },
   { name: 'validate-asymmetric', script: 'scripts/validate-asymmetric-routing.js' },
   { name: 'validate-grouped-moe-dispatch', script: 'scripts/validate-grouped-moe-dispatch.js' },
+  { name: 'validate-bidirectional-swa', script: 'scripts/validate-bidirectional-swa.js' },
   { name: 'validate-security', script: 'scripts/validate-security-levels.js' },
   { name: 'validate-capabilities', script: 'scripts/validate-capabilities.js' },
   { name: 'validate-language-support', script: 'scripts/validate-language-support.js' },
