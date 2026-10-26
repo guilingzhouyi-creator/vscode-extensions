@@ -4,7 +4,10 @@
   "private": true,
   "description": "Root-level gate orchestration for the multi-project workspace",
   "scripts": {
+    "prepare": "node scripts/common/install-hooks.js",
     "gate:install": "pwsh -File scripts/ps1/install-hooks.ps1",
+    "gate:install:portable": "node scripts/common/install-hooks.js",
+    "gate:rangemsg": "node scripts/common/validate-push-range-messages.js",
     "gate:precommit": "pwsh -File scripts/ps1/pre-commit-gate.ps1",
     "gate:prepush": "pwsh -File scripts/ps1/pre-push-gate.ps1",
     "gate:audit": "pwsh -File scripts/ps1/audit-all.ps1",

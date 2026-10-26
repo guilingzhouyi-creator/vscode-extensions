@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**86 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**91 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -46,6 +46,7 @@
 | `common/` | Node.js | `validate-metric-coverage.js` | audit / docs（`doc-metrics.json` 声明集与文档实际渲染集相等；声明未渲染与标记未声明双向阻断） | `pre-push-gate`、`audit-all`、CI |
 | `common/` | Node.js | `evaluate-change-entropy.js` | audit / entropy（Hassan 变更香农熵与 Kamei 跨域扩散 NF/ND/NS 评估，超阈阻断） | `pre-push-gate` CHANGE-ENTROPY-22、本地 CLI |
 | `common/` | Node.js | `bootstrap-gates.js` | tooling / bootstrap（钩子激活、依赖安装与构建一键引导） | 本地 CLI |
+| `common/` | Node.js | `install-hooks.js` | gate / hooks（仓库本地钩子载体自愈：`core.hooksPath` 指向 `.githooks`、六类载体索引可执行位回读断言；`--check` 只读核验，`--quiet` 抑制逐钩子成功行） | 根 `prepare`、`gate:install:portable`、CI |
 | `common/` | Node.js | `test-gate-parity.js` | validate / parity（双实现提交门禁行为差分） | CI、本地 CLI |
 | `common/` | Node.js | `test-gate-selftest.js` | validate / selftest（门禁 PASS/违规/缺依赖三态矩阵） | CI、本地 CLI |
 | `common/` | Node.js | `gate-receipts.js` | gate / receipt（本地门禁收据引擎：pre-commit/commit-msg 阶段标记、post-commit/post-merge 落盘、pre-push 逐提交审计与 ref 安全性判定；`--no-verify` 提交只能显式 bypass 并留痕） | `.githooks/*`、`pre-push-gate`、`install-hooks` |
@@ -53,6 +54,7 @@
 | `common/` | Node.js | `commit-structure-contract.js` | gate / structure（七项结构契约的单一实现：标题形态与长度、空行分割、正文密度、必需区块、项目归属、批次代号；`commit-msg-gate` 双实现均委托此处） | `validate-commit-msg`、`commit-msg-gate` |
 | `common/` | Node.js | `validate-commit-msg-style.js` | gate / style（提交信息文本风格与四维禁词核验器） | `commit-msg-gate`、`pre-push-gate`、CI |
 | `common/` | Node.js | `validate-commit-history-baseline.js` | gate / commit-history（待推送提交按冻结清单逐条核验：清单记录的规则对命中提交只报告不阻断，未记录的规则照常生效） | `pre-push-gate` COMMIT-HISTORY-BASELINE-36、CI |
+| `common/` | Node.js | `validate-push-range-messages.js` | gate / commit（推送区间逐提交复核提交信息契约，补偿被绕过或缺失的本地 `commit-msg` 钩子；冻结清单内的既有规则只报告不阻断） | CI、本地 CLI |
 | `common/` | JSON | `commit-history-baseline.json` | data / ssot（冻结提交基线与逐提交依据规则清单，`ratifiedAt` 为时间边界） | `validate-commit-history-baseline` |
 | `common/` | Node.js | `commit-tokenizer.js` | gate / style-lexical（零依赖提交信息分词器：零宽字符剥离、NFKC 归一、前缀 Trie 与结构解析） | `validate-commit-msg-style`、`validate-commit-guardrail` |
 | `common/` | Node.js | `commit-style-arbiter.js` | gate / style-lexical（祈使语态、客观叙述与学术白名单仲裁器） | `validate-commit-msg-style` |
@@ -286,3 +288,11 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 > | `COMMIT-HISTORY-BASELINE-36` | 提交历史冻结清单只能覆盖早于其生效时刻的提交 |
 > | `RULE-SOURCE-37` | 规则源文件内容与目录一致性 |
 > | `DESTRUCTIVE-OPS-38` | 破坏性文件操作静态守卫与溯源 |
+
+---
+
+## 九、钩子载体与推送区间补偿命令
+
+- `node scripts/common/install-hooks.js`：把本仓库的 `core.hooksPath` 指回 `.githooks` 并回读索引中的可执行位，可重复执行。`--check` 只读核验，CI 用它在全新检出上证明自愈真实发生；`--quiet` 抑制逐钩子成功行。不在 Git 工作树内时告警并以 0 退出，保证打包与源码快照不被阻断。
+- `node scripts/common/validate-push-range-messages.js`：按 `--range <base>..<head>`（缺省 `origin/main..HEAD`，也可用环境变量 `GATE_PUSH_RANGE`）逐条复核推送区间的提交信息契约；`--limit <n>` 便于本地单点自测。命中冻结清单的既有提交只报告不阻断，其余违规打印 `BLOCK` 并以 1 退出，用法错误以 2 退出。
+- 根 `prepare` 生命周期与 CI hygiene 作业都会调用上述两个脚本：前者让每次依赖安装自动修复钩子载体，后者先在全新检出上解除 `core.hooksPath` 再安装核验，最后按推送区间复核提交信息。

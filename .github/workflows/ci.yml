@@ -151,6 +151,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 区间复核需要完整的合并目标历史
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -317,6 +319,14 @@ jobs:
           '
           bash scripts/sh/release-tag.sh no-cl patch --message "v0.2.0 — X | Y" --dry-run >/dev/null 2>&1 && { echo "::error::缺 CHANGELOG 未拦截"; exit 1; }
           echo "✔ release-tag.sh 夹具自检全部通过"
+
+      - name: Prove hook carrier self-heal from a clean checkout
+        run: |
+          set -euo pipefail
+          # 模拟全新检出：本地 hooksPath 未配置，安装器必须自行修复并回读断言
+          git config --unset core.hooksPath || true
+          node scripts/common/install-hooks.js
+          node scripts/common/install-hooks.js --check
 
       - name: Git hooks & local gate scripts self-test
         run: |
@@ -562,6 +572,19 @@ jobs:
           node scripts/common/validate-trajectory-ledger.js
           rm -f "$MSG_TEMP"
           echo "✔ Git 本地门禁脚本与审查联动自检全部通过"
+
+      - name: Commit message gate for the pushed range
+        run: |
+          set -euo pipefail
+          # PR 用 base sha，push 用 before sha；新建分支的 before 为全零时回退到合并目标
+          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
+            BASE=origin/main
+          fi
+          if ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            BASE=origin/main
+          fi
+          node scripts/common/validate-push-range-messages.js --range "$BASE..HEAD"
 
       - name: Render workspace quality dashboard to Step Summary
         if: always()
