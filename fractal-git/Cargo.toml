@@ -177,3 +177,7 @@ path = "tests/rust/test_tipse_safety.rs"
 [[test]]
 name = "test_plumbing_parity"
 path = "tests/rust/test_plumbing_parity.rs"
+
+[[test]]
+name = "test_cli_contract_parity"
+path = "tests/rust/test_cli_contract_parity.rs"

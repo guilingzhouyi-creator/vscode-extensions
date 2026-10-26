@@ -24,6 +24,7 @@ use std::path::{Path, PathBuf};
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{FileMode, ObjectKind, Oid};
 use fg_index::{AttributeSet, GitIndex, IgnoreMatcher};
+use fg_object::GitTreeRef;
 use fg_storage::{OdbRouter, PackedObject};
 use fg_topology::{DiskRefStore, HeadState};
 
@@ -266,6 +267,61 @@ impl RepoView {
         Ok(current)
     }
 
+    /// Resolves a revision that may carry a ':path' tree suffix.
+    ///
+    /// 'git cat-file' and 'git ls-tree' accept 'rev:path', where the path is walked entry by entry
+    /// inside the tree objects the revision names -- never through the worktree or the index.
+    /// Walking the tree objects is what makes a committed-but-deleted file readable and what keeps
+    /// a worktree edit from changing the answer; a path that only exists on disk stays unresolved.
+    ///
+    /// # Errors
+    ///
+    /// Returns FractalError::ObjectCodec when the revision does not resolve, when it names an
+    /// object with no tree, or when a path component is absent from the tree.
+    pub fn resolve_object_spec(&self, spec: &str) -> FractalResult<Oid> {
+        let Some((revision, path)) = spec.split_once(':') else {
+            return self.resolve(spec);
+        };
+        let mut current = self.peel(&self.resolve(revision)?)?;
+        let mut object = self.object(&current)?;
+        if object.kind == ObjectKind::Commit {
+            current = parse_commit_tree(&object.payload)?;
+            object = self.object(&current)?;
+        }
+        if object.kind != ObjectKind::Tree {
+            return Err(FractalError::ObjectCodec(format!(
+                "'{revision}' resolves to a {}, which has no tree to walk",
+                object.kind.as_str()
+            )));
+        }
+        let segments: Vec<&str> = path
+            .trim_matches('/')
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+            .collect();
+        if segments.is_empty() {
+            return Ok(current);
+        }
+        let mut tree_payload = object.payload;
+        for (index, segment) in segments.iter().enumerate() {
+            let Some(entry) = GitTreeRef::from_bytes(&tree_payload).find_entry(segment)? else {
+                return Err(FractalError::ObjectCodec(format!(
+                    "path '{path}' does not exist in '{revision}'"
+                )));
+            };
+            if index + 1 == segments.len() {
+                return Ok(entry.oid);
+            }
+            if !entry.mode.is_tree() {
+                return Err(FractalError::ObjectCodec(format!(
+                    "path '{path}' does not exist in '{revision}'"
+                )));
+            }
+            tree_payload = self.object(&entry.oid)?.payload;
+        }
+        Ok(current)
+    }
+
     /// Resolves the part of a revision that names an object, without ancestry suffixes.
     fn resolve_base(&self, revision: &str) -> FractalResult<Oid> {
         if revision == "HEAD" || revision == "@" {
@@ -399,7 +455,7 @@ impl RepoView {
     ///
     /// Returns [`FractalError::ObjectCodec`] when the object is neither a tree nor a commit.
     pub fn resolve_tree(&self, revision: &str) -> FractalResult<(Oid, Oid)> {
-        let resolved = self.resolve(revision)?;
+        let resolved = self.resolve_object_spec(revision)?;
         let peeled = self.peel(&resolved)?;
         let object = self.object(&peeled)?;
         match object.kind {

@@ -71,8 +71,18 @@ pub struct InPlaceJournal {
 
 impl InPlaceJournal {
     /// Opens or creates an in-place transaction log at `path`.
+    ///
+    /// Missing parent directories are created on demand so that logging into a destination tree
+    /// that does not exist yet (for example `taxis unarchive -C out/nested`) produces the same
+    /// explicit outcome as any other filesystem failure instead of a bare `os error 3` from the
+    /// underlying `open` call.
     pub fn open<P: AsRef<Path>>(path: P) -> FractalResult<Self> {
         let path_buf = path.as_ref().to_path_buf();
+        if let Some(parent) = path_buf.parent() {
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                std::fs::create_dir_all(parent).map_err(FractalError::Io)?;
+            }
+        }
         let is_new = !path_buf.exists();
 
         let mut file = OpenOptions::new()
@@ -238,5 +248,26 @@ mod tests {
         let finished_state = InPlaceJournal::replay(&journal_path).expect("replay finished");
         assert!(finished_state.is_completed);
         assert_eq!(finished_state.extracted_members.len(), 2);
+    }
+
+    #[test]
+    fn test_open_creates_missing_parent_directories() {
+        let dir = test_temp_dir("inplace_wal_nested_");
+        let nested = dir
+            .path()
+            .join("out")
+            .join("deep")
+            .join(".taxis_unarchive.wal");
+        assert!(
+            !nested.parent().expect("journal parent").exists(),
+            "fixture must start without the destination tree"
+        );
+
+        let journal = InPlaceJournal::open(&nested).expect("open journal in missing directory");
+        drop(journal);
+
+        assert!(nested.is_file(), "journal must be created after mkdir -p");
+        let state = InPlaceJournal::replay(&nested).expect("replay freshly created journal");
+        assert!(!state.is_completed);
     }
 }

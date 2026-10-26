@@ -104,6 +104,20 @@ fn write_tar(path: &Path, members: &[(&str, &[u8])]) {
     finished.flush().expect("flush tar fixture");
 }
 
+fn write_targz(path: &Path, members: &[(&str, &[u8])]) {
+    let file = File::create(path).expect("create tar.gz fixture");
+    let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+    let mut writer = TarWriter::new(encoder);
+    for (index, (name, payload)) in members.iter().enumerate() {
+        writer
+            .append_file(name, 0o644, 1500000000 + index as i64, payload)
+            .expect("append tar.gz member");
+    }
+    let encoder = writer.finish().expect("finish tar.gz tar stream");
+    let mut finished = encoder.finish().expect("finish tar.gz gzip stream");
+    finished.flush().expect("flush tar.gz fixture");
+}
+
 fn assert_archive_untouched(path: &Path, before: &[u8]) {
     let after = fs::read(path).expect("read archive after command");
     assert_eq!(
@@ -466,5 +480,184 @@ fn test_bundle_unbundle_rejects_corrupted_payload_without_data_loss() {
     assert!(
         !dst_repo.join("payload.txt").exists(),
         "refusal must not materialize any working tree file"
+    );
+}
+
+#[test]
+fn test_targz_in_place_hole_punch_reports_measured_reclamation() {
+    let dir = test_temp_dir("tipse_safety_targz_");
+    let targz_path = dir.path().join("payload.tar.gz");
+    // Incompressible payloads keep the compressed archive large enough that forward punching has
+    // a real region to release instead of a few hundred gzip bytes.
+    let mut large_payload = vec![0u8; 64 * 1024];
+    let mut state: u32 = 0x5eed_1234;
+    for byte in &mut large_payload {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        *byte = (state >> 24) as u8;
+    }
+    write_targz(
+        &targz_path,
+        &[
+            ("bulk/blob.bin", large_payload.as_slice()),
+            ("notes/readme.txt", b"targz payload\n"),
+        ],
+    );
+    let archive_len_before = fs::metadata(&targz_path)
+        .expect("stat tar.gz fixture")
+        .len();
+    assert!(archive_len_before > 0);
+    let dest = dir.path().join("extracted");
+
+    let output = run_taxis(
+        dir.path(),
+        &[
+            "unarchive",
+            "-C",
+            dest.to_str().expect("dest path"),
+            targz_path.to_str().expect("tar.gz path"),
+        ],
+    );
+    let stdout_str = String::from_utf8_lossy(&output.stdout);
+    let stderr_str = String::from_utf8_lossy(&output.stderr);
+    if !output.status.success()
+        && stderr_str
+            .to_ascii_lowercase()
+            .contains("unsupported filesystem capability")
+    {
+        eprintln!("skip: filesystem does not support hole punching: {stderr_str}");
+        return;
+    }
+    assert!(
+        output.status.success(),
+        "taxis unarchive of a .tar.gz failed: {stdout_str}{stderr_str}"
+    );
+    assert!(
+        stdout_str.contains("forward hole punching"),
+        "in-place .tar.gz must report hole punching: {stdout_str}"
+    );
+    assert!(
+        !stdout_str.contains("tail-truncation"),
+        "in-place .tar.gz must not claim tail truncation: {stdout_str}"
+    );
+    assert_eq!(
+        fs::read(dest.join("bulk").join("blob.bin")).expect("read extracted blob"),
+        large_payload,
+        "forward hole punching must still materialize the member payload"
+    );
+    assert_eq!(
+        fs::read(dest.join("notes").join("readme.txt")).expect("read extracted readme"),
+        b"targz payload\n"
+    );
+    assert_eq!(
+        fs::metadata(&targz_path)
+            .expect("stat tar.gz after command")
+            .len(),
+        archive_len_before,
+        "forward hole punching keeps the archive logical length"
+    );
+    assert!(
+        !dest.join(".taxis_unarchive.wal").exists(),
+        "a completed extraction must remove its WAL journal"
+    );
+}
+
+#[test]
+fn test_unarchive_creates_missing_nested_destination_for_wal() {
+    let dir = test_temp_dir("tipse_safety_nested_dest_");
+    let zip_path = dir.path().join("nested.zip");
+    write_zip(
+        &zip_path,
+        &[("nested/leaf.txt", b"nested destination payload\n")],
+    );
+    let dest = dir.path().join("out").join("nested").join("deep");
+    assert!(
+        !dest.exists(),
+        "fixture precondition: destination ancestors do not exist"
+    );
+
+    let stdout = run_taxis_ok(
+        dir.path(),
+        &[
+            "unarchive",
+            "--no-in-place",
+            "-C",
+            dest.to_str().expect("dest path"),
+            zip_path.to_str().expect("zip path"),
+        ],
+    );
+    assert!(
+        stdout.contains("Source archive retained intact"),
+        "standard extraction must retain the source archive: {stdout}"
+    );
+    assert_eq!(
+        fs::read(dest.join("nested").join("leaf.txt")).expect("read nested extraction"),
+        b"nested destination payload\n"
+    );
+    assert!(
+        !dest.join(".taxis_unarchive.wal").exists(),
+        "WAL journal in a freshly created destination must be removed on completion"
+    );
+}
+
+#[test]
+fn test_unarchive_headroom_units_help_default_and_usage_errors() {
+    let dir = test_temp_dir("tipse_safety_headroom_");
+    let zip_path = dir.path().join("headroom.zip");
+    write_zip(&zip_path, &[("one.txt", b"headroom payload\n")]);
+
+    let help = run_taxis_ok(dir.path(), &["unarchive", "--help"]);
+    assert!(
+        help.contains("104857600 bytes"),
+        "help must render the DEFAULT_SAFETY_HEADROOM_BYTES constant: {help}"
+    );
+    for unit in ["K", "M", "G", "T"] {
+        assert!(
+            help.contains(unit),
+            "help must document the binary suffix {unit}: {help}"
+        );
+    }
+
+    let malformed = run_taxis(
+        dir.path(),
+        &[
+            "unarchive",
+            "--headroom",
+            "1X",
+            zip_path.to_str().expect("zip path"),
+        ],
+    );
+    assert_eq!(
+        malformed.status.code(),
+        Some(129),
+        "--headroom with an unknown unit must be a usage error instead of silently falling back"
+    );
+
+    let missing_value = run_taxis(dir.path(), &["unarchive", "--headroom"]);
+    assert_eq!(
+        missing_value.status.code(),
+        Some(129),
+        "--headroom without a value must be a usage error"
+    );
+
+    let dest = dir.path().join("dry_run_output");
+    let stdout = run_taxis_ok(
+        dir.path(),
+        &[
+            "unarchive",
+            "--dry-run",
+            "--headroom",
+            "1T",
+            "-C",
+            dest.to_str().expect("dest path"),
+            zip_path.to_str().expect("zip path"),
+        ],
+    );
+    assert!(
+        stdout.contains("Disk Effects"),
+        "a 1T headroom must be accepted by the projection path: {stdout}"
+    );
+    assert!(
+        !dest.exists(),
+        "dry-run must not create the destination directory"
     );
 }

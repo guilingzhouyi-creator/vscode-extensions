@@ -28,7 +28,8 @@ pub fn print_repack_help() {
          Options:\n\
            -w, --window <size>     Sliding window size for delta search (default: 10)\n\
            -d, --max-depth <depth> Maximum delta chain depth (default: 50)\n\
-           --low-disk              Progressively pack and purge loose objects in micro-pack slices (64MB~256MB)\n\
+           --low-disk              Progressively pack and purge loose objects in 64MB micro-pack slices\n\
+                                   (default; tune the slice size with --micro-pack)\n\
            --micro-pack <size>     Micro-pack slice limit for --low-disk (default: 64M, minimum: 1M)\n\
            -k, --keep-loose        Keep loose objects on disk after creating packfile\n\
            --auto                  Only repack if loose object count exceeds threshold\n\
@@ -205,6 +206,19 @@ pub fn handle_repack(ctx: &CliContext) {
 
 /// Formats successful repack output.
 fn report_repack_success(ctx: &CliContext, report: &RepackReport) {
+    let artifacts: Vec<serde_json::Value> = report
+        .artifacts
+        .iter()
+        .map(|artifact| {
+            json!({
+                "pack_oid": artifact.pack_oid.to_hex(),
+                "idx_oid": artifact.idx_oid.to_hex(),
+                "objects_packed": artifact.objects_packed,
+                "pack_bytes": artifact.pack_bytes
+            })
+        })
+        .collect();
+
     if ctx.json_mode {
         print_json(&json!({
             "status": "ok",
@@ -213,6 +227,9 @@ fn report_repack_success(ctx: &CliContext, report: &RepackReport) {
             "objects_packed": report.objects_packed,
             "objects_verified": report.objects_verified,
             "pack_bytes": report.pack_bytes,
+            "pack_count": report.artifacts.len(),
+            "total_pack_bytes": report.total_pack_bytes,
+            "artifacts": artifacts,
             "loose_pruned": report.loose_pruned,
             "duration_ms": report.duration_ms
         }));
@@ -223,6 +240,13 @@ fn report_repack_success(ctx: &CliContext, report: &RepackReport) {
         println!("Objects Packed:   {}", report.objects_packed);
         println!("Objects Verified: {}", report.objects_verified);
         println!("Packfile Size:    {} bytes", report.pack_bytes);
+        if report.artifacts.len() > 1 {
+            println!(
+                "Micro-Packs:      {} published, {} bytes total",
+                report.artifacts.len(),
+                report.total_pack_bytes
+            );
+        }
         println!("Loose Pruned:     {}", report.loose_pruned);
         println!("Time Elapsed:     {} ms", report.duration_ms);
     }

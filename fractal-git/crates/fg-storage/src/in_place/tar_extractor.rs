@@ -464,12 +464,50 @@ impl<R: Read> Read for CountingReader<R> {
     }
 }
 
+/// Measured outcome of forward-streaming in-place `.tar.gz` extraction.
+///
+/// Hole punching and tail truncation are distinct primitives: punching converts already-consumed
+/// archive regions into sparse extents while keeping the logical file length, tail truncation
+/// physically removes bytes from the end. The forward `.tar.gz` path only punches, therefore
+/// [`Self::total_truncated_bytes`] stays zero and [`Self::final_archive_len`] is the measured
+/// on-disk length after the run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TarGzInPlaceReport {
+    /// Number of extracted members.
+    pub files_extracted: usize,
+    /// Total uncompressed payload bytes written for those members.
+    pub total_extracted_bytes: u64,
+    /// Bytes whose storage was released by hole punching (sparse extents).
+    pub hole_punched_bytes: u64,
+    /// Bytes physically removed via tail truncation (always zero: this path punches only).
+    pub total_truncated_bytes: u64,
+    /// Measured archive length in bytes after the extraction finished.
+    pub final_archive_len: u64,
+}
+
+impl TarGzInPlaceReport {
+    /// Projects this report onto the shared extraction report consumed by reporting callers.
+    pub fn into_extraction_report(self) -> InPlaceExtractionReport {
+        InPlaceExtractionReport {
+            files_extracted: self.files_extracted,
+            total_extracted_bytes: self.total_extracted_bytes,
+            total_truncated_bytes: self.total_truncated_bytes,
+            final_archive_len: self.final_archive_len,
+        }
+    }
+}
+
 /// Extracts a compressed `.tar.gz` archive using forward streaming and hole punching.
+///
+/// Because the whole archive is consumed front-to-back, the completed run releases the storage of
+/// every consumed byte as a sparse hole instead of truncating the tail: the archive keeps its
+/// logical length. Punching failures propagate to the caller and the returned report carries
+/// measured counters rather than hardcoded zeroes.
 pub fn extract_targz_forward_hole_punch<P: AsRef<Path>, D: AsRef<Path>>(
     archive_path: P,
     dest_dir: D,
     punch_batch_bytes: u64,
-) -> FractalResult<InPlaceExtractionReport> {
+) -> FractalResult<TarGzInPlaceReport> {
     let dest = dest_dir.as_ref();
     fs::create_dir_all(dest).map_err(FractalError::Io)?;
 
@@ -543,16 +581,26 @@ pub fn extract_targz_forward_hole_punch<P: AsRef<Path>, D: AsRef<Path>>(
     }
 
     drop(gz);
-    let mut truncator = TailTruncator::from_file(hole_puncher.into_inner())?;
-    if truncator.current_len() > 0 {
-        truncator.truncate_to(0)?;
-    }
 
-    Ok(InPlaceExtractionReport {
+    // The gzip trailer (and any trailing padding) may remain unconsumed by the decoder, so punch
+    // the whole remainder up to the real end of file before reporting. Punching folds the region
+    // into sparse extents and leaves the logical length untouched.
+    let archive_len = hole_puncher
+        .file()
+        .metadata()
+        .map_err(FractalError::Io)?
+        .len();
+    if archive_len > last_punched_offset {
+        hole_puncher.punch_hole(last_punched_offset, archive_len - last_punched_offset)?;
+    }
+    hole_puncher.sync()?;
+
+    Ok(TarGzInPlaceReport {
         files_extracted,
         total_extracted_bytes,
-        total_truncated_bytes: truncator.total_truncated_bytes(),
-        final_archive_len: truncator.current_len(),
+        hole_punched_bytes: hole_puncher.total_punched_bytes(),
+        total_truncated_bytes: 0,
+        final_archive_len: archive_len,
     })
 }
 
@@ -739,11 +787,21 @@ mod tests {
 
         assert_eq!(report.files_extracted, 1);
         assert_eq!(report.total_extracted_bytes, payload.len() as u64);
-        assert_eq!(report.final_archive_len, 0);
-        assert_eq!(report.total_truncated_bytes, original_len);
+        // Forward hole punching folds consumed regions into sparse extents and never shortens the
+        // archive, so the reported length must be the measured value and truncation stays at zero.
+        assert_eq!(report.final_archive_len, original_len);
+        assert_eq!(
+            report.total_truncated_bytes, 0,
+            "forward hole punching must not claim tail truncation"
+        );
         assert!(
-            report.total_truncated_bytes > 0,
-            "reclamation counters must not stay hardcoded at zero"
+            report.hole_punched_bytes > 0,
+            "punched-byte counters must be measured, not hardcoded at zero"
+        );
+        assert!(report.hole_punched_bytes <= original_len);
+        assert_eq!(
+            report.hole_punched_bytes + report.total_truncated_bytes,
+            original_len
         );
 
         let remaining_len = fs::metadata(&gz_path).expect("metadata after").len();
@@ -752,5 +810,10 @@ mod tests {
         let extracted = fs::read(dest_dir.join("payload.bin")).expect("read payload");
         assert_eq!(extracted.len(), payload.len());
         assert!(extracted.iter().all(|&byte| byte == 0x33));
+
+        let projected = report.into_extraction_report();
+        assert_eq!(projected.files_extracted, 1);
+        assert_eq!(projected.total_truncated_bytes, 0);
+        assert_eq!(projected.final_archive_len, original_len);
     }
 }

@@ -58,15 +58,41 @@ impl Default for RepackOptions {
     }
 }
 
+/// One published packfile/Index pair produced by a repack run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RepackArtifact {
+    /// OID of the published packfile.
+    pub pack_oid: Oid,
+    /// OID of the published Index v2 file.
+    pub idx_oid: Oid,
+    /// Published packfile size in bytes.
+    pub pack_bytes: u64,
+    /// Number of objects stored in the packfile.
+    pub objects_packed: usize,
+}
+
 /// Execution summary returned upon successful repack completion.
+///
+/// Low-disk mode publishes one artifact per micro-pack slice, so the aggregate counters
+/// ([`Self::objects_packed`], [`Self::objects_verified`], [`Self::total_pack_bytes`]) cover every
+/// published pack while the legacy single-pack fields describe the *first* published pack and are
+/// kept in lockstep with `artifacts[0]` for existing callers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepackReport {
+    /// OID of the first published packfile (equals `artifacts[0].pack_oid`).
     pub pack_oid: Oid,
+    /// OID of the first published Index v2 file (equals `artifacts[0].idx_oid`).
     pub idx_oid: Oid,
+    /// Aggregate number of objects packed across every published packfile.
     pub objects_packed: usize,
-    /// Entries decoded from the freshly written pack and matched against their recorded ids.
+    /// Entries decoded from the freshly written packs and matched against their recorded ids.
     pub objects_verified: usize,
+    /// Size of the first published packfile (equals `artifacts[0].pack_bytes`).
     pub pack_bytes: u64,
+    /// Aggregate packfile bytes across every published pack (equals `pack_bytes` for one pack).
+    pub total_pack_bytes: u64,
+    /// Every published pack/idx pair in publication order.
+    pub artifacts: Vec<RepackArtifact>,
     pub loose_pruned: usize,
     pub duration_ms: u64,
 }
@@ -437,13 +463,23 @@ impl RepackEngine {
             objects_packed: count,
             objects_verified: replay.objects_verified,
             pack_bytes,
+            total_pack_bytes: pack_bytes,
+            artifacts: vec![RepackArtifact {
+                pack_oid,
+                idx_oid,
+                pack_bytes,
+                objects_packed: count,
+            }],
             loose_pruned,
             duration_ms,
         }))
     }
 
-    /// Progressively repacks loose objects in micro-pack slices (64MB~256MB default),
-    /// immediately purging each slice's loose objects upon verification to prevent low-disk deadlocks.
+    /// Progressively repacks loose objects in micro-pack slices (default 64MB, see
+    /// [`RepackOptions::micro_pack_bytes`]), immediately purging each slice's loose objects upon
+    /// verification to prevent low-disk deadlocks. Every published slice is recorded in
+    /// [`RepackReport::artifacts`]; the aggregate bytes are reported in
+    /// [`RepackReport::total_pack_bytes`].
     pub fn repack_repository_low_disk(
         git_dir: &Path,
         options: &RepackOptions,
@@ -480,8 +516,7 @@ impl RepackEngine {
         let mut total_verified = 0;
         let mut total_pack_bytes = 0;
         let mut total_pruned = 0;
-        let mut last_pack_oid = Oid::from_bytes([0u8; 20]);
-        let mut last_idx_oid = Oid::from_bytes([0u8; 20]);
+        let mut artifacts: Vec<RepackArtifact> = Vec::with_capacity(slices.len());
 
         let process_id = std::process::id();
 
@@ -545,18 +580,31 @@ impl RepackEngine {
             total_verified += replay.objects_verified;
             total_pack_bytes += pack_bytes;
             total_pruned += slice_pruned;
-            last_pack_oid = pack_oid;
-            last_idx_oid = idx_oid;
+            artifacts.push(RepackArtifact {
+                pack_oid,
+                idx_oid,
+                pack_bytes,
+                objects_packed: slice_count,
+            });
         }
 
         let duration_ms = start_time.elapsed().as_millis() as u64;
 
+        // Slices are never empty, but keep the scalar fields total instead of panicking if that
+        // invariant ever changes.
+        let (pack_oid, idx_oid, pack_bytes) = match artifacts.first() {
+            Some(first) => (first.pack_oid, first.idx_oid, first.pack_bytes),
+            None => (Oid::ZERO, Oid::ZERO, 0),
+        };
+
         Ok(Some(RepackReport {
-            pack_oid: last_pack_oid,
-            idx_oid: last_idx_oid,
+            pack_oid,
+            idx_oid,
             objects_packed: total_packed,
             objects_verified: total_verified,
-            pack_bytes: total_pack_bytes,
+            pack_bytes,
+            total_pack_bytes,
+            artifacts,
             loose_pruned: total_pruned,
             duration_ms,
         }))
@@ -659,6 +707,15 @@ mod tests {
         assert_eq!(report.objects_verified, 4);
         assert_eq!(report.loose_pruned, 4);
 
+        // All four tiny objects fit into a single slice: scalar pack fields must describe it and
+        // the aggregate byte counter must agree with the per-artifact accounting.
+        assert_eq!(report.artifacts.len(), 1);
+        assert_eq!(report.total_pack_bytes, report.pack_bytes);
+        assert_eq!(report.artifacts[0].pack_oid, report.pack_oid);
+        assert_eq!(report.artifacts[0].idx_oid, report.idx_oid);
+        assert_eq!(report.artifacts[0].pack_bytes, report.pack_bytes);
+        assert_eq!(report.artifacts[0].objects_packed, 4);
+
         // Assert all loose objects have been pruned
         let after_loose = scan_loose_objects(&git_dir).expect("scan after");
         assert!(after_loose.is_empty(), "all loose objects should be pruned");
@@ -670,5 +727,66 @@ mod tests {
             .flatten()
             .collect();
         assert!(!pack_entries.is_empty());
+    }
+
+    #[test]
+    fn test_low_disk_multi_pack_report_is_self_consistent() {
+        let dir = test_temp_dir("repack_multi_");
+        let git_dir = dir.path().join("test_repo.git");
+        let objects_dir = git_dir.join("objects");
+        fs::create_dir_all(&objects_dir).expect("create objects");
+
+        // Four ~600KB payloads exceed the 1MB slice floor in pairs, forcing several slices.
+        let chunk = vec![0x5Au8; 600 * 1024];
+        for index in 0..4u8 {
+            let mut content = chunk.clone();
+            content[0] = index;
+            write_test_loose(&git_dir, &content);
+        }
+
+        let options = RepackOptions {
+            low_disk: true,
+            micro_pack_bytes: 1024,
+            keep_loose: false,
+            ..Default::default()
+        };
+
+        let report = RepackEngine::repack_repository(&git_dir, &options)
+            .expect("repack low disk")
+            .expect("report present");
+
+        assert!(
+            report.artifacts.len() >= 2,
+            "600KB objects must not fit into one 1MB slice: {}",
+            report.artifacts.len()
+        );
+        assert_eq!(report.objects_packed, 4);
+        assert_eq!(
+            report
+                .artifacts
+                .iter()
+                .map(|artifact| artifact.objects_packed)
+                .sum::<usize>(),
+            report.objects_packed,
+            "per-artifact object counts must add up to the aggregate counter"
+        );
+        assert_eq!(
+            report
+                .artifacts
+                .iter()
+                .map(|artifact| artifact.pack_bytes)
+                .sum::<u64>(),
+            report.total_pack_bytes,
+            "per-artifact pack bytes must add up to the aggregate counter"
+        );
+        assert_eq!(report.artifacts[0].pack_oid, report.pack_oid);
+        assert_eq!(report.artifacts[0].idx_oid, report.idx_oid);
+        assert_eq!(report.artifacts[0].pack_bytes, report.pack_bytes);
+        let last = report.artifacts.last().expect("last artifact");
+        assert_ne!(
+            last.pack_oid, report.pack_oid,
+            "scalar pack fields describe the first published pack"
+        );
+        assert_eq!(scan_loose_objects(&git_dir).expect("scan after").len(), 0);
     }
 }

@@ -3,7 +3,7 @@
 //! Architecture Role: Dispatches `taxis unarchive`, providing in-place tail-truncating archive
 //!   extraction for ZIP and TAR archives, and forward hole-punching for TAR.GZ archives.
 //! Dependencies & Triggers: Dispatched by `taxis unarchive` / `taxis extract`.
-//! Responsibilities: CLI option parsing, preflight SpacePlan simulation, journal recovery, and execution reporting.
+//! Responsibilities: Preflight SpacePlan simulation, journal recovery, execution reporting; option parsing lives in `unarchive_options`.
 //! Exit Semantics & Design Rationale:
 //!   - Preflight SpacePlan check prevents ENOSPC disk exhaustion.
 //!   - Supports `--dry-run` to visualize the trough water-level curve before modifying any bytes.
@@ -19,7 +19,6 @@ use std::path::{Path, PathBuf};
 
 use fg_algorithms::space_plan::{
     check_headroom, simulate_space_plan, ExtractionUnit, SpacePlanConfig, SpacePlanReport,
-    DEFAULT_SAFETY_HEADROOM_BYTES,
 };
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{current_unix_seconds, FileMode, GitSignature};
@@ -39,33 +38,9 @@ use fg_topology::DiskRefStore;
 use fractal_git::constants::cli::CliTag;
 use serde_json::json;
 
-use super::common::{
-    fail_fatal, fail_io, fail_usage, parse_byte_size, print_json, reject, CliContext,
-};
+use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
-
-/// Options for `taxis unarchive`.
-#[derive(Debug, Clone)]
-pub struct UnarchiveOptions {
-    /// Path to the archive file (.zip, .tar, .tar.gz, .tgz, .bundle).
-    pub archive_path: PathBuf,
-    /// Destination directory.
-    pub dest_dir: PathBuf,
-    /// Whether to perform in-place tail truncation / hole punching (default: true).
-    pub in_place: bool,
-    /// Only simulate and display water-level projection without modifying disk.
-    pub dry_run: bool,
-    /// Safety headroom threshold in bytes.
-    pub safety_headroom_bytes: u64,
-    /// Batch window size in bytes.
-    pub batch_window_bytes: Option<u64>,
-    /// Direct ingestion to CAS ODB without worktree materialization.
-    pub to_odb: bool,
-    /// Target branch name for `--to-odb` mode.
-    pub branch: Option<String>,
-    /// Only construct and output the root tree OID (no commit or ref update).
-    pub tree_only: bool,
-}
+use super::unarchive_options::{parse_unarchive_options, print_unarchive_help, UnarchiveOptions};
 
 /// Formats byte counts into human-readable strings (MB, GB).
 fn format_bytes(bytes: u64) -> String {
@@ -181,123 +156,6 @@ fn parse_df_available_bytes(path: &Path) -> FractalResult<u64> {
         "cannot parse available space from df output for '{}'",
         path.display()
     ))))
-}
-
-/// Prints usage and options help for `taxis unarchive`.
-pub fn print_unarchive_help() {
-    println!(
-        "Usage: taxis unarchive <archive-path> [options]\n\n\
-         In-place, memory-efficient archive extractor with preflight disk headroom verification.\n\n\
-         Arguments:\n\
-           <archive-path>              Path to archive file (.zip, .tar, .tar.gz, .tgz, .bundle)\n\n\
-         Options:\n\
-           -C, --dest, --target <dir>  Destination directory (default: current directory)\n\
-           --in-place                  Extract in-place with reverse tail-truncation (default)\n\
-           --no-in-place               Standard extraction without modifying source archive\n\
-           --dry-run                   Simulate SpacePlan discrete trough curve without modifying disk\n\
-           --headroom <size>           Safety headroom threshold (default: 50MB, e.g. \"100M\", \"1G\")\n\
-           --batch-window <size>       Batch window size for staged truncation (e.g. \"64M\")\n\
-           --to-odb                    Ingest directly into CAS ODB without worktree materialization\n\
-           --branch, --ref <name>      Target branch to advance in --to-odb mode (default: refs/heads/import-<timestamp>)\n\
-           --tree-only                 Only construct and output root tree OID in --to-odb mode\n\
-           -h, --help                  Show this help message"
-    );
-}
-
-/// Parses CLI options for `taxis unarchive`.
-fn parse_unarchive_options(args: &[String]) -> UnarchiveOptions {
-    if args.is_empty() {
-        fail_usage(
-            "taxis unarchive <archive-path> [-C <dest-dir>] [--dry-run] [--in-place] [--to-odb]",
-        );
-    }
-
-    let mut archive_path = None;
-    let mut dest_dir = None;
-    let mut in_place = true;
-    let mut dry_run = false;
-    let mut safety_headroom_bytes = DEFAULT_SAFETY_HEADROOM_BYTES;
-    let mut batch_window_bytes = None;
-    let mut to_odb = false;
-    let mut branch = None;
-    let mut tree_only = false;
-
-    let mut cursor = 0;
-    while cursor < args.len() {
-        match args[cursor].as_str() {
-            "-h" | "--help" | "help" => {
-                print_unarchive_help();
-                std::process::exit(0);
-            }
-            "-C" | "--dest" | "--target" if cursor + 1 < args.len() => {
-                dest_dir = Some(PathBuf::from(&args[cursor + 1]));
-                cursor += 2;
-            }
-            "--dry-run" => {
-                dry_run = true;
-                cursor += 1;
-            }
-            "--in-place" => {
-                in_place = true;
-                cursor += 1;
-            }
-            "--no-in-place" => {
-                in_place = false;
-                cursor += 1;
-            }
-            "--to-odb" => {
-                to_odb = true;
-                cursor += 1;
-            }
-            "--branch" | "--ref" if cursor + 1 < args.len() => {
-                branch = Some(args[cursor + 1].clone());
-                to_odb = true;
-                cursor += 2;
-            }
-            "--tree-only" => {
-                tree_only = true;
-                to_odb = true;
-                cursor += 1;
-            }
-            "--headroom" if cursor + 1 < args.len() => {
-                if let Some(headroom_bytes) = parse_byte_size(&args[cursor + 1]) {
-                    safety_headroom_bytes = headroom_bytes;
-                }
-                cursor += 2;
-            }
-            "--batch-window" if cursor + 1 < args.len() => {
-                if let Some(window_bytes) = parse_byte_size(&args[cursor + 1]) {
-                    batch_window_bytes = Some(window_bytes);
-                }
-                cursor += 2;
-            }
-            arg if !arg.starts_with('-') && archive_path.is_none() => {
-                archive_path = Some(PathBuf::from(arg));
-                cursor += 1;
-            }
-            other => {
-                fail_usage(format!("unknown option or unexpected argument: '{other}'"));
-            }
-        }
-    }
-
-    let archive = archive_path.unwrap_or_else(|| {
-        fail_usage("missing archive file operand");
-    });
-
-    let dest = dest_dir.unwrap_or_else(|| PathBuf::from("."));
-
-    UnarchiveOptions {
-        archive_path: archive,
-        dest_dir: dest,
-        in_place,
-        dry_run,
-        safety_headroom_bytes,
-        batch_window_bytes,
-        to_odb,
-        branch,
-        tree_only,
-    }
 }
 
 /// Dispatches `taxis unarchive`.
@@ -437,6 +295,10 @@ pub fn handle_unarchive(ctx: &CliContext) {
         initial_archive_len: file_len,
     });
 
+    // Forward .tar.gz extraction reports punched (sparse) bytes instead of tail-truncated bytes;
+    // keep that distinction visible in the summary instead of folding it into truncation counters.
+    let mut hole_punched_bytes: Option<u64> = None;
+
     let result = if profile.is_zip {
         if opts.in_place {
             extract_zip_in_place(&opts.archive_path, &opts.dest_dir, &config)
@@ -455,6 +317,10 @@ pub fn handle_unarchive(ctx: &CliContext) {
             &opts.dest_dir,
             config.batch_window_bytes,
         )
+        .map(|report| {
+            hole_punched_bytes = Some(report.hole_punched_bytes);
+            report.into_extraction_report()
+        })
     } else {
         extract_tar_standard(&opts.archive_path, &opts.dest_dir)
     };
@@ -471,6 +337,7 @@ pub fn handle_unarchive(ctx: &CliContext) {
                     "files_extracted": report.files_extracted,
                     "total_extracted_bytes": report.total_extracted_bytes,
                     "total_truncated_bytes": report.total_truncated_bytes,
+                    "hole_punched_bytes": hole_punched_bytes,
                     "final_archive_len": report.final_archive_len,
                 }));
             } else {
@@ -480,15 +347,22 @@ pub fn handle_unarchive(ctx: &CliContext) {
                     opts.archive_path.display(),
                     format_bytes(report.total_extracted_bytes)
                 );
-                if opts.in_place {
-                    println!(
-                        "Reclaimed {} of disk space via tail-truncation.",
-                        format_bytes(report.total_truncated_bytes)
-                    );
-                } else {
+                if !opts.in_place {
                     println!(
                         "Source archive retained intact ({}, {} truncated).",
                         format_bytes(report.final_archive_len),
+                        format_bytes(report.total_truncated_bytes)
+                    );
+                } else if let Some(punched) = hole_punched_bytes {
+                    println!(
+                        "Reclaimed {} of disk space via forward hole punching; archive retained \
+                         at {} (sparse).",
+                        format_bytes(punched),
+                        format_bytes(report.final_archive_len)
+                    );
+                } else {
+                    println!(
+                        "Reclaimed {} of disk space via tail-truncation.",
                         format_bytes(report.total_truncated_bytes)
                     );
                 }

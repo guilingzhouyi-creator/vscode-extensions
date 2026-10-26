@@ -133,7 +133,7 @@ pub fn handle_log(ctx: &CliContext) {
 /// Git's --all means "pretend every ref is listed on the command line", so tags are peeled to the
 /// commits they point at and refs that name trees or blobs contribute nothing. HEAD is added even
 /// when it is detached, because a detached checkout is still a tip git log --all shows.
-fn collect_all_starts(view: &RepoView) -> FractalResult<Vec<Oid>> {
+pub(crate) fn collect_all_starts(view: &RepoView) -> FractalResult<Vec<Oid>> {
     let references = DiskRefStore::new(view.git_dir()).list_all()?;
     let mut starts: Vec<Oid> = Vec::new();
     let mut seen: HashSet<Oid> = HashSet::new();

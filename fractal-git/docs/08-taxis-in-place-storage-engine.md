@@ -62,7 +62,8 @@ flowchart TD
 - **[`InPlaceBundleConsumer`](../crates/fg-storage/src/in_place/bundle_consumer.rs#L29-L133)**：
   - 吞噬 Git Bundle v2 并生成 `.pack` 与 `.idx`：默认完整保留源 Bundle，仅在 `--in-place` 显式要求下校验尾部 SHA-1 后才截断。
 - **`RepackEngine::repack_repository_low_disk`**：
-  - 微分型包递进轮转（Micro-Pack Slicing，默认 64MB~256MB），每生成并验证一个微包即刻物理删除对应的 Loose Objects，根治低磁盘 GC 死锁。
+  - 微分型包递进轮转（Micro-Pack Slicing，切片上限默认 64MB（`RepackOptions::micro_pack_bytes`），`--micro-pack` 可调、下限 1M），每生成并验证一个微包即刻物理删除对应的 Loose Objects，根治低磁盘 GC 死锁。
+  - 报告口径：`artifacts` 依发布顺序列出全部 pack/idx 对；`total_pack_bytes` 为全部已发布包的累计字节；标量 `pack_oid`/`idx_oid`/`pack_bytes` 指向首个已发布包并与 `artifacts[0]` 严格一致（单包时二者等价）。
 
 ---
 
@@ -79,7 +80,7 @@ taxis unarchive archive.zip --dest ./output
 # 标准解压：正序只读解包，源归档字节保持原样
 taxis unarchive archive.zip --dest ./output --no-in-place
 
-# 针对 .tar.gz 使用前向打洞稀疏化
+# 针对 .tar.gz 使用前向打洞稀疏化（逻辑长度不变，报告单列 hole_punched_bytes）
 taxis unarchive archive.tar.gz --dest ./output --batch-window 32M
 
 # 直通 CAS 对象库 (ODB) 模式：跳过工作区落盘，直接写入 Loose Objects 并组装 Commit
@@ -94,6 +95,7 @@ taxis unarchive repo-export.zip --to-odb --tree-only
 | 选项组合 | 源归档 | 工作区 | 其余副作用 |
 | :--- | :--- | :--- | :--- |
 | 默认（`--in-place`） | 逆向截断至 0 | 落盘解包 | WAL 记录于目标目录 |
+| 默认（`--in-place`，`.tar.gz`/`.tgz`） | 前向打洞稀疏化，逻辑长度不变 | 落盘解包 | WAL 记录于目标目录；`total_truncated_bytes` 恒为 0 |
 | `--no-in-place` | 只读，字节不变 | 落盘解包 | 无截断 |
 | `--dry-run` | 只读 | 不创建 | 不写 ODB、不更新 ref、不截断 |
 | `--to-odb` | 随 `--in-place`（默认截断） | 不创建 | 写 Loose Objects 并推进分支 |
@@ -101,6 +103,10 @@ taxis unarchive repo-export.zip --to-odb --tree-only
 
 - 自由空间探测失败一律 fail-closed（拒绝执行），绝不退化为乐观常量。
 - 预审 `check_headroom` 在创建目标目录之前执行，因此被拒绝的命令不会留下空目录。
+- `--headroom` / `--batch-window` 接受 `K`/`M`/`G`/`T` 二进制后缀（1024 进制）或裸字节数；空值、非整数、未知单位与 `u64` 溢出一律按用法错误（退出码 129）拒绝，不再静默回退默认值。
+- 安全冗余默认值单源于 `DEFAULT_SAFETY_HEADROOM_BYTES`（100 MiB = 104857600 字节），帮助文本由该常量渲染，杜绝帮助文案与实现漂移。
+- 前向打洞路径的 `final_archive_len` 取实测文件长度，`total_truncated_bytes` 为 0，打洞释放量单列于 `hole_punched_bytes`，不得把打洞字节计入尾部截断。
+- WAL 打开前按需创建目标目录及其缺失祖先目录（`mkdir -p` 语义），因此 `-C out/nested` 指向尚不存在的目录时不会暴露裸 `os error 3`。
 
 ### 2. `taxis bundle unbundle`
 ```bash
@@ -120,3 +126,5 @@ taxis repack --low-disk --micro-pack 64M
 ```
 
 `--micro-pack` 接受 `64M` / `512K` / 裸字节数三种写法，下限 1M，默认 64M；未知选项按用法错误（退出码 129）拒绝，不再静默忽略。
+
+`--low-disk` 报告与 `fg-storage::repack::RepackReport` 同口径：JSON 的 `pack_count` 为已发布包数，`artifacts` 逐包列出 `pack_oid`/`idx_oid`/`objects_packed`/`pack_bytes`，`total_pack_bytes` 为全部包累计字节；顶层 `pack_oid`/`idx_oid`/`pack_bytes` 始终描述首个包。多包时文本报告额外输出 `Micro-Packs` 行。

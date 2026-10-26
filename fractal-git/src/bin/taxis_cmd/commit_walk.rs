@@ -149,15 +149,15 @@ fn parse_offset(text: &str) -> i32 {
 
 /// Parses a commit payload into a record.
 ///
+/// Headers are scanned as bytes so a message written in a declared legacy encoding does not make the
+/// whole commit unreadable; only the header lines themselves must be UTF-8, which Git guarantees for
+/// the structural fields. The body is decoded according to its `encoding` header.
+///
 /// # Errors
 ///
-/// Returns [`FractalError::ObjectCodec`] when the payload is not UTF-8, has no `tree` header, or
-/// carries a malformed `parent` or `author` line.
+/// Returns [`FractalError::ObjectCodec`] when a header line is not UTF-8, there is no `tree`
+/// header, or a `parent` / `tree` value is not a valid object id.
 pub fn parse_commit_record(oid: Oid, payload: &[u8]) -> FractalResult<CommitRecord> {
-    let text = std::str::from_utf8(payload).map_err(|utf_err| {
-        FractalError::ObjectCodec(format!("commit payload is not UTF-8: {utf_err}"))
-    })?;
-
     let mut tree: Option<Oid> = None;
     let mut parents: Vec<Oid> = Vec::new();
     let mut author = Signature {
@@ -167,33 +167,50 @@ pub fn parse_commit_record(oid: Oid, payload: &[u8]) -> FractalResult<CommitReco
         offset_minutes: 0,
     };
     let mut committer = author.clone();
-    let mut body_offset = text.len();
+    let mut encoding: Option<String> = None;
+    let mut body_start = payload.len();
+    let mut cursor = 0usize;
 
-    for (offset, line) in line_offsets(text) {
-        if line.is_empty() {
-            body_offset = offset + 1;
+    while cursor < payload.len() {
+        let line_end = payload[cursor..]
+            .iter()
+            .position(|&byte| byte == b'\n')
+            .map_or(payload.len(), |relative| cursor + relative);
+        let raw_line = &payload[cursor..line_end];
+        let next = if line_end < payload.len() {
+            line_end + 1
+        } else {
+            payload.len()
+        };
+        if raw_line.is_empty() {
+            body_start = next;
             break;
         }
+        let line = std::str::from_utf8(raw_line).map_err(|utf_err| {
+            FractalError::ObjectCodec(format!(
+                "commit {} header is not UTF-8: {utf_err}",
+                oid.to_hex()
+            ))
+        })?;
+        let line = line.trim_end_matches('\r');
         if let Some(value) = line.strip_prefix("tree ") {
             tree = Some(Oid::from_hex(value.trim())?);
-            continue;
-        }
-        if let Some(value) = line.strip_prefix("parent ") {
+        } else if let Some(value) = line.strip_prefix("parent ") {
             parents.push(Oid::from_hex(value.trim())?);
-            continue;
-        }
-        if let Some(value) = line.strip_prefix("author ") {
+        } else if let Some(value) = line.strip_prefix("author ") {
             author = parse_signature(value);
-            continue;
-        }
-        if let Some(value) = line.strip_prefix("committer ") {
+        } else if let Some(value) = line.strip_prefix("committer ") {
             committer = parse_signature(value);
+        } else if let Some(value) = line.strip_prefix("encoding ") {
+            encoding = Some(value.trim().to_string());
         }
+        cursor = next;
     }
 
     let tree = tree.ok_or_else(|| {
         FractalError::ObjectCodec(format!("commit {} has no 'tree' header", oid.to_hex()))
     })?;
+    let message = decode_commit_message(&payload[body_start..], encoding.as_deref())?;
     Ok(CommitRecord {
         oid,
         tree,
@@ -206,18 +223,31 @@ pub fn parse_commit_record(oid: Oid, payload: &[u8]) -> FractalResult<CommitReco
         committer_mailbox: committer.mailbox,
         committer_time: committer.time,
         committer_offset_minutes: committer.offset_minutes,
-        message: text[body_offset..].to_string(),
+        message,
     })
 }
 
-/// Yields `(byte offset, line)` pairs for every header line.
-fn line_offsets(text: &str) -> impl Iterator<Item = (usize, &str)> {
-    let mut offset = 0usize;
-    text.split('\n').map(move |line| {
-        let current = offset;
-        offset += line.len() + 1;
-        (current, line.trim_end_matches('\r'))
-    })
+/// Decodes a commit message body according to its `encoding` header.
+///
+/// Git stores the message in the encoding it was written in and recodes it when printing, so a
+/// commit written as ISO-8859-1 must still render as UTF-8. An encoding this build does not know
+/// falls back to lossy UTF-8: one legacy commit should not make the whole history unreadable.
+fn decode_commit_message(body: &[u8], encoding: Option<&str>) -> FractalResult<String> {
+    let declared = encoding.unwrap_or("UTF-8");
+    if declared.eq_ignore_ascii_case("iso-8859-1")
+        || declared.eq_ignore_ascii_case("iso8859-1")
+        || declared.eq_ignore_ascii_case("latin1")
+    {
+        return Ok(body.iter().map(|&byte| char::from(byte)).collect());
+    }
+    if declared.eq_ignore_ascii_case("utf-8") || declared.eq_ignore_ascii_case("utf8") {
+        return std::str::from_utf8(body)
+            .map(str::to_string)
+            .map_err(|utf_err| {
+                FractalError::ObjectCodec(format!("commit message is not valid UTF-8: {utf_err}"))
+            });
+    }
+    Ok(String::from_utf8_lossy(body).into_owned())
 }
 
 /// Walks every commit reachable from starts and returns them in Git's date order.

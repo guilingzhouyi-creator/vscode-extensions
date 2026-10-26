@@ -208,8 +208,6 @@ fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &C
             "branch": name,
             "target": target_oid.to_hex(),
         }));
-    } else {
-        println!("Created branch '{}' at {}", name, &target_oid.to_hex()[..8]);
     }
 }
 
@@ -357,8 +355,6 @@ fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &
             "old": effective_old,
             "new": new_name,
         }));
-    } else {
-        println!("Renamed branch '{}' to '{}'.", effective_old, new_name);
     }
 }
 

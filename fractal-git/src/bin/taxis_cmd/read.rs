@@ -26,7 +26,9 @@ use fractal_git::constants::cli::CliTag;
 
 use std::path::Path;
 
-use super::common::{fail_fatal, fail_usage, print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_usage, print_json, reject, CliContext, EXIT_REJECTED};
+pub use super::read_cat_file::handle_cat_file;
+use super::read_cat_file::{object_kind_of, well_formed_object_name};
 use super::repo_view::RepoView;
 
 /// NUL byte, used as the record separator in every `-z` form.
@@ -38,210 +40,6 @@ const NUL: u8 = 0;
 /// then a TAB before the name. Printing `<id> <name>` instead drops the type column and shifts the
 /// separator, so every line differs from Git's even though both list the same references.
 const DEFAULT_FOR_EACH_REF_FORMAT: &str = "%(objectname) %(objecttype)\t%(refname)";
-
-/// Dispatches `cat-file`.
-///
-/// Accepted forms: `cat-file -t <rev>`, `cat-file -s <rev>`, `cat-file -p <rev>`,
-/// `cat-file -e <rev>`, `cat-file <type> <rev>`, and the streaming forms `cat-file --batch` and
-/// `cat-file --batch-check`. A custom `--batch=<format>` is rejected rather than approximated: the
-/// placeholder language is broad, and a wrong column is worse than a clear refusal.
-pub fn handle_cat_file(ctx: &CliContext) {
-    let view = match RepoView::open(ctx) {
-        Ok(opened) => opened,
-        Err(open_err) => fail_fatal(open_err),
-    };
-
-    let mut mode = CatFileMode::Pretty;
-    let mut expect_type: Option<String> = None;
-    let mut revision: Option<String> = None;
-    let mut batch: Option<BatchMode> = None;
-    for argument in &ctx.args {
-        match argument.as_str() {
-            "-t" => mode = CatFileMode::Type,
-            "-s" => mode = CatFileMode::Size,
-            "-p" => mode = CatFileMode::Pretty,
-            "-e" => mode = CatFileMode::Exists,
-            "--batch" => batch = Some(BatchMode::Contents),
-            "--batch-check" => batch = Some(BatchMode::Check),
-            other if other.starts_with("--batch=") => reject(
-                CliTag::ERROR,
-                format!("cat-file does not implement the custom batch format in '{other}'"),
-            ),
-            other if other.starts_with('-') => reject(
-                CliTag::ERROR,
-                format!("cat-file does not support the flag '{other}'"),
-            ),
-            other => {
-                if revision.is_none() && is_object_type_name(other) {
-                    expect_type = Some(other.to_string());
-                } else if revision.is_none() {
-                    revision = Some(other.to_string());
-                } else {
-                    reject(
-                        CliTag::ERROR,
-                        format!("cat-file accepts one revision, got a second: '{other}'"),
-                    );
-                }
-            }
-        }
-    }
-
-    if let Some(batch_mode) = batch {
-        run_batch(&view, batch_mode);
-    }
-
-    let revision = match revision {
-        Some(value) => value,
-        None => fail_usage("taxis cat-file (-t | -s | -p | -e) <object>"),
-    };
-    let resolved = match view.resolve(&revision) {
-        Ok(oid) => oid,
-        Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
-    };
-    let object = match view.object(&resolved) {
-        Ok(found) => found,
-        Err(read_err) => reject(CliTag::ERROR, read_err),
-    };
-
-    if let Some(expected) = expect_type {
-        if expected != object.kind.as_str() {
-            reject(
-                CliTag::ERROR,
-                format!(
-                    "{} is a {}, not a {}",
-                    resolved.to_hex(),
-                    object.kind.as_str(),
-                    expected
-                ),
-            );
-        }
-    }
-
-    if ctx.json_mode {
-        let payload = serde_json::json!({
-            "engine": "taxis",
-            "operation": "cat-file",
-            "oid": resolved.to_hex(),
-            "type": object.kind.as_str(),
-            "size": object.payload.len(),
-            "payload": String::from_utf8_lossy(&object.payload),
-        });
-        print_json(&payload);
-        return;
-    }
-
-    match mode {
-        CatFileMode::Type => println!("{}", object.kind.as_str()),
-        CatFileMode::Size => println!("{}", object.payload.len()),
-        CatFileMode::Exists => {}
-        CatFileMode::Pretty => print_payload(object.kind, &object.payload),
-    }
-}
-
-/// What a `cat-file` invocation asked to be printed.
-enum CatFileMode {
-    /// Object type only.
-    Type,
-    /// Payload length only.
-    Size,
-    /// Full payload.
-    Pretty,
-    /// Nothing; only the exit status matters.
-    Exists,
-}
-
-/// Which batch answer `cat-file` streams for each stdin line.
-enum BatchMode {
-    /// `--batch`: id, type, size, then the payload.
-    Contents,
-    /// `--batch-check`: id, type, and size only.
-    Check,
-}
-
-/// Streams batch answers for every revision read from stdin.
-///
-/// Git keeps the process alive and answers line by line, reporting `<input> missing` for anything
-/// that does not resolve instead of failing the whole run. A one-shot lookup cannot express that: a
-/// caller feeding a hundred revisions expects ninety-nine answers and one diagnosis, not an abort.
-fn run_batch(view: &RepoView, mode: BatchMode) -> ! {
-    use std::io::{BufRead, Write};
-    let stdin = std::io::stdin();
-    let stdout = std::io::stdout();
-    let mut sink = stdout.lock();
-    for line in stdin.lock().lines() {
-        let Ok(line) = line else { break };
-        let request = line.trim();
-        if request.is_empty() {
-            continue;
-        }
-        let Ok(oid) = view.resolve(request) else {
-            let _ = writeln!(sink, "{request} missing");
-            continue;
-        };
-        let Ok(object) = view.object(&oid) else {
-            let _ = writeln!(sink, "{request} missing");
-            continue;
-        };
-        let _ = writeln!(
-            sink,
-            "{} {} {}",
-            oid.to_hex(),
-            object.kind.as_str(),
-            object.payload.len()
-        );
-        if matches!(mode, BatchMode::Contents) {
-            let _ = sink.write_all(&object.payload);
-            // Git always closes a batch payload with a newline, even when the payload already ends
-            // with one. That unconditional terminator is what lets a reader find the next header.
-            let _ = sink.write_all(b"\n");
-        }
-    }
-    let _ = sink.flush();
-    std::process::exit(0)
-}
-
-/// Reports whether `text` names one of the four object types.
-fn is_object_type_name(text: &str) -> bool {
-    matches!(text, "blob" | "tree" | "commit" | "tag")
-}
-
-/// Writes a payload to stdout, flattening a tree into its readable listing.
-///
-/// The payload is written verbatim, with no trailing newline added. `cat-file -p` output is compared
-/// byte-for-byte by callers that pipe it into a hash, and a single appended newline changes every
-/// such hash for every object whose content does not already end with one.
-fn print_payload(kind: ObjectKind, payload: &[u8]) {
-    if kind == ObjectKind::Tree {
-        for entry in GitTreeRef::from_bytes(payload).iter() {
-            match entry {
-                Ok(item) => println!(
-                    "{:06o} {} {}\t{}",
-                    item.mode.to_u32(),
-                    object_kind_of(item.mode).as_str(),
-                    item.oid.to_hex(),
-                    item.name
-                ),
-                Err(codec_err) => reject(CliTag::ERROR, codec_err),
-            }
-        }
-        return;
-    }
-    use std::io::Write;
-    let mut sink = std::io::stdout();
-    let _ = sink.write_all(payload);
-    let _ = sink.flush();
-}
-
-/// Maps a tree entry mode to the object kind it references.
-fn object_kind_of(mode: fg_core::models::FileMode) -> ObjectKind {
-    if mode.is_tree() {
-        ObjectKind::Tree
-    } else if mode == fg_core::models::FileMode::Gitlink {
-        ObjectKind::Commit
-    } else {
-        ObjectKind::Blob
-    }
-}
 
 /// Dispatches `ls-tree`.
 ///
@@ -259,7 +57,7 @@ pub fn handle_ls_tree(ctx: &CliContext) {
     let mut name_only = false;
     let mut nul_terminated = false;
     let mut revision: Option<String> = None;
-    let mut path_filter: Option<String> = None;
+    let mut paths: Vec<String> = Vec::new();
 
     for argument in &ctx.args {
         match argument.as_str() {
@@ -276,8 +74,8 @@ pub fn handle_ls_tree(ctx: &CliContext) {
             other => {
                 if revision.is_none() {
                     revision = Some(other.to_string());
-                } else if path_filter.is_none() {
-                    path_filter = Some(other.trim_end_matches('/').to_string());
+                } else {
+                    paths.push(other.to_string());
                 }
             }
         }
@@ -309,19 +107,26 @@ pub fn handle_ls_tree(ctx: &CliContext) {
     };
     let (_, tree_oid) = match view.resolve_tree(&revision) {
         Ok(pair) => pair,
-        Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
+        Err(_) => ls_tree_target_failure(&view, &revision),
     };
 
     let mut rows: Vec<TreeRow> = Vec::new();
-    if let Err(walk_err) = walk_tree(
-        &view,
-        &tree_oid,
-        "",
-        visibility,
-        path_filter.as_deref(),
-        &mut rows,
-    ) {
-        reject(CliTag::ERROR, walk_err);
+    if paths.is_empty() {
+        if let Err(walk_err) = collect_tree_rows(&view, &tree_oid, "", visibility, &mut rows) {
+            reject(CliTag::ERROR, walk_err);
+        }
+    } else {
+        for spec in &paths {
+            if let Err(walk_err) =
+                collect_path_rows(&view, &tree_oid, spec, visibility, include_trees, &mut rows)
+            {
+                reject(CliTag::ERROR, walk_err);
+            }
+        }
+        // Merged listings are re-sorted into tree order: Git emits one order no matter how many
+        // path arguments were given or in what order, and duplicate paths are printed once.
+        rows.sort_by_cached_key(tree_order_key);
+        rows.dedup_by(|left, right| left.path == right.path);
     }
 
     if ctx.json_mode {
@@ -364,6 +169,20 @@ pub fn handle_ls_tree(ctx: &CliContext) {
     }
 }
 
+/// Terminates the way Git does when an `ls-tree` tree-ish does not produce a tree.
+///
+/// Git separates two failures that a single error value would merge: a name it cannot turn into an
+/// object at all is reported as "Not a valid object name" (128), while a name it can resolve to a
+/// blob, a tag of a blob, or an absent well-formed id is reported as "not a tree object" (128).
+/// Scripts assert on the status, but the distinction is what tells a typo from a wrong argument
+/// kind, so both are reproduced here.
+fn ls_tree_target_failure(view: &RepoView, revision: &str) -> ! {
+    if well_formed_object_name(revision) || view.resolve_object_spec(revision).is_ok() {
+        fail_fatal("not a tree object");
+    }
+    fail_fatal(format!("Not a valid object name {revision}"))
+}
+
 /// One `ls-tree` output row.
 struct TreeRow {
     mode: u32,
@@ -399,13 +218,12 @@ impl TreeVisibility {
     }
 }
 
-/// Walks a tree, appending rows in Git's ordering.
-fn walk_tree(
+/// Collects every row a whole-tree listing prints, in Git's canonical order.
+fn collect_tree_rows(
     view: &RepoView,
     tree_oid: &Oid,
     prefix: &str,
     visibility: TreeVisibility,
-    filter: Option<&str>,
     rows: &mut Vec<TreeRow>,
 ) -> FractalResult<()> {
     let object = view.object(tree_oid)?;
@@ -417,11 +235,6 @@ fn walk_tree(
             format!("{prefix}/{}", entry.name)
         };
         let kind = object_kind_of(entry.mode);
-        let included =
-            filter.is_none_or(|target| path == target || path.starts_with(&format!("{target}/")));
-        if !included {
-            continue;
-        }
         if kind == ObjectKind::Tree {
             if visibility.shows(kind) {
                 rows.push(TreeRow {
@@ -432,7 +245,7 @@ fn walk_tree(
                 });
             }
             if visibility.recursive {
-                walk_tree(view, &entry.oid, &path, visibility, filter, rows)?;
+                collect_tree_rows(view, &entry.oid, &path, visibility, rows)?;
             }
             continue;
         }
@@ -447,6 +260,99 @@ fn walk_tree(
         });
     }
     Ok(())
+}
+
+/// Resolves one `ls-tree` path argument and collects the rows it selects.
+///
+/// A trailing slash is not cosmetic: `a` names the tree entry itself, while `a/` names what it
+/// contains. Resolving the argument component by component is what keeps a missing path silent
+/// instead of letting a prefix filter list the root tree under a name that does not exist.
+fn collect_path_rows(
+    view: &RepoView,
+    root_oid: &Oid,
+    spec: &str,
+    visibility: TreeVisibility,
+    explicit_trees: bool,
+    rows: &mut Vec<TreeRow>,
+) -> FractalResult<()> {
+    let lists_contents = spec.ends_with('/');
+    let trimmed = spec.trim_end_matches('/');
+    let segments: Vec<&str> = trimmed
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect();
+    if segments.is_empty() {
+        return Ok(());
+    }
+    let mut current = *root_oid;
+    let mut path = String::new();
+    let mut leaf: Option<(u32, ObjectKind, Oid)> = None;
+    for (index, segment) in segments.iter().enumerate() {
+        let object = view.object(&current)?;
+        let Some(entry) = GitTreeRef::from_bytes(&object.payload).find_entry(segment)? else {
+            return Ok(());
+        };
+        if index == 0 {
+            path = entry.name.to_string();
+        } else {
+            path.push('/');
+            path.push_str(entry.name);
+        }
+        let kind = object_kind_of(entry.mode);
+        if index + 1 == segments.len() {
+            leaf = Some((entry.mode.to_u32(), kind, entry.oid));
+            break;
+        }
+        if kind != ObjectKind::Tree {
+            return Ok(());
+        }
+        current = entry.oid;
+    }
+    let Some((mode, kind, oid)) = leaf else {
+        return Ok(());
+    };
+    if lists_contents {
+        if kind != ObjectKind::Tree {
+            return Ok(());
+        }
+        // The directory named by a trailing-slash argument is only printed when -t asks for tree
+        // rows; without it Git lists the directory's contents and not the directory itself.
+        if explicit_trees {
+            rows.push(TreeRow {
+                mode,
+                kind,
+                oid,
+                path: path.clone(),
+            });
+        }
+        collect_tree_rows(view, &oid, &path, visibility, rows)?;
+        return Ok(());
+    }
+    if visibility.shows(kind) {
+        rows.push(TreeRow {
+            mode,
+            kind,
+            oid,
+            path: path.clone(),
+        });
+    }
+    if kind == ObjectKind::Tree && visibility.recursive {
+        collect_tree_rows(view, &oid, &path, visibility, rows)?;
+    }
+    Ok(())
+}
+
+/// Builds the byte key Git sorts tree entries by.
+///
+/// Git compares a directory name as if it ended with `/`, which keeps `a` before `a/b` while a
+/// blob named `a.txt` sorts between them; reusing that rule for merged listings keeps multi-path
+/// output in the same order as a single tree walk.
+fn tree_order_key(row: &TreeRow) -> Vec<u8> {
+    let mut key = row.path.as_bytes().to_vec();
+    if row.kind == ObjectKind::Tree {
+        key.push(b'/');
+    }
+    key
 }
 
 /// Writes one record, honouring the `-z` terminator.
@@ -623,14 +529,24 @@ fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
     refs.sort_by(|left, right| left.0.cmp(&right.0));
 
     if verify_only {
-        refs = verify_exact_refs(&refs, &patterns);
+        refs = verify_exact_refs(&view, &refs, &patterns);
     }
     if include_head {
         match view.head_commit() {
-            Ok(Some(head_oid)) => refs.insert(0, ("HEAD".to_string(), head_oid)),
+            Ok(Some(head_oid)) => {
+                // --verify HEAD already produced the row; inserting again would print it twice.
+                if !refs.iter().any(|(name, _)| name == "HEAD") {
+                    refs.insert(0, ("HEAD".to_string(), head_oid));
+                }
+            }
             Ok(None) => {}
             Err(head_err) => fail_fatal(head_err),
         }
+    }
+    if !verify_only && !is_for_each_ref && refs.is_empty() && !ctx.json_mode {
+        // Git exits 1 without printing when there is nothing to list, which is how scripts detect an
+        // empty repository without parsing output. for-each-ref stays successful on an empty repo.
+        std::process::exit(EXIT_REJECTED);
     }
 
     if ctx.json_mode {
@@ -695,15 +611,30 @@ fn reference_matches(name: &str, pattern: &str) -> bool {
 
 /// Restricts a listing to the references named exactly.
 ///
-/// `show-ref --verify` matches no patterns: the argument must be the full reference name. Git exits
-/// 128 with `not a valid ref` otherwise, and callers rely on that to tell a typo from an absent
-/// reference, so a prefix match here would report success for a name that does not exist.
-fn verify_exact_refs(refs: &[(String, Oid)], patterns: &[String]) -> Vec<(String, Oid)> {
+/// show-ref --verify matches no patterns: the argument must be the full reference name. Git exits
+/// 128 with "not a valid ref" otherwise, and callers rely on that to tell a typo from an absent
+/// reference, so a prefix match here would report success for a name that does not exist. HEAD is
+/// accepted as a pseudo-reference and resolves through the current branch.
+fn verify_exact_refs(
+    view: &RepoView,
+    refs: &[(String, Oid)],
+    patterns: &[String],
+) -> Vec<(String, Oid)> {
     if patterns.is_empty() {
-        fail_usage("taxis show-ref --verify [--head] [--] <ref>...");
+        // Git treats a bare `--verify` as a fatal usage error (128), not a command-line shape error
+        // (129); scripts distinguish the two when they assert on status alone.
+        fail_fatal("--verify requires a reference");
     }
     let mut verified = Vec::with_capacity(patterns.len());
     for pattern in patterns {
+        if pattern == "HEAD" {
+            match view.head_commit() {
+                Ok(Some(head_oid)) => verified.push(("HEAD".to_string(), head_oid)),
+                Ok(None) => fail_fatal("'HEAD' - not a valid ref"),
+                Err(head_err) => fail_fatal(head_err),
+            }
+            continue;
+        }
         match refs.iter().find(|(name, _)| name == pattern) {
             Some(found) => verified.push(found.clone()),
             None => fail_fatal(format!("'{pattern}' - not a valid ref")),
@@ -931,7 +862,7 @@ fn report_check_ignore_json(
 
 #[cfg(test)]
 mod tests {
-    use super::{is_object_type_name, reference_matches, render_ref_format};
+    use super::{reference_matches, render_ref_format};
     use fg_core::models::Oid;
 
     /// Renders a format template without opening a repository.
@@ -941,15 +872,6 @@ mod tests {
     /// integration test rather than a unit test of the formatter.
     fn render_ref_format_for_test(template: &str, name: &str, oid: &Oid) -> String {
         render_ref_format(template, name, oid, "commit").expect("render")
-    }
-
-    #[test]
-    fn recognises_the_four_object_type_names() {
-        for name in ["blob", "tree", "commit", "tag"] {
-            assert!(is_object_type_name(name));
-        }
-        assert!(!is_object_type_name("blobs"));
-        assert!(!is_object_type_name("HEAD"));
     }
 
     #[test]

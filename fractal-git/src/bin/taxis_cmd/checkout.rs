@@ -113,7 +113,34 @@ pub fn handle_checkout(ctx: &CliContext) {
         &[previous_head, target_commit.to_hex(), "1".to_string()],
     );
 
-    print_checkout_verdict(&opts, target_commit, effective_branch.as_deref());
+    let target_subject = view
+        .object(&target_commit)
+        .ok()
+        .and_then(|object| commit_subject(&object.payload));
+    print_checkout_verdict(
+        &opts,
+        target_commit,
+        effective_branch.as_deref(),
+        target_subject.as_deref(),
+    );
+}
+
+/// Extracts the subject line Git names in its detached-HEAD report.
+///
+/// The header block ends at the first blank line; the subject is the first non-empty line of what
+/// follows. A commit message in a legacy encoding is decoded lossily because this string is only
+/// ever shown to a human, never compared as data.
+fn commit_subject(payload: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(payload);
+    let body = text
+        .split_once("\n\n")
+        .map_or(text.as_ref(), |(_, body)| body);
+    let subject = body.lines().next().unwrap_or("").trim();
+    if subject.is_empty() {
+        None
+    } else {
+        Some(subject.to_string())
+    }
 }
 
 /// Parses command-line arguments into structured checkout options.
@@ -599,31 +626,30 @@ pub(crate) fn update_references(
     }
 }
 
-/// Prints formatted confirmation message upon checkout completion.
-fn print_checkout_verdict(opts: &CheckoutOptions, target_commit: Oid, branch_name: Option<&str>) {
-    if let Some(branch) = branch_name {
-        if opts.new_branch.is_some() {
-            println!(
-                "{} Switched to a new branch '{}' at {}",
-                CliTag::TAXIS_CHECKOUT,
-                branch,
-                target_commit.to_hex()
-            );
-        } else {
-            println!(
-                "{} Switched to branch '{}' ({})",
-                CliTag::TAXIS_CHECKOUT,
-                branch,
-                target_commit.to_hex()
-            );
+/// Prints the confirmation Git writes to stderr after a successful checkout.
+///
+/// Git keeps stdout empty so a caller that captures it (`dir=$(git checkout -b b)`) never picks up
+/// a human sentence. The detached form reports the new commit as "HEAD is now at <short> <subject>";
+/// the longer detached-HEAD advice paragraph is suppressed here because Git only prints it once per
+/// repository and its exact wording depends on the advice.* configuration.
+fn print_checkout_verdict(
+    opts: &CheckoutOptions,
+    target_commit: Oid,
+    branch_name: Option<&str>,
+    subject: Option<&str>,
+) {
+    match branch_name {
+        Some(branch) if opts.new_branch.is_some() => {
+            eprintln!("Switched to a new branch '{branch}'");
         }
-    } else {
-        println!(
-            "{} Note: switching to '{}'. You are in 'detached HEAD' state at {}.",
-            CliTag::TAXIS_CHECKOUT,
-            opts.target,
-            target_commit.to_hex()
-        );
+        Some(branch) => eprintln!("Switched to branch '{branch}'"),
+        None => {
+            let short = &target_commit.to_hex()[..7];
+            match subject {
+                Some(subject) => eprintln!("HEAD is now at {short} {subject}"),
+                None => eprintln!("HEAD is now at {short}"),
+            }
+        }
     }
 }
 

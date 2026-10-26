@@ -124,3 +124,18 @@ pub fn fail_usage(detail: impl Display) -> ! {
     eprintln!("usage: {}", detail);
     std::process::exit(EXIT_USAGE)
 }
+
+/// Reports Git's "ambiguous argument" fatal for a revision that does not resolve.
+///
+/// Git prints this three-line block whenever a revision cannot be turned into an object id and the
+/// argument could also be a path; scripts match on the 128 status, and the `--` hint is the only
+/// guidance the user gets for disambiguating. Emitting the whole block here keeps the wording in
+/// one place instead of repeating it in every command that resolves revisions.
+pub fn fatal_ambiguous_argument(revision: impl Display) -> ! {
+    eprintln!(
+        "fatal: ambiguous argument '{revision}': unknown revision or path not in the working tree."
+    );
+    eprintln!("Use '--' to separate paths from revisions, like this:");
+    eprintln!("'git <command> [<revision>...] -- [<file>...]'");
+    std::process::exit(EXIT_FATAL)
+}
