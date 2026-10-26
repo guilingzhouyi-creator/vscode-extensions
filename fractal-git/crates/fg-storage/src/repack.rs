@@ -75,7 +75,7 @@ pub struct RepackArtifact {
 ///
 /// Low-disk mode publishes one artifact per micro-pack slice, so the aggregate counters
 /// ([`Self::objects_packed`], [`Self::objects_verified`], [`Self::total_pack_bytes`]) cover every
-/// published pack while the legacy single-pack fields describe the *first* published pack and are
+/// published pack while the single-pack projection fields describe the *first* published pack and
 /// kept in lockstep with `artifacts[0]` for existing callers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepackReport {

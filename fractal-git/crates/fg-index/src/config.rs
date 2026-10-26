@@ -903,7 +903,7 @@ mod tests {
     /// Creates a unique scratch directory inside the workspace tmp tree.
     ///
     /// The host temporary directory is not writable for every runner, and MSYS style shells hand
-    /// native processes a POSIX style TEMP that Windows resolves against the current drive root, so
+    /// native processes a POSIX style scratch variable that Windows resolves against the drive root,
     /// scratch fixtures stay under the workspace exactly like the differential suite does.
     fn scratch_root(name: &str) -> std::path::PathBuf {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));

@@ -321,41 +321,57 @@ fn plan_reference_updates(
     let mut advanced: Vec<(String, Oid)> = Vec::new();
 
     for (oid, bundle_name) in references {
-        let mut targets: Vec<(String, Option<Oid>)> = Vec::new();
-        if bundle_name == "HEAD" {
-            match &head_state {
-                HeadState::Symbolic(target_name) => {
-                    targets.push((target_name.clone(), read_ref_oid(git_dir, target_name)?));
-                }
-                HeadState::Detached(current_oid) => {
-                    targets.push(("HEAD".to_string(), Some(*current_oid)));
-                }
-                HeadState::Absent => targets.push(("HEAD".to_string(), None)),
-            }
-        } else {
-            validate_ref_name(bundle_name)?;
-            targets.push((bundle_name.clone(), read_ref_oid(git_dir, bundle_name)?));
-        }
-
-        for (target, expected_old) in targets {
-            match planned.iter().find(|update| update.target == target) {
-                Some(existing) if existing.new_oid != *oid => {
-                    return Err(FractalError::CorruptStore(format!(
-                        "bundle advances reference '{target}' to two different objects"
-                    )));
-                }
-                Some(_) => {}
-                None => planned.push(BundleRefUpdate {
-                    target,
-                    expected_old,
-                    new_oid: *oid,
-                }),
-            }
-        }
+        let (target, expected_old) = resolve_reference_target(git_dir, &head_state, bundle_name)?;
+        record_reference_update(&mut planned, target, expected_old, *oid)?;
         advanced.push((bundle_name.clone(), *oid));
     }
 
     Ok((planned, advanced))
+}
+
+/// Resolves one bundle reference entry to its repository ref name and prior value.
+///
+/// The returned name borrows from whichever input owns it: symbolic HEAD targets come from the
+/// loaded head state, every other ref name comes straight from the bundle header.
+fn resolve_reference_target<'a>(
+    git_dir: &Path,
+    head_state: &'a HeadState,
+    bundle_name: &'a str,
+) -> FractalResult<(&'a str, Option<Oid>)> {
+    if bundle_name != "HEAD" {
+        validate_ref_name(bundle_name)?;
+        return Ok((bundle_name, read_ref_oid(git_dir, bundle_name)?));
+    }
+    match head_state {
+        HeadState::Symbolic(target_name) => {
+            Ok((target_name.as_str(), read_ref_oid(git_dir, target_name)?))
+        }
+        HeadState::Detached(current_oid) => Ok(("HEAD", Some(*current_oid))),
+        HeadState::Absent => Ok(("HEAD", None)),
+    }
+}
+
+/// Records one planned reference advance, rejecting two distinct objects for one ref.
+fn record_reference_update(
+    planned: &mut Vec<BundleRefUpdate>,
+    target: &str,
+    expected_old: Option<Oid>,
+    new_oid: Oid,
+) -> FractalResult<()> {
+    match planned.iter().find(|update| update.target == target) {
+        Some(existing) if existing.new_oid != new_oid => Err(FractalError::CorruptStore(format!(
+            "bundle advances reference '{target}' to two different objects"
+        ))),
+        Some(_) => Ok(()),
+        None => {
+            planned.push(BundleRefUpdate {
+                target: target.to_string(),
+                expected_old,
+                new_oid,
+            });
+            Ok(())
+        }
+    }
 }
 
 /// Reads the repository HEAD into a typed state.
