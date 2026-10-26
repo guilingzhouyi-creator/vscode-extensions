@@ -144,7 +144,7 @@ fn query_available_free_space(target_path: &Path) -> FractalResult<u64> {
             return Ok(free_bytes);
         }
 
-        return Err(FractalError::Io(std::io::Error::last_os_error()));
+        Err(FractalError::Io(std::io::Error::last_os_error()))
     }
 
     #[cfg(not(windows))]
