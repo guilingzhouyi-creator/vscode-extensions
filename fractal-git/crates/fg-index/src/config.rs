@@ -13,9 +13,10 @@
 //!   - A failed write leaves the original config untouched: nothing is renamed until verification
 //!     passes, and every temporary file is removed on every error path.
 
+use std::ffi::OsString;
 use std::fmt;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use fg_core::models::ConflictPresentationMode;
 
@@ -220,38 +221,52 @@ impl Default for RepoConfig {
 }
 
 impl RepoConfig {
-    /// Reads the repository's config file, falling back to the defaults when it is absent.
+    /// Reads Git's configuration sequence: system, user, then the repository file.
+    ///
+    /// Git resolves core.autocrlf, core.filemode and conflict.mode from a merge of those layers,
+    /// so reading <git_dir>/config alone misreads a clean CRLF worktree as dirty whenever the
+    /// user's ~/.gitconfig sets core.autocrlf = true.
     pub fn load(git_dir: &Path) -> Self {
-        let text = match std::fs::read_to_string(git_dir.join("config")) {
-            Ok(found) => found,
-            Err(_) => return Self::default(),
-        };
-        Self::parse(&text)
+        Self::load_with_layers(git_dir, &config_layers(git_dir))
+    }
+
+    /// Loads the listed files in order, expanding include.path in place.
+    fn load_with_layers(git_dir: &Path, layers: &[PathBuf]) -> Self {
+        let mut config = Self::default();
+        let mut include_stack = Vec::new();
+        for path in layers {
+            apply_config_file(path, git_dir, 0, &mut include_stack, &mut config);
+        }
+        config
     }
 
     /// Parses config text, honouring modelled keys.
     pub fn parse(text: &str) -> Self {
         let mut config = Self::default();
         for entry in collect_entries(&parse_file(text)) {
-            let key = entry.key();
-            match (key.section(), key.subsection(), key.name()) {
-                ("core", None, "filemode") => {
-                    config.trust_executable_bit = parse_bool(entry.value()).unwrap_or(true);
-                }
-                ("core", None, "autocrlf") => {
-                    config.auto_crlf = parse_autocrlf(entry.value());
-                }
-                ("conflict", None, "mode") => {
-                    if let Some(text) = entry.value() {
-                        if let Some(mode) = ConflictPresentationMode::parse_str(text) {
-                            config.conflict_mode = mode;
-                        }
-                    }
-                }
-                _ => {}
-            }
+            config.apply_entry(entry.key(), entry.value());
         }
         config
+    }
+
+    /// Applies one entry; a later occurrence overrides an earlier one exactly as Git does.
+    fn apply_entry(&mut self, key: &ConfigKey, value: Option<&str>) {
+        match (key.section(), key.subsection(), key.name()) {
+            ("core", None, "filemode") => {
+                self.trust_executable_bit = parse_bool(value).unwrap_or(true);
+            }
+            ("core", None, "autocrlf") => {
+                self.auto_crlf = parse_autocrlf(value);
+            }
+            ("conflict", None, "mode") => {
+                if let Some(text) = value {
+                    if let Some(mode) = ConflictPresentationMode::parse_str(text) {
+                        self.conflict_mode = mode;
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Reports whether an executable-bit difference between the index and the worktree is a change.
@@ -268,6 +283,298 @@ impl RepoConfig {
     pub fn conflict_mode(&self) -> ConflictPresentationMode {
         self.conflict_mode
     }
+}
+
+/// Maximum include.path nesting this layer follows before ignoring further files.
+const MAX_INCLUDE_DEPTH: usize = 10;
+
+/// Files Git consults before the repository config, in ascending precedence.
+fn config_layers(git_dir: &Path) -> Vec<PathBuf> {
+    let mut layers = system_config_paths();
+    layers.extend(user_config_paths());
+    layers.push(git_dir.join("config"));
+    layers
+}
+
+/// System-wide configuration candidates, honouring Git's environment overrides.
+fn system_config_paths() -> Vec<PathBuf> {
+    if environment_flag("GIT_CONFIG_NOSYSTEM") {
+        return Vec::new();
+    }
+    if let Some(explicit) = std::env::var_os("GIT_CONFIG_SYSTEM") {
+        return explicit_file(explicit).into_iter().collect();
+    }
+    let mut candidates = Vec::new();
+    if cfg!(windows) {
+        for variable in ["PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"] {
+            let Some(root) = std::env::var_os(variable) else {
+                continue;
+            };
+            let root = PathBuf::from(root);
+            candidates.push(root.join("Git").join("etc").join("gitconfig"));
+            candidates.push(
+                root.join("Programs")
+                    .join("Git")
+                    .join("etc")
+                    .join("gitconfig"),
+            );
+        }
+    } else {
+        candidates.push(PathBuf::from("/etc/gitconfig"));
+    }
+    candidates
+}
+
+/// User configuration candidates: the XDG file first, then ~/.gitconfig.
+fn user_config_paths() -> Vec<PathBuf> {
+    if let Some(explicit) = std::env::var_os("GIT_CONFIG_GLOBAL") {
+        return explicit_file(explicit).into_iter().collect();
+    }
+    let mut paths = Vec::new();
+    if let Some(xdg) = xdg_config_home() {
+        paths.push(xdg.join("git").join("config"));
+    }
+    if let Some(home) = home_dir() {
+        paths.push(home.join(".gitconfig"));
+    }
+    paths
+}
+
+/// Reads one Git boolean environment flag using Git's git_env_bool truth table.
+///
+/// Presence alone is not enough: Git treats 0, false, no and off as "unset", so checking
+/// only whether the variable exists would disable the system layer for a caller that asked
+/// for it to stay enabled.
+fn environment_flag(name: &str) -> bool {
+    match std::env::var_os(name) {
+        Some(value) => {
+            let text = value.to_string_lossy().to_ascii_lowercase();
+            matches!(text.as_str(), "true" | "yes" | "on" | "1")
+        }
+        None => false,
+    }
+}
+
+/// Converts an environment path variable, treating an empty value as unset.
+fn explicit_file(value: OsString) -> Option<PathBuf> {
+    (!value.is_empty()).then_some(PathBuf::from(value))
+}
+
+/// Returns the user's home directory, preferring Git's POSIX variable.
+fn home_dir() -> Option<PathBuf> {
+    ["HOME", "USERPROFILE"]
+        .iter()
+        .find_map(std::env::var_os)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+/// Returns the XDG configuration root, which defaults to ~/.config.
+fn xdg_config_home() -> Option<PathBuf> {
+    match std::env::var_os("XDG_CONFIG_HOME") {
+        Some(value) if !value.is_empty() => Some(PathBuf::from(value)),
+        Some(_) => None,
+        None => home_dir().map(|home| home.join(".config")),
+    }
+}
+
+/// Applies one file, expanding includes and stopping a cycle or an over-deep chain.
+fn apply_config_file(
+    path: &Path,
+    git_dir: &Path,
+    depth: usize,
+    include_stack: &mut Vec<PathBuf>,
+    config: &mut RepoConfig,
+) {
+    if depth > MAX_INCLUDE_DEPTH {
+        return;
+    }
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return;
+    };
+    let identity = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    if include_stack.contains(&identity) {
+        return;
+    }
+    include_stack.push(identity);
+    for entry in collect_entries(&parse_file(&text)) {
+        match included_path(entry.key(), entry.value(), path, git_dir) {
+            Some(included) => {
+                apply_config_file(&included, git_dir, depth + 1, include_stack, config);
+            }
+            None => config.apply_entry(entry.key(), entry.value()),
+        }
+    }
+    include_stack.pop();
+}
+
+/// Resolves the file named by an include entry, or None when the entry is an ordinary setting.
+fn included_path(
+    key: &ConfigKey,
+    value: Option<&str>,
+    from: &Path,
+    git_dir: &Path,
+) -> Option<PathBuf> {
+    let value = value?;
+    if key.name() != "path" {
+        return None;
+    }
+    match (key.section(), key.subsection()) {
+        ("include", None) => resolve_include(value, from),
+        ("includeif", Some(condition)) => {
+            include_condition(condition, from, git_dir).then(|| resolve_include(value, from))?
+        }
+        _ => None,
+    }
+}
+
+/// Evaluates the condition of an includeIf entry.
+fn include_condition(condition: &str, from: &Path, git_dir: &Path) -> bool {
+    match condition.split_once(':') {
+        Some((kind, pattern)) if kind.eq_ignore_ascii_case("gitdir") => {
+            gitdir_matches(pattern, from, git_dir, false)
+        }
+        Some((kind, pattern)) if kind.eq_ignore_ascii_case("gitdir/i") => {
+            gitdir_matches(pattern, from, git_dir, true)
+        }
+        _ => false,
+    }
+}
+
+/// Resolves an include target relative to the including file, expanding a leading tilde.
+fn resolve_include(value: &str, from: &Path) -> Option<PathBuf> {
+    let expanded = expand_home(value.trim());
+    if expanded.is_empty() {
+        return None;
+    }
+    let path = PathBuf::from(expanded);
+    Some(if path.is_absolute() {
+        path
+    } else {
+        from.parent().unwrap_or(Path::new(".")).join(path)
+    })
+}
+
+/// Matches a gitdir includeIf pattern against the repository's Git directory.
+fn gitdir_matches(pattern: &str, from: &Path, git_dir: &Path, ignore_case: bool) -> bool {
+    let pattern = expand_home(pattern.trim());
+    let pattern_path = if let Some(relative) = pattern.strip_prefix("./") {
+        from.parent().unwrap_or(Path::new(".")).join(relative)
+    } else {
+        PathBuf::from(&pattern)
+    };
+    let pattern_text = normalize_glob_text(&pattern_path);
+    let anchored = pattern_text.starts_with('/') || has_windows_prefix(&pattern_text);
+    let mut candidates = vec![if anchored {
+        pattern_text.clone()
+    } else {
+        format!("**/{pattern_text}")
+    }];
+    if pattern_text.ends_with('/') {
+        if let Some(last) = candidates.last_mut() {
+            last.push_str("**");
+        }
+    }
+    let mut location = normalize_glob_text(git_dir);
+    if ignore_case {
+        location = location.to_ascii_lowercase();
+        candidates = candidates
+            .into_iter()
+            .map(|candidate| candidate.to_ascii_lowercase())
+            .collect();
+    }
+    let locations = [location.clone(), format!("{location}/")];
+    candidates.iter().any(|candidate| {
+        locations
+            .iter()
+            .any(|location| glob_matches(candidate, location))
+    })
+}
+
+/// Reports whether normalized text starts with a drive prefix such as C:/.
+fn has_windows_prefix(text: &str) -> bool {
+    let mut characters = text.chars();
+    matches!(
+        (characters.next(), characters.next()),
+        (Some(letter), Some(':')) if letter.is_ascii_alphabetic()
+    )
+}
+
+/// Expands a leading tilde to the user's home directory.
+fn expand_home(text: &str) -> String {
+    if text == "~" {
+        return home_dir().map_or_else(|| text.to_string(), |home| normalize_glob_text(&home));
+    }
+    let Some(rest) = text.strip_prefix("~/") else {
+        return text.to_string();
+    };
+    match home_dir() {
+        Some(home) => format!("{}/{}", normalize_glob_text(&home), rest),
+        None => text.to_string(),
+    }
+}
+
+/// Normalizes a path into Git's forward-slash spelling for pattern comparison.
+fn normalize_glob_text(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
+/// Matches text against a glob where double-star spans separators and star stays in one segment.
+fn glob_matches(pattern: &str, text: &str) -> bool {
+    let pattern_chars: Vec<char> = pattern.chars().collect();
+    let text_chars: Vec<char> = text.chars().collect();
+    let length = text_chars.len();
+    let mut reachable = vec![false; length + 1];
+    reachable[0] = true;
+    let mut index = 0usize;
+    while index < pattern_chars.len() {
+        let pattern_char = pattern_chars[index];
+        let mut next = vec![false; length + 1];
+        if pattern_char == '*' && pattern_chars.get(index + 1) == Some(&'*') {
+            index += 2;
+            while pattern_chars.get(index) == Some(&'*') {
+                index += 1;
+            }
+            let mut active = false;
+            for offset in 0..=length {
+                active |= reachable[offset];
+                next[offset] = active;
+            }
+            if pattern_chars.get(index) == Some(&'/') {
+                index += 1;
+            }
+        } else {
+            match pattern_char {
+                '*' => {
+                    let mut active = false;
+                    for offset in 0..=length {
+                        active |= reachable[offset];
+                        next[offset] = active;
+                        if offset < length && text_chars[offset] == '/' {
+                            active = false;
+                        }
+                    }
+                }
+                '?' => {
+                    for offset in 0..length {
+                        if reachable[offset] && text_chars[offset] != '/' {
+                            next[offset + 1] = true;
+                        }
+                    }
+                }
+                literal => {
+                    for offset in 0..length {
+                        if reachable[offset] && text_chars[offset] == literal {
+                            next[offset + 1] = true;
+                        }
+                    }
+                }
+            }
+            index += 1;
+        }
+        reachable = next;
+    }
+    reachable[length]
 }
 
 /// Reads every entry in path, in file order; a missing file is empty rather than an error.
@@ -592,5 +899,96 @@ mod tests {
             .filter(|line| matches!(line.kind, ParsedKind::Entry { .. }))
             .count();
         assert_eq!(kinds, 2);
+    }
+    /// Creates a unique scratch directory inside the workspace tmp tree.
+    ///
+    /// The host temporary directory is not writable for every runner, and MSYS style shells hand
+    /// native processes a POSIX style TEMP that Windows resolves against the current drive root, so
+    /// scratch fixtures stay under the workspace exactly like the differential suite does.
+    fn scratch_root(name: &str) -> std::path::PathBuf {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let workspace_root = manifest_dir
+            .ancestors()
+            .nth(3)
+            .expect("the crate lives three levels below the workspace root");
+        let base = workspace_root.join("tmp").join("fg-index-config");
+        let _ = std::fs::create_dir_all(&base);
+        let root = base.join(format!("{}-{name}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("scratch directory");
+        root
+    }
+
+    fn write_fixture(path: &std::path::Path, contents: &str) {
+        std::fs::write(path, contents).expect("fixture file");
+    }
+
+    #[test]
+    fn later_layers_override_earlier_ones() {
+        let root = scratch_root("layers");
+        let base = root.join("base");
+        let overlay = root.join("overlay");
+        let local = root.join("repository-config");
+        write_fixture(&base, "[core]\n\tautocrlf = input\n\tfilemode = true\n");
+        write_fixture(&overlay, "[core]\n\tautocrlf = false\n");
+        write_fixture(&local, "[core]\n\tfilemode = false\n");
+        let config = RepoConfig::load_with_layers(&root.join("git"), &[base, overlay, local]);
+        assert_eq!(config.auto_crlf(), AutoCrlf::False);
+        assert!(!config.trust_executable_bit());
+    }
+
+    #[test]
+    fn missing_layers_keep_the_compiled_in_defaults() {
+        let root = scratch_root("missing");
+        let config = RepoConfig::load_with_layers(&root.join("git"), &[root.join("absent")]);
+        assert_eq!(config.auto_crlf(), AutoCrlf::False);
+        assert!(config.trust_executable_bit());
+    }
+
+    #[test]
+    fn include_path_expands_relative_to_the_including_file() {
+        let root = scratch_root("include");
+        let included = root.join("crlf.cfg");
+        let local = root.join("config");
+        write_fixture(&included, "[core]\n\tautocrlf = true\n");
+        write_fixture(&local, "[include]\n\tpath = crlf.cfg\n");
+        let config = RepoConfig::load_with_layers(&root.join("git"), &[local]);
+        assert_eq!(config.auto_crlf(), AutoCrlf::True);
+    }
+
+    #[test]
+    fn include_cycles_terminate_and_apply_each_file_once() {
+        let root = scratch_root("cycle");
+        let first = root.join("first");
+        let second = root.join("second");
+        write_fixture(
+            &first,
+            "[include]\n\tpath = second\n[core]\n\tfilemode = false\n",
+        );
+        write_fixture(
+            &second,
+            "[include]\n\tpath = first\n[core]\n\tautocrlf = true\n",
+        );
+        let config = RepoConfig::load_with_layers(&root.join("git"), &[first]);
+        assert_eq!(config.auto_crlf(), AutoCrlf::True);
+        assert!(!config.trust_executable_bit());
+    }
+
+    #[test]
+    fn include_if_gitdir_matches_the_repository_directory() {
+        let root = scratch_root("includeif");
+        let included = root.join("matched.cfg");
+        let local = root.join("config");
+        write_fixture(&included, "[core]\n\tautocrlf = true\n");
+        let pattern = root.join("repo/").to_string_lossy().replace('\\', "/");
+        write_fixture(
+            &local,
+            &format!("[includeIf \"gitdir:{pattern}\"]\n\tpath = matched.cfg\n"),
+        );
+        let matched =
+            RepoConfig::load_with_layers(&root.join("repo/.git"), std::slice::from_ref(&local));
+        assert_eq!(matched.auto_crlf(), AutoCrlf::True);
+        let unmatched = RepoConfig::load_with_layers(&root.join("other/.git"), &[local]);
+        assert_eq!(unmatched.auto_crlf(), AutoCrlf::False);
     }
 }

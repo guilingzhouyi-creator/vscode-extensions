@@ -13,7 +13,7 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-TOP-001`: DAG topology traversal guard
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{CommitCounter, CommitTelemetryConfig, FractalRef, Oid, TelemetryCommitNode};
@@ -28,6 +28,9 @@ pub fn handle_rev_list(ctx: &CliContext) {
     let mut all_transient = false;
     let mut telemetry = false;
     let mut limit: Option<usize> = None;
+    let mut includes: Vec<String> = Vec::new();
+    let mut excludes: Vec<String> = Vec::new();
+    let mut negate_following = false;
 
     let mut cursor = 0usize;
     while cursor < ctx.args.len() {
@@ -37,6 +40,7 @@ pub fn handle_rev_list(ctx: &CliContext) {
             "--count" => count_only = true,
             "--all-transient" => all_transient = true,
             "--telemetry" => telemetry = true,
+            "--not" => negate_following = !negate_following,
             "-n" => match ctx.args.get(cursor) {
                 Some(text) => match text.parse::<usize>() {
                     Ok(parsed) => {
@@ -83,7 +87,7 @@ pub fn handle_rev_list(ctx: &CliContext) {
                     ),
                 }
             }
-            _ => {}
+            spec => classify_revision(spec, negate_following, &mut includes, &mut excludes),
         }
     }
 
@@ -110,10 +114,35 @@ pub fn handle_rev_list(ctx: &CliContext) {
         Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
     };
 
-    let records = match walk_commits(&view, &[head]) {
+    // Git treats a bare revision list as "everything reachable from these tips"; with no tips at
+    // all it falls back to HEAD, which this command has always used as its default walk start.
+    let include_oids = resolve_revisions(&view, &includes, "included");
+    let exclude_oids = resolve_revisions(&view, &excludes, "excluded");
+    let starts = if include_oids.is_empty() {
+        vec![head]
+    } else {
+        include_oids
+    };
+
+    let walked = match walk_commits(&view, &starts) {
         Ok(walked) => walked,
         Err(walk_err) => reject(CliTag::ERROR, walk_err),
     };
+    // A commit reachable from any exclude tip is subtracted from the answer, exactly like Git's
+    // ^rev / --not form. Excludes are walked on their own so the subtraction stays set-based.
+    let excluded_oids: HashSet<Oid> = if exclude_oids.is_empty() {
+        HashSet::new()
+    } else {
+        match walk_commits(&view, &exclude_oids) {
+            Ok(excluded) => excluded.into_iter().map(|record| record.oid).collect(),
+            Err(walk_err) => reject(CliTag::ERROR, walk_err),
+        }
+    };
+    let records: Vec<_> = walked
+        .into_iter()
+        .filter(|record| !excluded_oids.contains(&record.oid))
+        .collect();
+
     let node_index: HashMap<Oid, TelemetryCommitNode> = records
         .iter()
         .map(|record| (record.oid, record.to_telemetry_node()))
@@ -127,8 +156,11 @@ pub fn handle_rev_list(ctx: &CliContext) {
     };
 
     if count_only {
+        // Git counts the commits it would print, so -n caps the reported total too.
+        let reachable = limit.map_or(records.len(), |cap| records.len().min(cap));
         if ctx.json_mode {
             let rev_payload = serde_json::json!({
+                "count": reachable,
                 "official_count": verdict.official_count,
                 "total_raw_commits": verdict.total_raw_commits,
                 "filtered_agent_commits": verdict.filtered_agent_commits,
@@ -136,7 +168,7 @@ pub fn handle_rev_list(ctx: &CliContext) {
             });
             print_json(&rev_payload);
         } else {
-            println!("{}", verdict.official_count);
+            println!("{reachable}");
         }
         return;
     }
@@ -160,4 +192,46 @@ pub fn handle_rev_list(ctx: &CliContext) {
         verdict.filtered_agent_commits,
         verdict.dual_trunk_active
     );
+}
+
+/// Classifies one positional revision specifier into the include or exclude side.
+///
+/// The explicit caret form and a preceding --not compose the way Git documents them: either one
+/// flips the side, so two negations cancel out.
+fn classify_revision(
+    spec: &str,
+    negate_following: bool,
+    includes: &mut Vec<String>,
+    excludes: &mut Vec<String>,
+) {
+    let (explicit_caret, name) = match spec.strip_prefix('^') {
+        Some(rest) => (true, rest),
+        None => (false, spec),
+    };
+    if name.is_empty() {
+        reject(
+            CliTag::ERROR,
+            format!("rev-list received an empty revision in '{spec}'"),
+        );
+    }
+    if explicit_caret ^ negate_following {
+        excludes.push(name.to_string());
+    } else {
+        includes.push(name.to_string());
+    }
+}
+
+/// Resolves revision specifiers through the shared RepoView resolver, reporting the failing side.
+fn resolve_revisions(view: &RepoView, specs: &[String], role: &str) -> Vec<Oid> {
+    let mut resolved = Vec::with_capacity(specs.len());
+    for spec in specs {
+        match view.resolve(spec) {
+            Ok(oid) => resolved.push(oid),
+            Err(resolve_err) => reject(
+                CliTag::ERROR,
+                format!("rev-list cannot resolve the {role} revision '{spec}': {resolve_err}"),
+            ),
+        }
+    }
+    resolved
 }

@@ -3,12 +3,14 @@
 //! Architecture Role: Walks the commit DAG straight from the object store, producing the telemetry
 //!   nodes `rev-list` counts and the ancestry order `log` would print.
 //! Dependencies & Triggers: Consumed by `rev-list`; replaces a former `git log` subprocess call.
-//! Responsibilities: Parent extraction, author-mailbox classification, and bounded breadth-first
+//! Responsibilities: Parent extraction, author-mailbox classification, and a bounded date-ordered
 //!   traversal with cycle detection.
 //! Exit Semantics & Design Rationale:
-//!   - Traversal is breadth-first from the start commits with a visited set. A commit graph is not
-//!     guaranteed acyclic by its bytes alone: a forged or hand-edited repository can name a child as
-//!     its own ancestor, and a recursive walk would not terminate.
+//!   - Traversal starts at the given tips with a visited set and lists a commit only once every
+//!     child reachable from those tips has been listed, breaking ties by committer date, which is
+//!     what git log --date-order promises. A commit graph is not guaranteed acyclic by its bytes
+//!     alone: a forged or hand-edited repository can name a child as its own ancestor, so the walk
+//!     keeps a visited set and lists any cycle-blocked commits in discovery order.
 //!   - A commit that cannot be read is an error, not a skipped node. Skipping it would under-count
 //!     history and make the anti-inflation model report a smaller repository than exists.
 //!   - Classification matches what the previous `git log --format` bridge derived: an agent mailbox
@@ -16,7 +18,7 @@
 //!     promotion merge. Keeping the definition identical means the counts are comparable across the
 //!     change rather than merely plausible.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;
@@ -218,26 +220,30 @@ fn line_offsets(text: &str) -> impl Iterator<Item = (usize, &str)> {
     })
 }
 
-/// Walks every commit reachable from `starts` and returns them in visit order.
+/// Walks every commit reachable from starts and returns them in Git's date order.
 ///
-/// The order is breadth-first from the start commits, which puts each commit after its children and
-/// is what a history listing wants. Sorting by author time instead would be wrong: a rebase rewrites
-/// author times and a merge can legitimately carry a parent newer than its child.
+/// The walk implements what git log --date-order promises: no commit is listed before one of its
+/// children, and among the commits that are free to be listed the newest committer timestamp wins,
+/// with ties broken by discovery order. A plain breadth-first walk gets the first property but not
+/// the second, so a merge side branch appeared in the wrong place; a plain newest-first queue gets
+/// the second but can list a parent before a child whose date is older.
 ///
 /// # Errors
 ///
-/// Returns [`FractalError::ObjectCodec`] when a reachable commit is missing or is not a commit, and
-/// refuses a traversal that exceeds [`MAX_WALK_COMMITS`].
+/// Returns FractalError::ObjectCodec when a reachable commit is missing or is not a commit, and
+/// refuses a traversal that exceeds MAX_WALK_COMMITS.
 pub fn walk_commits(view: &RepoView, starts: &[Oid]) -> FractalResult<Vec<CommitRecord>> {
-    let mut visited: HashSet<Oid> = HashSet::new();
+    let mut discovered: HashSet<Oid> = HashSet::new();
     let mut queue: VecDeque<Oid> = VecDeque::new();
     for start in starts {
-        if visited.insert(*start) {
+        if discovered.insert(*start) {
             queue.push_back(*start);
         }
     }
 
-    let mut records = Vec::new();
+    let mut records: HashMap<Oid, CommitRecord> = HashMap::new();
+    let mut child_count: HashMap<Oid, usize> = HashMap::new();
+    let mut discovery_order: Vec<Oid> = Vec::new();
     while let Some(oid) = queue.pop_front() {
         if records.len() >= MAX_WALK_COMMITS {
             return Err(FractalError::ObjectCodec(format!(
@@ -254,13 +260,92 @@ pub fn walk_commits(view: &RepoView, starts: &[Oid]) -> FractalResult<Vec<Commit
         }
         let record = parse_commit_record(oid, &object.payload)?;
         for parent in &record.parents {
-            if visited.insert(*parent) {
+            *child_count.entry(*parent).or_insert(0) += 1;
+            if discovered.insert(*parent) {
                 queue.push_back(*parent);
             }
         }
-        records.push(record);
+        discovery_order.push(oid);
+        records.insert(oid, record);
     }
-    Ok(records)
+
+    let mut order = Vec::with_capacity(records.len());
+    let mut ready: BinaryHeap<DateOrderKey> = BinaryHeap::new();
+    let mut sequence = 0usize;
+    for start in starts {
+        if child_count.get(start).copied().unwrap_or(0) == 0 {
+            enqueue_ready(*start, &records, &mut ready, &mut sequence);
+        }
+    }
+    let mut emitted: HashSet<Oid> = HashSet::new();
+    while let Some(key) = ready.pop() {
+        if !emitted.insert(key.oid) {
+            continue;
+        }
+        let Some(record) = records.get(&key.oid) else {
+            continue;
+        };
+        let parents = record.parents.clone();
+        order.push(record.clone());
+        for parent in &parents {
+            let remaining = child_count.entry(*parent).or_insert(0);
+            *remaining = remaining.saturating_sub(1);
+            if *remaining == 0 {
+                enqueue_ready(*parent, &records, &mut ready, &mut sequence);
+            }
+        }
+    }
+    // A forged or hand-edited history can contain a cycle, which leaves those commits permanently
+    // blocked. Listing them in discovery order keeps the walk total instead of dropping history.
+    for oid in &discovery_order {
+        if emitted.contains(oid) {
+            continue;
+        }
+        if let Some(record) = records.get(oid) {
+            order.push(record.clone());
+        }
+    }
+    Ok(order)
+}
+
+/// Orders commits the way git log --date-order does: newest commit date first, then discovery order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DateOrderKey {
+    committer_time: i64,
+    sequence: usize,
+    oid: Oid,
+}
+
+impl Ord for DateOrderKey {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.committer_time
+            .cmp(&other.committer_time)
+            .then_with(|| other.sequence.cmp(&self.sequence))
+    }
+}
+
+impl PartialOrd for DateOrderKey {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+/// Queues one commit for listing, remembering its discovery order as the tie breaker.
+fn enqueue_ready(
+    oid: Oid,
+    records: &HashMap<Oid, CommitRecord>,
+    ready: &mut BinaryHeap<DateOrderKey>,
+    sequence: &mut usize,
+) {
+    let Some(record) = records.get(&oid) else {
+        return;
+    };
+    ready.push(DateOrderKey {
+        committer_time: record.committer_time,
+        sequence: *sequence,
+        oid,
+    });
+    *sequence += 1;
 }
 
 #[cfg(test)]

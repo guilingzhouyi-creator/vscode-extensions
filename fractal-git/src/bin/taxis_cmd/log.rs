@@ -19,7 +19,11 @@
 //!   - `show` without a patch flag prints the patch, because that is what the command means. A
 //!     `--stat` request prints the summary instead; printing both would double-count the change.
 
+use std::collections::HashSet;
+
 use fg_core::error::{FractalError, FractalResult};
+use fg_core::models::{ObjectKind, Oid};
+use fg_topology::DiskRefStore;
 use fractal_git::constants::cli::CliTag;
 
 use super::commit_walk::{walk_commits, CommitRecord};
@@ -61,16 +65,35 @@ pub fn handle_log(ctx: &CliContext) {
         Err(open_err) => fail_fatal(open_err),
     };
 
-    let start = match view.resolve(&request.revision) {
-        Ok(oid) => oid,
-        Err(resolve_err) => {
-            eprintln!("{} {}", CliTag::ERROR, resolve_err);
-            std::process::exit(EXIT_NO_MATCH);
+    let records = if request.all {
+        let starts = match collect_all_starts(&view) {
+            Ok(starts) => starts,
+            Err(collect_err) => reject(CliTag::ERROR, collect_err),
+        };
+        // Git exits cleanly with no output when --all matches nothing, for example
+        // in a repository whose only branches are unborn.
+        if starts.is_empty() {
+            if ctx.json_mode {
+                report_log_json(&[], &request);
+            }
+            return;
         }
-    };
-    let records = match walk_commits(&view, &[start]) {
-        Ok(walked) => walked,
-        Err(walk_err) => reject(CliTag::ERROR, walk_err),
+        match walk_commits(&view, &starts) {
+            Ok(walked) => walked,
+            Err(walk_err) => reject(CliTag::ERROR, walk_err),
+        }
+    } else {
+        let start = match view.resolve(&request.revision) {
+            Ok(oid) => oid,
+            Err(resolve_err) => {
+                eprintln!("{} {}", CliTag::ERROR, resolve_err);
+                std::process::exit(EXIT_NO_MATCH);
+            }
+        };
+        match walk_commits(&view, &[start]) {
+            Ok(walked) => walked,
+            Err(walk_err) => reject(CliTag::ERROR, walk_err),
+        }
     };
     let shown = &records[..records.len().min(request.limit)];
     // The width is a property of the repository, not of the request, so it is resolved once and
@@ -105,10 +128,35 @@ pub fn handle_log(ctx: &CliContext) {
     }
 }
 
+/// Collects every commit tip reachable from the repository references for log --all.
+///
+/// Git's --all means "pretend every ref is listed on the command line", so tags are peeled to the
+/// commits they point at and refs that name trees or blobs contribute nothing. HEAD is added even
+/// when it is detached, because a detached checkout is still a tip git log --all shows.
+fn collect_all_starts(view: &RepoView) -> FractalResult<Vec<Oid>> {
+    let references = DiskRefStore::new(view.git_dir()).list_all()?;
+    let mut starts: Vec<Oid> = Vec::new();
+    let mut seen: HashSet<Oid> = HashSet::new();
+    for (_name, oid) in references {
+        let peeled = view.peel(&oid)?;
+        let object = view.object(&peeled)?;
+        if object.kind == ObjectKind::Commit && seen.insert(peeled) {
+            starts.push(peeled);
+        }
+    }
+    if let Some(head) = view.head_commit()? {
+        if seen.insert(head) {
+            starts.push(head);
+        }
+    }
+    Ok(starts)
+}
+
 /// One parsed `log` invocation.
 struct LogRequest {
     revision: String,
     limit: usize,
+    all: bool,
     oneline: bool,
     format: Option<String>,
 }
@@ -119,6 +167,7 @@ impl LogRequest {
         let mut request = Self {
             revision: "HEAD".to_string(),
             limit: DEFAULT_LOG_LIMIT,
+            all: false,
             oneline: false,
             format: None,
         };
@@ -128,7 +177,13 @@ impl LogRequest {
             cursor += 1;
             match argument {
                 "--oneline" => request.oneline = true,
-                "--all" => request.limit = usize::MAX,
+                "--all" => {
+                    // Git walks every ref here; it also lifts the interactive cap this
+                    // command applies to a bare log, because a history-wide request must
+                    // not truncate.
+                    request.all = true;
+                    request.limit = usize::MAX;
+                }
                 "--format" | "--pretty" => {
                     let value = args
                         .get(cursor)
