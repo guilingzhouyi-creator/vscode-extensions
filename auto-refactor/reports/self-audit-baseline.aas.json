@@ -2,69 +2,69 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-26T04:43:02.937Z",
+  "timestamp": "2026-10-26T04:55:41.401Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.19,
+    "score": 99.18,
     "grade": "A+",
-    "cai": 78.21,
+    "cai": 78.23,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.917,
       "averagePor": 0.083,
       "averageColumnDensity": 0.864,
-      "averageSpatialDensity": 0.44,
-      "averageMahalanobisDistance": 4.658,
+      "averageSpatialDensity": 0.441,
+      "averageMahalanobisDistance": 4.652,
       "averageFisherSimplexDistance": 0.097
     },
     "counts": {
-      "files": 761,
-      "total": 4006,
+      "files": 764,
+      "total": 4043,
       "errors": 0,
-      "warns": 3476,
+      "warns": 3513,
       "info": 530,
       "suppressed": 139
     }
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 98.22,
+    "architectureConsistency": 98.21,
     "semanticPurity": 98.46,
     "codeSecurity": 99.79,
-    "performanceEfficiency": 99.58,
-    "standardization": 83.36,
-    "modernity": 98.47,
-    "maintainability": 93.24,
-    "commentQuality": 99.87,
-    "duplication": 95.07,
+    "performanceEfficiency": 99.59,
+    "standardization": 83.34,
+    "modernity": 98.48,
+    "maintainability": 93.23,
+    "commentQuality": 99.84,
+    "duplication": 95.01,
     "techDebtRisk": 100
   },
   "bottlenecks": [
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 4020,
-      "count": 402
+      "loss": 4060,
+      "count": 406
     },
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 2970,
-      "count": 208
+      "loss": 3000,
+      "count": 210
     },
     {
       "rule": "metric",
       "dim": "architectureConsistency",
-      "loss": 2370,
-      "count": 237
+      "loss": 2380,
+      "count": 238
     },
     {
       "rule": "NAM-DEC-001",
       "dim": "architectureConsistency",
-      "loss": 2200,
-      "count": 220
+      "loss": 2220,
+      "count": 222
     },
     {
       "rule": "SIM-TRN-001",
@@ -75,24 +75,25 @@
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 1960,
-      "count": 196
+      "loss": 1970,
+      "count": 197
     },
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 1869,
-      "count": 623
+      "loss": 1893,
+      "count": 631
     },
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 1755,
-      "count": 351
+      "loss": 1770,
+      "count": 354
     }
   ],
   "topology": {
     "L1_CONTRACT": [
+      "src/core/ast/ast-prefix-radix-cache.ts",
       "src/core/cfg/types.ts",
       "src/core/governance/repo-archetype.ts",
       "src/core/native/native-types.ts",
@@ -109,6 +110,209 @@
     ]
   },
   "files": {
+    "src/core/ast/ast-prefix-radix-cache.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 479 >= warn threshold 400).",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        }
+      },
+      {
+        "line": 106,
+        "col": 18,
+        "rule": "NAM-DEC-001",
+        "sev": "WARN",
+        "msg": "Symbol 'AstPrefixRadixCacheOptions' exhibits excessive length (26 chars, 5 segments), indicating missing architectural encapsulation. Decompose into domain dir…",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Identifier 'AstPrefixRadixCacheOptions' has 26 chars (5 segments)."
+        }
+      },
+      {
+        "line": 138,
+        "col": 22,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 138,
+              "startCol": 22,
+              "endLine": 138,
+              "endCol": 32
+            },
+            "replacementText": "ROOT_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 185,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"stepChildNode\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface StepChildNodeOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 218,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"createNewRadixNode\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface CreateNewRadixNodeOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 219,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 187",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        }
+      },
+      {
+        "line": 307,
+        "col": 53,
+        "rule": "duplicate-literal",
+        "sev": "WARN",
+        "msg": "Literal 1000 is repeated 4 times in this file; extract it into a shared constant.",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 334,
+        "col": 59,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 10 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 334,
+              "startCol": 59,
+              "endLine": 334,
+              "endCol": 61
+            },
+            "replacementText": "DURATION_10MS"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 334,
+        "col": 65,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 10 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 334,
+              "startCol": 65,
+              "endLine": 334,
+              "endCol": 67
+            },
+            "replacementText": "DURATION_10MS"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 334,
+        "col": 30,
+        "rule": "NUM-PREC-001",
+        "sev": "WARN",
+        "msg": "Lossy precision rounding `Math.round(avgMatchedLines * 10) / 10` detected. Calculation path truncates to 0.1 precision or exhibits mismatched scaling.",
+        "fix": {
+          "action": "align_numeric_precision",
+          "template": "Math.round(val * 100) / 100 + 0",
+          "safeToAutomate": true
+        },
+        "verify": "node scripts/validate-dual-faced-presentation.js"
+      },
+      {
+        "line": 384,
+        "col": 36,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 32 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 384,
+              "startCol": 36,
+              "endLine": 384,
+              "endCol": 38
+            },
+            "replacementText": "CONST_32"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 390,
+        "col": 13,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'sliceRemainingContent' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle',…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 395,
+        "col": 55,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 10 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 395,
+              "startCol": 55,
+              "endLine": 395,
+              "endCol": 57
+            },
+            "replacementText": "DURATION_10MS"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 435,
+        "col": 23,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "Identifier 'item' is vague and uninformative; lacks domain context.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'item' with a domain-qualified identifier (e."
+        }
+      }
+    ],
     "src/core/cfg/types.ts": [
       {
         "line": 76,
@@ -7571,184 +7775,10 @@
           "action": "rename_identifier",
           "template": "Replace 'res' with a domain-qualified identifier (e."
         }
-      },
-      {
-        "line": 89,
-        "col": 15,
-        "rule": "NAM-VAG-001",
-        "sev": "WARN",
-        "msg": "Identifier 'res' is vague and uninformative; lacks domain context.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'res' with a domain-qualified identifier (e."
-        }
-      },
-      {
-        "line": 115,
-        "col": 15,
-        "rule": "NAM-VAG-001",
-        "sev": "WARN",
-        "msg": "Identifier 'res' is vague and uninformative; lacks domain context.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'res' with a domain-qualified identifier (e."
-        }
-      },
-      {
-        "line": 142,
-        "col": 9,
-        "rule": "NAM-SGL-001",
-        "sev": "WARN",
-        "msg": "Single-letter variable name 'i' hurts code readability.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        }
-      },
-      {
-        "line": 195,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 177",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
-      },
-      {
-        "line": 205,
-        "col": 62,
-        "rule": "duplicate-literal",
-        "sev": "WARN",
-        "msg": "Literal 3 is repeated 6 times in this file; extract it into a shared constant.",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 208,
-        "col": 49,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 208,
-              "startCol": 49,
-              "endLine": 208,
-              "endCol": 60
-            },
-            "replacementText": "BILINGUAL_TEXT"
-          },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 237,
-        "col": 12,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'profileSingleFile' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'ru…",
-        "fix": {
-          "action": "replace_token",
-          "template": "languageDistribution",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 261,
-        "col": 12,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'profileProject' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
-        "fix": {
-          "action": "replace_token",
-          "template": "projectCommentProfile",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 292,
-        "col": 51,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 292,
-              "startCol": 51,
-              "endLine": 292,
-              "endCol": 62
-            },
-            "replacementText": "BILINGUAL_TEXT"
-          },
-          "safeToAutomate": true
-        }
-      }
-    ],
-    "src/core/constants/rules-architecture.generated.ts": [
-      {
-        "line": 1,
-        "rule": "GOV-FIL-001",
-        "sev": "WARN",
-        "msg": "File `rules-architecture.generated.ts` violates standard `kebab-case` naming convention for typescript.",
-        "fix": {
-          "action": "refactor",
-          "template": "Rename file to kebab-case (e.g. `rules-architecture.generated.ts`)."
-        }
-      },
-      {
-        "line": 1,
-        "rule": "NAM-FIL-001",
-        "sev": "WARN",
-        "msg": "File name 'rules-architecture.generated.ts' violates strict kebab-case naming convention for TypeScript/JavaScript.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Rename file to 'rules-architecture.generated.ts'."
-        }
-      },
-      {
-        "line": 207,
-        "col": 14,
-        "rule": "NAM-JRG-002",
-        "sev": "WARN",
-        "msg": "Symbol or test identifier 'RULE_ARCH_TMP_001' contains transient construction jargon or milestone marker.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace transient process markers with semantic domain naming."
-        }
-      },
-      {
-        "line": 683,
-        "col": 19,
-        "rule": "duplicate-literal",
-        "sev": "WARN",
-        "msg": "Literal 'warning' is repeated 59 times in this file; extract it into a shared constant.",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": true
-        }
-      }
-    ],
-    "src/core/constants/rules-automation.generated.ts": [
-      {
-        "line": 1,
-        "rule": "GOV-FIL-001",
-        "sev": "WARN",
-        "msg": "File `rules-automation.generated.ts` violates standard `kebab-case` naming convention for typescript.",
-        "fix": {
-          "action": "refactor",
-          "template": "Rename file to kebab-case (e.g. `rules-automation.generated.ts`)."
-        }
       }
     ]
   },
-  "truncated": 2976,
+  "truncated": 3013,
   "notes": [
     "dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph"
   ]
