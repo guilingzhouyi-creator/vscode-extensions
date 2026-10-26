@@ -13,150 +13,36 @@
 //! - `FGT-PRF-001`: Resource recycling and zero-transient allocation guard
 //! - `FGT-COR-001`: Core error contract guard
 
-use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use fg_algorithms::space_plan::{
-    check_headroom, simulate_space_plan, ExtractionUnit, SpacePlanConfig, SpacePlanReport,
-};
-use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::{current_unix_seconds, FileMode, GitSignature};
+use fg_algorithms::space_plan::{check_headroom, SpacePlanConfig};
+use fg_core::models::{current_unix_seconds, FileMode, GitSignature, TaxisPolicy};
 use fg_core::traits::{OdbStore, RefStore};
+use fg_gate::commit_guard::CommitMessageGuard;
+use fg_gate::pre_receive::PreReceiveGuard;
 use fg_index::InMemoryIndexTree;
 use fg_object::GitCommit;
 use fg_storage::commit_materializer::{serialize_commit_payload, serialize_tree_payload};
 use fg_storage::in_place::{
-    extract_member_payload, extract_tar_in_place, extract_tar_standard,
-    extract_targz_forward_hole_punch, extract_zip_in_place, extract_zip_standard,
-    index_tar_archive, plan_tar_in_place, plan_zip_in_place, read_zip_central_directory,
-    read_zip_eocd, sanitize_relative_path, BundleConsumeOptions, InPlaceBundleConsumer,
-    InPlaceJournal, InPlaceLogEntry, TailTruncator,
+    extract_member_payload, extract_tar_in_place_with_journal, extract_tar_standard,
+    extract_targz_forward_hole_punch, extract_zip_in_place_with_journal, extract_zip_standard,
+    index_tar_archive, read_zip_central_directory, read_zip_eocd, sanitize_relative_path,
+    BundleConsumeOptions, InPlaceBundleConsumer, InPlaceJournal, InPlaceLogEntry, TailTruncator,
 };
 use fg_storage::loose::LooseOdb;
+use fg_topology::refs::FractalRef;
 use fg_topology::DiskRefStore;
 use fractal_git::constants::cli::CliTag;
 use serde_json::json;
 
-use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_io, find_arg_value, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 use super::unarchive_options::{parse_unarchive_options, print_unarchive_help, UnarchiveOptions};
-
-/// Formats byte counts into human-readable strings (MB, GB).
-fn format_bytes(bytes: u64) -> String {
-    if bytes >= 1024 * 1024 * 1024 {
-        format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
-    } else if bytes >= 1024 * 1024 {
-        format!("{:.2} MB", bytes as f64 / (1024.0 * 1024.0))
-    } else if bytes >= 1024 {
-        format!("{:.2} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{bytes} B")
-    }
-}
-
-/// Resolves an existing ancestor path whose volume can be probed for free space.
-///
-/// The destination directory may not exist yet (dry-run must create nothing), so the walk-up
-/// keeps the probe read-only while still naming the volume the extraction will actually land on.
-fn resolve_space_probe_path(target_path: &Path) -> PathBuf {
-    let mut candidate = if target_path.is_absolute() {
-        target_path.to_path_buf()
-    } else {
-        std::env::current_dir()
-            .map(|cwd| cwd.join(target_path))
-            .unwrap_or_else(|_| target_path.to_path_buf())
-    };
-    loop {
-        if candidate.exists() {
-            return candidate;
-        }
-        match candidate.parent() {
-            Some(parent) if parent != candidate => candidate = parent.to_path_buf(),
-            _ => return candidate,
-        }
-    }
-}
-
-/// Queries available free disk space on the volume housing `target_path`.
-///
-/// Fails closed: an undeterminable figure is surfaced as an error, never replaced by an
-/// optimistic constant, because the preflight headroom verdict would otherwise be fiction.
-fn query_available_free_space(target_path: &Path) -> FractalResult<u64> {
-    let probe_path = resolve_space_probe_path(target_path);
-
-    #[cfg(windows)]
-    {
-        use std::os::windows::ffi::OsStrExt;
-        #[link(name = "kernel32")]
-        extern "system" {
-            fn GetDiskFreeSpaceExW(
-                lpDirectoryName: *const u16,
-                lpFreeBytesAvailableToCaller: *mut u64,
-                lpTotalNumberOfBytes: *mut u64,
-                lpTotalNumberOfFreeBytes: *mut u64,
-            ) -> i32;
-        }
-
-        let mut wide: Vec<u16> = probe_path.as_os_str().encode_wide().collect();
-        wide.push(0);
-
-        let mut free_bytes: u64 = 0;
-        let mut total_bytes: u64 = 0;
-        let mut total_free: u64 = 0;
-
-        // SAFETY: `wide` is a valid NUL-terminated wide string buffer. Out-pointers point to stack u64 variables.
-        let status = unsafe {
-            GetDiskFreeSpaceExW(
-                wide.as_ptr(),
-                &mut free_bytes,
-                &mut total_bytes,
-                &mut total_free,
-            )
-        };
-
-        if status != 0 {
-            return Ok(free_bytes);
-        }
-
-        Err(FractalError::Io(std::io::Error::last_os_error()))
-    }
-
-    #[cfg(not(windows))]
-    {
-        parse_df_available_bytes(&probe_path)
-    }
-}
-
-/// Parses the available-block column of POSIX `df -P -k` output for `path`.
-#[cfg(not(windows))]
-fn parse_df_available_bytes(path: &Path) -> FractalResult<u64> {
-    let output = std::process::Command::new("df")
-        .arg("-Pk")
-        .arg(path)
-        .output()
-        .map_err(FractalError::Io)?;
-    if !output.status.success() {
-        return Err(FractalError::Io(std::io::Error::other(format!(
-            "df -Pk failed for '{}'",
-            path.display()
-        ))));
-    }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines().skip(1) {
-        let fields: Vec<&str> = line.split_whitespace().collect();
-        if fields.len() < 4 {
-            continue;
-        }
-        if let Ok(blocks) = fields[3].parse::<u64>() {
-            return Ok(blocks.saturating_mul(1024));
-        }
-    }
-    Err(FractalError::Io(std::io::Error::other(format!(
-        "cannot parse available space from df output for '{}'",
-        path.display()
-    ))))
-}
+use super::unarchive_space::{
+    build_preflight_plan, format_bytes, print_space_plan_projection, query_available_free_space,
+    ArchiveProfile,
+};
 
 /// Dispatches `taxis unarchive`.
 pub fn handle_unarchive(ctx: &CliContext) {
@@ -212,13 +98,22 @@ pub fn handle_unarchive(ctx: &CliContext) {
         config.batch_window_bytes = batch_win;
     }
 
-    let free_space = match query_available_free_space(&opts.dest_dir) {
+    let probe_dir = if opts.to_odb || is_bundle {
+        match RepoView::open(ctx) {
+            Ok(v) => v.git_dir().to_path_buf(),
+            Err(_) => PathBuf::from(".git"),
+        }
+    } else {
+        opts.dest_dir.clone()
+    };
+
+    let free_space = match query_available_free_space(&probe_dir) {
         Ok(bytes) => bytes,
         Err(err) => reject(
             CliTag::ERROR,
             format!(
-                "cannot determine free disk space for destination '{}' (fail-closed): {err}",
-                opts.dest_dir.display()
+                "cannot determine free disk space for probe path '{}' (fail-closed): {err}",
+                probe_dir.display()
             ),
         ),
     };
@@ -283,17 +178,42 @@ pub fn handle_unarchive(ctx: &CliContext) {
     }
 
     let journal_path = opts.dest_dir.join(".taxis_unarchive.wal");
-    let mut journal = match InPlaceJournal::open(&journal_path) {
-        Ok(j) => j,
-        Err(e) => fail_io("open extraction WAL journal", e),
+    let resume_state = if opts.in_place && journal_path.exists() {
+        match InPlaceJournal::replay(&journal_path) {
+            Ok(state) if !state.is_completed && !state.extracted_members.is_empty() => {
+                if !ctx.json_mode {
+                    println!(
+                        "Notice: Incomplete in-place extraction detected in WAL. Resuming session ({} members already extracted)...",
+                        state.extracted_members.len()
+                    );
+                }
+                Some(state)
+            }
+            _ => None,
+        }
+    } else {
+        None
     };
 
-    let _ = journal.append(&InPlaceLogEntry::SessionInit {
-        archive_path: opts.archive_path.display().to_string(),
-        target_path: opts.dest_dir.display().to_string(),
-        total_members: plan_report.steps.len(),
-        initial_archive_len: file_len,
-    });
+    let already_extracted = resume_state.as_ref().map(|s| &s.extracted_members);
+    let mut journal = if opts.in_place {
+        match InPlaceJournal::open(&journal_path) {
+            Ok(mut j) => {
+                if resume_state.is_none() {
+                    let _ = j.append(&InPlaceLogEntry::SessionInit {
+                        archive_path: opts.archive_path.display().to_string(),
+                        target_path: opts.dest_dir.display().to_string(),
+                        total_members: plan_report.steps.len(),
+                        initial_archive_len: file_len,
+                    });
+                }
+                Some(j)
+            }
+            Err(e) => fail_io("open extraction WAL journal", e),
+        }
+    } else {
+        None
+    };
 
     // Forward .tar.gz extraction reports punched (sparse) bytes instead of tail-truncated bytes;
     // keep that distinction visible in the summary instead of folding it into truncation counters.
@@ -301,13 +221,25 @@ pub fn handle_unarchive(ctx: &CliContext) {
 
     let result = if profile.is_zip {
         if opts.in_place {
-            extract_zip_in_place(&opts.archive_path, &opts.dest_dir, &config)
+            extract_zip_in_place_with_journal(
+                &opts.archive_path,
+                &opts.dest_dir,
+                &config,
+                journal.as_mut(),
+                already_extracted,
+            )
         } else {
             extract_zip_standard(&opts.archive_path, &opts.dest_dir)
         }
     } else if profile.is_tar {
         if opts.in_place {
-            extract_tar_in_place(&opts.archive_path, &opts.dest_dir, &config)
+            extract_tar_in_place_with_journal(
+                &opts.archive_path,
+                &opts.dest_dir,
+                &config,
+                journal.as_mut(),
+                already_extracted,
+            )
         } else {
             extract_tar_standard(&opts.archive_path, &opts.dest_dir)
         }
@@ -327,8 +259,9 @@ pub fn handle_unarchive(ctx: &CliContext) {
 
     match result {
         Ok(report) => {
-            let _ = journal.append(&InPlaceLogEntry::SessionCompleted);
-            let _ = journal.remove();
+            if let Some(j) = journal {
+                let _ = j.remove();
+            }
 
             if ctx.json_mode {
                 print_json(&json!({
@@ -375,176 +308,6 @@ pub fn handle_unarchive(ctx: &CliContext) {
             );
         }
     }
-}
-
-/// Archive family flags resolved once from the operand filename.
-#[derive(Debug, Clone, Copy)]
-struct ArchiveProfile {
-    /// Operand is a ZIP archive.
-    is_zip: bool,
-    /// Operand is an uncompressed TAR archive.
-    is_tar: bool,
-    /// Operand is a Git Bundle v2 file.
-    is_bundle: bool,
-}
-
-/// Builds the preflight SpacePlan report for the selected family and execution mode.
-///
-/// In-place modes model progressive tail truncation reclamation; standard modes model a full
-/// duplicate of the uncompressed payload because the source archive stays intact afterwards.
-fn build_preflight_plan(
-    opts: &UnarchiveOptions,
-    profile: ArchiveProfile,
-    file_len: u64,
-    free_space: u64,
-    config: &SpacePlanConfig,
-) -> FractalResult<SpacePlanReport> {
-    if profile.is_bundle {
-        // The embedded pack is staged as a full copy before any reclamation becomes possible.
-        let units = if opts.in_place {
-            vec![
-                ExtractionUnit::new("bundle.pack.staging", file_len, 0, 0),
-                ExtractionUnit::new("bundle.truncate", 0, file_len, 0),
-            ]
-        } else {
-            vec![ExtractionUnit::new("bundle.pack.staging", file_len, 0, 0)]
-        };
-        return Ok(simulate_space_plan(free_space, &units, config));
-    }
-
-    if profile.is_zip {
-        let mut file = File::open(&opts.archive_path).map_err(FractalError::Io)?;
-        let eocd = read_zip_eocd(&mut file)?;
-        let members = read_zip_central_directory(&mut file, &eocd)?;
-        if opts.in_place {
-            return Ok(plan_zip_in_place(free_space, &members, config));
-        }
-        let units: Vec<ExtractionUnit> = members
-            .iter()
-            .filter(|member| !member.is_dir)
-            .map(|member| {
-                ExtractionUnit::new(
-                    &member.name,
-                    member.uncompressed_size,
-                    0,
-                    member.local_header_offset,
-                )
-            })
-            .collect();
-        return Ok(simulate_space_plan(free_space, &units, config));
-    }
-
-    if profile.is_tar {
-        let mut file = File::open(&opts.archive_path).map_err(FractalError::Io)?;
-        let members = index_tar_archive(&mut file)?;
-        if opts.in_place {
-            return Ok(plan_tar_in_place(free_space, &members, config));
-        }
-        let units: Vec<ExtractionUnit> = members
-            .iter()
-            .filter(|member| !member.is_dir)
-            .map(|member| ExtractionUnit::new(&member.name, member.size, 0, member.header_offset))
-            .collect();
-        return Ok(simulate_space_plan(free_space, &units, config));
-    }
-
-    // tar.gz forward stream: expansion is estimated, reclamation only happens in-place.
-    let estimated_expanded = file_len.saturating_mul(3);
-    let reclaimed = if opts.in_place { file_len } else { 0 };
-    let units = vec![ExtractionUnit::new(
-        "stream.tar.gz",
-        estimated_expanded,
-        reclaimed,
-        0,
-    )];
-    Ok(simulate_space_plan(free_space, &units, config))
-}
-
-/// Describes the execution mode in user-facing terms.
-fn execution_mode_label(opts: &UnarchiveOptions, profile: ArchiveProfile) -> &'static str {
-    if profile.is_bundle {
-        if opts.in_place {
-            "In-Place Git Bundle Ingestion"
-        } else {
-            "Non-Destructive Git Bundle Ingestion"
-        }
-    } else if opts.to_odb {
-        if opts.in_place {
-            "In-Place Direct CAS ODB Ingestion"
-        } else {
-            "Direct CAS ODB Ingestion (source retained)"
-        }
-    } else if opts.in_place {
-        "In-Place Adaptive Reclamation"
-    } else {
-        "Standard Extraction (source archive retained)"
-    }
-}
-
-/// Prints the dry-run SpacePlan projection; performs no filesystem mutation of any kind.
-fn print_space_plan_projection(
-    ctx: &CliContext,
-    opts: &UnarchiveOptions,
-    profile: ArchiveProfile,
-    file_len: u64,
-    free_space: u64,
-    config: &SpacePlanConfig,
-    plan_report: &SpacePlanReport,
-) {
-    if ctx.json_mode {
-        print_json(&json!({
-            "archive": opts.archive_path.display().to_string(),
-            "archive_size_bytes": file_len,
-            "initial_free_bytes": free_space,
-            "trough_free_bytes": plan_report.trough_free_space,
-            "safety_headroom_bytes": config.safety_headroom_bytes,
-            "is_viable": plan_report.is_viable,
-            "required_additional_bytes": plan_report.required_additional_bytes,
-            "in_place": opts.in_place,
-            "mode": execution_mode_label(opts, profile),
-        }));
-        return;
-    }
-
-    println!("=== Taxis SpacePlan Projection (dry-run) ===");
-    println!(
-        "Archive:                 {} ({})",
-        opts.archive_path.display(),
-        format_bytes(file_len)
-    );
-    println!("Target Destination:      {}", opts.dest_dir.display());
-    println!(
-        "Execution Mode:          {}",
-        execution_mode_label(opts, profile)
-    );
-    println!("Initial Free Disk Space: {}", format_bytes(free_space));
-    println!(
-        "Safety Headroom:         {}",
-        format_bytes(config.safety_headroom_bytes)
-    );
-    println!(
-        "Simulated Trough Level:  {}",
-        format_bytes(plan_report.trough_free_space)
-    );
-    println!(
-        "Projected Final Space:   {}",
-        format_bytes(plan_report.final_free_space)
-    );
-    println!(
-        "Assessment:              {}",
-        if plan_report.is_viable {
-            "VIABLE (Safe for execution)"
-        } else {
-            "BLOCKED (Headroom deficit)"
-        }
-    );
-    if !plan_report.is_viable {
-        println!(
-            "Additional Space Needed: {}",
-            format_bytes(plan_report.required_additional_bytes)
-        );
-    }
-    println!("Disk Effects:            none (projection only)");
 }
 
 /// Ingests a Git Bundle v2 operand into the repository ODB, honoring the in-place switch.
@@ -841,9 +604,9 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         return;
     }
 
-    // Assemble commit and advance ref
+    // Assemble commit and advance ref under full governance
     let ref_store = DiskRefStore::new(git_dir);
-    let target_ref = opts
+    let target_ref_str = opts
         .branch
         .as_deref()
         .map(|branch_name| {
@@ -855,26 +618,153 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         })
         .unwrap_or_else(|| format!("refs/heads/import-{}", current_unix_seconds()));
 
-    let parent_oid = ref_store.get_ref(&target_ref).ok().flatten();
-    let parent_oids = parent_oid.map(|p| vec![p]).unwrap_or_default();
-    let now_secs = current_unix_seconds();
-    let sig = GitSignature::new("Taxis In-Place Importer", "taxis@internal", now_secs);
+    let target_ref = match FractalRef::parse(&target_ref_str) {
+        Some(fref) => fref,
+        None => {
+            if let Some(branch) = target_ref_str.strip_prefix("refs/heads/") {
+                FractalRef::SystemTrunk {
+                    branch: branch.to_string(),
+                }
+            } else {
+                FractalRef::CellMain {
+                    cell_id: "cell-default".into(),
+                }
+            }
+        }
+    };
+
+    let human_author = find_arg_value(&ctx.args, &["--human"]).map(String::from)
+        .or_else(|| std::env::var("TAXIS_HUMAN_AUTHOR").ok());
+    let auth_token = find_arg_value(&ctx.args, &["--token"]).map(String::from)
+        .or_else(|| std::env::var("TAXIS_AUTHORITY_TOKEN").ok());
+    let agent_id = find_arg_value(&ctx.args, &["--agent"]).map(String::from)
+        .or_else(|| std::env::var("TAXIS_AGENT_ID").ok())
+        .unwrap_or_else(|| "agent-default".to_string());
+    let cell_id = find_arg_value(&ctx.args, &["--cell"]).map(String::from)
+        .or_else(|| std::env::var("TAXIS_CELL_ID").ok())
+        .unwrap_or_else(|| "cell-default".to_string());
+
+    let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or("workspace-strict");
+    let mut policy = match policy_name {
+        "rust-strict" => TaxisPolicy::rust_strict(),
+        _ => TaxisPolicy::workspace_strict(),
+    };
+    let authority_secret = human_author.as_deref().and_then(|_| {
+        fg_gate::authority::resolve_authority_secret(git_dir).ok()
+    });
+    if let Some(secret) = authority_secret.as_ref() {
+        policy.authority_secret = Some(secret.clone());
+    }
+
+    let actor = super::commit::resolve_actor_identity(
+        human_author.as_deref(),
+        auth_token,
+        &agent_id,
+        &cell_id,
+        authority_secret.as_ref(),
+    );
+
+    // 1. Enforce PreReceiveGuard authorization (P1-7)
+    if let Err(auth_err) = PreReceiveGuard::assert_actor_authorized(&target_ref, &actor, &policy) {
+        reject(
+            CliTag::AUTHORITY_BREACH,
+            format!(
+                "Push to '{}' rejected by PreReceiveGuard: {}",
+                target_ref.to_git_ref(),
+                auth_err
+            ),
+        );
+    }
+
     let archive_name = opts
         .archive_path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("archive");
-    let msg = format!("Import archive '{archive_name}' in-place straight into ODB\n");
-    let commit = GitCommit::new(root_tree_oid, parent_oids, sig.clone(), sig, msg, None);
+
+    let initial_msg = opts.message.clone().unwrap_or_else(|| {
+        format!(
+            "feat(core): import archive '{archive_name}' into ODB\n\n\
+             [Project]\nfractal-git\n\n\
+             [Why]\nIngest structured archive asset into repository object database.\n\n\
+             [Changed]\n- Materialized root tree from archive members\n- Ingested objects directly into ODB\n\n\
+             [Verification]\nAsserted tree integrity and actor authorization."
+        )
+    });
+
+    let touched_files = vec![archive_name.to_string()];
+
+    // 2. Validate commit message prior to hooks (Option B: Dual-validation)
+    if let Err(gov_err) = CommitMessageGuard::parse_and_verify(&initial_msg, &policy, Some(&touched_files)) {
+        reject(
+            CliTag::COMMIT_GOVERNANCE_FAIL,
+            format!("Commit message rejected by Taxis policy '{}': {gov_err}", policy.name),
+        );
+    }
+
+    // 3. Verify project lease authorization
+    super::commit::verify_project_lease_authorization(git_dir, &touched_files);
+
+    // 4. Assert hook pipeline approved
+    let source_ref = target_ref.to_git_ref();
+    super::git_hooks::assert_pipeline_approved(
+        &source_ref,
+        &target_ref.to_git_ref(),
+        &actor,
+        &policy,
+        &touched_files,
+        &initial_msg,
+    );
+
+    // 5. Run commit hook chain
+    let hook_runner = super::git_hooks::discover(git_dir, view.work_root());
+    let final_msg = super::git_hooks::run_commit_chain(&hook_runner, git_dir, &initial_msg);
+
+    // 6. Post-hook commit message validation (Option B: Dual-validation)
+    if let Err(gov_err) = CommitMessageGuard::parse_and_verify(&final_msg, &policy, Some(&touched_files)) {
+        reject(
+            CliTag::COMMIT_GOVERNANCE_FAIL,
+            format!(
+                "Commit message rejected after hook rewriting by Taxis policy '{}': {gov_err}",
+                policy.name
+            ),
+        );
+    }
+
+    let parent_oid = ref_store.get_ref(&target_ref.to_git_ref()).ok().flatten();
+    let parent_oids = parent_oid.map(|p| vec![p]).unwrap_or_default();
+    let now_secs = current_unix_seconds();
+    let sig = match human_author {
+        Some(name) => GitSignature::new(&name, format!("{name}@taxis.internal"), now_secs),
+        None => GitSignature::for_agent(&agent_id, &cell_id, now_secs),
+    };
+
+    let commit = GitCommit::new(root_tree_oid, parent_oids, sig.clone(), sig, final_msg, None);
     let commit_payload = serialize_commit_payload(&commit);
     let commit_oid = match loose_odb.write_object("commit", &commit_payload) {
         Ok(oid) => oid,
         Err(e) => reject(CliTag::ERROR, format!("write commit to ODB: {e}")),
     };
 
-    if let Err(e) = ref_store.update_ref(&target_ref, &commit_oid, parent_oid.as_ref()) {
-        reject(CliTag::ERROR, format!("advance ref '{target_ref}': {e}"));
+    // 7. Execute reference-transaction (preparing -> prepared -> write -> committed / aborted)
+    let branch_update = super::git_hooks::ReferenceUpdate {
+        previous: parent_oid,
+        next: commit_oid.to_hex(),
+        name: target_ref.to_git_ref(),
+    };
+    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
+        &hook_runner,
+        &[branch_update],
+        || {
+            ref_store
+                .update_ref(&target_ref.to_git_ref(), &commit_oid, parent_oid.as_ref())
+                .map_err(|e| format!("advance ref '{}': {e}", target_ref.to_git_ref()))
+        },
+    ) {
+        reject(CliTag::ERROR, err_msg);
     }
+
+    let target_ref = target_ref.to_git_ref();
 
     if ctx.json_mode {
         print_json(&json!({

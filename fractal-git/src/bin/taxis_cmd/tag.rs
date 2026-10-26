@@ -80,7 +80,7 @@ pub fn handle_tag(ctx: &CliContext) {
     if opts.annotated {
         create_annotated_tag(&view, &ref_store, tag_name, target_oid, &opts, ctx);
     } else {
-        create_lightweight_tag(&ref_store, tag_name, target_oid, ctx);
+        create_lightweight_tag(&view, &ref_store, tag_name, target_oid, ctx);
     }
 }
 
@@ -171,10 +171,22 @@ fn delete_tag(view: &RepoView, tag_name: &str, ctx: &CliContext) {
         _ => reject(CliTag::ERROR, format!("error: tag '{tag_name}' not found.")),
     };
 
-    match ref_store.delete_ref(&tag_ref) {
-        Ok(true) => {}
-        Ok(false) => reject(CliTag::ERROR, format!("error: tag '{tag_name}' not found.")),
-        Err(delete_err) => fail_fatal(format!("delete tag '{tag_name}': {delete_err}")),
+    let hook_runner = super::git_hooks::discover(view.git_dir(), view.work_root());
+    let update = super::git_hooks::ReferenceUpdate {
+        previous: Some(existing_oid),
+        next: "0".repeat(40),
+        name: tag_ref.clone(),
+    };
+    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
+        &hook_runner,
+        &[update],
+        || match ref_store.delete_ref(&tag_ref) {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(format!("error: tag '{tag_name}' not found.")),
+            Err(delete_err) => Err(format!("delete tag '{tag_name}': {delete_err}")),
+        },
+    ) {
+        reject(CliTag::ERROR, err_msg);
     }
 
     if ctx.json_mode {
@@ -196,14 +208,29 @@ fn delete_tag(view: &RepoView, tag_name: &str, ctx: &CliContext) {
 
 /// Creates a lightweight tag ref pointing directly to target_oid.
 fn create_lightweight_tag(
+    view: &RepoView,
     ref_store: &DiskRefStore,
     tag_name: &str,
     target_oid: Oid,
     ctx: &CliContext,
 ) {
     let tag_ref = format!("refs/tags/{tag_name}");
-    if let Err(err) = ref_store.update_ref(&tag_ref, &target_oid, None) {
-        fail_io(format!("write tag ref '{tag_ref}'"), err);
+    let hook_runner = super::git_hooks::discover(view.git_dir(), view.work_root());
+    let update = super::git_hooks::ReferenceUpdate {
+        previous: None,
+        next: target_oid.to_hex(),
+        name: tag_ref.clone(),
+    };
+    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
+        &hook_runner,
+        &[update],
+        || {
+            ref_store
+                .update_ref(&tag_ref, &target_oid, None)
+                .map_err(|err| format!("write tag ref '{tag_ref}': {err}"))
+        },
+    ) {
+        reject(CliTag::ERROR, err_msg);
     }
 
     if ctx.json_mode {
@@ -257,8 +284,22 @@ fn create_annotated_tag(
     };
 
     let tag_ref = format!("refs/tags/{tag_name}");
-    if let Err(err) = ref_store.update_ref(&tag_ref, &tag_oid, None) {
-        fail_io(format!("write tag ref '{tag_ref}'"), err);
+    let hook_runner = super::git_hooks::discover(view.git_dir(), view.work_root());
+    let update = super::git_hooks::ReferenceUpdate {
+        previous: None,
+        next: tag_oid.to_hex(),
+        name: tag_ref.clone(),
+    };
+    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
+        &hook_runner,
+        &[update],
+        || {
+            ref_store
+                .update_ref(&tag_ref, &tag_oid, None)
+                .map_err(|err| format!("write tag ref '{tag_ref}': {err}"))
+        },
+    ) {
+        reject(CliTag::ERROR, err_msg);
     }
 
     if ctx.json_mode {

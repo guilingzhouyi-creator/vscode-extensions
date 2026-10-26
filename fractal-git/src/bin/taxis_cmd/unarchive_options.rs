@@ -40,6 +40,8 @@ pub struct UnarchiveOptions {
     pub branch: Option<String>,
     /// Only construct and output the root tree OID (no commit or ref update).
     pub tree_only: bool,
+    /// Explicit commit message for `--to-odb` mode.
+    pub message: Option<String>,
 }
 
 /// Prints usage and options help for `taxis unarchive`.
@@ -60,6 +62,7 @@ pub fn print_unarchive_help() {
            --batch-window <size>       Batch window size for staged truncation (e.g. \"64M\"; binary K/M/G/T)\n\
            --to-odb                    Ingest directly into CAS ODB without worktree materialization\n\
            --branch, --ref <name>      Target branch to advance in --to-odb mode (default: refs/heads/import-<timestamp>)\n\
+           -m, --message <msg>         Commit message for --to-odb mode (default: compliant structured format)\n\
            --tree-only                 Only construct and output root tree OID in --to-odb mode\n\
            -h, --help                  Show this help message"
     );
@@ -117,6 +120,7 @@ pub(super) fn parse_unarchive_options(args: &[String]) -> UnarchiveOptions {
     let mut to_odb = false;
     let mut branch = None;
     let mut tree_only = false;
+    let mut message = None;
 
     let mut cursor = 0;
     while cursor < args.len() {
@@ -128,6 +132,13 @@ pub(super) fn parse_unarchive_options(args: &[String]) -> UnarchiveOptions {
             "-C" | "--dest" | "--target" if cursor + 1 < args.len() => {
                 dest_dir = Some(PathBuf::from(&args[cursor + 1]));
                 cursor += 2;
+            }
+            "-m" | "--message" if cursor + 1 < args.len() => {
+                message = Some(args[cursor + 1].clone());
+                cursor += 2;
+            }
+            "-m" | "--message" => {
+                fail_usage("--message requires a commit message text")
             }
             "--dry-run" => {
                 dry_run = true;
@@ -201,6 +212,7 @@ pub(super) fn parse_unarchive_options(args: &[String]) -> UnarchiveOptions {
         to_odb,
         branch,
         tree_only,
+        message,
     }
 }
 

@@ -183,11 +183,22 @@ fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &C
         );
     }
 
-    if let Err(write_err) = ref_store.update_ref(&full_ref, &target_oid, None) {
-        reject(
-            CliTag::ERROR,
-            format!("failed to write branch ref: {write_err}"),
-        );
+    let hook_runner = super::git_hooks::discover(git_dir, view.work_root());
+    let update = super::git_hooks::ReferenceUpdate {
+        previous: None,
+        next: target_oid.to_hex(),
+        name: full_ref.clone(),
+    };
+    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
+        &hook_runner,
+        &[update],
+        || {
+            ref_store
+                .update_ref(&full_ref, &target_oid, None)
+                .map_err(|write_err| format!("failed to write branch ref: {write_err}"))
+        },
+    ) {
+        reject(CliTag::ERROR, err_msg);
     }
 
     // Also persist into native container if present
@@ -245,11 +256,23 @@ fn delete_branch(view: &RepoView, name: &str, force: bool, ctx: &CliContext) {
         );
     }
 
-    // Remove the loose file, the packed entry, and the branch reflog in one step.
-    match ref_store.delete_ref(&full_ref) {
-        Ok(true) => {}
-        Ok(false) => reject(CliTag::ERROR, format!("error: branch '{name}' not found")),
-        Err(delete_err) => fail_fatal(format!("delete branch '{name}': {delete_err}")),
+    // Remove the loose file, the packed entry, and the branch reflog in one step under reference-transaction.
+    let hook_runner = super::git_hooks::discover(git_dir, view.work_root());
+    let update = super::git_hooks::ReferenceUpdate {
+        previous: Some(existing_oid),
+        next: "0".repeat(40),
+        name: full_ref.clone(),
+    };
+    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
+        &hook_runner,
+        &[update],
+        || match ref_store.delete_ref(&full_ref) {
+            Ok(true) => Ok(()),
+            Ok(false) => Err(format!("error: branch '{name}' not found")),
+            Err(delete_err) => Err(format!("delete branch '{name}': {delete_err}")),
+        },
+    ) {
+        reject(CliTag::ERROR, err_msg);
     }
 
     // Remove from native container if present
@@ -329,14 +352,35 @@ fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &
         );
     }
 
-    let rename_message = format!("Branch: renamed {old_full_ref} to {new_full_ref}");
-    if let Err(write_err) =
-        ref_store.update_ref_with_message(&new_full_ref, &oid, None, &rename_message)
-    {
-        fail_fatal(format!("rename branch '{new_name}': {write_err}"));
-    }
-    if let Err(delete_err) = ref_store.delete_ref(&old_full_ref) {
-        fail_fatal(format!("rename branch '{effective_old}': {delete_err}"));
+    let hook_runner = super::git_hooks::discover(git_dir, view.work_root());
+    let delete_update = super::git_hooks::ReferenceUpdate {
+        previous: Some(oid),
+        next: "0".repeat(40),
+        name: old_full_ref.clone(),
+    };
+    let create_update = super::git_hooks::ReferenceUpdate {
+        previous: None,
+        next: oid.to_hex(),
+        name: new_full_ref.clone(),
+    };
+    let updates = [delete_update, create_update];
+    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
+        &hook_runner,
+        &updates,
+        || {
+            let rename_message = format!("Branch: renamed {old_full_ref} to {new_full_ref}");
+            if let Err(write_err) =
+                ref_store.update_ref_with_message(&new_full_ref, &oid, None, &rename_message)
+            {
+                return Err(format!("rename branch '{new_name}': {write_err}"));
+            }
+            if let Err(delete_err) = ref_store.delete_ref(&old_full_ref) {
+                return Err(format!("rename branch '{effective_old}': {delete_err}"));
+            }
+            Ok(())
+        },
+    ) {
+        reject(CliTag::ERROR, err_msg);
     }
 
     // If active branch was renamed, update HEAD

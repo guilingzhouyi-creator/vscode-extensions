@@ -32,23 +32,27 @@ const COMMIT_MESSAGE_FILE: &str = "COMMIT_EDITMSG";
 const MERGE_MESSAGE_FILE: &str = "MERGE_MSG";
 
 /// Runs the pre-commit, prepare-commit-msg, and commit-msg chain for a commit operation.
-pub fn run_commit_chain(runner: &GitHookRunner, git_dir: &Path, message: &str) {
+/// Returns the message as updated by prepare-commit-msg (or original message on error).
+pub fn run_commit_chain(runner: &GitHookRunner, git_dir: &Path, message: &str) -> String {
     let envs = commit_environment(git_dir);
     let message_file = write_message_file(git_dir, COMMIT_MESSAGE_FILE, message);
     run_blocking(runner, "pre-commit", &[], None, &envs);
     run_prepare_commit_msg(runner, &message_file, "message", &envs);
     let message_argument = hook_argument_path(&message_file);
     run_blocking(runner, "commit-msg", &[message_argument], None, &envs);
+    fs::read_to_string(&message_file).unwrap_or_else(|_| message.to_string())
 }
 
 /// Runs the pre-merge-commit, prepare-commit-msg, and commit-msg chain for a merge operation.
-pub fn run_merge_chain(runner: &GitHookRunner, git_dir: &Path, message: &str) {
+/// Returns the message as updated by prepare-commit-msg (or original message on error).
+pub fn run_merge_chain(runner: &GitHookRunner, git_dir: &Path, message: &str) -> String {
     let envs = commit_environment(git_dir);
     let message_file = write_message_file(git_dir, MERGE_MESSAGE_FILE, message);
     run_blocking(runner, "pre-merge-commit", &[], None, &envs);
     run_prepare_commit_msg(runner, &message_file, "merge", &envs);
     let message_argument = hook_argument_path(&message_file);
     run_blocking(runner, "commit-msg", &[message_argument], None, &envs);
+    fs::read_to_string(&message_file).unwrap_or_else(|_| message.to_string())
 }
 
 /// Runs prepare-commit-msg for a commit reusing an existing message and returns the final text.
@@ -150,6 +154,41 @@ pub fn run_reference_transaction(
         return false;
     }
     true
+}
+
+/// Executes a durable reference mutation under the 4-phase reference-transaction lifecycle.
+///
+/// If either the `preparing` or `prepared` phase is blocked by a hook, the transaction
+/// transitions immediately to `aborted` and fails. If `operation` fails, the transaction
+/// transitions to `aborted` and returns the operation error. If `operation` succeeds,
+/// the transaction transitions to `committed`.
+pub fn execute_reference_transaction<F, R>(
+    runner: &GitHookRunner,
+    updates: &[ReferenceUpdate],
+    operation: F,
+) -> Result<R, String>
+where
+    F: FnOnce() -> Result<R, String>,
+{
+    if !run_reference_transaction(runner, "preparing", updates) {
+        let _ = run_reference_transaction(runner, "aborted", updates);
+        return Err("reference-transaction hook blocked during preparing phase".to_string());
+    }
+    if !run_reference_transaction(runner, "prepared", updates) {
+        let _ = run_reference_transaction(runner, "aborted", updates);
+        return Err("reference-transaction hook blocked during prepared phase".to_string());
+    }
+
+    match operation() {
+        Ok(result) => {
+            let _ = run_reference_transaction(runner, "committed", updates);
+            Ok(result)
+        }
+        Err(err) => {
+            let _ = run_reference_transaction(runner, "aborted", updates);
+            Err(err)
+        }
+    }
 }
 
 /// Evaluates the built-in fractal hook pipeline before materializing a commit.

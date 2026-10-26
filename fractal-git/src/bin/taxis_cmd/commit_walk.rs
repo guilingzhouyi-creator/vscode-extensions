@@ -18,10 +18,10 @@
 //!     promotion merge. Keeping the definition identical means the counts are comparable across the
 //!     change rather than merely plausible.
 
-use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
+use std::collections::{BinaryHeap, VecDeque};
 
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::Oid;
+use fg_core::models::{FastOidMap, FastOidSet, Oid};
 use fractal_git::TelemetryCommitNode;
 
 use super::repo_view::RepoView;
@@ -263,7 +263,7 @@ fn decode_commit_message(body: &[u8], encoding: Option<&str>) -> FractalResult<S
 /// Returns FractalError::ObjectCodec when a reachable commit is missing or is not a commit, and
 /// refuses a traversal that exceeds MAX_WALK_COMMITS.
 pub fn walk_commits(view: &RepoView, starts: &[Oid]) -> FractalResult<Vec<CommitRecord>> {
-    let mut discovered: HashSet<Oid> = HashSet::new();
+    let mut discovered: FastOidSet = FastOidSet::default();
     let mut queue: VecDeque<Oid> = VecDeque::new();
     for start in starts {
         if discovered.insert(*start) {
@@ -271,8 +271,8 @@ pub fn walk_commits(view: &RepoView, starts: &[Oid]) -> FractalResult<Vec<Commit
         }
     }
 
-    let mut records: HashMap<Oid, CommitRecord> = HashMap::new();
-    let mut child_count: HashMap<Oid, usize> = HashMap::new();
+    let mut records: FastOidMap<CommitRecord> = FastOidMap::default();
+    let mut child_count: FastOidMap<usize> = FastOidMap::default();
     let mut discovery_order: Vec<Oid> = Vec::new();
     while let Some(oid) = queue.pop_front() {
         if records.len() >= MAX_WALK_COMMITS {
@@ -307,32 +307,28 @@ pub fn walk_commits(view: &RepoView, starts: &[Oid]) -> FractalResult<Vec<Commit
             enqueue_ready(*start, &records, &mut ready, &mut sequence);
         }
     }
-    let mut emitted: HashSet<Oid> = HashSet::new();
+    let mut emitted: FastOidSet = FastOidSet::default();
     while let Some(key) = ready.pop() {
         if !emitted.insert(key.oid) {
             continue;
         }
-        let Some(record) = records.get(&key.oid) else {
+        let Some(record) = records.remove(&key.oid) else {
             continue;
         };
-        let parents = record.parents.clone();
-        order.push(record.clone());
-        for parent in &parents {
+        for parent in &record.parents {
             let remaining = child_count.entry(*parent).or_insert(0);
             *remaining = remaining.saturating_sub(1);
             if *remaining == 0 {
                 enqueue_ready(*parent, &records, &mut ready, &mut sequence);
             }
         }
+        order.push(record);
     }
     // A forged or hand-edited history can contain a cycle, which leaves those commits permanently
     // blocked. Listing them in discovery order keeps the walk total instead of dropping history.
     for oid in &discovery_order {
-        if emitted.contains(oid) {
-            continue;
-        }
-        if let Some(record) = records.get(oid) {
-            order.push(record.clone());
+        if let Some(record) = records.remove(oid) {
+            order.push(record);
         }
     }
     Ok(order)
@@ -363,7 +359,7 @@ impl PartialOrd for DateOrderKey {
 /// Queues one commit for listing, remembering its discovery order as the tie breaker.
 fn enqueue_ready(
     oid: Oid,
-    records: &HashMap<Oid, CommitRecord>,
+    records: &FastOidMap<CommitRecord>,
     ready: &mut BinaryHeap<DateOrderKey>,
     sequence: &mut usize,
 ) {

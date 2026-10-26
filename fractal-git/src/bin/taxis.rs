@@ -19,7 +19,7 @@ mod taxis_cmd;
 use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
     archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, commit,
-    config, daemon, diff, doctor, init, log, merge, operation, project, projection, promotion,
+    config, daemon, diff, doctor, hash_object, init, log, merge, operation, project, projection, promotion,
     quarantine, read, rebase, reclaim, relocate, remote, repack, reset, rev_list, revert, stash,
     status, submodule, tag, unarchive, undo, verify, worktree,
 };
@@ -73,6 +73,7 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["bench", "benchmark"], "bench"),
         (&["undo"], "undo"),
         (&["op", "operation"], "operation"),
+        (&["hash-object"], "hash-object"),
         (&["rev-list"], "rev-list"),
         (&["authority", "auth"], "authority"),
         (&["version", "-v", "--version"], "version"),
@@ -245,6 +246,7 @@ fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
         "branch" => branch::handle_branch(ctx),
         "commit" => commit::handle_commit(ctx),
         "diff" => diff::handle_diff(ctx),
+        "hash-object" => hash_object::handle_hash_object(ctx),
         "cat-file" => read::handle_cat_file(ctx),
         "ls-tree" => read::handle_ls_tree(ctx),
         "ls-files" => read::handle_ls_files(ctx),
@@ -398,7 +400,7 @@ fn reject_unimplemented(subcommand: &str) -> ! {
         CliTag::ERROR,
         format!(
             "'{subcommand}' has no native implementation in this build. \
-             Implemented: init, doctor, relocate, git-export, git-import, status, branch, commit, diff, cat-file, ls-tree, \
+             Implemented: init, doctor, relocate, git-export, git-import, status, branch, commit, diff, hash-object, cat-file, ls-tree, \
              ls-files, show-ref, for-each-ref, check-ignore, log, show, checkout, merge, reset, tag, cherry-pick, revert, \
              stash, rebase, repack, project, worktree, blackboard, promotion, bench, undo, operation, rev-list, verify, authority, reclaim, daemon, version, help."
         ),

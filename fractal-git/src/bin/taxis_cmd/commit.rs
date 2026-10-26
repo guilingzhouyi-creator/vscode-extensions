@@ -114,12 +114,14 @@ pub fn handle_commit(ctx: &CliContext) {
         &staged_files,
         &message,
     );
-    super::git_hooks::run_commit_chain(&hook_runner, &ctx.git_dir, &message);
+    let _ = verify_commit_governance(&message, &policy, &staged_files);
+    let final_message = super::git_hooks::run_commit_chain(&hook_runner, &ctx.git_dir, &message);
+    let _ = verify_commit_governance(&final_message, &policy, &staged_files);
 
     let materialized = materialize_staged_files(
         ctx,
         &staged_files,
-        &message,
+        &final_message,
         human_author.as_deref(),
         agent_id,
         cell_id,
@@ -236,7 +238,7 @@ fn resolve_commit_policy(policy_name: &str) -> TaxisPolicy {
 }
 
 /// Constructs actor identity differentiating human authority from agent sub-processes.
-fn resolve_actor_identity(
+pub(crate) fn resolve_actor_identity(
     human_author: Option<&str>,
     auth_token: Option<String>,
     agent_id: &str,
@@ -627,7 +629,7 @@ fn record_block_provenance(
 }
 
 /// Asserts that all staged files belong to active controlled projects and no TTL lease has expired.
-fn verify_project_lease_authorization(git_dir: &Path, staged_files: &[String]) {
+pub(crate) fn verify_project_lease_authorization(git_dir: &Path, staged_files: &[String]) {
     let now_secs = current_unix_seconds() as u64;
     let store = DiskProjectStore::new(git_dir);
     let work_root = git_dir.parent().unwrap_or_else(|| Path::new("."));
