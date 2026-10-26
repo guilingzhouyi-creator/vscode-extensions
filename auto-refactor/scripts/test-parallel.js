@@ -71,6 +71,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-grouped-moe-dispatch', script: 'scripts/validate-grouped-moe-dispatch.js' },
   { name: 'validate-bidirectional-swa', script: 'scripts/validate-bidirectional-swa.js' },
   { name: 'validate-dspark-radix-cache', script: 'scripts/validate-dspark-radix-cache.js' },
+  { name: 'validate-disaggregated-recipe', script: 'scripts/validate-disaggregated-recipe.js' },
   { name: 'validate-security', script: 'scripts/validate-security-levels.js' },
   { name: 'validate-capabilities', script: 'scripts/validate-capabilities.js' },
   { name: 'validate-language-support', script: 'scripts/validate-language-support.js' },
