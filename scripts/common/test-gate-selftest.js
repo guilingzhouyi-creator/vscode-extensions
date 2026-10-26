@@ -146,6 +146,10 @@ cases.push({ name: 'block chain guard is clean on the shipped corpus', args: ['s
   cases.push({ name: 'rule source consistency is clean', args: ['scripts/common/validate-rule-source-consistency.js'], expect: 0 });
 cases.push({ name: 'guard self-proof harness passes', args: ['scripts/common/test-gate-guards.js'], expect: 0 });
 
+  // 收据签名必须真能拒绝伪造：自测内含「无签名收据 BLOCK」「篡改签名 BLOCK」「amend 后重签自愈」三例，
+  // 只在纯 Node 层执行，不依赖 Git 钩子安装状态。
+  cases.push({ name: 'gate receipt signatures reject tampering and self-heal after amend', args: ['scripts/common/gate-receipts.js', 'selftest'], expect: 0 });
+
   return cases;
 }
 

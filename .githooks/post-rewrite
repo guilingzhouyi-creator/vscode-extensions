@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Git Post-Rewrite Hook — commit --amend / rebase 后把旧 sha 收据重算到新 sha（自愈，绝不阻断）
+set -euo pipefail
+ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+[[ -n "$ROOT_DIR" ]] || exit 0
+node "$ROOT_DIR/scripts/common/gate-receipts.js" rewrite 1>/dev/null || true
+exit 0

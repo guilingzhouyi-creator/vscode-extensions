@@ -35,6 +35,7 @@ const REQUIRED_HOOKS = Object.freeze([
     'post-commit',
     'post-merge',
     'pre-push',
+    'post-rewrite',
 ]);
 const MODE_EXECUTABLE = '100755';
 const EXIT_OK = 0;

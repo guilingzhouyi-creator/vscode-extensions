@@ -656,9 +656,22 @@ if ($hasFgCompile) {
             }
         }
     } else {
-        if (-not $Agent) {
-            Write-GateHost "  ⚠️ 未检测到 cargo 命令，跳过 fractal-git 本地编译校验（将在 CI 门禁中强制验证）" -ForegroundColor Yellow
+        if ($Agent) {
+            $cargoMissingDetails = "Agent 模式下 cargo 缺失属于空门禁，必须与 push 阶段 RUST-TAXIS-19 一致 fail-closed。"
+            $json = Write-PreCommitFailure `
+                -StepId "RUST-COMPILE-10" `
+                -RuleId "L0-COMPILE" `
+                -Summary "未检测到 cargo 工具链，fractal-git 本地编译校验无法执行。" `
+                -ActionableFix "安装 Rust 工具链并确保 cargo 在 PATH 中，然后重新执行 bash scripts/sh/pre-commit-gate.sh --agent。" `
+                -VerifyCmd "cargo --version" `
+                -TargetFiles @("fractal-git/Cargo.toml") `
+                -Details $cargoMissingDetails
+            Write-Output $json
+            exit 1
         }
+        Write-GateHost "  ⚠️ 未检测到 cargo 命令，fractal-git 本地编译校验无法执行（将在 CI 门禁中强制验证）" -ForegroundColor Yellow
+        Write-StepVerdict -StepId "RUST-COMPILE-10" -Status "BLOCK" -Detail "未检测到 cargo 工具链，fractal-git 本地编译校验无法执行"
+        $failed = $true
     }
 } elseif (-not $Agent -and ($stagedFiles | Where-Object { $_ -match "^fractal-git/" })) {
     Write-StepVerdict -StepId "RUST-COMPILE-10" -Status "SKIP" -Detail "仅文档或配置变更"

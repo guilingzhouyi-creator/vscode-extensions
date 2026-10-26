@@ -477,9 +477,20 @@ if [[ -n "$TOUCHED_FG_COMPILE" ]]; then
             fi
         fi
     else
-        if [[ "$AGENT_MODE" -eq 0 ]]; then
-            echo "  ⚠️ 未检测到 cargo 命令，跳过 fractal-git 本地编译校验（将在 CI 门禁中强制验证）"
+        if [[ "$AGENT_MODE" -eq 1 ]]; then
+            record_pre_commit_failure "RUST-COMPILE-10" \
+                "L0-COMPILE" \
+                "未检测到 cargo 工具链，fractal-git 本地编译校验无法执行。" \
+                "安装 Rust 工具链并确保 cargo 在 PATH 中，然后重新执行 bash scripts/sh/pre-commit-gate.sh --agent。" \
+                "cargo --version" \
+                "fractal-git/Cargo.toml" \
+                "Agent 模式下 cargo 缺失属于空门禁，与 push 阶段 RUST-TAXIS-19 一致 fail-closed。"
+            cat "$ROOT_DIR/.audit-logs/last-failure.json"
+            exit 1
         fi
+        echo "  ⚠️ 未检测到 cargo 命令，fractal-git 本地编译校验无法执行（将在 CI 门禁中强制验证）"
+        write_step_verdict "RUST-COMPILE-10" BLOCK "未检测到 cargo 工具链，fractal-git 本地编译校验无法执行"
+        FAILED=1
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]] && echo "$STAGED_FILES" | grep -q '^fractal-git/'; then
     write_step_verdict "RUST-COMPILE-10" SKIP "仅文档或配置变更"

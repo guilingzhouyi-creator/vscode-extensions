@@ -23,7 +23,7 @@ if [[ -z "$GIT_ROOT" ]]; then
 fi
 cd "$GIT_ROOT" || exit 1
 
-REQUIRED_HOOKS=(pre-commit commit-msg pre-merge-commit post-commit post-merge pre-push)
+REQUIRED_HOOKS=(pre-commit commit-msg pre-merge-commit post-commit post-merge pre-push post-rewrite)
 missing_hooks=()
 for hook in "${REQUIRED_HOOKS[@]}"; do
     if [[ ! -f ".githooks/$hook" ]]; then

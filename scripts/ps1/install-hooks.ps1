@@ -32,7 +32,7 @@ if (-not $gitRoot) {
 
 # 校验 hook 文件完整性
 $hooksDir = Join-Path $gitRoot '.githooks'
-$requiredHooks = @('pre-commit', 'commit-msg', 'pre-merge-commit', 'post-commit', 'post-merge', 'pre-push')
+$requiredHooks = @('pre-commit', 'commit-msg', 'pre-merge-commit', 'post-commit', 'post-merge', 'pre-push', 'post-rewrite')
 $missingHooks = @()
 foreach ($hook in $requiredHooks) {
     $hookPath = Join-Path $hooksDir $hook

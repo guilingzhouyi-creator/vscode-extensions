@@ -327,6 +327,109 @@ function compareEntryPoints(label, shScript, psScript, hasPwsh) {
 }
 
 /**
+ * Guards the compiler-absent branch of both pre-commit gates against silent regression.
+ *
+ * The step used to be an empty no-op: without a Rust toolchain both gates printed a warning and
+ * carried on, so an agent run reported PASS without compiling a single crate. That is exactly the
+ * failure a gate must not have, and the push-side counterpart already fails closed with
+ * RUST-TAXIS-19. A PATH-only probe can observe the bash branch alone, because the PowerShell gate
+ * resolves cargo from trusted absolute locations before consulting PATH; the text guard therefore
+ * pins both implementations so neither side can quietly revert on its own.
+ *
+ * @returns {boolean} True when both implementations keep the fail-closed branch.
+ */
+function assertCargoMissingFailClosed() {
+  const guards = [
+    [
+      'scripts/sh/pre-commit-gate.sh',
+      ['Agent 模式下 cargo 缺失属于空门禁', 'write_step_verdict "RUST-COMPILE-10" BLOCK "未检测到 cargo 工具链'],
+    ],
+    [
+      'scripts/ps1/pre-commit-gate.ps1',
+      ['-Details $cargoMissingDetails', 'Write-StepVerdict -StepId "RUST-COMPILE-10" -Status "BLOCK" -Detail "未检测到 cargo 工具链'],
+    ],
+  ];
+  const legacySkip = '跳过 fractal-git 本地编译校验';
+  let passed = true;
+  for (const [script, markers] of guards) {
+    const source = fs.readFileSync(path.join(REPO_ROOT, script), 'utf8');
+    const missing = markers.filter((marker) => !source.includes(marker));
+    const keepsLegacySkip = source.includes(legacySkip);
+    const ok = missing.length === 0 && !keepsLegacySkip;
+    console.log('RUST-COMPILE-10 fail-closed branch in ' + script + ': ' + (ok ? '✔ PASS' : '✖ BLOCK'));
+    if (!ok) {
+      if (missing.length > 0) console.log('  missing markers: ' + missing.join(' | '));
+      if (keepsLegacySkip) console.log('  the silent-skip wording is still present');
+      passed = false;
+    }
+  }
+  return passed;
+}
+
+/**
+ * Verifies the bash pre-commit gate blocks RUST-COMPILE-10 when cargo is absent from PATH.
+ *
+ * A throwaway Git index stages one Rust manifest so the gate's own staging detection fires; every
+ * cargo/rustup directory is then stripped from PATH for both the agent protocol and human mode.
+ * Both must fail, and the agent envelope must still attribute the block to RUST-COMPILE-10: an
+ * unattributed non-zero exit would let a later refactor pass this harness for the wrong reason.
+ *
+ * @returns {boolean} True when both modes blocked with the expected step identity.
+ */
+function compareCargoMissingBash() {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-parity-rust-'));
+  const posix = (value) => value.replace(/[\\]/g, '/');
+  const gitEnv = {
+    GIT_DIR: posix(path.join(scratch, '.git')),
+    GIT_WORK_TREE: posix(REPO_ROOT),
+    GIT_INDEX_FILE: posix(path.join(scratch, 'index')),
+  };
+  const init = spawnSync('git', ['init', '-q', scratch], { encoding: 'utf8' });
+  const stage = spawnSync('git', ['add', '--', 'fractal-git/Cargo.toml'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    env: { ...process.env, ...gitEnv },
+  });
+  if (init.status !== 0 || stage.status !== 0) {
+    fs.rmSync(scratch, { recursive: true, force: true });
+    console.log('cargo-missing RUST-COMPILE-10: SKIP (scratch git index unavailable)');
+    return true;
+  }
+  const pathValue = (process.env.PATH || '')
+    .split(path.delimiter)
+    .filter((entry) => entry && !/cargo|rustup/i.test(entry))
+    .join(path.delimiter);
+  const run = (args) => {
+    const result = spawnSync(POSIX_SHELL, args, {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: { ...makeGateEnv(), ...gitEnv, PATH: pathValue },
+    });
+    return {
+      status: result.error ? -1 : result.status,
+      output: (result.stdout || '') + (result.stderr || ''),
+    };
+  };
+  const agent = run(['scripts/sh/pre-commit-gate.sh', '--agent']);
+  const plain = run(['scripts/sh/pre-commit-gate.sh']);
+  fs.rmSync(scratch, { recursive: true, force: true });
+  const agentSteps = collectSteps(agent.output);
+  const agentOk = agent.status !== 0 && agentSteps.includes('RUST-COMPILE-10');
+  const plainOk =
+    plain.status !== 0 &&
+    plain.output.includes('RUST-COMPILE-10') &&
+    plain.output.includes('BLOCK') &&
+    !plain.output.includes('跳过 fractal-git 本地编译校验');
+  const ok = agentOk && plainOk;
+  const verdict = ok ? '✔ PASS' : '✖ BLOCK';
+  console.log('cargo-missing RUST-COMPILE-10: bash agent=' + agent.status + ' plain=' + plain.status + ' ' + verdict);
+  if (!ok) {
+    console.log('  agent steps=[' + agentSteps.join(',') + '] plain reportedStep=' + plain.output.includes('RUST-COMPILE-10'));
+  }
+  return ok;
+}
+
+/**
  * Materializes fixtures and compares both implementations.
  *
  * @returns {number} Process exit code.
@@ -352,6 +455,10 @@ function main() {
   for (const [label, shScript, psScript] of entryPoints) {
     if (!compareEntryPoints(label, shScript, psScript, hasPwsh)) failures += 1;
   }
+
+  // Fail-closed compile step: an absent Rust toolchain must block, never report a silent pass.
+  if (!assertCargoMissingFailClosed()) failures += 1;
+  if (!compareCargoMissingBash()) failures += 1;
 
   cleanup();
   if (failures > 0) {

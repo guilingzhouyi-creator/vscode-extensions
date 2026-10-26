@@ -14,6 +14,8 @@
  *   1. Merge per-phase markers written to pending/<ppid>.json without dropping sibling phases;
  *   2. Materialize a receipt from HEAD, tree, index digest, phases, actor and bypass facts, and
  *      preserve an already-verified receipt instead of downgrading it on a post-merge run;
+ *   2b. Sign every receipt and the baseline with HMAC-SHA256 under a key that lives outside the
+ *      repository, so a hand-written {verified:true} file can never pass the push audit;
  *   3. Exempt history at or below baseline.json, then require every pushed commit to carry a
  *      verified receipt, or record an explicit operator-allow-bypass line;
  *   4. Block protected-branch deletion and non-fast-forward pushes to a protected branch;
@@ -35,40 +37,21 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const SCHEMA_VERSION = 'gate-receipt-v1';
-const RECEIPTS_DIRNAME = 'gate-receipts';
-const PENDING_DIRNAME = 'pending';
-const BASELINE_FILENAME = 'baseline.json';
-const BYPASS_LOG_FILENAME = 'bypass.log';
-const PHASES = Object.freeze(['pre-commit', 'commit-msg']);
-const PHASE_STATUSES = Object.freeze(['pass', 'merge-structural']);
-const DEFAULT_PHASE_STATUS = 'pass';
-const SOURCE_HOOKS = Object.freeze(['post-commit', 'post-merge']);
-const DEFAULT_SOURCE_HOOK = 'post-commit';
-const PROTECTED_BRANCHES = Object.freeze(['main', 'master', 'integration']);
-const PROTECTED_PREFIX = 'refs/heads/';
-const BYPASS_REASON = 'no-verify-or-unrecorded';
-const OPERATOR_BYPASS_REASON = 'operator-allow-bypass';
-const MAX_PUSH_COMMITS = 2000;
-const MERGE_BASE_PROBE_LIMIT = 200;
-const ZERO_SHA = '0'.repeat(40);
-const TAG_PASS = 'PASS';
-const TAG_BLOCK = 'BLOCK';
-const TAG_INFO = 'INFO';
-const EXIT_OK = 0;
-const EXIT_BLOCK = 1;
-const EXIT_USAGE = 2;
+const SCHEMA_VERSION = 'gate-receipt-v1', RECEIPTS_DIRNAME = 'gate-receipts', PENDING_DIRNAME = 'pending';
+const BASELINE_FILENAME = 'baseline.json', BYPASS_LOG_FILENAME = 'bypass.log';
+const PHASES = Object.freeze(['pre-commit', 'commit-msg']), PHASE_STATUSES = Object.freeze(['pass', 'merge-structural']);
+const DEFAULT_PHASE_STATUS = 'pass', SOURCE_HOOKS = Object.freeze(['post-commit', 'post-merge']), DEFAULT_SOURCE_HOOK = 'post-commit';
+const PROTECTED_BRANCHES = Object.freeze(['main', 'master', 'integration']), PROTECTED_PREFIX = 'refs/heads/';
+const BYPASS_REASON = 'no-verify-or-unrecorded', OPERATOR_BYPASS_REASON = 'operator-allow-bypass';
+const MAX_PUSH_COMMITS = 2000, MERGE_BASE_PROBE_LIMIT = 200;
+const ZERO_SHA = '0'.repeat(40), TAG_PASS = 'PASS', TAG_BLOCK = 'BLOCK', TAG_INFO = 'INFO';
+const EXIT_OK = 0, EXIT_BLOCK = 1, EXIT_USAGE = 2;
 const RECEIPT_MISSING_TEXT = '缺少有效门禁收据（疑似 --no-verify 或 cherry-pick/revert 直接产生）';
-
-const GIT_ENV_KEYS = Object.freeze([
-  'GIT_DIR',
-  'GIT_WORK_TREE',
-  'GIT_INDEX_FILE',
-  'GIT_PREFIX',
-  'GIT_COMMON_DIR',
-  'GIT_OBJECT_DIRECTORY',
-  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
-]);
+const RECEIPT_KEY_ENV = 'DSH_GATE_RECEIPT_KEY_FILE', RECEIPT_KEY_DIRNAME = '.dsh', RECEIPT_KEY_FILENAME = 'gate-receipt.key';
+const RECEIPT_KEY_BYTES = 32, RECEIPT_KEY_MODE = 0o600, SIGNATURE_HEX_LENGTH = 64;
+const RECEIPT_KEY_PATTERN = /^[0-9a-f]{64}$/i, SHA_HEX_PATTERN = /^[0-9a-f]{40}$/;
+const SIGNATURE_FIELD = 'signature', SIGNATURE_ALG_FIELD = 'signatureAlg', SIGNATURE_ALG = 'hmac-sha256';
+const GIT_ENV_KEYS = Object.freeze(['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES']);
 
 const USAGE = [
   '用法: node scripts/common/gate-receipts.js <命令> [选项]',
@@ -76,6 +59,7 @@ const USAGE = [
   '命令:',
   '  mark --phase <pre-commit|commit-msg> --ppid <数字> [--status <pass|merge-structural>]',
   '  finalize --ppid <数字> [--hook <post-commit|post-merge>]',
+  '  rewrite                              # 读取 stdin 的 <old-sha> <new-sha> 行，重算并重签收据',
   '  baseline',
   '  verify-receipts --refs-file <路径> [--allow-bypass]',
   '  verify-refs --refs-file <路径>',
@@ -87,10 +71,15 @@ const USAGE = [
 const COMMAND_SPECS = new Map([
   ['mark', { values: ['phase', 'ppid', 'status'], flags: [], required: ['phase', 'ppid'] }],
   ['finalize', { values: ['ppid', 'hook'], flags: [], required: ['ppid'] }],
-  ['baseline', { values: [], flags: [], required: [] }],
   ['verify-receipts', { values: ['refs-file'], flags: ['allow-bypass'], required: ['refs-file'] }],
   ['verify-refs', { values: ['refs-file'], flags: [], required: ['refs-file'] }],
+  ['rewrite', { values: [], flags: [], required: [] }],
+  ['baseline', { values: [], flags: [], required: [] }],
   ['selftest', { values: [], flags: [], required: [] }],
+]);
+const COMMAND_HANDLERS = new Map([
+  ['mark', commandMark], ['finalize', commandFinalize], ['rewrite', commandRewrite], ['baseline', commandBaseline],
+  ['verify-receipts', commandVerifyReceipts], ['verify-refs', commandVerifyRefs], ['selftest', commandSelftest],
 ]);
 
 function toCamelCase(name) {
@@ -113,10 +102,7 @@ function parseCommandArgs(argv, spec) {
     const arg = argv[index];
     if (!arg.startsWith('--')) return { error: `参数必须以 -- 开头: ${arg}` };
     const name = arg.slice(2);
-    if (spec.flags.includes(name)) {
-      options[toCamelCase(name)] = true;
-      continue;
-    }
+    if (spec.flags.includes(name)) { options[toCamelCase(name)] = true; continue; }
     if (!spec.values.includes(name)) return { error: `未知参数: ${arg}` };
     if (index + 1 >= argv.length) return { error: `参数 ${arg} 缺少取值` };
     options[toCamelCase(name)] = argv[index + 1];
@@ -135,22 +121,7 @@ function run(argv) {
   if (spec === undefined) return usageError(`未知子命令: ${command}`);
   const parsed = parseCommandArgs(argv.slice(1), spec);
   if (parsed.error !== undefined) return usageError(`${command}: ${parsed.error}`);
-  switch (command) {
-    case 'mark':
-      return commandMark(parsed.options);
-    case 'finalize':
-      return commandFinalize(parsed.options);
-    case 'baseline':
-      return commandBaseline();
-    case 'verify-receipts':
-      return commandVerifyReceipts(parsed.options);
-    case 'verify-refs':
-      return commandVerifyRefs(parsed.options);
-    case 'selftest':
-      return commandSelftest();
-    default:
-      return usageError(`未知子命令: ${command}`);
-  }
+  return COMMAND_HANDLERS.get(command)(parsed.options);
 }
 
 function runGit(args, cwd) {
@@ -212,11 +183,7 @@ function writeFileAtomic(filePath, content) {
   try {
     fs.renameSync(tempPath, filePath);
   } catch (error) {
-    try {
-      fs.unlinkSync(tempPath);
-    } catch (cleanupError) {
-      void cleanupError;
-    }
+    try { fs.unlinkSync(tempPath); } catch (cleanupError) { void cleanupError; }
     throw error;
   }
 }
@@ -251,15 +218,98 @@ function readJsonSafe(filePath) {
   try {
     const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     return parsed !== null && typeof parsed === 'object' ? parsed : null;
-  } catch (error) {
-    void error;
-    return null;
-  }
+  } catch (error) { void error; return null; }
 }
 
 function nowIso() {
   return new Date().toISOString();
 }
+
+let cachedReceiptKey;
+
+/**
+ * Canonicalizes a JSON value so a signature never depends on key insertion order.
+ *
+ * @param {unknown} value - Arbitrary JSON value.
+ * @returns {unknown} Value with object keys sorted recursively.
+ */
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map((item) => canonicalize(item));
+  if (value === null || typeof value !== 'object') return value;
+  const ordered = {};
+  for (const key of Object.keys(value).sort()) ordered[key] = canonicalize(value[key]);
+  return ordered;
+}
+
+/**
+ * Loads the receipt signing key from env override or ~/.dsh, generating 32 random bytes on first
+ * use. The key never lives inside the repository, so a commit cannot carry its own forge tool.
+ *
+ * @returns {{key: Buffer}|{error: string}} Key material or a fail-closed reason.
+ */
+function readReceiptKey() {
+  if (cachedReceiptKey !== undefined) return cachedReceiptKey;
+  const configured = process.env[RECEIPT_KEY_ENV];
+  const keyPath = typeof configured === 'string' && configured.trim().length > 0
+    ? path.resolve(configured.trim()) : path.join(os.homedir(), RECEIPT_KEY_DIRNAME, RECEIPT_KEY_FILENAME);
+  try {
+    if (!fs.existsSync(keyPath)) {
+      fs.mkdirSync(path.dirname(keyPath), { recursive: true });
+      fs.writeFileSync(keyPath, `${crypto.randomBytes(RECEIPT_KEY_BYTES).toString('hex')}\n`, { encoding: 'utf8', mode: RECEIPT_KEY_MODE });
+      try { fs.chmodSync(keyPath, RECEIPT_KEY_MODE); } catch (error) { process.stderr.write(`WARN 无法把收据密钥权限收紧到 0600（${error.message}）\n`); }
+    }
+    const raw = fs.readFileSync(keyPath, 'utf8').trim();
+    if (!RECEIPT_KEY_PATTERN.test(raw)) { cachedReceiptKey = { error: `密钥文件内容不是 64 位十六进制: ${keyPath}` }; return cachedReceiptKey; }
+    cachedReceiptKey = { key: Buffer.from(raw, 'hex') };
+  } catch (error) { cachedReceiptKey = { error: `无法读写收据密钥 ${keyPath}: ${error.message}` }; }
+  return cachedReceiptKey;
+}
+
+/**
+ * Computes the HMAC-SHA256 signature over the canonical payload: only the signature field is
+ * stripped, so signatureAlg stays covered by the MAC and any byte edit invalidates the record.
+ *
+ * @param {object} record - Receipt or baseline record.
+ * @param {Buffer} key - HMAC key.
+ * @returns {string} Lowercase hex MAC.
+ */
+function computeSignature(record, key) {
+  const payload = { ...record };
+  delete payload[SIGNATURE_FIELD];
+  return crypto.createHmac('sha256', key).update(JSON.stringify(canonicalize(payload)), 'utf8').digest('hex');
+}
+
+/**
+ * Returns a copy of the record carrying signatureAlg and its MAC.
+ *
+ * @param {object} record - Receipt or baseline record.
+ * @param {Buffer} key - HMAC key.
+ * @returns {object} Signed record.
+ */
+function attachSignature(record, key) {
+  const signed = { ...record, [SIGNATURE_ALG_FIELD]: SIGNATURE_ALG };
+  signed[SIGNATURE_FIELD] = computeSignature(signed, key);
+  return signed;
+}
+
+/**
+ * Verifies a record signature and fails closed on every abnormal shape.
+ *
+ * @param {object|null} record - Parsed record.
+ * @returns {{ok: boolean, reason: string}} Verification outcome.
+ */
+function verifyRecordSignature(record) {
+  if (record === null || typeof record !== 'object') return { ok: false, reason: '记录不存在' };
+  if (record[SIGNATURE_ALG_FIELD] !== SIGNATURE_ALG) return { ok: false, reason: `${SIGNATURE_ALG_FIELD}=${String(record[SIGNATURE_ALG_FIELD])} 不是 ${SIGNATURE_ALG}` };
+  const actualHex = record[SIGNATURE_FIELD];
+  if (typeof actualHex !== 'string' || actualHex.length !== SIGNATURE_HEX_LENGTH) return { ok: false, reason: '缺少合法 signature' };
+  const keyed = readReceiptKey();
+  if (keyed.error !== undefined) return { ok: false, reason: keyed.error };
+  const expected = Buffer.from(computeSignature(record, keyed.key), 'hex'), actual = Buffer.from(actualHex.toLowerCase(), 'hex');
+  if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return { ok: false, reason: '签名不匹配' };
+  return { ok: true, reason: '' };
+}
+
 
 function isZeroSha(sha) {
   return /^0+$/.test(sha);
@@ -273,14 +323,6 @@ function shortSha(sha) {
   return typeof sha === 'string' ? sha.slice(0, 8) : '';
 }
 
-function removeQuietly(filePath) {
-  try {
-    fs.unlinkSync(filePath);
-  } catch (error) {
-    void error;
-  }
-}
-
 function removePendingFile(pendingPath) {
   try {
     fs.unlinkSync(pendingPath);
@@ -290,14 +332,12 @@ function removePendingFile(pendingPath) {
 }
 
 function readPendingPhases(record) {
-  if (record === null || typeof record.phases !== 'object' || record.phases === null) return {};
-  return record.phases;
+  return record !== null && typeof record.phases === 'object' && record.phases !== null ? record.phases : {};
 }
 
 function hashIndexListing() {
   const listing = runGit(['ls-files', '-s']);
-  const payload = listing.status === 0 ? listing.stdout : '';
-  return crypto.createHash('sha1').update(payload, 'utf8').digest('hex');
+  return crypto.createHash('sha1').update(listing.status === 0 ? listing.stdout : '', 'utf8').digest('hex');
 }
 
 function resolveActor() {
@@ -306,8 +346,7 @@ function resolveActor() {
 }
 
 function resolveBypassReason() {
-  const subject = gitText(['reflog', '-1', '--format=%gs']) || '';
-  const match = /^(cherry-pick|revert|am|rebase)/.exec(subject);
+  const match = /^(cherry-pick|revert|am|rebase)/.exec(gitText(['reflog', '-1', '--format=%gs']) || '');
   return match === null ? BYPASS_REASON : match[1];
 }
 
@@ -355,22 +394,17 @@ function commandFinalize(options) {
   if (!SOURCE_HOOKS.includes(hook)) return usageError(`finalize: --hook 必须是 ${SOURCE_HOOKS.join('|')}`);
   if (!isDecimal(options.ppid)) return usageError('finalize: --ppid 必须是十进制数字');
   const headSha = gitText(['rev-parse', 'HEAD']);
-  if (headSha === null) {
-    console.log('SKIP 无 HEAD 提交可记录（空仓库或未提交）');
-    return EXIT_OK;
-  }
+  if (headSha === null) { console.log('SKIP 无 HEAD 提交可记录（空仓库或未提交）'); return EXIT_OK; }
   const gitDir = resolveGitDir();
-  if (gitDir === null) {
-    process.stderr.write('WARN 当前目录不是 Git 仓库，跳过收据生成\n');
-    return EXIT_OK;
-  }
+  if (gitDir === null) { process.stderr.write('WARN 当前目录不是 Git 仓库，跳过收据生成\n'); return EXIT_OK; }
   const receipts = receiptsRoot(gitDir);
   const pendingPath = path.join(receipts, PENDING_DIRNAME, `${options.ppid}.json`);
   const phases = readPendingPhases(readJsonSafe(pendingPath));
   const verified = PHASES.every((phase) => Object.prototype.hasOwnProperty.call(phases, phase));
   const receiptPath = path.join(receipts, `${headSha}.json`);
   const existing = readJsonSafe(receiptPath);
-  if (existing !== null && existing.verified === true) {
+  const existingTrusted = existing !== null && existing.verified === true && verifyRecordSignature(existing).ok;
+  if (existingTrusted) {
     removePendingFile(pendingPath);
     console.log(`SKIP 收据 ${shortSha(headSha)} 已存在且 verified=true，保持不变`);
     return EXIT_OK;
@@ -388,9 +422,133 @@ function commandFinalize(options) {
     actor: resolveActor(),
     createdAt: nowIso(),
   };
-  tryWriteJson(receiptPath, receipt);
+  const keyed = readReceiptKey();
+  if (keyed.error !== undefined) process.stderr.write(`WARN 收据未签名，push 阶段将 fail-closed 阻断: ${keyed.error}\n`);
+  tryWriteJson(receiptPath, keyed.error !== undefined ? { ...receipt, [SIGNATURE_ALG_FIELD]: SIGNATURE_ALG, [SIGNATURE_FIELD]: '' } : attachSignature(receipt, keyed.key));
   removePendingFile(pendingPath);
   console.log(`PASS 收据 ${shortSha(headSha)} verified=${verified} hook=${hook}`);
+  return EXIT_OK;
+}
+
+/**
+ * Parses the "<old-sha> <new-sha>" lines Git feeds to a post-rewrite hook.
+ *
+ * @param {string} raw - Complete stdin text.
+ * @returns {{pairs: Array<{oldSha: string, newSha: string}>}|{error: string}} Parse outcome.
+ */
+function parseRewriteLines(raw) {
+  const pairs = [];
+  for (const rawLine of raw.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line.length === 0) continue;
+    const columns = line.split(/\s+/);
+    if (columns.length < 2) return { error: `post-rewrite 行必须是 <old-sha> <new-sha>: ${line}` };
+    const oldSha = columns[0].toLowerCase();
+    const newSha = columns[1].toLowerCase();
+    if (!SHA_HEX_PATTERN.test(oldSha) || !SHA_HEX_PATTERN.test(newSha)) {
+      return { error: `post-rewrite 行包含非 40 位 sha: ${line}` };
+    }
+    pairs.push({ oldSha, newSha });
+  }
+  return { pairs };
+}
+
+/**
+ * Reads the hook stdin payload without ever throwing on a closed or empty stream.
+ *
+ * @returns {string} stdin text, empty when unavailable.
+ */
+function readStdinText() {
+  try {
+    return fs.readFileSync(0, 'utf8');
+  } catch (error) {
+    void error;
+    return '';
+  }
+}
+
+/**
+ * Re-materializes one receipt for a rewritten commit.
+ *
+ * The old receipt must be authentically signed, otherwise nothing is propagated: rewriting is a
+ * provenance carry-forward, never a laundering step for forged evidence.
+ *
+ * @param {string} receipts - Absolute receipts root.
+ * @param {Buffer} key - HMAC key.
+ * @param {{oldSha: string, newSha: string}} pair - Rewrite pair.
+ * @returns {string} Operator-facing one-line outcome.
+ */
+function rewriteOneReceipt(receipts, key, pair) {
+  if (pair.oldSha === pair.newSha) return `SKIP 收据重写 ${shortSha(pair.newSha)}：新旧 sha 相同`;
+  const oldReceipt = readJsonSafe(path.join(receipts, `${pair.oldSha}.json`));
+  if (oldReceipt === null) {
+    return `WARN 收据重写跳过 ${shortSha(pair.oldSha)} -> ${shortSha(pair.newSha)}：旧收据不存在`;
+  }
+  const oldTrust = verifyRecordSignature(oldReceipt);
+  if (!oldTrust.ok) {
+    return `WARN 收据重写跳过 ${shortSha(pair.oldSha)} -> ${shortSha(pair.newSha)}：旧收据签名不可信（${oldTrust.reason}）`;
+  }
+  const existing = readJsonSafe(path.join(receipts, `${pair.newSha}.json`));
+  if (existing !== null && existing.verified === true && verifyRecordSignature(existing).ok) {
+    return `SKIP 收据重写 ${shortSha(pair.newSha)}：已有可信收据，保持不变`;
+  }
+  const verified = oldReceipt.verified === true;
+  const rewritten = attachSignature(
+    {
+      schemaVersion: oldReceipt.schemaVersion || SCHEMA_VERSION,
+      commitSha: pair.newSha,
+      treeSha: gitText(['rev-parse', `${pair.newSha}^{tree}`]) || '',
+      indexDigest: typeof oldReceipt.indexDigest === 'string' ? oldReceipt.indexDigest : '',
+      phases: typeof oldReceipt.phases === 'object' && oldReceipt.phases !== null ? oldReceipt.phases : {},
+      verified,
+      bypass: !verified,
+      bypassReason: verified ? null : oldReceipt.bypassReason || BYPASS_REASON,
+      sourceHook: 'post-rewrite',
+      actor: typeof oldReceipt.actor === 'string' ? oldReceipt.actor : resolveActor(),
+      createdAt: typeof oldReceipt.createdAt === 'string' ? oldReceipt.createdAt : nowIso(),
+      rewrittenFrom: pair.oldSha,
+      rewrittenAt: nowIso(),
+    },
+    key,
+  );
+  if (!tryWriteJson(path.join(receipts, `${pair.newSha}.json`), rewritten)) {
+    return `WARN 收据重写写入失败 ${shortSha(pair.newSha)}`;
+  }
+  return `PASS 收据重写 ${shortSha(pair.oldSha)} -> ${shortSha(pair.newSha)} verified=${verified}`;
+}
+
+/**
+ * Rewrites receipts after commit --amend or rebase, driven by the post-rewrite hook's stdin.
+ *
+ * Never blocks Git: post-rewrite is a post-transaction hook and must leave the rebase result intact;
+ * every problem becomes a WARN line and the exit code stays 0.
+ *
+ * @param {object} options - Parsed CLI options (unused).
+ * @returns {number} Always EXIT_OK.
+ */
+function commandRewrite(options) {
+  void options;
+  const gitDir = resolveGitDir();
+  if (gitDir === null) {
+    process.stderr.write('WARN 当前目录不是 Git 仓库，跳过收据重写\n');
+    return EXIT_OK;
+  }
+  const keyed = readReceiptKey();
+  if (keyed.error !== undefined) {
+    process.stderr.write(`WARN 无法加载收据签名密钥，跳过收据重写: ${keyed.error}\n`);
+    return EXIT_OK;
+  }
+  const parsed = parseRewriteLines(readStdinText());
+  if (parsed.error !== undefined) {
+    process.stderr.write(`WARN ${parsed.error}\n`);
+    return EXIT_OK;
+  }
+  if (parsed.pairs.length === 0) {
+    console.log('SKIP 收据重写：stdin 没有 <old-sha> <new-sha> 行');
+    return EXIT_OK;
+  }
+  const receipts = receiptsRoot(gitDir);
+  for (const pair of parsed.pairs) console.log(rewriteOneReceipt(receipts, keyed.key, pair));
   return EXIT_OK;
 }
 
@@ -403,13 +561,14 @@ function commandFinalize(options) {
 function commandBaseline() {
   const gitDir = resolveGitDir();
   if (gitDir === null) return failBlock('baseline: 无法解析 Git 目录（不在 Git 仓库内）');
+  const keyed = readReceiptKey();
+  if (keyed.error !== undefined) return failBlock(`baseline: 无法加载收据签名密钥（${keyed.error}）`);
   const commitSha = gitText(['rev-parse', 'HEAD']) || '';
-  tryWriteJson(path.join(receiptsRoot(gitDir), BASELINE_FILENAME), {
-    schemaVersion: SCHEMA_VERSION,
-    commitSha,
-    createdAt: nowIso(),
-  });
-  console.log(`PASS 写入 baseline（commitSha=${commitSha.length === 0 ? '(empty)' : shortSha(commitSha)}）`);
+  const baseline = attachSignature({ schemaVersion: SCHEMA_VERSION, commitSha, createdAt: nowIso() }, keyed.key);
+  if (!tryWriteJson(path.join(receiptsRoot(gitDir), BASELINE_FILENAME), baseline)) {
+    return failBlock('baseline: 写入 baseline 失败，拒绝留下不可信豁免');
+  }
+  console.log(`PASS 写入 baseline（commitSha=${commitSha.length === 0 ? '(empty)' : shortSha(commitSha)}，已签名）`);
   return EXIT_OK;
 }
 
@@ -480,7 +639,8 @@ function readCommitAncestors(baselineSha) {
  */
 function createBaselineExemptionLookup(receipts, commitCount) {
   const baseline = readJsonSafe(path.join(receipts, BASELINE_FILENAME));
-  const baselineSha = baseline !== null && typeof baseline.commitSha === 'string' ? baseline.commitSha : '';
+  const baselineTrusted = baseline !== null && verifyRecordSignature(baseline).ok;
+  const baselineSha = baselineTrusted && typeof baseline.commitSha === 'string' ? baseline.commitSha : '';
   if (baselineSha.length === 0) return () => false;
   if (commitCount <= MERGE_BASE_PROBE_LIMIT) {
     return (sha) => gitSucceeds(['merge-base', '--is-ancestor', sha, baselineSha]);
@@ -491,7 +651,8 @@ function createBaselineExemptionLookup(receipts, commitCount) {
 
 function hasVerifiedReceipt(receipts, sha) {
   const receipt = readJsonSafe(path.join(receipts, `${sha}.json`));
-  return receipt !== null && receipt.verified === true;
+  if (receipt === null || receipt.verified !== true) return false;
+  return verifyRecordSignature(receipt).ok;
 }
 
 function violationNote(violation) {
@@ -554,7 +715,15 @@ function commandVerifyReceipts(options) {
   if (refs.error !== undefined) return usageError(`verify-receipts: ${refs.error}`);
   const gitDir = resolveGitDir();
   if (gitDir === null) return failBlock('verify-receipts: 无法解析 Git 目录（不在 Git 仓库内）');
+  const keyed = readReceiptKey();
+  if (keyed.error !== undefined) return failBlock(`verify-receipts: 无法加载收据签名密钥（${keyed.error}）`);
   const receipts = receiptsRoot(gitDir);
+  const baselinePath = path.join(receipts, BASELINE_FILENAME);
+  if (fs.existsSync(baselinePath)) {
+    const baseline = readJsonSafe(baselinePath);
+    const baselineTrust = verifyRecordSignature(baseline);
+    if (!baselineTrust.ok) return failBlock(`verify-receipts: baseline 签名校验失败（${baselineTrust.reason}）`);
+  }
   const violations = collectReceiptViolations(refs.rows, receipts);
   if (violations.length === 0) {
     console.log(`PASS 收据校验通过：${refs.rows.length} 条 ref 范围内没有缺少有效收据的提交`);
@@ -640,6 +809,15 @@ function expectSelftestGit(dir, args, label) {
 
 function selftestCli(repo, args) {
   return spawnSync(process.execPath, [__filename, ...args], { cwd: repo.dir, encoding: 'utf8', windowsHide: true });
+}
+
+function selftestCliWithInput(repo, args, input) {
+  return spawnSync(process.execPath, [__filename, ...args], {
+    cwd: repo.dir,
+    encoding: 'utf8',
+    windowsHide: true,
+    input,
+  });
 }
 
 function expectSelftestExit(result, expected, label) {
@@ -818,6 +996,66 @@ function selftestNonFastForward(repo, ancestorSha, localSha, divergentSha) {
   });
 }
 
+function selftestUnsignedReceiptBlocked(repo) {
+  return selftestCase('h) 手写 {verified:true} 无签名收据 => verify-receipts exit 1', () => {
+    const sha = commitSelftestFile(repo, 'unsigned.txt', 'one\n', 'unsigned target');
+    const receipts = selftestReceipts(repo);
+    fs.mkdirSync(receipts, { recursive: true });
+    const forgedPath = path.join(receipts, `${sha}.json`);
+    fs.writeFileSync(forgedPath, JSON.stringify({ schemaVersion: SCHEMA_VERSION, commitSha: sha, verified: true, bypass: false }), 'utf8');
+    const parent = expectSelftestGit(repo.dir, ['rev-parse', `${sha}^`], '自测读取父提交');
+    const refsFile = writeSelftestRefs(repo, 'unsigned', [refLine('refs/heads/main', sha, 'refs/heads/main', parent)]);
+    const blocked = selftestCli(repo, ['verify-receipts', '--refs-file', refsFile]);
+    expectSelftestExit(blocked, 1, 'verify-receipts 无签名收据');
+    assertSelftest(blocked.stdout.includes('BLOCK 提交'), '无签名收据未产出 BLOCK 行');
+    fs.unlinkSync(forgedPath);
+    return '无签名收据 exit=1 且产出 BLOCK 行';
+  });
+}
+
+function selftestTamperedSignatureBlocked(repo) {
+  return selftestCase('i) 收据签名改一字节 => verify-receipts exit 1', () => {
+    const sha = commitSelftestFile(repo, 'tamper.txt', 'one\n', 'tamper target');
+    expectSelftestExit(selftestCli(repo, ['mark', '--phase', 'pre-commit', '--ppid', '6161']), 0, 'mark pre-commit');
+    expectSelftestExit(selftestCli(repo, ['mark', '--phase', 'commit-msg', '--ppid', '6161']), 0, 'mark commit-msg');
+    expectSelftestExit(selftestCli(repo, ['finalize', '--ppid', '6161']), 0, 'finalize');
+    const receiptPath = path.join(selftestReceipts(repo), `${sha}.json`);
+    const receipt = readJsonSafe(receiptPath);
+    assertSelftest(receipt !== null && typeof receipt.signature === 'string', '收据缺少 signature');
+    const flipped = receipt.signature.startsWith('0') ? `1${receipt.signature.slice(1)}` : `0${receipt.signature.slice(1)}`;
+    fs.writeFileSync(receiptPath, `${JSON.stringify({ ...receipt, signature: flipped }, null, 2)}\n`, 'utf8');
+    const parent = expectSelftestGit(repo.dir, ['rev-parse', `${sha}^`], '自测读取父提交');
+    const refsFile = writeSelftestRefs(repo, 'tampered', [refLine('refs/heads/main', sha, 'refs/heads/main', parent)]);
+    expectSelftestExit(selftestCli(repo, ['verify-receipts', '--refs-file', refsFile]), 1, 'verify-receipts 被篡改签名');
+    fs.unlinkSync(receiptPath);
+    return '篡改签名 exit=1';
+  });
+}
+
+function selftestRewriteAfterAmend(repo) {
+  return selftestCase('j) post-rewrite 把旧收据重算到新 sha 并标 rewrittenFrom', () => {
+    const oldSha = commitSelftestFile(repo, 'rewrite.txt', 'one\n', 'rewrite target');
+    expectSelftestExit(selftestCli(repo, ['mark', '--phase', 'pre-commit', '--ppid', '7171']), 0, 'mark pre-commit');
+    expectSelftestExit(selftestCli(repo, ['mark', '--phase', 'commit-msg', '--ppid', '7171']), 0, 'mark commit-msg');
+    expectSelftestExit(selftestCli(repo, ['finalize', '--ppid', '7171']), 0, 'finalize');
+    expectSelftestGit(repo.dir, ['commit', '-q', '--amend', '--no-edit'], '自测 amend');
+    const newSha = expectSelftestGit(repo.dir, ['rev-parse', 'HEAD'], '自测读取 amend 后 HEAD');
+    assertSelftest(newSha !== oldSha, 'amend 未改变 sha');
+    const rewritten = selftestCliWithInput(repo, ['rewrite'], `${oldSha} ${newSha}\n`);
+    expectSelftestExit(rewritten, 0, 'rewrite');
+    const receipt = readJsonSafe(path.join(selftestReceipts(repo), `${newSha}.json`));
+    assertSelftest(receipt !== null, '新 sha 收据不存在');
+    assertSelftest(receipt.rewrittenFrom === oldSha, `rewrittenFrom=${receipt.rewrittenFrom}`);
+    assertSelftest(receipt.verified === true, `verified=${receipt.verified}`);
+    assertSelftest(typeof receipt.signature === 'string' && receipt.signature.length === 64, '重写收据未签名');
+    assertSelftest(receipt.sourceHook === 'post-rewrite', `sourceHook=${receipt.sourceHook}`);
+    const parent = expectSelftestGit(repo.dir, ['rev-parse', `${newSha}^`], '自测读取父提交');
+    const refsFile = writeSelftestRefs(repo, 'rewritten', [refLine('refs/heads/main', newSha, 'refs/heads/main', parent)]);
+    expectSelftestExit(selftestCli(repo, ['verify-receipts', '--refs-file', refsFile]), 0, 'verify-receipts 重写后');
+    return `rewrittenFrom=${shortSha(oldSha)} -> ${shortSha(newSha)} verify exit=0`;
+  });
+}
+
 function createDivergentCommit(repo, baseSha) {
   const branch = expectSelftestGit(repo.dir, ['rev-parse', '--abbrev-ref', 'HEAD'], '自测读取当前分支');
   expectSelftestGit(repo.dir, ['checkout', '-q', '-b', 'selftest-side', baseSha], '自测创建旁支');
@@ -847,6 +1085,8 @@ function reportSelftest(results) {
 
 function executeSelftest() {
   const repo = createSelftestRepo();
+  const previousKeyEnv = process.env[RECEIPT_KEY_ENV];
+  process.env[RECEIPT_KEY_ENV] = path.join(repo.dir, 'receipt.key');
   const results = [];
   try {
     const baseSha = commitSelftestFile(repo, 'note.txt', 'one\n', 'base commit');
@@ -861,7 +1101,12 @@ function executeSelftest() {
     const divergentSha = createDivergentCommit(repo, secondSha);
     results.push(selftestRefSafety(repo, fourthSha));
     results.push(selftestNonFastForward(repo, thirdSha, fourthSha, divergentSha));
+    results.push(selftestUnsignedReceiptBlocked(repo));
+    results.push(selftestTamperedSignatureBlocked(repo));
+    results.push(selftestRewriteAfterAmend(repo));
   } finally {
+    if (previousKeyEnv === undefined) delete process.env[RECEIPT_KEY_ENV];
+    else process.env[RECEIPT_KEY_ENV] = previousKeyEnv;
     cleanupSelftestRepo(repo.dir);
   }
   return reportSelftest(results);
