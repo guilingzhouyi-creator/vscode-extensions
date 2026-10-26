@@ -26,8 +26,10 @@ static SCRATCH_COUNTER: AtomicU64 = AtomicU64::new(0);
 /// Resolves a unique writable scratch path.
 fn scratch_path(label: &str) -> PathBuf {
     let sequence = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let mut path = std::env::temp_dir();
-    path.push("Low");
+    let mut path = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("test_tmp");
     path.push("fg-native-integration");
     let _ = std::fs::create_dir_all(&path);
     path.push(format!("{}-{}-{}.txc", label, std::process::id(), sequence));

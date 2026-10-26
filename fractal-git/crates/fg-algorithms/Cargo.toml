@@ -11,3 +11,5 @@ fg-core = { path = "../fg-core" }
 fg-object = { path = "../fg-object" }
 sha1 = "0.10"
 serde = { version = "1.0", features = ["derive"] }
+imara-diff = "0.2"
+roaring = "0.10"

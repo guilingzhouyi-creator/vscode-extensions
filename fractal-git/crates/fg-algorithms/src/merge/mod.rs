@@ -18,4 +18,6 @@ pub use three_way::{
     CanonicalConflictEntry, CanonicalMergeResult, ConflictEntry, FastPathMerge, ThreeWayMerge,
     ThreeWayMergeResult,
 };
-pub use virtual_base::VirtualMergeBaseSynthesizer;
+pub use virtual_base::{
+    three_way_linear_scan, CompactTreeEntry, PathArena, PathId, VirtualMergeBaseSynthesizer,
+};

@@ -18,8 +18,10 @@ static SCRATCH_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Returns a writable scratch directory, creating it when absent.
 fn scratch_dir() -> PathBuf {
-    let mut base = std::env::temp_dir();
-    base.push("Low");
+    let mut base = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("test_tmp");
     base.push("fg-native-tests");
     let _ = std::fs::create_dir_all(&base);
     base

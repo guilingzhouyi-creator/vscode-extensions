@@ -23,9 +23,7 @@
 //!
 //! Domain Governance Rules: FGT-ALG-001 (unified patch generation), FGT-COR-001, FGT-PRF-001.
 
-use crate::diff::compact::{Compaction, Side};
-use crate::diff::xdiff::mark_changed;
-use crate::diff::xdiff_prepare::prepare;
+use crate::diff::engine::{DiffAlgorithm, DiffEngine};
 
 /// A line in a diff hunk, owning its text.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,7 +125,7 @@ pub fn split_lines(text: &str) -> Vec<&str> {
 /// Mirrors Git's `trim_common_tail` in `xdiff-interface.c`. Git invokes this optimization only
 /// when context length is 0 (`-U0`), so that unchanged trailing blocks on large files do not
 /// skew the line classification counts or waste Myers graph search steps.
-fn trim_common_tail<'a>(a: &'a str, b: &'a str) -> (&'a str, &'a str) {
+pub(crate) fn trim_common_tail<'a>(a: &'a str, b: &'a str) -> (&'a str, &'a str) {
     const BLK: usize = 1024;
     let a_bytes = a.as_bytes();
     let b_bytes = b.as_bytes();
@@ -203,50 +201,41 @@ impl PatchGenerator {
         new_text: &'a str,
         hunk_context: usize,
     ) -> UnifiedPatchRef<'a> {
-        // Identical content needs no search, and an empty pair has nothing to align. Both return
-        // before allocating the per-record arrays the stages need.
-        if old_text == new_text {
-            return UnifiedPatchRef {
-                file_path,
-                hunks: Vec::new(),
-            };
-        }
-
-        let (effective_old, effective_new) = if hunk_context == 0 {
-            trim_common_tail(old_text, new_text)
-        } else {
-            (old_text, new_text)
-        };
-
-        let old_lines: Vec<&'a str> = split_lines(effective_old);
-        let new_lines: Vec<&'a str> = split_lines(effective_new);
-
-        let old_records: Vec<&[u8]> = effective_old
-            .split_inclusive('\n')
-            .map(str::as_bytes)
-            .collect();
-        let new_records: Vec<&[u8]> = effective_new
-            .split_inclusive('\n')
-            .map(str::as_bytes)
-            .collect();
-        let (prepared_old, prepared_new) = prepare(&old_records, &new_records);
-        let (mut old_changed, mut new_changed) = mark_changed(&prepared_old, &prepared_new);
-
-        // Both sides' class ids serve as line identity for the layout pass: two lines are the same
-        // line exactly when they share a class, which is the same relation the alignment used.
-        Compaction::new(
-            Side {
-                hashes: &prepared_old.classes,
-                texts: &old_lines,
-            },
-            Side {
-                hashes: &prepared_new.classes,
-                texts: &new_lines,
-            },
+        Self::generate_patch_ref_with_algorithm(
+            file_path,
+            old_text,
+            new_text,
+            hunk_context,
+            DiffAlgorithm::Auto,
         )
-        .run(&mut old_changed, &mut new_changed);
+    }
 
-        let aligned = Self::align_lines(&old_lines, &new_lines, &old_changed, &new_changed);
+    /// Generates a unified patch with an explicit context width and diff algorithm.
+    pub fn generate_patch_ref_with_algorithm<'a>(
+        file_path: &'a str,
+        old_text: &'a str,
+        new_text: &'a str,
+        hunk_context: usize,
+        algorithm: DiffAlgorithm,
+    ) -> UnifiedPatchRef<'a> {
+        DiffEngine::with_algorithm(algorithm).generate_patch(
+            file_path,
+            old_text,
+            new_text,
+            hunk_context,
+        )
+    }
+
+    /// Builds a UnifiedPatchRef from pre-calculated change flags.
+    pub fn build_unified_patch_from_flags<'a>(
+        file_path: &'a str,
+        old_lines: &[&'a str],
+        new_lines: &[&'a str],
+        old_changed: &[bool],
+        new_changed: &[bool],
+        hunk_context: usize,
+    ) -> UnifiedPatchRef<'a> {
+        let aligned = Self::align_lines(old_lines, new_lines, old_changed, new_changed);
         UnifiedPatchRef {
             file_path,
             hunks: split_into_hunks(&aligned, hunk_context),

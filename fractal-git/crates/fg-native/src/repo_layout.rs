@@ -396,8 +396,10 @@ mod tests {
 
     fn scratch_workspace(label: &str) -> std::path::PathBuf {
         let sequence = SCRATCH.fetch_add(1, Ordering::Relaxed);
-        let mut path = std::env::temp_dir();
-        path.push("Low");
+        let mut path = std::env::current_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .join("target")
+            .join("test_tmp");
         path.push("fg-native-layout");
         let _ = std::fs::create_dir_all(&path);
         path.push(format!("{label}-{}-{sequence}", std::process::id()));

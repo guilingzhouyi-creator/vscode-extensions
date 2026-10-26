@@ -31,15 +31,15 @@ pub const DEFAULT_MAX_CHUNK: usize = 1024 * 64;
 const fn generate_gear_table() -> [u64; 256] {
     let mut table = [0u64; 256];
     let mut state = 0x9e3779b97f4a7c15u64;
-    let mut i = 0;
-    while i < 256 {
+    let mut table_index = 0;
+    while table_index < 256 {
         state = state.wrapping_add(0x9e3779b97f4a7c15);
         let mut mixed_state = state;
         mixed_state = (mixed_state ^ (mixed_state >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
         mixed_state = (mixed_state ^ (mixed_state >> 27)).wrapping_mul(0x94d049bb133111eb);
         mixed_state ^= mixed_state >> 31;
-        table[i] = mixed_state;
-        i += 1;
+        table[table_index] = mixed_state;
+        table_index += 1;
     }
     table
 }
@@ -124,30 +124,30 @@ impl FastCdcChunker {
         }
 
         let max_cut = remaining.min(self.max_size);
-        let mut cut = self.min_size;
-        let mid = self.min_size + (max_cut - self.min_size) / 2;
+        let mut cut_offset = self.min_size;
+        let midpoint = self.min_size + (max_cut - self.min_size) / 2;
         let slice = &input_bytes[*offset..*offset + max_cut];
 
         let mut fingerprint: u64 = 0;
         let mut found = false;
 
-        // Phase 1: Small mask normalization window [min_size..mid)
-        while cut < mid {
-            let byte = slice[cut];
+        // Phase 1: Small mask normalization window [min_size..midpoint)
+        while cut_offset < midpoint {
+            let byte = slice[cut_offset];
             fingerprint = (fingerprint << 1).wrapping_add(GEAR_TABLE[byte as usize]);
-            cut += 1;
+            cut_offset += 1;
             if (fingerprint & self.mask_s) == 0 {
                 found = true;
                 break;
             }
         }
 
-        // Phase 2: Large mask normalization window [mid..max_cut)
+        // Phase 2: Large mask normalization window [midpoint..max_cut)
         if !found {
-            while cut < max_cut {
-                let byte = slice[cut];
+            while cut_offset < max_cut {
+                let byte = slice[cut_offset];
                 fingerprint = (fingerprint << 1).wrapping_add(GEAR_TABLE[byte as usize]);
-                cut += 1;
+                cut_offset += 1;
                 if (fingerprint & self.mask_l) == 0 {
                     found = true;
                     break;
@@ -156,16 +156,16 @@ impl FastCdcChunker {
         }
 
         if !found {
-            cut = max_cut;
+            cut_offset = max_cut;
         }
 
-        let chunk = Self::make_chunk(input_bytes, *offset, cut);
-        *offset += cut;
+        let chunk = Self::make_chunk(input_bytes, *offset, cut_offset);
+        *offset += cut_offset;
         chunk
     }
 
-    fn make_chunk(input_bytes: &[u8], offset: usize, length: usize) -> ChunkDescriptor {
-        let slice = &input_bytes[offset..offset + length];
+    pub(crate) fn make_chunk_from_slice(slice: &[u8], offset: usize) -> ChunkDescriptor {
+        let length = slice.len();
         let mut hasher = Sha1::new();
 
         // Stack-allocated Git blob header to ensure loop zero-heap allocation (FGT-PRF-001)
@@ -181,6 +181,10 @@ impl FastCdcChunker {
             length,
             oid,
         }
+    }
+
+    fn make_chunk(input_bytes: &[u8], offset: usize, length: usize) -> ChunkDescriptor {
+        Self::make_chunk_from_slice(&input_bytes[offset..offset + length], offset)
     }
 
     #[inline]
@@ -199,8 +203,8 @@ impl FastCdcChunker {
                 remaining /= 10;
                 digit_count += 1;
             }
-            for idx in (0..digit_count).rev() {
-                buf[cursor] = digits[idx];
+            for digit_index in (0..digit_count).rev() {
+                buf[cursor] = digits[digit_index];
                 cursor += 1;
             }
         }

@@ -158,6 +158,7 @@ mod tests {
     use fg_core::models::{FileMode, Oid, SubmoduleEntry};
     use std::collections::BTreeMap;
     use std::fs;
+    use std::path::PathBuf;
 
     fn dummy_oid(byte: u8) -> Oid {
         let mut bytes = [0u8; 20];
@@ -167,7 +168,12 @@ mod tests {
 
     #[test]
     fn uninitialized_submodule_shows_minus() {
-        let temp_dir = std::env::temp_dir().join(format!("taxis_sub_test_{}", std::process::id()));
+        let base = std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("target")
+            .join("test_tmp");
+        let _ = fs::create_dir_all(&base);
+        let temp_dir = base.join(format!("taxis_sub_test_{}", std::process::id()));
         let _ = fs::create_dir_all(&temp_dir);
 
         let mut modules = BTreeMap::new();
@@ -189,7 +195,12 @@ mod tests {
 
     #[test]
     fn matching_submodule_head_shows_clean_space() {
-        let temp_dir = std::env::temp_dir().join(format!("taxis_sub_match_{}", std::process::id()));
+        let base = std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("target")
+            .join("test_tmp");
+        let _ = fs::create_dir_all(&base);
+        let temp_dir = base.join(format!("taxis_sub_match_{}", std::process::id()));
         let sub_git = temp_dir.join("vendor/sub/.git");
         let _ = fs::create_dir_all(&sub_git);
         let _ = fs::write(sub_git.join("HEAD"), format!("{}\n", dummy_oid(5).to_hex()));

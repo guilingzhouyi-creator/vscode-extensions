@@ -123,14 +123,14 @@ fn emit_copy_op(offset: usize, len: usize, out: &mut Vec<u8>) {
 
     let mut opcode = OPCODE_COPY;
     let mut operands = [0u8; 7];
-    let mut op_idx = 0;
+    let mut operand_index = 0;
 
     for shift in [0u32, 8, 16, 24] {
         let byte = ((offset >> shift) & 0xff) as u8;
         if byte != 0 {
             opcode |= 1u8 << (shift / 8);
-            operands[op_idx] = byte;
-            op_idx += 1;
+            operands[operand_index] = byte;
+            operand_index += 1;
         }
     }
 
@@ -139,14 +139,14 @@ fn emit_copy_op(offset: usize, len: usize, out: &mut Vec<u8>) {
             let byte = ((len >> shift) & 0xff) as u8;
             if byte != 0 {
                 opcode |= 0x10u8 << index;
-                operands[op_idx] = byte;
-                op_idx += 1;
+                operands[operand_index] = byte;
+                operand_index += 1;
             }
         }
     }
 
     out.push(opcode);
-    out.extend_from_slice(&operands[..op_idx]);
+    out.extend_from_slice(&operands[..operand_index]);
 }
 
 /// Emits the copy opcodes for one matched byte run.
@@ -199,50 +199,50 @@ pub fn encode_git_delta(base: &[u8], target: &[u8]) -> Option<Vec<u8>> {
 
     let mut index: HashMap<u32, usize> = HashMap::new();
     if base.len() >= MIN_MATCH_LEN {
-        let mut b_cursor = 0;
-        while b_cursor + MIN_MATCH_LEN <= base.len() {
+        let mut base_cursor = 0;
+        while base_cursor + MIN_MATCH_LEN <= base.len() {
             let key = u32::from_le_bytes([
-                base[b_cursor],
-                base[b_cursor + 1],
-                base[b_cursor + 2],
-                base[b_cursor + 3],
+                base[base_cursor],
+                base[base_cursor + 1],
+                base[base_cursor + 2],
+                base[base_cursor + 3],
             ]);
-            index.entry(key).or_insert(b_cursor);
-            b_cursor += MIN_MATCH_LEN;
+            index.entry(key).or_insert(base_cursor);
+            base_cursor += MIN_MATCH_LEN;
         }
     }
 
-    let mut t_cursor = 0;
+    let mut target_cursor = 0;
     let mut pending_insert_start = 0;
 
-    while t_cursor + MIN_MATCH_LEN <= target.len() {
+    while target_cursor + MIN_MATCH_LEN <= target.len() {
         let key = u32::from_le_bytes([
-            target[t_cursor],
-            target[t_cursor + 1],
-            target[t_cursor + 2],
-            target[t_cursor + 3],
+            target[target_cursor],
+            target[target_cursor + 1],
+            target[target_cursor + 2],
+            target[target_cursor + 3],
         ]);
 
-        if let Some(&b_pos) = index.get(&key) {
+        if let Some(&base_pos) = index.get(&key) {
             let mut match_len = 0;
-            while t_cursor + match_len < target.len()
-                && b_pos + match_len < base.len()
-                && target[t_cursor + match_len] == base[b_pos + match_len]
+            while target_cursor + match_len < target.len()
+                && base_pos + match_len < base.len()
+                && target[target_cursor + match_len] == base[base_pos + match_len]
             {
                 match_len += 1;
             }
 
             if match_len >= MIN_MATCH_LEN {
-                if pending_insert_start < t_cursor {
-                    emit_insert_ops(&target[pending_insert_start..t_cursor], &mut out);
+                if pending_insert_start < target_cursor {
+                    emit_insert_ops(&target[pending_insert_start..target_cursor], &mut out);
                 }
-                emit_match_copies(b_pos, match_len, &mut out);
-                t_cursor += match_len;
-                pending_insert_start = t_cursor;
+                emit_match_copies(base_pos, match_len, &mut out);
+                target_cursor += match_len;
+                pending_insert_start = target_cursor;
                 continue;
             }
         }
-        t_cursor += 1;
+        target_cursor += 1;
     }
 
     if pending_insert_start < target.len() {
@@ -283,45 +283,65 @@ pub fn find_pack_deltas(
     let mut depths = vec![0usize; count];
     let mut resolutions = Vec::with_capacity(count);
 
-    for i in 0..count {
-        let target = &items[i];
+    for item_index in 0..count {
+        let target = &items[item_index];
         let original_size = target.payload.len();
         let mut best_delta: Option<(usize, Vec<u8>)> = None;
         let mut best_size = (original_size * 4) / 5; // Require at least 20% size savings
 
-        let window_start = i.saturating_sub(window_size);
-        for j in window_start..i {
-            let candidate = &items[j];
+        let window_start = item_index.saturating_sub(window_size);
+        for candidate_index in window_start..item_index {
+            let candidate = &items[candidate_index];
             if candidate.kind != target.kind {
                 continue;
             }
-            if depths[j] >= max_depth {
+            if depths[candidate_index] >= max_depth {
                 continue;
             }
 
-            if let Some(delta) = encode_git_delta(&candidate.payload, &target.payload) {
+            let delta_fossil = if candidate.payload.len() >= 16 && target.payload.len() >= 16 {
+                crate::pack::fossil_matcher::encode_fossil_git_delta(&candidate.payload, &target.payload)
+            } else {
+                None
+            };
+            let delta_std = encode_git_delta(&candidate.payload, &target.payload);
+
+            let candidate_delta = match (delta_fossil, delta_std) {
+                (Some(delta_f), Some(delta_s)) => {
+                    if delta_f.len() <= delta_s.len() {
+                        Some(delta_f)
+                    } else {
+                        Some(delta_s)
+                    }
+                }
+                (Some(delta_f), None) => Some(delta_f),
+                (None, Some(delta_s)) => Some(delta_s),
+                (None, None) => None,
+            };
+
+            if let Some(delta) = candidate_delta {
                 if delta.len() < best_size {
                     best_size = delta.len();
-                    best_delta = Some((j, delta));
+                    best_delta = Some((candidate_index, delta));
                 }
             }
         }
 
-        if let Some((base_idx, delta_payload)) = best_delta {
-            depths[i] = depths[base_idx] + 1;
+        if let Some((base_index, delta_payload)) = best_delta {
+            depths[item_index] = depths[base_index] + 1;
             resolutions.push(PackDeltaChain {
                 oid: target.oid,
                 kind: target.kind,
                 resolution: DeltaResolution::Delta {
-                    base_oid: items[base_idx].oid,
-                    base_index: base_idx,
+                    base_oid: items[base_index].oid,
+                    base_index,
                     delta_payload,
                 },
                 original_size,
-                depth: depths[i],
+                depth: depths[item_index],
             });
         } else {
-            depths[i] = 0;
+            depths[item_index] = 0;
             resolutions.push(PackDeltaChain {
                 oid: target.oid,
                 kind: target.kind,

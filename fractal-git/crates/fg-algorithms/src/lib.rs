@@ -19,28 +19,35 @@ pub mod merge;
 pub mod pack;
 pub mod poset;
 pub mod space_plan;
+pub mod succinct;
 pub mod synthetic;
 pub mod traverse;
 
 pub use blame::{BlameEngine, BlameHunk, BlameLine};
 pub use bloom::PathBloomFilter;
-pub use cdc::{apply_edits, ChunkDescriptor, EditOp, FastCdcChunker, FastCdcIter, GEAR_TABLE};
+pub use cdc::{
+    apply_edits, ChunkDescriptor, EditOp, FastCdcChunker, FastCdcIter, StreamingFastCdc,
+    GEAR_TABLE, STREAMING_BUFFER_CAPACITY,
+};
 pub use diff::{
-    decimal_width, detect_renames, pprint_rename, scale_linear, shared_suffix_len, split_lines,
-    stat_graph, text_ends_with_newline, truncate_stat_name, BlobRef, ChangeKind, Compaction,
-    DiffEntry, PatchGenerator, PatchHunk, PatchHunkRef, PatchLine, PatchLineRef, RenameHit, Side,
-    StatLayout, TreeDiff, TreeDiffState, UnifiedPatch, UnifiedPatchRef, DEFAULT_HUNK_CONTEXT,
+    bit_parallel_diff, decimal_width, detect_renames, pprint_rename, scale_linear,
+    shared_suffix_len, split_lines, stat_graph, text_ends_with_newline, truncate_stat_name,
+    BIT_PARALLEL_MAX_LINES, BlobRef, ChangeKind, Compaction, DiffAlgorithm, DiffEngine, DiffEntry,
+    PatchGenerator, PatchHunk, PatchHunkRef, PatchLine, PatchLineRef, RenameHit, Side, StatLayout,
+    TreeDiff, TreeDiffState, UnifiedPatch, UnifiedPatchRef, DEFAULT_HUNK_CONTEXT,
     DEFAULT_RENAME_SCORE, MAX_RENAME_SCORE,
 };
 pub use math::{compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate};
 pub use merge::{
-    AlgebraicMerge, BlockMergeResult, BlockThreeWayMerge, CanonicalConflictEntry,
-    CanonicalMergeResult, ConflictEntry, FastPathMerge, TextMergeResult, TextThreeWayMerge,
-    ThreeWayMerge, ThreeWayMergeResult, VirtualMergeBaseSynthesizer,
+    three_way_linear_scan, AlgebraicMerge, BlockMergeResult, BlockThreeWayMerge,
+    CanonicalConflictEntry, CanonicalMergeResult, CompactTreeEntry, ConflictEntry, FastPathMerge,
+    PathArena, PathId, TextMergeResult, TextThreeWayMerge, ThreeWayMerge, ThreeWayMergeResult,
+    VirtualMergeBaseSynthesizer,
 };
 pub use pack::{
-    encode_git_delta, find_pack_deltas, DeltaResolution, PackDeltaChain, PackDeltaItem,
-    DEFAULT_DELTA_WINDOW, MAX_DELTA_DEPTH,
+    encode_fossil_git_delta, encode_git_delta, find_pack_deltas, DeltaResolution,
+    FossilRollingHash, PackDeltaChain, PackDeltaItem, DEFAULT_DELTA_WINDOW, FOSSIL_WINDOW_SIZE,
+    MAX_DELTA_DEPTH,
 };
 pub use poset::CorrectedCommitDate;
 pub use space_plan::{
@@ -48,11 +55,12 @@ pub use space_plan::{
     SpacePlanConfig, SpacePlanReport, SpacePlanStep, DEFAULT_BATCH_WINDOW_BYTES,
     DEFAULT_SAFETY_HEADROOM_BYTES, MAX_BATCH_WINDOW_BYTES, MIN_BATCH_WINDOW_BYTES,
 };
+pub use succinct::{EliasFano, EliasFanoBuilder, EliasFanoIter};
 pub use synthetic::{
     generate_commit_chain, generate_diamond_dag, generate_monorepo_trees, SyntheticCommitChain,
     SyntheticDag, SyntheticMonorepo,
 };
 pub use traverse::{
     commit_tree_oid, flatten_commit_tree_with, flatten_tree_with, DagWalker, FastOidHasher,
-    FastOidSet, FlattenedTreeEntry, SmallParentList,
+    FastOidSet, FlattenedTreeEntry, SegmentedCommitDag, SmallParentList,
 };

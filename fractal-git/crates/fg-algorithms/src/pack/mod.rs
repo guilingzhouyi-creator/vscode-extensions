@@ -7,8 +7,10 @@
 //! Exit Semantics & Design Rationale: Pure, high-performance computational primitives with zero allocations in tight loops.
 
 pub mod delta_search;
+pub mod fossil_matcher;
 
 pub use delta_search::{
     compute_basename_hash, encode_git_delta, find_pack_deltas, DeltaResolution, PackDeltaChain,
     PackDeltaItem, DEFAULT_DELTA_WINDOW, MAX_DELTA_DEPTH,
 };
+pub use fossil_matcher::{encode_fossil_git_delta, FossilRollingHash, FOSSIL_WINDOW_SIZE};
