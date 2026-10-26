@@ -340,4 +340,14 @@ mod tests {
         let delta = [0x04, 0x09, 0x91, 0x00, 0x02];
         assert!(apply_git_delta(b"abcd", &delta).is_err());
     }
+
+    #[test]
+    fn test_fossil_git_delta_encoder_decoder_roundtrip() {
+        let base = b"Rust 2021 edition provides exceptional performance and memory safety guarantees for Git algorithms.";
+        let target = b"Rust 2024 edition provides exceptional throughput and memory safety guarantees for Fractal Git algorithms.";
+
+        let delta = fg_algorithms::pack::encode_fossil_git_delta(base, target).expect("encode");
+        let reconstructed = apply_git_delta(base, &delta).expect("apply delta");
+        assert_eq!(&reconstructed[..], &target[..]);
+    }
 }

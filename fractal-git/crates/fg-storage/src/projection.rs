@@ -682,17 +682,11 @@ mod tests {
             static COUNTER: AtomicUsize = AtomicUsize::new(0);
             let count = COUNTER.fetch_add(1, Ordering::Relaxed);
             let pid = std::process::id();
-            let base = if cfg!(windows) {
-                let low = std::env::temp_dir().join("Low");
-                let _ = std::fs::create_dir_all(&low);
-                if low.exists() {
-                    low
-                } else {
-                    std::env::temp_dir()
-                }
-            } else {
-                std::env::temp_dir()
-            };
+            let base = std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join("target")
+                .join("test_tmp");
+            let _ = std::fs::create_dir_all(&base);
             let path = base.join(format!("fg_proj_{}_{}_{}", prefix, pid, count));
             std::fs::create_dir_all(&path).expect("Failed to create test directory");
             Self { path }

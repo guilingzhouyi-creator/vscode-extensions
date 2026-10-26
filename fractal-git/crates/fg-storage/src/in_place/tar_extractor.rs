@@ -17,6 +17,7 @@ use fg_core::error::{FractalError, FractalResult};
 use flate2::read::GzDecoder;
 
 use crate::in_place::hole_puncher::HolePuncher;
+use crate::in_place::journal::{InPlaceJournal, InPlaceLogEntry};
 use crate::in_place::tail_truncator::TailTruncator;
 use crate::in_place::zip_extractor::{sanitize_relative_path, InPlaceExtractionReport};
 
@@ -164,6 +165,18 @@ pub fn extract_tar_in_place<P: AsRef<Path>, D: AsRef<Path>>(
     dest_dir: D,
     config: &SpacePlanConfig,
 ) -> FractalResult<InPlaceExtractionReport> {
+    extract_tar_in_place_with_journal(archive_path, dest_dir, config, None, None)
+}
+
+/// Extracts an uncompressed Tar archive in reverse (tail-first) order with write-ahead logging (WAL),
+/// tail truncation, and optional skip set for auto-resume.
+pub fn extract_tar_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
+    archive_path: P,
+    dest_dir: D,
+    config: &SpacePlanConfig,
+    mut journal: Option<&mut InPlaceJournal>,
+    already_extracted: Option<&std::collections::HashSet<String>>,
+) -> FractalResult<InPlaceExtractionReport> {
     let dest = dest_dir.as_ref();
     fs::create_dir_all(dest).map_err(FractalError::Io)?;
 
@@ -186,27 +199,46 @@ pub fn extract_tar_in_place<P: AsRef<Path>, D: AsRef<Path>>(
             continue;
         }
 
-        // Read payload
-        truncator
-            .file_mut()
-            .seek(SeekFrom::Start(member.header_offset + 512))
-            .map_err(FractalError::Io)?;
-        let mut payload = vec![0u8; member.size as usize];
-        truncator
-            .file_mut()
-            .read_exact(&mut payload)
-            .map_err(FractalError::Io)?;
-
         let rel_path = sanitize_relative_path(&member.name)?;
         let target_path = dest.join(&rel_path);
-        if let Some(parent) = target_path.parent() {
-            fs::create_dir_all(parent).map_err(FractalError::Io)?;
-        }
 
-        fs::write(&target_path, &payload).map_err(FractalError::Io)?;
+        let is_already_done = already_extracted
+            .map(|set| set.contains(&member.name))
+            .unwrap_or(false)
+            && target_path.exists();
+
+        let payload_len = if is_already_done {
+            target_path.metadata().map(|m| m.len()).unwrap_or(member.size)
+        } else {
+            // Read payload
+            truncator
+                .file_mut()
+                .seek(SeekFrom::Start(member.header_offset + 512))
+                .map_err(FractalError::Io)?;
+            let mut payload = vec![0u8; member.size as usize];
+            truncator
+                .file_mut()
+                .read_exact(&mut payload)
+                .map_err(FractalError::Io)?;
+
+            if let Some(parent) = target_path.parent() {
+                fs::create_dir_all(parent).map_err(FractalError::Io)?;
+            }
+            fs::write(&target_path, &payload).map_err(FractalError::Io)?;
+
+            if let Some(j) = journal.as_mut() {
+                let _ = j.append_unbuffered(&InPlaceLogEntry::MemberExtracted {
+                    name: member.name.clone(),
+                    extracted_bytes: payload.len() as u64,
+                    local_header_offset: member.header_offset,
+                    crc32: 0,
+                });
+            }
+            payload.len() as u64
+        };
 
         files_extracted += 1;
-        total_extracted_bytes = total_extracted_bytes.saturating_add(payload.len() as u64);
+        total_extracted_bytes = total_extracted_bytes.saturating_add(payload_len);
 
         accumulated_reclaim = accumulated_reclaim.saturating_add(member.total_span);
 
@@ -214,6 +246,12 @@ pub fn extract_tar_in_place<P: AsRef<Path>, D: AsRef<Path>>(
         if (accumulated_reclaim >= config.batch_window_bytes || is_last)
             && member.header_offset < truncator.current_len()
         {
+            if let Some(j) = journal.as_mut() {
+                let _ = j.append(&InPlaceLogEntry::BatchTruncated {
+                    new_len: member.header_offset,
+                    freed_bytes: accumulated_reclaim,
+                });
+            }
             truncator.truncate_to(member.header_offset)?;
             accumulated_reclaim = 0;
         }
@@ -221,6 +259,9 @@ pub fn extract_tar_in_place<P: AsRef<Path>, D: AsRef<Path>>(
 
     if truncator.current_len() > 0 {
         truncator.truncate_to(0)?;
+    }
+    if let Some(j) = journal.as_mut() {
+        let _ = j.append(&InPlaceLogEntry::SessionCompleted);
     }
 
     Ok(InPlaceExtractionReport {

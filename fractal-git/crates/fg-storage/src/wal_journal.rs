@@ -468,12 +468,13 @@ mod tests {
 
     fn scratch_path(label: &str) -> std::path::PathBuf {
         let sequence = SCRATCH.fetch_add(1, Ordering::Relaxed);
-        let mut path = std::env::temp_dir();
-        path.push("Low");
-        path.push("fg-storage-wal");
-        let _ = std::fs::create_dir_all(&path);
-        path.push(format!("{label}-{}-{sequence}.wal", std::process::id()));
-        path
+        let base = std::env::current_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .join("target")
+            .join("test_tmp")
+            .join("fg-storage-wal");
+        let _ = std::fs::create_dir_all(&base);
+        base.join(format!("{label}-{}-{sequence}.wal", std::process::id()))
     }
 
     fn oid_from(seed: u8) -> Oid {

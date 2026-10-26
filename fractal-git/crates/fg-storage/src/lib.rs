@@ -27,8 +27,9 @@ pub mod wal_journal;
 
 pub use archive::{ArchiveEntry, ArchiveFormat, ArchiveGenerator, TarWriter, ZipWriter};
 pub use backends::{
-    crc32_ieee, DeltaBaseSource, IdxWriter, MultiPackIndex, OdbRouter, PackEntryMeta, PackFile,
-    PackIndex, PackLocation, PackWriter, PackedObject, DEFAULT_ROUTER_CACHE_BYTES, MAX_CHAIN_DEPTH,
+    crc32_ieee, DeltaBaseSource, IdxWriter, MultiPackIndex, OdbRouter, PackBitmap, PackEntryMeta,
+    PackFile, PackIndex, PackLocation, PackWriter, PackedObject, BITMAP_MAGIC, BITMAP_VERSION_1,
+    DEFAULT_ROUTER_CACHE_BYTES, MAX_CHAIN_DEPTH,
 };
 pub use bundle::{BundleEngine, BundleHeader, BundleReport, BUNDLE_V2_MAGIC};
 pub use cas_backend::CasBackend;
@@ -44,10 +45,11 @@ pub use delta_codec::{
 };
 pub use delta_git::{apply_git_delta, decode_git_delta, GitDelta, GitDeltaOp};
 pub use in_place::{
-    extract_tar_in_place, extract_targz_forward_hole_punch, extract_zip_in_place,
-    plan_tar_in_place, plan_zip_in_place, ArchiveRestorer, BundleConsumeReport, HolePuncher,
-    InPlaceBundleConsumer, InPlaceExtractionReport, InPlaceJournal, InPlaceLogEntry,
-    InPlaceResumeState, TailTruncator, TarMember, ZipMember,
+    extract_tar_in_place, extract_tar_in_place_with_journal, extract_targz_forward_hole_punch,
+    extract_zip_in_place, extract_zip_in_place_with_journal, plan_tar_in_place, plan_zip_in_place,
+    ArchiveRestorer, BundleConsumeReport, HolePuncher, InPlaceBundleConsumer,
+    InPlaceExtractionReport, InPlaceJournal, InPlaceLogEntry, InPlaceResumeState, TailTruncator,
+    TarMember, ZipMember,
 };
 pub use loose::{write_loose_object, LooseOdb};
 pub use projection::{export_native_to_git, import_git_to_native, ExportReport, ImportReport};

@@ -34,6 +34,7 @@ use fg_pools::ByteLruCache;
 
 use crate::backends::idx_file::PackIndex;
 use crate::backends::midx_file::MultiPackIndex;
+use crate::backends::pack_bitmap::PackBitmap;
 use crate::backends::pack_file::{DeltaBaseSource, PackFile, PackedObject};
 
 /// Default in-memory object cache capacity for the router (64 MiB).
@@ -44,6 +45,9 @@ const IDX_SUFFIX: &str = ".idx";
 
 /// Suffix of a packfile.
 const PACK_SUFFIX: &str = ".pack";
+
+/// Suffix of a pack bitmap file.
+const BITMAP_SUFFIX: &str = ".bitmap";
 
 /// Name of the multi-pack index inside `objects/pack`.
 const MIDX_NAME: &str = "multi-pack-index";
@@ -61,6 +65,7 @@ struct LoadedPack {
     name: String,
     index: PackIndex,
     pack: PackFile,
+    bitmap: Option<PackBitmap>,
 }
 
 /// A cached object: kind plus payload.
@@ -151,10 +156,17 @@ impl OdbRouter {
         for stem in names {
             let index = PackIndex::load(pack_dir.join(format!("{stem}{IDX_SUFFIX}")))?;
             let pack = PackFile::load(pack_dir.join(format!("{stem}{PACK_SUFFIX}")))?;
+            let bitmap_path = pack_dir.join(format!("{stem}{BITMAP_SUFFIX}"));
+            let bitmap = if bitmap_path.is_file() {
+                PackBitmap::open(&bitmap_path).ok()
+            } else {
+                None
+            };
             packs.push(LoadedPack {
                 name: format!("{stem}{PACK_SUFFIX}"),
                 index,
                 pack,
+                bitmap,
             });
         }
         Ok(packs)
@@ -168,6 +180,11 @@ impl OdbRouter {
     /// Number of packs currently open.
     pub fn pack_count(&self) -> usize {
         self.packs.len()
+    }
+
+    /// Returns the pack bitmap for the given open pack, if present.
+    pub fn pack_bitmap(&self, pack_index: usize) -> Option<&PackBitmap> {
+        self.packs.get(pack_index).and_then(|pack| pack.bitmap.as_ref())
     }
 
     /// Total number of objects the loaded indexes list.
@@ -454,11 +471,13 @@ mod tests {
     use std::path::PathBuf;
 
     fn scratch_dir(label: &str) -> PathBuf {
-        let mut path = std::env::temp_dir();
-        path.push("Low");
-        path.push("fg-odb-router");
-        let _ = fs::create_dir_all(&path);
-        path.push(format!("{label}-{}", std::process::id()));
+        let base = std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("target")
+            .join("test_tmp")
+            .join("fg-odb-router");
+        let _ = fs::create_dir_all(&base);
+        let path = base.join(format!("{label}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).expect("create scratch");
         path

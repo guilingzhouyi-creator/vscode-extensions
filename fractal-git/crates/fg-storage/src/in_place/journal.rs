@@ -111,6 +111,22 @@ impl InPlaceJournal {
         Ok(())
     }
 
+    /// Appends a log entry to the journal file without forcing an immediate OS fsync barrier.
+    ///
+    /// Durability is guaranteed by subsequently invoking [`sync_barrier`] prior to any
+    /// irreversible storage mutations such as archive tail truncation.
+    pub fn append_unbuffered(&mut self, entry: &InPlaceLogEntry) -> FractalResult<()> {
+        let line = serde_json::to_string(entry).map_err(FractalError::Json)?;
+        writeln!(self.file, "{line}").map_err(FractalError::Io)?;
+        Ok(())
+    }
+
+    /// Flushes all pending buffered writes to physical media via an OS `sync_all` barrier.
+    pub fn sync_barrier(&mut self) -> FractalResult<()> {
+        self.file.sync_all().map_err(FractalError::Io)?;
+        Ok(())
+    }
+
     /// Replays an existing journal file and constructs the resume state.
     pub fn replay<P: AsRef<Path>>(path: P) -> FractalResult<InPlaceResumeState> {
         let file = File::open(path.as_ref()).map_err(FractalError::Io)?;
