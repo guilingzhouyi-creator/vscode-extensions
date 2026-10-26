@@ -1,0 +1,25 @@
+{
+  "weekId": "2026-W44",
+  "startMs": 1792987737007,
+  "endMs": 1792988270695,
+  "totalRuns": 5,
+  "eloc": {
+    "processedTotal": 869604,
+    "uniqueTotal": 137304,
+    "changedTotal": 22764,
+    "semanticTotal": 18211
+  },
+  "qed": {
+    "mean": 0,
+    "min": 0,
+    "max": 0
+  },
+  "debt": {
+    "totalAdded": 5,
+    "totalResolved": 4,
+    "totalRegressions": 0,
+    "netYield": 0
+  },
+  "meanCompositeScore": 99.19,
+  "gatePassRate": 100
+}
