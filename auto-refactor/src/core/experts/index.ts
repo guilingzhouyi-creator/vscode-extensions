@@ -40,6 +40,11 @@ export * from './expert-types';
 export * from './expert-catalog';
 export * from './expert-activation-library';
 export * from './slice-dispatcher';
+export * from './grouped-dispatcher';
+export * from './expert-combiner';
+
+import { defaultGroupedExpertDispatcher } from './grouped-dispatcher';
+import { defaultExpertFindingCombiner } from './expert-combiner';
 
 /**
  * Retrieve an expert profile by either string ID or numeric 32-bit integer bit.
@@ -99,4 +104,6 @@ export const ExpertActivationSubsystem = Object.freeze({
     dispatchSliceFeatureBitset,
     deriveCategoryMatrix,
     deriveArchetypeMatrix,
+    groupedDispatcher: defaultGroupedExpertDispatcher,
+    combiner: defaultExpertFindingCombiner,
 });

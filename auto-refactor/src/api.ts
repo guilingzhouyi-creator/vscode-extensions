@@ -885,6 +885,7 @@ export * from './core/trajectory/anomalyDetector';
 export * from './core/guidance/agentConstraintGenerator';
 export * from './core/router/diffClassifier';
 export * from './core/router/sparseRuleRouter';
+export * from './core/constants/analyzer-bitmask';
 export * from './core/profiler/loadGovernor';
 export * from './core/pipeline/escalationChannel';
 export * from './core/pipeline/dualTrackPipeline';
@@ -1004,6 +1005,7 @@ export * from './core/experts';
 export * from './core/router/sliceTypes';
 export * from './core/router/sliceExtractor';
 export * from './core/router/sparseMoEGate';
+export * from './core/router/adaptive-bias-router';
 export * from './core/intelligence/callChainImpactTracer';
 
 // ---- Compact Agent Prompt Protocol (CAPP) & Localized Slice Audit ----

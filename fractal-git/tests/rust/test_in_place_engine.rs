@@ -472,15 +472,16 @@ fn test_tipse_cli_bundle_unbundle_and_delegation() {
     let bundle_initial_len = fs::metadata(&bundle_path).expect("meta").len();
     assert!(bundle_initial_len > 0);
 
-    // 1. In-place unbundle via `taxis bundle unbundle`
+    // 1. Unbundle via `taxis bundle unbundle` retains the source bundle by default
     let dst_repo = dir.path().join("dst_repo");
     create_repo(&dst_repo);
     let unbundle_out = run_taxis_ok(&dst_repo, &["bundle", "unbundle", bundle_arg]);
-    assert!(unbundle_out.contains("Taxis In-Place Bundle Ingestion"));
+    assert!(unbundle_out.contains("Taxis Bundle Ingestion"));
+    assert!(unbundle_out.contains("retained"));
     assert_eq!(
         fs::metadata(&bundle_path).expect("meta").len(),
-        0,
-        "bundle should be consumed in-place"
+        bundle_initial_len,
+        "default unbundle must retain the source bundle"
     );
 
     // Verify commits and files exist in dst_repo
@@ -489,6 +490,26 @@ fn test_tipse_cli_bundle_unbundle_and_delegation() {
     assert_eq!(src_head.trim(), dst_head.trim());
     let dst_ls = run_taxis_ok(&dst_repo, &["ls-tree", "-r", "HEAD"]);
     assert!(dst_ls.contains("pkg.txt"));
+
+    // 1b. `--in-place` opts into truncating the source bundle after verification
+    let in_place_bundle_path = dir.path().join("transfer_in_place.bundle");
+    fs::copy(&bundle_path, &in_place_bundle_path).expect("copy bundle for in-place run");
+    let in_place_arg = in_place_bundle_path.to_str().expect("path");
+    let dst_repo_in_place = dir.path().join("dst_repo_in_place");
+    create_repo(&dst_repo_in_place);
+    let in_place_out = run_taxis_ok(
+        &dst_repo_in_place,
+        &["bundle", "unbundle", in_place_arg, "--in-place"],
+    );
+    assert!(in_place_out.contains("Taxis Bundle Ingestion"));
+    assert!(in_place_out.contains("truncated"));
+    assert_eq!(
+        fs::metadata(&in_place_bundle_path).expect("meta").len(),
+        0,
+        "--in-place unbundle must truncate the source bundle"
+    );
+    let in_place_head = run_git_ok(&dst_repo_in_place, &["rev-parse", "HEAD"]);
+    assert_eq!(src_head.trim(), in_place_head.trim());
 
     // 2. In-place unarchive delegation via `taxis unarchive`
     let bundle_path2 = dir.path().join("transfer2.bundle");
@@ -499,7 +520,7 @@ fn test_tipse_cli_bundle_unbundle_and_delegation() {
     let dst_repo2 = dir.path().join("dst_repo2");
     create_repo(&dst_repo2);
     let unarchive_out = run_taxis_ok(&dst_repo2, &["unarchive", bundle_arg2]);
-    assert!(unarchive_out.contains("Taxis In-Place Bundle Ingestion"));
+    assert!(unarchive_out.contains("Taxis Bundle Ingestion"));
     assert_eq!(
         fs::metadata(&bundle_path2).expect("meta").len(),
         0,

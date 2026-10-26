@@ -18,11 +18,12 @@ use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{FileMode, ObjectKind, Oid};
 use fg_object::GitTreeRef;
 use fg_storage::bundle::BundleEngine;
+use fg_storage::in_place::{BundleConsumeOptions, InPlaceBundleConsumer};
 use fg_topology::DiskRefStore;
 use fractal_git::constants::cli::CliTag;
 
 use super::commit_walk::parse_commit_record;
-use super::common::{print_json, reject, CliContext};
+use super::common::{fail_usage, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 
 /// Dispatches `taxis bundle`.
@@ -55,11 +56,24 @@ fn print_bundle_help() {
            create <file> <git-rev-list-args>...  Create a Git bundle v2 file\n\
            verify <file>                         Verify bundle header, prerequisites, and packfile\n\
            list-heads <file>                     List references contained in a bundle\n\
-           unbundle, apply <file>                Ingest Git bundle v2 into repository ODB in-place"
+           unbundle, apply <file> [--in-place]   Ingest Git bundle v2 into repository ODB\n\n\
+         The unbundle command retains the source bundle by default; --in-place truncates it\n\
+         only after the embedded pack trailer has been verified."
     );
 }
 
-/// Ingests a Git bundle v2 file into the repository ODB in-place, advancing references.
+/// Options accepted by the `taxis bundle unbundle` command.
+struct BundleUnbundleOptions {
+    /// Bundle file the caller wants ingested.
+    bundle_file: PathBuf,
+    /// Whether the consumed bundle may be truncated once its pack trailer is verified.
+    truncate_source: bool,
+}
+
+/// Ingests a Git bundle v2 file into the repository ODB and advances references.
+///
+/// The source bundle is retained byte-for-byte by default so an ingest stays auditable and
+/// retryable; `--in-place` opts into truncating it after verification.
 fn handle_bundle_unbundle(ctx: &CliContext, args: &[String]) {
     if args.is_empty()
         || args
@@ -67,13 +81,19 @@ fn handle_bundle_unbundle(ctx: &CliContext, args: &[String]) {
             .any(|arg| arg == "-h" || arg == "--help" || arg == "help")
     {
         println!(
-            "Usage: taxis bundle unbundle <file>\n\n\
-             Ingests Git bundle v2 into repository ODB in-place and advances references."
+            "Usage: taxis bundle unbundle <file> [--in-place]\n\n\
+             Ingests Git bundle v2 into repository ODB and advances references.\n\
+             The source bundle is retained by default; --in-place truncates it to zero bytes\n\
+             only after the embedded pack trailer has been verified."
         );
         return;
     }
 
-    let bundle_file = PathBuf::from(&args[0]);
+    let options = match parse_bundle_unbundle_options(args) {
+        Ok(parsed_options) => parsed_options,
+        Err(detail) => fail_usage(detail),
+    };
+    let bundle_file = options.bundle_file;
     if !bundle_file.is_file() {
         reject(
             CliTag::ERROR,
@@ -89,11 +109,10 @@ fn handle_bundle_unbundle(ctx: &CliContext, args: &[String]) {
         Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
     };
 
-    let git_dir = view.git_dir();
-    match fg_storage::in_place::InPlaceBundleConsumer::consume_bundle_in_place(
-        &bundle_file,
-        git_dir,
-    ) {
+    let consume_options = BundleConsumeOptions {
+        truncate_source: options.truncate_source,
+    };
+    match InPlaceBundleConsumer::consume_bundle(&bundle_file, view.git_dir(), &consume_options) {
         Ok(report) => {
             if ctx.json_mode {
                 print_json(&serde_json::json!({
@@ -101,6 +120,8 @@ fn handle_bundle_unbundle(ctx: &CliContext, args: &[String]) {
                     "pack_oid": report.pack_oid.to_hex(),
                     "object_count": report.object_count,
                     "bundle_bytes_reclaimed": report.bundle_bytes_reclaimed,
+                    "source_truncated": report.source_truncated,
+                    "source_retained_bytes": report.source_retained_bytes,
                     "references_advanced": report.references_advanced.iter().map(|(name, oid)| {
                         serde_json::json!({
                             "ref": name,
@@ -109,9 +130,20 @@ fn handle_bundle_unbundle(ctx: &CliContext, args: &[String]) {
                     }).collect::<Vec<_>>(),
                 }));
             } else {
-                println!("=== Taxis In-Place Bundle Ingestion ===");
+                println!("=== Taxis Bundle Ingestion ===");
                 println!("Ingested Packfile:       {}", report.pack_oid.to_hex());
                 println!("Objects Ingested:        {}", report.object_count);
+                if report.source_truncated {
+                    println!(
+                        "Source Bundle:           truncated ({} bytes retained, {} bytes reclaimed)",
+                        report.source_retained_bytes, report.bundle_bytes_reclaimed
+                    );
+                } else {
+                    println!(
+                        "Source Bundle:           retained ({} bytes)",
+                        report.source_retained_bytes
+                    );
+                }
                 println!(
                     "Bundle Space Reclaimed:  {} bytes",
                     report.bundle_bytes_reclaimed
@@ -129,6 +161,39 @@ fn handle_bundle_unbundle(ctx: &CliContext, args: &[String]) {
             );
         }
     }
+}
+
+/// Parses `taxis bundle unbundle` arguments into typed options.
+fn parse_bundle_unbundle_options(args: &[String]) -> Result<BundleUnbundleOptions, String> {
+    let mut bundle_file: Option<PathBuf> = None;
+    let mut truncate_source = false;
+    for argument in args {
+        match argument.as_str() {
+            "--in-place" => truncate_source = true,
+            other if other.starts_with('-') => {
+                return Err(format!(
+                    "taxis bundle unbundle <file> [--in-place]: unknown option '{other}'"
+                ));
+            }
+            other => {
+                if bundle_file.is_some() {
+                    return Err(
+                        "taxis bundle unbundle <file> [--in-place]: exactly one bundle file is accepted"
+                            .to_string(),
+                    );
+                }
+                bundle_file = Some(PathBuf::from(other));
+            }
+        }
+    }
+    let bundle_file = match bundle_file {
+        Some(file) => file,
+        None => return Err("taxis bundle unbundle <file> [--in-place]".to_string()),
+    };
+    Ok(BundleUnbundleOptions {
+        bundle_file,
+        truncate_source,
+    })
 }
 
 fn handle_bundle_create(ctx: &CliContext, args: &[String]) {

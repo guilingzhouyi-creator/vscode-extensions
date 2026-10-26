@@ -67,6 +67,30 @@ pub fn find_all_arg_values<'a>(args: &'a [String], flags: &[&str]) -> Vec<&'a st
     collected
 }
 
+/// Parses a human readable byte quantity such as `64M`, `1G`, or a bare byte count.
+///
+/// Multipliers are binary (1K = 1024 bytes) because every caller sizes filesystem effects, where
+/// Git and the Windows APIs both count in 1024-byte units. Malformed or empty input returns `None`
+/// so each command can decide between a usage error and a fallback default.
+pub fn parse_byte_size(input_size_str: &str) -> Option<u64> {
+    let trimmed = input_size_str.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let (num_str, multiplier) = if trimmed.ends_with(['g', 'G']) {
+        (&trimmed[..trimmed.len() - 1], 1024 * 1024 * 1024)
+    } else if trimmed.ends_with(['m', 'M']) {
+        (&trimmed[..trimmed.len() - 1], 1024 * 1024)
+    } else if trimmed.ends_with(['k', 'K']) {
+        (&trimmed[..trimmed.len() - 1], 1024)
+    } else {
+        (trimmed, 1)
+    };
+
+    let num: u64 = num_str.parse().ok()?;
+    Some(num.saturating_mul(multiplier))
+}
+
 /// Reports a rejection on stderr and terminates the process with [`EXIT_REJECTED`].
 ///
 /// Centralizing this prevents the historical failure mode where a rejected command

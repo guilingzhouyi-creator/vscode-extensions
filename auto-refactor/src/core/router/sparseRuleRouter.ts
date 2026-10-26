@@ -44,6 +44,22 @@ import {
     analyzerMaskToNames,
 } from '../constants/analyzer-bitmask';
 import {
+    AdaptiveExpertBiasRouter,
+    defaultAdaptiveExpertBiasRouter,
+    type ScoredExpertBit,
+    type ExpertTelemetrySnapshot,
+    type BiasStateSnapshot,
+} from './adaptive-bias-router';
+
+export {
+    AdaptiveExpertBiasRouter,
+    defaultAdaptiveExpertBiasRouter,
+    type ScoredExpertBit,
+    type ExpertTelemetrySnapshot,
+    type BiasStateSnapshot,
+};
+
+import {
     ERR_UNKNOWN_CATEGORY,
     ERR_UNCLASSIFIED_FILE,
     CATEGORY_GENERAL_CODE,
@@ -204,15 +220,6 @@ export interface SparseBitmaskRouteResult {
 /** Hard capacity ceiling for FastTrack active experts (<= 25% of total 32 experts). */
 export const MAX_FAST_TRACK_CAPACITY = 8;
 
-/** Candidate expert bit and computed score tuple. */
-interface ScoredExpertBit {
-    readonly bit: number;
-    readonly score: number;
-}
-
-const TOTAL_ROUTER_EXPERTS = 32;
-const DEFAULT_ROUTER_EXPERT_PRIORITY = 10;
-
 const SWAR_MASK_55 = 0x55555555;
 const SWAR_MASK_33 = 0x33333333;
 const SWAR_MASK_0F = 0x0f0f0f0f;
@@ -225,18 +232,13 @@ const SWAR_SHIFT_16 = 16;
 
 /**
  * Filter and sort candidate routed bits by priority score descending.
+ * Delegates to AdaptiveExpertBiasRouter for dynamic online load balancing and yield rewards.
  */
-function scoreAndRankCandidateBits(mask: number): ScoredExpertBit[] {
-    const scored: ScoredExpertBit[] = [];
-    for (let i = 0; i < TOTAL_ROUTER_EXPERTS; i++) {
-        const bit = 1 << i;
-        if ((mask & bit) !== 0) {
-            const score = EXPERT_BASE_SCORES[bit] || DEFAULT_ROUTER_EXPERT_PRIORITY;
-            scored.push({ bit, score });
-        }
-    }
-    scored.sort((a, b) => b.score - a.score);
-    return scored;
+function scoreAndRankCandidateBits(
+    mask: number,
+    biasRouter: AdaptiveExpertBiasRouter = defaultAdaptiveExpertBiasRouter,
+): ScoredExpertBit[] {
+    return biasRouter.scoreAndRankCandidateBits(mask);
 }
 
 /**
@@ -247,11 +249,13 @@ function scoreAndRankCandidateBits(mask: number): ScoredExpertBit[] {
  *
  * @param candidateMask - Unbounded union of category-matched candidate analyzer bits.
  * @param capacity - Hard ceiling of allowed active experts (default: 8).
+ * @param biasRouter - Optional adaptive bias router instance (defaults to singleton).
  * @returns Partitioned activeMask (<= capacity) and overflowMask.
  */
 export function selectTopKBitmask(
     candidateMask: number,
     capacity: number = MAX_FAST_TRACK_CAPACITY,
+    biasRouter: AdaptiveExpertBiasRouter = defaultAdaptiveExpertBiasRouter,
 ): { activeMask: number; overflowMask: number } {
     const totalCount = popcount32(candidateMask);
     if (totalCount <= capacity) {
@@ -263,7 +267,7 @@ export function selectTopKBitmask(
     const routedQuota = Math.max(1, capacity - sharedCount);
 
     const nonSharedMask = candidateMask & ~SHARED_EXPERTS_MASK;
-    const ranked = scoreAndRankCandidateBits(nonSharedMask);
+    const ranked = scoreAndRankCandidateBits(nonSharedMask, biasRouter);
 
     let activeMask = sharedInCandidate;
     for (let i = 0; i < Math.min(ranked.length, routedQuota); i++) {
@@ -305,6 +309,8 @@ export interface RouterOptions {
     forceFull?: boolean;
     /** Project archetype to steer sparse general code routing instead of 100% full activation. */
     archetype?: ProjectArchetype;
+    /** Adaptive expert bias router instance for dynamic online load balancing. */
+    biasRouter?: AdaptiveExpertBiasRouter;
 }
 
 /** Routing event tag emitted when unknown diff category fallback is triggered. */
@@ -522,6 +528,7 @@ export function routeDiffToBitmask(
     const { activeMask, overflowMask } = selectTopKBitmask(
         candidateMask,
         MAX_FAST_TRACK_CAPACITY,
+        options.biasRouter ?? defaultAdaptiveExpertBiasRouter,
     );
 
     const skippedMask = availableMask & ~activeMask;

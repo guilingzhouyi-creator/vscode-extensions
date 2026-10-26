@@ -60,7 +60,7 @@ flowchart TD
 - **[`ArchiveRestorer`](../crates/fg-storage/src/in_place/restorer.rs#L16-L76)**：
   - 在解压异常中断或主动回滚时，为残留文件合成有效的 Central Directory 与 EOCD。
 - **[`InPlaceBundleConsumer`](../crates/fg-storage/src/in_place/bundle_consumer.rs#L29-L133)**：
-  - 吞噬 Git Bundle v2 并原地生成 `.pack` 与 `.idx`，消费后截断 Bundle 文件。
+  - 吞噬 Git Bundle v2 并生成 `.pack` 与 `.idx`：默认完整保留源 Bundle，仅在 `--in-place` 显式要求下校验尾部 SHA-1 后才截断。
 - **`RepackEngine::repack_repository_low_disk`**：
   - 微分型包递进轮转（Micro-Pack Slicing，默认 64MB~256MB），每生成并验证一个微包即刻物理删除对应的 Loose Objects，根治低磁盘 GC 死锁。
 
@@ -70,11 +70,14 @@ flowchart TD
 
 ### 1. `taxis unarchive`
 ```bash
-# 模拟执行并显示水位推演看板（不修改磁盘字节）
+# 投影水位推演看板并立即退出；任何模式都不落盘、不截断、不写 ODB
 taxis unarchive archive.zip --dest ./output --dry-run
 
-# 执行逆向就地解压与截断
-taxis unarchive archive.zip --dest ./output --in-place
+# 默认：逆向就地解压，尾部截断释放空间供后续成员落盘
+taxis unarchive archive.zip --dest ./output
+
+# 标准解压：正序只读解包，源归档字节保持原样
+taxis unarchive archive.zip --dest ./output --no-in-place
 
 # 针对 .tar.gz 使用前向打洞稀疏化
 taxis unarchive archive.tar.gz --dest ./output --batch-window 32M
@@ -86,17 +89,34 @@ taxis unarchive repo-export.zip --to-odb --branch main
 taxis unarchive repo-export.zip --to-odb --tree-only
 ```
 
+**行为契约**
+
+| 选项组合 | 源归档 | 工作区 | 其余副作用 |
+| :--- | :--- | :--- | :--- |
+| 默认（`--in-place`） | 逆向截断至 0 | 落盘解包 | WAL 记录于目标目录 |
+| `--no-in-place` | 只读，字节不变 | 落盘解包 | 无截断 |
+| `--dry-run` | 只读 | 不创建 | 不写 ODB、不更新 ref、不截断 |
+| `--to-odb` | 随 `--in-place`（默认截断） | 不创建 | 写 Loose Objects 并推进分支 |
+| `--to-odb --no-in-place` | 只读，字节不变 | 不创建 | 写 Loose Objects 并推进分支 |
+
+- 自由空间探测失败一律 fail-closed（拒绝执行），绝不退化为乐观常量。
+- 预审 `check_headroom` 在创建目标目录之前执行，因此被拒绝的命令不会留下空目录。
+
 ### 2. `taxis bundle unbundle`
 ```bash
-# 原位消费 Git Bundle，直接转换为 .pack/.idx 并更新引用
+# 默认：生成 .pack/.idx 并更新引用，源 Bundle 完整保留
 taxis bundle unbundle repo.bundle
 
-# 消费后自动截断并释放源 Bundle 文件空间
+# 显式要求：尾部 SHA-1 校验通过后截断源 Bundle 以释放空间
 taxis bundle unbundle repo.bundle --in-place
 ```
+
+引用更新采用旧值比对（CAS）加锁文件写入；源件截断严格排在 refs 推进与尾部校验之后，因此失败不会产生「refs 已推进而 pack 未落盘」的半状态。
 
 ### 3. `taxis repack --low-disk`
 ```bash
 # 在剩余磁盘紧张时启用微包递进轮转重打包
 taxis repack --low-disk --micro-pack 64M
 ```
+
+`--micro-pack` 接受 `64M` / `512K` / 裸字节数三种写法，下限 1M，默认 64M；未知选项按用法错误（退出码 129）拒绝，不再静默忽略。

@@ -15,6 +15,7 @@
 import { ALL_BUILTIN_ANALYZERS, popcount32 } from './sparseRuleRouter';
 import type { ASTSliceNode, SliceFeatureVector, SparseRoutingPlan } from './sliceTypes';
 import { dispatchSliceFeatureBitset } from '../experts';
+import { defaultGroupedExpertDispatcher, type GroupedDispatchPlan } from '../experts/grouped-dispatcher';
 import { ALL_ANALYZERS_MASK, analyzerMaskToNames } from '../constants/analyzer-bitmask';
 
 /** Total available built-in analyzer count for ratio calculation. */
@@ -167,6 +168,29 @@ export class SparseMoEGateRouter {
             activationRatio,
             reasons: allReasons,
         };
+    }
+
+    /**
+     * Build a contiguous GroupedDispatchPlan across multiple AST slices using DeepEP grouping.
+     *
+     * @param slices - List of AST slice nodes.
+     * @param availableMask - Bitmask of enabled analyzers.
+     * @returns Consolidated GroupedDispatchPlan.
+     */
+    public buildGroupedDispatchPlan(
+        slices: ASTSliceNode[],
+        availableMask: number = ALL_ANALYZERS_MASK,
+    ): GroupedDispatchPlan<{ id: string; filePath: string; activeMask: number; slice: ASTSliceNode }> {
+        const items = slices.map((slice) => {
+            const { activeMask } = this.routeSliceToBitmask(slice, availableMask);
+            return {
+                id: slice.sliceId,
+                filePath: slice.filePath,
+                activeMask,
+                slice,
+            };
+        });
+        return defaultGroupedExpertDispatcher.buildDispatchPlan(items);
     }
 }
 

@@ -14,17 +14,17 @@ pub mod tail_truncator;
 pub mod tar_extractor;
 pub mod zip_extractor;
 
-pub use bundle_consumer::{BundleConsumeReport, InPlaceBundleConsumer};
+pub use bundle_consumer::{BundleConsumeOptions, BundleConsumeReport, InPlaceBundleConsumer};
 pub use hole_puncher::HolePuncher;
 pub use journal::{InPlaceJournal, InPlaceLogEntry, InPlaceResumeState, TIPSE_WAL_MAGIC};
 pub use restorer::ArchiveRestorer;
 pub use tail_truncator::TailTruncator;
 pub use tar_extractor::{
-    extract_tar_in_place, extract_targz_forward_hole_punch, index_tar_archive, plan_tar_in_place,
-    TarMember,
+    extract_tar_in_place, extract_tar_standard, extract_targz_forward_hole_punch,
+    index_tar_archive, plan_tar_in_place, TarMember,
 };
 pub use zip_extractor::{
-    extract_member_payload, extract_zip_in_place, plan_zip_in_place, read_zip_central_directory,
-    read_zip_eocd, sanitize_relative_path, InPlaceExtractionReport, ZipEocd, ZipMember,
-    CDH_SIGNATURE, EOCD_SIGNATURE, LFH_SIGNATURE,
+    extract_member_payload, extract_zip_in_place, extract_zip_standard, plan_zip_in_place,
+    read_zip_central_directory, read_zip_eocd, sanitize_relative_path, InPlaceExtractionReport,
+    ZipEocd, ZipMember, CDH_SIGNATURE, EOCD_SIGNATURE, LFH_SIGNATURE,
 };

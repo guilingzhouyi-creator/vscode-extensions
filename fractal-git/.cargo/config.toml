@@ -1,0 +1,15 @@
+# Cargo environment isolation for the fractal-git workspace.
+#
+# Differential and CLI tests drive the system git binary as the parity oracle. Without
+# isolation that oracle inherits the host machine's global git configuration, so the same
+# commit can pass on one machine and fail on another (gpg signing, CRLF conversion, default
+# branch naming). The injected variables keep the oracle hermetic while leaving the tests
+# free to set identity and timestamps explicitly.
+[env]
+GIT_CONFIG_COUNT = "3"
+GIT_CONFIG_KEY_0 = "commit.gpgsign"
+GIT_CONFIG_VALUE_0 = "false"
+GIT_CONFIG_KEY_1 = "core.autocrlf"
+GIT_CONFIG_VALUE_1 = "false"
+GIT_CONFIG_KEY_2 = "init.defaultBranch"
+GIT_CONFIG_VALUE_2 = "main"

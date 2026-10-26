@@ -442,7 +442,7 @@ impl RepackEngine {
         }))
     }
 
-    /// Progressively repacks loose objects in micro-pack slices (256MB~512MB default),
+    /// Progressively repacks loose objects in micro-pack slices (64MB~256MB default),
     /// immediately purging each slice's loose objects upon verification to prevent low-disk deadlocks.
     pub fn repack_repository_low_disk(
         git_dir: &Path,

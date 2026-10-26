@@ -169,3 +169,11 @@ path = "tests/rust/test_remote_transport.rs"
 [[test]]
 name = "test_in_place_engine"
 path = "tests/rust/test_in_place_engine.rs"
+
+[[test]]
+name = "test_tipse_safety"
+path = "tests/rust/test_tipse_safety.rs"
+
+[[test]]
+name = "test_plumbing_parity"
+path = "tests/rust/test_plumbing_parity.rs"

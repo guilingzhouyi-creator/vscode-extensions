@@ -18,7 +18,7 @@ use fg_storage::repack::REPACK_BLOCKED_MARKER;
 use fg_storage::{RepackEngine, RepackOptions, RepackReport};
 use serde_json::json;
 
-use super::common::{fail_io, print_json, CliContext, EXIT_REJECTED};
+use super::common::{fail_io, fail_usage, parse_byte_size, print_json, CliContext, EXIT_REJECTED};
 
 /// Prints usage and options help for `taxis repack`.
 pub fn print_repack_help() {
@@ -28,7 +28,8 @@ pub fn print_repack_help() {
          Options:\n\
            -w, --window <size>     Sliding window size for delta search (default: 10)\n\
            -d, --max-depth <depth> Maximum delta chain depth (default: 50)\n\
-           --low-disk              Progressively pack and purge loose objects in micro-pack slices (256MB~512MB)\n\
+           --low-disk              Progressively pack and purge loose objects in micro-pack slices (64MB~256MB)\n\
+           --micro-pack <size>     Micro-pack slice limit for --low-disk (default: 64M, minimum: 1M)\n\
            -k, --keep-loose        Keep loose objects on disk after creating packfile\n\
            --auto                  Only repack if loose object count exceeds threshold\n\
            --threshold <count>     Threshold for auto-repack (default: 50)\n\
@@ -76,6 +77,24 @@ fn parse_repack_options(args: &[String]) -> (RepackOptions, bool, bool) {
                 options.low_disk = true;
                 cursor += 1;
             }
+            "--micro-pack" => {
+                let raw = match args.get(cursor + 1) {
+                    Some(value) => value.as_str(),
+                    None => {
+                        fail_usage("--micro-pack requires a size value (e.g. --micro-pack 64M)")
+                    }
+                };
+                match parse_byte_size(raw) {
+                    Some(bytes) if bytes >= 1024 * 1024 => options.micro_pack_bytes = bytes,
+                    Some(_) => fail_usage(format!(
+                        "--micro-pack {raw} is below the 1M floor required for slice verification"
+                    )),
+                    None => fail_usage(format!(
+                        "--micro-pack {raw} is not a byte size (expected e.g. 64M, 512K, 1048576)"
+                    )),
+                }
+                cursor += 2;
+            }
             "--async" => {
                 is_async = true;
                 cursor += 1;
@@ -83,6 +102,11 @@ fn parse_repack_options(args: &[String]) -> (RepackOptions, bool, bool) {
             "--auto" => {
                 auto_check_only = true;
                 cursor += 1;
+            }
+            unknown if unknown.starts_with('-') => {
+                fail_usage(format!(
+                    "unknown repack option '{unknown}' (see --help for the supported flags)"
+                ));
             }
             _ => {
                 cursor += 1;

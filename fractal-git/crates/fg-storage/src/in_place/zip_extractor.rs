@@ -2,6 +2,7 @@
 //! File Path: crates/fg-storage/src/in_place/zip_extractor.rs
 //! Architecture Role: Implements reverse (tail-first) ZIP decompression with in-place tail truncation.
 //!   Reclaims disk space as extraction progresses, bounded by an adaptive batch window.
+//!   Also exposes non-destructive standard extraction for read-only callers.
 //!
 //! Domain Governance Rules: FGT-STO-001, FGT-PRF-001, FGT-COR-001, FGT-SAF-001.
 
@@ -437,6 +438,78 @@ pub fn extract_zip_in_place<P: AsRef<Path>, D: AsRef<Path>>(
     Ok(report)
 }
 
+/// Extracts a ZIP archive into a destination directory while leaving the source archive intact.
+///
+/// Members are written in Central Directory order. The archive is opened read-only and is never
+/// truncated, resized, or rewritten, so the reclamation counters stay at zero while
+/// final_archive_len reports the untouched source length.
+///
+/// # Errors
+///
+/// Returns FractalError::Io for filesystem failures, FractalError::CorruptStore for malformed
+/// archive structures, and FractalError::PolicyViolation for path traversal attempts or
+/// unsupported compression methods.
+pub fn extract_zip_standard<P: AsRef<Path>, D: AsRef<Path>>(
+    archive_path: P,
+    dest_dir: D,
+) -> FractalResult<InPlaceExtractionReport> {
+    let dest = dest_dir.as_ref();
+    fs::create_dir_all(dest).map_err(FractalError::Io)?;
+
+    let mut file = File::open(archive_path.as_ref()).map_err(FractalError::Io)?;
+    let source_len = file.metadata().map_err(FractalError::Io)?.len();
+    let eocd = read_zip_eocd(&mut file)?;
+    let members = read_zip_central_directory(&mut file, &eocd)?;
+
+    let mut files_extracted = 0usize;
+    let mut total_extracted_bytes: u64 = 0;
+
+    for member in &members {
+        let rel_path = sanitize_relative_path(&member.name)?;
+        let target_path = dest.join(rel_path);
+
+        if member.is_dir {
+            fs::create_dir_all(&target_path).map_err(FractalError::Io)?;
+            continue;
+        }
+
+        if let Some(parent) = target_path.parent() {
+            fs::create_dir_all(parent).map_err(FractalError::Io)?;
+        }
+
+        let payload = extract_member_payload(&mut file, member)?;
+        fs::write(&target_path, &payload).map_err(FractalError::Io)?;
+        apply_zip_unix_permissions(&target_path, member.external_attributes)?;
+
+        files_extracted += 1;
+        total_extracted_bytes = total_extracted_bytes.saturating_add(payload.len() as u64);
+    }
+
+    Ok(InPlaceExtractionReport {
+        files_extracted,
+        total_extracted_bytes,
+        total_truncated_bytes: 0,
+        final_archive_len: source_len,
+    })
+}
+
+/// Applies the POSIX mode stored in a ZIP member external attributes to an extracted file.
+#[cfg_attr(not(unix), allow(unused_variables))]
+fn apply_zip_unix_permissions(target_path: &Path, external_attributes: u32) -> FractalResult<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+
+        let mode = (external_attributes >> 16) & 0o7777;
+        if mode != 0 {
+            fs::set_permissions(target_path, fs::Permissions::from_mode(mode))
+                .map_err(FractalError::Io)?;
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -515,5 +588,48 @@ mod tests {
         assert!(sanitize_relative_path("/root/evil.txt").is_err());
         assert!(sanitize_relative_path("a/../../evil.txt").is_err());
         assert!(sanitize_relative_path("safe/path.txt").is_ok());
+    }
+
+    #[test]
+    fn test_zip_standard_extraction_keeps_archive_intact() {
+        let dir = test_temp_dir("zip_standard_");
+        let zip_path = dir.path().join("archive.zip");
+        let extract_dir = dir.path().join("extracted");
+
+        let data1 = b"Standard extraction member one. The source archive must survive.";
+        let data2 = vec![0x5Au8; 4096];
+
+        let file = File::create(&zip_path).expect("create zip");
+        let mut writer = ZipWriter::new(file);
+        writer
+            .append_file("alpha.txt", 0o644, 1600000000, data1)
+            .expect("append alpha");
+        writer
+            .append_file("dir/beta.bin", 0o600, 1600000001, &data2)
+            .expect("append beta");
+        let mut finished = writer.finish().expect("finish zip");
+        finished.flush().expect("flush");
+        drop(finished);
+
+        let before = fs::read(&zip_path).expect("read archive before");
+        let original_len = before.len() as u64;
+
+        let report = extract_zip_standard(&zip_path, &extract_dir).expect("extract standard");
+
+        assert_eq!(report.files_extracted, 2);
+        assert_eq!(
+            report.total_extracted_bytes,
+            (data1.len() + data2.len()) as u64
+        );
+        assert_eq!(report.total_truncated_bytes, 0);
+        assert_eq!(report.final_archive_len, original_len);
+
+        let after = fs::read(&zip_path).expect("read archive after");
+        assert_eq!(after, before, "source archive must stay byte-identical");
+
+        let extracted_alpha = fs::read(extract_dir.join("alpha.txt")).expect("read alpha");
+        assert_eq!(&extracted_alpha[..], data1);
+        let extracted_beta = fs::read(extract_dir.join("dir/beta.bin")).expect("read beta");
+        assert_eq!(&extracted_beta[..], &data2[..]);
     }
 }
