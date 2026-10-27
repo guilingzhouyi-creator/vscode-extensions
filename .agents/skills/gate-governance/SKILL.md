@@ -4,9 +4,9 @@ description: >-
   【触发：门禁/全仓审查/提交门禁/脚本编写/跨平台/pwsh/bash/子进程】编写修改门禁脚本、运行全仓审查或处理跨平台脚本兼容时触发。落实 Tier 1 本地左移流式判定、工作目录隔离契约与零黑话规范。
 ---
 
-# gate-governance — 通用双层门禁架构与跨平台脚本工程治理
+# gate-governance — 三层同构门禁体系与跨平台脚本工程治理
 
-本技能规定了跨项目通用的双层同构门禁体系架构标准、受影响项目智能分流机制、跨平台脚本工程契约及子进程执行上下文隔离原则。
+本技能规定了跨项目通用的三层同构门禁体系架构标准（本地 Tier 1 -> 云端预测试机 Tier 1.5 -> GitHub CI Tier 2）、受影响项目智能切片机制、MicroVM 云端沙箱隔离公理及跨平台脚本工程契约。
 
 ---
 
@@ -26,9 +26,9 @@ description: >-
 **何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
-## 一、 双层同构门禁架构体系 (Two-Tier Isomorphic Gates)
+## 一、 三层同构门禁架构体系 (Three-Tier Isomorphic Gates)
 
-门禁系统严禁依赖单层防线，必须实施端到端双层纵深防御，确保本地极速反馈与远端主干看守 100% 规则同构：
+门禁系统严禁依赖单层防线，必须实施端到端三层逐级收紧的纵深防御，确保本地极速反馈、沙箱平台预演与远端主干看守 100% 规则同构：
 
 ### 1. 第一层：本地左移防御 (Tier 1 Local Shift-Left Gates)
 - **`pre-commit`（内存单遍流式判定，内存判定约 1 ms / 端到端约 160 ms）**：
@@ -49,8 +49,33 @@ description: >-
 - **`pre-push`（全域双重回归与基线看守）**：
   结合智能分流调度执行受影响项目的全量单元测试、跨模块静态审查、零高危技术债务防线与质量基线 Ratchet（`GUARD-BASE-001`：多维自审的体量预算、逆向层耦合与前后端标准化均衡不得跌破冻结基线）。
 
-### 2. 第二层：远端主干看守 (Tier 2 Remote CI Gate)
-- 远端 CI 流水线（`.github/workflows/`）完整镜像本地 Tier 1 全套判定（Hygiene + AST Slice + Style + Test + Audit）；
+### 2. 第 1.5 层：云端预测试机预演 (Tier 1.5 Remote Linux Sandbox Gate - Instabox)
+- **架构定位**：消解 Windows 本地开发机与 GitHub Actions Ubuntu CI 之间的跨平台环境断层，在真正向远端推进提交前，由与 GitHub Actions 1:1 等价的 Linux 原生沙箱进行先行拦截。
+- **双模式审查机制**：
+  1. **定向切片 (Targeted Slices)**：
+     - `hygiene`: 仓库八维物理卫生、文档规模一致性、规则ID闭包、反馈词表与 Shell 兼容（~5s）；
+     - `rust`: fractal-git 微 Crate 拓扑、零堆分配边界、`cargo fmt --check`、`cargo check`、`cargo clippy -D warnings`（~8s）；
+     - `timing`: workspace-timing 编译与 205+ 项单元测试（~7s）；
+     - `auto-refactor`: 静态引擎多维自审与 AST 单元测试（~8s）；
+     - `webgames`: 129 张配置表静态审查与 349 个 Mermaid 图表解析（~8s）；
+     - `staged`: 动态扫描改动集，自动路由并组合受影响领域的切片。
+  2. **全量预审 (Full Audit - `all`)**：
+     - 调度 `bash scripts/sh/audit-all.sh --fast`（或深度模式），全量覆盖全仓 6 大核心支柱，生成十维质量全景雷达。
+- **云端 MicroVM 多租户安全隔离公理**：
+  1. **Path Jail 独占隔离**：必须严格收口于 `/data/workspace/vscode-extensions/`，严禁向宿主根盘 `/`、`/data/services/` 或其他项目目录倾倒文件；
+  2. **并发与内存配额保护**：宿主 4 vCPU 必须保留 1 核防 OOM（命令加设最大并行度保护，如 `-j 3`）；
+  3. **端口零直接暴露**：严禁占用宿主常驻端口（`8788`, `8789`, `10801`, `5901`），临时测试报告一律通过 `instabox-port` 动态派发与按需唤醒；
+  4. **执行目录与临时产物**：跨子项目命令必须使用 `(cd <dir> && <cmd>)` 子 Shell 隔离，杜绝工作目录累积漂移；临时文件即用即销。
+- **本地调度命令面契约**：
+  - Node 调度中枢：`node scripts/common/remote-sandbox-gate.js --slice <name> [--remote|--local]`
+  - PowerShell 入口：`pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Slice <name> [-Local]`
+  - Bash 入口：`bash scripts/sh/remote-sandbox-test.sh --slice <name> [--local]`
+- **细水长流分批联动**：
+  - 调度器（`staggered-push-orchestrator.js`）严禁硬编码绕过门禁标志；在推进候选批次指针前，强制执行 `preflightCheckpointAudit` 并联动预测试机进行真实 Linux 切片预演（`--verify-remote` / `-RemoteSlice`），预检不通过坚决不推。
+
+### 3. 第二层：远端主干看守 (Tier 2 Remote CI Gate)
+- 远端 CI 流水线（`.github/workflows/`）作为最终的 Clean-Room 生产级构建、多矩阵验证与 VSIX 打包防线；
+- 由于前两层已排空一切跨平台与依赖隐患，Tier 2 保持 100% 预期绿灯；
 - 阻断任何由于本地 `--no-verify` 绕过提交的问题代码合入主干（触发 `GUARD-ISO-001` 熔断）；
 - 远端 CI 步骤中如需动态生成多行文件，统一使用 `printf "%s\n"` 语法，杜绝 `echo` 平台差异行为。
 
