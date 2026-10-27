@@ -20,10 +20,44 @@
 
 const fs = require('fs');
 const path = require('path');
+const { createRequire } = require('module');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const CATALOG_PATH = path.join(__dirname, 'rule-catalog.json');
 const TARGET_DIR = path.join(REPO_ROOT, 'auto-refactor', 'src', 'core', 'constants');
+const PACKAGE_ANCHOR = path.join(REPO_ROOT, 'auto-refactor', 'package.json');
+
+/**
+ * Loads the formatter through the subproject that declares it.
+ *
+ * The workspace root has no dependency manifest of its own, so a bare `require('prettier')` from
+ * this file resolves against directories that contain no modules. Anchoring the lookup at the
+ * subproject manifest keeps this generator and the subproject's format check on one formatter
+ * instance and one configuration file: resolving from the root would silently fall back to the
+ * formatter defaults, which disagree with the subproject on quote style and line width.
+ */
+function loadFormatter() {
+    const subprojectRequire = createRequire(PACKAGE_ANCHOR);
+    return subprojectRequire('prettier');
+}
+
+/**
+ * Formats generated text the way the subproject's own format check will read it.
+ *
+ * The configuration is resolved explicitly: this formatter version treats the options object as
+ * the whole truth and uses `filepath` only to pick a parser, so passing the path alone would format
+ * against the built-in defaults. Those defaults differ from the subproject on quote style and line
+ * width, which is precisely how the generated files drifted away from the check in the first place.
+ *
+ * @param content - Unformatted generated source text.
+ * @param filePath - Absolute destination path, used for configuration and parser selection.
+ * @returns Formatted source text.
+ */
+async function formatGenerated(content, filePath) {
+    const prettier = loadFormatter();
+    const config = (await prettier.resolveConfig(filePath)) ?? {};
+    return prettier.format(content, { ...config, filepath: filePath });
+}
 
 const SUBDOMAINS = [
     'architecture',
@@ -228,7 +262,16 @@ function buildFacadeFile() {
     return lines.join('\n');
 }
 
-function generate() {
+/**
+ * Collects every generated artifact as a path plus unformatted content pair.
+ *
+ * Emission and writing are separated so the whole set can be formatted before any file is touched:
+ * a partially formatted directory would leave the tree in a state where the format check fails,
+ * which is exactly the drift this generator must not create.
+ *
+ * @returns Artifact descriptors in a stable order.
+ */
+function collectArtifacts() {
     if (!fs.existsSync(CATALOG_PATH)) {
         console.error(`[BLOCK] Rule catalog SSOT not found: ${CATALOG_PATH}`);
         process.exit(1);
@@ -237,7 +280,7 @@ function generate() {
     const raw = fs.readFileSync(CATALOG_PATH, 'utf8');
     const catalog = JSON.parse(raw);
 
-    const arRules = (catalog.rules || []).filter(r => r.project === 'auto-refactor');
+    const arRules = (catalog.rules || []).filter((r) => r.project === 'auto-refactor');
     arRules.sort((a, b) => a.id.localeCompare(b.id));
 
     const domainBuckets = {};
@@ -250,21 +293,86 @@ function generate() {
         domainBuckets[domain].push(rule);
     }
 
-    // Emit types
-    const typesPath = path.join(TARGET_DIR, 'rule-catalog-types.ts');
-    fs.writeFileSync(typesPath, buildTypesFile(), 'utf8');
+    const artifacts = [
+        {
+            filePath: path.join(TARGET_DIR, 'rule-catalog-types.ts'),
+            content: buildTypesFile(),
+        },
+    ];
 
     for (const domain of SUBDOMAINS) {
         const rules = domainBuckets[domain];
         const { content } = buildSubdomainFile(domain, rules);
-        const filePath = path.join(TARGET_DIR, `rules-${domain}.generated.ts`);
-        fs.writeFileSync(filePath, content, 'utf8');
+        artifacts.push({
+            filePath: path.join(TARGET_DIR, `rules-${domain}.generated.ts`),
+            content,
+        });
     }
 
-    const facadeContent = buildFacadeFile();
-    const facadePath = path.join(TARGET_DIR, 'rule-catalog.generated.ts');
-    fs.writeFileSync(facadePath, facadeContent, 'utf8');
-    console.log(`PASS: Generated ${arRules.length} rules across ${SUBDOMAINS.length} subdomains in ${TARGET_DIR}`);
+    artifacts.push({
+        filePath: path.join(TARGET_DIR, 'rule-catalog.generated.ts'),
+        content: buildFacadeFile(),
+    });
+
+    return { artifacts, ruleCount: arRules.length };
 }
 
-generate();
+/**
+ * Reports whether each artifact on disk already matches its formatted generation.
+ *
+ * Comparison is against the formatted text, not the raw builder output: the contract is that a
+ * clean tree stays clean after regeneration, which only holds if the on-disk form is the formatted
+ * one.
+ *
+ * @param artifacts - Artifact descriptors produced by the builder pass.
+ * @returns Relative paths of files whose content differs from the formatted generation.
+ */
+async function findDriftedArtifacts(artifacts) {
+    const drifted = [];
+    for (const artifact of artifacts) {
+        const expected = await formatGenerated(artifact.content, artifact.filePath);
+        const actual = fs.existsSync(artifact.filePath)
+            ? fs.readFileSync(artifact.filePath, 'utf8')
+            : null;
+        if (actual !== expected) {
+            drifted.push(path.relative(REPO_ROOT, artifact.filePath));
+        }
+    }
+    return drifted;
+}
+
+async function writeArtifacts(artifacts) {
+    for (const artifact of artifacts) {
+        const formatted = await formatGenerated(artifact.content, artifact.filePath);
+        fs.writeFileSync(artifact.filePath, formatted, 'utf8');
+    }
+}
+
+async function main() {
+    const checkOnly = process.argv.includes('--check');
+    const { artifacts, ruleCount } = collectArtifacts();
+
+    if (checkOnly) {
+        const drifted = await findDriftedArtifacts(artifacts);
+        if (drifted.length > 0) {
+            console.error('[BLOCK] Generated artifacts are out of sync with the SSOT:');
+            for (const file of drifted) {
+                console.error(`  - ${file}`);
+            }
+            console.error('Run node scripts/common/generate-rule-catalog-types.js to regenerate.');
+            process.exit(1);
+        }
+        console.log(`PASS: ${artifacts.length} generated artifacts match the SSOT.`);
+        return;
+    }
+
+    await writeArtifacts(artifacts);
+    console.log(
+        `PASS: Generated ${ruleCount} rules across ${SUBDOMAINS.length} subdomains in ${TARGET_DIR}`,
+    );
+}
+
+main().catch((err) => {
+    console.error(`[BLOCK] Rule catalog generation failed: ${err.message}`);
+    process.exit(1);
+});
