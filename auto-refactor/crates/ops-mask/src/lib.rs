@@ -1,6 +1,6 @@
 //! Module: Native Acceleration Kernel — Source Masking & Spectrum Extractor
 //! Crate: ops-mask
-//! Architecture Role: SIMD byte-level scanner for multilang string/comment masking
+//! Architecture Role: Byte-level scanner for multilang string/comment masking
 //! and line statistics, providing 100% byte-parity with ECMAScript UTF-16 AST rules.
 
 use memchr::memchr;

@@ -252,7 +252,9 @@ export interface INativeCore {
     fastPatternMatch(sourceText: string, patterns: string[]): NativePatternMatch[];
 
     /**
-     * Masks comment and literal regions using the fast native SIMD masking operator.
+     * Masks comment and literal regions using the native lexer state machine when the assembly
+     * layer selects it; the assembly layer currently always routes this operator to the pure JS
+     * implementation, so the compiled function is exported but never read.
      */
     maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource;
 
