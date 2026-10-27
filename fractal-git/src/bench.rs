@@ -16,6 +16,7 @@ use fg_algorithms::synthetic::{
     generate_commit_chain, generate_diamond_dag, generate_monorepo_trees,
 };
 use fg_algorithms::traverse::DagWalker;
+use fg_algorithms::{bit_parallel_diff, encode_fossil_git_delta, FastCdcChunker, RoaringBitmap};
 use fg_core::constants::metrics::*;
 use fg_core::models::{
     AutoQualityScoreEnvelope, CorrectedCommitDate, FileMode, Oid, PathBloomFilter, TaxisPolicy,
@@ -81,6 +82,10 @@ impl TaxisBenchmarkSuite {
             metrics.push(Self::bench_bloom_filter_path_query(1000 * mult));
             metrics.push(Self::bench_buffer_pool_freelists(1000 * mult));
             metrics.push(Self::bench_byte_lru_cache(500 * mult));
+            metrics.push(Self::bench_bit_parallel_myers(1000 * mult));
+            metrics.push(Self::bench_fossil_rolling_hash(100 * mult));
+            metrics.push(Self::bench_fast_cdc_streaming(100 * mult));
+            metrics.push(Self::bench_roaring_bitmap_ops(500 * mult));
         }
 
         if matches!(level, BenchmarkLevel::Level2Scale | BenchmarkLevel::All) {
@@ -332,6 +337,80 @@ impl TaxisBenchmarkSuite {
         let elapsed = start.elapsed();
 
         Self::calculate_metric(METRIC_BYTE_LRU_CACHE, iterations * 2, elapsed)
+    }
+
+    /// Benchmarks 64-line bit-parallel Myers diff.
+    pub fn bench_bit_parallel_myers(iterations: usize) -> BenchmarkMetric {
+        let hashes_a: Vec<u32> = (0..64).map(|i| i * 7 + 3).collect();
+        let mut hashes_b = hashes_a.clone();
+        hashes_b[10] = 999;
+        hashes_b[25] = 888;
+        hashes_b[40] = 777;
+
+        let start = Instant::now();
+        for _ in 0..iterations {
+            let _ = bit_parallel_diff(&hashes_a, &hashes_b);
+        }
+        let elapsed = start.elapsed();
+
+        Self::calculate_metric(METRIC_BIT_PARALLEL_MYERS, iterations, elapsed)
+    }
+
+    /// Benchmarks Fossil 16-byte rolling hash sliding window delta matching.
+    pub fn bench_fossil_rolling_hash(iterations: usize) -> BenchmarkMetric {
+        let base: Vec<u8> = (0..2048).map(|i| (i % 251) as u8).collect();
+        let mut target = base.clone();
+        for i in (100..200).step_by(2) {
+            target[i] = 42;
+        }
+
+        let start = Instant::now();
+        for _ in 0..iterations {
+            let _ = encode_fossil_git_delta(&base, &target);
+        }
+        let elapsed = start.elapsed();
+
+        Self::calculate_metric(METRIC_FOSSIL_ROLLING_HASH, iterations, elapsed)
+    }
+
+    /// Benchmarks FastCDC Gear-table content-defined chunking throughput.
+    pub fn bench_fast_cdc_streaming(iterations: usize) -> BenchmarkMetric {
+        let payload: Vec<u8> = (0..16384).map(|i| (i * 31 % 256) as u8).collect();
+        let chunker = FastCdcChunker::default();
+
+        let start = Instant::now();
+        for _ in 0..iterations {
+            let mut count = 0;
+            for _ in chunker.iter(&payload) {
+                count += 1;
+            }
+            assert!(count > 0);
+        }
+        let elapsed = start.elapsed();
+
+        Self::calculate_metric(METRIC_FAST_CDC_STREAMING, iterations, elapsed)
+    }
+
+    /// Benchmarks Roaring Bitmap intersection and union throughput.
+    pub fn bench_roaring_bitmap_ops(iterations: usize) -> BenchmarkMetric {
+        let mut map_a = RoaringBitmap::new();
+        let mut map_b = RoaringBitmap::new();
+        for i in (0..5000).step_by(2) {
+            map_a.insert(i);
+        }
+        for i in (1000..6000).step_by(3) {
+            map_b.insert(i);
+        }
+
+        let start = Instant::now();
+        for _ in 0..iterations {
+            let inter = &map_a & &map_b;
+            let union = &map_a | &map_b;
+            assert!(inter.len() > 0 && union.len() > 0);
+        }
+        let elapsed = start.elapsed();
+
+        Self::calculate_metric(METRIC_ROARING_BITMAP_OPS, iterations, elapsed)
     }
 
     /// Benchmarks Poset DAG Reachability and Cutoff across a 2,000-node commit DAG (Level 2 Scale).

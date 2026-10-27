@@ -56,6 +56,7 @@ pub use space_plan::{
     DEFAULT_SAFETY_HEADROOM_BYTES, MAX_BATCH_WINDOW_BYTES, MIN_BATCH_WINDOW_BYTES,
 };
 pub use succinct::{EliasFano, EliasFanoBuilder, EliasFanoIter};
+pub use roaring::RoaringBitmap;
 pub use synthetic::{
     generate_commit_chain, generate_diamond_dag, generate_monorepo_trees, SyntheticCommitChain,
     SyntheticDag, SyntheticMonorepo,

@@ -49,6 +49,10 @@ pub fn is_valid_benchmark_metric(metric_name: &str) -> bool {
             | METRIC_BLOOM_DENSE_HISTORY
             | METRIC_MONOREPO_SPARSE_DIFF
             | METRIC_CONCURRENT_TRANSACTIONS
+            | METRIC_BIT_PARALLEL_MYERS
+            | METRIC_FOSSIL_ROLLING_HASH
+            | METRIC_FAST_CDC_STREAMING
+            | METRIC_ROARING_BITMAP_OPS
     )
 }
 

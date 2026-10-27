@@ -10,7 +10,7 @@ use fractal_git::constants::metrics::*;
 fn test_benchmark_suite_execution_and_timings() {
     let suite = TaxisBenchmarkSuite::run_default(1);
     assert_eq!(suite.engine, "taxis");
-    assert_eq!(suite.metrics.len(), 7);
+    assert_eq!(suite.metrics.len(), 11);
 
     for m in &suite.metrics {
         assert!(
@@ -168,9 +168,9 @@ fn test_benchmark_suite_level2_and_level3() {
         .iter()
         .any(|m| m.name == METRIC_CONCURRENT_TRANSACTIONS));
 
-    // All levels combined: 7 (L1) + 2 (L2) + 2 (L3) = 11 metrics
+    // All levels combined: 11 (L1) + 2 (L2) + 2 (L3) = 15 metrics
     let suite_all = TaxisBenchmarkSuite::run_suite(BenchmarkLevel::All, 1);
-    assert_eq!(suite_all.metrics.len(), 11);
+    assert_eq!(suite_all.metrics.len(), 15);
     for m in &suite_all.metrics {
         assert!(m.iterations > 0);
         assert!(m.ops_per_sec > 0.0);

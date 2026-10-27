@@ -269,6 +269,78 @@ function Start-GateProcess {
     return [PSCustomObject]@{ ExitCode = 124; Id = $proc.Id }
 }
 
+<#
+.SYNOPSIS
+    Runs `vitest related` over staged sources in command-line-safe batches.
+.DESCRIPTION
+    `npx.cmd` is a cmd.exe batch shim bounded by the 8191-character command line
+    limit. A mass rename staging several hundred sources exceeded that ceiling,
+    so the shim exited with "The command line is too long." before vitest ever
+    started, and the non-zero status surfaced as a bogus test failure. Launching
+    the vitest entry script through node raises the ceiling to the CreateProcess
+    bound, and the argument budget keeps every spawn well below it no matter how
+    many files a single commit stages.
+.PARAMETER RelativePaths
+    Project-relative POSIX paths with the `auto-refactor/` prefix already removed.
+.PARAMETER WorkingDirectory
+    Project root that owns the node_modules tree providing vitest.
+.PARAMETER NodeCommand
+    Resolved node executable used to launch the vitest entry script.
+.PARAMETER ArgumentBudget
+    Upper bound on joined path characters per spawn. Defaults to a conservative
+    fraction of the Windows limit, leaving headroom for the entry path and flags.
+.OUTPUTS
+    PSCustomObject with ExitCode (0 only when every batch passed) and Output
+    (merged child lines), so callers report the first failing batch verbatim.
+#>
+function Invoke-VitestRelated {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string[]]$RelativePaths,
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)][string]$NodeCommand,
+        [int]$ArgumentBudget = 24000,
+        [int]$TimeoutSeconds = 180
+    )
+
+    $entry = Join-Path $WorkingDirectory "node_modules/vitest/vitest.mjs"
+    if (-not (Test-Path -Path $entry -PathType Leaf)) {
+        return [PSCustomObject]@{ ExitCode = 127; Output = @("vitest entry script missing: $entry") }
+    }
+
+    $batches = [System.Collections.Generic.List[object]]::new()
+    $batch = [System.Collections.Generic.List[string]]::new()
+    $width = 0
+    foreach ($path in $RelativePaths) {
+        if ($batch.Count -gt 0 -and ($width + $path.Length + 1) -gt $ArgumentBudget) {
+            $batches.Add($batch.ToArray())
+            $batch.Clear()
+            $width = 0
+        }
+        $batch.Add($path)
+        $width += $path.Length + 1
+    }
+    if ($batch.Count -gt 0) { $batches.Add($batch.ToArray()) }
+
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $ordinal = 0
+    foreach ($chunk in $batches) {
+        $ordinal++
+        if ($batches.Count -gt 1) {
+            Write-GateHost "  ℹ️  [BATCH] vitest related over $($chunk.Count) files (batch $ordinal of $($batches.Count))" -ForegroundColor DarkGray
+        }
+        $child = Invoke-ChildProcess -FilePath $NodeCommand `
+            -ArgumentList (@($entry, "related") + $chunk + @("--run")) `
+            -WorkingDirectory $WorkingDirectory -TimeoutSeconds $TimeoutSeconds
+        if ($child.Output) { $lines.AddRange([string[]]$child.Output) }
+        if ($child.ExitCode -ne 0) {
+            return [PSCustomObject]@{ ExitCode = $child.ExitCode; Output = $lines.ToArray() }
+        }
+    }
+
+    return [PSCustomObject]@{ ExitCode = 0; Output = $lines.ToArray() }
+}
+
 
 # 根目录物理防污染与散落脚本前置雷达 (<3ms)
 $rootClutter = Get-ChildItem -Path $repoRoot -File -Depth 0 | Where-Object {
@@ -568,26 +640,25 @@ if ($hasArCompile) {
         if ($arStagedCode -and $arStagedCode.Count -gt 0) {
             $arRelArgs = @($arStagedCode | ForEach-Object { $_ -replace "^auto-refactor/", "" })
             if (-not $Agent) { Write-StepBanner -StepId "ENGINE-TESTS-08" }
-            $npxCmd = if ($IsWindows -or $env:OS -match "Windows") { "npx.cmd" } else { "npx" }
             if ($Agent) {
-                $vitestArgs = @("vitest", "related") + $arRelArgs + @("--run")
-                $childVitest = Invoke-ChildProcess -FilePath $npxCmd -ArgumentList $vitestArgs -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 180
+                $childVitest = Invoke-VitestRelated -RelativePaths $arRelArgs `
+                    -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NodeCommand $nodeCmd -TimeoutSeconds 180
                 $outVitest = $childVitest.Output
                 if ($childVitest.ExitCode -ne 0) {
                     $json = Write-PreCommitFailure `
                         -StepId "ENGINE-TESTS-08" `
                         -RuleId "GUARD-SYS-001" `
                         -Summary "Impacted unit tests failed in auto-refactor." `
-                        -ActionableFix "Run 'npx vitest related $($arRelArgs -join ' ') --run' in auto-refactor." `
-                        -VerifyCmd "npx --prefix auto-refactor vitest related $($arRelArgs -join ' ') --run" `
+                        -ActionableFix "Re-run scripts/ps1/pre-commit-gate.ps1 and inspect the vitest failure detail below." `
+                        -VerifyCmd "npx --prefix auto-refactor vitest related <changed-source> --run" `
                         -TargetFiles $arStagedCode `
                         -Details ($outVitest -join "`n")
                     Write-Output $json
                     exit 1
                 }
             } else {
-                $vArgs = @("vitest", "related") + $arRelArgs + @("--run")
-                $pVitest = Start-GateProcess -FilePath $npxCmd -ArgumentList $vArgs -WorkingDirectory (Join-Path $repoRoot "auto-refactor")
+                $pVitest = Invoke-VitestRelated -RelativePaths $arRelArgs `
+                    -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NodeCommand $nodeCmd -TimeoutSeconds 180
                 if ($pVitest.ExitCode -ne 0) {
                     Write-StepVerdict -StepId "ENGINE-TESTS-08" -Status "BLOCK" -Detail "auto-refactor 增量影响单测未通过"
                     $failed = $true

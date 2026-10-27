@@ -6,51 +6,79 @@
     {
       "name": "canonical_tree_diff_streaming",
       "iterations": 500,
-      "total_duration_us": 5566,
-      "avg_latency_ns": 11133,
-      "ops_per_sec": 89819.82143819498
+      "total_duration_us": 1771,
+      "avg_latency_ns": 3542,
+      "ops_per_sec": 282262.6171389861
     },
     {
       "name": "myers_diff_swar_tokens",
       "iterations": 500,
-      "total_duration_us": 6750,
-      "avg_latency_ns": 13500,
-      "ops_per_sec": 74074.07407407407
+      "total_duration_us": 3401,
+      "avg_latency_ns": 6803,
+      "ops_per_sec": 146989.65192850423
     },
     {
       "name": "dag_generation_cutoff_o1",
       "iterations": 2500,
-      "total_duration_us": 34,
-      "avg_latency_ns": 13,
-      "ops_per_sec": 72674418.60465115
+      "total_duration_us": 6,
+      "avg_latency_ns": 2,
+      "ops_per_sec": 416666666.6666666
     },
     {
       "name": "corrected_commit_date_cutoff_o1",
       "iterations": 2500,
-      "total_duration_us": 32,
-      "avg_latency_ns": 12,
-      "ops_per_sec": 77881619.9376947
+      "total_duration_us": 4,
+      "avg_latency_ns": 1,
+      "ops_per_sec": 520833333.3333334
     },
     {
       "name": "bloom_filter_path_query",
       "iterations": 5000,
-      "total_duration_us": 806,
-      "avg_latency_ns": 161,
-      "ops_per_sec": 6199628.02231866
+      "total_duration_us": 0,
+      "avg_latency_ns": 0,
+      "ops_per_sec": 0.0
     },
     {
       "name": "buffer_pool_thread_local_freelist",
       "iterations": 10000,
-      "total_duration_us": 982,
-      "avg_latency_ns": 98,
-      "ops_per_sec": 10175010.175010175
+      "total_duration_us": 227,
+      "avg_latency_ns": 22,
+      "ops_per_sec": 43956043.95604396
     },
     {
       "name": "byte_lru_cache_budget_eviction",
       "iterations": 5000,
-      "total_duration_us": 6254,
-      "avg_latency_ns": 1250,
-      "ops_per_sec": 799449.9784148505
+      "total_duration_us": 659,
+      "avg_latency_ns": 131,
+      "ops_per_sec": 7586102.260658474
+    },
+    {
+      "name": "bit_parallel_myers_64_lines",
+      "iterations": 5000,
+      "total_duration_us": 7086,
+      "avg_latency_ns": 1417,
+      "ops_per_sec": 705556.9666694889
+    },
+    {
+      "name": "fossil_rolling_hash_window",
+      "iterations": 500,
+      "total_duration_us": 933,
+      "avg_latency_ns": 1866,
+      "ops_per_sec": 535905.6806002144
+    },
+    {
+      "name": "fast_cdc_streaming_chunking",
+      "iterations": 500,
+      "total_duration_us": 6421,
+      "avg_latency_ns": 12843,
+      "ops_per_sec": 77861.00253826869
+    },
+    {
+      "name": "roaring_bitmap_set_ops",
+      "iterations": 2500,
+      "total_duration_us": 16769,
+      "avg_latency_ns": 6707,
+      "ops_per_sec": 149077.50837815597
     }
   ]
 }

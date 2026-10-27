@@ -36,3 +36,15 @@ pub const METRIC_MONOREPO_SPARSE_DIFF: &str = "monorepo_10k_sparse_tree_diff";
 
 /// Concurrent agent worktree allocation, commit, and sweep transactions.
 pub const METRIC_CONCURRENT_TRANSACTIONS: &str = "concurrent_agent_worktree_transactions";
+
+/// Bit-parallel Myers line vector difference across 64-line registers.
+pub const METRIC_BIT_PARALLEL_MYERS: &str = "bit_parallel_myers_64_lines";
+
+/// Fossil 16-byte rolling hash sliding window delta matching.
+pub const METRIC_FOSSIL_ROLLING_HASH: &str = "fossil_rolling_hash_window";
+
+/// FastCDC Gear-table content-defined chunking throughput.
+pub const METRIC_FAST_CDC_STREAMING: &str = "fast_cdc_streaming_chunking";
+
+/// Roaring bitmap set intersection and reachability evaluation.
+pub const METRIC_ROARING_BITMAP_OPS: &str = "roaring_bitmap_set_ops";
