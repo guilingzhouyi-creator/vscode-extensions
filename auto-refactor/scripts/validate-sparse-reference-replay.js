@@ -28,6 +28,7 @@ const {
   REASON_GLOBAL_MUTATION,
   REASON_MULTI_ANCHOR_SPAN,
   REASON_SIGNATURE_MUTATION,
+  REASON_CHANGE_SPAN_EXCEEDS_CAP,
   DEFAULT_MAX_COMPOUND_WINDOW_LINES,
 } = require('../dist/api');
 const { SymbolIndex } = require('../dist/core/intelligence/symbolIndex');
@@ -288,6 +289,178 @@ function assertPruningDelegates() {
   console.log('  ✔ issue pruning delegates to the bounded manager');
 }
 
+/** Assert window shifting ensures containment on large declarations (P0-1). */
+function assertWindowShiftingGuaranteesContainment() {
+  const swa = new SwaBoundedReplayManager();
+  const lineCount = 400;
+  const lines = ['export function processBatch(items: string[]): void {'];
+  for (let i = 2; i < lineCount; i++) {
+    lines.push(`    const step${i} = ${i};`);
+  }
+  lines.push('}');
+  const source = lines.join('\n');
+
+  // Test 1: Edit at line 129 (previously outside 1..128)
+  const edited129 = source.replace('const step129 = 129;', 'const step129 = 9999;');
+  const win129 = swa.computeReplayWindow('src/batch.ts', source, edited129, [129, 129]);
+  assert.strictEqual(win129.isBounded, true, 'line 129 edit must remain bounded');
+  assert.strictEqual(win129.requiresFullReplay, false, 'line 129 edit must not replay full file');
+  assert.ok(win129.startLine <= 129 && win129.endLine >= 129, 'window must strictly contain changed line 129');
+  assert.ok(win129.effectiveSpanLines <= 128, 'shifted window span must not exceed cap');
+
+  // Test 2: Edit at line 200
+  const edited200 = source.replace('const step200 = 200;', 'const step200 = 9999;');
+  const win200 = swa.computeReplayWindow('src/batch.ts', source, edited200, [200, 200]);
+  assert.strictEqual(win200.isBounded, true, 'line 200 edit must remain bounded');
+  assert.ok(win200.startLine <= 200 && win200.endLine >= 200, 'window must strictly contain changed line 200');
+  assert.ok(win200.effectiveSpanLines <= 128, 'shifted window span must not exceed cap');
+
+  // Test 3: Edit spanning 200 lines (50 to 250) exceeds cap and must degrade
+  const editedOver = source
+    .replace('const step50 = 50;', 'const step50 = 9999;')
+    .replace('const step250 = 250;', 'const step250 = 9999;');
+  const winOver = swa.computeReplayWindow('src/batch.ts', source, editedOver, [50, 250]);
+  assert.strictEqual(winOver.isBounded, false, 'oversized edit span must not be bounded');
+  assert.strictEqual(winOver.requiresFullReplay, true, 'oversized edit span must require full replay');
+  assert.strictEqual(winOver.reason, REASON_CHANGE_SPAN_EXCEEDS_CAP, 'must report REASON_CHANGE_SPAN_EXCEEDS_CAP');
+  console.log('  ✔ window shifting strictly guarantees change containment (P0-1)');
+}
+
+/** Assert signature mutation retains entire declaration body (P0-2). */
+function assertSignaturePreservesFullDeclaration() {
+  const planner = new SparseReferenceReplayManager();
+  const multilineSource = [
+    'export function calculateTax(',
+    '    amount: number,',
+    '    rate: number,',
+    '): number {',
+    '    const tax = amount * rate;',
+    '    return tax;',
+    '}',
+  ].join('\n');
+  const edited = multilineSource.replace(
+    'export function calculateTax(',
+    'export function calculateTaxNew(',
+  );
+
+  const callGraph = buildCallGraph(3);
+  const window = planner.computeSparseReplayWindow({
+    filePath: 'src/calc.ts',
+    oldContent: multilineSource,
+    newContent: edited,
+    changedLines: [1, 1],
+    resolveReferences: createCallGraphReferenceResolver(callGraph),
+  });
+
+  assert.strictEqual(window.isBounded, true, 'multiline signature edit is bounded');
+  assert.strictEqual(window.startLine, 1, 'window starts at line 1');
+  assert.strictEqual(window.endLine, 7, 'window must cover the entire function body through line 7');
+  assert.strictEqual(window.effectiveSpanLines, 7, 'effective span matches total declaration lines');
+  assert.strictEqual(window.isSparseBridged, true, 'bridging flag active');
+  console.log('  ✔ signature window covers complete declaration body (P0-2)');
+}
+
+/** Assert statement declarations are independent and caches are isolated (P0-3). */
+function assertStatementAnchorsIndependentAndCacheIsolated() {
+  const swa = new SwaBoundedReplayManager();
+  const source = [
+    'const A = 1;',
+    'const B = 2;',
+    'const C = 3;',
+    'export function f(): void {',
+    '    return;',
+    '}',
+  ].join('\n');
+
+  const anchors = swa.indexAnchors('src/stmts.ts', source);
+  assert.strictEqual(anchors.length, 4, 'must extract 4 independent anchors');
+  assert.strictEqual(anchors[0].name, 'A');
+  assert.strictEqual(anchors[0].startLine, 1);
+  assert.strictEqual(anchors[0].endLine, 1);
+  assert.strictEqual(anchors[1].name, 'B');
+  assert.strictEqual(anchors[1].startLine, 2);
+  assert.strictEqual(anchors[1].endLine, 2);
+  assert.strictEqual(anchors[2].name, 'C');
+  assert.strictEqual(anchors[2].startLine, 3);
+  assert.strictEqual(anchors[2].endLine, 3);
+  assert.strictEqual(anchors[3].name, 'f');
+  assert.strictEqual(anchors[3].startLine, 4);
+  assert.strictEqual(anchors[3].endLine, 6);
+
+  // Test cache isolation: AST cache must not overwrite text cache
+  const syntheticAstRoot = {
+    kind: 'SourceFile',
+    children: [
+      {
+        kind: 'Function',
+        name: 'astOnlyFunc',
+        start: { line: 10, column: 1 },
+        end: { line: 20, column: 1 },
+        text: 'function astOnlyFunc() {}',
+        introducesBinding: true,
+      },
+    ],
+  };
+
+  const astAnchors = swa.indexAnchors('src/stmts.ts', source, syntheticAstRoot);
+  assert.strictEqual(astAnchors.length, 1, 'AST path must extract ast root anchors');
+  assert.strictEqual(astAnchors[0].name, 'astOnlyFunc');
+
+  // Querying text path again must return text anchors from text namespace
+  const textAnchorsAgain = swa.indexAnchors('src/stmts.ts', source);
+  assert.strictEqual(textAnchorsAgain.length, 4, 'Text cache must remain isolated from AST cache');
+  assert.strictEqual(textAnchorsAgain[0].name, 'A');
+  console.log('  ✔ statement anchors are independent and AST/text caches are isolated (P0-3)');
+}
+
+/** Assert cross-language declarations in GDScript and Rust are accurately recognized (P0-4). */
+function assertCrossLanguageDeclarationsSupported() {
+  const swa = new SwaBoundedReplayManager();
+
+  // GDScript test
+  const gdScript = [
+    'var health = 100',
+    'const MAX_HEALTH = 200',
+    '',
+    'func _ready() -> void:',
+    '    print("ready")',
+    '',
+    'func _process(delta: float) -> void:',
+    '    pass',
+  ].join('\n');
+  const gdAnchors = swa.indexAnchors('scripts/player.gd', gdScript);
+  assert.strictEqual(gdAnchors.length, 4, 'must extract 4 GDScript anchors');
+  assert.strictEqual(gdAnchors[0].name, 'health');
+  assert.strictEqual(gdAnchors[0].startLine, 1);
+  assert.strictEqual(gdAnchors[0].endLine, 1);
+  assert.strictEqual(gdAnchors[1].name, 'MAX_HEALTH');
+  assert.strictEqual(gdAnchors[1].startLine, 2);
+  assert.strictEqual(gdAnchors[1].endLine, 2);
+  assert.strictEqual(gdAnchors[2].name, '_ready');
+  assert.strictEqual(gdAnchors[2].startLine, 4);
+  assert.strictEqual(gdAnchors[2].endLine, 5);
+  assert.strictEqual(gdAnchors[3].name, '_process');
+  assert.strictEqual(gdAnchors[3].startLine, 7);
+  assert.strictEqual(gdAnchors[3].endLine, 8);
+
+  // Rust test
+  const rustScript = [
+    'pub fn query(&self);',
+    'pub fn compute(&self) -> u32 {',
+    '    42',
+    '}',
+  ].join('\n');
+  const rsAnchors = swa.indexAnchors('src/engine.rs', rustScript);
+  assert.strictEqual(rsAnchors.length, 2, 'must extract 2 Rust anchors');
+  assert.strictEqual(rsAnchors[0].name, 'query');
+  assert.strictEqual(rsAnchors[0].startLine, 1);
+  assert.strictEqual(rsAnchors[0].endLine, 1);
+  assert.strictEqual(rsAnchors[1].name, 'compute');
+  assert.strictEqual(rsAnchors[1].startLine, 2);
+  assert.strictEqual(rsAnchors[1].endLine, 4);
+  console.log('  ✔ cross-language GDScript and Rust anchors supported (P0-4)');
+}
+
 function main() {
   console.log('=== Sparse Reference Replay Planner Validation ===');
   assertLocalEditStaysBounded();
@@ -299,7 +472,11 @@ function main() {
   assertImportMutationStaysFullReplay();
   assertResolverRankingAndDeterminism();
   assertPruningDelegates();
-  console.log('=== ALL SPARSE REFERENCE VALIDATION TESTS PASSED (9/9) ===');
+  assertWindowShiftingGuaranteesContainment();
+  assertSignaturePreservesFullDeclaration();
+  assertStatementAnchorsIndependentAndCacheIsolated();
+  assertCrossLanguageDeclarationsSupported();
+  console.log('=== ALL SPARSE REFERENCE VALIDATION TESTS PASSED (13/13) ===');
 }
 
 main();

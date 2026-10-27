@@ -26,6 +26,7 @@
  */
 
 import type { AstAnchor, SwaBoundedReplayManager, SwaReplayWindow } from './swa-bounded-replay';
+import type { NormalizedNode } from './multilang';
 import type { Issue } from '../types';
 import {
     REASON_MULTI_ANCHOR_SPAN,
@@ -99,6 +100,8 @@ export interface SparseReplayRequest {
     readonly changedLines?: readonly [number, number];
     /** Optional resolver supplying external call sites for a mutated signature. */
     readonly resolveReferences?: SparseReferenceResolver;
+    /** Optional pre-parsed normalized AST root for newContent. */
+    readonly rootNode?: NormalizedNode;
 }
 
 /** Tuning knobs for the sparse reference planner. */
@@ -147,6 +150,7 @@ export class SparseReferenceReplayManager {
             request.oldContent,
             request.newContent,
             request.changedLines,
+            request.rootNode,
         );
         if (this.swa.canUseSwaReplay(base)) {
             return this.asPlainWindow(base);
@@ -165,10 +169,15 @@ export class SparseReferenceReplayManager {
      *
      * @param filePath - File whose top-level declarations are indexed.
      * @param content - Source text to index.
+     * @param rootNode - Optional pre-parsed normalized AST root.
      * @returns Anchors in line order.
      */
-    public indexAnchors(filePath: string, content: string): readonly AstAnchor[] {
-        return this.swa.indexAnchors(filePath, content);
+    public indexAnchors(
+        filePath: string,
+        content: string,
+        rootNode?: NormalizedNode,
+    ): readonly AstAnchor[] {
+        return this.swa.indexAnchors(filePath, content, rootNode);
     }
 
     /**
@@ -210,7 +219,12 @@ export class SparseReferenceReplayManager {
     ): SparseReplayWindow {
         const range = request.changedLines;
         if (!range) return this.asPlainWindow(base);
-        const selection = this.selectAnchors(request.filePath, request.oldContent, range);
+        const selection = this.selectAnchors(
+            request.filePath,
+            request.oldContent,
+            range,
+            request.rootNode,
+        );
         if (selection.anchors.length < 2) return this.asPlainWindow(base);
 
         const spanStart = selection.anchors[0].startLine;
@@ -244,19 +258,33 @@ export class SparseReferenceReplayManager {
         const anchor = base.anchor;
         if (!anchor || !request.resolveReferences) return this.asPlainWindow(base);
 
-        const windowEnd = anchor.startLine + this.maxCompoundWindowLines - 1;
-        const endLine = Math.min(anchor.endLine, windowEnd);
+        const anchorSpan = anchor.endLine - anchor.startLine + 1;
+        let startLine = anchor.startLine;
+        let endLine = anchor.endLine;
+
+        if (anchorSpan > this.maxCompoundWindowLines) {
+            // Anchor itself exceeds compound window budget: apply P0-1 centered shift around signature
+            const targetSpan = this.maxCompoundWindowLines;
+            const sigLine = request.changedLines ? request.changedLines[0] : anchor.startLine;
+            const idealStart = sigLine - Math.floor(targetSpan / 2);
+            startLine = Math.max(
+                anchor.startLine,
+                Math.min(idealStart, anchor.endLine - targetSpan + 1),
+            );
+            endLine = Math.min(anchor.endLine, startLine + targetSpan - 1);
+        }
+
         const references = request
             .resolveReferences(anchor.name, this.maxSparseReferences)
             .slice(0, this.maxSparseReferences);
 
         return {
             anchor,
-            startLine: anchor.startLine,
+            startLine,
             endLine,
             isBounded: true,
             requiresFullReplay: false,
-            effectiveSpanLines: Math.max(1, endLine - anchor.startLine + 1),
+            effectiveSpanLines: Math.max(1, endLine - startLine + 1),
             reason:
                 references.length > 0
                     ? REASON_SPARSE_BRIDGED_SIGNATURE
@@ -272,15 +300,17 @@ export class SparseReferenceReplayManager {
      * @param filePath - File owning the anchors.
      * @param oldContent - Pre-mutation content used to rebuild the anchor index.
      * @param range - 1-based [first, last] changed line range.
+     * @param rootNode - Optional pre-parsed normalized AST root.
      * @returns Anchors intersecting the range, in source order.
      */
     private selectAnchors(
         filePath: string,
         oldContent: string,
         range: readonly [number, number],
+        rootNode?: NormalizedNode,
     ): AnchorSelection {
         const [rangeStart, rangeEnd] = range;
-        const anchors = this.swa.indexAnchors(filePath, oldContent);
+        const anchors = this.swa.indexAnchors(filePath, oldContent, rootNode);
         const intersecting: AstAnchor[] = [];
         for (let i = 0; i < anchors.length; i++) {
             const anchor = anchors[i];
