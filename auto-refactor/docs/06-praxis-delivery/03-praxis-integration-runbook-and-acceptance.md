@@ -116,7 +116,7 @@ const rows = overlapClusterRows();
 
 ## 4. 交付验收矩阵与全量自动化门禁
 
-Praxis 交付以 <!-- METRICS:BEGIN test-suite-count -->**177 套**<!-- METRICS:END test-suite-count -->自动化门禁套件（158 套独立并行验证套件 + 4 套串行守护进程套件 + vitest 单元套件）为刚性验收基线：
+Praxis 交付以 <!-- METRICS:BEGIN test-suite-count -->**180 套**<!-- METRICS:END test-suite-count -->自动化门禁套件（158 套独立并行验证套件 + 4 套串行守护进程套件 + vitest 单元套件）为刚性验收基线：
 
 | 验收核心域 | 验证命令 / 脚本路径 | 核心断言内容 | 验收标准 |
 | :--- | :--- | :--- | :---: |
@@ -129,7 +129,7 @@ Praxis 交付以 <!-- METRICS:BEGIN test-suite-count -->**177 套**<!-- METRICS:
 | **Rust N-API 与纯 TS 字节等价性** | `npm run validate-native-parity` | 6 大原生算子与纯 TS Shim 逐字节等价无漂移 | **PASS** |
 | **自研率 CAI 与贝叶斯置信区间** | `npm run validate-autonomy-scorer` | 6 维正交自研率、L1~L5 边界、Jeffreys Beta(0.5, 0.5) 置信下界 | **PASS** |
 | **三平面风险融合与共振放大** | `npm run validate-risk-fusion-engine` | $Risk = S^{1.0} \cdot D^{1.2} \cdot H^{0.8}$，双向确认升级 Critical | **PASS** |
-| **全量自动化测试套件矩阵** | `npm test` | <!-- METRICS:BEGIN test-suite-count -->**177 套**<!-- METRICS:END test-suite-count -->全量测试套件并行与串行回归验证 | **PASS** |
+| **全量自动化测试套件矩阵** | `npm test` | <!-- METRICS:BEGIN test-suite-count -->**180 套**<!-- METRICS:END test-suite-count -->全量测试套件并行与串行回归验证 | **PASS** |
 
 ---
 

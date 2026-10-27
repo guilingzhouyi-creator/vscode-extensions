@@ -7,7 +7,7 @@
 
 ## 1. 架构总览与全量门禁基准
 
-`auto-refactor` 在承载 **31 个多语言分析器**、**374 条注册规则体系** 及全语言语义 IR 的同时，依托 Rust N-API 原生算子与双轨流水线达成全仓亚秒级分析响应。引擎配套 <!-- METRICS:BEGIN test-suite-count -->**177 套**<!-- METRICS:END test-suite-count -->自动化测试套件（含 158 套独立并行验证套件、4 套串行/守护进程套件与 vitest 单元套件），在全量自测中实现 100% 自动化通过。
+`auto-refactor` 在承载 **31 个多语言分析器**、**374 条注册规则体系** 及全语言语义 IR 的同时，依托 Rust N-API 原生算子与双轨流水线达成全仓亚秒级分析响应。引擎配套 <!-- METRICS:BEGIN test-suite-count -->**180 套**<!-- METRICS:END test-suite-count -->自动化测试套件（含 158 套独立并行验证套件、4 套串行/守护进程套件与 vitest 单元套件），在全量自测中实现 100% 自动化通过。
 
 ```mermaid
 flowchart TD
