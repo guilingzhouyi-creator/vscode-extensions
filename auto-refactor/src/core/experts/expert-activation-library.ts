@@ -227,6 +227,9 @@ export { dispatchSliceFeatureBitset } from './slice-dispatcher';
 
 /**
  * Retrieve expert profile by string identifier.
+ *
+ * @param expertId - Catalog identifier exactly as declared in the expert manifest.
+ * @returns The matching profile, or undefined when the identifier is not registered.
  */
 export function getExpertProfile(expertId: string): MoEExpertProfile | undefined {
     return EXPERT_BY_ID.get(expertId);
@@ -234,6 +237,9 @@ export function getExpertProfile(expertId: string): MoEExpertProfile | undefined
 
 /**
  * Retrieve expert profile by 32-bit single-word bitmask.
+ *
+ * @param bit - Single-bit mask value; multi-bit masks address no single expert.
+ * @returns The profile holding that bit, or undefined when the bit is unassigned.
  */
 export function getExpertProfileByBit(bit: number): MoEExpertProfile | undefined {
     return EXPERT_BY_BIT.get(bit);
@@ -241,6 +247,8 @@ export function getExpertProfileByBit(bit: number): MoEExpertProfile | undefined
 
 /**
  * Retrieve all 32 expert profiles.
+ *
+ * @returns The frozen catalog in declaration order; callers must not sort or mutate it.
  */
 export function getAllExpertProfiles(): readonly MoEExpertProfile[] {
     return EXPERT_CATALOG;
@@ -248,6 +256,9 @@ export function getAllExpertProfiles(): readonly MoEExpertProfile[] {
 
 /**
  * Query active 32-bit bitmask for a semantic diff category.
+ *
+ * @param category - Semantic category of the change being classified.
+ * @returns The combined expert bitmask, or zero when the category activates no expert.
  */
 export function getCategoryBitmask(category: DiffSemanticCategory): number {
     return CATEGORY_BITMASK_MATRIX[category] || 0;
@@ -255,6 +266,9 @@ export function getCategoryBitmask(category: DiffSemanticCategory): number {
 
 /**
  * Query active 32-bit bitmask for a project archetype.
+ *
+ * @param archetype - Project archetype detected for the current workspace.
+ * @returns The combined expert bitmask, or zero when the archetype activates no expert.
  */
 export function getArchetypeBitmask(archetype: ProjectArchetype): number {
     return ARCHETYPE_BITMASK_MATRIX[archetype] || 0;
@@ -262,6 +276,9 @@ export function getArchetypeBitmask(archetype: ProjectArchetype): number {
 
 /**
  * Query active 32-bit bitmask for an exclusive programming language.
+ *
+ * @param language - Language name as recognised by the language adapters; matched case-insensitively.
+ * @returns The combined expert bitmask, or zero when the language activates no exclusive expert.
  */
 export function getLanguageExclusiveBitmask(language: string): number {
     return LANGUAGE_EXCLUSIVE_BITMASK[language.toLowerCase()] || 0;
@@ -275,6 +292,10 @@ export function getLanguageExclusiveBitmask(language: string): number {
  * Dynamically derive the category-to-analyzer mapping matrix.
  *
  * Fully backward-compatible with legacy deriveCategoryMatrix(manifest).
+ *
+ * @param _manifest - Legacy manifest argument, accepted for signature compatibility only. The
+ *   catalog is now compiled in, so the value is ignored and passing it changes nothing.
+ * @returns The frozen category-to-analyzer map.
  */
 export function deriveCategoryMatrix(
     _manifest?: readonly LegacyExpertManifestEntry[],
@@ -286,6 +307,10 @@ export function deriveCategoryMatrix(
  * Dynamically derive the archetype-to-analyzer mapping matrix.
  *
  * Fully backward-compatible with legacy deriveArchetypeMatrix(manifest).
+ *
+ * @param _manifest - Legacy manifest argument, accepted for signature compatibility only. The
+ *   catalog is now compiled in, so the value is ignored and passing it changes nothing.
+ * @returns The frozen archetype-to-analyzer map.
  */
 export function deriveArchetypeMatrix(
     _manifest?: readonly LegacyExpertManifestEntry[],

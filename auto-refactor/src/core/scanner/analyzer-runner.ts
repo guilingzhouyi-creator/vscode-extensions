@@ -366,6 +366,8 @@ function seedIndexes(
  *     materialized parse path so unchanged subtrees can be reused.
  * @param activeAnalyzers - Optional allow-list of analyzer names; omitted means the full
  *     resolved plan runs.
+ * @param lineBounds - Optional one-based inclusive line window; when present only findings inside
+ *     it are reported, which is how slice-scoped audits avoid re-reporting whole-file issues.
  * Concurrency: asynchronous per-file execution; safe for concurrent execution on separate files.
  * @returns The file's issues and its per-file metric summary.
  */

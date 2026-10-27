@@ -119,7 +119,9 @@ export class PersistentReviewFactStore {
     /**
      * Store a verified analysis fact.
      *
-     * @param params - Fact attributes (modulePath, contentHash, factType, payload).
+     * @param params - Fact attributes: the `modulePath` owning the fact, the `contentHash` that
+     *   scopes it to a revision, the `factType` selecting the category, and the `payload` holding
+     *   the analysis output.
      * @param ttlMs - Optional custom TTL override.
      * @returns Stored ReviewFact record.
      */

@@ -201,6 +201,16 @@ export async function handleScanDiff(
 
 /**
  * Execute an asymmetric Prefill-Decode disaggregated scan request.
+ *
+ * The fast verdict is awaited before the deep pass, so a caller receives the shallow decision
+ * while the deep pass is still running unless `prefillOnly` suppresses it entirely.
+ *
+ * @param ctx - Daemon scan context supplying the warm session and cache store.
+ * @param config - Scan configuration forwarded to the scanner and logger.
+ * @param inputs - File pairs to analyse, each carrying the previous and current content.
+ * @param options - Per-request overrides: `author` for attribution, `forceFull` to bypass the
+ *   delta path, and `prefillOnly` to skip awaiting the deep pass.
+ * @returns Fast verdict, deep status with its issue count, and elapsed milliseconds.
  */
 export async function handleAsymmetricScan(
     ctx: DaemonScanContext,
@@ -253,6 +263,13 @@ export async function handleAsymmetricScan(
 
 /**
  * Execute a localized AST slice audit request.
+ *
+ * @param filePath - Path of the file being audited; also selects the language adapter.
+ * @param oldContent - Content before the edit, used as the slice baseline.
+ * @param newContent - Content after the edit, compared slice by slice against the baseline.
+ * @param changedLines - One-based line numbers known to have changed; when omitted the extractor
+ *   derives the diff itself.
+ * @returns Extracted slices plus the elapsed milliseconds spent on extraction.
  */
 export async function handleSliceAudit(
     filePath: string,

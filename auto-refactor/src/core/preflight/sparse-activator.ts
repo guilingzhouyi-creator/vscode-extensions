@@ -271,6 +271,14 @@ function resolveActivationParameters(
 /**
  * Computes sparse analyzer activation mapping across indexed files based on scope decisions,
  * change sets, and domain affinity weights.
+ *
+ * Both call shapes reach the same resolution step: the current one passes a single parameters
+ * object, while the legacy positional form supplies the same values as trailing arguments.
+ *
+ * @param paramsOrAnalyzers - Parameters object, or the analyzer id list in the legacy call shape.
+ * @param legacyArgs - Legacy positional tail: file entries, scope decision, changed files,
+ *   neighbour files, threshold, and weights, in that order.
+ * @returns Frozen selection result with per-file analyzer mapping and a rationale per activation.
  */
 export function activateSparseAnalyzers(
     paramsOrAnalyzers: SparseActivationParams | readonly string[],
