@@ -11,7 +11,11 @@ use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use std::fmt;
 
+use super::hex::{decode_fixed_hex, encode_hex, HexDecodeError};
 use crate::error::{FractalError, FractalResult};
+
+/// Character width of a hexadecimal ChangeId rendering.
+const HEX_WIDTH: usize = 32;
 
 /// Immutable 16-byte stable change identifier.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -32,37 +36,29 @@ impl ChangeId {
     }
 
     /// Parses a 32-character hexadecimal string into a ChangeId.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed codec error when the trimmed input is not exactly 32 bytes or holds a
+    /// character outside the hexadecimal alphabet. Multi-byte input is rejected rather than
+    /// sliced, so no character boundary can be crossed.
     pub fn from_hex(hex_str: &str) -> FractalResult<Self> {
         let trimmed_hex = hex_str.trim();
-        if trimmed_hex.len() != 32 {
-            return Err(FractalError::ObjectCodec(format!(
-                "Invalid ChangeId hex length: expected 32, got {}",
-                trimmed_hex.len()
-            )));
-        }
-
-        let mut byte_buffer = [0u8; 16];
-        for index in 0..16 {
-            byte_buffer[index] = u8::from_str_radix(&trimmed_hex[index * 2..index * 2 + 2], 16)
-                .map_err(|parse_err| {
-                    FractalError::ObjectCodec(format!(
-                        "Invalid hex byte in ChangeId '{}': {}",
-                        trimmed_hex, parse_err
-                    ))
-                })?;
-        }
-
+        let byte_buffer =
+            decode_fixed_hex::<16>(trimmed_hex).map_err(|decode_err| match decode_err {
+                HexDecodeError::Length { actual, .. } => FractalError::ObjectCodec(format!(
+                    "Invalid ChangeId hex length: expected {HEX_WIDTH}, got {actual}"
+                )),
+                HexDecodeError::NonHex => FractalError::ObjectCodec(format!(
+                    "Invalid hex byte in ChangeId '{trimmed_hex}'"
+                )),
+            })?;
         Ok(Self(byte_buffer))
     }
 
     /// Returns lowercase 32-character hexadecimal representation.
     pub fn to_hex(&self) -> String {
-        let mut hex_text = String::with_capacity(32);
-        for byte_val in self.0 {
-            use std::fmt::Write;
-            let _ = write!(&mut hex_text, "{:02x}", byte_val);
-        }
-        hex_text
+        encode_hex(&self.0)
     }
 
     /// Deterministically derives a stable ChangeId from actor, card or topic, and timestamp.

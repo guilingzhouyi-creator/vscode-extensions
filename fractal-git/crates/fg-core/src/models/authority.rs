@@ -15,6 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sha1::{Digest, Sha1};
 
+use super::hex::{decode_fixed_hex, encode_hex, HexDecodeError};
 use crate::error::{FractalError, FractalResult};
 
 /// Environment variable carrying the authority secret.
@@ -76,22 +77,16 @@ impl AuthoritySecret {
     /// Builds a secret from exactly 64 lowercase or uppercase hex characters.
     pub fn from_hex(hex: &str) -> FractalResult<Self> {
         let trimmed = hex.trim();
-        let mut key = [0u8; MIN_SECRET_BYTES];
-        if trimmed.len() != MIN_SECRET_BYTES * 2 {
-            return Err(FractalError::PolicyViolation(format!(
-                "{BREACH_TAG} authority secret hex must be exactly {} characters, got {}; {AUTHORITY_REMEDIATION}",
-                MIN_SECRET_BYTES * 2,
-                trimmed.len()
-            )));
-        }
-        for (index, chunk) in trimmed.as_bytes().as_chunks::<2>().0.iter().enumerate() {
-            let byte = decode_hex_byte(chunk[0], chunk[1]).ok_or_else(|| {
-                FractalError::PolicyViolation(format!(
-                    "{BREACH_TAG} authority secret contains a non-hex character; {AUTHORITY_REMEDIATION}"
-                ))
-            })?;
-            key[index] = byte;
-        }
+        let key = decode_fixed_hex::<MIN_SECRET_BYTES>(trimmed).map_err(|decode_err| {
+            let observed = match decode_err {
+                HexDecodeError::Length { actual, .. } => actual,
+                HexDecodeError::NonHex => trimmed.len(),
+            };
+            FractalError::PolicyViolation(format!(
+                "{BREACH_TAG} authority secret hex must be exactly {} hexadecimal characters, got {observed}; {AUTHORITY_REMEDIATION}",
+                MIN_SECRET_BYTES * 2
+            ))
+        })?;
         Ok(Self(key))
     }
 
@@ -249,20 +244,10 @@ fn parse_token(token: &str) -> FractalResult<AuthorityClaims> {
 
 fn parse_hex_mac(token: &str) -> FractalResult<[u8; 20]> {
     let mac = token.rsplit('.').next().unwrap_or_default();
-    let mut bytes = [0u8; 20];
-    for (index, chunk) in mac.as_bytes().as_chunks::<2>().0.iter().enumerate() {
-        let high = decode_hex_byte(chunk[0], chunk[1])
-            .ok_or_else(|| invalid_token("MAC segment must be hexadecimal"))?;
-        bytes[index] = high;
-    }
-    if bytes_len_raw(mac) != 20 {
-        return Err(invalid_token("MAC segment must decode to 20 bytes"));
-    }
-    Ok(bytes)
-}
-
-fn bytes_len_raw(mac: &str) -> usize {
-    mac.len() / 2
+    decode_fixed_hex::<20>(mac).map_err(|decode_err| match decode_err {
+        HexDecodeError::Length { .. } => invalid_token("MAC segment must decode to 20 bytes"),
+        HexDecodeError::NonHex => invalid_token("MAC segment must be hexadecimal"),
+    })
 }
 
 /// Constant-time equality over equal-length byte slices.
@@ -275,29 +260,6 @@ fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
         difference |= a ^ b;
     }
     difference == 0
-}
-
-fn decode_hex_byte(high: u8, low: u8) -> Option<u8> {
-    Some((hex_nibble(high)? << 4) | hex_nibble(low)?)
-}
-
-fn hex_nibble(byte: u8) -> Option<u8> {
-    match byte {
-        b'0'..=b'9' => Some(byte - b'0'),
-        b'a'..=b'f' => Some(byte - b'a' + 10),
-        b'A'..=b'F' => Some(byte - b'A' + 10),
-        _ => None,
-    }
-}
-
-fn encode_hex(bytes: &[u8]) -> String {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    let mut encoded = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        encoded.push(DIGITS[(byte >> 4) as usize] as char);
-        encoded.push(DIGITS[(byte & 0x0f) as usize] as char);
-    }
-    encoded
 }
 
 fn invalid_token(reason: &str) -> FractalError {

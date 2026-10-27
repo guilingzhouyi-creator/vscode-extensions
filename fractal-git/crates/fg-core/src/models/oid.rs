@@ -10,7 +10,11 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use super::hex::{decode_fixed_hex, encode_hex, HexDecodeError};
 use crate::error::{FractalError, FractalResult};
+
+/// Character width of a hexadecimal OID rendering.
+const HEX_WIDTH: usize = 40;
 
 /// Compact 20-byte cryptographic object identifier representing standard Git SHA-1 hashes.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -26,25 +30,22 @@ impl Oid {
     }
 
     /// Parses a 40-character hexadecimal string into an Oid.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed codec error when the trimmed input is not exactly 40 bytes or holds a
+    /// character outside the hexadecimal alphabet. Multi-byte input is rejected rather than
+    /// sliced, so no character boundary can be crossed.
     pub fn from_hex(hex_str: &str) -> FractalResult<Self> {
         let hex = hex_str.trim();
-        if hex.len() != 40 {
-            return Err(FractalError::ObjectCodec(format!(
-                "Invalid OID hex length: expected 40, got {}",
-                hex.len()
-            )));
-        }
-
-        let mut bytes = [0u8; 20];
-        for i in 0..20 {
-            bytes[i] = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).map_err(|parse_err| {
-                FractalError::ObjectCodec(format!(
-                    "Invalid hex byte in OID '{}': {}",
-                    hex, parse_err
-                ))
-            })?;
-        }
-
+        let bytes = decode_fixed_hex::<20>(hex).map_err(|decode_err| match decode_err {
+            HexDecodeError::Length { actual, .. } => FractalError::ObjectCodec(format!(
+                "Invalid OID hex length: expected {HEX_WIDTH}, got {actual}"
+            )),
+            HexDecodeError::NonHex => {
+                FractalError::ObjectCodec(format!("Invalid hex byte in OID '{hex}'"))
+            }
+        })?;
         Ok(Self(bytes))
     }
 
@@ -55,12 +56,7 @@ impl Oid {
 
     /// Returns lowercase 40-character hexadecimal representation.
     pub fn to_hex(&self) -> String {
-        let mut hex = String::with_capacity(40);
-        for byte in self.0 {
-            use std::fmt::Write;
-            let _ = write!(&mut hex, "{:02x}", byte);
-        }
-        hex
+        encode_hex(&self.0)
     }
 }
 
