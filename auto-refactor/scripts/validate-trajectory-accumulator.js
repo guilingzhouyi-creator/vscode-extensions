@@ -129,6 +129,16 @@ async function runValidation() {
     thirdRunRes.lifetimeSummary.debt.netYield >= 0,
     'Net yield should reflect debt resolution',
   );
+  assert.strictEqual(
+    typeof thirdRunRes.lifetimeSummary.debt.densityYield,
+    'number',
+    'densityYield should be a number',
+  );
+  assert.strictEqual(
+    typeof thirdRunRes.lifetimeSummary.qed.kMean,
+    'number',
+    'kMean should be a number',
+  );
 
   console.log('--- [4/5] Testing Ledger Persistence & Compaction ---');
   const recentRecords = await readRecentRecords(TEST_LEDGER_DIR);

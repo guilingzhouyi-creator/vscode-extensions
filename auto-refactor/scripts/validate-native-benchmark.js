@@ -123,6 +123,46 @@ function benchmarkSourceMask(corpus, iterations = 10) {
 }
 
 /**
+ * Benchmark compact single-string source masking throughput.
+ */
+function benchmarkSourceMaskCompact(corpus, iterations = 10) {
+  const config = toNativeConfig(SOURCE_MASK_PRESETS[MASK_LANGUAGE_TYPESCRIPT]);
+  const corpusBytes = Buffer.byteLength(corpus, 'utf8');
+
+  // Warmup
+  nativeCore.maskSourceCodeCompact(corpus, config);
+  shim.maskSourceCodeCompact(corpus, config);
+
+  // Time Native
+  const t0Native = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    nativeCore.maskSourceCodeCompact(corpus, config);
+  }
+  const nativeElapsedMs = (performance.now() - t0Native) / iterations;
+
+  // Time Shim
+  const t0Shim = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    shim.maskSourceCodeCompact(corpus, config);
+  }
+  const shimElapsedMs = (performance.now() - t0Shim) / iterations;
+
+  const totalMb = corpusBytes / (1024 * 1024);
+  const nativeThroughputMbSec = totalMb / (nativeElapsedMs / 1000);
+  const shimThroughputMbSec = totalMb / (shimElapsedMs / 1000);
+  const speedup = shimElapsedMs / Math.max(0.001, nativeElapsedMs);
+
+  return {
+    operator: 'SIMD Mask Compact',
+    nativeElapsedMs,
+    shimElapsedMs,
+    nativeThroughputMbSec,
+    shimThroughputMbSec,
+    speedup,
+  };
+}
+
+/**
  * Benchmark clone block and MinHash detection.
  */
 function benchmarkCloneDetection(corpus, iterations = 10) {
@@ -409,6 +449,7 @@ function runBenchmark() {
 
   const results = [
     benchmarkSourceMask(corpus),
+    benchmarkSourceMaskCompact(corpus),
     benchmarkCloneDetection(corpus),
     benchmarkGraphTopology(),
     benchmarkHistogramDiff(corpus),

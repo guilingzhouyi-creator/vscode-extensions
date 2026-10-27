@@ -125,6 +125,12 @@ async function runTests() {
     assert.strictEqual(summary.totalRuns, 2, 'Weekly summary should aggregate 2 runs');
     assert.strictEqual(summary.eloc.semanticTotal, 95 + 40, 'Semantic ELOC must sum correctly');
     assert.strictEqual(summary.gatePassRate, 100, 'Pass rate should be 100%');
+    assert.strictEqual(
+      typeof summary.debt.densityYield,
+      'number',
+      'densityYield should be a number',
+    );
+    assert.strictEqual(typeof summary.qed.kMean, 'number', 'kMean should be a number');
 
     const lifetime = await readLifetimeSummary(tempLedgerDir);
     assert.ok(lifetime !== null, 'Lifetime summary file must exist');
