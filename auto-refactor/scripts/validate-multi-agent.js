@@ -25,7 +25,7 @@ const {
 } = require('../dist/core/trajectory');
 
 const {
-  createPraxisMultiAgentGovernanceService,
+  createMultiAgentGovernanceService,
   defaultPraxisMultiAgentGovernanceService,
 } = require('../dist/core/praxis');
 
@@ -341,7 +341,7 @@ function testPatchArbiter() {
 async function testPraxisFacadeService() {
   console.log('── Step 6: Praxis Multi-Agent Governance Facade Integration ──');
 
-  const service = createPraxisMultiAgentGovernanceService();
+  const service = createMultiAgentGovernanceService();
   assert.ok(service, 'Service factory must instantiate');
   assert.ok(defaultPraxisMultiAgentGovernanceService, 'Default service singleton must exist');
   assert.ok(new MultiAgentCoordinator(), 'MultiAgentCoordinator constructor must instantiate');

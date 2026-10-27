@@ -207,6 +207,3 @@ export function createTrajectoryLearningService(
 ): IPraxisTrajectoryLearningService {
     return new PraxisTrajectoryLearningService(extractor, detector);
 }
-
-/** Backward-compatibility alias for createTrajectoryLearningService. */
-export const createPraxisTrajectoryLearningService = createTrajectoryLearningService;

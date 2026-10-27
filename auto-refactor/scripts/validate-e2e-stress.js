@@ -26,8 +26,8 @@ const {
   createPraxisSliceAuditService,
   TrajectoryRecipeExtractor,
   RegressionTrajectoryDetector,
-  createPraxisTrajectoryLearningService,
-  createPraxisMultiAgentGovernanceService,
+  createTrajectoryLearningService,
+  createMultiAgentGovernanceService,
 } = require('../dist/api');
 const { SymbolIndex } = require('../dist/core/intelligence/symbolIndex');
 const { CallGraph } = require('../dist/core/intelligence/callGraph');
@@ -309,7 +309,7 @@ async function testGate4TrajectoryOscillation(trajectoryService, regressionDetec
  */
 async function testGate5PraxisSynergy(sliceService, trajectoryService) {
   console.log('\n[CASE-05] Verifying Praxis multi-facade SPI synergy...');
-  const multiAgentService = createPraxisMultiAgentGovernanceService();
+  const multiAgentService = createMultiAgentGovernanceService();
   const patches = [
     {
       agentUid: 'a1',
@@ -405,7 +405,7 @@ async function main() {
 
   const recipeExtractor = new TrajectoryRecipeExtractor();
   const regressionDetector = new RegressionTrajectoryDetector();
-  const trajectoryService = createPraxisTrajectoryLearningService(
+  const trajectoryService = createTrajectoryLearningService(
     recipeExtractor,
     regressionDetector,
   );

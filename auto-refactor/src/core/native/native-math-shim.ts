@@ -80,8 +80,6 @@ export function calculatePopoviciuPenaltyShim(
     return Math.round(factor * SCORE_ROUNDING_FACTOR) / SCORE_ROUNDING_FACTOR;
 }
 
-/** Backward-compatibility alias for calculatePopoviciuPenaltyShim. */
-export const calculatePopoviciuDispersionPenaltyShim = calculatePopoviciuPenaltyShim;
 
 /**
  * Counts opening and closing curly braces in a line with detailed breakdown.
@@ -104,8 +102,6 @@ export function computeWarshallClosureShim(matrix: Uint8Array, size: number): Ui
     return computeWarshallTransitiveClosure(matrix, size);
 }
 
-/** Backward-compatibility alias for computeWarshallClosureShim. */
-export const computeWarshallTransitiveClosureShim = computeWarshallClosureShim;
 
 /**
  * Computes inner dot product between two vector slices.

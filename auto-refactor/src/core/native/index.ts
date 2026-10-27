@@ -27,15 +27,16 @@ import {
     nativeSolveDataflow,
     nativeBitParallelMyersDistance,
     nativeSimHash64,
-    nativeSimHashHammingSimilarity,
-    nativeTrigramCosineSimilarity,
+    nativeSimHashSimilarity,
+    nativeTrigramSimilarity,
 } from './native-bridge';
 import type { NativeCoreStatus } from './native-types';
 
+// Only the native-* contract and its types form the public surface. The *Shim
+// symbols stay reachable inside native-bridge, which is their sole consumer, so
+// they are deliberately not re-exported here.
 export * from './native-types';
 export * from './native-bridge';
-export * from './native-clone-shim';
-export * from './native-flow-shim';
 
 /**
  * Probes current execution environment to report active native acceleration status.
@@ -86,6 +87,6 @@ export const NativeCoreFacade = Object.freeze({
     solveDataflow: nativeSolveDataflow,
     bitParallelMyersDistance: nativeBitParallelMyersDistance,
     simHash64: nativeSimHash64,
-    simHashHammingSimilarity: nativeSimHashHammingSimilarity,
-    trigramCosineSimilarity: nativeTrigramCosineSimilarity,
+    simHashHammingSimilarity: nativeSimHashSimilarity,
+    trigramCosineSimilarity: nativeTrigramSimilarity,
 });

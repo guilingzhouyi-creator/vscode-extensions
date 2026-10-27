@@ -24,29 +24,21 @@ import {
     computeNativeShannonEntropy,
     computeNativeStatisticalMoments,
     calculateNativePopoviciuPenalty,
-    calculateNativePopoviciuDispersionPenalty,
     countNativeBracesDetailed,
     computeNativeWarshallClosure,
-    computeNativeWarshallTransitiveClosure,
     computeNativeVectorDotProduct,
     computeNativeVectorCosineSimilarity,
     computeNativeVectorDistance,
-    computeNativeVectorEuclideanDistance,
     calculateNativeSimHashSimilarity,
-    calculateNativeSimHashHammingSimilarity,
     calculateNativeTrigramSimilarity,
-    calculateNativeTrigramCosineSimilarity,
     nativeShannonEntropy,
     nativeStatisticalMoments,
     nativePopoviciuPenalty,
-    nativePopoviciuDispersionPenalty,
     nativeCountBracesDetailed,
     nativeWarshallClosure,
-    nativeWarshallTransitiveClosure,
     nativeVectorDotProduct,
     nativeVectorCosineSimilarity,
     nativeVectorDistance,
-    nativeVectorEuclideanDistance,
     analyzeNativeDependencyGraph,
 } from '../../../src/core/native/native-bridge';
 
@@ -139,27 +131,25 @@ describe('Native Bridge Dual-Track Acceleration Suite', () => {
 
     describe('Popoviciu Dispersion Penalty Operator', () => {
         it('should return 1.0 for zero or non-finite standard deviation', () => {
-            expect(calculateNativePopoviciuDispersionPenalty(0.0)).toBe(1.0);
-            expect(calculateNativePopoviciuDispersionPenalty(-5.0)).toBe(1.0);
-            expect(calculateNativePopoviciuDispersionPenalty(NaN)).toBe(1.0);
+            expect(calculateNativePopoviciuPenalty(0.0)).toBe(1.0);
+            expect(calculateNativePopoviciuPenalty(-5.0)).toBe(1.0);
+            expect(calculateNativePopoviciuPenalty(NaN)).toBe(1.0);
         });
 
         it('should compute discount factor under default maxSigma=50 and gamma=0.5', () => {
             // sigma = 25.0 -> norm = 25 / 50 = 0.5 -> discount = 1 - 0.5 * 0.5 = 0.75
-            expect(calculateNativePopoviciuDispersionPenalty(25.0)).toBe(0.75);
             expect(calculateNativePopoviciuPenalty(25.0)).toBe(0.75);
-            expect(nativePopoviciuDispersionPenalty(25.0)).toBe(0.75);
             expect(nativePopoviciuPenalty(25.0)).toBe(0.75);
         });
 
         it('should support customized maxSigma and gamma parameters', () => {
             // sigma = 20.0, maxSigma = 100.0, gamma = 1.0 -> norm = 0.2 -> discount = 0.8
-            expect(calculateNativePopoviciuDispersionPenalty(20.0, 100.0, 1.0)).toBe(0.8);
+            expect(calculateNativePopoviciuPenalty(20.0, 100.0, 1.0)).toBe(0.8);
         });
 
         it('should clamp discount factor to [0.0, 1.0] under extreme dispersion', () => {
             // sigma = 100.0, maxSigma = 50.0, gamma = 1.0 -> raw = 1 - 2.0 = -1.0 -> clamped 0.0
-            expect(calculateNativePopoviciuDispersionPenalty(100.0, 50.0, 1.0)).toBe(0.0);
+            expect(calculateNativePopoviciuPenalty(100.0, 50.0, 1.0)).toBe(0.0);
         });
     });
 
@@ -197,7 +187,7 @@ describe('Native Bridge Dual-Track Acceleration Suite', () => {
     describe('Warshall Transitive Closure Operator', () => {
         it('should handle empty or degenerate matrix', () => {
             const empty = new Uint8Array(0);
-            expect(computeNativeWarshallTransitiveClosure(empty, 0)).toBe(empty);
+            expect(computeNativeWarshallClosure(empty, 0)).toBe(empty);
         });
 
         it('should compute transitive closure on a 3-vertex line graph (0 -> 1 -> 2)', () => {
@@ -210,7 +200,7 @@ describe('Native Bridge Dual-Track Acceleration Suite', () => {
                 0, 0, 1,
                 0, 0, 0,
             ]);
-            const closure = computeNativeWarshallTransitiveClosure(matrix, 3);
+            const closure = computeNativeWarshallClosure(matrix, 3);
             // Expected closure:
             // 0 1 1  (0 reaches 1 and 2)
             // 0 0 1  (1 reaches 2)
@@ -220,7 +210,7 @@ describe('Native Bridge Dual-Track Acceleration Suite', () => {
                 0, 0, 1,
                 0, 0, 0,
             ]);
-            expect(Array.from(nativeWarshallTransitiveClosure(new Uint8Array(matrix), 3))).toEqual([
+            expect(Array.from(nativeWarshallClosure(new Uint8Array(matrix), 3))).toEqual([
                 0, 1, 1,
                 0, 0, 1,
                 0, 0, 0,
@@ -251,9 +241,7 @@ describe('Native Bridge Dual-Track Acceleration Suite', () => {
         it('should compute Euclidean distance accurately', () => {
             const a = [0.0, 0.0, 0.0];
             const b = [3.0, 4.0, 0.0];
-            expect(computeNativeVectorEuclideanDistance(a, b)).toBe(5.0);
             expect(computeNativeVectorDistance(a, b)).toBe(5.0);
-            expect(nativeVectorEuclideanDistance(a, b)).toBe(5.0);
             expect(nativeVectorDistance(a, b)).toBe(5.0);
         });
 

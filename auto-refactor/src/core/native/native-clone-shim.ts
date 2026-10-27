@@ -435,8 +435,6 @@ export function calculateTrigramSimilarityShim(
     return calculateTrigramCosineSimilarity(vecA, vecB);
 }
 
-/** Backward-compatibility alias for calculateTrigramSimilarityShim. */
-export const calculateTrigramCosineSimilarityShim = calculateTrigramSimilarityShim;
 
 interface TemporalMiningState {
     readonly fileCommitCounts: Map<number, number>;

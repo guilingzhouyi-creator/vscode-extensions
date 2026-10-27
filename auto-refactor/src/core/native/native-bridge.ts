@@ -51,7 +51,7 @@ import {
     computeBitParallelDistanceShim,
     computeSimHash64Shim,
     calculateSimHashHammingSimilarityShim,
-    calculateTrigramCosineSimilarityShim,
+    calculateTrigramSimilarityShim,
     computeTemporalCouplingShim,
     evaluateBumpyRoadShim,
     batchProbeTriggersShim,
@@ -63,9 +63,9 @@ import { fastPatternMatchShim } from './native-pattern-shim';
 import {
     computeShannonEntropyShim,
     computeStatisticalMomentsShim,
-    calculatePopoviciuDispersionPenaltyShim,
+    calculatePopoviciuPenaltyShim,
     countBracesDetailedShim,
-    computeWarshallTransitiveClosureShim,
+    computeWarshallClosureShim,
     computeVectorDotProductShim,
     computeVectorCosineSimilarityShim,
     computeVectorEuclideanDistanceShim,
@@ -358,7 +358,7 @@ export class PureJsNativeShim implements INativeCore {
         tokensA: readonly string[],
         tokensB: readonly string[],
     ): number {
-        return calculateTrigramCosineSimilarityShim(tokensA, tokensB);
+        return calculateTrigramSimilarityShim(tokensA, tokensB);
     }
 
     /**
@@ -421,7 +421,7 @@ export class PureJsNativeShim implements INativeCore {
         maxSigma?: number,
         gamma?: number,
     ): number {
-        return calculatePopoviciuDispersionPenaltyShim(standardDeviation, maxSigma, gamma);
+        return calculatePopoviciuPenaltyShim(standardDeviation, maxSigma, gamma);
     }
 
     /**
@@ -437,7 +437,7 @@ export class PureJsNativeShim implements INativeCore {
      * Computes transitive closure over a dense boolean adjacency matrix using Warshall's algorithm.
      */
     public computeWarshallTransitiveClosure(matrix: Uint8Array, size: number): Uint8Array {
-        return computeWarshallTransitiveClosureShim(matrix, size);
+        return computeWarshallClosureShim(matrix, size);
     }
 
     /**
@@ -1118,28 +1118,18 @@ export {
     computeShannonEntropy as nativeShannonEntropy,
     computeNativeStatisticalMoments as nativeStatisticalMoments,
     calculatePopoviciuPenalty as calculateNativePopoviciuPenalty,
-    calculatePopoviciuPenalty as calculateNativePopoviciuDispersionPenalty,
     calculatePopoviciuPenalty as nativePopoviciuPenalty,
-    calculatePopoviciuPenalty as nativePopoviciuDispersionPenalty,
     countNativeBracesDetailed as nativeCountBracesDetailed,
     computeWarshallClosure as computeNativeWarshallClosure,
-    computeWarshallClosure as computeNativeWarshallTransitiveClosure,
     computeWarshallClosure as nativeWarshallClosure,
-    computeWarshallClosure as nativeWarshallTransitiveClosure,
     computeNativeVectorDotProduct as nativeVectorDotProduct,
     computeNativeVectorCosineSimilarity as nativeVectorCosineSimilarity,
     computeVectorDistance as computeNativeVectorDistance,
-    computeVectorDistance as computeNativeVectorEuclideanDistance,
     computeVectorDistance as nativeVectorDistance,
-    computeVectorDistance as nativeVectorEuclideanDistance,
     calculateSimHashSimilarity as calculateNativeSimHashSimilarity,
-    calculateSimHashSimilarity as calculateNativeSimHashHammingSimilarity,
     calculateSimHashSimilarity as nativeSimHashSimilarity,
-    calculateSimHashSimilarity as nativeSimHashHammingSimilarity,
     calculateTrigramSimilarity as calculateNativeTrigramSimilarity,
-    calculateTrigramSimilarity as calculateNativeTrigramCosineSimilarity,
     calculateTrigramSimilarity as nativeTrigramSimilarity,
-    calculateTrigramSimilarity as nativeTrigramCosineSimilarity,
     scanNativeSecrets as scanSecrets,
     countDuplicates as countNativeDuplicateLines,
     countDuplicates as nativeCountDuplicateLines,

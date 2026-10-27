@@ -18,22 +18,22 @@ const assert = require('assert');
 const {
   TrajectoryRecipeExtractor,
   RegressionTrajectoryDetector,
-  createPraxisTrajectoryLearningService,
+  createTrajectoryLearningService,
   calculateTrajectoryQualityVelocity,
   calculateRecipeGeneralizationIndex,
   calculateParameterClumpDensity,
   calculateLoopAllocationPressure,
   calculateHookDecouplingRatio,
   calculateDataFlowPurityScore,
-  calculateObjectPoolConservationIndex,
+  calculateObjectPoolIndex,
   calculateCasReentrancySafetyIndex,
   calculateIndirectionUtilityMetric,
   calculateConfigCacheFreshnessScore,
-  calculateDtoCompatibilityBridgeIndex,
+  calculateDtoBridgeIndex,
   calculateSchemaGroundingRate,
   calculateShimDebtDecayPenalty,
-  calculateArchitectureDirectnessIndex,
-  calculateDeprecationConvergenceHealth,
+  calculateDirectnessIndex,
+  calculateDeprecationHealth,
   calculateZeroCostModernUtility,
   calculateModernConstructAdoptionRate,
 } = require('../dist/api');
@@ -45,7 +45,7 @@ async function main() {
 
   const extractor = new TrajectoryRecipeExtractor();
   const detector = new RegressionTrajectoryDetector();
-  const service = createPraxisTrajectoryLearningService(extractor, detector);
+  const service = createTrajectoryLearningService(extractor, detector);
 
   // CASE-01: Monolithic to Extract-Method (REC-SPLIT)
   console.log('\n[CASE-01] Verifying Bad->Good decomposition into extract-method recipe...');
@@ -497,12 +497,12 @@ function evaluateContext(rawInput: TypedContextView): any {
 
   assert.strictEqual(calculateHookDecouplingRatio(8, 2), 0.8);
   assert.strictEqual(calculateDataFlowPurityScore(1, 0, 9), 0.9);
-  assert.strictEqual(calculateObjectPoolConservationIndex(10, 10, true), 1.0);
-  assert.strictEqual(calculateObjectPoolConservationIndex(10, 10, false), 0);
+  assert.strictEqual(calculateObjectPoolIndex(10, 10, true), 1.0);
+  assert.strictEqual(calculateObjectPoolIndex(10, 10, false), 0);
   assert.strictEqual(calculateCasReentrancySafetyIndex(9, 10, 0.0), 0.9);
   assert.strictEqual(calculateIndirectionUtilityMetric(100, 0), 100.0);
   assert.strictEqual(calculateConfigCacheFreshnessScore(5, 5, 0.0), 1.0);
-  assert.strictEqual(calculateDtoCompatibilityBridgeIndex(5, 5, 0), 0.91);
+  assert.strictEqual(calculateDtoBridgeIndex(5, 5, 0), 0.91);
   assert.strictEqual(calculateSchemaGroundingRate(18, 20), 0.9);
 
   // Modernization Formulas
@@ -513,9 +513,9 @@ function evaluateContext(rawInput: TypedContextView): any {
   assert.strictEqual(shimFresh, expectedFresh);
   assert.strictEqual(shimOld, expectedOld);
 
-  assert.strictEqual(calculateArchitectureDirectnessIndex(80, 20, 0), 0.8);
-  assert.strictEqual(calculateDeprecationConvergenceHealth(10, 0, 0, 100), 1.0);
-  assert.strictEqual(calculateDeprecationConvergenceHealth(10, 5, 10, 100), 0.49);
+  assert.strictEqual(calculateDirectnessIndex(80, 20, 0), 0.8);
+  assert.strictEqual(calculateDeprecationHealth(10, 0, 0, 100), 1.0);
+  assert.strictEqual(calculateDeprecationHealth(10, 5, 10, 100), 0.49);
   assert.strictEqual(calculateZeroCostModernUtility(1.2, 0, 0.0, 1.0), 100.0);
   assert.strictEqual(calculateZeroCostModernUtility(0.8, 3, 0.5, 0.8, 0.2), 20.0);
   assert.strictEqual(calculateModernConstructAdoptionRate(90, 10), 0.9);

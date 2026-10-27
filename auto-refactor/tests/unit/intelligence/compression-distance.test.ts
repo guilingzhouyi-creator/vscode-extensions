@@ -3,7 +3,7 @@
  * File Path: tests/unit/intelligence/compression-distance.test.ts
  * Architecture Role: Verifies universal information distance, code normalization,
  *   deflate byte sizing, and structural clone classification under Cilibrasi-Vitányi's NCD metric.
- * Dependencies & Triggers: Imports normalizeCodeForCompression and computeNormalizedCompressionDistance;
+ * Dependencies & Triggers: Imports normalizeCodeForCompression and computeCompressionDistance;
  *   executed under vitest test runner (`npm run test:unit` or `npm test`).
  * Responsibilities:
  *   1. Assert comment and whitespace stripping across multi-language syntax.
@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import {
     normalizeCodeForCompression,
     getCompressedByteLength,
-    computeNormalizedCompressionDistance,
+    computeCompressionDistance,
 } from '../../../src/core/intelligence/compression-distance';
 
 describe('normalizeCodeForCompression', () => {
@@ -49,7 +49,7 @@ describe('normalizeCodeForCompression', () => {
     });
 });
 
-describe('computeNormalizedCompressionDistance', () => {
+describe('computeCompressionDistance', () => {
     const codeSnippetA = `
         function calculateFibonacci(n: number): number {
             if (n <= 1) return n;
@@ -97,32 +97,32 @@ describe('computeNormalizedCompressionDistance', () => {
     `;
 
     it('demonstrates identity and reflexivity: NCD(A, A) is zero', () => {
-        const result = computeNormalizedCompressionDistance(codeSnippetA, codeSnippetA);
+        const result = computeCompressionDistance(codeSnippetA, codeSnippetA);
         expect(result.ncd).toBe(0.0);
         expect(result.isNearClone).toBe(true);
         expect(result.similarityCategory).toBe('exact');
     });
 
     it('detects structural near-clone across renamed identifiers (NCD <= 0.28)', () => {
-        const result = computeNormalizedCompressionDistance(codeSnippetA, codeSnippetNearClone);
+        const result = computeCompressionDistance(codeSnippetA, codeSnippetNearClone);
         expect(result.ncd).toBeLessThanOrEqual(0.28);
         expect(result.isNearClone).toBe(true);
         expect(['exact', 'near_clone']).toContain(result.similarityCategory);
     });
 
     it('assigns high distance to structurally orthogonal algorithms (NCD > 0.45)', () => {
-        const result = computeNormalizedCompressionDistance(codeSnippetA, codeSnippetUnrelated);
+        const result = computeCompressionDistance(codeSnippetA, codeSnippetUnrelated);
         expect(result.ncd).toBeGreaterThan(0.45);
         expect(result.isNearClone).toBe(false);
         expect(['related', 'distinct']).toContain(result.similarityCategory);
     });
 
     it('handles empty and boundary snippets without throwing or NaN', () => {
-        const emptyResult = computeNormalizedCompressionDistance('', '');
+        const emptyResult = computeCompressionDistance('', '');
         expect(emptyResult.ncd).toBe(0.0);
         expect(emptyResult.isNearClone).toBe(true);
 
-        const oneEmptyResult = computeNormalizedCompressionDistance(codeSnippetA, '');
+        const oneEmptyResult = computeCompressionDistance(codeSnippetA, '');
         expect(oneEmptyResult.ncd).toBe(1.0);
         expect(oneEmptyResult.isNearClone).toBe(false);
     });

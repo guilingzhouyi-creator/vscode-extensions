@@ -233,6 +233,3 @@ export function computeCompressionDistance(
         similarityCategory,
     });
 }
-
-/** Backward-compatibility alias for computeCompressionDistance. */
-export const computeNormalizedCompressionDistance = computeCompressionDistance;

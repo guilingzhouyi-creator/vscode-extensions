@@ -225,8 +225,6 @@ export function calculateObjectPoolIndex(
     return Math.round(balance * PERCENT_SCALE) / PERCENT_SCALE;
 }
 
-/** Backward-compatibility alias for calculateObjectPoolIndex. */
-export const calculateObjectPoolConservationIndex = calculateObjectPoolIndex;
 
 /**
  * Compatibility alias for object pool conservation.
@@ -374,8 +372,6 @@ export function calculateDtoBridgeIndex(
     return Math.round(index * PERCENT_SCALE) / PERCENT_SCALE;
 }
 
-/** Backward-compatibility alias for calculateDtoBridgeIndex. */
-export const calculateDtoCompatibilityBridgeIndex = calculateDtoBridgeIndex;
 
 /**
  * Measure Schema Grounding Rate for Dynamic Domain Literals.
@@ -459,8 +455,6 @@ export function calculateDirectnessIndex(
     return Math.round(index * PERCENT_SCALE) / PERCENT_SCALE;
 }
 
-/** Backward-compatibility alias for calculateDirectnessIndex. */
-export const calculateArchitectureDirectnessIndex = calculateDirectnessIndex;
 
 /**
  * Compute Deprecation Convergence Health.
@@ -504,8 +498,6 @@ export function calculateDeprecationHealth(
     return Math.round(health * PERCENT_SCALE) / PERCENT_SCALE;
 }
 
-/** Backward-compatibility alias for calculateDeprecationHealth. */
-export const calculateDeprecationConvergenceHealth = calculateDeprecationHealth;
 
 export {
     calculateZeroCostModernUtility,

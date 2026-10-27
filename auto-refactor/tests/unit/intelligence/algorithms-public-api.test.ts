@@ -25,7 +25,7 @@ import {
     evaluateModuleMainSequence,
     classifyMainSequenceZone,
     computePropagationCost,
-    computeNormalizedCompressionDistance,
+    computeCompressionDistance,
     normalizeCodeForCompression,
     computeHendersonSellersLcom,
     computeNewmanGirvanModularity,
@@ -45,7 +45,7 @@ describe('Code Intelligence Public API Exports', () => {
         expect(typeof evaluateModuleMainSequence).toBe('function');
         expect(typeof classifyMainSequenceZone).toBe('function');
         expect(typeof computePropagationCost).toBe('function');
-        expect(typeof computeNormalizedCompressionDistance).toBe('function');
+        expect(typeof computeCompressionDistance).toBe('function');
         expect(typeof normalizeCodeForCompression).toBe('function');
         expect(typeof computeHendersonSellersLcom).toBe('function');
         expect(typeof computeNewmanGirvanModularity).toBe('function');
@@ -64,7 +64,7 @@ describe('Code Intelligence Public API Exports', () => {
         });
         expect(ms.zone).toBe('balanced');
 
-        const ncd = computeNormalizedCompressionDistance('const a = 1;', 'const b = 1;');
+        const ncd = computeCompressionDistance('const a = 1;', 'const b = 1;');
         expect(ncd.isNearClone).toBe(true);
 
         const lcom = computeHendersonSellersLcom({

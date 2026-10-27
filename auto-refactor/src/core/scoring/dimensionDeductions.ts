@@ -35,7 +35,7 @@ import {
 } from './dimensionLiterals';
 import { calculateShimDebtDecayPenalty } from './modernization-formulas';
 export {
-    calculateArchitectureDirectnessIndex,
+    calculateDirectnessIndex,
     calculateShimDebtDecayPenalty,
 } from './modernization-formulas';
 import { DIMENSION_RULES, getDimensionRulesForAnalyzer } from './dimensionRuleTable';
@@ -588,7 +588,7 @@ export function calculateCompoundedDeduction(
 
 /**
  * Apply dynamic modernity decay deductions for backward compatibility shims.
- * Integrates calculateShimDebtDecayPenalty and calculateArchitectureDirectnessIndex.
+ * Integrates calculateShimDebtDecayPenalty and calculateDirectnessIndex.
  *
  * @param issue - Analyzed issue finding.
  * @param apply - Deduction callback function.

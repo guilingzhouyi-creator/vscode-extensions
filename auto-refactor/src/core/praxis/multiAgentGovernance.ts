@@ -171,6 +171,3 @@ export const defaultPraxisMultiAgentGovernanceService = new PraxisMultiAgentGove
 export function createMultiAgentGovernanceService(): IPraxisMultiAgentGovernanceService {
     return new PraxisMultiAgentGovernanceService();
 }
-
-/** Backward-compatibility alias for createMultiAgentGovernanceService. */
-export const createPraxisMultiAgentGovernanceService = createMultiAgentGovernanceService;
