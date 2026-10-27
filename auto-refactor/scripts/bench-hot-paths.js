@@ -207,7 +207,8 @@ async function runGovernanceScan(api, root, benchDir) {
   const cfgPath = path.join(cfgDir, '.hot-paths-config.json');
   fs.writeFileSync(
     cfgPath,
-    JSON.stringify({ include: ['src/**/*.ts'], analyzers: { governance: { enabled: true } } }) + '\n',
+    JSON.stringify({ include: ['src/**/*.ts'], analyzers: { governance: { enabled: true } } }) +
+      '\n',
   );
 
   try {

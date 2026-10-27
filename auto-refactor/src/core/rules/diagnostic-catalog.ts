@@ -158,24 +158,21 @@ export const DIAGNOSTIC_CATALOG: Readonly<Record<string, DiagnosticTemplate>> = 
         defaultSeverity: 'warning',
         actionCode: 'AR:NAM:002',
         defaultMessage: 'Vague identifier lacks domain context.',
-        suggestion:
-            'Rename to domain-qualified identifier (e.g. parseResult, tokenPayload).',
+        suggestion: 'Rename to domain-qualified identifier (e.g. parseResult, tokenPayload).',
     },
     [RULE_NAM_ABR_001]: {
         ruleId: RULE_NAM_ABR_001,
         defaultSeverity: 'warning',
         actionCode: 'AR:NAM:003',
         defaultMessage: 'Identifier has unapproved truncated abbreviation.',
-        suggestion:
-            'Expand unapproved abbreviation into standard domain term.',
+        suggestion: 'Expand unapproved abbreviation into standard domain term.',
     },
     [RULE_NAM_LEN_001]: {
         ruleId: RULE_NAM_LEN_001,
         defaultSeverity: 'warning',
         actionCode: 'AR:NAM:004',
         defaultMessage: 'Variable identifier length outside acceptable bounds.',
-        suggestion:
-            'Rename to expressive identifier between 3 and 40 characters.',
+        suggestion: 'Rename to expressive identifier between 3 and 40 characters.',
     },
     [RULE_NAM_LEN_002]: {
         ruleId: RULE_NAM_LEN_002,
@@ -189,8 +186,7 @@ export const DIAGNOSTIC_CATALOG: Readonly<Record<string, DiagnosticTemplate>> = 
         defaultSeverity: 'warning',
         actionCode: 'AR:NAM:006',
         defaultMessage: 'Single-letter variable name in business logic scope.',
-        suggestion:
-            'Rename to descriptive variable; reserve single letters for loop indices.',
+        suggestion: 'Rename to descriptive variable; reserve single letters for loop indices.',
     },
     [RULE_NAM_TYP_001]: {
         ruleId: RULE_NAM_TYP_001,
@@ -321,11 +317,11 @@ export function createLineIssue(
     const mapped = actionableMap ? actionableMap[draft.rule] : undefined;
     const actionable = mapped
         ? {
-            action: mapped.action,
-            code: mapped.code,
-            safeToAutomate: mapped.safeToAutomate,
-            templateSnippet: mapped.templateSnippet,
-        }
+              action: mapped.action,
+              code: mapped.code,
+              safeToAutomate: mapped.safeToAutomate,
+              templateSnippet: mapped.templateSnippet,
+          }
         : undefined;
     const issue: Issue = {
         id: `${analyzerName}:${draft.rule}:${file}:${line}`,

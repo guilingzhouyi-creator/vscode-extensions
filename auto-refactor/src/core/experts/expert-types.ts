@@ -21,14 +21,7 @@ import type { QualityDimension } from '../scoring/scoringTypes';
 
 /** Architectural domain classifications for MoE experts. */
 export type ExpertDomain =
-    | 'hygiene'
-    | 'security'
-    | 'ast'
-    | 'topology'
-    | 'concurrency'
-    | 'system'
-    | 'quality'
-    | 'lexical';
+    'hygiene' | 'security' | 'ast' | 'topology' | 'concurrency' | 'system' | 'quality' | 'lexical';
 
 /** Execution pipeline track designation (fast synchronous, deep asynchronous, or bypassed). */
 export type ExecutionTrack = 'fast' | 'deep' | 'off';

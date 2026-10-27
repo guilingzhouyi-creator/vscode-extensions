@@ -208,10 +208,7 @@ export class PureJsNativeShim implements INativeCore {
      * @override interface implementation
      * Fast multi-pattern textual scanner locating occurrences with 1-based line and column.
      */
-    public fastPatternMatch(
-        sourceText: string,
-        patterns: string[],
-    ): NativePatternMatch[] {
+    public fastPatternMatch(sourceText: string, patterns: string[]): NativePatternMatch[] {
         if (!sourceText || !patterns || patterns.length === 0) {
             return [];
         }
@@ -246,9 +243,7 @@ export class PureJsNativeShim implements INativeCore {
      * @override interface implementation
      * Counts duplicated non-blank lines using 32-bit line hashes.
      */
-    public countDuplicateLines(
-        content: string,
-    ): number {
+    public countDuplicateLines(content: string): number {
         const textToCount = content ?? '';
         if (textToCount.length === 0) {
             return 0;
@@ -261,10 +256,7 @@ export class PureJsNativeShim implements INativeCore {
      * @override interface implementation
      * Detects repeated code blocks within a single file.
      */
-    public detectCloneBlocks(
-        content: string,
-        minCloneLines: number,
-    ): NativeCloneBlock[] {
+    public detectCloneBlocks(content: string, minCloneLines: number): NativeCloneBlock[] {
         return !content || minCloneLines <= 0 ? [] : detectCloneBlocksShim(content, minCloneLines);
     }
 
@@ -283,10 +275,7 @@ export class PureJsNativeShim implements INativeCore {
      * @override interface implementation
      * Discovers similar file pairs using Locality Sensitive Hashing (LSH).
      */
-    public findClonePairs(
-        signatures: number[][],
-        threshold: number,
-    ): NativeClonePair[] {
+    public findClonePairs(signatures: number[][], threshold: number): NativeClonePair[] {
         if (!signatures || signatures.length === 0 || threshold < 0) {
             return [];
         }
@@ -833,10 +822,7 @@ export function getNativeCoreStatus(): NativeCoreStatus {
  * @param newContent - Updated text content.
  * @returns Array of computed NativeDiffHunk elements.
  */
-export function computeHistogramDiff(
-    oldContent: string,
-    newContent: string,
-): NativeDiffHunk[] {
+export function computeHistogramDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
     return oldContent === newContent ? [] : nativeCore.computeHistogramDiff(oldContent, newContent);
 }
 
@@ -867,10 +853,7 @@ export function analyzeDependencyGraph(edges: [string, string][]): NativeGraphAn
  * @param patterns - Pattern strings to match against source.
  * @returns Array of pattern matches with offsets and line numbers.
  */
-export function matchFastPatterns(
-    sourceText: string,
-    patterns: string[],
-): NativePatternMatch[] {
+export function matchFastPatterns(sourceText: string, patterns: string[]): NativePatternMatch[] {
     if (!sourceText || !patterns || patterns.length === 0) return [];
     return nativeCore.fastPatternMatch(sourceText, patterns);
 }
@@ -883,10 +866,7 @@ export function matchFastPatterns(
  * @param config - Lexical masking configuration.
  * @returns Masked source text structure with line metrics.
  */
-export function maskSourceCode(
-    content: string,
-    config: NativeMaskConfig,
-): NativeMaskedSource {
+export function maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource {
     if (!content) {
         return { raw: [], masked: [], lines: 0, nonBlankLines: 0 };
     }
@@ -1071,7 +1051,14 @@ const computeDominatorTree = (
     edges: Array<[string, string]>,
 ): NativeDominatorTreeResult =>
     !nodes || nodes.length === 0
-        ? { entry, reachableNodes: [], idom: {}, dominanceFrontiers: {}, loopHeaders: [], backEdges: [] }
+        ? {
+              entry,
+              reachableNodes: [],
+              idom: {},
+              dominanceFrontiers: {},
+              loopHeaders: [],
+              backEdges: [],
+          }
         : nativeCore.computeDominatorTree(entry, nodes, edges);
 
 const solveDataflow = (params: NativeDataflowParams): NativeDataflowResult =>
@@ -1082,8 +1069,7 @@ const solveDataflow = (params: NativeDataflowParams): NativeDataflowResult =>
 const computeBitParallelDistance = (pattern: Uint32Array, text: Uint32Array): number =>
     nativeCore.computeBitParallelDistance(pattern, text);
 
-const computeSimHash64 = (tokens: readonly string[]): string =>
-    nativeCore.computeSimHash64(tokens);
+const computeSimHash64 = (tokens: readonly string[]): string => nativeCore.computeSimHash64(tokens);
 
 const computeTemporalCoupling = (
     changesets: number[][],
@@ -1096,14 +1082,12 @@ const evaluateBumpyRoad = (
     lines: readonly string[],
     startLine: number,
     endLine: number,
-): NativeBumpyRoadResult =>
-    nativeCore.evaluateBumpyRoad(lines, startLine, endLine);
+): NativeBumpyRoadResult => nativeCore.evaluateBumpyRoad(lines, startLine, endLine);
 
 const batchProbeTriggers = (
     content: string,
     triggerGroups: readonly (readonly string[])[],
-): boolean[] =>
-    nativeCore.batchProbeTriggers(content, triggerGroups);
+): boolean[] => nativeCore.batchProbeTriggers(content, triggerGroups);
 
 export {
     computeHistogramDiff as computeNativeHistogramDiff,

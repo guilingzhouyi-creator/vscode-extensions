@@ -34,10 +34,7 @@ import {
     DEDUCTION_BACKWARD_SHIM,
 } from './dimensionLiterals';
 import { calculateShimDebtDecayPenalty } from './modernization-formulas';
-export {
-    calculateDirectnessIndex,
-    calculateShimDebtDecayPenalty,
-} from './modernization-formulas';
+export { calculateDirectnessIndex, calculateShimDebtDecayPenalty } from './modernization-formulas';
 import { DIMENSION_RULES, getDimensionRulesForAnalyzer } from './dimensionRuleTable';
 import {
     applyArchitectureDeductions,

@@ -21,9 +21,7 @@ let manifestModule;
 try {
   manifestModule = require(manifestModulePath);
 } catch (err) {
-  console.error(
-    '✖ BLOCK Unable to load core/experts module from dist. Run npm run build first.',
-  );
+  console.error('✖ BLOCK Unable to load core/experts module from dist. Run npm run build first.');
   console.error(err);
   process.exit(1);
 }

@@ -145,18 +145,9 @@ export function compressDiagnosticSentence(rawText: string): string {
         /Cognitive\s+complexity\s*\((\d+)\)\s*exceeds\s*threshold\s*\((\d+)\)\s*in\s*(?:function|method)?\s*('?[a-zA-Z0-9_$-]+'?)/i,
         'CC $1 > $2 in $3',
     );
-    msg = msg.replace(
-        /Effective\s+code\s+volume\s+budget\s+exceeded\.?/i,
-        'ELOC budget exceeded',
-    );
-    msg = msg.replace(
-        /Physical\s+line\s+count\s+ceiling\s+exceeded\.?/i,
-        'LOC ceiling exceeded',
-    );
-    msg = msg.replace(
-        /Dynamic\s+dilution\s+envelope\s+exceeded\.?/i,
-        'dilution envelope exceeded',
-    );
+    msg = msg.replace(/Effective\s+code\s+volume\s+budget\s+exceeded\.?/i, 'ELOC budget exceeded');
+    msg = msg.replace(/Physical\s+line\s+count\s+ceiling\s+exceeded\.?/i, 'LOC ceiling exceeded');
+    msg = msg.replace(/Dynamic\s+dilution\s+envelope\s+exceeded\.?/i, 'dilution envelope exceeded');
     msg = msg.replace(
         /Effective\s+logic\s+density\s+below\s+floor\s+threshold\.?/i,
         'token density below floor',
@@ -405,9 +396,7 @@ function buildDefectRecord(params: DefectRecordParams): AasDefectRecord {
     const sev = mapSeverity(issue.severity);
     const rawMsg = trimMessage(issue.message);
     const msg =
-        params.options.compressSentences !== false
-            ? compressDiagnosticSentence(rawMsg)
-            : rawMsg;
+        params.options.compressSentences !== false ? compressDiagnosticSentence(rawMsg) : rawMsg;
 
     const radius = params.options.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
     const anchor =

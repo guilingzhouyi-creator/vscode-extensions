@@ -71,7 +71,7 @@ function isReportArtifact(sourcePath) {
       payload.baselineMetrics ||
       Array.isArray(payload.issues) ||
       payload.cai !== undefined ||
-      payload.health !== undefined
+      payload.health !== undefined,
     );
   } catch {
     return false;
@@ -135,10 +135,7 @@ function main() {
     (isReportArtifact(artifact) ? reports : other).push(artifact);
   }
 
-  assert.ok(
-    reports.length > 0,
-    'At least one recognizable report must exist in reports/',
-  );
+  assert.ok(reports.length > 0, 'At least one recognizable report must exist in reports/');
 
   for (const report of reports) {
     assertAasSidecarFor(report);

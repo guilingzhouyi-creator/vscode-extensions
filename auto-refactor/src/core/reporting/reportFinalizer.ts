@@ -205,7 +205,6 @@ export function computeSummary(report: ScanReport): void {
     report.summary.uncertainty = summarizeUncertainty(report.issues);
 }
 
-
 /**
  * Validates that discovered include globs matched at least one scanned file.
  *

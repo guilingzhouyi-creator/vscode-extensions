@@ -80,7 +80,6 @@ export function calculatePopoviciuPenaltyShim(
     return Math.round(factor * SCORE_ROUNDING_FACTOR) / SCORE_ROUNDING_FACTOR;
 }
 
-
 /**
  * Counts opening and closing curly braces in a line with detailed breakdown.
  *
@@ -101,7 +100,6 @@ export function countBracesDetailedShim(line: string): NativeBraceBalance {
 export function computeWarshallClosureShim(matrix: Uint8Array, size: number): Uint8Array {
     return computeWarshallTransitiveClosure(matrix, size);
 }
-
 
 /**
  * Computes inner dot product between two vector slices.

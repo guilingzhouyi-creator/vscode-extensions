@@ -435,7 +435,6 @@ export function calculateTrigramSimilarityShim(
     return calculateTrigramCosineSimilarity(vecA, vecB);
 }
 
-
 interface TemporalMiningState {
     readonly fileCommitCounts: Map<number, number>;
     readonly pairSharedCounts: Map<string, number>;

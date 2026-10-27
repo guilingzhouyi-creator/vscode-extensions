@@ -44,7 +44,9 @@ export interface DispatchableReviewItem {
 /**
  * Contiguous execution batch containing all items assigned to a single expert analyzer.
  */
-export interface ExpertExecutionBatch<TItem extends DispatchableReviewItem = DispatchableReviewItem> {
+export interface ExpertExecutionBatch<
+    TItem extends DispatchableReviewItem = DispatchableReviewItem,
+> {
     /** 32-bit bitmask corresponding to this expert (1 << index). */
     readonly expertBit: number;
     /** Canonical string identifier of this expert (e.g. 'complexity', 'constants'). */
@@ -56,7 +58,9 @@ export interface ExpertExecutionBatch<TItem extends DispatchableReviewItem = Dis
 /**
  * Consolidated execution plan produced by the GroupedExpertDispatcher.
  */
-export interface GroupedDispatchPlan<TItem extends DispatchableReviewItem = DispatchableReviewItem> {
+export interface GroupedDispatchPlan<
+    TItem extends DispatchableReviewItem = DispatchableReviewItem,
+> {
     /** Total number of unique input items evaluated. */
     readonly totalItems: number;
     /** Dispatched per-expert execution batches. */

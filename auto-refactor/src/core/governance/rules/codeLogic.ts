@@ -292,7 +292,7 @@ function checkPrecisionLine(line: string, lineIndex: number): GovernanceViolatio
         },
         actionable: {
             action: 'align_numeric_precision',
-            code: (CODE_NUM_PRECISION_LOSSY),
+            code: CODE_NUM_PRECISION_LOSSY,
             taxonomy: 'NUM_PREC',
             safeToAutomate: true,
             templateSnippet: 'Math.round(val * 100) / 100 + 0',
@@ -372,7 +372,7 @@ function auditUnboundedLine(line: string, lineIndex: number): GovernanceViolatio
         customDetail: { matchedExpression: match[0] },
         actionable: {
             action: 'apply_guard_clause',
-            code: (CODE_NUM_UNBOUNDED_CONDITION),
+            code: CODE_NUM_UNBOUNDED_CONDITION,
             taxonomy: 'CTRL_FLOW',
             safeToAutomate: false,
             templateSnippet: 'if (val > 0 && val <= MAX_BOUND)',

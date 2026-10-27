@@ -98,7 +98,8 @@ export const AST_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'maintainability',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Ternary nesting, redundant boolean logic, dead stores, and AST simplification',
+            description:
+                'Ternary nesting, redundant boolean logic, dead stores, and AST simplification',
         },
     },
 
@@ -127,7 +128,8 @@ export const AST_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'maintainability',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Cyclomatic complexity, nesting depth, cognitive noise, and parameter count budgets',
+            description:
+                'Cyclomatic complexity, nesting depth, cognitive noise, and parameter count budgets',
         },
     },
 
@@ -168,7 +170,11 @@ export const AST_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
         domain: DOMAIN_AST,
         affinities: {
             signals: [SIG_INTERFACE_SIGNATURE, SIG_CONTROL_FLOW, SIG_GENERAL_CODE],
-            categories: [CATEGORY_INTERFACE_SIGNATURE, CATEGORY_CONTROL_FLOW, CATEGORY_GENERAL_CODE],
+            categories: [
+                CATEGORY_INTERFACE_SIGNATURE,
+                CATEGORY_CONTROL_FLOW,
+                CATEGORY_GENERAL_CODE,
+            ],
             archetypes: [ARCH_WEB, ARCH_LIBRARY, ARCH_STDLIB, ARCH_SYSTEMS],
             languages: [LANG_TYPESCRIPT, LANG_JAVASCRIPT],
             sliceTriggers: ['hasTypeMutation'],
@@ -186,7 +192,8 @@ export const AST_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'modernity',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Modern TypeScript idioms, explicit types, strict null checks, and enum migration',
+            description:
+                'Modern TypeScript idioms, explicit types, strict null checks, and enum migration',
         },
     },
 
@@ -216,7 +223,8 @@ export const AST_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'modernity',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Python 3.10+ modern idioms, type annotations, context managers, and path manipulation',
+            description:
+                'Python 3.10+ modern idioms, type annotations, context managers, and path manipulation',
         },
     },
 
@@ -246,7 +254,8 @@ export const AST_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'modernity',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Rust 2021/2024 idioms, zero-cost abstractions, error handling, and ownership patterns',
+            description:
+                'Rust 2021/2024 idioms, zero-cost abstractions, error handling, and ownership patterns',
         },
     },
 
@@ -276,7 +285,8 @@ export const AST_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'modernity',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Godot 4 typed GDScript, annotation conventions, signal safety, and scene references',
+            description:
+                'Godot 4 typed GDScript, annotation conventions, signal safety, and scene references',
         },
     },
 
@@ -306,7 +316,8 @@ export const AST_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'modernity',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Modern Go 1.20+ idioms, generics usage, context propagation, and error wrapping',
+            description:
+                'Modern Go 1.20+ idioms, generics usage, context propagation, and error wrapping',
         },
     },
 ]);

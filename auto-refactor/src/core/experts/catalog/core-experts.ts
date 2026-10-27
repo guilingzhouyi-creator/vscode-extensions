@@ -113,7 +113,8 @@ export const CORE_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'standardization',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Physical file cleanliness, empty files/dirs, BOM, EOF newlines, and naming conventions',
+            description:
+                'Physical file cleanliness, empty files/dirs, BOM, EOF newlines, and naming conventions',
         },
     },
 
@@ -143,7 +144,8 @@ export const CORE_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'standardization',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Shell script and PowerShell governance, error trapping, and cross-platform safety',
+            description:
+                'Shell script and PowerShell governance, error trapping, and cross-platform safety',
         },
     },
 
@@ -172,7 +174,8 @@ export const CORE_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'codeSecurity',
             isSpecialized: false,
             isSecurityFamily: true,
-            description: 'Destructive delete operand provenance and read-only automatic variable shadowing',
+            description:
+                'Destructive delete operand provenance and read-only automatic variable shadowing',
         },
     },
 
@@ -259,7 +262,8 @@ export const CORE_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'codeSecurity',
             isSpecialized: false,
             isSecurityFamily: true,
-            description: 'Injection vulnerabilities, taint sinks, prototype pollution, and unsafe deserialization',
+            description:
+                'Injection vulnerabilities, taint sinks, prototype pollution, and unsafe deserialization',
         },
     },
 
@@ -288,7 +292,8 @@ export const CORE_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'commentQuality',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'JSDoc completeness, comment density, dead code blocks, and ghost branches',
+            description:
+                'JSDoc completeness, comment density, dead code blocks, and ghost branches',
         },
     },
 
@@ -317,7 +322,8 @@ export const CORE_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'maintainability',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Identifier casing, boolean prefix contracts, Hungarian prefix avoidance, and lexical sanity',
+            description:
+                'Identifier casing, boolean prefix contracts, Hungarian prefix avoidance, and lexical sanity',
         },
     },
 
@@ -375,7 +381,8 @@ export const CORE_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'commentQuality',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Markdown link integrity, section completeness, relative dead links, and documentation hygiene',
+            description:
+                'Markdown link integrity, section completeness, relative dead links, and documentation hygiene',
         },
     },
 
@@ -404,7 +411,8 @@ export const CORE_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'codeSecurity',
             isSpecialized: true,
             isSecurityFamily: false,
-            description: 'Production build hygiene, debug residue, source map, and secret leak guard',
+            description:
+                'Production build hygiene, debug residue, source map, and secret leak guard',
         },
     },
 ]);

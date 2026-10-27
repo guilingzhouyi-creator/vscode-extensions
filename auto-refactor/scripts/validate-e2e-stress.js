@@ -405,10 +405,7 @@ async function main() {
 
   const recipeExtractor = new TrajectoryRecipeExtractor();
   const regressionDetector = new RegressionTrajectoryDetector();
-  const trajectoryService = createTrajectoryLearningService(
-    recipeExtractor,
-    regressionDetector,
-  );
+  const trajectoryService = createTrajectoryLearningService(recipeExtractor, regressionDetector);
 
   testGate1ClosedLoop();
   testGate2MultiLanguageScenarios();

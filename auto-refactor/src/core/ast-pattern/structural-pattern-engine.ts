@@ -286,7 +286,12 @@ function matchGeneralChildren(pNode: ts.Node, tNode: ts.Node, ctx: PatternMatchC
     });
 
     if (pChildren.length === 0 && tChildren.length === 0) {
-        return matchLiteralsAndIdentifiers(pNode, tNode, ctx.patternSourceFile, ctx.targetSourceFile);
+        return matchLiteralsAndIdentifiers(
+            pNode,
+            tNode,
+            ctx.patternSourceFile,
+            ctx.targetSourceFile,
+        );
     }
     if (pChildren.length !== tChildren.length) {
         return false;
@@ -501,7 +506,9 @@ export function findMatches(
             });
 
             if (matched && evaluateConstraints(rule.spec.where, scratchVarToBindingMap)) {
-                matches.push(createStructuralMatch(rule, node, targetSourceFile, scratchVarToBindingMap));
+                matches.push(
+                    createStructuralMatch(rule, node, targetSourceFile, scratchVarToBindingMap),
+                );
                 return;
             }
         }
@@ -673,7 +680,10 @@ export function matchAndRewrite(
     ruleSpec: PatternSpec | readonly PatternSpec[],
     options?: MatchAndRewriteOptions,
 ): RewriteResult {
-    const { targetSourceFile, compiledRules, rawRules } = prepareMatchEnvironment(sourceCode, ruleSpec);
+    const { targetSourceFile, compiledRules, rawRules } = prepareMatchEnvironment(
+        sourceCode,
+        ruleSpec,
+    );
     if (rawRules.length === 0) {
         throw new Error('matchAndRewrite requires at least one PatternSpec rule');
     }
@@ -787,7 +797,9 @@ export function matchPattern(
     maxMatches: number = DEFAULT_MAX_MATCHES,
 ): readonly StructuralMatch[] {
     const { targetSourceFile, compiledRules } = prepareMatchEnvironment(sourceCode, ruleSpec);
-    return Object.freeze(findMatches(targetSourceFile, targetSourceFile, compiledRules, maxMatches));
+    return Object.freeze(
+        findMatches(targetSourceFile, targetSourceFile, compiledRules, maxMatches),
+    );
 }
 
 /**

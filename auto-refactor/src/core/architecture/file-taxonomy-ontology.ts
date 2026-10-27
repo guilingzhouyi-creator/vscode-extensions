@@ -158,7 +158,11 @@ function matchSpecializedLibraryRole(metrics: FileBehavioralMetrics): RoleMatchR
 }
 
 function matchSharedOrDomainRole(metrics: FileBehavioralMetrics): RoleMatchResult {
-    if (metrics.crossDomainFanIn >= MIN_FAN_IN_SHARED && !metrics.isStateful && metrics.pureFunctionRatio >= 0.7) {
+    if (
+        metrics.crossDomainFanIn >= MIN_FAN_IN_SHARED &&
+        !metrics.isStateful &&
+        metrics.pureFunctionRatio >= 0.7
+    ) {
         return {
             role: ROLE_SHARED_LIBRARY,
             reason: 'High cross-domain reuse with stable stateless contract and low domain entity coupling',

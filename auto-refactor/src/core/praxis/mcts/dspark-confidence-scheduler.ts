@@ -31,10 +31,10 @@ const SYNTAX_WEIGHT = 0.35;
 const COMPLEXITY_WEIGHT = 0.35;
 
 /** Weight for scope safety dimension (0.0 to 1.0). */
-const SCOPE_SAFETY_WEIGHT = 0.30;
+const SCOPE_SAFETY_WEIGHT = 0.3;
 
 /** ASCII character codes for bracket pairs. */
-const CHAR_OPEN_PAREN = 40;  // '('
+const CHAR_OPEN_PAREN = 40; // '('
 const CHAR_CLOSE_PAREN = 41; // ')'
 const CHAR_OPEN_BRACE = 123; // '{'
 const CHAR_CLOSE_BRACE = 125; // '}'
@@ -216,9 +216,8 @@ export class DSparkConfidenceScheduler {
         const prunedCount = originalCount - acceptedCount;
         this.totalStepsPruned += prunedCount;
 
-        const meanConfidence = acceptedCount > 0
-            ? Math.round((confidenceSum / acceptedCount) * 1000) / 1000
-            : 0;
+        const meanConfidence =
+            acceptedCount > 0 ? Math.round((confidenceSum / acceptedCount) * 1000) / 1000 : 0;
 
         return {
             originalCount,
@@ -241,9 +240,8 @@ export class DSparkConfidenceScheduler {
         totalPruned: number;
         pruneRatio: number;
     } {
-        const ratio = this.totalStepsEvaluated > 0
-            ? this.totalStepsPruned / this.totalStepsEvaluated
-            : 0;
+        const ratio =
+            this.totalStepsEvaluated > 0 ? this.totalStepsPruned / this.totalStepsEvaluated : 0;
         return {
             totalEvaluated: this.totalStepsEvaluated,
             totalAccepted: this.totalStepsAccepted,
@@ -368,19 +366,23 @@ export class DSparkConfidenceScheduler {
         let score = 1.0;
 
         if (counts.parenBalance !== 0) {
-            score -= 0.50;
+            score -= 0.5;
             factors.push('unbalanced_parentheses');
         }
         if (counts.braceBalance !== 0) {
-            score -= 0.50;
+            score -= 0.5;
             factors.push('unbalanced_braces');
         }
         if (counts.bracketBalance !== 0) {
-            score -= 0.30;
+            score -= 0.3;
             factors.push('unbalanced_brackets');
         }
-        if ((counts.singleQuotes % 2 !== 0) || (counts.doubleQuotes % 2 !== 0) || (counts.backticks % 2 !== 0)) {
-            score -= 0.50;
+        if (
+            counts.singleQuotes % 2 !== 0 ||
+            counts.doubleQuotes % 2 !== 0 ||
+            counts.backticks % 2 !== 0
+        ) {
+            score -= 0.5;
             factors.push('unclosed_string_literal');
         }
 
@@ -394,7 +396,7 @@ export class DSparkConfidenceScheduler {
         const replacement = step.replacementText;
         const target = step.targetText || '';
 
-        let score = 0.70; // baseline neutral
+        let score = 0.7; // baseline neutral
 
         // Reward guard-clause early returns
         if (COMPLEXITY_REDUCING_PATTERN.test(replacement)) {
@@ -419,13 +421,13 @@ export class DSparkConfidenceScheduler {
         let score = 0.85;
 
         if (UNDEFINED_IDENTIFIER_HAZARD.test(text)) {
-            score -= 0.30;
+            score -= 0.3;
             factors.push('undefined_identifier_hazard');
         }
 
         // Check for empty or whitespace-only code block mutations
         if (text.trim().length === 0) {
-            score -= 0.40;
+            score -= 0.4;
             factors.push('empty_code_replacement');
         }
 

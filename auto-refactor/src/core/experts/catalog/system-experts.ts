@@ -144,7 +144,8 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'performanceEfficiency',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Regex compilation in loops, synchronous I/O in async contexts, and expensive allocations',
+            description:
+                'Regex compilation in loops, synchronous I/O in async contexts, and expensive allocations',
         },
     },
 
@@ -156,7 +157,11 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
         domain: DOMAIN_TOPOLOGY,
         affinities: {
             signals: [SIG_INTERFACE_SIGNATURE, SIG_IMPORT_EXPORT, SIG_GENERAL_CODE],
-            categories: [CATEGORY_INTERFACE_SIGNATURE, CATEGORY_IMPORT_EXPORT, CATEGORY_GENERAL_CODE],
+            categories: [
+                CATEGORY_INTERFACE_SIGNATURE,
+                CATEGORY_IMPORT_EXPORT,
+                CATEGORY_GENERAL_CODE,
+            ],
             archetypes: [ARCH_LIBRARY, ARCH_STDLIB, ARCH_WEB, ARCH_SYSTEMS, ARCH_GAME],
             sliceTriggers: ['hasSignatureMutation'],
         },
@@ -173,7 +178,8 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: DIMENSION_ARCH,
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Clean architecture layer boundaries, facade discipline, circular dependencies, and inversion of control',
+            description:
+                'Clean architecture layer boundaries, facade discipline, circular dependencies, and inversion of control',
         },
     },
 
@@ -202,7 +208,8 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: DIMENSION_ARCH,
             isSpecialized: true,
             isSecurityFamily: false,
-            description: 'Data flow integrity, schema evolution, serialization contracts, and state mutability boundaries',
+            description:
+                'Data flow integrity, schema evolution, serialization contracts, and state mutability boundaries',
         },
     },
 
@@ -231,7 +238,8 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: DIMENSION_ARCH,
             isSpecialized: true,
             isSecurityFamily: false,
-            description: 'Module coupling, fan-in/fan-out ratios, barrel export hygiene, and dependency direction',
+            description:
+                'Module coupling, fan-in/fan-out ratios, barrel export hygiene, and dependency direction',
         },
     },
 
@@ -260,7 +268,8 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: DIMENSION_ARCH,
             isSpecialized: true,
             isSecurityFamily: false,
-            description: 'Global import graph cycles, topological depth, and package boundary violations',
+            description:
+                'Global import graph cycles, topological depth, and package boundary violations',
         },
     },
 
@@ -318,7 +327,8 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: DIMENSION_ARCH,
             isSpecialized: true,
             isSecurityFamily: false,
-            description: 'Godot game loop allocation hygiene, object pool lifecycle, and physics step safety',
+            description:
+                'Godot game loop allocation hygiene, object pool lifecycle, and physics step safety',
         },
     },
 
@@ -347,7 +357,8 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: DIMENSION_ARCH,
             isSpecialized: true,
             isSecurityFamily: false,
-            description: 'VS Code extension API conventions, disposable lifecycle, and activation event discipline',
+            description:
+                'VS Code extension API conventions, disposable lifecycle, and activation event discipline',
         },
     },
 
@@ -376,7 +387,8 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'codeSecurity',
             isSpecialized: true,
             isSecurityFamily: true,
-            description: 'Client exposure risk, internal API leaks, CSS auth bypass, and route exposure',
+            description:
+                'Client exposure risk, internal API leaks, CSS auth bypass, and route exposure',
         },
     },
 
@@ -405,7 +417,8 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'modernity',
             isSpecialized: true,
             isSecurityFamily: false,
-            description: 'Test assertion modernity, mock isolation, deterministic clocks, and test suite hygiene',
+            description:
+                'Test assertion modernity, mock isolation, deterministic clocks, and test suite hygiene',
         },
     },
 
@@ -417,7 +430,11 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
         domain: DOMAIN_SYSTEM,
         affinities: {
             signals: [SIG_IMPORT_EXPORT, SIG_GENERAL_CODE, SIG_NON_SOURCE],
-            categories: [CATEGORY_IMPORT_EXPORT, CATEGORY_GENERAL_CODE, CATEGORY_INTERFACE_SIGNATURE],
+            categories: [
+                CATEGORY_IMPORT_EXPORT,
+                CATEGORY_GENERAL_CODE,
+                CATEGORY_INTERFACE_SIGNATURE,
+            ],
             archetypes: ALL_ARCHETYPES,
             sliceTriggers: [
                 'hasSignatureMutation',
@@ -439,7 +456,8 @@ export const SYSTEM_EXPERTS: readonly MoEExpertProfile[] = Object.freeze([
             dimension: 'standardization',
             isSpecialized: false,
             isSecurityFamily: false,
-            description: 'Commit message format, license headers, PR templates, and workspace governance compliance',
+            description:
+                'Commit message format, license headers, PR templates, and workspace governance compliance',
         },
     },
 

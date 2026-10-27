@@ -89,7 +89,10 @@ async function runVerificationCommand(
         const executionResult = await projectedSandbox.runCommand(
             strategy.verificationCommand.command,
             strategy.verificationCommand.args,
-            { timeoutMs: strategy.verificationCommand.timeoutMs ?? DEFAULT_VERIFICATION_TIMEOUT_MS },
+            {
+                timeoutMs:
+                    strategy.verificationCommand.timeoutMs ?? DEFAULT_VERIFICATION_TIMEOUT_MS,
+            },
         );
         return executionResult.success;
     } catch {
@@ -117,7 +120,10 @@ function computeScoreBreakdown(
             breakdown: {
                 testWeight: FAILED_TEST_PENALTY,
                 complexityWeight: 0.0,
-                ruleWeight: -Math.min(MAX_RULE_PENALTY, violationCount * VIOLATION_PENALTY_MULTIPLIER),
+                ruleWeight: -Math.min(
+                    MAX_RULE_PENALTY,
+                    violationCount * VIOLATION_PENALTY_MULTIPLIER,
+                ),
                 caiWeight: 0.0,
             },
         };
@@ -126,7 +132,10 @@ function computeScoreBreakdown(
     const testWeight = PASSED_TEST_WEIGHT;
     const complexityWeight =
         complexityDelta < 0
-            ? Math.min(MAX_COMPLEXITY_WEIGHT, Math.abs(complexityDelta) * VIOLATION_PENALTY_MULTIPLIER)
+            ? Math.min(
+                  MAX_COMPLEXITY_WEIGHT,
+                  Math.abs(complexityDelta) * VIOLATION_PENALTY_MULTIPLIER,
+              )
             : -Math.min(MAX_COMPLEXITY_WEIGHT, complexityDelta * VIOLATION_PENALTY_MULTIPLIER);
 
     const netDefectGain =
@@ -146,9 +155,14 @@ function computeScoreBreakdown(
     // CAI (Code Autonomy Index): objective assessment of structural cleanliness & net improvement
     const cleanRatio = 1.0 / (1.0 + violationCount);
     const cpxGain =
-        complexityDelta < 0 ? Math.min(1.0, Math.abs(complexityDelta) / MAX_COMPLEXITY_DIVISOR) : 0.0;
+        complexityDelta < 0
+            ? Math.min(1.0, Math.abs(complexityDelta) / MAX_COMPLEXITY_DIVISOR)
+            : 0.0;
     const rawCai = 0.5 * cleanRatio + 0.3 * Math.max(0, netDefectGain) + 0.2 * cpxGain;
-    const caiScore = Math.max(0.0, Math.min(1.0, Math.round(rawCai * ROUNDING_SCALE_HUNDRED) / ROUNDING_SCALE_HUNDRED));
+    const caiScore = Math.max(
+        0.0,
+        Math.min(1.0, Math.round(rawCai * ROUNDING_SCALE_HUNDRED) / ROUNDING_SCALE_HUNDRED),
+    );
     const caiWeight =
         Math.round(caiScore * CAI_WEIGHT_MULTIPLIER * ROUNDING_SCALE_HUNDRED) /
         ROUNDING_SCALE_HUNDRED;
@@ -157,7 +171,10 @@ function computeScoreBreakdown(
     const rawScore = baseScore + testWeight + complexityWeight + ruleWeight + caiWeight;
     const compositeScore = Math.max(
         0.0,
-        Math.min(MAX_COMPOSITE_SCORE, Math.round(rawScore * ROUNDING_SCALE_HUNDRED) / ROUNDING_SCALE_HUNDRED),
+        Math.min(
+            MAX_COMPOSITE_SCORE,
+            Math.round(rawScore * ROUNDING_SCALE_HUNDRED) / ROUNDING_SCALE_HUNDRED,
+        ),
     );
 
     return {

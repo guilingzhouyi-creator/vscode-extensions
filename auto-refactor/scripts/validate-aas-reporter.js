@@ -287,20 +287,26 @@ async function runTests() {
   // Test 9: Sentence token compression engine
   const { compressDiagnosticSentence } = require('../dist/core/reporting/aas-reporter');
   assert.strictEqual(
-    compressDiagnosticSentence("Identifier 'LOOP_HEADER_RE' contains unapproved truncated abbreviation 'RE'."),
+    compressDiagnosticSentence(
+      "Identifier 'LOOP_HEADER_RE' contains unapproved truncated abbreviation 'RE'.",
+    ),
     "identifier 'LOOP_HEADER_RE' unapproved abbr 'RE'",
   );
   assert.strictEqual(
-    compressDiagnosticSentence("Identifier 'val' is vague and uninformative; lacks domain context."),
+    compressDiagnosticSentence(
+      "Identifier 'val' is vague and uninformative; lacks domain context.",
+    ),
     "identifier 'val' lacks domain context",
   );
   assert.strictEqual(
-    compressDiagnosticSentence("Cognitive complexity (19) exceeds threshold (15) in function 'dispatchCommand'"),
+    compressDiagnosticSentence(
+      "Cognitive complexity (19) exceeds threshold (15) in function 'dispatchCommand'",
+    ),
     "CC 19 > 15 in 'dispatchCommand'",
   );
   assert.strictEqual(
-    compressDiagnosticSentence("Effective code volume budget exceeded."),
-    "ELOC budget exceeded",
+    compressDiagnosticSentence('Effective code volume budget exceeded.'),
+    'ELOC budget exceeded',
   );
   console.log('✔  Test 9: High-efficiency Token sentence compression engine verified');
 

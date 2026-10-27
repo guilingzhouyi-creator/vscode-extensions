@@ -191,10 +191,7 @@ async function main() {
     routeMulti.activationRatio <= 0.25,
     `Multi-category activation ratio must strictly cap at <= 0.25, got ${routeMulti.activationRatio}`,
   );
-  assert(
-    routeMulti.overflowAnalyzers instanceof Set,
-    'overflowAnalyzers must be emitted as a Set',
-  );
+  assert(routeMulti.overflowAnalyzers instanceof Set, 'overflowAnalyzers must be emitted as a Set');
   console.log(
     `Multi-category overflow analyzers: [${Array.from(routeMulti.overflowAnalyzers).join(', ')}]`,
   );

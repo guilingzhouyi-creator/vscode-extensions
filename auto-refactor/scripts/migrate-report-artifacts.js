@@ -64,7 +64,11 @@ function collectArtifacts(target) {
         if (!SKIP_DIRECTORIES.has(entry.name)) stack.push(path.join(current, entry.name));
         continue;
       }
-      if (!entry.name.endsWith(JSON_SUFFIX) || entry.name.endsWith(AAS_SUFFIX) || entry.name.endsWith(CAS_SUFFIX)) {
+      if (
+        !entry.name.endsWith(JSON_SUFFIX) ||
+        entry.name.endsWith(AAS_SUFFIX) ||
+        entry.name.endsWith(CAS_SUFFIX)
+      ) {
         continue;
       }
       found.push(path.join(current, entry.name));
@@ -85,13 +89,15 @@ function sidecarPath(sourcePath) {
 
 function extractScore(payload) {
   if (Number.isFinite(payload?.health?.score)) return payload.health.score;
-  if (Number.isFinite(payload?.baselineMetrics?.compositeScore)) return payload.baselineMetrics.compositeScore;
+  if (Number.isFinite(payload?.baselineMetrics?.compositeScore))
+    return payload.baselineMetrics.compositeScore;
   if (Number.isFinite(payload?.cai)) return payload.cai;
   return 100;
 }
 
 function extractTotal(payload) {
-  if (Number.isFinite(payload?.baselineMetrics?.issuesTotal)) return payload.baselineMetrics.issuesTotal;
+  if (Number.isFinite(payload?.baselineMetrics?.issuesTotal))
+    return payload.baselineMetrics.issuesTotal;
   if (Number.isFinite(payload?.summary?.issuesTotal)) return payload.summary.issuesTotal;
   if (Array.isArray(payload?.issues)) return payload.issues.length;
   return 0;
@@ -199,7 +205,9 @@ const OUTCOME_MARK = { migrated: '✔', skipped: '·', failed: '✖' };
 function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.targets.length === 0) {
-    console.error('Usage: node scripts/migrate-report-artifacts.js <file|dir> [--write] [--pretty]');
+    console.error(
+      'Usage: node scripts/migrate-report-artifacts.js <file|dir> [--write] [--pretty]',
+    );
     process.exit(1);
   }
 
@@ -216,7 +224,9 @@ function main() {
     console.log(`  ${OUTCOME_MARK[outcome.status]} ${outcome.detail}`);
   }
 
-  console.log(`\n${tally.migrated} migrated into AAS v1.0, ${tally.skipped} skipped, ${tally.failed} failed.`);
+  console.log(
+    `\n${tally.migrated} migrated into AAS v1.0, ${tally.skipped} skipped, ${tally.failed} failed.`,
+  );
   process.exit(tally.failed === 0 && tally.migrated > 0 ? 0 : 1);
 }
 

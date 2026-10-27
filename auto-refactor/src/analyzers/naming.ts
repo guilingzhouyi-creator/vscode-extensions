@@ -544,8 +544,8 @@ export class NamingAnalyzer implements Analyzer {
         const declarationKind: SymbolDeclarationKind = ts.isClassDeclaration(node)
             ? 'class'
             : ts.isInterfaceDeclaration(node)
-                ? 'interface'
-                : KIND_TYPE;
+              ? 'interface'
+              : KIND_TYPE;
         this.checkDecouplingSymbol(
             typeName,
             declarationKind,

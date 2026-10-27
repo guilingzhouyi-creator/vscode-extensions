@@ -9,7 +9,11 @@
  * Exit Semantics & Design Rationale: Immutable subsystem facade; preserves internal module freedom.
  */
 
-import { auditCommentLanguage, auditCommentDensity, auditCommentSemanticDuty } from './comment-auditor';
+import {
+    auditCommentLanguage,
+    auditCommentDensity,
+    auditCommentSemanticDuty,
+} from './comment-auditor';
 import { evaluateEffectiveCommentDensity, classifyCommentSnippet } from './comment-density-model';
 import { defaultProjectCommentProfiler, ProjectCommentProfiler } from './project-comment-profiler';
 
