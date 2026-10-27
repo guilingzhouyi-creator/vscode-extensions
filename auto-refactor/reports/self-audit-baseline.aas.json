@@ -2,11 +2,11 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-27T06:39:28.973Z",
+  "timestamp": "2026-10-27T10:11:14.267Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.1,
+    "score": 99.18,
     "grade": "A+",
     "cai": 78.27,
     "density": 0.95,
@@ -16,14 +16,14 @@
       "averagePor": 0.083,
       "averageColumnDensity": 0.864,
       "averageSpatialDensity": 0.445,
-      "averageMahalanobisDistance": 4.604,
+      "averageMahalanobisDistance": 4.603,
       "averageFisherSimplexDistance": 0.097
     },
     "counts": {
       "files": 770,
-      "total": 5162,
+      "total": 3923,
       "errors": 0,
-      "warns": 4626,
+      "warns": 3387,
       "info": 536,
       "suppressed": 156
     }
@@ -31,23 +31,17 @@
   "defaultVerify": "npm test",
   "dimensions": {
     "architectureConsistency": 98.42,
-    "semanticPurity": 98.41,
+    "semanticPurity": 98.4,
     "codeSecurity": 99.79,
     "performanceEfficiency": 99.57,
-    "standardization": 79.31,
-    "modernity": 98.47,
+    "standardization": 84.1,
+    "modernity": 98.48,
     "maintainability": 93.3,
     "commentQuality": 99.73,
     "duplication": 94.93,
     "techDebtRisk": 100
   },
   "bottlenecks": [
-    {
-      "rule": "NAM-ABR-001",
-      "dim": "standardization",
-      "loss": 6270,
-      "count": 1254
-    },
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
@@ -57,8 +51,8 @@
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3060,
-      "count": 214
+      "loss": 3065,
+      "count": 215
     },
     {
       "rule": "metric",
@@ -81,20 +75,25 @@
     {
       "rule": "NAM-DEC-001",
       "dim": "architectureConsistency",
-      "loss": 1980,
-      "count": 198
+      "loss": 1960,
+      "count": 196
     },
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
       "loss": 1926,
       "count": 642
+    },
+    {
+      "rule": "NAM-LEN-002",
+      "dim": "standardization",
+      "loss": 1810,
+      "count": 362
     }
   ],
   "topology": {
     "L1_CONTRACT": [
       "src/core/ast/ast-prefix-radix-cache.ts",
-      "src/core/ast/oxc-types.ts",
       "src/core/cfg/types.ts",
       "src/core/governance/repo-archetype.ts",
       "src/core/native/native-types.ts",
@@ -301,31 +300,6 @@
           },
           "safeToAutomate": true
         }
-      },
-      {
-        "line": 447,
-        "col": 23,
-        "rule": "NAM-VAG-001",
-        "sev": "WARN",
-        "msg": "Identifier 'item' is vague and uninformative; lacks domain context.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'item' with a domain-qualified identifier (e."
-        }
-      }
-    ],
-    "src/core/ast/oxc-types.ts": [
-      {
-        "line": 125,
-        "col": 14,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FN_TYPES' contains unapproved truncated abbreviation 'FN'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionTYPES",
-          "safeToAutomate": false
-        }
       }
     ],
     "src/core/cfg/types.ts": [
@@ -349,39 +323,6 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
-      },
-      {
-        "line": 122,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fsApi' contains unapproved truncated abbreviation 'fs'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 122,
-              "startCol": 7,
-              "endLine": 122,
-              "endCol": 12
-            },
-            "replacementText": "filesystemApi"
-          },
-          "template": "filesystemApi",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 127,
-        "col": 14,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'DEFAULT_FS_PROBE' contains unapproved truncated abbreviation 'FS'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "defaultFileSystemPROBE",
-          "safeToAutomate": false
         }
       }
     ],
@@ -481,7 +422,7 @@
     ],
     "src/core/reporting/aas-types.ts": [
       {
-        "line": 148,
+        "line": 150,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
         "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 51",
@@ -576,27 +517,6 @@
       }
     ],
     "scripts/gate-self.js": [
-      {
-        "line": 21,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fs' contains unapproved truncated abbreviation 'fs'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 21,
-              "startCol": 7,
-              "endLine": 21,
-              "endCol": 9
-            },
-            "replacementText": "fileSystem"
-          },
-          "template": "fileSystem",
-          "safeToAutomate": true
-        }
-      },
       {
         "line": 23,
         "col": 22,
@@ -718,17 +638,6 @@
         }
       },
       {
-        "line": 46,
-        "col": 11,
-        "rule": "NAM-VAG-001",
-        "sev": "WARN",
-        "msg": "Identifier 'data' is vague and uninformative; lacks domain context.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'data' with a domain-qualified identifier (e."
-        }
-      },
-      {
         "line": 76,
         "col": 3,
         "rule": "hardcoded-string",
@@ -786,17 +695,6 @@
             "replacementText": "WARN_TEXT"
           },
           "safeToAutomate": true
-        }
-      },
-      {
-        "line": 105,
-        "col": 7,
-        "rule": "NAM-VAG-001",
-        "sev": "WARN",
-        "msg": "Identifier 'result' is vague and uninformative; lacks domain context.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'result' with a domain-qualified identifier (e."
         }
       },
       {
@@ -922,27 +820,6 @@
         }
       },
       {
-        "line": 16,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fs' contains unapproved truncated abbreviation 'fs'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 16,
-              "startCol": 7,
-              "endLine": 16,
-              "endCol": 9
-            },
-            "replacementText": "fileSystem"
-          },
-          "template": "fileSystem",
-          "safeToAutomate": true
-        }
-      },
-      {
         "line": 17,
         "col": 22,
         "rule": "hardcoded-string",
@@ -979,27 +856,6 @@
             },
             "replacementText": "FILE_PATH_DISTAPI_TEXT"
           },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 20,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'ARG_PREFIX' contains unapproved truncated abbreviation 'ARG'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 20,
-              "startCol": 7,
-              "endLine": 20,
-              "endCol": 17
-            },
-            "replacementText": "argumentPREFIX"
-          },
-          "template": "argumentPREFIX",
           "safeToAutomate": true
         }
       },
@@ -1215,27 +1071,6 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
-        }
-      },
-      {
-        "line": 20,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fs' contains unapproved truncated abbreviation 'fs'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 20,
-              "startCol": 7,
-              "endLine": 20,
-              "endCol": 9
-            },
-            "replacementText": "fileSystem"
-          },
-          "template": "fileSystem",
-          "safeToAutomate": true
         }
       },
       {
@@ -1536,27 +1371,6 @@
         }
       },
       {
-        "line": 27,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fs' contains unapproved truncated abbreviation 'fs'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 27,
-              "startCol": 7,
-              "endLine": 27,
-              "endCol": 9
-            },
-            "replacementText": "fileSystem"
-          },
-          "template": "fileSystem",
-          "safeToAutomate": true
-        }
-      },
-      {
         "line": 48,
         "col": 60,
         "rule": "hardcoded-string",
@@ -1573,69 +1387,6 @@
             },
             "replacementText": "FILE_PATH_BASELINESIGNATURESJSON_TEXT"
           },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 71,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CRITICAL_RULE_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 71,
-              "startCol": 7,
-              "endLine": 71,
-              "endCol": 23
-            },
-            "replacementText": "criticalRULERegexPattern"
-          },
-          "template": "criticalRULERegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 72,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'HIGH_RULE_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 72,
-              "startCol": 7,
-              "endLine": 72,
-              "endCol": 19
-            },
-            "replacementText": "highRULERegexPattern"
-          },
-          "template": "highRULERegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 73,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'MEDIUM_RULE_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 73,
-              "startCol": 7,
-              "endLine": 73,
-              "endCol": 21
-            },
-            "replacementText": "mediumRULERegexPattern"
-          },
-          "template": "mediumRULERegexPattern",
           "safeToAutomate": true
         }
       },
@@ -1671,27 +1422,6 @@
         }
       },
       {
-        "line": 457,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'GIT_DIFF_NUMSTAT_CMD' contains unapproved truncated abbreviation 'CMD'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 457,
-              "startCol": 7,
-              "endLine": 457,
-              "endCol": 27
-            },
-            "replacementText": "gitDIFFNUMSTATCommand"
-          },
-          "template": "gitDIFFNUMSTATCommand",
-          "safeToAutomate": true
-        }
-      },
-      {
         "line": 499,
         "col": 10,
         "rule": "NAM-LEN-002",
@@ -1700,17 +1430,6 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
-      },
-      {
-        "line": 564,
-        "col": 11,
-        "rule": "NAM-VAG-001",
-        "sev": "WARN",
-        "msg": "Identifier 'val' is vague and uninformative; lacks domain context.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'val' with a domain-qualified identifier (e."
         }
       },
       {
@@ -1829,7 +1548,7 @@
         "col": 9,
         "rule": "NAM-LEN-001",
         "sev": "WARN",
-        "msg": "Local variable name 'lt' is too short (<= 2 characters) and not in permitted whitelist.",
+        "msg": "symbol 'lt' too short (<= 2 characters)",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -2868,27 +2587,6 @@
     ],
     "scripts/validate-suppression-gate.js": [
       {
-        "line": 22,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fs' contains unapproved truncated abbreviation 'fs'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 22,
-              "startCol": 7,
-              "endLine": 22,
-              "endCol": 9
-            },
-            "replacementText": "fileSystem"
-          },
-          "template": "fileSystem",
-          "safeToAutomate": true
-        }
-      },
-      {
         "line": 24,
         "col": 22,
         "rule": "hardcoded-string",
@@ -3112,153 +2810,6 @@
         }
       },
       {
-        "line": 31,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'LOOP_HEADER_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 31,
-              "startCol": 7,
-              "endLine": 31,
-              "endCol": 21
-            },
-            "replacementText": "loopHEADERRegexPattern"
-          },
-          "template": "loopHEADERRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 37,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TRANSIENT_TS_CONTAINER_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 37,
-              "startCol": 7,
-              "endLine": 37,
-              "endCol": 32
-            },
-            "replacementText": "transientTSCONTAINERRegexPattern"
-          },
-          "template": "transientTSCONTAINERRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 40,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TRANSIENT_GO_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 40,
-              "startCol": 7,
-              "endLine": 40,
-              "endCol": 22
-            },
-            "replacementText": "transientGORegexPattern"
-          },
-          "template": "transientGORegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 42,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TRANSIENT_RUST_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 42,
-              "startCol": 7,
-              "endLine": 42,
-              "endCol": 24
-            },
-            "replacementText": "transientRUSTRegexPattern"
-          },
-          "template": "transientRUSTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 45,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TRANSIENT_PYTHON_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 45,
-              "startCol": 7,
-              "endLine": 45,
-              "endCol": 26
-            },
-            "replacementText": "transientPYTHONRegexPattern"
-          },
-          "template": "transientPYTHONRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 47,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TRANSIENT_GDSCRIPT_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 47,
-              "startCol": 7,
-              "endLine": 47,
-              "endCol": 28
-            },
-            "replacementText": "transientGDSCRIPTRegexPattern"
-          },
-          "template": "transientGDSCRIPTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 64,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'BLOCKING_IO_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 64,
-              "startCol": 7,
-              "endLine": 64,
-              "endCol": 21
-            },
-            "replacementText": "blockingIORegexPattern"
-          },
-          "template": "blockingIORegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
         "line": 90,
         "col": 10,
         "rule": "NAM-LEN-002",
@@ -3278,48 +2829,6 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
-      },
-      {
-        "line": 184,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'MUTATION_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 184,
-              "startCol": 7,
-              "endLine": 184,
-              "endCol": 18
-            },
-            "replacementText": "mutationRegexPattern"
-          },
-          "template": "mutationRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 186,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'SIDE_EFFECT_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 186,
-              "startCol": 7,
-              "endLine": 186,
-              "endCol": 21
-            },
-            "replacementText": "sideEFFECTRegexPattern"
-          },
-          "template": "sideEFFECTRegexPattern",
-          "safeToAutomate": true
         }
       },
       {
@@ -3384,18 +2893,6 @@
         }
       },
       {
-        "line": 327,
-        "col": 5,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnNode' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionNode",
-          "safeToAutomate": false
-        }
-      },
-      {
         "line": 346,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -3404,51 +2901,6 @@
           "action": "introduce_parameter_object",
           "template": "export interface FindLoopSitesInFunctionOptions {",
           "safeToAutomate": false
-        }
-      },
-      {
-        "line": 347,
-        "col": 5,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnNode' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionNode",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 348,
-        "col": 5,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnSymbol' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionSymbol",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 380,
-        "col": 29,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnName' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 380,
-              "startCol": 29,
-              "endLine": 380,
-              "endCol": 35
-            },
-            "replacementText": "functionName"
-          },
-          "template": "functionName",
-          "safeToAutomate": true
         }
       },
       {
@@ -3469,39 +2921,6 @@
             "replacementText": "CONST_4"
           },
           "safeToAutomate": true
-        }
-      },
-      {
-        "line": 396,
-        "col": 5,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnName' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 396,
-              "startCol": 5,
-              "endLine": 396,
-              "endCol": 11
-            },
-            "replacementText": "functionName"
-          },
-          "template": "functionName",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 438,
-        "col": 31,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnMetric' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionMetric",
-          "safeToAutomate": false
         }
       },
       {
@@ -3536,90 +2955,6 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'concurrency."
-        }
-      },
-      {
-        "line": 27,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_LISTENER_ATTACH' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 27,
-              "startCol": 7,
-              "endLine": 27,
-              "endCol": 25
-            },
-            "replacementText": "regexpatternLISTENERATTACH"
-          },
-          "template": "regexpatternLISTENERATTACH",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 30,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_TEARDOWN_DRAIN' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 30,
-              "startCol": 7,
-              "endLine": 30,
-              "endCol": 24
-            },
-            "replacementText": "regexpatternTEARDOWNDRAIN"
-          },
-          "template": "regexpatternTEARDOWNDRAIN",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 34,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_LOCK_ACQUIRE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 34,
-              "startCol": 7,
-              "endLine": 34,
-              "endCol": 22
-            },
-            "replacementText": "regexpatternLOCKACQUIRE"
-          },
-          "template": "regexpatternLOCKACQUIRE",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 37,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_AWAIT_KEYWORD' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 37,
-              "startCol": 7,
-              "endLine": 37,
-              "endCol": 23
-            },
-            "replacementText": "regexpatternAWAITKEYWORD"
-          },
-          "template": "regexpatternAWAITKEYWORD",
-          "safeToAutomate": true
         }
       },
       {
@@ -3743,48 +3078,6 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
-      },
-      {
-        "line": 61,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_HOLLOW_SKIP_EXT' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 61,
-              "startCol": 7,
-              "endLine": 61,
-              "endCol": 25
-            },
-            "replacementText": "regexpatternHOLLOWSKIPEXT"
-          },
-          "template": "regexpatternHOLLOWSKIPEXT",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 62,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_DOCSTRING_START' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 62,
-              "startCol": 7,
-              "endLine": 62,
-              "endCol": 25
-            },
-            "replacementText": "regexpatternDOCSTRINGSTART"
-          },
-          "template": "regexpatternDOCSTRINGSTART",
-          "safeToAutomate": true
         }
       },
       {
@@ -3982,114 +3275,6 @@
         }
       },
       {
-        "line": 64,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TERMINAL_STMT_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 64,
-              "startCol": 7,
-              "endLine": 64,
-              "endCol": 23
-            },
-            "replacementText": "terminalSTMTRegexPattern"
-          },
-          "template": "terminalSTMTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 66,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'SUPPRESSION_DIRECTIVE_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 66,
-              "startCol": 7,
-              "endLine": 66,
-              "endCol": 31
-            },
-            "replacementText": "suppressionDIRECTIVERegexPattern"
-          },
-          "template": "suppressionDIRECTIVERegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 68,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'VAGUE_THROW_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 68,
-              "startCol": 7,
-              "endLine": 68,
-              "endCol": 21
-            },
-            "replacementText": "vagueTHROWRegexPattern"
-          },
-          "template": "vagueTHROWRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 70,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FLOATING_PROMISE_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 70,
-              "startCol": 7,
-              "endLine": 70,
-              "endCol": 26
-            },
-            "replacementText": "floatingPROMISERegexPattern"
-          },
-          "template": "floatingPROMISERegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 90,
-        "col": 10,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'buildJargonRe' contains unapproved truncated abbreviation 'Re'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "buildJargonRegexPattern",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 227,
-        "col": 15,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'jargonRe' contains unapproved truncated abbreviation 'Re'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "jargonRegexPattern",
-          "safeToAutomate": false
-        }
-      },
-      {
         "line": 284,
         "col": 43,
         "rule": "magic-number",
@@ -4183,27 +3368,6 @@
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'volume_suggestion'."
-        }
-      },
-      {
-        "line": 310,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnReason' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 310,
-              "startCol": 11,
-              "endLine": 310,
-              "endCol": 19
-            },
-            "replacementText": "functionReason"
-          },
-          "template": "functionReason",
-          "safeToAutomate": true
         }
       },
       {
@@ -4331,27 +3495,6 @@
         }
       },
       {
-        "line": 91,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'SINGLE_LETTER_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 91,
-              "startCol": 7,
-              "endLine": 91,
-              "endCol": 23
-            },
-            "replacementText": "singleLETTERRegexPattern"
-          },
-          "template": "singleLETTERRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
         "line": 98,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -4412,51 +3555,6 @@
           },
           "safeToAutomate": true
         }
-      },
-      {
-        "line": 325,
-        "col": 5,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnName' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 325,
-              "startCol": 5,
-              "endLine": 325,
-              "endCol": 11
-            },
-            "replacementText": "functionName"
-          },
-          "template": "functionName",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 381,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnMatch' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionMatch",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 383,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnName' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionName",
-          "safeToAutomate": false
-        }
       }
     ],
     "src/analyzers/rust-modern.ts": [
@@ -4468,552 +3566,6 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
-      },
-      {
-        "line": 51,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TRY_MACRO_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 51,
-              "startCol": 7,
-              "endLine": 51,
-              "endCol": 19
-            },
-            "replacementText": "tryMACRORegexPattern"
-          },
-          "template": "tryMACRORegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 54,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'EXTERN_CRATE_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 54,
-              "startCol": 7,
-              "endLine": 54,
-              "endCol": 22
-            },
-            "replacementText": "externCRATERegexPattern"
-          },
-          "template": "externCRATERegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 57,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'MACRO_USE_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 57,
-              "startCol": 7,
-              "endLine": 57,
-              "endCol": 19
-            },
-            "replacementText": "macroUSERegexPattern"
-          },
-          "template": "macroUSERegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 60,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'AMP_STRING_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 60,
-              "startCol": 7,
-              "endLine": 60,
-              "endCol": 20
-            },
-            "replacementText": "ampSTRINGRegexPattern"
-          },
-          "template": "ampSTRINGRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 63,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'NEEDLESS_CLONE_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 63,
-              "startCol": 7,
-              "endLine": 63,
-              "endCol": 24
-            },
-            "replacementText": "needlessCLONERegexPattern"
-          },
-          "template": "needlessCLONERegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 66,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'UNWRAP_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 66,
-              "startCol": 7,
-              "endLine": 66,
-              "endCol": 16
-            },
-            "replacementText": "unwrapRegexPattern"
-          },
-          "template": "unwrapRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 69,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'NUMERIC_CAST_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 69,
-              "startCol": 7,
-              "endLine": 69,
-              "endCol": 22
-            },
-            "replacementText": "numericCASTRegexPattern"
-          },
-          "template": "numericCASTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 72,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FORMAT_CALL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 72,
-              "startCol": 7,
-              "endLine": 72,
-              "endCol": 21
-            },
-            "replacementText": "formatCALLRegexPattern"
-          },
-          "template": "formatCALLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 75,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'POSITIONAL_PLACEHOLDER_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 75,
-              "startCol": 7,
-              "endLine": 75,
-              "endCol": 32
-            },
-            "replacementText": "positionalPLACEHOLDERRegexPattern"
-          },
-          "template": "positionalPLACEHOLDERRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 78,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'MULTILINE_FORMAT_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 78,
-              "startCol": 7,
-              "endLine": 78,
-              "endCol": 26
-            },
-            "replacementText": "multilineFORMATRegexPattern"
-          },
-          "template": "multilineFORMATRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 82,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FN_DECL_RE' contains unapproved truncated abbreviation 'FN'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 82,
-              "startCol": 7,
-              "endLine": 82,
-              "endCol": 17
-            },
-            "replacementText": "functionDECLRegexPattern"
-          },
-          "template": "functionDECLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 85,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'IF_LET_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 85,
-              "startCol": 7,
-              "endLine": 85,
-              "endCol": 16
-            },
-            "replacementText": "ifLETRegexPattern"
-          },
-          "template": "ifLETRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 88,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FOR_IN_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 88,
-              "startCol": 7,
-              "endLine": 88,
-              "endCol": 16
-            },
-            "replacementText": "forINRegexPattern"
-          },
-          "template": "forINRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 91,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FOR_FIND_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 91,
-              "startCol": 7,
-              "endLine": 91,
-              "endCol": 18
-            },
-            "replacementText": "forFINDRegexPattern"
-          },
-          "template": "forFINDRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 94,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'ASYNC_FN_RE' contains unapproved truncated abbreviation 'FN'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 94,
-              "startCol": 7,
-              "endLine": 94,
-              "endCol": 18
-            },
-            "replacementText": "asyncFunctionRegexPattern"
-          },
-          "template": "asyncFunctionRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 97,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'STD_LOCK_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 97,
-              "startCol": 7,
-              "endLine": 97,
-              "endCol": 18
-            },
-            "replacementText": "stdLOCKRegexPattern"
-          },
-          "template": "stdLOCKRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 100,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'AWAIT_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 100,
-              "startCol": 7,
-              "endLine": 100,
-              "endCol": 15
-            },
-            "replacementText": "awaitRegexPattern"
-          },
-          "template": "awaitRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 103,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CRASH_MACRO_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 103,
-              "startCol": 7,
-              "endLine": 103,
-              "endCol": 21
-            },
-            "replacementText": "crashMACRORegexPattern"
-          },
-          "template": "crashMACRORegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 106,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'EXPECT_CALL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 106,
-              "startCol": 7,
-              "endLine": 106,
-              "endCol": 21
-            },
-            "replacementText": "expectCALLRegexPattern"
-          },
-          "template": "expectCALLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 109,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'UNSAFE_KEYWORD_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 109,
-              "startCol": 7,
-              "endLine": 109,
-              "endCol": 24
-            },
-            "replacementText": "unsafeKEYWORDRegexPattern"
-          },
-          "template": "unsafeKEYWORDRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 112,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'SAFETY_PROOF_COMMENT_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 112,
-              "startCol": 7,
-              "endLine": 112,
-              "endCol": 30
-            },
-            "replacementText": "safetyPROOFCOMMENTRegexPattern"
-          },
-          "template": "safetyPROOFCOMMENTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 176,
-        "col": 10,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'checkFnDeclLine' contains unapproved truncated abbreviation 'Fn'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 176,
-              "startCol": 10,
-              "endLine": 176,
-              "endCol": 25
-            },
-            "replacementText": "checkFunctionDeclLine"
-          },
-          "template": "checkFunctionDeclLine",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 177,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnIdx' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 177,
-              "startCol": 11,
-              "endLine": 177,
-              "endCol": 16
-            },
-            "replacementText": "functionIndex"
-          },
-          "template": "functionIndex",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 275,
-        "col": 10,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'resolveAsyncFnScope' contains unapproved truncated abbreviation 'Fn'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 275,
-              "startCol": 10,
-              "endLine": 275,
-              "endCol": 29
-            },
-            "replacementText": "resolveAsyncFunctionScope"
-          },
-          "template": "resolveAsyncFunctionScope",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 298,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RUST_TEST_FILE_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 298,
-              "startCol": 7,
-              "endLine": 298,
-              "endCol": 24
-            },
-            "replacementText": "rustTESTFILERegexPattern"
-          },
-          "template": "rustTESTFILERegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 299,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RUST_TEST_ATTR_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 299,
-              "startCol": 7,
-              "endLine": 299,
-              "endCol": 24
-            },
-            "replacementText": "rustTESTATTRRegexPattern"
-          },
-          "template": "rustTESTATTRRegexPattern",
-          "safeToAutomate": true
         }
       },
       {
@@ -5060,18 +3612,6 @@
         }
       },
       {
-        "line": 431,
-        "col": 13,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnSigState' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionSigState",
-          "safeToAutomate": false
-        }
-      },
-      {
         "line": 433,
         "col": 5,
         "rule": "SIM-LONG-001",
@@ -5101,48 +3641,6 @@
             },
             "replacementText": "DURATION_10MS"
           },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 155,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnNode' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 155,
-              "startCol": 11,
-              "endLine": 155,
-              "endCol": 17
-            },
-            "replacementText": "functionNode"
-          },
-          "template": "functionNode",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 186,
-        "col": 10,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'matchPropAccessCall' contains unapproved truncated abbreviation 'Prop'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 186,
-              "startCol": 10,
-              "endLine": 186,
-              "endCol": 29
-            },
-            "replacementText": "matchPropertyAccessCall"
-          },
-          "template": "matchPropertyAccessCall",
           "safeToAutomate": true
         }
       },
@@ -5256,258 +3754,6 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'stdlib."
-        }
-      },
-      {
-        "line": 49,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TEST_PATH_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 49,
-              "startCol": 7,
-              "endLine": 49,
-              "endCol": 19
-            },
-            "replacementText": "testPATHRegexPattern"
-          },
-          "template": "testPATHRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 51,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CRYPTO_KEYWORD_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 51,
-              "startCol": 7,
-              "endLine": 51,
-              "endCol": 24
-            },
-            "replacementText": "cryptoKEYWORDRegexPattern"
-          },
-          "template": "cryptoKEYWORDRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 53,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TARGET_CFG_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 53,
-              "startCol": 7,
-              "endLine": 53,
-              "endCol": 20
-            },
-            "replacementText": "targetConfigRegexPattern"
-          },
-          "template": "targetConfigRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 55,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FALLBACK_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 55,
-              "startCol": 7,
-              "endLine": 55,
-              "endCol": 18
-            },
-            "replacementText": "fallbackRegexPattern"
-          },
-          "template": "fallbackRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 56,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'NO_STD_CONTEXT_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 56,
-              "startCol": 7,
-              "endLine": 56,
-              "endCol": 24
-            },
-            "replacementText": "noSTDCONTEXTRegexPattern"
-          },
-          "template": "noSTDCONTEXTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 57,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'IMPLICIT_ALLOC_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 57,
-              "startCol": 7,
-              "endLine": 57,
-              "endCol": 24
-            },
-            "replacementText": "implicitALLOCRegexPattern"
-          },
-          "template": "implicitALLOCRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 59,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RUST_PUB_FN_RE' contains unapproved truncated abbreviation 'FN'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 59,
-              "startCol": 7,
-              "endLine": 59,
-              "endCol": 21
-            },
-            "replacementText": "rustPUBFunctionRegexPattern"
-          },
-          "template": "rustPUBFunctionRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 60,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RUST_PANIC_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 60,
-              "startCol": 7,
-              "endLine": 60,
-              "endCol": 20
-            },
-            "replacementText": "rustPANICRegexPattern"
-          },
-          "template": "rustPANICRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 61,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'GO_PUB_FN_RE' contains unapproved truncated abbreviation 'FN'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 61,
-              "startCol": 7,
-              "endLine": 61,
-              "endCol": 19
-            },
-            "replacementText": "goPUBFunctionRegexPattern"
-          },
-          "template": "goPUBFunctionRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 62,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FN_DEF_RE' contains unapproved truncated abbreviation 'FN'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 62,
-              "startCol": 7,
-              "endLine": 62,
-              "endCol": 16
-            },
-            "replacementText": "functionDEFRegexPattern"
-          },
-          "template": "functionDEFRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 63,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'DEPTH_GUARD_PARAM_RE' contains unapproved truncated abbreviation 'PARAM'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 63,
-              "startCol": 7,
-              "endLine": 63,
-              "endCol": 27
-            },
-            "replacementText": "depthGUARDParameterRegexPattern"
-          },
-          "template": "depthGUARDParameterRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 64,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'DEPTH_GUARD_BODY_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 64,
-              "startCol": 7,
-              "endLine": 64,
-              "endCol": 26
-            },
-            "replacementText": "depthGUARDBODYRegexPattern"
-          },
-          "template": "depthGUARDBODYRegexPattern",
-          "safeToAutomate": true
         }
       },
       {
@@ -5671,30 +3917,6 @@
         }
       },
       {
-        "line": 435,
-        "col": 13,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'inFn' contains unapproved truncated abbreviation 'Fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "inFunction",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 436,
-        "col": 13,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnName' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionName",
-          "safeToAutomate": false
-        }
-      },
-      {
         "line": 471,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
@@ -5702,30 +3924,6 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
-      },
-      {
-        "line": 472,
-        "col": 13,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'inFn' contains unapproved truncated abbreviation 'Fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "inFunction",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 473,
-        "col": 13,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnName' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionName",
-          "safeToAutomate": false
         }
       },
       {
@@ -5758,90 +3956,6 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
-      },
-      {
-        "line": 52,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'PATTERN_NAME_BLOCKING_FS' contains unapproved truncated abbreviation 'FS'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 52,
-              "startCol": 7,
-              "endLine": 52,
-              "endCol": 31
-            },
-            "replacementText": "patternNAMEBLOCKINGFileSystem"
-          },
-          "template": "patternNAMEBLOCKINGFileSystem",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 102,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'EXEMPT_PATH_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 102,
-              "startCol": 7,
-              "endLine": 102,
-              "endCol": 21
-            },
-            "replacementText": "exemptPATHRegexPattern"
-          },
-          "template": "exemptPATHRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 112,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'MSG_PERF_BLOCKING_FS' contains unapproved truncated abbreviation 'FS'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 112,
-              "startCol": 7,
-              "endLine": 112,
-              "endCol": 27
-            },
-            "replacementText": "messagePERFBLOCKINGFileSystem"
-          },
-          "template": "messagePERFBLOCKINGFileSystem",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 114,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'SUGG_PERF_BLOCKING_FS' contains unapproved truncated abbreviation 'FS'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 114,
-              "startCol": 7,
-              "endLine": 114,
-              "endCol": 28
-            },
-            "replacementText": "suggPERFBLOCKINGFileSystem"
-          },
-          "template": "suggPERFBLOCKINGFileSystem",
-          "safeToAutomate": true
         }
       },
       {
@@ -5984,30 +4098,6 @@
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 414,
-        "col": 15,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'colorRe' contains unapproved truncated abbreviation 'Re'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "colorRegexPattern",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 482,
-        "col": 15,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'jitterRe' contains unapproved truncated abbreviation 'Re'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "jitterRegexPattern",
           "safeToAutomate": false
         }
       }
@@ -6358,153 +4448,6 @@
         }
       },
       {
-        "line": 43,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_UTIL_OR_SHARED' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 43,
-              "startCol": 7,
-              "endLine": 43,
-              "endCol": 24
-            },
-            "replacementText": "regexpatternUTILORSHARED"
-          },
-          "template": "regexpatternUTILORSHARED",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 44,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_INFRA' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 44,
-              "startCol": 7,
-              "endLine": 44,
-              "endCol": 15
-            },
-            "replacementText": "regexpatternINFRA"
-          },
-          "template": "regexpatternINFRA",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 45,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_RULE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 45,
-              "startCol": 7,
-              "endLine": 45,
-              "endCol": 14
-            },
-            "replacementText": "regexpatternRULE"
-          },
-          "template": "regexpatternRULE",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 46,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_POOL' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 46,
-              "startCol": 7,
-              "endLine": 46,
-              "endCol": 14
-            },
-            "replacementText": "regexpatternPOOL"
-          },
-          "template": "regexpatternPOOL",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 47,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_ALGO' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 47,
-              "startCol": 7,
-              "endLine": 47,
-              "endCol": 14
-            },
-            "replacementText": "regexpatternALGO"
-          },
-          "template": "regexpatternALGO",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 48,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_CONST' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 48,
-              "startCol": 7,
-              "endLine": 48,
-              "endCol": 15
-            },
-            "replacementText": "regexpatternCONST"
-          },
-          "template": "regexpatternCONST",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 49,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RE_UTILITY_FILE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 49,
-              "startCol": 7,
-              "endLine": 49,
-              "endCol": 22
-            },
-            "replacementText": "regexpatternUTILITYFILE"
-          },
-          "template": "regexpatternUTILITYFILE",
-          "safeToAutomate": true
-        }
-      },
-      {
         "line": 128,
         "col": 41,
         "rule": "hardcoded-string",
@@ -6681,18 +4624,6 @@
         }
       },
       {
-        "line": 129,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'patternSf' contains unapproved truncated abbreviation 'Sf'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "patternSourceFile",
-          "safeToAutomate": false
-        }
-      },
-      {
         "line": 130,
         "col": 9,
         "rule": "hardcoded-string",
@@ -6710,54 +4641,6 @@
             "replacementText": "PATTERNTSX_TEXT"
           },
           "safeToAutomate": true
-        }
-      },
-      {
-        "line": 191,
-        "col": 5,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'patternSf' contains unapproved truncated abbreviation 'Sf'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "patternSourceFile",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 192,
-        "col": 5,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'targetSf' contains unapproved truncated abbreviation 'Sf'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "targetSourceFile",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 454,
-        "col": 5,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'targetSf' contains unapproved truncated abbreviation 'Sf'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "targetSourceFile",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 482,
-        "col": 5,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'targetSf' contains unapproved truncated abbreviation 'Sf'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "targetSourceFile",
-          "safeToAutomate": false
         }
       },
       {
@@ -6838,18 +4721,6 @@
             "replacementText": "NOOP_TEXT"
           },
           "safeToAutomate": true
-        }
-      },
-      {
-        "line": 627,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'targetSf' contains unapproved truncated abbreviation 'Sf'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "targetSourceFile",
-          "safeToAutomate": false
         }
       },
       {
@@ -7105,27 +4976,6 @@
     ],
     "src/core/ast/fallback-chain-matcher.ts": [
       {
-        "line": 29,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'GENERATIONAL_STRIP_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 29,
-              "startCol": 7,
-              "endLine": 29,
-              "endCol": 28
-            },
-            "replacementText": "generationalSTRIPRegexPattern"
-          },
-          "template": "generationalSTRIPRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
         "line": 41,
         "col": 29,
         "rule": "hardcoded-string",
@@ -7317,18 +5167,6 @@
         }
       },
       {
-        "line": 89,
-        "col": 5,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'targetOp' contains unapproved truncated abbreviation 'Op'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "targetOperator",
-          "safeToAutomate": false
-        }
-      },
-      {
         "line": 109,
         "col": 31,
         "rule": "magic-number",
@@ -7345,27 +5183,6 @@
             },
             "replacementText": "CONST_3"
           },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 178,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'opKind' contains unapproved truncated abbreviation 'op'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 178,
-              "startCol": 11,
-              "endLine": 178,
-              "endCol": 17
-            },
-            "replacementText": "operatorKind"
-          },
-          "template": "operatorKind",
           "safeToAutomate": true
         }
       },
@@ -7388,27 +5205,6 @@
           },
           "safeToAutomate": true
         }
-      },
-      {
-        "line": 199,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'opSymbol' contains unapproved truncated abbreviation 'op'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 199,
-              "startCol": 11,
-              "endLine": 199,
-              "endCol": 19
-            },
-            "replacementText": "operatorSymbol"
-          },
-          "template": "operatorSymbol",
-          "safeToAutomate": true
-        }
       }
     ],
     "src/core/ast/gdscript-adapter.ts": [
@@ -7420,207 +5216,6 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
-      },
-      {
-        "line": 39,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FUNC_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 39,
-              "startCol": 7,
-              "endLine": 39,
-              "endCol": 14
-            },
-            "replacementText": "funcRegexPattern"
-          },
-          "template": "funcRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 40,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CLASS_NAME_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 40,
-              "startCol": 7,
-              "endLine": 40,
-              "endCol": 20
-            },
-            "replacementText": "classNAMERegexPattern"
-          },
-          "template": "classNAMERegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 41,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'INNER_CLASS_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 41,
-              "startCol": 7,
-              "endLine": 41,
-              "endCol": 21
-            },
-            "replacementText": "innerCLASSRegexPattern"
-          },
-          "template": "innerCLASSRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 42,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CONST_DECL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 42,
-              "startCol": 7,
-              "endLine": 42,
-              "endCol": 20
-            },
-            "replacementText": "constDECLRegexPattern"
-          },
-          "template": "constDECLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 43,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CONTROL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 43,
-              "startCol": 7,
-              "endLine": 43,
-              "endCol": 17
-            },
-            "replacementText": "controlRegexPattern"
-          },
-          "template": "controlRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 98,
-        "col": 10,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'pushParamIdentifier' contains unapproved truncated abbreviation 'Param'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 98,
-              "startCol": 10,
-              "endLine": 98,
-              "endCol": 29
-            },
-            "replacementText": "pushParameterIdentifier"
-          },
-          "template": "pushParameterIdentifier",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 125,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'paramStr' contains unapproved truncated abbreviation 'param'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 125,
-              "startCol": 11,
-              "endLine": 125,
-              "endCol": 19
-            },
-            "replacementText": "parameterString"
-          },
-          "template": "parameterString",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 129,
-        "col": 9,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'cur' contains unapproved truncated abbreviation 'cur'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "current",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 173,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TOLERANT_CALL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 173,
-              "startCol": 7,
-              "endLine": 173,
-              "endCol": 23
-            },
-            "replacementText": "tolerantCALLRegexPattern"
-          },
-          "template": "tolerantCALLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 188,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'callRe' contains unapproved truncated abbreviation 'Re'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 188,
-              "startCol": 11,
-              "endLine": 188,
-              "endCol": 17
-            },
-            "replacementText": "callRegexPattern"
-          },
-          "template": "callRegexPattern",
-          "safeToAutomate": true
         }
       },
       {
@@ -7666,18 +5261,6 @@
         }
       },
       {
-        "line": 271,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'fnNode' contains unapproved truncated abbreviation 'fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "functionNode",
-          "safeToAutomate": false
-        }
-      },
-      {
         "line": 289,
         "col": 10,
         "rule": "NAM-LEN-002",
@@ -7707,27 +5290,6 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
-      },
-      {
-        "line": 300,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'opMatches' contains unapproved truncated abbreviation 'op'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 300,
-              "startCol": 11,
-              "endLine": 300,
-              "endCol": 20
-            },
-            "replacementText": "operatorMatches"
-          },
-          "template": "operatorMatches",
-          "safeToAutomate": true
         }
       },
       {
@@ -7774,522 +5336,6 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
-      },
-      {
-        "line": 30,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'TYPE_DEF_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 30,
-              "startCol": 7,
-              "endLine": 30,
-              "endCol": 18
-            },
-            "replacementText": "typeDEFRegexPattern"
-          },
-          "template": "typeDEFRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 33,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'METHOD_DECL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 33,
-              "startCol": 7,
-              "endLine": 33,
-              "endCol": 21
-            },
-            "replacementText": "methodDECLRegexPattern"
-          },
-          "template": "methodDECLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 36,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FUNC_DECL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 36,
-              "startCol": 7,
-              "endLine": 36,
-              "endCol": 19
-            },
-            "replacementText": "funcDECLRegexPattern"
-          },
-          "template": "funcDECLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 39,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'VAR_DECL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 39,
-              "startCol": 7,
-              "endLine": 39,
-              "endCol": 18
-            },
-            "replacementText": "varDECLRegexPattern"
-          },
-          "template": "varDECLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 42,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CONST_DECL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 42,
-              "startCol": 7,
-              "endLine": 42,
-              "endCol": 20
-            },
-            "replacementText": "constDECLRegexPattern"
-          },
-          "template": "constDECLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 45,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CONST_BLOCK_START_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 45,
-              "startCol": 7,
-              "endLine": 45,
-              "endCol": 27
-            },
-            "replacementText": "constBLOCKSTARTRegexPattern"
-          },
-          "template": "constBLOCKSTARTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 48,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'VAR_BLOCK_START_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 48,
-              "startCol": 7,
-              "endLine": 48,
-              "endCol": 25
-            },
-            "replacementText": "varBLOCKSTARTRegexPattern"
-          },
-          "template": "varBLOCKSTARTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 51,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'BLOCK_ENTRY_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 51,
-              "startCol": 7,
-              "endLine": 51,
-              "endCol": 21
-            },
-            "replacementText": "blockENTRYRegexPattern"
-          },
-          "template": "blockENTRYRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 54,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CONTROL_FLOW_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 54,
-              "startCol": 7,
-              "endLine": 54,
-              "endCol": 22
-            },
-            "replacementText": "controlFLOWRegexPattern"
-          },
-          "template": "controlFLOWRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 57,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CASE_LABEL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 57,
-              "startCol": 7,
-              "endLine": 57,
-              "endCol": 20
-            },
-            "replacementText": "caseLABELRegexPattern"
-          },
-          "template": "caseLABELRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 60,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'GO_STMT_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 60,
-              "startCol": 7,
-              "endLine": 60,
-              "endCol": 17
-            },
-            "replacementText": "goSTMTRegexPattern"
-          },
-          "template": "goSTMTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 63,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'DEFER_STMT_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 63,
-              "startCol": 7,
-              "endLine": 63,
-              "endCol": 20
-            },
-            "replacementText": "deferSTMTRegexPattern"
-          },
-          "template": "deferSTMTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 66,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'RETURN_STMT_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 66,
-              "startCol": 7,
-              "endLine": 66,
-              "endCol": 21
-            },
-            "replacementText": "returnSTMTRegexPattern"
-          },
-          "template": "returnSTMTRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 69,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'STRING_LITERAL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 69,
-              "startCol": 7,
-              "endLine": 69,
-              "endCol": 24
-            },
-            "replacementText": "stringLITERALRegexPattern"
-          },
-          "template": "stringLITERALRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 72,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'INT_LITERAL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 72,
-              "startCol": 7,
-              "endLine": 72,
-              "endCol": 21
-            },
-            "replacementText": "intLITERALRegexPattern"
-          },
-          "template": "intLITERALRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 75,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'FLOAT_LITERAL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 75,
-              "startCol": 7,
-              "endLine": 75,
-              "endCol": 23
-            },
-            "replacementText": "floatLITERALRegexPattern"
-          },
-          "template": "floatLITERALRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 79,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'NAMED_LITERAL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 79,
-              "startCol": 7,
-              "endLine": 79,
-              "endCol": 23
-            },
-            "replacementText": "namedLITERALRegexPattern"
-          },
-          "template": "namedLITERALRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 82,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'CALL_EXPR_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 82,
-              "startCol": 7,
-              "endLine": 82,
-              "endCol": 19
-            },
-            "replacementText": "callEXPRRegexPattern"
-          },
-          "template": "callEXPRRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 113,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'STRUCT_FIELD_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 113,
-              "startCol": 7,
-              "endLine": 113,
-              "endCol": 22
-            },
-            "replacementText": "structFIELDRegexPattern"
-          },
-          "template": "structFIELDRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 120,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'PACKAGE_DECL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 120,
-              "startCol": 7,
-              "endLine": 120,
-              "endCol": 22
-            },
-            "replacementText": "packageDECLRegexPattern"
-          },
-          "template": "packageDECLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 123,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'IMPORT_DECL_RE' contains unapproved truncated abbreviation 'RE'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 123,
-              "startCol": 7,
-              "endLine": 123,
-              "endCol": 21
-            },
-            "replacementText": "importDECLRegexPattern"
-          },
-          "template": "importDECLRegexPattern",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 175,
-        "col": 10,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'splitGoParamSegments' contains unapproved truncated abbreviation 'Param'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 175,
-              "startCol": 10,
-              "endLine": 175,
-              "endCol": 30
-            },
-            "replacementText": "splitGoParameterSegments"
-          },
-          "template": "splitGoParameterSegments",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 175,
-        "col": 31,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'paramStr' contains unapproved truncated abbreviation 'param'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 175,
-              "startCol": 31,
-              "endLine": 175,
-              "endCol": 39
-            },
-            "replacementText": "parameterString"
-          },
-          "template": "parameterString",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 177,
-        "col": 9,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'cur' contains unapproved truncated abbreviation 'cur'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "current",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 201,
-        "col": 11,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'paramStr' contains unapproved truncated abbreviation 'param'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 201,
-              "startCol": 11,
-              "endLine": 201,
-              "endCol": 19
-            },
-            "replacementText": "parameterString"
-          },
-          "template": "parameterString",
-          "safeToAutomate": true
         }
       },
       {
@@ -8513,27 +5559,6 @@
         }
       },
       {
-        "line": 77,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'PROP_EXPORTED' contains unapproved truncated abbreviation 'PROP'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 77,
-              "startCol": 7,
-              "endLine": 77,
-              "endCol": 20
-            },
-            "replacementText": "propertyEXPORTED"
-          },
-          "template": "propertyEXPORTED",
-          "safeToAutomate": true
-        }
-      },
-      {
         "line": 80,
         "rule": "NAM-GLB-002",
         "sev": "WARN",
@@ -8556,69 +5581,6 @@
         }
       },
       {
-        "line": 63,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'OP_PLUS' contains unapproved truncated abbreviation 'OP'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 63,
-              "startCol": 7,
-              "endLine": 63,
-              "endCol": 14
-            },
-            "replacementText": "operatorPLUS"
-          },
-          "template": "operatorPLUS",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 64,
-        "col": 7,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'OP_ASSIGN' contains unapproved truncated abbreviation 'OP'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 64,
-              "startCol": 7,
-              "endLine": 64,
-              "endCol": 16
-            },
-            "replacementText": "operatorASSIGN"
-          },
-          "template": "operatorASSIGN",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 171,
-        "col": 10,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'findOxcTargetFnNode' contains unapproved truncated abbreviation 'Fn'.",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 171,
-              "startCol": 10,
-              "endLine": 171,
-              "endCol": 29
-            },
-            "replacementText": "findOxcTargetFunctionNode"
-          },
-          "template": "findOxcTargetFunctionNode",
-          "safeToAutomate": true
-        }
-      },
-      {
         "line": 340,
         "col": 10,
         "rule": "NAM-LEN-002",
@@ -8628,62 +5590,2312 @@
           "action": "replace_token",
           "safeToAutomate": false
         }
-      },
+      }
+    ],
+    "src/core/ast/oxc-projector.ts": [
       {
-        "line": 382,
-        "col": 10,
-        "rule": "NAM-ABR-001",
+        "line": 1,
+        "rule": "large-file",
         "sev": "WARN",
-        "msg": "Identifier 'isOxcToleratedCallArg' contains unapproved truncated abbreviation 'Arg'.",
+        "msg": "File is large; consider splitting (lines 653 >= warn threshold 400; functions 29 >= warn threshold 20).",
         "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 382,
-              "startCol": 10,
-              "endLine": 382,
-              "endCol": 31
-            },
-            "replacementText": "isOxcToleratedCallArgument"
-          },
-          "template": "isOxcToleratedCallArgument",
-          "safeToAutomate": true
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
         }
       },
       {
-        "line": 386,
-        "col": 11,
-        "rule": "NAM-ABR-001",
+        "line": 360,
+        "col": 13,
+        "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Identifier 'argIdx' contains unapproved truncated abbreviation 'arg'.",
+        "msg": "Function or method name 'greatGrandparentOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'r…",
         "fix": {
           "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 386,
-              "startCol": 11,
-              "endLine": 386,
-              "endCol": 17
-            },
-            "replacementText": "argumentIndex"
-          },
-          "template": "argumentIndex",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 513,
-        "col": 17,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "Identifier 'isOxcFnLikeNode' contains unapproved truncated abbreviation 'Fn'.",
-        "fix": {
-          "action": "replace_token",
-          "template": "isOxcFunctionLikeNode",
           "safeToAutomate": false
+        }
+      },
+      {
+        "line": 415,
+        "col": 5,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'forEachChild' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "template": "iterable",
+          "safeToAutomate": false
+        }
+      }
+    ],
+    "src/core/ast/python-adapter-helpers.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 424 >= warn threshold 400; functions 22 >= warn threshold 20).",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        }
+      }
+    ],
+    "src/core/ast/python-adapter.ts": [
+      {
+        "line": 40,
+        "rule": "NAM-GLB-002",
+        "sev": "WARN",
+        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
+        }
+      },
+      {
+        "line": 48,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'pythonParser' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "patch": {
+            "range": {
+              "startLine": 48,
+              "startCol": 10,
+              "endLine": 48,
+              "endCol": 22
+            },
+            "replacementText": "treeSitterParser"
+          },
+          "template": "treeSitterParser",
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 50,
+        "col": 32,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 50,
+              "startCol": 32,
+              "endLine": 50,
+              "endCol": 45
+            },
+            "replacementText": "TREESITTER_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 50,
+        "rule": "TSM-REQUIRE-001",
+        "sev": "WARN",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "fix": {
+          "action": "replace_token",
+          "template": "import $1 from $2;",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 51,
+        "col": 32,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 51,
+              "startCol": 32,
+              "endLine": 51,
+              "endCol": 52
+            },
+            "replacementText": "TREESITTERPYTHON_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 51,
+        "rule": "TSM-REQUIRE-001",
+        "sev": "WARN",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "fix": {
+          "action": "replace_token",
+          "template": "import $1 from $2;",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 74,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"resolvePythonNodeName\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ResolvePythonNodeNameOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 81,
+        "col": 29,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 81,
+              "startCol": 29,
+              "endLine": 81,
+              "endCol": 35
+            },
+            "replacementText": "CALL_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 92,
+        "col": 40,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 92,
+              "startCol": 40,
+              "endLine": 92,
+              "endCol": 61
+            },
+            "replacementText": "FUNCTIONDEFINITION_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 112,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'extractTypedOrDefaultPythonParam' has too many word segments (6 > 5); consider decomposing responsibilities.",
+        "fix": {
+          "action": "replace_token",
+          "patch": {
+            "range": {
+              "startLine": 112,
+              "startCol": 10,
+              "endLine": 112,
+              "endCol": 42
+            },
+            "replacementText": "extractTypedOrDefaultPythonParameter"
+          },
+          "template": "extractTypedOrDefaultPythonParameter",
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 114,
+        "col": 35,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 114,
+              "startCol": 35,
+              "endLine": 114,
+              "endCol": 41
+            },
+            "replacementText": "NAME_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 143,
+        "col": 11,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "identifier 'result' lacks domain context",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'result' with a domain-qualified identifier (e."
+        }
+      }
+    ],
+    "src/core/ast/rust-adapter.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 575 >= warn threshold 400; functions 22 >= warn threshold 20).",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        }
+      },
+      {
+        "line": 30,
+        "rule": "NAM-GLB-002",
+        "sev": "WARN",
+        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
+        }
+      },
+      {
+        "line": 35,
+        "col": 7,
+        "rule": "NAM-GLB-001",
+        "sev": "WARN",
+        "msg": "Top-level constant '_ADAPTER_ID_RUST' should follow UPPER_SNAKE_CASE naming convention.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Rename '_ADAPTER_ID_RUST' to an uppercase snake_case constant (e."
+        }
+      },
+      {
+        "line": 71,
+        "rule": "TSM-REQUIRE-001",
+        "sev": "WARN",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "fix": {
+          "action": "replace_token",
+          "template": "import $1 from $2;",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 72,
+        "rule": "TSM-REQUIRE-001",
+        "sev": "WARN",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "fix": {
+          "action": "replace_token",
+          "template": "import $1 from $2;",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 481,
+        "col": 32,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 481,
+              "startCol": 32,
+              "endLine": 481,
+              "endCol": 48
+            },
+            "replacementText": "ATTRIBUTEITEM_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 496,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 8 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 496,
+              "startCol": 32,
+              "endLine": 496,
+              "endCol": 33
+            },
+            "replacementText": "CONST_8"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 497,
+        "col": 48,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 497,
+              "startCol": 48,
+              "endLine": 497,
+              "endCol": 58
+            },
+            "replacementText": "MODITEM_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 536,
+        "col": 67,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 536,
+              "startCol": 67,
+              "endLine": 536,
+              "endCol": 76
+            },
+            "replacementText": "PATTERN_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 551,
+        "col": 24,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 551,
+              "startCol": 24,
+              "endLine": 551,
+              "endCol": 40
+            },
+            "replacementText": "SELFPARAMETER_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 552,
+        "col": 16,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 552,
+              "startCol": 16,
+              "endLine": 552,
+              "endCol": 22
+            },
+            "replacementText": "SELF_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      }
+    ],
+    "src/core/ast/scope-graph.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 519 >= warn threshold 400; functions 22 >= warn threshold 20).",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        }
+      },
+      {
+        "line": 78,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'scopeKindForNode' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 92,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'bindingOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 96,
+        "col": 56,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 96,
+              "startCol": 56,
+              "endLine": 96,
+              "endCol": 66
+            },
+            "replacementText": "CONSTANT_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 97,
+        "col": 56,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 97,
+              "startCol": 56,
+              "endLine": 97,
+              "endCol": 66
+            },
+            "replacementText": "VARIABLE_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 129,
+        "col": 5,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'lookup' has too few word segments (1 < 2); lacks semantic description.",
+        "fix": {
+          "action": "replace_token",
+          "template": "lookupResult",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 184,
+        "col": 38,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 184,
+              "startCol": 38,
+              "endLine": 184,
+              "endCol": 48
+            },
+            "replacementText": "CONSTANT_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 189,
+        "col": 31,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 3 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 189,
+              "startCol": 31,
+              "endLine": 189,
+              "endCol": 32
+            },
+            "replacementText": "CONST_3"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 191,
+        "col": 33,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 4 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 191,
+              "startCol": 33,
+              "endLine": 191,
+              "endCol": 34
+            },
+            "replacementText": "CONST_4"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 193,
+        "col": 35,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 5 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 193,
+              "startCol": 35,
+              "endLine": 193,
+              "endCol": 36
+            },
+            "replacementText": "CONST_5"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 250,
+        "col": 5,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name '_finalize' has too few word segments (1 < 2); lacks semantic description.",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 286,
+        "col": 15,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "identifier 'info' lacks domain context",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'info' with a domain-qualified identifier (e."
+        }
+      },
+      {
+        "line": 391,
+        "col": 21,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 391,
+              "startCol": 21,
+              "endLine": 391,
+              "endCol": 38
+            },
+            "replacementText": "SCOPEGRAPH_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 428,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"visit\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface VisitOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 448,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 315",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        }
+      },
+      {
+        "line": 468,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"leave\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface LeaveOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 504,
+        "col": 15,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "identifier 'info' lacks domain context",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'info' with a domain-qualified identifier (e."
+        }
+      }
+    ],
+    "src/core/ast/shell-adapter.ts": [
+      {
+        "line": 49,
+        "col": 13,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'documentRoot' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "template": "normalizedNode",
+          "safeToAutomate": false
+        }
+      }
+    ],
+    "src/core/ast/swa-bounded-replay.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 586 >= warn threshold 400; functions 21 >= warn threshold 20).",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        }
+      },
+      {
+        "line": 245,
+        "col": 15,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "identifier 'result' lacks domain context",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'result' with a domain-qualified identifier (e."
+        }
+      }
+    ],
+    "src/core/ast/swar.ts": [
+      {
+        "line": 56,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'isPureAsciiSWAR64' contains segment 'R64' with invalid morpheme phonetics (missing vowel or unapproved acronym).",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 95,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'align64' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 109,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'bitParallelMyers32Distance' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'han…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 167,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'bitParallelMyers64Distance' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'han…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      }
+    ],
+    "src/core/ast/traverse.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 581 >= warn threshold 400).",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        }
+      },
+      {
+        "line": 1,
+        "rule": "NAM-FIL-001",
+        "sev": "WARN",
+        "msg": "File name 'traverse.ts' has too few word segments (1 < 2); lacks domain specificity.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Expand file name 'traverse."
+        }
+      },
+      {
+        "line": 94,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"dispatchHooks\" has 8 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface DispatchHooksOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 141,
+        "rule": "SIM-LONG-001",
+        "sev": "WARN",
+        "msg": "Function \"runStreaming\" spans 112 lines (limit 60).",
+        "fix": {
+          "action": "split_function",
+          "template": "// Extracted helper:",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 195,
+        "col": 23,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"visitNode\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface VisitNodeOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 196,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 96",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        }
+      },
+      {
+        "line": 267,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"visit\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface VisitOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 359,
+        "rule": "SIM-LONG-001",
+        "sev": "WARN",
+        "msg": "Function \"runStreamingProjected\" spans 134 lines (limit 60).",
+        "fix": {
+          "action": "split_function",
+          "template": "// Extracted helper:",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 417,
+        "col": 22,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"visitRaw\" has 9 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface VisitRawOptions {",
+          "safeToAutomate": false
+        }
+      }
+    ],
+    "src/core/ast/ts-predicates.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 470 >= warn threshold 400; functions 24 >= warn threshold 20).",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        }
+      },
+      {
+        "line": 115,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'bindingName' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 172,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'kindOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "template": "nodeKind",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 188,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'branchWeightOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 210,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'calleeNameOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 225,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'calleeReceiverOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 244,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'nameOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 279,
+        "col": 49,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 279,
+              "startCol": 49,
+              "endLine": 279,
+              "endCol": 61
+            },
+            "replacementText": "DEEPFREEZE_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 344,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'tsIsCallTolerated' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'ru…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 435,
+        "rule": "HYG-DED-001",
+        "sev": "WARN",
+        "msg": "Dead code detected: Statement is unreachable following a terminal control flow statement (return/throw/break/continue)",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
+        }
+      },
+      {
+        "line": 466,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'posOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "template": "positionOf",
+          "safeToAutomate": false
+        }
+      }
+    ],
+    "src/core/ast/ts-projector.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 631 >= warn threshold 400; functions 34 >= warn threshold 20).",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        }
+      },
+      {
+        "line": 54,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'maxSyntaxKind' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 131,
+        "rule": "TSM-CTOR-001",
+        "sev": "WARN",
+        "msg": "Wrapper constructor called with `new`; a literal or the primitive is equivalent.",
+        "fix": {
+          "action": "replace_token",
+          "template": "[]",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 138,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'kindInfoFor' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "patch": {
+            "range": {
+              "startLine": 138,
+              "startCol": 10,
+              "endLine": 138,
+              "endCol": 21
+            },
+            "replacementText": "tsKindInfo"
+          },
+          "template": "tsKindInfo",
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 164,
+        "col": 22,
+        "rule": "NAM-ABR-001",
+        "sev": "WARN",
+        "msg": "identifier 'sf' unapproved abbr 'sf'",
+        "fix": {
+          "action": "replace_token",
+          "template": "sourceFile",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 257,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"isObservableSyntax\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface IsObservableSyntaxOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 289,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"shouldCollapseToPlaceholder\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ShouldCollapseToPlaceholderOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 301,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"resolveProjectedPositions\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ResolveProjectedPositionsOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 361,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"buildProjectedNode\" has 9 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface BuildProjectedNodeOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 425,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"applyProjectedMetadata\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ApplyProjectedMetadataOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 458,
+        "col": 13,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'greatGrandparentOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'r…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 468,
+        "col": 5,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'forEachChild' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "template": "iterable",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 543,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 434",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        }
+      },
+      {
+        "line": 591,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"applyCheapNonFunctionProps\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ApplyCheapNonFunctionPropsOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 602,
+        "col": 13,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'cheapProject' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "template": "normalizedNode",
+          "safeToAutomate": false
+        }
+      }
+    ],
+    "src/core/ast/typescript-adapter.ts": [
+      {
+        "line": 91,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"resolveNodePositions\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ResolveNodePositionsOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 115,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"resolveNodeName\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ResolveNodeNameOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 132,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"buildNormalizedNode\" has 8 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface BuildNormalizedNodeOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 189,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"applyNodeHierarchy\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ApplyNodeHierarchyOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 211,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"tryReuseSubtree\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface TryReuseSubtreeOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 237,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"recordSpanCache\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface RecordSpanCacheOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 245,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 219",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        }
+      },
+      {
+        "line": 256,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"traverseChildren\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface TraverseChildrenOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 273,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"mapNode\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface MapNodeOptions {",
+          "safeToAutomate": false
+        }
+      }
+    ],
+    "src/core/ast/utf8.ts": [
+      {
+        "line": 1,
+        "rule": "NAM-FIL-001",
+        "sev": "WARN",
+        "msg": "File name 'utf8.ts' has too few word segments (1 < 2); lacks domain specificity.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Expand file name 'utf8."
+        }
+      },
+      {
+        "line": 93,
+        "col": 17,
+        "rule": "HYG-WRAP-001",
+        "sev": "WARN",
+        "msg": "Function `isPureAscii` is a vacuous passthrough wrapper directly forwarding arguments to `isPureAsciiSWAR64`.",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
+        }
+      },
+      {
+        "line": 99,
+        "col": 5,
+        "rule": "NAM-SGL-001",
+        "sev": "WARN",
+        "msg": "Single-letter variable name 'i' hurts code readability.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
+        }
+      },
+      {
+        "line": 119,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"finishMultiByteSequence\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface FinishMultiByteSequenceOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 153,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'utf8ToUtf16Offsets' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'r…",
+        "fix": {
+          "action": "replace_token",
+          "template": "int32Array",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 157,
+        "col": 9,
+        "rule": "NAM-SGL-001",
+        "sev": "WARN",
+        "msg": "Single-letter variable name 'i' hurts code readability.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
+        }
+      },
+      {
+        "line": 230,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'utf8ToUtf16Offset' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'ru…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 234,
+        "col": 9,
+        "rule": "NAM-SGL-001",
+        "sev": "WARN",
+        "msg": "Single-letter variable name 'k' hurts code readability.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'k' with a meaningful descriptive name; only loop indices ('i','j','k…"
+        }
+      },
+      {
+        "line": 263,
+        "rule": "HYG-DED-001",
+        "sev": "WARN",
+        "msg": "Dead code detected: Statement is unreachable following a terminal control flow statement (return/throw/break/continue)",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
+        }
+      },
+      {
+        "line": 295,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 270",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        }
+      }
+    ],
+    "src/core/cfg/def-use-chain.ts": [
+      {
+        "line": 35,
+        "col": 10,
+        "rule": "HYG-WRAP-001",
+        "sev": "WARN",
+        "msg": "Function `isResourceAllocStatement` is a vacuous passthrough wrapper directly forwarding arguments to `COMBINED_RESOURCE_ALLOC_RE.test`.",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
+        }
+      },
+      {
+        "line": 39,
+        "col": 10,
+        "rule": "HYG-WRAP-001",
+        "sev": "WARN",
+        "msg": "Function `isResourceCleanupStatement` is a vacuous passthrough wrapper directly forwarding arguments to `COMBINED_RESOURCE_CLEANUP_RE.test`.",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
+        }
+      },
+      {
+        "line": 48,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 48 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 48,
+              "startCol": 18,
+              "endLine": 48,
+              "endCol": 20
+            },
+            "replacementText": "CONST_48"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 48,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 57 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 48,
+              "startCol": 32,
+              "endLine": 48,
+              "endCol": 34
+            },
+            "replacementText": "CONST_57"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 49,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 65 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 49,
+              "startCol": 18,
+              "endLine": 49,
+              "endCol": 20
+            },
+            "replacementText": "CONST_65"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 49,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 90 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 49,
+              "startCol": 32,
+              "endLine": 49,
+              "endCol": 34
+            },
+            "replacementText": "CONST_90"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 50,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 97 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 50,
+              "startCol": 18,
+              "endLine": 50,
+              "endCol": 20
+            },
+            "replacementText": "CONST_97"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 50,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 122 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 50,
+              "startCol": 32,
+              "endLine": 50,
+              "endCol": 35
+            },
+            "replacementText": "CONST_122"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 51,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 95 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 51,
+              "startCol": 18,
+              "endLine": 51,
+              "endCol": 20
+            },
+            "replacementText": "CONST_95"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 60,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 48 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 60,
+              "startCol": 18,
+              "endLine": 60,
+              "endCol": 20
+            },
+            "replacementText": "CONST_48"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 60,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 57 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 60,
+              "startCol": 32,
+              "endLine": 60,
+              "endCol": 34
+            },
+            "replacementText": "CONST_57"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 61,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 65 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 61,
+              "startCol": 18,
+              "endLine": 61,
+              "endCol": 20
+            },
+            "replacementText": "CONST_65"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 61,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 90 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 61,
+              "startCol": 32,
+              "endLine": 61,
+              "endCol": 34
+            },
+            "replacementText": "CONST_90"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 62,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 97 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 62,
+              "startCol": 18,
+              "endLine": 62,
+              "endCol": 20
+            },
+            "replacementText": "CONST_97"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 62,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 122 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 62,
+              "startCol": 32,
+              "endLine": 62,
+              "endCol": 35
+            },
+            "replacementText": "CONST_122"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 63,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 95 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 63,
+              "startCol": 18,
+              "endLine": 63,
+              "endCol": 20
+            },
+            "replacementText": "CONST_95"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 64,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 36 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 64,
+              "startCol": 18,
+              "endLine": 64,
+              "endCol": 20
+            },
+            "replacementText": "CONST_36"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 79,
+        "col": 75,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 46 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 79,
+              "startCol": 75,
+              "endLine": 79,
+              "endCol": 77
+            },
+            "replacementText": "CONST_46"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 145,
+        "col": 49,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 145,
+              "startCol": 49,
+              "endLine": 145,
+              "endCol": 55
+            },
+            "replacementText": "READ_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 147,
+        "col": 28,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 147,
+              "startCol": 28,
+              "endLine": 147,
+              "endCol": 37
+            },
+            "replacementText": "CLEANUP_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 149,
+        "col": 28,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 149,
+              "startCol": 28,
+              "endLine": 149,
+              "endCol": 41
+            },
+            "replacementText": "DEREFERENCE_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 178,
+        "col": 52,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 178,
+              "startCol": 52,
+              "endLine": 178,
+              "endCol": 72
+            },
+            "replacementText": "ANONYMOUSASYNCCALL_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 270,
+        "col": 34,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 270,
+              "startCol": 34,
+              "endLine": 270,
+              "endCol": 43
+            },
+            "replacementText": "CLEANUP_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      }
+    ],
+    "src/core/codemod/patch-engine.ts": [
+      {
+        "line": 50,
+        "col": 12,
+        "rule": "GOV-PRF-004",
+        "sev": "WARN",
+        "msg": "Synchronous fs call blocks the host event loop (UI jank / request stall source).",
+        "fix": {
+          "action": "refactor",
+          "template": "Use fs/promises or the host async fs API (e.g. vscode.workspace.fs)."
+        }
+      },
+      {
+        "line": 59,
+        "col": 12,
+        "rule": "GOV-PRF-004",
+        "sev": "WARN",
+        "msg": "Synchronous fs call blocks the host event loop (UI jank / request stall source).",
+        "fix": {
+          "action": "refactor",
+          "template": "Use fs/promises or the host async fs API (e.g. vscode.workspace.fs)."
+        }
+      },
+      {
+        "line": 88,
+        "col": 11,
+        "rule": "NAM-JRG-002",
+        "sev": "WARN",
+        "msg": "Symbol or test identifier 'tmpPath' contains transient construction jargon or milestone marker.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace transient process markers with semantic domain naming."
+        }
+      },
+      {
+        "line": 105,
+        "col": 11,
+        "rule": "NAM-JRG-002",
+        "sev": "WARN",
+        "msg": "Symbol or test identifier 'tmpPath' contains transient construction jargon or milestone marker.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace transient process markers with semantic domain naming."
+        }
+      },
+      {
+        "line": 128,
+        "col": 19,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'issueToFix' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 224,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 178",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        }
+      },
+      {
+        "line": 345,
+        "col": 54,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 3 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 345,
+              "startCol": 54,
+              "endLine": 345,
+              "endCol": 55
+            },
+            "replacementText": "CONST_3"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 346,
+        "col": 68,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 4 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 346,
+              "startCol": 68,
+              "endLine": 346,
+              "endCol": 69
+            },
+            "replacementText": "CONST_4"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 347,
+        "col": 68,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 4 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 347,
+              "startCol": 68,
+              "endLine": 347,
+              "endCol": 69
+            },
+            "replacementText": "CONST_4"
+          },
+          "safeToAutomate": true
+        }
+      }
+    ],
+    "src/core/codemod/transforms/trampoline-inliner.ts": [
+      {
+        "line": 53,
+        "col": 54,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 3 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 53,
+              "startCol": 54,
+              "endLine": 53,
+              "endCol": 55
+            },
+            "replacementText": "CONST_3"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 96,
+        "col": 50,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 96,
+              "startCol": 50,
+              "endLine": 96,
+              "endCol": 56
+            },
+            "replacementText": "EXTRACTED_STRING"
+          },
+          "safeToAutomate": true
+        }
+      }
+    ],
+    "src/core/comments/comment-auditor.ts": [
+      {
+        "line": 58,
+        "col": 29,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 58,
+              "startCol": 29,
+              "endLine": 58,
+              "endCol": 45
+            },
+            "replacementText": "FILE_PATH_DICTIONARIES_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 59,
+        "col": 29,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 59,
+              "startCol": 29,
+              "endLine": 59,
+              "endCol": 40
+            },
+            "replacementText": "FILE_PATH_LOCALES_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 60,
+        "col": 29,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 60,
+              "startCol": 29,
+              "endLine": 60,
+              "endCol": 37
+            },
+            "replacementText": "FILE_PATH_I18N_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 76,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"auditLineLevelLanguage\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface AuditLineLevelLanguageOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 109,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"auditMacroLanguageDrift\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface AuditMacroLanguageDriftOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 121,
+        "col": 41,
+        "rule": "duplicate-literal",
+        "sev": "WARN",
+        "msg": "Literal 100 is repeated 4 times in this file; extract it into a shared constant.",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 195,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"auditCommentLanguage\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface AuditCommentLanguageOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 250,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 216",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        }
+      }
+    ],
+    "src/core/comments/comment-density-model.ts": [
+      {
+        "line": 153,
+        "rule": "SIM-LONG-001",
+        "sev": "WARN",
+        "msg": "Function \"checkHighValueDocumentationSnippet\" spans 67 lines (limit 60).",
+        "fix": {
+          "action": "split_function",
+          "template": "// Extracted helper:",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 351,
+        "col": 15,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "identifier 'info' lacks domain context",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'info' with a domain-qualified identifier (e."
+        }
+      },
+      {
+        "line": 363,
+        "col": 72,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 100 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 363,
+              "startCol": 72,
+              "endLine": 363,
+              "endCol": 75
+            },
+            "replacementText": "DURATION_100MS"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 363,
+        "col": 79,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 100 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 363,
+              "startCol": 79,
+              "endLine": 363,
+              "endCol": 82
+            },
+            "replacementText": "DURATION_100MS"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 366,
+        "col": 74,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 3 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 366,
+              "startCol": 74,
+              "endLine": 366,
+              "endCol": 75
+            },
+            "replacementText": "CONST_3"
+          },
+          "safeToAutomate": true
+        }
+      }
+    ],
+    "src/core/comments/project-comment-profiler.ts": [
+      {
+        "line": 30,
+        "col": 9,
+        "rule": "NAM-SGL-001",
+        "sev": "WARN",
+        "msg": "Single-letter variable name 'i' hurts code readability.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
+        }
+      },
+      {
+        "line": 50,
+        "col": 9,
+        "rule": "NAM-SGL-001",
+        "sev": "WARN",
+        "msg": "Single-letter variable name 'i' hurts code readability.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
+        }
+      },
+      {
+        "line": 62,
+        "col": 9,
+        "rule": "NAM-SGL-001",
+        "sev": "WARN",
+        "msg": "Single-letter variable name 'i' hurts code readability.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
+        }
+      },
+      {
+        "line": 85,
+        "col": 15,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "identifier 'res' lacks domain context",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'res' with a domain-qualified identifier (e."
+        }
+      },
+      {
+        "line": 89,
+        "col": 15,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "identifier 'res' lacks domain context",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'res' with a domain-qualified identifier (e."
+        }
+      },
+      {
+        "line": 115,
+        "col": 15,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "identifier 'res' lacks domain context",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'res' with a domain-qualified identifier (e."
+        }
+      },
+      {
+        "line": 142,
+        "col": 9,
+        "rule": "NAM-SGL-001",
+        "sev": "WARN",
+        "msg": "Single-letter variable name 'i' hurts code readability.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
+        }
+      },
+      {
+        "line": 195,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 177",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        }
+      },
+      {
+        "line": 205,
+        "col": 62,
+        "rule": "duplicate-literal",
+        "sev": "WARN",
+        "msg": "Literal 3 is repeated 6 times in this file; extract it into a shared constant.",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": true
         }
       }
     ]
   },
-  "truncated": 4126
+  "truncated": 2887
 }
