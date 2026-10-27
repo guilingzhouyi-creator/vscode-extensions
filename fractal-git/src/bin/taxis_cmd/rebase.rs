@@ -169,9 +169,9 @@ impl<'a> ReplaySession<'a> {
     ) -> (ReplayOutcome, Vec<RebaseItem>, Vec<RebaseItem>) {
         let mut done = Vec::new();
         while !queue.is_empty() {
-            let item = queue.remove(0);
-            match self.apply(&item) {
-                StepOutcome::Applied => done.push(item),
+            let rebase_step = queue.remove(0);
+            match self.apply(&rebase_step) {
+                StepOutcome::Applied => done.push(rebase_step),
                 StepOutcome::Stopped {
                     stopped_sha,
                     message,
@@ -179,9 +179,9 @@ impl<'a> ReplaySession<'a> {
                     consumed,
                 } => {
                     if consumed {
-                        done.push(item);
+                        done.push(rebase_step);
                     } else {
-                        queue.insert(0, item);
+                        queue.insert(0, rebase_step);
                     }
                     let outcome = ReplayOutcome::Stopped {
                         stopped_sha,
@@ -430,8 +430,8 @@ pub fn handle_rebase(ctx: &CliContext) {
         .map(|(branch_name, _)| branch_name);
 
     let mut get_node = |oid: &Oid| -> Option<(CorrectedCommitDate, Vec<Oid>)> {
-        let obj = view.object(oid).ok()?;
-        let record = parse_commit_record(*oid, &obj.payload).ok()?;
+        let commit_obj = view.object(oid).ok()?;
+        let record = parse_commit_record(*oid, &commit_obj.payload).ok()?;
         Some((
             CorrectedCommitDate(record.committer_time.max(0) as u64),
             record.parents,

@@ -600,13 +600,13 @@ mod tests {
 
     /// Writes a one-object bundle and returns its on-disk length.
     fn write_synthetic_bundle(bundle_path: &Path, oid: Oid, ref_name: &str) -> u64 {
-        let item = PackDeltaItem::new(
+        let delta_item = PackDeltaItem::new(
             oid,
             ObjectKind::Blob,
             b"Sample blob inside bundle".to_vec(),
             None,
         );
-        let chains = fg_algorithms::pack::find_pack_deltas(vec![item], 10, 50);
+        let chains = fg_algorithms::pack::find_pack_deltas(vec![delta_item], 10, 50);
         let mut bundle_file = File::create(bundle_path).expect("create bundle");
         let references = vec![(oid, ref_name.to_string())];
         BundleEngine::write_bundle(&mut bundle_file, &[], &references, &chains)

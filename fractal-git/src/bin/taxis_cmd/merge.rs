@@ -116,8 +116,8 @@ pub fn handle_merge(ctx: &CliContext) {
     }
 
     let mut get_node = |oid: &Oid| -> Option<(CorrectedCommitDate, Vec<Oid>)> {
-        let obj = view.object(oid).ok()?;
-        let record = parse_commit_record(*oid, &obj.payload).ok()?;
+        let commit_obj = view.object(oid).ok()?;
+        let record = parse_commit_record(*oid, &commit_obj.payload).ok()?;
         Some((
             CorrectedCommitDate(record.committer_time.max(0) as u64),
             record.parents,
