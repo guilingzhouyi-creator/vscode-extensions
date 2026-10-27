@@ -42,6 +42,24 @@ function dispatchSliceExperts(vector: SliceFeatureVector): {
 }
 
 /**
+ * Compute skipped analyzers and activation ratio from active analyzers.
+ *
+ * @param activeAnalyzers - Active analyzer names.
+ * @param allAvailable - All available analyzer names.
+ * @returns Skipped analyzer names and rounded activation ratio.
+ */
+function computeRoutingSummary(
+    activeAnalyzers: string[],
+    allAvailable: readonly string[],
+): { skippedAnalyzers: string[]; activationRatio: number } {
+    const activeSet = new Set(activeAnalyzers);
+    const skippedAnalyzers = allAvailable.filter((analyzerName) => !activeSet.has(analyzerName));
+    const totalCount = allAvailable.length > 0 ? allAvailable.length : TOTAL_BUILTIN_ANALYZERS;
+    const activationRatio = Number((activeAnalyzers.length / totalCount).toFixed(DECIMAL_PLACES));
+    return { skippedAnalyzers, activationRatio };
+}
+
+/**
  * SparseMoEGateRouter implements Conditional Expert Dispatching for AST slices.
  */
 export class SparseMoEGateRouter {
@@ -104,13 +122,9 @@ export class SparseMoEGateRouter {
         const { analyzers, reasons } = dispatchSliceExperts(slice.featureVector);
         const availableSet = new Set(allAvailable);
         const activeAnalyzers = analyzers.filter((analyzerName) => availableSet.has(analyzerName));
-        const activeSet = new Set(activeAnalyzers);
-        const skippedAnalyzers = allAvailable.filter(
-            (analyzerName) => !activeSet.has(analyzerName),
-        );
-        const totalCount = allAvailable.length > 0 ? allAvailable.length : TOTAL_BUILTIN_ANALYZERS;
-        const activationRatio = Number(
-            (activeAnalyzers.length / totalCount).toFixed(DECIMAL_PLACES),
+        const { skippedAnalyzers, activationRatio } = computeRoutingSummary(
+            activeAnalyzers,
+            allAvailable,
         );
 
         return {
@@ -163,12 +177,9 @@ export class SparseMoEGateRouter {
         }
 
         const activeAnalyzers = Array.from(unionActive);
-        const skippedAnalyzers = allAvailable.filter(
-            (analyzerName) => !unionActive.has(analyzerName),
-        );
-        const totalCount = allAvailable.length > 0 ? allAvailable.length : TOTAL_BUILTIN_ANALYZERS;
-        const activationRatio = Number(
-            (activeAnalyzers.length / totalCount).toFixed(DECIMAL_PLACES),
+        const { skippedAnalyzers, activationRatio } = computeRoutingSummary(
+            activeAnalyzers,
+            allAvailable,
         );
 
         return {

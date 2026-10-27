@@ -594,20 +594,25 @@ async function runSelfAuditLane(bail, passed, failed) {
     return;
   }
 
-  const followUpSuites = [
-    { name: 'validate-self-refactor', script: 'scripts/validate-self-refactor.js' },
-    {
-      name: 'validate-self-multidimensional-audit',
-      script: 'scripts/validate-self-multidimensional-audit.js',
-    },
-  ];
-  await Promise.all(
-    followUpSuites.map(async (suite) => {
-      const res = await executeSuite(suite);
-      recordResult(suite, res, passed, failed);
-      return res;
-    }),
-  );
+  // validate-self-multidimensional-audit verifies the fresh baseline against trajectory.
+  // validate-self-refactor simulates post-refactor mutations to active-runs.ndjson.
+  // Sequential execution in this lane prevents state collision.
+  const multiDimSuite = {
+    name: 'validate-self-multidimensional-audit',
+    script: 'scripts/validate-self-multidimensional-audit.js',
+  };
+  const multiDimRes = await executeSuite(multiDimSuite);
+  recordResult(multiDimSuite, multiDimRes, passed, failed);
+  if (!multiDimRes.ok && bail) {
+    return;
+  }
+
+  const refactorSuite = {
+    name: 'validate-self-refactor',
+    script: 'scripts/validate-self-refactor.js',
+  };
+  const refactorRes = await executeSuite(refactorSuite);
+  recordResult(refactorSuite, refactorRes, passed, failed);
 }
 
 async function runFilteredSuites(parallelList, sequentialList, vitestPromise, passed, failed) {
