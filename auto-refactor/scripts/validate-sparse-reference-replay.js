@@ -30,6 +30,9 @@ const {
   REASON_SIGNATURE_MUTATION,
   REASON_CHANGE_SPAN_EXCEEDS_CAP,
   DEFAULT_MAX_COMPOUND_WINDOW_LINES,
+  resolveWindowCap,
+  MIN_ADAPTIVE_WINDOW_CAP,
+  MAX_ADAPTIVE_WINDOW_CAP,
 } = require('../dist/api');
 const { SymbolIndex } = require('../dist/core/intelligence/symbolIndex');
 const { CallGraph } = require('../dist/core/intelligence/callGraph');
@@ -461,6 +464,87 @@ function assertCrossLanguageDeclarationsSupported() {
   console.log('  ✔ cross-language GDScript and Rust anchors supported (P0-4)');
 }
 
+/** Assert adaptive window capacity calibration based on density metrics (P4-1). */
+function assertAdaptiveWindowCapCalibration() {
+  const planner = new SparseReferenceReplayManager();
+
+  // 1. Without density: returns default cap (256)
+  assert.strictEqual(resolveWindowCap(), DEFAULT_MAX_COMPOUND_WINDOW_LINES);
+  assert.strictEqual(planner.resolveWindowCap(), DEFAULT_MAX_COMPOUND_WINDOW_LINES);
+
+  // 2. High effective density (0.90): cap scales down
+  // Expected: round(256 * (0.65 / 0.90)) = round(184.88) = 185
+  const denseCap = resolveWindowCap({ effectiveDensity: 0.9 });
+  assert.strictEqual(denseCap, 185, 'high density scales down cap');
+
+  // 3. Low effective density (0.35): cap scales up
+  // Expected: round(256 * (0.65 / 0.35)) = round(475.42) = 475
+  const sparseCap = resolveWindowCap({ effectiveDensity: 0.35 });
+  assert.strictEqual(sparseCap, 475, 'low density scales up cap');
+
+  // 4. Clamping bounds
+  // Extreme low density (< 0.20): clamped to MAX_ADAPTIVE_WINDOW_CAP (512)
+  const extremeSparseCap = resolveWindowCap({ effectiveDensity: 0.05 });
+  assert.strictEqual(extremeSparseCap, MAX_ADAPTIVE_WINDOW_CAP, 'extreme low density clamped to max');
+
+  // Extreme high density (> 0.95): clamped to MIN_ADAPTIVE_WINDOW_CAP (>= 64)
+  const extremeDenseCap = resolveWindowCap({ effectiveDensity: 1.0 });
+  assert.ok(extremeDenseCap >= MIN_ADAPTIVE_WINDOW_CAP, 'must respect min cap');
+
+  // 5. Integration: compound span acceptance changes with density
+  const lines = ['export function f1(): void {'];
+  for (let i = 0; i < 98; i++) lines.push(`  const x${i} = ${i};`);
+  lines.push('}');
+  lines.push('export function f2(): void {');
+  for (let i = 0; i < 98; i++) lines.push(`  const y${i} = ${i};`);
+  lines.push('}');
+  const content = lines.join('\n');
+  const edited = content.replace('const x0 = 0;', 'const x0 = 999;').replace('const y0 = 0;', 'const y0 = 999;');
+
+  // Under normal default (cap 256), 200 lines is accepted:
+  const winDefault = planner.computeSparseReplayWindow({
+    filePath: 'src/compound.ts',
+    oldContent: content,
+    newContent: edited,
+    changedLines: [2, 102],
+  });
+  assert.strictEqual(winDefault.isBounded, true, '200 lines fits default 256 cap');
+  assert.strictEqual(winDefault.reason, REASON_COMPOUND_ANCHOR_WINDOW);
+
+  // Under high density (effectiveDensity: 0.90, cap 185), 200 lines EXCEEDS cap and degrades to full replay:
+  const winDense = planner.computeSparseReplayWindow({
+    filePath: 'src/compound.ts',
+    oldContent: content,
+    newContent: edited,
+    changedLines: [2, 102],
+    density: { effectiveDensity: 0.9 },
+  });
+  assert.strictEqual(winDense.isBounded, false, '200 lines exceeds 185 cap in dense file');
+  assert.strictEqual(winDense.requiresFullReplay, true);
+
+  // Under low density (effectiveDensity: 0.35, cap 475), an even larger 300-line span is accepted:
+  const bigLines = ['export function g1(): void {'];
+  for (let i = 0; i < 148; i++) bigLines.push(`  const a${i} = ${i};`);
+  bigLines.push('}');
+  bigLines.push('export function g2(): void {');
+  for (let i = 0; i < 148; i++) bigLines.push(`  const b${i} = ${i};`);
+  bigLines.push('}');
+  const bigContent = bigLines.join('\n');
+  const bigEdited = bigContent.replace('const a0 = 0;', 'const a0 = 999;').replace('const b0 = 0;', 'const b0 = 999;');
+
+  const winBigSparse = planner.computeSparseReplayWindow({
+    filePath: 'src/sparse-compound.ts',
+    oldContent: bigContent,
+    newContent: bigEdited,
+    changedLines: [2, 152],
+    density: { effectiveDensity: 0.35 },
+  });
+  assert.strictEqual(winBigSparse.isBounded, true, '300 lines fits low-density 475 cap');
+  assert.strictEqual(winBigSparse.reason, REASON_COMPOUND_ANCHOR_WINDOW);
+
+  console.log('  ✔ adaptive window capacity calibrated from code density metrics (P4-1)');
+}
+
 function main() {
   console.log('=== Sparse Reference Replay Planner Validation ===');
   assertLocalEditStaysBounded();
@@ -476,7 +560,8 @@ function main() {
   assertSignaturePreservesFullDeclaration();
   assertStatementAnchorsIndependentAndCacheIsolated();
   assertCrossLanguageDeclarationsSupported();
-  console.log('=== ALL SPARSE REFERENCE VALIDATION TESTS PASSED (13/13) ===');
+  assertAdaptiveWindowCapCalibration();
+  console.log('=== ALL SPARSE REFERENCE VALIDATION TESTS PASSED (14/14) ===');
 }
 
 main();

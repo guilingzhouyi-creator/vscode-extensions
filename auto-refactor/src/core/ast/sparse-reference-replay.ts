@@ -28,6 +28,7 @@
 import type { AstAnchor, SwaBoundedReplayManager, SwaReplayWindow } from './swa-bounded-replay';
 import type { NormalizedNode } from './multilang';
 import type { Issue } from '../types';
+import type { CodeDensityMetrics } from '../intelligence/code-density-analyzer';
 import {
     REASON_MULTI_ANCHOR_SPAN,
     REASON_SIGNATURE_MUTATION,
@@ -52,6 +53,15 @@ export const DEFAULT_MAX_SPARSE_REFERENCES = 32;
 
 /** Default cap, in lines, for a compound anchor window. */
 export const DEFAULT_MAX_COMPOUND_WINDOW_LINES = 256;
+
+/** Baseline effective code density used to calibrate adaptive window capacity. */
+export const BASELINE_EFFECTIVE_DENSITY = 0.65;
+
+/** Minimum safe bound for density-calibrated window capacity. */
+export const MIN_ADAPTIVE_WINDOW_CAP = 64;
+
+/** Maximum safe bound for density-calibrated window capacity. */
+export const MAX_ADAPTIVE_WINDOW_CAP = 512;
 
 /** Immutable empty reference array reused for every non-bridged window. */
 const EMPTY_REFERENCES: readonly SparseReferenceAnchor[] = Object.freeze([]);
@@ -102,6 +112,37 @@ export interface SparseReplayRequest {
     readonly resolveReferences?: SparseReferenceResolver;
     /** Optional pre-parsed normalized AST root for newContent. */
     readonly rootNode?: NormalizedNode;
+    /** Optional code density metrics to dynamically calibrate window capacity. */
+    readonly density?: CodeDensityMetrics;
+}
+
+/**
+ * Calibrate an adaptive window line capacity based on code density metrics.
+ *
+ * When code density is high (dense logic, few comments/blanks), physical lines carry higher
+ * cognitive and semantic payload, so the window cap scales down toward MIN_ADAPTIVE_WINDOW_CAP.
+ * When density is low (well-documented, spaced formatting, template/data), physical lines are
+ * sparser and the window comfortably expands toward MAX_ADAPTIVE_WINDOW_CAP without exceeding
+ * token and analyzer complexity budgets.
+ *
+ * @param density - Code density metrics, or undefined to use defaultCap directly.
+ * @param defaultCap - Fallback capacity in lines (defaults to DEFAULT_MAX_COMPOUND_WINDOW_LINES).
+ * @returns Calibrated window cap clamped between MIN_ADAPTIVE_WINDOW_CAP and
+ *   MAX_ADAPTIVE_WINDOW_CAP.
+ */
+export function resolveWindowCap(
+    density?: CodeDensityMetrics,
+    defaultCap: number = DEFAULT_MAX_COMPOUND_WINDOW_LINES,
+): number {
+    if (!density || typeof density.effectiveDensity !== 'number' || Number.isNaN(density.effectiveDensity)) {
+        return defaultCap;
+    }
+    const clampedDensity = Math.max(0.2, Math.min(0.95, density.effectiveDensity));
+    const scalingFactor = BASELINE_EFFECTIVE_DENSITY / clampedDensity;
+    const minCap = Math.min(defaultCap, MIN_ADAPTIVE_WINDOW_CAP);
+    const maxCap = Math.max(defaultCap, MAX_ADAPTIVE_WINDOW_CAP);
+    const computed = Math.round(defaultCap * scalingFactor);
+    return Math.max(minCap, Math.min(computed, maxCap));
 }
 
 /** Tuning knobs for the sparse reference planner. */
@@ -201,6 +242,17 @@ export class SparseReferenceReplayManager {
         return this.swa.pruneIssuesOutsideWindow(issues, window);
     }
 
+    /**
+     * Resolve an adaptive window cap based on density metrics and the manager's compound cap.
+     *
+     * @param density - Optional code density metrics.
+     * @param defaultCap - Optional fallback cap overriding this manager's compound window cap.
+     * @returns Calibrated window cap.
+     */
+    public resolveWindowCap(density?: CodeDensityMetrics, defaultCap?: number): number {
+        return resolveWindowCap(density, defaultCap ?? this.maxCompoundWindowLines);
+    }
+
     /** Wrap a base window with an empty reference set and no bridging flag. */
     private asPlainWindow(base: SwaReplayWindow): SparseReplayWindow {
         return { ...base, sparseReferences: EMPTY_REFERENCES, isSparseBridged: false };
@@ -230,7 +282,8 @@ export class SparseReferenceReplayManager {
         const spanStart = selection.anchors[0].startLine;
         const spanEnd = selection.anchors[selection.anchors.length - 1].endLine;
         const spanLines = spanEnd - spanStart + 1;
-        if (spanLines > this.maxCompoundWindowLines) return this.asPlainWindow(base);
+        const effectiveCap = this.resolveWindowCap(request.density);
+        if (spanLines > effectiveCap) return this.asPlainWindow(base);
 
         return {
             startLine: spanStart,
@@ -259,12 +312,13 @@ export class SparseReferenceReplayManager {
         if (!anchor || !request.resolveReferences) return this.asPlainWindow(base);
 
         const anchorSpan = anchor.endLine - anchor.startLine + 1;
+        const effectiveCap = this.resolveWindowCap(request.density);
         let startLine = anchor.startLine;
         let endLine = anchor.endLine;
 
-        if (anchorSpan > this.maxCompoundWindowLines) {
-            // Anchor itself exceeds compound window budget: apply P0-1 centered shift around signature
-            const targetSpan = this.maxCompoundWindowLines;
+        if (anchorSpan > effectiveCap) {
+            // Anchor itself exceeds compound window budget: apply centered shift around signature
+            const targetSpan = effectiveCap;
             const sigLine = request.changedLines ? request.changedLines[0] : anchor.startLine;
             const idealStart = sigLine - Math.floor(targetSpan / 2);
             startLine = Math.max(

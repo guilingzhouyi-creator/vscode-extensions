@@ -2,7 +2,7 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-27T15:29:34.709Z",
+  "timestamp": "2026-10-27T15:42:10.312Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
@@ -21,10 +21,10 @@
     },
     "counts": {
       "files": 776,
-      "total": 3996,
+      "total": 3998,
       "errors": 0,
       "warns": 3448,
-      "info": 548,
+      "info": 550,
       "suppressed": 154
     }
   },
@@ -35,10 +35,10 @@
     "codeSecurity": 99.79,
     "performanceEfficiency": 99.57,
     "standardization": 83.98,
-    "modernity": 98.37,
+    "modernity": 98.35,
     "maintainability": 93.31,
     "commentQuality": 99.82,
-    "duplication": 94.94,
+    "duplication": 94.95,
     "techDebtRisk": 100
   },
   "bottlenecks": [
@@ -6455,7 +6455,7 @@
     ],
     "src/core/ast/sparse-reference-replay.ts": [
       {
-        "line": 200,
+        "line": 241,
         "col": 12,
         "rule": "HYG-WRAP-001",
         "sev": "WARN",
@@ -6466,7 +6466,7 @@
         }
       },
       {
-        "line": 216,
+        "line": 268,
         "col": 13,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -6478,7 +6478,7 @@
         }
       },
       {
-        "line": 254,
+        "line": 307,
         "col": 13,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -6487,38 +6487,6 @@
           "action": "replace_token",
           "template": "sparseReplayWindow",
           "safeToAutomate": false
-        }
-      },
-      {
-        "line": 266,
-        "rule": "CMT-WID-001",
-        "sev": "WARN",
-        "msg": "Comment/docstring line exceeds 100 columns (found 103)",
-        "fix": {
-          "action": "refactor",
-          "template": "Wrap the comment at word boundaries; long directives keep their exemption"
-        }
-      },
-      {
-        "line": 266,
-        "col": 68,
-        "rule": "GOV-SAN-001",
-        "sev": "WARN",
-        "msg": "Comment contains temporary batch jargon / WIP marker `P0`. Replace with canonical architectural description.",
-        "fix": {
-          "action": "refactor",
-          "template": "Remove temporary phase/task tags and use standard domain terminology."
-        },
-        "verify": "node scripts/validate-governance-exemptions.js"
-      },
-      {
-        "line": 266,
-        "rule": "HYG-STB-002",
-        "sev": "WARN",
-        "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'P0'",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
         }
       }
     ],
@@ -7862,6 +7830,39 @@
         "fix": {
           "action": "refactor",
           "template": "Use fs/promises or the host async fs API (e.g. vscode.workspace.fs)."
+        }
+      },
+      {
+        "line": 59,
+        "col": 12,
+        "rule": "GOV-PRF-004",
+        "sev": "WARN",
+        "msg": "Synchronous fs call blocks the host event loop (UI jank / request stall source).",
+        "fix": {
+          "action": "refactor",
+          "template": "Use fs/promises or the host async fs API (e.g. vscode.workspace.fs)."
+        }
+      },
+      {
+        "line": 88,
+        "col": 11,
+        "rule": "NAM-JRG-002",
+        "sev": "WARN",
+        "msg": "Symbol or test identifier 'tmpPath' contains transient construction jargon or milestone marker.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace transient process markers with semantic domain naming."
+        }
+      },
+      {
+        "line": 105,
+        "col": 11,
+        "rule": "NAM-JRG-002",
+        "sev": "WARN",
+        "msg": "Symbol or test identifier 'tmpPath' contains transient construction jargon or milestone marker.",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace transient process markers with semantic domain naming."
         }
       }
     ]
