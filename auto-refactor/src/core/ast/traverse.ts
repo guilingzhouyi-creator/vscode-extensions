@@ -743,9 +743,8 @@ export function getPolicyFromAnalyzers(names: string[]): ProjectionPolicy {
     const needPositions = needComplexity || needLiterals;
     // `needSymbols` is scan-wide: the cross-file symbol index consumes declaration names/
     // positions and call names on every scan, independently of which analyzers are enabled.
-    // B2b STILL OPEN: the projector's placeholder gate (typescriptAdapter `project`) drops
-    // call nodes before this policy is consulted, so the lazy fast path currently yields an
-    // empty index and reports builtFrom='projection' instead of faking completeness.
+    // Call expressions are preserved across the lazy fast path so projection feeds the
+    // repository-intelligence symbol index and call-graph edges with high fidelity.
     return { needComplexity, needLiterals, needNames, needPositions, needSymbols: true };
 }
 

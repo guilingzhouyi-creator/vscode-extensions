@@ -193,6 +193,31 @@ async function main() {
       fs.rmSync(projectionRoot, { recursive: true, force: true });
     }
 
+    // ── 3c. B2b lock: Top-level call sites outside functions must be collected in projection mode ──
+    const topLevelCallRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-symbols-toplevel-'));
+    try {
+      const TOPLEVEL_FILES = {
+        'src/helper.ts': 'export function bootstrap(): void {}\n',
+        'src/index.ts': "import { bootstrap } from './helper';\nbootstrap();\n",
+      };
+      const report = await scanFixture(topLevelCallRoot, TOPLEVEL_FILES, {
+        configOverride: { include: ['**/*.ts'], analyzers: {} },
+      });
+      const idx = report.summary.symbolIndex;
+      assert.strictEqual(idx.builtFrom, 'projection');
+      assert.ok(
+        idx.references >= 1,
+        `top-level bootstrap() call must be collected in projection mode, got ${idx.references}`,
+      );
+      assert.ok(
+        idx.crossFileReferences >= 1,
+        `top-level call must resolve cross-file reference, got ${idx.crossFileReferences}`,
+      );
+      console.log('  ✔ projection path collects top-level call references (B2b lock)');
+    } finally {
+      fs.rmSync(topLevelCallRoot, { recursive: true, force: true });
+    }
+
     const oxcReport = await scanFixture(tsRoot, TS_FILES, { parser: 'oxc' });
     const oxcSource = oxcReport.summary.symbolIndex.builtFrom;
     assert.ok(

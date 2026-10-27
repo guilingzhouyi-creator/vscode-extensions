@@ -101,7 +101,9 @@ function computeKindSpecialFlag(
         CONTROL_OR_BLOCK.has(kindNum) ||
         kindNum === ts.SyntaxKind.FunctionKeyword ||
         BINDING_SOURCE_KINDS.has(kindNum) ||
-        TOP_LEVEL_DECL_KINDS.has(kindNum)
+        TOP_LEVEL_DECL_KINDS.has(kindNum) ||
+        kindNum === ts.SyntaxKind.CallExpression ||
+        kindNum === ts.SyntaxKind.NewExpression
     );
 }
 
@@ -277,6 +279,7 @@ export class TsNodeProjector implements NodeProjector {
         if (!kindMeta.special) return true;
         if (isLiteral && !this.policy.needLiterals) return true;
         if (isFuncKw && !this.policy.needComplexity) return true;
+        if (kindMeta.kind === NodeKind.Call && !this.policy.needSymbols) return true;
         if (
             astNode.kind === ts.SyntaxKind.BinaryExpression &&
             (astNode as ts.BinaryExpression).operatorToken.kind !== ts.SyntaxKind.EqualsToken
@@ -389,6 +392,7 @@ export class TsNodeProjector implements NodeProjector {
             start: pos.start,
             end: pos.end,
             name: this.resolveProjectedName(astNode, isCall, wantsSymbols, declaration),
+            calleeReceiver: isCall ? (calleeReceiverOf(astNode, this.sf) ?? undefined) : undefined,
             functionLike: fnLike,
             isClassDefining,
             introducesBinding: isBinding,
