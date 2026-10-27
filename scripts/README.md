@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**91 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**92 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -22,7 +22,7 @@
 | `common/` | Node.js | `validate-hardcoded-counts.js` | gate / counts（面向操作者的输出语句不得写死规模计数，须由实测数据插值渲染；内置反向探针自检，探针失效即自身阻断） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-block-chains.js` | gate / chains（PowerShell 块链分支合法性：`else`/`elseif`/`catch`/`finally` 必须挂在可接受它的块之后；重复的 `else` 解析器零报错，只在运行时于该行失败） | `pre-push-gate`、CI |
 | `common/` | Node.js | `test-gate-guards.js` | validate / guards（负向自证：逐项证明顺序、词表、同构守卫确实能检出各自缺陷类别） | `pre-push-gate`、CI |
-| `common/` | Node.js | `validate-script-isomorphism.js` | audit / isomorphism（<!-- METRICS:BEGIN iso-pairs -->**28 对跨平台同构脚本**<!-- METRICS:END iso-pairs -->结构对应性、逐行换行一致性、`set -e`/pipefail 与 PowerShell 原生命令开关守卫；WebGames 按已文档化策略豁免 errexit） | `audit-all`、CI |
+| `common/` | Node.js | `validate-script-isomorphism.js` | audit / isomorphism（<!-- METRICS:BEGIN iso-pairs -->**29 对跨平台同构脚本**<!-- METRICS:END iso-pairs -->结构对应性、逐行换行一致性、`set -e`/pipefail 与 PowerShell 原生命令开关守卫；WebGames 按已文档化策略豁免 errexit） | `audit-all`、CI |
 | `common/` | Node.js | `validate-shell-parity.js` | audit / parity（Linux 命令面守卫：断言 AGENTS.md 承诺的每个命令都真实可绑定、兼容层同时具备 GNU 与 PowerShell 降级两条路径，并回报当前宿主解析出的模式 `gnu` / `native`） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-skills.js` | audit / skills（全工作区研发技能规范、死链与镜像等价性守卫） | `pre-commit-gate`、`audit-all` |
 | `common/` | Node.js | `sync-skills.js` | tooling / skills（根目录技能集与 workspace-governance 插件双向同步工具） | 本地 CLI |

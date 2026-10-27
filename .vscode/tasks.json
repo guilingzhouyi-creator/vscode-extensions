@@ -23,6 +23,21 @@
             "path": "workspace-timing",
             "problemMatcher": "$tsc",
             "group": "build"
+        },
+        {
+            "label": "staggered-push: daemon",
+            "type": "shell",
+            "command": "node scripts/common/staggered-push-daemon.js",
+            "isBackground": true,
+            "problemMatcher": [],
+            "runOptions": {
+                "runOn": "folderOpen"
+            },
+            "presentation": {
+                "reveal": "never",
+                "panel": "shared",
+                "close": true
+            }
         }
     ]
 }

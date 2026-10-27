@@ -97,6 +97,15 @@ const PROJECT_HEADING = /^\[(?:Project(?:\s*\/\s*(?:项目|项目归属))?|项�
  */
 function controlledProjects() {
   try {
+    const resolver = require('./project-registry-resolver');
+    const dynamicNames = resolver.getControlledProjectNames();
+    if (dynamicNames && dynamicNames.length > 0) {
+      return dynamicNames;
+    }
+  } catch {
+    // Fall back to dictionary if resolver fails
+  }
+  try {
     const dictionary = JSON.parse(require('fs').readFileSync(TERMS_FILE, 'utf8'));
     const rule = (dictionary.rules || []).find((r) => r.id === 'CMG-PRJ-001');
     const declared = rule && Array.isArray(rule.controlledProjects) ? rule.controlledProjects : [];
@@ -198,24 +207,13 @@ function collectProjects(body) {
 }
 
 /**
- * Runs the seven structural checks.
+ * Checks the header line shape, trailing period, and the blank separator.
  *
- * @param {string} content - Raw commit message.
- * @param {{ projects?: string[] }} [options] - Overrides for testing.
- * @returns {Array<{step: string, ruleId: string, message: string, detail: string, line?: number, token?: string}>} Findings.
+ * @param {{lines: string[], header: string}} parsed - Parsed message parts.
+ * @param add - Finding sink.
  */
-function verifyStructure(content, options = {}) {
-  const { lines, header, body, type } = parseMessage(content);
-  const findings = [];
-  const add = (step, ruleId, message, detail, extra) =>
-    findings.push({ step, ruleId, message, detail, ...(extra || {}) });
-
-  if (header === '') {
-    add(STEP.header, 'GUARD-MSG-001', '提交标题为空', 'header is empty');
-    return findings;
-  }
-
-  // 1. Header shape.
+function checkHeaderShape(parsed, add) {
+  const { lines, header } = parsed;
   if (!HEADER.test(header)) {
     add(
       STEP.header,
@@ -224,19 +222,22 @@ function verifyStructure(content, options = {}) {
       `expected <type>(<scope>): <summary>, ${HEADER_MIN}~${HEADER_MAX} characters, type in ${ALL_TYPES.join('/')}`,
     );
   }
-  // 2. No trailing period.
   if (TRAILING_PERIOD.test(header)) {
     add(STEP.header, 'GUARD-MSG-001', `提交标题末尾包含句号: ${header}`, 'remove the trailing period');
   }
-  // 3. Blank second line.
   if (lines.length > 1 && (lines[1] || '').trim() !== '') {
     add(STEP.split, 'GUARD-MSG-001', '标题与正文之间缺少空行', 'line 2 must be blank');
   }
+}
 
-  const isCritical = CRITICAL_TYPES.includes(type);
-  if (!isCritical) return findings;
-
-  // 4. Body density.
+/**
+ * Checks body density and the presence of the required sections.
+ *
+ * @param {{lines: string[], body: string, type: string}} parsed - Parsed message parts.
+ * @param add - Finding sink.
+ */
+function checkBodySections(parsed, add) {
+  const { lines, body, type } = parsed;
   const substantive = countSubstantive(lines.slice(2));
   if (substantive < MIN_BODY_SUBSTANTIVE) {
     add(
@@ -246,7 +247,6 @@ function verifyStructure(content, options = {}) {
       'add technical facts under [Why], [Changed] and [Verification]',
     );
   }
-  // 5. Required sections.
   const missing = [];
   if (!SECTION.why.test(body)) missing.push('[Why]');
   if (!SECTION.change.test(body)) missing.push('[Changed/Added/Fixed]');
@@ -257,7 +257,16 @@ function verifyStructure(content, options = {}) {
   if (type === 'fix' && !SECTION.fixed.test(body)) {
     add(STEP.sections, 'GUARD-MSG-001', 'fix 提交缺少 [Fixed] 区块', 'state the defect and its root cause');
   }
-  // 6. Project scope.
+}
+
+/**
+ * Checks declared project ownership against the controlled set and leases.
+ *
+ * @param {string} body - Message body.
+ * @param {{ projects?: string[] }} options - Overrides for testing.
+ * @param add - Finding sink.
+ */
+function checkProjectScope(body, options, add) {
   const declared = collectProjects(body);
   if (declared.length === 0) {
     add(
@@ -266,32 +275,83 @@ function verifyStructure(content, options = {}) {
       '缺少项目归属区块或未声明任何项目',
       'declare [Project / 项目归属] with at least one controlled project',
     );
-  } else {
-    const legal = new Set(options.projects || controlledProjects());
-    const invalid = declared.filter((p) => !legal.has(p.toLowerCase()));
-    if (invalid.length > 0) {
-      add(
-        STEP.project,
-        'CMG-PRJ-001',
-        `项目归属包含未授权标识: ${invalid.join(', ')}`,
-        `allowed: ${[...legal].join(', ')}`,
-      );
-    }
+    return;
   }
-  // 7. Batch codenames. The line number is reported so a caller that prints it does not have to
-  // re-scan with a second copy of the pattern — that copy is how the two vocabularies drifted.
+
+  const legal = new Set(options.projects || controlledProjects());
+  const invalid = declared.filter((p) => !legal.has(p.toLowerCase()));
+  if (invalid.length > 0) {
+    add(
+      STEP.project,
+      'CMG-PRJ-001',
+      `项目归属包含未授权标识: ${invalid.join(', ')}`,
+      `allowed: ${[...legal].join(', ')}`,
+    );
+  }
+  try {
+    const resolver = require('./project-registry-resolver');
+    for (const p of declared) {
+      if (resolver.getProjectStatus(p) === 'Frozen') {
+        add(
+          STEP.project,
+          'CMG-PRJ-001',
+          `项目 '${p}' TTL 租约已过期，提交权限已被拒绝 (Commit Lockdown)`,
+          `run 'taxis project renew ${p}' to unfreeze commit privileges`,
+        );
+      }
+    }
+  } catch {
+    // Ignore if resolver is unavailable
+  }
+}
+
+/**
+ * Checks the body for sprint codenames.
+ *
+ * @param {string} body - Message body.
+ * @param add - Finding sink.
+ */
+function checkBatchCodenames(body, add) {
+  // The line number is reported so a caller that prints it does not have to
+  // re-scan with a second copy of the pattern — that copy is how the two
+  // vocabularies drifted.
   const batchLines = [];
   body.split(/\r?\n/).forEach((line, index) => {
     const hit = BATCH_CODE.exec(line);
     if (hit) batchLines.push({ line: index + 3, token: hit[0] });
   });
-  if (batchLines.length > 0) {
-    const first = batchLines[0];
-    add(STEP.batch, 'CMG-STY-001', `正文包含批次代号: ${first.token}`, 'describe the technical fact instead', {
-      line: first.line,
-      token: first.token,
-    });
+  if (batchLines.length === 0) return;
+  const first = batchLines[0];
+  add(STEP.batch, 'CMG-STY-001', `正文包含批次代号: ${first.token}`, 'describe the technical fact instead', {
+    line: first.line,
+    token: first.token,
+  });
+}
+
+/**
+ * Runs the seven structural checks.
+ *
+ * @param {string} content - Raw commit message.
+ * @param {{ projects?: string[] }} [options] - Overrides for testing.
+ * @returns {Array<{step: string, ruleId: string, message: string, detail: string, line?: number, token?: string}>} Findings.
+ */
+function verifyStructure(content, options = {}) {
+  const parsed = parseMessage(content);
+  const findings = [];
+  const add = (step, ruleId, message, detail, extra) =>
+    findings.push({ step, ruleId, message, detail, ...(extra || {}) });
+
+  if (parsed.header === '') {
+    add(STEP.header, 'GUARD-MSG-001', '提交标题为空', 'header is empty');
+    return findings;
   }
+
+  checkHeaderShape(parsed, add);
+  if (!CRITICAL_TYPES.includes(parsed.type)) return findings;
+
+  checkBodySections(parsed, add);
+  checkProjectScope(parsed.body, options, add);
+  checkBatchCodenames(parsed.body, add);
   return findings;
 }
 

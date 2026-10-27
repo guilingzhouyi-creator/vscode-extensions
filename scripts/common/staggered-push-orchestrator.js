@@ -2,17 +2,18 @@
  * Module: Staggered Push Orchestrator
  * File Path: scripts/common/staggered-push-orchestrator.js
  * Architecture Role: Core orchestration engine for staggered, rate-limited Git pushing from local
- *   backlog to remote default branch, advancing the remote pointer along historical commits.
+ *   backlog to remote default branch, advancing the remote pointer along verified historical checkpoints.
  * Dependencies & Triggers: Consumed by scripts/ps1/run-daily-staggered-push.ps1 and scheduled
- *   automation runners; invokes git CLI (fetch, rev-list, log, push).
+ *   automation runners; invokes git CLI (fetch, rev-list, log, push) and gate validators.
  * Responsibilities:
  *   1. Calculate the unpushed commit backlog between origin/<branch> and local <branch>;
  *   2. Enforce daily idempotence using .audit-logs/staggered-push-history.ndjson;
  *   3. Randomly sample N in [3, 6] commits (or clamp to remaining);
- *   4. Advance remote ref via fast-forward: git push origin <targetSha>:refs/heads/<branch>;
- *   5. Record structured audit receipts with commit summaries and residual counts.
+ *   4. Preflight-audit candidate checkpoints to ensure pushed commits satisfy commit governance;
+ *   5. Advance remote ref via fast-forward: git push origin <targetSha>:refs/heads/<branch>;
+ *   6. Record structured audit receipts with commit summaries and residual counts.
  * Exit Semantics & Design Rationale: Pure Node.js engine with clear JSON output contracts;
- *   supports --dry-run, --count, --force, and --json for safe inspection and orchestration.
+ *   supports --dry-run, --count, --force, --preflight, --allow-bypass, and --json for safe inspection.
  *
  * @module staggered-push-orchestrator
  */
@@ -141,14 +142,134 @@ function getUnpushedCommits(remote, branch) {
 }
 
 /**
+ * Validates commit messages across the candidate push range.
+ *
+ * @param {string} range - Commit range string (e.g. 'origin/main..HEAD').
+ * @returns {{ passed: boolean, message: string }} Verification verdict.
+ */
+function auditCommitRange(range) {
+  const validatorJs = path.join(__dirname, 'validate-commit-msg.js');
+  if (!fs.existsSync(validatorJs)) {
+    return { passed: true, message: 'Commit validator script omitted' };
+  }
+  try {
+    execFileSync(process.execPath, [validatorJs, '--range', range], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return { passed: true, message: 'Commit message governance checks passed' };
+  } catch (err) {
+    const detail = (err.stdout || err.stderr || err.message || '').trim();
+    return { passed: false, message: `Commit message governance failure: ${detail}` };
+  }
+}
+
+/**
+ * Audits documentation consistency and scale figures across the workspace.
+ *
+ * @returns {{ passed: boolean, message: string }} Verification verdict.
+ */
+function auditDocumentationConsistency() {
+  const docValidatorJs = path.join(__dirname, 'validate-docs-consistency.js');
+  if (!fs.existsSync(docValidatorJs)) {
+    return { passed: true, message: 'Doc consistency validator script omitted' };
+  }
+  try {
+    execFileSync(process.execPath, [docValidatorJs], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return { passed: true, message: 'Documentation consistency checks passed' };
+  } catch (err) {
+    const detail = (err.stderr || err.stdout || err.message || '').trim();
+    return { passed: false, message: `Documentation consistency failure: ${detail}` };
+  }
+}
+
+/**
+ * Executes a targeted slice verification on the Tier 1.5 remote sandbox machine.
+ *
+ * @param {string} sliceName - Targeted slice name.
+ * @returns {{ passed: boolean, message: string }} Verification verdict.
+ */
+function auditRemoteSandboxSlice(sliceName) {
+  const sandboxGateJs = path.join(__dirname, 'remote-sandbox-gate.js');
+  if (!fs.existsSync(sandboxGateJs)) {
+    return { passed: true, message: 'Remote sandbox validator script omitted' };
+  }
+  try {
+    execFileSync(process.execPath, [sandboxGateJs, '--slice', sliceName, '--remote'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return { passed: true, message: `Tier 1.5 remote sandbox slice '${sliceName}' passed` };
+  } catch (err) {
+    const detail = (err.stderr || err.stdout || err.message || '').trim();
+    return { passed: false, message: `Tier 1.5 remote sandbox slice '${sliceName}' failure: ${detail}` };
+  }
+}
+
+/**
+ * Performs preflight verification on the candidate target commit.
+ *
+ * @param {string} remote - Git remote name.
+ * @param {string} branch - Target branch name.
+ * @param {string} targetSha - Target commit SHA.
+ * @param {string|null} [verifyRemoteSlice=null] - Optional remote sandbox slice to audit.
+ * @returns {{ passed: boolean, reason?: string }} Verification verdict.
+ */
+function preflightCheckpointAudit(remote, branch, targetSha, verifyRemoteSlice = null) {
+  const range = `${remote}/${branch}..${targetSha}`;
+  const commitVerdict = auditCommitRange(range);
+  if (!commitVerdict.passed) {
+    return { passed: false, reason: commitVerdict.message };
+  }
+
+  const docVerdict = auditDocumentationConsistency();
+  if (!docVerdict.passed) {
+    return { passed: false, reason: docVerdict.message };
+  }
+
+  if (verifyRemoteSlice) {
+    const remoteVerdict = auditRemoteSandboxSlice(verifyRemoteSlice);
+    if (!remoteVerdict.passed) {
+      return { passed: false, reason: remoteVerdict.message };
+    }
+  }
+
+  return { passed: true };
+}
+
+/**
+ * Resolves the batch count N within bounds, defaulting to random [3, 6].
+ *
+ * @param {number} explicitCount - User-specified commit count.
+ * @param {number} totalBacklog - Total available backlog count.
+ * @returns {number} Clamped batch count.
+ */
+function resolveBatchCount(explicitCount, totalBacklog) {
+  let target = explicitCount;
+  if (!target || target <= 0) {
+    target = Math.floor(Math.random() * BATCH_RANDOM_SPAN) + MIN_BATCH_COMMITS;
+  }
+  return Math.min(target, totalBacklog);
+}
+
+/**
  * Orchestrates a single staggered push calculation or execution.
  *
  * @param {object} options - Options object.
  * @param {boolean} [options.dryRun=false] - If true, simulate without pushing.
  * @param {number} [options.count=0] - Explicit count override, 0 for random 3-6.
  * @param {boolean} [options.force=false] - Ignore today's idempotency check.
+ * @param {boolean} [options.preflight=false] - If true, execute preflight check without pushing.
+ * @param {boolean} [options.allowBypass=false] - If true, forward allow-bypass flag to git pre-push.
  * @param {string} [options.remote=DEFAULT_REMOTE] - Git remote name.
  * @param {string} [options.branch=DEFAULT_BRANCH] - Target branch name.
+ * @param {string|null} [options.verifyRemoteSlice=null] - Optional Tier 1.5 remote sandbox slice to audit.
  * @returns {object} Execution summary.
  */
 function executeStaggeredPush(options = {}) {
@@ -156,14 +277,17 @@ function executeStaggeredPush(options = {}) {
     dryRun = false,
     count = 0,
     force = false,
+    preflight = false,
+    allowBypass = false,
     remote = DEFAULT_REMOTE,
     branch = DEFAULT_BRANCH,
+    verifyRemoteSlice = null,
   } = options;
 
   const todayStr = getLocalDateString();
 
   // 1. Check idempotency
-  if (!force && hasPushedToday(todayStr)) {
+  if (!force && !preflight && !dryRun && hasPushedToday(todayStr)) {
     return {
       status: 'SKIP',
       date: todayStr,
@@ -203,15 +327,23 @@ function executeStaggeredPush(options = {}) {
   }
 
   // 4. Determine batch count N
-  let targetCount = count;
-  if (!targetCount || targetCount <= 0) {
-    targetCount = Math.floor(Math.random() * BATCH_RANDOM_SPAN) + MIN_BATCH_COMMITS;
-  }
-  const actualCount = Math.min(targetCount, totalBacklog);
+  const actualCount = resolveBatchCount(count, totalBacklog);
   const targetSha = unpushedCommits[actualCount - 1];
   const startSha = unpushedCommits[0];
 
-  // 5. Collect commit summaries
+  // 5. Preflight check on candidate target commit
+  const preflightVerdict = preflightCheckpointAudit(remote, branch, targetSha, verifyRemoteSlice);
+  if (!preflightVerdict.passed) {
+    return {
+      status: 'BLOCK',
+      summary: `Preflight checkpoint validation failed for candidate ${targetSha.substring(0, SHA_SHORT_LEN)}: ${preflightVerdict.reason}`,
+      action: 'BLOCKED',
+      targetSha,
+      pushedCount: actualCount,
+    };
+  }
+
+  // 6. Collect commit summaries
   const selectedShas = unpushedCommits.slice(0, actualCount);
   const commitSummaries = selectedShas.map((sha) => {
     try {
@@ -226,7 +358,7 @@ function executeStaggeredPush(options = {}) {
 
   const result = {
     date: todayStr,
-    action: dryRun ? 'DRY_RUN' : 'PUSH',
+    action: preflight ? 'PREFLIGHT' : dryRun ? 'DRY_RUN' : 'PUSH',
     pushedCount: actualCount,
     startSha,
     targetSha,
@@ -234,6 +366,14 @@ function executeStaggeredPush(options = {}) {
     remainingAfter,
     commits: commitSummaries,
   };
+
+  if (preflight) {
+    return {
+      status: 'PASS',
+      summary: `[Preflight] Candidate checkpoint ${targetSha.substring(0, SHA_SHORT_LEN)} passed pre-push validation (${actualCount} commits).`,
+      ...result,
+    };
+  }
 
   if (dryRun) {
     return {
@@ -243,11 +383,14 @@ function executeStaggeredPush(options = {}) {
     };
   }
 
-  // 6. Execute push with GATE_ALLOW_BYPASS=1
+  // 7. Execute push safely (Allow bypass only if explicitly requested)
+  const pushEnv = {};
+  if (allowBypass) {
+    pushEnv.GATE_ALLOW_BYPASS = '1';
+  }
+
   try {
-    git([GIT_CMD_PUSH, remote, `${targetSha}:refs/heads/${branch}`], {
-      GATE_ALLOW_BYPASS: '1',
-    });
+    git([GIT_CMD_PUSH, remote, `${targetSha}:refs/heads/${branch}`], pushEnv);
   } catch (err) {
     return {
       status: 'BLOCK',
@@ -257,7 +400,7 @@ function executeStaggeredPush(options = {}) {
     };
   }
 
-  // 7. Record to audit log
+  // 8. Record to audit log
   const auditRecord = {
     timestamp: new Date().toISOString(),
     ...result,
@@ -276,6 +419,8 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run') || args.includes('-n');
   const force = args.includes('--force') || args.includes('-f');
+  const preflight = args.includes('--preflight') || args.includes('-p');
+  const allowBypass = args.includes('--allow-bypass');
   const jsonOutput = args.includes('--json');
 
   let count = 0;
@@ -284,7 +429,39 @@ if (require.main === module) {
     count = parseInt(args[countIdx + 1], 10) || 0;
   }
 
-  const outcome = executeStaggeredPush({ dryRun, count, force });
+  let branch = DEFAULT_BRANCH;
+  const branchIdx = args.findIndex((a) => a === '--branch' || a === '-b');
+  if (branchIdx !== -1 && args[branchIdx + 1]) {
+    branch = args[branchIdx + 1];
+  }
+
+  let remote = DEFAULT_REMOTE;
+  const remoteIdx = args.findIndex((a) => a === '--remote' || a === '-r');
+  if (remoteIdx !== -1 && args[remoteIdx + 1]) {
+    remote = args[remoteIdx + 1];
+  }
+
+  let verifyRemoteSlice = null;
+  const vrsIdx = args.findIndex((a) => a === '--verify-remote' || a === '--remote-slice');
+  if (vrsIdx !== -1) {
+    const nextArg = args[vrsIdx + 1];
+    if (nextArg && !nextArg.startsWith('-')) {
+      verifyRemoteSlice = nextArg;
+    } else {
+      verifyRemoteSlice = 'hygiene';
+    }
+  }
+
+  const outcome = executeStaggeredPush({
+    dryRun,
+    count,
+    force,
+    preflight,
+    allowBypass,
+    branch,
+    remote,
+    verifyRemoteSlice,
+  });
 
   if (jsonOutput) {
     process.stdout.write(JSON.stringify(outcome, null, 2) + '\n');
@@ -315,5 +492,6 @@ module.exports = {
   executeStaggeredPush,
   hasPushedToday,
   getLocalDateString,
+  preflightCheckpointAudit,
   AUDIT_LOG_FILE,
 };

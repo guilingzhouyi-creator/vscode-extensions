@@ -800,7 +800,18 @@ function scanCounts(file, violations, detectors) {
  */
 function resolvesScriptReference(ref) {
   if (fs.existsSync(path.join(REPO_ROOT, ref))) return true;
-  return PROJECT_SCRIPT_ROOTS.some((owner) => fs.existsSync(path.join(REPO_ROOT, owner, ref)));
+  if (PROJECT_SCRIPT_ROOTS.some((owner) => fs.existsSync(path.join(REPO_ROOT, owner, ref)))) {
+    return true;
+  }
+  // Source fallback for compiled scripts (e.g., scripts/dist/review/run-review.js -> scripts/review/run-review.ts)
+  if (ref.includes('dist/')) {
+    const srcRef = ref.replace(/([/\\])dist[/\\]/, '$1').replace(/\.js$/, '.ts');
+    if (fs.existsSync(path.join(REPO_ROOT, srcRef))) return true;
+    if (PROJECT_SCRIPT_ROOTS.some((owner) => fs.existsSync(path.join(REPO_ROOT, owner, srcRef)))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -950,4 +961,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = Object.freeze({ runAudit, buildClaimDetectors, scanTextForClaims });
+module.exports = Object.freeze({ runAudit, buildClaimDetectors, scanTextForClaims, resolvesScriptReference });

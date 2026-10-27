@@ -1006,6 +1006,128 @@ function parseRunArgs(args) {
   return { isAgentMode, range, explicitFiles, useIndex: explicitFiles.length === 0 };
 }
 
+/**
+ * Collects lease-frozen violations for the staged file set.
+ *
+ * @param repoRoot - Repository root (unused by the resolver but kept for symmetry).
+ * @param stagedFiles - Staged file paths relative to the repository root.
+ * @returns Violation records for every staged file owned by a frozen project.
+ */
+function collectProjectViolations(repoRoot, stagedFiles) {
+  const violations = [];
+  try {
+    const resolver = require('./project-registry-resolver');
+    const leases = resolver.resolveProjectLeases();
+    for (const lease of leases) {
+      if (lease.status !== 'Frozen') continue;
+      const root = (lease.root_path || '').replace(/\\/g, '/').replace(/^\.\/?/, '');
+      const hit = root === ''
+        ? stagedFiles.find((f) => !f.startsWith('scripts/'))
+        : stagedFiles.find((f) => f.startsWith(root + '/') || f === root);
+      if (!hit) continue;
+      violations.push({
+        ruleId: 'CMG-PRJ-001',
+        severity: SEVERITY_BLOCK,
+        file: hit,
+        message: `受控项目 '${lease.id}' TTL 租约已过期，提交权限已被绝对冻结 (Commit Lockdown)。运行 'taxis project renew ${lease.id}' 续约解冻。`,
+      });
+    }
+  } catch {
+    // Non-fatal if resolver fails
+  }
+  return violations;
+}
+
+/**
+ * Reports the empty-staging pass in either agent or human form.
+ *
+ * @param isAgentMode - Whether the caller wants the structured protocol envelope.
+ */
+function reportEmptyStaging(isAgentMode) {
+  if (isAgentMode) {
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: PROTOCOL_VERSION,
+          status: STATUS_PASS,
+          gate: FAST_STAGED_GATE,
+          summary: 'Staged area is empty, fast-staged review skipped.',
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
+    console.log('ℹ️  暂存区无文件变更，跳过 fast-staged 检查。');
+  }
+  process.exit(0);
+}
+
+/**
+ * Emits the pass verdict in either agent or human form.
+ *
+ * @param isAgentMode - Whether the caller wants the structured protocol envelope.
+ * @param warnings - Indentation warnings collected during the file stream pass.
+ */
+function reportPassingVerdict(isAgentMode, warnings) {
+  if (isAgentMode) {
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: PROTOCOL_VERSION,
+          status: STATUS_PASS,
+          gate: FAST_STAGED_GATE,
+          summary: 'All fast-staged hygiene and security checks passed.',
+          warnings: warnings.slice(0, 20),
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  for (const spec of GATE_SPECS) {
+    console.log(`  ✔  ${spec.id}  ${spec.name}`);
+  }
+  if (warnings.length > 0) {
+    console.warn(`  ⚠ [WARN] ${warnings.length} 处缩进宽度不符合契约（仅告警，不阻断）`);
+    for (const item of warnings.slice(0, 5)) {
+      console.warn(`     ${item.file}:${item.line} ${item.actual} != ${item.expected}`);
+    }
+  }
+}
+
+/**
+ * Emits the blocking verdict: snapshot for the workbench, envelope for agents.
+ *
+ * @param isAgentMode - Whether the caller wants the structured protocol envelope.
+ * @param buckets - Violation buckets grouped by the check that produced them.
+ * @param warnings - Indentation warnings collected during the file stream pass.
+ */
+function reportBlockingVerdict(isAgentMode, buckets, warnings) {
+  const allViolations = buckets.flat();
+  const { writeFailureSnapshot } = require('./log-rotator');
+  const envelope = {
+    gate: FAST_STAGED_GATE,
+    step: STEP_NAME,
+    failedCommand: SCRIPT_NAME,
+    exitCode: 1,
+    summary: `Fast staged check blocked commit due to ${allViolations.length} physical hygiene or security violations.`,
+    violations: allViolations,
+    warnings: warnings.slice(0, 20),
+    targetFiles: Array.from(new Set(allViolations.map((v) => v.file).filter(Boolean))),
+    verificationCommand: SCRIPT_NAME,
+  };
+  writeFailureSnapshot(envelope);
+
+  if (isAgentMode) {
+    console.log(JSON.stringify(envelope, null, 2));
+    process.exit(1);
+  }
+  reportHumanViolations(buckets.slice(0, 6));
+  process.exit(1);
+}
+
 function runFastStaged() {
   const { isAgentMode, range, explicitFiles, useIndex } = parseRunArgs(process.argv.slice(2));
   const repoRoot = path.resolve(__dirname, '../..');
@@ -1023,93 +1145,27 @@ function runFastStaged() {
     checkFileStream(repoRoot, stagedFiles, useIndex);
 
   if (stagedFiles.length === 0 && gate1Violations.length === 0 && nomenclatureViolations.length === 0) {
-    if (isAgentMode) {
-      console.log(
-        JSON.stringify(
-          {
-            protocolVersion: PROTOCOL_VERSION,
-            status: STATUS_PASS,
-            gate: FAST_STAGED_GATE,
-            summary: 'Staged area is empty, fast-staged review skipped.',
-          },
-          null,
-          2,
-        ),
-      );
-    } else {
-      console.log('ℹ️  暂存区无文件变更，跳过 fast-staged 检查。');
-    }
-    process.exit(0);
+    reportEmptyStaging(isAgentMode);
   }
 
   const diffText = getStagedDiff(repoRoot, range);
   const { gate3Violations, gate6Violations } = checkDiffStream(diffText);
+  const projectViolations = collectProjectViolations(repoRoot, stagedFiles);
 
-  const allViolations = [
-    ...gate1Violations,
-    ...lineEndingViolations,
-    ...gate3Violations,
-    ...nomenclatureViolations,
-    ...volumeViolations,
-    ...gate6Violations,
+  const buckets = [
+    gate1Violations,
+    lineEndingViolations,
+    gate3Violations,
+    nomenclatureViolations,
+    volumeViolations,
+    gate6Violations,
+    projectViolations,
   ];
 
-  if (allViolations.length > 0) {
-    const { writeFailureSnapshot } = require('./log-rotator');
-    const envelope = {
-      gate: FAST_STAGED_GATE,
-      step: STEP_NAME,
-      failedCommand: SCRIPT_NAME,
-      exitCode: 1,
-      summary: `Fast staged check blocked commit due to ${allViolations.length} physical hygiene or security violations.`,
-      violations: allViolations,
-      warnings: warnings.slice(0, 20),
-      targetFiles: Array.from(new Set(allViolations.map((v) => v.file).filter(Boolean))),
-      verificationCommand: SCRIPT_NAME,
-    };
-    writeFailureSnapshot(envelope);
-
-    if (isAgentMode) {
-      console.log(JSON.stringify(envelope, null, 2));
-      process.exit(1);
-    }
-
-    reportHumanViolations([
-      gate1Violations,
-      lineEndingViolations,
-      gate3Violations,
-      nomenclatureViolations,
-      volumeViolations,
-      gate6Violations,
-    ]);
-    process.exit(1);
+  if (buckets.some((bucket) => bucket.length > 0)) {
+    reportBlockingVerdict(isAgentMode, buckets, warnings);
   }
-
-  if (isAgentMode) {
-    console.log(
-      JSON.stringify(
-        {
-          protocolVersion: PROTOCOL_VERSION,
-          status: STATUS_PASS,
-          gate: FAST_STAGED_GATE,
-          summary: 'All fast-staged hygiene and security checks passed.',
-          warnings: warnings.slice(0, 20),
-        },
-        null,
-        2,
-      ),
-    );
-  } else {
-    for (const spec of GATE_SPECS) {
-      console.log(`  ✔  ${spec.id}  ${spec.name}`);
-    }
-    if (warnings.length > 0) {
-      console.warn(`  ⚠ [WARN] ${warnings.length} 处缩进宽度不符合契约（仅告警，不阻断）`);
-      for (const item of warnings.slice(0, 5)) {
-        console.warn(`     ${item.file}:${item.line} ${item.actual} != ${item.expected}`);
-      }
-    }
-  }
+  reportPassingVerdict(isAgentMode, warnings);
   process.exit(0);
 }
 

@@ -16,7 +16,11 @@ param(
     [switch]$DryRun,
     [int]$Count = 0,
     [switch]$Force,
-    [switch]$Json
+    [switch]$Json,
+    [switch]$Preflight,
+    [switch]$AllowBypass,
+    [switch]$VerifyRemote,
+    [string]$RemoteSlice
 )
 
 Set-StrictMode -Version Latest
@@ -47,8 +51,19 @@ if ($Force) {
 if ($Json) {
     $nodeArgs += "--json"
 }
+if ($Preflight) {
+    $nodeArgs += "--preflight"
+}
+if ($AllowBypass) {
+    $nodeArgs += "--allow-bypass"
+}
 if ($Count -gt 0) {
     $nodeArgs += @("--count", $Count.ToString())
+}
+if ($RemoteSlice) {
+    $nodeArgs += @("--verify-remote", $RemoteSlice)
+} elseif ($VerifyRemote) {
+    $nodeArgs += "--verify-remote"
 }
 
 & $nodeCmd $nodeArgs
