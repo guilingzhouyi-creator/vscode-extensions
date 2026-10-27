@@ -94,12 +94,16 @@
 | `sh/` | Bash | `version-bump.sh` | release（全工作区版本号一致性递增工具） | 本地 CLI |
 | `ps1/` | PowerShell | `version-bump.ps1` | release（version-bump.sh 同构双实现） | 本地 CLI（Windows） |
 | `common/` | Node.js | `project-registry-resolver.js` | tooling / registry（全工作区受控项目单源动态发现与路径解析器） | 本地 CLI、CI |
+| `common/` | Node.js | `remote-sandbox-gate.js` | tooling / gate（云端 Linux 预测试机切片调度中枢，把改动集路由到 hygiene、rust、timing、auto-refactor、webgames 与 all 六类预演） | `remote-sandbox-test.ps1`、`remote-sandbox-test.sh`、CI |
 | `common/` | Node.js | `render-skill-catalog.js` | tooling / skills（将技能注册表渲染为面向人类的技能调用全景清单） | 本地 CLI |
 | `common/` | Node.js | `skill-registry-resolver.js` | tooling / skills（技能注册表单源读取与路径解析引擎） | `render-skill-catalog`、CI |
 | `common/` | JSON | `skill-registry.json` | data / ssot（全工作区技能单一真源元数据与触发词拓扑注册表） | `skill-registry-resolver` |
+| `common/` | Node.js | `staggered-push-daemon.js` | tooling / git（常驻调度器，在目标时间窗内触发一次错峰推送批次） | `run-daily-staggered-push` |
 | `common/` | Node.js | `staggered-push-orchestrator.js` | tooling / git（错峰分批安全限速推送核心调度编排器） | `run-daily-staggered-push` |
 | `common/` | Node.js | `sync-skill-metadata.js` | tooling / skills（根据注册表向技能文件单源回填激活指令与关联链接） | 本地 CLI |
+| `ps1/` | PowerShell | `remote-sandbox-test.ps1` | tooling / gate（云端预测试机切片预演的 PowerShell 薄入口） | 本地 CLI、CI |
 | `ps1/` | PowerShell | `run-daily-staggered-push.ps1` | tooling / git（每日错峰分批 Git 提交安全推送脚本，Windows PowerShell 实现） | 本地 CLI、计划任务 |
+| `sh/` | Bash | `remote-sandbox-test.sh` | tooling / gate（云端预测试机切片预演的 POSIX Bash 薄入口） | 本地 CLI、CI |
 | `sh/` | Bash | `run-daily-staggered-push.sh` | tooling / git（每日错峰分批 Git 提交安全推送脚本，POSIX Bash 实现） | 本地 CLI、计划任务 |
 | `py/` | Python | （预留，暂无脚本） | — | 规范见 [`py/README.md`](py/README.md) |
 
