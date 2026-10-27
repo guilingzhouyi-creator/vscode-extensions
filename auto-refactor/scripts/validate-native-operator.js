@@ -156,10 +156,7 @@ function validateStatusAndCapabilities() {
   const status = getNativeCoreStatus();
   console.log(`[Status] Active Engine: ${status.activeEngine} (version: ${status.version})`);
   console.log(`[Status] Capabilities: ${status.capabilities.join(', ')}`);
-  assert.ok(
-    status.capabilities.includes('simd-source-mask'),
-    'Capability simd-source-mask missing',
-  );
+  assert.ok(status.capabilities.includes('source-mask'), 'Capability source-mask missing');
   assert.ok(status.capabilities.includes('histogram-diff'), 'Capability histogram-diff missing');
   assert.ok(status.capabilities.includes('tarjan-scc'), 'Capability tarjan-scc missing');
   assert.ok(status.capabilities.includes('dominator-tree'), 'Capability dominator-tree missing');

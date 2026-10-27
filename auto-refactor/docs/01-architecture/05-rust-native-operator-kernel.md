@@ -140,27 +140,36 @@ pub fn is_ecma_whitespace(ch: u32) -> bool {
 
 在 Node.js 中调用 Rust 编写的 N-API 原生插件并非毫无成本。参数封包、V8 堆内存拷贝与跨语言 C FFI 跨边界调用通常伴随约 `0.02 ~ 0.08ms` 的固有上下文切换开销。对于微小输入，FFI 调用本身的耗时甚至可能远远高于纯 JavaScript 运行时间。
 
-[`src/core/native/native-bridge.ts`](../../src/core/native/native-bridge.ts) 实现了**自适应微尺寸门限分流机制**：
+[`src/core/native/native-bridge.ts`](../../src/core/native/native-bridge.ts) 的装配层按算子类型选择三种分派策略之一：尺寸门限分流、成员存在性探测、或恒定走纯 JS 实现。下图为**门限分流**的两个算子，也是本文件仅有的两处尺寸判定：
 
 ```mermaid
 flowchart TD
-  REQ["调度 Native 算子请求"] --> DISPATCH{"算子类型与载荷尺寸判定"}
+  REQ["调度 Native 算子请求"] --> DISPATCH{"算子分派策略"}
 
-  DISPATCH -->|"maskSourceCode 文本长度"| MASK_GATE{"content.length < 256<br/>(MICRO_SOURCE_MASK_THRESHOLD)?"}
-  MASK_GATE -- 是 (微小文本) --> JS_MASK["调度 PureJsNativeShim.maskSourceCode<br/>(进程内免 FFI 序列化开销)"]
-  MASK_GATE -- 否 (正常/大文件) --> RUST_MASK["调度 Rust Native ops-mask<br/>(SIMD 向量化高速脱敏)"]
+  DISPATCH -->|"computeHistogramDiff<br/>文本总长"| DIFF_GATE{"payload < 64 KiB?<br/>(LARGE_DIFF_BYTES_THRESHOLD)"}
+  DIFF_GATE -- 是 --> JS_DIFF["PureJsNativeShim.computeHistogramDiff<br/>(进程内免 FFI 序列化开销)"]
+  DIFF_GATE -- 否 --> RUST_DIFF["Rust ops-diff<br/>(直方图差分 + 位并行 Myers)"]
 
-  DISPATCH -->|"analyzeDependencyGraph 边数"| GRAPH_GATE{"edges.length < 1500?"}
-  GRAPH_GATE -- 是 (稀疏小图) --> JS_GRAPH["调度 PureJsNativeShim.analyzeDependencyGraph<br/>(免 JS Array -> Vec 内存拷贝)"]
-  GRAPH_GATE -- 否 (密集大型图) --> RUST_GRAPH["调度 Rust Native ops-graph<br/>(多线程/无 GC Tarjan & 支配树)"]
+  DISPATCH -->|"analyzeDependencyGraph<br/>边数"| GRAPH_GATE{"edges.length < 1500?<br/>(LARGE_GRAPH_EDGES_THRESHOLD)"}
+  GRAPH_GATE -- 是 --> JS_GRAPH["PureJsNativeShim.analyzeDependencyGraph<br/>(免 JS Array -> Vec 内存拷贝)"]
+  GRAPH_GATE -- 否 --> RUST_GRAPH["Rust ops-graph<br/>(无 GC 的 Tarjan SCC 与支配树)"]
+
+  DISPATCH -->|"maskSourceCode<br/>任意尺寸"| JS_MASK["PureJsNativeShim.maskSourceCode<br/>(恒定走纯 JS，无尺寸门限)"]
 ```
 
-1. **源码脱敏分流门限 (`MICRO_SOURCE_MASK_THRESHOLD = 256`)**：
-   - 当文本长度 `< 256` 字符时，分流至纯 TypeScript 实现（`maskSourceTextJs`），消除跨 N-API 边界构建 `NativeMaskConfig` 对象的开销；
-   - 当文本长度 $\ge 256$ 字符时，分流至 Rust `ops-mask` 原生内核，充分发挥 SWAR / SIMD 字节加速优势。
-2. **依赖图分析分流门限 (`edges.length < 1500`)**：
-   - 当图边数 `< 1500` 条时，分流至纯 TypeScript Tarjan 实现（`PureJsNativeShim.analyzeDependencyGraph`），省去将 JavaScript 嵌套数组序列化为 Rust `Vec<Vec<String>>` 的巨大内存分配损耗；
-   - 当边数 $\ge 1500$ 条时，分流至 Rust `ops-graph` 原生内核，以零 GC、高密度的紧凑图遍历能力保障大型项目毫秒级分析。
+1. **差分分流门限 (`LARGE_DIFF_BYTES_THRESHOLD = 64 KiB`)**：
+   - 当新旧文本长度之和小于该门限时，分流至纯 TypeScript 实现，省去跨 N-API 边界传递两个字符串的封包成本；
+   - 达到或超过门限时，分流至 Rust `ops-diff` 原生内核。
+2. **依赖图分析分流门限 (`LARGE_GRAPH_EDGES_THRESHOLD = 1500`)**：
+   - 当图边数小于该门限时，分流至纯 TypeScript Tarjan 实现（`PureJsNativeShim.analyzeDependencyGraph`），省去将 JavaScript 嵌套数组序列化为 Rust `Vec<Vec<String>>` 的内存分配损耗；
+   - 达到或超过门限时，分流至 Rust `ops-graph` 原生内核。
+3. **源码脱敏没有门限 (`maskSourceCode` 恒走纯 JS)**：
+   - 该算子返回结构化行数组，此形状跨 N-API 会造成逐元素的 V8 字符串分配，开销随行数线性增长，且无法通过尺寸门限消除——任何尺寸下原生路径都不占优；
+   - 因此装配层无条件调用 `PureJsNativeShim.maskSourceCode`，`binding.maskSourceCode` 虽由编译产物导出但从不被读取。这是刻意的架构决策，不是缺失的分支；
+   - 其能力名为 `source-mask`，不声明任何向量化前缀。此前文档描述的 `MICRO_SOURCE_MASK_THRESHOLD = 256` 分流分支在代码中从未存在。
+4. **其余算子采用成员存在性探测**：装配层在调用点检查编译产物是否提供该函数，提供则调用，否则回退纯 JS。这条策略不用门限，因为两侧的输入输出形状一致，没有需要折中的序列化代价。
+
+> 能力名的口径：`getNativeCoreStatus().capabilities` 只登记引擎确实具备的能力。编译产物与纯 JS 实现暴露同一套算子，因此两者的能力名列表是同一份——原生列表直接由纯 JS 列表派生，不重复书写，也不会漂移。历史上曾有 `simd-`、`parallel-`、`zero-copy-` 前缀的能力名，实测在九个编译 crate 中均无对应实现（无 `std::arch` intrinsics、无线程或并行迭代器、仅一处就地缓冲区重解释），已全部移除。
 
 ---
 

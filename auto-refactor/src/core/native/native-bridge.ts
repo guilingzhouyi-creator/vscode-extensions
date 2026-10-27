@@ -109,12 +109,18 @@ const ENGINE_RUST_NATIVE: NativeCoreEngineType = 'rust-native';
 const VERSION_SHIM = '0.4.0-shim';
 const VERSION_NATIVE_FALLBACK = '0.4.0-native';
 
+// Capability names state what the engine actually does, not what it was expected to do. Four
+// earlier names advertised facilities that no compiled crate contains: the mask operators run in
+// pure JavaScript by design, no crate uses std::arch or target_feature intrinsics, none spawns
+// threads or uses a parallel iterator, and only one function ever reinterprets a buffer in place.
+// A name is consumed as a promise by callers inspecting the status, so an aspirational name is a
+// false one. The names below are limited to what each operator demonstrably performs.
 const CAPABILITY_HISTOGRAM_DIFF = 'histogram-diff';
 const CAPABILITY_TARJAN_SCC = 'tarjan-scc';
 const CAPABILITY_TOPOLOGICAL_SORT = 'topological-sort';
 const CAPABILITY_FAST_PATTERN_MATCH = 'fast-pattern-match';
-const CAPABILITY_SIMD_SOURCE_MASK = 'simd-source-mask';
-const CAPABILITY_SIMD_SOURCE_MASK_COMPACT = 'simd-source-mask-compact';
+const CAPABILITY_SOURCE_MASK = 'source-mask';
+const CAPABILITY_SOURCE_MASK_COMPACT = 'source-mask-compact';
 const CAPABILITY_CLONE_DETECTION = 'clone-detection';
 const CAPABILITY_MINHASH_LSH = 'minhash-lsh';
 const CAPABILITY_DOMINATOR_TREE = 'dominator-tree';
@@ -133,17 +139,13 @@ const CAPABILITY_WARSHALL_CLOSURE = 'warshall-closure';
 const CAPABILITY_VECTOR_MATH = 'vector-math';
 const CAPABILITY_SCOPE_SHADOWING = 'scope-shadowing';
 
-const CAPABILITY_SIMD_HISTOGRAM_DIFF = 'simd-histogram-diff';
-const CAPABILITY_PARALLEL_TARJAN_SCC = 'parallel-tarjan-scc';
-const CAPABILITY_ZERO_COPY_BUFFER = 'zero-copy-buffer';
-
 const SHIM_CAPABILITIES: readonly string[] = Object.freeze([
     CAPABILITY_HISTOGRAM_DIFF,
     CAPABILITY_TARJAN_SCC,
     CAPABILITY_TOPOLOGICAL_SORT,
     CAPABILITY_FAST_PATTERN_MATCH,
-    CAPABILITY_SIMD_SOURCE_MASK,
-    CAPABILITY_SIMD_SOURCE_MASK_COMPACT,
+    CAPABILITY_SOURCE_MASK,
+    CAPABILITY_SOURCE_MASK_COMPACT,
     CAPABILITY_CLONE_DETECTION,
     CAPABILITY_MINHASH_LSH,
     CAPABILITY_DOMINATOR_TREE,
@@ -163,12 +165,10 @@ const SHIM_CAPABILITIES: readonly string[] = Object.freeze([
     CAPABILITY_SCOPE_SHADOWING,
 ]);
 
-const NATIVE_CORE_CAPABILITIES: readonly string[] = Object.freeze([
-    ...SHIM_CAPABILITIES,
-    CAPABILITY_SIMD_HISTOGRAM_DIFF,
-    CAPABILITY_PARALLEL_TARJAN_SCC,
-    CAPABILITY_ZERO_COPY_BUFFER,
-]);
+// The compiled engine exposes the same operator set as the shim, so its name list is derived from
+// the shim list rather than repeated. Adding an operator then reaches both engines at once, and the
+// two lists cannot drift into disagreeing about what the layer supports.
+const NATIVE_CORE_CAPABILITIES: readonly string[] = Object.freeze([...SHIM_CAPABILITIES]);
 
 /**
  * Pure JavaScript fallback implementation of INativeCore.
