@@ -22,6 +22,13 @@ export interface NativeCoreStatus {
     readonly activeEngine: NativeCoreEngineType;
     readonly version?: string;
     readonly capabilities: string[];
+    /**
+     * Why a shipped compiled addon was refused, populated only when the pure JS shim is active.
+     *
+     * Absent means either the addon loaded cleanly or none was found; present means an addon was
+     * present but rejected, and the text names the members or failure that caused it.
+     */
+    readonly degradedReason?: string;
 }
 
 /**

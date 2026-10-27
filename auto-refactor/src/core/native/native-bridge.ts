@@ -83,6 +83,27 @@ const LARGE_GRAPH_EDGES_THRESHOLD = 1500;
 const MIN_NATIVE_TRIGRAM_TOKEN_COUNT = 500;
 
 const NATIVE_BINDING_PATH = '../../../crates/auto-refactor-core/index.node';
+
+/**
+ * Binding members the assembly layer calls without a shim fallback.
+ *
+ * Each name here is assigned straight through to the compiled module (no `selectBinding` guard,
+ * no size gate, no shim override), so a module that lacks it would hand callers `undefined` and
+ * fail only at the first invocation. The list is therefore the contract the loader must verify
+ * before accepting a binding: a present-but-incomplete addon has to be refused up front, not
+ * discovered later as a `TypeError` on a specific operator.
+ */
+const REQUIRED_BINDING_FIELDS = [
+    'computeHistogramDiff',
+    'analyzeDependencyGraph',
+    'fastPatternMatch',
+    'countDuplicateLines',
+    'detectCloneBlocks',
+    'findClonePairs',
+    'computeDominatorTree',
+    'solveDataflow',
+] as const;
+
 const ENGINE_PURE_JS: NativeCoreEngineType = 'pure-js-shim';
 const ENGINE_RUST_NATIVE: NativeCoreEngineType = 'rust-native';
 const VERSION_SHIM = '0.4.0-shim';
@@ -489,20 +510,25 @@ interface RawNativeBinding {
     ) => NativeSecretFinding[];
     readonly computeHistogramDiff: (oldContent: string, newContent: string) => NativeDiffHunk[];
     readonly analyzeDependencyGraph: (edges: [string, string][]) => NativeGraphAnalysis;
-    readonly fastPatternMatch: (sourceText: string, patterns: string[]) => NativePatternMatch[];
-    readonly maskSourceCode: (content: string, config: NativeMaskConfig) => NativeMaskedSource;
+    readonly fastPatternMatch?: (sourceText: string, patterns: string[]) => NativePatternMatch[];
+    /**
+     * Present in the compiled addon but never dereferenced by this module: masking always routes to
+     * the shim because returning structured line arrays across N-API costs more than the masking
+     * itself. Kept optional so the type matches how the layer actually uses it.
+     */
+    readonly maskSourceCode?: (content: string, config: NativeMaskConfig) => NativeMaskedSource;
     readonly maskSourceCodeCompact?: (content: string, config: NativeMaskConfig) => string;
-    readonly countDuplicateLines: (content: string) => number;
-    readonly detectCloneBlocks: (content: string, minCloneLines: number) => NativeCloneBlock[];
+    readonly countDuplicateLines?: (content: string) => number;
+    readonly detectCloneBlocks?: (content: string, minCloneLines: number) => NativeCloneBlock[];
     readonly computeMinHash?: (content: string, numPermutations?: number) => number[];
     readonly computeMinhash?: (content: string, numPermutations?: number) => number[];
-    readonly findClonePairs: (signatures: number[][], threshold: number) => NativeClonePair[];
-    readonly computeDominatorTree: (
+    readonly findClonePairs?: (signatures: number[][], threshold: number) => NativeClonePair[];
+    readonly computeDominatorTree?: (
         entry: string,
         nodes: string[],
         edges: Array<[string, string]>,
     ) => NativeDominatorTreeResult;
-    readonly solveDataflow: (
+    readonly solveDataflow?: (
         entry: string,
         nodes: string[],
         edges: Array<[string, string]>,
@@ -602,17 +628,30 @@ function assembleDiffAndGraphOps(
             }
             return binding.analyzeDependencyGraph(edges);
         },
-        fastPatternMatch: binding.fastPatternMatch,
-        computeDominatorTree: binding.computeDominatorTree,
-        solveDataflow: (params: NativeDataflowParams) =>
-            binding.solveDataflow(
+        fastPatternMatch: selectBinding(binding.fastPatternMatch, (sourceText, patterns) =>
+            jsShim.fastPatternMatch(sourceText, patterns),
+        ),
+        computeDominatorTree: selectBinding(binding.computeDominatorTree, (entry, nodes, edges) =>
+            jsShim.computeDominatorTree(entry, nodes, edges),
+        ),
+        solveDataflow: (params: NativeDataflowParams) => {
+            // The compiled operator takes positional arguments while the shim takes the params
+            // object, so this pair cannot share one `selectBinding` type. The handler is resolved
+            // per call instead of at assembly time; without the guard a binding that lacks the
+            // operator would dereference `undefined` here.
+            const nativeSolver = binding.solveDataflow;
+            if (typeof nativeSolver !== 'function') {
+                return jsShim.solveDataflow(params);
+            }
+            return nativeSolver(
                 params.entry,
                 params.nodes ?? [],
                 params.edges,
                 params.forward ?? true,
                 params.gen ?? {},
                 params.kill ?? {},
-            ),
+            );
+        },
         analyzeScopeShadowing: (scopes, bindings) => {
             // Guard: Passing objects across N-API causes FFI property extraction churn.
             // Under zero-regression mandate, route to optimized pure JS shim.
@@ -643,10 +682,16 @@ function assembleCloneOps(
         maskSourceCodeCompact: selectBinding(binding.maskSourceCodeCompact, (content, config) =>
             jsShim.maskSourceCodeCompact(content, config),
         ),
-        countDuplicateLines: binding.countDuplicateLines,
-        detectCloneBlocks: binding.detectCloneBlocks,
+        countDuplicateLines: selectBinding(binding.countDuplicateLines, (content) =>
+            jsShim.countDuplicateLines(content),
+        ),
+        detectCloneBlocks: selectBinding(binding.detectCloneBlocks, (content, minCloneLines) =>
+            jsShim.detectCloneBlocks(content, minCloneLines),
+        ),
         computeMinHash: resolveMinHashBinding(binding, jsShim),
-        findClonePairs: binding.findClonePairs,
+        findClonePairs: selectBinding(binding.findClonePairs, (signatures, threshold) =>
+            jsShim.findClonePairs(signatures, threshold),
+        ),
         computeBitParallelDistance: selectBinding(
             binding.computeBitParallelDistance,
             (pattern, text) => jsShim.computeBitParallelDistance(pattern, text),
@@ -771,17 +816,56 @@ function assembleNativeBindingCore(
     };
 }
 
+/**
+ * Records why the last compiled binding was rejected, so a degraded run can be distinguished from
+ * an absent addon.
+ *
+ * Falls back to the pure JS shim in both cases, and `isNativeAvailable: false` alone cannot tell
+ * the two apart: an operator that quietly runs slower looks identical to a deployment mistake.
+ * Keeping the rejected member names lets the status surface name them.
+ */
+let rejectedBindingReason: string | null = null;
+
+/**
+ * Verifies that every member the assembly layer dereferences without a guard is callable.
+ *
+ * Exported because it is the admission contract itself, not an implementation detail: a deployment
+ * check can ask whether a candidate addon satisfies the layer without constructing the bridge, and
+ * the unit suite asserts the two outcomes on synthetic candidates rather than relying on whichever
+ * binary happens to be present on the machine running the tests.
+ *
+ * @param binding - Candidate object loaded from the compiled addon.
+ * @returns Names of required members that are not callable; empty when the binding is usable.
+ */
+export function findUnsatisfiedBindingFields(binding: unknown): string[] {
+    if (!binding || typeof binding !== 'object') {
+        return [...REQUIRED_BINDING_FIELDS];
+    }
+    const candidate = binding as Record<string, unknown>;
+    return REQUIRED_BINDING_FIELDS.filter((name) => typeof candidate[name] !== 'function');
+}
+
 function loadNativeBindingModule(): RawNativeBinding | null {
     try {
         const modulePath = NATIVE_BINDING_PATH;
         const dynamicLoader = typeof require === 'function' ? require : undefined;
-        if (!dynamicLoader) return null;
-        const binding = dynamicLoader(modulePath) as RawNativeBinding;
-        if (binding && typeof binding.computeHistogramDiff === 'function') {
-            return binding;
+        if (!dynamicLoader) {
+            rejectedBindingReason = 'no dynamic module loader is available in this runtime';
+            return null;
         }
-    } catch (_err) {
-        void _err;
+        const binding = dynamicLoader(modulePath) as RawNativeBinding;
+        if (!binding || typeof binding !== 'object') {
+            rejectedBindingReason = 'the addon did not export an object';
+            return null;
+        }
+        const missing = findUnsatisfiedBindingFields(binding);
+        if (missing.length > 0) {
+            rejectedBindingReason = `addon exports ${missing.join(', ')} as non-callable`;
+            return null;
+        }
+        return binding;
+    } catch (err) {
+        rejectedBindingReason = `addon failed to load: ${(err as Error).message}`;
     }
     return null;
 }
@@ -802,15 +886,24 @@ export const nativeCore: INativeCore = probeNativeBinding() || new PureJsNativeS
 /**
  * Retrieves the status and capabilities of the active acceleration engine with immutable defense.
  *
+ * The rejection reason is carried through only when the shim is active, so a caller can separate
+ * "no compiled addon was shipped" from "an addon was shipped but refused". Both report
+ * `isNativeAvailable: false`; without the reason they are indistinguishable from the outside.
+ *
  * @returns Active native core engine status descriptor.
  */
 export function getNativeCoreStatus(): NativeCoreStatus {
     const status = nativeCore.getStatus();
+    const degradedReason =
+        status.isNativeAvailable === false && rejectedBindingReason !== null
+            ? rejectedBindingReason
+            : undefined;
     return Object.freeze({
         isNativeAvailable: status.isNativeAvailable,
         activeEngine: status.activeEngine,
         version: status.version,
         capabilities: Object.freeze([...status.capabilities]) as unknown as string[],
+        degradedReason,
     });
 }
 
