@@ -47,137 +47,17 @@ parking_lot = "0.12"
 tempfile = "3.8"
 
 [[test]]
-name = "test_in_memory_index"
-path = "tests/rust/test_in_memory_index.rs"
+name = "integration_storage"
+path = "tests/integration_storage.rs"
 
 [[test]]
-name = "test_self_hosted_ipc"
-path = "tests/rust/test_self_hosted_ipc.rs"
+name = "integration_algorithms"
+path = "tests/integration_algorithms.rs"
 
 [[test]]
-name = "test_algorithms"
-path = "tests/rust/test_algorithms.rs"
+name = "integration_cli"
+path = "tests/integration_cli.rs"
 
 [[test]]
-name = "test_pools"
-path = "tests/rust/test_pools.rs"
-
-[[test]]
-name = "test_storage"
-path = "tests/rust/test_storage.rs"
-
-[[test]]
-name = "test_index"
-path = "tests/rust/test_index.rs"
-
-[[test]]
-name = "test_object_codec"
-path = "tests/rust/test_object_codec.rs"
-
-[[test]]
-name = "test_governance"
-path = "tests/rust/test_governance.rs"
-
-[[test]]
-name = "test_uac_promotions"
-path = "tests/rust/test_uac_promotions.rs"
-
-[[test]]
-name = "test_benchmarks"
-path = "tests/rust/test_benchmarks.rs"
-
-[[test]]
-name = "test_operations"
-path = "tests/rust/test_operations.rs"
-
-[[test]]
-name = "test_relocate"
-path = "tests/rust/test_relocate.rs"
-
-[[test]]
-name = "test_refs"
-path = "tests/rust/test_refs.rs"
-
-[[test]]
-name = "test_tag_codec"
-path = "tests/rust/test_tag_codec.rs"
-
-[[test]]
-name = "test_algebraic_conflicts"
-path = "tests/rust/test_algebraic_conflicts.rs"
-
-[[test]]
-name = "test_commit_graph"
-path = "tests/rust/test_commit_graph.rs"
-
-[[test]]
-name = "test_commit_materializer"
-path = "tests/rust/test_commit_materializer.rs"
-
-[[test]]
-name = "test_governance_pipeline"
-path = "tests/rust/test_governance_pipeline.rs"
-
-[[test]]
-name = "test_git_hooks"
-path = "tests/rust/test_git_hooks.rs"
-
-[[test]]
-name = "test_git_differential"
-path = "tests/rust/test_git_differential.rs"
-
-[[test]]
-name = "test_read_commands"
-path = "tests/rust/test_read_commands.rs"
-
-[[test]]
-name = "test_pack_generation"
-path = "tests/rust/test_pack_generation.rs"
-
-[[test]]
-name = "test_conflict_modes"
-path = "tests/rust/test_conflict_modes.rs"
-
-[[test]]
-name = "test_submodules"
-path = "tests/rust/test_submodules.rs"
-
-[[test]]
-name = "test_edge_porcelain"
-path = "tests/rust/test_edge_porcelain.rs"
-
-[[test]]
-name = "test_interactive_operations"
-path = "tests/rust/test_interactive_operations.rs"
-
-[[test]]
-name = "test_config_parity"
-path = "tests/rust/test_config_parity.rs"
-
-[[test]]
-name = "test_project_leases"
-path = "tests/rust/test_project_leases.rs"
-
-[[test]]
-name = "test_bounded_worktree"
-path = "tests/rust/test_bounded_worktree.rs"
-
-[[test]]
-name = "test_remote_transport"
-path = "tests/rust/test_remote_transport.rs"
-
-[[test]]
-name = "test_in_place_engine"
-path = "tests/rust/test_in_place_engine.rs"
-
-[[test]]
-name = "test_tipse_safety"
-path = "tests/rust/test_tipse_safety.rs"
-
-[[test]]
-name = "test_plumbing_parity"
-path = "tests/rust/test_plumbing_parity.rs"
-
-[[test]]
-name = "test_cli_contract_parity"
-path = "tests/rust/test_cli_contract_parity.rs"
+name = "integration_governance"
+path = "tests/integration_governance.rs"
