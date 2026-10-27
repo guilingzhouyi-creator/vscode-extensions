@@ -252,6 +252,13 @@ async function main() {
   assert.ok(fullVerdict.routingPlan.activeAnalyzers.length > 0, 'Must have active analyzers');
   assert.ok(fullVerdict.impacts.length > 0, 'Must report symbol impacts');
   assert.strictEqual(fullVerdict.status, 'BLOCK'); // Due to GOV-SLC-001 breaking mutation
+  assert.ok(fullVerdict.replayWindow, 'Must produce a replay window summary (P2-1)');
+  assert.strictEqual(typeof fullVerdict.replayWindow.isBounded, 'boolean');
+  assert.strictEqual(typeof fullVerdict.replayWindow.sparseReferenceCount, 'number');
+  assert.ok(fullVerdict.replayWindow.isBounded, 'Local edit must produce a bounded window');
+  assert.ok(fullVerdict.replayWindow.sparseReferenceCount > 0, 'Breaking signature with callers must retain sparse references');
+  assert.ok(fullVerdict.replayWindow.isSparseBridged, 'Window must be marked as sparse bridged');
+  assert.ok(Array.isArray(fullVerdict.replayWindow.sparseReferences), 'Must attach external sparse reference list');
   console.log(`  ✔ Praxis slice audit facade verified (Verdict status: ${fullVerdict.status})`);
 
   console.log('\n================================================================');

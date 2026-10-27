@@ -46,6 +46,24 @@ const MICROS_PER_MILLI = 1000;
 const SCOPE_FULL_FILE = 'full';
 
 /**
+ * Fold discrete 1-based changed line numbers into a 1-based [min, max] boundary range.
+ *
+ * @param changedLines - Array of modified line numbers.
+ * @returns [firstLine, lastLine] tuple, or undefined when changedLines is empty or omitted.
+ */
+function foldChangedLineBounds(changedLines?: readonly number[]): readonly [number, number] | undefined {
+    if (!changedLines || changedLines.length === 0) return undefined;
+    let min = changedLines[0];
+    let max = changedLines[0];
+    for (let i = 1; i < changedLines.length; i++) {
+        const line = changedLines[i];
+        if (line < min) min = line;
+        if (line > max) max = line;
+    }
+    return [min, max];
+}
+
+/**
  * Project a sparse reference window into the serializable verdict shape.
  *
  * @param window - Planner window for the audited file.
@@ -58,6 +76,7 @@ function summarizeWindow(window: SparseReplayWindow): SliceReplayWindowSummary {
         isBounded: window.isBounded,
         isSparseBridged: window.isSparseBridged,
         sparseReferenceCount: window.sparseReferences.length,
+        sparseReferences: window.sparseReferences.length > 0 ? window.sparseReferences : undefined,
         reason: window.reason,
     };
 }
@@ -188,8 +207,8 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
         const status: 'PASS' | 'WARN' | 'BLOCK' = hasErrors
             ? 'BLOCK'
             : hasWarnings
-              ? 'WARN'
-              : 'PASS';
+                ? 'WARN'
+                : 'PASS';
 
         return {
             filePath: input.filePath,
@@ -219,10 +238,12 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
         input: PraxisSliceAuditInput,
         callGraph?: CallGraph,
     ): SliceReplayWindowSummary {
+        const lineBounds = foldChangedLineBounds(input.changedLines);
         const window = this.replayPlanner.computeSparseReplayWindow({
             filePath: input.filePath,
             oldContent: input.oldContent,
             newContent: input.newContent,
+            changedLines: lineBounds,
             resolveReferences: callGraph ? createCallGraphReferenceResolver(callGraph) : undefined,
         });
         return summarizeWindow(window);

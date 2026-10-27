@@ -48,6 +48,13 @@ import type { ReviewMemoryManager } from '../memory/reviewMemory';
 import type { CodeDomainFingerprint, ReviewMemoryRecord } from '../memory/types';
 import type { ChangeTrajectoryManager } from '../trajectory/changeTrajectory';
 import { detectDependencyCycles, detectDependencyCyclesAsync } from './cycle-detector';
+import type {
+    SparseReferenceReplayManager,
+    SparseReplayWindow,
+} from '../ast/sparse-reference-replay';
+import { defaultSparseReferenceReplayManager } from '../ast/sparse-reference-replay';
+import { createCallGraphReferenceResolver } from '../intelligence/sparse-reference-resolver';
+import type { CallGraph } from '../intelligence/callGraph';
 
 /** Number of leading digest hex characters kept as the short revision identifier. */
 const REVISION_ID_LENGTH = 16;
@@ -229,6 +236,16 @@ export interface DualTrackOptions {
     graph?: ModuleDependencyGraph;
     /** Project archetype to steer sparse general code routing instead of 100% full activation. */
     archetype?: ProjectArchetype;
+    /**
+     * When true, uses SWA / Sparse Reference Replay to compute lineBounds if input.lineBounds
+     * is not provided, bounding the AST traversal and pruning irrelevant subtrees.
+     * Defaults to false (gated progressive opt-in).
+     */
+    replayBoundedFastTrack?: boolean;
+    /**
+     * Optional sparse reference replay manager override. Falls back to defaultSparseReferenceReplayManager.
+     */
+    replayManager?: SparseReferenceReplayManager;
 }
 
 export { detectDependencyCycles, detectDependencyCyclesAsync };
@@ -689,29 +706,83 @@ function resolveActiveAnalyzersForFile(context: ResolveAnalyzersContext): {
 }
 
 /**
+ * Resolve optional 1-based [first, last] line boundaries for FastTrack AST slice pruning.
+ *
+ * When input.lineBounds is already supplied, it takes precedence. When omitted and
+ * replayBoundedFastTrack is enabled in options, the sparse reference replay planner computes
+ * a bounded window for the mutation.
+ *
+ * @param input - Current file diff input.
+ * @param options - Pipeline options holding the replay toggle.
+ * @param callGraph - Optional repository call graph for external reference resolution.
+ * @returns Bounded line range and replay window when admissible.
+ */
+function resolveFastTrackLineBounds(
+    input: DiffFileInput,
+    options: DualTrackOptions,
+    callGraph?: CallGraph,
+): {
+    readonly lineBounds?: readonly [number, number];
+    readonly replayWindow?: SparseReplayWindow;
+    readonly planner?: SparseReferenceReplayManager;
+} {
+    if (input.lineBounds) {
+        return { lineBounds: input.lineBounds };
+    }
+    if (!options.replayBoundedFastTrack) {
+        return {};
+    }
+    const planner = options.replayManager ?? defaultSparseReferenceReplayManager;
+    const replayWindow = planner.computeSparseReplayWindow({
+        filePath: input.filePath,
+        oldContent: input.oldContent,
+        newContent: input.newContent,
+        resolveReferences: callGraph ? createCallGraphReferenceResolver(callGraph) : undefined,
+    });
+    if (planner.canUseSparseReplay(replayWindow)) {
+        return {
+            lineBounds: [replayWindow.startLine, replayWindow.endLine],
+            replayWindow,
+            planner,
+        };
+    }
+    return { replayWindow, planner };
+}
+
+/**
  * Audit a single file mutation in FastTrack: diff classification, sparse MoE routing,
  * localized scan execution, scoring and memory persistence.
  */
 async function auditSingleFileInput(context: AuditFileInputContext): Promise<void> {
     const inputTarget = context.input;
     const { activeAnalyzers, currentDomains } = resolveActiveAnalyzersForFile(context);
+    const { lineBounds, replayWindow, planner } = resolveFastTrackLineBounds(
+        inputTarget,
+        context.options,
+        context.scanner.getCallGraph?.(),
+    );
 
     const fileResult = await context.scanner.runAnalyzers(
         inputTarget.filePath,
         inputTarget.newContent,
         undefined,
         activeAnalyzers,
-        inputTarget.lineBounds,
+        lineBounds,
     );
 
-    context.acc.fastIssues.push(...fileResult.issues);
+    const finalIssues =
+        replayWindow && planner && planner.canUseSparseReplay(replayWindow)
+            ? planner.pruneIssuesOutsideWindow(fileResult.issues, replayWindow)
+            : fileResult.issues;
+
+    context.acc.fastIssues.push(...finalIssues);
     if (fileResult.metric) {
         context.acc.fastMetrics.push(fileResult.metric);
     }
 
     const scoreBreakdown = context.scorer.evaluateFile(
         inputTarget.filePath,
-        fileResult.issues,
+        finalIssues,
         fileResult.metric,
     );
     context.acc.lastScoreBreakdown = scoreBreakdown;
@@ -722,7 +793,7 @@ async function auditSingleFileInput(context: AuditFileInputContext): Promise<voi
         filePath: inputTarget.filePath,
         newContent: inputTarget.newContent,
         currentDomains,
-        fileIssues: fileResult.issues,
+        fileIssues: finalIssues,
         scoreBreakdown,
         author: context.author,
         activeAnalyzers: Array.from(activeAnalyzers),

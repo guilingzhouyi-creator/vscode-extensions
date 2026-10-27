@@ -251,6 +251,25 @@ async function main() {
   assert(memRecord, 'Review memory must record file');
   assert.strictEqual(memRecord.status, 'APPROVED', 'Memory status should be APPROVED');
 
+  // Verify replayBoundedFastTrack gated opt-in (P2-2)
+  const boundedExec = await executeDualTrack(
+    scanner,
+    [
+      {
+        filePath: testFile,
+        oldContent: initialContent,
+        newContent: updatedContent,
+      },
+    ],
+    { replayBoundedFastTrack: true },
+  );
+  assert.strictEqual(
+    boundedExec.fastVerdict.status,
+    'SPECULATIVE_PASSED',
+    'Replay-bounded FastTrack must pass on clean localized edit',
+  );
+  console.log('  ✔ replayBoundedFastTrack gated opt-in successfully bounds and audits change (P2-2)');
+
   console.log('✔ FastTrack foreground audit verified.\n');
 
   console.log('=== [4/5] Testing DeepTrack Asynchronous Cycle & Escalation ===');

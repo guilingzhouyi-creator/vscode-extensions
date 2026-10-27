@@ -203,6 +203,13 @@ export interface SliceReplayWindowSummary {
     isSparseBridged: boolean;
     /** Number of external call sites kept as sparse references. */
     sparseReferenceCount: number;
+    /** External call sites retained as bounded context when bridged. */
+    sparseReferences?: readonly {
+        readonly file: string;
+        readonly line: number;
+        readonly caller: string | null;
+        readonly symbol: string;
+    }[];
     /** Planner reason tag explaining the window. */
     reason: string;
 }
