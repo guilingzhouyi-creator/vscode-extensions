@@ -64,6 +64,11 @@ const FIXTURES = {
     '    return "ok"',
     'def test_banana():',
     '    pass',
+    'def check_python_vars():',
+    '    x = 10',
+    '    _ = 20',
+    '    fn = 30',
+    '    res = 40',
   ].join('\n'),
 
   'src/clean-module/globals-test.ts': [
@@ -127,8 +132,42 @@ const FIXTURES = {
 
   'src/clean-module/polyglot_sample.go': [
     'package clean',
+    'type bad_go_type struct {}',
+    'type PhaseOneManager struct {}',
+    'const MaxTimeout = 60',
+    'const temp_limit = 10',
     'func bananaApple() {}',
     'func GetUserData() {}',
+    'func processGoItems() {',
+    '    x := 10',
+    '    _ = 20',
+    '    var res = 30',
+    '    var fn = "short"',
+    '    var tempVal = 40',
+    '    for i := 0; i < 10; i++ {',
+    '        itemIdx := i',
+    '    }',
+    '}',
+    'func TestGoFeature() {',
+    '    x := 99',
+    '    data := 100',
+    '}',
+  ].join('\n'),
+
+  'src/clean-module/polyglot_sample.gd': [
+    'class_name bad_gd_class',
+    'const bad_gd_const = 5',
+    'const MAX_SPEED = 100',
+    'func banana_apple():',
+    '    pass',
+    'func update_player_state():',
+    '    var x = 10',
+    '    var _ = 20',
+    '    var res = 30',
+    '    var fn = null',
+    '    var temp_val = 40',
+    '    for i in range(10):',
+    '        var count = i',
   ].join('\n'),
 
   'src/clean-module/polyglot_sample.rs': [
@@ -141,6 +180,7 @@ const FIXTURES = {
     '    let _ = 30;',
     '    let mut i = 0;',
     '    let data = 40;',
+    '    let fn = 50;',
     '}',
     '#[test]',
     'fn test_my_feature() {',
@@ -445,13 +485,153 @@ function verifyRustPolyglotNaming(byRule) {
   console.log('  ✔ NAM-TYP-001, NAM-GLB-001, NAM-SGL-001, NAM-VAG-001 verified for Rust');
 }
 
+function verifyGoPolyglotNaming(byRule) {
+  const typIssues = byRule('NAM-TYP-001');
+  assert.ok(
+    typIssues.some(
+      (i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'bad_go_type',
+    ),
+    'Go bad_go_type should trigger NAM-TYP-001',
+  );
+
+  const jrgIssues = byRule('NAM-JRG-002');
+  assert.ok(
+    jrgIssues.some(
+      (i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'PhaseOneManager',
+    ),
+    'Go PhaseOneManager should trigger NAM-JRG-002',
+  );
+  assert.ok(
+    jrgIssues.some(
+      (i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'temp_limit',
+    ),
+    'Go temp_limit should trigger NAM-JRG-002',
+  );
+
+  const sglIssues = byRule('NAM-SGL-001');
+  assert.ok(
+    sglIssues.some((i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'x'),
+    'Go single-letter variable x should trigger NAM-SGL-001',
+  );
+  assert.ok(
+    !sglIssues.some((i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === '_'),
+    'Go wildcard _ should be exempt from NAM-SGL-001',
+  );
+  assert.ok(
+    !sglIssues.some((i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'i'),
+    'Go loop index i should be exempt from NAM-SGL-001',
+  );
+  assert.strictEqual(
+    sglIssues.filter((i) => i.location.file.endsWith('.go')).length,
+    1,
+    'Only non-test variable x should trigger NAM-SGL-001 in Go; test x must be exempted',
+  );
+
+  const vagIssues = byRule('NAM-VAG-001');
+  assert.ok(
+    vagIssues.some((i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'res'),
+    'Go variable res should trigger NAM-VAG-001',
+  );
+  assert.strictEqual(
+    vagIssues.filter((i) => i.location.file.endsWith('.go')).length,
+    1,
+    'Only non-test variable res should trigger NAM-VAG-001 in Go; test data must be exempted',
+  );
+
+  console.log('  ✔ NAM-TYP-001, NAM-JRG-002, NAM-SGL-001, NAM-VAG-001 verified for Go');
+}
+
+function verifyGDScriptPolyglotNaming(byRule) {
+  const typIssues = byRule('NAM-TYP-001');
+  assert.ok(
+    typIssues.some(
+      (i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === 'bad_gd_class',
+    ),
+    'GDScript bad_gd_class should trigger NAM-TYP-001',
+  );
+
+  const glbIssues = byRule('NAM-GLB-001');
+  assert.ok(
+    glbIssues.some(
+      (i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === 'bad_gd_const',
+    ),
+    'GDScript bad_gd_const should trigger NAM-GLB-001',
+  );
+  assert.ok(
+    !glbIssues.some(
+      (i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === 'MAX_SPEED',
+    ),
+    'GDScript MAX_SPEED constant should be valid',
+  );
+
+  const sglIssues = byRule('NAM-SGL-001');
+  assert.ok(
+    sglIssues.some((i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === 'x'),
+    'GDScript single-letter variable x should trigger NAM-SGL-001',
+  );
+  assert.ok(
+    !sglIssues.some((i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === '_'),
+    'GDScript wildcard _ should be exempt from NAM-SGL-001',
+  );
+  assert.ok(
+    !sglIssues.some((i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === 'i'),
+    'GDScript loop index i should be exempt from NAM-SGL-001',
+  );
+
+  const vagIssues = byRule('NAM-VAG-001');
+  assert.ok(
+    vagIssues.some((i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === 'res'),
+    'GDScript variable res should trigger NAM-VAG-001',
+  );
+
+  console.log('  ✔ NAM-TYP-001, NAM-GLB-001, NAM-SGL-001, NAM-VAG-001 verified for GDScript');
+}
+
+function verifyPolyglotVariableLengthsAndActionable(byRule) {
+  const len1Issues = byRule('NAM-LEN-001');
+  assert.ok(
+    len1Issues.some((i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'fn'),
+    'Go variable fn should trigger NAM-LEN-001',
+  );
+  assert.ok(
+    len1Issues.some((i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === 'fn'),
+    'GDScript variable fn should trigger NAM-LEN-001',
+  );
+  assert.ok(
+    len1Issues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'fn'),
+    'Rust variable fn should trigger NAM-LEN-001',
+  );
+  assert.ok(
+    len1Issues.some((i) => i.location.file.endsWith('.py') && i.detail && i.detail.name === 'fn'),
+    'Python variable fn should trigger NAM-LEN-001',
+  );
+
+  const polyglotIssues = [...len1Issues, ...byRule('NAM-TYP-001'), ...byRule('NAM-GLB-001')].filter(
+    (i) => !i.location.file.endsWith('.ts'),
+  );
+  assert.ok(polyglotIssues.length >= 8, 'Expected polyglot issues with actionable payloads');
+  for (const issue of polyglotIssues) {
+    assert.ok(
+      issue.actionable,
+      `Issue ${issue.rule} in ${issue.location.file} must attach actionable payload`,
+    );
+    assert.strictEqual(issue.actionable.action, 'replace_token');
+    assert.strictEqual(issue.actionable.taxonomy, 'GOV_NORM');
+    assert.ok(issue.actionable.targetSymbol, 'Actionable payload must contain targetSymbol');
+  }
+
+  console.log(
+    '  ✔ NAM-LEN-001 and AAS v1.0 actionable payload verified across Go, GDScript, Rust, and Python',
+  );
+}
+
 async function run() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-naming-'));
   try {
     writeWorkspace(root);
     const report = await scan({
       root,
-      include: ['src/**/*.ts', 'src/**/*.py', 'src/**/*.go', 'src/**/*.rs'],
+      include: ['src/**/*.ts', 'src/**/*.py', 'src/**/*.go', 'src/**/*.rs', 'src/**/*.gd'],
       analyzers: ['naming'],
       cache: false,
       daemon: 'off',
@@ -469,6 +649,9 @@ async function run() {
     verifyFunctionLengthRules(byRule);
     verifyAdaptiveNamingRules(byRule);
     verifyRustPolyglotNaming(byRule);
+    verifyGoPolyglotNaming(byRule);
+    verifyGDScriptPolyglotNaming(byRule);
+    verifyPolyglotVariableLengthsAndActionable(byRule);
 
     console.log('\n ALL NAMING SUITE VERIFICATION CHECKS PASSED SUCCESSFULLY!\n');
   } finally {
