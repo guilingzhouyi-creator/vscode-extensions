@@ -157,7 +157,10 @@ async function performDeepAstScan(fastMode) {
     if (totalScore == null) {
       return null;
     }
-    const caiIndex = report.autonomy?.compositeAutonomyIndex ?? 100.0;
+    // An absent autonomy index means the scan did not measure it. Falling back to a full-score
+    // literal would publish a measurement that never happened, so absence is carried through as
+    // null and the consumers below decide how to report an unmeasured plane.
+    const caiIndex = report.autonomy?.compositeAutonomyIndex ?? null;
     let lowerBound = report.autonomy?.confidence?.lowerBound;
     if (lowerBound == null) {
       const p = Math.max(0, Math.min(1, totalScore / 100.0));
@@ -173,7 +176,7 @@ async function performDeepAstScan(fastMode) {
 
     return {
       compositeScore: Number(totalScore.toFixed(2)),
-      caiIndex: Number(caiIndex.toFixed(2)),
+      caiIndex: caiIndex === null ? null : Number(caiIndex.toFixed(2)),
       credibleLowerBound: Number(lowerBound.toFixed(2)),
       antiGamingPassed: isAntiGamingPassed,
       triPlaneQuality: report.triPlaneQuality || null,
@@ -341,11 +344,14 @@ async function main() {
     qualityEnvelope: {
       composite_score: finalCompositeScore,
       cai_score: finalCaiIndex,
-      cyclomatic_complexity_delta: 0,
-      eloc_delta: 0,
+      // Neither delta is measured by this report: it runs the gate suite, not a before/after
+      // structural diff. The previous literal zeros read as "measured, no change" and are replaced
+      // by null so a consumer sees absence rather than a fabricated result.
+      cyclomatic_complexity_delta: null,
+      eloc_delta: null,
       credible_interval_lower: finalCiLower,
       anti_gaming_passed: finalAntiGaming,
-      summary_report: `Auto-Refactor Quality Gate: ${passChecks}/${totalChecks} checks green, Composite=${finalCompositeScore}, CAI=${caiLabel}`,
+      summary_report: `Auto-Refactor Quality Gate: ${passChecks}/${totalChecks} checks green, Composite=${finalCompositeScore}, CAI=${caiLabel}, structural deltas unmeasured`,
     },
     violations,
     warnings,
