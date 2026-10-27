@@ -231,6 +231,7 @@ dependencies = [
  "fg-object",
  "fg-pools",
  "flate2",
+ "libc",
  "roaring",
  "serde",
  "serde_json",
