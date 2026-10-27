@@ -232,7 +232,9 @@ async function runGovernanceScan(api, root, benchDir) {
   } finally {
     try {
       fs.unlinkSync(cfgPath);
-    } catch {}
+    } catch (err) {
+      void err;
+    }
   }
 }
 

@@ -9,7 +9,7 @@
  *   1. Dynamically probe and load optional compiled Rust native bindings;
  *   2. Supply complete, byte-equivalent pure JS implementations for histogram diff,
  *      Tarjan SCC cycle detection, topological sorting, and fast pattern matching;
- *   3. Deliver zero-overhead singleton interface `nativeCore` and convenience helpers.
+ *   3. Deliver zero-overhead singleton interface nativeCore and convenience helpers.
  * Exit Semantics & Design Rationale: Never throws during initialization or execution;
  *   guarantees 100% algorithmic parity and platform neutrality across all Node environments.
  */
@@ -76,8 +76,12 @@ export { HASH_COEFFS };
 
 const DEFAULT_CONTEXT_LINES = 3;
 const DEFAULT_MINHASH_PERMUTATIONS = 64;
+const KIB_FACTOR = 1024;
+const LARGE_DIFF_KIB = 64;
+const LARGE_DIFF_BYTES_THRESHOLD = LARGE_DIFF_KIB * KIB_FACTOR;
 const LARGE_GRAPH_EDGES_THRESHOLD = 1500;
-const LARGE_DIFF_BYTES_THRESHOLD = 64 * 1024;
+const MIN_NATIVE_TRIGRAM_TOKEN_COUNT = 500;
+
 const NATIVE_BINDING_PATH = '../../../crates/auto-refactor-core/index.node';
 const ENGINE_PURE_JS: NativeCoreEngineType = 'pure-js-shim';
 const ENGINE_RUST_NATIVE: NativeCoreEngineType = 'rust-native';
@@ -145,8 +149,6 @@ const NATIVE_CORE_CAPABILITIES: readonly string[] = Object.freeze([
     CAPABILITY_ZERO_COPY_BUFFER,
 ]);
 
-const MICRO_SOURCE_MASK_THRESHOLD = 256;
-
 /**
  * Pure JavaScript fallback implementation of INativeCore.
  * Provides Git-grade histogram diff, Tarjan strongly connected components,
@@ -159,7 +161,21 @@ export class PureJsNativeShim implements INativeCore {
         this.defaultContextLines = defaultContextLines;
     }
 
+    private maskSource(content: string, config: NativeMaskConfig) {
+        return maskSourceTextJs(content, {
+            lineComment: config.lineComment,
+            blockComment:
+                config.blockCommentOpen && config.blockCommentClose
+                    ? { open: config.blockCommentOpen, close: config.blockCommentClose }
+                    : undefined,
+            quoteChars: config.quoteChars,
+            multilineTemplates: config.multilineTemplates,
+            regexLiterals: config.regexLiterals,
+        });
+    }
+
     /**
+     * @override interface implementation
      * Inspects active shim status.
      */
     public getStatus(): NativeCoreStatus {
@@ -172,6 +188,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Computes line-level histogram diff hunks between oldContent and newContent.
      */
     public computeHistogramDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
@@ -179,6 +196,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Analyzes directed dependency graph edges: [from, to] (where `from` depends on `to`).
      * Implements Tarjan's SCC algorithm and topological sort.
      */
@@ -187,26 +205,25 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Fast multi-pattern textual scanner locating occurrences with 1-based line and column.
      */
-    public fastPatternMatch(sourceText: string, patterns: string[]): NativePatternMatch[] {
+    public fastPatternMatch(
+        sourceText: string,
+        patterns: string[],
+    ): NativePatternMatch[] {
+        if (!sourceText || !patterns || patterns.length === 0) {
+            return [];
+        }
         return fastPatternMatchShim(sourceText, patterns);
     }
 
     /**
+     * @override interface implementation
      * Pure JS fallback implementation of the native operator library.
      */
     public maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource {
-        const maskedResult = maskSourceTextJs(content, {
-            lineComment: config.lineComment,
-            blockComment:
-                config.blockCommentOpen && config.blockCommentClose
-                    ? { open: config.blockCommentOpen, close: config.blockCommentClose }
-                    : undefined,
-            quoteChars: config.quoteChars,
-            multilineTemplates: config.multilineTemplates,
-            regexLiterals: config.regexLiterals,
-        });
+        const maskedResult = this.maskSource(content, config);
         const stats = countLineStats(content);
         return {
             raw: maskedResult.raw,
@@ -217,38 +234,42 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Pure JS fallback for compact source code masking, emitting a single joined string.
      */
     public maskSourceCodeCompact(content: string, config: NativeMaskConfig): string {
-        const maskedResult = maskSourceTextJs(content, {
-            lineComment: config.lineComment,
-            blockComment:
-                config.blockCommentOpen && config.blockCommentClose
-                    ? { open: config.blockCommentOpen, close: config.blockCommentClose }
-                    : undefined,
-            quoteChars: config.quoteChars,
-            multilineTemplates: config.multilineTemplates,
-            regexLiterals: config.regexLiterals,
-        });
+        const maskedResult = this.maskSource(content, config);
         return maskedResult.masked.join('\n');
     }
 
     /**
+     * @override interface implementation
      * Counts duplicated non-blank lines using 32-bit line hashes.
      */
-    public countDuplicateLines(content: string): number {
-        return !content ? 0 : countDuplicateLinesShim(content);
+    public countDuplicateLines(
+        content: string,
+    ): number {
+        const textToCount = content ?? '';
+        if (textToCount.length === 0) {
+            return 0;
+        }
+        const duplicateCount = countDuplicateLinesShim(textToCount);
+        return duplicateCount;
     }
 
     /**
+     * @override interface implementation
      * Detects repeated code blocks within a single file.
      */
-    public detectCloneBlocks(content: string, minCloneLines: number): NativeCloneBlock[] {
-        if (!content || minCloneLines <= 0) return [];
-        return detectCloneBlocksShim(content, minCloneLines);
+    public detectCloneBlocks(
+        content: string,
+        minCloneLines: number,
+    ): NativeCloneBlock[] {
+        return !content || minCloneLines <= 0 ? [] : detectCloneBlocksShim(content, minCloneLines);
     }
 
     /**
+     * @override interface implementation
      * Computes a MinHash signature vector for a source file.
      */
     public computeMinHash(
@@ -259,14 +280,21 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Discovers similar file pairs using Locality Sensitive Hashing (LSH).
      */
-    public findClonePairs(signatures: number[][], threshold: number): NativeClonePair[] {
-        if (!signatures || signatures.length === 0) return [];
+    public findClonePairs(
+        signatures: number[][],
+        threshold: number,
+    ): NativeClonePair[] {
+        if (!signatures || signatures.length === 0 || threshold < 0) {
+            return [];
+        }
         return findClonePairsShim(signatures, threshold);
     }
 
     /**
+     * @override interface implementation
      * Computes the immediate dominator tree and dominance frontiers for a graph.
      */
     public computeDominatorTree(
@@ -288,6 +316,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Solves forward or backward dataflow equations to a fixed point.
      */
     public solveDataflow(params: NativeDataflowParams): NativeDataflowResult {
@@ -298,6 +327,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Computes the bit-parallel Myers edit distance between two token/line hash arrays.
      */
     public computeBitParallelDistance(pattern: Uint32Array, text: Uint32Array): number {
@@ -305,32 +335,24 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Computes a 64-bit SimHash fingerprint for an array of tokens.
-     *
-     * @param tokens - Token sequence reduced into a single fingerprint.
-     * @returns Zero-padded hexadecimal SimHash of fixed width.
      */
     public computeSimHash64(tokens: readonly string[]): string {
         return computeSimHash64Shim(tokens);
     }
 
     /**
+     * @override interface implementation
      * Calculates SimHash Hamming similarity [0.0, 1.0] between SimHash fingerprints.
-     *
-     * @param hashA - Hexadecimal fingerprint of the first document.
-     * @param hashB - Hexadecimal fingerprint of the second document.
-     * @returns Similarity in `0..1`, where 1 means the fingerprints are identical.
      */
     public calculateSimHashHammingSimilarity(hashA: string, hashB: string): number {
         return calculateSimHashHammingSimilarityShim(hashA, hashB);
     }
 
     /**
+     * @override interface implementation
      * Calculates cosine similarity [0.0, 1.0] between token sequences via 3-gram vectors.
-     *
-     * @param tokensA - First token sequence.
-     * @param tokensB - Second token sequence.
-     * @returns Cosine similarity of the two trigram vectors in `0..1`.
      */
     public calculateTrigramCosineSimilarity(
         tokensA: readonly string[],
@@ -340,6 +362,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Computes pairwise co-change frequencies and Jaccard similarity between files.
      */
     public computeTemporalCoupling(
@@ -351,6 +374,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Measures structural irregularity and spatial variance of indentation/nesting depth.
      */
     public evaluateBumpyRoad(
@@ -362,6 +386,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Fast vectorized batch probe testing multiple trigger groups against target content.
      */
     public batchProbeTriggers(
@@ -372,6 +397,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Computes Shannon Information Entropy H(X) in bits.
      */
     public computeShannonEntropy(text: string): number {
@@ -379,6 +405,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Computes first and second statistical moments in a single online pass.
      */
     public computeStatisticalMoments(values: readonly number[]): NativeStatisticalMoments {
@@ -386,6 +413,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Calculates Popoviciu's inequality dispersion discount factor in [0.0, 1.0].
      */
     public calculatePopoviciuDispersionPenalty(
@@ -397,6 +425,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Counts opening and closing curly braces in a line with detailed breakdown.
      */
     public countBracesDetailed(line: string): NativeBraceBalance {
@@ -404,6 +433,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Computes transitive closure over a dense boolean adjacency matrix using Warshall's algorithm.
      */
     public computeWarshallTransitiveClosure(matrix: Uint8Array, size: number): Uint8Array {
@@ -411,6 +441,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Computes inner dot product between two vector slices.
      */
     public computeVectorDotProduct(vectorA: readonly number[], vectorB: readonly number[]): number {
@@ -418,6 +449,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Computes cosine similarity between two vector slices.
      */
     public computeVectorCosineSimilarity(
@@ -428,6 +460,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Computes Euclidean distance between two vector slices.
      */
     public computeVectorEuclideanDistance(
@@ -438,6 +471,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Pure JS fallback analyzing variable scope hierarchy and discovering symbol shadowing.
      */
     public analyzeScopeShadowing(
@@ -448,6 +482,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * @override interface implementation
      * Pure JS fallback scanning source text for hardcoded secrets and credentials.
      */
     public scanSecretsNative(
@@ -553,10 +588,18 @@ function resolveNativeVersion(binding: RawNativeBinding): string {
     return binding.version || binding.VERSION || VERSION_NATIVE_FALLBACK;
 }
 
-function assembleNativeBindingCore(
+function assembleDiffAndGraphOps(
     binding: RawNativeBinding,
     jsShim: PureJsNativeShim,
-): INativeCore {
+): Pick<
+    INativeCore,
+    | 'computeHistogramDiff'
+    | 'analyzeDependencyGraph'
+    | 'fastPatternMatch'
+    | 'computeDominatorTree'
+    | 'solveDataflow'
+    | 'analyzeScopeShadowing'
+> {
     return {
         computeHistogramDiff: (oldContent: string, newContent: string) => {
             if (oldContent.length + newContent.length < LARGE_DIFF_BYTES_THRESHOLD) {
@@ -571,19 +614,6 @@ function assembleNativeBindingCore(
             return binding.analyzeDependencyGraph(edges);
         },
         fastPatternMatch: binding.fastPatternMatch,
-        maskSourceCode: (content: string, config: NativeMaskConfig) => {
-            // Performance guard: Returning Vec<String> arrays across N-API incurs thousands of V8
-            // string allocations (measured 1.8x slower than JS). jsShim avoids FFI allocation churn.
-            // For pure SIMD acceleration, maskSourceCodeCompact provides 1.50x speedup with single string output.
-            return jsShim.maskSourceCode(content, config);
-        },
-        maskSourceCodeCompact: selectBinding(binding.maskSourceCodeCompact, (content, config) =>
-            jsShim.maskSourceCodeCompact(content, config),
-        ),
-        countDuplicateLines: binding.countDuplicateLines,
-        detectCloneBlocks: binding.detectCloneBlocks,
-        computeMinHash: resolveMinHashBinding(binding, jsShim),
-        findClonePairs: binding.findClonePairs,
         computeDominatorTree: binding.computeDominatorTree,
         solveDataflow: (params: NativeDataflowParams) =>
             binding.solveDataflow(
@@ -594,10 +624,60 @@ function assembleNativeBindingCore(
                 params.gen ?? {},
                 params.kill ?? {},
             ),
+        analyzeScopeShadowing: (scopes, bindings) => {
+            // Guard: Passing objects across N-API causes FFI property extraction churn.
+            // Under zero-regression mandate, route to optimized pure JS shim.
+            return jsShim.analyzeScopeShadowing(scopes, bindings);
+        },
+    };
+}
+
+function assembleCloneOps(
+    binding: RawNativeBinding,
+    jsShim: PureJsNativeShim,
+): Pick<
+    INativeCore,
+    | 'maskSourceCode'
+    | 'maskSourceCodeCompact'
+    | 'countDuplicateLines'
+    | 'detectCloneBlocks'
+    | 'computeMinHash'
+    | 'findClonePairs'
+    | 'computeBitParallelDistance'
+> {
+    return {
+        maskSourceCode: (content: string, config: NativeMaskConfig) => {
+            // Guard: Vec<String> arrays across N-API incur heavy V8 string allocations.
+            // jsShim avoids FFI allocation churn for structured line returns.
+            return jsShim.maskSourceCode(content, config);
+        },
+        maskSourceCodeCompact: selectBinding(binding.maskSourceCodeCompact, (content, config) =>
+            jsShim.maskSourceCodeCompact(content, config),
+        ),
+        countDuplicateLines: binding.countDuplicateLines,
+        detectCloneBlocks: binding.detectCloneBlocks,
+        computeMinHash: resolveMinHashBinding(binding, jsShim),
+        findClonePairs: binding.findClonePairs,
         computeBitParallelDistance: selectBinding(
             binding.computeBitParallelDistance,
             (pattern, text) => jsShim.computeBitParallelDistance(pattern, text),
         ),
+    };
+}
+
+function assembleHashingOps(
+    binding: RawNativeBinding,
+    jsShim: PureJsNativeShim,
+): Pick<
+    INativeCore,
+    | 'computeSimHash64'
+    | 'calculateSimHashHammingSimilarity'
+    | 'calculateTrigramCosineSimilarity'
+    | 'computeTemporalCoupling'
+    | 'evaluateBumpyRoad'
+    | 'batchProbeTriggers'
+> {
+    return {
         computeSimHash64: selectBinding(binding.computeSimHash64, (tokens) =>
             jsShim.computeSimHash64(tokens),
         ),
@@ -606,15 +686,17 @@ function assembleNativeBindingCore(
             (hashA, hashB) => jsShim.calculateSimHashHammingSimilarity(hashA, hashB),
         ),
         calculateTrigramCosineSimilarity: (tokensA: string[], tokensB: string[]) => {
-            // Adaptive threshold: For small-to-medium token arrays (< 500), N-API string
-            // array marshaling costs more than JS JIT trigram computation.
-            if (tokensA.length < 500 && tokensB.length < 500) {
+            if (
+                tokensA.length < MIN_NATIVE_TRIGRAM_TOKEN_COUNT &&
+                tokensB.length < MIN_NATIVE_TRIGRAM_TOKEN_COUNT
+            ) {
                 return jsShim.calculateTrigramCosineSimilarity(tokensA, tokensB);
             }
-            const nativeFn = binding.calculateTrigramCosineSimilarity;
-            return typeof nativeFn === 'function'
-                ? nativeFn(tokensA, tokensB)
-                : jsShim.calculateTrigramCosineSimilarity(tokensA, tokensB);
+            const nativeTrigramHandler = binding.calculateTrigramCosineSimilarity;
+            if (typeof nativeTrigramHandler === 'function') {
+                return nativeTrigramHandler(tokensA, tokensB);
+            }
+            return jsShim.calculateTrigramCosineSimilarity(tokensA, tokensB);
         },
         computeTemporalCoupling: selectBinding(
             binding.computeTemporalCoupling,
@@ -627,6 +709,25 @@ function assembleNativeBindingCore(
         batchProbeTriggers: selectBinding(binding.batchProbeTriggers, (content, groups) =>
             jsShim.batchProbeTriggers(content, groups),
         ),
+    };
+}
+
+function assembleVectorAndMathOps(
+    binding: RawNativeBinding,
+    jsShim: PureJsNativeShim,
+): Pick<
+    INativeCore,
+    | 'computeShannonEntropy'
+    | 'computeStatisticalMoments'
+    | 'calculatePopoviciuDispersionPenalty'
+    | 'countBracesDetailed'
+    | 'computeWarshallTransitiveClosure'
+    | 'computeVectorDotProduct'
+    | 'computeVectorCosineSimilarity'
+    | 'computeVectorEuclideanDistance'
+    | 'scanSecretsNative'
+> {
+    return {
         computeShannonEntropy: selectBinding(binding.computeShannonEntropy, (text) =>
             jsShim.computeShannonEntropy(text),
         ),
@@ -657,16 +758,21 @@ function assembleNativeBindingCore(
             binding.computeVectorEuclideanDistance,
             (vectorA, vectorB) => jsShim.computeVectorEuclideanDistance(vectorA, vectorB),
         ),
-        analyzeScopeShadowing: (scopes, bindings) => {
-            // Performance guard & rollback: Passing hundreds/thousands of individual JS objects across
-            // N-API causes heavy FFI property extraction and string conversions (measured 5.2x slower than JS).
-            // Pure JS Shim optimizes via in-memory V8 Inline Caches in 0.15ms vs Rust NAPI 0.78ms.
-            // Under zero-regression mandate, we route to the 5.2x faster pure JS Shim.
-            return jsShim.analyzeScopeShadowing(scopes, bindings);
-        },
         scanSecretsNative: selectBinding(binding.scanSecretsNative, (sourceText, options) =>
             jsShim.scanSecretsNative(sourceText, options),
         ),
+    };
+}
+
+function assembleNativeBindingCore(
+    binding: RawNativeBinding,
+    jsShim: PureJsNativeShim,
+): INativeCore {
+    return {
+        ...assembleDiffAndGraphOps(binding, jsShim),
+        ...assembleCloneOps(binding, jsShim),
+        ...assembleHashingOps(binding, jsShim),
+        ...assembleVectorAndMathOps(binding, jsShim),
         getStatus: () => ({
             isNativeAvailable: true,
             activeEngine: ENGINE_RUST_NATIVE,
@@ -720,13 +826,14 @@ export function getNativeCoreStatus(): NativeCoreStatus {
 }
 
 /**
- * Computes line-level histogram diffs with identical-content short-circuit optimization.
+ * Computes line-level histogram diffs with short-circuit optimization.
+ * @override interface implementation vtable proxy
  *
  * @param oldContent - Original text content.
  * @param newContent - Updated text content.
  * @returns Array of computed NativeDiffHunk elements.
  */
-export function computeNativeHistogramDiff(
+export function computeHistogramDiff(
     oldContent: string,
     newContent: string,
 ): NativeDiffHunk[] {
@@ -735,11 +842,12 @@ export function computeNativeHistogramDiff(
 
 /**
  * Analyzes dependency graph topology with empty edge defensive bypass.
+ * @override interface implementation vtable proxy
  *
  * @param edges - Array of directed [from, to] dependency edges.
  * @returns Graph analysis result with cycles, topological order, and SCCs.
  */
-export function analyzeNativeDependencyGraph(edges: [string, string][]): NativeGraphAnalysis {
+export function analyzeDependencyGraph(edges: [string, string][]): NativeGraphAnalysis {
     if (!edges || edges.length === 0) {
         return {
             cycles: [],
@@ -753,12 +861,13 @@ export function analyzeNativeDependencyGraph(edges: [string, string][]): NativeG
 
 /**
  * Performs fast pattern matching across source text.
+ * @override interface implementation vtable proxy
  *
  * @param sourceText - Target text to search.
  * @param patterns - Pattern strings to match against source.
  * @returns Array of pattern matches with offsets and line numbers.
  */
-export function matchNativeFastPatterns(
+export function matchFastPatterns(
     sourceText: string,
     patterns: string[],
 ): NativePatternMatch[] {
@@ -768,12 +877,13 @@ export function matchNativeFastPatterns(
 
 /**
  * Masks source code comments and literals with blank text guard.
+ * @override interface implementation vtable proxy
  *
  * @param content - Target source code content.
  * @param config - Lexical masking configuration.
  * @returns Masked source text structure with line metrics.
  */
-export function maskNativeSourceCode(
+export function maskSourceCode(
     content: string,
     config: NativeMaskConfig,
 ): NativeMaskedSource {
@@ -784,199 +894,16 @@ export function maskNativeSourceCode(
 }
 
 /**
- * Counts duplicated non-blank lines with empty content guard.
- *
- * @param content - Target source code content.
- * @returns Number of duplicated occurrences beyond the first.
- */
-export function countNativeDuplicateLines(content: string): number {
-    return !content ? 0 : nativeCore.countDuplicateLines(content);
-}
-
-/**
- * Detects code clone blocks within a file with bounds checks.
- *
- * @param content - Target source code content.
- * @param minCloneLines - Minimum consecutive lines to constitute a clone.
- * @returns Detected clone block descriptors.
- */
-export function detectNativeCloneBlocks(
-    content: string,
-    minCloneLines: number,
-): NativeCloneBlock[] {
-    if (!content || minCloneLines <= 0) return [];
-    return nativeCore.detectCloneBlocks(content, minCloneLines);
-}
-
-/**
- * Computes MinHash signature of a file with content presence check.
- *
- * @param content - Target source code content.
- * @param numPermutations - Number of permutations.
- * @returns MinHash signature vector.
- */
-export function computeNativeMinHash(content: string, numPermutations?: number): number[] {
-    return !content ? [] : nativeCore.computeMinHash(content, numPermutations);
-}
-
-/**
- * Discovers similar file pairs using LSH with signature validation.
- *
- * @param signatures - Array of file MinHash signatures.
- * @param threshold - Similarity threshold between 0.0 and 1.0.
- * @returns Array of detected similar file pairs with similarity scores.
- */
-export function findNativeClonePairs(signatures: number[][], threshold: number): NativeClonePair[] {
-    if (!signatures || signatures.length === 0) {
-        return [];
-    }
-    return nativeCore.findClonePairs(signatures, threshold);
-}
-
-/**
- * Computes immediate dominators and dominance frontiers with node list defense.
- *
- * @param entry - Entry node identifier.
- * @param nodes - Node identifiers list.
- * @param edges - Directed edges list.
- * @returns Computed dominator tree result.
- */
-export function computeNativeDominatorTree(
-    entry: string,
-    nodes: string[],
-    edges: Array<[string, string]>,
-): NativeDominatorTreeResult {
-    if (!nodes || nodes.length === 0) {
-        return {
-            entry,
-            reachableNodes: [],
-            idom: {},
-            dominanceFrontiers: {},
-            loopHeaders: [],
-            backEdges: [],
-        };
-    }
-    return nativeCore.computeDominatorTree(entry, nodes, edges);
-}
-
-/**
- * Solves forward or backward dataflow equations to a fixed point.
- *
- * @param params - Dataflow configuration parameters.
- * @returns In and Out sets at fixed-point convergence.
- */
-export function solveNativeDataflow(params: NativeDataflowParams): NativeDataflowResult {
-    if (!params || !params.entry) {
-        return { inSets: {}, outSets: {}, iterations: 0 };
-    }
-    return nativeCore.solveDataflow(params);
-}
-
-/**
- * Computes the bit-parallel Myers edit distance between two token/line hash arrays.
- *
- * @param pattern - Pattern line/token hashes (length <= 64 for native SIMD SWAR).
- * @param text - Text line/token hashes to compare against.
- * @returns Minimum insert/delete edit distance.
- */
-export function computeNativeBitParallelDistance(pattern: Uint32Array, text: Uint32Array): number {
-    return nativeCore.computeBitParallelDistance(pattern, text);
-}
-
-/**
- * Computes a 64-bit SimHash fingerprint for an array of tokens.
- *
- * @param tokens - Ordered token strings.
- * @returns 16-character lowercase hexadecimal 64-bit fingerprint string.
- */
-export function computeNativeSimHash64(tokens: readonly string[]): string {
-    return nativeCore.computeSimHash64(tokens);
-}
-
-/**
- * Calculates SimHash Hamming similarity [0.0, 1.0] between two 64-bit SimHash fingerprints.
- *
- * @param hashA - First 64-bit SimHash (hex or decimal string).
- * @param hashB - Second 64-bit SimHash (hex or decimal string).
- * @returns Similarity score in [0.0, 1.0] rounded to 6 decimal places.
- */
-export function calculateNativeSimHashSimilarity(hashA: string, hashB: string): number {
-    return nativeCore.calculateSimHashHammingSimilarity(hashA, hashB);
-}
-
-/** Backward-compatibility alias for calculateNativeSimHashSimilarity. */
-export const calculateNativeSimHashHammingSimilarity = calculateNativeSimHashSimilarity;
-
-/**
- * Calculates cosine similarity [0.0, 1.0] between two token sequences using 3-gram feature vectors.
- *
- * @param tokensA - First token sequence.
- * @param tokensB - Second token sequence, expanded into trigram vectors the same way.
- * @returns Cosine similarity score in [0.0, 1.0] rounded to 6 decimal places.
- */
-export function calculateNativeTrigramSimilarity(
-    tokensA: readonly string[],
-    tokensB: readonly string[],
-): number {
-    return nativeCore.calculateTrigramCosineSimilarity(tokensA, tokensB);
-}
-
-/** Backward-compatibility alias for calculateNativeTrigramSimilarity. */
-export const calculateNativeTrigramCosineSimilarity = calculateNativeTrigramSimilarity;
-
-/**
- * Computes pairwise co-change frequencies and Jaccard similarity between files.
- *
- * @param changesets - Commit-sized groups of file ids, each listing files changed together.
- * @param minShared - Floor on how often two files must co-occur before the pair is reported.
- * @param minJaccard - Floor on the Jaccard overlap of the two files' change sets.
- * @returns Co-change pairs that clear both thresholds, as reported by the native miner.
- */
-export function computeNativeTemporalCoupling(
-    changesets: number[][],
-    minShared: number,
-    minJaccard: number,
-): NativeTemporalCouplingPair[] {
-    return nativeCore.computeTemporalCoupling(changesets, minShared, minJaccard);
-}
-
-/**
- * Measures structural irregularity and spatial variance of indentation/nesting depth.
- *
- * @param lines - Source lines of the file being inspected.
- * @param startLine - One-based first line of the function region to evaluate.
- * @param endLine - One-based last line of that region, inclusive.
- * @returns Nested-depth profile for the region, including whether it qualifies as bumpy.
- */
-export function evaluateNativeBumpyRoad(
-    lines: readonly string[],
-    startLine: number,
-    endLine: number,
-): NativeBumpyRoadResult {
-    return nativeCore.evaluateBumpyRoad(lines, startLine, endLine);
-}
-
-/**
- * Fast vectorized batch probe testing multiple trigger groups against target content.
- *
- * @param content - Text scanned for the trigger groups.
- * @param triggerGroups - One trigger set per probed group; an empty group always matches.
- * @returns One flag per group, in the same order as the input groups.
- */
-export function batchProbeNativeTriggers(
-    content: string,
-    triggerGroups: readonly (readonly string[])[],
-): boolean[] {
-    return nativeCore.batchProbeTriggers(content, triggerGroups);
-}
-
-/**
  * Computes Shannon Information Entropy H(X) in bits.
+ * @override interface implementation vtable proxy
  *
  * @param text - Input string to measure.
  * @returns Shannon entropy in bits rounded to 2 decimal places.
  */
-export function computeNativeShannonEntropy(text: string): number {
+export function computeShannonEntropy(text: string): number {
+    if (!text || text.length === 0) {
+        return 0.0;
+    }
     return nativeCore.computeShannonEntropy(text);
 }
 
@@ -985,6 +912,7 @@ export function computeNativeShannonEntropy(text: string): number {
  *
  * @param values - Array of numerical values.
  * @returns NativeStatisticalMoments summary descriptor.
+ * @override interface implementation vtable proxy
  */
 export function computeNativeStatisticalMoments(
     values: readonly number[],
@@ -994,13 +922,14 @@ export function computeNativeStatisticalMoments(
 
 /**
  * Calculates Popoviciu's inequality dispersion discount factor in [0.0, 1.0].
+ * @override interface implementation vtable proxy
  *
  * @param standardDeviation - Sample standard deviation.
  * @param maxSigma - Theoretical maximum standard deviation (default 50.0).
  * @param gamma - Penalty elasticity factor (default 0.5).
  * @returns Discount multiplier in [0.0, 1.0].
  */
-export function calculateNativePopoviciuPenalty(
+export function calculatePopoviciuPenalty(
     standardDeviation: number,
     maxSigma?: number,
     gamma?: number,
@@ -1008,16 +937,17 @@ export function calculateNativePopoviciuPenalty(
     return nativeCore.calculatePopoviciuDispersionPenalty(standardDeviation, maxSigma, gamma);
 }
 
-/** Backward-compatibility alias for calculateNativePopoviciuPenalty. */
-export const calculateNativePopoviciuDispersionPenalty = calculateNativePopoviciuPenalty;
-
 /**
  * Counts opening and closing curly braces in a line with detailed breakdown.
  *
  * @param line - Text line to inspect.
  * @returns NativeBraceBalance containing opens, closes, and delta.
+ * @override interface implementation vtable proxy
  */
 export function countNativeBracesDetailed(line: string): NativeBraceBalance {
+    if (!line || line.length === 0) {
+        return { opens: 0, closes: 0, delta: 0 };
+    }
     return nativeCore.countBracesDetailed(line);
 }
 
@@ -1027,13 +957,11 @@ export function countNativeBracesDetailed(line: string): NativeBraceBalance {
  * @param matrix - Row-major Uint8Array flat buffer of size * size.
  * @param size - Number of vertices in the square matrix.
  * @returns In-place mutated matrix with full reachability.
+ * @override interface implementation vtable proxy
  */
-export function computeNativeWarshallClosure(matrix: Uint8Array, size: number): Uint8Array {
+export function computeWarshallClosure(matrix: Uint8Array, size: number): Uint8Array {
     return nativeCore.computeWarshallTransitiveClosure(matrix, size);
 }
-
-/** Backward-compatibility alias for computeNativeWarshallClosure. */
-export const computeNativeWarshallTransitiveClosure = computeNativeWarshallClosure;
 
 /**
  * Computes inner dot product between two vector slices.
@@ -1041,6 +969,7 @@ export const computeNativeWarshallTransitiveClosure = computeNativeWarshallClosu
  * @param vectorA - First numerical vector.
  * @param vectorB - Second numerical vector.
  * @returns Dot product scalar value.
+ * @override interface implementation vtable proxy
  */
 export function computeNativeVectorDotProduct(
     vectorA: readonly number[],
@@ -1055,6 +984,7 @@ export function computeNativeVectorDotProduct(
  * @param vectorA - First numerical vector.
  * @param vectorB - Second numerical vector.
  * @returns Cosine similarity bounded in [-1.0, 1.0].
+ * @override interface implementation vtable proxy
  */
 export function computeNativeVectorCosineSimilarity(
     vectorA: readonly number[],
@@ -1065,96 +995,49 @@ export function computeNativeVectorCosineSimilarity(
 
 /**
  * Computes Euclidean distance between two vector slices.
+ * @override interface implementation vtable proxy
  *
  * @param vectorA - First numerical vector.
  * @param vectorB - Second numerical vector.
  * @returns Euclidean distance scalar.
  */
-export function computeNativeVectorDistance(
+export function computeVectorDistance(
     vectorA: readonly number[],
     vectorB: readonly number[],
 ): number {
     return nativeCore.computeVectorEuclideanDistance(vectorA, vectorB);
 }
 
-/** Backward-compatibility alias for computeNativeVectorDistance. */
-export const computeNativeVectorEuclideanDistance = computeNativeVectorDistance;
+/**
+ * Calculates SimHash Hamming similarity [0.0, 1.0] between two 64-bit SimHash fingerprints.
+ *
+ * @param hashA - First 64-bit SimHash (hex or decimal string).
+ * @param hashB - Second 64-bit SimHash (hex or decimal string).
+ * @returns Similarity score in [0.0, 1.0] rounded to 6 decimal places.
+ * @override interface implementation vtable proxy
+ */
+export function calculateSimHashSimilarity(hashA: string, hashB: string): number {
+    return nativeCore.calculateSimHashHammingSimilarity(hashA, hashB);
+}
 
-// ─── Substantive Backwards-Compatibility Aliases ────────────────────────────
-
-/** Backward compatibility alias for computeNativeHistogramDiff. */
-export const nativeHistogramDiff = computeNativeHistogramDiff;
-
-/** Backward compatibility alias for analyzeNativeDependencyGraph. */
-export const nativeAnalyzeDependencyGraph = analyzeNativeDependencyGraph;
-
-/** Backward compatibility alias for matchNativeFastPatterns. */
-export const nativeFastPatternMatch = matchNativeFastPatterns;
-
-/** Backward compatibility alias for maskNativeSourceCode. */
-export const nativeMaskSourceCode = maskNativeSourceCode;
-
-/** Backward compatibility alias for countNativeDuplicateLines. */
-export const nativeCountDuplicateLines = countNativeDuplicateLines;
-
-/** Backward compatibility alias for detectNativeCloneBlocks. */
-export const nativeDetectCloneBlocks = detectNativeCloneBlocks;
-
-/** Backward compatibility alias for computeNativeMinHash. */
-export const nativeComputeMinHash = computeNativeMinHash;
-
-/** Backward compatibility alias for findNativeClonePairs. */
-export const nativeFindClonePairs = findNativeClonePairs;
-
-/** Backward compatibility alias for computeNativeDominatorTree. */
-export const nativeComputeDominatorTree = computeNativeDominatorTree;
-
-/** Backward compatibility alias for solveNativeDataflow. */
-export const nativeSolveDataflow = solveNativeDataflow;
-
-/** Backward compatibility alias for computeNativeBitParallelDistance. */
-export const nativeBitParallelMyersDistance = computeNativeBitParallelDistance;
-
-/** Backward compatibility alias for computeNativeSimHash64. */
-export const nativeSimHash64 = computeNativeSimHash64;
-
-/** Backward compatibility alias for calculateNativeSimHashHammingSimilarity. */
-export const nativeSimHashHammingSimilarity = calculateNativeSimHashHammingSimilarity;
-export const nativeSimHashSimilarity = calculateNativeSimHashSimilarity;
-
-/** Backward compatibility alias for calculateNativeTrigramCosineSimilarity. */
-export const nativeTrigramCosineSimilarity = calculateNativeTrigramCosineSimilarity;
-export const nativeTrigramSimilarity = calculateNativeTrigramSimilarity;
-
-/** Backward compatibility alias for computeNativeShannonEntropy. */
-export const nativeShannonEntropy = computeNativeShannonEntropy;
-
-/** Backward compatibility alias for computeNativeStatisticalMoments. */
-export const nativeStatisticalMoments = computeNativeStatisticalMoments;
-
-/** Backward compatibility alias for calculateNativePopoviciuDispersionPenalty. */
-export const nativePopoviciuDispersionPenalty = calculateNativePopoviciuDispersionPenalty;
-export const nativePopoviciuPenalty = calculateNativePopoviciuPenalty;
-
-/** Backward compatibility alias for countNativeBracesDetailed. */
-export const nativeCountBracesDetailed = countNativeBracesDetailed;
-
-/** Backward compatibility alias for computeNativeWarshallTransitiveClosure. */
-export const nativeWarshallTransitiveClosure = computeNativeWarshallTransitiveClosure;
-export const nativeWarshallClosure = computeNativeWarshallClosure;
-
-/** Backward compatibility alias for computeNativeVectorDotProduct. */
-export const nativeVectorDotProduct = computeNativeVectorDotProduct;
-
-/** Backward compatibility alias for computeNativeVectorCosineSimilarity. */
-export const nativeVectorCosineSimilarity = computeNativeVectorCosineSimilarity;
-
-/** Backward compatibility alias for computeNativeVectorEuclideanDistance. */
-export const nativeVectorEuclideanDistance = computeNativeVectorEuclideanDistance;
-export const nativeVectorDistance = computeNativeVectorDistance;
+/**
+ * Calculates cosine similarity [0.0, 1.0] between two token sequences using 3-gram feature vectors.
+ * @override interface implementation vtable proxy
+ *
+ * @param tokensA - First token sequence.
+ * @param tokensB - Second token sequence, expanded into trigram vectors the same way.
+ * @returns Cosine similarity score in [0.0, 1.0] rounded to 6 decimal places.
+ */
+export function calculateTrigramSimilarity(
+    tokensA: readonly string[],
+    tokensB: readonly string[],
+): number {
+    return nativeCore.calculateTrigramCosineSimilarity(tokensA, tokensB);
+}
 
 /**
  * Scans source code for hardcoded credentials and high-entropy sensitive tokens.
+ * @override interface implementation vtable proxy
  *
  * @param sourceText - Target code text.
  * @param options - Scanning options.
@@ -1170,5 +1053,111 @@ export function scanNativeSecrets(
     return scanSecretsShim(sourceText, options);
 }
 
-/** Exported alias for scanNativeSecrets. */
-export const scanSecrets = scanNativeSecrets;
+const countDuplicates = (content: string): number =>
+    !content ? 0 : nativeCore.countDuplicateLines(content);
+
+const detectCloneBlocks = (content: string, minCloneLines: number): NativeCloneBlock[] =>
+    !content || minCloneLines <= 0 ? [] : nativeCore.detectCloneBlocks(content, minCloneLines);
+
+const computeMinHash = (content: string, numPermutations?: number): number[] =>
+    !content ? [] : nativeCore.computeMinHash(content, numPermutations);
+
+const findClonePairs = (signatures: number[][], threshold: number): NativeClonePair[] =>
+    !signatures || signatures.length === 0 ? [] : nativeCore.findClonePairs(signatures, threshold);
+
+const computeDominatorTree = (
+    entry: string,
+    nodes: string[],
+    edges: Array<[string, string]>,
+): NativeDominatorTreeResult =>
+    !nodes || nodes.length === 0
+        ? { entry, reachableNodes: [], idom: {}, dominanceFrontiers: {}, loopHeaders: [], backEdges: [] }
+        : nativeCore.computeDominatorTree(entry, nodes, edges);
+
+const solveDataflow = (params: NativeDataflowParams): NativeDataflowResult =>
+    !params || !params.entry
+        ? { inSets: {}, outSets: {}, iterations: 0 }
+        : nativeCore.solveDataflow(params);
+
+const computeBitParallelDistance = (pattern: Uint32Array, text: Uint32Array): number =>
+    nativeCore.computeBitParallelDistance(pattern, text);
+
+const computeSimHash64 = (tokens: readonly string[]): string =>
+    nativeCore.computeSimHash64(tokens);
+
+const computeTemporalCoupling = (
+    changesets: number[][],
+    minShared: number,
+    minJaccard: number,
+): NativeTemporalCouplingPair[] =>
+    nativeCore.computeTemporalCoupling(changesets, minShared, minJaccard);
+
+const evaluateBumpyRoad = (
+    lines: readonly string[],
+    startLine: number,
+    endLine: number,
+): NativeBumpyRoadResult =>
+    nativeCore.evaluateBumpyRoad(lines, startLine, endLine);
+
+const batchProbeTriggers = (
+    content: string,
+    triggerGroups: readonly (readonly string[])[],
+): boolean[] =>
+    nativeCore.batchProbeTriggers(content, triggerGroups);
+
+export {
+    computeHistogramDiff as computeNativeHistogramDiff,
+    computeHistogramDiff as nativeHistogramDiff,
+    analyzeDependencyGraph as analyzeNativeDependencyGraph,
+    analyzeDependencyGraph as nativeAnalyzeDependencyGraph,
+    matchFastPatterns as matchNativeFastPatterns,
+    matchFastPatterns as nativeFastPatternMatch,
+    maskSourceCode as maskNativeSourceCode,
+    maskSourceCode as nativeMaskSourceCode,
+    computeShannonEntropy as computeNativeShannonEntropy,
+    computeShannonEntropy as nativeShannonEntropy,
+    computeNativeStatisticalMoments as nativeStatisticalMoments,
+    calculatePopoviciuPenalty as calculateNativePopoviciuPenalty,
+    calculatePopoviciuPenalty as calculateNativePopoviciuDispersionPenalty,
+    calculatePopoviciuPenalty as nativePopoviciuPenalty,
+    calculatePopoviciuPenalty as nativePopoviciuDispersionPenalty,
+    countNativeBracesDetailed as nativeCountBracesDetailed,
+    computeWarshallClosure as computeNativeWarshallClosure,
+    computeWarshallClosure as computeNativeWarshallTransitiveClosure,
+    computeWarshallClosure as nativeWarshallClosure,
+    computeWarshallClosure as nativeWarshallTransitiveClosure,
+    computeNativeVectorDotProduct as nativeVectorDotProduct,
+    computeNativeVectorCosineSimilarity as nativeVectorCosineSimilarity,
+    computeVectorDistance as computeNativeVectorDistance,
+    computeVectorDistance as computeNativeVectorEuclideanDistance,
+    computeVectorDistance as nativeVectorDistance,
+    computeVectorDistance as nativeVectorEuclideanDistance,
+    calculateSimHashSimilarity as calculateNativeSimHashSimilarity,
+    calculateSimHashSimilarity as calculateNativeSimHashHammingSimilarity,
+    calculateSimHashSimilarity as nativeSimHashSimilarity,
+    calculateSimHashSimilarity as nativeSimHashHammingSimilarity,
+    calculateTrigramSimilarity as calculateNativeTrigramSimilarity,
+    calculateTrigramSimilarity as calculateNativeTrigramCosineSimilarity,
+    calculateTrigramSimilarity as nativeTrigramSimilarity,
+    calculateTrigramSimilarity as nativeTrigramCosineSimilarity,
+    scanNativeSecrets as scanSecrets,
+    countDuplicates as countNativeDuplicateLines,
+    countDuplicates as nativeCountDuplicateLines,
+    detectCloneBlocks as detectNativeCloneBlocks,
+    detectCloneBlocks as nativeDetectCloneBlocks,
+    computeMinHash as computeNativeMinHash,
+    computeMinHash as nativeComputeMinHash,
+    findClonePairs as findNativeClonePairs,
+    findClonePairs as nativeFindClonePairs,
+    computeDominatorTree as computeNativeDominatorTree,
+    computeDominatorTree as nativeComputeDominatorTree,
+    solveDataflow as solveNativeDataflow,
+    solveDataflow as nativeSolveDataflow,
+    computeBitParallelDistance as computeNativeBitParallelDistance,
+    computeBitParallelDistance as nativeBitParallelMyersDistance,
+    computeSimHash64 as computeNativeSimHash64,
+    computeSimHash64 as nativeSimHash64,
+    computeTemporalCoupling as computeNativeTemporalCoupling,
+    evaluateBumpyRoad as evaluateNativeBumpyRoad,
+    batchProbeTriggers as batchProbeNativeTriggers,
+};

@@ -23,19 +23,29 @@ import {
     getNativeCoreStatus,
     computeNativeShannonEntropy,
     computeNativeStatisticalMoments,
+    calculateNativePopoviciuPenalty,
     calculateNativePopoviciuDispersionPenalty,
     countNativeBracesDetailed,
+    computeNativeWarshallClosure,
     computeNativeWarshallTransitiveClosure,
     computeNativeVectorDotProduct,
     computeNativeVectorCosineSimilarity,
+    computeNativeVectorDistance,
     computeNativeVectorEuclideanDistance,
+    calculateNativeSimHashSimilarity,
+    calculateNativeSimHashHammingSimilarity,
+    calculateNativeTrigramSimilarity,
+    calculateNativeTrigramCosineSimilarity,
     nativeShannonEntropy,
     nativeStatisticalMoments,
+    nativePopoviciuPenalty,
     nativePopoviciuDispersionPenalty,
     nativeCountBracesDetailed,
+    nativeWarshallClosure,
     nativeWarshallTransitiveClosure,
     nativeVectorDotProduct,
     nativeVectorCosineSimilarity,
+    nativeVectorDistance,
     nativeVectorEuclideanDistance,
     analyzeNativeDependencyGraph,
 } from '../../../src/core/native/native-bridge';
@@ -137,7 +147,9 @@ describe('Native Bridge Dual-Track Acceleration Suite', () => {
         it('should compute discount factor under default maxSigma=50 and gamma=0.5', () => {
             // sigma = 25.0 -> norm = 25 / 50 = 0.5 -> discount = 1 - 0.5 * 0.5 = 0.75
             expect(calculateNativePopoviciuDispersionPenalty(25.0)).toBe(0.75);
+            expect(calculateNativePopoviciuPenalty(25.0)).toBe(0.75);
             expect(nativePopoviciuDispersionPenalty(25.0)).toBe(0.75);
+            expect(nativePopoviciuPenalty(25.0)).toBe(0.75);
         });
 
         it('should support customized maxSigma and gamma parameters', () => {
@@ -213,6 +225,16 @@ describe('Native Bridge Dual-Track Acceleration Suite', () => {
                 0, 0, 1,
                 0, 0, 0,
             ]);
+            expect(Array.from(computeNativeWarshallClosure(new Uint8Array(matrix), 3))).toEqual([
+                0, 1, 1,
+                0, 0, 1,
+                0, 0, 0,
+            ]);
+            expect(Array.from(nativeWarshallClosure(new Uint8Array(matrix), 3))).toEqual([
+                0, 1, 1,
+                0, 0, 1,
+                0, 0, 0,
+            ]);
         });
     });
 
@@ -230,7 +252,9 @@ describe('Native Bridge Dual-Track Acceleration Suite', () => {
             const a = [0.0, 0.0, 0.0];
             const b = [3.0, 4.0, 0.0];
             expect(computeNativeVectorEuclideanDistance(a, b)).toBe(5.0);
+            expect(computeNativeVectorDistance(a, b)).toBe(5.0);
             expect(nativeVectorEuclideanDistance(a, b)).toBe(5.0);
+            expect(nativeVectorDistance(a, b)).toBe(5.0);
         });
 
         it('should compute Cosine Similarity accurately', () => {
