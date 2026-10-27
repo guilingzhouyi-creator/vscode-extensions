@@ -444,14 +444,14 @@ export class AstPrefixRadixCache {
             }
 
             while (stack.length > 0) {
-                const item = stack.pop();
-                if (!item) continue;
-                if (item.node.children.size === 0 && item.node.lastAccessTime < oldestTime) {
-                    oldestTime = item.node.lastAccessTime;
-                    oldestLeaf = { parentMap: item.parentMap, key: item.key };
+                const stackEntry = stack.pop();
+                if (!stackEntry) continue;
+                if (stackEntry.node.children.size === 0 && stackEntry.node.lastAccessTime < oldestTime) {
+                    oldestTime = stackEntry.node.lastAccessTime;
+                    oldestLeaf = { parentMap: stackEntry.parentMap, key: stackEntry.key };
                 }
-                for (const [childKey, childNode] of item.node.children.entries()) {
-                    stack.push({ parentMap: item.node.children, key: childKey, node: childNode });
+                for (const [childKey, childNode] of stackEntry.node.children.entries()) {
+                    stack.push({ parentMap: stackEntry.node.children, key: childKey, node: childNode });
                 }
             }
 

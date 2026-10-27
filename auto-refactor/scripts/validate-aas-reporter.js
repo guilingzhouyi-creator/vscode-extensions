@@ -284,6 +284,73 @@ async function runTests() {
   assert.strictEqual(truncatedAas.truncated, 2, 'Must record omitted defects in truncated count');
   console.log('✔  Test 8: Defect budget and truncation tracking verified');
 
+  // Test 9: Sentence token compression engine
+  const { compressDiagnosticSentence } = require('../dist/core/reporting/aas-reporter');
+  assert.strictEqual(
+    compressDiagnosticSentence("Identifier 'LOOP_HEADER_RE' contains unapproved truncated abbreviation 'RE'."),
+    "identifier 'LOOP_HEADER_RE' unapproved abbr 'RE'",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence("Identifier 'val' is vague and uninformative; lacks domain context."),
+    "identifier 'val' lacks domain context",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence("Cognitive complexity (19) exceeds threshold (15) in function 'dispatchCommand'"),
+    "CC 19 > 15 in 'dispatchCommand'",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence("Effective code volume budget exceeded."),
+    "ELOC budget exceeded",
+  );
+  console.log('✔  Test 9: High-efficiency Token sentence compression engine verified');
+
+  // Test 10: Scale report >= 70% token savings ratchet
+  const scaleIssues = [];
+  for (let f = 0; f < 10; f++) {
+    const fPath = `src/module_${f}/service.ts`;
+    for (let i = 0; i < 6; i++) {
+      scaleIssues.push({
+        id: `naming:NAM-ABR-001:${fPath}:${i * 10 + 1}`,
+        analyzer: 'naming',
+        rule: 'NAM-ABR-001',
+        severity: 'warning',
+        message: `Identifier 'tempItem_${i}' contains unapproved truncated abbreviation 'tempItem_${i}'.`,
+        location: {
+          file: fPath,
+          start: { line: i * 10 + 1, column: 5 },
+          end: { line: i * 10 + 1, column: 15 },
+        },
+        detail: {
+          astKind: 'VariableDeclaration',
+          scope: 'BlockScope',
+          token: `tempItem_${i}`,
+          parentDeclaration: 'FunctionDeclaration',
+        },
+        actionable: {
+          action: 'rename_identifier',
+          patch: 'replace_identifier',
+          safeToAutomate: true,
+          templateSnippet: `expand tempItem_${i}`,
+        },
+        suggestion: `Expand abbreviation 'tempItem_${i}' to full descriptive name.`,
+      });
+    }
+  }
+  const scaleReport = createMockScanReport({ issues: scaleIssues });
+  const scaleVerbose = JSON.stringify(scaleReport, null, 2);
+  const scaleAas = toAasJson(scaleReport, { baseDir: '/workspace', pretty: false });
+  const scaleVerboseBytes = Buffer.byteLength(scaleVerbose, 'utf8');
+  const scaleAasBytes = Buffer.byteLength(scaleAas, 'utf8');
+  const scaleSavings = Math.round((1 - scaleAasBytes / scaleVerboseBytes) * 100);
+  console.log(
+    `   Scale report: Verbose ${scaleVerboseBytes}B | AAS ${scaleAasBytes}B | Savings: ${scaleSavings}%`,
+  );
+  assert.ok(
+    scaleSavings >= 70,
+    `Scale report must achieve >= 70% token/byte savings per AGENTS.md (got ${scaleSavings}%)`,
+  );
+  console.log('✔  Test 10: Scale report >= 70% Token savings ratchet verified');
+
   console.log('\n--- All Agent Audit Schema (AAS v1.0) Tests Passed! ---');
 }
 

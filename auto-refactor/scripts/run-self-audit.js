@@ -561,9 +561,9 @@ function computePreciseScore(tenDimensionsMap) {
   if (!tenDimensionsMap || typeof tenDimensionsMap !== 'object') return null;
   let weightedSum = 0;
   for (const dim of ALL_QUALITY_DIMENSIONS) {
-    const val =
+    const dimensionScore =
       typeof tenDimensionsMap[dim] === 'number' ? tenDimensionsMap[dim] : DEFAULT_MAX_SCORE;
-    weightedSum += val * 0.1;
+    weightedSum += dimensionScore * 0.1;
   }
   return Math.round(weightedSum * 10000) / 10000;
 }

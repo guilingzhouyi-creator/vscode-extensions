@@ -43,12 +43,12 @@ if (!['info', 'warning', 'error'].includes(severity)) {
 function countBaselineIssues(filePath) {
   if (!fs.existsSync(filePath)) return 0;
   try {
-    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    if (Array.isArray(data.groups)) {
-      return data.groups.reduce((acc, g) => acc + (g.count || 0), 0);
+    const baselinePayload = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (Array.isArray(baselinePayload.groups)) {
+      return baselinePayload.groups.reduce((acc, g) => acc + (g.count || 0), 0);
     }
-    if (Array.isArray(data.issues)) {
-      return data.issues.length;
+    if (Array.isArray(baselinePayload.issues)) {
+      return baselinePayload.issues.length;
     }
   } catch {
     return 0;
@@ -102,12 +102,12 @@ if (update) {
   cliArgs.push('--baseline', BASELINE, '--fail-on-severity', severity);
 }
 
-const result = spawnSync(process.execPath, cliArgs, { cwd: ROOT, stdio: 'inherit' });
-if (result.error) {
-  process.stderr.write(`[gate:self] failed to launch CLI: ${result.error.message}\n`);
+const scanProcessResult = spawnSync(process.execPath, cliArgs, { cwd: ROOT, stdio: 'inherit' });
+if (scanProcessResult.error) {
+  process.stderr.write(`[gate:self] failed to launch CLI: ${scanProcessResult.error.message}\n`);
   process.exit(2);
 }
-const code = result.status === null ? 2 : result.status;
+const code = scanProcessResult.status === null ? 2 : scanProcessResult.status;
 
 // The machine-readable report carries the ratchet annotations; summarize it instead of dumping
 // the full text report (the repository legitimately carries thousands of baselined findings).

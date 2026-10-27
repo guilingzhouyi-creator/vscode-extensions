@@ -144,6 +144,35 @@ export const COMMON_ABBREVIATIONS: Readonly<Record<string, string>> = Object.fre
 );
 
 /**
+ * Approved industry-standard domain abbreviations accepted across engineering teams.
+ */
+export const APPROVED_DOMAIN_ABBREVIATIONS: ReadonlySet<string> = new Set([
+    'fs',
+    're',
+    'cmd',
+    'arg',
+    'args',
+    'param',
+    'params',
+    'fn',
+    'db',
+    'prop',
+    'props',
+    'op',
+    'ops',
+    'ns',
+    'ast',
+    'id',
+    'ids',
+    'len',
+    'idx',
+    'src',
+    'dst',
+    'buf',
+    'ctx',
+]);
+
+/**
  * Unapproved abbreviations triggering NAM-ABR-001 warnings.
  */
 export const UNAPPROVED_ABBREVIATION_SET: ReadonlySet<string> = new Set([
@@ -157,18 +186,8 @@ export const UNAPPROVED_ABBREVIATION_SET: ReadonlySet<string> = new Set([
     'tbl',
     'chk',
     'cb',
-    'fn',
     'sf',
-    'db',
-    'fs',
     'el',
-    'ns',
-    'op',
-    're',
-    'param',
-    'arg',
-    'cmd',
-    'prop',
 ]);
 
 /**
@@ -549,13 +568,19 @@ export function inferNamingCandidates(name: string, node?: ts.Node): NamingCandi
  * Find unapproved abbreviation in an identifier.
  *
  * @param name - Identifier name to inspect.
+ * @param allowedCustomSet - Optional custom set of approved domain abbreviation tokens.
  * @returns Unapproved abbreviation record or null if compliant.
  */
 export function findUnapprovedAbbreviation(
     name: string,
+    allowedCustomSet?: ReadonlySet<string>,
 ): { unapproved: string; expanded?: string } | null {
     if (!name) return null;
     const lower = name.toLowerCase();
+
+    if (allowedCustomSet?.has(lower) || APPROVED_DOMAIN_ABBREVIATIONS.has(lower)) {
+        return null;
+    }
 
     if (UNAPPROVED_ABBREVIATION_SET.has(lower)) {
         return { unapproved: name, expanded: COMMON_ABBREVIATIONS[lower] };
@@ -564,6 +589,9 @@ export function findUnapprovedAbbreviation(
     const tokens = getIdentifierTokens(name);
     for (const token of tokens) {
         const tokenLower = token.toLowerCase();
+        if (allowedCustomSet?.has(tokenLower) || APPROVED_DOMAIN_ABBREVIATIONS.has(tokenLower)) {
+            continue;
+        }
         if (UNAPPROVED_ABBREVIATION_SET.has(tokenLower)) {
             return { unapproved: token, expanded: COMMON_ABBREVIATIONS[tokenLower] };
         }
@@ -906,6 +934,7 @@ export interface FunctionNamingAuditOptions {
     enforceVerbNounContract?: boolean;
     enforceMorphemeCheck?: boolean;
     allowedShortNames?: string[];
+    allowedAbbreviations?: string[];
 }
 
 interface DiagnosticDescriptorPayload {
@@ -938,7 +967,11 @@ function emitNamingIssue(
 }
 
 function checkAndEmitAbbreviation(target: NamingAuditTarget, context: NamingAuditContext): void {
-    const abbr = findUnapprovedAbbreviation(target.name);
+    const rawAllowed = context.opts?.allowedAbbreviations;
+    const customAllowed = rawAllowed
+        ? new Set<string>(rawAllowed.map((abbrToken: string) => abbrToken.toLowerCase()))
+        : undefined;
+    const abbr = findUnapprovedAbbreviation(target.name, customAllowed);
     if (!abbr) return;
     const desc = NamingMessages.UNAPPROVED_ABBREVIATION(
         target.name,

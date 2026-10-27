@@ -47,7 +47,7 @@ export interface CompiledPatternRule {
     /** Parsed root pattern node used for structural comparisons. */
     readonly patternNode: ts.Node;
     /** Source file container housing the pattern AST. */
-    readonly patternSf: ts.SourceFile;
+    readonly patternSourceFile: ts.SourceFile;
 }
 
 /**
@@ -126,18 +126,18 @@ export function unwrapParentheses(node: ts.Node): ts.Node {
  * @returns Compiled pattern structure with root AST node.
  */
 export function compilePattern(spec: PatternSpec): CompiledPatternRule {
-    const patternSf = ts.createSourceFile(
+    const patternSourceFile = ts.createSourceFile(
         '__pattern__.tsx',
         spec.pattern,
         ts.ScriptTarget.Latest,
         true,
         ts.ScriptKind.TSX,
     );
-    if (patternSf.statements.length === 0) {
+    if (patternSourceFile.statements.length === 0) {
         throw new Error(`Pattern yielded no valid AST nodes: "${spec.pattern}"`);
     }
 
-    const firstStmt = patternSf.statements[0];
+    const firstStmt = patternSourceFile.statements[0];
     let rootNode: ts.Node = firstStmt;
     const kind: PatternKind = spec.kind ?? 'auto';
 
@@ -145,13 +145,13 @@ export function compilePattern(spec: PatternSpec): CompiledPatternRule {
         rootNode = firstStmt.expression;
     } else if (
         kind === 'auto' &&
-        patternSf.statements.length === 1 &&
+        patternSourceFile.statements.length === 1 &&
         ts.isExpressionStatement(firstStmt)
     ) {
         rootNode = firstStmt.expression;
     }
 
-    return { spec, patternNode: rootNode, patternSf };
+    return { spec, patternNode: rootNode, patternSourceFile };
 }
 
 /**
@@ -167,7 +167,7 @@ function matchMetavariable(
         return true;
     }
 
-    const targetText = targetNode.getText(ctx.targetSf).trim();
+    const targetText = targetNode.getText(ctx.targetSourceFile).trim();
     const existing = ctx.bindings.get(name);
     if (existing !== undefined) {
         return normalizeCode(existing.value) === normalizeCode(targetText);
@@ -177,7 +177,7 @@ function matchMetavariable(
         name,
         value: targetText,
         nodeKind: ts.SyntaxKind[targetNode.kind],
-        range: computeRange(targetNode, ctx.targetSf),
+        range: computeRange(targetNode, ctx.targetSourceFile),
     });
     return true;
 }
@@ -188,8 +188,8 @@ function matchMetavariable(
 function matchLiteralsAndIdentifiers(
     pNode: ts.Node,
     tNode: ts.Node,
-    patternSf: ts.SourceFile,
-    targetSf: ts.SourceFile,
+    patternSourceFile: ts.SourceFile,
+    targetSourceFile: ts.SourceFile,
 ): boolean {
     if (ts.isIdentifier(pNode)) {
         return ts.isIdentifier(tNode) && pNode.text === tNode.text;
@@ -202,15 +202,15 @@ function matchLiteralsAndIdentifiers(
         );
     }
 
-    return pNode.getText(patternSf).trim() === tNode.getText(targetSf).trim();
+    return pNode.getText(patternSourceFile).trim() === tNode.getText(targetSourceFile).trim();
 }
 
 /**
  * Context container carrying pattern and target source files alongside captured bindings.
  */
 export interface PatternMatchContext {
-    readonly patternSf: ts.SourceFile;
-    readonly targetSf: ts.SourceFile;
+    readonly patternSourceFile: ts.SourceFile;
+    readonly targetSourceFile: ts.SourceFile;
     readonly bindings: Map<string, MetavariableBinding>;
 }
 
@@ -286,7 +286,7 @@ function matchGeneralChildren(pNode: ts.Node, tNode: ts.Node, ctx: PatternMatchC
     });
 
     if (pChildren.length === 0 && tChildren.length === 0) {
-        return matchLiteralsAndIdentifiers(pNode, tNode, ctx.patternSf, ctx.targetSf);
+        return matchLiteralsAndIdentifiers(pNode, tNode, ctx.patternSourceFile, ctx.targetSourceFile);
     }
     if (pChildren.length !== tChildren.length) {
         return false;
@@ -451,11 +451,11 @@ function buildBindingsRecord(
 function createStructuralMatch(
     rule: CompiledPatternRule,
     node: ts.Node,
-    targetSf: ts.SourceFile,
+    targetSourceFile: ts.SourceFile,
     bindings: Map<string, MetavariableBinding>,
 ): StructuralMatch {
-    const range = computeRange(node, targetSf);
-    const matchedText = targetSf.text.substring(range.start, range.end);
+    const range = computeRange(node, targetSourceFile);
+    const matchedText = targetSourceFile.text.substring(range.start, range.end);
     const replacementText = synthesizeRewrite(rule.spec.rewrite, bindings);
     const bindingsRecord = buildBindingsRecord(bindings);
 
@@ -472,14 +472,14 @@ function createStructuralMatch(
  * Discovers non-overlapping structural matches across target AST.
  *
  * @param rootNode - Document root AST node.
- * @param targetSf - Document source file.
+ * @param targetSourceFile - Document source file.
  * @param rules - Compiled pattern rewrite rules.
  * @param maxReplacements - Cap on number of matches collected.
  * @returns Array of discovered structural matches.
  */
 export function findMatches(
     rootNode: ts.Node,
-    targetSf: ts.SourceFile,
+    targetSourceFile: ts.SourceFile,
     rules: readonly CompiledPatternRule[],
     maxReplacements: number,
 ): StructuralMatch[] {
@@ -495,13 +495,13 @@ export function findMatches(
             const rule = rules[i];
             scratchVarToBindingMap.clear();
             const matched = matchNode(rule.patternNode, node, {
-                patternSf: rule.patternSf,
-                targetSf,
+                patternSourceFile: rule.patternSourceFile,
+                targetSourceFile,
                 bindings: scratchVarToBindingMap,
             });
 
             if (matched && evaluateConstraints(rule.spec.where, scratchVarToBindingMap)) {
-                matches.push(createStructuralMatch(rule, node, targetSf, scratchVarToBindingMap));
+                matches.push(createStructuralMatch(rule, node, targetSourceFile, scratchVarToBindingMap));
                 return;
             }
         }
@@ -609,7 +609,7 @@ function createNoopRewriteResult(
 }
 
 interface PreparedMatchEnvironment {
-    targetSf: ts.SourceFile;
+    targetSourceFile: ts.SourceFile;
     compiledRules: CompiledPatternRule[];
     rawRules: readonly PatternSpec[];
 }
@@ -624,14 +624,14 @@ function prepareMatchEnvironment(
         compiledRules.push(compilePattern(rawRules[i]));
     }
 
-    const targetSf = ts.createSourceFile(
+    const targetSourceFile = ts.createSourceFile(
         VIRTUAL_TARGET_FILE,
         sourceCode,
         ts.ScriptTarget.Latest,
         true,
         ts.ScriptKind.TSX,
     );
-    return { targetSf, compiledRules, rawRules };
+    return { targetSourceFile, compiledRules, rawRules };
 }
 
 function applySortedEdits(sourceCode: string, sortedMatches: StructuralMatch[]): string {
@@ -673,13 +673,13 @@ export function matchAndRewrite(
     ruleSpec: PatternSpec | readonly PatternSpec[],
     options?: MatchAndRewriteOptions,
 ): RewriteResult {
-    const { targetSf, compiledRules, rawRules } = prepareMatchEnvironment(sourceCode, ruleSpec);
+    const { targetSourceFile, compiledRules, rawRules } = prepareMatchEnvironment(sourceCode, ruleSpec);
     if (rawRules.length === 0) {
         throw new Error('matchAndRewrite requires at least one PatternSpec rule');
     }
 
     const maxReplacements = options?.maxReplacements ?? DEFAULT_MAX_MATCHES;
-    const matches = findMatches(targetSf, targetSf, compiledRules, maxReplacements);
+    const matches = findMatches(targetSourceFile, targetSourceFile, compiledRules, maxReplacements);
 
     if (matches.length === 0) {
         return createNoopRewriteResult(sourceCode, rawRules);
@@ -786,8 +786,8 @@ export function matchPattern(
     ruleSpec: PatternSpec | readonly PatternSpec[],
     maxMatches: number = DEFAULT_MAX_MATCHES,
 ): readonly StructuralMatch[] {
-    const { targetSf, compiledRules } = prepareMatchEnvironment(sourceCode, ruleSpec);
-    return Object.freeze(findMatches(targetSf, targetSf, compiledRules, maxMatches));
+    const { targetSourceFile, compiledRules } = prepareMatchEnvironment(sourceCode, ruleSpec);
+    return Object.freeze(findMatches(targetSourceFile, targetSourceFile, compiledRules, maxMatches));
 }
 
 /**

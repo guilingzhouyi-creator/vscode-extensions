@@ -35,6 +35,7 @@ import {
 import {
     NamingMessages,
     ALLOWED_SHORT_NAMES,
+    APPROVED_DOMAIN_ABBREVIATIONS,
     MAX_VARIABLE_NAME_LENGTH,
     MAX_FUNCTION_NAME_LENGTH,
     auditFunctionName,
@@ -61,6 +62,7 @@ import {
 export {
     NamingMessages,
     ALLOWED_SHORT_NAMES,
+    APPROVED_DOMAIN_ABBREVIATIONS,
     MAX_VARIABLE_NAME_LENGTH,
     MAX_FUNCTION_NAME_LENGTH,
     APPROVED_ACTION_VERBS,
@@ -94,6 +96,7 @@ export interface NamingOptions {
     enforceMorphemeCheck?: boolean;
     allowedShortFiles?: string[];
     allowedShortNames?: string[];
+    allowedAbbreviations?: string[];
     vagueBlacklist?: string[];
     singleLetterAllowed?: string[];
 }
@@ -541,8 +544,8 @@ export class NamingAnalyzer implements Analyzer {
         const declarationKind: SymbolDeclarationKind = ts.isClassDeclaration(node)
             ? 'class'
             : ts.isInterfaceDeclaration(node)
-              ? 'interface'
-              : KIND_TYPE;
+                ? 'interface'
+                : KIND_TYPE;
         this.checkDecouplingSymbol(
             typeName,
             declarationKind,

@@ -174,24 +174,24 @@ function findGoCloseParen(trimmed: string, openIdx: number): number {
 
 function splitGoParamSegments(paramStr: string): string[] {
     const segments: string[] = [];
-    let cur = '';
+    let currentSegment = '';
     let pDepth = 0;
     for (let i = 0; i < paramStr.length; i++) {
         const charStr = paramStr[i];
         if (charStr === '(' || charStr === '[' || charStr === '{') {
             pDepth++;
-            cur += charStr;
+            currentSegment += charStr;
         } else if (charStr === ')' || charStr === ']' || charStr === '}') {
             pDepth--;
-            cur += charStr;
+            currentSegment += charStr;
         } else if (charStr === ',' && pDepth === 0) {
-            segments.push(cur.trim());
-            cur = '';
+            segments.push(currentSegment.trim());
+            currentSegment = '';
         } else {
-            cur += charStr;
+            currentSegment += charStr;
         }
     }
-    if (cur.trim()) segments.push(cur.trim());
+    if (currentSegment.trim()) segments.push(currentSegment.trim());
     return segments;
 }
 

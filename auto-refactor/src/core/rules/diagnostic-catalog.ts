@@ -33,6 +33,16 @@ import {
     RULE_TST_TOP_001,
     RULE_STDLIB_PANIC_001,
 } from '../constants/rule-catalog.generated';
+import {
+    RULE_NAM_VAG_001,
+    RULE_NAM_ABR_001,
+    RULE_NAM_LEN_001,
+    RULE_NAM_LEN_002,
+    RULE_NAM_SGL_001,
+    RULE_NAM_TYP_001,
+    RULE_NAM_GLB_001,
+    RULE_NAM_MBR_001,
+} from '../constants/rules-quality.generated';
 import type { AgentActionablePayload, Issue, Severity } from '../types';
 
 /** Structured diagnostic template for a rule violation. */
@@ -143,6 +153,66 @@ export const DIAGNOSTIC_CATALOG: Readonly<Record<string, DiagnosticTemplate>> = 
         suggestion:
             'Rename symbol to reflect contract semantics using canonical domain dictionary vocabulary.',
     },
+    [RULE_NAM_VAG_001]: {
+        ruleId: RULE_NAM_VAG_001,
+        defaultSeverity: 'warning',
+        actionCode: 'AR:NAM:002',
+        defaultMessage: 'Vague identifier lacks domain context.',
+        suggestion:
+            'Rename to domain-qualified identifier (e.g. parseResult, tokenPayload).',
+    },
+    [RULE_NAM_ABR_001]: {
+        ruleId: RULE_NAM_ABR_001,
+        defaultSeverity: 'warning',
+        actionCode: 'AR:NAM:003',
+        defaultMessage: 'Identifier has unapproved truncated abbreviation.',
+        suggestion:
+            'Expand unapproved abbreviation into standard domain term.',
+    },
+    [RULE_NAM_LEN_001]: {
+        ruleId: RULE_NAM_LEN_001,
+        defaultSeverity: 'warning',
+        actionCode: 'AR:NAM:004',
+        defaultMessage: 'Variable identifier length outside acceptable bounds.',
+        suggestion:
+            'Rename to expressive identifier between 3 and 40 characters.',
+    },
+    [RULE_NAM_LEN_002]: {
+        ruleId: RULE_NAM_LEN_002,
+        defaultSeverity: 'warning',
+        actionCode: 'AR:NAM:005',
+        defaultMessage: 'Function identifier lacks semantic verb-noun action.',
+        suggestion: 'Rename to descriptive verb-noun phrase.',
+    },
+    [RULE_NAM_SGL_001]: {
+        ruleId: RULE_NAM_SGL_001,
+        defaultSeverity: 'warning',
+        actionCode: 'AR:NAM:006',
+        defaultMessage: 'Single-letter variable name in business logic scope.',
+        suggestion:
+            'Rename to descriptive variable; reserve single letters for loop indices.',
+    },
+    [RULE_NAM_TYP_001]: {
+        ruleId: RULE_NAM_TYP_001,
+        defaultSeverity: 'warning',
+        actionCode: 'AR:NAM:007',
+        defaultMessage: 'Type definition violates PascalCase naming convention.',
+        suggestion: 'Rename type or interface using PascalCase.',
+    },
+    [RULE_NAM_GLB_001]: {
+        ruleId: RULE_NAM_GLB_001,
+        defaultSeverity: 'warning',
+        actionCode: 'AR:NAM:008',
+        defaultMessage: 'Module constant violates UPPER_SNAKE_CASE naming convention.',
+        suggestion: 'Rename module-level constant to UPPER_SNAKE_CASE.',
+    },
+    [RULE_NAM_MBR_001]: {
+        ruleId: RULE_NAM_MBR_001,
+        defaultSeverity: 'warning',
+        actionCode: 'AR:NAM:009',
+        defaultMessage: 'Member or method violates camelCase naming convention.',
+        suggestion: 'Rename property or method using camelCase.',
+    },
     [RULE_SEC_EXP_001]: {
         ruleId: RULE_SEC_EXP_001,
         defaultSeverity: 'error',
@@ -251,11 +321,11 @@ export function createLineIssue(
     const mapped = actionableMap ? actionableMap[draft.rule] : undefined;
     const actionable = mapped
         ? {
-              action: mapped.action,
-              code: mapped.code,
-              safeToAutomate: mapped.safeToAutomate,
-              templateSnippet: mapped.templateSnippet,
-          }
+            action: mapped.action,
+            code: mapped.code,
+            safeToAutomate: mapped.safeToAutomate,
+            templateSnippet: mapped.templateSnippet,
+        }
         : undefined;
     const issue: Issue = {
         id: `${analyzerName}:${draft.rule}:${file}:${line}`,

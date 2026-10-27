@@ -129,6 +129,8 @@ export interface AasReportOptions {
     readonly maxTotalDefects?: number;
     /** Include info-level findings (defaults to false to conserve tokens) */
     readonly includeInfo?: boolean;
+    /** Compress diagnostic messages into high-efficiency token sentences (defaults to true) */
+    readonly compressSentences?: boolean;
     /** Include analyzer name per defect (defaults to false to conserve tokens) */
     readonly includeAnalyzer?: boolean;
     /** Default project test command hoisted to root (defaults to 'npm test') */

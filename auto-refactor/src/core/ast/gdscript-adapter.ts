@@ -126,24 +126,24 @@ function extractGDScriptParams(rawLine: string, openIdx: number): string[] {
     if (!paramStr) return [];
 
     const params: string[] = [];
-    let cur = '';
+    let currentParamText = '';
     const state = { inStr: null as string | null, depth: 0 };
 
     for (let i = 0; i < paramStr.length; i++) {
         const charStr = paramStr[i];
         if (state.inStr && charStr === '\\') {
-            cur += charStr + (paramStr[++i] || '');
+            currentParamText += charStr + (paramStr[++i] || '');
             continue;
         }
         if (charStr === ',' && !state.inStr && state.depth === 0) {
-            pushParamIdentifier(params, cur);
-            cur = '';
+            pushParamIdentifier(params, currentParamText);
+            currentParamText = '';
             continue;
         }
         updateQuoteAndDepth(charStr, state);
-        cur += charStr;
+        currentParamText += charStr;
     }
-    pushParamIdentifier(params, cur);
+    pushParamIdentifier(params, currentParamText);
     return params;
 }
 

@@ -114,6 +114,63 @@ function trimMessage(text: string, maxChars: number = DEFAULT_MAX_MESSAGE_CHARS)
 }
 
 /**
+ * Compresses diagnostic narrative into high-information-density token sentence.
+ *
+ * Implements the Five-Principle Compression Protocol (see token-frugal-sentence-and-diagnostic-spec.md).
+ *
+ * @param rawText - Raw narrative diagnostic string.
+ * @returns Concise token-dense diagnostic sentence.
+ */
+export function compressDiagnosticSentence(rawText: string): string {
+    if (!rawText) return '';
+    let msg = rawText.replace(/\s+/g, ' ').trim();
+
+    msg = msg.replace(
+        /Identifier\s+('?[a-zA-Z0-9_$-]+'?)\s+contains\s+unapproved\s+truncated\s+abbreviation\s+('?[a-zA-Z0-9_$-]+'?)\.?/i,
+        'identifier $1 unapproved abbr $2',
+    );
+    msg = msg.replace(
+        /Identifier\s+('?[a-zA-Z0-9_$-]+'?)\s+is\s+vague\s+and\s+uninformative;\s*lacks\s+domain\s+context\.?/i,
+        'identifier $1 lacks domain context',
+    );
+    msg = msg.replace(
+        /(?:Function\s+or\s+method\s+name|Local\s+variable\s+name|Variable\s+name)\s+('?[a-zA-Z0-9_$-]+'?)\s+is\s+too\s+short\s*\(([^)]+)\)[^.]*\.?/i,
+        'symbol $1 too short ($2)',
+    );
+    msg = msg.replace(
+        /(?:Function\s+or\s+method\s+name|Variable\s+name)\s+('?[a-zA-Z0-9_$-]+'?)\s+is\s+excessively\s+long\s*\(([^)]+)\)[^.]*\.?/i,
+        'symbol $1 too long ($2)',
+    );
+    msg = msg.replace(
+        /Cognitive\s+complexity\s*\((\d+)\)\s*exceeds\s*threshold\s*\((\d+)\)\s*in\s*(?:function|method)?\s*('?[a-zA-Z0-9_$-]+'?)/i,
+        'CC $1 > $2 in $3',
+    );
+    msg = msg.replace(
+        /Effective\s+code\s+volume\s+budget\s+exceeded\.?/i,
+        'ELOC budget exceeded',
+    );
+    msg = msg.replace(
+        /Physical\s+line\s+count\s+ceiling\s+exceeded\.?/i,
+        'LOC ceiling exceeded',
+    );
+    msg = msg.replace(
+        /Dynamic\s+dilution\s+envelope\s+exceeded\.?/i,
+        'dilution envelope exceeded',
+    );
+    msg = msg.replace(
+        /Effective\s+logic\s+density\s+below\s+floor\s+threshold\.?/i,
+        'token density below floor',
+    );
+    msg = msg.replace(
+        /(?:Function|Method)\s+has\s+(\d+)\s+positional\s+parameters?\s+exceeding\s+threshold\s+of\s+(\d+)\.?/i,
+        'params $1 > $2',
+    );
+
+    msg = msg.replace(/^(?:Notice|Warning|Error|Violation):\s*/i, '');
+    return msg.trim();
+}
+
+/**
  * In-memory anchor extractor avoiding direct synchronous filesystem operations.
  */
 class AnchorCache {
@@ -287,7 +344,8 @@ function resolveActionFromRule(rule: string): string {
  */
 function cleanSuggestion(raw: string): string | undefined {
     if (!raw) return undefined;
-    const trimmed = raw.trim();
+    let trimmed = raw.trim();
+    trimmed = trimmed.replace(/^(?:Please\s+|Consider\s+|It\s+is\s+recommended\s+to\s+)/i, '');
     if (trimmed.length <= MAX_SUGGESTION_CHARS) return trimmed;
     const match = trimmed.match(/^([^.!?\n]+[.!?]?)/);
     const firstClause = match
@@ -345,7 +403,11 @@ function buildDefectRecord(params: DefectRecordParams): AasDefectRecord {
     const endLine = issue.location?.end?.line ?? startLine;
     const col = issue.location?.start?.column;
     const sev = mapSeverity(issue.severity);
-    const msg = trimMessage(issue.message);
+    const rawMsg = trimMessage(issue.message);
+    const msg =
+        params.options.compressSentences !== false
+            ? compressDiagnosticSentence(rawMsg)
+            : rawMsg;
 
     const radius = params.options.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
     const anchor =
