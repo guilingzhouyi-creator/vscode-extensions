@@ -2,11 +2,11 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-27T10:11:14.267Z",
+  "timestamp": "2026-10-27T12:31:58.790Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.18,
+    "score": 99.17,
     "grade": "A+",
     "cai": 78.27,
     "density": 0.95,
@@ -14,29 +14,29 @@
       "compositeDensity": 0.8,
       "averageTspr": 0.917,
       "averagePor": 0.083,
-      "averageColumnDensity": 0.864,
-      "averageSpatialDensity": 0.445,
-      "averageMahalanobisDistance": 4.603,
+      "averageColumnDensity": 0.863,
+      "averageSpatialDensity": 0.446,
+      "averageMahalanobisDistance": 4.596,
       "averageFisherSimplexDistance": 0.097
     },
     "counts": {
-      "files": 770,
-      "total": 3923,
+      "files": 776,
+      "total": 3968,
       "errors": 0,
-      "warns": 3387,
-      "info": 536,
+      "warns": 3424,
+      "info": 544,
       "suppressed": 156
     }
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 98.42,
-    "semanticPurity": 98.4,
+    "architectureConsistency": 98.43,
+    "semanticPurity": 98.36,
     "codeSecurity": 99.79,
     "performanceEfficiency": 99.57,
-    "standardization": 84.1,
-    "modernity": 98.48,
-    "maintainability": 93.3,
+    "standardization": 84.04,
+    "modernity": 98.43,
+    "maintainability": 93.27,
     "commentQuality": 99.73,
     "duplication": 94.93,
     "techDebtRisk": 100
@@ -45,14 +45,14 @@
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 4140,
-      "count": 414
+      "loss": 4180,
+      "count": 418
     },
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3065,
-      "count": 215
+      "loss": 3070,
+      "count": 216
     },
     {
       "rule": "metric",
@@ -61,16 +61,16 @@
       "count": 240
     },
     {
-      "rule": "SIM-TRN-001",
+      "rule": "SIM-LONG-001",
       "dim": "standardization",
       "loss": 2020,
       "count": 202
     },
     {
-      "rule": "SIM-LONG-001",
+      "rule": "SIM-TRN-001",
       "dim": "standardization",
-      "loss": 2010,
-      "count": 201
+      "loss": 2020,
+      "count": 202
     },
     {
       "rule": "NAM-DEC-001",
@@ -81,14 +81,14 @@
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 1926,
-      "count": 642
+      "loss": 1953,
+      "count": 651
     },
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 1810,
-      "count": 362
+      "loss": 1890,
+      "count": 378
     }
   ],
   "topology": {
@@ -115,7 +115,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 491 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 498 >= warn threshold 400).",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -860,7 +860,7 @@
         }
       },
       {
-        "line": 82,
+        "line": 86,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -871,7 +871,17 @@
         }
       },
       {
-        "line": 90,
+        "line": 94,
+        "rule": "HYG-DED-001",
+        "sev": "WARN",
+        "msg": "Dead code detected: Statement is unreachable following a terminal control flow statement (return/throw/break/continue)",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
+        }
+      },
+      {
+        "line": 95,
         "col": 10,
         "rule": "magic-number",
         "sev": "WARN",
@@ -880,9 +890,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 90,
+              "startLine": 95,
               "startCol": 10,
-              "endLine": 90,
+              "endLine": 95,
               "endCol": 13
             },
             "replacementText": "DURATION_100MS"
@@ -891,7 +901,17 @@
         }
       },
       {
-        "line": 102,
+        "line": 101,
+        "rule": "HYG-DED-001",
+        "sev": "WARN",
+        "msg": "Dead code detected: Statement is unreachable following a terminal control flow statement (return/throw/break/continue)",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
+        }
+      },
+      {
+        "line": 108,
         "col": 16,
         "rule": "magic-number",
         "sev": "WARN",
@@ -900,9 +920,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 102,
+              "startLine": 108,
               "startCol": 16,
-              "endLine": 102,
+              "endLine": 108,
               "endCol": 18
             },
             "replacementText": "CONST_95"
@@ -911,7 +931,7 @@
         }
       },
       {
-        "line": 103,
+        "line": 109,
         "col": 16,
         "rule": "magic-number",
         "sev": "WARN",
@@ -920,9 +940,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 103,
+              "startLine": 109,
               "startCol": 16,
-              "endLine": 103,
+              "endLine": 109,
               "endCol": 18
             },
             "replacementText": "CONST_85"
@@ -931,7 +951,7 @@
         }
       },
       {
-        "line": 114,
+        "line": 120,
         "col": 37,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -940,9 +960,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 114,
+              "startLine": 120,
               "startCol": 37,
-              "endLine": 114,
+              "endLine": 120,
               "endCol": 45
             },
             "replacementText": "AASV1_TEXT"
@@ -951,7 +971,7 @@
         }
       },
       {
-        "line": 126,
+        "line": 132,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -960,9 +980,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 126,
+              "startLine": 132,
               "startCol": 13,
-              "endLine": 126,
+              "endLine": 132,
               "endCol": 21
             },
             "replacementText": "AASV1_TEXT"
@@ -971,7 +991,7 @@
         }
       },
       {
-        "line": 128,
+        "line": 134,
         "col": 34,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -980,9 +1000,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 128,
+              "startLine": 134,
               "startCol": 34,
-              "endLine": 128,
+              "endLine": 134,
               "endCol": 41
             },
             "replacementText": "CONST_040_TEXT"
@@ -991,7 +1011,7 @@
         }
       },
       {
-        "line": 165,
+        "line": 171,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -1002,7 +1022,7 @@
         }
       },
       {
-        "line": 178,
+        "line": 184,
         "col": 22,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -1011,9 +1031,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 178,
+              "startLine": 184,
               "startCol": 22,
-              "endLine": 178,
+              "endLine": 184,
               "endCol": 31
             },
             "replacementText": "SKIPPED_TEXT"
@@ -1022,7 +1042,7 @@
         }
       },
       {
-        "line": 185,
+        "line": 191,
         "col": 22,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -1031,9 +1051,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 185,
+              "startLine": 191,
               "startCol": 22,
-              "endLine": 185,
+              "endLine": 191,
               "endCol": 32
             },
             "replacementText": "MIGRATED_TEXT"
@@ -1042,7 +1062,7 @@
         }
       },
       {
-        "line": 194,
+        "line": 200,
         "col": 20,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -1051,9 +1071,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 194,
+              "startLine": 200,
               "startCol": 20,
-              "endLine": 194,
+              "endLine": 200,
               "endCol": 30
             },
             "replacementText": "MIGRATED_TEXT"
@@ -4617,7 +4637,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 810 >= warn threshold 400; functions 34 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 822 >= warn threshold 400; functions 34 >= warn threshold 20).",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -4644,7 +4664,7 @@
         }
       },
       {
-        "line": 552,
+        "line": 559,
         "col": 42,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4653,9 +4673,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 552,
+              "startLine": 559,
               "startCol": 42,
-              "endLine": 552,
+              "endLine": 559,
               "endCol": 43
             },
             "replacementText": "CONST_3"
@@ -4664,7 +4684,7 @@
         }
       },
       {
-        "line": 553,
+        "line": 560,
         "col": 58,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4673,9 +4693,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 553,
+              "startLine": 560,
               "startCol": 58,
-              "endLine": 553,
+              "endLine": 560,
               "endCol": 59
             },
             "replacementText": "CONST_4"
@@ -4684,7 +4704,7 @@
         }
       },
       {
-        "line": 554,
+        "line": 561,
         "col": 58,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4693,9 +4713,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 554,
+              "startLine": 561,
               "startCol": 58,
-              "endLine": 554,
+              "endLine": 561,
               "endCol": 59
             },
             "replacementText": "CONST_4"
@@ -4704,7 +4724,7 @@
         }
       },
       {
-        "line": 595,
+        "line": 602,
         "col": 36,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4713,9 +4733,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 595,
+              "startLine": 602,
               "startCol": 36,
-              "endLine": 595,
+              "endLine": 602,
               "endCol": 42
             },
             "replacementText": "NOOP_TEXT"
@@ -4724,7 +4744,7 @@
         }
       },
       {
-        "line": 734,
+        "line": 744,
         "col": 32,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4733,9 +4753,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 734,
+              "startLine": 744,
               "startCol": 32,
-              "endLine": 734,
+              "endLine": 744,
               "endCol": 33
             },
             "replacementText": "CONST_5"
@@ -4744,7 +4764,7 @@
         }
       },
       {
-        "line": 734,
+        "line": 744,
         "col": 69,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4753,9 +4773,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 734,
+              "startLine": 744,
               "startCol": 69,
-              "endLine": 734,
+              "endLine": 744,
               "endCol": 70
             },
             "replacementText": "CONST_5"
@@ -4764,7 +4784,7 @@
         }
       },
       {
-        "line": 759,
+        "line": 769,
         "col": 36,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4773,9 +4793,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 759,
+              "startLine": 769,
               "startCol": 36,
-              "endLine": 759,
+              "endLine": 769,
               "endCol": 54
             },
             "replacementText": "FIXPOINTREWRITE_TEXT"
@@ -6279,19 +6299,304 @@
         }
       }
     ],
+    "src/core/ast/sparse-ast-hopper.ts": [
+      {
+        "line": 62,
+        "col": 25,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 62,
+              "startCol": 25,
+              "endLine": 62,
+              "endCol": 33
+            },
+            "replacementText": "INSIDE_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 66,
+        "col": 40,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 66,
+              "startCol": 40,
+              "endLine": 66,
+              "endCol": 48
+            },
+            "replacementText": "BEFORE_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 67,
+        "col": 40,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 67,
+              "startCol": 40,
+              "endLine": 67,
+              "endCol": 47
+            },
+            "replacementText": "AFTER_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 68,
+        "col": 68,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 68,
+              "startCol": 68,
+              "endLine": 68,
+              "endCol": 76
+            },
+            "replacementText": "INSIDE_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 69,
+        "col": 12,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 69,
+              "startCol": 12,
+              "endLine": 69,
+              "endCol": 19
+            },
+            "replacementText": "WRAPS_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 84,
+        "col": 24,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 84,
+              "startCol": 24,
+              "endLine": 84,
+              "endCol": 32
+            },
+            "replacementText": "BEFORE_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 84,
+        "col": 48,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 84,
+              "startCol": 48,
+              "endLine": 84,
+              "endCol": 55
+            },
+            "replacementText": "AFTER_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 103,
+        "col": 24,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 103,
+              "startCol": 24,
+              "endLine": 103,
+              "endCol": 32
+            },
+            "replacementText": "INSIDE_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 103,
+        "col": 48,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 103,
+              "startCol": 48,
+              "endLine": 103,
+              "endCol": 55
+            },
+            "replacementText": "WRAPS_TEXT"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 112,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'totalHopperNodes' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 122,
+        "col": 17,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'hopperPruneRatio' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      }
+    ],
+    "src/core/ast/sr-swa-replay.ts": [
+      {
+        "line": 1,
+        "rule": "NAM-FIL-001",
+        "sev": "WARN",
+        "msg": "File name 'sr-swa-replay.ts' contains segment 'sr' with invalid morpheme phonetics (missing vowel or unapproved acronym).",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Use recognizable English domain terms containing vowels for file name segments."
+        }
+      },
+      {
+        "line": 143,
+        "col": 12,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'computeSrReplayWindow' contains segment 'Sr' with invalid morpheme phonetics (missing vowel or unapproved acronym).",
+        "fix": {
+          "action": "replace_token",
+          "template": "srSwaReplayWindow",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 169,
+        "col": 12,
+        "rule": "HYG-WRAP-001",
+        "sev": "WARN",
+        "msg": "Function `indexAnchors` is a vacuous passthrough wrapper directly forwarding arguments to `swa.indexAnchors`.",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
+        }
+      },
+      {
+        "line": 179,
+        "col": 12,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'canUseSrReplay' contains segment 'Sr' with invalid morpheme phonetics (missing vowel or unapproved acronym).",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 190,
+        "col": 12,
+        "rule": "HYG-WRAP-001",
+        "sev": "WARN",
+        "msg": "Function `pruneIssuesOutsideWindow` is a vacuous passthrough wrapper directly forwarding arguments to `swa.pruneIssuesOutsideWindow`.",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
+        }
+      },
+      {
+        "line": 206,
+        "col": 13,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'promoteCompoundSpan' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', '…",
+        "fix": {
+          "action": "replace_token",
+          "template": "srSwaReplayWindow",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 239,
+        "col": 13,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'promoteSignature' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run…",
+        "fix": {
+          "action": "replace_token",
+          "template": "srSwaReplayWindow",
+          "safeToAutomate": false
+        }
+      }
+    ],
     "src/core/ast/swa-bounded-replay.ts": [
       {
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 586 >= warn threshold 400; functions 21 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 605 >= warn threshold 400; functions 21 >= warn threshold 20).",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
         }
       },
       {
-        "line": 245,
+        "line": 246,
         "col": 15,
         "rule": "NAM-VAG-001",
         "sev": "WARN",
@@ -6353,7 +6658,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 581 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 637 >= warn threshold 400).",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -6370,7 +6675,7 @@
         }
       },
       {
-        "line": 94,
+        "line": 103,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
         "msg": "Function \"dispatchHooks\" has 8 parameters (limit 4). Introduce a parameter object.",
@@ -6381,10 +6686,21 @@
         }
       },
       {
-        "line": 141,
+        "line": 143,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"runStreaming\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface RunStreamingOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 143,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"runStreaming\" spans 112 lines (limit 60).",
+        "msg": "Function \"runStreaming\" spans 122 lines (limit 60).",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -6392,7 +6708,7 @@
         }
       },
       {
-        "line": 195,
+        "line": 200,
         "col": 23,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -6404,17 +6720,17 @@
         }
       },
       {
-        "line": 196,
+        "line": 201,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 96",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 105",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
         }
       },
       {
-        "line": 267,
+        "line": 279,
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -6426,10 +6742,32 @@
         }
       },
       {
-        "line": 359,
+        "line": 384,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'admitProjectedNode' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'r…",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 431,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"runStreamingProjected\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface RunStreamingProjectedOptions {",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 431,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"runStreamingProjected\" spans 134 lines (limit 60).",
+        "msg": "Function \"runStreamingProjected\" spans 118 lines (limit 60).",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -6437,11 +6775,11 @@
         }
       },
       {
-        "line": 417,
+        "line": 492,
         "col": 22,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"visitRaw\" has 9 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"visitRaw\" has 5 parameters (limit 4). Introduce a parameter object.",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface VisitRawOptions {",
@@ -7574,328 +7912,8 @@
           },
           "safeToAutomate": true
         }
-      },
-      {
-        "line": 96,
-        "col": 50,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 96,
-              "startCol": 50,
-              "endLine": 96,
-              "endCol": 56
-            },
-            "replacementText": "EXTRACTED_STRING"
-          },
-          "safeToAutomate": true
-        }
-      }
-    ],
-    "src/core/comments/comment-auditor.ts": [
-      {
-        "line": 58,
-        "col": 29,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 58,
-              "startCol": 29,
-              "endLine": 58,
-              "endCol": 45
-            },
-            "replacementText": "FILE_PATH_DICTIONARIES_TEXT"
-          },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 59,
-        "col": 29,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 59,
-              "startCol": 29,
-              "endLine": 59,
-              "endCol": 40
-            },
-            "replacementText": "FILE_PATH_LOCALES_TEXT"
-          },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 60,
-        "col": 29,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 60,
-              "startCol": 29,
-              "endLine": 60,
-              "endCol": 37
-            },
-            "replacementText": "FILE_PATH_I18N_TEXT"
-          },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 76,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"auditLineLevelLanguage\" has 5 parameters (limit 4). Introduce a parameter object.",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface AuditLineLevelLanguageOptions {",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 109,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"auditMacroLanguageDrift\" has 5 parameters (limit 4). Introduce a parameter object.",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface AuditMacroLanguageDriftOptions {",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 121,
-        "col": 41,
-        "rule": "duplicate-literal",
-        "sev": "WARN",
-        "msg": "Literal 100 is repeated 4 times in this file; extract it into a shared constant.",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 195,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"auditCommentLanguage\" has 5 parameters (limit 4). Introduce a parameter object.",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface AuditCommentLanguageOptions {",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 250,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 216",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
-      }
-    ],
-    "src/core/comments/comment-density-model.ts": [
-      {
-        "line": 153,
-        "rule": "SIM-LONG-001",
-        "sev": "WARN",
-        "msg": "Function \"checkHighValueDocumentationSnippet\" spans 67 lines (limit 60).",
-        "fix": {
-          "action": "split_function",
-          "template": "// Extracted helper:",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 351,
-        "col": 15,
-        "rule": "NAM-VAG-001",
-        "sev": "WARN",
-        "msg": "identifier 'info' lacks domain context",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'info' with a domain-qualified identifier (e."
-        }
-      },
-      {
-        "line": 363,
-        "col": 72,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 100 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 363,
-              "startCol": 72,
-              "endLine": 363,
-              "endCol": 75
-            },
-            "replacementText": "DURATION_100MS"
-          },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 363,
-        "col": 79,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 100 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 363,
-              "startCol": 79,
-              "endLine": 363,
-              "endCol": 82
-            },
-            "replacementText": "DURATION_100MS"
-          },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 366,
-        "col": 74,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 366,
-              "startCol": 74,
-              "endLine": 366,
-              "endCol": 75
-            },
-            "replacementText": "CONST_3"
-          },
-          "safeToAutomate": true
-        }
-      }
-    ],
-    "src/core/comments/project-comment-profiler.ts": [
-      {
-        "line": 30,
-        "col": 9,
-        "rule": "NAM-SGL-001",
-        "sev": "WARN",
-        "msg": "Single-letter variable name 'i' hurts code readability.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        }
-      },
-      {
-        "line": 50,
-        "col": 9,
-        "rule": "NAM-SGL-001",
-        "sev": "WARN",
-        "msg": "Single-letter variable name 'i' hurts code readability.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        }
-      },
-      {
-        "line": 62,
-        "col": 9,
-        "rule": "NAM-SGL-001",
-        "sev": "WARN",
-        "msg": "Single-letter variable name 'i' hurts code readability.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        }
-      },
-      {
-        "line": 85,
-        "col": 15,
-        "rule": "NAM-VAG-001",
-        "sev": "WARN",
-        "msg": "identifier 'res' lacks domain context",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'res' with a domain-qualified identifier (e."
-        }
-      },
-      {
-        "line": 89,
-        "col": 15,
-        "rule": "NAM-VAG-001",
-        "sev": "WARN",
-        "msg": "identifier 'res' lacks domain context",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'res' with a domain-qualified identifier (e."
-        }
-      },
-      {
-        "line": 115,
-        "col": 15,
-        "rule": "NAM-VAG-001",
-        "sev": "WARN",
-        "msg": "identifier 'res' lacks domain context",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'res' with a domain-qualified identifier (e."
-        }
-      },
-      {
-        "line": 142,
-        "col": 9,
-        "rule": "NAM-SGL-001",
-        "sev": "WARN",
-        "msg": "Single-letter variable name 'i' hurts code readability.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        }
-      },
-      {
-        "line": 195,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 177",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
-      },
-      {
-        "line": 205,
-        "col": 62,
-        "rule": "duplicate-literal",
-        "sev": "WARN",
-        "msg": "Literal 3 is repeated 6 times in this file; extract it into a shared constant.",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": true
-        }
       }
     ]
   },
-  "truncated": 2887
+  "truncated": 2924
 }
