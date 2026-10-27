@@ -137,9 +137,7 @@ pub(super) fn parse_unarchive_options(args: &[String]) -> UnarchiveOptions {
                 message = Some(args[cursor + 1].clone());
                 cursor += 2;
             }
-            "-m" | "--message" => {
-                fail_usage("--message requires a commit message text")
-            }
+            "-m" | "--message" => fail_usage("--message requires a commit message text"),
             "--dry-run" => {
                 dry_run = true;
                 cursor += 1;

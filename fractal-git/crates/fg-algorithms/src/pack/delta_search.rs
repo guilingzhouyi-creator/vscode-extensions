@@ -300,7 +300,10 @@ pub fn find_pack_deltas(
             }
 
             let delta_fossil = if candidate.payload.len() >= 16 && target.payload.len() >= 16 {
-                crate::pack::fossil_matcher::encode_fossil_git_delta(&candidate.payload, &target.payload)
+                crate::pack::fossil_matcher::encode_fossil_git_delta(
+                    &candidate.payload,
+                    &target.payload,
+                )
             } else {
                 None
             };

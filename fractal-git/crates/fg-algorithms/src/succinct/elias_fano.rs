@@ -359,11 +359,7 @@ impl EliasFano {
             primary_word & low_mask
         } else {
             let bits_from_first = 64 - bit_in_word;
-            let secondary_word = self
-                .low_words
-                .get(word_idx + 1)
-                .copied()
-                .unwrap_or(0);
+            let secondary_word = self.low_words.get(word_idx + 1).copied().unwrap_or(0);
             let combined = primary_word | (secondary_word << bits_from_first);
             combined & low_mask
         }
@@ -379,11 +375,7 @@ impl EliasFano {
     /// Finds the bit position (0-based) of the `target_rank`-th set bit (one) in `high_words`.
     fn select_high_1(&self, target_rank: usize) -> u64 {
         let inventory_idx = target_rank / INVENTORY_INTERVAL;
-        let mut word_idx = self
-            .high_inventory
-            .get(inventory_idx)
-            .copied()
-            .unwrap_or(0);
+        let mut word_idx = self.high_inventory.get(inventory_idx).copied().unwrap_or(0);
 
         // Count ones before `word_idx`
         let mut ones_accum = 0usize;

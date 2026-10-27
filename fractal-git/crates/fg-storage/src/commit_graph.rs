@@ -459,7 +459,10 @@ impl CommitGraphReader {
             return fg_algorithms::EliasFano::from_slice(&[]);
         }
         let mut generations: Vec<u64> = (0..count)
-            .filter_map(|position| self.get_entry(position).map(|entry| entry.generation as u64))
+            .filter_map(|position| {
+                self.get_entry(position)
+                    .map(|entry| entry.generation as u64)
+            })
             .collect();
         generations.sort_unstable();
         fg_algorithms::EliasFano::from_slice(&generations)

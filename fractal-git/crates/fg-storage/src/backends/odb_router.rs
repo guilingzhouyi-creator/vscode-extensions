@@ -184,7 +184,9 @@ impl OdbRouter {
 
     /// Returns the pack bitmap for the given open pack, if present.
     pub fn pack_bitmap(&self, pack_index: usize) -> Option<&PackBitmap> {
-        self.packs.get(pack_index).and_then(|pack| pack.bitmap.as_ref())
+        self.packs
+            .get(pack_index)
+            .and_then(|pack| pack.bitmap.as_ref())
     }
 
     /// Total number of objects the loaded indexes list.

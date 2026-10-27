@@ -726,13 +726,33 @@ fn diff_cli_parity_working_tree_and_staged() {
     // Modify a file in working tree
     write_file(&repo, "a.txt", "alpha modified\nnew line\n");
     assert_parity(&repo, &["diff"], &["diff"], "working tree diff");
-    assert_parity(&repo, &["diff", "--stat"], &["diff", "--stat"], "working tree diff --stat");
-    assert_parity(&repo, &["diff", "--name-only"], &["diff", "--name-only"], "working tree diff --name-only");
+    assert_parity(
+        &repo,
+        &["diff", "--stat"],
+        &["diff", "--stat"],
+        "working tree diff --stat",
+    );
+    assert_parity(
+        &repo,
+        &["diff", "--name-only"],
+        &["diff", "--name-only"],
+        "working tree diff --name-only",
+    );
 
     // Stage it
     run_git(&repo, &["add", "a.txt"]);
-    assert_parity(&repo, &["diff", "--cached"], &["diff", "--cached"], "cached diff");
-    assert_parity(&repo, &["diff", "--staged"], &["diff", "--staged"], "staged diff");
+    assert_parity(
+        &repo,
+        &["diff", "--cached"],
+        &["diff", "--cached"],
+        "cached diff",
+    );
+    assert_parity(
+        &repo,
+        &["diff", "--staged"],
+        &["diff", "--staged"],
+        "staged diff",
+    );
 
     let _ = fs::remove_dir_all(&repo);
 }
@@ -798,15 +818,26 @@ fn unarchive_dry_run_cli_contract() {
     let zip_path = repo.join("test_sample.zip");
     let file = fs::File::create(&zip_path).expect("create zip");
     let mut writer = fg_storage::archive::ZipWriter::new(file);
-    writer.append_file("sample.txt", 0o644, 1700000000, b"content").expect("append");
+    writer
+        .append_file("sample.txt", 0o644, 1700000000, b"content")
+        .expect("append");
     let mut finished = writer.finish().expect("finish");
     finished.flush().expect("flush");
 
-    let out = run_taxis(&repo, &["unarchive", "--dry-run", zip_path.to_str().unwrap()]);
+    let out = run_taxis(
+        &repo,
+        &["unarchive", "--dry-run", zip_path.to_str().unwrap()],
+    );
     assert!(out.status.success(), "unarchive --dry-run must succeed");
     let stdout = stdout_text(&out);
-    assert!(stdout.contains("Taxis SpacePlan Projection"), "dry-run header");
-    assert!(stdout.contains("VIABLE (Safe for execution)"), "viable status");
+    assert!(
+        stdout.contains("Taxis SpacePlan Projection"),
+        "dry-run header"
+    );
+    assert!(
+        stdout.contains("VIABLE (Safe for execution)"),
+        "viable status"
+    );
 
     let _ = fs::remove_dir_all(&repo);
 }

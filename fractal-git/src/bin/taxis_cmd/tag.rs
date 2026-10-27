@@ -177,15 +177,15 @@ fn delete_tag(view: &RepoView, tag_name: &str, ctx: &CliContext) {
         next: "0".repeat(40),
         name: tag_ref.clone(),
     };
-    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
-        &hook_runner,
-        &[update],
-        || match ref_store.delete_ref(&tag_ref) {
+    if let Err(err_msg) =
+        super::git_hooks::execute_reference_transaction(&hook_runner, &[update], || match ref_store
+            .delete_ref(&tag_ref)
+        {
             Ok(true) => Ok(()),
             Ok(false) => Err(format!("error: tag '{tag_name}' not found.")),
             Err(delete_err) => Err(format!("delete tag '{tag_name}': {delete_err}")),
-        },
-    ) {
+        })
+    {
         reject(CliTag::ERROR, err_msg);
     }
 
@@ -221,15 +221,13 @@ fn create_lightweight_tag(
         next: target_oid.to_hex(),
         name: tag_ref.clone(),
     };
-    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
-        &hook_runner,
-        &[update],
-        || {
+    if let Err(err_msg) =
+        super::git_hooks::execute_reference_transaction(&hook_runner, &[update], || {
             ref_store
                 .update_ref(&tag_ref, &target_oid, None)
                 .map_err(|err| format!("write tag ref '{tag_ref}': {err}"))
-        },
-    ) {
+        })
+    {
         reject(CliTag::ERROR, err_msg);
     }
 
@@ -290,15 +288,13 @@ fn create_annotated_tag(
         next: tag_oid.to_hex(),
         name: tag_ref.clone(),
     };
-    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
-        &hook_runner,
-        &[update],
-        || {
+    if let Err(err_msg) =
+        super::git_hooks::execute_reference_transaction(&hook_runner, &[update], || {
             ref_store
                 .update_ref(&tag_ref, &tag_oid, None)
                 .map_err(|err| format!("write tag ref '{tag_ref}': {err}"))
-        },
-    ) {
+        })
+    {
         reject(CliTag::ERROR, err_msg);
     }
 

@@ -213,7 +213,8 @@ impl<R: Read> StreamingFastCdc<R> {
 
     /// Reads and returns only the next ChunkDescriptor without cloning the payload.
     pub fn next_chunk(&mut self) -> io::Result<Option<ChunkDescriptor>> {
-        self.next_chunk_payload().map(|opt| opt.map(|(desc, _)| desc))
+        self.next_chunk_payload()
+            .map(|opt| opt.map(|(desc, _)| desc))
     }
 }
 

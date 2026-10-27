@@ -388,7 +388,9 @@ pub fn extract_zip_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
         if let Some(j) = journal.as_mut() {
             let _ = j.append(&InPlaceLogEntry::BatchTruncated {
                 new_len: eocd.central_directory_offset,
-                freed_bytes: truncator.current_len().saturating_sub(eocd.central_directory_offset),
+                freed_bytes: truncator
+                    .current_len()
+                    .saturating_sub(eocd.central_directory_offset),
             });
         }
         truncator.truncate_to(eocd.central_directory_offset)?;
@@ -415,7 +417,10 @@ pub fn extract_zip_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
                 && target_path.exists();
 
             let payload_len = if is_already_done {
-                target_path.metadata().map(|m| m.len()).unwrap_or(member.uncompressed_size)
+                target_path
+                    .metadata()
+                    .map(|m| m.len())
+                    .unwrap_or(member.uncompressed_size)
             } else {
                 // 1. Extract and verify payload
                 let payload = extract_member_payload(truncator.file_mut(), member)?;
@@ -430,7 +435,8 @@ pub fn extract_zip_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
                     if member.external_attributes > 0 {
                         let mode = (member.external_attributes >> 16) & 0o7777;
                         if mode != 0 {
-                            let _ = fs::set_permissions(&target_path, fs::Permissions::from_mode(mode));
+                            let _ =
+                                fs::set_permissions(&target_path, fs::Permissions::from_mode(mode));
                         }
                     }
                 }
@@ -495,7 +501,8 @@ pub fn extract_zip_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
             // Remaining members are those from current_extracted_idx onwards
             let remaining_members = &members[current_extracted_idx..];
             if !remaining_members.is_empty() && truncator.current_len() > 0 {
-                let _ = ArchiveRestorer::synthesize_zip_tail(truncator.file_mut(), remaining_members);
+                let _ =
+                    ArchiveRestorer::synthesize_zip_tail(truncator.file_mut(), remaining_members);
                 let _ = ArchiveRestorer::verify_restored_zip(truncator.file_mut());
             }
             Err(err)

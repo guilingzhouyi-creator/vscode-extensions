@@ -270,12 +270,16 @@ fn test_commit_graph_compressed_indices() {
     let reader = CommitGraphReader::from_bytes(bytes).expect("parse graph");
     assert_eq!(reader.num_commits(), 5);
 
-    let comp_ts = reader.build_compressed_timestamps().expect("compressed timestamps");
+    let comp_ts = reader
+        .build_compressed_timestamps()
+        .expect("compressed timestamps");
     assert_eq!(comp_ts.len(), 5);
     assert_eq!(comp_ts.get(0), Some(1_700_000_000));
     assert_eq!(comp_ts.get(4), Some(1_700_000_004));
 
-    let comp_gen = reader.build_compressed_generations().expect("compressed generations");
+    let comp_gen = reader
+        .build_compressed_generations()
+        .expect("compressed generations");
     assert_eq!(comp_gen.len(), 5);
     assert_eq!(comp_gen.get(0), Some(7));
     assert_eq!(comp_gen.get(4), Some(11));

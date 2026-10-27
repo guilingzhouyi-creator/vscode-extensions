@@ -694,7 +694,9 @@ fn test_unarchive_to_odb_blocked_on_trunk_for_agent() {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("PreReceiveGuard") || stderr.contains("Human Control Breach") || stderr.contains("AUTHORITY_BREACH"),
+        stderr.contains("PreReceiveGuard")
+            || stderr.contains("Human Control Breach")
+            || stderr.contains("AUTHORITY_BREACH"),
         "stderr must report pre-receive authorization breach: {stderr}"
     );
 }
@@ -707,7 +709,10 @@ fn test_unarchive_to_odb_succeeds_on_feature_branch() {
     run_taxis_ok(&repo_dir, &["init", "--git-compat"]);
 
     let zip_path = dir.path().join("source.zip");
-    write_zip(&zip_path, &[("lib.rs", b"pub fn add(a: i32, b: i32) -> i32 { a + b }\n")]);
+    write_zip(
+        &zip_path,
+        &[("lib.rs", b"pub fn add(a: i32, b: i32) -> i32 { a + b }\n")],
+    );
 
     // Push to an agent-authorized cell card ref
     let stdout = run_taxis_ok(
@@ -756,23 +761,28 @@ fn test_archive_restorer_synthesizes_valid_zip() {
         ],
     );
 
-    let mut file = File::options().read(true).write(true).open(&zip_path).expect("open zip");
+    let mut file = File::options()
+        .read(true)
+        .write(true)
+        .open(&zip_path)
+        .expect("open zip");
     let eocd = read_zip_eocd(&mut file).expect("read eocd");
     let members = read_zip_central_directory(&mut file, &eocd).expect("read cd");
     assert_eq!(members.len(), 3);
 
     // Truncate Central Directory (simulating mid-extraction crash)
-    file.set_len(eocd.central_directory_offset).expect("truncate cd");
+    file.set_len(eocd.central_directory_offset)
+        .expect("truncate cd");
 
     // Restorer should re-synthesize Central Directory for remaining members (e.g. file1 and file2)
     let remaining = &members[0..2];
-    let new_len = ArchiveRestorer::synthesize_zip_tail(&mut file, remaining)
-        .expect("synthesize zip tail");
+    let new_len =
+        ArchiveRestorer::synthesize_zip_tail(&mut file, remaining).expect("synthesize zip tail");
     assert!(new_len > eocd.central_directory_offset);
 
     // Verify restored ZIP is openable and has exactly 2 members
-    let restored_members = ArchiveRestorer::verify_restored_zip(&mut file)
-        .expect("verify restored zip");
+    let restored_members =
+        ArchiveRestorer::verify_restored_zip(&mut file).expect("verify restored zip");
     assert_eq!(restored_members.len(), 2);
     assert_eq!(restored_members[0].name, "file1.txt");
     assert_eq!(restored_members[1].name, "file2.txt");
@@ -837,5 +847,8 @@ fn test_in_place_wal_auto_resume() {
 
     assert!(dest.join("first.txt").exists(), "first.txt must exist");
     assert!(dest.join("second.txt").exists(), "second.txt must exist");
-    assert!(!wal_path.exists(), "WAL journal must be removed on clean completion");
+    assert!(
+        !wal_path.exists(),
+        "WAL journal must be removed on clean completion"
+    );
 }

@@ -189,15 +189,13 @@ fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &C
         next: target_oid.to_hex(),
         name: full_ref.clone(),
     };
-    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
-        &hook_runner,
-        &[update],
-        || {
+    if let Err(err_msg) =
+        super::git_hooks::execute_reference_transaction(&hook_runner, &[update], || {
             ref_store
                 .update_ref(&full_ref, &target_oid, None)
                 .map_err(|write_err| format!("failed to write branch ref: {write_err}"))
-        },
-    ) {
+        })
+    {
         reject(CliTag::ERROR, err_msg);
     }
 
@@ -263,15 +261,15 @@ fn delete_branch(view: &RepoView, name: &str, force: bool, ctx: &CliContext) {
         next: "0".repeat(40),
         name: full_ref.clone(),
     };
-    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
-        &hook_runner,
-        &[update],
-        || match ref_store.delete_ref(&full_ref) {
+    if let Err(err_msg) =
+        super::git_hooks::execute_reference_transaction(&hook_runner, &[update], || match ref_store
+            .delete_ref(&full_ref)
+        {
             Ok(true) => Ok(()),
             Ok(false) => Err(format!("error: branch '{name}' not found")),
             Err(delete_err) => Err(format!("delete branch '{name}': {delete_err}")),
-        },
-    ) {
+        })
+    {
         reject(CliTag::ERROR, err_msg);
     }
 
@@ -364,10 +362,8 @@ fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &
         name: new_full_ref.clone(),
     };
     let updates = [delete_update, create_update];
-    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
-        &hook_runner,
-        &updates,
-        || {
+    if let Err(err_msg) =
+        super::git_hooks::execute_reference_transaction(&hook_runner, &updates, || {
             let rename_message = format!("Branch: renamed {old_full_ref} to {new_full_ref}");
             if let Err(write_err) =
                 ref_store.update_ref_with_message(&new_full_ref, &oid, None, &rename_message)
@@ -378,8 +374,8 @@ fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &
                 return Err(format!("rename branch '{effective_old}': {delete_err}"));
             }
             Ok(())
-        },
-    ) {
+        })
+    {
         reject(CliTag::ERROR, err_msg);
     }
 

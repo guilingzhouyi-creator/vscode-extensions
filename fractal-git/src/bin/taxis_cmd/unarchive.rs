@@ -633,14 +633,18 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         }
     };
 
-    let human_author = find_arg_value(&ctx.args, &["--human"]).map(String::from)
+    let human_author = find_arg_value(&ctx.args, &["--human"])
+        .map(String::from)
         .or_else(|| std::env::var("TAXIS_HUMAN_AUTHOR").ok());
-    let auth_token = find_arg_value(&ctx.args, &["--token"]).map(String::from)
+    let auth_token = find_arg_value(&ctx.args, &["--token"])
+        .map(String::from)
         .or_else(|| std::env::var("TAXIS_AUTHORITY_TOKEN").ok());
-    let agent_id = find_arg_value(&ctx.args, &["--agent"]).map(String::from)
+    let agent_id = find_arg_value(&ctx.args, &["--agent"])
+        .map(String::from)
         .or_else(|| std::env::var("TAXIS_AGENT_ID").ok())
         .unwrap_or_else(|| "agent-default".to_string());
-    let cell_id = find_arg_value(&ctx.args, &["--cell"]).map(String::from)
+    let cell_id = find_arg_value(&ctx.args, &["--cell"])
+        .map(String::from)
         .or_else(|| std::env::var("TAXIS_CELL_ID").ok())
         .unwrap_or_else(|| "cell-default".to_string());
 
@@ -649,9 +653,9 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         "rust-strict" => TaxisPolicy::rust_strict(),
         _ => TaxisPolicy::workspace_strict(),
     };
-    let authority_secret = human_author.as_deref().and_then(|_| {
-        fg_gate::authority::resolve_authority_secret(git_dir).ok()
-    });
+    let authority_secret = human_author
+        .as_deref()
+        .and_then(|_| fg_gate::authority::resolve_authority_secret(git_dir).ok());
     if let Some(secret) = authority_secret.as_ref() {
         policy.authority_secret = Some(secret.clone());
     }
@@ -695,10 +699,15 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
     let touched_files = vec![archive_name.to_string()];
 
     // 2. Validate commit message prior to hooks (Option B: Dual-validation)
-    if let Err(gov_err) = CommitMessageGuard::parse_and_verify(&initial_msg, &policy, Some(&touched_files)) {
+    if let Err(gov_err) =
+        CommitMessageGuard::parse_and_verify(&initial_msg, &policy, Some(&touched_files))
+    {
         reject(
             CliTag::COMMIT_GOVERNANCE_FAIL,
-            format!("Commit message rejected by Taxis policy '{}': {gov_err}", policy.name),
+            format!(
+                "Commit message rejected by Taxis policy '{}': {gov_err}",
+                policy.name
+            ),
         );
     }
 
@@ -721,7 +730,9 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
     let final_msg = super::git_hooks::run_commit_chain(&hook_runner, git_dir, &initial_msg);
 
     // 6. Post-hook commit message validation (Option B: Dual-validation)
-    if let Err(gov_err) = CommitMessageGuard::parse_and_verify(&final_msg, &policy, Some(&touched_files)) {
+    if let Err(gov_err) =
+        CommitMessageGuard::parse_and_verify(&final_msg, &policy, Some(&touched_files))
+    {
         reject(
             CliTag::COMMIT_GOVERNANCE_FAIL,
             format!(
@@ -739,7 +750,14 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         None => GitSignature::for_agent(&agent_id, &cell_id, now_secs),
     };
 
-    let commit = GitCommit::new(root_tree_oid, parent_oids, sig.clone(), sig, final_msg, None);
+    let commit = GitCommit::new(
+        root_tree_oid,
+        parent_oids,
+        sig.clone(),
+        sig,
+        final_msg,
+        None,
+    );
     let commit_payload = serialize_commit_payload(&commit);
     let commit_oid = match loose_odb.write_object("commit", &commit_payload) {
         Ok(oid) => oid,
@@ -752,15 +770,13 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         next: commit_oid.to_hex(),
         name: target_ref.to_git_ref(),
     };
-    if let Err(err_msg) = super::git_hooks::execute_reference_transaction(
-        &hook_runner,
-        &[branch_update],
-        || {
+    if let Err(err_msg) =
+        super::git_hooks::execute_reference_transaction(&hook_runner, &[branch_update], || {
             ref_store
                 .update_ref(&target_ref.to_git_ref(), &commit_oid, parent_oid.as_ref())
                 .map_err(|e| format!("advance ref '{}': {e}", target_ref.to_git_ref()))
-        },
-    ) {
+        })
+    {
         reject(CliTag::ERROR, err_msg);
     }
 

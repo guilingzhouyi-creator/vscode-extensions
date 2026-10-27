@@ -65,7 +65,9 @@ impl SegmentedCommitDag {
 
     /// Returns the direct parent indices of a commit index.
     pub fn parents(&self, index: u32) -> Option<&[u32]> {
-        self.parents.get(index as usize).map(|parent_list| parent_list.as_slice())
+        self.parents
+            .get(index as usize)
+            .map(|parent_list| parent_list.as_slice())
     }
 
     /// Returns the reachability bitmap for a commit OID.
@@ -83,7 +85,8 @@ impl SegmentedCommitDag {
         }
 
         let mut oids = Vec::with_capacity(commit_count);
-        let mut oid_to_index = HashMap::with_capacity_and_hasher(commit_count, BuildHasherDefault::default());
+        let mut oid_to_index =
+            HashMap::with_capacity_and_hasher(commit_count, BuildHasherDefault::default());
 
         for (oid, _) in commits {
             if !oid_to_index.contains_key(oid) {
@@ -232,11 +235,7 @@ mod tests {
         let c1 = Oid::from_bytes([0x02; 20]);
         let c2 = Oid::from_bytes([0x03; 20]);
 
-        let commits = vec![
-            (root, Vec::new()),
-            (c1, vec![root]),
-            (c2, vec![c1]),
-        ];
+        let commits = vec![(root, Vec::new()), (c1, vec![root]), (c2, vec![c1])];
 
         let dag = SegmentedCommitDag::from_commits(&commits);
         assert_eq!(dag.len(), 3);

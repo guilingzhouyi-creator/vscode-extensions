@@ -63,7 +63,10 @@ impl FossilRollingHash {
     pub fn roll(&mut self, outgoing: u8, incoming: u8) {
         let outgoing_value = outgoing as u16;
         let incoming_value = incoming as u16;
-        self.sum_bytes = self.sum_bytes.wrapping_sub(outgoing_value).wrapping_add(incoming_value);
+        self.sum_bytes = self
+            .sum_bytes
+            .wrapping_sub(outgoing_value)
+            .wrapping_add(incoming_value);
         self.weighted_sum = self
             .weighted_sum
             .wrapping_sub(outgoing_value.wrapping_mul(16))

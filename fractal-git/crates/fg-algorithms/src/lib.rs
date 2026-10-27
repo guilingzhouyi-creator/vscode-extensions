@@ -32,9 +32,9 @@ pub use cdc::{
 pub use diff::{
     bit_parallel_diff, decimal_width, detect_renames, pprint_rename, scale_linear,
     shared_suffix_len, split_lines, stat_graph, text_ends_with_newline, truncate_stat_name,
-    BIT_PARALLEL_MAX_LINES, BlobRef, ChangeKind, Compaction, DiffAlgorithm, DiffEngine, DiffEntry,
-    PatchGenerator, PatchHunk, PatchHunkRef, PatchLine, PatchLineRef, RenameHit, Side, StatLayout,
-    TreeDiff, TreeDiffState, UnifiedPatch, UnifiedPatchRef, DEFAULT_HUNK_CONTEXT,
+    BlobRef, ChangeKind, Compaction, DiffAlgorithm, DiffEngine, DiffEntry, PatchGenerator,
+    PatchHunk, PatchHunkRef, PatchLine, PatchLineRef, RenameHit, Side, StatLayout, TreeDiff,
+    TreeDiffState, UnifiedPatch, UnifiedPatchRef, BIT_PARALLEL_MAX_LINES, DEFAULT_HUNK_CONTEXT,
     DEFAULT_RENAME_SCORE, MAX_RENAME_SCORE,
 };
 pub use math::{compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate};
@@ -50,13 +50,13 @@ pub use pack::{
     MAX_DELTA_DEPTH,
 };
 pub use poset::CorrectedCommitDate;
+pub use roaring::RoaringBitmap;
 pub use space_plan::{
     check_headroom, compute_adaptive_batch_window, simulate_space_plan, ExtractionUnit,
     SpacePlanConfig, SpacePlanReport, SpacePlanStep, DEFAULT_BATCH_WINDOW_BYTES,
     DEFAULT_SAFETY_HEADROOM_BYTES, MAX_BATCH_WINDOW_BYTES, MIN_BATCH_WINDOW_BYTES,
 };
 pub use succinct::{EliasFano, EliasFanoBuilder, EliasFanoIter};
-pub use roaring::RoaringBitmap;
 pub use synthetic::{
     generate_commit_chain, generate_diamond_dag, generate_monorepo_trees, SyntheticCommitChain,
     SyntheticDag, SyntheticMonorepo,

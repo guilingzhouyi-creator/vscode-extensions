@@ -479,7 +479,9 @@ fn test_merge_commit_records_two_ordered_parents() {
 
     // System Git is the independent baseline comparator for parent ordering and ancestry.
     if !system_git_available() {
-        eprintln!("skip: system git is unavailable or restricted, skipping git cat-file verification");
+        eprintln!(
+            "skip: system git is unavailable or restricted, skipping git cat-file verification"
+        );
         let _ = fs::remove_dir_all(&root);
         return;
     }
@@ -552,7 +554,9 @@ fn run_system_git(repo: &std::path::Path, args: &[&str]) -> String {
 #[test]
 fn test_merge_commit_matches_system_git_merge() {
     if !system_git_available() {
-        eprintln!("skip: system git is unavailable or restricted, skipping git baseline comparison");
+        eprintln!(
+            "skip: system git is unavailable or restricted, skipping git baseline comparison"
+        );
         return;
     }
 

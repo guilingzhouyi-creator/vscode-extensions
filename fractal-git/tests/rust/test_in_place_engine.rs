@@ -420,7 +420,14 @@ fn test_tipse_cli_unarchive_to_odb_zip() {
     );
 
     // Verify git ls-tree or taxis ls-tree can read the tree
-    let ls_tree = run_taxis_ok(&repo, &["ls-tree", "-r", "refs/fractal/cell/cell-default/card/in-place-import"]);
+    let ls_tree = run_taxis_ok(
+        &repo,
+        &[
+            "ls-tree",
+            "-r",
+            "refs/fractal/cell/cell-default/card/in-place-import",
+        ],
+    );
     assert!(ls_tree.contains("hello.txt"));
     assert!(ls_tree.contains("nested/module.rs"));
 

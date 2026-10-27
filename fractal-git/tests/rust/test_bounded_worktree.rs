@@ -268,7 +268,10 @@ fn test_cow_worktree_materialization_and_path_jail_isolation() {
     assert!(dst_manifest.exists());
     assert!(dst_allowed.exists());
     assert!(dst_restricted.exists());
-    assert!(is_readonly(&dst_restricted), "restricted file must be read-only");
+    assert!(
+        is_readonly(&dst_restricted),
+        "restricted file must be read-only"
+    );
 
     // Agent modifies allowed file (detach if needed, write)
     let _ = detach_for_write(&dst_allowed);

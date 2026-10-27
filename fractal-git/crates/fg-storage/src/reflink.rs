@@ -34,9 +34,7 @@ pub enum ReflinkKind {
 
 /// Sets or unsets the read-only flag on target path.
 pub fn set_readonly(path: &Path, readonly: bool) -> FractalResult<()> {
-    let mut perms = fs::metadata(path)
-        .map_err(FractalError::Io)?
-        .permissions();
+    let mut perms = fs::metadata(path).map_err(FractalError::Io)?.permissions();
     perms.set_readonly(readonly);
     fs::set_permissions(path, perms).map_err(FractalError::Io)
 }
@@ -271,9 +269,7 @@ fn linux_block_clone(src: &Path, dst: &Path) -> FractalResult<()> {
         .open(dst)?;
 
     // SAFETY: `src_file` and `dst_file` are valid open file descriptors.
-    let ioctl_status = unsafe {
-        libc::ioctl(dst_file.as_raw_fd(), FICLONE, src_file.as_raw_fd())
-    };
+    let ioctl_status = unsafe { libc::ioctl(dst_file.as_raw_fd(), FICLONE, src_file.as_raw_fd()) };
 
     if ioctl_status != 0 {
         let _ = fs::remove_file(dst);

@@ -208,7 +208,8 @@ impl PackBitmap {
             let _entry_flags = bytes[cursor + 5];
             cursor += 6;
 
-            if let Ok(entry_bitmap) = RoaringBitmap::deserialize_from(&bytes[cursor..trailer_start]) {
+            if let Ok(entry_bitmap) = RoaringBitmap::deserialize_from(&bytes[cursor..trailer_start])
+            {
                 cursor += entry_bitmap.serialized_size();
                 commit_bitmaps.push((pos, entry_bitmap));
             } else {
@@ -230,10 +231,7 @@ impl PackBitmap {
     /// Reads a `.bitmap` file from disk.
     pub fn open(path: &Path) -> FractalResult<Self> {
         let bytes = fs::read(path).map_err(|e| {
-            FractalError::ObjectCodec(format!(
-                "Failed to open bitmap at {}: {e}",
-                path.display()
-            ))
+            FractalError::ObjectCodec(format!("Failed to open bitmap at {}: {e}", path.display()))
         })?;
         Self::from_bytes(&bytes)
     }

@@ -17,9 +17,7 @@ use imara_diff::{Algorithm, Diff, InternedInput};
 
 use crate::diff::bit_parallel::{bit_parallel_diff, BIT_PARALLEL_MAX_LINES};
 use crate::diff::compact::{Compaction, Side};
-use crate::diff::patch::{
-    split_lines, trim_common_tail, PatchGenerator, UnifiedPatchRef,
-};
+use crate::diff::patch::{split_lines, trim_common_tail, PatchGenerator, UnifiedPatchRef};
 use crate::diff::xdiff::mark_changed;
 use crate::diff::xdiff_prepare::prepare;
 
@@ -58,11 +56,7 @@ impl DiffEngine {
     }
 
     /// Computes the change masks `(old_changed, new_changed)` for two texts.
-    pub fn compute_change_flags(
-        &self,
-        old_text: &str,
-        new_text: &str,
-    ) -> (Vec<bool>, Vec<bool>) {
+    pub fn compute_change_flags(&self, old_text: &str, new_text: &str) -> (Vec<bool>, Vec<bool>) {
         if old_text == new_text {
             let old_count = split_lines(old_text).len();
             let new_count = split_lines(new_text).len();
@@ -90,14 +84,10 @@ impl DiffEngine {
                 if old_lines.len() <= BIT_PARALLEL_MAX_LINES
                     && new_lines.len() <= BIT_PARALLEL_MAX_LINES
                 {
-                    let old_records: Vec<&[u8]> = old_text
-                        .split_inclusive('\n')
-                        .map(str::as_bytes)
-                        .collect();
-                    let new_records: Vec<&[u8]> = new_text
-                        .split_inclusive('\n')
-                        .map(str::as_bytes)
-                        .collect();
+                    let old_records: Vec<&[u8]> =
+                        old_text.split_inclusive('\n').map(str::as_bytes).collect();
+                    let new_records: Vec<&[u8]> =
+                        new_text.split_inclusive('\n').map(str::as_bytes).collect();
                     let (prepared_old, prepared_new) = prepare(&old_records, &new_records);
                     let (mut old_changed, mut new_changed) =
                         bit_parallel_diff(&prepared_old.classes, &prepared_new.classes);
@@ -122,17 +112,12 @@ impl DiffEngine {
                 self.compute_imara_flags(old_text, new_text, Algorithm::Histogram)
             }
             DiffAlgorithm::Myers => {
-                let old_records: Vec<&[u8]> = old_text
-                    .split_inclusive('\n')
-                    .map(str::as_bytes)
-                    .collect();
-                let new_records: Vec<&[u8]> = new_text
-                    .split_inclusive('\n')
-                    .map(str::as_bytes)
-                    .collect();
+                let old_records: Vec<&[u8]> =
+                    old_text.split_inclusive('\n').map(str::as_bytes).collect();
+                let new_records: Vec<&[u8]> =
+                    new_text.split_inclusive('\n').map(str::as_bytes).collect();
                 let (prepared_old, prepared_new) = prepare(&old_records, &new_records);
-                let (mut old_changed, mut new_changed) =
-                    mark_changed(&prepared_old, &prepared_new);
+                let (mut old_changed, mut new_changed) = mark_changed(&prepared_old, &prepared_new);
                 Compaction::new(
                     Side {
                         hashes: &prepared_old.classes,

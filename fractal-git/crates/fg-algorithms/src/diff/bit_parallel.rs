@@ -49,7 +49,8 @@ pub fn bit_parallel_diff(old_hashes: &[u32], new_hashes: &[u32]) -> (Vec<bool>, 
         }
 
         let equality_or_vertical = pattern_match_mask | vertical_vector;
-        let borrow_diff = (equality_or_vertical.wrapping_sub((vertical_vector << 1) | 1)) ^ equality_or_vertical;
+        let borrow_diff =
+            (equality_or_vertical.wrapping_sub((vertical_vector << 1) | 1)) ^ equality_or_vertical;
         vertical_vector = equality_or_vertical & borrow_diff;
         column_bitmasks[column_index] = vertical_vector;
     }

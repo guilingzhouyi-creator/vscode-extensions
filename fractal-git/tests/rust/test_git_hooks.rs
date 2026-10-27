@@ -320,9 +320,18 @@ fn test_reference_transaction_blocks_branch_creation() {
     let odb = fractal_git::LooseOdb::new(&git_dir);
     let dummy_tree = odb.write_object("tree", b"").expect("write dummy tree");
     let sig = fractal_git::GitSignature::new("Tester", "test@company.com", 1700000000);
-    let commit = fractal_git::GitCommit::new(dummy_tree, vec![], sig.clone(), sig, "feat(core): seed\n", None);
+    let commit = fractal_git::GitCommit::new(
+        dummy_tree,
+        vec![],
+        sig.clone(),
+        sig,
+        "feat(core): seed\n",
+        None,
+    );
     let commit_payload = fg_storage::commit_materializer::serialize_commit_payload(&commit);
-    let commit_oid = odb.write_object("commit", &commit_payload).expect("write dummy commit");
+    let commit_oid = odb
+        .write_object("commit", &commit_payload)
+        .expect("write dummy commit");
     let _ = ref_store.update_ref("refs/heads/main", &commit_oid, None);
 
     // Now attempt to branch with blocked name
@@ -338,8 +347,14 @@ fn test_reference_transaction_blocks_branch_creation() {
     );
 
     // Assert ref was NOT written
-    let check_ref = ref_store.get_ref("refs/heads/blocked-branch").ok().flatten();
-    assert!(check_ref.is_none(), "blocked branch ref must not exist on disk");
+    let check_ref = ref_store
+        .get_ref("refs/heads/blocked-branch")
+        .ok()
+        .flatten();
+    assert!(
+        check_ref.is_none(),
+        "blocked branch ref must not exist on disk"
+    );
 }
 
 #[test]
@@ -367,9 +382,18 @@ fn test_reference_transaction_blocks_tag_creation() {
     let odb = fractal_git::LooseOdb::new(&git_dir);
     let dummy_tree = odb.write_object("tree", b"").expect("write dummy tree");
     let sig = fractal_git::GitSignature::new("Tester", "test@company.com", 1700000000);
-    let commit = fractal_git::GitCommit::new(dummy_tree, vec![], sig.clone(), sig, "feat(core): seed\n", None);
+    let commit = fractal_git::GitCommit::new(
+        dummy_tree,
+        vec![],
+        sig.clone(),
+        sig,
+        "feat(core): seed\n",
+        None,
+    );
     let commit_payload = fg_storage::commit_materializer::serialize_commit_payload(&commit);
-    let commit_oid = odb.write_object("commit", &commit_payload).expect("write dummy commit");
+    let commit_oid = odb
+        .write_object("commit", &commit_payload)
+        .expect("write dummy commit");
     let _ = ref_store.update_ref("refs/heads/main", &commit_oid, None);
 
     let blocked_out = run_taxis(repository.path(), &["tag", "blocked-tag", "main"]);
@@ -379,5 +403,8 @@ fn test_reference_transaction_blocks_tag_creation() {
     );
 
     let check_ref = ref_store.get_ref("refs/tags/blocked-tag").ok().flatten();
-    assert!(check_ref.is_none(), "blocked tag ref must not exist on disk");
+    assert!(
+        check_ref.is_none(),
+        "blocked tag ref must not exist on disk"
+    );
 }

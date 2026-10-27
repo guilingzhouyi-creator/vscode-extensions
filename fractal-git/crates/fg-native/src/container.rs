@@ -618,7 +618,10 @@ impl ContainerFileLock {
                 unsafe { CloseHandle(handle) };
                 return Err(NativeError::Io(std::io::Error::new(
                     std::io::ErrorKind::TimedOut,
-                    format!("timed out waiting for container lock on '{}'", path.display()),
+                    format!(
+                        "timed out waiting for container lock on '{}'",
+                        path.display()
+                    ),
                 )));
             }
 
@@ -692,7 +695,10 @@ impl ContainerFileLock {
             if start.elapsed() >= timeout {
                 return Err(NativeError::Io(std::io::Error::new(
                     std::io::ErrorKind::TimedOut,
-                    format!("timed out waiting for container lock on '{}'", path.display()),
+                    format!(
+                        "timed out waiting for container lock on '{}'",
+                        path.display()
+                    ),
                 )));
             }
 
@@ -912,19 +918,24 @@ mod tests {
         let lock_path = crate::test_support::scratch_path("lock_test.txc.lock");
 
         // 1. Acquire lock 1
-        let lock1 = ContainerFileLock::acquire(&lock_path, 500).expect("first lock acquire succeeds");
+        let lock1 =
+            ContainerFileLock::acquire(&lock_path, 500).expect("first lock acquire succeeds");
 
         // 2. Second acquire with short timeout must fail because lock1 holds it exclusively
         let start = std::time::Instant::now();
         let lock2_res = ContainerFileLock::acquire(&lock_path, 100);
-        assert!(lock2_res.is_err(), "second acquire must time out while lock1 is held");
+        assert!(
+            lock2_res.is_err(),
+            "second acquire must time out while lock1 is held"
+        );
         assert!(start.elapsed() >= std::time::Duration::from_millis(50));
 
         // 3. Drop lock 1
         drop(lock1);
 
         // 4. Now acquire must succeed immediately
-        let lock3 = ContainerFileLock::acquire(&lock_path, 500).expect("acquire after release succeeds");
+        let lock3 =
+            ContainerFileLock::acquire(&lock_path, 500).expect("acquire after release succeeds");
         drop(lock3);
 
         let _ = std::fs::remove_file(&lock_path);

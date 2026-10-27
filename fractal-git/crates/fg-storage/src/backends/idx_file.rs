@@ -254,7 +254,9 @@ impl PackIndex {
         if count == 0 {
             return fg_algorithms::EliasFano::from_slice(&[]);
         }
-        let mut sorted_offsets: Vec<u64> = (0..count).map(|object_index| self.offset_at(object_index)).collect();
+        let mut sorted_offsets: Vec<u64> = (0..count)
+            .map(|object_index| self.offset_at(object_index))
+            .collect();
         sorted_offsets.sort_unstable();
         fg_algorithms::EliasFano::from_slice(&sorted_offsets)
     }
@@ -366,7 +368,9 @@ mod tests {
     #[test]
     fn builds_compressed_offsets_index() {
         let (index, _, _) = sample_index();
-        let compressed_offsets = index.build_compressed_offsets().expect("build compressed offsets");
+        let compressed_offsets = index
+            .build_compressed_offsets()
+            .expect("build compressed offsets");
         assert_eq!(compressed_offsets.len(), 2);
         assert_eq!(compressed_offsets.get(0), Some(100));
         assert_eq!(compressed_offsets.get(1), Some(7000));

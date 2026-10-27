@@ -203,7 +203,12 @@ pub fn build_preflight_plan(
                 .map(|member| {
                     let est_blob_size = (member.size as f64 * 0.4).ceil() as u64 + 32;
                     let bytes_truncated = if opts.in_place { member.total_span } else { 0 };
-                    ExtractionUnit::new(&member.name, est_blob_size, bytes_truncated, member.header_offset)
+                    ExtractionUnit::new(
+                        &member.name,
+                        est_blob_size,
+                        bytes_truncated,
+                        member.header_offset,
+                    )
                 })
                 .collect();
             return Ok(simulate_space_plan(free_space, &units, config));

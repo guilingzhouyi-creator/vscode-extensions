@@ -208,7 +208,10 @@ pub fn extract_tar_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
             && target_path.exists();
 
         let payload_len = if is_already_done {
-            target_path.metadata().map(|m| m.len()).unwrap_or(member.size)
+            target_path
+                .metadata()
+                .map(|m| m.len())
+                .unwrap_or(member.size)
         } else {
             // Read payload
             truncator

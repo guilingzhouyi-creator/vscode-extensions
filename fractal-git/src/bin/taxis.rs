@@ -19,9 +19,9 @@ mod taxis_cmd;
 use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
     archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, commit,
-    config, daemon, diff, doctor, hash_object, init, log, merge, operation, project, projection, promotion,
-    quarantine, read, rebase, reclaim, relocate, remote, repack, reset, rev_list, revert, stash,
-    status, submodule, tag, unarchive, undo, verify, worktree,
+    config, daemon, diff, doctor, hash_object, init, log, merge, operation, project, projection,
+    promotion, quarantine, read, rebase, reclaim, relocate, remote, repack, reset, rev_list,
+    revert, stash, status, submodule, tag, unarchive, undo, verify, worktree,
 };
 
 use fg_core::models::current_unix_seconds;

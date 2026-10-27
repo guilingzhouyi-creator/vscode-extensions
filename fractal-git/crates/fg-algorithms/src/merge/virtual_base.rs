@@ -190,10 +190,14 @@ impl VirtualMergeBaseSynthesizer {
         };
 
         let compact_ancestor = ancestor_base.map(&mut convert_tree);
-        let compact_bases: Vec<Vec<CompactTreeEntry>> =
-            bases.iter().map(|base_tree| convert_tree(base_tree)).collect();
-        let compact_base_refs: Vec<&[CompactTreeEntry]> =
-            compact_bases.iter().map(|base_entries| base_entries.as_slice()).collect();
+        let compact_bases: Vec<Vec<CompactTreeEntry>> = bases
+            .iter()
+            .map(|base_tree| convert_tree(base_tree))
+            .collect();
+        let compact_base_refs: Vec<&[CompactTreeEntry]> = compact_bases
+            .iter()
+            .map(|base_entries| base_entries.as_slice())
+            .collect();
 
         let merged_compact =
             Self::synthesize_compact(compact_ancestor.as_deref(), &compact_base_refs);
@@ -308,8 +312,10 @@ mod tests {
         let mut base2 = ancestor.clone();
         base2.insert("theirs_mod.txt".to_string(), dummy_oid(3));
 
-        let virtual_base =
-            VirtualMergeBaseSynthesizer::synthesize_virtual_base(Some(&ancestor), &[&base1, &base2]);
+        let virtual_base = VirtualMergeBaseSynthesizer::synthesize_virtual_base(
+            Some(&ancestor),
+            &[&base1, &base2],
+        );
 
         assert_eq!(virtual_base.get("shared.txt"), Some(&dummy_oid(1)));
         assert_eq!(virtual_base.get("ours_mod.txt"), Some(&dummy_oid(2)));
