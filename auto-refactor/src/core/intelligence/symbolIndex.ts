@@ -9,15 +9,19 @@
  *     `api.querySymbols`, the dependency-graph unused-export pass and future reviewers
  * Responsibilities: Aggregate per-file declarations (function/method/class/struct/interface/
  *     trait/impl/variable/constant/field) and call references into by-name maps; answer
- *     `resolve()`, `crossFileReferencesTo()` and `stats()`; keep the maps copy-free for readers
+ *     `resolve()`, `crossFileReferencesTo()` and `stats()`; keep the maps copy-free for readers;
+ *     hand out a bounded `createSlidingView()` for repositories whose call edges would not fit
  * Exit Semantics & Design Rationale: Pure in-memory aggregation — no I/O, no throwing. The index
  *     is only as complete as the tree the adapter materialized, so `stats().builtFrom` records
  *     which path produced it (a lazy-projection scan reports `projection` and a reduced index
  *     instead of pretending to be complete). Declarations without a position keep `line: null`
- *     rather than inventing one, because callers use the line to jump into source.
+ *     rather than inventing one, because callers use the line to jump into source. The sliding view
+ *     keeps declarations and bounds only call edges, so a dropped edge surfaces as an evicted file
+ *     instead of masquerading as "nobody calls this".
  */
 import type { NormalizedNode } from '../ast/multilang';
 import { NodeKind } from '../ast/multilang';
+import { DEFAULT_MAX_ACTIVE_FILES, SlidingSymbolStream } from './sliding-symbol-stream';
 
 /** Kinds of declarations the index records, derived from the language-neutral node kinds. */
 export type SymbolKind =
@@ -322,6 +326,19 @@ export class SymbolIndex {
      */
     calledNames(): string[] {
         return [...this.references.keys()].sort();
+    }
+
+    /**
+     * Build a bounded sliding view over this index for very large repositories.
+     *
+     * The view keeps every declaration in a compact name map and bounds only the call-edge set, so
+     * a caller can trade "who calls this?" completeness for a flat memory ceiling.
+     *
+     * @param maxActiveFiles - Maximum files whose call edges stay resident.
+     * @returns Bounded view seeded from this index.
+     */
+    createSlidingView(maxActiveFiles: number = DEFAULT_MAX_ACTIVE_FILES): SlidingSymbolStream {
+        return SlidingSymbolStream.fromIndex(this, maxActiveFiles);
     }
 
     /**

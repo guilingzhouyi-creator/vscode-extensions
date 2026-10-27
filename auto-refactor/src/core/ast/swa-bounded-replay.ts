@@ -172,9 +172,10 @@ export class SwaBoundedReplayManager {
         }
 
         this.cacheMissCount++;
-        const anchors = rootNode && rootNode.children && rootNode.children.length > 0
-            ? this.extractAnchorsFromAst(rootNode)
-            : this.extractAnchorsFromText(content);
+        const anchors =
+            rootNode && rootNode.children && rootNode.children.length > 0
+                ? this.extractAnchorsFromAst(rootNode)
+                : this.extractAnchorsFromText(content);
 
         this.storeInCache(filePath, contentHash, anchors);
         return anchors;
@@ -307,7 +308,7 @@ export class SwaBoundedReplayManager {
         const isSignatureIntact = this.verifySignatureIntact(anchor, newLines);
 
         if (!isSignatureIntact && !this.allowSignatureMutation) {
-            return this.buildFullReplayWindow(totalNewLines, REASON_SIGNATURE_MUTATION);
+            return this.buildFullReplayWindow(totalNewLines, REASON_SIGNATURE_MUTATION, anchor);
         }
 
         return this.constructBoundedWindow(anchor, totalNewLines);
@@ -520,7 +521,11 @@ export class SwaBoundedReplayManager {
 
         let oldSuffix = oldLines.length - 1;
         let newSuffix = newLines.length - 1;
-        while (oldSuffix >= prefix && newSuffix >= prefix && oldLines[oldSuffix] === newLines[newSuffix]) {
+        while (
+            oldSuffix >= prefix &&
+            newSuffix >= prefix &&
+            oldLines[oldSuffix] === newLines[newSuffix]
+        ) {
             oldSuffix--;
             newSuffix--;
         }
@@ -539,9 +544,23 @@ export class SwaBoundedReplayManager {
 
     /**
      * Internal: Construct full-replay fallback window.
+     *
+     * `anchor` is attached only for a rejected signature mutation: the planner above reuses it to
+     * bound the replay to that declaration, so the fallback must not discard the identity of the
+     * declaration that caused the rejection.
+     *
+     * @param totalLines - Line count of the mutated file.
+     * @param reason - Diagnostic reason for the fallback.
+     * @param anchor - Declaration whose signature mutation forced the fallback, when applicable.
+     * @returns Unbounded window covering the whole file.
      */
-    private buildFullReplayWindow(totalLines: number, reason: string): SwaReplayWindow {
+    private buildFullReplayWindow(
+        totalLines: number,
+        reason: string,
+        anchor?: AstAnchor,
+    ): SwaReplayWindow {
         return {
+            anchor,
             startLine: 1,
             endLine: Math.max(1, totalLines),
             isBounded: false,

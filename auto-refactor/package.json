@@ -118,6 +118,8 @@
     "self:audit": "node scripts/run-self-audit.js",
     "bench-asymmetric": "node scripts/bench-asymmetric.js",
     "validate-review-memory": "node scripts/validate-review-memory.js",
+    "validate-sparse-replay": "node scripts/validate-sparse-reference-replay.js",
+    "validate-sparse-hopper": "node scripts/validate-sparse-ast-hopper.js",
     "validate-generalized": "node scripts/validate-generalized.js",
     "validate-governance": "node scripts/validate-governance.js",
     "validate-praxis": "node scripts/validate-praxis-foundation.js",

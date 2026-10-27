@@ -70,6 +70,11 @@ const PARALLEL_SUITES = [
   { name: 'validate-asymmetric', script: 'scripts/validate-asymmetric-routing.js' },
   { name: 'validate-grouped-moe-dispatch', script: 'scripts/validate-grouped-moe-dispatch.js' },
   { name: 'validate-bidirectional-swa', script: 'scripts/validate-bidirectional-swa.js' },
+  {
+    name: 'validate-sparse-reference-replay',
+    script: 'scripts/validate-sparse-reference-replay.js',
+  },
+  { name: 'validate-sparse-ast-hopper', script: 'scripts/validate-sparse-ast-hopper.js' },
   { name: 'validate-dspark-radix-cache', script: 'scripts/validate-dspark-radix-cache.js' },
   { name: 'validate-disaggregated-recipe', script: 'scripts/validate-disaggregated-recipe.js' },
   { name: 'validate-security', script: 'scripts/validate-security-levels.js' },

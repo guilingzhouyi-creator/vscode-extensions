@@ -10,18 +10,27 @@
  * Responsibilities: runStreaming dispatches visit/finalize and isolates analyzer errors;
  *   FileMetricCollector derives line/nesting/function/top-level/export counts;
  *   runStreamingProjected mirrors the contract over NodeProjector; FAST_PATH_ANALYZERS,
- *   fastPathEnabled, policyFromAnalyzers, and tryCreateProjector build the lazy path.
+ *   fastPathEnabled, policyFromAnalyzers, and tryCreateProjector build the lazy path; both entry
+ *   points prune out-of-window subtrees through sparse-ast-hopper when a line span is supplied.
  * Exit Semantics & Design Rationale: analyzer exceptions become one core:analyzer-error issue
  *   (error severity only under failOnAnalyzerError) instead of aborting the scan;
  *   tryCreateProjector returns null on an ineligible gate or projector failure so the caller
  *   falls back to materialized traversal. One descent replaces N re-walks, inlined scope
  *   frames avoid per-node allocation, and staying TypeScript-free preserves oxc byte parity.
+ *   Subtree pruning is limited to nodes whose whole extent lies outside the audited span, so a
+ *   pruned branch can never have carried an in-window finding.
  */
 
 import type { AnalyzerContext, Issue, FileMetric } from '../types';
 import type { NormalizedNode, LanguageAdapter, NodeProjector, ProjectionPolicy } from './multilang';
 import { NodeKind } from './multilang';
 import { computeEffectiveCodeDensity } from '../scoring/effectiveDensity';
+import type { SparseHopperStats, SparseHopperWindow } from './sparse-ast-hopper';
+import {
+    createSparseHopperStats,
+    isSubtreePrunable,
+    shouldDispatchNode,
+} from './sparse-ast-hopper';
 
 const SEVERITY_ERROR = 'error';
 const SEVERITY_INFO = 'info';
@@ -112,29 +121,22 @@ function dispatchHooks(
 }
 
 /**
- * Fast AST slice latent range boundary guard for MLA-style range pruning.
- */
-function isNodeOutsideBounds(
-    node: NormalizedNode,
-    bounds: readonly [number, number] | undefined,
-): boolean {
-    if (!bounds) return false;
-    const [minLine, maxLine] = bounds;
-    if (node.end && node.end.line < minLine) return true;
-    if (node.start && node.start.line > maxLine) return true;
-    return false;
-}
-
-/**
  * Run the single shared traversal over the normalized tree, dispatching to each entry's
  * `visit` (per node) and `finalize` (once). Analyzers without `visit`/`finalize` are skipped
  * (they are handled by the legacy `analyze` path elsewhere). Per-analyzer errors during
  * `visit`/`finalize` become a single `core:analyzer-error` Issue per analyzer.
+ *
+ * When `lineBounds` is supplied the sparse hopper prunes every subtree whose complete extent sits
+ * outside the window: such a subtree cannot contain a finding inside the audited span, so skipping
+ * it removes work without removing evidence. Nodes without materialized positions are never
+ * pruned, and nodes that merely wrap the window are still dispatched so scope context survives.
  * @param adapter - Language adapter supplying `children()` over the normalized tree.
  * @param root - Normalized SourceFile root; its children are visited but the root itself is
  *   not dispatched.
  * @param entries - Analyzer plus merged-context pairs participating in this pass, dispatched
  *   in array order.
+ * @param lineBounds - Optional 1-based [first, last] audited span enabling subtree pruning.
+ * @param hopperStats - Optional counters receiving visited/pruned node totals for this pass.
  * @returns Issues emitted by each analyzer's `finalize`, plus at most one analyzer-error issue
  *   per analyzer that threw during `visit` or `finalize`; direct `visit` output is discarded.
  */
@@ -143,9 +145,12 @@ export function runStreaming(
     root: NormalizedNode,
     entries: StreamingEntry[],
     lineBounds?: readonly [number, number],
+    hopperStats?: SparseHopperStats,
 ): Issue[] {
     const issues: Issue[] = [];
     const errored = new Set<string>();
+    const stats = hopperStats ?? createSparseHopperStats();
+    const window = lineBounds ? { startLine: lineBounds[0], endLine: lineBounds[1] } : undefined;
 
     // Pre-bind visit/finalize once per file: saves the per-node `typeof` check and property
     const activeVisits: ActiveHook[] = [];
@@ -200,8 +205,15 @@ export function runStreaming(
         className: string | null,
         binding: string | null,
     ): void => {
-        if (isNodeOutsideBounds(node, lineBounds)) return;
-        if (activeVisits.length > 0) {
+        if (isSubtreePrunable(node, window)) {
+            stats.pruned += 1;
+            return;
+        }
+        const shouldDispatch = shouldDispatchNode(node, window);
+        if (shouldDispatch) {
+            stats.visited += 1;
+        }
+        if (shouldDispatch && activeVisits.length > 0) {
             dispatchHooks(
                 activeVisits,
                 node,
@@ -222,7 +234,7 @@ export function runStreaming(
             visitNode(childNode, node, parent, childDepth, cName, cBinding);
         }
 
-        if (hasAnyLeave) {
+        if (shouldDispatch && hasAnyLeave) {
             dispatchHooks(
                 activeLeaves,
                 node,
@@ -325,6 +337,64 @@ export class FileMetricCollector {
 // NodeProjector interface only, so the oxc worker's lazy-typescript benefit is preserved.
 // ---------------------------------------------------------------------------
 
+/** Threaded scope values for one hook invocation, kept in one object to shorten signatures. */
+interface ProjectedScope {
+    readonly depth: number;
+    readonly className: string | null;
+    readonly binding: string | null;
+    readonly parentProj: NormalizedNode | undefined;
+    readonly grandparentProj: NormalizedNode | undefined;
+}
+
+/**
+ * Dispatch one projected node to a set of bound hooks.
+ *
+ * @param hooks - Bound visit or leave hooks for this pass.
+ * @param node - Projected node under consideration.
+ * @param scope - Threaded scope values for the hook contract.
+ * @param pushError - Error sink turning a hook exception into one analyzer-error issue.
+ */
+function dispatchProjectedHooks(
+    hooks: ActiveHook[],
+    node: NormalizedNode,
+    scope: ProjectedScope,
+    pushError: ErrorReporter,
+): void {
+    if (hooks.length === 0) return;
+    dispatchHooks(
+        hooks,
+        node,
+        scope.parentProj,
+        scope.grandparentProj,
+        scope.depth,
+        scope.className,
+        scope.binding,
+        pushError,
+    );
+}
+
+/**
+ * Record the hopper verdict for one projected node and report whether it must be dispatched.
+ *
+ * @param node - Projected node under consideration.
+ * @param window - Active audited span, or undefined when the whole file is audited.
+ * @param stats - Counters receiving the visited/pruned tally.
+ * @returns True when the node itself must reach the analyzer hooks.
+ */
+function admitProjectedNode(
+    node: NormalizedNode,
+    window: SparseHopperWindow | undefined,
+    stats: SparseHopperStats,
+): boolean {
+    if (isSubtreePrunable(node, window)) {
+        stats.pruned += 1;
+        return false;
+    }
+    if (!shouldDispatchNode(node, window)) return false;
+    stats.visited += 1;
+    return true;
+}
+
 /**
  * Run the shared traversal over a LAZY projection source (no materialized normalized tree).
  *
@@ -352,6 +422,8 @@ export class FileMetricCollector {
  *   in array order.
  * @param onNode - Optional scan-wide node observer (cross-file symbol index); called once per
  *   projected node, in traversal order.
+ * @param lineBounds - Optional 1-based [first, last] audited span enabling subtree pruning.
+ * @param hopperStats - Optional counters receiving visited/pruned node totals for this pass.
  * @returns Issues emitted by each analyzer's `finalize`, plus at most one analyzer-error issue
  *   per analyzer that threw during `visit` or `finalize`; projector exceptions propagate to
  *   the caller so it can fall back to the materialized path.
@@ -361,9 +433,12 @@ export function runStreamingProjected(
     entries: StreamingEntry[],
     onNode?: (node: NormalizedNode, caller: string | null) => void,
     lineBounds?: readonly [number, number],
+    hopperStats?: SparseHopperStats,
 ): Issue[] {
     const issues: Issue[] = [];
     const errored = new Set<string>();
+    const stats = hopperStats ?? createSparseHopperStats();
+    const window = lineBounds ? { startLine: lineBounds[0], endLine: lineBounds[1] } : undefined;
 
     const activeVisits: ActiveHook[] = [];
     for (let i = 0; i < entries.length; i++) {
@@ -418,66 +493,47 @@ export function runStreamingProjected(
         raw: unknown,
         parentRaw: unknown | undefined,
         grandparentRaw: unknown | undefined,
-        depth: number,
-        className: string | null,
-        binding: string | null,
-        parentProj: NormalizedNode | undefined,
-        grandparentProj: NormalizedNode | undefined,
+        scope: ProjectedScope,
         caller: string | null,
     ): void => {
         const node = projector.project(raw, parentRaw, grandparentRaw);
-        if (isNodeOutsideBounds(node, lineBounds)) return;
+        const shouldDispatch = admitProjectedNode(node, window, stats);
+        if (!shouldDispatch) return;
         // Scan-wide consumers (the cross-file symbol index) observe the SAME projected nodes the
         // analyzers see; this is the only point where the lazy path has a NormalizedNode in hand.
         if (onNode) onNode(node, caller);
-        if (activeVisits.length > 0) {
-            dispatchHooks(
-                activeVisits,
-                node,
-                parentProj,
-                grandparentProj,
-                depth,
-                className,
-                binding,
-                pushError,
-            );
-        }
+        dispatchProjectedHooks(activeVisits, node, scope, pushError);
 
-        const childDepth = depth + (node.increasesNesting ? 1 : 0);
-        const cName = resolveChildScopeName(node, className);
-        const cBinding = resolveChildScopeBinding(node, binding);
+        const childDepth = scope.depth + (node.increasesNesting ? 1 : 0);
+        const cName = resolveChildScopeName(node, scope.className);
+        const cBinding = resolveChildScopeBinding(node, scope.binding);
         const cCaller = node.functionLike && typeof node.name === 'string' ? node.name : caller;
+        const childScope: ProjectedScope = {
+            depth: childDepth,
+            className: cName,
+            binding: cBinding,
+            parentProj: node,
+            grandparentProj: scope.parentProj,
+        };
 
         for (const childRaw of projector.forEachChild(raw)) {
-            visitRaw(
-                childRaw,
-                raw,
-                parentRaw,
-                childDepth,
-                cName,
-                cBinding,
-                node,
-                parentProj,
-                cCaller,
-            );
+            visitRaw(childRaw, raw, parentRaw, childScope, cCaller);
         }
 
         if (hasAnyLeave) {
-            dispatchHooks(
-                activeLeaves,
-                node,
-                parentProj,
-                grandparentProj,
-                depth,
-                className,
-                binding,
-                pushError,
-            );
+            dispatchProjectedHooks(activeLeaves, node, scope, pushError);
         }
     };
 
+    const rootScope: ProjectedScope = {
+        depth: 0,
+        className: null,
+        binding: null,
+        parentProj: rootProj,
+        grandparentProj: undefined,
+    };
     for (const childRaw of projector.forEachChild(rootRaw)) {
-        visitRaw(childRaw, rootRaw, undefined, 0, null, null, rootProj, undefined, null);
+        visitRaw(childRaw, rootRaw, undefined, rootScope, null);
     }
 
     for (const entry of entries) {

@@ -176,10 +176,33 @@ export interface PraxisSliceAuditVerdict {
     impacts: CallChainImpactResult[];
     /** Issues identified during slice inspection. */
     issues: Issue[];
+    /** Replay window that justified the audited span, when a planner was consulted. */
+    replayWindow?: SliceReplayWindowSummary;
     /** High-resolution analysis latency in microseconds (C-06). */
     latencyUs: number;
     /** Analysis latency in milliseconds. */
     latencyMs: number;
     /** Status indicating whether slice passes architectural governance. */
     status: 'PASS' | 'WARN' | 'BLOCK';
+}
+
+/**
+ * Transport-safe summary of the replay window chosen for a slice audit.
+ *
+ * The planner's own window carries a resolver closure and an anchor object; the verdict keeps only
+ * the facts a reviewer or agent needs, so the verdict stays serializable.
+ */
+export interface SliceReplayWindowSummary {
+    /** 1-based inclusive first audited line. */
+    startLine: number;
+    /** 1-based inclusive last audited line. */
+    endLine: number;
+    /** True when the audit stayed inside a bounded window. */
+    isBounded: boolean;
+    /** True when the window carries a bounded external reference set. */
+    isSparseBridged: boolean;
+    /** Number of external call sites kept as sparse references. */
+    sparseReferenceCount: number;
+    /** Planner reason tag explaining the window. */
+    reason: string;
 }

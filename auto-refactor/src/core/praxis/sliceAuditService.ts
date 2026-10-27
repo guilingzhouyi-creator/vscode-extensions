@@ -3,26 +3,38 @@
  * File Path: src/core/praxis/sliceAuditService.ts
  * Architecture Role: High-performance, strongly typed facade designed specifically for the
  *   Praxis Diff Subsystem team; delivers sub-10ms localized AST slice audits, MoE CED sparse
- *   routing plans, and cross-file call chain impact propagation.
- * Dependencies & Triggers: Consumes sliceExtractor, sparseMoEGate, callChainImpactTracer,
- *   and CallGraph; consumed by Praxis diff review cells and public api.
+ *   routing plans, cross-file call chain impact propagation, and the sparse reference replay
+ *   window that bounds each audit instead of regenerating the whole file.
+ * Dependencies & Triggers: Consumes sliceExtractor, sparseMoEGate, callChainImpactTracer, the
+ *   sparse reference replay planner and CallGraph; consumed by Praxis diff review cells and the
+ *   public api.
  * Responsibilities: Coordinate AST slice extraction, sparse MoE analyzer gating, caller
- *   closure impact analysis, and synthesize actionable slice audit verdicts.
+ *   closure impact analysis, sparse reference window planning, and synthesize actionable slice
+ *   verdicts.
  * Exit Semantics & Design Rationale: Strongly typed SPI contracts; never throws, handles
- *   empty/corrupt inputs safely and returns descriptive status verdicts.
+ *   empty/corrupt inputs safely and returns descriptive status verdicts. The window summary is
+ *   always populated when contents are supplied, so a reviewer can tell a bounded local audit from
+ *   a whole-file fallback without re-deriving the diff.
  */
 
 import type { CallGraph } from '../intelligence/callGraph';
 import type { CallChainImpactTracer } from '../intelligence/callChainImpactTracer';
 import { defaultCallChainImpactTracer } from '../intelligence/callChainImpactTracer';
+import { createCallGraphReferenceResolver } from '../intelligence/sparse-reference-resolver';
 import type { ASTSliceExtractor } from '../router/sliceExtractor';
 import { defaultASTSliceExtractor } from '../router/sliceExtractor';
 import type { SparseMoEGateRouter } from '../router/sparseMoEGate';
 import { defaultSparseMoEGateRouter } from '../router/sparseMoEGate';
 import type {
+    SparseReferenceReplayManager,
+    SparseReplayWindow,
+} from '../ast/sparse-reference-replay';
+import { defaultSparseReferenceReplayManager } from '../ast/sparse-reference-replay';
+import type {
     CallChainImpactResult,
     PraxisSliceAuditInput,
     PraxisSliceAuditVerdict,
+    SliceReplayWindowSummary,
     SparseRoutingPlan,
 } from '../router/sliceTypes';
 import type { Issue } from '../types';
@@ -32,6 +44,23 @@ import { formatCompactAgentPrompt } from '../guidance/agentConstraintGenerator';
 const NANOS_PER_MICRO = 1000n;
 const MICROS_PER_MILLI = 1000;
 const SCOPE_FULL_FILE = 'full';
+
+/**
+ * Project a sparse reference window into the serializable verdict shape.
+ *
+ * @param window - Planner window for the audited file.
+ * @returns Window summary carrying only transport-safe facts.
+ */
+function summarizeWindow(window: SparseReplayWindow): SliceReplayWindowSummary {
+    return {
+        startLine: window.startLine,
+        endLine: window.endLine,
+        isBounded: window.isBounded,
+        isSparseBridged: window.isSparseBridged,
+        sparseReferenceCount: window.sparseReferences.length,
+        reason: window.reason,
+    };
+}
 
 /**
  * Interface contract provided to Praxis team for fine-grained AST slice audit governance.
@@ -104,17 +133,21 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
 
     private readonly tracer: CallChainImpactTracer;
 
+    private readonly replayPlanner: SparseReferenceReplayManager;
+
     /**
-     * Initialize service with modular slice extractor, router, and tracer.
+     * Initialize service with modular slice extractor, router, tracer and replay planner.
      */
     constructor(
         extractor: ASTSliceExtractor = defaultASTSliceExtractor,
         gateRouter: SparseMoEGateRouter = defaultSparseMoEGateRouter,
         tracer: CallChainImpactTracer = defaultCallChainImpactTracer,
+        replayPlanner: SparseReferenceReplayManager = defaultSparseReferenceReplayManager,
     ) {
         this.extractor = extractor;
         this.gateRouter = gateRouter;
         this.tracer = tracer;
+        this.replayPlanner = replayPlanner;
     }
 
     /**
@@ -135,6 +168,7 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
         const routingPlan = this.gateRouter.routeCombinedSlices(slices);
         const impacts: CallChainImpactResult[] = [];
         const issues: Issue[] = [];
+        const replayWindow = this.planReplayWindow(input, callGraph);
 
         const maxDepth = input.maxCallDepth ?? 3;
         for (const slice of slices) {
@@ -163,10 +197,35 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
             routingPlan,
             impacts,
             issues,
+            replayWindow,
             latencyUs,
             latencyMs,
             status,
         };
+    }
+
+    /**
+     * Plan the sparse reference replay window for this audit.
+     *
+     * A signature mutation no longer forces a whole-file statement: the planner bounds the window
+     * to the mutated declaration and attaches the external call sites it could reach, so the
+     * verdict can name the blast radius instead of re-reading every file.
+     *
+     * @param input - Slice audit input carrying contents and changed lines.
+     * @param callGraph - Call graph used to resolve sparse references, when available.
+     * @returns Serializable window summary for the verdict.
+     */
+    private planReplayWindow(
+        input: PraxisSliceAuditInput,
+        callGraph?: CallGraph,
+    ): SliceReplayWindowSummary {
+        const window = this.replayPlanner.computeSparseReplayWindow({
+            filePath: input.filePath,
+            oldContent: input.oldContent,
+            newContent: input.newContent,
+            resolveReferences: callGraph ? createCallGraphReferenceResolver(callGraph) : undefined,
+        });
+        return summarizeWindow(window);
     }
 
     /**
