@@ -298,8 +298,8 @@ export function calculateTokenShannonEntropy(tokens: readonly string[]): Shannon
 
     const freqMap = new Map<string, number>();
     for (let i = 0; i < totalCount; i++) {
-        const t = tokens[i];
-        freqMap.set(t, (freqMap.get(t) ?? 0) + 1);
+        const token = tokens[i];
+        freqMap.set(token, (freqMap.get(token) ?? 0) + 1);
     }
 
     const vocabularySize = freqMap.size;
@@ -310,9 +310,9 @@ export function calculateTokenShannonEntropy(tokens: readonly string[]): Shannon
     let entropy = 0;
     const invTotal = 1.0 / totalCount;
     for (const count of freqMap.values()) {
-        const p = count * invTotal;
-        if (p > 0) {
-            entropy -= p * Math.log2(p);
+        const probability = count * invTotal;
+        if (probability > 0) {
+            entropy -= probability * Math.log2(probability);
         }
     }
 

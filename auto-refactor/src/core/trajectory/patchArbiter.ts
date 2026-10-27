@@ -117,23 +117,23 @@ function evaluateCandidateSlice(patch: AgentPatchSlice): PatchArbitrationCandida
     const newContent = patch.newContent || '';
     const issuesCount = patch.ruleHitIds?.length || 0;
 
-    const pq = evaluatePatchQuality({
+    const qualityResult = evaluatePatchQuality({
         filePath: patch.filePath,
         beforeContent: oldContent,
         afterContent: newContent,
         newIssues: [],
     });
 
-    const density = pq.effectiveDensityAfter;
-    if (pq.verdict === 'gaming_rejected') {
+    const density = qualityResult.effectiveDensityAfter;
+    if (qualityResult.verdict === 'gaming_rejected') {
         return createGamingCandidate(patch, density);
     }
-    if (pq.verdict === 'unavailable') {
-        return createUnmeasuredCandidate(patch, density, pq.deltaScore ?? 0);
+    if (qualityResult.verdict === 'unavailable') {
+        return createUnmeasuredCandidate(patch, density, qualityResult.deltaScore ?? 0);
     }
 
     const compositeScore = patch.compositeScore ?? 90;
-    const deltaScore = pq.deltaScore ?? 0;
+    const deltaScore = qualityResult.deltaScore ?? 0;
     const arbitrationScore = computeArbitrationScore(
         compositeScore,
         deltaScore,
@@ -168,14 +168,14 @@ export class PatchArbiter {
         const candidates = patches.map(evaluateCandidateSlice);
 
         // Sort descending by arbitration score, with tie-break on agentUid
-        candidates.sort((a, b) => {
-            if (b.compositeScore !== a.compositeScore) {
-                return b.compositeScore - a.compositeScore;
+        candidates.sort((candidateA, candidateB) => {
+            if (candidateB.compositeScore !== candidateA.compositeScore) {
+                return candidateB.compositeScore - candidateA.compositeScore;
             }
-            if (b.deltaScore !== a.deltaScore) {
-                return b.deltaScore - a.deltaScore;
+            if (candidateB.deltaScore !== candidateA.deltaScore) {
+                return candidateB.deltaScore - candidateA.deltaScore;
             }
-            return a.agentUid.localeCompare(b.agentUid);
+            return candidateA.agentUid.localeCompare(candidateB.agentUid);
         });
 
         // Assign ranks and mark the top non-gaming candidate as recommended

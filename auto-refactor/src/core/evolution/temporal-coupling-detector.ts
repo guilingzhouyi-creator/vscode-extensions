@@ -197,12 +197,12 @@ function resolveCouplingWarningLevel(
 }
 
 function createWarningMessage(params: CouplingWarningParams): string {
-    return params.isCrossModule ?
-        `Cross-module shotgun surgery detected: '${params.fileA}' (${params.moduleA}) and '${params.fileB}' (${params.moduleB}) ` +
-            `frequently change together in ${params.sharedCommits} commits (Jaccard similarity: ${params.couplingPct}%). ` +
-            `Extract a shared contract or unify module responsibilities.` :
-        `Intra-module temporal coupling detected: '${params.fileA}' and '${params.fileB}' ` +
-            `frequently change together in ${params.sharedCommits} commits (Jaccard similarity: ${params.couplingPct}%).`;
+    return params.isCrossModule
+        ? `Cross-module shotgun surgery detected: '${params.fileA}' (${params.moduleA}) and '${params.fileB}' (${params.moduleB}) ` +
+              `frequently change together in ${params.sharedCommits} commits (Jaccard similarity: ${params.couplingPct}%). ` +
+              `Extract a shared contract or unify module responsibilities.`
+        : `Intra-module temporal coupling detected: '${params.fileA}' and '${params.fileB}' ` +
+              `frequently change together in ${params.sharedCommits} commits (Jaccard similarity: ${params.couplingPct}%).`;
 }
 
 function buildMappedChangeSets(
@@ -212,13 +212,13 @@ function buildMappedChangeSets(
     const interner = new IdInterner<string>();
     const mappedChangeSets: number[][] = [];
 
-    for (const cs of changeSets) {
-        if (!cs.changedFiles || cs.changedFiles.length > maxFiles) {
+    for (const changeSet of changeSets) {
+        if (!changeSet.changedFiles || changeSet.changedFiles.length > maxFiles) {
             continue;
         }
         const ids: number[] = [];
-        for (const f of cs.changedFiles) {
-            const norm = normalizeEvolutionPath(f);
+        for (const fileItem of changeSet.changedFiles) {
+            const norm = normalizeEvolutionPath(fileItem);
             if (norm) {
                 ids.push(interner.intern(norm));
             }
@@ -242,12 +242,12 @@ function buildTemporalCouplingPairs(
     const pairs: TemporalCouplingPair[] = [];
     let crossModuleWarningCount = 0;
 
-    for (const np of nativePairs) {
-        const rawA = idToFile[np.fileA];
-        const rawB = idToFile[np.fileB];
+    for (const nativePair of nativePairs) {
+        const rawA = idToFile[nativePair.fileA];
+        const rawB = idToFile[nativePair.fileB];
         const [fileA, fileB] = rawA.localeCompare(rawB) <= 0 ? [rawA, rawB] : [rawB, rawA];
-        const commitsA = fileA === rawA ? np.commitsA : np.commitsB;
-        const commitsB = fileA === rawA ? np.commitsB : np.commitsA;
+        const commitsA = fileA === rawA ? nativePair.commitsA : nativePair.commitsB;
+        const commitsB = fileA === rawA ? nativePair.commitsB : nativePair.commitsA;
 
         const moduleA = moduleResolver(fileA);
         const moduleB = moduleResolver(fileB);
@@ -256,14 +256,19 @@ function buildTemporalCouplingPairs(
             crossModuleWarningCount++;
         }
 
-        const couplingPercentage = +(np.jaccardSimilarity * DEFAULT_PRECISION_SCALE).toFixed(2);
-        const warningLevel = resolveCouplingWarningLevel(isCrossModule, np.jaccardSimilarity);
+        const couplingPercentage = +(
+            nativePair.jaccardSimilarity * DEFAULT_PRECISION_SCALE
+        ).toFixed(2);
+        const warningLevel = resolveCouplingWarningLevel(
+            isCrossModule,
+            nativePair.jaccardSimilarity,
+        );
         const warningMessage = createWarningMessage({
             fileA,
             fileB,
             moduleA,
             moduleB,
-            sharedCommits: np.sharedCommits,
+            sharedCommits: nativePair.sharedCommits,
             couplingPct: couplingPercentage,
             isCrossModule,
         });
@@ -271,10 +276,10 @@ function buildTemporalCouplingPairs(
         pairs.push({
             fileA,
             fileB,
-            sharedCommits: np.sharedCommits,
+            sharedCommits: nativePair.sharedCommits,
             commitsA,
             commitsB,
-            jaccardSimilarity: np.jaccardSimilarity,
+            jaccardSimilarity: nativePair.jaccardSimilarity,
             couplingPercentage,
             isCrossModule,
             moduleA,
@@ -284,14 +289,14 @@ function buildTemporalCouplingPairs(
         });
     }
 
-    pairs.sort((a, b) => {
-        if (b.jaccardSimilarity !== a.jaccardSimilarity) {
-            return b.jaccardSimilarity - a.jaccardSimilarity;
+    pairs.sort((pairA, pairB) => {
+        if (pairB.jaccardSimilarity !== pairA.jaccardSimilarity) {
+            return pairB.jaccardSimilarity - pairA.jaccardSimilarity;
         }
-        if (b.sharedCommits !== a.sharedCommits) {
-            return b.sharedCommits - a.sharedCommits;
+        if (pairB.sharedCommits !== pairA.sharedCommits) {
+            return pairB.sharedCommits - pairA.sharedCommits;
         }
-        return a.fileA.localeCompare(b.fileA);
+        return pairA.fileA.localeCompare(pairB.fileA);
     });
 
     return { pairs, crossModuleWarningCount };
@@ -495,12 +500,16 @@ export class TemporalCouplingDetector {
     public isGitRepository(targetDir?: string): boolean {
         const cwd = targetDir || process.cwd();
         try {
-            const probeResult = childProcess.spawnSync(CMD_GIT, ['rev-parse', '--is-inside-work-tree'], {
-                cwd,
-                encoding: ENCODING_UTF8,
-                timeout: TIMEOUT_GIT_PROBE_MS,
-                stdio: STDIO_IGNORE_PIPE_IGNORE,
-            });
+            const probeResult = childProcess.spawnSync(
+                CMD_GIT,
+                ['rev-parse', '--is-inside-work-tree'],
+                {
+                    cwd,
+                    encoding: ENCODING_UTF8,
+                    timeout: TIMEOUT_GIT_PROBE_MS,
+                    stdio: STDIO_IGNORE_PIPE_IGNORE,
+                },
+            );
             return probeResult.status === 0 && probeResult.stdout.trim() === 'true';
         } catch {
             return false;
@@ -517,12 +526,12 @@ export class TemporalCouplingDetector {
         pairSharedCounts: Map<string, number>,
     ): void {
         const seenSet = new Set<string>();
-        for (const cs of changeSets) {
-            if (!cs.changedFiles || cs.changedFiles.length > maxFilesPerCommit) {
+        for (const changeSet of changeSets) {
+            if (!changeSet.changedFiles || changeSet.changedFiles.length > maxFilesPerCommit) {
                 continue;
             }
 
-            const uniqueFiles = extractUniqueCommitFiles(cs.changedFiles, seenSet);
+            const uniqueFiles = extractUniqueCommitFiles(changeSet.changedFiles, seenSet);
             if (uniqueFiles.length < 2) {
                 if (uniqueFiles.length === 1) {
                     const single = uniqueFiles[0];

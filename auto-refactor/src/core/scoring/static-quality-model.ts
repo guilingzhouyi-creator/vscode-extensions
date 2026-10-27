@@ -359,9 +359,9 @@ export function computeStaticQualityScore(
     let weightedScore = 0;
 
     for (const axis of ALL_STATIC_QUALITY_AXES) {
-        const w = mergedWeights[axis] ?? 0;
-        weightSum += w;
-        weightedScore += vector[axis] * w;
+        const axisWeight = mergedWeights[axis] ?? 0;
+        weightSum += axisWeight;
+        weightedScore += vector[axis] * axisWeight;
     }
 
     const rawScore = weightSum <= 0 ? 0 : weightedScore / weightSum;
@@ -478,13 +478,13 @@ export function computeStaticVectorDelta(
     let normAfterSq = 0;
 
     for (const axis of ALL_STATIC_QUALITY_AXES) {
-        const b = before[axis];
-        const a = after[axis];
-        const diff = a - b;
+        const valBefore = before[axis];
+        const valAfter = after[axis];
+        const diff = valAfter - valBefore;
         sumDiffSq += diff * diff;
-        dotProduct += b * a;
-        normBeforeSq += b * b;
-        normAfterSq += a * a;
+        dotProduct += valBefore * valAfter;
+        normBeforeSq += valBefore * valBefore;
+        normAfterSq += valAfter * valAfter;
     }
 
     const euclideanDistance =

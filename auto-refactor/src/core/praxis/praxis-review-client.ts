@@ -529,13 +529,13 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         }
         let hasMajorRework = false;
         for (let i = 0; i < hunks.length; i++) {
-            const h = hunks[i];
-            if (h.reviewVerdict?.violations) {
-                for (let k = 0; k < h.reviewVerdict.violations.length; k++) {
-                    violations.push(h.reviewVerdict.violations[k]);
+            const hunk = hunks[i];
+            if (hunk.reviewVerdict?.violations) {
+                for (let k = 0; k < hunk.reviewVerdict.violations.length; k++) {
+                    violations.push(hunk.reviewVerdict.violations[k]);
                 }
             }
-            if (h.reviewVerdict?.status === 'major_rework_needed') {
+            if (hunk.reviewVerdict?.status === 'major_rework_needed') {
                 hasMajorRework = true;
             }
         }
@@ -669,14 +669,14 @@ export class PraxisReviewClient implements IPraxisReviewClient {
     private collectAffectedFiles(hunks: ReviewDiffHunk[]): string[] {
         const fileSet = new Set<string>();
         for (let i = 0; i < hunks.length; i++) {
-            const h = hunks[i];
-            if (h.astContext?.impactFiles) {
-                for (let j = 0; j < h.astContext.impactFiles.length; j++) {
-                    fileSet.add(h.astContext.impactFiles[j]);
+            const hunk = hunks[i];
+            if (hunk.astContext?.impactFiles) {
+                for (let j = 0; j < hunk.astContext.impactFiles.length; j++) {
+                    fileSet.add(hunk.astContext.impactFiles[j]);
                 }
             }
-            if (h.hunkId.includes(':')) {
-                const parts = h.hunkId.split(':');
+            if (hunk.hunkId.includes(':')) {
+                const parts = hunk.hunkId.split(':');
                 if (parts.length > 1) {
                     fileSet.add(parts[1]);
                 }

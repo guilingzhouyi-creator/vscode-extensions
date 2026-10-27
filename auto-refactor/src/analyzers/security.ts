@@ -337,13 +337,17 @@ export class SecurityAnalyzer implements Analyzer {
     /**
      * Analyze raw file content line by line and return bounded security findings.
      *
-     * @param sf - Parsed TypeScript source file; unused because scanning reads `ctx.content`.
+     * @param sourceFile - Parsed TypeScript source file; unused because scanning reads
+     *   `ctx.content`.
      * @param ctx - Per-file context with content, normalized path, merged options, and level.
      * @returns Findings capped at `maxIssuesPerFile`; empty when the level is `off` or the path is
      *   treated as non-production test, fixture, sample, dist, or mock code.
      */
-    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
-        void sf;
+    analyze(
+        sourceFile: import('typescript').SourceFile | undefined,
+        ctx: AnalyzerContext,
+    ): Issue[] {
+        void sourceFile;
         const opts = (ctx.options || {}) as SecurityOptions;
         const level: SecurityLevel = opts.level || ctx.config.securityLevel || LEVEL_BASIC;
 

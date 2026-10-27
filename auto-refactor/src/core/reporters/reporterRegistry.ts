@@ -165,9 +165,9 @@ registerReporter({
                 `| Severity | Rule | Location | Message |`,
                 `| :--- | :--- | :--- | :--- |`,
             );
-            for (const it of issues.slice(0, MARKDOWN_MAX_ISSUES)) {
+            for (const issueItem of issues.slice(0, MARKDOWN_MAX_ISSUES)) {
                 lines.push(
-                    `| **${it.severity.toUpperCase()}** | \`${it.rule}\` | \`${it.location.file}:${it.location.start.line}\` | ${it.message.replace(/\|/g, '\\|')} |`,
+                    `| **${issueItem.severity.toUpperCase()}** | \`${issueItem.rule}\` | \`${issueItem.location.file}:${issueItem.location.start.line}\` | ${issueItem.message.replace(/\|/g, '\\|')} |`,
                 );
             }
             if (issues.length > MARKDOWN_MAX_ISSUES) {
@@ -194,27 +194,27 @@ registerReporter({
                         driver: {
                             name: report.tool,
                             version: report.version,
-                            rules: Array.from(new Set(report.issues.map((i) => i.rule))).map(
-                                (r) => ({ id: r }),
-                            ),
+                            rules: Array.from(
+                                new Set(report.issues.map((issue) => issue.rule)),
+                            ).map((ruleId) => ({ id: ruleId })),
                         },
                     },
-                    results: report.issues.map((i) => ({
-                        ruleId: i.rule,
+                    results: report.issues.map((issue) => ({
+                        ruleId: issue.rule,
                         level:
-                            i.severity === 'error'
+                            issue.severity === 'error'
                                 ? 'error'
-                                : i.severity === 'warning'
+                                : issue.severity === 'warning'
                                   ? 'warning'
                                   : 'note',
-                        message: { text: i.message },
+                        message: { text: issue.message },
                         locations: [
                             {
                                 physicalLocation: {
-                                    artifactLocation: { uri: i.location.file },
+                                    artifactLocation: { uri: issue.location.file },
                                     region: {
-                                        startLine: i.location.start.line,
-                                        startColumn: i.location.start.column || 1,
+                                        startLine: issue.location.start.line,
+                                        startColumn: issue.location.start.column || 1,
                                     },
                                 },
                             },

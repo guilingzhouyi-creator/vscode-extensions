@@ -57,8 +57,8 @@ export function createJsDocTemplateFix(
     docLines.push(' *');
 
     if (options.params && options.params.length > 0) {
-        for (const p of options.params) {
-            docLines.push(` * @param ${p.name} - ${p.description}`);
+        for (const param of options.params) {
+            docLines.push(` * @param ${param.name} - ${param.description}`);
         }
     }
 
@@ -72,7 +72,9 @@ export function createJsDocTemplateFix(
 
     docLines.push(' */\n');
 
-    const formattedBlock = docLines.map((l, idx) => (idx === 0 ? l : baseIndent + l)).join('\n');
+    const formattedBlock = docLines
+        .map((lineText, idx) => (idx === 0 ? lineText : baseIndent + lineText))
+        .join('\n');
 
     const insertEdit: TextEdit = {
         startLine: options.line,

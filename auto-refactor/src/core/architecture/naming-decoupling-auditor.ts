@@ -202,8 +202,8 @@ export function splitIdentifierTokens(name: string): string[] {
     if (name.includes('_')) {
         return name
             .split('_')
-            .map((s) => s.trim())
-            .filter((s) => s.length > 0);
+            .map((token) => token.trim())
+            .filter((token) => token.length > 0);
     }
 
     // PascalCase / camelCase / acronyms (e.g., HTTPResponseHandler -> HTTP, Response, Handler)
@@ -223,7 +223,7 @@ export function splitIdentifierTokens(name: string): string[] {
  */
 function toKebabPath(tokens: readonly string[]): string {
     return tokens
-        .map((t) => t.toLowerCase())
+        .map((token) => token.toLowerCase())
         .join('/')
         .concat('/');
 }

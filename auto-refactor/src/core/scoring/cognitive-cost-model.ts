@@ -117,13 +117,13 @@ export function calculateControlFlowNestingIndex(
             : NESTING_BUDGET_STANDARD;
 
     let totalPenalty = 0;
-    for (const fn of metrics) {
-        const depth = fn.maxDepth ?? 1;
+    for (const funcNode of metrics) {
+        const depth = funcNode.maxDepth ?? 1;
         const excessDepth = Math.max(0, depth - budget);
         if (excessDepth > 0) {
-            const span = fn.nestingSpan ?? fn.loc;
-            const spanRatio = fn.loc > 0 ? Math.min(1.0, span / fn.loc) : 1.0;
-            const ccFactor = CC_FACTOR_BASE + (fn.cc || CC_FACTOR_BASE) / CC_FACTOR_SCALE;
+            const span = funcNode.nestingSpan ?? funcNode.loc;
+            const spanRatio = funcNode.loc > 0 ? Math.min(1.0, span / funcNode.loc) : 1.0;
+            const ccFactor = CC_FACTOR_BASE + (funcNode.cc || CC_FACTOR_BASE) / CC_FACTOR_SCALE;
             const fnPenalty = kappa * excessDepth * spanRatio * ccFactor;
             totalPenalty += fnPenalty;
         }
@@ -153,13 +153,13 @@ export function isTrivialForwardingWrapper(content: string): boolean {
     const trimmed = content.trim();
     const lines = trimmed
         .split('\n')
-        .map((l) => l.trim())
+        .map((lineEntry) => lineEntry.trim())
         .filter(Boolean);
     if (lines.length > TRIVIAL_WRAPPER_LINE_LIMIT) return false;
 
     // Pattern: return (this.)?method(args) or just (this.)?method(args)
     const forwardPattern = /^(?:return\s+)?(?:[a-zA-Z0-9_$.]+)\([^)]*\);?$/;
-    return lines.some((l) => forwardPattern.test(l));
+    return lines.some((line) => forwardPattern.test(line));
 }
 
 /**
@@ -179,9 +179,9 @@ export function evaluateNetCognitiveCost(
 ): CognitiveCostEvaluation {
     const issues: Issue[] = [];
     const forwardingWrappers = metrics.filter(
-        (m) =>
-            m.isForwardingWrapper ||
-            (m.loc <= TRIVIAL_WRAPPER_LOC_THRESHOLD && Boolean(m.delegatesTo)),
+        (metric) =>
+            metric.isForwardingWrapper ||
+            (metric.loc <= TRIVIAL_WRAPPER_LOC_THRESHOLD && Boolean(metric.delegatesTo)),
     );
     const wrapperCount = forwardingWrappers.length;
 
@@ -191,7 +191,7 @@ export function evaluateNetCognitiveCost(
     const hopPenalty = wrapperCount * HOP_PENALTY_PER_WRAPPER + fileHopPenalty;
 
     // Current maximum and total CC
-    const currentMaxCC = metrics.length > 0 ? Math.max(...metrics.map((m) => m.cc)) : 0;
+    const currentMaxCC = metrics.length > 0 ? Math.max(...metrics.map((metric) => metric.cc)) : 0;
     const rawCCReduction = previousMaxCC ? Math.max(0, previousMaxCC - currentMaxCC) : 0;
 
     // Net cognitive gain = CC reduction - hop penalty
@@ -200,7 +200,9 @@ export function evaluateNetCognitiveCost(
     // Flag mechanical decomposition gaming (CPX-HOP-001)
     // Triggered if there are 3 or more trivial forwarding wrappers created
     if (wrapperCount >= GAMING_WRAPPER_COUNT_THRESHOLD) {
-        const names = forwardingWrappers.map((w) => w.name).slice(0, MAX_SAMPLE_WRAPPER_NAMES);
+        const names = forwardingWrappers
+            .map((wrapper) => wrapper.name)
+            .slice(0, MAX_SAMPLE_WRAPPER_NAMES);
         issues.push({
             id: `complexity:${RULE_CPX_HOP_001}:${filePath}:1`,
             analyzer: ANALYZER_COMPLEXITY,

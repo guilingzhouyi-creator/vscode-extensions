@@ -108,7 +108,7 @@ export interface PendingScan {
 }
 
 interface TransportIo {
-    write: (m: DaemonMessage) => void;
+    write: (message: DaemonMessage) => void;
     close: () => void;
     id: () => number;
 }
@@ -135,7 +135,7 @@ interface ScanTask {
     readonly requestId: string;
     readonly configJson: Record<string, unknown>;
     readonly options: BaseScanTaskOptions;
-    readonly io: { write: (m: DaemonMessage) => void };
+    readonly io: { write: (message: DaemonMessage) => void };
     readonly socket?: net.Socket;
 }
 
@@ -145,7 +145,7 @@ interface ScanDiffTask {
     readonly configJson: Record<string, unknown>;
     readonly diffs: Array<Record<string, unknown>>;
     readonly options: ScanDiffTaskOptions;
-    readonly io: { write: (m: DaemonMessage) => void };
+    readonly io: { write: (message: DaemonMessage) => void };
     readonly socket?: net.Socket;
 }
 
@@ -225,9 +225,9 @@ export class DaemonServer {
 
             const srv = net.createServer((socket) => this.handleConnection(socket));
             this.server = srv;
-            srv.on(ERROR_EVENT, (e) => {
-                this.logger.error(`daemon server error: ${e.message}`);
-                reject(e);
+            srv.on(ERROR_EVENT, (error) => {
+                this.logger.error(`daemon server error: ${error.message}`);
+                reject(error);
             });
             srv.listen(this.pipe, onReady);
         });
@@ -236,7 +236,7 @@ export class DaemonServer {
     private processIncomingChunk(
         chunk: string,
         bufferState: BufferState,
-        io: TransportIo,
+        transportIo: TransportIo,
         socket?: net.Socket,
     ): void {
         bufferState.buffer += chunk;
@@ -250,7 +250,7 @@ export class DaemonServer {
             try {
                 decodedMessage = decodeLine(rawLine);
             } catch {
-                io.write({
+                transportIo.write({
                     v: 1,
                     id: 0,
                     type: MESSAGE_TYPE_ERROR,
@@ -259,7 +259,7 @@ export class DaemonServer {
                 });
                 continue;
             }
-            this.handleMessage(decodedMessage, io, socket);
+            this.handleMessage(decodedMessage, transportIo, socket);
         }
     }
 
@@ -267,13 +267,15 @@ export class DaemonServer {
         const stdin = process.stdin;
         const stdout = process.stdout;
         const bufferState: BufferState = { buffer: '' };
-        const io: TransportIo = {
-            write: (m: DaemonMessage) => stdout.write(encodeMessage(m)),
+        const transportIo: TransportIo = {
+            write: (message: DaemonMessage) => stdout.write(encodeMessage(message)),
             close: () => {},
             id: () => 0,
         };
         stdin.setEncoding(ENCODING_UTF8);
-        stdin.on(EVENT_DATA, (chunk: string) => this.processIncomingChunk(chunk, bufferState, io));
+        stdin.on(EVENT_DATA, (chunk: string) =>
+            this.processIncomingChunk(chunk, bufferState, transportIo),
+        );
         stdin.on(EVENT_END, () => this.shutdown(REASON_STDIO_EOF));
     }
 
@@ -281,16 +283,16 @@ export class DaemonServer {
         this.scheduleIdle();
         const bufferState: BufferState = { buffer: '' };
         socket.setEncoding(ENCODING_UTF8);
-        const write = (m: DaemonMessage) => {
-            if (!socket.destroyed) socket.write(encodeMessage(m));
+        const write = (message: DaemonMessage) => {
+            if (!socket.destroyed) socket.write(encodeMessage(message));
         };
-        const io: TransportIo = {
+        const transportIo: TransportIo = {
             write,
             close: () => socket.destroy(),
             id: () => this.nextId++,
         };
         socket.on(EVENT_DATA, (chunk: string) =>
-            this.processIncomingChunk(chunk, bufferState, io, socket),
+            this.processIncomingChunk(chunk, bufferState, transportIo, socket),
         );
         socket.on(EVENT_CLOSE, () => {
             this.abortSocketPending(socket);
@@ -315,7 +317,7 @@ export class DaemonServer {
         }
     }
 
-    private handleHello(msg: HelloMessage, io: TransportIo): void {
+    private handleHello(msg: HelloMessage, transportIo: TransportIo): void {
         const ack: HelloAckMessage = {
             v: 1,
             id: msg.id,
@@ -329,18 +331,18 @@ export class DaemonServer {
                 diff: true,
             },
         };
-        io.write(ack);
+        transportIo.write(ack);
         this.scheduleIdle();
     }
 
     /** Dispatch one decoded NDJSON message (shared by net + stdio transports). */
-    private handleMessage(msg: DaemonMessage, io: TransportIo, socket?: net.Socket): void {
+    private handleMessage(msg: DaemonMessage, transportIo: TransportIo, socket?: net.Socket): void {
         switch (msg.type) {
             case MSG_TYPE_HELLO:
-                this.handleHello(msg, io);
+                this.handleHello(msg, transportIo);
                 break;
             case MSG_TYPE_PING:
-                io.write({ v: 1, id: msg.id, type: MSG_TYPE_PONG });
+                transportIo.write({ v: 1, id: msg.id, type: MSG_TYPE_PONG });
                 this.scheduleIdle();
                 break;
             case MSG_TYPE_SCAN:
@@ -350,7 +352,7 @@ export class DaemonServer {
                     requestId: msg.params.requestId,
                     configJson: msg.params.config,
                     options: msg.params.options,
-                    io,
+                    io: transportIo,
                     socket,
                 }).catch((err: unknown) => {
                     this.logger.error(
@@ -366,7 +368,7 @@ export class DaemonServer {
                     configJson: msg.params.config,
                     diffs: msg.params.diffs,
                     options: msg.params.options,
-                    io,
+                    io: transportIo,
                     socket,
                 }).catch((err: unknown) => {
                     this.logger.error(
@@ -381,7 +383,7 @@ export class DaemonServer {
                 this.shutdown(msg.reason || REASON_CLIENT_REQUEST);
                 break;
             default:
-                io.write({
+                transportIo.write({
                     v: 1,
                     id: msg.id,
                     type: MESSAGE_TYPE_ERROR,
@@ -392,12 +394,12 @@ export class DaemonServer {
     }
 
     private async runScan(task: ScanTask): Promise<void> {
-        const { id, requestId, configJson, options, socket } = task;
+        const { id: taskId, requestId, configJson, options, socket } = task;
         const config = configJson as unknown as ScanConfig;
         const abortController = new AbortController();
         this.pending.set(requestId, {
             requestId,
-            id,
+            id: taskId,
             kind: MSG_TYPE_SCAN,
             socket,
             startedAt: Date.now(),
@@ -407,20 +409,20 @@ export class DaemonServer {
         try {
             const { report, stats } = await handleScan(this.ctx, config, options);
             this.handleScanSuccess(task, report, stats);
-        } catch (e) {
-            this.handleScanError(task, e);
+        } catch (error) {
+            this.handleScanError(task, error);
         } finally {
             this.pending.delete(requestId);
         }
     }
 
     private async runScanDiff(task: ScanDiffTask): Promise<void> {
-        const { id, requestId, configJson, diffs, options, socket } = task;
+        const { id: taskId, requestId, configJson, diffs, options, socket } = task;
         const config = configJson as unknown as ScanConfig;
         const abortController = new AbortController();
         this.pending.set(requestId, {
             requestId,
-            id,
+            id: taskId,
             kind: MSG_TYPE_SCAN_DIFF,
             socket,
             startedAt: Date.now(),
@@ -430,8 +432,8 @@ export class DaemonServer {
         try {
             const { report, stats } = await handleScanDiff(this.ctx, config, diffs, options);
             this.handleScanSuccess(task, report, stats);
-        } catch (e) {
-            this.handleScanError(task, e);
+        } catch (error) {
+            this.handleScanError(task, error);
         } finally {
             this.pending.delete(requestId);
         }
@@ -527,23 +529,25 @@ const FLAG_STDIO = '--stdio';
  *   are installed; a bind failure writes to stderr and calls `process.exit(1)` instead.
  */
 export async function runDaemonMain(argv: string[]): Promise<void> {
-    const rootArg = argv.find((a, i) => a === FLAG_ROOT && argv[i + 1])
+    const rootArg = argv.find((argStr, i) => argStr === FLAG_ROOT && argv[i + 1])
         ? argv[argv.indexOf(FLAG_ROOT) + 1]
         : process.cwd();
     const stdio = argv.includes(FLAG_STDIO);
     const server = new DaemonServer(rootArg, { stdio });
     try {
         await server.startListening();
-    } catch (e) {
+    } catch (error) {
         process.stderr.write(
-            `[auto-refactor daemon] failed to listen: ${e instanceof Error ? e.message : String(e)}\n`,
+            `[auto-refactor daemon] failed to listen: ${error instanceof Error ? error.message : String(error)}\n`,
         );
         process.exit(1);
     }
     process.on(SIGNAL_SIGTERM, () => server.shutdown(REASON_SIGTERM));
     process.on(SIGNAL_SIGINT, () => server.shutdown(REASON_SIGINT));
-    process.on(EVENT_UNCAUGHT_EXCEPTION, (e) => {
-        process.stderr.write(`[auto-refactor daemon] uncaught: ${e && e.stack ? e.stack : e}\n`);
+    process.on(EVENT_UNCAUGHT_EXCEPTION, (error) => {
+        process.stderr.write(
+            `[auto-refactor daemon] uncaught: ${error && (error as Error).stack ? (error as Error).stack : error}\n`,
+        );
         server.shutdown(REASON_UNCAUGHT_EXCEPTION);
     });
     process.on(EVENT_UNHANDLED_REJECTION, (reason: unknown) => {

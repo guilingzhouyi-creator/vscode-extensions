@@ -88,8 +88,8 @@ export class AuditBus {
 
     /** Emits multiple findings in batch */
     public emitFindings(events: readonly AuditFindingEvent[]): void {
-        for (const e of events) {
-            this.emitFinding(e);
+        for (const event of events) {
+            this.emitFinding(event);
         }
     }
 
@@ -169,8 +169,8 @@ export class AuditBus {
         // Aggregate deduplicated file metrics and cumulative ELOC
         const uniqueFiles = Array.from(this.metrics.keys());
         let totalAuditedEloc = 0;
-        for (const m of this.metrics.values()) {
-            totalAuditedEloc += m.eloc;
+        for (const metric of this.metrics.values()) {
+            totalAuditedEloc += metric.eloc;
         }
 
         const avgConfidence =

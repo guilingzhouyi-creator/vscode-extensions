@@ -61,8 +61,8 @@ function initByteTriageLut(): void {
     BYTE_TRIAGE_LUT[CHAR_CODE_DOUBLE_QUOTE] |= LUT_LITERAL_START;
     BYTE_TRIAGE_LUT[CHAR_CODE_SINGLE_QUOTE] |= LUT_LITERAL_START;
     BYTE_TRIAGE_LUT[CHAR_CODE_BACKTICK] |= LUT_LITERAL_START;
-    for (let c = CHAR_CODE_DIGIT_ZERO; c <= CHAR_CODE_DIGIT_NINE; c++) {
-        BYTE_TRIAGE_LUT[c] |= LUT_LITERAL_START;
+    for (let charCode = CHAR_CODE_DIGIT_ZERO; charCode <= CHAR_CODE_DIGIT_NINE; charCode++) {
+        BYTE_TRIAGE_LUT[charCode] |= LUT_LITERAL_START;
     }
 
     // Control flow, async, I/O, and type keywords leading chars
@@ -143,7 +143,8 @@ export function fastInspectSliceDelta(
         if (trimmed.length === 0) continue;
 
         const firstChar = trimmed.charCodeAt(0);
-        const lutTag = firstChar < ASCII_LUT_CAPACITY ? BYTE_TRIAGE_LUT[firstChar] : LUT_KEYWORD_CANDIDATE;
+        const lutTag =
+            firstChar < ASCII_LUT_CAPACITY ? BYTE_TRIAGE_LUT[firstChar] : LUT_KEYWORD_CANDIDATE;
 
         if ((lutTag & LUT_COMMENT) === 0 || !COMMENT_LINE_RE.test(trimmed)) {
             acc.isDocOnly = false;

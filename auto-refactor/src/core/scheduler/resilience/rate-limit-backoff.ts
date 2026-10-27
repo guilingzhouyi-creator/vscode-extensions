@@ -144,13 +144,13 @@ export class RateLimitBackoffMachine {
      * @returns Delay in milliseconds.
      */
     computeDelayMs(attempt?: number): number {
-        const a = Math.max(1, attempt ?? (this._attempt > 0 ? this._attempt : 1));
-        const power = Math.pow(2, a - 1);
+        const attemptIndex = Math.max(1, attempt ?? (this._attempt > 0 ? this._attempt : 1));
+        const power = Math.pow(2, attemptIndex - 1);
         const nominalDelayMs = Math.min(this.maxDelayMs, this.baseDelayMs * power);
 
         // Jitter: (1 +/- J) where J in [0, 0.2]. Range is [1 - J, 1 + J].
-        const r = this.rng();
-        const clampedR = Math.max(0, Math.min(1, r));
+        const randomSample = this.rng();
+        const clampedR = Math.max(0, Math.min(1, randomSample));
         const jitterFactor = 1 - this.jitterRatio + clampedR * 2 * this.jitterRatio;
 
         const calculatedDelayMs = Math.round(nominalDelayMs * jitterFactor);

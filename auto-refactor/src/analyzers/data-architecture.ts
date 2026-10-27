@@ -206,8 +206,8 @@ function checkAndPushSite(trimmed: string, meta: SiteMeta, sites: DataAccessSite
 export class DataArchitectureAnalyzer implements Analyzer {
     name = 'data-architecture' as const;
 
-    analyze(sf: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
-        void sf;
+    analyze(sourceFile: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
+        void sourceFile;
         if (isToolOrTestScript(ctx.filePath)) {
             return [];
         }

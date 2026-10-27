@@ -93,6 +93,7 @@ export interface NamingOptions {
     enforceVerbNounContract?: boolean;
     enforceMorphemeCheck?: boolean;
     allowedShortFiles?: string[];
+    allowedShortNames?: string[];
     vagueBlacklist?: string[];
     singleLetterAllowed?: string[];
 }
@@ -155,7 +156,7 @@ export class NamingAnalyzer implements Analyzer {
     readonly name = ANALYZER_NAMING;
     private readonly decouplingAuditor = new NamingDecouplingAuditor();
 
-    analyze(sf: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
+    analyze(sourceFile: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         const issues: Issue[] = [];
         const opts = (ctx.options || {}) as NamingOptions;
         const filePath = ctx.filePath.replace(/\\/g, '/');
@@ -171,13 +172,13 @@ export class NamingAnalyzer implements Analyzer {
         }
 
         const ext = path.extname(filePath).toLowerCase();
-        this.dispatchLanguageAudit(ext, sf, ctx, issues);
+        this.dispatchLanguageAudit(ext, sourceFile, ctx, issues);
 
         issues.sort(
-            (a, b) =>
-                a.location.start.line - b.location.start.line ||
-                a.location.start.column - b.location.start.column ||
-                a.rule.localeCompare(b.rule),
+            (issueA, issueB) =>
+                issueA.location.start.line - issueB.location.start.line ||
+                issueA.location.start.column - issueB.location.start.column ||
+                issueA.rule.localeCompare(issueB.rule),
         );
 
         return issues;
@@ -193,15 +194,15 @@ export class NamingAnalyzer implements Analyzer {
      */
     private dispatchLanguageAudit(
         ext: string,
-        sf: ts.SourceFile | undefined,
+        sourceFile: ts.SourceFile | undefined,
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
         const opts = (ctx.options || {}) as NamingOptions;
         if (JS_TS_EXTS.has(ext)) {
-            const sourceFile = sf ?? this.resolveSourceFile(ctx);
-            if (sourceFile) {
-                this.auditTypeScriptAst(sourceFile, opts, ctx, issues);
+            const resolvedSourceFile = sourceFile ?? this.resolveSourceFile(ctx);
+            if (resolvedSourceFile) {
+                this.auditTypeScriptAst(resolvedSourceFile, opts, ctx, issues);
             }
             return;
         }
@@ -269,11 +270,11 @@ export class NamingAnalyzer implements Analyzer {
 
     private resolveSymbolIndexAndEmitter(aCtx: AstNamingContext): {
         readonly index: SymbolIndexLike | undefined;
-        readonly emit: (d: NamingDiagnosticRecord) => void;
+        readonly emit: (diagnostic: NamingDiagnosticRecord) => void;
     } {
         return {
             index: this.extractSymbolIndex(aCtx.ctx),
-            emit: (d: NamingDiagnosticRecord) => this.emitDiagnostic(aCtx, d),
+            emit: (diagnostic: NamingDiagnosticRecord) => this.emitDiagnostic(aCtx, diagnostic),
         };
     }
 
@@ -404,7 +405,9 @@ export class NamingAnalyzer implements Analyzer {
     ): void {
         if (!ts.isIdentifier(elem.name)) return;
         const elemName = elem.name.text;
-        const elemPos = aCtx.sf.getLineAndCharacterOfPosition(elem.name.getStart(aCtx.sf));
+        const elemPos = aCtx.sourceFile.getLineAndCharacterOfPosition(
+            elem.name.getStart(aCtx.sourceFile),
+        );
         const isPropertyMatch =
             !elem.propertyName ||
             (ts.isIdentifier(elem.propertyName) && elem.propertyName.text === elemName);
@@ -435,7 +438,9 @@ export class NamingAnalyzer implements Analyzer {
     ): void {
         if (ts.isIdentifier(decl.name)) {
             const name = decl.name.text;
-            const pos = aCtx.sf.getLineAndCharacterOfPosition(decl.name.getStart(aCtx.sf));
+            const pos = aCtx.sourceFile.getLineAndCharacterOfPosition(
+                decl.name.getStart(aCtx.sourceFile),
+            );
 
             if (scope.isTopLevel && scope.isConst && aCtx.opts.checkGlobals !== false) {
                 checkTopLevelConstantHelper(decl, name, pos, aCtx);
@@ -469,9 +474,11 @@ export class NamingAnalyzer implements Analyzer {
         aCtx: AstNamingContext,
     ): void {
         const isConst = Boolean(node.declarationList.flags & ts.NodeFlags.Const);
-        const isTopLevel = node.parent === aCtx.sf;
+        const isTopLevel = node.parent === aCtx.sourceFile;
         if (isTopLevel && !isConst && aCtx.opts.checkGlobals !== false) {
-            const pos = aCtx.sf.getLineAndCharacterOfPosition(node.getStart(aCtx.sf));
+            const pos = aCtx.sourceFile.getLineAndCharacterOfPosition(
+                node.getStart(aCtx.sourceFile),
+            );
             aCtx.issues.push(
                 this.formatIssue(aCtx.ctx, {
                     line: pos.line + 1,
@@ -481,7 +488,9 @@ export class NamingAnalyzer implements Analyzer {
                         'Module-level mutable variable declaration (`let`/`var`) introduces implicit global state.',
                     severity: SEVERITY_WARNING,
                     detail: {
-                        statement: node.getText(aCtx.sf).slice(0, MAX_STATEMENT_PREVIEW_LENGTH),
+                        statement: node
+                            .getText(aCtx.sourceFile)
+                            .slice(0, MAX_STATEMENT_PREVIEW_LENGTH),
                     },
                     suggestion:
                         'Refactor top-level mutable state into function-scoped variables, class instances, or explicit state holders.',
@@ -510,7 +519,9 @@ export class NamingAnalyzer implements Analyzer {
         if (!namedNode.name || !ts.isIdentifier(namedNode.name)) return;
 
         const typeName = namedNode.name.text;
-        const pos = aCtx.sf.getLineAndCharacterOfPosition(namedNode.name.getStart(aCtx.sf));
+        const pos = aCtx.sourceFile.getLineAndCharacterOfPosition(
+            namedNode.name.getStart(aCtx.sourceFile),
+        );
         if (!/^[A-Z][a-zA-Z0-9]*$/.test(typeName)) {
             aCtx.issues.push(
                 this.formatIssue(aCtx.ctx, {
@@ -532,7 +543,13 @@ export class NamingAnalyzer implements Analyzer {
             : ts.isInterfaceDeclaration(node)
               ? 'interface'
               : KIND_TYPE;
-        this.checkDecouplingSymbol(typeName, declarationKind, pos, aCtx, node.parent === aCtx.sf);
+        this.checkDecouplingSymbol(
+            typeName,
+            declarationKind,
+            pos,
+            aCtx,
+            node.parent === aCtx.sourceFile,
+        );
     }
 
     private auditMemberCamelCase(
@@ -562,7 +579,9 @@ export class NamingAnalyzer implements Analyzer {
         if (!member.name || !ts.isIdentifier(member.name)) return;
 
         const memberName = member.name.text;
-        const pos = aCtx.sf.getLineAndCharacterOfPosition(member.name.getStart(aCtx.sf));
+        const pos = aCtx.sourceFile.getLineAndCharacterOfPosition(
+            member.name.getStart(aCtx.sourceFile),
+        );
         this.auditMemberCamelCase(memberName, pos, aCtx);
 
         if (ts.isMethodDeclaration(member)) {
@@ -597,7 +616,9 @@ export class NamingAnalyzer implements Analyzer {
     ): void {
         if (!ts.isIdentifier(paramDecl.name)) return;
         const paramName = paramDecl.name.text;
-        const pos = aCtx.sf.getLineAndCharacterOfPosition(paramDecl.name.getStart(aCtx.sf));
+        const pos = aCtx.sourceFile.getLineAndCharacterOfPosition(
+            paramDecl.name.getStart(aCtx.sourceFile),
+        );
         this.checkVariableName({ name: paramName, decl: paramDecl, pos }, aCtx);
         if (!isExemptVague) {
             checkIdentifierVaguenessHelper(paramName, pos, aCtx);
@@ -609,13 +630,15 @@ export class NamingAnalyzer implements Analyzer {
     }
 
     private checkFunctionParameters(node: ts.Node, aCtx: AstNamingContext): void {
-        const fn = node as
+        const funcNode = node as
             | ts.FunctionDeclaration
             | ts.ArrowFunction
             | ts.FunctionExpression
             | ts.MethodDeclaration;
         if (ts.isFunctionDeclaration(node) && node.name) {
-            const pos = aCtx.sf.getLineAndCharacterOfPosition(node.name.getStart(aCtx.sf));
+            const pos = aCtx.sourceFile.getLineAndCharacterOfPosition(
+                node.name.getStart(aCtx.sourceFile),
+            );
             this.checkFunctionName(node.name.text, node, pos, aCtx);
             if (aCtx.opts.checkJargon !== false) {
                 checkSymbolJargonHelper(node.name.text, pos, aCtx);
@@ -625,12 +648,12 @@ export class NamingAnalyzer implements Analyzer {
                 KIND_FUNCTION,
                 pos,
                 aCtx,
-                node.parent === aCtx.sf,
+                node.parent === aCtx.sourceFile,
             );
         }
         const isArrow = ts.isArrowFunction(node) || ts.isFunctionExpression(node);
-        const isExemptVague = isSimpleArrowFunction(node, aCtx.sf);
-        for (const paramDecl of fn.parameters) {
+        const isExemptVague = isSimpleArrowFunction(node, aCtx.sourceFile);
+        for (const paramDecl of funcNode.parameters) {
             this.auditFunctionParameter(paramDecl, isArrow, isExemptVague, aCtx);
         }
     }
@@ -640,7 +663,7 @@ export class NamingAnalyzer implements Analyzer {
      * and single-letter bindings.
      */
     private auditTypeScriptAst(
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
         opts: NamingOptions,
         ctx: AnalyzerContext,
         issues: Issue[],
@@ -657,7 +680,7 @@ export class NamingAnalyzer implements Analyzer {
             ctx,
             opts,
             issues,
-            sf,
+            sourceFile,
             vagueSet,
             singleAllowed,
             symbols: discoveredSymbols,
@@ -679,7 +702,7 @@ export class NamingAnalyzer implements Analyzer {
             if (isLoop) inLoopDepth--;
         };
 
-        ts.forEachChild(sf, visit);
+        ts.forEachChild(sourceFile, visit);
 
         if (
             opts.checkDecoupling !== false &&
@@ -712,7 +735,7 @@ export class NamingAnalyzer implements Analyzer {
             return;
         }
         if (ts.isCallExpression(node) && aCtx.opts.checkJargon !== false) {
-            checkCallExpressionJargonHelper(node, aCtx.sf, aCtx);
+            checkCallExpressionJargonHelper(node, aCtx.sourceFile, aCtx);
         }
     }
 
@@ -737,7 +760,7 @@ export class NamingAnalyzer implements Analyzer {
                         ctx,
                         opts,
                         issues,
-                        sf: undefined as unknown as ts.SourceFile,
+                        sourceFile: undefined as unknown as ts.SourceFile,
                         symbols: syms,
                     };
                     this.checkDecouplingSymbol(

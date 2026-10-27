@@ -91,10 +91,10 @@ export function checkGdWeakVarLine(
 ): void {
     const trimmed = line.trim();
     if (trimmed.startsWith('#')) return;
-    const m = line.match(GD_WEAK_VAR_RE);
-    if (!m) return;
+    const matchResult = line.match(GD_WEAK_VAR_RE);
+    if (!matchResult) return;
 
-    const rhs = line.slice((m.index ?? 0) + m[0].length).trim();
+    const rhs = line.slice((matchResult.index ?? 0) + matchResult[0].length).trim();
     const isVariantAmbiguous =
         VARIANT_RHS_RE.test(rhs) ||
         DICT_GET_PREFIX_RE.test(rhs) ||
@@ -104,9 +104,9 @@ export function checkGdWeakVarLine(
 
     violations.push({
         ruleId: RULE_ID_GOV_TYP_001,
-        message: `Variable \`${m[1]}\`: ${MSG_EXPLICIT_TYPING}`,
+        message: `Variable \`${matchResult[1]}\`: ${MSG_EXPLICIT_TYPING}`,
         line: lineIndex + 1,
-        column: (m.index ?? 0) + 1,
+        column: (matchResult.index ?? 0) + 1,
         suggestion: SUGG_EXPLICIT_TYPING,
         fixable: true,
         suggestedPatch: line.replace(/var\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=/, 'var $1 :='),
@@ -121,10 +121,10 @@ export function checkGdWeakVarLine(
  */
 export function computeParenDelta(codePart: string): number {
     let delta = 0;
-    for (let c = 0; c < codePart.length; c++) {
-        const ch = codePart[c];
-        if (ch === '(' || ch === '[' || ch === '{') delta++;
-        else if (ch === ')' || ch === ']' || ch === '}') delta--;
+    for (let charIndex = 0; charIndex < codePart.length; charIndex++) {
+        const char = codePart[charIndex];
+        if (char === '(' || char === '[' || char === '{') delta++;
+        else if (char === ')' || char === ']' || char === '}') delta--;
     }
     return delta;
 }
@@ -146,9 +146,9 @@ export function parsePythonFunctionSignature(
     let endLine = startIndex;
 
     for (let j = startIndex; j < lines.length; j++) {
-        const l = lines[j];
-        const hashIdx = l.search(/#/);
-        const codePart = hashIdx >= 0 ? l.slice(0, hashIdx) : l;
+        const currentLine = lines[j];
+        const hashIdx = currentLine.search(/#/);
+        const codePart = hashIdx >= 0 ? currentLine.slice(0, hashIdx) : currentLine;
 
         depth += computeParenDelta(codePart);
         sigText += ' ' + codePart.trim();
@@ -206,14 +206,14 @@ export function checkGdFunctionSignature(
     signatureLine: string,
     startLine: number,
 ): GovernanceViolation | null {
-    const m = signatureLine.match(GD_FUNC_RE);
-    if (m && !m[1].startsWith('_')) {
+    const matchResult = signatureLine.match(GD_FUNC_RE);
+    if (matchResult && !matchResult[1].startsWith('_')) {
         return {
             ruleId: RULE_ID_GOV_TYP_002,
-            message: `Function \`${m[1]}\` lacks explicit return type annotation (\`-> Type\`).`,
+            message: `Function \`${matchResult[1]}\` lacks explicit return type annotation (\`-> Type\`).`,
             line: startLine,
-            column: m.index != null ? m.index + 1 : 1,
-            suggestion: `Add explicit return type: \`func ${m[1]}(...) -> void:\` or appropriate type.`,
+            column: matchResult.index != null ? matchResult.index + 1 : 1,
+            suggestion: `Add explicit return type: \`func ${matchResult[1]}(...) -> void:\` or appropriate type.`,
             fixable: false,
         };
     }

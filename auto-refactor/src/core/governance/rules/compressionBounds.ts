@@ -134,8 +134,8 @@ function hasLineTernaryCandidate(line: string): boolean {
 function countLogicalOperatorChars(line: string): number {
     let count = 0;
     for (let j = 0; j < line.length; j++) {
-        const ch = line.charCodeAt(j);
-        if (ch === CHAR_AMPERSAND || ch === CHAR_PIPE) {
+        const charCode = line.charCodeAt(j);
+        if (charCode === CHAR_AMPERSAND || charCode === CHAR_PIPE) {
             count++;
         }
     }
@@ -335,7 +335,7 @@ function evaluateSingleLineStatement(
         .replace(/;$/, '');
     const semiParts = statementCode
         .split(TOKEN_SEMICOLON)
-        .map((s) => s.trim())
+        .map((segment) => segment.trim())
         .filter(Boolean);
 
     if (semiParts.length < 2) return null;
@@ -428,9 +428,9 @@ function calculateNetBraceDepth(code: string, currentDepth: number): number {
     let opens = 0;
     let closes = 0;
     for (let j = 0; j < code.length; j++) {
-        const c = code.charCodeAt(j);
-        if (c === CHAR_CLOSE_BRACE) closes++;
-        else if (c === CHAR_OPEN_BRACE) opens++;
+        const charCode = code.charCodeAt(j);
+        if (charCode === CHAR_CLOSE_BRACE) closes++;
+        else if (charCode === CHAR_OPEN_BRACE) opens++;
     }
     if (closes > opens && currentDepth > 0) {
         return Math.max(0, currentDepth - (closes - opens));

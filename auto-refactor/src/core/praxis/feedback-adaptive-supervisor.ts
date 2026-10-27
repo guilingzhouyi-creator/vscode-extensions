@@ -870,12 +870,20 @@ export class FeedbackAdaptiveSupervisor {
      */
     public applyImportedLedgerSnapshot(snapshot: GovernanceLedgerSnapshot): void {
         if (snapshot.learnedWeights) {
-            const { Ws, Wd, Wf } = snapshot.learnedWeights;
-            if (typeof Ws === 'number' && typeof Wd === 'number' && typeof Wf === 'number') {
+            const {
+                Ws: weightStatic,
+                Wd: weightDynamic,
+                Wf: weightFeedback,
+            } = snapshot.learnedWeights;
+            if (
+                typeof weightStatic === 'number' &&
+                typeof weightDynamic === 'number' &&
+                typeof weightFeedback === 'number'
+            ) {
                 this.currentWeights = {
-                    [PROP_WS]: Ws,
-                    [PROP_WD]: Wd,
-                    [PROP_WF]: Wf,
+                    [PROP_WS]: weightStatic,
+                    [PROP_WD]: weightDynamic,
+                    [PROP_WF]: weightFeedback,
                 };
             }
         }

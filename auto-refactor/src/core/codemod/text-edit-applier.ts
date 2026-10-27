@@ -113,11 +113,11 @@ export class TextEditApplier {
         });
 
         // Sort ascending by startOffset, then descending by endOffset
-        offsetEdits.sort((a, b) => {
-            if (a.startOffset !== b.startOffset) {
-                return a.startOffset - b.startOffset;
+        offsetEdits.sort((editA, editB) => {
+            if (editA.startOffset !== editB.startOffset) {
+                return editA.startOffset - editB.startOffset;
             }
-            return b.endOffset - a.endOffset;
+            return editB.endOffset - editA.endOffset;
         });
 
         const validEdits: OffsetEdit[] = [];
@@ -135,7 +135,7 @@ export class TextEditApplier {
         }
 
         // Apply edits in reverse order (descending startOffset) to maintain offset validity
-        validEdits.sort((a, b) => b.startOffset - a.startOffset);
+        validEdits.sort((editA, editB) => editB.startOffset - editA.startOffset);
 
         let result = source;
         for (const edit of validEdits) {

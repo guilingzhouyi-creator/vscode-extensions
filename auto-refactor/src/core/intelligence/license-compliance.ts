@@ -249,7 +249,9 @@ export function classifySpdxLicense(licenseSpdx: string): LicenseCategory {
         // Under dual licensing, licensee may choose the most permissive available branch
         if (categories.includes(CATEGORY_PERMISSIVE)) return CATEGORY_PERMISSIVE;
         if (categories.includes(CATEGORY_WEAK_COPYLEFT)) return CATEGORY_WEAK_COPYLEFT;
-        return categories.includes(CATEGORY_VIRAL_COPYLEFT) ? CATEGORY_VIRAL_COPYLEFT : CATEGORY_UNAPPROVED;
+        return categories.includes(CATEGORY_VIRAL_COPYLEFT)
+            ? CATEGORY_VIRAL_COPYLEFT
+            : CATEGORY_UNAPPROVED;
     }
 
     // Handle conjunctive compound licensing (e.g. "MIT AND GPL-3.0")
@@ -287,7 +289,9 @@ export function isViralCopyleft(licenseSpdx: string): boolean {
     // If expression contains OR with a permissive branch, viral obligations are avoidable
     if (/(?:\s+OR\s+|\)\s*OR\s*|\s*OR\s*\()/i.test(trimmed)) {
         const parts = trimmed.split(/(?:\s+OR\s+|\)\s*OR\s*|\s*OR\s*\()/i).map(normalizeToken);
-        const hasPermissive = parts.some((p) => classifySingleToken(p) === CATEGORY_PERMISSIVE);
+        const hasPermissive = parts.some(
+            (part) => classifySingleToken(part) === CATEGORY_PERMISSIVE,
+        );
         return hasPermissive ? false : parts.some(isViralToken);
     }
 
@@ -452,7 +456,8 @@ function evaluateCategoryCompliance(params: CategoryComplianceEvalParams): Licen
             riskLevel: 'medium',
             reason: `Weak copyleft license "${ctx.trimmed}" requires policy exception or dynamic linking review.`,
             violation: `Weak copyleft license "${ctx.trimmed}" is not approved under standard permissive policy.`,
-            remediation: 'Ensure module is linked dynamically without modifications, or request policy exception.',
+            remediation:
+                'Ensure module is linked dynamically without modifications, or request policy exception.',
         });
     }
 
@@ -517,8 +522,12 @@ export function auditLicenseCompliance(
 
     const allowedCategories = policy.allowedCategories ??
         DEFAULT_LICENSE_POLICY.allowedCategories ?? [CATEGORY_PERMISSIVE];
-    const allowedLicenses = (policy.allowedLicenses ?? []).map((l) => normalizeToken(l));
-    const blockedLicenses = (policy.blockedLicenses ?? []).map((l) => normalizeToken(l));
+    const allowedLicenses = (policy.allowedLicenses ?? []).map((licenseStr) =>
+        normalizeToken(licenseStr),
+    );
+    const blockedLicenses = (policy.blockedLicenses ?? []).map((licenseStr) =>
+        normalizeToken(licenseStr),
+    );
     const allowWeakCopyleft = policy.allowWeakCopyleft ?? false;
     const blockViralCopyleft = policy.blockViralCopyleft ?? true;
 

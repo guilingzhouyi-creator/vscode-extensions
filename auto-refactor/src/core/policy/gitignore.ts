@@ -52,26 +52,26 @@ function parseStarGlob(glob: string, i: number): { re: string; nextI: number } {
 }
 
 function globPatternBody(glob: string): string {
-    let re = '';
+    let regexBody = '';
     let i = 0;
     while (i < glob.length) {
-        const c = glob[i];
-        if (c === '*') {
+        const char = glob[i];
+        if (char === '*') {
             const step = parseStarGlob(glob, i);
-            re += step.re;
+            regexBody += step.re;
             i = step.nextI;
-        } else if (c === '?') {
-            re += '[^/]';
+        } else if (char === '?') {
+            regexBody += '[^/]';
             i++;
-        } else if ('.+^${}()|[]\\'.includes(c)) {
-            re += '\\' + c;
+        } else if ('.+^${}()|[]\\'.includes(char)) {
+            regexBody += '\\' + char;
             i++;
         } else {
-            re += c;
+            regexBody += char;
             i++;
         }
     }
-    return re;
+    return regexBody;
 }
 
 /**
@@ -100,15 +100,15 @@ export function globToRegExp(glob: string): RegExp {
 export function loadGitignore(root: string): (rel: string) => boolean {
     const giPath = path.join(root, '.gitignore');
     try {
-        const fd = fs.openSync(giPath, 'r');
+        const fileDescriptor = fs.openSync(giPath, 'r');
         let content = '';
         try {
-            const stat = fs.fstatSync(fd);
+            const stat = fs.fstatSync(fileDescriptor);
             const buf = Buffer.allocUnsafe(stat.size);
-            fs.readSync(fd, buf, 0, stat.size, 0);
+            fs.readSync(fileDescriptor, buf, 0, stat.size, 0);
             content = buf.toString('utf8');
         } finally {
-            fs.closeSync(fd);
+            fs.closeSync(fileDescriptor);
         }
         const lines = content.split(/\r?\n/);
         return parseGitignoreLines(lines);
@@ -153,9 +153,9 @@ export function parseGitignoreLines(lines: string[]): (rel: string) => boolean {
     return (rel: string): boolean => {
         const norm = rel.split(path.sep).join('/');
         let ignored = false;
-        for (const p of patterns) {
-            if (p.regex.test(norm)) {
-                ignored = !p.negated;
+        for (const patternItem of patterns) {
+            if (patternItem.regex.test(norm)) {
+                ignored = !patternItem.negated;
             }
         }
         return ignored;

@@ -64,47 +64,47 @@ function consumeAsterisk(glob: string, i: number): { token: string; nextIndex: n
  * @returns A new case-sensitive RegExp anchored with `^` and `$`; never null.
  */
 export function globToRegExp(glob: string): RegExp {
-    let re = '';
+    let regexPattern = '';
     let i = 0;
     while (i < glob.length) {
-        const c = glob[i];
-        if (c === '*') {
+        const char = glob[i];
+        if (char === '*') {
             const consumed = consumeAsterisk(glob, i);
-            re += consumed.token;
+            regexPattern += consumed.token;
             i = consumed.nextIndex;
-        } else if (c === '?') {
-            re += '[^/]';
+        } else if (char === '?') {
+            regexPattern += '[^/]';
             i++;
-        } else if ('.+^${}()|[]\\'.includes(c)) {
-            re += '\\' + c;
+        } else if ('.+^${}()|[]\\'.includes(char)) {
+            regexPattern += '\\' + char;
             i++;
         } else {
-            re += c;
+            regexPattern += char;
             i++;
         }
     }
-    return new RegExp('^' + re + '$');
+    return new RegExp('^' + regexPattern + '$');
 }
 
 /**
  * Test a relative path against every pattern in order, short-circuiting on the first match.
  *
  * @param patterns - Anchored regexes from globToRegExp; an empty list matches nothing.
- * @param p - Repo-relative POSIX path to test.
- * @returns True when at least one pattern accepts `p`, false otherwise.
+ * @param targetPath - Repo-relative POSIX path to test.
+ * @returns True when at least one pattern accepts `targetPath`, false otherwise.
  */
-export function matchAny(patterns: RegExp[], p: string): boolean {
-    return patterns.some((rx) => rx.test(p));
+export function matchAny(patterns: RegExp[], targetPath: string): boolean {
+    return patterns.some((regex) => regex.test(targetPath));
 }
 
 /**
  * Normalize path separators and drive letters consistently across platforms.
  *
- * @param p - Path using either platform separator; existing `/` separators pass through.
- * @returns `p` with all separators switched to `/` and a Windows drive letter lower-cased.
+ * @param inputPath - Path using either platform separator; existing `/` separators pass through.
+ * @returns `inputPath` with all separators switched to `/` and a Windows drive letter lower-cased.
  */
-export function normalizePath(p: string): string {
-    const norm = p.split(path.sep).join('/');
+export function normalizePath(inputPath: string): string {
+    const norm = inputPath.split(path.sep).join('/');
     // On Windows, normalize drive letter to lowercase (e.g. C:/ -> c:/) for uniform cache keys
     if (/^[A-Za-z]:\//.test(norm)) {
         return norm[0].toLowerCase() + norm.slice(1);
@@ -153,7 +153,7 @@ function readDirectoryEntries(dir: string): fs.Dirent[] {
 /**
  * Dispatches a single directory entry into the traversal queue or results list.
  *
- * @param e - Filesystem directory entry to evaluate.
+ * @param entry - Filesystem directory entry to evaluate.
  * @param dir - Current directory path containing entry.
  * @param absRoot - Root directory being traversed.
  * @param includeRx - Include regex patterns.
@@ -163,7 +163,7 @@ function readDirectoryEntries(dir: string): fs.Dirent[] {
  * @param results - Accumulated output list of matched files.
  */
 function dispatchDiscoveryEntry(
-    e: fs.Dirent,
+    entry: fs.Dirent,
     dir: string,
     absRoot: string,
     includeRx: RegExp[],
@@ -172,15 +172,15 @@ function dispatchDiscoveryEntry(
     dirQueue: string[],
     results: string[],
 ): void {
-    const abs = path.join(dir, e.name);
+    const abs = path.join(dir, entry.name);
     const rel = path.relative(absRoot, abs).split(path.sep).join('/');
 
-    if (e.isDirectory() && shouldTraverseDirectory(rel, e.name, excludeRx, gitignore)) {
+    if (entry.isDirectory() && shouldTraverseDirectory(rel, entry.name, excludeRx, gitignore)) {
         dirQueue.push(abs);
         return;
     }
 
-    if (e.isFile() && shouldIncludeFile(rel, e.name, includeRx, excludeRx, gitignore)) {
+    if (entry.isFile() && shouldIncludeFile(rel, entry.name, includeRx, excludeRx, gitignore)) {
         results.push(rel);
     }
 }
@@ -211,9 +211,9 @@ export function collectFiles(
         const dir = dirQueue[queueHead++]!;
         const entries = readDirectoryEntries(dir);
 
-        for (const e of entries) {
+        for (const entry of entries) {
             dispatchDiscoveryEntry(
-                e,
+                entry,
                 dir,
                 absRoot,
                 includeRx,

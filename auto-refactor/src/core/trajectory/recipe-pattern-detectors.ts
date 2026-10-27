@@ -16,9 +16,9 @@ function resolveText(lines: string[], text?: string): string {
 }
 
 function countBranchMatches(text: string, minCount: number): number {
-    const re = /case\s+|else\s+if/g;
+    const branchRegex = /case\s+|else\s+if/g;
     let count = 0;
-    while (re.exec(text) !== null) {
+    while (branchRegex.exec(text) !== null) {
         count++;
         if (count >= minCount) break;
     }
@@ -152,7 +152,7 @@ export class RecipePatternDetectors {
     /**
      * Pattern 7: Config Cache Invalidation & Hot-Reload (config-cache-invalidation).
      */
-    public static isConfigCacheInvalidationIntroduction(
+    public static isCacheInvalidationIntro(
         before: string[],
         after: string[],
         beforeText?: string,
@@ -307,7 +307,7 @@ export class RecipePatternDetectors {
     /**
      * Pattern 15: State Machine Guard Discipline (state-machine-discipline).
      */
-    public static isStateMachineDisciplineIntroduction(
+    public static isStateMachineDisciplineIntro(
         before: string[],
         after: string[],
         beforeText?: string,

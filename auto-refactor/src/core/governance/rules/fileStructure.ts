@@ -197,12 +197,12 @@ function validatePathParity(lines: string[], normalizedPath: string): Governance
 function hasModuleHeaderDocstring(lines: string[], isPython: boolean): boolean {
     const headLimit = Math.min(HEADER_SCAN_LINES, lines.length);
     for (let i = 0; i < headLimit; i++) {
-        const l = lines[i];
-        const trimmed = l.trim();
+        const line = lines[i];
+        const trimmed = line.trim();
         if (isPython && (trimmed.startsWith('"""') || trimmed.startsWith("'''"))) {
             return true;
         }
-        if (HEADER_KEYWORD_RE.test(l)) {
+        if (HEADER_KEYWORD_RE.test(line)) {
             return true;
         }
     }
@@ -258,7 +258,7 @@ export const ModuleHeaderRule: GovernanceRule = {
 
 function hasTypeDecl(content: string, name: string): boolean {
     const patterns = [`class ${name}`, `interface ${name}`, `type ${name}`, `enum ${name}`];
-    return patterns.some((p) => content.includes(p));
+    return patterns.some((pattern) => content.includes(pattern));
 }
 
 const IMPORT_OR_REQUIRE_RE =

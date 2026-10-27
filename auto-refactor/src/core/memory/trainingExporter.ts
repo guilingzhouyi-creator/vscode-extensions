@@ -96,11 +96,11 @@ export interface ExportOptions {
 
 function writeTextFileSync(targetFile: string, text: string): void {
     fs.mkdirSync(path.dirname(targetFile), { recursive: true });
-    const fd = fs.openSync(targetFile, 'w');
+    const fileHandle = fs.openSync(targetFile, 'w');
     try {
-        fs.writeSync(fd, text, undefined, 'utf8');
+        fs.writeSync(fileHandle, text, undefined, 'utf8');
     } finally {
-        fs.closeSync(fd);
+        fs.closeSync(fileHandle);
     }
 }
 
@@ -110,19 +110,22 @@ function buildAlpacaSample(
     hardRules: RuleHitRecord[],
 ): AlpacaSample {
     const issuesDescription = activeRules
-        .map((r: RuleHitRecord) => `- [${r.severity.toUpperCase()}] Line ${r.line}: ${r.message}`)
+        .map(
+            (ruleHit: RuleHitRecord) =>
+                `- [${ruleHit.severity.toUpperCase()}] Line ${ruleHit.line}: ${ruleHit.message}`,
+        )
         .join('\n');
 
     const instruction = `Perform static code review and automated refactoring on the provided source code snippet from '${rec.filePath}'. Identify violations and provide compliant corrections.`;
     const domainSections = (rec.codeDomains || [])
         .map(
-            (d: CodeDomainFingerprint) =>
-                `// Domain: ${d.name}\n// Complexity: ${d.cyclomaticComplexity}`,
+            (domain: CodeDomainFingerprint) =>
+                `// Domain: ${domain.name}\n// Complexity: ${domain.cyclomaticComplexity}`,
         )
         .join('\n\n');
     const input = `Code:\n\`\`\`\n// File: ${rec.filePath}\n${domainSections}\n\`\`\`\n\nDetected issues:\n${issuesDescription}`;
 
-    const output = `Refactoring Analysis:\n1. Violations Found: ${activeRules.length} issue(s) detected.\n${activeRules.map((r: RuleHitRecord) => `   - ${r.rule}: ${r.message}`).join('\n')}\n\n2. Remediation Strategy:\n- Extract constants, isolate architecture boundaries, and enforce proper error handling.\n\n3. Compliant Code:\n\`\`\`\n// Refactored and verified compliant\n\`\`\``;
+    const output = `Refactoring Analysis:\n1. Violations Found: ${activeRules.length} issue(s) detected.\n${activeRules.map((ruleHit: RuleHitRecord) => `   - ${ruleHit.rule}: ${ruleHit.message}`).join('\n')}\n\n2. Remediation Strategy:\n- Extract constants, isolate architecture boundaries, and enforce proper error handling.\n\n3. Compliant Code:\n\`\`\`\n// Refactored and verified compliant\n\`\`\``;
 
     return {
         instruction,
@@ -130,7 +133,7 @@ function buildAlpacaSample(
         output,
         metadata: {
             file: rec.filePath,
-            ruleIds: activeRules.map((r: RuleHitRecord) => r.rule),
+            ruleIds: activeRules.map((ruleHit: RuleHitRecord) => ruleHit.rule),
             // An unmeasured composite is NaN, which is falsy, so a truthiness test would
             // silently record 0 and train on a fabricated "no change" signal. Only a real
             // measurement is converted; anything else is left out of the training record.
@@ -255,15 +258,15 @@ export class TrainingDatasetExporter {
      */
     exportShareGpt(options: ExportOptions = {}): ShareGptSample[] {
         const alpaca = this.exportAlpaca(options);
-        const results: ShareGptSample[] = alpaca.map((s: AlpacaSample) => ({
+        const results: ShareGptSample[] = alpaca.map((sample: AlpacaSample) => ({
             conversations: [
                 {
                     from: 'human',
-                    value: `${s.instruction}\n\n${s.input}`,
+                    value: `${sample.instruction}\n\n${sample.input}`,
                 },
                 {
                     from: 'gpt',
-                    value: s.output,
+                    value: sample.output,
                 },
             ],
         }));
@@ -287,14 +290,14 @@ export class TrainingDatasetExporter {
         if (cached !== undefined) {
             return cached;
         }
-        const r = ruleId.toLowerCase();
+        const lowerRule = ruleId.toLowerCase();
         const isHard =
-            r.startsWith('sec-') ||
-            r.startsWith('arch-') ||
-            r.startsWith('circular') ||
-            r.includes('injection') ||
-            r.includes('secret') ||
-            r.includes('leak');
+            lowerRule.startsWith('sec-') ||
+            lowerRule.startsWith('arch-') ||
+            lowerRule.startsWith('circular') ||
+            lowerRule.includes('injection') ||
+            lowerRule.includes('secret') ||
+            lowerRule.includes('leak');
         this.ruleCategoryCache.set(ruleId, isHard);
         return isHard;
     }

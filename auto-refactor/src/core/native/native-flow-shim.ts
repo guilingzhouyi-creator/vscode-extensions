@@ -27,8 +27,8 @@ function buildNodeIndex(
 ): { allNodeNames: string[]; nameToId: Map<string, number> } {
     const nodeSet = new Set<string>();
     nodeSet.add(entry);
-    for (const n of nodes) {
-        nodeSet.add(n);
+    for (const nodeName of nodes) {
+        nodeSet.add(nodeName);
     }
     for (const edge of edges) {
         if (edge.length >= 2) {
@@ -55,11 +55,11 @@ function buildAdjacencyLists(
 
     for (const edge of edges) {
         if (edge.length >= 2) {
-            const u = nameToId.get(edge[0]);
-            const v = nameToId.get(edge[1]);
-            if (u !== undefined && v !== undefined) {
-                succs[u].push(v);
-                preds[v].push(u);
+            const sourceId = nameToId.get(edge[0]);
+            const targetId = nameToId.get(edge[1]);
+            if (sourceId !== undefined && targetId !== undefined) {
+                succs[sourceId].push(targetId);
+                preds[targetId].push(sourceId);
             }
         }
     }
@@ -99,9 +99,9 @@ function computeReversePostOrder(
 /**
  * Intersects two dominator paths in the semi-lattice.
  */
-function intersectIdom(b1: number, b2: number, doms: number[], rpoIndex: number[]): number {
-    let finger1 = b1;
-    let finger2 = b2;
+function intersectIdom(blockA: number, blockB: number, doms: number[], rpoIndex: number[]): number {
+    let finger1 = blockA;
+    let finger2 = blockB;
     while (finger1 !== finger2) {
         while (rpoIndex[finger1] > rpoIndex[finger2]) {
             finger1 = doms[finger1];
@@ -117,9 +117,9 @@ function intersectIdom(b1: number, b2: number, doms: number[], rpoIndex: number[
  * Finds initial valid dominator predecessor candidate.
  */
 function findFirstValidPredecessor(preds: number[], doms: number[]): number {
-    for (const p of preds) {
-        if (doms[p] !== -1) {
-            return p;
+    for (const predId of preds) {
+        if (doms[predId] !== -1) {
+            return predId;
         }
     }
     return -1;
@@ -133,9 +133,9 @@ function refineNodeDominator(nodePreds: number[], doms: number[], rpoIndex: numb
     if (newIdom === -1) {
         return -1;
     }
-    for (const p of nodePreds) {
-        if (p !== newIdom && doms[p] !== -1) {
-            newIdom = intersectIdom(p, newIdom, doms, rpoIndex);
+    for (const predId of nodePreds) {
+        if (predId !== newIdom && doms[predId] !== -1) {
+            newIdom = intersectIdom(predId, newIdom, doms, rpoIndex);
         }
     }
     return newIdom;
@@ -158,10 +158,10 @@ function computeImmediateDominators(
     while (changed) {
         changed = false;
         for (let i = 1; i < rpo.length; i++) {
-            const b = rpo[i];
-            const newIdom = refineNodeDominator(preds[b], doms, rpoIndex);
-            if (newIdom !== -1 && doms[b] !== newIdom) {
-                doms[b] = newIdom;
+            const blockId = rpo[i];
+            const newIdom = refineNodeDominator(preds[blockId], doms, rpoIndex);
+            if (newIdom !== -1 && doms[blockId] !== newIdom) {
+                doms[blockId] = newIdom;
                 changed = true;
             }
         }
@@ -173,14 +173,14 @@ function computeImmediateDominators(
  * Propagates dominance frontier for a given join node up the dominator chain of a predecessor.
  */
 function addFrontierFromPredecessor(
-    p: number,
-    b: number,
+    predecessorId: number,
+    blockId: number,
     doms: number[],
-    df: Array<Set<number>>,
+    frontiers: Array<Set<number>>,
 ): void {
-    let runner = p;
-    while (runner !== doms[b] && runner !== -1) {
-        df[runner].add(b);
+    let runner = predecessorId;
+    while (runner !== doms[blockId] && runner !== -1) {
+        frontiers[runner].add(blockId);
         if (runner === doms[runner]) {
             break;
         }
@@ -198,17 +198,17 @@ function computeFrontiers(
     total: number,
     allNodeNames: string[],
 ): Record<string, string[]> {
-    const df: Array<Set<number>> = Array.from({ length: total }, () => new Set<number>());
-    for (const b of rpo) {
-        if (preds[b].length < 2) continue;
-        for (const p of preds[b]) {
-            addFrontierFromPredecessor(p, b, doms, df);
+    const frontiers: Array<Set<number>> = Array.from({ length: total }, () => new Set<number>());
+    for (const blockId of rpo) {
+        if (preds[blockId].length < 2) continue;
+        for (const predId of preds[blockId]) {
+            addFrontierFromPredecessor(predId, blockId, doms, frontiers);
         }
     }
 
     const dominanceFrontiers: Record<string, string[]> = {};
-    for (const b of rpo) {
-        dominanceFrontiers[allNodeNames[b]] = Array.from(df[b])
+    for (const blockId of rpo) {
+        dominanceFrontiers[allNodeNames[blockId]] = Array.from(frontiers[blockId])
             .map((idx) => allNodeNames[idx])
             .sort();
     }
@@ -218,10 +218,10 @@ function computeFrontiers(
 /**
  * Tests whether node u dominates node v.
  */
-function checkDominates(doms: number[], u: number, v: number): boolean {
-    let curr = v;
+function checkDominates(doms: number[], dominatorId: number, targetId: number): boolean {
+    let curr = targetId;
     while (curr !== -1) {
-        if (curr === u) return true;
+        if (curr === dominatorId) return true;
         if (curr === doms[curr]) break;
         curr = doms[curr];
     }
@@ -241,10 +241,15 @@ function findLoopStructures(
 
     for (const edge of edges) {
         if (edge.length < 2) continue;
-        const u = nameToId.get(edge[0]);
-        const v = nameToId.get(edge[1]);
-        if (u !== undefined && v !== undefined && doms[u] !== -1 && doms[v] !== -1) {
-            if (checkDominates(doms, v, u)) {
+        const sourceId = nameToId.get(edge[0]);
+        const targetId = nameToId.get(edge[1]);
+        if (
+            sourceId !== undefined &&
+            targetId !== undefined &&
+            doms[sourceId] !== -1 &&
+            doms[targetId] !== -1
+        ) {
+            if (checkDominates(doms, targetId, sourceId)) {
                 backEdges.push([edge[0], edge[1]]);
                 loopHeadersSet.add(edge[1]);
             }
@@ -280,9 +285,9 @@ export function computeDominatorTreeShim(
 
     const reachableNodes = rpo.map((idx) => allNodeNames[idx]);
     const idom: Record<string, string> = {};
-    for (const b of rpo) {
-        if (b !== entryId && doms[b] !== -1) {
-            idom[allNodeNames[b]] = allNodeNames[doms[b]];
+    for (const blockId of rpo) {
+        if (blockId !== entryId && doms[blockId] !== -1) {
+            idom[allNodeNames[blockId]] = allNodeNames[doms[blockId]];
         }
     }
 
@@ -312,8 +317,8 @@ function hasSetChanged(oldSet: Set<string>, newSet: Set<string>): boolean {
  */
 function mergeAdjacentSets(neighbors: number[], sets: Array<Set<string>>): Set<string> {
     const merged = new Set<string>();
-    for (const n of neighbors) {
-        for (const item of sets[n]) {
+    for (const neighborId of neighbors) {
+        for (const item of sets[neighborId]) {
             merged.add(item);
         }
     }

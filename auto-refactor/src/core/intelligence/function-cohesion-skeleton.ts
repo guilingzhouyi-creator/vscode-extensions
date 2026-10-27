@@ -85,9 +85,9 @@ function extractSymbolTokens(lines: string[]): Set<string> {
         'from',
     ]);
 
-    for (const m of matches) {
-        if (!KEYWORDS.has(m) && m.length >= 2) {
-            tokens.add(m);
+    for (const token of matches) {
+        if (!KEYWORDS.has(token) && token.length >= 2) {
+            tokens.add(token);
         }
     }
     return tokens;
@@ -135,14 +135,14 @@ function normalizeStatement(line: string): string {
  */
 function cleanStatements(lines: string[]): string[] {
     return lines
-        .map((l) => l.trim())
-        .filter((l) => {
-            if (l.length === 0) return false;
+        .map((line) => line.trim())
+        .filter((line) => {
+            if (line.length === 0) return false;
             if (
-                l.startsWith('//') ||
-                l.startsWith('/*') ||
-                l.startsWith('*') ||
-                l.startsWith('#')
+                line.startsWith('//') ||
+                line.startsWith('/*') ||
+                line.startsWith('*') ||
+                line.startsWith('#')
             ) {
                 return false;
             }
@@ -168,10 +168,10 @@ function longestCommonSuffix(stmtsA: string[], stmtsB: string[]): string[] {
     const limit = Math.min(stmtsA.length, stmtsB.length);
     const common: string[] = [];
     for (let i = 0; i < limit; i++) {
-        const a = stmtsA[stmtsA.length - 1 - i];
-        const b = stmtsB[stmtsB.length - 1 - i];
-        if (a === b && a.length > 0) {
-            common.push(a);
+        const stmtA = stmtsA[stmtsA.length - 1 - i];
+        const stmtB = stmtsB[stmtsB.length - 1 - i];
+        if (stmtA === stmtB && stmtA.length > 0) {
+            common.push(stmtA);
         } else {
             break;
         }
@@ -294,7 +294,7 @@ export function analyzeFunctionCohesionAndSkeleton(
         return { issues, disjointPairs, skeletonCandidates };
     }
 
-    const tokenSets = functions.map((fn) => extractSymbolTokens(fn.lines));
+    const tokenSets = functions.map((func) => extractSymbolTokens(func.lines));
 
     for (let i = 0; i < functions.length; i++) {
         for (let j = i + 1; j < functions.length; j++) {

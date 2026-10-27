@@ -54,14 +54,14 @@ export function normalizeGroupsForRename(
     pathRemap?: Record<string, string>,
 ): GroupedBaselineRow[] {
     if (!pathRemap || Object.keys(pathRemap).length === 0) return groups;
-    return groups.map((g) => {
-        const remappedKey = remapGroupKey(g.key, pathRemap);
-        if (remappedKey !== g.key) {
+    return groups.map((group) => {
+        const remappedKey = remapGroupKey(group.key, pathRemap);
+        if (remappedKey !== group.key) {
             return {
-                ...g,
+                ...group,
                 key: remappedKey,
             };
         }
-        return g;
+        return group;
     });
 }

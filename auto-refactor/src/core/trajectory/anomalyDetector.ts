@@ -256,8 +256,8 @@ function detectConflictingFixes(
         (current.diffSummary?.modifiedDomains || []).length > 0
     ) {
         const prevMods = new Set(previous.diffSummary?.modifiedDomains || []);
-        const overlapping = (current.diffSummary?.modifiedDomains || []).filter((d) =>
-            prevMods.has(d),
+        const overlapping = (current.diffSummary?.modifiedDomains || []).filter((diffScore) =>
+            prevMods.has(diffScore),
         );
         if (overlapping.length > 0 && Math.abs(compositeDelta) < 2) {
             return {
@@ -281,11 +281,11 @@ function detectConflictingFixes(
  * @returns Array of structured issue records.
  */
 function formatIssueSummaries(issueIds: string[], severity: Severity, defaultMessage: string) {
-    return issueIds.map((id) => ({
-        id,
-        rule: id.split(':')[1] || id,
+    return issueIds.map((issueId) => ({
+        id: issueId,
+        rule: issueId.split(':')[1] || issueId,
         severity,
-        line: parseInt(id.split(':')[3] || '1', DECIMAL_RADIX),
+        line: parseInt(issueId.split(':')[3] || '1', DECIMAL_RADIX),
         message: defaultMessage,
     }));
 }
@@ -351,8 +351,8 @@ export class AnomalyDetector {
 
         const prevIssues = new Set(previous.ruleHitIds);
         const currIssues = new Set(current.ruleHitIds);
-        const newIssueIds = current.ruleHitIds.filter((id) => !prevIssues.has(id));
-        const resolvedIssueIds = previous.ruleHitIds.filter((id) => !currIssues.has(id));
+        const newIssueIds = current.ruleHitIds.filter((issueId) => !prevIssues.has(issueId));
+        const resolvedIssueIds = previous.ruleHitIds.filter((issueId) => !currIssues.has(issueId));
 
         anomalies.push(...detectReintroducedIssues(newIssueIds, current, previous, history));
 

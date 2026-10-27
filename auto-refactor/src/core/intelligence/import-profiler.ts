@@ -180,8 +180,8 @@ function parsePythonFromClause(
     specifiers.add(spec);
     const pkg = spec.split('.')[0].toLowerCase();
     const items = rawItems.split(',');
-    for (const it of items) {
-        const parts = it.trim().split(/\s+as\s+/);
+    for (const item of items) {
+        const parts = item.trim().split(/\s+as\s+/);
         const local = (parts[1] || parts[0] || '').trim();
         if (local) symbolToPkg.set(local, pkg);
     }
@@ -193,8 +193,8 @@ function parsePythonImportClause(
     symbolToPkg: Map<string, string>,
 ): void {
     const items = rawItems.split(',');
-    for (const it of items) {
-        const parts = it.trim().split(/\s+as\s+/);
+    for (const item of items) {
+        const parts = item.trim().split(/\s+as\s+/);
         const mod = parts[0].trim();
         const local = (parts[1] || parts[0] || '').trim();
         if (!mod) continue;

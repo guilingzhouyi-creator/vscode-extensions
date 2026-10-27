@@ -184,10 +184,10 @@ function resolveCheckerDeprecation(
         const symbol = checker.getSymbolAtLocation(identifier);
         if (!symbol) return null;
         const tags = symbol.getJsDocTags();
-        const depTag = tags.find((t) => t.name === 'deprecated');
+        const depTag = tags.find((tag) => tag.name === 'deprecated');
         if (!depTag) return null;
         return depTag.text && depTag.text.length > 0
-            ? depTag.text.map((t) => t.text).join('')
+            ? depTag.text.map((part) => part.text).join('')
             : 'Deprecated symbol';
     } catch (err) {
         // Defensive: fall back to local AST index when TypeChecker boundaries fail

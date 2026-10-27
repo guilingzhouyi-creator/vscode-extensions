@@ -193,9 +193,9 @@ export function synthesizeChangesetScope(ctx: ScopeSynthesisContext): ModeSynthe
 
     const dimensionDeltas: Partial<Record<QualityDimension, number>> = {};
     for (const dim of activeDims) {
-        const b = sliceBeforeScores?.[dim] ?? sliceAfterScores[dim];
-        const a = sliceAfterScores[dim];
-        dimensionDeltas[dim] = Math.round((a - b) * 100) / 100;
+        const beforeVal = sliceBeforeScores?.[dim] ?? sliceAfterScores[dim];
+        const afterVal = sliceAfterScores[dim];
+        dimensionDeltas[dim] = Math.round((afterVal - beforeVal) * 100) / 100;
     }
 
     const changesetDelta: ChangesetDeltaAssessment = Object.freeze({
@@ -304,7 +304,9 @@ export function normalizeScopeQuality(params: ScopeNormalizationParams): ScopeNo
     } = params;
 
     // Calculate slice composite score after changes
-    const activeDims = ALL_QUALITY_DIMENSIONS.filter((d) => sliceAfterScores[d] !== undefined);
+    const activeDims = ALL_QUALITY_DIMENSIONS.filter(
+        (dimension) => sliceAfterScores[dimension] !== undefined,
+    );
     const afterComp = computeCompositeScore(sliceAfterScores, activeDims, weights);
     const sliceAfterScore = Number.isFinite(afterComp.compositeScore)
         ? afterComp.compositeScore

@@ -230,8 +230,9 @@ export class CircularDiffBuffer {
             if (this.storageAdapter?.evictToR4Archive) {
                 const res = this.storageAdapter.evictToR4Archive(binaryPayload);
                 if (res instanceof Promise) {
-                    res.then((r) => {
-                        if (this.onEvictToR4) this.onEvictToR4(binaryPayload, r.archiveId);
+                    res.then((evictResult) => {
+                        if (this.onEvictToR4)
+                            this.onEvictToR4(binaryPayload, evictResult.archiveId);
                     }).catch(() => {});
                 } else if (res && this.onEvictToR4) {
                     this.onEvictToR4(binaryPayload, res.archiveId);

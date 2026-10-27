@@ -36,7 +36,7 @@ function createArchitectureLocation(file: string) {
 }
 
 function createMetaArchitectureIssue(
-    id: string,
+    issueId: string,
     rule: string,
     severity: Severity,
     message: string,
@@ -45,7 +45,7 @@ function createMetaArchitectureIssue(
     suggestion: string,
 ): Issue {
     return {
-        id,
+        id: issueId,
         analyzer: ANALYZER_ARCHITECTURE,
         rule,
         severity,

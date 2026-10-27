@@ -158,9 +158,9 @@ async function runWithPersistentPool(
         entry.warm = true;
         entry.lastUsed = Date.now();
         ctx.opts.pool!.touch(ctx.poolFp);
-    } catch (e) {
+    } catch (error) {
         ctx.scanner.logger.warn(
-            `persistent worker pool failed (${String(e)}); falling back to in-process`,
+            `persistent worker pool failed (${String(error)}); falling back to in-process`,
         );
         ctx.opts.pool!.destroy(ctx.poolFp);
         results = await ctx.scanner.runInProcess(ctx.missFiles, ctx.absRoot, ctx.preloaded);
@@ -184,9 +184,9 @@ async function runWithTransientPool(
             runAnalyzersFn: (rel, content) => ctx.scanner.runAnalyzers(rel, content),
             preloaded: ctx.preloaded,
         });
-    } catch (e) {
+    } catch (error) {
         ctx.scanner.logger.warn(
-            `worker pool failed (${String(e)}); falling back to in-process scan`,
+            `worker pool failed (${String(error)}); falling back to in-process scan`,
         );
         results = await ctx.scanner.runInProcess(ctx.missFiles, ctx.absRoot, ctx.preloaded);
     }
@@ -196,17 +196,17 @@ async function runWithTransientPool(
 function recordAnalyzedResults(ctx: RecordAnalyzedContext): number {
     let analyzed = 0;
     for (let k = 0; k < ctx.toAnalyze.length; k++) {
-        const t = ctx.toAnalyze[k];
-        ctx.perFile[t.idx] = ctx.results[k];
-        ctx.sessionBucket.set(t.rel, ctx.results[k]);
+        const taskItem = ctx.toAnalyze[k];
+        ctx.perFile[taskItem.idx] = ctx.results[k];
+        ctx.sessionBucket.set(taskItem.rel, ctx.results[k]);
         analyzed++;
         if (ctx.l2Enabled) {
             ctx.cache.writeL2(
-                t.fpHash,
-                t.contentHash,
-                t.rel,
+                taskItem.fpHash,
+                taskItem.contentHash,
+                taskItem.rel,
                 ctx.results[k],
-                ctx.fpByRel.get(t.rel),
+                ctx.fpByRel.get(taskItem.rel),
             );
         }
     }
@@ -217,11 +217,11 @@ async function executeDiffMissBatches(
     ctx: DiffMissBatchesContext,
 ): Promise<{ analyzed: number; poolWarm: boolean }> {
     if (ctx.toAnalyze.length === 0) return { analyzed: 0, poolWarm: false };
-    const missFiles = ctx.toAnalyze.map((t) => ctx.files[t.idx]);
-    const workerDescs: WorkerAnalyzerDesc[] = ctx.scanner.plan.map((p) => ({
-        name: p.name,
-        modulePath: p.modulePath,
-        options: (p.options ?? {}) as Record<string, any>,
+    const missFiles = ctx.toAnalyze.map((taskItem) => ctx.files[taskItem.idx]);
+    const workerDescs: WorkerAnalyzerDesc[] = ctx.scanner.plan.map((planItem) => ({
+        name: planItem.name,
+        modulePath: planItem.modulePath,
+        options: (planItem.options ?? {}) as Record<string, any>,
     }));
     const effWorkers = effectiveWorkers(ctx.cfg.workers, missFiles.length);
     const useWorkers = effWorkers > 1;
@@ -400,10 +400,10 @@ function aggregateScanResults(perFile: ({ issues: Issue[]; metric: FileMetric | 
 } {
     const issues: Issue[] = [];
     const fileMetrics: FileMetric[] = [];
-    for (const r of perFile) {
-        if (!r) continue;
-        issues.push(...r.issues);
-        if (r.metric) fileMetrics.push(r.metric);
+    for (const result of perFile) {
+        if (!result) continue;
+        issues.push(...result.issues);
+        if (result.metric) fileMetrics.push(result.metric);
     }
     issues.sort(computeIssueSortOrder);
     return { issues, fileMetrics };
@@ -545,7 +545,9 @@ async function runDiffPipelines(ctx: ExecuteDiffPipelinesContext): Promise<{
     missStats: { analyzed: number; poolWarm: boolean };
     incStats: { incrementalFiles: number; incrementalHit: number };
 }> {
-    const fpByRel = new Map<string, Fingerprint>(ctx.routingState.l1Fps.map((w) => [w.rel, w.fp]));
+    const fpByRel = new Map<string, Fingerprint>(
+        ctx.routingState.l1Fps.map((entry) => [entry.rel, entry.fp]),
+    );
     const missStats = await executeDiffMissBatches({
         scanner: ctx.scanner,
         toAnalyze: ctx.routingState.toAnalyze,

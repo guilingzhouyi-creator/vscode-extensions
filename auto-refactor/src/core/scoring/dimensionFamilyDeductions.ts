@@ -83,10 +83,10 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
         return;
 
     const line = issue.location?.start?.line;
-    const r = issue.rule;
+    const ruleId = issue.rule;
     const msg = issue.message;
 
-    if (r === RULE_ARCH_LEAK_002) {
+    if (ruleId === RULE_ARCH_LEAK_002) {
         // Charged to two axes on purpose: a leaked credential is an architecture breach and
         // a security defect. The security-side rationale carries a [dual-axis] tag so the
         // report can distinguish this from an accidental double charge.
@@ -94,41 +94,41 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_DTO_CREDENTIAL_LEAK,
             ScoringRationales.DTO_CREDENTIAL_LEAK(msg),
-            r,
+            ruleId,
             line,
         );
         apply(
             DIMENSION_CODE_SECURITY,
             DEDUCTION_DTO_CREDENTIAL_LEAK,
             ScoringRationales.DTO_CREDENTIAL_LEAK_SECURITY_AXIS(msg),
-            r,
+            ruleId,
             line,
         );
     } else if (
-        RULES_LAYER_CONSTRAINT.includes(r) ||
+        RULES_LAYER_CONSTRAINT.includes(ruleId) ||
         // Fragment fallback for custom architecture analyzers whose rule ids this engine cannot
         // know; built-in rules match by id first so a rename cannot silently drop the deduction.
-        r.includes(FRAGMENT_LAYER) ||
-        r.includes(FRAGMENT_BOUNDARY) ||
-        r.includes(FRAGMENT_LEAK)
+        ruleId.includes(FRAGMENT_LAYER) ||
+        ruleId.includes(FRAGMENT_BOUNDARY) ||
+        ruleId.includes(FRAGMENT_LEAK)
     ) {
         apply(
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_LAYER_CONSTRAINT_VIOLATION,
             ScoringRationales.LAYER_CONSTRAINT_VIOLATION(msg),
-            r,
+            ruleId,
             line,
         );
     } else if (
-        r === RULE_IMPORT_CYCLE ||
-        r.includes(FRAGMENT_CYCLE) ||
-        r.includes(FRAGMENT_CIRCULAR)
+        ruleId === RULE_IMPORT_CYCLE ||
+        ruleId.includes(FRAGMENT_CYCLE) ||
+        ruleId.includes(FRAGMENT_CIRCULAR)
     ) {
         apply(
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_CIRCULAR_DEPENDENCY,
             ScoringRationales.CIRCULAR_DEPENDENCY(msg),
-            r,
+            ruleId,
             line,
         );
     } else {
@@ -136,7 +136,7 @@ export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplie
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_ARCHITECTURE_DESIGN_VIOLATION,
             ScoringRationales.ARCHITECTURE_DESIGN_VIOLATION(msg),
-            r,
+            ruleId,
             line,
         );
     }
@@ -218,16 +218,16 @@ function resolveSecurityDeduction(
  * @param apply - Deduction callback function.
  */
 export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): void {
-    const r = issue.rule;
+    const ruleId = issue.rule;
     const msg = issue.message;
-    const resolution = resolveSecurityDeduction(issue.analyzer, r, msg);
+    const resolution = resolveSecurityDeduction(issue.analyzer, ruleId, msg);
     if (!resolution) return;
 
     apply(
         DIMENSION_CODE_SECURITY,
         resolution.deduction,
         resolution.rationale,
-        r,
+        ruleId,
         issue.location?.start?.line,
     );
 }
@@ -246,19 +246,19 @@ export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier
     if (issue.analyzer !== ANALYZER_PERFORMANCE) return;
 
     const line = issue.location?.start?.line;
-    const r = issue.rule;
+    const ruleId = issue.rule;
     const msg = issue.message;
 
     if (
-        r === RULE_PRF_TRANSIENT_ALLOCATION ||
-        r.includes(FRAGMENT_LOOP) ||
-        r.includes(FRAGMENT_ALLOC)
+        ruleId === RULE_PRF_TRANSIENT_ALLOCATION ||
+        ruleId.includes(FRAGMENT_LOOP) ||
+        ruleId.includes(FRAGMENT_ALLOC)
     ) {
         apply(
             DIMENSION_PERFORMANCE_EFFICIENCY,
             DEDUCTION_TRANSIENT_LOOP_ALLOCATION,
             ScoringRationales.TRANSIENT_LOOP_ALLOCATION(msg),
-            r,
+            ruleId,
             line,
         );
     } else {
@@ -268,7 +268,7 @@ export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier
             DIMENSION_PERFORMANCE_EFFICIENCY,
             DEDUCTION_INEFFICIENT_ALGORITHM,
             ScoringRationales.INEFFICIENT_ALGORITHM_PATH(msg),
-            r,
+            ruleId,
             line,
         );
     }

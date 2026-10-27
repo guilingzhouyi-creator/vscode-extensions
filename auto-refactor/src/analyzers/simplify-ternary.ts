@@ -52,34 +52,39 @@ const COGNITIVE_DELTA_SHALLOW = -REWARD_BONUS_SHALLOW;
 
 const OPPORTUNITY_CONDITIONAL_RETURN = 'conditional-return';
 const OPPORTUNITY_SEQUENTIAL_RETURN = 'sequential-return';
-const OPPORTUNITY_CONDITIONAL_ASSIGNMENT_IMMUTABLE = 'conditional-assignment-immutable';
+const OPPORTUNITY_COND_ASSIGN_IMMUTABLE = 'conditional-assignment-immutable';
 const OPPORTUNITY_CONDITIONAL_ASSIGNMENT = 'conditional-assignment';
 const PREFIX_RETURN = 'return ';
 
 /**
  * Check if a node is an increment or decrement expression.
  */
-function isIncrementOrDecrement(n: ts.Node): boolean {
+function isIncrementOrDecrement(node: ts.Node): boolean {
     return (
-        (ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n)) &&
-        (n.operator === ts.SyntaxKind.PlusPlusToken || n.operator === ts.SyntaxKind.MinusMinusToken)
+        (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+        (node.operator === ts.SyntaxKind.PlusPlusToken ||
+            node.operator === ts.SyntaxKind.MinusMinusToken)
     );
 }
 
 /**
  * Check whether an AST node introduces side-effects or multi-level nesting.
  */
-function isImpureNode(n: ts.Node): boolean {
-    if (ts.isConditionalExpression(n) || ts.isAwaitExpression(n) || ts.isYieldExpression(n)) {
+function isImpureNode(node: ts.Node): boolean {
+    if (
+        ts.isConditionalExpression(node) ||
+        ts.isAwaitExpression(node) ||
+        ts.isYieldExpression(node)
+    ) {
         return true;
     }
-    if (isIncrementOrDecrement(n)) {
+    if (isIncrementOrDecrement(node)) {
         return true;
     }
     return (
-        ts.isBinaryExpression(n) &&
-        n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
-        n.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
     );
 }
 
@@ -92,15 +97,15 @@ function isImpureNode(n: ts.Node): boolean {
 function isPureShallowExpression(node: ts.Node): boolean {
     let pure = true;
 
-    function walk(n: ts.Node): void {
+    function walk(astNode: ts.Node): void {
         if (!pure) {
             return;
         }
-        if (isImpureNode(n)) {
+        if (isImpureNode(astNode)) {
             pure = false;
             return;
         }
-        ts.forEachChild(n, walk);
+        ts.forEachChild(astNode, walk);
     }
 
     walk(node);
@@ -123,19 +128,19 @@ function unwrapSingleStatement(stmt: ts.Statement): ts.Statement | null {
 /**
  * Helper to obtain the 0-based line/col range between two AST nodes.
  *
- * @param sf - Source file for position translation.
+ * @param sourceFile - Source file for position translation.
  * @param startNode - AST node defining range start.
  * @param endNode - AST node defining range end.
  * @returns 0-based start and end position range.
  */
 function getStatementPositionRange(
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     startNode: ts.Node,
     endNode: ts.Node,
 ): StatementPositionRange {
     return {
-        start: sf.getLineAndCharacterOfPosition(startNode.getStart(sf)),
-        end: sf.getLineAndCharacterOfPosition(endNode.getEnd()),
+        start: sourceFile.getLineAndCharacterOfPosition(startNode.getStart(sourceFile)),
+        end: sourceFile.getLineAndCharacterOfPosition(endNode.getEnd()),
     };
 }
 
@@ -319,26 +324,26 @@ function matchAssignmentBranchPair(
     if (!ts.isExpressionStatement(thenStmt) || !ts.isExpressionStatement(elseStmt)) {
         return null;
     }
-    const t = thenStmt.expression;
-    const e = elseStmt.expression;
+    const thenExpr = thenStmt.expression;
+    const elseExpr = elseStmt.expression;
     if (
-        !ts.isBinaryExpression(t) ||
-        t.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
-        !ts.isIdentifier(t.left)
+        !ts.isBinaryExpression(thenExpr) ||
+        thenExpr.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+        !ts.isIdentifier(thenExpr.left)
     ) {
         return null;
     }
     if (
-        !ts.isBinaryExpression(e) ||
-        e.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
-        !ts.isIdentifier(e.left)
+        !ts.isBinaryExpression(elseExpr) ||
+        elseExpr.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+        !ts.isIdentifier(elseExpr.left)
     ) {
         return null;
     }
-    if (t.left.text !== e.left.text) {
+    if (thenExpr.left.text !== elseExpr.left.text) {
         return null;
     }
-    return { targetName: t.left.text, trueExpr: t.right, falseExpr: e.right };
+    return { targetName: thenExpr.left.text, trueExpr: thenExpr.right, falseExpr: elseExpr.right };
 }
 
 interface AssignmentIssueParams {
@@ -359,7 +364,7 @@ function emitAssignmentTernaryIssues(
                 message: `Conditional assignment to '${params.targetName}' can be folded into an immutable const declaration with a ternary.`,
                 suggestion: `Fold into const declaration: \`${params.candidate}\``,
                 pos: params.pos,
-                opportunity: OPPORTUNITY_CONDITIONAL_ASSIGNMENT_IMMUTABLE,
+                opportunity: OPPORTUNITY_COND_ASSIGN_IMMUTABLE,
                 canMakeImmutable: true,
                 candidate: params.candidate,
             }),
@@ -544,13 +549,13 @@ function walkNode(node: ts.Node, ctx: TernaryMatcherContext): void {
 /**
  * Detect ternary simplification and immutable folding opportunities in a TypeScript AST.
  *
- * @param sf - Parsed TypeScript source file.
+ * @param sourceFile - Parsed TypeScript source file.
  * @param ctx - Analyzer context.
  * @param opts - Merged simplify options.
  * @param issues - Target issue accumulator.
  */
 export function detectTernaryOpportunities(
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     ctx: AnalyzerContext,
     opts: SimplifyOptions,
     issues: Issue[],
@@ -558,6 +563,6 @@ export function detectTernaryOpportunities(
     if (opts.checkTernarySimplification === false) return;
     const maxLen = opts.maxTernaryLength ?? DEFAULT_MAX_TERNARY_LENGTH;
     const file = ctx.filePath.replace(/\\/g, '/');
-    const matcherCtx: TernaryMatcherContext = { sf, file, maxLen, issues };
-    walkNode(sf, matcherCtx);
+    const matcherCtx: TernaryMatcherContext = { sf: sourceFile, file, maxLen, issues };
+    walkNode(sourceFile, matcherCtx);
 }

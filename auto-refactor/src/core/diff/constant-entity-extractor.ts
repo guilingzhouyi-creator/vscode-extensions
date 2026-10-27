@@ -163,9 +163,9 @@ function popScopeStackToDepth(scopeStack: ScopeFrame[], currentDepth: number): v
     }
 }
 
-function adjustDepthForChar(ch: string, depth: number, scopeStack: ScopeFrame[]): number {
-    if (ch === '{') return depth + 1;
-    if (ch === '}') {
+function adjustDepthForChar(char: string, depth: number, scopeStack: ScopeFrame[]): number {
+    if (char === '{') return depth + 1;
+    if (char === '}') {
         const next = depth - 1;
         popScopeStackToDepth(scopeStack, next);
         return next;
@@ -179,8 +179,8 @@ function updateBracesAndScopeStack(
     scopeStack: ScopeFrame[],
 ): { braceDepth: number; currentScope: string | null } {
     let currentDepth = braceDepth;
-    for (let c = 0; c < trimmed.length; c++) {
-        currentDepth = adjustDepthForChar(trimmed[c], currentDepth, scopeStack);
+    for (let charIdx = 0; charIdx < trimmed.length; charIdx++) {
+        currentDepth = adjustDepthForChar(trimmed[charIdx], currentDepth, scopeStack);
     }
     const currentScope = scopeStack.length > 0 ? scopeStack[scopeStack.length - 1].name : null;
     return { braceDepth: currentDepth, currentScope };

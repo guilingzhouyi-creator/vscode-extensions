@@ -188,14 +188,14 @@ function checkModernJsTsLine(
     if (!line.includes(KEYWORD_VAR)) return;
     const trimmed = line.trim();
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) return;
-    const m = line.match(VAR_RE);
-    if (!m) return;
+    const matchResult = line.match(VAR_RE);
+    if (!matchResult) return;
 
     violations.push({
         ruleId: 'GOV-STD-002',
-        message: `Outdated \`var\` keyword used for \`${m[1]}\`. Use modern \`let\` or \`const\` instead.`,
+        message: `Outdated \`var\` keyword used for \`${matchResult[1]}\`. Use modern \`let\` or \`const\` instead.`,
         line: lineIndex + 1,
-        column: m.index != null ? m.index + 1 : 1,
+        column: matchResult.index != null ? matchResult.index + 1 : 1,
         suggestion: `Replace \`var\` with \`const\` (if unassigned) or \`let\`.`,
         fixable: true,
         suggestedPatch: line.replace(/\bvar\b/, 'let'),

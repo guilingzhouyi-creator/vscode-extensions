@@ -48,7 +48,7 @@ const NOT_TRAMPOLINE: TrampolineDetectionResult = Object.freeze({
  */
 export function detectVacuousTrampoline(content: string): TrampolineDetectionResult {
     const rawLines = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '').split('\n');
-    const codeLines = rawLines.map((l) => l.trim()).filter((l) => l.length > 0);
+    const codeLines = rawLines.map((line) => line.trim()).filter((line) => line.length > 0);
 
     if (codeLines.length === 0 || codeLines.length > 3) {
         return NOT_TRAMPOLINE;

@@ -69,11 +69,11 @@ export function isPureAsciiSWAR64(buf: Uint8Array): boolean {
     // Validate 8 bytes per step via two 32-bit reads with zero BigInt heap boxing
     if (word8Count > 0) {
         const view = new DataView(buf.buffer, buf.byteOffset, len);
-        for (let w = 0; w < word8Count; w++) {
-            const off = w * WORD64_BYTES;
-            const w1 = view.getUint32(off, true);
-            const w2 = view.getUint32(off + WORD32_BYTES, true);
-            if (((w1 | w2) & HIGH_BITS_32) !== 0) return false;
+        for (let wordIdx = 0; wordIdx < word8Count; wordIdx++) {
+            const offset = wordIdx * WORD64_BYTES;
+            const lowWord = view.getUint32(offset, true);
+            const highWord = view.getUint32(offset + WORD32_BYTES, true);
+            if (((lowWord | highWord) & HIGH_BITS_32) !== 0) return false;
         }
     }
 
@@ -107,46 +107,46 @@ export function align64(bytes: number): number {
  * @throws Error when `pattern.length > 32`; empty inputs return the other sequence's length.
  */
 export function bitParallelMyers32Distance(pattern: Uint32Array, text: Uint32Array): number {
-    const m = pattern.length;
-    const n = text.length;
-    if (m === 0) return n;
-    if (n === 0) return m;
-    if (m > MYERS32_MAX_PATTERN_LINES) {
+    const patternLen = pattern.length;
+    const textLen = text.length;
+    if (patternLen === 0) return textLen;
+    if (textLen === 0) return patternLen;
+    if (patternLen > MYERS32_MAX_PATTERN_LINES) {
         throw new Error('Pattern length must be <= 32 for 32-bit Bit-Parallel Myers');
     }
 
     // Precompute pattern bitmasks (one bit per line occurrence in pattern)
     const peq = new Map<number, number>();
-    for (let i = 0; i < m; i++) {
+    for (let i = 0; i < patternLen; i++) {
         const hash = pattern[i];
         const mask = peq.get(hash) || 0;
         peq.set(hash, mask | (1 << i));
     }
 
-    let vp = ~0; // 0xFFFFFFFF
-    let vn = 0;
-    let score = m;
-    const targetBit = 1 << (m - 1);
+    let vertPos = ~0; // 0xFFFFFFFF
+    let vertNeg = 0;
+    let score = patternLen;
+    const targetBit = 1 << (patternLen - 1);
 
-    for (let j = 0; j < n; j++) {
+    for (let j = 0; j < textLen; j++) {
         const hash = text[j];
-        const pm = peq.get(hash) || 0;
+        const patternMask = peq.get(hash) || 0;
 
-        const x = ((pm & vp) >>> 0) + (vp >>> 0);
-        const d0 = (x ^ vp) | pm | vn | 0;
-        let hp = vn | ~(d0 | vp) | 0;
-        let hn = (vp & d0) | 0;
+        const x = ((patternMask & vertPos) >>> 0) + (vertPos >>> 0);
+        const deltaZeroMask = (x ^ vertPos) | patternMask | vertNeg | 0;
+        let horizPos = vertNeg | ~(deltaZeroMask | vertPos) | 0;
+        let horizNeg = (vertPos & deltaZeroMask) | 0;
 
         // Shift horizontal deltas
-        hp = (hp << 1) | 1 | 0;
-        hn = (hn << 1) | 0;
+        horizPos = (horizPos << 1) | 1 | 0;
+        horizNeg = (horizNeg << 1) | 0;
 
-        vp = hn | ~(d0 | hp) | 0;
-        vn = (hp & d0) | 0;
+        vertPos = horizNeg | ~(deltaZeroMask | horizPos) | 0;
+        vertNeg = (horizPos & deltaZeroMask) | 0;
 
-        if ((hp & targetBit) !== 0) {
+        if ((horizPos & targetBit) !== 0) {
             score++;
-        } else if ((hn & targetBit) !== 0) {
+        } else if ((horizNeg & targetBit) !== 0) {
             score--;
         }
     }
@@ -165,46 +165,47 @@ export function bitParallelMyers32Distance(pattern: Uint32Array, text: Uint32Arr
  * @throws Error when `pattern.length > 64`.
  */
 export function bitParallelMyers64Distance(pattern: Uint32Array, text: Uint32Array): number {
-    const m = pattern.length;
-    if (m <= MYERS32_MAX_PATTERN_LINES) {
+    const patternLen = pattern.length;
+    if (patternLen <= MYERS32_MAX_PATTERN_LINES) {
         return bitParallelMyers32Distance(pattern, text);
     }
-    const n = text.length;
-    if (n === 0) return m;
-    if (m > MYERS64_MAX_PATTERN_LINES) {
+    const textLen = text.length;
+    if (textLen === 0) return patternLen;
+    if (patternLen > MYERS64_MAX_PATTERN_LINES) {
         throw new Error('Pattern length must be <= 64 for 64-bit Bit-Parallel Myers');
     }
 
     // Precompute pattern bitmasks (one bit per line occurrence in pattern)
     const peq = new Map<number, bigint>();
-    for (let i = 0; i < m; i++) {
+    for (let i = 0; i < patternLen; i++) {
         const hash = pattern[i];
         const mask = peq.get(hash) || 0n;
         peq.set(hash, mask | (1n << BigInt(i)));
     }
 
-    let vp = ~0n; // Positive vertical delta vector
-    let vn = 0n; // Negative vertical delta vector
-    let score = m;
+    let vertPos = ~0n; // Positive vertical delta vector
+    let vertNeg = 0n; // Negative vertical delta vector
+    let score = patternLen;
 
-    for (let j = 0; j < n; j++) {
+    for (let j = 0; j < textLen; j++) {
         const hash = text[j];
-        const pm = peq.get(hash) || 0n;
+        const patternMask = peq.get(hash) || 0n;
 
-        const d0 = (((pm & vp) + vp) ^ vp) | pm | vn;
-        let hp = vn | ~(d0 | vp);
-        let hn = vp & d0;
+        const deltaZeroMask =
+            (((patternMask & vertPos) + vertPos) ^ vertPos) | patternMask | vertNeg;
+        let horizPos = vertNeg | ~(deltaZeroMask | vertPos);
+        let horizNeg = vertPos & deltaZeroMask;
 
         // Shift horizontal deltas
-        hp = (hp << 1n) | 1n;
-        hn = hn << 1n;
+        horizPos = (horizPos << 1n) | 1n;
+        horizNeg = horizNeg << 1n;
 
-        vp = hn | ~(d0 | hp);
-        vn = hp & d0;
+        vertPos = horizNeg | ~(deltaZeroMask | horizPos);
+        vertNeg = horizPos & deltaZeroMask;
 
-        if ((hp & (1n << BigInt(m - 1))) !== 0n) {
+        if ((horizPos & (1n << BigInt(patternLen - 1))) !== 0n) {
             score++;
-        } else if ((hn & (1n << BigInt(m - 1))) !== 0n) {
+        } else if ((horizNeg & (1n << BigInt(patternLen - 1))) !== 0n) {
             score--;
         }
     }

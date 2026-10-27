@@ -308,8 +308,13 @@ function extractCommentLineInfo(
 
 function findNextCodeLine(lines: string[], start: number): string | undefined {
     for (let j = start; j < lines.length; j++) {
-        const t = lines[j].trim();
-        if (t.length > 0 && !t.startsWith('//') && !t.startsWith('/*') && !t.startsWith('*')) {
+        const trimmedLine = lines[j].trim();
+        if (
+            trimmedLine.length > 0 &&
+            !trimmedLine.startsWith('//') &&
+            !trimmedLine.startsWith('/*') &&
+            !trimmedLine.startsWith('*')
+        ) {
             return lines[j];
         }
     }

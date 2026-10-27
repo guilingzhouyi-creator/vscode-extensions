@@ -173,14 +173,14 @@ function setCachedSnapshot(projectHash: string, info: RegistryInfo | null): void
 
 function parseRegistryContent(raw: string): RegistryInfo | null {
     try {
-        const o = JSON.parse(raw);
+        const parsedObj = JSON.parse(raw);
         if (
-            o &&
-            typeof o.pid === 'number' &&
-            typeof o.pipe === 'string' &&
-            typeof o.protocol === 'number'
+            parsedObj &&
+            typeof parsedObj.pid === 'number' &&
+            typeof parsedObj.pipe === 'string' &&
+            typeof parsedObj.protocol === 'number'
         ) {
-            return o as RegistryInfo;
+            return parsedObj as RegistryInfo;
         }
         return null;
     } catch {

@@ -56,13 +56,13 @@ export function isIncrementalCandidate(
  *
  * @param fpMtimeMs - Modification time recorded for the file.
  * @param fpSize - Byte size recorded for the file.
- * @param l1 - L1 cache entry for the file, when one exists.
+ * @param l1Entry - L1 cache entry for the file, when one exists.
  * @returns True when the L1 entry is still fresh for this file.
  */
 export function isFreshL1Hit(
     fpMtimeMs: number,
     fpSize: number,
-    l1: { mtimeMs: number; size: number } | null | undefined,
+    l1Entry: { mtimeMs: number; size: number } | null | undefined,
 ): boolean {
-    return l1 != null && l1.mtimeMs === fpMtimeMs && l1.size === fpSize;
+    return l1Entry != null && l1Entry.mtimeMs === fpMtimeMs && l1Entry.size === fpSize;
 }

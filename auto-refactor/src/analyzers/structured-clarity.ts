@@ -46,13 +46,13 @@ function computeMaxBranchDepth(node: NormalizedNode, currentDepth = 0): number {
     const kids = node.children;
     if (!kids) return max;
     for (let i = 0; i < kids.length; i++) {
-        const c = kids[i];
-        if (c.functionLike) continue;
+        const child = kids[i];
+        if (child.functionLike) continue;
         const isNestingControl =
-            c.kind === NodeKind.ControlFlow ||
-            (Boolean(c.increasesNesting) && c.kind !== NodeKind.Block);
+            child.kind === NodeKind.ControlFlow ||
+            (Boolean(child.increasesNesting) && child.kind !== NodeKind.Block);
         const nextDepth = isNestingControl ? currentDepth + 1 : currentDepth;
-        const childMax = computeMaxBranchDepth(c, nextDepth);
+        const childMax = computeMaxBranchDepth(child, nextDepth);
         if (childMax > max) max = childMax;
     }
     return max;
@@ -148,14 +148,14 @@ const OPTIMIZATION_TIPS: readonly string[] = [
 /**
  * Format an actionable optimization hint based on cyclomatic complexity.
  *
- * @param cc - Measured cyclomatic complexity score.
+ * @param complexityScore - Measured cyclomatic complexity score.
  * @returns Guidance string suggesting decomposition strategies.
  */
-export function formatOptimizationHint(cc: number): string {
-    if (cc >= CRITICAL_COMPLEXITY_THRESHOLD) {
+export function formatOptimizationHint(complexityScore: number): string {
+    if (complexityScore >= CRITICAL_COMPLEXITY_THRESHOLD) {
         return `Critical complexity. ${OPTIMIZATION_TIPS.join(' ')}`;
     }
-    if (cc >= HIGH_COMPLEXITY_THRESHOLD) {
+    if (complexityScore >= HIGH_COMPLEXITY_THRESHOLD) {
         return `High complexity. ${OPTIMIZATION_TIPS.slice(0, HIGH_COMPLEXITY_TIP_COUNT).join(' ')}`;
     }
     return `Moderate complexity. ${OPTIMIZATION_TIPS.slice(0, 2).join(' ')}`;

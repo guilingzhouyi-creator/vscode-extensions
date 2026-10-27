@@ -210,11 +210,11 @@ export class RingBufferBus<T> {
     /**
      * Rounds up integer to nearest power of two for fast bitwise masking.
      */
-    private nextPowerOfTwo(n: number): number {
-        let p = 1;
-        while (p < n) {
-            p <<= 1;
+    private nextPowerOfTwo(targetVal: number): number {
+        let powerVal = 1;
+        while (powerVal < targetVal) {
+            powerVal <<= 1;
         }
-        return p;
+        return powerVal;
     }
 }

@@ -152,7 +152,9 @@ function evaluateGodUtilityRisk(ctx: UtilityFileInspectionContext): Issue | null
         return null;
     }
 
-    const categories = [...new Set(ctx.exportedSymbols.map((s) => s.category))].join(', ');
+    const categories = [
+        ...new Set(ctx.exportedSymbols.map((symbolInfo) => symbolInfo.category)),
+    ].join(', ');
     return createBoundaryIssue(
         RULE_ARCH_UTL_001,
         ctx.filePath,
@@ -215,8 +217,8 @@ export function auditBoundaryDiscipline(
     files: UtilityFileInspectionContext[],
 ): BoundaryDisciplineResult {
     const issues: Issue[] = [];
-    for (const f of files) {
-        issues.push(...evaluateUtilityFile(f));
+    for (const fileCtx of files) {
+        issues.push(...evaluateUtilityFile(fileCtx));
     }
 
     return {

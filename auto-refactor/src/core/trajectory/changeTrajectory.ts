@@ -112,9 +112,9 @@ export class ChangeTrajectoryManager {
      */
     getAllAnomalies(): Array<{ filePath: string; anomaly: EvolutionAnomaly }> {
         const list: Array<{ filePath: string; anomaly: EvolutionAnomaly }> = [];
-        for (const [p, t] of this.trajectories.entries()) {
-            for (const a of t.activeAnomalies) {
-                list.push({ filePath: p, anomaly: a });
+        for (const [patchPath, trajectory] of this.trajectories.entries()) {
+            for (const anomaly of trajectory.activeAnomalies) {
+                list.push({ filePath: patchPath, anomaly });
             }
         }
         return list;

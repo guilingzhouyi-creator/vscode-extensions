@@ -72,6 +72,8 @@ export interface AuditRunOptions {
     gateCode?: string;
     /** Explicit or incremental diff ELOC counters (if available from baseline or git diff). */
     diffCounters?: Partial<ElocCounters>;
+    /** Optional micro-slice quality delta override (e.g. from a localized refactoring slice). */
+    sliceDeltaQ?: number;
 }
 
 /**
@@ -98,10 +100,10 @@ function evaluateFileBatchEloc(
     cache: BlockFingerprintCache,
 ): { processedEloc: number; uniqueIncrement: number } {
     let processedEloc = 0;
-    for (const f of files) {
-        const fileEloc = countBlockEloc(f.content);
+    for (const fileItem of files) {
+        const fileEloc = countBlockEloc(fileItem.content);
         processedEloc += fileEloc;
-        const blocks = extractBlockFingerprints(f.filePath, f.content);
+        const blocks = extractBlockFingerprints(fileItem.filePath, fileItem.content);
         cache.recordAndDeduplicate(blocks);
     }
     return {
@@ -136,8 +138,14 @@ function resolveScoreVector(scoreVector?: number[], fallbackScore = 100): number
  */
 function createInitialLifetimeSummary(record: CompactTrajectoryRecord): WeeklyTrajectorySummary {
     const netDebt = record.debt.res - record.debt.add;
-    const processedKiloEloc = Math.max(1, record.eloc.proc / 1000);
-    const netYield = Math.round((netDebt / processedKiloEloc) * 100) / 100;
+    const semanticKilo =
+        record.eloc.sem > 0
+            ? Math.max(0.1, record.eloc.sem / 1000)
+            : Math.max(1, record.eloc.uniq / 1000);
+    const netYield = Math.round((netDebt / semanticKilo) * 100) / 100;
+    const baseKilo = Math.max(1, record.eloc.uniq / 1000);
+    const densityYield = Math.round((netDebt / baseKilo) * 100) / 100;
+    const kMean = Math.round(record.score.qed * 1000 * 100) / 100;
 
     return {
         weekId: 'LIFETIME',
@@ -154,12 +162,14 @@ function createInitialLifetimeSummary(record: CompactTrajectoryRecord): WeeklyTr
             mean: record.score.qed,
             min: record.score.qed,
             max: record.score.qed,
+            kMean,
         },
         debt: {
             totalAdded: record.debt.add,
             totalResolved: record.debt.res,
             totalRegressions: record.debt.reg,
             netYield,
+            densityYield,
         },
         meanCompositeScore: record.score.aft,
         gatePassRate: record.gate.pass ? 100.0 : 0.0,
@@ -182,16 +192,21 @@ function updateLifetimeSummary(
     const qedMin = Math.min(prev.qed.min, record.score.qed);
     const qedMax = Math.max(prev.qed.max, record.score.qed);
     const qedMean =
-        Math.round(((prev.qed.mean * prev.totalRuns + record.score.qed) / totalRuns) * 10000) /
-        10000;
+        Math.round(((prev.qed.mean * prev.totalRuns + record.score.qed) / totalRuns) * 1000000) /
+        1000000;
+    const kMean = Math.round(qedMean * 1000 * 100) / 100;
 
     const totalAdded = prev.debt.totalAdded + record.debt.add;
     const totalResolved = prev.debt.totalResolved + record.debt.res;
     const totalRegressions = prev.debt.totalRegressions + record.debt.reg;
 
     const netDebt = totalResolved - totalAdded;
-    const processedKiloEloc = Math.max(1, processedTotal / 1000);
-    const netYield = Math.round((netDebt / processedKiloEloc) * 100) / 100;
+    const semanticKilo =
+        semanticTotal > 0 ? Math.max(0.1, semanticTotal / 1000) : Math.max(1, uniqueTotal / 1000);
+    const netYield = Math.round((netDebt / semanticKilo) * 100) / 100;
+
+    const baseKilo = Math.max(1, uniqueTotal / 1000);
+    const densityYield = Math.round((netDebt / baseKilo) * 100) / 100;
 
     const meanCompositeScore =
         Math.round(
@@ -217,12 +232,14 @@ function updateLifetimeSummary(
             mean: qedMean,
             min: qedMin,
             max: qedMax,
+            kMean,
         },
         debt: {
             totalAdded,
             totalResolved,
             totalRegressions,
             netYield,
+            densityYield,
         },
         meanCompositeScore,
         gatePassRate,
@@ -342,6 +359,7 @@ export class TrajectoryAccumulator {
             scoreVector,
             counters,
             debtDelta,
+            sliceDeltaQ: options.sliceDeltaQ,
         });
 
         const { gatePass, gateCode } = deriveGateDecision(

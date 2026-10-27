@@ -111,16 +111,16 @@ export function computeSequenceSimilarity(seqA: string[], seqB: string[]): numbe
 /**
  * Computes multi-dimensional behavioral similarity between two routines.
  *
- * @param a - First routine descriptor.
- * @param b - Second routine descriptor.
+ * @param routineA - First routine descriptor.
+ * @param routineB - Second routine descriptor.
  * @returns Similarity score in range [0.0, 1.0].
  */
 export function computeSemanticSimilarity(
-    a: RoutineSemanticDescriptor,
-    b: RoutineSemanticDescriptor,
+    routineA: RoutineSemanticDescriptor,
+    routineB: RoutineSemanticDescriptor,
 ): number {
-    const fpA = a.fingerprint;
-    const fpB = b.fingerprint;
+    const fpA = routineA.fingerprint;
+    const fpB = routineB.fingerprint;
 
     // 1. CFG Skeleton Match (Weight: 0.25)
     const cfgScore = fpA.cfgSkeletonHash === fpB.cfgSkeletonHash ? 1.0 : 0.2;
@@ -167,9 +167,13 @@ function evaluateCrossDomainDivergence(
         };
     }
 
-    const stateOwnerships = new Set(routines.map((r) => r.fingerprint.stateOwnership));
-    const hasMutations = routines.some((r) => r.fingerprint.sideEffectBoundary === 'mutates_arg');
-    const hasIoOrAsync = routines.some((r) => r.fingerprint.sideEffectBoundary === 'io_async');
+    const stateOwnerships = new Set(routines.map((routine) => routine.fingerprint.stateOwnership));
+    const hasMutations = routines.some(
+        (routine) => routine.fingerprint.sideEffectBoundary === 'mutates_arg',
+    );
+    const hasIoOrAsync = routines.some(
+        (routine) => routine.fingerprint.sideEffectBoundary === 'io_async',
+    );
 
     if (stateOwnerships.size > 1 || hasMutations || hasIoOrAsync) {
         return {
@@ -192,8 +196,8 @@ function evaluateCrossDomainDivergence(
 export function evaluateDomainDivergence(
     routines: RoutineSemanticDescriptor[],
 ): DomainDivergenceResult {
-    const domains = new Set(routines.map((r) => r.fingerprint.domainName));
-    const allPure = routines.every((r) => r.fingerprint.sideEffectBoundary === 'pure');
+    const domains = new Set(routines.map((routine) => routine.fingerprint.domainName));
+    const allPure = routines.every((routine) => routine.fingerprint.sideEffectBoundary === 'pure');
 
     if (domains.size > 1) {
         const crossCheck = evaluateCrossDomainDivergence(routines, allPure);

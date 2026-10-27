@@ -208,12 +208,12 @@ export async function selfTestCommand(_args: string[]): Promise<{ code: number; 
         const report: ScanReport = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
         const fired = new Set(report.issues.map((i) => `${i.analyzer}:${i.rule}`));
 
-        let ok = true;
+        let allPassed = true;
         for (const { pair, why } of EXPECTED_PAIRS) {
             if (fired.has(pair)) {
                 lines.push(`  PASS  ${pair.padEnd(PAIR_LABEL_WIDTH)} ${why}`);
             } else {
-                ok = false;
+                allPassed = false;
                 lines.push(
                     `  MISS  ${pair.padEnd(PAIR_LABEL_WIDTH)} ${why} -- Analyzer regression!`,
                 );
@@ -224,11 +224,11 @@ export async function selfTestCommand(_args: string[]): Promise<{ code: number; 
             `  -- Fixture total ${report.summary.filesScanned} files / ${report.issues.length} findings, covering families: ${[...unexpectedFamilies].join(', ')}`,
         );
         return {
-            code: ok ? 0 : 1,
+            code: allPassed ? 0 : 1,
             text: [
                 `auto-refactor self-test (known violation fixtures -> engine hit assertion)`,
                 ...lines,
-                ok
+                allPassed
                     ? 'Conclusion: All expected engine rules fired ✔'
                     : 'Conclusion: Regressed analyzer detected ✖ BLOCK',
             ].join('\n'),

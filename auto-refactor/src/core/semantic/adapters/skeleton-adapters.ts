@@ -170,7 +170,7 @@ export class GDScriptSemanticAdapter extends UnifiedLanguageAdapter {
             if (funcMatch) {
                 const fnName = funcMatch[1];
                 const params = funcMatch[2]
-                    ? funcMatch[2].split(',').filter((p) => p.trim().length > 0)
+                    ? funcMatch[2].split(',').filter((paramStr) => paramStr.trim().length > 0)
                     : [];
                 const node = this.createFunctionNode(
                     canonicalFile,

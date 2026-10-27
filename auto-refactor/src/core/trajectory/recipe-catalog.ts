@@ -184,7 +184,7 @@ export const PATTERN_DESCRIPTORS: readonly PatternDescriptor[] = [
     },
     {
         match: (beforeLines, afterLines) =>
-            RecipePatternDetectors.isConfigCacheInvalidationIntroduction(beforeLines, afterLines),
+            RecipePatternDetectors.isCacheInvalidationIntro(beforeLines, afterLines),
         name: 'Config-Driven Cache Invalidation & Lazy Self-Healing',
         category: 'config-cache-invalidation',
         description:
@@ -328,7 +328,7 @@ export const PATTERN_DESCRIPTORS: readonly PatternDescriptor[] = [
     },
     {
         match: (beforeLines, afterLines) =>
-            RecipePatternDetectors.isStateMachineDisciplineIntroduction(beforeLines, afterLines),
+            RecipePatternDetectors.isStateMachineDisciplineIntro(beforeLines, afterLines),
         name: 'Finite State Machine Transition Guard Discipline',
         category: 'state-machine-discipline',
         description:

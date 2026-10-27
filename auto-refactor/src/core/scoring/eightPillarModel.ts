@@ -170,7 +170,7 @@ export function synthesizeEightPillars(
 
     for (const pillar of ALL_PRIMARY_PILLARS) {
         const values = pillarBuckets[pillar];
-        const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+        const avg = values.reduce((sum, valueScore) => sum + valueScore, 0) / values.length;
         pillars[pillar] = Math.round(avg * PILLAR_SCORE_ROUND_FACTOR) / PILLAR_SCORE_ROUND_FACTOR;
     }
 
@@ -188,14 +188,14 @@ export function synthesizeEightPillars(
     let weightedSum = 0;
     let logSum = 0;
     for (const pillar of ALL_PRIMARY_PILLARS) {
-        const w = weights[pillar];
-        weightedSum += pillars[pillar] * w;
+        const weight = weights[pillar];
+        weightedSum += pillars[pillar] * weight;
         const boundedScore = Math.max(
             COMPOSITE_PILLAR_INDEX_FLOOR,
             Math.min(PILLAR_MAX_SCORE, pillars[pillar]),
         );
-        logSum += w * Math.log(boundedScore);
-        totalWeight += w;
+        logSum += weight * Math.log(boundedScore);
+        totalWeight += weight;
     }
 
     let rawScore = DEFAULT_INITIAL_RAW_SCORE;

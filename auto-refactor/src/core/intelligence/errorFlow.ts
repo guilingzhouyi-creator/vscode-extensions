@@ -111,7 +111,7 @@ function extractAttributedSiteInfo(entryValue: string, literals: LiteralIndex): 
     const sites = literals.sitesOf(entryValue);
     const raiserSymbols = sites.map((site: LiteralOccurrence) => site.symbol ?? UNATTRIBUTED);
     const raisers = deduplicateSorted(raiserSymbols);
-    const files = deduplicateSorted(sites.map((s) => s.file));
+    const files = deduplicateSorted(sites.map((site) => site.file));
     const duplicate =
         raisers.filter((raiser) => raiser !== UNATTRIBUTED).length > 1 || files.length > 1;
     const attributedRaisers = raisers.filter((raiser): raiser is string => raiser !== UNATTRIBUTED);
@@ -120,10 +120,10 @@ function extractAttributedSiteInfo(entryValue: string, literals: LiteralIndex): 
 
 function findBestPropagationChain(graph: CallGraph, attributedRaisers: string[]): string[] {
     let bestChain: string[] = [];
-    for (const r of attributedRaisers) {
-        const c = propagationChain(graph, r);
-        if (c.length > bestChain.length) {
-            bestChain = c;
+    for (const raiser of attributedRaisers) {
+        const chain = propagationChain(graph, raiser);
+        if (chain.length > bestChain.length) {
+            bestChain = chain;
         }
     }
     return bestChain;
@@ -202,6 +202,8 @@ export function buildErrorFlowIssues(
         });
     }
 
-    issues.sort((a, b) => b.hops - a.hops || a.issue.id.localeCompare(b.issue.id));
+    issues.sort(
+        (itemA, itemB) => itemB.hops - itemA.hops || itemA.issue.id.localeCompare(itemB.issue.id),
+    );
     return issues.slice(0, maxIssues).map((item) => item.issue);
 }

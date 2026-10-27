@@ -135,11 +135,11 @@ function isCrossGenerationalPair(idA: string, idB: string): boolean {
 function extractOperandNames(operands: readonly ts.Expression[], count: number): string[] {
     const names: string[] = [];
     for (let i = 0; i < count; i++) {
-        const op = operands[i];
-        if (ts.isIdentifier(op)) {
-            names.push(op.text);
-        } else if (ts.isPropertyAccessExpression(op)) {
-            names.push(op.name.text);
+        const operand = operands[i];
+        if (ts.isIdentifier(operand)) {
+            names.push(operand.text);
+        } else if (ts.isPropertyAccessExpression(operand)) {
+            names.push(operand.name.text);
         }
     }
     return names;

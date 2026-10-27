@@ -30,15 +30,15 @@ function skipStringLiteral(content: string, startIdx: number): number {
     let i = startIdx + 1;
     const len = content.length;
     while (i < len) {
-        const c = content[i];
-        if (c === '\\') {
+        const charStr = content[i];
+        if (charStr === '\\') {
             i += 2;
             continue;
         }
-        if (c === quote) {
+        if (charStr === quote) {
             return i + 1;
         }
-        if (quote !== '`' && (c === '\n' || c === '\r')) {
+        if (quote !== '`' && (charStr === '\n' || charStr === '\r')) {
             return i;
         }
         i++;
@@ -98,8 +98,8 @@ function appendComment(comments: string[], text: string): void {
     }
 }
 
-function isQuoteChar(ch: string): boolean {
-    return ch === '"' || ch === "'" || ch === '`';
+function isQuoteChar(charStr: string): boolean {
+    return charStr === '"' || charStr === "'" || charStr === '`';
 }
 
 function tryScanAnyComment(
@@ -107,22 +107,22 @@ function tryScanAnyComment(
     index: number,
     isLineStart: boolean,
 ): { comment: string; nextIdx: number; isLineStart: boolean } | null {
-    const ch = content[index];
-    if (ch === '/') {
+    const charStr = content[index];
+    if (charStr === '/') {
         return tryScanSlashComment(content, index);
     }
-    if (ch === '#' && isLineStart && content[index + 1] !== '!') {
+    if (charStr === '#' && isLineStart && content[index + 1] !== '!') {
         const res = scanLineComment(content, index + 1);
         return { comment: res.comment, nextIdx: res.nextIdx, isLineStart: true };
     }
     return null;
 }
 
-function advanceLineStartState(ch: string, current: boolean): boolean {
-    if (ch === '\n' || ch === '\r') {
+function advanceLineStartState(charStr: string, current: boolean): boolean {
+    if (charStr === '\n' || charStr === '\r') {
         return true;
     }
-    if (ch !== ' ' && ch !== '\t') {
+    if (charStr !== ' ' && charStr !== '\t') {
         return false;
     }
     return current;
@@ -143,9 +143,9 @@ export function extractRawCommentText(content: string): string {
     let isLineStart = true;
 
     while (i < len) {
-        const ch = content[i];
+        const charStr = content[i];
 
-        if (isQuoteChar(ch)) {
+        if (isQuoteChar(charStr)) {
             i = skipStringLiteral(content, i);
             isLineStart = false;
             continue;
@@ -159,7 +159,7 @@ export function extractRawCommentText(content: string): string {
             continue;
         }
 
-        isLineStart = advanceLineStartState(ch, isLineStart);
+        isLineStart = advanceLineStartState(charStr, isLineStart);
         i++;
     }
 

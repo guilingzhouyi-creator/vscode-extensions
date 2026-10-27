@@ -82,10 +82,10 @@ function checkExpensiveLoopOp(
 ): void {
     const match = line.match(EXPENSIVE_OPS_RE);
     if (!match) return;
-    const op = match[0];
+    const operation = match[0];
     violations.push({
         ruleId: 'GOV-PRF-001',
-        message: `Potentially loop-invariant expensive operation \`${op.replace(/[(_]/g, '')}\` executed inside loop body.`,
+        message: `Potentially loop-invariant expensive operation \`${operation.replace(/[(_]/g, '')}\` executed inside loop body.`,
         line: lineIndex + 1,
         column: match.index != null ? match.index + 1 : 1,
         suggestion:
@@ -184,25 +184,25 @@ function checkLinearSearchHit(line: string, lineIndex: number): GovernanceViolat
     ) {
         return null;
     }
-    const m = line.match(LINEAR_SEARCH_RE);
-    if (!m) return null;
+    const matchResult = line.match(LINEAR_SEARCH_RE);
+    if (!matchResult) return null;
     // TEXT_VARIABLE_RE has a long alternation chain. It is only tested against
-    // JS identifiers (m[1] from LINEAR_SEARCH_RE). Variable names longer than
+    // JS identifiers (matchResult[1] from LINEAR_SEARCH_RE). Variable names longer than
     // 64 characters are not realistic text/semantic variable names, so we skip
     // the full regex test for them — this also bounds any backtracking cost.
-    const varName = m[1];
+    const varName = matchResult[1];
     const isTextVar =
         varName.length <= MAX_TEXT_VARIABLE_NAME_LENGTH && safeRegexTest(TEXT_VARIABLE_RE, varName);
-    if (isTextVar && (m[2] === METHOD_INCLUDES || m[2] === METHOD_INDEXOF)) {
+    if (isTextVar && (matchResult[2] === METHOD_INCLUDES || matchResult[2] === METHOD_INDEXOF)) {
         return null;
     }
-    if (m[2] === METHOD_INCLUDES || m[2] === METHOD_INDEXOF) {
+    if (matchResult[2] === METHOD_INCLUDES || matchResult[2] === METHOD_INDEXOF) {
         return {
             ruleId: 'GOV-PRF-005',
-            message: `Array linear lookup \`${m[1]}.${m[2]}()\` inside loop body creates quadratic O(N*M) time complexity.`,
+            message: `Array linear lookup \`${matchResult[1]}.${matchResult[2]}()\` inside loop body creates quadratic O(N*M) time complexity.`,
             line: lineIndex + 1,
-            column: line.indexOf(m[0]) + 1,
-            suggestion: `Hoist array to Set before loop: \`const ${m[1]}Set = new Set(${m[1]});\` and use \`${m[1]}Set.has(...)\` for O(1) lookups.`,
+            column: line.indexOf(matchResult[0]) + 1,
+            suggestion: `Hoist array to Set before loop: \`const ${matchResult[1]}Set = new Set(${matchResult[1]});\` and use \`${matchResult[1]}Set.has(...)\` for O(1) lookups.`,
             fixable: false,
             evidence: {
                 confidence: 0.7,
@@ -213,10 +213,10 @@ function checkLinearSearchHit(line: string, lineIndex: number): GovernanceViolat
     }
     return {
         ruleId: 'GOV-PRF-002',
-        message: `Linear search \`${m[1]}.${m[2]}()\` inside loop body creates quadratic O(N*M) time complexity.`,
+        message: `Linear search \`${matchResult[1]}.${matchResult[2]}()\` inside loop body creates quadratic O(N*M) time complexity.`,
         line: lineIndex + 1,
-        column: line.indexOf(m[0]) + 1,
-        suggestion: `Consider caching \`${m[1]}\` into a Set or Map before the loop for O(1) lookups.`,
+        column: line.indexOf(matchResult[0]) + 1,
+        suggestion: `Consider caching \`${matchResult[1]}\` into a Set or Map before the loop for O(1) lookups.`,
         fixable: false,
         evidence: {
             confidence: 0.65,
@@ -314,7 +314,7 @@ export const InLoopLinearSearchRule: GovernanceRule = {
         if (!hasLoopLinearSearchPreCheck(ctx.content)) return null;
 
         const violations = getOrCollectLinearSearches(ctx);
-        const filtered = violations.filter((v) => v.ruleId === 'GOV-PRF-002');
+        const filtered = violations.filter((violation) => violation.ruleId === 'GOV-PRF-002');
         return filtered.length > 0 ? filtered : null;
     },
 };
@@ -337,7 +337,7 @@ export const InLoopArrayPreHashRule: GovernanceRule = {
         if (!hasLoopLinearSearchPreCheck(ctx.content)) return null;
 
         const violations = getOrCollectLinearSearches(ctx);
-        const filtered = violations.filter((v) => v.ruleId === 'GOV-PRF-005');
+        const filtered = violations.filter((violation) => violation.ruleId === 'GOV-PRF-005');
         return filtered.length > 0 ? filtered : null;
     },
 };

@@ -130,7 +130,7 @@ function hasAnyCategoryAnalyzer(
     needed: readonly string[],
     analyzerSet: ReadonlySet<string>,
 ): boolean {
-    return needed.some((a) => analyzerSet.has(a));
+    return needed.some((analyzer) => analyzerSet.has(analyzer));
 }
 
 function collectCategoryRelevantFiles(
@@ -143,11 +143,11 @@ function collectCategoryRelevantFiles(
     const relevantFiles: string[] = [];
     let sliceWorkload = 0;
 
-    for (const f of files) {
-        const needed = fileAnalyzerMap[f] || EMPTY_STRING_LIST;
+    for (const file of files) {
+        const needed = fileAnalyzerMap[file] || EMPTY_STRING_LIST;
         if (hasAnyCategoryAnalyzer(needed, analyzerSet)) {
-            relevantFiles.push(f);
-            const eloc = entryMap.get(f)?.eloc.estimatedEloc || 50;
+            relevantFiles.push(file);
+            const eloc = entryMap.get(file)?.eloc.estimatedEloc || 50;
             sliceWorkload += eloc * analyzersCount;
         }
     }
@@ -169,8 +169,8 @@ export function partitionReviewSlices(
     maxWorkers = 4,
 ): SlicePartitionResult {
     const entryMap = new Map<string, AuditIndexEntry>();
-    for (const e of fileEntries) {
-        entryMap.set(e.filePath, e);
+    for (const entry of fileEntries) {
+        entryMap.set(entry.filePath, entry);
     }
 
     // Group activated analyzers by slice category

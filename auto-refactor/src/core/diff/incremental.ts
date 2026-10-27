@@ -65,8 +65,10 @@ export function incrementalEnabled(): boolean {
  *   is unset, non-numeric, zero, or negative.
  */
 export function incrementalMinLines(): number {
-    const v = parseInt(process.env.AR_INCREMENTAL_MIN_LINES || '', DECIMAL_RADIX);
-    return Number.isInteger(v) && v > 0 ? v : DEFAULT_INCREMENTAL_MIN_LINES;
+    const parsedValue = parseInt(process.env.AR_INCREMENTAL_MIN_LINES || '', DECIMAL_RADIX);
+    return Number.isInteger(parsedValue) && parsedValue > 0
+        ? parsedValue
+        : DEFAULT_INCREMENTAL_MIN_LINES;
 }
 
 /**
@@ -77,8 +79,10 @@ export function incrementalMinLines(): number {
  *   variable is unset, non-numeric, zero, or negative.
  */
 export function incrementalMaxChangedLines(): number {
-    const v = parseInt(process.env.AR_INCREMENTAL_MAX_CHANGED_LINES || '', DECIMAL_RADIX);
-    return Number.isInteger(v) && v > 0 ? v : DEFAULT_INCREMENTAL_MAX_CHANGED_LINES;
+    const parsedValue = parseInt(process.env.AR_INCREMENTAL_MAX_CHANGED_LINES || '', DECIMAL_RADIX);
+    return Number.isInteger(parsedValue) && parsedValue > 0
+        ? parsedValue
+        : DEFAULT_INCREMENTAL_MAX_CHANGED_LINES;
 }
 
 /**

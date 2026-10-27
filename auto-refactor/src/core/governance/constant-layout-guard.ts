@@ -251,7 +251,8 @@ export function checkConstantLayoutAndScope(content: string, filePath: string): 
 
     const entities = extractConstantEntities(content, filePath);
     const topLevelEntities = entities.filter(
-        (e) => e.identity.codeDomain === DOMAIN_MODULE_CONSTANTS && !e.identity.isExported,
+        (entity) =>
+            entity.identity.codeDomain === DOMAIN_MODULE_CONSTANTS && !entity.identity.isExported,
     );
 
     for (const entity of topLevelEntities) {

@@ -24,8 +24,8 @@ interface AgentBlastRadius {
 /**
  * Normalizes file path to POSIX style.
  */
-function normalizePath(p: string): string {
-    return p.replace(/\\/g, '/');
+function normalizePath(patchPath: string): string {
+    return patchPath.replace(/\\/g, '/');
 }
 
 function getOrCreateAgentBlastRadius(
@@ -98,11 +98,11 @@ export class DuplicateWorkAuditor {
             for (let j = i + 1; j < agents.length; j++) {
                 const agentA = agents[i];
                 const agentB = agents[j];
-                const rA = radii.get(agentA)!;
-                const rB = radii.get(agentB)!;
+                const recordA = radii.get(agentA)!;
+                const recordB = radii.get(agentB)!;
 
-                const fileOverlap = computeJaccardIndex(rA.files, rB.files);
-                const symOverlap = computeJaccardIndex(rA.symbols, rB.symbols);
+                const fileOverlap = computeJaccardIndex(recordA.files, recordB.files);
+                const symOverlap = computeJaccardIndex(recordA.symbols, recordB.symbols);
                 const combinedOverlap = Math.max(fileOverlap, symOverlap);
 
                 if (combinedOverlap >= threshold) {
@@ -110,8 +110,8 @@ export class DuplicateWorkAuditor {
                         agentA,
                         agentB,
                         overlapRatio: combinedOverlap,
-                        commonFiles: intersectSets(rA.files, rB.files),
-                        commonSymbols: intersectSets(rA.symbols, rB.symbols),
+                        commonFiles: intersectSets(recordA.files, recordB.files),
+                        commonSymbols: intersectSets(recordA.symbols, recordB.symbols),
                     });
                 }
             }

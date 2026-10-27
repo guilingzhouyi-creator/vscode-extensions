@@ -15,7 +15,10 @@
 import { ALL_BUILTIN_ANALYZERS, popcount32 } from './sparseRuleRouter';
 import type { ASTSliceNode, SliceFeatureVector, SparseRoutingPlan } from './sliceTypes';
 import { dispatchSliceFeatureBitset } from '../experts';
-import { defaultGroupedExpertDispatcher, type GroupedDispatchPlan } from '../experts/grouped-dispatcher';
+import {
+    defaultGroupedExpertDispatcher,
+    type GroupedDispatchPlan,
+} from '../experts/grouped-dispatcher';
 import { ALL_ANALYZERS_MASK, analyzerMaskToNames } from '../constants/analyzer-bitmask';
 
 /** Total available built-in analyzer count for ratio calculation. */
@@ -100,11 +103,15 @@ export class SparseMoEGateRouter {
 
         const { analyzers, reasons } = dispatchSliceExperts(slice.featureVector);
         const availableSet = new Set(allAvailable);
-        const activeAnalyzers = analyzers.filter((a) => availableSet.has(a));
+        const activeAnalyzers = analyzers.filter((analyzerName) => availableSet.has(analyzerName));
         const activeSet = new Set(activeAnalyzers);
-        const skippedAnalyzers = allAvailable.filter((a) => !activeSet.has(a));
+        const skippedAnalyzers = allAvailable.filter(
+            (analyzerName) => !activeSet.has(analyzerName),
+        );
         const totalCount = allAvailable.length > 0 ? allAvailable.length : TOTAL_BUILTIN_ANALYZERS;
-        const activationRatio = Number((activeAnalyzers.length / totalCount).toFixed(DECIMAL_PLACES));
+        const activationRatio = Number(
+            (activeAnalyzers.length / totalCount).toFixed(DECIMAL_PLACES),
+        );
 
         return {
             sliceId: slice.sliceId,
@@ -144,24 +151,28 @@ export class SparseMoEGateRouter {
 
         for (const slice of slices) {
             const plan = this.routeSlice(slice, allAvailable);
-            for (const a of plan.activeAnalyzers) {
-                unionActive.add(a);
+            for (const analyzerName of plan.activeAnalyzers) {
+                unionActive.add(analyzerName);
             }
-            for (const r of plan.reasons) {
-                if (!seenReasons.has(r)) {
-                    seenReasons.add(r);
-                    allReasons.push(r);
+            for (const reason of plan.reasons) {
+                if (!seenReasons.has(reason)) {
+                    seenReasons.add(reason);
+                    allReasons.push(reason);
                 }
             }
         }
 
         const activeAnalyzers = Array.from(unionActive);
-        const skippedAnalyzers = allAvailable.filter((a) => !unionActive.has(a));
+        const skippedAnalyzers = allAvailable.filter(
+            (analyzerName) => !unionActive.has(analyzerName),
+        );
         const totalCount = allAvailable.length > 0 ? allAvailable.length : TOTAL_BUILTIN_ANALYZERS;
-        const activationRatio = Number((activeAnalyzers.length / totalCount).toFixed(DECIMAL_PLACES));
+        const activationRatio = Number(
+            (activeAnalyzers.length / totalCount).toFixed(DECIMAL_PLACES),
+        );
 
         return {
-            sliceId: slices.map((s) => s.sliceId).join(','),
+            sliceId: slices.map((sliceItem) => sliceItem.sliceId).join(','),
             filePath: slices[0].filePath,
             activeAnalyzers,
             skippedAnalyzers,
@@ -180,7 +191,12 @@ export class SparseMoEGateRouter {
     public buildGroupedDispatchPlan(
         slices: ASTSliceNode[],
         availableMask: number = ALL_ANALYZERS_MASK,
-    ): GroupedDispatchPlan<{ id: string; filePath: string; activeMask: number; slice: ASTSliceNode }> {
+    ): GroupedDispatchPlan<{
+        id: string;
+        filePath: string;
+        activeMask: number;
+        slice: ASTSliceNode;
+    }> {
         const items = slices.map((slice) => {
             const { activeMask } = this.routeSliceToBitmask(slice, availableMask);
             return {

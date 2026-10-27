@@ -147,8 +147,8 @@ interface MutableAstMapping extends DiffAstNodeMapping {
 
 function countChangedLinesInHunk(hunk: ReviewDiffHunk): number {
     let count = 0;
-    for (const l of hunk.lines) {
-        if (l.type !== DIFF_LINE_TYPE_CONTEXT) {
+    for (const line of hunk.lines) {
+        if (line.type !== DIFF_LINE_TYPE_CONTEXT) {
             count++;
         }
     }
@@ -461,8 +461,12 @@ function isConflictCandidate(content: string, start: number, len: number): boole
     if (len < MIN_CONFLICT_MARKER_LENGTH) {
         return false;
     }
-    const c = content.charCodeAt(start);
-    return c === CHAR_CODE_LESS_THAN || c === CHAR_CODE_EQUALS || c === CHAR_CODE_GREATER_THAN;
+    const charCode = content.charCodeAt(start);
+    return (
+        charCode === CHAR_CODE_LESS_THAN ||
+        charCode === CHAR_CODE_EQUALS ||
+        charCode === CHAR_CODE_GREATER_THAN
+    );
 }
 
 /**

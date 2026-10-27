@@ -145,7 +145,7 @@ export { getEffectiveWorkers as effectiveWorkers };
  *
  * @param items - Items to map over.
  * @param limit - Concurrency ceiling.
- * @param fn - Asynchronous mapping function.
+ * @param mapperFn - Asynchronous mapping function.
  * @param signal - Optional AbortSignal to cancel in-flight work.
  * @returns Results in the same index order as `items`.
  * Concurrency: bounded parallel async execution; safe for single-threaded runtime.
@@ -153,7 +153,7 @@ export { getEffectiveWorkers as effectiveWorkers };
 export async function runParallelMap<T, U>(
     items: T[],
     limit: number,
-    fn: (item: T) => Promise<U>,
+    mapperFn: (item: T) => Promise<U>,
     signal?: AbortSignal,
 ): Promise<U[]> {
     const out: U[] = [];
@@ -165,7 +165,7 @@ export async function runParallelMap<T, U>(
                 throw new Error('Scan aborted by user');
             }
             const currentItemIndex = idx++;
-            out[currentItemIndex] = await fn(items[currentItemIndex]);
+            out[currentItemIndex] = await mapperFn(items[currentItemIndex]);
         }
     };
     const concurrencyLimit = Math.max(1, Math.min(limit, items.length));
@@ -658,7 +658,7 @@ export async function dispatchBatches(
         runAnalyzersFn,
         hybridK,
         keepAlive,
-        fp,
+        fp: poolFingerprint,
     } = opts;
     if (files.length === 0) return [];
     const workerPath = path.resolve(__dirname, '..', WORKER_SCRIPT_FILE);
@@ -870,8 +870,8 @@ export async function dispatchBatches(
         const postBatchToWorker = (targetWorker: Worker, ready: ReadyBatch): void => {
             const postMessageStartTimeMs = timingTelemetry ? nowMs() : 0;
             const msg: Record<string, unknown> = { tasks: ready.tasks };
-            if (fp !== undefined) {
-                msg.fp = fp;
+            if (poolFingerprint !== undefined) {
+                msg.fp = poolFingerprint;
                 msg.config = config;
                 msg.descs = descs;
             }

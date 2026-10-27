@@ -95,42 +95,42 @@ export function isPureAscii(buf: Uint8Array): boolean {
 }
 
 function decodeLeadByte(
-    b: number,
+    byteVal: number,
     i: number,
     emitAt: (idx: number, codeUnits: number) => void,
 ): { needed: number; cp: number; startIdx: number } {
-    if (b <= ASCII_MAX) {
+    if (byteVal <= ASCII_MAX) {
         emitAt(i, BMP_CODE_UNITS);
         return { needed: 0, cp: 0, startIdx: -1 };
     }
-    if (b >= LEAD2_MIN && b <= LEAD2_MAX) {
-        return { needed: LEAD2_CONTINUATIONS, cp: b & LEAD2_PAYLOAD_MASK, startIdx: i };
+    if (byteVal >= LEAD2_MIN && byteVal <= LEAD2_MAX) {
+        return { needed: LEAD2_CONTINUATIONS, cp: byteVal & LEAD2_PAYLOAD_MASK, startIdx: i };
     }
-    if (b >= LEAD3_MIN && b <= LEAD3_MAX) {
-        return { needed: LEAD3_CONTINUATIONS, cp: b & LEAD3_PAYLOAD_MASK, startIdx: i };
+    if (byteVal >= LEAD3_MIN && byteVal <= LEAD3_MAX) {
+        return { needed: LEAD3_CONTINUATIONS, cp: byteVal & LEAD3_PAYLOAD_MASK, startIdx: i };
     }
-    if (b >= LEAD4_MIN && b <= LEAD4_MAX) {
-        return { needed: LEAD4_CONTINUATIONS, cp: b & LEAD4_PAYLOAD_MASK, startIdx: i };
+    if (byteVal >= LEAD4_MIN && byteVal <= LEAD4_MAX) {
+        return { needed: LEAD4_CONTINUATIONS, cp: byteVal & LEAD4_PAYLOAD_MASK, startIdx: i };
     }
     emitAt(i, BMP_CODE_UNITS);
     return { needed: 0, cp: 0, startIdx: -1 };
 }
 
 function finishMultiByteSequence(
-    cp: number,
+    codePoint: number,
     needed: number,
     startIdx: number,
     emitAt: (idx: number, codeUnits: number) => void,
-    minForLen: (n: number) => number,
+    minForLen: (contCount: number) => number,
 ): void {
     const isInvalid =
-        cp < minForLen(needed) ||
-        cp > MAX_CODE_POINT ||
-        (cp >= SURROGATE_MIN && cp <= SURROGATE_MAX);
+        codePoint < minForLen(needed) ||
+        codePoint > MAX_CODE_POINT ||
+        (codePoint >= SURROGATE_MIN && codePoint <= SURROGATE_MAX);
     if (isInvalid) {
         emitAt(startIdx, BMP_CODE_UNITS);
     } else {
-        emitAt(startIdx, cp > BMP_MAX ? SURROGATE_PAIR_CODE_UNITS : BMP_CODE_UNITS);
+        emitAt(startIdx, codePoint > BMP_MAX ? SURROGATE_PAIR_CODE_UNITS : BMP_CODE_UNITS);
     }
 }
 
@@ -156,17 +156,17 @@ export function utf8ToUtf16Offsets(buf: Uint8Array): Int32Array {
     let utf16 = 0;
     let i = 0;
     // UTF-8 decoder state (WHATWG UTF-8 decoder, fatal:false → lossy U+FFFD).
-    let cp = 0;
+    let codePoint = 0;
     let needed = 0;
     let seen = 0;
     let startIdx = -1;
 
     // Minimum valid code point for an N-continuation sequence (overlong-encoding guard):
     // one continuation byte → 2-byte sequence, two → 3-byte, three → 4-byte.
-    const minForLen = (n: number): number =>
-        n === LEAD2_CONTINUATIONS
+    const minForLen = (contCount: number): number =>
+        contCount === LEAD2_CONTINUATIONS
             ? SEQ2_MIN_CODE_POINT
-            : n === LEAD3_CONTINUATIONS
+            : contCount === LEAD3_CONTINUATIONS
               ? SEQ3_MIN_CODE_POINT
               : SEQ4_MIN_CODE_POINT;
 
@@ -176,25 +176,26 @@ export function utf8ToUtf16Offsets(buf: Uint8Array): Int32Array {
     };
 
     while (i < buf.length) {
-        const b = buf[i];
+        const byteVal = buf[i];
         if (needed === 0) {
-            const lead = decodeLeadByte(b, i, emitAt);
+            const lead = decodeLeadByte(byteVal, i, emitAt);
             needed = lead.needed;
-            cp = lead.cp;
+            codePoint = lead.cp;
             startIdx = lead.startIdx;
             i++;
             continue;
         }
 
         // Expect a continuation byte.
-        if (b >= CONTINUATION_MIN && b <= CONTINUATION_MAX) {
+        if (byteVal >= CONTINUATION_MIN && byteVal <= CONTINUATION_MAX) {
             seen++;
-            cp = (cp << CONTINUATION_SHIFT_BITS) | (b & CONTINUATION_PAYLOAD_MASK);
+            codePoint =
+                (codePoint << CONTINUATION_SHIFT_BITS) | (byteVal & CONTINUATION_PAYLOAD_MASK);
             if (seen === needed) {
-                finishMultiByteSequence(cp, needed, startIdx, emitAt, minForLen);
+                finishMultiByteSequence(codePoint, needed, startIdx, emitAt, minForLen);
                 needed = 0;
                 seen = 0;
-                cp = 0;
+                codePoint = 0;
                 startIdx = -1;
             }
             i++;
@@ -204,7 +205,7 @@ export function utf8ToUtf16Offsets(buf: Uint8Array): Int32Array {
             emitAt(startIdx, 1);
             needed = 0;
             seen = 0;
-            cp = 0;
+            codePoint = 0;
             startIdx = -1;
             // do not advance i
         }
@@ -253,38 +254,50 @@ export function normalizeEditRanges(editRanges: EditRange[], buf: Uint8Array): E
     // Fast-path: pure ASCII files avoid 4.4MB Array allocation and map lookups!
     if (isPureAscii(buf)) {
         const out: EditRange[] = [];
-        for (const e of editRanges) {
-            if (e.oldEndByte === e.startByte && e.newEndByte === e.startByte) continue;
+        for (const editRange of editRanges) {
+            if (
+                editRange.oldEndByte === editRange.startByte &&
+                editRange.newEndByte === editRange.startByte
+            )
+                continue;
             out.push({
-                startLine: e.startLine,
-                oldEndLine: e.oldEndLine,
-                newEndLine: e.newEndLine,
-                startByte: e.startByte,
-                oldEndByte: e.oldEndByte,
-                newEndByte: e.newEndByte,
+                startLine: editRange.startLine,
+                oldEndLine: editRange.oldEndLine,
+                newEndLine: editRange.newEndLine,
+                startByte: editRange.startByte,
+                oldEndByte: editRange.oldEndByte,
+                newEndByte: editRange.newEndByte,
             });
         }
-        out.sort((a, b) => a.startByte - b.startByte || a.startLine - b.startLine);
+        out.sort(
+            (firstRange, secondRange) =>
+                firstRange.startByte - secondRange.startByte ||
+                firstRange.startLine - secondRange.startLine,
+        );
         return out;
     }
 
-    const map = utf8ToUtf16Offsets(buf);
+    const offsetMap = utf8ToUtf16Offsets(buf);
     const out: EditRange[] = [];
-    for (const e of editRanges) {
-        const startByte = utf8ToUtf16Offset(map, e.startByte);
-        const oldEndByte = utf8ToUtf16Offset(map, e.oldEndByte);
-        const newEndByte = utf8ToUtf16Offset(map, e.newEndByte);
+    for (const editRange of editRanges) {
+        const startByte = utf8ToUtf16Offset(offsetMap, editRange.startByte);
+        const oldEndByte = utf8ToUtf16Offset(offsetMap, editRange.oldEndByte);
+        const newEndByte = utf8ToUtf16Offset(offsetMap, editRange.newEndByte);
         // Drop no-op edits (no deleted bytes and no inserted bytes).
         if (oldEndByte === startByte && newEndByte === startByte) continue;
         out.push({
-            startLine: e.startLine,
-            oldEndLine: e.oldEndLine,
-            newEndLine: e.newEndLine,
+            startLine: editRange.startLine,
+            oldEndLine: editRange.oldEndLine,
+            newEndLine: editRange.newEndLine,
             startByte,
             oldEndByte,
             newEndByte,
         });
     }
-    out.sort((a, b) => a.startByte - b.startByte || a.startLine - b.startLine);
+    out.sort(
+        (firstRange, secondRange) =>
+            firstRange.startByte - secondRange.startByte ||
+            firstRange.startLine - secondRange.startLine,
+    );
     return out;
 }

@@ -61,8 +61,8 @@ export function auditStructuralPatterns(content: string, filePath: string, issue
             continue;
         }
 
-        for (let m = 0; m < result.matches.length; m++) {
-            const match = result.matches[m];
+        for (let matchIdx = 0; matchIdx < result.matches.length; matchIdx++) {
+            const match = result.matches[matchIdx];
             const startLine = match.range.startLine;
             const startCol = match.range.startCol;
             const endLine = match.range.endLine;

@@ -342,11 +342,11 @@ export class TsModernAnalyzer extends DeclarativeModernAnalyzer {
         const lineIndexByWord = buildCandidateLineIndex(masked, importLines, clauses);
         const isTypeByNameMap = new Map<string, boolean>();
 
-        for (let c = 0; c < clauses.length; c++) {
-            const { lineIndex, names } = clauses[c];
+        for (let clauseIdx = 0; clauseIdx < clauses.length; clauseIdx++) {
+            const { lineIndex, names } = clauses[clauseIdx];
             const typeOnly: string[] = [];
-            for (let n = 0; n < names.length; n++) {
-                const name = names[n];
+            for (let nameIdx = 0; nameIdx < names.length; nameIdx++) {
+                const name = names[nameIdx];
                 let isType = isTypeByNameMap.get(name);
                 if (isType === undefined) {
                     isType = this.isTypeOnlyName(name, masked, importLines, lineIndexByWord);
@@ -380,8 +380,8 @@ export class TsModernAnalyzer extends DeclarativeModernAnalyzer {
     ): { lineTotal: number; lineTyped: number } {
         let lineTyped = 0;
         const lineTotal = countMatches(code, patterns.word);
-        for (let p = 0; p < patterns.typePatterns.length; p++) {
-            lineTyped += countMatches(code, patterns.typePatterns[p]);
+        for (let patternIdx = 0; patternIdx < patterns.typePatterns.length; patternIdx++) {
+            lineTyped += countMatches(code, patterns.typePatterns[patternIdx]);
         }
         return { lineTotal, lineTyped };
     }
@@ -444,15 +444,15 @@ const CHAR_CODE_CR = 13;
 const CHAR_CODE_LF = 10;
 
 function findFirstNonWhitespaceColumn(line: string): number {
-    for (let c = 0; c < line.length; c++) {
-        const code = line.charCodeAt(c);
+    for (let charIdx = 0; charIdx < line.length; charIdx++) {
+        const code = line.charCodeAt(charIdx);
         if (
             code !== CHAR_CODE_SPACE &&
             code !== CHAR_CODE_TAB &&
             code !== CHAR_CODE_CR &&
             code !== CHAR_CODE_LF
         ) {
-            return c + 1;
+            return charIdx + 1;
         }
     }
     return 1;
@@ -511,12 +511,12 @@ const wordPatternByWordMap = new Map<string, RegExp>();
 const REGEXP_GLOBAL_FLAG = 'g';
 
 function getCompiledWordPattern(word: string): RegExp {
-    let re = wordPatternByWordMap.get(word);
-    if (!re) {
-        re = new RegExp(`\\b${escapeRegExp(word)}\\b`);
-        wordPatternByWordMap.set(word, re);
+    let wordRegex = wordPatternByWordMap.get(word);
+    if (!wordRegex) {
+        wordRegex = new RegExp(`\\b${escapeRegExp(word)}\\b`);
+        wordPatternByWordMap.set(word, wordRegex);
     }
-    return re;
+    return wordRegex;
 }
 
 function getCompiledTypePatterns(name: string): CompiledTypePatterns {
@@ -554,10 +554,10 @@ function buildCandidateLineIndex(
     records: ImportClauseRecord[],
 ): Map<string, Set<number>> {
     const lineIndexByWord = new Map<string, Set<number>>();
-    for (let r = 0; r < records.length; r++) {
-        const names = records[r].names;
-        for (let n = 0; n < names.length; n++) {
-            initializeWordSetEntry(lineIndexByWord, names[n]);
+    for (let recordIdx = 0; recordIdx < records.length; recordIdx++) {
+        const names = records[recordIdx].names;
+        for (let nameIdx = 0; nameIdx < names.length; nameIdx++) {
+            initializeWordSetEntry(lineIndexByWord, names[nameIdx]);
         }
     }
     if (lineIndexByWord.size === 0) return lineIndexByWord;
@@ -592,9 +592,9 @@ function isArgOnPreviousLine(masked: readonly string[], start: number): boolean 
 
 function updateOpenParenDepth(line: string, currentDepth: number): number {
     let depth = currentDepth;
-    for (let c = 0; c < line.length; c++) {
-        if (line[c] === '(') depth++;
-        else if (line[c] === ')' && depth > 0) depth--;
+    for (let charIdx = 0; charIdx < line.length; charIdx++) {
+        if (line[charIdx] === '(') depth++;
+        else if (line[charIdx] === ')' && depth > 0) depth--;
     }
     return depth;
 }

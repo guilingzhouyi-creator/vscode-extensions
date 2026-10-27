@@ -54,9 +54,9 @@ function fnv1a64(str: string): bigint {
  * @returns Number of set bits.
  */
 function popcount32(x: number): number {
-    let v = x - ((x >>> 1) & 0x55555555);
-    v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
-    return (((v + (v >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
+    let val = x - ((x >>> 1) & 0x55555555);
+    val = (val & 0x33333333) + ((val >>> 2) & 0x33333333);
+    return (((val + (val >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
 }
 
 /**
@@ -146,17 +146,17 @@ export function computeSimHash64(tokens: readonly string[]): bigint {
     const weights = new Int32Array(64);
 
     for (let i = 0; i < len; i++) {
-        const h = fnv1a64(tokens[i]);
-        for (let b = 0; b < 64; b++) {
-            const bit = (h >> BigInt(b)) & 1n;
-            weights[b] += bit === 1n ? 1 : -1;
+        const tokenHash = fnv1a64(tokens[i]);
+        for (let bitIdx = 0; bitIdx < 64; bitIdx++) {
+            const bit = (tokenHash >> BigInt(bitIdx)) & 1n;
+            weights[bitIdx] += bit === 1n ? 1 : -1;
         }
     }
 
     let fingerprint = 0n;
-    for (let b = 0; b < 64; b++) {
-        if (weights[b] > 0) {
-            fingerprint |= 1n << BigInt(b);
+    for (let bitIdx = 0; bitIdx < 64; bitIdx++) {
+        if (weights[bitIdx] > 0) {
+            fingerprint |= 1n << BigInt(bitIdx);
         }
     }
 

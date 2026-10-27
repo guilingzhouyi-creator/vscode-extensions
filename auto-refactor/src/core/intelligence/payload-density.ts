@@ -89,12 +89,12 @@ export function calculateWeightedTokenPayload(
     let totalWeight = 0;
 
     for (let i = 0; i < count; i++) {
-        const t = tokens[i];
-        const w = t.weight;
-        totalWeight += w;
+        const token = tokens[i];
+        const weight = token.weight;
+        totalWeight += weight;
 
-        if (t.category === 'CALC_FLOW' || t.category === 'DOMAIN_LITERAL') {
-            semanticWeight += w;
+        if (token.category === 'CALC_FLOW' || token.category === 'DOMAIN_LITERAL') {
+            semanticWeight += weight;
         }
     }
 
@@ -159,14 +159,17 @@ export function calculateLoopStateEntropy(
         return { deltaEntropy: 0, isTautological: true };
     }
 
-    const m = Math.max(0, Number.isFinite(stateMutationsCount) ? stateMutationsCount : 0);
-    if (m === 0 && !hasSideEffects) {
+    const mutationCount = Math.max(
+        0,
+        Number.isFinite(stateMutationsCount) ? stateMutationsCount : 0,
+    );
+    if (mutationCount === 0 && !hasSideEffects) {
         return { deltaEntropy: 0, isTautological: true };
     }
 
-    const n = Math.max(1, iterationItemsCount);
-    const ratio = Math.min(m, n) / n;
-    const entropyGrowth = ratio * (Math.log2(1.0 + m) / Math.log2(2.0 + n));
+    const itemCount = Math.max(1, iterationItemsCount);
+    const ratio = Math.min(mutationCount, itemCount) / itemCount;
+    const entropyGrowth = ratio * (Math.log2(1.0 + mutationCount) / Math.log2(2.0 + itemCount));
     const sideEffectBonus = hasSideEffects ? 0.2 : 0.0;
     const deltaEntropy = Math.min(1.0, Math.max(0.0, entropyGrowth + sideEffectBonus));
 

@@ -197,7 +197,7 @@ function scanMultiLineResetState(
     issues: Issue[],
     rule: DeclarativeLineRule,
 ): void {
-    const hasExtends = masked.some((l) => EXTENDS_ANY_RE.test(l));
+    const hasExtends = masked.some((line) => EXTENDS_ANY_RE.test(line));
     if (!hasExtends) return;
 
     for (let index = 0; index < masked.length; index += 1) {
@@ -552,7 +552,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
         return this.delegate.finalize(ctx);
     }
 
-    public analyze(sf: unknown, ctx: AnalyzerContext): Issue[] {
-        return this.delegate.analyze(sf, ctx);
+    public analyze(sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
+        return this.delegate.analyze(sourceFile, ctx);
     }
 }

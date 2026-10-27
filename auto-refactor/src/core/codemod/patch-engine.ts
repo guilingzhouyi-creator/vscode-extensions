@@ -127,13 +127,13 @@ export class PatchEngine {
      */
     public static issueToFix(issue: Issue): FixDescriptor | null {
         if (issue.actionable?.patch) {
-            const p = issue.actionable.patch;
+            const patchItem = issue.actionable.patch;
             const edit: TextEdit = {
-                startLine: p.range.startLine,
-                startCol: p.range.startCol,
-                endLine: p.range.endLine,
-                endCol: p.range.endCol,
-                newText: p.replacementText,
+                startLine: patchItem.range.startLine,
+                startCol: patchItem.range.startCol,
+                endLine: patchItem.range.endLine,
+                endCol: patchItem.range.endCol,
+                newText: patchItem.replacementText,
             };
             return {
                 ruleId: issue.rule,
@@ -309,9 +309,9 @@ export class PatchEngine {
 
         const normalizedPath = filePath.replace(/\\/g, '/');
         const header = `--- a/${normalizedPath}\n+++ b/${normalizedPath}\n`;
-        const hunkStrings = hunks.map((h) => {
-            const hHeader = `@@ -${h.oldStart},${h.oldCount} +${h.newStart},${h.newCount} @@\n`;
-            return hHeader + h.lines.join('\n') + '\n';
+        const hunkStrings = hunks.map((hunkItem) => {
+            const hHeader = `@@ -${hunkItem.oldStart},${hunkItem.oldCount} +${hunkItem.newStart},${hunkItem.newCount} @@\n`;
+            return hHeader + hunkItem.lines.join('\n') + '\n';
         });
 
         return header + hunkStrings.join('');

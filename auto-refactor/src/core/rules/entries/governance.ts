@@ -40,7 +40,7 @@ const LANGUAGES_EXC_001: readonly string[] = [
 const LANGUAGES_RUST: readonly string[] = [LANGUAGE_RUST];
 
 function defineGov(
-    id: string,
+    ruleId: string,
     languages: readonly string[],
     defaultSeverity: RuleSeverity,
     summary: string,
@@ -48,7 +48,7 @@ function defineGov(
     docsAnchor: string,
 ): RuleDefinition {
     return defineRule({
-        id,
+        id: ruleId,
         family: RULE_FAMILY_GOVERNANCE,
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,
@@ -61,14 +61,14 @@ function defineGov(
 }
 
 function defineCmp(
-    id: string,
+    ruleId: string,
     defaultSeverity: RuleSeverity,
     summary: string,
     remediation: string,
     docsAnchor: string,
 ): RuleDefinition {
     return defineRule({
-        id,
+        id: ruleId,
         family: RULE_FAMILY_CMP,
         analyzer: ANALYZER_GOVERNANCE,
         canonical: true,

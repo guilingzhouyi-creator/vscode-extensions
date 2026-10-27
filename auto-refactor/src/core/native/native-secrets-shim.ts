@@ -31,19 +31,19 @@ export function calculateShannonEntropyShim(token: string): number {
     const len = token.length;
     let entropy = 0.0;
     for (const count of freqs.values()) {
-        const p = count / len;
-        entropy -= p * Math.log2(p);
+        const probability = count / len;
+        entropy -= probability * Math.log2(probability);
     }
     return entropy;
 }
 
-function isTokenChar(ch: number): boolean {
+function isTokenChar(charCode: number): boolean {
     return (
-        (ch >= 48 && ch <= 57) || // 0-9
-        (ch >= 65 && ch <= 90) || // A-Z
-        (ch >= 97 && ch <= 122) || // a-z
-        ch === 95 || // _
-        ch === 45 // -
+        (charCode >= 48 && charCode <= 57) || // 0-9
+        (charCode >= 65 && charCode <= 90) || // A-Z
+        (charCode >= 97 && charCode <= 122) || // a-z
+        charCode === 95 || // _
+        charCode === 45 // -
     );
 }
 
@@ -83,8 +83,12 @@ function tryMatchGithubToken(line: string, lineNum: number): NativeSecretFinding
     if (ghpPos === -1) return null;
     let count = 0;
     for (let i = ghpPos + 4; i < line.length; i++) {
-        const c = line.charCodeAt(i);
-        if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122)) {
+        const charCode = line.charCodeAt(i);
+        if (
+            (charCode >= 48 && charCode <= 57) ||
+            (charCode >= 65 && charCode <= 90) ||
+            (charCode >= 97 && charCode <= 122)
+        ) {
             count++;
         } else {
             break;
@@ -107,8 +111,13 @@ function tryMatchGithubPat(line: string, lineNum: number): NativeSecretFinding |
     if (patPos === -1) return null;
     let count = 0;
     for (let i = patPos + 11; i < line.length; i++) {
-        const c = line.charCodeAt(i);
-        if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95) {
+        const charCode = line.charCodeAt(i);
+        if (
+            (charCode >= 48 && charCode <= 57) ||
+            (charCode >= 65 && charCode <= 90) ||
+            (charCode >= 97 && charCode <= 122) ||
+            charCode === 95
+        ) {
             count++;
         } else {
             break;
@@ -131,8 +140,12 @@ function tryMatchOpenAiKey(line: string, lineNum: number): NativeSecretFinding |
     if (skPos === -1) return null;
     let count = 0;
     for (let i = skPos + 3; i < line.length; i++) {
-        const c = line.charCodeAt(i);
-        if ((c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122)) {
+        const charCode = line.charCodeAt(i);
+        if (
+            (charCode >= 48 && charCode <= 57) ||
+            (charCode >= 65 && charCode <= 90) ||
+            (charCode >= 97 && charCode <= 122)
+        ) {
             count++;
         } else {
             break;
@@ -154,8 +167,8 @@ function tryMatchAwsAccessKey(line: string, lineNum: number): NativeSecretFindin
     const akiaPos = line.indexOf('AKIA');
     if (akiaPos === -1 || akiaPos + 20 > line.length) return null;
     for (let i = akiaPos + 4; i < akiaPos + 20; i++) {
-        const c = line.charCodeAt(i);
-        if (!((c >= 48 && c <= 57) || (c >= 65 && c <= 90))) {
+        const charCode = line.charCodeAt(i);
+        if (!((charCode >= 48 && charCode <= 57) || (charCode >= 65 && charCode <= 90))) {
             return null;
         }
     }
@@ -196,16 +209,16 @@ function evaluateEntropyToken(
     threshold: number,
 ): NativeSecretFinding | null {
     if (token.length < minLen) return null;
-    const ent = calculateShannonEntropyShim(token);
-    if (ent < threshold) return null;
+    const entropyVal = calculateShannonEntropyShim(token);
+    if (entropyVal < threshold) return null;
     return {
         rule: 'high-entropy-token',
         kind: 'high-entropy',
         line: lineNum,
         column: start + 1,
-        message: `High-entropy token detected (${ent.toFixed(2)} bits/char, threshold ${threshold.toFixed(2)})`,
+        message: `High-entropy token detected (${entropyVal.toFixed(2)} bits/char, threshold ${threshold.toFixed(2)})`,
         preview: token.slice(0, Math.min(30, token.length)),
-        entropy: Math.round(ent * 100) / 100,
+        entropy: Math.round(entropyVal * 100) / 100,
     };
 }
 

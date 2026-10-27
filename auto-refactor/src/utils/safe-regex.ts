@@ -55,23 +55,23 @@ const SAFE_EXTRACT_BUDGET = 500;
  *    safe for all keyword/pattern detection use cases in this codebase
  *    because every text trigger is a local pattern, not a full-file validation.
  *
- * @param re - The regular expression to test. Non-global; global regexes
+ * @param patternRegex - The regular expression to test. Non-global; global regexes
  *             have their lastIndex reset before testing.
  * @param str - The string to test against.
  * @returns True if the regex matches within the safe budget, false otherwise.
  */
-export function safeRegexTest(re: RegExp, str: string): boolean {
+export function safeRegexTest(patternRegex: RegExp, str: string): boolean {
     if (str.length < SAFE_DIRECT_THRESHOLD) {
-        return re.test(str);
+        return patternRegex.test(str);
     }
 
     // Reset state for global/sticky regexes to avoid cross-call pollution.
-    re.lastIndex = 0;
+    patternRegex.lastIndex = 0;
 
     // All our text-trigger patterns are keyword-level. If a pattern hasn't
     // matched in the first N characters, it won't match later.
     const bounded = str.slice(0, SAFE_MATCH_BUDGET);
-    return re.test(bounded);
+    return patternRegex.test(bounded);
 }
 
 /**
@@ -82,15 +82,15 @@ export function safeRegexTest(re: RegExp, str: string): boolean {
  * local features (tokens, identifiers, markers) — not global full-file scans.
  *
  * @param str - The string to match against.
- * @param re - The regular expression.
+ * @param patternRegex - The regular expression.
  * @returns Match result (same as String.match) or null on no match / budget exceeded.
  */
-export function safeRegexMatch(str: string, re: RegExp): RegExpMatchArray | null {
+export function safeRegexMatch(str: string, patternRegex: RegExp): RegExpMatchArray | null {
     if (str.length < SAFE_DIRECT_THRESHOLD * 2) {
-        return str.match(re);
+        return str.match(patternRegex);
     }
     const bounded = str.slice(0, SAFE_EXTRACT_BUDGET);
-    return bounded.match(re);
+    return bounded.match(patternRegex);
 }
 
 /**
@@ -100,30 +100,30 @@ export function safeRegexMatch(str: string, re: RegExp): RegExpMatchArray | null
  * backtracking on pathological input. The callback receives each match and
  * should return false to stop iteration (true to continue).
  *
- * @param re - A global RegExp. lastIndex is reset before iteration.
+ * @param patternRegex - A global RegExp. lastIndex is reset before iteration.
  * @param str - The string to scan.
  * @param onMatch - Callback for each match; return true to continue, false to stop.
  * @param maxIterations - Maximum exec iterations (default 1000).
  * @returns Number of matches found before stopping.
  */
 export function safeRegexExecLoop(
-    re: RegExp,
+    patternRegex: RegExp,
     str: string,
     onMatch: (match: RegExpExecArray) => boolean | void,
     maxIterations = 1000,
 ): number {
-    re.lastIndex = 0;
+    patternRegex.lastIndex = 0;
     let count = 0;
-    let m: RegExpExecArray | null;
+    let matchResult: RegExpExecArray | null;
 
-    while ((m = re.exec(str)) !== null) {
+    while ((matchResult = patternRegex.exec(str)) !== null) {
         count++;
-        const cont = onMatch(m);
+        const cont = onMatch(matchResult);
         if (cont === false) break;
         if (count >= maxIterations) break;
         // Guard against zero-width matches causing infinite loops
-        if (m[0].length === 0) {
-            re.lastIndex++;
+        if (matchResult[0].length === 0) {
+            patternRegex.lastIndex++;
         }
     }
 
@@ -228,16 +228,16 @@ export function escapeRegex(str: string): string {
  * runs on non-matching input, it can never backtrack catastrophically.
  *
  * @param requiredSubstring - A literal substring that must be present for the regex to match.
- * @param re - The full regex to run when the pre-check passes.
+ * @param patternRegex - The full regex to run when the pre-check passes.
  * @returns A function equivalent to (str) => re.test(str) but with pre-gating.
  */
 export function createPrefixedTest(
     requiredSubstring: string,
-    re: RegExp,
+    patternRegex: RegExp,
 ): (str: string) => boolean {
     return (str: string) => {
         if (!str.includes(requiredSubstring)) return false;
-        return safeRegexTest(re, str);
+        return safeRegexTest(patternRegex, str);
     };
 }
 
@@ -260,13 +260,13 @@ export function buildAlternationRe(
     flags = 'i',
     wordBounded = true,
 ): { re: RegExp; warnings: string[] } {
-    const escaped = words.map((w) => escapeRegex(String(w)));
+    const escaped = words.map((word) => escapeRegex(String(word)));
     const source = wordBounded ? `\\b(?:${escaped.join('|')})\\b` : `(?:${escaped.join('|')})`;
 
     const warnings = auditRegexSafety(source);
-    const re = new RegExp(source, flags);
+    const regex = new RegExp(source, flags);
 
-    return { re, warnings };
+    return { re: regex, warnings };
 }
 
 /**
@@ -282,9 +282,9 @@ export function buildAlternationRe(
 export function isRegexSafe(pattern: string): boolean {
     const warnings = auditRegexSafety(pattern);
     return !warnings.some(
-        (w) =>
-            w.includes('Nested quantifier') ||
-            w.includes('Alternation inside quantified group') ||
-            w.includes('Backreference inside quantified group'),
+        (warning) =>
+            warning.includes('Nested quantifier') ||
+            warning.includes('Alternation inside quantified group') ||
+            warning.includes('Backreference inside quantified group'),
     );
 }

@@ -24,7 +24,7 @@ import { LoadGovernor } from '../profiler/loadGovernor';
 import type { Issue, FileMetric } from '../types';
 
 /** Default ring buffer slot capacity connecting prefill and decode stages. */
-const DEFAULT_DISAGGREGATED_BUFFER_CAPACITY = 512;
+const DEFAULT_DISAGGREGATED_CAPACITY = 512;
 
 /**
  * Intermediate prefilled slice payload emitted by the Prefill stage.
@@ -89,8 +89,8 @@ export class DisaggregatedAuditPipeline {
         this.prefillConcurrency = options.prefillConcurrency ?? Math.max(1, Math.floor(cpus / 2));
         this.decodeConcurrency = options.decodeConcurrency ?? Math.max(2, cpus);
 
-        const cap = options.bufferCapacity ?? DEFAULT_DISAGGREGATED_BUFFER_CAPACITY;
-        this.ringBuffer = new RingBufferBus<PrefillAuditSlice>(cap, 'drop_oldest');
+        const bufferCap = options.bufferCapacity ?? DEFAULT_DISAGGREGATED_CAPACITY;
+        this.ringBuffer = new RingBufferBus<PrefillAuditSlice>(bufferCap, 'drop_oldest');
     }
 
     /**
@@ -169,7 +169,7 @@ export class DisaggregatedAuditPipeline {
         }[],
         governor: LoadGovernor,
     ): Promise<PrefillAuditSlice[]> {
-        const availableAnalyzers = scanner.getPlan().map((p) => p.name);
+        const availableAnalyzers = scanner.getPlan().map((planEntry) => planEntry.name);
         const slices: PrefillAuditSlice[] = [];
 
         for (let i = 0; i < items.length; i++) {
@@ -208,9 +208,7 @@ export class DisaggregatedAuditPipeline {
 
         for (let i = 0; i < slices.length; i += batchSize) {
             const batch = slices.slice(i, i + batchSize);
-            const batchPromises = batch.map((slice) =>
-                this.decodeSingleSlice(scanner, slice),
-            );
+            const batchPromises = batch.map((slice) => this.decodeSingleSlice(scanner, slice));
 
             const batchVerdicts = await Promise.all(batchPromises);
             for (let j = 0; j < batchVerdicts.length; j++) {

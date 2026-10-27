@@ -174,10 +174,14 @@ export function createScanConfig(opts: PerformanceOptions, file: string): Perfor
     const checkAlloc = opts.checkTransientAllocations !== false;
     const checkLinearLookups = opts.checkLinearLookups !== false;
 
-    const syncIoAllowPatterns = (opts.blockingIoAllowPatterns ?? []).map((g) => globToRegExp(g));
+    const syncIoAllowPatterns = (opts.blockingIoAllowPatterns ?? []).map((globPattern) =>
+        globToRegExp(globPattern),
+    );
     const syncIoAllowlisted = syncIoAllowPatterns.length > 0 && matchAny(syncIoAllowPatterns, file);
 
-    const allocAllowPatterns = (opts.allocationAllowPatterns ?? []).map((g) => globToRegExp(g));
+    const allocAllowPatterns = (opts.allocationAllowPatterns ?? []).map((globPattern) =>
+        globToRegExp(globPattern),
+    );
     const allocAllowlisted = allocAllowPatterns.length > 0 && matchAny(allocAllowPatterns, file);
 
     const isIndentBased = file.endsWith('.py') || file.endsWith('.gd');
@@ -239,7 +243,7 @@ export function updateIndentLoops(
 export function updateBraceLoops(trimmed: string, loopStack: LoopScope[]): void {
     if (!trimmed.includes('}')) return;
     const closes = (trimmed.match(/\}/g) || []).length;
-    for (let c = 0; c < closes; c++) {
+    for (let closeIdx = 0; closeIdx < closes; closeIdx++) {
         if (loopStack.length > 0) {
             loopStack.pop();
         }

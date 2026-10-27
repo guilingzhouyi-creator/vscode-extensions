@@ -214,7 +214,9 @@ function messageHas(fragment: string): (issue: Issue) => boolean {
  * @returns Predicate over a finding.
  */
 function ruleMatches(rules: string[], fragments: string[]): (issue: Issue) => boolean {
-    return (issue) => rules.includes(issue.rule) || fragments.some((f) => issue.rule.includes(f));
+    return (issue) =>
+        rules.includes(issue.rule) ||
+        fragments.some((ruleFinding) => issue.rule.includes(ruleFinding));
 }
 
 /** Probe accepting every finding of the row's analyzer (catch-all rows). */

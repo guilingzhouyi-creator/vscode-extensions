@@ -233,8 +233,8 @@ function extractUsedVariableNames(trimmed: string, defined: readonly string[]): 
 function extractFunctionCalls(trimmed: string): string[] {
     const calls: string[] = [];
     const callMatches = trimmed.matchAll(/([a-zA-Z_$][a-zA-Z0-9_$.]*)\s*\(/g);
-    for (const m of callMatches) {
-        if (!KEYWORDS.has(m[1])) calls.push(m[1]);
+    for (const matchItem of callMatches) {
+        if (!KEYWORDS.has(matchItem[1])) calls.push(matchItem[1]);
     }
     return calls;
 }
@@ -263,12 +263,12 @@ function checkFloatingPromiseCall(trimmed: string): boolean {
 function findMatchingParen(text: string, openIndex: number): number {
     let depth = 0;
     for (let i = openIndex; i < text.length; i++) {
-        const ch = text[i];
-        if (ch === '(') {
+        const char = text[i];
+        if (char === '(') {
             depth++;
             continue;
         }
-        if (ch === ')' && --depth === 0) {
+        if (char === ')' && --depth === 0) {
             return i;
         }
     }
@@ -332,10 +332,10 @@ export class CfgBuilder {
      *
      * @param lineText - Raw text of the statement line.
      * @param lineNumber - Source code line index (1-based).
-     * @param id - Statement identifier.
+     * @param statementId - Statement identifier.
      * @returns Structured statement metadata.
      */
-    static parseStatement(lineText: string, lineNumber: number, id: string): CfgStatement {
+    static parseStatement(lineText: string, lineNumber: number, statementId: string): CfgStatement {
         const trimmed = lineText.trim();
         const kind = classifyStatementKind(trimmed);
         const definedVars = extractDefinedVariableNames(trimmed);
@@ -345,7 +345,7 @@ export class CfgBuilder {
         const isNullGuard = NULL_GUARD_PATTERN.test(trimmed);
 
         return {
-            id,
+            id: statementId,
             kind,
             rawText: trimmed,
             line: lineNumber,
@@ -415,7 +415,7 @@ export class CfgBuilder {
 
         if (
             !currentBlock.isTerminator() &&
-            !currentBlock.successors.some((s) => s.id === exit.id)
+            !currentBlock.successors.some((succ) => succ.id === exit.id)
         ) {
             currentBlock.addSuccessor(exit, UNCONDITIONAL_EDGE);
         }

@@ -358,12 +358,12 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
                 enclosingSymbol: hunk.astContext?.enclosingSymbol,
                 impactFiles: hunk.astContext?.impactFiles,
             };
-            const v = await activePolicy.evaluateChange(filePath, hunk, ctx);
-            if (v.status === 'major_rework_needed') {
-                return v;
+            const hunkVerdict = await activePolicy.evaluateChange(filePath, hunk, ctx);
+            if (hunkVerdict.status === 'major_rework_needed') {
+                return hunkVerdict;
             }
-            if (v.status === 'minor_fix_needed') {
-                highest = v;
+            if (hunkVerdict.status === 'minor_fix_needed') {
+                highest = hunkVerdict;
             }
         }
         return highest;
@@ -384,10 +384,10 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
 
     private computeAggregatedImpact(hunks: ReviewDiffHunk[]): string[] {
         const impactSet = new Set<string>();
-        for (const h of hunks) {
-            if (h.astContext?.impactFiles) {
-                for (const f of h.astContext.impactFiles) {
-                    impactSet.add(f);
+        for (const hunk of hunks) {
+            if (hunk.astContext?.impactFiles) {
+                for (const file of hunk.astContext.impactFiles) {
+                    impactSet.add(file);
                 }
             }
         }

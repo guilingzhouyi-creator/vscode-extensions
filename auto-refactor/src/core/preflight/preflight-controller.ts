@@ -200,7 +200,9 @@ export class PreflightAuditController {
 
         // Filter indexed entries down to targets
         const targetEntrySet = new Set(targetFiles);
-        const candidateEntries = indexedEntries.filter((e) => targetEntrySet.has(e.filePath));
+        const candidateEntries = indexedEntries.filter((entry) =>
+            targetEntrySet.has(entry.filePath),
+        );
         const changedSet = new Set(diffFiles);
         const neighborSet = new Set(expansionResult?.firstOrderNeighbors || []);
 

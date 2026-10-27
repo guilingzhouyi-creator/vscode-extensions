@@ -320,9 +320,9 @@ export class TensorPartitioner {
         // 1. Compute Topological Dependency Depth for each file
         const depthMap = this.computeDependencyDepths(files, edges);
         let maxDepth = 0;
-        for (const d of depthMap.values()) {
-            if (d > maxDepth) {
-                maxDepth = d;
+        for (const depth of depthMap.values()) {
+            if (depth > maxDepth) {
+                maxDepth = depth;
             }
         }
 
@@ -376,8 +376,8 @@ export class TensorPartitioner {
         edges: [string, string][],
     ): Map<string, number> {
         const depthsByFile = new Map<string, number>();
-        for (const f of files) {
-            depthsByFile.set(f, 0);
+        for (const file of files) {
+            depthsByFile.set(file, 0);
         }
 
         const importsByFile = buildImportsGraph(edges);

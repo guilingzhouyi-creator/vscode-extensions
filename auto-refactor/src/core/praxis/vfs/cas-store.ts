@@ -485,8 +485,8 @@ export class CasStore {
         }
 
         const forkedEntries = new Map<string, VfsFileEntry>();
-        for (const [k, v] of source.entries.entries()) {
-            forkedEntries.set(k, { ...v });
+        for (const [filePath, fileEntry] of source.entries.entries()) {
+            forkedEntries.set(filePath, { ...fileEntry });
         }
 
         const now = Date.now();
@@ -511,9 +511,11 @@ export class CasStore {
      * Computes the Merkle root hash for an array of file entries.
      */
     private computeTreeHash(entries: VfsFileEntry[]): string {
-        const sorted = [...entries].sort((a, b) => a.path.localeCompare(b.path));
+        const sorted = [...entries].sort((entryA, entryB) =>
+            entryA.path.localeCompare(entryB.path),
+        );
         const manifest = sorted
-            .map((e) => `${e.path}:${e.contentHash ?? ''}:${e.size}:${e.mode}`)
+            .map((entry) => `${entry.path}:${entry.contentHash ?? ''}:${entry.size}:${entry.mode}`)
             .join('\n');
         return createHash('sha256').update(manifest).digest('hex');
     }
@@ -620,7 +622,7 @@ export class CasStore {
             }
         }
 
-        return deltas.sort((a, b) => a.path.localeCompare(b.path));
+        return deltas.sort((deltaA, deltaB) => deltaA.path.localeCompare(deltaB.path));
     }
 
     /**

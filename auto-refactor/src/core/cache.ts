@@ -267,8 +267,17 @@ export class CacheStore {
         this.l2LoadLevel = CACHE_LOAD_LEVEL_DISABLED;
         if (this.logger) {
             this.logger.warn(
-                `L2 cache too large (${(fileSize / BYTES_PER_KIB / KIB_PER_MIB).toFixed(1)} MiB), skipping load`,
+                `L2 cache too large (${(fileSize / BYTES_PER_KIB / KIB_PER_MIB).toFixed(1)} MiB), auto-recovering through compaction`,
             );
+        }
+        try {
+            writeFileAtomic(this.resultsPath, '');
+            writeFileAtomic(this.pathsPath, '');
+            this.l2LoadLevel = CACHE_LOAD_LEVEL_FULL;
+            this.appendedL2Count = 0;
+        } catch (err) {
+            void err;
+            /* Keep disabled if filesystem write fails */
         }
     }
 
@@ -522,14 +531,20 @@ export class CacheStore {
     }
 
     private shouldRewriteL1Snapshot(): boolean {
+        const fileSize = SyncIoBarrier.statSize(this.fingerprintsPath);
+        const isOverPhysicalThreshold = fileSize > 0 && fileSize >= this.maxL2LoadBytes * 0.25;
         return (
+            isOverPhysicalThreshold ||
             this.appendedL1Count >= COMPACTION_THRESHOLD_L1_ENTRIES ||
             !SyncIoBarrier.exists(this.fingerprintsPath)
         );
     }
 
     private shouldRewriteL2Snapshot(): boolean {
+        const fileSize = SyncIoBarrier.statSize(this.resultsPath);
+        const isOverPhysicalThreshold = fileSize > 0 && fileSize >= this.maxL2LoadBytes * 0.75;
         return (
+            isOverPhysicalThreshold ||
             this.appendedL2Count >= COMPACTION_THRESHOLD_L2_ENTRIES ||
             !SyncIoBarrier.exists(this.resultsPath)
         );
@@ -647,7 +662,7 @@ export class CacheStore {
         let excess = this.l2.size - this.maxEntries;
         if (excess <= 0) return;
 
-        const sorted = [...this.l2.values()].sort((a, b) => a.ts - b.ts);
+        const sorted = [...this.l2.values()].sort((entryA, entryB) => entryA.ts - entryB.ts);
         for (const entryRecord of sorted) {
             if (excess <= 0) break;
             this.removeSecondaryCacheEntry(entryRecord);

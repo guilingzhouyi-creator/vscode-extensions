@@ -254,9 +254,9 @@ export class AgentQuotaGateway {
         const now = Date.now();
         let swept = 0;
 
-        for (const [id, lease] of state.activeLeases.entries()) {
+        for (const [leaseId, lease] of state.activeLeases.entries()) {
             if (now >= lease.expiresAt) {
-                state.activeLeases.delete(id);
+                state.activeLeases.delete(leaseId);
                 state.totalExpired++;
                 swept++;
             }

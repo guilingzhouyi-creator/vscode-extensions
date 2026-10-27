@@ -141,15 +141,15 @@ export class DefUseAnalyzer {
             if (stmt.usedVars.length === 0) continue;
             const isCleanup = isResourceCleanupStatement(stmt.rawText);
             for (let i = 0; i < stmt.usedVars.length; i++) {
-                const v = stmt.usedVars[i];
+                const varName = stmt.usedVars[i];
                 let kind: VariableUse['kind'] = 'read';
                 if (isCleanup) {
                     kind = 'cleanup';
-                } else if (hasMemberDereference(stmt.rawText, v)) {
+                } else if (hasMemberDereference(stmt.rawText, varName)) {
                     kind = 'dereference';
                 }
                 uses.push({
-                    variable: v,
+                    variable: varName,
                     blockId: block.id,
                     statementId: stmt.id,
                     line: stmt.line,
@@ -198,11 +198,11 @@ export class DefUseAnalyzer {
         for (const stmt of block.statements) {
             if (!stmt.isNullGuard) continue;
             for (let i = 0; i < stmt.usedVars.length; i++) {
-                const v = stmt.usedVars[i];
+                const varName = stmt.usedVars[i];
                 if (leavesOnGuard) {
-                    protectedVars.add(v);
+                    protectedVars.add(varName);
                 } else {
-                    protectedVars.delete(v);
+                    protectedVars.delete(varName);
                 }
             }
         }
@@ -228,12 +228,12 @@ export class DefUseAnalyzer {
         for (const stmt of block.statements) {
             if (stmt.isNullGuard) continue;
             for (let i = 0; i < stmt.usedVars.length; i++) {
-                const v = stmt.usedVars[i];
-                if (protectedVars.has(v)) continue;
-                if (hasMemberDereference(stmt.rawText, v)) {
+                const varName = stmt.usedVars[i];
+                if (protectedVars.has(varName)) continue;
+                if (hasMemberDereference(stmt.rawText, varName)) {
                     findings.push({
                         line: stmt.line,
-                        variable: v,
+                        variable: varName,
                         rawText: stmt.rawText,
                     });
                 }
@@ -266,9 +266,9 @@ export class DefUseAnalyzer {
         const findings: UnclosedResourceFinding[] = [];
         const cleanupVars = new Set<string>();
         for (let i = 0; i < uses.length; i++) {
-            const u = uses[i];
-            if (u.kind === 'cleanup') {
-                cleanupVars.add(u.variable);
+            const useItem = uses[i];
+            if (useItem.kind === 'cleanup') {
+                cleanupVars.add(useItem.variable);
             }
         }
 

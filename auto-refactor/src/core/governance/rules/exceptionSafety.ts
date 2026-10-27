@@ -306,10 +306,10 @@ function updateTestScopeBalance(
     currentDepth: number,
 ): { inTestScope: boolean; newDepth: number } {
     let depth = currentDepth;
-    for (let c = 0; c < line.length; c++) {
-        if (line[c] === '{') {
+    for (let charIndex = 0; charIndex < line.length; charIndex++) {
+        if (line[charIndex] === '{') {
             depth++;
-        } else if (line[c] === '}') {
+        } else if (line[charIndex] === '}') {
             depth--;
             if (depth <= 0) {
                 return { inTestScope: false, newDepth: 0 };

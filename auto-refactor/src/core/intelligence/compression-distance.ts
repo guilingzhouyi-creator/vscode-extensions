@@ -157,7 +157,7 @@ export function getCompressedByteLength(text: string): number {
  * @param options - Comparison parameters.
  * @returns Detailed compression distance outcome.
  */
-export function computeNormalizedCompressionDistance(
+export function computeCompressionDistance(
     codeA: string,
     codeB: string,
     options?: CompressionDistanceOptions,
@@ -178,12 +178,12 @@ export function computeNormalizedCompressionDistance(
     }
 
     if (normA === normB) {
-        const cA = getCompressedByteLength(normA);
+        const compressedBytes = getCompressedByteLength(normA);
         return Object.freeze({
             ncd: 0.0,
-            compressedBytesA: cA,
-            compressedBytesB: cA,
-            compressedBytesCombined: cA,
+            compressedBytesA: compressedBytes,
+            compressedBytesB: compressedBytes,
+            compressedBytesCombined: compressedBytes,
             isNearClone: true,
             similarityCategory: 'exact',
         });
@@ -200,12 +200,12 @@ export function computeNormalizedCompressionDistance(
         });
     }
 
-    const cA = getCompressedByteLength(normA);
-    const cB = getCompressedByteLength(normB);
+    const compressedBytesA = getCompressedByteLength(normA);
+    const compressedBytesB = getCompressedByteLength(normB);
     const cAB = getCompressedByteLength(normA + ' ' + normB);
 
-    const minC = Math.min(cA, cB);
-    const maxC = Math.max(cA, cB);
+    const minC = Math.min(compressedBytesA, compressedBytesB);
+    const maxC = Math.max(compressedBytesA, compressedBytesB);
 
     let rawNcd = 0.0;
     if (maxC > 0) {
@@ -226,10 +226,13 @@ export function computeNormalizedCompressionDistance(
 
     return Object.freeze({
         ncd,
-        compressedBytesA: cA,
-        compressedBytesB: cB,
+        compressedBytesA,
+        compressedBytesB,
         compressedBytesCombined: cAB,
         isNearClone,
         similarityCategory,
     });
 }
+
+/** Backward-compatibility alias for computeCompressionDistance. */
+export const computeNormalizedCompressionDistance = computeCompressionDistance;

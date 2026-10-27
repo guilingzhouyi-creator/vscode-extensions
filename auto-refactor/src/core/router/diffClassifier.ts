@@ -257,13 +257,13 @@ interface MergedObs {
     hasGeneralCode: boolean;
 }
 
-function mergeObservations(a: DiffLineObservation, b: DiffLineObservation): MergedObs {
+function mergeObservations(obsA: DiffLineObservation, obsB: DiffLineObservation): MergedObs {
     return {
-        hasImportExport: a.hasImportExport || b.hasImportExport,
-        hasInterface: a.hasInterface || b.hasInterface,
-        hasControlFlow: a.hasControlFlow || b.hasControlFlow,
-        hasLiteral: a.hasLiteral || b.hasLiteral,
-        hasGeneralCode: a.hasGeneralCode || b.hasGeneralCode,
+        hasImportExport: obsA.hasImportExport || obsB.hasImportExport,
+        hasInterface: obsA.hasInterface || obsB.hasInterface,
+        hasControlFlow: obsA.hasControlFlow || obsB.hasControlFlow,
+        hasLiteral: obsA.hasLiteral || obsB.hasLiteral,
+        hasGeneralCode: obsA.hasGeneralCode || obsB.hasGeneralCode,
     };
 }
 
@@ -276,28 +276,32 @@ function isStructuralDeletion(obs: DiffLineObservation): boolean {
  * Populate fine-grained mutation categories and signals from diff observations.
  */
 function populateMutationCategories(
-    m: MergedObs,
+    mergedObs: MergedObs,
     categories: Set<DiffSemanticCategory>,
     signals: Set<MutationSignal>,
 ): void {
-    if (m.hasImportExport) {
+    if (mergedObs.hasImportExport) {
         categories.add(CATEGORY_IMPORT_EXPORT);
         signals.add(SIGNAL_IMPORT_EXPORT);
     }
-    if (m.hasInterface) {
+    if (mergedObs.hasInterface) {
         categories.add(CATEGORY_INTERFACE_SIGNATURE);
         signals.add(SIGNAL_INTERFACE_SIGNATURE);
     }
-    if (m.hasControlFlow) {
+    if (mergedObs.hasControlFlow) {
         categories.add(CATEGORY_CONTROL_FLOW);
         signals.add(SIGNAL_CONTROL_FLOW);
     }
-    const hasOther = m.hasGeneralCode || m.hasControlFlow || m.hasInterface || m.hasImportExport;
-    if (m.hasLiteral && !hasOther) {
+    const hasOther =
+        mergedObs.hasGeneralCode ||
+        mergedObs.hasControlFlow ||
+        mergedObs.hasInterface ||
+        mergedObs.hasImportExport;
+    if (mergedObs.hasLiteral && !hasOther) {
         categories.add(CATEGORY_LITERAL_ONLY);
         signals.add(SIGNAL_LITERAL);
     }
-    if (categories.size === 0 || m.hasGeneralCode) {
+    if (categories.size === 0 || mergedObs.hasGeneralCode) {
         categories.add(CATEGORY_GENERAL_CODE);
         signals.add(SIGNAL_GENERAL_CODE);
     }
@@ -357,9 +361,9 @@ function extractDiffLines(
 ): { addedLines: string[]; removedLines: string[] } {
     const addedLines: string[] = [];
     const removedLines: string[] = [];
-    for (const op of ops) {
-        if (op.type === DIFF_OP_INSERT) addedLines.push(newLines[op.bIdx]);
-        if (op.type === DIFF_OP_DELETE) removedLines.push(oldLines[op.aIdx]);
+    for (const diffOp of ops) {
+        if (diffOp.type === DIFF_OP_INSERT) addedLines.push(newLines[diffOp.bIdx]);
+        if (diffOp.type === DIFF_OP_DELETE) removedLines.push(oldLines[diffOp.aIdx]);
     }
     return { addedLines, removedLines };
 }

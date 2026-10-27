@@ -26,14 +26,14 @@ export function calculateShannonEntropy(text: string): number {
     if (!text || text.length === 0) return 0.0;
     const freqMap = new Map<string, number>();
     for (let i = 0; i < text.length; i += 1) {
-        const ch = text[i];
-        freqMap.set(ch, (freqMap.get(ch) ?? 0) + 1);
+        const char = text[i];
+        freqMap.set(char, (freqMap.get(char) ?? 0) + 1);
     }
     const len = text.length;
     let entropy = 0.0;
     for (const count of freqMap.values()) {
-        const p = count / len;
-        entropy -= p * Math.log2(p);
+        const probability = count / len;
+        entropy -= probability * Math.log2(probability);
     }
     return Math.round(entropy * PRECISION_ROUNDING) / PRECISION_ROUNDING;
 }
@@ -50,18 +50,18 @@ export function calculateShannonEntropy(text: string): number {
 export function calculateSimpsonDiversityIndex(counts: readonly number[]): number {
     if (!counts || counts.length === 0) return 0.0;
     let total = 0;
-    for (const c of counts) {
-        if (Number.isFinite(c) && c > 0) {
-            total += c;
+    for (const countItem of counts) {
+        if (Number.isFinite(countItem) && countItem > 0) {
+            total += countItem;
         }
     }
     if (total <= 1) return 0.0;
 
     let sumSquaredP = 0.0;
-    for (const c of counts) {
-        if (Number.isFinite(c) && c > 0) {
-            const p = c / total;
-            sumSquaredP += p * p;
+    for (const countItem of counts) {
+        if (Number.isFinite(countItem) && countItem > 0) {
+            const probability = countItem / total;
+            sumSquaredP += probability * probability;
         }
     }
     const diversity = Math.max(0.0, Math.min(1.0, 1.0 - sumSquaredP));

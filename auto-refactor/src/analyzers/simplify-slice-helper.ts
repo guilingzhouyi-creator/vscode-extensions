@@ -131,22 +131,22 @@ const NON_READ_DECLARATION_KINDS = new Set([
     ts.SyntaxKind.ClassDeclaration,
 ]);
 
-function isDeclarationName(parent: ts.Node, id: ts.Identifier): boolean {
+function isDeclarationName(parent: ts.Node, identifier: ts.Identifier): boolean {
     if (!NON_READ_DECLARATION_KINDS.has(parent.kind)) return false;
-    return (parent as { name?: ts.Node }).name === id;
+    return (parent as { name?: ts.Node }).name === identifier;
 }
 
-function isAssignmentTarget(parent: ts.Node, id: ts.Identifier): boolean {
+function isAssignmentTarget(parent: ts.Node, identifier: ts.Identifier): boolean {
     if (!ts.isBinaryExpression(parent)) return false;
-    return parent.left === id && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+    return parent.left === identifier && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
 }
 
-function isIdentifierRead(id: ts.Identifier): boolean {
-    if (LITERAL_IDENTIFIERS.has(id.text)) return false;
-    const parent = id.parent;
+function isIdentifierRead(identifier: ts.Identifier): boolean {
+    if (LITERAL_IDENTIFIERS.has(identifier.text)) return false;
+    const parent = identifier.parent;
     if (!parent) return true;
     if (ts.isTypeNode(parent) || ts.isTypeReferenceNode(parent)) return false;
-    return !isDeclarationName(parent, id) && !isAssignmentTarget(parent, id);
+    return !isDeclarationName(parent, identifier) && !isAssignmentTarget(parent, identifier);
 }
 
 function isAssignmentOperator(kind: ts.SyntaxKind): boolean {
@@ -158,8 +158,11 @@ function collectUnaryWrites(
     writes: Set<string>,
     reads: Set<string>,
 ): void {
-    const op = node.operator;
-    if (op === ts.SyntaxKind.PlusPlusToken || op === ts.SyntaxKind.MinusMinusToken) {
+    const operatorKind = node.operator;
+    if (
+        operatorKind === ts.SyntaxKind.PlusPlusToken ||
+        operatorKind === ts.SyntaxKind.MinusMinusToken
+    ) {
         if (ts.isIdentifier(node.operand)) {
             writes.add(node.operand.text);
             reads.add(node.operand.text);
@@ -201,8 +204,8 @@ function collectFunctionParameterNames(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression,
 ): Set<string> {
     const names = new Set<string>();
-    for (const p of node.parameters) {
-        collectBindingIdentifiers(p.name, names);
+    for (const param of node.parameters) {
+        collectBindingIdentifiers(param.name, names);
     }
     return names;
 }
@@ -212,7 +215,7 @@ function buildExtractSignature(
     inputs: string[],
     outputs: string[],
 ): { signature: string; template: string } {
-    const paramList = inputs.map((v) => `${v}: unknown`).join(', ');
+    const paramList = inputs.map((varName) => `${varName}: unknown`).join(', ');
     let returnType = RETURN_TYPE_VOID;
     let returnStmt = '';
     let callSite = `${helperName}(${inputs.join(', ')});`;
@@ -222,7 +225,7 @@ function buildExtractSignature(
         returnStmt = `    return ${outputs[0]};`;
         callSite = `const ${outputs[0]} = ${helperName}(${inputs.join(', ')});`;
     } else if (outputs.length > 1) {
-        returnType = `{ ${outputs.map((v) => `${v}: unknown`).join(', ')} }`;
+        returnType = `{ ${outputs.map((varName) => `${varName}: unknown`).join(', ')} }`;
         returnStmt = `    return { ${outputs.join(', ')} };`;
         callSite = `const { ${outputs.join(', ')} } = ${helperName}(${inputs.join(', ')});`;
     }
@@ -279,7 +282,7 @@ interface LineSpanRangeIndices {
 function resolveLineSpan(
     range: LineSpanRangeIndices,
     statements: readonly ts.Statement[],
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     cachedLines?: { starts?: Int32Array; ends?: Int32Array },
 ): FunctionSliceRange {
     if (cachedLines?.starts && cachedLines?.ends) {
@@ -288,8 +291,10 @@ function resolveLineSpan(
             endLine: cachedLines.ends[range.endIndex],
         };
     }
-    const startPos = sf.getLineAndCharacterOfPosition(statements[range.startIndex].getStart(sf));
-    const endPos = sf.getLineAndCharacterOfPosition(statements[range.endIndex].getEnd());
+    const startPos = sourceFile.getLineAndCharacterOfPosition(
+        statements[range.startIndex].getStart(sourceFile),
+    );
+    const endPos = sourceFile.getLineAndCharacterOfPosition(statements[range.endIndex].getEnd());
     return { startLine: startPos.line + 1, endLine: endPos.line + 1 };
 }
 
@@ -341,14 +346,14 @@ function populateSliceVariables(
     buffers: { reads: Set<string>; writes: Set<string> },
 ): void {
     for (let k = range.startIndex; k <= range.endIndex; k++) {
-        stmtInfos[k].reads.forEach((r) => buffers.reads.add(r));
-        stmtInfos[k].writes.forEach((w) => buffers.writes.add(w));
+        stmtInfos[k].reads.forEach((readVar) => buffers.reads.add(readVar));
+        stmtInfos[k].writes.forEach((writeVar) => buffers.writes.add(writeVar));
     }
 }
 
 interface SliceEvaluationContext {
     readonly statements: readonly ts.Statement[];
-    readonly sf: ts.SourceFile;
+    readonly sourceFile: ts.SourceFile;
     readonly paramNames: ReadonlySet<string>;
     readonly stmtInfos: StatementVariableInfo[];
     readonly helperName: string;
@@ -386,7 +391,12 @@ function evaluateSliceRange(
     );
     const outputVars = collectOutputVariables(sliceWrites, readsAfter);
     const dependencyCount = computeDependencyScore(inputVars.length, outputVars.length);
-    const sliceRange = resolveLineSpan(range, context.statements, context.sf, context.cachedLines);
+    const sliceRange = resolveLineSpan(
+        range,
+        context.statements,
+        context.sourceFile,
+        context.cachedLines,
+    );
     const { signature, template } = buildExtractSignature(
         context.helperName,
         inputVars,
@@ -462,12 +472,12 @@ function createSliceAnalysis(candidates: FunctionSliceCandidate[]): FunctionSlic
  * Computes contiguous statement slice boundaries with minimal cross-slice state coupling.
  *
  * @param node - Function AST node to analyze.
- * @param sf - Enclosing SourceFile for position lookups.
+ * @param sourceFile - Enclosing SourceFile for position lookups.
  * @returns Candidate slices ranked by minimal dependency count, or null when non-sliceable.
  */
 export function computeFunctionSlices(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression,
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
 ): FunctionSliceAnalysis | null {
     if (!node.body || !ts.isBlock(node.body)) return null;
     const statements = node.body.statements;
@@ -476,7 +486,7 @@ export function computeFunctionSlices(
     const fnName = node.name && ts.isIdentifier(node.name) ? node.name.text : DEFAULT_FUNCTION_NAME;
     const helperName = PREFIX_EXTRACT + formatCapitalizedText(fnName);
     const paramNames = collectFunctionParameterNames(node);
-    const stmtInfos = statements.map((s) => collectVariablesInStatement(s));
+    const stmtInfos = statements.map((stmt) => collectVariablesInStatement(stmt));
 
     const candidates: FunctionSliceCandidate[] = [];
     const statementCount = statements.length;
@@ -485,8 +495,9 @@ export function computeFunctionSlices(
     const stmtStartLines = new Int32Array(statementCount);
     const stmtEndLines = new Int32Array(statementCount);
     for (let k = 0; k < statementCount; k++) {
-        stmtStartLines[k] = sf.getLineAndCharacterOfPosition(statements[k].getStart(sf)).line + 1;
-        stmtEndLines[k] = sf.getLineAndCharacterOfPosition(statements[k].getEnd()).line + 1;
+        stmtStartLines[k] =
+            sourceFile.getLineAndCharacterOfPosition(statements[k].getStart(sourceFile)).line + 1;
+        stmtEndLines[k] = sourceFile.getLineAndCharacterOfPosition(statements[k].getEnd()).line + 1;
     }
 
     const prefixWrites = precomputePrefixWrites(statementCount, stmtInfos);
@@ -495,7 +506,7 @@ export function computeFunctionSlices(
     const scratchWrites = new Set<string>();
     const sliceContext: SliceEvaluationContext = {
         statements,
-        sf,
+        sourceFile,
         paramNames,
         stmtInfos,
         helperName,
@@ -524,12 +535,12 @@ export function computeFunctionSlices(
         );
     }
 
-    candidates.sort((a, b) => {
-        if (a.crossSliceDependencyCount !== b.crossSliceDependencyCount) {
-            return a.crossSliceDependencyCount - b.crossSliceDependencyCount;
+    candidates.sort((candidateA, candidateB) => {
+        if (candidateA.crossSliceDependencyCount !== candidateB.crossSliceDependencyCount) {
+            return candidateA.crossSliceDependencyCount - candidateB.crossSliceDependencyCount;
         }
-        const aLen = a.endIndex - a.startIndex + 1;
-        const bLen = b.endIndex - b.startIndex + 1;
+        const aLen = candidateA.endIndex - candidateA.startIndex + 1;
+        const bLen = candidateB.endIndex - candidateB.startIndex + 1;
         return bLen - aLen;
     });
 
@@ -563,39 +574,41 @@ function invertBinaryOperator(kind: ts.SyntaxKind): string | null {
  * Invert a conditional expression into its complementary guard form.
  *
  * @param expr - Expression AST node to invert.
- * @param sf - Source file providing text tokens.
+ * @param sourceFile - Source file providing text tokens.
  * @returns Inverted conditional code snippet string.
  */
-export function invertConditionExpression(expr: ts.Expression, sf: ts.SourceFile): string {
+export function invertConditionExpression(expr: ts.Expression, sourceFile: ts.SourceFile): string {
     if (ts.isBinaryExpression(expr)) {
         const invOp = invertBinaryOperator(expr.operatorToken.kind);
         if (invOp) {
-            return `${expr.left.getText(sf)} ${invOp} ${expr.right.getText(sf)}`;
+            return `${expr.left.getText(sourceFile)} ${invOp} ${expr.right.getText(sourceFile)}`;
         }
-        return `!(${expr.getText(sf)})`;
+        return `!(${expr.getText(sourceFile)})`;
     }
     if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken) {
-        return expr.operand.getText(sf);
+        return expr.operand.getText(sourceFile);
     }
     if (ts.isParenthesizedExpression(expr)) {
-        return invertConditionExpression(expr.expression, sf);
+        return invertConditionExpression(expr.expression, sourceFile);
     }
     if (ts.isIdentifier(expr)) {
-        return `!${expr.getText(sf)}`;
+        return `!${expr.getText(sourceFile)}`;
     }
-    return `!(${expr.getText(sf)})`;
+    return `!(${expr.getText(sourceFile)})`;
 }
 
 function findFallbackReturn(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression,
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
 ): string {
     if (!node.body || !ts.isBlock(node.body)) return DEFAULT_EMPTY_RETURN;
     const stmts = node.body.statements;
     for (let i = stmts.length - 1; i >= 0; i--) {
-        const s = stmts[i];
-        if (ts.isReturnStatement(s)) {
-            return s.expression ? `return ${s.expression.getText(sf)};` : DEFAULT_EMPTY_RETURN;
+        const stmt = stmts[i];
+        if (ts.isReturnStatement(stmt)) {
+            return stmt.expression
+                ? `return ${stmt.expression.getText(sourceFile)};`
+                : DEFAULT_EMPTY_RETURN;
         }
     }
     return DEFAULT_EMPTY_RETURN;
@@ -627,21 +640,21 @@ function collectNestedIfConditions(
  * Generate flattened early-return guard clauses from deeply nested if conditions.
  *
  * @param node - Target function AST node.
- * @param sf - Source file providing syntax text.
+ * @param sourceFile - Source file providing syntax text.
  * @returns Flattened early-return guard clause string, or null if not applicable.
  */
 export function getInvertedGuardSnippet(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression,
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
 ): string | null {
     if (!node.body || !ts.isBlock(node.body)) return null;
     const statements = node.body.statements;
     if (statements.length === 0) return null;
 
     let outerIf: ts.IfStatement | null = null;
-    for (const s of statements) {
-        if (ts.isIfStatement(s)) {
-            outerIf = s;
+    for (const stmt of statements) {
+        if (ts.isIfStatement(stmt)) {
+            outerIf = stmt;
             break;
         }
     }
@@ -652,11 +665,13 @@ export function getInvertedGuardSnippet(
     collectNestedIfConditions(outerIf, conds, deepestBody);
     if (conds.length === 0) return null;
 
-    const fallbackReturn = findFallbackReturn(node, sf);
-    const clauses = conds.map((c) => `if (${invertConditionExpression(c, sf)}) ${fallbackReturn}`);
+    const fallbackReturn = findFallbackReturn(node, sourceFile);
+    const clauses = conds.map(
+        (condExpr) => `if (${invertConditionExpression(condExpr, sourceFile)}) ${fallbackReturn}`,
+    );
 
     if (deepestBody.stmt) {
-        clauses.push(deepestBody.stmt.getText(sf));
+        clauses.push(deepestBody.stmt.getText(sourceFile));
     }
 
     return clauses.join('\n');
@@ -677,8 +692,10 @@ export function generateParameterObjectSnippet(
     params: Array<{ name: string; type?: string }>,
 ): string {
     const typeName = `${formatCapitalizedText(functionName)}Options`;
-    const propLines = params.map((p) => `    ${p.name}: ${p.type || 'unknown'};`).join('\n');
-    const paramNames = params.map((p) => p.name).join(', ');
+    const propLines = params
+        .map((param) => `    ${param.name}: ${param.type || 'unknown'};`)
+        .join('\n');
+    const paramNames = params.map((param) => param.name).join(', ');
 
     return [
         `export interface ${typeName} {`,
@@ -707,18 +724,18 @@ const functionLineCache = new WeakMap<
 /**
  * Find the function-like AST node located closest to a specified line number.
  *
- * @param sf - Source file to inspect.
+ * @param sourceFile - Source file to inspect.
  * @param targetLine - 1-based target line number.
  * @returns Function-like AST node or null if none found.
  */
 export function findTsFunctionAtLine(
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     targetLine: number,
 ): ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression | null {
-    let sfCache = functionLineCache.get(sf);
+    let sfCache = functionLineCache.get(sourceFile);
     if (!sfCache) {
         sfCache = new Map();
-        functionLineCache.set(sf, sfCache);
+        functionLineCache.set(sourceFile, sfCache);
     } else if (sfCache.has(targetLine)) {
         return sfCache.get(targetLine)!;
     }
@@ -731,11 +748,11 @@ export function findTsFunctionAtLine(
         | null = null;
     let minDistance = Infinity;
 
-    const lineStarts = sf.getLineStarts();
+    const lineStarts = sourceFile.getLineStarts();
     const minLine = Math.max(1, targetLine - 2);
-    const minPos = minLine <= lineStarts.length ? lineStarts[minLine - 1] : sf.end;
+    const minPos = minLine <= lineStarts.length ? lineStarts[minLine - 1] : sourceFile.end;
     const maxLineIdx = targetLine + 2;
-    const maxPos = maxLineIdx < lineStarts.length ? lineStarts[maxLineIdx] : sf.end;
+    const maxPos = maxLineIdx < lineStarts.length ? lineStarts[maxLineIdx] : sourceFile.end;
 
     function walk(astNode: ts.Node): boolean | void {
         if (astNode.end < minPos || astNode.pos > maxPos) {
@@ -748,7 +765,7 @@ export function findTsFunctionAtLine(
             ts.isArrowFunction(astNode) ||
             ts.isFunctionExpression(astNode)
         ) {
-            const pos = sf.getLineAndCharacterOfPosition(astNode.getStart(sf));
+            const pos = sourceFile.getLineAndCharacterOfPosition(astNode.getStart(sourceFile));
             const line = pos.line + 1;
             const distance = Math.abs(line - targetLine);
             if (distance < minDistance && distance <= 2) {
@@ -763,7 +780,7 @@ export function findTsFunctionAtLine(
         return ts.forEachChild(astNode, walk);
     }
 
-    walk(sf);
+    walk(sourceFile);
     sfCache.set(targetLine, bestMatch);
     return bestMatch;
 }
@@ -791,7 +808,7 @@ export function isNormalizedNode(node: unknown): node is NormalizedNode {
  */
 export function walkNormalizedTree(
     node: NormalizedNode,
-    visitor: (n: NormalizedNode) => void,
+    visitor: (nodeItem: NormalizedNode) => void,
 ): void {
     visitor(node);
     const children = node.children;
@@ -870,50 +887,50 @@ export function computeControlFlowNesting(rootNode: NormalizedNode): number {
 /**
  * Resolves source function node at a given line number in a TypeScript source file.
  *
- * @param sf - Optional parsed TypeScript source file.
+ * @param sourceFile - Optional parsed TypeScript source file.
  * @param startLine - Target 1-based start line.
  * @returns Found function-like node or null.
  */
 export function findSourceFunction(
-    sf: ts.SourceFile | null | undefined,
+    sourceFile: ts.SourceFile | null | undefined,
     startLine: number,
 ): ReturnType<typeof findTsFunctionAtLine> {
-    return sf ? findTsFunctionAtLine(sf, startLine) : null;
+    return sourceFile ? findTsFunctionAtLine(sourceFile, startLine) : null;
 }
 
 /**
  * Invokes an enricher callback if a matching TypeScript function is found at the given line.
  *
- * @param sf - Parsed source file.
+ * @param sourceFile - Parsed source file.
  * @param startLine - 1-based line number of the target function.
  * @param enricher - Callback that attaches AST slices or annotations.
  */
 export function attachAstEnrichment(
-    sf: ts.SourceFile | null | undefined,
+    sourceFile: ts.SourceFile | null | undefined,
     startLine: number,
     enricher: (
         targetFunction: NonNullable<ReturnType<typeof findTsFunctionAtLine>>,
         source: ts.SourceFile,
     ) => void,
 ): void {
-    const tsFn = findSourceFunction(sf, startLine);
-    if (!tsFn || !sf) return;
-    enricher(tsFn, sf);
+    const tsFn = findSourceFunction(sourceFile, startLine);
+    if (!tsFn || !sourceFile) return;
+    enricher(tsFn, sourceFile);
 }
 
 /**
  * Computes and attaches optimal function slice boundaries to an issue and its actionable.
  *
  * @param issue - Finding to enrich with function extraction candidates.
- * @param sf - Optional parsed source file.
+ * @param sourceFile - Optional parsed source file.
  * @param startLine - 1-based start line of the function.
  */
 export function attachFunctionLengthSlices(
     issue: Issue,
-    sf: ts.SourceFile | null | undefined,
+    sourceFile: ts.SourceFile | null | undefined,
     startLine: number,
 ): void {
-    attachAstEnrichment(sf, startLine, (targetFunction, source) => {
+    attachAstEnrichment(sourceFile, startLine, (targetFunction, source) => {
         const slices = computeFunctionSlices(targetFunction, source);
         const best = slices ? (slices.recommendedSlice ?? slices[0]) : null;
         if (!best) return;
@@ -944,15 +961,15 @@ export function attachFunctionLengthSlices(
  * Computes and attaches guard clause condition inversion snippet to an issue and its actionable.
  *
  * @param issue - Finding to enrich with inverted condition snippet.
- * @param sf - Optional parsed source file.
+ * @param sourceFile - Optional parsed source file.
  * @param startLine - 1-based start line of the target control flow.
  */
 export function attachGuardClauseInversion(
     issue: Issue,
-    sf: ts.SourceFile | null | undefined,
+    sourceFile: ts.SourceFile | null | undefined,
     startLine: number,
 ): void {
-    attachAstEnrichment(sf, startLine, (targetFunction, source) => {
+    attachAstEnrichment(sourceFile, startLine, (targetFunction, source) => {
         const invertedSnippet = generateInvertedConditionSnippet(targetFunction, source);
         if (!invertedSnippet) return;
 

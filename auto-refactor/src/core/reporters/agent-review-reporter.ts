@@ -321,42 +321,46 @@ function buildDirectiveEnvelope(
 }
 
 function buildBuilderDirectives(directives: AgentActionableDirective[]): AgentBuilderDirective[] {
-    const sortedDirectives = [...directives].sort((a, b) => {
+    const sortedDirectives = [...directives].sort((firstDirective, secondDirective) => {
         const rankDiff =
-            TOPOLOGY_RANK[a.ruleContract.topologyLayer] -
-            TOPOLOGY_RANK[b.ruleContract.topologyLayer];
+            TOPOLOGY_RANK[firstDirective.ruleContract.topologyLayer] -
+            TOPOLOGY_RANK[secondDirective.ruleContract.topologyLayer];
         if (rankDiff !== 0) return rankDiff;
-        const fileDiff = a.targetContext.filePath.localeCompare(b.targetContext.filePath);
+        const fileDiff = firstDirective.targetContext.filePath.localeCompare(
+            secondDirective.targetContext.filePath,
+        );
         if (fileDiff !== 0) return fileDiff;
-        return a.targetContext.startLine - b.targetContext.startLine;
+        return firstDirective.targetContext.startLine - secondDirective.targetContext.startLine;
     });
 
-    return sortedDirectives.map((d, idx) => {
-        const hasClarify = Boolean(d.clarificationRequest);
+    return sortedDirectives.map((directive, directiveIndex) => {
+        const hasClarify = Boolean(directive.clarificationRequest);
         const action = hasClarify
             ? ACTION_REQUEST_CLARIFICATION
-            : d.remediationRecipe.actionVerb || ACTION_REFACTOR;
-        const safeToAutomate = hasClarify ? false : d.remediationRecipe.safeToAutomate;
+            : directive.remediationRecipe.actionVerb || ACTION_REFACTOR;
+        const safeToAutomate = hasClarify ? false : directive.remediationRecipe.safeToAutomate;
         const instruction =
-            hasClarify && d.clarificationRequest
-                ? `[Awaiting Clarification] ${d.clarificationRequest.promptQuestion}`
-                : d.remediationRecipe.remediationSummary;
+            hasClarify && directive.clarificationRequest
+                ? `[Awaiting Clarification] ${directive.clarificationRequest.promptQuestion}`
+                : directive.remediationRecipe.remediationSummary;
 
         return {
-            directiveId: d.directiveId,
-            sequence: idx + 1,
-            topologyLayer: d.ruleContract.topologyLayer,
-            targetFile: d.targetContext.filePath,
-            line: d.targetContext.startLine,
+            directiveId: directive.directiveId,
+            sequence: directiveIndex + 1,
+            topologyLayer: directive.ruleContract.topologyLayer,
+            targetFile: directive.targetContext.filePath,
+            line: directive.targetContext.startLine,
             action,
             safeToAutomate,
             instruction,
-            ...(d.remediationRecipe.templateSnippet
-                ? { templateSnippet: d.remediationRecipe.templateSnippet }
+            ...(directive.remediationRecipe.templateSnippet
+                ? { templateSnippet: directive.remediationRecipe.templateSnippet }
                 : {}),
-            constraints: d.immutableConstraints.contractRules,
+            constraints: directive.immutableConstraints.contractRules,
             ...(hasClarify ? { requiresClarification: true } : {}),
-            ...(d.clarificationRequest ? { clarificationRequest: d.clarificationRequest } : {}),
+            ...(directive.clarificationRequest
+                ? { clarificationRequest: directive.clarificationRequest }
+                : {}),
         };
     });
 }
@@ -364,14 +368,14 @@ function buildBuilderDirectives(directives: AgentActionableDirective[]): AgentBu
 function buildReviewerDirectives(
     directives: AgentActionableDirective[],
 ): AgentReviewerCrossCheckPoint[] {
-    return directives.map((d) => ({
-        checkPointId: `CP-${d.directiveId}`,
-        targetFile: d.targetContext.filePath,
-        relatedRule: d.ruleContract.ruleId,
-        severity: d.ruleContract.severity,
-        verificationCommand: d.verificationDirective.command,
-        qualitativeAssertion: d.verificationDirective.assertionCriteria.join('; '),
-        topologyLayer: d.ruleContract.topologyLayer,
+    return directives.map((directive) => ({
+        checkPointId: `CP-${directive.directiveId}`,
+        targetFile: directive.targetContext.filePath,
+        relatedRule: directive.ruleContract.ruleId,
+        severity: directive.ruleContract.severity,
+        verificationCommand: directive.verificationDirective.command,
+        qualitativeAssertion: directive.verificationDirective.assertionCriteria.join('; '),
+        topologyLayer: directive.ruleContract.topologyLayer,
     }));
 }
 
@@ -383,22 +387,31 @@ function buildDirectivesMetrics(directives: AgentActionableDirective[]): AgentDi
         L4_PRESENTATION: 0,
         L5_GOVERNANCE: 0,
     };
-    for (const d of directives) {
-        byTopologyLayer[d.ruleContract.topologyLayer]++;
+    for (const directive of directives) {
+        byTopologyLayer[directive.ruleContract.topologyLayer]++;
     }
 
     const totalDirectives = directives.length;
-    const safeToAutomateCount = directives.filter((d) => d.remediationRecipe.safeToAutomate).length;
+    const safeToAutomateCount = directives.filter(
+        (directive) => directive.remediationRecipe.safeToAutomate,
+    ).length;
     const automationRatio =
         totalDirectives === 0 ? 1.0 : Number((safeToAutomateCount / totalDirectives).toFixed(2));
-    const affectedFilesCount = new Set(directives.map((d) => d.targetContext.filePath)).size;
+    const affectedFilesCount = new Set(
+        directives.map((directive) => directive.targetContext.filePath),
+    ).size;
 
     return {
         totalDirectives,
         bySeverity: {
-            block: directives.filter((d) => d.ruleContract.severity === VERDICT_BLOCK).length,
-            warn: directives.filter((d) => d.ruleContract.severity === VERDICT_WARN).length,
-            info: directives.filter((d) => d.ruleContract.severity === DIRECTIVE_INFO).length,
+            block: directives.filter(
+                (directive) => directive.ruleContract.severity === VERDICT_BLOCK,
+            ).length,
+            warn: directives.filter((directive) => directive.ruleContract.severity === VERDICT_WARN)
+                .length,
+            info: directives.filter(
+                (directive) => directive.ruleContract.severity === DIRECTIVE_INFO,
+            ).length,
         },
         byTopologyLayer,
         safeToAutomateCount,

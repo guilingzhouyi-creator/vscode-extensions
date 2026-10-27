@@ -178,7 +178,7 @@ function loadExternalAnalyzer(
     let analyzer: Analyzer;
     try {
         analyzer = instantiateAnalyzer(mod, decl.name);
-    } catch (_e) {
+    } catch (_error) {
         throw new AutoRefactorError(
             `${ERR_INVALID_CUSTOM_ANALYZER} custom analyzer "${decl.name}" does not export a valid Analyzer from ${modPath}`,
             'MODULE_NOT_FOUND',
@@ -248,26 +248,31 @@ function resolveCustomAnalyzers(
 ): void {
     const customAnalyzers = config.customAnalyzers;
     if (!customAnalyzers) return;
-    for (const c of customAnalyzers) {
-        if (c.enabled === false || seen.has(c.name)) continue;
-        if (!c.signals || !Array.isArray(c.signals) || c.signals.length === 0 || !c.track) {
+    for (const customDecl of customAnalyzers) {
+        if (customDecl.enabled === false || seen.has(customDecl.name)) continue;
+        if (
+            !customDecl.signals ||
+            !Array.isArray(customDecl.signals) ||
+            customDecl.signals.length === 0 ||
+            !customDecl.track
+        ) {
             throw new Error(
-                `${ERR_INVALID_CUSTOM_ANALYZER} Custom analyzer '${c.name}' must declare 'signals' and 'track' (Fail-Closed, N-08)`,
+                `${ERR_INVALID_CUSTOM_ANALYZER} Custom analyzer '${customDecl.name}' must declare 'signals' and 'track' (Fail-Closed, N-08)`,
             );
         }
-        const { analyzer, modulePath } = loadExternalAnalyzer(c, baseDir);
+        const { analyzer, modulePath } = loadExternalAnalyzer(customDecl, baseDir);
         const customModulePath = modulePath;
         plan.push({
-            name: c.name,
+            name: customDecl.name,
             instance: analyzer,
-            options: { ...config.thresholds, ...(c.options || {}) },
+            options: { ...config.thresholds, ...(customDecl.options || {}) },
             modulePath,
             factory: () => {
                 const mod = dynamicRequire(customModulePath);
-                return instantiateAnalyzer(mod, c.name);
+                return instantiateAnalyzer(mod, customDecl.name);
             },
         });
-        seen.add(c.name);
+        seen.add(customDecl.name);
     }
 }
 

@@ -39,7 +39,7 @@ const FORBIDDEN_IMPORTS = [
 
 const FORBIDDEN_IMPORT_PATTERNS = FORBIDDEN_IMPORTS.map((pkg) => ({
     pkg,
-    re: new RegExp(`(?:from|require\\s*\\()\\s*['"]${pkg}['"]`),
+    pattern: new RegExp(`(?:from|require\\s*\\()\\s*['"]${pkg}['"]`),
 }));
 
 const KEYWORD_EXTENDS = 'extends';
@@ -74,12 +74,12 @@ function countTopLevelParams(paramStr: string): number {
     let depth = 0;
     let commas = 0;
     for (let j = 0; j < trimmed.length; j++) {
-        const c = trimmed[j];
-        if (OPEN_BRACKETS.has(c)) {
+        const char = trimmed[j];
+        if (OPEN_BRACKETS.has(char)) {
             depth++;
-        } else if (CLOSE_BRACKETS.has(c)) {
+        } else if (CLOSE_BRACKETS.has(char)) {
             depth--;
-        } else if (c === ',' && depth === 0) {
+        } else if (char === ',' && depth === 0) {
             commas++;
         }
     }
@@ -95,8 +95,8 @@ function checkLineForbiddenImports(
     lineIndex: number,
     violations: GovernanceViolation[],
 ): void {
-    for (const { pkg, re } of FORBIDDEN_IMPORT_PATTERNS) {
-        if (re.test(line)) {
+    for (const { pkg, pattern } of FORBIDDEN_IMPORT_PATTERNS) {
+        if (pattern.test(line)) {
             violations.push({
                 ruleId: 'GOV-MNT-002',
                 message: `Core domain module imports presentation/framework package \`${pkg}\`.`,
@@ -134,16 +134,16 @@ function checkExtendsLine(
     isDomainOrBackend: boolean,
     violations: GovernanceViolation[],
 ): void {
-    const m = line.match(EXTENDS_RE);
-    if (m) {
-        const className = m[1];
-        const superName = m[2];
+    const matchResult = line.match(EXTENDS_RE);
+    if (matchResult) {
+        const className = matchResult[1];
+        const superName = matchResult[2];
         if (SUBCLASS_HEURISTIC_RE.test(superName)) {
             violations.push({
                 ruleId: 'GOV-MNT-001',
                 message: `Class \`${className}\` extends \`${superName}\`, potentially exceeding max inheritance depth of 2.`,
                 line: lineIndex + 1,
-                column: m.index != null ? m.index + 1 : 1,
+                column: matchResult.index != null ? matchResult.index + 1 : 1,
                 suggestion:
                     'Refactor deep class hierarchy into single domain class + composition strategy pattern.',
                 fixable: false,
@@ -179,9 +179,9 @@ function extractParameterText(
     let accumulated = lines[startLineIdx].slice(openParenIdx + 1);
     let depth = 1;
     for (let j = 0; j < accumulated.length; j++) {
-        const ch = accumulated[j];
-        if (ch === '(') depth++;
-        else if (ch === ')') {
+        const char = accumulated[j];
+        if (char === '(') depth++;
+        else if (char === ')') {
             depth--;
             if (depth === 0) return accumulated.slice(0, j);
         }
@@ -191,9 +191,9 @@ function extractParameterText(
     for (let k = startLineIdx + 1; k < maxLine; k++) {
         const line = lines[k];
         for (let j = 0; j < line.length; j++) {
-            const ch = line[j];
-            if (ch === '(') depth++;
-            else if (ch === ')') {
+            const char = line[j];
+            if (char === '(') depth++;
+            else if (char === ')') {
                 depth--;
                 if (depth === 0) {
                     accumulated += ' ' + line.slice(0, j);
@@ -224,13 +224,13 @@ function inspectFunctionAtLine(
     violations: GovernanceViolation[],
 ): void {
     if (!hasFunctionStartToken(line)) return;
-    const m = line.match(FUNC_START_RE) || line.match(PY_GD_FUNC_RE);
-    if (!m) return;
+    const matchResult = line.match(FUNC_START_RE) || line.match(PY_GD_FUNC_RE);
+    if (!matchResult) return;
 
-    const funcName = m[1] || m[2];
+    const funcName = matchResult[1] || matchResult[2];
     if (!funcName || funcName === 'constructor') return;
 
-    const openIdx = line.indexOf('(', m.index ?? 0);
+    const openIdx = line.indexOf('(', matchResult.index ?? 0);
     if (openIdx === -1) return;
 
     const paramText = extractParameterText(lines, lineIndex, openIdx);
@@ -310,11 +310,11 @@ export const DomainDecouplingRule: GovernanceRule = {
         'Domain layer must remain clean and portable; importing UI or CLI presentation frameworks introduces severe coupling.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        const p = ctx.filePath.replace(/\\/g, '/').toLowerCase();
+        const normalizedPath = ctx.filePath.replace(/\\/g, '/').toLowerCase();
         const isDomain =
-            p.includes('/domain/') ||
-            p.includes('/domains/') ||
-            (p.includes('/core/') && !p.includes('/cli/'));
+            normalizedPath.includes('/domain/') ||
+            normalizedPath.includes('/domains/') ||
+            (normalizedPath.includes('/core/') && !normalizedPath.includes('/cli/'));
         if (!isDomain) return null;
 
         if (!FORBIDDEN_IMPORTS.some((pkg) => ctx.content.includes(pkg))) return null;

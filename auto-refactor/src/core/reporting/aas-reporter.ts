@@ -110,9 +110,7 @@ function resolveVerdict(counts: AasCounts): AasVerdict {
  */
 function trimMessage(text: string, maxChars: number = DEFAULT_MAX_MESSAGE_CHARS): string {
     const clean = (text || '').replace(/\s+/g, ' ').trim();
-    return clean.length <= maxChars ?
-        clean :
-        clean.slice(0, Math.max(1, maxChars - 1)) + ELLIPSIS;
+    return clean.length <= maxChars ? clean : clean.slice(0, Math.max(1, maxChars - 1)) + ELLIPSIS;
 }
 
 /**
@@ -185,10 +183,17 @@ function buildHealth(report: ScanReport, counts: AasCounts, options?: AasReportO
             : report.qualityScore?.densityTensorSummary;
 
     return {
-        score: score !== null && Number.isFinite(score) ? Math.round(score * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED : null,
+        score:
+            score !== null && Number.isFinite(score)
+                ? Math.round(score * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED
+                : null,
         grade,
-        ...(cai !== undefined && Number.isFinite(cai) ? { cai: Math.round(cai * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED } : {}),
-        ...(density !== undefined && Number.isFinite(density) ? { density: Math.round(density * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED } : {}),
+        ...(cai !== undefined && Number.isFinite(cai)
+            ? { cai: Math.round(cai * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED }
+            : {}),
+        ...(density !== undefined && Number.isFinite(density)
+            ? { density: Math.round(density * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED }
+            : {}),
         ...(tensorSummary ? { tensorSummary } : {}),
         counts,
     };
@@ -225,7 +230,7 @@ function extractDeductionBottlenecks(
             loss: Math.round(data.loss * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
             count: data.count,
         }))
-        .sort((a, b) => b.loss - a.loss)
+        .sort((itemA, itemB) => itemB.loss - itemA.loss)
         .slice(0, limit);
 }
 
@@ -239,7 +244,7 @@ function extractFrequencyBottlenecks(issues: readonly Issue[], limit: number): A
     }
     return Array.from(freqMap.entries())
         .map(([rule, count]) => ({ rule, loss: count, count }))
-        .sort((a, b) => b.count - a.count)
+        .sort((itemA, itemB) => itemB.count - itemA.count)
         .slice(0, limit);
 }
 
@@ -285,10 +290,12 @@ function cleanSuggestion(raw: string): string | undefined {
     const trimmed = raw.trim();
     if (trimmed.length <= MAX_SUGGESTION_CHARS) return trimmed;
     const match = trimmed.match(/^([^.!?\n]+[.!?]?)/);
-    const firstClause = match ? match[1].trim() : trimmed.slice(0, ELLIPSIS_TRUNCATE_CHARS) + ELLIPSIS;
-    return firstClause.length <= MAX_SUGGESTION_CHARS ?
-        firstClause :
-        firstClause.slice(0, ELLIPSIS_TRUNCATE_CHARS) + ELLIPSIS;
+    const firstClause = match
+        ? match[1].trim()
+        : trimmed.slice(0, ELLIPSIS_TRUNCATE_CHARS) + ELLIPSIS;
+    return firstClause.length <= MAX_SUGGESTION_CHARS
+        ? firstClause
+        : firstClause.slice(0, ELLIPSIS_TRUNCATE_CHARS) + ELLIPSIS;
 }
 
 /**
@@ -342,7 +349,9 @@ function buildDefectRecord(params: DefectRecordParams): AasDefectRecord {
 
     const radius = params.options.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
     const anchor =
-        sev !== AAS_SEV_INFO ? params.anchorCache.getAnchor(params.file, startLine, endLine, radius) : undefined;
+        sev !== AAS_SEV_INFO
+            ? params.anchorCache.getAnchor(params.file, startLine, endLine, radius)
+            : undefined;
 
     const fix = buildFixRecipe(issue);
     const verifyCmd = generateVerificationDirective(
@@ -412,8 +421,8 @@ function collectFileIssues(
 function resolvePrimaryLayer(issues: readonly Issue[], fPath: string): string {
     let bestLayer = 'L5_GOVERNANCE';
     let bestRank = UNRANKED_TOPOLOGY_WEIGHT;
-    for (const it of issues) {
-        const layer = resolveTopologyLayer(it.rule, fPath);
+    for (const issue of issues) {
+        const layer = resolveTopologyLayer(issue.rule, fPath);
         const rank = TOPOLOGY_RANK[layer] ?? UNRANKED_TOPOLOGY_WEIGHT;
         if (rank < bestRank) {
             bestRank = rank;
@@ -438,11 +447,11 @@ function buildFileLayerMap(fileMap: Map<string, Issue[]>): Map<string, string> {
  * Sorts files by topological priority (L1 -> L5), breaking ties alphabetically.
  */
 function sortFilesByTopology(files: string[], fileLayerMap: Map<string, string>): string[] {
-    return [...files].sort((a, b) => {
-        const rankA = TOPOLOGY_RANK[fileLayerMap.get(a)!] ?? UNRANKED_TOPOLOGY_WEIGHT;
-        const rankB = TOPOLOGY_RANK[fileLayerMap.get(b)!] ?? UNRANKED_TOPOLOGY_WEIGHT;
+    return [...files].sort((fileA, fileB) => {
+        const rankA = TOPOLOGY_RANK[fileLayerMap.get(fileA)!] ?? UNRANKED_TOPOLOGY_WEIGHT;
+        const rankB = TOPOLOGY_RANK[fileLayerMap.get(fileB)!] ?? UNRANKED_TOPOLOGY_WEIGHT;
         if (rankA !== rankB) return rankA - rankB;
-        return a.localeCompare(b);
+        return fileA.localeCompare(fileB);
     });
 }
 
@@ -463,20 +472,21 @@ interface EmitDefectsParams {
 /**
  * Emits defect records for a single file respecting per-file and total caps.
  */
-function emitDefectsForFile(
-    params: EmitDefectsParams,
-): { emitted: AasDefectRecord[]; omittedCount: number } {
+function emitDefectsForFile(params: EmitDefectsParams): {
+    emitted: AasDefectRecord[];
+    omittedCount: number;
+} {
     const emitted: AasDefectRecord[] = [];
     let omittedCount = 0;
 
-    for (const it of params.issues) {
+    for (const issue of params.issues) {
         if (emitted.length >= params.maxPerFile || emitted.length >= params.remainingBudget) {
             omittedCount++;
             continue;
         }
         emitted.push(
             buildDefectRecord({
-                issue: it,
+                issue,
                 file: params.fPath,
                 layer: params.layer,
                 anchorCache: params.anchorCache,

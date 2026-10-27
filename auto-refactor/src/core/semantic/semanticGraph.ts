@@ -71,7 +71,7 @@ export class SemanticGraph {
         if (!list) {
             return;
         }
-        const idx = list.findIndex((n) => n.id === node.id);
+        const idx = list.findIndex((targetNode) => targetNode.id === node.id);
         if (idx >= 0) {
             list.splice(idx, 1);
         }
@@ -80,15 +80,15 @@ export class SemanticGraph {
     /**
      * Checks if a node exists.
      */
-    public hasNode(id: string): boolean {
-        return this.nodes.has(id);
+    public hasNode(nodeId: string): boolean {
+        return this.nodes.has(nodeId);
     }
 
     /**
      * Retrieves a node by its canonical identifier.
      */
-    public getNode(id: string): SemanticNode | undefined {
-        return this.nodes.get(id);
+    public getNode(nodeId: string): SemanticNode | undefined {
+        return this.nodes.get(nodeId);
     }
 
     /**
@@ -207,8 +207,8 @@ export class SemanticGraph {
         }
 
         const nodes: SemanticNode[] = [];
-        for (const id of visitedNodes) {
-            const node = this.nodes.get(id);
+        for (const visitedId of visitedNodes) {
+            const node = this.nodes.get(visitedId);
             if (node) {
                 nodes.push(node);
             }
@@ -316,17 +316,17 @@ export class SemanticGraph {
         while (head < queue.length) {
             const cur = queue[head++];
             for (const edge of this.getOutgoingEdges(cur)) {
-                const n = edge.toNodeId;
-                if (this.nodes.has(n) && !visited.has(n)) {
-                    visited.add(n);
-                    queue.push(n);
+                const neighborId = edge.toNodeId;
+                if (this.nodes.has(neighborId) && !visited.has(neighborId)) {
+                    visited.add(neighborId);
+                    queue.push(neighborId);
                 }
             }
             for (const edge of this.getIncomingEdges(cur)) {
-                const n = edge.fromNodeId;
-                if (this.nodes.has(n) && !visited.has(n)) {
-                    visited.add(n);
-                    queue.push(n);
+                const neighborId = edge.fromNodeId;
+                if (this.nodes.has(neighborId) && !visited.has(neighborId)) {
+                    visited.add(neighborId);
+                    queue.push(neighborId);
                 }
             }
         }
@@ -368,13 +368,13 @@ export class SemanticGraph {
     }): SemanticGraph {
         const graph = new SemanticGraph();
         if (Array.isArray(payload.nodes)) {
-            for (const n of payload.nodes) {
-                graph.addNode(n);
+            for (const node of payload.nodes) {
+                graph.addNode(node);
             }
         }
         if (Array.isArray(payload.edges)) {
-            for (const e of payload.edges) {
-                graph.addEdge(e);
+            for (const edge of payload.edges) {
+                graph.addEdge(edge);
             }
         }
         return graph;

@@ -63,17 +63,17 @@ export class DaemonClient {
     private nextId = 0;
     private pendingHello: {
         resolve: (ack: HelloAckMessage) => void;
-        reject: (e: Error) => void;
+        reject: (error: Error) => void;
     } | null = null;
     private pendingScan: {
-        resolve: (r: WarmScanResult) => void;
-        reject: (e: Error) => void;
+        resolve: (scanResult: WarmScanResult) => void;
+        reject: (error: Error) => void;
     } | null = null;
     private pendingScanDiff: {
-        resolve: (r: { report: unknown; stats: unknown }) => void;
-        reject: (e: Error) => void;
+        resolve: (diffResult: { report: unknown; stats: unknown }) => void;
+        reject: (error: Error) => void;
     } | null = null;
-    private pendingPong: { resolve: () => void; reject: (e: Error) => void } | null = null;
+    private pendingPong: { resolve: () => void; reject: (error: Error) => void } | null = null;
     private caps: { cache: boolean; stream: boolean; maxWorkers: number; diff?: boolean } | null =
         null;
 
@@ -103,7 +103,7 @@ export class DaemonClient {
             const socket = net.connect(registry.pipe);
             this.socket = socket;
             let settled = false;
-            const fail = (e: Error) => {
+            const fail = (error: Error) => {
                 if (settled) return;
                 settled = true;
                 try {
@@ -111,7 +111,7 @@ export class DaemonClient {
                 } catch {
                     /* ignore */
                 }
-                reject(e);
+                reject(error);
             };
 
             const timer = setTimeout(
@@ -145,20 +145,20 @@ export class DaemonClient {
             });
 
             socket.on('data', (chunk: Buffer) => this.onData(chunk.toString('utf8')));
-            socket.on('error', (e) => {
-                if (!settled) fail(new Error(`CONNECT_ERROR: ${e.message}`));
+            socket.on('error', (err) => {
+                if (!settled) fail(new Error(`CONNECT_ERROR: ${err.message}`));
                 // Mid-scan daemon crash: reject any in-flight request so the caller
                 // degrades to cold.
                 if (this.pendingScan) {
-                    this.pendingScan.reject(new Error(`DAEMON_DISCONNECT: ${e.message}`));
+                    this.pendingScan.reject(new Error(`DAEMON_DISCONNECT: ${err.message}`));
                     this.pendingScan = null;
                 }
                 if (this.pendingScanDiff) {
-                    this.pendingScanDiff.reject(new Error(`DAEMON_DISCONNECT: ${e.message}`));
+                    this.pendingScanDiff.reject(new Error(`DAEMON_DISCONNECT: ${err.message}`));
                     this.pendingScanDiff = null;
                 }
                 if (this.pendingPong) {
-                    this.pendingPong.reject(new Error(`DAEMON_DISCONNECT: ${e.message}`));
+                    this.pendingPong.reject(new Error(`DAEMON_DISCONNECT: ${err.message}`));
                     this.pendingPong = null;
                 }
             });
@@ -201,7 +201,7 @@ export class DaemonClient {
                 return;
             }
             const requestId = `r${++this.nextId}`;
-            const id = this.nextId;
+            const messageId = this.nextId;
             let settled = false;
             const timer = setTimeout(() => {
                 if (!settled) {
@@ -210,22 +210,22 @@ export class DaemonClient {
                 }
             }, SCAN_TIMEOUT_MS);
             this.pendingScan = {
-                resolve: (r) => {
+                resolve: (scanResult) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
-                    resolve(r);
+                    resolve(scanResult);
                 },
-                reject: (e) => {
+                reject: (error) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
-                    reject(e);
+                    reject(error);
                 },
             };
             this.send({
                 v: 1,
-                id,
+                id: messageId,
                 type: 'scan',
                 params: {
                     requestId,
@@ -267,7 +267,7 @@ export class DaemonClient {
                 return;
             }
             const requestId = `r${++this.nextId}`;
-            const id = this.nextId;
+            const messageId = this.nextId;
             let settled = false;
             const timer = setTimeout(() => {
                 if (!settled) {
@@ -276,22 +276,22 @@ export class DaemonClient {
                 }
             }, SCAN_TIMEOUT_MS);
             this.pendingScanDiff = {
-                resolve: (r) => {
+                resolve: (diffResult) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
-                    resolve(r);
+                    resolve(diffResult);
                 },
-                reject: (e) => {
+                reject: (error) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
-                    reject(e);
+                    reject(error);
                 },
             };
             this.send({
                 v: 1,
-                id,
+                id: messageId,
                 type: 'scan_diff',
                 params: {
                     requestId,
@@ -332,11 +332,11 @@ export class DaemonClient {
                     clearTimeout(timer);
                     resolve();
                 },
-                reject: (e) => {
+                reject: (error) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
-                    reject(e);
+                    reject(error);
                 },
             };
             this.send({ v: 1, id: ++this.nextId, type: 'ping' });
@@ -491,10 +491,10 @@ export async function tryWarmScan(
         const result = await client.scan(config, options);
         client.close();
         return result;
-    } catch (e) {
+    } catch (error) {
         client.close();
         logger?.debug(
-            `warm scan fallback to cold scan: ${e instanceof Error ? e.message : String(e)}`,
+            `warm scan fallback to cold scan: ${error instanceof Error ? error.message : String(error)}`,
         );
         return null;
     }
@@ -547,10 +547,10 @@ export async function tryWarmScanDiff(
         const result = await client.scanDiff(config, diffs, options);
         client.close();
         return result;
-    } catch (e) {
+    } catch (error) {
         client.close();
         logger?.debug(
-            `warm scan diff fallback to cold scan: ${e instanceof Error ? e.message : String(e)}`,
+            `warm scan diff fallback to cold scan: ${error instanceof Error ? error.message : String(error)}`,
         );
         return null;
     }

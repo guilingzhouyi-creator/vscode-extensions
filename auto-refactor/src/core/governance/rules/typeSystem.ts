@@ -48,7 +48,7 @@ function scanLinePatternViolations(
     lines: string[],
     pattern: RegExp,
     ruleId: 'GOV-TYP-004' | 'GOV-TYP-005',
-    messageFn: (m: RegExpExecArray) => string,
+    messageFn: (match: RegExpExecArray) => string,
     suggestion: string,
 ): GovernanceViolation[] {
     const violations: GovernanceViolation[] = [];
@@ -76,7 +76,7 @@ function scanLinePatternViolations(
 /**
  * Factory for creating TypeScript pattern-matching governance rules.
  *
- * @param id - Governance rule ID.
+ * @param ruleId - Governance rule ID.
  * @param name - Human-readable rule name.
  * @param risk - Risk level.
  * @param rationale - Architectural justification.
@@ -87,17 +87,17 @@ function scanLinePatternViolations(
  * @returns Configured GovernanceRule instance.
  */
 function createTypeGovernanceRule(
-    id: 'GOV-TYP-004' | 'GOV-TYP-005',
+    ruleId: 'GOV-TYP-004' | 'GOV-TYP-005',
     name: string,
     risk: 'medium' | 'high',
     rationale: string,
     pattern: RegExp,
-    messageFn: (m: RegExpExecArray) => string,
+    messageFn: (match: RegExpExecArray) => string,
     suggestion: string,
     trigger: string,
 ): GovernanceRule {
     return {
-        id,
+        id: ruleId,
         name,
         category: TYPE_SYSTEM_CATEGORY,
         severity: SEVERITY_WARNING,
@@ -111,7 +111,7 @@ function createTypeGovernanceRule(
             const violations = scanLinePatternViolations(
                 ctx.masked,
                 pattern,
-                id,
+                ruleId,
                 messageFn,
                 suggestion,
             );
@@ -238,7 +238,8 @@ export const UnsafePropertyPenetrationRule: GovernanceRule = createTypeGovernanc
     RISK_HIGH,
     'Accessing properties via `(expr as any).prop` bypasses compiler type safety.',
     PROPERTY_PENETRATION_RE,
-    (m) => `Unsafe property penetration on \`${m[1]}\` via \`as any\`. Use standard type guards.`,
+    (matchResult) =>
+        `Unsafe property penetration on \`${matchResult[1]}\` via \`as any\`. Use standard type guards.`,
     'Use standard type guards before accessing properties.',
     'as any',
 );

@@ -67,9 +67,9 @@ function stripStringLiterals(line: string): string {
 function updateBraceDepth(line: string, currentDepth: number): number {
     const cleanLine = stripStringLiterals(line.split('//')[0]);
     let depth = currentDepth;
-    for (const ch of cleanLine) {
-        if (ch === '{') depth++;
-        else if (ch === '}') depth--;
+    for (const charStr of cleanLine) {
+        if (charStr === '{') depth++;
+        else if (charStr === '}') depth--;
     }
     return depth;
 }

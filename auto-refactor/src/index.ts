@@ -561,9 +561,9 @@ async function handleScanCommand(args: string[]): Promise<number> {
     if (cli.cacheClear) {
         const cfg = resolveConfig(cli);
         const cache = new CacheStore(cli.cacheDir, cfg.root);
-        const ok = cache.clear();
+        const clearedOk = cache.clear();
         process.stderr.write(
-            `[auto-refactor] cache cleared (${ok ? STATUS_OK : STATUS_FAILED}): ${cache.dir}\n`,
+            `[auto-refactor] cache cleared (${clearedOk ? STATUS_OK : STATUS_FAILED}): ${cache.dir}\n`,
         );
     }
 

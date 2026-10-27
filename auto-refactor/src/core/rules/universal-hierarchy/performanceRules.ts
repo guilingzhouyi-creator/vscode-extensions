@@ -331,7 +331,7 @@ export class PerformanceRuleEvaluator {
             const callText = node.expression.getText();
             this.checkAstCallExpression({ node, callText, filePath, sourceFile, issues });
         } else if (ts.isArrayLiteralExpression(node) && node.elements.length > 0) {
-            const hasSpread = node.elements.some((el) => ts.isSpreadElement(el));
+            const hasSpread = node.elements.some((elementNode) => ts.isSpreadElement(elementNode));
             if (hasSpread) {
                 issues.push(
                     this.createAllocationIssue(

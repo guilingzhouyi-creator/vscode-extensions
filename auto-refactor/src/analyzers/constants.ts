@@ -165,16 +165,16 @@ export class ConstantsAnalyzer implements Analyzer {
     private literals: LiteralRecord[] = [];
     private issues: Issue[] = [];
 
-    analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         this.literals = [];
         this.issues = [];
 
         const { TypeScriptAdapter } =
             require('../core/ast/typescript-adapter') as typeof import('../core/ast/typescript-adapter');
         const adapter = new TypeScriptAdapter();
-        const ast = adapter.parse(sf.text, ctx.filePath);
+        const ast = adapter.parse(sourceFile.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [
-            { analyzer: this, ctx: { ...ctx, sourceFile: sf, root: ast.root, adapter } },
+            { analyzer: this, ctx: { ...ctx, sourceFile, root: ast.root, adapter } },
         ]);
     }
 
@@ -277,12 +277,12 @@ export class ConstantsAnalyzer implements Analyzer {
     private executeTopologyPass(ctx: AnalyzerContext, issues: Issue[]): void {
         if (!ctx.content) return;
         const entities = extractConstantEntities(ctx.content, ctx.filePath);
-        const observed = entities.map((e) => ({
-            name: e.identity.name,
-            normalizedValue: e.fingerprint?.normalizedValue ?? '',
+        const observed = entities.map((entity) => ({
+            name: entity.identity.name,
+            normalizedValue: entity.fingerprint?.normalizedValue ?? '',
             filePath: ctx.filePath,
-            line: e.identity.line ?? 1,
-            isExported: e.identity.isExported,
+            line: entity.identity.line ?? 1,
+            isExported: entity.identity.isExported,
         }));
         issues.push(...inspectConstantLibraryTopology(observed, ctx.filePath));
         issues.push(...detectConstantDrift(observed));
@@ -320,7 +320,16 @@ export class ConstantsAnalyzer implements Analyzer {
         const granular = Boolean(ctx.options.granularRules);
 
         for (const lit of this.literals) {
-            if (this.shouldSkipMagicNumber(lit, min, suppress, isDataOrConfig, isConstLib, ctx.content)) {
+            if (
+                this.shouldSkipMagicNumber(
+                    lit,
+                    min,
+                    suppress,
+                    isDataOrConfig,
+                    isConstLib,
+                    ctx.content,
+                )
+            ) {
                 continue;
             }
             const issue = this.buildMagicNumberIssue(lit, ctx, classify, granular);
@@ -643,9 +652,9 @@ export class ConstantsAnalyzer implements Analyzer {
 
     private suggestName(value: string, kind: typeof NUM_KIND | typeof STR_KIND): string {
         if (kind === NUM_KIND) {
-            const n = Number(value);
-            if (Number.isInteger(n) && Math.abs(n) < SUGGESTED_NAME_INTEGER_LIMIT)
-                return `CONST_${n}`;
+            const numValue = Number(value);
+            if (Number.isInteger(numValue) && Math.abs(numValue) < SUGGESTED_NAME_INTEGER_LIMIT)
+                return `CONST_${numValue}`;
             return 'EXTRACTED_NUMBER';
         }
         const cleaned = value
@@ -654,7 +663,7 @@ export class ConstantsAnalyzer implements Analyzer {
             .trim()
             .split(RE_WHITESPACE)
             .slice(0, SUGGESTED_NAME_MAX_WORDS)
-            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
             .join('');
         const name = cleaned ? `${cleaned.toUpperCase()}_TEXT` : 'EXTRACTED_STRING';
         return RE_LEADING_DIGIT.test(name) ? `CONST_${name}` : name;

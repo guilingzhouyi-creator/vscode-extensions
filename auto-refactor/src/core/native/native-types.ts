@@ -368,17 +368,17 @@ export interface INativeCore {
     /**
      * Computes inner dot product between two vector slices.
      */
-    computeVectorDotProduct(a: readonly number[], b: readonly number[]): number;
+    computeVectorDotProduct(vectorA: readonly number[], vectorB: readonly number[]): number;
 
     /**
      * Computes cosine similarity between two vector slices.
      */
-    computeVectorCosineSimilarity(a: readonly number[], b: readonly number[]): number;
+    computeVectorCosineSimilarity(vectorA: readonly number[], vectorB: readonly number[]): number;
 
     /**
      * Computes Euclidean distance between two vector slices.
      */
-    computeVectorEuclideanDistance(a: readonly number[], b: readonly number[]): number;
+    computeVectorEuclideanDistance(vectorA: readonly number[], vectorB: readonly number[]): number;
 
     /**
      * Analyzes variable scope hierarchy and detects outer-scope symbol shadowing incidents.

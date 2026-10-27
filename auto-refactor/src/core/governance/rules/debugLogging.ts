@@ -83,8 +83,12 @@ function checkDebugLine(
         startIdx++;
     }
     if (startIdx >= line.length) return;
-    const c0 = line.charCodeAt(startIdx);
-    if (c0 === CHAR_CODE_HASH || c0 === CHAR_CODE_SLASH || c0 === CHAR_CODE_ASTERISK) {
+    const firstCharCode = line.charCodeAt(startIdx);
+    if (
+        firstCharCode === CHAR_CODE_HASH ||
+        firstCharCode === CHAR_CODE_SLASH ||
+        firstCharCode === CHAR_CODE_ASTERISK
+    ) {
         return;
     }
 
@@ -92,12 +96,15 @@ function checkDebugLine(
         const pat = patterns[pIdx];
         if (!matchesDbgPattern(line, pat)) continue;
 
-        const m = line.match(pat.wordRe);
+        const matchResult = line.match(pat.wordRe);
         violations.push({
             ruleId: 'GOV-DBG-001',
             message: `Diagnostic call \`${pat.id}\` found in production file.`,
             line: lineIndex + 1,
-            column: m && m.index != null ? m.index + 1 : line.search(pat.wordRe) + 1,
+            column:
+                matchResult && matchResult.index != null
+                    ? matchResult.index + 1
+                    : line.search(pat.wordRe) + 1,
             suggestion: 'Remove debug statement or route through a configurable Logger interface.',
             fixable: false,
         });
@@ -133,8 +140,8 @@ export const DiagnosticLeakRule: GovernanceRule = {
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
-        const patterns = getDbgPatterns(ctx.capabilities.debugIdentifiers).filter((p) =>
-            ctx.content.includes(p.id),
+        const patterns = getDbgPatterns(ctx.capabilities.debugIdentifiers).filter((pattern) =>
+            ctx.content.includes(pattern.id),
         );
 
         if (patterns.length === 0) {

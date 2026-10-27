@@ -99,8 +99,8 @@ export class CodeEvolutionAnalyzer {
             this.miner.preloadRepository(targetDir);
         }
         const results = new Map<string, CodeEvolutionMetrics>();
-        for (const fp of filePaths) {
-            results.set(fp, this.analyzeFile(fp, targetDir));
+        for (const filePath of filePaths) {
+            results.set(filePath, this.analyzeFile(filePath, targetDir));
         }
         return results;
     }
@@ -218,9 +218,9 @@ export class CodeEvolutionAnalyzer {
         let entropy = 0.0;
         for (const author of authors) {
             const count = authorCounts[author];
-            const p = count / totalCommits;
-            if (p > 0) {
-                entropy -= p * (Math.log(p) / Math.LN2);
+            const prob = count / totalCommits;
+            if (prob > 0) {
+                entropy -= prob * (Math.log(prob) / Math.LN2);
             }
         }
 
@@ -264,8 +264,10 @@ export class CodeEvolutionAnalyzer {
         const newerHalf = commits.slice(0, mid);
         const olderHalf = commits.slice(mid);
 
-        const newerBugRatio = newerHalf.filter((c) => c.isBugFix).length / newerHalf.length;
-        const olderBugRatio = olderHalf.filter((c) => c.isBugFix).length / olderHalf.length;
+        const newerBugRatio =
+            newerHalf.filter((commitItem) => commitItem.isBugFix).length / newerHalf.length;
+        const olderBugRatio =
+            olderHalf.filter((commitItem) => commitItem.isBugFix).length / olderHalf.length;
 
         // If olderBugRatio > newerBugRatio, debt is converging (positive velocity)
         const diff = olderBugRatio - newerBugRatio;

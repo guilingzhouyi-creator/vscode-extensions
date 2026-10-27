@@ -307,7 +307,8 @@ function createProhibitedEmbeddedResult(params: ProhibitedResultParams): DualTra
     const { filePath, content, ext, lineCount, productionLoc } = params;
     const lines = content.split(/\r\n|\n/);
     const testLineIdx = lines.findIndex(
-        (l) => !COMMENT_LINE_RE.test(l) && TEST_CALL_SITE_RE.test(stripNonExecutableText(l)),
+        (line) =>
+            !COMMENT_LINE_RE.test(line) && TEST_CALL_SITE_RE.test(stripNonExecutableText(line)),
     );
     const lineNum = testLineIdx >= 0 ? testLineIdx + 1 : 1;
 

@@ -349,7 +349,7 @@ export class ComplexityAnalyzer implements Analyzer {
         lines: string[];
     }> = [];
 
-    analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         this.issues = [];
         this.loopSites.clear();
         this.functionCCs = [];
@@ -362,9 +362,9 @@ export class ComplexityAnalyzer implements Analyzer {
             MODULE_TYPESCRIPT_ADAPTER,
         ) as typeof import('../core/ast/typescript-adapter');
         const adapter = new TypeScriptAdapter();
-        const ast = adapter.parse(sf.text, ctx.filePath);
+        const ast = adapter.parse(sourceFile.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [
-            { analyzer: this, ctx: { ...ctx, sourceFile: sf, root: ast.root, adapter } },
+            { analyzer: this, ctx: { ...ctx, sourceFile, root: ast.root, adapter } },
         ]);
     }
 
@@ -569,7 +569,7 @@ export class ComplexityAnalyzer implements Analyzer {
         const isParserContext =
             RE_PARSER_FILE_CONTEXT.test(ctx.filePath) || RE_PARSER_FUNCTION_NAME.test(name);
 
-        const hasSwitchOrDispatch = fnLines.some((l) => RE_SWITCH_OR_DISPATCH_LINE.test(l));
+        const hasSwitchOrDispatch = fnLines.some((line) => RE_SWITCH_OR_DISPATCH_LINE.test(line));
         const isStateMachine = hasSwitchOrDispatch && fnLines.length >= MIN_STATE_MACHINE_LINES;
         const isEventLoop =
             RE_EVENT_LOOP_FILE_CONTEXT.test(ctx.filePath) || RE_EVENT_LOOP_FUNCTION_NAME.test(name);

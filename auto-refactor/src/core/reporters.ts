@@ -99,8 +99,8 @@ function renderReportHeader(report: ScanReport): string[] {
         `Scanned ${report.summary.filesScanned} file(s); ${report.summary.issuesTotal} issue(s) ` +
             `[error=${report.summary.bySeverity.error}, warning=${report.summary.bySeverity.warning}, info=${report.summary.bySeverity.info}]`,
     );
-    for (const [a, c] of Object.entries(report.summary.byAnalyzer)) {
-        lines.push(`  analyzer ${a}: ${c} issue(s)`);
+    for (const [analyzerName, issueCount] of Object.entries(report.summary.byAnalyzer)) {
+        lines.push(`  analyzer ${analyzerName}: ${issueCount} issue(s)`);
     }
     if (report.summary.disabledAnalyzers && report.summary.disabledAnalyzers.length > 0) {
         lines.push(
@@ -133,8 +133,8 @@ function getOrCreateFileIssues(byFile: Map<string, Issue[]>, file: string): Issu
  */
 function groupIssuesByFile(issues: readonly Issue[]): Map<string, Issue[]> {
     const byFile = new Map<string, Issue[]>();
-    for (const it of issues) {
-        getOrCreateFileIssues(byFile, it.location.file).push(it);
+    for (const issueItem of issues) {
+        getOrCreateFileIssues(byFile, issueItem.location.file).push(issueItem);
     }
     return byFile;
 }
@@ -148,12 +148,12 @@ function groupIssuesByFile(issues: readonly Issue[]): Map<string, Issue[]> {
 function appendFileIssueBlocks(lines: string[], byFile: Map<string, Issue[]>): void {
     for (const [file, items] of byFile) {
         lines.push(`■ ${file}`);
-        for (const it of items) {
-            const loc = `${it.location.start.line}:${it.location.start.column}`;
+        for (const issueItem of items) {
+            const loc = `${issueItem.location.start.line}:${issueItem.location.start.column}`;
             lines.push(
-                `  [${it.severity.toUpperCase()}] ${it.analyzer}/${it.rule} @${loc} — ${it.message}`,
+                `  [${issueItem.severity.toUpperCase()}] ${issueItem.analyzer}/${issueItem.rule} @${loc} — ${issueItem.message}`,
             );
-            if (it.suggestion) lines.push(`      ↳ ${it.suggestion}`);
+            if (issueItem.suggestion) lines.push(`      ↳ ${issueItem.suggestion}`);
         }
         lines.push('');
     }
@@ -196,28 +196,32 @@ export function toText(report: ScanReport): string {
  */
 export function toSarif(report: ScanReport): string {
     const ruleIds = new Set<string>();
-    for (const it of report.issues) ruleIds.add(`${it.analyzer}.${it.rule}`);
+    for (const issueItem of report.issues) ruleIds.add(`${issueItem.analyzer}.${issueItem.rule}`);
 
-    const rules = [...ruleIds].map((id) => ({
-        id,
-        name: id,
-        shortDescription: { text: id },
+    const rules = [...ruleIds].map((ruleId) => ({
+        id: ruleId,
+        name: ruleId,
+        shortDescription: { text: ruleId },
     }));
 
-    const results = report.issues.map((it) => ({
-        ruleId: `${it.analyzer}.${it.rule}`,
-        level: SARIF_LEVEL[it.severity],
-        message: { text: it.message + (it.suggestion ? ` Suggestion: ${it.suggestion}` : '') },
-        properties: { analyzer: it.analyzer, detail: it.detail },
+    const results = report.issues.map((issueItem) => ({
+        ruleId: `${issueItem.analyzer}.${issueItem.rule}`,
+        level: SARIF_LEVEL[issueItem.severity],
+        message: {
+            text:
+                issueItem.message +
+                (issueItem.suggestion ? ` Suggestion: ${issueItem.suggestion}` : ''),
+        },
+        properties: { analyzer: issueItem.analyzer, detail: issueItem.detail },
         locations: [
             {
                 physicalLocation: {
-                    artifactLocation: { uri: it.location.file },
+                    artifactLocation: { uri: issueItem.location.file },
                     region: {
-                        startLine: it.location.start.line,
-                        startColumn: it.location.start.column,
-                        endLine: it.location.end.line,
-                        endColumn: it.location.end.column,
+                        startLine: issueItem.location.start.line,
+                        startColumn: issueItem.location.start.column,
+                        endLine: issueItem.location.end.line,
+                        endColumn: issueItem.location.end.column,
                     },
                 },
             },

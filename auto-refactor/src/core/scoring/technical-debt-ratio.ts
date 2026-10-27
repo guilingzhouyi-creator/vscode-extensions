@@ -174,8 +174,8 @@ export function resolveSqaleGrade(tdr: number): SqaleRating {
 
 function initializePillarEffort(): Record<PrimaryQualityPillar, number> {
     const record = {} as Record<PrimaryQualityPillar, number>;
-    for (const p of ALL_PRIMARY_PILLARS) {
-        record[p] = 0;
+    for (const pillar of ALL_PRIMARY_PILLARS) {
+        record[pillar] = 0;
     }
     return record;
 }

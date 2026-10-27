@@ -64,7 +64,9 @@ interface MicroCandidate {
 function isExportedNode(node: ts.Node): boolean {
     const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
     if (!modifiers) return false;
-    return modifiers.some((m: ts.ModifierLike) => m.kind === ts.SyntaxKind.ExportKeyword);
+    return modifiers.some(
+        (modifier: ts.ModifierLike) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    );
 }
 
 function findEnclosingFunction(node: ts.Node): ts.Node | null {
@@ -132,16 +134,16 @@ function isEligibleTargetNode(
 }
 
 function isEligibleOrphanSpan(
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     node: ts.Node,
 ): { start: number; end: number; childEloc: number; calleeText: string } | null {
-    const start = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-    const end = sf.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+    const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+    const end = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
     const span = end - start + 1;
     if (span > MAX_ORPHAN_LINE_SPAN || span < 2) {
         return null;
     }
-    const calleeText = node.getText(sf);
+    const calleeText = node.getText(sourceFile);
     const childEloc = countEffectiveLines(calleeText);
     if (childEloc > MAX_ORPHAN_ELOC || childEloc < 1) {
         return null;
@@ -149,12 +151,12 @@ function isEligibleOrphanSpan(
     return { start, end, childEloc, calleeText };
 }
 
-function tryExtractMicroCandidate(node: ts.Node, sf: ts.SourceFile): MicroCandidate | null {
+function tryExtractMicroCandidate(node: ts.Node, sourceFile: ts.SourceFile): MicroCandidate | null {
     const fnNode = isEligibleTargetNode(node);
     if (!fnNode || !fnNode.name || !ts.isIdentifier(fnNode.name)) {
         return null;
     }
-    const spanInfo = isEligibleOrphanSpan(sf, fnNode);
+    const spanInfo = isEligibleOrphanSpan(sourceFile, fnNode);
     if (!spanInfo) {
         return null;
     }
@@ -168,36 +170,38 @@ function tryExtractMicroCandidate(node: ts.Node, sf: ts.SourceFile): MicroCandid
     };
 }
 
-function collectMicroCandidates(sf: ts.SourceFile): MicroCandidate[] {
+function collectMicroCandidates(sourceFile: ts.SourceFile): MicroCandidate[] {
     const candidates: MicroCandidate[] = [];
     const walk = (node: ts.Node): void => {
-        const candidate = tryExtractMicroCandidate(node, sf);
+        const candidate = tryExtractMicroCandidate(node, sourceFile);
         if (candidate) {
             candidates.push(candidate);
         }
         ts.forEachChild(node, walk);
     };
-    walk(sf);
+    walk(sourceFile);
     return candidates;
 }
 
-function matchPropAccessCall(p: ts.Node): ts.Node | null {
-    if (!ts.isPropertyAccessExpression(p)) return null;
-    const gp = p.parent;
-    return gp && ts.isCallExpression(gp) && gp.expression === p ? gp : null;
+function matchPropAccessCall(parentNode: ts.Node): ts.Node | null {
+    if (!ts.isPropertyAccessExpression(parentNode)) return null;
+    const grandParent = parentNode.parent;
+    return grandParent && ts.isCallExpression(grandParent) && grandParent.expression === parentNode
+        ? grandParent
+        : null;
 }
 
 function matchCallSite(node: ts.Node, targetName: string, targetNode: ts.Node): ts.Node | null {
     if (!ts.isIdentifier(node)) return null;
     if (node.text !== targetName || node === targetNode) return null;
-    const p = node.parent;
-    if (!p) return null;
-    if (ts.isCallExpression(p) && p.expression === node) return p;
-    return matchPropAccessCall(p);
+    const parentNode = node.parent;
+    if (!parentNode) return null;
+    if (ts.isCallExpression(parentNode) && parentNode.expression === node) return parentNode;
+    return matchPropAccessCall(parentNode);
 }
 
 function findSingleCallSite(
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     targetName: string,
     targetNode: ts.Node,
 ): ts.Node | null {
@@ -209,7 +213,7 @@ function findSingleCallSite(
         }
         ts.forEachChild(node, findCalls);
     };
-    findCalls(sf);
+    findCalls(sourceFile);
     return callSites.length === 1 ? callSites[0] : null;
 }
 
@@ -226,16 +230,16 @@ function isTestOrFixturePath(filePath: string): boolean {
 
 function evaluateCandidateInlining(
     cand: MicroCandidate,
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     filePath: string,
 ): Issue | null {
-    const callSite = findSingleCallSite(sf, cand.name, cand.node.name ?? cand.node);
+    const callSite = findSingleCallSite(sourceFile, cand.name, cand.node.name ?? cand.node);
     if (!callSite) return null;
 
     const callerNode = findEnclosingFunction(callSite);
     if (!callerNode || callerNode === cand.node) return null;
 
-    const callerText = callerNode.getText(sf);
+    const callerText = callerNode.getText(sourceFile);
     const callerTokens = tokenizeCode(callerText).rawTokens;
     const calleeTokens = tokenizeCode(cand.calleeText).rawTokens;
 
@@ -290,13 +294,13 @@ function evaluateCandidateInlining(
 /**
  * Audits a TypeScript source file for single-use orphan micro-functions (SIM-INL-001).
  *
- * @param sf - Materialized TypeScript SourceFile.
+ * @param sourceFile - Materialized TypeScript SourceFile.
  * @param ctx - Active analyzer context.
  * @param _opts - Simplify analyzer options.
  * @param issues - Output issues collection.
  */
 export function auditOrphanInlining(
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     ctx: AnalyzerContext,
     _opts: SimplifyOptions,
     issues: Issue[],
@@ -306,11 +310,11 @@ export function auditOrphanInlining(
         return;
     }
 
-    const candidates = collectMicroCandidates(sf);
+    const candidates = collectMicroCandidates(sourceFile);
     if (candidates.length === 0) return;
 
     for (let cIdx = 0; cIdx < candidates.length; cIdx++) {
-        const issue = evaluateCandidateInlining(candidates[cIdx], sf, filePath);
+        const issue = evaluateCandidateInlining(candidates[cIdx], sourceFile, filePath);
         if (issue) {
             issues.push(issue);
         }

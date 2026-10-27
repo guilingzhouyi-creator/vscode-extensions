@@ -118,10 +118,10 @@ function buildDiagnosticCard(
     const actionVerb = act?.action;
     const safeToAutomate = act?.safeToAutomate;
     const targetArguments = act?.targetArguments;
-    const id = `${directive.file}:${directive.line}:${directive.ruleId}`;
+    const cardId = `${directive.file}:${directive.line}:${directive.ruleId}`;
 
     return {
-        id,
+        id: cardId,
         ruleId: directive.ruleId,
         severity,
         badgeText,
@@ -228,8 +228,8 @@ export class PraxisPresentationAdapter implements IPraxisPresentationService {
         options?: PraxisPresentationOptions,
     ): PraxisPresentationPayload {
         const locale = options?.locale ?? this.i18n.getLocale();
-        let cards = agentPrompt.directives.map((d) =>
-            buildDiagnosticCard(d, this.i18n, locale, options),
+        let cards = agentPrompt.directives.map((directiveItem) =>
+            buildDiagnosticCard(directiveItem, this.i18n, locale, options),
         );
         if (options?.aggregateOverlaps !== false) {
             cards = aggregateSemanticOverlappingCards(cards);

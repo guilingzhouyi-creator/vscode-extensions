@@ -320,7 +320,7 @@ export class StdlibAnalyzer implements Analyzer {
         return this.analyze(undefined, ctx);
     }
 
-    analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
+    analyze(_sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
         const content = ctx.content || '';
         const file = ctx.filePath.replace(/\\/g, '/');
         if (content.length === 0) return [];

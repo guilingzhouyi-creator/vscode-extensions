@@ -42,16 +42,16 @@ export const RULE_REGISTRY: readonly RuleDefinition[] = [
     ...PLATFORM_RULES,
     ...STDLIB_RULES,
     ...VOLUME_DENSITY_RULES,
-].sort((a, b) => a.id.localeCompare(b.id));
+].sort((ruleA, ruleB) => ruleA.id.localeCompare(ruleB.id));
 
 /**
  * Look up one rule definition.
  *
- * @param id - Rule id to resolve.
- * @returns The definition, or undefined when the id is not registered.
+ * @param ruleId - Rule id to resolve.
+ * @returns The definition, or undefined when the ruleId is not registered.
  */
-export function getRule(id: string): RuleDefinition | undefined {
-    return RULE_REGISTRY.find((rule) => rule.id === id);
+export function getRule(ruleId: string): RuleDefinition | undefined {
+    return RULE_REGISTRY.find((rule) => rule.id === ruleId);
 }
 
 /**

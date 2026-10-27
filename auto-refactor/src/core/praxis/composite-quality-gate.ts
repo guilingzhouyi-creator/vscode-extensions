@@ -166,7 +166,10 @@ function resolveVerdictCode(
     if (!options.dynamicPass) return COMPOSITE_VERDICT.BLOCK_DYNAMIC_FAILURE;
     if (options.metrics.regressionDensity > thresholds.maxRegressionDensity)
         return COMPOSITE_VERDICT.BLOCK_REGRESSION;
-    if (options.metrics.gamingPenalty > 0 && violations.some((v) => v.includes('Anti-gaming')))
+    if (
+        options.metrics.gamingPenalty > 0 &&
+        violations.some((violation) => violation.includes('Anti-gaming'))
+    )
         return COMPOSITE_VERDICT.BLOCK_GAMING_DETECTED;
     if (
         options.metrics.qed < thresholds.minQed ||
@@ -199,11 +202,11 @@ function formatGateSummaryText(
 
     if (violations.length > 0) {
         lines.push('  Violations:');
-        for (const v of violations) lines.push(`    • [BLOCK] ${v}`);
+        for (const violation of violations) lines.push(`    • [BLOCK] ${violation}`);
     }
     if (warnings.length > 0) {
         lines.push('  Warnings:');
-        for (const w of warnings) lines.push(`    • [WARN] ${w}`);
+        for (const warning of warnings) lines.push(`    • [WARN] ${warning}`);
     }
     lines.push('========================================================================');
 

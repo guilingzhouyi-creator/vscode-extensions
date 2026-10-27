@@ -104,11 +104,13 @@ function resolveTargetDomain(
 
     if (domainName) {
         return memory.codeDomains.find(
-            (d) => d.name === domainName || d.name.endsWith('.' + domainName),
+            (domain) => domain.name === domainName || domain.name.endsWith('.' + domainName),
         );
     }
     if (line !== undefined) {
-        return memory.codeDomains.find((d) => line >= d.span.startLine && line <= d.span.endLine);
+        return memory.codeDomains.find(
+            (domain) => line >= domain.span.startLine && line <= domain.span.endLine,
+        );
     }
     return undefined;
 }
@@ -148,14 +150,20 @@ function extractMemoryViolations(
     const frequentViolations: string[] = [];
 
     if (targetDomainObj) {
-        for (const v of targetDomainObj.ruleViolations) {
+        for (const violation of targetDomainObj.ruleViolations) {
             frequentViolations.push(
-                GuidanceMessages.FORMAT_VIOLATION_WITH_SEVERITY(v.rule, v.severity, v.message),
+                GuidanceMessages.FORMAT_VIOLATION_WITH_SEVERITY(
+                    violation.rule,
+                    violation.severity,
+                    violation.message,
+                ),
             );
         }
     } else if (memory) {
-        for (const h of memory.ruleHits.slice(0, MAX_MEMORY_RULE_HITS)) {
-            frequentViolations.push(GuidanceMessages.FORMAT_VIOLATION(h.rule, h.line, h.message));
+        for (const hit of memory.ruleHits.slice(0, MAX_MEMORY_RULE_HITS)) {
+            frequentViolations.push(
+                GuidanceMessages.FORMAT_VIOLATION(hit.rule, hit.line, hit.message),
+            );
         }
     }
 
@@ -176,9 +184,13 @@ function extractTrajectoryPitfalls(
     const historicalPitfalls: string[] = [];
     if (!trajectory) return historicalPitfalls;
 
-    for (const a of trajectory.activeAnomalies) {
-        if (!targetDomainObj || !a.domainId || a.domainId === targetDomainObj.domainId) {
-            historicalPitfalls.push(GuidanceMessages.FORMAT_PITFALL(a.kind, a.message));
+    for (const anomaly of trajectory.activeAnomalies) {
+        if (
+            !targetDomainObj ||
+            !anomaly.domainId ||
+            anomaly.domainId === targetDomainObj.domainId
+        ) {
+            historicalPitfalls.push(GuidanceMessages.FORMAT_PITFALL(anomaly.kind, anomaly.message));
         }
     }
 
@@ -219,24 +231,24 @@ function renderGuidanceMarkdown(params: GuidanceMarkdownParams): string {
 
     if (hardConstraints.length > 0) {
         lines.push(GuidanceMessages.SECTION_HARD_CONSTRAINTS);
-        lines.push(...hardConstraints.map((c) => `- ⚠️ ${c}`));
+        lines.push(...hardConstraints.map((constraint) => `- ⚠️ ${constraint}`));
         lines.push('');
     }
 
     if (historicalPitfalls.length > 0) {
         lines.push(GuidanceMessages.SECTION_HISTORICAL_PITFALLS);
-        lines.push(...historicalPitfalls.map((p) => `- ❌ ${p}`));
+        lines.push(...historicalPitfalls.map((pitfall) => `- ❌ ${pitfall}`));
         lines.push('');
     }
 
     if (frequentViolations.length > 0) {
         lines.push(GuidanceMessages.SECTION_FREQUENT_VIOLATIONS);
-        lines.push(...frequentViolations.map((v) => `- 🔍 ${v}`));
+        lines.push(...frequentViolations.map((violation) => `- 🔍 ${violation}`));
         lines.push('');
     }
 
     lines.push(GuidanceMessages.SECTION_RECOMMENDED_PATTERNS);
-    lines.push(...recommendedPatterns.map((r) => `- ✨ ${r}`));
+    lines.push(...recommendedPatterns.map((pattern) => `- ✨ ${pattern}`));
     lines.push('');
 
     return lines.join('\n');
@@ -422,7 +434,7 @@ function renderClarifyDirective(params: DirectiveRenderParams): CompactGuardDire
     const clarifyReq = clarify!;
     const question = (clarifyReq.promptQuestion || issue.message || '').replace(/\s+/g, ' ').trim();
     const optKeys = (clarifyReq.candidateOptions || [])
-        .map((o) => (typeof o === 'string' ? o : o.key))
+        .map((opt) => (typeof opt === 'string' ? opt : opt.key))
         .join(',');
     const firstOpt = clarifyReq.candidateOptions?.[0];
     const fallbackKey = firstOpt
@@ -504,15 +516,17 @@ export function formatCompactAgentPrompt(
     protocolVersion?: '1.0' | '2.0',
 ): CompactAgentPrompt {
     const directives = issues.map(formatCompactGuardDirective);
-    const hasBlock = directives.some((d) => d.severity === VERDICT_BLOCK);
-    const hasWarn = directives.some((d) => d.severity === VERDICT_WARN);
+    const hasBlock = directives.some((directive) => directive.severity === VERDICT_BLOCK);
+    const hasWarn = directives.some((directive) => directive.severity === VERDICT_WARN);
     const verdict = hasBlock ? VERDICT_BLOCK : hasWarn ? VERDICT_WARN : VERDICT_PASS;
 
-    const hasClarify = directives.some((d) => d.directiveType === DIRECTIVE_TYPE_CLARIFY);
+    const hasClarify = directives.some(
+        (directive) => directive.directiveType === DIRECTIVE_TYPE_CLARIFY,
+    );
     const version: '1.0' | '2.0' =
         protocolVersion ?? (hasClarify ? PROTOCOL_VERSION_2_0 : PROTOCOL_VERSION_1_0);
 
-    const renderedDirectives = directives.map((d) => d.renderedDirective);
+    const renderedDirectives = directives.map((directive) => directive.renderedDirective);
     const count = directives.length;
     const header = `[CAPP:v${version}] ${target} -> ${verdict} (${count} directive${count === 1 ? '' : 's'})`;
     const compactPromptText =
@@ -566,10 +580,10 @@ export function formatAnchorSlice(
         return undefined;
     }
     const slice: string[] = [];
-    for (let l = fromLine; l <= toLine; l++) {
-        const isTarget = l >= startLine && l <= endLine;
+    for (let lineNum = fromLine; lineNum <= toLine; lineNum++) {
+        const isTarget = lineNum >= startLine && lineNum <= endLine;
         const prefix = isTarget ? '> ' : '  ';
-        slice.push(`${prefix}${l} | ${lines[l - 1]}`);
+        slice.push(`${prefix}${lineNum} | ${lines[lineNum - 1]}`);
     }
     return slice.join('\n');
 }

@@ -203,9 +203,9 @@ function populateDependencyImpact(
 ): void {
     if (!dependencyGraph) return;
     if (hunk.astContext?.impactFiles) return;
-    const dg = dependencyGraph as DependencyGraphLike;
-    if (typeof dg.getAffectedFiles === 'function') {
-        const affected = dg.getAffectedFiles(filePath);
+    const depGraph = dependencyGraph as DependencyGraphLike;
+    if (typeof depGraph.getAffectedFiles === 'function') {
+        const affected = depGraph.getAffectedFiles(filePath);
         if (affected && affected.length > 0) {
             hunk.astContext = {
                 ...(hunk.astContext || {}),
@@ -223,7 +223,8 @@ function isHunkAnIssue(hunk: ReviewDiffHunk): boolean {
         return hunk.reviewVerdict.status !== VERDICT_PASSED;
     }
     return hunk.lines.some(
-        (l: AttributedDiffLine) => l.type === DIFF_LINE_DELETE || l.type === DIFF_LINE_INSERT,
+        (diffLine: AttributedDiffLine) =>
+            diffLine.type === DIFF_LINE_DELETE || diffLine.type === DIFF_LINE_INSERT,
     );
 }
 

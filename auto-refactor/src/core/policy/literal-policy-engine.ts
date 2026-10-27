@@ -86,8 +86,8 @@ export function isCallArgumentToleratedByPolicy(
     }
 
     if (policy.allowedPattern && typeof val === 'string') {
-        const re = new RegExp(policy.allowedPattern);
-        if (re.test(val)) return true;
+        const patternRegex = new RegExp(policy.allowedPattern);
+        if (patternRegex.test(val)) return true;
     }
 
     return false;

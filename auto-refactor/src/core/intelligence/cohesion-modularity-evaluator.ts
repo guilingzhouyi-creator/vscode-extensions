@@ -84,20 +84,20 @@ const MIN_EDGES_FOR_INVERSION_WARN = 10;
  * @returns Evaluated class cohesion outcome.
  */
 export function computeHendersonSellersLcom(input: ClassCohesionInput): ClassCohesionEvaluation {
-    const m = input.methodsCount;
-    const a = input.attributesCount;
+    const methodsCount = input.methodsCount;
+    const attributesCount = input.attributesCount;
 
     // Classes with 0 or 1 method or 0 attributes are trivially cohesive
     if (
-        m <= 1 ||
-        a <= 0 ||
+        methodsCount <= 1 ||
+        attributesCount <= 0 ||
         !input.attributeAccessCounts ||
         input.attributeAccessCounts.length === 0
     ) {
         return Object.freeze({
-            methodsCount: m,
-            attributesCount: a,
-            meanAccessPerAttribute: a > 0 ? 1.0 : 0.0,
+            methodsCount,
+            attributesCount,
+            meanAccessPerAttribute: attributesCount > 0 ? 1.0 : 0.0,
             lcomStar: 0.0,
             isGodClassCandidate: false,
         });
@@ -108,24 +108,24 @@ export function computeHendersonSellersLcom(input: ClassCohesionInput): ClassCoh
         accessSum += Math.max(0, input.attributeAccessCounts[i]);
     }
 
-    const meanAccess = +(accessSum / a).toFixed(4);
-    // Formula: (m - meanAccess) / (m - 1)
-    const rawLcom = (m - meanAccess) / (m - 1);
+    const meanAccess = +(accessSum / attributesCount).toFixed(4);
+    // Formula: (methodsCount - meanAccess) / (methodsCount - 1)
+    const rawLcom = (methodsCount - meanAccess) / (methodsCount - 1);
     const lcomStar = +Math.max(0.0, Math.min(1.0, rawLcom)).toFixed(4);
     const isGodClassCandidate =
-        lcomStar >= LCOM_STAR_GOD_CLASS_THRESHOLD && m >= MIN_METHODS_FOR_GOD_CLASS;
+        lcomStar >= LCOM_STAR_GOD_CLASS_THRESHOLD && methodsCount >= MIN_METHODS_FOR_GOD_CLASS;
 
     let recommendation: string | undefined;
     if (isGodClassCandidate) {
         recommendation =
-            `High Lack of Cohesion detected (LCOM*=${lcomStar}, methods=${m}, fields=${a}). ` +
+            `High Lack of Cohesion detected (LCOM*=${lcomStar}, methods=${methodsCount}, fields=${attributesCount}). ` +
             `Methods operate on disparate subsets of state. Decompose this God class into smaller, ` +
             `highly cohesive components focused on distinct data subsets.`;
     }
 
     return Object.freeze({
-        methodsCount: m,
-        attributesCount: a,
+        methodsCount,
+        attributesCount,
         meanAccessPerAttribute: meanAccess,
         lcomStar,
         isGodClassCandidate,
@@ -135,16 +135,16 @@ export function computeHendersonSellersLcom(input: ClassCohesionInput): ClassCoh
 
 function computeNodeDegreesAndWeight(
     matrix: readonly (readonly number[])[],
-    n: number,
+    nodeCount: number,
 ): { degrees: Float64Array; twoM: number } {
-    const degrees = new Float64Array(n);
+    const degrees = new Float64Array(nodeCount);
     let totalEdgeWeight = 0;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < nodeCount; i++) {
         const row = matrix[i];
         if (!row) {
             continue;
         }
-        for (let j = 0; j < n; j++) {
+        for (let j = 0; j < nodeCount; j++) {
             const weight = row[j] || 0;
             if (weight > 0) {
                 degrees[i] += weight;
@@ -192,10 +192,10 @@ function calculateModularityAccumulation(context: ModularitySumContext): number 
  * @returns Evaluated modularity outcome.
  */
 export function computeNewmanGirvanModularity(input: ModularityNetworkInput): ModularityEvaluation {
-    const n = input.nodeCount;
-    if (n <= 1 || !input.adjacencyMatrix || input.adjacencyMatrix.length === 0) {
+    const nodeCount = input.nodeCount;
+    if (nodeCount <= 1 || !input.adjacencyMatrix || input.adjacencyMatrix.length === 0) {
         return Object.freeze({
-            nodeCount: n,
+            nodeCount,
             totalEdges: 0,
             modularityQ: 0.0,
             isWellModularized: true,
@@ -203,10 +203,10 @@ export function computeNewmanGirvanModularity(input: ModularityNetworkInput): Mo
         });
     }
 
-    const { degrees, twoM } = computeNodeDegreesAndWeight(input.adjacencyMatrix, n);
+    const { degrees, twoM } = computeNodeDegreesAndWeight(input.adjacencyMatrix, nodeCount);
     if (twoM <= 0) {
         return Object.freeze({
-            nodeCount: n,
+            nodeCount,
             totalEdges: 0,
             modularityQ: 0.0,
             isWellModularized: true,
@@ -219,7 +219,7 @@ export function computeNewmanGirvanModularity(input: ModularityNetworkInput): Mo
         degrees,
         communities: input.nodeCommunities,
         twoM,
-        nodeCount: n,
+        nodeCount,
     });
     const modularityQ = +(qSum / twoM).toFixed(4);
     const totalEdges = Math.round(twoM / 2);
@@ -236,7 +236,7 @@ export function computeNewmanGirvanModularity(input: ModularityNetworkInput): Mo
     }
 
     return Object.freeze({
-        nodeCount: n,
+        nodeCount,
         totalEdges,
         modularityQ,
         isWellModularized,

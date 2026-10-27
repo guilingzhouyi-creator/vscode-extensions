@@ -229,8 +229,8 @@ function extractExportedSymbols(content: string): string[] {
 function parseNamedImportParts(rawSymbols: string, resolved: string): ImportedSymbolRef[] {
     const refs: ImportedSymbolRef[] = [];
     const parts = rawSymbols.split(',');
-    for (const p of parts) {
-        const item = p.trim();
+    for (const part of parts) {
+        const item = part.trim();
         if (!item) continue;
         const asMatch = item.match(/^([A-Za-z0-9_$]+)\s+as\s+([A-Za-z0-9_$]+)$/);
         if (asMatch) {
@@ -260,8 +260,8 @@ export class ModuleDependencyGraph {
     /** importerNormFile -> (resolvedTargetNormFile -> ImportedSymbolRef[]) */
     private readonly importedSymbolsMap: Map<string, Map<string, ImportedSymbolRef[]>> = new Map();
 
-    private norm(p: string): string {
-        return normalizePath(p).replace(/\.(ts|tsx|js|jsx|d\.ts)$/, '');
+    private norm(filePath: string): string {
+        return normalizePath(filePath).replace(/\.(ts|tsx|js|jsx|d\.ts)$/, '');
     }
 
     /**

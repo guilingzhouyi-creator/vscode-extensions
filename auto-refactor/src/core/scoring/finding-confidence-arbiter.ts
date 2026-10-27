@@ -433,7 +433,9 @@ function checkCustomDirectives(
     if (!customDirectives || customDirectives.length === 0) {
         return null;
     }
-    const escaped = customDirectives.map((d) => d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const escaped = customDirectives
+        .map((directive) => directive.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('|');
     const match = new RegExp(escaped).exec(rawLine);
     if (match) {
         return {
@@ -1071,7 +1073,7 @@ export class FindingConfidenceArbiter {
         );
 
         if (this.enableClustering && acc.activeFindings.length > 1) {
-            acc.blockingCount = finalActiveFindings.filter((f) => f.mustBlock).length;
+            acc.blockingCount = finalActiveFindings.filter((finding) => finding.mustBlock).length;
         }
 
         const gateVerdict: GateVerdict =

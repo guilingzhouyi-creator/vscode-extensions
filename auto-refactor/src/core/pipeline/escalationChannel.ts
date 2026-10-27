@@ -188,7 +188,8 @@ export class EscalationChannel {
      */
     hasBreaches(): boolean {
         return this.events.some(
-            (e) => e.severity === 'error' || (e.severity as string) === 'critical',
+            (eventItem) =>
+                eventItem.severity === 'error' || (eventItem.severity as string) === 'critical',
         );
     }
 

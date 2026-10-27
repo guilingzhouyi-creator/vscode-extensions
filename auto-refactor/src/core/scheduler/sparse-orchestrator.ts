@@ -103,8 +103,8 @@ export class SparseOrchestrator {
     ): Promise<number> {
         const t1Start = Date.now();
         if (options?.dependencyEdges) {
-            for (const [from, to] of options.dependencyEdges) {
-                this.topologyCache.recordDependency(from, to);
+            for (const [sourcePath, targetPath] of options.dependencyEdges) {
+                this.topologyCache.recordDependency(sourcePath, targetPath);
             }
         }
         await cooperativeYield();
@@ -298,7 +298,7 @@ export class SparseOrchestrator {
             scoring: 0,
         };
 
-        const validFiles = files.filter((f) => Boolean(f && f.trim()));
+        const validFiles = files.filter((file) => Boolean(file && file.trim()));
         timings.structureAnalysis = await this.analyzeStructure(validFiles, options);
 
         const t2Start = Date.now();
@@ -339,7 +339,8 @@ export class SparseOrchestrator {
 
         const totalPossibleDomainUnits = validFiles.length * 5;
         const activatedUnits = partitions.reduce(
-            (acc, p) => acc + p.primaryFiles.length * p.activeDomains.length,
+            (acc, partition) =>
+                acc + partition.primaryFiles.length * partition.activeDomains.length,
             0,
         );
         const sparseActivationSavingsRatio =
@@ -385,7 +386,7 @@ export class SparseOrchestrator {
         }
 
         // Scenario 2: Naming collision with constants table
-        const namingIssue = findings.find((f) => f.analyzer === 'naming');
+        const namingIssue = findings.find((finding) => finding.analyzer === 'naming');
         if (namingIssue && content.includes('SHARED_CONSTANTS')) {
             const rnd = Math.random().toString(36).slice(2, 6);
             const event: ReviewCascadeEvent = {

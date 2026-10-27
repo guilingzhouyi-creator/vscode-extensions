@@ -154,8 +154,8 @@ function registerCluster(
     visited: Set<string>,
     domains: SemanticCodeDomain[],
 ): void {
-    for (const r of matched) {
-        visited.add(r.id);
+    for (const routine of matched) {
+        visited.add(routine.id);
     }
     const avgSim = totalSim / (matched.length - 1);
     domains.push(createDomainCluster(matched, avgSim, domains.length + 1));
@@ -204,7 +204,8 @@ export function clusterSemanticDomains(
  */
 function computeDomainDRC(domain: SemanticCodeDomain): number {
     const excessCount = domain.routines.length - 1;
-    const avgCC = domain.routines.reduce((acc, r) => acc + r.cc, 0) / domain.routines.length;
+    const avgCC =
+        domain.routines.reduce((acc, routine) => acc + routine.cc, 0) / domain.routines.length;
     return Math.round(excessCount * avgCC * domain.similarityScore);
 }
 
@@ -218,7 +219,7 @@ function computeDomainDRC(domain: SemanticCodeDomain): number {
 function buildDistributedRedundancyIssue(domain: SemanticCodeDomain, domainDRC: number): Issue {
     const sample = domain.routines[0];
     const locations = domain.routines
-        .map((r) => `${r.filePath}:${r.startLine} (${r.name})`)
+        .map((routine) => `${routine.filePath}:${routine.startLine} (${routine.name})`)
         .join(', ');
     const simPct = (domain.similarityScore * 100).toFixed(0);
 
@@ -242,11 +243,11 @@ function buildDistributedRedundancyIssue(domain: SemanticCodeDomain, domainDRC: 
             similarity: domain.similarityScore,
             domainDRC,
             routineCount: domain.routines.length,
-            routines: domain.routines.map((r) => ({
-                name: r.name,
-                file: r.filePath,
-                line: r.startLine,
-                cc: r.cc,
+            routines: domain.routines.map((routine) => ({
+                name: routine.name,
+                file: routine.filePath,
+                line: routine.startLine,
+                cc: routine.cc,
             })),
         },
         suggestion:
@@ -272,7 +273,7 @@ export function evaluateDistributedRedundancy(
 ): DistributedRedundancyResult {
     const simThreshold = options?.similarityThreshold ?? DEFAULT_SIM_THRESHOLD;
     const domains = clusterSemanticDomains(descriptors, simThreshold);
-    const totalProjectCC = descriptors.reduce((sum, d) => sum + d.cc, 0);
+    const totalProjectCC = descriptors.reduce((sum, desc) => sum + desc.cc, 0);
 
     const baseBudget =
         options?.redundancyBudgetCC ??

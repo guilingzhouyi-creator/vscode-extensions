@@ -156,7 +156,7 @@ export class ShellLintAnalyzer implements Analyzer {
         return this.analyze(undefined, ctx);
     }
 
-    analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
+    analyze(_sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
         const content = ctx.content || '';
         const file = ctx.filePath.replace(/\\/g, '/');
         if (content.length === 0) return [];
@@ -233,7 +233,7 @@ export class ShellLintAnalyzer implements Analyzer {
         checkShellResourceCleanup(lines, maskedLines, emit);
 
         const { hasE } = scanStrictErrorFlags(maskedLines);
-        const hasTtyGuard = maskedLines.some((l) => SH_TTY_GUARD_RE.test(l));
+        const hasTtyGuard = maskedLines.some((line) => SH_TTY_GUARD_RE.test(line));
 
         let inHeredoc = false;
         let heredocDelimiter = '';
@@ -386,7 +386,7 @@ export class ShellLintAnalyzer implements Analyzer {
         checkPowerShellResourceDisposal(lines, maskedLines, emit);
 
         const hasInteractiveGuard = maskedLines.some(
-            (l) => PS_INTERACTIVE_GUARD_RE.test(l) || PS_NON_INTERACTIVE_FLAG_RE.test(l),
+            (line) => PS_INTERACTIVE_GUARD_RE.test(line) || PS_NON_INTERACTIVE_FLAG_RE.test(line),
         );
 
         const state: PowerShellScanState = {
@@ -609,9 +609,9 @@ function isUntypedParamCandidate(trimmed: string, maskedTrimmed: string): boolea
  */
 function updateParamParenDepth(trimmed: string, currentDepth: number): number {
     let depth = currentDepth;
-    for (const ch of trimmed) {
-        if (ch === '(') depth++;
-        else if (ch === ')') depth--;
+    for (const charToken of trimmed) {
+        if (charToken === '(') depth++;
+        else if (charToken === ')') depth--;
     }
     return depth;
 }

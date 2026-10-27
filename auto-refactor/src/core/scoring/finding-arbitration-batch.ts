@@ -185,25 +185,25 @@ export function applyNoisyRuleDemotions(
     const quarantineSet = new Set(autoQuarantinedRules);
 
     for (let i = 0; i < acc.findings.length; i++) {
-        const f = acc.findings[i];
-        if (f.tier === TIER_PRESCRIPTIVE && noisySet.has(f.issue.rule)) {
-            const isAutoQuarantine = quarantineSet.has(f.issue.rule);
-            f.tier = TIER_ADVISORY;
-            f.confidence = advisoryDefault;
+        const finding = acc.findings[i];
+        if (finding.tier === TIER_PRESCRIPTIVE && noisySet.has(finding.issue.rule)) {
+            const isAutoQuarantine = quarantineSet.has(finding.issue.rule);
+            finding.tier = TIER_ADVISORY;
+            finding.confidence = advisoryDefault;
             if (isAutoQuarantine) {
-                f.isQuarantined = true;
-                f.ruleLifecycleState = LIFECYCLE_QUARANTINED;
-                f.rationale +=
+                finding.isQuarantined = true;
+                finding.ruleLifecycleState = LIFECYCLE_QUARANTINED;
+                finding.rationale +=
                     ' [TRICORDER DYNAMIC QUARANTINE: Auto-quarantined due to excessive developer suppression ratio >= 50%]';
                 acc.quarantinedCount++;
             } else {
-                f.rationale +=
+                finding.rationale +=
                     ' [Tricorder Feedback: Demoted from Prescriptive to Advisory due to elevated developer suppression ratio >= 30%]';
             }
             acc.prescriptiveCount--;
             acc.advisoryCount++;
-            if (f.mustBlock) {
-                f.mustBlock = false;
+            if (finding.mustBlock) {
+                finding.mustBlock = false;
                 acc.blockingCount = Math.max(0, acc.blockingCount - 1);
             }
         }
@@ -218,10 +218,10 @@ function resolveClusterPrimary(cluster: ArbitratedFinding[]): {
         return { primary: cluster[0], secondaryCount: 0 };
     }
 
-    const tierWeight = (t: FindingConfidenceTier) =>
-        t === TIER_PRESCRIPTIVE
+    const tierWeight = (tier: FindingConfidenceTier) =>
+        tier === TIER_PRESCRIPTIVE
             ? TIER_WEIGHT_PRESCRIPTIVE
-            : t === TIER_ACTIONABLE
+            : tier === TIER_ACTIONABLE
               ? TIER_WEIGHT_ACTIONABLE
               : TIER_WEIGHT_ADVISORY;
 
@@ -295,7 +295,9 @@ export function clusterOverlappingFindings(candidates: ArbitratedFinding[]): {
             continue;
         }
 
-        fileFindings.sort((a, b) => a.issue.location.start.line - b.issue.location.start.line);
+        fileFindings.sort(
+            (itemA, itemB) => itemA.issue.location.start.line - itemB.issue.location.start.line,
+        );
 
         const currentCluster: ArbitratedFinding[] = [fileFindings[0]];
 

@@ -166,37 +166,37 @@ export class ScopeGraph {
             scopeIndices.set(this._allScopes[i], i);
         }
         for (let i = 0; i < this._allScopes.length; i++) {
-            const s = this._allScopes[i];
-            const parentIdx = s.parent ? (scopeIndices.get(s.parent) ?? -1) : -1;
-            const kindCode = s.kind === 'function' ? 1 : s.kind === 'class' ? 2 : 0;
+            const scopeItem = this._allScopes[i];
+            const parentIdx = scopeItem.parent ? (scopeIndices.get(scopeItem.parent) ?? -1) : -1;
+            const kindCode = scopeItem.kind === 'function' ? 1 : scopeItem.kind === 'class' ? 2 : 0;
             scopes.push({
                 parent: parentIdx,
                 kind: kindCode,
-                startLine: s.startLine,
-                endLine: s.endLine,
+                startLine: scopeItem.startLine,
+                endLine: scopeItem.endLine,
             });
         }
         const bindings: NativeBindingInput[] = [];
         for (let i = 0; i < this._allScopes.length; i++) {
-            const s = this._allScopes[i];
-            for (const b of s.bindings.values()) {
+            const scopeItem = this._allScopes[i];
+            for (const binding of scopeItem.bindings.values()) {
                 const bKindCode =
-                    b.kind === 'constant'
+                    binding.kind === 'constant'
                         ? 1
-                        : b.kind === 'function'
+                        : binding.kind === 'function'
                           ? 2
-                          : b.kind === 'class'
+                          : binding.kind === 'class'
                             ? 3
-                            : b.kind === 'parameter'
+                            : binding.kind === 'parameter'
                               ? 4
-                              : b.kind === 'import'
+                              : binding.kind === 'import'
                                 ? 5
                                 : 0;
                 bindings.push({
                     scopeId: i,
-                    name: b.name,
+                    name: binding.name,
                     kind: bKindCode,
-                    line: b.node.start?.line ?? 0,
+                    line: binding.node.start?.line ?? 0,
                 });
             }
         }

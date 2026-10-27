@@ -90,7 +90,8 @@ export class GateArchitectureAnalyzer implements Analyzer {
         GateArchitectureAnalyzer.auditCache.clear();
     }
 
-    analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+        void sourceFile;
         return this.finalize(ctx);
     }
 

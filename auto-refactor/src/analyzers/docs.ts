@@ -96,15 +96,17 @@ export class DocsAnalyzer implements Analyzer {
     /**
      * Scan one markdown file.
      *
-     * @param _sf - Unused TypeScript source file (kept for the analyzer contract).
+     * @param _sourceFile - Unused TypeScript source file (kept for the analyzer contract).
      * @param ctx - Analyzer context carrying content, path and the resolved scan root.
      * @returns Documentation findings for the file.
      */
-    analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
+    analyze(_sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
         const content = ctx.content || '';
         const file = ctx.filePath.replace(/\\/g, '/');
         if (!file.endsWith('.md') || content.length === 0) return [];
-        const lines = content.split('\n').map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l));
+        const lines = content
+            .split('\n')
+            .map((lineStr) => (lineStr.endsWith('\r') ? lineStr.slice(0, -1) : lineStr));
         const issues: Issue[] = [];
         const emit = (
             lineIdx: number,
@@ -178,7 +180,7 @@ export class DocsAnalyzer implements Analyzer {
         const exemptMarkers = options.exemptMarkers
             ? [...DEFAULT_EXEMPT_MARKERS, ...options.exemptMarkers]
             : DEFAULT_EXEMPT_MARKERS;
-        const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const exemptMarkersRe = new RegExp(exemptMarkers.map(escapeRegex).join('|'));
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -247,7 +249,7 @@ export class DocsAnalyzer implements Analyzer {
         }
         const repeated = [...lineCounts.entries()]
             .filter(([, count]) => count >= 2)
-            .sort((a, b) => b[1] - a[1])
+            .sort((entryA, entryB) => entryB[1] - entryA[1])
             .slice(0, DUP_MAX_REPORTED);
         if (repeated.length === 0) return;
         const [sample, count] = repeated[0];

@@ -162,9 +162,9 @@ function parseTypeDeclaration(
 function findGoCloseParen(trimmed: string, openIdx: number): number {
     let depth = 1;
     for (let i = openIdx + 1; i < trimmed.length; i++) {
-        const ch = trimmed[i];
-        if (ch === '(' || ch === '[' || ch === '{') depth++;
-        else if (ch === ')' || ch === ']' || ch === '}') {
+        const charStr = trimmed[i];
+        if (charStr === '(' || charStr === '[' || charStr === '{') depth++;
+        else if (charStr === ')' || charStr === ']' || charStr === '}') {
             depth--;
             if (depth === 0) return i;
         }
@@ -177,18 +177,18 @@ function splitGoParamSegments(paramStr: string): string[] {
     let cur = '';
     let pDepth = 0;
     for (let i = 0; i < paramStr.length; i++) {
-        const ch = paramStr[i];
-        if (ch === '(' || ch === '[' || ch === '{') {
+        const charStr = paramStr[i];
+        if (charStr === '(' || charStr === '[' || charStr === '{') {
             pDepth++;
-            cur += ch;
-        } else if (ch === ')' || ch === ']' || ch === '}') {
+            cur += charStr;
+        } else if (charStr === ')' || charStr === ']' || charStr === '}') {
             pDepth--;
-            cur += ch;
-        } else if (ch === ',' && pDepth === 0) {
+            cur += charStr;
+        } else if (charStr === ',' && pDepth === 0) {
             segments.push(cur.trim());
             cur = '';
         } else {
-            cur += ch;
+            cur += charStr;
         }
     }
     if (cur.trim()) segments.push(cur.trim());
@@ -447,9 +447,9 @@ function parseSimpleStatement(
 function collectFloatOccupiedPositions(floatMatches: RegExpMatchArray[]): ReadonlySet<number> {
     if (floatMatches.length === 0) return EMPTY_NUMERIC_POSITION_SET;
     const occupied = new Set<number>();
-    for (const fm of floatMatches) {
-        const start = fm.index ?? 0;
-        const end = start + (fm[0]?.length ?? 0);
+    for (const floatMatch of floatMatches) {
+        const start = floatMatch.index ?? 0;
+        const end = start + (floatMatch[0]?.length ?? 0);
         for (let pos = start; pos < end; pos++) occupied.add(pos);
     }
     return occupied;
@@ -463,34 +463,34 @@ function parseNumericLiterals(
 ): void {
     // Find float literals first to avoid partial matches with int regex
     const floatMatches = [...codeOnly.matchAll(FLOAT_LITERAL_RE)];
-    for (const m of floatMatches) {
-        const idx = m.index ?? 0;
+    for (const matchItem of floatMatches) {
+        const idx = matchItem.index ?? 0;
         out.push({
             kind: NodeKind.NumericLiteral,
-            text: m[0],
+            text: matchItem[0],
             isNumeric: true,
             tolerated: false,
             start: { line: lineNum, column: idx + 1 },
-            end: { line: lineNum, column: idx + m[0].length + 1 },
+            end: { line: lineNum, column: idx + matchItem[0].length + 1 },
         });
     }
 
     // Integer literals — skip positions that overlap with float matches
     const coveredPositions = collectFloatOccupiedPositions(floatMatches);
     const intMatches = [...codeOnly.matchAll(INT_LITERAL_RE)];
-    for (const m of intMatches) {
-        const idx = m.index ?? 0;
+    for (const matchItem of intMatches) {
+        const idx = matchItem.index ?? 0;
         // Skip if this int overlaps with a float match
         if (coveredPositions.has(idx)) {
             continue;
         }
         out.push({
             kind: NodeKind.NumericLiteral,
-            text: m[0],
+            text: matchItem[0],
             isNumeric: true,
             tolerated: false,
             start: { line: lineNum, column: idx + 1 },
-            end: { line: lineNum, column: idx + m[0].length + 1 },
+            end: { line: lineNum, column: idx + matchItem[0].length + 1 },
         });
     }
 }
@@ -613,9 +613,9 @@ function parseCallExpressions(
 function braceDelta(codeOnly: string): number {
     let opens = 0;
     let closes = 0;
-    for (const ch of codeOnly) {
-        if (ch === OPEN_BRACE) opens++;
-        else if (ch === CLOSE_BRACE) closes++;
+    for (const charStr of codeOnly) {
+        if (charStr === OPEN_BRACE) opens++;
+        else if (charStr === CLOSE_BRACE) closes++;
     }
     return opens - closes;
 }

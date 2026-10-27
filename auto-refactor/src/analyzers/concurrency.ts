@@ -27,7 +27,8 @@ const RULE_RSM_LOCK_001 = 'RSM-LOCK-001';
 const RE_LISTENER_ATTACH = /\.(?:on|addListener|addEventListener|subscribe)\s*\(/;
 
 /** Pattern detecting teardown or cleanup method calls. */
-const RE_TEARDOWN_DRAIN = /\.(?:off|removeListener|removeEventListener|unsubscribe|teardown|dispose|flush|drain)\s*\(/;
+const RE_TEARDOWN_DRAIN =
+    /\.(?:off|removeListener|removeEventListener|unsubscribe|teardown|dispose|flush|drain)\s*\(/;
 
 /** Pattern detecting lock acquisition. */
 const RE_LOCK_ACQUIRE = /\b(?:acquire|lock|mutex\.lock)\s*\(/i;
@@ -77,11 +78,11 @@ export class ConcurrencyAnalyzer implements Analyzer {
     /**
      * Inspect file content for concurrency and resource lifecycle hazards.
      *
-     * @param _sf - Optional materialized TypeScript source file.
+     * @param _sourceFile - Optional materialized TypeScript source file.
      * @param context - Analyzer execution context with file path and content.
      * @returns Array of identified concurrency issues.
      */
-    public analyze(_sf: ts.SourceFile | undefined, context: AnalyzerContext): Issue[] {
+    public analyze(_sourceFile: ts.SourceFile | undefined, context: AnalyzerContext): Issue[] {
         const issues: Issue[] = [];
         const content = context.content;
         const lines = content.split('\n');
@@ -116,9 +117,11 @@ export class ConcurrencyAnalyzer implements Analyzer {
                 createLineIssue(ANALYZER_CONCURRENCY, context.filePath, {
                     rule: RULE_PRF_LEAK_001,
                     lineIdx: attachLineIdx,
-                    message: 'Event listener or subscription registered without matching teardown/dispose cleanup logic.',
+                    message:
+                        'Event listener or subscription registered without matching teardown/dispose cleanup logic.',
                     severity: 'warning',
-                    suggestion: 'Ensure symmetry: register teardown, unsubscribe, or removeEventListener in lifecycle cleanup.',
+                    suggestion:
+                        'Ensure symmetry: register teardown, unsubscribe, or removeEventListener in lifecycle cleanup.',
                 }),
             );
         }

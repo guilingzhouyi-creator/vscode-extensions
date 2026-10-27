@@ -83,7 +83,7 @@ export function normalizeParameterNames(paramStr: string): string[] {
  */
 export function isTransparentForwarding(params: string[], callArgsStr: string): boolean {
     const trimmed = callArgsStr.trim();
-    const callArgs = trimmed ? trimmed.split(',').map((s) => s.trim()) : [];
+    const callArgs = trimmed ? trimmed.split(',').map((argStr) => argStr.trim()) : [];
 
     if (params.length !== callArgs.length) {
         return false;

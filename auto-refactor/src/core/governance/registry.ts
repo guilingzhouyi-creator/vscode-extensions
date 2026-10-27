@@ -182,7 +182,7 @@ export class GovernanceRegistry {
         }
         if (triggers.length === 0) return null;
         // Build a case-sensitive alternation regex; we escape each trigger first.
-        const escaped = triggers.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        const escaped = triggers.map((trigger) => trigger.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
         return new RegExp(escaped.join('|'));
     }
 

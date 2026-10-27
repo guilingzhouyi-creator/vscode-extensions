@@ -494,8 +494,8 @@ function resolveCycleStrategy(
         'pure-type' | 'high-layer' | 'runtime-instance' | 'event' | 'strategy' | 'small-leaf'
     >,
 ): { nodes: string[]; strategy: SccResolutionStrategy; rationale: string } {
-    const types = nodes.map((n) => nodeTypes?.get(n) ?? TYPE_PURE);
-    if (types.every((t) => t === TYPE_PURE)) {
+    const types = nodes.map((nodeName) => nodeTypes?.get(nodeName) ?? TYPE_PURE);
+    if (types.every((typeKind) => typeKind === TYPE_PURE)) {
         return {
             nodes: [...nodes],
             strategy: STRATEGY_TYPE_SINKING,
@@ -530,7 +530,7 @@ function resolveCycleStrategy(
             rationale: 'Extract dynamic strategies into centralized registry',
         };
     }
-    if (types.every((t) => t === TYPE_SMALL_LEAF)) {
+    if (types.every((typeKind) => typeKind === TYPE_SMALL_LEAF)) {
         return {
             nodes: [...nodes],
             strategy: STRATEGY_RE_MERGING,

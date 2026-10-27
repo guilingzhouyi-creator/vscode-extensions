@@ -64,9 +64,9 @@ function stripCommentsAndStrings(line: string): string {
 
 function computeDeltaDepth(cleanLine: string): number {
     let delta = 0;
-    for (const ch of cleanLine) {
-        if (ch === '{') delta++;
-        else if (ch === '}') delta--;
+    for (const charStr of cleanLine) {
+        if (charStr === '{') delta++;
+        else if (charStr === '}') delta--;
     }
     return delta;
 }

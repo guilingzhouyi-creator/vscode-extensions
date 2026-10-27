@@ -345,8 +345,7 @@ export interface Thresholds {
  * directives, `aas` for the token-frugal Agent Audit Schema (AAS v1.0), or `praxis`
  * for rich frontend UI payloads.
  */
-export type OutputFormat =
-    'json' | 'sarif' | 'text' | 'agent' | 'capp' | 'praxis' | 'aas';
+export type OutputFormat = 'json' | 'sarif' | 'text' | 'agent' | 'capp' | 'praxis' | 'aas';
 
 /**
  * Depth of the comments analyzer: `off` disables it, `basic` reports header/doc gaps at info
@@ -561,7 +560,7 @@ export interface Analyzer {
      * calling `analyze` directly (e.g. from a unit test or a script) still works and yields the
      * same results as the multiplexed engine path.
      */
-    analyze(sf: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[];
+    analyze(sourceFile: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[];
     /**
      * OPTIONAL streaming hook — part of the single-pass multiplexed traversal.
      *

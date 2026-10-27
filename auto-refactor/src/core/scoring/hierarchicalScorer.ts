@@ -473,13 +473,13 @@ function accumulateScoreItem(
 ): void {
     acc.count++;
     acc.sumComposite += composite;
-    for (const p of ALL_PRIMARY_PILLARS) {
-        acc.pillarSums[p] += pillars[p];
+    for (const pillar of ALL_PRIMARY_PILLARS) {
+        acc.pillarSums[pillar] += pillars[pillar];
     }
-    for (const d of ALL_QUALITY_DIMENSIONS) {
+    for (const dimension of ALL_QUALITY_DIMENSIONS) {
         const fallback =
-            d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
-        acc.dimSums[d] += dimensions?.[d] ?? fallback;
+            dimension === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        acc.dimSums[dimension] += dimensions?.[dimension] ?? fallback;
     }
 }
 
@@ -493,12 +493,14 @@ function finalizeAverageScores(acc: ScoreAccumulator): {
         PrimaryQualityPillar,
         number
     >;
-    for (const p of ALL_PRIMARY_PILLARS) {
-        pillars[p] = Math.round((acc.pillarSums[p] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    for (const pillar of ALL_PRIMARY_PILLARS) {
+        pillars[pillar] =
+            Math.round((acc.pillarSums[pillar] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
     }
     const tenDimensions: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
-    for (const d of ALL_QUALITY_DIMENSIONS) {
-        tenDimensions[d] = Math.round((acc.dimSums[d] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    for (const dimension of ALL_QUALITY_DIMENSIONS) {
+        tenDimensions[dimension] =
+            Math.round((acc.dimSums[dimension] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
     }
     return {
         compositeScore: Math.round((acc.sumComposite / count) * SCORE_ROUNDING) / SCORE_ROUNDING,
@@ -515,8 +517,13 @@ function buildModuleScores(modMap: Map<string, FileQualityScore[]>): ModuleQuali
     for (const [moduleName, files] of modMap.entries()) {
         const acc = initScoreAccumulator();
         for (let i = 0; i < files.length; i++) {
-            const f = files[i];
-            accumulateScoreItem(acc, f.compositeScore, f.eightPillars.pillars, f.tenDimensions);
+            const fileScore = files[i];
+            accumulateScoreItem(
+                acc,
+                fileScore.compositeScore,
+                fileScore.eightPillars.pillars,
+                fileScore.tenDimensions,
+            );
         }
         const averages = finalizeAverageScores(acc);
         modules.push({
@@ -542,8 +549,13 @@ function buildDomainScores(
         const modules = buildModuleScores(modMap);
         const acc = initScoreAccumulator();
         for (let i = 0; i < modules.length; i++) {
-            const m = modules[i];
-            accumulateScoreItem(acc, m.compositeScore, m.pillars, m.tenDimensions);
+            const moduleScore = modules[i];
+            accumulateScoreItem(
+                acc,
+                moduleScore.compositeScore,
+                moduleScore.pillars,
+                moduleScore.tenDimensions,
+            );
         }
         const averages = finalizeAverageScores(acc);
         domains.push({
@@ -577,8 +589,8 @@ function computeProjectPillars(
         );
         const fileWeight = Math.log(fileLoc + LOC_LOG_SMOOTH_BIAS);
         weightSum += fileWeight;
-        for (const p of ALL_PRIMARY_PILLARS) {
-            globalPillarSums[p] += file.eightPillars.pillars[p] * fileWeight;
+        for (const pillar of ALL_PRIMARY_PILLARS) {
+            globalPillarSums[pillar] += file.eightPillars.pillars[pillar] * fileWeight;
         }
     }
 
@@ -587,14 +599,15 @@ function computeProjectPillars(
         PrimaryQualityPillar,
         number
     >;
-    for (const p of ALL_PRIMARY_PILLARS) {
-        projectPillars[p] =
-            Math.round((globalPillarSums[p] / safeTotalWeight) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    for (const pillar of ALL_PRIMARY_PILLARS) {
+        projectPillars[pillar] =
+            Math.round((globalPillarSums[pillar] / safeTotalWeight) * SCORE_ROUNDING) /
+            SCORE_ROUNDING;
     }
 
     if (fatalCount > 0) {
-        const hasFatalArch = fileScores.some((f) =>
-            f.issues.some(
+        const hasFatalArch = fileScores.some((fileScore) =>
+            fileScore.issues.some(
                 (i) => i.severity === SEVERITY_ERROR && i.rule.startsWith(PREFIX_RULE_ARCH),
             ),
         );
@@ -614,9 +627,9 @@ function createEmptyProjectScore(): ProjectQualityScore {
         QualityDimension,
         number
     >;
-    for (const d of ALL_QUALITY_DIMENSIONS) {
-        emptyDimensions[d] =
-            d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+    for (const dimension of ALL_QUALITY_DIMENSIONS) {
+        emptyDimensions[dimension] =
+            dimension === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
     }
     const emptyPillars = synthesizeEightPillars(emptyDimensions);
     return {
@@ -700,11 +713,11 @@ function accumulateDimensionSums(
     fileWeight: number,
 ): void {
     const fDims = file.tenDimensions;
-    for (const d of ALL_QUALITY_DIMENSIONS) {
+    for (const dimension of ALL_QUALITY_DIMENSIONS) {
         const fallback =
-            d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
-        const dimScore = fDims?.[d] ?? fallback;
-        projectDimSums[d] += dimScore * fileWeight;
+            dimension === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        const dimScore = fDims?.[dimension] ?? fallback;
+        projectDimSums[dimension] += dimScore * fileWeight;
     }
 }
 
@@ -728,8 +741,8 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
     let totalDimWeight = 0;
 
     const projectDimSums: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
-    for (const d of ALL_QUALITY_DIMENSIONS) {
-        projectDimSums[d] = 0;
+    for (const dimension of ALL_QUALITY_DIMENSIONS) {
+        projectDimSums[dimension] = 0;
     }
 
     for (const file of fileScores) {
@@ -737,16 +750,16 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
         fatalCount += countFatalIssues(file.issues);
         totalDensity += file.effectiveDensity;
 
-        const d = file.densityMetrics;
-        if (d) {
-            totalCompositeDensity += d.compositeDensity;
-            totalTspr += d.tspr;
-            totalPor += d.por;
-            totalColumnDensity += d.columnDensity;
-            if (typeof d.spatialDensity === 'number') {
-                totalSpatialDensity += d.spatialDensity;
-                totalMahalanobisDistance += d.mahalanobisDistance ?? 0;
-                totalFisherSimplexDistance += d.fisherSimplexDistance ?? 0;
+        const density = file.densityMetrics;
+        if (density) {
+            totalCompositeDensity += density.compositeDensity;
+            totalTspr += density.tspr;
+            totalPor += density.por;
+            totalColumnDensity += density.columnDensity;
+            if (typeof density.spatialDensity === 'number') {
+                totalSpatialDensity += density.spatialDensity;
+                totalMahalanobisDistance += density.mahalanobisDistance ?? 0;
+                totalFisherSimplexDistance += density.fisherSimplexDistance ?? 0;
                 countSpatial++;
             }
         } else {
@@ -799,8 +812,8 @@ function computeWeightedProjectDimensions(
         QualityDimension,
         number
     >;
-    for (const d of ALL_QUALITY_DIMENSIONS) {
-        projectDimensions[d] = clampScore(projectDimSums[d] / safeTotalWeight);
+    for (const dimension of ALL_QUALITY_DIMENSIONS) {
+        projectDimensions[dimension] = clampScore(projectDimSums[dimension] / safeTotalWeight);
     }
     return projectDimensions;
 }
@@ -823,14 +836,14 @@ function finalizeProjectEightPillars(
     synthesized.pillars = projectPillars;
     let totalWeight = 0;
     let logSum = 0;
-    for (const p of ALL_PRIMARY_PILLARS) {
-        const w = synthesized.weights[p];
+    for (const pillar of ALL_PRIMARY_PILLARS) {
+        const weight = synthesized.weights[pillar];
         const boundedScore = Math.max(
             BOUNDED_SCORE_MIN,
-            Math.min(DIMENSION_MAX_SCORE, projectPillars[p]),
+            Math.min(DIMENSION_MAX_SCORE, projectPillars[pillar]),
         );
-        logSum += w * Math.log(boundedScore);
-        totalWeight += w;
+        logSum += weight * Math.log(boundedScore);
+        totalWeight += weight;
     }
     synthesized.compositeScore =
         totalWeight > 0
@@ -888,9 +901,8 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
         Math.round((metrics.totalMahalanobisDistance / safeSpatialCount) * RATIO_SCALE_THOUSAND) /
         RATIO_SCALE_THOUSAND;
     const avgFisher =
-        Math.round(
-            (metrics.totalFisherSimplexDistance / safeSpatialCount) * RATIO_SCALE_THOUSAND,
-        ) / RATIO_SCALE_THOUSAND;
+        Math.round((metrics.totalFisherSimplexDistance / safeSpatialCount) * RATIO_SCALE_THOUSAND) /
+        RATIO_SCALE_THOUSAND;
 
     return {
         compositeScore: synthesized.compositeScore,

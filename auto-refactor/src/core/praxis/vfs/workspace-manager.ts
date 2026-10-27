@@ -102,10 +102,10 @@ export class WorkspaceManager {
     /**
      * Resolves an existing workspace by branch ID or task card ID.
      */
-    public getWorkspace(id: string): LayerVFSWorkspace | null {
-        let record = this.activeWorkspaces.get(id);
+    public getWorkspace(workspaceId: string): LayerVFSWorkspace | null {
+        let record = this.activeWorkspaces.get(workspaceId);
         if (!record) {
-            const branchId = this.cardToBranchIndex.get(id);
+            const branchId = this.cardToBranchIndex.get(workspaceId);
             if (branchId) {
                 record = this.activeWorkspaces.get(branchId);
             }
@@ -120,17 +120,19 @@ export class WorkspaceManager {
      * Lists all currently active managed workspaces.
      */
     public listWorkspaces(): LayerVFSWorkspace[] {
-        return Array.from(this.activeWorkspaces.values()).map((r) => this.bindWorkspaceHandle(r));
+        return Array.from(this.activeWorkspaces.values()).map((recordItem) =>
+            this.bindWorkspaceHandle(recordItem),
+        );
     }
 
     /**
      * Discards an active workspace and drops its memory overlay.
      */
-    public discardWorkspace(id: string): boolean {
-        let branchId = id;
-        const record = this.activeWorkspaces.get(id);
+    public discardWorkspace(workspaceId: string): boolean {
+        let branchId = workspaceId;
+        const record = this.activeWorkspaces.get(workspaceId);
         if (!record) {
-            const mapped = this.cardToBranchIndex.get(id);
+            const mapped = this.cardToBranchIndex.get(workspaceId);
             if (mapped) {
                 branchId = mapped;
             } else {

@@ -210,7 +210,7 @@ export class ReviewMemoryManager {
             fileHash: prepared.fileHash,
             astDigest: prepared.astDigest,
             qualityScore: prepared.qualityScores,
-            ruleHitIds: prepared.ruleHits.map((h) => h.id),
+            ruleHitIds: prepared.ruleHits.map((hit) => hit.id),
         };
 
         // Append revision and cap at maxRevisionsPerFile
@@ -238,14 +238,14 @@ export class ReviewMemoryManager {
         if (!rec) return;
 
         // Prune unnecessary details, keeping only the essential fingerprint
-        rec.codeDomains = rec.codeDomains.map((d) => ({
-            domainId: d.domainId,
-            kind: d.kind,
-            name: d.name,
-            span: d.span,
-            semanticHash: d.semanticHash,
-            cyclomaticComplexity: d.cyclomaticComplexity,
-            ruleViolations: d.ruleViolations,
+        rec.codeDomains = rec.codeDomains.map((domain) => ({
+            domainId: domain.domainId,
+            kind: domain.kind,
+            name: domain.name,
+            span: domain.span,
+            semanticHash: domain.semanticHash,
+            cyclomaticComplexity: domain.cyclomaticComplexity,
+            ruleViolations: domain.ruleViolations,
         }));
     }
 
@@ -272,7 +272,7 @@ export class ReviewMemoryManager {
      */
     getStats(): { recordsCount: number; revisionsCount: number; maxFiles: number } {
         let revCount = 0;
-        for (const r of this.revisions.values()) revCount += r.length;
+        for (const revList of this.revisions.values()) revCount += revList.length;
         return {
             recordsCount: this.records.size,
             revisionsCount: revCount,
@@ -338,11 +338,11 @@ export class ReviewMemoryManager {
     private flushPending(): void {
         if (!this.memoryFilePath || this.pendingLines.length === 0) return;
         try {
-            const fd = fs.openSync(this.memoryFilePath, 'a');
+            const fileHandle = fs.openSync(this.memoryFilePath, 'a');
             try {
-                fs.writeSync(fd, this.pendingLines.join(''), undefined, 'utf8');
+                fs.writeSync(fileHandle, this.pendingLines.join(''), undefined, 'utf8');
             } finally {
-                fs.closeSync(fd);
+                fs.closeSync(fileHandle);
             }
             this.pendingLines.length = 0;
         } catch {
@@ -378,11 +378,11 @@ export class ReviewMemoryManager {
                 .map((record) => JSON.stringify(record))
                 .join('\n');
             const compactStagingPath = `${this.memoryFilePath}.tmp`;
-            const fd = fs.openSync(compactStagingPath, 'w');
+            const fileHandle = fs.openSync(compactStagingPath, 'w');
             try {
-                fs.writeSync(fd, `${body}\n`, undefined, 'utf8');
+                fs.writeSync(fileHandle, `${body}\n`, undefined, 'utf8');
             } finally {
-                fs.closeSync(fd);
+                fs.closeSync(fileHandle);
             }
             fs.renameSync(compactStagingPath, this.memoryFilePath);
             this.logLines = this.records.size;
@@ -405,14 +405,14 @@ export class ReviewMemoryManager {
     }
 
     private readLogContent(filePath: string): string {
-        const fd = fs.openSync(filePath, 'r');
+        const fileHandle = fs.openSync(filePath, 'r');
         try {
-            const stat = fs.fstatSync(fd);
+            const stat = fs.fstatSync(fileHandle);
             const buf = Buffer.allocUnsafe(stat.size);
-            fs.readSync(fd, buf, 0, stat.size, 0);
+            fs.readSync(fileHandle, buf, 0, stat.size, 0);
             return buf.toString('utf8');
         } finally {
-            fs.closeSync(fd);
+            fs.closeSync(fileHandle);
         }
     }
 

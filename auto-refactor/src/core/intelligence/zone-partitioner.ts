@@ -281,9 +281,9 @@ function coalesceSegments(
     let declCount = 1;
 
     for (let i = 1; i < items.length; i++) {
-        const it = items[i];
-        if (it.zone === curZone) {
-            endLine = it.line;
+        const item = items[i];
+        if (item.zone === curZone) {
+            endLine = item.line;
             declCount++;
         } else {
             segments.push({
@@ -294,9 +294,9 @@ function coalesceSegments(
                 declarationsCount: declCount,
                 summary: `${curZone}: lines ${startLine}-${endLine}`,
             });
-            curZone = it.zone;
-            startLine = it.line;
-            endLine = it.line;
+            curZone = item.zone;
+            startLine = item.line;
+            endLine = item.line;
             declCount = 1;
         }
     }
@@ -339,7 +339,7 @@ function coalesceSegments(
 
     // Entanglement Index (EI): ratio of zone transitions over total segments
     // Excluding terminal embedded test blocks from entanglement penalty
-    const nonTestSegments = segments.filter((s) => s.zone !== ZONE_EMBEDDED_TEST);
+    const nonTestSegments = segments.filter((segment) => segment.zone !== ZONE_EMBEDDED_TEST);
     const transitions = Math.max(0, nonTestSegments.length - 1);
     const entanglementIndex = +(transitions / Math.max(1, items.length)).toFixed(4);
     const isDecoupled = entanglementIndex <= 0.25;

@@ -120,7 +120,7 @@ export interface FusedIssueRisk {
  * @returns Fully articulated FusedIssueRisk record.
  */
 interface CorroborationArbitration {
-    D: number;
+    dynamicRiskScore: number;
     isDualConfirmed: boolean;
     suppressionApplied: boolean;
     rationale: string;
@@ -132,42 +132,54 @@ function arbitrateCorroboration(
 ): CorroborationArbitration {
     if (!dynamicRisk || dynamicRisk.evidenceConfidence <= 0) {
         return {
-            D: 1.0,
+            dynamicRiskScore: 1.0,
             isDualConfirmed: false,
             suppressionApplied: false,
             rationale: RiskFusionRationales.TELEMETRY_UNAVAILABLE,
         };
     }
 
-    const D = Math.max(MIN_DYNAMIC_RISK, dynamicRisk.normalizedRisk);
-    const S = staticRisk.normalizedRisk;
+    const dynamicRiskScore = Math.max(MIN_DYNAMIC_RISK, dynamicRisk.normalizedRisk);
+    const staticRiskScore = staticRisk.normalizedRisk;
 
-    if (S >= DUAL_CONFIRM_THRESHOLD_STATIC && D >= DUAL_CONFIRM_THRESHOLD_DYNAMIC) {
+    if (
+        staticRiskScore >= DUAL_CONFIRM_THRESHOLD_STATIC &&
+        dynamicRiskScore >= DUAL_CONFIRM_THRESHOLD_DYNAMIC
+    ) {
         return {
-            D,
+            dynamicRiskScore,
             isDualConfirmed: true,
             suppressionApplied: false,
-            rationale: RiskFusionRationales.DUAL_CONFIRMED(S, D),
+            rationale: RiskFusionRationales.DUAL_CONFIRMED(staticRiskScore, dynamicRiskScore),
         };
     }
-    if (S >= DAMPENING_THRESHOLD_STATIC && D <= DAMPENING_THRESHOLD_DYNAMIC) {
+    if (
+        staticRiskScore >= DAMPENING_THRESHOLD_STATIC &&
+        dynamicRiskScore <= DAMPENING_THRESHOLD_DYNAMIC
+    ) {
         return {
-            D,
+            dynamicRiskScore,
             isDualConfirmed: false,
             suppressionApplied: true,
-            rationale: RiskFusionRationales.SINGLE_SIDED_DAMPENED(S, D),
+            rationale: RiskFusionRationales.SINGLE_SIDED_DAMPENED(
+                staticRiskScore,
+                dynamicRiskScore,
+            ),
         };
     }
-    if (S <= HIDDEN_BOTTLENECK_STATIC && D >= HIDDEN_BOTTLENECK_DYNAMIC) {
+    if (
+        staticRiskScore <= HIDDEN_BOTTLENECK_STATIC &&
+        dynamicRiskScore >= HIDDEN_BOTTLENECK_DYNAMIC
+    ) {
         return {
-            D,
+            dynamicRiskScore,
             isDualConfirmed: false,
             suppressionApplied: false,
-            rationale: RiskFusionRationales.HIDDEN_BOTTLENECK(S, D),
+            rationale: RiskFusionRationales.HIDDEN_BOTTLENECK(staticRiskScore, dynamicRiskScore),
         };
     }
     return {
-        D,
+        dynamicRiskScore,
         isDualConfirmed: false,
         suppressionApplied: false,
         rationale: RiskFusionRationales.STANDARD_FUSION,
@@ -227,14 +239,14 @@ export function fuseIssueRisks(
         churnMultiplier = historicalFactor[PROPERTY_IMPACT_MULTIPLIER];
     }
 
-    const S = Math.max(MIN_NORMALIZED_STATIC_RISK, staticRisk.normalizedRisk);
-    const H = Math.max(
+    const staticRiskScore = Math.max(MIN_NORMALIZED_STATIC_RISK, staticRisk.normalizedRisk);
+    const historicalMultiplier = Math.max(
         MIN_HISTORICAL_FACTOR,
         Math.min(MAX_HISTORICAL_FACTOR, baseH * churnMultiplier),
     );
 
     const {
-        D,
+        dynamicRiskScore,
         isDualConfirmed,
         suppressionApplied,
         rationale: baseRationale,
@@ -242,9 +254,9 @@ export function fuseIssueRisks(
 
     const modifier = suppressionApplied ? 0.35 : isDualConfirmed ? 1.3 : 1.0;
     const fusedScore = computePowerResonance({
-        staticScore: S,
-        dynamicScore: D,
-        historicalScore: H,
+        staticScore: staticRiskScore,
+        dynamicScore: dynamicRiskScore,
+        historicalScore: historicalMultiplier,
         coeffs,
         modifier,
         ceiling: MAX_FUSED_SCORE_CEILING,
@@ -265,7 +277,8 @@ export function fuseIssueRisks(
         dynamicRisk: dynamicRisk
             ? Math.round(dynamicRisk.normalizedRisk * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR
             : 0.0,
-        historicalFactor: Math.round(H * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        historicalFactor:
+            Math.round(historicalMultiplier * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
         fusedScore,
         level,
         isDualConfirmed,

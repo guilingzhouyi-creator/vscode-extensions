@@ -465,9 +465,11 @@ function evaluateCoverageQuality(sites: TestSite[]): {
     freshness: number;
     effectiveness: number;
 } {
-    const hasDeprecated = sites.some((s) => s.referencesDeprecatedContract);
+    const hasDeprecated = sites.some((site) => site.referencesDeprecatedContract);
     const freshness = hasDeprecated ? 0.2 : 1.0;
-    const onlyWeak = sites.every((s) => s.isTautological || s.isMockOnly || s.isSkipped);
+    const onlyWeak = sites.every(
+        (site) => site.isTautological || site.isMockOnly || site.isSkipped,
+    );
     const effectiveness = onlyWeak ? 0.1 : 1.0;
     return { freshness, effectiveness };
 }
@@ -481,17 +483,17 @@ function indexMatchingSitesBySymbol(
     businessNodes: SemanticNode[],
 ): Map<string, TestSite[]> {
     const siteMap = new Map<string, TestSite[]>();
-    for (let b = 0; b < businessNodes.length; b++) {
-        siteMap.set(businessNodes[b].name.toLowerCase(), []);
+    for (let nodeIdx = 0; nodeIdx < businessNodes.length; nodeIdx++) {
+        siteMap.set(businessNodes[nodeIdx].name.toLowerCase(), []);
     }
 
-    for (let s = 0; s < testSites.length; s++) {
-        const site = testSites[s];
+    for (let siteIdx = 0; siteIdx < testSites.length; siteIdx++) {
+        const site = testSites[siteIdx];
         const testedLower = site.testedSymbol ? site.testedSymbol.toLowerCase() : null;
         const testNameLower = site.testName.toLowerCase();
 
-        for (let b = 0; b < businessNodes.length; b++) {
-            const lowerName = businessNodes[b].name.toLowerCase();
+        for (let nodeIdx = 0; nodeIdx < businessNodes.length; nodeIdx++) {
+            const lowerName = businessNodes[nodeIdx].name.toLowerCase();
             const matches =
                 testedLower === lowerName || hasCaseInsensitiveSubstring(testNameLower, lowerName);
             if (matches) {
@@ -523,11 +525,11 @@ export function mapBusinessToTests(
     const semanticUnits: ActiveSemanticUnit[] = [];
     const uncoveredSymbols: string[] = [];
 
-    const businessNodes = nodes.filter((n: SemanticNode) => {
-        if (!ELIGIBLE_NODE_KINDS.has(n.kind)) {
+    const businessNodes = nodes.filter((node: SemanticNode) => {
+        if (!ELIGIBLE_NODE_KINDS.has(node.kind)) {
             return false;
         }
-        const file = n.location?.file ?? '';
+        const file = node.location?.file ?? '';
         return !isTestFilePath(file);
     });
 

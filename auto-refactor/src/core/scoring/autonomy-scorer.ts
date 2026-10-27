@@ -361,13 +361,13 @@ function readSourceFileContent(absPath: string): string {
         const stat = fs.statSync(absPath);
         const readLength = Math.min(stat.size, MAX_AUTONOMY_FILE_READ_BYTES);
         if (readLength <= 0) return '';
-        const fd = fs.openSync(absPath, 'r');
+        const fileDesc = fs.openSync(absPath, 'r');
         try {
             const buf = Buffer.allocUnsafe(readLength);
-            const bytesRead = fs.readSync(fd, buf, 0, readLength, 0);
+            const bytesRead = fs.readSync(fileDesc, buf, 0, readLength, 0);
             return buf.toString('utf8', 0, bytesRead);
         } finally {
-            fs.closeSync(fd);
+            fs.closeSync(fileDesc);
         }
     } catch {
         return '';
@@ -524,7 +524,8 @@ function calculateSupplyChainResilience(supplyChain: SupplyChainProfile): number
     const transitiveCount = supplyChain.transitiveDependencyCount;
     const depth = supplyChain.estimatedDepth;
 
-    const penalty = directCount * 0.5 + Math.sqrt(transitiveCount) * 0.8 + Math.max(0, depth - 1) * 2.0;
+    const penalty =
+        directCount * 0.5 + Math.sqrt(transitiveCount) * 0.8 + Math.max(0, depth - 1) * 2.0;
     const resilience = Math.max(MIN_RESILIENCE_SCORE, Math.min(PERCENT_MAX, PERCENT_MAX - penalty));
     return clampScore(resilience);
 }

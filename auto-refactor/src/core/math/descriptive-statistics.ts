@@ -160,7 +160,7 @@ export function computeQuantile(values: readonly number[], quantile: number): nu
     if (!values || values.length === 0) return 0;
     const boundedQ = clampRange(quantile, 0.0, 1.0);
 
-    const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+    const sorted = values.filter(Number.isFinite).sort((valA, valB) => valA - valB);
     if (sorted.length === 0) return 0;
     if (sorted.length === 1) return sorted[0];
 
@@ -190,7 +190,7 @@ export function computeMedian(values: readonly number[]): number {
  * @returns Interquartile range distance.
  */
 export function computeInterquartileRange(values: readonly number[]): number {
-    const q1 = computeQuantile(values, 0.25);
-    const q3 = computeQuantile(values, 0.75);
-    return roundPrecision(Math.max(0, q3 - q1));
+    const firstQuartile = computeQuantile(values, 0.25);
+    const thirdQuartile = computeQuantile(values, 0.75);
+    return roundPrecision(Math.max(0, thirdQuartile - firstQuartile));
 }

@@ -34,11 +34,7 @@ const MAX_IN_MEMORY_FACTS = 4096;
 
 /** Supported immutable analysis fact classification categories. */
 export type FactCategory =
-    | 'pure_function'
-    | 'acyclic_subgraph'
-    | 'rule_pass'
-    | 'invariant'
-    | 'symbol_digest';
+    'pure_function' | 'acyclic_subgraph' | 'rule_pass' | 'invariant' | 'symbol_digest';
 
 /**
  * Single immutable analysis fact record.
@@ -301,14 +297,14 @@ export class PersistentReviewFactStore {
      * Internal: Read ledger file content using scoped file descriptor.
      */
     private readLedgerContent(filePath: string): string {
-        const fd = fs.openSync(filePath, 'r');
+        const fileDescriptor = fs.openSync(filePath, 'r');
         try {
-            const stat = fs.fstatSync(fd);
-            const buf = Buffer.allocUnsafe(stat.size);
-            fs.readSync(fd, buf, 0, stat.size, 0);
-            return buf.toString('utf8');
+            const stat = fs.fstatSync(fileDescriptor);
+            const bufferPayload = Buffer.allocUnsafe(stat.size);
+            fs.readSync(fileDescriptor, bufferPayload, 0, stat.size, 0);
+            return bufferPayload.toString('utf8');
         } finally {
-            fs.closeSync(fd);
+            fs.closeSync(fileDescriptor);
         }
     }
 

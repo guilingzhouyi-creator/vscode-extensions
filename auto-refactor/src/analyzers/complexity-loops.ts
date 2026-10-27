@@ -91,15 +91,15 @@ function braceMatchedEnd(masked: string[], headerLine: number, cap: number): num
     let depth = 0;
     const firstLineStr = masked[headerLine - 1] ?? '';
     const firstCharIdx = Math.max(0, firstLineStr.lastIndexOf(')'));
-    for (let l = headerLine; l <= cap; l++) {
-        const lineStr = masked[l - 1] ?? '';
-        const startCharIdx = l === headerLine ? firstCharIdx : 0;
-        for (let c = startCharIdx; c < lineStr.length; c++) {
-            const ch = lineStr[c];
-            if (ch === '{') depth++;
-            else if (ch === '}') {
+    for (let lineIdx = headerLine; lineIdx <= cap; lineIdx++) {
+        const lineStr = masked[lineIdx - 1] ?? '';
+        const startCharIdx = lineIdx === headerLine ? firstCharIdx : 0;
+        for (let charIdx = startCharIdx; charIdx < lineStr.length; charIdx++) {
+            const charToken = lineStr[charIdx];
+            if (charToken === '{') depth++;
+            else if (charToken === '}') {
                 depth--;
-                if (depth <= 0) return l;
+                if (depth <= 0) return lineIdx;
             }
         }
     }
@@ -113,8 +113,8 @@ function indentationLoopBodyEnd(
     cap: number,
 ): number {
     let lastBodyLine = headerLine;
-    for (let l = headerLine + 1; l <= cap; l++) {
-        const line = targetLines[l - 1] ?? '';
+    for (let lineIdx = headerLine + 1; lineIdx <= cap; lineIdx++) {
+        const line = targetLines[lineIdx - 1] ?? '';
         const trimmedLine = line.trim();
         if (
             trimmedLine.length === 0 ||
@@ -125,7 +125,7 @@ function indentationLoopBodyEnd(
         }
         const lineIndent = line.length - line.trimStart().length;
         if (lineIndent > baseIndent) {
-            lastBodyLine = l;
+            lastBodyLine = lineIdx;
         } else {
             break;
         }
@@ -174,8 +174,9 @@ function loopBodyRange(
         return { from: headerLine, to: braceMatchedEnd(targetLines, headerLine, cap) };
     }
     if (afterParen.trim().length > 0) return { from: headerLine, to: headerLine };
-    for (let l = headerLine + 1; l <= cap; l++) {
-        if ((targetLines[l - 1] ?? '').trim().length > 0) return { from: headerLine, to: l };
+    for (let lineIdx = headerLine + 1; lineIdx <= cap; lineIdx++) {
+        if ((targetLines[lineIdx - 1] ?? '').trim().length > 0)
+            return { from: headerLine, to: lineIdx };
     }
     return { from: headerLine, to: headerLine };
 }
@@ -255,14 +256,14 @@ function inspectSingleLoopLine(txt: string, transientRegex: RegExp): LoopLineIns
  *
  * @param lines - Array of full source lines.
  * @param from - First body line (inclusive, 1-based).
- * @param to - Last body line (inclusive, 1-based).
+ * @param toLine - Last body line (inclusive, 1-based).
  * @param transientRegex - Pre-compiled regex matching transient container allocations.
  * @returns Flags the complexity rules report on.
  */
 function inspectLoopBody(
     lines: string[],
     from: number,
-    to: number,
+    toLine: number,
     transientRegex: RegExp = TRANSIENT_TS_CONTAINER_RE,
 ): {
     hasTransientAllocation: boolean;
@@ -276,8 +277,8 @@ function inspectLoopBody(
     let hasSideEffects = false;
     let effectiveStatements = 0;
 
-    for (let l = from; l <= to && l <= lines.length; l++) {
-        const lineInfo = inspectSingleLoopLine(lines[l - 1] ?? '', transientRegex);
+    for (let lineIdx = from; lineIdx <= toLine && lineIdx <= lines.length; lineIdx++) {
+        const lineInfo = inspectSingleLoopLine(lines[lineIdx - 1] ?? '', transientRegex);
         if (lineInfo.isEffective) {
             effectiveStatements++;
             if (lineInfo.isMutation) stateMutationsCount++;
@@ -355,17 +356,17 @@ export function findLoopSitesInFunction(
     const transientRegex = resolveTransientRegex(filePath);
     const isIndentedLang = filePath.endsWith('.py') || filePath.endsWith('.gd');
 
-    for (let l = startLine; l <= endLine; l++) {
-        const lineText = lines[l - 1] ?? '';
+    for (let lineIdx = startLine; lineIdx <= endLine; lineIdx++) {
+        const lineText = lines[lineIdx - 1] ?? '';
         const trimmed = lineText.trim();
-        const maskedLine = getMaskedLine(masked, l);
+        const maskedLine = getMaskedLine(masked, lineIdx);
         if (!isLoopHeaderCandidate(trimmed, lineText, isIndentedLang, maskedLine)) continue;
 
         const scaleVariable = resolveLoopScaleVariable(lineText);
-        const body = loopBodyRange(masked, l, endLine, lines);
+        const body = loopBodyRange(masked, lineIdx, endLine, lines);
         sites.push({
             file: filePath,
-            line: l,
+            line: lineIdx,
             symbol: fnSymbol,
             isBounded: isBoundedCollection(scaleVariable),
             scaleVariable,
@@ -434,16 +435,16 @@ export function createRoutineDescriptors(
     filePath: string,
 ): RoutineSemanticDescriptor[] {
     const domainName = filePath.split(/[\\/]/)[0] || 'default';
-    return fileFunctions.map((fn) => ({
-        id: `${filePath}:${fn.name}:${fn.startLine}`,
+    return fileFunctions.map((fnMetric) => ({
+        id: `${filePath}:${fnMetric.name}:${fnMetric.startLine}`,
         filePath,
-        name: fn.name,
-        startLine: fn.startLine,
-        endLine: fn.endLine,
-        cc: fn.cc,
-        loc: fn.endLine - fn.startLine + 1,
+        name: fnMetric.name,
+        startLine: fnMetric.startLine,
+        endLine: fnMetric.endLine,
+        cc: fnMetric.cc,
+        loc: fnMetric.endLine - fnMetric.startLine + 1,
         fingerprint: {
-            symbolTokens: new Set([fn.name]),
+            symbolTokens: new Set([fnMetric.name]),
             domainName,
             callInDegree: 1,
             callOutDegree: 1,
@@ -471,9 +472,9 @@ function walkChildrenCC(node: NormalizedNode): number {
     const kids = node.children;
     if (!kids) return 0;
     for (let i = 0; i < kids.length; i++) {
-        const c = kids[i];
-        if (c.functionLike) continue;
-        sum += (c.branchWeight || 0) + walkChildrenCC(c);
+        const childNode = kids[i];
+        if (childNode.functionLike) continue;
+        sum += (childNode.branchWeight || 0) + walkChildrenCC(childNode);
     }
     return sum;
 }

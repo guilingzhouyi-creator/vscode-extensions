@@ -40,33 +40,33 @@ export function analyzeScopeShadowingShim(
 ): NativeShadowingResult[] {
     const parentMap = new Map<number, number | null>();
     for (let i = 0; i < scopes.length; i++) {
-        const p = scopes[i].parent;
-        parentMap.set(i, typeof p === 'number' && p >= 0 ? p : null);
+        const parentId = scopes[i].parent;
+        parentMap.set(i, typeof parentId === 'number' && parentId >= 0 ? parentId : null);
     }
 
     const bindingsByScope = new Map<number, Map<string, NativeBindingInput>>();
     for (let i = 0; i < bindings.length; i++) {
-        const b = bindings[i];
-        const scopeMap = getOrCreateScopeMap(bindingsByScope, b.scopeId);
-        if (!scopeMap.has(b.name)) {
-            scopeMap.set(b.name, b);
+        const bindingItem = bindings[i];
+        const scopeMap = getOrCreateScopeMap(bindingsByScope, bindingItem.scopeId);
+        if (!scopeMap.has(bindingItem.name)) {
+            scopeMap.set(bindingItem.name, bindingItem);
         }
     }
 
     const defects: NativeShadowingResult[] = [];
     for (let i = 0; i < bindings.length; i++) {
-        const b = bindings[i];
-        let curr = parentMap.get(b.scopeId);
+        const bindingItem = bindings[i];
+        let curr = parentMap.get(bindingItem.scopeId);
         while (curr !== null && curr !== undefined) {
-            const outer = bindingsByScope.get(curr)?.get(b.name);
+            const outer = bindingsByScope.get(curr)?.get(bindingItem.name);
             if (outer) {
                 defects.push({
-                    symbol: b.name,
-                    innerScopeId: b.scopeId,
-                    innerLine: b.line,
+                    symbol: bindingItem.name,
+                    innerScopeId: bindingItem.scopeId,
+                    innerLine: bindingItem.line,
                     outerScopeId: outer.scopeId,
                     outerLine: outer.line,
-                    bindingKind: b.kind,
+                    bindingKind: bindingItem.kind,
                 });
             }
             curr = parentMap.get(curr);

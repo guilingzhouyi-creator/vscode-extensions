@@ -137,8 +137,8 @@ function computeSubtreeComplexityAndHash(
     node: NormalizedNode,
     kind: CodeDomainKind,
     fullName: string,
-): { cc: number; semanticHash: string } {
-    let cc = 1;
+): { cyclomaticComplexity: number; semanticHash: string } {
+    let cyclomaticComplexity = 1;
     const structTokens: string[] = [kind, fullName];
     const collectStack: NormalizedNode[] = [];
     if (node.children) {
@@ -148,7 +148,7 @@ function computeSubtreeComplexityAndHash(
     }
     while (collectStack.length > 0) {
         const child = collectStack.pop()!;
-        if (child.branchWeight) cc += child.branchWeight;
+        if (child.branchWeight) cyclomaticComplexity += child.branchWeight;
         structTokens.push(child.kind);
         if (child.name) structTokens.push(child.name);
         if (child.children) {
@@ -158,7 +158,7 @@ function computeSubtreeComplexityAndHash(
         }
     }
     const semanticHash = fastDigest(structTokens.join('|'));
-    return { cc, semanticHash };
+    return { cyclomaticComplexity, semanticHash };
 }
 
 /**
@@ -167,7 +167,7 @@ function computeSubtreeComplexityAndHash(
  * @param node - AST node representing the domain.
  * @param kind - Domain kind.
  * @param fullName - Full qualified name.
- * @param cc - Cyclomatic complexity.
+ * @param cyclomaticComplexity - Cyclomatic complexity.
  * @param semanticHash - Computed structural hash.
  * @param issues - Scanned issues to filter for domain span.
  * @returns Complete CodeDomainFingerprint.
@@ -176,7 +176,7 @@ function buildDomainFingerprint(
     node: NormalizedNode,
     kind: CodeDomainKind,
     fullName: string,
-    cc: number,
+    cyclomaticComplexity: number,
     semanticHash: string,
     issues: Issue[],
 ): CodeDomainFingerprint {
@@ -187,10 +187,10 @@ function buildDomainFingerprint(
     const domainId = `${kind}:${fullName}:${startLine}`;
 
     const domainIssues = issues.filter(
-        (it) =>
-            it.location?.start &&
-            it.location.start.line >= startLine &&
-            it.location.start.line <= endLine,
+        (issue) =>
+            issue.location?.start &&
+            issue.location.start.line >= startLine &&
+            issue.location.start.line <= endLine,
     );
 
     return {
@@ -199,13 +199,13 @@ function buildDomainFingerprint(
         name: fullName,
         span: { startLine, endLine, startCol, endCol },
         semanticHash,
-        cyclomaticComplexity: cc,
-        ruleViolations: domainIssues.map((it) => ({
-            rule: it.rule,
-            analyzer: it.analyzer,
-            severity: it.severity,
-            line: it.location.start.line,
-            message: it.message,
+        cyclomaticComplexity,
+        ruleViolations: domainIssues.map((issue) => ({
+            rule: issue.rule,
+            analyzer: issue.analyzer,
+            severity: issue.severity,
+            line: issue.location.start.line,
+            message: issue.message,
         })),
         metricSummary: {
             lines: Math.max(1, endLine - startLine + 1),
@@ -248,7 +248,7 @@ function extractFromAst(root: NormalizedNode, issues: Issue[]): CodeDomainFinger
         const identity = resolveDomainIdentity(node, enclosingClass);
 
         if (identity.isDomain) {
-            const { cc, semanticHash } = computeSubtreeComplexityAndHash(
+            const { cyclomaticComplexity, semanticHash } = computeSubtreeComplexityAndHash(
                 node,
                 identity.kind,
                 identity.fullName,
@@ -258,7 +258,7 @@ function extractFromAst(root: NormalizedNode, issues: Issue[]): CodeDomainFinger
                     node,
                     identity.kind,
                     identity.fullName,
-                    cc,
+                    cyclomaticComplexity,
                     semanticHash,
                     issues,
                 ),
@@ -281,10 +281,10 @@ function countLineBraces(line: string): { opens: number; closes: number } {
     let opens = 0;
     let closes = 0;
     for (let i = 0; i < line.length; i++) {
-        const ch = line.charCodeAt(i);
-        if (ch === 123) {
+        const charCode = line.charCodeAt(i);
+        if (charCode === 123) {
             opens++;
-        } else if (ch === 125) {
+        } else if (charCode === 125) {
             closes++;
         }
     }
@@ -336,10 +336,10 @@ function extractFromText(content: string, issues: Issue[]): CodeDomainFingerprin
         const domainId = `function:${name}:${startLine}`;
 
         const domainIssues = issues.filter(
-            (it) =>
-                it.location?.start &&
-                it.location.start.line >= startLine &&
-                it.location.start.line <= endLine,
+            (issue) =>
+                issue.location?.start &&
+                issue.location.start.line >= startLine &&
+                issue.location.start.line <= endLine,
         );
 
         domains.push({
@@ -349,12 +349,12 @@ function extractFromText(content: string, issues: Issue[]): CodeDomainFingerprin
             span: { startLine, endLine, startCol: 1, endCol: 1 },
             semanticHash,
             cyclomaticComplexity: 1,
-            ruleViolations: domainIssues.map((it) => ({
-                rule: it.rule,
-                analyzer: it.analyzer,
-                severity: it.severity,
-                line: it.location.start.line,
-                message: it.message,
+            ruleViolations: domainIssues.map((issue) => ({
+                rule: issue.rule,
+                analyzer: issue.analyzer,
+                severity: issue.severity,
+                line: issue.location.start.line,
+                message: issue.message,
             })),
             metricSummary: {
                 lines: Math.max(1, endLine - startLine + 1),

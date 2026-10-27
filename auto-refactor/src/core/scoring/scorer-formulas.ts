@@ -89,17 +89,17 @@ const SCALE_MODE_ABSOLUTE_STR = 'absolute';
 /**
  * Evaluates whether an analyzer is enabled under the given ScanConfig.
  */
-function isAnalyzerActive(id: string, config?: ScanConfig): boolean {
+function isAnalyzerActive(analyzerId: string, config?: ScanConfig): boolean {
     if (config === undefined) return true;
-    const declaration = config.analyzers?.[id];
+    const declaration = config.analyzers?.[analyzerId];
     return declaration !== undefined && declaration.enabled !== false;
 }
 
 function filterActiveAnalyzers(declared: readonly string[], config?: ScanConfig): string[] {
     const active: string[] = [];
-    for (const id of declared) {
-        if (isAnalyzerActive(id, config)) {
-            active.push(id);
+    for (const analyzerId of declared) {
+        if (isAnalyzerActive(analyzerId, config)) {
+            active.push(analyzerId);
         }
     }
     return active;
@@ -232,25 +232,25 @@ export function computeCompositeScore(
     // into an arbitrary score, so reject the configuration at the boundary instead.
     let overallWeight = 0;
     for (const dim of ALL_QUALITY_DIMENSIONS) {
-        const w = weights[dim];
-        if (typeof w !== 'number' || !Number.isFinite(w) || w < 0) {
+        const dimWeight = weights[dim];
+        if (typeof dimWeight !== 'number' || !Number.isFinite(dimWeight) || dimWeight < 0) {
             throw new RangeError(
-                `quality weight for "${dim}" must be a finite non-negative number, got ${String(w)}`,
+                `quality weight for "${dim}" must be a finite non-negative number, got ${String(dimWeight)}`,
             );
         }
-        overallWeight += w;
+        overallWeight += dimWeight;
     }
 
     let logSum = 0;
     let totalWeight = 0;
     for (const dim of evaluatedDimensions) {
-        const w = weights[dim];
+        const dimWeight = weights[dim];
         const index = Math.max(
             COMPOSITE_INDEX_FLOOR,
             Math.min(DIMENSION_MAX_SCORE, rawScores[dim]),
         );
-        logSum += w * Math.log(index);
-        totalWeight += w;
+        logSum += dimWeight * Math.log(index);
+        totalWeight += dimWeight;
     }
     const coverage =
         overallWeight === 0
@@ -297,13 +297,13 @@ export const SCORE_EPSILON = 1e-4;
 /**
  * Checks whether two score values are equal within precision tolerance.
  *
- * @param a - First score value.
- * @param b - Second score value.
+ * @param scoreA - First score value.
+ * @param scoreB - Second score value.
  * @param tolerance - Comparison precision tolerance bound.
  * @returns True if absolute difference is within tolerance.
  */
-export function isScoreEqual(a: number, b: number, tolerance = SCORE_EPSILON): boolean {
-    return Math.abs(a - b) <= tolerance;
+export function isScoreEqual(scoreA: number, scoreB: number, tolerance = SCORE_EPSILON): boolean {
+    return Math.abs(scoreA - scoreB) <= tolerance;
 }
 
 /**
@@ -606,14 +606,14 @@ export function accumulateProjectMetrics(
     // the file silently. Counted and reported rather than skipped quietly.
     const skippedFiles: string[] = [];
 
-    for (const m of fileMetrics) {
-        const fScore = fileQualityScores[m.file];
+    for (const metric of fileMetrics) {
+        const fScore = fileQualityScores[metric.file];
         if (!fScore) {
-            skippedFiles.push(m.file);
+            skippedFiles.push(metric.file);
             continue;
         }
 
-        const weight = Math.max(1, m.nonBlankLines || m.lines || 1);
+        const weight = Math.max(1, metric.nonBlankLines || metric.lines || 1);
         totalWeight += weight;
 
         for (const dim of ALL_QUALITY_DIMENSIONS) {

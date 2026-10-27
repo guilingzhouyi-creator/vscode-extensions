@@ -137,9 +137,9 @@ export class PraxisI18nProvider implements IPraxisI18nProvider {
             localeMap = new Map();
             this.customRules.set(normalized, localeMap);
         }
-        for (const [id, entry] of Object.entries(entries)) {
-            const existing = localeMap.get(id);
-            localeMap.set(id, existing ? { ...existing, ...entry } : { ...entry });
+        for (const [ruleId, entry] of Object.entries(entries)) {
+            const existing = localeMap.get(ruleId);
+            localeMap.set(ruleId, existing ? { ...existing, ...entry } : { ...entry });
         }
     }
 

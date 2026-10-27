@@ -131,14 +131,14 @@ function adapterSupportsExtension(adapter: LanguageAdapter, ext: string): boolea
     return set.has(ext);
 }
 
-function getAdapter(id: string): LanguageAdapter {
-    if (registered[id]) return registered[id];
-    return (cache[id] ??= factories[id]());
+function getAdapter(adapterId: string): LanguageAdapter {
+    if (registered[adapterId]) return registered[adapterId];
+    return (cache[adapterId] ??= factories[adapterId]());
 }
 
 /**
  * Register a runtime language adapter, replacing any built-in or previously registered adapter
- * with the same `id`.
+ * with the same `adapterId`.
  *
  * The adapter is stored by `adapter.id`, and any lazily cached instance under that id is
  * evicted so the next `adapterFor` call resolves to this registration. Registration is
@@ -178,12 +178,12 @@ export function adapterFor(filePath: string, parser: ParserKind = 'typescript'):
         const adapter = getAdapter(known);
         if (adapterSupportsExtension(adapter, ext)) return adapter;
     }
-    for (const id of Object.keys(factories)) {
-        const a = getAdapter(id);
-        if (adapterSupportsExtension(a, ext)) return a;
+    for (const adapterId of Object.keys(factories)) {
+        const currentAdapter = getAdapter(adapterId);
+        if (adapterSupportsExtension(currentAdapter, ext)) return currentAdapter;
     }
-    for (const a of Object.values(registered)) {
-        if (adapterSupportsExtension(a, ext)) return a;
+    for (const regAdapter of Object.values(registered)) {
+        if (adapterSupportsExtension(regAdapter, ext)) return regAdapter;
     }
     return getAdapter(ADAPTER_ID_TYPESCRIPT);
 }
@@ -208,11 +208,11 @@ export function hasAdapterFor(filePath: string, parser: ParserKind = 'typescript
     if (known && !registered[known]) {
         if (adapterSupportsExtension(getAdapter(known), ext)) return true;
     }
-    for (const id of Object.keys(factories)) {
-        if (adapterSupportsExtension(getAdapter(id), ext)) return true;
+    for (const adapterId of Object.keys(factories)) {
+        if (adapterSupportsExtension(getAdapter(adapterId), ext)) return true;
     }
-    for (const a of Object.values(registered)) {
-        if (adapterSupportsExtension(a, ext)) return true;
+    for (const regAdapter of Object.values(registered)) {
+        if (adapterSupportsExtension(regAdapter, ext)) return true;
     }
     return false;
 }

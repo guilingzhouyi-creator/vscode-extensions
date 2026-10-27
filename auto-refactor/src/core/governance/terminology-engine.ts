@@ -414,15 +414,15 @@ const CUSTOM_WHITELIST_CACHE = new Map<
 >();
 
 function getOrCompileAsciiPattern(asciiPat: string): RegExp {
-    let re = ASCII_PATTERN_RE_CACHE.get(asciiPat);
-    if (!re) {
+    let patternRegex = ASCII_PATTERN_RE_CACHE.get(asciiPat);
+    if (!patternRegex) {
         const unescaped = asciiPat.replace(/\\[a-zA-Z]/g, '');
         const isExactCase = !/[a-z]/.test(unescaped) && /[A-Z]/.test(unescaped);
         const flags = isExactCase ? 'g' : 'gi';
-        re = new RegExp(asciiPat, flags);
-        ASCII_PATTERN_RE_CACHE.set(asciiPat, re);
+        patternRegex = new RegExp(asciiPat, flags);
+        ASCII_PATTERN_RE_CACHE.set(asciiPat, patternRegex);
     }
-    return re;
+    return patternRegex;
 }
 
 interface CompiledRuleLexicon {
@@ -435,14 +435,18 @@ const RULE_LEXICON_CACHE = new WeakMap<TerminologyRule, CompiledRuleLexicon>();
 function getOrCompileRuleLexicon(rule: TerminologyRule): CompiledRuleLexicon {
     let lexicon = RULE_LEXICON_CACHE.get(rule);
     if (!lexicon) {
-        const validPatterns = rule.patterns.filter((p): p is string => Boolean(p && p.length > 0));
+        const validPatterns = rule.patterns.filter((pattern): pattern is string =>
+            Boolean(pattern && pattern.length > 0),
+        );
         if (validPatterns.length === 0) {
             lexicon = { patternRe: null, patternSet: new Set() };
         } else {
             // Sort by descending length so longer compound phrases match first
-            const sorted = [...validPatterns].sort((a, b) => b.length - a.length);
-            const escaped = sorted.map((p) =>
-                p.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&'),
+            const sorted = [...validPatterns].sort(
+                (patternA, patternB) => patternB.length - patternA.length,
+            );
+            const escaped = sorted.map((pattern) =>
+                pattern.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&'),
             );
             lexicon = {
                 patternRe: new RegExp(escaped.join('|'), 'g'),
@@ -702,10 +706,10 @@ function collectLineAsciiPatterns(
 ): void {
     const lowerRaw = lowerRawLine ?? rawLine.toLowerCase();
     for (const asciiPat of rule.asciiPatterns) {
-        const re = getOrCompileAsciiPattern(asciiPat);
-        re.lastIndex = 0;
+        const asciiRegex = getOrCompileAsciiPattern(asciiPat);
+        asciiRegex.lastIndex = 0;
         let match: RegExpExecArray | null;
-        while ((match = re.exec(sanitized)) !== null) {
+        while ((match = asciiRegex.exec(sanitized)) !== null) {
             const term = match[0];
             if (isVocabularyEnumeration(sanitized, match.index, term)) {
                 continue;

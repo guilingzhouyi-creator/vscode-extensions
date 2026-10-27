@@ -221,13 +221,13 @@ export class TypeScriptSemanticAdapter extends UnifiedLanguageAdapter {
         filePath: string,
         graph: SemanticGraph,
     ): void {
-        const walk = (n: ts.Node): void => {
-            if (ts.isCallExpression(n)) {
-                const calleeText = n.expression.getText();
+        const walk = (astNode: ts.Node): void => {
+            if (ts.isCallExpression(astNode)) {
+                const calleeText = astNode.expression.getText();
                 const calleeId = buildCanonicalSymbolId(this.language, filePath, calleeText);
                 graph.addEdge(this.createCallEdge(callerId, calleeId));
             }
-            ts.forEachChild(n, walk);
+            ts.forEachChild(astNode, walk);
         };
         walk(root);
     }
@@ -265,6 +265,6 @@ export class TypeScriptSemanticAdapter extends UnifiedLanguageAdapter {
             return false;
         }
         const modifiers = ts.getModifiers(node);
-        return Boolean(modifiers?.some((m) => m.kind === kind));
+        return Boolean(modifiers?.some((modifierItem) => modifierItem.kind === kind));
     }
 }

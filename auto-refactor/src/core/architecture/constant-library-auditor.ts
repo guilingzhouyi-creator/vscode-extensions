@@ -241,7 +241,7 @@ export function inspectConstantLibraryTopology(
 
     const suggestion =
         `Scaffold constant library at '${verdict.recommendedDirectory}' with sliced domain ` +
-        `modules (${verdict.suggestedModules.filter((m) => !m.isBarrel).length} modules) ` +
+        `modules (${verdict.suggestedModules.filter((moduleItem) => !moduleItem.isBarrel).length} modules) ` +
         `and a unified 'index.ts' barrel export.`;
 
     const issue: Issue = {

@@ -224,13 +224,15 @@ function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
     // regexes on untrusted file content.
     const compiled: CompiledSecretPattern[] = [];
 
-    for (const p of base) {
-        if (opts.patterns && !isRegexSafe(p.source)) {
-            const warnings = auditRegexSafety(p.source);
-            console.warn(`[secrets] Skipping unsafe pattern "${p.name}": ${warnings.join('; ')}`);
+    for (const patternDef of base) {
+        if (opts.patterns && !isRegexSafe(patternDef.source)) {
+            const warnings = auditRegexSafety(patternDef.source);
+            console.warn(
+                `[secrets] Skipping unsafe pattern "${patternDef.name}": ${warnings.join('; ')}`,
+            );
             continue;
         }
-        compiled.push({ name: p.name, re: new RegExp(p.source) });
+        compiled.push({ name: patternDef.name, re: new RegExp(patternDef.source) });
     }
 
     if (opts.extraPatterns) {
@@ -275,13 +277,17 @@ export class SecretsAnalyzer implements Analyzer {
     /**
      * Analyze one file and return bounded secret findings.
      *
-     * @param sf - Parsed TypeScript source file; unused because detection reads `ctx.content`.
+     * @param sourceFile - Parsed TypeScript source file; unused because detection reads
+     *   `ctx.content`.
      * @param ctx - Per-file context with raw content, normalized path, merged options, and level.
      * @returns At most `maxIssuesPerFile` issues, at most one per line; empty for off/suppressed.
      * @throws SyntaxError - When a caller-supplied pattern string is not a valid regex.
      */
-    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
-        void sf;
+    analyze(
+        sourceFile: import('typescript').SourceFile | undefined,
+        ctx: AnalyzerContext,
+    ): Issue[] {
+        void sourceFile;
         const opts = (ctx.options || {}) as SecretsOptions & { level?: SecurityLevel };
         const level: SecurityLevel = opts.level || ctx.config.securityLevel || LEVEL_BASIC;
         const normPath = ctx.filePath.replace(/\\/g, '/');
@@ -338,23 +344,26 @@ export class SecretsAnalyzer implements Analyzer {
             maxFindings: cap,
         });
         for (let i = 0; i < nativeFindings.length; i++) {
-            const f = nativeFindings[i];
+            const finding = nativeFindings[i];
             const suggestion =
-                f.rule === RULE_HIGH_ENTROPY_TOKEN
-                    ? SecretMessages.HIGH_ENTROPY_TOKEN(f.entropy, f.preview.length).suggestion
-                    : SecretMessages.HARDCODED_SECRET('secret', f.preview).suggestion;
+                finding.rule === RULE_HIGH_ENTROPY_TOKEN
+                    ? SecretMessages.HIGH_ENTROPY_TOKEN(finding.entropy, finding.preview.length)
+                          .suggestion
+                    : SecretMessages.HARDCODED_SECRET('secret', finding.preview).suggestion;
             issues.push(
                 this.makeSecretIssue({
                     ctx,
-                    line: f.line,
-                    rule: f.rule,
-                    message: f.message,
+                    line: finding.line,
+                    rule: finding.rule,
+                    message: finding.message,
                     detail:
-                        f.entropy > 0
-                            ? { entropy: f.entropy }
-                            : { kind: f.kind, pattern: f.preview },
+                        finding.entropy > 0
+                            ? { entropy: finding.entropy }
+                            : { kind: finding.kind, pattern: finding.preview },
                     severity:
-                        f.rule === RULE_HIGH_ENTROPY_TOKEN ? entropy.severity : SEVERITY_ERROR,
+                        finding.rule === RULE_HIGH_ENTROPY_TOKEN
+                            ? entropy.severity
+                            : SEVERITY_ERROR,
                     suggestion,
                 }),
             );
@@ -394,14 +403,14 @@ export class SecretsAnalyzer implements Analyzer {
         context: SecretLineAuditContext,
         patterns: CompiledSecretPattern[],
     ): boolean {
-        for (const p of patterns) {
+        for (const patternDef of patterns) {
             // Use safeRegexTest: direct for short lines, bounded for long lines
             // (e.g. minified content on a single line). All secret patterns are
             // keyword-level triggers, so truncating long lines is safe.
-            if (safeRegexTest(p.re, context.lineText)) {
+            if (safeRegexTest(patternDef.re, context.lineText)) {
                 const desc = SecretMessages.HARDCODED_SECRET(
-                    p.name,
-                    p.re.source.slice(0, REGEX_SOURCE_PREVIEW_LENGTH),
+                    patternDef.name,
+                    patternDef.re.source.slice(0, REGEX_SOURCE_PREVIEW_LENGTH),
                 );
                 context.issues.push(
                     this.makeSecretIssue({
@@ -409,7 +418,7 @@ export class SecretsAnalyzer implements Analyzer {
                         line: context.line,
                         rule: RULE_SECRET_DETECTED,
                         message: desc.message,
-                        detail: { kind: p.name },
+                        detail: { kind: patternDef.name },
                         severity: SEVERITY_ERROR,
                         suggestion: desc.suggestion,
                     }),

@@ -385,9 +385,9 @@ function checkSingleConstraint(
         return false;
     }
     if (constraint.regex !== undefined) {
-        const re =
+        const regexMatcher =
             typeof constraint.regex === 'string' ? new RegExp(constraint.regex) : constraint.regex;
-        if (!re.test(binding.value)) {
+        if (!regexMatcher.test(binding.value)) {
             return false;
         }
     }
@@ -637,24 +637,24 @@ function prepareMatchEnvironment(
 function applySortedEdits(sourceCode: string, sortedMatches: StructuralMatch[]): string {
     let transformed = sourceCode;
     for (let i = 0; i < sortedMatches.length; i++) {
-        const m = sortedMatches[i];
+        const matchItem = sortedMatches[i];
         transformed =
-            transformed.substring(0, m.range.start) +
-            m.replacementText +
-            transformed.substring(m.range.end);
+            transformed.substring(0, matchItem.range.start) +
+            matchItem.replacementText +
+            transformed.substring(matchItem.range.end);
     }
     return transformed;
 }
 
 function buildPatchEdits(matches: StructuralMatch[]): PatchEdit[] {
-    return matches.map((m) => ({
+    return matches.map((matchItem) => ({
         range: {
-            startLine: m.range.startLine,
-            startCol: m.range.startCol,
-            endLine: m.range.endLine,
-            endCol: m.range.endCol,
+            startLine: matchItem.range.startLine,
+            startCol: matchItem.range.startCol,
+            endLine: matchItem.range.endLine,
+            endCol: matchItem.range.endCol,
         },
-        newText: m.replacementText,
+        newText: matchItem.replacementText,
     }));
 }
 
@@ -685,7 +685,9 @@ export function matchAndRewrite(
         return createNoopRewriteResult(sourceCode, rawRules);
     }
 
-    const sortedMatches = [...matches].sort((a, b) => b.range.start - a.range.start);
+    const sortedMatches = [...matches].sort(
+        (matchA, matchB) => matchB.range.start - matchA.range.start,
+    );
     const transformed = applySortedEdits(sourceCode, sortedMatches);
     const edits = buildPatchEdits(matches);
 

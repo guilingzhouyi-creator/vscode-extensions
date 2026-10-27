@@ -151,15 +151,15 @@ const FAMILY_PATTERN_RE = /^(?:TS-|PY-|GOV-TYP-)|(?:python|typescript)/;
  * Table-driven dispatch rules for classifying pyramid layers.
  */
 const LAYER_DISPATCH_TABLE: ReadonlyArray<{
-    matches: (id: string) => boolean;
+    matches: (ruleId: string) => boolean;
     layer: RuleLayer;
 }> = [
     {
-        matches: (id) => UNIVERSAL_EXACT_RULES.has(id) || UNIVERSAL_PREFIX_RE.test(id),
+        matches: (ruleId) => UNIVERSAL_EXACT_RULES.has(ruleId) || UNIVERSAL_PREFIX_RE.test(ruleId),
         layer: RULE_LAYER_UNIVERSAL,
     },
     {
-        matches: (id) => FAMILY_EXACT_RULES.has(id) || FAMILY_PATTERN_RE.test(id),
+        matches: (ruleId) => FAMILY_EXACT_RULES.has(ruleId) || FAMILY_PATTERN_RE.test(ruleId),
         layer: RULE_LAYER_FAMILY,
     },
 ];

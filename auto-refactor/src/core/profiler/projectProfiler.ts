@@ -274,7 +274,7 @@ function inspectPartitionEntry(
 
     if (subStack.buildSystem || subStack.frameworks.length > 0) {
         if (subStack.buildSystem) buildSystems.add(subStack.buildSystem);
-        for (const fw of subStack.frameworks) frameworks.add(fw);
+        for (const framework of subStack.frameworks) frameworks.add(framework);
 
         partitions.push({
             name: ent.name,
@@ -615,8 +615,8 @@ function isGameArchetype(root: string, profile?: Partial<ProjectProfile>): boole
     if (profile?.primaryLanguage === GDSCRIPT_LANGUAGE_ID) return true;
     if ((profile?.languages?.[GDSCRIPT_LANGUAGE_ID] ?? 0) > 0) return true;
     if (fs.existsSync(path.join(root, FILE_PROJECT_GODOT))) return true;
-    for (const f of profile?.frameworks ?? []) {
-        if (GAME_FRAMEWORKS.has(f.toLowerCase())) return true;
+    for (const framework of profile?.frameworks ?? []) {
+        if (GAME_FRAMEWORKS.has(framework.toLowerCase())) return true;
     }
     return false;
 }
@@ -625,8 +625,8 @@ function isWebArchetype(
     profile?: Partial<ProjectProfile>,
     packageData?: Record<string, any> | null,
 ): boolean {
-    for (const f of profile?.frameworks ?? []) {
-        if (WEB_FRAMEWORKS.has(f.toLowerCase())) return true;
+    for (const framework of profile?.frameworks ?? []) {
+        if (WEB_FRAMEWORKS.has(framework.toLowerCase())) return true;
     }
     if (!packageData) return false;
     const allDeps = {

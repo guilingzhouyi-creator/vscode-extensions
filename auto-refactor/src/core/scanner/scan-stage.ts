@@ -87,10 +87,10 @@ export interface ScanTimingMarks {
  * @returns One descriptor per resolved analyzer, in plan order.
  */
 function workerDescs(plan: ResolvedAnalyzer[]): WorkerAnalyzerDesc[] {
-    return plan.map((p) => ({
-        name: p.name,
-        modulePath: p.modulePath,
-        options: p.options,
+    return plan.map((planItem) => ({
+        name: planItem.name,
+        modulePath: planItem.modulePath,
+        options: planItem.options,
     }));
 }
 
@@ -126,9 +126,9 @@ export async function runParseAnalyzeStage(
             runAnalyzersFn: host.runAnalyzers.bind(host),
         });
         if (host.recordWorkerSymbols) {
-            for (const r of perFile) {
-                if (r.symbols) {
-                    host.recordWorkerSymbols(r.symbols.definitions, r.symbols.references);
+            for (const result of perFile) {
+                if (result.symbols) {
+                    host.recordWorkerSymbols(result.symbols.definitions, result.symbols.references);
                 }
             }
         }
@@ -136,8 +136,8 @@ export async function runParseAnalyzeStage(
             `parse+analyze stage ran across ${effWorkers} worker thread(s) (in-process fallback available)`,
         );
         return perFile;
-    } catch (e) {
-        host.logger.warn(`worker pool failed (${String(e)}); falling back to in-process scan`);
+    } catch (error) {
+        host.logger.warn(`worker pool failed (${String(error)}); falling back to in-process scan`);
         return host.runInProcess(files, absRoot);
     }
 }
@@ -154,9 +154,9 @@ export function mergePerFileResults(perFile: PerFileResult[]): {
 } {
     const issues: Issue[] = [];
     const fileMetrics: FileMetric[] = [];
-    for (const r of perFile) {
-        issues.push(...r.issues);
-        if (r.metric) fileMetrics.push(r.metric);
+    for (const result of perFile) {
+        issues.push(...result.issues);
+        if (result.metric) fileMetrics.push(result.metric);
     }
     return { issues, fileMetrics };
 }
@@ -167,13 +167,14 @@ export function mergePerFileResults(perFile: PerFileResult[]): {
  * @param issues - Issues to sort in place.
  */
 export function sortIssues(issues: Issue[]): void {
-    issues.sort((a, b) => {
-        if (a.location.file !== b.location.file) return a.location.file < b.location.file ? -1 : 1;
-        if (a.location.start.line !== b.location.start.line) {
-            return a.location.start.line - b.location.start.line;
+    issues.sort((issueA, issueB) => {
+        if (issueA.location.file !== issueB.location.file)
+            return issueA.location.file < issueB.location.file ? -1 : 1;
+        if (issueA.location.start.line !== issueB.location.start.line) {
+            return issueA.location.start.line - issueB.location.start.line;
         }
-        if (a.analyzer !== b.analyzer) return a.analyzer < b.analyzer ? -1 : 1;
-        return a.rule < b.rule ? -1 : 1;
+        if (issueA.analyzer !== issueB.analyzer) return issueA.analyzer < issueB.analyzer ? -1 : 1;
+        return issueA.rule < issueB.rule ? -1 : 1;
     });
 }
 

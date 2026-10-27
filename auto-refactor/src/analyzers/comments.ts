@@ -207,7 +207,7 @@ const SIX_FIELD_PATTERNS: ReadonlyArray<{
 }> = Object.freeze(
     SIX_FIELD_HEADERS_EN.map((headerEn, i) => {
         const headerZh = SIX_FIELD_HEADERS_ZH[i];
-        const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, REGEX_ESCAPE_REPLACEMENT);
+        const esc = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, REGEX_ESCAPE_REPLACEMENT);
         const aliases = SIX_FIELD_ALIASES_ZH[headerZh] || [headerZh];
         const allZh = aliases.map(esc).join('|');
         return Object.freeze({
@@ -310,8 +310,11 @@ function shouldRunSubAudit(
 export class CommentAnalyzer implements Analyzer {
     name = 'comments' as const;
 
-    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
-        void sf;
+    analyze(
+        sourceFile: import('typescript').SourceFile | undefined,
+        ctx: AnalyzerContext,
+    ): Issue[] {
+        void sourceFile;
         const opts = (ctx.options || {}) as CommentOptions;
         const level: CommentLevel = opts.level || ctx.config.commentLevel || AUDIT_LEVEL.STANDARD;
 
@@ -849,7 +852,7 @@ export class CommentAnalyzer implements Analyzer {
             return {
                 foundDoc: true,
                 commentLine: params.recentCommentLines[0].line,
-                docText: params.recentCommentLines.map((c) => c.text).join('\n'),
+                docText: params.recentCommentLines.map((comment) => comment.text).join('\n'),
             };
         }
 

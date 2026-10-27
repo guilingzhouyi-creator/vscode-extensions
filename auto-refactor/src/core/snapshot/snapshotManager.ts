@@ -56,7 +56,8 @@ export function computeSha256(content: string): string {
  */
 export function computeRuleRegistryDigest(): string {
     const serialized = RULE_REGISTRY.map(
-        (r) => `${r.id}:${r.analyzer}:${r.defaultSeverity}:${r.canonical ? '1' : '0'}`,
+        (rule) =>
+            `${rule.id}:${rule.analyzer}:${rule.defaultSeverity}:${rule.canonical ? '1' : '0'}`,
     ).join('\n');
     return computeSha256(serialized);
 }
@@ -107,7 +108,7 @@ export function createAuditSnapshot(
         ...metricsOverride,
     };
 
-    const registeredRuleIds = RULE_REGISTRY.map((r) => r.id);
+    const registeredRuleIds = RULE_REGISTRY.map((rule) => rule.id);
 
     return {
         snapshotId: `snapshot-v${CURRENT_ENGINE_VERSION}-${Date.now()}`,
@@ -183,23 +184,23 @@ export function verifyAuditSnapshot(
 }
 
 function writeTextFileSync(targetPath: string, text: string): void {
-    const fd = fs.openSync(targetPath, 'w');
+    const fileDescriptor = fs.openSync(targetPath, 'w');
     try {
-        fs.writeSync(fd, text, 0, 'utf8');
+        fs.writeSync(fileDescriptor, text, 0, 'utf8');
     } finally {
-        fs.closeSync(fd);
+        fs.closeSync(fileDescriptor);
     }
 }
 
 function readTextFileSync(targetPath: string): string {
-    const fd = fs.openSync(targetPath, 'r');
+    const fileDescriptor = fs.openSync(targetPath, 'r');
     try {
-        const stat = fs.fstatSync(fd);
+        const stat = fs.fstatSync(fileDescriptor);
         const buf = Buffer.allocUnsafe(stat.size);
-        fs.readSync(fd, buf, 0, stat.size, 0);
+        fs.readSync(fileDescriptor, buf, 0, stat.size, 0);
         return buf.toString('utf8');
     } finally {
-        fs.closeSync(fd);
+        fs.closeSync(fileDescriptor);
     }
 }
 

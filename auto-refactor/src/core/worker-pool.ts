@@ -67,37 +67,44 @@ export class WorkerPoolManager {
 
     /** Get (or lazily spawn) the pool for a configuration fingerprint. */
     getOrCreate(
-        fp: string,
+        fingerprint: string,
         config: ScanConfig,
         descs: WorkerAnalyzerDesc[],
-        n: number,
+        poolSize: number,
     ): WorkerPoolEntry {
-        let e = this.pools.get(fp);
-        if (!e) {
+        let poolEntry = this.pools.get(fingerprint);
+        if (!poolEntry) {
             const workers: Worker[] = [];
             const workerIdx = new Map<Worker, number>();
-            for (let k = 0; k < n; k++) {
-                const w = new Worker(this.workerPath, {
+            for (let k = 0; k < poolSize; k++) {
+                const worker = new Worker(this.workerPath, {
                     workerData: { config, analyzerDescs: descs },
                 });
-                workers.push(w);
-                workerIdx.set(w, k);
+                workers.push(worker);
+                workerIdx.set(worker, k);
             }
-            e = { fp, workers, workerIdx, n, lastUsed: Date.now(), warm: false };
-            this.pools.set(fp, e);
-            this.order.push(fp);
+            poolEntry = {
+                fp: fingerprint,
+                workers,
+                workerIdx,
+                n: poolSize,
+                lastUsed: Date.now(),
+                warm: false,
+            };
+            this.pools.set(fingerprint, poolEntry);
+            this.order.push(fingerprint);
             this.prune();
         }
-        return e;
+        return poolEntry;
     }
 
     /** Mark a pool as most-recently-used (LRU order). */
-    touch(fp: string): void {
-        const i = this.order.indexOf(fp);
+    touch(fingerprint: string): void {
+        const i = this.order.indexOf(fingerprint);
         if (i >= 0) this.order.splice(i, 1);
-        this.order.push(fp);
-        const e = this.pools.get(fp);
-        if (e) e.lastUsed = Date.now();
+        this.order.push(fingerprint);
+        const poolEntry = this.pools.get(fingerprint);
+        if (poolEntry) poolEntry.lastUsed = Date.now();
     }
 
     /** LRU prune: terminate least-recently-used pools beyond maxPools. */
@@ -111,18 +118,18 @@ export class WorkerPoolManager {
     }
 
     /** Terminate + drop a pool (broken workers, LRU eviction, RSS guard). */
-    destroy(fp: string): void {
-        const e = this.pools.get(fp);
-        if (!e) return;
-        for (const w of e.workers) {
+    destroy(fingerprint: string): void {
+        const poolEntry = this.pools.get(fingerprint);
+        if (!poolEntry) return;
+        for (const worker of poolEntry.workers) {
             try {
-                w.postMessage({ exit: true });
+                worker.postMessage({ exit: true });
             } catch (_msgErr) {
                 /* ignore */
             }
             const timer = setTimeout(() => {
                 try {
-                    w.terminate();
+                    worker.terminate();
                 } catch (_termErr) {
                     /* ignore */
                 }
@@ -131,8 +138,8 @@ export class WorkerPoolManager {
                 timer.unref();
             }
         }
-        this.pools.delete(fp);
-        const i = this.order.indexOf(fp);
+        this.pools.delete(fingerprint);
+        const i = this.order.indexOf(fingerprint);
         if (i >= 0) this.order.splice(i, 1);
     }
 
@@ -156,9 +163,9 @@ export class WorkerPoolManager {
             return;
         }
         if (rss > RSS_SOFT_LIMIT_MB * BYTES_PER_MIB) {
-            for (const fp of [...this.order]) {
-                const e = this.pools.get(fp);
-                if (e && !e.warm) this.destroy(fp);
+            for (const fingerprint of [...this.order]) {
+                const poolEntry = this.pools.get(fingerprint);
+                if (poolEntry && !poolEntry.warm) this.destroy(fingerprint);
             }
             while (this.pools.size > 1) {
                 const victim = this.order[0];
@@ -169,7 +176,7 @@ export class WorkerPoolManager {
     }
 
     shutdown(): void {
-        for (const fp of [...this.pools.keys()]) this.destroy(fp);
+        for (const fingerprint of [...this.pools.keys()]) this.destroy(fingerprint);
     }
 
     size(): number {

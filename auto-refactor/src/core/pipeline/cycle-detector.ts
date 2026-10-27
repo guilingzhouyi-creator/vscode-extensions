@@ -42,9 +42,9 @@ export function normalizeDependencyRoots(
     edges: Map<string, Set<string>>,
 ): string[] {
     if (targetFiles && targetFiles.length > 0) {
-        return targetFiles.map((f) =>
+        return targetFiles.map((targetFile) =>
             path
-                .normalize(f)
+                .normalize(targetFile)
                 .replace(/\\/g, '/')
                 .replace(/\.(ts|tsx|js|jsx|d\.ts)$/, ''),
         );

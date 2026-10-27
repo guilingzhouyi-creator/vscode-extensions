@@ -84,8 +84,12 @@ export class WorkerPoolManager implements IExecutionScheduler {
     private readonly analyzerInstancePool = new Map<string, unknown[]>();
 
     public constructor(options?: WorkerPoolOptions) {
-        const cpuCount = typeof os.cpus === 'function' ? os.cpus().length : DEFAULT_FALLBACK_CPU_COUNT;
-        const defaultConcurrency = Math.min(MAX_DEFAULT_CONCURRENCY, Math.max(MIN_DEFAULT_CONCURRENCY, cpuCount));
+        const cpuCount =
+            typeof os.cpus === 'function' ? os.cpus().length : DEFAULT_FALLBACK_CPU_COUNT;
+        const defaultConcurrency = Math.min(
+            MAX_DEFAULT_CONCURRENCY,
+            Math.max(MIN_DEFAULT_CONCURRENCY, cpuCount),
+        );
         this.maxConcurrency = Math.max(1, options?.maxConcurrency ?? defaultConcurrency);
         this.maxQueueDepth = Math.max(MIN_QUEUE_DEPTH_LIMIT, options?.maxQueueDepth ?? 10_000);
         this.starvationAgeMs = Math.max(MIN_STARVATION_AGE_MS, options?.starvationAgeMs ?? 3_000);
@@ -100,7 +104,10 @@ export class WorkerPoolManager implements IExecutionScheduler {
             return Promise.reject(new Error('Scheduler is shutting down; cannot accept new tasks'));
         }
 
-        if (this.queue.length >= this.maxQueueDepth && task.priority < CRITICAL_TASK_PRIORITY_THRESHOLD) {
+        if (
+            this.queue.length >= this.maxQueueDepth &&
+            task.priority < CRITICAL_TASK_PRIORITY_THRESHOLD
+        ) {
             const queueMsg = `Scheduler queue capacity reached (${this.queue.length} >= ${this.maxQueueDepth})`;
             return Promise.reject(new Error(queueMsg));
         }
@@ -368,7 +375,10 @@ export class WorkerPoolManager implements IExecutionScheduler {
         for (let i = 0; i < this.queue.length; i++) {
             const pendingTask = this.queue[i];
             let priority = pendingTask.task.priority as number;
-            if (priority < MAX_BOOSTED_PRIORITY && now - pendingTask.enqueuedAt >= this.starvationAgeMs) {
+            if (
+                priority < MAX_BOOSTED_PRIORITY &&
+                now - pendingTask.enqueuedAt >= this.starvationAgeMs
+            ) {
                 priority = Math.min(
                     MAX_BOOSTED_PRIORITY,
                     priority + PRIORITY_BOOST_STEP,
@@ -401,8 +411,8 @@ export class WorkerPoolManager implements IExecutionScheduler {
     /**
      * Removes an item from the pending queue by task ID.
      */
-    private removeQueuedTask(id: string): void {
-        const index = this.queue.findIndex((entry) => entry.task.id === id);
+    private removeQueuedTask(taskId: string): void {
+        const index = this.queue.findIndex((entry) => entry.task.id === taskId);
         if (index !== -1) {
             const removed = this.queue.splice(index, 1)[0];
             if (removed.timer) {

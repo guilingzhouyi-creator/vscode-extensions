@@ -18,15 +18,18 @@ const EPSILON_NORM = 1e-12;
 /**
  * Computes inner dot product between two vector slices: sum(a_i * b_i).
  *
- * @param a - First numerical vector.
- * @param b - Second numerical vector.
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
  * @returns Dot product scalar value.
  */
-export function computeVectorDotProduct(a: readonly number[], b: readonly number[]): number {
-    const len = Math.min(a.length, b.length);
+export function computeVectorDotProduct(
+    vectorA: readonly number[],
+    vectorB: readonly number[],
+): number {
+    const len = Math.min(vectorA.length, vectorB.length);
     let sum = 0.0;
     for (let i = 0; i < len; i++) {
-        sum += a[i] * b[i];
+        sum += vectorA[i] * vectorB[i];
     }
     return sum;
 }
@@ -34,25 +37,28 @@ export function computeVectorDotProduct(a: readonly number[], b: readonly number
 /**
  * Computes Euclidean norm (L2 norm) of a vector: sqrt(sum(a_i^2)).
  *
- * @param a - Input numerical vector.
+ * @param vector - Input numerical vector.
  * @returns L2 Euclidean norm.
  */
-export function computeEuclideanNorm(a: readonly number[]): number {
-    return Math.sqrt(computeVectorDotProduct(a, a));
+export function computeEuclideanNorm(vector: readonly number[]): number {
+    return Math.sqrt(computeVectorDotProduct(vector, vector));
 }
 
 /**
  * Computes Euclidean distance between two vectors: sqrt(sum((a_i - b_i)^2)).
  *
- * @param a - First vector coordinate.
- * @param b - Second vector coordinate.
+ * @param vectorA - First vector coordinate.
+ * @param vectorB - Second vector coordinate.
  * @returns Euclidean distance scalar.
  */
-export function computeVectorEuclideanDistance(a: readonly number[], b: readonly number[]): number {
-    const len = Math.min(a.length, b.length);
+export function computeVectorEuclideanDistance(
+    vectorA: readonly number[],
+    vectorB: readonly number[],
+): number {
+    const len = Math.min(vectorA.length, vectorB.length);
     let diffSum = 0.0;
     for (let i = 0; i < len; i++) {
-        const diff = a[i] - b[i];
+        const diff = vectorA[i] - vectorB[i];
         diffSum += diff * diff;
     }
     return Math.sqrt(diffSum);
@@ -61,15 +67,18 @@ export function computeVectorEuclideanDistance(a: readonly number[], b: readonly
 /**
  * Computes Manhattan distance (L1 norm) between two vectors: sum(|a_i - b_i|).
  *
- * @param a - First vector coordinate.
- * @param b - Second vector coordinate.
+ * @param vectorA - First vector coordinate.
+ * @param vectorB - Second vector coordinate.
  * @returns Manhattan distance scalar.
  */
-export function computeVectorManhattanDistance(a: readonly number[], b: readonly number[]): number {
-    const len = Math.min(a.length, b.length);
+export function computeVectorManhattanDistance(
+    vectorA: readonly number[],
+    vectorB: readonly number[],
+): number {
+    const len = Math.min(vectorA.length, vectorB.length);
     let sum = 0.0;
     for (let i = 0; i < len; i++) {
-        sum += Math.abs(a[i] - b[i]);
+        sum += Math.abs(vectorA[i] - vectorB[i]);
     }
     return sum;
 }
@@ -78,13 +87,16 @@ export function computeVectorManhattanDistance(a: readonly number[], b: readonly
  * Computes Cosine Similarity between two vectors: (a * b) / (||a|| * ||b||).
  * Returns 1.0 for two near-zero vectors, or 0.0 if either norm is zero.
  *
- * @param a - First numerical vector.
- * @param b - Second numerical vector.
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
  * @returns Cosine similarity bounded in [-1.0, 1.0].
  */
-export function computeVectorCosineSimilarity(a: readonly number[], b: readonly number[]): number {
-    const normA = computeEuclideanNorm(a);
-    const normB = computeEuclideanNorm(b);
+export function computeVectorCosineSimilarity(
+    vectorA: readonly number[],
+    vectorB: readonly number[],
+): number {
+    const normA = computeEuclideanNorm(vectorA);
+    const normB = computeEuclideanNorm(vectorB);
 
     if (normA < EPSILON_NORM && normB < EPSILON_NORM) {
         return 1.0;
@@ -93,7 +105,7 @@ export function computeVectorCosineSimilarity(a: readonly number[], b: readonly 
         return 0.0;
     }
 
-    const dot = computeVectorDotProduct(a, b);
+    const dot = computeVectorDotProduct(vectorA, vectorB);
     const sim = dot / (normA * normB);
     return Math.min(1.0, Math.max(-1.0, sim));
 }
@@ -101,17 +113,17 @@ export function computeVectorCosineSimilarity(a: readonly number[], b: readonly 
 /**
  * Normalizes a vector to unit length (L2 norm = 1.0).
  *
- * @param a - Input numerical vector.
+ * @param vector - Input numerical vector.
  * @returns Normalized unit vector, or zero vector if norm is near zero.
  */
-export function normalizeVectorL2(a: readonly number[]): number[] {
-    const norm = computeEuclideanNorm(a);
+export function normalizeVectorL2(vector: readonly number[]): number[] {
+    const norm = computeEuclideanNorm(vector);
     if (norm < EPSILON_NORM) {
-        return new Array(a.length).fill(0.0);
+        return new Array(vector.length).fill(0.0);
     }
-    const result = new Array<number>(a.length);
-    for (let i = 0; i < a.length; i++) {
-        result[i] = a[i] / norm;
+    const result = new Array<number>(vector.length);
+    for (let i = 0; i < vector.length; i++) {
+        result[i] = vector[i] / norm;
     }
     return result;
 }
@@ -134,11 +146,11 @@ export function computeVectorCentroid(vectors: readonly (readonly number[])[]): 
     const centroid = new Array<number>(dim).fill(0.0);
     let count = 0;
 
-    for (const v of vectors) {
-        if (v.length === dim) {
+    for (const vector of vectors) {
+        if (vector.length === dim) {
             count++;
             for (let i = 0; i < dim; i++) {
-                centroid[i] += v[i];
+                centroid[i] += vector[i];
             }
         }
     }

@@ -280,11 +280,11 @@ function resolveAsyncFnScope(
     let depth = 0;
     for (let j = startIndex; j < lines.length; j += 1) {
         const line = lines[j];
-        for (let c = 0; c < line.length; c += 1) {
-            if (line[c] === '{') {
+        for (let charIndex = 0; charIndex < line.length; charIndex += 1) {
+            if (line[charIndex] === '{') {
                 if (bodyStart === -1) bodyStart = j;
                 depth += 1;
-            } else if (line[c] === '}') {
+            } else if (line[charIndex] === '}') {
                 depth -= 1;
                 if (depth === 0 && bodyStart !== -1) {
                     return { bodyStart, bodyEnd: j };
@@ -308,9 +308,9 @@ function isTestScopeOrFile(ctx: LineScanContext): boolean {
     let depth = 0;
     for (let i = ctx.lineIndex; i >= 0; i -= 1) {
         const line = ctx.allRawLines[i];
-        for (let c = line.length - 1; c >= 0; c -= 1) {
-            if (line[c] === '}') depth += 1;
-            else if (line[c] === '{' && depth > 0) depth -= 1;
+        for (let charIndex = line.length - 1; charIndex >= 0; charIndex -= 1) {
+            if (line[charIndex] === '}') depth += 1;
+            else if (line[charIndex] === '{' && depth > 0) depth -= 1;
         }
         if (RUST_TEST_ATTR_RE.test(line)) {
             return true;
@@ -359,11 +359,11 @@ function scanAsyncLockIssues(
             if (STD_LOCK_RE.test(masked[j])) lockLines.push(j);
             if (AWAIT_RE.test(masked[j])) maxAwaitLine = j;
         }
-        for (const lk of lockLines) {
-            if (maxAwaitLine > lk) {
+        for (const lockLineIdx of lockLines) {
+            if (maxAwaitLine > lockLineIdx) {
                 issues.push(
-                    delegate.emitIssue(RULE_LOCK_AWAIT, file, lk + 1, {
-                        line: raw[lk].trim(),
+                    delegate.emitIssue(RULE_LOCK_AWAIT, file, lockLineIdx + 1, {
+                        line: raw[lockLineIdx].trim(),
                     }),
                 );
             }
@@ -620,8 +620,8 @@ export class RustModernAnalyzer implements Analyzer {
         return this.analyze(undefined, ctx);
     }
 
-    public analyze(sf: unknown, ctx: AnalyzerContext): Issue[] {
+    public analyze(sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
         this.fnSigState = { inParams: false, inSig: false };
-        return this.delegate.analyze(sf, ctx);
+        return this.delegate.analyze(sourceFile, ctx);
     }
 }

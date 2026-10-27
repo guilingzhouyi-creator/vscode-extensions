@@ -52,9 +52,9 @@ function globToRegex(glob: string): RegExp {
 }
 
 /** Normalize a file path the same way the core graph does: POSIX, extension stripped. */
-function normalizeRel(p: string): string {
+function normalizeRel(relPath: string): string {
     return path
-        .normalize(p)
+        .normalize(relPath)
         .replace(/\\/g, '/')
         .replace(/\.(ts|tsx|js|jsx|d\.ts|mts|cts|mjs|cjs)$/, '');
 }
@@ -90,7 +90,7 @@ function compileGroups(groups: Record<string, string[]>): CompiledGroup[] {
 
 function matchGroup(normPath: string, compiledGroups: CompiledGroup[]): string | null {
     for (const { group, regexes } of compiledGroups) {
-        if (regexes.some((re) => re.test(normPath))) {
+        if (regexes.some((patternRegex) => patternRegex.test(normPath))) {
             return group;
         }
     }
@@ -114,14 +114,14 @@ function classifyAllowedExternal(
 
 function compileRuleConstraints(fromGroup: string, rule: GroupRules): RuleConstraints {
     const allowGroups = new Set([fromGroup, ...(rule.allowGroups ?? [])]);
-    const compiledExceptionRegexes = (rule.allowImportGlobs ?? []).map((g) => {
-        return globToRegex(g.includes('/') ? g : `**/${g}`);
+    const compiledExceptionRegexes = (rule.allowImportGlobs ?? []).map((globPattern) => {
+        return globToRegex(globPattern.includes('/') ? globPattern : `**/${globPattern}`);
     });
 
     const target = { allowAll: false, exact: new Set<string>(), prefixes: [] as string[] };
     if (rule.allowExternal) {
-        for (const a of rule.allowExternal) {
-            classifyAllowedExternal(a, target);
+        for (const allowedEntry of rule.allowExternal) {
+            classifyAllowedExternal(allowedEntry, target);
         }
     }
 
@@ -163,8 +163,11 @@ const CARRIAGE_RETURN_CHAR_CODE = 13;
 export class DependencyGraphAnalyzer implements Analyzer {
     name = 'dependency-graph' as const;
 
-    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
-        void sf;
+    analyze(
+        sourceFile: import('typescript').SourceFile | undefined,
+        ctx: AnalyzerContext,
+    ): Issue[] {
+        void sourceFile;
         const opts = (ctx.options || {}) as DependencyGraphOptions;
         const groups = opts.groups ?? {};
         const rules = opts.rules ?? {};
@@ -240,9 +243,9 @@ export class DependencyGraphAnalyzer implements Analyzer {
         issues: Issue[],
     ): void {
         IMPORT_SPEC_RE.lastIndex = 0;
-        let m: RegExpExecArray | null;
-        while ((m = IMPORT_SPEC_RE.exec(lineText)) !== null) {
-            const spec = m[1];
+        let matchResult: RegExpExecArray | null;
+        while ((matchResult = IMPORT_SPEC_RE.exec(lineText)) !== null) {
+            const spec = matchResult[1];
             if (spec) {
                 this.auditImportSpecifier(
                     spec,
@@ -325,8 +328,12 @@ export class DependencyGraphAnalyzer implements Analyzer {
 
         if (targetGroup && constraints.allowGroups.has(targetGroup)) return;
 
-        const globException = constraints.compiledExceptionRegexes.some((re) => {
-            return re.test(resolved) || re.test(resolved + '.ts') || re.test(resolved + '/index');
+        const globException = constraints.compiledExceptionRegexes.some((patternRegex) => {
+            return (
+                patternRegex.test(resolved) ||
+                patternRegex.test(resolved + '.ts') ||
+                patternRegex.test(resolved + '/index')
+            );
         });
         if (globException) return;
 

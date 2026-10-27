@@ -127,16 +127,17 @@ function ingestExportedSymbols(deltas: SemanticDelta[]): Map<string, string[]> {
  * Deterministically sorts unique issues by file, line, column, and rule.
  */
 function sortDeduplicatedIssues(uniqueIssues: Iterable<Issue>): Issue[] {
-    return Array.from(uniqueIssues).sort((a, b) => {
-        const fileA = a.location?.file ?? '';
-        const fileB = b.location?.file ?? '';
+    return Array.from(uniqueIssues).sort((issueA, issueB) => {
+        const fileA = issueA.location?.file ?? '';
+        const fileB = issueB.location?.file ?? '';
         const fileCmp = fileA.localeCompare(fileB);
         if (fileCmp !== 0) return fileCmp;
-        const lineCmp = (a.location?.start?.line ?? 0) - (b.location?.start?.line ?? 0);
+        const lineCmp = (issueA.location?.start?.line ?? 0) - (issueB.location?.start?.line ?? 0);
         if (lineCmp !== 0) return lineCmp;
-        const colCmp = (a.location?.start?.column ?? 0) - (b.location?.start?.column ?? 0);
+        const colCmp =
+            (issueA.location?.start?.column ?? 0) - (issueB.location?.start?.column ?? 0);
         if (colCmp !== 0) return colCmp;
-        return a.rule.localeCompare(b.rule);
+        return issueA.rule.localeCompare(issueB.rule);
     });
 }
 

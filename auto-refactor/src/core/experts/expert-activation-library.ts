@@ -28,11 +28,7 @@ import {
 } from '../router/sliceTypes';
 import type { MoEExpertProfile } from './expert-types';
 import type { LegacyExpertManifestEntry } from './expert-catalog';
-import {
-    EXPERT_CATALOG,
-    EXPERT_BY_ID,
-    EXPERT_BY_BIT,
-} from './expert-catalog';
+import { EXPERT_CATALOG, EXPERT_BY_ID, EXPERT_BY_BIT } from './expert-catalog';
 
 // ============================================================================
 // 1. Pre-Computed Static Projections (Pure Algebraic SSOT)
@@ -59,16 +55,19 @@ const ALL_PROJECT_ARCHETYPES = Object.freeze([
 /**
  * 32-bit bitmask activation matrix per semantic diff category.
  */
-export const CATEGORY_BITMASK_MATRIX: Readonly<Record<DiffSemanticCategory, number>> = Object.freeze(
-    Object.fromEntries(
-        ALL_DIFF_CATEGORIES.map((cat) => {
-            const mask = EXPERT_CATALOG.reduce((acc, expert) => {
-                return expert.affinities.categories.includes(cat) ? (acc | expert.bit) >>> 0 : acc;
-            }, 0);
-            return [cat, mask];
-        }),
-    ) as Record<DiffSemanticCategory, number>,
-);
+export const CATEGORY_BITMASK_MATRIX: Readonly<Record<DiffSemanticCategory, number>> =
+    Object.freeze(
+        Object.fromEntries(
+            ALL_DIFF_CATEGORIES.map((cat) => {
+                const mask = EXPERT_CATALOG.reduce((acc, expert) => {
+                    return expert.affinities.categories.includes(cat)
+                        ? (acc | expert.bit) >>> 0
+                        : acc;
+                }, 0);
+                return [cat, mask];
+            }),
+        ) as Record<DiffSemanticCategory, number>,
+    );
 
 /**
  * String identifier activation matrix per semantic diff category.
@@ -79,9 +78,9 @@ export const CATEGORY_ANALYZER_MAP: Readonly<Record<DiffSemanticCategory, readon
             ALL_DIFF_CATEGORIES.map((cat) => [
                 cat,
                 Object.freeze(
-                    EXPERT_CATALOG.filter((e) => e.affinities.categories.includes(cat)).map(
-                        (e) => e.id,
-                    ),
+                    EXPERT_CATALOG.filter((expert) =>
+                        expert.affinities.categories.includes(cat),
+                    ).map((expert) => expert.id),
                 ),
             ]),
         ) as Record<DiffSemanticCategory, readonly string[]>,
@@ -110,9 +109,9 @@ export const ARCHETYPE_ANALYZER_MAP: Readonly<Record<ProjectArchetype, readonly 
             ALL_PROJECT_ARCHETYPES.map((arch) => [
                 arch,
                 Object.freeze(
-                    EXPERT_CATALOG.filter((e) => e.affinities.archetypes.includes(arch)).map(
-                        (e) => e.id,
-                    ),
+                    EXPERT_CATALOG.filter((expert) =>
+                        expert.affinities.archetypes.includes(arch),
+                    ).map((expert) => expert.id),
                 ),
             ]),
         ) as Record<ProjectArchetype, readonly string[]>,
@@ -122,29 +121,31 @@ export const ARCHETYPE_ANALYZER_MAP: Readonly<Record<ProjectArchetype, readonly 
  * Language exclusive analyzer identifier map.
  * Dynamically projected from EXPERT_CATALOG language affinities.
  */
-export const LANGUAGE_EXCLUSIVE_ANALYZERS: Readonly<Record<string, readonly string[]>> = Object.freeze(
-    Object.fromEntries(
-        ['typescript', 'javascript', 'python', 'rust', 'gdscript', 'go', 'shell'].map((lang) => {
-            const list = EXPERT_CATALOG.filter((e) =>
-                e.affinities.languages?.includes(lang),
-            ).map((e) => e.id);
-            return [lang, Object.freeze(list)];
-        }),
-    ),
-);
+export const LANGUAGE_EXCLUSIVE_ANALYZERS: Readonly<Record<string, readonly string[]>> =
+    Object.freeze(
+        Object.fromEntries(
+            ['typescript', 'javascript', 'python', 'rust', 'gdscript', 'go', 'shell'].map(
+                (lang) => {
+                    const list = EXPERT_CATALOG.filter((expert) =>
+                        expert.affinities.languages?.includes(lang),
+                    ).map((expert) => expert.id);
+                    return [lang, Object.freeze(list)];
+                },
+            ),
+        ),
+    );
 
 /**
  * Pre-computed Set lookups for language exclusive analyzer filters.
  */
-export const LANGUAGE_EXCLUSIVE_SETS: Readonly<Record<string, ReadonlySet<string>>> =
-    Object.freeze(
-        Object.fromEntries(
-            Object.entries(LANGUAGE_EXCLUSIVE_ANALYZERS).map(([lang, list]) => [
-                lang,
-                new Set<string>(list),
-            ]),
-        ),
-    );
+export const LANGUAGE_EXCLUSIVE_SETS: Readonly<Record<string, ReadonlySet<string>>> = Object.freeze(
+    Object.fromEntries(
+        Object.entries(LANGUAGE_EXCLUSIVE_ANALYZERS).map(([lang, list]) => [
+            lang,
+            new Set<string>(list),
+        ]),
+    ),
+);
 
 /**
  * Language exclusive 32-bit bitmask map.
@@ -152,8 +153,8 @@ export const LANGUAGE_EXCLUSIVE_SETS: Readonly<Record<string, ReadonlySet<string
 export const LANGUAGE_EXCLUSIVE_BITMASK: Readonly<Record<string, number>> = Object.freeze(
     Object.fromEntries(
         Object.entries(LANGUAGE_EXCLUSIVE_ANALYZERS).map(([lang, list]) => {
-            const mask = list.reduce((acc, id) => {
-                const exp = EXPERT_BY_ID.get(id);
+            const mask = list.reduce((acc, analyzerId) => {
+                const exp = EXPERT_BY_ID.get(analyzerId);
                 return exp ? (acc | exp.bit) >>> 0 : acc;
             }, 0);
             return [lang, mask];
@@ -167,48 +168,49 @@ export const LANGUAGE_EXCLUSIVE_BITMASK: Readonly<Record<string, number>> = Obje
  */
 export const ALL_LANGUAGE_SPECIFIC_ANALYZERS: readonly string[] = Object.freeze(
     EXPERT_CATALOG.filter(
-        (e) => e.affinities.languages && e.affinities.languages.length > 0,
-    ).map((e) => e.id),
+        (expert) => expert.affinities.languages && expert.affinities.languages.length > 0,
+    ).map((expert) => expert.id),
 );
 
 /**
  * 32-bit bitmask of all language-specific specialized modernizers.
  */
-export const ALL_LANGUAGE_SPECIFIC_MASK: number = ALL_LANGUAGE_SPECIFIC_ANALYZERS.reduce(
-    (acc, id) => {
-        const exp = EXPERT_BY_ID.get(id);
+export const ALL_LANGUAGE_SPECIFIC_MASK: number =
+    ALL_LANGUAGE_SPECIFIC_ANALYZERS.reduce((acc, analyzerId) => {
+        const exp = EXPERT_BY_ID.get(analyzerId);
         return exp ? (acc | exp.bit) >>> 0 : acc;
-    },
-    0,
-) >>> 0;
+    }, 0) >>> 0;
 
 /**
  * N_shared baseline expert identifiers.
  */
 export const SHARED_EXPERTS: readonly string[] = Object.freeze(
-    EXPERT_CATALOG.filter((e) => e.serving.isShared).map((e) => e.id),
+    EXPERT_CATALOG.filter((expert) => expert.serving.isShared).map((expert) => expert.id),
 );
 
 /**
  * N_shared baseline 32-bit bitmask (Hygiene + Constants).
  */
-export const SHARED_EXPERTS_MASK: number = EXPERT_CATALOG.reduce((acc, expert) => {
-    return expert.serving.isShared ? (acc | expert.bit) >>> 0 : acc;
-}, 0) >>> 0;
+export const SHARED_EXPERTS_MASK: number =
+    EXPERT_CATALOG.reduce((acc, expert) => {
+        return expert.serving.isShared ? (acc | expert.bit) >>> 0 : acc;
+    }, 0) >>> 0;
 
 /**
  * Hot resident pool 32-bit bitmask (memoryTier === 'resident').
  */
-export const HOT_RESIDENT_BITMASK: number = EXPERT_CATALOG.reduce((acc, expert) => {
-    return expert.serving.memoryTier === 'resident' ? (acc | expert.bit) >>> 0 : acc;
-}, 0) >>> 0;
+export const HOT_RESIDENT_BITMASK: number =
+    EXPERT_CATALOG.reduce((acc, expert) => {
+        return expert.serving.memoryTier === 'resident' ? (acc | expert.bit) >>> 0 : acc;
+    }, 0) >>> 0;
 
 /**
  * Specialized (non-default) expert 32-bit bitmask.
  */
-export const SPECIALIZED_EXPERTS_BITMASK: number = EXPERT_CATALOG.reduce((acc, expert) => {
-    return expert.governance.isSpecialized ? (acc | expert.bit) >>> 0 : acc;
-}, 0) >>> 0;
+export const SPECIALIZED_EXPERTS_BITMASK: number =
+    EXPERT_CATALOG.reduce((acc, expert) => {
+        return expert.governance.isSpecialized ? (acc | expert.bit) >>> 0 : acc;
+    }, 0) >>> 0;
 
 /**
  * Pre-computed immutable base score table for every expert bit derived from EXPERT_CATALOG.
@@ -226,8 +228,8 @@ export { dispatchSliceFeatureBitset } from './slice-dispatcher';
 /**
  * Retrieve expert profile by string identifier.
  */
-export function getExpertProfile(id: string): MoEExpertProfile | undefined {
-    return EXPERT_BY_ID.get(id);
+export function getExpertProfile(expertId: string): MoEExpertProfile | undefined {
+    return EXPERT_BY_ID.get(expertId);
 }
 
 /**
@@ -296,9 +298,7 @@ export function deriveArchetypeMatrix(
  *
  * @param manifest - List of expert manifests to validate.
  */
-export function validateExpertManifest(
-    manifest: readonly LegacyExpertManifestEntry[],
-): void {
+export function validateExpertManifest(manifest: readonly LegacyExpertManifestEntry[]): void {
     const ids = new Set<string>();
     for (const entry of manifest) {
         if (ids.has(entry.id)) {

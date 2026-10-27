@@ -34,36 +34,36 @@ interface HunkBuilderState {
     firstNewAssigned: boolean;
 }
 
-function applyDiffOpEqual(op: DiffOp, oldLines: string[], state: HunkBuilderState): void {
+function applyDiffOpEqual(diffOp: DiffOp, oldLines: string[], state: HunkBuilderState): void {
     if (!state.firstOldAssigned) {
-        state.oldStart = op.aIdx + 1;
+        state.oldStart = diffOp.aIdx + 1;
         state.firstOldAssigned = true;
     }
     if (!state.firstNewAssigned) {
-        state.newStart = op.bIdx + 1;
+        state.newStart = diffOp.bIdx + 1;
         state.firstNewAssigned = true;
     }
     state.oldLinesCount++;
     state.newLinesCount++;
-    state.lines.push(' ' + (oldLines[op.aIdx] ?? ''));
+    state.lines.push(' ' + (oldLines[diffOp.aIdx] ?? ''));
 }
 
-function applyDiffOpDelete(op: DiffOp, oldLines: string[], state: HunkBuilderState): void {
+function applyDiffOpDelete(diffOp: DiffOp, oldLines: string[], state: HunkBuilderState): void {
     if (!state.firstOldAssigned) {
-        state.oldStart = op.aIdx + 1;
+        state.oldStart = diffOp.aIdx + 1;
         state.firstOldAssigned = true;
     }
     state.oldLinesCount++;
-    state.lines.push('-' + (oldLines[op.aIdx] ?? ''));
+    state.lines.push('-' + (oldLines[diffOp.aIdx] ?? ''));
 }
 
-function applyDiffOpInsert(op: DiffOp, newLines: string[], state: HunkBuilderState): void {
+function applyDiffOpInsert(diffOp: DiffOp, newLines: string[], state: HunkBuilderState): void {
     if (!state.firstNewAssigned) {
-        state.newStart = op.bIdx + 1;
+        state.newStart = diffOp.bIdx + 1;
         state.firstNewAssigned = true;
     }
     state.newLinesCount++;
-    state.lines.push('+' + (newLines[op.bIdx] ?? ''));
+    state.lines.push('+' + (newLines[diffOp.bIdx] ?? ''));
 }
 
 /**
@@ -199,17 +199,17 @@ function buildHunk(context: {
     };
 
     for (let opIdx = context.startIdx; opIdx < context.endIdx; opIdx++) {
-        const op = context.ops[opIdx];
-        if (op.type === DIFF_OP_EQUAL) {
-            applyDiffOpEqual(op, context.oldLines, state);
+        const diffOp = context.ops[opIdx];
+        if (diffOp.type === DIFF_OP_EQUAL) {
+            applyDiffOpEqual(diffOp, context.oldLines, state);
             continue;
         }
-        if (op.type === DIFF_OP_DELETE) {
-            applyDiffOpDelete(op, context.oldLines, state);
+        if (diffOp.type === DIFF_OP_DELETE) {
+            applyDiffOpDelete(diffOp, context.oldLines, state);
             continue;
         }
-        if (op.type === DIFF_OP_INSERT) {
-            applyDiffOpInsert(op, context.newLines, state);
+        if (diffOp.type === DIFF_OP_INSERT) {
+            applyDiffOpInsert(diffOp, context.newLines, state);
         }
     }
 

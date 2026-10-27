@@ -208,11 +208,11 @@ export class VscodeExtensionAnalyzer implements Analyzer {
      * Synchronous analysis routine for VS Code extension domain rules.
      * Concurrency: Thread-safe, reentrant, zero mutable shared state.
      *
-     * @param _sf - Unused AST source file parameter.
+     * @param _sourceFile - Unused AST source file parameter.
      * @param ctx - File scan context containing content and path.
      * @returns Array of discovered issues.
      */
-    analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
+    analyze(_sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
         const file = ctx.filePath.replace(/\\/g, '/');
         const hasValidExt = ACCEPTED_EXTENSIONS.some((ext) => file.endsWith(ext));
         if (!hasValidExt) return [];
@@ -226,24 +226,24 @@ export class VscodeExtensionAnalyzer implements Analyzer {
 
         // 1. VSC-MEM-001 via generalized lifecycle matcher
         const lifecycleViolations = matchResourceLifecycle(masked, VSC_LIFECYCLE_PATTERN);
-        for (const v of lifecycleViolations) {
-            const isUnregistered = v.reason === REASON_UNREGISTERED;
+        for (const violation of lifecycleViolations) {
+            const isUnregistered = violation.reason === REASON_UNREGISTERED;
             const msg = isUnregistered
                 ? MSG_MEM_UNREGISTERED
-                : `Disposable '${v.resourceIdentifier}' is not registered into context.subscriptions.`;
+                : `Disposable '${violation.resourceIdentifier}' is not registered into context.subscriptions.`;
             const sugg = isUnregistered ? SUGG_MEM_UNREGISTERED : SUGG_MEM_TRACK_VARIABLE;
             issues.push(
                 makeVscIssue({
                     file,
-                    line: v.line,
+                    line: violation.line,
                     rule: 'VSC-MEM-001',
                     severity: SEVERITY_ERROR,
                     message: msg,
                     suggestion: sugg,
                     detail: {
-                        line: v.line,
-                        text: v.rawText,
-                        variable: v.resourceIdentifier,
+                        line: violation.line,
+                        text: violation.rawText,
+                        variable: violation.resourceIdentifier,
                     },
                 }),
             );
@@ -251,16 +251,16 @@ export class VscodeExtensionAnalyzer implements Analyzer {
 
         // 2. VSC-PERF-001 via generalized blocking matcher
         const blockingViolations = matchBlockingCalls(masked, VSC_BLOCKING_PATTERN);
-        for (const b of blockingViolations) {
+        for (const blockingViolation of blockingViolations) {
             issues.push(
                 makeVscIssue({
                     file,
-                    line: b.line,
+                    line: blockingViolation.line,
                     rule: 'VSC-PERF-001',
                     severity: SEVERITY_WARNING,
                     message: MSG_PERF_BLOCKING_FS,
                     suggestion: SUGG_PERF_BLOCKING_FS,
-                    detail: { line: b.line, call: b.callName },
+                    detail: { line: blockingViolation.line, call: blockingViolation.callName },
                 }),
             );
         }
@@ -283,48 +283,56 @@ export class VscodeExtensionAnalyzer implements Analyzer {
 
         // 4. VSC-UI-001: Webview dynamic collection rendering bounded density & folding
         const uiFoldingViolations = this.detectUnboundedCollectionRendering(raw, masked);
-        for (const f of uiFoldingViolations) {
+        for (const foldingViolation of uiFoldingViolations) {
             issues.push(
                 makeVscIssue({
                     file,
-                    line: f.line,
+                    line: foldingViolation.line,
                     rule: 'VSC-UI-001',
                     severity: SEVERITY_WARNING,
                     message: MSG_UI_UNBOUNDED_COLLECTION,
                     suggestion: SUGG_UI_UNBOUNDED_COLLECTION,
-                    detail: { line: f.line, text: f.text },
+                    detail: { line: foldingViolation.line, text: foldingViolation.text },
                 }),
             );
         }
 
         // 5. VSC-UI-002: Webview CSS theme variable completeness & high-contrast guard
         const colorViolations = this.detectHardcodedThemeColors(raw);
-        for (const c of colorViolations) {
+        for (const colorViolation of colorViolations) {
             issues.push(
                 makeVscIssue({
                     file,
-                    line: c.line,
+                    line: colorViolation.line,
                     rule: 'VSC-UI-002',
                     severity: SEVERITY_ERROR,
-                    message: `Webview UI contains hardcoded color '${c.color}' instead of theme CSS variables.`,
+                    message: `Webview UI contains hardcoded color '${colorViolation.color}' instead of theme CSS variables.`,
                     suggestion: SUGG_UI_THEME_CSS_VARS,
-                    detail: { line: c.line, text: c.text, color: c.color },
+                    detail: {
+                        line: colorViolation.line,
+                        text: colorViolation.text,
+                        color: colorViolation.color,
+                    },
                 }),
             );
         }
 
         // 6. VSC-PERF-002: Webview CSS transition on geometry layout properties causing reflow
         const layoutTransitionViolations = this.detectLayoutTransitions(raw);
-        for (const t of layoutTransitionViolations) {
+        for (const transitionViolation of layoutTransitionViolations) {
             issues.push(
                 makeVscIssue({
                     file,
-                    line: t.line,
+                    line: transitionViolation.line,
                     rule: 'VSC-PERF-002',
                     severity: SEVERITY_WARNING,
-                    message: `Webview CSS transition directly animates geometry layout property '${t.prop}' triggering expensive browser reflow.`,
+                    message: `Webview CSS transition directly animates geometry layout property '${transitionViolation.prop}' triggering expensive browser reflow.`,
                     suggestion: SUGG_PERF_LAYOUT_TRANSITIONS,
-                    detail: { line: t.line, text: t.text, prop: t.prop },
+                    detail: {
+                        line: transitionViolation.line,
+                        text: transitionViolation.text,
+                        prop: transitionViolation.prop,
+                    },
                 }),
             );
         }
@@ -332,32 +340,36 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         // 7. VSC-UI-003: Webview interactive form controls missing accessible labels
         //    conforming to WCAG 4.1.2 requirements.
         const a11yViolations = this.detectInaccessibleFormControls(raw);
-        for (const a of a11yViolations) {
+        for (const a11yViolation of a11yViolations) {
             issues.push(
                 makeVscIssue({
                     file,
-                    line: a.line,
+                    line: a11yViolation.line,
                     rule: 'VSC-UI-003',
                     severity: SEVERITY_WARNING,
-                    message: `Webview interactive <${a.tag}> form control lacks accessible label binding (WCAG 4.1.2).`,
+                    message: `Webview interactive <${a11yViolation.tag}> form control lacks accessible label binding (WCAG 4.1.2).`,
                     suggestion: SUGG_UI_A11Y_FORM_LABELS,
-                    detail: { line: a.line, text: a.text, tag: a.tag },
+                    detail: {
+                        line: a11yViolation.line,
+                        text: a11yViolation.text,
+                        tag: a11yViolation.tag,
+                    },
                 }),
             );
         }
 
         // 8. VSC-UI-004: Webview interactive dynamic border jitter guard
         const borderJitterViolations = this.detectDynamicBorderJitter(raw);
-        for (const b of borderJitterViolations) {
+        for (const jitterViolation of borderJitterViolations) {
             issues.push(
                 makeVscIssue({
                     file,
-                    line: b.line,
+                    line: jitterViolation.line,
                     rule: 'VSC-UI-004',
                     severity: SEVERITY_WARNING,
                     message: MSG_UI_DYNAMIC_BORDER_JITTER,
                     suggestion: SUGG_UI_DYNAMIC_BORDER_JITTER,
-                    detail: { line: b.line, text: b.text },
+                    detail: { line: jitterViolation.line, text: jitterViolation.text },
                 }),
             );
         }
@@ -409,11 +421,11 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             if (isStandaloneSvgLine(line, rawLines, i)) {
                 continue;
             }
-            const m = colorRe.exec(line);
-            if (m) {
-                const matchedColor = m[1].toLowerCase();
+            const matchResult = colorRe.exec(line);
+            if (matchResult) {
+                const matchedColor = matchResult[1].toLowerCase();
                 if (MONOCHROME_COLORS.has(matchedColor) && !line.includes(THEME_CSS_VAR_PREFIX)) {
-                    violations.push({ line: i + 1, text: line.trim(), color: m[1] });
+                    violations.push({ line: i + 1, text: line.trim(), color: matchResult[1] });
                 }
             }
         }
@@ -424,12 +436,13 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         rawLines: string[],
     ): Array<{ line: number; text: string; prop: string }> {
         const violations: Array<{ line: number; text: string; prop: string }> = [];
-        const re = /transition\s*:[^;]*\b(width|height|top|bottom|left|right|margin|padding)\b/i;
+        const transitionRegex =
+            /transition\s*:[^;]*\b(width|height|top|bottom|left|right|margin|padding)\b/i;
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            const m = re.exec(line);
-            if (m) {
-                violations.push({ line: i + 1, text: line.trim(), prop: m[1] });
+            const matchResult = transitionRegex.exec(line);
+            if (matchResult) {
+                violations.push({ line: i + 1, text: line.trim(), prop: matchResult[1] });
             }
         }
         return violations;

@@ -299,8 +299,10 @@ export class LogRingBuffer {
             const payload = this.drainBufferPayload();
             try {
                 LogIoBarrier.appendSync(this.filePath, payload);
-            } catch (e) {
-                process.stderr.write(`[auto-refactor] WARN sync log flush failed: ${String(e)}\n`);
+            } catch (error) {
+                process.stderr.write(
+                    `[auto-refactor] WARN sync log flush failed: ${String(error)}\n`,
+                );
             }
         } finally {
             this.isSyncFlushing = false;
@@ -320,8 +322,10 @@ export class LogRingBuffer {
         const payload = this.drainBufferPayload();
         try {
             await fs.promises.appendFile(this.filePath, payload);
-        } catch (e) {
-            process.stderr.write(`[auto-refactor] WARN async log append failed: ${String(e)}\n`);
+        } catch (error) {
+            process.stderr.write(
+                `[auto-refactor] WARN async log append failed: ${String(error)}\n`,
+            );
         } finally {
             this.isFlushing = false;
         }
@@ -382,7 +386,10 @@ function formatJsonMessage(params: FormatLogMessageParams): string {
             name: params.errorObj.name,
             message: params.errorObj.message,
             stack: params.errorObj.stack,
-            cause: params.errorObj.cause instanceof Error ? params.errorObj.cause.message : params.errorObj.cause,
+            cause:
+                params.errorObj.cause instanceof Error
+                    ? params.errorObj.cause.message
+                    : params.errorObj.cause,
         };
     }
     return JSON.stringify(record);
@@ -479,9 +486,9 @@ export class Logger {
             contextObj = errorOrContext as LogContext;
         }
 
-        const ts = new Date().toISOString();
+        const timestamp = new Date().toISOString();
         const formatParams: FormatLogMessageParams = {
-            timestamp: ts,
+            timestamp,
             level,
             message: msg,
             errorObj,

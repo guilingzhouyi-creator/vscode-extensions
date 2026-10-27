@@ -253,7 +253,7 @@ interface DaemonCmdModuleExports {
 /** Dynamic module loader bypassing direct require call syntax in ESM module. */
 function loadDaemonModule<T>(modulePath: string): T {
     const dynamicRequire = (mod: string): T =>
-        (module as unknown as { require: (id: string) => T })['require'](mod);
+        (module as unknown as { require: (moduleId: string) => T })['require'](mod);
     return dynamicRequire(modulePath);
 }
 
@@ -433,20 +433,20 @@ export async function scanWarm(
 
 /** Decode any Buffer content fields in DiffInput[] to UTF-16 strings (JSON-safe for daemon). */
 function decodeDiffs(diffs: DiffInput[]): DiffInput[] {
-    return diffs.map((d) => {
-        if (d.kind === DIFF_INPUT_KIND_FULL) {
+    return diffs.map((diffItem) => {
+        if (diffItem.kind === DIFF_INPUT_KIND_FULL) {
             return {
-                ...d,
-                oldContent: decodeContent(d.oldContent as unknown as string | Buffer),
-                newContent: decodeContent(d.newContent as unknown as string | Buffer),
+                ...diffItem,
+                oldContent: decodeContent(diffItem.oldContent as unknown as string | Buffer),
+                newContent: decodeContent(diffItem.newContent as unknown as string | Buffer),
             };
         }
         return {
-            ...d,
-            newContent: decodeContent(d.newContent as unknown as string | Buffer),
+            ...diffItem,
+            newContent: decodeContent(diffItem.newContent as unknown as string | Buffer),
             oldContent:
-                d.oldContent !== undefined
-                    ? decodeContent(d.oldContent as unknown as string | Buffer)
+                diffItem.oldContent !== undefined
+                    ? decodeContent(diffItem.oldContent as unknown as string | Buffer)
                     : undefined,
         };
     });
@@ -982,7 +982,6 @@ export { toAgentReview, toCapp, toPraxisPresentation } from './core/reporters';
 export * from './core/reporting/aas-types';
 export { buildAasReport, toAasJson } from './core/reporting/aas-reporter';
 
-
 // ---- Praxis Diff Governance Subsystem Facade & SPI ----
 export * from './core/praxis';
 export {
@@ -1040,9 +1039,5 @@ export * from './core/evolution';
 export * from './core/telemetry';
 
 // ---- DeepInfer Disaggregated Serving & Worker Pool Management ----
-export {
-    handleAsymmetricScan,
-    handleSliceAudit,
-    createDaemonContext,
-} from './daemon/scanHandler';
+export { handleAsymmetricScan, handleSliceAudit, createDaemonContext } from './daemon/scanHandler';
 export { WorkerPoolManager } from './core/scheduler/worker-pool-manager';

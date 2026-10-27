@@ -84,11 +84,11 @@ export class RegressionTrajectoryDetector {
     /**
      * Checks whether two revisions are identical in content or AST representation.
      */
-    private isStateMatch(a: FileRevision, b: FileRevision): boolean {
-        if (a.fileHash && b.fileHash && a.fileHash === b.fileHash) {
+    private isStateMatch(revA: FileRevision, revB: FileRevision): boolean {
+        if (revA.fileHash && revB.fileHash && revA.fileHash === revB.fileHash) {
             return true;
         }
-        return Boolean(a.astDigest && b.astDigest && a.astDigest === b.astDigest);
+        return Boolean(revA.astDigest && revB.astDigest && revA.astDigest === revB.astDigest);
     }
 
     /**

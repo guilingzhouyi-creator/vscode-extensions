@@ -44,13 +44,13 @@ const DEFAULT_MAX_EXPANSION_LIMIT = 30;
 const DEFAULT_CONFIDENCE = 0.9;
 
 /** Normalizes a file path for key comparison */
-function normPath(p: string): string {
-    return p.replace(/\\/g, '/').toLowerCase();
+function normPath(targetPath: string): string {
+    return targetPath.replace(/\\/g, '/').toLowerCase();
 }
 
 /** Extracts normalized base name without directory and extension */
-function extractBaseName(p: string): string {
-    const norm = normPath(p);
+function extractBaseName(targetPath: string): string {
+    const norm = normPath(targetPath);
     return norm.split('/').pop()?.split('.')[0] || '';
 }
 

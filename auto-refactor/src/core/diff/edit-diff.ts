@@ -103,11 +103,11 @@ export function computeLineStarts(content: string): number[] {
  * @returns Line count, always at least 1.
  */
 export function countLines(content: string): number {
-    let n = 1;
+    let totalLines = 1;
     for (let i = 0; i < content.length; i++) {
-        if (content.charCodeAt(i) === LINE_FEED_CODE) n++;
+        if (content.charCodeAt(i) === LINE_FEED_CODE) totalLines++;
     }
-    return n;
+    return totalLines;
 }
 
 /**
@@ -198,11 +198,11 @@ export function computeLineStartsAndHashes(content: string): LineIndex {
  * @returns Unsigned 32-bit FNV-1a hashes.
  */
 export function hashLinesDirect(content: string, starts: number[]): Uint32Array {
-    const n = starts.length;
-    const hashes = new Uint32Array(n);
-    for (let i = 0; i < n; i++) {
+    const lineCount = starts.length;
+    const hashes = new Uint32Array(lineCount);
+    for (let i = 0; i < lineCount; i++) {
         const startOffset = starts[i];
-        const endOffset = i + 1 < n ? starts[i + 1] - 1 : content.length;
+        const endOffset = i + 1 < lineCount ? starts[i + 1] - 1 : content.length;
         let hash = FNV1A_32_OFFSET_BASIS;
         for (let j = startOffset; j < endOffset; j++) {
             hash ^= content.charCodeAt(j);
@@ -248,11 +248,11 @@ export function fastDiff(
     oldLineHashes?: Uint32Array,
     newLineHashes?: Uint32Array,
 ): DiffOp[] {
-    const n = oldLines.length;
-    const m = newLines.length;
-    if (n === 0 && m === 0) return [];
-    if (n === 0) return newLines.map((_, bIdx) => ({ type: DIFF_OP_INSERT, aIdx: 0, bIdx }));
-    if (m === 0) return oldLines.map((_, aIdx) => ({ type: DIFF_OP_DELETE, aIdx, bIdx: 0 }));
+    const oldLen = oldLines.length;
+    const newLen = newLines.length;
+    if (oldLen === 0 && newLen === 0) return [];
+    if (oldLen === 0) return newLines.map((_, bIdx) => ({ type: DIFF_OP_INSERT, aIdx: 0, bIdx }));
+    if (newLen === 0) return oldLines.map((_, aIdx) => ({ type: DIFF_OP_DELETE, aIdx, bIdx: 0 }));
 
     const hashA = oldLineHashes || hashLines(oldLines);
     const hashB = newLineHashes || hashLines(newLines);
@@ -267,8 +267,8 @@ export function fastDiff(
     return myersDiffCore({
         prefix,
         suffix,
-        oldLineCount: n,
-        newLineCount: m,
+        oldLineCount: oldLen,
+        newLineCount: newLen,
         midA,
         midB,
         midHA,
@@ -346,11 +346,12 @@ export function validateEditRanges(edits: EditRange[], maxByte?: number): void {
  * @returns Total deleted + inserted line count.
  */
 export function changedLineCount(edits: EditRange[]): number {
-    let n = 0;
+    let totalChanged = 0;
     for (const edit of edits) {
-        n += edit.oldEndLine - edit.startLine + 1 + (edit.newEndLine - edit.startLine + 1);
+        totalChanged +=
+            edit.oldEndLine - edit.startLine + 1 + (edit.newEndLine - edit.startLine + 1);
     }
-    return n;
+    return totalChanged;
 }
 
 /**

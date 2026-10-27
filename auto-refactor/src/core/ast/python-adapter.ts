@@ -49,9 +49,9 @@ function pythonParser(): TreeSitterParser {
     if (!parser) {
         const Parser = require('tree-sitter');
         const Python = require('tree-sitter-python');
-        const p = new Parser();
-        p.setLanguage(Python);
-        parser = p as TreeSitterParser;
+        const tsParser = new Parser();
+        tsParser.setLanguage(Python);
+        parser = tsParser as TreeSitterParser;
     }
     return parser;
 }
@@ -63,39 +63,40 @@ function pythonParser(): TreeSitterParser {
  * `.py` files here; `parse` materializes the whole tree eagerly and `root` / `children`
  * expose it to the shared single-pass traversal without any further parsing.
  */
-function isPythonLiteralNode(kind: NodeKind, sn: TreeSitterNode): boolean {
+function isPythonLiteralNode(kind: NodeKind, sitterNode: TreeSitterNode): boolean {
     return (
         kind === NodeKind.NumericLiteral ||
         kind === NodeKind.StringLiteral ||
-        (kind === NodeKind.Literal && isAtomLiteral(sn))
+        (kind === NodeKind.Literal && isAtomLiteral(sitterNode))
     );
 }
 
 function resolvePythonNodeName(
-    sn: TreeSitterNode,
+    sitterNode: TreeSitterNode,
     kind: NodeKind,
     fnLike: boolean,
     isClassDefining: boolean,
     isBinding: boolean,
 ): string | undefined {
-    if (sn.type === 'call') return callNameOf(sn) ?? undefined;
+    if (sitterNode.type === 'call') return callNameOf(sitterNode) ?? undefined;
     const shouldName =
         fnLike ||
         isClassDefining ||
         isBinding ||
         kind === NodeKind.Variable ||
         kind === NodeKind.Constant;
-    return shouldName ? (nameOf(sn) ?? undefined) : undefined;
+    return shouldName ? (nameOf(sitterNode) ?? undefined) : undefined;
 }
 
-function resolveChildMapContext(ctx: MapContext, sn: TreeSitterNode): MapContext {
-    const fnLike = sn.type === 'function_definition';
-    const name = fnLike ? nameOf(sn) : null;
+function resolveChildMapContext(ctx: MapContext, sitterNode: TreeSitterNode): MapContext {
+    const fnLike = sitterNode.type === 'function_definition';
+    const name = fnLike ? nameOf(sitterNode) : null;
     const isTestFn =
         ctx.isTestFunction ||
         Boolean(name && /^(?:test_|_assert_|assert_|selftest|_test)/i.test(name));
     return {
-        constBound: ctx.constBound || (sn.type === PY_ASSIGNMENT && isConstTarget(sn)),
+        constBound:
+            ctx.constBound || (sitterNode.type === PY_ASSIGNMENT && isConstTarget(sitterNode)),
         isTestFunction: isTestFn,
     };
 }
@@ -111,7 +112,7 @@ const SPLAT_PATTERN_TYPES = new Set(['list_splat_pattern', 'dictionary_splat_pat
 function extractTypedOrDefaultPythonParam(child: TreeSitterNode): string | undefined {
     const idNode = child.childForFieldName
         ? child.childForFieldName('name')
-        : child.namedChildren?.find((c) => c.type === 'identifier');
+        : child.namedChildren?.find((childNode) => childNode.type === 'identifier');
     if (idNode?.text) return idNode.text;
     if (child.text) return child.text.split(/[:=]/)[0].trim();
     return undefined;
@@ -130,9 +131,13 @@ function extractSinglePythonParam(child: TreeSitterNode): string | undefined {
     return undefined;
 }
 
-function extractPythonParameters(sn: TreeSitterNode): string[] | undefined {
-    const paramsNode = sn.childForFieldName ? sn.childForFieldName('parameters') : null;
-    const resolvedParamsNode = paramsNode ?? sn.namedChildren?.find((c) => c.type === 'parameters');
+function extractPythonParameters(sitterNode: TreeSitterNode): string[] | undefined {
+    const paramsNode = sitterNode.childForFieldName
+        ? sitterNode.childForFieldName('parameters')
+        : null;
+    const resolvedParamsNode =
+        paramsNode ??
+        sitterNode.namedChildren?.find((childNode) => childNode.type === 'parameters');
     if (!resolvedParamsNode) return undefined;
 
     const result: string[] = [];
@@ -170,61 +175,67 @@ export class PythonAdapter extends BaseAstAdapter {
     /**
      * Recursively materialize one tree-sitter node and its named children.
      *
-     * @param sn - Raw tree-sitter node to map.
+     * @param sitterNode - Raw tree-sitter node to map.
      * @param parent - Raw parent used for literal-context and tolerated-context flags.
      * @param ctx - Inheritance context propagated from enclosing declarations.
      * @returns The normalized node with the exact field shape the analyzers consume.
      */
     private mapNode(
-        sn: TreeSitterNode,
+        sitterNode: TreeSitterNode,
         parent: TreeSitterNode | undefined,
         ctx: MapContext,
     ): NormalizedNode {
-        const kind = kindOfPythonNode(sn);
-        const isLiteral = isPythonLiteralNode(kind, sn);
+        const kind = kindOfPythonNode(sitterNode);
+        const isLiteral = isPythonLiteralNode(kind, sitterNode);
         const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
         const isClassDefining = kind === NodeKind.Class;
-        const isBinding = introducesBinding(sn);
-        const name = resolvePythonNodeName(sn, kind, fnLike, isClassDefining, isBinding);
+        const isBinding = introducesBinding(sitterNode);
+        const name = resolvePythonNodeName(sitterNode, kind, fnLike, isClassDefining, isBinding);
 
         const node: NormalizedNode = {
             kind,
-            rawKind: sn.type,
+            rawKind: sitterNode.type,
             // Literals carry their raw source text (constants analyzer reads it as the value).
-            text: isLiteral ? sn.text : undefined,
-            start: { line: sn.startPosition.row + 1, column: sn.startPosition.column + 1 },
-            end: { line: sn.endPosition.row + 1, column: sn.endPosition.column + 1 },
+            text: isLiteral ? sitterNode.text : undefined,
+            start: {
+                line: sitterNode.startPosition.row + 1,
+                column: sitterNode.startPosition.column + 1,
+            },
+            end: {
+                line: sitterNode.endPosition.row + 1,
+                column: sitterNode.endPosition.column + 1,
+            },
             name,
             isNumeric: kind === NodeKind.NumericLiteral,
             isString: kind === NodeKind.StringLiteral,
-            branchWeight: branchWeightOf(sn),
+            branchWeight: branchWeightOf(sitterNode),
             functionLike: fnLike,
             isClassDefining,
             introducesBinding: isBinding,
             bindingName: isBinding ? (name ?? null) : null,
             hasFunctionInitializer: isBinding,
-            increasesNesting: NESTING_TYPES.has(sn.type),
+            increasesNesting: NESTING_TYPES.has(sitterNode.type),
             // Python has no constructor keyword; `__init__` stays a plain Method so complexity
             // reports the idiomatic `Class.__init__` name instead of a synthetic "constructor".
             isConstructor: false,
-            parameters: fnLike ? extractPythonParameters(sn) : undefined,
+            parameters: fnLike ? extractPythonParameters(sitterNode) : undefined,
         };
 
-        const topLevel = isTopLevel(sn);
+        const topLevel = isTopLevel(sitterNode);
         node.topLevel = topLevel;
-        node.exported = topLevel && !isPrivateName(nameOf(sn));
+        node.exported = topLevel && !isPrivateName(nameOf(sitterNode));
 
         if (isLiteral) {
             node.isConstBound = ctx.constBound || parent?.type === PY_ASSIGNMENT;
-            node.tolerated = isToleratedOf(sn, parent, ctx);
+            node.tolerated = isToleratedOf(sitterNode, parent, ctx);
         }
 
-        const childCtx = resolveChildMapContext(ctx, sn);
-        const namedChildren = sn.namedChildren;
+        const childCtx = resolveChildMapContext(ctx, sitterNode);
+        const namedChildren = sitterNode.namedChildren;
         if (namedChildren && namedChildren.length > 0) {
             const kids: NormalizedNode[] = [];
             for (let i = 0; i < namedChildren.length; i++) {
-                kids.push(this.mapNode(namedChildren[i], sn, childCtx));
+                kids.push(this.mapNode(namedChildren[i], sitterNode, childCtx));
             }
             node.children = kids;
         }

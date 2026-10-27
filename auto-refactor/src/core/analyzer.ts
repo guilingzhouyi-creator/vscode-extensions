@@ -156,7 +156,7 @@ export class Scanner implements ScannerContext {
         );
 
         const sparseResult = routeArchetypeToAnalyzers(detectedArchetype, {
-            customAnalyzers: config.customAnalyzers?.map((c) => c.name),
+            customAnalyzers: config.customAnalyzers?.map((customAnalyzer) => customAnalyzer.name),
         });
         // The routing decision is always computed so the report can explain the archetype, but it
         // only changes the analyzer set when sparseRouting is on. The `applied` flag marks that
@@ -192,7 +192,7 @@ export class Scanner implements ScannerContext {
         }
 
         this.logger.debug(
-            `resolved ${this.plan.length} analyzer(s): ${this.plan.map((p) => p.name).join(', ') || '(none)'}`,
+            `resolved ${this.plan.length} analyzer(s): ${this.plan.map((planItem) => planItem.name).join(', ') || '(none)'}`,
         );
     }
 
@@ -313,11 +313,11 @@ export class Scanner implements ScannerContext {
         const issues: Issue[] = [];
         const loopSites = new Map<string, LoopSite[]>();
 
-        for (const p of this.plan) {
-            if (p.name !== 'complexity') continue;
+        for (const planItem of this.plan) {
+            if (planItem.name !== 'complexity') continue;
             // Optional capability: analyzers declare the loop sites they collected, and the
             // post-scan pass consumes them without depending on the concrete analyzer class.
-            const provider = p.instance as Partial<LoopSiteProvider>;
+            const provider = planItem.instance as Partial<LoopSiteProvider>;
             if (typeof provider.getLoopSites !== 'function') continue;
             for (const [sym, sites] of provider.getLoopSites().entries()) {
                 loopSites.set(sym, sites);
@@ -375,7 +375,7 @@ export class Scanner implements ScannerContext {
         if (cfg.signal?.aborted) {
             throw new Error('Scan aborted by user');
         }
-        const t0 = Date.now();
+        const startTime = Date.now();
         const absRoot = path.resolve(cfg.root);
         const includeRx = cfg.include.map(globToRegExp);
         const excludeRx = cfg.exclude.map(globToRegExp);
@@ -392,7 +392,7 @@ export class Scanner implements ScannerContext {
         sortIssues(issues);
         const sortedAt = AR_TIMING ? nowMs() : 0;
 
-        const durationMs = Date.now() - t0;
+        const durationMs = Date.now() - startTime;
         const report = this.buildReport(files.length, issues, fileMetrics, durationMs);
         this.logger.info(
             `done in ${durationMs}ms: ${report.summary.issuesTotal} issue(s) ` +
@@ -539,8 +539,8 @@ export class Scanner implements ScannerContext {
                 try {
                     const pre = preloaded && preloaded.get(rel);
                     content = pre ? pre.toString('utf8') : await fs.promises.readFile(abs, 'utf8');
-                } catch (e) {
-                    this.logger.warn(`skip unreadable file ${rel}: ${String(e)}`);
+                } catch (readError) {
+                    this.logger.warn(`skip unreadable file ${rel}: ${String(readError)}`);
                     return { issues: [] as Issue[], metric: null as FileMetric | null };
                 }
                 return this.runAnalyzers(rel, content);

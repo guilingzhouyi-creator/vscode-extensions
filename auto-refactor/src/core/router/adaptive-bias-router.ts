@@ -104,7 +104,7 @@ export class AdaptiveExpertBiasRouter {
                 scored.push({ bit, score: dynamicScore });
             }
         }
-        scored.sort((a, b) => b.score - a.score);
+        scored.sort((firstEntry, secondEntry) => secondEntry.score - firstEntry.score);
         return scored;
     }
 

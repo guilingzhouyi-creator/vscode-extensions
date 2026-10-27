@@ -314,17 +314,17 @@ export const ProseTerminologySanitizationRule: GovernanceRule = {
 
         if (findings.length === 0) return null;
 
-        return findings.map((f) => ({
+        return findings.map((finding) => ({
             ruleId: 'GOV-SAN-002',
-            message: f.message,
-            line: f.line,
-            column: f.column,
-            suggestion: f.guidance,
+            message: finding.message,
+            line: finding.line,
+            column: finding.column,
+            suggestion: finding.guidance,
             fixable: false,
             customDetail: {
-                category: f.category,
-                term: f.term,
-                snippet: f.contextSnippet,
+                category: finding.category,
+                term: finding.term,
+                snippet: finding.contextSnippet,
             },
             actionable: {
                 action: 'sanitize_prose_terminology',
@@ -334,8 +334,8 @@ export const ProseTerminologySanitizationRule: GovernanceRule = {
                 templateSnippet:
                     'Use objective, factual technical statements instead of promotional or casual phrasing.',
                 targetArguments: {
-                    forbiddenTerm: f.term,
-                    category: f.category,
+                    forbiddenTerm: finding.term,
+                    category: finding.category,
                 },
             },
         }));

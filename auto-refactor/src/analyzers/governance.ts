@@ -78,16 +78,22 @@ function dispatchGovernanceRules(
     }
 }
 
-function resolveGovernanceLocation(v: GovernanceViolation, filePath: string): IssueLocation {
+function resolveGovernanceLocation(
+    violation: GovernanceViolation,
+    filePath: string,
+): IssueLocation {
     return {
         file: filePath,
-        start: { line: v.line, column: v.column },
-        end: { line: v.endLine ?? v.line, column: v.endColumn ?? v.column + 1 },
+        start: { line: violation.line, column: violation.column },
+        end: {
+            line: violation.endLine ?? violation.line,
+            column: violation.endColumn ?? violation.column + 1,
+        },
     };
 }
 
 function resolveGovernanceDetail(
-    v: GovernanceViolation,
+    violation: GovernanceViolation,
     rule: GovernanceRule | undefined,
     targetLanguage: string,
 ): GovernanceIssueDetail {
@@ -95,7 +101,7 @@ function resolveGovernanceDetail(
     const risk = rule?.risk || 'medium';
     const rationale = rule?.rationale || '';
     const isFixable = rule?.isFixable ?? false;
-    const fixable = v.fixable !== undefined ? v.fixable : isFixable;
+    const fixable = violation.fixable !== undefined ? violation.fixable : isFixable;
 
     return {
         category,
@@ -103,16 +109,16 @@ function resolveGovernanceDetail(
         rationale,
         fixable,
         targetLanguage,
-        ruleId: v.ruleId,
-        suggestedPatch: v.suggestedPatch,
-        ...v.customDetail,
+        ruleId: violation.ruleId,
+        suggestedPatch: violation.suggestedPatch,
+        ...violation.customDetail,
     };
 }
 
 function buildGovernanceIssue(
     issueId: string,
     analyzerName: string,
-    v: GovernanceViolation,
+    violation: GovernanceViolation,
     rule: GovernanceRule | undefined,
     loc: IssueLocation,
     detail: GovernanceIssueDetail,
@@ -122,18 +128,18 @@ function buildGovernanceIssue(
     const issue: Issue = {
         id: issueId,
         analyzer: analyzerName,
-        rule: v.ruleId,
+        rule: violation.ruleId,
         severity,
-        message: v.message,
+        message: violation.message,
         location: loc,
         detail,
-        suggestion: v.suggestion,
+        suggestion: violation.suggestion,
     };
     if (actionable) {
         issue.actionable = actionable;
     }
-    if (v.evidence) {
-        issue.evidence = v.evidence;
+    if (violation.evidence) {
+        issue.evidence = violation.evidence;
     }
     return issue;
 }
@@ -174,8 +180,8 @@ export class GovernanceAnalyzer implements Analyzer {
                 this.capabilities.languageId,
                 ctx.options,
             );
-            this.nodeRules = rules.filter((r) => typeof r.checkNode === 'function');
-            this.fileRules = rules.filter((r) => typeof r.checkFile === 'function');
+            this.nodeRules = rules.filter((rule) => typeof rule.checkNode === 'function');
+            this.fileRules = rules.filter((rule) => typeof rule.checkFile === 'function');
 
             // === OPTIMIZATION BLOCK: text trigger pre-scan + kind grouping ===
             // Fast path: if a rule has a textTrigger, it only runs when its trigger
@@ -184,8 +190,12 @@ export class GovernanceAnalyzer implements Analyzer {
             // reduce how often we short-circuit, never correctness — the actual rule
             // still runs its own precise checks on the masked view.
             if (ctx.content) {
-                this.fileRules = this.fileRules.filter((r) => matchesTextTrigger(r, ctx.content));
-                this.nodeRules = this.nodeRules.filter((r) => matchesTextTrigger(r, ctx.content));
+                this.fileRules = this.fileRules.filter((rule) =>
+                    matchesTextTrigger(rule, ctx.content),
+                );
+                this.nodeRules = this.nodeRules.filter((rule) =>
+                    matchesTextTrigger(rule, ctx.content),
+                );
             }
 
             // Group node-level rules by target kind for dispatch optimization.
@@ -209,7 +219,7 @@ export class GovernanceAnalyzer implements Analyzer {
         }
     }
 
-    analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         this.violations = [];
         this.hasCheckedFile = false;
         this.nodeRules = [];
@@ -219,9 +229,9 @@ export class GovernanceAnalyzer implements Analyzer {
         // Standalone contract fallback
 
         const adapter = new TypeScriptAdapter();
-        const ast = adapter.parse(sf.text, ctx.filePath);
+        const ast = adapter.parse(sourceFile.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [
-            { analyzer: this, ctx: { ...ctx, sourceFile: sf, root: ast.root, adapter } },
+            { analyzer: this, ctx: { ...ctx, sourceFile, root: ast.root, adapter } },
         ]);
     }
 
@@ -273,15 +283,15 @@ export class GovernanceAnalyzer implements Analyzer {
     }
 
     private deriveGovernanceActionable(
-        v: GovernanceViolation,
+        violation: GovernanceViolation,
         _loc: IssueLocation,
     ): AgentActionablePayload | undefined {
-        if (v.actionable) {
-            return v.actionable;
+        if (violation.actionable) {
+            return violation.actionable;
         }
 
-        const taxonomy = resolveRuleTaxonomy(v.ruleId);
-        if (v.ruleId === 'NUM-PREC-001') {
+        const taxonomy = resolveRuleTaxonomy(violation.ruleId);
+        if (violation.ruleId === 'NUM-PREC-001') {
             return {
                 action: 'align_numeric_precision',
                 code: CODE_NUM_PRECISION_LOSSY,
@@ -289,12 +299,12 @@ export class GovernanceAnalyzer implements Analyzer {
                 safeToAutomate: true,
                 templateSnippet: 'Math.round(val * 100) / 100 + 0',
                 targetArguments: {
-                    matchedExpression: v.customDetail?.matchedExpression,
+                    matchedExpression: violation.customDetail?.matchedExpression,
                     standardPrecision: 0.01,
                 },
             };
         }
-        if (v.ruleId === 'GOV-SAN-002') {
+        if (violation.ruleId === 'GOV-SAN-002') {
             return {
                 action: 'sanitize_prose_terminology',
                 code: CODE_GOV_PROSE_SANITIZATION,
@@ -302,12 +312,12 @@ export class GovernanceAnalyzer implements Analyzer {
                 safeToAutomate: false,
                 templateSnippet: 'State verifiable technical scope and bounds.',
                 targetArguments: {
-                    forbiddenTerm: v.customDetail?.term,
-                    category: v.customDetail?.category,
+                    forbiddenTerm: violation.customDetail?.term,
+                    category: violation.customDetail?.category,
                 },
             };
         }
-        if (v.ruleId === 'GOV-LOG-001') {
+        if (violation.ruleId === 'GOV-LOG-001') {
             return {
                 action: 'apply_guard_clause',
                 code: CODE_GOV_LOGIC_GUARD,
@@ -315,12 +325,12 @@ export class GovernanceAnalyzer implements Analyzer {
                 safeToAutomate: true,
                 templateSnippet: 'if (!condition) return defaultValue;',
                 targetArguments: {
-                    maxNesting: v.customDetail?.maxNesting,
-                    threshold: v.customDetail?.threshold,
+                    maxNesting: violation.customDetail?.maxNesting,
+                    threshold: violation.customDetail?.threshold,
                 },
             };
         }
-        if (v.ruleId === 'GOV-LOG-002' || v.ruleId === 'ARCH-FAC-001') {
+        if (violation.ruleId === 'GOV-LOG-002' || violation.ruleId === 'ARCH-FAC-001') {
             return {
                 action: 'decouple_facade',
                 code: CODE_GOV_FACADE_DECOUPLING,
@@ -329,33 +339,35 @@ export class GovernanceAnalyzer implements Analyzer {
                 templateSnippet: 'Inline export target or add substantive contract logic.',
             };
         }
-        if (v.suggestedPatch) {
+        if (violation.suggestedPatch) {
             return {
                 action: 'replace_token',
-                code: `AR:GOV:${v.ruleId.replace(/[^A-Za-z0-9]/g, '_')}`,
+                code: `AR:GOV:${violation.ruleId.replace(/[^A-Za-z0-9]/g, '_')}`,
                 taxonomy,
-                safeToAutomate: Boolean(v.fixable),
-                templateSnippet: v.suggestedPatch,
+                safeToAutomate: Boolean(violation.fixable),
+                templateSnippet: violation.suggestedPatch,
             };
         }
         return undefined;
     }
 
     private recordViolationIssue(
-        v: GovernanceViolation,
+        violation: GovernanceViolation,
         ctx: AnalyzerContext,
         seenIds: Set<string>,
         issues: Issue[],
     ): void {
-        const issueId = `governance:${v.ruleId}:${ctx.filePath}:${v.line}`;
+        const issueId = `governance:${violation.ruleId}:${ctx.filePath}:${violation.line}`;
         if (seenIds.has(issueId)) return;
         seenIds.add(issueId);
 
-        const rule = this.registry.get(v.ruleId);
-        const loc = resolveGovernanceLocation(v, ctx.filePath);
-        const detail = resolveGovernanceDetail(v, rule, this.capabilities.languageId);
-        const actionable = this.deriveGovernanceActionable(v, loc);
-        issues.push(buildGovernanceIssue(issueId, this.name, v, rule, loc, detail, actionable));
+        const rule = this.registry.get(violation.ruleId);
+        const loc = resolveGovernanceLocation(violation, ctx.filePath);
+        const detail = resolveGovernanceDetail(violation, rule, this.capabilities.languageId);
+        const actionable = this.deriveGovernanceActionable(violation, loc);
+        issues.push(
+            buildGovernanceIssue(issueId, this.name, violation, rule, loc, detail, actionable),
+        );
     }
 
     finalize(ctx: AnalyzerContext): Issue[] {
@@ -370,8 +382,8 @@ export class GovernanceAnalyzer implements Analyzer {
         const issues: Issue[] = [];
         const seenIds = new Set<string>();
 
-        for (const v of this.violations) {
-            this.recordViolationIssue(v, ctx, seenIds, issues);
+        for (const violation of this.violations) {
+            this.recordViolationIssue(violation, ctx, seenIds, issues);
         }
 
         return issues;

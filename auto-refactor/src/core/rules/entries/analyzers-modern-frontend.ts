@@ -24,14 +24,14 @@ import type { RuleDefinition } from '../types';
  * Helper to define frontend UI engineering rules.
  */
 function defineUiRule(
-    id: string,
+    ruleId: string,
     defaultSeverity: typeof SEVERITY_INFO | typeof SEVERITY_WARNING,
     summary: string,
     remediation: string,
     docsAnchor: string,
 ): RuleDefinition {
     return defineRule({
-        id,
+        id: ruleId,
         family: RULE_FAMILY_UI,
         analyzer: 'frontend',
         canonical: true,
@@ -47,14 +47,14 @@ function defineUiRule(
  * Helper to define production hygiene rules.
  */
 function defineProdHygieneRule(
-    id: string,
+    ruleId: string,
     defaultSeverity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
     summary: string,
     remediation: string,
     docsAnchor: string,
 ): RuleDefinition {
     return defineRule({
-        id,
+        id: ruleId,
         family: RULE_FAMILY_PRODUCTION,
         analyzer: 'production-hygiene',
         canonical: true,
@@ -70,14 +70,14 @@ function defineProdHygieneRule(
  * Helper to define client exposure security rules.
  */
 function defineExposureRule(
-    id: string,
+    ruleId: string,
     defaultSeverity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
     summary: string,
     remediation: string,
     docsAnchor: string,
 ): RuleDefinition {
     return defineRule({
-        id,
+        id: ruleId,
         family: RULE_FAMILY_SECURITY,
         analyzer: 'client-exposure',
         canonical: true,

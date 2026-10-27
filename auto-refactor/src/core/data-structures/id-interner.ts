@@ -34,13 +34,13 @@ export class IdInterner<T> {
      * @returns Contiguous 0-based integer identifier.
      */
     public intern(item: T): number {
-        let id = this.itemToId.get(item);
-        if (id === undefined) {
-            id = this.idToItem.length;
-            this.itemToId.set(item, id);
+        let internedId = this.itemToId.get(item);
+        if (internedId === undefined) {
+            internedId = this.idToItem.length;
+            this.itemToId.set(item, internedId);
             this.idToItem.push(item);
         }
-        return id;
+        return internedId;
     }
 
     /**
@@ -56,14 +56,14 @@ export class IdInterner<T> {
     /**
      * Retrieves the original item associated with an integer ID in O(1).
      *
-     * @param id - Assigned integer identifier.
+     * @param internedId - Assigned integer identifier.
      * @returns Original item, or undefined if ID is out of bounds.
      */
-    public getItem(id: number): T | undefined {
-        if (id < 0 || id >= this.idToItem.length) {
+    public getItem(internedId: number): T | undefined {
+        if (internedId < 0 || internedId >= this.idToItem.length) {
             return undefined;
         }
-        return this.idToItem[id];
+        return this.idToItem[internedId];
     }
 
     /**

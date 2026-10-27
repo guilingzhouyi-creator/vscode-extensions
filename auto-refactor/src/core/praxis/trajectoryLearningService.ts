@@ -201,9 +201,12 @@ export const defaultPraxisTrajectoryLearningService = new PraxisTrajectoryLearni
  * @param detector - Optional custom regression detector instance.
  * @returns Configured IPraxisTrajectoryLearningService instance.
  */
-export function createPraxisTrajectoryLearningService(
+export function createTrajectoryLearningService(
     extractor?: TrajectoryRecipeExtractor,
     detector?: RegressionTrajectoryDetector,
 ): IPraxisTrajectoryLearningService {
     return new PraxisTrajectoryLearningService(extractor, detector);
 }
+
+/** Backward-compatibility alias for createTrajectoryLearningService. */
+export const createPraxisTrajectoryLearningService = createTrajectoryLearningService;

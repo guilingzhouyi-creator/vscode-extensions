@@ -60,8 +60,8 @@ function serverJsPath(): string {
     return path.join(__dirname, '..', 'daemon', 'server.js');
 }
 
-function sleep(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms));
+function sleep(durationMs: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, durationMs));
 }
 
 /**
@@ -257,12 +257,12 @@ async function stopDaemon(root: string, projectHash: string): Promise<DaemonCliR
         }
         clearRegistry(projectHash);
         return { code: 0, text: `daemon stopped (was pid ${reg.pid})` };
-    } catch (e) {
+    } catch (error) {
         // Daemon unreachable — treat as stopped (stale registry).
         clearRegistry(projectHash);
         return {
             code: 0,
-            text: `daemon not reachable (${e instanceof Error ? e.message : String(e)}); registry cleared`,
+            text: `daemon not reachable (${error instanceof Error ? error.message : String(error)}); registry cleared`,
         };
     } finally {
         client.close();

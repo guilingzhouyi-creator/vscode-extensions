@@ -299,19 +299,24 @@ export function activateSparseAnalyzers(
         }
     }
 
-    const activatedAnalyzers = config.availableAnalyzers.filter((id) => activatedSet.has(id));
-    const skippedAnalyzers = config.availableAnalyzers.filter((id) => !activatedSet.has(id));
+    const activatedAnalyzers = config.availableAnalyzers.filter((analyzerId) =>
+        activatedSet.has(analyzerId),
+    );
+    const skippedAnalyzers = config.availableAnalyzers.filter(
+        (analyzerId) => !activatedSet.has(analyzerId),
+    );
     const selectedFiles = config.fileEntries
-        .map((e) => e.filePath)
-        .filter((f) => (fileAnalyzerMap[f]?.length || 0) > 0);
+        .map((entry) => entry.filePath)
+        .filter((filePath) => (fileAnalyzerMap[filePath]?.length || 0) > 0);
     const skippedFiles = config.fileEntries
-        .map((e) => e.filePath)
-        .filter((f) => !selectedFiles.includes(f));
+        .map((entry) => entry.filePath)
+        .filter((filePath) => !selectedFiles.includes(filePath));
 
     const totalAvail = config.availableAnalyzers.length;
     const activationRatio =
         totalAvail > 0
-            ? Math.round((activatedAnalyzers.length / totalAvail) * SCORE_SCALE_THOUSAND) / SCORE_SCALE_THOUSAND
+            ? Math.round((activatedAnalyzers.length / totalAvail) * SCORE_SCALE_THOUSAND) /
+              SCORE_SCALE_THOUSAND
             : 0;
 
     const summaryText =

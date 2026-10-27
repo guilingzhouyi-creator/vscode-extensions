@@ -131,9 +131,9 @@ export function compressDimensionDeductions(
     if (!pointsList || pointsList.length === 0) return 0;
 
     let rawTotal = 0;
-    for (const p of pointsList) {
-        if (!isNaN(p) && p > 0) {
-            rawTotal += p;
+    for (const point of pointsList) {
+        if (!isNaN(point) && point > 0) {
+            rawTotal += point;
         }
     }
 

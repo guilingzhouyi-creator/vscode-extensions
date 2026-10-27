@@ -233,7 +233,7 @@ function recordFileMemory(
         fileHash: record.fileHash,
         astDigest: record.astDigest,
         qualityScore: score,
-        ruleHitIds: record.ruleHits.map((h) => h.id),
+        ruleHitIds: record.ruleHits.map((ruleHit) => ruleHit.id),
     });
 }
 
@@ -265,11 +265,11 @@ function collectFileQuality(
     issuesByFile: Map<string, Issue[]>,
 ): Record<string, QualityScoreBreakdown> {
     const fileQualityScores: Record<string, QualityScoreBreakdown> = {};
-    for (const m of fileMetrics) {
-        const fileIssues = resolveFileIssues(issuesByFile, m.file);
-        const score = host.scorer.evaluateFile(m.file, fileIssues, m, host.config);
-        fileQualityScores[m.file] = score;
-        recordFileMemory(host, m, fileIssues, score);
+    for (const metric of fileMetrics) {
+        const fileIssues = resolveFileIssues(issuesByFile, metric.file);
+        const score = host.scorer.evaluateFile(metric.file, fileIssues, metric, host.config);
+        fileQualityScores[metric.file] = score;
+        recordFileMemory(host, metric, fileIssues, score);
     }
     return fileQualityScores;
 }

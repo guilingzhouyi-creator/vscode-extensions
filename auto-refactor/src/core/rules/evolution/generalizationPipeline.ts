@@ -288,14 +288,14 @@ export class RuleGeneralizationPipeline {
     }
 
     /** Retrieves a candidate by identifier. */
-    public getCandidate(id: string): RuleCandidate | undefined {
-        return !id ? undefined : this.candidates.get(id);
+    public getCandidate(candidateId: string): RuleCandidate | undefined {
+        return !candidateId ? undefined : this.candidates.get(candidateId);
     }
 
     /** Lists all registered candidates matching optional filters. */
     public getCandidates(filter?: { level?: GeneralizationLevel }): RuleCandidate[] {
         const all = Array.from(this.candidates.values());
-        return !filter?.level ? all : all.filter((c) => c.level === filter.level);
+        return !filter?.level ? all : all.filter((candidate) => candidate.level === filter.level);
     }
 
     /** Backward-compatible alias for getCandidates. */
@@ -365,7 +365,7 @@ export class RuleGeneralizationPipeline {
             promotedAt: new Date().toISOString(),
             targetAnalyzer: candidate.targetAnalyzer,
             ruleLayer,
-            verifiedLanguages: candidate.fixtures.map((f) => f.language),
+            verifiedLanguages: candidate.fixtures.map((fixture) => fixture.language),
         };
     }
 

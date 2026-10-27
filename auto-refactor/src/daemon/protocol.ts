@@ -277,6 +277,6 @@ export function decodeLine(line: string): DaemonMessage {
  *   the closure, so generators are independent and require no external synchronization.
  */
 export function createIdGenerator(): () => number {
-    let n = 0;
-    return () => ++n;
+    let counter = 0;
+    return () => ++counter;
 }

@@ -252,7 +252,7 @@ export class GoModernAnalyzer implements Analyzer {
         return this.delegate.finalize(ctx);
     }
 
-    public analyze(sf: unknown, ctx: AnalyzerContext): Issue[] {
-        return this.delegate.analyze(sf, ctx);
+    public analyze(sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
+        return this.delegate.analyze(sourceFile, ctx);
     }
 }

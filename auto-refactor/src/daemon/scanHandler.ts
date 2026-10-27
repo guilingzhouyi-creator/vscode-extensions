@@ -79,7 +79,7 @@ export async function handleScan(
     config: ScanConfig,
     options: DaemonScanOptions,
 ): Promise<{ report: ScanReport; stats: WarmStats }> {
-    const t0 = Date.now();
+    const startTimeMs = Date.now();
     const cfg = { ...config } as ScanConfig;
     if (typeof options.workers === 'number' && options.workers > 0) cfg.workers = options.workers;
     if (options.parser === 'oxc' || options.parser === 'typescript') cfg.parser = options.parser;
@@ -99,7 +99,7 @@ export async function handleScan(
         });
 
         result.stats.daemonUsed = true;
-        result.stats.daemonMs = Date.now() - t0;
+        result.stats.daemonMs = Date.now() - startTimeMs;
         return result;
     } finally {
         logger.close();
@@ -114,9 +114,13 @@ export async function handleScan(
  */
 function buildDiffHintsMap(diffs: Array<Record<string, unknown>>): Map<string, DiffInput> {
     const diffHints = new Map<string, DiffInput>();
-    for (const d of diffs) {
-        if (d && typeof d.filePath === 'string' && !diffHints.has(d.filePath)) {
-            diffHints.set(d.filePath, d as unknown as DiffInput);
+    for (const diffItem of diffs) {
+        if (
+            diffItem &&
+            typeof diffItem.filePath === 'string' &&
+            !diffHints.has(diffItem.filePath)
+        ) {
+            diffHints.set(diffItem.filePath, diffItem as unknown as DiffInput);
         }
     }
     return diffHints;
@@ -160,7 +164,7 @@ export async function handleScanDiff(
         delta?: boolean;
     },
 ): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats }> {
-    const t0 = Date.now();
+    const startTimeMs = Date.now();
     const cfg = { ...config } as ScanConfig;
     if (typeof options.workers === 'number' && options.workers > 0) cfg.workers = options.workers;
     if (options.parser === 'oxc' || options.parser === 'typescript') cfg.parser = options.parser;
@@ -188,7 +192,7 @@ export async function handleScanDiff(
                 : await scanner.scanWithDiff({ ...baseOpts, deltaOnly: false });
 
         result.stats.daemonUsed = true;
-        result.stats.daemonMs = Date.now() - t0;
+        result.stats.daemonMs = Date.now() - startTimeMs;
         return { report: result.report, stats: result.stats as DiffStats };
     } finally {
         logger.close();
@@ -218,7 +222,7 @@ export async function handleAsymmetricScan(
     deepIssuesCount: number;
     durationMs: number;
 }> {
-    const t0 = Date.now();
+    const startTimeMs = Date.now();
     const cfg = { ...config };
     const logger = new Logger(cfg.logLevel || 'silent', cfg.logFile);
     try {
@@ -240,7 +244,7 @@ export async function handleAsymmetricScan(
             fastVerdict: exec.fastVerdict,
             deepStatus,
             deepIssuesCount,
-            durationMs: Date.now() - t0,
+            durationMs: Date.now() - startTimeMs,
         };
     } finally {
         logger.close();
@@ -259,7 +263,7 @@ export async function handleSliceAudit(
     slices: ReturnType<typeof defaultASTSliceExtractor.extractSlices>;
     durationMs: number;
 }> {
-    const t0 = Date.now();
+    const startTimeMs = Date.now();
     const slices = defaultASTSliceExtractor.extractSlices(
         filePath,
         oldContent,
@@ -268,7 +272,7 @@ export async function handleSliceAudit(
     );
     return {
         slices,
-        durationMs: Date.now() - t0,
+        durationMs: Date.now() - startTimeMs,
     };
 }
 
@@ -290,12 +294,12 @@ export function createDaemonContext(): DaemonScanContext {
             const key = cacheDir
                 ? path.resolve(cacheDir)
                 : path.join(path.resolve(root), '.auto-refactor-cache');
-            let c = cacheByKey.get(key);
-            if (!c) {
-                c = new CacheStore(cacheDir, root);
-                cacheByKey.set(key, c);
+            let cacheStore = cacheByKey.get(key);
+            if (!cacheStore) {
+                cacheStore = new CacheStore(cacheDir, root);
+                cacheByKey.set(key, cacheStore);
             }
-            return c;
+            return cacheStore;
         },
     };
 }

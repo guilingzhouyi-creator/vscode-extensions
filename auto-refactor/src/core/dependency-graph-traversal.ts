@@ -56,11 +56,11 @@ export function globToRegex(glob: string): RegExp {
  */
 export function findImportCycles(edges: Map<string, Set<string>>): string[][] {
     const sortedAdjacency = new Map<string, string[]>();
-    const sortedNexts = (n: string): string[] => {
-        let cached = sortedAdjacency.get(n);
+    const sortedNexts = (nodeName: string): string[] => {
+        let cached = sortedAdjacency.get(nodeName);
         if (!cached) {
-            cached = [...(edges.get(n) ?? [])].sort();
-            sortedAdjacency.set(n, cached);
+            cached = [...(edges.get(nodeName) ?? [])].sort();
+            sortedAdjacency.set(nodeName, cached);
         }
         return cached;
     };
@@ -82,10 +82,13 @@ export interface CyclePassOptions {
 
 async function readSingleFileSafe(
     rootDir: string,
-    f: string,
+    filePath: string,
 ): Promise<readonly [string, string] | null> {
     try {
-        return [f, await fs.promises.readFile(path.join(rootDir, f), 'utf8')] as const;
+        return [
+            filePath,
+            await fs.promises.readFile(path.join(rootDir, filePath), 'utf8'),
+        ] as const;
     } catch {
         return null;
     }
@@ -97,13 +100,13 @@ function applyReadResults(
     contents: Map<string, string>,
 ): number {
     let failures = 0;
-    for (const r of results) {
-        if (!r) {
+    for (const resultItem of results) {
+        if (!resultItem) {
             failures++;
             continue;
         }
-        contents.set(r[0], r[1]);
-        graph.registerFromContent(r[0], r[1]);
+        contents.set(resultItem[0], resultItem[1]);
+        graph.registerFromContent(resultItem[0], resultItem[1]);
     }
     return failures;
 }
@@ -118,7 +121,9 @@ async function readFilesBatched(
     let failures = 0;
     for (let i = 0; i < files.length; i += READ_WINDOW) {
         const chunk = files.slice(i, i + READ_WINDOW);
-        const results = await Promise.all(chunk.map((f) => readSingleFileSafe(rootDir, f)));
+        const results = await Promise.all(
+            chunk.map((filePath) => readSingleFileSafe(rootDir, filePath)),
+        );
         failures += applyReadResults(results, graph, contents);
     }
     return failures;
@@ -151,24 +156,24 @@ function getOrCreateImporterSet(map: Map<string, Set<string>>, key: string): Set
 function buildImportersMap(forward: Map<string, Set<string>>): Map<string, Set<string>> {
     const importers = new Map<string, Set<string>>();
     for (const [from, nexts] of forward) {
-        for (const n of nexts) {
-            getOrCreateImporterSet(importers, n).add(from);
+        for (const nextNode of nexts) {
+            getOrCreateImporterSet(importers, nextNode).add(from);
         }
     }
     return importers;
 }
 
 function getImporterTokens(
-    f: string,
+    filePath: string,
     contents: Map<string, string>,
     tokenCache: Map<string, Set<string>>,
 ): Set<string> | undefined {
-    let tokens = tokenCache.get(f);
+    let tokens = tokenCache.get(filePath);
     if (!tokens) {
-        const c = contents.get(f);
-        if (c === undefined) return undefined;
-        tokens = new Set(c.match(/\b[A-Za-z0-9_$]+\b/g) ?? []);
-        tokenCache.set(f, tokens);
+        const fileContent = contents.get(filePath);
+        if (fileContent === undefined) return undefined;
+        tokens = new Set(fileContent.match(/\b[A-Za-z0-9_$]+\b/g) ?? []);
+        tokenCache.set(filePath, tokens);
     }
     return tokens;
 }
@@ -182,8 +187,8 @@ function auditModuleSymbols(
     issues: Issue[],
 ): number {
     const combinedTokens = new Set<string>();
-    for (const f of importerSet) {
-        const tokens = getImporterTokens(f, contents, importerTokenSets);
+    for (const importerPath of importerSet) {
+        const tokens = getImporterTokens(importerPath, contents, importerTokenSets);
         if (tokens === undefined) {
             return 0;
         }
@@ -229,8 +234,8 @@ function auditUnusedExports(
     const importers = buildImportersMap(graph.getForwardEdges());
     const importerTokenSets = new Map<string, Set<string>>();
     const ENTRY_EXTS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
-    const isEntry = (f: string): boolean =>
-        entryRes.some((re) => ENTRY_EXTS.some((ext) => re.test(f + ext)));
+    const isEntry = (filePath: string): boolean =>
+        entryRes.some((regex) => ENTRY_EXTS.some((ext) => regex.test(filePath + ext)));
     let unusedFlagged = 0;
     const unusedSeverity: Severity = opts.unusedSeverity ?? 'warning';
 
@@ -333,7 +338,7 @@ export async function runCyclePass(
         {}) as CyclePassOptions;
     if (opts.detectCycles === false) return { issues, warnings };
 
-    const files = report.fileMetrics.map((m) => m.file);
+    const files = report.fileMetrics.map((fileMetric) => fileMetric.file);
     const usePrebuilt = prebuilt != null && opts.detectUnusedExports !== true;
     const { ModuleDependencyGraph: GraphClass } =
         require('./dependency-graph') as typeof import('./dependency-graph');

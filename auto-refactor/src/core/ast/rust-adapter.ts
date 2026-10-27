@@ -537,7 +537,7 @@ function extractRustParamName(child: TreeSitterNode): string | undefined {
     if (pat?.text) {
         return pat.text;
     }
-    const idNode = child.namedChildren?.find((c) => c.type === 'identifier');
+    const idNode = child.namedChildren?.find((childNode) => childNode.type === 'identifier');
     if (idNode?.text) {
         return idNode.text;
     }
@@ -560,7 +560,7 @@ function extractSingleRustParam(child: TreeSitterNode): string | undefined {
 function extractRustParameters(syntaxNode: TreeSitterNode): string[] | undefined {
     const paramsNode = syntaxNode.childForFieldName
         ? syntaxNode.childForFieldName('parameters')
-        : syntaxNode.namedChildren?.find((c) => c.type === 'parameters');
+        : syntaxNode.namedChildren?.find((childNode) => childNode.type === 'parameters');
     if (!paramsNode) return undefined;
     const names: string[] = [];
     const children = paramsNode.namedChildren || [];

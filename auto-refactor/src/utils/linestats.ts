@@ -66,8 +66,8 @@ const LATIN1_RANGE_LIMIT = 256;
 /** Fast-path lookup table for Latin-1 whitespace code points (0x00..0xFF). */
 export const LATIN1_TRIM_WHITESPACE: Uint8Array = (() => {
     const table = new Uint8Array(LATIN1_RANGE_LIMIT);
-    for (let c = CHAR_TAB; c <= CHAR_CARRIAGE_RETURN; c++) {
-        table[c] = 1;
+    for (let codePoint = CHAR_TAB; codePoint <= CHAR_CARRIAGE_RETURN; codePoint++) {
+        table[codePoint] = 1;
     }
     table[CHAR_SPACE] = 1;
     table[CHAR_NO_BREAK_SPACE] = 1;
@@ -85,8 +85,8 @@ export const UNICODE_TRIM_WHITESPACE: ReadonlySet<number> = (() => {
         CHAR_IDEOGRAPHIC_SPACE,
         CHAR_ZERO_WIDTH_NO_BREAK_SPACE,
     ]);
-    for (let c = CHAR_EN_QUAD; c <= CHAR_HAIR_SPACE; c++) {
-        set.add(c);
+    for (let codePoint = CHAR_EN_QUAD; codePoint <= CHAR_HAIR_SPACE; codePoint++) {
+        set.add(codePoint);
     }
     return set;
 })();
@@ -105,15 +105,15 @@ export const UNICODE_TRIM_WHITESPACE: ReadonlySet<number> = (() => {
  * U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF. Note that U+2028/U+2029
  * are trim-whitespace but NOT `\n`, so they do not increment `lines` (matching split).
  *
- * @param ch - UTF-16 code unit to test.
+ * @param codeUnit - UTF-16 code unit to test.
  * @returns `true` when ECMAScript `String.prototype.trim` treats the code point as
  * whitespace; `false` for every other code point.
  */
-function isTrimWhitespace(ch: number): boolean {
-    if (ch < LATIN1_RANGE_LIMIT) {
-        return LATIN1_TRIM_WHITESPACE[ch] === 1;
+function isTrimWhitespace(codeUnit: number): boolean {
+    if (codeUnit < LATIN1_RANGE_LIMIT) {
+        return LATIN1_TRIM_WHITESPACE[codeUnit] === 1;
     }
-    return UNICODE_TRIM_WHITESPACE.has(ch);
+    return UNICODE_TRIM_WHITESPACE.has(codeUnit);
 }
 
 /**
@@ -133,14 +133,14 @@ export function countLineStats(content: string): { lines: number; nonBlankLines:
     let nonBlankLines = 0;
     let lineHasNonBlank = false;
     for (let i = 0; i < content.length; i++) {
-        const ch = content.charCodeAt(i);
-        if (ch === CHAR_LINE_FEED /* \n */) {
+        const codeUnit = content.charCodeAt(i);
+        if (codeUnit === CHAR_LINE_FEED /* \n */) {
             if (lineHasNonBlank) nonBlankLines++;
             lines++;
             lineHasNonBlank = false;
             continue;
         }
-        if (!lineHasNonBlank && !isTrimWhitespace(ch)) lineHasNonBlank = true;
+        if (!lineHasNonBlank && !isTrimWhitespace(codeUnit)) lineHasNonBlank = true;
     }
     if (lineHasNonBlank) nonBlankLines++;
     return { lines, nonBlankLines };

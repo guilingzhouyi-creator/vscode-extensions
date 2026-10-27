@@ -66,9 +66,9 @@ export class TypeScriptAdapter extends BaseAstAdapter {
      * @returns Normalized AST whose root is the source-file node.
      */
     parse(content: string, filePath: string, seed?: ProjectionSeed): NormalizedAst {
-        const sf = createSourceFile(filePath, content);
-        const root = this.mapNode(sf, undefined, undefined, undefined, sf, seed);
-        return { root, sourceFile: sf };
+        const sourceFile = createSourceFile(filePath, content);
+        const root = this.mapNode(sourceFile, undefined, undefined, undefined, sourceFile, seed);
+        return { root, sourceFile };
     }
 
     /**
@@ -84,133 +84,145 @@ export class TypeScriptAdapter extends BaseAstAdapter {
         filePath: string,
         policy: ProjectionPolicy,
     ): NodeProjector | null {
-        const sf = createSourceFile(filePath, content);
-        return new TsNodeProjector(sf, policy);
+        const sourceFile = createSourceFile(filePath, content);
+        return new TsNodeProjector(sourceFile, policy);
     }
 
     private resolveNodePositions(
-        n: ts.Node,
+        tsNode: ts.Node,
         isLiteral: boolean,
         fnLike: boolean,
         isCall: boolean,
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
     ): { start?: Position; end?: Position } {
         const needsPos =
             isLiteral ||
             fnLike ||
             isCall ||
-            n.kind === ts.SyntaxKind.FunctionKeyword ||
-            n.kind === ts.SyntaxKind.SourceFile ||
-            ts.isClassDeclaration(n) ||
-            ts.isClassExpression(n) ||
-            ts.isVariableDeclaration(n) ||
-            ts.isParameter(n);
+            tsNode.kind === ts.SyntaxKind.FunctionKeyword ||
+            tsNode.kind === ts.SyntaxKind.SourceFile ||
+            ts.isClassDeclaration(tsNode) ||
+            ts.isClassExpression(tsNode) ||
+            ts.isVariableDeclaration(tsNode) ||
+            ts.isParameter(tsNode);
         if (!needsPos) return {};
         return {
-            start: posOf(n.getStart(sf), sf),
-            end: posOf(n.getEnd(), sf),
+            start: posOf(tsNode.getStart(sourceFile), sourceFile),
+            end: posOf(tsNode.getEnd(), sourceFile),
         };
     }
 
     private resolveNodeName(
-        n: ts.Node,
+        tsNode: ts.Node,
         kind: NodeKind,
         isCall: boolean,
         fnLike: boolean,
         isClassDefining: boolean,
         isBinding: boolean,
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
     ): string | undefined {
-        if (isCall) return calleeNameOf(n, sf) ?? undefined;
-        if (fnLike || isClassDefining || isBinding) return nameOf(n, sf) ?? undefined;
+        if (isCall) return calleeNameOf(tsNode, sourceFile) ?? undefined;
+        if (fnLike || isClassDefining || isBinding) return nameOf(tsNode, sourceFile) ?? undefined;
         if (kind === NodeKind.Variable || kind === NodeKind.Constant) {
-            return nameOf(n, sf) ?? undefined;
+            return nameOf(tsNode, sourceFile) ?? undefined;
         }
         return undefined;
     }
 
     private buildNormalizedNode(
-        n: ts.Node,
+        tsNode: ts.Node,
         kind: NodeKind,
         isLiteral: boolean,
         fnLike: boolean,
         isClassDefining: boolean,
         isBinding: boolean,
         isCall: boolean,
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
     ): NormalizedNode {
-        const pos = this.resolveNodePositions(n, isLiteral, fnLike, isCall, sf);
+        const pos = this.resolveNodePositions(tsNode, isLiteral, fnLike, isCall, sourceFile);
         return {
             kind,
-            rawKind: n.kind === ts.SyntaxKind.FunctionKeyword ? 'FunctionKeyword' : undefined,
-            text: isLiteral ? n.getText(sf) : undefined,
+            rawKind: tsNode.kind === ts.SyntaxKind.FunctionKeyword ? 'FunctionKeyword' : undefined,
+            text: isLiteral ? tsNode.getText(sourceFile) : undefined,
             start: pos.start,
             end: pos.end,
-            name: this.resolveNodeName(n, kind, isCall, fnLike, isClassDefining, isBinding, sf),
-            calleeReceiver: isCall ? (calleeReceiverOf(n, sf) ?? undefined) : undefined,
+            name: this.resolveNodeName(
+                tsNode,
+                kind,
+                isCall,
+                fnLike,
+                isClassDefining,
+                isBinding,
+                sourceFile,
+            ),
+            calleeReceiver: isCall
+                ? (calleeReceiverOf(tsNode, sourceFile) ?? undefined)
+                : undefined,
             isNumeric: kind === NodeKind.NumericLiteral,
             isString: kind === NodeKind.StringLiteral,
-            branchWeight: branchWeightOf(n),
+            branchWeight: branchWeightOf(tsNode),
             functionLike: fnLike,
             isClassDefining,
             introducesBinding: isBinding,
-            bindingName: isBinding ? bindingName(n, sf) : null,
+            bindingName: isBinding ? bindingName(tsNode, sourceFile) : null,
             hasFunctionInitializer: isBinding,
-            increasesNesting: CONTROL_OR_BLOCK.has(n.kind),
-            isConstructor: ts.isConstructorDeclaration(n),
-            parameters: fnLike ? this.extractFnParameters(n, sf) : undefined,
+            increasesNesting: CONTROL_OR_BLOCK.has(tsNode.kind),
+            isConstructor: ts.isConstructorDeclaration(tsNode),
+            parameters: fnLike ? this.extractFnParameters(tsNode, sourceFile) : undefined,
         };
     }
 
-    private extractFnParameters(n: ts.Node, sf: ts.SourceFile): string[] | undefined {
+    private extractFnParameters(tsNode: ts.Node, sourceFile: ts.SourceFile): string[] | undefined {
         if (
-            !ts.isFunctionDeclaration(n) &&
-            !ts.isMethodDeclaration(n) &&
-            !ts.isFunctionExpression(n) &&
-            !ts.isArrowFunction(n) &&
-            !ts.isConstructorDeclaration(n)
+            !ts.isFunctionDeclaration(tsNode) &&
+            !ts.isMethodDeclaration(tsNode) &&
+            !ts.isFunctionExpression(tsNode) &&
+            !ts.isArrowFunction(tsNode) &&
+            !ts.isConstructorDeclaration(tsNode)
         ) {
             return undefined;
         }
-        if (!n.parameters) return [];
-        return n.parameters.map((p) => p.name.getText(sf));
+        if (!tsNode.parameters) return [];
+        return tsNode.parameters.map((paramNode) => paramNode.name.getText(sourceFile));
     }
 
     private applyNodeHierarchy(
         node: NormalizedNode,
-        n: ts.Node,
+        tsNode: ts.Node,
         parentTs: ts.Node | undefined,
         grandparentTs: ts.Node | undefined,
         greatGrandparentTs: ts.Node | undefined,
         isLiteral: boolean,
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
     ): void {
-        const topLevel = !!parentTs && ts.isSourceFile(parentTs) && isTopLevelDecl(n);
+        const topLevel = !!parentTs && ts.isSourceFile(parentTs) && isTopLevelDecl(tsNode);
         node.topLevel = topLevel;
         node.exported =
             topLevel &&
-            (hasExportModifier(n) || ts.isExportAssignment(n) || ts.isExportDeclaration(n));
+            (hasExportModifier(tsNode) ||
+                ts.isExportAssignment(tsNode) ||
+                ts.isExportDeclaration(tsNode));
         if (isLiteral) {
-            node.isConstBound = isConstBoundOf(n, parentTs, grandparentTs, greatGrandparentTs);
-            node.tolerated = isToleratedOf(n, parentTs, sf, grandparentTs);
+            node.isConstBound = isConstBoundOf(tsNode, parentTs, grandparentTs, greatGrandparentTs);
+            node.tolerated = isToleratedOf(tsNode, parentTs, sourceFile, grandparentTs);
         }
     }
 
     private tryReuseSubtree(
         node: NormalizedNode,
-        n: ts.Node,
+        tsNode: ts.Node,
         fnLike: boolean,
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
         seed?: ProjectionSeed,
     ): boolean {
         if (!seed || !fnLike) return false;
-        const startPos = posOf(n.getStart(sf), sf);
+        const startPos = posOf(tsNode.getStart(sourceFile), sourceFile);
         const span: ReusedSpan = {
             startLine: startPos.line,
             startColumn: startPos.column,
-            startByte: n.getStart(sf),
-            endByte: n.getEnd(),
-            sourceText: n.getText(sf),
+            startByte: tsNode.getStart(sourceFile),
+            endByte: tsNode.getEnd(),
+            sourceText: tsNode.getText(sourceFile),
         };
         const reused = seed.reuseSubtree(span);
         if (reused) {
@@ -225,79 +237,81 @@ export class TypeScriptAdapter extends BaseAstAdapter {
     private recordSpanCache(
         seed: ProjectionSeed | undefined,
         fnLike: boolean,
-        n: ts.Node,
-        sf: ts.SourceFile,
+        tsNode: ts.Node,
+        sourceFile: ts.SourceFile,
         kids: NormalizedNode[] | undefined,
     ): void {
         if (!seed || !fnLike) return;
-        const startPos = posOf(n.getStart(sf), sf);
+        const startPos = posOf(tsNode.getStart(sourceFile), sourceFile);
         const span: ReusedSpan = {
             startLine: startPos.line,
             startColumn: startPos.column,
-            startByte: n.getStart(sf),
-            endByte: n.getEnd(),
-            sourceText: n.getText(sf),
+            startByte: tsNode.getStart(sourceFile),
+            endByte: tsNode.getEnd(),
+            sourceText: tsNode.getText(sourceFile),
         };
         seed.cacheSubtree(span, kids || []);
     }
 
     private traverseChildren(
-        n: ts.Node,
+        tsNode: ts.Node,
         parentTs: ts.Node | undefined,
         grandparentTs: ts.Node | undefined,
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
         seed?: ProjectionSeed,
     ): NormalizedNode[] | undefined {
         let kids: NormalizedNode[] | undefined;
-        ts.forEachChild(n, (c) => {
-            if (isSkippableToken(c)) return;
-            (kids ??= []).push(this.mapNode(c, n, parentTs, grandparentTs, sf, seed));
+        ts.forEachChild(tsNode, (childTs) => {
+            if (isSkippableToken(childTs)) return;
+            (kids ??= []).push(
+                this.mapNode(childTs, tsNode, parentTs, grandparentTs, sourceFile, seed),
+            );
         });
         return kids;
     }
 
     private mapNode(
-        n: ts.Node,
+        tsNode: ts.Node,
         parentTs: ts.Node | undefined,
         grandparentTs: ts.Node | undefined,
         greatGrandparentTs: ts.Node | undefined,
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
         seed?: ProjectionSeed,
     ): NormalizedNode {
-        const kind = kindOf(n);
+        const kind = kindOf(tsNode);
         const isLiteral = kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral;
-        const fnLike = isFunctionLike(n);
-        const isBinding = introducesBinding(n);
-        const isClassDefining = ts.isClassDeclaration(n) || ts.isClassExpression(n);
+        const fnLike = isFunctionLike(tsNode);
+        const isBinding = introducesBinding(tsNode);
+        const isClassDefining = ts.isClassDeclaration(tsNode) || ts.isClassExpression(tsNode);
         const isCall = kind === NodeKind.Call;
 
         const node = this.buildNormalizedNode(
-            n,
+            tsNode,
             kind,
             isLiteral,
             fnLike,
             isClassDefining,
             isBinding,
             isCall,
-            sf,
+            sourceFile,
         );
         this.applyNodeHierarchy(
             node,
-            n,
+            tsNode,
             parentTs,
             grandparentTs,
             greatGrandparentTs,
             isLiteral,
-            sf,
+            sourceFile,
         );
 
-        if (this.tryReuseSubtree(node, n, fnLike, sf, seed)) {
+        if (this.tryReuseSubtree(node, tsNode, fnLike, sourceFile, seed)) {
             return node;
         }
 
-        const kids = this.traverseChildren(n, parentTs, grandparentTs, sf, seed);
+        const kids = this.traverseChildren(tsNode, parentTs, grandparentTs, sourceFile, seed);
         node.children = kids;
-        this.recordSpanCache(seed, fnLike, n, sf, kids);
+        this.recordSpanCache(seed, fnLike, tsNode, sourceFile, kids);
         return node;
     }
 }

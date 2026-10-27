@@ -82,8 +82,8 @@ export class SemanticPraxisContextEnricher implements IPraxisContextEnricher {
         // Extract backward impact slice (files depending on or calling this symbol)
         const impactSlice = this.graph.getSlice(matchedNode.id, 3, 'backward');
         const impactFiles = Array.from(
-            new Set(impactSlice.nodes.map((n) => n.location.file)),
-        ).filter((f) => f !== canonicalFile);
+            new Set(impactSlice.nodes.map((node) => node.location.file)),
+        ).filter((filePath) => filePath !== canonicalFile);
 
         return {
             enclosingSymbol: matchedNode.name,
@@ -119,10 +119,12 @@ export class SemanticPraxisContextEnricher implements IPraxisContextEnricher {
                 ? this.graph.getNodesByFile(canonicalFile)
                 : this.graph
                       .getAllNodes()
-                      .filter((n) => normalizeCanonicalPath(n.location?.file) === canonicalFile);
+                      .filter(
+                          (node) => normalizeCanonicalPath(node.location?.file) === canonicalFile,
+                      );
 
         const candidates = fileNodes.filter(
-            (n) => n.location.start.line <= endLine && n.location.end.line >= startLine,
+            (node) => node.location.start.line <= endLine && node.location.end.line >= startLine,
         );
 
         if (candidates.length === 0) {
@@ -131,7 +133,7 @@ export class SemanticPraxisContextEnricher implements IPraxisContextEnricher {
 
         // Prioritize more granular nodes: function > type > module
         const sorted = [...candidates].sort(
-            (a, b) => getKindWeight(b.kind) - getKindWeight(a.kind),
+            (nodeA, nodeB) => getKindWeight(nodeB.kind) - getKindWeight(nodeA.kind),
         );
 
         return sorted[0];

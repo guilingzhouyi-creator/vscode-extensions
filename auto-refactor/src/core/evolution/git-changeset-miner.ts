@@ -189,8 +189,8 @@ function computeRawShannonEntropy(
     for (let i = 0; i < count; i++) {
         const item = fileChanges[i];
         if (item.total > 0) {
-            const p = item.total / sumDelta;
-            rawEntropy -= p * (Math.log(p) / Math.LN2);
+            const prob = item.total / sumDelta;
+            rawEntropy -= prob * (Math.log(prob) / Math.LN2);
         }
     }
 

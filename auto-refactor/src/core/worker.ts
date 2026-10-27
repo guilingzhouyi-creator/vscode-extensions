@@ -50,7 +50,7 @@ interface LoadedAnalyzer {
     name: string;
     analyzer: {
         name?: string;
-        analyze?(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[];
+        analyze?(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[];
         visit?(...args: unknown[]): void;
         finalize?(ctx: AnalyzerContext): Issue[];
     };
@@ -97,13 +97,13 @@ function loadDynamicModule<T = any>(modulePath: string): T {
 }
 
 function loadDescs(descs: Desc[]): LoadedAnalyzer[] {
-    return descs.map((d) => {
-        const mod = loadDynamicModule(d.modulePath);
-        const analyzerInstance = instantiateAnalyzer(mod, d.name);
+    return descs.map((descItem) => {
+        const mod = loadDynamicModule(descItem.modulePath);
+        const analyzerInstance = instantiateAnalyzer(mod, descItem.name);
         return {
-            name: d.name,
+            name: descItem.name,
             analyzer: analyzerInstance,
-            options: d.options,
+            options: descItem.options,
             mod,
         };
     });
@@ -164,8 +164,8 @@ function printWorkerTable(): void {
     const wall = nowMs() - perf.started;
     const busy = perf.msgWall;
     const idle = perf.idleTotal;
-    const pct = (v: number): string =>
-        ((v / Math.max(1, wall)) * PERCENT_SCALE).toFixed(TIMING_DECIMALS);
+    const pct = (valMs: number): string =>
+        ((valMs / Math.max(1, wall)) * PERCENT_SCALE).toFixed(TIMING_DECIMALS);
     const fileCount = perf.files || 1;
     console.error(
         `[AR-TIMING worker] wall=${formatMs(wall)}ms busy=${formatMs(busy)}ms(${pct(busy)}%) ` +
@@ -218,14 +218,14 @@ function splitAnalyzers(instances: LoadedAnalyzer[]): {
     legacy: LoadedAnalyzer[];
 } {
     const streaming = instances.filter(
-        (a) =>
-            typeof a.analyzer.visit === TYPEOF_FUNCTION ||
-            typeof a.analyzer.finalize === TYPEOF_FUNCTION,
+        (analyzerItem) =>
+            typeof analyzerItem.analyzer.visit === TYPEOF_FUNCTION ||
+            typeof analyzerItem.analyzer.finalize === TYPEOF_FUNCTION,
     );
     const legacy = instances.filter(
-        (a) =>
-            typeof a.analyzer.visit !== TYPEOF_FUNCTION &&
-            typeof a.analyzer.finalize !== TYPEOF_FUNCTION,
+        (analyzerItem) =>
+            typeof analyzerItem.analyzer.visit !== TYPEOF_FUNCTION &&
+            typeof analyzerItem.analyzer.finalize !== TYPEOF_FUNCTION,
     );
     return { streaming, legacy };
 }
@@ -302,11 +302,11 @@ function createAnalyzerEntries(context: AnalyzerEntriesContext): StreamingEntry[
         lineStats,
     });
 
-    const streamingEntries: StreamingEntry[] = streaming.map((a) => {
-        const analyzerInstance = instantiateAnalyzer(a.mod, a.name);
+    const streamingEntries: StreamingEntry[] = streaming.map((loadedItem) => {
+        const analyzerInstance = instantiateAnalyzer(loadedItem.mod, loadedItem.name);
         return {
             analyzer: analyzerInstance as unknown as StreamingEntry['analyzer'],
-            ctx: buildContext(a.options),
+            ctx: buildContext(loadedItem.options),
         };
     });
     streamingEntries.push({ analyzer: metric, ctx: buildContext({}) });
@@ -382,7 +382,7 @@ function executeLegacyAnalyzers(context: LegacyExecutionContext): Issue[] {
     const issues: Issue[] = [];
     if (!sourceFile) return issues;
 
-    for (const a of legacy) {
+    for (const legacyAnalyzer of legacy) {
         const ctx: AnalyzerContext = {
             filePath: file,
             content,
@@ -390,23 +390,26 @@ function executeLegacyAnalyzers(context: LegacyExecutionContext): Issue[] {
             adapter,
             sourceFile,
             config,
-            options: a.options,
+            options: legacyAnalyzer.options,
             lineStats,
         };
         try {
-            if (typeof a.analyzer.analyze === 'function') {
-                issues.push(...a.analyzer.analyze(sourceFile, ctx));
+            if (typeof legacyAnalyzer.analyzer.analyze === 'function') {
+                issues.push(...legacyAnalyzer.analyzer.analyze(sourceFile, ctx));
             }
-        } catch (e) {
+        } catch (analyzerError) {
             const sev: 'error' | 'info' = config.failOnAnalyzerError ? SEV_ERROR : SEV_INFO;
             issues.push({
                 id: `core:analyzer-error:${file}:1`,
-                analyzer: a.name,
+                analyzer: legacyAnalyzer.name,
                 rule: RULE_ANALYZER_ERROR,
                 severity: sev,
-                message: `Analyzer "${a.name}" threw: ${(e as Error).message}`,
+                message: `Analyzer "${legacyAnalyzer.name}" threw: ${(analyzerError as Error).message}`,
                 location: { file, start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
-                detail: { error: String(e), stack: e instanceof Error ? e.stack : undefined },
+                detail: {
+                    error: String(analyzerError),
+                    stack: analyzerError instanceof Error ? analyzerError.stack : undefined,
+                },
             });
         }
     }
@@ -426,7 +429,7 @@ function createLegacySourceFile(context: SourceFileResolveContext): ts.SourceFil
     const { legacyCount, adapterId, file, content } = context;
     if (legacyCount > 0 && (adapterId === 'typescript' || adapterId === 'oxc')) {
         const astModule = loadDynamicModule<{
-            createSourceFile?: (f: string, c: string) => ts.SourceFile;
+            createSourceFile?: (filePath: string, fileContent: string) => ts.SourceFile;
         }>(MODULE_PATH_AST);
         return astModule?.createSourceFile?.(file, content);
     }
@@ -504,7 +507,7 @@ interface PipelineRunContext {
     streaming: LoadedAnalyzer[];
     legacy: LoadedAnalyzer[];
     adapter: LanguageAdapter;
-    sf: ts.SourceFile | undefined;
+    sourceFile: ts.SourceFile | undefined;
     lineStats: LineStats;
 }
 
@@ -512,8 +515,19 @@ function executePipelineAnalyzers(context: PipelineRunContext): {
     issues: Issue[];
     metric: FileMetric | null;
 } {
-    const { proj, ast, rootForCtx, file, content, cfg, streaming, legacy, adapter, sf, lineStats } =
-        context;
+    const {
+        proj,
+        ast,
+        rootForCtx,
+        file,
+        content,
+        cfg,
+        streaming,
+        legacy,
+        adapter,
+        sourceFile,
+        lineStats,
+    } = context;
     const metricCollector = new FileMetricCollector();
     const entries = createAnalyzerEntries({
         streaming,
@@ -522,7 +536,7 @@ function executePipelineAnalyzers(context: PipelineRunContext): {
         file,
         content,
         adapter,
-        sourceFile: sf,
+        sourceFile,
         config: cfg,
         lineStats,
     });
@@ -535,7 +549,7 @@ function executePipelineAnalyzers(context: PipelineRunContext): {
         content,
         file,
         streaming,
-        sourceFile: sf,
+        sourceFile,
         config: cfg,
         lineStats,
     });
@@ -545,7 +559,7 @@ function executePipelineAnalyzers(context: PipelineRunContext): {
     const astRoot = resolveAstRoot(ast, rootForCtx);
     const legacyIssues = executeLegacyAnalyzers({
         legacy,
-        sourceFile: sf,
+        sourceFile,
         file,
         content,
         root: astRoot,
@@ -576,7 +590,7 @@ function executeScanPipeline(
         adapter,
         content,
         file,
-        streamingNames: streaming.map((a) => a.name),
+        streamingNames: streaming.map((analyzer) => analyzer.name),
         legacyCount: legacy.length,
     });
 
@@ -585,7 +599,7 @@ function executeScanPipeline(
     if (languageIssue) issues.push(languageIssue);
 
     const tSf0 = AR_TIMING ? nowMs() : 0;
-    const sf = resolveSourceFile({
+    const sourceFile = resolveSourceFile({
         ast,
         legacyCount: legacy.length,
         adapterId: adapter.id,
@@ -608,7 +622,7 @@ function executeScanPipeline(
         streaming,
         legacy,
         adapter,
-        sf,
+        sourceFile,
         lineStats,
     });
     issues.push(...runResult.issues);
@@ -671,9 +685,13 @@ function resolveMessageInstances(msg: WorkerTaskMessage): {
 function decodeTaskContents(
     tasks: { file: string; absPath?: string; buf?: Uint8Array }[],
 ): (string | undefined)[] {
-    return tasks.map((t) => {
-        if (t.buf !== undefined) {
-            return Buffer.from(t.buf.buffer, t.buf.byteOffset, t.buf.byteLength).toString('utf8');
+    return tasks.map((taskItem) => {
+        if (taskItem.buf !== undefined) {
+            return Buffer.from(
+                taskItem.buf.buffer,
+                taskItem.buf.byteOffset,
+                taskItem.buf.byteLength,
+            ).toString('utf8');
         }
         return undefined;
     });
@@ -697,7 +715,10 @@ function sendWorkerResults(
 ): void {
     if (BINARY_RESULT_ENABLED) {
         const buf = encodeResults(results);
-        const symbolsMap = results.map((r) => ({ file: r.file, symbols: r.symbols }));
+        const symbolsMap = results.map((resultItem) => ({
+            file: resultItem.file,
+            symbols: resultItem.symbols,
+        }));
         port.postMessage({ results: buf, symbolsMap }, [buf.buffer as ArrayBuffer]);
     } else {
         port.postMessage({ results });
@@ -722,8 +743,14 @@ if (parentPort) {
         const contents = decodeTaskContents(tasks);
         const tDecode1 = AR_TIMING ? nowMs() : 0;
         const results = await Promise.all(
-            tasks.map((t, i) =>
-                runOne({ file: t.file, absPath: t.absPath, content: contents[i], cfg, instances }),
+            tasks.map((taskItem, i) =>
+                runOne({
+                    file: taskItem.file,
+                    absPath: taskItem.absPath,
+                    content: contents[i],
+                    cfg,
+                    instances,
+                }),
             ),
         );
         const tRun1 = AR_TIMING ? nowMs() : 0;

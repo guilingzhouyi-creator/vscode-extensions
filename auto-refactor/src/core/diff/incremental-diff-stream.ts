@@ -125,24 +125,24 @@ export class IncrementalDiffStream {
     /**
      * Ingests an incoming streaming text chunk `e`.
      * If `e` starts with `lastChunk`, slices `e.slice(lastChunk.length)` to extract the delta.
-     * Otherwise, treats `e` as an incremental disjoint slice directly.
+     * Otherwise, treats `chunk` as an incremental disjoint slice directly.
      *
-     * @param e - Incoming streaming string or cumulative buffer.
+     * @param chunk - Incoming streaming string or cumulative buffer.
      * @returns Processed slice result with grid row span.
      */
-    processChunk(e: string): IncrementalSliceResult {
+    processChunk(chunk: string): IncrementalSliceResult {
         const lastChunk = this.lastChunk;
         let isPrefixCoherent = false;
         let delta: string;
 
-        if (lastChunk.length > 0 && e.startsWith(lastChunk)) {
+        if (lastChunk.length > 0 && chunk.startsWith(lastChunk)) {
             isPrefixCoherent = true;
-            delta = e.slice(lastChunk.length);
-            this.lastChunk = e;
+            delta = chunk.slice(lastChunk.length);
+            this.lastChunk = chunk;
         } else {
             isPrefixCoherent = false;
-            delta = e;
-            this.lastChunk = lastChunk + e;
+            delta = chunk;
+            this.lastChunk = lastChunk + chunk;
         }
 
         this.accumulatedContent += delta;
@@ -165,8 +165,8 @@ export class IncrementalDiffStream {
     /**
      * Alias for processChunk implementing stream write ergonomics.
      */
-    write(e: string): IncrementalSliceResult {
-        return this.processChunk(e);
+    write(chunk: string): IncrementalSliceResult {
+        return this.processChunk(chunk);
     }
 
     /**

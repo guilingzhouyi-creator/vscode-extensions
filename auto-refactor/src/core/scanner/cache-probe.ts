@@ -108,7 +108,7 @@ export interface ExecuteIncrementalFilesOptions {
 interface ProbeL1Context {
     rel: string;
     fingerprint: Fingerprint | null | undefined;
-    l1: ReturnType<CacheStore['lookupL1']>;
+    l1Entry: ReturnType<CacheStore['lookupL1']>;
     sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>;
     cache: CacheStore;
     fpContext: CacheFingerprintContext;
@@ -174,8 +174,8 @@ function lookupFreshL2(
 function tryProbeL1Hit(
     context: ProbeL1Context,
 ): { issues: Issue[]; metric: FileMetric | null } | null {
-    const { rel, fingerprint, l1, sessionBucket, cache, fpContext } = context;
-    if (fingerprint == null || !isFreshL1Hit(fingerprint.mtimeMs, fingerprint.size, l1))
+    const { rel, fingerprint, l1Entry, sessionBucket, cache, fpContext } = context;
+    if (fingerprint == null || !isFreshL1Hit(fingerprint.mtimeMs, fingerprint.size, l1Entry))
         return null;
     const cached = sessionBucket.get(rel);
     if (cached) return cached;
@@ -266,7 +266,7 @@ export async function probeSingleFileCache(options: ProbeSingleFileOptions): Pro
     const l1Hit = tryProbeL1Hit({
         rel,
         fingerprint: statEntry.fp,
-        l1: cache.lookupL1(rel),
+        l1Entry: cache.lookupL1(rel),
         sessionBucket,
         cache,
         fpContext,
@@ -287,11 +287,11 @@ export async function probeSingleFileCache(options: ProbeSingleFileOptions): Pro
 
     const contentHash = sha256Hex(buf);
     const fpHash = fpContext.fpHashFor(rel);
-    const l2 = lookupFreshL2(cache, fpContext, fpHash, contentHash);
-    if (l2) {
+    const l2Result = lookupFreshL2(cache, fpContext, fpHash, contentHash);
+    if (l2Result) {
         const cachedResultPayload = remapCachedResult(
-            { issues: l2.issues, metric: l2.metric },
-            l2.p,
+            { issues: l2Result.issues, metric: l2Result.metric },
+            l2Result.p,
             rel,
         );
         perFile[fileIndex] = cachedResultPayload;
@@ -366,9 +366,9 @@ async function runWithPersistentPool(
         entry.warm = true;
         entry.lastUsed = Date.now();
         opts.pool!.touch(poolFp);
-    } catch (e) {
+    } catch (error) {
         scanner.logger.warn(
-            `persistent worker pool failed (${String(e)}); falling back to in-process`,
+            `persistent worker pool failed (${String(error)}); falling back to in-process`,
         );
         opts.pool!.destroy(poolFp);
         results = await scanner.runInProcess(missFiles, absRoot, preloadedBufferMap);
@@ -394,8 +394,10 @@ async function runWithTransientPool(
             runAnalyzersFn: (rel, content) => scanner.runAnalyzers(rel, content),
             preloaded: preloadedBufferMap,
         });
-    } catch (e) {
-        scanner.logger.warn(`worker pool failed (${String(e)}); falling back to in-process scan`);
+    } catch (error) {
+        scanner.logger.warn(
+            `worker pool failed (${String(error)}); falling back to in-process scan`,
+        );
         results = await scanner.runInProcess(missFiles, absRoot, preloadedBufferMap);
     }
     return { results, poolWarm: false };
@@ -508,8 +510,8 @@ async function runSingleIncrementalAnalysis(
             fileQueueItem.content,
             fileQueueItem.state,
         );
-    } catch (e) {
-        return runIncrementalRecovery(scanner, fileQueueItem, incBucket, e);
+    } catch (error) {
+        return runIncrementalRecovery(scanner, fileQueueItem, incBucket, error);
     }
 }
 
@@ -528,9 +530,9 @@ async function runIncrementalRecovery(
     incBucket.set(fileQueueItem.rel, freshState);
     try {
         return await scanner.runAnalyzers(fileQueueItem.rel, fileQueueItem.content, freshState);
-    } catch (e2) {
+    } catch (seedError) {
         scanner.logger.warn(
-            `seeded materialization failed on ${fileQueueItem.rel}: ${String(e2)}; unseeded rescan`,
+            `seeded materialization failed on ${fileQueueItem.rel}: ${String(seedError)}; unseeded rescan`,
         );
         return scanner.runAnalyzers(fileQueueItem.rel, fileQueueItem.content);
     }

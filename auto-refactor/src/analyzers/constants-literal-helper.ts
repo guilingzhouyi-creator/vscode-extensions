@@ -661,7 +661,7 @@ export function buildDuplicateIssue(
             value: first.value,
             numeric: first.numeric,
             occurrences: records.length,
-            lines: records.map((l) => l.node.start?.line ?? 1),
+            lines: records.map((rec) => rec.node.start?.line ?? 1),
             suggestedName: suggested,
         },
         suggestion: formatConstantDeclarationSuggestion(

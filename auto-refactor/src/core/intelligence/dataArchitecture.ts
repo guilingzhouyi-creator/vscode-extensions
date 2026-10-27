@@ -182,7 +182,7 @@ function isOnlinePath(
     }
     const onlineWords = options.onlinePathPatterns ?? DEFAULT_ONLINE_WORDS;
     return (
-        onlineWords.some((w) => lower.includes(w)) ||
+        onlineWords.some((word) => lower.includes(word)) ||
         /@(?:Get|Post|Put|Delete)\b/.test(content) ||
         /\b(?:express|fastify|router)\b/.test(content)
     );
@@ -756,7 +756,7 @@ export function auditDataGraphArchitecture(
     if (options.checkNPlusOne === false) return issues;
 
     const allNodes = graph.getAllNodes();
-    const callsEdges = graph.getAllEdges().filter((e) => e.kind === EDGE_KIND_CALLS);
+    const callsEdges = graph.getAllEdges().filter((edge) => edge.kind === EDGE_KIND_CALLS);
     const callsMap = new Map<string, string[]>();
 
     for (const edge of callsEdges) {
@@ -1028,7 +1028,8 @@ export class DataArchitectureEvaluator implements IDataArchitectureEvaluator {
     ) => Issue[];
 
     public constructor() {
-        this.audit = (f, c, g, o) => this.auditDataArchitecture(f, c, g, o);
+        this.audit = (filePath, content, graph, options) =>
+            this.auditDataArchitecture(filePath, content, graph, options);
     }
 
     /**

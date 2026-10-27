@@ -208,7 +208,7 @@ export function calculateDataFlowPurity(mutationsCount: number, totalOpsCount: n
  * @param hasResetState - Whether class implements reset_state method.
  * @returns Pool conservation index in [0, 1].
  */
-export function calculateObjectPoolConservationIndex(
+export function calculateObjectPoolIndex(
     poolAcquires: number,
     poolReleases: number,
     hasResetState: boolean,
@@ -224,6 +224,9 @@ export function calculateObjectPoolConservationIndex(
     const balance = Math.max(0, 1.0 - diff / maxOps);
     return Math.round(balance * PERCENT_SCALE) / PERCENT_SCALE;
 }
+
+/** Backward-compatibility alias for calculateObjectPoolIndex. */
+export const calculateObjectPoolConservationIndex = calculateObjectPoolIndex;
 
 /**
  * Compatibility alias for object pool conservation.
@@ -360,7 +363,7 @@ export function calculateConfigCacheFreshnessScore(
  * @param directLegacyCalls - Un-migrated legacy scalar signature calls.
  * @returns Compatibility bridge index in [0, 1].
  */
-export function calculateDtoCompatibilityBridgeIndex(
+export function calculateDtoBridgeIndex(
     legacyBridgesCount: number,
     directTypedDtoCalls: number,
     directLegacyCalls: number = 0,
@@ -370,6 +373,9 @@ export function calculateDtoCompatibilityBridgeIndex(
     const index = modernBridgeOps / total;
     return Math.round(index * PERCENT_SCALE) / PERCENT_SCALE;
 }
+
+/** Backward-compatibility alias for calculateDtoBridgeIndex. */
+export const calculateDtoCompatibilityBridgeIndex = calculateDtoBridgeIndex;
 
 /**
  * Measure Schema Grounding Rate for Dynamic Domain Literals.
@@ -405,7 +411,7 @@ export function calculateSchemaGroundingRate(
  * @param ageDays - Age of the shim since introduction in days.
  * @param callCount - Number of call sites still routing through the shim.
  * @param totalCallCount - Total call sites across old and new API.
- * @param mu - Aging debt growth factor per day (default 0.02 = 2% per day).
+ * @param decayFactor - Aging debt growth factor per day (default 0.02 = 2% per day).
  * @returns Dynamic shim penalty score.
  */
 export function calculateShimDebtDecayPenalty(
@@ -413,13 +419,13 @@ export function calculateShimDebtDecayPenalty(
     ageDays: number,
     callCount: number,
     totalCallCount: number,
-    mu: number = 0.02,
+    decayFactor: number = 0.02,
 ): number {
     if (shimWeights <= 0 || callCount <= 0) {
         return 0;
     }
     const safeAge = Math.max(0, ageDays);
-    const agingMultiplier = 1.0 + mu * safeAge;
+    const agingMultiplier = 1.0 + decayFactor * safeAge;
     const callRatio = Math.min(1.0, Math.max(0, callCount) / (Math.max(0, totalCallCount) + 1));
     const penalty = shimWeights * agingMultiplier * callRatio;
     return Math.round(penalty * SCORE_ROUNDING) / SCORE_ROUNDING;
@@ -438,7 +444,7 @@ export function calculateShimDebtDecayPenalty(
  * @param bridgeWrappersCount - Active wrapper functions maintaining backward compatibility.
  * @returns Directness purity index in [0, 1].
  */
-export function calculateArchitectureDirectnessIndex(
+export function calculateDirectnessIndex(
     directCallsCount: number,
     shimCallsCount: number,
     bridgeWrappersCount: number = 0,
@@ -452,6 +458,9 @@ export function calculateArchitectureDirectnessIndex(
     const index = direct / total;
     return Math.round(index * PERCENT_SCALE) / PERCENT_SCALE;
 }
+
+/** Backward-compatibility alias for calculateDirectnessIndex. */
+export const calculateArchitectureDirectnessIndex = calculateDirectnessIndex;
 
 /**
  * Compute Deprecation Convergence Health.
@@ -468,7 +477,7 @@ export function calculateArchitectureDirectnessIndex(
  * @param totalCallsCount - Total calls evaluated across boundaries.
  * @returns Deprecation health index in [0, 1].
  */
-export function calculateDeprecationConvergenceHealth(
+export function calculateDeprecationHealth(
     deprecatedSymbolsCount: number,
     unannotatedDeprecationsCount: number,
     inwardContaminationsCount: number,
@@ -494,6 +503,9 @@ export function calculateDeprecationConvergenceHealth(
     const health = annotationHealth * isolationHealth;
     return Math.round(health * PERCENT_SCALE) / PERCENT_SCALE;
 }
+
+/** Backward-compatibility alias for calculateDeprecationHealth. */
+export const calculateDeprecationConvergenceHealth = calculateDeprecationHealth;
 
 export {
     calculateZeroCostModernUtility,

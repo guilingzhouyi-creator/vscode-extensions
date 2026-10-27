@@ -87,9 +87,9 @@ function remapDomainViolations(
     newDomain: CodeDomainFingerprint,
     lineDelta: number,
 ): CodeDomainFingerprint {
-    const remappedViolations = oldDomain.ruleViolations.map((v) => ({
-        ...v,
-        line: v.line + lineDelta,
+    const remappedViolations = oldDomain.ruleViolations.map((violation) => ({
+        ...violation,
+        line: violation.line + lineDelta,
     }));
     return {
         ...newDomain,
@@ -110,8 +110,8 @@ function diffFineGrainedDomains(
     newDomains: CodeDomainFingerprint[],
 ): DomainMatchResult {
     const oldDomainMap = new Map<string, CodeDomainFingerprint>();
-    for (const d of oldDomains) {
-        oldDomainMap.set(`${d.kind}:${d.name}`, d);
+    for (const domain of oldDomains) {
+        oldDomainMap.set(`${domain.kind}:${domain.name}`, domain);
     }
 
     const unaffectedDomains: CodeDomainFingerprint[] = [];

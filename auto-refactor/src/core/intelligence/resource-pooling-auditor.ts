@@ -257,7 +257,7 @@ export function evaluateResourcePooling(
     const poolIssues = auditPoolImplementations(pools);
 
     return {
-        unpooledHotspots: sites.filter((s) => s.isInLoopOrHotPath && !s.isPrimitiveOrTiny),
+        unpooledHotspots: sites.filter((site) => site.isInLoopOrHotPath && !site.isPrimitiveOrTiny),
         pools,
         issues: [...unpooledIssues, ...poolIssues],
     };

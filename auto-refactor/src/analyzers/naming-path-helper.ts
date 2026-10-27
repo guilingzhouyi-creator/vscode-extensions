@@ -112,10 +112,10 @@ export function hasTransientJargon(name: string): boolean {
         .toLowerCase()
         .split(/[^a-z0-9]+/);
     for (let i = 0; i < tokens.length; i++) {
-        const t = tokens[i];
-        if (JARGON_TOKEN_RE.test(t)) return true;
+        const token = tokens[i];
+        if (JARGON_TOKEN_RE.test(token)) return true;
         if (
-            JARGON_PREFIX_TOKEN_RE.test(t) &&
+            JARGON_PREFIX_TOKEN_RE.test(token) &&
             i + 1 < tokens.length &&
             /^\d+$/.test(tokens[i + 1])
         ) {
@@ -192,7 +192,7 @@ export function auditStructuredResourceFile(
     const lines = (content || '').split('\n');
     const eloc = Math.max(
         1,
-        lines.filter((l) => l.trim().length > 0 && !l.trim().startsWith('//')).length,
+        lines.filter((line) => line.trim().length > 0 && !line.trim().startsWith('//')).length,
     );
     const findings = auditStructuredResourceTopology(
         [
@@ -210,13 +210,13 @@ export function auditStructuredResourceFile(
         MAX_STRUCTURED_RESOURCE_BUDGET,
     );
 
-    for (const f of findings) {
+    for (const finding of findings) {
         issues.push(
             mkIssue({
                 line: 1,
-                rule: f.ruleId,
-                message: f.message,
-                detail: f.details,
+                rule: finding.ruleId,
+                message: finding.message,
+                detail: finding.details,
                 suggestion: `Align '${filePath}' with 3-tier structured resource topology standard.`,
             }),
         );
@@ -392,7 +392,7 @@ function checkFileNameLength(target: FileNamingTarget, pCtx: PathNamingContext):
     const minLen = pCtx.opts.minFileLength ?? DEFAULT_MIN_FILE_NAME_LENGTH;
     const maxLen = pCtx.opts.maxFileLength ?? DEFAULT_MAX_FILE_NAME_LENGTH;
     const allowedSet = pCtx.opts.allowedShortFiles
-        ? new Set(pCtx.opts.allowedShortFiles.map((s) => s.toLowerCase()))
+        ? new Set(pCtx.opts.allowedShortFiles.map((stem) => stem.toLowerCase()))
         : ALLOWED_SHORT_FILE_STEMS;
 
     const lower = target.nameWithoutExt.toLowerCase();
@@ -421,8 +421,8 @@ function splitCamelStem(stem: string): string[] {
         .replace(/([A-Z]+)([A-Z][a-z0-9])/g, '$1-$2')
         .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
         .split('-')
-        .map((s) => s.trim().toLowerCase())
-        .filter((s) => s.length > 0);
+        .map((seg) => seg.trim().toLowerCase())
+        .filter((seg) => seg.length > 0);
 }
 
 /**
@@ -439,8 +439,8 @@ export function splitFileNameSegments(nameWithoutExt: string, ext: string): stri
     return cleaned
         .split(separator)
         .flatMap((fragment) => (isSnake ? [fragment] : splitCamelStem(fragment)))
-        .map((s) => s.trim().toLowerCase())
-        .filter((s) => s.length > 0);
+        .map((seg) => seg.trim().toLowerCase())
+        .filter((seg) => seg.length > 0);
 }
 
 function checkFileWordLimits(
@@ -518,7 +518,7 @@ function checkFileWordsAndMorphemes(target: FileNamingTarget, pCtx: PathNamingCo
     if (IGNORED_FILE_BASENAMES.has(lowerStem)) return;
 
     const allowedSet = pCtx.opts.allowedShortFiles
-        ? new Set(pCtx.opts.allowedShortFiles.map((s) => s.toLowerCase()))
+        ? new Set(pCtx.opts.allowedShortFiles.map((stem) => stem.toLowerCase()))
         : ALLOWED_SHORT_FILE_STEMS;
 
     const minLen = pCtx.opts.minFileLength ?? DEFAULT_MIN_FILE_NAME_LENGTH;

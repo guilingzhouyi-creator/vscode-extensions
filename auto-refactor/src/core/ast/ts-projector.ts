@@ -53,8 +53,8 @@ export interface TsKindInfo {
 
 function maxSyntaxKind(): number {
     let max = 0;
-    for (const v of Object.values(ts.SyntaxKind)) {
-        if (typeof v === 'number' && v > max) max = v;
+    for (const kindVal of Object.values(ts.SyntaxKind)) {
+        if (typeof kindVal === 'number' && kindVal > max) max = kindVal;
     }
     return max;
 }
@@ -170,12 +170,12 @@ export class TsNodeProjector implements NodeProjector {
     /**
      * Create a lazy projector wrapping one parsed source file.
      *
-     * @param sf - Parsed TypeScript source file.
+     * @param sourceFile - Parsed TypeScript source file.
      * @param policy - Policy gating which normalized fields are constructed.
      */
-    constructor(sf: ts.SourceFile, policy: ProjectionPolicy) {
-        this.root = sf;
-        this.sf = sf;
+    constructor(sourceFile: ts.SourceFile, policy: ProjectionPolicy) {
+        this.root = sourceFile;
+        this.sf = sourceFile;
         this.policy = policy;
     }
 
@@ -408,18 +408,18 @@ export class TsNodeProjector implements NodeProjector {
         return node;
     }
 
-    private extractFnParameters(n: ts.Node): string[] | undefined {
+    private extractFnParameters(astNode: ts.Node): string[] | undefined {
         if (
-            !ts.isFunctionDeclaration(n) &&
-            !ts.isMethodDeclaration(n) &&
-            !ts.isFunctionExpression(n) &&
-            !ts.isArrowFunction(n) &&
-            !ts.isConstructorDeclaration(n)
+            !ts.isFunctionDeclaration(astNode) &&
+            !ts.isMethodDeclaration(astNode) &&
+            !ts.isFunctionExpression(astNode) &&
+            !ts.isArrowFunction(astNode) &&
+            !ts.isConstructorDeclaration(astNode)
         ) {
             return undefined;
         }
-        if (!n.parameters) return [];
-        return n.parameters.map((p) => p.name.getText(this.sf));
+        if (!astNode.parameters) return [];
+        return astNode.parameters.map((paramNode) => paramNode.name.getText(this.sf));
     }
 
     private applyProjectedMetadata(
@@ -490,34 +490,34 @@ export class TsNodeProjector implements NodeProjector {
     }
 
     private projectSubtree(
-        fn: ts.Node,
+        fnNode: ts.Node,
         parentRaw: ts.Node | undefined,
         _grandparentRaw: ts.Node | undefined,
     ): NormalizedNode[] {
         const rawChildren: ts.Node[] = [];
-        const children = this.buildSubtree(fn, parentRaw, rawChildren);
-        this.functionSubtrees.set(fn, rawChildren);
+        const children = this.buildSubtree(fnNode, parentRaw, rawChildren);
+        this.functionSubtrees.set(fnNode, rawChildren);
         return children;
     }
 
     private buildSubtree(
-        fn: ts.Node,
+        fnNode: ts.Node,
         parentRaw: ts.Node | undefined,
         rawOut: ts.Node[] | null,
     ): NormalizedNode[] {
         const children: NormalizedNode[] = [];
         const rawChildren: ts.Node[] = [];
-        ts.forEachChild(fn, (childNode) => {
+        ts.forEachChild(fnNode, (childNode) => {
             if (isSkippableToken(childNode)) return;
             rawChildren.push(childNode);
             if (rawOut) rawOut.push(childNode);
-            const proj = this.cheapProject(childNode, fn, parentRaw);
+            const proj = this.cheapProject(childNode, fnNode, parentRaw);
             children.push(proj);
             if (!isFunctionLike(childNode)) {
-                proj.children = this.buildSubtree(childNode, fn, null);
+                proj.children = this.buildSubtree(childNode, fnNode, null);
             }
         });
-        if (rawChildren.length > 0) this.rawChildrenCache.set(fn, rawChildren);
+        if (rawChildren.length > 0) this.rawChildrenCache.set(fnNode, rawChildren);
         return children;
     }
 

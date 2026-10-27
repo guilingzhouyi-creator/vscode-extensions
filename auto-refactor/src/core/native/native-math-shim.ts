@@ -61,7 +61,7 @@ export function computeStatisticalMomentsShim(values: readonly number[]): Native
  * @param gamma - Penalty elasticity factor (default 0.5).
  * @returns Discount multiplier in [0.0, 1.0].
  */
-export function calculatePopoviciuDispersionPenaltyShim(
+export function calculatePopoviciuPenaltyShim(
     standardDeviation: number,
     maxSigma?: number,
     gamma?: number,
@@ -80,6 +80,9 @@ export function calculatePopoviciuDispersionPenaltyShim(
     return Math.round(factor * SCORE_ROUNDING_FACTOR) / SCORE_ROUNDING_FACTOR;
 }
 
+/** Backward-compatibility alias for calculatePopoviciuPenaltyShim. */
+export const calculatePopoviciuDispersionPenaltyShim = calculatePopoviciuPenaltyShim;
+
 /**
  * Counts opening and closing curly braces in a line with detailed breakdown.
  *
@@ -97,47 +100,53 @@ export function countBracesDetailedShim(line: string): NativeBraceBalance {
  * @param size - Number of vertices in the square matrix.
  * @returns In-place mutated matrix with full reachability.
  */
-export function computeWarshallTransitiveClosureShim(matrix: Uint8Array, size: number): Uint8Array {
+export function computeWarshallClosureShim(matrix: Uint8Array, size: number): Uint8Array {
     return computeWarshallTransitiveClosure(matrix, size);
 }
+
+/** Backward-compatibility alias for computeWarshallClosureShim. */
+export const computeWarshallTransitiveClosureShim = computeWarshallClosureShim;
 
 /**
  * Computes inner dot product between two vector slices.
  *
- * @param a - First numerical vector.
- * @param b - Second numerical vector.
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
  * @returns Dot product scalar.
  */
-export function computeVectorDotProductShim(a: readonly number[], b: readonly number[]): number {
-    return computeVectorDotProduct(a, b);
+export function computeVectorDotProductShim(
+    vectorA: readonly number[],
+    vectorB: readonly number[],
+): number {
+    return computeVectorDotProduct(vectorA, vectorB);
 }
 
 /**
  * Computes cosine similarity between two vector slices.
  *
- * @param a - First numerical vector.
- * @param b - Second numerical vector.
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
  * @returns Cosine similarity bounded in [-1.0, 1.0].
  */
 export function computeVectorCosineSimilarityShim(
-    a: readonly number[],
-    b: readonly number[],
+    vectorA: readonly number[],
+    vectorB: readonly number[],
 ): number {
-    return computeVectorCosineSimilarity(a, b);
+    return computeVectorCosineSimilarity(vectorA, vectorB);
 }
 
 /**
  * Computes Euclidean distance between two vector slices.
  *
- * @param a - First numerical vector.
- * @param b - Second numerical vector.
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
  * @returns Euclidean distance scalar.
  */
 export function computeVectorEuclideanDistanceShim(
-    a: readonly number[],
-    b: readonly number[],
+    vectorA: readonly number[],
+    vectorB: readonly number[],
 ): number {
-    return computeVectorEuclideanDistance(a, b);
+    return computeVectorEuclideanDistance(vectorA, vectorB);
 }
 
 /**

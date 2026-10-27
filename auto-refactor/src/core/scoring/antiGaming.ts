@@ -338,11 +338,11 @@ function checkNamingEntropyAnomaly(
 ): number {
     const varMatches = content.match(RE_VAR_DECLARATIONS);
     if (!varMatches || varMatches.length < ENTROPY_CONFIG.minVarCount) return 0.0;
-    const names = varMatches.map((m) => m.replace(RE_VAR_KEYWORD_PREFIX, ''));
+    const names = varMatches.map((varMatch) => varMatch.replace(RE_VAR_KEYWORD_PREFIX, ''));
     const concatenated = names.join('');
     const entropy = calculateShannonEntropy(concatenated);
     const isDegenerate =
-        names.filter((n) => RE_DEGENERATE_IDENTIFIER.test(n)).length >=
+        names.filter((varName) => RE_DEGENERATE_IDENTIFIER.test(varName)).length >=
         ENTROPY_CONFIG.degenerateThreshold;
     if (
         (entropy < ENTROPY_CONFIG.degenerateBound && isDegenerate) ||

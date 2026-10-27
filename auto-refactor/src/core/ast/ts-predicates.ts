@@ -109,23 +109,23 @@ export function isSkippableToken(node: ts.Node): boolean {
  * Resolve the bound identifier or property name for an assignment or declaration.
  *
  * @param node - Candidate binding-source node.
- * @param sf - Source file used to resolve identifier and property text.
+ * @param sourceFile - Source file used to resolve identifier and property text.
  * @returns The bound name, or null when the node is not a binding source.
  */
-export function bindingName(node: ts.Node, sf: ts.SourceFile): string | null {
+export function bindingName(node: ts.Node, sourceFile: ts.SourceFile): string | null {
     if (ts.isVariableDeclaration(node) && node.initializer && isFunctionLike(node.initializer)) {
-        return (node.name as ts.Identifier)?.getText?.(sf) ?? null;
+        return (node.name as ts.Identifier)?.getText?.(sourceFile) ?? null;
     }
     const isProp = ts.isPropertyAssignment(node) || ts.isPropertyDeclaration(node);
     if (isProp && node.initializer && isFunctionLike(node.initializer)) {
-        return node.name.getText(sf);
+        return node.name.getText(sourceFile);
     }
     const isAssign =
         ts.isBinaryExpression(node) &&
         node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
         isFunctionLike(node.right);
     if (isAssign && (ts.isPropertyAccessExpression(node.left) || ts.isIdentifier(node.left))) {
-        return node.left.getText(sf);
+        return node.left.getText(sourceFile);
     }
     return null;
 }
@@ -188,11 +188,11 @@ const BRANCH_WEIGHT_KINDS = new Set<ts.SyntaxKind>([
 export function branchWeightOf(node: ts.Node): number {
     if (BRANCH_WEIGHT_KINDS.has(node.kind)) return 1;
     if (node.kind === ts.SyntaxKind.BinaryExpression) {
-        const op = (node as ts.BinaryExpression).operatorToken.kind;
+        const operatorKind = (node as ts.BinaryExpression).operatorToken.kind;
         if (
-            op === ts.SyntaxKind.AmpersandAmpersandToken ||
-            op === ts.SyntaxKind.BarBarToken ||
-            op === ts.SyntaxKind.QuestionQuestionToken
+            operatorKind === ts.SyntaxKind.AmpersandAmpersandToken ||
+            operatorKind === ts.SyntaxKind.BarBarToken ||
+            operatorKind === ts.SyntaxKind.QuestionQuestionToken
         ) {
             return 1;
         }
@@ -204,12 +204,12 @@ export function branchWeightOf(node: ts.Node): number {
  * Callee name of a call expression, reduced to its final segment.
  *
  * @param node - Candidate node.
- * @param sf - Owning source file, used for text extraction.
+ * @param sourceFile - Owning source file, used for text extraction.
  * @returns The callee name, or null when not a call expression.
  */
-export function calleeNameOf(node: ts.Node, sf: ts.SourceFile): string | null {
+export function calleeNameOf(node: ts.Node, sourceFile: ts.SourceFile): string | null {
     if (!ts.isCallExpression(node)) return null;
-    const text = node.expression.getText(sf);
+    const text = node.expression.getText(sourceFile);
     if (text.length === 0) return null;
     const dot = text.lastIndexOf('.');
     return dot >= 0 ? text.slice(dot + 1) : text;
@@ -219,14 +219,14 @@ export function calleeNameOf(node: ts.Node, sf: ts.SourceFile): string | null {
  * Callee qualifier/receiver of a call expression, if available (`a.b()` → `a`, `a.b.c()` → `a`).
  *
  * @param node - Candidate node.
- * @param sf - Owning source file, used for text extraction.
+ * @param sourceFile - Owning source file, used for text extraction.
  * @returns The leftmost or immediate receiver identifier, or null when unnamed or direct call.
  */
-export function calleeReceiverOf(node: ts.Node, sf: ts.SourceFile): string | null {
+export function calleeReceiverOf(node: ts.Node, sourceFile: ts.SourceFile): string | null {
     if (!ts.isCallExpression(node)) return null;
     const expr = node.expression;
     if (ts.isPropertyAccessExpression(expr)) {
-        const fullExprText = expr.expression.getText(sf);
+        const fullExprText = expr.expression.getText(sourceFile);
         if (!fullExprText) return null;
         const dot = fullExprText.indexOf('.');
         return dot > 0 ? fullExprText.slice(0, dot).trim() : fullExprText.trim();
@@ -238,11 +238,11 @@ export function calleeReceiverOf(node: ts.Node, sf: ts.SourceFile): string | nul
  * Resolve the declared name of a node for consumers that need it.
  *
  * @param node - Raw TypeScript node that may carry a name field.
- * @param sf - Source file used to extract name text.
+ * @param sourceFile - Source file used to extract name text.
  * @returns The non-empty name text, or null if unnamed.
  */
-export function nameOf(node: ts.Node, sf: ts.SourceFile): string | null {
-    const nameText = (node as ts.NamedDeclaration).name?.getText(sf);
+export function nameOf(node: ts.Node, sourceFile: ts.SourceFile): string | null {
+    const nameText = (node as ts.NamedDeclaration).name?.getText(sourceFile);
     return typeof nameText === 'string' && nameText.length > 0 ? nameText : null;
 }
 
@@ -341,10 +341,14 @@ export function isConstBoundOf(
     return isEnclosedInConstDeclaration(parent, grandparent, greatGrandparent);
 }
 
-function tsIsCallTolerated(caller: ts.Node, argumentNode: ts.Node, sf: ts.SourceFile): boolean {
+function tsIsCallTolerated(
+    caller: ts.Node,
+    argumentNode: ts.Node,
+    sourceFile: ts.SourceFile,
+): boolean {
     if (!ts.isCallExpression(caller) && !ts.isNewExpression(caller)) return false;
     if (!caller.arguments?.includes(argumentNode as ts.Expression)) return false;
-    const callee = caller.expression.getText(sf);
+    const callee = caller.expression.getText(sourceFile);
     return (
         /\b(t|i18n\.\w*|translate|fmt|formatMessage)\s*$/.test(callee) ||
         TEST_AND_ASSERT_CALLEES.test(callee) ||
@@ -380,19 +384,19 @@ function isNamedPropertyContext(parentNode: ts.Node, node: ts.Node): boolean {
 
 function isStringConcatTolerated(
     parentNode: ts.Node,
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     grandparent?: ts.Node,
 ): boolean {
     if (!grandparent) return false;
     if (!ts.isBinaryExpression(parentNode)) return false;
     if (parentNode.operatorToken.kind !== ts.SyntaxKind.PlusToken) return false;
-    return tsIsCallTolerated(grandparent, parentNode, sf);
+    return tsIsCallTolerated(grandparent, parentNode, sourceFile);
 }
 
 function isToleratedString(
     node: ts.Node,
     parentNode: ts.Node,
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     grandparent?: ts.Node,
 ): boolean {
     if (isTypeContext(parentNode, grandparent)) return true;
@@ -400,28 +404,36 @@ function isToleratedString(
     if (isNamedPropertyContext(parentNode, node)) return true;
     if (ts.isElementAccessExpression(parentNode)) return parentNode.argumentExpression === node;
     if (JSX_ELEMENT_KINDS.has(parentNode.kind)) return false;
-    if (tsIsCallTolerated(parentNode, node, sf)) return true;
-    return isStringConcatTolerated(parentNode, sf, grandparent);
+    if (tsIsCallTolerated(parentNode, node, sourceFile)) return true;
+    return isStringConcatTolerated(parentNode, sourceFile, grandparent);
 }
 
-function isToleratedCallArg(node: ts.Node, parentNode: ts.Node, sf?: ts.SourceFile): boolean {
-    if (!ts.isCallExpression(parentNode) || !sf) return false;
+function isToleratedCallArg(
+    node: ts.Node,
+    parentNode: ts.Node,
+    sourceFile?: ts.SourceFile,
+): boolean {
+    if (!ts.isCallExpression(parentNode) || !sourceFile) return false;
     const args = parentNode.arguments;
     const argIdx = args.indexOf(node as ts.Expression);
     if (argIdx < 0) return false;
-    const callee = parentNode.expression.getText(sf);
-    const numVal = Number((node as ts.NumericLiteral).text ?? node.getText(sf));
+    const callee = parentNode.expression.getText(sourceFile);
+    const numVal = Number((node as ts.NumericLiteral).text ?? node.getText(sourceFile));
     return isCallArgumentToleratedByPolicy(callee, argIdx, numVal);
 }
 
-function isToleratedNumeric(node: ts.Node, parentNode: ts.Node, sf?: ts.SourceFile): boolean {
+function isToleratedNumeric(
+    node: ts.Node,
+    parentNode: ts.Node,
+    sourceFile?: ts.SourceFile,
+): boolean {
     const isAccess =
         (ts.isElementAccessExpression(parentNode) && parentNode.argumentExpression === node) ||
         (ts.isPropertyAssignment(parentNode) && parentNode.name === node);
     if (isAccess || ts.isPropertyAccessExpression(parentNode) || ts.isEnumMember(parentNode))
         return true;
     if (ts.isTypeNode(parentNode) || ts.isCaseClause(parentNode)) return true;
-    return isToleratedCallArg(node, parentNode, sf);
+    return isToleratedCallArg(node, parentNode, sourceFile);
 }
 
 /**
@@ -429,29 +441,29 @@ function isToleratedNumeric(node: ts.Node, parentNode: ts.Node, sf?: ts.SourceFi
  *
  * @param node - Literal node to classify.
  * @param parentNode - Raw parent node.
- * @param sf - Source file used to print call callees for the i18n heuristic.
+ * @param sourceFile - Source file used to print call callees for the i18n heuristic.
  * @param grandparent - Optional raw grandparent node for compound expressions.
  * @returns True when the literal sits in a tolerated context.
  */
 export function isToleratedOf(
     node: ts.Node,
     parentNode: ts.Node | undefined,
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     grandparent?: ts.Node,
 ): boolean {
     if (!parentNode) return false;
-    if (ts.isNumericLiteral(node)) return isToleratedNumeric(node, parentNode, sf);
-    return isToleratedString(node, parentNode, sf, grandparent);
+    if (ts.isNumericLiteral(node)) return isToleratedNumeric(node, parentNode, sourceFile);
+    return isToleratedString(node, parentNode, sourceFile, grandparent);
 }
 
 /**
  * Convert a character offset into a 1-based line/column position.
  *
  * @param pos - Absolute character offset inside the source file.
- * @param sf - Source file providing the line map.
+ * @param sourceFile - Source file providing the line map.
  * @returns The normalized position with 1-based line and column numbers.
  */
-export function posOf(pos: number, sf: ts.SourceFile): Position {
-    const lineChar = sf.getLineAndCharacterOfPosition(pos);
+export function posOf(pos: number, sourceFile: ts.SourceFile): Position {
+    const lineChar = sourceFile.getLineAndCharacterOfPosition(pos);
     return { line: lineChar.line + 1, column: lineChar.character + 1 };
 }

@@ -116,10 +116,12 @@ function hasStreamingHooks(instance: Analyzer): boolean {
  * @returns Streaming and legacy subsets, each preserving the original plan order.
  */
 function partitionPlan(plan: ResolvedAnalyzer[], activeAnalyzers?: Set<string>): PlanPartition {
-    const allowed = plan.filter((p) => !activeAnalyzers || activeAnalyzers.has(p.name));
+    const allowed = plan.filter(
+        (planItem) => !activeAnalyzers || activeAnalyzers.has(planItem.name),
+    );
     return {
-        streaming: allowed.filter((p) => hasStreamingHooks(p.instance)),
-        legacy: allowed.filter((p) => !hasStreamingHooks(p.instance)),
+        streaming: allowed.filter((planItem) => hasStreamingHooks(planItem.instance)),
+        legacy: allowed.filter((planItem) => !hasStreamingHooks(planItem.instance)),
     };
 }
 
@@ -169,7 +171,7 @@ function prepareParse(
               adapter,
               content,
               rel,
-              partition.streaming.map((p) => p.name),
+              partition.streaming.map((planItem) => planItem.name),
               partition.legacy.length,
           );
     if (proj) {
@@ -224,11 +226,14 @@ function buildStreamingEntries(
     base: FileContextBase,
 ): StreamingEntry[] {
     const entries: StreamingEntry[] = [];
-    for (const p of partition.streaming) {
-        if (!isFileAnalyzerActive(base.preflightMask, p.name)) {
+    for (const planItem of partition.streaming) {
+        if (!isFileAnalyzerActive(base.preflightMask, planItem.name)) {
             continue;
         }
-        entries.push({ analyzer: p.factory(), ctx: makeContext(base, root, p.options) });
+        entries.push({
+            analyzer: planItem.factory(),
+            ctx: makeContext(base, root, planItem.options),
+        });
     }
     entries.push({ analyzer: metric, ctx: makeContext(base, root, {}) });
     return entries;
@@ -295,11 +300,11 @@ function runStreamingPhase(
             ),
         );
         return { issues, metric, ast: parse.ast };
-    } catch (e) {
+    } catch (error) {
         // Projector failure → materialized fallback (mirrors worker-pool → in-process fallback
         // semantics): same output, only a performance regression.
         host.logger.warn(
-            `lazy projection failed on ${base.rel}: ${String(e)}; falling back to materialized path`,
+            `lazy projection failed on ${base.rel}: ${String(error)}; falling back to materialized path`,
         );
         // NEVER reuse the outer entries — the interrupted projected traversal has already
         // accumulated state in those analyzer instances (constants' literals, complexity's

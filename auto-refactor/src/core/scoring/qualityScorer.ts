@@ -285,7 +285,7 @@ export class QualityScorer {
             deductionPoints[dim] = Math.max(0, DIMENSION_MAX_SCORE - rawScores[dim]);
         }
 
-        allRationales.sort((a, b) => a.delta - b.delta);
+        allRationales.sort((itemA, itemB) => itemA.delta - itemB.delta);
 
         const { evaluatedBy, notEvaluated, evaluatedDimensions } =
             calculateEvaluatedDimensions(config);

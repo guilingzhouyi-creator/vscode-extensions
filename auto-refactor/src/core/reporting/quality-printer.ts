@@ -42,13 +42,17 @@ const SDK_NAME_PAD_WIDTH = 20;
 export function printProjectStackProfile(profile: ProjectProfile, scaleGrade?: string): void {
     process.stdout.write(`\n=== Project Stack Profile ===\n`);
     process.stdout.write(`Primary Language: ${profile.primaryLanguage}\n`);
-    process.stdout.write(`Build Systems:    ${profile.buildSystems.join(', ') || DEFAULT_EMPTY_PLACEHOLDER}\n`);
-    process.stdout.write(`Frameworks:       ${profile.frameworks.join(', ') || DEFAULT_EMPTY_PLACEHOLDER}\n`);
+    process.stdout.write(
+        `Build Systems:    ${profile.buildSystems.join(', ') || DEFAULT_EMPTY_PLACEHOLDER}\n`,
+    );
+    process.stdout.write(
+        `Frameworks:       ${profile.frameworks.join(', ') || DEFAULT_EMPTY_PLACEHOLDER}\n`,
+    );
     process.stdout.write(`Scale Grade:      ${scaleGrade || DEFAULT_SCALE_GRADE}\n`);
     process.stdout.write(`Is Polyglot:      ${profile.isPolyglot}\n`);
     if (profile.partitions.length > 0) {
         process.stdout.write(
-            `Partitions:       ${profile.partitions.map((p) => p.name).join(', ')}\n`,
+            `Partitions:       ${profile.partitions.map((partition) => partition.name).join(', ')}\n`,
         );
     }
     process.stdout.write(`=============================\n\n`);
@@ -128,9 +132,9 @@ export function printQualityScoreAssessment(
     if (scoreBreakdown.rationales && scoreBreakdown.rationales.length > 0) {
         process.stdout.write(`-------------------------------------------\n`);
         process.stdout.write(`Key Deductions & Rationales:\n`);
-        for (const r of scoreBreakdown.rationales.slice(0, MAX_QUALITY_RATIONALES)) {
+        for (const rationale of scoreBreakdown.rationales.slice(0, MAX_QUALITY_RATIONALES)) {
             process.stdout.write(
-                `  [${r.delta} pts] ${r.dimension}: ${r.reason}${r.line ? ` (L${r.line})` : ''}\n`,
+                `  [${rationale.delta} pts] ${rationale.dimension}: ${rationale.reason}${rationale.line ? ` (L${rationale.line})` : ''}\n`,
             );
         }
     }
@@ -150,7 +154,9 @@ export function printAutonomyAssessment(autonomyEvaluation: AutonomyEvaluation):
     );
     process.stdout.write(`Status: ${autonomyEvaluation.gradeDescription}\n`);
     if (autonomyEvaluation.confidence) {
-        const confTag = autonomyEvaluation.confidence.isLowConfidence ? ' [Sparse Sample - Smoothed]' : '';
+        const confTag = autonomyEvaluation.confidence.isLowConfidence
+            ? ' [Sparse Sample - Smoothed]'
+            : '';
         process.stdout.write(
             `Bayesian Credible Bounds : [${autonomyEvaluation.confidence.lowerBound.toFixed(1)}% ~ ` +
                 `${autonomyEvaluation.confidence.upperBound.toFixed(1)}%] ` +
@@ -185,7 +191,10 @@ export function printAutonomyAssessment(autonomyEvaluation: AutonomyEvaluation):
     if (autonomyEvaluation.externalSdkInventory.length > 0) {
         process.stdout.write(`-------------------------------------------\n`);
         process.stdout.write(`Top External SDK Dependencies:\n`);
-        for (const sdk of autonomyEvaluation.externalSdkInventory.slice(0, TOP_DEPENDENCIES_LIMIT)) {
+        for (const sdk of autonomyEvaluation.externalSdkInventory.slice(
+            0,
+            TOP_DEPENDENCIES_LIMIT,
+        )) {
             process.stdout.write(
                 `  • ${sdk.name.padEnd(SDK_NAME_PAD_WIDTH)}: ${sdk.callCount} calls across ${sdk.fileCount} files\n`,
             );

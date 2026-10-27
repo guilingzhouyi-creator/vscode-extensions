@@ -99,34 +99,40 @@ function compileBoundaryPattern(pattern: BoundaryIsolationPattern): CompiledBoun
     const filePathRegex =
         stringIndicators.length > 0
             ? getOrCreateRegExp(
-                  stringIndicators.map((s) => escapeRegExp(s.toLowerCase())).join('|'),
+                  stringIndicators
+                      .map((indicator) => escapeRegExp(indicator.toLowerCase()))
+                      .join('|'),
               )
             : null;
 
     const headerRegex =
         stringIndicators.length > 0
-            ? getOrCreateRegExp(stringIndicators.map((s) => escapeRegExp(s)).join('|'))
+            ? getOrCreateRegExp(
+                  stringIndicators.map((indicator) => escapeRegExp(indicator)).join('|'),
+              )
             : null;
 
     const targets: CompiledBoundaryTarget[] = [];
     const targetPatternStrings: string[] = [];
 
     for (let i = 0; i < pattern.forbiddenTargets.length; i++) {
-        const t = pattern.forbiddenTargets[i];
-        if (typeof t === 'string') {
-            const escaped = escapeRegExp(t);
+        const targetItem = pattern.forbiddenTargets[i];
+        if (typeof targetItem === 'string') {
+            const escaped = escapeRegExp(targetItem);
             targets.push({
-                id: t,
+                id: targetItem,
                 matcher: getOrCreateRegExp(escaped),
             });
             targetPatternStrings.push(escaped);
         } else {
-            const matcher = t.global ? getOrCreateRegExp(t.source, t.flags.replace('g', '')) : t;
+            const matcher = targetItem.global
+                ? getOrCreateRegExp(targetItem.source, targetItem.flags.replace('g', ''))
+                : targetItem;
             targets.push({
-                id: t.source,
+                id: targetItem.source,
                 matcher,
             });
-            targetPatternStrings.push(t.source);
+            targetPatternStrings.push(targetItem.source);
         }
     }
 

@@ -231,12 +231,17 @@ function extractDeclaredKeys(content: string): Set<string> {
 function collectObjectKeys(targetRecord: unknown, keys: Set<string>, depth = 0): void {
     if (!targetRecord || typeof targetRecord !== 'object' || depth > MAX_CONFIG_OBJECT_DEPTH)
         return;
-    for (const [k, v] of Object.entries(targetRecord)) {
-        if (k && k.length >= 2 && isNaN(Number(k)) && !IGNORED_CONFIG_KEYS.has(k)) {
-            keys.add(k);
+    for (const [entryKey, entryValue] of Object.entries(targetRecord)) {
+        if (
+            entryKey &&
+            entryKey.length >= 2 &&
+            isNaN(Number(entryKey)) &&
+            !IGNORED_CONFIG_KEYS.has(entryKey)
+        ) {
+            keys.add(entryKey);
         }
-        if (v && typeof v === 'object') {
-            collectObjectKeys(v, keys, depth + 1);
+        if (entryValue && typeof entryValue === 'object') {
+            collectObjectKeys(entryValue, keys, depth + 1);
         }
     }
 }
@@ -318,7 +323,7 @@ function detectDuplicateConfigs(keyToOriginsMap: Map<string, string[]>, issues: 
                 severity: SEVERITY_WARNING,
                 message:
                     `Duplicate configuration declaration: Key '${key}' is redundantly declared ` +
-                    `in multiple config sources: ${origins.map((o) => `'${o}'`).join(', ')}.`,
+                    `in multiple config sources: ${origins.map((originItem) => `'${originItem}'`).join(', ')}.`,
                 location: {
                     file: origins[0],
                     start: { line: 1, column: 1 },
@@ -393,7 +398,7 @@ function checkDomainLeakage(
         }
     }
 
-    const hasScattered = SCATTERED_CONFIG_PATTERNS.some((p) => src.content.includes(p));
+    const hasScattered = SCATTERED_CONFIG_PATTERNS.some((pattern) => src.content.includes(pattern));
 
     return { hasEnv, hasIO, hasScattered };
 }
@@ -402,8 +407,8 @@ function extractWordTokens(content: string): Set<string> {
     const tokens = new Set<string>();
     const matches = content.match(/[a-zA-Z0-9_$-]+/g);
     if (matches) {
-        for (const m of matches) {
-            tokens.add(m);
+        for (const matchedToken of matches) {
+            tokens.add(matchedToken);
         }
     }
     return tokens;
@@ -573,8 +578,8 @@ function detectFlatConfigSprawl(
     maxFlatThreshold = DEFAULT_FLAT_CONFIG_SPRAWL_THRESHOLD,
 ): number {
     const dirMap = new Map<string, string[]>();
-    for (const f of configFiles) {
-        const norm = f.filePath.replace(/\\/g, '/');
+    for (const configFile of configFiles) {
+        const norm = configFile.filePath.replace(/\\/g, '/');
         const dir = extractFileDirectory(norm);
         appendMapStringList(dirMap, dir, norm);
     }
@@ -585,7 +590,7 @@ function detectFlatConfigSprawl(
             flatSprawlCount++;
             const sample = filesInDir
                 .slice(0, MAX_DIAGNOSTIC_SAMPLES)
-                .map((p) => p.split('/').pop())
+                .map((filePath) => filePath.split('/').pop())
                 .join(', ');
             issues.push({
                 id: `architecture:${RULE_ARCH_CFG_008}:${filesInDir[0]}:1`,
@@ -659,7 +664,7 @@ function detectUnroutedSubtables(sourceFiles: ConfigScanFile[], issues: Issue[])
 }
 
 function calculateMaturityGrade(score: number): { level: number; grade: ConfigMaturityGrade } {
-    const entry = MATURITY_GRADE_LADDER.find((t) => score >= t.minScore);
+    const entry = MATURITY_GRADE_LADDER.find((tier) => score >= tier.minScore);
     if (entry) return { level: entry.level, grade: entry.grade };
     return { level: 0, grade: 'L0' };
 }

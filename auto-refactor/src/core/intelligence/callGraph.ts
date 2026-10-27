@@ -77,8 +77,8 @@ function enqueueUnseenCallees(
     }
 }
 
-function compareStrings(a: string, b: string): number {
-    return a < b ? -1 : a > b ? 1 : 0;
+function compareStrings(strA: string, strB: string): number {
+    return strA < strB ? -1 : strA > strB ? 1 : 0;
 }
 
 /**
@@ -120,11 +120,11 @@ export class CallGraph {
             }
         }
         this.allEdges.sort(
-            (a, b) =>
-                compareStrings(a.caller ?? '', b.caller ?? '') ||
-                compareStrings(a.callerFile, b.callerFile) ||
-                (a.line ?? 0) - (b.line ?? 0) ||
-                compareStrings(a.callee, b.callee),
+            (edgeA, edgeB) =>
+                compareStrings(edgeA.caller ?? '', edgeB.caller ?? '') ||
+                compareStrings(edgeA.callerFile, edgeB.callerFile) ||
+                (edgeA.line ?? 0) - (edgeB.line ?? 0) ||
+                compareStrings(edgeA.callee, edgeB.callee),
         );
         for (const edge of this.allEdges) {
             if (edge.caller !== null) {

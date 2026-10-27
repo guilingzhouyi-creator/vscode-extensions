@@ -55,7 +55,7 @@ export function instantiateAnalyzer(mod: unknown, name: string): Analyzer {
                 record.default ||
                 record.Analyzer ||
                 record[name] ||
-                Object.values(record).find((v) => typeof v === TYPEOF_FUNCTION);
+                Object.values(record).find((val) => typeof val === TYPEOF_FUNCTION);
             if (typeof Ctor === TYPEOF_FUNCTION) resolved = new (Ctor as new () => Analyzer)();
         }
     }

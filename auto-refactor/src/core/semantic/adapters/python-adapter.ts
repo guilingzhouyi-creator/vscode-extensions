@@ -89,7 +89,7 @@ export class PythonSemanticAdapter extends UnifiedLanguageAdapter {
                 const funcName = funcMatch[1];
                 const isAsync = trimmed.startsWith('async');
                 const params = funcMatch[2]
-                    ? funcMatch[2].split(',').filter((p) => p.trim().length > 0)
+                    ? funcMatch[2].split(',').filter((paramStr) => paramStr.trim().length > 0)
                     : [];
                 currentFunc = currentClass ? `${currentClass}.${funcName}` : funcName;
                 currentFuncIndent = indent;

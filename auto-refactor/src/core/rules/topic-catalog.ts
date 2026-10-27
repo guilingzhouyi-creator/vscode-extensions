@@ -572,7 +572,7 @@ function collectTopicNumbers(
  */
 function checkTopicSequence(groupKey: string, nums: readonly number[]): string[] {
     const gaps: string[] = [];
-    const sorted = [...nums].sort((a, b) => a - b);
+    const sorted = [...nums].sort((numA, numB) => numA - numB);
     const [family, topic] = groupKey.split(':');
     const minNum = sorted[0];
 

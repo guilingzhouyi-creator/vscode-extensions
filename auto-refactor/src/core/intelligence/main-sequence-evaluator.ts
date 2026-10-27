@@ -164,19 +164,19 @@ export function generateZoneRecommendation(
  * the closure; keeping it here made the names disagree with the signature.
  *
  * @param closure - Flat row-major NxN transitive-closure matrix (1 = source reaches target).
- * @param n - Number of nodes N.
+ * @param nodeCount - Number of nodes N.
  * @returns One ratio per node, each the dependent share rounded to four decimals.
  */
-function computeNodeBlastRadii(closure: Uint8Array, n: number): number[] {
-    const nodeBlastRadii = new Array<number>(n);
-    for (let target = 0; target < n; target++) {
+function computeNodeBlastRadii(closure: Uint8Array, nodeCount: number): number[] {
+    const nodeBlastRadii = new Array<number>(nodeCount);
+    for (let target = 0; target < nodeCount; target++) {
         let dependentsCount = 0;
-        for (let source = 0; source < n; source++) {
-            if (closure[source * n + target] === 1) {
+        for (let source = 0; source < nodeCount; source++) {
+            if (closure[source * nodeCount + target] === 1) {
                 dependentsCount++;
             }
         }
-        nodeBlastRadii[target] = +(dependentsCount / n).toFixed(4);
+        nodeBlastRadii[target] = +(dependentsCount / nodeCount).toFixed(4);
     }
     return nodeBlastRadii;
 }
@@ -202,40 +202,39 @@ export function computePropagationCost(
         });
     }
 
-    const n = nodeCount;
-    const closure = new Uint8Array(n * n);
+    const closure = new Uint8Array(nodeCount * nodeCount);
 
     // Initialize closure with identity and direct edges
-    for (let i = 0; i < n; i++) {
-        closure[i * n + i] = 1;
+    for (let i = 0; i < nodeCount; i++) {
+        closure[i * nodeCount + i] = 1;
         const row = adjacencyMatrix[i];
         if (!row) {
             continue;
         }
-        for (let j = 0; j < n; j++) {
+        for (let j = 0; j < nodeCount; j++) {
             if (row[j]) {
-                closure[i * n + j] = 1;
+                closure[i * nodeCount + j] = 1;
             }
         }
     }
 
     // Warshall's algorithm for transitive reachability
-    computeWarshallTransitiveClosure(closure, n);
+    computeWarshallTransitiveClosure(closure, nodeCount);
 
-    const nodeBlastRadii = computeNodeBlastRadii(closure, n);
+    const nodeBlastRadii = computeNodeBlastRadii(closure, nodeCount);
 
     let totalReachablePairs = 0;
-    for (let idx = 0; idx < n * n; idx++) {
+    for (let idx = 0; idx < nodeCount * nodeCount; idx++) {
         totalReachablePairs += closure[idx];
     }
 
-    const totalPossiblePairs = n * n;
+    const totalPossiblePairs = nodeCount * nodeCount;
     const propagationCost = +(totalReachablePairs / totalPossiblePairs).toFixed(4);
-    const averageBlastRadius = +(totalReachablePairs / (n * n)).toFixed(4);
+    const averageBlastRadius = +(totalReachablePairs / (nodeCount * nodeCount)).toFixed(4);
     const isHyperCoupled = propagationCost > HYPER_COUPLED_THRESHOLD;
 
     return Object.freeze({
-        nodeCount: n,
+        nodeCount,
         propagationCost,
         averageBlastRadius,
         isHyperCoupled,

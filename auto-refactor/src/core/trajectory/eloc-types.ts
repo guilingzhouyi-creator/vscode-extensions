@@ -116,6 +116,9 @@ export interface TechnicalDebtDelta {
 export interface TrajectoryQualityMetrics {
     /** Quality Efficiency of Delta: ΔQ_semantic / max(1, ELOC_semantic). */
     qed: number;
+    /** Quality Evolution Density per Kilo-ELOC
+     *  (kQED: ΔQ_semantic / max(0.001, ELOC_semantic / 1000)). */
+    kQed?: number;
     /** Review Yield: (Debt_resolved + max(0, ΔQ)) / (ELOC_processed / 1000). */
     reviewYield: number;
     /** Regression Density: RegressionFindings / (ELOC_semantic / 1000). */
@@ -203,13 +206,19 @@ export interface WeeklyTrajectorySummary {
         mean: number;
         min: number;
         max: number;
+        /** Quality evolution density per kilo-ELOC
+         *  (kQED: ΔQ / max(0.001, ELOC_semantic / 1000)). */
+        kMean?: number;
     };
     /** Aggregate technical debt change. */
     debt: {
         totalAdded: number;
         totalResolved: number;
         totalRegressions: number;
+        /** Net debt cleared per kilo-ELOC refactored (semantic changed scale). */
         netYield: number;
+        /** Net debt cleared per kilo-ELOC of total codebase (unique base scale). */
+        densityYield?: number;
     };
     /** Mean composite quality score at week end. */
     meanCompositeScore: number;

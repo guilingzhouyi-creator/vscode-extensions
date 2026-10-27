@@ -78,10 +78,10 @@ function formatReversalPatch(hunk: ReviewDiffHunk): string {
     return (
         `--- current\n+++ reverted\n${hunk.header}\n` +
         hunk.lines
-            .map((l) => {
-                if (l.type === 'insert') return `-${l.content}`;
-                if (l.type === 'delete') return `+${l.content}`;
-                return ` ${l.content}`;
+            .map((diffLine) => {
+                if (diffLine.type === 'insert') return `-${diffLine.content}`;
+                if (diffLine.type === 'delete') return `+${diffLine.content}`;
+                return ` ${diffLine.content}`;
             })
             .join('\n')
     );
@@ -212,7 +212,7 @@ export function revertTaskCard(
         if (content === undefined) continue;
 
         const sortedHunks = [...matchingHunks].sort(
-            (a, b) => b.newSpan.startLine - a.newSpan.startLine,
+            (hunkA, hunkB) => hunkB.newSpan.startLine - hunkA.newSpan.startLine,
         );
 
         const revertResult = applySortedHunksToFile(content, sortedHunks, rolledBackCheckpoints);

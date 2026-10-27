@@ -69,9 +69,9 @@ function tryStartBoundary(
 function computeBraceDelta(line: string): number {
     let delta = 0;
     for (let i = 0; i < line.length; i++) {
-        const ch = line.charCodeAt(i);
-        if (ch === CHAR_CODE_OPEN_BRACE) delta++;
-        else if (ch === CHAR_CODE_CLOSE_BRACE) delta--;
+        const charCode = line.charCodeAt(i);
+        if (charCode === CHAR_CODE_OPEN_BRACE) delta++;
+        else if (charCode === CHAR_CODE_CLOSE_BRACE) delta--;
     }
     return delta;
 }
@@ -156,7 +156,7 @@ function resolvePrimaryKind(vector: SliceFeatureVector): SliceMutationKind {
  * @returns Array of 1-based changed line numbers.
  */
 function deriveChangedLineNumbers(oldContent: string, newContent: string): number[] {
-    const oldLines = new Set(oldContent.split(/\r?\n/).map((l) => l.trim()));
+    const oldLines = new Set(oldContent.split(/\r?\n/).map((lineText) => lineText.trim()));
     const incomingLines = newContent.split(/\r?\n/);
     const changed: number[] = [];
 
@@ -184,13 +184,13 @@ function findEnclosingBoundary(
     let high = boundaries.length - 1;
     while (low <= high) {
         const mid = (low + high) >> 1;
-        const b = boundaries[mid];
-        if (lineNum < b.startLine) {
+        const boundary = boundaries[mid];
+        if (lineNum < boundary.startLine) {
             high = mid - 1;
-        } else if (lineNum > b.endLine) {
+        } else if (lineNum > boundary.endLine) {
             low = mid + 1;
         } else {
-            return b;
+            return boundary;
         }
     }
     return undefined;
@@ -212,7 +212,7 @@ function createBoundarySliceNode(
     const signatureChanged = oldSig !== incomingSignature;
 
     const oldLinesSet = new Set(sliceOldLines);
-    const addedLines = sliceNewLines.filter((l) => !oldLinesSet.has(l));
+    const addedLines = sliceNewLines.filter((lineText) => !oldLinesSet.has(lineText));
     const vector = inspectSliceDelta(addedLines, signatureChanged);
     const primaryKind = resolvePrimaryKind(vector);
 

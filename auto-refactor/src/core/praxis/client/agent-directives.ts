@@ -370,10 +370,10 @@ export function buildAgentDirectivesBundle(
     let infoCount = 0;
 
     for (let i = 0; i < issues.length; i++) {
-        const s = issues[i].severity;
-        if (s === SEVERITY_STR_ERROR) {
+        const severityStr = issues[i].severity;
+        if (severityStr === SEVERITY_STR_ERROR) {
             blockCount++;
-        } else if (s === SEVERITY_STR_WARN) {
+        } else if (severityStr === SEVERITY_STR_WARN) {
             warnCount++;
         } else {
             infoCount++;
@@ -481,8 +481,8 @@ export function tagHunksWithContext(
 function extractRulesFromViolations(violations: string[]): string[] {
     const rules: string[] = [];
     for (let i = 0; i < violations.length; i++) {
-        const v = violations[i];
-        const match = v.match(/\[([a-zA-Z0-9_\-:]+)\]/);
+        const violation = violations[i];
+        const match = violation.match(/\[([a-zA-Z0-9_\-:]+)\]/);
         if (match && match[1]) {
             rules.push(match[1]);
         }
@@ -504,11 +504,11 @@ function buildGateDiagnosticCards(
 
     const cards: PraxisDiagnosticCard[] = [];
     for (let i = 0; i < violations.length; i++) {
-        const v = violations[i];
-        const match = v.match(/\[([a-zA-Z0-9_\-:]+)\]\s*(.*)/);
+        const violation = violations[i];
+        const match = violation.match(/\[([a-zA-Z0-9_\-:]+)\]\s*(.*)/);
         const ruleId = match ? match[1] : DEFAULT_UNSPECIFIED_RULE;
-        const msg = match ? match[2] : v;
-        const isError = !approved || /BLOCK|error/i.test(v);
+        const msg = match ? match[2] : violation;
+        const isError = !approved || /BLOCK|error/i.test(violation);
         const severity: PraxisPresentationSeverity = isError ? SEVERITY_BLOCK : SEVERITY_WARN_PRES;
         const badgeColor: PraxisBadgeColor = isError ? COLOR_RED : COLOR_YELLOW;
         const badgeText = isError
@@ -701,7 +701,10 @@ export function buildDualFacedDiff(
     if (params.gateApproved) {
         badgeColor = COLOR_GREEN;
     } else if (
-        params.violations.some((v) => v.includes(VERDICT_BLOCK) || v.includes(SEVERITY_STR_ERROR))
+        params.violations.some(
+            (violation) =>
+                violation.includes(VERDICT_BLOCK) || violation.includes(SEVERITY_STR_ERROR),
+        )
     ) {
         badgeColor = COLOR_RED;
     }

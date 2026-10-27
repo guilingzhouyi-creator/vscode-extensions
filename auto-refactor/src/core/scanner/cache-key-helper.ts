@@ -120,14 +120,16 @@ export function buildCacheFingerprintContext(
     plan: ResolvedAnalyzer[],
     cacheCustom?: boolean,
 ): CacheFingerprintContext {
-    const descs: FingerprintAnalyzerDesc[] = plan.map((p) => ({
-        name: p.name,
-        version: ANALYZER_VERSIONS[p.name] ?? 1,
-        modulePath: p.modulePath,
-        options: p.options,
-        legacy: typeof p.instance.visit !== TYPEOF_FUNCTION,
+    const descs: FingerprintAnalyzerDesc[] = plan.map((planItem) => ({
+        name: planItem.name,
+        version: ANALYZER_VERSIONS[planItem.name] ?? 1,
+        modulePath: planItem.modulePath,
+        options: planItem.options,
+        legacy: typeof planItem.instance.visit !== TYPEOF_FUNCTION,
     }));
-    const customAnalyzers = (cfg.customAnalyzers || []).filter((c) => c.enabled !== false);
+    const customAnalyzers = (cfg.customAnalyzers || []).filter(
+        (analyzer) => analyzer.enabled !== false,
+    );
     const customHash =
         customAnalyzers.length > 0 && cacheCustom === true ? computeCustomHash(descs) : null;
     const l2Enabled = customAnalyzers.length === 0 || (cacheCustom === true && customHash !== null);

@@ -37,9 +37,9 @@ const DEFAULT_AGENT_UID = 'Agent';
  */
 export function getLine(content: string, starts: number[], idx: number): string {
     if (idx < 0 || idx >= starts.length) return '';
-    const s = starts[idx];
-    const e = idx + 1 < starts.length ? starts[idx + 1] - 1 : content.length;
-    return content.slice(s, e);
+    const startOffset = starts[idx];
+    const endOffset = idx + 1 < starts.length ? starts[idx + 1] - 1 : content.length;
+    return content.slice(startOffset, endOffset);
 }
 
 /**
@@ -72,31 +72,31 @@ function findClusterEnd(ops: DiffOp[], startIdx: number, contextLines: number): 
  * Convert a single diff op into an attributed hunk line.
  */
 function toAttributedLine(
-    op: DiffOp,
+    diffOp: DiffOp,
     oldContent: string,
     newContent: string,
     oldStarts: number[],
     newStarts: number[],
 ): AttributedDiffLine {
-    if (op.type === DIFF_OP_EQUAL) {
+    if (diffOp.type === DIFF_OP_EQUAL) {
         return {
             type: LINE_TYPE_CONTEXT,
-            lineNoOld: op.aIdx + 1,
-            lineNoNew: op.bIdx + 1,
-            content: getLine(oldContent, oldStarts, op.aIdx),
+            lineNoOld: diffOp.aIdx + 1,
+            lineNoNew: diffOp.bIdx + 1,
+            content: getLine(oldContent, oldStarts, diffOp.aIdx),
         };
     }
-    if (op.type === DIFF_OP_DELETE) {
+    if (diffOp.type === DIFF_OP_DELETE) {
         return {
             type: DIFF_OP_DELETE,
-            lineNoOld: op.aIdx + 1,
-            content: getLine(oldContent, oldStarts, op.aIdx),
+            lineNoOld: diffOp.aIdx + 1,
+            content: getLine(oldContent, oldStarts, diffOp.aIdx),
         };
     }
     return {
         type: DIFF_OP_INSERT,
-        lineNoNew: op.bIdx + 1,
-        content: getLine(newContent, newStarts, op.bIdx),
+        lineNoNew: diffOp.bIdx + 1,
+        content: getLine(newContent, newStarts, diffOp.bIdx),
     };
 }
 
@@ -114,12 +114,12 @@ function buildHunkLines(
     let oldCount = 0;
     let newCount = 0;
 
-    for (const op of hunkOps) {
-        lines.push(toAttributedLine(op, oldContent, newContent, oldStarts, newStarts));
-        if (op.type === DIFF_OP_EQUAL || op.type === DIFF_OP_DELETE) {
+    for (const diffOp of hunkOps) {
+        lines.push(toAttributedLine(diffOp, oldContent, newContent, oldStarts, newStarts));
+        if (diffOp.type === DIFF_OP_EQUAL || diffOp.type === DIFF_OP_DELETE) {
             oldCount++;
         }
-        if (op.type === DIFF_OP_EQUAL || op.type === DIFF_OP_INSERT) {
+        if (diffOp.type === DIFF_OP_EQUAL || diffOp.type === DIFF_OP_INSERT) {
             newCount++;
         }
     }

@@ -105,8 +105,8 @@ function dispatchHooks(
         const hook = active[i];
         try {
             hook.fn(node, hook.ctx, parent, grandparent, depth, className, binding);
-        } catch (e) {
-            pushError(hook.name, e, hook.ctx);
+        } catch (error) {
+            pushError(hook.name, error, hook.ctx);
         }
     }
 }
@@ -150,30 +150,30 @@ export function runStreaming(
     // Pre-bind visit/finalize once per file: saves the per-node `typeof` check and property
     const activeVisits: ActiveHook[] = [];
     for (let i = 0; i < entries.length; i++) {
-        const a = entries[i];
-        if (isCallable(a.analyzer.visit)) {
+        const entry = entries[i];
+        if (isCallable(entry.analyzer.visit)) {
             activeVisits.push({
-                fn: a.analyzer.visit.bind(a.analyzer),
-                ctx: a.ctx,
-                name: a.analyzer.name,
+                fn: entry.analyzer.visit.bind(entry.analyzer),
+                ctx: entry.ctx,
+                name: entry.analyzer.name,
             });
         }
     }
 
     const activeLeaves: ActiveHook[] = [];
     for (let i = entries.length - 1; i >= 0; i--) {
-        const a = entries[i];
-        if (isCallable(a.analyzer.leave)) {
+        const entry = entries[i];
+        if (isCallable(entry.analyzer.leave)) {
             activeLeaves.push({
-                fn: a.analyzer.leave.bind(a.analyzer),
-                ctx: a.ctx,
-                name: a.analyzer.name,
+                fn: entry.analyzer.leave.bind(entry.analyzer),
+                ctx: entry.ctx,
+                name: entry.analyzer.name,
             });
         }
     }
     const hasAnyLeave = activeLeaves.length > 0;
 
-    const pushError = (name: string, e: unknown, ctx: AnalyzerContext) => {
+    const pushError = (name: string, error: unknown, ctx: AnalyzerContext) => {
         if (errored.has(name)) return; // one error issue per analyzer per file
         errored.add(name);
         const sev = ctx.config.failOnAnalyzerError ? SEVERITY_ERROR : SEVERITY_INFO;
@@ -182,13 +182,13 @@ export function runStreaming(
             analyzer: name,
             rule: RULE_ANALYZER_ERROR,
             severity: sev,
-            message: `Analyzer "${name}" threw: ${(e as Error).message}`,
+            message: `Analyzer "${name}" threw: ${(error as Error).message}`,
             location: {
                 file: ctx.filePath,
                 start: { line: 1, column: 1 },
                 end: { line: 1, column: 1 },
             },
-            detail: { error: String(e) },
+            detail: { error: String(error) },
         });
     };
 
@@ -218,8 +218,8 @@ export function runStreaming(
         const cName = resolveChildScopeName(node, className);
         const cBinding = resolveChildScopeBinding(node, binding);
 
-        for (const c of adapter.children(node)) {
-            visitNode(c, node, parent, childDepth, cName, cBinding);
+        for (const childNode of adapter.children(node)) {
+            visitNode(childNode, node, parent, childDepth, cName, cBinding);
         }
 
         if (hasAnyLeave) {
@@ -236,16 +236,16 @@ export function runStreaming(
         }
     };
 
-    for (const c of adapter.children(root)) {
-        visitNode(c, root, undefined, 0, null, null);
+    for (const childNode of adapter.children(root)) {
+        visitNode(childNode, root, undefined, 0, null, null);
     }
 
-    for (const a of entries) {
-        if (!isCallable(a.analyzer.finalize)) continue;
+    for (const entry of entries) {
+        if (!isCallable(entry.analyzer.finalize)) continue;
         try {
-            issues.push(...a.analyzer.finalize(a.ctx));
-        } catch (e) {
-            pushError(a.analyzer.name, e, a.ctx);
+            issues.push(...entry.analyzer.finalize(entry.ctx));
+        } catch (error) {
+            pushError(entry.analyzer.name, error, entry.ctx);
         }
     }
     return issues;
@@ -273,9 +273,9 @@ export class FileMetricCollector {
         _className?: string | null,
         _binding?: string | null,
     ): void {
-        const d = depth ?? 0;
+        const currentDepth = depth ?? 0;
         if (node.functionLike) this.functions++;
-        if (d > this.maxNesting) this.maxNesting = d;
+        if (currentDepth > this.maxNesting) this.maxNesting = currentDepth;
         if (parent && parent.kind === NodeKind.SourceFile && node.topLevel) {
             this.topLevelDeclarations++;
             if (node.exported) this.exportedSymbols++;
@@ -294,9 +294,9 @@ export class FileMetricCollector {
         } else {
             lines = 0;
             nonBlankLines = 0;
-            for (const l of ctx.content.split(/\r\n|\n/)) {
+            for (const lineText of ctx.content.split(/\r\n|\n/)) {
                 lines++;
-                if (l.trim().length > 0) nonBlankLines++;
+                if (lineText.trim().length > 0) nonBlankLines++;
             }
         }
         const density = ctx.content ? computeEffectiveCodeDensity(ctx.content) : null;
@@ -367,30 +367,30 @@ export function runStreamingProjected(
 
     const activeVisits: ActiveHook[] = [];
     for (let i = 0; i < entries.length; i++) {
-        const a = entries[i];
-        if (isCallable(a.analyzer.visit)) {
+        const entry = entries[i];
+        if (isCallable(entry.analyzer.visit)) {
             activeVisits.push({
-                fn: a.analyzer.visit.bind(a.analyzer),
-                ctx: a.ctx,
-                name: a.analyzer.name,
+                fn: entry.analyzer.visit.bind(entry.analyzer),
+                ctx: entry.ctx,
+                name: entry.analyzer.name,
             });
         }
     }
 
     const activeLeaves: ActiveHook[] = [];
     for (let i = entries.length - 1; i >= 0; i--) {
-        const a = entries[i];
-        if (isCallable(a.analyzer.leave)) {
+        const entry = entries[i];
+        if (isCallable(entry.analyzer.leave)) {
             activeLeaves.push({
-                fn: a.analyzer.leave.bind(a.analyzer),
-                ctx: a.ctx,
-                name: a.analyzer.name,
+                fn: entry.analyzer.leave.bind(entry.analyzer),
+                ctx: entry.ctx,
+                name: entry.analyzer.name,
             });
         }
     }
     const hasAnyLeave = activeLeaves.length > 0;
 
-    const pushError = (name: string, e: unknown, ctx: AnalyzerContext) => {
+    const pushError = (name: string, error: unknown, ctx: AnalyzerContext) => {
         if (errored.has(name)) return; // one error issue per analyzer per file
         errored.add(name);
         const sev = ctx.config.failOnAnalyzerError ? SEVERITY_ERROR : SEVERITY_INFO;
@@ -399,13 +399,13 @@ export function runStreamingProjected(
             analyzer: name,
             rule: RULE_ANALYZER_ERROR,
             severity: sev,
-            message: `Analyzer "${name}" threw: ${(e as Error).message}`,
+            message: `Analyzer "${name}" threw: ${(error as Error).message}`,
             location: {
                 file: ctx.filePath,
                 start: { line: 1, column: 1 },
                 end: { line: 1, column: 1 },
             },
-            detail: { error: String(e) },
+            detail: { error: String(error) },
         });
     };
 
@@ -448,8 +448,18 @@ export function runStreamingProjected(
         const cBinding = resolveChildScopeBinding(node, binding);
         const cCaller = node.functionLike && typeof node.name === 'string' ? node.name : caller;
 
-        for (const c of projector.forEachChild(raw)) {
-            visitRaw(c, raw, parentRaw, childDepth, cName, cBinding, node, parentProj, cCaller);
+        for (const childRaw of projector.forEachChild(raw)) {
+            visitRaw(
+                childRaw,
+                raw,
+                parentRaw,
+                childDepth,
+                cName,
+                cBinding,
+                node,
+                parentProj,
+                cCaller,
+            );
         }
 
         if (hasAnyLeave) {
@@ -466,16 +476,16 @@ export function runStreamingProjected(
         }
     };
 
-    for (const c of projector.forEachChild(rootRaw)) {
-        visitRaw(c, rootRaw, undefined, 0, null, null, rootProj, undefined, null);
+    for (const childRaw of projector.forEachChild(rootRaw)) {
+        visitRaw(childRaw, rootRaw, undefined, 0, null, null, rootProj, undefined, null);
     }
 
-    for (const a of entries) {
-        if (!isCallable(a.analyzer.finalize)) continue;
+    for (const entry of entries) {
+        if (!isCallable(entry.analyzer.finalize)) continue;
         try {
-            issues.push(...a.analyzer.finalize(a.ctx));
-        } catch (e) {
-            pushError(a.analyzer.name, e, a.ctx);
+            issues.push(...entry.analyzer.finalize(entry.ctx));
+        } catch (error) {
+            pushError(entry.analyzer.name, error, entry.ctx);
         }
     }
     return issues;
@@ -559,7 +569,7 @@ export function tryCreateProjector(
 ): NodeProjector | null {
     const [streamingNames, legacyCount] = rest;
     if (legacyCount > 0) return null;
-    if (streamingNames.some((n) => !FAST_PATH_ANALYZERS.has(n))) return null;
+    if (streamingNames.some((analyzerName) => !FAST_PATH_ANALYZERS.has(analyzerName))) return null;
     if (!fastPathEnabled()) return null;
     if (!isCallable(adapter.project)) return null;
     try {

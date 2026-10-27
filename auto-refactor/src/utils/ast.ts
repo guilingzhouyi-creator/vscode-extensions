@@ -21,7 +21,6 @@
 import * as ts from 'typescript';
 import type { Position, IssueLocation } from '../core/types';
 
-
 /** Function-like node kinds that constitute a separate complexity/unit boundary. */
 const FUNCTION_LIKE = new Set<ts.SyntaxKind>([
     ts.SyntaxKind.FunctionDeclaration,
@@ -77,28 +76,30 @@ export function createSourceFile(fileName: string, content: string): ts.SourceFi
 /**
  * Convert a zero-based character offset into a 1-based line and column position.
  *
- * @param sf - SourceFile that owns the offset and supplies the line map.
+ * @param sourceFile - SourceFile that owns the offset and supplies the line map.
  * @param pos - Zero-based character offset; it must fall inside the file, because an
  *   out-of-range value is clamped by the compiler line map and yields a meaningless position.
  * @returns A `Position` with 1-based `line` and `column`, matching the issue-reporting model.
  */
-export function getPos(sf: ts.SourceFile, pos: number): Position {
-    const lc = sf.getLineAndCharacterOfPosition(pos);
-    return { line: lc.line + 1, column: lc.character + 1 };
+export function getPos(sourceFile: ts.SourceFile, pos: number): Position {
+    const lineChar = sourceFile.getLineAndCharacterOfPosition(pos);
+    return { line: lineChar.line + 1, column: lineChar.character + 1 };
 }
 
 /**
  * Build an issue location spanning a node from its start (inclusive) to its end (exclusive).
  *
- * @param sf - SourceFile used for both the reported file name and the offset-to-line mapping.
+ * @param sourceFile - SourceFile used for both the reported file name and the
+ *   offset-to-line mapping.
  * @param node - Node to locate; leading trivia is skipped by `getStart`, so the location points
  *   at the first meaningful token rather than at preceding whitespace or comments.
- * @returns An `IssueLocation` whose `start` and `end` are 1-based positions in `sf.fileName`.
+ * @returns An `IssueLocation` whose `start` and `end` are 1-based positions in
+ *   `sourceFile.fileName`.
  */
-export function loc(sf: ts.SourceFile, node: ts.Node): IssueLocation {
+export function loc(sourceFile: ts.SourceFile, node: ts.Node): IssueLocation {
     return {
-        file: sf.fileName,
-        start: getPos(sf, node.getStart(sf)),
-        end: getPos(sf, node.getEnd()),
+        file: sourceFile.fileName,
+        start: getPos(sourceFile, node.getStart(sourceFile)),
+        end: getPos(sourceFile, node.getEnd()),
     };
 }

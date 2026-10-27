@@ -56,10 +56,10 @@ const CSHARP_USING_RE = /^\s*using\s+([A-Za-z0-9_.]+);/;
 
 function extractJsSpecifiers(lineText: string, file: string, specifiers: SpecifierInfo[]): void {
     JS_IMPORT_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = JS_IMPORT_RE.exec(lineText)) !== null) {
-        if (m[1]) {
-            const raw = m[1];
+    let execMatch: RegExpExecArray | null;
+    while ((execMatch = JS_IMPORT_RE.exec(lineText)) !== null) {
+        if (execMatch[1]) {
+            const raw = execMatch[1];
             const isRelative = raw.startsWith('.') || raw.startsWith('/') || raw.startsWith('@/');
             specifiers.push({
                 raw,
@@ -74,9 +74,9 @@ function extractJsSpecifiers(lineText: string, file: string, specifiers: Specifi
 
 function extractGdScriptSpecifiers(lineText: string, specifiers: SpecifierInfo[]): void {
     GDSCRIPT_IMPORT_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = GDSCRIPT_IMPORT_RE.exec(lineText)) !== null) {
-        const raw = m[1] || m[2];
+    let execMatch: RegExpExecArray | null;
+    while ((execMatch = GDSCRIPT_IMPORT_RE.exec(lineText)) !== null) {
+        const raw = execMatch[1] || execMatch[2];
         if (raw) {
             specifiers.push({
                 raw,

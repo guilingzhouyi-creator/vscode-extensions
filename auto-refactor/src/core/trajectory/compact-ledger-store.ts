@@ -57,7 +57,9 @@ export function formatCompactRecord(params: {
 
     // 0.01 precision is required downstream: the self-audit baseline compares
     // trajectory vectors against stored values at two decimals.
-    const compactVector = metrics.scoreVector.map((v: number) => Math.round(v * 100) / 100);
+    const compactVector = metrics.scoreVector.map(
+        (scoreVal: number) => Math.round(scoreVal * 100) / 100,
+    );
     const boundedId = runId.length > 12 ? runId.slice(-12) : runId;
     const boundedRev = revision.slice(0, 8);
     const boundedMod = module.length > 12 ? module.slice(0, 12) : module;
@@ -88,7 +90,7 @@ export function formatCompactRecord(params: {
             bef: Math.round(metrics.beforeScore * 100) / 100,
             aft: Math.round(metrics.afterScore * 100) / 100,
             vec: compactVector,
-            qed: Math.round(metrics.qed * 10000) / 10000,
+            qed: Math.round(metrics.qed * 1000000) / 1000000,
         },
         debt: {
             add: metrics.debtDelta.addedDebtPoints,
@@ -155,7 +157,7 @@ export async function pruneActiveRuns(
         const lines = content
             .trim()
             .split('\n')
-            .filter((l) => l.trim().length > 0);
+            .filter((lineText) => lineText.trim().length > 0);
         if (lines.length > maxRollingRuns) {
             const recentLines = lines.slice(-maxRollingRuns);
             await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
@@ -185,7 +187,7 @@ async function pruneActiveRunsIfOversized(
         const lines = content
             .trim()
             .split('\n')
-            .filter((l) => l.trim().length > 0);
+            .filter((lineText) => lineText.trim().length > 0);
         if (lines.length > maxRollingRuns * 1.5) {
             const recentLines = lines.slice(-maxRollingRuns);
             await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
@@ -257,7 +259,7 @@ export async function readRecentRecords(
         const lines = content
             .trim()
             .split('\n')
-            .filter((l) => l.trim().length > 0);
+            .filter((lineText) => lineText.trim().length > 0);
         const targetLines = limit > 0 && lines.length > limit ? lines.slice(-limit) : lines;
         const records: CompactTrajectoryRecord[] = [];
 

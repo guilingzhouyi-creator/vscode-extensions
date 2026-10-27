@@ -384,14 +384,14 @@ export class SqliteBackend implements IPraxisVFSStorage {
         entries: VfsFileEntry[],
         metadata?: { message?: string; cardContext?: { cardId?: string } },
     ): Promise<WorkspaceSnapshot> {
-        const db = this.assertOpen();
+        const database = this.assertOpen();
         const snapshotId = randomUUID();
         const now = Date.now();
         const cardId = metadata?.cardContext?.cardId || null;
-        const totalSize = entries.reduce((acc, e) => acc + e.size, 0);
+        const totalSize = entries.reduce((acc, entry) => acc + entry.size, 0);
         const metaJson = metadata ? JSON.stringify(metadata) : null;
 
-        db.exec('BEGIN TRANSACTION;');
+        database.exec('BEGIN TRANSACTION;');
         try {
             this.stmtInsertSnapshot?.run(
                 snapshotId,
@@ -416,9 +416,9 @@ export class SqliteBackend implements IPraxisVFSStorage {
                 );
             }
 
-            db.exec(COMMIT_SQL);
+            database.exec(COMMIT_SQL);
         } catch (transactionError) {
-            db.exec(ROLLBACK_SQL);
+            database.exec(ROLLBACK_SQL);
             throw new VfsError(
                 `Failed to create snapshot transaction: ${String(transactionError)}`,
                 'ERR_STORAGE_EXHAUSTED',

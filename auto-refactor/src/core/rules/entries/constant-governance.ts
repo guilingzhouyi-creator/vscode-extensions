@@ -32,13 +32,13 @@ const RULE_ID_CONST_SCP_001 = 'CONST-SCP-001';
 const RULE_ID_CONST_SCP_002 = 'CONST-SCP-002';
 
 function createGovernanceRule(
-    id: string,
+    ruleId: string,
     summary: string,
     remediation: string,
     severity = SEVERITY_WARNING,
 ): RuleDefinition {
     return defineRule({
-        id,
+        id: ruleId,
         family: RULE_FAMILY_CONSTANTS,
         analyzer: ANALYZER_CONSTANTS,
         canonical: true,
@@ -46,7 +46,7 @@ function createGovernanceRule(
         defaultSeverity: severity,
         summary,
         remediation,
-        docsAnchor: `${DOCS_ANCHOR_BASE}${id.toLowerCase()}`,
+        docsAnchor: `${DOCS_ANCHOR_BASE}${ruleId.toLowerCase()}`,
     });
 }
 

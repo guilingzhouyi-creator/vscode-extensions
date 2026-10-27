@@ -127,9 +127,9 @@ export function countDuplicateLinesShim(content: string): number {
     const { starts, hashes } = computeLineStartsAndHashes(content);
     const counts = new Map<number, number>();
     for (let i = 0; i < hashes.length; i += 1) {
-        const s = starts[i];
-        const e = i + 1 < starts.length ? starts[i + 1] - 1 : content.length;
-        if (!content.slice(s, e).trim()) continue;
+        const startPos = starts[i];
+        const endPos = i + 1 < starts.length ? starts[i + 1] - 1 : content.length;
+        if (!content.slice(startPos, endPos).trim()) continue;
         counts.set(hashes[i], (counts.get(hashes[i]) ?? 0) + 1);
     }
     let duplicated = 0;
@@ -155,8 +155,8 @@ function filterMeaningfulLines(lines: string[]): { hashes: number[]; indices: nu
             trimmed !== '}'
         ) {
             let hashVal = 0x811c9dc5;
-            for (let c = 0; c < trimmed.length; c++) {
-                hashVal ^= trimmed.charCodeAt(c);
+            for (let charIdx = 0; charIdx < trimmed.length; charIdx++) {
+                hashVal ^= trimmed.charCodeAt(charIdx);
                 hashVal = Math.imul(hashVal, 0x01000193);
             }
             hashes.push(hashVal | 0);
@@ -173,7 +173,9 @@ function filterMeaningfulLines(lines: string[]): { hashes: number[]; indices: nu
  * @returns Array of detected clone blocks.
  */
 export function detectCloneBlocksShim(content: string, minCloneLines: number): NativeCloneBlock[] {
-    const lines = content.split('\n').map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l));
+    const lines = content
+        .split('\n')
+        .map((lineText) => (lineText.endsWith('\r') ? lineText.slice(0, -1) : lineText));
     const { hashes: meaningfulHashes, indices: meaningfulLineIndices } =
         filterMeaningfulLines(lines);
 
@@ -214,12 +216,12 @@ function computeShingles(meaningfulHashes: number[]): number[] {
     const shingles: number[] = [];
     if (meaningfulHashes.length >= 3) {
         for (let i = 0; i <= meaningfulHashes.length - 3; i++) {
-            const s =
+            const shingleHash =
                 (Math.imul(meaningfulHashes[i], 961) +
                     Math.imul(meaningfulHashes[i + 1], 31) +
                     meaningfulHashes[i + 2]) >>>
                 0;
-            shingles.push(s);
+            shingles.push(shingleHash);
         }
     } else {
         shingles.push(...meaningfulHashes);
@@ -237,9 +239,11 @@ export function computeMinHashShim(content: string, numPermutations = 64): numbe
     const numHashes = Math.min(numPermutations, HASH_COEFFS.length);
     const signature = new Array<number>(numHashes).fill(0xffffffff);
 
-    const lines = content.split('\n').map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l));
+    const lines = content
+        .split('\n')
+        .map((lineText) => (lineText.endsWith('\r') ? lineText.slice(0, -1) : lineText));
     const { hashes: rawHashes } = filterMeaningfulLines(lines);
-    const meaningfulHashes = rawHashes.map((h) => h >>> 0);
+    const meaningfulHashes = rawHashes.map((hashItem) => hashItem >>> 0);
 
     if (meaningfulHashes.length === 0) {
         return signature;
@@ -248,8 +252,8 @@ export function computeMinHashShim(content: string, numPermutations = 64): numbe
     const shingles = computeShingles(meaningfulHashes);
     for (const shingle of shingles) {
         for (let k = 0; k < numHashes; k++) {
-            const [a, b] = HASH_COEFFS[k];
-            const hashVal = (Math.imul(a, shingle) + b) >>> 0;
+            const [coeffA, coeffB] = HASH_COEFFS[k];
+            const hashVal = (Math.imul(coeffA, shingle) + coeffB) >>> 0;
             if (hashVal < signature[k]) {
                 signature[k] = hashVal;
             }
@@ -264,9 +268,9 @@ export function computeMinHashShim(content: string, numPermutations = 64): numbe
 function addBucketCandidates(bucket: number[], candidateMap: Map<string, [number, number]>): void {
     for (let i = 0; i < bucket.length; i++) {
         for (let j = i + 1; j < bucket.length; j++) {
-            const a = Math.min(bucket[i], bucket[j]);
-            const b = Math.max(bucket[i], bucket[j]);
-            candidateMap.set(`${a}:${b}`, [a, b]);
+            const minIdx = Math.min(bucket[i], bucket[j]);
+            const maxIdx = Math.max(bucket[i], bucket[j]);
+            candidateMap.set(`${minIdx}:${maxIdx}`, [minIdx, maxIdx]);
         }
     }
 }
@@ -291,15 +295,15 @@ interface PopulateBandBucketsParams {
 function populateBandBuckets(params: PopulateBandBucketsParams): void {
     const { signatures, start, end, totalSignatures, buckets } = params;
     buckets.clear();
-    for (let f = 0; f < totalSignatures; f++) {
-        const sig = signatures[f];
+    for (let sigIdx = 0; sigIdx < totalSignatures; sigIdx++) {
+        const sig = signatures[sigIdx];
         if (sig.length < end) continue;
         let bandHash = 0x811c9dc5;
-        for (let r = start; r < end; r++) {
-            bandHash ^= sig[r];
+        for (let rowIdx = start; rowIdx < end; rowIdx++) {
+            bandHash ^= sig[rowIdx];
             bandHash = Math.imul(bandHash, 0x01000193);
         }
-        addToBucket(buckets, bandHash >>> 0, f);
+        addToBucket(buckets, bandHash >>> 0, sigIdx);
     }
 }
 
@@ -319,10 +323,10 @@ function evaluateCloneCandidates(
     threshold: number,
 ): NativeClonePair[] {
     const pairs: NativeClonePair[] = [];
-    for (const [a, b] of candidateMap.values()) {
-        const similarity = computeSignatureSimilarity(signatures[a], signatures[b]);
+    for (const [fileIdxA, fileIdxB] of candidateMap.values()) {
+        const similarity = computeSignatureSimilarity(signatures[fileIdxA], signatures[fileIdxB]);
         if (similarity >= threshold) {
-            pairs.push({ fileA: a, fileB: b, similarity });
+            pairs.push({ fileA: fileIdxA, fileB: fileIdxB, similarity });
         }
     }
     pairs.sort((pairA, pairB) => pairB.similarity - pairA.similarity);
@@ -400,8 +404,8 @@ export function computeSimHash64Shim(tokens: readonly string[]): string {
  * @returns Similarity in the closed interval `0..1`, where 1 means identical fingerprints.
  */
 export function computeSimHashSimilarityShim(hashA: string, hashB: string): number {
-    const parse = (s: string): bigint => {
-        const trimmed = s.trim();
+    const parse = (hashString: string): bigint => {
+        const trimmed = hashString.trim();
         if (trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
             return BigInt(trimmed);
         }
@@ -422,7 +426,7 @@ export const calculateSimHashHammingSimilarityShim = computeSimHashSimilarityShi
  * @param tokensB - Token sequence of the second document, expanded the same way.
  * @returns Cosine similarity of the two trigram vectors in `0..1`.
  */
-export function calculateTrigramCosineSimilarityShim(
+export function calculateTrigramSimilarityShim(
     tokensA: readonly string[],
     tokensB: readonly string[],
 ): number {
@@ -430,6 +434,9 @@ export function calculateTrigramCosineSimilarityShim(
     const vecB = extractTokenTrigrams(tokensB);
     return calculateTrigramCosineSimilarity(vecA, vecB);
 }
+
+/** Backward-compatibility alias for calculateTrigramSimilarityShim. */
+export const calculateTrigramCosineSimilarityShim = calculateTrigramSimilarityShim;
 
 interface TemporalMiningState {
     readonly fileCommitCounts: Map<number, number>;
@@ -441,8 +448,8 @@ function recordChangeset(changeset: number[], state: TemporalMiningState): void 
         return;
     }
     const unique = Array.from(new Set(changeset)).sort((firstId, secondId) => firstId - secondId);
-    for (const id of unique) {
-        state.fileCommitCounts.set(id, (state.fileCommitCounts.get(id) || 0) + 1);
+    for (const fileId of unique) {
+        state.fileCommitCounts.set(fileId, (state.fileCommitCounts.get(fileId) || 0) + 1);
     }
     const len = unique.length;
     for (let i = 0; i < len; i++) {
@@ -567,10 +574,10 @@ const MIN_BUMPY_SCORE_THRESHOLD = 12.0;
 export function measureLineIndentLevelShim(line: string): number {
     let spaces = 0;
     for (let i = 0; i < line.length; i++) {
-        const ch = line.charCodeAt(i);
-        if (ch === 32) {
+        const charCode = line.charCodeAt(i);
+        if (charCode === 32) {
             spaces++;
-        } else if (ch === 9) {
+        } else if (charCode === 9) {
             spaces += SPACE_INDENT_SIZE;
         } else {
             break;
@@ -710,15 +717,17 @@ function hasInitialByte(content: string, len: number, lut: Uint8Array): boolean 
 function matchesAnyTrigger(content: string, group: readonly string[]): boolean {
     const validTriggers: string[] = [];
     for (let i = 0; i < group.length; i++) {
-        const t = group[i];
-        if (t && t.length > 0) {
-            validTriggers.push(t);
+        const triggerItem = group[i];
+        if (triggerItem && triggerItem.length > 0) {
+            validTriggers.push(triggerItem);
         }
     }
     if (validTriggers.length === 0) {
         return false;
     }
-    const pattern = validTriggers.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const pattern = validTriggers
+        .map((triggerPattern) => triggerPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('|');
     return new RegExp(pattern).test(content);
 }
 
@@ -754,7 +763,7 @@ export function batchProbeTriggersShim(
         return [];
     }
     if (!content) {
-        return triggerGroups.map((g) => !g || g.length === 0);
+        return triggerGroups.map((triggerGroup) => !triggerGroup || triggerGroup.length === 0);
     }
     const len = content.length;
     return triggerGroups.map((group) => probeSingleTriggerGroup(content, group, len));

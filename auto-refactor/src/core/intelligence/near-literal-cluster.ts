@@ -85,12 +85,17 @@ export interface SiblingLiteralCluster {
     hasHardcodedInline: boolean;
 }
 
-function identifyNumericFamily(n: number): string | null {
-    if (n >= HTTP_STATUS_MIN && n <= HTTP_STATUS_MAX) return FAMILY_HTTP_STATUS;
-    if (n >= DURATION_MS_MIN && n <= DURATION_MS_MAX && n % DURATION_STEP_1000 === 0) {
+function identifyNumericFamily(numericValue: number): string | null {
+    if (numericValue >= HTTP_STATUS_MIN && numericValue <= HTTP_STATUS_MAX)
+        return FAMILY_HTTP_STATUS;
+    if (
+        numericValue >= DURATION_MS_MIN &&
+        numericValue <= DURATION_MS_MAX &&
+        numericValue % DURATION_STEP_1000 === 0
+    ) {
         return FAMILY_DURATION_MS;
     }
-    if (KNOWN_PORT_SET.has(n)) return FAMILY_NETWORK_PORT;
+    if (KNOWN_PORT_SET.has(numericValue)) return FAMILY_NETWORK_PORT;
     return null;
 }
 
@@ -162,7 +167,7 @@ function addCandidateToClusters(lit: LiteralRecord, clusters: SiblingLiteralClus
  * Evaluates an individual cluster and builds a finding if extraction is incomplete.
  */
 function buildClusterIssue(cluster: SiblingLiteralCluster, filePath: string): Issue | null {
-    const unextracted = cluster.literals.filter((l) => !l.isConstBound);
+    const unextracted = cluster.literals.filter((lit) => !lit.isConstBound);
     if (unextracted.length === 0) return null;
 
     const isIncomplete =
@@ -170,9 +175,9 @@ function buildClusterIssue(cluster: SiblingLiteralCluster, filePath: string): Is
     if (!isIncomplete) return null;
 
     const firstUnextracted = unextracted[0];
-    const suggestions = unextracted.map((l) => {
-        const suggestedName = generateSemanticConstantName(l.value, l.numeric);
-        return `const ${suggestedName} = ${l.value}; (line ${l.line})`;
+    const suggestions = unextracted.map((lit) => {
+        const suggestedName = generateSemanticConstantName(lit.value, lit.numeric);
+        return `const ${suggestedName} = ${lit.value}; (line ${lit.line})`;
     });
 
     const desc = ConstantsMessages.UNEXTRACTED_CLUSTER_LEAK(
@@ -192,8 +197,8 @@ function buildClusterIssue(cluster: SiblingLiteralCluster, filePath: string): Is
             family: cluster.family,
             totalClusterCount: cluster.literals.length,
             unextractedCount: unextracted.length,
-            lines: unextracted.map((l) => l.line),
-            values: unextracted.map((l) => l.value),
+            lines: unextracted.map((lit) => lit.line),
+            values: unextracted.map((lit) => lit.value),
         },
         suggestion: `${desc.suggestion}:\n  ${suggestions.join('\n  ')}`,
     };
@@ -210,9 +215,9 @@ export function scanNearLiteralClusters(literals: LiteralRecord[], filePath: str
     const issues: Issue[] = [];
     if (literals.length < MIN_CLUSTER_SIZE) return issues;
 
-    const candidates = literals.filter((l) => {
-        if (l.tolerated) return false;
-        return !l.numeric || !TOLERATED_NUMERIC_STRINGS.has(l.value);
+    const candidates = literals.filter((lit) => {
+        if (lit.tolerated) return false;
+        return !lit.numeric || !TOLERATED_NUMERIC_STRINGS.has(lit.value);
     });
 
     const clusters: SiblingLiteralCluster[] = [];

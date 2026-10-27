@@ -145,8 +145,11 @@ export interface StubsAuditContext {
 export class HygieneAnalyzer implements Analyzer {
     name = 'hygiene' as const;
 
-    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
-        void sf;
+    analyze(
+        sourceFile: import('typescript').SourceFile | undefined,
+        ctx: AnalyzerContext,
+    ): Issue[] {
+        void sourceFile;
         const opts = (ctx.options || {}) as HygieneOptions;
         const issues: Issue[] = [];
         const content = ctx.content || '';
@@ -502,11 +505,11 @@ export class HygieneAnalyzer implements Analyzer {
         }
 
         const checkRule = (
-            re: RegExp,
+            patternRegex: RegExp,
             rule: string,
             getDesc: (expr: string) => { message: string; suggestion?: string },
         ): void => {
-            if (!re.test(trimmed)) return;
+            if (!patternRegex.test(trimmed)) return;
             const desc = getDesc(trimmed);
             issues.push(
                 this.makeHygieneIssue({

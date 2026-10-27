@@ -176,7 +176,7 @@ function auditBackendEnvSecrets(file: string, rawLines: string[], issues: Issue[
 export class ProductionHygieneAnalyzer implements Analyzer {
     readonly name = ANALYZER_PRODUCTION_HYGIENE_ID;
 
-    analyze(_sf: unknown, context: AnalyzerContext): Issue[] {
+    analyze(_sourceFile: unknown, context: AnalyzerContext): Issue[] {
         const file = context.filePath;
         const issues: Issue[] = [];
         const rawLines = context.content.split('\n');

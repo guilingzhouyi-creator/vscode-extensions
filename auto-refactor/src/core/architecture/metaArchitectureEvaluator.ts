@@ -89,10 +89,10 @@ export class MetaArchitectureEvaluator {
         if (!enforceCleanLayers) return 0;
         const inversions = graph.findLayerInversions(DEFAULT_ALLOWED_DEPENDENCIES);
         for (const edge of inversions) {
-            const from = graph.getNode(edge.fromNodeId);
-            const to = graph.getNode(edge.toNodeId);
-            if (from && to) {
-                evaluateLayerInversion(edge, from, to, issues, isSelfRepo);
+            const fromNode = graph.getNode(edge.fromNodeId);
+            const toNode = graph.getNode(edge.toNodeId);
+            if (fromNode && toNode) {
+                evaluateLayerInversion(edge, fromNode, toNode, issues, isSelfRepo);
             }
         }
         return inversions.length;
@@ -106,10 +106,10 @@ export class MetaArchitectureEvaluator {
         if (!flagBypass) return 0;
         const bypasses = graph.findPrivateBypasses();
         for (const edge of bypasses) {
-            const from = graph.getNode(edge.fromNodeId);
-            const to = graph.getNode(edge.toNodeId);
-            if (from && to) {
-                evaluateBoundaryBypass(edge, from, to, issues);
+            const fromNode = graph.getNode(edge.fromNodeId);
+            const toNode = graph.getNode(edge.toNodeId);
+            if (fromNode && toNode) {
+                evaluateBoundaryBypass(edge, fromNode, toNode, issues);
             }
         }
         return bypasses.length;
@@ -121,13 +121,13 @@ export class MetaArchitectureEvaluator {
         issues: Issue[],
     ): import('./config-driven-architecture').ConfigDrivenAnalysisResult | undefined {
         if (!flagConfig) return undefined;
-        const configFiles = nodes.map((n) => ({
-            filePath: n.filePath,
+        const configFiles = nodes.map((node) => ({
+            filePath: node.filePath,
             content: '',
-            imports: n.imports,
-            isDomainCore: n.role === 'headless_domain_core',
+            imports: node.imports,
+            isDomainCore: node.role === 'headless_domain_core',
         }));
-        const domainSet = new Set(nodes.map((n) => n.domainName).filter(Boolean));
+        const domainSet = new Set(nodes.map((node) => node.domainName).filter(Boolean));
         const configMaturity = auditConfigDrivenArchitecture(configFiles, {
             fileCount: nodes.length,
             domainCount: domainSet.size || 1,
@@ -239,8 +239,8 @@ export class MetaArchitectureEvaluator {
         const headlessBreachCount = graph.findHeadlessViolations().length;
         const layerDistribution = graph.computeDistribution();
         const nodeMap = new Map<string, SemanticArchitectureNode>();
-        for (const n of nodes) {
-            nodeMap.set(n.id, n);
+        for (const node of nodes) {
+            nodeMap.set(node.id, node);
         }
 
         return {

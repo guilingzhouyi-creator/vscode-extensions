@@ -83,12 +83,12 @@ export function computeCodeSurvival(
 
     for (let i = 0; i < intervals.length; i++) {
         const item = intervals[i];
-        const n = Math.max(0, item.atRiskCount);
-        const d = Math.max(0, item.eventCount);
+        const atRisk = Math.max(0, item.atRiskCount);
+        const events = Math.max(0, item.eventCount);
 
         let hazard = 0.0;
-        if (n > 0) {
-            hazard = Math.min(1.0, +(d / n).toFixed(4));
+        if (atRisk > 0) {
+            hazard = Math.min(1.0, +(events / atRisk).toFixed(4));
         }
         finalHazard = hazard;
 

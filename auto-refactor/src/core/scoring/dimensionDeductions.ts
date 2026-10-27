@@ -258,7 +258,7 @@ const FAMILY_DIMENSION_CACHE = new Map<string, QualityDimension | null>();
  * Pre-sorted family prefixes descending by length to guarantee longest-prefix match.
  */
 const SORTED_FAMILY_PREFIXES: readonly string[] = Object.keys(FAMILY_DIMENSIONS).sort(
-    (a, b) => b.length - a.length,
+    (deductionA, deductionB) => deductionB.length - deductionA.length,
 );
 
 /**
@@ -443,12 +443,12 @@ export function isTier1CriticalDebt(rule: string, analyzer: string, severity: st
     if (severity === FRAGMENT_ERROR) {
         return true;
     }
-    const a = (analyzer ?? '').toLowerCase();
-    if (a.includes('security')) {
+    const analyzerName = (analyzer ?? '').toLowerCase();
+    if (analyzerName.includes('security')) {
         return true;
     }
-    const r = (rule ?? '').toUpperCase();
-    return TIER1_PREFIX_RE.test(r) || TIER1_KEYWORD_RE.test(r);
+    const ruleId = (rule ?? '').toUpperCase();
+    return TIER1_PREFIX_RE.test(ruleId) || TIER1_KEYWORD_RE.test(ruleId);
 }
 
 /**
@@ -459,12 +459,12 @@ export function isTier1CriticalDebt(rule: string, analyzer: string, severity: st
  * @returns True if the finding represents evolutionary maintenance debt.
  */
 export function isTier2EvolutionaryDebt(rule: string, analyzer: string): boolean {
-    const a = (analyzer ?? '').toLowerCase();
-    if (TIER2_ANALYZER_RE.test(a)) {
+    const analyzerName = (analyzer ?? '').toLowerCase();
+    if (TIER2_ANALYZER_RE.test(analyzerName)) {
         return true;
     }
-    const r = (rule ?? '').toUpperCase();
-    return TIER2_PREFIX_RE.test(r);
+    const ruleId = (rule ?? '').toUpperCase();
+    return TIER2_PREFIX_RE.test(ruleId);
 }
 
 /**

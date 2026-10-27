@@ -80,7 +80,7 @@ function ruleMatches(ids: string[], fragments: string[]): (issue: Issue) => bool
     return (issue) => {
         if (issue.rule && ids.includes(issue.rule)) return true;
         const lower = issue.message.toLowerCase();
-        return fragments.some((f) => lower.includes(f));
+        return fragments.some((ruleFinding) => lower.includes(ruleFinding));
     };
 }
 

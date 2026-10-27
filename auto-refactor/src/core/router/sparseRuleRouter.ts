@@ -281,11 +281,11 @@ export function selectTopKBitmask(
 /**
  * Fast SWAR population count (Hamming weight) of a 32-bit unsigned integer.
  *
- * @param v - 32-bit unsigned integer value.
+ * @param value - 32-bit unsigned integer value.
  * @returns The number of set bits (1s) in the integer.
  */
-export function popcount32(v: number): number {
-    let x = v >>> 0;
+export function popcount32(value: number): number {
+    let x = value >>> 0;
     x = x - ((x >>> SWAR_SHIFT_1) & SWAR_MASK_55);
     x = (x & SWAR_MASK_33) + ((x >>> SWAR_SHIFT_2) & SWAR_MASK_33);
     x = (x + (x >>> SWAR_SHIFT_4)) & SWAR_MASK_0F;
@@ -512,8 +512,8 @@ export function routeDiffToBitmask(
     }
 
     if (options.customAnalyzers) {
-        for (const ca of options.customAnalyzers) {
-            candidateMask |= analyzerNameToBit(ca);
+        for (const customAnalyzer of options.customAnalyzers) {
+            candidateMask |= analyzerNameToBit(customAnalyzer);
         }
     }
 
@@ -571,17 +571,17 @@ export function routeDiffToAnalyzers(
     const bitResult = routeDiffToBitmask(classification, options);
     const activeAnalyzers = new Set(analyzerMaskToNames(bitResult.activeMask));
     if (options.customAnalyzers) {
-        for (const ca of options.customAnalyzers) {
-            activeAnalyzers.add(ca);
+        for (const customAnalyzer of options.customAnalyzers) {
+            activeAnalyzers.add(customAnalyzer);
         }
     }
     const all = options.availableAnalyzers
         ? [...options.availableAnalyzers]
         : [...ALL_BUILTIN_ANALYZERS];
     const skippedAnalyzers = new Set<string>();
-    for (const a of all) {
-        if (!activeAnalyzers.has(a)) {
-            skippedAnalyzers.add(a);
+    for (const analyzerName of all) {
+        if (!activeAnalyzers.has(analyzerName)) {
+            skippedAnalyzers.add(analyzerName);
         }
     }
     const overflowAnalyzers = new Set(analyzerMaskToNames(bitResult.overflowMask));
@@ -630,29 +630,29 @@ export function routeArchetypeToAnalyzers(
         }
         throw new Error(`${ERR_UNKNOWN_CATEGORY} Unknown archetype: ${archetype}`);
     }
-    for (const a of targets) {
-        if (allSet.has(a)) {
-            active.add(a);
+    for (const analyzerName of targets) {
+        if (allSet.has(analyzerName)) {
+            active.add(analyzerName);
         }
     }
 
     // Always include custom analyzers for zero false negatives
     if (options.customAnalyzers) {
-        for (const ca of options.customAnalyzers) {
-            active.add(ca);
+        for (const customAnalyzer of options.customAnalyzers) {
+            active.add(customAnalyzer);
         }
     }
 
     if (active.size === 0) {
-        for (const a of all) {
-            active.add(a);
+        for (const analyzerName of all) {
+            active.add(analyzerName);
         }
     }
 
     const skipped = new Set<string>();
-    for (const a of all) {
-        if (!active.has(a)) {
-            skipped.add(a);
+    for (const analyzerName of all) {
+        if (!active.has(analyzerName)) {
+            skipped.add(analyzerName);
         }
     }
 

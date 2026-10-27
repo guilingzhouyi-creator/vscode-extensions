@@ -143,8 +143,10 @@ export function stripLiteralQuotes(str: string): string {
     if (len === 0) return str;
     const first = str.charCodeAt(0);
     const last = str.charCodeAt(len - 1);
-    const isQuote = (c: number) =>
-        c === CHAR_CODE_SINGLE_QUOTE || c === CHAR_CODE_DOUBLE_QUOTE || c === CHAR_CODE_BACKTICK;
+    const isQuote = (charCode: number) =>
+        charCode === CHAR_CODE_SINGLE_QUOTE ||
+        charCode === CHAR_CODE_DOUBLE_QUOTE ||
+        charCode === CHAR_CODE_BACKTICK;
     const start = isQuote(first) ? 1 : 0;
     const end = len > start && isQuote(last) ? len - 1 : len;
     return start > 0 || end < len ? str.slice(start, end) : str;
@@ -217,19 +219,19 @@ export function computeConstantFingerprint(
 /**
  * Determines whether two constant fingerprints represent identical semantic values.
  *
- * @param a - First constant fingerprint.
- * @param b - Second constant fingerprint.
+ * @param firstFingerprint - First constant fingerprint.
+ * @param secondFingerprint - Second constant fingerprint.
  * @returns True if both fingerprints are semantically equivalent.
  */
 export function areSemanticallyEqual(
-    a: ConstantSemanticFingerprint,
-    b: ConstantSemanticFingerprint,
+    firstFingerprint: ConstantSemanticFingerprint,
+    secondFingerprint: ConstantSemanticFingerprint,
 ): boolean {
     return (
-        a.semanticHash === b.semanticHash ||
-        (a.normalizedValue === b.normalizedValue &&
-            a.inferredType === b.inferredType &&
-            a.semanticKind === b.semanticKind)
+        firstFingerprint.semanticHash === secondFingerprint.semanticHash ||
+        (firstFingerprint.normalizedValue === secondFingerprint.normalizedValue &&
+            firstFingerprint.inferredType === secondFingerprint.inferredType &&
+            firstFingerprint.semanticKind === secondFingerprint.semanticKind)
     );
 }
 
@@ -327,8 +329,8 @@ function isConstantStatement(line: string): boolean {
 function isConstantContentDominant(lines: string[]): boolean {
     if (lines.length === 0) return false;
     let constLineCount = 0;
-    for (const l of lines) {
-        if (isConstantStatement(l)) {
+    for (const line of lines) {
+        if (isConstantStatement(line)) {
             constLineCount++;
         }
     }
@@ -364,10 +366,11 @@ function hasConstantTableCharacteristics(content: string): boolean {
 
     const lines = stripped
         .split('\n')
-        .map((l) => l.trim())
+        .map((line) => line.trim())
         .filter(
-            (l) =>
-                l.length > 0 && !EXCLUDED_STATEMENT_PREFIXES.some((prefix) => l.startsWith(prefix)),
+            (line) =>
+                line.length > 0 &&
+                !EXCLUDED_STATEMENT_PREFIXES.some((prefix) => line.startsWith(prefix)),
         );
 
     return isConstantContentDominant(lines);

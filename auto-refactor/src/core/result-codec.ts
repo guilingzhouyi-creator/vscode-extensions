@@ -463,7 +463,7 @@ function decodeSeverity(severityCode: number): Severity {
 }
 
 function decodeSingleIssue(reader: Reader): Issue {
-    const id = reader.readString();
+    const issueId = reader.readString();
     const analyzer = reader.readString();
     const rule = reader.readString();
     const severityCode = reader.readU8();
@@ -479,7 +479,7 @@ function decodeSingleIssue(reader: Reader): Issue {
     const hasActionable = reader.readU8();
     const actionable = hasActionable ? (reader.readValue() as Issue['actionable']) : undefined;
     return {
-        id,
+        id: issueId,
         analyzer,
         rule,
         severity: decodeSeverity(severityCode),

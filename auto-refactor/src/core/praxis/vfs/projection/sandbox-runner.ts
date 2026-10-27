@@ -51,8 +51,8 @@ function attachProcessListeners(
     onError: (err: Error) => void,
     onClose: (code: number | null) => void,
 ): void {
-    child.stdout?.on('data', (d: Buffer | string) => onStdout(d.toString()));
-    child.stderr?.on('data', (d: Buffer | string) => onStderr(d.toString()));
+    child.stdout?.on('data', (chunkData: Buffer | string) => onStdout(chunkData.toString()));
+    child.stderr?.on('data', (chunkData: Buffer | string) => onStderr(chunkData.toString()));
     child.on('error', onError);
     child.on('close', onClose);
 }

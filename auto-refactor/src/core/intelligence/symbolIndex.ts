@@ -298,7 +298,8 @@ export class SymbolIndex {
             const raw = this.references.get(name);
             if (!raw || raw.length === 0) return [];
             sorted = [...raw].sort(
-                (a, b) => a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0),
+                (refA, refB) =>
+                    refA.file.localeCompare(refB.file) || (refA.line ?? 0) - (refB.line ?? 0),
             );
             this.sortedReferences.set(name, sorted);
         }

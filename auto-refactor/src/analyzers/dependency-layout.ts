@@ -174,10 +174,10 @@ function expressionMentionsRequire(expr: ts.Expression): boolean {
     }
 }
 
-function findFirstTsDeclarationLine(sf: ts.SourceFile): number | undefined {
-    for (const stmt of sf.statements) {
+function findFirstTsDeclarationLine(sourceFile: ts.SourceFile): number | undefined {
+    for (const stmt of sourceFile.statements) {
         if (establishesImportHorizon(stmt)) {
-            return sf.getLineAndCharacterOfPosition(stmt.getStart(sf)).line + 1;
+            return sourceFile.getLineAndCharacterOfPosition(stmt.getStart(sourceFile)).line + 1;
         }
     }
     return undefined;
@@ -203,11 +203,11 @@ function findFirstPolyglotDeclarationLine(lines: string[], language: string): nu
 }
 
 function resolveSourceFile(
-    sf: ts.SourceFile | undefined,
+    sourceFile: ts.SourceFile | undefined,
     ctx: AnalyzerContext,
     language: string,
 ): ts.SourceFile | undefined {
-    const existing = sf || (ctx as { sourceFile?: ts.SourceFile }).sourceFile;
+    const existing = sourceFile || (ctx as { sourceFile?: ts.SourceFile }).sourceFile;
     if (existing || language !== 'typescript' || !ctx.content) {
         return existing;
     }
@@ -227,7 +227,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
     /** Cached split lines of current file under analysis to eliminate repeated full-file splits. */
     private fileLines: string[] = [];
 
-    analyze(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         const options = (ctx.config.analyzers['dependency-layout']?.options ||
             {}) as DependencyLayoutOptions;
         const normPath = ctx.filePath.replace(/\\/g, '/');
@@ -238,7 +238,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         const imports: ImportStatementInfo[] = [];
         const resources: ExternalResourceRef[] = [];
 
-        const effectiveSf = resolveSourceFile(sf, ctx, language);
+        const effectiveSf = resolveSourceFile(sourceFile, ctx, language);
 
         const firstDeclarationLine = this.resolveFirstDeclarationLine(
             language,
@@ -278,18 +278,22 @@ export class DependencyLayoutAnalyzer implements Analyzer {
 
     private resolveFirstDeclarationLine(
         language: string,
-        sf: ts.SourceFile | undefined,
+        sourceFile: ts.SourceFile | undefined,
         lines: string[],
     ): number | undefined {
-        if (language === 'typescript' && sf && typeof sf.forEachChild === 'function') {
-            return findFirstTsDeclarationLine(sf);
+        if (
+            language === 'typescript' &&
+            sourceFile &&
+            typeof sourceFile.forEachChild === 'function'
+        ) {
+            return findFirstTsDeclarationLine(sourceFile);
         }
         return findFirstPolyglotDeclarationLine(lines, language);
     }
 
     private handleCallImport(
         node: ts.CallExpression,
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
         ctx: AnalyzerContext,
         isInsideFunction: boolean,
         options?: DependencyLayoutOptions,
@@ -297,8 +301,8 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         const specifier = extractCallSpecifier(node);
         if (!specifier) return null;
 
-        const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-        const rawText = node.getText(sf).trim();
+        const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+        const rawText = node.getText(sourceFile).trim();
         const category = categorizeImport(specifier, 'typescript');
         const surroundingText = this.getSurroundingText(this.fileLines, line);
         const exemption = extractExemptionReason(surroundingText, options?.lazyImportExemptMarkers);
@@ -317,7 +321,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
     }
 
     private analyzeTsWithAst(
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
         ctx: AnalyzerContext,
         imports: ImportStatementInfo[],
         options?: DependencyLayoutOptions,
@@ -329,12 +333,17 @@ export class DependencyLayoutAnalyzer implements Analyzer {
             if (isFn) functionNestingLevel++;
 
             if (ts.isImportDeclaration(node)) {
-                const info = handleStaticImport(node, sf, ctx.filePath, functionNestingLevel > 0);
+                const info = handleStaticImport(
+                    node,
+                    sourceFile,
+                    ctx.filePath,
+                    functionNestingLevel > 0,
+                );
                 if (info) imports.push(info);
             } else if (ts.isCallExpression(node)) {
                 const info = this.handleCallImport(
                     node,
-                    sf,
+                    sourceFile,
                     ctx,
                     functionNestingLevel > 0,
                     options,
@@ -346,7 +355,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
             if (isFn) functionNestingLevel--;
         };
 
-        visit(sf);
+        visit(sourceFile);
     }
 
     private analyzeWithLines(
@@ -537,7 +546,7 @@ function isFunctionBoundary(node: ts.Node): boolean {
 
 function handleStaticImport(
     node: ts.ImportDeclaration,
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     filePath: string,
     isInsideFunction: boolean,
 ): ImportStatementInfo | null {
@@ -546,8 +555,8 @@ function handleStaticImport(
         : '';
     if (!moduleSpecifier) return null;
 
-    const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-    const rawText = node.getText(sf).trim();
+    const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+    const rawText = node.getText(sourceFile).trim();
     const category = categorizeImport(moduleSpecifier, 'typescript');
     const isWildcard =
         node.importClause?.namedBindings !== undefined &&

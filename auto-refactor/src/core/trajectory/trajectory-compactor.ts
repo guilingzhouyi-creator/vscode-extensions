@@ -28,13 +28,13 @@ import {
  * @returns ISO week identifier.
  */
 export function getIsoWeekId(timestamp: number): string {
-    const d = new Date(timestamp);
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+    const dateObj = new Date(timestamp);
+    const dayNum = dateObj.getUTCDay() || 7;
+    dateObj.setUTCDate(dateObj.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(dateObj.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil(((dateObj.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
     const paddedWeek = weekNo < 10 ? `0${weekNo}` : `${weekNo}`;
-    return `${d.getUTCFullYear()}-W${paddedWeek}`;
+    return `${dateObj.getUTCFullYear()}-W${paddedWeek}`;
 }
 
 /**
@@ -65,12 +65,14 @@ export function aggregateRecords(
                 mean: 0,
                 min: 0,
                 max: 0,
+                kMean: 0,
             },
             debt: {
                 totalAdded: 0,
                 totalResolved: 0,
                 totalRegressions: 0,
                 netYield: 0,
+                densityYield: 0,
             },
             meanCompositeScore: 100,
             gatePassRate: 100,
@@ -92,36 +94,41 @@ export function aggregateRecords(
     let scoreSum = 0;
     let passedGateCount = 0;
 
-    for (const r of records) {
-        if (r.t < startMs) startMs = r.t;
-        if (r.t > endMs) endMs = r.t;
+    for (const record of records) {
+        if (record.t < startMs) startMs = record.t;
+        if (record.t > endMs) endMs = record.t;
 
-        processedTotal += r.eloc.proc;
-        if (r.eloc.uniq > maxUnique) maxUnique = r.eloc.uniq;
-        changedTotal += r.eloc.chg;
-        semanticTotal += r.eloc.sem;
+        processedTotal += record.eloc.proc;
+        if (record.eloc.uniq > maxUnique) maxUnique = record.eloc.uniq;
+        changedTotal += record.eloc.chg;
+        semanticTotal += record.eloc.sem;
 
-        const qed = r.score.qed;
+        const qed = record.score.qed;
         qedSum += qed;
         if (qed < qedMin) qedMin = qed;
         if (qed > qedMax) qedMax = qed;
 
-        totalAddedDebt += r.debt.add;
-        totalResolvedDebt += r.debt.res;
-        totalRegressions += r.debt.reg;
+        totalAddedDebt += record.debt.add;
+        totalResolvedDebt += record.debt.res;
+        totalRegressions += record.debt.reg;
 
-        scoreSum += r.score.aft;
-        if (r.gate.pass) passedGateCount++;
+        scoreSum += record.score.aft;
+        if (record.gate.pass) passedGateCount++;
     }
 
     const totalRuns = records.length;
-    const meanQed = Math.round((qedSum / totalRuns) * 10000) / 10000;
+    const meanQed = Math.round((qedSum / totalRuns) * 1000000) / 1000000;
+    const kMean = Math.round(meanQed * 1000 * 100) / 100;
     const meanScore = Math.round((scoreSum / totalRuns) * 100) / 100;
     const gatePassRate = Math.round((passedGateCount / totalRuns) * 10000) / 100;
 
     const netDebt = totalResolvedDebt - totalAddedDebt;
-    const processedKiloEloc = Math.max(1, processedTotal / 1000);
-    const netYield = Math.round((netDebt / processedKiloEloc) * 100) / 100;
+    const semanticKilo =
+        semanticTotal > 0 ? Math.max(0.1, semanticTotal / 1000) : Math.max(1, maxUnique / 1000);
+    const netYield = Math.round((netDebt / semanticKilo) * 100) / 100;
+
+    const baseKilo = Math.max(1, maxUnique / 1000);
+    const densityYield = Math.round((netDebt / baseKilo) * 100) / 100;
 
     return {
         weekId: summaryId,
@@ -138,16 +145,95 @@ export function aggregateRecords(
             mean: meanQed,
             min: qedMin === Infinity ? 0 : qedMin,
             max: qedMax === -Infinity ? 0 : qedMax,
+            kMean,
         },
         debt: {
             totalAdded: totalAddedDebt,
             totalResolved: totalResolvedDebt,
             totalRegressions,
             netYield,
+            densityYield,
         },
         meanCompositeScore: meanScore,
         gatePassRate,
     };
+}
+
+/**
+ * Running totals accumulated across weekly summaries before the final projection.
+ *
+ * Extracted so `aggregateWeeklySummaries` stays within the cyclomatic budget: the fold body
+ * carries no branching beyond the accumulator updates themselves.
+ */
+interface WeeklySummaryAccumulator {
+    startMs: number;
+    endMs: number;
+    totalRuns: number;
+    processedTotal: number;
+    maxUnique: number;
+    changedTotal: number;
+    semanticTotal: number;
+    qedWeightedSum: number;
+    qedMin: number;
+    qedMax: number;
+    totalAddedDebt: number;
+    totalResolvedDebt: number;
+    totalRegressions: number;
+    scoreWeightedSum: number;
+    passedWeightedCount: number;
+}
+
+/**
+ * Creates the neutral accumulator for the weekly-summary fold.
+ *
+ * @returns Accumulator seeded with additive identities and inverted min/max bounds.
+ */
+function createWeeklyAccumulator(): WeeklySummaryAccumulator {
+    return {
+        startMs: Infinity,
+        endMs: -Infinity,
+        totalRuns: 0,
+        processedTotal: 0,
+        maxUnique: 0,
+        changedTotal: 0,
+        semanticTotal: 0,
+        qedWeightedSum: 0,
+        qedMin: Infinity,
+        qedMax: -Infinity,
+        totalAddedDebt: 0,
+        totalResolvedDebt: 0,
+        totalRegressions: 0,
+        scoreWeightedSum: 0,
+        passedWeightedCount: 0,
+    };
+}
+
+/**
+ * Folds one weekly summary into the accumulator.
+ *
+ * @param acc - Accumulator mutated in place.
+ * @param snapshot - Weekly summary to absorb.
+ * @returns Nothing; `acc` is updated.
+ */
+function absorbWeeklySummary(
+    acc: WeeklySummaryAccumulator,
+    snapshot: WeeklyTrajectorySummary,
+): void {
+    acc.startMs = Math.min(acc.startMs, snapshot.startMs);
+    acc.endMs = Math.max(acc.endMs, snapshot.endMs);
+    acc.totalRuns += snapshot.totalRuns;
+    acc.processedTotal += snapshot.eloc.processedTotal;
+    acc.maxUnique = Math.max(acc.maxUnique, snapshot.eloc.uniqueTotal);
+    acc.changedTotal += snapshot.eloc.changedTotal;
+    acc.semanticTotal += snapshot.eloc.semanticTotal;
+    acc.qedWeightedSum += snapshot.qed.mean * snapshot.totalRuns;
+    acc.qedMin = Math.min(acc.qedMin, snapshot.qed.min);
+    acc.qedMax = Math.max(acc.qedMax, snapshot.qed.max);
+    acc.totalAddedDebt += snapshot.debt.totalAdded;
+    acc.totalResolvedDebt += snapshot.debt.totalResolved;
+    acc.totalRegressions += snapshot.debt.totalRegressions;
+    acc.scoreWeightedSum += snapshot.meanCompositeScore * snapshot.totalRuns;
+    acc.passedWeightedCount += (snapshot.gatePassRate / 100) * snapshot.totalRuns;
 }
 
 /**
@@ -163,57 +249,32 @@ export function aggregateWeeklySummaries(
         return aggregateRecords([], 'LIFETIME');
     }
 
-    let startMs = Infinity;
-    let endMs = -Infinity;
-    let totalRuns = 0;
-    let processedTotal = 0;
-    let maxUnique = 0;
-    let changedTotal = 0;
-    let semanticTotal = 0;
-    let qedWeightedSum = 0;
-    let qedMin = Infinity;
-    let qedMax = -Infinity;
-    let totalAddedDebt = 0;
-    let totalResolvedDebt = 0;
-    let totalRegressions = 0;
-    let scoreWeightedSum = 0;
-    let passedWeightedCount = 0;
-
-    for (const s of summaries) {
-        if (s.startMs < startMs) startMs = s.startMs;
-        if (s.endMs > endMs) endMs = s.endMs;
-        totalRuns += s.totalRuns;
-
-        processedTotal += s.eloc.processedTotal;
-        if (s.eloc.uniqueTotal > maxUnique) maxUnique = s.eloc.uniqueTotal;
-        changedTotal += s.eloc.changedTotal;
-        semanticTotal += s.eloc.semanticTotal;
-
-        qedWeightedSum += s.qed.mean * s.totalRuns;
-        if (s.qed.min < qedMin) qedMin = s.qed.min;
-        if (s.qed.max > qedMax) qedMax = s.qed.max;
-
-        totalAddedDebt += s.debt.totalAdded;
-        totalResolvedDebt += s.debt.totalResolved;
-        totalRegressions += s.debt.totalRegressions;
-
-        scoreWeightedSum += s.meanCompositeScore * s.totalRuns;
-        passedWeightedCount += (s.gatePassRate / 100) * s.totalRuns;
+    const acc = createWeeklyAccumulator();
+    for (const snapshot of summaries) {
+        absorbWeeklySummary(acc, snapshot);
     }
 
-    const meanQed = totalRuns > 0 ? Math.round((qedWeightedSum / totalRuns) * 10000) / 10000 : 0;
-    const meanScore = totalRuns > 0 ? Math.round((scoreWeightedSum / totalRuns) * 100) / 100 : 100;
+    const { totalRuns, processedTotal, maxUnique, changedTotal, semanticTotal } = acc;
+    const meanQed =
+        totalRuns > 0 ? Math.round((acc.qedWeightedSum / totalRuns) * 1000000) / 1000000 : 0;
+    const kMean = Math.round(meanQed * 1000 * 100) / 100;
+    const meanScore =
+        totalRuns > 0 ? Math.round((acc.scoreWeightedSum / totalRuns) * 100) / 100 : 100;
     const gatePassRate =
-        totalRuns > 0 ? Math.round((passedWeightedCount / totalRuns) * 10000) / 100 : 100;
+        totalRuns > 0 ? Math.round((acc.passedWeightedCount / totalRuns) * 10000) / 100 : 100;
 
-    const netDebt = totalResolvedDebt - totalAddedDebt;
-    const processedKiloEloc = Math.max(1, processedTotal / 1000);
-    const netYield = Math.round((netDebt / processedKiloEloc) * 100) / 100;
+    const netDebt = acc.totalResolvedDebt - acc.totalAddedDebt;
+    const semanticKilo =
+        semanticTotal > 0 ? Math.max(0.1, semanticTotal / 1000) : Math.max(1, maxUnique / 1000);
+    const netYield = Math.round((netDebt / semanticKilo) * 100) / 100;
+
+    const baseKilo = Math.max(1, maxUnique / 1000);
+    const densityYield = Math.round((netDebt / baseKilo) * 100) / 100;
 
     return {
         weekId: 'LIFETIME',
-        startMs: startMs === Infinity ? Date.now() : startMs,
-        endMs: endMs === -Infinity ? Date.now() : endMs,
+        startMs: acc.startMs === Infinity ? Date.now() : acc.startMs,
+        endMs: acc.endMs === -Infinity ? Date.now() : acc.endMs,
         totalRuns,
         eloc: {
             processedTotal,
@@ -223,14 +284,16 @@ export function aggregateWeeklySummaries(
         },
         qed: {
             mean: meanQed,
-            min: qedMin === Infinity ? 0 : qedMin,
-            max: qedMax === -Infinity ? 0 : qedMax,
+            min: acc.qedMin === Infinity ? 0 : acc.qedMin,
+            max: acc.qedMax === -Infinity ? 0 : acc.qedMax,
+            kMean,
         },
         debt: {
-            totalAdded: totalAddedDebt,
-            totalResolved: totalResolvedDebt,
-            totalRegressions,
+            totalAdded: acc.totalAddedDebt,
+            totalResolved: acc.totalResolvedDebt,
+            totalRegressions: acc.totalRegressions,
             netYield,
+            densityYield,
         },
         meanCompositeScore: meanScore,
         gatePassRate,
@@ -266,20 +329,69 @@ async function saveWeeklyPartitionSummary(
     return summary;
 }
 
+function resolveLegacyBaseLines(eloc?: WeeklyTrajectorySummary['eloc'], totalRuns = 1): number {
+    if (typeof eloc?.uniqueTotal === 'number' && eloc.uniqueTotal > 0) {
+        return eloc.uniqueTotal;
+    }
+    if (typeof eloc?.processedTotal === 'number' && eloc.processedTotal > 0) {
+        return Math.max(1, Math.round(eloc.processedTotal / Math.max(1, totalRuns)));
+    }
+    return 10000;
+}
+
+function normalizeLegacyDebtYield(
+    debt?: WeeklyTrajectorySummary['debt'],
+    totalLines = 10000,
+): void {
+    if (!debt || typeof debt.densityYield === 'number') {
+        return;
+    }
+    const baseKilo = Math.max(1, totalLines / 1000);
+    const resolved = debt.totalResolved ?? 0;
+    const added = debt.totalAdded ?? 0;
+    debt.densityYield = Math.round(((resolved - added) / baseKilo) * 100) / 100;
+}
+
+function normalizeLegacyQedMean(qed?: WeeklyTrajectorySummary['qed']): void {
+    if (!qed || typeof qed.kMean === 'number') {
+        return;
+    }
+    const mean = qed.mean ?? 0;
+    qed.kMean = Math.round(mean * 1000 * 100) / 100;
+}
+
+function normalizeLegacyWeeklySummary(parsed: WeeklyTrajectorySummary): void {
+    if (!parsed) {
+        return;
+    }
+    const baseLines = resolveLegacyBaseLines(parsed.eloc, parsed.totalRuns);
+    normalizeLegacyDebtYield(parsed.debt, baseLines);
+    normalizeLegacyQedMean(parsed.qed);
+}
+
+async function loadWeeklySummaryFile(filePath: string): Promise<WeeklyTrajectorySummary | null> {
+    try {
+        const raw = await fs.promises.readFile(filePath, 'utf8');
+        const parsed = JSON.parse(raw) as WeeklyTrajectorySummary;
+        normalizeLegacyWeeklySummary(parsed);
+        return parsed;
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Loads all valid weekly trajectory summaries from the partitions directory.
  */
 async function readWeeklySummaries(weeklyDir: string): Promise<WeeklyTrajectorySummary[]> {
     const allFiles = await fs.promises.readdir(weeklyDir);
-    const summaryFiles = allFiles.filter((f) => f.endsWith('.summary.json'));
+    const summaryFiles = allFiles.filter((fileName) => fileName.endsWith('.summary.json'));
     const summaries: WeeklyTrajectorySummary[] = [];
 
     for (const file of summaryFiles) {
-        try {
-            const raw = await fs.promises.readFile(path.join(weeklyDir, file), 'utf8');
-            summaries.push(JSON.parse(raw));
-        } catch {
-            // Best-effort: ignore unreadable or malformed partition files
+        const summary = await loadWeeklySummaryFile(path.join(weeklyDir, file));
+        if (summary) {
+            summaries.push(summary);
         }
     }
     return summaries;
@@ -336,8 +448,8 @@ export async function compactLedger(
 
     // Group records by ISO Week
     const weekGroups = new Map<string, CompactTrajectoryRecord[]>();
-    for (const r of records) {
-        appendWeekRecord(weekGroups, getIsoWeekId(r.t), r);
+    for (const record of records) {
+        appendWeekRecord(weekGroups, getIsoWeekId(record.t), record);
     }
 
     const summaries: WeeklyTrajectorySummary[] = [];

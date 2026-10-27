@@ -227,7 +227,9 @@ export class AstPrefixRadixCache {
             lineKey,
             cumulativeLines,
             astSubtrees: isTerminal ? astSubtrees : EMPTY_SUBTREE_ARRAY,
-            importedSymbols: isTerminal ? (importedSymbols ?? EMPTY_SYMBOLS_ARRAY) : EMPTY_SYMBOLS_ARRAY,
+            importedSymbols: isTerminal
+                ? (importedSymbols ?? EMPTY_SYMBOLS_ARRAY)
+                : EMPTY_SYMBOLS_ARRAY,
             children: new Map(),
             lastAccessTime: now,
             hitCount: 0,
@@ -259,9 +261,10 @@ export class AstPrefixRadixCache {
     public findLongestPrefixMatch(source: string | readonly string[]): RadixPrefixMatchResult {
         this.queryCount++;
 
-        const lines = typeof source === 'string'
-            ? this.extractCandidatePrefixLines(source)
-            : source.slice(0, this.maxPrefixScanLines);
+        const lines =
+            typeof source === 'string'
+                ? this.extractCandidatePrefixLines(source)
+                : source.slice(0, this.maxPrefixScanLines);
 
         const totalPrefixLines = lines.length;
         if (totalPrefixLines === 0) {
@@ -365,7 +368,11 @@ export class AstPrefixRadixCache {
                 continue;
             }
 
-            if (IMPORT_DECLARATION_PATTERN.test(trimmed) || trimmed.startsWith('//') || trimmed.startsWith('/*')) {
+            if (
+                IMPORT_DECLARATION_PATTERN.test(trimmed) ||
+                trimmed.startsWith('//') ||
+                trimmed.startsWith('/*')
+            ) {
                 prefixLines.push(trimmed);
             } else {
                 // First non-import non-comment statement terminates prefix scan
@@ -392,7 +399,8 @@ export class AstPrefixRadixCache {
         let charIndex = 0;
 
         while (charIndex < fullContent.length && currentLine < matchedLines) {
-            if (fullContent.charCodeAt(charIndex) === 10) { // '\n'
+            if (fullContent.charCodeAt(charIndex) === 10) {
+                // '\n'
                 currentLine++;
             }
             charIndex++;
@@ -426,7 +434,11 @@ export class AstPrefixRadixCache {
             let oldestLeaf: { parentMap: Map<string, RadixTreeNode>; key: string } | undefined;
             let oldestTime = Infinity;
 
-            const stack: Array<{ parentMap: Map<string, RadixTreeNode>; key: string; node: RadixTreeNode }> = [];
+            const stack: Array<{
+                parentMap: Map<string, RadixTreeNode>;
+                key: string;
+                node: RadixTreeNode;
+            }> = [];
             for (const [key, child] of this.root.children.entries()) {
                 stack.push({ parentMap: this.root.children, key, node: child });
             }
@@ -438,8 +450,8 @@ export class AstPrefixRadixCache {
                     oldestTime = item.node.lastAccessTime;
                     oldestLeaf = { parentMap: item.parentMap, key: item.key };
                 }
-                for (const [k, c] of item.node.children.entries()) {
-                    stack.push({ parentMap: item.node.children, key: k, node: c });
+                for (const [childKey, childNode] of item.node.children.entries()) {
+                    stack.push({ parentMap: item.node.children, key: childKey, node: childNode });
                 }
             }
 

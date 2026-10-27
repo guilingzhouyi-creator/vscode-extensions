@@ -147,9 +147,9 @@ function updateBlockNesting(
 
 function computeBracketDelta(code: string): number {
     let depth = 0;
-    for (const ch of code) {
-        if (ch === '(' || ch === '[' || ch === '{') depth++;
-        else if (ch === ')' || ch === ']' || ch === '}') depth--;
+    for (const char of code) {
+        if (char === '(' || char === '[' || char === '{') depth++;
+        else if (char === ')' || char === ']' || char === '}') depth--;
     }
     return depth;
 }

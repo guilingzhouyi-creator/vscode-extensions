@@ -143,9 +143,9 @@ function resolveFanIn(
     }
 
     const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
-    let isExported = modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+    let isExported = modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
     const isPrivate =
-        modifiers?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword) ||
+        modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.PrivateKeyword) ||
         symbolName.startsWith('_') ||
         symbolName.startsWith('#');
 
@@ -154,10 +154,14 @@ function resolveFanIn(
     // Public method or member inside an exported class/interface represents a public API contract
     if (!isExported && parent && ts.isClassDeclaration(parent)) {
         const parentModifiers = ts.canHaveModifiers(parent) ? ts.getModifiers(parent) : undefined;
-        const parentExported = parentModifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-        const isExplicitPublic = modifiers?.some((m) => m.kind === ts.SyntaxKind.PublicKeyword);
+        const parentExported = parentModifiers?.some(
+            (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+        );
+        const isExplicitPublic = modifiers?.some(
+            (modifier) => modifier.kind === ts.SyntaxKind.PublicKeyword,
+        );
         const isExplicitProtected = modifiers?.some(
-            (m) => m.kind === ts.SyntaxKind.ProtectedKeyword,
+            (modifier) => modifier.kind === ts.SyntaxKind.ProtectedKeyword,
         );
         if (parentExported && (isExplicitPublic || !isExplicitProtected)) {
             isExported = true;

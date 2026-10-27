@@ -204,7 +204,8 @@ export class DynamicPartitioner {
             return [];
         }
 
-        const activeDomains = targetDomains ?? DEFAULT_DOMAIN_BINDINGS.map((b) => b.domain);
+        const activeDomains =
+            targetDomains ?? DEFAULT_DOMAIN_BINDINGS.map((binding) => binding.domain);
         const clusters = clusterFilesByModule(files);
         return this.packAllClusters(clusters, fileContents, activeDomains);
     }
@@ -227,8 +228,8 @@ export class DynamicPartitioner {
                 activeDomains,
                 nextSeq,
             );
-            for (const cp of clusterPartitions) {
-                partitions.push(cp);
+            for (const partition of clusterPartitions) {
+                partitions.push(partition);
             }
         }
 

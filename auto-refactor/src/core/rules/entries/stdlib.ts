@@ -30,13 +30,13 @@ const RULE_ID_STDLIB_RECURSION_001 = 'STDLIB-RECURSION-001';
 const RULE_ID_STDLIB_PORT_001 = 'STDLIB-PORT-001';
 
 function createStdlibRule(
-    id: string,
+    ruleId: string,
     summary: string,
     remediation: string,
     severity = SEVERITY_WARNING,
 ): RuleDefinition {
     return defineRule({
-        id,
+        id: ruleId,
         family: RULE_FAMILY_STDLIB,
         analyzer: ANALYZER_STDLIB,
         canonical: true,
@@ -44,7 +44,7 @@ function createStdlibRule(
         defaultSeverity: severity,
         summary,
         remediation,
-        docsAnchor: `${DOCS_ANCHOR_BASE}${id.toLowerCase()}`,
+        docsAnchor: `${DOCS_ANCHOR_BASE}${ruleId.toLowerCase()}`,
     });
 }
 

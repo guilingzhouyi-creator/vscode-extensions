@@ -82,15 +82,14 @@ export const RULE_NAM_ABR_001 = 'NAM-ABR-001';
 export const MAX_VARIABLE_NAME_LENGTH = 42;
 
 /** Maximum permitted length for function and method identifiers. */
-export const MAX_FUNCTION_NAME_LENGTH = 50;
+export const MAX_FUNCTION_NAME_LENGTH = 35;
 
-/** Allowed short identifier names commonly accepted across domains. */
+/**
+ * Allowed short identifier names commonly accepted across domains: standard coordinates,
+ * loop counters, and explicit discards.
+ */
 export const ALLOWED_SHORT_NAMES: ReadonlySet<string> = new Set(
-    (
-        'x y z dx dy w h id ip i j k l m n p r s t v a b c d e f _ ' +
-        'ts fs cp vm db fd fn cb el sf ns op re ex ev ok no ch tx rx io os ui ci cd eq ne gt lt ' +
-        'l1 l2 rl w1 w2 vp vn pm hp hn d0 tn lc'
-    ).split(' '),
+    'x y z dx dy w h id ip i j k _'.split(' '),
 );
 
 /**
@@ -121,6 +120,20 @@ const ABBREVIATION_PAIRS: ReadonlyArray<readonly [string, string]> = Object.free
     ['res', 'response'],
     ['src', 'source'],
     ['str', 'string'],
+    ['fn', 'function'],
+    ['sf', 'sourceFile'],
+    ['db', 'database'],
+    ['fs', 'fileSystem'],
+    ['el', 'element'],
+    ['ns', 'namespace'],
+    ['op', 'operator'],
+    ['re', 'regexPattern'],
+    ['param', 'parameter'],
+    ['arg', 'argument'],
+    ['cmd', 'command'],
+    ['opt', 'option'],
+    ['prop', 'property'],
+    ['val', 'value'],
 ]);
 
 /**
@@ -144,6 +157,18 @@ export const UNAPPROVED_ABBREVIATION_SET: ReadonlySet<string> = new Set([
     'tbl',
     'chk',
     'cb',
+    'fn',
+    'sf',
+    'db',
+    'fs',
+    'el',
+    'ns',
+    'op',
+    're',
+    'param',
+    'arg',
+    'cmd',
+    'prop',
 ]);
 
 /**
@@ -233,8 +258,8 @@ const TYPE_NAME_TO_WRAPPER_MAP: ReadonlyMap<string, TypeWrapperHandler> = new Ma
 const SOURCE_TYPE_INFERENCE = 'type_inference';
 const SOURCE_INITIALIZER_CALL = 'initializer_call';
 const SOURCE_ABBREVIATION_EXPANSION = 'abbreviation_expansion';
-const ACTION_REPLACE_TOKEN = 'replace_token';
-const TAXONOMY_GOV_NORM = 'GOV_NORM';
+export const ACTION_REPLACE_TOKEN = 'replace_token';
+export const TAXONOMY_GOV_NORM = 'GOV_NORM';
 const MIN_FUNCTION_NAME_LENGTH = 3;
 const SEVERITY_WARN: Severity = 'warning';
 
@@ -506,14 +531,14 @@ export function inferNamingCandidates(name: string, node?: ts.Node): NamingCandi
         candidates.push(abbrCandidate);
     }
 
-    candidates.sort((a, b) => b.confidence - a.confidence);
+    candidates.sort((candA, candB) => candB.confidence - candA.confidence);
 
     const seen = new Set<string>();
     const deduplicated: NamingCandidate[] = [];
-    for (const c of candidates) {
-        if (!seen.has(c.name)) {
-            seen.add(c.name);
-            deduplicated.push(c);
+    for (const candidate of candidates) {
+        if (!seen.has(candidate.name)) {
+            seen.add(candidate.name);
+            deduplicated.push(candidate);
         }
     }
 
@@ -584,10 +609,10 @@ export function inspectCrossFileContext(
     }
 
     const rawRefs = symbolIndex.crossFileReferencesTo(symbolName, normPath) ?? [];
-    const references: CrossFileReferenceSummary[] = rawRefs.map((r) => ({
-        file: (r.file || '').replace(/\\/g, '/'),
-        line: r.line ?? null,
-        caller: r.caller ?? null,
+    const references: CrossFileReferenceSummary[] = rawRefs.map((refSummary) => ({
+        file: (refSummary.file || '').replace(/\\/g, '/'),
+        line: refSummary.line ?? null,
+        caller: refSummary.caller ?? null,
     }));
 
     return {
@@ -618,9 +643,9 @@ export function evaluateNamingAmbiguity(
     }
 
     const tokens = getIdentifierTokens(name);
-    for (const t of tokens) {
-        if (POLYSEMIC_ABBREVIATIONS.has(t.toLowerCase())) {
-            reasons.push(`Token '${t}' has multiple domain interpretations`);
+    for (const token of tokens) {
+        if (POLYSEMIC_ABBREVIATIONS.has(token.toLowerCase())) {
+            reasons.push(`Token '${token}' has multiple domain interpretations`);
         }
     }
 
@@ -880,6 +905,7 @@ export interface FunctionNamingAuditOptions {
     maxFunctionLength?: number;
     enforceVerbNounContract?: boolean;
     enforceMorphemeCheck?: boolean;
+    allowedShortNames?: string[];
 }
 
 interface DiagnosticDescriptorPayload {
@@ -1006,7 +1032,10 @@ export function auditVariableName(target: NamingAuditTarget, context: NamingAudi
     if (opts.checkLengths !== false) {
         const isTopLevel = target.isTopLevel ?? false;
         const nameLength = target.name.length;
-        const isShort = !isTopLevel && nameLength === 2 && !ALLOWED_SHORT_NAMES.has(target.name);
+        const allowedShortSet = opts.allowedShortNames
+            ? new Set(opts.allowedShortNames)
+            : ALLOWED_SHORT_NAMES;
+        const isShort = !isTopLevel && nameLength === 2 && !allowedShortSet.has(target.name);
         const isLong =
             nameLength >= MAX_VARIABLE_NAME_LENGTH &&
             (!isTopLevel || !/^[A-Z][A-Z0-9_]*$/.test(target.name));

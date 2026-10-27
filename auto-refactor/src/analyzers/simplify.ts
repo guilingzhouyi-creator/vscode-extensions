@@ -248,7 +248,7 @@ interface FunctionParameterAuditParams {
         | ts.ArrowFunction
         | ts.FunctionExpression
         | ts.ConstructorDeclaration;
-    sf: ts.SourceFile;
+    sourceFile: ts.SourceFile;
     ctx: AnalyzerContext;
     opts: SimplifyOptions;
     issues: Issue[];
@@ -363,22 +363,22 @@ export class SimplifyAnalyzer implements Analyzer {
     }
 
     private auditFunctionParameters(params: FunctionParameterAuditParams): void {
-        const { node, sf, ctx, opts, issues } = params;
+        const { node, sourceFile, ctx, opts, issues } = params;
         const limit = opts.maxFunctionParameters ?? DEFAULT_MAX_FUNCTION_PARAMETERS;
         const nodeParams = node.parameters;
         const name = resolveFunctionDeclarationName(node);
         const file = ctx.filePath.replace(/\\/g, '/');
 
-        const startPos = sf.getLineAndCharacterOfPosition(node.getStart(sf));
-        const endPos = sf.getLineAndCharacterOfPosition(node.getEnd());
+        const startPos = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+        const endPos = sourceFile.getLineAndCharacterOfPosition(node.getEnd());
         const startLine = startPos.line + 1;
         const startCol = startPos.character + 1;
 
         if (nodeParams.length > limit) {
-            const paramNames = nodeParams.map((p) => p.name.getText(sf));
-            const paramInfo = nodeParams.map((p) => ({
-                name: p.name.getText(sf),
-                type: p.type ? p.type.getText(sf) : undefined,
+            const paramNames = nodeParams.map((param) => param.name.getText(sourceFile));
+            const paramInfo = nodeParams.map((param) => ({
+                name: param.name.getText(sourceFile),
+                type: param.type ? param.type.getText(sourceFile) : undefined,
             }));
 
             const template = generateParameterObjectSnippet(name, paramInfo);
@@ -442,7 +442,7 @@ export class SimplifyAnalyzer implements Analyzer {
     }
 
     private auditTypeScriptFunctions(
-        sf: ts.SourceFile,
+        sourceFile: ts.SourceFile,
         ctx: AnalyzerContext,
         opts: SimplifyOptions,
         issues: Issue[],
@@ -455,11 +455,11 @@ export class SimplifyAnalyzer implements Analyzer {
                 ts.isFunctionExpression(node) ||
                 ts.isConstructorDeclaration(node)
             ) {
-                this.auditFunctionParameters({ node, sf, ctx, opts, issues });
+                this.auditFunctionParameters({ node, sourceFile, ctx, opts, issues });
             }
             ts.forEachChild(node, walk);
         };
-        walk(sf);
+        walk(sourceFile);
     }
 
     private checkFunctionParameters(
@@ -569,24 +569,26 @@ export class SimplifyAnalyzer implements Analyzer {
     /**
      * Standalone `analyze()` contract: run the line-based scan and ternary opportunities.
      *
-     * @param sf - Optional TypeScript source file or unknown AST.
+     * @param rawAstOrSource - Optional TypeScript source file or unknown AST.
      * @param ctx - Analyzer context carrying the file content and options.
      * @returns The findings for the file.
      */
-    analyze(sf: unknown, ctx: AnalyzerContext): Issue[] {
+    analyze(rawAstOrSource: unknown, ctx: AnalyzerContext): Issue[] {
         const issues = this.scanContent(ctx);
         const opts = (ctx.options || {}) as SimplifyOptions;
-        if (isNormalizedNode(sf)) {
-            walkNormalizedTree(sf, (node) => this.visit(node, ctx));
+        if (isNormalizedNode(rawAstOrSource)) {
+            walkNormalizedTree(rawAstOrSource, (node) => this.visit(node, ctx));
             issues.push(...this.longFunctions);
             this.longFunctions = [];
         }
         const isTsSource =
-            typeof sf === 'object' &&
-            sf !== null &&
-            PROP_FOR_EACH_CHILD in sf &&
-            typeof (sf as Record<string, unknown>)[PROP_FOR_EACH_CHILD] === 'function';
-        const sourceFile = isTsSource ? (sf as ts.SourceFile) : this.getOrParseSourceFile(ctx);
+            typeof rawAstOrSource === 'object' &&
+            rawAstOrSource !== null &&
+            PROP_FOR_EACH_CHILD in rawAstOrSource &&
+            typeof (rawAstOrSource as Record<string, unknown>)[PROP_FOR_EACH_CHILD] === 'function';
+        const sourceFile = isTsSource
+            ? (rawAstOrSource as ts.SourceFile)
+            : this.getOrParseSourceFile(ctx);
         this.dispatchSourceAudits(sourceFile, ctx, opts, issues);
         return issues;
     }
@@ -627,7 +629,9 @@ export class SimplifyAnalyzer implements Analyzer {
         if (!content) return [];
         const file = ctx.filePath.replace(/\\/g, '/');
         const opts = (ctx.options || {}) as SimplifyOptions;
-        const lines = content.split('\n').map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l));
+        const lines = content
+            .split('\n')
+            .map((lineStr) => (lineStr.endsWith('\r') ? lineStr.slice(0, -1) : lineStr));
         const issues: Issue[] = [];
 
         this.detectCommentedOutCode(lines, file, opts, issues);
@@ -685,9 +689,9 @@ export class SimplifyAnalyzer implements Analyzer {
         for (let i = 0; i < lines.length; i++) {
             const trimmed = lines[i].trim();
             let marker: string | undefined;
-            for (const m of COMMENT_MARKERS) {
-                if (trimmed.startsWith(m)) {
-                    marker = m;
+            for (const markerToken of COMMENT_MARKERS) {
+                if (trimmed.startsWith(markerToken)) {
+                    marker = markerToken;
                     break;
                 }
             }
@@ -906,8 +910,8 @@ export class SimplifyAnalyzer implements Analyzer {
         opts: SimplifyOptions,
         issues: Issue[],
     ): void {
-        const patterns = (opts.printAllowPatterns ?? DEFAULT_PRINT_ALLOW_PATTERNS).map((p) =>
-            globToRegExp(p),
+        const patterns = (opts.printAllowPatterns ?? DEFAULT_PRINT_ALLOW_PATTERNS).map((pattern) =>
+            globToRegExp(pattern),
         );
         if (patterns.length > 0) {
             if (matchAny(patterns, file)) return;

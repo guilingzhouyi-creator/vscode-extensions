@@ -18,14 +18,25 @@ import type {
     SymbolEntry,
 } from '../core/architecture/naming-decoupling-auditor';
 import { auditFunctionSemantics, isExemptFunctionName } from './naming-path-helper';
+import {
+    ALLOWED_SHORT_NAMES,
+    MAX_VARIABLE_NAME_LENGTH,
+    MAX_FUNCTION_NAME_LENGTH,
+    COMMON_ABBREVIATIONS,
+    ACTION_REPLACE_TOKEN,
+    TAXONOMY_GOV_NORM,
+    type NamingActionablePayload,
+} from './naming-candidate-helper';
 
 /** Structured diagnostic payload for Python naming findings. */
 export interface PythonFindingInput {
     readonly line: number;
+    readonly column?: number;
     readonly rule: string;
     readonly message: string;
     readonly detail: Record<string, unknown>;
     readonly suggestion?: string;
+    readonly actionable?: NamingActionablePayload;
 }
 
 /** Callback factory for instantiating canonical Issue records. */
@@ -57,6 +68,7 @@ export interface PythonNamingOptions {
     enforceVerbNounContract?: boolean;
     enforceMorphemeCheck?: boolean;
     vagueBlacklist?: string[];
+    allowedShortNames?: string[];
 }
 
 /**
@@ -73,8 +85,49 @@ export interface PythonNamingContext {
 }
 
 const MIN_PYTHON_FUNCTION_LENGTH = 3;
-const MAX_PYTHON_FUNCTION_LENGTH = 50;
 const MIN_CLUSTER_SYMBOLS = 4;
+
+const TOLERATED_SINGLE_LETTERS: ReadonlySet<string> = new Set(['_', 'i', 'j', 'k']);
+const SINGLE_LETTER_RE = /^[a-zA-Z]$/;
+
+function isUntoleratedSingleLetter(varName: string): boolean {
+    if (varName.length !== 1 || !SINGLE_LETTER_RE.test(varName)) return false;
+    return !TOLERATED_SINGLE_LETTERS.has(varName);
+}
+
+function buildPythonActionable(
+    name: string,
+    rule: string,
+    line: number,
+    column = 1,
+    suggestedName?: string,
+    safeToAutomate = false,
+): NamingActionablePayload {
+    const candidate = suggestedName ?? COMMON_ABBREVIATIONS[name];
+    return {
+        action: ACTION_REPLACE_TOKEN,
+        code: rule,
+        taxonomy: TAXONOMY_GOV_NORM,
+        safeToAutomate,
+        targetSymbol: candidate ?? name,
+        templateSnippet: candidate,
+        patch: candidate
+            ? {
+                  range: {
+                      startLine: line,
+                      startCol: column,
+                      endLine: line,
+                      endCol: column + name.length,
+                  },
+                  replacementText: candidate,
+              }
+            : undefined,
+        targetArguments: {
+            originalName: name,
+            ...(candidate ? { suggestedName: candidate } : {}),
+        },
+    };
+}
 
 const KIND_TYPE: SymbolDeclarationKind = 'type';
 const KIND_CONSTANT: SymbolDeclarationKind = 'constant';
@@ -106,6 +159,7 @@ export function auditPythonClass(
                 message: `Python class '${className}' should follow PascalCase convention.`,
                 detail: { name: className },
                 suggestion: `Rename class '${className}' to PascalCase.`,
+                actionable: buildPythonActionable(className, 'NAM-TYP-001', lineIdx + 1),
             }),
         );
     }
@@ -117,6 +171,7 @@ export function auditPythonClass(
                 message: `Python class '${className}' contains transient construction jargon.`,
                 detail: { name: className },
                 suggestion: 'Replace transient process markers with semantic domain naming.',
+                actionable: buildPythonActionable(className, 'NAM-JRG-002', lineIdx + 1),
             }),
         );
     }
@@ -129,8 +184,96 @@ export function auditPythonClass(
     );
 }
 
+function auditPythonSingleLetterAndLength(
+    varName: string,
+    lineIdx: number,
+    pCtx: PythonNamingContext,
+): void {
+    if (pCtx.opts.checkSingleLetters !== false && isUntoleratedSingleLetter(varName)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                rule: 'NAM-SGL-001',
+                message: `Single-letter variable name '${varName}' hurts readability.`,
+                detail: { name: varName },
+                suggestion: `Replace '${varName}' with a meaningful name; only 'i','j','k','_' tolerated.`,
+                actionable: buildPythonActionable(varName, 'NAM-SGL-001', lineIdx + 1),
+            }),
+        );
+        return;
+    }
+
+    if (pCtx.opts.checkLengths === false) return;
+
+    if (varName.length < 3) {
+        const isAllowedShort =
+            ALLOWED_SHORT_NAMES.has(varName) ||
+            (pCtx.opts.allowedShortNames && pCtx.opts.allowedShortNames.includes(varName));
+        if (!isAllowedShort) {
+            pCtx.issues.push(
+                pCtx.mkIssue({
+                    line: lineIdx + 1,
+                    rule: 'NAM-LEN-001',
+                    message: `Python variable name '${varName}' is too short (< 3 characters); lacks semantic clarity.`,
+                    detail: { name: varName, length: varName.length, minLen: 3 },
+                    suggestion: `Rename '${varName}' to a descriptive identifier with >= 3 characters.`,
+                    actionable: buildPythonActionable(varName, 'NAM-LEN-001', lineIdx + 1),
+                }),
+            );
+        }
+    } else if (varName.length > MAX_VARIABLE_NAME_LENGTH) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                rule: 'NAM-LEN-001',
+                message: `Python variable name '${varName}' is excessively long (> ${MAX_VARIABLE_NAME_LENGTH} characters); decompose or simplify.`,
+                detail: { name: varName, length: varName.length, maxLen: MAX_VARIABLE_NAME_LENGTH },
+                suggestion: `Refactor '${varName}' into a concise identifier with <= ${MAX_VARIABLE_NAME_LENGTH} characters.`,
+                actionable: buildPythonActionable(varName, 'NAM-LEN-001', lineIdx + 1),
+            }),
+        );
+    }
+}
+
+function auditPythonVaguenessAndJargon(
+    varName: string,
+    lineIdx: number,
+    pCtx: PythonNamingContext,
+): void {
+    if (pCtx.opts.checkVagueNames !== false && pCtx.vagueSet.has(varName.toLowerCase())) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                rule: 'NAM-VAG-001',
+                message: `Identifier '${varName}' is vague and uninformative; lacks domain context.`,
+                detail: { name: varName },
+                suggestion: `Replace '${varName}' with a domain-qualified identifier.`,
+                actionable: buildPythonActionable(varName, 'NAM-VAG-001', lineIdx + 1),
+            }),
+        );
+    }
+
+    if (pCtx.opts.checkJargon !== false && pCtx.hasTransientJargon(varName)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                rule: 'NAM-JRG-002',
+                message: `Python identifier '${varName}' contains transient construction jargon.`,
+                detail: { name: varName },
+                suggestion: 'Replace transient process markers with semantic domain naming.',
+                actionable: buildPythonActionable(varName, 'NAM-JRG-002', lineIdx + 1),
+            }),
+        );
+    }
+}
+
+function auditPythonVariable(varName: string, lineIdx: number, pCtx: PythonNamingContext): void {
+    auditPythonSingleLetterAndLength(varName, lineIdx, pCtx);
+    auditPythonVaguenessAndJargon(varName, lineIdx, pCtx);
+}
+
 /**
- * Audits a Python assignment line for vague names, single letters, and jargon.
+ * Audits a Python assignment line for vague names, single letters, length bounds, and jargon.
  *
  * @param line - Line text containing assignment.
  * @param lineIdx - 0-indexed line number.
@@ -146,39 +289,8 @@ export function auditPythonAssignment(
     const assignMatch = /^([A-Za-z_][A-Za-z0-9_]*)\s*[:=]/.exec(line);
     if (!assignMatch) return;
     const varName = assignMatch[1];
-    if (pCtx.opts.checkVagueNames !== false && pCtx.vagueSet.has(varName.toLowerCase())) {
-        pCtx.issues.push(
-            pCtx.mkIssue({
-                line: lineIdx + 1,
-                rule: 'NAM-VAG-001',
-                message: `Identifier '${varName}' is vague and uninformative; lacks domain context.`,
-                detail: { name: varName },
-                suggestion: `Replace '${varName}' with a domain-qualified identifier.`,
-            }),
-        );
-    }
-    if (pCtx.opts.checkSingleLetters !== false && varName.length === 1 && varName !== '_') {
-        pCtx.issues.push(
-            pCtx.mkIssue({
-                line: lineIdx + 1,
-                rule: 'NAM-SGL-001',
-                message: `Single-letter variable name '${varName}' hurts readability.`,
-                detail: { name: varName },
-                suggestion: `Replace '${varName}' with a meaningful name.`,
-            }),
-        );
-    }
-    if (pCtx.opts.checkJargon !== false && pCtx.hasTransientJargon(varName)) {
-        pCtx.issues.push(
-            pCtx.mkIssue({
-                line: lineIdx + 1,
-                rule: 'NAM-JRG-002',
-                message: `Python identifier '${varName}' contains transient construction jargon.`,
-                detail: { name: varName },
-                suggestion: 'Replace transient process markers with semantic domain naming.',
-            }),
-        );
-    }
+    auditPythonVariable(varName, lineIdx, pCtx);
+
     const isUpper = /^[A-Z0-9_]+$/.test(varName);
     pCtx.checkDecouplingSymbol(
         varName,
@@ -187,6 +299,26 @@ export function auditPythonAssignment(
         pCtx.symbols,
         topLevel,
     );
+}
+
+/**
+ * Audits a Python for loop declaration line for loop variable naming constraints.
+ *
+ * @param line - Raw source line containing the loop header.
+ * @param lineIdx - Zero-based index of that line in the file.
+ * @param pCtx - Accumulating Python naming context for suggestions and findings.
+ * @returns Nothing; findings are pushed into `pCtx`.
+ */
+export function auditPythonForLoop(line: string, lineIdx: number, pCtx: PythonNamingContext): void {
+    const forMatch = /^for\s+([A-Za-z0-9_,\s]+)\s+in\b/.exec(line);
+    if (!forMatch) return;
+    const rawVars = forMatch[1].split(',');
+    for (let i = 0; i < rawVars.length; i++) {
+        const varName = rawVars[i].trim();
+        if (varName.length > 0) {
+            auditPythonVariable(varName, lineIdx, pCtx);
+        }
+    }
 }
 
 function checkPythonFunctionLength(
@@ -199,7 +331,7 @@ function checkPythonFunctionLength(
     if (isExemptFunctionName(fnName)) return false;
 
     const minLen = pCtx.opts.minFunctionLength ?? MIN_PYTHON_FUNCTION_LENGTH;
-    const maxLen = pCtx.opts.maxFunctionLength ?? MAX_PYTHON_FUNCTION_LENGTH;
+    const maxLen = pCtx.opts.maxFunctionLength ?? MAX_FUNCTION_NAME_LENGTH;
 
     if (fnName.length < minLen) {
         pCtx.issues.push(
@@ -209,6 +341,7 @@ function checkPythonFunctionLength(
                 message: `Python function or method name '${fnName}' is too short (< ${minLen} characters); lacks semantic description.`,
                 detail: { name: fnName, length: fnName.length, minLen },
                 suggestion: `Rename '${fnName}' to a descriptive snake_case verb-noun phrase with at least ${minLen} characters.`,
+                actionable: buildPythonActionable(fnName, 'NAM-LEN-002', lineIdx + 1),
             }),
         );
         return true;
@@ -222,6 +355,7 @@ function checkPythonFunctionLength(
                 message: `Python function or method name '${fnName}' is excessively long (>= ${maxLen} characters); consider simplifying or decomposing.`,
                 detail: { name: fnName, length: fnName.length, maxLen },
                 suggestion: `Refactor '${fnName}' to reduce verbosity or decompose responsibilities into smaller procedures.`,
+                actionable: buildPythonActionable(fnName, 'NAM-LEN-002', lineIdx + 1),
             }),
         );
         return true;
@@ -253,7 +387,7 @@ export function auditPythonFunction(
     }
 
     const cleanName = fnName.replace(/^_+|_+$/g, '');
-    const segments = cleanName.split('_').filter((s) => s.length > 0);
+    const segments = cleanName.split('_').filter((segment) => segment.length > 0);
     const finding = auditFunctionSemantics(fnName, segments, pCtx.opts);
     if (finding) {
         pCtx.issues.push(
@@ -263,6 +397,7 @@ export function auditPythonFunction(
                 message: finding.message,
                 detail: { name: fnName, findingType: finding.type, token: finding.token },
                 suggestion: `Refactor Python function '${fnName}' according to engineering naming standards.`,
+                actionable: buildPythonActionable(fnName, 'NAM-LEN-002', lineIdx + 1),
             }),
         );
     }
@@ -275,6 +410,7 @@ export function auditPythonFunction(
                 message: `Python function '${fnName}' contains transient construction jargon.`,
                 detail: { name: fnName },
                 suggestion: 'Replace transient process markers with semantic domain naming.',
+                actionable: buildPythonActionable(fnName, 'NAM-JRG-002', lineIdx + 1),
             }),
         );
     }
@@ -350,6 +486,7 @@ export function auditPythonSourceHelper(
         auditPythonClass(line, i, scopedCtx, topLevel);
         auditPythonFunction(line, i, scopedCtx, topLevel);
         auditPythonAssignment(line, i, scopedCtx, topLevel);
+        auditPythonForLoop(line, i, scopedCtx);
     }
 
     if (pCtx.opts.checkDecoupling !== false && symbols.length >= MIN_CLUSTER_SYMBOLS) {

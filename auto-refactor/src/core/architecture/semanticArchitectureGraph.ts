@@ -37,8 +37,8 @@ export interface SourceArchitectureFile {
 /**
  * Normalizes a file path to forward slashes.
  */
-function normalizePath(p: string): string {
-    return p.replace(/\\/g, '/');
+function normalizePath(filePath: string): string {
+    return filePath.replace(/\\/g, '/');
 }
 
 /**
@@ -127,14 +127,14 @@ export class SemanticArchitectureGraph {
     ): SemanticArchitectureEdge[] {
         const inversions: SemanticArchitectureEdge[] = [];
         for (const edge of this.edges) {
-            const from = this.nodes.get(edge.fromNodeId);
-            const to = this.nodes.get(edge.toNodeId);
-            if (!from || !to || from.role === to.role) {
+            const fromNode = this.nodes.get(edge.fromNodeId);
+            const toNode = this.nodes.get(edge.toNodeId);
+            if (!fromNode || !toNode || fromNode.role === toNode.role) {
                 continue;
             }
 
-            const allowed = allowedMatrix[from.role];
-            if (allowed && !allowed.has(to.role)) {
+            const allowed = allowedMatrix[fromNode.role];
+            if (allowed && !allowed.has(toNode.role)) {
                 edge.isLayerInversion = true;
                 inversions.push(edge);
             }
@@ -298,8 +298,8 @@ function collectFileMap(graph: SemanticGraph): Map<string, FileEntry> {
     const fileMap = new Map<string, FileEntry>();
 
     for (const node of graph.getAllNodes()) {
-        const f = normalizePath(node.location.file);
-        const info = getOrCreateFileEntry(fileMap, f);
+        const filePath = normalizePath(node.location.file);
+        const info = getOrCreateFileEntry(fileMap, filePath);
         info.exports.add(node.name);
     }
 

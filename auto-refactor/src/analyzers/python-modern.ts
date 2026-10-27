@@ -1013,14 +1013,14 @@ export class PythonModernAnalyzer implements Analyzer {
         let depth = 0;
         let current = '';
         const parts: string[] = [];
-        for (const ch of paramsStr) {
-            if (ch === '(' || ch === '[' || ch === '{') depth++;
-            else if (ch === ')' || ch === ']' || ch === '}') depth--;
-            if (ch === ',' && depth === 0) {
+        for (const charToken of paramsStr) {
+            if (charToken === '(' || charToken === '[' || charToken === '{') depth++;
+            else if (charToken === ')' || charToken === ']' || charToken === '}') depth--;
+            if (charToken === ',' && depth === 0) {
                 parts.push(current);
                 current = '';
             } else {
-                current += ch;
+                current += charToken;
             }
         }
         if (current.trim() !== '') parts.push(current);

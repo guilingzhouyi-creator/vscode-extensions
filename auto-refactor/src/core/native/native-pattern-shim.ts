@@ -79,7 +79,10 @@ export function fastPatternMatchShim(sourceText: string, patterns: string[]): Na
     }
 
     if (patterns.length > 1) {
-        results.sort((a, b) => a.line - b.line || a.column - b.column);
+        results.sort(
+            (firstMatch, secondMatch) =>
+                firstMatch.line - secondMatch.line || firstMatch.column - secondMatch.column,
+        );
     }
 
     return results;

@@ -227,7 +227,7 @@ export function auditCommentDensity(
 ): void {
     const metrics = evaluateEffectiveCommentDensity(content);
     if (metrics.hasWaterLogging && metrics.totalCommentLines >= MIN_WATER_LOGGING_LINES) {
-        const firstTrivial = metrics.snippets.find((s) => s.isWaterLogging);
+        const firstTrivial = metrics.snippets.find((snippet) => snippet.isWaterLogging);
         const lineIdx = firstTrivial ? firstTrivial.line - 1 : 0;
         issues.push(
             mkIssue(
@@ -279,16 +279,16 @@ export function auditCommentSemanticDuty(
             const bodyEnd = Math.min(lines.length, i + LOOKAHEAD_BODY_LINES);
             const bodyText = lines.slice(i, bodyEnd).join('\n');
             const mismatches = matchCommentCodeDuty(symbol, docText, bodyText, i + 1);
-            for (const m of mismatches) {
+            for (const mismatch of mismatches) {
                 issues.push(
                     mkIssue(
                         ctx,
                         i,
                         'CMT-INT-001',
-                        m.message,
+                        mismatch.message,
                         SEVERITY_WARNING,
-                        { symbol, claimedContract: m.claimedContract },
-                        m.suggestion,
+                        { symbol, claimedContract: mismatch.claimedContract },
+                        mismatch.suggestion,
                     ),
                 );
             }

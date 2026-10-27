@@ -78,7 +78,7 @@ export class SemanticAdapterRegistry {
      * Lists all supported languages currently registered.
      */
     public getSupportedLanguages(): string[] {
-        return Array.from(new Set(this.adapters.map((a) => a.language)));
+        return Array.from(new Set(this.adapters.map((adapter) => adapter.language)));
     }
 
     /**

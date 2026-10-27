@@ -966,7 +966,7 @@ export function inspectRepoArchetype(
     }
 
     const hooks = detectHooks(absRoot, probe);
-    const ci = detectCi(absRoot, probe);
+    const ciContext = detectCi(absRoot, probe);
     const gateScripts = detectGateScripts(absRoot, probe);
     const topology = detectRepoTopology(absRoot, probe);
 
@@ -979,7 +979,7 @@ export function inspectRepoArchetype(
         manifests,
         scriptsAvailable,
         hooks,
-        ci,
+        ci: ciContext,
         gateScripts,
     };
 }

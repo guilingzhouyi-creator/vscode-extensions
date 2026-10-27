@@ -389,8 +389,8 @@ function matchDirectorySemantics(
 export class ArchitectureAnalyzer implements Analyzer {
     readonly name = ANALYZER_NAME;
 
-    analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
-        void sf;
+    analyze(sourceFile: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
+        void sourceFile;
         const opts = (ctx.options || {}) as ArchitectureOptions;
         const file = ctx.filePath.replace(/\\/g, '/');
         const currentLayer = this.resolveLayer(file, opts, ctx);

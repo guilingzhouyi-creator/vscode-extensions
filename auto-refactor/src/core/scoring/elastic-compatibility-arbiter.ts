@@ -82,15 +82,16 @@ export interface ElasticEvaluationResult {
 /**
  * Fast SemVer parser returning [major, minor, patch] tuple or null if unparseable.
  *
- * @param v - Version string to parse.
+ * @param versionStr - Version string to parse.
  * @returns 3-tuple of integers or null.
  */
-function parseSemVer(v: string | undefined): [number, number, number] | null {
-    if (!v) return null;
+function parseSemVer(versionStr: string | undefined): [number, number, number] | null {
+    if (!versionStr) return null;
     const clean =
-        v.charCodeAt(0) === CHAR_LOWERCASE_V || v.charCodeAt(0) === CHAR_UPPERCASE_V
-            ? v.slice(1)
-            : v;
+        versionStr.charCodeAt(0) === CHAR_LOWERCASE_V ||
+        versionStr.charCodeAt(0) === CHAR_UPPERCASE_V
+            ? versionStr.slice(1)
+            : versionStr;
     const parts = clean.split('.');
     if (parts.length === 0) return null;
     const major = parseInt(parts[0], 10);

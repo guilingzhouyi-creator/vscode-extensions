@@ -63,17 +63,17 @@ export interface RecipePacket {
 /**
  * Compute Adler-32 checksum across a byte buffer without heap allocations.
  *
- * @param buf - Byte buffer to hash.
+ * @param buffer - Byte buffer to hash.
  * @returns 32-bit unsigned Adler-32 checksum.
  */
-export function computeAdler32(buf: Uint8Array): number {
-    let a = 1;
-    let b = 0;
-    for (let i = 0; i < buf.length; i++) {
-        a = (a + buf[i]) % ADLER_MOD;
-        b = (b + a) % ADLER_MOD;
+export function computeAdler32(buffer: Uint8Array): number {
+    let sumLow = 1;
+    let sumHigh = 0;
+    for (let i = 0; i < buffer.length; i++) {
+        sumLow = (sumLow + buffer[i]) % ADLER_MOD;
+        sumHigh = (sumHigh + sumLow) % ADLER_MOD;
     }
-    return ((b << 16) | a) >>> 0;
+    return ((sumHigh << 16) | sumLow) >>> 0;
 }
 
 /**
@@ -158,7 +158,9 @@ export function decodeRecipePacket(
     const actualChecksum = computeAdler32(payloadBytes);
 
     if (actualChecksum !== expectedChecksum) {
-        throw new Error(`Recipe checksum mismatch: expected ${expectedChecksum}, got ${actualChecksum}`);
+        throw new Error(
+            `Recipe checksum mismatch: expected ${expectedChecksum}, got ${actualChecksum}`,
+        );
     }
 
     const decoder = new TextDecoder('utf-8');

@@ -55,7 +55,7 @@ function inspectConstantGroupDrift(name: string, list: ObservedConstantDeclarati
     if (distinctValues.size <= 1) return [];
 
     const summary = Array.from(distinctValues.entries())
-        .map(([val, sites]) => `"${val}" in [${sites.map((s) => s.filePath).join(', ')}]`)
+        .map(([val, sites]) => `"${val}" in [${sites.map((site) => site.filePath).join(', ')}]`)
         .join('; ');
 
     const issues: Issue[] = [];
@@ -76,7 +76,7 @@ function inspectConstantGroupDrift(name: string, list: ObservedConstantDeclarati
                 symbol: name,
                 currentValue: item.normalizedValue,
                 allDistinctValues: Array.from(distinctValues.keys()),
-                filesInvolved: list.map((l) => l.filePath),
+                filesInvolved: list.map((item) => item.filePath),
             },
             suggestion: desc.suggestion,
         });

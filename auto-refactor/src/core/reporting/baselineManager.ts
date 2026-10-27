@@ -117,12 +117,12 @@ function getOrCreateBaselineRow(
 
 function getOrCreateSeverityHistogram(
     histograms: Record<string, SeverityHistogram>,
-    id: string,
+    histogramId: string,
 ): SeverityHistogram {
-    let histogram = histograms[id];
+    let histogram = histograms[histogramId];
     if (!histogram) {
         histogram = {};
-        histograms[id] = histogram;
+        histograms[histogramId] = histogram;
     }
     return histogram;
 }
@@ -176,7 +176,7 @@ function creditFrom(count: number, severities?: SeverityHistogram): BaselineCred
         return { buckets: new Map([[UNKNOWN_SEVERITY, count]]), remaining: count };
     }
     const buckets = new Map(entries);
-    return { buckets, remaining: [...buckets.values()].reduce((a, b) => a + b, 0) };
+    return { buckets, remaining: [...buckets.values()].reduce((sum, val) => sum + val, 0) };
 }
 
 /**
@@ -209,7 +209,7 @@ function consumeCredit(credit: BaselineCredits, severity: Severity): boolean {
     const findingRank = SEVERITY_RANK[severity] ?? 0;
     const compatible = [...credit.buckets.entries()]
         .filter(([bucket, count]) => count > 0 && bucketRank(bucket) >= findingRank)
-        .sort((a, b) => bucketRank(a[0]) - bucketRank(b[0]));
+        .sort((entryA, entryB) => bucketRank(entryA[0]) - bucketRank(entryB[0]));
     if (compatible.length === 0) return false;
     const [chosenBucket, count] = compatible[0];
     credit.buckets.set(chosenBucket, count - 1);
@@ -250,19 +250,22 @@ export function readIdCredits(
     severities?: Record<string, SeverityHistogram>,
 ): BaselineSnapshot {
     const occurrences = new Map<string, number>();
-    for (const id of ids) {
-        occurrences.set(id, (occurrences.get(id) ?? 0) + 1);
+    for (const findingId of ids) {
+        occurrences.set(findingId, (occurrences.get(findingId) ?? 0) + 1);
     }
     // Union with the histogram keys: an id carrying a credit only in `severities` keeps it, so a
     // hand-trimmed id list can never turn a baselined finding into a false new one.
     if (severities) {
-        for (const id of Object.keys(severities)) {
-            if (!occurrences.has(id)) occurrences.set(id, 0);
+        for (const findingId of Object.keys(severities)) {
+            if (!occurrences.has(findingId)) occurrences.set(findingId, 0);
         }
     }
     const credits = new Map<string, BaselineCredits>();
-    for (const id of occurrences.keys()) {
-        credits.set(id, creditFrom(occurrences.get(id) ?? 0, severities?.[id]));
+    for (const findingId of occurrences.keys()) {
+        credits.set(
+            findingId,
+            creditFrom(occurrences.get(findingId) ?? 0, severities?.[findingId]),
+        );
     }
     return { credits, severityAware: Boolean(severities) };
 }

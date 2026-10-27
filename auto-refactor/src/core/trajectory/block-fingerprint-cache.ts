@@ -106,9 +106,9 @@ function detectBlockDeclaration(trimmed: string): { kind: AstBlockKind; name: st
  */
 function computeBraceBalance(line: string): number {
     let delta = 0;
-    for (let c = 0; c < line.length; c++) {
-        if (line[c] === '{') delta++;
-        else if (line[c] === '}') delta--;
+    for (let charIndex = 0; charIndex < line.length; charIndex++) {
+        if (line[charIndex] === '{') delta++;
+        else if (line[charIndex] === '}') delta--;
     }
     return delta;
 }
@@ -158,14 +158,14 @@ function finalizeBlockRecord(
     endLine: number,
 ): BlockFingerprint {
     const blockContent = state.lines.join('\n');
-    const fp = computeNormalizedFingerprint(blockContent);
+    const fingerprint = computeNormalizedFingerprint(blockContent);
     const eloc = countBlockEloc(blockContent);
 
     return {
         blockId: `${normPath}:${state.startLine}:${state.name}`,
         kind: state.kind,
         name: state.name,
-        fingerprint: fp,
+        fingerprint,
         eloc,
         filePath: normPath,
         startLine: state.startLine,

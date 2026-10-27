@@ -419,8 +419,8 @@ export function getDefaultConfig(root: string): ScanConfig {
  */
 function findFirstExistingCandidate(candidates: string[]): string | undefined {
     const existsFn = fs[FS_OP_EXISTS];
-    for (const c of candidates) {
-        if (existsFn(c)) return c;
+    for (const candidate of candidates) {
+        if (existsFn(candidate)) return candidate;
     }
     return undefined;
 }
@@ -448,10 +448,10 @@ function loadConfigFile(
         try {
             fileCfg = JSON.parse(readTextFile(existingFile));
             baseDir = path.dirname(path.resolve(existingFile));
-        } catch (e) {
+        } catch (readError) {
             console.warn(
                 `[auto-refactor] config file exists but is invalid/unreadable, falling back to defaults: ${existingFile} ` +
-                    `(${e instanceof Error ? e.message : String(e)})`,
+                    `(${readError instanceof Error ? readError.message : String(readError)})`,
             );
         }
     }
@@ -546,10 +546,10 @@ function applyCliAnalyzersFilter(
     } else if (isStringValue(allowList)) {
         items = allowList
             .split(DELIM_COMMA)
-            .map((s) => s.trim())
+            .map((itemStr) => itemStr.trim())
             .filter(Boolean);
     } else if (isPlainObject(allowList)) {
-        items = Object.keys(allowList).filter((k) => Boolean(allowList[k]));
+        items = Object.keys(allowList).filter((itemKey) => Boolean(allowList[itemKey]));
     } else {
         return analyzers;
     }

@@ -74,20 +74,20 @@ function findCallClosingParen(rawLine: string, openIdx: number): number {
     let depth = 1;
     let inStr: string | null = null;
     for (let i = openIdx + 1; i < rawLine.length; i++) {
-        const ch = rawLine[i];
+        const charCode = rawLine[i];
         if (inStr) {
-            if (ch === '\\') {
+            if (charCode === '\\') {
                 i++;
-            } else if (ch === inStr) {
+            } else if (charCode === inStr) {
                 inStr = null;
             }
             continue;
         }
-        if (ch === '"' || ch === "'") {
-            inStr = ch;
-        } else if (ch === '(') {
+        if (charCode === '"' || charCode === "'") {
+            inStr = charCode;
+        } else if (charCode === '(') {
             depth++;
-        } else if (ch === ')') {
+        } else if (charCode === ')') {
             depth--;
             if (depth === 0) return i;
         }
@@ -102,16 +102,19 @@ function pushParamIdentifier(params: string[], rawToken: string): void {
     if (idMatch) params.push(idMatch[1]);
 }
 
-function updateQuoteAndDepth(ch: string, state: { inStr: string | null; depth: number }): void {
+function updateQuoteAndDepth(
+    charStr: string,
+    state: { inStr: string | null; depth: number },
+): void {
     if (state.inStr) {
-        if (ch === state.inStr) state.inStr = null;
+        if (charStr === state.inStr) state.inStr = null;
         return;
     }
-    if (ch === '"' || ch === "'") {
-        state.inStr = ch;
-    } else if (ch === '(' || ch === '[' || ch === '{') {
+    if (charStr === '"' || charStr === "'") {
+        state.inStr = charStr;
+    } else if (charStr === '(' || charStr === '[' || charStr === '{') {
         state.depth++;
-    } else if (ch === ')' || ch === ']' || ch === '}') {
+    } else if (charStr === ')' || charStr === ']' || charStr === '}') {
         state.depth--;
     }
 }
@@ -127,18 +130,18 @@ function extractGDScriptParams(rawLine: string, openIdx: number): string[] {
     const state = { inStr: null as string | null, depth: 0 };
 
     for (let i = 0; i < paramStr.length; i++) {
-        const ch = paramStr[i];
-        if (state.inStr && ch === '\\') {
-            cur += ch + (paramStr[++i] || '');
+        const charStr = paramStr[i];
+        if (state.inStr && charStr === '\\') {
+            cur += charStr + (paramStr[++i] || '');
             continue;
         }
-        if (ch === ',' && !state.inStr && state.depth === 0) {
+        if (charStr === ',' && !state.inStr && state.depth === 0) {
             pushParamIdentifier(params, cur);
             cur = '';
             continue;
         }
-        updateQuoteAndDepth(ch, state);
-        cur += ch;
+        updateQuoteAndDepth(charStr, state);
+        cur += charStr;
     }
     pushParamIdentifier(params, cur);
     return params;
@@ -183,13 +186,13 @@ interface TolerantCallSpan {
 function collectTolerantCallSpans(rawLine: string): TolerantCallSpan[] {
     const spans: TolerantCallSpan[] = [];
     const callRe = new RegExp(TOLERANT_CALL_RE.source, 'g');
-    let cm: RegExpExecArray | null;
-    while ((cm = callRe.exec(rawLine)) !== null) {
-        let openIdx = cm.index + cm[0].length - 1;
-        while (openIdx >= cm.index && rawLine.charCodeAt(openIdx) !== 0x28) {
+    let callMatch: RegExpExecArray | null;
+    while ((callMatch = callRe.exec(rawLine)) !== null) {
+        let openIdx = callMatch.index + callMatch[0].length - 1;
+        while (openIdx >= callMatch.index && rawLine.charCodeAt(openIdx) !== 0x28) {
             openIdx--;
         }
-        if (openIdx < cm.index) {
+        if (openIdx < callMatch.index) {
             continue;
         }
         const closeIdx = findCallClosingParen(rawLine, openIdx);
@@ -484,7 +487,9 @@ export class GDScriptAdapter extends BaseAstAdapter {
 
         // Numeric literals (integer, float, hex)
         // Avoid matching numbers inside strings or identifiers
-        const codeWithoutStrings = rawLine.replace(strRegex, (m) => ' '.repeat(m.length));
+        const codeWithoutStrings = rawLine.replace(strRegex, (matchText) =>
+            ' '.repeat(matchText.length),
+        );
         const numRegex = /\b(0x[0-9a-fA-F]+|\d+\.\d+|\d+)\b/g;
 
         while ((match = numRegex.exec(codeWithoutStrings)) !== null) {

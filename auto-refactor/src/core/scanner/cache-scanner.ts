@@ -58,7 +58,7 @@ export async function executeScanWithCache(
         throw new Error('Scan aborted by user');
     }
     const cache = opts.cache;
-    const t0 = Date.now();
+    const startTimeMs = Date.now();
     const absRoot = path.resolve(cfg.root);
     const includeRx = cfg.include.map(globToRegExp);
     const excludeRx = cfg.exclude.map(globToRegExp);
@@ -101,7 +101,7 @@ export async function executeScanWithCache(
         });
     }
 
-    const fpByRel = new Map<string, Fingerprint>(queue.l1Fps.map((w) => [w.rel, w.fp]));
+    const fpByRel = new Map<string, Fingerprint>(queue.l1Fps.map((entry) => [entry.rel, entry.fp]));
     const missStats = await executeCacheMisses({
         scanner,
         toAnalyze: queue.toAnalyze,
@@ -139,27 +139,29 @@ export async function executeScanWithCache(
         scanner.logger.warn(`incremental RSS guard: cleared ${incRssEvicted} file state(s)`);
     }
 
-    for (const w of queue.l1Fps) cache.writeL1(w.rel, w.fp);
-    for (const w of queue.l2Refresh) cache.writeL2(w.fpHash, w.contentHash, w.rel, w.result, w.fp);
+    for (const entry of queue.l1Fps) cache.writeL1(entry.rel, entry.fp);
+    for (const item of queue.l2Refresh)
+        cache.writeL2(item.fpHash, item.contentHash, item.rel, item.result, item.fp);
     cache.flush();
 
     const issues: Issue[] = [];
     const fileMetrics: FileMetric[] = [];
-    for (const r of perFile) {
-        if (!r) continue;
-        issues.push(...r.issues);
-        if (r.metric) fileMetrics.push(r.metric);
+    for (const result of perFile) {
+        if (!result) continue;
+        issues.push(...result.issues);
+        if (result.metric) fileMetrics.push(result.metric);
     }
-    issues.sort((a, b) => {
-        if (a.location.file !== b.location.file) return a.location.file < b.location.file ? -1 : 1;
-        if (a.location.start.line !== b.location.start.line) {
-            return a.location.start.line - b.location.start.line;
+    issues.sort((issueA, issueB) => {
+        if (issueA.location.file !== issueB.location.file)
+            return issueA.location.file < issueB.location.file ? -1 : 1;
+        if (issueA.location.start.line !== issueB.location.start.line) {
+            return issueA.location.start.line - issueB.location.start.line;
         }
-        if (a.analyzer !== b.analyzer) return a.analyzer < b.analyzer ? -1 : 1;
-        return a.rule < b.rule ? -1 : 1;
+        if (issueA.analyzer !== issueB.analyzer) return issueA.analyzer < issueB.analyzer ? -1 : 1;
+        return issueA.rule < issueB.rule ? -1 : 1;
     });
 
-    const durationMs = Date.now() - t0;
+    const durationMs = Date.now() - startTimeMs;
     const report = scanner.buildReport(files.length, issues, fileMetrics, durationMs);
     const totalAnalyzed = missStats.analyzed + incStats.incrementalFiles;
     scanner.logger.info(

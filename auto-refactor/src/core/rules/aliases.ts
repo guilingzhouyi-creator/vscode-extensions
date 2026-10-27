@@ -66,11 +66,11 @@ export const LEGACY_RULE_ALIASES: Readonly<Record<string, string>> = Object.free
 /**
  * Query lifecycle metadata for a given rule alias candidate under 4D-ECE governance.
  *
- * @param id - Potential legacy alias identifier.
- * @returns Metadata descriptor or undefined if id is not a legacy alias.
+ * @param ruleId - Potential legacy alias identifier.
+ * @returns Metadata descriptor or undefined if ruleId is not a legacy alias.
  */
-export function getLegacyRuleMetadata(id: string): LegacyRuleAliasMetadata | undefined {
-    const canonicalId = LEGACY_RULE_ALIASES[id];
+export function getLegacyRuleMetadata(ruleId: string): LegacyRuleAliasMetadata | undefined {
+    const canonicalId = LEGACY_RULE_ALIASES[ruleId];
     if (!canonicalId) {
         return undefined;
     }
@@ -84,22 +84,22 @@ export function getLegacyRuleMetadata(id: string): LegacyRuleAliasMetadata | und
 /**
  * Resolve any rule id to the canonical id that decides its identity.
  *
- * @param id - Rule id as emitted or written in a config/baseline.
+ * @param ruleId - Rule id as emitted or written in a config/baseline.
  * @returns The canonical id for a legacy alias, otherwise the id itself.
  */
-export function canonicalRuleId(id: string): string {
-    return LEGACY_RULE_ALIASES[id] ?? id;
+export function canonicalRuleId(ruleId: string): string {
+    return LEGACY_RULE_ALIASES[ruleId] ?? ruleId;
 }
 
 /**
  * Resolve any rule id to its standard canonical 3-letter form,
  * integrating legacy alias resolution.
  *
- * @param id - Rule id as emitted, written in a config/baseline, or historical 4+ letter form.
+ * @param ruleId - Rule id as emitted, written in a config/baseline, or historical 4+ letter form.
  * @returns Standard 3-letter canonical rule id.
  */
-export function toCanonicalRuleId(id: string): string {
-    const legacyResolved = canonicalRuleId(id);
+export function toCanonicalRuleId(ruleId: string): string {
+    const legacyResolved = canonicalRuleId(ruleId);
     return normalizeToCanonicalRuleId(legacyResolved);
 }
 
@@ -114,14 +114,14 @@ export const CANONICAL_3LETTER_FORM_PATTERN = /^[A-Z]{2,3}-[A-Z]{3}-\d{3}$/;
  * Determine whether a rule identifier is composed of the standard 3-3-3 canonical format
  * (or 2-letter script family format).
  *
- * @param id - Candidate rule identifier string.
- * @returns True if id conforms to standard 3-3-3 or 2-letter script family canonical shape.
+ * @param ruleId - Candidate rule identifier string.
+ * @returns True if ruleId conforms to standard 3-3-3 or 2-letter script family canonical shape.
  */
-export function isCanonical3LetterForm(id: string): boolean {
-    if (typeof id !== 'string') {
+export function isCanonical3LetterForm(ruleId: string): boolean {
+    if (typeof ruleId !== 'string') {
         return false;
     }
-    return CANONICAL_3LETTER_FORM_PATTERN.test(id);
+    return CANONICAL_3LETTER_FORM_PATTERN.test(ruleId);
 }
 
 /**
@@ -180,9 +180,11 @@ export function auditAliasWindow(): {
         seen.add(target);
     }
     return {
-        missingAlias: legacy.filter((id) => !(id in LEGACY_RULE_ALIASES)),
-        unknownAlias: keys.filter((id) => !getRule(id)),
-        malformedTarget: keys.filter((id) => !RULE_ID_PATTERN.test(LEGACY_RULE_ALIASES[id])),
+        missingAlias: legacy.filter((ruleId) => !(ruleId in LEGACY_RULE_ALIASES)),
+        unknownAlias: keys.filter((ruleId) => !getRule(ruleId)),
+        malformedTarget: keys.filter(
+            (ruleId) => !RULE_ID_PATTERN.test(LEGACY_RULE_ALIASES[ruleId]),
+        ),
         duplicateTargets,
     };
 }

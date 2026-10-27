@@ -246,11 +246,11 @@ export class GdscriptGameAnalyzer implements Analyzer {
      * Synchronous analysis routine for GDScript game domain rules.
      * Concurrency: Thread-safe, reentrant, zero mutable shared state.
      *
-     * @param _sf - Unused AST source file parameter.
+     * @param _sourceFile - Unused AST source file parameter.
      * @param ctx - File scan context containing content and path.
      * @returns Array of discovered issues.
      */
-    analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
+    analyze(_sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
         const file = ctx.filePath.replace(/\\/g, '/');
         const hasValidExt = ACCEPTED_EXTENSIONS.some((ext) => file.endsWith(ext));
         if (!hasValidExt) return [];
@@ -264,16 +264,20 @@ export class GdscriptGameAnalyzer implements Analyzer {
 
         // 1. GDM-PRF-001 via generalized hot path matcher
         const hotViolations = matchHotPathAllocations(masked, GAME_HOT_PATH_PATTERN);
-        for (const h of hotViolations) {
+        for (const violation of hotViolations) {
             issues.push(
                 makeGameIssue({
                     file,
-                    line: h.line,
+                    line: violation.line,
                     rule: 'GDM-PRF-001',
                     severity: SEVERITY_ERROR,
-                    message: formatHotPathMessage(h.allocationType),
+                    message: formatHotPathMessage(violation.allocationType),
                     suggestion: GAME_DIAGNOSTICS.hotPath.suggestion,
-                    detail: { line: h.line, text: h.rawText, scope: h.scopeName },
+                    detail: {
+                        line: violation.line,
+                        text: violation.rawText,
+                        scope: violation.scopeName,
+                    },
                 }),
             );
         }

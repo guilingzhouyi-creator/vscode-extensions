@@ -35,39 +35,60 @@ const TRIGGER_ASYNC = 'hasAsyncMutation' as const;
 const TRIGGER_TYPE = 'hasTypeMutation' as const;
 
 // Pre-computed bitmasks for slice feature triggers
-const SLICE_MASK_DOC_ONLY = EXPERT_CATALOG.reduce((acc, e) => {
-    return e.affinities.sliceTriggers.includes(TRIGGER_DOC_ONLY) ? (acc | e.bit) >>> 0 : acc;
-}, 0) >>> 0;
+const SLICE_MASK_DOC_ONLY =
+    EXPERT_CATALOG.reduce((accumulatedMask, expertItem) => {
+        return expertItem.affinities.sliceTriggers.includes(TRIGGER_DOC_ONLY)
+            ? (accumulatedMask | expertItem.bit) >>> 0
+            : accumulatedMask;
+    }, 0) >>> 0;
 
-const SLICE_MASK_LITERAL = EXPERT_CATALOG.reduce((acc, e) => {
-    return e.affinities.sliceTriggers.includes(TRIGGER_LITERAL) ? (acc | e.bit) >>> 0 : acc;
-}, 0) >>> 0;
+const SLICE_MASK_LITERAL =
+    EXPERT_CATALOG.reduce((accumulatedMask, expertItem) => {
+        return expertItem.affinities.sliceTriggers.includes(TRIGGER_LITERAL)
+            ? (accumulatedMask | expertItem.bit) >>> 0
+            : accumulatedMask;
+    }, 0) >>> 0;
 
-const SLICE_MASK_SIGNATURE = EXPERT_CATALOG.reduce((acc, e) => {
-    return e.affinities.sliceTriggers.includes(TRIGGER_SIGNATURE) ? (acc | e.bit) >>> 0 : acc;
-}, 0) >>> 0;
+const SLICE_MASK_SIGNATURE =
+    EXPERT_CATALOG.reduce((accumulatedMask, expertItem) => {
+        return expertItem.affinities.sliceTriggers.includes(TRIGGER_SIGNATURE)
+            ? (accumulatedMask | expertItem.bit) >>> 0
+            : accumulatedMask;
+    }, 0) >>> 0;
 
-const SLICE_MASK_CONTROL_FLOW = EXPERT_CATALOG.reduce((acc, e) => {
-    return e.affinities.sliceTriggers.includes(TRIGGER_CONTROL_FLOW) ? (acc | e.bit) >>> 0 : acc;
-}, 0) >>> 0;
+const SLICE_MASK_CONTROL_FLOW =
+    EXPERT_CATALOG.reduce((accumulatedMask, expertItem) => {
+        return expertItem.affinities.sliceTriggers.includes(TRIGGER_CONTROL_FLOW)
+            ? (accumulatedMask | expertItem.bit) >>> 0
+            : accumulatedMask;
+    }, 0) >>> 0;
 
-const SLICE_MASK_IO = EXPERT_CATALOG.reduce((acc, e) => {
-    return e.affinities.sliceTriggers.includes(TRIGGER_IO) ? (acc | e.bit) >>> 0 : acc;
-}, 0) >>> 0;
+const SLICE_MASK_IO =
+    EXPERT_CATALOG.reduce((accumulatedMask, expertItem) => {
+        return expertItem.affinities.sliceTriggers.includes(TRIGGER_IO)
+            ? (accumulatedMask | expertItem.bit) >>> 0
+            : accumulatedMask;
+    }, 0) >>> 0;
 
-const SLICE_MASK_ASYNC = EXPERT_CATALOG.reduce((acc, e) => {
-    return e.affinities.sliceTriggers.includes(TRIGGER_ASYNC) ? (acc | e.bit) >>> 0 : acc;
-}, 0) >>> 0;
+const SLICE_MASK_ASYNC =
+    EXPERT_CATALOG.reduce((accumulatedMask, expertItem) => {
+        return expertItem.affinities.sliceTriggers.includes(TRIGGER_ASYNC)
+            ? (accumulatedMask | expertItem.bit) >>> 0
+            : accumulatedMask;
+    }, 0) >>> 0;
 
-const SLICE_MASK_TYPE = EXPERT_CATALOG.reduce((acc, e) => {
-    return e.affinities.sliceTriggers.includes(TRIGGER_TYPE) ? (acc | e.bit) >>> 0 : acc;
-}, 0) >>> 0;
+const SLICE_MASK_TYPE =
+    EXPERT_CATALOG.reduce((accumulatedMask, expertItem) => {
+        return expertItem.affinities.sliceTriggers.includes(TRIGGER_TYPE)
+            ? (accumulatedMask | expertItem.bit) >>> 0
+            : accumulatedMask;
+    }, 0) >>> 0;
 
-const SLICE_MASK_GENERAL_FALLBACK = (
-    (EXPERT_BY_ID.get(ID_COMPLEXITY)?.bit || 0) |
-    (EXPERT_BY_ID.get(ID_GOVERNANCE)?.bit || 0) |
-    (EXPERT_BY_ID.get(ID_HYGIENE)?.bit || 0)
-) >>> 0;
+const SLICE_MASK_GENERAL_FALLBACK =
+    ((EXPERT_BY_ID.get(ID_COMPLEXITY)?.bit || 0) |
+        (EXPERT_BY_ID.get(ID_GOVERNANCE)?.bit || 0) |
+        (EXPERT_BY_ID.get(ID_HYGIENE)?.bit || 0)) >>>
+    0;
 
 /**
  * Fast CED bitset dispatch based on an AST slice feature vector.

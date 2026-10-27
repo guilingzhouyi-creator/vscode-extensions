@@ -34,7 +34,7 @@ export interface AstNamingContext {
     readonly ctx: AnalyzerContext;
     readonly opts: NamingOptions;
     readonly issues: Issue[];
-    readonly sf: ts.SourceFile;
+    readonly sourceFile: ts.SourceFile;
     readonly vagueSet?: Set<string>;
     readonly singleAllowed?: Set<string>;
     readonly symbols?: SymbolEntry[];
@@ -166,12 +166,12 @@ export function checkTopLevelConstantHelper(
  * Audits test title arguments in call expressions for milestone/sprint jargon.
  *
  * @param node - AST call expression node.
- * @param sf - Source file representation.
+ * @param sourceFile - Source file representation.
  * @param aCtx - AST naming traversal context.
  */
 export function checkCallExpressionJargonHelper(
     node: ts.CallExpression,
-    sf: ts.SourceFile,
+    sourceFile: ts.SourceFile,
     aCtx: AstNamingContext,
 ): void {
     if (!ts.isIdentifier(node.expression) || !TEST_RUNNER_FUNCTIONS.has(node.expression.text)) {
@@ -184,7 +184,7 @@ export function checkCallExpressionJargonHelper(
     if (!TEST_TITLE_JARGON_RE.test(arg0.text)) {
         return;
     }
-    const pos = sf.getLineAndCharacterOfPosition(arg0.getStart(sf));
+    const pos = sourceFile.getLineAndCharacterOfPosition(arg0.getStart(sourceFile));
     pushAstFinding(aCtx, {
         line: pos.line + 1,
         column: pos.character + 1,
@@ -437,13 +437,13 @@ const MAX_SIMPLE_ARROW_LINES = 4;
  * Checks whether an AST node is a single-line or single-expression arrow function.
  *
  * @param node - AST node to test.
- * @param sf - Source file providing position offsets.
+ * @param sourceFile - Source file providing position offsets.
  * @returns True if node is a single-line or concise-body arrow function.
  */
-export function isSimpleArrowFunction(node: ts.Node, sf: ts.SourceFile): boolean {
+export function isSimpleArrowFunction(node: ts.Node, sourceFile: ts.SourceFile): boolean {
     if (!ts.isArrowFunction(node)) return false;
     if (!ts.isBlock(node.body) || node.body.statements.length <= 1) return true;
-    const startLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
-    const endLine = sf.getLineAndCharacterOfPosition(node.getEnd()).line;
+    const startLine = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line;
+    const endLine = sourceFile.getLineAndCharacterOfPosition(node.getEnd()).line;
     return endLine - startLine <= MAX_SIMPLE_ARROW_LINES;
 }

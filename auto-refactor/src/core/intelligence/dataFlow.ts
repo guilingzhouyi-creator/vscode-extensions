@@ -130,11 +130,11 @@ export class DataFlowGraph {
     /**
      * Retrieves a registered data flow node by its unique identifier.
      *
-     * @param id - Unique identifier of the node to look up.
+     * @param nodeId - Unique identifier of the node to look up.
      * @returns The matching DataFlowNode if present in the graph, or undefined if not found.
      */
-    public getNode(id: string): DataFlowNode | undefined {
-        return !id ? undefined : this.nodes.get(id);
+    public getNode(nodeId: string): DataFlowNode | undefined {
+        return !nodeId ? undefined : this.nodes.get(nodeId);
     }
 
     /**
@@ -158,21 +158,21 @@ export class DataFlowGraph {
     /**
      * Queries all directed edges originating from the specified source node.
      *
-     * @param id - Identifier of the source node whose outgoing edges are requested.
+     * @param nodeId - Identifier of the source node whose outgoing edges are requested.
      * @returns Read-only array of outgoing DataFlowEdge instances, or an empty array if none exist.
      */
-    public getOutgoingEdges(id: string): readonly DataFlowEdge[] {
-        return this.outgoing.get(id) ?? [];
+    public getOutgoingEdges(nodeId: string): readonly DataFlowEdge[] {
+        return this.outgoing.get(nodeId) ?? [];
     }
 
     /**
      * Queries all directed edges terminating at the specified destination node.
      *
-     * @param id - Identifier of the destination node whose incoming edges are requested.
+     * @param nodeId - Identifier of the destination node whose incoming edges are requested.
      * @returns Read-only array of incoming DataFlowEdge instances, or an empty array if none exist.
      */
-    public getIncomingEdges(id: string): readonly DataFlowEdge[] {
-        return this.incoming.get(id) ?? [];
+    public getIncomingEdges(nodeId: string): readonly DataFlowEdge[] {
+        return this.incoming.get(nodeId) ?? [];
     }
 
     /**
@@ -218,13 +218,13 @@ export class DataFlowGraph {
             const current = queue[head++];
             if (visited.has(current)) continue;
             visited.add(current);
-            const n = this.nodes.get(current);
-            if (n) lastNode = n;
+            const targetNode = this.nodes.get(current);
+            if (targetNode) lastNode = targetNode;
             const outgoingEdges = this.outgoing.get(current);
             if (outgoingEdges) {
-                for (const e of outgoingEdges) {
-                    if (!visited.has(e.to)) {
-                        queue.push(e.to);
+                for (const edge of outgoingEdges) {
+                    if (!visited.has(edge.to)) {
+                        queue.push(edge.to);
                     }
                 }
             }
@@ -242,7 +242,9 @@ export class DataFlowGraph {
         stages: LifecycleStage[];
         endNode: DataFlowNode;
     }> {
-        const sources = Array.from(this.nodes.values()).filter((n) => n.stage === STAGE_SOURCE);
+        const sources = Array.from(this.nodes.values()).filter(
+            (node) => node.stage === STAGE_SOURCE,
+        );
         const pipelines: Array<{
             startNode: DataFlowNode;
             stages: LifecycleStage[];
@@ -282,9 +284,9 @@ export class DataFlowGraph {
             persistent: 0,
             unbounded: 0,
         };
-        for (const n of this.nodes.values()) {
-            stageDist[n.stage] = (stageDist[n.stage] ?? 0) + 1;
-            lifeDist[n.lifetime] = (lifeDist[n.lifetime] ?? 0) + 1;
+        for (const node of this.nodes.values()) {
+            stageDist[node.stage] = (stageDist[node.stage] ?? 0) + 1;
+            lifeDist[node.lifetime] = (lifeDist[node.lifetime] ?? 0) + 1;
         }
         return {
             totalNodes: this.nodes.size,
@@ -302,7 +304,7 @@ export class DataFlowGraph {
      */
     public computeDominators(entryNodeId: string): NativeDominatorTreeResult {
         const nodeIds = Array.from(this.nodes.keys());
-        const edgeTuples: Array<[string, string]> = this.edges.map((e) => [e.from, e.to]);
+        const edgeTuples: Array<[string, string]> = this.edges.map((edge) => [edge.from, edge.to]);
         return nativeCore.computeDominatorTree(entryNodeId, nodeIds, edgeTuples);
     }
 
@@ -322,7 +324,7 @@ export class DataFlowGraph {
         forward = true,
     ): NativeDataflowResult {
         const nodeIds = Array.from(this.nodes.keys());
-        const edgeTuples: Array<[string, string]> = this.edges.map((e) => [e.from, e.to]);
+        const edgeTuples: Array<[string, string]> = this.edges.map((edge) => [edge.from, edge.to]);
         return nativeCore.solveDataflow({
             entry: entryNodeId,
             nodes: nodeIds,
@@ -562,7 +564,7 @@ function extractOpeners(code: string): Opener[] {
     if (timer) openers.push({ kind: SCOPE_KIND_TIMER, index: timer.index });
     const loop = /\b(?:while|for)\s*\(/.exec(code);
     if (loop) openers.push({ kind: SCOPE_KIND_LOOP, index: loop.index });
-    openers.sort((a, b) => a.index - b.index);
+    openers.sort((openerA, openerB) => openerA.index - openerB.index);
     return openers;
 }
 
@@ -588,14 +590,14 @@ function findBracelessOpener(code: string, openers: Opener[]): Opener | null {
  */
 function collectAppendSites(code: string, appendRes: Map<string, RegExp>): AppendSite[] {
     const sites: AppendSite[] = [];
-    for (const [name, re] of appendRes) {
-        re.lastIndex = 0;
+    for (const [name, patternRegex] of appendRes) {
+        patternRegex.lastIndex = 0;
         let match: RegExpExecArray | null;
-        while ((match = re.exec(code)) !== null) {
+        while ((match = patternRegex.exec(code)) !== null) {
             sites.push({ index: match.index, name, length: match[0].length });
         }
     }
-    sites.sort((a, b) => a.index - b.index);
+    sites.sort((siteA, siteB) => siteA.index - siteB.index);
     return sites;
 }
 

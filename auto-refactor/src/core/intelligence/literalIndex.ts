@@ -217,7 +217,10 @@ export class LiteralIndex {
         for (const [value, occurrences] of this.byValue) {
             entries.push(this.entryOf(value, occurrences));
         }
-        entries.sort((a, b) => b.occurrences - a.occurrences || (a.value < b.value ? -1 : 1));
+        entries.sort(
+            (entryA, entryB) =>
+                entryB.occurrences - entryA.occurrences || (entryA.value < entryB.value ? -1 : 1),
+        );
         return entries;
     }
 
@@ -245,7 +248,10 @@ export class LiteralIndex {
                 result.push(entry);
             }
         }
-        result.sort((a, b) => b.occurrences - a.occurrences || (a.value < b.value ? -1 : 1));
+        result.sort(
+            (entryA, entryB) =>
+                entryB.occurrences - entryA.occurrences || (entryA.value < entryB.value ? -1 : 1),
+        );
         return result;
     }
 

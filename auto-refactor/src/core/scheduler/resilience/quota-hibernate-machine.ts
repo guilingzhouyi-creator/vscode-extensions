@@ -39,8 +39,8 @@ export interface VirtualClock {
 /** Standard system clock implementation backed by Node.js globals. */
 export const SYSTEM_CLOCK: VirtualClock = {
     now: () => Date.now(),
-    setTimeout: (fn, ms) => setTimeout(fn, ms),
-    clearTimeout: (id) => clearTimeout(id as NodeJS.Timeout),
+    setTimeout: (handlerFn, timeoutMs) => setTimeout(handlerFn, timeoutMs),
+    clearTimeout: (timerHandle) => clearTimeout(timerHandle as NodeJS.Timeout),
 };
 
 /**
@@ -143,7 +143,7 @@ export class QuotaHibernateMachine extends EventEmitter {
     /**
      * Submits a task. Runs immediately if RUNNING, or queues if HIBERNATING.
      */
-    public enqueueTask<T>(id: string, execute: () => Promise<T>): Promise<T> {
+    public enqueueTask<T>(taskId: string, execute: () => Promise<T>): Promise<T> {
         if (this.state === 'TERMINATED') {
             return Promise.reject(new Error('Machine is terminated'));
         }
@@ -161,7 +161,7 @@ export class QuotaHibernateMachine extends EventEmitter {
 
         return new Promise<T>((resolve, reject) => {
             this.taskQueue.push({
-                id,
+                id: taskId,
                 execute: execute as () => Promise<unknown>,
                 resolve: resolve as (value: unknown) => void,
                 reject,

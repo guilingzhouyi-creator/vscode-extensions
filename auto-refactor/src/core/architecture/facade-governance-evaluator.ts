@@ -123,9 +123,9 @@ function checkVacuousTrampoline(
         ) {
             return { isTrampoline: false, targetPath: '' };
         }
-        const m = line.match(TRAMPOLINE_REEXPORT_RE);
-        if (m) {
-            targetPath = m[1];
+        const match = line.match(TRAMPOLINE_REEXPORT_RE);
+        if (match) {
+            targetPath = match[1];
         }
     }
 
@@ -254,7 +254,7 @@ export function auditFacadeGovernance(
     const stripped = stripComments(content);
     const codeLines = stripped
         .split('\n')
-        .map((l) => l.trim())
+        .map((line) => line.trim())
         .filter(Boolean);
 
     const normPath = filePath.replace(/\\/g, '/');

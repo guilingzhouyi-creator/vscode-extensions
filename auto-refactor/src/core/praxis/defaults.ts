@@ -147,7 +147,7 @@ export class DefaultPraxisThresholdPolicy implements IPraxisThresholdPolicy {
         hunk: ReviewDiffHunk,
         _context: PraxisEnrichedContext,
     ): PraxisVerdict {
-        const changeCount = hunk.lines.filter((l) => l.type !== 'context').length;
+        const changeCount = hunk.lines.filter((line) => line.type !== 'context').length;
         if (changeCount > this.autoEscalateLines) {
             return {
                 status: 'major_rework_needed',

@@ -23,9 +23,9 @@ import type { DispatchableReviewItem, GroupedDispatchPlan } from './grouped-disp
 const DEDUP_KEY_DELIMITER = '|';
 
 /** Reusable static comparator sorting issues by start position ascending. */
-function compareIssuesByPosition(a: Issue, b: Issue): number {
-    const lineDiff = a.location.start.line - b.location.start.line;
-    return lineDiff !== 0 ? lineDiff : a.location.start.column - b.location.start.column;
+function compareIssuesByPosition(issueA: Issue, issueB: Issue): number {
+    const lineDiff = issueA.location.start.line - issueB.location.start.line;
+    return lineDiff !== 0 ? lineDiff : issueA.location.start.column - issueB.location.start.column;
 }
 
 /** Immutable empty issues array to eliminate per-iteration transient allocations. */
@@ -211,11 +211,7 @@ export class ExpertFindingCombiner {
                 reports,
             );
         } else {
-            this.buildReportsFromItemIssues(
-                itemIssuesMap,
-                dispatchPlan.activeExpertIds,
-                reports,
-            );
+            this.buildReportsFromItemIssues(itemIssuesMap, dispatchPlan.activeExpertIds, reports);
         }
 
         return reports;

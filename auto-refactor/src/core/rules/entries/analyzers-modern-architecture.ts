@@ -33,7 +33,7 @@ import {
 } from '../../scoring/dimensionLiterals';
 
 function defineLanguageAgnosticRule(
-    id: string,
+    ruleId: string,
     family: typeof RULE_FAMILY_ARCHITECTURE | typeof RULE_FAMILY_PERFORMANCE,
     analyzer: typeof ANALYZER_ARCHITECTURE | typeof ANALYZER_PERFORMANCE,
     defaultSeverity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
@@ -42,7 +42,7 @@ function defineLanguageAgnosticRule(
     docsAnchor: string,
 ): RuleDefinition {
     return defineRule({
-        id,
+        id: ruleId,
         family,
         analyzer,
         canonical: true,
@@ -55,13 +55,13 @@ function defineLanguageAgnosticRule(
 }
 
 function defineArchitectureRule(
-    id: string,
+    ruleId: string,
     summary: string,
     remediation: string,
     docsAnchor: string,
 ): RuleDefinition {
     return defineLanguageAgnosticRule(
-        id,
+        ruleId,
         RULE_FAMILY_ARCHITECTURE,
         ANALYZER_ARCHITECTURE,
         SEVERITY_WARNING,
@@ -72,14 +72,14 @@ function defineArchitectureRule(
 }
 
 function definePerformanceRule(
-    id: string,
+    ruleId: string,
     defaultSeverity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
     summary: string,
     remediation: string,
     docsAnchor: string,
 ): RuleDefinition {
     return defineLanguageAgnosticRule(
-        id,
+        ruleId,
         RULE_FAMILY_PERFORMANCE,
         ANALYZER_PERFORMANCE,
         defaultSeverity,

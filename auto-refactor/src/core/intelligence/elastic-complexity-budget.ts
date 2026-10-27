@@ -140,7 +140,7 @@ const ALGO_KEYWORDS = [
 function isMathOrAlgorithm(name: string, isStateOrAlgorithm?: boolean): boolean {
     if (isStateOrAlgorithm) return true;
     const lower = name.toLowerCase();
-    return ALGO_KEYWORDS.some((kw) => lower.includes(kw));
+    return ALGO_KEYWORDS.some((keyword) => lower.includes(keyword));
 }
 
 function computeClarityMultiplier(maxDepth: number): number {
@@ -194,18 +194,21 @@ export function normalizeLanguageTag(langOrExt: string): string {
 }
 
 function computeBudgetThresholds(
-    fn: FunctionComplexityContext,
+    funcCtx: FunctionComplexityContext,
     defaultWarn: number,
     defaultFail: number,
 ) {
-    const langKey = normalizeLanguageTag(fn.language);
+    const langKey = normalizeLanguageTag(funcCtx.language);
     const base = LANGUAGE_BASE_THRESHOLDS[langKey] ?? { warn: defaultWarn, fail: defaultFail };
     const langMultiplier = base.warn / DEFAULT_WARN_THRESHOLD;
-    const roleMultiplier = computeRoleMultiplier(fn.role);
-    const isAlgo = isMathOrAlgorithm(fn.name, fn.isStateOrAlgorithm);
+    const roleMultiplier = computeRoleMultiplier(funcCtx.role);
+    const isAlgo = isMathOrAlgorithm(funcCtx.name, funcCtx.isStateOrAlgorithm);
     const domainMultiplier = isAlgo ? DOMAIN_ALGO_MULTIPLIER : MULTIPLIER_DEFAULT;
-    const clarityMultiplier = computeClarityMultiplier(fn.maxDepth);
-    const blastRadiusMultiplier = computeBlastRadiusMultiplier(fn.isExported, fn.maxDepth);
+    const clarityMultiplier = computeClarityMultiplier(funcCtx.maxDepth);
+    const blastRadiusMultiplier = computeBlastRadiusMultiplier(
+        funcCtx.isExported,
+        funcCtx.maxDepth,
+    );
 
     const totalMultiplier =
         langMultiplier *
@@ -222,7 +225,7 @@ function computeBudgetThresholds(
         Math.min(EFFECTIVE_FAIL_MAX, Math.round(base.fail * totalMultiplier)),
     );
     const hasAlgorithmicProof = Boolean(
-        (isAlgo || fn.hasDocContract) && fn.maxDepth <= BLAST_RADIUS_MAX_DEPTH,
+        (isAlgo || funcCtx.hasDocContract) && funcCtx.maxDepth <= BLAST_RADIUS_MAX_DEPTH,
     );
 
     return {
@@ -241,33 +244,33 @@ function computeBudgetThresholds(
 }
 
 function createBudgetExceededIssue(
-    fn: FunctionComplexityContext,
+    funcCtx: FunctionComplexityContext,
     effectiveWarn: number,
     effectiveFail: number,
     totalMultiplier: number,
     hasAlgorithmicProof: boolean,
     multipliers: Record<string, number>,
 ): Issue {
-    const severity = fn.cc >= effectiveFail ? SEVERITY_ERROR : SEVERITY_WARNING;
+    const severity = funcCtx.cc >= effectiveFail ? SEVERITY_ERROR : SEVERITY_WARNING;
     return {
-        id: `complexity:${RULE_CPX_BUD_001}:${fn.filePath}:${fn.startLine}`,
+        id: `complexity:${RULE_CPX_BUD_001}:${funcCtx.filePath}:${funcCtx.startLine}`,
         analyzer: ANALYZER_COMPLEXITY,
         rule: RULE_CPX_BUD_001,
         severity,
         message:
-            `Function "${fn.name}" has cyclomatic complexity ${fn.cc}, exceeding its ` +
-            `elastic budget of ${effectiveWarn} (maxDepth: ${fn.maxDepth}, multiplier: ${totalMultiplier.toFixed(2)}).`,
+            `Function "${funcCtx.name}" has cyclomatic complexity ${funcCtx.cc}, exceeding its ` +
+            `elastic budget of ${effectiveWarn} (maxDepth: ${funcCtx.maxDepth}, multiplier: ${totalMultiplier.toFixed(2)}).`,
         location: {
-            file: fn.filePath,
-            start: { line: fn.startLine, column: fn.startColumn },
-            end: { line: fn.startLine, column: fn.startColumn + 40 },
+            file: funcCtx.filePath,
+            start: { line: funcCtx.startLine, column: funcCtx.startColumn },
+            end: { line: funcCtx.startLine, column: funcCtx.startColumn + 40 },
         },
         detail: {
-            function: fn.name,
-            cc: fn.cc,
+            function: funcCtx.name,
+            cc: funcCtx.cc,
             effectiveWarn,
             effectiveFail,
-            maxDepth: fn.maxDepth,
+            maxDepth: funcCtx.maxDepth,
             hasAlgorithmicProof,
             multipliers,
         },
@@ -277,24 +280,24 @@ function createBudgetExceededIssue(
     };
 }
 
-function createUnjustifiedNestingIssue(fn: FunctionComplexityContext): Issue {
+function createUnjustifiedNestingIssue(funcCtx: FunctionComplexityContext): Issue {
     return {
-        id: `complexity:${RULE_CPX_JST_001}:${fn.filePath}:${fn.startLine}`,
+        id: `complexity:${RULE_CPX_JST_001}:${funcCtx.filePath}:${funcCtx.startLine}`,
         analyzer: ANALYZER_COMPLEXITY,
         rule: RULE_CPX_JST_001,
         severity: SEVERITY_WARNING,
         message:
-            `Unjustified runaway complexity in "${fn.name}": complexity ${fn.cc} ` +
-            `with deep control flow nesting depth ${fn.maxDepth} lacks algorithmic or state-machine justification.`,
+            `Unjustified runaway complexity in "${funcCtx.name}": complexity ${funcCtx.cc} ` +
+            `with deep control flow nesting depth ${funcCtx.maxDepth} lacks algorithmic or state-machine justification.`,
         location: {
-            file: fn.filePath,
-            start: { line: fn.startLine, column: fn.startColumn },
-            end: { line: fn.startLine, column: fn.startColumn + 40 },
+            file: funcCtx.filePath,
+            start: { line: funcCtx.startLine, column: funcCtx.startColumn },
+            end: { line: funcCtx.startLine, column: funcCtx.startColumn + 40 },
         },
         detail: {
-            function: fn.name,
-            cc: fn.cc,
-            maxDepth: fn.maxDepth,
+            function: funcCtx.name,
+            cc: funcCtx.cc,
+            maxDepth: funcCtx.maxDepth,
             reason: 'Deeply nested procedural branch soup without specification contract',
         },
         suggestion:
@@ -305,26 +308,26 @@ function createUnjustifiedNestingIssue(fn: FunctionComplexityContext): Issue {
 /**
  * Evaluates the elastic complexity budget for a single function.
  *
- * @param fn - Function complexity context and AST metrics.
+ * @param funcCtx - Function complexity context and AST metrics.
  * @param defaultWarn - Fallback warning threshold (default 12).
  * @param defaultFail - Fallback failure threshold (default 20).
  * @returns Elastic budget evaluation with effective thresholds and emitted issues.
  */
 export function evaluateElasticComplexityBudget(
-    fn: FunctionComplexityContext,
+    funcCtx: FunctionComplexityContext,
     defaultWarn = DEFAULT_WARN_THRESHOLD,
     defaultFail = DEFAULT_FAIL_THRESHOLD,
 ): ElasticBudgetEvaluation {
     const issues: Issue[] = [];
-    const thresholds = computeBudgetThresholds(fn, defaultWarn, defaultFail);
+    const thresholds = computeBudgetThresholds(funcCtx, defaultWarn, defaultFail);
     const { totalMultiplier, effectiveWarn, effectiveFail, hasAlgorithmicProof, multipliers } =
         thresholds;
 
-    const isExceeded = fn.cc >= effectiveWarn;
+    const isExceeded = funcCtx.cc >= effectiveWarn;
     if (isExceeded) {
         issues.push(
             createBudgetExceededIssue(
-                fn,
+                funcCtx,
                 effectiveWarn,
                 effectiveFail,
                 totalMultiplier,
@@ -335,11 +338,11 @@ export function evaluateElasticComplexityBudget(
     }
 
     const isUnjustified =
-        fn.cc >= UNJUSTIFIED_CC_THRESHOLD &&
-        fn.maxDepth >= UNJUSTIFIED_DEPTH_THRESHOLD &&
+        funcCtx.cc >= UNJUSTIFIED_CC_THRESHOLD &&
+        funcCtx.maxDepth >= UNJUSTIFIED_DEPTH_THRESHOLD &&
         !hasAlgorithmicProof;
     if (isUnjustified) {
-        issues.push(createUnjustifiedNestingIssue(fn));
+        issues.push(createUnjustifiedNestingIssue(funcCtx));
     }
 
     return {
@@ -367,7 +370,7 @@ export function evaluateFileCumulativeBudget(
     functionCCs: number[],
 ): Issue | null {
     if (functionCCs.length === 0) return null;
-    const totalCC = functionCCs.reduce((sum, c) => sum + c, 0);
+    const totalCC = functionCCs.reduce((sum, complexity) => sum + complexity, 0);
     // Dynamic file budget: base 80 CC per 500 LOC
     const baseBudget = Math.max(
         FILE_BUDGET_MIN,

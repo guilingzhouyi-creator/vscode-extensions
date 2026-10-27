@@ -267,7 +267,9 @@ export function calculateAuthorEntropy(authorCounts?: Record<string, number>): {
         return { entropy: ENTROPY_MIN_VALUE, primaryAuthorRatio: PRIMARY_RATIO_MONOPOLY };
     }
 
-    const counts = Object.values(authorCounts).filter((c) => typeof c === 'number' && c > 0);
+    const counts = Object.values(authorCounts).filter(
+        (commitCount) => typeof commitCount === 'number' && commitCount > 0,
+    );
     const activeAuthorCount = counts.length;
     if (activeAuthorCount <= 1) {
         return { entropy: ENTROPY_MIN_VALUE, primaryAuthorRatio: PRIMARY_RATIO_MONOPOLY };

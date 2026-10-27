@@ -74,9 +74,9 @@ function detectRelocatedBlocks(
 } {
     const oldByFp = new Map<string, { block: BlockFingerprint; index: number }>();
     for (let i = 0; i < oldBlocks.length; i++) {
-        const ob = oldBlocks[i];
-        if (!oldByFp.has(ob.fingerprint)) {
-            oldByFp.set(ob.fingerprint, { block: ob, index: i });
+        const oldBlock = oldBlocks[i];
+        if (!oldByFp.has(oldBlock.fingerprint)) {
+            oldByFp.set(oldBlock.fingerprint, { block: oldBlock, index: i });
         }
     }
 
@@ -86,23 +86,23 @@ function detectRelocatedBlocks(
 
     let lastOldIndex = -1;
     for (let j = 0; j < newBlocks.length; j++) {
-        const nb = newBlocks[j];
-        const match = oldByFp.get(nb.fingerprint);
+        const newBlock = newBlocks[j];
+        const match = oldByFp.get(newBlock.fingerprint);
         if (match) {
-            const isCrossFile = match.block.filePath !== nb.filePath;
-            const isNameChanged = match.block.name !== nb.name;
+            const isCrossFile = match.block.filePath !== newBlock.filePath;
+            const isNameChanged = match.block.name !== newBlock.name;
             const isOrderReversed = match.index < lastOldIndex;
 
             if (isCrossFile || isNameChanged || isOrderReversed) {
                 relocatedBlocks.push({
-                    name: nb.name,
-                    kind: nb.kind,
+                    name: newBlock.name,
+                    kind: newBlock.kind,
                     oldLocation: { file: match.block.filePath, line: match.block.startLine },
-                    newLocation: { file: nb.filePath, line: nb.startLine },
-                    eloc: nb.eloc,
+                    newLocation: { file: newBlock.filePath, line: newBlock.startLine },
+                    eloc: newBlock.eloc,
                 });
-                relocatedBlockFingerprints.add(nb.fingerprint);
-                relocatedEloc += nb.eloc;
+                relocatedBlockFingerprints.add(newBlock.fingerprint);
+                relocatedEloc += newBlock.eloc;
             } else {
                 lastOldIndex = match.index;
             }
@@ -167,11 +167,11 @@ function analyzeDiffOperations(
         boilerplateEloc: 0,
     };
 
-    for (const op of diffOps) {
-        if (op.type === DIFF_OP_INSERT) {
-            applyLineMetrics(newLines[op.bIdx] ?? '', true, metrics);
-        } else if (op.type === DIFF_OP_DELETE) {
-            applyLineMetrics(oldLines[op.aIdx] ?? '', false, metrics);
+    for (const diffOp of diffOps) {
+        if (diffOp.type === DIFF_OP_INSERT) {
+            applyLineMetrics(newLines[diffOp.bIdx] ?? '', true, metrics);
+        } else if (diffOp.type === DIFF_OP_DELETE) {
+            applyLineMetrics(oldLines[diffOp.aIdx] ?? '', false, metrics);
         }
     }
 

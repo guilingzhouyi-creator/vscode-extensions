@@ -173,13 +173,17 @@ export class PerformanceAnalyzer implements Analyzer {
      * recomputed from `ctx.content` on every call, so no state leaks between files and repeated
      * calls share no mutable state. It never throws; disabled checks simply yield no issues.
      *
-     * @param sf - Parsed TypeScript source file; kept for the Analyzer contract but not read,
+     * @param sourceFile - Parsed TypeScript source file; kept for the Analyzer contract
+     *   but not read,
      *             because the heuristics run over raw `ctx.content` instead of the AST.
      * @param ctx - Scan context with the normalized file path, raw text and option overrides.
      * @returns Performance issues ordered by line; severity is `info`, `warning` or `error`.
      */
-    analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
-        void sf;
+    analyze(
+        sourceFile: import('typescript').SourceFile | undefined,
+        ctx: AnalyzerContext,
+    ): Issue[] {
+        void sourceFile;
         const opts = (ctx.options || {}) as PerformanceOptions;
         const issues: Issue[] = [];
         const content = ctx.content || '';
@@ -350,18 +354,18 @@ export class PerformanceAnalyzer implements Analyzer {
     private checkBlockingIo(pass: ScanPassContext, nextLine: ScannedLine, lineIdx: number): void {
         const { trimmed, lineText } = nextLine;
         const inAsyncFunction = pass.scanState.inAsyncFunction;
-        for (const io of BLOCKING_IO_PATTERNS) {
-            if (!io.pattern.test(trimmed)) continue;
+        for (const ioPattern of BLOCKING_IO_PATTERNS) {
+            if (!ioPattern.pattern.test(trimmed)) continue;
 
             const isCriticalContext =
                 inAsyncFunction || /(_process|_physics_process|tick|render)/.test(lineText);
-            const desc = PerformanceMessages.BLOCKING_SYNC_IO(io.name, inAsyncFunction);
+            const desc = PerformanceMessages.BLOCKING_SYNC_IO(ioPattern.name, inAsyncFunction);
             pass.issues.push(
                 this.mkIssue(pass.ctx, lineIdx, {
                     rule: RULE_PRF_IO_001,
                     message: desc.message,
                     severity: isCriticalContext ? SEVERITY_ERROR : SEVERITY_WARNING,
-                    detail: { api: io.name, inAsync: inAsyncFunction },
+                    detail: { api: ioPattern.name, inAsync: inAsyncFunction },
                     suggestion: desc.suggestion,
                 }),
             );

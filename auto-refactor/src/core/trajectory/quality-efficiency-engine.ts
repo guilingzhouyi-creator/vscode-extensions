@@ -64,10 +64,10 @@ export function computeCompositeFromVector(
 
     for (let i = 0; i < ALL_QUALITY_DIMENSIONS.length; i++) {
         const dim = ALL_QUALITY_DIMENSIONS[i];
-        const w = weights[dim] ?? DEFAULT_QUALITY_WEIGHTS[dim] ?? 0.1;
+        const dimWeight = weights[dim] ?? DEFAULT_QUALITY_WEIGHTS[dim] ?? 0.1;
         const val = vector[i] ?? 100;
-        weightedSum += val * w;
-        totalWeight += w;
+        weightedSum += val * dimWeight;
+        totalWeight += dimWeight;
     }
 
     if (totalWeight === 0) return 100;
@@ -176,10 +176,15 @@ export function computeEfficiencyIndices(
     deltaQSemantic: number,
     counters: ElocCounters,
     debtDelta: TechnicalDebtDelta,
-): { qed: number; reviewYield: number; regressionDensity: number } {
+): { qed: number; kQed: number; reviewYield: number; regressionDensity: number } {
     // 1. QED = ΔQ_semantic / max(1, ELOC_semantic)
+    // Preserves 6 decimal places to prevent micro-underflow truncation in macro scans
     const effectiveSemanticEloc = Math.max(1, counters.semantic);
-    const qed = Math.round((deltaQSemantic / effectiveSemanticEloc) * 10000) / 10000;
+    const qed = Math.round((deltaQSemantic / effectiveSemanticEloc) * 1000000) / 1000000;
+
+    // kQED = ΔQ_semantic / max(0.001, ELOC_semantic / 1000)
+    const semanticKiloEloc = Math.max(0.001, counters.semantic / 1000);
+    const kQed = Math.round((deltaQSemantic / semanticKiloEloc) * 10000) / 10000;
 
     // 2. ReviewYield = (Debt_net + max(0, ΔQ_semantic)) / max(1, ELOC_processed / 1000)
     const processedKiloEloc = Math.max(1, counters.processed / 1000);
@@ -188,11 +193,10 @@ export function computeEfficiencyIndices(
         Math.round(((debtDelta.netDebtCleared + positiveDeltaQ) / processedKiloEloc) * 100) / 100;
 
     // 3. RegressionDensity = RegressionFindings / max(0.001, ELOC_semantic / 1000)
-    const semanticKiloEloc = Math.max(0.001, counters.semantic / 1000);
     const regressionDensity =
         Math.round((debtDelta.regressionFindingsCount / semanticKiloEloc) * 100) / 100;
 
-    return { qed, reviewYield, regressionDensity };
+    return { qed, kQed, reviewYield, regressionDensity };
 }
 
 /**
@@ -230,6 +234,7 @@ export function computeTrajectoryQualityMetrics(params: {
 
     return {
         qed: indices.qed,
+        kQed: indices.kQed,
         reviewYield: indices.reviewYield,
         regressionDensity: indices.regressionDensity,
         deltaQSemantic,

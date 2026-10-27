@@ -55,7 +55,8 @@ function ruleMatches(
     fragments: readonly string[],
 ): (issue: Issue) => boolean {
     return (issue) =>
-        rules.includes(issue.rule) || fragments.some((f) => issue.rule && issue.rule.includes(f));
+        rules.includes(issue.rule) ||
+        fragments.some((ruleFinding) => issue.rule && issue.rule.includes(ruleFinding));
 }
 
 /**

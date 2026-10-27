@@ -35,11 +35,11 @@ export class BasicBlock {
     /**
      * Initializes a new basic block.
      *
-     * @param id - Unique numeric identifier.
+     * @param blockId - Unique numeric identifier.
      * @param kind - Initial classification of this block.
      */
-    constructor(id: number, kind: BasicBlockKind = 'normal') {
-        this.id = id;
+    constructor(blockId: number, kind: BasicBlockKind = 'normal') {
+        this.id = blockId;
         this.kind = kind;
     }
 
@@ -59,7 +59,7 @@ export class BasicBlock {
      * @param kind - Edge transition condition classification.
      */
     addSuccessor(target: BasicBlock, kind: CfgEdgeKind = 'unconditional'): void {
-        if (!this.successors.some((b) => b.id === target.id)) {
+        if (!this.successors.some((succBlock) => succBlock.id === target.id)) {
             this.successors.push(target);
             this.outgoingEdges.push({
                 fromId: this.id,
@@ -67,7 +67,7 @@ export class BasicBlock {
                 kind,
             });
         }
-        if (!target.predecessors.some((b) => b.id === this.id)) {
+        if (!target.predecessors.some((predBlock) => predBlock.id === this.id)) {
             target.predecessors.push(this);
         }
     }
@@ -102,8 +102,8 @@ export class BasicBlock {
     collectDefinedVars(): Set<string> {
         const result = new Set<string>();
         for (const stmt of this.statements) {
-            for (const v of stmt.definedVars) {
-                result.add(v);
+            for (const varName of stmt.definedVars) {
+                result.add(varName);
             }
         }
         return result;
@@ -117,8 +117,8 @@ export class BasicBlock {
     collectUsedVars(): Set<string> {
         const result = new Set<string>();
         for (const stmt of this.statements) {
-            for (const v of stmt.usedVars) {
-                result.add(v);
+            for (const varName of stmt.usedVars) {
+                result.add(varName);
             }
         }
         return result;

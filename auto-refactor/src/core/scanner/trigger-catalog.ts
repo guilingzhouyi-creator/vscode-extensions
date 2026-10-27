@@ -257,7 +257,7 @@ export class AnalyzerTriggerCatalog {
      * @param triggers - Array of trigger tokens required for activation.
      */
     public register(analyzerId: string, triggers: readonly string[]): void {
-        const validTriggers = triggers.filter((t) => t.length > 0);
+        const validTriggers = triggers.filter((triggerToken) => triggerToken.length > 0);
         const firstByteLut = buildFirstByteLut(validTriggers);
         this.entries.set(analyzerId, {
             analyzerId,
@@ -341,7 +341,7 @@ export class AnalyzerTriggerCatalog {
         if (ids.length === 0) {
             return new Set<string>();
         }
-        const triggerGroups = ids.map((id) => this.entries.get(id)?.triggers ?? []);
+        const triggerGroups = ids.map((analyzerId) => this.entries.get(analyzerId)?.triggers ?? []);
         const probeResults = nativeCore.batchProbeTriggers(content, triggerGroups);
         const result = new Set<string>();
         for (let i = 0; i < ids.length; i++) {
@@ -364,7 +364,9 @@ export class AnalyzerTriggerCatalog {
         if (!plan || plan.length === 0) {
             return [];
         }
-        const triggerGroups = plan.map((p) => this.entries.get(p.name)?.triggers ?? []);
+        const triggerGroups = plan.map(
+            (planItem) => this.entries.get(planItem.name)?.triggers ?? [],
+        );
         const probeResults = nativeCore.batchProbeTriggers(content, triggerGroups);
         return plan.filter((_, idx) => probeResults[idx]);
     }

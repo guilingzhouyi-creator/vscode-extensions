@@ -99,7 +99,7 @@ export class CallChainImpactTracer {
         }
 
         const impactedFiles = Array.from(impactedFilesSet).sort();
-        const crossFileCallers = callChains.filter((c) => c.file !== targetFile);
+        const crossFileCallers = callChains.filter((chain) => chain.file !== targetFile);
         const riskLevel = evaluateRiskLevel(
             hasBreakingMutation,
             crossFileCallers.length,

@@ -465,8 +465,8 @@ export function checkUnquotedVariables(
         /(^|[\s;|&(])\$([A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\})(?=[\s;|&)\]]|$)/g,
     );
     if (matches && matches.length > 0) {
-        const filtered = matches.filter((m) => {
-            const inner = m.match(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/);
+        const filtered = matches.filter((matchStr) => {
+            const inner = matchStr.match(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/);
             return inner ? inner[1].length !== 1 : false;
         });
 

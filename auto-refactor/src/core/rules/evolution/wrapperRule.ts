@@ -73,7 +73,7 @@ function inspectBodyForForwarding(
         return null;
     }
 
-    const joinedBody = bodyLines.map((l) => l.trim()).join(' ');
+    const joinedBody = bodyLines.map((lineStr) => lineStr.trim()).join(' ');
 
     // Match patterns strictly requiring the entire body to be only the return/call:
     // `return this.target(a, b);` or `return target(a, b);` or `target(a, b)` (Rust)

@@ -64,41 +64,44 @@ export function runLegacyPhase(
     base: FileContextBase,
 ): Issue[] {
     const issues: Issue[] = [];
-    const sf = base.sourceFile;
-    for (const p of legacy) {
-        if (!sf && p.instance.requiresSourceFile) continue;
-        if (!isFileAnalyzerActive(base.preflightMask, p.name)) continue;
+    const sourceFile = base.sourceFile;
+    for (const planItem of legacy) {
+        if (!sourceFile && planItem.instance.requiresSourceFile) continue;
+        if (!isFileAnalyzerActive(base.preflightMask, planItem.name)) continue;
         const ctx: AnalyzerContext = {
             filePath: base.rel,
             content: base.content,
             root: outcome.ast?.root || parse.rootForCtx,
             adapter: base.adapter,
-            sourceFile: sf,
+            sourceFile,
             config: base.config,
-            options: p.options,
+            options: planItem.options,
             lineStats: base.lineStats,
         };
         try {
-            issues.push(...p.instance.analyze(sf, ctx));
-        } catch (e) {
-            if (!sf && e instanceof TypeError) {
+            issues.push(...planItem.instance.analyze(sourceFile, ctx));
+        } catch (error) {
+            if (!sourceFile && error instanceof TypeError) {
                 // Analyzer strictly expected SourceFile AST; safely ignore on non-TS/JS files
                 continue;
             }
             const sev: Severity = base.config.failOnAnalyzerError ? 'error' : 'info';
-            host.logger.error(`analyzer "${p.name}" threw on ${base.rel}`, e);
+            host.logger.error(`analyzer "${planItem.name}" threw on ${base.rel}`, error);
             issues.push({
                 id: `core:analyzer-error:${base.rel}:1`,
-                analyzer: p.name,
+                analyzer: planItem.name,
                 rule: 'analyzer-error',
                 severity: sev,
-                message: `Analyzer "${p.name}" threw: ${(e as Error).message}`,
+                message: `Analyzer "${planItem.name}" threw: ${(error as Error).message}`,
                 location: {
                     file: base.rel,
                     start: { line: 1, column: 1 },
                     end: { line: 1, column: 1 },
                 },
-                detail: { error: String(e), stack: e instanceof Error ? e.stack : undefined },
+                detail: {
+                    error: String(error),
+                    stack: error instanceof Error ? error.stack : undefined,
+                },
             });
         }
     }

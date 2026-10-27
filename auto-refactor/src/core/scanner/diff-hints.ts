@@ -176,11 +176,11 @@ function handleByteEqual(
     ctx: DiffRoutingContext,
 ): boolean {
     ctx.routingState.byteEqual++;
-    const l2 = ctx.fpContext.l2Enabled ? ctx.cache.lookupL2(fph, contentHash) : null;
-    if (l2) {
+    const l2Result = ctx.fpContext.l2Enabled ? ctx.cache.lookupL2(fph, contentHash) : null;
+    if (l2Result) {
         const result = remapCachedResult(
-            { issues: l2.issues, metric: l2.metric },
-            l2.p,
+            { issues: l2Result.issues, metric: l2Result.metric },
+            l2Result.p,
             params.rel,
         );
         ctx.perFile[params.fileIndex] = result;
@@ -316,12 +316,12 @@ export async function processChangedFileHint(
 }
 
 function tryResolveUnchangedL1(params: UnchangedFileParams, ctx: DiffRoutingContext): boolean {
-    const l1 = ctx.cache.lookupL1(params.rel);
+    const l1Entry = ctx.cache.lookupL1(params.rel);
     if (
         !params.statEntry.fp ||
-        !l1 ||
-        l1.mtimeMs !== params.statEntry.fp.mtimeMs ||
-        l1.size !== params.statEntry.fp.size
+        !l1Entry ||
+        l1Entry.mtimeMs !== params.statEntry.fp.mtimeMs ||
+        l1Entry.size !== params.statEntry.fp.size
     ) {
         return false;
     }
@@ -360,9 +360,13 @@ function tryResolveUnchangedL2(
     params: UnchangedFileParams,
     ctx: DiffRoutingContext,
 ): boolean {
-    const l2 = ctx.fpContext.l2Enabled ? ctx.cache.lookupL2(fph, contentHash) : null;
-    if (!l2) return false;
-    const result = remapCachedResult({ issues: l2.issues, metric: l2.metric }, l2.p, params.rel);
+    const l2Result = ctx.fpContext.l2Enabled ? ctx.cache.lookupL2(fph, contentHash) : null;
+    if (!l2Result) return false;
+    const result = remapCachedResult(
+        { issues: l2Result.issues, metric: l2Result.metric },
+        l2Result.p,
+        params.rel,
+    );
     ctx.perFile[params.fileIndex] = result;
     ctx.sessionBucket.set(params.rel, result);
     ctx.routingState.l2Hit++;

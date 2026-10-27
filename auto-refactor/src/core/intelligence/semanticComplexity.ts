@@ -138,7 +138,7 @@ function recordUnboundedCycleIssue(context: UnboundedCycleContext): void {
         requiresManualConfirm: true,
         suggestedFix:
             'Introduce an explicit depth accumulator parameter with termination threshold, or rewrite using an iterative worklist.',
-        impactedCallers: callGraph.callersOf(currentSymbol).map((e) => e.caller ?? 'unknown'),
+        impactedCallers: callGraph.callersOf(currentSymbol).map((edge) => edge.caller ?? 'unknown'),
         impactedTests: [],
         verificationMethod:
             'Test with deep tree or cyclic data structures to verify graceful termination.',
@@ -246,10 +246,10 @@ function extractParamSignature(lines: string[], startLineIdx: number): string | 
     let depth = 0;
     let closeIdx = -1;
     for (let i = openIdx; i < text.length; i++) {
-        const ch = text[i];
-        if (ch === '(') {
+        const char = text[i];
+        if (char === '(') {
             depth++;
-        } else if (ch === ')') {
+        } else if (char === ')') {
             depth--;
             if (depth === 0) {
                 closeIdx = i;
@@ -267,8 +267,8 @@ interface ParameterNestingState {
     angle: number;
 }
 
-function updateParameterNesting(ch: string, state: ParameterNestingState): boolean {
-    switch (ch) {
+function updateParameterNesting(char: string, state: ParameterNestingState): boolean {
+    switch (char) {
         case '(':
             state.paren++;
             return true;
@@ -302,18 +302,18 @@ function splitParameters(paramStr: string): string[] {
     let current = '';
     const state: ParameterNestingState = { paren: 0, bracket: 0, angle: 0 };
     for (let i = 0; i < paramStr.length; i++) {
-        const ch = paramStr[i];
-        if (updateParameterNesting(ch, state)) {
-            current += ch;
+        const char = paramStr[i];
+        if (updateParameterNesting(char, state)) {
+            current += char;
             continue;
         }
-        if (ch === ',' && state.paren === 0 && state.bracket === 0 && state.angle === 0) {
+        if (char === ',' && state.paren === 0 && state.bracket === 0 && state.angle === 0) {
             const trimmed = current.trim();
             if (trimmed) params.push(trimmed);
             current = '';
             continue;
         }
-        current += ch;
+        current += char;
     }
     const tail = current.trim();
     if (tail) params.push(tail);
@@ -330,19 +330,19 @@ interface LegacyDefinitionParameters {
 function extractArrayParameters(candidateDef: LegacyDefinitionParameters): string[] | null {
     if (
         Array.isArray(candidateDef.parameters) &&
-        candidateDef.parameters.every((p): p is string => typeof p === 'string')
+        candidateDef.parameters.every((param): param is string => typeof param === 'string')
     ) {
         return candidateDef.parameters;
     }
     if (
         Array.isArray(candidateDef.params) &&
-        candidateDef.params.every((p): p is string => typeof p === 'string')
+        candidateDef.params.every((param): param is string => typeof param === 'string')
     ) {
         return candidateDef.params;
     }
     if (
         Array.isArray(candidateDef.paramNames) &&
-        candidateDef.paramNames.every((p): p is string => typeof p === 'string')
+        candidateDef.paramNames.every((param): param is string => typeof param === 'string')
     ) {
         return candidateDef.paramNames;
     }
@@ -568,11 +568,11 @@ function compileUnionPattern(patterns: readonly RegExp[]): RegExp | null {
     let hasS = false;
     const sources: string[] = [];
     for (let i = 0; i < patterns.length; i++) {
-        const p = patterns[i];
-        if (p.ignoreCase) hasI = true;
-        if (p.unicode) hasU = true;
-        if (p.dotAll) hasS = true;
-        sources.push(`(?:${p.source})`);
+        const pattern = patterns[i];
+        if (pattern.ignoreCase) hasI = true;
+        if (pattern.unicode) hasU = true;
+        if (pattern.dotAll) hasS = true;
+        sources.push(`(?:${pattern.source})`);
     }
     let flags = '';
     if (hasI) flags += 'i';

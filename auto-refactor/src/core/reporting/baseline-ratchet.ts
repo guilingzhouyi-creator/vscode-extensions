@@ -165,8 +165,12 @@ export function ratchetDownGroups(
         ? normalizeGroupsForRename(existingGroups, pathRemap)
         : existingGroups;
     const currentGrouped = groupCounts(currentIssues);
-    const currentMap = new Map<string, GroupedBaselineRow>(currentGrouped.map((g) => [g.key, g]));
-    const existingMap = new Map<string, GroupedBaselineRow>(priorGroups.map((g) => [g.key, g]));
+    const currentMap = new Map<string, GroupedBaselineRow>(
+        currentGrouped.map((group) => [group.key, group]),
+    );
+    const existingMap = new Map<string, GroupedBaselineRow>(
+        priorGroups.map((group) => [group.key, group]),
+    );
 
     const acc: RatchetAccumulator = {
         groups: [],

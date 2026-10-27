@@ -67,8 +67,8 @@ export interface ScopeDecisionOptions {
 const DEFAULT_MAX_BLAST_RADIUS = 50;
 
 /** Normalizes a file path to lower-case posix */
-function normalizePath(p: string): string {
-    return p.replace(/\\/g, '/').toLowerCase();
+function normalizePath(filePath: string): string {
+    return filePath.replace(/\\/g, '/').toLowerCase();
 }
 
 /** Predicate functions per recognized domain */
@@ -87,7 +87,7 @@ function filterFilesByDomain(files: readonly string[], domain: string): string[]
     const normDomain = domain.toLowerCase();
     const fallbackPredicate = (norm: string) => norm.includes(normDomain);
     const predicate = DOMAIN_PREDICATES[normDomain] || fallbackPredicate;
-    return files.filter((f) => predicate(normalizePath(f)));
+    return files.filter((filePath) => predicate(normalizePath(filePath)));
 }
 
 /** Detects if diff files exclusively concentrate in a single recognized domain */
@@ -114,8 +114,8 @@ function checkBlastRadiusFallback(
     }
 
     let totalFanIn = 0;
-    for (const f of diffFiles) {
-        const entry = indexStore.get(f);
+    for (const diffFile of diffFiles) {
+        const entry = indexStore.get(diffFile);
         if (entry) {
             totalFanIn += entry.deps.fanIn;
             if (entry.role === 'core_trunk' && entry.deps.fanIn >= 15) {

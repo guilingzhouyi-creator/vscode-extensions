@@ -24,8 +24,8 @@ const GUARD_SIGNATURES = [
 /**
  * Normalizes file path to POSIX style.
  */
-function normalizePath(p: string): string {
-    return p.replace(/\\/g, '/');
+function normalizePath(patchPath: string): string {
+    return patchPath.replace(/\\/g, '/');
 }
 
 /**
@@ -98,14 +98,14 @@ export class IntentConflictDetector {
     private appendPatchToFileMap(
         fileMap: Map<string, AgentPatchSlice[]>,
         norm: string,
-        p: AgentPatchSlice,
+        patch: AgentPatchSlice,
     ): void {
         let list = fileMap.get(norm);
         if (!list) {
             list = [];
             fileMap.set(norm, list);
         }
-        list.push(p);
+        list.push(patch);
     }
 
     /**
@@ -115,9 +115,9 @@ export class IntentConflictDetector {
         const conflicts: AgentIntentConflict[] = [];
         const fileMap = new Map<string, AgentPatchSlice[]>();
 
-        for (const p of patches) {
-            const norm = normalizePath(p.filePath);
-            this.appendPatchToFileMap(fileMap, norm, p);
+        for (const patch of patches) {
+            const norm = normalizePath(patch.filePath);
+            this.appendPatchToFileMap(fileMap, norm, patch);
         }
 
         for (const [norm, group] of fileMap.entries()) {

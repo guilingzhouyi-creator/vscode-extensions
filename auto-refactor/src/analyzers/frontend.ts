@@ -331,13 +331,13 @@ function countInterfaceBodyProps(body: string): number {
     const len = body.length;
 
     for (let i = 0; i < len; i++) {
-        const ch = body.charCodeAt(i);
-        if (ch === ASCII_NEWLINE_CODE) {
+        const charCode = body.charCodeAt(i);
+        if (charCode === ASCII_NEWLINE_CODE) {
             if (hasVisibleCharOnLine) {
                 count++;
                 hasVisibleCharOnLine = false;
             }
-        } else if (ch > ASCII_SPACE_CODE) {
+        } else if (charCode > ASCII_SPACE_CODE) {
             hasVisibleCharOnLine = true;
         }
     }
@@ -702,7 +702,7 @@ function auditContainerQueryAndAntiSquash(file: string, rawLines: string[], issu
 export class FrontendAnalyzer implements Analyzer {
     readonly name = ANALYZER_FRONTEND_ID;
 
-    analyze(_sf: unknown, context: AnalyzerContext): Issue[] {
+    analyze(_sourceFile: unknown, context: AnalyzerContext): Issue[] {
         const file = context.filePath;
         const ext = path.extname(file).toLowerCase();
         if (!FRONTEND_EXTENSIONS.has(ext) && !context.content.includes('<template>')) {

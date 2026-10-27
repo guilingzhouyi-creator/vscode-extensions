@@ -185,7 +185,7 @@ export function auditRoutingSafety(context: RepoArchetypeContext, issues: Issue[
         context.hooks.preCommit,
         context.hooks.commitMsg,
         context.hooks.prePush,
-    ].filter((h): h is NonNullable<typeof h> => Boolean(h));
+    ].filter((hookFile): hookFile is NonNullable<typeof hookFile> => Boolean(hookFile));
 
     for (const hook of hookFiles) {
         const content = hook.content;
@@ -283,7 +283,9 @@ export function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[
 
     const hasConventionalCheck =
         /(?:feat|fix|refactor|chore|test|docs|style|perf)/i.test(content) ||
-        Object.values(context.gateScripts.contents).some((c) => /commit-msg|conventional/i.test(c));
+        Object.values(context.gateScripts.contents).some((scriptContent) =>
+            /commit-msg|conventional/i.test(scriptContent),
+        );
 
     if (!hasConventionalCheck) {
         issues.push(
@@ -309,7 +311,7 @@ export function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[
             content,
             ...Object.entries(context.gateScripts.contents)
                 .filter(([k]) => /commit-msg/i.test(k))
-                .map(([, v]) => v),
+                .map(([, scriptContent]) => scriptContent),
         ].join('\n');
 
         const hasProjectScopeCheck =
@@ -338,7 +340,9 @@ export function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[
                     extraDetail: {
                         action: 'add_project_scope_gate',
                         targetFile: relPath,
-                        detectedSubprojects: context.topology.subprojects.map((s) => s.name),
+                        detectedSubprojects: context.topology.subprojects.map(
+                            (subproject) => subproject.name,
+                        ),
                         safeToAutomate: true,
                     },
                 }),
@@ -435,8 +439,8 @@ export function auditBudgetTiering(context: RepoArchetypeContext, issues: Issue[
 
     const hasStagedFiltering =
         /(?:git\s+diff|--cached|--staged|staged)/i.test(content) ||
-        Object.values(context.gateScripts.contents).some((c) =>
-            /diff\s+--cached|--staged/i.test(c),
+        Object.values(context.gateScripts.contents).some((scriptContent) =>
+            /diff\s+--cached|--staged/i.test(scriptContent),
         );
 
     const runsHeavyweightUnstaged =
@@ -551,9 +555,9 @@ export function auditStrictErrorDiscipline(context: RepoArchetypeContext, issues
         ...(context.hooks.preCommit ? [context.hooks.preCommit] : []),
         ...(context.hooks.commitMsg ? [context.hooks.commitMsg] : []),
         ...(context.hooks.prePush ? [context.hooks.prePush] : []),
-        ...Object.entries(context.gateScripts.contents).map(([rel, c]) => ({
+        ...Object.entries(context.gateScripts.contents).map(([rel, scriptContent]) => ({
             filePath: path.join(context.root, rel),
-            content: c,
+            content: scriptContent,
         })),
     ];
 
@@ -578,9 +582,9 @@ export function auditSsotSync(context: RepoArchetypeContext, issues: Issue[]): v
 
     if (mentionsRuleCatalog) {
         const catalogExists =
-            Object.keys(context.gateScripts.contents).some((f) =>
-                /rule-catalog\.json|review-rules\.json/i.test(f),
-            ) || context.gateScripts.files.some((f) => /catalog|registry/i.test(f));
+            Object.keys(context.gateScripts.contents).some((filePath) =>
+                /rule-catalog\.json|review-rules\.json/i.test(filePath),
+            ) || context.gateScripts.files.some((filePath) => /catalog|registry/i.test(filePath));
 
         if (!catalogExists) {
             issues.push(
@@ -650,8 +654,8 @@ export function auditCommitMsgStyle(context: RepoArchetypeContext, issues: Issue
         return;
     }
 
-    const termsContent = Object.entries(context.gateScripts.contents).find(([f]) =>
-        /commit-msg-forbidden-terms\.json/i.test(f),
+    const termsContent = Object.entries(context.gateScripts.contents).find(([filePath]) =>
+        /commit-msg-forbidden-terms\.json/i.test(filePath),
     )?.[1];
 
     if (termsContent) {
@@ -695,7 +699,7 @@ export function auditAstSliceGuard(context: RepoArchetypeContext, issues: Issue[
         context.hooks.preCommit?.content || '',
         ...Object.entries(context.gateScripts.contents)
             .filter(([k]) => /pre-commit/i.test(k))
-            .map(([, v]) => v),
+            .map(([, scriptContent]) => scriptContent),
     ].join('\n');
 
     const relPath = context.hooks.preCommit
@@ -782,8 +786,8 @@ export function auditProcessInteractiveSafety(
     context: RepoArchetypeContext,
     issues: Issue[],
 ): void {
-    const ps1Scripts = Object.entries(context.gateScripts.contents).filter(([f]) =>
-        f.endsWith('.ps1'),
+    const ps1Scripts = Object.entries(context.gateScripts.contents).filter(([filePath]) =>
+        filePath.endsWith('.ps1'),
     );
 
     for (const [relPath, content] of ps1Scripts) {
@@ -822,20 +826,26 @@ export function auditProcessInteractiveSafety(
  * @param issues - Target array for appending findings.
  */
 export function auditDualPlatformPairing(context: RepoArchetypeContext, issues: Issue[]): void {
-    const isCoreGateScript = (f: string) =>
-        /(?:pre-commit|commit-msg|pre-push|audit-all)[-_]gate|audit-all/i.test(f);
+    const isCoreGateScript = (filePath: string) =>
+        /(?:pre-commit|commit-msg|pre-push|audit-all)[-_]gate|audit-all/i.test(filePath);
 
     const shScripts = context.gateScripts.files.filter(
-        (f) => f.startsWith('scripts/sh/') && f.endsWith('.sh') && isCoreGateScript(f),
+        (filePath) =>
+            filePath.startsWith('scripts/sh/') &&
+            filePath.endsWith('.sh') &&
+            isCoreGateScript(filePath),
     );
     const ps1Scripts = context.gateScripts.files.filter(
-        (f) => f.startsWith('scripts/ps1/') && f.endsWith('.ps1') && isCoreGateScript(f),
+        (filePath) =>
+            filePath.startsWith('scripts/ps1/') &&
+            filePath.endsWith('.ps1') &&
+            isCoreGateScript(filePath),
     );
 
     if (shScripts.length === 0 && ps1Scripts.length === 0) return;
 
-    const shBases = new Set(shScripts.map((f) => path.basename(f, '.sh')));
-    const ps1Bases = new Set(ps1Scripts.map((f) => path.basename(f, '.ps1')));
+    const shBases = new Set(shScripts.map((filePath) => path.basename(filePath, '.sh')));
+    const ps1Bases = new Set(ps1Scripts.map((filePath) => path.basename(filePath, '.ps1')));
 
     for (const base of shBases) {
         if (!ps1Bases.has(base)) {

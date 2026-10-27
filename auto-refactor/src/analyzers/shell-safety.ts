@@ -147,11 +147,11 @@ export class ShellSafetyAnalyzer implements Analyzer {
     /**
      * Standalone entry point.
      *
-     * @param _sf - Unused; this analyzer reads text rather than a TypeScript syntax tree.
+     * @param _sourceFile - Unused; this analyzer reads text rather than a TypeScript syntax tree.
      * @param context - Engine context carrying the file path, content and merged options.
      * @returns Findings for this file; empty when it carries no defect.
      */
-    analyze(_sf: unknown, context: AnalyzerContext): Issue[] {
+    analyze(_sourceFile: unknown, context: AnalyzerContext): Issue[] {
         const file = context.filePath.replace(/\\/g, '/');
         const dialect = dialectOf(file);
         if (dialect === null) return [];

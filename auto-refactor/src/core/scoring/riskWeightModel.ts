@@ -216,9 +216,9 @@ export function mapRuleToPrimaryPillar(ruleId: string): PrimaryQualityPillar {
         }
     }
 
-    const m = KEYWORD_DISPATCH_RE.exec(ruleId);
-    if (m && KEYWORD_TO_PILLAR_MAP[m[1]]) {
-        return KEYWORD_TO_PILLAR_MAP[m[1]];
+    const match = KEYWORD_DISPATCH_RE.exec(ruleId);
+    if (match && KEYWORD_TO_PILLAR_MAP[match[1]]) {
+        return KEYWORD_TO_PILLAR_MAP[match[1]];
     }
 
     return PILLAR_MAINTAINABILITY;
@@ -380,14 +380,14 @@ export function computeRiskWeightedPenalties(issues: Issue[]): RiskPenaltyResult
     }
 
     let totalPenalty = 0;
-    for (const p of Object.values(pillarPenalties)) {
-        totalPenalty += p;
+    for (const penalty of Object.values(pillarPenalties)) {
+        totalPenalty += penalty;
     }
 
     const dimKeys = Object.keys(dimensionPenalties) as QualityDimension[];
-    for (const d of dimKeys) {
-        dimensionPenalties[d] =
-            Math.round(dimensionPenalties[d] * DAMPENING_SCALE) / DAMPENING_SCALE;
+    for (const dimension of dimKeys) {
+        dimensionPenalties[dimension] =
+            Math.round(dimensionPenalties[dimension] * DAMPENING_SCALE) / DAMPENING_SCALE;
     }
 
     return {

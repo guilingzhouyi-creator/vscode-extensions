@@ -142,9 +142,9 @@ export function writeFileAtomic(targetFile: string, fileContent: string): void {
     writeTextFileSync(stagingPath, fileContent);
     try {
         SyncIoBarrier.rename(stagingPath, targetFile);
-    } catch (e) {
+    } catch (error) {
         SyncIoBarrier.remove(stagingPath);
-        throw e;
+        throw error;
     }
 }
 
@@ -245,12 +245,12 @@ export function isValidPathEntry(
 /**
  * Serializes L1 fingerprint entries into newline-delimited JSON.
  *
- * @param l1 - Map of normalized paths to L1 fingerprints.
+ * @param l1Cache - Map of normalized paths to L1 fingerprints.
  * @returns Serialized NDJSON string.
  */
-export function serializeL1(l1: Map<string, Fingerprint>): string {
+export function serializeL1(l1Cache: Map<string, Fingerprint>): string {
     const lines: string[] = [];
-    for (const [relPath, fingerprint] of l1) {
+    for (const [relPath, fingerprint] of l1Cache) {
         const lineObj: Record<string, unknown> = {
             t: 'f',
             p: relPath,
@@ -266,12 +266,12 @@ export function serializeL1(l1: Map<string, Fingerprint>): string {
 /**
  * Serializes L2 cache entries into newline-delimited JSON.
  *
- * @param l2 - Map of cache keys to L2 records.
+ * @param l2Cache - Map of cache keys to L2 records.
  * @returns Serialized NDJSON string.
  */
-export function serializeL2(l2: Map<string, L2EntryRecord>): string {
+export function serializeL2(l2Cache: Map<string, L2EntryRecord>): string {
     const lines: string[] = [];
-    for (const entry of l2.values()) {
+    for (const entry of l2Cache.values()) {
         const lineObj: Record<string, unknown> = {
             t: 'r',
             k: entry.k,
@@ -439,13 +439,13 @@ export async function writeFileAtomicAsync(targetFile: string, fileContent: stri
     await writeTextFileAsync(stagingPath, fileContent);
     try {
         await fs.promises.rename(stagingPath, targetFile);
-    } catch (e) {
+    } catch (error) {
         try {
             await fs.promises.unlink(stagingPath);
         } catch {
             /* ignore */
         }
-        throw e;
+        throw error;
     }
 }
 

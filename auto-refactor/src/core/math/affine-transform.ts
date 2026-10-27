@@ -57,37 +57,37 @@ export function transformPoint(
     params: AffineTransformParams,
     out?: Point2D,
 ): Point2D {
-    const cx = params.cursorX;
-    const cy = params.cursorY;
-    const sx = params.scaleX ?? 1.0;
-    const sy = params.scaleY ?? 1.0;
-    const rad = params.rotationRad ?? 0.0;
-    const tx = params.translateX ?? 0.0;
-    const ty = params.translateY ?? 0.0;
+    const anchorX = params.cursorX;
+    const anchorY = params.cursorY;
+    const scaleFactorX = params.scaleX ?? 1.0;
+    const scaleFactorY = params.scaleY ?? 1.0;
+    const radians = params.rotationRad ?? 0.0;
+    const shiftX = params.translateX ?? 0.0;
+    const shiftY = params.translateY ?? 0.0;
 
     // 1. Shift relative to cursor anchor
-    const dx = x - cx;
-    const dy = y - cy;
+    const deltaX = x - anchorX;
+    const deltaY = y - anchorY;
 
     // 2. Scale
-    const scaledX = dx * sx;
-    const scaledY = dy * sy;
+    const scaledX = deltaX * scaleFactorX;
+    const scaledY = deltaY * scaleFactorY;
 
     // 3. Rotate and restore anchor + translation
-    const cosTheta = Math.cos(rad);
-    const sinTheta = Math.sin(rad);
-    const rx = scaledX * cosTheta - scaledY * sinTheta;
-    const ry = scaledX * sinTheta + scaledY * cosTheta;
+    const cosTheta = Math.cos(radians);
+    const sinTheta = Math.sin(radians);
+    const rotatedX = scaledX * cosTheta - scaledY * sinTheta;
+    const rotatedY = scaledX * sinTheta + scaledY * cosTheta;
 
-    const resX = rx + cx + tx;
-    const resY = ry + cy + ty;
+    const resultX = rotatedX + anchorX + shiftX;
+    const resultY = rotatedY + anchorY + shiftY;
 
     if (out) {
-        out.x = resX;
-        out.y = resY;
+        out.x = resultX;
+        out.y = resultY;
         return out;
     }
-    return { x: resX, y: resY };
+    return { x: resultX, y: resultY };
 }
 
 /**
@@ -98,27 +98,27 @@ export function transformPoint(
  * @param params - Affine transformation parameters.
  */
 export function transformPointsInPlace(coords: Float64Array, params: AffineTransformParams): void {
-    const cx = params.cursorX;
-    const cy = params.cursorY;
-    const sx = params.scaleX ?? 1.0;
-    const sy = params.scaleY ?? 1.0;
-    const rad = params.rotationRad ?? 0.0;
-    const tx = params.translateX ?? 0.0;
-    const ty = params.translateY ?? 0.0;
+    const anchorX = params.cursorX;
+    const anchorY = params.cursorY;
+    const scaleFactorX = params.scaleX ?? 1.0;
+    const scaleFactorY = params.scaleY ?? 1.0;
+    const radians = params.rotationRad ?? 0.0;
+    const shiftX = params.translateX ?? 0.0;
+    const shiftY = params.translateY ?? 0.0;
 
-    const cosTheta = Math.cos(rad);
-    const sinTheta = Math.sin(rad);
+    const cosTheta = Math.cos(radians);
+    const sinTheta = Math.sin(radians);
 
     const len = coords.length - (coords.length % 2);
     for (let i = 0; i < len; i += 2) {
-        const dx = coords[i] - cx;
-        const dy = coords[i + 1] - cy;
+        const deltaX = coords[i] - anchorX;
+        const deltaY = coords[i + 1] - anchorY;
 
-        const scaledX = dx * sx;
-        const scaledY = dy * sy;
+        const scaledX = deltaX * scaleFactorX;
+        const scaledY = deltaY * scaleFactorY;
 
-        coords[i] = scaledX * cosTheta - scaledY * sinTheta + cx + tx;
-        coords[i + 1] = scaledX * sinTheta + scaledY * cosTheta + cy + ty;
+        coords[i] = scaledX * cosTheta - scaledY * sinTheta + anchorX + shiftX;
+        coords[i + 1] = scaledX * sinTheta + scaledY * cosTheta + anchorY + shiftY;
     }
 }
 
@@ -130,29 +130,29 @@ export function transformPointsInPlace(coords: Float64Array, params: AffineTrans
  * @returns Inverse affine transformation parameters.
  */
 export function invertTransform(params: AffineTransformParams): AffineTransformParams {
-    const sx = params.scaleX ?? 1.0;
-    const sy = params.scaleY ?? 1.0;
-    const invSx = sx !== 0 ? 1.0 / sx : 1.0;
-    const invSy = sy !== 0 ? 1.0 / sy : 1.0;
+    const scaleFactorX = params.scaleX ?? 1.0;
+    const scaleFactorY = params.scaleY ?? 1.0;
+    const invScaleX = scaleFactorX !== 0 ? 1.0 / scaleFactorX : 1.0;
+    const invScaleY = scaleFactorY !== 0 ? 1.0 / scaleFactorY : 1.0;
 
-    const rad = params.rotationRad ?? 0.0;
-    const invRad = -rad;
+    const radians = params.rotationRad ?? 0.0;
+    const invRad = -radians;
 
-    const tx = params.translateX ?? 0.0;
-    const ty = params.translateY ?? 0.0;
+    const shiftX = params.translateX ?? 0.0;
+    const shiftY = params.translateY ?? 0.0;
 
     const invCos = Math.cos(invRad);
     const invSin = Math.sin(invRad);
-    const scaledTx = tx * invSx;
-    const scaledTy = ty * invSy;
+    const scaledTx = shiftX * invScaleX;
+    const scaledTy = shiftY * invScaleY;
     const invTx = -(scaledTx * invCos - scaledTy * invSin);
     const invTy = -(scaledTx * invSin + scaledTy * invCos);
 
     return {
         cursorX: params.cursorX,
         cursorY: params.cursorY,
-        scaleX: invSx,
-        scaleY: invSy,
+        scaleX: invScaleX,
+        scaleY: invScaleY,
         rotationRad: invRad,
         translateX: invTx,
         translateY: invTy,

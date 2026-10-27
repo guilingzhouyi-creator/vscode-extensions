@@ -30,8 +30,8 @@ interface DependencyEdge {
 /**
  * Normalizes file path to POSIX style.
  */
-function normalizePath(p: string): string {
-    return p.replace(/\\/g, '/');
+function normalizePath(patchPath: string): string {
+    return patchPath.replace(/\\/g, '/');
 }
 
 /**
@@ -145,9 +145,9 @@ type CycleResult = { cycle: string[]; edges: DependencyEdge[] };
  */
 function extractUniqueAgentsFromCycle(edges: DependencyEdge[]): string[] {
     const agentUids = new Set<string>();
-    for (const e of edges) {
-        if (e.agentUid !== '__base__') {
-            agentUids.add(e.agentUid);
+    for (const edge of edges) {
+        if (edge.agentUid !== '__base__') {
+            agentUids.add(edge.agentUid);
         }
     }
     return Array.from(agentUids);
@@ -221,27 +221,27 @@ function checkDependencyLayerInversion(
  * Validates whether an imported symbol has been concurrently removed or modified by another agent.
  */
 function checkImportContractBreakage(
-    p: AgentPatchSlice,
+    patch: AgentPatchSlice,
     sym: string,
     exportedMap: Map<string, { agentUid: string; file: string }>,
 ): AgentCollision | null {
     const exp = exportedMap.get(sym);
-    if (!exp || exp.agentUid === p.agentUid) {
+    if (!exp || exp.agentUid === patch.agentUid) {
         return null;
     }
-    if (p.deletedLines <= 0 || (p.newContent || '').indexOf(sym) !== -1) {
+    if (patch.deletedLines <= 0 || (patch.newContent || '').indexOf(sym) !== -1) {
         return null;
     }
     const collisionId = `contract-${Date.now()}`;
     const msg =
-        `Contract breakage between '${exp.agentUid}' and '${p.agentUid}': ` +
+        `Contract breakage between '${exp.agentUid}' and '${patch.agentUid}': ` +
         `symbol '${sym}' is modified/removed while concurrently referenced`;
-    const issue = createCollisionIssue(collisionId, p.filePath, msg, { sym });
+    const issue = createCollisionIssue(collisionId, patch.filePath, msg, { sym });
     return {
         collisionId,
         kind: 'contract_breakage',
-        agents: [exp.agentUid, p.agentUid],
-        files: [exp.file, p.filePath],
+        agents: [exp.agentUid, patch.agentUid],
+        files: [exp.file, patch.filePath],
         description: msg,
         issue,
     };
@@ -250,10 +250,10 @@ function checkImportContractBreakage(
 /**
  * Creates a synthetic dependency edge representing an existing base repository edge.
  */
-function createBaseEdge(from: string, to: string): DependencyEdge {
+function createBaseEdge(from: string, targetPath: string): DependencyEdge {
     return {
         from,
-        to,
+        to: targetPath,
         agentUid: '__base__',
         patchId: '__base__',
     };
@@ -308,13 +308,15 @@ export class AgentCollisionDetector {
     ): AgentCollision | null {
         const adj = new Map<string, DependencyEdge[]>();
 
-        for (const e of baseEdges) {
-            const fromPath = normalizePath(e.from);
-            getOrCreateEdgeList(adj, fromPath).push(createBaseEdge(fromPath, normalizePath(e.to)));
+        for (const edge of baseEdges) {
+            const fromPath = normalizePath(edge.from);
+            getOrCreateEdgeList(adj, fromPath).push(
+                createBaseEdge(fromPath, normalizePath(edge.to)),
+            );
         }
 
-        for (const e of patchEdges) {
-            getOrCreateEdgeList(adj, e.from).push(e);
+        for (const edge of patchEdges) {
+            getOrCreateEdgeList(adj, edge.from).push(edge);
         }
 
         const visited = new Set<string>();
@@ -366,23 +368,23 @@ export class AgentCollisionDetector {
         const collisions: AgentCollision[] = [];
         const exportedMap = new Map<string, { agentUid: string; file: string }>();
 
-        for (const p of patches) {
-            const exported = p.exportedSymbols;
+        for (const patch of patches) {
+            const exported = patch.exportedSymbols;
             if (!exported || exported.length === 0) {
                 continue;
             }
             for (const sym of exported) {
-                exportedMap.set(sym, { agentUid: p.agentUid, file: p.filePath });
+                exportedMap.set(sym, { agentUid: patch.agentUid, file: patch.filePath });
             }
         }
 
-        for (const p of patches) {
-            const imported = p.importedSymbols;
+        for (const patch of patches) {
+            const imported = patch.importedSymbols;
             if (!imported || imported.length === 0) {
                 continue;
             }
             for (const sym of imported) {
-                const collision = checkImportContractBreakage(p, sym, exportedMap);
+                const collision = checkImportContractBreakage(patch, sym, exportedMap);
                 if (collision) {
                     collisions.push(collision);
                 }

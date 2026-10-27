@@ -47,12 +47,7 @@ const USER_ACTIVATION_OR_ORIGIN_RE =
 
 const MAX_LISTENER_SCAN_WINDOW = 40;
 
-const EXEMPT_PATH_SUBSTRINGS = Object.freeze([
-    '/tests/',
-    '/test/',
-    '/scripts/',
-    '/fixtures/',
-]);
+const EXEMPT_PATH_SUBSTRINGS = Object.freeze(['/tests/', '/test/', '/scripts/', '/fixtures/']);
 
 interface ExposureIssueParams {
     readonly file: string;
@@ -218,7 +213,7 @@ function auditIframeUserActivation(file: string, rawLines: string[], issues: Iss
 export class ClientExposureAnalyzer implements Analyzer {
     readonly name = ANALYZER_CLIENT_EXPOSURE_ID;
 
-    analyze(_sf: unknown, context: AnalyzerContext): Issue[] {
+    analyze(_sourceFile: unknown, context: AnalyzerContext): Issue[] {
         const file = context.filePath.replace(/\\/g, '/');
         const norm = ('/' + file).toLowerCase();
         if (EXEMPT_PATH_SUBSTRINGS.some((sub) => norm.includes(sub))) {
