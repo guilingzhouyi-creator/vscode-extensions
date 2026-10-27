@@ -235,7 +235,7 @@ function buildStreamingEntries(
             ctx: makeContext(base, root, planItem.options),
         });
     }
-    entries.push({ analyzer: metric, ctx: makeContext(base, root, {}) });
+    entries.push({ analyzer: metric, ctx: makeContext(base, root, {}), exemptFromPruning: true });
     return entries;
 }
 

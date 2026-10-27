@@ -27,6 +27,7 @@ const {
   hopperPruneRatio,
   totalHopperNodes,
   SlidingSymbolStream,
+  SwaBoundedReplayManager,
 } = require('../dist/api');
 const { SymbolIndex, collectSymbols } = require('../dist/core/intelligence/symbolIndex');
 const { NodeKind } = require('../dist/core/ast/multilang');
@@ -319,6 +320,85 @@ function assertViewFromIndex() {
   console.log('  ✔ sliding view reproduces the source index facts');
 }
 
+/** Assert FileMetricCollector is exempt from pruning and produces identical metrics (P1-1). */
+function assertFileMetricExemptFromPruning() {
+  const { runStreaming, FileMetricCollector } = require('../dist/core/ast/traverse');
+
+  const metricCollectorFull = new FileMetricCollector();
+  runStreaming(FIXTURE_ADAPTER, buildFixtureTree(), [
+    { analyzer: metricCollectorFull, ctx: { config: {}, filePath: 'fixture.ts', content: '', root: buildFixtureTree() } },
+  ]);
+  metricCollectorFull.finalize({ config: {}, filePath: 'fixture.ts', content: 'let x = 1;\n'.repeat(20) });
+
+  const metricCollectorBounded = new FileMetricCollector();
+  const stats = createSparseHopperStats();
+  runStreaming(
+    FIXTURE_ADAPTER,
+    buildFixtureTree(),
+    [
+      { analyzer: metricCollectorBounded, ctx: { config: {}, filePath: 'fixture.ts', content: '', root: buildFixtureTree() } },
+    ],
+    [6, 9], // Narrow window covering only 1 of 4 functions
+    stats,
+  );
+  metricCollectorBounded.finalize({ config: {}, filePath: 'fixture.ts', content: 'let x = 1;\n'.repeat(20) });
+
+  assert.strictEqual(
+    metricCollectorBounded.functions,
+    metricCollectorFull.functions,
+    'functions metric must be bitwise identical despite bounded window pruning',
+  );
+  assert.strictEqual(
+    metricCollectorBounded.topLevelDeclarations,
+    metricCollectorFull.topLevelDeclarations,
+    'topLevelDeclarations metric must be bitwise identical',
+  );
+  assert.strictEqual(
+    metricCollectorBounded.maxNesting,
+    metricCollectorFull.maxNesting,
+    'maxNesting metric must be bitwise identical',
+  );
+  assert.strictEqual(
+    metricCollectorBounded.exportedSymbols,
+    metricCollectorFull.exportedSymbols,
+    'exportedSymbols metric must be bitwise identical',
+  );
+  assert.strictEqual(
+    stats.pruned,
+    6,
+    'hopper records pruned nodes (3 functions + 3 child constants) for non-exempt analyzers',
+  );
+  console.log('  ✔ FileMetricCollector is exempt from pruning and preserves static profiling (P1-1)');
+}
+
+/** Assert file-level finalize issues at line 1 survive window pruning (P1-2). */
+function assertFileLevelFinalizeIssuesSurvivePruning() {
+  const swa = new SwaBoundedReplayManager();
+  const window = {
+    startLine: 400,
+    endLine: 470,
+    isBounded: true,
+    requiresFullReplay: false,
+    effectiveSpanLines: 71,
+    reason: 'BOUNDED_LOCAL_REPLAY',
+  };
+
+  const issues = [
+    { rule: 'NAM-FIL-001', location: { start: { line: 1 } } },
+    { rule: 'VOL-FIL-001', location: { start: { line: 1 } } },
+    { rule: 'SIM-EXP-001', location: { start: { line: 10 } } },
+    { rule: 'CMP-IF-001', location: { start: { line: 420 } } },
+  ];
+
+  const surviving = swa.pruneIssuesOutsideWindow(issues, window);
+  assert.strictEqual(surviving.length, 3, 'file-level rules (NAM-FIL, VOL-FIL) and in-window rule survive');
+  assert.ok(surviving.some((i) => i.rule === 'NAM-FIL-001'), 'NAM-FIL-001 must survive');
+  assert.ok(surviving.some((i) => i.rule === 'VOL-FIL-001'), 'VOL-FIL-001 must survive');
+  assert.ok(surviving.some((i) => i.rule === 'CMP-IF-001'), 'in-window issue must survive');
+  assert.ok(!surviving.some((i) => i.rule === 'SIM-EXP-001'), 'out-of-window local issue must be pruned');
+  console.log('  ✔ file-level finalize rules survive window pruning (P1-2)');
+}
+
 async function main() {
   console.log('=== Sparse AST Hopper and Sliding Symbol Stream Validation ===');
   assertClassification();
@@ -330,7 +410,9 @@ async function main() {
   assertStreamBudget();
   assertSaliencyProtectsHotFile();
   assertViewFromIndex();
-  console.log('=== ALL SPARSE HOPPER VALIDATION TESTS PASSED (9/9) ===');
+  assertFileMetricExemptFromPruning();
+  assertFileLevelFinalizeIssuesSurvivePruning();
+  console.log('=== ALL SPARSE HOPPER VALIDATION TESTS PASSED (11/11) ===');
 }
 
 main().catch((error) => {

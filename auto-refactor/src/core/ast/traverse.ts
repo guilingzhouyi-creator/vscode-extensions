@@ -63,8 +63,12 @@ export interface StreamingEntry {
          */
         leave?: StreamingVisitHook;
         finalize?(ctx: AnalyzerContext): Issue[];
+        /** When true, the analyzer is exempt from window-based pruning and observes all nodes. */
+        exemptFromPruning?: boolean;
     };
     ctx: AnalyzerContext;
+    /** Optional entry-level exemption flag from window-based pruning. */
+    exemptFromPruning?: boolean;
 }
 
 /** `typeof` tag detecting analyzer visit()/finalize() methods on entries/projections. */
@@ -121,6 +125,145 @@ function dispatchHooks(
 }
 
 /**
+ * Partition streaming entries into active and exempt visit hooks.
+ *
+ * @param entries - Analyzer plus context entries participating in this pass.
+ * @returns Partitioned active and exempt visit hooks.
+ */
+function collectVisitHooks(entries: readonly StreamingEntry[]): {
+    active: ActiveHook[];
+    exempt: ActiveHook[];
+} {
+    const active: ActiveHook[] = [];
+    const exempt: ActiveHook[] = [];
+    for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (!isCallable(entry.analyzer.visit)) continue;
+        const hook: ActiveHook = {
+            fn: entry.analyzer.visit.bind(entry.analyzer),
+            ctx: entry.ctx,
+            name: entry.analyzer.name,
+        };
+        if (entry.exemptFromPruning || entry.analyzer.exemptFromPruning) {
+            exempt.push(hook);
+        } else {
+            active.push(hook);
+        }
+    }
+    return { active, exempt };
+}
+
+/**
+ * Partition streaming entries into active and exempt leave hooks in reverse array order.
+ *
+ * @param entries - Analyzer plus context entries participating in this pass.
+ * @returns Partitioned active and exempt leave hooks.
+ */
+function collectLeaveHooks(entries: readonly StreamingEntry[]): {
+    active: ActiveHook[];
+    exempt: ActiveHook[];
+} {
+    const active: ActiveHook[] = [];
+    const exempt: ActiveHook[] = [];
+    for (let i = entries.length - 1; i >= 0; i--) {
+        const entry = entries[i];
+        if (!isCallable(entry.analyzer.leave)) continue;
+        const hook: ActiveHook = {
+            fn: entry.analyzer.leave.bind(entry.analyzer),
+            ctx: entry.ctx,
+            name: entry.analyzer.name,
+        };
+        if (entry.exemptFromPruning || entry.analyzer.exemptFromPruning) {
+            exempt.push(hook);
+        } else {
+            active.push(hook);
+        }
+    }
+    return { active, exempt };
+}
+
+/**
+ * Invoke finalize on each participating analyzer, accumulating issues and capturing exceptions.
+ *
+ * @param entries - Participating streaming entries.
+ * @param issues - Target issues array.
+ * @param pushError - Sink for analyzer exceptions.
+ */
+function finalizeStreamingEntries(
+    entries: readonly StreamingEntry[],
+    issues: Issue[],
+    pushError: ErrorReporter,
+): void {
+    for (const entry of entries) {
+        if (!isCallable(entry.analyzer.finalize)) continue;
+        try {
+            issues.push(...entry.analyzer.finalize(entry.ctx));
+        } catch (error) {
+            pushError(entry.analyzer.name, error, entry.ctx);
+        }
+    }
+}
+
+/**
+ * Create a single analyzer error issue when a visit or finalize hook throws.
+ *
+ * @param name - Analyzer name.
+ * @param error - Caught exception.
+ * @param ctx - Active analyzer context.
+ * @returns Diagnostic Issue record.
+ */
+function createAnalyzerErrorIssue(name: string, error: unknown, ctx: AnalyzerContext): Issue {
+    const sev = ctx.config.failOnAnalyzerError ? SEVERITY_ERROR : SEVERITY_INFO;
+    return {
+        id: `core:analyzer-error:${ctx.filePath}:1`,
+        analyzer: name,
+        rule: RULE_ANALYZER_ERROR,
+        severity: sev,
+        message: `Analyzer "${name}" threw: ${(error as Error).message}`,
+        location: {
+            file: ctx.filePath,
+            start: { line: 1, column: 1 },
+            end: { line: 1, column: 1 },
+        },
+        detail: { error: String(error) },
+    };
+}
+
+/**
+ * Dispatch both active (window-admitted) and exempt (whole-file) hooks for one traversal event.
+ *
+ * @param active - Active hooks to dispatch if the node should be dispatched.
+ * @param exempt - Exempt hooks that observe all non-pruned nodes regardless of window.
+ * @param node - Currently visited normalized node.
+ * @param shouldDispatch - Whether the node falls within the active hopper window.
+ * @param parent - Immediate parent of the node.
+ * @param grandparent - Grandparent of the node.
+ * @param depth - Current nesting depth.
+ * @param className - Active class name scope.
+ * @param binding - Active binding scope.
+ * @param pushError - Sink for analyzer exceptions.
+ */
+function dispatchActiveAndExemptHooks(
+    active: ActiveHook[],
+    exempt: ActiveHook[],
+    node: NormalizedNode,
+    shouldDispatch: boolean,
+    parent: NormalizedNode | undefined,
+    grandparent: NormalizedNode | undefined,
+    depth: number,
+    className: string | null,
+    binding: string | null,
+    pushError: ErrorReporter,
+): void {
+    if (shouldDispatch && active.length > 0) {
+        dispatchHooks(active, node, parent, grandparent, depth, className, binding, pushError);
+    }
+    if (exempt.length > 0) {
+        dispatchHooks(exempt, node, parent, grandparent, depth, className, binding, pushError);
+    }
+}
+
+/**
  * Run the single shared traversal over the normalized tree, dispatching to each entry's
  * `visit` (per node) and `finalize` (once). Analyzers without `visit`/`finalize` are skipped
  * (they are handled by the legacy `analyze` path elsewhere). Per-analyzer errors during
@@ -152,49 +295,13 @@ export function runStreaming(
     const stats = hopperStats ?? createSparseHopperStats();
     const window = lineBounds ? { startLine: lineBounds[0], endLine: lineBounds[1] } : undefined;
 
-    // Pre-bind visit/finalize once per file: saves the per-node `typeof` check and property
-    const activeVisits: ActiveHook[] = [];
-    for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i];
-        if (isCallable(entry.analyzer.visit)) {
-            activeVisits.push({
-                fn: entry.analyzer.visit.bind(entry.analyzer),
-                ctx: entry.ctx,
-                name: entry.analyzer.name,
-            });
-        }
-    }
-
-    const activeLeaves: ActiveHook[] = [];
-    for (let i = entries.length - 1; i >= 0; i--) {
-        const entry = entries[i];
-        if (isCallable(entry.analyzer.leave)) {
-            activeLeaves.push({
-                fn: entry.analyzer.leave.bind(entry.analyzer),
-                ctx: entry.ctx,
-                name: entry.analyzer.name,
-            });
-        }
-    }
-    const hasAnyLeave = activeLeaves.length > 0;
+    const { active: activeVisits, exempt: exemptVisits } = collectVisitHooks(entries);
+    const { active: activeLeaves, exempt: exemptLeaves } = collectLeaveHooks(entries);
 
     const pushError = (name: string, error: unknown, ctx: AnalyzerContext) => {
-        if (errored.has(name)) return; // one error issue per analyzer per file
+        if (errored.has(name)) return;
         errored.add(name);
-        const sev = ctx.config.failOnAnalyzerError ? SEVERITY_ERROR : SEVERITY_INFO;
-        issues.push({
-            id: `core:analyzer-error:${ctx.filePath}:1`,
-            analyzer: name,
-            rule: RULE_ANALYZER_ERROR,
-            severity: sev,
-            message: `Analyzer "${name}" threw: ${(error as Error).message}`,
-            location: {
-                file: ctx.filePath,
-                start: { line: 1, column: 1 },
-                end: { line: 1, column: 1 },
-            },
-            detail: { error: String(error) },
-        });
+        issues.push(createAnalyzerErrorIssue(name, error, ctx));
     };
 
     const visitNode = (
@@ -205,26 +312,31 @@ export function runStreaming(
         className: string | null,
         binding: string | null,
     ): void => {
-        if (isSubtreePrunable(node, window)) {
+        const prunable = isSubtreePrunable(node, window);
+        if (prunable) {
             stats.pruned += 1;
-            return;
+            if (exemptVisits.length === 0) {
+                return;
+            }
         }
-        const shouldDispatch = shouldDispatchNode(node, window);
+
+        const shouldDispatch = !prunable && shouldDispatchNode(node, window);
         if (shouldDispatch) {
             stats.visited += 1;
         }
-        if (shouldDispatch && activeVisits.length > 0) {
-            dispatchHooks(
-                activeVisits,
-                node,
-                parent,
-                grandparent,
-                depth,
-                className,
-                binding,
-                pushError,
-            );
-        }
+
+        dispatchActiveAndExemptHooks(
+            activeVisits,
+            exemptVisits,
+            node,
+            shouldDispatch,
+            parent,
+            grandparent,
+            depth,
+            className,
+            binding,
+            pushError,
+        );
 
         const childDepth = depth + (node.increasesNesting ? 1 : 0);
         const cName = resolveChildScopeName(node, className);
@@ -234,32 +346,25 @@ export function runStreaming(
             visitNode(childNode, node, parent, childDepth, cName, cBinding);
         }
 
-        if (shouldDispatch && hasAnyLeave) {
-            dispatchHooks(
-                activeLeaves,
-                node,
-                parent,
-                grandparent,
-                depth,
-                className,
-                binding,
-                pushError,
-            );
-        }
+        dispatchActiveAndExemptHooks(
+            activeLeaves,
+            exemptLeaves,
+            node,
+            shouldDispatch,
+            parent,
+            grandparent,
+            depth,
+            className,
+            binding,
+            pushError,
+        );
     };
 
     for (const childNode of adapter.children(root)) {
         visitNode(childNode, root, undefined, 0, null, null);
     }
 
-    for (const entry of entries) {
-        if (!isCallable(entry.analyzer.finalize)) continue;
-        try {
-            issues.push(...entry.analyzer.finalize(entry.ctx));
-        } catch (error) {
-            pushError(entry.analyzer.name, error, entry.ctx);
-        }
-    }
+    finalizeStreamingEntries(entries, issues, pushError);
     return issues;
 }
 
@@ -270,6 +375,7 @@ export function runStreaming(
  */
 export class FileMetricCollector {
     name = '__metric__' as const;
+    exemptFromPruning = true;
     functions = 0;
     maxNesting = 0;
     topLevelDeclarations = 0;
@@ -396,6 +502,67 @@ function admitProjectedNode(
 }
 
 /**
+ * Dispatch both active and exempt projected hooks for one lazy-projection traversal event.
+ *
+ * @param active - Active hooks to dispatch if the node should be dispatched.
+ * @param exempt - Exempt hooks that observe all non-pruned nodes regardless of window.
+ * @param node - Currently projected node.
+ * @param shouldDispatch - Whether the node falls within the active hopper window.
+ * @param scope - Threaded scope values for the hook contract.
+ * @param pushError - Sink for analyzer exceptions.
+ */
+function dispatchProjectedActiveAndExemptHooks(
+    active: ActiveHook[],
+    exempt: ActiveHook[],
+    node: NormalizedNode,
+    shouldDispatch: boolean,
+    scope: ProjectedScope,
+    pushError: ErrorReporter,
+): void {
+    if (shouldDispatch && active.length > 0) {
+        dispatchProjectedHooks(active, node, scope, pushError);
+    }
+    if (exempt.length > 0) {
+        dispatchProjectedHooks(exempt, node, scope, pushError);
+    }
+}
+
+/**
+ * Notify the scan-wide node observer (cross-file symbol index) if the node is admitted.
+ *
+ * @param onNode - Optional scan-wide node observer.
+ * @param node - Current projected node.
+ * @param caller - Current function caller name.
+ * @param shouldDispatch - Whether the node falls within the active hopper window.
+ * @param hasExemptVisits - Whether any visits are exempt from window pruning.
+ */
+function notifyProjectedObserver(
+    onNode: ((node: NormalizedNode, caller: string | null) => void) | undefined,
+    node: NormalizedNode,
+    caller: string | null,
+    shouldDispatch: boolean,
+    hasExemptVisits: boolean,
+): void {
+    if (onNode && (shouldDispatch || hasExemptVisits)) {
+        onNode(node, caller);
+    }
+}
+
+/**
+ * Resolve the effective caller identifier when descending into a child scope.
+ *
+ * @param node - Normalized node whose scope is being entered.
+ * @param fallbackCaller - Current enclosing caller if the node does not establish a new function scope.
+ * @returns Updated function name or fallback.
+ */
+function resolveChildCaller(node: NormalizedNode, fallbackCaller: string | null): string | null {
+    if (node.functionLike && typeof node.name === 'string') {
+        return node.name;
+    }
+    return fallbackCaller;
+}
+
+/**
  * Run the shared traversal over a LAZY projection source (no materialized normalized tree).
  *
  * Mirrors `runStreaming` exactly: identical visit dispatch (per analyzer, errors become a
@@ -440,48 +607,13 @@ export function runStreamingProjected(
     const stats = hopperStats ?? createSparseHopperStats();
     const window = lineBounds ? { startLine: lineBounds[0], endLine: lineBounds[1] } : undefined;
 
-    const activeVisits: ActiveHook[] = [];
-    for (let i = 0; i < entries.length; i++) {
-        const entry = entries[i];
-        if (isCallable(entry.analyzer.visit)) {
-            activeVisits.push({
-                fn: entry.analyzer.visit.bind(entry.analyzer),
-                ctx: entry.ctx,
-                name: entry.analyzer.name,
-            });
-        }
-    }
-
-    const activeLeaves: ActiveHook[] = [];
-    for (let i = entries.length - 1; i >= 0; i--) {
-        const entry = entries[i];
-        if (isCallable(entry.analyzer.leave)) {
-            activeLeaves.push({
-                fn: entry.analyzer.leave.bind(entry.analyzer),
-                ctx: entry.ctx,
-                name: entry.analyzer.name,
-            });
-        }
-    }
-    const hasAnyLeave = activeLeaves.length > 0;
+    const { active: activeVisits, exempt: exemptVisits } = collectVisitHooks(entries);
+    const { active: activeLeaves, exempt: exemptLeaves } = collectLeaveHooks(entries);
 
     const pushError = (name: string, error: unknown, ctx: AnalyzerContext) => {
-        if (errored.has(name)) return; // one error issue per analyzer per file
+        if (errored.has(name)) return;
         errored.add(name);
-        const sev = ctx.config.failOnAnalyzerError ? SEVERITY_ERROR : SEVERITY_INFO;
-        issues.push({
-            id: `core:analyzer-error:${ctx.filePath}:1`,
-            analyzer: name,
-            rule: RULE_ANALYZER_ERROR,
-            severity: sev,
-            message: `Analyzer "${name}" threw: ${(error as Error).message}`,
-            location: {
-                file: ctx.filePath,
-                start: { line: 1, column: 1 },
-                end: { line: 1, column: 1 },
-            },
-            detail: { error: String(error) },
-        });
+        issues.push(createAnalyzerErrorIssue(name, error, ctx));
     };
 
     const rootRaw = projector.root;
@@ -497,17 +629,34 @@ export function runStreamingProjected(
         caller: string | null,
     ): void => {
         const node = projector.project(raw, parentRaw, grandparentRaw);
-        const shouldDispatch = admitProjectedNode(node, window, stats);
-        if (!shouldDispatch) return;
-        // Scan-wide consumers (the cross-file symbol index) observe the SAME projected nodes the
-        // analyzers see; this is the only point where the lazy path has a NormalizedNode in hand.
-        if (onNode) onNode(node, caller);
-        dispatchProjectedHooks(activeVisits, node, scope, pushError);
+        const prunable = isSubtreePrunable(node, window);
+        if (prunable) {
+            stats.pruned += 1;
+            if (exemptVisits.length === 0) {
+                return;
+            }
+        }
+
+        const shouldDispatch = !prunable && shouldDispatchNode(node, window);
+        if (shouldDispatch) {
+            stats.visited += 1;
+        }
+
+        notifyProjectedObserver(onNode, node, caller, shouldDispatch, exemptVisits.length > 0);
+
+        dispatchProjectedActiveAndExemptHooks(
+            activeVisits,
+            exemptVisits,
+            node,
+            shouldDispatch,
+            scope,
+            pushError,
+        );
 
         const childDepth = scope.depth + (node.increasesNesting ? 1 : 0);
         const cName = resolveChildScopeName(node, scope.className);
         const cBinding = resolveChildScopeBinding(node, scope.binding);
-        const cCaller = node.functionLike && typeof node.name === 'string' ? node.name : caller;
+        const cCaller = resolveChildCaller(node, caller);
         const childScope: ProjectedScope = {
             depth: childDepth,
             className: cName,
@@ -520,9 +669,14 @@ export function runStreamingProjected(
             visitRaw(childRaw, raw, parentRaw, childScope, cCaller);
         }
 
-        if (hasAnyLeave) {
-            dispatchProjectedHooks(activeLeaves, node, scope, pushError);
-        }
+        dispatchProjectedActiveAndExemptHooks(
+            activeLeaves,
+            exemptLeaves,
+            node,
+            shouldDispatch,
+            scope,
+            pushError,
+        );
     };
 
     const rootScope: ProjectedScope = {
@@ -536,14 +690,7 @@ export function runStreamingProjected(
         visitRaw(childRaw, rootRaw, undefined, rootScope, null);
     }
 
-    for (const entry of entries) {
-        if (!isCallable(entry.analyzer.finalize)) continue;
-        try {
-            issues.push(...entry.analyzer.finalize(entry.ctx));
-        } catch (error) {
-            pushError(entry.analyzer.name, error, entry.ctx);
-        }
-    }
+    finalizeStreamingEntries(entries, issues, pushError);
     return issues;
 }
 
