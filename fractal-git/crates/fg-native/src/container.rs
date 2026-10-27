@@ -478,24 +478,244 @@ impl ContainerBuilder {
         output
     }
 
-    /// Serializes and writes the container atomically to `path`.
+    /// Serializes and writes the container atomically to `path` with cross-process transaction locking.
     ///
-    /// Writes `<path>.tmp` first, flushes it, then renames onto `path`, so a crash leaves either the
-    /// previous container or the new one, never a truncated mixture.
+    /// Acquires an exclusive advisory lock on `<path>.lock`, writes to a process-unique temporary
+    /// file, then renames onto `path` with transient retry recovery.
     ///
     /// # Errors
     ///
-    /// Propagates [`NativeError::Io`] from the staging write, flush, or rename.
+    /// Propagates [`NativeError::Io`] from the lock acquisition, staging write, or rename.
     pub fn write_atomic(&self, path: &Path) -> NativeResult<()> {
-        let bytes = self.build();
-        let staging: PathBuf = path.with_extension("txc.tmp");
-
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
+
+        let lock_path = path.with_extension("txc.lock");
+        let _lock_guard = ContainerFileLock::acquire(&lock_path, 5000)?;
+
+        let bytes = self.build();
+        let parent = path.parent().unwrap_or_else(|| Path::new("."));
+        let staging: PathBuf = parent.join(format!(
+            ".repo_{}_{}.txc.tmp",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+
         fs::write(&staging, &bytes)?;
-        fs::rename(&staging, path)?;
+
+        let mut renamed = fs::rename(&staging, path);
+        if renamed.is_err() {
+            for _ in 0..3 {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                renamed = fs::rename(&staging, path);
+                if renamed.is_ok() {
+                    break;
+                }
+            }
+        }
+
+        if let Err(err) = renamed {
+            let _ = fs::remove_file(&staging);
+            return Err(NativeError::Io(err));
+        }
+
         Ok(())
+    }
+}
+
+/// Cross-process advisory lock ensuring atomic concurrent access to repository container files.
+#[cfg(windows)]
+pub struct ContainerFileLock {
+    handle: *mut core::ffi::c_void,
+}
+
+#[cfg(windows)]
+impl ContainerFileLock {
+    /// Acquires an exclusive advisory file lock on `path` within `timeout_ms`.
+    pub fn acquire(path: &Path, timeout_ms: u64) -> NativeResult<Self> {
+        use std::os::windows::ffi::OsStrExt;
+
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn CreateFileW(
+                lpFileName: *const u16,
+                dwDesiredAccess: u32,
+                dwShareMode: u32,
+                lpSecurityAttributes: *const core::ffi::c_void,
+                dwCreationDisposition: u32,
+                dwFlagsAndAttributes: u32,
+                hTemplateFile: *mut core::ffi::c_void,
+            ) -> *mut core::ffi::c_void;
+            fn LockFileEx(
+                hFile: *mut core::ffi::c_void,
+                dwFlags: u32,
+                dwReserved: u32,
+                nNumberOfBytesToLockLow: u32,
+                nNumberOfBytesToLockHigh: u32,
+                lpOverlapped: *mut core::ffi::c_void,
+            ) -> i32;
+            fn CloseHandle(hObject: *mut core::ffi::c_void) -> i32;
+        }
+
+        const GENERIC_READ: u32 = 0x8000_0000;
+        const GENERIC_WRITE: u32 = 0x4000_0000;
+        const FILE_SHARE_READ: u32 = 0x0000_0001;
+        const FILE_SHARE_WRITE: u32 = 0x0000_0002;
+        const OPEN_ALWAYS: u32 = 4;
+        const FILE_ATTRIBUTE_NORMAL: u32 = 0x0000_0080;
+        const INVALID_HANDLE_VALUE: *mut core::ffi::c_void = -1isize as *mut core::ffi::c_void;
+        const LOCKFILE_EXCLUSIVE_LOCK: u32 = 0x0000_0002;
+        const LOCKFILE_FAIL_IMMEDIATELY: u32 = 0x0000_0001;
+
+        let mut wide_path: Vec<u16> = path.as_os_str().encode_wide().collect();
+        wide_path.push(0);
+
+        // SAFETY: `wide_path` is a NUL-terminated wide string outliving CreateFileW.
+        let handle = unsafe {
+            CreateFileW(
+                wide_path.as_ptr(),
+                GENERIC_READ | GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                std::ptr::null(),
+                OPEN_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL,
+                std::ptr::null_mut(),
+            )
+        };
+
+        if handle == INVALID_HANDLE_VALUE {
+            return Err(NativeError::Io(std::io::Error::last_os_error()));
+        }
+
+        let start = std::time::Instant::now();
+        let timeout = std::time::Duration::from_millis(timeout_ms);
+        let mut sleep_ms = 5u64;
+
+        loop {
+            let mut overlapped: [u8; 32] = [0; 32];
+            // SAFETY: `handle` is an open handle; overlapped buffer is valid.
+            let locked = unsafe {
+                LockFileEx(
+                    handle,
+                    LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
+                    0,
+                    1,
+                    0,
+                    overlapped.as_mut_ptr().cast(),
+                )
+            };
+
+            if locked != 0 {
+                return Ok(Self { handle });
+            }
+
+            if start.elapsed() >= timeout {
+                // SAFETY: Close handle on timeout failure.
+                unsafe { CloseHandle(handle) };
+                return Err(NativeError::Io(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    format!("timed out waiting for container lock on '{}'", path.display()),
+                )));
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
+            sleep_ms = (sleep_ms * 2).min(100);
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for ContainerFileLock {
+    fn drop(&mut self) {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn UnlockFile(
+                hFile: *mut core::ffi::c_void,
+                dwFileOffsetLow: u32,
+                dwFileOffsetHigh: u32,
+                nNumberOfBytesToUnlockLow: u32,
+                nNumberOfBytesToUnlockHigh: u32,
+            ) -> i32;
+            fn CloseHandle(hObject: *mut core::ffi::c_void) -> i32;
+        }
+
+        // SAFETY: `self.handle` is valid handle held during lock lifecycle.
+        unsafe {
+            UnlockFile(self.handle, 0, 0, 1, 0);
+            CloseHandle(self.handle);
+        }
+    }
+}
+
+/// Cross-process advisory lock ensuring atomic concurrent access to repository container files.
+#[cfg(not(windows))]
+pub struct ContainerFileLock {
+    file: std::fs::File,
+}
+
+#[cfg(not(windows))]
+impl ContainerFileLock {
+    /// Acquires an exclusive advisory file lock on `path` within `timeout_ms`.
+    pub fn acquire(path: &Path, timeout_ms: u64) -> NativeResult<Self> {
+        use std::os::unix::fs::OpenOptionsExt;
+        use std::os::unix::io::AsRawFd;
+
+        extern "C" {
+            fn flock(fd: i32, operation: i32) -> i32;
+        }
+
+        const LOCK_EX: i32 = 2;
+        const LOCK_NB: i32 = 4;
+
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .mode(0o644)
+            .open(path)?;
+
+        let start = std::time::Instant::now();
+        let timeout = std::time::Duration::from_millis(timeout_ms);
+        let mut sleep_ms = 5u64;
+
+        loop {
+            // SAFETY: file is a valid open file descriptor.
+            let lock_status = unsafe { flock(file.as_raw_fd(), LOCK_EX | LOCK_NB) };
+            if lock_status == 0 {
+                return Ok(Self { file });
+            }
+
+            if start.elapsed() >= timeout {
+                return Err(NativeError::Io(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    format!("timed out waiting for container lock on '{}'", path.display()),
+                )));
+            }
+
+            std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
+            sleep_ms = (sleep_ms * 2).min(100);
+        }
+    }
+}
+
+#[cfg(not(windows))]
+impl Drop for ContainerFileLock {
+    fn drop(&mut self) {
+        use std::os::unix::io::AsRawFd;
+
+        extern "C" {
+            fn flock(fd: i32, operation: i32) -> i32;
+        }
+
+        const LOCK_UN: i32 = 8;
+        // SAFETY: file is a valid open file descriptor.
+        unsafe {
+            flock(self.file.as_raw_fd(), LOCK_UN);
+        }
     }
 }
 
@@ -546,7 +766,7 @@ fn read_u64_le(bytes: &[u8], offset: usize) -> NativeResult<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ContainerBuilder, ContainerView};
+    use super::{ContainerBuilder, ContainerFileLock, ContainerView};
     use crate::error::NativeError;
     use crate::section_tag::SectionTag;
 
@@ -685,6 +905,29 @@ mod tests {
         assert!(view.has_section(SectionTag::Meta));
 
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn container_file_lock_mutual_exclusion() {
+        let lock_path = crate::test_support::scratch_path("lock_test.txc.lock");
+
+        // 1. Acquire lock 1
+        let lock1 = ContainerFileLock::acquire(&lock_path, 500).expect("first lock acquire succeeds");
+
+        // 2. Second acquire with short timeout must fail because lock1 holds it exclusively
+        let start = std::time::Instant::now();
+        let lock2_res = ContainerFileLock::acquire(&lock_path, 100);
+        assert!(lock2_res.is_err(), "second acquire must time out while lock1 is held");
+        assert!(start.elapsed() >= std::time::Duration::from_millis(50));
+
+        // 3. Drop lock 1
+        drop(lock1);
+
+        // 4. Now acquire must succeed immediately
+        let lock3 = ContainerFileLock::acquire(&lock_path, 500).expect("acquire after release succeeds");
+        drop(lock3);
+
+        let _ = std::fs::remove_file(&lock_path);
     }
 
     #[test]

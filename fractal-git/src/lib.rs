@@ -115,10 +115,13 @@ pub use fg_storage::cas_backend::CasBackend;
 pub use fg_storage::cas_bridge::{CasFileDescriptor, CasToGitMaterializer, MaterializeRequest};
 pub use fg_storage::commit_graph::{CommitGraphEntry, CommitGraphReader, CommitGraphWriter};
 pub use fg_storage::commit_materializer::{
-    materialize_commit, serialize_commit_payload, serialize_tree_payload, write_commit_objects,
-    CommitMaterializationRequest, MaterializedCommit,
+    materialize_commit, read_full_tree_entries, serialize_commit_payload, serialize_tree_payload,
+    write_commit_objects, CommitMaterializationRequest, MaterializedCommit,
 };
 pub use fg_storage::loose::{write_loose_object, LooseOdb};
+pub use fg_storage::reflink::{
+    clone_file_cow, detach_for_write, is_readonly, set_readonly, ReflinkKind,
+};
 pub use fg_storage::repack::{scan_loose_objects, RepackEngine, RepackOptions, RepackReport};
 pub use fg_storage::wal_journal::{WalJournal, WalRecord};
 

@@ -195,7 +195,8 @@ fn handle_worktree_add(ctx: &CliContext) {
         );
     }
 
-    let materialized = materialize_projection(&destination, &projection);
+    let materialized = materialize_projection(&destination, &projection)
+        + materialize_worktree_files(&ctx.git_dir, &destination, &projection, mode);
     let creation_latency_us = started_at.elapsed().as_micros() as u64;
     let mut record = if projection.is_full {
         WorktreeRecord::full(destination.display().to_string())
@@ -270,6 +271,73 @@ fn materialize_projection(destination: &Path, projection: &ScopeProjection) -> u
         }
     }
     created
+}
+
+/// Materializes actual files into the allocated worktree using CoW block reflink or Ghost Linking.
+///
+/// Within-scope files are made writable (or eligible for CoW writes); outside-scope files are
+/// projected as read-only stubs, providing a complete read view for compilers and linters while
+/// preventing unauthorized writes.
+fn materialize_worktree_files(
+    git_dir: &Path,
+    destination: &Path,
+    projection: &ScopeProjection,
+    mode: WorktreeMode,
+) -> usize {
+    if mode == WorktreeMode::VirtualMemory {
+        return 0;
+    }
+
+    let work_root = super::repo_view::resolve_work_root(git_dir);
+    if !work_root.exists() {
+        return 0;
+    }
+
+    let mut tracked_paths = std::collections::BTreeSet::new();
+
+    let index_file = git_dir.join("index");
+    if let Ok(git_index) = fg_index::GitIndex::load(&index_file) {
+        for e in git_index.entries() {
+            if work_root.join(&e.path).is_file() {
+                tracked_paths.insert(e.path.clone());
+            }
+        }
+    }
+
+    let container_path = fg_native::container_path(git_dir);
+    if let Ok(doc) = RepoDocument::load(&container_path) {
+        for e in doc.indx.entries() {
+            if work_root.join(&e.path).is_file() {
+                tracked_paths.insert(e.path.clone());
+            }
+        }
+    }
+
+    let mut materialized_count = 0usize;
+
+    for rel_path in tracked_paths.iter().take(PROJECTION_SCAN_LIMIT) {
+        let in_scope = projection.contains_path(rel_path);
+
+        if mode == WorktreeMode::SparseGhost && !in_scope {
+            // In SparseGhost mode, keep top-level manifests only for toolchain resolution
+            let is_root_manifest = !rel_path.contains('/') && !rel_path.contains('\\');
+            if !is_root_manifest {
+                continue;
+            }
+        }
+
+        let src_file = work_root.join(rel_path);
+        let dst_file = destination.join(rel_path.replace('/', std::path::MAIN_SEPARATOR_STR));
+
+        if let Ok(_kind) = fg_storage::reflink::clone_file_cow(&src_file, &dst_file) {
+            materialized_count += 1;
+            if !in_scope {
+                let _ = fg_storage::reflink::set_readonly(&dst_file, true);
+            }
+        }
+    }
+
+    materialized_count
 }
 
 /// Parses CLI flags specific to `worktree add` command.

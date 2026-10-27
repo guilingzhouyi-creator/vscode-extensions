@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use fractal_git::{
-    materialize_commit, CommitMaterializationRequest, DiskRefStore, FileMode, GitSignature,
-    LooseOdb, OdbStore, RefStore,
+    materialize_commit, read_full_tree_entries, CommitMaterializationRequest, DiskRefStore,
+    FileMode, GitSignature, LooseOdb, OdbStore, RefStore,
 };
 
 /// Monotonic counter keeping scratch directory names unique within one process.
@@ -147,6 +147,12 @@ fn materialize_commit_chains_onto_existing_reference() {
         ref_store.get_ref(ref_name).expect("read ref"),
         Some(second.commit_oid)
     );
+
+    // The second commit preserves all files from the parent commit (a.txt) and adds b.txt
+    let second_entries = read_full_tree_entries(&odb, &second.tree_oid).expect("read second tree");
+    assert_eq!(second_entries.len(), 2);
+    assert!(second_entries.contains_key("a.txt"));
+    assert!(second_entries.contains_key("b.txt"));
 
     let _ = std::fs::remove_dir_all(&root);
 }
@@ -287,6 +293,88 @@ fn materialize_commit_preserves_executable_and_symlink_modes() {
         .read_object(&materialized.blob_oids[2])
         .expect("read symlink blob");
     assert!(link_blob.ends_with(b"run.sh"));
+
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn materialize_commit_preserves_unmodified_parent_files_across_commits() {
+    let root = scratch_dir("preservation");
+    write_file(&root, "file1.txt", "content 1\n");
+    write_file(&root, "file2.txt", "content 2\n");
+    write_file(&root, "dir/file3.txt", "content 3\n");
+
+    let git_dir = root.join(".git");
+    let odb = LooseOdb::new(&git_dir);
+    let ref_store = DiskRefStore::new(&git_dir);
+    let ref_name = "refs/fractal/cell/cell-preserve/main";
+
+    // Commit 1: stages 3 files
+    let first = materialize_commit(
+        &odb,
+        &ref_store,
+        &request_for(
+            &root,
+            &["file1.txt", "file2.txt", "dir/file3.txt"],
+            "feat: commit 1 (3 files)\n",
+            ref_name,
+        ),
+    )
+    .expect("commit 1");
+
+    let first_entries = read_full_tree_entries(&odb, &first.tree_oid).expect("read tree 1");
+    assert_eq!(first_entries.len(), 3);
+
+    // Commit 2: only modifies file2.txt
+    write_file(&root, "file2.txt", "content 2 updated\n");
+    let second = materialize_commit(
+        &odb,
+        &ref_store,
+        &request_for(
+            &root,
+            &["file2.txt"],
+            "fix: commit 2 (modify file2 only)\n",
+            ref_name,
+        ),
+    )
+    .expect("commit 2");
+
+    let second_entries = read_full_tree_entries(&odb, &second.tree_oid).expect("read tree 2");
+    assert_eq!(second_entries.len(), 3, "tree 2 must still carry 3 files");
+    assert!(second_entries.contains_key("file1.txt"));
+    assert!(second_entries.contains_key("file2.txt"));
+    assert!(second_entries.contains_key("dir/file3.txt"));
+    assert_ne!(
+        first_entries.get("file2.txt").unwrap().1,
+        second_entries.get("file2.txt").unwrap().1,
+        "file2 blob must change"
+    );
+    assert_eq!(
+        first_entries.get("file1.txt").unwrap().1,
+        second_entries.get("file1.txt").unwrap().1,
+        "file1 blob must be preserved by reference"
+    );
+
+    // Commit 3: adds dir2/file4.txt
+    write_file(&root, "dir2/file4.txt", "content 4\n");
+    let third = materialize_commit(
+        &odb,
+        &ref_store,
+        &request_for(
+            &root,
+            &["dir2/file4.txt"],
+            "feat: commit 3 (add file4)\n",
+            ref_name,
+        ),
+    )
+    .expect("commit 3");
+
+    let third_entries = read_full_tree_entries(&odb, &third.tree_oid).expect("read tree 3");
+    assert_eq!(third_entries.len(), 4, "tree 3 must carry all 4 files");
+    assert!(third_entries.contains_key("file1.txt"));
+    assert!(third_entries.contains_key("file2.txt"));
+    assert!(third_entries.contains_key("dir/file3.txt"));
+    assert!(third_entries.contains_key("dir2/file4.txt"));
 
     let _ = std::fs::remove_dir_all(&root);
 }

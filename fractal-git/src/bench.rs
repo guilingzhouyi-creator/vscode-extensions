@@ -406,7 +406,7 @@ impl TaxisBenchmarkSuite {
         for _ in 0..iterations {
             let inter = &map_a & &map_b;
             let union = &map_a | &map_b;
-            assert!(inter.len() > 0 && union.len() > 0);
+            assert!(!inter.is_empty() && !union.is_empty());
         }
         let elapsed = start.elapsed();
 

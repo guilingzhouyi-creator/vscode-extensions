@@ -12,6 +12,7 @@
 //! - `FGT-STO-001`: Storage layer crash safety guard
 //! - `FGT-OBJ-001`: Git object model serialization guard
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use fg_core::constants::git::{OBJ_BLOB, OBJ_COMMIT, OBJ_TREE};
@@ -19,6 +20,7 @@ use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{FileMode, GitSignature, Oid};
 use fg_core::traits::{OdbStore, RefStore};
 use fg_index::InMemoryIndexTree;
+use fg_object::borrowed::{GitCommitRef, GitTreeRef};
 use fg_object::{GitBlob, GitCommit, GitTree};
 
 /// Request describing one commit to materialize.
@@ -96,7 +98,23 @@ fn write_commit_objects_inner(
         ));
     }
 
+    let parent_oid = ref_store.get_ref(&request.target_ref)?;
+    let mut parent_oids: Vec<Oid> = parent_oid.iter().copied().collect();
+    parent_oids.extend(additional_parents.iter().copied());
+
     let mut index_tree = InMemoryIndexTree::new();
+    if let Some(parent_commit_oid) = parent_oid {
+        if let Ok(raw_parent) = odb.read_object(&parent_commit_oid) {
+            if let Ok(parent_payload) = split_raw_payload(&raw_parent) {
+                if let Ok(commit_ref) = GitCommitRef::parse(parent_payload) {
+                    if let Ok(parent_entries) = read_full_tree_entries(odb, commit_ref.tree_oid()) {
+                        index_tree = index_tree.graft_onto_parent(&parent_entries);
+                    }
+                }
+            }
+        }
+    }
+
     let mut blob_oids = Vec::with_capacity(request.files.len());
     let mut modes = Vec::with_capacity(request.files.len());
 
@@ -122,10 +140,6 @@ fn write_commit_objects_inner(
         Ok(())
     })?;
 
-    let parent_oid = ref_store.get_ref(&request.target_ref)?;
-    let mut parent_oids: Vec<Oid> = parent_oid.iter().copied().collect();
-    parent_oids.extend(additional_parents.iter().copied());
-
     let commit = GitCommit::new(
         tree_oid,
         parent_oids,
@@ -149,6 +163,48 @@ fn write_commit_objects_inner(
         parent_oid,
         modes,
     })
+}
+
+/// Splits the loose object header (`"<type> <size>\0"`) returning the raw payload slice.
+fn split_raw_payload(raw: &[u8]) -> FractalResult<&[u8]> {
+    let nul_pos = raw
+        .iter()
+        .position(|&b| b == 0)
+        .ok_or_else(|| FractalError::ObjectCodec("missing null byte in object header".into()))?;
+    Ok(&raw[nul_pos + 1..])
+}
+
+/// Recursively reads all entries from a Git tree hierarchy into a flat path -> (FileMode, Oid) map.
+pub fn read_full_tree_entries(
+    odb: &impl OdbStore,
+    root_tree_oid: &Oid,
+) -> FractalResult<BTreeMap<String, (FileMode, Oid)>> {
+    let mut entries = BTreeMap::new();
+    if *root_tree_oid == Oid::ZERO {
+        return Ok(entries);
+    }
+    let mut stack = vec![(String::new(), *root_tree_oid)];
+
+    while let Some((prefix, tree_oid)) = stack.pop() {
+        let raw_bytes = odb.read_object(&tree_oid)?;
+        let payload = split_raw_payload(&raw_bytes)?;
+        let tree_ref = GitTreeRef::from_bytes(payload);
+        for entry_res in tree_ref.iter() {
+            let entry = entry_res?;
+            let full_path = if prefix.is_empty() {
+                entry.name.to_string()
+            } else {
+                format!("{}/{}", prefix, entry.name)
+            };
+            if entry.mode == FileMode::Directory {
+                stack.push((full_path, entry.oid));
+            } else {
+                entries.insert(full_path, (entry.mode, entry.oid));
+            }
+        }
+    }
+
+    Ok(entries)
 }
 
 /// Materializes `request` into the object database, advancing the target reference on success.

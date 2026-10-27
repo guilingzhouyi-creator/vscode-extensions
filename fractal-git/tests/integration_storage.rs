@@ -29,3 +29,6 @@ mod test_index;
 
 #[path = "rust/test_in_memory_index.rs"]
 mod test_in_memory_index;
+
+#[path = "rust/test_commit_materializer.rs"]
+mod test_commit_materializer;

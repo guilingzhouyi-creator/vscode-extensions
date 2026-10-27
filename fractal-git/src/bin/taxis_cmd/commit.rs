@@ -33,7 +33,7 @@ use fractal_git::{
     ActorIdentity, AgentPushContext, BlockProvenanceEntry, BlockProvenanceParams,
     CommitMaterializationRequest, CommitMessageGuard, DiskProvenanceStore, DiskRefStore,
     FractalRef, GitSignature, LooseOdb, OperationGraph, PreReceiveGuard, RepoViewSnapshot,
-    TaxisPolicy, ValidatedCommitWitness,
+    TaxisPolicy, ValidatedCommitWitness, WalJournal, WalRecord,
 };
 
 use super::common::{fail_io, find_all_arg_values, find_arg_value, print_json, reject, CliContext};
@@ -118,6 +118,15 @@ pub fn handle_commit(ctx: &CliContext) {
     let final_message = super::git_hooks::run_commit_chain(&hook_runner, &ctx.git_dir, &message);
     let _ = verify_commit_governance(&final_message, &policy, &staged_files);
 
+    let tx_id = format!("tx-{}-{}", agent_id, current_unix_seconds());
+    let wal = WalJournal::open(ctx.git_dir.join("journal/commit.wal")).ok();
+    if let Some(ref w) = wal {
+        let _ = w.append(&WalRecord::BeginTx {
+            tx_id: tx_id.clone(),
+            timestamp_ms: current_unix_seconds() as i64 * 1000,
+        });
+    }
+
     let materialized = materialize_staged_files(
         ctx,
         &staged_files,
@@ -128,9 +137,26 @@ pub fn handle_commit(ctx: &CliContext) {
         &target_ref,
     );
 
-    // Synchronize staged index (.taxis/index and doc.indx)
-    let mut index_entries = Vec::with_capacity(staged_files.len());
-    let mut native_indx = fg_native::IndxSection::new();
+    // Synchronize staged index (.taxis/index and doc.indx) preserving existing tracked files
+    let index_file = ctx.git_dir.join("index");
+    let mut index_entry_map = std::collections::BTreeMap::new();
+    if let Ok(existing_index) = fg_index::GitIndex::load(&index_file) {
+        for entry in existing_index.entries() {
+            index_entry_map.insert(entry.path.clone(), entry.clone());
+        }
+    }
+
+    let container_path = fg_native::container_path(&ctx.git_dir);
+    let native_doc = if container_path.is_file() {
+        RepoDocument::load(&container_path).ok()
+    } else {
+        None
+    };
+
+    let mut native_indx = native_doc
+        .as_ref()
+        .map(|d| d.indx.clone())
+        .unwrap_or_else(fg_native::IndxSection::new);
 
     for (i, path) in staged_files.iter().enumerate() {
         let blob_oid = materialized.blob_oids.get(i).copied().unwrap_or(Oid::ZERO);
@@ -153,18 +179,30 @@ pub fn handle_commit(ctx: &CliContext) {
             .get(i)
             .copied()
             .unwrap_or(FileMode::RegularFile);
-        index_entries.push(IndexEntry {
-            path: path.clone(),
-            mode,
-            oid: blob_oid,
-            stage: IndexStage::Normal,
-            size,
-            mtime_seconds: mtime_sec,
-            mtime_nanos: mtime_nano,
-            assume_valid: false,
-            skip_worktree: false,
-            intent_to_add: false,
-        });
+
+        if let Some(ref w) = wal {
+            let _ = w.append(&WalRecord::StageFile {
+                tx_id: tx_id.clone(),
+                path: path.clone(),
+                oid: blob_oid,
+            });
+        }
+
+        index_entry_map.insert(
+            path.clone(),
+            IndexEntry {
+                path: path.clone(),
+                mode,
+                oid: blob_oid,
+                stage: IndexStage::Normal,
+                size,
+                mtime_seconds: mtime_sec,
+                mtime_nanos: mtime_nano,
+                assume_valid: false,
+                skip_worktree: false,
+                intent_to_add: false,
+            },
+        );
         let _ = native_indx.upsert(NativeIndexEntry {
             path: path.clone(),
             mode,
@@ -185,21 +223,35 @@ pub fn handle_commit(ctx: &CliContext) {
         });
     }
 
-    let _ = write_dirc_v2(&ctx.git_dir.join("index"), &index_entries);
+    let final_index_entries: Vec<IndexEntry> = index_entry_map.into_values().collect();
+    let _ = write_dirc_v2(&index_file, &final_index_entries);
+
+    if let Some(ref w) = wal {
+        let _ = w.append(&WalRecord::UpdateRef {
+            tx_id: tx_id.clone(),
+            git_ref: target_ref.to_git_ref(),
+            new_oid: materialized.commit_oid,
+        });
+    }
 
     // Synchronize native container (doc.refs & doc.indx) if present
-    let container_path = fg_native::container_path(&ctx.git_dir);
-    if container_path.is_file() {
-        if let Ok(mut doc) = RepoDocument::load(&container_path) {
-            let git_ref = target_ref.to_git_ref();
-            let _ = doc.refs.upsert(RefRecord {
-                name: git_ref.clone(),
-                oid: materialized.commit_oid,
-                peeled: None,
-            });
-            doc.indx = native_indx;
-            let _ = doc.save_atomic(&container_path);
-        }
+    if let Some(mut doc) = native_doc {
+        let git_ref = target_ref.to_git_ref();
+        let _ = doc.refs.upsert(RefRecord {
+            name: git_ref.clone(),
+            oid: materialized.commit_oid,
+            peeled: None,
+        });
+        doc.indx = native_indx;
+        let _ = doc.save_atomic(&container_path);
+    }
+
+    if let Some(ref w) = wal {
+        let _ = w.append(&WalRecord::CommitTx {
+            tx_id: tx_id.clone(),
+            commit_oid: materialized.commit_oid,
+        });
+        let _ = w.checkpoint();
     }
 
     // Ensure HEAD exists on disk

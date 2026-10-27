@@ -21,6 +21,8 @@ use fg_core::error::FractalError;
 use fg_core::models::{FileUid, MutationBudget, Oid, ReservationStatus, SliceAuthorization};
 use fg_index::quarantine::{IsolateMutationRequest, QuarantineLedger, QuarantineStatus};
 use fg_index::virtual_inode::VirtualInodeTable;
+use fg_storage::reflink::{clone_file_cow, detach_for_write, is_readonly};
+use fg_topology::worktree::ScopeProjection;
 
 static DIR_LOCK: Mutex<()> = Mutex::new(());
 
@@ -228,4 +230,59 @@ fn test_virtual_inode_persistence_roundtrip() {
     assert_eq!(loaded.lookup_uid_by_path("src/b.rs"), Some(uid2));
     assert_eq!(loaded.lookup_path_by_uid(&uid1), Some("src/a.rs"));
     assert_eq!(loaded.lookup_path_by_uid(&uid2), Some("src/b.rs"));
+}
+
+#[test]
+fn test_cow_worktree_materialization_and_path_jail_isolation() {
+    let test_dir = TestDir::new("cow_isolation");
+    let trunk_root = test_dir.path().join("trunk");
+    let agent_root = test_dir.path().join("agent_worktree");
+
+    std::fs::create_dir_all(trunk_root.join("src/allowed")).unwrap();
+    std::fs::create_dir_all(trunk_root.join("src/restricted")).unwrap();
+
+    let manifest = trunk_root.join("Cargo.toml");
+    let allowed_file = trunk_root.join("src/allowed/worker.rs");
+    let restricted_file = trunk_root.join("src/restricted/core.rs");
+
+    std::fs::write(&manifest, "[package]\nname = \"test\"\n").unwrap();
+    std::fs::write(&allowed_file, "pub fn do_work() { 1 }\n").unwrap();
+    std::fs::write(&restricted_file, "pub fn core_secret() { 999 }\n").unwrap();
+
+    let projection = ScopeProjection::scoped(vec!["src/allowed/".to_string()]);
+
+    // Materialize into agent_root using CoW clone
+    let dst_manifest = agent_root.join("Cargo.toml");
+    let dst_allowed = agent_root.join("src/allowed/worker.rs");
+    let dst_restricted = agent_root.join("src/restricted/core.rs");
+
+    clone_file_cow(&manifest, &dst_manifest).unwrap();
+    clone_file_cow(&allowed_file, &dst_allowed).unwrap();
+    clone_file_cow(&restricted_file, &dst_restricted).unwrap();
+
+    // Restricted file outside scope must be set read-only
+    if !projection.contains_path("src/restricted/core.rs") {
+        let _ = fg_storage::reflink::set_readonly(&dst_restricted, true);
+    }
+
+    assert!(dst_manifest.exists());
+    assert!(dst_allowed.exists());
+    assert!(dst_restricted.exists());
+    assert!(is_readonly(&dst_restricted), "restricted file must be read-only");
+
+    // Agent modifies allowed file (detach if needed, write)
+    let _ = detach_for_write(&dst_allowed);
+    std::fs::write(&dst_allowed, "pub fn do_work() { 2 }\n").unwrap();
+
+    // Verify trunk file is completely untouched
+    assert_eq!(
+        std::fs::read_to_string(&allowed_file).unwrap(),
+        "pub fn do_work() { 1 }\n",
+        "trunk file must remain unchanged after agent modification"
+    );
+    assert_eq!(
+        std::fs::read_to_string(&dst_allowed).unwrap(),
+        "pub fn do_work() { 2 }\n",
+        "agent file must reflect modification"
+    );
 }

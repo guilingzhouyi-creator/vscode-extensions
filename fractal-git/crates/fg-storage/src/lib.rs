@@ -22,6 +22,7 @@ pub mod delta_git;
 pub mod in_place;
 pub mod loose;
 pub mod projection;
+pub mod reflink;
 pub mod repack;
 pub mod wal_journal;
 
@@ -53,6 +54,7 @@ pub use in_place::{
 };
 pub use loose::{write_loose_object, LooseOdb};
 pub use projection::{export_native_to_git, import_git_to_native, ExportReport, ImportReport};
+pub use reflink::{clone_file_cow, detach_for_write, is_readonly, set_readonly, ReflinkKind};
 pub use repack::{scan_loose_objects, RepackEngine, RepackOptions, RepackReport};
 pub use wal_journal::{WalJournal, WalRecord};
 
