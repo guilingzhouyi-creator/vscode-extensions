@@ -915,7 +915,7 @@ export function getNativeCoreStatus(): NativeCoreStatus {
  * @param newContent - Updated text content.
  * @returns Array of computed NativeDiffHunk elements.
  */
-export function computeHistogramDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
+export function nativeHistogramDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
     return oldContent === newContent ? [] : nativeCore.computeHistogramDiff(oldContent, newContent);
 }
 
@@ -926,7 +926,7 @@ export function computeHistogramDiff(oldContent: string, newContent: string): Na
  * @param edges - Array of directed [from, to] dependency edges.
  * @returns Graph analysis result with cycles, topological order, and SCCs.
  */
-export function analyzeDependencyGraph(edges: [string, string][]): NativeGraphAnalysis {
+export function nativeAnalyzeDependencyGraph(edges: [string, string][]): NativeGraphAnalysis {
     if (!edges || edges.length === 0) {
         return {
             cycles: [],
@@ -946,7 +946,10 @@ export function analyzeDependencyGraph(edges: [string, string][]): NativeGraphAn
  * @param patterns - Pattern strings to match against source.
  * @returns Array of pattern matches with offsets and line numbers.
  */
-export function matchFastPatterns(sourceText: string, patterns: string[]): NativePatternMatch[] {
+export function nativeFastPatternMatch(
+    sourceText: string,
+    patterns: string[],
+): NativePatternMatch[] {
     if (!sourceText || !patterns || patterns.length === 0) return [];
     return nativeCore.fastPatternMatch(sourceText, patterns);
 }
@@ -959,7 +962,10 @@ export function matchFastPatterns(sourceText: string, patterns: string[]): Nativ
  * @param config - Lexical masking configuration.
  * @returns Masked source text structure with line metrics.
  */
-export function maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource {
+export function nativeMaskSourceCode(
+    content: string,
+    config: NativeMaskConfig,
+): NativeMaskedSource {
     if (!content) {
         return { raw: [], masked: [], lines: 0, nonBlankLines: 0 };
     }
@@ -973,7 +979,7 @@ export function maskSourceCode(content: string, config: NativeMaskConfig): Nativ
  * @param text - Input string to measure.
  * @returns Shannon entropy in bits rounded to 2 decimal places.
  */
-export function computeShannonEntropy(text: string): number {
+export function nativeShannonEntropy(text: string): number {
     if (!text || text.length === 0) {
         return 0.0;
     }
@@ -987,9 +993,7 @@ export function computeShannonEntropy(text: string): number {
  * @returns NativeStatisticalMoments summary descriptor.
  * @override interface implementation vtable proxy
  */
-export function computeNativeStatisticalMoments(
-    values: readonly number[],
-): NativeStatisticalMoments {
+export function nativeStatisticalMoments(values: readonly number[]): NativeStatisticalMoments {
     return nativeCore.computeStatisticalMoments(values);
 }
 
@@ -1002,7 +1006,7 @@ export function computeNativeStatisticalMoments(
  * @param gamma - Penalty elasticity factor (default 0.5).
  * @returns Discount multiplier in [0.0, 1.0].
  */
-export function calculatePopoviciuPenalty(
+export function nativePopoviciuPenalty(
     standardDeviation: number,
     maxSigma?: number,
     gamma?: number,
@@ -1017,7 +1021,7 @@ export function calculatePopoviciuPenalty(
  * @returns NativeBraceBalance containing opens, closes, and delta.
  * @override interface implementation vtable proxy
  */
-export function countNativeBracesDetailed(line: string): NativeBraceBalance {
+export function nativeCountBracesDetailed(line: string): NativeBraceBalance {
     if (!line || line.length === 0) {
         return { opens: 0, closes: 0, delta: 0 };
     }
@@ -1032,7 +1036,7 @@ export function countNativeBracesDetailed(line: string): NativeBraceBalance {
  * @returns In-place mutated matrix with full reachability.
  * @override interface implementation vtable proxy
  */
-export function computeWarshallClosure(matrix: Uint8Array, size: number): Uint8Array {
+export function nativeWarshallClosure(matrix: Uint8Array, size: number): Uint8Array {
     return nativeCore.computeWarshallTransitiveClosure(matrix, size);
 }
 
@@ -1044,7 +1048,7 @@ export function computeWarshallClosure(matrix: Uint8Array, size: number): Uint8A
  * @returns Dot product scalar value.
  * @override interface implementation vtable proxy
  */
-export function computeNativeVectorDotProduct(
+export function nativeVectorDotProduct(
     vectorA: readonly number[],
     vectorB: readonly number[],
 ): number {
@@ -1059,7 +1063,7 @@ export function computeNativeVectorDotProduct(
  * @returns Cosine similarity bounded in [-1.0, 1.0].
  * @override interface implementation vtable proxy
  */
-export function computeNativeVectorCosineSimilarity(
+export function nativeVectorCosineSimilarity(
     vectorA: readonly number[],
     vectorB: readonly number[],
 ): number {
@@ -1074,7 +1078,7 @@ export function computeNativeVectorCosineSimilarity(
  * @param vectorB - Second numerical vector.
  * @returns Euclidean distance scalar.
  */
-export function computeVectorDistance(
+export function nativeVectorDistance(
     vectorA: readonly number[],
     vectorB: readonly number[],
 ): number {
@@ -1089,7 +1093,7 @@ export function computeVectorDistance(
  * @returns Similarity score in [0.0, 1.0] rounded to 6 decimal places.
  * @override interface implementation vtable proxy
  */
-export function calculateSimHashSimilarity(hashA: string, hashB: string): number {
+export function nativeSimHashSimilarity(hashA: string, hashB: string): number {
     return nativeCore.calculateSimHashHammingSimilarity(hashA, hashB);
 }
 
@@ -1101,7 +1105,7 @@ export function calculateSimHashSimilarity(hashA: string, hashB: string): number
  * @param tokensB - Second token sequence, expanded into trigram vectors the same way.
  * @returns Cosine similarity score in [0.0, 1.0] rounded to 6 decimal places.
  */
-export function calculateTrigramSimilarity(
+export function nativeTrigramSimilarity(
     tokensA: readonly string[],
     tokensB: readonly string[],
 ): number {
@@ -1126,19 +1130,61 @@ export function scanNativeSecrets(
     return scanSecretsShim(sourceText, options);
 }
 
-const countDuplicates = (content: string): number =>
+/**
+ * Counts lines that repeat within one source text.
+ *
+ * @param content - Source text whose lines are compared.
+ * @returns Number of lines that appear more than once; zero for empty input.
+ */
+export const nativeCountDuplicateLines = (content: string): number =>
     !content ? 0 : nativeCore.countDuplicateLines(content);
 
-const detectCloneBlocks = (content: string, minCloneLines: number): NativeCloneBlock[] =>
+/**
+ * Detects contiguous clone blocks inside one source text.
+ *
+ * @param content - Source text scanned for repeated line windows.
+ * @param minCloneLines - Shortest run that still counts as a clone block.
+ * @returns Detected clone blocks; empty for empty input or a non-positive window.
+ */
+export const nativeDetectCloneBlocks = (
+    content: string,
+    minCloneLines: number,
+): NativeCloneBlock[] =>
     !content || minCloneLines <= 0 ? [] : nativeCore.detectCloneBlocks(content, minCloneLines);
 
-const computeMinHash = (content: string, numPermutations?: number): number[] =>
+/**
+ * Builds a MinHash signature for the token stream of one source text.
+ *
+ * @param content - Source text whose token stream is reduced.
+ * @param numPermutations - Signature width; the engine default applies when omitted.
+ * @returns Signature vector; empty for empty input.
+ */
+export const nativeComputeMinHash = (content: string, numPermutations?: number): number[] =>
     !content ? [] : nativeCore.computeMinHash(content, numPermutations);
 
-const findClonePairs = (signatures: number[][], threshold: number): NativeClonePair[] =>
+/**
+ * Groups MinHash signatures into clone pairs by locality-sensitive hashing.
+ *
+ * @param signatures - Signature vectors, one per candidate file.
+ * @param threshold - Minimum Jaccard similarity for a pair to be reported.
+ * @returns Clone pairs above the threshold; empty when no signatures are supplied.
+ */
+export const nativeFindClonePairs = (
+    signatures: number[][],
+    threshold: number,
+): NativeClonePair[] =>
     !signatures || signatures.length === 0 ? [] : nativeCore.findClonePairs(signatures, threshold);
 
-const computeDominatorTree = (
+/**
+ * Computes the immediate-dominator tree of a control flow graph.
+ *
+ * @param entry - Name of the graph entry node.
+ * @param nodes - All node names in the graph.
+ * @param edges - Directed `[from, to]` edges.
+ * @returns Dominator tree with idom, dominance frontiers, loop headers and back edges; every
+ *     mapping is empty when no nodes are supplied.
+ */
+export const nativeComputeDominatorTree = (
     entry: string,
     nodes: string[],
     edges: Array<[string, string]>,
@@ -1154,77 +1200,32 @@ const computeDominatorTree = (
           }
         : nativeCore.computeDominatorTree(entry, nodes, edges);
 
-const solveDataflow = (params: NativeDataflowParams): NativeDataflowResult =>
+/**
+ * Solves dataflow equations to a fixed point.
+ *
+ * @param params - Dataflow query carrying the entry node, direction and gen/kill sets.
+ * @returns In/out sets per node plus the iteration count; empty when no entry is supplied.
+ */
+export const nativeSolveDataflow = (params: NativeDataflowParams): NativeDataflowResult =>
     !params || !params.entry
         ? { inSets: {}, outSets: {}, iterations: 0 }
         : nativeCore.solveDataflow(params);
 
-const computeBitParallelDistance = (pattern: Uint32Array, text: Uint32Array): number =>
+/**
+ * Computes the exact Myers edit distance between two symbol sequences.
+ *
+ * @param pattern - First sequence, one code point per slot.
+ * @param text - Second sequence, one code point per slot.
+ * @returns Insert/delete distance between the sequences.
+ */
+export const nativeBitParallelMyersDistance = (pattern: Uint32Array, text: Uint32Array): number =>
     nativeCore.computeBitParallelDistance(pattern, text);
 
-const computeSimHash64 = (tokens: readonly string[]): string => nativeCore.computeSimHash64(tokens);
-
-const computeTemporalCoupling = (
-    changesets: number[][],
-    minShared: number,
-    minJaccard: number,
-): NativeTemporalCouplingPair[] =>
-    nativeCore.computeTemporalCoupling(changesets, minShared, minJaccard);
-
-const evaluateBumpyRoad = (
-    lines: readonly string[],
-    startLine: number,
-    endLine: number,
-): NativeBumpyRoadResult => nativeCore.evaluateBumpyRoad(lines, startLine, endLine);
-
-const batchProbeTriggers = (
-    content: string,
-    triggerGroups: readonly (readonly string[])[],
-): boolean[] => nativeCore.batchProbeTriggers(content, triggerGroups);
-
-export {
-    computeHistogramDiff as computeNativeHistogramDiff,
-    computeHistogramDiff as nativeHistogramDiff,
-    analyzeDependencyGraph as analyzeNativeDependencyGraph,
-    analyzeDependencyGraph as nativeAnalyzeDependencyGraph,
-    matchFastPatterns as matchNativeFastPatterns,
-    matchFastPatterns as nativeFastPatternMatch,
-    maskSourceCode as maskNativeSourceCode,
-    maskSourceCode as nativeMaskSourceCode,
-    computeShannonEntropy as computeNativeShannonEntropy,
-    computeShannonEntropy as nativeShannonEntropy,
-    computeNativeStatisticalMoments as nativeStatisticalMoments,
-    calculatePopoviciuPenalty as calculateNativePopoviciuPenalty,
-    calculatePopoviciuPenalty as nativePopoviciuPenalty,
-    countNativeBracesDetailed as nativeCountBracesDetailed,
-    computeWarshallClosure as computeNativeWarshallClosure,
-    computeWarshallClosure as nativeWarshallClosure,
-    computeNativeVectorDotProduct as nativeVectorDotProduct,
-    computeNativeVectorCosineSimilarity as nativeVectorCosineSimilarity,
-    computeVectorDistance as computeNativeVectorDistance,
-    computeVectorDistance as nativeVectorDistance,
-    calculateSimHashSimilarity as calculateNativeSimHashSimilarity,
-    calculateSimHashSimilarity as nativeSimHashSimilarity,
-    calculateTrigramSimilarity as calculateNativeTrigramSimilarity,
-    calculateTrigramSimilarity as nativeTrigramSimilarity,
-    scanNativeSecrets as scanSecrets,
-    countDuplicates as countNativeDuplicateLines,
-    countDuplicates as nativeCountDuplicateLines,
-    detectCloneBlocks as detectNativeCloneBlocks,
-    detectCloneBlocks as nativeDetectCloneBlocks,
-    computeMinHash as computeNativeMinHash,
-    computeMinHash as nativeComputeMinHash,
-    findClonePairs as findNativeClonePairs,
-    findClonePairs as nativeFindClonePairs,
-    computeDominatorTree as computeNativeDominatorTree,
-    computeDominatorTree as nativeComputeDominatorTree,
-    solveDataflow as solveNativeDataflow,
-    solveDataflow as nativeSolveDataflow,
-    computeBitParallelDistance as computeNativeBitParallelDistance,
-    computeBitParallelDistance as nativeBitParallelMyersDistance,
-    computeSimHash64 as computeNativeSimHash64,
-    computeSimHash64 as nativeSimHash64,
-    computeTemporalCoupling as computeNativeTemporalCoupling,
-    evaluateBumpyRoad as evaluateNativeBumpyRoad,
-    batchProbeTriggers as batchProbeNativeTriggers,
-};
+/**
+ * Computes the 64-bit SimHash fingerprint of a token sequence.
+ *
+ * @param tokens - Token sequence to fingerprint.
+ * @returns Fingerprint as a lowercase hexadecimal string.
+ */
+export const nativeSimHash64 = (tokens: readonly string[]): string =>
+    nativeCore.computeSimHash64(tokens);

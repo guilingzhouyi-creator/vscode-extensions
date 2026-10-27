@@ -43,7 +43,7 @@ import {
     safeRegexExecLoop,
     safeRegexTest,
 } from '../utils/safe-regex';
-import { scanSecrets } from '../core/native/native-bridge';
+import { scanNativeSecrets } from '../core/native/native-bridge';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 
 /** Named regex source pair used by the built-in and caller-supplied pattern tables. */
@@ -337,7 +337,7 @@ export class SecretsAnalyzer implements Analyzer {
         cap: number,
     ): Issue[] {
         const issues: Issue[] = [];
-        const nativeFindings = scanSecrets(content, {
+        const nativeFindings = scanNativeSecrets(content, {
             scanEntropy: entropy.enabled,
             minEntropyLen: entropy.minLength,
             entropyThreshold: entropy.threshold,
