@@ -12,18 +12,18 @@
 ```mermaid
 flowchart TD
   subgraph TS["TypeScript 双轨桥接层 (src/core/native/)"]
-    BRIDGE["native-bridge.ts<br/>(自动探测 + 自适应微尺寸门限分流)"]
+    BRIDGE["native-bridge.ts<br/>(自动探测 + 双门限分流 + 成员存在性回退)"]
     CLONE_SHIM["native-clone-shim.ts<br/>(MinHash / LSH / 克隆块检测)"]
-    FLOW_SHIM["native-flow-shim.ts<br/>(Lengauer-Tarjan 支配树 / 数据流不动点)"]
+    FLOW_SHIM["native-flow-shim.ts<br/>(即时支配点 / 数据流不动点)"]
   end
 
   subgraph RUST["Rust Cargo Workspace (crates/)"]
-    CORE["crates/auto-refactor-core<br/>(N-API 胶水层 + 跨边界零拷贝 Buffer 编解码)"]
-    DIFF["crates/ops-diff<br/>(SWAR 向量化换行扫描 + FNV-1a + Myers / Histogram Diff)"]
-    GRAPH["crates/ops-graph<br/>(Lengauer-Tarjan 支配树 + Tarjan SCC + 数据流求解器)"]
+    CORE["crates/auto-refactor-core<br/>(N-API 胶水层 + 跨边界值编解码)"]
+    DIFF["crates/ops-diff<br/>(Myers 线性空间差分 + 直方图 Hunk 装配)"]
+    GRAPH["crates/ops-graph<br/>(迭代式即时支配树 + Tarjan SCC + 数据流求解器)"]
     MASK["crates/ops-mask<br/>(单趟词法 FSM: 注释/字符串/模板/正则原位纯空格替换)"]
-    PATTERN["crates/ops-pattern<br/>(Aho-Corasick 多模式高熵密钥扫描与协议分类)"]
-    CLONE["crates/ops-clone<br/>(Token 归一化 + 64 维 MinHash + LSH 桶克隆聚类)"]
+    PATTERN["crates/ops-pattern<br/>(最稀有字节预筛多模式扫描 + 密钥熵检测)"]
+    CLONE["crates/ops-clone<br/>(Token 归一化 + 64 维 MinHash + LSH 分带聚类)"]
   end
 
   BRIDGE -->|"加载 index.node"| CORE
@@ -40,16 +40,16 @@ flowchart TD
 
 | 导出算子函数 (N-API) | 归属 Crate | 核心算法与底层数据结构 | 解决的计算瓶颈与服务之上层系统 |
 | :--- | :--- | :--- | :--- |
-| **`compute_histogram_diff`** | `ops-diff` | 64-bit SWAR 换行符定位、FNV-1a 32 位哈希、直方图差分 (Histogram Diff) 与 Bit-Parallel Myers | 毫秒级海量文本差分、Praxis Diff 治理与门禁评估 |
+| **`compute_histogram_diff`** | `ops-diff` | 公共前后缀剥离后的线性空间 Myers 差分，再装配为带上下文的 Hunk；`compute_bit_parallel_myers_distance` 另提供 64/128 位字内并行距离计算与标量回退 | 毫秒级海量文本差分、Praxis Diff 治理与门禁评估 |
 | **`analyze_dependency_graph`** | `ops-graph` | 基于显式栈的 Tarjan 强连通分量 (SCC)、字典序拓扑排序与环路路径提取 | 跨模块循环依赖检测 (`import-cycle`) 与架构分层校验 |
-| **`compute_dominator_tree`** | `ops-graph` | Lengauer-Tarjan 快速支配树算法、支配边界 (Dominance Frontiers)、回边识别 (Back Edges) | 控制流图 (CFG) 深度分析、不可约循环检测与自然循环头识别 |
-| **`solve_dataflow`** | `ops-graph` | 单调框架前向/后向数据流方程不动点求解 (Fixed-Point Solver)、位集 (BitSet) 快速收敛迭代 | 跨过程污点传播、活跃变量分析与死代码消除 |
-| **`mask_source_code`** | `ops-mask` | 单趟 SIMD/FSM 词法状态机、ECMAScript 全空白字符判定、注释与字面量原位纯空格替换 | 词法脱敏、行有效度量 (`linestats`)、注释规范与常量抽取 |
+| **`compute_dominator_tree`** | `ops-graph` | 逆向后序编号上的迭代式即时支配点求解、支配边界 (Dominance Frontiers)、回边识别 (Back Edges) | 控制流图 (CFG) 深度分析、不可约循环检测与自然循环头识别 |
+| **`solve_dataflow`** | `ops-graph` | 单调框架前向/后向数据流方程不动点求解 (Fixed-Point Solver)、有序集合快速收敛迭代 | 跨过程污点传播、活跃变量分析与死代码消除 |
+| **`mask_source_code`** | `ops-mask` | 单趟词法状态机、ECMAScript 全空白字符判定、注释与字面量原位纯空格替换；换行定位借助 `memchr` 的字节搜索 | 词法脱敏、行有效度量 (`linestats`)、注释规范与常量抽取 |
 | **`count_duplicate_lines`** | `ops-clone` | 快速哈希与非空有效行重复频次统计 | 代码冗余度量化、物理坏味道扫描 |
 | **`detect_clone_blocks`** | `ops-clone` | 滑动窗口行哈希比对、连续克隆代码块贪心聚类 (`CloneBlock`) | 重复代码块治理 (`HYG-DED-001`) |
 | **`compute_minhash`** | `ops-clone` | Token 流规约化、64 组伪随机置换系数 MinHash 签名哈希向量生成 | 文件级语义结构指纹提取 |
-| **`find_clone_pairs`** | `ops-clone` | 局部敏感哈希 (LSH) 桶碰撞聚类、Jaccard 相似度阈值快速筛选 | 跨全仓大规模近近似克隆检测 (`HYG-DED-001`) |
-| **`fast_pattern_match`** | `ops-pattern` | Aho-Corasick 多模式自动机匹配、高熵凭证与敏感词快速命中 | 凭证泄漏扫描 (`secrets`) 与安全审计 (`security`) |
+| **`find_clone_pairs`** | `ops-clone` | 十六分带的局部敏感哈希 (LSH) 桶碰撞聚类、Jaccard 相似度阈值筛选 | 跨全仓大规模近近似克隆检测 (`HYG-DED-001`) |
+| **`fast_pattern_match`** | `ops-pattern` | 每个模式先选出最稀有字节作为预筛锚点，逐行跳过不含任何锚点的行，命中锚点后再逐字节比对；密钥侧辅以 Shannon 熵检测 | 凭证泄漏扫描 (`secrets`) 与安全审计 (`security`) |
 
 ---
 
@@ -136,7 +136,7 @@ pub fn is_ecma_whitespace(ch: u32) -> bool {
 
 ---
 
-## 3. 自适应微尺寸门限分流 (Adaptive Micro-Threshold Dispatch)
+## 3. 尺寸门限分流与成员存在性回退 (Threshold Dispatch & Member Probe)
 
 在 Node.js 中调用 Rust 编写的 N-API 原生插件并非毫无成本。参数封包、V8 堆内存拷贝与跨语言 C FFI 跨边界调用通常伴随约 `0.02 ~ 0.08ms` 的固有上下文切换开销。对于微小输入，FFI 调用本身的耗时甚至可能远远高于纯 JavaScript 运行时间。
 
@@ -185,14 +185,14 @@ flowchart TD
    - `computeMinHashShim`: 包含与 Rust `ops-clone` 严格一致的 64 组伪随机置换系数（`HASH_COEFFS`），采用完全相同的无符号 32 位溢出运算（`Math.imul` 与 `>>> 0`）；
    - `findClonePairsShim`: 局部敏感哈希 (LSH) 桶聚类算法。
 2. **[`src/core/native/native-flow-shim.ts`](../../src/core/native/native-flow-shim.ts)**：
-   - `computeDominatorTreeShim`: 纯 TypeScript 完整实现 Lengauer-Tarjan 支配树算法，计算即时支配节点（`idom`）、支配边界（`dominance_frontiers`）与回边集（`back_edges`）；
+   - `computeDominatorTreeShim`: 纯 TypeScript 完整实现即时支配点求解，计算即时支配节点（`idom`）、支配边界（`dominance_frontiers`）与回边集（`back_edges`）；
    - `solveDataflowShim`: 纯 TypeScript 实现的前向/后向单调数据流方程不动点迭代求解器。
 
 ### 4.2 确定性输出契约与门禁看守
 
 - **节点排序字典序归一化**：图遍历的 SCC 列表、拓扑排序和克隆对集合在输出前均按节点 ID 的字典序执行严格归一化排序，消除由于不同语言底层哈希表迭代顺序差异导致的输出抖动。
 - **三重自动化验证门禁**：
-  1. `npm run gate:rust`：在 Rust 侧对全部 6 个 Crate 执行 `cargo clippy -- -D warnings`、`cargo fmt --check` 与单元测试（零警告容忍）；
+  1. `npm run gate:rust`：对全部 Cargo 成员 Crate 执行 `cargo clippy -- -D warnings`、`cargo fmt --check` 与单元测试（零警告容忍）；
   2. `npm run validate-native-parity`：在同一组复杂真实代码库上分别强制调用 Rust Native 路径与 Pure-TS Shim 路径，逐字段断言输出的支配树映射、数据流收敛集合、克隆对、脱敏字符串与 Diff 操作序列 **100% 逐字节相等**；
   3. `npm run validate-native-bridge`：测试动态加载探测、二进制损坏模拟与透明回退逻辑，确保生产环境绝对零崩溃。
 

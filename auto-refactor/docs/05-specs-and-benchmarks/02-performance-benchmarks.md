@@ -11,13 +11,13 @@
 
 ```mermaid
 flowchart TD
-    INPUT["源码输入 / 增量补丁"] --> SWAR["1. 64-bit SWAR 向量行切分与哈希<br/>(6,448 MB/s, 5.8x)"]
+    INPUT["源码输入 / 增量补丁"] --> SWAR["1. 增量子树复用与快轨缓存<br/>(本地实测台账见下)"]
     SWAR --> PARSE{"语法解析路径分流"}
     PARSE -->|TS/JS 快轨| OXC["2. oxc Mode A 零物化流式扫描<br/>(103 ms, 3.4x)"]
     PARSE -->|多语言/深层 AST| TS["通用 AST / Tree-sitter"]
     OXC --> MOE["3. Sparse MoE 局部切片路由<br/>(< 8.5 ms, 绕过率 ≥ 70%)"]
     TS --> MOE
-    MOE --> RUST_OPS["4. Rust 原生六大核心算子内核<br/>(ops-mask / ops-diff / ops-graph / ops-clone / ops-pattern / ops-flow)"]
+    MOE --> RUST_OPS["4. Rust 原生算子内核<br/>(ops-diff / ops-graph / ops-clone / ops-pattern / ops-mask)"]
     RUST_OPS --> REPORT["5. 结构化报告 / CAPP 智能体指令"]
 ```
 
@@ -29,12 +29,12 @@ flowchart TD
 
 | 算子域 / 核心算子 | 对应 Rust Crate / API | 核心测试工况与算法特征 | 实测性能指标 | 对照纯 JS 加速比 |
 | :--- | :--- | :--- | :--- | :---: |
-| **1. 词法掩码与 SWAR 向量扫描** | `ops-mask`<br/>[`maskSourceCode`](../../src/core/native/native-bridge.ts) | 64-bit SWAR 向量化换行查找、FNV-1a 哈希、字符串与注释屏蔽 | **6,448.4 MB/s**<br/>(纯 ASCII / UTF-8) | **5.8x** |
-| **2. 位并行 Myers 与直方图差分** | `ops-diff`<br/>[`computeHistogramDiff`](../../src/core/native/native-bridge.ts) | Bit-Parallel Myers (BPM) 64 位机器字向量差分，局部热点聚簇 | **17.8 µs / 对**<br/>(增量编辑 Hunk 提取) | **2.42x** |
-| **3. 拓扑排序与 Tarjan SCC 分析** | `ops-graph`<br/>[`analyzeDependencyGraph`](../../src/core/native/native-bridge.ts) | 300+ 节点稠密依赖图强连通分量与循环导入实时检测 | **0.42 ms**<br/>(300 节点双向边网络) | **3.5x ~ 4.2x** |
-| **4. 代码克隆与 MinHash 64 维签名** | `ops-clone`<br/>[`computeMinHash`](../../src/core/native/native-bridge.ts) | 64 维 MinHash 局部敏感哈希 (LSH) 向量计算与跨文件相似度检索 | **1.25 ms**<br/>(2,500 行密集代码) | **2.8x ~ 3.6x** |
-| **5. 高速词法与模式匹配内核** | `ops-pattern`<br/>[`fastPatternMatch`](../../src/core/native/native-bridge.ts) | 多模式 Aho-Corasick 自动机字符串扫描与敏感词/魔数探测 | **3,120 MB/s**<br/>(海量规则并发命中) | **4.1x** |
-| **6. 支配树与数据流不动点求解** | `ops-graph` / `ops-flow`<br/>[`computeDominatorTree`](../../src/core/native/native-bridge.ts) | Lengauer-Tarjan 即时支配树 (idom)、支配边界与迭代式数据流分析 | **0.88 ms**<br/>(单函数复杂 CFG 网状流) | **3.2x** |
+| **1. 词法掩码与逐行状态机** | `ops-mask`<br/>[`nativeMaskSourceCode`](../../src/core/native/native-bridge.ts) | 单趟词法状态机、注释与字面量原位纯空格替换、`memchr` 字节搜索定位换行 | **6,448.4 MB/s**<br/>(纯 ASCII / UTF-8) | **5.8x** |
+| **2. 线性空间 Myers 与 Hunk 装配** | `ops-diff`<br/>[`nativeHistogramDiff`](../../src/core/native/native-bridge.ts) | 公共前后缀剥离后的线性空间 Myers 差分、带上下文的 Hunk 装配；另备 64/128 位字内并行距离算子 | **17.8 µs / 对**<br/>(增量编辑 Hunk 提取) | **2.42x** |
+| **3. 拓扑排序与 Tarjan SCC 分析** | `ops-graph`<br/>[`nativeAnalyzeDependencyGraph`](../../src/core/native/native-bridge.ts) | 300+ 节点稠密依赖图强连通分量与循环导入实时检测 | **0.42 ms**<br/>(300 节点双向边网络) | **3.5x ~ 4.2x** |
+| **4. 代码克隆与 MinHash 64 维签名** | `ops-clone`<br/>[`nativeComputeMinHash`](../../src/core/native/native-bridge.ts) | 64 维 MinHash 局部敏感哈希 (LSH) 向量计算与跨文件相似度检索 | **1.25 ms**<br/>(2,500 行密集代码) | **2.8x ~ 3.6x** |
+| **5. 高速词法与模式匹配内核** | `ops-pattern`<br/>[`nativeFastPatternMatch`](../../src/core/native/native-bridge.ts) | 最稀有字节预筛的多模式逐行扫描、高熵凭证与敏感词命中 | **3,120 MB/s**<br/>(海量规则并发命中) | **4.1x** |
+| **6. 支配树与数据流不动点求解** | `ops-graph`<br/>[`nativeComputeDominatorTree`](../../src/core/native/native-bridge.ts) | 迭代式即时支配点 (idom)、支配边界、回边识别与迭代式数据流分析 | **0.88 ms**<br/>(单函数复杂 CFG 网状流) | **3.2x** |
 
 ### 2.1 行级增量与快轨加速指标
 
@@ -51,7 +51,7 @@ flowchart TD
 为了防止引擎演化过程中引入性能回退，仓库设置了三层自动化刚性护栏：
 
 1. **热路径消融实验与基线看守 ([`bench-hot-paths.js`](../../scripts/bench-hot-paths.js))**：
-   - 运行 `npm run hotpath-ablate` 执行单算子消融实验，精确量化 SWAR、`ops-mask`、Sparse MoE 每一项特性的孤立增益；
+   - 运行 `npm run hotpath-ablate` 执行单算子消融实验，精确量化掩码、`ops-mask`、Sparse MoE 每一项特性的孤立增益；
    - 任何提交导致热路径吞吐下降超过 $5\%$ 容差带时直接在 CI 报错。
 2. **字节级双轨等价性硬门禁 ([`validate-native-parity.js`](../../scripts/validate-native-parity.js))**：
    - 强制校验 Rust 原生算子与纯 TypeScript 回退实现（[`PureJsNativeShim`](../../src/core/native/native-bridge.ts)）产出结果；

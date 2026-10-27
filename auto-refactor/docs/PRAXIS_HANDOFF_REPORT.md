@@ -20,7 +20,7 @@
 | **专册 04** | [Praxis-LayerVFS 瞬时工作区对接手册与联调规范](./06-praxis-delivery/04-praxis-layervfs-integration-guide.md) | LayerVFS CAS 内容寻址、FastCDC 动态分块、SQLite WAL 单文件存储、零拷贝分叉 (`< 3ms`)、物理投影与 MCTS 多智能体打擂裁判规范 |
 | **专册 05** | [LayerVFS 虚拟分叉与 MCTS 探索树架构规范](./01-architecture/06-layervfs-virtual-storage-and-mcts.md) | LayerVFS 核心算法拓扑、Gear Hash 滚动切块、UCT 探索树评估模型与沙箱生命周期隔离规范 |
 | **规范 01** | [配置模式与多格式报告契约](./05-specs-and-benchmarks/01-config-and-reports.md) | `auto-refactor.config.json` Schema、32 分析器与 374 规则阈值默认值、`.refactor-trajectory/` 紧凑账本规范 (< 350B, *Ms) |
-| **规范 02** | [全维性能基准与原生算子加速台账](./05-specs-and-benchmarks/02-performance-benchmarks.md) | SWAR 64-bit 扫描 (6,448 MB/s)、BPM 差分 (17.8 µs)、增量子树复用 (17.8x)、6 大原生 Rust 算子加速比与 <!-- METRICS:BEGIN test-suite-count -->**179 套**<!-- METRICS:END test-suite-count -->套件防劣化护栏 |
+| **规范 02** | [全维性能基准与原生算子加速台账](./05-specs-and-benchmarks/02-performance-benchmarks.md) | 词法掩码 6,448 MB/s、字内并行距离 17.8 µs、增量子树复用 17.8x、6 大原生 Rust 算子加速比与 <!-- METRICS:BEGIN test-suite-count -->**179 套**<!-- METRICS:END test-suite-count -->套件防劣化护栏 |
 | **规范 03** | [规范文件头与有效注释密度 (ECD-C) 规范](./05-specs-and-benchmarks/03-comment-and-header-standard.md) | 六字段标准模块头 (`CMT-HDR-001`)、ECD-C 模型与真实注释规则字典 (`CMT-HDR-001`, `CMT-BAN-001`, `CMT-DEAD-001`, `CMT-MOJI-001`, `HYG-STB-002`) |
 | **规范 05** | [外部工程接入与基线棘轮指南](./05-specs-and-benchmarks/05-consumer-integration.md) | Baseline 1.2.0 单向收紧棘轮机制、零高危债务防线 (`critical = 0, high = 0`) 及多端工程差异化配置 |
 | **规范 07** | [三平面质量量化模型与代码自治度 (CAI) 规范](./05-specs-and-benchmarks/07-quantified-quality-standard.md) | 10 大细粒度维度到 8 大战略支柱映射、双曲饱和衰减、安全动态天花板、三平面风险共振 ($S^{1.0} \cdot D^{1.2} \cdot H^{0.8}$) 与 **CAI 2.0 纯客观 6 维自研率**（Jeffreys Beta 后验） |
@@ -64,7 +64,7 @@
    - 双向印证放大（$1.3\times$）、单向冷路径抑制（$0.35\times$）与隐蔽运行时瓶颈捕获。
 6. **Rust N-API 六大原生算子与双轨等价桥 ([`native-bridge.ts`](../src/core/native/native-bridge.ts))**：
    - `crates/` 下 6 个原生算子（`ops-mask`, `ops-diff`, `ops-graph`, `ops-clone`, `ops-pattern`, `auto-refactor-core`）；
-   - SWAR 64-bit 扫描 6,448 MB/s (5.8x)，BPM 差分 17.8 µs (2.4x)；
+   - 词法掩码 6,448 MB/s (5.8x)，字内并行距离 17.8 µs (2.4x)；
    - 纯 TypeScript 回退实现通过 `npm run validate-native-parity` 字节级等价验证。
 
 ---

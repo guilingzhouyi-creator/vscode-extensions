@@ -24,7 +24,7 @@ flowchart TD
     BB["BasicBlock (基础块)"]
     BUILDER["CfgBuilder (CFG 构造器)"]
     DEF_USE["DefUseAnalyzer (定义-使用链)"]
-    NATIVE_DOM["crates/ops-graph (Lengauer-Tarjan 支配树)"]
+    NATIVE_DOM["crates/ops-graph (迭代式即时支配点)"]
   end
 
   subgraph DFG_Module["数据流分析 (src/core/intelligence/dataFlow.ts)"]
@@ -48,7 +48,7 @@ flowchart TD
 | 分析结构 | 源码物理路径 | 运行状态 | 核心职责 |
 | :--- | :--- | :---: | :--- |
 | **控制流图 (CFG)** | [`src/core/cfg/`](../../src/core/cfg/) | **Wired** | 基础块划分、分支跳转、循环回边、异常控制流 |
-| **支配树 (Dominator Tree)** | [`crates/ops-graph/`](../../crates/ops-graph/) | **Wired** | Lengauer-Tarjan 算法，计算自然循环头（Natural Loops） |
+| **支配树 (Dominator Tree)** | [`crates/ops-graph/`](../../crates/ops-graph/) | **Wired** | 逆向后序上的迭代式即时支配点求解，计算自然循环头（Natural Loops） |
 | **无界增长与增量度量** | [`src/core/intelligence/dataFlow.ts`](../../src/core/intelligence/dataFlow.ts) | **Wired** | 词法掩码下深度栈追踪、耦合度与增量代码维护性 |
 | **全量数据流图 (`DataFlowGraph`)** | [`src/core/intelligence/dataFlow.ts`](../../src/core/intelligence/dataFlow.ts) | **Unwired** | 跨阶段端到端生命周期图（仅测试验证套件构造） |
 | **符号调用图 (`CallGraph`)** | [`src/core/intelligence/callGraph.ts`](../../src/core/intelligence/callGraph.ts) | **Wired** | 符号级调用者与被调用者拓扑索引、冲击闭包计算 |
@@ -65,9 +65,9 @@ flowchart TD
 - [`cfg-builder.ts`](../../src/core/cfg/cfg-builder.ts)：遍历 AST 并构造函数体内部的条件跳转（`if`/`else`）、循环跳转（`for`/`while`/`do-while`）、多路分支（`switch`/`case`）以及异常分支（`try`/`catch`/`finally`/`throw`）；
 - [`def-use-chain.ts`](../../src/core/cfg/def-use-chain.ts)：`DefUseAnalyzer` 在基础块序列上构建变量的定义点（Definition）与使用点（Use）关联链。
 
-### 2.2 Lengauer-Tarjan 支配树加速
+### 2.2 即时支配点求解加速
 
-通过 [`crates/ops-graph/`](../../crates/ops-graph/) 的 Rust 原生算子，引擎在近线性时间 $O(E \cdot \alpha(E, V))$ 内计算基础块的直接支配节点（Immediate Dominator）：
+通过 [`crates/ops-graph/`](../../crates/ops-graph/) 的 Rust 原生算子，引擎在逆向后序（RPO）上迭代收敛出基础块的直接支配节点（Immediate Dominator）。该实现属迭代式数据流求解，不是 Lengauer-Tarjan 的并查集变体，收敛轮数以支配关系的实际变化为准：
 - **自然循环识别**：根据回边（Back-Edges, $n \to d$ 且 $d$ 支配 $n$）准确定位循环入口；
 - **规则支撑**：精准驱动性能规则判断，例如循环内阻塞 I/O（`PRF-IO-001`）与循环体内瞬态内存分配（`PRF-MEM-001`）。
 

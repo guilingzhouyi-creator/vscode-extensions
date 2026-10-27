@@ -66,7 +66,7 @@ flowchart TD
 ### 1.4 L3 级：低频锚点直方图差分 (`histogramDiff`) 与 Rust 原生算子
 
 - **直方图差分 (`histogramDiff`)**：位于 [`src/core/diff/histogram-diff.ts`](../../src/core/diff/histogram-diff.ts)，统计中间区域行出现频次，优先挑选出现频度最低的唯一代码行（如唯一方法签名、专有声明语句）作为对齐锚点（Anchor），以此为基准递归划分左右子序列，消除大括号 `{}` 或空行错位引起的面条式 Diff；
-- **Rust 原生算子 (`crates/ops-diff`)**：通过 Node-API 桥接的 `fastNativeDiff`（`nativeCore.computeHistogramDiff`），利用 Rust 底层原生算子提供数倍于 V8 的直方图差分吞吐。
+- **Rust 原生算子 (`crates/ops-diff`)**：通过 Node-API 桥接的 `nativeHistogramDiff`（`nativeCore.computeHistogramDiff`）。该路径实现的是剥除公共前后缀之后的线性空间 Myers 差分，函数名沿用 `histogram_diff` 但内部不统计行频次；真正按低频锚点递归划分的是上一条的 TypeScript 实现。两条路径的 Hunk 输出经等价校验门禁逐字节比对。
 
 ---
 

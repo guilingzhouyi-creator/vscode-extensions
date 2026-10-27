@@ -18,11 +18,11 @@
 ### 🌲 L2. 跨语言语法解析、语义 IR 与图分析底座 (`02-parsers-and-ast/`)
 * [01-multilang-abstraction.md](./02-parsers-and-ast/01-multilang-abstraction.md)：`NormalizedNode` 归一化语法树、`SemanticGraph` 跨语言语义拓扑图与九类适配器 / 八种语言生态矩阵（TS/JS, Python, Rust, Go, GDScript, Shell, YAML, Markdown）。
 * [02-oxc-fastpath.md](./02-parsers-and-ast/02-oxc-fastpath.md)：Rust `oxc-parser` 0.144.0 Mode A 零物化流式快轨、Mode B 按需物化补偿及与 `typescript` 编译器 100% 字节等价验证。
-* [03-lazy-projection.md](./02-parsers-and-ast/03-lazy-projection.md)：按需懒投影控制流图 (`CFG`)、Lengauer-Tarjan 支配树、数据流生命周期图 (`DFG`) 与跨文件调用图 (`CallGraph`)。
+* [03-lazy-projection.md](./02-parsers-and-ast/03-lazy-projection.md)：按需懒投影控制流图 (`CFG`)、迭代式即时支配点、数据流生命周期图 (`DFG`) 与跨文件调用图 (`CallGraph`)。
 
 ### ⚡ L3. 行级增量计算、向量化 Diff 与流式底座 (`03-incremental-and-diff/`)
 * [01-line-level-incremental.md](./03-incremental-and-diff/01-line-level-incremental.md)：`LineMap` 坐标平移、`reuseSubtree` 未变动子树零重算、`ASTSliceExtractor` 最小语法切片与 `CallChainImpactTracer` 爆炸半径追踪。
-* [02-diff-interface-spec.md](./03-incremental-and-diff/02-diff-interface-spec.md)：64-bit SWAR 行扫描、FNV-1a 行哈希、Bit-Parallel Myers (BPM) / Histogram Diff 算法栈与 `scanDiffStream` 异步事件流契约。
+* [02-diff-interface-spec.md](./03-incremental-and-diff/02-diff-interface-spec.md)：64-bit SWAR 行扫描、FNV-1a 行哈希、Bit-Parallel Myers (BPM) 与低频锚点直方图差分的算法栈，及 `scanDiffStream` 异步事件流契约。
 * [03-praxis-integration-guide.md](./03-incremental-and-diff/03-praxis-integration-guide.md)：`CircularDiffBuffer` 环形缓冲、`Uint8Array` R4 二进制冷存淘汰与 `SemanticPraxisContextEnricher` 作用域富集指南。
 * [04-sparse-reference-replay.md](./03-incremental-and-diff/04-sparse-reference-replay.md)：稀疏参考滑动窗口重算 —— 复合锚点合并、签名变更的调用点桥接、三条退化边界、参考集排序规则、树级剪枝配合与流式符号视图边界。
 
@@ -33,7 +33,7 @@
 ### 📊 L5. 配置契约、三平面质量度量与性能基准 (`05-specs-and-benchmarks/`)
 * [01-config-and-reports.md](./05-specs-and-benchmarks/01-config-and-reports.md)：`auto-refactor.config.json` 完整 Schema、32 分析器与 374 规则默认阈值、`.refactor-trajectory/` 紧凑账本规范 (< 350B, *Ms) 与 JSON/SARIF/Text 报告契约。
 * [08-compact-agent-schema.md](./05-specs-and-benchmarks/08-compact-agent-schema.md)：AAS v1.0 智能体原生审查契约 —— 文件聚合、L1~L5 架构依赖拓扑排序、高密度代码锚点切片、修复配方与 5D 黎曼流形相空间张量。
-* [02-performance-benchmarks.md](./05-specs-and-benchmarks/02-performance-benchmarks.md)：6 大核心算子性能基准台账（SWAR 6,448 MB/s, BPM 17.8 µs）、<!-- METRICS:BEGIN test-suite-count -->**179 套**<!-- METRICS:END test-suite-count -->测试套件全量自测与防劣化回归护栏。
+* [02-performance-benchmarks.md](./05-specs-and-benchmarks/02-performance-benchmarks.md)：6 大核心算子性能基准台账（词法掩码 6,448 MB/s, 字内并行距离 17.8 µs）、<!-- METRICS:BEGIN test-suite-count -->**179 套**<!-- METRICS:END test-suite-count -->测试套件全量自测与防劣化回归护栏。
 * [03-comment-and-header-standard.md](./05-specs-and-benchmarks/03-comment-and-header-standard.md)：规范六字段模块头契约 (`CMT-HDR-001`)、有效注释密度 (ECD-C) 算法模型与真实注释规则字典。
 * [04-cross-language-generalization.md](./05-specs-and-benchmarks/04-cross-language-generalization.md)：项目中立性不变量 (`validate-project-neutrality`) 与文件语义角色自动推导 (`file-role-inference.ts`)。
 * [05-consumer-integration.md](./05-specs-and-benchmarks/05-consumer-integration.md)：`baseline.json` 1.2.0 信用消耗语义、零高危债务防线 (`critical = 0, high = 0`) 以及 `workspace-timing` / `WebGames` 差异化接入范式。
