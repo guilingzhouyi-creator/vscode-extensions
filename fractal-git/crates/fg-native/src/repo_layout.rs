@@ -176,8 +176,11 @@ impl RepoLayout {
             crate::HeadState::Symbolic { target } => format!("ref: {target}\n"),
             crate::HeadState::Detached { oid } => format!("{}\n", oid.to_hex()),
         };
-        let _ = std::fs::write(self.repo_dir.join("HEAD"), head_content);
-        let _ = std::fs::create_dir_all(self.repo_dir.join("refs/heads"));
+        // HEAD and refs/heads are part of the published repository, not decoration: a caller that
+        // receives Ok must be able to read them back. Both writes therefore propagate their error
+        // instead of leaving a container that exists but cannot resolve a branch.
+        std::fs::write(self.repo_dir.join("HEAD"), head_content)?;
+        std::fs::create_dir_all(self.repo_dir.join("refs/heads"))?;
 
         let hidden = attempt_hide(&self.repo_dir);
 
