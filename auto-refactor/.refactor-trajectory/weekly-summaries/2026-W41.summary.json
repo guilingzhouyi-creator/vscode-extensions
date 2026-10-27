@@ -12,13 +12,15 @@
   "qed": {
     "mean": -0.0004,
     "min": -0.01,
-    "max": 0
+    "max": 0,
+    "kMean": -0.4
   },
   "debt": {
     "totalAdded": 792,
     "totalResolved": 135,
     "totalRegressions": 0,
-    "netYield": -0.05
+    "netYield": -5.86,
+    "densityYield": -5.91
   },
   "meanCompositeScore": 98.75,
   "gatePassRate": 91.09
