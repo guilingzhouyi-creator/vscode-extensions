@@ -1,7 +1,8 @@
 /**
  * Module: Core Engine — Sparse Reference Replay Planner (Bounded Working Set)
  * File Path: src/core/ast/sparse-reference-replay.ts
- * Architecture Role: Planner-level upgrade over the bounded sliding-window replay manager. Where the
+ * Architecture Role: Planner-level upgrade over the bounded sliding-window replay manager. Where
+ *   the
  *   base manager degrades to whole-file replay on signature, import or cross-anchor mutations, this
  *   planner keeps a constant-size working set by widening the window to a compound anchor span or
  *   by attaching a bounded reference set gathered from the call sites of the mutated symbol.

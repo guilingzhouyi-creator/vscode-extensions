@@ -208,8 +208,10 @@ export async function handleScanDiff(
  * @param ctx - Daemon scan context supplying the warm session and cache store.
  * @param config - Scan configuration forwarded to the scanner and logger.
  * @param inputs - File pairs to analyse, each carrying the previous and current content.
- * @param options - Per-request overrides: `author` for attribution, `forceFull` to bypass the
- *   delta path, and `prefillOnly` to skip awaiting the deep pass.
+ * @param options - Per-request overrides, all optional.
+ * @param options.author - Attribution recorded on the produced report; omitted leaves it unset.
+ * @param options.forceFull - Bypass the delta path even when a previous revision is known.
+ * @param options.prefillOnly - Return after the fast verdict without awaiting the deep pass.
  * @returns Fast verdict, deep status with its issue count, and elapsed milliseconds.
  */
 export async function handleAsymmetricScan(

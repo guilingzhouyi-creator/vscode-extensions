@@ -9,17 +9,16 @@
  *   4. SwaBoundedReplayManager bounded sliding window calculation and signature invariance check;
  *   5. SwaBoundedReplayManager issue pruning and global fallback safeguards.
  * Dependencies & Triggers: Consumes dist/api; triggered by test-parallel.js and npm test.
- * Responsibilities: Assert exact schedule topologies, zero bubble leakage, and O(1) bounded windows.
- * Exit Semantics & Design Rationale: Exits 0 on all assertions passing; exits 1 with trace on failure.
+ * Responsibilities: Assert exact schedule topologies, zero bubble leakage, and O(1) bounded
+ *   windows.
+ * Exit Semantics & Design Rationale: Exits 0 on all assertions passing; exits 1 with trace on
+ *   failure.
  */
 
 const assert = require('assert');
 const {
   BidirectionalAuditScheduler,
-  defaultBidirectionalAuditScheduler,
   SwaBoundedReplayManager,
-  defaultSwaBoundedReplayManager,
-  DEFAULT_SWA_WINDOW_SIZE,
   REASON_BOUNDED_LOCAL,
   REASON_SIGNATURE_MUTATION,
   REASON_GLOBAL_MUTATION,
@@ -182,7 +181,8 @@ async function main() {
 
   console.log('=== [4/5] Testing SwaBoundedReplayManager Bounded Replay Evaluation ===');
 
-  // Case 4.1: Localized edit inside calculateTax body (lines 4-5 modified, signature line 3 untouched)
+  // Case 4.1: Localized edit inside calculateTax body (lines 4-5 modified, signature line 3
+  // untouched)
   const modifiedLocalSource = [
     'import { something } from "./other";',
     '',

@@ -2,13 +2,15 @@
  * Module: Core Engine — deepseek-recipe Rust High-Throughput Binary Protocol
  * File Path: src/core/protocol/auto-refactor-recipe.ts
  * Architecture Role: High-throughput binary packet serialization and streaming protocol inspired
- *   by DeepSeek's deepseek-recipe. Packs AAS v1.0 reports, agent reasoning traces (Thinking blocks),
+ *   by the DeepSeek recipe format. Packs AAS v1.0 reports, agent reasoning traces (Thinking
+ *   blocks),
  *   AST slices, and diff hunks into compact binary TLV streams with zero-copy parsing and byte
  *   parity with Rust native engine counterparts.
  * Dependencies & Triggers: Consumes fastDigest from domainFingerprint and Uint8Array/TextEncoder.
  *   Triggered during daemon IPC, AAS packaging, and recipe archive persistence.
  * Responsibilities:
- *   1. Encode and decode binary TLV (Type-Length-Value) frames with magic header "RECP" and Adler-32 checksums.
+ *   1. Encode and decode binary TLV (Type-Length-Value) frames with magic header "RECP" and
+ *      Adler-32 checksums.
  *   2. Support 5 structured recipe tags: AstSlice (0x01), ThinkingBlock (0x02), AasReport (0x03),
  *      DiffHunk (0x04), and GuidancePrompt (0x05).
  *   3. Provide multi-packet stream encoding and zero-copy streaming decoding.

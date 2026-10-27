@@ -12,7 +12,8 @@
  *      complexity trend, and symbol scope safety.
  *   2. Enforce Safe Prefix Rollout: truncate candidate edit sequence at the first step where
  *      confidence falls below threshold, retaining verified safe prefix [0 ... j-1].
- *   3. Prune low-confidence rollout branches before triggering expensive compilation or test suites.
+ *   3. Prune low-confidence rollout branches before triggering expensive compilation or test
+ *      suites.
  *   4. Provide performance and pruning telemetry metrics without transient heap allocation.
  * Exit Semantics & Design Rationale: Deterministic pure heuristic scoring. Eliminates roughly
  *   30% of doomed rollout branches ahead of verification, significantly cutting CPU waste.
@@ -177,7 +178,8 @@ export class DSparkConfidenceScheduler {
 
     /**
      * Execute Safe Prefix Rollout over an array of speculative candidate edit steps.
-     * Truncates at the first step falling below confidence threshold theta once minSteps is reached.
+     * Truncates at the first step falling below confidence threshold theta once minSteps is
+     * reached.
      *
      * @param steps - Sequence of candidate steps.
      * @returns SafePrefixRolloutResult containing accepted prefix and confidence metrics.

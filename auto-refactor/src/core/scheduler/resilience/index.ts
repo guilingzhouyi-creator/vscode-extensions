@@ -3,7 +3,8 @@
  * File Path: src/core/scheduler/resilience/index.ts
  * Architecture Role: Central facade for rate limiting backoff and quota hibernation state machines.
  * Dependencies & Triggers: Consumed by agent quota gateway and task execution orchestrators.
- * Responsibilities: Re-export resilience state machines with an immutable facade satisfying ARCH-FAC-001.
+ * Responsibilities: Re-export resilience state machines with an immutable facade satisfying
+ *   ARCH-FAC-001.
  * Exit Semantics & Design Rationale: Immutable subsystem facade; deterministic recovery.
  */
 

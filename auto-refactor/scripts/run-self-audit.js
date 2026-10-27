@@ -557,17 +557,6 @@ function estimateChangedEloc() {
   }
 }
 
-function computePreciseScore(tenDimensionsMap) {
-  if (!tenDimensionsMap || typeof tenDimensionsMap !== 'object') return null;
-  let weightedSum = 0;
-  for (const dim of ALL_QUALITY_DIMENSIONS) {
-    const dimensionScore =
-      typeof tenDimensionsMap[dim] === 'number' ? tenDimensionsMap[dim] : DEFAULT_MAX_SCORE;
-    weightedSum += dimensionScore * 0.1;
-  }
-  return Math.round(weightedSum * 10000) / 10000;
-}
-
 /**
  * Records an audit run into the persistent trajectory accumulator ledger.
  */

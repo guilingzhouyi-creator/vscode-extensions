@@ -89,7 +89,8 @@ export class AdaptiveExpertBiasRouter {
     private readonly yieldRewards = new Float32Array(TOTAL_ROUTER_EXPERTS);
 
     /**
-     * Rank candidate routed bits by composite score (base + dynamic bias + yield reward) descending.
+     * Rank candidate routed bits by composite score (base + dynamic bias + yield reward)
+     * descending.
      *
      * @param mask - Unbounded candidate analyzer bitmask.
      * @returns Array of scored expert bits sorted in descending priority order.

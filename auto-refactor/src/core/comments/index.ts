@@ -5,7 +5,8 @@
  *   effective comment density models, and semantic duty matchers.
  * Dependencies & Triggers: Re-exports ./comment-types, ./project-comment-profiler,
  *   ./comment-density-model, and ./comment-semantic-matcher.
- * Responsibilities: Deliver an immutable, unified import surface for comment governance satisfying ARCH-FAC-001.
+ * Responsibilities: Deliver an immutable, unified import surface for comment governance
+ *   satisfying ARCH-FAC-001.
  * Exit Semantics & Design Rationale: Immutable subsystem facade; preserves internal module freedom.
  */
 

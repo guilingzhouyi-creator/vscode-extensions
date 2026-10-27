@@ -10,7 +10,8 @@
  *   5. Cross-language binary format verification (TypeScript <-> Rust 100% byte equivalence).
  * Dependencies & Triggers: Consumes dist/api; triggered by test-parallel.js and npm test.
  * Responsibilities: Assert exact TLV byte layouts, zero-allocation facts, and queue decoupling.
- * Exit Semantics & Design Rationale: Exits 0 on all assertions passing; exits 1 with trace on failure.
+ * Exit Semantics & Design Rationale: Exits 0 on all assertions passing; exits 1 with trace on
+ *   failure.
  */
 
 const assert = require('assert');
@@ -18,10 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const {
   PersistentReviewFactStore,
-  defaultPersistentReviewFactStore,
-  DEFAULT_FACT_TTL_MS,
   DisaggregatedAuditPipeline,
-  defaultDisaggregatedAuditPipeline,
   RecipeTag,
   encodeRecipePacket,
   decodeRecipePacket,

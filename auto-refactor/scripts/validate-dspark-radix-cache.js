@@ -9,19 +9,14 @@
  *   4. AstPrefixRadixCache sub-threshold fallback and remaining source slice calculation;
  *   5. AstPrefixRadixCache LRU bound enforcement and telemetry accounting.
  * Dependencies & Triggers: Consumes dist/api; triggered by test-parallel.js and npm test.
- * Responsibilities: Assert exact confidence thresholds, zero transient leaks, and correct LCP reuse.
- * Exit Semantics & Design Rationale: Exits 0 on all assertions passing; exits 1 with trace on failure.
+ * Responsibilities: Assert exact confidence thresholds, zero transient leaks, and correct LCP
+ *   reuse.
+ * Exit Semantics & Design Rationale: Exits 0 on all assertions passing; exits 1 with trace on
+ *   failure.
  */
 
 const assert = require('assert');
-const {
-  DSparkConfidenceScheduler,
-  defaultDSparkConfidenceScheduler,
-  DEFAULT_CONFIDENCE_THRESHOLD,
-  AstPrefixRadixCache,
-  defaultAstPrefixRadixCache,
-  DEFAULT_MIN_MATCH_LINES,
-} = require('../dist/api');
+const { DSparkConfidenceScheduler, AstPrefixRadixCache } = require('../dist/api');
 const { NodeKind } = require('../dist/core/ast/multilang');
 
 async function main() {

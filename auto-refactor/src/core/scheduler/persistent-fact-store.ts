@@ -119,9 +119,12 @@ export class PersistentReviewFactStore {
     /**
      * Store a verified analysis fact.
      *
-     * @param params - Fact attributes: the `modulePath` owning the fact, the `contentHash` that
-     *   scopes it to a revision, the `factType` selecting the category, and the `payload` holding
-     *   the analysis output.
+     * @param params - Fact attributes, all required.
+     * @param params.modulePath - Repository-relative path of the module the fact describes.
+     * @param params.contentHash - Digest of the revision the fact was derived from; a changed hash
+     *   retires the fact rather than serving it against newer content.
+     * @param params.factType - Category selecting how the payload is interpreted.
+     * @param params.payload - Analysis output to retain for this module and revision.
      * @param ttlMs - Optional custom TTL override.
      * @returns Stored ReviewFact record.
      */
@@ -346,7 +349,9 @@ export class PersistentReviewFactStore {
             return;
         }
 
-        const pruned = this.pruneExpired();
+        // Expiry first: a store full of stale entries needs no eviction once they are gone, and the
+        // size check below decides whether anything still has to be dropped.
+        this.pruneExpired();
         if (this.facts.size < MAX_IN_MEMORY_FACTS) {
             return;
         }

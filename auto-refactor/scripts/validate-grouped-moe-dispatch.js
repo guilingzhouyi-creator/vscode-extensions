@@ -3,27 +3,24 @@
  * File Path: scripts/validate-grouped-moe-dispatch.js
  * Architecture Role: Comprehensive integration assertion suite validating Phase 1 DeepSeek-V3 /
  *   DeepEP architectural internalizations:
- *   1. AdaptiveExpertBiasRouter online queue depth feedback, dynamic bias updates, and yield rewards;
+ *   1. AdaptiveExpertBiasRouter online queue depth feedback, dynamic bias updates, and yield
+ *      rewards;
  *   2. GroupedExpertDispatcher slice clustering and contiguous batching (All-to-All Dispatch);
  *   3. ExpertFindingCombiner deduplication and deterministic item reduction (All-to-All Combine);
  *   4. SparseMoEGateRouter integration and two-tier adaptive dispatch boundary.
  * Dependencies & Triggers: Consumes dist/api; triggered by test-parallel.js and npm test.
  * Responsibilities: Assert zero false negatives, deterministic load balancing, and exact dedup.
- * Exit Semantics & Design Rationale: Pure assertion runner; exits 0 on full success, 1 on any failure.
+ * Exit Semantics & Design Rationale: Pure assertion runner; exits 0 on full success, 1 on any
+ *   failure.
  */
 
 const assert = require('assert');
 const {
   AdaptiveExpertBiasRouter,
-  defaultAdaptiveExpertBiasRouter,
   selectTopKBitmask,
-  routeDiffToBitmask,
   GroupedExpertDispatcher,
-  defaultGroupedExpertDispatcher,
   ExpertFindingCombiner,
-  defaultExpertFindingCombiner,
   defaultSparseMoEGateRouter,
-  MAX_FAST_TRACK_CAPACITY,
   analyzerNameToBit,
 } = require('../dist/api');
 

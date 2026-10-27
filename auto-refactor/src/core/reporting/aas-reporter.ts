@@ -116,7 +116,8 @@ function trimMessage(text: string, maxChars: number = DEFAULT_MAX_MESSAGE_CHARS)
 /**
  * Compresses diagnostic narrative into high-information-density token sentence.
  *
- * Implements the Five-Principle Compression Protocol (see token-frugal-sentence-and-diagnostic-spec.md).
+ * Implements the Five-Principle Compression Protocol (see
+ * token-frugal-sentence-and-diagnostic-spec.md).
  *
  * @param rawText - Raw narrative diagnostic string.
  * @returns Concise token-dense diagnostic sentence.

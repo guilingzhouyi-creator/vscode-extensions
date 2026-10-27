@@ -22,23 +22,18 @@
 
 import type { DiffClassificationResult } from './diffClassifier';
 import type { ProjectArchetype } from '../types';
-import { EXPERT_MANIFEST } from '../experts';
 import {
     CATEGORY_ANALYZER_MAP,
     ARCHETYPE_ANALYZER_MAP,
     CATEGORY_BITMASK_MATRIX,
     ARCHETYPE_BITMASK_MATRIX,
-    SHARED_EXPERTS,
     SHARED_EXPERTS_MASK,
-    LANGUAGE_EXCLUSIVE_ANALYZERS,
     LANGUAGE_EXCLUSIVE_SETS,
     LANGUAGE_EXCLUSIVE_BITMASK,
     ALL_LANGUAGE_SPECIFIC_ANALYZERS,
     ALL_LANGUAGE_SPECIFIC_MASK,
-    EXPERT_BASE_SCORES,
 } from '../experts/expert-activation-library';
 import {
-    AnalyzerBit,
     ALL_ANALYZERS_MASK,
     analyzerNameToBit,
     analyzerMaskToNames,
@@ -204,6 +199,9 @@ export {
     LANGUAGE_EXCLUSIVE_BITMASK,
     ALL_LANGUAGE_SPECIFIC_MASK,
 } from '../experts/expert-activation-library';
+
+// The values are re-exported straight from the library, so only the locally consumed ones are
+// imported above. Importing a symbol solely to re-export it would mark the local binding unused.
 
 /**
  * Result of a 32-bit integer bitmask sparse routing evaluation.

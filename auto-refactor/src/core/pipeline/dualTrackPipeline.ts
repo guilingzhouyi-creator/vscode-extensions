@@ -599,7 +599,8 @@ async function checkArchitectureLayerBreaches(
 }
 
 /**
- * Asynchronously execute cold expert compensation scan on background thread for offloaded candidate analyzers.
+ * Asynchronously execute cold expert compensation scan on background thread for offloaded
+ * candidate analyzers.
  */
 async function auditColdCompensationEscalations(context: {
     readonly plan: DeepTrackExecutionPlan;

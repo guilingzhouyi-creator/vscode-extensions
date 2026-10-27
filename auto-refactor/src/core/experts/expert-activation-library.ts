@@ -17,7 +17,7 @@
  */
 
 import type { ProjectArchetype } from '../types';
-import type { DiffSemanticCategory, SliceFeatureVector } from '../router/sliceTypes';
+import type { DiffSemanticCategory } from '../router/sliceTypes';
 import {
     CATEGORY_LITERAL_ONLY,
     CATEGORY_CONTROL_FLOW,
@@ -277,7 +277,8 @@ export function getArchetypeBitmask(archetype: ProjectArchetype): number {
 /**
  * Query active 32-bit bitmask for an exclusive programming language.
  *
- * @param language - Language name as recognised by the language adapters; matched case-insensitively.
+ * @param language - Language name as recognised by the language adapters; matched
+ *   case-insensitively.
  * @returns The combined expert bitmask, or zero when the language activates no exclusive expert.
  */
 export function getLanguageExclusiveBitmask(language: string): number {

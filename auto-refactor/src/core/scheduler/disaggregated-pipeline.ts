@@ -7,12 +7,15 @@
  *   (sparse rule evaluation, AAS v1.0 rendering, guidance prompt generation) with independent
  *   concurrency pools and zero-allocation ring buffer transport.
  * Dependencies & Triggers: Consumes RingBufferBus from scheduler, LoadGovernor from profiler,
- *   Scanner from analyzer, and Issue from types. Triggered during multi-file scans and batch passes.
+ *   Scanner from analyzer, and Issue from types. Triggered during multi-file scans and batch
+ *   passes.
  * Responsibilities:
- *   1. Manage decoupled Prefill worker pool (compute-bounded) and Decode worker pool (wide concurrency).
+ *   1. Manage decoupled Prefill worker pool (compute-bounded) and Decode worker pool (wide
+ *      concurrency).
  *   2. Transport prefilled AST slices through an in-memory RingBufferBus to prevent GC thrashing.
  *   3. Enforce stage-level backpressure when decode queue capacity reaches high-water mark.
- *   4. Collect and report PD disaggregated pipeline telemetry (prefill time, decode time, queue depth).
+ *   4. Collect and report PD disaggregated pipeline telemetry (prefill time, decode time,
+ *      queue depth).
  * Exit Semantics & Design Rationale: Pure asynchronous execution. Decouples heavy foreground
  *   CPU workloads from background streaming rules, preventing UI event loop starvation.
  */

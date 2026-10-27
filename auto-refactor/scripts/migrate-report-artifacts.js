@@ -6,7 +6,8 @@
  * Dependencies & Triggers: Consumes ../dist/api (buildAasReport, toAasJson); invoked manually or
  *   by maintenance scripts, never on the scan hot path.
  * Responsibilities:
- *   1. Walk one file or a directory of *.json artifacts and project each report payload into AAS v1.0.
+ *   1. Walk one file or a directory of *.json artifacts and project each report payload into
+ *      AAS v1.0.
  *   2. Write the AAS projection beside the source as <name>.aas.json, or overwrite under --write.
  *   3. Enforce zero legacy CAS v3 (*.cas.json) artifacts are generated.
  * Exit Semantics & Design Rationale: 0 = success, 1 = I/O fault or no valid artifact found.
@@ -15,7 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { buildAasReport, toAasJson } = require('../dist/api');
+const { buildAasReport } = require('../dist/api');
 
 const ARG_PREFIX = '--';
 const FLAG_WRITE = '--write';
