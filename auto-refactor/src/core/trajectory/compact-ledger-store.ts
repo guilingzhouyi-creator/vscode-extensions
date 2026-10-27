@@ -23,6 +23,14 @@ import type {
 /** Default maximum number of recent runs to keep in active rolling NDJSON file. */
 export const DEFAULT_MAX_ROLLING_RUNS = 100;
 
+/**
+ * Hard per-record byte ceiling for the active runs ledger.
+ * The retention file is read whole on every audit, so a single oversized line
+ * inflates every subsequent read; the guard in validate-trajectory-ledger.js
+ * enforces the same value independently.
+ */
+export const LEDGER_RECORD_LIMIT = 350;
+
 /** Default relative directory name for refactor trajectory storage. */
 export const DEFAULT_LEDGER_DIR_NAME = '.refactor-trajectory';
 
@@ -109,15 +117,45 @@ export function formatCompactRecord(params: {
  */
 export function serializeNdjsonLine(record: CompactTrajectoryRecord): string {
     let serialized = JSON.stringify(record);
-    if (Buffer.byteLength(serialized, 'utf8') >= 350) {
-        const compacted: CompactTrajectoryRecord = {
-            ...record,
-            mod: record.mod.slice(0, 8),
-            agent: record.agent.slice(0, 8),
-        };
-        serialized = JSON.stringify(compacted);
+    if (Buffer.byteLength(serialized, 'utf8') < LEDGER_RECORD_LIMIT) {
+        return serialized;
     }
+
+    // Degrade in fixed order, cheapest information loss first. Truncating the
+    // module and agent labels only reclaims a handful of bytes, which used to be
+    // the sole step: a record whose score vector carried ten two-decimal values
+    // stayed over budget and the ledger guard then blocked the whole audit.
+    const ladder: Array<(rec: CompactTrajectoryRecord) => CompactTrajectoryRecord> = [
+        (rec) => ({ ...rec, mod: rec.mod.slice(0, 8), agent: rec.agent.slice(0, 8) }),
+        (rec) => ({ ...rec, id: rec.id.slice(-8) }),
+        (rec) => ({ ...rec, score: { ...rec.score, vec: rec.score.vec.map(roundToTenth) } }),
+        (rec) => ({ ...rec, score: { ...rec.score, vec: rec.score.vec.map(roundToWhole) } }),
+        (rec) => ({ ...rec, score: { ...rec.score, qed: roundToWhole(rec.score.qed) } }),
+    ];
+
+    let candidate = record;
+    for (const step of ladder) {
+        candidate = step(candidate);
+        serialized = JSON.stringify(candidate);
+        if (Buffer.byteLength(serialized, 'utf8') < LEDGER_RECORD_LIMIT) {
+            return serialized;
+        }
+    }
+
+    // Last resort: the ten-dimension vector is a diagnostic detail; the record's
+    // identity, gate verdict and debt delta are what downstream readers compare.
+    serialized = JSON.stringify({ ...candidate, score: { ...candidate.score, vec: [] } });
     return serialized;
+}
+
+/** Rounds a score to one decimal place. */
+function roundToTenth(value: number): number {
+    return Math.round(value * 10) / 10;
+}
+
+/** Rounds a score to an integer. */
+function roundToWhole(value: number): number {
+    return Math.round(value);
 }
 
 /**
