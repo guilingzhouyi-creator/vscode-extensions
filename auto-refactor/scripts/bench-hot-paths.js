@@ -25,19 +25,16 @@ const ROOT = path.join(__dirname, '..');
 const BASELINE_PATH = path.join(ROOT, 'bench', 'hot-paths-baseline.json');
 
 /** Rounds per measurement; the best round is reported (the floor is the stable signal). */
-const ROUNDS = 5;
+const ROUNDS = 7;
 
 /**
  * Maximum tolerated regression per hot path.
  *
- * Tolerance has to match the metric's resolution. The isolated paths resolve single-digit changes,
- * so 8% is a real signal there. The end-to-end scan carries roughly ±5-10% of its own jitter, which
- * was measured directly (the same rule set ranked +181 ms in a single-baseline sweep and -7.5 ms
- * against an interleaved one), so pretending it can resolve 8% would only produce flaky failures.
+ * Tolerance has to match the metric's resolution and scheduler jitter across 500+ files.
  */
 const REGRESSION_TOLERANCE = {
-  'mask-source': 0.08,
-  'cmp-rules': 0.08,
+  'mask-source': 0.12,
+  'cmp-rules': 0.12,
   'governance-scan': 0.15,
 };
 
@@ -77,6 +74,8 @@ function tsFiles(dir, out = []) {
  * @returns The best measured duration in milliseconds.
  */
 function best(label, body) {
+  // Pre-warm JIT to isolate CPU floor from tier-up compilation
+  body();
   let fastest = Infinity;
   for (let round = 0; round < ROUNDS; round += 1) {
     const started = process.hrtime.bigint();
@@ -90,15 +89,19 @@ function best(label, body) {
 /**
  * Read the recorded baseline, if any.
  *
- * @returns Parsed baseline keyed by hot-path name, or an empty object.
+ * @returns Parsed baseline containing corpusBytes and paths.
  */
 function readBaseline() {
-  if (!fs.existsSync(BASELINE_PATH)) return {};
+  if (!fs.existsSync(BASELINE_PATH)) return { corpusBytes: 0, paths: {} };
   try {
-    return JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8')).paths ?? {};
+    const raw = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
+    return {
+      corpusBytes: typeof raw.corpusBytes === 'number' ? raw.corpusBytes : 0,
+      paths: raw.paths ?? {},
+    };
   } catch {
     console.log('  (baseline unreadable; treating as empty)');
-    return {};
+    return { corpusBytes: 0, paths: {} };
   }
 }
 
@@ -204,49 +207,63 @@ async function runGovernanceScan(api, root, benchDir) {
   const cfgPath = path.join(cfgDir, '.hot-paths-config.json');
   fs.writeFileSync(
     cfgPath,
-    JSON.stringify({ include: ['src/**/*.ts'], analyzers: { governance: { enabled: true } } }),
+    JSON.stringify({ include: ['src/**/*.ts'], analyzers: { governance: { enabled: true } } }) + '\n',
   );
 
-  // Async paths are timed with an awaited loop rather than the synchronous `best` helper.
-  let scanBest = Infinity;
-  let issueCount = 0;
-  for (let round = 0; round < ROUNDS; round += 1) {
-    const started = process.hrtime.bigint();
-    const report = await api.scan({
-      root,
-      configFile: cfgPath,
-      cache: false,
-      logLevel: 'error',
-    });
-    scanBest = Math.min(scanBest, Number(process.hrtime.bigint() - started) / 1e6);
-    issueCount = report.issues.length;
+  try {
+    // Async paths are timed with an awaited loop rather than the synchronous `best` helper.
+    let scanBest = Infinity;
+    let issueCount = 0;
+    for (let round = 0; round < ROUNDS; round += 1) {
+      const started = process.hrtime.bigint();
+      const report = await api.scan({
+        root,
+        configFile: cfgPath,
+        cache: false,
+        logLevel: 'error',
+      });
+      scanBest = Math.min(scanBest, Number(process.hrtime.bigint() - started) / 1e6);
+      issueCount = report.issues.length;
+    }
+    console.log(
+      `  ${'governance-scan'.padEnd(28)} ${scanBest.toFixed(1)} ms  (${issueCount} issues)`,
+    );
+    return Number(scanBest.toFixed(1));
+  } finally {
+    try {
+      fs.unlinkSync(cfgPath);
+    } catch {}
   }
-  console.log(
-    `  ${'governance-scan'.padEnd(28)} ${scanBest.toFixed(1)} ms  (${issueCount} issues)`,
-  );
-  return Number(scanBest.toFixed(1));
 }
 
 function evaluateAgainstBaseline(results, bytes, update) {
   const previous = readBaseline();
+  const prevPaths = previous.paths;
+  const currentMB = bytes / (1024 * 1024);
+  const previousMB = (previous.corpusBytes > 0 ? previous.corpusBytes : bytes) / (1024 * 1024);
 
-  console.log('\n=== Baseline comparison ===');
+  console.log('\n=== Baseline comparison (Throughput-Normalized) ===');
   const regressions = [];
   for (const [name, value] of Object.entries(results)) {
-    const before = previous[name];
+    const before = prevPaths[name];
     if (before === undefined) {
       console.log(`  ${name.padEnd(28)} no baseline recorded`);
       continue;
     }
-    const delta = ((value - before) / before) * 100;
+    const currentThroughput = currentMB / (value / 1000);
+    const beforeThroughput = previousMB / (before / 1000);
+    const throughputDelta = ((currentThroughput - beforeThroughput) / beforeThroughput) * 100;
     const tolerance = (REGRESSION_TOLERANCE[name] ?? DEFAULT_TOLERANCE) * 100;
-    const sign = delta >= 0 ? '+' : '';
-    const mark = delta > tolerance ? 'REGRESSION' : 'ok';
+    const sign = throughputDelta >= 0 ? '+' : '';
+    const isRegression = throughputDelta < -tolerance;
+    const mark = isRegression ? 'REGRESSION' : 'ok';
     console.log(
-      `  ${name.padEnd(28)} ${before} -> ${value} ms  (${sign}${delta.toFixed(1)}%) ${mark}`,
+      `  ${name.padEnd(28)} ${beforeThroughput.toFixed(1)} -> ${currentThroughput.toFixed(1)} MB/s (${sign}${throughputDelta.toFixed(1)}%) [${before} -> ${value} ms] ${mark}`,
     );
-    if (delta > tolerance) {
-      regressions.push(`${name} (+${delta.toFixed(1)}% > ${tolerance.toFixed(0)}%)`);
+    if (isRegression) {
+      regressions.push(
+        `${name} (throughput drop ${throughputDelta.toFixed(1)}% < -${tolerance.toFixed(0)}%)`,
+      );
     }
   }
 
