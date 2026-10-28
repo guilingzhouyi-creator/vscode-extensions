@@ -72,10 +72,25 @@ description: >-
 
 ---
 
-## 五、 验证命令与关联资产
+## 五、 演化轨迹账本精度与真实技术债消减公理 (Trajectory Ledger & Defect Tracking)
+
+长期演化账本必须客观反映代码质量的微观渐进收益，严禁经验合成与截断失真：
+
+| 治理指标 | 刚性设计标准 | 核心算法与防范目标 |
+| :--- | :--- | :--- |
+| **小数密度精度与 $k\text{Mean}$** | 六位小数 + 千行密度投影 | 质量演化密度 $\text{QED} = \frac{\Delta Q}{\text{ELOC}}$ 以六位小数保留（`Math.round(x * 1000000) / 1000000`）；宏观展示引入 $k\text{Mean} = \text{mQED}/1\text{k ELOC}$，防止大仓微重构下溢归零。 |
+| **双轨技术债务收益率** | `netYield` 与 `densityYield` 双轨分流 | 收益率严禁用跨轮次累加的 `processedTotal` 作分母（防止累加稀释失真）。`netYield` 以 $semanticTotal/1000$ 为分母（下限 $0.1$），$semanticTotal$ 为零时退到 $uniqueTotal/1000$；`densityYield` 以全仓去重底数 $uniqueTotal/1000$（下限 $1$）为基底。 |
+| **缺陷指纹比对基线** | 独立签名账本优先，截断报告仅作降级 | 债务增删比对读 `.refactor-trajectory/baseline-signatures.json`：键为 `规则#文件`，值按行号匹配并附债务层级。该账本缺失或不可解析时才退回 AAS 报告的 `files` 段，而该段受 Token 预算截断（`truncated` 字段非零），因此不得将 AAS 载荷当作权威比对源。 |
+| **真实增删与显式折算** | 取 Git numstat 真实增删，折算权重集中声明 | 增删行直接取 `git diff --numstat HEAD`，排除 `reports/`、`.refactor-trajectory/`、`dist/`、`node_modules/`；语义行数按文件类型权重加权求和，权重常量内联于折算函数内，新增语言时须同处登记。历史底数解析顺序为 $uniqueTotal \to processedTotal/totalRuns \to$ 内建常量，任一层命中即停，不得跳过前两层直接取固定值。 |
+| **度量与执行真值双向闭合** | 派生值必等于运行时实报总数 | 任何对外公布的计数必须由可执行真源重算，且与运行时自报总数逐一相等（如测试套件数须等于 `ALL N/N TEST SUITES PASSED`）。解析源码的守卫若与运行时总数不符，先判定为守卫自身的文本解析缺陷（如只识别多行 `\n];` 终止符而漏掉单行 `}];`），严禁反过来删改文档迁就错误守卫。 |
+
+---
+
+## 六、 验证命令与关联资产
 
 ```powershell
 node auto-refactor/scripts/validate-autonomy-scorer.js && node auto-refactor/scripts/validate-project-neutrality.js
+node auto-refactor/scripts/validate-trajectory-accumulator.js && node auto-refactor/scripts/validate-compact-ledger.js
 ```
 
 - [jeffreys-beta-credible-interval.md](references/jeffreys-beta-credible-interval.md)：Fisher 信息矩阵 Jeffreys 先验推导与 `BLOCK_GAMING_DETECTED` 反刷分攻击向量剖析；

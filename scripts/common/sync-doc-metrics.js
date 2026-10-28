@@ -221,6 +221,27 @@ function splitCanonicalRules(rules) {
 }
 
 /**
+ * Locates the closing brace of one array literal declared in the test runner.
+ *
+ * The terminator must accept both literal shapes the runner uses: a multi-line array closes with
+ * `];` on its own line, while a single-element lane closes inline as `}];`. Matching only the
+ * multi-line form made the single-line daemon lane swallow every following lane, so the guard
+ * published a total three higher than the runner could ever execute.
+ *
+ * @param {string} source - Runner source text.
+ * @param {string} marker - Declaration opening the array literal.
+ * @returns {number} Index of the terminator, or -1 when the literal is absent.
+ */
+function findArrayLiteralEnd(source, marker) {
+  const start = source.indexOf(marker);
+  if (start < 0) return -1;
+  const candidates = [source.indexOf('\n];', start), source.indexOf('}];', start)].filter(
+    (index) => index >= 0,
+  );
+  return candidates.length === 0 ? -1 : Math.min(...candidates);
+}
+
+/**
  * Counts the suites declared in one array literal of the parallel test runner.
  *
  * Counting `script:` occurrences rather than `{ name:` keeps a suite whose declaration spans
@@ -234,7 +255,7 @@ function splitCanonicalRules(rules) {
 function countRunnerSuites(source, marker) {
   const start = source.indexOf(marker);
   if (start < 0) return -1;
-  const end = source.indexOf('\n];', start);
+  const end = findArrayLiteralEnd(source, marker);
   if (end < 0) return -1;
   return (source.slice(start, end).match(/\bscript: /g) || []).length;
 }
