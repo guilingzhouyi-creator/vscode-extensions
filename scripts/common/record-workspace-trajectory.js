@@ -251,14 +251,81 @@ function pruneActiveRunsIfExceeded(activeFile, maxRuns = DEFAULT_MAX_ROLLING_RUN
   }
 }
 
-function main() {
-  const root = path.resolve(__dirname, '..', '..');
-  const args = process.argv.slice(2);
-  const isFailed = args.includes('--fail') || args.includes('--failed');
-  const commitLedger = args.includes('--commit-ledger');
-  const gateCode = isFailed ? 'BLOCK' : 'PASS';
-  const gatePass = !isFailed;
+/**
+ * Reads `--name=value` style options out of argv.
+ *
+ * Only these two options use the equals form on purpose: they are optional annotations, and a caller that
+ * forgets the `=` must not silently produce a record that claims skills were activated. An unknown or
+ * valueless form is reported and skipped rather than guessed.
+ *
+ * @param {string[]} args - Raw argv.
+ * @returns {{skills: string[]|null, preset: string|null, warnings: string[]}} Parsed annotations.
+ */
+function parseActivationArgs(args) {
+  const warnings = [];
+  let skills = null;
+  let preset = null;
+  for (const arg of args) {
+    if (arg.startsWith('--skills=')) {
+      const parsed = arg
+        .slice('--skills='.length)
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      skills = parsed.length > 0 ? parsed : null;
+      if (skills === null) warnings.push('--skills= 为空，已忽略');
+      continue;
+    }
+    if (arg.startsWith('--preset=')) {
+      const value = arg.slice('--preset='.length).trim();
+      preset = value.length > 0 ? value : null;
+      if (preset === null) warnings.push('--preset= 为空，已忽略');
+      continue;
+    }
+    if (arg === '--skills' || arg === '--preset') {
+      warnings.push(`${arg} 需要 '=' 形式的取值（如 ${arg}=a,b），已忽略`);
+    }
+  }
+  return { skills, preset, warnings };
+}
 
+/**
+ * Appends the activation annotation to a sidecar ledger.
+ *
+ * The main run record has a hard 360-byte envelope and currently sits at ~343B, so even a single skill
+ * name would exceed it. Raising the envelope to fit telemetry would weaken a guard that exists to keep the
+ * ledger readable, so the annotation lives in its own file, keyed by run id. A sidecar also keeps the
+ * semantics honest: an absent sidecar means "activation was not recorded", which is different from
+ * "zero skills were activated" and stays distinguishable.
+ *
+ * @param {string} ledgerDir - Ledger directory.
+ * @param {string} runId - Run identifier matching the main record.
+ * @param {{skills: string[]|null, preset: string|null}} activation - Parsed annotation.
+ * @returns {number} Bytes written, or 0 when nothing was recorded.
+ */
+function appendActivationSidecar(ledgerDir, runId, activation) {
+  if (!activation.skills && !activation.preset) return 0;
+  const entry = { id: runId, t: Date.now() };
+  if (activation.skills) entry.skills = activation.skills;
+  if (activation.preset) entry.preset = activation.preset;
+  const line = `${JSON.stringify(entry)}\n`;
+  try {
+    fs.appendFileSync(path.join(ledgerDir, 'activation.ndjson'), line, 'utf8');
+    return Buffer.byteLength(line, 'utf8');
+  } catch (error) {
+    console.warn(`  ⚠ 激活遥测写入失败（${error.message}），主记录已落盘`);
+    return 0;
+  }
+}
+
+/**
+ * Resolves which ledger directory this run writes to.
+ *
+ * @param {string} root - Repository root.
+ * @param {boolean} commitLedger - Whether the run targets the tracked ledger.
+ * @returns {{ledgerDir: string, trackedLedgerDir: string}} Target and tracked directories.
+ */
+function resolveLedgerTargets(root, commitLedger) {
   const trackedLedgerDir = resolveLedgerDir(root);
   const ledgerDir = commitLedger ? trackedLedgerDir : path.join(root, '.audit-logs', 'trajectory');
   if (!fs.existsSync(ledgerDir)) {
@@ -268,27 +335,72 @@ function main() {
       // best-effort
     }
   }
+  return { ledgerDir, trackedLedgerDir };
+}
 
+/**
+ * Assembles score, ELOC and debt counters into one record payload.
+ *
+ * @param {object|null} baseline - Parsed self-audit baseline.
+ * @param {object} previous - Previous record, used to carry the before score forward.
+ * @returns {{record: object, elocAvailable: boolean}} Record body fragments.
+ */
+function buildRecordPayload(baseline, previous) {
+  const scoreVal = extractCanonicalScore(baseline);
+  const vector = extractCanonicalVector(baseline);
+  const eloc = resolveElocCounters(baseline);
+  const debt = extractDebtCounters(baseline);
+  const scoreBef = previous && previous.score && typeof previous.score.aft === 'number'
+    ? previous.score.aft
+    : scoreVal;
+  const qedVal = eloc.available ? computeQedYield(scoreBef, scoreVal, eloc.chg, eloc.sem) : 0;
+  return {
+    elocAvailable: eloc.available,
+    record: {
+      // 四层 ELOC 计数缺席时整块省略：写入 null 或 0 都会被下游当成真实测量值。
+      ...(eloc.available
+        ? { eloc: { proc: eloc.proc, uniq: eloc.uniq, chg: eloc.chg, sem: eloc.sem, reloc: 0, cosm: 0 } }
+        : { elocUnavailable: true }),
+      score: { bef: scoreBef, aft: scoreVal, vec: vector, qed: qedVal },
+      debt: { add: debt.add, res: debt.res, reg: debt.reg },
+    },
+  };
+}
+
+/**
+ * Renders the one-line run summary, naming the activation state only when it was recorded.
+ *
+ * @param {object} params - Summary inputs.
+ * @returns {string} Console line.
+ */
+function renderRunSummary(params) {
+  const { ledgerScope, byteLen, revision, activationBytes, activation } = params;
+  const activationNote = activationBytes > 0
+    ? `，activation=${activationBytes}B（${(activation.skills || []).length} skills）`
+    : '，activation 未记录';
+  return `  ✔ [Trajectory] Workspace audit run appended to ${ledgerScope} (${byteLen}B, rev: ${revision}${activationNote})`;
+}
+
+function main() {
+  const root = path.resolve(__dirname, '..', '..');
+  const args = process.argv.slice(2);
+  const isFailed = args.includes('--fail') || args.includes('--failed');
+  const commitLedger = args.includes('--commit-ledger');
+  const activation = parseActivationArgs(args);
+  for (const warning of activation.warnings) {
+    console.warn(`  ⚠ ${warning}`);
+  }
+
+  const { ledgerDir, trackedLedgerDir } = resolveLedgerTargets(root, commitLedger);
   const trackedRunsPath = path.join(trackedLedgerDir, 'active-runs.ndjson');
   const activeRunsPath = path.join(ledgerDir, 'active-runs.ndjson');
   const revision = getGitRevision(root);
   const runId = String(Date.now()).slice(-12);
   const baseline = loadBaselineMetrics(root);
-
-  const scoreVal = extractCanonicalScore(baseline);
-  const vector = extractCanonicalVector(baseline);
-  const eloc = resolveElocCounters(baseline);
-  const debt = extractDebtCounters(baseline);
-
-  const prevRecord =
+  const previous =
     readPreviousRecord(activeRunsPath) ||
     (commitLedger ? null : readPreviousRecord(trackedRunsPath));
-  const scoreBef =
-    prevRecord && prevRecord.score && typeof prevRecord.score.aft === 'number'
-      ? prevRecord.score.aft
-      : scoreVal;
-  const scoreAft = scoreVal;
-  const qedVal = eloc.available ? computeQedYield(scoreBef, scoreAft, eloc.chg, eloc.sem) : 0;
+  const payload = buildRecordPayload(baseline, previous);
 
   const record = {
     t: Date.now(),
@@ -296,45 +408,22 @@ function main() {
     id: runId,
     mod: 'workspace',
     agent: 'audit-all',
-    // 四层 ELOC 计数缺席时整块省略：写入 null 或 0 都会被下游当成真实测量值。
-    ...(eloc.available
-      ? {
-        eloc: {
-          proc: eloc.proc,
-          uniq: eloc.uniq,
-          chg: eloc.chg,
-          sem: eloc.sem,
-          reloc: 0,
-          cosm: 0,
-        },
-      }
-      : { elocUnavailable: true }),
-    score: {
-      bef: scoreBef,
-      aft: scoreAft,
-      vec: vector,
-      qed: qedVal,
-    },
-    debt: {
-      add: debt.add,
-      res: debt.res,
-      reg: debt.reg,
-    },
-    gate: {
-      pass: gatePass,
-      code: gateCode,
-    },
+    ...payload.record,
+    gate: { pass: !isFailed, code: isFailed ? 'BLOCK' : 'PASS' },
   };
 
   const line = serializeCompactRecordLine(record);
-  const byteLen = Buffer.byteLength(line, 'utf8');
-
   fs.appendFileSync(activeRunsPath, line + '\n', 'utf8');
   pruneActiveRunsIfExceeded(activeRunsPath, DEFAULT_MAX_ROLLING_RUNS);
-  const ledgerScope = commitLedger ? 'tracked ledger' : 'runtime .audit-logs';
-  console.log(
-    `  ✔ [Trajectory] Workspace audit run appended to ${ledgerScope} (${byteLen}B, rev: ${revision})`,
-  );
+
+  const activationBytes = appendActivationSidecar(ledgerDir, runId, activation);
+  console.log(renderRunSummary({
+    ledgerScope: commitLedger ? 'tracked ledger' : 'runtime .audit-logs',
+    byteLen: Buffer.byteLength(line, 'utf8'),
+    revision,
+    activationBytes,
+    activation,
+  }));
 }
 
 main();

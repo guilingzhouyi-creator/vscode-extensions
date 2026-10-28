@@ -499,6 +499,14 @@ if ($refsLineCount -gt 0) {
     Write-StepVerdict -StepId "RECEIPT-AUDIT-40" -Status "SKIP" -Detail "无推送 refs 输入（手动执行门禁）"
 }
 
+# 四方闭合：技能注册表、原型技能清单、专员模板与 DSH 写路径策略各自自洽却互相矛盾的缺陷，
+# 任何单点校验都看不见，必须交叉比对。
+$codeCascade41 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js") -WorkingDirectory $repoRoot -StepId "CASCADE-COHERENCE-41" -TimeoutSeconds 60
+if ($codeCascade41 -ne 0) {
+    $failed = $true
+}
+
+
 if ($Agent) {
     if ($failed) {
         $lastFailurePath = Join-Path $repoRoot ".audit-logs/last-failure.json"

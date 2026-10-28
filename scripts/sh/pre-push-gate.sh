@@ -514,6 +514,12 @@ else
     write_step_verdict "RECEIPT-AUDIT-40" SKIP "无推送 refs 输入（手动执行门禁）"
 fi
 
+# 四方闭合：技能注册表、原型技能清单、专员模板与 DSH 写路径策略各自自洽却互相矛盾的缺陷，
+# 任何单点校验都看不见，必须交叉比对。
+if ! run_gate_step 60 "CASCADE-COHERENCE-41" "$ROOT_DIR" "$NODE_BIN" .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js; then
+    FAILED=1
+fi
+
 if [[ "$AGENT_MODE" -eq 1 ]]; then
     if [[ "$FAILED" -ne 0 ]]; then
         if [[ -f "$AUDIT_LOG_DIR/last-failure.json" ]]; then

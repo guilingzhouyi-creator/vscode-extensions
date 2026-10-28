@@ -78,6 +78,67 @@ function validateActiveRuns(ledgerDir) {
   return { bytes: stat.size, violations };
 }
 
+function validateArchivedRuns(ledgerDir) {
+  const archivePath = path.join(ledgerDir, 'archive-runs.ndjson');
+  if (!fs.existsSync(archivePath)) {
+    return { bytes: 0, violations: 0 };
+  }
+
+  const stat = fs.statSync(archivePath);
+  const content = fs.readFileSync(archivePath, 'utf8');
+  const lines = content.split('\n').filter((l) => l.trim().length > 0);
+  let violations = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    violations += validateSingleRecordLine(lines[i], i);
+  }
+
+  console.log(
+    `  ✔ Verified ${lines.length} archived trajectory records (all <= ${MAX_RECORD_BYTE_SIZE}B)`,
+  );
+  return { bytes: stat.size, violations };
+}
+
+/**
+ * Validates the optional activation sidecar.
+ *
+ * The sidecar is separate from `active-runs.ndjson` because the main record has a 360-byte envelope that
+ * telemetry cannot fit into without weakening it. Absent file means "activation was never recorded" and
+ * passes silently; a present file must be NDJSON with a run id and at least one annotation, so a
+ * half-written line is caught here instead of being read as a skill that was never activated.
+ *
+ * @param {string} ledgerDir - Ledger directory.
+ * @returns {{bytes: number, violations: number}} Bytes and violation count.
+ */
+function validateActivationSidecar(ledgerDir) {
+  const sidecarPath = path.join(ledgerDir, 'activation.ndjson');
+  if (!fs.existsSync(sidecarPath)) {
+    return { bytes: 0, violations: 0 };
+  }
+
+  const stat = fs.statSync(sidecarPath);
+  const lines = fs.readFileSync(sidecarPath, 'utf8').split('\n').filter((l) => l.trim().length > 0);
+  let violations = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    try {
+      const parsed = JSON.parse(lines[i]);
+      const hasSkills = Array.isArray(parsed.skills) && parsed.skills.length > 0;
+      const hasPreset = typeof parsed.preset === 'string' && parsed.preset.length > 0;
+      if (!parsed.id || (!hasSkills && !hasPreset)) {
+        console.error(`  ❌ activation.ndjson line ${i + 1} lacks a run id or any annotation`);
+        violations++;
+      }
+    } catch (err) {
+      console.error(`  ❌ activation.ndjson line ${i + 1} is corrupt: ${err.message}`);
+      violations++;
+    }
+  }
+
+  console.log(`  ✔ Verified ${lines.length} activation annotation(s)`);
+  return { bytes: stat.size, violations };
+}
+
 function validateLifetimeSummary(ledgerDir) {
   const lifetimePath = path.join(ledgerDir, 'lifetime.summary.json');
   if (!fs.existsSync(lifetimePath)) {
@@ -142,11 +203,14 @@ function main() {
   }
 
   const activeRes = validateActiveRuns(ledgerDir);
+  const archiveRes = validateArchivedRuns(ledgerDir);
+  const activationRes = validateActivationSidecar(ledgerDir);
   const lifetimeRes = validateLifetimeSummary(ledgerDir);
   const weeklyRes = validateWeeklySummaries(ledgerDir);
 
-  const totalBytes = activeRes.bytes + lifetimeRes.bytes + weeklyRes.bytes;
-  const violations = activeRes.violations + lifetimeRes.violations + weeklyRes.violations;
+  const totalBytes = activeRes.bytes + archiveRes.bytes + activationRes.bytes + lifetimeRes.bytes + weeklyRes.bytes;
+  const violations =
+    activeRes.violations + archiveRes.violations + activationRes.violations + lifetimeRes.violations + weeklyRes.violations;
 
   if (totalBytes > MAX_TOTAL_STORAGE_BYTES) {
     console.error(

@@ -77,6 +77,7 @@ $logRuleSourceOut = Join-Path $transientDir "audit-check-rulesource-$randSuffix.
 $logDocsOut = Join-Path $transientDir "audit-check-docsout-$randSuffix.out.log"
 $logLedgerOut = Join-Path $transientDir "audit-check-ledgerout-$randSuffix.out.log"
 $logSubagentOut = Join-Path $transientDir "audit-check-subagentout-$randSuffix.out.log"
+$logCascadeOut = Join-Path $transientDir "audit-check-cascadeout-$randSuffix.out.log"
 $logDocAnchorsOut = Join-Path $transientDir "audit-check-docanchors-$randSuffix.out.log"
 $logMetricCoverageOut = Join-Path $transientDir "audit-check-metriccoverage-$randSuffix.out.log"
 $logFamilyContractOut = Join-Path $transientDir "audit-check-familycontract-$randSuffix.out.log"
@@ -139,6 +140,7 @@ $resRuleSource = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/
 $resDocs = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-docs-consistency.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocsOut -NoNewWindow -PassThru -Wait
 $resLedger = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-trajectory-ledger.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logLedgerOut -NoNewWindow -PassThru -Wait
 $resSubagent = Start-Process -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js") -WorkingDirectory $repoRoot -RedirectStandardOutput $logSubagentOut -NoNewWindow -PassThru -Wait
+$resCascade = Start-Process -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js") -WorkingDirectory $repoRoot -RedirectStandardOutput $logCascadeOut -NoNewWindow -PassThru -Wait
 $resDocAnchors = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-doc-anchors.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocAnchorsOut -NoNewWindow -PassThru -Wait
 $resMetricCoverage = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-metric-coverage.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logMetricCoverageOut -NoNewWindow -PassThru -Wait
 $resFamilyContract = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-family-contract.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFamilyContractOut -NoNewWindow -PassThru -Wait
@@ -158,7 +160,7 @@ $codeCatalog = $res.ExitCode
 $ruleStepCodes = @(
     $codeCatalog, $resFeedback.ExitCode, $resOrdering.ExitCode, $resSkills.ExitCode,
     $resClosure.ExitCode, $resReach.ExitCode, $resRuleSource.ExitCode, $resDocs.ExitCode,
-    $resLedger.ExitCode, $resSubagent.ExitCode, $resDocAnchors.ExitCode, $resMetricCoverage.ExitCode,
+    $resLedger.ExitCode, $resSubagent.ExitCode, $resCascade.ExitCode, $resDocAnchors.ExitCode, $resMetricCoverage.ExitCode,
     $resFamilyContract.ExitCode, $resDocReach.ExitCode, $resCommitHistory.ExitCode,
     $resDestructive.ExitCode, $resChains.ExitCode, $resCounts.ExitCode, $resParity.ExitCode,
     $resGateProof.ExitCode, $resDocMetrics.ExitCode

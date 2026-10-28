@@ -347,6 +347,11 @@
           "id": "RECEIPT-AUDIT-40",
           "title": "逐提交门禁收据审计与绕过留痕",
           "ruleId": "GUARD-HOOK-001"
+        },
+        {
+          "id": "CASCADE-COHERENCE-41",
+          "ruleId": "RCFG-RULE-DRIFT",
+          "title": "技能注册表、原型、专员模板与 DSH 策略四方闭合"
         }
       ]
     },
