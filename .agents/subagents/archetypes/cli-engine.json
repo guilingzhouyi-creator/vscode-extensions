@@ -36,7 +36,7 @@
     "test-benchmark-engineering"
   ],
   "rigidAxioms": [
-    "32 个内置分析器与 374 条内置规则体系自测全通过 (180/180 套测试)，零孤儿用例与规则漂移 (RCFG-RULE-DRIFT)",
+    "32 个内置分析器与 374 条内置规则体系自测全通过 (179/179 套测试)，零孤儿用例与规则漂移 (RCFG-RULE-DRIFT)",
     "Rust 原生算子内核与 pure-TS shim 必须保持 100% 字节等价，符合 RSM-* 现代 Rust 惯用法与零 panic (FGT-ERR-001 / RSM-PNC-001)",
     "循环体内严禁动态编译 RegExp 或瞬态堆分配 (CPX-SPACE-001 / FGT-PRF-001)，形参借用切片优先 (RSM-STR-001)",
     "门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，零空包跳板 (ARCH-ABS-001 / ARCH-FAC-001)",

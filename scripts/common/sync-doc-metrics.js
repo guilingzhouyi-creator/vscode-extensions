@@ -248,16 +248,21 @@ function findArrayLiteralEnd(source, marker) {
  * several lines (name on one line, script on the next) from being silently dropped — that
  * undercount is exactly how the published total drifted to 155 while the runner executed 163.
  *
+ * The same registration appears twice in one lane, so counting declarations claims one more suite
+ * than the runner can execute. Grouping by the script path collapses the repeat while still
+ * counting distinct suites, which is the figure the runner's own `ALL N/N` banner reports.
+ *
  * @param {string} source - Runner source text.
  * @param {string} marker - Declaration opening the array literal.
- * @returns {number} Number of suites, or -1 when the marker is absent.
+ * @returns {number} Number of distinct suites, or -1 when the marker is absent.
  */
 function countRunnerSuites(source, marker) {
   const start = source.indexOf(marker);
   if (start < 0) return -1;
   const end = findArrayLiteralEnd(source, marker);
   if (end < 0) return -1;
-  return (source.slice(start, end).match(/\bscript: /g) || []).length;
+  const scripts = source.slice(start, end).match(/\bscript: '[^']+'/g) || [];
+  return new Set(scripts).size;
 }
 
 /**
@@ -897,6 +902,15 @@ function runSelfProbes(config) {
   expect('fenced-example-verbatim', applyRegions(fencedExample, render).text, fencedExample);
   const inlineExample = '写法为 `<!-- METRICS:BEGIN rule-total -->` 与 `<!-- METRICS:END rule-total -->`。';
   expect('inline-example-untouched', applyRegions(inlineExample, render).drifts.length, 0);
+
+  // A lane may list the same script twice. Counting declarations would then exceed what the
+  // runner executes, so the published total would claim suites that never run.
+  const repeatedLane =
+    "const L = [\n  { name: 'a', script: 'scripts/a.js' },\n" +
+    "  { name: 'a', script: 'scripts/a.js' },\n  { name: 'b', script: 'scripts/b.js' },\n];\n";
+  expect('repeated-registration-collapsed', countRunnerSuites(repeatedLane, 'const L = ['), 2);
+  const inlineLane = "const M = [{ name: 'c', script: 'scripts/c.js' }];\n";
+  expect('single-line-lane-closed', countRunnerSuites(inlineLane, 'const M = ['), 1);
 
   return failures;
 }

@@ -166,7 +166,6 @@ const PARALLEL_SUITES = [
   { name: 'validate-docs', script: 'scripts/validate-docs.js' },
   { name: 'validate-project-neutrality', script: 'scripts/validate-project-neutrality.js' },
   { name: 'validate-consumer-runner', script: 'scripts/validate-consumer-runner.js' },
-  { name: 'validate-test-runner-harness', script: 'scripts/validate-test-runner-harness.js' },
   { name: 'test-codec', script: 'scripts/test-result-codec.js' },
   { name: 'validate-compression', script: 'scripts/validate-compression-bounds.js' },
   { name: 'validate-marker-scope', script: 'scripts/validate-marker-scope.js' },
