@@ -55,6 +55,7 @@ export const NEED_RUNTIME_EVIDENCE = 'NEED_RUNTIME_EVIDENCE';
 export type Severity = 'info' | 'warning' | 'error';
 
 import type { AgentProfileName } from './governance/agent-profiles';
+import type { PartialScoringConfig } from './scoring/scoring-parameters';
 export type { AgentProfileName };
 
 /** Informational severity level; maps to SARIF note level. */
@@ -767,6 +768,13 @@ export interface ScanConfig {
     agentUid?: string;
     /** Custom dimension weights for transparent quality scoring. */
     scoringWeights?: Record<string, number>;
+    /**
+     * Partial override of the scoring parameter SSOT: autonomy weights and aggregation mode,
+     * the dimension index half-point, the macro-file damping knee, the security attack surface
+     * ceiling, and the anti-gaming conjunction threshold. Absent fields keep their defaults, so
+     * an empty object reproduces the published model exactly.
+     */
+    scoring?: PartialScoringConfig;
     /** When true, bypasses file-level syntactic and extension preflight filtering. */
     bypassPreflight?: boolean;
     /** Explicit or auto-detected project archetype ('demo' | 'web' | 'game' | 'library'). */

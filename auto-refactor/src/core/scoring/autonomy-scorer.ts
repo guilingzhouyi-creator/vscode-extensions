@@ -10,7 +10,8 @@
  *   1. Quantify proprietary vs in-tree vendor vs generated effective lines of code;
  *   2. Quantify internal module calls vs external third-party SDK calls;
  *   3. Quantify core algorithm/domain kernel density against glue layers;
- *   4. Quantify code originality by auditing cloned/borrowed token blocks;
+ *   4. Quantify code originality from genuine clone density (borrowed blocks, not repeated
+ *      string or numeric literals, which are an extraction suggestion rather than plagiarism);
  *   5. Quantify supply chain dependency depth and lockfile resilience;
  *   6. Quantify mission-critical security and dispatch path in-house ratio;
  *   7. Compute Jeffreys conjugate Beta(0.5, 0.5) Bayesian credible interval and confidence;
@@ -19,6 +20,9 @@
  *   defensive division-by-zero guards and graceful handling for minimal single-file libraries.
  *   Degradation adaptivity: When symbolIndex is absent, rCall gracefully degrades according to
  *   file-level external SDK import presence instead of falsely defaulting to 100%.
+ *   Every coefficient, weight, and half-point comes from `scoring-parameters`, so a scan can be
+ *   tuned through `ScanConfig.scoring` without editing this module; the six axes are combined by
+ *   a weighted geometric mean by default so one collapsed axis cannot be outvoted.
  */
 
 import * as fs from 'fs';
@@ -28,7 +32,6 @@ import {
     classifyFileProvenance,
     classifyImportProvenance,
     findNearestManifestInventory,
-    isDevOnlyDependency,
     loadProjectManifestDependencies,
     loadProjectSupplyChainProfile,
     type ProjectManifestInventory,
@@ -41,13 +44,38 @@ import {
     type FileImportProfile,
 } from '../intelligence/import-profiler';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
-import type { SymbolIndex, SymbolReference } from '../intelligence/symbolIndex';
+import type { SymbolIndex } from '../intelligence/symbolIndex';
 import { clampScore, computeExactBetaCredibleInterval } from '../math';
 import { AutonomyGradeDescriptions } from '../messages';
+import {
+    DEFAULT_SCORING_CONFIG,
+    resolveScoringConfig,
+    type AutonomyScoringConfig,
+    type ScoringAggregationMode,
+} from './scoring-parameters';
+import {
+    HEADER_PREVIEW_SLICE_500,
+    KIND_EXTERNAL_SDK,
+    KIND_INTERNAL,
+    KIND_STDLIB,
+    MAX_AUTONOMY_FILE_READ_BYTES,
+    PROVENANCE_GENERATED,
+    PROVENANCE_IN_TREE_VENDOR,
+    ROLE_ALGORITHM_COMPUTATION,
+    ROLE_BUSINESS_MODULE,
+    ROLE_CORE_TRUNK,
+    createAutonomyScanState,
+    isCriticalPathFile,
+    isProductionExternalSdk,
+    recordSdkCall,
+    type AutonomyScanState,
+} from './autonomy-scan-state';
+import { applySymbolIndexReferences } from './autonomy-reference-scan';
 
 const SCALE_LOC_EXPONENT = 4000;
 const SCALE_FILE_EXPONENT = 8;
 const PRECISION_THREE = 3;
+const PRECISION_TWO = 2;
 const PERCENT_MAX = 100.0;
 const PERCENT_FACTOR = 100;
 const MIN_EFFECTIVE_SAMPLE_SIZE = 2;
@@ -66,80 +94,7 @@ const GRADE_L3 = 'L3_BALANCED';
 const GRADE_L2 = 'L2_FRAMEWORK_DEPENDENT';
 const GRADE_L1 = 'L1_SHALLOW_WRAPPER';
 
-const MAX_AUTONOMY_FILE_READ_BYTES = 524288;
-const HEADER_PREVIEW_SLICE_500 = 500;
-
-const TEST_FILE_OR_FIXTURE_PATTERN =
-    /(?:^|[\\/])(?:tests?|__tests__|testing|spec|fixtures?)[\\/]|[\\/][a-z0-9_.-]+(?:\.test|\.spec)\.[a-z0-9]+$|(?:^|[\\/])scripts[\\/](?:validate|test|bench)[-_][a-z0-9_.-]+\.[a-z0-9]+$/i;
-
-const TEST_HARNESS_PACKAGES: ReadonlySet<string> = new Set([
-    'vitest',
-    'jest',
-    'mocha',
-    'chai',
-    'supertest',
-    'sinon',
-    'jasmine',
-    'pytest',
-    'unittest',
-    '@types/jest',
-    '@types/mocha',
-    '@types/node',
-    '@vitest/runner',
-    '@vitest/utils',
-    '@vitest/expect',
-    '@vitest/spy',
-]);
-
-function isTestOrFixtureFile(filePath: string): boolean {
-    return TEST_FILE_OR_FIXTURE_PATTERN.test(filePath.replace(/\\/g, '/'));
-}
-
-function isProductionExternalSdk(
-    specOrPkg: string,
-    currentFile: string,
-    fileInv?: ProjectManifestInventory,
-): boolean {
-    const pkg = extractModulePackageName(specOrPkg);
-    if (!pkg) return false;
-    if (isTestOrFixtureFile(currentFile)) {
-        if (TEST_HARNESS_PACKAGES.has(pkg) || TEST_HARNESS_PACKAGES.has(specOrPkg)) {
-            return false;
-        }
-        if (!fileInv) return false;
-        if (isDevOnlyDependency(pkg, fileInv)) {
-            return false;
-        }
-        const norm = pkg.toLowerCase();
-        const inProd =
-            fileInv.prodDependencies.has(norm) ||
-            fileInv.prodDependencies.has(pkg) ||
-            fileInv.peerDependencies.has(norm) ||
-            fileInv.peerDependencies.has(pkg);
-        if (!inProd) {
-            return false;
-        }
-    }
-    return true;
-}
-
-const KIND_INTERNAL = 'internal';
-const KIND_STDLIB = 'stdlib';
-const KIND_EXTERNAL_SDK = 'external_sdk';
-const PROVENANCE_IN_TREE_VENDOR = 'in_tree_vendor';
-const PROVENANCE_GENERATED = 'generated';
-const ROLE_ALGORITHM_COMPUTATION = 'algorithm_computation';
-const ROLE_CORE_TRUNK = 'core_trunk';
-const ROLE_BUSINESS_MODULE = 'business_module';
-
-const MIN_RESILIENCE_SCORE = 15.0;
-const MIN_RCALL_SCORE = 10;
-const EXTERNAL_PKG_PENALTY_WEIGHT = 15;
-const MAX_CLONE_PENALTY = 80;
-const CLONE_PENALTY_MULTIPLIER = 1.5;
 const RULE_HYG_CLN_001 = 'HYG-CLN-001';
-const RULE_DUPLICATE_LITERAL = 'duplicate-literal';
-const HASH_PRIME_MULTIPLIER = 31;
 
 /**
  * Computes rigorous Bayesian Credible Interval for autonomy index using
@@ -276,16 +231,6 @@ export interface AutonomyEvaluation {
     };
 }
 
-/** Default sub-dimension weighting distribution (CAI 2.0 normalized to 1.00) */
-const DEFAULT_AUTONOMY_WEIGHTS = {
-    effectiveLoc: 0.3,
-    symbolCall: 0.2,
-    domainKernel: 0.15,
-    codeOriginality: 0.15,
-    supplyChainResilience: 0.1,
-    criticalPathAutonomy: 0.1,
-};
-
 /**
  * Assign qualitative grade based on composite autonomy score.
  */
@@ -327,32 +272,6 @@ function resolveAutonomyGrade(score: number): {
 
 export { extractFileImportProfile, type FileImportProfile };
 
-/** Pattern to identify mission-critical runtime, security, crypto, and architecture roots */
-const CRITICAL_PATH_PATTERN =
-    /(?:auth|crypto|security|cipher|token|signature|hash|tls|ssl|secret|rbac|permission|runtime|kernel|dispatch|protocol|driver|syscall|gateway|bootstrap|main\b)/i;
-
-/**
- * Evaluates the in-house self-development ratio across all scanned files.
- */
-interface AutonomyScanState {
-    proprietaryFiles: number;
-    vendorFiles: number;
-    generatedFiles: number;
-    proprietaryEffectiveLoc: number;
-    vendorEffectiveLoc: number;
-    generatedEffectiveLoc: number;
-    domainKernelEffectiveLoc: number;
-    internalSymbolCalls: number;
-    externalSdkCalls: number;
-    stdlibCalls: number;
-    criticalPathFiles: number;
-    criticalPathInternalCalls: number;
-    criticalPathExternalCalls: number;
-    sdkCallCounts: Map<string, number>;
-    sdkFileSets: Map<string, Set<string>>;
-    currentSpecifiers?: string[];
-}
-
 /**
  * Load raw source content from memory map or disk file without early 1KB truncation.
  */
@@ -392,26 +311,6 @@ function loadFileRawContent(
         return chunk;
     }
     return '';
-}
-
-function recordSdkCall(
-    state: AutonomyScanState,
-    pkg: string,
-    currentFile: string,
-    isCritical: boolean,
-): void {
-    state.externalSdkCalls++;
-    if (isCritical) {
-        state.criticalPathExternalCalls++;
-    }
-    const currentCount = state.sdkCallCounts.get(pkg) || 0;
-    state.sdkCallCounts.set(pkg, currentCount + 1);
-    let set = state.sdkFileSets.get(pkg);
-    if (!set) {
-        set = new Set();
-        state.sdkFileSets.set(pkg, set);
-    }
-    set.add(currentFile);
 }
 
 /**
@@ -487,7 +386,7 @@ function accumulateFileMetric(params: FileMetricAccumulationParams): void {
     state.proprietaryFiles++;
     state.proprietaryEffectiveLoc += eloc;
 
-    const isCritical = !isTestOrFixtureFile(metric.file) && CRITICAL_PATH_PATTERN.test(metric.file);
+    const isCritical = isCriticalPathFile(metric.file);
     if (isCritical) {
         state.criticalPathFiles++;
     }
@@ -515,29 +414,136 @@ function accumulateFileMetric(params: FileMetricAccumulationParams): void {
 
 /**
  * Quantifies supply chain resilience against external transitive dependency explosion.
+ *
+ * Coefficients come from the autonomy parameter block rather than inline literals, so a
+ * framework-heavy project can widen the dampening without editing the engine.
+ *
+ * @param supplyChain - Lockfile and manifest profile of the project.
+ * @param config - Autonomy parameters supplying the dampening coefficients.
+ * @returns Resilience score in [minResilience, 100].
  */
-function calculateSupplyChainResilience(supplyChain: SupplyChainProfile): number {
+function calculateSupplyChainResilience(
+    supplyChain: SupplyChainProfile,
+    config: AutonomyScoringConfig,
+): number {
     if (supplyChain.directDependencyCount === 0 && supplyChain.totalLockfilePackages === 0) {
         return PERCENT_MAX;
     }
     const directCount = supplyChain.directDependencyCount;
     const transitiveCount = supplyChain.transitiveDependencyCount;
     const depth = supplyChain.estimatedDepth;
+    const coefficients = config.supplyChain;
 
     const penalty =
-        directCount * 0.5 + Math.sqrt(transitiveCount) * 0.8 + Math.max(0, depth - 1) * 2.0;
-    const resilience = Math.max(MIN_RESILIENCE_SCORE, Math.min(PERCENT_MAX, PERCENT_MAX - penalty));
+        directCount * coefficients.directWeight +
+        Math.sqrt(transitiveCount) * coefficients.transitiveWeight +
+        Math.max(0, depth - 1) * coefficients.depthWeight;
+    const resilience = Math.max(
+        coefficients.minResilience,
+        Math.min(PERCENT_MAX, PERCENT_MAX - penalty),
+    );
     return clampScore(resilience);
 }
 
 /**
+ * Combine the six autonomy axes into the composite index.
+ *
+ * The default geometric form is bounded by the weakest axis, so outsourcing the critical path
+ * cannot be masked by a high proprietary-LOC ratio. Both branches floor each axis at
+ * `compositeIndexFloor`: the logarithm needs a strictly positive argument, and the floor keeps a
+ * single collapse visible (~15^0.1 ≈ 0.76 against 1.0) without erasing the score.
+ *
+ * @param axes - Six axis scores in [0, 100].
+ * @param weights - Matching non-negative weights; only their ratios matter.
+ * @param mode - Aggregation strategy.
+ * @param floor - Strictly positive floor applied before the geometric mean.
+ * @returns Composite index rounded to two decimals.
+ */
+function aggregateAutonomyAxes(
+    axes: readonly number[],
+    weights: readonly number[],
+    mode: ScoringAggregationMode,
+    floor: number,
+): number {
+    let weightMass = 0;
+    for (const weight of weights) weightMass += weight;
+    if (weightMass <= 0) return 0;
+
+    if (mode === 'arithmetic') {
+        let sum = 0;
+        for (let index = 0; index < axes.length; index++) {
+            sum += axes[index] * weights[index];
+        }
+        return +(sum / weightMass).toFixed(PRECISION_TWO);
+    }
+
+    let logSum = 0;
+    for (let index = 0; index < axes.length; index++) {
+        if (weights[index] <= 0) continue;
+        const bounded = Math.max(floor, Math.min(PERCENT_FACTOR, axes[index]));
+        logSum += weights[index] * Math.log(bounded);
+    }
+    return +Math.exp(logSum / weightMass).toFixed(PRECISION_TWO);
+}
+
+/**
+ * Quantifies code originality from genuine clone findings only.
+ *
+ * Two corrections over the previous absolute-count penalty:
+ *
+ * 1. `duplicate-literal` is a constant-extraction suggestion, not borrowed code, so it no
+ *    longer feeds this axis — a project is not less original for repeating `'utf8'`.
+ * 2. The penalty is a hyperbolic function of clone *density* (findings per thousand proprietary
+ *    ELOC) instead of `count * 1.5` clamped at 80. The old form saturated at 54 findings, so
+ *    every repository past a few thousand lines reported exactly 20% originality regardless of
+ *    how clean it actually was; density keeps large and small trees comparable and never pins.
+ *
+ * @param issues - All findings collected during the scan.
+ * @param proprietaryEloc - Proprietary effective lines of code in the tree.
+ * @param config - Autonomy parameters supplying the clone half-point and density unit.
+ * @returns Originality index in [0, 100]; 100 when no clone was found.
+ */
+function calculateCodeOriginality(
+    issues: Issue[],
+    proprietaryEloc: number,
+    config: AutonomyScoringConfig,
+): number {
+    let cloneFindings = 0;
+    for (const issue of issues) {
+        if (issue.rule === RULE_HYG_CLN_001) cloneFindings++;
+    }
+    if (cloneFindings === 0) {
+        return PERCENT_FACTOR;
+    }
+    const unit = Math.max(1, config.cloneDensityElocUnit);
+    const density = cloneFindings / Math.max(1, proprietaryEloc / unit);
+    const score = (PERCENT_FACTOR * config.cloneHalfPoint) / (config.cloneHalfPoint + density);
+    return Number.isFinite(score) ? clampScore(score) : PERCENT_FACTOR;
+}
+
+/**
  * Synthesize raw accounting state and issues into AutonomyEvaluation.
+ *
+ * The six axes are combined through a weighted geometric mean by default, matching the quality
+ * model: an arithmetic sum let five healthy axes outvote one collapsed axis (a fully outsourced
+ * critical path, for instance) and report a passable autonomy index for a project that owns no
+ * core logic. Each axis is floored at `compositeIndexFloor` so a single collapse still registers
+ * without driving the logarithm to negative infinity.
+ *
+ * @param state - Accumulated per-file accounting state.
+ * @param totalFiles - Number of files considered in the scan.
+ * @param issues - All findings collected during the scan.
+ * @param supplyChain - Lockfile and manifest profile of the project.
+ * @param config - Autonomy parameters; defaults to the scoring SSOT.
+ * @returns Full autonomy evaluation record.
  */
 function synthesizeAutonomyEvaluation(
     state: AutonomyScanState,
     totalFiles: number,
     issues: Issue[],
     supplyChain: SupplyChainProfile,
+    config: AutonomyScoringConfig = DEFAULT_SCORING_CONFIG.autonomy,
+    compositeIndexFloor: number = DEFAULT_SCORING_CONFIG.compositeIndexFloor,
 ): AutonomyEvaluation {
     const totalTreeEloc =
         state.proprietaryEffectiveLoc + state.vendorEffectiveLoc + state.generatedEffectiveLoc;
@@ -553,8 +559,8 @@ function synthesizeAutonomyEvaluation(
     } else if (state.sdkCallCounts.size > 0 || state.externalSdkCalls > 0) {
         const externalPkgs = Math.max(1, state.sdkCallCounts.size);
         rCall = Math.max(
-            MIN_RCALL_SCORE,
-            PERCENT_FACTOR - externalPkgs * EXTERNAL_PKG_PENALTY_WEIGHT,
+            config.minSymbolCallScore,
+            PERCENT_FACTOR - externalPkgs * config.externalPackagePenalty,
         );
     } else {
         rCall = PERCENT_FACTOR;
@@ -568,13 +574,9 @@ function synthesizeAutonomyEvaluation(
               )
             : PERCENT_FACTOR;
 
-    const cloneIssues = issues.filter(
-        (i) => i.rule === RULE_HYG_CLN_001 || i.rule === RULE_DUPLICATE_LITERAL,
-    );
-    const clonePenalty = Math.min(MAX_CLONE_PENALTY, cloneIssues.length * CLONE_PENALTY_MULTIPLIER);
-    const rPure = Math.max(0, PERCENT_FACTOR - clonePenalty);
+    const rPure = calculateCodeOriginality(issues, state.proprietaryEffectiveLoc, config);
 
-    const rSupply = calculateSupplyChainResilience(supplyChain);
+    const rSupply = calculateSupplyChainResilience(supplyChain, config);
 
     const totalCriticalCalls = state.criticalPathInternalCalls + state.criticalPathExternalCalls;
     let rCritical: number;
@@ -586,15 +588,20 @@ function synthesizeAutonomyEvaluation(
         rCritical = rCall;
     }
 
-    const weights = DEFAULT_AUTONOMY_WEIGHTS;
-    const compositeScore = +(
-        rLoc * weights.effectiveLoc +
-        rCall * weights.symbolCall +
-        rDomain * weights.domainKernel +
-        rPure * weights.codeOriginality +
-        rSupply * weights.supplyChainResilience +
-        rCritical * weights.criticalPathAutonomy
-    ).toFixed(2);
+    const weights = config.weights;
+    const compositeScore = aggregateAutonomyAxes(
+        [rLoc, rCall, rDomain, rPure, rSupply, rCritical],
+        [
+            weights.effectiveLoc,
+            weights.symbolCall,
+            weights.domainKernel,
+            weights.codeOriginality,
+            weights.supplyChainResilience,
+            weights.criticalPathAutonomy,
+        ],
+        config.aggregationMode,
+        compositeIndexFloor,
+    );
 
     const boundedComposite = Math.max(0, Math.min(PERCENT_FACTOR, compositeScore));
     const { grade, description } = resolveAutonomyGrade(boundedComposite);
@@ -655,284 +662,6 @@ function synthesizeAutonomyEvaluation(
             criticalPathExternalCalls: state.criticalPathExternalCalls,
         },
     };
-}
-
-const COMMON_STDLIB_SYMBOLS: ReadonlySet<string> = new Set(
-    // Common ECMAScript / JS / TS built-ins
-    (
-        'push pop shift unshift slice splice join map filter reduce find includes forEach indexOf ' +
-        'lastIndexOf some every concat reverse sort keys values entries assign freeze seal create ' +
-        'defineProperty hasOwnProperty toString valueOf trim split replace replaceAll toLowerCase ' +
-        'toUpperCase startsWith endsWith substring charAt charCodeAt match test exec now parse ' +
-        'stringify log info warn error debug trace floor ceil round abs min max sqrt pow random ' +
-        'setTimeout clearTimeout setInterval clearInterval resolve reject then catch finally all race ' +
-        'has get set add delete clear size length bind call apply close open read write ' +
-        // Rust standard library & prelude items
-        'std core alloc Box Rc Arc RefCell Mutex RwLock Option Result Some None Ok Err ' +
-        'Default Clone Copy Send Sync Debug Display Hash PartialEq Eq PartialOrd Ord ' +
-        'String str Vec HashMap HashSet BTreeMap BTreeSet Instant Duration println eprintln ' +
-        'format vec panic assert assert_eq assert_ne ' +
-        // Go standard library & built-in functions
-        'make len cap append copy close delete print println panic recover new Error ' +
-        'Read Write Close Sprint Sprintf Sprintln Print Printf Println ' +
-        // Python built-in functions & methods
-        'range enumerate zip issubclass getattr setattr hasattr dict tuple int ' +
-        'float bool bytes bytearray sum sorted any all ' +
-        // GDScript built-ins
-        'push_error push_warning randf randi randf_range randi_range deg_to_rad rad_to_deg ' +
-        'clamp lerp emit_signal connect disconnect queue_free is_instance_valid get_node has_node'
-    ).split(' '),
-);
-
-function selectBalancedSdk(extPkgs: readonly string[], symbolName: string): string {
-    if (extPkgs.length === 1) return extPkgs[0];
-    let hash = 0;
-    for (let i = 0; i < symbolName.length; i++) {
-        hash = (hash * HASH_PRIME_MULTIPLIER + symbolName.charCodeAt(i)) >>> 0;
-    }
-    return extPkgs[hash % extPkgs.length];
-}
-
-interface BoundImportRefParams {
-    readonly boundPkg: string;
-    readonly file: string;
-    readonly isCritical: boolean;
-    readonly effectiveDeps?: Set<string>;
-    readonly fileInv: ProjectManifestInventory;
-    readonly state: AutonomyScanState;
-}
-
-/**
- * Dispatches an import-bound reference to the appropriate autonomy state bucket.
- */
-function processBoundImportRef(params: BoundImportRefParams): void {
-    const { boundPkg, file, isCritical, effectiveDeps, fileInv, state } = params;
-    const boundKind = classifyImportProvenance(boundPkg, file, effectiveDeps);
-    if (boundKind === KIND_STDLIB) {
-        state.stdlibCalls++;
-        return;
-    }
-    if (boundKind === KIND_INTERNAL) {
-        state.internalSymbolCalls++;
-        if (isCritical) state.criticalPathInternalCalls++;
-        return;
-    }
-    if (!isProductionExternalSdk(boundPkg, file, fileInv)) {
-        state.stdlibCalls++;
-        return;
-    }
-    recordSdkCall(state, boundPkg, file, isCritical);
-}
-
-/**
- * Per-scan memo tables shared while classifying symbol references.
- */
-interface ReferenceScanCaches {
-    criticalByFile: Map<string, boolean>;
-    inventoryByFile: Map<string, ProjectManifestInventory>;
-}
-
-/**
- * Immutable inputs the reference classifier needs for every call site.
- */
-interface ReferenceScanInputs {
-    symbolIndex: SymbolIndex;
-    fileToExtPackages: Map<string, string[]>;
-    fileToImportProfiles?: Map<string, FileImportProfile>;
-    rootDir: string;
-    manifestDeps?: Set<string>;
-}
-
-/**
- * Resolve (and memoize) whether a file sits on a critical execution path.
- *
- * @param file - File owning the reference.
- * @param caches - Per-scan memo tables.
- * @returns `true` when the file is production code on a critical path.
- */
-function isCriticalFile(file: string, caches: ReferenceScanCaches): boolean {
-    const cached = caches.criticalByFile.get(file);
-    if (cached !== undefined) return cached;
-    const isCritical = !isTestOrFixtureFile(file) && CRITICAL_PATH_PATTERN.test(file);
-    caches.criticalByFile.set(file, isCritical);
-    return isCritical;
-}
-
-/**
- * Resolve (and memoize) the nearest manifest inventory for a file.
- *
- * @param file - File owning the reference.
- * @param caches - Per-scan memo tables.
- * @param rootDir - Scan root used for the nearest-manifest walk.
- * @returns The nearest manifest inventory.
- */
-function resolveReferenceInventory(
-    file: string,
-    caches: ReferenceScanCaches,
-    rootDir: string,
-): ProjectManifestInventory {
-    const cached = caches.inventoryByFile.get(file);
-    if (cached !== undefined) return cached;
-    const resolved = findNearestManifestInventory(file, rootDir);
-    caches.inventoryByFile.set(file, resolved);
-    return resolved;
-}
-
-/**
- * Count a reference that resolves to an in-project declaration.
- *
- * @param ref - Indexed call reference.
- * @param isCritical - Whether the referencing file is on a critical path.
- * @param symbolIndex - Materialized project symbol index.
- * @param state - Autonomy evaluation state to update.
- * @returns `true` when the reference was internal and has been counted.
- */
-function countInternalReference(
-    ref: SymbolReference,
-    isCritical: boolean,
-    symbolIndex: SymbolIndex,
-    state: AutonomyScanState,
-): boolean {
-    if (!symbolIndex.hasDefinition(ref.name)) return false;
-    state.internalSymbolCalls++;
-    if (isCritical) state.criticalPathInternalCalls++;
-    return true;
-}
-
-function isStdlibOrReceiver(name: string, calleeReceiver?: string | null): boolean {
-    return (
-        COMMON_STDLIB_SYMBOLS.has(name) ||
-        (Boolean(calleeReceiver) && COMMON_STDLIB_SYMBOLS.has(calleeReceiver!))
-    );
-}
-
-const RECEIVER_THIS = 'this';
-const RECEIVER_SELF = 'self';
-const RECEIVER_SUPER = 'super';
-const SELF_RECEIVER_SET = new Set<string>([RECEIVER_THIS, RECEIVER_SELF, RECEIVER_SUPER]);
-
-function isSelfReceiver(calleeReceiver?: string | null): boolean {
-    return Boolean(calleeReceiver && SELF_RECEIVER_SET.has(calleeReceiver));
-}
-
-function resolveMatchedExtPackage(extPkgs: string[], ref: SymbolReference): string {
-    if (ref.calleeReceiver && extPkgs.includes(ref.calleeReceiver)) {
-        return ref.calleeReceiver;
-    }
-    if (extPkgs.includes(ref.name)) {
-        return ref.name;
-    }
-    return selectBalancedSdk(extPkgs, ref.name);
-}
-
-interface ExternalReferenceCountParams {
-    readonly ref: SymbolReference;
-    readonly isCritical: boolean;
-    readonly inputs: ReferenceScanInputs;
-    readonly caches: ReferenceScanCaches;
-    readonly state: AutonomyScanState;
-}
-
-/**
- * Count a reference that is not backed by an in-project declaration: import-bound packages,
- * common standard-library symbols, or the file's external SDK packages.
- *
- * Contract: a file with no declared external package degrades to a stdlib call rather than an
- * external SDK call, so supply-chain metrics never inflate on unresolved references.
- */
-function countExternalReference(params: ExternalReferenceCountParams): void {
-    const { ref, isCritical, inputs, caches, state } = params;
-    const fileInv = resolveReferenceInventory(ref.file, caches, inputs.rootDir);
-    const effectiveDeps =
-        fileInv.allDependencies.size > 0 ? fileInv.allDependencies : inputs.manifestDeps;
-
-    const profile = inputs.fileToImportProfiles?.get(ref.file);
-    const boundPkg =
-        profile?.symbolToPackageMap.get(ref.name) ??
-        (ref.calleeReceiver ? profile?.symbolToPackageMap.get(ref.calleeReceiver) : undefined);
-    if (boundPkg) {
-        processBoundImportRef({
-            boundPkg,
-            file: ref.file,
-            isCritical,
-            effectiveDeps,
-            fileInv,
-            state,
-        });
-        return;
-    }
-
-    if (isStdlibOrReceiver(ref.name, ref.calleeReceiver)) {
-        state.stdlibCalls++;
-        return;
-    }
-
-    if (isSelfReceiver(ref.calleeReceiver)) {
-        state.internalSymbolCalls++;
-        if (isCritical) state.criticalPathInternalCalls++;
-        return;
-    }
-
-    const extPkgs = inputs.fileToExtPackages.get(ref.file);
-    if (!extPkgs || extPkgs.length === 0) {
-        state.stdlibCalls++;
-        return;
-    }
-
-    const matchedPkg = resolveMatchedExtPackage(extPkgs, ref);
-    recordSdkCall(state, matchedPkg, ref.file, isCritical);
-}
-
-interface SymbolIndexReferenceParams {
-    readonly symbolIndex: SymbolIndex;
-    readonly state: AutonomyScanState;
-    readonly fileToExtPackages: Map<string, string[]>;
-    readonly fileToImportProfiles?: Map<string, FileImportProfile>;
-    readonly rootDir?: string;
-    readonly manifestDeps?: Set<string>;
-}
-
-/**
- * Overwrites call metrics with true AST call references from the indexed symbol graph
- * and local file import binding profiles.
- */
-function applySymbolIndexReferences(params: SymbolIndexReferenceParams): void {
-    const {
-        symbolIndex,
-        state,
-        fileToExtPackages,
-        fileToImportProfiles,
-        rootDir = process.cwd(),
-        manifestDeps,
-    } = params;
-    const refs = symbolIndex.getAllReferences();
-    if (refs.length === 0) return;
-
-    state.internalSymbolCalls = 0;
-    state.externalSdkCalls = 0;
-    state.stdlibCalls = 0;
-    state.criticalPathInternalCalls = 0;
-    state.criticalPathExternalCalls = 0;
-    state.sdkCallCounts.clear();
-    state.sdkFileSets.clear();
-
-    const caches: ReferenceScanCaches = {
-        criticalByFile: new Map<string, boolean>(),
-        inventoryByFile: new Map<string, ProjectManifestInventory>(),
-    };
-    const inputs: ReferenceScanInputs = {
-        symbolIndex,
-        fileToExtPackages,
-        fileToImportProfiles,
-        rootDir,
-        manifestDeps,
-    };
-
-    for (const ref of refs) {
-        const isCritical = isCriticalFile(ref.file, caches);
-        if (countInternalReference(ref, isCritical, symbolIndex, state)) continue;
-        countExternalReference({ ref, isCritical, inputs, caches, state });
-    }
 }
 
 function appendExtPackage(pkgs: string[] | undefined, spec: string): string[] {
@@ -1044,26 +773,11 @@ export function evaluateProjectAutonomy(
     const { fileMetrics, issues, config, fileContents, symbolIndex } = ctx;
 
     const rootDir = config.root || process.cwd();
+    const scoringConfig = resolveScoringConfig(config.scoring);
     const manifestDeps = loadProjectManifestDependencies(rootDir);
     const supplyChain = loadProjectSupplyChainProfile(rootDir, manifestDeps.size);
 
-    const state: AutonomyScanState = {
-        proprietaryFiles: 0,
-        vendorFiles: 0,
-        generatedFiles: 0,
-        proprietaryEffectiveLoc: 0,
-        vendorEffectiveLoc: 0,
-        generatedEffectiveLoc: 0,
-        domainKernelEffectiveLoc: 0,
-        internalSymbolCalls: 0,
-        externalSdkCalls: 0,
-        stdlibCalls: 0,
-        criticalPathFiles: 0,
-        criticalPathInternalCalls: 0,
-        criticalPathExternalCalls: 0,
-        sdkCallCounts: new Map<string, number>(),
-        sdkFileSets: new Map<string, Set<string>>(),
-    };
+    const state: AutonomyScanState = createAutonomyScanState();
 
     const fileToExtPackages = new Map<string, string[]>();
     const fileToImportProfiles = new Map<string, FileImportProfile>();
@@ -1107,5 +821,12 @@ export function evaluateProjectAutonomy(
         });
     }
 
-    return synthesizeAutonomyEvaluation(state, fileMetrics.length, issues, supplyChain);
+    return synthesizeAutonomyEvaluation(
+        state,
+        fileMetrics.length,
+        issues,
+        supplyChain,
+        scoringConfig.autonomy,
+        scoringConfig.compositeIndexFloor,
+    );
 }

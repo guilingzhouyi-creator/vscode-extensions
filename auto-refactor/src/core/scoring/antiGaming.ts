@@ -23,6 +23,7 @@ import { evaluateEffectiveCommentDensity } from '../comments/comment-density-mod
 import { calculateShannonEntropy } from '../math';
 import { AntiGamingMessages } from '../messages';
 import { tokenizeCode, calculateTokenShannonEntropy } from '../intelligence/token-entropy';
+import { DEFAULT_SCORING_CONFIG, type AntiGamingScoringConfig } from './scoring-parameters';
 
 /**
  * Rule identifier for anti-gaming detection.
@@ -108,9 +109,12 @@ const PENALTY_NAMING_ENTROPY = 10.0;
 const TAUTOLOGICAL_LOOP_THRESHOLD = 2;
 const PENALTY_TAUTOLOGICAL_TRAVERSAL = 20.0;
 
-const LOW_ENTROPY_MIN_LINES = 300;
-const LOW_ENTROPY_SHANNON_THRESHOLD = 2.5;
+const LOW_ENTROPY_MIN_LINES = DEFAULT_SCORING_CONFIG.antiGaming.lowEntropyMinLines;
+const LOW_ENTROPY_SHANNON_THRESHOLD = DEFAULT_SCORING_CONFIG.antiGaming.lowEntropyShannonThreshold;
 const PENALTY_LOW_ENTROPY_TOKEN = 25.0;
+
+/** Canonical verdict code emitted when the anti-gaming conjunction fires. */
+export const VERDICT_BLOCK_GAMING_DETECTED = 'BLOCK_GAMING_DETECTED';
 
 interface CreateGamingIssueParams {
     filePath: string;
@@ -452,6 +456,95 @@ function checkLowEntropyTokenPadding(
         return PENALTY_LOW_ENTROPY_TOKEN;
     }
     return 0.0;
+}
+
+/**
+ * Inputs for the canonical anti-gaming conjunction.
+ */
+export interface AntiGamingConjunctionInput {
+    /** Semantic (non-cosmetic) effective lines the change actually rewrote. */
+    readonly changedEloc: number;
+    /** Total effective lines of the audited surface, used as the ratio denominator. */
+    readonly totalEloc: number;
+    /** Net technical debt points removed by the change; zero or negative means none. */
+    readonly netDebtEliminated: number;
+    /** Accumulated pattern penalty from `detectScoreGaming`/`detectDiffScoreGaming`. */
+    readonly gamingPenalty: number;
+    /**
+     * Whether the change claims a quality or efficiency gain (`ΔQ > 0`, `QED > 0`, or a raised
+     * composite). Without this guard the conjunction would also fire on an ordinary small bug
+     * fix, which never claims a score gain and must not be frozen as gaming.
+     */
+    readonly claimsScoreGain: boolean;
+}
+
+/**
+ * Result of the canonical anti-gaming conjunction.
+ */
+export interface AntiGamingConjunctionVerdict {
+    readonly isGaming: boolean;
+    /** Canonical verdict code, present only when the conjunction fired. */
+    readonly verdictCode?: typeof VERDICT_BLOCK_GAMING_DETECTED;
+    /** Explicit reason, present only when the conjunction fired. */
+    readonly reason?: string;
+}
+
+/**
+ * Evaluates the canonical `BLOCK_GAMING_DETECTED` conjunction.
+ *
+ * The rule SSOT states the trigger as a strict mathematical conjunction — a trivial semantic
+ * change ratio (`<= 15%`) **and** a non-positive net debt elimination. Previously that
+ * conjunction existed only in the skill template while the production gate matched a message
+ * substring, so the published contract and the enforced behaviour could drift apart. This
+ * operator is that contract in code, and every gate routes through it.
+ *
+ * The `claimsScoreGain` guard keeps the conjunction aimed at its actual target: a change that
+ * *claims* a quality gain while rewriting almost no semantics and clearing no debt. A genuinely
+ * small bug fix trips the ratio and the debt condition as well, but claims nothing, so it is not
+ * frozen.
+ *
+ * A pattern penalty from `detectScoreGaming` is a separate sufficient trigger: it means a
+ * concrete gaming construct (tautological tests, trampoline padding, low-entropy water) was
+ * found, which does not depend on how small the diff happened to be.
+ *
+ * @param input - Semantic change ratio inputs plus the accumulated pattern penalty.
+ * @param config - Anti-gaming parameters; defaults to the scoring SSOT.
+ * @returns Verdict indicating whether the change must be frozen.
+ */
+export function evaluateAntiGamingConjunction(
+    input: AntiGamingConjunctionInput,
+    config: AntiGamingScoringConfig = DEFAULT_SCORING_CONFIG.antiGaming,
+): AntiGamingConjunctionVerdict {
+    // A missing measurement is not evidence of gaming: coercing NaN to zero would make every
+    // unmeasured change look like a trivial one and freeze it. The ratio branch therefore
+    // requires both operands to be real numbers.
+    const ratioMeasurable = Number.isFinite(input.changedEloc) && Number.isFinite(input.totalEloc);
+    const changed = ratioMeasurable ? Math.max(0, input.changedEloc) : 0;
+    const total = ratioMeasurable ? Math.max(1, input.totalEloc) : 1;
+    const semanticRatio = changed / total;
+    const threshold = config.semanticChangeRatioThreshold;
+    const netDebt = Number.isFinite(input.netDebtEliminated) ? input.netDebtEliminated : 0;
+
+    if (ratioMeasurable && input.claimsScoreGain && semanticRatio <= threshold && netDebt <= 0) {
+        return {
+            isGaming: true,
+            verdictCode: VERDICT_BLOCK_GAMING_DETECTED,
+            reason:
+                `Semantic change ratio ${(semanticRatio * 100).toFixed(2)}% is at or below ` +
+                `${(threshold * 100).toFixed(2)}% with no net debt eliminated ` +
+                `(${netDebt.toFixed(2)} points) while claiming a score gain.`,
+        };
+    }
+
+    if (Number.isFinite(input.gamingPenalty) && input.gamingPenalty > 0) {
+        return {
+            isGaming: true,
+            verdictCode: VERDICT_BLOCK_GAMING_DETECTED,
+            reason: `Gaming pattern penalty of ${input.gamingPenalty} points was raised.`,
+        };
+    }
+
+    return { isGaming: false };
 }
 
 /**

@@ -11,6 +11,7 @@
  */
 
 export * from './scoringTypes';
+export * from './scoring-parameters';
 export * from './eightPillarModel';
 export * from './riskWeightModel';
 export * from './effectiveDensity';

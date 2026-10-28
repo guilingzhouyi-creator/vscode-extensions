@@ -37,6 +37,7 @@ import {
 } from './dimensionDeductions';
 import { evaluateTechnicalDebtAssessment } from './technical-debt-ratio';
 import { ArchetypeWeightTuner } from './archetype-weight-tuner';
+import { resolveScoringConfig } from './scoring-parameters';
 import {
     DIMENSION_MAX_SCORE,
     GRADE_A_PLUS_MIN,
@@ -53,8 +54,6 @@ import {
     calculateConfidenceFromVolume,
     applyScaleDampedScores,
     effectivePenaltyFromIndex,
-    SATURATION_HALFPOINT,
-    COMPOSITE_INDEX_FLOOR,
     accumulateProjectMetrics,
     CONFIDENCE_SCOPE_PROJECT,
 } from './scorer-formulas';
@@ -170,7 +169,14 @@ export class QualityScorer {
         // Snapshot the linear totals before the curve consumes them: the index curve is not
         // invertible from the index alone, so the report has to carry both.
         const linearPoints = { ...deductionPoints };
-        const rawScores = applyScaleDampedScores(deductionPoints, scaleFactor, metric);
+        const scoringConfig = resolveScoringConfig(config?.scoring);
+        const qualityConfig = scoringConfig.quality;
+        const rawScores = applyScaleDampedScores(
+            deductionPoints,
+            scaleFactor,
+            metric,
+            qualityConfig,
+        );
         const effectivePoints = {} as Record<QualityDimension, number>;
         for (const dim of ALL_QUALITY_DIMENSIONS) {
             effectivePoints[dim] = effectivePenaltyFromIndex(rawScores[dim]);
@@ -194,6 +200,7 @@ export class QualityScorer {
             rawScores,
             evaluatedDimensions,
             effectiveWeights,
+            scoringConfig.compositeIndexFloor,
         );
         const grade = resolveQualityGrade(compositeScore);
         const confidence = calculateConfidence(metric, coverage);
@@ -209,13 +216,13 @@ export class QualityScorer {
             formulas: {
                 indexMapping:
                     'density dims (Michaelis-Menten / Hill rational decay): index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
-                    `${SATURATION_HALFPOINT}; codeSecurity: index = max(0, securityCeiling - linearPoints); ` +
+                    `${scoringConfig.quality.saturationHalfpoint}; codeSecurity: index = max(0, securityCeiling - linearPoints); ` +
                     'absolute dims: index = max(0, 100 - linearPoints)',
-                saturationHalfpoint: SATURATION_HALFPOINT,
-                compositeIndexFloor: COMPOSITE_INDEX_FLOOR,
+                saturationHalfpoint: scoringConfig.quality.saturationHalfpoint,
+                compositeIndexFloor: scoringConfig.compositeIndexFloor,
                 dimensionScaleMode: { ...DIMENSION_SCALE_MODE },
                 composite:
-                    'exp(sum(weights[d] * ln(max(COMPOSITE_INDEX_FLOOR, indices[d])) for d in evaluated) / sum(weights[d] for d in evaluated))',
+                    'exp(sum(weights[d] * ln(max(compositeIndexFloor, indices[d])) for d in evaluated) / sum(weights[d] for d in evaluated))',
                 coverage: 'sum(weights[d] for d in evaluated) / sum(weights[d] for all dimensions)',
                 confidence: 'clamp(baseConfidenceFromLines * coverage, floor, 1)',
                 gradeCutoffs: [
@@ -299,10 +306,12 @@ export class QualityScorer {
                 ? this.tuner.tuneWeights(config.archetype, this.weights)
                 : this.weights;
 
+        const scoringConfig = resolveScoringConfig(config?.scoring);
         const { compositeScore, coverage } = computeCompositeScore(
             rawScores,
             evaluatedDimensions,
             effectiveWeights,
+            scoringConfig.compositeIndexFloor,
         );
         const grade = resolveQualityGrade(compositeScore);
         // Project scope: totalWeight is the repository's non-blank line total. Passing it
@@ -326,13 +335,13 @@ export class QualityScorer {
             formulas: {
                 indexMapping:
                     'density dims (Michaelis-Menten / Hill rational decay): index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
-                    `${SATURATION_HALFPOINT}; codeSecurity: index = max(0, securityCeiling - linearPoints); ` +
+                    `${scoringConfig.quality.saturationHalfpoint}; codeSecurity: index = max(0, securityCeiling - linearPoints); ` +
                     'absolute dims: index = max(0, 100 - linearPoints)',
-                saturationHalfpoint: SATURATION_HALFPOINT,
-                compositeIndexFloor: COMPOSITE_INDEX_FLOOR,
+                saturationHalfpoint: scoringConfig.quality.saturationHalfpoint,
+                compositeIndexFloor: scoringConfig.compositeIndexFloor,
                 dimensionScaleMode: { ...DIMENSION_SCALE_MODE },
                 composite:
-                    'exp(sum(weights[d] * ln(max(COMPOSITE_INDEX_FLOOR, indices[d])) for d in evaluated) / sum(weights[d] for d in evaluated))',
+                    'exp(sum(weights[d] * ln(max(compositeIndexFloor, indices[d])) for d in evaluated) / sum(weights[d] for d in evaluated))',
                 coverage: 'sum(weights[d] for d in evaluated) / sum(weights[d] for all dimensions)',
                 confidence: 'clamp(baseConfidenceFromLines * coverage, floor, 1)',
                 gradeCutoffs: [

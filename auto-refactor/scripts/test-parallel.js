@@ -246,6 +246,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-context-slice', script: 'scripts/validate-context-slice.js' },
   { name: 'validate-self-norms', script: 'scripts/validate-self-norms.js' },
   { name: 'validate-scoring-coverage', script: 'scripts/validate-scoring-coverage.js' },
+  { name: 'validate-scoring-parameters', script: 'scripts/validate-scoring-parameters.js' },
   { name: 'validate-diff-score', script: 'scripts/validate-diff-score.js' },
   { name: 'validate-role-inference', script: 'scripts/validate-role-inference.js' },
   {

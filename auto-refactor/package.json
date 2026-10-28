@@ -77,6 +77,7 @@
     "validate-change-quality-arbiter": "node scripts/validate-change-quality-arbiter.js",
     "validate-feedback-adaptive-supervisor": "node scripts/validate-feedback-adaptive-supervisor.js",
     "validate-autonomy-scorer": "node scripts/validate-autonomy-scorer.js",
+    "validate-scoring-parameters": "node scripts/validate-scoring-parameters.js",
     "validate-data-flow": "node scripts/validate-data-flow.js && node scripts/validate-context-slice.js",
     "validate-pattern-kernel": "node scripts/validate-pattern-kernel.js",
     "validate-domain-adapters": "node scripts/validate-domain-adapters.js",

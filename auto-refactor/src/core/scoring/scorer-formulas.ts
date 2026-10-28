@@ -22,6 +22,11 @@ import type {
     QualityWeights,
 } from './scoringTypes';
 import { ALL_QUALITY_DIMENSIONS, DIMENSION_ANALYZERS, DIMENSION_SCALE_MODE } from './scoringTypes';
+import {
+    DEFAULT_SCORING_CONFIG,
+    type QualityScoringConfig,
+    type SecurityCeilingScoringConfig,
+} from './scoring-parameters';
 export {
     clamp,
     clampRatio,
@@ -77,12 +82,6 @@ export const CONFIDENCE_SCOPE_PROJECT = 'project';
 export const CONFIDENCE_SCOPE_FILE = 'file';
 
 const DEFAULT_FALLBACK_RULE = 'metric';
-const ATTACK_SURFACE_BASELINE_LINES = 100;
-const ATTACK_SURFACE_EXPORT_LIMIT = 30;
-const ATTACK_SURFACE_LOC_LIMIT = 500;
-const SMOOTHING_SCALE_MULTIPLIER = 100;
-const SMOOTHING_SCALE_BIAS = 25;
-const SMOOTHING_SCALE_DIVISOR = 125;
 const SCALE_FACTOR_PRECISION = 4;
 const SCALE_MODE_ABSOLUTE_STR = 'absolute';
 
@@ -206,7 +205,7 @@ export function groupDeductionsByDimension(
  * collapsed axis: one axis at the floor and nine at 100 yields ~85, against 90 for the
  * arithmetic mean, so the shortfall registers without the whole score collapsing.
  */
-export const COMPOSITE_INDEX_FLOOR = 15;
+export const COMPOSITE_INDEX_FLOOR = DEFAULT_SCORING_CONFIG.compositeIndexFloor;
 
 /**
  * Calculate the weighted composite score and measured weight coverage.
@@ -220,12 +219,14 @@ export const COMPOSITE_INDEX_FLOOR = 15;
  * @param rawScores - Unweighted score per dimension (0-100).
  * @param evaluatedDimensions - List of active dimensions evaluated in scan.
  * @param weights - Scoring weight configuration.
+ * @param indexFloor - Strictly positive floor applied before the geometric mean.
  * @returns Composite score rounded to one decimal and coverage ratio.
  */
 export function computeCompositeScore(
     rawScores: Record<QualityDimension, number>,
     evaluatedDimensions: QualityDimension[],
     weights: QualityWeights,
+    indexFloor: number = COMPOSITE_INDEX_FLOOR,
 ): { compositeScore: number; coverage: number } {
     // A negative or non-finite weight makes the weighted mean meaningless rather than
     // merely skewed, and the previous `totalWeight || 1` fallback silently turned that
@@ -245,10 +246,7 @@ export function computeCompositeScore(
     let totalWeight = 0;
     for (const dim of evaluatedDimensions) {
         const dimWeight = weights[dim];
-        const index = Math.max(
-            COMPOSITE_INDEX_FLOOR,
-            Math.min(DIMENSION_MAX_SCORE, rawScores[dim]),
-        );
+        const index = Math.max(indexFloor, Math.min(DIMENSION_MAX_SCORE, rawScores[dim]));
         logSum += dimWeight * Math.log(index);
         totalWeight += dimWeight;
     }
@@ -411,8 +409,11 @@ export function calculateConfidence(
  * dimension carrying 24840 points became indistinguishable from one carrying 1230. The
  * reciprocal form asymptotes to 0 instead of to the 100-point ceiling, keeping extreme
  * cases strictly ordered and reportable.
+ *
+ * Re-exported from the parameter SSOT so a tuned configuration and this published constant can
+ * never drift apart; `applyScaleDampedScores` accepts an explicit override for per-scan tuning.
  */
-export const SATURATION_HALFPOINT = 30;
+export const SATURATION_HALFPOINT = DEFAULT_SCORING_CONFIG.quality.saturationHalfpoint;
 
 /**
  * Compute the theoretical code security ceiling based on attack surface exposure.
@@ -422,15 +423,20 @@ export const SATURATION_HALFPOINT = 30;
  * exported symbols (API attack surface) and code volume (LOC attack surface).
  *
  * @param metric - Optional precomputed lexical file metric.
- * @param scaleFactor - Optional file scale factor relative to 100 LOC baseline (defaults to 1).
+ * @param scaleFactor - Optional file scale factor relative to the 100 LOC baseline (defaults to 1).
+ * @param config - Optional attack surface coefficients; defaults to the scoring SSOT.
  * @returns Attack-surface-damped theoretical maximum security score.
  */
-export function computeSecurityCeiling(metric?: FileMetric | null, scaleFactor = 1): number {
+export function computeSecurityCeiling(
+    metric?: FileMetric | null,
+    scaleFactor = 1,
+    config: SecurityCeilingScoringConfig = DEFAULT_SCORING_CONFIG.quality.securityCeiling,
+): number {
     const expSymbols = metric?.exportedSymbols ?? 0;
-    const lines = metric?.nonBlankLines ?? scaleFactor * ATTACK_SURFACE_BASELINE_LINES;
-    const expTerm = 0.6 * Math.min(1.0, expSymbols / ATTACK_SURFACE_EXPORT_LIMIT);
-    const locTerm = 0.4 * Math.min(1.0, lines / ATTACK_SURFACE_LOC_LIMIT);
-    const discount = 0.5 * (expTerm + locTerm);
+    const lines = metric?.nonBlankLines ?? scaleFactor * config.baselineLines;
+    const expTerm = config.exportWeight * Math.min(1.0, expSymbols / config.exportLimit);
+    const locTerm = config.locWeight * Math.min(1.0, lines / config.locLimit);
+    const discount = config.maxDiscount * (expTerm + locTerm);
     return Math.round((DIMENSION_MAX_SCORE - discount) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
 
@@ -450,29 +456,48 @@ export function computeSecurityCeiling(metric?: FileMetric | null, scaleFactor =
  * @param deductionPoints - Net penalty points per dimension.
  * @param scaleFactor - Ratio of file lines to baseline (100 LOC).
  * @param metric - Optional precomputed lexical file metric for attack surface ceiling derivation.
+ * @param config - Optional quality curve parameters; defaults to the scoring SSOT.
  * @returns Dimension scores mapped in [0, 100].
  */
 /**
- * Normalizes input scale factor to a safe positive number using continuous sub-linear
- * rational smoothing for micro-files (LOC < 100), eliminating discontinuous step cliffs.
+ * Normalizes input scale factor to a safe positive number.
+ *
+ * Three continuous segments, so neither a micro-file nor a monolithic file can game the curve:
+ *
+ * - `s < 1`: rational smoothing into `(microFileFloorScale, 1)`, matching the previous
+ *   `(100s + 25) / 125` mapping at the default floor of 0.2.
+ * - `1 <= s <= knee`: identity, so a 100-1000 line file keeps its literal scale.
+ * - `s > knee`: logarithmic damping `knee + w * ln(1 + (s - knee) / w)`. Without it a 10,000
+ *   line file carried `s = 100`, which divided a real defect count into a tiny density and let
+ *   the hyperbolic curve report a near-ceiling index for a badly bloated file. The segment is
+ *   C1-continuous at the knee: value `knee` and slope `1` on both sides.
  *
  * @param scaleFactor - Ratio of file lines to the 100-line baseline, possibly non-positive.
+ * @param config - Optional quality curve parameters; defaults to the scoring SSOT.
  * @returns A strictly positive factor; non-finite or non-positive inputs collapse to the floor.
  */
-export function sanitizeScaleFactor(scaleFactor: number): number {
+export function sanitizeScaleFactor(
+    scaleFactor: number,
+    config: QualityScoringConfig = DEFAULT_SCORING_CONFIG.quality,
+): number {
     const safeScale =
         typeof scaleFactor === 'number' && Number.isFinite(scaleFactor) && scaleFactor > 0
             ? scaleFactor
             : 1;
     if (safeScale < 1.0) {
-        // Continuous rational smoothing: safeScale in (0, 1) -> (100 * safeScale + 25) / 125 in
-        // (0.2, 1.0)
-        return +(
-            (SMOOTHING_SCALE_MULTIPLIER * safeScale + SMOOTHING_SCALE_BIAS) /
-            SMOOTHING_SCALE_DIVISOR
-        ).toFixed(SCALE_FACTOR_PRECISION);
+        // Linear blend from the floor at an empty file to 1.0 at the 100-line baseline: the
+        // default floor of 0.2 reproduces the previous (100s + 25) / 125 mapping exactly while
+        // letting a tuned floor move the lower asymptote without changing the endpoint.
+        const floor = config.microFileFloorScale;
+        return +(floor + (1 - floor) * safeScale).toFixed(SCALE_FACTOR_PRECISION);
     }
-    return +safeScale.toFixed(SCALE_FACTOR_PRECISION);
+    if (safeScale <= config.macroFileKneeScale) {
+        return +safeScale.toFixed(SCALE_FACTOR_PRECISION);
+    }
+    const knee = config.macroFileKneeScale;
+    const weight = config.macroFileLogWeight;
+    const damped = knee + weight * Math.log(1 + (safeScale - knee) / weight);
+    return +damped.toFixed(SCALE_FACTOR_PRECISION);
 }
 
 /**
@@ -503,6 +528,7 @@ function computeStandardDimensionScore(
     dim: QualityDimension,
     rawPoints: number,
     effectiveScale: number,
+    halfpoint: number,
 ): number {
     if (rawPoints <= 0) {
         return DIMENSION_MAX_SCORE;
@@ -512,7 +538,7 @@ function computeStandardDimensionScore(
         return Number.isFinite(absoluteScore) ? absoluteScore : DIMENSION_MAX_SCORE;
     }
     const density = rawPoints / effectiveScale;
-    const score = (DIMENSION_MAX_SCORE * SATURATION_HALFPOINT) / (SATURATION_HALFPOINT + density);
+    const score = (DIMENSION_MAX_SCORE * halfpoint) / (halfpoint + density);
     return Number.isFinite(score)
         ? Math.max(0, Math.min(DIMENSION_MAX_SCORE, score))
         : DIMENSION_MAX_SCORE;
@@ -526,11 +552,12 @@ function resolveDimensionScore(
     rawPoints: number,
     securityCeiling: number,
     effectiveScale: number,
+    halfpoint: number,
 ): number {
     if (dim === 'codeSecurity') {
         return computeSecurityDimensionScore(rawPoints, securityCeiling);
     }
-    return computeStandardDimensionScore(dim, rawPoints, effectiveScale);
+    return computeStandardDimensionScore(dim, rawPoints, effectiveScale, halfpoint);
 }
 
 /**
@@ -540,21 +567,29 @@ function resolveDimensionScore(
  * @param deductionPoints - Map of quality dimensions to accumulated raw deduction points.
  * @param scaleFactor - Codebase or file scale factor damping factor.
  * @param metric - Optional file metric for computing security dimension ceilings.
+ * @param config - Optional quality curve parameters; defaults to the scoring SSOT.
  * @returns Record of quality dimension scores mapped to their scale-damped scores.
  */
 export function applyScaleDampedScores(
     deductionPoints: Record<QualityDimension, number>,
     scaleFactor: number,
     metric?: FileMetric | null,
+    config: QualityScoringConfig = DEFAULT_SCORING_CONFIG.quality,
 ): Record<QualityDimension, number> {
     const rawScores = {} as Record<QualityDimension, number>;
-    const effectiveScale = sanitizeScaleFactor(scaleFactor);
+    const effectiveScale = sanitizeScaleFactor(scaleFactor, config);
     const securityScale = metric !== undefined ? effectiveScale : 1;
-    const securityCeiling = computeSecurityCeiling(metric, securityScale);
+    const securityCeiling = computeSecurityCeiling(metric, securityScale, config.securityCeiling);
 
     for (const dim of ALL_QUALITY_DIMENSIONS) {
         const rawPoints = sanitizeDeduction(deductionPoints[dim]);
-        rawScores[dim] = resolveDimensionScore(dim, rawPoints, securityCeiling, effectiveScale);
+        rawScores[dim] = resolveDimensionScore(
+            dim,
+            rawPoints,
+            securityCeiling,
+            effectiveScale,
+            config.saturationHalfpoint,
+        );
     }
     return rawScores;
 }

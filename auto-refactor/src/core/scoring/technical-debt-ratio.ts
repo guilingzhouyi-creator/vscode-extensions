@@ -187,14 +187,66 @@ const PILLAR_BY_ANALYZER: Readonly<Record<string, PrimaryQualityPillar>> = Objec
     performance: 'performance',
 });
 
+/**
+ * Rule family prefix to primary pillar.
+ *
+ * The debt paydown chart partitions remediation effort by pillar, so a family missing from this
+ * table silently lands in `maintainability` and makes the chart claim that every unlisted rule
+ * belongs to one pillar. The table therefore covers every registered family in
+ * `scripts/common/rule-catalog.json`; `validate-scoring-parameters.js` asserts that closure, so a
+ * newly registered family cannot be forgotten.
+ */
 const PILLAR_BY_RULE_PREFIX: Readonly<Record<string, PrimaryQualityPillar>> = Object.freeze({
+    // security
     'SEC-': 'security',
+    'HC-': 'security',
+    // architecture
     'ARCH-': 'architecture',
+    'LAY-': 'architecture',
+    'DEP-': 'architecture',
+    'FGT-': 'architecture',
+    // performance
     'PRF-': 'performance',
+    'NUM-': 'performance',
+    'CMP-': 'performance',
+    'RSM-': 'performance',
+    // data
+    'DAT-': 'data',
+    'TSM-': 'data',
+    'PYM-': 'data',
+    'GOM-': 'data',
+    // maintainability
+    'CPX-': 'maintainability',
+    'BIG-': 'maintainability',
+    // testing
+    'TST-': 'testing',
+    'TB-': 'testing',
+    // reliability
     'GOV-': 'reliability',
     'HYG-': 'reliability',
+    'ERR-': 'reliability',
+    'RES-': 'reliability',
+    'PROD-': 'reliability',
+    'VOL-': 'reliability',
+    'GDM-': 'reliability',
+    // extensibility
     'NAM-': 'extensibility',
     'SIM-': 'extensibility',
+    'CMT-': 'extensibility',
+    'DOC-': 'extensibility',
+    'ADV-': 'extensibility',
+    'ART-': 'extensibility',
+    'EXT-': 'extensibility',
+    'VSC-': 'extensibility',
+    'UI-': 'extensibility',
+    'SH-': 'extensibility',
+    'PS-': 'extensibility',
+    'CMG-': 'extensibility',
+    'RCFG-': 'extensibility',
+    'SCR-': 'extensibility',
+    'UUID-': 'extensibility',
+    'ARF-': 'extensibility',
+    'MOD-': 'extensibility',
 });
 
 function resolveTargetPillar(ruleId: string, analyzer?: string): PrimaryQualityPillar {
