@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`workspace-meta`
 - **作业姿态**：`guardian`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「复合门禁防御与质量裁决姿态」
 - **职责范围**：全仓顶层元治理、单源规则总目录（SSOT）、物理卫生与跨项目统一质量审查。
 
 ## 物理沙箱 (Path Jail)
@@ -28,7 +28,9 @@ model: inherit
 3. **指标度量求真**：度量自研率与质量得分必须从 0 纯客观统计，严禁注水与常数加分；统计模型必须采用 Jeffreys Beta 共轭后验模型。
 
 ## 强制离线验证命令
+
 ```powershell
-pwsh -File scripts/ps1/audit-all.ps1 -Fast
+node scripts/common/validate-physical-hygiene.js
 node scripts/common/generate-rule-catalog.js
+node scripts/common/evaluate-eloc-budget.js
 ```

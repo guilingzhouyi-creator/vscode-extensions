@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`git-kernel`
 - **作业姿态**：`refactor`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「结构消融与复杂度平铺姿态」
 - **职责范围**：`fractal-git` 循环瞬态堆分配消除、CAS 热路径优化、超大模块按职责解耦。
 
 ## 物理沙箱 (Path Jail)
@@ -30,8 +30,12 @@ model: inherit
 5. **注释契约与证明随行 (`FGT-SAF-001` / `RSM-SAF-001`)**：模块职责注释与每处 `unsafe` 的 `// SAFETY:` 形式证明随实质代码搬迁，严禁因重构而删除证明。
 
 ## 强制离线验证命令
+
 ```powershell
 node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js
 node fractal-git/scripts/common/check-zero-alloc-boundary.js
+node fractal-git/scripts/common/validate-crate-topology.js
+pwsh -File fractal-git/scripts/ps1/gate-rust.ps1
+pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1
 cargo test --workspace --manifest-path fractal-git/Cargo.toml
 ```

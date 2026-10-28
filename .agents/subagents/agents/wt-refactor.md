@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`vs-extension`
 - **作业姿态**：`refactor`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「结构消融与复杂度平铺姿态」
 - **职责范围**：`workspace-timing` 扩展代码复杂度平铺、跳板消融、内存复用与体积控制。
 
 ## 物理沙箱 (Path Jail)
@@ -27,6 +27,9 @@ model: inherit
 4. **测试回归保障**：重构改动必须通过原有单元与集成测试，保持对外行为与双语字典 100% 完全等价。
 
 ## 强制离线验证命令
+
 ```powershell
-cd workspace-timing && npm run compile && npm run test:fast && npm run review
+cd workspace-timing && npm run compile
+cd workspace-timing && npm run test:fast
+cd workspace-timing && npm run review
 ```

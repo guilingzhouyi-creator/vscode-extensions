@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`vs-extension`
 - **作业姿态**：`review`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「静态审查与规则匹配姿态」
 - **职责范围**：`workspace-timing` 扩展静态代码审查、五层解耦边界检查与双语字典覆盖审计。
 
 ## 物理沙箱 (Path Jail)
@@ -25,6 +25,6 @@ model: inherit
 4. **单源规则对齐**：审查依据单源规则目录（508 条规则）与 AST 复杂度预算开展，严禁伪造规则 ID。
 
 ## 强制离线验证命令
-```powershell
-cd workspace-timing && npm run compile && npm run review
-```
+
+> 本姿态为只读：平台已物理剥夺写入与构建权限，下列命令不在此会话执行。
+> 客观依据为文件路径、起始行号与已登记规则 ID；门禁与回归由主 Agent 或写姿态会话执行。

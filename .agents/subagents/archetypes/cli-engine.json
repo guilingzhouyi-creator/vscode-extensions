@@ -22,18 +22,18 @@
   },
   "associatedSkills": [
     "auto-refactor-dev",
-    "defensive-security-and-taint-safety",
-    "state-concurrency-and-crash-recovery",
-    "algorithmic-operator-engineering",
     "rust-engineering",
+    "algorithmic-operator-engineering",
+    "telemetry-statistical-modeling",
+    "test-benchmark-engineering",
     "spec-driven-development",
-    "debugging-and-error-recovery",
-    "constraint-driven-development",
-    "facade-discipline",
     "coding-craft",
     "complexity-budget",
-    "telemetry-statistical-modeling",
-    "test-benchmark-engineering"
+    "facade-discipline",
+    "debugging-and-error-recovery",
+    "constraint-driven-development",
+    "rule-catalog-governance",
+    "state-concurrency-and-crash-recovery"
   ],
   "rigidAxioms": [
     "32 个内置分析器与 374 条内置规则体系自测全通过 (179/179 套测试)，零孤儿用例与规则漂移 (RCFG-RULE-DRIFT)",

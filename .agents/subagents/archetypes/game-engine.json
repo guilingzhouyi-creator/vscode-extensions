@@ -23,15 +23,15 @@
   },
   "associatedSkills": [
     "webgames-workflow",
-    "state-concurrency-and-crash-recovery",
     "algorithmic-operator-engineering",
+    "interaction-design-physics",
+    "test-benchmark-engineering",
     "spec-driven-development",
-    "debugging-and-error-recovery",
-    "constraint-driven-development",
     "coding-craft",
     "complexity-budget",
-    "interaction-design-physics",
-    "test-benchmark-engineering"
+    "state-concurrency-and-crash-recovery",
+    "debugging-and-error-recovery",
+    "constraint-driven-development"
   ],
   "rigidAxioms": [
     "【项目本质与技术栈红线】WebGames 为 Godot 4.7 引擎卡拉尔世界纯逻辑与配置驱动系统，绝对不是基于浏览器的 Web 游戏、网页游戏或 HTML5 游戏；严禁引入 Web/DOM/HTML/JS 前端技术栈，严禁依赖浏览器执行环境",

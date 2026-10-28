@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`game-engine`
 - **作业姿态**：`refactor`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「结构消融与复杂度平铺姿态」
 - **职责范围**：`WebGames` 游戏脚本循环堆分配消除、对象池状态重置、超大 GDScript 脚本解耦与跳板消融。
 
 ## 物理沙箱 (Path Jail)
@@ -27,6 +27,9 @@ model: inherit
 4. **全量回归保障**：重构改动必须通过领域全量架构与语法自检。
 
 ## 强制离线验证命令
+
 ```powershell
-cd WebGames && pwsh scripts/ps1/audit-all.ps1
+python WebGames/scripts/py/audit_arch_static.py
+pwsh -File WebGames/scripts/ps1/check-gdscript.ps1
+pwsh -File WebGames/scripts/ps1/audit-all.ps1
 ```

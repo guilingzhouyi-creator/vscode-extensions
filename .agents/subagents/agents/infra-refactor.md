@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`infra-tool`
 - **作业姿态**：`refactor`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「结构消融与复杂度平铺姿态」
 - **职责范围**：工作区工程化脚本复杂度平铺、跨平台差异收口、异常捕获加固与防御增强。
 
 ## 物理沙箱 (Path Jail)
@@ -27,6 +27,7 @@ model: inherit
 4. **验证闭环**：重构后必须通过本地预审门禁与全仓快速审查。
 
 ## 强制离线验证命令
+
 ```powershell
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 pwsh -File scripts/ps1/audit-all.ps1 -Fast

@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`game-engine`
 - **作业姿态**：`construct`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「业务生产与增量编码姿态」
 - **职责范围**：`WebGames` 游戏系统架构、GDScript 模块研发与基于四阶段方案的工程落地。
 
 ## 物理沙箱 (Path Jail)
@@ -28,6 +28,9 @@ model: inherit
 4. **四阶段方案先行**：重大改动必须在方案目录下编写严格的四阶段方案细则，获批后方可进入编码。
 
 ## 强制离线验证命令
+
 ```powershell
-cd WebGames && pwsh scripts/ps1/audit-all.ps1
+python WebGames/scripts/py/audit_arch_static.py
+pwsh -File WebGames/scripts/ps1/check-gdscript.ps1
+pwsh -File WebGames/scripts/ps1/audit-all.ps1
 ```

@@ -23,17 +23,18 @@
   "associatedSkills": [
     "workspace-timing-dev",
     "state-concurrency-and-crash-recovery",
-    "defensive-security-and-taint-safety",
-    "algorithmic-operator-engineering",
+    "interaction-design-physics",
+    "test-benchmark-engineering",
+    "release-package-workflow",
     "spec-driven-development",
-    "debugging-and-error-recovery",
-    "constraint-driven-development",
-    "facade-discipline",
     "coding-craft",
     "complexity-budget",
-    "interaction-design-physics",
-    "release-package-workflow",
-    "test-benchmark-engineering"
+    "facade-discipline",
+    "debugging-and-error-recovery",
+    "defensive-security-and-taint-safety",
+    "constraint-driven-development",
+    "algorithmic-operator-engineering",
+    "gate-governance"
   ],
   "rigidAxioms": [
     "严格遵守五层架构单向依赖：presentation -> application -> domain -> persistence -> integration",

@@ -23,11 +23,17 @@
     ]
   },
   "associatedSkills": [
+    "batch-commit",
+    "constraint-driven-development",
+    "docs-archive-governance",
+    "release-package-workflow",
+    "subagent-orchestration",
     "rule-catalog-governance",
     "coding-craft",
     "complexity-budget",
-    "batch-commit",
-    "docs-archive-governance"
+    "test-benchmark-engineering",
+    "debugging-and-error-recovery",
+    "gate-governance"
   ],
   "rigidAxioms": [
     "零空文件：全仓严禁创建或遗留 0 字节文件或纯空白字符文件",

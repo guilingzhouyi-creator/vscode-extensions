@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`skill-governance`
 - **作业姿态**：`refactor`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「结构消融与复杂度平铺姿态」
 - **职责范围**：技能集上下文瘦身（深水区下沉至 `references/`）、跨技能重复内容消融、样板复杂度平铺与双目录同构同步。
 
 ## 物理沙箱 (Path Jail)
@@ -27,6 +27,8 @@ model: inherit
 4. **双副本同步闭环**：重构后必须执行 `sync-skills.js` 与 `validate-skills.js` 确保 100% 绿色通过。
 
 ## 强制离线验证命令
+
 ```powershell
-node scripts/common/sync-skills.js && node scripts/common/validate-skills.js
+node scripts/common/validate-skills.js
+node scripts/common/sync-skills.js --check
 ```

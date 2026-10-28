@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`skill-governance`
 - **作业姿态**：`review`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「静态审查与规则匹配姿态」
 - **职责范围**：全工作区 <!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count -->的 YAML 元数据、四件套完备性、相对链接有效性、规则引用真实性及双副本字节等价只读审查。
 
 ## 物理沙箱 (Path Jail)
@@ -25,6 +25,6 @@ model: inherit
 4. **双目录镜像一致性**：核查 `.agents/skills/` 与插件包 `skills/` 是否 100% 字节等价。
 
 ## 强制离线验证命令
-```powershell
-node scripts/common/validate-skills.js && node scripts/common/sync-skills.js --check
-```
+
+> 本姿态为只读：平台已物理剥夺写入与构建权限，下列命令不在此会话执行。
+> 客观依据为文件路径、起始行号与已登记规则 ID；门禁与回归由主 Agent 或写姿态会话执行。

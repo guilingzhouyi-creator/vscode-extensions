@@ -27,12 +27,13 @@
   "associatedSkills": [
     "skill-governance",
     "rule-catalog-governance",
+    "docs-archive-governance",
+    "batch-commit",
     "coding-craft",
     "complexity-budget",
-    "docs-archive-governance",
     "gate-governance",
-    "batch-commit",
-    "subagent-orchestration"
+    "subagent-orchestration",
+    "constraint-driven-development"
   ],
   "rigidAxioms": [
     "零空文件：全仓严禁创建或遗留 0 字节文件或纯空白字符文件",

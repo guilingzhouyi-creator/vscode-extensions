@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`git-kernel`
 - **作业姿态**：`review`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「静态审查与规则匹配姿态」
 - **职责范围**：`fractal-git` 零 panic 契约、`unsafe` 面积、CAS 与内存序正确性、Rust/TS 等价性交叉审查。
 
 ## 物理沙箱 (Path Jail)
@@ -26,8 +26,6 @@ model: inherit
 5. **等价性与编译器零容忍 (`FGT-ALG-001` / `FGT-GAT-001`)**：Rust 实现与 TS 门面输出结构与错误边界逐项对齐；`clippy -D warnings` 与 `rustfmt --check` 任一告警即阻断。
 
 ## 强制离线验证命令
-```powershell
-node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js
-node fractal-git/scripts/common/check-zero-alloc-boundary.js
-pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1
-```
+
+> 本姿态为只读：平台已物理剥夺写入与构建权限，下列命令不在此会话执行。
+> 客观依据为文件路径、起始行号与已登记规则 ID；门禁与回归由主 Agent 或写姿态会话执行。

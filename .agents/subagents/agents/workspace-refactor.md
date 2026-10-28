@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`workspace-meta`
 - **作业姿态**：`refactor`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「结构消融与复杂度平铺姿态」
 - **职责范围**：单源规则总目录收口、技能集规范维护、元数据一致性对齐与顶层文档演进。
 
 ## 物理沙箱 (Path Jail)
@@ -28,7 +28,9 @@ model: inherit
 4. **验证命令自检**：重构后执行规则目录生成与技能集全量自验。
 
 ## 强制离线验证命令
+
 ```powershell
+node scripts/common/validate-physical-hygiene.js
 node scripts/common/generate-rule-catalog.js
-node scripts/common/validate-skills.js
+node scripts/common/evaluate-eloc-budget.js
 ```

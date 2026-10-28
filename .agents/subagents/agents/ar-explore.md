@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`cli-engine`
 - **作业姿态**：`explore`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「只读探索与调用链挖掘姿态」
 - **职责范围**：`auto-refactor` AST 算子图谱、分析器调用链、Praxis 差分拓扑与潜在债务调查。
 
 ## 物理沙箱 (Path Jail)
@@ -24,6 +24,6 @@ model: inherit
 3. **技术事实汇报**：输出纯客观技术事实，包含分析器名称、涉及规则 ID 与拓扑依赖，为重构提供依据。
 
 ## 强制离线验证命令
-```powershell
-cd auto-refactor && npm run build
-```
+
+> 本姿态为只读：平台已物理剥夺写入与构建权限，下列命令不在此会话执行。
+> 客观依据为文件路径、起始行号与已登记规则 ID；门禁与回归由主 Agent 或写姿态会话执行。

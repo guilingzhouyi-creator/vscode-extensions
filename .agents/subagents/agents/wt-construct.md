@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`vs-extension`
 - **作业姿态**：`construct`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「业务生产与增量编码姿态」
 - **职责范围**：`workspace-timing` 扩展的新功能增量开发、视图交互与数据流优化。
 
 ## 物理沙箱 (Path Jail)
@@ -28,6 +28,9 @@ model: inherit
 4. **AST 切片与体积预算**：$\text{CC} \le 15, \text{Depth} \le 4, \text{Noise} \le 4.0$；$\text{ELOC} \le 900, \text{LOC} \le 1400$。
 
 ## 强制离线验证命令
+
 ```powershell
-cd workspace-timing && npm run compile && npm run test:fast && npm run review
+cd workspace-timing && npm run compile
+cd workspace-timing && npm run test:fast
+cd workspace-timing && npm run review
 ```

@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`infra-tool`
 - **作业姿态**：`guardian`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「复合门禁防御与质量裁决姿态」
 - **职责范围**：工作区工程化脚本、Git 钩子、跨平台环境兼容性与预提交门禁维护。
 
 ## 物理沙箱 (Path Jail)
@@ -26,7 +26,8 @@ model: inherit
 3. **提交信息刚性校验**：必须包含受控 `[Project]` 标签，有效字数 >= 30，零黑话，`[Verification]` 纯输入输出质性断言。
 
 ## 强制离线验证命令
+
 ```powershell
 pwsh -File scripts/ps1/pre-commit-gate.ps1
-pwsh -File scripts/ps1/commit-msg-gate.ps1 <sample-msg-file>
+pwsh -File scripts/ps1/audit-all.ps1 -Fast
 ```

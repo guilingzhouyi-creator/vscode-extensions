@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`git-kernel`
 - **作业姿态**：`construct`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「业务生产与增量编码姿态」
 - **职责范围**：`fractal-git` 微 Crate 分层拓扑、Plumbing 协议实现、对象与索引结构演进。
 
 ## 物理沙箱 (Path Jail)
@@ -33,10 +33,12 @@ model: inherit
 7. **Rust 与 TS 字节等价 (`FGT-ALG-001`)**：原生算子与 TS 门面差分基准零容忍；常量收敛于 SSOT，Clippy `-D warnings` 零告警。
 
 ## 强制离线验证命令
+
 ```powershell
 node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js
 node fractal-git/scripts/common/check-zero-alloc-boundary.js
 node fractal-git/scripts/common/validate-crate-topology.js
 pwsh -File fractal-git/scripts/ps1/gate-rust.ps1
+pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1
 cargo test --workspace --manifest-path fractal-git/Cargo.toml
 ```

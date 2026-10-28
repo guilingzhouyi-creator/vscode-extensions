@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`infra-tool`
 - **作业姿态**：`construct`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「业务生产与增量编码姿态」
 - **职责范围**：工作区跨平台脚本工程化开发、双层门禁功能增量编写、Git 钩子增强与打包流水线研发。
 
 ## 物理沙箱 (Path Jail)
@@ -27,6 +27,7 @@ model: inherit
 4. **非交互防御守卫**：脚本严禁交互式挂起阻塞，必须具备无提示自动化执行能力。
 
 ## 强制离线验证命令
+
 ```powershell
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 pwsh -File scripts/ps1/audit-all.ps1 -Fast

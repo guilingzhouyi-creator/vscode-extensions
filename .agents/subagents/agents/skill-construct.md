@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`skill-governance`
 - **作业姿态**：`construct`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「业务生产与增量编码姿态」
 - **职责范围**：全工作区研发技能（`.agents/skills/`）的四件套物理构建、JIT 渐进式披露参考编写与标准代码样板实现。
 
 ## 物理沙箱 (Path Jail)
@@ -27,6 +27,8 @@ model: inherit
 4. **物理卫生与排版契约**：所有 `.md`, `.json`, `.ts`, `.js` 严格保持 LF 换行，零死链、零空文件。
 
 ## 强制离线验证命令
+
 ```powershell
-node scripts/common/sync-skills.js && node scripts/common/validate-skills.js
+node scripts/common/validate-skills.js
+node scripts/common/sync-skills.js --check
 ```

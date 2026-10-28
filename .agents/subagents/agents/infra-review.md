@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`infra-tool`
 - **作业姿态**：`review`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「静态审查与规则匹配姿态」
 - **职责范围**：工作区工程化脚本审查、跨平台对等性审查 (`GUARD-PAIR-001`)、非交互守卫与目录隔离检查。
 
 ## 物理沙箱 (Path Jail)
@@ -25,6 +25,6 @@ model: inherit
 4. **单源规则核验**：审查过程引用的规则 ID 必须在 `rule-catalog.json`（508 条规则）中真实登记。
 
 ## 强制离线验证命令
-```powershell
-pwsh -File scripts/ps1/audit-all.ps1 -Fast
-```
+
+> 本姿态为只读：平台已物理剥夺写入与构建权限，下列命令不在此会话执行。
+> 客观依据为文件路径、起始行号与已登记规则 ID；门禁与回归由主 Agent 或写姿态会话执行。

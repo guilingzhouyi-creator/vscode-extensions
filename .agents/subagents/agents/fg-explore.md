@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`git-kernel`
 - **作业姿态**：`explore`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「只读探索与调用链挖掘姿态」
 - **职责范围**：`fractal-git` 对象与索引结构、存储层生命周期、Plumbing 语义与门禁桥接调用的调查。
 
 ## 物理沙箱 (Path Jail)
@@ -25,8 +25,6 @@ model: inherit
 4. **技术事实汇报**：输出纯客观事实、Rust 规则体系对齐状态与精确文件行号，作为后续规格与重构方案的前置输入。
 
 ## 强制离线验证命令
-```powershell
-node fractal-git/scripts/common/validate-crate-topology.js
-node fractal-git/scripts/common/validate-git-parity.js
-node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js
-```
+
+> 本姿态为只读：平台已物理剥夺写入与构建权限，下列命令不在此会话执行。
+> 客观依据为文件路径、起始行号与已登记规则 ID；门禁与回归由主 Agent 或写姿态会话执行。

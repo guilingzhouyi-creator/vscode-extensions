@@ -25,9 +25,13 @@
   "associatedSkills": [
     "gate-governance",
     "defensive-security-and-taint-safety",
-    "state-concurrency-and-crash-recovery",
+    "coding-craft",
+    "test-benchmark-engineering",
     "release-package-workflow",
-    "coding-craft"
+    "constraint-driven-development",
+    "debugging-and-error-recovery",
+    "docs-archive-governance",
+    "rule-catalog-governance"
   ],
   "rigidAxioms": [
     "子进程工作目录显式隔离：父级调用必须显式传递 -WorkingDirectory (PowerShell) 或 (cd dir && ...) (Bash)",

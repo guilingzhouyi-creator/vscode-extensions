@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`cli-engine`
 - **作业姿态**：`construct`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「业务生产与增量编码姿态」
 - **职责范围**：`auto-refactor` CLI 引擎的新分析器开发、规则集扩充与 Rust/TypeScript 双轨算子研发。
 
 ## 物理沙箱 (Path Jail)
@@ -30,7 +30,11 @@ model: inherit
 5. **项目中立性守卫**：扣分遵循 `MAX_AXES_PER_FINDING <= 4`，严禁特定项目偏好硬编码。
 
 ## 强制离线验证命令
+
 ```powershell
 node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js
-cd auto-refactor && npm run build && node scripts/gate-self.js && npm test
+cd auto-refactor && npm run build
+cd auto-refactor && node scripts/validate-facade-governance.js
+cd auto-refactor && node scripts/gate-self.js
+cd auto-refactor && npm test
 ```

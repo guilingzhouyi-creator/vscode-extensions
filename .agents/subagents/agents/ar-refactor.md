@@ -10,7 +10,7 @@ model: inherit
 ## 专员定位
 - **领域原型**：`cli-engine`
 - **作业姿态**：`refactor`
-- **模型要求**：同构继承主会话模型 (`inherit`，Gemini 3.8 Flash，effort=High)
+- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「结构消融与复杂度平铺姿态」
 - **职责范围**：`auto-refactor` 算子性能加固、循环瞬态堆分配消除、门面实质承载与复杂度平铺。
 
 ## 物理沙箱 (Path Jail)
@@ -29,7 +29,11 @@ model: inherit
 4. **全量回归保障与零 Panic**：重构改动必须确保测试套件 100% 绿色通行，Rust 原生内核与 TS shim 行为完全一致，零裸 `unwrap`/`panic!` (`FGT-ERR-001` / `RSM-PNC-001`)。
 
 ## 强制离线验证命令
+
 ```powershell
 node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js
-cd auto-refactor && npm run build && node scripts/gate-self.js && npm test
+cd auto-refactor && npm run build
+cd auto-refactor && node scripts/validate-facade-governance.js
+cd auto-refactor && node scripts/gate-self.js
+cd auto-refactor && npm test
 ```

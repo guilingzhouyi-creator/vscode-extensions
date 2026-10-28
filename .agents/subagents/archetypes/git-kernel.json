@@ -11,15 +11,15 @@
     "fractal-git-dev",
     "rust-engineering",
     "state-concurrency-and-crash-recovery",
-    "defensive-security-and-taint-safety",
     "algorithmic-operator-engineering",
-    "coding-craft",
-    "complexity-budget",
     "test-benchmark-engineering",
     "spec-driven-development",
-    "constraint-driven-development",
+    "coding-craft",
+    "complexity-budget",
     "facade-discipline",
-    "debugging-and-error-recovery"
+    "defensive-security-and-taint-safety",
+    "debugging-and-error-recovery",
+    "constraint-driven-development"
   ],
   "rigidAxioms": [
     "10 微 Crate 分层拓扑（fg-core/object/index/algorithms/pools/storage/native/topology/transport/gate）单向依赖，零循环",
