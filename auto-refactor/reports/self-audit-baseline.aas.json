@@ -2,29 +2,29 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-27T15:42:10.312Z",
+  "timestamp": "2026-10-28T11:01:24.835Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
     "score": 99.17,
     "grade": "A+",
-    "cai": 78.28,
+    "cai": 87.88,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.917,
       "averagePor": 0.083,
-      "averageColumnDensity": 0.864,
-      "averageSpatialDensity": 0.445,
-      "averageMahalanobisDistance": 4.606,
+      "averageColumnDensity": 0.863,
+      "averageSpatialDensity": 0.446,
+      "averageMahalanobisDistance": 4.584,
       "averageFisherSimplexDistance": 0.097
     },
     "counts": {
-      "files": 776,
-      "total": 3998,
+      "files": 775,
+      "total": 4023,
       "errors": 0,
-      "warns": 3448,
-      "info": 550,
+      "warns": 3470,
+      "info": 553,
       "suppressed": 154
     }
   },
@@ -34,37 +34,37 @@
     "semanticPurity": 98.38,
     "codeSecurity": 99.79,
     "performanceEfficiency": 99.57,
-    "standardization": 83.98,
+    "standardization": 83.92,
     "modernity": 98.35,
-    "maintainability": 93.31,
-    "commentQuality": 99.82,
-    "duplication": 94.95,
+    "maintainability": 93.33,
+    "commentQuality": 99.86,
+    "duplication": 94.93,
     "techDebtRisk": 100
   },
   "bottlenecks": [
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 4260,
-      "count": 426
+      "loss": 4300,
+      "count": 430
     },
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3095,
-      "count": 217
+      "loss": 3125,
+      "count": 219
     },
     {
       "rule": "metric",
       "dim": "architectureConsistency",
-      "loss": 2390,
-      "count": 239
+      "loss": 2370,
+      "count": 237
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2020,
-      "count": 202
+      "loss": 2060,
+      "count": 206
     },
     {
       "rule": "SIM-TRN-001",
@@ -73,22 +73,22 @@
       "count": 202
     },
     {
+      "rule": "hardcoded-string",
+      "dim": "duplication",
+      "loss": 1986,
+      "count": 662
+    },
+    {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 1975,
-      "count": 395
+      "loss": 1985,
+      "count": 397
     },
     {
       "rule": "NAM-DEC-001",
       "dim": "architectureConsistency",
       "loss": 1960,
       "count": 196
-    },
-    {
-      "rule": "hardcoded-string",
-      "dim": "duplication",
-      "loss": 1956,
-      "count": 652
     }
   ],
   "topology": {
@@ -509,7 +509,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 919 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 927 >= warn threshold 400).",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -6455,7 +6455,7 @@
     ],
     "src/core/ast/sparse-reference-replay.ts": [
       {
-        "line": 241,
+        "line": 245,
         "col": 12,
         "rule": "HYG-WRAP-001",
         "sev": "WARN",
@@ -6466,7 +6466,7 @@
         }
       },
       {
-        "line": 268,
+        "line": 272,
         "col": 13,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -6478,7 +6478,7 @@
         }
       },
       {
-        "line": 307,
+        "line": 311,
         "col": 13,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -6495,34 +6495,14 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 845 >= warn threshold 400; functions 27 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 850 >= warn threshold 400; functions 27 >= warn threshold 20).",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
         }
       },
       {
-        "line": 74,
-        "rule": "CMT-WID-001",
-        "sev": "WARN",
-        "msg": "Comment/docstring line exceeds 100 columns (found 118)",
-        "fix": {
-          "action": "refactor",
-          "template": "Wrap the comment at word boundaries; long directives keep their exemption"
-        }
-      },
-      {
-        "line": 78,
-        "rule": "CMT-WID-001",
-        "sev": "WARN",
-        "msg": "Comment/docstring line exceeds 100 columns (found 106)",
-        "fix": {
-          "action": "refactor",
-          "template": "Wrap the comment at word boundaries; long directives keep their exemption"
-        }
-      },
-      {
-        "line": 218,
+        "line": 224,
         "col": 38,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -6531,9 +6511,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 218,
+              "startLine": 224,
               "startCol": 38,
-              "endLine": 218,
+              "endLine": 224,
               "endCol": 44
             },
             "replacementText": "TEXT_TEXT"
@@ -6542,7 +6522,7 @@
         }
       },
       {
-        "line": 247,
+        "line": 253,
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -6554,7 +6534,7 @@
         }
       },
       {
-        "line": 304,
+        "line": 310,
         "col": 15,
         "rule": "NAM-VAG-001",
         "sev": "WARN",
@@ -6565,17 +6545,17 @@
         }
       },
       {
-        "line": 429,
+        "line": 436,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 413",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 420",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
         }
       },
       {
-        "line": 549,
+        "line": 556,
         "rule": "TSM-INCLUDES-001",
         "sev": "WARN",
         "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants.",
@@ -6586,7 +6566,7 @@
         }
       },
       {
-        "line": 632,
+        "line": 639,
         "rule": "TSM-INCLUDES-001",
         "sev": "WARN",
         "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants.",
@@ -6597,7 +6577,7 @@
         }
       },
       {
-        "line": 634,
+        "line": 641,
         "rule": "TSM-INCLUDES-001",
         "sev": "WARN",
         "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants.",
@@ -6659,7 +6639,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 783 >= warn threshold 400; functions 26 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 761 >= warn threshold 400; functions 25 >= warn threshold 20).",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -6754,18 +6734,7 @@
         }
       },
       {
-        "line": 490,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'admitProjectedNode' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'r…",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 514,
+        "line": 492,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -6776,7 +6745,7 @@
         }
       },
       {
-        "line": 514,
+        "line": 492,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
         "msg": "Function \"dispatchProjectedActiveAndExemptHooks\" has 6 parameters (limit 4). Introduce a parameter object.",
@@ -6787,7 +6756,7 @@
         }
       },
       {
-        "line": 539,
+        "line": 517,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
         "msg": "Function \"notifyProjectedObserver\" has 5 parameters (limit 4). Introduce a parameter object.",
@@ -6798,17 +6767,7 @@
         }
       },
       {
-        "line": 555,
-        "rule": "CMT-WID-001",
-        "sev": "WARN",
-        "msg": "Comment/docstring line exceeds 100 columns (found 104)",
-        "fix": {
-          "action": "refactor",
-          "template": "Wrap the comment at word boundaries; long directives keep their exemption"
-        }
-      },
-      {
-        "line": 598,
+        "line": 576,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
         "msg": "Function \"runStreamingProjected\" has 5 parameters (limit 4). Introduce a parameter object.",
@@ -6819,7 +6778,7 @@
         }
       },
       {
-        "line": 598,
+        "line": 576,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
         "msg": "Function \"runStreamingProjected\" spans 98 lines (limit 60).",
@@ -6830,7 +6789,7 @@
         }
       },
       {
-        "line": 624,
+        "line": 602,
         "col": 22,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -7864,8 +7823,72 @@
           "action": "rename_identifier",
           "template": "Replace transient process markers with semantic domain naming."
         }
+      },
+      {
+        "line": 128,
+        "col": 19,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'issueToFix' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        }
+      },
+      {
+        "line": 224,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 178",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        }
+      },
+      {
+        "line": 345,
+        "col": 54,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 3 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 345,
+              "startCol": 54,
+              "endLine": 345,
+              "endCol": 55
+            },
+            "replacementText": "CONST_3"
+          },
+          "safeToAutomate": true
+        }
+      },
+      {
+        "line": 346,
+        "col": 68,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 4 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 346,
+              "startCol": 68,
+              "endLine": 346,
+              "endCol": 69
+            },
+            "replacementText": "CONST_4"
+          },
+          "safeToAutomate": true
+        }
       }
     ]
   },
-  "truncated": 2948
+  "truncated": 2970,
+  "notes": [
+    "dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph"
+  ]
 }

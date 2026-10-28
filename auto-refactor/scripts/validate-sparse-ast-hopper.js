@@ -326,9 +326,16 @@ function assertFileMetricExemptFromPruning() {
 
   const metricCollectorFull = new FileMetricCollector();
   runStreaming(FIXTURE_ADAPTER, buildFixtureTree(), [
-    { analyzer: metricCollectorFull, ctx: { config: {}, filePath: 'fixture.ts', content: '', root: buildFixtureTree() } },
+    {
+      analyzer: metricCollectorFull,
+      ctx: { config: {}, filePath: 'fixture.ts', content: '', root: buildFixtureTree() },
+    },
   ]);
-  metricCollectorFull.finalize({ config: {}, filePath: 'fixture.ts', content: 'let x = 1;\n'.repeat(20) });
+  metricCollectorFull.finalize({
+    config: {},
+    filePath: 'fixture.ts',
+    content: 'let x = 1;\n'.repeat(20),
+  });
 
   const metricCollectorBounded = new FileMetricCollector();
   const stats = createSparseHopperStats();
@@ -336,12 +343,19 @@ function assertFileMetricExemptFromPruning() {
     FIXTURE_ADAPTER,
     buildFixtureTree(),
     [
-      { analyzer: metricCollectorBounded, ctx: { config: {}, filePath: 'fixture.ts', content: '', root: buildFixtureTree() } },
+      {
+        analyzer: metricCollectorBounded,
+        ctx: { config: {}, filePath: 'fixture.ts', content: '', root: buildFixtureTree() },
+      },
     ],
     [6, 9], // Narrow window covering only 1 of 4 functions
     stats,
   );
-  metricCollectorBounded.finalize({ config: {}, filePath: 'fixture.ts', content: 'let x = 1;\n'.repeat(20) });
+  metricCollectorBounded.finalize({
+    config: {},
+    filePath: 'fixture.ts',
+    content: 'let x = 1;\n'.repeat(20),
+  });
 
   assert.strictEqual(
     metricCollectorBounded.functions,
@@ -368,7 +382,9 @@ function assertFileMetricExemptFromPruning() {
     6,
     'hopper records pruned nodes (3 functions + 3 child constants) for non-exempt analyzers',
   );
-  console.log('  ✔ FileMetricCollector is exempt from pruning and preserves static profiling (P1-1)');
+  console.log(
+    '  ✔ FileMetricCollector is exempt from pruning and preserves static profiling (P1-1)',
+  );
 }
 
 /** Assert file-level finalize issues at line 1 survive window pruning (P1-2). */
@@ -391,11 +407,27 @@ function assertFileLevelFinalizeIssuesSurvivePruning() {
   ];
 
   const surviving = swa.pruneIssuesOutsideWindow(issues, window);
-  assert.strictEqual(surviving.length, 3, 'file-level rules (NAM-FIL, VOL-FIL) and in-window rule survive');
-  assert.ok(surviving.some((i) => i.rule === 'NAM-FIL-001'), 'NAM-FIL-001 must survive');
-  assert.ok(surviving.some((i) => i.rule === 'VOL-FIL-001'), 'VOL-FIL-001 must survive');
-  assert.ok(surviving.some((i) => i.rule === 'CMP-IF-001'), 'in-window issue must survive');
-  assert.ok(!surviving.some((i) => i.rule === 'SIM-EXP-001'), 'out-of-window local issue must be pruned');
+  assert.strictEqual(
+    surviving.length,
+    3,
+    'file-level rules (NAM-FIL, VOL-FIL) and in-window rule survive',
+  );
+  assert.ok(
+    surviving.some((i) => i.rule === 'NAM-FIL-001'),
+    'NAM-FIL-001 must survive',
+  );
+  assert.ok(
+    surviving.some((i) => i.rule === 'VOL-FIL-001'),
+    'VOL-FIL-001 must survive',
+  );
+  assert.ok(
+    surviving.some((i) => i.rule === 'CMP-IF-001'),
+    'in-window issue must survive',
+  );
+  assert.ok(
+    !surviving.some((i) => i.rule === 'SIM-EXP-001'),
+    'out-of-window local issue must be pruned',
+  );
   console.log('  ✔ file-level finalize rules survive window pruning (P1-2)');
 }
 

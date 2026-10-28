@@ -51,7 +51,9 @@ const SCOPE_FULL_FILE = 'full';
  * @param changedLines - Array of modified line numbers.
  * @returns [firstLine, lastLine] tuple, or undefined when changedLines is empty or omitted.
  */
-function foldChangedLineBounds(changedLines?: readonly number[]): readonly [number, number] | undefined {
+function foldChangedLineBounds(
+    changedLines?: readonly number[],
+): readonly [number, number] | undefined {
     if (!changedLines || changedLines.length === 0) return undefined;
     let min = changedLines[0];
     let max = changedLines[0];
@@ -207,8 +209,8 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
         const status: 'PASS' | 'WARN' | 'BLOCK' = hasErrors
             ? 'BLOCK'
             : hasWarnings
-                ? 'WARN'
-                : 'PASS';
+              ? 'WARN'
+              : 'PASS';
 
         return {
             filePath: input.filePath,

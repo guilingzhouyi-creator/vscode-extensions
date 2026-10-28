@@ -268,7 +268,9 @@ async function main() {
     'SPECULATIVE_PASSED',
     'Replay-bounded FastTrack must pass on clean localized edit',
   );
-  console.log('  ✔ replayBoundedFastTrack gated opt-in successfully bounds and audits change (P2-2)');
+  console.log(
+    '  ✔ replayBoundedFastTrack gated opt-in successfully bounds and audits change (P2-2)',
+  );
 
   console.log('✔ FastTrack foreground audit verified.\n');
 

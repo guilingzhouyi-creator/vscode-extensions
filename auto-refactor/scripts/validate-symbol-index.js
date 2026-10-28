@@ -193,7 +193,8 @@ async function main() {
       fs.rmSync(projectionRoot, { recursive: true, force: true });
     }
 
-    // ── 3c. B2b lock: Top-level call sites outside functions must be collected in projection mode ──
+    // ── 3c. B2b lock: top-level call sites outside functions must be collected in projection
+    // mode ──
     const topLevelCallRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-symbols-toplevel-'));
     try {
       const TOPLEVEL_FILES = {

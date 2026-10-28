@@ -243,7 +243,8 @@ export interface DualTrackOptions {
      */
     replayBoundedFastTrack?: boolean;
     /**
-     * Optional sparse reference replay manager override. Falls back to defaultSparseReferenceReplayManager.
+     * Optional sparse reference replay manager override. Falls back to
+     * `defaultSparseReferenceReplayManager`.
      */
     replayManager?: SparseReferenceReplayManager;
 }

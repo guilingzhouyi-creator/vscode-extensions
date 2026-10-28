@@ -134,7 +134,11 @@ export function resolveWindowCap(
     density?: CodeDensityMetrics,
     defaultCap: number = DEFAULT_MAX_COMPOUND_WINDOW_LINES,
 ): number {
-    if (!density || typeof density.effectiveDensity !== 'number' || Number.isNaN(density.effectiveDensity)) {
+    if (
+        !density ||
+        typeof density.effectiveDensity !== 'number' ||
+        Number.isNaN(density.effectiveDensity)
+    ) {
         return defaultCap;
     }
     const clampedDensity = Math.max(0.2, Math.min(0.95, density.effectiveDensity));

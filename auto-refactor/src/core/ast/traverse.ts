@@ -25,7 +25,7 @@ import type { AnalyzerContext, Issue, FileMetric } from '../types';
 import type { NormalizedNode, LanguageAdapter, NodeProjector, ProjectionPolicy } from './multilang';
 import { NodeKind } from './multilang';
 import { computeEffectiveCodeDensity } from '../scoring/effectiveDensity';
-import type { SparseHopperStats, SparseHopperWindow } from './sparse-ast-hopper';
+import type { SparseHopperStats } from './sparse-ast-hopper';
 import {
     createSparseHopperStats,
     isSubtreePrunable,
@@ -480,28 +480,6 @@ function dispatchProjectedHooks(
 }
 
 /**
- * Record the hopper verdict for one projected node and report whether it must be dispatched.
- *
- * @param node - Projected node under consideration.
- * @param window - Active audited span, or undefined when the whole file is audited.
- * @param stats - Counters receiving the visited/pruned tally.
- * @returns True when the node itself must reach the analyzer hooks.
- */
-function admitProjectedNode(
-    node: NormalizedNode,
-    window: SparseHopperWindow | undefined,
-    stats: SparseHopperStats,
-): boolean {
-    if (isSubtreePrunable(node, window)) {
-        stats.pruned += 1;
-        return false;
-    }
-    if (!shouldDispatchNode(node, window)) return false;
-    stats.visited += 1;
-    return true;
-}
-
-/**
  * Dispatch both active and exempt projected hooks for one lazy-projection traversal event.
  *
  * @param active - Active hooks to dispatch if the node should be dispatched.
@@ -552,7 +530,7 @@ function notifyProjectedObserver(
  * Resolve the effective caller identifier when descending into a child scope.
  *
  * @param node - Normalized node whose scope is being entered.
- * @param fallbackCaller - Current enclosing caller if the node does not establish a new function scope.
+ * @param fallbackCaller - Current enclosing caller if the node does not establish a function scope.
  * @returns Updated function name or fallback.
  */
 function resolveChildCaller(node: NormalizedNode, fallbackCaller: string | null): string | null {

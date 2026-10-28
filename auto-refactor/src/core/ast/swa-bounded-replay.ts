@@ -71,11 +71,17 @@ const CHAR_SPACE = 32;
 /** ASCII character code for horizontal tab '\t'. */
 const CHAR_TAB = 9;
 
-/** Fast regex pattern matching top-level function, class, interface, const or macro declarations across languages. */
+/**
+ * Fast regex pattern matching top-level function, class, interface, const or macro declarations
+ * across languages.
+ */
 const DECLARATION_LINE_PATTERN =
     /^\s*(?:(export|pub(?:\([^)]+\))?)\s+)?(?:default\s+)?(?:async\s+)?(?:function|class|interface|type|const|let|var|enum|struct|impl|trait|fn|def|func)\s+([A-Za-z0-9_$]+)/;
 
-/** Fast regex pattern matching top-level statement keywords that terminate on same line when unbraced. */
+/**
+ * Fast regex pattern matching top-level statement keywords that terminate on the same line when
+ * unbraced.
+ */
 const STATEMENT_DECL_PATTERN =
     /^\s*(?:(?:export|pub(?:\([^)]+\))?)\s+)?(?:default\s+)?(?:const|let|var|type)\b/;
 
@@ -408,7 +414,8 @@ export class SwaBoundedReplayManager {
 
             const targetSpan = Math.min(this.maxWindowLines, anchorEnd - anchorStart + 1);
             const idealStart = changeStart - Math.floor((targetSpan - changeSpan) / 2);
-            const winStart = Math.max(anchorStart, Math.min(idealStart, anchorEnd - targetSpan + 1));
+            const latestStart = anchorEnd - targetSpan + 1;
+            const winStart = Math.max(anchorStart, Math.min(idealStart, latestStart));
             const winEnd = Math.min(totalLines, Math.min(anchorEnd, winStart + targetSpan - 1));
             const effectiveSpan = Math.max(1, winEnd - winStart + 1);
 
@@ -690,9 +697,7 @@ export class SwaBoundedReplayManager {
         anchors: AstAnchor[],
     ): void {
         const endLine = current.isIndentBased ? current.lastBodyLine : totalLines;
-        anchors.push(
-            this.buildTextAnchor(current, Math.max(current.startLine, endLine)),
-        );
+        anchors.push(this.buildTextAnchor(current, Math.max(current.startLine, endLine)));
     }
 
     /**

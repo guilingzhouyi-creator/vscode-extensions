@@ -256,9 +256,15 @@ async function main() {
   assert.strictEqual(typeof fullVerdict.replayWindow.isBounded, 'boolean');
   assert.strictEqual(typeof fullVerdict.replayWindow.sparseReferenceCount, 'number');
   assert.ok(fullVerdict.replayWindow.isBounded, 'Local edit must produce a bounded window');
-  assert.ok(fullVerdict.replayWindow.sparseReferenceCount > 0, 'Breaking signature with callers must retain sparse references');
+  assert.ok(
+    fullVerdict.replayWindow.sparseReferenceCount > 0,
+    'Breaking signature with callers must retain sparse references',
+  );
   assert.ok(fullVerdict.replayWindow.isSparseBridged, 'Window must be marked as sparse bridged');
-  assert.ok(Array.isArray(fullVerdict.replayWindow.sparseReferences), 'Must attach external sparse reference list');
+  assert.ok(
+    Array.isArray(fullVerdict.replayWindow.sparseReferences),
+    'Must attach external sparse reference list',
+  );
   console.log(`  ✔ Praxis slice audit facade verified (Verdict status: ${fullVerdict.status})`);
 
   console.log('\n================================================================');

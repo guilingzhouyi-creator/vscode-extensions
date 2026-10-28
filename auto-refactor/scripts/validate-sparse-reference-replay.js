@@ -308,14 +308,20 @@ function assertWindowShiftingGuaranteesContainment() {
   const win129 = swa.computeReplayWindow('src/batch.ts', source, edited129, [129, 129]);
   assert.strictEqual(win129.isBounded, true, 'line 129 edit must remain bounded');
   assert.strictEqual(win129.requiresFullReplay, false, 'line 129 edit must not replay full file');
-  assert.ok(win129.startLine <= 129 && win129.endLine >= 129, 'window must strictly contain changed line 129');
+  assert.ok(
+    win129.startLine <= 129 && win129.endLine >= 129,
+    'window must strictly contain changed line 129',
+  );
   assert.ok(win129.effectiveSpanLines <= 128, 'shifted window span must not exceed cap');
 
   // Test 2: Edit at line 200
   const edited200 = source.replace('const step200 = 200;', 'const step200 = 9999;');
   const win200 = swa.computeReplayWindow('src/batch.ts', source, edited200, [200, 200]);
   assert.strictEqual(win200.isBounded, true, 'line 200 edit must remain bounded');
-  assert.ok(win200.startLine <= 200 && win200.endLine >= 200, 'window must strictly contain changed line 200');
+  assert.ok(
+    win200.startLine <= 200 && win200.endLine >= 200,
+    'window must strictly contain changed line 200',
+  );
   assert.ok(win200.effectiveSpanLines <= 128, 'shifted window span must not exceed cap');
 
   // Test 3: Edit spanning 200 lines (50 to 250) exceeds cap and must degrade
@@ -324,8 +330,16 @@ function assertWindowShiftingGuaranteesContainment() {
     .replace('const step250 = 250;', 'const step250 = 9999;');
   const winOver = swa.computeReplayWindow('src/batch.ts', source, editedOver, [50, 250]);
   assert.strictEqual(winOver.isBounded, false, 'oversized edit span must not be bounded');
-  assert.strictEqual(winOver.requiresFullReplay, true, 'oversized edit span must require full replay');
-  assert.strictEqual(winOver.reason, REASON_CHANGE_SPAN_EXCEEDS_CAP, 'must report REASON_CHANGE_SPAN_EXCEEDS_CAP');
+  assert.strictEqual(
+    winOver.requiresFullReplay,
+    true,
+    'oversized edit span must require full replay',
+  );
+  assert.strictEqual(
+    winOver.reason,
+    REASON_CHANGE_SPAN_EXCEEDS_CAP,
+    'must report REASON_CHANGE_SPAN_EXCEEDS_CAP',
+  );
   console.log('  ✔ window shifting strictly guarantees change containment (P0-1)');
 }
 
@@ -357,8 +371,16 @@ function assertSignaturePreservesFullDeclaration() {
 
   assert.strictEqual(window.isBounded, true, 'multiline signature edit is bounded');
   assert.strictEqual(window.startLine, 1, 'window starts at line 1');
-  assert.strictEqual(window.endLine, 7, 'window must cover the entire function body through line 7');
-  assert.strictEqual(window.effectiveSpanLines, 7, 'effective span matches total declaration lines');
+  assert.strictEqual(
+    window.endLine,
+    7,
+    'window must cover the entire function body through line 7',
+  );
+  assert.strictEqual(
+    window.effectiveSpanLines,
+    7,
+    'effective span matches total declaration lines',
+  );
   assert.strictEqual(window.isSparseBridged, true, 'bridging flag active');
   console.log('  ✔ signature window covers complete declaration body (P0-2)');
 }
@@ -447,12 +469,9 @@ function assertCrossLanguageDeclarationsSupported() {
   assert.strictEqual(gdAnchors[3].endLine, 8);
 
   // Rust test
-  const rustScript = [
-    'pub fn query(&self);',
-    'pub fn compute(&self) -> u32 {',
-    '    42',
-    '}',
-  ].join('\n');
+  const rustScript = ['pub fn query(&self);', 'pub fn compute(&self) -> u32 {', '    42', '}'].join(
+    '\n',
+  );
   const rsAnchors = swa.indexAnchors('src/engine.rs', rustScript);
   assert.strictEqual(rsAnchors.length, 2, 'must extract 2 Rust anchors');
   assert.strictEqual(rsAnchors[0].name, 'query');
@@ -485,7 +504,11 @@ function assertAdaptiveWindowCapCalibration() {
   // 4. Clamping bounds
   // Extreme low density (< 0.20): clamped to MAX_ADAPTIVE_WINDOW_CAP (512)
   const extremeSparseCap = resolveWindowCap({ effectiveDensity: 0.05 });
-  assert.strictEqual(extremeSparseCap, MAX_ADAPTIVE_WINDOW_CAP, 'extreme low density clamped to max');
+  assert.strictEqual(
+    extremeSparseCap,
+    MAX_ADAPTIVE_WINDOW_CAP,
+    'extreme low density clamped to max',
+  );
 
   // Extreme high density (> 0.95): clamped to MIN_ADAPTIVE_WINDOW_CAP (>= 64)
   const extremeDenseCap = resolveWindowCap({ effectiveDensity: 1.0 });
@@ -499,7 +522,9 @@ function assertAdaptiveWindowCapCalibration() {
   for (let i = 0; i < 98; i++) lines.push(`  const y${i} = ${i};`);
   lines.push('}');
   const content = lines.join('\n');
-  const edited = content.replace('const x0 = 0;', 'const x0 = 999;').replace('const y0 = 0;', 'const y0 = 999;');
+  const edited = content
+    .replace('const x0 = 0;', 'const x0 = 999;')
+    .replace('const y0 = 0;', 'const y0 = 999;');
 
   // Under normal default (cap 256), 200 lines is accepted:
   const winDefault = planner.computeSparseReplayWindow({
@@ -511,7 +536,8 @@ function assertAdaptiveWindowCapCalibration() {
   assert.strictEqual(winDefault.isBounded, true, '200 lines fits default 256 cap');
   assert.strictEqual(winDefault.reason, REASON_COMPOUND_ANCHOR_WINDOW);
 
-  // Under high density (effectiveDensity: 0.90, cap 185), 200 lines EXCEEDS cap and degrades to full replay:
+  // Under high density (effectiveDensity: 0.90, cap 185), 200 lines EXCEEDS the cap and
+  // therefore degrades to a full replay:
   const winDense = planner.computeSparseReplayWindow({
     filePath: 'src/compound.ts',
     oldContent: content,
@@ -530,7 +556,9 @@ function assertAdaptiveWindowCapCalibration() {
   for (let i = 0; i < 148; i++) bigLines.push(`  const b${i} = ${i};`);
   bigLines.push('}');
   const bigContent = bigLines.join('\n');
-  const bigEdited = bigContent.replace('const a0 = 0;', 'const a0 = 999;').replace('const b0 = 0;', 'const b0 = 999;');
+  const bigEdited = bigContent
+    .replace('const a0 = 0;', 'const a0 = 999;')
+    .replace('const b0 = 0;', 'const b0 = 999;');
 
   const winBigSparse = planner.computeSparseReplayWindow({
     filePath: 'src/sparse-compound.ts',
