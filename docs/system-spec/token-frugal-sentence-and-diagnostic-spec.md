@@ -2,7 +2,7 @@
 
 > **规范编号**：`SPECIFICATION_TOKEN_FRUGAL_DIAGNOSTIC`  
 > **适用范围**：全工作区智能体审查交互、AAS v1.0 序列化、静态分析器诊断生成及提交说明门禁  
-> **关联真源**：[AGENTS.md](../../AGENTS.md) 审查报告与 Token 节约公理、[aas-reporter.ts](../../auto-refactor/src/core/reporting/aas-reporter.ts)、[diagnostic-catalog.ts](../../auto-refactor/src/core/rules/diagnostic-catalog.ts)
+> **关联真源**：[AGENTS.md](../../AGENTS.md) 「全工作区统一审查」行中的 AAS v1.0 与 Token 削减契约、[aas-reporter.ts](../../auto-refactor/src/core/reporting/aas-reporter.ts)、[diagnostic-catalog.ts](../../auto-refactor/src/core/rules/diagnostic-catalog.ts)
 
 ---
 

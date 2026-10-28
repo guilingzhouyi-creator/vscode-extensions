@@ -47,7 +47,8 @@
 
 > 本节计数以实测为准（`.agents/skills/` 与 `.agents/plugins/workspace-governance/skills/`
 > 两处镜像各 <!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count --> `SKILL.md`，由 `validate-skills.js` 的同构配对校验覆盖）。
-> DSH 治理模式族的单源位于 [`../../dsh/presets/`](../../dsh/presets/)，不在本目录内。
+> DSH 治理模式族的单源位于 [`../../dsh/bundle/`](../../dsh/bundle/)（`package.json` 声明装载入口、
+> `cordis.patch.yml` 承载声明行、`guard-plugin.js` 是守卫实现、`jail-policy.json` 是策略单源），不在本目录内。
 
 ---
 

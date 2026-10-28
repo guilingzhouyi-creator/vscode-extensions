@@ -2,7 +2,7 @@
   "name": "workspace-governance",
   "displayName": "Workspace Governance & Engineering Suite",
   "version": "1.0.0",
-  "description": "全工作区一体化治理与研发套件：打包 27 项核心研发技能、SSOT 单源规则目录、双轨体积与 AST 复杂度预算、四模式 DSH 治理模式族与 Path Jail 物理守卫、SubAgent 正交派生编排与全仓自动化质量门禁。",
+  "description": "全工作区一体化治理与研发套件：打包 <!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count --> 核心研发技能、SSOT 单源规则目录、双轨体积与 AST 复杂度预算、四模式 DSH 治理模式族与 Path Jail 物理守卫、SubAgent 正交派生编排与全仓自动化质量门禁。",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [
     "执行全工作区统一质量审查与门禁预审 (pwsh scripts/ps1/audit-all.ps1)",
