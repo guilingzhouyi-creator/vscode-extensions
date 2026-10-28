@@ -1,0 +1,30 @@
+{
+  "schema": "workspace-dsh-jail-policy/v1",
+  "description": "DSH 写路径策略单源。策略只表达姿态（写/读）与全工作区恒不可写的禁区；领域边界由各原型的 pathJail（.agents/subagents/archetypes/*.json）承担，两者不得重复表达同一约束。空 allowRoots 表示整仓可写（受 denyRoots 与 read 姿态约束）。",
+  "modes": {
+    "wg-construct": {
+      "mode": "write",
+      "allowRoots": [],
+      "denyRoots": [".git", "archive", "node_modules", ".audit-logs", "**/target", "**/dist", "**/out", "**/bin", "**/obj", "**/.venv"],
+      "deniedTools": []
+    },
+    "wg-refactor": {
+      "mode": "write",
+      "allowRoots": [],
+      "denyRoots": [".git", "archive", "node_modules", ".audit-logs", "**/target", "**/dist", "**/out", "**/bin", "**/obj", "**/.venv"],
+      "deniedTools": []
+    },
+    "wg-review": {
+      "mode": "read",
+      "allowRoots": [],
+      "denyRoots": [],
+      "deniedTools": []
+    },
+    "wg-explore": {
+      "mode": "read",
+      "allowRoots": [],
+      "denyRoots": [],
+      "deniedTools": []
+    }
+  }
+}
