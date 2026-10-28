@@ -199,11 +199,15 @@ if (-not $cargoCmd) {
         foreach ($m in [regex]::Matches($testOutput, 'test result: (?:ok|FAILED)\.\s+(\d+)\s+passed')) {
             $passedTotal += [int]$m.Groups[1].Value
         }
-        $statusRegression = "PASS"
         if ($passedTotal -gt 0) {
+            $statusRegression = "PASS"
             Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "PASS" -Detail "$passedTotal 项测试通过"
         } else {
-            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "PASS" -Detail "回归套件通过（cargo 未报告测试计数）"
+            # A green exit code carrying no reported count means the harness executed nothing, or
+            # the output shape changed underneath this parser. Both conditions must surface: calling
+            # this PASS made an empty suite indistinguishable from one that actually asserted.
+            $statusRegression = "WARN"
+            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "WARN" -Detail "cargo 未报告任何测试计数，回归覆盖不可证实"
         }
     }
 }

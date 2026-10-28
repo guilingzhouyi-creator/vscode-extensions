@@ -511,13 +511,16 @@ fn find_untracked(
 
     let mut pending: Vec<(std::path::PathBuf, String)> =
         vec![(view.work_root().to_path_buf(), String::new())];
+    // Hoisted out of the directory walk: the same buffer is cleared and refilled per directory
+    // instead of allocating a new one on every level of the traversal.
+    let mut child_directories: Vec<(std::path::PathBuf, String)> = Vec::new();
     while let Some((directory, relative)) = pending.pop() {
         let read = match fs::read_dir(&directory) {
             Ok(entries) => entries,
             Err(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => continue,
             Err(io_err) => return Err(FractalError::Io(io_err)),
         };
-        let mut child_directories: Vec<(std::path::PathBuf, String)> = Vec::new();
+        child_directories.clear();
         for entry in read {
             let entry = entry?;
             let file_name = entry.file_name().to_string_lossy().into_owned();
@@ -546,7 +549,7 @@ fn find_untracked(
             );
         }
 
-        for (absolute, path) in child_directories {
+        for (absolute, path) in child_directories.drain(..) {
             let holds_tracked = tracked_prefixes.contains(&path)
                 || tracked
                     .iter()

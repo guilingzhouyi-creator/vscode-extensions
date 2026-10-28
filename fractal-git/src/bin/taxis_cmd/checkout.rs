@@ -128,7 +128,7 @@ pub fn handle_checkout(ctx: &CliContext) {
 /// Extracts the subject line Git names in its detached-HEAD report.
 ///
 /// The header block ends at the first blank line; the subject is the first non-empty line of what
-/// follows. A commit message in a legacy encoding is decoded lossily because this string is only
+/// follows. A commit message in a non-UTF-8 encoding is decoded lossily because this string is only
 /// ever shown to a human, never compared as data.
 fn commit_subject(payload: &[u8]) -> Option<String> {
     let text = String::from_utf8_lossy(payload);

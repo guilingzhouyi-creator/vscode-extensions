@@ -24,6 +24,7 @@ const path = require('path');
 
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const CRATES_DIR = path.join(PROJECT_ROOT, 'crates');
+const BIN_DIR = path.join(PROJECT_ROOT, 'src', 'bin');
 
 const RE_LOOP_START = /^\s*(?:for\b|while\b|loop\b)/;
 const RE_TRANSIENT_ALLOC =
@@ -117,16 +118,37 @@ function checkLoopAllocation(line, trimmed, ctx, state, violations) {
 }
 
 /**
+ * Advances the pending safety-proof tracker by one line.
+ *
+ * A `// SAFETY:` comment may wrap across several lines, so the proof stays pending while the
+ * comment block continues and is cleared by the first line that is not a comment. Tracking only
+ * the immediately preceding line would reject a genuine multi-line justification.
+ *
+ * @param {string} trimmed - Trimmed source line.
+ * @param {boolean} wasPending - Whether a proof was pending before this line.
+ * @returns {boolean} Whether a proof is pending after this line.
+ */
+function advanceSafetyProof(trimmed, wasPending) {
+  if (/^\/\/[/!]?\s*SAFETY:/.test(trimmed)) return true;
+  if (trimmed.startsWith('//')) return wasPending;
+  return false;
+}
+
+/**
  * Requires a preceding proof comment on every unsafe block (FGT-SAF-001).
  *
  * @param {string} trimmed - Trimmed source line.
  * @param {{ relPath: string, lineNum: number }} ctx - Per-line context.
- * @param {boolean} prevLineCommented - Whether the previous line was a comment.
+ * @param {boolean} hasSafetyProof - Whether a `// SAFETY:` block precedes this line.
  * @param {string[]} violations - Mutable collector.
  */
-function checkUnsafeProof(trimmed, ctx, prevLineCommented, violations) {
+function checkUnsafeProof(trimmed, ctx, hasSafetyProof, violations) {
   const isUnsafeBlock = trimmed.startsWith('unsafe ') || trimmed === 'unsafe {';
-  if (!isUnsafeBlock || prevLineCommented) return;
+  // The proof comment must carry the `SAFETY:` prefix. Accepting any preceding comment let a
+  // narrative note such as `// this is what upstream does` stand in for an actual justification,
+  // which is not the same artifact: one records behaviour, the other records why the invariants a
+  // caller must uphold are in fact upheld here.
+  if (!isUnsafeBlock || hasSafetyProof) return;
   violations.push(
     `FGT-SAF-001: Undocumented unsafe block missing safety proof at ${ctx.relPath}:${ctx.lineNum}`,
   );
@@ -186,7 +208,10 @@ function checkVagueIdentifier(line, ctx, violations) {
  */
 function checkForbiddenJargon(trimmed, ctx, violations) {
   if (!ctx.isComment) return;
-  if (/\b(?:TODO|FIXME|HACK|XXX|sprint\d*|temp|legacy)\b/i.test(trimmed)) {
+  // The term must stand on its own. `\b` is not enough here: hyphens count as boundaries, so a
+  // documented Git filename such as `git-rebase-todo` would be reported as a TODO marker. Requiring
+  // the term to sit outside any identifier keeps the marker check while letting filenames through.
+  if (/(^|[^A-Za-z0-9_-])(?:TODO|FIXME|HACK|XXX|sprint\d*|temp|legacy)(?![A-Za-z0-9_-])/i.test(trimmed)) {
     violations.push(
       `CMT-TRM-001: Forbidden comment term at ${ctx.relPath}:${ctx.lineNum}: ${trimmed}`,
     );
@@ -205,7 +230,7 @@ function scanRustFile(filePath, violations) {
   const loopState = { inLoopBlock: false, loopBraceDepth: 0 };
   const testState = { pendingTestAttr: false, inTestModule: false, testDepth: 0 };
   const docState = { hasPendingDoc: false };
-  let prevLineCommented = false;
+  let safetyProofPending = false;
 
   lines.forEach((line, index) => {
     const trimmed = line.trim();
@@ -221,12 +246,12 @@ function scanRustFile(filePath, violations) {
 
     checkErrorPropagation(line, ctx, violations);
     checkLoopAllocation(line, trimmed, ctx, loopState, violations);
-    checkUnsafeProof(trimmed, ctx, prevLineCommented, violations);
+    checkUnsafeProof(trimmed, ctx, safetyProofPending, violations);
     checkPublicRustdoc(trimmed, ctx, docState, violations);
     checkVagueIdentifier(line, ctx, violations);
     checkForbiddenJargon(trimmed, ctx, violations);
 
-    prevLineCommented = isComment;
+    safetyProofPending = advanceSafetyProof(trimmed, safetyProofPending);
   });
 }
 
@@ -260,6 +285,11 @@ function runZeroAllocBoundaryCheck() {
   const rustFiles = [];
 
   collectRustSources(CRATES_DIR, rustFiles);
+  // The package binary is production code as well. Scanning only `crates/` meant every contract
+  // this gate enforces — zero loop allocation, typed errors, safety proofs, Rustdoc — stopped at
+  // the crate boundary, while `src/bin/` ships in the same binary and carries far more imperative
+  // control flow than most crates do.
+  collectRustSources(BIN_DIR, rustFiles);
   console.log(`Auditing ${rustFiles.length} production Rust source files across micro-crates...`);
 
   for (const file of rustFiles) {

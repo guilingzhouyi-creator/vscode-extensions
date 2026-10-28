@@ -149,7 +149,7 @@ fn parse_offset(text: &str) -> i32 {
 
 /// Parses a commit payload into a record.
 ///
-/// Headers are scanned as bytes so a message written in a declared legacy encoding does not make the
+/// Headers are scanned as bytes so a message written in a declared non-UTF-8 encoding does not make the
 /// whole commit unreadable; only the header lines themselves must be UTF-8, which Git guarantees for
 /// the structural fields. The body is decoded according to its `encoding` header.
 ///
@@ -231,7 +231,8 @@ pub fn parse_commit_record(oid: Oid, payload: &[u8]) -> FractalResult<CommitReco
 ///
 /// Git stores the message in the encoding it was written in and recodes it when printing, so a
 /// commit written as ISO-8859-1 must still render as UTF-8. An encoding this build does not know
-/// falls back to lossy UTF-8: one legacy commit should not make the whole history unreadable.
+/// falls back to lossy UTF-8: one record in an unknown encoding should not make the whole history
+/// unreadable.
 fn decode_commit_message(body: &[u8], encoding: Option<&str>) -> FractalResult<String> {
     let declared = encoding.unwrap_or("UTF-8");
     if declared.eq_ignore_ascii_case("iso-8859-1")

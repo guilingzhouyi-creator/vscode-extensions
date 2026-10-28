@@ -90,7 +90,10 @@ PASSED_TOTAL="$(printf '%s\n' "${TEST_OUTPUT}" | sed -nE 's/^test result: (ok|FA
 if [[ "${PASSED_TOTAL}" -gt 0 ]]; then
     write_step_verdict "CRATE-REGRESSION-02" PASS "${PASSED_TOTAL} 项测试通过"
 else
-    write_step_verdict "CRATE-REGRESSION-02" PASS "回归套件通过（cargo 未报告测试计数）"
+    # A green exit status carrying no reported count means the harness executed nothing, or the
+    # output shape changed underneath this parser. Both conditions must surface: calling this PASS
+    # made an empty suite indistinguishable from one that actually asserted.
+    write_step_verdict "CRATE-REGRESSION-02" WARN "cargo 未报告任何测试计数，回归覆盖不可证实"
 fi
 
 # -----------------------------------------------------------------------------

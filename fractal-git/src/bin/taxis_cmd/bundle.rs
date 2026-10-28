@@ -592,6 +592,9 @@ fn add_tree_closure(
     items: &mut Vec<PackDeltaItem>,
 ) -> FractalResult<()> {
     let mut stack = vec![root];
+    // Hoisted out of the walk so descending into a tree does not allocate a fresh child list on
+    // every iteration; the buffer is reused and cleared instead.
+    let mut children: Vec<(FileMode, Oid, String)> = Vec::new();
     while let Some(tree_oid) = stack.pop() {
         if excluded.contains(&tree_oid) || !visited.insert(tree_oid) {
             continue;
@@ -604,14 +607,14 @@ fn add_tree_closure(
                 "object {tree_hex} is a {kind_str}, not a tree"
             )));
         }
-        let mut children: Vec<(FileMode, Oid, String)> = Vec::new();
+        children.clear();
         for entry in GitTreeRef::from_bytes(&object.payload).iter() {
             let entry = entry?;
             if entry.mode.is_tree() || entry.mode.has_blob() {
                 children.push((entry.mode, entry.oid, entry.name.to_string()));
             }
         }
-        for (mode, child_oid, name) in children {
+        for (mode, child_oid, name) in children.drain(..) {
             if mode.is_tree() {
                 stack.push(child_oid);
                 continue;

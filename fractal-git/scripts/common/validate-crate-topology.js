@@ -56,7 +56,48 @@ const ALLOWED_INTERNAL_DEPS = Object.freeze({
 });
 
 /**
+ * Reads `[workspace].members` from the root manifest and reduces each entry to its crate directory
+ * name, so member discovery follows the manifest instead of the architecture matrix.
+ *
+ * @param {string} content - Raw root Cargo.toml content.
+ * @returns {string[]} Crate directory names, in manifest order.
+ */
+function extractWorkspaceMembers(content) {
+  const members = [];
+  const lines = content.split('\n');
+  let inMembersArray = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.split('#')[0].trim();
+    if (!inMembersArray) {
+      if (/^members\s*=\s*\[/.test(line)) {
+        inMembersArray = true;
+      } else {
+        continue;
+      }
+    }
+    const quoted = line.match(/"([^"]+)"/g) || [];
+    for (const entry of quoted) {
+      const relativePath = entry.replace(/"/g, '');
+      const segments = relativePath.split('/').filter(Boolean);
+      if (segments.length > 0) {
+        members.push(segments[segments.length - 1]);
+      }
+    }
+    if (line.includes(']')) {
+      break;
+    }
+  }
+  return members;
+}
+
+/**
  * Extracts internal crate dependency names from a Cargo.toml file content.
+ *
+ * All three dependency tables are scanned. A crate that reaches a forbidden layer only through a
+ * dev- or build-dependency is still a crate that reaches it, and those tables used to be invisible
+ * here: a boundary violation could be introduced by moving an import into a test or a build script
+ * without any gate noticing.
  *
  * @param {string} content - Raw Cargo.toml content.
  * @returns {string[]} Array of internal dependency crate names.
@@ -64,12 +105,13 @@ const ALLOWED_INTERNAL_DEPS = Object.freeze({
 function extractInternalDependencies(content) {
   const deps = [];
   const lines = content.split('\n');
+  const DEPENDENCY_TABLES = new Set(['[dependencies]', '[dev-dependencies]', '[build-dependencies]']);
   let inDependencies = false;
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (line.startsWith('[')) {
-      inDependencies = line === '[dependencies]';
+      inDependencies = DEPENDENCY_TABLES.has(line);
       continue;
     }
     if (!inDependencies || line.startsWith('#') || !line.includes('=')) {
@@ -136,7 +178,16 @@ function runTopologyValidation() {
     process.exit(1);
   }
 
-  const manifestMembers = Object.keys(CRATE_LAYERS);
+  // The member list is read from the workspace manifest rather than from the architecture matrix.
+  // Deriving it from the matrix made the two sides agree by construction: a crate added to the
+  // workspace but never registered in `CRATE_LAYERS` was simply never inspected, and the gate
+  // reported full compliance for a crate it had not looked at.
+  const rootManifest = fs.readFileSync(ROOT_CARGO_TOML, 'utf8');
+  const manifestMembers = extractWorkspaceMembers(rootManifest);
+  if (manifestMembers.length === 0) {
+    console.error('FGT-DEP-001: Workspace manifest declares no members; topology cannot be verified');
+    process.exit(1);
+  }
   console.log(`Inspecting ${manifestMembers.length} micro-crates under ${path.relative(process.cwd(), CRATES_DIR)}...`);
 
   for (const crate of manifestMembers) {
