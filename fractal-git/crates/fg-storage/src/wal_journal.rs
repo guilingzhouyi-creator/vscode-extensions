@@ -22,6 +22,7 @@
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;
+use fg_native::checksum::crc32c;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -438,31 +439,13 @@ impl WalJournal {
     }
 }
 
-/// Computes CRC32C over a byte slice using the same polynomial as the container layer.
-///
-/// The journal deliberately reuses the container's polynomial so one integrity primitive covers
-/// every durable artifact; two polynomials would need two independent implementations and two
-/// independent test suites for the same guarantee.
-fn crc32c(payload: &[u8]) -> u32 {
-    const POLYNOMIAL: u32 = 0x82F6_3B78;
-    let mut crc = !0u32;
-    for byte in payload {
-        crc ^= u32::from(*byte);
-        for _ in 0..8 {
-            let mask = (crc & 1).wrapping_neg();
-            crc = (crc >> 1) ^ (POLYNOMIAL & mask);
-        }
-    }
-    !crc
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     use fg_core::models::Oid;
 
-    use super::{WalJournal, WalRecord, WAL_MAGIC};
+    use super::{crc32c, WalJournal, WalRecord, WAL_MAGIC};
 
     static SCRATCH: AtomicU64 = AtomicU64::new(0);
 
@@ -485,7 +468,9 @@ mod tests {
 
     #[test]
     fn crc32c_matches_the_standard_check_value() {
-        assert_eq!(super::crc32c(b"123456789"), 0xE306_9283);
+        // The journal consumes the shared container-layer primitive rather than a private copy, so
+        // this assertion pins the value the frame writer actually emits.
+        assert_eq!(crc32c(b"123456789"), 0xE306_9283);
     }
 
     #[test]
