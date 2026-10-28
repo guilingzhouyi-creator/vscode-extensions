@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1793186260664",
-  "timestamp": "2026-10-28T11:17:45.047Z",
+  "snapshotId": "snapshot-v0.4.0-1793187030471",
+  "timestamp": "2026-10-28T11:30:39.382Z",
   "cai": 87.88,
   "autonomy": {
     "compositeAutonomyIndex": 87.88,
@@ -69,8 +69,8 @@
       "proprietaryFiles": 768,
       "vendorFiles": 0,
       "generatedFiles": 7,
-      "totalEffectiveLoc": 232479,
-      "proprietaryEffectiveLoc": 226928,
+      "totalEffectiveLoc": 232478,
+      "proprietaryEffectiveLoc": 226927,
       "vendorEffectiveLoc": 0,
       "generatedEffectiveLoc": 5551,
       "internalSymbolCalls": 2011,
@@ -100,7 +100,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 775,
-    "durationMs": 1926
+    "durationMs": 4708
   },
   "metrics": {
     "compositeScore": 99.17,
@@ -1167,43 +1167,43 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 181542,
+      "processed": 181541,
       "unique": 143793,
-      "changed": 46,
-      "semantic": 24,
+      "changed": 63,
+      "semantic": 28,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 41,
-      "deleted": 5,
-      "modified": 5
+      "added": 38,
+      "deleted": 25,
+      "modified": 25
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1793186260662,
+      "endMs": 1793187030468,
       "totalRuns": 454,
       "eloc": {
-        "processedTotal": 69377696,
+        "processedTotal": 69386378,
         "uniqueTotal": 143793,
-        "changedTotal": 1222678,
-        "semanticTotal": 977749
+        "changedTotal": 1220897,
+        "semanticTotal": 976251
       },
       "qed": {
-        "mean": 0.00007,
+        "mean": 0.000069,
         "min": -0.13,
         "max": 0.18,
         "kMean": 0.07
       },
       "debt": {
-        "totalAdded": 3128,
+        "totalAdded": 3116,
         "totalResolved": 5155,
-        "totalRegressions": 13,
-        "netYield": 2.07,
-        "densityYield": 14.1
+        "totalRegressions": 12,
+        "netYield": 2.09,
+        "densityYield": 14.18
       },
       "meanCompositeScore": 98.97,
-      "gatePassRate": 95.38
+      "gatePassRate": 95.6
     },
     "isFirstBaseline": false
   }
