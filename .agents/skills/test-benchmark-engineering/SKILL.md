@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | 分形版本控制内核（链上第 5 步）；自动重构内核（链上第 5 步）；VS Code 扩展与计时视图（链上第 4 步）；游戏引擎与 Godot 视图（链上第 4 步）；门禁与命令面基础设施（链上第 4 步）；工作区元治理与并行交付（领域支援） |
-| **前置** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[telemetry-statistical-modeling](../telemetry-statistical-modeling/SKILL.md)、[interaction-design-physics](../interaction-design-physics/SKILL.md)、[coding-craft](../coding-craft/SKILL.md) |
-| **接续** | [release-package-workflow](../release-package-workflow/SKILL.md) |
-| **并行支援** | [constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[spec-driven-development](../spec-driven-development/SKILL.md) |
-| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
-
-**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+- **链路**：[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[telemetry-statistical-modeling](../telemetry-statistical-modeling/SKILL.md)、[interaction-design-physics](../interaction-design-physics/SKILL.md)、[coding-craft](../coding-craft/SKILL.md) → **本技能** → [release-package-workflow](../release-package-workflow/SKILL.md)；并行支援 `constraint-driven-development`、`debugging-and-error-recovery`、`complexity-budget`、`spec-driven-development`。
+- **领域**：分形版本控制内核（链上第 5 步）；另 1 个领域支援；其余 4 条领域链见 `docs/skill-catalog.md`
+- **协作专员**：原型 `git-kernel`：`fg-construct`、`fg-review`、`fg-refactor`、`fg-explore`
+- **何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；新增分析器或规则 → `auto-refactor-dev` + `rule-catalog-governance` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件

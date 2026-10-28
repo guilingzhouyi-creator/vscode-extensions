@@ -29,6 +29,14 @@ const REPO_ROOT = findRepoRoot(__dirname);
 const SUBAGENTS_ROOT = path.join(REPO_ROOT, '.agents/subagents');
 const CATALOG_PATH = path.join(SUBAGENTS_ROOT, 'subagent-catalog.json');
 const RULE_CATALOG_PATH = path.join(REPO_ROOT, 'scripts/common/rule-catalog.json');
+const REGISTRY_PATH = path.join(REPO_ROOT, 'scripts/common/skill-registry.json');
+
+const { resolveScenarioIntent, INTENT_MATCH_THRESHOLD } = require(
+  path.join(REPO_ROOT, 'scripts/common/skill-registry-resolver.js'),
+);
+
+/** 技能激活契约最多列出的技能条数；其余仅列名，避免契约退化为技能目录。 */
+const SKILL_ACTIVATION_LIMIT = 6;
 
 const MODE_ID_PATTERN = /^wg-[a-z]+$/u;
 
@@ -65,42 +73,35 @@ function resolveDshMode(presetDshMode, cliOptions, catalog) {
   return { id: declared, ...info };
 }
 
+/**
+ * 从自由文本意图解析 (原型, 姿态)。
+ *
+ * 早期实现在此维护第三套正则映射，与技能注册表的 domains 场景表并行演化：
+ * 175 个触发词中 143 个路由不到任何原型，`Rust`/`Clippy` 落到 cli-engine、`对象池` 落到
+ * git-kernel，且无人校验这份表 —— 改一次领域名，路由就静默指向不存在的专员。
+ * 现在唯一的判定来自 `domains[].scenarios[]`：作者的场景表既描述意图，也声明姿态。
+ *
+ * @param {string} intent - 自由文本意图。
+ * @returns {{ archetype: string|null, posture: string|null, scenario: string|null, score: number }}
+ *   命中的原型与姿态；无足够相似场景时为 null。
+ */
 function resolveIntent(intent) {
-  const text = (intent || '').toLowerCase();
-  let archKey = null;
-  let postKey = null;
-
-  if (/skill|技能|skills/.test(text)) {
-    archKey = 'skill-governance';
-  } else if (/fractal-git|taxis|\bfg\b|微\s*crate|plumbing|cargo|\bunsafe\b|\bcas\b|对象池|索引拓扑/.test(text)) {
-    archKey = 'git-kernel';
-  } else if (/workspace-timing|timing|\bwt\b|vscode|扩展|插件|时钟|计时|双语|webview|i18n/.test(text)) {
-    archKey = 'vs-extension';
-  } else if (/auto-refactor|\bar\b|cli|分析器|静态分析|rust|算子|praxis|cai|diff|n-api/.test(text)) {
-    archKey = 'cli-engine';
-  } else if (/webgames|\bwg\b|godot|gdscript|游戏|卡拉尔/.test(text)) {
-    archKey = 'game-engine';
-  } else if (/(?:全仓|工作区).*(?:门禁|统一审查|audit-all)|单源规则|规则目录|元治理|元数据|(?:五大|六大|全量)支柱|顶层蓝图/.test(text)) {
-    archKey = 'workspace-meta';
-  } else if (/infra|scripts|脚本|门禁|发布|package|powershell|pwsh|bash|流水线|\bci\b|hook/.test(text)) {
-    archKey = 'infra-tool';
-  } else if (/workspace|全仓|工作区|治理|公理/.test(text)) {
-    archKey = 'workspace-meta';
+  let registry = null;
+  try {
+    registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
+  } catch (_error) {
+    registry = null;
   }
-
-  if (/重构|refactor|消融|解耦|瘦身|优化|降重|平铺|收敛|精简|simplif|跳板|算法|算子|lut|swar|位并行|csr|soa|第一性原理/.test(text)) {
-    postKey = 'refactor';
-  } else if (/开发|编码|实现|特性|construct|增量|编写|生产|新建|新增|创建|tdd|测试驱动|spec|规格|契约|cdd|约束驱动/.test(text)) {
-    postKey = 'construct';
-  } else if (/守卫|巡检|guardian|门禁裁决|看守|防反弹|防御|约束|constraint|底线|floor|ratchet|棘轮/.test(text)) {
-    postKey = 'guardian';
-  } else if (/探索|调研|排查|explore|探针|调查|勘测|拓扑|调用链|排错|debug|质询|interview|缺陷|故障|context|上下文/.test(text)) {
-    postKey = 'explore';
-  } else if (/审查|review|检查|合规|诊断|(?:^|[^态])分析|doubt|怀疑|对抗|证伪|挑刺|cross-review/.test(text)) {
-    postKey = 'review';
+  if (!registry) {
+    return { archetype: null, posture: null, scenario: null, score: 0 };
   }
-
-  return { archetype: archKey, posture: postKey };
+  const matched = resolveScenarioIntent(registry, intent);
+  return {
+    archetype: matched.archetype,
+    posture: matched.posture,
+    scenario: matched.scenario ? matched.scenario.intent : null,
+    score: matched.score,
+  };
 }
 
 const VALUE_ARG_MAP = {
@@ -120,7 +121,64 @@ const BOOLEAN_ARG_MAP = {
   '--all': 'dumpAll',
   '--dump-all': 'dumpAll',
   '--json': 'json',
+  '--allow-adhoc': 'allowAdhoc',
 };
+
+/**
+ * 断言独占文件列表落在原型授权的沙箱内。
+ *
+ * 派生任务外壳时曾不校验 `--files`，于是 `--preset fg-construct --files WebGames/x.py`
+ * 会生成一份把禁区列为「独占」的任务外壳，而外壳是 SubAgent 唯一可见的授权依据。
+ * 沙箱在此处是提示词层的最后一道防线，必须与原型 pathJail 同源。
+ *
+ * @param {object} archetypeObj - 原型配置。
+ * @param {string|null} exclusiveFiles - 逗号分隔的独占文件列表。
+ * @returns {void}
+ * @throws {Error} 任一文件越界时抛出。
+ */
+function assertExclusiveFilesInJail(archetypeObj, exclusiveFiles) {
+  if (!exclusiveFiles || !String(exclusiveFiles).trim()) return;
+  const allowed = archetypeObj.pathJail?.allowedPrefixes || [];
+  const forbidden = archetypeObj.pathJail?.forbiddenPrefixes || [];
+  const files = String(exclusiveFiles)
+    .split(',')
+    .map((item) => item.trim().replace(/\\/gu, '/').replace(/^\.\//u, ''))
+    .filter(Boolean);
+  for (const file of files) {
+    const hitForbidden = forbidden.find((prefix) => file.startsWith(prefix));
+    if (hitForbidden !== undefined) {
+      throw new Error(`独占文件越界: '${file}' 命中禁止前缀 '${hitForbidden}' (原型 ${archetypeObj.archetype})`);
+    }
+    if (allowed.length > 0 && !allowed.some((prefix) => file.startsWith(prefix))) {
+      throw new Error(`独占文件越界: '${file}' 不在授权前缀 [${allowed.join(', ')}] 内 (原型 ${archetypeObj.archetype})`);
+    }
+  }
+}
+
+/**
+ * 断言显式参数与预置声明不冲突。
+ *
+ * 姿态曾在冲突时被静默忽略：`--preset fg-review --posture construct` 会悄悄按 review 输出，
+ * 调用方以为派了施工专员，实际拿到只读专员。静默择一比报错更危险。
+ *
+ * @param {object} cliOptions - 解析后的命令行选项。
+ * @param {object|null} preset - 命中的预置记录。
+ * @returns {void}
+ * @throws {Error} 参数冲突时抛出。
+ */
+function assertNoOverrideConflict(cliOptions, preset) {
+  if (!preset) return;
+  if (cliOptions.posture && cliOptions.posture !== preset.posture) {
+    throw new Error(
+      `参数冲突: --preset ${cliOptions.preset} 的姿态是 ${preset.posture}，与 --posture ${cliOptions.posture} 不符`,
+    );
+  }
+  if (cliOptions.archetype && cliOptions.archetype !== preset.archetype) {
+    throw new Error(
+      `参数冲突: --preset ${cliOptions.preset} 的原型是 ${preset.archetype}，与 --archetype ${cliOptions.archetype} 不符`,
+    );
+  }
+}
 
 function parseCliArgs(argv) {
   const options = {
@@ -136,6 +194,7 @@ function parseCliArgs(argv) {
     dshMode: null,
     dumpAll: false,
     json: false,
+    allowAdhoc: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -172,13 +231,61 @@ function formatExclusiveFilesLine(isReadOnly, exclusiveFiles) {
   return `- 独占文件列表 (Zero-Intersection Path Jail，严禁触碰列表外任何文件)：\n${numbered}`;
 }
 
+/**
+ * 从技能注册表读出每个技能的一句话职责，用于渲染技能激活契约。
+ *
+ * 契约曾只把 12 个技能名拼成一行「核心参考技能」，实测 27 份专员模板无一携带技能绑定，
+ * 于是 SubAgent 收到的是清单而不是过程知识：它知道自己"参考"哪些技能，却没有任何指令
+ * 要求真正读取正文。这正是「委派了却没激活技能」的失效模式。
+ *
+ * @param {string[]} skillNames - 原型声明的技能名，顺序即加载优先级。
+ * @returns {Array<{ name: string, duty: string }>} 技能与职责。
+ */
+function resolveSkillDuties(skillNames) {
+  let registry = null;
+  try {
+    registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
+  } catch (_error) {
+    registry = null;
+  }
+  return skillNames.map((skillName) => {
+    const record = registry?.skills?.[skillName];
+    const firstSentence = String(record?.purpose || record?.pitch || '').split(/[。；]/u)[0];
+    return { name: skillName, duty: firstSentence.length > 0 ? firstSentence : '（未登记职责，按技能名判断）' };
+  });
+}
+
+/**
+ * 渲染技能激活契约。
+ *
+ * 只列前 6 条：关联技能最长 14 条，全列会把契约撑成一份目录，而注意力预算有限。
+ * 前 6 条按领域链顺序取，即原型作者声明的优先级。
+ *
+ * @param {object} archetypeObj - 原型配置。
+ * @returns {string} Layer 1.5 正文。
+ */
+function renderSkillActivationContract(archetypeObj) {
+  const duties = resolveSkillDuties(archetypeObj.associatedSkills || []);
+  const primary = duties.slice(0, SKILL_ACTIVATION_LIMIT);
+  const rest = duties.slice(SKILL_ACTIVATION_LIMIT);
+  const lines = primary.map(
+    (item, index) => `  ${index + 1}. \`${item.name}\` — ${item.duty}`,
+  );
+  const restLine = rest.length > 0
+    ? `\n  其余关联技能（命中具体问题时再加载）：${rest.map((item) => `\`${item.name}\``).join('、')}`
+    : '';
+  return `行动前必须先读取下列技能的 \`SKILL.md\` 正文并遵守其约束；仅知道技能名不算遵守。
+${lines.join('\n')}${restLine}
+
+禁止加载本契约未列出的技能。技能内容与本契约 Layer 2 冲突时，以 Layer 2 为准。`;
+}
+
 function buildSystemPrompt(archetypeObj, postureObj) {
   const totalRules = getTotalRuleCount();
   const allowedList = archetypeObj.pathJail.allowedPrefixes.map((p) => `  - ${p}`).join('\n');
   const forbiddenList = archetypeObj.pathJail.forbiddenPrefixes.map((p) => `  - ${p}`).join('\n');
   const axiomList = archetypeObj.rigidAxioms.map((a, idx) => `  ${idx + 1}. ${a}`).join('\n');
   const postureRuleList = postureObj.behaviorRules.map((r, idx) => `  ${idx + 1}. ${r}`).join('\n');
-  const skillList = archetypeObj.associatedSkills.join(', ');
   const isReadOnly = postureObj?.toolPermissions?.enableWriteTools === false;
   const verifyCommands = archetypeObj.localVerification.map((c) => `  $ ${c}`).join('\n');
 
@@ -193,27 +300,20 @@ ${verifyCommands}`;
 
 > 本提示词由工作区 JIT 合成引擎自动生成，代表当前 SubAgent 必须遵守的刚性执行契约。
 
-## 🏛️ Layer 0: 工作区全局刚性公理 (AGENTS.md)
-1. 物理卫生：全仓严禁创建或遗留 0 字节空文件；脚本必须严格保持换行契约（.ps1 CRLF，其他 LF）；纯空格缩进且单 EOF 换行；
-2. 复杂度预算：圈复杂度 CC <= 15，控制流深度 Depth <= 4，单行噪声比 Noise <= 4.0；单文件双轨体积 ELOC <= 900 / LOC <= 1400；循环体与高频调度消除瞬态堆分配 (CPX-SPACE-001)；
-3. 门面设计：门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，严禁 <= 3 行空包跳板 (ARCH-ABS-001 / ARCH-FAC-001)；
-4. 真实性纪律：单源规则目录 (rule-catalog.json) 权威收录 ${totalRules} 条规则，严禁虚构规则 ID (RCFG-RULE-DRIFT)，禁止敷衍/夸大词汇与施工临时黑话；
-5. 零高危技术债：全工作区 High/Critical 债务历史性归零 (0 项)，严禁引入任何技术债务反弹 (一票否决)；
-6. 会话隔离与并行避让：严格以自身任务独占 Path Jail 为界；工作区出现非本任务改动时判定为外部并行会话活动，坚决保持零触碰、零清理、零越界修复；严禁执行全局破坏性还原（git restore . / git clean -fd）；严禁通配暂存（git add . / -A）；
-7. 六大高级编程规范性思维约束：
-  - 状态空间闭合：先用判别联合/Type-State 让非法状态不可表示，状态扫描成对声明进入与退出归位条件；
-  - 单源派生与双向闭包：修改枚举/注册表时同步闭环 SSOT 真源、自动派生投影与双向差集守卫；
-  - 反机械应付 (Anti-Gaming)：靠控制流代数化简降复杂度，严禁删注释或拆出 <= 3 行透传跳板凑指标；
-  - 负空间与污点防御：先写退化短路、超时强杀与路径三步污点守卫 (GUARD-DESTR-001)，再写主干逻辑；
-  - 对称生命周期与零分配：获取与释放 (off/disconnect/flush/teardown) 同级对称，循环体零瞬态堆分配；
-  - 可证伪自检探针：编写门禁或校验器必须内置 runSelfProbes() 正反样本自证检出能力。
+## 🏛️ Layer 0: 公理来源与优先级
+平台已无条件注入 \`AGENTS.md\`（工作区治理总枢），其中含物理卫生、复杂度预算、门面设计、
+规则真实性、零高危技术债与会话隔离公理。本契约不重复其条款，仅补充本专员特有约束。
+优先级：Layer 2 领域公理 > 本契约其余各层 > 技能正文；与 \`AGENTS.md\` 冲突时以 \`AGENTS.md\` 为准。
 
 ## 🛡️ Layer 1: 物理路径沙箱约束 (Path Jail Guard)
 * 授权操作路径前缀：
 ${allowedList}
 * 严禁触碰路径前缀（越界操作立即阻断）：
 ${forbiddenList}
-* 核心参考技能 (Skills)：${skillList}
+* 单源规则目录权威收录 ${totalRules} 条规则，严禁虚构规则 ID (\`RCFG-RULE-DRIFT\`)。
+
+## 🧠 Layer 1.5: 技能激活契约 (Skill Activation)
+${renderSkillActivationContract(archetypeObj)}
 
 ## ⚖️ Layer 2: 领域刚性公理与技术栈规范
 ${axiomList}
@@ -264,6 +364,7 @@ function synthesizeSingle(params) {
 
   const archetypeObj = readJson(path.join(SUBAGENTS_ROOT, archRel));
   const postureObj = readJson(path.join(SUBAGENTS_ROOT, postRel));
+  assertExclusiveFilesInJail(archetypeObj, cliOptions.exclusiveFiles);
 
   const subagentName = cliOptions.name || presetKey || `${archKey}-${postKey}`;
   const subagentDesc = defaultDesc || `${archetypeObj.displayName} 的 ${postureObj.displayName}`;
@@ -335,21 +436,49 @@ function resolveArchetypeAndPosture(cliOptions, catalog) {
 
   let archKey = cliOptions.archetype;
   let postKey = cliOptions.posture;
+  let intentNote = '';
 
   if (cliOptions.intent && (!archKey || !postKey)) {
     const deduced = resolveIntent(cliOptions.intent);
     archKey = archKey || deduced.archetype;
     postKey = postKey || deduced.posture;
+    if (!deduced.archetype) {
+      intentNote =
+        `\n--intent "${cliOptions.intent}" 未匹配任何领域场景（最高相似度 ${deduced.score.toFixed(2)} < ${INTENT_MATCH_THRESHOLD}）。` +
+        '\n可用场景见 `scripts/common/skill-registry.json` 的 `domains[].scenarios[]`；' +
+        '也可直接传 --preset 或 --archetype + --posture。';
+    } else if (deduced.scenario) {
+      intentNote = `\n--intent 命中场景「${deduced.scenario}」（相似度 ${deduced.score.toFixed(2)}）。`;
+    }
   }
 
   if (!archKey || !postKey) {
     throw new Error(
       'Could not resolve both archetype and posture. Specify --preset, --archetype + --posture, or a clear --intent'
+      + intentNote
     );
   }
 
   const { matchedPresetKey, defaultDesc, dshMode } = matchPresetByKeys(archKey, postKey, catalog);
   return { archKey, postKey, defaultDesc, matchedPresetKey, dshMode };
+}
+/**
+ * 断言 (archetype × posture) 有预置支撑。
+ *
+ * 7 原型 × 5 姿态的笛卡尔积是 35 组，而预置只有 27 条。缺预置的组合会被当场合成出一个
+ * 无审计过的专员（如 `workspace-meta-construct`，可开写权限），其描述、红线与门禁命令
+ * 都不在任何单源目录中登记过。确需临时装配时必须显式声明，让调用点留痕。
+ *
+ * @param {object} resolved - 解析结果。
+ * @param {object} cliOptions - 命令行选项。
+ * @returns {void}
+ * @throws {Error} 无预置支撑且未显式放行时抛出。
+ */
+function assertPresetBacked(resolved, cliOptions) {
+  if (resolved.matchedPresetKey || cliOptions.allowAdhoc) return;
+  throw new Error(
+    `${resolved.archKey} × ${resolved.postKey} 无预置专员；若确需临时装配，请显式传 --allow-adhoc`,
+  );
 }
 
 function synthesize(cliOptions) {
@@ -371,10 +500,14 @@ function synthesize(cliOptions) {
     return { dumpAll: true, presets: allResults };
   }
 
+  if (cliOptions.preset) {
+    assertNoOverrideConflict(cliOptions, catalog.presets[cliOptions.preset] || null);
+  }
   const { archKey, postKey, defaultDesc, matchedPresetKey, dshMode } = resolveArchetypeAndPosture(
     cliOptions,
     catalog
   );
+  assertPresetBacked({ archKey, postKey, matchedPresetKey }, cliOptions);
   return synthesizeSingle({
     archKey,
     postKey,
@@ -386,8 +519,82 @@ function synthesize(cliOptions) {
   });
 }
 
+/**
+ * 自证：每类守卫必须真的拒绝其声称拦截的缺陷。
+ *
+ * 这些断言平时都跑在合法输入上，全绿的结果与「守卫是死代码」无法区分。每条探针喂入
+ * 一份携带单一缺陷的输入，断言它确实被拒；再补一条合法输入断言它被接受，
+ * 否则「拒绝一切」也能让所有探针通过。
+ *
+ * @returns {string[]} 探针失败项。
+ */
+function runSelfProbes() {
+  const failures = [];
+  const expect = (label, fn, wanted) => {
+    let outcome;
+    try {
+      fn();
+      outcome = 'ACCEPTED';
+    } catch (_error) {
+      outcome = 'REJECTED';
+    }
+    if (outcome !== wanted) failures.push(`probe "${label}": expected ${wanted}, got ${outcome}`);
+  };
+  const jail = {
+    archetype: 'probe',
+    pathJail: { allowedPrefixes: ['proj/'], forbiddenPrefixes: ['other/'] },
+    rigidAxioms: ['axiom'],
+    localVerification: ['cmd'],
+    associatedSkills: ['skill-a'],
+    displayName: 'Probe',
+  };
+
+  expect(
+    'out-of-jail-file-rejected',
+    () => assertExclusiveFilesInJail(jail, 'other/secret.py'),
+    'REJECTED',
+  );
+  expect(
+    'out-of-prefix-file-rejected',
+    () => assertExclusiveFilesInJail(jail, 'elsewhere/x.ts'),
+    'REJECTED',
+  );
+  expect('in-jail-file-accepted', () => assertExclusiveFilesInJail(jail, 'proj/a.ts'), 'ACCEPTED');
+  expect('empty-file-list-accepted', () => assertExclusiveFilesInJail(jail, null), 'ACCEPTED');
+
+  expect(
+    'posture-conflict-rejected',
+    () => assertNoOverrideConflict({ preset: 'p', posture: 'construct' }, { posture: 'review', archetype: 'a' }),
+    'REJECTED',
+  );
+  expect(
+    'matching-posture-accepted',
+    () => assertNoOverrideConflict({ preset: 'p', posture: 'review' }, { posture: 'review', archetype: 'a' }),
+    'ACCEPTED',
+  );
+
+  expect('adhoc-without-flag-rejected', () => assertPresetBacked({ archKey: 'a', postKey: 'b', matchedPresetKey: null }, {}), 'REJECTED');
+  expect(
+    'adhoc-with-flag-accepted',
+    () => assertPresetBacked({ archKey: 'a', postKey: 'b', matchedPresetKey: null }, { allowAdhoc: true }),
+    'ACCEPTED',
+  );
+  expect(
+    'preset-backed-accepted',
+    () => assertPresetBacked({ archKey: 'a', postKey: 'b', matchedPresetKey: 'p' }, {}),
+    'ACCEPTED',
+  );
+  return failures;
+}
+
 function run() {
   const options = parseCliArgs(process.argv.slice(2));
+  const probeFailures = runSelfProbes();
+  if (probeFailures.length > 0) {
+    console.error('❌ [FAIL] 合成器自证失败（守卫不再具备区分能力）:');
+    for (const failure of probeFailures) console.error(`   - ${failure}`);
+    process.exit(1);
+  }
   try {
     const result = synthesize(options);
     if (options.json) {
@@ -434,4 +641,8 @@ module.exports = {
   buildTaskPromptTemplate,
   resolveIntent,
   parseCliArgs,
+  assertExclusiveFilesInJail,
+  assertNoOverrideConflict,
+  assertPresetBacked,
+  runSelfProbes,
 };

@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | 技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援） |
-| **前置** | —（作为领域入口，无前置） |
-| **接续** | —（链路末端，交回提交与验收） |
-| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[batch-commit](../batch-commit/SKILL.md) |
-| **领域链** | 技能与规则元治理：skill-governance → rule-catalog-governance → docs-archive-governance → batch-commit；其余领域链见 `docs/skill-catalog.md` |
-
-**何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；新增规则标识并闭合登记 → `rule-catalog-governance` + `skill-governance` + `gate-governance`
+- **链路**：无（通用方法论） → **本技能** → 无（通用方法论）；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`batch-commit`。
+- **领域**：另 2 个领域支援
+- **协作专员**：全领域调度总枢（7 原型 × 5 姿态 × 27 预置）
+- **何时联动**：技能描述命中率低或调用含义不清 → `skill-governance` + `subagent-orchestration` + `coding-craft`；多智能体任务装配与沙箱隔离 → `subagent-orchestration` + `skill-governance` + `gate-governance`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 五层上下文分级架构与四重立体防线
@@ -70,12 +65,19 @@ description: >-
 ## 四、 JIT 动态装配命令与主 Agent 8 步交叉复审 SOP
 
 ```bash
-# 1. 动态合成 SubAgent 契约与任务外壳
+# 1. 动态合成 SubAgent 契约与任务外壳（越界独占文件、冲突姿态、无预置组合一律拒绝）
 node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --preset fg-construct --files "fractal-git/crates/fg-index/src/lib.rs" --task "优化无锁索引" --json
 
 # 2. 校验全仓 SubAgent 目录、原型、姿态与单源模板 1:1 合规
 node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
+
+# 3. 校验技能注册表 / 原型技能清单 / 专员模板 / DSH 写路径策略 / 意图路由五源闭合
+node .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js
 ```
+
+三条命令行必须全部通过才允许派发：合成器拒绝越界与无源组合，目录守卫看守 27 条预置的物理结构，闭合守卫看守跨源一致性。
+
+**意图路由**：不确定该派哪个专员时，可直接传 `--intent "自然语言描述"`。解析不靠任何独立词表，而是在 `scripts/common/skill-registry.json` 的 `domains[].scenarios[]` 里按字符二元组 Dice 相似度匹配（阈值 0.3），命中的场景同时给出原型与作业姿态；相似度不足时报错并列出可用场景，绝不猜测。场景表想新增一条可路由意图，加 `intent` + `skills` + `posture` 三项即可，闭合守卫会同时校验该 (原型 × 姿态) 是否有预置专员支撑。
 
 SubAgent 返回后，主 Agent **严禁盲信其文字汇报**，必须独立执行 **8 步交叉复审**：
 ① **沙箱越界审计**（`git status` / `git diff --name-only` 比对独占列表）$\to$ ② **领域编译自检** $\to$ ③ **体积与复杂度预算**（`evaluate-eloc-budget.js` / `validate-code-density.js`）$\to$ ④ **规则目录零漂移**（`validate-rule-id-closure.js`）$\to$ ⑤ **领域专属架构守卫** $\to$ ⑥ **自审棘轮与零 High/Critical 债务防反弹** $\to$ ⑦ **领域回归测试**（`auto-refactor` <!-- METRICS:BEGIN test-suite-count -->**179 套**<!-- METRICS:END test-suite-count -->、`workspace-timing` <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->）$\to$ ⑧ **全仓 <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->统一审查**（`audit-all.ps1 -Fast`）。

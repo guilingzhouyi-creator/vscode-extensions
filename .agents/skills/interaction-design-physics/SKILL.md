@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | VS Code 扩展与计时视图（链上第 3 步）；游戏引擎与 Godot 视图（链上第 3 步） |
-| **前置** | [state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)、[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) |
-| **接续** | [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md) |
-| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
-| **领域链** | VS Code 扩展与计时视图：workspace-timing-dev → state-concurrency-and-crash-recovery → interaction-design-physics → test-benchmark-engineering → release-package-workflow；其余领域链见 `docs/skill-catalog.md` |
-
-**何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
+- **链路**：[state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)、[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) → **本技能** → [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`。
+- **领域**：VS Code 扩展与计时视图（链上第 3 步）；其余 1 条领域链见 `docs/skill-catalog.md`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
+- **何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；卡拉尔界面动效与感知幂律渐隐 → `webgames-workflow` + `interaction-design-physics` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 界面交互物理学五大刚性公理

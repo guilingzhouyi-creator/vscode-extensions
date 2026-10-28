@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | 自动重构内核（链上第 4 步） |
-| **前置** | [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) |
-| **接续** | [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md) |
-| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
-| **领域链** | 自动重构内核：auto-refactor-dev → rust-engineering → algorithmic-operator-engineering → telemetry-statistical-modeling → test-benchmark-engineering |
-
-**何时联动**：新增分析器或规则 → `auto-refactor-dev` + `rule-catalog-governance` + `test-benchmark-engineering`；Rust 与 TypeScript 输出字节不等价 → `auto-refactor-dev` + `rust-engineering` + `debugging-and-error-recovery`
+- **链路**：[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) → **本技能** → [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`。
+- **领域**：自动重构内核（链上第 4 步）
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
+- **何时联动**：评分口径被注水或刷分 → `telemetry-statistical-modeling` + `constraint-driven-development` + `auto-refactor-dev`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 客观统计零注水与 AST 符号溯源公理

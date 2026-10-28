@@ -33,6 +33,144 @@ const LINKS_BLOCK = Object.freeze({
 /** Rendered role labels for the linkage table. */
 const ROLE_LABELS = Object.freeze({ entry: '领域入口', chain: '链上第 {position} 步', support: '领域支援' });
 
+/** Priority order for ranking domain roles: entry is primary, chain is active step, support is broad. */
+const ROLE_PRIORITY = Object.freeze({ entry: 1, chain: 2, support: 3 });
+
+/** Repository root, resolved from this module so the caller cwd never matters. */
+const REPO_ROOT = path.resolve(__dirname, '../..');
+
+/** SubAgent catalog, the single source of the preset-to-archetype binding. */
+const SUBAGENT_CATALOG_RELATIVE_PATH = '.agents/subagents/subagent-catalog.json';
+
+/** Minimum Dice similarity for a free-text intent to claim an authored scenario. */
+const INTENT_MATCH_THRESHOLD = 0.3;
+
+/** Cached preset index; cleared by `resetPresetIndex()` in probes. */
+let presetIndexCache = null;
+
+/**
+ * Loads the preset index grouped by archetype.
+ *
+ * The resolver used to carry a second, hand-written copy of this table. It happened to agree with the
+ * catalog, but nothing compared them: a new preset or a changed posture would have left the rendered
+ * "协作专员" row describing a specialist that no longer exists. Reading the catalog removes the copy;
+ * a missing or malformed catalog throws instead of rendering an empty row, because a silently blank
+ * cell is indistinguishable from "this domain has no specialist".
+ *
+ * @returns {Record<string, string[]>} Preset names grouped by archetype.
+ */
+function presetsByArchetype() {
+    if (presetIndexCache) return presetIndexCache;
+    const catalogPath = path.join(REPO_ROOT, SUBAGENT_CATALOG_RELATIVE_PATH);
+    if (!fs.existsSync(catalogPath)) {
+        throw new Error(`subagent catalog not found: ${catalogPath}`);
+    }
+    const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+    const index = {};
+    for (const [presetName, preset] of Object.entries(catalog.presets || {})) {
+        if (!preset || !preset.archetype) continue;
+        (index[preset.archetype] = index[preset.archetype] || []).push(presetName);
+    }
+    presetIndexCache = index;
+    return index;
+}
+
+/**
+ * Drops the cached preset index so a probe sees its own fixture.
+ *
+ * @returns {void}
+ */
+function resetPresetIndex() {
+    presetIndexCache = null;
+}
+
+/**
+ * Normalises an intent phrase for bigram comparison.
+ *
+ * Whitespace, punctuation and case carry no meaning in these phrases, and keeping them would make
+ * "taxis 输出与 git 逐字节不一致" and "taxis输出与git逐字节不一致" compare as different strings.
+ *
+ * @param {string} text - Raw phrase.
+ * @returns {string} Reduced phrase.
+ */
+function normalizeIntentText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[\s\p{P}\p{S}]/gu, '');
+}
+
+/**
+ * Computes the Sørensen–Dice coefficient over character bigrams.
+ *
+ * Dice rather than substring containment because an author writes the scenario once and callers
+ * paraphrase it: "索引树并发写入崩溃" must still reach "索引树并发写入或崩溃恢复".
+ * A single character would make every short phrase match every other short phrase, hence bigrams.
+ *
+ * @param {string} left - Normalised phrase.
+ * @param {string} right - Normalised phrase.
+ * @returns {number} Similarity in [0, 1].
+ */
+function diceSimilarity(left, right) {
+    if (!left || !right) return 0;
+    if (left === right) return 1;
+    if (left.length < 2 || right.length < 2) return left === right ? 1 : 0;
+    const bigrams = (text) => {
+        const out = new Map();
+        for (let i = 0; i < text.length - 1; i += 1) {
+            const gram = text.slice(i, i + 2);
+            out.set(gram, (out.get(gram) || 0) + 1);
+        }
+        return out;
+    };
+    const a = bigrams(left);
+    const b = bigrams(right);
+    let overlap = 0;
+    let total = 0;
+    for (const [gram, count] of a) {
+        const mirror = b.get(gram) || 0;
+        overlap += Math.min(count, mirror);
+        total += count;
+    }
+    for (const count of b.values()) total += count;
+    return total === 0 ? 0 : (2 * overlap) / total;
+}
+
+/**
+ * Resolves a free-text intent against the authored domain scenarios.
+ *
+ * Intent routing used to be a third hard-coded source: a chain of regular expressions living next to
+ * the registry and the catalog. It agreed with neither — 143 of its 175 trigger words routed nowhere
+ * and none of them were validated, so a renamed domain left the router silently pointing at a specialist
+ * that no longer existed. Deriving the answer from `domains[].scenarios[]` makes the authored scenario
+ * table the only place that decides what an intent means.
+ *
+ * @param {object} registry - Loaded registry.
+ * @param {string} intentText - Free-text intent, typically `--intent`.
+ * @returns {{ domain: object|null, scenario: object|null, archetype: string|null,
+ *   posture: string|null, score: number }} Best matching scenario, or an all-null result.
+ */
+function resolveScenarioIntent(registry, intentText) {
+    const text = normalizeIntentText(intentText);
+    const empty = Object.freeze({ domain: null, scenario: null, archetype: null, posture: null, score: 0 });
+    if (!text) return empty;
+    let best = { domain: null, scenario: null, archetype: null, posture: null, score: 0 };
+    for (const domain of registry.domains || []) {
+        for (const scenario of domain.scenarios || []) {
+            const score = diceSimilarity(normalizeIntentText(scenario.intent), text);
+            if (score > best.score) {
+                best = {
+                    domain,
+                    scenario,
+                    archetype: domain.archetype || null,
+                    posture: scenario.posture || null,
+                    score,
+                };
+            }
+        }
+    }
+    return best.score >= INTENT_MATCH_THRESHOLD ? best : empty;
+}
+
 /** Maximum number of parallel support links rendered per skill. */
 const PARALLEL_LIMIT = 4;
 
@@ -128,7 +266,12 @@ function domainRoles(registry, skillName) {
             roles.push({ domain, role: 'support', position: 0 });
         }
     }
-    return roles;
+    return roles.sort((a, b) => {
+        const pA = ROLE_PRIORITY[a.role] || 99;
+        const pB = ROLE_PRIORITY[b.role] || 99;
+        if (pA !== pB) return pA - pB;
+        return (a.domain.order || 99) - (b.domain.order || 99);
+    });
 }
 
 /**
@@ -174,11 +317,13 @@ function buildLinkage(registry, skillName, roleRecords) {
     const successors = [];
     const chains = [];
     for (const record of roles) {
-        const chain = record.domain.chain || [];
-        const index = chain.indexOf(skillName);
-        if (index > 0) predecessors.push(chain[index - 1]);
-        if (index >= 0 && index < chain.length - 1) successors.push(chain[index + 1]);
-        chains.push(record.domain);
+        if (record.role === 'entry' || record.role === 'chain') {
+            const chain = record.domain.chain || [];
+            const index = chain.indexOf(skillName);
+            if (index > 0) predecessors.push(chain[index - 1]);
+            if (index >= 0 && index < chain.length - 1) successors.push(chain[index + 1]);
+            chains.push(record.domain);
+        }
     }
     const excluded = new Set([skillName, ...predecessors, ...successors]);
     const parallel = collectParallel(registry, roles, excluded);
@@ -204,84 +349,130 @@ function renderLinkList(names, fallback) {
 }
 
 /**
+ * Render a constraint list as inline code spans rather than links.
+ *
+ * Parallel support is not a navigation target: it is the set of constraints that the same change must
+ * satisfy at once. Rendering it as links implied "go read these next", which is the opposite of what the
+ * list means, and each link cost roughly three times the characters of the bare name.
+ *
+ * @param {string[]} names - Skill names.
+ * @param {string} fallback - Text used when the list is empty.
+ * @returns {string} Inline code spans.
+ */
+function renderConstraintList(names, fallback) {
+    if (names.length === 0) return fallback;
+    return names.map((name) => `\`${name}\``).join('、');
+}
+
+/**
  * Render the role cell describing where the skill sits in the domain topology.
  *
- * @param {object} registry - Loaded registry.
  * @param {Array<object>} roles - Role records.
- * @returns {string} Human-readable position text.
+ * @param {object|null} primaryChain - Domain the skill's chain step belongs to, if any.
+ * @returns {string} Compact position text.
  */
-function renderPosition(registry, roles) {
-    if (roles.length === 0) return '通用方法论支撑，无专属领域链';
-    return roles
-        .map((record) => {
-            const label = ROLE_LABELS[record.role].replace('{position}', String(record.position));
-            return `${record.domain.title}（${label}）`;
-        })
-        .join('；');
-}
-
-/**
- * Render the primary domain chain, capped so a long chain cannot dominate the entry file.
- *
- * @param {object} registry - Loaded registry.
- * @param {object[]} chains - Domains the skill belongs to.
- * @returns {string} Markdown cell content.
- */
-function renderChains(chains) {
-    if (chains.length === 0) return '—';
-    const primary = chains[0];
-    const pathText = (primary.chain || []).map((name) => name).join(' → ');
-    const tail = chains.length > 1 ? '；其余领域链见 `docs/skill-catalog.md`' : '';
-    return `${primary.title}：${pathText}${tail}`;
-}
-
-/**
- * Render the "when to chain" cell from the authored domain scenarios.
- *
- * @param {Array<object>} roles - Role records carrying their domain scenarios.
- * @returns {string} Human-readable scenario text.
- */
-function renderScenarios(roles) {
-    const lines = [];
-    for (const record of roles) {
-        for (const scenario of record.domain.scenarios || []) {
-            if (lines.length >= 2) break;
-            lines.push(`${scenario.intent} → ${scenario.skills.map((name) => `\`${name}\``).join(' + ')}`);
-        }
+function renderPosition(roles, primaryChain) {
+    if (roles.length === 0) return '通用方法论，无专属领域链';
+    const chainRole = roles.find((record) => record.role !== 'support');
+    const supportCount = roles.filter((record) => record.role === 'support').length;
+    const parts = [];
+    if (chainRole) {
+        const label = ROLE_LABELS[chainRole.role].replace('{position}', String(chainRole.position));
+        parts.push(`${primaryChain ? primaryChain.title : chainRole.domain.title}（${label}）`);
     }
-    return lines.length > 0 ? lines.join('；') : '—';
+    if (supportCount > 0) parts.push(`另 ${supportCount} 个领域支援`);
+    return parts.join('；');
 }
 
 /**
  * Render the generated linkage block for one skill entry file.
+ *
+ * Compacted from a six-row table to three lines. The table form cost roughly 1.4k characters per skill
+ * and the bulk of it was table chrome plus a "定位" row that repeated every supporting domain title,
+ * while the same information is already one click away in the generated catalogue. Three lines keep the
+ * navigation targets (predecessor, successor, parallel support) and drop the restatement.
  *
  * @param {object} registry - Loaded registry.
  * @param {string} skillName - Skill directory name.
  * @returns {string} Markdown block bounded by the SKILL-LINKS markers.
  */
 function renderSkillLinks(registry, skillName) {
-    const skill = registry.skills[skillName];
     const linkage = buildLinkage(registry, skillName);
-    const rows = [
-        `| **定位** | ${renderPosition(registry, linkage.roles)} |`,
-        `| **前置** | ${renderLinkList(linkage.predecessors, '—（作为领域入口，无前置）')} |`,
-        `| **接续** | ${renderLinkList(linkage.successors, '—（链路末端，交回提交与验收）')} |`,
-        `| **并行支援** | ${renderLinkList(linkage.parallel, '—')} |`,
-        `| **领域链** | ${renderChains(linkage.chains)} |`,
-    ];
+    const isUniversal = linkage.chains.length === 0;
+    const predecessor = renderLinkList(linkage.predecessors, isUniversal ? '无（通用方法论）' : '—');
+    const successor = renderLinkList(linkage.successors, isUniversal ? '无（通用方法论）' : '—');
+    const parallel = renderConstraintList(linkage.parallel, '—');
+    const chainTail = linkage.chains.length > 1 ? `；其余 ${linkage.chains.length - 1} 条领域链见 \`docs/skill-catalog.md\`` : '';
     return [
         LINKS_BLOCK.begin,
         LINKS_BLOCK.heading,
         '',
-        '> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。',
+        '> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。',
         '',
-        '| 联动关系 | 技能 |',
-        '| :--- | :--- |',
-        ...rows,
-        '',
-        `**何时联动**：${renderScenarios(linkage.roles)}`,
+        `- **链路**：${predecessor} → **本技能** → ${successor}；并行支援 ${parallel}。`,
+        `- **领域**：${renderPosition(linkage.roles, linkage.chains[0] || null)}${chainTail}`,
+        `- **协作专员**：${renderSubagents(registry, skillName, linkage)}`,
+        `- **何时联动**：${renderScenarios(linkage.roles, skillName)}`,
         LINKS_BLOCK.end,
     ].join('\n');
+}
+
+/**
+ * Render the SubAgent preset binding describing which autonomous specialist to dispatch.
+ *
+ * A universal-methodology skill is deliberately rendered as "do not delegate": the eleven skills on that
+ * layer are constraints the main loop applies while working, not work that can be handed off. The earlier
+ * wording told the reader to "dynamically assemble a specialist by domain", which invited exactly the
+ * delegation the orchestration skill warns against — a delegated agent that only carries a constraint
+ * cannot enforce it on the change it is not making.
+ *
+ * @param {object} registry - Loaded registry.
+ * @param {string} skillName - Skill directory name.
+ * @param {object} [linkage] - Linkage view.
+ * @returns {string} Human-readable specialist dispatch guidance.
+ */
+function renderSubagents(registry, skillName, linkage) {
+    const skill = (registry.skills || {})[skillName];
+    if (skillName === 'subagent-orchestration') {
+        return '全领域调度总枢（7 原型 × 5 姿态 × 27 预置）';
+    }
+    if (skill && skill.layer === 'universal-methodology') {
+        return '不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）';
+    }
+    const currentLinkage = linkage || buildLinkage(registry, skillName);
+    const primaryDomain = currentLinkage.chains[0] || (currentLinkage.roles[0] ? currentLinkage.roles[0].domain : null);
+    if (!primaryDomain || !primaryDomain.archetype) return '—';
+
+    const arch = primaryDomain.archetype;
+    const presets = (presetsByArchetype()[arch] || []).map((p) => `\`${p}\``).join('、');
+    if (!presets) return `原型 \`${arch}\`（预置目录中无专员）`;
+    return `原型 \`${arch}\`：${presets}`;
+}
+
+/**
+ * Render the "when to chain" cell from the authored domain scenarios.
+ * Prioritizes scenarios where the skill itself participates; falls back to domain-wide scenarios.
+ *
+ * @param {Array<object>} roles - Role records carrying their domain scenarios.
+ * @param {string} [skillName] - Skill directory name used for filtering.
+ * @returns {string} Human-readable scenario text.
+ */
+function renderScenarios(roles, skillName) {
+    const matching = [];
+    const fallback = [];
+    for (const record of roles) {
+        for (const scenario of record.domain.scenarios || []) {
+            const formatted = `${scenario.intent} → ${scenario.skills.map((name) => `\`${name}\``).join(' + ')}`;
+            if (skillName && Array.isArray(scenario.skills) && scenario.skills.includes(skillName)) {
+                if (matching.length < 2) matching.push(formatted);
+            } else {
+                if (fallback.length < 2) fallback.push(formatted);
+            }
+        }
+    }
+    if (matching.length > 0) return matching.join('；');
+    if (fallback.length > 0) return fallback.join('；');
+    return '—';
 }
 
 /**
@@ -301,13 +492,24 @@ module.exports = {
     PARALLEL_LIMIT,
     REGISTRY_RELATIVE_PATH,
     SKILLS_RELATIVE_DIR,
+    SUBAGENT_CATALOG_RELATIVE_PATH,
+    INTENT_MATCH_THRESHOLD,
     buildLinkage,
     classifyTrigger,
+    diceSimilarity,
     domainRoles,
     findLayer,
     listSkillNames,
     loadRegistry,
+    normalizeIntentText,
+    presetsByArchetype,
+    renderLinkList,
+    renderConstraintList,
     renderDescription,
     renderFrontmatter,
+    renderPosition,
     renderSkillLinks,
+    renderSubagents,
+    resetPresetIndex,
+    resolveScenarioIntent,
 };

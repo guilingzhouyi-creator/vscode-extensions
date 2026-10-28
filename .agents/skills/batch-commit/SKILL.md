@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | 技能与规则元治理（链上第 4 步）；工作区元治理与并行交付（领域入口） |
-| **前置** | [docs-archive-governance](../docs-archive-governance/SKILL.md) |
-| **接续** | [constraint-driven-development](../constraint-driven-development/SKILL.md) |
-| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[gate-governance](../gate-governance/SKILL.md)、[rule-catalog-governance](../rule-catalog-governance/SKILL.md) |
-| **领域链** | 技能与规则元治理：skill-governance → rule-catalog-governance → docs-archive-governance → batch-commit；其余领域链见 `docs/skill-catalog.md` |
-
-**何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；新增规则标识并闭合登记 → `rule-catalog-governance` + `skill-governance` + `gate-governance`
+- **链路**：[docs-archive-governance](../docs-archive-governance/SKILL.md) → **本技能** → [constraint-driven-development](../constraint-driven-development/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`gate-governance`、`rule-catalog-governance`。
+- **领域**：工作区元治理与并行交付（领域入口）；其余 1 条领域链见 `docs/skill-catalog.md`
+- **协作专员**：原型 `workspace-meta`：`workspace-review`、`workspace-refactor`、`workspace-guardian`
+- **何时联动**：并行会话改动混杂需要精准暂存 → `batch-commit` + `subagent-orchestration` + `constraint-driven-development`；提交信息被门禁拦下 → `batch-commit` + `rule-catalog-governance` + `gate-governance`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件

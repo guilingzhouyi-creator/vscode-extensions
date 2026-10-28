@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | VS Code 扩展与计时视图（链上第 5 步）；门禁与命令面基础设施（链上第 5 步）；工作区元治理与并行交付（链上第 4 步） |
-| **前置** | [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)、[docs-archive-governance](../docs-archive-governance/SKILL.md) |
-| **接续** | —（链路末端，交回提交与验收） |
-| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md)、[gate-governance](../gate-governance/SKILL.md) |
-| **领域链** | VS Code 扩展与计时视图：workspace-timing-dev → state-concurrency-and-crash-recovery → interaction-design-physics → test-benchmark-engineering → release-package-workflow；其余领域链见 `docs/skill-catalog.md` |
-
-**何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
+- **链路**：[test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)、[docs-archive-governance](../docs-archive-governance/SKILL.md) → **本技能** → —；并行支援 `coding-craft`、`constraint-driven-development`、`debugging-and-error-recovery`、`gate-governance`。
+- **领域**：VS Code 扩展与计时视图（链上第 5 步）；其余 2 条领域链见 `docs/skill-catalog.md`
+- **协作专员**：原型 `vs-extension`：`wt-construct`、`wt-review`、`wt-refactor`、`wt-explore`
+- **何时联动**：打包 vsix 并热同步 → `release-package-workflow` + `workspace-timing-dev` + `gate-governance`；发版日志与版本号对齐 → `release-package-workflow` + `docs-archive-governance` + `batch-commit`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件

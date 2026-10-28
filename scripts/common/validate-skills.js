@@ -630,6 +630,15 @@ function checkDomainChain(domain, skills, loadArchetype) {
 }
 
 /**
+ * Postures an authored scenario may demand. Mirrors `.agents/subagents/postures/`.
+ *
+ * Kept as a literal rather than read from the catalog on purpose: a scenario posture is an authored
+ * decision about what the dispatcher should do, so a typo must be rejected here instead of silently
+ * becoming "no posture" and letting the synthesizer fall back to guessing.
+ */
+const SCENARIO_POSTURES = Object.freeze(['construct', 'review', 'refactor', 'explore', 'guardian']);
+
+/**
  * Validates the scenario rows of one domain.
  *
  * @param {object} domain - Domain record.
@@ -652,6 +661,11 @@ function checkDomainScenarios(domain, skills, members) {
             } else if (!members.has(name)) {
                 errors.push(`${label} references '${name}' outside chain∪supports`);
             }
+        }
+        if (!scenario.posture) {
+            errors.push(`${label} declares no action posture; --intent cannot route it`);
+        } else if (!SCENARIO_POSTURES.includes(scenario.posture)) {
+            errors.push(`${label} declares unknown posture '${scenario.posture}'`);
         }
     }
     return errors;
@@ -921,8 +935,35 @@ function runSelfProbes() {
   const linkageProbe = validateRegistryLinkage('<probe>', linkageRegistry, () => ['other-skill']);
   probe(
     'SKILL-LINKAGE flags chain, archetype, scenario, layer and linkage violations',
-    ['chain needs at least 2', 'absent from archetype', 'unknown skill', "layer 'unknown-layer'", 'belongs to no domain', 'no predecessor, successor or parallel support']
+    ['chain needs at least 2', 'absent from archetype', 'unknown skill', "layer 'unknown-layer'", 'belongs to no domain', 'no predecessor, successor or parallel support', 'declares no action posture']
       .every((needle) => linkageProbe.some((message) => message.includes(needle))),
+  );
+
+  const postureProbe = checkDomainScenarios(
+    {
+      id: 'probe-domain',
+      chain: ['probe-a'],
+      supports: ['probe-x'],
+      scenarios: [
+        { intent: 'no posture', skills: ['probe-a', 'probe-x'] },
+        { intent: 'bad posture', skills: ['probe-a', 'probe-x'], posture: 'sprint' },
+        { intent: 'good posture', skills: ['probe-a', 'probe-x'], posture: 'refactor' },
+      ],
+    },
+    { 'probe-a': {}, 'probe-x': {} },
+    new Set(['probe-a', 'probe-x']),
+  );
+  probe(
+    'SKILL-LINKAGE flags a scenario without a routable posture',
+    postureProbe.some((message) => message.includes("'no posture' declares no action posture")),
+  );
+  probe(
+    'SKILL-LINKAGE flags an unknown scenario posture',
+    postureProbe.some((message) => message.includes("'bad posture' declares unknown posture 'sprint'")),
+  );
+  probe(
+    'SKILL-LINKAGE accepts a scenario with a known posture',
+    !postureProbe.some((message) => message.includes("'good posture'")),
   );
 
   const cleanMetadataRegistry = {
@@ -950,7 +991,7 @@ function runSelfProbes() {
       archetype: 'probe-archetype',
       chain: ['probe-a', 'probe-b'],
       supports: [],
-      scenarios: [{ intent: 'probe scenario', skills: ['probe-a', 'probe-b'] }],
+      scenarios: [{ intent: 'probe scenario', skills: ['probe-a', 'probe-b'], posture: 'construct' }],
     }],
     skills: {
       'probe-a': probeSkill([]),

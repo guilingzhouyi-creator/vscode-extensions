@@ -49,6 +49,7 @@
 | 新增或修改 taxis 子命令 | `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering` |
 | taxis 输出与 git 逐字节不一致 | `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering` |
 | 索引树并发写入或崩溃恢复 | `fractal-git-dev` + `state-concurrency-and-crash-recovery` + `defensive-security-and-taint-safety` |
+| 精简模块导出面与消除空门面 | `fractal-git-dev` + `facade-discipline` + `rust-engineering` |
 
 ### 自动重构内核（`auto-refactor Rust 与 TypeScript 双轨`）
 
@@ -61,6 +62,7 @@
 | 新增分析器或规则 | `auto-refactor-dev` + `rule-catalog-governance` + `test-benchmark-engineering` |
 | Rust 与 TypeScript 输出字节不等价 | `auto-refactor-dev` + `rust-engineering` + `debugging-and-error-recovery` |
 | 评分口径被注水或刷分 | `telemetry-statistical-modeling` + `constraint-driven-development` + `auto-refactor-dev` |
+| 消融纯转发跳板与参数收敛 | `auto-refactor-dev` + `facade-discipline` + `complexity-budget` |
 
 ### VS Code 扩展与计时视图（`workspace-timing`）
 
@@ -73,6 +75,7 @@
 | 计时视图卡顿或丢帧 | `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering` |
 | 进程被杀后缓冲区数据丢失 | `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering` |
 | 打包 vsix 并热同步 | `release-package-workflow` + `workspace-timing-dev` + `gate-governance` |
+| 扩展多形参函数与门面收敛 | `workspace-timing-dev` + `facade-discipline` + `coding-craft` |
 
 ### 游戏引擎与 Godot 视图（`WebGames`）
 
@@ -85,6 +88,7 @@
 | 新玩法先出四阶段方案 | `spec-driven-development` + `webgames-workflow` + `test-benchmark-engineering` |
 | 热路径循环里出现对象分配 | `webgames-workflow` + `algorithmic-operator-engineering` + `complexity-budget` |
 | 配置字段与视图快照不一致 | `webgames-workflow` + `debugging-and-error-recovery` + `coding-craft` |
+| 卡拉尔界面动效与感知幂律渐隐 | `webgames-workflow` + `interaction-design-physics` + `test-benchmark-engineering` |
 
 ### 门禁与命令面基础设施（`scripts / pre-commit / CI`）
 
@@ -109,6 +113,7 @@
 | 新增技能或改技能描述 | `skill-governance` + `docs-archive-governance` + `batch-commit` |
 | 新增规则标识并闭合登记 | `rule-catalog-governance` + `skill-governance` + `gate-governance` |
 | 技能描述命中率低或调用含义不清 | `skill-governance` + `subagent-orchestration` + `coding-craft` |
+| 多智能体任务装配与沙箱隔离 | `subagent-orchestration` + `skill-governance` + `gate-governance` |
 
 ### 工作区元治理与并行交付（`并行会话 / 提交 / 归档 / 发版`）
 
@@ -129,10 +134,11 @@
 - **调用含义**：为算法与高频算子确立从数据表示到单趟融合的降维路径，并用差分基准与微基准证明收益真实存在。
 - **描述行**：`【触发：算子/热路径/吞吐优化/降维/SoA/LUT/基准等价/卡顿】当涉及算法瓶颈、吞吐优化、高频循环热路径或数据表示反转(SoA)时触发。执行五步降维协议与100%差分等价基准验证。`
 - **所属层**：通用工程与算法突破层
-- **联动定位**：分形版本控制内核（链上第 4 步）；自动重构内核（链上第 3 步）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（链上第 2 步）
+- **联动定位**：分形版本控制内核（链上第 4 步）；自动重构内核（链上第 3 步）；游戏引擎与 Godot 视图（链上第 2 步）；VS Code 扩展与计时视图（领域支援）
 - **前置**：`state-concurrency-and-crash-recovery`、`rust-engineering`、`webgames-workflow`
 - **接续**：`test-benchmark-engineering`、`telemetry-statistical-modeling`、`interaction-design-physics`
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -151,10 +157,11 @@
 - **调用含义**：在任何代码落笔时提供命名、失败语义、类型穷尽与依赖方向的工艺判据，守住函数级质量底线。
 - **描述行**：`【触发：写代码/重构/命名/错误处理/类型设计/SSOT/空捕获】编写、生成或审查任何代码时必须遵循。坚持命名即契约、显式失败语义、类型穷尽、最小接口暴露与单向依赖，对接 508 条 SSOT 规则。`
 - **所属层**：通用工程与算法突破层
-- **联动定位**：分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）；门禁与命令面基础设施（链上第 3 步）；技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援）
+- **联动定位**：门禁与命令面基础设施（链上第 3 步）；分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）；技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援）
 - **前置**：`defensive-security-and-taint-safety`
 - **接续**：`test-benchmark-engineering`
 - **并行支援**：`constraint-driven-development`、`complexity-budget`、`debugging-and-error-recovery`、`algorithmic-operator-engineering`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -174,9 +181,10 @@
 - **描述行**：`【触发：重构/拆分文件/CC/Depth/ELOC/LOC/JSDoc/注水】重构大文件、优化认知复杂度(CC<=15)、缩减嵌套深度(Depth<=4)或检查体积包络(ELOC<=900)时触发。落实六字段 JSDoc 契约与循环零堆分配。`
 - **所属层**：通用工程与算法突破层
 - **联动定位**：分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）；技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援）
-- **前置**：—（领域入口）
-- **接续**：—（链路末端）
+- **前置**：—（通用方法论横向支援）
+- **接续**：—（按需横向注入）
 - **并行支援**：`coding-craft`、`constraint-driven-development`、`debugging-and-error-recovery`、`test-benchmark-engineering`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -196,10 +204,11 @@
 - **调用含义**：在交割前用机器化底线与五步怀疑循环证伪改动，阻止阈值下调、测试弱化与半成品交付。
 - **描述行**：`【触发：交割/验收/证伪/Doubt/阈值下调/测试弱化/半成品】完成特性交付、声称修复完成或合入前对抗性证伪时必须触发。落实 Floor Guard 刚性底线与单调棘轮，主动推翻边界假设与脆弱实现。`
 - **所属层**：通用工程与算法突破层
-- **联动定位**：分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）；门禁与命令面基础设施（领域支援）；技能与规则元治理（领域支援）；工作区元治理与并行交付（链上第 2 步）
+- **联动定位**：工作区元治理与并行交付（链上第 2 步）；分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）；门禁与命令面基础设施（领域支援）；技能与规则元治理（领域支援）
 - **前置**：`batch-commit`
 - **接续**：`docs-archive-governance`
 - **并行支援**：`coding-craft`、`complexity-budget`、`debugging-and-error-recovery`、`test-benchmark-engineering`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -217,9 +226,10 @@
 - **描述行**：`【触发：排错/报错/崩溃/单测失败/SSCCE/复现/假说/故障】遇到任何故障、测试报错或异常行为时必须使用。严格遵循观察-假说-SSCCE隔离-最小修复五步法，坚决贯彻两次受挫即停原则，严禁盲目猜修。`
 - **所属层**：通用工程与算法突破层
 - **联动定位**：分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）；门禁与命令面基础设施（领域支援）；工作区元治理与并行交付（领域支援）
-- **前置**：—（领域入口）
-- **接续**：—（链路末端）
+- **前置**：—（通用方法论横向支援）
+- **接续**：—（按需横向注入）
 - **并行支援**：`coding-craft`、`constraint-driven-development`、`test-benchmark-engineering`、`complexity-budget`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -236,10 +246,11 @@
 - **调用含义**：在破坏性操作与外部输入暴露前执行污点证明，封锁递归删除、变量遮蔽与注入类风险。
 - **描述行**：`【触发：删除文件/rm/注入/污点追踪/变量遮蔽/路径穿越/清理目录】执行破坏性文件操作、清理目录、暴露端点或处理外部输入时触发。落实递归删除三步污点守卫(GUARD-DESTR-001)与只读自动变量防篡改。`
 - **所属层**：通用工程与算法突破层
-- **联动定位**：分形版本控制内核（领域支援）；VS Code 扩展与计时视图（领域支援）；门禁与命令面基础设施（链上第 2 步）
+- **联动定位**：门禁与命令面基础设施（链上第 2 步）；分形版本控制内核（领域支援）；VS Code 扩展与计时视图（领域支援）
 - **前置**：`gate-governance`
 - **接续**：`coding-craft`
 - **并行支援**：`constraint-driven-development`、`debugging-and-error-recovery`、`test-benchmark-engineering`、`algorithmic-operator-engineering`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -259,9 +270,10 @@
 - **描述行**：`【触发：门面/跳板/透传/ARCH-ABS/参数收敛/消融/空壳膨胀】消融<=3行纯转发跳板(ARCH-ABS-001)、压缩多形参对象(SIM-ARGS-001)或重构模块导出面时触发。确保门面具备实质承载(ARCH-FAC-001)与不可变冻结。`
 - **所属层**：通用工程与算法突破层
 - **联动定位**：分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）
-- **前置**：—（领域入口）
-- **接续**：—（链路末端）
+- **前置**：—（通用方法论横向支援）
+- **接续**：—（按需横向注入）
 - **并行支援**：`algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -284,6 +296,7 @@
 - **前置**：`state-concurrency-and-crash-recovery`、`algorithmic-operator-engineering`
 - **接续**：`test-benchmark-engineering`
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -301,9 +314,10 @@
 - **描述行**：`【触发：需求澄清/质询/能力拓扑/规格书/X-Y/返工】遇到模糊需求、重大架构重构或开发新特性前触发。通过每次一问消除歧义与 X-Y 问题，先确立能力拓扑图与接口契约规格，再行动手编码。`
 - **所属层**：通用工程与算法突破层
 - **联动定位**：分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）；游戏引擎与 Godot 视图（领域支援）
-- **前置**：—（领域入口）
-- **接续**：—（链路末端）
+- **前置**：—（通用方法论横向支援）
+- **接续**：—（按需横向注入）
 - **并行支援**：`algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -320,10 +334,11 @@
 - **调用含义**：在设计并发、状态机与落盘路径时落实对称释放、原子替换与幂等回放，杜绝泄漏与半写。
 - **描述行**：`【触发：并发/状态机/排障/泄漏/原子落盘/幂等/崩溃恢复/Journal】涉及并发调度、句柄生命周期对称释放(PRF-LEAK-001)、异步派发器排空或崩溃恢复幂等性设计时触发。杜绝孤儿句柄与悬挂协程。`
 - **所属层**：通用工程与算法突破层
-- **联动定位**：分形版本控制内核（链上第 3 步）；自动重构内核（领域支援）；VS Code 扩展与计时视图（链上第 2 步）；游戏引擎与 Godot 视图（领域支援）
+- **联动定位**：分形版本控制内核（链上第 3 步）；VS Code 扩展与计时视图（链上第 2 步）；自动重构内核（领域支援）；游戏引擎与 Godot 视图（领域支援）
 - **前置**：`rust-engineering`、`workspace-timing-dev`
 - **接续**：`algorithmic-operator-engineering`、`interaction-design-physics`
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -346,6 +361,7 @@
 - **前置**：`algorithmic-operator-engineering`
 - **接续**：`test-benchmark-engineering`
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
 
 **典型情形**：
 
@@ -362,10 +378,11 @@
 - **调用含义**：回答『这批改动如何拆成可独立回滚的提交』，产出分批清单与门禁预审结论。
 - **描述行**：`【触发：提交/分批/暂存/commit/git/预审/禁词/原子提交】当准备提交代码、分批原子提交或审查 git commit 信息时必须使用。按 6 层拓扑拆解提交，拦截 6 类黑话禁词，执行离线门禁预审与原子提交闭环。`
 - **所属层**：工作区统一治理底座
-- **联动定位**：技能与规则元治理（链上第 4 步）；工作区元治理与并行交付（领域入口）
+- **联动定位**：工作区元治理与并行交付（领域入口）；技能与规则元治理（链上第 4 步）
 - **前置**：`docs-archive-governance`
 - **接续**：`constraint-driven-development`
 - **并行支援**：`coding-craft`、`complexity-budget`、`gate-governance`、`rule-catalog-governance`
+- **协作专员**：原型 `workspace-meta`：`workspace-review`、`workspace-refactor`、`workspace-guardian`
 
 **典型情形**：
 
@@ -384,10 +401,11 @@
 - **调用含义**：回答『这份文档该归到哪、相对链接是否还活』，产出归档元数据与文档门禁结论。
 - **描述行**：`【触发：文档归档/蓝图/架构演进/README/归档清单/死链/案卷封存】编写、修改顶层架构蓝图、交付物归档、案卷封存或全宗技术档案时触发。维护 agent-native-system-blueprint 与纯正面向用户标准。`
 - **所属层**：工作区统一治理底座
-- **联动定位**：门禁与命令面基础设施（领域支援）；技能与规则元治理（链上第 3 步）；工作区元治理与并行交付（链上第 3 步）
+- **联动定位**：技能与规则元治理（链上第 3 步）；工作区元治理与并行交付（链上第 3 步）；门禁与命令面基础设施（领域支援）
 - **前置**：`rule-catalog-governance`、`constraint-driven-development`
 - **接续**：`batch-commit`、`release-package-workflow`
 - **并行支援**：`coding-craft`、`gate-governance`、`complexity-budget`、`debugging-and-error-recovery`
+- **协作专员**：原型 `skill-governance`：`skill-construct`、`skill-review`、`skill-refactor`
 
 **典型情形**：
 
@@ -406,10 +424,11 @@
 - **调用含义**：回答『这条门禁该在哪一层拦、脚本如何跨平台可靠执行』，产出双层门禁与脚本契约。
 - **描述行**：`【触发：门禁/全仓审查/提交门禁/脚本编写/跨平台/pwsh/bash/子进程】编写修改门禁脚本、运行全仓审查或处理跨平台脚本兼容时触发。落实 Tier 1 本地左移流式判定、工作目录隔离契约与零黑话规范。`
 - **所属层**：工作区统一治理底座
-- **联动定位**：VS Code 扩展与计时视图（领域支援）；门禁与命令面基础设施（领域入口）；技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援）
+- **联动定位**：门禁与命令面基础设施（领域入口）；VS Code 扩展与计时视图（领域支援）；技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援）
 - **前置**：—（领域入口）
 - **接续**：`defensive-security-and-taint-safety`
 - **并行支援**：`coding-craft`、`constraint-driven-development`、`complexity-budget`、`debugging-and-error-recovery`
+- **协作专员**：原型 `infra-tool`：`infra-construct`、`infra-review`、`infra-refactor`、`infra-explore`、`infra-guardian`
 
 **典型情形**：
 
@@ -433,6 +452,7 @@
 - **前置**：`test-benchmark-engineering`、`docs-archive-governance`
 - **接续**：—（链路末端）
 - **并行支援**：`coding-craft`、`constraint-driven-development`、`debugging-and-error-recovery`、`gate-governance`
+- **协作专员**：原型 `vs-extension`：`wt-construct`、`wt-review`、`wt-refactor`、`wt-explore`
 
 **典型情形**：
 
@@ -451,10 +471,11 @@
 - **调用含义**：回答『这个规则 ID 是否已登记、会不会被判漂移』，产出 SSOT 元数据与闭包校验结果。
 - **描述行**：`【触发：新增规则/修改规则/SSOT/规则目录/规则登记/规则漂移/命名拓扑】增删改规则 ID、治理跨项目规则元数据或维护单源规则目录时触发。看守 3-3-3 命名拓扑与 RCFG-RULE-DRIFT 防虚构闭包。`
 - **所属层**：工作区统一治理底座
-- **联动定位**：自动重构内核（领域支援）；门禁与命令面基础设施（领域支援）；技能与规则元治理（链上第 2 步）；工作区元治理与并行交付（领域支援）
+- **联动定位**：技能与规则元治理（链上第 2 步）；自动重构内核（领域支援）；门禁与命令面基础设施（领域支援）；工作区元治理与并行交付（领域支援）
 - **前置**：`skill-governance`
 - **接续**：`docs-archive-governance`
 - **并行支援**：`coding-craft`、`constraint-driven-development`、`complexity-budget`、`debugging-and-error-recovery`
+- **协作专员**：原型 `skill-governance`：`skill-construct`、`skill-review`、`skill-refactor`
 
 **典型情形**：
 
@@ -477,6 +498,7 @@
 - **前置**：—（领域入口）
 - **接续**：`rule-catalog-governance`
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`batch-commit`
+- **协作专员**：原型 `skill-governance`：`skill-construct`、`skill-review`、`skill-refactor`
 
 **典型情形**：
 
@@ -496,9 +518,10 @@
 - **描述行**：`【触发：subagent/派发任务/多agent协同/并发开发/隔离边界/上下文预算/交叉复审】派发或编排 SubAgent、处理五层上下文预算治理(75% 脱水)时必须使用。强制同构模型、独占 Zero-Intersection Path Jail 物理防冲突与交叉复审。`
 - **所属层**：工作区统一治理底座
 - **联动定位**：技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援）
-- **前置**：—（领域入口）
-- **接续**：—（链路末端）
+- **前置**：—（通用方法论横向支援）
+- **接续**：—（按需横向注入）
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`batch-commit`
+- **协作专员**：全领域调度总枢（7 原型 × 5 姿态 × 27 预置）
 
 **典型情形**：
 
@@ -521,6 +544,7 @@
 - **前置**：`algorithmic-operator-engineering`、`telemetry-statistical-modeling`、`interaction-design-physics`、`coding-craft`
 - **接续**：`release-package-workflow`
 - **并行支援**：`constraint-driven-development`、`debugging-and-error-recovery`、`complexity-budget`、`spec-driven-development`
+- **协作专员**：原型 `git-kernel`：`fg-construct`、`fg-review`、`fg-refactor`、`fg-explore`
 
 **典型情形**：
 
@@ -543,6 +567,7 @@
 - **前置**：—（领域入口）
 - **接续**：`rust-engineering`
 - **并行支援**：`algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`
+- **协作专员**：原型 `cli-engine`：`ar-construct`、`ar-review`、`ar-refactor`、`ar-explore`
 
 **典型情形**：
 
@@ -564,6 +589,7 @@
 - **前置**：—（领域入口）
 - **接续**：`rust-engineering`
 - **并行支援**：`algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`
+- **协作专员**：原型 `git-kernel`：`fg-construct`、`fg-review`、`fg-refactor`、`fg-explore`
 
 **典型情形**：
 
@@ -587,6 +613,7 @@
 - **前置**：`fractal-git-dev`、`auto-refactor-dev`
 - **接续**：`state-concurrency-and-crash-recovery`、`algorithmic-operator-engineering`
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`
+- **协作专员**：原型 `git-kernel`：`fg-construct`、`fg-review`、`fg-refactor`、`fg-explore`
 
 **典型情形**：
 
@@ -610,6 +637,7 @@
 - **前置**：—（领域入口）
 - **接续**：`algorithmic-operator-engineering`
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`
+- **协作专员**：原型 `game-engine`：`wg-construct`、`wg-review`、`wg-refactor`、`wg-explore`
 
 **典型情形**：
 
@@ -631,6 +659,7 @@
 - **前置**：—（领域入口）
 - **接续**：`state-concurrency-and-crash-recovery`
 - **并行支援**：`algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`
+- **协作专员**：原型 `vs-extension`：`wt-construct`、`wt-review`、`wt-refactor`、`wt-explore`
 
 **典型情形**：
 

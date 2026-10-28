@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | VS Code 扩展与计时视图（领域支援）；门禁与命令面基础设施（领域入口）；技能与规则元治理（领域支援）；工作区元治理与并行交付（领域支援） |
-| **前置** | —（作为领域入口，无前置） |
-| **接续** | [defensive-security-and-taint-safety](../defensive-security-and-taint-safety/SKILL.md) |
-| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
-| **领域链** | VS Code 扩展与计时视图：workspace-timing-dev → state-concurrency-and-crash-recovery → interaction-design-physics → test-benchmark-engineering → release-package-workflow；其余领域链见 `docs/skill-catalog.md` |
-
-**何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
+- **链路**：— → **本技能** → [defensive-security-and-taint-safety](../defensive-security-and-taint-safety/SKILL.md)；并行支援 `coding-craft`、`constraint-driven-development`、`complexity-budget`、`debugging-and-error-recovery`。
+- **领域**：门禁与命令面基础设施（领域入口）；另 3 个领域支援
+- **协作专员**：原型 `infra-tool`：`infra-construct`、`infra-review`、`infra-refactor`、`infra-explore`、`infra-guardian`
+- **何时联动**：新增门禁步骤并登记语义标识 → `gate-governance` + `rule-catalog-governance` + `test-benchmark-engineering`；pwsh 与 bash 门禁语义漂移 → `gate-governance` + `coding-craft` + `debugging-and-error-recovery`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 三层同构门禁架构体系 (Three-Tier Isomorphic Gates)

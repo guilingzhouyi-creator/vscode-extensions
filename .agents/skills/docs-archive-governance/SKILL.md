@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | 门禁与命令面基础设施（领域支援）；技能与规则元治理（链上第 3 步）；工作区元治理与并行交付（链上第 3 步） |
-| **前置** | [rule-catalog-governance](../rule-catalog-governance/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md) |
-| **接续** | [batch-commit](../batch-commit/SKILL.md)、[release-package-workflow](../release-package-workflow/SKILL.md) |
-| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[gate-governance](../gate-governance/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
-| **领域链** | 门禁与命令面基础设施：gate-governance → defensive-security-and-taint-safety → coding-craft → test-benchmark-engineering → release-package-workflow；其余领域链见 `docs/skill-catalog.md` |
-
-**何时联动**：新增门禁步骤并登记语义标识 → `gate-governance` + `rule-catalog-governance` + `test-benchmark-engineering`；pwsh 与 bash 门禁语义漂移 → `gate-governance` + `coding-craft` + `debugging-and-error-recovery`
+- **链路**：[rule-catalog-governance](../rule-catalog-governance/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md) → **本技能** → [batch-commit](../batch-commit/SKILL.md)、[release-package-workflow](../release-package-workflow/SKILL.md)；并行支援 `coding-craft`、`gate-governance`、`complexity-budget`、`debugging-and-error-recovery`。
+- **领域**：技能与规则元治理（链上第 3 步）；另 1 个领域支援；其余 1 条领域链见 `docs/skill-catalog.md`
+- **协作专员**：原型 `skill-governance`：`skill-construct`、`skill-review`、`skill-refactor`
+- **何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；发版日志与版本号对齐 → `release-package-workflow` + `docs-archive-governance` + `batch-commit`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件

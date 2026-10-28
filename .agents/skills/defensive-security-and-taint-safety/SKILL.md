@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | 分形版本控制内核（领域支援）；VS Code 扩展与计时视图（领域支援）；门禁与命令面基础设施（链上第 2 步） |
-| **前置** | [gate-governance](../gate-governance/SKILL.md) |
-| **接续** | [coding-craft](../coding-craft/SKILL.md) |
-| **并行支援** | [constraint-driven-development](../constraint-driven-development/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md)、[test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)、[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) |
-| **领域链** | 分形版本控制内核：fractal-git-dev → rust-engineering → state-concurrency-and-crash-recovery → algorithmic-operator-engineering → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
-
-**何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+- **链路**：[gate-governance](../gate-governance/SKILL.md) → **本技能** → [coding-craft](../coding-craft/SKILL.md)；并行支援 `constraint-driven-development`、`debugging-and-error-recovery`、`test-benchmark-engineering`、`algorithmic-operator-engineering`。
+- **领域**：门禁与命令面基础设施（链上第 2 步）；另 2 个领域支援
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
+- **何时联动**：破坏性删除或路径穿越 → `defensive-security-and-taint-safety` + `gate-governance` + `coding-craft`；索引树并发写入或崩溃恢复 → `fractal-git-dev` + `state-concurrency-and-crash-recovery` + `defensive-security-and-taint-safety`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件

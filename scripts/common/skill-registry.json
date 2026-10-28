@@ -162,6 +162,7 @@
       "scenarios": [
         {
           "intent": "新增或修改 taxis 子命令",
+          "posture": "construct",
           "skills": [
             "fractal-git-dev",
             "rust-engineering",
@@ -170,6 +171,7 @@
         },
         {
           "intent": "taxis 输出与 git 逐字节不一致",
+          "posture": "explore",
           "skills": [
             "fractal-git-dev",
             "debugging-and-error-recovery",
@@ -178,10 +180,20 @@
         },
         {
           "intent": "索引树并发写入或崩溃恢复",
+          "posture": "explore",
           "skills": [
             "fractal-git-dev",
             "state-concurrency-and-crash-recovery",
             "defensive-security-and-taint-safety"
+          ]
+        },
+        {
+          "intent": "精简模块导出面与消除空门面",
+          "posture": "refactor",
+          "skills": [
+            "fractal-git-dev",
+            "facade-discipline",
+            "rust-engineering"
           ]
         }
       ]
@@ -212,6 +224,7 @@
       "scenarios": [
         {
           "intent": "新增分析器或规则",
+          "posture": "construct",
           "skills": [
             "auto-refactor-dev",
             "rule-catalog-governance",
@@ -220,6 +233,7 @@
         },
         {
           "intent": "Rust 与 TypeScript 输出字节不等价",
+          "posture": "explore",
           "skills": [
             "auto-refactor-dev",
             "rust-engineering",
@@ -228,10 +242,20 @@
         },
         {
           "intent": "评分口径被注水或刷分",
+          "posture": "review",
           "skills": [
             "telemetry-statistical-modeling",
             "constraint-driven-development",
             "auto-refactor-dev"
+          ]
+        },
+        {
+          "intent": "消融纯转发跳板与参数收敛",
+          "posture": "refactor",
+          "skills": [
+            "auto-refactor-dev",
+            "facade-discipline",
+            "complexity-budget"
           ]
         }
       ]
@@ -263,6 +287,7 @@
       "scenarios": [
         {
           "intent": "计时视图卡顿或丢帧",
+          "posture": "explore",
           "skills": [
             "workspace-timing-dev",
             "interaction-design-physics",
@@ -271,6 +296,7 @@
         },
         {
           "intent": "进程被杀后缓冲区数据丢失",
+          "posture": "explore",
           "skills": [
             "workspace-timing-dev",
             "state-concurrency-and-crash-recovery",
@@ -279,10 +305,20 @@
         },
         {
           "intent": "打包 vsix 并热同步",
+          "posture": "construct",
           "skills": [
             "release-package-workflow",
             "workspace-timing-dev",
             "gate-governance"
+          ]
+        },
+        {
+          "intent": "扩展多形参函数与门面收敛",
+          "posture": "refactor",
+          "skills": [
+            "workspace-timing-dev",
+            "facade-discipline",
+            "coding-craft"
           ]
         }
       ]
@@ -310,6 +346,7 @@
       "scenarios": [
         {
           "intent": "新玩法先出四阶段方案",
+          "posture": "construct",
           "skills": [
             "spec-driven-development",
             "webgames-workflow",
@@ -318,6 +355,7 @@
         },
         {
           "intent": "热路径循环里出现对象分配",
+          "posture": "refactor",
           "skills": [
             "webgames-workflow",
             "algorithmic-operator-engineering",
@@ -326,10 +364,20 @@
         },
         {
           "intent": "配置字段与视图快照不一致",
+          "posture": "explore",
           "skills": [
             "webgames-workflow",
             "debugging-and-error-recovery",
             "coding-craft"
+          ]
+        },
+        {
+          "intent": "卡拉尔界面动效与感知幂律渐隐",
+          "posture": "construct",
+          "skills": [
+            "webgames-workflow",
+            "interaction-design-physics",
+            "test-benchmark-engineering"
           ]
         }
       ]
@@ -356,6 +404,7 @@
       "scenarios": [
         {
           "intent": "新增门禁步骤并登记语义标识",
+          "posture": "construct",
           "skills": [
             "gate-governance",
             "rule-catalog-governance",
@@ -364,6 +413,7 @@
         },
         {
           "intent": "pwsh 与 bash 门禁语义漂移",
+          "posture": "explore",
           "skills": [
             "gate-governance",
             "coding-craft",
@@ -372,6 +422,7 @@
         },
         {
           "intent": "破坏性删除或路径穿越",
+          "posture": "guardian",
           "skills": [
             "defensive-security-and-taint-safety",
             "gate-governance",
@@ -402,6 +453,7 @@
       "scenarios": [
         {
           "intent": "新增技能或改技能描述",
+          "posture": "construct",
           "skills": [
             "skill-governance",
             "docs-archive-governance",
@@ -410,6 +462,7 @@
         },
         {
           "intent": "新增规则标识并闭合登记",
+          "posture": "construct",
           "skills": [
             "rule-catalog-governance",
             "skill-governance",
@@ -418,10 +471,20 @@
         },
         {
           "intent": "技能描述命中率低或调用含义不清",
+          "posture": "review",
           "skills": [
             "skill-governance",
             "subagent-orchestration",
             "coding-craft"
+          ]
+        },
+        {
+          "intent": "多智能体任务装配与沙箱隔离",
+          "posture": "construct",
+          "skills": [
+            "subagent-orchestration",
+            "skill-governance",
+            "gate-governance"
           ]
         }
       ]
@@ -450,6 +513,7 @@
       "scenarios": [
         {
           "intent": "并行会话改动混杂需要精准暂存",
+          "posture": "guardian",
           "skills": [
             "batch-commit",
             "subagent-orchestration",
@@ -458,6 +522,7 @@
         },
         {
           "intent": "提交信息被门禁拦下",
+          "posture": "review",
           "skills": [
             "batch-commit",
             "rule-catalog-governance",
@@ -466,6 +531,7 @@
         },
         {
           "intent": "发版日志与版本号对齐",
+          "posture": "review",
           "skills": [
             "release-package-workflow",
             "docs-archive-governance",

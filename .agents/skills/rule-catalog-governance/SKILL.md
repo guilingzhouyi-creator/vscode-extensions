@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | 自动重构内核（领域支援）；门禁与命令面基础设施（领域支援）；技能与规则元治理（链上第 2 步）；工作区元治理与并行交付（领域支援） |
-| **前置** | [skill-governance](../skill-governance/SKILL.md) |
-| **接续** | [docs-archive-governance](../docs-archive-governance/SKILL.md) |
-| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[debugging-and-error-recovery](../debugging-and-error-recovery/SKILL.md) |
-| **领域链** | 自动重构内核：auto-refactor-dev → rust-engineering → algorithmic-operator-engineering → telemetry-statistical-modeling → test-benchmark-engineering；其余领域链见 `docs/skill-catalog.md` |
-
-**何时联动**：新增分析器或规则 → `auto-refactor-dev` + `rule-catalog-governance` + `test-benchmark-engineering`；Rust 与 TypeScript 输出字节不等价 → `auto-refactor-dev` + `rust-engineering` + `debugging-and-error-recovery`
+- **链路**：[skill-governance](../skill-governance/SKILL.md) → **本技能** → [docs-archive-governance](../docs-archive-governance/SKILL.md)；并行支援 `coding-craft`、`constraint-driven-development`、`complexity-budget`、`debugging-and-error-recovery`。
+- **领域**：技能与规则元治理（链上第 2 步）；另 3 个领域支援
+- **协作专员**：原型 `skill-governance`：`skill-construct`、`skill-review`、`skill-refactor`
+- **何时联动**：新增规则标识并闭合登记 → `rule-catalog-governance` + `skill-governance` + `gate-governance`；新增分析器或规则 → `auto-refactor-dev` + `rule-catalog-governance` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件

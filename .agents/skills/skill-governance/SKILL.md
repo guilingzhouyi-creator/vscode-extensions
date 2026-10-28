@@ -13,17 +13,12 @@ description: >-
 <!-- SKILL-LINKS:BEGIN -->
 ## 联动技能
 
-> 本节由 `scripts/common/sync-skill-metadata.js` 依 `scripts/common/skill-registry.json` 生成，禁止手改。
+> 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-| 联动关系 | 技能 |
-| :--- | :--- |
-| **定位** | 技能与规则元治理（领域入口） |
-| **前置** | —（作为领域入口，无前置） |
-| **接续** | [rule-catalog-governance](../rule-catalog-governance/SKILL.md) |
-| **并行支援** | [coding-craft](../coding-craft/SKILL.md)、[complexity-budget](../complexity-budget/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md)、[batch-commit](../batch-commit/SKILL.md) |
-| **领域链** | 技能与规则元治理：skill-governance → rule-catalog-governance → docs-archive-governance → batch-commit |
-
-**何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；新增规则标识并闭合登记 → `rule-catalog-governance` + `skill-governance` + `gate-governance`
+- **链路**：— → **本技能** → [rule-catalog-governance](../rule-catalog-governance/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`batch-commit`。
+- **领域**：技能与规则元治理（领域入口）
+- **协作专员**：原型 `skill-governance`：`skill-construct`、`skill-review`、`skill-refactor`
+- **何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；新增规则标识并闭合登记 → `rule-catalog-governance` + `skill-governance` + `gate-governance`
 <!-- SKILL-LINKS:END -->
 
 ## 一、 适用场景与触发条件
