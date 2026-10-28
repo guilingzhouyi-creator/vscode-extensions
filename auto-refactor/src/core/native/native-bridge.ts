@@ -38,9 +38,15 @@ import type {
     NativeStatisticalMoments,
     NativeTemporalCouplingPair,
 } from './native-types';
-import { computeHistogramDiffShim } from './native-diff-shim';
-import { analyzeScopeShadowingShim } from './native-scope-shim';
-import { scanSecretsShim } from './native-secrets-shim';
+import {
+    analyzeScopeShadowingShim,
+    analyzeDependencyGraphShim,
+    computeDominatorTreeShim,
+    computeHistogramDiffShim,
+    fastPatternMatchShim,
+    solveDataflowShim,
+} from './native-shims-structural';
+import { scanSecretsShim } from './native-shims-metrics';
 import { countLineStats } from '../../utils/linestats';
 import { maskSourceTextJs } from '../policy/source-mask';
 import {
@@ -56,10 +62,7 @@ import {
     evaluateBumpyRoadShim,
     batchProbeTriggersShim,
     HASH_COEFFS,
-} from './native-clone-shim';
-import { computeDominatorTreeShim, solveDataflowShim } from './native-flow-shim';
-import { analyzeDependencyGraphShim } from './native-graph-shim';
-import { fastPatternMatchShim } from './native-pattern-shim';
+} from './native-shims-clone';
 import {
     computeShannonEntropyShim,
     computeStatisticalMomentsShim,
@@ -70,7 +73,7 @@ import {
     computeVectorCosineSimilarityShim,
     computeVectorEuclideanDistanceShim,
     selectBinding,
-} from './native-math-shim';
+} from './native-shims-metrics';
 
 export { HASH_COEFFS };
 

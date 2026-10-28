@@ -1,6 +1,6 @@
 /**
  * Module: Core Engine - Native Clone & Duplication Shim
- * File Path: src/core/native/native-clone-shim.ts
+ * File Path: src/core/native/native-shims-clone.ts
  * Architecture Role: Pure JavaScript fallback implementation of duplicate line counting,
  *     intra-file clone block detection, MinHash signatures, and LSH clone pair discovery.
  * Dependencies & Triggers: Consumes ./native-types; delegated by ./native-bridge.
@@ -10,6 +10,9 @@
  *     3. Compute MinHash signature vectors using 64 independent hash permutations;
  *     4. Discover cross-file clone pairs using Locality Sensitive Hashing (LSH) bands.
  * Exit Semantics & Design Rationale: Dependency-free, fully deterministic pure JS shim.
+ * Rust crate mapping: every export below falls back for `crates/ops-clone/`.
+ * Volume budget: roughly 591 of 900 executable lines; the remaining headroom is about a third of
+ *     the ceiling, so a new clone-family operator may land here, but two will need a split.
  */
 
 import type {

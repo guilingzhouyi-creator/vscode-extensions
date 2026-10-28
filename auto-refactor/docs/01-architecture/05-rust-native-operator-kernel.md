@@ -1,7 +1,7 @@
 # 05. Rust N-API 原生加速内核与双轨等价桥
 
 > **所属层级**：L1 核心架构与原生内核 (`docs/01-architecture/`)  
-> **对应代码真源**：[`crates/Cargo.toml`](../../crates/Cargo.toml)、[`crates/auto-refactor-core/`](../../crates/auto-refactor-core/)、[`crates/ops-diff/`](../../crates/ops-diff/)、[`crates/ops-graph/`](../../crates/ops-graph/)、[`crates/ops-pattern/`](../../crates/ops-pattern/)、[`crates/ops-mask/`](../../crates/ops-mask/)、[`crates/ops-clone/`](../../crates/ops-clone/)、[`src/core/native/native-bridge.ts`](../../src/core/native/native-bridge.ts)、[`src/core/native/native-clone-shim.ts`](../../src/core/native/native-clone-shim.ts)、[`src/core/native/native-flow-shim.ts`](../../src/core/native/native-flow-shim.ts)
+> **对应代码真源**：[`crates/Cargo.toml`](../../crates/Cargo.toml)、[`crates/auto-refactor-core/`](../../crates/auto-refactor-core/)、[`crates/ops-diff/`](../../crates/ops-diff/)、[`crates/ops-graph/`](../../crates/ops-graph/)、[`crates/ops-pattern/`](../../crates/ops-pattern/)、[`crates/ops-mask/`](../../crates/ops-mask/)、[`crates/ops-clone/`](../../crates/ops-clone/)、[`src/core/native/native-bridge.ts`](../../src/core/native/native-bridge.ts)、[`src/core/native/native-shims-clone.ts`](../../src/core/native/native-shims-clone.ts)、[`src/core/native/native-shims-structural.ts`](../../src/core/native/native-shims-structural.ts)、[`src/core/native/native-shims-metrics.ts`](../../src/core/native/native-shims-metrics.ts)
 
 ---
 
@@ -13,8 +13,8 @@
 flowchart TD
   subgraph TS["TypeScript 双轨桥接层 (src/core/native/)"]
     BRIDGE["native-bridge.ts<br/>(自动探测 + 双门限分流 + 成员存在性回退)"]
-    CLONE_SHIM["native-clone-shim.ts<br/>(MinHash / LSH / 克隆块检测)"]
-    FLOW_SHIM["native-flow-shim.ts<br/>(即时支配点 / 数据流不动点)"]
+    CLONE_SHIM["native-shims-clone.ts<br/>(MinHash / LSH / 克隆块检测)"]
+    STRUCT_SHIM["native-shims-structural.ts<br/>(支配树 / 数据流 / 图拓扑 / 差分 Hunk)"]
   end
 
   subgraph RUST["Rust Cargo Workspace (crates/)"]
@@ -179,14 +179,24 @@ flowchart TD
 
 ### 4.1 纯 JS Shim 实现矩阵
 
-1. **[`src/core/native/native-clone-shim.ts`](../../src/core/native/native-clone-shim.ts)**：
+1. **[`src/core/native/native-shims-clone.ts`](../../src/core/native/native-shims-clone.ts)**：
    - `countDuplicateLinesShim`: 统计重复行；
    - `detectCloneBlocksShim`: 贪心滑动窗口克隆代码块检测；
    - `computeMinHashShim`: 包含与 Rust `ops-clone` 严格一致的 64 组伪随机置换系数（`HASH_COEFFS`），采用完全相同的无符号 32 位溢出运算（`Math.imul` 与 `>>> 0`）；
    - `findClonePairsShim`: 局部敏感哈希 (LSH) 桶聚类算法。
-2. **[`src/core/native/native-flow-shim.ts`](../../src/core/native/native-flow-shim.ts)**：
+2. **[`src/core/native/native-shims-structural.ts`](../../src/core/native/native-shims-structural.ts)**：由原先的支配点 / 数据流 / 差分 / 图拓扑 / 模式匹配 / 作用域六个文件合并而成，文件头保留了「符号 → 原 Rust crate」映射表：
    - `computeDominatorTreeShim`: 纯 TypeScript 完整实现即时支配点求解，计算即时支配节点（`idom`）、支配边界（`dominance_frontiers`）与回边集（`back_edges`）；
-   - `solveDataflowShim`: 纯 TypeScript 实现的前向/后向单调数据流方程不动点迭代求解器。
+   - `solveDataflowShim`: 纯 TypeScript 实现的前向/后向单调数据流方程不动点迭代求解器；
+   - `computeHistogramDiffShim` / `assembleHunksShim`: 直方图差分与统一 Hunk 装配；
+   - `analyzeDependencyGraphShim`: Tarjan 强连通分量与 Kahn 拓扑排序；
+   - `fastPatternMatchShim`: 多子串行内扫描，输出按行列确定性排序；
+   - `analyzeScopeShadowingShim`: 词法作用域链与变量遮蔽检测。
+3. **[`src/core/native/native-shims-metrics.ts`](../../src/core/native/native-shims-metrics.ts)**：标量度量族，文件头同样保留 crate 映射表：
+   - `computeShannonEntropyShim` / `computeStatisticalMomentsShim` / `calculatePopoviciuPenaltyShim`: 信息熵、Welford 矩估计与 Popoviciu 离散折扣；
+   - `countBracesDetailedShim` / `computeWarshallClosureShim` / 向量三算子: 括号配平、Warshall 传递闭包与向量几何；
+   - `scanSecretsShim`: 凭据前缀扫描与高熵令牌识别，其熵计算直接复用本模块的 `computeShannonEntropyShim`，不再另存一份实现。
+
+> 关于体积：`native-shims-structural.ts` 的可执行行数已接近 900 行上限。该文件内新增任何算子都应先拆分为独立模块，而不是继续追加。
 
 ### 4.2 确定性输出契约与门禁看守
 

@@ -1,42 +1,176 @@
 /**
- * Module: Native Bridge — Pure TypeScript Shim for Native Secrets Scanner
- * File Path: src/core/native/native-secrets-shim.ts
- * Architecture Role: Deterministic fallback and differential testing oracle for
- *   native secrets scanner.
- * Dependencies & Triggers: Zero external dependencies; consumes
- *   NativeSecretFinding and NativeSecretScanOptions.
+ * Module: Core Engine — Native Metrics & Measurement Shim
+ * File Path: src/core/native/native-shims-metrics.ts
+ * Architecture Role: Pure JavaScript fallback implementation of the scalar measurement family:
+ *   Shannon information entropy, Welford statistical moments, Popoviciu dispersion, Warshall
+ *   closure, vector geometry, and the credential / high-entropy secret scanner.
+ * Dependencies & Triggers: Consumes ../math, ../algorithms and ./native-types; delegated by
+ *   ./native-bridge.
  * Responsibilities:
- *   1. Replicate Rust ops-pattern credential detection algorithms in pure TypeScript;
- *   2. Replicate Shannon entropy calculation for high-entropy secret detection;
- *   3. Serve as 100% equivalent fallback oracle when native addon is unavailable.
- * Exit Semantics & Design Rationale: Pure deterministic calculation with zero I/O;
- *   guarantees byte-for-byte behavioral parity with native scanSecretsNative.
+ *   1. Calculate Shannon entropy over character streams with 0.0 NaN guard;
+ *   2. Compute Welford first and second statistical moments with 4-decimal precision;
+ *   3. Calculate Popoviciu inequality dispersion discount factor with bounded gamma;
+ *   4. Count opening and closing curly braces with net delta tracking;
+ *   5. Compute dense boolean matrix transitive closure via in-place Warshall relaxation;
+ *   6. Provide vector space metric operations (dot, cosine, Euclidean);
+ *   7. Scan credentials by prefix patterns and high-entropy token thresholds.
+ * Exit Semantics & Design Rationale: CC <= 6 per function; pure functions; zero allocations in
+ *   inner loops; guarantees numerical parity with the Rust ops-math and ops-vector kernels.
+ *
+ * Rust crate mapping:
+ *   - crates/ops-math/    -> entropy, statistical moments, Popoviciu, brace counting, Warshall;
+ *   - crates/ops-vector/  -> dot product, cosine similarity, Euclidean distance;
+ *   - crates/ops-pattern/ -> credential prefix scan and high-entropy token detection.
+ *
+ * Volume budget: roughly 315 of 900 executable lines. This file is the smallest of the three
+ *   shim bundles and has ample headroom for additional measurement operators.
  */
 
-import type { NativeSecretFinding, NativeSecretScanOptions } from './native-types';
+import type {
+    NativeBraceBalance,
+    NativeSecretFinding,
+    NativeSecretScanOptions,
+    NativeStatisticalMoments,
+} from './native-types';
+import { countBracesDetailed } from '../algorithms/text-metrics';
+import { computeWarshallTransitiveClosure } from '../algorithms/graph';
+import { calculateShannonEntropy } from '../math/information-entropy';
+import { computeStatisticalMoments } from '../math/descriptive-statistics';
+import {
+    POPOVICIU_MAX_SIGMA,
+    DEFAULT_DISPERSION_PENALTY_RATIO,
+} from '../math/statistical-dispersion';
+import {
+    computeVectorDotProduct,
+    computeVectorCosineSimilarity,
+    computeVectorEuclideanDistance,
+} from '../math/vector-space';
+
+const SCORE_ROUNDING_FACTOR = 100;
 
 /**
- * Pure TypeScript Shannon entropy computation matching Rust implementation.
+ * Computes Shannon Information Entropy H(X) in bits.
  *
- * @param token - String token to analyze.
- * @returns Shannon entropy in bits per character.
+ * This is the single entropy implementation the shim layer exposes. The credential scanner below
+ * calls it directly rather than carrying its own copy, so the dual-track parity oracle compares
+ * one TypeScript formula against the Rust kernel instead of two that could drift independently.
+ *
+ * @param text - Input string to measure.
+ * @returns Shannon entropy in bits rounded to 2 decimal places.
  */
-export function calculateShannonEntropyShim(token: string): number {
-    if (token.length === 0) return 0.0;
-    const freqs = new Map<number, number>();
-    for (let i = 0; i < token.length; i++) {
-        const code = token.charCodeAt(i);
-        freqs.set(code, (freqs.get(code) || 0) + 1);
-    }
-    const len = token.length;
-    let entropy = 0.0;
-    for (const count of freqs.values()) {
-        const probability = count / len;
-        entropy -= probability * Math.log2(probability);
-    }
-    return entropy;
+export function computeShannonEntropyShim(text: string): number {
+    return calculateShannonEntropy(text);
 }
 
+/**
+ * Computes first and second statistical moments in a single online pass.
+ *
+ * @param values - Array of numerical values.
+ * @returns Statistical moments (mean, variance, standardDeviation, count).
+ */
+export function computeStatisticalMomentsShim(values: readonly number[]): NativeStatisticalMoments {
+    return computeStatisticalMoments(values);
+}
+
+/**
+ * Calculates Popoviciu's inequality dispersion discount factor in [0.0, 1.0].
+ *
+ * @param standardDeviation - Sample standard deviation.
+ * @param maxSigma - Maximum theoretical standard deviation (default 50.0).
+ * @param gamma - Penalty elasticity factor (default 0.5).
+ * @returns Discount multiplier in [0.0, 1.0].
+ */
+export function calculatePopoviciuPenaltyShim(
+    standardDeviation: number,
+    maxSigma?: number,
+    gamma?: number,
+): number {
+    if (!Number.isFinite(standardDeviation) || standardDeviation <= 0) {
+        return 1.0;
+    }
+    const effectiveSigma =
+        maxSigma !== undefined && Number.isFinite(maxSigma) && maxSigma > 0
+            ? maxSigma
+            : POPOVICIU_MAX_SIGMA;
+    const effectiveGamma =
+        gamma !== undefined && Number.isFinite(gamma) ? gamma : DEFAULT_DISPERSION_PENALTY_RATIO;
+    const normalizedDispersion = standardDeviation / effectiveSigma;
+    const factor = Math.max(0.0, 1.0 - normalizedDispersion * effectiveGamma);
+    return Math.round(factor * SCORE_ROUNDING_FACTOR) / SCORE_ROUNDING_FACTOR;
+}
+
+/**
+ * Counts opening and closing curly braces in a line with detailed breakdown.
+ * @param line - Text line to inspect.
+ * @returns NativeBraceBalance containing opens, closes, and delta.
+ */
+export function countBracesDetailedShim(line: string): NativeBraceBalance {
+    return countBracesDetailed(line);
+}
+
+/**
+ * Computes transitive closure over a dense boolean adjacency matrix using Warshall's algorithm.
+ *
+ * @param matrix - Row-major Uint8Array flat buffer of size * size.
+ * @param size - Number of vertices in the square matrix.
+ * @returns In-place mutated matrix with full reachability.
+ */
+export function computeWarshallClosureShim(matrix: Uint8Array, size: number): Uint8Array {
+    return computeWarshallTransitiveClosure(matrix, size);
+}
+
+/**
+ * Computes inner dot product between two vector slices.
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
+ * @returns Dot product scalar.
+ */
+export function computeVectorDotProductShim(
+    vectorA: readonly number[],
+    vectorB: readonly number[],
+): number {
+    return computeVectorDotProduct(vectorA, vectorB);
+}
+
+/**
+ * Computes cosine similarity between two vector slices.
+ *
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
+ * @returns Cosine similarity bounded in [-1.0, 1.0].
+ */
+export function computeVectorCosineSimilarityShim(
+    vectorA: readonly number[],
+    vectorB: readonly number[],
+): number {
+    return computeVectorCosineSimilarity(vectorA, vectorB);
+}
+
+/**
+ * Computes Euclidean distance between two vector slices.
+ * @param vectorA - First numerical vector.
+ * @param vectorB - Second numerical vector.
+ * @returns Euclidean distance scalar.
+ */
+export function computeVectorEuclideanDistanceShim(
+    vectorA: readonly number[],
+    vectorB: readonly number[],
+): number {
+    return computeVectorEuclideanDistance(vectorA, vectorB);
+}
+
+/**
+ * Defensive fallback binding selector ensuring strictly bounded cyclomatic complexity.
+ *
+ * @param bindingFn - Optional native binding function.
+ * @param fallbackFn - Fallback pure JS shim function.
+ * @returns Active binding function.
+ */
+export function selectBinding<T>(bindingFn: T | undefined, fallbackFn: T): T {
+    return typeof bindingFn === 'function' ? bindingFn : fallbackFn;
+}
+
+/** Code point ranges accepted as a high-entropy token member: alphanumerics, underscore, hyphen. */
 function isTokenChar(charCode: number): boolean {
     return (
         (charCode >= 48 && charCode <= 57) || // 0-9
@@ -209,7 +343,7 @@ function evaluateEntropyToken(
     threshold: number,
 ): NativeSecretFinding | null {
     if (token.length < minLen) return null;
-    const entropyVal = calculateShannonEntropyShim(token);
+    const entropyVal = computeShannonEntropyShim(token);
     if (entropyVal < threshold) return null;
     return {
         rule: 'high-entropy-token',
