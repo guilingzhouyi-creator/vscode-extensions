@@ -22,7 +22,12 @@ authors = ["Google DeepMind Advanced Agentic Coding Pair"]
 license = "MIT"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+# The library is consumed only by this package's own binary and its test targets, all of which link
+# it as Rust. It exposes no C ABI: there is no `no_mangle` entry point, no `.node` loader, and the
+# TypeScript side states outright that it ships no native binding. Keeping `cdylib` in the crate
+# types therefore produced a shared object whose several tens of thousands of export ordinals had no
+# reader, and every public item — the measurement harness included — was published through it.
+crate-type = ["rlib"]
 
 [dependencies]
 fg-core = { path = "crates/fg-core" }
