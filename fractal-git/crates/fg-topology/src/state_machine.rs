@@ -25,12 +25,16 @@ pub enum WorktreeState {
 }
 
 /// A tracked fractal workspace instance.
+///
+/// The lifecycle field is private on purpose: every mutation has to pass through the transition
+/// methods below, which refuse illegal edges. A public field would let a caller jump straight from
+/// `Spawned` to `Materialized` and leave the recorded evidence inconsistent with the state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FractalWorkspaceNode {
     pub workspace_id: String,
     pub fractal_ref: String,
     pub parent_ref: String,
-    pub state: WorktreeState,
+    state: WorktreeState,
     pub baseline_commit_oid: Oid,
     pub head_commit_oid: Option<Oid>,
     pub created_at_ms: i64,
@@ -38,6 +42,13 @@ pub struct FractalWorkspaceNode {
 }
 
 impl FractalWorkspaceNode {
+    /// Reports the current lifecycle state.
+    ///
+    /// @returns The state this node currently occupies.
+    pub fn state(&self) -> WorktreeState {
+        self.state
+    }
+
     /// Spawns a new workspace node in `Spawned` state.
     pub fn new(
         workspace_id: impl Into<String>,
