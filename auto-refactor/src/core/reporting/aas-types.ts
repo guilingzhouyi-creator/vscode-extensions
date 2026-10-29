@@ -117,6 +117,59 @@ export interface AasDefectRecord {
     readonly analyzer?: string;
     /** Whether this defect is newly introduced compared to the baseline */
     readonly isNew?: boolean;
+    /**
+     * Calibrated confidence in [0, 1], emitted only when the arbitration pass ran.
+     *
+     * Omitted rather than defaulted on purpose: a defect with no adjudicated score must be
+     * visibly unknown to a consumer, because a number that looks like 0.95 but means "nobody
+     * checked" is worse than no number at all.
+     */
+    readonly conf?: number;
+    /** Confidence tier: T1 proven (blocks), T2 patchable, T3 suggestion only. */
+    readonly tier?: 'T1' | 'T2' | 'T3';
+}
+
+/**
+ * Counts answering "how much of this report can be used without a human".
+ *
+ * This is the block a consumer reads first: it separates findings the arbiter proved, findings a
+ * patch can settle mechanically, and the small remainder that genuinely needs a person. Without
+ * it a reader has only a severity total, which conflates "one real defect" with "four hundred
+ * suggestions nobody has verified".
+ */
+export interface AasUsability {
+    /** Findings proven deterministically; these are what block the gate. */
+    readonly proven: number;
+    /** Findings carrying a mechanically applicable patch. */
+    readonly patchable: number;
+    /** Findings that are suggestions only and never block. */
+    readonly advisory: number;
+    /**
+     * Findings whose rule has no outcome history, so the score is the analyzer's own report.
+     * The honest count of "nobody has confirmed this class of finding".
+     */
+    readonly uncalibrated: number;
+    /**
+     * Findings a human must actually read: non-blocking, uncalibrated, and requiring runtime
+     * confirmation. Everything else is either proven or mechanically fixable.
+     */
+    readonly needsHuman: number;
+}
+
+/** Aggregated executive summary of a build/review run. */
+export interface AasSummary {
+    /** Protocol schema id */
+    readonly schema: string;
+    /** One-sentence headline */
+    readonly headline: string;
+    /** Verdict */
+    readonly verdict: AasVerdict;
+    /** Health block */
+    readonly health: AasHealth;
+    /** Severity/count summary */
+    readonly counts: AasCounts;
+    /** Usability block, present when the arbitration pass ran */
+    readonly usability?: AasUsability;
 }
 
 /** Configuration options governing AAS report serialization and token budgeting. */

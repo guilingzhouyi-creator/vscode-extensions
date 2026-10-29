@@ -32,6 +32,7 @@ import {
     type AasHealth,
     type AasReportOptions,
     type AasSeverity,
+    type AasUsability,
     type AasVerdict,
     type AgentAuditReport,
 } from './aas-types';
@@ -384,6 +385,35 @@ interface DefectRecordParams {
     readonly anchorCache: AnchorCache;
     readonly options: AasReportOptions;
     readonly defaultVerify: string;
+    /**
+     * Tier the arbitration pass assigned this issue's rule, or undefined when the pass did not
+     * run. Passed in rather than derived here: the arbiter owns tiering, and a reporter that
+     * re-derived it would be a second source of truth for the same judgement.
+     */
+    readonly tier?: 'T1' | 'T2' | 'T3';
+}
+
+/**
+ * Projects the optional adjudication fields onto a defect record.
+ *
+ * Split out of `buildDefectRecord` so the record assembly stays a flat list of field decisions
+ * rather than accumulating one branch per optional field. Both fields are omitted — never
+ * defaulted — when unavailable: a consumer must be able to tell "not adjudicated" from
+ * "adjudicated as certain", and only absence carries that meaning.
+ *
+ * @param issue - Source finding.
+ * @param tier - Tier the arbitration pass assigned the finding's rule, when it ran.
+ * @returns Tier and confidence fields, possibly empty.
+ */
+function projectAdjudicationFields(
+    issue: Issue,
+    tier: 'T1' | 'T2' | 'T3' | undefined,
+): { tier?: 'T1' | 'T2' | 'T3'; conf?: number } {
+    const fields: { tier?: 'T1' | 'T2' | 'T3'; conf?: number } = {};
+    if (tier) fields.tier = tier;
+    const confidence = issue.evidence?.confidence;
+    if (typeof confidence === 'number') fields.conf = Number(confidence.toFixed(2));
+    return fields;
 }
 
 /**
@@ -425,6 +455,7 @@ function buildDefectRecord(params: DefectRecordParams): AasDefectRecord {
         ...(isNonDefaultVerify ? { verify: verifyCmd } : {}),
         ...(params.options.includeAnalyzer && issue.analyzer ? { analyzer: issue.analyzer } : {}),
         ...(issue.isNew ? { isNew: true } : {}),
+        ...projectAdjudicationFields(issue, params.tier),
     };
 }
 
@@ -519,6 +550,8 @@ interface EmitDefectsParams {
     readonly defaultVerify: string;
     readonly maxPerFile: number;
     readonly remainingBudget: number;
+    /** Rule-to-tier map from the arbitration pass, or undefined when it did not run. */
+    readonly ruleTiers?: Readonly<Record<string, 'T1' | 'T2' | 'T3'>>;
 }
 
 /**
@@ -536,6 +569,7 @@ function emitDefectsForFile(params: EmitDefectsParams): {
             omittedCount++;
             continue;
         }
+        const tier = params.ruleTiers ? params.ruleTiers[issue.rule] : undefined;
         emitted.push(
             buildDefectRecord({
                 issue,
@@ -544,6 +578,7 @@ function emitDefectsForFile(params: EmitDefectsParams): {
                 anchorCache: params.anchorCache,
                 options: params.options,
                 defaultVerify: params.defaultVerify,
+                ...(tier ? { tier } : {}),
             }),
         );
     }
@@ -563,6 +598,28 @@ function resolveCounts(report: ScanReport): AasCounts {
         warns: summary.bySeverity.warning ?? 0,
         info: summary.bySeverity.info ?? 0,
         ...(summary.suppressedCount !== undefined ? { suppressed: summary.suppressedCount } : {}),
+    };
+}
+
+/**
+ * Projects the arbitration verdict into the usability block a consumer reads first.
+ *
+ * Returns undefined when the arbitration pass did not run, so the block's presence is itself the
+ * signal that the numbers were adjudicated. Emitting zeroes instead would be indistinguishable
+ * from "a scan that found nothing", which is the opposite meaning.
+ *
+ * @param report - Complete scan report.
+ * @returns Usability counts, or undefined when no arbitration ran.
+ */
+function resolveUsability(report: ScanReport): AasUsability | undefined {
+    const arbitration = report.summary.arbitration;
+    if (!arbitration) return undefined;
+    return {
+        proven: arbitration.prescriptiveCount,
+        patchable: arbitration.actionableCount,
+        advisory: arbitration.advisoryCount,
+        uncalibrated: arbitration.uncalibratedCount,
+        needsHuman: arbitration.reviewQueueCount,
     };
 }
 
@@ -592,6 +649,8 @@ interface DefectEmissionContext {
     readonly maxFiles: number;
     readonly maxPerFile: number;
     readonly maxTotal: number;
+    /** Rule-to-tier map from the arbitration pass, or undefined when it did not run. */
+    readonly ruleTiers?: Readonly<Record<string, 'T1' | 'T2' | 'T3'>>;
 }
 
 /**
@@ -627,6 +686,7 @@ function processDefectFiles(
             defaultVerify: ctx.defaultVerify,
             maxPerFile: ctx.maxPerFile,
             remainingBudget,
+            ...(ctx.ruleTiers ? { ruleTiers: ctx.ruleTiers } : {}),
         });
 
         truncatedCount += emissionResult.omittedCount;
@@ -679,6 +739,7 @@ function groupDefects(
 
     const topologyMap = initTopologyMap();
     const resultFiles: Record<string, AasDefectRecord[]> = {};
+    const ruleTiers = report.summary.arbitration?.ruleTiers;
 
     const ctx: DefectEmissionContext = {
         sortedFiles,
@@ -690,6 +751,7 @@ function groupDefects(
         maxFiles: options.maxFiles ?? DEFAULT_MAX_FILES,
         maxPerFile: options.maxDefectsPerFile ?? DEFAULT_MAX_DEFECTS_PER_FILE,
         maxTotal: options.maxTotalDefects ?? DEFAULT_MAX_TOTAL_DEFECTS,
+        ...(ruleTiers ? { ruleTiers } : {}),
     };
 
     const truncatedCount = processDefectFiles(ctx, topologyMap, resultFiles);
@@ -714,6 +776,7 @@ export function buildAasReport(
     const counts = resolveCounts(report);
     const verdict = resolveVerdict(counts);
     const health = buildHealth(report, counts, options);
+    const usability = resolveUsability(report);
     const dimensions = projectDimensions(report.qualityScore);
     const bottlenecks = extractBottlenecks(report);
     const { files, topology, truncatedCount } = groupDefects(
@@ -731,6 +794,7 @@ export function buildAasReport(
         root: report.root,
         verdict,
         health,
+        ...(usability ? { usability } : {}),
         defaultVerify,
         ...(dimensions ? { dimensions } : {}),
         bottlenecks,

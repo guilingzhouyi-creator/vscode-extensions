@@ -7,20 +7,26 @@
  *                     `../api`, reads `ScanReport` from `../core/types`, and uses fs/os/path to
  *                     build and delete the temporary fixture root.
  * Responsibilities: build fixture files/config covering constants, complexity, large-file,
- *                     governance, secrets, and dependency-graph analyzers; run scanAndRender;
- *                     assert every `EXPECTED_PAIRS` analyzer:rule pair fires; print PASS/MISS
- *                     rows plus a summary; remove the temp directory in all cases.
+ *                     governance, secrets, and dependency-graph analyzers plus a clean
+ *                     negative-control module; run scanAndRender; assert every
+ *                     `EXPECTED_PAIRS` analyzer:rule pair fires and that no
+ *                     `CLEAN_RULE_ALLOWLIST` rule fires on the clean module; print
+ *                     PASS/MISS/FP rows plus recall and precision summary; remove the temp
+ *                     directory in all cases.
  * Exit Semantics & Design Rationale: Resolves to `{ code, text }` rather than calling
- *                     process.exit: 0 when all expected pairs fired, 1 when any pair is missing,
- *                     2 on fixture/setup failure; `finally` cleanup prevents temp-dir leaks, and
- *                     the live-pipeline assertion exists to catch analyzers that silently stop
- *                     firing while conventional gates still report PASS.
+ *                     process.exit: 0 when every expected pair fired and the clean fixture
+ *                     stayed silent, 1 on either a missing pair or a false positive, 2 on
+ *                     fixture/setup failure; `finally` cleanup prevents temp-dir leaks. The two
+ *                     assertions cover opposite failures: the recall direction catches analyzers
+ *                     that silently stop firing, the precision direction catches rules that
+ *                     silently start over-matching. Only the recall direction existed before,
+ *                     which is why the oversized fixture could rot into a benign constant
+ *                     catalog — legally exempt from `large-file` — while the gate stayed green.
  *
  * Builds a temporary fixture project containing KNOWN violations (one per built-in
- * analyzer family), runs an in-process scan, and asserts each expected `analyzer:rule`
- * pair actually fires. Guards against "analyzer silently broken but gate reports PASS" —
- * the same methodology proven in multi-layered review systems (it caught a real
- * three-color DFS defect there).
+ * analyzer family) plus one module that violates nothing, runs an in-process scan, and asserts
+ * both directions. Guards against "analyzer silently broken but gate reports PASS" and against
+ * "rule silently over-matching but every fixture still passes".
  */
 
 import * as fs from 'fs';
@@ -36,15 +42,49 @@ import type { ScanReport } from '../core/types';
 const FIXTURE_BRANCH_COUNT = 25;
 
 /**
- * Number of filler comment lines in the large-file fixture; keeps the generated module above
- * the large-file fail threshold so `large-file:large-file` must fire.
+ * Number of generated functions in the large-file fixture.
+ *
+ * The module must cross the 800-line fail threshold through DENSE code rather than through a
+ * long constant catalog: `large-file` exempts benign constant tables up to
+ * `MAX_BENIGN_CONSTANT_LINES`, so a 820-line `export const codeLine_N = N;` block is legally
+ * ignored and the fixture silently stops tripping the rule it exists to assert. Each function
+ * below contributes branching control flow, which keeps the module outside that exemption.
  */
-const FIXTURE_FILLER_LINES = 820;
+const FIXTURE_OVERSIZED_FUNCTIONS = 260;
+
+/**
+ * Branch-heavy body reused by every generated function in the oversized fixture. Three physical
+ * lines per function, one of them a conditional, so the module is dense enough for the volume
+ * rules and still cheap enough to parse inside the self-test budget.
+ */
+const FIXTURE_OVERSIZED_BODY = (index: number): string =>
+    `export function task_${index}(value: number): number {\n` +
+    `  if (value > ${index}) {\n    return value - 1;\n  }\n  return value + 1;\n}\n`;
 
 /**
  * Column width used to pad the `analyzer:rule` pair label in the PASS/MISS report rows.
  */
 const PAIR_LABEL_WIDTH = 36;
+
+/**
+ * Files that must stay silent.
+ *
+ * A fixture set that only proves "the rules we expected did fire" cannot detect the opposite and
+ * more expensive failure: a rule firing on code that does not violate it. The clean fixture is
+ * scanned by the same pipeline under the same config, and every rule in this allowlist must
+ * produce zero findings on it.
+ */
+const CLEAN_RULE_ALLOWLIST: ReadonlySet<string> = new Set([
+    'large-file',
+    'VOL-ELOC-001',
+    'VOL-LOC-001',
+    'high-complexity',
+    'magic-number',
+    'secret-detected',
+]);
+
+/** Ordered view of `CLEAN_RULE_ALLOWLIST`, used for iteration and the summary line. */
+const CLEAN_RULE_ALLOWLIST_ORDERED: readonly string[] = [...CLEAN_RULE_ALLOWLIST];
 
 interface FixtureFile {
     rel: string;
@@ -53,10 +93,34 @@ interface FixtureFile {
 }
 
 /**
+ * Build the negative-control source.
+ *
+ * It is deliberately dense (real branching, named constants, no filler) yet free of every
+ * violation `CLEAN_RULE_ALLOWLIST` names. If a rule starts over-matching, this file is what
+ * turns the over-match into a red self-test instead of a quiet false positive in real reviews.
+ *
+ * @returns TypeScript source small enough to stay far below every volume and complexity band.
+ */
+function buildCleanFixtureSource(): string {
+    return [
+        'export const RETRY_FLOOR = 0;',
+        'export const RETRY_CEILING = 1;',
+        '',
+        'export function clampRetry(value: number): number {',
+        '    if (value < RETRY_FLOOR) {',
+        '        return RETRY_FLOOR;',
+        '    }',
+        '    return value > RETRY_CEILING ? RETRY_CEILING : value;',
+        '}',
+        '',
+    ].join('\n');
+}
+
+/**
  * Build the temporary fixture project files and the configuration enabling their analyzers.
  *
- * Each sample intentionally violates one analyzer contract, and the generated filler module
- * pushes the large-file fixture past its line threshold.
+ * Each sample intentionally violates one analyzer contract, and the generated oversized module
+ * crosses the volume envelope through dense branching code rather than a constant catalog.
  *
  * @returns Fixture files with the reason each exists, plus the configuration that enables
  *          the analyzers expected to fire on them.
@@ -66,9 +130,8 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
         { length: FIXTURE_BRANCH_COUNT },
         (_, i) => `  if (x > ${i}) { x = x - 1; }`,
     ).join('\n');
-    const filler = Array.from(
-        { length: FIXTURE_FILLER_LINES },
-        (_, i) => `export const codeLine_${i} = ${i};\n`,
+    const oversized = Array.from({ length: FIXTURE_OVERSIZED_FUNCTIONS }, (_, i) =>
+        FIXTURE_OVERSIZED_BODY(i),
     ).join('');
     const files: FixtureFile[] = [
         {
@@ -94,8 +157,13 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
         },
         {
             rel: 'src/toolarge.ts',
-            content: `${filler}export const end = 1;\n`,
-            why: 'large-file:large-file (820+ lines >= fail threshold 800)',
+            content: `${oversized}export const end = 1;\n`,
+            why: `large-file:large-file (${FIXTURE_OVERSIZED_FUNCTIONS * 5} dense lines >= fail threshold 800)`,
+        },
+        {
+            rel: 'src/clean-compact.ts',
+            content: buildCleanFixtureSource(),
+            why: 'negative control: dense but small, so volume/complexity/literal rules stay silent',
         },
         {
             rel: 'src/swallow.ts',
@@ -184,7 +252,46 @@ function materializeFixtureFiles(
 }
 
 /**
+ * Name of the negative-control fixture. Findings reported on this file are false positives by
+ * construction, because the source deliberately satisfies every rule in the allowlist.
+ */
+const CLEAN_FIXTURE_BASENAME = 'clean-compact.ts';
+
+/**
+ * Collect the false-positive breaches on the negative-control fixture.
+ *
+ * Only rules present in the scan are considered, so a disabled rule is never counted as a
+ * breach; the check is about over-matching, not about coverage.
+ *
+ * @param issues - Every finding the self-test scan produced.
+ * @returns One human-readable row per (rule, line) false positive, plus the distinct rule count.
+ */
+function collectFalsePositives(issues: readonly ScanReport['issues'][number][]): {
+    rows: string[];
+    ruleCount: number;
+} {
+    const rows: string[] = [];
+    const breachedRules = new Set<string>();
+    for (const issue of issues) {
+        const file = issue.location?.file ?? '';
+        if (!file.endsWith(CLEAN_FIXTURE_BASENAME)) continue;
+        if (!CLEAN_RULE_ALLOWLIST.has(issue.rule)) continue;
+        if (breachedRules.has(issue.rule)) continue;
+        breachedRules.add(issue.rule);
+        rows.push(
+            `  FP    ${issue.rule.padEnd(PAIR_LABEL_WIDTH)} clean fixture line ${issue.location?.start?.line ?? 0} -- False positive!`,
+        );
+    }
+    return { rows, ruleCount: breachedRules.size };
+}
+
+/**
  * Executes built-in end-to-end self-test suite on synthetic fixtures.
+ *
+ * Two directions are asserted. Every `EXPECTED_PAIRS` entry must fire (no silent analyzer
+ * regression), and no rule in `CLEAN_RULE_ALLOWLIST` may fire on the negative-control fixture
+ * (no silent over-matching). Only the first direction existed before, which is exactly the
+ * blind spot that let the fixture rot unnoticed while the gate stayed green.
  *
  * @param _args - Command-line arguments.
  * @returns Resulting exit code and text output report.
@@ -208,29 +315,40 @@ export async function selfTestCommand(_args: string[]): Promise<{ code: number; 
         const report: ScanReport = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
         const fired = new Set(report.issues.map((i) => `${i.analyzer}:${i.rule}`));
 
-        let allPassed = true;
+        let missedCount = 0;
         for (const { pair, why } of EXPECTED_PAIRS) {
             if (fired.has(pair)) {
                 lines.push(`  PASS  ${pair.padEnd(PAIR_LABEL_WIDTH)} ${why}`);
             } else {
-                allPassed = false;
+                missedCount++;
                 lines.push(
                     `  MISS  ${pair.padEnd(PAIR_LABEL_WIDTH)} ${why} -- Analyzer regression!`,
                 );
             }
         }
+
+        const falsePositives = collectFalsePositives(report.issues);
+        lines.push(...falsePositives.rows);
+
         const unexpectedFamilies = new Set(report.issues.map((i) => i.analyzer));
         lines.push(
             `  -- Fixture total ${report.summary.filesScanned} files / ${report.issues.length} findings, covering families: ${[...unexpectedFamilies].join(', ')}`,
         );
+        lines.push(
+            `  -- Recall ${EXPECTED_PAIRS.length - missedCount}/${EXPECTED_PAIRS.length} expected pairs fired, ` +
+                `precision ${falsePositives.ruleCount === 0 ? 'clean (0' : `breached (${falsePositives.ruleCount}`} ` +
+                `of ${CLEAN_RULE_ALLOWLIST_ORDERED.length} guarded rules on the clean fixture)`,
+        );
+
+        const allPassed = missedCount === 0 && falsePositives.ruleCount === 0;
         return {
             code: allPassed ? 0 : 1,
             text: [
                 `auto-refactor self-test (known violation fixtures -> engine hit assertion)`,
                 ...lines,
                 allPassed
-                    ? 'Conclusion: All expected engine rules fired ✔'
-                    : 'Conclusion: Regressed analyzer detected ✖ BLOCK',
+                    ? 'Conclusion: All expected engine rules fired, no false positive on the clean fixture ✔'
+                    : 'Conclusion: Regressed analyzer or over-matching rule detected ✖ BLOCK',
             ].join('\n'),
         };
     } catch (err) {

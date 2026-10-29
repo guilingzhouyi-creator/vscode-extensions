@@ -82,12 +82,7 @@
         },
         "agentProfile": {
           "type": "string",
-          "enum": [
-            "untrusted",
-            "standard",
-            "trusted-autonomous",
-            "human-review"
-          ],
+          "enum": ["untrusted", "standard", "trusted-autonomous", "human-review"],
           "description": "Effective Agent security profile under which the scan executed."
         },
         "appliedRatio": {
@@ -101,10 +96,7 @@
           "description": "Recorded degradation and budget fallback events during scan.",
           "items": {
             "type": "object",
-            "required": [
-              "reason",
-              "timestamp"
-            ],
+            "required": ["reason", "timestamp"],
             "properties": {
               "reason": {
                 "type": "string"
@@ -183,6 +175,122 @@
             }
           },
           "description": "Uncertainty metrics summarizing findings requiring runtime verification and average confidence."
+        },
+        "arbitration": {
+          "type": "object",
+          "description": "Finding-level arbitration verdict. Present when the post-scan arbitration pass ran. It answers a different question than bySeverity: severity says how loud a finding is, this says whether it was proven, mechanically patchable, or only a suggestion.",
+          "required": [
+            "totalEvaluated",
+            "prescriptiveCount",
+            "actionableCount",
+            "advisoryCount",
+            "suppressedCount",
+            "prunedBySliceCount",
+            "blockingCount",
+            "gateVerdict",
+            "uncalibratedCount",
+            "reviewQueueCount"
+          ],
+          "properties": {
+            "totalEvaluated": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "prescriptiveCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "T1 findings backed by deterministic proof; these block the gate."
+            },
+            "actionableCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "T2 findings carrying a mechanically applicable patch."
+            },
+            "advisoryCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "T3 findings that are suggestions only and never block."
+            },
+            "suppressedCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "prunedBySliceCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "blockingCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "gateVerdict": {
+              "type": "string",
+              "enum": ["passed", "blocked"]
+            },
+            "uncalibratedCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Findings whose rule has no outcome history, so the confidence is the analyzer's own report."
+            },
+            "reviewQueueCount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Findings a human must read: non-blocking, uncalibrated, and flagged as needing runtime confirmation."
+            },
+            "advisoryOnlyRules": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Rules the arbiter classified as advisory on every occurrence. Report metadata only; the exit code follows failOnSeverity and never reads this list."
+            },
+            "ruleTiers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "enum": ["T1", "T2", "T3"]
+              },
+              "description": "Strongest tier the arbiter assigned each rule in this report."
+            },
+            "noisyRules": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "quarantinedRules": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "model": {
+              "type": "object",
+              "description": "Fingerprint and shape of the adjudication evidence behind these tiers. Omitted when no outcome evidence was supplied, which is a different claim from a model with zero observations.",
+              "required": ["schema", "digest", "calibratedRuleCount", "observationCount"],
+              "additionalProperties": false,
+              "properties": {
+                "schema": {
+                  "type": "string",
+                  "description": "Schema tag of the model description."
+                },
+                "digest": {
+                  "type": "string",
+                  "description": "Digest over the evidence counts and thresholds; changes whenever either changes."
+                },
+                "calibratedRuleCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Rules carrying observed outcomes."
+                },
+                "observationCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Total observations behind those rules."
+                }
+              }
+            }
+          }
         },
         "ratchetBaselineUsed": {
           "type": "boolean",

@@ -12,7 +12,14 @@
  */
 
 import * as fs from 'fs';
-import type { ScanConfig, ScanReport, Issue, SuppressionRule, FileMetric } from '../types';
+import type {
+    ScanConfig,
+    ScanReport,
+    ScanSummary,
+    Issue,
+    SuppressionRule,
+    FileMetric,
+} from '../types';
 import type { Scanner } from '../analyzer';
 import { summarizeUncertainty } from './uncertaintySummary';
 import type { Logger } from '../logger';
@@ -39,6 +46,11 @@ import { computeUnifiedQualityScore } from '../scoring/fusion-scorer';
 import type { GovernanceProjectProfile } from '../scoring/fusion-scorer';
 import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
 import { FindingConfidenceArbiter } from '../scoring/finding-confidence-arbiter';
+import type { ArbitratedFinding } from '../scoring/finding-confidence-arbiter';
+import type { RuleCalibrationStats } from '../scoring/confidence-calibration';
+import { loadCalibrationCorpus } from '../scoring/calibration-corpus';
+import { buildConfidenceModelAsset } from '../scoring/confidence-model-asset';
+import { buildReviewQueue, countNeedsHuman, writeReviewQueue } from './review-queue';
 import { BehavioralHotspotEvaluator, type FileHotspotInput } from '../evolution';
 
 export { BASELINE_GRANULARITY_GROUPED, groupCounts };
@@ -60,6 +72,7 @@ const PASS_EMPTY_DIRECTORIES = 'empty-directories';
 const PASS_ERROR_FLOW = 'error-flow';
 const PASS_SEMANTIC_COMPLEXITY = 'semantic-complexity';
 const PASS_SUPPRESSIONS = 'suppressions';
+const PASS_ARBITRATION = 'arbitration';
 const PASS_BASELINE = 'baseline';
 
 /** Analyzer keys declared in scan configuration. */
@@ -145,13 +158,32 @@ const FINALIZED = Symbol('auto-refactor:finalized');
 const KEY_REPORT = 'report';
 const KEY_CONFIG = 'config';
 
-/** Options controlling baseline ratchet and update behavior. */
+/**
+ * Options controlling the post-scan finalization passes.
+ *
+ * The name is historical — baseline ratchet settings were the first entries — but this is the
+ * shared option bag `finalizeReport` receives from the API layer, so every post-scan artifact
+ * path belongs here rather than in a second parallel struct the caller would have to keep in
+ * sync. Field names match `ScanOptions` exactly so a caller's options object is assignable
+ * without translation.
+ */
 export interface FinalizeBaselineOptions {
     baseline?: string;
     updateBaseline?: string;
     baselineGranularity?: string;
     baselineRatchetDown?: boolean;
     forceBaselineExpand?: boolean;
+    /** Write the human review queue to this NDJSON path when set. */
+    reviewQueue?: string;
+    /**
+     * Calibration corpus supplying per-rule outcome counts.
+     *
+     * Omitted by default, and that default is load-bearing: with no corpus every confidence is
+     * the analyzer's own score, exactly as it was before calibration existed. A project that has
+     * accumulated review outcomes points this at its own file and gets adjudicated posteriors
+     * instead.
+     */
+    confidenceCorpus?: string;
 }
 
 /** Unified context structure aggregating parameters across report finalization passes. */
@@ -757,6 +789,222 @@ function buildHotspotInput(metric: FileMetric, defectCount: number): FileHotspot
 }
 
 /**
+ * Maps each rule to the strongest tier the arbiter assigned it in this report.
+ *
+ * Strongest, not weakest: a rule that proved one finding is a proven rule even if other
+ * occurrences were only advisory, so a downstream reader can never mistake it for harmless.
+ *
+ * Derived from the full `findings` list rather than `activeFindings`. Clustering collapses
+ * overlapping findings into a primary plus subordinates, so a rule whose every occurrence was
+ * clustered away would vanish from `activeFindings` and silently lose its tier — a gate input
+ * that changes meaning depending on whether clustering happens to be enabled.
+ *
+ * @param findings - Every arbitrated finding, including suppressed and clustered ones.
+ * @returns Rule id to tier map, using the AAS tier vocabulary.
+ */
+function resolveRuleTiers(
+    findings: readonly { issue: { rule: string }; tier: string; isSuppressed: boolean }[],
+): Record<string, 'T1' | 'T2' | 'T3'> {
+    const rank: Record<string, number> = { prescriptive: 3, actionable: 2, advisory: 1 };
+    const best = new Map<string, { tier: 'T1' | 'T2' | 'T3'; rank: number }>();
+    for (const finding of findings) {
+        if (finding.isSuppressed) continue;
+        const currentRank = rank[finding.tier] ?? 0;
+        const existing = best.get(finding.issue.rule);
+        if (existing && existing.rank >= currentRank) continue;
+        best.set(finding.issue.rule, {
+            tier:
+                finding.tier === 'prescriptive'
+                    ? 'T1'
+                    : finding.tier === 'actionable'
+                      ? 'T2'
+                      : 'T3',
+            rank: currentRank,
+        });
+    }
+    const tiers: Record<string, 'T1' | 'T2' | 'T3'> = {};
+    for (const [rule, entry] of best) tiers[rule] = entry.tier;
+    return tiers;
+}
+
+/**
+ * Groups arbitrated findings by rule and reports which rules never reached a blocking tier.
+ *
+ * This is report metadata; the exit code does not read it. Narrowing the gate from here would
+ * override the operator's explicit `failOnSeverity`, and the severity floor already guarantees
+ * that an advisory finding cannot block on its own. Two properties still matter, because a
+ * consumer reading the list must not misread it as an exemption it is not:
+ *
+ * - Grouping, not per-finding. A rule that blocks on one line and advises on another cannot be
+ *   predicted by a reader, so only a rule whose every occurrence was non-blocking is exempt.
+ * - Full `findings`, not `activeFindings`. Clustering replaces an overlapping group with a single
+ *   primary, so deriving this from the clustered list would let a blocking rule disappear from
+ *   the map entirely and be treated as advisory — turning an internal reporting option into a
+ *   silent gate loosening.
+ *
+ * @param findings - Every arbitrated finding, including suppressed and clustered ones.
+ * @returns Rule ids whose every active finding was classified non-blocking.
+ */
+function resolveAdvisoryOnlyRules(
+    findings: readonly { issue: { rule: string }; mustBlock: boolean; isSuppressed: boolean }[],
+): string[] {
+    const blockingRules = new Set<string>();
+    const activeRules = new Set<string>();
+    for (const finding of findings) {
+        if (finding.isSuppressed) continue;
+        activeRules.add(finding.issue.rule);
+        if (finding.mustBlock) blockingRules.add(finding.issue.rule);
+    }
+    const advisoryOnly: string[] = [];
+    for (const rule of activeRules) {
+        if (!blockingRules.has(rule)) advisoryOnly.push(rule);
+    }
+    return advisoryOnly;
+}
+
+/**
+ * Loads the calibration corpus named by the caller, if any.
+ *
+ * The read is asynchronous because this runs inside the already-async post-scan pipeline, where a
+ * synchronous read would stall the event loop for the whole file. A missing file yields no
+ * statistics rather than an error — the pre-calibration behaviour — and every rejected entry is
+ * reported rather than the first: a corpus that has half rotted should say so once, not fail
+ * silently until someone audits it.
+ *
+ * @param corpusPath - Path supplied by the caller, or undefined.
+ * @param logger - Logger used to surface rejected entries.
+ * @returns Accepted rule statistics; empty when no corpus was named or none was usable.
+ */
+async function loadCalibrationStats(
+    corpusPath: string | undefined,
+    logger: Logger,
+): Promise<RuleCalibrationStats[]> {
+    const loaded = await loadCalibrationCorpus(corpusPath, async (filePath) => {
+        if (!fs.existsSync(filePath)) return undefined;
+        return fs.promises.readFile(filePath, 'utf8');
+    });
+    if (loaded.rejections.length > 0) {
+        logger.info(
+            `${PASS_ARBITRATION}: ${loaded.rejections.length} calibration corpus entry(ies) ` +
+                `rejected (${loaded.rejections.join('; ')})`,
+        );
+    }
+    return loaded.stats;
+}
+
+/**
+ * Projects the model asset onto the summary's provenance block.
+ *
+ * Omitted entirely when no evidence was supplied: an empty model would read as a deployed model
+ * with zero observations, which is a different claim from "no model was used at all".
+ *
+ * @param stats - Accepted per-rule outcome counts.
+ * @returns Partial summary fields to spread, empty when there is no evidence.
+ */
+function projectModelProvenance(
+    stats: readonly RuleCalibrationStats[],
+): { model?: NonNullable<ScanSummary['arbitration']>['model'] } {
+    if (stats.length === 0) return {};
+    const asset = buildConfidenceModelAsset(stats);
+    return {
+        model: {
+            schema: asset.schema,
+            digest: asset.digest,
+            calibratedRuleCount: asset.calibratedRuleCount,
+            observationCount: asset.observationCount,
+        },
+    };
+}
+
+/**
+ * Counts active findings whose rule carries no outcome history.
+ *
+ * @param findings - Every arbitrated finding, including suppressed and clustered ones.
+ * @returns Number of non-suppressed findings scored from the analyzer's self-report alone.
+ */
+function countUncalibrated(findings: readonly ArbitratedFinding[]): number {
+    let count = 0;
+    for (const finding of findings) {
+        if (!finding.isSuppressed && finding.confidenceSource === 'uncalibrated') count += 1;
+    }
+    return count;
+}
+
+/**
+ * Runs the finding arbitration pass and publishes its verdict on the report summary.
+ *
+ * Before this pass existed the arbiter ran once inside the evolution pass and only two of its
+ * fields (`noisyRules`) survived; `gateVerdict`, the tier counts, the blocking count and the
+ * executable patches were computed and thrown away. The consequence was that the confidence
+ * tiering could not influence anything a consumer saw. Writing the verdict to
+ * `report.summary.arbitration` is what makes it reachable from the exit code and from the AAS
+ * report, which is the whole point of adjudicating at all.
+ *
+ * The human review queue is derived from the same `findings` list and its narrowest category
+ * supplies `reviewQueueCount`. Deriving the counter rather than recomputing the predicate is what
+ * keeps the summary and the emitted file from disagreeing about how much human work exists.
+ *
+ * The pass is fail-soft: arbitration is advisory metadata, and a reporting failure must never
+ * turn a completed scan into a failed one, so a throw is logged and the pass is skipped.
+ *
+ * @param passContext - Post-scan pass context carrying the report and logger.
+ * @param reviewQueuePath - Optional NDJSON path for the human review queue.
+ * @param ruleCalibrationStats - Per-rule outcome counts; empty leaves every score self-reported.
+ * @returns Nothing; mutates `report.summary.arbitration` and writes the queue when a path is set.
+ */
+async function applyArbitrationPass(
+    passContext: PostScanPassContext,
+    reviewQueuePath: string | undefined,
+    ruleCalibrationStats: readonly RuleCalibrationStats[],
+): Promise<void> {
+    const { report, logger } = passContext;
+    try {
+        const arbiter = new FindingConfidenceArbiter(
+            ruleCalibrationStats.length > 0 ? { ruleCalibrationStats } : undefined,
+        );
+        const arbitration = arbiter.arbitrate(report.issues);
+        const advisoryOnlyRules = resolveAdvisoryOnlyRules(arbitration.findings);
+        const ruleTiers = resolveRuleTiers(arbitration.findings);
+        const queueRecords = buildReviewQueue(arbitration.findings);
+        const reviewQueueCount = countNeedsHuman(queueRecords);
+
+        report.summary.arbitration = {
+            totalEvaluated: arbitration.totalEvaluated,
+            prescriptiveCount: arbitration.prescriptiveCount,
+            actionableCount: arbitration.actionableCount,
+            advisoryCount: arbitration.advisoryCount,
+            suppressedCount: arbitration.suppressedCount,
+            prunedBySliceCount: arbitration.prunedBySliceCount,
+            blockingCount: arbitration.blockingCount,
+            gateVerdict: arbitration.gateVerdict,
+            uncalibratedCount: countUncalibrated(arbitration.findings),
+            reviewQueueCount,
+            advisoryOnlyRules,
+            ruleTiers,
+            ...projectModelProvenance(ruleCalibrationStats),
+            ...(arbitration.noisyRules && arbitration.noisyRules.length > 0
+                ? { noisyRules: arbitration.noisyRules }
+                : {}),
+            ...(arbitration.quarantinedRules && arbitration.quarantinedRules.length > 0
+                ? { quarantinedRules: arbitration.quarantinedRules }
+                : {}),
+        };
+
+        let writtenCount = 0;
+        if (reviewQueuePath) {
+            writtenCount = await writeReviewQueue(reviewQueuePath, queueRecords);
+        }
+        logger.info(
+            `${PASS_ARBITRATION}: ${arbitration.prescriptiveCount} prescriptive / ` +
+                `${arbitration.actionableCount} actionable / ${arbitration.advisoryCount} advisory, ` +
+                `${arbitration.blockingCount} blocking, ${writtenCount} queued for review`,
+        );
+    } catch (arbitrationError) {
+        logger.info(`${PASS_ARBITRATION}: degraded (${String(arbitrationError)})`);
+    }
+}
+
+/**
  * Executes behavioral hotspot evaluation across scanned files, ranking top refactoring hotspots.
  *
  * @param context - Current post-scan execution context.
@@ -870,6 +1118,14 @@ export async function finalizeReport(
     postScanPasses.push(PASS_SUPPRESSIONS);
     const suppressedCount = await applySuppressions(report, config.suppressions ?? []);
     report.summary.suppressedCount = suppressedCount;
+
+    await applyArbitrationPass(
+        passContext,
+        options.reviewQueue,
+        await loadCalibrationStats(options.confidenceCorpus, logger),
+    );
+    postScanPasses.push(PASS_ARBITRATION);
+
     report.summary.postScanPasses = postScanPasses;
     if (warnings.length > 0) report.summary.warnings = warnings;
 

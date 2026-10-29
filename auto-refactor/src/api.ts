@@ -140,6 +140,22 @@ export interface ScanOptions {
     /** Save current scan issues into a new baseline.json. */
     updateBaseline?: string;
     /**
+     * Write the human review queue to this NDJSON path.
+     *
+     * The queue holds only the findings no automated tier could settle, so it is a work list
+     * rather than a second copy of the report; see `core/reporting/review-queue.ts` for the
+     * category precedence.
+     */
+    reviewQueue?: string;
+    /**
+     * Calibration corpus supplying per-rule outcome counts.
+     *
+     * Omit it and every confidence stays the analyzer's own score, which is the pre-calibration
+     * behaviour; point it at an accumulated corpus and confidence becomes a posterior adjudicated
+     * from recorded outcomes.
+     */
+    confidenceCorpus?: string;
+    /**
      * Ratchet comparison granularity: 'id' (exact issue id) | 'grouped' (analyzer|rule|file
      * counts). Default from config ('id').
      */
@@ -721,14 +737,41 @@ async function writeRenderedReport(
     }
 }
 
+/**
+ * Resolves the severity rank a gate blocks at, or null when the gate is disabled.
+ *
+ * @param config - Effective scan config.
+ * @returns Rank threshold, or null when no failure condition is configured.
+ */
+function resolveGateThreshold(config: ScanConfig): number | null {
+    if (config.failOnSeverity) return SEVERITY_GATE_RANK[config.failOnSeverity];
+    if (config.failOnIssue) return SEVERITY_GATE_RANK.error;
+    return null;
+}
+
+/**
+ * Decides the CI exit code from the severity threshold the operator configured.
+ *
+ * The gate is deliberately severity-driven and nothing else. Tier classification answers "may I
+ * use this result" and lives in `summary.arbitration` and the AAS `usability` block, where a
+ * consumer reads it; it does not decide the exit code, because the two questions have different
+ * failure costs. Loosening a gate on an inferred tier would let an over-matching classifier hide
+ * a real defect, and the operator already has an explicit, auditable way to withdraw a rule's
+ * authority: the lifecycle state (`quarantined` / `canary` / `deprecated`), which the arbiter
+ * applies and which the severity floor respects.
+ *
+ * The severity floor is what keeps the two consistent: a finding the analyzer marked `error` on
+ * an active rule stays blocking no matter what tier the arbiter would have inferred, so "advisory
+ * never blocks" holds by construction rather than by subtracting findings here.
+ *
+ * @param report - Completed scan report.
+ * @param config - Effective scan config carrying the fail-on settings.
+ * @returns 0 when nothing blocks, 1 when a blocking finding exists.
+ */
 function evaluateGateExitCode(report: ScanReport, config: ScanConfig): number {
-    if (!config.failOnIssue && !config.failOnSeverity) return 0;
+    const threshold = resolveGateThreshold(config);
+    if (threshold === null) return 0;
     const ratchetUsed = report.summary.ratchetBaselineUsed === true;
-    const threshold = config.failOnSeverity
-        ? SEVERITY_GATE_RANK[config.failOnSeverity]
-        : config.failOnIssue
-          ? SEVERITY_GATE_RANK.error
-          : SEVERITY_GATE_RANK.disabled;
     // A suppressed finding stays in the report for auditing but never decides a gate: that is
     // the documented contract of `suppression` (report.schema.json) and what gate-self.js
     // already assumed, so the exit code must agree with it instead of counting the finding.

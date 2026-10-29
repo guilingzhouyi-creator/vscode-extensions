@@ -101,6 +101,8 @@ root:root
 config:configFile
 baseline:baseline
 update-baseline:updateBaseline
+review-queue:reviewQueue
+confidence-corpus:confidenceCorpus
 cache-dir:cacheDir
 agent-uid:agentUid
 telemetry:telemetry
@@ -520,6 +522,10 @@ Options:
                               baseline, applies to NEW issues only (generalizes --fail-on-issue)
   --baseline-granularity <g>  Baseline ratchet comparison: id (exact issue id) | grouped
                               (analyzer|rule|file counts — tolerant to line shifts)
+  --review-queue <file>       Write the human review queue as NDJSON: only the findings no
+                              automated tier could settle (runtime-dependent or uncalibrated)
+  --confidence-corpus <file>  Per-rule outcome counts that turn confidence into a calibrated
+                              posterior; omitted, every score stays the analyzer's self-report
   --fail-on-analyzer-error    Treat analyzer crashes as 'error' (can fail CI)
   --config <file>             Path to auto-refactor.config.json (declarative registry)
   --log-level <lvl>           silent|error|warn|info|debug (default: info; stderr)
