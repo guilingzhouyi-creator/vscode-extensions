@@ -2,7 +2,7 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-29T10:47:47.868Z",
+  "timestamp": "2026-10-29T10:57:43.922Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
@@ -21,9 +21,9 @@
     },
     "counts": {
       "files": 789,
-      "total": 4111,
+      "total": 4112,
       "errors": 0,
-      "warns": 3541,
+      "warns": 3542,
       "info": 570,
       "suppressed": 161
     }
@@ -31,8 +31,8 @@
   "usability": {
     "proven": 54,
     "patchable": 1738,
-    "advisory": 2319,
-    "uncalibrated": 3896,
+    "advisory": 2320,
+    "uncalibrated": 3897,
     "needsHuman": 6
   },
   "defaultVerify": "npm test",
@@ -8450,5 +8450,5 @@
       }
     ]
   },
-  "truncated": 3041
+  "truncated": 3042
 }

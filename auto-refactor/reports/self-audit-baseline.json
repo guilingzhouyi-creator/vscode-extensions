@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1793270866541",
-  "timestamp": "2026-10-29T10:47:51.347Z",
+  "snapshotId": "snapshot-v0.4.0-1793271462773",
+  "timestamp": "2026-10-29T10:57:46.749Z",
   "cai": 88.02,
   "autonomy": {
     "compositeAutonomyIndex": 88.02,
@@ -95,7 +95,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 789,
-    "durationMs": 2112
+    "durationMs": 1902
   },
   "metrics": {
     "compositeScore": 99.17,
@@ -118,25 +118,25 @@
       "averageMahalanobisDistance": 4.602,
       "averageFisherSimplexDistance": 0.097
     },
-    "totalIssues": 4111,
+    "totalIssues": 4112,
     "suppressedIssues": 161,
-    "unsuppressedIssues": 3950,
+    "unsuppressedIssues": 3951,
     "bySeverity": {
       "info": 570,
-      "warning": 3541,
+      "warning": 3542,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
       "medium": 685,
-      "low": 3426
+      "low": 3427
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 99.77,
-      "maintainability": 97.8,
+      "maintainability": 97.79,
       "performance": 99.83,
       "data": 98.47,
       "testing": 99.84,
@@ -164,7 +164,7 @@
     "performanceEfficiency": 99.83,
     "standardization": 95.86,
     "modernity": 99.84,
-    "maintainability": 97.8,
+    "maintainability": 97.79,
     "commentQuality": 100,
     "duplication": 97.41,
     "techDebtRisk": 99.99
@@ -266,7 +266,7 @@
       "critical": 0,
       "high": 0,
       "medium": 685,
-      "low": 3426
+      "low": 3427
     },
     "criticalItems": [],
     "highItems": []
@@ -920,10 +920,10 @@
       },
       {
         "domainName": "reporting",
-        "compositeScore": 99.31,
+        "compositeScore": 99.28,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.84,
+          "maintainability": 98.6,
           "performance": 99.37,
           "data": 98.37,
           "testing": 99.96,
@@ -1164,25 +1164,25 @@
     "runEloc": {
       "processed": 184610,
       "unique": 146455,
-      "changed": 504,
-      "semantic": 390,
+      "changed": 494,
+      "semantic": 382,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 390,
-      "deleted": 114,
-      "modified": 114
+      "added": 381,
+      "deleted": 113,
+      "modified": 113
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1793270866539,
+      "endMs": 1793271462771,
       "totalRuns": 454,
       "eloc": {
-        "processedTotal": 69422763,
+        "processedTotal": 69432127,
         "uniqueTotal": 146455,
-        "changedTotal": 1222264,
-        "semanticTotal": 976950
+        "changedTotal": 1222316,
+        "semanticTotal": 976994
       },
       "qed": {
         "mean": 0.000069,
