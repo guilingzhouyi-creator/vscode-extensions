@@ -94,11 +94,27 @@ pub struct TaxisPolicy {
     pub require_blank_line: bool,
     /// Minimum substantive body characters for production commits (default: 30).
     pub min_body_chars: usize,
+    /// Minimum substantive body characters for non-critical commits (default: 15).
+    #[serde(default)]
+    pub min_non_critical_body_chars: usize,
     /// Types that trigger substantive body and structured section checks.
     pub production_types: Vec<String>,
     /// Required structured sections for production commits
     /// (e.g. ["Why", "Changed", "Verification"]).
     pub required_sections: Vec<String>,
+    /// Required structured sections for non-critical commits
+    /// (e.g. ["Why", "Verification"]).
+    #[serde(default)]
+    pub non_critical_required_sections: Vec<String>,
+    /// Whether scope inside parentheses is mandatory on conventional headers.
+    #[serde(default)]
+    pub require_scope: bool,
+    /// Whether structured sections must strictly follow topological order.
+    #[serde(default)]
+    pub enforce_section_ordering: bool,
+    /// Whether structured sections must appear at most once.
+    #[serde(default)]
+    pub disallow_duplicate_sections: bool,
     /// Whether a project identifier section is mandatory.
     pub require_project_tag: bool,
     /// Whitelist of allowed project names if project tag is required (empty = allow any).
@@ -110,6 +126,9 @@ pub struct TaxisPolicy {
     /// Disallow raw execution telemetry numbers (e.g. "15 tests passed", "0.04s")
     /// in verification section.
     pub qualitative_verification_only: bool,
+    /// Whether verification section must contain a falsifiable technical assertion.
+    #[serde(default)]
+    pub require_falsifiable_verification: bool,
     /// Enforce exclusive human control on System Trunk & Integration Trunk.
     pub human_controlled_trunks: bool,
     /// Dual-Trunk mode active: official commit count only counts system/integration merges.
@@ -158,7 +177,9 @@ impl TaxisPolicy {
             max_header_chars: 80,
             disallow_header_period: true,
             require_blank_line: true,
+            require_scope: true,
             min_body_chars: 30,
+            min_non_critical_body_chars: 15,
             production_types: vec![
                 "feat".into(),
                 "fix".into(),
@@ -171,12 +192,20 @@ impl TaxisPolicy {
                 "Changed".into(),
                 "Verification".into(),
             ],
+            non_critical_required_sections: vec![
+                "Project".into(),
+                "Why".into(),
+                "Verification".into(),
+            ],
+            enforce_section_ordering: true,
+            disallow_duplicate_sections: true,
             require_project_tag: true,
             allowed_projects: vec![
                 "fractal-git".into(),
                 "auto-refactor".into(),
                 "workspace-timing".into(),
                 "WebGames".into(),
+                "governance".into(),
             ],
             forbidden_terms: vec![
                 "wip".into(),
@@ -225,6 +254,7 @@ impl TaxisPolicy {
             ],
             diff_coherence: DiffCoherenceMode::Strict,
             qualitative_verification_only: true,
+            require_falsifiable_verification: true,
             human_controlled_trunks: true,
             dual_trunk_enabled: true,
             uac_required_for_system_trunk: true,
@@ -255,7 +285,9 @@ impl TaxisPolicy {
             max_header_chars: 80,
             disallow_header_period: true,
             require_blank_line: true,
+            require_scope: true,
             min_body_chars: 30,
+            min_non_critical_body_chars: 15,
             production_types: vec![
                 "feat".into(),
                 "fix".into(),
@@ -263,6 +295,9 @@ impl TaxisPolicy {
                 "perf".into(),
             ],
             required_sections: vec!["Why".into(), "Changed".into(), "Verification".into()],
+            non_critical_required_sections: vec!["Why".into(), "Verification".into()],
+            enforce_section_ordering: true,
+            disallow_duplicate_sections: true,
             require_project_tag: false,
             allowed_projects: Vec::new(),
             forbidden_terms: vec![
@@ -288,6 +323,7 @@ impl TaxisPolicy {
             ],
             diff_coherence: DiffCoherenceMode::Strict,
             qualitative_verification_only: true,
+            require_falsifiable_verification: true,
             human_controlled_trunks: true,
             dual_trunk_enabled: true,
             uac_required_for_system_trunk: true,
@@ -321,14 +357,20 @@ impl TaxisPolicy {
             max_header_chars: 100,
             disallow_header_period: false,
             require_blank_line: true,
+            require_scope: false,
             min_body_chars: 10,
+            min_non_critical_body_chars: 0,
             production_types: vec!["feat".into(), "fix".into()],
             required_sections: Vec::new(),
+            non_critical_required_sections: Vec::new(),
+            enforce_section_ordering: false,
+            disallow_duplicate_sections: false,
             require_project_tag: false,
             allowed_projects: Vec::new(),
             forbidden_terms: vec!["wip".into(), "temp".into()],
             diff_coherence: DiffCoherenceMode::Permissive,
             qualitative_verification_only: false,
+            require_falsifiable_verification: false,
             human_controlled_trunks: true,
             dual_trunk_enabled: false,
             uac_required_for_system_trunk: true,
@@ -349,14 +391,20 @@ impl TaxisPolicy {
             max_header_chars: 1000,
             disallow_header_period: false,
             require_blank_line: false,
+            require_scope: false,
             min_body_chars: 0,
+            min_non_critical_body_chars: 0,
             production_types: Vec::new(),
             required_sections: Vec::new(),
+            non_critical_required_sections: Vec::new(),
+            enforce_section_ordering: false,
+            disallow_duplicate_sections: false,
             require_project_tag: false,
             allowed_projects: Vec::new(),
             forbidden_terms: Vec::new(),
             diff_coherence: DiffCoherenceMode::Disabled,
             qualitative_verification_only: false,
+            require_falsifiable_verification: false,
             human_controlled_trunks: false,
             dual_trunk_enabled: false,
             uac_required_for_system_trunk: false,

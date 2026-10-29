@@ -15,6 +15,17 @@ use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{DiffCoherenceMode, TaxisPolicy, ValidatedCommitWitness};
 use std::collections::HashMap;
 
+/// Parsed sections and metrics extracted from the commit body lines.
+#[derive(Debug, Clone)]
+pub struct SectionParseResult {
+    /// Case-insensitive section mapping (e.g. "Why" -> content).
+    pub sections: HashMap<String, String>,
+    /// Number of substantive non-whitespace technical characters excluding metadata.
+    pub substantive_chars: usize,
+    /// Headings encountered in physical document order: `(normalized_name, raw_heading)`.
+    pub headings: Vec<(String, String)>,
+}
+
 /// High-integrity commit message and semantic diff guard.
 pub struct CommitMessageGuard;
 
@@ -63,25 +74,29 @@ impl CommitMessageGuard {
         let (commit_type, scope, summary) = Self::parse_header(header, &mut violations, policy);
 
         // 3. Body sections & substantive character count
-        let (sections, substantive_chars) = Self::parse_sections(&lines[1..]);
+        let parsed_sections = Self::parse_sections(&lines[1..]);
         let is_production = policy
             .production_types
             .iter()
             .any(|prod_type| prod_type.eq_ignore_ascii_case(&commit_type));
 
-        // 4. Blank line, production sections, and project tag checks
+        // 4. Blank line, production/non-critical sections, ordering, deduplication, and project tag checks
         Self::validate_body_spacing_and_trailers(
             &lines,
             policy,
             is_production,
             &commit_type,
-            substantive_chars,
-            &sections,
+            &parsed_sections,
             &mut violations,
         );
 
         // 5. Anti-inflation forbidden terms and verification telemetry check
-        Self::validate_anti_inflation_telemetry(raw_message, policy, &sections, &mut violations);
+        Self::validate_anti_inflation_telemetry(
+            raw_message,
+            policy,
+            &parsed_sections.sections,
+            &mut violations,
+        );
 
         // 6. Semantic Diff Borrow Check (Diff-to-Scope coherence)
         Self::validate_diff_coherence(
@@ -103,8 +118,8 @@ impl CommitMessageGuard {
             commit_type,
             scope,
             summary,
-            substantive_chars,
-            sections,
+            parsed_sections.substantive_chars,
+            parsed_sections.sections,
             raw_message,
         ))
     }
@@ -121,147 +136,6 @@ impl CommitMessageGuard {
         if policy.disallow_header_period && (header.ends_with('.') || header.ends_with('。')) {
             violations
                 .push("GUARD-MSG-001: Header summary must not end with a trailing period".into());
-        }
-    }
-
-    fn validate_body_spacing_and_trailers(
-        lines: &[&str],
-        policy: &TaxisPolicy,
-        is_production: bool,
-        commit_type: &str,
-        substantive_chars: usize,
-        sections: &HashMap<String, String>,
-        violations: &mut Vec<String>,
-    ) {
-        if policy.require_blank_line && lines.len() > 1 && !lines[1].trim().is_empty() {
-            violations.push(
-                "GUARD-MSG-001: Line 2 must be an empty blank line separating header and body"
-                    .into(),
-            );
-        }
-
-        if is_production {
-            if substantive_chars < policy.min_body_chars {
-                violations.push(format!(
-                    "GUARD-MSG-001: Production commit '{}' has only {} substantive chars; \
-                     minimum required is {}",
-                    commit_type, substantive_chars, policy.min_body_chars
-                ));
-            }
-
-            for required_sec in &policy.required_sections {
-                let found = sections
-                    .keys()
-                    .any(|sec_key| sec_key.eq_ignore_ascii_case(required_sec));
-                if !found {
-                    violations.push(format!(
-                        concat!(
-                            "GUARD-MSG-001: Missing required structured section ",
-                            "[{}] for production commit"
-                        ),
-                        required_sec
-                    ));
-                }
-            }
-        }
-
-        if policy.require_project_tag {
-            let found_project = sections
-                .iter()
-                .find(|(sec_key, _)| sec_key.to_lowercase().contains("project"));
-            match found_project {
-                None => violations.push("CMG-PRJ-001: Missing mandatory [Project] section".into()),
-                Some((_, header_value)) => {
-                    if !policy.allowed_projects.is_empty() {
-                        let matches_allowed = policy.allowed_projects.iter().any(|allowed| {
-                            header_value
-                                .to_lowercase()
-                                .contains(&allowed.to_lowercase())
-                        });
-                        if !matches_allowed {
-                            violations.push(format!(
-                                "CMG-PRJ-001: Project '{}' not in allowed list: {:?}",
-                                header_value, policy.allowed_projects
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn validate_anti_inflation_telemetry(
-        raw_message: &str,
-        policy: &TaxisPolicy,
-        sections: &HashMap<String, String>,
-        violations: &mut Vec<String>,
-    ) {
-        let lower_msg = raw_message.to_lowercase();
-        for forbidden in &policy.forbidden_terms {
-            let lower_term = forbidden.to_lowercase();
-            if lower_msg.contains(&lower_term) {
-                violations.push(format!(
-                    "CMG-STY-001: Commit message contains forbidden term '{}'",
-                    forbidden
-                ));
-            }
-        }
-
-        if policy.qualitative_verification_only {
-            if let Some((_, ver_content)) = sections.iter().find(|(sec_key, _)| {
-                sec_key.to_lowercase().contains("verification") || sec_key.contains("验证")
-            }) {
-                if Self::contains_execution_telemetry_numbers(ver_content) {
-                    violations.push(
-                        "CMG-STY-006: [Verification] must contain qualitative logic assertions; \
-                         raw execution telemetry numbers/percentages are forbidden"
-                            .into(),
-                    );
-                }
-            }
-        }
-    }
-
-    fn validate_diff_coherence(
-        policy: &TaxisPolicy,
-        touched_paths: Option<&[String]>,
-        is_production: bool,
-        scope: Option<&str>,
-        violations: &mut Vec<String>,
-    ) {
-        if policy.diff_coherence != DiffCoherenceMode::Strict {
-            return;
-        }
-        let Some(paths) = touched_paths else {
-            return;
-        };
-
-        if is_production && paths.is_empty() {
-            violations.push(
-                concat!(
-                    "FGT-GAT-001: Semantic dangling pointer; ",
-                    "production commit touches zero files"
-                )
-                .into(),
-            );
-        }
-
-        if let Some(sc) = scope {
-            let norm_scope = sc.to_lowercase();
-            let is_broad_scope = norm_scope.contains("root")
-                || norm_scope.contains("all")
-                || norm_scope.contains("core");
-            for path in paths {
-                let norm_path = path.to_lowercase();
-                if !norm_path.contains(&norm_scope) && !is_broad_scope {
-                    violations.push(format!(
-                        "FGT-GAT-001: Out-of-scope mutation: path '{}' \
-                         does not match declared scope '{}'",
-                        path, sc
-                    ));
-                    break;
-                }
-            }
         }
     }
 
@@ -304,6 +178,22 @@ impl CommitMessageGuard {
             (type_and_scope.to_lowercase(), None)
         };
 
+        if policy.require_scope {
+            match &scope {
+                None => {
+                    violations.push(
+                        "GUARD-MSG-001: Mandatory scope is missing in header (expected '<type>(<scope>): <summary>')".into(),
+                    );
+                }
+                Some(sc) if sc.is_empty() || sc.chars().any(char::is_whitespace) => {
+                    violations.push(
+                        "GUARD-MSG-001: Mandatory scope is empty or contains whitespace".into(),
+                    );
+                }
+                _ => {}
+            }
+        }
+
         if !policy.allowed_types.is_empty()
             && !policy
                 .allowed_types
@@ -319,8 +209,9 @@ impl CommitMessageGuard {
         (commit_type, scope, summary)
     }
 
-    fn parse_sections(body_lines: &[&str]) -> (HashMap<String, String>, usize) {
+    fn parse_sections(body_lines: &[&str]) -> SectionParseResult {
         let mut sections = HashMap::new();
+        let mut headings = Vec::new();
         let mut current_section: Option<String> = None;
         let mut current_content = Vec::new();
         let mut substantive_chars = 0;
@@ -331,41 +222,485 @@ impl CommitMessageGuard {
                 continue;
             }
 
-            // Check for section header like `[Why]` or `[Project: foo]`
-            if trimmed.starts_with('[') && trimmed.contains(']') {
-                if let Some(sec_name) = current_section.take() {
-                    sections.insert(sec_name, current_content.join("\n"));
-                    current_content.clear();
-                }
+            if trimmed.starts_with('[') {
+                if let Some(close_bracket) = trimmed.find(']') {
+                    let inside = trimmed[1..close_bracket].trim();
+                    let after = trimmed[close_bracket + 1..].trim();
 
-                let close_bracket = match trimmed.find(']') {
-                    Some(idx) => idx,
-                    None => continue,
-                };
-                let inside = &trimmed[1..close_bracket];
+                    if let Some(sec_name) = current_section.take() {
+                        sections.insert(sec_name, current_content.join("\n"));
+                        current_content.clear();
+                    }
 
-                if let Some(colon) = inside.find(':') {
-                    let sec_key = inside[..colon].trim().to_string();
-                    let sec_val = inside[colon + 1..].trim().to_string();
-                    sections.insert(sec_key, sec_val);
-                    current_section = None;
-                } else {
-                    current_section = Some(inside.trim().to_string());
+                    let (sec_name, inline_content) = if let Some(colon) = inside.find(':') {
+                        let name = inside[..colon].trim();
+                        let val = inside[colon + 1..].trim();
+                        (name, val)
+                    } else {
+                        (inside, after)
+                    };
+
+                    let norm_sec = sec_name.trim().to_string();
+                    headings.push((norm_sec.clone(), trimmed.to_string()));
+
+                    let val = inline_content.trim_start_matches(':').trim();
+                    if !val.is_empty() {
+                        current_content.push(val.to_string());
+                        if !norm_sec.eq_ignore_ascii_case("project") && !norm_sec.contains("项目") {
+                            substantive_chars += val.chars().filter(|c| !c.is_whitespace()).count();
+                        }
+                    }
+
+                    current_section = Some(norm_sec);
+                    continue;
                 }
-            } else {
-                substantive_chars += trimmed
-                    .chars()
-                    .filter(|char_val| !char_val.is_whitespace())
-                    .count();
-                current_content.push(trimmed);
             }
+
+            let is_in_project = current_section.as_ref().is_some_and(|sec| {
+                sec.eq_ignore_ascii_case("project") || sec.contains("项目")
+            });
+
+            if !is_in_project {
+                substantive_chars += trimmed.chars().filter(|c| !c.is_whitespace()).count();
+            }
+            current_content.push(trimmed.to_string());
         }
 
         if let Some(sec_name) = current_section {
             sections.insert(sec_name, current_content.join("\n"));
         }
 
-        (sections, substantive_chars)
+        SectionParseResult {
+            sections,
+            substantive_chars,
+            headings,
+        }
+    }
+
+    fn get_section_rank(name: &str) -> u8 {
+        let lower = name.trim().to_lowercase();
+        if lower == "project" || lower == "项目" || lower == "项目归属" {
+            1
+        } else if lower == "why" || lower == "动机" || lower == "背景" || lower == "动机背景" {
+            2
+        } else if matches!(
+            lower.as_str(),
+            "added" | "changed" | "fixed" | "removed" | "新增" | "变更" | "修改" | "修复" | "删除"
+        ) {
+            3
+        } else if lower == "verification" || lower == "验证" || lower == "验证结论" {
+            4
+        } else {
+            99
+        }
+    }
+
+    fn check_blank_line(lines: &[&str], require_blank_line: bool, violations: &mut Vec<String>) {
+        if require_blank_line && lines.len() > 1 && !lines[1].trim().is_empty() {
+            violations.push(
+                "GUARD-MSG-001: Line 2 must be an empty blank line separating header and body"
+                    .into(),
+            );
+        }
+    }
+
+    fn check_section_duplicates(
+        headings: &[(String, String)],
+        disallow_duplicate: bool,
+        violations: &mut Vec<String>,
+    ) {
+        if !disallow_duplicate {
+            return;
+        }
+        let mut seen = std::collections::HashSet::new();
+        for (sec_name, _) in headings {
+            let lower = sec_name.to_lowercase();
+            if !seen.insert(lower) {
+                violations.push(format!(
+                    "GUARD-MSG-001: Duplicate structured section '[{}]' found in commit body",
+                    sec_name
+                ));
+            }
+        }
+    }
+
+    fn check_section_topology(
+        headings: &[(String, String)],
+        enforce_ordering: bool,
+        violations: &mut Vec<String>,
+    ) {
+        if !enforce_ordering {
+            return;
+        }
+        let mut max_rank = 0u8;
+        let mut last_sec_name = "";
+        for (sec_name, _) in headings {
+            let rank = Self::get_section_rank(sec_name);
+            if rank == 99 {
+                continue;
+            }
+            if rank < max_rank {
+                violations.push(format!(
+                    "GUARD-MSG-001: Sections violate topological order: '[{}]' must appear before '[{}]'",
+                    sec_name, last_sec_name
+                ));
+            } else {
+                max_rank = rank;
+                last_sec_name = sec_name.as_str();
+            }
+        }
+    }
+
+    fn check_fix_commit_section(
+        commit_type: &str,
+        sections: &HashMap<String, String>,
+        violations: &mut Vec<String>,
+    ) {
+        if !commit_type.eq_ignore_ascii_case("fix") {
+            return;
+        }
+        let has_fixed = sections.keys().any(|k| {
+            let lower = k.to_lowercase();
+            lower == "fixed" || lower == "修复"
+        });
+        if !has_fixed {
+            violations.push(
+                "GUARD-MSG-001: Fix commits must use '[Fixed]' section instead of '[Changed]'"
+                    .into(),
+            );
+        }
+    }
+
+    fn check_body_volume_and_required_sections(
+        commit_type: &str,
+        is_production: bool,
+        parsed: &SectionParseResult,
+        policy: &TaxisPolicy,
+        violations: &mut Vec<String>,
+    ) {
+        if is_production {
+            if parsed.substantive_chars < policy.min_body_chars {
+                violations.push(format!(
+                    "GUARD-MSG-001: Production commit '{}' has only {} substantive chars; minimum required is {}",
+                    commit_type, parsed.substantive_chars, policy.min_body_chars
+                ));
+            }
+
+            for required_sec in &policy.required_sections {
+                let found = parsed.sections.keys().any(|sec_key| {
+                    if required_sec.eq_ignore_ascii_case("changed")
+                        && commit_type.eq_ignore_ascii_case("fix")
+                    {
+                        sec_key.eq_ignore_ascii_case("fixed")
+                            || sec_key.contains("修复")
+                            || sec_key.eq_ignore_ascii_case("changed")
+                    } else {
+                        sec_key.eq_ignore_ascii_case(required_sec)
+                    }
+                });
+                if !found {
+                    violations.push(format!(
+                        "GUARD-MSG-001: Missing required structured section [{}] for production commit",
+                        required_sec
+                    ));
+                }
+            }
+        } else {
+            if policy.min_non_critical_body_chars > 0
+                && parsed.substantive_chars < policy.min_non_critical_body_chars
+            {
+                violations.push(format!(
+                    "GUARD-MSG-001: Non-critical commit '{}' has only {} substantive chars; minimum required is {}",
+                    commit_type, parsed.substantive_chars, policy.min_non_critical_body_chars
+                ));
+            }
+
+            for required_sec in &policy.non_critical_required_sections {
+                let found = parsed
+                    .sections
+                    .keys()
+                    .any(|sec_key| sec_key.eq_ignore_ascii_case(required_sec));
+                if !found {
+                    violations.push(format!(
+                        "GUARD-MSG-001: Missing required structured section [{}] for non-critical commit",
+                        required_sec
+                    ));
+                }
+            }
+        }
+    }
+
+    fn check_project_tag(
+        sections: &HashMap<String, String>,
+        policy: &TaxisPolicy,
+        violations: &mut Vec<String>,
+    ) {
+        if !policy.require_project_tag {
+            return;
+        }
+        let found_project = sections.iter().find(|(sec_key, _)| {
+            sec_key.to_lowercase().contains("project") || sec_key.contains("项目")
+        });
+        match found_project {
+            None => violations.push("CMG-PRJ-001: Missing mandatory [Project] section".into()),
+            Some((_, val)) => {
+                if !policy.allowed_projects.is_empty() {
+                    let matches_allowed = policy
+                        .allowed_projects
+                        .iter()
+                        .any(|allowed| val.to_lowercase().contains(&allowed.to_lowercase()));
+                    if !matches_allowed {
+                        violations.push(format!(
+                            "CMG-PRJ-001: Project '{}' not in allowed list: {:?}",
+                            val, policy.allowed_projects
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    fn validate_body_spacing_and_trailers(
+        lines: &[&str],
+        policy: &TaxisPolicy,
+        is_production: bool,
+        commit_type: &str,
+        parsed: &SectionParseResult,
+        violations: &mut Vec<String>,
+    ) {
+        Self::check_blank_line(lines, policy.require_blank_line, violations);
+        Self::check_section_duplicates(
+            &parsed.headings,
+            policy.disallow_duplicate_sections,
+            violations,
+        );
+        Self::check_section_topology(
+            &parsed.headings,
+            policy.enforce_section_ordering,
+            violations,
+        );
+        Self::check_fix_commit_section(commit_type, &parsed.sections, violations);
+        Self::check_body_volume_and_required_sections(
+            commit_type,
+            is_production,
+            parsed,
+            policy,
+            violations,
+        );
+        Self::check_project_tag(&parsed.sections, policy, violations);
+    }
+
+    fn strip_backticks(input: &str) -> String {
+        let mut out = String::with_capacity(input.len());
+        let mut in_backtick = false;
+        for ch in input.chars() {
+            if ch == '`' {
+                in_backtick = !in_backtick;
+            } else if !in_backtick {
+                out.push(ch);
+            }
+        }
+        out
+    }
+
+    fn is_falsifiable_assertion(assertion_text: &str) -> bool {
+        let plain_owned = Self::strip_backticks(assertion_text);
+        let plain = plain_owned.trim();
+        if plain.is_empty() {
+            return false;
+        }
+
+        let lower = plain.to_lowercase();
+        let trimmed_punct = lower.trim_end_matches(&['.', '!', '。', '！', ';', '；'][..]);
+        if matches!(
+            trimmed_punct,
+            "ok" | "done"
+                | "pass"
+                | "passed"
+                | "yes"
+                | "已完成"
+                | "已经完成"
+                | "已修复"
+                | "已经修复"
+                | "已改好"
+                | "没问题"
+                | "无问题"
+                | "通过"
+        ) {
+            return false;
+        }
+
+        const HEDGE_PHRASES: &[&str] = &[
+            "应该",
+            "大概",
+            "基本上没问题",
+            "基本没问题",
+            "不出意外",
+            "按理",
+            "后续再看",
+            "待处理",
+        ];
+        if HEDGE_PHRASES.iter().any(|phrase| lower.contains(phrase)) {
+            return false;
+        }
+
+        const CLI_PREFIXES: &[&str] = &[
+            "npm ", "npx ", "node ", "pwsh ", "bash ", "git ", "cargo ", "tsc ", "vitest ",
+            "python ",
+        ];
+        let is_cli = CLI_PREFIXES.iter().any(|prefix| lower.starts_with(prefix));
+        if is_cli {
+            let has_assertion = lower.contains("pass")
+                || lower.contains("fail")
+                || lower.contains("成功")
+                || lower.contains("通过")
+                || lower.contains("绿色")
+                || lower.contains(';')
+                || lower.contains('；')
+                || lower.contains("->")
+                || lower.contains("=>");
+            if !has_assertion {
+                return false;
+            }
+        }
+
+        let substantive_count = plain
+            .chars()
+            .filter(|&c| {
+                !c.is_whitespace()
+                    && !matches!(
+                        c,
+                        '。' | '，'
+                            | ','
+                            | '、'
+                            | '；'
+                            | ';'
+                            | '：'
+                            | ':'
+                            | '!'
+                            | '！'
+                            | '-'
+                            | '*'
+                            | '`'
+                            | '('
+                            | ')'
+                            | '（'
+                            | '）'
+                    )
+            })
+            .count();
+
+        substantive_count >= 8
+    }
+
+    fn extract_verification_assertions(ver_content: &str) -> Vec<String> {
+        let mut assertion_entries = Vec::new();
+        let mut prose_lines = Vec::new();
+
+        for line in ver_content.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if trimmed.starts_with('-') || trimmed.starts_with('*') {
+                let bullet_line = trimmed.trim_start_matches(&['-', '*', ' '][..]).trim();
+                if !bullet_line.is_empty() {
+                    assertion_entries.push(bullet_line.to_string());
+                }
+            } else {
+                prose_lines.push(trimmed);
+            }
+        }
+
+        if assertion_entries.is_empty() && !prose_lines.is_empty() {
+            assertion_entries.push(prose_lines.join(" "));
+        }
+        assertion_entries
+    }
+
+    fn validate_anti_inflation_telemetry(
+        raw_message: &str,
+        policy: &TaxisPolicy,
+        sections: &HashMap<String, String>,
+        violations: &mut Vec<String>,
+    ) {
+        let lower_msg = raw_message.to_lowercase();
+        for forbidden in &policy.forbidden_terms {
+            let lower_term = forbidden.to_lowercase();
+            if lower_msg.contains(&lower_term) {
+                violations.push(format!(
+                    "CMG-STY-001: Commit message contains forbidden term '{}'",
+                    forbidden
+                ));
+            }
+        }
+
+        let ver_entry = sections.iter().find(|(sec_key, _)| {
+            let lower = sec_key.to_lowercase();
+            lower.contains("verification") || sec_key.contains("验证")
+        });
+
+        if let Some((_, ver_content)) = ver_entry {
+            if policy.qualitative_verification_only
+                && Self::contains_execution_telemetry_numbers(ver_content)
+            {
+                violations.push(
+                    "CMG-STY-006: [Verification] must contain qualitative logic assertions; raw execution telemetry numbers/percentages are forbidden".into(),
+                );
+            }
+
+            if policy.require_falsifiable_verification {
+                let assertions = Self::extract_verification_assertions(ver_content);
+                let has_falsifiable = assertions.iter().any(|entry| Self::is_falsifiable_assertion(entry));
+                if !has_falsifiable {
+                    violations.push(
+                        "CMG-STY-006: [Verification] must contain at least one substantive falsifiable technical assertion (not a raw shell command or placeholder)".into(),
+                    );
+                }
+            }
+        }
+    }
+
+    fn validate_diff_coherence(
+        policy: &TaxisPolicy,
+        touched_paths: Option<&[String]>,
+        is_production: bool,
+        scope: Option<&str>,
+        violations: &mut Vec<String>,
+    ) {
+        if policy.diff_coherence != DiffCoherenceMode::Strict {
+            return;
+        }
+        let Some(paths) = touched_paths else {
+            return;
+        };
+
+        if is_production && paths.is_empty() {
+            violations.push(
+                concat!(
+                    "FGT-GAT-001: Semantic dangling pointer; ",
+                    "production commit touches zero files"
+                )
+                .into(),
+            );
+        }
+
+        if let Some(sc) = scope {
+            let norm_scope = sc.to_lowercase();
+            let is_broad_scope = norm_scope.contains("root")
+                || norm_scope.contains("all")
+                || norm_scope.contains("core");
+            for path in paths {
+                let norm_path = path.to_lowercase();
+                if !norm_path.contains(&norm_scope) && !is_broad_scope {
+                    violations.push(format!(
+                        "FGT-GAT-001: Out-of-scope mutation: path '{}' does not match declared scope '{}'",
+                        path, sc
+                    ));
+                    break;
+                }
+            }
+        }
     }
 
     fn contains_execution_telemetry_numbers(text: &str) -> bool {

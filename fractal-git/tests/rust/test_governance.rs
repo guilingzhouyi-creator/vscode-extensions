@@ -319,3 +319,159 @@ fn test_anti_inflation_commit_telemetry() {
     assert_eq!(verdict_native.filtered_agent_commits, 0);
     assert!(!verdict_native.dual_trunk_active);
 }
+
+#[test]
+fn test_strict_commit_contract_hardening() {
+    let policy = TaxisPolicy::workspace_strict();
+
+    // 1. Missing scope rejection (require_scope: true)
+    let no_scope = r#"feat: add new cas feature
+
+[Project] fractal-git
+
+[Why]
+Need cas storage expansion.
+
+[Changed]
+- Added chunker
+
+[Verification]
+Assert all chunk boundaries match fastcdc specifications."#;
+    let res = CommitMessageGuard::parse_and_verify(no_scope, &policy, None);
+    assert!(res.is_err());
+    let err = format!("{:?}", res.err().unwrap());
+    assert!(err.contains("Mandatory scope is missing"));
+
+    // 2. Duplicate section rejection (disallow_duplicate_sections: true)
+    let dup_section = r#"feat(cas): add new cas feature
+
+[Project] fractal-git
+
+[Why]
+First why motivation context.
+
+[Why]
+Duplicate why section is forbidden.
+
+[Changed]
+- Added chunker
+
+[Verification]
+Assert all chunk boundaries match fastcdc specifications."#;
+    let res_dup = CommitMessageGuard::parse_and_verify(dup_section, &policy, None);
+    assert!(res_dup.is_err());
+    let err_dup = format!("{:?}", res_dup.err().unwrap());
+    assert!(err_dup.contains("Duplicate structured section"));
+
+    // 3. Section topological order violation (enforce_section_ordering: true)
+    // Here [Verification] appears before [Why]
+    let inverted_sections = r#"feat(cas): add new cas feature
+
+[Project] fractal-git
+
+[Verification]
+Assert all chunk boundaries match fastcdc specifications.
+
+[Why]
+Need cas storage expansion.
+
+[Changed]
+- Added chunker"#;
+    let res_inv = CommitMessageGuard::parse_and_verify(inverted_sections, &policy, None);
+    assert!(res_inv.is_err());
+    let err_inv = format!("{:?}", res_inv.err().unwrap());
+    assert!(err_inv.contains("Sections violate topological order"));
+
+    // 4. Non-falsifiable verification rejection (bare shell command or trivial hedge word)
+    let bare_cmd = r#"feat(cas): add new cas feature
+
+[Project] fractal-git
+
+[Why]
+Need cas storage expansion.
+
+[Changed]
+- Added chunker
+
+[Verification]
+`cargo test --test test_governance`"#;
+    let res_bare = CommitMessageGuard::parse_and_verify(bare_cmd, &policy, None);
+    assert!(res_bare.is_err());
+    let err_bare = format!("{:?}", res_bare.err().unwrap());
+    assert!(err_bare.contains("CMG-STY-006"));
+
+    // 5. Fix commit must use [Fixed] section instead of only [Changed]
+    let fix_missing_fixed = r#"fix(gate): repair validation regression
+
+[Project] fractal-git
+
+[Why]
+Gate check threw false positive on clean branch.
+
+[Changed]
+- Updated rule check
+
+[Verification]
+Assert clean branch passes gate evaluation without rejection."#;
+    let res_fix = CommitMessageGuard::parse_and_verify(fix_missing_fixed, &policy, None);
+    assert!(res_fix.is_err());
+    let err_fix = format!("{:?}", res_fix.err().unwrap());
+    assert!(err_fix.contains("Fix commits must use '[Fixed]'"));
+
+    // 6. Non-critical commit (e.g. docs) with insufficient substantive characters
+    let docs_too_short = r#"docs(readme): typo
+
+[Project] fractal-git
+
+[Why]
+Fix.
+
+[Verification]
+Short."#;
+    let res_short = CommitMessageGuard::parse_and_verify(docs_too_short, &policy, None);
+    assert!(res_short.is_err());
+    let err_short = format!("{:?}", res_short.err().unwrap());
+    assert!(err_short.contains("Non-critical commit 'docs' has only"));
+
+    // 7. Fully compliant production commit passes cleanly
+    let compliant_production = r#"feat(cas): introduce 64-byte aligned chunking buffer
+
+[Project] fractal-git
+
+[Why]
+Eliminate transient heap allocation during streaming object encoding.
+
+[Changed]
+- Added aligned page chunker implementation
+- Wired zero-copy buffer recycling
+
+[Verification]
+Assert all allocated memory slots return to free pool without byte leakage."#;
+    let res_ok = CommitMessageGuard::parse_and_verify(
+        compliant_production,
+        &policy,
+        Some(&["crates/fg-storage/src/cas.rs".to_string()]),
+    );
+    assert!(
+        res_ok.is_ok(),
+        "Expected compliant commit to pass: {:?}",
+        res_ok.err()
+    );
+
+    // 8. Fully compliant non-critical commit (e.g. docs) passes cleanly
+    let compliant_non_critical = r#"docs(gate): update architecture governance reference manual
+
+[Project] fractal-git
+
+[Why]
+Document new scope, topological order, and falsifiability contract invariants.
+
+[Verification]
+Assert markdown links and code block citations resolve without broken references."#;
+    let res_docs_ok = CommitMessageGuard::parse_and_verify(compliant_non_critical, &policy, None);
+    assert!(
+        res_docs_ok.is_ok(),
+        "Expected compliant docs commit to pass: {:?}",
+        res_docs_ok.err()
+    );
+}
