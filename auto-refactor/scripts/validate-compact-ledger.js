@@ -20,6 +20,8 @@ const {
   appendTrajectoryRecord,
   readRecentRecords,
   readLifetimeSummary,
+  pruneActiveRuns,
+  readArchivedRecords,
 } = require('../dist/core/trajectory/compact-ledger-store');
 const { getIsoWeekId, compactLedger } = require('../dist/core/trajectory/trajectory-compactor');
 
@@ -136,6 +138,20 @@ async function runTests() {
     assert.ok(lifetime !== null, 'Lifetime summary file must exist');
     assert.strictEqual(lifetime.totalRuns, 2);
     console.log('    ✔ Trajectory compaction and lifetime summary verified');
+
+    // --- Test 5: Lossless Cold Archival on Rolling Window Pruning ---
+    console.log('  ▶ [Test 5] Testing lossless cold archival on rolling retention prune...');
+    const activeFile = path.join(tempLedgerDir, 'active-runs.ndjson');
+    await pruneActiveRuns(activeFile, 1);
+
+    const remainingActive = await readRecentRecords(tempLedgerDir, 10);
+    assert.strictEqual(remainingActive.length, 1, 'Active ledger should retain 1 record');
+    assert.strictEqual(remainingActive[0].id, 'run-test-002');
+
+    const archived = await readArchivedRecords(tempLedgerDir);
+    assert.strictEqual(archived.length, 1, 'Cold archive should preserve 1 pruned record');
+    assert.strictEqual(archived[0].id, 'run-test-001');
+    console.log('    ✔ Lossless cold archival on active-runs truncation verified');
 
     console.log('\n🎉 ALL Phase 3 Compact Ledger & Compaction Tests PASSED!\n');
   } finally {

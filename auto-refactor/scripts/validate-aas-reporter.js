@@ -395,21 +395,53 @@ async function runTests() {
     compressDiagnosticSentence('Effective code volume budget exceeded.'),
     'ELOC budget exceeded',
   );
-  console.log('✔  Test 9: High-efficiency Token sentence compression engine verified');
+  assert.strictEqual(
+    compressDiagnosticSentence("Synchronous 'fs.readFileSync' blocks event loop."),
+    "sync 'fs.readFileSync' blocks event loop",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence("Sync I/O in async method"),
+    "sync IO in async fn",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence("Zero transient heap allocation in hot loop bodies violated"),
+    "loop transient heap allocation",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence("Control flow nesting depth (5) exceeds limit (4)"),
+    "nesting depth 5 > 4",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence("Procedure line count (120) exceeds limit (80)"),
+    "procedure lines 120 > 80",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence("Magic number 42 detected without semantic constant."),
+    "magic number 42",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence("Literal string 'prod' should be constant."),
+    "literal string 'prod' not constant",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence("Facade method merely delegates to inner without value-add"),
+    "trampoline pass-through",
+  );
+  console.log('✔  Test 9: High-efficiency Token sentence compression engine verified (12 rules)');
 
   // Test 10: Scale report >= 70% token savings ratchet
   const scaleIssues = [];
-  for (let f = 0; f < 10; f++) {
-    const fPath = `src/module_${f}/service.ts`;
+  for (let fileIndex = 0; fileIndex < 10; fileIndex++) {
+    const targetFilePath = `src/module_${fileIndex}/service.ts`;
     for (let i = 0; i < 6; i++) {
       scaleIssues.push({
-        id: `naming:NAM-ABR-001:${fPath}:${i * 10 + 1}`,
+        id: `naming:NAM-ABR-001:${targetFilePath}:${i * 10 + 1}`,
         analyzer: 'naming',
         rule: 'NAM-ABR-001',
         severity: 'warning',
         message: `Identifier 'tempItem_${i}' contains unapproved truncated abbreviation 'tempItem_${i}'.`,
         location: {
-          file: fPath,
+          file: targetFilePath,
           start: { line: i * 10 + 1, column: 5 },
           end: { line: i * 10 + 1, column: 15 },
         },
@@ -444,10 +476,221 @@ async function runTests() {
   );
   console.log('✔  Test 10: Scale report >= 70% Token savings ratchet verified');
 
-  console.log('\n--- All Agent Audit Schema (AAS v1.0) Tests Passed! ---');
+  // Test 11: Ten-Dimensional rich breakdown (AAS v1.1) and complete Markdown coverage
+  const test11Report = createMockScanReport();
+  const doc11 = buildAasReport(test11Report, { includeDimensionDetails: true });
+  assert.ok(doc11.dimensionDetails, 'AAS v1.1 report must include dimensionDetails');
+  assert.strictEqual(typeof doc11.dimensionDetails.codeSecurity.score, 'number');
+  assert.strictEqual(typeof doc11.dimensionDetails.codeSecurity.grade, 'string');
+  assert.strictEqual(typeof doc11.dimensionDetails.codeSecurity.weight, 'number');
+  assert.ok(doc11.health.dimensionSummary, 'AAS health block must include dimensionSummary');
+  assert.strictEqual(typeof doc11.health.dimensionSummary.healthyCount, 'number');
+
+  const mdReporter = getReporter('markdown');
+  assert.ok(mdReporter, 'Markdown reporter plugin must be registered');
+  const mdOutput = mdReporter.format(test11Report);
+  assert.ok(mdOutput.includes('代码安全'), 'Missing 代码安全');
+  assert.ok(mdOutput.includes('架构一致'), 'Missing 架构一致');
+  assert.ok(mdOutput.includes('可维护性'), 'Missing 可维护性');
+  assert.ok(mdOutput.includes('性能预算'), 'Missing 性能预算');
+  assert.ok(mdOutput.includes('技术债风险'), 'Missing 技术债风险');
+  assert.ok(mdOutput.includes('语义纯度'), 'Missing 语义纯度');
+  assert.ok(mdOutput.includes('重复率'), 'Missing 重复率');
+  assert.ok(mdOutput.includes('标准化'), 'Missing 标准化');
+  assert.ok(mdOutput.includes('现代化'), 'Missing 现代化');
+  assert.ok(mdOutput.includes('注释质量'), 'Missing 注释质量');
+  console.log('✔  Test 11: Ten-Dimensional rich metrics (AAS v1.1) & complete Markdown table verified');
+
+  // Test 12: Truthful metrics mapping (SQALE, Polyglot, Gaming defense, and CAI isolation)
+  const enrichedReport = createMockScanReport({
+    autonomy: { compositeAutonomyIndex: 88.4 },
+    qualityScore: {
+      ...test11Report.qualityScore,
+      technicalDebt: {
+        totalRemediationMinutes: 120,
+        technicalDebtRatio: 4.5,
+        sqaleGrade: 'A',
+      },
+      polyglotGeneralization: {
+        index: 91.2,
+        meanScore: 89.5,
+        dispersionPenalty: 0.95,
+        standardDeviation: 5.2,
+        languageCount: 3,
+      },
+      densityTensorSummary: {
+        compositeDensity: 0.85,
+        averageTspr: 0.72,
+        averagePor: 0.28,
+        averageColumnDensity: 0.65,
+        averageMahalanobisDistance: 1.42,
+        averageFisherSimplexDistance: 0.31,
+      },
+    },
+    summary: {
+      ...test11Report.summary,
+      arbitration: {
+        totalEvaluated: 1,
+        prescriptiveCount: 1,
+        actionableCount: 0,
+        advisoryCount: 0,
+        suppressedCount: 0,
+        prunedBySliceCount: 0,
+        blockingCount: 0,
+        gateVerdict: 'pass',
+        uncalibratedCount: 0,
+        reviewQueueCount: 0,
+        advisoryOnlyRules: [],
+        ruleTiers: {},
+        isGamingBlocked: false,
+        semanticChangeRatio: 0.25,
+        netDebtDelta: 5,
+      },
+    },
+  });
+
+  const enrichedDoc = buildAasReport(enrichedReport);
+  assert.strictEqual(enrichedDoc.health.cai, 88.4, 'Health CAI must strictly reflect autonomy index');
+  assert.deepStrictEqual(
+    enrichedDoc.health.sqale,
+    { tdr: 4.5, remediationMinutes: 120, grade: 'A' },
+    'SQALE technical debt must be populated accurately',
+  );
+  assert.deepStrictEqual(
+    enrichedDoc.health.polyglot,
+    { index: 91.2, meanScore: 89.5, dispersionPenalty: 0.95, standardDeviation: 5.2, languageCount: 3 },
+    'Polyglot metrics must be preserved in independent health block',
+  );
+  assert.deepStrictEqual(
+    enrichedDoc.health.gamingDefense,
+    { isBlocked: false, semanticRatio: 0.25, netDebtDelta: 5 },
+    'Anti-gaming defense circuit status must be tracked',
+  );
+  assert.strictEqual(
+    enrichedDoc.health.tensorSummary.averageFisherSimplexDistance,
+    0.31,
+    '5D tensor must retain Fisher simplex distance',
+  );
+
+  // Assert CAI never steals from polyglot when autonomy is undefined
+  const nonAutonomyReport = createMockScanReport({
+    autonomy: undefined,
+    qualityScore: {
+      ...test11Report.qualityScore,
+      polyglotGeneralization: { index: 95.0, meanScore: 95.0, dispersionPenalty: 1.0, standardDeviation: 0, languageCount: 1 },
+    },
+  });
+  const nonAutonomyDoc = buildAasReport(nonAutonomyReport);
+  assert.strictEqual(
+    nonAutonomyDoc.health.cai,
+    undefined,
+    'CAI must remain undefined when autonomy analysis did not run (no falsified metric borrowing)',
+  );
+  console.log('✔  Test 12: Truthful metrics mapping & CAI isolation verified');
+
+  // Test 13: Same-line anchor deduplication
+  const duplicateAnchorReport = createMockScanReport({
+    issues: [
+      {
+        id: 'dup:1',
+        analyzer: 'constants',
+        rule: 'hardcoded-string',
+        severity: 'error',
+        message: 'Literal string detected.',
+        location: { file: 'src/app.ts', start: { line: 3, column: 10 }, end: { line: 3, column: 16 } },
+      },
+      {
+        id: 'dup:2',
+        analyzer: 'constants',
+        rule: 'magic-number',
+        severity: 'error',
+        message: 'Magic number detected.',
+        location: { file: 'src/app.ts', start: { line: 3, column: 12 }, end: { line: 3, column: 14 } },
+      },
+      {
+        id: 'dup:3',
+        analyzer: 'complexity',
+        rule: 'high-complexity',
+        severity: 'error',
+        message: 'High complexity on line 5.',
+        location: { file: 'src/app.ts', start: { line: 5, column: 1 }, end: { line: 5, column: 10 } },
+      },
+    ],
+  });
+
+  const dedupDoc = buildAasReport(duplicateAnchorReport, {
+    baseDir: '/workspace',
+    fileReader: (rel) => fileMock[rel],
+    deduplicateAnchors: true,
+  });
+  const dedupDefects = dedupDoc.files['src/app.ts'];
+  assert.strictEqual(dedupDefects.length, 3);
+  assert.ok(dedupDefects[0].anchor, 'First line-3 defect must have anchor');
+  assert.strictEqual(
+    dedupDefects[1].anchor,
+    undefined,
+    'Second line-3 defect must omit redundant duplicate anchor slice',
+  );
+  assert.ok(dedupDefects[2].anchor, 'Line-5 defect must have anchor');
+
+  const nonDedupDoc = buildAasReport(duplicateAnchorReport, {
+    baseDir: '/workspace',
+    fileReader: (rel) => fileMock[rel],
+    deduplicateAnchors: false,
+  });
+  const nonDedupDefects = nonDedupDoc.files['src/app.ts'];
+  assert.ok(nonDedupDefects[0].anchor, 'Both must have anchor when deduplication is disabled');
+  assert.ok(nonDedupDefects[1].anchor, 'Both must have anchor when deduplication is disabled');
+
+  const dedupJson = toAasJson(duplicateAnchorReport, {
+    baseDir: '/workspace',
+    fileReader: (relativeFilePath) => fileMock[relativeFilePath],
+    deduplicateAnchors: true,
+    pretty: false,
+  });
+  const nonDedupJson = toAasJson(duplicateAnchorReport, {
+    baseDir: '/workspace',
+    fileReader: (relativeFilePath) => fileMock[relativeFilePath],
+    deduplicateAnchors: false,
+    pretty: false,
+  });
+  assert.ok(
+    Buffer.byteLength(dedupJson) < Buffer.byteLength(nonDedupJson),
+    'Deduplicated JSON must be strictly smaller in bytes',
+  );
+  console.log('✔  Test 13: Same-line anchor deduplication and token saving verified');
+
+  // Test 14: Variable naming cleanliness static assertion
+  const fs = require('fs');
+  const path = require('path');
+  const coreReportingFiles = [
+    path.join(__dirname, '..', 'src', 'core', 'reporting', 'aas-reporter.ts'),
+    path.join(__dirname, '..', 'src', 'core', 'reporters', 'agent-review-reporter.ts'),
+  ];
+  const forbiddenSingleLetterRe = /\b(?:const|let|var)\s+([a-zA-Z])\s*[:=]/;
+  const forbiddenShortAbbrRe = /\b(?:const|let|var)\s+(?:act|rec|def|sev|col|td|doc|ctx)\b/;
+
+  coreReportingFiles.forEach((filePath) => {
+    const sourceCode = fs.readFileSync(filePath, 'utf8');
+    const singleMatch = sourceCode.match(forbiddenSingleLetterRe);
+    assert.strictEqual(
+      singleMatch,
+      null,
+      `Forbidden single-letter variable '${singleMatch ? singleMatch[1] : ''}' in ${path.basename(filePath)}`,
+    );
+    const abbrMatch = sourceCode.match(forbiddenShortAbbrRe);
+    assert.strictEqual(
+      abbrMatch,
+      null,
+      `Forbidden truncated abbreviation in ${path.basename(filePath)}: ${abbrMatch ? abbrMatch[0] : ''}`,
+    );
+  });
+  console.log('✔  Test 14: Variable naming cleanliness and single-letter elimination verified');
+
+  console.log('\n--- All Agent Audit Schema (AAS v1.0 / v1.1) Tests Passed! ---');
 }
 
-runTests().catch((err) => {
-  console.error('FAIL: validate-aas-reporter.js encountered an error:', err);
+runTests().catch((executionError) => {
+  console.error('FAIL: validate-aas-reporter.js encountered an error:', executionError);
   process.exit(1);
 });

@@ -37,7 +37,7 @@ describe('ScopeGraph', () => {
         it('module scope exists with correct kind and null parent', () => {
             const graph = buildTS('const x = 1;\n');
             const root = graph.getRoot()!;
-            expect(root).toBeTruthy();
+            expect(root).toBeDefined();
             expect(root.kind).toBe('module');
             expect(root.parent).toBeNull();
             expect(graph.scopeCount).toBeGreaterThanOrEqual(1);
@@ -118,7 +118,7 @@ describe('ScopeGraph', () => {
             const fnScope = root.children[0];
 
             const innerResult = graph.lookup('inner', fnScope);
-            expect(innerResult.binding).toBeTruthy();
+            expect(innerResult.binding).toBeDefined();
             expect(innerResult.binding!.name).toBe('inner');
             expect(innerResult.binding!.kind).toBe('variable');
             expect(innerResult.binding!.scope).toBe(fnScope);
@@ -139,7 +139,7 @@ describe('ScopeGraph', () => {
             const fnScope = root.children[0];
 
             const topResult = graph.lookup('top', fnScope);
-            expect(topResult.binding).toBeTruthy();
+            expect(topResult.binding).toBeDefined();
             expect(topResult.binding!.name).toBe('top');
             expect(topResult.binding!.scope).toBe(root);
             expect(topResult.all.length).toBe(1);
@@ -269,7 +269,7 @@ describe('ScopeGraph', () => {
             const graph = buildPy(source);
             const root = graph.getRoot()!;
 
-            expect(root).toBeTruthy();
+            expect(root).toBeDefined();
             expect(root.kind).toBe('module');
             expect(graph.scopeCount).toBeGreaterThanOrEqual(3);
 
@@ -278,7 +278,7 @@ describe('ScopeGraph', () => {
 
             // Lookup "outer" (function) from module scope
             const outerResult = graph.lookup('outer', root);
-            expect(outerResult.binding).toBeTruthy();
+            expect(outerResult.binding).toBeDefined();
         });
 
         it('shadow detection works with Python adapter', () => {
@@ -286,8 +286,8 @@ describe('ScopeGraph', () => {
             const graph = buildPy(source);
             const root = graph.getRoot()!;
 
-            const fnScope = root.children.find((s) => s.kind === 'function');
-            expect(fnScope).toBeTruthy();
+            const fnScope = root.children.find((childScope) => childScope.kind === 'function');
+            expect(fnScope).toBeDefined();
 
             expect(graph.isShadowed('x', fnScope!)).toBe(true);
 

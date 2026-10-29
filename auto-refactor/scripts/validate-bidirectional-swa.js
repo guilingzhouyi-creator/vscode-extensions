@@ -160,11 +160,11 @@ async function main() {
     'Should index 2 declarations (calculateTax and AccountManager)',
   );
 
-  const fnAnchor = anchors[0];
-  assert.strictEqual(fnAnchor.name, 'calculateTax');
-  assert.strictEqual(fnAnchor.startLine, 3);
-  assert.strictEqual(fnAnchor.endLine, 6);
-  assert(fnAnchor.signatureHash.length > 0, 'Must compute signature hash');
+  const functionAnchor = anchors[0];
+  assert.strictEqual(functionAnchor.name, 'calculateTax');
+  assert.strictEqual(functionAnchor.startLine, 3);
+  assert.strictEqual(functionAnchor.endLine, 6);
+  assert(functionAnchor.signatureHash.length > 0, 'Must compute signature hash');
 
   const classAnchor = anchors[1];
   assert.strictEqual(classAnchor.name, 'AccountManager');
@@ -231,16 +231,16 @@ async function main() {
     '}',
   ].join('\n');
 
-  const sigWindow = swaManager.computeReplayWindow(
+  const signatureWindow = swaManager.computeReplayWindow(
     'src/account.ts',
     sampleSource,
     modifiedSignatureSource,
     [3, 3],
   );
-  assert.strictEqual(sigWindow.isBounded, false, 'Signature mutation must not be bounded');
-  assert.strictEqual(sigWindow.requiresFullReplay, true, 'Must require full replay');
-  assert.strictEqual(sigWindow.reason, REASON_SIGNATURE_MUTATION);
-  assert.strictEqual(swaManager.canUseSwaReplay(sigWindow), false);
+  assert.strictEqual(signatureWindow.isBounded, false, 'Signature mutation must not be bounded');
+  assert.strictEqual(signatureWindow.requiresFullReplay, true, 'Must require full replay');
+  assert.strictEqual(signatureWindow.reason, REASON_SIGNATURE_MUTATION);
+  assert.strictEqual(swaManager.canUseSwaReplay(signatureWindow), false);
 
   // Case 4.3: Top-level import modified (line 1)
   const modifiedImportSource = [
@@ -323,15 +323,15 @@ async function main() {
   assert.strictEqual(pruned.length, 1, 'Only issue at line 4 should be retained in [3, 6] window');
   assert.strictEqual(pruned[0].id, 'rule2:4');
 
-  // Pruning against sigWindow (full replay required) should retain all issues
-  const unpruned = swaManager.pruneIssuesOutsideWindow(testIssues, sigWindow);
+  // Pruning against signatureWindow (full replay required) should retain all issues
+  const unpruned = swaManager.pruneIssuesOutsideWindow(testIssues, signatureWindow);
   assert.strictEqual(unpruned.length, 3, 'Full replay window must retain all issues');
 
   console.log('SWA issue pruning verified.');
   console.log('=== ALL PHASE 2 VALIDATION TESTS PASSED (5/5) ===');
 }
 
-main().catch((err) => {
-  console.error('Phase 2 validation failed:', err);
+main().catch((validationError) => {
+  console.error('Phase 2 validation failed:', validationError);
   process.exit(1);
 });

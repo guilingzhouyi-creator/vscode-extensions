@@ -41,7 +41,7 @@ async function main() {
   // 2. Low confidence step: broken syntax with unbalanced brace
   const unclosedBraceStep = {
     filePath: 'src/handler.ts',
-    replacementText: 'function calculateTotal() {\n    const a = 10;',
+    replacementText: 'function calculateTotal() {\n    const total = 10;',
     line: 25,
   };
   const unclosedResult = scheduler.scoreStep(unclosedBraceStep, 1);
@@ -55,7 +55,7 @@ async function main() {
   // 3. Low confidence step: unclosed string literal
   const unclosedQuoteStep = {
     filePath: 'src/handler.ts',
-    replacementText: 'const msg = "unterminated string;',
+    replacementText: 'const errorText = "unterminated string;',
     line: 30,
   };
   const quoteResult = scheduler.scoreStep(unclosedQuoteStep, 2);
@@ -248,7 +248,7 @@ async function main() {
   console.log('=== ALL PHASE 3 VALIDATION TESTS PASSED (5/5) ===');
 }
 
-main().catch((err) => {
-  console.error('Phase 3 validation failed:', err);
+main().catch((validationError) => {
+  console.error('Phase 3 validation failed:', validationError);
   process.exit(1);
 });

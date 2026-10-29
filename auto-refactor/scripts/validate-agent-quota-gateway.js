@@ -30,23 +30,23 @@ async function testTierRegistrationAndBasicLease() {
   gateway.registerAgent('agent-batch-1', 'batch');
 
   // Interactive agent acquires lease
-  const res1 = gateway.acquireLease('agent-interactive-1', TaskPriority.NORMAL);
-  assert.strictEqual(res1.granted, true);
-  assert.ok(res1.lease);
-  assert.strictEqual(res1.lease.agentId, 'agent-interactive-1');
-  assert.strictEqual(res1.lease.tier, 'interactive');
+  const firstLeaseResult = gateway.acquireLease('agent-interactive-1', TaskPriority.NORMAL);
+  assert.strictEqual(firstLeaseResult.granted, true);
+  assert.ok(firstLeaseResult.lease);
+  assert.strictEqual(firstLeaseResult.lease.agentId, 'agent-interactive-1');
+  assert.strictEqual(firstLeaseResult.lease.tier, 'interactive');
 
   // Check metrics
-  const m1 = gateway.getMetrics('agent-interactive-1');
-  assert.strictEqual(m1.activeLeases, 1);
-  assert.strictEqual(m1.totalGranted, 1);
+  const metricsBeforeRelease = gateway.getMetrics('agent-interactive-1');
+  assert.strictEqual(metricsBeforeRelease.activeLeases, 1);
+  assert.strictEqual(metricsBeforeRelease.totalGranted, 1);
 
   // Release lease
-  const released = gateway.releaseLease(res1.lease.leaseId);
+  const released = gateway.releaseLease(firstLeaseResult.lease.leaseId);
   assert.strictEqual(released, true);
 
-  const m1After = gateway.getMetrics('agent-interactive-1');
-  assert.strictEqual(m1After.activeLeases, 0);
+  const metricsAfterRelease = gateway.getMetrics('agent-interactive-1');
+  assert.strictEqual(metricsAfterRelease.activeLeases, 0);
 
   console.log('  ✔ Agent tier registration, lease acquisition, and release confirmed');
 }
@@ -62,23 +62,23 @@ async function testConcurrencyLimitsAndCriticalBurst() {
   });
 
   // Acquire 2 normal leases (reaches limit)
-  const l1 = gateway.acquireLease('agent-bg', TaskPriority.NORMAL);
-  const l2 = gateway.acquireLease('agent-bg', TaskPriority.NORMAL);
-  assert.strictEqual(l1.granted, true);
-  assert.strictEqual(l2.granted, true);
+  const firstLease = gateway.acquireLease('agent-bg', TaskPriority.NORMAL);
+  const secondLease = gateway.acquireLease('agent-bg', TaskPriority.NORMAL);
+  assert.strictEqual(firstLease.granted, true);
+  assert.strictEqual(secondLease.granted, true);
 
   // 3rd NORMAL task must be rejected
-  const l3Normal = gateway.acquireLease('agent-bg', TaskPriority.NORMAL);
-  assert.strictEqual(l3Normal.granted, false);
-  assert.ok(l3Normal.reason.includes('Concurrency limit exceeded'));
+  const thirdNormalLease = gateway.acquireLease('agent-bg', TaskPriority.NORMAL);
+  assert.strictEqual(thirdNormalLease.granted, false);
+  assert.ok(thirdNormalLease.reason.includes('Concurrency limit exceeded'));
 
   // 3rd CRITICAL task must be granted (burst allowed: ceil(2 * 1.5) = 3)
-  const l3Critical = gateway.acquireLease('agent-bg', TaskPriority.CRITICAL);
-  assert.strictEqual(l3Critical.granted, true);
+  const thirdCriticalLease = gateway.acquireLease('agent-bg', TaskPriority.CRITICAL);
+  assert.strictEqual(thirdCriticalLease.granted, true);
 
   // 4th CRITICAL task must be rejected (burst ceiling reached)
-  const l4Critical = gateway.acquireLease('agent-bg', TaskPriority.CRITICAL);
-  assert.strictEqual(l4Critical.granted, false);
+  const fourthCriticalLease = gateway.acquireLease('agent-bg', TaskPriority.CRITICAL);
+  assert.strictEqual(fourthCriticalLease.granted, false);
 
   console.log('  ✔ Concurrency limits enforced with critical priority burst headroom');
 }
@@ -121,8 +121,8 @@ async function testLeaseTtlAndExpirationSweep() {
     burstCapacity: 10,
   });
 
-  const res = gateway.acquireLease('agent-short-lived');
-  assert.strictEqual(res.granted, true);
+  const shortLivedLeaseResult = gateway.acquireLease('agent-short-lived');
+  assert.strictEqual(shortLivedLeaseResult.granted, true);
   assert.strictEqual(gateway.getMetrics('agent-short-lived').activeLeases, 1);
 
   // Wait 40ms for lease to expire

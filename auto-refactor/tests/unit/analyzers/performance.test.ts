@@ -16,6 +16,7 @@ import { PerformanceAnalyzer } from '../../../src/analyzers/performance';
 import {
     extractLinearLookupMethod,
     LINEAR_LOOKUP_RE,
+    TRANSIENT_ALLOC_RE,
 } from '../../../src/analyzers/performance-helpers';
 import {
     extractGuardedRecursiveSymbols,
@@ -228,5 +229,56 @@ describe('Recursive Depth Termination Guard Whitelist (CPX-REC-001)', () => {
         // Guarded recursion must be exempted (no issue emitted)
         const guardedIssue = issues.find((i) => i.detail.symbol === 'guardedDfs');
         expect(guardedIssue).toBeUndefined();
+    });
+});
+
+describe('PerformanceAnalyzer - Polyglot Hot Path Regex Allocations (PRF-MEM-001)', () => {
+    const analyzer = new PerformanceAnalyzer();
+
+    function createPolyglotCtx(filePath: string, content: string): AnalyzerContext {
+        return {
+            filePath,
+            content,
+            options: { checkTransientAllocations: true },
+            config: {},
+        };
+    }
+
+    it('matches Regex::new and re.compile in TRANSIENT_ALLOC_RE', () => {
+        expect(TRANSIENT_ALLOC_RE.test('let re = Regex::new(r"\\d+");')).toBe(true);
+        expect(TRANSIENT_ALLOC_RE.test('pattern = re.compile(r"\\d+")')).toBe(true);
+    });
+
+    it('flags Rust Regex::new inside a loop as PRF-MEM-001', () => {
+        const rustCode = [
+            'fn process_lines(lines: &[&str]) {',
+            '    for line in lines {',
+            '        let re = Regex::new(r"^\\d+").unwrap();',
+            '        if re.is_match(line) {',
+            '            consume(line);',
+            '        }',
+            '    }',
+            '}',
+        ].join('\n');
+
+        const issues = analyzer.analyze(undefined, createPolyglotCtx('src/lib.rs', rustCode));
+        const memIssues = issues.filter((i) => i.rule === 'PRF-MEM-001');
+        expect(memIssues.length).toBe(1);
+        expect(memIssues[0].message).toContain('Transient heap allocation in hot loop');
+    });
+
+    it('flags Python re.compile inside a loop as PRF-MEM-001', () => {
+        const pyCode = [
+            'def process_items(items):',
+            '    for item in items:',
+            '        pattern = re.compile(r"^item_")',
+            '        if pattern.match(item):',
+            '            pass',
+        ].join('\n');
+
+        const issues = analyzer.analyze(undefined, createPolyglotCtx('pkg/scanner.py', pyCode));
+        const memIssues = issues.filter((i) => i.rule === 'PRF-MEM-001');
+        expect(memIssues.length).toBe(1);
+        expect(memIssues[0].message).toContain('Transient heap allocation in hot loop');
     });
 });

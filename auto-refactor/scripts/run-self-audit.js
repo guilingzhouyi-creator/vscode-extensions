@@ -295,17 +295,18 @@ function serializeBaselineSignatures(issues) {
   return files;
 }
 
-function writeBaselineSignatures(filesMap, revision) {
+function writeBaselineSignatures(filesMap, revision, trajectoryDir = TRAJECTORY_DIR) {
   try {
-    if (!fs.existsSync(TRAJECTORY_DIR)) {
-      fs.mkdirSync(TRAJECTORY_DIR, { recursive: true });
+    if (!fs.existsSync(trajectoryDir)) {
+      fs.mkdirSync(trajectoryDir, { recursive: true });
     }
     const payload = {
       timestamp: Date.now(),
       revision: revision || 'unknown',
       files: filesMap,
     };
-    fs.writeFileSync(BASELINE_SIGNATURES_FILE, JSON.stringify(payload) + '\n', 'utf8');
+    const signaturesPath = path.join(trajectoryDir, 'baseline-signatures.json');
+    fs.writeFileSync(signaturesPath, JSON.stringify(payload) + '\n', 'utf8');
   } catch {
     // Best-effort
   }
@@ -557,11 +558,56 @@ function estimateChangedEloc() {
   }
 }
 
+function getGitRevision(root) {
+  try {
+    const { execSync } = require('child_process');
+    const out = execSync('git rev-parse --short HEAD', {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (out.length > 0) return out.slice(0, 8);
+  } catch {
+    // Best-effort fallback to disk
+  }
+  try {
+    const gitDir = path.join(root, '..', '.git');
+    if (!fs.existsSync(gitDir)) return null;
+    const headPath = path.join(gitDir, 'HEAD');
+    if (!fs.existsSync(headPath)) return null;
+    const head = fs.readFileSync(headPath, 'utf8').trim();
+    if (!head.startsWith('ref: ')) return head.length >= 7 ? head.slice(0, 8) : null;
+    const refName = head.slice(5);
+    const refPath = path.join(gitDir, refName);
+    if (fs.existsSync(refPath)) return fs.readFileSync(refPath, 'utf8').trim().slice(0, 8);
+  } catch {
+    // Ignore read errors
+  }
+  return null;
+}
+
 /**
  * Records an audit run into the persistent trajectory accumulator ledger.
  */
 async function recordRunToTrajectory(params) {
-  const trajectoryAccumulator = new TrajectoryAccumulator(TRAJECTORY_DIR);
+  const trajectoryDir = params.trajectoryDir || TRAJECTORY_DIR;
+  const diffCounters = estimateChangedEloc();
+
+  if (params.persist === false && !params.trajectoryDir) {
+    const prevLt = params.prevBaseline?.trajectory?.lifetime || null;
+    return {
+      runEloc: {
+        processed: diffCounters?.processed || 0,
+        unique: diffCounters?.unique || 0,
+        changed: diffCounters?.changed || 0,
+        semantic: diffCounters?.semantic || 0,
+      },
+      lifetime: prevLt,
+      gateVerdict: { pass: true },
+    };
+  }
+
+  const trajectoryAccumulator = new TrajectoryAccumulator(trajectoryDir);
   const scoreVector = ALL_QUALITY_DIMENSIONS.map((dim) => {
     return params.projectScore.tenDimensions?.[dim] ?? DEFAULT_MAX_SCORE;
   });
@@ -578,11 +624,15 @@ async function recordRunToTrajectory(params) {
   const beforeScore =
     params.prevBaseline?.metrics?.compositeScore ?? params.projectScore.compositeScore;
   const afterScore = params.projectScore.compositeScore;
-  const diffCounters = estimateChangedEloc();
+
+  const gitRev = getGitRevision(ROOT);
+  const ruleSig = params.snapshot.rulesDigest.slice(0, DIGEST_REVISION_LENGTH);
+  const revision = gitRev || ruleSig;
 
   return trajectoryAccumulator.recordAuditRun({
     runId: `run-${params.snapshot.snapshotId}`,
-    revision: params.snapshot.rulesDigest.slice(0, DIGEST_REVISION_LENGTH),
+    revision,
+    sig: ruleSig,
     module: MODULE_NAME_AUTO_ENGINE,
     agent: AGENT_NAME_SELF_AUDIT,
     timestamp: params.startTime,
@@ -600,10 +650,20 @@ async function recordRunToTrajectory(params) {
 
 function buildMetricsSummary(projectScore, scanReport, issues, debtByTier) {
   const suppressedCount = scanReport.summary.suppressedCount || 0;
+  const technicalDebt = scanReport.qualityScore?.technicalDebt;
+  const sqale = technicalDebt
+    ? {
+        tdr: technicalDebt.technicalDebtRatio,
+        remediationMinutes: technicalDebt.totalRemediationMinutes,
+        grade: technicalDebt.sqaleGrade,
+      }
+    : null;
+
   return {
     compositeScore: projectScore.compositeScore,
     grade: projectScore.grade,
     autonomyRate: scanReport.autonomy?.compositeAutonomyIndex ?? null,
+    sqale,
     polyglotGeneralization:
       scanReport.qualityScore?.polyglotGeneralization ??
       projectScore.polyglotGeneralization ??
@@ -671,6 +731,78 @@ function buildBaselineReport(params) {
 }
 
 /**
+ * Populates zero-defect files into the map to avoid survivorship bias in scoring.
+ *
+ * @param fileIssuesMap - Map of file paths to detected issues.
+ * @param fileMetrics - Array of metrics returned by scanner.
+ */
+function populateZeroDefectFiles(fileIssuesMap, fileMetrics) {
+  if (!Array.isArray(fileMetrics)) return;
+  for (const m of fileMetrics) {
+    const file = m.file ?? m.filePath;
+    if (file && !fileIssuesMap.has(file)) {
+      fileIssuesMap.set(file, []);
+    }
+  }
+}
+
+/**
+ * Resolves scanner execution options.
+ *
+ * @param options - Audit runner options.
+ * @returns Scanner options configuration.
+ */
+function resolveAuditScanConfig(options) {
+  const cpus = os.cpus();
+  const cpusLen = Array.isArray(cpus) ? cpus.length : 4;
+  const workers = Math.max(1, Math.min(16, cpusLen));
+  return {
+    root: ROOT,
+    include: ['src/**/*.ts', 'scripts/*.js'],
+    parser: 'oxc',
+    autoTune: false,
+    workers,
+    cache: true,
+    cacheDir: path.join(ROOT, '.auto-refactor-cache', 'self-audit'),
+    logLevel: RUN_LOG_LEVEL_WARN,
+    ...options.scanOptions,
+  };
+}
+
+/**
+ * Persists baseline report, AAS stream, and defect signatures to disk.
+ *
+ * @param params - Persistence configuration and reports.
+ */
+function writeAuditOutputs(params) {
+  const { baselineOutput, aasOutput, trajectoryDir, snapshot, scanReport, baselineReport, issues } = params;
+  fs.writeFileSync(baselineOutput, JSON.stringify(baselineReport, null, 2) + '\n', 'utf8');
+
+  const cai = baselineReport.metrics.autonomyRate;
+  const healthOverride = {
+    score: baselineReport.metrics.compositeScore,
+    grade: baselineReport.metrics.grade,
+    density: baselineReport.metrics.effectiveCodeDensity,
+    tensorSummary: baselineReport.metrics.densityTensorSummary,
+    sqale: baselineReport.metrics.sqale,
+    polyglot: baselineReport.metrics.polyglotGeneralization,
+  };
+  if (typeof cai === 'number') {
+    healthOverride.cai = cai;
+  }
+
+  const aasContent = toAasJson(scanReport, {
+    baseDir: ROOT,
+    healthOverride,
+  });
+  fs.writeFileSync(aasOutput, aasContent + '\n', 'utf8');
+
+  const newSignaturesMap = serializeBaselineSignatures(issues);
+  const rev = snapshot.rulesDigest.slice(0, DIGEST_REVISION_LENGTH);
+  writeBaselineSignatures(newSignaturesMap, rev, trajectoryDir);
+}
+
+/**
  * Run comprehensive self-audit over auto-refactor repository.
  *
  * @param options - Optional overrides for audit run.
@@ -680,52 +812,25 @@ async function runSelfAudit(options = {}) {
   const startTime = Date.now();
   fs.mkdirSync(REPORTS_DIR, { recursive: true });
 
-  // 0. Read existing baseline before snapshot
   const prevBaseline = readExistingBaseline();
-
-  // 1. Create Immutable Audit Snapshot (E, R, C, L, S)
   const snapshot = createAuditSnapshot();
-
-  // 2. Execute Full Production Scan over Engine Sources
-  const defaultWorkers = Math.max(1, Math.min(16, os.cpus().length || 4));
-  const scanReport = await scan({
-    root: ROOT,
-    include: ['src/**/*.ts', 'scripts/*.js'],
-    parser: 'oxc',
-    autoTune: false,
-    workers: defaultWorkers,
-    cache: true,
-    cacheDir: path.join(ROOT, '.auto-refactor-cache', 'self-audit'),
-    logLevel: RUN_LOG_LEVEL_WARN,
-    ...options.scanOptions,
-  });
+  const scanConfig = resolveAuditScanConfig(options);
+  const scanReport = await scan(scanConfig);
 
   const durationMs = Date.now() - startTime;
-  const issues = scanReport.issues || [];
-  const filesScanned = scanReport.summary.filesScanned || 0;
+  const issues = Array.isArray(scanReport.issues) ? scanReport.issues : [];
+  const filesScanned = scanReport.summary?.filesScanned ?? 0;
 
-  // 3. Classify Technical Debt Ledger
   const { debtByTier, criticalItems, highItems, fileIssuesMap } = buildDebtLedger(issues);
+  populateZeroDefectFiles(fileIssuesMap, scanReport.fileMetrics);
 
-  // Supplement zero-defect files: populate fileIssuesMap from fileMetrics
-  // to avoid survivorship bias in scores.
-  if (Array.isArray(scanReport.fileMetrics)) {
-    for (const m of scanReport.fileMetrics) {
-      const file = m.file || m.filePath;
-      if (file && !fileIssuesMap.has(file)) {
-        fileIssuesMap.set(file, []);
-      }
-    }
-  }
-
-  // 4. File-Level and Hierarchical Eight-Pillar Scoring
   const fileScores = computeFileScores(fileIssuesMap);
   const projectScore = aggregateProjectScore(fileScores);
-
-  // 5. Identify Top Refactoring Hotspots for Self-Refactoring
   const topHotspots = computeTopHotspots(fileScores);
 
-  // 6. Automatically Record Run into Trajectory Accumulator
+  const persist = options.persist !== false;
+  const trajectoryDir = options.trajectoryDir ?? (persist ? TRAJECTORY_DIR : null);
+
   const scannedFilesList = collectScannedFiles(scanReport.fileMetrics);
   const trajectoryRes = await recordRunToTrajectory({
     snapshot,
@@ -735,9 +840,10 @@ async function runSelfAudit(options = {}) {
     startTime,
     prevBaseline,
     issues,
+    trajectoryDir,
+    persist,
   });
 
-  // 7. Build Baseline Report Object
   const baselineReport = buildBaselineReport({
     snapshot,
     projectScore,
@@ -752,31 +858,17 @@ async function runSelfAudit(options = {}) {
     trajectoryRes,
   });
 
-  // 8. Write to reports/self-audit-baseline.json
-  fs.writeFileSync(BASELINE_OUTPUT, JSON.stringify(baselineReport, null, 2) + '\n', 'utf8');
-
-  // 9. Write the Agent-Native AAS v1.0 report artifact. File-grouped, topologically ordered
-  // stream designed for autonomous Agent consumption with high token economy.
-  fs.writeFileSync(
-    BASELINE_AAS_OUTPUT,
-    toAasJson(scanReport, {
-      baseDir: ROOT,
-      healthOverride: {
-        score: baselineReport.metrics.compositeScore,
-        grade: baselineReport.metrics.grade,
-        ...(baselineReport.metrics.autonomyRate !== null
-          ? { cai: baselineReport.metrics.autonomyRate }
-          : {}),
-        density: baselineReport.metrics.effectiveCodeDensity,
-        tensorSummary: baselineReport.metrics.densityTensorSummary,
-      },
-    }) + '\n',
-    'utf8',
-  );
-
-  // 10. Write loss-less, compact baseline defect signatures index for trajectory delta evaluation
-  const newSignaturesMap = serializeBaselineSignatures(issues);
-  writeBaselineSignatures(newSignaturesMap, snapshot.rulesDigest.slice(0, DIGEST_REVISION_LENGTH));
+  if (persist) {
+    writeAuditOutputs({
+      baselineOutput: options.baselineOutput ?? BASELINE_OUTPUT,
+      aasOutput: options.aasOutput ?? BASELINE_AAS_OUTPUT,
+      trajectoryDir: trajectoryDir ?? TRAJECTORY_DIR,
+      snapshot,
+      scanReport,
+      baselineReport,
+      issues,
+    });
+  }
 
   return baselineReport;
 }
@@ -807,13 +899,13 @@ function formatProgressBar(
 function printPillarsRadar(pillars) {
   if (!pillars) return;
   console.log('--- [Eight Strategic Pillars Health Radar] ---');
-  for (const [pillar, val] of Object.entries(pillars)) {
-    const progressBar = formatProgressBar(val);
-    const pName = (pillar.charAt(0).toUpperCase() + pillar.slice(1)).padEnd(
+  for (const [pillarName, scoreValue] of Object.entries(pillars)) {
+    const progressBar = formatProgressBar(scoreValue);
+    const formattedPillarName = (pillarName.charAt(0).toUpperCase() + pillarName.slice(1)).padEnd(
       PILLAR_LABEL_WIDTH,
       ' ',
     );
-    console.log(`  ${pName} : [${progressBar}] ${val.toFixed(1)}`);
+    console.log(`  ${formattedPillarName} : [${progressBar}] ${scoreValue.toFixed(1)}`);
   }
 }
 
@@ -825,11 +917,11 @@ function printPillarsRadar(pillars) {
 function printMicroDimensions(dimensions) {
   if (!dimensions) return;
   console.log('\n--- [Ten-Dimensional Micro-Quality Indices] ---');
-  for (const [dim, val] of Object.entries(dimensions)) {
-    const numVal = typeof val === 'number' ? val : DEFAULT_MAX_SCORE;
+  for (const [dimensionKey, scoreValue] of Object.entries(dimensions)) {
+    const numVal = typeof scoreValue === 'number' ? scoreValue : DEFAULT_MAX_SCORE;
     const progressBar = formatProgressBar(numVal);
-    const dName = dim.padEnd(DIMENSION_LABEL_WIDTH, ' ');
-    console.log(`  ${dName} : [${progressBar}] ${numVal.toFixed(1)}`);
+    const formattedDimensionName = dimensionKey.padEnd(DIMENSION_LABEL_WIDTH, ' ');
+    console.log(`  ${formattedDimensionName} : [${progressBar}] ${numVal.toFixed(1)}`);
   }
 }
 
@@ -847,10 +939,10 @@ function printDebtHotspots(metrics, topHotspots) {
   console.log(`  Low Debt      : ${metrics.byDebtTier.low}`);
 
   console.log('\n--- [Top 5 Technical Debt Hotspots for Self-Refactoring Refactoring] ---');
-  for (const [idx, h] of topHotspots.slice(0, HOTSPOTS_DISPLAY_LIMIT).entries()) {
+  for (const [index, hotspot] of topHotspots.slice(0, HOTSPOTS_DISPLAY_LIMIT).entries()) {
     console.log(
-      `  ${idx + 1}. ${h.filePath} (${h.totalIssues} issues, ` +
-        `critical=${h.criticalCount}, high=${h.highCount}, score=${h.compositeScore})`,
+      `  ${index + 1}. ${hotspot.filePath} (${hotspot.totalIssues} issues, ` +
+        `critical=${hotspot.criticalCount}, high=${hotspot.highCount}, score=${hotspot.compositeScore})`,
     );
   }
 }
@@ -862,25 +954,26 @@ function printDebtHotspots(metrics, topHotspots) {
  */
 function printTrajectoryLedger(trajectory) {
   if (!trajectory || !trajectory.lifetime) return;
-  const lt = trajectory.lifetime;
+  const lifetime = trajectory.lifetime;
   console.log('\n--- [Cumulative ELOC & Long-Term Trajectory Ledger] ---');
   console.log(`  Run Processed ELOC    : ${trajectory.runEloc.processed.toLocaleString()} lines`);
-  console.log(`  Lifetime Total Runs   : ${lt.totalRuns}`);
+  console.log(`  Lifetime Total Runs   : ${lifetime.totalRuns}`);
   console.log(
-    `  Lifetime Processed    : ${lt.eloc.processedTotal.toLocaleString()} lines (Additive Accumulation)`,
+    `  Lifetime Processed    : ${lifetime.eloc.processedTotal.toLocaleString()} lines (Additive Accumulation)`,
   );
   console.log(
-    `  Lifetime Unique (AST) : ${lt.eloc.uniqueTotal.toLocaleString()} lines (Deduplicated Coverage)`,
+    `  Lifetime Unique (AST) : ${lifetime.eloc.uniqueTotal.toLocaleString()} lines (Deduplicated Coverage)`,
   );
-  console.log(`  Lifetime Gate Pass %  : ${lt.gatePassRate.toFixed(1)}%`);
+  console.log(`  Lifetime Gate Pass %  : ${lifetime.gatePassRate.toFixed(1)}%`);
 }
 
 /**
  * Print terminal formatted executive dashboard.
  *
  * @param report - Self-audit baseline report.
+ * @param isCheckMode - Whether run is in check/dry-run mode.
  */
-function printTerminalDashboard(report) {
+function printTerminalDashboard(report, isCheckMode = false) {
   console.log('================================================================');
   console.log('       AUTO-REFACTOR SYSTEM SELF-AUDIT BASELINE       ');
   console.log('================================================================\n');
@@ -898,8 +991,22 @@ function printTerminalDashboard(report) {
     `Composite Score: ${report.metrics.compositeScore} / 100.0 (Grade: ${report.metrics.grade})`,
   );
   console.log(
-    `Code Density   : ${(report.metrics.effectiveCodeDensity * PERCENT_MULTIPLIER).toFixed(1)}%\n`,
+    `Code Density   : ${(report.metrics.effectiveCodeDensity * PERCENT_MULTIPLIER).toFixed(1)}%`,
   );
+  if (report.metrics.sqale) {
+    const sq = report.metrics.sqale;
+    console.log(
+      `SQALE TDR      : ${sq.tdr.toFixed(1)}% [Grade: ${sq.grade}] (Remediation: ${(sq.remediationMinutes / 60).toFixed(1)}h / ${sq.remediationMinutes}min)`,
+    );
+  }
+  if (report.metrics.densityTensorSummary) {
+    const ts = report.metrics.densityTensorSummary;
+    const mDist = ts.averageMahalanobisDistance !== undefined ? ` | Mahalanobis: ${ts.averageMahalanobisDistance.toFixed(2)}` : '';
+    console.log(
+      `5D Tensor      : TSPR ${(ts.averageTspr * PERCENT_MULTIPLIER).toFixed(0)}% | POR ${(ts.averagePor * PERCENT_MULTIPLIER).toFixed(0)}% | ColDensity ${(ts.averageColumnDensity * PERCENT_MULTIPLIER).toFixed(0)}%${mDist}`,
+    );
+  }
+  console.log('');
 
   printPillarsRadar(report.eightPillars && report.eightPillars.pillars);
   printMicroDimensions(report.tenDimensions);
@@ -907,15 +1014,74 @@ function printTerminalDashboard(report) {
   printTrajectoryLedger(report.trajectory);
 
   console.log('\n================================================================');
-  console.log(`✔ Baseline Report Saved to: ${path.relative(ROOT, BASELINE_OUTPUT)}`);
+  if (isCheckMode) {
+    console.log('✔ Baseline Verified in Read-Only Mode (Zero Disk Mutation)');
+  } else {
+    console.log(`✔ Baseline Report Saved to: ${path.relative(ROOT, BASELINE_OUTPUT)}`);
+  }
   console.log('================================================================\n');
+}
+
+function assertCompositeRegression(report, prev) {
+  if (prev && typeof prev.metrics?.compositeScore === 'number') {
+    if (report.metrics.compositeScore < prev.metrics.compositeScore - 0.05) {
+      console.error(
+        `❌ Quality regression detected: ${report.metrics.compositeScore} < baseline ${prev.metrics.compositeScore}`,
+      );
+      process.exit(1);
+    }
+  }
+}
+
+function assertDimensionRegression(report, prev) {
+  if (!prev || !prev.tenDimensions || !report.tenDimensions) return;
+  const MAX_DIMENSION_REGRESSION_TOLERANCE = 3.0;
+  for (const [dim, prevVal] of Object.entries(prev.tenDimensions)) {
+    const currVal = report.tenDimensions[dim];
+    if (typeof prevVal === 'number' && typeof currVal === 'number') {
+      if (currVal < prevVal - MAX_DIMENSION_REGRESSION_TOLERANCE) {
+        console.error(
+          `❌ Quality dimension regression detected in [${dim}]: ${currVal.toFixed(1)} < baseline ${prevVal.toFixed(1)} (-${(prevVal - currVal).toFixed(1)})`,
+        );
+        process.exit(1);
+      }
+    }
+  }
+}
+
+function assertDebtBoundaries(report) {
+  if (report.metrics.byDebtTier.critical > 0 || report.metrics.byDebtTier.high > 0) {
+    console.error(
+      `❌ Critical/High debt detected: critical=${report.metrics.byDebtTier.critical}, high=${report.metrics.byDebtTier.high}`,
+    );
+    process.exit(1);
+  }
+}
+
+function verifyCliCheckMode(report) {
+  const prev = readExistingBaseline();
+  assertCompositeRegression(report, prev);
+  assertDimensionRegression(report, prev);
+  assertDebtBoundaries(report);
+  console.log('✔ [Check] Self-audit baseline verification passed with zero disk mutation.');
 }
 
 // CLI execution entrypoint
 if (require.main === module) {
-  runSelfAudit()
+  const args = process.argv.slice(2);
+  const isCheckMode =
+    args.includes('--check') || args.includes('--dry-run') || args.includes('--verify');
+  const isUpdateMode = args.includes('--update') || args.includes('--write');
+
+  runSelfAudit({
+    persist: isUpdateMode || !isCheckMode,
+    check: isCheckMode,
+  })
     .then((report) => {
-      printTerminalDashboard(report);
+      printTerminalDashboard(report, isCheckMode);
+      if (isCheckMode) {
+        verifyCliCheckMode(report);
+      }
       process.exit(0);
     })
     .catch((err) => {

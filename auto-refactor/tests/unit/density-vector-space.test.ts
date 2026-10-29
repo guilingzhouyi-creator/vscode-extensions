@@ -31,13 +31,13 @@ import {
 
 describe('density-vector-space: Logit Tangent Space Mapping', () => {
     it('maps midpoint 0.5 to tangent origin 0.0', () => {
-        const y = logitTransform(0.5);
-        expect(y).toBeCloseTo(0.0, 5);
+        const logitVal = logitTransform(0.5);
+        expect(logitVal).toBeCloseTo(0.0, 5);
     });
 
     it('maps target attractor 0.90 to logit value ~2.1972', () => {
-        const y = logitTransform(0.90);
-        expect(y).toBeCloseTo(2.197225, 4);
+        const logitVal = logitTransform(0.90);
+        expect(logitVal).toBeCloseTo(2.197225, 4);
     });
 
     it('handles extreme boundaries [0.0, 1.0] without NaN or Infinity', () => {
@@ -51,10 +51,10 @@ describe('density-vector-space: Logit Tangent Space Mapping', () => {
 
     it('satisfies inverse logit round-trip identity', () => {
         const testPoints = [0.1, 0.25, 0.5, 0.75, 0.9, 0.99];
-        for (const p of testPoints) {
-            const y = logitTransform(p);
-            const recovered = inverseLogit(y);
-            expect(recovered).toBeCloseTo(p, 4);
+        for (const probability of testPoints) {
+            const logitVal = logitTransform(probability);
+            const recovered = inverseLogit(logitVal);
+            expect(recovered).toBeCloseTo(probability, 4);
         }
     });
 });
@@ -66,18 +66,18 @@ describe('density-vector-space: Mahalanobis Distance & Covariance Whitening', ()
     });
 
     it('yields zero whitened vector at the optimal attractor', () => {
-        const z = computeWhitenedCoordinates(DEFAULT_TARGET_TANGENT_ATTRACTOR);
+        const whitenedVector = computeWhitenedCoordinates(DEFAULT_TARGET_TANGENT_ATTRACTOR);
         for (let i = 0; i < 5; i++) {
-            expect(z[i]).toBeCloseTo(0.0, 5);
+            expect(whitenedVector[i]).toBeCloseTo(0.0, 5);
         }
     });
 
     it('satisfies ||z||_2 == d_M across arbitrary coordinate deltas', () => {
         const arbitraryTangent = [1.5, 2.0, 0.8, 1.2, 2.5] as const;
-        const z = computeWhitenedCoordinates(arbitraryTangent);
+        const whitenedVector = computeWhitenedCoordinates(arbitraryTangent);
         let normSq = 0;
         for (let i = 0; i < 5; i++) {
-            normSq += z[i] * z[i];
+            normSq += whitenedVector[i] * whitenedVector[i];
         }
         const expectedDist = Math.sqrt(normSq);
         const actualDist = computeMahalanobisDistance(arbitraryTangent);

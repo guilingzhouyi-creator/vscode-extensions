@@ -613,7 +613,15 @@ function verifyModernGovernanceEnhancements(govIssues) {
   assert(blsIssues[0]?.severity === 'warning', 'GOV-BLS-001 must have warning severity');
 }
 
-run().catch((err) => {
-  console.error('Fatal error in validate-governance:', err);
-  process.exit(1);
-});
+run()
+  .finally(() => {
+    try {
+      fs.rmSync(TMP_DIR, { recursive: true, force: true });
+    } catch {
+      // best-effort cleanup
+    }
+  })
+  .catch((executionError) => {
+    console.error('Fatal error in validate-governance:', executionError);
+    process.exit(1);
+  });

@@ -40,9 +40,9 @@ function assert(condition, message) {
   }
 }
 
-function measure(fn) {
+function measure(targetFunction) {
   const start = process.hrtime.bigint();
-  const result = fn();
+  const result = targetFunction();
   const end = process.hrtime.bigint();
   const ms = Number(end - start) / 1e6;
   return { result, ms };
@@ -56,21 +56,21 @@ console.log('\n1. auditRegexSafety — pattern safety detection');
 // Nested quantifiers
 const nestedWarn = auditRegexSafety('(a+)+');
 assert(
-  nestedWarn.some((w) => w.includes('Nested quantifier')),
+  nestedWarn.some((warningMessage) => warningMessage.includes('Nested quantifier')),
   'Detects nested quantifier (a+)+',
 );
 
 // Alternation inside quantifier
 const altWarn = auditRegexSafety('(a|aa)*');
 assert(
-  altWarn.some((w) => w.includes('Alternation inside quantified group')),
+  altWarn.some((warningMessage) => warningMessage.includes('Alternation inside quantified group')),
   'Detects alternation inside quantifier (a|aa)*',
 );
 
 // Backreference inside quantified group — e.g. (a\1)+  where \1 is inside + group
 const backrefWarn = auditRegexSafety('(a\\1)+');
 assert(
-  backrefWarn.some((w) => w.includes('Backreference inside quantified group')),
+  backrefWarn.some((warningMessage) => warningMessage.includes('Backreference inside quantified group')),
   'Detects backreference inside quantified group (a\\1)+',
 );
 
@@ -85,10 +85,10 @@ assert(!isRegexSafe('(a+)+'), 'Nested quantifier is rejected by isRegexSafe');
 assert(!isRegexSafe('(a|aa)*'), 'Alternation-in-quantifier rejected by isRegexSafe');
 
 // Long alternation warning
-const longAlt = Array.from({ length: 25 }, (_, i) => `keyword${i}`).join('|');
+const longAlt = Array.from({ length: 25 }, (_, index) => `keyword${index}`).join('|');
 const longAltWarn = auditRegexSafety(longAlt);
 assert(
-  longAltWarn.some((w) => w.includes('Long alternation chain')),
+  longAltWarn.some((warningMessage) => warningMessage.includes('Long alternation chain')),
   'Warns about long alternation chains (>20 pipes)',
 );
 
@@ -112,7 +112,7 @@ try {
   const elapsed = Date.now() - start;
   rawSlow = elapsed > 10; // 22 chars should take well over 10ms
   console.log(`  INFO: Raw nested-quantifier regex on 22 chars took ${elapsed.toFixed(2)}ms`);
-} catch (_e) {
+} catch (_suppressedError) {
   // Expected: some regex engines or platforms may throw on pathological patterns;
   // we only need to know if the raw pattern is slow, not that it throws.
   rawSlow = true;
@@ -251,7 +251,7 @@ const userPatterns = [
   'sk-[A-Za-z0-9]{20,}', // safe
 ];
 
-const safePatterns = userPatterns.filter((p) => isRegexSafe(p));
+const safePatterns = userPatterns.filter((pattern) => isRegexSafe(pattern));
 assert(
   safePatterns.length === 2,
   `2 of 3 user patterns pass safety check (got ${safePatterns.length})`,
@@ -271,10 +271,10 @@ const jargonPatterns = [
   'phase[0-9]+', // safe
 ];
 
-const safeJargon = jargonPatterns.filter((p) => isRegexSafe(p));
+const safeJargon = jargonPatterns.filter((pattern) => isRegexSafe(pattern));
 assert(safeJargon.length > 0, 'Should find safe jargon patterns');
 // Alternation inside a quantifier is flagged as vulnerable to polynomial backtracking
-const hasUnsafe = jargonPatterns.some((p) => !isRegexSafe(p));
+const hasUnsafe = jargonPatterns.some((pattern) => !isRegexSafe(pattern));
 assert(hasUnsafe, 'At least one jargon pattern is correctly flagged as unsafe');
 
 // ---------------------------------------------------------------------------

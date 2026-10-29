@@ -16,6 +16,8 @@
 
 const assert = require('assert');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { runSelfAudit, BASELINE_OUTPUT, BASELINE_AAS_OUTPUT } = require('./run-self-audit');
 
 const EXPECTED_PILLARS = [
@@ -247,11 +249,12 @@ function validateDebtLedger(report) {
  * Validates the baseline report file on disk and schema parity with in-memory report.
  *
  * @param report - In-memory report produced by runner.
+ * @param baselinePath - File path to the persisted baseline JSON report.
  */
-function validateBaselineFileOnDisk(report) {
+function validateBaselineFileOnDisk(report, baselinePath = BASELINE_OUTPUT) {
   console.log('2. Validating Baseline Report File on Disk & Schema Parity...');
-  assert.ok(fs.existsSync(BASELINE_OUTPUT), 'reports/self-audit-baseline.json must exist');
-  const fileContent = fs.readFileSync(BASELINE_OUTPUT, 'utf8');
+  assert.ok(fs.existsSync(baselinePath), `${baselinePath} must exist`);
+  const fileContent = fs.readFileSync(baselinePath, 'utf8');
   const parsed = JSON.parse(fileContent);
 
   validateReportSchema(parsed);
@@ -299,14 +302,15 @@ function validateBaselineFileOnDisk(report) {
  * Validate that the producer properly emits the Agent Audit Schema (AAS v1.0) report artifact.
  *
  * @param report - In-memory report produced by the runner.
+ * @param aasPath - File path to the persisted AAS report artifact.
  */
-function validateAasReportOnDisk(report) {
+function validateAasReportOnDisk(report, aasPath = BASELINE_AAS_OUTPUT) {
   console.log('3. Validating AAS v1.0 Agent-Native Report Emission...');
   assert.ok(
-    fs.existsSync(BASELINE_AAS_OUTPUT),
-    'reports/self-audit-baseline.aas.json must be emitted by the producer',
+    fs.existsSync(aasPath),
+    `${aasPath} must be emitted by the producer`,
   );
-  const aasDoc = JSON.parse(fs.readFileSync(BASELINE_AAS_OUTPUT, 'utf8'));
+  const aasDoc = JSON.parse(fs.readFileSync(aasPath, 'utf8'));
   assert.strictEqual(aasDoc.schema, 'aas-v1', 'AAS document must declare aas-v1 schema');
   assert.strictEqual(aasDoc.tool, 'auto-refactor');
   assert.strictEqual(aasDoc.health.score, report.metrics.compositeScore);
@@ -321,39 +325,54 @@ async function main() {
   console.log('=== [Self-Audit] Testing System Self-Audit Engine (Reviewer -> Reviewer) ===\n');
 
   const start = Date.now();
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'self-audit-test-'));
+  const tempBaseline = path.join(tempDir, 'self-audit-baseline.json');
+  const tempAas = path.join(tempDir, 'self-audit-baseline.aas.json');
+  const tempTrajectory = path.join(tempDir, 'trajectory');
 
-  // 1. Run Self-Audit Engine
-  console.log('1. Executing Full Self-Audit via Immutable Sandbox...');
-  const report = await runSelfAudit();
-  const elapsedSec = (Date.now() - start) / 1000;
+  try {
+    // 1. Run Self-Audit Engine targeting isolated sandbox output
+    console.log('1. Executing Full Self-Audit via Immutable Sandbox (Isolated Output)...');
+    const report = await runSelfAudit({
+      baselineOutput: tempBaseline,
+      aasOutput: tempAas,
+      trajectoryDir: tempTrajectory,
+      persist: true,
+    });
+    const elapsedSec = (Date.now() - start) / 1000;
 
-  // Schema baseline assertion on in-memory report
-  validateReportSchema(report);
+    // Schema baseline assertion on in-memory report
+    validateReportSchema(report);
 
-  // 2. Validate Baseline Report File Output & Disk Parity
-  validateBaselineFileOnDisk(report);
+    // 2. Validate Baseline Report File Output & Disk Parity
+    validateBaselineFileOnDisk(report, tempBaseline);
 
-  // 3. Validate the AAS v1.0 Agent-Native report
-  validateAasReportOnDisk(report);
+    // 3. Validate the AAS v1.0 Agent-Native report
+    validateAasReportOnDisk(report, tempAas);
 
-  // 4. Validate Immutable Audit Snapshot Quintuple (E, R, C, L, S)
-  validateSnapshotMetadata(report);
+    // 4. Validate Immutable Audit Snapshot Quintuple (E, R, C, L, S)
+    validateSnapshotMetadata(report);
 
-  // 5. Validate Scope & Performance
-  validateScopeAndPerformance(report, elapsedSec);
+    // 5. Validate Scope & Performance
+    validateScopeAndPerformance(report, elapsedSec);
 
-  // 6. Validate Eight Strategic Pillars Health Model
-  validateEightPillarsAndMetrics(report);
+    // 6. Validate Eight Strategic Pillars Health Model
+    validateEightPillarsAndMetrics(report);
 
-  // 7. Validate Ten-Dimensional Scoring Subsystem Integration
-  validateTenDimensions(report);
+    // 7. Validate Ten-Dimensional Scoring Subsystem Integration
+    validateTenDimensions(report);
 
-  // 8. Validate Technical Debt Ledger Tiering
-  validateDebtLedger(report);
+    // 8. Validate Technical Debt Ledger Tiering
+    validateDebtLedger(report);
 
-  console.log('\n================================================================');
-  console.log('🎉 ALL Self-Audit SYSTEM SELF-AUDIT TESTS PASSED (8/8)!');
-  console.log('================================================================');
+    console.log('\n================================================================');
+    console.log('🎉 ALL Self-Audit SYSTEM SELF-AUDIT TESTS PASSED (8/8)!');
+    console.log('================================================================');
+  } finally {
+    if (tempDir && tempDir.includes('self-audit-test-')) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
 }
 
 main().catch((err) => {

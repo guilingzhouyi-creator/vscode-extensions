@@ -55,6 +55,7 @@
     "validate-no-empty-scripts": "node scripts/validate-no-empty-scripts.js",
     "validate-physical-naming": "node scripts/validate-physical-naming.js",
     "validate-constants-ssot": "node scripts/validate-constants-ssot.js",
+    "validate-regex-ssot": "node scripts/validate-regex-ssot.js",
     "validate-i18n-cleanliness": "node scripts/validate-i18n-cleanliness.js",
     "validate-agent-actionable": "node scripts/validate-agent-actionable.js",
     "validate-aas-reporter": "node scripts/validate-aas-reporter.js",

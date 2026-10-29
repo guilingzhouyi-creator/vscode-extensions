@@ -41,7 +41,7 @@ try {
   // best-effort
 }
 
-process.env.AUTO_REFACTOR_REGISTRY_DIR ||= path.join(DEFAULT_TMP_DIR, 'ar-registry');
+process.env.AUTO_REFACTOR_REGISTRY_DIR ||= path.join(DEFAULT_TMP_DIR, 'ar-warm-registry');
 try {
   fs.mkdirSync(process.env.AUTO_REFACTOR_REGISTRY_DIR, { recursive: true });
 } catch {
@@ -341,12 +341,15 @@ function normalize(r) {
   };
 }
 
-function rmRetry(p) {
+function rmRetry(targetPath) {
   try {
-    fs.rmSync(p, { recursive: true, force: true });
+    fs.rmSync(targetPath, { recursive: true, force: true });
   } catch {
     try {
-      fs.renameSync(p, path.join(DEFAULT_TMP_DIR, `ar-stale-${path.basename(p)}-${Date.now()}`));
+      fs.renameSync(
+        targetPath,
+        path.join(DEFAULT_TMP_DIR, `ar-stale-${path.basename(targetPath)}-${Date.now()}`),
+      );
     } catch {
       /* ignore */
     }
@@ -559,12 +562,12 @@ async function main() {
         },
       ],
     });
-    const [f, w] = await Promise.all([freshScan(), warmScan()]);
-    const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
+    const [freshReport, warmReport] = await Promise.all([freshScan(), warmScan()]);
+    const isReportEqual = JSON.stringify(normalize(freshReport)) === JSON.stringify(normalize(warmReport.report));
     check(
       'scenario-custom-analyzer-l2-disabled',
-      eq && w.stats.daemonUsed === true,
-      `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
+      isReportEqual && warmReport.stats.daemonUsed === true,
+      `cacheHit=${warmReport.stats.cacheHit} analyzed=${warmReport.stats.analyzed}`,
     );
     writeConfig(); // restore
   }
@@ -572,7 +575,7 @@ async function main() {
   // ---- Scenario: daemon crash → warm degrades to cold (daemon:'auto' never auto-starts) ----
   {
     daemonStop(CORPUS);
-    const [f, w] = await Promise.all([
+    const [freshReport, warmReport] = await Promise.all([
       freshScan(),
       scanWarm({
         root: CORPUS,
@@ -584,11 +587,11 @@ async function main() {
         cacheDir: CACHE_DIR,
       }),
     ]);
-    const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
+    const isReportEqual = JSON.stringify(normalize(freshReport)) === JSON.stringify(normalize(warmReport.report));
     check(
       'scenario-daemon-crash-degrade',
-      eq && w.stats.daemonUsed === false,
-      `daemonUsed=${w.stats.daemonUsed} cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
+      isReportEqual && warmReport.stats.daemonUsed === false,
+      `daemonUsed=${warmReport.stats.daemonUsed} cacheHit=${warmReport.stats.cacheHit} analyzed=${warmReport.stats.analyzed}`,
     );
   }
 
@@ -596,16 +599,25 @@ async function main() {
   await rustPromise;
 
   daemonStop(CORPUS);
+  daemonStop(RUST_CORPUS);
+  rmRetry(CORPUS);
+  rmRetry(RUST_CORPUS);
+  rmRetry(CACHE_DIR);
+  rmRetry(CACHE_DIR_RUST);
 
   console.log(failed ? `\n${failed} scenario(s) FAILED` : '\nALL WARM SCENARIOS PASS');
   process.exit(failed ? 1 : 0);
 }
 
-main().catch((e) => {
-  console.error(e);
+main().catch((executionError) => {
+  console.error(executionError);
   try {
     daemonStop(CORPUS);
     daemonStop(RUST_CORPUS);
+    rmRetry(CORPUS);
+    rmRetry(RUST_CORPUS);
+    rmRetry(CACHE_DIR);
+    rmRetry(CACHE_DIR_RUST);
   } catch {
     /* ignore */
   }

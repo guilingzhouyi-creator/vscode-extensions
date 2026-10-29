@@ -274,4 +274,26 @@ func _ready():
         const attackRef = symbols.references.find((r) => r.name === 'attack');
         expect(attackRef?.calleeReceiver).toBe('player');
     });
+
+    it('accurately parses multi-line TypeScript imports and rejects embedded string literals', () => {
+        const tsCode = `
+import {
+    AlphaService,
+    BetaService as Beta,
+} from 'alpha-lib';
+import type { GammaType } from 'gamma-lib';
+export { DeltaService } from 'delta-lib';
+
+const rule = {
+    suggestion: 'Import the binding (\`import x from "fake-m"\` / \`import { y } from "fake-m"\`) instead.',
+};
+`;
+        const profile = extractFileImportProfile(tsCode, 'src/test-service.ts');
+        expect(profile.specifiers).toContain('alpha-lib');
+        expect(profile.specifiers).toContain('gamma-lib');
+        expect(profile.specifiers).toContain('delta-lib');
+        expect(profile.specifiers).not.toContain('fake-m');
+        expect(profile.symbolToPackageMap.get('AlphaService')).toBe('alpha-lib');
+        expect(profile.symbolToPackageMap.get('Beta')).toBe('alpha-lib');
+    });
 });

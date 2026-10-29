@@ -97,30 +97,30 @@ const CONFIG = {
 /**
  * Reduce a scan report to the fields that the parser-parity assertion compares.
  *
- * @param r - Raw report returned by `scan`; only summary, issues, and fileMetrics are read.
+ * @param scanReport - Raw report returned by `scan`; only summary, issues, and fileMetrics are read.
  * @returns Deterministic pretty-printed JSON used for the byte-for-byte fast-path comparison.
  */
-function normalize(r) {
-  const issues = r.issues
-    .map((x) => ({
-      id: x.id,
-      analyzer: x.analyzer,
-      rule: x.rule,
-      severity: x.severity,
-      message: x.message,
-      location: x.location,
-      detail: x.detail,
+function normalize(scanReport) {
+  const issues = scanReport.issues
+    .map((issue) => ({
+      id: issue.id,
+      analyzer: issue.analyzer,
+      rule: issue.rule,
+      severity: issue.severity,
+      message: issue.message,
+      location: issue.location,
+      detail: issue.detail,
     }))
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const fileMetrics = r.fileMetrics
-    .map((m) => ({ ...m }))
-    .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+    .sort((issueA, issueB) => (issueA.id < issueB.id ? -1 : issueA.id > issueB.id ? 1 : 0));
+  const fileMetrics = scanReport.fileMetrics
+    .map((metric) => ({ ...metric }))
+    .sort((metricA, metricB) => (metricA.file < metricB.file ? -1 : metricA.file > metricB.file ? 1 : 0));
   return JSON.stringify(
     {
-      filesScanned: r.summary.filesScanned,
-      issuesTotal: r.summary.issuesTotal,
-      byAnalyzer: r.summary.byAnalyzer,
-      bySeverity: r.summary.bySeverity,
+      filesScanned: scanReport.summary.filesScanned,
+      issuesTotal: scanReport.summary.issuesTotal,
+      byAnalyzer: scanReport.summary.byAnalyzer,
+      bySeverity: scanReport.summary.bySeverity,
       issues,
       fileMetrics,
     },
@@ -143,10 +143,10 @@ function buildIssueLookup(issues) {
   const countsByRuleLineVal = new Map();
   const countsByRuleVal = new Map();
 
-  for (const i of issues) {
-    const rule = i.rule;
-    const line = i.location && i.location.start ? i.location.start.line : undefined;
-    const val = i.detail && i.detail.value !== undefined ? String(i.detail.value) : undefined;
+  for (const issue of issues) {
+    const rule = issue.rule;
+    const line = issue.location && issue.location.start ? issue.location.start.line : undefined;
+    const val = issue.detail && issue.detail.value !== undefined ? String(issue.detail.value) : undefined;
     if (val !== undefined) {
       const rvKey = `${rule}|${val}`;
       countsByRuleVal.set(rvKey, (countsByRuleVal.get(rvKey) || 0) + 1);
@@ -230,67 +230,72 @@ const KEYPOINT_SPECS = [
 
 function runKeypointSpecs(specs, lookup, widget, pass, fail) {
   for (const spec of specs) {
-    const res = spec.evaluate(lookup, widget);
-    if (res.pass) {
-      pass(res.passMsg);
+    const evaluationResult = spec.evaluate(lookup, widget);
+    if (evaluationResult.pass) {
+      pass(evaluationResult.passMsg);
     } else {
-      fail(res.failMsg);
+      fail(evaluationResult.failMsg);
     }
   }
 }
 
 async function main() {
-  fs.mkdirSync(SRC, { recursive: true });
-  fs.writeFileSync(path.join(SRC, 'widget.ts'), CONTENT);
-  fs.writeFileSync(path.join(SRC, 'dep.ts'), "export const DEP = 'dep token';\n");
-  fs.writeFileSync(path.join(SRC, 'other.ts'), "export const extra = 'other token';\n");
-  fs.writeFileSync(path.join(TMP, 'auto-refactor.config.json'), JSON.stringify(CONFIG, null, 2));
+  try {
+    fs.mkdirSync(SRC, { recursive: true });
+    fs.writeFileSync(path.join(SRC, 'widget.ts'), CONTENT);
+    fs.writeFileSync(path.join(SRC, 'dep.ts'), "export const DEP = 'dep token';\n");
+    fs.writeFileSync(path.join(SRC, 'other.ts'), "export const extra = 'other token';\n");
+    fs.writeFileSync(path.join(TMP, 'auto-refactor.config.json'), JSON.stringify(CONFIG, null, 2) + '\n');
 
-  const { scan } = require(path.join(ROOT, 'dist', 'api'));
-  process.env.AR_FASTPATH = '0';
-  const r0 = await scan({
-    root: TMP,
-    configFile: path.join(TMP, 'auto-refactor.config.json'),
-    workers: 1,
-    format: 'json',
-    logLevel: 'silent',
-    parser: 'oxc',
-  });
-  const out0 = normalize(r0);
-  process.env.AR_FASTPATH = '1';
-  const r1 = await scan({
-    root: TMP,
-    configFile: path.join(TMP, 'auto-refactor.config.json'),
-    workers: 1,
-    format: 'json',
-    logLevel: 'silent',
-    parser: 'oxc',
-  });
-  const out1 = normalize(r1);
+    const { scan } = require(path.join(ROOT, 'dist', 'api'));
+    process.env.AR_FASTPATH = '0';
+    const reportWithoutFastpath = await scan({
+      root: TMP,
+      configFile: path.join(TMP, 'auto-refactor.config.json'),
+      workers: 1,
+      format: 'json',
+      logLevel: 'silent',
+      parser: 'oxc',
+    });
+    const normalizedWithoutFastpath = normalize(reportWithoutFastpath);
 
-  let failed = 0;
-  const fail = (msg) => {
-    failed++;
-    console.log('✖ BLOCK ', msg);
-  };
-  const pass = (msg) => console.log('PASS', msg);
+    process.env.AR_FASTPATH = '1';
+    const reportWithFastpath = await scan({
+      root: TMP,
+      configFile: path.join(TMP, 'auto-refactor.config.json'),
+      workers: 1,
+      format: 'json',
+      logLevel: 'silent',
+      parser: 'oxc',
+    });
+    const normalizedWithFastpath = normalize(reportWithFastpath);
 
-  const ok = out0 === out1;
-  if (ok) {
-    pass('byte-identical (fast=0 vs fast=1)');
-  } else {
-    fail('byte-identical (fast=0 vs fast=1)');
+    let failed = 0;
+    const fail = (statusMessage) => {
+      failed++;
+      console.log('✖ BLOCK ', statusMessage);
+    };
+    const pass = (statusMessage) => console.log('PASS', statusMessage);
+
+    const isByteIdentical = normalizedWithoutFastpath === normalizedWithFastpath;
+    if (isByteIdentical) {
+      pass('byte-identical (fast=0 vs fast=1)');
+    } else {
+      fail('byte-identical (fast=0 vs fast=1)');
+    }
+
+    const issues = JSON.parse(normalizedWithFastpath).issues;
+    const lookup = buildIssueLookup(issues);
+    const widget = reportWithFastpath.fileMetrics.find((metric) => metric.file.endsWith('widget.ts'));
+
+    runKeypointSpecs(KEYPOINT_SPECS, lookup, widget, pass, fail);
+
+    console.log(failed === 0 ? '\nT04 KEY POINTS: ALL PASS' : `\nT04 KEY POINTS: ${failed} FAILED`);
+    cleanup();
+    process.exit(failed === 0 ? 0 : 1);
+  } finally {
+    cleanup();
   }
-
-  const issues = JSON.parse(out1).issues;
-  const lookup = buildIssueLookup(issues);
-  const widget = r1.fileMetrics.find((m) => m.file.endsWith('widget.ts'));
-
-  runKeypointSpecs(KEYPOINT_SPECS, lookup, widget, pass, fail);
-
-  console.log(failed === 0 ? '\nT04 KEY POINTS: ALL PASS' : `\nT04 KEY POINTS: ${failed} FAILED`);
-  cleanup();
-  process.exit(failed === 0 ? 0 : 1);
 }
 
 /**
@@ -307,8 +312,8 @@ function cleanup() {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
+main().catch((executionError) => {
+  console.error(executionError);
   cleanup();
   process.exit(1);
 });

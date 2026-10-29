@@ -78,8 +78,8 @@ describe('LayerVFS — FastCDC & CAS Storage Engine', () => {
             const origChunks = cdc.chunk(original);
             const modChunks = cdc.chunk(modified);
 
-            const origSet = new Set(origChunks.map((c) => c.chunkHash));
-            const sharedChunks = modChunks.filter((c) => origSet.has(c.chunkHash));
+            const origSet = new Set(origChunks.map((chunk) => chunk.chunkHash));
+            const sharedChunks = modChunks.filter((chunk) => origSet.has(chunk.chunkHash));
 
             // Over 85% of chunks must remain 100% identical and deduplicated
             const deduplicationRatio = sharedChunks.length / modChunks.length;
@@ -87,8 +87,8 @@ describe('LayerVFS — FastCDC & CAS Storage Engine', () => {
 
             // New data stored must be well below 25KB
             const newBytes = modChunks
-                .filter((c) => !origSet.has(c.chunkHash))
-                .reduce((acc, c) => acc + c.length, 0);
+                .filter((chunk) => !origSet.has(chunk.chunkHash))
+                .reduce((totalBytes, chunk) => totalBytes + chunk.length, 0);
             expect(newBytes).toBeLessThan(25 * 1024);
         });
 
@@ -165,7 +165,8 @@ describe('LayerVFS — FastCDC & CAS Storage Engine', () => {
                 cardContext: { cardId: 'CARD-001' },
             });
 
-            expect(snapshot.snapshotId).toBeTruthy();
+            expect(typeof snapshot.snapshotId).toBe('string');
+            expect(snapshot.snapshotId.length).toBeGreaterThan(0);
             expect(snapshot.fileCount).toBe(2);
             expect(snapshot.totalSizeBytes).toBe(1536);
 
@@ -175,7 +176,7 @@ describe('LayerVFS — FastCDC & CAS Storage Engine', () => {
 
             const retrievedEntries = await backend.getSnapshotEntries(snapshot.snapshotId);
             expect(retrievedEntries.length).toBe(2);
-            expect(retrievedEntries.map((e) => e.path)).toContain('src/core/index.ts');
+            expect(retrievedEntries.map((snapshotEntry) => snapshotEntry.path)).toContain('src/core/index.ts');
 
             await backend.close();
         });
@@ -187,7 +188,8 @@ describe('LayerVFS — FastCDC & CAS Storage Engine', () => {
             const originalText = 'const x = 42;\n'.repeat(1000);
             const casObj = await store.putContent(originalText);
 
-            expect(casObj.contentHash).toBeTruthy();
+            expect(typeof casObj.contentHash).toBe('string');
+            expect(casObj.contentHash.length).toBeGreaterThan(0);
             expect(casObj.byteLength).toBe(Buffer.byteLength(originalText));
 
             const reassembled = await store.getContent(casObj.contentHash);

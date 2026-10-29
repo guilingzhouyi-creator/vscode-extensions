@@ -53,13 +53,13 @@ function testRealRepoBatchEquivalence() {
 
   // Measure single file mining time
   const t0 = Date.now();
-  const singleProfiles = targetFiles.map((f) => minerSingle.mineFileHistory(f, cwd));
+  const singleProfiles = targetFiles.map((filePath) => minerSingle.mineFileHistory(filePath, cwd));
   const singleTime = Math.max(1, Date.now() - t0);
 
   // Measure batch preloaded mining time
   const t1 = Date.now();
   minerBatch.preloadRepository(cwd, EQUIVALENCE_MAX_COMMITS);
-  const batchProfiles = targetFiles.map((f) => minerBatch.mineFileHistory(f, cwd));
+  const batchProfiles = targetFiles.map((filePath) => minerBatch.mineFileHistory(filePath, cwd));
   const batchTime = Math.max(1, Date.now() - t1);
 
   console.log(`  Single-file time for ${targetFiles.length} files: ${singleTime}ms`);
@@ -68,29 +68,29 @@ function testRealRepoBatchEquivalence() {
   // Verify 100% equivalence for all targets
   for (let i = 0; i < targetFiles.length; i++) {
     const file = targetFiles[i];
-    const s = singleProfiles[i];
-    const b = batchProfiles[i];
+    const singleProfile = singleProfiles[i];
+    const batchProfile = batchProfiles[i];
 
-    assert.strictEqual(b.isGitAvailable, s.isGitAvailable, `isGitAvailable mismatch for ${file}`);
+    assert.strictEqual(batchProfile.isGitAvailable, singleProfile.isGitAvailable, `isGitAvailable mismatch for ${file}`);
     assert.strictEqual(
-      b.totalCommits,
-      s.totalCommits,
-      `totalCommits mismatch for ${file}: single=${s.totalCommits}, batch=${b.totalCommits}`,
+      batchProfile.totalCommits,
+      singleProfile.totalCommits,
+      `totalCommits mismatch for ${file}: single=${singleProfile.totalCommits}, batch=${batchProfile.totalCommits}`,
     );
-    assert.strictEqual(b.bugFixCommits, s.bugFixCommits, `bugFixCommits mismatch for ${file}`);
+    assert.strictEqual(batchProfile.bugFixCommits, singleProfile.bugFixCommits, `bugFixCommits mismatch for ${file}`);
     assert.strictEqual(
-      b.uniqueAuthorsCount,
-      s.uniqueAuthorsCount,
+      batchProfile.uniqueAuthorsCount,
+      singleProfile.uniqueAuthorsCount,
       `uniqueAuthorsCount mismatch for ${file}`,
     );
     assert.strictEqual(
-      b.lastModifiedTimestamp,
-      s.lastModifiedTimestamp,
+      batchProfile.lastModifiedTimestamp,
+      singleProfile.lastModifiedTimestamp,
       `lastModifiedTimestamp mismatch for ${file}`,
     );
     assert.strictEqual(
-      b.firstSeenTimestamp,
-      s.firstSeenTimestamp,
+      batchProfile.firstSeenTimestamp,
+      singleProfile.firstSeenTimestamp,
       `firstSeenTimestamp mismatch for ${file}`,
     );
   }
@@ -110,28 +110,28 @@ function testCodeEvolutionAnalyzerBatch() {
   const analyzerBatch = new CodeEvolutionAnalyzer(minerBatch);
   minerBatch.preloadRepository(cwd, EQUIVALENCE_MAX_COMMITS);
 
-  const seqResults = targetFiles.map((f) => analyzerSequential.analyzeFile(f, cwd));
+  const seqResults = targetFiles.map((filePath) => analyzerSequential.analyzeFile(filePath, cwd));
   const batchMap = analyzerBatch.analyzeFilesBatch(targetFiles, cwd);
 
   assert.strictEqual(batchMap.size, targetFiles.length);
 
   for (let i = 0; i < targetFiles.length; i++) {
     const file = targetFiles[i];
-    const s = seqResults[i];
-    const b = batchMap.get(file);
+    const seqResult = seqResults[i];
+    const batchResult = batchMap.get(file);
 
-    assert(b, `Missing batch result for ${file}`);
+    assert(batchResult, `Missing batch result for ${file}`);
     assert.strictEqual(
-      b.vulnerabilityMultiplier,
-      s.vulnerabilityMultiplier,
+      batchResult.vulnerabilityMultiplier,
+      seqResult.vulnerabilityMultiplier,
       `Multiplier mismatch for ${file}`,
     );
-    assert.strictEqual(b.bugProneScore, s.bugProneScore, `Bug prone mismatch for ${file}`);
-    assert.strictEqual(b.authorEntropyScore, s.authorEntropyScore, `Entropy mismatch for ${file}`);
-    assert.strictEqual(b.decayScore, s.decayScore, `Decay mismatch for ${file}`);
+    assert.strictEqual(batchResult.bugProneScore, seqResult.bugProneScore, `Bug prone mismatch for ${file}`);
+    assert.strictEqual(batchResult.authorEntropyScore, seqResult.authorEntropyScore, `Entropy mismatch for ${file}`);
+    assert.strictEqual(batchResult.decayScore, seqResult.decayScore, `Decay mismatch for ${file}`);
     assert.strictEqual(
-      b.debtVelocityScore,
-      s.debtVelocityScore,
+      batchResult.debtVelocityScore,
+      seqResult.debtVelocityScore,
       `Debt velocity mismatch for ${file}`,
     );
   }

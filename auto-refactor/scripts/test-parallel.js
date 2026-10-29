@@ -44,15 +44,26 @@ for (let i = 0; i < rawArgs.length; i++) {
 // ── Test Suites Declaration ──
 // Priority set for heavy suites (Longest Processing Time First / LPT scheduling)
 const HIGH_LATENCY_SUITES_PRIORITY = new Set([
-  'validate-triplane-cross-project',
-  'validate-equivalence',
   'validate-diff',
-  'validate-consumer-runner',
   'validate-batch-git-history',
-  'validate-context-slice',
+  'validate-consumer-runner',
   'validate-data-flow',
-  'validate-call-graph',
+  'validate-review-memory',
+  'validate-equivalence',
+  'validate-triplane-cross-project',
+  'validate-no-empty-scripts',
+  'validate-asymmetric',
+  'validate-generalized',
+  'validate-security',
+  'validate-sparse-ast-hopper',
+  'validate-language-matrix',
   'validate-symbol-index',
+  'validate-oxc',
+  'validate-grouped-moe-dispatch',
+  'validate-governance',
+  'validate-self-slice-audit',
+  'validate-context-slice',
+  'validate-call-graph',
 ]);
 
 // Stage 1: Isolated parallel test suites (no shared daemon or corpus disk state)
@@ -200,6 +211,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-stdlib-profile', script: 'scripts/validate-stdlib-profile.js' },
   { name: 'validate-agent-actionable', script: 'scripts/validate-agent-actionable.js' },
   { name: 'validate-constants-ssot', script: 'scripts/validate-constants-ssot.js' },
+  { name: 'validate-regex-ssot', script: 'scripts/validate-regex-ssot.js' },
   { name: 'validate-i18n-cleanliness', script: 'scripts/validate-i18n-cleanliness.js' },
   {
     name: 'validate-nested-constant-cleanliness',
@@ -420,34 +432,29 @@ async function runVitestUnit(skip) {
   }
   console.log('\n--- [Unit Suites] Executing vitest tests/unit ---');
   const start = Date.now();
-  const bin = path.join(
-    ROOT,
-    'node_modules',
-    '.bin',
-    process.platform === 'win32' ? 'vitest.cmd' : 'vitest',
-  );
-  const res = await new Promise((resolve) => {
-    const child = spawn(bin, ['run'], {
+  const vitestScriptPath = path.join(ROOT, 'node_modules', 'vitest', 'vitest.mjs');
+  const unitExecutionResult = await new Promise((resolve) => {
+    const childProcessInstance = spawn(process.execPath, [vitestScriptPath, 'run'], {
       cwd: ROOT,
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32',
+      shell: false,
     });
     let stdout = '';
     let stderr = '';
-    child.stdout.on('data', (d) => (stdout += d));
-    child.stderr.on('data', (d) => (stderr += d));
-    child.on('error', (err) => resolve({ code: 1, stdout, stderr: String(err) }));
-    child.on('close', (code) => resolve({ code, stdout, stderr }));
+    childProcessInstance.stdout.on('data', (chunk) => (stdout += chunk));
+    childProcessInstance.stderr.on('data', (chunk) => (stderr += chunk));
+    childProcessInstance.on('error', (spawnError) => resolve({ code: 1, stdout, stderr: String(spawnError) }));
+    childProcessInstance.on('close', (exitCode) => resolve({ code: exitCode, stdout, stderr }));
   });
   return {
     name: 'vitest-unit',
     script: 'vitest run',
-    code: res.code,
-    ok: res.code === 0,
+    code: unitExecutionResult.code,
+    ok: unitExecutionResult.code === 0,
     durationMs: Date.now() - start,
-    stdout: res.stdout,
-    stderr: res.stderr,
+    stdout: unitExecutionResult.stdout,
+    stderr: unitExecutionResult.stderr,
   };
 }
 
@@ -665,11 +672,12 @@ async function runFourLaneConcurrentPipeline(parallelList, vitestPromise, passed
   });
 
   const parallelPromise = runAsyncPool(parallelList, concurrency, async (suite) => {
-    const res = await executeSuite(suite);
-    recordResult(suite, res, passed, failed);
-    return res;
+    const suiteExecutionResult = await executeSuite(suite);
+    recordResult(suite, suiteExecutionResult, passed, failed);
+    return suiteExecutionResult;
   });
 
+  const daemonPromise = runSequentialSuites(DAEMON_SUITES, bail, passed, failed);
   const selfAuditPromise = runSelfAuditLane(bail, passed, failed);
   const unitPromise = vitestPromise.then((unitResult) => {
     if (unitResult) {
@@ -677,11 +685,7 @@ async function runFourLaneConcurrentPipeline(parallelList, vitestPromise, passed
     }
   });
 
-  await Promise.all([parallelPromise, selfAuditPromise, unitPromise]);
-
-  if (!bail || failed.length === 0) {
-    await runSequentialSuites(DAEMON_SUITES, bail, passed, failed);
-  }
+  await Promise.all([parallelPromise, daemonPromise, selfAuditPromise, unitPromise]);
 }
 
 // ── Main Runner ──

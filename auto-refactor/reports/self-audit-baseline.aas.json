@@ -2,100 +2,112 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-29T10:57:43.922Z",
+  "timestamp": "2026-10-29T15:41:22.807Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
     "score": 99.17,
     "grade": "A+",
-    "cai": 88.02,
+    "cai": 87.98,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.917,
       "averagePor": 0.083,
-      "averageColumnDensity": 0.865,
-      "averageSpatialDensity": 0.444,
-      "averageMahalanobisDistance": 4.602,
-      "averageFisherSimplexDistance": 0.097
+      "averageColumnDensity": 0.866,
+      "averageSpatialDensity": 0.443,
+      "averageMahalanobisDistance": 4.609,
+      "averageFisherSimplexDistance": 0.096
+    },
+    "sqale": {
+      "tdr": 0.004,
+      "remediationMinutes": 28811,
+      "grade": "A"
+    },
+    "polyglot": {
+      "index": 96.51,
+      "meanScore": 96.51,
+      "dispersionPenalty": 1,
+      "standardDeviation": 0,
+      "languageCount": 1
     },
     "counts": {
-      "files": 789,
-      "total": 4112,
+      "files": 795,
+      "total": 4178,
       "errors": 0,
-      "warns": 3542,
-      "info": 570,
-      "suppressed": 161
+      "warns": 3591,
+      "info": 587,
+      "suppressed": 162
     }
   },
   "usability": {
-    "proven": 54,
-    "patchable": 1738,
-    "advisory": 2320,
-    "uncalibrated": 3897,
+    "proven": 55,
+    "patchable": 1770,
+    "advisory": 2353,
+    "uncalibrated": 3961,
     "needsHuman": 6
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 98.45,
-    "semanticPurity": 98.4,
+    "architectureConsistency": 98.06,
+    "semanticPurity": 98.34,
     "codeSecurity": 99.79,
-    "performanceEfficiency": 99.57,
-    "standardization": 83.83,
-    "modernity": 98.35,
-    "maintainability": 93.38,
-    "commentQuality": 99.85,
-    "duplication": 94.91,
+    "performanceEfficiency": 99.55,
+    "standardization": 83.78,
+    "modernity": 98.29,
+    "maintainability": 92.84,
+    "commentQuality": 99.69,
+    "duplication": 94.89,
     "techDebtRisk": 100
   },
   "bottlenecks": [
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 4280,
-      "count": 428
+      "loss": 4300,
+      "count": 430
     },
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3210,
-      "count": 224
+      "loss": 3255,
+      "count": 227
     },
     {
       "rule": "metric",
       "dim": "architectureConsistency",
-      "loss": 2380,
-      "count": 238
+      "loss": 2420,
+      "count": 242
     },
     {
-      "rule": "SIM-TRN-001",
-      "dim": "standardization",
-      "loss": 2180,
-      "count": 218
-    },
-    {
-      "rule": "SIM-LONG-001",
-      "dim": "standardization",
-      "loss": 2080,
-      "count": 208
+      "rule": "NAM-DEC-001",
+      "dim": "architectureConsistency",
+      "loss": 2160,
+      "count": 216
     },
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2075,
-      "count": 415
+      "loss": 2145,
+      "count": 429
+    },
+    {
+      "rule": "SIM-TRN-001",
+      "dim": "standardization",
+      "loss": 2140,
+      "count": 214
+    },
+    {
+      "rule": "SIM-LONG-001",
+      "dim": "standardization",
+      "loss": 2100,
+      "count": 210
     },
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
       "loss": 2019,
       "count": 673
-    },
-    {
-      "rule": "NAM-DEC-001",
-      "dim": "architectureConsistency",
-      "loss": 1980,
-      "count": 198
     }
   ],
   "topology": {
@@ -107,13 +119,63 @@
       "src/core/praxis/client/types.ts",
       "src/core/praxis/presentation/presentation-types.ts",
       "src/core/reporters/agent-directives-types.ts",
+      "src/core/reporters/reporterRegistry.ts",
       "src/core/reporting/aas-types.ts",
+      "src/core/reporting/quality-printer.ts",
       "src/core/router/sliceTypes.ts",
       "src/core/scoring/scoringTypes.ts",
       "src/core/trajectory/eloc-types.ts",
       "src/core/trajectory/recipeTypes.ts",
       "src/core/trajectory/types.ts",
       "src/core/types.ts"
+    ],
+    "L2_OPERATOR": [
+      "scripts/gate-self.js",
+      "scripts/migrate-report-artifacts.js",
+      "scripts/migrate-trajectory-summaries.js",
+      "scripts/run-self-audit.js",
+      "scripts/validate-composite-gate.js",
+      "scripts/validate-file-preflight-gate.js",
+      "scripts/validate-suppression-gate.js",
+      "src/analyzers/complexity-loops.ts",
+      "src/analyzers/concurrency.ts",
+      "src/analyzers/hygiene-file-helper.ts",
+      "src/analyzers/hygiene.ts",
+      "src/analyzers/large-file.ts",
+      "src/analyzers/naming-python-helper.ts",
+      "src/analyzers/rust-modern.ts",
+      "src/analyzers/simplify-inlining.ts",
+      "src/analyzers/stdlib.ts",
+      "src/analyzers/vscode-extension.ts",
+      "src/cli/selfTestCmd.ts",
+      "src/core/architecture/metaArchitectureEvaluator.ts",
+      "src/core/ast-pattern/structural-pattern-engine.ts",
+      "src/core/ast/adapters.ts",
+      "src/core/ast/data-adapter.ts",
+      "src/core/ast/deprecated-usage-visitor.ts",
+      "src/core/ast/fallback-chain-matcher.ts",
+      "src/core/ast/gdscript-adapter.ts",
+      "src/core/ast/go-adapter-parser.ts",
+      "src/core/ast/language-support.ts",
+      "src/core/ast/markdown-adapter.ts",
+      "src/core/ast/multilang.ts",
+      "src/core/ast/oxc-adapter.ts",
+      "src/core/ast/oxc-predicates.ts",
+      "src/core/ast/oxc-projector.ts",
+      "src/core/ast/python-adapter-helpers.ts",
+      "src/core/ast/python-adapter.ts",
+      "src/core/ast/rust-adapter.ts",
+      "src/core/ast/scope-graph.ts",
+      "src/core/ast/shell-adapter.ts",
+      "src/core/ast/sparse-ast-hopper.ts",
+      "src/core/ast/sparse-reference-replay.ts",
+      "src/core/ast/swa-bounded-replay.ts",
+      "src/core/ast/swar.ts",
+      "src/core/ast/traverse.ts",
+      "src/core/ast/ts-predicates.ts",
+      "src/core/ast/ts-projector.ts",
+      "src/core/ast/typescript-adapter.ts",
+      "src/core/ast/utf8.ts"
     ]
   },
   "files": {
@@ -122,7 +184,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 498 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 498 >= warn threshold 400)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -146,7 +208,7 @@
         "col": 22,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -167,7 +229,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"stepChildNode\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"stepChildNode\" has 7 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface StepChildNodeOptions {",
@@ -180,7 +242,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"createNewRadixNode\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"createNewRadixNode\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface CreateNewRadixNodeOptions {",
@@ -204,7 +266,7 @@
         "col": 53,
         "rule": "duplicate-literal",
         "sev": "WARN",
-        "msg": "Literal 1000 is repeated 4 times in this file; extract it into a shared constant.",
+        "msg": "Literal 1000 is repeated 4 times in this file; extract it into a shared constant",
         "fix": {
           "action": "extract_constant",
           "safeToAutomate": true
@@ -216,7 +278,7 @@
         "col": 59,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -237,7 +299,7 @@
         "col": 65,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -258,7 +320,7 @@
         "col": 30,
         "rule": "NUM-PREC-001",
         "sev": "WARN",
-        "msg": "Lossy precision rounding `Math.round(avgMatchedLines * 10) / 10` detected. Calculation path truncates to 0.1 precision or exhibits mismatched scaling.",
+        "msg": "Lossy precision rounding `Math.round(avgMatchedLines * 10) / 10` detected. Calculation path truncates to 0.1 precision or exhibits mismatched scaling",
         "fix": {
           "action": "align_numeric_precision",
           "template": "Math.round(val * 100) / 100 + 0",
@@ -272,7 +334,7 @@
         "col": 36,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 32 should be extracted into a named constant.",
+        "msg": "Magic number 32 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -305,7 +367,7 @@
         "col": 55,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -340,7 +402,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 1001 >= warn threshold 400; functions 31 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 1001 >= warn threshold 400; functions 31 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -353,7 +415,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 413 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 413 >= warn threshold 400)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -380,7 +442,7 @@
         "col": 13,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
-        "msg": "Symbol 'PraxisPresentationSeverity' belongs to a flat prefix cluster ('praxispresentation', 4 symbols). Extract into module 'domain/praxis/presentation/'.",
+        "msg": "Symbol 'PraxisPresentationSeverity' belongs to a flat prefix cluster ('praxispresentation', 4 symbols). Extract into module 'domain/praxis/presentation/'",
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'praxispresentation'."
@@ -392,7 +454,7 @@
         "col": 18,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
-        "msg": "Symbol 'PraxisPresentationMetrics' belongs to a flat prefix cluster ('praxispresentation', 4 symbols). Extract into module 'domain/praxis/presentation/'.",
+        "msg": "Symbol 'PraxisPresentationMetrics' belongs to a flat prefix cluster ('praxispresentation', 4 symbols). Extract into module 'domain/praxis/presentation/'",
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'praxispresentation'."
@@ -404,7 +466,7 @@
         "col": 18,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
-        "msg": "Symbol 'PraxisPresentationPayload' belongs to a flat prefix cluster ('praxispresentation', 4 symbols). Extract into module 'domain/praxis/presentation/'.",
+        "msg": "Symbol 'PraxisPresentationPayload' belongs to a flat prefix cluster ('praxispresentation', 4 symbols). Extract into module 'domain/praxis/presentation/'",
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'praxispresentation'."
@@ -416,7 +478,7 @@
         "col": 18,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
-        "msg": "Symbol 'PraxisPresentationOptions' belongs to a flat prefix cluster ('praxispresentation', 4 symbols). Extract into module 'domain/praxis/presentation/'.",
+        "msg": "Symbol 'PraxisPresentationOptions' belongs to a flat prefix cluster ('praxispresentation', 4 symbols). Extract into module 'domain/praxis/presentation/'",
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'praxispresentation'."
@@ -450,9 +512,227 @@
         "tier": "T1"
       }
     ],
+    "src/core/reporters/reporterRegistry.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 421 >= warn threshold 400; functions 22 >= warn threshold 20)",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 1,
+        "rule": "NAM-FIL-001",
+        "sev": "WARN",
+        "msg": "File name 'reporterRegistry.ts' violates strict kebab-case naming convention for TypeScript/JavaScript",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Rename file to 'reporter-registry.ts'."
+        },
+        "tier": "T1"
+      },
+      {
+        "line": 93,
+        "col": 10,
+        "rule": "NAM-DEC-001",
+        "sev": "WARN",
+        "msg": "Symbol 'renderMarkdownProgressBar' belongs to a flat prefix cluster ('rendermarkdown', 4 symbols). Extract into module 'domain/render/markdown/'",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "4 symbols share prefix 'rendermarkdown'."
+        },
+        "tier": "T1"
+      },
+      {
+        "line": 149,
+        "col": 11,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "identifier 'result' lacks domain context",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'result' with a domain-qualified identifier (e."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 168,
+        "col": 10,
+        "rule": "NAM-DEC-001",
+        "sev": "WARN",
+        "msg": "Symbol 'renderMarkdownDimensionRow' belongs to a flat prefix cluster ('rendermarkdown', 4 symbols). Extract into module 'domain/render/markdown/'",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "4 symbols share prefix 'rendermarkdown'."
+        },
+        "tier": "T1"
+      },
+      {
+        "line": 174,
+        "col": 72,
+        "rule": "GOV-TYP-003",
+        "sev": "WARN",
+        "msg": "Avoid naked `any` type annotations; prefer `unknown` or specific union types",
+        "fix": {
+          "action": "refactor",
+          "template": "Replace with a strongly-typed interface, generic parameter, or `unknown`."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 174,
+        "rule": "TSM-ANY-001",
+        "sev": "WARN",
+        "msg": "Explicit `any` disables checking for every value it touches",
+        "fix": {
+          "action": "replace_token",
+          "template": "unknown",
+          "safeToAutomate": false
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 175,
+        "col": 65,
+        "rule": "GOV-TYP-003",
+        "sev": "WARN",
+        "msg": "Avoid naked `any` type annotations; prefer `unknown` or specific union types",
+        "fix": {
+          "action": "refactor",
+          "template": "Replace with a strongly-typed interface, generic parameter, or `unknown`."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 175,
+        "rule": "TSM-ANY-001",
+        "sev": "WARN",
+        "msg": "Explicit `any` disables checking for every value it touches",
+        "fix": {
+          "action": "replace_token",
+          "template": "unknown",
+          "safeToAutomate": false
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 176,
+        "col": 47,
+        "rule": "NUM-PREC-001",
+        "sev": "WARN",
+        "msg": "Lossy precision rounding ` (rawScoreValue as number).toFixed(1)` detected. Calculation path truncates to 0.1 precision or exhibits mismatched scaling",
+        "fix": {
+          "action": "align_numeric_precision",
+          "template": "Math.round(val * 100) / 100 + 0",
+          "safeToAutomate": true
+        },
+        "verify": "node scripts/validate-dual-faced-presentation.js",
+        "tier": "T2"
+      },
+      {
+        "line": 177,
+        "col": 68,
+        "rule": "GOV-TYP-003",
+        "sev": "WARN",
+        "msg": "Avoid naked `any` type annotations; prefer `unknown` or specific union types",
+        "fix": {
+          "action": "refactor",
+          "template": "Replace with a strongly-typed interface, generic parameter, or `unknown`."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 177,
+        "rule": "TSM-ANY-001",
+        "sev": "WARN",
+        "msg": "Explicit `any` disables checking for every value it touches",
+        "fix": {
+          "action": "replace_token",
+          "template": "unknown",
+          "safeToAutomate": false
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 189,
+        "col": 11,
+        "rule": "NAM-VAG-001",
+        "sev": "WARN",
+        "msg": "identifier 'bar' lacks domain context",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace 'bar' with a domain-qualified identifier (e."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 198,
+        "col": 10,
+        "rule": "NAM-DEC-001",
+        "sev": "WARN",
+        "msg": "Symbol 'renderMarkdownQualityScorecard' belongs to a flat prefix cluster ('rendermarkdown', 4 symbols). Extract into module 'domain/render/markdown/'",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "4 symbols share prefix 'rendermarkdown'."
+        },
+        "tier": "T1"
+      },
+      {
+        "line": 224,
+        "col": 26,
+        "rule": "NUM-PREC-001",
+        "sev": "WARN",
+        "msg": "Lossy precision rounding ` (technicalDebt.totalRemediationMinutes / 60).toFixed(1)` detected. Calculation path truncates to 0.1 precision or exhibits mismatche…",
+        "fix": {
+          "action": "align_numeric_precision",
+          "template": "Math.round(val * 100) / 100 + 0",
+          "safeToAutomate": true
+        },
+        "verify": "node scripts/validate-dual-faced-presentation.js",
+        "tier": "T2"
+      },
+      {
+        "line": 245,
+        "col": 10,
+        "rule": "NAM-DEC-001",
+        "sev": "WARN",
+        "msg": "Symbol 'renderMarkdownIssuesSection' belongs to a flat prefix cluster ('rendermarkdown', 4 symbols). Extract into module 'domain/render/markdown/'",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "4 symbols share prefix 'rendermarkdown'."
+        },
+        "tier": "T1"
+      },
+      {
+        "line": 362,
+        "rule": "HYG-STB-002",
+        "sev": "WARN",
+        "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'w3'",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 363,
+        "rule": "HYG-DED-001",
+        "sev": "WARN",
+        "msg": "Dead code detected: Statement is unreachable following a terminal control flow statement (return/throw/break/continue)",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
+        },
+        "tier": "T3"
+      }
+    ],
     "src/core/reporting/aas-types.ts": [
       {
-        "line": 203,
+        "line": 237,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
         "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 51",
@@ -463,12 +743,106 @@
         "tier": "T3"
       }
     ],
+    "src/core/reporting/quality-printer.ts": [
+      {
+        "line": 107,
+        "col": 75,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 60 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 107,
+              "startCol": 75,
+              "endLine": 107,
+              "endCol": 77
+            },
+            "replacementText": "CONST_60"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 107,
+        "col": 33,
+        "rule": "NUM-PREC-001",
+        "sev": "WARN",
+        "msg": "Lossy precision rounding ` (technicalDebt.totalRemediationMinutes / 60).toFixed(1)` detected. Calculation path truncates to 0.1 precision or exhibits mismatche…",
+        "fix": {
+          "action": "align_numeric_precision",
+          "template": "Math.round(val * 100) / 100 + 0",
+          "safeToAutomate": true
+        },
+        "verify": "node scripts/validate-dual-faced-presentation.js",
+        "tier": "T2"
+      },
+      {
+        "line": 176,
+        "col": 76,
+        "rule": "GOV-TYP-003",
+        "sev": "WARN",
+        "msg": "Avoid naked `any` type annotations; prefer `unknown` or specific union types",
+        "fix": {
+          "action": "refactor",
+          "template": "Replace with a strongly-typed interface, generic parameter, or `unknown`."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 176,
+        "rule": "TSM-ANY-001",
+        "sev": "WARN",
+        "msg": "Explicit `any` disables checking for every value it touches",
+        "fix": {
+          "action": "replace_token",
+          "template": "unknown",
+          "safeToAutomate": false
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 177,
+        "col": 81,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 100 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 177,
+              "startCol": 81,
+              "endLine": 177,
+              "endCol": 84
+            },
+            "replacementText": "DURATION_100MS"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 238,
+        "rule": "CPX-TRV-001",
+        "sev": "WARN",
+        "msg": "Tautological loop traversal detected in 'printAutonomyAssessment': iteration exhibits zero or negligible state mutation entropy delta (deltaEntropy: 0 <= 0.05)",
+        "fix": {
+          "action": "decompose_complexity",
+          "template": "Eliminate vacuous iteration loop or replace with direct expression / slice lo…"
+        },
+        "verify": "node scripts/common/evaluate-eloc-budget.js",
+        "tier": "T3"
+      }
+    ],
     "src/core/router/sliceTypes.ts": [
       {
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'sliceTypes.ts' violates strict kebab-case naming convention for TypeScript/JavaScript.",
+        "msg": "File name 'sliceTypes.ts' violates strict kebab-case naming convention for TypeScript/JavaScript",
         "fix": {
           "action": "rename_identifier",
           "template": "Rename file to 'slice-types.ts'."
@@ -481,7 +855,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'scoringTypes.ts' violates strict kebab-case naming convention for TypeScript/JavaScript.",
+        "msg": "File name 'scoringTypes.ts' violates strict kebab-case naming convention for TypeScript/JavaScript",
         "fix": {
           "action": "rename_identifier",
           "template": "Rename file to 'scoring-types.ts'."
@@ -495,7 +869,7 @@
         "col": 41,
         "rule": "GOV-SAN-001",
         "sev": "WARN",
-        "msg": "Comment contains temporary batch jargon / WIP marker `W40`. Replace with canonical architectural description.",
+        "msg": "Comment contains temporary batch jargon / WIP marker `W40`. Replace with canonical architectural description",
         "fix": {
           "action": "refactor",
           "template": "Remove temporary phase/task tags and use standard domain terminology."
@@ -520,7 +894,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'recipeTypes.ts' violates strict kebab-case naming convention for TypeScript/JavaScript.",
+        "msg": "File name 'recipeTypes.ts' violates strict kebab-case naming convention for TypeScript/JavaScript",
         "fix": {
           "action": "rename_identifier",
           "template": "Rename file to 'recipe-types.ts'."
@@ -546,7 +920,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 1007 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 1015 >= warn threshold 400)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -560,7 +934,7 @@
         "col": 22,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -581,7 +955,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -602,7 +976,7 @@
         "col": 32,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -623,7 +997,7 @@
         "col": 34,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -644,7 +1018,7 @@
         "col": 47,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -665,7 +1039,7 @@
         "col": 15,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -686,7 +1060,7 @@
         "col": 3,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -707,7 +1081,7 @@
         "col": 3,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -728,7 +1102,7 @@
         "col": 3,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -748,7 +1122,7 @@
         "line": 114,
         "rule": "NAM-GLB-002",
         "sev": "WARN",
-        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state.",
+        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state",
         "fix": {
           "action": "rename_identifier",
           "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
@@ -760,7 +1134,7 @@
         "col": 41,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -781,7 +1155,7 @@
         "col": 25,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -802,7 +1176,7 @@
         "col": 67,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -823,7 +1197,7 @@
         "col": 114,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -844,7 +1218,7 @@
         "col": 125,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -867,7 +1241,7 @@
         "col": 22,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -888,7 +1262,7 @@
         "col": 36,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -909,7 +1283,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'sidecarPath' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'sidecarPath' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -932,7 +1306,7 @@
         "col": 10,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 100 should be extracted into a named constant.",
+        "msg": "Magic number 100 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -964,7 +1338,7 @@
         "col": 16,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 95 should be extracted into a named constant.",
+        "msg": "Magic number 95 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -985,7 +1359,7 @@
         "col": 16,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 85 should be extracted into a named constant.",
+        "msg": "Magic number 85 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1006,7 +1380,7 @@
         "col": 37,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1027,7 +1401,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1048,7 +1422,7 @@
         "col": 34,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1069,7 +1443,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'migrateOne' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'migrateOne' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -1081,7 +1455,7 @@
         "col": 22,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1102,7 +1476,7 @@
         "col": 22,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1123,7 +1497,7 @@
         "col": 20,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1157,7 +1531,7 @@
         "col": 22,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1178,7 +1552,7 @@
         "col": 46,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1199,7 +1573,7 @@
         "col": 49,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1220,7 +1594,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'healActiveRuns' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'healActiveRuns' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -1232,7 +1606,7 @@
         "col": 24,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1253,7 +1627,7 @@
         "col": 61,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1274,7 +1648,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'healW44Anomaly' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'healW44Anomaly' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -1286,7 +1660,7 @@
         "col": 66,
         "rule": "duplicate-literal",
         "sev": "WARN",
-        "msg": "Literal 1000 is repeated 5 times in this file; extract it into a shared constant.",
+        "msg": "Literal 1000 is repeated 5 times in this file; extract it into a shared constant",
         "fix": {
           "action": "extract_constant",
           "safeToAutomate": true
@@ -1298,7 +1672,7 @@
         "col": 26,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1330,7 +1704,7 @@
         "col": 28,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 100.0 should be extracted into a named constant.",
+        "msg": "Magic number 100.0 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1351,7 +1725,7 @@
         "col": 43,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 100000 should be extracted into a named constant.",
+        "msg": "Magic number 100000 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1372,7 +1746,7 @@
         "col": 48,
         "rule": "duplicate-literal",
         "sev": "WARN",
-        "msg": "Literal 100 is repeated 6 times in this file; extract it into a shared constant.",
+        "msg": "Literal 100 is repeated 6 times in this file; extract it into a shared constant",
         "fix": {
           "action": "extract_constant",
           "safeToAutomate": true
@@ -1384,7 +1758,7 @@
         "col": 48,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 100000 should be extracted into a named constant.",
+        "msg": "Magic number 100000 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1405,7 +1779,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'migrateSummary' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'migrateSummary' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -1417,7 +1791,7 @@
         "col": 27,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 96.0 should be extracted into a named constant.",
+        "msg": "Magic number 96.0 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1438,7 +1812,7 @@
         "col": 33,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1460,7 +1834,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 1044 >= warn threshold 400; functions 49 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 1099 >= warn threshold 400; functions 53 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -1472,7 +1846,7 @@
         "col": 60,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1493,7 +1867,7 @@
         "col": 53,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1514,7 +1888,7 @@
         "col": 56,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1547,7 +1921,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'shouldIncludeFileInElocDiff' has too many word segments (6 > 5); consider decomposing responsibilities.",
+        "msg": "Function or method name 'shouldIncludeFileInElocDiff' has too many word segments (6 > 5); consider decomposing responsibilities",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -1559,7 +1933,7 @@
         "col": 45,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 8 should be extracted into a named constant.",
+        "msg": "Magic number 8 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1580,7 +1954,7 @@
         "col": 26,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1601,7 +1975,7 @@
         "col": 58,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 7 should be extracted into a named constant.",
+        "msg": "Magic number 7 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1622,7 +1996,7 @@
         "col": 76,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 8 should be extracted into a named constant.",
+        "msg": "Magic number 8 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1643,7 +2017,7 @@
         "col": 32,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 5 should be extracted into a named constant.",
+        "msg": "Magic number 5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1664,7 +2038,7 @@
         "col": 89,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 8 should be extracted into a named constant.",
+        "msg": "Magic number 8 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1681,18 +2055,18 @@
         "tier": "T2"
       },
       {
-        "line": 747,
+        "line": 757,
         "col": 55,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 4 should be extracted into a named constant.",
+        "msg": "Magic number 4 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 747,
+              "startLine": 757,
               "startCol": 55,
-              "endLine": 747,
+              "endLine": 757,
               "endCol": 56
             },
             "replacementText": "CONST_4"
@@ -1702,18 +2076,18 @@
         "tier": "T2"
       },
       {
-        "line": 748,
+        "line": 758,
         "col": 40,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 16 should be extracted into a named constant.",
+        "msg": "Magic number 16 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 748,
+              "startLine": 758,
               "startCol": 40,
-              "endLine": 748,
+              "endLine": 758,
               "endCol": 42
             },
             "replacementText": "CONST_16"
@@ -1723,18 +2097,18 @@
         "tier": "T2"
       },
       {
-        "line": 756,
+        "line": 766,
         "col": 55,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 756,
+              "startLine": 766,
               "startCol": 55,
-              "endLine": 756,
+              "endLine": 766,
               "endCol": 67
             },
             "replacementText": "SELFAUDIT_TEXT"
@@ -1744,11 +2118,44 @@
         "tier": "T2"
       },
       {
-        "line": 945,
-        "col": 9,
+        "line": 997,
+        "col": 11,
         "rule": "NAM-LEN-001",
         "sev": "WARN",
-        "msg": "symbol 'lt' too short (<= 2 characters)",
+        "msg": "symbol 'sq' too short (<= 2 characters)",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 999,
+        "col": 109,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 60 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 999,
+              "startCol": 109,
+              "endLine": 999,
+              "endCol": 111
+            },
+            "replacementText": "CONST_60"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 1003,
+        "col": 11,
+        "rule": "NAM-LEN-001",
+        "sev": "WARN",
+        "msg": "symbol 'ts' too short (<= 2 characters)",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -1762,7 +2169,7 @@
         "col": 43,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1782,7 +2189,7 @@
         "line": 17,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"runTests\" spans 132 lines (limit 60).",
+        "msg": "Function \"runTests\" spans 132 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -1795,7 +2202,7 @@
         "col": 16,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 2000 should be extracted into a named constant.",
+        "msg": "Magic number 2000 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1816,7 +2223,7 @@
         "col": 13,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 1000 should be extracted into a named constant.",
+        "msg": "Magic number 1000 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1837,7 +2244,7 @@
         "col": 14,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 40 should be extracted into a named constant.",
+        "msg": "Magic number 40 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1858,7 +2265,7 @@
         "col": 15,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 35 should be extracted into a named constant.",
+        "msg": "Magic number 35 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1879,7 +2286,7 @@
         "col": 15,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 5 should be extracted into a named constant.",
+        "msg": "Magic number 5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1900,7 +2307,7 @@
         "col": 12,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 20 should be extracted into a named constant.",
+        "msg": "Magic number 20 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1921,7 +2328,7 @@
         "col": 14,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 20 should be extracted into a named constant.",
+        "msg": "Magic number 20 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1942,7 +2349,7 @@
         "col": 15,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 20 should be extracted into a named constant.",
+        "msg": "Magic number 20 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1963,7 +2370,7 @@
         "col": 18,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 6.5 should be extracted into a named constant.",
+        "msg": "Magic number 6.5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -1984,7 +2391,7 @@
         "col": 21,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3.5 should be extracted into a named constant.",
+        "msg": "Magic number 3.5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2005,7 +2412,7 @@
         "col": 18,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 82.0 should be extracted into a named constant.",
+        "msg": "Magic number 82.0 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2026,7 +2433,7 @@
         "col": 17,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 85.5 should be extracted into a named constant.",
+        "msg": "Magic number 85.5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2047,7 +2454,7 @@
         "col": 19,
         "rule": "duplicate-literal",
         "sev": "WARN",
-        "msg": "Literal 90 is repeated 10 times in this file; extract it into a shared constant.",
+        "msg": "Literal 90 is repeated 10 times in this file; extract it into a shared constant",
         "fix": {
           "action": "extract_constant",
           "safeToAutomate": true
@@ -2059,7 +2466,7 @@
         "col": 27,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2080,7 +2487,7 @@
         "col": 23,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2101,7 +2508,7 @@
         "col": 12,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2122,7 +2529,7 @@
         "col": 12,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2143,7 +2550,7 @@
         "col": 12,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2164,7 +2571,7 @@
         "col": 12,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2185,7 +2592,7 @@
         "col": 24,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 28.5 should be extracted into a named constant.",
+        "msg": "Magic number 28.5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2206,7 +2613,7 @@
         "col": 12,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2227,7 +2634,7 @@
         "col": 20,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 6.5 should be extracted into a named constant.",
+        "msg": "Magic number 6.5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2248,7 +2655,7 @@
         "col": 12,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2269,7 +2676,7 @@
         "col": 56,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 100 should be extracted into a named constant.",
+        "msg": "Magic number 100 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2290,7 +2697,7 @@
         "col": 25,
         "rule": "GOV-ARC-001",
         "sev": "WARN",
-        "msg": "Historical dossier nomenclature or batch tag `Phase 4` found outside archived directory white-list.",
+        "msg": "Historical dossier nomenclature or batch tag `Phase 4` found outside archived directory white-list",
         "fix": {
           "action": "refactor",
           "template": "Remove milestone/batch tags from active code; use canonical product features …"
@@ -2315,7 +2722,7 @@
         "col": 22,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2336,7 +2743,7 @@
         "col": 37,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2357,7 +2764,7 @@
         "col": 45,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2378,7 +2785,7 @@
         "col": 53,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2399,7 +2806,7 @@
         "col": 66,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2420,7 +2827,7 @@
         "col": 39,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2441,7 +2848,7 @@
         "col": 47,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2462,7 +2869,7 @@
         "col": 55,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2483,7 +2890,7 @@
         "col": 66,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2504,7 +2911,7 @@
         "col": 39,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2525,7 +2932,7 @@
         "col": 47,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2546,7 +2953,7 @@
         "col": 55,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2567,7 +2974,7 @@
         "col": 68,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2587,7 +2994,7 @@
         "line": 25,
         "rule": "NAM-GLB-002",
         "sev": "WARN",
-        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state.",
+        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state",
         "fix": {
           "action": "rename_identifier",
           "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
@@ -2599,7 +3006,7 @@
         "col": 46,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 32 should be extracted into a named constant.",
+        "msg": "Magic number 32 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2620,7 +3027,7 @@
         "col": 41,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 32 should be extracted into a named constant.",
+        "msg": "Magic number 32 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2641,7 +3048,7 @@
         "col": 42,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2662,7 +3069,7 @@
         "col": 38,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2683,7 +3090,7 @@
         "col": 38,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2704,7 +3111,7 @@
         "col": 38,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2725,7 +3132,7 @@
         "col": 37,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2746,7 +3153,7 @@
         "col": 33,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2767,7 +3174,7 @@
         "col": 7,
         "rule": "NAM-GLB-001",
         "sev": "WARN",
-        "msg": "Top-level constant 'cleanCode' should follow UPPER_SNAKE_CASE naming convention.",
+        "msg": "Top-level constant 'cleanCode' should follow UPPER_SNAKE_CASE naming convention",
         "fix": {
           "action": "rename_identifier",
           "template": "Rename 'cleanCode' to an uppercase snake_case constant (e.g. 'CLEAN_CODE')."
@@ -2779,7 +3186,7 @@
         "col": 36,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2800,7 +3207,7 @@
         "col": 7,
         "rule": "NAM-GLB-001",
         "sev": "WARN",
-        "msg": "Top-level constant 'secretCode' should follow UPPER_SNAKE_CASE naming convention.",
+        "msg": "Top-level constant 'secretCode' should follow UPPER_SNAKE_CASE naming convention",
         "fix": {
           "action": "rename_identifier",
           "template": "Rename 'secretCode' to an uppercase snake_case constant (e.g. 'SECRET_CODE')."
@@ -2812,7 +3219,7 @@
         "col": 36,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2833,7 +3240,7 @@
         "col": 7,
         "rule": "NAM-GLB-001",
         "sev": "WARN",
-        "msg": "Top-level constant 'commentCode' should follow UPPER_SNAKE_CASE naming convention.",
+        "msg": "Top-level constant 'commentCode' should follow UPPER_SNAKE_CASE naming convention",
         "fix": {
           "action": "rename_identifier",
           "template": "Rename 'commentCode' to an uppercase snake_case constant (e.g. 'COMMENT_CODE')."
@@ -2847,7 +3254,7 @@
         "col": 22,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2868,7 +3275,7 @@
         "col": 41,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2889,7 +3296,7 @@
         "col": 71,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2910,7 +3317,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'optionsFor' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'optionsFor' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -2922,7 +3329,7 @@
         "col": 33,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2943,7 +3350,7 @@
         "col": 36,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2964,7 +3371,7 @@
         "col": 31,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -2985,7 +3392,7 @@
         "col": 23,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3006,7 +3413,7 @@
         "col": 62,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3027,7 +3434,7 @@
         "col": 61,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3048,7 +3455,7 @@
         "col": 26,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3070,7 +3477,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 491 >= warn threshold 400; functions 21 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 491 >= warn threshold 400; functions 21 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -3106,7 +3513,7 @@
         "col": 35,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 47 should be extracted into a named constant.",
+        "msg": "Magic number 47 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3127,7 +3534,7 @@
         "col": 77,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 35 should be extracted into a named constant.",
+        "msg": "Magic number 35 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3158,7 +3565,7 @@
         "line": 311,
         "rule": "TSM-INCLUDES-001",
         "sev": "WARN",
-        "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants.",
+        "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants",
         "fix": {
           "action": "replace_token",
           "template": "$1.includes($2)",
@@ -3170,7 +3577,7 @@
         "line": 346,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"findLoopSitesInFunction\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"findLoopSitesInFunction\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface FindLoopSitesInFunctionOptions {",
@@ -3183,7 +3590,7 @@
         "col": 21,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 4 should be extracted into a named constant.",
+        "msg": "Magic number 4 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3204,7 +3611,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'walkChildrenCC' contains segment 'CC' with invalid morpheme phonetics (missing vowel or unapproved acronym).",
+        "msg": "Function or method name 'walkChildrenCC' contains segment 'CC' with invalid morpheme phonetics (missing vowel or unapproved acronym)",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -3229,7 +3636,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'concurrency.ts' has too few word segments (1 < 2); lacks domain specificity.",
+        "msg": "File name 'concurrency.ts' has too few word segments (1 < 2); lacks domain specificity",
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'concurrency."
@@ -3240,7 +3647,7 @@
         "line": 44,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"checkLockBoundary\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"checkLockBoundary\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface CheckLockBoundaryOptions {",
@@ -3253,7 +3660,7 @@
         "col": 27,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3274,7 +3681,7 @@
         "col": 26,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3295,7 +3702,7 @@
         "col": 58,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3316,7 +3723,7 @@
         "col": 65,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 30 should be extracted into a named constant.",
+        "msg": "Magic number 30 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3337,7 +3744,7 @@
         "col": 31,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3359,7 +3766,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 405 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 405 >= warn threshold 400)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -3371,7 +3778,7 @@
         "col": 37,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3392,7 +3799,7 @@
         "col": 62,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3412,7 +3819,7 @@
         "line": 138,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"reportEolMismatch\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"reportEolMismatch\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ReportEolMismatchOptions {",
@@ -3436,7 +3843,7 @@
         "col": 28,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3457,7 +3864,7 @@
         "col": 23,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3478,7 +3885,7 @@
         "col": 23,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3499,7 +3906,7 @@
         "col": 28,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3520,7 +3927,7 @@
         "col": 60,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3540,7 +3947,7 @@
         "line": 332,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"auditDirectoryConventions\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"auditDirectoryConventions\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface AuditDirectoryConventionsOptions {",
@@ -3554,7 +3961,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 546 >= warn threshold 400; functions 20 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 546 >= warn threshold 400; functions 20 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -3565,7 +3972,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'hygiene.ts' has too few word segments (1 < 2); lacks domain specificity.",
+        "msg": "File name 'hygiene.ts' has too few word segments (1 < 2); lacks domain specificity",
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'hygiene."
@@ -3577,7 +3984,7 @@
         "col": 43,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3598,7 +4005,7 @@
         "col": 32,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3620,7 +4027,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 717 >= warn threshold 400; functions 27 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 717 >= warn threshold 400; functions 27 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -3632,7 +4039,7 @@
         "col": 7,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
-        "msg": "Symbol 'VOLUME_SUGGESTION_DECOMPOSE' belongs to a flat prefix cluster ('volume_suggestion', 4 symbols). Extract into module 'domain/volume/suggestion/'.",
+        "msg": "Symbol 'VOLUME_SUGGESTION_DECOMPOSE' belongs to a flat prefix cluster ('volume_suggestion', 4 symbols). Extract into module 'domain/volume/suggestion/'",
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'volume_suggestion'."
@@ -3644,7 +4051,7 @@
         "col": 7,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
-        "msg": "Symbol 'VOLUME_SUGGESTION_SPLIT' belongs to a flat prefix cluster ('volume_suggestion', 4 symbols). Extract into module 'domain/volume/suggestion/'.",
+        "msg": "Symbol 'VOLUME_SUGGESTION_SPLIT' belongs to a flat prefix cluster ('volume_suggestion', 4 symbols). Extract into module 'domain/volume/suggestion/'",
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'volume_suggestion'."
@@ -3656,7 +4063,7 @@
         "col": 7,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
-        "msg": "Symbol 'VOLUME_SUGGESTION_COMPACT' belongs to a flat prefix cluster ('volume_suggestion', 4 symbols). Extract into module 'domain/volume/suggestion/'.",
+        "msg": "Symbol 'VOLUME_SUGGESTION_COMPACT' belongs to a flat prefix cluster ('volume_suggestion', 4 symbols). Extract into module 'domain/volume/suggestion/'",
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'volume_suggestion'."
@@ -3668,7 +4075,7 @@
         "col": 7,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
-        "msg": "Symbol 'VOLUME_SUGGESTION_DOCUMENT' belongs to a flat prefix cluster ('volume_suggestion', 4 symbols). Extract into module 'domain/volume/suggestion/'.",
+        "msg": "Symbol 'VOLUME_SUGGESTION_DOCUMENT' belongs to a flat prefix cluster ('volume_suggestion', 4 symbols). Extract into module 'domain/volume/suggestion/'",
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'volume_suggestion'."
@@ -3691,7 +4098,7 @@
         "col": 15,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3712,7 +4119,7 @@
         "col": 32,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 100 should be extracted into a named constant.",
+        "msg": "Magic number 100 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3733,7 +4140,7 @@
         "col": 93,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 100 should be extracted into a named constant.",
+        "msg": "Magic number 100 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3754,7 +4161,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"visit\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"visit\" has 7 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface VisitOptions {",
@@ -3767,7 +4174,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3800,7 +4207,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 496 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 496 >= warn threshold 400)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -3811,7 +4218,7 @@
         "line": 98,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"buildPythonActionable\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"buildPythonActionable\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface BuildPythonActionableOptions {",
@@ -3824,7 +4231,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'auditPythonSingleLetterAndLength' has too many word segments (6 > 5); consider decomposing responsibilities.",
+        "msg": "Function or method name 'auditPythonSingleLetterAndLength' has too many word segments (6 > 5); consider decomposing responsibilities",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -3836,7 +4243,7 @@
         "col": 26,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3857,7 +4264,7 @@
         "col": 78,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3879,7 +4286,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 628 >= warn threshold 400; functions 23 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 553 >= warn threshold 400; functions 22 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -3887,11 +4294,11 @@
         "tier": "T3"
       },
       {
-        "line": 331,
+        "line": 256,
         "col": 17,
         "rule": "duplicate-literal",
         "sev": "WARN",
-        "msg": "Literal 'apply_guard_clause' is repeated 6 times in this file; extract it into a shared constant.",
+        "msg": "Literal 'apply_guard_clause' is repeated 6 times in this file; extract it into a shared constant",
         "fix": {
           "action": "extract_constant",
           "safeToAutomate": true
@@ -3899,10 +4306,10 @@
         "tier": "T2"
       },
       {
-        "line": 340,
+        "line": 265,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"scanAsyncLockIssues\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"scanAsyncLockIssues\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ScanAsyncLockIssuesOptions {",
@@ -3911,10 +4318,10 @@
         "tier": "T1"
       },
       {
-        "line": 391,
+        "line": 316,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"scanUnsafeSafetyProofs\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"scanUnsafeSafetyProofs\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ScanUnsafeSafetyProofsOptions {",
@@ -3923,10 +4330,10 @@
         "tier": "T1"
       },
       {
-        "line": 392,
+        "line": 317,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 341",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 266",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
@@ -3934,11 +4341,11 @@
         "tier": "T3"
       },
       {
-        "line": 433,
+        "line": 358,
         "col": 5,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"RustModernAnalyzer.<anonymous>\" spans 185 lines (limit 60).",
+        "msg": "Function \"RustModernAnalyzer.<anonymous>\" spans 185 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "safeToAutomate": false
@@ -3952,7 +4359,7 @@
         "col": 29,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -3984,7 +4391,7 @@
         "col": 31,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 5 should be extracted into a named constant.",
+        "msg": "Magic number 5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4005,7 +4412,7 @@
         "col": 58,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4026,7 +4433,7 @@
         "col": 35,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4047,7 +4454,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4069,7 +4476,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 648 >= warn threshold 400; functions 21 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 648 >= warn threshold 400; functions 21 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -4080,7 +4487,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'stdlib.ts' has too few word segments (1 < 2); lacks domain specificity.",
+        "msg": "File name 'stdlib.ts' has too few word segments (1 < 2); lacks domain specificity",
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'stdlib."
@@ -4092,7 +4499,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4113,7 +4520,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'braceDelta' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'braceDelta' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -4124,7 +4531,7 @@
         "line": 224,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"collectRecursionSites\" spans 76 lines (limit 60).",
+        "msg": "Function \"collectRecursionSites\" spans 76 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -4137,7 +4544,7 @@
         "col": 23,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"openFrame\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"openFrame\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface OpenFrameOptions {",
@@ -4150,7 +4557,7 @@
         "col": 5,
         "rule": "CMP-DEN-001",
         "sev": "WARN",
-        "msg": "High cognitive token density (30% operators) exceeds maintainability lower bounds.",
+        "msg": "High cognitive token density (30% operators) exceeds maintainability lower bounds",
         "fix": {
           "action": "refactor",
           "template": "Reduce cognitive density: introduce whitespace and named intermediate constan…"
@@ -4163,7 +4570,7 @@
         "col": 44,
         "rule": "NAM-SGL-001",
         "sev": "WARN",
-        "msg": "Single-letter variable name 'i' hurts code readability.",
+        "msg": "Single-letter variable name 'i' hurts code readability",
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
@@ -4175,7 +4582,7 @@
         "col": 35,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 4 should be extracted into a named constant.",
+        "msg": "Magic number 4 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4196,7 +4603,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"emitIssue\" has 8 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"emitIssue\" has 8 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface EmitIssueOptions {",
@@ -4209,7 +4616,7 @@
         "col": 5,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"StdlibAnalyzer.emitIssue\" spans 66 lines (limit 60).",
+        "msg": "Function \"StdlibAnalyzer.emitIssue\" spans 66 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -4222,7 +4629,7 @@
         "col": 25,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4243,7 +4650,7 @@
         "col": 25,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4275,7 +4682,7 @@
         "col": 87,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 1000 should be extracted into a named constant.",
+        "msg": "Magic number 1000 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4297,7 +4704,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 493 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 493 >= warn threshold 400)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -4309,7 +4716,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'makeVscIssue' contains segment 'Vsc' with invalid morpheme phonetics (missing vowel or unapproved acronym).",
+        "msg": "Function or method name 'makeVscIssue' contains segment 'Vsc' with invalid morpheme phonetics (missing vowel or unapproved acronym)",
         "fix": {
           "action": "replace_token",
           "patch": {
@@ -4331,7 +4738,7 @@
         "col": 23,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4363,7 +4770,7 @@
         "col": 23,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4395,7 +4802,7 @@
         "col": 39,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4416,7 +4823,7 @@
         "col": 51,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4448,7 +4855,7 @@
         "col": 5,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"VscodeExtensionAnalyzer.analyze\" spans 164 lines (limit 60).",
+        "msg": "Function \"VscodeExtensionAnalyzer.analyze\" spans 164 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -4462,7 +4869,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'selfTestCmd.ts' violates strict kebab-case naming convention for TypeScript/JavaScript.",
+        "msg": "File name 'selfTestCmd.ts' violates strict kebab-case naming convention for TypeScript/JavaScript",
         "fix": {
           "action": "rename_identifier",
           "template": "Rename file to 'self-test-cmd.ts'."
@@ -4473,7 +4880,7 @@
         "line": 128,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"buildFixtures\" spans 83 lines (limit 60).",
+        "msg": "Function \"buildFixtures\" spans 83 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -4486,7 +4893,7 @@
         "col": 74,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 5 should be extracted into a named constant.",
+        "msg": "Magic number 5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4507,7 +4914,7 @@
         "col": 55,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4528,7 +4935,7 @@
         "col": 36,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 800 should be extracted into a named constant.",
+        "msg": "Magic number 800 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4549,7 +4956,7 @@
         "col": 39,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 800 should be extracted into a named constant.",
+        "msg": "Magic number 800 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4570,7 +4977,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4591,7 +4998,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4612,7 +5019,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4633,7 +5040,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4654,7 +5061,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4675,7 +5082,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4696,7 +5103,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4717,7 +5124,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4738,7 +5145,7 @@
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4771,7 +5178,7 @@
         "col": 63,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4792,7 +5199,7 @@
         "col": 36,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4813,7 +5220,7 @@
         "col": 51,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4835,7 +5242,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'metaArchitectureEvaluator.ts' violates strict kebab-case naming convention for TypeScript/JavaScript.",
+        "msg": "File name 'metaArchitectureEvaluator.ts' violates strict kebab-case naming convention for TypeScript/JavaScript",
         "fix": {
           "action": "rename_identifier",
           "template": "Rename file to 'meta-architecture-evaluator.ts'."
@@ -4847,7 +5254,7 @@
         "col": 41,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4868,7 +5275,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"evaluateTaxonomyAudit\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"evaluateTaxonomyAudit\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface EvaluateTaxonomyAuditOptions {",
@@ -4881,7 +5288,7 @@
         "col": 22,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 100 should be extracted into a named constant.",
+        "msg": "Magic number 100 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4902,7 +5309,7 @@
         "col": 22,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 150 should be extracted into a named constant.",
+        "msg": "Magic number 150 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4923,7 +5330,7 @@
         "col": 33,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant.",
+        "msg": "Magic number 10 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4944,7 +5351,7 @@
         "col": 27,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4965,7 +5372,7 @@
         "col": 27,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -4986,7 +5393,7 @@
         "col": 70,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5007,7 +5414,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"buildAuditResult\" has 9 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"buildAuditResult\" has 9 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface BuildAuditResultOptions {",
@@ -5021,7 +5428,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 822 >= warn threshold 400; functions 34 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 822 >= warn threshold 400; functions 34 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -5033,7 +5440,7 @@
         "col": 9,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5054,7 +5461,7 @@
         "col": 42,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5075,7 +5482,7 @@
         "col": 58,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 4 should be extracted into a named constant.",
+        "msg": "Magic number 4 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5096,7 +5503,7 @@
         "col": 58,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 4 should be extracted into a named constant.",
+        "msg": "Magic number 4 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5117,7 +5524,7 @@
         "col": 36,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5138,7 +5545,7 @@
         "col": 32,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 5 should be extracted into a named constant.",
+        "msg": "Magic number 5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5159,7 +5566,7 @@
         "col": 69,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 5 should be extracted into a named constant.",
+        "msg": "Magic number 5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5180,7 +5587,7 @@
         "col": 36,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5202,7 +5609,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'adapters.ts' has too few word segments (1 < 2); lacks domain specificity.",
+        "msg": "File name 'adapters.ts' has too few word segments (1 < 2); lacks domain specificity",
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'adapters."
@@ -5213,7 +5620,7 @@
         "line": 105,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -5225,7 +5632,7 @@
         "line": 106,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -5237,7 +5644,7 @@
         "line": 107,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -5249,7 +5656,7 @@
         "line": 108,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -5261,7 +5668,7 @@
         "line": 109,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -5273,7 +5680,7 @@
         "line": 110,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -5285,7 +5692,7 @@
         "line": 111,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -5297,7 +5704,7 @@
         "line": 112,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -5309,7 +5716,7 @@
         "line": 113,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -5334,7 +5741,7 @@
         "col": 17,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'adapterFor' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'adapterFor' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "template": "languageAdapter",
@@ -5349,7 +5756,7 @@
         "col": 13,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'documentRoot' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'documentRoot' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "template": "normalizedNode",
@@ -5364,7 +5771,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5409,7 +5816,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5430,7 +5837,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5451,7 +5858,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5472,7 +5879,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5493,7 +5900,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5514,7 +5921,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5535,7 +5942,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5556,7 +5963,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5577,7 +5984,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5598,7 +6005,7 @@
         "col": 11,
         "rule": "NAM-SGL-001",
         "sev": "WARN",
-        "msg": "Single-letter variable name 'k' hurts code readability.",
+        "msg": "Single-letter variable name 'k' hurts code readability",
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'k' with a meaningful descriptive name; only loop indices ('i','j','k…"
@@ -5610,7 +6017,7 @@
         "col": 31,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5631,7 +6038,7 @@
         "col": 27,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5653,7 +6060,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 530 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 530 >= warn threshold 400)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -5665,7 +6072,7 @@
         "col": 78,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 0x28 should be extracted into a named constant.",
+        "msg": "Magic number 0x28 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5685,7 +6092,7 @@
         "line": 215,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"tryParseClassDecl\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"tryParseClassDecl\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface TryParseClassDeclOptions {",
@@ -5697,7 +6104,7 @@
         "line": 257,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"tryParseFuncDecl\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"tryParseFuncDecl\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface TryParseFuncDeclOptions {",
@@ -5710,7 +6117,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'tryParseControlStmt' contains segment 'Stmt' with invalid morpheme phonetics (missing vowel or unapproved acronym).",
+        "msg": "Function or method name 'tryParseControlStmt' contains segment 'Stmt' with invalid morpheme phonetics (missing vowel or unapproved acronym)",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -5721,7 +6128,7 @@
         "line": 289,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"tryParseControlStmt\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"tryParseControlStmt\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface TryParseControlStmtOptions {",
@@ -5745,7 +6152,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'tryParseStructureStmt' contains segment 'Stmt' with invalid morpheme phonetics (missing vowel or unapproved acronym).",
+        "msg": "Function or method name 'tryParseStructureStmt' contains segment 'Stmt' with invalid morpheme phonetics (missing vowel or unapproved acronym)",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -5756,7 +6163,7 @@
         "line": 317,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"tryParseStructureStmt\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"tryParseStructureStmt\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface TryParseStructureStmtOptions {",
@@ -5769,7 +6176,7 @@
         "col": 5,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"GDScriptAdapter.extractLiterals\" spans 77 lines (limit 60).",
+        "msg": "Function \"GDScriptAdapter.extractLiterals\" spans 77 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -5783,7 +6190,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 967 >= warn threshold 400; functions 28 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 912 >= warn threshold 400; functions 28 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -5791,10 +6198,10 @@
         "tier": "T3"
       },
       {
-        "line": 487,
+        "line": 432,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 468",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 413",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
@@ -5802,10 +6209,10 @@
         "tier": "T3"
       },
       {
-        "line": 526,
+        "line": 471,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"parseStringLiterals\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"parseStringLiterals\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ParseStringLiteralsOptions {",
@@ -5814,11 +6221,11 @@
         "tier": "T1"
       },
       {
-        "line": 613,
+        "line": 558,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'braceDelta' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'braceDelta' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -5826,10 +6233,10 @@
         "tier": "T1"
       },
       {
-        "line": 671,
+        "line": 616,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"trackBraceDelta\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"trackBraceDelta\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface TrackBraceDeltaOptions {",
@@ -5838,18 +6245,18 @@
         "tier": "T1"
       },
       {
-        "line": 699,
+        "line": 644,
         "col": 59,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 699,
+              "startLine": 644,
               "startCol": 59,
-              "endLine": 699,
+              "endLine": 644,
               "endCol": 67
             },
             "replacementText": "SELECT_TEXT"
@@ -5859,10 +6266,10 @@
         "tier": "T2"
       },
       {
-        "line": 753,
+        "line": 698,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"handleTypeOrFunc\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"handleTypeOrFunc\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface HandleTypeOrFuncOptions {",
@@ -5871,18 +6278,18 @@
         "tier": "T1"
       },
       {
-        "line": 774,
+        "line": 719,
         "col": 64,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 774,
+              "startLine": 719,
               "startCol": 64,
-              "endLine": 774,
+              "endLine": 719,
               "endCol": 70
             },
             "replacementText": "FUNC_TEXT"
@@ -5892,10 +6299,10 @@
         "tier": "T2"
       },
       {
-        "line": 782,
+        "line": 727,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"handleVarOrConst\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"handleVarOrConst\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface HandleVarOrConstOptions {",
@@ -5904,10 +6311,10 @@
         "tier": "T1"
       },
       {
-        "line": 815,
+        "line": 760,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"handleBlockEntries\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"handleBlockEntries\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface HandleBlockEntriesOptions {",
@@ -5916,10 +6323,10 @@
         "tier": "T1"
       },
       {
-        "line": 833,
+        "line": 778,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"handleDeclarationLine\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"handleDeclarationLine\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface HandleDeclarationLineOptions {",
@@ -5928,10 +6335,10 @@
         "tier": "T1"
       },
       {
-        "line": 859,
+        "line": 804,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"handleControlFlowLine\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"handleControlFlowLine\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface HandleControlFlowLineOptions {",
@@ -5970,7 +6377,7 @@
         "col": 19,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -5993,7 +6400,7 @@
         "col": 13,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'documentRoot' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'documentRoot' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "template": "normalizedNode",
@@ -6007,7 +6414,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'multilang.ts' has too few word segments (1 < 2); lacks domain specificity.",
+        "msg": "File name 'multilang.ts' has too few word segments (1 < 2); lacks domain specificity",
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'multilang."
@@ -6020,7 +6427,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 634 >= warn threshold 400; functions 23 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 634 >= warn threshold 400; functions 23 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -6031,7 +6438,7 @@
         "line": 80,
         "rule": "NAM-GLB-002",
         "sev": "WARN",
-        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state.",
+        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state",
         "fix": {
           "action": "rename_identifier",
           "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
@@ -6044,7 +6451,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 561 >= warn threshold 400; functions 25 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 561 >= warn threshold 400; functions 25 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -6056,7 +6463,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'isOxcEnclosedInConstDeclaration' has too many word segments (6 > 5); consider decomposing responsibilities.",
+        "msg": "Function or method name 'isOxcEnclosedInConstDeclaration' has too many word segments (6 > 5); consider decomposing responsibilities",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -6069,7 +6476,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 653 >= warn threshold 400; functions 29 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 653 >= warn threshold 400; functions 29 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -6093,7 +6500,7 @@
         "col": 5,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'forEachChild' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'forEachChild' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "template": "iterable",
@@ -6107,7 +6514,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 424 >= warn threshold 400; functions 22 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 424 >= warn threshold 400; functions 22 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -6120,7 +6527,7 @@
         "line": 40,
         "rule": "NAM-GLB-002",
         "sev": "WARN",
-        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state.",
+        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state",
         "fix": {
           "action": "rename_identifier",
           "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
@@ -6132,7 +6539,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'pythonParser' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'pythonParser' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "patch": {
@@ -6154,7 +6561,7 @@
         "col": 32,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6174,7 +6581,7 @@
         "line": 50,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -6187,7 +6594,7 @@
         "col": 32,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6207,7 +6614,7 @@
         "line": 51,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -6219,7 +6626,7 @@
         "line": 74,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"resolvePythonNodeName\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"resolvePythonNodeName\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ResolvePythonNodeNameOptions {",
@@ -6232,7 +6639,7 @@
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6253,7 +6660,7 @@
         "col": 40,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6274,7 +6681,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'extractTypedOrDefaultPythonParam' has too many word segments (6 > 5); consider decomposing responsibilities.",
+        "msg": "Function or method name 'extractTypedOrDefaultPythonParam' has too many word segments (6 > 5); consider decomposing responsibilities",
         "fix": {
           "action": "replace_token",
           "patch": {
@@ -6296,7 +6703,7 @@
         "col": 35,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6330,7 +6737,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 575 >= warn threshold 400; functions 22 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 575 >= warn threshold 400; functions 22 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -6341,7 +6748,7 @@
         "line": 30,
         "rule": "NAM-GLB-002",
         "sev": "WARN",
-        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state.",
+        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state",
         "fix": {
           "action": "rename_identifier",
           "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
@@ -6353,7 +6760,7 @@
         "col": 7,
         "rule": "NAM-GLB-001",
         "sev": "WARN",
-        "msg": "Top-level constant '_ADAPTER_ID_RUST' should follow UPPER_SNAKE_CASE naming convention.",
+        "msg": "Top-level constant '_ADAPTER_ID_RUST' should follow UPPER_SNAKE_CASE naming convention",
         "fix": {
           "action": "rename_identifier",
           "template": "Rename '_ADAPTER_ID_RUST' to an uppercase snake_case constant (e."
@@ -6364,7 +6771,7 @@
         "line": 71,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -6376,7 +6783,7 @@
         "line": 72,
         "rule": "TSM-REQUIRE-001",
         "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax.",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
         "fix": {
           "action": "replace_token",
           "template": "import $1 from $2;",
@@ -6389,7 +6796,7 @@
         "col": 32,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6410,7 +6817,7 @@
         "col": 32,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 8 should be extracted into a named constant.",
+        "msg": "Magic number 8 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6431,7 +6838,7 @@
         "col": 48,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6452,7 +6859,7 @@
         "col": 67,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6473,7 +6880,7 @@
         "col": 24,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6494,7 +6901,7 @@
         "col": 16,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6516,7 +6923,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 519 >= warn threshold 400; functions 22 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 519 >= warn threshold 400; functions 22 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -6540,7 +6947,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'bindingOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'bindingOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -6552,7 +6959,7 @@
         "col": 56,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6573,7 +6980,7 @@
         "col": 56,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6594,7 +7001,7 @@
         "col": 5,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'lookup' has too few word segments (1 < 2); lacks semantic description.",
+        "msg": "Function or method name 'lookup' has too few word segments (1 < 2); lacks semantic description",
         "fix": {
           "action": "replace_token",
           "template": "lookupResult",
@@ -6607,7 +7014,7 @@
         "col": 38,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6628,7 +7035,7 @@
         "col": 31,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
+        "msg": "Magic number 3 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6649,7 +7056,7 @@
         "col": 33,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 4 should be extracted into a named constant.",
+        "msg": "Magic number 4 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6670,7 +7077,7 @@
         "col": 35,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 5 should be extracted into a named constant.",
+        "msg": "Magic number 5 should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6691,7 +7098,7 @@
         "col": 5,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name '_finalize' has too few word segments (1 < 2); lacks semantic description.",
+        "msg": "Function or method name '_finalize' has too few word segments (1 < 2); lacks semantic description",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -6715,7 +7122,7 @@
         "col": 21,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6736,7 +7143,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"visit\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"visit\" has 7 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface VisitOptions {",
@@ -6760,7 +7167,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"leave\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"leave\" has 7 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface LeaveOptions {",
@@ -6787,7 +7194,7 @@
         "col": 13,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'documentRoot' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'documentRoot' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "template": "normalizedNode",
@@ -6802,7 +7209,7 @@
         "col": 25,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6823,7 +7230,7 @@
         "col": 40,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6844,7 +7251,7 @@
         "col": 40,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6865,7 +7272,7 @@
         "col": 68,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6886,7 +7293,7 @@
         "col": 12,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6907,7 +7314,7 @@
         "col": 24,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6928,7 +7335,7 @@
         "col": 48,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6949,7 +7356,7 @@
         "col": 24,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -6970,7 +7377,7 @@
         "col": 48,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -7017,7 +7424,7 @@
         "col": 12,
         "rule": "HYG-WRAP-001",
         "sev": "WARN",
-        "msg": "Function `pruneIssuesOutsideWindow` is a vacuous passthrough wrapper directly forwarding arguments to `swa.pruneIssuesOutsideWindow`.",
+        "msg": "Function `pruneIssuesOutsideWindow` is a vacuous passthrough wrapper directly forwarding arguments to `swa.pruneIssuesOutsideWindow`",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
@@ -7056,7 +7463,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 850 >= warn threshold 400; functions 27 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 850 >= warn threshold 400; functions 27 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -7068,7 +7475,7 @@
         "col": 38,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -7089,7 +7496,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"computeReplayWindow\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"computeReplayWindow\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ComputeReplayWindowOptions {",
@@ -7124,7 +7531,7 @@
         "line": 556,
         "rule": "TSM-INCLUDES-001",
         "sev": "WARN",
-        "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants.",
+        "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants",
         "fix": {
           "action": "replace_token",
           "template": "$1.includes($2)",
@@ -7136,7 +7543,7 @@
         "line": 639,
         "rule": "TSM-INCLUDES-001",
         "sev": "WARN",
-        "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants.",
+        "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants",
         "fix": {
           "action": "replace_token",
           "template": "$1.includes($2)",
@@ -7148,7 +7555,7 @@
         "line": 641,
         "rule": "TSM-INCLUDES-001",
         "sev": "WARN",
-        "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants.",
+        "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants",
         "fix": {
           "action": "replace_token",
           "template": "$1.includes($2)",
@@ -7163,7 +7570,7 @@
         "col": 17,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'isPureAsciiSWAR64' contains segment 'R64' with invalid morpheme phonetics (missing vowel or unapproved acronym).",
+        "msg": "Function or method name 'isPureAsciiSWAR64' contains segment 'R64' with invalid morpheme phonetics (missing vowel or unapproved acronym)",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -7175,7 +7582,7 @@
         "col": 17,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'align64' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'align64' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -7212,7 +7619,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 761 >= warn threshold 400; functions 25 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 761 >= warn threshold 400; functions 25 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -7223,7 +7630,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'traverse.ts' has too few word segments (1 < 2); lacks domain specificity.",
+        "msg": "File name 'traverse.ts' has too few word segments (1 < 2); lacks domain specificity",
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'traverse."
@@ -7234,7 +7641,7 @@
         "line": 107,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"dispatchHooks\" has 8 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"dispatchHooks\" has 8 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface DispatchHooksOptions {",
@@ -7257,7 +7664,7 @@
         "line": 246,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"dispatchActiveAndExemptHooks\" has 10 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"dispatchActiveAndExemptHooks\" has 10 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface DispatchActiveAndExemptHooksOptions {",
@@ -7269,7 +7676,7 @@
         "line": 286,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"runStreaming\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"runStreaming\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface RunStreamingOptions {",
@@ -7281,7 +7688,7 @@
         "line": 286,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"runStreaming\" spans 84 lines (limit 60).",
+        "msg": "Function \"runStreaming\" spans 84 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -7294,7 +7701,7 @@
         "col": 23,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"visitNode\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"visitNode\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface VisitNodeOptions {",
@@ -7307,7 +7714,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"visit\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"visit\" has 7 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface VisitOptions {",
@@ -7320,7 +7727,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'dispatchProjectedActiveAndExemptHooks' has too many word segments (6 > 5); consider decomposing responsibilities.",
+        "msg": "Function or method name 'dispatchProjectedActiveAndExemptHooks' has too many word segments (6 > 5); consider decomposing responsibilities",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -7331,7 +7738,7 @@
         "line": 492,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"dispatchProjectedActiveAndExemptHooks\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"dispatchProjectedActiveAndExemptHooks\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface DispatchProjectedActiveAndExemptHooksOptions {",
@@ -7343,7 +7750,7 @@
         "line": 517,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"notifyProjectedObserver\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"notifyProjectedObserver\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface NotifyProjectedObserverOptions {",
@@ -7355,7 +7762,7 @@
         "line": 576,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"runStreamingProjected\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"runStreamingProjected\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface RunStreamingProjectedOptions {",
@@ -7367,7 +7774,7 @@
         "line": 576,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"runStreamingProjected\" spans 98 lines (limit 60).",
+        "msg": "Function \"runStreamingProjected\" spans 98 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -7380,7 +7787,7 @@
         "col": 22,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"visitRaw\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"visitRaw\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface VisitRawOptions {",
@@ -7394,7 +7801,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 470 >= warn threshold 400; functions 24 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 470 >= warn threshold 400; functions 24 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -7406,7 +7813,7 @@
         "col": 17,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'bindingName' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'bindingName' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -7418,7 +7825,7 @@
         "col": 17,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'kindOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'kindOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "template": "nodeKind",
@@ -7431,7 +7838,7 @@
         "col": 17,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'branchWeightOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'branchWeightOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -7443,7 +7850,7 @@
         "col": 17,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'calleeNameOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'calleeNameOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -7467,7 +7874,7 @@
         "col": 17,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'nameOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'nameOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -7479,7 +7886,7 @@
         "col": 49,
         "rule": "hardcoded-string",
         "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
+        "msg": "Hardcoded string should be extracted into a named constant",
         "fix": {
           "action": "extract_constant",
           "patch": {
@@ -7523,7 +7930,7 @@
         "col": 17,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'posOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'posOf' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "template": "positionOf",
@@ -7537,7 +7944,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 635 >= warn threshold 400; functions 34 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 635 >= warn threshold 400; functions 34 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -7549,7 +7956,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'maxSyntaxKind' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'maxSyntaxKind' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
@@ -7560,7 +7967,7 @@
         "line": 133,
         "rule": "TSM-CTOR-001",
         "sev": "WARN",
-        "msg": "Wrapper constructor called with `new`; a literal or the primitive is equivalent.",
+        "msg": "Wrapper constructor called with `new`; a literal or the primitive is equivalent",
         "fix": {
           "action": "replace_token",
           "template": "[]",
@@ -7573,7 +7980,7 @@
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'kindInfoFor' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'kindInfoFor' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "patch": {
@@ -7608,7 +8015,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"isObservableSyntax\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"isObservableSyntax\" has 7 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface IsObservableSyntaxOptions {",
@@ -7621,7 +8028,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"shouldCollapseToPlaceholder\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"shouldCollapseToPlaceholder\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ShouldCollapseToPlaceholderOptions {",
@@ -7634,7 +8041,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"resolveProjectedPositions\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"resolveProjectedPositions\" has 7 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ResolveProjectedPositionsOptions {",
@@ -7647,7 +8054,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"buildProjectedNode\" has 9 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"buildProjectedNode\" has 9 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface BuildProjectedNodeOptions {",
@@ -7660,7 +8067,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"applyProjectedMetadata\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"applyProjectedMetadata\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ApplyProjectedMetadataOptions {",
@@ -7685,7 +8092,7 @@
         "col": 5,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'forEachChild' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'forEachChild' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "template": "iterable",
@@ -7709,7 +8116,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"applyCheapNonFunctionProps\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"applyCheapNonFunctionProps\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ApplyCheapNonFunctionPropsOptions {",
@@ -7722,7 +8129,7 @@
         "col": 13,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
-        "msg": "Function or method name 'cheapProject' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
+        "msg": "Function or method name 'cheapProject' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
         "fix": {
           "action": "replace_token",
           "template": "normalizedNode",
@@ -7737,7 +8144,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"resolveNodePositions\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"resolveNodePositions\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ResolveNodePositionsOptions {",
@@ -7750,7 +8157,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"resolveNodeName\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"resolveNodeName\" has 7 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ResolveNodeNameOptions {",
@@ -7763,7 +8170,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"buildNormalizedNode\" has 8 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"buildNormalizedNode\" has 8 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface BuildNormalizedNodeOptions {",
@@ -7776,7 +8183,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"applyNodeHierarchy\" has 7 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"applyNodeHierarchy\" has 7 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface ApplyNodeHierarchyOptions {",
@@ -7789,7 +8196,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"tryReuseSubtree\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"tryReuseSubtree\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface TryReuseSubtreeOptions {",
@@ -7802,7 +8209,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"recordSpanCache\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"recordSpanCache\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface RecordSpanCacheOptions {",
@@ -7826,7 +8233,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"traverseChildren\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"traverseChildren\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface TraverseChildrenOptions {",
@@ -7839,7 +8246,7 @@
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"mapNode\" has 6 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"mapNode\" has 6 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface MapNodeOptions {",
@@ -7853,7 +8260,7 @@
         "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
-        "msg": "File name 'utf8.ts' has too few word segments (1 < 2); lacks domain specificity.",
+        "msg": "File name 'utf8.ts' has too few word segments (1 < 2); lacks domain specificity",
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'utf8."
@@ -7865,7 +8272,7 @@
         "col": 17,
         "rule": "HYG-WRAP-001",
         "sev": "WARN",
-        "msg": "Function `isPureAscii` is a vacuous passthrough wrapper directly forwarding arguments to `isPureAsciiSWAR64`.",
+        "msg": "Function `isPureAscii` is a vacuous passthrough wrapper directly forwarding arguments to `isPureAsciiSWAR64`",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
@@ -7877,7 +8284,7 @@
         "col": 5,
         "rule": "NAM-SGL-001",
         "sev": "WARN",
-        "msg": "Single-letter variable name 'i' hurts code readability.",
+        "msg": "Single-letter variable name 'i' hurts code readability",
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
@@ -7888,7 +8295,7 @@
         "line": 119,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
-        "msg": "Function \"finishMultiByteSequence\" has 5 parameters (limit 4). Introduce a parameter object.",
+        "msg": "Function \"finishMultiByteSequence\" has 5 parameters (limit 4). Introduce a parameter object",
         "fix": {
           "action": "introduce_parameter_object",
           "template": "export interface FinishMultiByteSequenceOptions {",
@@ -7914,7 +8321,7 @@
         "col": 9,
         "rule": "NAM-SGL-001",
         "sev": "WARN",
-        "msg": "Single-letter variable name 'i' hurts code readability.",
+        "msg": "Single-letter variable name 'i' hurts code readability",
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
@@ -7938,517 +8345,17 @@
         "col": 9,
         "rule": "NAM-SGL-001",
         "sev": "WARN",
-        "msg": "Single-letter variable name 'k' hurts code readability.",
+        "msg": "Single-letter variable name 'k' hurts code readability",
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'k' with a meaningful descriptive name; only loop indices ('i','j','k…"
         },
         "tier": "T3"
-      },
-      {
-        "line": 263,
-        "rule": "HYG-DED-001",
-        "sev": "WARN",
-        "msg": "Dead code detected: Statement is unreachable following a terminal control flow statement (return/throw/break/continue)",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
-        },
-        "tier": "T3"
-      },
-      {
-        "line": 295,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 270",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        },
-        "tier": "T3"
-      }
-    ],
-    "src/core/cfg/def-use-chain.ts": [
-      {
-        "line": 35,
-        "col": 10,
-        "rule": "HYG-WRAP-001",
-        "sev": "WARN",
-        "msg": "Function `isResourceAllocStatement` is a vacuous passthrough wrapper directly forwarding arguments to `COMBINED_RESOURCE_ALLOC_RE.test`.",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 39,
-        "col": 10,
-        "rule": "HYG-WRAP-001",
-        "sev": "WARN",
-        "msg": "Function `isResourceCleanupStatement` is a vacuous passthrough wrapper directly forwarding arguments to `COMBINED_RESOURCE_CLEANUP_RE.test`.",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 48,
-        "col": 18,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 48 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 48,
-              "startCol": 18,
-              "endLine": 48,
-              "endCol": 20
-            },
-            "replacementText": "CONST_48"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 48,
-        "col": 32,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 57 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 48,
-              "startCol": 32,
-              "endLine": 48,
-              "endCol": 34
-            },
-            "replacementText": "CONST_57"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 49,
-        "col": 18,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 65 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 49,
-              "startCol": 18,
-              "endLine": 49,
-              "endCol": 20
-            },
-            "replacementText": "CONST_65"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 49,
-        "col": 32,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 90 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 49,
-              "startCol": 32,
-              "endLine": 49,
-              "endCol": 34
-            },
-            "replacementText": "CONST_90"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 50,
-        "col": 18,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 97 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 50,
-              "startCol": 18,
-              "endLine": 50,
-              "endCol": 20
-            },
-            "replacementText": "CONST_97"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 50,
-        "col": 32,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 122 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 50,
-              "startCol": 32,
-              "endLine": 50,
-              "endCol": 35
-            },
-            "replacementText": "CONST_122"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 51,
-        "col": 18,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 95 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 51,
-              "startCol": 18,
-              "endLine": 51,
-              "endCol": 20
-            },
-            "replacementText": "CONST_95"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 60,
-        "col": 18,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 48 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 60,
-              "startCol": 18,
-              "endLine": 60,
-              "endCol": 20
-            },
-            "replacementText": "CONST_48"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 60,
-        "col": 32,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 57 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 60,
-              "startCol": 32,
-              "endLine": 60,
-              "endCol": 34
-            },
-            "replacementText": "CONST_57"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 61,
-        "col": 18,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 65 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 61,
-              "startCol": 18,
-              "endLine": 61,
-              "endCol": 20
-            },
-            "replacementText": "CONST_65"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 61,
-        "col": 32,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 90 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 61,
-              "startCol": 32,
-              "endLine": 61,
-              "endCol": 34
-            },
-            "replacementText": "CONST_90"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 62,
-        "col": 18,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 97 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 62,
-              "startCol": 18,
-              "endLine": 62,
-              "endCol": 20
-            },
-            "replacementText": "CONST_97"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 62,
-        "col": 32,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 122 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 62,
-              "startCol": 32,
-              "endLine": 62,
-              "endCol": 35
-            },
-            "replacementText": "CONST_122"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 63,
-        "col": 18,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 95 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 63,
-              "startCol": 18,
-              "endLine": 63,
-              "endCol": 20
-            },
-            "replacementText": "CONST_95"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 64,
-        "col": 18,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 36 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 64,
-              "startCol": 18,
-              "endLine": 64,
-              "endCol": 20
-            },
-            "replacementText": "CONST_36"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 79,
-        "col": 75,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 46 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 79,
-              "startCol": 75,
-              "endLine": 79,
-              "endCol": 77
-            },
-            "replacementText": "CONST_46"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 145,
-        "col": 49,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 145,
-              "startCol": 49,
-              "endLine": 145,
-              "endCol": 55
-            },
-            "replacementText": "READ_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 147,
-        "col": 28,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 147,
-              "startCol": 28,
-              "endLine": 147,
-              "endCol": 37
-            },
-            "replacementText": "CLEANUP_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 149,
-        "col": 28,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 149,
-              "startCol": 28,
-              "endLine": 149,
-              "endCol": 41
-            },
-            "replacementText": "DEREFERENCE_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 178,
-        "col": 52,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 178,
-              "startCol": 52,
-              "endLine": 178,
-              "endCol": 72
-            },
-            "replacementText": "ANONYMOUSASYNCCALL_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 270,
-        "col": 34,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 270,
-              "startCol": 34,
-              "endLine": 270,
-              "endCol": 43
-            },
-            "replacementText": "CLEANUP_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      }
-    ],
-    "src/core/codemod/patch-engine.ts": [
-      {
-        "line": 50,
-        "col": 12,
-        "rule": "GOV-PRF-004",
-        "sev": "WARN",
-        "msg": "Synchronous fs call blocks the host event loop (UI jank / request stall source).",
-        "fix": {
-          "action": "refactor",
-          "template": "Use fs/promises or the host async fs API (e.g. vscode.workspace.fs)."
-        },
-        "tier": "T3"
       }
     ]
   },
-  "truncated": 3042
+  "truncated": 3091,
+  "notes": [
+    "dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph"
+  ]
 }

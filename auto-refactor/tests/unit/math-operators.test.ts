@@ -87,11 +87,11 @@ describe('Core Math — Pure Mathematical Operators', () => {
         });
 
         it('inverts incomplete beta function I_x(a, b) = p with roundtrip consistency', () => {
-            const a = 3.5;
-            const b = 2.5;
+            const alphaParam = 3.5;
+            const betaParam = 2.5;
             const targetP = 0.65;
-            const xSolved = computeInverseIncompleteBeta(a, b, targetP);
-            const pRoundtrip = computeRegularizedIncompleteBeta(a, b, xSolved);
+            const xSolved = computeInverseIncompleteBeta(alphaParam, betaParam, targetP);
+            const pRoundtrip = computeRegularizedIncompleteBeta(alphaParam, betaParam, xSolved);
             expect(pRoundtrip).toBeCloseTo(targetP, 4);
         });
 

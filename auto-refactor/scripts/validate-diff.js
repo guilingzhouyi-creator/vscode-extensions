@@ -38,6 +38,12 @@ try {
 }
 
 const CACHE_DIR = path.join(DEFAULT_TMP_DIR, 'ar-diff-validate-cache');
+process.env.AUTO_REFACTOR_REGISTRY_DIR ||= path.join(DEFAULT_TMP_DIR, 'ar-diff-registry');
+try {
+  fs.mkdirSync(process.env.AUTO_REFACTOR_REGISTRY_DIR, { recursive: true });
+} catch {
+  // best-effort
+}
 const CFG = path.join(CORPUS, 'auto-refactor.config.json');
 
 const FORMAT_JSON = 'json';

@@ -374,15 +374,15 @@ async function main() {
   );
 
   // All 4 active sets must be distinct
-  const toKey = (r) => Array.from(r.activeAnalyzers).sort().join(',');
+  const toKey = (routeResult) => Array.from(routeResult.activeAnalyzers).sort().join(',');
   assert.notStrictEqual(toKey(demoRoute), toKey(webRoute));
   assert.notStrictEqual(toKey(webRoute), toKey(gameRoute));
   assert.notStrictEqual(toKey(gameRoute), toKey(libRoute));
 
   const tmpRoot = createTempTestDir('archetype-scan-');
   // Helper to create and scan archetype test fixtures
-  const setupWs = (dirName, files) => {
-    const wsDir = path.join(tmpRoot, dirName);
+  const setupWs = (workspaceDirName, files) => {
+    const wsDir = path.join(tmpRoot, workspaceDirName);
     deployFixtures(wsDir, files);
     return wsDir;
   };
@@ -390,10 +390,10 @@ async function main() {
   try {
     // 1. Demo workspace (path contains sample_demo_project)
     const demoDir = setupWs('sample_demo_project', { 'src/index.ts': 'export const DEMO = 1;\n' });
-    const demoRep = await scan({ root: demoDir, cache: false, workers: 1 });
-    assert.strictEqual(demoRep.summary.activatedReviewers?.archetype, 'demo');
-    assert(demoRep.summary.activatedReviewers.active.includes('constants'));
-    assert(!demoRep.summary.activatedReviewers.active.includes('architecture'));
+    const demoReport = await scan({ root: demoDir, cache: false, workers: 1 });
+    assert.strictEqual(demoReport.summary.activatedReviewers?.archetype, 'demo');
+    assert(demoReport.summary.activatedReviewers.active.includes('constants'));
+    assert(!demoReport.summary.activatedReviewers.active.includes('architecture'));
 
     // 2. Web workspace (package.json has express)
     const webPkg = JSON.stringify({ name: 'web', dependencies: { express: '^4.18.0' } });
@@ -401,9 +401,9 @@ async function main() {
       'package.json': webPkg,
       'src/server.ts': 'export function app() {}\n',
     });
-    const webRep = await scan({ root: webDir, cache: false, workers: 1 });
-    assert.strictEqual(webRep.summary.activatedReviewers?.archetype, 'web');
-    assert(webRep.summary.activatedReviewers.active.includes('security'));
+    const webReport = await scan({ root: webDir, cache: false, workers: 1 });
+    assert.strictEqual(webReport.summary.activatedReviewers?.archetype, 'web');
+    assert(webReport.summary.activatedReviewers.active.includes('security'));
 
     // 3. Game workspace (project.godot exists)
     const gameFiles = {
@@ -411,9 +411,9 @@ async function main() {
       'scripts/player.gd': 'extends Node\nfunc _ready():\n\tpass\n',
     };
     const gameDir = setupWs('game_project', gameFiles);
-    const gameRep = await scan({ root: gameDir, cache: false, workers: 1 });
-    assert.strictEqual(gameRep.summary.activatedReviewers?.archetype, 'game');
-    assert(gameRep.summary.activatedReviewers.active.includes('gdscript-modern'));
+    const gameReport = await scan({ root: gameDir, cache: false, workers: 1 });
+    assert.strictEqual(gameReport.summary.activatedReviewers?.archetype, 'game');
+    assert(gameReport.summary.activatedReviewers.active.includes('gdscript-modern'));
 
     // 4. Library workspace (package.json has main/module)
     const libPkg = JSON.stringify({ name: 'my-lib', main: 'dist/index.js' });
@@ -421,14 +421,14 @@ async function main() {
       'package.json': libPkg,
       'src/index.ts': 'export function lib() {}\n',
     });
-    const libRep = await scan({ root: libDir, cache: false, workers: 1 });
-    assert.strictEqual(libRep.summary.activatedReviewers?.archetype, 'library');
-    assert(libRep.summary.activatedReviewers.active.includes('architecture'));
-    assert(libRep.summary.activatedReviewers.active.includes('dependency-graph'));
+    const libReport = await scan({ root: libDir, cache: false, workers: 1 });
+    assert.strictEqual(libReport.summary.activatedReviewers?.archetype, 'library');
+    assert(libReport.summary.activatedReviewers.active.includes('architecture'));
+    assert(libReport.summary.activatedReviewers.active.includes('dependency-graph'));
 
     // 5. Test sparseRouting=true filtering
-    const sparseRep = await scan({ root: demoDir, sparseRouting: true, cache: false, workers: 1 });
-    assert.strictEqual(sparseRep.summary.activatedReviewers?.archetype, 'demo');
+    const sparseReport = await scan({ root: demoDir, sparseRouting: true, cache: false, workers: 1 });
+    assert.strictEqual(sparseReport.summary.activatedReviewers?.archetype, 'demo');
 
     console.log('Archetype activations verified across demo, web, game, library.');
   } finally {
@@ -439,20 +439,20 @@ async function main() {
 
   console.log('=== [7/7] Testing DeepInfer Disaggregated Serving & Tiered Offloading ===');
   // 1. Localized slice audit serving
-  const sliceAuditRes = await handleSliceAudit(
+  const sliceAuditResult = await handleSliceAudit(
     'src/math.ts',
     'export function add(a: number, b: number): number { return a + b; }',
     'export function add(a: number, b: number, c?: number): number { return a + b + (c || 0); }',
     [1],
   );
-  assert(sliceAuditRes.slices.length > 0, 'Slice audit must extract affected AST slices');
-  assert.strictEqual(sliceAuditRes.slices[0].symbolName, 'add', 'Symbol name must match');
+  assert(sliceAuditResult.slices.length > 0, 'Slice audit must extract affected AST slices');
+  assert.strictEqual(sliceAuditResult.slices[0].symbolName, 'add', 'Symbol name must match');
   console.log(
-    `Slice audit extracted ${sliceAuditRes.slices.length} slice(s) in ${sliceAuditRes.durationMs}ms`,
+    `Slice audit extracted ${sliceAuditResult.slices.length} slice(s) in ${sliceAuditResult.durationMs}ms`,
   );
 
   // 2. Disaggregated Prefill-Decode serving via daemon context
-  const daemonCtx = createDaemonContext();
+  const daemonContext = createDaemonContext();
   const daemonConfig = {
     root: process.cwd(),
     include: ['src/**/*.ts'],
@@ -471,20 +471,20 @@ async function main() {
   ];
 
   // Prefill only (FastTrack foreground audit without blocking on DeepTrack)
-  const prefillRes = await handleAsymmetricScan(daemonCtx, daemonConfig, daemonInputs, {
+  const prefillResult = await handleAsymmetricScan(daemonContext, daemonConfig, daemonInputs, {
     prefillOnly: true,
   });
-  assert.strictEqual(prefillRes.fastVerdict.status, 'SPECULATIVE_PASSED');
-  assert.strictEqual(prefillRes.deepStatus, 'SKIPPED');
-  console.log(`Disaggregated Prefill-only completed in ${prefillRes.durationMs}ms`);
+  assert.strictEqual(prefillResult.fastVerdict.status, 'SPECULATIVE_PASSED');
+  assert.strictEqual(prefillResult.deepStatus, 'SKIPPED');
+  console.log(`Disaggregated Prefill-only completed in ${prefillResult.durationMs}ms`);
 
   // Full Prefill + Decode disaggregation
-  const fullRes = await handleAsymmetricScan(daemonCtx, daemonConfig, daemonInputs, {
+  const fullDisaggregatedResult = await handleAsymmetricScan(daemonContext, daemonConfig, daemonInputs, {
     prefillOnly: false,
   });
-  assert.strictEqual(fullRes.fastVerdict.status, 'SPECULATIVE_PASSED');
-  assert.strictEqual(fullRes.deepStatus, 'CONFIRMED');
-  console.log(`Full Disaggregated Prefill+Decode completed in ${fullRes.durationMs}ms`);
+  assert.strictEqual(fullDisaggregatedResult.fastVerdict.status, 'SPECULATIVE_PASSED');
+  assert.strictEqual(fullDisaggregatedResult.deepStatus, 'CONFIRMED');
+  console.log(`Full Disaggregated Prefill+Decode completed in ${fullDisaggregatedResult.durationMs}ms`);
 
   // 3. KTransformers-style tiered analyzer pool offloading
   const pool = new WorkerPoolManager({ maxConcurrency: 2 });
@@ -510,7 +510,7 @@ async function main() {
   console.log('🎉 ALL ASYMMETRIC AUDIT SCANNING ENGINE CHECKS PASSED (7/7)!');
 }
 
-main().catch((err) => {
-  console.error('Validation failed:', err);
+main().catch((validationError) => {
+  console.error('Validation failed:', validationError);
   process.exit(1);
 });

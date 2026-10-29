@@ -92,7 +92,7 @@ function runTests() {
     ];
 
     const result = auditConfigDrivenArchitecture(files, { fileCount: 2, domainCount: 1 });
-    const deadIssue = result.issues.find((i) => i.rule === 'ARCH-CFG-002');
+    const deadIssue = result.issues.find((issue) => issue.rule === 'ARCH-CFG-002');
     assert(deadIssue !== undefined, 'Detected dead config key (ARCH-CFG-002)');
     assert(
       deadIssue && deadIssue.message.includes('obsolete_key_never_used'),
@@ -118,7 +118,7 @@ function runTests() {
     ];
 
     const result = auditConfigDrivenArchitecture(files, { fileCount: 3, domainCount: 1 });
-    const dupIssue = result.issues.find((i) => i.rule === 'ARCH-CFG-003');
+    const dupIssue = result.issues.find((issue) => issue.rule === 'ARCH-CFG-003');
     assert(dupIssue !== undefined, 'Detected duplicate configuration (ARCH-CFG-003)');
     assert(
       dupIssue && dupIssue.detail.key === 'database_url',
@@ -142,7 +142,7 @@ function runTests() {
     ];
 
     const result = auditConfigDrivenArchitecture(files, { fileCount: 1, domainCount: 1 });
-    const envIssue = result.issues.find((i) => i.rule === 'ARCH-CFG-004');
+    const envIssue = result.issues.find((issue) => issue.rule === 'ARCH-CFG-004');
     assert(envIssue !== undefined, 'Detected implicit process.env in domain core (ARCH-CFG-004)');
     assert(
       envIssue && envIssue.location.file === 'src/domain/pricing.ts',
@@ -168,7 +168,7 @@ function runTests() {
     ];
 
     const result = auditConfigDrivenArchitecture(files, { fileCount: 3, domainCount: 1 });
-    const scattered = result.issues.find((i) => i.rule === 'ARCH-CFG-005');
+    const scattered = result.issues.find((issue) => issue.rule === 'ARCH-CFG-005');
     assert(scattered !== undefined, 'Detected scattered raw config access (ARCH-CFG-005)');
   }
 
@@ -181,7 +181,7 @@ function runTests() {
           import * as fs from 'fs';
           export class CombatEngine {
             init() {
-              const cfg = fs.readFileSync('config/combat.json');
+              const configData = fs.readFileSync('config/combat.json');
             }
           }
         `,
@@ -190,7 +190,7 @@ function runTests() {
     ];
 
     const result = auditConfigDrivenArchitecture(files, { fileCount: 1, domainCount: 1 });
-    const coupling = result.issues.find((i) => i.rule === 'ARCH-CFG-006');
+    const coupling = result.issues.find((issue) => issue.rule === 'ARCH-CFG-006');
     assert(coupling !== undefined, 'Detected physical disk I/O in domain core (ARCH-CFG-006)');
   }
 
@@ -207,7 +207,7 @@ function runTests() {
     ];
 
     const result = auditConfigDrivenArchitecture(files, { fileCount: 7, domainCount: 1 });
-    const overAbstract = result.issues.find((i) => i.rule === 'ARCH-CFG-007');
+    const overAbstract = result.issues.find((issue) => issue.rule === 'ARCH-CFG-007');
     assert(
       overAbstract !== undefined,
       'Detected over-abstracted config for small project (ARCH-CFG-007)',
@@ -253,7 +253,7 @@ function runTests() {
     ];
 
     const result = auditConfigDrivenArchitecture(files, { fileCount: 2, domainCount: 1 });
-    const deadIssue = result.issues.find((i) => i.rule === 'ARCH-CFG-002');
+    const deadIssue = result.issues.find((issue) => issue.rule === 'ARCH-CFG-002');
     assert(
       deadIssue !== undefined && deadIssue.message.includes('port'),
       'Token boundary matching correctly identifies "port" as dead despite "import"/"export"',

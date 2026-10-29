@@ -34,9 +34,9 @@ function createTempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), `gate-test-${prefix}-`));
 }
 
-function cleanTempDir(dir) {
+function cleanTempDir(targetDir) {
   try {
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(targetDir, { recursive: true, force: true });
   } catch {
     // best-effort: test fixture cleanup
   }
@@ -54,52 +54,52 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
 
 // ── Test 1: Archetype Detection ──
 (function testArchetypeDetection() {
-  const dir = createTempDir('archetype');
+  const testDirectory = createTempDir('archetype');
   try {
     // 1.1 Node.js project
     fs.writeFileSync(
-      path.join(dir, 'package.json'),
+      path.join(testDirectory, 'package.json'),
       JSON.stringify({ name: 'test-node', scripts: { test: 'jest' } }),
     );
-    fs.writeFileSync(path.join(dir, 'pnpm-lock.yaml'), '');
-    let ctx = inspectRepoArchetype(dir);
-    assert.strictEqual(ctx.primaryArchetype, 'node');
-    assert.strictEqual(ctx.packageManager, 'pnpm');
-    assert.ok(ctx.manifests.packageJson);
-    assert.ok(ctx.scriptsAvailable.includes('test'));
+    fs.writeFileSync(path.join(testDirectory, 'pnpm-lock.yaml'), '');
+    let repoContext = inspectRepoArchetype(testDirectory);
+    assert.strictEqual(repoContext.primaryArchetype, 'node');
+    assert.strictEqual(repoContext.packageManager, 'pnpm');
+    assert.ok(repoContext.manifests.packageJson);
+    assert.ok(repoContext.scriptsAvailable.includes('test'));
 
     // 1.2 Polyglot project (Node + Rust)
-    fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]\nname = "test-rust"');
+    fs.writeFileSync(path.join(testDirectory, 'Cargo.toml'), '[package]\nname = "test-rust"');
     // Nested gate scripts under scripts/ps1 and scripts/sh
-    fs.mkdirSync(path.join(dir, 'scripts', 'ps1'), { recursive: true });
-    fs.mkdirSync(path.join(dir, 'scripts', 'sh'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'scripts', 'ps1', 'pre-commit-gate.ps1'), '# ps1 gate');
-    fs.writeFileSync(path.join(dir, 'scripts', 'sh', 'pre-commit-gate.sh'), '# sh gate');
+    fs.mkdirSync(path.join(testDirectory, 'scripts', 'ps1'), { recursive: true });
+    fs.mkdirSync(path.join(testDirectory, 'scripts', 'sh'), { recursive: true });
+    fs.writeFileSync(path.join(testDirectory, 'scripts', 'ps1', 'pre-commit-gate.ps1'), '# ps1 gate');
+    fs.writeFileSync(path.join(testDirectory, 'scripts', 'sh', 'pre-commit-gate.sh'), '# sh gate');
 
-    ctx = inspectRepoArchetype(dir);
-    assert.strictEqual(ctx.primaryArchetype, 'polyglot');
-    assert.ok(ctx.archetypes.includes('node'));
-    assert.ok(ctx.archetypes.includes('rust'));
-    assert.ok(ctx.gateScripts.files.some((f) => f.includes('pre-commit-gate.ps1')));
-    assert.ok(ctx.gateScripts.files.some((f) => f.includes('pre-commit-gate.sh')));
+    repoContext = inspectRepoArchetype(testDirectory);
+    assert.strictEqual(repoContext.primaryArchetype, 'polyglot');
+    assert.ok(repoContext.archetypes.includes('node'));
+    assert.ok(repoContext.archetypes.includes('rust'));
+    assert.ok(repoContext.gateScripts.files.some((filePath) => filePath.includes('pre-commit-gate.ps1')));
+    assert.ok(repoContext.gateScripts.files.some((filePath) => filePath.includes('pre-commit-gate.sh')));
 
     console.log(
       '  ✔ 1. Universal repository archetype detection (Node, Rust, Polyglot, Nested Gate Scripts)',
     );
   } finally {
-    cleanTempDir(dir);
+    cleanTempDir(testDirectory);
   }
 })();
 
 // ── Test 2: Scenario A - Completely Missing Gate System (GUARD-SYS-001) ──
 (function testMissingGateSystem() {
-  const dir = createTempDir('missing-sys');
+  const testDirectory = createTempDir('missing-sys');
   try {
     fs.writeFileSync(
-      path.join(dir, 'package.json'),
+      path.join(testDirectory, 'package.json'),
       JSON.stringify({ name: 'empty-gate-project' }),
     );
-    const result = auditGateArchitecture(dir);
+    const result = auditGateArchitecture(testDirectory);
 
     assert.strictEqual(result.passed, false);
     assert.strictEqual(result.issues.length, 1);
@@ -121,24 +121,24 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
       '  ✔ 2. GUARD-SYS-001: Missing gate system emits full cross-platform scaffold payload',
     );
   } finally {
-    cleanTempDir(dir);
+    cleanTempDir(testDirectory);
   }
 })();
 
 // ── Test 3: Scenario A - Missing Local Hooks (GUARD-HOOK-001) ──
 (function testMissingLocalHooks() {
-  const dir = createTempDir('missing-hook');
+  const testDirectory = createTempDir('missing-hook');
   try {
-    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'ci-only-project' }));
-    fs.mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true });
+    fs.writeFileSync(path.join(testDirectory, 'package.json'), JSON.stringify({ name: 'ci-only-project' }));
+    fs.mkdirSync(path.join(testDirectory, '.github', 'workflows'), { recursive: true });
     fs.writeFileSync(
-      path.join(dir, '.github', 'workflows', 'ci.yml'),
+      path.join(testDirectory, '.github', 'workflows', 'ci.yml'),
       'name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest',
     );
 
-    const result = auditGateArchitecture(dir);
+    const result = auditGateArchitecture(testDirectory);
     assert.strictEqual(result.passed, false);
-    const hookIssue = result.issues.find((i) => i.rule === 'GUARD-HOOK-001');
+    const hookIssue = result.issues.find((issue) => issue.rule === 'GUARD-HOOK-001');
     assert.ok(hookIssue, 'Expected GUARD-HOOK-001 issue');
     assert.strictEqual(hookIssue.severity, 'warning');
     assert.ok(hookIssue.actionable);
@@ -146,23 +146,23 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
 
     console.log('  ✔ 3. GUARD-HOOK-001: Missing local left-shift Git hooks flagged with warning');
   } finally {
-    cleanTempDir(dir);
+    cleanTempDir(testDirectory);
   }
 })();
 
 // ── Test 4: Scenario B - Hook Runtime Degradation & Safety (GUARD-ROUTE-001) ──
 (function testRoutingSafety() {
-  const dir = createTempDir('fragile-route');
+  const testDirectory = createTempDir('fragile-route');
   try {
-    fs.mkdirSync(path.join(dir, '.githooks'), { recursive: true });
+    fs.mkdirSync(path.join(testDirectory, '.githooks'), { recursive: true });
     // Fragile launcher using powershell.exe directly
     fs.writeFileSync(
-      path.join(dir, '.githooks', 'pre-commit'),
+      path.join(testDirectory, '.githooks', 'pre-commit'),
       '#!/bin/sh\npowershell.exe -File scripts/gate.ps1\n',
     );
-    const result = auditGateArchitecture(dir);
+    const result = auditGateArchitecture(testDirectory);
 
-    const routeIssue = result.issues.find((i) => i.rule === 'GUARD-ROUTE-001');
+    const routeIssue = result.issues.find((issue) => issue.rule === 'GUARD-ROUTE-001');
     assert.ok(routeIssue, 'Expected GUARD-ROUTE-001 issue for powershell.exe bare invocation');
     assert.strictEqual(routeIssue.severity, 'error');
 
@@ -170,107 +170,107 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
       '  ✔ 4. GUARD-ROUTE-001: Fragile hook routing (powershell.exe) detected and blocked',
     );
   } finally {
-    cleanTempDir(dir);
+    cleanTempDir(testDirectory);
   }
 })();
 
 // ── Test 5: Scenario B - Physical Hygiene Guard (GUARD-HYG-001) ──
 (function testHygieneGuard() {
-  const dir = createTempDir('no-hygiene');
+  const testDirectory = createTempDir('no-hygiene');
   try {
-    fs.mkdirSync(path.join(dir, '.githooks'), { recursive: true });
+    fs.mkdirSync(path.join(testDirectory, '.githooks'), { recursive: true });
     // Hook that lacks zero-byte empty file check
     fs.writeFileSync(
-      path.join(dir, '.githooks', 'pre-commit'),
+      path.join(testDirectory, '.githooks', 'pre-commit'),
       '#!/usr/bin/env bash\nset -euo pipefail\necho "Running tests"\n',
     );
-    const result = auditGateArchitecture(dir);
+    const result = auditGateArchitecture(testDirectory);
 
-    const hygIssue = result.issues.find((i) => i.rule === 'GUARD-HYG-001');
+    const hygIssue = result.issues.find((issue) => issue.rule === 'GUARD-HYG-001');
     assert.ok(hygIssue, 'Expected GUARD-HYG-001 for missing 0-byte check');
     assert.strictEqual(hygIssue.severity, 'error');
 
     console.log('  ✔ 5. GUARD-HYG-001: Pre-commit lacking zero-byte empty file check flagged');
   } finally {
-    cleanTempDir(dir);
+    cleanTempDir(testDirectory);
   }
 })();
 
 // ── Test 6: Scenario B - Commit-Msg Integrity (GUARD-MSG-001) ──
 (function testCommitMsgGate() {
-  const dir = createTempDir('no-commit-msg');
+  const testDirectory = createTempDir('no-commit-msg');
   try {
-    fs.mkdirSync(path.join(dir, '.githooks'), { recursive: true });
+    fs.mkdirSync(path.join(testDirectory, '.githooks'), { recursive: true });
     fs.writeFileSync(
-      path.join(dir, '.githooks', 'pre-commit'),
+      path.join(testDirectory, '.githooks', 'pre-commit'),
       '#!/usr/bin/env bash\nset -euo pipefail\nif [ ! -s "$1" ]; then exit 1; fi\n',
     );
-    const result = auditGateArchitecture(dir);
+    const result = auditGateArchitecture(testDirectory);
 
-    const msgIssue = result.issues.find((i) => i.rule === 'GUARD-MSG-001');
+    const msgIssue = result.issues.find((issue) => issue.rule === 'GUARD-MSG-001');
     assert.ok(msgIssue, 'Expected GUARD-MSG-001 for missing commit-msg hook');
     assert.strictEqual(msgIssue.severity, 'warning');
 
     console.log('  ✔ 6. GUARD-MSG-001: Missing commit-msg hook flagged');
   } finally {
-    cleanTempDir(dir);
+    cleanTempDir(testDirectory);
   }
 })();
 
 // ── Test 7: Scenario B - Strict Error Discipline (GUARD-ERR-001) ──
 (function testStrictErrorDiscipline() {
-  const dir = createTempDir('loose-error');
+  const testDirectory = createTempDir('loose-error');
   try {
-    fs.mkdirSync(path.join(dir, '.githooks'), { recursive: true });
-    fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(testDirectory, '.githooks'), { recursive: true });
+    fs.mkdirSync(path.join(testDirectory, 'scripts'), { recursive: true });
     // Script lacking set -e
     fs.writeFileSync(
-      path.join(dir, 'scripts', 'pre-commit-gate.sh'),
+      path.join(testDirectory, 'scripts', 'pre-commit-gate.sh'),
       '#!/usr/bin/env bash\necho "no strict mode"\n',
     );
     fs.writeFileSync(
-      path.join(dir, '.githooks', 'pre-commit'),
+      path.join(testDirectory, '.githooks', 'pre-commit'),
       '#!/usr/bin/env bash\nset -euo pipefail\n',
     );
 
-    const result = auditGateArchitecture(dir);
-    const errIssue = result.issues.find((i) => i.rule === 'GUARD-ERR-001');
+    const result = auditGateArchitecture(testDirectory);
+    const errIssue = result.issues.find((issue) => issue.rule === 'GUARD-ERR-001');
     assert.ok(errIssue, 'Expected GUARD-ERR-001 for script lacking set -euo pipefail');
     assert.strictEqual(errIssue.severity, 'error');
 
     console.log('  ✔ 7. GUARD-ERR-001: Gate script without strict error flags blocked');
   } finally {
-    cleanTempDir(dir);
+    cleanTempDir(testDirectory);
   }
 })();
 
 // ── Test 8: Scenario B - Dual-Tier Isomorphism (GUARD-ISO-001) ──
 (function testIsomorphism() {
-  const dir = createTempDir('non-isomorphic');
+  const testDirectory = createTempDir('non-isomorphic');
   try {
-    fs.mkdirSync(path.join(dir, '.githooks'), { recursive: true });
-    fs.mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true });
+    fs.mkdirSync(path.join(testDirectory, '.githooks'), { recursive: true });
+    fs.mkdirSync(path.join(testDirectory, '.github', 'workflows'), { recursive: true });
 
     // CI runs lint, but local hooks only run regression
     fs.writeFileSync(
-      path.join(dir, '.github', 'workflows', 'ci.yml'),
+      path.join(testDirectory, '.github', 'workflows', 'ci.yml'),
       'name: CI\njobs:\n  lint:\n    run: npm run lint\n  test:\n    run: npm test',
     );
     fs.writeFileSync(
-      path.join(dir, '.githooks', 'pre-commit'),
+      path.join(testDirectory, '.githooks', 'pre-commit'),
       '#!/usr/bin/env bash\nset -euo pipefail\nif [ ! -s "$1" ]; then exit 1; fi\n',
     );
     fs.writeFileSync(
-      path.join(dir, '.githooks', 'commit-msg'),
+      path.join(testDirectory, '.githooks', 'commit-msg'),
       '#!/usr/bin/env bash\nset -euo pipefail\n# feat: test\n',
     );
     fs.writeFileSync(
-      path.join(dir, '.githooks', 'pre-push'),
+      path.join(testDirectory, '.githooks', 'pre-push'),
       '#!/usr/bin/env bash\nset -euo pipefail\nnpm test\n',
     );
 
-    const result = auditGateArchitecture(dir);
-    const isoIssue = result.issues.find((i) => i.rule === 'GUARD-ISO-001');
+    const result = auditGateArchitecture(testDirectory);
+    const isoIssue = result.issues.find((issue) => issue.rule === 'GUARD-ISO-001');
     assert.ok(isoIssue, 'Expected GUARD-ISO-001 for unmirrored CI lint check');
     assert.strictEqual(isoIssue.severity, 'warning');
 
@@ -291,7 +291,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
         '#!/usr/bin/env bash\nset -euo pipefail\nnpm test\n',
       );
       const resultNoCi = auditGateArchitecture(dirNoCi);
-      const isoNoCiIssue = resultNoCi.issues.find((i) => i.rule === 'GUARD-ISO-001');
+      const isoNoCiIssue = resultNoCi.issues.find((issue) => issue.rule === 'GUARD-ISO-001');
       assert.ok(isoNoCiIssue, 'Expected GUARD-ISO-001 when CI workflow is missing completely');
       assert.strictEqual(isoNoCiIssue.severity, 'warning');
       assert.ok(isoNoCiIssue.actionable, 'Expected actionable payload for missing CI');
@@ -302,25 +302,25 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
 
     console.log('  ✔ 8. GUARD-ISO-001: Discrepancy between CI and local hooks identified');
   } finally {
-    cleanTempDir(dir);
+    cleanTempDir(testDirectory);
   }
 })();
 
 // ── Test 9: Scaffolding Generator Completeness ──
 (function testScaffoldingGenerator() {
-  const dir = createTempDir('scaffold-gen');
+  const testDirectory = createTempDir('scaffold-gen');
   try {
-    fs.writeFileSync(path.join(dir, 'Cargo.toml'), '[package]\nname = "rust-app"');
-    const ctx = inspectRepoArchetype(dir);
-    const scaffold = generateGateScaffold(ctx);
+    fs.writeFileSync(path.join(testDirectory, 'Cargo.toml'), '[package]\nname = "rust-app"');
+    const repoContext = inspectRepoArchetype(testDirectory);
+    const scaffold = generateGateScaffold(repoContext);
 
     assert.strictEqual(scaffold.archetype, 'rust');
-    assert.ok(scaffold.suggestedStructure.hooks.some((h) => h.name === 'pre-commit'));
-    assert.ok(scaffold.suggestedStructure.hooks.some((h) => h.name === 'commit-msg'));
-    assert.ok(scaffold.suggestedStructure.hooks.some((h) => h.name === 'pre-push'));
+    assert.ok(scaffold.suggestedStructure.hooks.some((hook) => hook.name === 'pre-commit'));
+    assert.ok(scaffold.suggestedStructure.hooks.some((hook) => hook.name === 'commit-msg'));
+    assert.ok(scaffold.suggestedStructure.hooks.some((hook) => hook.name === 'pre-push'));
 
-    const prePush = scaffold.suggestedStructure.runnerScripts.find((s) =>
-      s.filePath.includes('pre-push'),
+    const prePush = scaffold.suggestedStructure.runnerScripts.find((script) =>
+      script.filePath.includes('pre-push'),
     );
     assert.ok(
       prePush.content.includes('cargo test --workspace'),
@@ -329,7 +329,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
 
     console.log('  ✔ 9. Gate scaffolding generator generates valid archetype-specific templates');
   } finally {
-    cleanTempDir(dir);
+    cleanTempDir(testDirectory);
   }
 })();
 
@@ -369,7 +369,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
 
   // Verify no critical gate system missing errors
   const criticalSysIssue = result.issues.find(
-    (i) => i.rule === 'GUARD-SYS-001' || i.rule === 'GUARD-HOOK-001',
+    (issue) => issue.rule === 'GUARD-SYS-001' || issue.rule === 'GUARD-HOOK-001',
   );
   assert.strictEqual(
     criticalSysIssue,
