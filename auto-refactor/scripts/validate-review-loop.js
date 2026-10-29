@@ -28,7 +28,7 @@ const os = require('os');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const { reviewCommand } = require(path.join(ROOT, 'dist/cli/reviewCmd'));
+const { reviewCommand } = require(path.join(ROOT, 'dist/cli/review-cmd'));
 const intake = require(path.join(ROOT, 'dist/core/reporting/review-queue-intake'));
 const ledger = require(path.join(ROOT, 'dist/core/scoring/review-verdict-ledger'));
 const corpusModule = require(path.join(ROOT, 'dist/core/scoring/calibration-corpus'));
@@ -261,6 +261,52 @@ function verifyVocabulary() {
     console.log('  ✔ two distinct verdicts, and one occurrence identity shape.');
 }
 
+/** Stage 7: one answer must not silently cover unrelated rules, and a dry run must write nothing. */
+function verifyCrossRuleGuardAndDryRun() {
+    console.log('\n7. Verifying a cross-rule batch is refused and a dry run writes nothing...');
+    const dir = scratch();
+    try {
+        const three = [
+            queueLine({ rule: 'large-file', file: 'a.ts', line: 1 }),
+            queueLine({ rule: 'hardcoded-string', file: 'b.ts', line: 5 }),
+            queueLine({ rule: 'magic-number', file: 'c.ts', line: 9 }),
+        ].join('\n');
+        fs.writeFileSync(dir.queue, three + '\n');
+
+        const refused = run(dir, 'false-positive');
+        assert.strictEqual(refused.code, 2, refused.text);
+        assert.ok(refused.text.includes('distinct rules'), refused.text);
+        assert.ok(!fs.existsSync(dir.corpus), 'a refused batch must not write a corpus');
+        assert.ok(!fs.existsSync(dir.ledger), 'a refused batch must not write a ledger');
+
+        const preview = run(dir, 'false-positive', ['--any-rule', '--dry-run']);
+        assert.strictEqual(preview.code, 0, preview.text);
+        assert.ok(preview.text.includes('Nothing was written'), preview.text);
+        assert.ok(!fs.existsSync(dir.corpus), 'a dry run must not write a corpus');
+        assert.ok(!fs.existsSync(dir.ledger), 'a dry run must not write a ledger');
+
+        const narrowed = run(dir, 'false-positive', ['--rule', 'magic-number', '--dry-run']);
+        assert.strictEqual(narrowed.code, 0, narrowed.text);
+        assert.ok(narrowed.text.includes('1 verdict'), narrowed.text);
+        assert.ok(
+            narrowed.text.includes('queued record(s) would still need a decision'),
+            narrowed.text,
+        );
+
+        const committed = run(dir, 'false-positive', ['--rule', 'magic-number']);
+        assert.strictEqual(committed.code, 0, committed.text);
+        const body = JSON.parse(fs.readFileSync(dir.corpus, 'utf8'));
+        assert.deepStrictEqual(body.rules, [
+            { rule: 'magic-number', truePositives: 0, falsePositives: 1 },
+        ]);
+        console.log(
+            '  ✔ cross-rule batch refused, flagged batch allowed, dry run silent, narrow run recorded.',
+        );
+    } finally {
+        dir.cleanup();
+    }
+}
+
 function main() {
     console.log('=== Review Loop Closure ===');
     verifyVerdictReachesArbiter();
@@ -269,6 +315,7 @@ function main() {
     verifyMalformedInputRefused();
     verifyUsageAndEmpty();
     verifyVocabulary();
+    verifyCrossRuleGuardAndDryRun();
     console.log('\nConclusion: a human verdict reaches the corpus, moves the arbiter, and is idempotent ✔');
 }
 

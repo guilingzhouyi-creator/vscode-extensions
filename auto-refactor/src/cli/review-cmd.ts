@@ -75,6 +75,12 @@ const FLAG_FILE = '--file';
 /** Flag name narrowing the answer to one line. */
 const FLAG_LINE = '--line';
 
+/** Flag that permits one answer to cover several distinct rules. */
+const FLAG_ANY_RULE = '--any-rule';
+
+/** Flag that previews the effect without writing anything. */
+const FLAG_DRY_RUN = '--dry-run';
+
 /** Marker printed when the invocation answers the whole queue rather than one occurrence. */
 const ALL_PENDING = 'all';
 
@@ -91,10 +97,14 @@ const USAGE = [
     '  --corpus <path>    Calibration corpus to rewrite (read by --confidence-corpus)',
     '  --verdict <kind>   true-positive or false-positive',
     '  --ledger <path>    Verdict ledger; defaults to review-verdicts.json beside the corpus',
-    '  --rule <id>        Answer only this rule (omit to answer every pending record)',
+    '  --rule <id>        Answer only this rule',
     '  --file <path>      Answer only this file',
     '  --line <n>         Answer only this line',
+    '  --any-rule         Permit one answer to cover several distinct rules in the queue',
+    '  --dry-run          Show what would be recorded without writing anything',
     '',
+    'A selection spanning more than one rule is refused unless --any-rule is given: one answer',
+    'cannot stand for decisions the reviewer never made about unrelated rules.',
     'Records already carrying a verdict are skipped, so re-running the same review is safe.',
 ].join('\n');
 
@@ -107,6 +117,8 @@ interface ReviewInvocation {
     readonly rule: string | undefined;
     readonly file: string | undefined;
     readonly line: number | undefined;
+    readonly anyRule: boolean;
+    readonly dryRun: boolean;
 }
 
 /**
@@ -174,7 +186,30 @@ function resolveInvocation(args: readonly string[]): ReviewInvocation | string {
         rule: readFlag(args, FLAG_RULE),
         file: readFlag(args, FLAG_FILE)?.replace(/\\/g, '/'),
         line,
+        anyRule: args.includes(FLAG_ANY_RULE),
+        dryRun: args.includes(FLAG_DRY_RUN),
     };
+}
+
+/**
+ * Reports the distinct rules a selection spans.
+ *
+ * Exported through the result so the caller can refuse a cross-rule batch: one `--verdict` value
+ * covering three unrelated rules is a statement the reviewer never made, and recording it would
+ * fabricate evidence for rules nobody looked at.
+ *
+ * @param occurrences - Selected occurrences.
+ * @returns Distinct rule ids in first-seen order.
+ */
+function distinctRules(occurrences: readonly QueuedOccurrence[]): string[] {
+    const seen = new Set<string>();
+    const rules: string[] = [];
+    for (const occurrence of occurrences) {
+        if (seen.has(occurrence.rule)) continue;
+        seen.add(occurrence.rule);
+        rules.push(occurrence.rule);
+    }
+    return rules;
 }
 
 /**
@@ -351,9 +386,36 @@ export function reviewCommand(args: readonly string[]): { code: number; text: st
         };
     }
 
+    const rules = distinctRules(targets);
+    if (rules.length > 1 && !invocation.anyRule) {
+        return {
+            code: EXIT_USAGE,
+            text: [
+                `Refusing to record: the selection spans ${rules.length} distinct rules ` +
+                    `(${rules.join(', ')}).`,
+                'One answer cannot stand for decisions never made about unrelated rules.',
+                'Narrow with --rule/--file/--line, or pass --any-rule to record it deliberately.',
+            ].join('\n'),
+        };
+    }
+
     const recorded = toVerdictRecords(targets, invocation.verdict, Date.now());
     const merged = mergeVerdicts(existing, recorded);
     const stats = aggregateVerdicts(merged);
+
+    if (invocation.dryRun) {
+        const remaining = intake.occurrences.length - merged.length;
+        return {
+            code: EXIT_OK,
+            text: [
+                `Dry run: would record ${recorded.length} verdict(s) as ${invocation.verdict} ` +
+                    `across ${rules.length} rule(s).`,
+                `Ledger would hold ${merged.length} record(s); ${remaining} queued record(s) ` +
+                    `would still need a decision.`,
+                'Nothing was written.',
+            ].join('\n'),
+        };
+    }
 
     writeDocument(ledgerPath, serializeLedger(merged));
     writeDocument(invocation.corpus, serializeCorpus(stats, CALIBRATION_CORPUS_SCHEMA));
