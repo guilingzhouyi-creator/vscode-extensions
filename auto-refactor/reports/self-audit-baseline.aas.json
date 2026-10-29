@@ -2,87 +2,94 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-28T11:41:08.887Z",
+  "timestamp": "2026-10-28T15:07:52.006Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
     "score": 99.17,
     "grade": "A+",
-    "cai": 87.88,
+    "cai": 88,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.917,
       "averagePor": 0.083,
-      "averageColumnDensity": 0.863,
-      "averageSpatialDensity": 0.446,
-      "averageMahalanobisDistance": 4.584,
+      "averageColumnDensity": 0.864,
+      "averageSpatialDensity": 0.444,
+      "averageMahalanobisDistance": 4.612,
       "averageFisherSimplexDistance": 0.097
     },
     "counts": {
-      "files": 775,
-      "total": 4023,
+      "files": 785,
+      "total": 4087,
       "errors": 0,
-      "warns": 3470,
-      "info": 553,
-      "suppressed": 154
+      "warns": 3522,
+      "info": 565,
+      "suppressed": 161
     }
+  },
+  "usability": {
+    "proven": 54,
+    "patchable": 1735,
+    "advisory": 2298,
+    "uncalibrated": 3872,
+    "needsHuman": 6
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 98.44,
-    "semanticPurity": 98.38,
+    "architectureConsistency": 98.47,
+    "semanticPurity": 98.4,
     "codeSecurity": 99.79,
     "performanceEfficiency": 99.57,
-    "standardization": 83.92,
-    "modernity": 98.35,
-    "maintainability": 93.33,
+    "standardization": 83.88,
+    "modernity": 98.34,
+    "maintainability": 93.4,
     "commentQuality": 99.86,
-    "duplication": 94.93,
+    "duplication": 94.89,
     "techDebtRisk": 100
   },
   "bottlenecks": [
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 4300,
-      "count": 430
+      "loss": 4280,
+      "count": 428
     },
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3125,
-      "count": 219
+      "loss": 3210,
+      "count": 224
     },
     {
       "rule": "metric",
       "dim": "architectureConsistency",
-      "loss": 2370,
-      "count": 237
-    },
-    {
-      "rule": "SIM-LONG-001",
-      "dim": "standardization",
-      "loss": 2060,
-      "count": 206
+      "loss": 2380,
+      "count": 238
     },
     {
       "rule": "SIM-TRN-001",
       "dim": "standardization",
-      "loss": 2020,
-      "count": 202
+      "loss": 2100,
+      "count": 210
     },
     {
-      "rule": "hardcoded-string",
-      "dim": "duplication",
-      "loss": 1986,
-      "count": 662
+      "rule": "SIM-LONG-001",
+      "dim": "standardization",
+      "loss": 2090,
+      "count": 209
     },
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 1985,
-      "count": 397
+      "loss": 2035,
+      "count": 407
+    },
+    {
+      "rule": "hardcoded-string",
+      "dim": "duplication",
+      "loss": 2019,
+      "count": 673
     },
     {
       "rule": "NAM-DEC-001",
@@ -119,7 +126,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 106,
@@ -130,7 +138,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Identifier 'AstPrefixRadixCacheOptions' has 26 chars (5 segments)."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 138,
@@ -150,7 +159,8 @@
             "replacementText": "ROOT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 185,
@@ -162,7 +172,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface StepChildNodeOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 218,
@@ -174,7 +185,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface CreateNewRadixNodeOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 219,
@@ -184,7 +196,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 310,
@@ -195,7 +208,8 @@
         "fix": {
           "action": "extract_constant",
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 337,
@@ -215,7 +229,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 337,
@@ -235,7 +250,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 337,
@@ -248,7 +264,8 @@
           "template": "Math.round(val * 100) / 100 + 0",
           "safeToAutomate": true
         },
-        "verify": "node scripts/validate-dual-faced-presentation.js"
+        "verify": "node scripts/validate-dual-faced-presentation.js",
+        "tier": "T2"
       },
       {
         "line": 391,
@@ -268,7 +285,8 @@
             "replacementText": "CONST_32"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 397,
@@ -279,7 +297,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 402,
@@ -299,7 +318,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/core/cfg/types.ts": [
@@ -311,7 +331,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/governance/repo-archetype.ts": [
@@ -323,7 +344,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/native/native-types.ts": [
@@ -335,7 +357,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/praxis/client/types.ts": [
@@ -347,7 +370,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/praxis/presentation/presentation-types.ts": [
@@ -360,7 +384,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'praxispresentation'."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 75,
@@ -371,7 +396,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'praxispresentation'."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 89,
@@ -382,7 +408,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'praxispresentation'."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 107,
@@ -393,7 +420,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'praxispresentation'."
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/reporters/agent-directives-types.ts": [
@@ -406,7 +434,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Identifier 'AgentCodeDensityConstraintSpec' has 30 chars (5 segments)."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 328,
@@ -417,19 +446,21 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Identifier 'AgentReviewerCrossCheckPoint' has 28 chars (5 segments)."
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/reporting/aas-types.ts": [
       {
-        "line": 150,
+        "line": 203,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
         "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 51",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/router/sliceTypes.ts": [
@@ -441,7 +472,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Rename file to 'slice-types.ts'."
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/scoring/scoringTypes.ts": [
@@ -453,12 +485,13 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Rename file to 'scoring-types.ts'."
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/trajectory/eloc-types.ts": [
       {
-        "line": 189,
+        "line": 191,
         "col": 41,
         "rule": "GOV-SAN-001",
         "sev": "WARN",
@@ -467,17 +500,19 @@
           "action": "refactor",
           "template": "Remove temporary phase/task tags and use standard domain terminology."
         },
-        "verify": "node scripts/validate-governance-exemptions.js"
+        "verify": "node scripts/validate-governance-exemptions.js",
+        "tier": "T3"
       },
       {
-        "line": 189,
+        "line": 191,
         "rule": "HYG-STB-002",
         "sev": "WARN",
         "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'W40'",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/trajectory/recipeTypes.ts": [
@@ -489,7 +524,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Rename file to 'recipe-types.ts'."
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/trajectory/types.ts": [
@@ -501,7 +537,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/types.ts": [
@@ -509,11 +546,12 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 927 >= warn threshold 400).",
+        "msg": "File is large; consider splitting (lines 1005 >= warn threshold 400).",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "scripts/gate-self.js": [
@@ -535,7 +573,8 @@
             "replacementText": "PATH_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 26,
@@ -555,7 +594,8 @@
             "replacementText": "DIST_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 27,
@@ -575,7 +615,8 @@
             "replacementText": "FILE_PATH_AUTOREFACTORCONFIGJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 28,
@@ -595,7 +636,8 @@
             "replacementText": "BASELINES_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 28,
@@ -615,7 +657,8 @@
             "replacementText": "FILE_PATH_SELFSCANBASELINEJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 38,
@@ -635,7 +678,8 @@
             "replacementText": "WARNING_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 76,
@@ -655,7 +699,8 @@
             "replacementText": "SCAN_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 88,
@@ -675,7 +720,8 @@
             "replacementText": "GROUPED_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 92,
@@ -695,7 +741,8 @@
             "replacementText": "WARN_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 114,
@@ -705,7 +752,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 130,
@@ -725,7 +773,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 137,
@@ -745,7 +794,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 138,
@@ -765,7 +815,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 170,
@@ -785,7 +836,8 @@
             "replacementText": "PASS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 170,
@@ -805,7 +857,8 @@
             "replacementText": "BLOCK_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "scripts/migrate-report-artifacts.js": [
@@ -827,7 +880,8 @@
             "replacementText": "PATH_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 19,
@@ -847,7 +901,8 @@
             "replacementText": "FILE_PATH_DISTAPI_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 87,
@@ -858,7 +913,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 95,
@@ -868,7 +924,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 96,
@@ -888,7 +945,8 @@
             "replacementText": "DURATION_100MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 102,
@@ -898,7 +956,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 109,
@@ -918,7 +977,8 @@
             "replacementText": "CONST_95"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 110,
@@ -938,7 +998,8 @@
             "replacementText": "CONST_85"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 121,
@@ -958,7 +1019,8 @@
             "replacementText": "AASV1_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 133,
@@ -978,7 +1040,8 @@
             "replacementText": "AASV1_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 135,
@@ -998,7 +1061,8 @@
             "replacementText": "CONST_040_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 172,
@@ -1009,7 +1073,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 185,
@@ -1029,7 +1094,8 @@
             "replacementText": "SKIPPED_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 192,
@@ -1049,7 +1115,8 @@
             "replacementText": "MIGRATED_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 201,
@@ -1069,7 +1136,8 @@
             "replacementText": "MIGRATED_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "scripts/migrate-trajectory-summaries.js": [
@@ -1081,7 +1149,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 21,
@@ -1101,7 +1170,8 @@
             "replacementText": "PATH_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 24,
@@ -1121,7 +1191,8 @@
             "replacementText": "WEEKLYSUMMARIES_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 25,
@@ -1141,7 +1212,8 @@
             "replacementText": "FILE_PATH_LIFETIMESUMMARYJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 28,
@@ -1152,7 +1224,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 39,
@@ -1172,7 +1245,8 @@
             "replacementText": "SELFAUDITENGINE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 39,
@@ -1192,7 +1266,8 @@
             "replacementText": "SELFAUDITE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 60,
@@ -1203,7 +1278,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 61,
@@ -1214,7 +1290,8 @@
         "fix": {
           "action": "extract_constant",
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 61,
@@ -1234,7 +1311,8 @@
             "replacementText": "CONST_2026W44_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 61,
@@ -1244,7 +1322,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 64,
@@ -1264,7 +1343,8 @@
             "replacementText": "DURATION_100MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 70,
@@ -1284,7 +1364,8 @@
             "replacementText": "CONST_100000"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 73,
@@ -1295,7 +1376,8 @@
         "fix": {
           "action": "extract_constant",
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 77,
@@ -1315,7 +1397,8 @@
             "replacementText": "CONST_100000"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 81,
@@ -1326,7 +1409,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 117,
@@ -1346,7 +1430,8 @@
             "replacementText": "CONST_96"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 135,
@@ -1366,7 +1451,8 @@
             "replacementText": "FILE_PATH_SUMMARYJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "scripts/run-self-audit.js": [
@@ -1374,11 +1460,12 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 933 >= warn threshold 400; functions 45 >= warn threshold 20).",
+        "msg": "File is large; consider splitting (lines 1044 >= warn threshold 400; functions 49 >= warn threshold 20).",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 48,
@@ -1398,10 +1485,32 @@
             "replacementText": "FILE_PATH_BASELINESIGNATURESJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 338,
+        "line": 308,
+        "col": 53,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 308,
+              "startCol": 53,
+              "endLine": 308,
+              "endCol": 79
+            },
+            "replacementText": "FILE_PATH_BASELINESIGNATURESJSON_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 339,
         "col": 56,
         "rule": "magic-number",
         "sev": "WARN",
@@ -1410,18 +1519,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 338,
+              "startLine": 339,
               "startCol": 56,
-              "endLine": 338,
+              "endLine": 339,
               "endCol": 58
             },
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 396,
+        "line": 397,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -1429,10 +1539,11 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
-        "line": 499,
+        "line": 500,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -1440,42 +1551,138 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
-        "line": 679,
-        "rule": "SIM-LONG-001",
-        "sev": "WARN",
-        "msg": "Function \"runSelfAudit\" spans 104 lines (limit 60).",
-        "fix": {
-          "action": "split_function",
-          "template": "// Extracted helper:",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 690,
-        "col": 47,
+        "line": 569,
+        "col": 45,
         "rule": "magic-number",
         "sev": "WARN",
-        "msg": "Magic number 16 should be extracted into a named constant.",
+        "msg": "Magic number 8 should be extracted into a named constant.",
         "fix": {
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 690,
-              "startCol": 47,
-              "endLine": 690,
-              "endCol": 49
+              "startLine": 569,
+              "startCol": 45,
+              "endLine": 569,
+              "endCol": 46
             },
-            "replacementText": "CONST_16"
+            "replacementText": "CONST_8"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 690,
-        "col": 71,
+        "line": 579,
+        "col": 26,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 579,
+              "startCol": 26,
+              "endLine": 579,
+              "endCol": 33
+            },
+            "replacementText": "REF_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 579,
+        "col": 58,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 7 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 579,
+              "startCol": 58,
+              "endLine": 579,
+              "endCol": 59
+            },
+            "replacementText": "CONST_7"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 579,
+        "col": 76,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 8 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 579,
+              "startCol": 76,
+              "endLine": 579,
+              "endCol": 77
+            },
+            "replacementText": "CONST_8"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 580,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 5 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 580,
+              "startCol": 32,
+              "endLine": 580,
+              "endCol": 33
+            },
+            "replacementText": "CONST_5"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 582,
+        "col": 89,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 8 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 582,
+              "startCol": 89,
+              "endLine": 582,
+              "endCol": 90
+            },
+            "replacementText": "CONST_8"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 747,
+        "col": 55,
         "rule": "magic-number",
         "sev": "WARN",
         "msg": "Magic number 4 should be extracted into a named constant.",
@@ -1483,18 +1690,40 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 690,
-              "startCol": 71,
-              "endLine": 690,
-              "endCol": 72
+              "startLine": 747,
+              "startCol": 55,
+              "endLine": 747,
+              "endCol": 56
             },
             "replacementText": "CONST_4"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 698,
+        "line": 748,
+        "col": 40,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 16 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 748,
+              "startCol": 40,
+              "endLine": 748,
+              "endCol": 42
+            },
+            "replacementText": "CONST_16"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 756,
         "col": 55,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -1503,18 +1732,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 698,
+              "startLine": 756,
               "startCol": 55,
-              "endLine": 698,
+              "endLine": 756,
               "endCol": 67
             },
             "replacementText": "SELFAUDIT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 865,
+        "line": 945,
         "col": 9,
         "rule": "NAM-LEN-001",
         "sev": "WARN",
@@ -1522,7 +1752,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T2"
       }
     ],
     "scripts/validate-composite-gate.js": [
@@ -1544,7 +1775,8 @@
             "replacementText": "FILE_PATH_DISTCOREPRAXISCOMPOSITE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 17,
@@ -1555,7 +1787,8 @@
           "action": "split_function",
           "template": "// Extracted helper:",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 21,
@@ -1575,7 +1808,8 @@
             "replacementText": "DURATION_2S"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 22,
@@ -1595,7 +1829,8 @@
             "replacementText": "DURATION_1S"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 23,
@@ -1615,7 +1850,8 @@
             "replacementText": "CONST_40"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 24,
@@ -1635,7 +1871,8 @@
             "replacementText": "CONST_35"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 26,
@@ -1655,7 +1892,8 @@
             "replacementText": "CONST_5"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 28,
@@ -1675,7 +1913,8 @@
             "replacementText": "CONST_20"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 29,
@@ -1695,7 +1934,8 @@
             "replacementText": "CONST_20"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 30,
@@ -1715,7 +1955,8 @@
             "replacementText": "CONST_20"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 35,
@@ -1735,7 +1976,8 @@
             "replacementText": "CONST_7"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 37,
@@ -1755,7 +1997,8 @@
             "replacementText": "CONST_4"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 38,
@@ -1775,7 +2018,8 @@
             "replacementText": "CONST_82"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 39,
@@ -1795,7 +2039,8 @@
             "replacementText": "CONST_86"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 40,
@@ -1806,7 +2051,8 @@
         "fix": {
           "action": "extract_constant",
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 44,
@@ -1826,7 +2072,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 45,
@@ -1846,7 +2093,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 55,
@@ -1866,7 +2114,8 @@
             "replacementText": "PRECOMMIT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 65,
@@ -1886,7 +2135,8 @@
             "replacementText": "PREPUSH_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 77,
@@ -1906,7 +2156,8 @@
             "replacementText": "PRECOMMIT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 91,
@@ -1926,7 +2177,8 @@
             "replacementText": "PRECOMMIT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 105,
@@ -1946,7 +2198,8 @@
             "replacementText": "CONST_29"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 114,
@@ -1966,7 +2219,8 @@
             "replacementText": "PREPUSH_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 134,
@@ -1986,7 +2240,8 @@
             "replacementText": "CONST_7"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 137,
@@ -2006,7 +2261,8 @@
             "replacementText": "PREPUSH_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 141,
@@ -2026,7 +2282,8 @@
             "replacementText": "DURATION_100MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 147,
@@ -2037,7 +2294,8 @@
         "fix": {
           "action": "refactor",
           "template": "Remove milestone/batch tags from active code; use canonical product features …"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 147,
@@ -2047,7 +2305,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "scripts/validate-file-preflight-gate.js": [
@@ -2069,7 +2328,8 @@
             "replacementText": "PATH_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 21,
@@ -2089,7 +2349,8 @@
             "replacementText": "DIST_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 21,
@@ -2109,7 +2370,8 @@
             "replacementText": "CORE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 21,
@@ -2129,7 +2391,8 @@
             "replacementText": "CONSTANTS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 21,
@@ -2149,7 +2412,8 @@
             "replacementText": "ANALYZERBITMASK_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 22,
@@ -2169,7 +2433,8 @@
             "replacementText": "DIST_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 22,
@@ -2189,7 +2454,8 @@
             "replacementText": "CORE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 22,
@@ -2209,7 +2475,8 @@
             "replacementText": "SCANNER_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 22,
@@ -2229,7 +2496,8 @@
             "replacementText": "FILEPREFLIGHTGATE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 23,
@@ -2249,7 +2517,8 @@
             "replacementText": "DIST_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 23,
@@ -2269,7 +2538,8 @@
             "replacementText": "CORE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 23,
@@ -2289,7 +2559,8 @@
             "replacementText": "CONSTANTS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 23,
@@ -2309,7 +2580,8 @@
             "replacementText": "RULECODES_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 25,
@@ -2319,7 +2591,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 53,
@@ -2339,7 +2612,8 @@
             "replacementText": "CONST_32"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 59,
@@ -2359,7 +2633,8 @@
             "replacementText": "CONST_32"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 82,
@@ -2379,7 +2654,8 @@
             "replacementText": "X1_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 83,
@@ -2399,7 +2675,8 @@
             "replacementText": "TSMODERN_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 84,
@@ -2419,7 +2696,8 @@
             "replacementText": "RUSTMODERN_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 85,
@@ -2439,7 +2717,8 @@
             "replacementText": "SHELLLINT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 88,
@@ -2459,7 +2738,8 @@
             "replacementText": "TSMODERN_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 90,
@@ -2479,7 +2759,8 @@
             "replacementText": "PYTHONMODERN_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 96,
@@ -2490,7 +2771,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Rename 'cleanCode' to an uppercase snake_case constant (e.g. 'CLEAN_CODE')."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 99,
@@ -2510,7 +2792,8 @@
             "replacementText": "SECRETS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 107,
@@ -2521,7 +2804,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Rename 'secretCode' to an uppercase snake_case constant (e.g. 'SECRET_CODE')."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 110,
@@ -2541,7 +2825,8 @@
             "replacementText": "SECRETS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 114,
@@ -2552,7 +2837,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Rename 'commentCode' to an uppercase snake_case constant (e.g. 'COMMENT_CODE')."
-        }
+        },
+        "tier": "T1"
       }
     ],
     "scripts/validate-suppression-gate.js": [
@@ -2574,7 +2860,8 @@
             "replacementText": "PATH_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 26,
@@ -2594,7 +2881,8 @@
             "replacementText": "FILE_PATH_DISTAPI_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 31,
@@ -2614,7 +2902,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 55,
@@ -2625,7 +2914,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 58,
@@ -2645,7 +2935,8 @@
             "replacementText": "FILE_PATH_AUTOREFACTORCONFIGJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 76,
@@ -2665,7 +2956,8 @@
             "replacementText": "FILE_PATH_GATEBASELINEJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 77,
@@ -2685,7 +2977,8 @@
             "replacementText": "FILE_PATH_GATEREPORTJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 96,
@@ -2705,7 +2998,8 @@
             "replacementText": "WARNING_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 102,
@@ -2725,7 +3019,8 @@
             "replacementText": "ARSUPPRESSGATE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 103,
@@ -2745,7 +3040,8 @@
             "replacementText": "ARCONTROLGATE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 111,
@@ -2765,7 +3061,8 @@
             "replacementText": "MAGICNUMBER_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/analyzers/complexity-loops.ts": [
@@ -2777,7 +3074,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 90,
@@ -2788,7 +3086,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 109,
@@ -2799,7 +3098,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 306,
@@ -2819,7 +3119,8 @@
             "replacementText": "CONST_47"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 306,
@@ -2839,7 +3140,8 @@
             "replacementText": "CONST_35"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 308,
@@ -2849,7 +3151,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 311,
@@ -2860,7 +3163,8 @@
           "action": "replace_token",
           "template": "$1.includes($2)",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 346,
@@ -2871,7 +3175,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface FindLoopSitesInFunctionOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 388,
@@ -2891,7 +3196,8 @@
             "replacementText": "CONST_4"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 470,
@@ -2902,7 +3208,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 488,
@@ -2913,7 +3220,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/analyzers/concurrency.ts": [
@@ -2925,7 +3233,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'concurrency."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 44,
@@ -2936,7 +3245,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface CheckLockBoundaryOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 61,
@@ -2956,7 +3266,8 @@
             "replacementText": "WARNING_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 67,
@@ -2976,7 +3287,8 @@
             "replacementText": "RELEASE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 67,
@@ -2996,7 +3308,8 @@
             "replacementText": "UNLOCK_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 115,
@@ -3016,7 +3329,8 @@
             "replacementText": "CONST_30"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 122,
@@ -3036,7 +3350,8 @@
             "replacementText": "WARNING_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/analyzers/hygiene-file-helper.ts": [
@@ -3048,7 +3363,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 111,
@@ -3068,7 +3384,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 112,
@@ -3088,7 +3405,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 138,
@@ -3099,7 +3417,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ReportEolMismatchOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 205,
@@ -3109,7 +3428,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 249,
@@ -3129,7 +3449,8 @@
             "replacementText": "FILE_PATH_ACTUALJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 250,
@@ -3149,7 +3470,8 @@
             "replacementText": "THUMBSDB_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 252,
@@ -3169,7 +3491,8 @@
             "replacementText": "DESKTOPINI_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 327,
@@ -3189,7 +3512,8 @@
             "replacementText": "CONFIG_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 327,
@@ -3209,7 +3533,8 @@
             "replacementText": "CONF_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 332,
@@ -3220,7 +3545,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface AuditDirectoryConventionsOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/analyzers/hygiene.ts": [
@@ -3232,7 +3558,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 1,
@@ -3242,7 +3569,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'hygiene."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 284,
@@ -3262,7 +3590,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 288,
@@ -3282,7 +3611,8 @@
             "replacementText": "MAKEFILE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/analyzers/large-file.ts": [
@@ -3294,7 +3624,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 92,
@@ -3305,7 +3636,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'volume_suggestion'."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 93,
@@ -3316,7 +3648,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'volume_suggestion'."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 94,
@@ -3327,7 +3660,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'volume_suggestion'."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 95,
@@ -3338,7 +3672,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "4 symbols share prefix 'volume_suggestion'."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 342,
@@ -3348,7 +3683,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 359,
@@ -3368,7 +3704,8 @@
             "replacementText": "LARGEFILE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 612,
@@ -3388,7 +3725,8 @@
             "replacementText": "DURATION_100MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 612,
@@ -3408,7 +3746,8 @@
             "replacementText": "DURATION_100MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 652,
@@ -3420,7 +3759,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface VisitOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 702,
@@ -3440,7 +3780,8 @@
             "replacementText": "LARGEFILE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 702,
@@ -3450,7 +3791,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/analyzers/naming-python-helper.ts": [
@@ -3462,7 +3804,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 98,
@@ -3473,7 +3816,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface BuildPythonActionableOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 187,
@@ -3484,7 +3828,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 208,
@@ -3504,7 +3849,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 218,
@@ -3524,7 +3870,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/analyzers/rust-modern.ts": [
@@ -3536,7 +3883,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 331,
@@ -3547,7 +3895,8 @@
         "fix": {
           "action": "extract_constant",
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 340,
@@ -3558,7 +3907,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ScanAsyncLockIssuesOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 391,
@@ -3569,7 +3919,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ScanUnsafeSafetyProofsOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 392,
@@ -3579,7 +3930,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 433,
@@ -3590,7 +3942,8 @@
         "fix": {
           "action": "split_function",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/analyzers/simplify-inlining.ts": [
@@ -3612,7 +3965,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 190,
@@ -3622,7 +3976,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 246,
@@ -3642,7 +3997,8 @@
             "replacementText": "CONST_5"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 246,
@@ -3662,7 +4018,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 263,
@@ -3682,7 +4039,8 @@
             "replacementText": "SIMPLIFY_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 289,
@@ -3702,7 +4060,8 @@
             "replacementText": "FILE_PATH_INLINEMICROFRAGMENTDIRECTLY_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/analyzers/stdlib.ts": [
@@ -3714,7 +4073,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 1,
@@ -3724,7 +4084,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'stdlib."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 109,
@@ -3744,7 +4105,8 @@
             "replacementText": "CONST_1RE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 137,
@@ -3755,7 +4117,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 224,
@@ -3766,7 +4129,8 @@
           "action": "split_function",
           "template": "// Extracted helper:",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 236,
@@ -3778,7 +4142,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface OpenFrameOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 302,
@@ -3789,7 +4154,9 @@
         "fix": {
           "action": "refactor",
           "template": "Reduce cognitive density: introduce whitespace and named intermediate constan…"
-        }
+        },
+        "tier": "T3",
+        "conf": 0.8
       },
       {
         "line": 305,
@@ -3800,7 +4167,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 306,
@@ -3820,7 +4188,8 @@
             "replacementText": "CONST_4"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 350,
@@ -3832,7 +4201,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface EmitIssueOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 350,
@@ -3844,7 +4214,8 @@
           "action": "split_function",
           "template": "// Extracted helper:",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 380,
@@ -3864,7 +4235,8 @@
             "replacementText": "USECONSTANTTIMECOMPARISON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 385,
@@ -3884,7 +4256,8 @@
             "replacementText": "GUARDRECURSION_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 471,
@@ -3894,7 +4267,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 574,
@@ -3914,7 +4288,8 @@
             "replacementText": "DURATION_1S"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/analyzers/vscode-extension.ts": [
@@ -3926,7 +4301,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 153,
@@ -3947,7 +4323,8 @@
           },
           "template": "issue",
           "safeToAutomate": true
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 175,
@@ -3967,7 +4344,8 @@
             "replacementText": "XMLNSHTTPWWWW3_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 175,
@@ -3977,7 +4355,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 176,
@@ -3997,7 +4376,8 @@
             "replacementText": "XMLNSHTTPWWWW3_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 176,
@@ -4007,7 +4387,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 180,
@@ -4027,7 +4408,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 181,
@@ -4047,7 +4429,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 183,
@@ -4057,7 +4440,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 215,
@@ -4069,7 +4453,8 @@
           "action": "split_function",
           "template": "// Extracted helper:",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/cli/selfTestCmd.ts": [
@@ -4081,21 +4466,44 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Rename file to 'self-test-cmd.ts'."
-        }
+        },
+        "tier": "T1"
       },
       {
-        "line": 64,
+        "line": 128,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"buildFixtures\" spans 79 lines (limit 60).",
+        "msg": "Function \"buildFixtures\" spans 83 lines (limit 60).",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
-        "line": 107,
+        "line": 161,
+        "col": 74,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 5 should be extracted into a named constant.",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 161,
+              "startCol": 74,
+              "endLine": 161,
+              "endCol": 75
+            },
+            "replacementText": "CONST_5"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 175,
         "col": 55,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4104,18 +4512,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 107,
+              "startLine": 175,
               "startCol": 55,
-              "endLine": 107,
+              "endLine": 175,
               "endCol": 85
             },
             "replacementText": "A1B2C3D4E5F6G7H8I9J0K1L2M3N4_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 129,
+        "line": 197,
         "col": 36,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4124,18 +4533,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 129,
+              "startLine": 197,
               "startCol": 36,
-              "endLine": 129,
+              "endLine": 197,
               "endCol": 39
             },
             "replacementText": "CONST_800"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 130,
+        "line": 198,
         "col": 39,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4144,18 +4554,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 130,
+              "startLine": 198,
               "startCol": 39,
-              "endLine": 130,
+              "endLine": 198,
               "endCol": 42
             },
             "replacementText": "CONST_800"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 148,
+        "line": 216,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4164,18 +4575,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 148,
+              "startLine": 216,
               "startCol": 13,
-              "endLine": 148,
+              "endLine": 216,
               "endCol": 37
             },
             "replacementText": "CONSTANTSMAGICNUMBER_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 149,
+        "line": 217,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4184,18 +4596,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 149,
+              "startLine": 217,
               "startCol": 13,
-              "endLine": 149,
+              "endLine": 217,
               "endCol": 41
             },
             "replacementText": "COMPLEXITYHIGHCOMPLEXITY_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 150,
+        "line": 218,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4204,18 +4617,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 150,
+              "startLine": 218,
               "startCol": 13,
-              "endLine": 150,
+              "endLine": 218,
               "endCol": 36
             },
             "replacementText": "LARGEFILELARGEFILE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 151,
+        "line": 219,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4224,18 +4638,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 151,
+              "startLine": 219,
               "startCol": 13,
-              "endLine": 151,
+              "endLine": 219,
               "endCol": 37
             },
             "replacementText": "GOVERNANCEGOVEXC001_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 152,
+        "line": 220,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4244,18 +4659,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 152,
+              "startLine": 220,
               "startCol": 13,
-              "endLine": 152,
+              "endLine": 220,
               "endCol": 37
             },
             "replacementText": "GOVERNANCEGOVPRF003_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 153,
+        "line": 221,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4264,18 +4680,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 153,
+              "startLine": 221,
               "startCol": 13,
-              "endLine": 153,
+              "endLine": 221,
               "endCol": 37
             },
             "replacementText": "GOVERNANCEGOVPRF004_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 154,
+        "line": 222,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4284,18 +4701,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 154,
+              "startLine": 222,
               "startCol": 13,
-              "endLine": 154,
+              "endLine": 222,
               "endCol": 38
             },
             "replacementText": "SECRETSSECRETDETECTED_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 155,
+        "line": 223,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4304,18 +4722,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 155,
+              "startLine": 223,
               "startCol": 13,
-              "endLine": 155,
+              "endLine": 223,
               "endCol": 44
             },
             "replacementText": "DEPENDENCYGRAPHIMPORTCYCLE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 156,
+        "line": 224,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4324,18 +4743,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 156,
+              "startLine": 224,
               "startCol": 13,
-              "endLine": 156,
+              "endLine": 224,
               "endCol": 45
             },
             "replacementText": "DEPENDENCYGRAPHUNUSEDMODULE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 192,
+        "line": 299,
         "col": 23,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -4343,10 +4763,11 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
-        "line": 194,
+        "line": 301,
         "col": 63,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4355,18 +4776,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 194,
+              "startLine": 301,
               "startCol": 63,
-              "endLine": 194,
+              "endLine": 301,
               "endCol": 88
             },
             "replacementText": "AUTOREFACTORSELFTEST_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 199,
+        "line": 306,
         "col": 36,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4375,18 +4797,19 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 199,
+              "startLine": 306,
               "startCol": 36,
-              "endLine": 199,
+              "endLine": 306,
               "endCol": 63
             },
             "replacementText": "FILE_PATH_AUTOREFACTORCONFIGJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
-        "line": 206,
+        "line": 313,
         "col": 51,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4395,15 +4818,16 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 206,
+              "startLine": 313,
               "startCol": 51,
-              "endLine": 206,
+              "endLine": 313,
               "endCol": 74
             },
             "replacementText": "FILE_PATH_SELFTESTREPORTJSON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/core/architecture/metaArchitectureEvaluator.ts": [
@@ -4415,7 +4839,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Rename file to 'meta-architecture-evaluator.ts'."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 128,
@@ -4435,7 +4860,8 @@
             "replacementText": "HEADLESSDOMAINCORE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 139,
@@ -4447,7 +4873,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface EvaluateTaxonomyAuditOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 173,
@@ -4467,7 +4894,8 @@
             "replacementText": "DURATION_100MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 207,
@@ -4487,7 +4915,8 @@
             "replacementText": "CONST_150"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 210,
@@ -4507,7 +4936,8 @@
             "replacementText": "DURATION_10MS"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 212,
@@ -4527,7 +4957,8 @@
             "replacementText": "MATH_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 213,
@@ -4547,7 +4978,8 @@
             "replacementText": "FORMATTING_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 217,
@@ -4567,7 +4999,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 228,
@@ -4579,7 +5012,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface BuildAuditResultOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast-pattern/structural-pattern-engine.ts": [
@@ -4591,7 +5025,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 130,
@@ -4611,7 +5046,8 @@
             "replacementText": "PATTERNTSX_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 559,
@@ -4631,7 +5067,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 560,
@@ -4651,7 +5088,8 @@
             "replacementText": "CONST_4"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 561,
@@ -4671,7 +5109,8 @@
             "replacementText": "CONST_4"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 602,
@@ -4691,7 +5130,8 @@
             "replacementText": "NOOP_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 744,
@@ -4711,7 +5151,8 @@
             "replacementText": "CONST_5"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 744,
@@ -4731,7 +5172,8 @@
             "replacementText": "CONST_5"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 769,
@@ -4751,7 +5193,8 @@
             "replacementText": "FIXPOINTREWRITE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/core/ast/adapters.ts": [
@@ -4763,7 +5206,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'adapters."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 105,
@@ -4774,7 +5218,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 106,
@@ -4785,7 +5230,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 107,
@@ -4796,7 +5242,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 108,
@@ -4807,7 +5254,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 109,
@@ -4818,7 +5266,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 110,
@@ -4829,7 +5278,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 111,
@@ -4840,7 +5290,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 112,
@@ -4851,7 +5302,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 113,
@@ -4862,7 +5314,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 125,
@@ -4873,7 +5326,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 170,
@@ -4885,7 +5339,8 @@
           "action": "replace_token",
           "template": "languageAdapter",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/data-adapter.ts": [
@@ -4899,7 +5354,8 @@
           "action": "replace_token",
           "template": "normalizedNode",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/deprecated-usage-visitor.ts": [
@@ -4921,7 +5377,8 @@
             "replacementText": "FILE_PATH_TESTS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 99,
@@ -4931,7 +5388,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 190,
@@ -4941,7 +5399,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/ast/fallback-chain-matcher.ts": [
@@ -4963,7 +5422,8 @@
             "replacementText": "FILE_PATH_ADAPTER_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 42,
@@ -4983,7 +5443,8 @@
             "replacementText": "FILE_PATH_ADAPTERS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 43,
@@ -5003,7 +5464,8 @@
             "replacementText": "FILE_PATH_COMPAT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 44,
@@ -5023,7 +5485,8 @@
             "replacementText": "FILE_PATH_SHIMS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 45,
@@ -5043,7 +5506,8 @@
             "replacementText": "FILE_PATH_PERIMETER_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 46,
@@ -5063,7 +5527,8 @@
             "replacementText": "FILE_PATH_GATEWAY_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 47,
@@ -5083,7 +5548,8 @@
             "replacementText": "FILE_PATH_BRIDGES_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 48,
@@ -5103,7 +5569,8 @@
             "replacementText": "ADAPTERTS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 49,
@@ -5123,7 +5590,8 @@
             "replacementText": "SHIMTS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 67,
@@ -5134,7 +5602,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'k' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 109,
@@ -5154,7 +5623,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 187,
@@ -5174,7 +5644,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/core/ast/gdscript-adapter.ts": [
@@ -5186,7 +5657,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 192,
@@ -5206,7 +5678,8 @@
             "replacementText": "CONST_40"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 215,
@@ -5217,7 +5690,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface TryParseClassDeclOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 257,
@@ -5228,7 +5702,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface TryParseFuncDeclOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 289,
@@ -5239,7 +5714,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 289,
@@ -5250,7 +5726,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface TryParseControlStmtOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 290,
@@ -5260,7 +5737,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 317,
@@ -5271,7 +5749,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 317,
@@ -5282,7 +5761,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface TryParseStructureStmtOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 442,
@@ -5294,7 +5774,8 @@
           "action": "split_function",
           "template": "// Extracted helper:",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/go-adapter-parser.ts": [
@@ -5306,7 +5787,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 487,
@@ -5316,7 +5798,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 526,
@@ -5327,7 +5810,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ParseStringLiteralsOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 613,
@@ -5338,7 +5822,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 671,
@@ -5349,7 +5834,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface TrackBraceDeltaOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 699,
@@ -5369,7 +5855,8 @@
             "replacementText": "SELECT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 753,
@@ -5380,7 +5867,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface HandleTypeOrFuncOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 774,
@@ -5400,7 +5888,8 @@
             "replacementText": "FUNC_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 782,
@@ -5411,7 +5900,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface HandleVarOrConstOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 815,
@@ -5422,7 +5912,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface HandleBlockEntriesOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 833,
@@ -5433,7 +5924,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface HandleDeclarationLineOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 859,
@@ -5444,7 +5936,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface HandleControlFlowLineOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/language-support.ts": [
@@ -5457,7 +5950,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 40,
@@ -5468,7 +5962,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 47,
@@ -5488,7 +5983,8 @@
             "replacementText": "LANGUAGE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/core/ast/markdown-adapter.ts": [
@@ -5502,7 +5998,8 @@
           "action": "replace_token",
           "template": "normalizedNode",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/multilang.ts": [
@@ -5514,7 +6011,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'multilang."
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/oxc-adapter.ts": [
@@ -5526,7 +6024,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 80,
@@ -5536,7 +6035,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/ast/oxc-predicates.ts": [
@@ -5548,7 +6048,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 340,
@@ -5559,7 +6060,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/oxc-projector.ts": [
@@ -5571,7 +6073,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 360,
@@ -5582,7 +6085,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 415,
@@ -5594,7 +6098,8 @@
           "action": "replace_token",
           "template": "iterable",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/python-adapter-helpers.ts": [
@@ -5606,7 +6111,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/ast/python-adapter.ts": [
@@ -5618,7 +6124,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 48,
@@ -5639,7 +6146,8 @@
           },
           "template": "treeSitterParser",
           "safeToAutomate": true
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 50,
@@ -5659,7 +6167,8 @@
             "replacementText": "TREESITTER_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 50,
@@ -5670,7 +6179,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 51,
@@ -5690,7 +6200,8 @@
             "replacementText": "TREESITTERPYTHON_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 51,
@@ -5701,7 +6212,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 74,
@@ -5712,7 +6224,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ResolvePythonNodeNameOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 81,
@@ -5732,7 +6245,8 @@
             "replacementText": "CALL_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 92,
@@ -5752,7 +6266,8 @@
             "replacementText": "FUNCTIONDEFINITION_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 112,
@@ -5773,7 +6288,8 @@
           },
           "template": "extractTypedOrDefaultPythonParameter",
           "safeToAutomate": true
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 114,
@@ -5793,7 +6309,8 @@
             "replacementText": "NAME_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 143,
@@ -5804,7 +6321,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'result' with a domain-qualified identifier (e."
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/ast/rust-adapter.ts": [
@@ -5816,7 +6334,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 30,
@@ -5826,7 +6345,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 35,
@@ -5837,7 +6357,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Rename '_ADAPTER_ID_RUST' to an uppercase snake_case constant (e."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 71,
@@ -5848,7 +6369,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 72,
@@ -5859,7 +6381,8 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 481,
@@ -5879,7 +6402,8 @@
             "replacementText": "ATTRIBUTEITEM_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 496,
@@ -5899,7 +6423,8 @@
             "replacementText": "CONST_8"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 497,
@@ -5919,7 +6444,8 @@
             "replacementText": "MODITEM_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 536,
@@ -5939,7 +6465,8 @@
             "replacementText": "PATTERN_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 551,
@@ -5959,7 +6486,8 @@
             "replacementText": "SELFPARAMETER_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 552,
@@ -5979,7 +6507,8 @@
             "replacementText": "SELF_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/core/ast/scope-graph.ts": [
@@ -5991,7 +6520,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 78,
@@ -6002,7 +6532,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 92,
@@ -6013,7 +6544,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 96,
@@ -6033,7 +6565,8 @@
             "replacementText": "CONSTANT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 97,
@@ -6053,7 +6586,8 @@
             "replacementText": "VARIABLE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 129,
@@ -6065,7 +6599,8 @@
           "action": "replace_token",
           "template": "lookupResult",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 184,
@@ -6085,7 +6620,8 @@
             "replacementText": "CONSTANT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 189,
@@ -6105,7 +6641,8 @@
             "replacementText": "CONST_3"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 191,
@@ -6125,7 +6662,8 @@
             "replacementText": "CONST_4"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 193,
@@ -6145,7 +6683,8 @@
             "replacementText": "CONST_5"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 250,
@@ -6156,7 +6695,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 286,
@@ -6167,7 +6707,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'info' with a domain-qualified identifier (e."
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 391,
@@ -6187,7 +6728,8 @@
             "replacementText": "SCOPEGRAPH_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 428,
@@ -6199,7 +6741,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface VisitOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 448,
@@ -6209,7 +6752,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 468,
@@ -6221,7 +6765,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface LeaveOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 504,
@@ -6232,7 +6777,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'info' with a domain-qualified identifier (e."
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/ast/shell-adapter.ts": [
@@ -6246,7 +6792,8 @@
           "action": "replace_token",
           "template": "normalizedNode",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/sparse-ast-hopper.ts": [
@@ -6268,7 +6815,8 @@
             "replacementText": "INSIDE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 66,
@@ -6288,7 +6836,8 @@
             "replacementText": "BEFORE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 67,
@@ -6308,7 +6857,8 @@
             "replacementText": "AFTER_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 68,
@@ -6328,7 +6878,8 @@
             "replacementText": "INSIDE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 69,
@@ -6348,7 +6899,8 @@
             "replacementText": "WRAPS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 84,
@@ -6368,7 +6920,8 @@
             "replacementText": "BEFORE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 84,
@@ -6388,7 +6941,8 @@
             "replacementText": "AFTER_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 103,
@@ -6408,7 +6962,8 @@
             "replacementText": "INSIDE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 103,
@@ -6428,7 +6983,8 @@
             "replacementText": "WRAPS_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 112,
@@ -6439,7 +6995,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 122,
@@ -6450,7 +7007,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/sparse-reference-replay.ts": [
@@ -6463,7 +7021,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 272,
@@ -6475,7 +7034,8 @@
           "action": "replace_token",
           "template": "sparseReplayWindow",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 311,
@@ -6487,7 +7047,8 @@
           "action": "replace_token",
           "template": "sparseReplayWindow",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/swa-bounded-replay.ts": [
@@ -6499,7 +7060,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 224,
@@ -6519,7 +7081,8 @@
             "replacementText": "TEXT_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 253,
@@ -6531,7 +7094,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ComputeReplayWindowOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 310,
@@ -6542,7 +7106,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'result' with a domain-qualified identifier (e."
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 436,
@@ -6552,7 +7117,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 556,
@@ -6563,7 +7129,8 @@
           "action": "replace_token",
           "template": "$1.includes($2)",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 639,
@@ -6574,7 +7141,8 @@
           "action": "replace_token",
           "template": "$1.includes($2)",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 641,
@@ -6585,7 +7153,8 @@
           "action": "replace_token",
           "template": "$1.includes($2)",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/core/ast/swar.ts": [
@@ -6598,7 +7167,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 95,
@@ -6609,7 +7179,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 109,
@@ -6620,7 +7191,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 167,
@@ -6631,7 +7203,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/traverse.ts": [
@@ -6643,7 +7216,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 1,
@@ -6653,7 +7227,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'traverse."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 107,
@@ -6664,7 +7239,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface DispatchHooksOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 173,
@@ -6674,7 +7250,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 246,
@@ -6685,7 +7262,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface DispatchActiveAndExemptHooksOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 286,
@@ -6696,7 +7274,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface RunStreamingOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 286,
@@ -6707,7 +7286,8 @@
           "action": "split_function",
           "template": "// Extracted helper:",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 307,
@@ -6719,7 +7299,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface VisitNodeOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 385,
@@ -6731,7 +7312,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface VisitOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 492,
@@ -6742,7 +7324,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 492,
@@ -6753,7 +7336,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface DispatchProjectedActiveAndExemptHooksOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 517,
@@ -6764,7 +7348,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface NotifyProjectedObserverOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 576,
@@ -6775,7 +7360,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface RunStreamingProjectedOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 576,
@@ -6786,7 +7372,8 @@
           "action": "split_function",
           "template": "// Extracted helper:",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 602,
@@ -6798,7 +7385,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface VisitRawOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/ts-predicates.ts": [
@@ -6810,7 +7398,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 115,
@@ -6821,7 +7410,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 172,
@@ -6833,7 +7423,8 @@
           "action": "replace_token",
           "template": "nodeKind",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 188,
@@ -6844,7 +7435,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 210,
@@ -6855,7 +7447,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 225,
@@ -6866,7 +7459,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 244,
@@ -6877,7 +7471,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 279,
@@ -6897,7 +7492,8 @@
             "replacementText": "DEEPFREEZE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 344,
@@ -6908,7 +7504,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 435,
@@ -6918,7 +7515,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 466,
@@ -6930,7 +7528,8 @@
           "action": "replace_token",
           "template": "positionOf",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/ts-projector.ts": [
@@ -6942,7 +7541,8 @@
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 54,
@@ -6953,7 +7553,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 133,
@@ -6964,7 +7565,8 @@
           "action": "replace_token",
           "template": "[]",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 140,
@@ -6985,7 +7587,8 @@
           },
           "template": "tsKindInfo",
           "safeToAutomate": true
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 166,
@@ -6997,7 +7600,8 @@
           "action": "replace_token",
           "template": "sourceFile",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 259,
@@ -7009,7 +7613,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface IsObservableSyntaxOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 292,
@@ -7021,7 +7626,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ShouldCollapseToPlaceholderOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 304,
@@ -7033,7 +7639,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ResolveProjectedPositionsOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 364,
@@ -7045,7 +7652,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface BuildProjectedNodeOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 429,
@@ -7057,7 +7665,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ApplyProjectedMetadataOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 462,
@@ -7068,7 +7677,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 472,
@@ -7080,7 +7690,8 @@
           "action": "replace_token",
           "template": "iterable",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 547,
@@ -7090,7 +7701,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 595,
@@ -7102,7 +7714,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ApplyCheapNonFunctionPropsOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 606,
@@ -7114,7 +7727,8 @@
           "action": "replace_token",
           "template": "normalizedNode",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/typescript-adapter.ts": [
@@ -7128,7 +7742,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ResolveNodePositionsOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 115,
@@ -7140,7 +7755,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ResolveNodeNameOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 132,
@@ -7152,7 +7768,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface BuildNormalizedNodeOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 189,
@@ -7164,7 +7781,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface ApplyNodeHierarchyOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 211,
@@ -7176,7 +7794,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface TryReuseSubtreeOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 237,
@@ -7188,7 +7807,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface RecordSpanCacheOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 245,
@@ -7198,7 +7818,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 256,
@@ -7210,7 +7831,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface TraverseChildrenOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 273,
@@ -7222,7 +7844,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface MapNodeOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       }
     ],
     "src/core/ast/utf8.ts": [
@@ -7234,7 +7857,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Expand file name 'utf8."
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 93,
@@ -7245,7 +7869,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 99,
@@ -7256,7 +7881,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 119,
@@ -7267,7 +7893,8 @@
           "action": "introduce_parameter_object",
           "template": "export interface FinishMultiByteSequenceOptions {",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 153,
@@ -7279,7 +7906,8 @@
           "action": "replace_token",
           "template": "int32Array",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 157,
@@ -7290,7 +7918,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 230,
@@ -7301,7 +7930,8 @@
         "fix": {
           "action": "replace_token",
           "safeToAutomate": false
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 234,
@@ -7312,7 +7942,8 @@
         "fix": {
           "action": "rename_identifier",
           "template": "Replace 'k' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 263,
@@ -7322,7 +7953,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Remove unreachable dead code or refactor surrounding branch conditions to ens…"
-        }
+        },
+        "tier": "T3"
       },
       {
         "line": 295,
@@ -7332,7 +7964,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
+        },
+        "tier": "T3"
       }
     ],
     "src/core/cfg/def-use-chain.ts": [
@@ -7345,7 +7978,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 39,
@@ -7356,7 +7990,8 @@
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
-        }
+        },
+        "tier": "T1"
       },
       {
         "line": 48,
@@ -7376,7 +8011,8 @@
             "replacementText": "CONST_48"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 48,
@@ -7396,7 +8032,8 @@
             "replacementText": "CONST_57"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 49,
@@ -7416,7 +8053,8 @@
             "replacementText": "CONST_65"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 49,
@@ -7436,7 +8074,8 @@
             "replacementText": "CONST_90"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 50,
@@ -7456,7 +8095,8 @@
             "replacementText": "CONST_97"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 50,
@@ -7476,7 +8116,8 @@
             "replacementText": "CONST_122"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 51,
@@ -7496,7 +8137,8 @@
             "replacementText": "CONST_95"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 60,
@@ -7516,7 +8158,8 @@
             "replacementText": "CONST_48"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 60,
@@ -7536,7 +8179,8 @@
             "replacementText": "CONST_57"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 61,
@@ -7556,7 +8200,8 @@
             "replacementText": "CONST_65"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 61,
@@ -7576,7 +8221,8 @@
             "replacementText": "CONST_90"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 62,
@@ -7596,7 +8242,8 @@
             "replacementText": "CONST_97"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 62,
@@ -7616,7 +8263,8 @@
             "replacementText": "CONST_122"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 63,
@@ -7636,7 +8284,8 @@
             "replacementText": "CONST_95"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 64,
@@ -7656,7 +8305,8 @@
             "replacementText": "CONST_36"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 79,
@@ -7676,7 +8326,8 @@
             "replacementText": "CONST_46"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 145,
@@ -7696,7 +8347,8 @@
             "replacementText": "READ_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 147,
@@ -7716,7 +8368,8 @@
             "replacementText": "CLEANUP_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 149,
@@ -7736,7 +8389,8 @@
             "replacementText": "DEREFERENCE_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 178,
@@ -7756,7 +8410,8 @@
             "replacementText": "ANONYMOUSASYNCCALL_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       },
       {
         "line": 270,
@@ -7776,7 +8431,8 @@
             "replacementText": "CLEANUP_TEXT"
           },
           "safeToAutomate": true
-        }
+        },
+        "tier": "T2"
       }
     ],
     "src/core/codemod/patch-engine.ts": [
@@ -7789,103 +8445,10 @@
         "fix": {
           "action": "refactor",
           "template": "Use fs/promises or the host async fs API (e.g. vscode.workspace.fs)."
-        }
-      },
-      {
-        "line": 59,
-        "col": 12,
-        "rule": "GOV-PRF-004",
-        "sev": "WARN",
-        "msg": "Synchronous fs call blocks the host event loop (UI jank / request stall source).",
-        "fix": {
-          "action": "refactor",
-          "template": "Use fs/promises or the host async fs API (e.g. vscode.workspace.fs)."
-        }
-      },
-      {
-        "line": 88,
-        "col": 11,
-        "rule": "NAM-JRG-002",
-        "sev": "WARN",
-        "msg": "Symbol or test identifier 'tmpPath' contains transient construction jargon or milestone marker.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace transient process markers with semantic domain naming."
-        }
-      },
-      {
-        "line": 105,
-        "col": 11,
-        "rule": "NAM-JRG-002",
-        "sev": "WARN",
-        "msg": "Symbol or test identifier 'tmpPath' contains transient construction jargon or milestone marker.",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace transient process markers with semantic domain naming."
-        }
-      },
-      {
-        "line": 128,
-        "col": 19,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'issueToFix' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        }
-      },
-      {
-        "line": 224,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 178",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        }
-      },
-      {
-        "line": 345,
-        "col": 54,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 3 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 345,
-              "startCol": 54,
-              "endLine": 345,
-              "endCol": 55
-            },
-            "replacementText": "CONST_3"
-          },
-          "safeToAutomate": true
-        }
-      },
-      {
-        "line": 346,
-        "col": 68,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 4 should be extracted into a named constant.",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 346,
-              "startCol": 68,
-              "endLine": 346,
-              "endCol": 69
-            },
-            "replacementText": "CONST_4"
-          },
-          "safeToAutomate": true
-        }
+        },
+        "tier": "T3"
       }
     ]
   },
-  "truncated": 2970
+  "truncated": 3022
 }
