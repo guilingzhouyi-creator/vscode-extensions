@@ -16,7 +16,9 @@
       "sha": "3ed17e053aa0688f4fa41170c51cebdae252088b",
       "committedAt": "2026-10-21T12:44:24.000Z",
       "ruleIds": [
-        "CMG-STY-001"
+        "CMG-PRJ-001",
+        "CMG-STY-001",
+        "GUARD-MSG-001"
       ]
     },
     {

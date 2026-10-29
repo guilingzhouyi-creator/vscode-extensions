@@ -33,6 +33,7 @@ const FEEDBACK = require('./validate-gate-feedback');
 const VERDICTS = require('./validate-gate-verdicts');
 const ISOMORPHISM = require('./validate-script-isomorphism');
 const CHAINS = require('./validate-block-chains');
+const SCORING_CLOSURE = require('./validate-scoring-rule-closure');
 
 /**
  * Creates a scratch directory removed when the process exits.
@@ -483,6 +484,12 @@ check(
   ),
 );
 check(
+  'commit structure contract rejects missing scope',
+  STRUCTURE.verifyStructure('fix: 修复空指针分支的判定顺序\n\n[Project / 项目归属]\n- governance\n').some(
+    (f) => f.step === 'HEADER-FORM-01',
+  ),
+);
+check(
   'commit structure contract reads the controlled project list from the dictionary',
   STRUCTURE.controlledProjects().includes('governance') &&
     STRUCTURE.controlledProjects().includes('fractal-git'),
@@ -520,6 +527,37 @@ check(
     );
     return Boolean(finding) && finding.token === 'phase2' && finding.line > 0;
   })(),
+);
+check(
+  'commit structure contract rejects duplicate section headings',
+  STRUCTURE.verifyStructure(
+    codenameBody('现有判定在空指针分支上缺少保护，构造边界输入时会抛出异常并中断门禁流程。') +
+      '\n\n[Why / 动机背景]\n- 重复的动机说明，必须被结构检查拦截。',
+  ).some((f) => f.step === 'BODY-SECTIONS-05'),
+);
+check(
+  'commit structure contract rejects out-of-order sections',
+  STRUCTURE.verifyStructure(
+    'fix(gate): 修复空指针分支的判定顺序\n\n[Project / 项目归属]\n- governance\n\n[Verification / 验证结论]\n- 以空输入复核，门禁给出结构化阻断而非异常中断。\n\n[Why / 动机背景]\n- 现有判定在空指针分支上缺少保护，构造边界输入时会抛出异常。\n',
+  ).some((f) => f.step === 'BODY-SECTIONS-05'),
+);
+check(
+  'commit structure contract rejects non-falsifiable bare-command verification',
+  STRUCTURE.verifyStructure(
+    'fix(gate): 修复空指针分支的判定顺序\n\n[Project / 项目归属]\n- governance\n\n[Why / 动机背景]\n- 现有判定在空指针分支上缺少保护。\n\n[Fixed / 修复缺陷]\n- 修复空指针缺陷。\n\n[Verification / 验证结论]\n- npm test\n',
+  ).some((f) => f.step === 'BODY-SECTIONS-05'),
+);
+check(
+  'commit structure contract rejects non-critical commit without body',
+  STRUCTURE.verifyStructure('docs(gate): 简短说明文档').some(
+    (f) => f.step === 'BODY-SECTIONS-05' && f.ruleId === 'GUARD-MSG-001',
+  ),
+);
+check(
+  'commit structure contract accepts non-critical commit with Why and Verification',
+  STRUCTURE.verifyStructure(
+    'docs(gate): 补充判定顺序说明与契约设计\n\n[Project / 项目归属]\n- governance\n\n[Why / 动机背景]\n- 补充门禁的详细设计与降级契约说明文档。\n\n[Verification / 验证结论]\n- 运行本地文档完整性校验，全部断言成立。\n',
+  ).length === 0,
 );
 check(
   'validate-commit-msg projects the contract codename finding without a second vocabulary',
@@ -707,6 +745,22 @@ check(
     return unguardedSites.length === 0;
   })(),
   `${mutatedSites} site(s) mutated, unguarded: ${unguardedSites.slice(0, 6).join(', ') || 'none'}`,
+);
+
+check(
+  'scoring rule closure guard verifies 100% catalog coverage',
+  (() => {
+    const res = SCORING_CLOSURE.verifyScoringRuleClosure();
+    return res.ok && res.unmapped.length === 0 && res.totalRules > 0;
+  })(),
+);
+check(
+  'scoring rule closure guard flags unmapped rule prefix',
+  (() => {
+    const fakeFamilyMap = { 'FGT-COR': 'codeSecurity' };
+    const resolved = SCORING_CLOSURE.resolveRuleDimension('UNMAPPED-XYZ-001', fakeFamilyMap, ['FGT-COR']);
+    return resolved === null;
+  })(),
 );
 
 const failures = results.filter((r) => !r.ok).length;if (failures > 0) {

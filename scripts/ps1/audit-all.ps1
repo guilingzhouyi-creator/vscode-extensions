@@ -72,6 +72,7 @@ $logFeedbackOut = Join-Path $transientDir "audit-check-feedbackout-$randSuffix.o
 $logOrderingOut = Join-Path $transientDir "audit-check-orderingout-$randSuffix.out.log"
 $logSkillsOut = Join-Path $transientDir "audit-check-skillsout-$randSuffix.out.log"
 $logClosureOut = Join-Path $transientDir "audit-check-closureout-$randSuffix.out.log"
+$logScoringClosureOut = Join-Path $transientDir "audit-check-scoringclosureout-$randSuffix.out.log"
 $logReachOut = Join-Path $transientDir "audit-check-reachout-$randSuffix.out.log"
 $logRuleSourceOut = Join-Path $transientDir "audit-check-rulesource-$randSuffix.out.log"
 $logDocsOut = Join-Path $transientDir "audit-check-docsout-$randSuffix.out.log"
@@ -135,6 +136,7 @@ $resFeedback = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/va
 $resOrdering = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gate-ordering.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logOrderingOut -NoNewWindow -PassThru -Wait
 $resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logSkillsOut -NoNewWindow -PassThru -Wait
 $resClosure = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-id-closure.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logClosureOut -NoNewWindow -PassThru -Wait
+$resScoringClosure = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-scoring-rule-closure.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logScoringClosureOut -NoNewWindow -PassThru -Wait
 $resReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-reachability.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logReachOut -NoNewWindow -PassThru -Wait
 $resRuleSource = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-source-consistency.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logRuleSourceOut -NoNewWindow -PassThru -Wait
 $resDocs = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-docs-consistency.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocsOut -NoNewWindow -PassThru -Wait
@@ -159,7 +161,7 @@ $resDocMetrics = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/
 $codeCatalog = $res.ExitCode
 $ruleStepCodes = @(
     $codeCatalog, $resFeedback.ExitCode, $resOrdering.ExitCode, $resSkills.ExitCode,
-    $resClosure.ExitCode, $resReach.ExitCode, $resRuleSource.ExitCode, $resDocs.ExitCode,
+    $resClosure.ExitCode, $resScoringClosure.ExitCode, $resReach.ExitCode, $resRuleSource.ExitCode, $resDocs.ExitCode,
     $resLedger.ExitCode, $resSubagent.ExitCode, $resCascade.ExitCode, $resDocAnchors.ExitCode, $resMetricCoverage.ExitCode,
     $resFamilyContract.ExitCode, $resDocReach.ExitCode, $resCommitHistory.ExitCode,
     $resDestructive.ExitCode, $resChains.ExitCode, $resCounts.ExitCode, $resParity.ExitCode,
@@ -362,22 +364,37 @@ $globalColor = if ($failed) { "Red" } else { "Green" }
 function Get-SafeProp {
     [CmdletBinding()]
     param(
-        [psobject]$Target,
+        [object]$Target,
         [string]$Name
     )
     if ($null -eq $Target) { return $null }
+    if ($Target -is [System.Collections.IDictionary]) {
+        if ($Target.Contains($Name)) { return $Target[$Name] }
+        return $null
+    }
     $p = $Target.PSObject.Properties[$Name]
     if ($null -ne $p) { return $p.Value }
     return $null
 }
 
-# 读取 auto-refactor 十维工程质量基线
+# 读取 auto-refactor 十维工程质量基线 (优先读取轻量级 UAR 收据)
+$receiptPath = Join-Path $repoRoot "auto-refactor\reports\audit-receipt.json"
 $aasBaselinePath = Join-Path $repoRoot "auto-refactor\reports\self-audit-baseline.aas.json"
 $baselinePath = Join-Path $repoRoot "auto-refactor\reports\self-audit-baseline.json"
 $baseline = $null; $tenDimensions = $null; $compositeScore = $null; $totalDebt = $null; $autonomyRate = $null; $grade = $null; $notEvaluatedDims = $null
 
 try {
-    if (Test-Path $aasBaselinePath) {
+    if (Test-Path $receiptPath) {
+        $receiptData = (Get-Content -Path $receiptPath -Raw -Encoding utf8) | ConvertFrom-Json
+        if ($receiptData -and $receiptData.schemaVersion -eq "1.0") {
+            if ($null -ne $receiptData.healthScore) { $compositeScore = [double]$receiptData.healthScore }
+            if ($null -ne $receiptData.grade) { $grade = [string]$receiptData.grade }
+            if ($null -ne $receiptData.issuesTotal) { $totalDebt = [int]$receiptData.issuesTotal }
+            if ($null -ne $receiptData.confidence) { $autonomyRate = [double]$receiptData.confidence * 100 }
+            $tenDimensions = $receiptData.dimensions; $baseline = $receiptData
+        }
+    }
+    if ($null -eq $baseline -and (Test-Path $aasBaselinePath)) {
         $aasData = (Get-Content -Path $aasBaselinePath -Raw -Encoding utf8) | ConvertFrom-Json
         if ($aasData -and $aasData.schema -eq "aas-v1" -and $aasData.health) {
             $h = $aasData.health
@@ -774,21 +791,70 @@ $workspaceHealthScore = [math]::Round($rawWeighted * $damping, 2)
 $wsHealthStr = if ($workspaceHealthScore % 1 -eq 0) { $workspaceHealthScore.ToString("0.0") } else { $workspaceHealthScore.ToString("0.##") }
 $wsGrade = (Get-GradeFromScore $workspaceHealthScore).Trim()
 
-$qualityVectorObj = if ($null -ne $tenDimensions) {
-    $qObj = [ordered]@{}
-    foreach ($d in $dimDefinitions) {
-        $rawScore = Get-SafeProp $tenDimensions $d.key
-        $parsedScore = 0.0
-        if ($null -ne $rawScore -and [double]::TryParse([string]$rawScore, [ref]$parsedScore) -and -not [double]::IsNaN($parsedScore) -and $parsedScore -gt 0) {
-            $qObj[$d.key] = $parsedScore
-        } else {
-            $qObj[$d.key] = $null
+# ── 全工作区动态十维工程质量向量加权合成契约 ─────────────────────────────────
+# 摒弃单一子系统静态基线假满分与脱节快照：将 6 大子系统基石得分、多语言采样与细粒度基线
+# 按照架构影响半径进行动态加权融合，确保任意子系统劣化均能客观敏锐地映射到对应维度。
+$dynamicDimensions = [ordered]@{}
+foreach ($d in $dimDefinitions) {
+    $dimKey = $d.key
+    $baseVal = if ($null -ne $tenDimensions -and $null -ne (Get-SafeProp $tenDimensions $dimKey)) {
+        $pVal = 0.0
+        if ([double]::TryParse([string](Get-SafeProp $tenDimensions $dimKey), [ref]$pVal) -and -not [double]::IsNaN($pVal) -and $pVal -gt 0) {
+            $pVal
+        } else { $null }
+    } else { $null }
+
+    # 各维度子系统影响因子映射 (Subsystem Domain Attribution)
+    $dimScore = switch ($dimKey) {
+        "codeSecurity" {
+            $dyn = [math]::Round([double]$scoreAr * 0.65 + [double]$scoreFg * 0.35, 1)
+            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+        }
+        "architectureConsistency" {
+            $dyn = [math]::Round([double]$scoreAr * 0.35 + [double]$scoreRules * 0.25 + [double]$scoreWg * 0.20 + [double]$scoreFg * 0.20, 1)
+            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+        }
+        "performanceEfficiency" {
+            $dyn = [math]::Round([double]$scoreAr * 0.40 + [double]$scoreWg * 0.35 + [double]$scoreFg * 0.25, 1)
+            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+        }
+        "maintainability" {
+            $dyn = [math]::Round([double]$scoreAr * 0.45 + [double]$scoreWt * 0.30 + [double]$scoreHygiene * 0.25, 1)
+            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+        }
+        "standardization" {
+            $dyn = [math]::Round([double]$scoreHygiene * 0.45 + [double]$scoreRules * 0.30 + [double]$scoreAr * 0.25, 1)
+            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+        }
+        "modernity" {
+            $polyScore = if ($null -ne $polyglotIndex) { $polyglotIndex } else { $scoreAr }
+            $dyn = [math]::Round([double]$scoreAr * 0.50 + [double]$polyScore * 0.50, 1)
+            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+        }
+        "semanticPurity" {
+            $dyn = [math]::Round([double]$scoreAr * 0.60 + [double]$scoreWt * 0.40, 1)
+            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+        }
+        "duplication" {
+            $dyn = [math]::Round([double]$scoreAr * 0.65 + [double]$scoreHygiene * 0.35, 1)
+            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+        }
+        "commentQuality" {
+            $dyn = [math]::Round([double]$scoreAr * 0.60 + [double]$scoreWt * 0.40, 1)
+            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+        }
+        "techDebtRisk" {
+            $dyn = [math]::Round([double]$scoreAr * 0.40 + [double]$scoreWg * 0.30 + [double]$scoreFg * 0.30, 1)
+            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+        }
+        default {
+            if ($null -ne $baseVal) { $baseVal } else { $scoreAr }
         }
     }
-    $qObj
-} else {
-    $null
+    $dynamicDimensions[$dimKey] = [math]::Max($SCORE_FLOOR, [math]::Min(100.0, [double]$dimScore))
 }
+
+$qualityVectorObj = $dynamicDimensions
 
 $summary = [ordered]@{
     protocolVersion = "1.0.0"
@@ -939,9 +1005,9 @@ $sepTitle2 = "─ [auto-refactor 静态引擎十维工程质量全景指数] "
 $sep2 = "├" + $sepTitle2 + ("─" * ($targetWidth - (Get-DisplayWidth $sepTitle2))) + "┤"
 Write-GateHost $sep2 -ForegroundColor Cyan
 
-if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
+if ($null -ne $qualityVectorObj) {
     foreach ($d in $dimDefinitions) {
-        $rawScore = Get-SafeProp $tenDimensions $d.key
+        $rawScore = Get-SafeProp $qualityVectorObj $d.key
         $isNotEvaluated = $false
         if ($null -ne $notEvaluatedDims -and $notEvaluatedDims -contains $d.key) {
             $isNotEvaluated = $true
@@ -1023,11 +1089,11 @@ if ($env:GITHUB_STEP_SUMMARY) {
         [void]$md.AppendLine()
         [void]$md.AppendLine("### 🎯 auto-refactor 静态引擎十维工程质量全景指数")
         [void]$md.AppendLine()
-        if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
+        if ($null -ne $qualityVectorObj) {
             [void]$md.AppendLine("| 序号 | 质量维度 | 得分 | 进度可视化 |")
             [void]$md.AppendLine("| :---: | :--- | :---: | :--- |")
             foreach ($d in $dimDefinitions) {
-                $rawScore = Get-SafeProp $tenDimensions $d.key
+                $rawScore = Get-SafeProp $qualityVectorObj $d.key
                 $isNotEvaluated = $false
                 if ($null -ne $notEvaluatedDims -and $notEvaluatedDims -contains $d.key) {
                     $isNotEvaluated = $true

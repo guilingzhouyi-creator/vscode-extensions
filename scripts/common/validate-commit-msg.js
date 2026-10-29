@@ -171,6 +171,7 @@ function validateBatchCodename(content) {
   return verifyStructure(content)
     .filter((finding) => finding.step === STEP_BATCH_CODE)
     .map((finding) => ({
+      ruleId: finding.ruleId || 'CMG-STY-001',
       lineNum: finding.line || 0,
       term: finding.token || '',
       category: 'batch_codename',
@@ -270,7 +271,12 @@ function validateCommitRange(range) {
     // commit that violates a genuinely new rule still fails.
     const frozenRules = historyBaseline.get(sha);
     if (frozenRules) {
-      const liveFindings = res.styleFindings.filter((f) => !frozenRules.has(f.ruleId));
+      const allFindings = [
+        ...(res.structureFindings || []).map((f) => ({ ruleId: f.ruleId })),
+        ...(res.hallucinatedRules || []).map(() => ({ ruleId: 'GUARD-SSOT-001' })),
+        ...(res.styleFindings || []),
+      ];
+      const liveFindings = allFindings.filter((f) => !frozenRules.has(f.ruleId));
       if (liveFindings.length === 0) {
         frozenCount++;
         continue;
@@ -282,6 +288,11 @@ function validateCommitRange(range) {
       console.error(`\n❌ 提交 ${sha} 包含刚性违规内容:`);
       if (res.hallucinatedRules.length > 0) {
         console.error(`   • RULE-TRUTH-08 违规 (虚构规则 ID): ${res.hallucinatedRules.join(', ')}`);
+      }
+      if ((res.structureFindings || []).length > 0) {
+        for (const s of res.structureFindings) {
+          console.error(`   • [${s.step}] 结构契约违规: ${s.message} (${s.detail})`);
+        }
       }
       if (res.styleFindings.length > 0) {
         console.error(formatDiagnosticReport(res.styleFindings));
@@ -380,7 +391,16 @@ function readCommitContent(target) {
 
 function reportCommitMsgFailure(res, target, isAgentMode) {
   const violations = buildCommitMsgViolations(res, target);
-  const failureSummary = res.debtVerdict?.reason || `Commit message verification failed with ${violations.length} rule hallucination or forbidden style violations.`;
+  let failureSummary = '';
+  if (res.structureFindings && res.structureFindings.length > 0) {
+    failureSummary = `Commit message structural contract failed with ${res.structureFindings.length} violation(s).`;
+  } else if (res.hallucinatedRules && res.hallucinatedRules.length > 0) {
+    failureSummary = `Commit message referenced ${res.hallucinatedRules.length} unregistered/hallucinated rule ID(s).`;
+  } else if (res.debtVerdict?.reason && !res.debtVerdict.passed) {
+    failureSummary = res.debtVerdict.reason;
+  } else {
+    failureSummary = `Commit message verification failed with ${violations.length} rule hallucination or forbidden style violations.`;
+  }
 
   try {
     const { writeFailureSnapshot } = require(MODULE_LOG_ROTATOR);

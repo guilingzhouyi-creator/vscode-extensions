@@ -102,6 +102,8 @@ CODE_SKILLS=0
 "$NODE_BIN" scripts/common/validate-skills.js >/dev/null 2>&1 || CODE_SKILLS=$?
 CODE_CLOSURE=0
 "$NODE_BIN" scripts/common/validate-rule-id-closure.js >/dev/null 2>&1 || CODE_CLOSURE=$?
+CODE_SCORING_CLOSURE=0
+"$NODE_BIN" scripts/common/validate-scoring-rule-closure.js >/dev/null 2>&1 || CODE_SCORING_CLOSURE=$?
 CODE_REACH=0
 "$NODE_BIN" scripts/common/validate-rule-reachability.js >/dev/null 2>&1 || CODE_REACH=$?
 CODE_RULE_SOURCE=0
@@ -135,7 +137,7 @@ CODE_GATE_PROOF=0
 "$NODE_BIN" scripts/common/test-gate-guards.js >/dev/null 2>&1 || CODE_GATE_PROOF=$?
 CODE_DOC_METRICS=0
 "$NODE_BIN" scripts/common/sync-doc-metrics.js >/dev/null 2>&1 || CODE_DOC_METRICS=$?
-if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_RULE_SOURCE" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 || "$CODE_COMMIT_HISTORY" -ne 0 || "$CODE_DESTRUCTIVE" -ne 0 || "$CODE_CHAINS" -ne 0 || "$CODE_COUNTS" -ne 0 || "$CODE_PARITY" -ne 0 || "$CODE_GATE_PROOF" -ne 0 || "$CODE_DOC_METRICS" -ne 0 ]]; then
+if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_SCORING_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_RULE_SOURCE" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 || "$CODE_COMMIT_HISTORY" -ne 0 || "$CODE_DESTRUCTIVE" -ne 0 || "$CODE_CHAINS" -ne 0 || "$CODE_COUNTS" -ne 0 || "$CODE_PARITY" -ne 0 || "$CODE_GATE_PROOF" -ne 0 || "$CODE_DOC_METRICS" -ne 0 ]]; then
     STATUS_RULES="BLOCK"
     write_step_verdict "RULE-AUDIT-02" BLOCK "规则目录同步、闭包、可达性、规则源一致性、文档一致性、技能集、轨迹账本或破坏性操作溯源审查未通过"
     FAILED=1
@@ -362,8 +364,23 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   const codeParity = Number(process.argv[37] || 0);
   const codeGateProof = Number(process.argv[38] || 0);
   const codeDocMetrics = Number(process.argv[39] || 0);
+  const receiptFile = path.join(rootDir, "auto-refactor", "reports", "audit-receipt.json");
   const aasBaselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.aas.json");
   const baselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.json");
+  let receiptLoaded = false;
+  if (fs.existsSync(receiptFile)) {
+    try {
+      const rc = JSON.parse(fs.readFileSync(receiptFile, "utf8"));
+      if (rc.schemaVersion === "1.0") {
+        compositeScore = rc.healthScore;
+        grade = rc.grade;
+        totalDebt = rc.issuesTotal;
+        autonomyRate = rc.confidence ? rc.confidence * 100 : 95.0;
+        tenDimensions = rc.dimensions;
+        receiptLoaded = true;
+      }
+    } catch (_) {}
+  }
   const wtReportFile = path.join(rootDir, "workspace-timing", "reports", "review", "report-latest.json");
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
 
@@ -377,7 +394,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   let qualityVector = null;
 
   try {
-    if (fs.existsSync(aasBaselineFile)) {
+    if (!receiptLoaded && fs.existsSync(aasBaselineFile)) {
       const aas = JSON.parse(fs.readFileSync(aasBaselineFile, "utf8"));
       if (aas && aas.schema === "aas-v1" && aas.health) {
         compositeScore = aas.health.score ?? null;
@@ -638,6 +655,56 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   }
 
   const wsGrade = getGradeFromScore(workspaceHealthScore);
+
+  const dynamicDimensions = {};
+  for (const d of dimDefinitions) {
+    const dimKey = d.key;
+    const baseVal = (tenDimensions && typeof tenDimensions[dimKey] === "number" && !isNaN(tenDimensions[dimKey]) && tenDimensions[dimKey] > 0)
+      ? Number(tenDimensions[dimKey])
+      : null;
+
+    let dimScore = scoreAr;
+    switch (dimKey) {
+      case "codeSecurity":
+        dimScore = Math.round((scoreAr * 0.65 + scoreFg * 0.35) * 10) / 10;
+        break;
+      case "architectureConsistency":
+        dimScore = Math.round((scoreAr * 0.35 + scoreRules * 0.25 + scoreWg * 0.20 + scoreFg * 0.20) * 10) / 10;
+        break;
+      case "performanceEfficiency":
+        dimScore = Math.round((scoreAr * 0.40 + scoreWg * 0.35 + scoreFg * 0.25) * 10) / 10;
+        break;
+      case "maintainability":
+        dimScore = Math.round((scoreAr * 0.45 + scoreWt * 0.30 + scoreHygiene * 0.25) * 10) / 10;
+        break;
+      case "standardization":
+        dimScore = Math.round((scoreHygiene * 0.45 + scoreRules * 0.30 + scoreAr * 0.25) * 10) / 10;
+        break;
+      case "modernity": {
+        const polyScore = polyglotIndex != null ? polyglotIndex : scoreAr;
+        dimScore = Math.round((scoreAr * 0.50 + polyScore * 0.50) * 10) / 10;
+        break;
+      }
+      case "semanticPurity":
+        dimScore = Math.round((scoreAr * 0.60 + scoreWt * 0.40) * 10) / 10;
+        break;
+      case "duplication":
+        dimScore = Math.round((scoreAr * 0.65 + scoreHygiene * 0.35) * 10) / 10;
+        break;
+      case "commentQuality":
+        dimScore = Math.round((scoreAr * 0.60 + scoreWt * 0.40) * 10) / 10;
+        break;
+      case "techDebtRisk":
+        dimScore = Math.round((scoreAr * 0.40 + scoreWg * 0.30 + scoreFg * 0.30) * 10) / 10;
+        break;
+    }
+    if (baseVal !== null) {
+      dimScore = Math.min(baseVal, dimScore);
+    }
+    dynamicDimensions[dimKey] = Math.max(SCORE_FLOOR, Math.min(100.0, dimScore));
+  }
+  tenDimensions = dynamicDimensions;
+  qualityVector = dynamicDimensions;
 
   const summary = {
     protocolVersion: "1.0.0",

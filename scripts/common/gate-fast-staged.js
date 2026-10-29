@@ -32,6 +32,7 @@ const {
   classifyCStyleLine,
   classifyHashStyleLine,
   classifyPowerShellLine,
+  getLanguageVerbosityFactor,
 } = require('./evaluate-eloc-budget');
 
 /** Hash-comment languages; mirrors the SSOT classifier's extension set. */
@@ -629,26 +630,29 @@ function validateFileVolume(file, content, volumeViolations) {
   }
   const ext = path.extname(file).toLowerCase();
   const { totalLoc, eloc, wiringCount } = calculateEloc(content, ext);
-  if (eloc > MAX_ELOC_BUDGET) {
+  const langFactor = typeof getLanguageVerbosityFactor === 'function' ? getLanguageVerbosityFactor(file) : 1.0;
+  const maxEloc = Math.round(MAX_ELOC_BUDGET * langFactor);
+  const maxLoc = Math.round(MAX_LOC_BUDGET * langFactor);
+  if (eloc > maxEloc) {
     const tpl = VIOLATION_TPLS.VOL_ELOC;
     volumeViolations.push(
       createViolation({
         ruleId: RULE_VOL_ELOC_001,
         file,
-        message: `单文件有效行数超标 (${eloc} > ${MAX_ELOC_BUDGET} ELOC): ${file}`,
+        message: `单文件有效行数超标 (${eloc} > ${maxEloc} ELOC): ${file}`,
         actual: `ELOC = ${eloc}`,
         expected: tpl.expected,
         actionableFix: tpl.actionableFix,
       }),
     );
   }
-  if (totalLoc > MAX_LOC_BUDGET) {
+  if (totalLoc > maxLoc) {
     const tpl = VIOLATION_TPLS.VOL_LOC;
     volumeViolations.push(
       createViolation({
         ruleId: RULE_VOL_LOC_001,
         file,
-        message: `单文件行数超标 (${totalLoc} > ${MAX_LOC_BUDGET} LOC): ${file}`,
+        message: `单文件行数超标 (${totalLoc} > ${maxLoc} LOC): ${file}`,
         actual: `LOC = ${totalLoc}`,
         expected: tpl.expected,
         actionableFix: tpl.actionableFix,

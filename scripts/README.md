@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**94 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**95 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -37,6 +37,7 @@
 | `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区规则单源目录聚合与零漂移核验器；默认只读，`--write` 显式重生成） | 本地 CLI、`pre-push` 门禁、CI |
 | `common/` | Node.js | `generate-rule-catalog-types.js` | tooling / ssot（从 rule-catalog.json SSOT 自动生成 auto-refactor 强类型常量库与领域子模块） | 本地 CLI、CI |
 | `common/` | Node.js | `validate-rule-id-closure.js` | audit / ssot（门禁引用规则 ID 与目录登记的双向闭包守卫） | `pre-push-gate`、CI |
+| `common/` | Node.js | `validate-scoring-rule-closure.js` | audit / scoring（全仓 SSOT 规则 100% 映射至十维质量空间双向闭包守卫） | `pre-push-gate`、`audit-all`、CI |
 | `common/` | Node.js | `validate-docs-consistency.js` | audit / docs（动态对照 `rule-catalog.json` 真实计数拦截规则总数漂移；含治理文档脚本死链守卫） | `pre-push-gate`、CI |
 | `common/` | Node.js | `sync-doc-metrics.js` | audit / metrics（文档规模数字的单源渲染与零漂移守卫：`METRICS:BEGIN/END` 区域由真源求值渲染，`--write` 就地校正，内置反向探针自证检出能力） | `pre-push-gate`、CI、本地 CLI |
 | `common/` | Node.js | `validate-rule-reachability.js` | audit / ssot（error 级规则执行入口可达性守卫） | `pre-push-gate`、CI |

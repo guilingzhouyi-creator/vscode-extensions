@@ -38,6 +38,7 @@ const TERMS_FILE = path.join(__dirname, 'commit-msg-forbidden-terms.json');
 const CRITICAL_TYPES = Object.freeze(['feat', 'fix', 'refactor', 'perf']);
 const ALL_TYPES = Object.freeze(['feat', 'fix', 'refactor', 'docs', 'test', 'chore', 'style', 'perf']);
 const MIN_BODY_SUBSTANTIVE = 30;
+const NON_CRITICAL_MIN_BODY_SUBSTANTIVE = 15;
 const HEADER_MIN = 4;
 const HEADER_MAX = 80;
 
@@ -66,7 +67,7 @@ const STEP = Object.freeze({
  * real contract violation, not a localization difference.
  */
 const HEADER = new RegExp(
-  `^(${ALL_TYPES.join('|')})(\\([\\w\\-/,@.\\u4e00-\\u9fff]+\\))?: ([\\s\\S]{${HEADER_MIN},${HEADER_MAX}})$`,
+  `^(${ALL_TYPES.join('|')})\\(([\\w\\-/,@.\\u4e00-\\u9fff]+(?:,\\s*[\\w\\-/,@.\\u4e00-\\u9fff]+)*)\\): ([\\s\\S]{${HEADER_MIN},${HEADER_MAX}})$`,
   'u',
 );
 
@@ -84,8 +85,8 @@ const SECTION = Object.freeze({
   fixed: /^\s*\[(?:Fixed|修复)/im,
 });
 
-/** Project-scope headings, including the inline `[Project: a, b]` form. */
-const PROJECT_HEADING = /^\[(?:Project(?:\s*\/\s*(?:项目|项目归属))?|项目归属|项目)(?:\s*:\s*(.*?))?\](?:\s*:\s*(.*))?$/i;
+/** Project-scope headings, including the inline `[Project: a, b]` and `[Project] a, b` forms. */
+const PROJECT_HEADING = /^\[(?:Project(?:\s*\/\s*(?:项目|项目归属))?|项目归属|项目)(?:\s*:\s*(.*?))?\](?:\s*:?\s*(.*))?$/i;
 
 /**
  * Reads the controlled project enumeration from the forbidden-terms dictionary.
@@ -206,6 +207,15 @@ function collectProjects(body) {
   return declared;
 }
 
+/** Bare command line invocations that carry no assertion fact. */
+const BARE_CMD = /^`?(?:npm|npx|node|pwsh|bash|git|vitest|cargo|tsc|python)\b[^。；]*$/i;
+
+/** Trivial single-word completions without verifiable technical assertion. */
+const HEDGE_WORD = /^(?:ok|done|已(?:经)?(?:改好|修复|完成|测试)|无问题|没问题|通过|pass)[。.!！]?$/i;
+
+/** Speculative hedge phrases indicating unverified assumptions. */
+const HEDGE_PHRASE = /(应该|大概|基本(?:上)?没问题|没问题|无问题|已经(?:改|修)好|已(?:经)?完成(?:修改|修复)|不出意外|按理)/;
+
 /**
  * Checks the header line shape, trailing period, and the blank separator.
  *
@@ -219,7 +229,7 @@ function checkHeaderShape(parsed, add) {
       STEP.header,
       'GUARD-MSG-001',
       `提交标题不符合格式契约: ${header}`,
-      `expected <type>(<scope>): <summary>, ${HEADER_MIN}~${HEADER_MAX} characters, type in ${ALL_TYPES.join('/')}`,
+      `expected <type>(<scope>): <summary>, ${HEADER_MIN}~${HEADER_MAX} characters, type in ${ALL_TYPES.join('/')}, scope is required`,
     );
   }
   if (TRAILING_PERIOD.test(header)) {
@@ -238,24 +248,153 @@ function checkHeaderShape(parsed, add) {
  */
 function checkBodySections(parsed, add) {
   const { lines, body, type } = parsed;
+  const isCritical = CRITICAL_TYPES.includes(type);
+  const minSubstantive = isCritical ? MIN_BODY_SUBSTANTIVE : NON_CRITICAL_MIN_BODY_SUBSTANTIVE;
   const substantive = countSubstantive(lines.slice(2));
-  if (substantive < MIN_BODY_SUBSTANTIVE) {
+  if (substantive < minSubstantive) {
     add(
       STEP.density,
       'GUARD-MSG-001',
-      `正文实质信息量不足 (${substantive} < ${MIN_BODY_SUBSTANTIVE})`,
-      'add technical facts under [Why], [Changed] and [Verification]',
+      `正文实质信息量不足 (${substantive} < ${minSubstantive})`,
+      isCritical
+        ? 'add technical facts under [Why], [Changed] and [Verification]'
+        : 'add technical facts under [Why] and [Verification]',
     );
   }
   const missing = [];
   if (!SECTION.why.test(body)) missing.push('[Why]');
-  if (!SECTION.change.test(body)) missing.push('[Changed/Added/Fixed]');
+  if (isCritical && !SECTION.change.test(body)) missing.push('[Changed/Added/Fixed]');
   if (!SECTION.verification.test(body)) missing.push('[Verification]');
   if (missing.length > 0) {
     add(STEP.sections, 'GUARD-MSG-001', `缺少必需区块: ${missing.join(', ')}`, 'add the listed sections');
   }
   if (type === 'fix' && !SECTION.fixed.test(body)) {
     add(STEP.sections, 'GUARD-MSG-001', 'fix 提交缺少 [Fixed] 区块', 'state the defect and its root cause');
+  }
+}
+
+/**
+ * Determines whether a verification item contains a falsifiable technical assertion.
+ *
+ * @param {string} item - Raw text line from verification section.
+ * @returns {boolean} True if the item carries substantive technical assertions.
+ */
+function isFalsifiableItem(item) {
+  const plain = item.replace(/`[^`]*`/g, '').trim();
+  if (!plain) return false;
+  if (HEDGE_WORD.test(plain) || HEDGE_PHRASE.test(plain)) return false;
+  if (BARE_CMD.test(plain)) return false;
+  const substantive = plain.replace(/[\s。，,、；;：:!！\-*]/g, '').length;
+  return substantive >= 8;
+}
+
+/**
+ * Extracts bullet or prose items from the Verification section of the body.
+ *
+ * @param {string} body - Commit body.
+ * @returns {string[]} Verification bullet items or prose lines.
+ */
+function extractVerificationItems(body) {
+  let inside = false;
+  const collected = [];
+  for (const raw of body.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (SECTION.verification.test(line)) {
+      inside = true;
+      continue;
+    }
+    if (inside && /^\s*\[[^\]]+\]/.test(line)) {
+      inside = false;
+      continue;
+    }
+    if (inside && line !== '') {
+      collected.push(line);
+    }
+  }
+  const bullets = collected
+    .filter((l) => /^[-*]\s+/.test(l))
+    .map((l) => l.replace(/^[-*]\s+/, '').trim());
+  if (bullets.length > 0) return bullets;
+  const prose = collected.join(' ').trim();
+  return prose ? [prose] : [];
+}
+
+/**
+ * Verifies that the Verification section contains at least one falsifiable assertion.
+ *
+ * @param {string} body - Commit body.
+ * @param add - Finding sink.
+ */
+function checkVerificationAssertion(body, add) {
+  if (!SECTION.verification.test(body)) return;
+  const items = extractVerificationItems(body);
+  const hasRealAssertion = items.some(isFalsifiableItem);
+  if (!hasRealAssertion) {
+    add(
+      STEP.sections,
+      'GUARD-MSG-001',
+      '验证结论缺少实质技术断言或仅包含敷衍占位符/裸命令',
+      'provide at least one concrete, falsifiable technical assertion under [Verification]',
+    );
+  }
+}
+
+/**
+ * Maps section name to canonical rank to enforce topological ordering.
+ *
+ * @param {string} name - Lower-case section heading keyword.
+ * @returns {number} Rank (1 to 4), or 99 for unknown/custom sections.
+ */
+function getSectionRank(name) {
+  if (/^(project|项目|项目归属)$/.test(name)) return 1;
+  if (/^(why|动机|背景|动机背景)$/.test(name)) return 2;
+  if (/^(added|changed|fixed|removed|新增|变更|修改|修复|删除)$/.test(name)) return 3;
+  if (/^(verification|验证|验证结论)$/.test(name)) return 4;
+  return 99;
+}
+
+/**
+ * Checks section uniqueness and topological ordering across the body.
+ *
+ * @param {string} body - Commit body.
+ * @param add - Finding sink.
+ */
+function checkSectionOrderAndDuplication(body, add) {
+  const headings = [];
+  const lines = body.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^\s*\[([a-zA-Z\u4e00-\u9fff]+)(?:\s*[\/|].*?)?\]/.exec(lines[i]);
+    if (m) {
+      headings.push({ name: m[1].toLowerCase(), raw: m[0].trim() });
+    }
+  }
+  const seen = new Set();
+  for (const h of headings) {
+    if (seen.has(h.name)) {
+      add(
+        STEP.sections,
+        'GUARD-MSG-001',
+        `正文存在重复区块: ${h.raw}`,
+        'each section must appear at most once',
+      );
+    }
+    seen.add(h.name);
+  }
+  let lastRank = 0;
+  for (const h of headings) {
+    const r = getSectionRank(h.name);
+    if (r < 99) {
+      if (r < lastRank) {
+        add(
+          STEP.sections,
+          'GUARD-MSG-001',
+          `区块顺序颠倒: ${h.raw}`,
+          'sections must follow order: [Project] -> [Why] -> [Changed/Added/Fixed] -> [Verification]',
+        );
+        break;
+      }
+      lastRank = r;
+    }
   }
 }
 
@@ -347,10 +486,10 @@ function verifyStructure(content, options = {}) {
   }
 
   checkHeaderShape(parsed, add);
-  if (!CRITICAL_TYPES.includes(parsed.type)) return findings;
-
-  checkBodySections(parsed, add);
   checkProjectScope(parsed.body, options, add);
+  checkBodySections(parsed, add);
+  checkSectionOrderAndDuplication(parsed.body, add);
+  checkVerificationAssertion(parsed.body, add);
   checkBatchCodenames(parsed.body, add);
   return findings;
 }
@@ -376,17 +515,26 @@ function runSelfProbes() {
   expect('compliant-message-passes', steps(clean).length, 0);
   expect('chinese-scope-accepted', steps(build('fix(门禁): 修复空指针分支的判定顺序', [project, why, fixed, verify].join('\n\n'))).length, 0);
   expect('short-header-rejected', steps(build('fix(gate): abc', [project, why, fixed, verify].join('\n\n'))).includes(STEP.header), true);
+  expect('missing-scope-rejected', steps(build('fix: 修复空指针分支的判定顺序', [project, why, fixed, verify].join('\n\n'))).includes(STEP.header), true);
+  expect('empty-scope-rejected', steps(build('fix(): 修复空指针分支的判定顺序', [project, why, fixed, verify].join('\n\n'))).includes(STEP.header), true);
   expect('trailing-period-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序。', [project, why, fixed, verify].join('\n\n'))).includes(STEP.header), true);
   expect('unknown-type-rejected', steps(build('update(gate): 修复空指针分支的判定顺序', [project, why, fixed, verify].join('\n\n'))).includes(STEP.header), true);
   expect('missing-blank-line-rejected', steps(['fix(gate): 修复空指针分支的判定顺序', project, why, fixed, verify, ''].join('\n')).includes(STEP.split), true);
-  expect('thin-body-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, '[Why]\n- 短', '[Fixed]\n- 短', '[Verification]\n- 短'].join('\n\n'))).includes(STEP.density), true);
+  expect('thin-body-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, '[Why]\n- 短', '[Fixed]\n- 短', '[Verification]\n- 短断言结果合格通过'].join('\n\n'))).includes(STEP.density), true);
   expect('missing-verification-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, why, fixed].join('\n\n'))).includes(STEP.sections), true);
   expect('fix-without-fixed-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, why, '[Changed]\n- 补充显式判空与早返回，避免异常穿透到调用方。', verify].join('\n\n'))).includes(STEP.sections), true);
   expect('missing-project-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [why, fixed, verify].join('\n\n'))).includes(STEP.project), true);
   expect('invalid-project-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', ['[Project / 项目归属]\n- unknown', why, fixed, verify].join('\n\n'))).includes(STEP.project), true);
   expect('batch-codename-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, '[Why]\n- 本 Sprint 3 内补齐判定顺序保护，构造边界输入时会抛出异常并中断门禁流程。', fixed, verify].join('\n\n'))).includes(STEP.batch), true);
-  // A non-critical type carries no body obligations, so a short body must not be flagged.
-  expect('docs-short-body-passes', steps(build('docs(gate): 补充判定顺序说明', '简短说明')).length, 0);
+  expect('duplicate-section-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, why, why, fixed, verify].join('\n\n'))).includes(STEP.sections), true);
+  expect('out-of-order-section-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, verify, why, fixed].join('\n\n'))).includes(STEP.sections), true);
+  expect('bare-cmd-verification-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, why, fixed, '[Verification]\n- npm test'].join('\n\n'))).includes(STEP.sections), true);
+  expect('hedge-verification-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, why, fixed, '[Verification]\n- 应该没问题了'].join('\n\n'))).includes(STEP.sections), true);
+  // Compliant non-critical message (docs) passes with Why and Verification
+  const docsClean = build('docs(gate): 补充判定顺序说明与契约设计', [project, why, verify].join('\n\n'));
+  expect('compliant-docs-message-passes', steps(docsClean).length, 0);
+  // Non-critical type without body or sections rejected
+  expect('docs-without-body-rejected', steps(build('docs(gate): 补充判定顺序说明', '简短说明')).includes(STEP.sections), true);
   return failures;
 }
 
