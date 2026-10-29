@@ -18,6 +18,7 @@
 
 import * as path from 'path';
 import * as childProcess from 'child_process';
+import { normalizePathSeparators } from '../constants';
 
 /**
  * Structured record representing file change metrics parsed from git diff numstat.
@@ -84,7 +85,6 @@ export const DEFAULT_KNOWN_SUBSYSTEMS: readonly string[] = Object.freeze([
 const CMD_GIT = 'git';
 const TAB_SPLIT_RE = /\t+/;
 const LINE_SPLIT_RE = /\r?\n/;
-const BACKSLASH_GLOBAL_RE = /\\/g;
 const FORWARD_SLASH = '/';
 const BINARY_PLACEHOLDER = '-';
 const SUBSYSTEM_ROOT = 'root';
@@ -105,7 +105,7 @@ export function resolveSubsystem(
     if (!relPath) {
         return SUBSYSTEM_ROOT;
     }
-    const normalized = relPath.replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH);
+    const normalized = normalizePathSeparators(relPath);
     const subsystemsCount = knownSubsystems.length;
 
     for (let i = 0; i < subsystemsCount; i++) {
@@ -264,7 +264,7 @@ export function computeChangeEntropy(
     for (let i = 0; i < fileCount; i++) {
         const item = fileChanges[i];
         sumDelta += item.total;
-        dirSet.add(path.dirname(item.filePath).replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH));
+        dirSet.add(normalizePathSeparators(path.dirname(item.filePath)));
         subSet.add(resolveSubsystem(item.filePath, knownSubs));
     }
 

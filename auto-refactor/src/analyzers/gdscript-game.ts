@@ -14,6 +14,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ANALYZER_GDSCRIPT_GAME } from '../core/scoring/dimensionLiterals';
+import { REGEX } from '../core/constants';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
 import {
@@ -99,11 +100,6 @@ const KEYWORD_FACTORY = 'factory';
 const POOL_ACQUIRE_NAMES: ReadonlySet<string> = new Set(['acquire', 'get_obj']);
 const POOL_RESET_NAMES: ReadonlySet<string> = new Set(['reset_state']);
 
-const FUNC_DEF_RE = /^\s*func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
-const RESET_STATE_CALL_RE = /(?:\.|\b)(reset_state)\s*\(/;
-const SIGNAL_CONNECT_RE = /\.connect\s*\(/;
-const SIGNAL_DISCONNECT_RE = /\.disconnect\s*\(/;
-
 const MSG_POOL_MISSING_RESET = 'Object pool acquisition logic missing reset_state() contract.';
 const SUGGEST_POOL_MISSING_RESET =
     'Ensure recycled objects invoke reset_state() before returning to caller to avoid state corruption.';
@@ -176,11 +172,11 @@ function auditPoolContracts(file: string, raw: readonly string[], issues: Issue[
     let hasResetInvocation = false;
 
     for (const line of raw) {
-        const funcDef = FUNC_DEF_RE.exec(line);
+        const funcDef = REGEX.SYNTAX.GDSCRIPT_FUNC.exec(line);
         if (funcDef && POOL_ACQUIRE_NAMES.has(funcDef[1])) {
             hasAcquireOrGet = true;
         }
-        const resetCall = RESET_STATE_CALL_RE.exec(line);
+        const resetCall = REGEX.SYNTAX.GDSCRIPT_RESET_STATE_CALL.exec(line);
         if (resetCall && POOL_RESET_NAMES.has(resetCall[1])) {
             hasResetInvocation = true;
         }
@@ -206,8 +202,8 @@ function auditSignalConnections(file: string, masked: readonly string[], issues:
     let disconnectCount = 0;
 
     for (const line of masked) {
-        if (SIGNAL_CONNECT_RE.test(line)) connectCount++;
-        if (SIGNAL_DISCONNECT_RE.test(line)) disconnectCount++;
+        if (REGEX.SYNTAX.GDSCRIPT_SIGNAL_CONNECT.test(line)) connectCount++;
+        if (REGEX.SYNTAX.GDSCRIPT_SIGNAL_DISCONNECT.test(line)) disconnectCount++;
     }
 
     if (connectCount > disconnectCount + 2) {

@@ -18,6 +18,7 @@
 
 import type { Issue } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
+import { REGEX } from '../core/constants';
 import { ANALYZER_TYPESCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import type { SourceMaskConfig } from '../core/policy/source-mask';
 import {
@@ -34,42 +35,6 @@ const DECLARATION_SUFFIX = '.d.ts';
 
 /** Extensions that may carry type annotations; the type-position rules skip plain JavaScript. */
 const TYPED_EXTENSIONS = ['.ts', '.tsx'];
-
-/** `var` declaration: function-scoped and hoisted where `const` or `let` expresses the intent. */
-const VAR_DECL_RE = /\bvar\s+[A-Za-z_$]/;
-
-/** CommonJS `require(...)` call; reported only inside modules that already use ESM syntax. */
-const REQUIRE_CALL_RE = /\brequire\s*\(/;
-
-/** ESM marker that turns a `require` call into a legacy leftover instead of the module style. */
-const ESM_SYNTAX_RE = /^\s*(?:import|export)\b/m;
-
-/** Wrapper constructors whose literal or primitive form is shorter and behaves better. */
-const WRAPPER_CTOR_RE = /\bnew\s+(?:Array|Object|String|Number|Boolean)\s*\(/;
-
-/** The `arguments` object, which rest parameters replace in modern code. */
-const ARGUMENTS_USE_RE = /\barguments\s*(?:\[|\.|\))/;
-
-/** `Object.assign({}, …)` used as a shallow merge where object spread reads better. */
-const OBJECT_ASSIGN_RE = /\bObject\s*\.\s*assign\s*\(\s*\{\s*\}/;
-
-/** `indexOf` compared against -1/0: exactly the shape `includes` was introduced to replace. */
-const INDEX_OF_BOUNDARY_RE = /\.\s*indexOf\s*\([^)]*\)\s*(?:!==?\s*-1|===?\s*-1|>=?\s*0|>\s*-1)/;
-
-/** Deprecated `String.prototype.substr`, superseded by `slice` (and by `substring`). */
-const SUBSTR_RE = /\.\s*substr\s*\(/;
-
-/** `replace('literal', …)`: a string pattern rewrites only the first occurrence. */
-const REPLACE_LITERAL_RE = /\.\s*replace\s*\(\s*(['"`])/;
-
-/** Fast guard pattern matching `.replace(` before applying detailed literal extraction. */
-const REPLACE_CALL_RE = /\.replace\(/;
-
-/** Explicit `any` in a type position, where `unknown` keeps the same call sites type-safe. */
-const ANY_TYPE_RE = /(?::\s*any\b)|(?:\bas\s+any\b)|(?:<\s*any\s*>)|(?:\bany\s*\[\s*\])/;
-
-/** Named import clause without the `type` modifier; the specifier is masked out beforehand. */
-const NAMED_IMPORT_RE = /^\s*import\s+\{([^}]*)\}\s+from\s/;
 
 const TS_QUOTE_CHARS = '"\'`';
 
@@ -111,7 +76,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-VAR-001',
         severity: SEVERITY_WARNING,
-        pattern: VAR_DECL_RE,
+        pattern: REGEX.SYNTAX.TS_VAR_DECL,
         message:
             '`var` is function-scoped and hoisted; block-scoped `const` (or `let`) states intent.',
         suggestion: 'Declare with `const`, or `let` when the binding is reassigned.',
@@ -124,7 +89,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-CTOR-001',
         severity: SEVERITY_WARNING,
-        pattern: WRAPPER_CTOR_RE,
+        pattern: REGEX.SYNTAX.TS_WRAPPER_CTOR,
         message: 'Wrapper constructor called with `new`; a literal or the primitive is equivalent.',
         suggestion: 'Use `[]`, `{}`, `String(x)`, `Number(x)` or `Boolean(x)` instead of `new`.',
         actionable: {
@@ -136,7 +101,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-ARGS-001',
         severity: SEVERITY_WARNING,
-        pattern: ARGUMENTS_USE_RE,
+        pattern: REGEX.SYNTAX.TS_ARGUMENTS_USE,
         message: '`arguments` is array-like, untyped and unavailable in arrow functions.',
         suggestion: 'Take a rest parameter (`(...args: T[])`) and use it directly.',
         actionable: {
@@ -148,7 +113,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-SPREAD-001',
         severity: SEVERITY_WARNING,
-        pattern: OBJECT_ASSIGN_RE,
+        pattern: REGEX.SYNTAX.TS_OBJECT_ASSIGN,
         message: '`Object.assign({}, …)` shallow-merges where object spread says the same thing.',
         suggestion:
             'Merge with `{ ...source }`, which is typed and avoids the empty-object argument.',
@@ -161,7 +126,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: RULE_TSM_INCLUDES,
         severity: SEVERITY_WARNING,
-        pattern: INDEX_OF_BOUNDARY_RE,
+        pattern: REGEX.SYNTAX.TS_INDEX_OF_BOUNDARY,
         message: '`indexOf` compared against -1/0 is less direct than the boolean the check wants.',
         suggestion:
             'Use `includes(value)` (or `indexOf(...) >= 0` when the index itself is needed).',
@@ -174,7 +139,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-SUBSTR-001',
         severity: SEVERITY_WARNING,
-        pattern: SUBSTR_RE,
+        pattern: REGEX.SYNTAX.TS_SUBSTR,
         message: '`String.prototype.substr` is deprecated and absent from the language standard.',
         suggestion: 'Use `slice(start, start + length)`, which has identical semantics here.',
         actionable: {
@@ -186,8 +151,9 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: RULE_TSM_REQUIRE,
         severity: SEVERITY_WARNING,
-        pattern: REQUIRE_CALL_RE,
-        condition: (ctx: LineScanContext) => ESM_SYNTAX_RE.test(ctx.allMaskedLines.join('\n')),
+        pattern: REGEX.SYNTAX.TS_REQUIRE_CALL,
+        condition: (ctx: LineScanContext) =>
+            REGEX.SYNTAX.TS_ESM_SYNTAX.test(ctx.allMaskedLines.join('\n')),
         message: 'CommonJS `require` in a module that already uses ESM syntax.',
         suggestion: 'Import the binding (`import x from "m"` / `import { y } from "m"`) instead.',
         actionable: {
@@ -199,7 +165,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-ANY-001',
         severity: SEVERITY_WARNING,
-        pattern: ANY_TYPE_RE,
+        pattern: REGEX.SYNTAX.TS_ANY_TYPE,
         condition: (ctx: LineScanContext) => isTypedPath(ctx.file),
         message: 'Explicit `any` disables checking for every value it touches.',
         suggestion: 'Prefer `unknown` plus a narrowing check, or a precise generic/union type.',
@@ -311,8 +277,8 @@ export class TsModernAnalyzer extends DeclarativeModernAnalyzer {
         out: Issue[],
     ): void {
         for (let index = 0; index < masked.length; index += 1) {
-            if (!REPLACE_CALL_RE.test(masked[index])) continue;
-            const match = REPLACE_LITERAL_RE.exec(raw[index]);
+            if (!REGEX.SYNTAX.TS_REPLACE_CALL.test(masked[index])) continue;
+            const match = REGEX.SYNTAX.TS_REPLACE_LITERAL.exec(raw[index]);
             if (!match) continue;
             out.push(
                 this.emitIssue(
@@ -334,7 +300,7 @@ export class TsModernAnalyzer extends DeclarativeModernAnalyzer {
     ): void {
         const importLines = new Set<number>();
         for (let index = 0; index < masked.length; index += 1) {
-            if (NAMED_IMPORT_RE.test(masked[index])) importLines.add(index);
+            if (REGEX.SYNTAX.TS_NAMED_IMPORT.test(masked[index])) importLines.add(index);
         }
         if (importLines.size === 0) return;
 
@@ -484,7 +450,7 @@ function collectImportClauses(
 ): ImportClauseRecord[] {
     const records: ImportClauseRecord[] = [];
     for (const index of importLines) {
-        const clause = NAMED_IMPORT_RE.exec(masked[index]);
+        const clause = REGEX.SYNTAX.TS_NAMED_IMPORT.exec(masked[index]);
         if (!clause) continue;
         const names = parseClauseImportNames(clause[1]);
         if (names.length > 0) {

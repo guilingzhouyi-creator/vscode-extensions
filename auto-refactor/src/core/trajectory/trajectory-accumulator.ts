@@ -44,6 +44,8 @@ export interface AuditRunOptions {
     runId: string;
     /** Commit hash or revision short SHA. */
     revision: string;
+    /** Optional rule registry digest signature. */
+    sig?: string;
     /** Module or scope identifier (e.g. 'workspace-unified', 'auto-refactor'). */
     module: string;
     /** Actor/Agent name (e.g. 'antigravity-agent', 'self-audit', 'human-dev'). */
@@ -371,6 +373,7 @@ export class TrajectoryAccumulator {
         const record = formatCompactRecord({
             runId: options.runId,
             revision: options.revision,
+            sig: options.sig,
             module: options.module,
             agent: options.agent || 'auto-refactor-audit',
             timestamp: options.timestamp || Date.now(),

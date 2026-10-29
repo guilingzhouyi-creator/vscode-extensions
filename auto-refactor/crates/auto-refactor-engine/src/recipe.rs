@@ -90,7 +90,12 @@ pub fn decode_recipe_packet(buf: &[u8], offset: usize) -> Result<(RecipePacket, 
         return Err("Buffer too small for recipe packet header".to_string());
     }
 
-    let magic = u32::from_be_bytes([buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]]);
+    let magic = u32::from_be_bytes([
+        buf[offset],
+        buf[offset + 1],
+        buf[offset + 2],
+        buf[offset + 3],
+    ]);
     if magic != RECIPE_MAGIC {
         return Err(format!("Invalid recipe magic signature: 0x{magic:x}"));
     }
@@ -101,7 +106,8 @@ pub fn decode_recipe_packet(buf: &[u8], offset: usize) -> Result<(RecipePacket, 
     }
 
     let tag_byte = buf[offset + 5];
-    let tag = RecipeTag::from_u8(tag_byte).ok_or_else(|| format!("Unknown recipe tag: {tag_byte}"))?;
+    let tag =
+        RecipeTag::from_u8(tag_byte).ok_or_else(|| format!("Unknown recipe tag: {tag_byte}"))?;
 
     let payload_len = u32::from_be_bytes([
         buf[offset + 6],

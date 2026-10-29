@@ -20,6 +20,7 @@
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_GO_MODERN } from '../core/scoring/dimensionLiterals';
+import { REGEX } from '../core/constants';
 import type { SourceMaskConfig } from '../core/policy/source-mask';
 import {
     DeclarativeModernAnalyzer,
@@ -73,14 +74,6 @@ const MAX_RECEIVER_NAME_LEN = 3;
  * Error variable naming: variables holding errors should start with `err`.
  */
 const VAR_ERROR_TYPE_RE = /^var\s+([A-Za-z_][A-Za-z0-9_]*)\s+error\b/;
-
-/**
- * Package comment: the line immediately before package declaration should be a comment.
- */
-const PACKAGE_DECL_RE = /^package\s+[A-Za-z_][A-Za-z0-9_]*\s*$/;
-
-/** Line that is a comment (starts with `//` or `/*`). */
-const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*)/;
 
 // --- Actionable snippet templates ---
 
@@ -144,7 +137,7 @@ function hasBadErrorName(code: string): boolean {
  * Check if package declaration is preceded by a comment.
  */
 function isPackageMissingComment(ctx: LineScanContext): boolean {
-    if (!PACKAGE_DECL_RE.test(ctx.trimmed)) {
+    if (!REGEX.SYNTAX.GO_PACKAGE.test(ctx.trimmed)) {
         return false;
     }
 
@@ -157,7 +150,7 @@ function isPackageMissingComment(ctx: LineScanContext): boolean {
         return true;
     }
 
-    return !COMMENT_LINE_RE.test(ctx.allRawLines[prevIdx]);
+    return !REGEX.COMMENT.COMMENT_LINE.test(ctx.allRawLines[prevIdx]);
 }
 
 // --- Declarative Rules Definition ---

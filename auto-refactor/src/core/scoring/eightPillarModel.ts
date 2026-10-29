@@ -71,7 +71,8 @@ export const DEFAULT_PILLAR_WEIGHTS: Record<PrimaryQualityPillar, number> = {
 };
 
 /**
- * Mapping from the 10 fine-grained dimensions to the 8 primary pillars.
+ * Mapping from the 10 fine-grained dimensions to the 8 primary legacy pillars.
+ * Note: Ten-Dimensional Quality Space is the SSOT primary governance standard.
  */
 export const DIMENSION_TO_PILLAR_MAP: Record<QualityDimension, PrimaryQualityPillar> = {
     architectureConsistency: PILLAR_ARCHITECTURE,
@@ -83,7 +84,7 @@ export const DIMENSION_TO_PILLAR_MAP: Record<QualityDimension, PrimaryQualityPil
     standardization: PILLAR_EXTENSIBILITY,
     commentQuality: PILLAR_EXTENSIBILITY,
     duplication: PILLAR_EXTENSIBILITY,
-    modernity: PILLAR_TESTING,
+    modernity: PILLAR_EXTENSIBILITY,
 };
 
 /**
@@ -170,8 +171,8 @@ export function synthesizeEightPillars(
 
     for (const pillar of ALL_PRIMARY_PILLARS) {
         const values = pillarBuckets[pillar];
-        const avg = values.reduce((sum, valueScore) => sum + valueScore, 0) / values.length;
-        pillars[pillar] = Math.round(avg * PILLAR_SCORE_ROUND_FACTOR) / PILLAR_SCORE_ROUND_FACTOR;
+        const averageScore = values.reduce((sum, valueScore) => sum + valueScore, 0) / values.length;
+        pillars[pillar] = Math.round(averageScore * PILLAR_SCORE_ROUND_FACTOR) / PILLAR_SCORE_ROUND_FACTOR;
     }
 
     const appliedCeilings: { pillar: PrimaryQualityPillar; maxScore: number; reason: string }[] =

@@ -16,6 +16,7 @@
 
 import type { NormalizedNode } from './multilang';
 import { NodeKind } from './multilang';
+import { REGEX } from '../constants';
 
 const MIN_SIGNIFICANT_STRING_LENGTH = 3;
 const KEYWORD_STRUCT = 'struct';
@@ -23,63 +24,6 @@ const BLOCK_COMMENT_START = '/*';
 const BLOCK_COMMENT_END = '*/';
 const LINE_COMMENT_PREFIX = '//';
 const EMPTY_NUMERIC_POSITION_SET: ReadonlySet<number> = Object.freeze(new Set<number>());
-
-// --- Regex patterns for Go syntax detection ---
-
-/** `type Foo struct` or `type Bar interface` or `type Baz int` */
-const TYPE_DEF_RE = /^type\s+([A-Za-z_][A-Za-z0-9_]*)\s+(struct|interface)\b/;
-
-/** Method declaration: `func (r *Receiver) MethodName(...)` */
-const METHOD_DECL_RE = /^func\s+\((?:[^)]+)\)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\(/;
-
-/** Function declaration: `func FuncName(...)` */
-const FUNC_DECL_RE = /^func\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\(/;
-
-/** `var x type` or `var x, y type` or `var x = value` */
-const VAR_DECL_RE = /^var\s+(?:\(\s*)?([A-Za-z_][A-Za-z0-9_]*)/;
-
-/** `const x type = value` or `const ( x = 1 )` */
-const CONST_DECL_RE = /^const\s+(?:\(\s*)?([A-Za-z_][A-Za-z0-9_]*)/;
-
-/** `const (` — start of a multi-line const block */
-const CONST_BLOCK_START_RE = /^const\s*\(/;
-
-/** `var (` — start of a multi-line var block */
-const VAR_BLOCK_START_RE = /^var\s*\(/;
-
-/** Identifier at the start of a line inside a const/var block: `Name = value` or `Name type` */
-const BLOCK_ENTRY_RE = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:=|\s+[A-Za-z_*])/;
-
-/** Control flow keywords that increase nesting */
-const CONTROL_FLOW_RE = /^\s*(if|for|switch|select)\b/;
-
-/** `case` or `default` inside switch/select (adds branch weight) */
-const CASE_LABEL_RE = /^\s*(case\b|default:)/;
-
-/** Go statement: `go func()` */
-const GO_STMT_RE = /^\s*go\s+/;
-
-/** Defer statement: `defer foo()` */
-const DEFER_STMT_RE = /^\s*defer\s+/;
-
-/** Return statement: `return x, y` */
-const RETURN_STMT_RE = /^\s*return\b/;
-
-/** String literal: double-quoted or backtick-quoted */
-const STRING_LITERAL_RE = /(["`])((?:\\.|(?!\1).)*)\1/g;
-
-/** Integer literal: decimal, hex (0x), octal (0o), binary (0b), with optional underscores */
-const INT_LITERAL_RE = /\b(?:0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|[1-9][0-9_]*|0)\b/g;
-
-/** Float literal: with decimal point or exponent */
-const FLOAT_LITERAL_RE =
-    /\b(?:(?:[0-9][0-9_]*\.[0-9_]*|[0-9][0-9_]*[eE][+-]?[0-9_]+|\.[0-9][0-9_]*)(?:[eE][+-]?[0-9_]+)?)\b/g;
-
-/** Named literals: true, false, nil, iota */
-const NAMED_LITERAL_RE = /\b(true|false|nil|iota)\b/g;
-
-/** Function call expression: `name(` — heuristic, matches identifier followed by open paren */
-const CALL_EXPR_RE = /([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*\(/g;
 
 const CALL_KEYWORD_EXCLUSIONS = new Set([
     'if',
@@ -116,9 +60,6 @@ const STRUCT_FIELD_RE = /^\s+([A-Za-z_][A-Za-z0-9_]*)\s+[A-Za-z_*]/;
 const OPEN_BRACE = '{';
 const CLOSE_BRACE = '}';
 
-/** Package declaration: `package foo` */
-const PACKAGE_DECL_RE = /^package\s+([A-Za-z_][A-Za-z0-9_]*)/;
-
 /** Import declaration: `import "foo"` or `import ( ... )` */
 const IMPORT_DECL_RE = /^import\s+/;
 
@@ -143,7 +84,7 @@ function parseTypeDeclaration(
     line: string,
     lineNum: number,
 ): NormalizedNode | null {
-    const match = TYPE_DEF_RE.exec(trimmed);
+    const match = REGEX.SYNTAX.GO_TYPE_DEF.exec(trimmed);
     if (!match) return null;
     const typeName = match[1];
     const isStruct = match[2] === KEYWORD_STRUCT;
@@ -219,7 +160,7 @@ function extractGoParams(trimmed: string, openIdx: number): string[] {
  * @returns NormalizedNode for the function/method, or null.
  */
 function parseFuncOrMethod(trimmed: string, line: string, lineNum: number): NormalizedNode | null {
-    const methodMatch = METHOD_DECL_RE.exec(trimmed);
+    const methodMatch = REGEX.SYNTAX.GO_METHOD_DECL.exec(trimmed);
     if (methodMatch) {
         const methodName = methodMatch[1];
         const openIdx = methodMatch.index + methodMatch[0].length - 1;
@@ -238,7 +179,7 @@ function parseFuncOrMethod(trimmed: string, line: string, lineNum: number): Norm
             children: [],
         };
     }
-    const funcMatch = FUNC_DECL_RE.exec(trimmed);
+    const funcMatch = REGEX.SYNTAX.GO_FUNC_DECL.exec(trimmed);
     if (funcMatch) {
         const funcName = funcMatch[1];
         const openIdx = funcMatch.index + funcMatch[0].length - 1;
@@ -273,7 +214,7 @@ function parseVarDeclaration(
     line: string,
     lineNum: number,
 ): NormalizedNode | null {
-    const match = VAR_DECL_RE.exec(trimmed);
+    const match = REGEX.SYNTAX.GO_VAR_DECL.exec(trimmed);
     if (!match) return null;
     const varName = match[1];
     return {
@@ -302,7 +243,7 @@ function parseConstDeclaration(
     line: string,
     lineNum: number,
 ): NormalizedNode | null {
-    const match = CONST_DECL_RE.exec(trimmed);
+    const match = REGEX.SYNTAX.GO_CONST_DECL.exec(trimmed);
     if (!match) return null;
     const constName = match[1];
     return {
@@ -339,7 +280,7 @@ function parseBlockEntry(
     // Skip comment lines
     if (trimmed.startsWith('//')) return null;
 
-    const match = BLOCK_ENTRY_RE.exec(trimmed);
+    const match = REGEX.SYNTAX.GO_BLOCK_ENTRY.exec(trimmed);
     if (!match) return null;
     const name = match[1];
     // Skip if it looks like a keyword or type name (heuristic: skip all-lowercase words
@@ -369,7 +310,7 @@ function parseBlockEntry(
  * @returns NormalizedNode for control flow, or null.
  */
 function parseControlFlow(trimmed: string, line: string, lineNum: number): NormalizedNode | null {
-    if (!CONTROL_FLOW_RE.test(trimmed)) return null;
+    if (!REGEX.SYNTAX.GO_CONTROL_FLOW.test(trimmed)) return null;
     return {
         kind: NodeKind.ControlFlow,
         branchWeight: 1,
@@ -396,7 +337,7 @@ function parseCaseLabel(
     inSwitchSelect: boolean,
 ): NormalizedNode | null {
     if (!inSwitchSelect) return null;
-    if (!CASE_LABEL_RE.test(trimmed)) return null;
+    if (!REGEX.SYNTAX.GO_CASE_LABEL.test(trimmed)) return null;
     return {
         kind: NodeKind.ControlFlow,
         branchWeight: 1,
@@ -419,7 +360,11 @@ function parseSimpleStatement(
     line: string,
     lineNum: number,
 ): NormalizedNode | null {
-    if (GO_STMT_RE.test(trimmed) || DEFER_STMT_RE.test(trimmed) || RETURN_STMT_RE.test(trimmed)) {
+    if (
+        REGEX.SYNTAX.GO_STMT.test(trimmed) ||
+        REGEX.SYNTAX.GO_DEFER_STMT.test(trimmed) ||
+        REGEX.SYNTAX.GO_RETURN_STMT.test(trimmed)
+    ) {
         return {
             kind: NodeKind.Other,
             start: { line: lineNum, column: 1 },
@@ -462,7 +407,7 @@ function parseNumericLiterals(
     out: NormalizedNode[],
 ): void {
     // Find float literals first to avoid partial matches with int regex
-    const floatMatches = [...codeOnly.matchAll(FLOAT_LITERAL_RE)];
+    const floatMatches = [...codeOnly.matchAll(REGEX.SYNTAX.createFloatLiteralScanner())];
     for (const matchItem of floatMatches) {
         const idx = matchItem.index ?? 0;
         out.push({
@@ -477,7 +422,7 @@ function parseNumericLiterals(
 
     // Integer literals — skip positions that overlap with float matches
     const coveredPositions = collectFloatOccupiedPositions(floatMatches);
-    const intMatches = [...codeOnly.matchAll(INT_LITERAL_RE)];
+    const intMatches = [...codeOnly.matchAll(REGEX.SYNTAX.createIntLiteralScanner())];
     for (const matchItem of intMatches) {
         const idx = matchItem.index ?? 0;
         // Skip if this int overlaps with a float match
@@ -531,9 +476,9 @@ function parseStringLiterals(
     inImport: boolean,
 ): void {
     const baseOffset = computeSegmentOffset(line, trimmed);
-    STRING_LITERAL_RE.lastIndex = 0;
+    const scanner = REGEX.SYNTAX.createStringLiteralScanner();
     let match: RegExpExecArray | null;
-    while ((match = STRING_LITERAL_RE.exec(trimmed)) !== null) {
+    while ((match = scanner.exec(trimmed)) !== null) {
         const rawVal = match[2];
         const colOffset = baseOffset + (match.index ?? 0);
         out.push({
@@ -561,9 +506,9 @@ function parseNamedLiterals(
     lineNum: number,
     out: NormalizedNode[],
 ): void {
-    NAMED_LITERAL_RE.lastIndex = 0;
+    const scanner = REGEX.SYNTAX.createGoNamedLiteralScanner();
     let match: RegExpExecArray | null;
-    while ((match = NAMED_LITERAL_RE.exec(codeOnly)) !== null) {
+    while ((match = scanner.exec(codeOnly)) !== null) {
         const idx = match.index ?? 0;
         out.push({
             kind: NodeKind.Literal,
@@ -588,9 +533,9 @@ function parseCallExpressions(
     lineNum: number,
     out: NormalizedNode[],
 ): void {
-    CALL_EXPR_RE.lastIndex = 0;
+    const scanner = REGEX.SYNTAX.createGoCallExprScanner();
     let match: RegExpExecArray | null;
-    while ((match = CALL_EXPR_RE.exec(codeOnly)) !== null) {
+    while ((match = scanner.exec(codeOnly)) !== null) {
         const callName = match[1];
         // Skip Go keywords and built-in functions
         if (CALL_KEYWORD_EXCLUSIONS.has(callName)) continue;
@@ -738,7 +683,7 @@ function handlePackageAndImport(
     wasTopLevel: boolean,
     ctx: ParseContext,
 ): boolean {
-    if (wasTopLevel && PACKAGE_DECL_RE.test(codeOnly)) return true;
+    if (wasTopLevel && REGEX.SYNTAX.GO_PACKAGE.test(codeOnly)) return true;
     if (wasTopLevel && IMPORT_DECL_RE.test(codeOnly)) {
         if (codeOnly.includes('(')) ctx.inImport = true;
         return true;
@@ -787,7 +732,7 @@ function handleVarOrConst(
     ctx: ParseContext,
     children: NormalizedNode[],
 ): boolean {
-    if (wasTopLevel && VAR_BLOCK_START_RE.test(codeOnly)) {
+    if (wasTopLevel && REGEX.SYNTAX.GO_VAR_BLOCK_START.test(codeOnly)) {
         ctx.inVarBlock = true;
         return true;
     }
@@ -798,7 +743,7 @@ function handleVarOrConst(
         trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
         return true;
     }
-    if (wasTopLevel && CONST_BLOCK_START_RE.test(codeOnly)) {
+    if (wasTopLevel && REGEX.SYNTAX.GO_CONST_BLOCK_START.test(codeOnly)) {
         ctx.inConstBlock = true;
         return true;
     }

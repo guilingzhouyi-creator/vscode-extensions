@@ -52,6 +52,7 @@ export const DEFAULT_LEDGER_DIR_NAME = '.refactor-trajectory';
 export function formatCompactRecord(params: {
     runId: string;
     revision: string;
+    sig?: string;
     module: string;
     agent: string;
     timestamp?: number;
@@ -60,7 +61,7 @@ export function formatCompactRecord(params: {
     gatePass: boolean;
     gateCode?: string;
 }): CompactTrajectoryRecord {
-    const { runId, revision, module, agent, timestamp, counters, metrics, gatePass, gateCode } =
+    const { runId, revision, sig, module, agent, timestamp, counters, metrics, gatePass, gateCode } =
         params;
 
     // 0.01 precision is required downstream: the self-audit baseline compares
@@ -83,6 +84,7 @@ export function formatCompactRecord(params: {
     return {
         t: timestamp ?? Date.now(),
         rev: boundedRev,
+        ...(sig ? { sig: sig.length > 8 ? sig.slice(0, 8) : sig } : {}),
         id: boundedId,
         mod: boundedMod,
         agent: boundedAgent,
@@ -180,6 +182,23 @@ const ESTIMATED_LINE_BYTES = 200;
 let appendCounter = 0;
 
 /**
+ * Persists pruned trajectory runs into an append-only cold archive file.
+ * Prevents loss of historical runs when the rolling active window truncates.
+ *
+ * @param ledgerDir - Root trajectory ledger directory.
+ * @param prunedLines - Array of serialized NDJSON record lines that were slid out.
+ */
+async function archivePrunedRuns(ledgerDir: string, prunedLines: string[]): Promise<void> {
+    if (prunedLines.length === 0) return;
+    try {
+        const archiveFile = path.join(ledgerDir, 'archive-runs.ndjson');
+        await fs.promises.appendFile(archiveFile, prunedLines.join('\n') + '\n', 'utf8');
+    } catch {
+        // Best-effort: ignore cold archive write failures
+    }
+}
+
+/**
  * Prunes the active runs NDJSON file to the given retention limit.
  * Idempotent async routine; requires external synchronization against concurrent writes.
  *
@@ -197,7 +216,9 @@ export async function pruneActiveRuns(
             .split('\n')
             .filter((lineText) => lineText.trim().length > 0);
         if (lines.length > maxRollingRuns) {
+            const prunedLines = lines.slice(0, lines.length - maxRollingRuns);
             const recentLines = lines.slice(-maxRollingRuns);
+            await archivePrunedRuns(path.dirname(activeFile), prunedLines);
             await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
         }
     } catch (err: unknown) {
@@ -227,7 +248,9 @@ async function pruneActiveRunsIfOversized(
             .split('\n')
             .filter((lineText) => lineText.trim().length > 0);
         if (lines.length > maxRollingRuns * 1.5) {
+            const prunedLines = lines.slice(0, lines.length - maxRollingRuns);
             const recentLines = lines.slice(-maxRollingRuns);
+            await archivePrunedRuns(path.dirname(activeFile), prunedLines);
             await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
         }
     } catch (err: unknown) {
@@ -364,5 +387,38 @@ export async function writeLifetimeSummary(
             // Ignore staging cleanup failure
         }
         throw err;
+    }
+}
+
+/**
+ * Reads all historical trajectory records from the cold archive if present.
+ * Reentrant and idempotent async read-only routine.
+ *
+ * @param ledgerDir - Ledger directory path.
+ * @returns Array of parsed CompactTrajectoryRecord items from cold storage.
+ */
+export async function readArchivedRecords(
+    ledgerDir: string,
+): Promise<CompactTrajectoryRecord[]> {
+    const archiveFile = path.join(ledgerDir, 'archive-runs.ndjson');
+    if (!fs.existsSync(archiveFile)) {
+        return [];
+    }
+    try {
+        const content = await fs.promises.readFile(archiveFile, 'utf8');
+        const lines = content
+            .trim()
+            .split('\n')
+            .filter((lineText) => lineText.trim().length > 0);
+        const records: CompactTrajectoryRecord[] = [];
+        for (const line of lines) {
+            const parsed = parseCompactRecordSafe(line);
+            if (parsed !== null) {
+                records.push(parsed);
+            }
+        }
+        return records;
+    } catch {
+        return [];
     }
 }

@@ -160,9 +160,9 @@ function extractMemoryViolations(
             );
         }
     } else if (memory) {
-        for (const hit of memory.ruleHits.slice(0, MAX_MEMORY_RULE_HITS)) {
+        for (const memoryHit of memory.ruleHits.slice(0, MAX_MEMORY_RULE_HITS)) {
             frequentViolations.push(
-                GuidanceMessages.FORMAT_VIOLATION(hit.rule, hit.line, hit.message),
+                GuidanceMessages.FORMAT_VIOLATION(memoryHit.rule, memoryHit.line, memoryHit.message),
             );
         }
     }
@@ -382,16 +382,16 @@ export interface CompactAgentPrompt {
  * @returns AgentClarificationRequest or undefined.
  */
 export function extractClarificationRequest(issue: Issue): AgentClarificationRequest | undefined {
-    const raw =
+    const rawClarification =
         (issue as unknown as Record<string, unknown>).clarificationRequest ??
         issue.detail?.clarificationRequest ??
         (issue.actionable as unknown as Record<string, unknown> | undefined)?.clarificationRequest;
     if (
-        raw &&
-        typeof raw === 'object' &&
-        PROP_PROMPT_QUESTION in (raw as Record<string, unknown>)
+        rawClarification &&
+        typeof rawClarification === 'object' &&
+        PROP_PROMPT_QUESTION in (rawClarification as Record<string, unknown>)
     ) {
-        return raw as AgentClarificationRequest;
+        return rawClarification as AgentClarificationRequest;
     }
     return undefined;
 }
@@ -413,23 +413,23 @@ function resolveDirectiveSeverity(severity: string | undefined): CompactDirectiv
 }
 
 function resolveFileBasename(filePath: string | undefined): string {
-    const raw = filePath || DEFAULT_UNKNOWN_BASENAME;
-    if (!raw.includes('/') && !raw.includes('\\')) {
-        return raw;
+    const rawFilePath = filePath || DEFAULT_UNKNOWN_BASENAME;
+    if (!rawFilePath.includes('/') && !rawFilePath.includes('\\')) {
+        return rawFilePath;
     }
-    return raw.split(/[/\\]/).pop() || raw;
+    return rawFilePath.split(/[/\\]/).pop() || rawFilePath;
 }
 
 interface DirectiveRenderParams {
     issue: Issue;
-    sev: CompactDirectiveSeverity;
-    file: string;
-    line: number;
+    directiveSeverity: CompactDirectiveSeverity;
+    targetFile: string;
+    lineNumber: number;
     clarify?: AgentClarificationRequest;
 }
 
 function renderClarifyDirective(params: DirectiveRenderParams): CompactGuardDirective {
-    const { issue, clarify, sev, file, line } = params;
+    const { issue, clarify, directiveSeverity, targetFile, lineNumber } = params;
     const ruleId = issue.rule;
     const clarifyReq = clarify!;
     const question = (clarifyReq.promptQuestion || issue.message || '').replace(/\s+/g, ' ').trim();
@@ -443,13 +443,13 @@ function renderClarifyDirective(params: DirectiveRenderParams): CompactGuardDire
             : firstOpt.key
         : DEFAULT_FALLBACK_OPTION_KEY;
     const defKey = clarifyReq.defaultChoiceKey || fallbackKey;
-    const renderedDirective = `[CLARIFY|${sev}|${ruleId}] ${file}:${line} -> ${question} ?opts=[${optKeys}] def=${defKey}`;
+    const renderedDirective = `[CLARIFY|${directiveSeverity}|${ruleId}] ${targetFile}:${lineNumber} -> ${question} ?opts=[${optKeys}] def=${defKey}`;
 
     return {
-        severity: sev,
+        severity: directiveSeverity,
         ruleId,
-        file,
-        line,
+        file: targetFile,
+        line: lineNumber,
         summary: question,
         actionable: issue.actionable,
         directiveType: DIRECTIVE_TYPE_CLARIFY,
@@ -459,7 +459,7 @@ function renderClarifyDirective(params: DirectiveRenderParams): CompactGuardDire
 }
 
 function renderGuardDirective(params: DirectiveRenderParams): CompactGuardDirective {
-    const { issue, sev, file, line } = params;
+    const { issue, directiveSeverity, targetFile, lineNumber } = params;
     const ruleId = issue.rule;
     const summary = (issue.message || '').replace(/\s+/g, ' ').trim();
     const fixHint = issue.suggestion ? issue.suggestion.replace(/\s+/g, ' ').trim() : undefined;
@@ -468,13 +468,13 @@ function renderGuardDirective(params: DirectiveRenderParams): CompactGuardDirect
     const actionPart = actionable
         ? ` -> action:${actionable.action} [safe=${actionable.safeToAutomate}]`
         : '';
-    const renderedDirective = `[GUARD|${sev}|${ruleId}] ${file}:${line} -> ${summary}.${fixPart}${actionPart}`;
+    const renderedDirective = `[GUARD|${directiveSeverity}|${ruleId}] ${targetFile}:${lineNumber} -> ${summary}.${fixPart}${actionPart}`;
 
     return {
-        severity: sev,
+        severity: directiveSeverity,
         ruleId,
-        file,
-        line,
+        file: targetFile,
+        line: lineNumber,
         summary,
         fixHint,
         actionable,
@@ -490,12 +490,12 @@ function renderGuardDirective(params: DirectiveRenderParams): CompactGuardDirect
  * @returns Structured and rendered CompactGuardDirective.
  */
 export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective {
-    const sev = resolveDirectiveSeverity(issue.severity);
-    const file = resolveFileBasename(issue.location?.file);
-    const line = issue.location?.start?.line ?? 1;
+    const directiveSeverity = resolveDirectiveSeverity(issue.severity);
+    const targetFile = resolveFileBasename(issue.location?.file);
+    const lineNumber = issue.location?.start?.line ?? 1;
 
     const clarify = extractClarificationRequest(issue);
-    const renderParams: DirectiveRenderParams = { issue, sev, file, line, clarify };
+    const renderParams: DirectiveRenderParams = { issue, directiveSeverity, targetFile, lineNumber, clarify };
     if (clarify) {
         return renderClarifyDirective(renderParams);
     }
@@ -556,6 +556,34 @@ export function formatCompactAgentPrompt(
 }
 
 /**
+ * Trims trailing carriage return if present before newline.
+ */
+function stripTrailingCr(content: string, startOffset: number, endOffset: number): number {
+    if (endOffset > startOffset && content.charCodeAt(endOffset - 1) === 13) {
+        return endOffset - 1;
+    }
+    return endOffset;
+}
+
+/**
+ * Formats a single anchor line with gutter line number and target marker.
+ */
+function renderAnchorLine(
+    content: string,
+    lineStartOffset: number,
+    rawEndOffset: number,
+    currentLine: number,
+    targetStartLine: number,
+    targetEndLine: number,
+): string {
+    const endOffset = stripTrailingCr(content, lineStartOffset, rawEndOffset);
+    const lineText = content.slice(lineStartOffset, endOffset);
+    const isTarget = currentLine >= targetStartLine && currentLine <= targetEndLine;
+    const prefix = isTarget ? '> ' : '  ';
+    return `${prefix}${currentLine} | ${lineText}`;
+}
+
+/**
  * Safely format code lines into an anchor slice with surrounding context.
  *
  * @param content - Source file content string.
@@ -573,19 +601,46 @@ export function formatAnchorSlice(
     if (!content) {
         return undefined;
     }
-    const lines = content.split(/\r?\n/);
     const fromLine = Math.max(1, startLine - radius);
-    const toLine = Math.min(lines.length, endLine + radius);
+    const toLine = endLine + radius;
     if (fromLine > toLine) {
         return undefined;
     }
+
     const slice: string[] = [];
-    for (let lineNum = fromLine; lineNum <= toLine; lineNum++) {
-        const isTarget = lineNum >= startLine && lineNum <= endLine;
-        const prefix = isTarget ? '> ' : '  ';
-        slice.push(`${prefix}${lineNum} | ${lines[lineNum - 1]}`);
+    let currentLine = 1;
+    let lineStartOffset = 0;
+    const contentLength = content.length;
+
+    for (let charIndex = 0; charIndex <= contentLength; charIndex++) {
+        const isEof = charIndex === contentLength;
+        const isNewline = !isEof && content.charCodeAt(charIndex) === 10;
+        if (!isNewline && !isEof) {
+            continue;
+        }
+
+        if (currentLine >= fromLine && currentLine <= toLine) {
+            slice.push(
+                renderAnchorLine(
+                    content,
+                    lineStartOffset,
+                    charIndex,
+                    currentLine,
+                    startLine,
+                    endLine,
+                ),
+            );
+        }
+
+        if (currentLine >= toLine || isEof) {
+            break;
+        }
+
+        currentLine++;
+        lineStartOffset = charIndex + 1;
     }
-    return slice.join('\n');
+
+    return slice.length > 0 ? slice.join('\n') : undefined;
 }
 
 /**
@@ -655,22 +710,22 @@ const ZERO_HEAP_RULE_RE = /(?:PRF-MEM|ADV-PRF|CPX-SPACE-001)/;
 const ZERO_HEAP_MSG_RE = /(?:loop|allocation)/;
 const IMMUTABLE_MSG_RE = /(?:immutable|freeze)/;
 
-function isPurityRequired(layer: AgentTopologyLayer, msg: string): boolean {
-    return layer === LAYER_L1_CONTRACT || layer === LAYER_L2_OPERATOR || PURITY_MSG_RE.test(msg);
+function isPurityRequired(layer: AgentTopologyLayer, diagnosticMessage: string): boolean {
+    return layer === LAYER_L1_CONTRACT || layer === LAYER_L2_OPERATOR || PURITY_MSG_RE.test(diagnosticMessage);
 }
 
-function isZeroHeapRequired(rule: string, layer: AgentTopologyLayer, msg: string): boolean {
+function isZeroHeapRequired(rule: string, layer: AgentTopologyLayer, diagnosticMessage: string): boolean {
     return (
-        layer === LAYER_L2_OPERATOR || ZERO_HEAP_RULE_RE.test(rule) || ZERO_HEAP_MSG_RE.test(msg)
+        layer === LAYER_L2_OPERATOR || ZERO_HEAP_RULE_RE.test(rule) || ZERO_HEAP_MSG_RE.test(diagnosticMessage)
     );
 }
 
-function isImmutableRequired(rule: string, layer: AgentTopologyLayer, msg: string): boolean {
+function isImmutableRequired(rule: string, layer: AgentTopologyLayer, diagnosticMessage: string): boolean {
     return (
         layer === LAYER_L1_CONTRACT ||
         layer === LAYER_L3_CONFIG ||
         rule === 'ARCH-FAC-001' ||
-        IMMUTABLE_MSG_RE.test(msg)
+        IMMUTABLE_MSG_RE.test(diagnosticMessage)
     );
 }
 
@@ -724,13 +779,13 @@ export function generateImmutableConstraints(
     issue: Issue,
     layer: AgentTopologyLayer,
 ): AgentImmutableConstraints {
-    const rule = (issue.rule || '').toUpperCase();
-    const msg = (issue.message || '').toLowerCase();
+    const ruleUpper = (issue.rule || '').toUpperCase();
+    const normalizedMessage = (issue.message || '').toLowerCase();
     const filePath = issue.location?.file;
 
-    const preservesPurity = isPurityRequired(layer, msg);
-    const zeroHeapAllocationInLoop = isZeroHeapRequired(rule, layer, msg);
-    const immutableStateSnapshot = isImmutableRequired(rule, layer, msg);
+    const preservesPurity = isPurityRequired(layer, normalizedMessage);
+    const zeroHeapAllocationInLoop = isZeroHeapRequired(ruleUpper, layer, normalizedMessage);
+    const immutableStateSnapshot = isImmutableRequired(ruleUpper, layer, normalizedMessage);
     const elocBudgetConstraint = true;
     const noExternalSideEffects =
         layer === LAYER_L1_CONTRACT || layer === LAYER_L2_OPERATOR || layer === LAYER_L5_GOVERNANCE;
@@ -871,11 +926,11 @@ export function generateVerificationDirective(
     _layer: AgentTopologyLayer,
     _targetRoot?: string,
 ): AgentVerificationDirective {
-    const file = (issue.location?.file || '').replace(/\\/g, '/');
-    const rule = (issue.rule || '').toUpperCase();
+    const normalizedFile = (issue.location?.file || '').replace(/\\/g, '/');
+    const targetRule = (issue.rule || '').toUpperCase();
 
     for (const strategy of VERIFICATION_DIRECTIVE_STRATEGIES) {
-        if (strategy.matcher(file, rule)) {
+        if (strategy.matcher(normalizedFile, targetRule)) {
             return strategy.factory(issue);
         }
     }

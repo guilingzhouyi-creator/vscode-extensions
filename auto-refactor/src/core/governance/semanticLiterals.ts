@@ -30,6 +30,8 @@
  * to eliminate mechanical false positives.
  */
 
+import { REGEX } from '../constants';
+
 /** Fallback semantic kind when no specialized literal domain matches. */
 const GENERAL_LITERAL_KIND = 'general';
 
@@ -73,12 +75,6 @@ export interface SemanticClassification {
     suggestedConstPrefix: string;
     rationale: string;
 }
-
-const URL_RE = /^(?:https?|wss?|ftp):\/\/[^\s"'`<>]+$/i;
-const PATH_PREFIX_RE = /^(?:\/|[a-zA-Z]:[\\/]|\.\.?[\\/])/;
-const FILE_EXT_RE =
-    /\.(?:json|ya?ml|toml|png|jpe?g|gif|svg|ico|css|scss|html|wasm|proto|graphql|sql|md)$/i;
-const INLINE_SVG_RE = /^\s*<svg(?:\s+[^>]*>|>)/i;
 
 /** Millisecond threshold above which a duration reads more naturally in seconds. */
 const MS_PER_SECOND = 1000;
@@ -228,15 +224,6 @@ const MAX_PATTERN_LENGTH = 256;
 /** Decorative run: one character repeated at least this many times (ASCII banners). */
 const MIN_BANNER_RUN = 8;
 const BANNER_RE = new RegExp(`^(.)\\1{${MIN_BANNER_RUN - 1},}$`);
-const GLOB_META_RE = /[*?{}[\]]/;
-const RELATIVE_SPECIFIER_RE = /^(?:\.{1,2}\/|\/[A-Za-z0-9_@.-]+\/|[A-Za-z0-9_@.-]+\/)/;
-/** Rust path prefixes (`std::`, `crate::`) are module vocabulary, like a relative specifier. */
-const RUST_PATH_PREFIX_RE = /^(?:std|crate|core|super|self)::/;
-/** Assertion snippets the test rules compare against (`expect(`, `assert.`) are probe text. */
-const TEST_PROBE_RE = /^(?:expect|assert)[.(]?$/;
-const CJK_RE = /[　-〿一-鿿＀-￯]/;
-const CREDENTIAL_RE =
-    /(?:ghp_|gho_|github_pat_|sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{12,}|xox[baprs]-|-----BEGIN|Bearer\s)/i;
 
 /** Conventional tokens that are vocabulary rather than payload: encodings, formats, keywords. */
 const CONVENTIONAL_TOKENS = new Set([
@@ -594,7 +581,7 @@ function matchesPatternRule(raw: string, lowered: string): boolean {
         RULE_ID_RE.test(raw) ||
         RULE_PREFIX_RE.test(raw) ||
         ENUM_TAG_RE.test(raw) ||
-        TEST_PROBE_RE.test(raw) ||
+        REGEX.SYNTAX.TEST_PROBE.test(raw) ||
         CLI_FLAG_RE.test(raw) ||
         MIME_TYPE_RE.test(lowered) ||
         FILE_EXTENSION_RE.test(raw) ||
@@ -632,7 +619,7 @@ export function isConventionalVocabulary(raw: string, lowered: string): boolean 
  */
 function isMessageText(raw: string): boolean {
     if (BANNER_RE.test(raw)) return true;
-    return raw.length >= MIN_MESSAGE_LENGTH && (/\s/.test(raw) || CJK_RE.test(raw));
+    return raw.length >= MIN_MESSAGE_LENGTH && (/\s/.test(raw) || REGEX.LITERAL.CJK_CHAR.test(raw));
 }
 
 /**
@@ -644,7 +631,9 @@ function isMessageText(raw: string): boolean {
 function isGlobPattern(raw: string): boolean {
     if (raw.length > MAX_PATTERN_LENGTH || /\s/.test(raw)) return false;
     return (
-        GLOB_META_RE.test(raw) || RELATIVE_SPECIFIER_RE.test(raw) || RUST_PATH_PREFIX_RE.test(raw)
+        REGEX.LITERAL.GLOB_META.test(raw) ||
+        REGEX.LITERAL.RELATIVE_SPECIFIER_PREFIX.test(raw) ||
+        REGEX.SYNTAX.RUST_PATH_PREFIX.test(raw)
     );
 }
 
@@ -753,7 +742,7 @@ function classifyNumericLiteral(num: number): SemanticClassification {
  * @returns Classification if matched, otherwise null.
  */
 function classifyStructuralString(unquoted: string): SemanticClassification | null {
-    if (INLINE_SVG_RE.test(unquoted)) {
+    if (REGEX.LITERAL.INLINE_SVG.test(unquoted)) {
         return {
             kind: 'inline-svg',
             isReasonable: false,
@@ -763,7 +752,7 @@ function classifyStructuralString(unquoted: string): SemanticClassification | nu
         };
     }
 
-    if (URL_RE.test(unquoted)) {
+    if (REGEX.LITERAL.URL.test(unquoted)) {
         return {
             kind: 'url',
             isReasonable: false,
@@ -772,7 +761,10 @@ function classifyStructuralString(unquoted: string): SemanticClassification | nu
         };
     }
 
-    if (PATH_PREFIX_RE.test(unquoted) || FILE_EXT_RE.test(unquoted)) {
+    if (
+        REGEX.LITERAL.PATH_PREFIX.test(unquoted) ||
+        REGEX.LITERAL.FILE_EXTENSION.test(unquoted)
+    ) {
         return {
             kind: 'file-path',
             isReasonable: false,
@@ -807,7 +799,7 @@ function classifyStringLiteral(unquoted: string): SemanticClassification {
         return structural;
     }
 
-    if (CREDENTIAL_RE.test(unquoted)) {
+    if (REGEX.SECURITY.CREDENTIAL_TOKEN.test(unquoted)) {
         return {
             kind: GENERAL_LITERAL_KIND,
             isReasonable: false,

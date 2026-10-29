@@ -16,7 +16,16 @@
  */
 import { SEVERITY_INFO, type Issue, type AgentActionType } from '../core/types';
 import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
+import { REGEX } from '../core/constants';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
+import {
+    isCommentOrBlankLine,
+    calculateIndentWidth,
+    findMatchingBraceInLines,
+    advancePastBlanksAndComments,
+    findLastMeaningfulLine,
+    countMeaningfulStatements,
+} from '../core/ast/block-scope-utils';
 import type { SimplifyOptions } from './simplify';
 
 const DEFAULT_MAX_GUARD_NESTING = 3;
@@ -42,78 +51,7 @@ const PATTERNS = {
     pyIfBoolNoElse: 'python-if-boolean-return-no-else',
 } as const;
 
-const PREFIX_SLASH_SLASH = '//';
 const PREFIX_HASH = '#';
-const PREFIX_STAR = '*';
-const PREFIX_BLOCK_COMMENT_START = '/*';
-
-const TERMINATING_STMT_RE = /^\s*(?:return|throw|break|continue)\b/;
-const IF_OPEN_RE = /\bif\s*\([^)]*\)\s*\{/;
-const ELSE_RE = /^\s*\}\s*else\b/;
-const RETURN_BOOL_RE = /^\s*return\s+(true|false)\s*[;}]?\s*$/;
-const TERNARY_BOOL_RETURN_RE = /return\s+[^;]+\?\s*(?:true|false)\s*:\s*(?:true|false)\s*[;}]/;
-const PY_IF_RE = /^(\s*)if\s+.*:\s*$/;
-const PY_DEF_RE = /^(\s*)(?:async\s+)?def\s+[A-Za-z_]\w*\s*\(/;
-
-function isCommentOrBlankLine(trimmed: string): boolean {
-    if (!trimmed) return true;
-    return (
-        trimmed.startsWith(PREFIX_SLASH_SLASH) ||
-        trimmed.startsWith(PREFIX_HASH) ||
-        trimmed.startsWith(PREFIX_STAR) ||
-        trimmed.startsWith(PREFIX_BLOCK_COMMENT_START)
-    );
-}
-
-function computeIndentWidth(line: string): number {
-    const match = /^\s*/.exec(line);
-    return match ? match[0].length : 0;
-}
-
-function findMatchingBrace(lines: string[], startIndex: number): number {
-    let depth = 0;
-    let started = false;
-    for (let lineIndex = startIndex; lineIndex < lines.length; lineIndex++) {
-        const line = lines[lineIndex];
-        for (let charIndex = 0; charIndex < line.length; charIndex++) {
-            if (line[charIndex] === '{') {
-                depth++;
-                started = true;
-            } else if (line[charIndex] === '}' && started) {
-                depth--;
-                if (depth === 0) return lineIndex;
-            }
-        }
-    }
-    return -1;
-}
-
-const BRACE_ONLY_LINE_RE = /^[{}]+$/;
-
-function findLastMeaningfulLine(lines: string[], start: number, end: number): number {
-    for (let lineIndex = end; lineIndex >= start; lineIndex--) {
-        const trimmed = lines[lineIndex].trim();
-        if (isCommentOrBlankLine(trimmed) || BRACE_ONLY_LINE_RE.test(trimmed)) continue;
-        return lineIndex;
-    }
-    return -1;
-}
-
-function countMeaningfulStatements(lines: string[], start: number, end: number): number {
-    let count = 0;
-    for (let lineIndex = start; lineIndex < end; lineIndex++) {
-        const trimmed = lines[lineIndex].trim();
-        if (isCommentOrBlankLine(trimmed) || BRACE_ONLY_LINE_RE.test(trimmed)) continue;
-        count++;
-    }
-    return count;
-}
-
-function advancePastBlanksAndComments(lines: string[], start: number): number {
-    let lineIndex = start;
-    while (lineIndex < lines.length && isCommentOrBlankLine(lines[lineIndex].trim())) lineIndex++;
-    return lineIndex;
-}
 
 const SIMPLIFY_ACTIONABLE_MAP: Record<
     string,
@@ -205,9 +143,9 @@ const ELSE_SUGGESTION = 'Remove the `else` keyword and de-indent its body to red
  */
 function auditRedundantElseBrace(lines: string[], file: string, issues: Issue[]): void {
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-        if (!IF_OPEN_RE.test(lines[lineIndex])) continue;
+        if (!REGEX.SYNTAX.IF_OPEN.test(lines[lineIndex])) continue;
 
-        const closeIdx = findMatchingBrace(lines, lineIndex);
+        const closeIdx = findMatchingBraceInLines(lines, lineIndex);
         if (closeIdx === -1 || closeIdx <= lineIndex) continue;
 
         const closeLine = lines[closeIdx];
@@ -218,13 +156,13 @@ function auditRedundantElseBrace(lines: string[], file: string, issues: Issue[])
         if (!hasElseSameLine) {
             const nextIdx = advancePastBlanksAndComments(lines, closeIdx + 1);
             if (nextIdx >= lines.length) continue;
-            if (!ELSE_RE.test(lines[nextIdx])) continue;
+            if (!REGEX.SYNTAX.ELSE_CLAUSE.test(lines[nextIdx])) continue;
             elseLineIdx = nextIdx;
         }
 
         const lastStmtIdx = findLastMeaningfulLine(lines, lineIndex + 1, closeIdx - 1);
         if (lastStmtIdx === -1) continue;
-        if (!TERMINATING_STMT_RE.test(lines[lastStmtIdx].trim())) continue;
+        if (!REGEX.SYNTAX.TERMINATING_STMT.test(lines[lastStmtIdx].trim())) continue;
 
         issues.push(
             makeIssue({
@@ -249,7 +187,7 @@ function findPythonIfBodyEnd(lines: string[], start: number, ifIndent: number): 
             bodyLineIndex++;
             continue;
         }
-        if (computeIndentWidth(lines[bodyLineIndex]) <= ifIndent) break;
+        if (calculateIndentWidth(lines[bodyLineIndex]) <= ifIndent) break;
         lastStmtIdx = bodyLineIndex;
         bodyLineIndex++;
     }
@@ -260,7 +198,7 @@ function findPythonTerminatingElse(lines: string[], lastStmtIdx: number, ifInden
     const lastStmt = lines[lastStmtIdx].trim();
     if (!/^(?:return|raise|break|continue)\b/.test(lastStmt)) return -1;
     const searchLineIndex = advancePastBlanksAndComments(lines, lastStmtIdx + 1);
-    if (searchLineIndex >= lines.length || computeIndentWidth(lines[searchLineIndex]) !== ifIndent)
+    if (searchLineIndex >= lines.length || calculateIndentWidth(lines[searchLineIndex]) !== ifIndent)
         return -1;
     return /^(else|elif)\b/.test(lines[searchLineIndex].trim()) ? searchLineIndex : -1;
 }
@@ -271,7 +209,7 @@ function findPythonTerminatingElse(lines: string[], lastStmtIdx: number, ifInden
  */
 function auditRedundantElsePython(lines: string[], file: string, issues: Issue[]): void {
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-        const ifMatch = PY_IF_RE.exec(lines[lineIndex]);
+        const ifMatch = REGEX.SYNTAX.PYTHON_IF_HEADER.exec(lines[lineIndex]);
         if (!ifMatch) continue;
         const ifIndent = ifMatch[1].length;
 
@@ -356,7 +294,7 @@ function emitBooleanIssue(
  */
 function auditTernaryBoolReturn(context: LineAuditContext): void {
     for (let lineIndex = 0; lineIndex < context.lines.length; lineIndex++) {
-        if (!TERNARY_BOOL_RETURN_RE.test(context.lines[lineIndex])) continue;
+        if (!REGEX.SYNTAX.TERNARY_BOOL_RETURN.test(context.lines[lineIndex])) continue;
         const match = context.lines[lineIndex].match(
             /return\s+(.+?)\?\s*(true|false)\s*:\s*(true|false)/,
         );
@@ -401,7 +339,7 @@ function findElseBodyStart(lines: string[], closeIdx: number): number {
     const afterClose = closeLine.replace(/^\s*\}\s*/, '');
     if (/^else\b/.test(afterClose)) return closeIdx;
     const nextIdx = advancePastBlanksAndComments(lines, closeIdx + 1);
-    return nextIdx < lines.length && ELSE_RE.test(lines[nextIdx]) ? nextIdx : -1;
+    return nextIdx < lines.length && REGEX.SYNTAX.ELSE_CLAUSE.test(lines[nextIdx]) ? nextIdx : -1;
 }
 
 interface BlockIfCheckSpec {
@@ -414,7 +352,7 @@ interface BlockIfCheckSpec {
 function checkBlockIfNoElse(spec: BlockIfCheckSpec): void {
     const searchLineIndex = advancePastBlanksAndComments(spec.context.lines, spec.closeIdx + 1);
     if (searchLineIndex >= spec.context.lines.length) return;
-    const nextBool = RETURN_BOOL_RE.exec(spec.context.lines[searchLineIndex].trim());
+    const nextBool = REGEX.SYNTAX.RETURN_BOOL.exec(spec.context.lines[searchLineIndex].trim());
     if (!nextBool || spec.ifBool === (nextBool[1] === 'true')) return;
 
     emitBooleanIssue(
@@ -433,7 +371,7 @@ interface BlockIfElseSpec {
 }
 
 function checkBlockIfElse(spec: BlockIfElseSpec): void {
-    const elseCloseIdx = findMatchingBrace(spec.context.lines, spec.elseBodyStart);
+    const elseCloseIdx = findMatchingBraceInLines(spec.context.lines, spec.elseBodyStart);
     if (elseCloseIdx === -1) return;
 
     const elseLastIdx = findLastMeaningfulLine(
@@ -442,7 +380,7 @@ function checkBlockIfElse(spec: BlockIfElseSpec): void {
         elseCloseIdx - 1,
     );
     if (elseLastIdx === -1) return;
-    const elseBoolMatch = RETURN_BOOL_RE.exec(spec.context.lines[elseLastIdx].trim());
+    const elseBoolMatch = REGEX.SYNTAX.RETURN_BOOL.exec(spec.context.lines[elseLastIdx].trim());
     if (!elseBoolMatch) return;
     const elseBool = elseBoolMatch[1] === 'true';
     if (spec.ifBool === elseBool) return;
@@ -463,12 +401,12 @@ function auditBlockBoolReturn(context: LineAuditContext): void {
         const trimmed = context.lines[lineIndex].trim();
         if (!/^if\s*\((.+)\)\s*\{\s*$/.test(trimmed)) continue;
 
-        const closeIdx = findMatchingBrace(context.lines, lineIndex);
+        const closeIdx = findMatchingBraceInLines(context.lines, lineIndex);
         if (closeIdx === -1) continue;
 
         const lastStmtIdx = findLastMeaningfulLine(context.lines, lineIndex + 1, closeIdx - 1);
         if (lastStmtIdx === -1) continue;
-        const ifBoolMatch = RETURN_BOOL_RE.exec(context.lines[lastStmtIdx].trim());
+        const ifBoolMatch = REGEX.SYNTAX.RETURN_BOOL.exec(context.lines[lastStmtIdx].trim());
         if (!ifBoolMatch) continue;
         const ifBool = ifBoolMatch[1] === 'true';
 
@@ -491,7 +429,7 @@ function findPythonBlockEnd(lines: string[], start: number, ifIndent: number): n
             searchIndex++;
             continue;
         }
-        if (computeIndentWidth(lines[searchIndex]) <= ifIndent) break;
+        if (calculateIndentWidth(lines[searchIndex]) <= ifIndent) break;
         searchIndex++;
     }
     return searchIndex;
@@ -512,7 +450,7 @@ function auditPyBoolWithElse(spec: PythonBoolCheckSpec): void {
     );
     if (
         searchLineIndex >= spec.context.lines.length ||
-        computeIndentWidth(spec.context.lines[searchLineIndex]) <= spec.ifIndent
+        calculateIndentWidth(spec.context.lines[searchLineIndex]) <= spec.ifIndent
     )
         return;
     const elseBoolMatch = /^return\s+(True|False)\s*$/.exec(
@@ -553,11 +491,11 @@ function auditPythonBoolReturn(context: LineAuditContext): void {
         const trimmed = context.lines[lineIndex].trim();
         if (!/^if\s+(.+):\s*$/.test(trimmed)) continue;
 
-        const ifIndent = computeIndentWidth(context.lines[lineIndex]);
+        const ifIndent = calculateIndentWidth(context.lines[lineIndex]);
         const bodyLineIndex = advancePastBlanksAndComments(context.lines, lineIndex + 1);
         if (
             bodyLineIndex >= context.lines.length ||
-            computeIndentWidth(context.lines[bodyLineIndex]) <= ifIndent
+            calculateIndentWidth(context.lines[bodyLineIndex]) <= ifIndent
         )
             continue;
 
@@ -569,7 +507,7 @@ function auditPythonBoolReturn(context: LineAuditContext): void {
         const blockEndIndex = findPythonBlockEnd(context.lines, bodyLineIndex + 1, ifIndent);
         if (
             blockEndIndex >= context.lines.length ||
-            computeIndentWidth(context.lines[blockEndIndex]) !== ifIndent
+            calculateIndentWidth(context.lines[blockEndIndex]) !== ifIndent
         )
             continue;
 
@@ -632,7 +570,7 @@ function resolveGuardIfSpan(lines: string[], lineIndex: number): number {
     const trimmed = lines[lineIndex].trim();
     if (/^if\s*\([^)]*\)\s*(?:return|throw)\b/.test(trimmed)) return lineIndex;
     if (/^if\s*\([^)]*\)\s*\{\s*$/.test(trimmed)) {
-        const closeIdx = findMatchingBrace(lines, lineIndex);
+        const closeIdx = findMatchingBraceInLines(lines, lineIndex);
         if (closeIdx === -1) return -1;
         const stmts = countMeaningfulStatements(lines, lineIndex + 1, closeIdx);
         if (stmts !== 1) return -1;
@@ -761,7 +699,7 @@ function advancePastPythonDocstrings(lines: string[], startIndex: number): numbe
 function resolvePythonGuardIfEnd(lines: string[], lineIndex: number, ifIndent: number): number {
     const bodyIdx = advancePastBlanksAndComments(lines, lineIndex + 1);
     if (bodyIdx >= lines.length) return -1;
-    if (computeIndentWidth(lines[bodyIdx]) <= ifIndent) return -1;
+    if (calculateIndentWidth(lines[bodyIdx]) <= ifIndent) return -1;
     if (!/^(?:return|raise)\b/.test(lines[bodyIdx].trim())) return -1;
 
     let nextIdx = bodyIdx + 1;
@@ -771,7 +709,7 @@ function resolvePythonGuardIfEnd(lines: string[], lineIndex: number, ifIndent: n
     ) {
         nextIdx++;
     }
-    if (nextIdx < lines.length && computeIndentWidth(lines[nextIdx]) > ifIndent) return -1;
+    if (nextIdx < lines.length && calculateIndentWidth(lines[nextIdx]) > ifIndent) return -1;
     return nextIdx;
 }
 
@@ -790,9 +728,9 @@ function countPythonGuardClauses(
             currentLineIndex++;
             continue;
         }
-        if (computeIndentWidth(lines[currentLineIndex]) <= funcIndent) break;
+        if (calculateIndentWidth(lines[currentLineIndex]) <= funcIndent) break;
 
-        const ifMatch = PY_IF_RE.exec(lines[currentLineIndex]);
+        const ifMatch = REGEX.SYNTAX.PYTHON_IF_HEADER.exec(lines[currentLineIndex]);
         if (!ifMatch) break;
         const ifIndent = ifMatch[1].length;
 
@@ -814,9 +752,9 @@ function auditGuardClausePatternsPython(
     issues: Issue[],
 ): void {
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
-        const defMatch = PY_DEF_RE.exec(lines[lineIndex]);
-        if (!defMatch) continue;
-        const funcIndent = defMatch[1].length;
+        const line = lines[lineIndex];
+        if (!REGEX.SYNTAX.PYTHON_DEF.test(line)) continue;
+        const funcIndent = line.length - line.trimStart().length;
 
         const startIdx = advancePastPythonDocstrings(lines, lineIndex + 1);
         const { count, firstIfLine } = countPythonGuardClauses(lines, startIdx, funcIndent);

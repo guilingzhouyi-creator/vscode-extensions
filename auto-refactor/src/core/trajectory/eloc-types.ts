@@ -147,6 +147,8 @@ export interface CompactTrajectoryRecord {
     t: number;
     /** Git revision / commit hash or short SHA. */
     rev: string;
+    /** Optional rule registry digest signature (e.g. 8-char prefix). */
+    sig?: string;
     /** Unique run identifier. */
     id: string;
     /** Target module or project domain. */

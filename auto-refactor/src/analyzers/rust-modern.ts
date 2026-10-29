@@ -25,6 +25,8 @@ import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/
 
 import { SEVERITY_WARNING, SEVERITY_INFO, SEVERITY_ERROR } from '../core/types';
 import { ANALYZER_RUST_MODERN } from '../core/scoring/dimensionLiterals';
+import { REGEX } from '../core/constants';
+import { findMatchingBraceInText } from '../core/ast/block-scope-utils';
 import type { SourceMaskConfig } from '../core/policy/source-mask';
 import {
     DeclarativeModernAnalyzer,
@@ -46,64 +48,6 @@ const RUST_MASK: SourceMaskConfig = {
 };
 
 // --- Keyword regular expressions ---
-
-/** `try!(expr)`, superseded by the `?` operator. */
-const TRY_MACRO_RE = /\btry!\s*\(/;
-
-/** `extern crate name;`, unnecessary from edition 2018 onwards. */
-const EXTERN_CRATE_RE = /^\s*extern\s+crate\s+[A-Za-z_]\w*\s*;/;
-
-/** `#[macro_use]`, replaced by naming the macros in the `use` path. */
-const MACRO_USE_RE = /#\[\s*macro_use\s*\]/;
-
-/** `&String` in a function signature parameter. */
-const AMP_STRING_RE = /&\s*String\b/;
-
-/** `.clone()` whose only consumer is a comparison or a length check, i.e. a needless allocation. */
-const NEEDLESS_CLONE_RE = /\.clone\(\)\s*(?:==|!=|\.len\(\)|\.is_empty\(\))/;
-
-/** `.unwrap()` on a fallible result, which panics instead of propagating. */
-const UNWRAP_RE = /\.unwrap\(\)/;
-
-/** Naked `as` numeric cast susceptible to silent truncation or wrapping. */
-const NUMERIC_CAST_RE = /\bas\s+(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|f32|f64)\b/;
-
-/** A formatting macro call, detected on the masked line (its format string is blanked). */
-const FORMAT_CALL_RE = /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\(/;
-
-/** Positional placeholder inside macro call on a single line. */
-const POSITIONAL_PLACEHOLDER_RE = /!\s*\(\s*"[^"]*\{\}/;
-
-/** Positional format call spanning multiple lines. */
-const MULTILINE_FORMAT_RE =
-    /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\([^;]*"[^"]*\{\}/;
-
-/** Function declaration prefix. */
-const FN_DECL_RE = /\bfn\s+[A-Za-z_]\w*/;
-
-/** `if let` pattern matching declaration. */
-const IF_LET_RE = /\bif\s+let\s+[^{]+=\s*/;
-
-/** `for ... in` loop header. */
-const FOR_IN_RE = /\bfor\s+(?:[A-Za-z_]\w*|\([A-Za-z0-9_,\s]+\))\s+in\b/;
-
-/** `for ... in` loop immediately checking condition and returning. */
-const FOR_FIND_RE = /\bfor\s+[^{]+\{\s*if\s+[^{]+\{\s*return\b/;
-
-/** Async function declaration. */
-const ASYNC_FN_RE = /\basync\s+(?:unsafe\s+)?(?:extern(?:\s+"[^"]+")?\s+)?fn\b/;
-
-/** Synchronous standard library lock acquisition without `.await`. */
-const STD_LOCK_RE = /(?:std::sync::(?:Mutex|RwLock)|\.(?:lock|read|write)\s*\(\s*\)(?!\s*\.await))/;
-
-/** `.await` expression. */
-const AWAIT_RE = /\.await\b/;
-
-/** `panic!`, `todo!`, `unimplemented!`, or `unreachable!` crash macro. */
-const CRASH_MACRO_RE = /\b(?:panic|todo|unimplemented|unreachable)!\s*\(/;
-
-/** `.expect(...)` call. */
-const EXPECT_CALL_RE = /\.expect\s*\(/;
 
 /** `unsafe` block or function signature. */
 const UNSAFE_KEYWORD_RE = /\bunsafe\s*(?:\{|\bfn\b)/;
@@ -142,12 +86,12 @@ interface FnSigState {
  * Test whether a formatting macro call contains positional `{}` arguments.
  */
 function isPositionalFormatCall(raw: readonly string[], startIndex: number): boolean {
-    if (POSITIONAL_PLACEHOLDER_RE.test(raw[startIndex])) {
+    if (REGEX.SYNTAX.RUST_POSITIONAL_PLACEHOLDER.test(raw[startIndex])) {
         return true;
     }
     const maxLine = Math.min(startIndex + MAX_MULTILINE_FORMAT_SPAN_LINES, raw.length);
     const chunk = raw.slice(startIndex, maxLine).join('\n');
-    return MULTILINE_FORMAT_RE.test(chunk);
+    return REGEX.SYNTAX.RUST_MULTILINE_FORMAT.test(chunk);
 }
 
 /**
@@ -159,10 +103,10 @@ function checkSigOpenParen(code: string, state: FnSigState): boolean {
         state.inSig = false;
         const closeParen = code.indexOf(')', openParen);
         if (closeParen !== -1) {
-            return AMP_STRING_RE.test(code.slice(openParen, closeParen));
+            return REGEX.SYNTAX.RUST_AMP_STRING.test(code.slice(openParen, closeParen));
         }
         state.inParams = true;
-        return AMP_STRING_RE.test(code.slice(openParen));
+        return REGEX.SYNTAX.RUST_AMP_STRING.test(code.slice(openParen));
     }
     if (code.includes('{') || code.includes(';')) {
         state.inSig = false;
@@ -174,15 +118,15 @@ function checkSigOpenParen(code: string, state: FnSigState): boolean {
  * Inspect function declaration line for opening paren and parameters.
  */
 function checkFnDeclLine(code: string, state: FnSigState): boolean {
-    const fnIdx = code.search(FN_DECL_RE);
+    const fnIdx = code.search(REGEX.SYNTAX.RUST_FN);
     const openParen = code.indexOf('(', fnIdx);
     if (openParen !== -1) {
         const closeParen = code.indexOf(')', openParen);
         if (closeParen !== -1) {
-            return AMP_STRING_RE.test(code.slice(openParen, closeParen));
+            return REGEX.SYNTAX.RUST_AMP_STRING.test(code.slice(openParen, closeParen));
         }
         state.inParams = true;
-        return AMP_STRING_RE.test(code.slice(openParen));
+        return REGEX.SYNTAX.RUST_AMP_STRING.test(code.slice(openParen));
     }
     state.inSig = true;
     return false;
@@ -195,7 +139,7 @@ function checkAmpStringInLine(code: string, state: FnSigState): boolean {
     if (state.inParams) {
         const closeParen = code.indexOf(')');
         const slice = closeParen !== -1 ? code.slice(0, closeParen) : code;
-        const hit = AMP_STRING_RE.test(slice);
+        const hit = REGEX.SYNTAX.RUST_AMP_STRING.test(slice);
         if (closeParen !== -1 || code.includes('{') || code.includes(';')) {
             state.inParams = false;
         }
@@ -204,32 +148,14 @@ function checkAmpStringInLine(code: string, state: FnSigState): boolean {
     if (state.inSig) {
         return checkSigOpenParen(code, state);
     }
-    return FN_DECL_RE.test(code) ? checkFnDeclLine(code, state) : false;
-}
-
-/**
- * Find index of matching closing brace for an open brace.
- */
-function findMatchingBrace(text: string, startIndex: number): number {
-    let depth = 0;
-    for (let i = startIndex; i < text.length; i += 1) {
-        if (text[i] === '{') {
-            depth += 1;
-        } else if (text[i] === '}') {
-            depth -= 1;
-            if (depth === 0) {
-                return i;
-            }
-        }
-    }
-    return -1;
+    return REGEX.SYNTAX.RUST_FN.test(code) ? checkFnDeclLine(code, state) : false;
 }
 
 /**
  * Detect `if let ... else { return/break; }` pattern eligible for `let-else`.
  */
 function isLetElseCandidate(lines: readonly string[], startIndex: number): boolean {
-    if (!IF_LET_RE.test(lines[startIndex])) {
+    if (!REGEX.SYNTAX.RUST_IF_LET.test(lines[startIndex])) {
         return false;
     }
     const maxLine = Math.min(startIndex + MAX_LET_ELSE_SPAN_LINES, lines.length);
@@ -241,7 +167,7 @@ function isLetElseCandidate(lines: readonly string[], startIndex: number): boole
     if (openBrace === -1) {
         return false;
     }
-    const ifEnd = findMatchingBrace(chunk, openBrace);
+    const ifEnd = findMatchingBraceInText(chunk, openBrace);
     if (ifEnd === -1) {
         return false;
     }
@@ -251,7 +177,7 @@ function isLetElseCandidate(lines: readonly string[], startIndex: number): boole
         return false;
     }
     const elseStart = ifEnd + 1 + elseMatch[0].length - 1;
-    const elseEnd = findMatchingBrace(chunk, elseStart);
+    const elseEnd = findMatchingBraceInText(chunk, elseStart);
     const elseBody =
         elseEnd !== -1 ? chunk.slice(elseStart + 1, elseEnd) : chunk.slice(elseStart + 1);
     return /\b(?:return|break)\b/.test(elseBody);
@@ -261,12 +187,12 @@ function isLetElseCandidate(lines: readonly string[], startIndex: number): boole
  * Detect manual `for item in iter` loop searching followed immediately by return.
  */
 function isForFindCandidate(lines: readonly string[], startIndex: number): boolean {
-    if (!FOR_IN_RE.test(lines[startIndex])) {
+    if (!REGEX.SYNTAX.RUST_FOR_IN.test(lines[startIndex])) {
         return false;
     }
     const maxLine = Math.min(startIndex + MAX_FOR_FIND_SPAN_LINES, lines.length);
     const chunk = lines.slice(startIndex, maxLine).join(' ');
-    return FOR_FIND_RE.test(chunk);
+    return REGEX.SYNTAX.RUST_FOR_FIND.test(chunk);
 }
 
 /**
@@ -296,7 +222,6 @@ function resolveAsyncFnScope(
 }
 
 const RUST_TEST_FILE_RE = /(?:[\\/]tests[\\/]|[\\/]test_[^\\/]+\.rs$|_test\.rs$)/i;
-const RUST_TEST_ATTR_RE = /#\[.*(?:test|cfg\(test\)).*\]/;
 
 /**
  * Determine whether the line is located inside a test file or a `#[test]` / `#[cfg(test)]` block.
@@ -312,7 +237,7 @@ function isTestScopeOrFile(ctx: LineScanContext): boolean {
             if (line[charIndex] === '}') depth += 1;
             else if (line[charIndex] === '{' && depth > 0) depth -= 1;
         }
-        if (RUST_TEST_ATTR_RE.test(line)) {
+        if (REGEX.SYNTAX.RUST_TEST_ATTR.test(line)) {
             return true;
         }
     }
@@ -345,7 +270,7 @@ function scanAsyncLockIssues(
     issues: Issue[],
 ): void {
     for (let i = 0; i < masked.length; i += 1) {
-        if (!ASYNC_FN_RE.test(masked[i])) {
+        if (!REGEX.SYNTAX.RUST_ASYNC_FN.test(masked[i])) {
             continue;
         }
         const scope = resolveAsyncFnScope(masked, i);
@@ -356,8 +281,8 @@ function scanAsyncLockIssues(
         const lockLines: number[] = [];
         let maxAwaitLine = -1;
         for (let j = scope.bodyStart; j <= scope.bodyEnd; j += 1) {
-            if (STD_LOCK_RE.test(masked[j])) lockLines.push(j);
-            if (AWAIT_RE.test(masked[j])) maxAwaitLine = j;
+            if (REGEX.SYNTAX.RUST_STD_LOCK.test(masked[j])) lockLines.push(j);
+            if (REGEX.SYNTAX.RUST_AWAIT.test(masked[j])) maxAwaitLine = j;
         }
         for (const lockLineIdx of lockLines) {
             if (maxAwaitLine > lockLineIdx) {
@@ -435,7 +360,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-TRY-001',
                 severity: SEVERITY_WARNING,
-                pattern: TRY_MACRO_RE,
+                pattern: REGEX.SYNTAX.RUST_TRY_MACRO,
                 message: '`try!` predates the `?` operator and obscures the error path.',
                 suggestion:
                     'Replace `try!(expr)` with `expr?`, which composes inside larger expressions.',
@@ -449,7 +374,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-EXTERN-001',
                 severity: SEVERITY_WARNING,
-                pattern: EXTERN_CRATE_RE,
+                pattern: REGEX.SYNTAX.RUST_EXTERN_CRATE,
                 message:
                     '`extern crate` is obsolete since edition 2018: dependencies resolve by path.',
                 suggestion:
@@ -463,7 +388,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-MACRO-001',
                 severity: SEVERITY_WARNING,
-                pattern: MACRO_USE_RE,
+                pattern: REGEX.SYNTAX.RUST_MACRO_USE,
                 message: '`#[macro_use]` imports macros textually, so their origin is invisible.',
                 suggestion:
                     'Import the macros explicitly (`use crate::m::{a, b};`) and drop the attribute.',
@@ -476,7 +401,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-CLONE-001',
                 severity: SEVERITY_INFO,
-                pattern: NEEDLESS_CLONE_RE,
+                pattern: REGEX.SYNTAX.RUST_NEEDLESS_CLONE,
                 message:
                     '`.clone()` result is only compared or measured, so the copy is invisible work.',
                 suggestion:
@@ -490,7 +415,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-UNWRAP-001',
                 severity: SEVERITY_INFO,
-                pattern: UNWRAP_RE,
+                pattern: REGEX.SYNTAX.RUST_UNWRAP,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message:
                     '`.unwrap()` panics on `None`/`Err` and hides the failure from the caller.',
@@ -505,7 +430,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-CAST-001',
                 severity: SEVERITY_INFO,
-                pattern: NUMERIC_CAST_RE,
+                pattern: REGEX.SYNTAX.RUST_NUMERIC_CAST,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message: 'Naked `as` numeric cast can silently truncate or wrap on overflow.',
                 suggestion:
@@ -535,7 +460,7 @@ export class RustModernAnalyzer implements Analyzer {
                 message: 'Positional `{}` captures drift out of sync with the argument list.',
                 suggestion: 'Inline the binding (`format!("{value}")`) so the compiler checks it.',
                 condition: (ctx) =>
-                    FORMAT_CALL_RE.test(ctx.maskedLine) &&
+                    REGEX.SYNTAX.RUST_FORMAT_CALL.test(ctx.maskedLine) &&
                     isPositionalFormatCall(ctx.allRawLines, ctx.lineIndex),
                 actionable: {
                     action: 'replace_token',
@@ -573,7 +498,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-EXP-001',
                 severity: SEVERITY_INFO,
-                pattern: EXPECT_CALL_RE,
+                pattern: REGEX.SYNTAX.RUST_EXPECT_CALL,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message:
                     '`.expect()` panics if unfulfilled; prefer strong-typed error propagation in production.',
@@ -588,7 +513,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-PNC-001',
                 severity: SEVERITY_ERROR,
-                pattern: CRASH_MACRO_RE,
+                pattern: REGEX.SYNTAX.RUST_CRASH_MACRO,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message:
                     'Naked crash macro (`panic!`, `todo!`, `unimplemented!`, or `unreachable!`) in production code.',

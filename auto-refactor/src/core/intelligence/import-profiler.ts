@@ -113,7 +113,7 @@ function extractTsJsImportLine(
     specifiers: Set<string>,
     symbolToPkg: Map<string, string>,
 ): void {
-    const importFromMatch = /import\s+(?:type\s+)?(.*?)\s+from\s+['"]([^'"]+)['"]/.exec(trimmed);
+    const importFromMatch = /^(?:export\s+)?import\s+(?:type\s+)?(.*?)\s+from\s+['"]([^'"]+)['"]/.exec(trimmed);
     if (importFromMatch) {
         const spec = importFromMatch[2].trim();
         if (!isValidPackageSpecifier(spec)) return;
@@ -122,7 +122,7 @@ function extractTsJsImportLine(
         parseImportClause(importFromMatch[1].trim(), pkg, symbolToPkg);
         return;
     }
-    const requireMatch = /(?:const|let|var)\s+(.*?)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/.exec(
+    const requireMatch = /^(?:export\s+)?(?:const|let|var)\s+(.*?)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/.exec(
         trimmed,
     );
     if (requireMatch) {
@@ -133,7 +133,7 @@ function extractTsJsImportLine(
         parseImportClause(requireMatch[1].trim(), pkg, symbolToPkg);
         return;
     }
-    const sideEffectMatch = /import\s*\(?\s*['"]([^'"]+)['"]\s*\)?/.exec(trimmed);
+    const sideEffectMatch = /^(?:export\s+)?import\s+['"]([^'"]+)['"]/.exec(trimmed);
     if (sideEffectMatch) {
         const spec = sideEffectMatch[1].trim();
         if (isValidPackageSpecifier(spec)) {
@@ -141,7 +141,15 @@ function extractTsJsImportLine(
         }
         return;
     }
-    const exportFromMatch = /export\s+.*?\s+from\s+['"]([^'"]+)['"]/.exec(trimmed);
+    const dynamicImportMatch = /(?:^|[\s=,;({])import\s*\(\s*['"]([^'"]+)['"]\s*\)/.exec(trimmed);
+    if (dynamicImportMatch) {
+        const spec = dynamicImportMatch[1].trim();
+        if (isValidPackageSpecifier(spec)) {
+            specifiers.add(spec);
+        }
+        return;
+    }
+    const exportFromMatch = /^export\s+(?:type\s+)?(?:\{[\s\S]*?\}|\*|\*\s+as\s+[A-Za-z0-9_$]+)?\s*from\s+['"]([^'"]+)['"]/.exec(trimmed);
     if (exportFromMatch) {
         const spec = exportFromMatch[1].trim();
         if (isValidPackageSpecifier(spec)) {
@@ -150,23 +158,51 @@ function extractTsJsImportLine(
     }
 }
 
+const COMMENT_LINE_PATTERN = /^(?:\/\/|\/\*|\*)/;
+
+function isIgnoredLine(trimmed: string): boolean {
+    return !trimmed || COMMENT_LINE_PATTERN.test(trimmed);
+}
+
+function isMultiLineImportStart(trimmed: string): boolean {
+    if (!/^(?:export\s+)?import\s+/.test(trimmed)) return false;
+    return !trimmed.includes('from ') && !trimmed.includes('=') && !trimmed.endsWith(';');
+}
+
+function isMultiLineImportEnd(trimmed: string): boolean {
+    return trimmed.includes('from ') || trimmed.endsWith(';') || trimmed.includes("'") || trimmed.includes('"');
+}
+
 function extractTsJsImportProfile(
     content: string,
     specifiers: Set<string>,
     symbolToPkg: Map<string, string>,
 ): void {
     const lines = content.split('\n');
+    let accumulating = false;
+    let accumulated = '';
+
     for (const line of lines) {
-        if (!hasTsJsImportKeyword(line)) continue;
         const trimmed = line.trim();
-        if (
-            !trimmed ||
-            trimmed.startsWith('//') ||
-            trimmed.startsWith('/*') ||
-            trimmed.startsWith('*')
-        ) {
+        if (isIgnoredLine(trimmed)) continue;
+
+        if (accumulating) {
+            accumulated += ' ' + trimmed;
+            if (isMultiLineImportEnd(trimmed)) {
+                extractTsJsImportLine(accumulated, specifiers, symbolToPkg);
+                accumulating = false;
+                accumulated = '';
+            }
             continue;
         }
+
+        if (isMultiLineImportStart(trimmed)) {
+            accumulating = true;
+            accumulated = trimmed;
+            continue;
+        }
+
+        if (!hasTsJsImportKeyword(line)) continue;
         extractTsJsImportLine(trimmed, specifiers, symbolToPkg);
     }
 }

@@ -18,6 +18,7 @@ import type {
     CodeDomainKind,
 } from '../intelligence/constant-identity';
 import { computeConstantFingerprint } from '../intelligence/constant-identity';
+import { REGEX } from '../constants';
 
 interface ScopeFrame {
     name: string;
@@ -32,8 +33,6 @@ const RUST_CONST_DECL_RE =
 const GO_CONST_DECL_RE =
     /^(?:(export)\s+)?const\s+([A-Za-z0-9_$]+)(?:\s+[\w*&[\]]+)?\s*=\s*([^;,\n]+)/;
 const IMPORT_LINE_RE = /^(?:import[\s{]|require\(|export\s+(?:\*|\{)|from\s|use\s)/;
-const COMMENT_LINE_RE = /^(\/\/|#)/;
-const BLOCK_COMMENT_END_RE = /\*\//;
 const HEADER_COMMENT_RE = /^(\/\/|\/\*|\*)/;
 const COMPLEX_INITIALIZER_RE = /^[{(\s]|^(?:function\b|=>)/;
 const SCOPE_DECL_RE =
@@ -222,10 +221,10 @@ export function extractConstantEntities(content: string, filePath: string): Cons
 
         if (trimmed.startsWith('/*')) inCommentBlock = true;
         if (inCommentBlock) {
-            inCommentBlock = !BLOCK_COMMENT_END_RE.test(trimmed);
+            inCommentBlock = !REGEX.COMMENT.BLOCK_END.test(trimmed);
             continue;
         }
-        if (COMMENT_LINE_RE.test(trimmed)) continue;
+        if (REGEX.COMMENT.COMMENT_LINE.test(trimmed)) continue;
         if (!pastImports && IMPORT_LINE_RE.test(trimmed)) continue;
         if (!pastImports && trimmed.length > 0) pastImports = true;
 

@@ -20,28 +20,14 @@
  */
 import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
+import { REGEX } from '../core/constants';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
 import {
     isShellFile,
     isPowerShellFile,
-    SHEBANG_RE,
-    CD_WITHOUT_CHECK_RE,
-    READ_CMD_RE,
-    READ_HAS_R_RE,
-    DOLLAR_STAR_RE,
-    ECHO_FLAG_RE,
     POWERSHELL_ALIASES,
     PS_APPROVED_VERBS_FOLDED,
-    PS_FUNCTION_RE,
-    PS_CMDLET_BINDING_RE,
-    PS_PARAM_BLOCK_RE,
-    PS_PARAM_WITH_TYPE_RE,
-    PS_PARAM_SIMPLE_RE,
-    PS_ERROR_ACTION_RE,
-    SH_TTY_GUARD_RE,
-    PS_INTERACTIVE_GUARD_RE,
-    PS_NON_INTERACTIVE_FLAG_RE,
     type ShellEmitter,
     type PowerShellScanState,
     type ShellLineScanContext,
@@ -233,7 +219,7 @@ export class ShellLintAnalyzer implements Analyzer {
         checkShellResourceCleanup(lines, maskedLines, emit);
 
         const { hasE } = scanStrictErrorFlags(maskedLines);
-        const hasTtyGuard = maskedLines.some((line) => SH_TTY_GUARD_RE.test(line));
+        const hasTtyGuard = maskedLines.some((line) => REGEX.SHELL.SH_TTY_GUARD.test(line));
 
         let inHeredoc = false;
         let heredocDelimiter = '';
@@ -285,7 +271,7 @@ export class ShellLintAnalyzer implements Analyzer {
     private checkShebang(lines: string[], _file: string, emit: ShellEmitter): void {
         if (lines.length === 0) return;
         const firstLine = lines[0].trim();
-        if (!SHEBANG_RE.test(firstLine)) {
+        if (!REGEX.SHELL.SHEBANG.test(firstLine)) {
             emit(
                 0,
                 RULE_SH_INIT_001,
@@ -317,7 +303,7 @@ export class ShellLintAnalyzer implements Analyzer {
     }
 
     private checkCdWithoutCheck(trimmed: string, lineIndex: number, emit: ShellEmitter): void {
-        if (CD_WITHOUT_CHECK_RE.test(trimmed)) {
+        if (REGEX.SHELL.CD_WITHOUT_CHECK.test(trimmed)) {
             emit(
                 lineIndex,
                 RULE_SH_CMD_001,
@@ -330,7 +316,7 @@ export class ShellLintAnalyzer implements Analyzer {
     }
 
     private checkReadWithoutR(trimmed: string, lineIndex: number, emit: ShellEmitter): void {
-        if (READ_CMD_RE.test(trimmed) && !READ_HAS_R_RE.test(trimmed)) {
+        if (REGEX.SHELL.READ_CMD.test(trimmed) && !REGEX.SHELL.READ_HAS_R.test(trimmed)) {
             emit(
                 lineIndex,
                 RULE_SH_READ_001,
@@ -343,7 +329,7 @@ export class ShellLintAnalyzer implements Analyzer {
     }
 
     private checkArraySyntax(trimmed: string, lineIndex: number, emit: ShellEmitter): void {
-        if (DOLLAR_STAR_RE.test(trimmed)) {
+        if (REGEX.SHELL.DOLLAR_STAR.test(trimmed)) {
             emit(
                 lineIndex,
                 RULE_SH_ARRAY_001,
@@ -356,7 +342,7 @@ export class ShellLintAnalyzer implements Analyzer {
     }
 
     private checkEchoPortability(trimmed: string, lineIndex: number, emit: ShellEmitter): void {
-        if (ECHO_FLAG_RE.test(trimmed)) {
+        if (REGEX.SHELL.ECHO_FLAG.test(trimmed)) {
             emit(
                 lineIndex,
                 RULE_SH_ECHO_001,
@@ -386,7 +372,9 @@ export class ShellLintAnalyzer implements Analyzer {
         checkPowerShellResourceDisposal(lines, maskedLines, emit);
 
         const hasInteractiveGuard = maskedLines.some(
-            (line) => PS_INTERACTIVE_GUARD_RE.test(line) || PS_NON_INTERACTIVE_FLAG_RE.test(line),
+            (line) =>
+                REGEX.SHELL.PS_INTERACTIVE_GUARD.test(line) ||
+                REGEX.SHELL.PS_NON_INTERACTIVE_FLAG.test(line),
         );
 
         const state: PowerShellScanState = {
@@ -422,7 +410,7 @@ export class ShellLintAnalyzer implements Analyzer {
         this.checkPowerShellFunctionEntry(state, lineCtx.trimmed, lineCtx.lineIndex, emit);
         this.checkPowerShellParamBlock(state, lineCtx.trimmed, lineCtx.maskedTrimmed);
 
-        if (state.inFunction && PS_CMDLET_BINDING_RE.test(lineCtx.trimmed)) {
+        if (state.inFunction && REGEX.SHELL.PS_CMDLET_BINDING.test(lineCtx.trimmed)) {
             state.seenCmdletBinding = true;
         }
 
@@ -437,7 +425,7 @@ export class ShellLintAnalyzer implements Analyzer {
         lineIdx: number,
         emit: ShellEmitter,
     ): void {
-        const funcMatch = PS_FUNCTION_RE.exec(trimmed);
+        const funcMatch = REGEX.SHELL.PS_FUNCTION.exec(trimmed);
         if (funcMatch && !state.inFunction) {
             state.inFunction = true;
             state.functionName = funcMatch[1];
@@ -453,7 +441,7 @@ export class ShellLintAnalyzer implements Analyzer {
         trimmed: string,
         maskedTrimmed: string,
     ): void {
-        if (state.inFunction && PS_PARAM_BLOCK_RE.test(trimmed)) {
+        if (state.inFunction && REGEX.SHELL.PS_PARAM_BLOCK.test(trimmed)) {
             state.inParamBlock = true;
             state.paramBraceDepth = 0;
         }
@@ -505,7 +493,7 @@ export class ShellLintAnalyzer implements Analyzer {
         for (let i = 0; i < maxScan; i++) {
             const trimmed = lines[i].trim();
             if (trimmed === '' || trimmed.startsWith(HASH_COMMENT_CHAR)) continue;
-            if (PS_ERROR_ACTION_RE.test(trimmed)) {
+            if (REGEX.SHELL.PS_ERROR_ACTION.test(trimmed)) {
                 found = true;
                 break;
             }
@@ -588,10 +576,10 @@ export class ShellLintAnalyzer implements Analyzer {
  * @returns True if the candidate is an untyped variable parameter.
  */
 function isUntypedParamCandidate(trimmed: string, maskedTrimmed: string): boolean {
-    if (trimmed.startsWith(PARAM_ATTR_PREFIX) || PS_PARAM_WITH_TYPE_RE.test(trimmed)) {
+    if (trimmed.startsWith(PARAM_ATTR_PREFIX) || REGEX.SHELL.PS_PARAM_WITH_TYPE.test(trimmed)) {
         return false;
     }
-    const match = PS_PARAM_SIMPLE_RE.exec(trimmed);
+    const match = REGEX.SHELL.PS_PARAM_SIMPLE.exec(trimmed);
     if (!match) return false;
     const varName = match[1].toLowerCase();
     if (BUILTIN_PS_VALUES.has(varName)) {

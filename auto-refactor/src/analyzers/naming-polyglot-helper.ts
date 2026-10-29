@@ -14,6 +14,7 @@
 
 import type { AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
+import { camelToSnake, REGEX } from '../core/constants';
 import { auditFunctionSemantics, hasTransientJargon } from './naming-path-helper';
 import { DEFAULT_VAGUE_BLACKLIST } from './naming-ast-helper';
 import { scanRustLine, type RustLineScanState } from './naming-rust-helper';
@@ -72,7 +73,6 @@ const MIN_POLYGLOT_VARIABLE_LENGTH = 3;
 const BENCHMARK_PREFIX = 'Benchmark';
 const FUZZ_PREFIX = 'Fuzz';
 const EXAMPLE_PREFIX = 'Example';
-const CAMEL_TO_SNAKE_PATTERN = '$1_$2';
 
 export function toPascalCase(ident: string): string {
     return ident
@@ -82,7 +82,7 @@ export function toPascalCase(ident: string): string {
 }
 
 export function toUpperSnakeCase(ident: string): string {
-    return ident.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase();
+    return camelToSnake(ident).toUpperCase();
 }
 
 export function buildPolyglotActionable(
@@ -167,10 +167,6 @@ const GO_KEYWORDS = new Set([
     'var',
 ]);
 
-const GDSCRIPT_FUNC_RE = /^\s*(?:static\s+)?func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
-const GDSCRIPT_CLASS_RE = /^\s*class_name\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
-const GDSCRIPT_CONST_RE = /^\s*const\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*[:=]/;
-const GDSCRIPT_VAR_RE = /^\s*(?:@(?:export|onready)\s+)?var\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
 const GDSCRIPT_FOR_RE = /^\s*for\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\b/;
 
 const GO_EXEMPT_NAMES = new Set([
@@ -220,10 +216,7 @@ function splitPolyglotNameTokens(name: string, isSnake: boolean): string[] {
     if (isSnake) {
         return name.split('_').filter(Boolean);
     }
-    return name
-        .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN)
-        .split('_')
-        .filter(Boolean);
+    return camelToSnake(name).split('_').filter(Boolean);
 }
 
 /**
@@ -325,8 +318,6 @@ export function auditExtractedFunction(
 
 /** Single-letter identifiers that carry conventional loop or discard meaning. */
 const TOLERATED_SINGLE_LETTERS: ReadonlySet<string> = new Set(['_', 'i', 'j', 'k']);
-/** Pattern matching exactly one ASCII letter. */
-const SINGLE_LETTER_RE = /^[a-zA-Z]$/;
 
 /**
  * Resolve whether a one-character name is an untolerated single letter.
@@ -335,7 +326,7 @@ const SINGLE_LETTER_RE = /^[a-zA-Z]$/;
  * @returns `true` only for single ASCII letters outside the `_`/`i`/`j`/`k` allowlist.
  */
 function isUntoleratedSingleLetter(varName: string): boolean {
-    if (varName.length !== 1 || !SINGLE_LETTER_RE.test(varName)) return false;
+    if (varName.length !== 1 || !REGEX.NAMING.SINGLE_LETTER.test(varName)) return false;
     return !TOLERATED_SINGLE_LETTERS.has(varName);
 }
 
@@ -785,7 +776,7 @@ function auditGDScriptConstant(
 }
 
 function auditGDScriptLine(line: string, lineIdx: number, pCtx: PolyglotNamingContext): void {
-    const fnMatch = GDSCRIPT_FUNC_RE.exec(line);
+    const fnMatch = REGEX.SYNTAX.GDSCRIPT_FUNC.exec(line);
     if (fnMatch) {
         if (!isGDScriptFunctionExempt(fnMatch[1])) {
             auditExtractedFunction({ fnName: fnMatch[1], lineIdx, isSnake: true }, pCtx);
@@ -793,13 +784,13 @@ function auditGDScriptLine(line: string, lineIdx: number, pCtx: PolyglotNamingCo
         return;
     }
 
-    const classMatch = GDSCRIPT_CLASS_RE.exec(line);
+    const classMatch = REGEX.SYNTAX.GDSCRIPT_CLASS_NAME.exec(line);
     if (classMatch) {
         auditGDScriptClass(classMatch[1], lineIdx, pCtx);
         return;
     }
 
-    const constMatch = GDSCRIPT_CONST_RE.exec(line);
+    const constMatch = REGEX.SYNTAX.GDSCRIPT_CONST.exec(line);
     if (constMatch) {
         auditGDScriptConstant(constMatch[1], lineIdx, pCtx);
         return;
@@ -811,7 +802,7 @@ function auditGDScriptLine(line: string, lineIdx: number, pCtx: PolyglotNamingCo
         return;
     }
 
-    const varMatch = GDSCRIPT_VAR_RE.exec(line);
+    const varMatch = REGEX.SYNTAX.GDSCRIPT_VAR.exec(line);
     if (varMatch) {
         auditPolyglotVariable(varMatch[1], lineIdx, false, false, pCtx, 'gdscript');
         return;

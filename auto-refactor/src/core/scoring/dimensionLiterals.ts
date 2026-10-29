@@ -37,79 +37,79 @@ export const DIMENSION_ARCHITECTURE_CONSISTENCY = 'architectureConsistency';
 /** Quality dimension id for code security. */
 export const DIMENSION_CODE_SECURITY = 'codeSecurity';
 
-/**  */
+/** Deduction points for DTO credential leak violations. */
 export const DEDUCTION_DTO_CREDENTIAL_LEAK = 30;
 
-/**  */
+/** Deduction points for path traversal vulnerability signals. */
 export const DEDUCTION_PATH_TRAVERSAL = 30;
 
-/**  */
+/** Deduction points for potential injection vulnerabilities. */
 export const DEDUCTION_POTENTIAL_INJECTION = 30;
 
-/**  */
+/** Deduction points for architecture layer boundary breaches. */
 export const DEDUCTION_LAYER_CONSTRAINT_VIOLATION = 20;
 
-/**  */
+/** Deduction points for weak or broken hash algorithms. */
 export const DEDUCTION_BROKEN_HASH = 20;
 
-/**  */
+/** Deduction points for sensitive data logged in cleartext. */
 export const DEDUCTION_SENSITIVE_DATA_LOGGED = 20;
 
-/**  */
+/** Deduction points for potential memory leak or handle retention. */
 export const DEDUCTION_MEMORY_LEAK_RISK = 20;
 
-/**  */
+/** Deduction points for architectural design or dependency rule breaches. */
 export const DEDUCTION_ARCHITECTURE_DESIGN_VIOLATION = 15;
 
-/**  */
+/** Deduction points for transient object allocation inside loops. */
 export const DEDUCTION_TRANSIENT_LOOP_ALLOCATION = 15;
 
-/**  */
+/** Deduction points for oversized file or module line count overflow. */
 export const DEDUCTION_LINE_COUNT_OVERFLOW = 15;
 
-/**  */
+/** Deduction points for excessive cyclomatic complexity. */
 export const DEDUCTION_CYCLOMATIC_COMPLEXITY = 15;
 
-/**  */
+/** Deduction points for banned slang or unapproved engineering jargon. */
 export const DEDUCTION_BANNED_JARGON = 15;
 
-/**  */
+/** Deduction points for error-level technical debt findings. */
 export const DEDUCTION_ERROR_TECH_DEBT = 15;
 
-/**  */
+/** Deduction points for type safety escape hatches or unconstrained types. */
 export const DEDUCTION_TYPE_SAFETY_ESCAPE = 10;
 
-/**  */
+/** Deduction points for unreachable dead code branches. */
 export const DEDUCTION_UNREACHABLE_DEAD_CODE = 10;
 
-/**  */
+/** Deduction points for inefficient algorithmic or data structure patterns. */
 export const DEDUCTION_INEFFICIENT_ALGORITHM = 10;
 
-/**  */
+/** Deduction points for deprecated APIs or obsolete language features. */
 export const DEDUCTION_DEPRECATED_FEATURE = 10;
 
-/**  */
+/** Deduction points for nesting block depth exceeding budget. */
 export const DEDUCTION_NESTING_DEPTH_OVERFLOW = 10;
 
-/**  */
+/** Deduction points for excessive exported public API symbols. */
 export const DEDUCTION_EXCESSIVE_EXPORTED_SYMBOLS = 10;
 
-/**  */
+/** Deduction points for unused variables or dead bindings. */
 export const DEDUCTION_UNUSED_BINDING = 5;
 
-/**  */
+/** Deduction points for identifier naming convention violations. */
 export const DEDUCTION_NAMING_VIOLATION = 5;
 
-/**  */
+/** Deduction points for substandard or non-compliant comments. */
 export const DEDUCTION_SUBSTANDARD_COMMENT = 5;
 
-/**  */
+/** Deduction points for warning-level technical debt findings. */
 export const DEDUCTION_WARNING_TECH_DEBT = 5;
 
-/**  */
+/** Maximum allowable control-flow nesting depth threshold. */
 export const MAX_NESTING_DEPTH = 5;
 
-/**  */
+/** Maximum allowable exported public symbols per module. */
 export const MAX_EXPORTED_SYMBOLS = 30;
 
 // Re-export built-in analyzer identifiers directly from Single Source of Truth
@@ -148,151 +148,151 @@ export {
     ANALYZER_CONCURRENCY,
 } from '../constants/rule-codes';
 
-/**  */
+/** Quality dimension id for semantic purity. */
 export const DIMENSION_SEMANTIC_PURITY = 'semanticPurity';
 
-/**  */
+/** Quality dimension id for standardization and uniformity. */
 export const DIMENSION_STANDARDIZATION = 'standardization';
 
-/**  */
+/** Quality dimension id for language idiom modernity. */
 export const DIMENSION_MODERNITY = 'modernity';
 
-/**  */
+/** Quality dimension id for structural maintainability. */
 export const DIMENSION_MAINTAINABILITY = 'maintainability';
 
-/**  */
+/** Quality dimension id for documentation and comment quality. */
 export const DIMENSION_COMMENT_QUALITY = 'commentQuality';
 
-/**  */
+/** Quality dimension id for code and literal duplication. */
 export const DIMENSION_DUPLICATION = 'duplication';
 
-/**  */
+/** Quality dimension id for technical debt risk control. */
 export const DIMENSION_TECH_DEBT_RISK = 'techDebtRisk';
 
-/**  */
+/** Quality dimension id for runtime performance efficiency. */
 export const DIMENSION_PERFORMANCE_EFFICIENCY = 'performanceEfficiency';
 
-/**  */
+/** Rule ID for DTO credential leak detection. */
 export const RULE_ARCH_LEAK_002 = 'ARCH-LEAK-002';
 
-/**  */
+/** Rule ID for critical arbitrary code execution. */
 export const RULE_SEC_VUL_001 = 'SEC-VUL-001';
 
-/**  */
+/** Rule ID for critical command injection. */
 export const RULE_SEC_VUL_002 = 'SEC-VUL-002';
 
-/**  */
+/** Rule ID for prototype pollution vulnerability. */
 export const RULE_SEC_VUL_003 = 'SEC-VUL-003';
 
-/**  */
+/** Rule ID for insecure randomness generation. */
 export const RULE_SEC_VUL_004 = 'SEC-VUL-004';
 
-/**  */
+/** Rule ID for broken cryptographic hash usage. */
 export const RULE_SEC_VUL_005 = 'SEC-VUL-005';
 
-/**  */
+/** Rule ID for path traversal vulnerabilities. */
 export const RULE_SEC_VUL_006 = 'SEC-VUL-006';
 
-/**  */
+/** Rule ID for sensitive data leak in log output. */
 export const RULE_SEC_LEAK_001 = 'SEC-LEAK-001';
 
-/**  */
+/** Match fragment for work-in-progress placeholder markers. */
 export const FRAGMENT_PLACEHOLDER_MARKER = 'wip';
 
-/**  */
+/** Match fragment for architecture layer violations. */
 export const FRAGMENT_LAYER = 'layer';
 
-/**  */
+/** Match fragment for boundary constraint checks. */
 export const FRAGMENT_BOUNDARY = 'boundary';
 
-/**  */
+/** Match fragment for memory or resource leaks. */
 export const FRAGMENT_LEAK = 'LEAK';
 
-/**  */
+/** Match fragment for dependency cycle signals. */
 export const FRAGMENT_CYCLE = 'cycle';
 
-/**  */
+/** Match fragment for circular dependency indicators. */
 export const FRAGMENT_CIRCULAR = 'circular';
 
-/**  */
+/** Match fragment for type-safety violations. */
 export const FRAGMENT_TYPE = 'type';
 
-/**  */
+/** Match fragment for escape hatch detections. */
 export const FRAGMENT_ESCAPE = 'escape';
 
-/**  */
+/** Match fragment for dead code detections. */
 export const FRAGMENT_DEAD = 'dead';
 
-/**  */
+/** Match fragment for unreachable statement detections. */
 export const FRAGMENT_UNREACHABLE = 'unreachable';
 
-/**  */
+/** Match fragment for unused binding signals. */
 export const FRAGMENT_UNUSED = 'unused';
 
-/**  */
+/** Match fragment for hardcoded secret signals. */
 export const FRAGMENT_SECRET = 'secret';
 
-/**  */
+/** Match fragment for auth token signals. */
 export const FRAGMENT_TOKEN = 'token';
 
-/**  */
+/** Match fragment for dynamic eval execution. */
 export const FRAGMENT_EVAL = 'eval';
 
-/**  */
+/** Match fragment for unsafe operation detections. */
 export const FRAGMENT_UNSAFE = 'unsafe';
 
-/**  */
+/** Match fragment for missing input sanitization. */
 export const FRAGMENT_SANITIZATION = 'sanitization';
 
-/**  */
+/** Match fragment for loop-internal allocation checks. */
 export const FRAGMENT_LOOP = 'loop';
 
-/**  */
+/** Match fragment for heap allocation checks. */
 export const FRAGMENT_ALLOC = 'alloc';
 
-/**  */
+/** Match fragment for unbounded growth checks. */
 export const FRAGMENT_UNBOUNDED = 'unbounded';
 
-/**  */
+/** Match fragment for alternative leak keyword patterns. */
 export const FRAGMENT_LEAK_ALT = 'leak';
 
-/**  */
+/** Match fragment for naming violation patterns. */
 export const FRAGMENT_NAMING = 'naming';
 
-/**  */
+/** Match fragment for file line length violations. */
 export const FRAGMENT_LINES = 'lines';
 
-/**  */
+/** Match fragment for legacy idiom detections. */
 export const FRAGMENT_LEGACY = 'legacy';
 
-/**  */
+/** Match fragment for deprecated API usage. */
 export const FRAGMENT_DEPRECATED = 'deprecated';
 
-/**  */
+/** Match fragment for excessive block nesting. */
 export const FRAGMENT_NESTING = 'nesting';
 
-/**  */
+/** Match fragment for banned jargon patterns. */
 export const FRAGMENT_BANNED = 'banned';
 
-/**  */
+/** Match fragment for jargon term signals. */
 export const FRAGMENT_JARGON = 'jargon';
 
-/**  */
+/** Match fragment for missing documentation checks. */
 export const FRAGMENT_MISSING = 'missing';
 
-/**  */
+/** Match fragment for duplication detection checks. */
 export const FRAGMENT_DUPLICATE = 'duplicate';
 
-/**  */
+/** Match fragment for magic literal detections. */
 export const FRAGMENT_MAGIC = 'magic';
 
-/**  */
+/** Match fragment for error debt category matching. */
 export const FRAGMENT_ERROR = 'error';
 
-/**  */
+/** Match fragment for warning debt category matching. */
 export const FRAGMENT_WARNING = 'warning';
 
-/**  */
+/** Match fragment for cryptographic key patterns. */
 export const FRAGMENT_KEY = 'key';
 
 /** Rule id for bare panic/unwrap escaping public API. */

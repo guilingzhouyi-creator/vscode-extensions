@@ -23,6 +23,7 @@ import { SEVERITY_INFO, SEVERITY_WARNING } from '../core/types';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { ExposureMessages } from '../core/messages/exposure';
 import { isToolOrTestScript } from '../core/governance/pathScope';
+import { REGEX } from '../core/constants';
 
 /** Canonical analyzer identifier for frontend UI/UX, A11y, and component architecture audits. */
 export const ANALYZER_FRONTEND_ID = 'frontend';
@@ -105,71 +106,7 @@ const FRONTEND_EXTENSIONS = new Set([
     '.js',
 ]);
 
-const CSS_REFLOW_PROPERTIES_RE =
-    /\b(?:transition|animation)\s*:[^;]*\b(width|height|top|left|right|bottom|margin|padding)\b/i;
-
-const IMG_TAG_WITHOUT_ALT_RE = /<img\b(?![^>]*\balt\s*=)[^>]*>/i;
-const INTERACTIVE_DIV_SPAN_RE = /<(?:div|span)\b[^>]*\bon(?:click|keydown|keyup)\s*=[^>]*>/i;
-const HAS_ROLE_RE = /\brole\s*=\s*(?:['"][^'"]+['"]|\{[^}]+\})/i;
-const HAS_TABINDEX_RE = /\btabindex\s*=\s*(?:['"]?[-\d]+['"]?|\{[^}]+\})/i;
-
-const HOOK_DECLARATION_RE = /\bfunction\s+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{/g;
-const HANDLER_DECLARATION_RE =
-    /\b(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>/g;
-const INTERFACE_PROPS_RE = /interface\s+([A-Za-z0-9_]*Props)\s*\{([^}]+)\}/g;
-
-const ENTER_KEY_HANDLER_RE =
-    /\b(?:e|event)\.(?:key\s*===?\s*['"]Enter['"]|code\s*===?\s*['"]Enter['"]|keyCode\s*===?\s*13\b)/i;
-const IME_COMPOSITION_GUARD_RE = /\b(?:isComposing|keyCode\s*===?\s*229|which\s*===?\s*229)\b/;
-
-const TIMER_COUNTER_DISPLAY_RE =
-    /(?:\{\s*(?:format(?:Time|Duration|Timer)|[a-zA-Z0-9_]*(?:elapsed|timer|stopwatch|countdown)[a-zA-Z0-9_]*)\b|<(?:span|div|p)\b[^>]*\b(?:timer|stopwatch|clock|counter|elapsed|duration)[^>]*>)/i;
-const TABULAR_NUMS_RE = /\b(?:tabular-nums|tnum|font-variant-numeric)\b/i;
-
-const CONTAINER_BORDER_RE =
-    /<(?:div|section|aside|nav|fieldset)\b[^>]*\bclass(?:Name)?\s*=\s*['"][^'"]*\b(?:border|border-(?:gray|slate|zinc|neutral|stone|solid|dashed|\d{3}))\b[^'"]*['"]/i;
-const CHILD_BORDER_RE =
-    /<(?:button|input|select|span)\b[^>]*\bclass(?:Name)?\s*=\s*['"][^'"]*(?<![tbrl]-)\bborder(?:\s+|-[a-z0-9]+|\b)(?![tbrl]-)[^'"]*['"]/i;
 const SCRIPT_EXT_RE = /\.(?:tsx|jsx|ts|js|vue|svelte)$/i;
-const CLOSING_CONTAINER_TAG_RE = /<\/(?:div|section)>/i;
-
-const CJK_CHAR_RE = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/;
-const ANTI_SQUASH_RE =
-    /\b(?:text-balance|text-wrap:\s*balance\b|textWrap:\s*['"]balance['"]|break-words|overflow-wrap:\s*(?:break-word|anywhere)\b|overflowWrap:\s*['"](?:break-word|anywhere)['"]|word-break:\s*break-word\b)/i;
-const MEDIA_QUERY_RE = /@media\b/i;
-const LOCAL_CLASS_OR_ID_RE = /(?:\.[a-zA-Z_-][\w-]*|#[a-zA-Z_-][\w-]*)\s*\{/;
-
-/**
- * A line whose first non-space characters open a regular-expression literal.
- *
- * The analyzer's own pattern definitions contain the literal text `@media`, so without this guard
- * the rule reports the constant that implements it.
- */
-const REGEX_LITERAL_LINE_RE = /^\s*(?:const|let|var)?\s*[\w$]+\s*(?::[^=]+)?=\s*\/(?![*/])/;
-
-/** A line that opens a block comment or continues one; its text is prose, not markup or CSS. */
-const BLOCK_COMMENT_LINE_RE = /^\s*(?:\/\*|\*)/;
-
-/**
- * A single-quoted or double-quoted string that makes up the whole right-hand side of an assignment.
- *
- * `remediation: '改用 &str（或 impl AsRef<str>）。'` is a dictionary value, not a CSS declaration,
- * even though it contains a colon and CJK text. The colon test in `isTextContainerCarrier` cannot
- * tell the two apart on its own, so the shape of the line has to.
- */
-const PURE_STRING_ASSIGNMENT_RE =
-    /^\s*[\w$'"]+\s*:\s*(?:'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")\s*,?\s*$/;
-
-/**
- * A whole line that is one string literal, optionally assigned to a name.
- *
- * A verification script stores its fixture as `const css = '.card { @media ... }'`. The line is a
- * string value, not a stylesheet, and the braces inside it are fixture text. Only string literals
- * are covered; an array or template that embeds markup keeps being treated as markup, which is what
- * the assertion fixtures need.
- */
-const STRING_VALUE_LINE_RE =
-    /^\s*(?:(?:const|let|var)\s+[\w$]+(?:\s*:\s*[^=]+)?\s*=\s*)?(?:'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")\s*;?\s*$/;
 
 /**
  * Decide whether a line is metadata or a literal rather than executable markup or CSS.
@@ -179,10 +116,10 @@ const STRING_VALUE_LINE_RE =
  */
 function isNonCarrierLine(line: string): boolean {
     return (
-        BLOCK_COMMENT_LINE_RE.test(line) ||
-        REGEX_LITERAL_LINE_RE.test(line) ||
-        PURE_STRING_ASSIGNMENT_RE.test(line) ||
-        STRING_VALUE_LINE_RE.test(line)
+        REGEX.COMMENT.COMMENT_LINE.test(line) ||
+        REGEX.SYNTAX.REGEX_LITERAL_LINE.test(line) ||
+        REGEX.SYNTAX.PURE_STRING_ASSIGNMENT.test(line) ||
+        REGEX.SYNTAX.STRING_VALUE_LINE.test(line)
     );
 }
 
@@ -232,7 +169,7 @@ function makeFrontendIssue(context: FrontendIssueContext): Issue {
 function auditAccessibilityAndSemantics(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (IMG_TAG_WITHOUT_ALT_RE.test(line)) {
+        if (REGEX.SYNTAX.JSX_IMG_WITHOUT_ALT.test(line)) {
             issues.push(
                 makeFrontendIssue({
                     file,
@@ -245,9 +182,9 @@ function auditAccessibilityAndSemantics(file: string, rawLines: string[], issues
                 }),
             );
         }
-        if (INTERACTIVE_DIV_SPAN_RE.test(line)) {
-            const hasRole = HAS_ROLE_RE.test(line);
-            const hasTab = HAS_TABINDEX_RE.test(line);
+        if (REGEX.SYNTAX.JSX_INTERACTIVE_TAG.test(line)) {
+            const hasRole = REGEX.SYNTAX.JSX_ROLE_ATTR.test(line);
+            const hasTab = REGEX.SYNTAX.JSX_TABINDEX_ATTR.test(line);
             if (!hasRole || !hasTab) {
                 issues.push(
                     makeFrontendIssue({
@@ -275,7 +212,7 @@ function auditDomDepthAndAnimationReflow(file: string, rawLines: string[], issue
 
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (CSS_REFLOW_PROPERTIES_RE.test(line)) {
+        if (REGEX.SYNTAX.CSS_REFLOW_PROPERTIES.test(line)) {
             issues.push(
                 makeFrontendIssue({
                     file,
@@ -351,11 +288,11 @@ function countInterfaceBodyProps(body: string): number {
  * Audits component complexity and duplication patterns (UI-ENG-003).
  */
 function auditComponentPropsAndReuse(file: string, content: string, issues: Issue[]): void {
-    INTERFACE_PROPS_RE.lastIndex = 0;
+    const scanner = REGEX.SYNTAX.createJsxInterfacePropsScanner();
     const interfaceMap = new Map<string, string[]>();
     let match: RegExpExecArray | null;
 
-    while ((match = INTERFACE_PROPS_RE.exec(content)) !== null) {
+    while ((match = scanner.exec(content)) !== null) {
         const name = match[1];
         const body = match[2];
         const existing = interfaceMap.get(name);
@@ -393,9 +330,9 @@ function auditComponentPropsAndReuse(file: string, content: string, issues: Issu
 function auditFrontendNaming(file: string, content: string, issues: Issue[]): void {
     if (!file.endsWith('.tsx') && !file.endsWith('.jsx') && !file.endsWith('.ts')) return;
 
-    HOOK_DECLARATION_RE.lastIndex = 0;
+    const hookScanner = REGEX.SYNTAX.createJsxHookDeclScanner();
     let match: RegExpExecArray | null;
-    while ((match = HOOK_DECLARATION_RE.exec(content)) !== null) {
+    while ((match = hookScanner.exec(content)) !== null) {
         const fnName = match[1];
         if (fnName.endsWith(SUFFIX_HOOK) && !fnName.startsWith(PREFIX_USE)) {
             issues.push(
@@ -412,8 +349,8 @@ function auditFrontendNaming(file: string, content: string, issues: Issue[]): vo
         }
     }
 
-    HANDLER_DECLARATION_RE.lastIndex = 0;
-    while ((match = HANDLER_DECLARATION_RE.exec(content)) !== null) {
+    const handlerScanner = REGEX.SYNTAX.createJsxHandlerDeclScanner();
+    while ((match = handlerScanner.exec(content)) !== null) {
         const varName = match[1];
         if (
             varName.endsWith(SUFFIX_HANDLER) &&
@@ -440,7 +377,7 @@ function auditFrontendNaming(file: string, content: string, issues: Issue[]): vo
  */
 function hasImeGuardInRange(rawLines: string[], start: number, end: number): boolean {
     for (let index = start; index < end; index++) {
-        if (IME_COMPOSITION_GUARD_RE.test(rawLines[index])) return true;
+        if (REGEX.SYNTAX.JSX_IME_GUARD.test(rawLines[index])) return true;
     }
     return false;
 }
@@ -453,7 +390,7 @@ function auditImeCompositionGuard(file: string, rawLines: string[], issues: Issu
 
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (!ENTER_KEY_HANDLER_RE.test(line)) continue;
+        if (!REGEX.SYNTAX.JSX_ENTER_KEY_EVENT.test(line)) continue;
 
         const windowStart = Math.max(0, i - IME_WINDOW_LOOKBACK_LINES);
         const windowEnd = Math.min(rawLines.length, i + IME_WINDOW_LOOKAHEAD_LINES);
@@ -480,13 +417,13 @@ function auditImeCompositionGuard(file: string, rawLines: string[], issues: Issu
 function auditTabularNumerics(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (!TIMER_COUNTER_DISPLAY_RE.test(line)) continue;
+        if (!REGEX.SYNTAX.JSX_TIMER_DISPLAY.test(line)) continue;
 
         const windowStart = Math.max(0, i - TABULAR_WINDOW_LOOKBACK_LINES);
         const windowEnd = Math.min(rawLines.length, i + TABULAR_WINDOW_LOOKAHEAD_LINES);
         let hasTabularNums = false;
         for (let j = windowStart; j < windowEnd; j++) {
-            if (TABULAR_NUMS_RE.test(rawLines[j])) {
+            if (REGEX.SYNTAX.JSX_TABULAR_NUMS.test(rawLines[j])) {
                 hasTabularNums = true;
                 break;
             }
@@ -514,13 +451,13 @@ function auditTabularNumerics(file: string, rawLines: string[], issues: Issue[])
 function auditSingleBorderDiscipline(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (!CONTAINER_BORDER_RE.test(line)) continue;
+        if (!REGEX.SYNTAX.JSX_CONTAINER_BORDER.test(line)) continue;
 
         const searchEnd = Math.min(rawLines.length, i + BORDER_LOOKAHEAD_LINES);
         for (let j = i + 1; j < searchEnd; j++) {
             const childLine = rawLines[j];
-            if (CLOSING_CONTAINER_TAG_RE.test(childLine)) break;
-            if (CHILD_BORDER_RE.test(childLine)) {
+            if (REGEX.SYNTAX.JSX_CLOSING_CONTAINER.test(childLine)) break;
+            if (REGEX.SYNTAX.JSX_CHILD_BORDER.test(childLine)) {
                 issues.push(
                     makeFrontendIssue({
                         file,
@@ -550,7 +487,7 @@ function mediaTargetsLocalComponent(rawLines: string[], startIndex: number): boo
 
     for (let i = startIndex + 1; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (LOCAL_CLASS_OR_ID_RE.test(line)) {
+        if (REGEX.SYNTAX.CSS_LOCAL_CLASS_OR_ID.test(line)) {
             return true;
         }
         braceCount += (line.match(/\{/g) || []).length;
@@ -576,11 +513,11 @@ function mediaQueryTargetsLocal(
     globalBraceDepth: number,
 ): boolean {
     const line = rawLines[index];
-    const mediaIndex = line.search(MEDIA_QUERY_RE);
+    const mediaIndex = line.search(REGEX.SYNTAX.CSS_MEDIA_QUERY);
     const prefix = mediaIndex > 0 ? line.slice(0, mediaIndex) : '';
     const suffix = mediaIndex >= 0 ? line.slice(mediaIndex) : '';
     if (globalBraceDepth > 0 || /\{/.test(prefix)) return true;
-    if (LOCAL_CLASS_OR_ID_RE.test(suffix)) return true;
+    if (REGEX.SYNTAX.CSS_LOCAL_CLASS_OR_ID.test(suffix)) return true;
     return mediaTargetsLocalComponent(rawLines, index);
 }
 
@@ -594,7 +531,7 @@ function auditMediaQueryDiscipline(file: string, rawLines: string[], issues: Iss
     let globalBraceDepth = 0;
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        const isMediaLine = !isNonCarrierLine(line) && MEDIA_QUERY_RE.test(line);
+        const isMediaLine = !isNonCarrierLine(line) && REGEX.SYNTAX.CSS_MEDIA_QUERY.test(line);
         if (isMediaLine && mediaQueryTargetsLocal(rawLines, i, globalBraceDepth)) {
             issues.push(
                 makeFrontendIssue({
@@ -622,7 +559,7 @@ function ancestorHasAntiSquash(rawLines: string[], currentIndex: number): boolea
     const lookbackStart = Math.max(0, currentIndex - ANTI_SQUASH_LOOKBACK_LINES);
     for (let j = currentIndex - 1; j >= lookbackStart; j--) {
         const line = rawLines[j];
-        if (ANTI_SQUASH_RE.test(line)) {
+        if (REGEX.SYNTAX.CSS_ANTI_SQUASH.test(line)) {
             return true;
         }
     }
@@ -651,13 +588,13 @@ function auditCjkAntiSquash(file: string, rawLines: string[], issues: Issue[]): 
         if (isNonCarrierLine(line)) {
             continue;
         }
-        if (!CJK_CHAR_RE.test(line)) {
+        if (!REGEX.LITERAL.CJK_CHAR.test(line)) {
             continue;
         }
         if (!isTextContainerCarrier(line)) {
             continue;
         }
-        if (ANTI_SQUASH_RE.test(line)) {
+        if (REGEX.SYNTAX.CSS_ANTI_SQUASH.test(line)) {
             continue;
         }
         if (ancestorHasAntiSquash(rawLines, i)) {

@@ -189,11 +189,16 @@ const DIM_CODE_SECURITY: QualityDimension = 'codeSecurity';
 const DIM_STANDARDIZATION: QualityDimension = 'standardization';
 const DIM_TECH_DEBT_RISK: QualityDimension = 'techDebtRisk';
 
+/**
+ * Projection mapping from 8 strategic pillars onto the 10 micro-quality dimensions.
+ * Note: Data architecture fundamentally maps to semantic purity (schema & data invariants),
+ * preventing data breaches from erroneously penalizing performanceEfficiency.
+ */
 const PILLAR_TO_DIMENSION_MAP: Record<PrimaryQualityPillar, QualityDimension> = {
     architecture: DIM_ARCHITECTURE_CONSISTENCY,
     maintainability: DIM_MAINTAINABILITY,
     performance: DIM_PERFORMANCE_EFFICIENCY,
-    data: DIM_PERFORMANCE_EFFICIENCY,
+    data: DIM_SEMANTIC_PURITY,
     testing: DIM_MODERNITY,
     reliability: DIM_SEMANTIC_PURITY,
     security: DIM_CODE_SECURITY,
@@ -302,9 +307,9 @@ function applyTechDebtPenetration(
     dimensionPenalties: Record<QualityDimension, number>,
     issue: Issue,
     effectivePenalty: number,
-    dim: QualityDimension,
+    dimension: QualityDimension,
 ): void {
-    if (dim === DIM_TECH_DEBT_RISK) return;
+    if (dimension === DIM_TECH_DEBT_RISK) return;
 
     const ruleNorm = (issue.rule ?? '').toUpperCase();
     const analyzerNorm = (issue.analyzer ?? '').toLowerCase();
@@ -366,13 +371,13 @@ export function computeRiskWeightedPenalties(issues: Issue[]): RiskPenaltyResult
         const effectivePenalty = result.assessment.effectivePenalty;
 
         pillarPenalties[result.assessment.affectedPillar] += effectivePenalty;
-        const dim =
+        const targetDimension =
             familyDimensionOf(issue.rule) ||
             PILLAR_TO_DIMENSION_MAP[result.assessment.affectedPillar] ||
             DIM_MAINTAINABILITY;
-        dimensionPenalties[dim] += effectivePenalty;
+        dimensionPenalties[targetDimension] += effectivePenalty;
 
-        applyTechDebtPenetration(dimensionPenalties, issue, effectivePenalty, dim);
+        applyTechDebtPenetration(dimensionPenalties, issue, effectivePenalty, targetDimension);
 
         assessments.push(result.assessment);
         if (result.isFatal) fatalIssueCount++;

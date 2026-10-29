@@ -10,6 +10,11 @@
  */
 
 import * as path from 'path';
+import {
+    REGEX,
+    createJsImportScanner,
+    createGdscriptPreloadScanner,
+} from '../constants';
 
 /** Clean Architecture layer name for domain code, used in comparisons and path prefixes. */
 const ARCHITECTURE_LAYER_DOMAIN = 'domain';
@@ -38,26 +43,10 @@ export interface SpecifierInfo {
  * 3. Python: from .pkg.module import ..., from pkg.module import ..., import pkg.module
  * 4. Rust: use crate::pkg::module, use super::pkg::module
  */
-const JS_IMPORT_RE =
-    /(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?|export\s+(?:[\s\S]*?from\s+)?|import\(|require\()['"]([^'"]+)['"]/g;
-
-const GDSCRIPT_IMPORT_RE =
-    /(?:(?:preload|load)\s*\(\s*['"](?:res:\/\/)?([^'"]+)['"]\s*\)|extends\s+['"](?:res:\/\/)?([^'"]+)['"])/g;
-
-const PYTHON_FROM_IMPORT_RE = /^\s*(?:from\s+([A-Za-z0-9_.]+)\s+import|import\s+([A-Za-z0-9_.]+))/;
-
-const RUST_USE_RE = /^\s*use\s+(?:crate|super)::([A-Za-z0-9_:]+)/;
-
-const GO_IMPORT_RE = /^\s*(?:import\s+)?['"]([^'"]+)['"]/;
-
-const JAVA_IMPORT_RE = /^\s*import\s+(?:static\s+)?([A-Za-z0-9_.]+);?/;
-
-const CSHARP_USING_RE = /^\s*using\s+([A-Za-z0-9_.]+);/;
-
 function extractJsSpecifiers(lineText: string, file: string, specifiers: SpecifierInfo[]): void {
-    JS_IMPORT_RE.lastIndex = 0;
+    const scanner = createJsImportScanner();
     let execMatch: RegExpExecArray | null;
-    while ((execMatch = JS_IMPORT_RE.exec(lineText)) !== null) {
+    while ((execMatch = scanner.exec(lineText)) !== null) {
         if (execMatch[1]) {
             const raw = execMatch[1];
             const isRelative = raw.startsWith('.') || raw.startsWith('/') || raw.startsWith('@/');
@@ -73,9 +62,9 @@ function extractJsSpecifiers(lineText: string, file: string, specifiers: Specifi
 }
 
 function extractGdScriptSpecifiers(lineText: string, specifiers: SpecifierInfo[]): void {
-    GDSCRIPT_IMPORT_RE.lastIndex = 0;
+    const scanner = createGdscriptPreloadScanner();
     let execMatch: RegExpExecArray | null;
-    while ((execMatch = GDSCRIPT_IMPORT_RE.exec(lineText)) !== null) {
+    while ((execMatch = scanner.exec(lineText)) !== null) {
         const raw = execMatch[1] || execMatch[2];
         if (raw) {
             specifiers.push({
@@ -88,7 +77,7 @@ function extractGdScriptSpecifiers(lineText: string, specifiers: SpecifierInfo[]
 }
 
 function extractPythonSpecifiers(trimmed: string, file: string, specifiers: SpecifierInfo[]): void {
-    const pyMatch = trimmed.match(PYTHON_FROM_IMPORT_RE);
+    const pyMatch = trimmed.match(REGEX.SYNTAX.PYTHON_FROM_IMPORT);
     if (!pyMatch) return;
     const mod = pyMatch[1] || pyMatch[2];
     if (!mod) return;
@@ -108,7 +97,7 @@ function extractPythonSpecifiers(trimmed: string, file: string, specifiers: Spec
 }
 
 function extractRustSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
-    const rustMatch = trimmed.match(RUST_USE_RE);
+    const rustMatch = trimmed.match(REGEX.SYNTAX.RUST_USE);
     if (rustMatch && rustMatch[1]) {
         specifiers.push({
             raw: rustMatch[1],
@@ -119,7 +108,7 @@ function extractRustSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): vo
 }
 
 function extractGoSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
-    const goMatch = trimmed.match(GO_IMPORT_RE);
+    const goMatch = trimmed.match(REGEX.SYNTAX.GO_IMPORT);
     if (goMatch && goMatch[1]) {
         specifiers.push({
             raw: goMatch[1],
@@ -130,7 +119,7 @@ function extractGoSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void
 }
 
 function extractJvmSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
-    const jvmMatch = trimmed.match(JAVA_IMPORT_RE);
+    const jvmMatch = trimmed.match(REGEX.SYNTAX.JAVA_IMPORT);
     if (jvmMatch && jvmMatch[1]) {
         specifiers.push({
             raw: jvmMatch[1],
@@ -144,7 +133,7 @@ function extractJvmSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): voi
 }
 
 function extractCSharpSpecifiers(trimmed: string, specifiers: SpecifierInfo[]): void {
-    const csMatch = trimmed.match(CSHARP_USING_RE);
+    const csMatch = trimmed.match(REGEX.SYNTAX.CSHARP_USING);
     if (csMatch && csMatch[1]) {
         specifiers.push({
             raw: csMatch[1],

@@ -24,6 +24,7 @@ import type {
     SymbolEntry,
 } from '../core/architecture/naming-decoupling-auditor';
 import { ANALYZER_NAMING } from '../core/scoring/dimensionLiterals';
+import { camelToSnake } from '../core/constants';
 import { hasTransientJargon } from './naming-path-helper';
 import type { NamingOptions } from './naming';
 
@@ -115,7 +116,6 @@ export const DEFAULT_SINGLE_LETTER_ALLOWED = new Set([
     'z',
 ]);
 
-const CAMEL_TO_SNAKE_PATTERN = '$1_$2';
 const JARGON_PATTERN = '\\b(p[0-9]+|phase[\\s_-]*[0-9]+|st[\\s_-]*[0-9]+|temp|tmp|w' + 'ip)\\b';
 const REGEX_IGNORE_CASE = 'i';
 
@@ -150,7 +150,7 @@ export function checkTopLevelConstantHelper(
         return;
     }
 
-    const suggestionName = name.replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN).toUpperCase();
+    const suggestionName = camelToSnake(name).toUpperCase();
     pushAstFinding(aCtx, {
         line: pos.line + 1,
         column: pos.character + 1,

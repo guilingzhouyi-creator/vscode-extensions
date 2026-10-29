@@ -14,18 +14,7 @@
 
 import * as crypto from 'crypto';
 import type { AstBlockKind, BlockFingerprint } from './eloc-types';
-
-/** Regular expressions for extracting high-level AST blocks in TS/JS/GDScript/Python */
-const FN_DECL_RE = /^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/;
-const METHOD_DECL_RE =
-    /^(?:public|private|protected|static|async|\s)*([A-Za-z0-9_$]+)\s*\([^)]*\)\s*(?::\s*[^,{]+)?\s*\{/;
-const CLASS_DECL_RE = /^(?:export\s+)?(?:abstract\s+)?class\s+([A-Za-z0-9_$]+)/;
-const INTERFACE_DECL_RE = /^(?:export\s+)?interface\s+([A-Za-z0-9_$]+)/;
-const TYPE_DECL_RE = /^(?:export\s+)?type\s+([A-Za-z0-9_$]+)\s*=/;
-const GDSCRIPT_FUNC_RE = /^func\s+([A-Za-z0-9_$]+)\s*\(/;
-const GDSCRIPT_CLASS_RE = /^class_name\s+([A-Za-z0-9_$]+)/;
-const PYTHON_DEF_RE = /^def\s+([A-Za-z0-9_$]+)\s*\(/;
-const PYTHON_CLASS_RE = /^class\s+([A-Za-z0-9_$]+)/;
+import { REGEX } from '../constants';
 
 /**
  * Computes a normalized structural fingerprint hash of code text,
@@ -76,26 +65,29 @@ export function countBlockEloc(content: string): number {
 function detectBlockDeclaration(trimmed: string): { kind: AstBlockKind; name: string } | null {
     let match: RegExpMatchArray | null = null;
 
-    if ((match = trimmed.match(FN_DECL_RE))) {
+    if ((match = trimmed.match(REGEX.SYNTAX.TS_FUNCTION_HEADER))) {
         return { kind: 'function', name: match[1] };
     }
     if (
-        (match = trimmed.match(CLASS_DECL_RE)) ||
-        (match = trimmed.match(GDSCRIPT_CLASS_RE)) ||
-        (match = trimmed.match(PYTHON_CLASS_RE))
+        (match = trimmed.match(REGEX.SYNTAX.TS_CLASS_HEADER)) ||
+        (match = trimmed.match(REGEX.SYNTAX.GDSCRIPT_CLASS_NAME)) ||
+        (match = trimmed.match(REGEX.SYNTAX.PYTHON_CLASS))
     ) {
         return { kind: 'class', name: match[1] };
     }
-    if ((match = trimmed.match(INTERFACE_DECL_RE))) {
+    if ((match = trimmed.match(REGEX.SYNTAX.TS_INTERFACE_HEADER))) {
         return { kind: 'interface', name: match[1] };
     }
-    if ((match = trimmed.match(TYPE_DECL_RE))) {
+    if ((match = trimmed.match(REGEX.SYNTAX.TS_TYPE_ALIAS_HEADER))) {
         return { kind: 'type', name: match[1] };
     }
-    if ((match = trimmed.match(GDSCRIPT_FUNC_RE)) || (match = trimmed.match(PYTHON_DEF_RE))) {
+    if (
+        (match = trimmed.match(REGEX.SYNTAX.GDSCRIPT_FUNC)) ||
+        (match = trimmed.match(REGEX.SYNTAX.PYTHON_DEF))
+    ) {
         return { kind: 'function', name: match[1] };
     }
-    if ((match = trimmed.match(METHOD_DECL_RE))) {
+    if ((match = trimmed.match(REGEX.SYNTAX.TS_METHOD_HEADER))) {
         return { kind: 'method', name: match[1] };
     }
     return null;

@@ -13,6 +13,7 @@
 
 import * as path from 'path';
 import type { AnalyzerContext, Issue } from '../core/types';
+import { camelToSnake } from '../core/constants';
 import {
     parseStructuredResourceNaming,
     RECOGNIZED_RESOURCE_BASE_TYPES,
@@ -98,19 +99,8 @@ export const JARGON_TOKEN_RE = /^(p\d+|phase\d*|st\d+|temp|tmp|w\x69p)$/;
 /** Regular expression matching prefix tokens for multi-part jargon. */
 export const JARGON_PREFIX_TOKEN_RE = /^(?:p|st|phase)$/;
 
-const CAMEL_TO_SNAKE_PATTERN = '$1_$2';
-
-/**
- * Checks whether a given identifier or file component contains transient process jargon.
- *
- * @param name - Symbol or filename to inspect.
- * @returns True if transient milestone jargon is detected.
- */
 export function hasTransientJargon(name: string): boolean {
-    const tokens = name
-        .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN)
-        .toLowerCase()
-        .split(/[^a-z0-9]+/);
+    const tokens = camelToSnake(name).split(/[^a-z0-9]+/);
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
         if (JARGON_TOKEN_RE.test(token)) return true;
@@ -290,10 +280,7 @@ function auditSnakeFileName(target: FileNamingTarget, mkIssue: IssueFactory): Is
         /^[a-z0-9]+(_[a-z0-9]+)*$/.test(cleaned) ||
         (ext === '.py' && /^__[a-z0-9_]+__$/.test(nameWithoutExt));
     if (isSnake) return null;
-    const suggested = nameWithoutExt
-        .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN)
-        .replace(/[-]/g, '_')
-        .toLowerCase();
+    const suggested = camelToSnake(nameWithoutExt).replace(/[-]/g, '_');
     return mkIssue({
         line: 1,
         rule: RULE_NAM_FIL_001,

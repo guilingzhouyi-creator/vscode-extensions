@@ -21,6 +21,7 @@ import { ZONE_EMBEDDED_TEST } from '../intelligence/zone-partitioner';
 import { isToolOrTestScript } from '../governance/pathScope';
 import { RULE_TST_TOP_001 } from './dimensionLiterals';
 import { DualTrackTestMessages } from '../messages';
+import { REGEX } from '../constants';
 
 /** Categorization of code files into testing topology tracks. */
 export type TestingTrack = 'EXPLICIT_TEST_FILE' | 'EMBEDDED_TEST_ZONE' | 'PRODUCTION_CODE';
@@ -71,9 +72,6 @@ const MARKER_PY_MAIN = 'if __name__ == "__main__":';
 const TEST_CALL_SITE_RE =
     /(?:^|[;{}\s])(?:await\s+)?(?:describe|it|test)(?:\.(?:each|skip|only|concurrent|todo|failing|serial))?\s*\(/;
 
-/** Line-leading comment or block-comment continuation, which carries prose rather than code. */
-const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*|\*)/;
-
 /**
  * Strip string, template and regular-expression literals plus trailing line comments.
  *
@@ -105,7 +103,7 @@ function stripNonExecutableText(line: string): string {
  */
 function hasTestCallSite(content: string): boolean {
     for (const line of content.split(/\r\n|\n/)) {
-        if (COMMENT_LINE_RE.test(line)) continue;
+        if (REGEX.COMMENT.COMMENT_LINE.test(line)) continue;
         if (TEST_CALL_SITE_RE.test(stripNonExecutableText(line))) return true;
     }
     return false;
@@ -308,7 +306,7 @@ function createProhibitedEmbeddedResult(params: ProhibitedResultParams): DualTra
     const lines = content.split(/\r\n|\n/);
     const testLineIdx = lines.findIndex(
         (line) =>
-            !COMMENT_LINE_RE.test(line) && TEST_CALL_SITE_RE.test(stripNonExecutableText(line)),
+            !REGEX.COMMENT.COMMENT_LINE.test(line) && TEST_CALL_SITE_RE.test(stripNonExecutableText(line)),
     );
     const lineNum = testLineIdx >= 0 ? testLineIdx + 1 : 1;
 

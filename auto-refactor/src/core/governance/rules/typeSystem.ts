@@ -15,6 +15,7 @@
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { SEVERITY_WARNING } from '../../types';
+import { REGEX } from '../../constants';
 import { NodeKind } from '../../ast/multilang';
 import {
     TYPE_SYSTEM_CATEGORY,
@@ -32,7 +33,6 @@ const RISK_HIGH = 'high';
 const EXPORT_KEYWORD = 'export';
 const FORCED_ESCAPE_RE = /\b(?:undefined|null)\s+as\s+any\b/;
 const PROPERTY_PENETRATION_RE = /\(\s*([a-zA-Z0-9_$]+)\s+as\s+any\s*\)\s*(?:\.|\?\.|\b\[)/;
-const ESLINT_DISABLE_RE = /eslint-disable/;
 
 /**
  * Scans masked lines for regex matches and formats governance violations.
@@ -56,7 +56,7 @@ function scanLinePatternViolations(
         const line = lines[i];
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
-        if (ESLINT_DISABLE_RE.test(line)) continue;
+        if (REGEX.COMMENT.ESLINT_DISABLE.test(line)) continue;
 
         const match = pattern.exec(line);
         if (match) {

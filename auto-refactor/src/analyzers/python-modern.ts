@@ -17,6 +17,7 @@
  */
 import type { Analyzer, AnalyzerContext, Issue, AgentActionType, Severity } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
+import { REGEX } from '../core/constants';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import {
     PY_STDLIB_NAMES,
@@ -55,11 +56,6 @@ const BLOCK_KIND_OTHER = 'other';
 const PREFIX_OS_PATH = 'os.path.';
 
 const BLOCK_OPEN_RE = /:\s*(?:#.*)?$/;
-const ASYNC_DEF_RE = /^\s*async\s+def\b/;
-const DEF_RE = /^\s*def\b/;
-const CLASS_RE = /^\s*class\b/;
-const EXCEPT_RE = /^\s*except\b/;
-const WITH_RE = /^\s*(?:async\s+)?with\b/;
 
 /* Shadowing detection (PYM-SHADOW-001) --------------------------------------------------- */
 
@@ -67,8 +63,6 @@ const WITH_RE = /^\s*(?:async\s+)?with\b/;
 const ASSIGN_RE = /^\s*([A-Za-z_]\w*)\s*=(?!=|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|<<=|>>=|\*\*=|\/\/=)/;
 /** for loop variable: `for x in ...:` */
 const FOR_VAR_RE = /^\s*for\s+([A-Za-z_]\w*)\s+in\b/;
-/** Function definition with parameters: `def foo(a, b, c):` */
-const DEF_PARAMS_RE = /^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)/;
 /** with statement target: `with ... as f:` */
 const WITH_AS_RE = /^\s*(?:async\s+)?with\b.*\bas\s+([A-Za-z_]\w*)\s*[:,#]/;
 /** except clause target: `except Exception as e:` */
@@ -81,17 +75,14 @@ const BLOCKING_CALL_RE =
     /\b(?:time\.sleep|requests\.(?:get|post|put|patch|delete|request)|urllib\.request\.urlopen)\s*\(/;
 const SYNC_ORM_CALL_RE = /(?<![\w.])(?:[A-Za-z_]\w*\.)*(?:session|Session)\.(?:query|execute)\s*\(/;
 const AWAITED_ORM_CALL_RE = /await\s+[^=;]*\b(?:session|Session)\.(?:query|execute)\s*\(/;
-const MUTABLE_DEFAULT_RE = /=\s*(?:\[|\{|(?:list|dict|set)\s*\()/;
 const PERCENT_FORMAT_RE = /(?:'[^']*%[sdrfioxeg%][^']*'|"[^"]*%[sdrfioxeg%][^"]*")\s*%/;
 const RAISE_RE = /^raise\s+\S/;
-const RAISE_FROM_RE = /^raise\b[^\n]*\bfrom\b/;
 
 /** Maximum number of following lines inspected for a `from` cause clause on a multi-line raise. */
 const RAISE_CAUSE_LOOKAHEAD_LINES = 5;
 
 /** Block kind for an `async def` frame; mirrors the Python `async` keyword token. */
 const PYTHON_ASYNC_KEYWORD = 'async';
-const PY_PEP585_RE = /\b(?:typing\.)?(List|Dict|Set|FrozenSet|Tuple|Type)\s*\[/;
 const ABC_IMPORT_RE = /^from\s+typing\s+import\s+(.+)$/;
 const PY_PEP604_ANN_ASSIGN_RE =
     /^\s*[A-Za-z_]\w*\s*:\s*(?:typing\.)?(?:Optional|Union)\s*\[[^\]]*\]\s*=/;
@@ -521,8 +512,8 @@ export class PythonModernAnalyzer implements Analyzer {
         const trimmed = scanCtx.trimmed;
         const emit = scanCtx.emit;
 
-        if (PY_PEP585_RE.test(line)) {
-            const hit = PY_PEP585_RE.exec(line)?.[1] ?? '';
+        if (REGEX.SYNTAX.PYTHON_PEP585.test(line)) {
+            const hit = REGEX.SYNTAX.PYTHON_PEP585.exec(line)?.[1] ?? '';
             const spec: IssueSpec = {
                 rule: RULE_PYM_GENERIC_001,
                 severity: SEVERITY_ERROR,
@@ -563,7 +554,7 @@ export class PythonModernAnalyzer implements Analyzer {
     ): void {
         if (!RAISE_RE.test(codeOnly)) return;
         const hasCauseAhead =
-            RAISE_FROM_RE.test(codeOnly) ||
+            REGEX.SYNTAX.PYTHON_RAISE_FROM.test(codeOnly) ||
             this.checkFollowingLinesContain(
                 scanCtx.lineIndex,
                 lines,
@@ -577,18 +568,21 @@ export class PythonModernAnalyzer implements Analyzer {
 
     private auditMutableDefaults(scanCtx: PyLineScanContext): void {
         const line = scanCtx.line;
-        const isDef = ASYNC_DEF_RE.test(line) || DEF_RE.test(line) || CLASS_RE.test(line);
+        const isDef =
+            REGEX.SYNTAX.PYTHON_ASYNC_DEF.test(line) ||
+            REGEX.SYNTAX.PYTHON_DEF_KEYWORD.test(line) ||
+            REGEX.SYNTAX.PYTHON_CLASS_KEYWORD.test(line);
         if (!isDef) return;
         const parenIdx = line.indexOf('(');
         if (parenIdx === -1) return;
         const signature = line.slice(parenIdx + 1);
-        if (signature !== '' && MUTABLE_DEFAULT_RE.test(signature)) {
+        if (signature !== '' && REGEX.SYNTAX.PYTHON_MUTABLE_DEFAULT.test(signature)) {
             scanCtx.emit(scanCtx.lineIndex, SPEC_DEFAULT, { line: scanCtx.trimmed });
         }
     }
 
     private auditUnmanagedOpen(scanCtx: PyLineScanContext, inWith: boolean): void {
-        if (!inWith && /\bopen\s*\(/.test(scanCtx.line) && !WITH_RE.test(scanCtx.line)) {
+        if (!inWith && /\bopen\s*\(/.test(scanCtx.line) && !REGEX.SYNTAX.PYTHON_WITH.test(scanCtx.line)) {
             scanCtx.emit(scanCtx.lineIndex, SPEC_OPEN, { line: scanCtx.trimmed });
         }
     }
@@ -604,7 +598,7 @@ export class PythonModernAnalyzer implements Analyzer {
         }
         this.auditMutableDefaults(scanCtx);
 
-        if (blockCtx.inAsync && !ASYNC_DEF_RE.test(scanCtx.line)) {
+        if (blockCtx.inAsync && !REGEX.SYNTAX.PYTHON_ASYNC_DEF.test(scanCtx.line)) {
             this.auditAsyncCalls(scanCtx);
         }
 
@@ -826,13 +820,16 @@ export class PythonModernAnalyzer implements Analyzer {
         shadowCtx: PyShadowContext,
     ): boolean {
         const enclosingScope = this.getTopScope(shadowCtx);
-        const defMatch = DEF_PARAMS_RE.exec(line);
+        const defMatch = REGEX.SYNTAX.PYTHON_DEF_PARAMS.exec(line);
         if (defMatch) {
             const funcName = defMatch[1];
             const paramsStr = defMatch[2];
             this.registerBinding(funcName, targetLine, enclosingScope, shadowCtx);
-            const isAsync = ASYNC_DEF_RE.test(line);
-            const newKind = isAsync || DEF_RE.test(line) ? SCOPE_KIND_FUNCTION : SCOPE_KIND_CLASS;
+            const isAsync = REGEX.SYNTAX.PYTHON_ASYNC_DEF.test(line);
+            const newKind =
+                isAsync || REGEX.SYNTAX.PYTHON_DEF_KEYWORD.test(line)
+                    ? SCOPE_KIND_FUNCTION
+                    : SCOPE_KIND_CLASS;
             const newScope: VarScope = {
                 indent: shadowCtx.indent,
                 kind: newKind,
@@ -849,8 +846,8 @@ export class PythonModernAnalyzer implements Analyzer {
             return true;
         }
 
-        if (CLASS_RE.test(line)) {
-            const clsMatch = /^\s*class\s+([A-Za-z_]\w*)/.exec(line);
+        if (REGEX.SYNTAX.PYTHON_CLASS_KEYWORD.test(line)) {
+            const clsMatch = REGEX.SYNTAX.PYTHON_CLASS.exec(line);
             if (clsMatch) {
                 this.registerBinding(clsMatch[1], targetLine, enclosingScope, shadowCtx);
             }
@@ -1043,11 +1040,11 @@ export class PythonModernAnalyzer implements Analyzer {
     }
 
     private resolveBlockKind(trimmed: string): BlockKind {
-        if (ASYNC_DEF_RE.test(trimmed)) return PYTHON_ASYNC_KEYWORD;
-        if (DEF_RE.test(trimmed)) return BLOCK_KIND_DEF;
-        if (CLASS_RE.test(trimmed)) return BLOCK_KIND_CLASS;
-        if (EXCEPT_RE.test(trimmed)) return BLOCK_KIND_EXCEPT;
-        return WITH_RE.test(trimmed) ? BLOCK_KIND_WITH : BLOCK_KIND_OTHER;
+        if (REGEX.SYNTAX.PYTHON_ASYNC_DEF.test(trimmed)) return PYTHON_ASYNC_KEYWORD;
+        if (REGEX.SYNTAX.PYTHON_DEF_KEYWORD.test(trimmed)) return BLOCK_KIND_DEF;
+        if (REGEX.SYNTAX.PYTHON_CLASS_KEYWORD.test(trimmed)) return BLOCK_KIND_CLASS;
+        if (REGEX.SYNTAX.PYTHON_EXCEPT_KEYWORD.test(trimmed)) return BLOCK_KIND_EXCEPT;
+        return REGEX.SYNTAX.PYTHON_WITH.test(trimmed) ? BLOCK_KIND_WITH : BLOCK_KIND_OTHER;
     }
 
     /**

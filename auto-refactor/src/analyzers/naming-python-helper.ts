@@ -12,6 +12,7 @@
  */
 
 import type { Issue } from '../core/types';
+import { REGEX } from '../core/constants';
 import type {
     NamingDecouplingAuditor,
     SymbolDeclarationKind,
@@ -88,10 +89,9 @@ const MIN_PYTHON_FUNCTION_LENGTH = 3;
 const MIN_CLUSTER_SYMBOLS = 4;
 
 const TOLERATED_SINGLE_LETTERS: ReadonlySet<string> = new Set(['_', 'i', 'j', 'k']);
-const SINGLE_LETTER_RE = /^[a-zA-Z]$/;
 
 function isUntoleratedSingleLetter(varName: string): boolean {
-    if (varName.length !== 1 || !SINGLE_LETTER_RE.test(varName)) return false;
+    if (varName.length !== 1 || !REGEX.NAMING.SINGLE_LETTER.test(varName)) return false;
     return !TOLERATED_SINGLE_LETTERS.has(varName);
 }
 

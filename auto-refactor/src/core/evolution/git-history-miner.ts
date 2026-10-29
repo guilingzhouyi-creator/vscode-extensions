@@ -16,6 +16,7 @@
 
 import * as childProcess from 'child_process';
 import * as path from 'path';
+import { normalizePathSeparators } from '../constants';
 
 /** Structured record representing a single git commit modifying a file. */
 export interface GitCommitRecord {
@@ -60,7 +61,6 @@ const FORWARD_SLASH = '/';
 const ASCII_RECORD_SEP = '\x1e';
 const ASCII_FIELD_SEP = '\x1f';
 const NEWLINE_SPLIT_RE = /\r?\n/;
-const BACKSLASH_GLOBAL_RE = /\\/g;
 
 const STR_TRUE = 'true';
 const MIN_HEADER_FIELD_COUNT = 4;
@@ -128,7 +128,7 @@ function recordCommitFiles(
     fileLines: string[],
 ): void {
     for (const rawFile of fileLines) {
-        const normFile = rawFile.trim().replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH);
+        const normFile = normalizePathSeparators(rawFile.trim());
         if (!normFile) continue;
         appendCommitRecord(commitsByFile, normFile, record);
     }
@@ -315,10 +315,8 @@ export class GitHistoryMiner {
 
         const profiles: ProfileAliasContext[] = [];
         for (const [relTop, commits] of commitsByFile.entries()) {
-            const absPath = path
-                .resolve(topLevel, relTop)
-                .replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH);
-            const relCwd = path.relative(cwd, absPath).replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH);
+            const absPath = normalizePathSeparators(path.resolve(topLevel, relTop));
+            const relCwd = normalizePathSeparators(path.relative(cwd, absPath));
             const profile = this.aggregateCommitRecords(absPath, commits);
             profile.isGitAvailable = true;
             profiles.push({ profilesMap, profile, absPath, relCwd, relTop });
@@ -331,7 +329,7 @@ export class GitHistoryMiner {
         const cwd = targetDir || this.repoRoot || process.cwd();
 
         if (this.batchCache) {
-            const normPath = targetFilePath.replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH);
+            const normPath = normalizePathSeparators(targetFilePath);
             const cached =
                 this.batchCache.get(normPath) || this.batchCache.get(normPath.toLowerCase());
             if (cached) {

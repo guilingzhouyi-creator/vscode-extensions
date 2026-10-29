@@ -18,6 +18,7 @@
 
 import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
 import { ANALYZER_GDSCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
+import { REGEX } from '../core/constants';
 import type { SourceMaskConfig } from '../core/policy/source-mask';
 import { DeclarativeModernAnalyzer, type DeclarativeLineRule } from './declarative-modern-pack';
 
@@ -93,17 +94,10 @@ const GDSCRIPT_MASK: SourceMaskConfig = {
 
 // --- Regex Patterns ---
 
-const YIELD_RE = /\byield\s*\(/;
-const EXPORT_RE = /^\s*export(?:\s*\([^)]*\))?\s+(?:var|const|onready)\b/;
-const ONREADY_RE = /^\s*onready\s+var\b/;
-const TOOL_RE = /^\s*tool\s*$/;
-const POOL_ARRAY_RE = /\bPool(?:Byte|Int|Real|String|Vector2|Vector3|Color)Array\b/;
 const RPC_MODIFIER_RE =
     /^\s*(?:remote|master|puppet|slave|remotesync|mastersync|puppetsync|sync)\s+func\b/;
 const LEGACY_CONNECT_RE = /\.connect\s*\(\s*"[^"]*"\s*,\s*(?:self|[A-Za-z_]\w*)\s*,\s*"[^"]*"\s*\)/;
 
-const EXTENDS_ANY_RE = /^\s*extends\s+[A-Za-z_]\w*/;
-const RESET_STATE_FUNC_RE = /^\s*func\s+reset_state\s*\(\s*\)/;
 const SUPER_RESET_RE = /\bsuper(?:\.reset_state\s*\(\s*\)|\s*\(\s*\))/;
 const DEBOUNCE_ACTION_BUTTON_RE = /\b(?:btn|button|action)_[a-zA-Z0-9_]*\.pressed\.connect\b/;
 const DEBOUNCE_HANDLER_RE = /func\s+_on_(?:btn|button|action)_[a-zA-Z0-9_]*_pressed\b/;
@@ -197,12 +191,12 @@ function scanMultiLineResetState(
     issues: Issue[],
     rule: DeclarativeLineRule,
 ): void {
-    const hasExtends = masked.some((line) => EXTENDS_ANY_RE.test(line));
+    const hasExtends = masked.some((line) => REGEX.SYNTAX.GDSCRIPT_EXTENDS.test(line));
     if (!hasExtends) return;
 
     for (let index = 0; index < masked.length; index += 1) {
         const code = masked[index];
-        if (!RESET_STATE_FUNC_RE.test(code)) continue;
+        if (!REGEX.SYNTAX.GDSCRIPT_RESET_STATE_FUNC.test(code)) continue;
 
         const funcIndent = code.search(/\S/);
         let hasSuper = false;
@@ -277,7 +271,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_YIELD_001,
                 severity: SEV_WARN,
-                pattern: YIELD_RE,
+                pattern: REGEX.SYNTAX.GDSCRIPT_YIELD,
                 message:
                     '`yield` was removed in Godot 4: coroutines are plain `await` expressions.',
                 suggestion: 'Rewrite `yield(obj, "signal")` as `await obj.signal`.',
@@ -290,7 +284,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_EXPORT_001,
                 severity: SEV_WARN,
-                pattern: EXPORT_RE,
+                pattern: REGEX.SYNTAX.GDSCRIPT_EXPORT_STMT,
                 message: 'The `export` statement syntax is gone; Godot 4 uses annotations.',
                 suggestion:
                     'Write `@export var x: int`, keeping the type in the declaration itself.',
@@ -303,7 +297,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_ONREADY_001,
                 severity: SEV_WARN,
-                pattern: ONREADY_RE,
+                pattern: REGEX.SYNTAX.GDSCRIPT_ONREADY,
                 message: '`onready` became the `@onready` annotation in Godot 4.',
                 suggestion: 'Write `@onready var node = $Path`.',
                 actionable: {
@@ -315,7 +309,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_TOOL_001,
                 severity: SEV_WARN,
-                pattern: TOOL_RE,
+                pattern: REGEX.SYNTAX.GDSCRIPT_TOOL,
                 message: 'The `tool` keyword became the `@tool` annotation in Godot 4.',
                 suggestion: 'Put `@tool` on the first line of the script.',
                 actionable: {
@@ -327,7 +321,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_POOL_001,
                 severity: SEV_WARN,
-                pattern: POOL_ARRAY_RE,
+                pattern: REGEX.SYNTAX.GDSCRIPT_POOL_ARRAY,
                 message: '`Pool*Array` types were renamed to `Packed*Array` in Godot 4.',
                 suggestion: 'Use the `PackedByteArray` / `PackedVector2Array` family of names.',
                 actionable: {

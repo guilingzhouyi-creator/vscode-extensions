@@ -14,6 +14,7 @@
  */
 import { fileNameEndsWith, pathHasSegment } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
+import { REGEX } from '../../constants';
 import {
     checkJsTsSilentExceptions,
     checkPythonSilentExceptions,
@@ -46,7 +47,6 @@ const TOKEN_UNWRAP = '.unwrap()';
 
 const EXCEPT_KEYWORD_RE = /\bexcept\b/;
 const CATCH_KEYWORD_RE = /\bcatch\b/;
-const UNWRAP_RE = /\bunwrap\s*\(/;
 
 /**
  * Inspects a multi-line Python except block to detect if all contained statements are swallowed.
@@ -282,7 +282,6 @@ export const SwallowedExceptionRule: GovernanceRule = {
 };
 
 const KEYWORD_UNWRAP = 'unwrap';
-const RUST_TEST_ATTR_RE = /#\[.*(?:test|cfg\(test\)).*\]/;
 
 /**
  * Mutable Rust test-scope tracking state for the naked-unwrap scan.
@@ -294,7 +293,7 @@ interface UnwrapScanState {
 }
 
 function isNakedUnwrapCandidate(line: string): boolean {
-    if (!line.includes(KEYWORD_UNWRAP) || !UNWRAP_RE.test(line)) return false;
+    if (!line.includes(KEYWORD_UNWRAP) || !REGEX.SYNTAX.RUST_UNWRAP.test(line)) return false;
     return !line.trim().startsWith('//');
 }
 
@@ -326,7 +325,7 @@ function checkRustTestDeclaration(
     trimmed: string,
     pendingTestFn: boolean,
 ): { inTestScope: boolean; pendingTestFn: boolean } {
-    if (RUST_TEST_ATTR_RE.test(trimmed)) {
+    if (REGEX.SYNTAX.RUST_TEST_ATTR.test(trimmed)) {
         return { inTestScope: trimmed.includes('cfg(test)'), pendingTestFn: true };
     }
     if (pendingTestFn && (trimmed.startsWith('fn ') || trimmed.includes(' fn '))) {
@@ -371,7 +370,7 @@ function buildNakedUnwrapViolation(line: string, lineIndex: number): GovernanceV
         ruleId: 'GOV-EXC-002',
         message: 'Naked `.unwrap()` invocation in production code may trigger unhandled panics.',
         line: lineIndex + 1,
-        column: line.search(UNWRAP_RE) + 1,
+        column: line.search(REGEX.SYNTAX.RUST_UNWRAP) + 1,
         suggestion:
             'Handle with `?` error propagation, `.expect("reason")`, or `match` / `if let`.',
         fixable: false,

@@ -28,6 +28,8 @@
 /** Rule identifier for a recursive delete whose operand traces to a root or home expression. */
 export const RULE_GUARD_DESTR_001 = 'GUARD-DESTR-001';
 
+import { REGEX } from '../core/constants';
+
 /** Rule identifier for a binding that shadows a read-only PowerShell automatic variable. */
 export const RULE_GUARD_VAR_001 = 'GUARD-VAR-001';
 
@@ -143,12 +145,6 @@ const JS_STATEMENT_WINDOW = 6;
  * brace or comma. Without this, the guard reported its own negative corpus.
  */
 const NON_STATEMENT_PREFIX_RE = /^(?:#|\/\/|\*|["'`]|\[["'`])/;
-
-/** Powershell automatic-variable write shapes: plain, compound, cast, foreach and multi-assign. */
-const PS_ASSIGN_RE = /\$([A-Za-z_][A-Za-z0-9_]*)\s*(?:=[^=]|\+=|-=|\*=)/g;
-const PS_FOREACH_RE = /foreach\s*\(\s*\$([A-Za-z_][A-Za-z0-9_]*)\s+in\b/gi;
-const PS_CAST_ASSIGN_RE = /\[[A-Za-z_][A-Za-z0-9_.[\]]*\]\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*=/g;
-const PS_MULTI_ASSIGN_RE = /\$([A-Za-z_][A-Za-z0-9_]*)\s*,[^=\r\n]*=/g;
 
 /** Binding shapes that carry provenance: assignment, the three loop forms, and callbacks. */
 const ASSIGN_RE = /(?:^|[\s(,])(?:const|let|var)?\s*\$?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^\r\n]*)$/;
@@ -503,10 +499,10 @@ export function findAutomaticVariableShadows(lines: readonly string[]): Automati
     lines.forEach((line, index) => {
         if (isNonStatementLine(line.trim())) return;
         const lineNumber = index + 1;
-        for (const match of line.matchAll(PS_ASSIGN_RE)) report(match[1], lineNumber);
-        for (const match of line.matchAll(PS_FOREACH_RE)) report(match[1], lineNumber);
-        for (const match of line.matchAll(PS_CAST_ASSIGN_RE)) report(match[1], lineNumber);
-        for (const match of line.matchAll(PS_MULTI_ASSIGN_RE)) report(match[1], lineNumber);
+        for (const match of line.matchAll(REGEX.SHELL.createPsAssignScanner())) report(match[1], lineNumber);
+        for (const match of line.matchAll(REGEX.SHELL.createPsForeachScanner())) report(match[1], lineNumber);
+        for (const match of line.matchAll(REGEX.SHELL.createPsCastAssignScanner())) report(match[1], lineNumber);
+        for (const match of line.matchAll(REGEX.SHELL.createPsMultiAssignScanner())) report(match[1], lineNumber);
     });
     return shadows;
 }

@@ -18,6 +18,7 @@
 import * as childProcess from 'child_process';
 import { nativeCore } from '../native/native-bridge';
 import { IdInterner } from '../data-structures/id-interner';
+import { normalizePathSeparators } from '../constants';
 
 /**
  * Structured commit representation containing all files touched in a single change.
@@ -122,7 +123,6 @@ const STDIO_IGNORE_PIPE_IGNORE: [childProcess.IOType, childProcess.IOType, child
     'ignore',
 ];
 
-const BACKSLASH_GLOBAL_RE = /\\/g;
 const FORWARD_SLASH = '/';
 
 interface NativeCouplingPair {
@@ -151,7 +151,7 @@ interface CouplingWarningParams {
  * @returns Normalized forward-slash relative path.
  */
 export function normalizeEvolutionPath(rawPath: string): string {
-    return rawPath.trim().replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH).replace(/^\/+/, '');
+    return normalizePathSeparators(rawPath.trim()).replace(/^\/+/, '');
 }
 
 /**

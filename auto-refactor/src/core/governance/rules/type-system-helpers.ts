@@ -12,6 +12,7 @@
 
 import type { GovernanceViolation } from '../types';
 import { isToolOrTestScript } from '../pathScope';
+import { REGEX } from '../../constants';
 
 /** Shared category token for all type system governance rules. */
 export const TYPE_SYSTEM_CATEGORY = 'type_system';
@@ -27,19 +28,6 @@ const RULE_ID_GOV_TYP_006 = 'GOV-TYP-006';
 const MSG_EXPLICIT_TYPING =
     'Variable uses implicit loose assignment (`var =`). Use explicit declaration or static inference (`:=`).';
 const SUGG_EXPLICIT_TYPING = 'Change to `var name := ...` or provide an explicit type annotation.';
-
-const GD_WEAK_VAR_RE = /^\s*(?:@\w+\s+)?(?:static\s+)?var\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=(?!=)/;
-const VARIANT_RHS_RE = /^\s*(null|\[\]|\{\}|Variant)/;
-const VARIANT_CALL_RE = /\.get\(|\bget\(.*Variant|Variant.*get\(/;
-const VARIANT_COLLECTION_ACCESS_RE = /^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*[\[.]/;
-const NON_VARIANT_SINGLETONS_RE = /(?:GameConfig|DeterministicRNG|UniqueIdGenerator)\./;
-const DICT_GET_PREFIX_RE = /^d\.get\(/;
-const ANY_KEYWORD_RE = /\bany\b/;
-const ESLINT_DISABLE_RE = /eslint-disable/;
-const GD_FUNC_RE = /^\s*(?:static\s+)?func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\s*(?!->)\s*:/;
-const PY_FUNC_START_RE = /^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
-const PY_RETURN_TYPE_RE = /\)\s*->\s*[^:]+:/;
-const ANY_RE = /:\s*\bany\b|\bas\s+any\b/;
 
 /** Opening parenthesis character set for function signature scanning. */
 const OPEN_PAREN_CHARS: ReadonlySet<string> = new Set(['(']);
@@ -69,13 +57,6 @@ function lineHasExportKeyword(line: string): boolean {
 }
 
 const MAX_SIGNATURE_SCAN_LINES = 40;
-const BLOCK_OR_SEMI_RE = /[{;]/;
-const ARROW_BODY_RE = /=>/;
-const FN_RETURN_TYPE_SUFFIX_RE = /\)\s*:\s*[^{;]+(?:\{|;)/;
-const ARROW_RETURN_TYPE_SUFFIX_RE = /\)\s*:\s*[^=]+=>/;
-
-const EXPORT_FN_RE = /^\s*export\s+(?:default\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\(/;
-const EXPORT_CONST_ARROW_RE = /^\s*export\s+const\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?\(/;
 
 /**
  * Evaluates a single line for GDScript weak variable assignment.
@@ -91,15 +72,16 @@ export function checkGdWeakVarLine(
 ): void {
     const trimmed = line.trim();
     if (trimmed.startsWith('#')) return;
-    const matchResult = line.match(GD_WEAK_VAR_RE);
+    const matchResult = line.match(REGEX.SYNTAX.GDSCRIPT_WEAK_VAR);
     if (!matchResult) return;
 
     const rhs = line.slice((matchResult.index ?? 0) + matchResult[0].length).trim();
     const isVariantAmbiguous =
-        VARIANT_RHS_RE.test(rhs) ||
-        DICT_GET_PREFIX_RE.test(rhs) ||
-        VARIANT_CALL_RE.test(rhs) ||
-        (VARIANT_COLLECTION_ACCESS_RE.test(rhs) && !NON_VARIANT_SINGLETONS_RE.test(rhs));
+        REGEX.SYNTAX.GDSCRIPT_VARIANT_RHS.test(rhs) ||
+        REGEX.SYNTAX.GDSCRIPT_DICT_GET.test(rhs) ||
+        REGEX.SYNTAX.GDSCRIPT_VARIANT_CALL.test(rhs) ||
+        (REGEX.SYNTAX.GDSCRIPT_COLLECTION_ACCESS.test(rhs) &&
+            !REGEX.SYNTAX.GDSCRIPT_NON_VARIANT_SINGLETONS.test(rhs));
     if (isVariantAmbiguous) return;
 
     violations.push({
@@ -174,7 +156,7 @@ export function checkPythonFunctionReturnTypes(
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (line.trim().startsWith('#')) continue;
-        const match = PY_FUNC_START_RE.exec(line);
+        const match = REGEX.SYNTAX.PYTHON_FUNC_START.exec(line);
         if (!match) continue;
 
         const funcName = match[1];
@@ -182,7 +164,7 @@ export function checkPythonFunctionReturnTypes(
         if (!matchedEnd) continue;
 
         i = endLine;
-        if (!PY_RETURN_TYPE_RE.test(sigText)) {
+        if (!REGEX.SYNTAX.PYTHON_RETURN_TYPE.test(sigText)) {
             violations.push({
                 ruleId: RULE_ID_GOV_TYP_002,
                 message: `Function \`${funcName}\` lacks explicit return type annotation (\`-> Type\`).`,
@@ -206,7 +188,7 @@ export function checkGdFunctionSignature(
     signatureLine: string,
     startLine: number,
 ): GovernanceViolation | null {
-    const matchResult = signatureLine.match(GD_FUNC_RE);
+    const matchResult = signatureLine.match(REGEX.SYNTAX.GDSCRIPT_FUNC_NO_RETURN);
     if (matchResult && !matchResult[1].startsWith('_')) {
         return {
             ruleId: RULE_ID_GOV_TYP_002,
@@ -229,16 +211,16 @@ export function checkGdFunctionSignature(
 export function checkUnsafeAny(masked: string[], violations: GovernanceViolation[]): void {
     for (let i = 0; i < masked.length; i++) {
         const line = masked[i];
-        if (!ANY_KEYWORD_RE.test(line)) continue;
+        if (!REGEX.SYNTAX.TS_ANY_KEYWORD.test(line)) continue;
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
-        if (ANY_RE.test(line) && !ESLINT_DISABLE_RE.test(line)) {
+        if (REGEX.SYNTAX.TS_ANY_TYPE.test(line) && !REGEX.COMMENT.ESLINT_DISABLE.test(line)) {
             violations.push({
                 ruleId: RULE_ID_GOV_TYP_003,
                 message:
                     'Avoid naked `any` type annotations; prefer `unknown` or specific union types.',
                 line: i + 1,
-                column: line.search(ANY_RE) + 1,
+                column: line.search(REGEX.SYNTAX.TS_ANY_TYPE) + 1,
                 suggestion:
                     'Replace with a strongly-typed interface, generic parameter, or `unknown`.',
                 fixable: false,
@@ -247,7 +229,6 @@ export function checkUnsafeAny(masked: string[], violations: GovernanceViolation
     }
 }
 
-/**
 /**
  * Scans forward from the declaration line to accumulate the signature text.
  *
@@ -368,16 +349,16 @@ export function checkExportedFunctionReturnTypes(
         if (!lineHasExportKeyword(line)) continue;
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
-        if (ESLINT_DISABLE_RE.test(line)) continue;
+        if (REGEX.COMMENT.ESLINT_DISABLE.test(line)) continue;
 
         inspectExportedDeclaration(
             line,
             i,
             masked,
             violations,
-            EXPORT_FN_RE,
-            BLOCK_OR_SEMI_RE,
-            FN_RETURN_TYPE_SUFFIX_RE,
+            REGEX.SYNTAX.TS_EXPORT_FN,
+            REGEX.SYNTAX.BLOCK_OR_SEMI,
+            REGEX.SYNTAX.TS_FN_RETURN_TYPE_SUFFIX,
             false,
         );
         inspectExportedDeclaration(
@@ -385,9 +366,9 @@ export function checkExportedFunctionReturnTypes(
             i,
             masked,
             violations,
-            EXPORT_CONST_ARROW_RE,
-            ARROW_BODY_RE,
-            ARROW_RETURN_TYPE_SUFFIX_RE,
+            REGEX.SYNTAX.TS_EXPORT_CONST_ARROW,
+            REGEX.SYNTAX.ARROW_BODY,
+            REGEX.SYNTAX.TS_ARROW_RETURN_TYPE_SUFFIX,
             true,
         );
     }

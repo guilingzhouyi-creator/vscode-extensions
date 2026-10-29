@@ -31,11 +31,13 @@ import type {
 import type { DefectTaxonomyCategory } from '../core/governance/standard-terminology';
 import { SEVERITY_WARNING } from '../core/types';
 import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
+import { REGEX } from '../core/constants';
 import type { NormalizedNode } from '../core/ast/multilang';
 import { NodeKind } from '../core/ast/multilang';
 import { locN } from '../utils/normalized';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { globToRegExp, matchAny } from '../core/file-discovery';
+import { isCommentOrBlankLine, calculateIndentWidth } from '../core/ast/block-scope-utils';
 import { detectTernaryOpportunities } from './simplify-ternary';
 import {
     auditRedundantElse,
@@ -108,14 +110,11 @@ const LIFECYCLE_HOOK_NAMES: ReadonlySet<string> = new Set([
     '_physics_process',
 ]);
 
-const HANDLER_OR_SOLVER_RE =
-    /^(?:on[A-Z]|handle[A-Z]|resolve[A-Z]|solve[A-Z]|dispatch[A-Z]|_on_[a-z0-9]|_input$|_gui_input$|_unhandled_input$)/;
-
 function isSemanticHandlerOrSolver(name: string): boolean {
     if (!name || LIFECYCLE_HOOK_NAMES.has(name.toLowerCase())) {
         return false;
     }
-    return HANDLER_OR_SOLVER_RE.test(name);
+    return REGEX.NAMING.HANDLER_OR_SOLVER.test(name);
 }
 
 const ACTION_SPLIT_FUNCTION: AgentActionType = 'split_function';
@@ -166,35 +165,13 @@ const DEFAULT_PRINT_ALLOW_PATTERNS = [
 /** Keyword-anchored "this comment is code" heuristic, language-neutral. */
 const CODE_SHAPED_RE =
     /^(?:def|class|function|fn|func|return|raise|throw|import|from|if|for|while|switch|try|except|catch|with|const|let|var|public|private|protected|async|await|yield|break|continue|else|elif|namespace|using|struct|enum|interface)\b/;
-const CODE_ASSIGN_RE = /^[A-Za-z_][A-Za-z0-9_]*\s*(?:[-+*/%]?=|\+\+|--|\.[A-Za-z_]\w*\s*=|\()/;
 
-/** Debug-output call sites across the supported languages. */
-const DEBUG_PRINT_RE =
-    /\b(?:print|pprint|breakpoint|dbg!|println!|eprintln!)\s*\(|\bconsole\.(?:log|debug|info|trace)\s*\(/;
-
-const PY_DEF_RE = /^(\s*)(?:async\s+)?def\s+[A-Za-z_]\w*\s*\(/;
-// Only `pass` counts as an empty body: an ellipsis body is the idiomatic Protocol/ABC
-// stub marker, so flagging it would produce false positives on interface declarations.
-const PY_EMPTY_BODY_RE = /^pass\s*$/;
-const BRACE_EMPTY_ONE_LINER_RE = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\s*\}\s*$/;
-const BRACE_OPEN_RE = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\s*$/;
-const BRACE_CLOSE_RE = /^\s*\}\s*;?\s*$/;
 const PREFIX_SLASH_SLASH = '//';
 const PREFIX_HASH = '#';
 const PREFIX_STAR = '*';
 const PREFIX_BLOCK_COMMENT_START = '/*';
 const COMMENT_MARKERS = [PREFIX_SLASH_SLASH, PREFIX_HASH, PREFIX_STAR];
 const CHAR_DOUBLE_QUOTE = '"';
-
-function isCommentOrBlankLine(trimmed: string): boolean {
-    if (!trimmed) return true;
-    return (
-        trimmed.startsWith(PREFIX_SLASH_SLASH) ||
-        trimmed.startsWith(PREFIX_HASH) ||
-        trimmed.startsWith(PREFIX_STAR) ||
-        trimmed.startsWith(PREFIX_BLOCK_COMMENT_START)
-    );
-}
 
 function countEffectiveFunctionLines(lines: string[], startLine: number, endLine: number): number {
     const startIdx = Math.max(0, startLine - 1);
@@ -699,7 +676,7 @@ export class SimplifyAnalyzer implements Analyzer {
             const codeShaped =
                 !!marker &&
                 body.length > 0 &&
-                (CODE_SHAPED_RE.test(body) || CODE_ASSIGN_RE.test(body));
+                (CODE_SHAPED_RE.test(body) || REGEX.SYNTAX.CODE_ASSIGN_LINE.test(body));
             if (codeShaped) {
                 if (streak === 0) start = i;
                 streak++;
@@ -742,10 +719,10 @@ export class SimplifyAnalyzer implements Analyzer {
     }
 
     private isBraceBlockEmpty(lines: string[], startIndex: number): boolean {
-        if (BRACE_EMPTY_ONE_LINER_RE.test(lines[startIndex])) {
+        if (REGEX.SYNTAX.BRACE_EMPTY_ONE_LINER.test(lines[startIndex])) {
             return true;
         }
-        if (BRACE_OPEN_RE.test(lines[startIndex])) {
+        if (REGEX.SYNTAX.BRACE_OPEN_FN.test(lines[startIndex])) {
             let lineIndex = startIndex + 1;
             while (
                 lineIndex < lines.length &&
@@ -754,7 +731,7 @@ export class SimplifyAnalyzer implements Analyzer {
             ) {
                 lineIndex++;
             }
-            return lineIndex < lines.length && BRACE_CLOSE_RE.test(lines[lineIndex]);
+            return lineIndex < lines.length && REGEX.SYNTAX.BRACE_CLOSE_LINE.test(lines[lineIndex]);
         }
         return false;
     }
@@ -815,9 +792,9 @@ export class SimplifyAnalyzer implements Analyzer {
         lineIndex: number,
         issues: Issue[],
     ): void {
-        const def = PY_DEF_RE.exec(lines[lineIndex]);
-        if (def) {
-            if (this.checkPythonBodyEmpty(lines, lineIndex, def[1].length)) {
+        if (REGEX.SYNTAX.PYTHON_DEF.test(lines[lineIndex])) {
+            const indent = this.getIndentWidth(lines[lineIndex]);
+            if (this.checkPythonBodyEmpty(lines, lineIndex, indent)) {
                 this.emitEmptyIssue(lines, file, lineIndex, issues);
             }
             return;
@@ -867,7 +844,10 @@ export class SimplifyAnalyzer implements Analyzer {
      */
     private checkPythonBodyEmpty(lines: string[], defIndex: number, defIndent: number): boolean {
         const bodyLineIndex = this.advancePastPythonDocstrings(lines, defIndex + 1);
-        if (bodyLineIndex >= lines.length || !PY_EMPTY_BODY_RE.test(lines[bodyLineIndex].trim())) {
+        if (
+            bodyLineIndex >= lines.length ||
+            !REGEX.SYNTAX.PYTHON_EMPTY_BODY.test(lines[bodyLineIndex].trim())
+        ) {
             return false;
         }
         if (this.getIndentWidth(lines[bodyLineIndex]) <= defIndent) {
@@ -892,8 +872,7 @@ export class SimplifyAnalyzer implements Analyzer {
      * @returns The number of leading spaces (tabs count as one column).
      */
     private getIndentWidth(line: string): number {
-        const match = /^\s*/.exec(line);
-        return match ? match[0].length : 0;
+        return calculateIndentWidth(line);
     }
 
     /**
@@ -921,7 +900,7 @@ export class SimplifyAnalyzer implements Analyzer {
             if (trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('*')) {
                 continue;
             }
-            if (!DEBUG_PRINT_RE.test(lines[i])) {
+            if (!REGEX.SYNTAX.DEBUG_PRINT_CALL.test(lines[i])) {
                 continue;
             }
             const issue = createLineIssue(ANALYZER_SIMPLIFY, file, {

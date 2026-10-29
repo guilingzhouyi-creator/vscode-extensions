@@ -9,6 +9,7 @@
  */
 import type { SEVERITY_INFO } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
+import { REGEX } from '../core/constants';
 
 /* ---- Rule ID constants ---- */
 
@@ -166,36 +167,6 @@ export function isPowerShellFile(filePath: string): boolean {
     return dot > slash ? POWERSHELL_EXTS.has(lower.slice(dot)) : false;
 }
 
-/* ---- Shell patterns ---- */
-
-/** Regular expression matching executable shell script shebang line. */
-export const SHEBANG_RE = /^#!\s*\/.*(?:bash|sh|zsh|ksh|env\s+\w*sh)\b/;
-/** Regular expression matching 'set -e' or 'set -o errexit'. */
-export const SET_E_RE = /\bset\s+(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)\b/;
-/** Regular expression matching 'set -u' or 'set -o nounset'. */
-export const SET_U_RE = /\bset\s+(-[a-zA-Z]*u[a-zA-Z]*|-o\s+nounset)\b/;
-/** Regular expression matching 'set -o pipefail'. */
-export const SET_PIPEFAIL_RE = /\bset\s+(-o\s+pipefail|-[a-zA-Z]*o[a-zA-Z]*\s+pipefail)\b/;
-/** Regular expression matching legacy backtick command substitution. */
-export const BACKTICK_CMD_RE = /`[^`]+`/;
-export const DEPRECATED_TEST_RE = /(?:^|[\s;|&(])\[[!\s\w]/;
-export const MODERN_TEST_RE = /\[\[/;
-export const CD_WITHOUT_CHECK_RE = /^\s*(?:cd\s+[^\s;|&]+)(?!.*(?:\|\||&&))/;
-export const READ_CMD_RE = /^\s*read\b/;
-export const READ_HAS_R_RE = /\s-r\b/;
-export const DOLLAR_STAR_RE = /(?:^|[\s;|&(=])\$\*(?:[\s;|&)]|$)/;
-export const ECHO_FLAG_RE = /^\s*echo\s+-(?:e|n|en|ne)\b/;
-export const SHELL_TRAP_EXIT_RE = /\btrap\b.*?\b(?:EXIT|0|INT|TERM)\b/;
-export const SHELL_MKTEMP_RE = /\b(?:mktemp\b|>\s*.*?\.(?:tmp|lock)\b)/;
-export const SH_READ_INTERACTIVE_RE = /^\s*read\s+(?!-t\b)/;
-export const SH_TTY_GUARD_RE = /\[\[?\s+-t\s+0\s*\]\]?/;
-export const SH_EVAL_DYNAMIC_RE = /\beval\s+["']?\$[A-Za-z_{]/;
-export const SH_PREDICATE_COMMANDS_RE =
-    /^\s*(?:git\s+diff(?:-index)?\s+--quiet|grep\s+-[a-zA-Z]*q|diff\s+-q|cmp\s+-s)\b/;
-export const SH_EXIT_GUARD_RE = /(?:\|\||&&|;\s*STATUS=|\bif\b|\bwhile\b)/;
-export const SHELL_DOC_HEADER_RE =
-    /(?:#\s*(?:Module|Description|Purpose|Architecture Role|Responsibilities|Usage|模块归属|职责说明|架构定位|用法示例|退出语义):)/i;
-
 /* ---- PowerShell patterns & tables ---- */
 
 const POWERSHELL_ALIAS_MAPPING_TEXT = `Get-ChildItem:ls dir gci
@@ -265,23 +236,6 @@ export const PS_APPROVED_VERBS_FOLDED = new Set(
     [...PS_APPROVED_VERBS].map((approvedVerb) => approvedVerb.toLowerCase()),
 );
 
-export const PS_FUNCTION_RE = /^\s*function\s+([A-Za-z][A-Za-z0-9_-]*)\s*(?:\(\))?\s*\{?/;
-export const PS_CMDLET_BINDING_RE = /\[CmdletBinding\s*\(\s*\)\]/;
-export const PS_PARAM_BLOCK_RE = /^\s*param\s*\(/i;
-export const PS_PARAM_WITH_TYPE_RE = /\[[A-Za-z][A-Za-z0-9_.]*(?:\[\s*\])?\]\s*\$/;
-export const PS_PARAM_SIMPLE_RE = /(?:^|[\s,])\$([A-Za-z][A-Za-z0-9_]*)\s*(?:=|,|\))/;
-export const PS_ERROR_ACTION_RE = /\$ErrorActionPreference\s*=\s*['"]Stop['"]/i;
-export const PS_RESOURCE_DISPOSAL_RE =
-    /(?:\[System\.IO\.FileStream\]|\[System\.Threading\.Mutex\]|New-Object\s+System\.IO\.FileStream)/i;
-export const PS_FINALLY_RE = /\bfinally\s*\{/i;
-export const PS_INTERACTIVE_RE = /\b(?:Read-Host|pause)\b|\$host\.UI\.ReadLine\s*\(/i;
-export const PS_INTERACTIVE_GUARD_RE =
-    /\[Environment\]::UserInteractive\s+-and\s+-not\s+\[Console\]::IsOutputRedirected/i;
-export const PS_NON_INTERACTIVE_FLAG_RE = /-(?:Force|NonInteractive|Batch|Silent|Quiet)\b/i;
-export const PS_IEX_DYNAMIC_RE = /\b(?:Invoke-Expression|iex)\s+["']?\$[A-Za-z_{]/i;
-export const PS_DOC_HEADER_RE =
-    /(?:\.(?:SYNOPSIS|DESCRIPTION)|\b(?:Module|Description|Purpose):|<#|#\s*(?:模块归属|职责说明|架构定位|用法示例|退出语义):)/i;
-
 /* ---- Emitter and State Types ---- */
 
 export type ShellEmitter = (
@@ -331,9 +285,9 @@ export function scanStrictErrorFlags(maskedLines: string[]): {
     for (let i = 0; i < maxScan; i++) {
         const trimmed = maskedLines[i].trim();
         if (trimmed === '') continue;
-        if (SET_E_RE.test(trimmed)) hasE = true;
-        if (SET_U_RE.test(trimmed)) hasU = true;
-        if (SET_PIPEFAIL_RE.test(trimmed)) hasPipefail = true;
+        if (REGEX.SHELL.SET_ERREXIT.test(trimmed)) hasE = true;
+        if (REGEX.SHELL.SET_NOUNSET.test(trimmed)) hasU = true;
+        if (REGEX.SHELL.SET_PIPEFAIL.test(trimmed)) hasPipefail = true;
         if (hasE && hasU && hasPipefail) break;
     }
     return { hasE, hasU, hasPipefail };
@@ -351,7 +305,7 @@ export function checkDeprecatedSyntax(lineCtx: ShellLineScanContext, emit: Shell
     const masked = lineCtx.maskedTrimmed;
     const idx = lineCtx.lineIndex;
 
-    if (BACKTICK_CMD_RE.test(raw) && !/^['"]/.test(trimmed)) {
+    if (REGEX.SHELL.BACKTICK_CMD.test(raw) && !/^['"]/.test(trimmed)) {
         if (masked.includes('`')) {
             emit(
                 idx,
@@ -364,7 +318,7 @@ export function checkDeprecatedSyntax(lineCtx: ShellLineScanContext, emit: Shell
         }
     }
 
-    if (DEPRECATED_TEST_RE.test(masked) && !MODERN_TEST_RE.test(masked)) {
+    if (REGEX.SHELL.DEPRECATED_TEST.test(masked) && !REGEX.SHELL.MODERN_TEST.test(masked)) {
         if (
             !/:\s*\[/.test(trimmed) &&
             !/\]\s*,/.test(trimmed) &&
@@ -497,7 +451,7 @@ export function checkShellDocContract(lines: string[], filePath: string, emit: S
 
     const maxScan = Math.min(lines.length, 30);
     for (let i = 0; i < maxScan; i++) {
-        if (SHELL_DOC_HEADER_RE.test(lines[i])) return;
+        if (REGEX.SHELL.SHELL_DOC_HEADER.test(lines[i])) return;
     }
 
     emit(
@@ -526,7 +480,7 @@ export function checkPowerShellDocContract(
 
     const maxScan = Math.min(lines.length, 30);
     for (let i = 0; i < maxScan; i++) {
-        if (PS_DOC_HEADER_RE.test(lines[i])) return;
+        if (REGEX.SHELL.PS_DOC_HEADER.test(lines[i])) return;
     }
 
     emit(
@@ -573,7 +527,7 @@ export function checkShellStrictExitCapture(
     emit: ShellEmitter,
 ): void {
     if (!hasSetE) return;
-    if (SH_PREDICATE_COMMANDS_RE.test(trimmed) && !SH_EXIT_GUARD_RE.test(trimmed)) {
+    if (REGEX.SHELL.SH_PREDICATE_COMMANDS.test(trimmed) && !REGEX.SHELL.SH_EXIT_GUARD.test(trimmed)) {
         emit(
             lineIdx,
             RULE_SH_EXIT_001,
@@ -604,10 +558,10 @@ export function checkShellResourceCleanup(
     for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trim();
         if (trimmed.startsWith('#')) continue;
-        if (SHELL_TRAP_EXIT_RE.test(trimmed)) {
+        if (REGEX.SHELL.SHELL_TRAP_EXIT.test(trimmed)) {
             hasTrap = true;
         }
-        if (!hasResource && SHELL_MKTEMP_RE.test(trimmed)) {
+        if (!hasResource && REGEX.SHELL.SHELL_MKTEMP.test(trimmed)) {
             hasResource = true;
             resourceLine = i;
         }
@@ -642,11 +596,11 @@ export function checkPowerShellResourceDisposal(
 
     for (let i = 0; i < lines.length; i++) {
         const masked = maskedLines[i];
-        if (PS_FINALLY_RE.test(masked)) {
+        if (REGEX.SHELL.PS_FINALLY.test(masked)) {
             hasFinally = true;
             break;
         }
-        if (handleLine === -1 && PS_RESOURCE_DISPOSAL_RE.test(masked)) {
+        if (handleLine === -1 && REGEX.SHELL.PS_RESOURCE_DISPOSAL.test(masked)) {
             handleLine = i;
         }
     }
@@ -675,7 +629,7 @@ export function checkShellDynamicSecurity(
     lineIdx: number,
     emit: ShellEmitter,
 ): void {
-    if (SH_EVAL_DYNAMIC_RE.test(trimmed)) {
+    if (REGEX.SHELL.SH_EVAL_DYNAMIC.test(trimmed)) {
         emit(
             lineIdx,
             RULE_SH_SEC_001,
@@ -699,7 +653,7 @@ export function checkPowerShellDynamicSecurity(
     lineIdx: number,
     emit: ShellEmitter,
 ): void {
-    if (PS_IEX_DYNAMIC_RE.test(trimmed)) {
+    if (REGEX.SHELL.PS_IEX_DYNAMIC.test(trimmed)) {
         emit(
             lineIdx,
             RULE_PS_SEC_001,
@@ -724,7 +678,7 @@ export function checkPowerShellSafety(
     emit: ShellEmitter,
 ): void {
     if (hasGuard) return;
-    if (PS_INTERACTIVE_RE.test(lineCtx.maskedTrimmed)) {
+    if (REGEX.SHELL.PS_INTERACTIVE.test(lineCtx.maskedTrimmed)) {
         emit(
             lineCtx.lineIndex,
             RULE_PS_SAFE_001,
@@ -752,7 +706,7 @@ export function checkShellSafety(
     const masked = lineCtx.maskedTrimmed;
     if (/^\s*while\b.*?\bread\b/.test(masked)) return;
     if (/<<<|<<|<[a-zA-Z0-9_\/"'$]/.test(masked)) return;
-    if (SH_READ_INTERACTIVE_RE.test(masked) && !/\s-t\s+\d+/.test(masked)) {
+    if (REGEX.SHELL.SH_READ_INTERACTIVE.test(masked) && !/\s-t\s+\d+/.test(masked)) {
         emit(
             lineCtx.lineIndex,
             RULE_SH_SAFE_001,
