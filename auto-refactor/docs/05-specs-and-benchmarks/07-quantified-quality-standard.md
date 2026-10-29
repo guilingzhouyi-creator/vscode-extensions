@@ -174,7 +174,88 @@ $$\text{CAI} = \sum_{k=1}^6 w_k R_k \in [0.0, 100.0]$$
 
 ---
 
-## 6. 关联文档导航
+## 6. Finding 级置信校准与三级可裁决分层 (Jev-style Adjudication)
+
+> **代码真源**：[`confidence-calibration.ts`](../../src/core/scoring/confidence-calibration.ts)、[`finding-confidence-arbiter.ts`](../../src/core/scoring/finding-confidence-arbiter.ts)、[`validate-confidence-calibration.js`](../../scripts/validate-confidence-calibration.js)
+
+### 6.1 问题：自评分不是置信度
+
+分析器命中模式后由**同一个分析器**声明「这个命中是真的」。它没有机制发现自己在过度匹配，所以这个自评分是一份自己判的卷子——无论把参数（规则条数）堆到多大，它对自己脑补出来的幻觉天然缺乏概率校准能力。这与文档解析领域「让识别模型给自己打置信分」的失效模式同构。
+
+因此引擎把**提议**与**裁决**拆开：分析器只产出 `Issue` 与自评 `evidence.confidence`，置信度由 `confidence-calibration.ts` 依据**已观测结局**重新裁定。
+
+### 6.2 经验贝叶斯后验与收缩
+
+对每条规则维护 $\text{Beta}(\alpha, \beta)$ 共轭后验，先验取无信息无偏的 **Jeffreys $\text{Beta}(0.5, 0.5)$**：
+
+$$\alpha = \text{TP} + 0.5, \qquad \beta = \text{FP} + 0.5, \qquad N = \text{TP} + \text{FP}$$
+
+后验均值与收缩权重：
+
+$$\mu = \frac{\alpha}{\alpha + \beta}, \qquad r = \frac{N}{N + N_0}, \qquad \text{Calibrated} = r \cdot \mu + (1 - r) \cdot \text{Raw}$$
+
+其中收缩锚点 $N_0 = 10$。三条刚性性质：
+
+1. **零观测即中性**：$N = 0 \Rightarrow r = 0 \Rightarrow \text{Calibrated} = \text{Raw}$。引入校准不是全局静默改分。
+2. **小样本不得夺权**：$N = 2 \Rightarrow r \approx 0.17$，后验无法压过分析器自评；$N \ge N_0$ 才置 `isReliable = true`。
+3. **无证据不得乐观**：`Actionable` 档在零观测时落在 $\text{CONFIDENCE\_ACTIONABLE\_FLOOR} = 0.90$，而非旧实现假设的 $0.95$ 天花板。「没有证据」与「近乎确定」被彻底分开。
+
+### 6.3 可裁决分层的三档与严重性底线
+
+| 层级 | 语义 | 门禁权威 | `confidenceSource` |
+| :--- | :--- | :--- | :--- |
+| **T1 Prescriptive** | 确定性静态证明（复杂度超阈、语法错误、密钥泄漏、`error` 级活跃规则） | **阻断** | `verified` |
+| **T2 Actionable** | 携带机械可应用 patch（`templateSnippet` / `unifiedDiff` / `patchRange`） | 不阻断 | `calibrated` / `uncalibrated` |
+| **T3 Advisory** | 演进建议与风格提示 | 不阻断 | `calibrated` / `uncalibrated` |
+
+**严重性底线 (`enforceSeverityFloor`)**：裁决不得静默撤销分析器的 `error` 声明。一条活跃规则上报 `error` 却不带 patch 时，仍保持 T1 阻断；撤销阻断权只能经**显式可审计的生命周期机制**（`quarantined` / `canary` / `experimental` / `deprecated`）。否则任何过度匹配的 error 级规则都会自动静默，体积红线将退化为装饰。该守卫**单向**：只能恢复阻断，不能新造阻断。
+
+### 6.4 可靠性度量与单调棘轮
+
+`validate-confidence-calibration.js` 以冻结标注语料同时度量**两个方向相反**的指标：
+
+$$\text{ECE} = \sum_{b=1}^{B} \frac{|S_b|}{|S|} \left| \text{acc}(S_b) - \text{conf}(S_b) \right|, \qquad \text{Brier} = \frac{1}{|S|} \sum_{i=1}^{|S|} (\hat{p}_i - y_i)^2$$
+
+- **ECE** 回答「说 0.9 时是否真有 90% 对」，对系统性过度自信敏感；
+- **Brier** 是逐观测平方误差，对分箱内部的错序敏感。两者方向互补，缺一都会漏。
+
+实测于 118 条标注观测（含刻意构造的过度自信组）：$\text{ECE}\; 0.2642 \to 0.1589$、$\text{Brier}\; 0.2907 \to 0.1852$、自报告乐观偏差 $0.2643 \to 0.1100$。棘轮钉在 $\text{ECE} \le 0.17$、$\text{Brier} \le 0.20$，只许降不许升；同时断言「全 0.99 判定器得分必须严格更差」，防止指标退化为死数。
+
+残余偏差属收缩锚点的设计代价：每条规则的观测数约等于锚点时，只半信自己的后验。若要归零，须扩充语料，而非削弱锚点——削弱锚点会让极少观测的规则压过分析器，比残余偏差危险得多。
+
+### 6.5 报告与门禁的双通道
+
+| 通道 | 载体 | 回答的问题 |
+| :--- | :--- | :--- |
+| **严重度** | `summary.bySeverity` | 这条 finding 有多吵 |
+| **裁决** | `summary.arbitration` / AAS `usability` | 这条 finding 能不能直接用 |
+
+`summary.arbitration` 记录三档计数、`blockingCount`、`gateVerdict`、`uncalibratedCount`、`reviewQueueCount`（人工必读）、`advisoryOnlyRules`、`ruleTiers`（逐规则最强档）。AAS 报告头部输出 `usability ∈ {proven, patchable, advisory, uncalibrated, needsHuman}`，逐缺陷携带 `tier` 与 `conf`；未裁决时**整块省略**而非输出零值，否则与「什么都没扫到」不可区分。
+
+**退出码只由严重度决定**，不读裁决。两个问题有不同的失败代价：「这条有多吵」的答案错了会漏掉真缺陷，「这条能不能直接用」的答案错了只是多花一次人工复核。用推断出来的档位去收窄门禁，等于让一个可能过度匹配的分层器替操作者决定是否放行——而操作者已经有显式、可审计的撤权通道（`quarantined` / `canary` / `deprecated`），由 `enforceSeverityFloor` 强制执行。因此 `advisoryOnlyRules` 是**报告元数据**，供上层消费者读取，不参与退出码计算。
+
+### 6.6 闭环：结局回收、人工队列与置信门控重审
+
+校准若只停留在报告字段上，就只是一次更精致的自夸。三个模块把裁决接回实际作业面：
+
+| 环节 | 真源 | 解决的问题 | 关闭的旧失效 |
+| :--- | :--- | :--- | :--- |
+| **语料入口** | [`calibration-corpus.ts`](../../src/core/scoring/calibration-corpus.ts) | 把已记录的结局计数送进裁决器 | `baseline/confidence-calibration.json` 此前有格式无读者，`ruleCalibrationStats` 永远为空 |
+| **人工队列** | [`review-queue.ts`](../../src/core/reporting/review-queue.ts) | 把自动化无法定案的残余导出为确定性 NDJSON 工单 | `reviewQueueCount` 只是个数字，没有任何人能看到具体是哪几条 |
+| **修复结局** | [`fix-outcome-tracker.ts`](../../src/core/memory/fix-outcome-tracker.ts) | 把「上次报过、这次不报了」记成 `HistoricalFixResult` | `fixResults` 在两条写路径上恒为 `[]`，复审记忆从不记录任何修复 |
+| **门控重审** | [`confidence-rework.ts`](../../src/core/pipeline/confidence-rework.ts) | 对**有界**快扫的低置信 finding 做**一次**更宽上下文的重扫 | 有界扫描的窗口边缘误报此前只能二选一：照单全收，或整文件重扫 |
+
+**语料入口的拒绝语义**：负数、非整数、字符串化计数、零观测条目、重复规则 ID 一律拒收并给出理由，绝不 `Number()` 强转。把手写文件的笔误转成 0 或 1 都是凭空捏造观测。语料缺失或不可用即「无证据」，此时每条置信度与分析器自评完全一致——这正是引入校准前的行为，因此坏语料的代价是退回到旧状态，而不是让裁决器拿着脏数据乱判。
+
+**人工队列的四类与优先级**：`needs-human`（无校准证据且声明需要运行时证据）→ `runtime-evidence` → `uncalibrated` → `advisory`。三个排除条件是队列成立的前提：已阻断的由自动化层级定案、已抑制的已被人工定案、**携带可执行 patch 的由 codemod 定案**。缺了第三条，队列会退化成「所有无历史规则的 finding」，在年轻规则集上几乎是全量。排序按分类、文件、行号、规则、分析器五级全序，同输入两次运行必须字节一致。
+
+**修复结局的诚实边界**：规则按 **rule id** 而非 issue id 比对，因为 issue id 内嵌行号，仅仅移动一行就会既像「已修复」又像「新引入」。同时这类消失**不进校准语料的正负样本**——finding 消失的原因可能是改了、删了行、规则收敛了或文件被重新生成，与「当初报错了」不是同一件事。把复发当成功会系统性抬高规则置信度，是比漏计更危险的方向。
+
+**重扫的条件与预算**：仅当扫描是**有界**的、finding 非 `error` 级（严重性底线已定案）、且置信度低于 $\theta = 0.65$ 时才重审，且只跑产出该 finding 的分析器。四种策略按能否改变答案来分派：整体符号类规则（复杂度）放宽窗口无用，走无界 `deepen-ast`；分析器已声明「只有运行时证据才能定案」（`evidence.requiresRuntime`）的走 `defer-external-evidence`——放宽窗口只会重读到同一份「缺动态信息」，本地重扫纯属白跑；稀疏路由漏掉分析器时走 `swap-analyzer-set`；其余走 `widen-context`。重扫**只做一次**：确定性错的分析器第三次也不会对，而无界重试会把一次毫秒级快扫做成它本要避免的深扫。被否证的 finding 直接丢弃并经 `EscalationChannel` 发布 `SPECULATIVE_INVALIDATION`，严重度取 `info`——否证是流水线正常工作的证据，报成 `error` 会让 `hasBreaches()` 在好结果上失败。
+
+---
+
+## 7. 关联文档导航
 
 - [01. 配置模式与多格式报告契约](./01-config-and-reports.md)
 - [02. 全维性能基准与原生算子加速台账](./02-performance-benchmarks.md)
