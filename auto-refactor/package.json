@@ -29,6 +29,7 @@
     "self-test": "node dist/index.js self-test",
     "validate-confidence-calibration": "node scripts/validate-confidence-calibration.js",
     "validate-closed-loop": "node scripts/validate-closed-loop.js",
+    "validate-review-loop": "node scripts/validate-review-loop.js",
     "validate-aggregator-parity": "node scripts/validate-aggregator-parity.js",
     "gate:self:warning": "node scripts/gate-self.js --severity warning",
     "gate:self:warning:update": "node scripts/gate-self.js --severity warning --update",
