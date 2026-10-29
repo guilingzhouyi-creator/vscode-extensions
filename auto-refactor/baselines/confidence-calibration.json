@@ -1,0 +1,15 @@
+{
+  "schema": "confidence-calibration-corpus/v1",
+  "rationale": "Observed outcome counts per rule, the evidence behind every calibrated confidence score. A rule's self-reported confidence is a self-marked exam: the analyzer that matched the pattern also asserts the match is real, and it cannot notice its own over-matching. Each entry records what actually happened after the finding shipped. truePositives are findings a reviewer or a ratchet later confirmed; falsePositives are findings that were rejected, suppressed with a stated reason, or rolled back. The Jeffreys prior (0.5, 0.5) in src/core/scoring/confidence-calibration.ts means an unlisted rule starts at the same place it always was, so adding this file is never a silent global change. Counts only ever grow: shrinking one requires evidence that the earlier count was wrong, which is a review, not an edit.",
+  "provenance": {
+    "suppressionReason": "config.suppressions[].reason in auto-refactor.config.json records why a reviewer deliberately silenced a rule on a file; each such entry is one false positive.",
+    "ratchetBaseline": "baselines/self-scan.baseline.json freezes findings the project accepted as known debt rather than defects.",
+    "incidentRollback": "praxis Incident Ledger rollback events record advice that had to be reverted, the strongest false-positive signal available."
+  },
+  "rules": [],
+  "notes": [
+    "An empty rules array is a valid, honest state: every confidence then equals the analyzer's own score, exactly as before calibration existed.",
+    "Populate an entry only from recorded outcomes, never from an estimate of how accurate a rule feels.",
+    "scripts/validate-confidence-calibration.js asserts the health of this file and the ECE/Brier monotonic ratchet over the labelled evaluation set."
+  ]
+}

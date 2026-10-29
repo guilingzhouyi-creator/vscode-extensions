@@ -843,6 +843,86 @@ export interface ScanSummary {
         requiresRuntimeCount: number;
         averageConfidence: number;
     };
+    /**
+     * Finding-level arbitration verdict.
+     *
+     * Present when the post-scan arbitration pass ran. It is the answer to a different question
+     * than `bySeverity`: severity counts how loud each finding is, while this records whether the
+     * findings were adjudicated into blocking, actionable and advisory tiers, how many lacked any
+     * calibration evidence, and which findings a human must look at because no automated tier
+     * could settle them.
+     */
+    arbitration?: {
+        /** Findings assessed. */
+        totalEvaluated: number;
+        /** T1: deterministic proof, blocks the gate. */
+        prescriptiveCount: number;
+        /** T2: carries a mechanically applicable patch. */
+        actionableCount: number;
+        /** T3: suggestion only, never blocks. */
+        advisoryCount: number;
+        /** Findings withheld because a suppression directive matched them. */
+        suppressedCount: number;
+        /** Non-blocking findings outside the modified differential slice. */
+        prunedBySliceCount: number;
+        /** Findings whose tier demands gate obstruction. */
+        blockingCount: number;
+        /** Gate verdict implied by `blockingCount`. */
+        gateVerdict: 'passed' | 'blocked';
+        /** Findings whose rule carries no outcome history, so the score is self-reported. */
+        uncalibratedCount: number;
+        /**
+         * Findings that no automated tier could settle: non-blocking, made without calibration
+         * evidence, and flagged as needing runtime confirmation. These are the only findings a
+         * reviewer has to read; everything else is either proven or mechanically fixable.
+         */
+        reviewQueueCount: number;
+        /** Rule ids demoted for an excessive suppression ratio. */
+        noisyRules?: string[];
+        /** Rule ids held back entirely after repeated rejection. */
+        quarantinedRules?: string[];
+        /**
+         * Rules the arbiter classified as advisory on every occurrence in this report.
+         *
+         * Recorded per rule rather than per finding because the gate verdict is repository-wide:
+         * a finding-level exemption would let the same rule block on one line and pass on
+         * another with no way for a reader to predict which. A rule appears here only when
+         * nothing it produced reached a blocking tier.
+         *
+         * Report metadata only: the exit code never reads it. The gate follows the operator's
+         * `failOnSeverity`, and narrowing it from here would override that explicit choice.
+         */
+        advisoryOnlyRules?: string[];
+        /**
+         * Tier the arbiter assigned to each rule that produced at least one active finding.
+         *
+         * A rule's tier is its strongest outcome in this report, not its weakest: a rule that
+         * blocks on one line is a T1 rule even if it only advised on another, so a consumer can
+         * never model it as benign. Per-rule rather than per-finding because the tier answers
+         * "can this class of finding be trusted", and AAS records are keyed by rule.
+         */
+        ruleTiers?: Record<string, 'T1' | 'T2' | 'T3'>;
+        /**
+         * Fingerprint and shape of the adjudication evidence behind those tiers.
+         *
+         * Two reports can disagree about the same finding because the code changed or because the
+         * evidence did; without this block they are indistinguishable. `digest` changes whenever
+         * the accepted outcome counts or the tier thresholds change, so a consumer comparing two
+         * runs can tell a regression from a model refresh. Absent when no evidence was supplied,
+         * because "no model" is a state a reader must be able to see rather than infer from a
+         * digest that happens to look stable.
+         */
+        model?: {
+            /** Schema tag of the model description. */
+            schema: string;
+            /** Digest over the evidence counts and thresholds. */
+            digest: string;
+            /** Rules carrying observed outcomes. */
+            calibratedRuleCount: number;
+            /** Total observations behind those rules. */
+            observationCount: number;
+        };
+    };
     filesScanned: number;
     issuesTotal: number;
     bySeverity: Record<Severity, number>;

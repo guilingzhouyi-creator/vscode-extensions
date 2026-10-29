@@ -25,6 +25,18 @@ import {
     resolveBatchClustering,
     clusterOverlappingFindings,
 } from './finding-arbitration-batch';
+import type { ConfidenceSource, RuleCalibrationStats } from './confidence-calibration';
+import { calibrateRuleConfidence, indexRuleStats } from './confidence-calibration';
+import type { TierPolicyOptions } from './finding-tier-policy';
+import {
+    enforceSeverityFloor,
+    resolveActionableOrAdvisoryPolicy,
+    resolveExpiredSuppressionPolicy,
+    resolvePrescriptivePolicy,
+} from './finding-tier-policy';
+
+/** Provenance token for a confidence backed by deterministic static proof, not a posterior. */
+const CONFIDENCE_SOURCE_VERIFIED: ConfidenceSource = 'verified';
 
 export { clusterOverlappingFindings };
 
@@ -53,7 +65,13 @@ export type GateVerdict = typeof GATE_VERDICT_PASSED | typeof GATE_VERDICT_BLOCK
 /** Fixed maximum confidence score assigned to prescriptive findings. */
 export const CONFIDENCE_PRESCRIPTIVE = 1.0;
 
-/** Default confidence score assigned to actionable findings with patches. */
+/**
+ * Confidence a rule may claim only after its posterior has been calibrated.
+ *
+ * This is a ceiling, never a default: a finding whose outcome history is unknown must not be
+ * scored as if it were nearly certain. Treating "no evidence" as 0.95 is the reverse of
+ * calibration — it rewards the analyzer that never justified itself.
+ */
 export const CONFIDENCE_ACTIONABLE_DEFAULT = 0.95;
 
 /** Minimum acceptable confidence floor for actionable findings. */
@@ -121,6 +139,17 @@ export interface ArbitratedFinding {
     tier: FindingConfidenceTier;
     /** Quantified confidence score in [0.0, 1.0] */
     confidence: number;
+    /**
+     * Provenance of `confidence`, so a consumer can distinguish an adjudicated score from an
+     * analyzer's unverified self-report instead of treating the two as equivalent.
+     */
+    confidenceSource?: ConfidenceSource;
+    /** Posterior size behind `confidence`; zero means the rule has never been observed. */
+    calibrationSampleSize?: number;
+    /** Lower bound of the calibrated 95% credible interval. */
+    confidenceLowerBound?: number;
+    /** Upper bound of the calibrated 95% credible interval. */
+    confidenceUpperBound?: number;
     /** Whether this finding demands gate obstruction */
     mustBlock: boolean;
     /** Executable mutation payload for Actionable findings */
@@ -223,6 +252,14 @@ export interface FindingConfidenceArbiterOptions {
     ruleLifecycleMap?: Map<string, RuleLifecycleState> | Record<string, RuleLifecycleState>;
     /** Dynamic suppression ratio threshold to trigger automatic rule quarantine (default: 0.50) */
     autoQuarantineThreshold?: number;
+    /**
+     * Observed outcome counts per rule, used to calibrate confidence.
+     *
+     * Omit it and every confidence falls back to the analyzer's self-report, exactly as before
+     * this option existed; supply it and confidence becomes an adjudicated posterior that rises
+     * with confirmed findings and falls with rejections.
+     */
+    ruleCalibrationStats?: readonly RuleCalibrationStats[];
 }
 
 /**
@@ -594,66 +631,6 @@ function isLineInRanges(lineNo: number, spans: LineRangeSpan[]): boolean {
     return false;
 }
 
-/**
- * Applies rule lifecycle policy (quarantine, canary, experimental, deprecated)
- * to decide whether a prescriptive violation has its blocking authority revoked.
- */
-function applyRuleLifecyclePolicy(
-    lifecycleState: RuleLifecycleState,
-    prescriptive: { isMatch: boolean; rationale: string },
-    patch: ExecutablePatch | undefined,
-    actionableFloor: number,
-    advisoryDefault: number,
-): {
-    tier: FindingConfidenceTier;
-    confidence: number;
-    mustBlock: boolean;
-    rationale: string;
-    isQuarantined: boolean;
-} {
-    if (lifecycleState === LIFECYCLE_QUARANTINED) {
-        const tier = patch ? TIER_ACTIONABLE : TIER_ADVISORY;
-        const confidence = patch ? actionableFloor : advisoryDefault;
-        return {
-            tier,
-            confidence,
-            mustBlock: false,
-            rationale: `[TRICORDER QUARANTINE: Rule is quarantined due to elevated developer suppression ratio; prescriptive blocking revoked] ${prescriptive.rationale}`,
-            isQuarantined: true,
-        };
-    }
-
-    if (lifecycleState === LIFECYCLE_DEPRECATED) {
-        return {
-            tier: TIER_ADVISORY,
-            confidence: advisoryDefault,
-            mustBlock: false,
-            rationale: `[DEPRECATED RULE: Rule scheduled for deprecation; prescriptive blocking disabled] ${prescriptive.rationale}`,
-            isQuarantined: true,
-        };
-    }
-
-    if (lifecycleState === LIFECYCLE_CANARY || lifecycleState === LIFECYCLE_EXPERIMENTAL) {
-        const tier = patch ? TIER_ACTIONABLE : TIER_ADVISORY;
-        const confidence = patch ? actionableFloor : advisoryDefault;
-        return {
-            tier,
-            confidence,
-            mustBlock: false,
-            rationale: `[${lifecycleState.toUpperCase()} RULE: Non-blocking trial evaluation] ${prescriptive.rationale}`,
-            isQuarantined: true,
-        };
-    }
-
-    return {
-        tier: TIER_PRESCRIPTIVE,
-        confidence: CONFIDENCE_PRESCRIPTIVE,
-        mustBlock: true,
-        rationale: prescriptive.rationale,
-        isQuarantined: false,
-    };
-}
-
 type InlineSuppressionResult = {
     isSuppressed: boolean;
     isExpired?: boolean;
@@ -699,91 +676,6 @@ function checkLineDirectiveAt(
     return null;
 }
 
-interface ArbitratedPolicy {
-    tier: FindingConfidenceTier;
-    confidence: number;
-    mustBlock: boolean;
-    patch?: ExecutablePatch;
-    rationale: string;
-    isSuppressionExpired: boolean;
-    isQuarantined: boolean;
-}
-
-function resolveExpiredSuppressionPolicy(
-    issue: Issue,
-    suppression: InlineSuppressionResult,
-): ArbitratedPolicy {
-    return {
-        tier: TIER_PRESCRIPTIVE,
-        confidence: CONFIDENCE_PRESCRIPTIVE,
-        mustBlock: true,
-        rationale: `[SUPPRESSION EXPIRED: Inlined suppression expired on ${suppression.expiryDate}. Immediate remediation required.]`,
-        patch: extractExecutablePatch(issue),
-        isSuppressionExpired: true,
-        isQuarantined: false,
-    };
-}
-
-function resolvePrescriptivePolicy(
-    issue: Issue,
-    prescriptive: { isMatch: boolean; rationale: string },
-    lifecycleState: RuleLifecycleState,
-    actionableConfidenceFloor: number,
-    advisoryConfidenceDefault: number,
-): ArbitratedPolicy {
-    const patch = extractExecutablePatch(issue);
-    const policy = applyRuleLifecyclePolicy(
-        lifecycleState,
-        prescriptive,
-        patch,
-        actionableConfidenceFloor,
-        advisoryConfidenceDefault,
-    );
-    return {
-        tier: policy.tier,
-        confidence: policy.confidence,
-        mustBlock: policy.mustBlock,
-        rationale: policy.rationale,
-        isQuarantined: policy.isQuarantined,
-        patch,
-        isSuppressionExpired: false,
-    };
-}
-
-function resolveActionableOrAdvisoryPolicy(
-    issue: Issue,
-    actionableConfidenceFloor: number,
-    advisoryConfidenceDefault: number,
-): ArbitratedPolicy {
-    const patch = extractExecutablePatch(issue);
-    if (patch) {
-        return {
-            tier: TIER_ACTIONABLE,
-            confidence: Math.max(
-                actionableConfidenceFloor,
-                issue.evidence?.confidence ?? CONFIDENCE_ACTIONABLE_DEFAULT,
-            ),
-            mustBlock: false,
-            rationale: 'Actionable finding with deterministic executable patch payload',
-            patch,
-            isSuppressionExpired: false,
-            isQuarantined: false,
-        };
-    }
-    return {
-        tier: TIER_ADVISORY,
-        confidence: Math.min(
-            CONFIDENCE_ACTIONABLE_FLOOR - 0.01,
-            issue.evidence?.confidence ?? advisoryConfidenceDefault,
-        ),
-        mustBlock: false,
-        rationale: 'Advisory suggestion for architectural evolution and code quality',
-        patch: undefined,
-        isSuppressionExpired: false,
-        isQuarantined: false,
-    };
-}
-
 /**
  * Tricorder-inspired Finding Confidence Arbiter.
  *
@@ -805,6 +697,7 @@ export class FindingConfidenceArbiter {
     private readonly enableClustering: boolean;
     private readonly ruleLifecycleMap?: Map<string, RuleLifecycleState>;
     private readonly autoQuarantineThreshold: number;
+    private readonly ruleCalibrationStats?: ReadonlyMap<string, RuleCalibrationStats>;
 
     /**
      * Initializes a new instance of FindingConfidenceArbiter.
@@ -832,6 +725,9 @@ export class FindingConfidenceArbiter {
         this.nowTimestamp = options?.nowTimestamp ?? Date.now();
         this.enableClustering = options?.enableClustering ?? false;
         this.autoQuarantineThreshold = options?.autoQuarantineThreshold ?? 0.5;
+        this.ruleCalibrationStats = options?.ruleCalibrationStats
+            ? indexRuleStats(options.ruleCalibrationStats)
+            : undefined;
 
         if (options?.ruleLifecycleMap) {
             if (options.ruleLifecycleMap instanceof Map) {
@@ -982,21 +878,22 @@ export class FindingConfidenceArbiter {
         const lifecycleState: RuleLifecycleState =
             this.ruleLifecycleMap?.get(issue.rule) || LIFECYCLE_ACTIVE;
 
-        const policy = suppression.isExpired
-            ? resolveExpiredSuppressionPolicy(issue, suppression)
+        const calibrated = calibrateRuleConfidence(
+            issue.evidence?.confidence ?? CONFIDENCE_ACTIONABLE_FLOOR,
+            this.ruleCalibrationStats?.get(issue.rule),
+        );
+
+        const policyOptions: TierPolicyOptions = {
+            actionableConfidenceFloor: this.actionableConfidenceFloor,
+            advisoryConfidenceDefault: this.advisoryConfidenceDefault,
+        };
+        const patch = extractExecutablePatch(issue);
+        const resolved = suppression.isExpired
+            ? resolveExpiredSuppressionPolicy(patch, suppression)
             : prescriptive.isMatch
-              ? resolvePrescriptivePolicy(
-                    issue,
-                    prescriptive,
-                    lifecycleState,
-                    this.actionableConfidenceFloor,
-                    this.advisoryConfidenceDefault,
-                )
-              : resolveActionableOrAdvisoryPolicy(
-                    issue,
-                    this.actionableConfidenceFloor,
-                    this.advisoryConfidenceDefault,
-                );
+              ? resolvePrescriptivePolicy(prescriptive, lifecycleState, patch, policyOptions)
+              : resolveActionableOrAdvisoryPolicy(patch, calibrated, policyOptions);
+        const policy = enforceSeverityFloor(resolved, issue, lifecycleState);
 
         const inSlice = Boolean(
             this.differentialSlice?.enabled && this.isInDifferentialSlice(issue, changedRanges),
@@ -1008,10 +905,18 @@ export class FindingConfidenceArbiter {
             this.differentialSlice?.pruneHistoricalNonBlocking !== false,
         );
 
+        const confidenceSource: ConfidenceSource = policy.mustBlock
+            ? CONFIDENCE_SOURCE_VERIFIED
+            : calibrated.source;
+
         return {
             issue,
             tier: policy.tier,
             confidence: policy.confidence,
+            confidenceSource,
+            calibrationSampleSize: calibrated.sampleSize,
+            confidenceLowerBound: calibrated.lowerBound,
+            confidenceUpperBound: calibrated.upperBound,
             mustBlock: policy.mustBlock,
             executablePatch: policy.patch,
             isSuppressed: suppression.isSuppressed,

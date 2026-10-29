@@ -32,3 +32,5 @@ export * from './archetype-weight-tuner';
 export * from './topological-churn-evaluator';
 export * from './modernization-formulas';
 export * from './technical-debt-ratio';
+export * from './confidence-calibration';
+export * from './finding-confidence-arbiter';
