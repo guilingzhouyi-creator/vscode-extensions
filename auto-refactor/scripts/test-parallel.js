@@ -132,6 +132,7 @@ const PARALLEL_SUITES = [
   },
   { name: 'validate-closed-loop', script: 'scripts/validate-closed-loop.js' },
   { name: 'validate-review-loop', script: 'scripts/validate-review-loop.js' },
+  { name: 'validate-stale-dist', script: 'scripts/validate-stale-dist.js' },
   { name: 'validate-aggregator-parity', script: 'scripts/validate-aggregator-parity.js' },
   { name: 'validate-suite-manifest', script: 'scripts/validate-suite-manifest.js' },
   { name: 'validate-test-runner-harness', script: 'scripts/validate-test-runner-harness.js' },

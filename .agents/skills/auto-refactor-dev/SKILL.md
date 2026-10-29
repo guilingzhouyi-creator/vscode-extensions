@@ -6,7 +6,7 @@ description: >-
 
 # auto-refactor-dev — 静态重构引擎、双轨算子与 Praxis SDK 开发规范
 
-本技能规范了 `auto-refactor/` 的六层架构、Rust+TS 双轨 100% 字节等价、<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器四阶段流水线（Stage 0~3）、<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->治理体系（<!-- METRICS:BEGIN test-suite-count -->**183 套**<!-- METRICS:END test-suite-count -->测试）、Praxis 客户端 SDK 与一体两面三层拓扑 Diff 引擎。
+本技能规范了 `auto-refactor/` 的六层架构、Rust+TS 双轨 100% 字节等价、<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器四阶段流水线（Stage 0~3）、<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->治理体系（<!-- METRICS:BEGIN test-suite-count -->**184 套**<!-- METRICS:END test-suite-count -->测试）、Praxis 客户端 SDK 与一体两面三层拓扑 Diff 引擎。
 
 ---
 
@@ -40,7 +40,7 @@ description: >-
 | **Stage 2: 单文件 AST 与现代化** | `simplify`, `complexity`, `stdlib`, `ts-modern`, `python-modern`, `rust-modern`, `gdscript-modern`, `go-modern`, `frontend` | 单文件 AST 与控制流图（`<10ms` 切片）；平铺逻辑、$\text{CC}\le 15 / \text{Depth}\le 4$、多语言现代惯用法 |
 | **Stage 3: 全工程语义图拓扑** | `performance`, `architecture`, `data-architecture`, `dependency-layout`, `dependency-graph`, `gate-architecture`, `gdscript-game`, `vscode-extension`, `client-exposure`, `test-modernity`, `governance` | 跨文件 `SemanticGraph`（Tarjan SCC / 支配树）；循环零分配、门面承载、依赖环、目录隔离、单源规则核验 |
 
-- **规则登记**：遵循 `FAMILY-TOPIC-NNN`，同步注册于 `src/core/rules/`、`dimensionRuleTable.ts`（单 Finding 扣分维度 $\text{AxesPerFinding} \le 4$）与 `scripts/common/rule-catalog.json`；所有 `scripts/validate-*.js` 必须在 `scripts/test-parallel.js`（<!-- METRICS:BEGIN test-suite-count -->**183 套**<!-- METRICS:END test-suite-count -->测试）显式纳管（`validate-suite-manifest.js`）。
+- **规则登记**：遵循 `FAMILY-TOPIC-NNN`，同步注册于 `src/core/rules/`、`dimensionRuleTable.ts`（单 Finding 扣分维度 $\text{AxesPerFinding} \le 4$）与 `scripts/common/rule-catalog.json`；所有 `scripts/validate-*.js` 必须在 `scripts/test-parallel.js`（<!-- METRICS:BEGIN test-suite-count -->**184 套**<!-- METRICS:END test-suite-count -->测试）显式纳管（`validate-suite-manifest.js`）。
 
 ---
 
