@@ -34,6 +34,7 @@ import {
 import type { ReviewMemoryManager } from '../memory/reviewMemory';
 import type { ReviewMemoryRecord } from '../memory/types';
 import { extractCodeDomains, computeAstDigest } from '../memory/domainFingerprint';
+import { deriveResolvedRules, reconcileFixResults } from '../memory/fix-outcome-tracker';
 import type { ChangeTrajectoryManager } from '../trajectory/changeTrajectory';
 import type { SymbolIndex } from '../intelligence/symbolIndex';
 import type { LiteralIndex } from '../intelligence/literalIndex';
@@ -177,6 +178,8 @@ function buildMemoryRecord(
             ':' +
             lastAudited,
     );
+    const revisionId = revisionHash.slice(0, REVISION_ID_LENGTH);
+    const existingRecord = host.reviewMemory.getRecord(metric.file);
 
     return {
         filePath: metric.file,
@@ -197,15 +200,39 @@ function buildMemoryRecord(
         // containing "NaN", which is not a stable identity: two identical unmeasured states
         // are indistinguishable from two different ones. A fixed token keeps the id
         // deterministic while still distinguishing measured from unmeasured revisions.
-        revisionId: revisionHash.slice(0, REVISION_ID_LENGTH),
+        revisionId,
         agentUid: cfg.agentUid || DEFAULT_AGENT_UID,
         contextWindows: {
             imports: [],
             exports: [],
             layer: cfg.profile?.directorySemantics?.[path.dirname(metric.file)],
         },
-        fixResults: [],
+        fixResults: reconcileFixResults(
+            existingRecord?.fixResults,
+            deriveResolvedRules(existingRecord, fileIssues, enabledAnalyzers(cfg)),
+            revisionId,
+            lastAudited,
+            cfg.agentUid || DEFAULT_AGENT_UID,
+        ),
     };
+}
+
+/**
+ * Lists the analyzers this scan could have run.
+ *
+ * A full scan runs every enabled analyzer on every file, so "enabled" is exactly "ran" here. The
+ * distinction matters downstream: a rule that stopped firing because its analyzer was disabled is
+ * not a resolved finding, and crediting it as one would record work that never happened.
+ *
+ * @param cfg - Effective scan config carrying the per-analyzer enabled flags.
+ * @returns Analyzer ids whose declarations are not disabled.
+ */
+function enabledAnalyzers(cfg: ScanConfig): string[] {
+    const names: string[] = [];
+    for (const [name, declaration] of Object.entries(cfg.analyzers)) {
+        if (declaration?.enabled !== false) names.push(name);
+    }
+    return names;
 }
 
 /**

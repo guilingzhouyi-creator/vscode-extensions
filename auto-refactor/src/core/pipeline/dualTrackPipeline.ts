@@ -46,6 +46,7 @@ import { ModuleDependencyGraph } from '../dependency-graph';
 import type { FileRevision } from '../trajectory/types';
 import type { ReviewMemoryManager } from '../memory/reviewMemory';
 import type { CodeDomainFingerprint, ReviewMemoryRecord } from '../memory/types';
+import { deriveResolvedRules, reconcileFixResults } from '../memory/fix-outcome-tracker';
 import type { ChangeTrajectoryManager } from '../trajectory/changeTrajectory';
 import { detectDependencyCycles, detectDependencyCyclesAsync } from './cycle-detector';
 import type {
@@ -55,6 +56,19 @@ import type {
 import { defaultSparseReferenceReplayManager } from '../ast/sparse-reference-replay';
 import { createCallGraphReferenceResolver } from '../intelligence/sparse-reference-resolver';
 import type { CallGraph } from '../intelligence/callGraph';
+import { DEFAULT_CONFIDENCE_THRESHOLD } from '../praxis/mcts/dspark-confidence-scheduler';
+import type { ReworkSummary } from './confidence-rework';
+import {
+    REWORK_DEEPEN_AST,
+    buildInvalidationEvents,
+    collectReworkAnalyzers,
+    dropRefutedFindings,
+    expandWindow,
+    hasLocalRework,
+    planRework,
+    reconcileRework,
+    summarizeRework,
+} from './confidence-rework';
 
 /** Number of leading digest hex characters kept as the short revision identifier. */
 const REVISION_ID_LENGTH = 16;
@@ -187,6 +201,14 @@ export interface FastTrackVerdict {
     agentGuidancePrompt?: string;
     /** Anomaly kinds detected while recording change-trajectory revisions. */
     anomaliesDetected: string[];
+    /**
+     * Counters for the confidence-gated rework pass.
+     *
+     * `refuted` is the number worth watching: it is the volume of speculation the wider scan
+     * cleared, and therefore the number of false findings a caller would have shipped had the
+     * bounded scan been taken at its word.
+     */
+    rework: ReworkSummary;
 }
 
 /**
@@ -319,7 +341,36 @@ interface AuditFileInputContext {
     readonly author: string;
     readonly archetype: ProjectArchetype | undefined;
     readonly acc: FastTrackAccumulator;
+    readonly channel: EscalationChannel;
 }
+
+/** Parameter context for the confidence-gated rework pass over one file. */
+interface ConfidenceReworkContext {
+    readonly scanner: Scanner;
+    readonly input: DiffFileInput;
+    readonly acc: FastTrackAccumulator;
+    readonly channel: EscalationChannel;
+    readonly memory: ReviewMemoryManager;
+    readonly trajectory: ChangeTrajectoryManager;
+    readonly issues: readonly Issue[];
+    readonly lineBounds?: readonly [number, number];
+    readonly routing?: SparseRouteResult;
+}
+
+/** Result of one file's rework pass: the findings to ship plus the counters to report. */
+interface ConfidenceReworkResult {
+    /** Findings that survived the second look, in original order. */
+    readonly issues: Issue[];
+    /** Per-file counters folded into the run totals. */
+    readonly summary: ReworkSummary;
+}
+
+/** Default counters for a file whose rework pass had nothing to do. */
+const EMPTY_REWORK_SUMMARY: ReworkSummary = Object.freeze({
+    evaluated: 0,
+    confirmed: 0,
+    refuted: 0,
+});
 
 /** Parameter context for building fast track speculative verdict. */
 interface FastTrackVerdictContext {
@@ -387,6 +438,8 @@ function runMemoryAndTrajectoryRecording(context: MemoryTrajectoryContext): void
     const contentDigest = computeAstDigest(undefined, newContent);
     const hasErrorIssue = fileIssues.some((issue) => issue.severity === SEVERITY_ERROR);
     const revisionId = contentDigest.slice(0, REVISION_ID_LENGTH);
+    const existingRecord = memory.get(filePath);
+    const auditedAt = Date.now();
 
     memory.put({
         filePath,
@@ -402,10 +455,16 @@ function runMemoryAndTrajectoryRecording(context: MemoryTrajectoryContext): void
             message: issue.message,
         })),
         qualityScores: scoreBreakdown,
-        lastAudited: Date.now(),
+        lastAudited: auditedAt,
         revisionId,
         contextWindows: { imports: [], exports: [] },
-        fixResults: [],
+        fixResults: reconcileFixResults(
+            existingRecord?.fixResults,
+            deriveResolvedRules(existingRecord, fileIssues, activeAnalyzers),
+            revisionId,
+            auditedAt,
+            author,
+        ),
         status: hasErrorIssue ? STATUS_REJECTED : STATUS_APPROVED,
         activeAnalyzers,
         overallScore: scoreBreakdown.compositeScore,
@@ -413,7 +472,7 @@ function runMemoryAndTrajectoryRecording(context: MemoryTrajectoryContext): void
 
     const revision: FileRevision = {
         revisionId,
-        timestamp: Date.now(),
+        timestamp: auditedAt,
         agentUid: author,
         fileHash: contentDigest,
         astDigest: contentDigest,
@@ -670,6 +729,8 @@ interface FastTrackAccumulator {
     sparseRouting: Record<string, SparseRouteResult>;
     allAnomalies: string[];
     lastScoreBreakdown?: QualityScoreBreakdown;
+    /** Running totals of the confidence-gated rework pass, aggregated over every file. */
+    rework: { evaluated: number; confirmed: number; refuted: number };
 }
 
 /**
@@ -751,6 +812,64 @@ function resolveFastTrackLineBounds(
 }
 
 /**
+ * Re-audits the low-confidence findings of a bounded fast scan with strictly more context.
+ *
+ * This is the pipeline's retry arm, and it exists because the alternative was worse in both
+ * directions. Trusting a bounded scan's guess shipped window-edge artefacts; rescanning the file
+ * unconditionally paid the full fast-track cost on every file to fix a handful of findings. Here
+ * a second pass runs only when a finding is both unproven and cheap to re-check, and it runs for
+ * the producing analyzers only.
+ *
+ * The pass never loops. A deterministically wrong analyzer does not improve on a third attempt,
+ * so one wider look is the whole budget; whatever survives it is settled by the deep track or by
+ * the reviewer, not by trying again.
+ *
+ * @param context - File, its bounded findings, the window that produced them and the sink.
+ * @returns Findings to ship plus this file's rework counters.
+ */
+async function runConfidenceRework(
+    context: ConfidenceReworkContext,
+): Promise<ConfidenceReworkResult> {
+    const { scanner, input, acc, channel, memory, trajectory, issues } = context;
+    const skippedAnalyzers = context.routing
+        ? Array.from(context.routing.overflowAnalyzers ?? [])
+        : [];
+    const candidates = planRework({
+        issues,
+        confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+        wasBounded: Boolean(context.lineBounds),
+        skippedAnalyzers,
+    });
+    const analyzers = collectReworkAnalyzers(candidates, skippedAnalyzers);
+    if (candidates.length === 0 || !hasLocalRework(candidates) || analyzers.length === 0) {
+        return { issues: [...issues], summary: EMPTY_REWORK_SUMMARY };
+    }
+
+    const needsUnbounded = candidates.some((candidate) => candidate.strategy === REWORK_DEEPEN_AST);
+    const widerBounds =
+        needsUnbounded || !context.lineBounds ? undefined : expandWindow(context.lineBounds);
+    const widerResult = await scanner.runAnalyzers(
+        input.filePath,
+        input.newContent,
+        undefined,
+        new Set(analyzers),
+        widerBounds,
+    );
+
+    const outcomes = reconcileRework(candidates, widerResult.issues);
+    const summary = summarizeRework(outcomes);
+    acc.rework.evaluated += summary.evaluated;
+    acc.rework.confirmed += summary.confirmed;
+    acc.rework.refuted += summary.refuted;
+
+    const invalidations = buildInvalidationEvents(outcomes, input.filePath, Date.now());
+    for (const invalidation of invalidations) {
+        await channel.publish(invalidation, memory, trajectory);
+    }
+    return { issues: dropRefutedFindings(issues, outcomes), summary };
+}
+
+/**
  * Audit a single file mutation in FastTrack: diff classification, sparse MoE routing,
  * localized scan execution, scoring and memory persistence.
  */
@@ -771,10 +890,23 @@ async function auditSingleFileInput(context: AuditFileInputContext): Promise<voi
         lineBounds,
     );
 
-    const finalIssues =
+    const boundedIssues =
         replayWindow && planner && planner.canUseSparseReplay(replayWindow)
             ? planner.pruneIssuesOutsideWindow(fileResult.issues, replayWindow)
             : fileResult.issues;
+
+    const reworkResult = await runConfidenceRework({
+        scanner: context.scanner,
+        input: inputTarget,
+        acc: context.acc,
+        channel: context.channel,
+        memory: context.memory,
+        trajectory: context.trajectory,
+        issues: boundedIssues,
+        lineBounds,
+        routing: context.acc.sparseRouting[inputTarget.filePath],
+    });
+    const finalIssues = reworkResult.issues;
 
     context.acc.fastIssues.push(...finalIssues);
     if (fileResult.metric) {
@@ -828,6 +960,7 @@ function buildFastTrackVerdict(context: FastTrackVerdictContext): FastTrackVerdi
         sparseRouting: acc.sparseRouting,
         agentGuidancePrompt: agentPrompt.renderedMarkdown,
         anomaliesDetected: acc.allAnomalies,
+        rework: { ...acc.rework },
     };
 }
 
@@ -870,6 +1003,7 @@ export async function executeDualTrack(
         fastMetrics: [],
         sparseRouting: {},
         allAnomalies: [],
+        rework: { evaluated: 0, confirmed: 0, refuted: 0 },
     };
 
     for (const input of inputs) {
@@ -883,6 +1017,7 @@ export async function executeDualTrack(
             author,
             archetype,
             acc,
+            channel,
         });
     }
 
