@@ -105,7 +105,7 @@ async function main() {
     const full = await scan(options);
     assert.deepStrictEqual(
       full.summary.postScanPasses,
-      ['dependency-graph', 'suppressions', 'baseline'],
+      ['dependency-graph', 'suppressions', 'arbitration', 'baseline'],
       `full scan must run every pass, got ${JSON.stringify(full.summary.postScanPasses)}`,
     );
     assert.strictEqual(
@@ -121,7 +121,7 @@ async function main() {
     const diff = await scanDiff(diffs, options);
     assert.deepStrictEqual(
       diff.report.summary.postScanPasses,
-      ['suppressions', 'baseline'],
+      ['suppressions', 'arbitration', 'baseline'],
       `diff scan must skip cross-file passes, got ${JSON.stringify(diff.report.summary.postScanPasses)}`,
     );
     assert.ok(
@@ -151,7 +151,7 @@ async function main() {
     );
     assert.deepStrictEqual(
       delta.report.summary.postScanPasses,
-      ['suppressions', 'baseline'],
+      ['suppressions', 'arbitration', 'baseline'],
       'delta shares the incremental scope',
     );
     console.log('  ✔ delta report is a strict filter of the diff report');
@@ -215,7 +215,7 @@ async function main() {
       );
       assert.deepStrictEqual(
         cli.summary.postScanPasses,
-        ['suppressions'],
+        ['suppressions', 'arbitration'],
         'changed-set mode must declare the incremental scope',
       );
       assert.ok(

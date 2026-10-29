@@ -126,6 +126,12 @@ const PARALLEL_SUITES = [
     name: 'validate-precision-governance',
     script: 'scripts/validate-precision-governance.js',
   },
+  {
+    name: 'validate-confidence-calibration',
+    script: 'scripts/validate-confidence-calibration.js',
+  },
+  { name: 'validate-closed-loop', script: 'scripts/validate-closed-loop.js' },
+  { name: 'validate-aggregator-parity', script: 'scripts/validate-aggregator-parity.js' },
   { name: 'validate-suite-manifest', script: 'scripts/validate-suite-manifest.js' },
   { name: 'validate-test-runner-harness', script: 'scripts/validate-test-runner-harness.js' },
   { name: 'validate-report-schema', script: 'scripts/validate-report-schema.js' },

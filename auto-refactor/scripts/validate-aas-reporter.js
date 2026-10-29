@@ -171,7 +171,94 @@ async function runTests() {
   assert.ok(aasDoc.dimensions, 'AAS report must carry dimensions when present');
   assert.strictEqual(aasDoc.dimensions.architectureConsistency, 90);
   assert.strictEqual(aasDoc.dimensions.codeSecurity, 98);
+  assert.strictEqual(
+    aasDoc.usability,
+    undefined,
+    'A report whose arbitration pass never ran must omit the usability block, not emit zeroes',
+  );
   console.log('✔  Test 1: AAS-v1 protocol and executive health block verified');
+
+  // Test 1b: usability block and per-defect tier/confidence projection
+  const arbitratedDoc = buildAasReport(
+    {
+      ...report,
+      summary: {
+        ...report.summary,
+        arbitration: {
+          totalEvaluated: 4,
+          prescriptiveCount: 1,
+          actionableCount: 2,
+          advisoryCount: 1,
+          suppressedCount: 0,
+          prunedBySliceCount: 0,
+          blockingCount: 1,
+          gateVerdict: 'blocked',
+          uncalibratedCount: 3,
+          reviewQueueCount: 1,
+          advisoryOnlyRules: ['hardcoded-string'],
+          ruleTiers: { 'ARCH-CLN-001': 'T1', 'magic-number': 'T2', 'hardcoded-string': 'T3' },
+        },
+      },
+      issues: report.issues.map((issue) =>
+        issue.rule === 'magic-number'
+          ? { ...issue, evidence: { confidence: 0.873, requiresRuntime: true } }
+          : issue,
+      ),
+    },
+    { baseDir: '/workspace', fileReader: (rel) => fileMock[rel], includeInfo: true },
+  );
+  assert.deepStrictEqual(
+    arbitratedDoc.usability,
+    { proven: 1, patchable: 2, advisory: 1, uncalibrated: 3, needsHuman: 1 },
+    'Usability block must project the arbitration verdict verbatim',
+  );
+  const arbitrationDefects = Object.values(arbitratedDoc.files).flat();
+  const tieredDefect = arbitrationDefects.find((defect) => defect.rule === 'ARCH-CLN-001');
+  assert.strictEqual(tieredDefect.tier, 'T1', 'Rule tier must reach the defect record');
+  const confidentDefect = arbitrationDefects.find((defect) => defect.rule === 'magic-number');
+  assert.strictEqual(
+    confidentDefect.conf,
+    0.87,
+    'Evidence confidence must be projected at two decimals, not dropped',
+  );
+  const tierlessDefect = arbitrationDefects.find((defect) => defect.rule === 'hardcoded-string');
+  assert.strictEqual(
+    tierlessDefect.tier,
+    'T3',
+    'A rule recorded as advisory must reach the defect record as T3',
+  );
+  const unrecordedDoc = buildAasReport(
+    {
+      ...report,
+      summary: {
+        ...report.summary,
+        arbitration: {
+          totalEvaluated: 4,
+          prescriptiveCount: 1,
+          actionableCount: 2,
+          advisoryCount: 1,
+          suppressedCount: 0,
+          prunedBySliceCount: 0,
+          blockingCount: 1,
+          gateVerdict: 'blocked',
+          uncalibratedCount: 3,
+          reviewQueueCount: 1,
+          advisoryOnlyRules: [],
+          ruleTiers: {},
+        },
+      },
+    },
+    { baseDir: '/workspace', fileReader: (rel) => fileMock[rel], includeInfo: true },
+  );
+  const unrecordedDefect = Object.values(unrecordedDoc.files)
+    .flat()
+    .find((defect) => defect.rule === 'ARCH-CLN-001');
+  assert.strictEqual(
+    unrecordedDefect.tier,
+    undefined,
+    'A defect whose rule has no recorded tier must omit the field rather than invent one',
+  );
+  console.log('✔  Test 1b: Usability block, rule tiers and per-defect confidence verified');
 
   // Test 2: Topological ordering of files
   // src/types/index.ts has ARCH-CLN-001 (L1_CONTRACT) -> must precede src/app.ts and src/utils.ts
