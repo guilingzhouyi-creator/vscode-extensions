@@ -122,7 +122,7 @@ const VALID_PROFILES_DEF = 'frontend backend composite';
 const VALID_FORMATS_DEF = 'json sarif text agent capp compact praxis aas';
 const VALID_COMMENT_LEVELS_DEF = 'off basic standard strict';
 const VALID_SECURITY_LEVELS_DEF = 'off basic full';
-const KNOWN_CLI_SUBCOMMANDS_DEF = 'scan daemon self-test symbols guide trajectory memory stats';
+const KNOWN_CLI_SUBCOMMANDS_DEF = 'scan daemon self-test review symbols guide trajectory memory stats';
 
 function parseMappingTable<T extends Record<string, string>>(tableDefinition: string): Readonly<T> {
     const tableResult: Record<string, string> = {};
@@ -501,6 +501,7 @@ const CLI_USAGE_HELP_TEXT = `auto-refactor — automated code-refactoring analyz
 Usage:
   auto-refactor scan [options]       Run static analysis and quality review on source files
   auto-refactor self-test            Run known-violation fixture corpus to verify all analyzers
+  auto-refactor review --queue <f> --corpus <f> --verdict <tp|fp>  Answer queued findings
   auto-refactor daemon start|stop|status [--root <dir>]  Manage background acceleration daemon
   auto-refactor symbols <name> [--root <dir>]            Inspect definitions, calls and cross-file usages
   auto-refactor guide <file> [--domain <d>] [--line <l>] Query agent guardrails and active rule guidance

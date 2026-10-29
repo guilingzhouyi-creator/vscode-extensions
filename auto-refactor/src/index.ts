@@ -51,6 +51,7 @@ import { evaluateCompositeGate, type GateStage } from './core/praxis/composite-q
 import { CacheStore } from './core/cache';
 import { daemonCommand } from './cli/daemonCmd';
 import { selfTestCommand } from './cli/selfTestCmd';
+import { reviewCommand } from './cli/review-cmd';
 import { analyzeCodeDensity } from './core/intelligence/code-density-analyzer';
 
 /** Decimal radix used when parsing numeric CLI arguments such as `--line`. */
@@ -68,6 +69,7 @@ const CMD_STATS = 'stats';
 const CMD_GATE = 'gate';
 const CMD_SCAN = 'scan';
 const CMD_SELF_TEST = 'self-test';
+const CMD_REVIEW = 'review';
 
 /** Common CLI option flags */
 const FLAG_ROOT = '--root';
@@ -810,6 +812,12 @@ async function main(): Promise<void> {
         const selfTestResult = await selfTestCommand(testArgs);
         process.stderr.write(selfTestResult.text + '\n');
         process.exit(selfTestResult.code);
+    }
+    if (subcommand === CMD_REVIEW) {
+        const reviewArgs = args.slice(args.indexOf(CMD_REVIEW) + 1);
+        const reviewResult = reviewCommand(reviewArgs);
+        process.stdout.write(reviewResult.text + '\n');
+        process.exit(reviewResult.code);
     }
     if (subcommand === CMD_GUIDE) {
         handleGuideCommand(args);
