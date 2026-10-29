@@ -902,6 +902,14 @@ export interface ScanSummary {
          * "can this class of finding be trusted", and AAS records are keyed by rule.
          */
         ruleTiers?: Record<string, 'T1' | 'T2' | 'T3'>;
+        /** Whether anti-gaming circuit detected gaming attempts and froze score yields. */
+        isGamingBlocked?: boolean;
+        /** Ratio of changed semantic code over total codebase volume. */
+        semanticChangeRatio?: number;
+        /** Net technical debt delta in points. */
+        netDebtDelta?: number;
+        /** Plain reason string if score gaming was blocked. */
+        gamingReason?: string;
         /**
          * Fingerprint and shape of the adjudication evidence behind those tiers.
          *

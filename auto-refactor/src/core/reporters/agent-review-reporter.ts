@@ -19,6 +19,9 @@
 
 import type { ScanReport, Issue } from '../types';
 import {
+    TOPOLOGY_LAYER_PRIORITY as TOPOLOGY_RANK,
+} from '../reporting/agent-audit-pipeline';
+import {
     formatCompactAgentPrompt,
     extractAnchorCodeSlice,
     resolveTopologyLayer,
@@ -91,24 +94,6 @@ const PROP_PROMPT_QUESTION = 'promptQuestion';
 const FENCE_MARKDOWN_CODE = '```';
 const RECOMMENDED_SUFFIX = ' (recommended)';
 
-const CONTRACT_LAYER: AgentTopologyLayer = 'L1_CONTRACT';
-const OPERATOR_LAYER: AgentTopologyLayer = 'L2_OPERATOR';
-const CONFIG_LAYER: AgentTopologyLayer = 'L3_CONFIG';
-const PRESENTATION_LAYER: AgentTopologyLayer = 'L4_PRESENTATION';
-const GOVERNANCE_LAYER: AgentTopologyLayer = 'L5_GOVERNANCE';
-
-const TOPOLOGY_LAYERS: readonly AgentTopologyLayer[] = [
-    CONTRACT_LAYER,
-    OPERATOR_LAYER,
-    CONFIG_LAYER,
-    PRESENTATION_LAYER,
-    GOVERNANCE_LAYER,
-];
-
-const TOPOLOGY_RANK: Record<AgentTopologyLayer, number> = Object.fromEntries(
-    TOPOLOGY_LAYERS.map((layer, index) => [layer, index + 1]),
-) as Record<AgentTopologyLayer, number>;
-
 /**
  * Resolves overall report diagnostic verdict.
  *
@@ -130,7 +115,7 @@ function buildTargetContext(
     reportRoot: string,
     options?: AgentReviewReporterOptions,
 ): AgentTargetContext {
-    const file = issue.location?.file || DEFAULT_UNKNOWN_FILE;
+    const targetFilePath = issue.location?.file || DEFAULT_UNKNOWN_FILE;
     const startLine = issue.location?.start?.line ?? 1;
     const endLine = issue.location?.end?.line ?? startLine;
     const startColumn = issue.location?.start?.column;
@@ -138,7 +123,7 @@ function buildTargetContext(
     const baseDir = options?.baseDir || reportRoot;
     const radius = options?.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
     const anchorCodeSlice = extractAnchorCodeSlice({
-        filePath: file,
+        filePath: targetFilePath,
         startLine,
         endLine,
         baseDir,
@@ -146,7 +131,7 @@ function buildTargetContext(
     });
 
     return {
-        filePath: file,
+        filePath: targetFilePath,
         startLine,
         endLine,
         ...(startColumn !== undefined ? { startColumn } : {}),
@@ -157,32 +142,32 @@ function buildTargetContext(
 }
 
 function buildRemediationRecipe(issue: Issue): AgentRemediationRecipe {
-    const act = issue.actionable;
+    const actionable = issue.actionable;
     let remediationSummary = issue.suggestion;
     if (!remediationSummary) {
-        remediationSummary = act ? `Apply standard ${act.action} remediation` : issue.message;
+        remediationSummary = actionable ? `Apply standard ${actionable.action} remediation` : issue.message;
     }
 
     return {
         remediationSummary,
-        ...(act?.templateSnippet ? { templateSnippet: act.templateSnippet } : {}),
-        safeToAutomate: act?.safeToAutomate ?? false,
-        ...(act?.action ? { actionVerb: act.action } : {}),
-        ...(act?.taxonomy ? { taxonomy: act.taxonomy } : {}),
+        ...(actionable?.templateSnippet ? { templateSnippet: actionable.templateSnippet } : {}),
+        safeToAutomate: actionable?.safeToAutomate ?? false,
+        ...(actionable?.action ? { actionVerb: actionable.action } : {}),
+        ...(actionable?.taxonomy ? { taxonomy: actionable.taxonomy } : {}),
     };
 }
 
 function extractIssueClarification(issue: Issue): AgentClarificationRequest | undefined {
-    const raw =
+    const rawClarification =
         (issue as unknown as Record<string, unknown>).clarificationRequest ??
         issue.detail?.clarificationRequest ??
         (issue.actionable as unknown as Record<string, unknown> | undefined)?.clarificationRequest;
     if (
-        raw &&
-        typeof raw === 'object' &&
-        PROP_PROMPT_QUESTION in (raw as Record<string, unknown>)
+        rawClarification &&
+        typeof rawClarification === 'object' &&
+        PROP_PROMPT_QUESTION in (rawClarification as Record<string, unknown>)
     ) {
-        return raw as AgentClarificationRequest;
+        return rawClarification as AgentClarificationRequest;
     }
     return undefined;
 }
@@ -191,12 +176,12 @@ function extractIssueCrossFileContext(
     issue: Issue,
     clarification?: AgentClarificationRequest,
 ): CrossFileUsageContext | undefined {
-    const raw =
+    const rawUsageContext =
         (issue as unknown as Record<string, unknown>).crossFileUsageContext ??
         issue.detail?.crossFileUsageContext ??
         (issue.actionable as unknown as Record<string, unknown> | undefined)?.crossFileUsageContext;
-    if (raw && typeof raw === 'object') {
-        return raw as CrossFileUsageContext;
+    if (rawUsageContext && typeof rawUsageContext === 'object') {
+        return rawUsageContext as CrossFileUsageContext;
     }
     return clarification?.crossFileUsageContext;
 }
@@ -205,21 +190,21 @@ function getIssueProposal(
     issue: Issue,
     directiveId: string,
 ): AgentStandardizationProposal | undefined {
-    const raw =
+    const rawProposal =
         (issue as unknown as Record<string, unknown>).standardizationProposal ??
         issue.detail?.standardizationProposal ??
         (issue.actionable as unknown as Record<string, unknown> | undefined)
             ?.standardizationProposal;
-    if (raw && typeof raw === 'object') {
-        return raw as AgentStandardizationProposal;
+    if (rawProposal && typeof rawProposal === 'object') {
+        return rawProposal as AgentStandardizationProposal;
     }
-    const act = issue.actionable;
-    if (act?.patch || act?.action) {
+    const actionable = issue.actionable;
+    if (actionable?.patch || actionable?.action) {
         return {
             proposalId: `PROP:${issue.id || directiveId}`,
-            ...(act.patch ? { exactPatch: act.patch } : {}),
-            ...(act.action ? { transformOperator: act.action } : {}),
-            ...(act.templateSnippet ? { afterSnippet: act.templateSnippet } : {}),
+            ...(actionable.patch ? { exactPatch: actionable.patch } : {}),
+            ...(actionable.action ? { transformOperator: actionable.action } : {}),
+            ...(actionable.templateSnippet ? { afterSnippet: actionable.templateSnippet } : {}),
         };
     }
     return undefined;
@@ -463,30 +448,30 @@ export function toStructuredAgentDirectivesJson(
     return JSON.stringify(payload, null, 2);
 }
 
-function formatDirectiveClarification(req: AgentClarificationRequest): string[] {
+function formatDirectiveClarification(clarificationRequest: AgentClarificationRequest): string[] {
     const lines: string[] = [
         '- Clarification Request:',
-        `  * Question: ${req.promptQuestion} (Type: \`${req.questionType}\`)`,
+        `  * Question: ${clarificationRequest.promptQuestion} (Type: \`${clarificationRequest.questionType}\`)`,
     ];
-    if (req.candidateOptions && req.candidateOptions.length > 0) {
+    if (clarificationRequest.candidateOptions && clarificationRequest.candidateOptions.length > 0) {
         lines.push('  * Candidate Options:');
-        for (const opt of req.candidateOptions) {
-            const rec = opt.recommended ? RECOMMENDED_SUFFIX : '';
-            const def = opt.key === req.defaultChoiceKey ? ' [default]' : '';
-            lines.push(`    - \`${opt.key}\`: ${opt.label}${rec}${def}`);
+        for (const optionItem of clarificationRequest.candidateOptions) {
+            const recommendedSuffix = optionItem.recommended ? RECOMMENDED_SUFFIX : '';
+            const defaultChoiceSuffix = optionItem.key === clarificationRequest.defaultChoiceKey ? ' [default]' : '';
+            lines.push(`    - \`${optionItem.key}\`: ${optionItem.label}${recommendedSuffix}${defaultChoiceSuffix}`);
         }
     }
     return lines;
 }
 
-function formatDirectiveCrossFileImpact(ctx: CrossFileUsageContext): string[] {
+function formatDirectiveCrossFileImpact(usageContext: CrossFileUsageContext): string[] {
     const lines: string[] = [
         '- Cross-File Impact:',
-        `  * Exported: ${ctx.isExportedSymbol}, References: ${ctx.referenceCount}, Coordinated Rename: ${ctx.requiresCoordinatedRename}`,
+        `  * Exported: ${usageContext.isExportedSymbol}, References: ${usageContext.referenceCount}, Coordinated Rename: ${usageContext.requiresCoordinatedRename}`,
     ];
-    if (ctx.impactedFiles && ctx.impactedFiles.length > 0) {
+    if (usageContext.impactedFiles && usageContext.impactedFiles.length > 0) {
         lines.push(
-            `  * Impacted Files (${ctx.impactedFiles.length}): ${ctx.impactedFiles.join(', ')}`,
+            `  * Impacted Files (${usageContext.impactedFiles.length}): ${usageContext.impactedFiles.join(', ')}`,
         );
     }
     return lines;
@@ -527,20 +512,20 @@ function formatAgentDirectiveBlock(
     directive: AgentActionableDirective,
     includeSnippets: boolean,
 ): string[] {
-    const sev =
+    const severityLabel =
         directive.ruleContract.severity === VERDICT_BLOCK
             ? SEV_LABEL_ERROR
             : directive.ruleContract.severity === VERDICT_WARN
               ? SEV_LABEL_WARNING
               : SEV_LABEL_INFO;
-    const file = directive.targetContext.filePath;
-    const line = directive.targetContext.startLine;
-    const col = directive.targetContext.startColumn;
+    const targetFilePath = directive.targetContext.filePath;
+    const targetStartLine = directive.targetContext.startLine;
+    const targetStartColumn = directive.targetContext.startColumn;
 
     const lines: string[] = [
-        `### [${sev}|${directive.ruleContract.ruleId}] ${file}:${line}`,
+        `### [${severityLabel}|${directive.ruleContract.ruleId}] ${targetFilePath}:${targetStartLine}`,
         `- Message: ${directive.ruleContract.rootCause}`,
-        `- Target Context: \`${file}:${line}${col !== undefined ? `:${col}` : ''}\` (Layer: \`${directive.ruleContract.topologyLayer}\`, Span: L${line}-L${directive.targetContext.endLine})`,
+        `- Target Context: \`${targetFilePath}:${targetStartLine}${targetStartColumn !== undefined ? `:${targetStartColumn}` : ''}\` (Layer: \`${directive.ruleContract.topologyLayer}\`, Span: L${targetStartLine}-L${directive.targetContext.endLine})`,
     ];
 
     if (directive.targetContext.anchorCodeSlice) {
@@ -552,8 +537,8 @@ function formatAgentDirectiveBlock(
 
     if (directive.immutableConstraints.contractRules.length > 0) {
         lines.push('- Immutable Constraints:');
-        for (const rule of directive.immutableConstraints.contractRules) {
-            lines.push(`  * ${rule}`);
+        for (const contractRule of directive.immutableConstraints.contractRules) {
+            lines.push(`  * ${contractRule}`);
         }
     }
 

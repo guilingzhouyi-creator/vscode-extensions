@@ -153,11 +153,11 @@ export function auditRegexSafety(pattern: string): string[] {
     if (!pattern || pattern.length < 3) return warnings;
 
     // --- Nested quantifiers ---
-    // Matches: (...)+, (...)*, (...)?  where the group body contains a quantifier
-    // Simplified heuristic: detect group-close followed by quantifier, where the
-    // group contains at least one quantifier character.
-    const nestedQuantRegex = /\((?:[^()]*[+*?][^()]*)\)[+*?]/;
-    if (nestedQuantRegex.test(pattern)) {
+    // Matches: (...)+, (...)* where the group body contains an unescaped repeating quantifier
+    // Strips non-capturing syntax prefixes (?:, ?=, ?!, ?<=, ?<!) so they don't trigger false positives.
+    const normalizedGroupPattern = pattern.replace(/\(\?[=!:<!]/g, '(');
+    const nestedQuantRegex = /\((?:[^()]*[+*?][^()]*)\)[+*]/;
+    if (nestedQuantRegex.test(normalizedGroupPattern)) {
         warnings.push(
             'Nested quantifier detected (e.g. "(a+)+") — potential catastrophic backtracking',
         );

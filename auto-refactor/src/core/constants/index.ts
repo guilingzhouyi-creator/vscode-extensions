@@ -19,6 +19,7 @@ import * as AstTokens from './ast-tokens';
 import * as DiagnosticTokens from './diagnostic-tokens';
 import * as SystemTokens from './system-tokens';
 import * as RuleCodes from './rule-codes';
+import * as RegexPatterns from './regex-patterns';
 
 // Granular direct re-exports for transparent backward compatibility
 export * from './ast-tokens';
@@ -26,6 +27,7 @@ export * from './diagnostic-tokens';
 export * from './system-tokens';
 export * from './rule-codes';
 export * from './analyzer-bitmask';
+export * from './regex-patterns';
 
 /**
  * Immutable AST and grammar token namespace.
@@ -48,6 +50,11 @@ export const SYSTEM = Object.freeze({ ...SystemTokens });
 export const RULES = Object.freeze({ ...RuleCodes });
 
 /**
+ * Immutable standardized regular expression catalog namespace.
+ */
+export const REGEX = RegexPatterns.REGEX;
+
+/**
  * Consolidated root constants catalog facade with deep immutability guarantees.
  */
 export const CoreConstants = Object.freeze({
@@ -55,4 +62,5 @@ export const CoreConstants = Object.freeze({
     diagnostic: DIAGNOSTIC,
     system: SYSTEM,
     rules: RULES,
+    regex: REGEX,
 });

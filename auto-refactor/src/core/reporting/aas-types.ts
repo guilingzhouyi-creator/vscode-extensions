@@ -55,6 +55,36 @@ export interface AasHealth {
         readonly averageColumnDensity: number;
         readonly averageSpatialDensity?: number;
         readonly averageMahalanobisDistance?: number;
+        readonly averageFisherSimplexDistance?: number;
+    };
+    /** SQALE technical debt assessment (ISO/IEC 25010) */
+    readonly sqale?: {
+        readonly tdr: number;
+        readonly remediationMinutes: number;
+        readonly grade: string;
+    };
+    /** Polyglot multi-language generalization & modernization balance */
+    readonly polyglot?: {
+        readonly index: number;
+        readonly meanScore: number;
+        readonly dispersionPenalty: number;
+        readonly standardDeviation: number;
+        readonly languageCount: number;
+    };
+    /** Anti-gaming defense fuse status (BLOCK_GAMING_DETECTED) */
+    readonly gamingDefense?: {
+        readonly isBlocked: boolean;
+        readonly semanticRatio?: number;
+        readonly netDebtDelta?: number;
+        readonly reason?: string;
+    };
+    /** Ten-dimensional aggregate status summary */
+    readonly dimensionSummary?: {
+        readonly healthyCount: number;
+        readonly warningCount: number;
+        readonly failingCount: number;
+        readonly lowestDimension?: string;
+        readonly lowestScore?: number;
     };
     /** Aggregate counter summary */
     readonly counts: AasCounts;
@@ -180,6 +210,8 @@ export interface AasReportOptions {
     readonly maxDefectsPerFile?: number;
     /** Maximum total defects across all files */
     readonly maxTotalDefects?: number;
+    /** Include detailed ten-dimensional metrics breakdown (defaults to true when uncompressed) */
+    readonly includeDimensionDetails?: boolean;
     /** Include info-level findings (defaults to false to conserve tokens) */
     readonly includeInfo?: boolean;
     /** Compress diagnostic messages into high-efficiency token sentences (defaults to true) */
@@ -190,6 +222,8 @@ export interface AasReportOptions {
     readonly defaultVerify?: string;
     /** Context line radius for anchor code slice (defaults to 1 for token economy) */
     readonly contextRadius?: number;
+    /** Whether to deduplicate anchor code slices for defects on the same line (defaults to true) */
+    readonly deduplicateAnchors?: boolean;
     /** Base repository root directory for resolving file contents */
     readonly baseDir?: string;
     /** Custom file reader for anchor code extraction */
@@ -207,11 +241,52 @@ export interface AasReportOptions {
             readonly averageColumnDensity: number;
             readonly averageSpatialDensity?: number;
             readonly averageMahalanobisDistance?: number;
+            readonly averageFisherSimplexDistance?: number;
+        };
+        readonly sqale?: {
+            readonly tdr: number;
+            readonly remediationMinutes: number;
+            readonly grade: string;
+        };
+        readonly polyglot?: {
+            readonly index: number;
+            readonly meanScore: number;
+            readonly dispersionPenalty: number;
+            readonly standardDeviation: number;
+            readonly languageCount: number;
+        };
+        readonly gamingDefense?: {
+            readonly isBlocked: boolean;
+            readonly semanticRatio?: number;
+            readonly netDebtDelta?: number;
+            readonly reason?: string;
         };
     };
 }
 
-/** Complete Agent-Native audit report payload adhering to AAS v1.0. */
+/** Detailed metrics and attribution for a single quality dimension in AAS v1.1. */
+export interface AasDimensionDetail {
+    /** Dimension canonical index (0.0 to 100.0) */
+    readonly score: number;
+    /** Standard letter grade (A+, A, B, C, D, F, N/A) */
+    readonly grade?: string;
+    /** Normalized effective weight in composite calculation (0.0 to 1.0) */
+    readonly weight?: number;
+    /** Statistical confidence based on evidence volume (0.0 to 1.0) */
+    readonly confidence?: number;
+    /** Whether this dimension was actively evaluated */
+    readonly evaluated?: boolean;
+    /** Total point deductions charged to this dimension */
+    readonly totalLoss?: number;
+    /** Top rule bottlenecks dragging down this dimension */
+    readonly topBottlenecks?: readonly {
+        readonly rule: string;
+        readonly loss: number;
+        readonly count: number;
+    }[];
+}
+
+/** Complete Agent-Native audit report payload adhering to AAS v1.0 / v1.1. */
 export interface AgentAuditReport {
     /** Protocol discriminator: 'aas-v1' */
     readonly schema: typeof AAS_SCHEMA_ID;
@@ -229,8 +304,10 @@ export interface AgentAuditReport {
     readonly health: AasHealth;
     /** Default qualitative verification command for entire workspace / project */
     readonly defaultVerify?: string;
-    /** Ten-dimensional quality indices if computed */
+    /** Ten-dimensional quality indices if computed (scalar scores) */
     readonly dimensions?: Partial<Record<string, number>>;
+    /** Enhanced Ten-Dimensional quality breakdown with weights and rationales (AAS v1.1) */
+    readonly dimensionDetails?: Partial<Record<string, AasDimensionDetail>>;
     /** Top quality bottlenecks */
     readonly bottlenecks: readonly AasBottleneck[];
     /** Architectural topology layer mapping: layer -> affected file paths */

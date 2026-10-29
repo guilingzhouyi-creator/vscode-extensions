@@ -14,12 +14,15 @@
  *   to CC <= 10, Depth <= 3, and zero transient loop allocation (PRF-MEM-001) with no sync I/O.
  */
 
-import * as path from 'path';
 import type { Issue, ScanReport, Severity } from '../types';
-import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
+import type { QualityScoreBreakdown, QualityScoreRationale } from '../scoring/scoringTypes';
+import { ALL_QUALITY_DIMENSIONS, DEFAULT_QUALITY_WEIGHTS } from '../scoring/scoringTypes';
+import {
+    filterActiveTopologyBuckets,
+    executeFileTopologyPipeline,
+} from './agent-audit-pipeline';
 import {
     formatAnchorSlice,
-    resolveTopologyLayer,
     generateVerificationDirective,
     type AgentTopologyLayer,
 } from '../guidance/agentConstraintGenerator';
@@ -28,6 +31,7 @@ import {
     type AasBottleneck,
     type AasCounts,
     type AasDefectRecord,
+    type AasDimensionDetail,
     type AasFixRecipe,
     type AasHealth,
     type AasReportOptions,
@@ -36,6 +40,7 @@ import {
     type AasVerdict,
     type AgentAuditReport,
 } from './aas-types';
+import { resolveQualityGrade } from '../scoring/scorer-formulas';
 
 export * from './aas-types';
 
@@ -51,7 +56,6 @@ const ELLIPSIS = '…';
 const ROUND_SCALE_HUNDRED = 100;
 const MAX_SUGGESTION_CHARS = 80;
 const ELLIPSIS_TRUNCATE_CHARS = 77;
-const UNRANKED_TOPOLOGY_WEIGHT = 99;
 
 const SEVERITY_ERROR: Severity = 'error';
 const SEVERITY_WARNING: Severity = 'warning';
@@ -64,31 +68,15 @@ const VERDICT_BLOCK: AasVerdict = 'BLOCK';
 const VERDICT_WARN: AasVerdict = 'WARN';
 const VERDICT_PASS: AasVerdict = 'PASS';
 
-const TOPOLOGY_ORDER: readonly string[] = [
-    'L1_CONTRACT',
-    'L2_OPERATOR',
-    'L3_CONFIG',
-    'L4_PRESENTATION',
-    'L5_GOVERNANCE',
-];
-
-const TOPOLOGY_RANK: Readonly<Record<string, number>> = Object.freeze({
-    L1_CONTRACT: 1,
-    L2_OPERATOR: 2,
-    L3_CONFIG: 3,
-    L4_PRESENTATION: 4,
-    L5_GOVERNANCE: 5,
-});
-
 /**
  * Maps static analysis severity onto Agent triage severity.
  *
- * @param sev - Finding severity.
+ * @param rawSeverity - Finding severity.
  * @returns Mapped AAS severity.
  */
-function mapSeverity(sev?: string): AasSeverity {
-    if (sev === SEVERITY_ERROR) return AAS_SEV_BLOCK;
-    return sev === SEVERITY_WARNING ? AAS_SEV_WARN : AAS_SEV_INFO;
+function mapSeverity(rawSeverity?: string): AasSeverity {
+    if (rawSeverity === SEVERITY_ERROR) return AAS_SEV_BLOCK;
+    return rawSeverity === SEVERITY_WARNING ? AAS_SEV_WARN : AAS_SEV_INFO;
 }
 
 /**
@@ -110,8 +98,8 @@ function resolveVerdict(counts: AasCounts): AasVerdict {
  * @returns Shortened string.
  */
 function trimMessage(text: string, maxChars: number = DEFAULT_MAX_MESSAGE_CHARS): string {
-    const clean = (text || '').replace(/\s+/g, ' ').trim();
-    return clean.length <= maxChars ? clean : clean.slice(0, Math.max(1, maxChars - 1)) + ELLIPSIS;
+    const cleanedText = (text || '').replace(/\s+/g, ' ').trim();
+    return cleanedText.length <= maxChars ? cleanedText : cleanedText.slice(0, Math.max(1, maxChars - 1)) + ELLIPSIS;
 }
 
 /**
@@ -125,42 +113,74 @@ function trimMessage(text: string, maxChars: number = DEFAULT_MAX_MESSAGE_CHARS)
  */
 export function compressDiagnosticSentence(rawText: string): string {
     if (!rawText) return '';
-    let msg = rawText.replace(/\s+/g, ' ').trim();
+    let messageText = rawText.replace(/\s+/g, ' ').trim();
 
-    msg = msg.replace(
+    messageText = messageText.replace(
         /Identifier\s+('?[a-zA-Z0-9_$-]+'?)\s+contains\s+unapproved\s+truncated\s+abbreviation\s+('?[a-zA-Z0-9_$-]+'?)\.?/i,
         'identifier $1 unapproved abbr $2',
     );
-    msg = msg.replace(
+    messageText = messageText.replace(
         /Identifier\s+('?[a-zA-Z0-9_$-]+'?)\s+is\s+vague\s+and\s+uninformative;\s*lacks\s+domain\s+context\.?/i,
         'identifier $1 lacks domain context',
     );
-    msg = msg.replace(
+    messageText = messageText.replace(
         /(?:Function\s+or\s+method\s+name|Local\s+variable\s+name|Variable\s+name)\s+('?[a-zA-Z0-9_$-]+'?)\s+is\s+too\s+short\s*\(([^)]+)\)[^.]*\.?/i,
         'symbol $1 too short ($2)',
     );
-    msg = msg.replace(
+    messageText = messageText.replace(
         /(?:Function\s+or\s+method\s+name|Variable\s+name)\s+('?[a-zA-Z0-9_$-]+'?)\s+is\s+excessively\s+long\s*\(([^)]+)\)[^.]*\.?/i,
         'symbol $1 too long ($2)',
     );
-    msg = msg.replace(
+    messageText = messageText.replace(
         /Cognitive\s+complexity\s*\((\d+)\)\s*exceeds\s*threshold\s*\((\d+)\)\s*in\s*(?:function|method)?\s*('?[a-zA-Z0-9_$-]+'?)/i,
         'CC $1 > $2 in $3',
     );
-    msg = msg.replace(/Effective\s+code\s+volume\s+budget\s+exceeded\.?/i, 'ELOC budget exceeded');
-    msg = msg.replace(/Physical\s+line\s+count\s+ceiling\s+exceeded\.?/i, 'LOC ceiling exceeded');
-    msg = msg.replace(/Dynamic\s+dilution\s+envelope\s+exceeded\.?/i, 'dilution envelope exceeded');
-    msg = msg.replace(
+    messageText = messageText.replace(/Effective\s+code\s+volume\s+budget\s+exceeded\.?/i, 'ELOC budget exceeded');
+    messageText = messageText.replace(/Physical\s+line\s+count\s+ceiling\s+exceeded\.?/i, 'LOC ceiling exceeded');
+    messageText = messageText.replace(/Dynamic\s+dilution\s+envelope\s+exceeded\.?/i, 'dilution envelope exceeded');
+    messageText = messageText.replace(
         /Effective\s+logic\s+density\s+below\s+floor\s+threshold\.?/i,
         'token density below floor',
     );
-    msg = msg.replace(
+    messageText = messageText.replace(
         /(?:Function|Method)\s+has\s+(\d+)\s+positional\s+parameters?\s+exceeding\s+threshold\s+of\s+(\d+)\.?/i,
         'params $1 > $2',
     );
+    messageText = messageText.replace(
+        /Synchronous\s+('?[a-zA-Z0-9_$.-]+'?)\s+blocks\s+event\s+loop\.?/i,
+        'sync $1 blocks event loop',
+    );
+    messageText = messageText.replace(
+        /Sync\s+I\/O\s+in\s+async\s+(?:method|function)\.?/i,
+        'sync IO in async fn',
+    );
+    messageText = messageText.replace(
+        /Zero\s+transient\s+heap\s+allocation\s+(?:in\s+hot\s+loop\s+bodies\s+)?violated\.?/i,
+        'loop transient heap allocation',
+    );
+    messageText = messageText.replace(
+        /Control\s+flow\s+nesting\s+depth\s*\((\d+)\)\s*exceeds\s*(?:limit|threshold)\s*(?:\((\d+)\)|\s*(\d+))\.?/i,
+        'nesting depth $1 > $2$3',
+    );
+    messageText = messageText.replace(
+        /Procedure\s+line\s+count\s*\((\d+)\)\s*exceeds\s*(?:single-responsibility\s+)?limit\s*(?:\((\d+)\)|\s*(\d+))\.?/i,
+        'procedure lines $1 > $2$3',
+    );
+    messageText = messageText.replace(
+        /Magic\s+number\s+(\d+)\s+detected(?:[^.]*)?\.?/i,
+        'magic number $1',
+    );
+    messageText = messageText.replace(
+        /Literal\s+string\s+("?[^"]+"?|'?[^']+'?)\s+should\s+be\s+constant\.?/i,
+        'literal string $1 not constant',
+    );
+    messageText = messageText.replace(
+        /(?:Facade\s+method\s+merely\s+delegates\s+to\s+[^.]*|Single-target\s+pass-through\s+trampoline\s+detected)\.?/i,
+        'trampoline pass-through',
+    );
 
-    msg = msg.replace(/^(?:Notice|Warning|Error|Violation):\s*/i, '');
-    return msg.trim();
+    messageText = messageText.replace(/^(?:Notice|Warning|Error|Violation|Failed):\s*/i, '');
+    return messageText.trim().replace(/\.$/, '');
 }
 
 /**
@@ -183,8 +203,8 @@ class AnchorCache {
         if (!this.customReader) return undefined;
         let content = this.cache.get(file);
         if (content === undefined) {
-            const raw = this.customReader(file);
-            content = raw !== undefined ? raw : null;
+            const rawContent = this.customReader(file);
+            content = rawContent !== undefined ? rawContent : null;
             this.cache.set(file, content);
         }
         if (!content) return undefined;
@@ -200,12 +220,228 @@ function projectDimensions(
 ): Partial<Record<string, number>> | undefined {
     if (!breakdown?.indices) return undefined;
     const projectedScores: Record<string, number> = {};
-    for (const [dim, val] of Object.entries(breakdown.indices)) {
-        if (typeof val === 'number' && Number.isFinite(val)) {
-            projectedScores[dim] = val;
+    for (const [dimensionName, scoreValue] of Object.entries(breakdown.indices)) {
+        if (typeof scoreValue === 'number' && Number.isFinite(scoreValue)) {
+            projectedScores[dimensionName] = scoreValue;
         }
     }
     return Object.keys(projectedScores).length > 0 ? projectedScores : undefined;
+}
+
+/**
+ * Appends a rule loss occurrence to a dimension's loss map without in-loop allocation.
+ */
+function recordRuleLoss(lossMap: Map<string, { loss: number; count: number }>, rule: string, delta: number): void {
+    const currentLoss = lossMap.get(rule);
+    if (currentLoss) {
+        currentLoss.loss += Math.abs(delta);
+        currentLoss.count += 1;
+    } else {
+        lossMap.set(rule, { loss: Math.abs(delta), count: 1 });
+    }
+}
+
+/**
+ * Resolves or creates a dimension's loss map outside lexical loop.
+ */
+function getOrCreateLossMap(
+    dimensionRationales: Map<string, Map<string, { loss: number; count: number }>>,
+    dimension: string,
+): Map<string, { loss: number; count: number }> {
+    let lossMap = dimensionRationales.get(dimension);
+    if (!lossMap) {
+        lossMap = new Map();
+        dimensionRationales.set(dimension, lossMap);
+    }
+    return lossMap;
+}
+
+/**
+ * Collects rule loss statistics grouped by dimension key.
+ */
+function collectDimensionRuleLosses(rationales?: QualityScoreRationale[]): Map<string, Map<string, { loss: number; count: number }>> {
+    const dimensionRationales = new Map<string, Map<string, { loss: number; count: number }>>();
+    if (!rationales || rationales.length === 0) return dimensionRationales;
+
+    ALL_QUALITY_DIMENSIONS.forEach((dimension) => {
+        dimensionRationales.set(dimension, new Map());
+    });
+
+    for (const rationale of rationales) {
+        const lossMap = getOrCreateLossMap(dimensionRationales, rationale.dimension);
+        recordRuleLoss(lossMap, rationale.rule || 'unknown', rationale.delta);
+    }
+    return dimensionRationales;
+}
+
+/**
+ * Derives top bottlenecks from a dimension's rule loss map.
+ */
+function extractTopBottlenecks(lossMap?: Map<string, { loss: number; count: number }>): {
+    totalLoss?: number;
+    topBottlenecks?: Array<{ rule: string; loss: number; count: number }>;
+} {
+    if (!lossMap || lossMap.size === 0) return {};
+    const sorted = Array.from(lossMap.entries())
+        .map(([rule, stat]) => ({ rule, loss: stat.loss, count: stat.count }))
+        .sort((itemA, itemB) => itemB.loss - itemA.loss);
+    const totalLoss = sorted.reduce((sum, item) => sum + item.loss, 0);
+    return {
+        ...(totalLoss > 0 ? { totalLoss } : {}),
+        topBottlenecks: sorted.slice(0, 3),
+    };
+}
+
+/**
+ * Projects detailed ten-dimensional metrics including weights, confidence, and bottlenecks (AAS v1.1).
+ */
+function projectDimensionDetails(
+    breakdown?: QualityScoreBreakdown,
+    options?: AasReportOptions,
+): Partial<Record<string, AasDimensionDetail>> | undefined {
+    if (!breakdown?.indices || !options?.includeDimensionDetails) return undefined;
+
+    const notEvaluatedSet = new Set(breakdown.notEvaluated ?? []);
+    const details: Record<string, AasDimensionDetail> = {};
+    const dimensionRationales = collectDimensionRuleLosses(breakdown.rationales);
+
+    Object.entries(breakdown.indices).forEach(([dimension, scoreValue]) => {
+        if (typeof scoreValue !== 'number' || !Number.isFinite(scoreValue)) return;
+        const evaluated = !notEvaluatedSet.has(dimension as any);
+        const fallbackWeight = (DEFAULT_QUALITY_WEIGHTS as Record<string, number>)[dimension];
+        const weightVal = breakdown.weights && typeof (breakdown.weights as Record<string, number>)[dimension] === 'number'
+            ? (breakdown.weights as Record<string, number>)[dimension]
+            : fallbackWeight;
+        const bottlenecks = extractTopBottlenecks(dimensionRationales.get(dimension));
+
+        details[dimension] = {
+            score: Math.round(scoreValue * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
+            grade: resolveQualityGrade(scoreValue),
+            evaluated,
+            ...(weightVal !== undefined ? { weight: Math.round(weightVal * 1000) / 1000 } : {}),
+            ...(breakdown.confidence !== undefined
+                ? { confidence: Math.round(breakdown.confidence * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED }
+                : {}),
+            ...bottlenecks,
+        };
+    });
+    return Object.keys(details).length > 0 ? details : undefined;
+}
+
+/**
+ * Rounds numeric metric to 2 decimal places.
+ */
+function roundMetric(metricValue: number | undefined | null): number | undefined {
+    if (typeof metricValue === 'number' && Number.isFinite(metricValue)) {
+        return Math.round(metricValue * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED;
+    }
+    return undefined;
+}
+
+/**
+ * Resolves composite health score with optional override.
+ */
+function resolveHealthScore(overrideScore?: number | null, rawScore?: number | null): number | null {
+    const candidateScore = overrideScore !== undefined ? overrideScore : (rawScore ?? null);
+    const roundedScore = roundMetric(candidateScore);
+    return roundedScore !== undefined ? roundedScore : null;
+}
+
+/**
+ * Resolves CAI metric truthfully without falling back to polyglot generalization.
+ */
+function resolveHealthCai(report: ScanReport, overrideCai?: number): number | undefined {
+    const autonomyIndex = overrideCai ?? report.autonomy?.compositeAutonomyIndex;
+    return roundMetric(autonomyIndex);
+}
+
+/**
+ * Resolves SQALE technical debt assessment.
+ */
+function resolveHealthSqale(
+    report: ScanReport,
+    override?: AasHealth['sqale'],
+): AasHealth['sqale'] | undefined {
+    if (override) return override;
+    const technicalDebt = report.qualityScore?.technicalDebt;
+    if (!technicalDebt) return undefined;
+    return {
+        tdr: roundMetric(technicalDebt.technicalDebtRatio) ?? 0,
+        remediationMinutes: Math.round(technicalDebt.totalRemediationMinutes),
+        grade: technicalDebt.sqaleGrade,
+    };
+}
+
+/**
+ * Resolves polyglot modernization and balance metrics.
+ */
+function resolveHealthPolyglot(
+    report: ScanReport,
+    override?: AasHealth['polyglot'],
+): AasHealth['polyglot'] | undefined {
+    if (override) return override;
+    const polyglotMetrics = report.qualityScore?.polyglotGeneralization;
+    if (!polyglotMetrics) return undefined;
+    return {
+        index: roundMetric(polyglotMetrics.index) ?? 0,
+        meanScore: roundMetric(polyglotMetrics.meanScore) ?? 0,
+        dispersionPenalty: roundMetric(polyglotMetrics.dispersionPenalty) ?? 0,
+        standardDeviation: roundMetric(polyglotMetrics.standardDeviation) ?? 0,
+        languageCount: polyglotMetrics.languageCount ?? 0,
+    };
+}
+
+/**
+ * Resolves anti-gaming defense circuit status.
+ */
+function resolveHealthGamingDefense(
+    report: ScanReport,
+    override?: AasHealth['gamingDefense'],
+): AasHealth['gamingDefense'] | undefined {
+    if (override) return override;
+    const arbitration = report.summary.arbitration;
+    if (arbitration && arbitration.isGamingBlocked !== undefined) {
+        return {
+            isBlocked: arbitration.isGamingBlocked,
+            ...(arbitration.semanticChangeRatio !== undefined
+                ? { semanticRatio: roundMetric(arbitration.semanticChangeRatio) }
+                : {}),
+            ...(arbitration.netDebtDelta !== undefined ? { netDebtDelta: arbitration.netDebtDelta } : {}),
+            ...(arbitration.gamingReason ? { reason: arbitration.gamingReason } : {}),
+        };
+    }
+    return undefined;
+}
+
+/**
+ * Summarizes dimensional health status distribution.
+ */
+function computeDimensionSummary(indices?: Record<string, number>): AasHealth['dimensionSummary'] | undefined {
+    if (!indices) return undefined;
+    let healthyCount = 0;
+    let warningCount = 0;
+    let failingCount = 0;
+    let lowestDimension: string | undefined;
+    let lowestScore = 100;
+
+    Object.entries(indices).forEach(([dimension, scoreValue]) => {
+        if (typeof scoreValue !== 'number' || !Number.isFinite(scoreValue)) return;
+        if (scoreValue >= 90) healthyCount++;
+        else if (scoreValue >= 75) warningCount++;
+        else failingCount++;
+
+        if (scoreValue < lowestScore) {
+            lowestScore = scoreValue;
+            lowestDimension = dimension;
+        }
+    });
+
+    return {
+        healthyCount,
+        warningCount,
+        failingCount,
+        ...(lowestDimension ? { lowestDimension, lowestScore: Math.round(lowestScore * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED } : {}),
+    };
 }
 
 /**
@@ -213,38 +449,28 @@ function projectDimensions(
  */
 function buildHealth(report: ScanReport, counts: AasCounts, options?: AasReportOptions): AasHealth {
     const override = options?.healthOverride;
-    const score =
-        override?.score !== undefined
-            ? override.score
-            : (report.qualityScore?.compositeScore ?? null);
+    const score = resolveHealthScore(override?.score, report.qualityScore?.compositeScore);
     const grade = override?.grade ?? report.qualityScore?.grade ?? 'N/A';
-    const cai =
-        override?.cai !== undefined
-            ? override.cai
-            : (report.autonomy?.compositeAutonomyIndex ??
-              report.qualityScore?.polyglotGeneralization?.index);
-    const density =
-        override?.density !== undefined
-            ? override.density
-            : report.qualityScore?.effectiveCodeDensity;
-    const tensorSummary =
-        override?.tensorSummary !== undefined
-            ? override.tensorSummary
-            : report.qualityScore?.densityTensorSummary;
+    const computedCai = resolveHealthCai(report, override?.cai);
+    const density = roundMetric(override?.density ?? report.qualityScore?.effectiveCodeDensity);
+    const tensorSummary = override?.tensorSummary ?? report.qualityScore?.densityTensorSummary;
+    const sqale = resolveHealthSqale(report, override?.sqale);
+    const polyglot = resolveHealthPolyglot(report, override?.polyglot);
+    const gamingDefense = resolveHealthGamingDefense(report, override?.gamingDefense);
+    const dimensionSummary = options?.includeDimensionDetails
+        ? computeDimensionSummary(report.qualityScore?.indices)
+        : undefined;
 
     return {
-        score:
-            score !== null && Number.isFinite(score)
-                ? Math.round(score * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED
-                : null,
+        score,
         grade,
-        ...(cai !== undefined && Number.isFinite(cai)
-            ? { cai: Math.round(cai * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED }
-            : {}),
-        ...(density !== undefined && Number.isFinite(density)
-            ? { density: Math.round(density * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED }
-            : {}),
+        ...(computedCai !== undefined ? { cai: computedCai } : {}),
+        ...(density !== undefined ? { density } : {}),
         ...(tensorSummary ? { tensorSummary } : {}),
+        ...(sqale ? { sqale } : {}),
+        ...(polyglot ? { polyglot } : {}),
+        ...(gamingDefense ? { gamingDefense } : {}),
+        ...(dimensionSummary ? { dimensionSummary } : {}),
         counts,
     };
 }
@@ -256,29 +482,29 @@ function extractDeductionBottlenecks(
     deductions: Record<string, { entries: Array<{ rule?: string; points: number }> }>,
     limit: number,
 ): AasBottleneck[] {
-    const lossMap = new Map<string, { dim: string; loss: number; count: number }>();
-    for (const [dim, audit] of Object.entries(deductions)) {
+    const lossMap = new Map<string, { dimension: string; loss: number; count: number }>();
+    for (const [dimension, audit] of Object.entries(deductions)) {
         const entries = audit?.entries;
         if (!Array.isArray(entries)) continue;
         for (const entry of entries) {
-            const rule = entry.rule || 'unknown';
+            const ruleId = entry.rule || 'unknown';
             const points = Number.isFinite(entry.points) ? entry.points : 0;
-            const current = lossMap.get(rule);
+            const current = lossMap.get(ruleId);
             if (current) {
                 current.loss += points;
                 current.count += 1;
             } else {
-                lossMap.set(rule, { dim, loss: points, count: 1 });
+                lossMap.set(ruleId, { dimension, loss: points, count: 1 });
             }
         }
     }
 
     return Array.from(lossMap.entries())
-        .map(([rule, data]) => ({
-            rule,
-            dim: data.dim,
-            loss: Math.round(data.loss * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
-            count: data.count,
+        .map(([ruleId, bottleneckData]) => ({
+            rule: ruleId,
+            dim: bottleneckData.dimension,
+            loss: Math.round(bottleneckData.loss * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
+            count: bottleneckData.count,
         }))
         .sort((itemA, itemB) => itemB.loss - itemA.loss)
         .slice(0, limit);
@@ -335,10 +561,13 @@ function resolveActionFromRule(rule: string): string {
 /**
  * Extracts concise, single-clause suggestion template (<= 80 chars) to prevent prose bloat.
  */
-function cleanSuggestion(raw: string): string | undefined {
-    if (!raw) return undefined;
-    let trimmed = raw.trim();
-    trimmed = trimmed.replace(/^(?:Please\s+|Consider\s+|It\s+is\s+recommended\s+to\s+)/i, '');
+function cleanSuggestion(rawContent: string): string | undefined {
+    if (!rawContent) return undefined;
+    let trimmed = rawContent.trim();
+    trimmed = trimmed.replace(
+        /^(?:Please\s+|Consider\s+|It\s+is\s+(?:recommended|required)\s+to\s+|You\s+should\s+|Ensure\s+that\s+|Try\s+to\s+)/i,
+        '',
+    );
     if (trimmed.length <= MAX_SUGGESTION_CHARS) return trimmed;
     const match = trimmed.match(/^([^.!?\n]+[.!?]?)/);
     const firstClause = match
@@ -353,16 +582,16 @@ function cleanSuggestion(raw: string): string | undefined {
  * Builds actionable remediation recipe from issue metadata.
  */
 function buildFixRecipe(issue: Issue): AasFixRecipe | undefined {
-    const act = issue.actionable;
-    if (act?.action) {
-        const conciseTemplate = act.templateSnippet
-            ? cleanSuggestion(act.templateSnippet)
+    const actionable = issue.actionable;
+    if (actionable?.action) {
+        const conciseTemplate = actionable.templateSnippet
+            ? cleanSuggestion(actionable.templateSnippet)
             : undefined;
         return {
-            action: act.action,
-            ...(act.patch ? { patch: act.patch } : {}),
+            action: actionable.action,
+            ...(actionable.patch ? { patch: actionable.patch } : {}),
             ...(conciseTemplate ? { template: conciseTemplate } : {}),
-            ...(act.safeToAutomate !== undefined ? { safeToAutomate: act.safeToAutomate } : {}),
+            ...(actionable.safeToAutomate !== undefined ? { safeToAutomate: actionable.safeToAutomate } : {}),
         };
     }
     if (issue.suggestion) {
@@ -385,6 +614,7 @@ interface DefectRecordParams {
     readonly anchorCache: AnchorCache;
     readonly options: AasReportOptions;
     readonly defaultVerify: string;
+    readonly skipAnchor?: boolean;
     /**
      * Tier the arbitration pass assigned this issue's rule, or undefined when the pass did not
      * run. Passed in rather than derived here: the arbiter owns tiering, and a reporter that
@@ -423,19 +653,20 @@ function buildDefectRecord(params: DefectRecordParams): AasDefectRecord {
     const issue = params.issue;
     const startLine = issue.location?.start?.line ?? 1;
     const endLine = issue.location?.end?.line ?? startLine;
-    const col = issue.location?.start?.column;
-    const sev = mapSeverity(issue.severity);
-    const rawMsg = trimMessage(issue.message);
-    const msg =
-        params.options.compressSentences !== false ? compressDiagnosticSentence(rawMsg) : rawMsg;
+    const startColumn = issue.location?.start?.column;
+    const severityTier = mapSeverity(issue.severity);
+    const rawMessage = trimMessage(issue.message);
+    const compressedMessage =
+        params.options.compressSentences !== false ? compressDiagnosticSentence(rawMessage) : rawMessage;
 
+    const shouldSkipAnchor = params.skipAnchor === true;
     const radius = params.options.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
     const anchor =
-        sev !== AAS_SEV_INFO
+        !shouldSkipAnchor && severityTier !== AAS_SEV_INFO
             ? params.anchorCache.getAnchor(params.file, startLine, endLine, radius)
             : undefined;
 
-    const fix = buildFixRecipe(issue);
+    const fixRecipe = buildFixRecipe(issue);
     const verifyCmd = generateVerificationDirective(
         issue,
         params.layer,
@@ -446,12 +677,12 @@ function buildDefectRecord(params: DefectRecordParams): AasDefectRecord {
 
     return {
         line: startLine,
-        ...(col !== undefined && col > 1 ? { col } : {}),
+        ...(startColumn !== undefined && startColumn > 1 ? { col: startColumn } : {}),
         rule: issue.rule,
-        sev,
-        msg,
+        sev: severityTier,
+        msg: compressedMessage,
         ...(anchor ? { anchor } : {}),
-        ...(fix ? { fix } : {}),
+        ...(fixRecipe ? { fix: fixRecipe } : {}),
         ...(isNonDefaultVerify ? { verify: verifyCmd } : {}),
         ...(params.options.includeAnalyzer && issue.analyzer ? { analyzer: issue.analyzer } : {}),
         ...(issue.isNew ? { isNew: true } : {}),
@@ -460,90 +691,11 @@ function buildDefectRecord(params: DefectRecordParams): AasDefectRecord {
 }
 
 /**
- * Normalizes file path to relative POSIX format.
- */
-function normalizeRelativePath(filePath: string, baseDir: string): string {
-    let rel = filePath.replace(/\\/g, '/');
-    if (baseDir && path.isAbsolute(rel)) {
-        rel = path.relative(baseDir, rel).replace(/\\/g, '/');
-    }
-    return rel;
-}
-
-/**
- * Retrieves existing array from map or instantiates fresh array without loop allocation.
- */
-function getOrCreateBucket<K, V>(map: Map<K, V[]>, key: K): V[] {
-    const existing = map.get(key);
-    if (existing) return existing;
-    const fresh: V[] = [];
-    map.set(key, fresh);
-    return fresh;
-}
-
-/**
- * Partitions eligible findings into a map of repository-relative file paths.
- */
-function collectFileIssues(
-    issues: readonly Issue[],
-    includeInfo: boolean,
-    baseDir: string,
-): Map<string, Issue[]> {
-    const fileMap = new Map<string, Issue[]>();
-    for (const issue of issues) {
-        if (!includeInfo && issue.severity === 'info') continue;
-        const normFile = normalizeRelativePath(issue.location?.file || 'unknown', baseDir);
-        getOrCreateBucket(fileMap, normFile).push(issue);
-    }
-    return fileMap;
-}
-
-/**
- * Resolves the highest-priority architectural topology layer across all findings in a file.
- */
-function resolvePrimaryLayer(issues: readonly Issue[], fPath: string): string {
-    let bestLayer = 'L5_GOVERNANCE';
-    let bestRank = UNRANKED_TOPOLOGY_WEIGHT;
-    for (const issue of issues) {
-        const layer = resolveTopologyLayer(issue.rule, fPath);
-        const rank = TOPOLOGY_RANK[layer] ?? UNRANKED_TOPOLOGY_WEIGHT;
-        if (rank < bestRank) {
-            bestRank = rank;
-            bestLayer = layer;
-        }
-    }
-    return bestLayer;
-}
-
-/**
- * Maps each affected file to its primary architectural topology layer.
- */
-function buildFileLayerMap(fileMap: Map<string, Issue[]>): Map<string, string> {
-    const layerMap = new Map<string, string>();
-    for (const [fPath, issues] of fileMap.entries()) {
-        layerMap.set(fPath, resolvePrimaryLayer(issues, fPath));
-    }
-    return layerMap;
-}
-
-/**
- * Sorts files by topological priority (L1 -> L5), breaking ties alphabetically.
- */
-function sortFilesByTopology(files: string[], fileLayerMap: Map<string, string>): string[] {
-    return [...files].sort((fileA, fileB) => {
-        const rankA = TOPOLOGY_RANK[fileLayerMap.get(fileA)!] ?? UNRANKED_TOPOLOGY_WEIGHT;
-        const rankB = TOPOLOGY_RANK[fileLayerMap.get(fileB)!] ?? UNRANKED_TOPOLOGY_WEIGHT;
-        if (rankA !== rankB) return rankA - rankB;
-        return fileA.localeCompare(fileB);
-    });
-}
-
-/**
  * Parameter object for batch file defect emission.
  */
 interface EmitDefectsParams {
     readonly issues: readonly Issue[];
-    readonly fPath: string;
+    readonly filePath: string;
     readonly layer: AgentTopologyLayer;
     readonly anchorCache: AnchorCache;
     readonly options: AasReportOptions;
@@ -563,24 +715,41 @@ function emitDefectsForFile(params: EmitDefectsParams): {
 } {
     const emitted: AasDefectRecord[] = [];
     let omittedCount = 0;
+    let previousCoveredFromLine = -1;
+    let previousCoveredToLine = -1;
+    const shouldDeduplicate = params.options.deduplicateAnchors !== false;
+    const radius = params.options.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
 
     for (const issue of params.issues) {
         if (emitted.length >= params.maxPerFile || emitted.length >= params.remainingBudget) {
             omittedCount++;
             continue;
         }
-        const tier = params.ruleTiers ? params.ruleTiers[issue.rule] : undefined;
-        emitted.push(
-            buildDefectRecord({
-                issue,
-                file: params.fPath,
-                layer: params.layer,
-                anchorCache: params.anchorCache,
-                options: params.options,
-                defaultVerify: params.defaultVerify,
-                ...(tier ? { tier } : {}),
-            }),
-        );
+        const startLine = issue.location?.start?.line ?? 1;
+        const endLine = issue.location?.end?.line ?? startLine;
+        const isCoveredByPreviousAnchor =
+            shouldDeduplicate &&
+            startLine >= previousCoveredFromLine &&
+            endLine <= previousCoveredToLine;
+        const skipAnchor = isCoveredByPreviousAnchor;
+
+        const confidenceTier = params.ruleTiers ? params.ruleTiers[issue.rule] : undefined;
+        const defectRecord = buildDefectRecord({
+            issue,
+            file: params.filePath,
+            layer: params.layer,
+            anchorCache: params.anchorCache,
+            options: params.options,
+            defaultVerify: params.defaultVerify,
+            skipAnchor,
+            ...(confidenceTier ? { tier: confidenceTier } : {}),
+        });
+
+        if (defectRecord.anchor) {
+            previousCoveredFromLine = Math.max(1, startLine - radius);
+            previousCoveredToLine = endLine + radius;
+        }
+        emitted.push(defectRecord);
     }
 
     return { emitted, omittedCount };
@@ -624,25 +793,12 @@ function resolveUsability(report: ScanReport): AasUsability | undefined {
 }
 
 /**
- * Creates static empty buckets for architectural layers.
- */
-function initTopologyMap(): Record<string, string[]> {
-    return {
-        L1_CONTRACT: [],
-        L2_INFRA: [],
-        L3_CONFIG: [],
-        L4_BUSINESS: [],
-        L5_GOVERNANCE: [],
-    };
-}
-
-/**
  * Context parameters for batch defect processing.
  */
 interface DefectEmissionContext {
     readonly sortedFiles: readonly string[];
     readonly fileMap: ReadonlyMap<string, readonly Issue[]>;
-    readonly fileLayerMap: ReadonlyMap<string, string>;
+    readonly fileLayerMap: ReadonlyMap<string, AgentTopologyLayer>;
     readonly anchorCache: AnchorCache;
     readonly options: AasReportOptions;
     readonly defaultVerify: string;
@@ -657,66 +813,50 @@ interface DefectEmissionContext {
  * Emits defects for each file up to the allocated capacity.
  */
 function processDefectFiles(
-    ctx: DefectEmissionContext,
-    topologyMap: Record<string, string[]>,
+    emissionContext: DefectEmissionContext,
+    topologyMap: Record<AgentTopologyLayer, string[]>,
     resultFiles: Record<string, AasDefectRecord[]>,
 ): number {
     let filesCount = 0;
     let totalEmitted = 0;
     let truncatedCount = 0;
 
-    for (const fPath of ctx.sortedFiles) {
-        const issues = ctx.fileMap.get(fPath);
+    for (const targetFilePath of emissionContext.sortedFiles) {
+        const issues = emissionContext.fileMap.get(targetFilePath);
         if (!issues) {
             continue;
         }
-        const layer = ctx.fileLayerMap.get(fPath) ?? 'L5_GOVERNANCE';
-        if (filesCount >= ctx.maxFiles || totalEmitted >= ctx.maxTotal) {
+        const layer = emissionContext.fileLayerMap.get(targetFilePath) ?? 'L5_GOVERNANCE';
+        if (filesCount >= emissionContext.maxFiles || totalEmitted >= emissionContext.maxTotal) {
             truncatedCount += issues.length;
             continue;
         }
 
-        const remainingBudget = ctx.maxTotal - totalEmitted;
+        const remainingBudget = emissionContext.maxTotal - totalEmitted;
         const emissionResult = emitDefectsForFile({
             issues,
-            fPath,
-            layer: layer as AgentTopologyLayer,
-            anchorCache: ctx.anchorCache,
-            options: ctx.options,
-            defaultVerify: ctx.defaultVerify,
-            maxPerFile: ctx.maxPerFile,
+            filePath: targetFilePath,
+            layer,
+            anchorCache: emissionContext.anchorCache,
+            options: emissionContext.options,
+            defaultVerify: emissionContext.defaultVerify,
+            maxPerFile: emissionContext.maxPerFile,
             remainingBudget,
-            ...(ctx.ruleTiers ? { ruleTiers: ctx.ruleTiers } : {}),
+            ...(emissionContext.ruleTiers ? { ruleTiers: emissionContext.ruleTiers } : {}),
         });
 
         truncatedCount += emissionResult.omittedCount;
         totalEmitted += emissionResult.emitted.length;
         if (emissionResult.emitted.length > 0) {
-            resultFiles[fPath] = emissionResult.emitted;
+            resultFiles[targetFilePath] = emissionResult.emitted;
             filesCount++;
             const bucket = topologyMap[layer];
             if (bucket) {
-                bucket.push(fPath);
+                bucket.push(targetFilePath);
             }
         }
     }
     return truncatedCount;
-}
-
-/**
- * Collects non-empty topology buckets.
- */
-function filterActiveTopology(
-    topologyMap: Record<string, string[]>,
-): Partial<Record<string, readonly string[]>> {
-    const active: Partial<Record<string, readonly string[]>> = {};
-    for (const layer of TOPOLOGY_ORDER) {
-        const bucket = topologyMap[layer];
-        if (bucket && bucket.length > 0) {
-            active[layer] = bucket;
-        }
-    }
-    return active;
 }
 
 /**
@@ -733,18 +873,19 @@ function groupDefects(
     truncatedCount: number;
 } {
     const baseDir = options.baseDir || report.root || '';
-    const fileMap = collectFileIssues(report.issues, options.includeInfo === true, baseDir);
-    const fileLayerMap = buildFileLayerMap(fileMap);
-    const sortedFiles = sortFilesByTopology(Array.from(fileMap.keys()), fileLayerMap);
+    const pipelineCtx = executeFileTopologyPipeline(
+        report.issues,
+        baseDir,
+        options.includeInfo === true,
+    );
 
-    const topologyMap = initTopologyMap();
     const resultFiles: Record<string, AasDefectRecord[]> = {};
     const ruleTiers = report.summary.arbitration?.ruleTiers;
 
-    const ctx: DefectEmissionContext = {
-        sortedFiles,
-        fileMap,
-        fileLayerMap,
+    const emissionContext: DefectEmissionContext = {
+        sortedFiles: pipelineCtx.sortedFiles,
+        fileMap: pipelineCtx.fileMap,
+        fileLayerMap: pipelineCtx.fileLayerMap,
         anchorCache,
         options,
         defaultVerify,
@@ -754,8 +895,8 @@ function groupDefects(
         ...(ruleTiers ? { ruleTiers } : {}),
     };
 
-    const truncatedCount = processDefectFiles(ctx, topologyMap, resultFiles);
-    const topology = filterActiveTopology(topologyMap);
+    const truncatedCount = processDefectFiles(emissionContext, pipelineCtx.topologyBuckets, resultFiles);
+    const topology = filterActiveTopologyBuckets(pipelineCtx.topologyBuckets);
 
     return { files: resultFiles, topology, truncatedCount };
 }
@@ -778,6 +919,7 @@ export function buildAasReport(
     const health = buildHealth(report, counts, options);
     const usability = resolveUsability(report);
     const dimensions = projectDimensions(report.qualityScore);
+    const dimensionDetails = projectDimensionDetails(report.qualityScore, options);
     const bottlenecks = extractBottlenecks(report);
     const { files, topology, truncatedCount } = groupDefects(
         report,
@@ -797,6 +939,7 @@ export function buildAasReport(
         ...(usability ? { usability } : {}),
         defaultVerify,
         ...(dimensions ? { dimensions } : {}),
+        ...(dimensionDetails ? { dimensionDetails } : {}),
         bottlenecks,
         topology,
         files,
@@ -818,6 +961,6 @@ export function toAasJson(
     report: ScanReport,
     options: AasReportOptions & { readonly pretty?: boolean } = {},
 ): string {
-    const doc = buildAasReport(report, options);
-    return JSON.stringify(doc, null, options.pretty === false ? 0 : 2);
+    const auditDocument = buildAasReport(report, options);
+    return JSON.stringify(auditDocument, null, options.pretty === false ? 0 : 2);
 }

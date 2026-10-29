@@ -72,7 +72,7 @@ function renderTriPlaneVector(triPlane: UnifiedQualityAssessment): void {
         `  • Static Plane Q_s (${wsPct}% wt)   : ${triPlane.staticScore.toFixed(1)} ` +
             `[A:${staticVec.A.toFixed(0)} M:${staticVec.M.toFixed(0)} P:${staticVec.P.toFixed(0)} ` +
             `D:${staticVec.D.toFixed(0)} T:${staticVec.T.toFixed(0)} R:${staticVec.R.toFixed(0)} ` +
-            `E:${staticVec.E.toFixed(0)}]\n`,
+            `S:${staticVec.S.toFixed(0)} E:${staticVec.E.toFixed(0)}]\n`,
     );
     const wdPct = (triPlane.weights.Wd * PERCENT_SCALE).toFixed(0);
     if (triPlane.dynamicVector) {
@@ -92,6 +92,55 @@ function renderTriPlaneVector(triPlane: UnifiedQualityAssessment): void {
     process.stdout.write(
         `  • Fused Total Q_tot         : ${triPlane.totalScore.toFixed(1)} / 100\n`,
     );
+}
+
+/**
+ * Renders technical debt, density tensor, and polyglot metrics.
+ */
+function renderTechnicalDebtAndDensity(scoreBreakdown: QualityScoreBreakdown): void {
+    if (!scoreBreakdown.technicalDebt && !scoreBreakdown.densityTensorSummary && !scoreBreakdown.polyglotGeneralization) {
+        return;
+    }
+    process.stdout.write(`-------------------------------------------\n`);
+    if (scoreBreakdown.technicalDebt) {
+        const technicalDebt = scoreBreakdown.technicalDebt;
+        const remediationHours = (technicalDebt.totalRemediationMinutes / 60).toFixed(1);
+        process.stdout.write(
+            `SQALE Technical Debt    : ${technicalDebt.technicalDebtRatio.toFixed(1)}% ` +
+                `[Grade: ${technicalDebt.sqaleGrade}] (Remediation: ${remediationHours}h / ${technicalDebt.totalRemediationMinutes}min)\n`,
+        );
+    }
+    if (scoreBreakdown.densityTensorSummary) {
+        const densityTensor = scoreBreakdown.densityTensorSummary;
+        const distanceSuffix = densityTensor.averageMahalanobisDistance !== undefined
+            ? ` | Mahalanobis: ${densityTensor.averageMahalanobisDistance.toFixed(2)}`
+            : '';
+        process.stdout.write(
+            `5D Density Tensor       : Density ${(densityTensor.compositeDensity * PERCENT_SCALE).toFixed(1)}% ` +
+                `[TSPR: ${(densityTensor.averageTspr * PERCENT_SCALE).toFixed(0)}% | POR: ${(densityTensor.averagePor * PERCENT_SCALE).toFixed(0)}%${distanceSuffix}]\n`,
+        );
+    }
+    if (scoreBreakdown.polyglotGeneralization) {
+        const polyglotMetrics = scoreBreakdown.polyglotGeneralization;
+        process.stdout.write(
+            `Polyglot Generalization : ${polyglotMetrics.index.toFixed(1)} / 100 ` +
+                `(${polyglotMetrics.languageCount} langs, mean: ${polyglotMetrics.meanScore.toFixed(1)}, penalty: ${polyglotMetrics.dispersionPenalty.toFixed(2)})\n`,
+        );
+    }
+}
+
+/**
+ * Renders top deduction rationales.
+ */
+function renderDeductionRationales(rationales?: QualityScoreBreakdown['rationales']): void {
+    if (!rationales || rationales.length === 0) return;
+    process.stdout.write(`-------------------------------------------\n`);
+    process.stdout.write(`Key Deductions & Rationales:\n`);
+    for (const rationale of rationales.slice(0, MAX_QUALITY_RATIONALES)) {
+        process.stdout.write(
+            `  [${rationale.delta} pts] ${rationale.dimension}: ${rationale.reason}${rationale.line ? ` (L${rationale.line})` : ''}\n`,
+        );
+    }
 }
 
 /**
@@ -121,23 +170,18 @@ export function printQualityScoreAssessment(
     );
     process.stdout.write(`-------------------------------------------\n`);
     const notEvaluatedSet = new Set<QualityDimension>(scoreBreakdown.notEvaluated ?? []);
-    for (const [dim, val] of Object.entries(scoreBreakdown.indices)) {
-        const isNotEvaluated = notEvaluatedSet.has(dim as QualityDimension);
-        const valText = isNotEvaluated ? 'N/A [NOT EVALUATED]' : (val as number).toFixed(2);
-        process.stdout.write(`  • ${dim.padEnd(QUALITY_DIMENSION_LABEL_WIDTH)}: ${valText}\n`);
+    for (const [dimensionKey, scoreValue] of Object.entries(scoreBreakdown.indices)) {
+        const isNotEvaluated = notEvaluatedSet.has(dimensionKey as QualityDimension);
+        const valText = isNotEvaluated ? 'N/A [NOT EVALUATED]' : (scoreValue as number).toFixed(2);
+        const weightVal = scoreBreakdown.weights ? (scoreBreakdown.weights as any)[dimensionKey] : undefined;
+        const weightTag = typeof weightVal === 'number' ? ` (wt: ${(weightVal * 100).toFixed(1)}%)` : '';
+        process.stdout.write(`  • ${dimensionKey.padEnd(QUALITY_DIMENSION_LABEL_WIDTH)}: ${valText}${weightTag}\n`);
     }
     if (triPlane) {
         renderTriPlaneVector(triPlane);
     }
-    if (scoreBreakdown.rationales && scoreBreakdown.rationales.length > 0) {
-        process.stdout.write(`-------------------------------------------\n`);
-        process.stdout.write(`Key Deductions & Rationales:\n`);
-        for (const rationale of scoreBreakdown.rationales.slice(0, MAX_QUALITY_RATIONALES)) {
-            process.stdout.write(
-                `  [${rationale.delta} pts] ${rationale.dimension}: ${rationale.reason}${rationale.line ? ` (L${rationale.line})` : ''}\n`,
-            );
-        }
-    }
+    renderTechnicalDebtAndDensity(scoreBreakdown);
+    renderDeductionRationales(scoreBreakdown.rationales);
     process.stdout.write(`===========================================\n\n`);
 }
 
