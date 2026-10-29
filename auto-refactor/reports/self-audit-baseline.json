@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1793200070029",
-  "timestamp": "2026-10-28T15:07:54.682Z",
+  "snapshotId": "snapshot-v0.4.0-1793250111438",
+  "timestamp": "2026-10-29T05:01:56.170Z",
   "cai": 88,
   "autonomy": {
     "compositeAutonomyIndex": 88,
@@ -9,7 +9,7 @@
     "dimensions": {
       "effectiveLocAutonomy": 97.65,
       "symbolCallAutonomy": 97.89,
-      "domainKernelDensity": 63.15,
+      "domainKernelDensity": 63.16,
       "codeOriginality": 89.88,
       "supplyChainResilience": 77.27,
       "criticalPathAutonomy": 94.44
@@ -64,8 +64,8 @@
       "proprietaryFiles": 778,
       "vendorFiles": 0,
       "generatedFiles": 7,
-      "totalEffectiveLoc": 236350,
-      "proprietaryEffectiveLoc": 230799,
+      "totalEffectiveLoc": 236358,
+      "proprietaryEffectiveLoc": 230807,
       "vendorEffectiveLoc": 0,
       "generatedEffectiveLoc": 5551,
       "internalSymbolCalls": 2228,
@@ -95,7 +95,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 785,
-    "durationMs": 2664
+    "durationMs": 2028
   },
   "metrics": {
     "compositeScore": 99.17,
@@ -118,18 +118,18 @@
       "averageMahalanobisDistance": 4.612,
       "averageFisherSimplexDistance": 0.097
     },
-    "totalIssues": 4087,
+    "totalIssues": 4086,
     "suppressedIssues": 161,
-    "unsuppressedIssues": 3926,
+    "unsuppressedIssues": 3925,
     "bySeverity": {
       "info": 565,
-      "warning": 3522,
+      "warning": 3521,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
-      "medium": 686,
+      "medium": 685,
       "low": 3401
     }
   },
@@ -265,7 +265,7 @@
     "summary": {
       "critical": 0,
       "high": 0,
-      "medium": 686,
+      "medium": 685,
       "low": 3401
     },
     "criticalItems": [],
@@ -1162,27 +1162,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 183978,
+      "processed": 183974,
       "unique": 145892,
-      "changed": 1931,
-      "semantic": 1427,
+      "changed": 491,
+      "semantic": 379,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 1583,
-      "deleted": 348,
-      "modified": 348
+      "added": 378,
+      "deleted": 113,
+      "modified": 113
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1793200070027,
+      "endMs": 1793250111436,
       "totalRuns": 454,
       "eloc": {
-        "processedTotal": 69413989,
+        "processedTotal": 69418058,
         "uniqueTotal": 145892,
-        "changedTotal": 1222037,
-        "semanticTotal": 976761
+        "changedTotal": 1222144,
+        "semanticTotal": 976850
       },
       "qed": {
         "mean": 0.000069,
@@ -1192,9 +1192,9 @@
       },
       "debt": {
         "totalAdded": 3143,
-        "totalResolved": 5169,
+        "totalResolved": 5170,
         "totalRegressions": 17,
-        "netYield": 2.07,
+        "netYield": 2.08,
         "densityYield": 13.89
       },
       "meanCompositeScore": 98.97,
