@@ -25,6 +25,8 @@
 import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
+import { globToRegExp } from '../core/file-discovery';
+import { normalizePathSeparators } from '../core/constants';
 
 interface GroupRules {
     allowGroups?: string[];
@@ -40,22 +42,9 @@ interface DependencyGraphOptions {
     maxCyclesReported?: number;
 }
 
-/** Simple glob → RegExp: `**` crosses segments, `*` stays within one segment. */
-function globToRegex(glob: string): RegExp {
-    const escaped = glob
-        .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-        .replace(/\*\*/g, '\u0000')
-        .replace(/\*/g, '[^/]*')
-        .replace(/\u0000/g, '.*')
-        .replace(/\?/g, '.');
-    return new RegExp(`^${escaped}$`);
-}
-
 /** Normalize a file path the same way the core graph does: POSIX, extension stripped. */
 function normalizeRel(relPath: string): string {
-    return path
-        .normalize(relPath)
-        .replace(/\\/g, '/')
+    return normalizePathSeparators(path.normalize(relPath))
         .replace(/\.(ts|tsx|js|jsx|d\.ts|mts|cts|mjs|cjs)$/, '');
 }
 
@@ -74,7 +63,7 @@ interface RuleConstraints {
 
 function compileGroupRegexes(globs?: string[]): RegExp[] {
     if (!globs || globs.length === 0) return [];
-    return globs.map(globToRegex);
+    return globs.map(globToRegExp);
 }
 
 function compileGroups(groups: Record<string, string[]>): CompiledGroup[] {
@@ -115,7 +104,7 @@ function classifyAllowedExternal(
 function compileRuleConstraints(fromGroup: string, rule: GroupRules): RuleConstraints {
     const allowGroups = new Set([fromGroup, ...(rule.allowGroups ?? [])]);
     const compiledExceptionRegexes = (rule.allowImportGlobs ?? []).map((globPattern) => {
-        return globToRegex(globPattern.includes('/') ? globPattern : `**/${globPattern}`);
+        return globToRegExp(globPattern.includes('/') ? globPattern : `**/${globPattern}`);
     });
 
     const target = { allowAll: false, exact: new Set<string>(), prefixes: [] as string[] };
@@ -173,7 +162,7 @@ export class DependencyGraphAnalyzer implements Analyzer {
         const rules = opts.rules ?? {};
         if (Object.keys(groups).length === 0) return [];
 
-        const file = ctx.filePath.replace(/\\/g, '/');
+        const file = normalizePathSeparators(ctx.filePath);
         const normFile = normalizeRel(file);
 
         const compiledGroups = compileGroups(groups);

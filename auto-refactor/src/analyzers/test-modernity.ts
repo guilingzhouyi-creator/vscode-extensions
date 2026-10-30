@@ -28,44 +28,7 @@ import {
 import { DualTrackTestEvaluator } from '../core/scoring/dual-track-test-evaluator';
 import { partitionFileZones } from '../core/intelligence/zone-partitioner';
 import { analyzeCodeDensity } from '../core/intelligence/code-density-analyzer';
-
-/** Pattern identifying test case declarations for polyglot fallbacks. */
-const TEST_DECL_RE =
-    /\b(?:it|test|describe|test_case|func\s+test_|def\s+test_)\s*(?:\(\s*['"]([^'"]+)['"]|([A-Za-z0-9_]+))/;
-
-/** Pattern identifying permanently skipped or disabled tests. */
-const SKIPPED_TEST_RE =
-    /\b(?:\.skip\s*\(|xit\s*\(|xtest\s*\(|@pytest\.mark\.skip|@pytest\.mark\.xfail|@ignore\b)/;
-
-/** Pattern identifying tautological assertions. */
-const TAUTOLOGICAL_ASSERT_RE =
-    /\b(?:expect\s*\(\s*(true|1|'a'|[a-zA-Z0-9_$]+)\s*\)\.to(?:Be|Equal)\s*\(\s*(?:true|1|'a'|\1)\s*\)|assert\s+(?:True|1\s*==\s*1)\b)/;
-
-/** Pattern identifying assertions that test mock stubs only. */
-const MOCK_ONLY_ASSERT_RE =
-    /\bexpect\s*\(\s*(?:mock|jest\.fn|stub|spy)[A-Za-z0-9_.]*\)\.(?:toHaveBeenCalled|toBe|toEqual)/;
-
-/** Pattern identifying tests asserting obsolete V1 contract versions. */
-const OBSOLETE_CONTRACT_RE =
-    /\b(?:v1_contract|legacy_v1_api|contract_v1|apiVersion:\s*['"]v1['"])\b/;
-
-/** Pattern identifying fragile equality assertions against floating point literals. */
-const FRAGILE_FLOAT_ASSERT_RE =
-    /\b(?:expect\([^)]+\)\.to(?:Be|Equal|toStrictEqual)\s*\(\s*([0-9]+\.[0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\([^,)]+,\s*([0-9]+\.[0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\(\s*([0-9]+\.[0-9]+)\s*,|assert_true\s*\([^,)]*==\s*([0-9]+\.[0-9]+))/;
-
-/**
- * Pattern identifying entity metrics and physical total counters vulnerable to brittle magic
- * oracles.
- */
-const BRITTLE_ORACLE_TARGET_RE =
-    /\b(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount|entryCount|testsCount|totalTests)\b/i;
-
-/** Pattern identifying brittle assertions against entity counters with integer literals >= 2. */
-const BRITTLE_ORACLE_ASSERT_RE =
-    /\b(?:expect\s*\([^)]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount|entryCount|testsCount|totalTests)[^)]*\)\s*\.to(?:Be|Equal|toStrictEqual)\s*\(\s*([0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\([^,)]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount|entryCount|testsCount|totalTests)[^,)]*,\s*([0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\(\s*([0-9]+)\s*,\s*[^,)]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount|entryCount|testsCount|totalTests))/i;
-
-/** Pattern identifying block comment closure. */
-const BLOCK_COMMENT_CLOSE_RE = /\*\//;
+import { REGEX, normalizePathSeparators } from '../core/constants';
 
 /** Test block names recognized during AST traversal. */
 const TEST_BLOCK_NAMES = new Set([
@@ -160,7 +123,7 @@ function createLineCaseRecord(name: string, line: number): CaseRecord {
 }
 
 function isTestFilePath(filePath: string): boolean {
-    const lowerPath = filePath.toLowerCase().replace(/\\/g, '/');
+    const lowerPath = normalizePathSeparators(filePath).toLowerCase();
     return (
         lowerPath.includes('test') ||
         lowerPath.includes('spec') ||
@@ -484,7 +447,7 @@ export class TestModernityAnalyzer implements Analyzer {
             return;
         }
 
-        if (OBSOLETE_CONTRACT_RE.test(node.getText(sourceFile))) {
+        if (REGEX.TEST.OBSOLETE_CONTRACT.test(node.getText(sourceFile))) {
             if (currentCase) currentCase.obsoleteCount++;
             sites.push({
                 file: ctx.filePath,
@@ -573,7 +536,7 @@ export class TestModernityAnalyzer implements Analyzer {
             return null;
         }
         const targetText = innerCall.arguments[0].getText(sourceFile);
-        if (!BRITTLE_ORACLE_TARGET_RE.test(targetText)) {
+        if (!REGEX.TEST.BRITTLE_COUNTER_IDENT.test(targetText)) {
             return null;
         }
         return { literal: arg.text, target: targetText };
@@ -588,7 +551,7 @@ export class TestModernityAnalyzer implements Analyzer {
             return null;
         }
         const targetText = targetNode.getText(sourceFile);
-        if (!BRITTLE_ORACLE_TARGET_RE.test(targetText)) {
+        if (!REGEX.TEST.BRITTLE_COUNTER_IDENT.test(targetText)) {
             return null;
         }
         const numVal = Number(litNode.text);
@@ -720,23 +683,25 @@ export class TestModernityAnalyzer implements Analyzer {
             const line = lines[i];
             const lineNum = i + 1;
 
-            const declMatch = line.match(TEST_DECL_RE);
+            const declMatch = line.match(REGEX.TEST.TEST_CASE_DECL);
             if (declMatch) {
                 currentTestName = declMatch[1] || declMatch[2] || UNKNOWN_TEST_NAME;
                 currentCase = createLineCaseRecord(currentTestName, lineNum);
                 caseRecords.push(currentCase);
             }
 
-            const isSkipped = SKIPPED_TEST_RE.test(line);
-            const isTautological = TAUTOLOGICAL_ASSERT_RE.test(line);
-            const isMockOnly = MOCK_ONLY_ASSERT_RE.test(line);
-            const isObsolete = OBSOLETE_CONTRACT_RE.test(line);
-            const floatMatch = FRAGILE_FLOAT_ASSERT_RE.exec(line);
+            const isSkipped = REGEX.TEST.SKIPPED_TEST.test(line);
+            const isTautological = REGEX.TEST.TAUTOLOGICAL_ASSERT.test(line);
+            const isMockOnly = REGEX.TEST.MOCK_ONLY_ASSERT.test(line);
+            const isObsolete = REGEX.TEST.OBSOLETE_CONTRACT.test(line);
+            const floatMatch = REGEX.TEST.FRAGILE_FLOAT_ASSERT.exec(line);
             const isFragileFloat = floatMatch !== null;
             const fragileFloatLit = floatMatch
                 ? floatMatch.slice(1).find(Boolean) || 'float'
                 : undefined;
-            const brittleMatch = BRITTLE_ORACLE_ASSERT_RE.exec(line);
+            const brittleMatch = REGEX.TEST.BRITTLE_COUNTER_IDENT.test(line)
+                ? REGEX.TEST.NUMERIC_ASSERT.exec(line)
+                : null;
             const isBrittleOracle = brittleMatch !== null;
             const brittleOracleLit = brittleMatch
                 ? brittleMatch.slice(1).find(Boolean) || 'scalar'
@@ -765,6 +730,12 @@ export class TestModernityAnalyzer implements Analyzer {
         }
     }
 
+    /**
+     * Appends a diagnostic test smell site record if any non-conforming anti-pattern is flagged.
+     *
+     * @param params - Smell site parameters including line coordinates and smell indicators.
+     * @param sites - Mutable collection of test site records.
+     */
     private recordSiteIfSmell(
         params: {
             filePath: string;
@@ -821,6 +792,12 @@ export class TestModernityAnalyzer implements Analyzer {
         });
     }
 
+    /**
+     * Computes effective non-comment, non-empty physical lines of code for test files.
+     *
+     * @param content - Raw test source content.
+     * @returns Filtered non-comment line count.
+     */
     private countNloc(content: string): number {
         const lines = content.split('\n');
         let nloc = 0;
@@ -830,11 +807,11 @@ export class TestModernityAnalyzer implements Analyzer {
             const trimmed = line.trim();
             if (!trimmed) continue;
             if (inBlockComment) {
-                if (BLOCK_COMMENT_CLOSE_RE.test(trimmed)) inBlockComment = false;
+                if (REGEX.COMMENT.BLOCK_END.test(trimmed)) inBlockComment = false;
                 continue;
             }
             if (trimmed.startsWith('/*')) {
-                if (!BLOCK_COMMENT_CLOSE_RE.test(trimmed)) inBlockComment = true;
+                if (!REGEX.COMMENT.BLOCK_END.test(trimmed)) inBlockComment = true;
                 continue;
             }
             if (trimmed.startsWith('//') || trimmed.startsWith('#')) {
@@ -845,14 +822,27 @@ export class TestModernityAnalyzer implements Analyzer {
         return nloc;
     }
 
+    /**
+     * Extracts normalized target domain identifier from file path.
+     *
+     * @param filePath - Path to the test file.
+     * @returns Inferred domain identifier.
+     */
     private inferDomainName(filePath: string): string {
-        const norm = filePath.replace(/\\/g, '/');
+        const norm = normalizePathSeparators(filePath);
         const filename = norm.split('/').pop() || 'unknown';
         return filename
             .replace(/^(?:test_|fe_\d+_)/, '')
             .replace(/(?:\.test|\.spec|_test)?\.[a-z]+$/, '');
     }
 
+    /**
+     * Constructs active semantic units mapping test cases to business domain symbols.
+     *
+     * @param domain - Inferred domain identifier.
+     * @param cases - Collection of case records discovered during scan.
+     * @returns Mapped active semantic units.
+     */
     private buildSemanticUnits(domain: string, cases: CaseRecord[]): ActiveSemanticUnit[] {
         const units: ActiveSemanticUnit[] = [];
         for (const caseRecord of cases) {

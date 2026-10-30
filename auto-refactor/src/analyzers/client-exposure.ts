@@ -19,31 +19,15 @@ import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ExposureMessages } from '../core/messages/exposure';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
+import { REGEX, normalizePathSeparators } from '../core/constants';
+
 /** Canonical analyzer identifier for client-side exposure and credential security audits. */
 export const ANALYZER_CLIENT_EXPOSURE_ID = 'client-exposure';
 
-const INTERNAL_ENDPOINT_PATTERNS = [
-    /(?:fetch|axios\.(?:get|post|put|delete)|request)\s*\(\s*['"`](?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:internal|admin\/internal|actuator|debug|private)\//i,
-    /['"`]\/(?:internal|admin\/internal|actuator|debug)\/[a-zA-Z0-9_/-]+['"`]/i,
-];
-
-const CSS_AUTH_BYPASS_RE =
-    /<(?:button|div|span|form)[^>]*(?:style\s*=\s*['"][^'"]*display\s*:\s*none|hidden\b)[^>]*(?:admin|manage|delete|grant|privileged)/i;
-
-const DISABLED_FEATURE_FLAG_RE =
-    /\bif\s*\(\s*(?:FEATURE_FLAGS\.[A-Z0-9_]+\s*===?\s*false|!FEATURE_FLAGS\.[A-Z0-9_]+)\s*\)\s*\{/i;
-
-const UNRELEASED_ROUTE_RE =
-    /\b(?:path|route)\s*:\s*['"`]\/(?:test|sandbox|debug|preview|internal-only)[a-zA-Z0-9_/-]*['"`]/i;
-
-const MESSAGE_LISTENER_RE =
-    /(?:addEventListener\s*\(\s*['"`]message['"`]|(?:window\.)?onmessage\s*=)/i;
-
-const SENSITIVE_ACTION_RE =
-    /\b(?:window\.open\s*\(|localStorage\.setItem\s*\(|sessionStorage\.setItem\s*\(|\.download\s*=|vscode\.postMessage\s*\(|document\.execCommand\s*\()/i;
-
-const USER_ACTIVATION_OR_ORIGIN_RE =
-    /\b(?:(?:event|e|ev|msg)\.userActivation\b|userActivation\.(?:isActive|hasBeenActive)|\.origin\b)/i;
+const INTERNAL_ENDPOINT_PATTERNS: readonly RegExp[] = Object.freeze([
+    REGEX.SECURITY.INTERNAL_ENDPOINT_CALL,
+    REGEX.SECURITY.INTERNAL_ENDPOINT_PATH,
+]);
 
 const MAX_LISTENER_SCAN_WINDOW = 40;
 
@@ -101,7 +85,7 @@ function auditInternalApiEndpoints(file: string, rawLines: string[], issues: Iss
 function auditCssAuthorizationBypass(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (CSS_AUTH_BYPASS_RE.test(line)) {
+        if (REGEX.SECURITY.CSS_AUTH_BYPASS.test(line)) {
             issues.push(
                 makeExposureIssue({
                     file,
@@ -123,7 +107,7 @@ function auditCssAuthorizationBypass(file: string, rawLines: string[], issues: I
 function auditFeatureFlagCodeSplitting(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (DISABLED_FEATURE_FLAG_RE.test(line)) {
+        if (REGEX.SECURITY.FEATURE_FLAG_DEAD_GATE.test(line)) {
             issues.push(
                 makeExposureIssue({
                     file,
@@ -145,7 +129,7 @@ function auditFeatureFlagCodeSplitting(file: string, rawLines: string[], issues:
 function auditUnreleasedRoutes(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (UNRELEASED_ROUTE_RE.test(line)) {
+        if (REGEX.SECURITY.CLIENT_DEBUG_ROUTE.test(line)) {
             issues.push(
                 makeExposureIssue({
                     file,
@@ -163,7 +147,7 @@ function auditUnreleasedRoutes(file: string, rawLines: string[], issues: Issue[]
 
 function hasGuardedActivationOrOrigin(lines: string[], start: number, end: number): boolean {
     for (let i = start; i < end; i++) {
-        if (USER_ACTIVATION_OR_ORIGIN_RE.test(lines[i])) {
+        if (REGEX.SECURITY.USER_ACTIVATION_OR_ORIGIN.test(lines[i])) {
             return true;
         }
     }
@@ -172,7 +156,7 @@ function hasGuardedActivationOrOrigin(lines: string[], start: number, end: numbe
 
 function findSensitiveActionLine(lines: string[], start: number, end: number): number {
     for (let i = start; i < end; i++) {
-        if (SENSITIVE_ACTION_RE.test(lines[i])) {
+        if (REGEX.SECURITY.SENSITIVE_ACTION_TRIGGER.test(lines[i])) {
             return i + 1;
         }
     }
@@ -182,7 +166,7 @@ function findSensitiveActionLine(lines: string[], start: number, end: number): n
 function auditIframeUserActivation(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (!MESSAGE_LISTENER_RE.test(line)) {
+        if (!REGEX.SECURITY.MESSAGE_LISTENER.test(line)) {
             continue;
         }
         const windowEnd = Math.min(rawLines.length, i + MAX_LISTENER_SCAN_WINDOW);
@@ -214,7 +198,7 @@ export class ClientExposureAnalyzer implements Analyzer {
     readonly name = ANALYZER_CLIENT_EXPOSURE_ID;
 
     analyze(_sourceFile: unknown, context: AnalyzerContext): Issue[] {
-        const file = context.filePath.replace(/\\/g, '/');
+        const file = normalizePathSeparators(context.filePath);
         const norm = ('/' + file).toLowerCase();
         if (EXEMPT_PATH_SUBSTRINGS.some((sub) => norm.includes(sub))) {
             return [];

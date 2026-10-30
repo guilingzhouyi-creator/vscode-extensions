@@ -21,13 +21,14 @@ import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { globToRegExp } from '../core/file-discovery';
 import { auditTerminologyProse } from '../core/governance/terminology-engine';
+import { REGEX, normalizePathSeparators } from '../core/constants';
 
 function matchesExemptPathPattern(normalized: string, pattern: string): boolean {
     return new RegExp(pattern, 'i').test(normalized);
 }
 
 function isExemptDocsPath(filePath: string, options?: DocsOptions): boolean {
-    const normalized = filePath.replace(/\\/g, '/');
+    const normalized = normalizePathSeparators(filePath);
     if (options?.exemptPathPatterns) {
         for (const pattern of options.exemptPathPatterns) {
             if (matchesExemptPathPattern(normalized, pattern)) return true;
@@ -102,7 +103,7 @@ export class DocsAnalyzer implements Analyzer {
      */
     analyze(_sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
         const content = ctx.content || '';
-        const file = ctx.filePath.replace(/\\/g, '/');
+        const file = normalizePathSeparators(ctx.filePath);
         if (!file.endsWith('.md') || content.length === 0) return [];
         const lines = content
             .split('\n')
@@ -180,8 +181,7 @@ export class DocsAnalyzer implements Analyzer {
         const exemptMarkers = options.exemptMarkers
             ? [...DEFAULT_EXEMPT_MARKERS, ...options.exemptMarkers]
             : DEFAULT_EXEMPT_MARKERS;
-        const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const exemptMarkersRe = new RegExp(exemptMarkers.map(escapeRegex).join('|'));
+        const exemptMarkersRe = new RegExp(exemptMarkers.map((marker) => REGEX.escape(marker)).join('|'));
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (exemptMarkersRe.test(line)) continue;

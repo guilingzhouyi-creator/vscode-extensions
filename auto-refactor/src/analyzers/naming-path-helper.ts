@@ -13,7 +13,13 @@
 
 import * as path from 'path';
 import type { AnalyzerContext, Issue } from '../core/types';
-import { camelToSnake, REGEX, createSnakeCleanScanner } from '../core/constants';
+import {
+    camelToSnake,
+    REGEX,
+    createSnakeCleanScanner,
+    normalizePathSeparators,
+} from '../core/constants';
+import { toKebabCase, splitIdentifierWords } from '../core/naming/case-converter';
 import {
     parseStructuredResourceNaming,
     RECOGNIZED_RESOURCE_BASE_TYPES,
@@ -128,7 +134,7 @@ const SNAKE_EXTS = new Set(['.py', '.rs', '.gd']);
  * @returns True when file is part of analyzer/engine implementations.
  */
 export function isAnalyzerOrEngineFile(filePath: string): boolean {
-    return REGEX.NAMING.ANALYZER_OR_ENGINE_PATH.test(filePath.replace(/\\/g, '/').toLowerCase());
+    return REGEX.NAMING.ANALYZER_OR_ENGINE_PATH.test(normalizePathSeparators(filePath).toLowerCase());
 }
 
 /**
@@ -232,8 +238,6 @@ export function auditFileAndDirectoryPaths(pCtx: PathNamingContext): void {
     }
 }
 
-const CAMEL_TO_KEBAB_PATTERN = '$1-$2';
-
 interface FileNamingTarget {
     readonly filePath: string;
     readonly baseName: string;
@@ -250,10 +254,7 @@ function auditJsTsFileName(target: FileNamingTarget, mkIssue: IssueFactory): Iss
     const isPascalComponent =
         (ext === '.tsx' || ext === '.jsx') && /^[A-Z][a-zA-Z0-9]+$/.test(nameWithoutExt);
     if (isPascalComponent) return null;
-    const suggested = nameWithoutExt
-        .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_KEBAB_PATTERN)
-        .replace(/[_]/g, '-')
-        .toLowerCase();
+    const suggested = toKebabCase(nameWithoutExt);
     return mkIssue({
         line: 1,
         rule: RULE_NAM_FIL_001,
@@ -324,7 +325,7 @@ function dispatchNamingStrategy(
 const FIXTURE_OR_BENCH_PATH_RE = /\/(?:\.bench|fixtures|testdata|__mocks__)\//;
 
 function isFixtureOrBenchPath(filePath: string): boolean {
-    return FIXTURE_OR_BENCH_PATH_RE.test(filePath.replace(/\\/g, '/').toLowerCase());
+    return FIXTURE_OR_BENCH_PATH_RE.test(normalizePathSeparators(filePath).toLowerCase());
 }
 
 interface FileLengthAuditOptions {
@@ -394,12 +395,7 @@ function checkFileNameLength(target: FileNamingTarget, pCtx: PathNamingContext):
  * @returns Lowercase word segments, preserving original order.
  */
 function splitCamelStem(stem: string): string[] {
-    return stem
-        .replace(/([A-Z]+)([A-Z][a-z0-9])/g, '$1-$2')
-        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-        .split('-')
-        .map((seg) => seg.trim().toLowerCase())
-        .filter((seg) => seg.length > 0);
+    return splitIdentifierWords(stem);
 }
 
 /**
