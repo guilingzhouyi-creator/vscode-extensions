@@ -24,6 +24,7 @@ import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { ExposureMessages } from '../core/messages/exposure';
 import { isToolOrTestScript } from '../core/governance/pathScope';
 import { REGEX } from '../core/constants';
+import { calculateBraceDelta } from '../core/ast/block-scope-utils';
 
 /** Canonical analyzer identifier for frontend UI/UX, A11y, and component architecture audits. */
 export const ANALYZER_FRONTEND_ID = 'frontend';
@@ -480,18 +481,14 @@ function auditSingleBorderDiscipline(file: string, rawLines: string[], issues: I
  * to determine if it targets local component selectors.
  */
 function mediaTargetsLocalComponent(rawLines: string[], startIndex: number): boolean {
-    let braceCount = 0;
-    const firstLine = rawLines[startIndex];
-    braceCount += (firstLine.match(/\{/g) || []).length;
-    braceCount -= (firstLine.match(/\}/g) || []).length;
+    let braceCount = calculateBraceDelta(rawLines[startIndex]);
 
     for (let i = startIndex + 1; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (REGEX.SYNTAX.CSS_LOCAL_CLASS_OR_ID.test(line)) {
             return true;
         }
-        braceCount += (line.match(/\{/g) || []).length;
-        braceCount -= (line.match(/\}/g) || []).length;
+        braceCount += calculateBraceDelta(line);
         if (braceCount <= 0) {
             break;
         }
@@ -546,9 +543,7 @@ function auditMediaQueryDiscipline(file: string, rawLines: string[], issues: Iss
             );
         }
 
-        const openCount = (line.match(/\{/g) || []).length;
-        const closeCount = (line.match(/\}/g) || []).length;
-        globalBraceDepth = Math.max(0, globalBraceDepth + openCount - closeCount);
+        globalBraceDepth = Math.max(0, globalBraceDepth + calculateBraceDelta(line));
     }
 }
 

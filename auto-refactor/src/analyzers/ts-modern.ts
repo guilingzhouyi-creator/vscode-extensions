@@ -397,13 +397,6 @@ function countMatches(code: string, pattern: RegExp): number {
     return code.match(pattern)?.length ?? 0;
 }
 
-const REGEX_ESCAPE_RE = /[.*+?^${}()|[\]\\]/g;
-const REGEX_MATCH_SUBSTITUTION = '\\$&';
-
-function escapeRegExp(text: string): string {
-    return text.replace(REGEX_ESCAPE_RE, REGEX_MATCH_SUBSTITUTION);
-}
-
 const CHAR_CODE_SPACE = 32;
 const CHAR_CODE_TAB = 9;
 const CHAR_CODE_CR = 13;
@@ -479,7 +472,7 @@ const REGEXP_GLOBAL_FLAG = 'g';
 function getCompiledWordPattern(word: string): RegExp {
     let wordRegex = wordPatternByWordMap.get(word);
     if (!wordRegex) {
-        wordRegex = new RegExp(`\\b${escapeRegExp(word)}\\b`);
+        wordRegex = new RegExp(`\\b${REGEX.escape(word)}\\b`);
         wordPatternByWordMap.set(word, wordRegex);
     }
     return wordRegex;
@@ -489,7 +482,7 @@ function getCompiledTypePatterns(name: string): CompiledTypePatterns {
     let cached = typePatternsByNameMap.get(name);
     if (cached) return cached;
 
-    const escaped = escapeRegExp(name);
+    const escaped = REGEX.escape(name);
     cached = {
         word: new RegExp(`\\b${escaped}\\b`, REGEXP_GLOBAL_FLAG),
         fallbackWord: new RegExp(`\\b${escaped}\\b`),

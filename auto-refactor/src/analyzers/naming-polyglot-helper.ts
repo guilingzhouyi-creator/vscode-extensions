@@ -15,6 +15,7 @@
 import type { AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
 import { camelToSnake, REGEX } from '../core/constants';
+import { calculateBraceDelta } from '../core/ast/block-scope-utils';
 import { auditFunctionSemantics, hasTransientJargon } from './naming-path-helper';
 import { DEFAULT_VAGUE_BLACKLIST } from './naming-ast-helper';
 import { scanRustLine, type RustLineScanState } from './naming-rust-helper';
@@ -102,14 +103,14 @@ export function buildPolyglotActionable(
         targetSymbol: candidate ?? name,
         patch: candidate
             ? {
-                  range: {
-                      startLine: line,
-                      startCol: column,
-                      endLine: line,
-                      endCol: column + name.length,
-                  },
-                  replacementText: candidate,
-              }
+                range: {
+                    startLine: line,
+                    startCol: column,
+                    endLine: line,
+                    endCol: column + name.length,
+                },
+                replacementText: candidate,
+            }
             : undefined,
         templateSnippet: candidate,
         targetArguments: {
@@ -596,17 +597,29 @@ function auditGoDeclarations(line: string, lineIdx: number, pCtx: PolyglotNaming
     }
 }
 
+/**
+ * Advances Go brace depth and resets test scope when block boundary is exited.
+ *
+ * @param trimmed - Line text trimmed of leading and trailing whitespace.
+ * @param state - Mutable Go line scanning state.
+ */
 function advanceGoBraceDepth(trimmed: string, state: GoLineScanState): void {
     const codeOnly = trimmed.split('//')[0];
-    const openBraces = (codeOnly.match(/\{/g) || []).length;
-    const closeBraces = (codeOnly.match(/\}/g) || []).length;
-    state.braceDepth += openBraces - closeBraces;
+    state.braceDepth += calculateBraceDelta(codeOnly);
     if (state.braceDepth < 0) state.braceDepth = 0;
     if (state.testFunctionDepth >= 0 && state.braceDepth <= state.testFunctionDepth) {
         state.testFunctionDepth = -1;
     }
 }
 
+/**
+ * Scans a single Go source code line for function signatures, declarations, and bindings.
+ *
+ * @param line - Raw source code line.
+ * @param lineIdx - Zero-based line index in the source file.
+ * @param state - Mutable Go line scanning state.
+ * @param pCtx - Polyglot naming execution context.
+ */
 function scanGoLine(
     line: string,
     lineIdx: number,

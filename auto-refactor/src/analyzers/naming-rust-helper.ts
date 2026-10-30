@@ -17,6 +17,8 @@
 import { SEVERITY_WARNING } from '../core/types';
 import { hasTransientJargon } from './naming-path-helper';
 import type { PolyglotNamingContext } from './naming-polyglot-helper';
+import { REGEX } from '../core/constants';
+import { calculateBraceDelta } from '../core/ast/block-scope-utils';
 import {
     auditExtractedFunction,
     auditPolyglotVariable,
@@ -25,17 +27,12 @@ import {
     toUpperSnakeCase,
 } from './naming-polyglot-helper';
 
-const RUST_FN_PREFIX = '^\\s*(?:pub(?:\\s*\\([^)]*\\))?\\s+)?(?:const\\s+)?';
-const RUST_FN_SUFFIX =
-    '(?:async\\s+)?(?:unsafe\\s+)?(?:extern(?:\\s*"[^"]*")?\\s+)?fn\\s+([a-zA-Z_][a-zA-Z0-9_]*)';
-const RUST_FN_RE = new RegExp(RUST_FN_PREFIX + RUST_FN_SUFFIX);
-const RUST_TYPE_RE =
-    /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:struct|enum|trait)\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
-const RUST_CONST_RE =
-    /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:const|static)\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
-const RUST_LET_RE = /^\s*let\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*(?::[^=]+)?\s*=/;
-const RUST_FOR_RE = /^\s*for\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\b/;
-const RUST_TUPLE_LET_RE = /^\s*let\s+(?:mut\s+)?\(([a-zA-Z0-9_,\s]+)\)\s*(?::[^=]+)?\s*=/;
+const RUST_FN_RE = REGEX.RUST.FN;
+const RUST_TYPE_RE = REGEX.RUST.TYPE;
+const RUST_CONST_RE = REGEX.RUST.CONST;
+const RUST_LET_RE = REGEX.RUST.LET;
+const RUST_FOR_RE = REGEX.RUST.FOR;
+const RUST_TUPLE_LET_RE = REGEX.RUST.TUPLE_LET;
 
 const RUST_EXEMPT_NAMES = new Set([
     'main',
@@ -59,8 +56,6 @@ const RUST_TEST_FN_ATTRS: readonly string[] = Object.freeze([
 ]);
 const RUST_ATTR_PREFIX = '#[';
 const RUST_LINE_COMMENT = '//';
-const RUST_OPEN_BRACE_RE = /\{/g;
-const RUST_CLOSE_BRACE_RE = /\}/g;
 
 /**
  * Mutable brace/test-scope state threaded across Rust source lines.
@@ -258,10 +253,7 @@ function handleRustFunctionLine(
 
 function advanceRustBraceDepth(trimmed: string, state: RustLineScanState): void {
     const codeOnly = trimmed.split(RUST_LINE_COMMENT)[0];
-    const openBraces = (codeOnly.match(RUST_OPEN_BRACE_RE) || []).length;
-    const closeBraces = (codeOnly.match(RUST_CLOSE_BRACE_RE) || []).length;
-
-    state.braceDepth += openBraces - closeBraces;
+    state.braceDepth += calculateBraceDelta(codeOnly);
     if (state.braceDepth < 0) state.braceDepth = 0;
     if (state.testFunctionDepth >= 0 && state.braceDepth <= state.testFunctionDepth) {
         state.testFunctionDepth = -1;

@@ -16,6 +16,7 @@ import { calculateLoopStateEntropy } from '../core/intelligence/payload-density'
 import { isCommentLine } from '../core/scanner/text-scanner-utils';
 import type { AllocationSiteContext } from '../core/intelligence/resource-pooling-auditor';
 import type { RoutineSemanticDescriptor } from '../core/intelligence/semantic-domain-detector';
+import { REGEX } from '../core/constants';
 
 /**
  * Maximum window of lines inside a loop body inspected for allocations and blocking I/O.
@@ -25,26 +26,11 @@ const MAX_LOOP_INSPECTION_WINDOW_LINES = 30;
 /** Default scale collection variable name when loop target cannot be parsed. */
 const DEFAULT_SCALE_VAR = 'dynamicCollection';
 
-/**
- * Loop headers the engine treats as iteration sites across TS/JS, Python, Rust, Go, GDScript.
- */
-const LOOP_HEADER_RE =
-    /\b(?:for\s*\(|for\s+[a-zA-Z0-9_$]+(?:\s*,\s*[a-zA-Z0-9_$]+)?\s*(?:in|range|:=)|for\s*\{|while\s*\(|while\s+[^{:\n]+|loop\s*\{|do\s*\{)\b/;
+/** Loop headers the engine treats as iteration sites across TS/JS, Python, Rust, Go, GDScript. */
+const LOOP_HEADER_RE = REGEX.SYNTAX.LOOP_HEADER;
 
-/**
- * Transient heap allocation patterns per language runtime.
- */
-const TRANSIENT_TS_CONTAINER_RE =
-    /\b(?:new\s+(?:Array|Object|Map|Set|WeakMap|WeakSet|Int[0-9]+Array|Uint[0-9]+Array|Float[0-9]+Array)|\/duplicate\(true\)|\.clone\()/;
-
-const TRANSIENT_GO_RE = /\b(?:make\s*\(\s*(?:\[\]|map\[|chan\b)|&[A-Z][a-zA-Z0-9_]*\{|\.clone\()/;
-
-const TRANSIENT_RUST_RE =
-    /\b(?:(?:Vec|Box|String|HashMap|BTreeMap|HashSet|BTreeSet)::(?:new|with_capacity)\s*\(|\.clone\()/;
-
-const TRANSIENT_PYTHON_RE = /(?:(?<![.\w])(?:list|dict|set)\s*\(|\.copy\()/;
-
-const TRANSIENT_GDSCRIPT_RE = /\b(?:\/duplicate\(true\)|\.duplicate\()/;
+/** Synchronous I/O calls that amplify its cost when run once per iteration. */
+const BLOCKING_IO_RE = REGEX.SYNTAX.BLOCKING_IO;
 
 /**
  * Select the appropriate transient allocation regex based on file path extension.
@@ -53,16 +39,12 @@ const TRANSIENT_GDSCRIPT_RE = /\b(?:\/duplicate\(true\)|\.duplicate\()/;
  * @returns Pre-compiled regex matching transient container allocations in that runtime.
  */
 function resolveTransientRegex(filePath: string): RegExp {
-    if (filePath.endsWith('.py')) return TRANSIENT_PYTHON_RE;
-    if (filePath.endsWith('.go')) return TRANSIENT_GO_RE;
-    if (filePath.endsWith('.rs')) return TRANSIENT_RUST_RE;
-    if (filePath.endsWith('.gd')) return TRANSIENT_GDSCRIPT_RE;
-    return TRANSIENT_TS_CONTAINER_RE;
+    if (filePath.endsWith('.py')) return REGEX.PYTHON.TRANSIENT_ALLOCATION;
+    if (filePath.endsWith('.go')) return REGEX.GO.TRANSIENT_ALLOCATION;
+    if (filePath.endsWith('.rs')) return REGEX.RUST.TRANSIENT_ALLOCATION;
+    if (filePath.endsWith('.gd')) return REGEX.GDSCRIPT.TRANSIENT_ALLOCATION;
+    return REGEX.SYNTAX.TRANSIENT_TS_CONTAINER;
 }
-
-/** Synchronous I/O calls that amplify its cost when run once per iteration. */
-const BLOCKING_IO_RE =
-    /\b(?:fs\.readFileSync|fs\.writeFileSync|execSync|spawnSync|socket\.send|db\.query)\b/;
 
 /**
  * Resolve the variable or expression a loop is bounded by.
@@ -264,7 +246,7 @@ function inspectLoopBody(
     lines: string[],
     from: number,
     toLine: number,
-    transientRegex: RegExp = TRANSIENT_TS_CONTAINER_RE,
+    transientRegex: RegExp = REGEX.SYNTAX.TRANSIENT_TS_CONTAINER,
 ): {
     hasTransientAllocation: boolean;
     hasBlockingIo: boolean;

@@ -50,10 +50,10 @@ const RUST_MASK: SourceMaskConfig = {
 // --- Keyword regular expressions ---
 
 /** `unsafe` block or function signature. */
-const UNSAFE_KEYWORD_RE = /\bunsafe\s*(?:\{|\bfn\b)/;
+const UNSAFE_KEYWORD_RE = REGEX.RUST.UNSAFE_KEYWORD;
 
 /** `// SAFETY:` invariant proof comment. */
-const SAFETY_PROOF_COMMENT_RE = /\/\/\s*SAFETY:\s*\S+/;
+const SAFETY_PROOF_COMMENT_RE = REGEX.RUST.SAFETY_PROOF_COMMENT;
 
 const MAX_MULTILINE_FORMAT_SPAN_LINES = 10;
 const MAX_LET_ELSE_SPAN_LINES = 25;
@@ -221,7 +221,7 @@ function resolveAsyncFnScope(
     return bodyStart !== -1 ? { bodyStart, bodyEnd: lines.length - 1 } : null;
 }
 
-const RUST_TEST_FILE_RE = /(?:[\\/]tests[\\/]|[\\/]test_[^\\/]+\.rs$|_test\.rs$)/i;
+const RUST_TEST_FILE_RE = REGEX.RUST.TEST_FILE;
 
 /**
  * Determine whether the line is located inside a test file or a `#[test]` / `#[cfg(test)]` block.

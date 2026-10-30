@@ -31,6 +31,7 @@ import {
     CODE_STB_CONDITIONAL_COMPILATION,
     REGEX,
 } from '../core/constants';
+import { calculateBraceDelta } from '../core/ast/block-scope-utils';
 
 /** Relevant source extensions for standard library and systems runtime analysis */
 const STDLIB_EXTS = new Set([
@@ -433,7 +434,7 @@ export class StdlibAnalyzer implements Analyzer {
             }
             if (!inFn) continue;
 
-            depth += (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
+            depth += calculateBraceDelta(line);
 
             if (REGEX.SYNTAX.STDLIB_RUST_PANIC.test(line)) {
                 this.emitIssue(
@@ -470,9 +471,9 @@ export class StdlibAnalyzer implements Analyzer {
             }
             if (!inFn) continue;
 
-            depth += (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
+            depth += calculateBraceDelta(line);
 
-            if (/\bpanic\s*\(/.test(line)) {
+            if (REGEX.GO.PANIC.test(line)) {
                 this.emitIssue(
                     issues,
                     file,

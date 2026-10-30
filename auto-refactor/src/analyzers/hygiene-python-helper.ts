@@ -13,6 +13,8 @@
  */
 
 import type { AnalyzerContext, Issue, Severity } from '../core/types';
+import { REGEX } from '../core/constants';
+import { calculateDelimiterDelta, calculateIndentWidth } from '../core/ast/block-scope-utils';
 
 /** Callback factory for instantiating canonical Issue records. */
 export type HygieneIssueFactory = (params: {
@@ -108,12 +110,11 @@ const PY_KIND_DEF = 'def';
 const PY_KIND_PARAMETER = 'parameter';
 const PY_BINDING_ASSIGNMENT = 'assignment';
 const SEVERITY_WARNING: Severity = 'warning';
-const PY_ASSIGN_RE = /^([A-Za-z_]\w*)\s*(?::[^=]+)?=(?!=)/;
-const PY_FOR_RE = /^for\s+([A-Za-z_]\w*)\s+in\b/;
-const PY_EXCEPT_AS_RE = /^except\b[^:]*\bas\s+([A-Za-z_]\w*)\s*:/;
-const PY_CLASS_RE = /^class\s+[A-Za-z_]\w*/;
-const PY_DEF_LINE_RE = /^(?:async\s+)?def\s+[A-Za-z_]\w*\s*\(([^)]*)\)/;
-const PY_WITH_AS_RE = /\bas\s+([A-Za-z_]\w*)\s*(?:,|:)/g;
+const PY_ASSIGN_RE = REGEX.PYTHON.ASSIGN;
+const PY_FOR_RE = REGEX.PYTHON.FOR_VAR;
+const PY_EXCEPT_AS_RE = REGEX.PYTHON.EXCEPT_AS;
+const PY_CLASS_RE = REGEX.PYTHON.CLASS;
+const PY_DEF_LINE_RE = REGEX.PYTHON.DEF_LINE;
 
 function updateDocstringState(
     line: string,
@@ -143,15 +144,6 @@ function updateBlockNesting(
     }
     const current = blocks[blocks.length - 1];
     return Boolean(current && current.kind === PY_KIND_CLASS);
-}
-
-function computeBracketDelta(code: string): number {
-    let depth = 0;
-    for (const char of code) {
-        if (char === '(' || char === '[' || char === '{') depth++;
-        else if (char === ')' || char === ']' || char === '}') depth--;
-    }
-    return depth;
 }
 
 interface PythonNameContext {
@@ -255,9 +247,9 @@ function dispatchNameCheck(
 }
 
 function auditPythonWithBindings(params: PythonLineContext): void {
-    PY_WITH_AS_RE.lastIndex = 0;
+    const scanner = REGEX.PYTHON.createWithAsScanner();
     let match: RegExpExecArray | null;
-    while ((match = PY_WITH_AS_RE.exec(params.trimmed)) !== null) {
+    while ((match = scanner.exec(params.trimmed)) !== null) {
         dispatchNameCheck(params, match[1]);
     }
 }
@@ -339,9 +331,9 @@ export function auditPythonHygiene(params: PythonHygieneContext): void {
 
         const depthAtStart = bracketDepth;
         const codeOnly = trimmed.split('#')[0];
-        bracketDepth += computeBracketDelta(codeOnly);
+        bracketDepth += calculateDelimiterDelta(codeOnly);
 
-        const indent = line.length - line.trimStart().length;
+        const indent = calculateIndentWidth(line);
         const inClassBody = updateBlockNesting(indent, blocks);
 
         // Inside an open call/collection every `name=` is a keyword argument, not a binding.

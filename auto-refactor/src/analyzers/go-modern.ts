@@ -48,21 +48,21 @@ const GO_MASK: SourceMaskConfig = {
  * Unchecked error: `f, _ := os.Open(...)` or `x, _ = foo()` where `_` discards
  * the second return value (conventionally an error).
  */
-const UNCHECKED_ERROR_RE = /,\s*_\s*(?::=|=)|^_\s*(?::=|=)/;
+const UNCHECKED_ERROR_RE = REGEX.GO.UNCHECKED_ERROR;
 
 /**
  * context.Context parameter that is NOT the first parameter of a function/method.
  */
-const CONTEXT_IN_PARAMS_RE = /context\.Context/;
+const CONTEXT_IN_PARAMS_RE = REGEX.GO.CONTEXT_IN_PARAMS;
 const CONTEXT_PACKAGE_TYPE = 'context.Context';
 
 /** Function / method signature start — used to locate parameter lists. */
-const FUNC_SIGNATURE_RE = /^func\s+(?:\([^)]+\)\s+)?[A-Za-z_][A-Za-z0-9_]*\s*(?:\[[^\]]*\])?\s*\(/;
+const FUNC_SIGNATURE_RE = REGEX.GO.FUNC_SIGNATURE;
 
 /**
  * Receiver naming: `func (self *Foo)` or `func (this Bar)` or overly long receiver names.
  */
-const RECEIVER_RE = /^func\s+\(\s*([A-Za-z_][A-Za-z0-9_]*)\s+\*?([A-Za-z_][A-Za-z0-9_]*)\s*\)/;
+const RECEIVER_RE = REGEX.GO.RECEIVER;
 
 /** Receiver names that violate Go conventions. */
 const BAD_RECEIVER_NAMES = new Set(['self', 'this', 'me', 'receiver', 'rec']);
@@ -73,7 +73,7 @@ const MAX_RECEIVER_NAME_LEN = 3;
 /**
  * Error variable naming: variables holding errors should start with `err`.
  */
-const VAR_ERROR_TYPE_RE = /^var\s+([A-Za-z_][A-Za-z0-9_]*)\s+error\b/;
+const VAR_ERROR_TYPE_RE = REGEX.GO.VAR_ERROR_TYPE;
 
 // --- Actionable snippet templates ---
 

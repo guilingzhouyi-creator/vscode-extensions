@@ -241,11 +241,11 @@ export function updateIndentLoops(
  * @param loopStack - Mutable loop scope stack.
  */
 export function updateBraceLoops(trimmed: string, loopStack: LoopScope[]): void {
-    if (!trimmed.includes('}')) return;
-    const closes = (trimmed.match(/\}/g) || []).length;
-    for (let closeIdx = 0; closeIdx < closes; closeIdx++) {
-        if (loopStack.length > 0) {
+    if (loopStack.length === 0 || !trimmed.includes('}')) return;
+    for (let i = 0; i < trimmed.length; i++) {
+        if (trimmed.charCodeAt(i) === 125) {
             loopStack.pop();
+            if (loopStack.length === 0) break;
         }
     }
 }
