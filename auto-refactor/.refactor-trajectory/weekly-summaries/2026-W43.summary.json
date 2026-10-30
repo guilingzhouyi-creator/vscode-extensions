@@ -23,5 +23,13 @@
     "densityYield": 13.66
   },
   "meanCompositeScore": 99.11,
-  "gatePassRate": 100
+  "gatePassRate": 100,
+  "stability": {
+    "zeroRegressionRuns": 101,
+    "zeroRegressionStreak": 101,
+    "semanticPurityRatio": 0.8,
+    "uniqueCoverageRatio": 0.0079,
+    "scoreFloor": 99.11,
+    "scoreCeiling": 99.11
+  }
 }

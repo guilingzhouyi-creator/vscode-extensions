@@ -14,6 +14,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type {
     CompactTrajectoryRecord,
+    CompactVerificationTelemetry,
     WeeklyManifoldSummary,
     WeeklyStabilityMetrics,
     WeeklyTrajectorySummary,
@@ -88,52 +89,75 @@ function deriveRecordsStability(
     };
 }
 
+interface VerificationBatchState {
+    verifiedRuns: number;
+    killSum: number;
+    minKill: number;
+    creditSum: number;
+    creditCount: number;
+    minCi: number;
+    quarantineCount: number;
+}
+
+function foldVerificationRecord(
+    state: VerificationBatchState,
+    vrf: CompactVerificationTelemetry,
+): void {
+    state.verifiedRuns += 1;
+    if (typeof vrf.k === 'number') {
+        state.killSum += vrf.k;
+        state.minKill = Math.min(state.minKill, vrf.k);
+    }
+    if (typeof vrf.cr === 'number') {
+        state.creditSum += vrf.cr;
+        state.creditCount += 1;
+    }
+    if (typeof vrf.ci === 'number') {
+        state.minCi = Math.min(state.minCi, vrf.ci);
+    }
+    if (vrf.q === 1) {
+        state.quarantineCount += 1;
+    }
+}
+
 /**
  * Accumulates in-kernel verification telemetry across a batch of compact records.
  */
 function deriveRecordsVerification(
     records: CompactTrajectoryRecord[],
 ): WeeklyVerificationSummary | undefined {
-    let verifiedRuns = 0;
-    let killSum = 0;
-    let minKill = Infinity;
-    let creditSum = 0;
-    let creditCount = 0;
-    let minCi = Infinity;
-    let quarantineCount = 0;
+    const state: VerificationBatchState = {
+        verifiedRuns: 0,
+        killSum: 0,
+        minKill: Infinity,
+        creditSum: 0,
+        creditCount: 0,
+        minCi: Infinity,
+        quarantineCount: 0,
+    };
 
     for (const record of records) {
-        const vrf = record.vrf;
-        if (!vrf) continue;
-        verifiedRuns += 1;
-        if (typeof vrf.k === 'number') {
-            killSum += vrf.k;
-            if (vrf.k < minKill) minKill = vrf.k;
-        }
-        if (typeof vrf.cr === 'number') {
-            creditSum += vrf.cr;
-            creditCount += 1;
-        }
-        if (typeof vrf.ci === 'number' && vrf.ci < minCi) {
-            minCi = vrf.ci;
-        }
-        if (vrf.q === 1) {
-            quarantineCount += 1;
+        if (record.vrf) {
+            foldVerificationRecord(state, record.vrf);
         }
     }
 
-    if (verifiedRuns === 0) {
+    if (state.verifiedRuns === 0) {
         return undefined;
     }
 
+    const meanCredit =
+        state.creditCount > 0
+            ? Math.round((state.creditSum / state.creditCount) * 100) / 100
+            : 100;
+
     return {
-        verifiedRuns,
-        meanMutationKillRate: Math.round((killSum / verifiedRuns) * 10000) / 10000,
-        minMutationKillRate: minKill === Infinity ? 1 : minKill,
-        meanBayesianCredit:
-            creditCount > 0 ? Math.round((creditSum / creditCount) * 100) / 100 : 100,
-        minBayesianCiLower: minCi === Infinity ? 1 : minCi,
-        quarantineCount,
+        verifiedRuns: state.verifiedRuns,
+        meanMutationKillRate: Math.round((state.killSum / state.verifiedRuns) * 10000) / 10000,
+        minMutationKillRate: state.minKill === Infinity ? 1 : state.minKill,
+        meanBayesianCredit: meanCredit,
+        minBayesianCiLower: state.minCi === Infinity ? 1 : state.minCi,
+        quarantineCount: state.quarantineCount,
     };
 }
 
@@ -663,24 +687,51 @@ function normalizeLegacyQedMean(qed?: WeeklyTrajectorySummary['qed']): void {
     qed.kMean = Math.round(mean * 1000 * 100) / 100;
 }
 
+function computeSafeRatio(numerator: number, denominator: number): number {
+    if (denominator <= 0) return 1;
+    return Math.round((numerator / denominator) * 10000) / 10000;
+}
+
+interface LegacyElocMetrics {
+    chg: number;
+    sem: number;
+    proc: number;
+    uniq: number;
+}
+
+function extractLegacyEloc(eloc?: WeeklyTrajectorySummary['eloc']): LegacyElocMetrics {
+    if (!eloc) {
+        return { chg: 0, sem: 0, proc: 0, uniq: 0 };
+    }
+    return {
+        chg: eloc.changedTotal,
+        sem: eloc.semanticTotal,
+        proc: eloc.processedTotal,
+        uniq: eloc.uniqueTotal,
+    };
+}
+
 function normalizeLegacyStability(parsed: WeeklyTrajectorySummary): void {
     if (parsed.stability) {
         return;
     }
-    const totalRuns = parsed.totalRuns ?? 0;
-    const zeroReg = parsed.debt?.totalRegressions === 0 ? totalRuns : 0;
-    const chg = parsed.eloc?.changedTotal ?? 0;
-    const sem = parsed.eloc?.semanticTotal ?? 0;
-    const proc = parsed.eloc?.processedTotal ?? 0;
-    const uniq = parsed.eloc?.uniqueTotal ?? 0;
+
+    const totalRuns = typeof parsed.totalRuns === 'number' ? parsed.totalRuns : 0;
+    const isZeroReg = Boolean(parsed.debt && parsed.debt.totalRegressions === 0);
+    const zeroReg = isZeroReg ? totalRuns : 0;
+    const isPassing = typeof parsed.gatePassRate === 'number' && parsed.gatePassRate >= 100;
+    const streak = isZeroReg && isPassing ? totalRuns : 0;
+    const score = typeof parsed.meanCompositeScore === 'number' ? parsed.meanCompositeScore : 100;
+
+    const { chg, sem, proc, uniq } = extractLegacyEloc(parsed.eloc);
 
     parsed.stability = {
         zeroRegressionRuns: zeroReg,
-        zeroRegressionStreak: zeroReg === totalRuns && parsed.gatePassRate >= 100 ? totalRuns : 0,
-        semanticPurityRatio: chg > 0 ? Math.round((sem / chg) * 10000) / 10000 : 1,
-        uniqueCoverageRatio: proc > 0 ? Math.min(1, Math.round((uniq / proc) * 10000) / 10000) : 1,
-        scoreFloor: parsed.meanCompositeScore ?? 100,
-        scoreCeiling: parsed.meanCompositeScore ?? 100,
+        zeroRegressionStreak: streak,
+        semanticPurityRatio: computeSafeRatio(sem, chg),
+        uniqueCoverageRatio: Math.min(1, computeSafeRatio(uniq, proc)),
+        scoreFloor: score,
+        scoreCeiling: score,
     };
 }
 

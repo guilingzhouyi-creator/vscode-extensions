@@ -19,7 +19,10 @@ import type {
     CompactVerificationTelemetry,
     ElocCounters,
     TrajectoryQualityMetrics,
+    WeeklyManifoldSummary,
+    WeeklyStabilityMetrics,
     WeeklyTrajectorySummary,
+    WeeklyVerificationSummary,
 } from './eloc-types';
 import {
     extractBlockFingerprints,
@@ -138,6 +141,55 @@ function resolveScoreVector(scoreVector?: number[], fallbackScore = 100): number
     ];
 }
 
+function createInitialStability(record: CompactTrajectoryRecord): WeeklyStabilityMetrics {
+    const isZeroReg = record.debt.reg === 0;
+    const isPassing = record.gate.pass;
+    const chg = record.eloc.chg;
+    const sem = record.eloc.sem;
+    const proc = record.eloc.proc;
+    const uniq = record.eloc.uniq;
+
+    const semanticPurityRatio = chg > 0 ? Math.round((sem / chg) * 10000) / 10000 : 1;
+    const uniqueCoverageRatio =
+        proc > 0 ? Math.min(1, Math.round((uniq / proc) * 10000) / 10000) : 1;
+
+    return {
+        zeroRegressionRuns: isZeroReg ? 1 : 0,
+        zeroRegressionStreak: isZeroReg && isPassing ? 1 : 0,
+        semanticPurityRatio,
+        uniqueCoverageRatio,
+        scoreFloor: record.score.aft,
+        scoreCeiling: record.score.aft,
+    };
+}
+
+function createInitialVerification(
+    vrf?: CompactVerificationTelemetry,
+): WeeklyVerificationSummary | undefined {
+    if (!vrf) return undefined;
+    const killRate = vrf.k ?? 1;
+    return {
+        verifiedRuns: 1,
+        meanMutationKillRate: killRate,
+        minMutationKillRate: killRate,
+        meanBayesianCredit: vrf.cr ?? 100,
+        minBayesianCiLower: vrf.ci ?? 1,
+        quarantineCount: vrf.q === 1 ? 1 : 0,
+    };
+}
+
+function createInitialManifold(
+    vrf?: CompactVerificationTelemetry,
+): WeeklyManifoldSummary | undefined {
+    if (!vrf || (vrf.dm === undefined && vrf.tau === undefined)) return undefined;
+    const distance = vrf.dm ?? 0;
+    return {
+        meanMahalanobisDistance: distance,
+        maxMahalanobisDistance: distance,
+        ...(vrf.tau !== undefined ? { meanTau: vrf.tau } : {}),
+    };
+}
+
 /**
  * Constructs cumulative lifetime summary from initial record.
  */
@@ -151,6 +203,10 @@ function createInitialLifetimeSummary(record: CompactTrajectoryRecord): WeeklyTr
     const baseKilo = Math.max(1, record.eloc.uniq / 1000);
     const densityYield = Math.round((netDebt / baseKilo) * 100) / 100;
     const kMean = Math.round(record.score.qed * 1000 * 100) / 100;
+
+    const stability = createInitialStability(record);
+    const verification = createInitialVerification(record.vrf);
+    const manifold = createInitialManifold(record.vrf);
 
     return {
         weekId: 'LIFETIME',
@@ -178,41 +234,9 @@ function createInitialLifetimeSummary(record: CompactTrajectoryRecord): WeeklyTr
         },
         meanCompositeScore: record.score.aft,
         gatePassRate: record.gate.pass ? 100.0 : 0.0,
-        stability: {
-            zeroRegressionRuns: record.debt.reg === 0 ? 1 : 0,
-            zeroRegressionStreak: record.debt.reg === 0 && record.gate.pass ? 1 : 0,
-            semanticPurityRatio:
-                record.eloc.chg > 0
-                    ? Math.round((record.eloc.sem / record.eloc.chg) * 10000) / 10000
-                    : 1,
-            uniqueCoverageRatio:
-                record.eloc.proc > 0
-                    ? Math.min(1, Math.round((record.eloc.uniq / record.eloc.proc) * 10000) / 10000)
-                    : 1,
-            scoreFloor: record.score.aft,
-            scoreCeiling: record.score.aft,
-        },
-        ...(record.vrf
-            ? {
-                verification: {
-                    verifiedRuns: 1,
-                    meanMutationKillRate: record.vrf.k ?? 1,
-                    minMutationKillRate: record.vrf.k ?? 1,
-                    meanBayesianCredit: record.vrf.cr ?? 100,
-                    minBayesianCiLower: record.vrf.ci ?? 1,
-                    quarantineCount: record.vrf.q === 1 ? 1 : 0,
-                },
-            }
-            : {}),
-        ...(record.vrf && (record.vrf.dm !== undefined || record.vrf.tau !== undefined)
-            ? {
-                manifold: {
-                    meanMahalanobisDistance: record.vrf.dm ?? 0,
-                    maxMahalanobisDistance: record.vrf.dm ?? 0,
-                    ...(record.vrf.tau !== undefined ? { meanTau: record.vrf.tau } : {}),
-                },
-            }
-            : {}),
+        stability,
+        ...(verification ? { verification } : {}),
+        ...(manifold ? { manifold } : {}),
     };
 }
 

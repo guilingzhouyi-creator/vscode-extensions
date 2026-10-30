@@ -117,6 +117,7 @@ async function runValidation() {
     addedDebtPoints: 0,
     resolvedDebtPoints: 10,
     regressionFindingsCount: 0,
+    verification: { k: 0.96, cr: 99.1, ci: 0.92, dm: 0.11, tau: 7.8 },
   });
 
   assert.strictEqual(thirdRunRes.lifetimeSummary.totalRuns, 3, 'Lifetime total runs should be 3');
@@ -147,6 +148,13 @@ async function runValidation() {
   const lifetime = await readLifetimeSummary(TEST_LEDGER_DIR);
   assert.ok(lifetime !== null, 'Lifetime summary file should exist and be valid JSON');
   assert.strictEqual(lifetime.totalRuns, 3, 'Persisted lifetime runs should be 3');
+  assert.ok(lifetime.stability, 'Persisted lifetime summary should include stability metrics');
+  assert.strictEqual(lifetime.stability.zeroRegressionRuns, 3);
+  assert.ok(
+    lifetime.verification,
+    'Persisted lifetime summary should include verification metrics',
+  );
+  assert.strictEqual(lifetime.verification.meanMutationKillRate, 0.96);
 
   console.log('--- [5/5] Testing NDJSON Record Size Bound (< 350 Bytes) ---');
   const ndjsonPath = path.join(TEST_LEDGER_DIR, 'active-runs.ndjson');

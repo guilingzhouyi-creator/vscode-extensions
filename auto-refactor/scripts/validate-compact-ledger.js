@@ -89,7 +89,7 @@ async function runTests() {
     console.log('  ▶ [Test 2] Testing rolling NDJSON ledger persistence...');
     await appendTrajectoryRecord(tempLedgerDir, compactRec);
 
-    // Add second record
+    // Add second record with verification & manifold telemetry
     const compactRec2 = formatCompactRecord({
       runId: 'run-test-002',
       revision: 'b2c3d4e5f6a1',
@@ -99,7 +99,13 @@ async function runTests() {
       counters: { ...sampleCounters, semantic: 40, changed: 50 },
       metrics: { ...sampleMetrics, qed: 0.1, deltaQSemantic: 4.0, afterScore: 91.0 },
       gatePass: true,
+      vrf: { k: 0.94, cr: 98.2, ci: 0.91, dm: 0.14, tau: 8.6 },
     });
+    const serializedWithVrf = serializeNdjsonLine(compactRec2);
+    assert.ok(
+      Buffer.byteLength(serializedWithVrf, 'utf8') < 350,
+      'Record with vrf telemetry must stay strictly under 350 bytes',
+    );
     await appendTrajectoryRecord(tempLedgerDir, compactRec2);
 
     const loaded = await readRecentRecords(tempLedgerDir, 10);
@@ -133,10 +139,20 @@ async function runTests() {
       'densityYield should be a number',
     );
     assert.strictEqual(typeof summary.qed.kMean, 'number', 'kMean should be a number');
+    assert.ok(summary.stability, 'Weekly summary should include stability metrics');
+    assert.strictEqual(summary.stability.zeroRegressionRuns, 2);
+    assert.strictEqual(summary.stability.zeroRegressionStreak, 2);
+    assert.ok(summary.verification, 'Weekly summary should include verification metrics');
+    assert.strictEqual(summary.verification.verifiedRuns, 1);
+    assert.strictEqual(summary.verification.meanMutationKillRate, 0.94);
+    assert.ok(summary.manifold, 'Weekly summary should include manifold metrics');
+    assert.strictEqual(summary.manifold.meanMahalanobisDistance, 0.14);
 
     const lifetime = await readLifetimeSummary(tempLedgerDir);
     assert.ok(lifetime !== null, 'Lifetime summary file must exist');
     assert.strictEqual(lifetime.totalRuns, 2);
+    assert.ok(lifetime.stability, 'Lifetime summary must include stability metrics');
+    assert.ok(lifetime.verification, 'Lifetime summary must include verification metrics');
     console.log('    ✔ Trajectory compaction and lifetime summary verified');
 
     // --- Test 5: Lossless Cold Archival on Rolling Window Pruning ---

@@ -2,112 +2,112 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-30T04:26:11.301Z",
+  "timestamp": "2026-10-30T06:58:20.686Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
     "score": 99.17,
     "grade": "A+",
-    "cai": 87.98,
+    "cai": 87.97,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.917,
       "averagePor": 0.083,
-      "averageColumnDensity": 0.866,
-      "averageSpatialDensity": 0.443,
-      "averageMahalanobisDistance": 4.609,
-      "averageFisherSimplexDistance": 0.096
+      "averageColumnDensity": 0.863,
+      "averageSpatialDensity": 0.442,
+      "averageMahalanobisDistance": 4.623,
+      "averageFisherSimplexDistance": 0.097
     },
     "sqale": {
       "tdr": 0.004,
-      "remediationMinutes": 28811,
+      "remediationMinutes": 29060,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.51,
-      "meanScore": 96.51,
+      "index": 96.48,
+      "meanScore": 96.48,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "counts": {
-      "files": 795,
-      "total": 4178,
+      "files": 806,
+      "total": 4250,
       "errors": 0,
-      "warns": 3591,
-      "info": 587,
+      "warns": 3605,
+      "info": 645,
       "suppressed": 162
     }
   },
   "usability": {
-    "proven": 55,
-    "patchable": 1770,
-    "advisory": 2353,
-    "uncalibrated": 3961,
+    "proven": 56,
+    "patchable": 1766,
+    "advisory": 2428,
+    "uncalibrated": 4032,
     "needsHuman": 6
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 98.06,
-    "semanticPurity": 98.34,
-    "codeSecurity": 99.79,
-    "performanceEfficiency": 99.55,
-    "standardization": 83.78,
-    "modernity": 98.29,
-    "maintainability": 92.84,
-    "commentQuality": 99.69,
-    "duplication": 94.89,
+    "architectureConsistency": 97.95,
+    "semanticPurity": 98.32,
+    "codeSecurity": 99.78,
+    "performanceEfficiency": 99.56,
+    "standardization": 83.77,
+    "modernity": 98.16,
+    "maintainability": 92.85,
+    "commentQuality": 99.43,
+    "duplication": 94.96,
     "techDebtRisk": 100
   },
   "bottlenecks": [
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 4300,
-      "count": 430
+      "loss": 4340,
+      "count": 434
     },
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3255,
-      "count": 227
+      "loss": 3285,
+      "count": 229
     },
     {
       "rule": "metric",
       "dim": "architectureConsistency",
-      "loss": 2420,
-      "count": 242
+      "loss": 2440,
+      "count": 244
     },
     {
       "rule": "NAM-DEC-001",
       "dim": "architectureConsistency",
+      "loss": 2320,
+      "count": 232
+    },
+    {
+      "rule": "SIM-TRN-001",
+      "dim": "standardization",
       "loss": 2160,
       "count": 216
     },
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2145,
-      "count": 429
-    },
-    {
-      "rule": "SIM-TRN-001",
-      "dim": "standardization",
-      "loss": 2140,
-      "count": 214
+      "loss": 2155,
+      "count": 431
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2100,
-      "count": 210
+      "loss": 2120,
+      "count": 212
     },
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 2019,
-      "count": 673
+      "loss": 1983,
+      "count": 661
     }
   ],
   "topology": {
@@ -143,6 +143,7 @@
       "src/analyzers/hygiene.ts",
       "src/analyzers/large-file.ts",
       "src/analyzers/naming-python-helper.ts",
+      "src/analyzers/performance-helpers.ts",
       "src/analyzers/rust-modern.ts",
       "src/analyzers/simplify-inlining.ts",
       "src/analyzers/stdlib.ts",
@@ -151,6 +152,7 @@
       "src/core/architecture/metaArchitectureEvaluator.ts",
       "src/core/ast-pattern/structural-pattern-engine.ts",
       "src/core/ast/adapters.ts",
+      "src/core/ast/block-scope-utils.ts",
       "src/core/ast/data-adapter.ts",
       "src/core/ast/deprecated-usage-visitor.ts",
       "src/core/ast/fallback-chain-matcher.ts",
@@ -732,10 +734,10 @@
     ],
     "src/core/reporting/aas-types.ts": [
       {
-        "line": 237,
+        "line": 248,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 51",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 54",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
@@ -865,7 +867,18 @@
     ],
     "src/core/trajectory/eloc-types.ts": [
       {
-        "line": 191,
+        "line": 168,
+        "rule": "CMT-WID-001",
+        "sev": "WARN",
+        "msg": "Comment/docstring line exceeds 100 columns (found 103)",
+        "fix": {
+          "action": "refactor",
+          "template": "Wrap the comment at word boundaries; long directives keep their exemption"
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 259,
         "col": 41,
         "rule": "GOV-SAN-001",
         "sev": "WARN",
@@ -878,7 +891,7 @@
         "tier": "T3"
       },
       {
-        "line": 191,
+        "line": 259,
         "rule": "HYG-STB-002",
         "sev": "WARN",
         "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'W40'",
@@ -3477,7 +3490,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 491 >= warn threshold 400; functions 21 >= warn threshold 20)",
+        "msg": "File is large; consider splitting (lines 473 >= warn threshold 400; functions 21 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -3485,7 +3498,7 @@
         "tier": "T3"
       },
       {
-        "line": 90,
+        "line": 72,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -3497,7 +3510,7 @@
         "tier": "T1"
       },
       {
-        "line": 109,
+        "line": 91,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -3509,7 +3522,7 @@
         "tier": "T1"
       },
       {
-        "line": 306,
+        "line": 288,
         "col": 35,
         "rule": "magic-number",
         "sev": "WARN",
@@ -3518,9 +3531,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 306,
+              "startLine": 288,
               "startCol": 35,
-              "endLine": 306,
+              "endLine": 288,
               "endCol": 37
             },
             "replacementText": "CONST_47"
@@ -3530,7 +3543,7 @@
         "tier": "T2"
       },
       {
-        "line": 306,
+        "line": 288,
         "col": 77,
         "rule": "magic-number",
         "sev": "WARN",
@@ -3539,9 +3552,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 306,
+              "startLine": 288,
               "startCol": 77,
-              "endLine": 306,
+              "endLine": 288,
               "endCol": 79
             },
             "replacementText": "CONST_35"
@@ -3551,7 +3564,7 @@
         "tier": "T2"
       },
       {
-        "line": 308,
+        "line": 290,
         "rule": "HYG-DED-001",
         "sev": "WARN",
         "msg": "Dead code detected: Statement is unreachable following a terminal control flow statement (return/throw/break/continue)",
@@ -3562,7 +3575,7 @@
         "tier": "T3"
       },
       {
-        "line": 311,
+        "line": 293,
         "rule": "TSM-INCLUDES-001",
         "sev": "WARN",
         "msg": "`indexOf` compared against -1/0 is less direct than the boolean the check wants",
@@ -3574,7 +3587,7 @@
         "tier": "T2"
       },
       {
-        "line": 346,
+        "line": 328,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
         "msg": "Function \"findLoopSitesInFunction\" has 5 parameters (limit 4). Introduce a parameter object",
@@ -3586,7 +3599,7 @@
         "tier": "T1"
       },
       {
-        "line": 388,
+        "line": 370,
         "col": 21,
         "rule": "magic-number",
         "sev": "WARN",
@@ -3595,9 +3608,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 388,
+              "startLine": 370,
               "startCol": 21,
-              "endLine": 388,
+              "endLine": 370,
               "endCol": 22
             },
             "replacementText": "CONST_4"
@@ -3607,7 +3620,7 @@
         "tier": "T2"
       },
       {
-        "line": 470,
+        "line": 452,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -3619,7 +3632,7 @@
         "tier": "T1"
       },
       {
-        "line": 488,
+        "line": 470,
         "col": 17,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -4027,7 +4040,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 717 >= warn threshold 400; functions 27 >= warn threshold 20)",
+        "msg": "File is large; consider splitting (lines 721 >= warn threshold 400; functions 28 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -4157,7 +4170,7 @@
         "tier": "T2"
       },
       {
-        "line": 652,
+        "line": 656,
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -4170,7 +4183,7 @@
         "tier": "T1"
       },
       {
-        "line": 702,
+        "line": 706,
         "col": 29,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4179,9 +4192,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 702,
+              "startLine": 706,
               "startCol": 29,
-              "endLine": 702,
+              "endLine": 706,
               "endCol": 41
             },
             "replacementText": "LARGEFILE_TEXT"
@@ -4191,7 +4204,7 @@
         "tier": "T2"
       },
       {
-        "line": 702,
+        "line": 706,
         "rule": "HYG-DED-001",
         "sev": "WARN",
         "msg": "Dead code detected: Statement is unreachable following a terminal control flow statement (return/throw/break/continue)",
@@ -4275,6 +4288,29 @@
               "endCol": 79
             },
             "replacementText": "CONST_3"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      }
+    ],
+    "src/analyzers/performance-helpers.ts": [
+      {
+        "line": 246,
+        "col": 39,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 125 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 246,
+              "startCol": 39,
+              "endLine": 246,
+              "endCol": 42
+            },
+            "replacementText": "CONST_125"
           },
           "safeToAutomate": true
         },
@@ -4476,7 +4512,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 648 >= warn threshold 400; functions 21 >= warn threshold 20)",
+        "msg": "File is large; consider splitting (lines 636 >= warn threshold 400; functions 21 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -4495,7 +4531,7 @@
         "tier": "T1"
       },
       {
-        "line": 109,
+        "line": 94,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4504,9 +4540,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 109,
+              "startLine": 94,
               "startCol": 13,
-              "endLine": 109,
+              "endLine": 94,
               "endCol": 19
             },
             "replacementText": "CONST_1RE_TEXT"
@@ -4516,7 +4552,7 @@
         "tier": "T2"
       },
       {
-        "line": 137,
+        "line": 122,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -4528,7 +4564,7 @@
         "tier": "T1"
       },
       {
-        "line": 224,
+        "line": 209,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
         "msg": "Function \"collectRecursionSites\" spans 76 lines (limit 60)",
@@ -4540,7 +4576,7 @@
         "tier": "T1"
       },
       {
-        "line": 236,
+        "line": 221,
         "col": 23,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -4553,7 +4589,7 @@
         "tier": "T1"
       },
       {
-        "line": 302,
+        "line": 287,
         "col": 5,
         "rule": "CMP-DEN-001",
         "sev": "WARN",
@@ -4566,7 +4602,7 @@
         "conf": 0.8
       },
       {
-        "line": 305,
+        "line": 290,
         "col": 44,
         "rule": "NAM-SGL-001",
         "sev": "WARN",
@@ -4578,7 +4614,7 @@
         "tier": "T3"
       },
       {
-        "line": 306,
+        "line": 291,
         "col": 35,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4587,9 +4623,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 306,
+              "startLine": 291,
               "startCol": 35,
-              "endLine": 306,
+              "endLine": 291,
               "endCol": 36
             },
             "replacementText": "CONST_4"
@@ -4599,7 +4635,7 @@
         "tier": "T2"
       },
       {
-        "line": 350,
+        "line": 335,
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -4612,7 +4648,7 @@
         "tier": "T1"
       },
       {
-        "line": 350,
+        "line": 335,
         "col": 5,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
@@ -4625,7 +4661,7 @@
         "tier": "T1"
       },
       {
-        "line": 380,
+        "line": 365,
         "col": 25,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4634,9 +4670,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 380,
+              "startLine": 365,
               "startCol": 25,
-              "endLine": 380,
+              "endLine": 365,
               "endCol": 55
             },
             "replacementText": "USECONSTANTTIMECOMPARISON_TEXT"
@@ -4646,7 +4682,7 @@
         "tier": "T2"
       },
       {
-        "line": 385,
+        "line": 370,
         "col": 25,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4655,9 +4691,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 385,
+              "startLine": 370,
               "startCol": 25,
-              "endLine": 385,
+              "endLine": 370,
               "endCol": 42
             },
             "replacementText": "GUARDRECURSION_TEXT"
@@ -4667,10 +4703,10 @@
         "tier": "T2"
       },
       {
-        "line": 471,
+        "line": 456,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 434",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 419",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
@@ -4678,8 +4714,8 @@
         "tier": "T3"
       },
       {
-        "line": 574,
-        "col": 87,
+        "line": 561,
+        "col": 71,
         "rule": "magic-number",
         "sev": "WARN",
         "msg": "Magic number 1000 should be extracted into a named constant",
@@ -4687,10 +4723,10 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 574,
-              "startCol": 87,
-              "endLine": 574,
-              "endCol": 91
+              "startLine": 561,
+              "startCol": 71,
+              "endLine": 561,
+              "endCol": 75
             },
             "replacementText": "DURATION_1S"
           },
@@ -5748,6 +5784,19 @@
           "safeToAutomate": false
         },
         "tier": "T1"
+      }
+    ],
+    "src/core/ast/block-scope-utils.ts": [
+      {
+        "line": 65,
+        "rule": "CMT-WID-001",
+        "sev": "WARN",
+        "msg": "Comment/docstring line exceeds 100 columns (found 103)",
+        "fix": {
+          "action": "refactor",
+          "template": "Wrap the comment at word boundaries; long directives keep their exemption"
+        },
+        "tier": "T3"
       }
     ],
     "src/core/ast/data-adapter.ts": [
@@ -8315,44 +8364,8 @@
           "safeToAutomate": false
         },
         "tier": "T1"
-      },
-      {
-        "line": 157,
-        "col": 9,
-        "rule": "NAM-SGL-001",
-        "sev": "WARN",
-        "msg": "Single-letter variable name 'i' hurts code readability",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'i' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        },
-        "tier": "T3"
-      },
-      {
-        "line": 230,
-        "col": 17,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'utf8ToUtf16Offset' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'ru…",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 234,
-        "col": 9,
-        "rule": "NAM-SGL-001",
-        "sev": "WARN",
-        "msg": "Single-letter variable name 'k' hurts code readability",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Replace 'k' with a meaningful descriptive name; only loop indices ('i','j','k…"
-        },
-        "tier": "T3"
       }
     ]
   },
-  "truncated": 3091
+  "truncated": 3105
 }
