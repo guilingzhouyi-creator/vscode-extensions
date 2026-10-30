@@ -12,6 +12,9 @@
  * Exit Semantics & Design Rationale: Type declarations only; CC = 0, zero runtime overhead.
  */
 
+import type { QualityDimension, Severity } from '../types';
+import type { CompactVerificationTelemetry } from '../trajectory/eloc-types';
+
 /** Protocol schema identifier for AAS v1.0 reports. */
 export const AAS_SCHEMA_ID = 'aas-v1';
 
@@ -85,6 +88,14 @@ export interface AasHealth {
         readonly failingCount: number;
         readonly lowestDimension?: string;
         readonly lowestScore?: number;
+    };
+    /** Optional in-kernel verification & 5D Riemannian manifold health telemetry */
+    readonly vrf?: {
+        readonly k: number;
+        readonly cr: number;
+        readonly ci: number;
+        readonly q: number;
+        readonly dm: number;
     };
     /** Aggregate counter summary */
     readonly counts: AasCounts;
@@ -260,6 +271,13 @@ export interface AasReportOptions {
             readonly semanticRatio?: number;
             readonly netDebtDelta?: number;
             readonly reason?: string;
+        };
+        readonly vrf?: {
+            readonly k: number;
+            readonly cr: number;
+            readonly ci: number;
+            readonly q: number;
+            readonly dm: number;
         };
     };
 }

@@ -12,7 +12,13 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { CompactTrajectoryRecord, WeeklyTrajectorySummary } from './eloc-types';
+import type {
+    CompactTrajectoryRecord,
+    WeeklyManifoldSummary,
+    WeeklyStabilityMetrics,
+    WeeklyTrajectorySummary,
+    WeeklyVerificationSummary,
+} from './eloc-types';
 import {
     ensureLedgerDirectory,
     readRecentRecords,
@@ -35,6 +41,137 @@ export function getIsoWeekId(timestamp: number): string {
     const weekNo = Math.ceil(((dateObj.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
     const paddedWeek = weekNo < 10 ? `0${weekNo}` : `${weekNo}`;
     return `${dateObj.getUTCFullYear()}-W${paddedWeek}`;
+}
+
+/**
+ * Derives steady-state defensive stability metrics from a batch of compact records.
+ */
+function deriveRecordsStability(
+    records: CompactTrajectoryRecord[],
+    processedTotal: number,
+    maxUnique: number,
+    changedTotal: number,
+    semanticTotal: number,
+): WeeklyStabilityMetrics {
+    let zeroRegressionRuns = 0;
+    let zeroRegressionStreak = 0;
+    let scoreFloor = Infinity;
+    let scoreCeiling = -Infinity;
+
+    for (const record of records) {
+        if (record.debt.reg === 0) {
+            zeroRegressionRuns += 1;
+        }
+        if (record.debt.reg === 0 && record.gate.pass) {
+            zeroRegressionStreak += 1;
+        } else {
+            zeroRegressionStreak = 0;
+        }
+        if (record.score.aft < scoreFloor) scoreFloor = record.score.aft;
+        if (record.score.aft > scoreCeiling) scoreCeiling = record.score.aft;
+    }
+
+    const semanticPurityRatio =
+        changedTotal > 0 ? Math.round((semanticTotal / changedTotal) * 10000) / 10000 : 1;
+    const uniqueCoverageRatio =
+        processedTotal > 0
+            ? Math.min(1, Math.round((maxUnique / processedTotal) * 10000) / 10000)
+            : 1;
+
+    return {
+        zeroRegressionRuns,
+        zeroRegressionStreak,
+        semanticPurityRatio,
+        uniqueCoverageRatio,
+        scoreFloor: scoreFloor === Infinity ? 100 : scoreFloor,
+        scoreCeiling: scoreCeiling === -Infinity ? 100 : scoreCeiling,
+    };
+}
+
+/**
+ * Accumulates in-kernel verification telemetry across a batch of compact records.
+ */
+function deriveRecordsVerification(
+    records: CompactTrajectoryRecord[],
+): WeeklyVerificationSummary | undefined {
+    let verifiedRuns = 0;
+    let killSum = 0;
+    let minKill = Infinity;
+    let creditSum = 0;
+    let creditCount = 0;
+    let minCi = Infinity;
+    let quarantineCount = 0;
+
+    for (const record of records) {
+        const vrf = record.vrf;
+        if (!vrf) continue;
+        verifiedRuns += 1;
+        if (typeof vrf.k === 'number') {
+            killSum += vrf.k;
+            if (vrf.k < minKill) minKill = vrf.k;
+        }
+        if (typeof vrf.cr === 'number') {
+            creditSum += vrf.cr;
+            creditCount += 1;
+        }
+        if (typeof vrf.ci === 'number' && vrf.ci < minCi) {
+            minCi = vrf.ci;
+        }
+        if (vrf.q === 1) {
+            quarantineCount += 1;
+        }
+    }
+
+    if (verifiedRuns === 0) {
+        return undefined;
+    }
+
+    return {
+        verifiedRuns,
+        meanMutationKillRate: Math.round((killSum / verifiedRuns) * 10000) / 10000,
+        minMutationKillRate: minKill === Infinity ? 1 : minKill,
+        meanBayesianCredit:
+            creditCount > 0 ? Math.round((creditSum / creditCount) * 100) / 100 : 100,
+        minBayesianCiLower: minCi === Infinity ? 1 : minCi,
+        quarantineCount,
+    };
+}
+
+/**
+ * Accumulates 5D Riemannian manifold and density telemetry across a batch of compact records.
+ */
+function deriveRecordsManifold(
+    records: CompactTrajectoryRecord[],
+): WeeklyManifoldSummary | undefined {
+    let dmCount = 0;
+    let dmSum = 0;
+    let maxDm = 0;
+    let tauCount = 0;
+    let tauSum = 0;
+
+    for (const record of records) {
+        const vrf = record.vrf;
+        if (!vrf) continue;
+        if (typeof vrf.dm === 'number') {
+            dmCount += 1;
+            dmSum += vrf.dm;
+            if (vrf.dm > maxDm) maxDm = vrf.dm;
+        }
+        if (typeof vrf.tau === 'number') {
+            tauCount += 1;
+            tauSum += vrf.tau;
+        }
+    }
+
+    if (dmCount === 0 && tauCount === 0) {
+        return undefined;
+    }
+
+    return {
+        meanMahalanobisDistance: dmCount > 0 ? Math.round((dmSum / dmCount) * 10000) / 10000 : 0,
+        maxMahalanobisDistance: Math.round(maxDm * 10000) / 10000,
+        ...(tauCount > 0 ? { meanTau: Math.round((tauSum / tauCount) * 100) / 100 } : {}),
+    };
 }
 
 /**
@@ -76,6 +213,14 @@ export function aggregateRecords(
             },
             meanCompositeScore: 100,
             gatePassRate: 100,
+            stability: {
+                zeroRegressionRuns: 0,
+                zeroRegressionStreak: 0,
+                semanticPurityRatio: 1,
+                uniqueCoverageRatio: 1,
+                scoreFloor: 100,
+                scoreCeiling: 100,
+            },
         };
     }
 
@@ -130,6 +275,16 @@ export function aggregateRecords(
     const baseKilo = Math.max(1, maxUnique / 1000);
     const densityYield = Math.round((netDebt / baseKilo) * 100) / 100;
 
+    const stability = deriveRecordsStability(
+        records,
+        processedTotal,
+        maxUnique,
+        changedTotal,
+        semanticTotal,
+    );
+    const verification = deriveRecordsVerification(records);
+    const manifold = deriveRecordsManifold(records);
+
     return {
         weekId: summaryId,
         startMs,
@@ -156,6 +311,9 @@ export function aggregateRecords(
         },
         meanCompositeScore: meanScore,
         gatePassRate,
+        stability,
+        ...(verification ? { verification } : {}),
+        ...(manifold ? { manifold } : {}),
     };
 }
 
@@ -181,6 +339,19 @@ interface WeeklySummaryAccumulator {
     totalRegressions: number;
     scoreWeightedSum: number;
     passedWeightedCount: number;
+    zeroRegressionRuns: number;
+    zeroRegressionStreak: number;
+    scoreFloor: number;
+    scoreCeiling: number;
+    verifiedRuns: number;
+    killWeightedSum: number;
+    minKill: number;
+    creditWeightedSum: number;
+    minCi: number;
+    quarantineCount: number;
+    manifoldWeeks: number;
+    dmSum: number;
+    maxDm: number;
 }
 
 /**
@@ -205,7 +376,60 @@ function createWeeklyAccumulator(): WeeklySummaryAccumulator {
         totalRegressions: 0,
         scoreWeightedSum: 0,
         passedWeightedCount: 0,
+        zeroRegressionRuns: 0,
+        zeroRegressionStreak: 0,
+        scoreFloor: Infinity,
+        scoreCeiling: -Infinity,
+        verifiedRuns: 0,
+        killWeightedSum: 0,
+        minKill: Infinity,
+        creditWeightedSum: 0,
+        minCi: Infinity,
+        quarantineCount: 0,
+        manifoldWeeks: 0,
+        dmSum: 0,
+        maxDm: 0,
     };
+}
+
+/**
+ * Folds stability, verification, and manifold sub-summaries into the accumulator.
+ */
+function absorbExtendedSummaryBlocks(
+    acc: WeeklySummaryAccumulator,
+    snapshot: WeeklyTrajectorySummary,
+): void {
+    const stab = snapshot.stability;
+    const weekZeroRegRuns =
+        stab?.zeroRegressionRuns ??
+        (snapshot.debt.totalRegressions === 0 ? snapshot.totalRuns : 0);
+    acc.zeroRegressionRuns += weekZeroRegRuns;
+    if (weekZeroRegRuns === snapshot.totalRuns && snapshot.gatePassRate >= 100) {
+        acc.zeroRegressionStreak += snapshot.totalRuns;
+    } else {
+        acc.zeroRegressionStreak = stab?.zeroRegressionStreak ?? 0;
+    }
+    acc.scoreFloor = Math.min(acc.scoreFloor, stab?.scoreFloor ?? snapshot.meanCompositeScore);
+    acc.scoreCeiling = Math.max(
+        acc.scoreCeiling,
+        stab?.scoreCeiling ?? snapshot.meanCompositeScore,
+    );
+
+    if (snapshot.verification && snapshot.verification.verifiedRuns > 0) {
+        const vrf = snapshot.verification;
+        acc.verifiedRuns += vrf.verifiedRuns;
+        acc.killWeightedSum += vrf.meanMutationKillRate * vrf.verifiedRuns;
+        acc.minKill = Math.min(acc.minKill, vrf.minMutationKillRate);
+        acc.creditWeightedSum += vrf.meanBayesianCredit * vrf.verifiedRuns;
+        acc.minCi = Math.min(acc.minCi, vrf.minBayesianCiLower);
+        acc.quarantineCount += vrf.quarantineCount;
+    }
+
+    if (snapshot.manifold) {
+        acc.manifoldWeeks += 1;
+        acc.dmSum += snapshot.manifold.meanMahalanobisDistance;
+        acc.maxDm = Math.max(acc.maxDm, snapshot.manifold.maxMahalanobisDistance);
+    }
 }
 
 /**
@@ -234,6 +458,59 @@ function absorbWeeklySummary(
     acc.totalRegressions += snapshot.debt.totalRegressions;
     acc.scoreWeightedSum += snapshot.meanCompositeScore * snapshot.totalRuns;
     acc.passedWeightedCount += (snapshot.gatePassRate / 100) * snapshot.totalRuns;
+    absorbExtendedSummaryBlocks(acc, snapshot);
+}
+
+function buildAggregatedStability(
+    acc: WeeklySummaryAccumulator,
+    meanScore: number,
+    semanticPurityRatio: number,
+    uniqueCoverageRatio: number,
+): WeeklyStabilityMetrics {
+    const scoreFloor = acc.scoreFloor === Infinity ? meanScore : acc.scoreFloor;
+    const scoreCeiling = acc.scoreCeiling === -Infinity ? meanScore : acc.scoreCeiling;
+    return {
+        zeroRegressionRuns: acc.zeroRegressionRuns,
+        zeroRegressionStreak: acc.zeroRegressionStreak,
+        semanticPurityRatio,
+        uniqueCoverageRatio,
+        scoreFloor,
+        scoreCeiling,
+    };
+}
+
+function buildAggregatedVerification(
+    acc: WeeklySummaryAccumulator,
+): WeeklyVerificationSummary | undefined {
+    if (acc.verifiedRuns <= 0) {
+        return undefined;
+    }
+    const meanKill = Math.round((acc.killWeightedSum / acc.verifiedRuns) * 10000) / 10000;
+    const minKill = acc.minKill === Infinity ? 1 : acc.minKill;
+    const meanCredit = Math.round((acc.creditWeightedSum / acc.verifiedRuns) * 100) / 100;
+    const minCi = acc.minCi === Infinity ? 1 : acc.minCi;
+    return {
+        verifiedRuns: acc.verifiedRuns,
+        meanMutationKillRate: meanKill,
+        minMutationKillRate: minKill,
+        meanBayesianCredit: meanCredit,
+        minBayesianCiLower: minCi,
+        quarantineCount: acc.quarantineCount,
+    };
+}
+
+function buildAggregatedManifold(
+    acc: WeeklySummaryAccumulator,
+): WeeklyManifoldSummary | undefined {
+    if (acc.manifoldWeeks <= 0) {
+        return undefined;
+    }
+    const meanDm = Math.round((acc.dmSum / acc.manifoldWeeks) * 10000) / 10000;
+    const maxDm = Math.round(acc.maxDm * 10000) / 10000;
+    return {
+        meanMahalanobisDistance: meanDm,
+        maxMahalanobisDistance: maxDm,
+    };
 }
 
 /**
@@ -249,8 +526,9 @@ export function aggregateWeeklySummaries(
         return aggregateRecords([], 'LIFETIME');
     }
 
+    const orderedSummaries = [...summaries].sort((a, b) => a.startMs - b.startMs);
     const acc = createWeeklyAccumulator();
-    for (const snapshot of summaries) {
+    for (const snapshot of orderedSummaries) {
         absorbWeeklySummary(acc, snapshot);
     }
 
@@ -270,6 +548,22 @@ export function aggregateWeeklySummaries(
 
     const baseKilo = Math.max(1, maxUnique / 1000);
     const densityYield = Math.round((netDebt / baseKilo) * 100) / 100;
+
+    const semanticPurityRatio =
+        changedTotal > 0 ? Math.round((semanticTotal / changedTotal) * 10000) / 10000 : 1;
+    const uniqueCoverageRatio =
+        processedTotal > 0
+            ? Math.min(1, Math.round((maxUnique / processedTotal) * 10000) / 10000)
+            : 1;
+
+    const stability = buildAggregatedStability(
+        acc,
+        meanScore,
+        semanticPurityRatio,
+        uniqueCoverageRatio,
+    );
+    const verification = buildAggregatedVerification(acc);
+    const manifold = buildAggregatedManifold(acc);
 
     return {
         weekId: 'LIFETIME',
@@ -297,6 +591,9 @@ export function aggregateWeeklySummaries(
         },
         meanCompositeScore: meanScore,
         gatePassRate,
+        stability,
+        ...(verification ? { verification } : {}),
+        ...(manifold ? { manifold } : {}),
     };
 }
 
@@ -313,12 +610,18 @@ async function saveWeeklyPartitionSummary(
     if (fs.existsSync(weekFilePath)) {
         try {
             const raw = await fs.promises.readFile(weekFilePath, 'utf8');
-            const existing = JSON.parse(raw);
+            const existing = JSON.parse(raw) as WeeklyTrajectorySummary;
             if (
                 existing &&
                 typeof existing.totalRuns === 'number' &&
                 existing.totalRuns > summary.totalRuns
             ) {
+                normalizeLegacyWeeklySummary(existing);
+                await fs.promises.writeFile(
+                    weekFilePath,
+                    JSON.stringify(existing, null, 2) + '\n',
+                    'utf8',
+                );
                 return existing;
             }
         } catch {
@@ -360,6 +663,27 @@ function normalizeLegacyQedMean(qed?: WeeklyTrajectorySummary['qed']): void {
     qed.kMean = Math.round(mean * 1000 * 100) / 100;
 }
 
+function normalizeLegacyStability(parsed: WeeklyTrajectorySummary): void {
+    if (parsed.stability) {
+        return;
+    }
+    const totalRuns = parsed.totalRuns ?? 0;
+    const zeroReg = parsed.debt?.totalRegressions === 0 ? totalRuns : 0;
+    const chg = parsed.eloc?.changedTotal ?? 0;
+    const sem = parsed.eloc?.semanticTotal ?? 0;
+    const proc = parsed.eloc?.processedTotal ?? 0;
+    const uniq = parsed.eloc?.uniqueTotal ?? 0;
+
+    parsed.stability = {
+        zeroRegressionRuns: zeroReg,
+        zeroRegressionStreak: zeroReg === totalRuns && parsed.gatePassRate >= 100 ? totalRuns : 0,
+        semanticPurityRatio: chg > 0 ? Math.round((sem / chg) * 10000) / 10000 : 1,
+        uniqueCoverageRatio: proc > 0 ? Math.min(1, Math.round((uniq / proc) * 10000) / 10000) : 1,
+        scoreFloor: parsed.meanCompositeScore ?? 100,
+        scoreCeiling: parsed.meanCompositeScore ?? 100,
+    };
+}
+
 function normalizeLegacyWeeklySummary(parsed: WeeklyTrajectorySummary): void {
     if (!parsed) {
         return;
@@ -367,13 +691,18 @@ function normalizeLegacyWeeklySummary(parsed: WeeklyTrajectorySummary): void {
     const baseLines = resolveLegacyBaseLines(parsed.eloc, parsed.totalRuns);
     normalizeLegacyDebtYield(parsed.debt, baseLines);
     normalizeLegacyQedMean(parsed.qed);
+    normalizeLegacyStability(parsed);
 }
 
 async function loadWeeklySummaryFile(filePath: string): Promise<WeeklyTrajectorySummary | null> {
     try {
         const raw = await fs.promises.readFile(filePath, 'utf8');
         const parsed = JSON.parse(raw) as WeeklyTrajectorySummary;
+        const hadStability = Boolean(parsed.stability);
         normalizeLegacyWeeklySummary(parsed);
+        if (!hadStability) {
+            await fs.promises.writeFile(filePath, JSON.stringify(parsed, null, 2) + '\n', 'utf8');
+        }
         return parsed;
     } catch {
         return null;

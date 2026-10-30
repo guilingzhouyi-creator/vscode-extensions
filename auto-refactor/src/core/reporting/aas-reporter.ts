@@ -467,6 +467,7 @@ function buildHealth(report: ScanReport, counts: AasCounts, options?: AasReportO
     const sqale = resolveHealthSqale(report, override?.sqale);
     const polyglot = resolveHealthPolyglot(report, override?.polyglot);
     const gamingDefense = resolveHealthGamingDefense(report, override?.gamingDefense);
+    const vrf = override?.vrf;
     const dimensionSummary = options?.includeDimensionDetails
         ? computeDimensionSummary(report.qualityScore?.indices)
         : undefined;
@@ -481,6 +482,7 @@ function buildHealth(report: ScanReport, counts: AasCounts, options?: AasReportO
         ...(polyglot ? { polyglot } : {}),
         ...(gamingDefense ? { gamingDefense } : {}),
         ...(dimensionSummary ? { dimensionSummary } : {}),
+        ...(vrf ? { vrf } : {}),
         counts,
     };
 }

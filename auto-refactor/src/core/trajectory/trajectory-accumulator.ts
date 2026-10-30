@@ -16,6 +16,7 @@
 import * as path from 'path';
 import type {
     CompactTrajectoryRecord,
+    CompactVerificationTelemetry,
     ElocCounters,
     TrajectoryQualityMetrics,
     WeeklyTrajectorySummary,
@@ -76,6 +77,8 @@ export interface AuditRunOptions {
     diffCounters?: Partial<ElocCounters>;
     /** Optional micro-slice quality delta override (e.g. from a localized refactoring slice). */
     sliceDeltaQ?: number;
+    /** Optional in-kernel verification & 5D Riemannian manifold telemetry. */
+    verification?: CompactVerificationTelemetry;
 }
 
 /**
@@ -175,6 +178,41 @@ function createInitialLifetimeSummary(record: CompactTrajectoryRecord): WeeklyTr
         },
         meanCompositeScore: record.score.aft,
         gatePassRate: record.gate.pass ? 100.0 : 0.0,
+        stability: {
+            zeroRegressionRuns: record.debt.reg === 0 ? 1 : 0,
+            zeroRegressionStreak: record.debt.reg === 0 && record.gate.pass ? 1 : 0,
+            semanticPurityRatio:
+                record.eloc.chg > 0
+                    ? Math.round((record.eloc.sem / record.eloc.chg) * 10000) / 10000
+                    : 1,
+            uniqueCoverageRatio:
+                record.eloc.proc > 0
+                    ? Math.min(1, Math.round((record.eloc.uniq / record.eloc.proc) * 10000) / 10000)
+                    : 1,
+            scoreFloor: record.score.aft,
+            scoreCeiling: record.score.aft,
+        },
+        ...(record.vrf
+            ? {
+                verification: {
+                    verifiedRuns: 1,
+                    meanMutationKillRate: record.vrf.k ?? 1,
+                    minMutationKillRate: record.vrf.k ?? 1,
+                    meanBayesianCredit: record.vrf.cr ?? 100,
+                    minBayesianCiLower: record.vrf.ci ?? 1,
+                    quarantineCount: record.vrf.q === 1 ? 1 : 0,
+                },
+            }
+            : {}),
+        ...(record.vrf && (record.vrf.dm !== undefined || record.vrf.tau !== undefined)
+            ? {
+                manifold: {
+                    meanMahalanobisDistance: record.vrf.dm ?? 0,
+                    maxMahalanobisDistance: record.vrf.dm ?? 0,
+                    ...(record.vrf.tau !== undefined ? { meanTau: record.vrf.tau } : {}),
+                },
+            }
+            : {}),
     };
 }
 
@@ -381,6 +419,7 @@ export class TrajectoryAccumulator {
             metrics: qualityMetrics,
             gatePass,
             gateCode,
+            vrf: options.verification,
         });
 
         // 5. Append to Active NDJSON Ledger
