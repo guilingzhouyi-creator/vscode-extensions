@@ -5,9 +5,9 @@
  *     scanner factories across all analyzers, rules, and governance guards.
  * Dependencies & Triggers: Zero external dependencies; imported by core analyzers and guards.
  * Responsibilities:
- *     1. Centralize canonical regular expression patterns partitioned into 6 semantic domains.
+ *     1. Centralize canonical regular expression patterns partitioned into semantic domains.
  *     2. Enforce the state-separation discipline: stateless immutable constants vs fresh factories.
- *     3. Expose frozen domain namespaces (NAMING, SYNTAX, COMMENT, LITERAL, SHELL, SECURITY).
+ *     3. Expose frozen domain namespaces (NAMING, SYNTAX, COMMENT, LITERAL, SHELL, SECURITY, PYTHON, GDSCRIPT).
  *     4. Provide backward-compatible named exports with zero mutable lastIndex state leakage.
  * Exit Semantics & Design Rationale: Pure, frozen regex constants and deterministic factories;
  *     zero side effects and strictly immune to ReDoS back-tracking traps.
@@ -65,6 +65,50 @@ export function createKebabToCamelScanner(): RegExp {
     return /-([a-z0-9])/g;
 }
 
+/** Matches transient milestone or construction jargon in symbol and file names. */
+export const TRANSIENT_JARGON_PATTERN =
+    /\b(p[0-9]+|phase[\s_]*[0-9]+|st[\s_]*[0-9]+|temp|tmp|w\x69p|new)\b/i;
+
+/** Matches standalone jargon tokens. */
+export const JARGON_TOKEN_PATTERN = /^(p\d+|phase\d*|st\d+|temp|tmp|w\x69p)$/;
+
+/** Matches prefix tokens for multi-part jargon. */
+export const JARGON_PREFIX_TOKEN_PATTERN = /^(?:p|st|phase)$/;
+
+/** Matches analyzer or engine core path components. */
+export const ANALYZER_OR_ENGINE_PATH_PATTERN =
+    /(?:\/(?:analyzers|core|engine|tests|scripts|test)\/|-(?:analyzer|rules|helper)\.ts$)/;
+
+/** Matches test or event hook identifier prefixes. */
+export const EXEMPT_PREFIX_PATTERN = /^(?:test_|on_)/;
+
+/** Matches English vowel characters. */
+export const VOWEL_PATTERN = /[aeiouy]/i;
+
+/** Matches English letter characters. */
+export const LETTERS_PATTERN = /[a-z]/i;
+
+/** Matches test and spec file suffix patterns. */
+export const TEST_SPEC_SUFFIX_PATTERN = /\.(test|spec)$/;
+
+/** Matches identifier starting with numeric digit. */
+export const LEADING_DIGIT_PATTERN = /^[0-9]/;
+
+/** Creates a fresh global scanner for stripping leading and trailing underscores. */
+export function createSnakeCleanScanner(): RegExp {
+    return /^_+|_+$/g;
+}
+
+/** Creates a fresh global scanner for stripping enclosing quotes. */
+export function createOuterQuotesScanner(): RegExp {
+    return /^['"`]|['"`]$/g;
+}
+
+/** Creates a fresh global scanner for replacing non-alphanumeric sequences. */
+export function createNonAlphanumericScanner(): RegExp {
+    return /[^A-Za-z0-9]+/g;
+}
+
 export const REGEX_NAMING = Object.freeze({
     CAMEL_CASE: CAMEL_CASE_PATTERN,
     PASCAL_CASE: PASCAL_CASE_PATTERN,
@@ -79,6 +123,18 @@ export const REGEX_NAMING = Object.freeze({
     createCamelToSnakeScanner,
     createSnakeToCamelScanner,
     createKebabToCamelScanner,
+    TRANSIENT_JARGON: TRANSIENT_JARGON_PATTERN,
+    JARGON_TOKEN: JARGON_TOKEN_PATTERN,
+    JARGON_PREFIX_TOKEN: JARGON_PREFIX_TOKEN_PATTERN,
+    ANALYZER_OR_ENGINE_PATH: ANALYZER_OR_ENGINE_PATH_PATTERN,
+    EXEMPT_PREFIX: EXEMPT_PREFIX_PATTERN,
+    VOWEL: VOWEL_PATTERN,
+    LETTERS: LETTERS_PATTERN,
+    TEST_SPEC_SUFFIX: TEST_SPEC_SUFFIX_PATTERN,
+    LEADING_DIGIT: LEADING_DIGIT_PATTERN,
+    createSnakeCleanScanner,
+    createOuterQuotesScanner,
+    createNonAlphanumericScanner,
 });
 
 // ============================================================================
@@ -577,6 +633,105 @@ export const PYTHON_IF_HEADER_PATTERN = /^(\s*)if\s+.*:\s*$/;
 /** Matches line composed exclusively of opening or closing braces. */
 export const BRACE_ONLY_LINE_PATTERN = /^[{}]+$/;
 
+/** Matches Rust use import specifier. */
+export const RUST_USE_IMPORT_PATTERN = /^\s*use\s+([A-Za-z0-9_:]+)/;
+
+/** Matches GDScript preload or load import statement. */
+export const GDSCRIPT_LOAD_IMPORT_PATTERN = /(?:preload|load)\s*\(\s*['"](?:res:\/\/)?([^'"]+)['"]\s*\)/;
+
+/** Matches Python function or class declaration header. */
+export const PYTHON_DECL_HEADER_PATTERN = /^\s*(?:def|class)\s+[A-Za-z0-9_]+/;
+
+/** Matches GDScript func declaration header. */
+export const GDSCRIPT_FUNC_DECL_HEADER_PATTERN = /^\s*func\s+[A-Za-z0-9_]+/;
+
+/** Matches Rust function declaration header. */
+export const RUST_FN_DECL_HEADER_PATTERN = /^\s*(?:pub\s+)?(?:async\s+)?fn\s+[A-Za-z0-9_]+/;
+
+/** Matches TypeScript import or require declaration line. */
+export const TS_IMPORT_LINE_PATTERN =
+    /^\s*(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?|const\s+.*=\s*require\()['"]([^'"]+)['"]/;
+
+/** Matches TypeScript wildcard import statements. */
+export const TS_WILDCARD_IMPORT_PATTERN = /\b(?:import\s+\*\s+as|import\s+\*)/;
+
+/** Matches uppercase constant alias declarations. */
+export const CONSTANT_ALIAS_PATTERN =
+    /^(?:export\s+)?const\s+([A-Z][A-Z0-9_]{2,})\s*(?::\s*[^=]+)?\s*=\s*([A-Z][A-Z0-9_]{2,})\s*;?$/;
+
+/** Matches diagnostic or logging message prefixes. */
+export const DIAGNOSTIC_LOG_PREFIX_PATTERN =
+    /^(?:error|failed|warning|info|debug|trace|fatal|assert|[A-Z0-9]+-[A-Z0-9]+-[0-9]+):/i;
+
+/** Matches diagnostic or logging invocation parent contexts. */
+export const DIAGNOSTIC_CALL_PARENT_PATTERN =
+    /(?:\b(?:log(?:ger|ging)?|console\.(?:log|warn|error|info|debug)|print|println|eprintln|panic|bail|anyhow)\s*\(|new\s+Error|raise\s+|reject\(|exit\(|warn(?:ing)?\()/i;
+
+/** Matches audit finding or violation sink push invocations. */
+export const DIAGNOSTIC_SINK_PARENT_PATTERN =
+    /(?:\b(?:violations\.push|push_violation|findings\.append|issues\.append|auditfinding|finding|violation|diagnostic)\s*\(|echo\s+|write-host\b|tracing::)/i;
+
+/** Matches Go function declaration line. */
+export const GO_FUNC_DECL_LINE_PATTERN =
+    /^\s*func\s+(?:\([^)]+\)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\(/;
+
+/** Matches Go struct or interface type definition. */
+export const GO_STRUCT_OR_INTERFACE_PATTERN =
+    /^\s*(?:type\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s+(?:struct|interface)\b/;
+
+/** Matches Go const declaration line (linear ReDoS immune). */
+export const GO_CONST_DECL_LINE_PATTERN = /^\s*const\s+([a-zA-Z_][a-zA-Z0-9_,\s]*)/;
+
+/** Matches Go var declaration line (linear ReDoS immune). */
+export const GO_VAR_DECL_LINE_PATTERN = /^\s*var\s+([a-zA-Z_][a-zA-Z0-9_,\s]*)/;
+
+/** Matches Go for-loop variable binding line (linear ReDoS immune). */
+export const GO_FOR_DECL_LINE_PATTERN = /^\s*for\s+([a-zA-Z_][a-zA-Z0-9_,\s]*)\s*:?=/;
+
+/** Matches Go if short statement binding line (linear ReDoS immune). */
+export const GO_IF_SHORT_DECL_PATTERN = /^\s*if\s+([a-zA-Z_][a-zA-Z0-9_,\s]*)\s*:=/;
+
+/** Matches Go short variable declaration line (linear ReDoS immune). */
+export const GO_SHORT_VAR_DECL_PATTERN = /^\s*([a-zA-Z_][a-zA-Z0-9_,\s]*)\s*:=/;
+
+/** Matches GDScript for loop statement line. */
+export const GDSCRIPT_FOR_DECL_PATTERN = /^\s*for\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\b/;
+
+/** Matches cryptographic keywords for constant-time comparison audits. */
+export const STDLIB_CRYPTO_KEYWORD_PATTERN =
+    /(?:crypto|hash|token|secret|digest|cipher|signature|subtle|constant_time|hmac|sha256|blake3|keccak|aes_)/i;
+
+/** Matches platform-specific target configuration attributes. */
+export const STDLIB_TARGET_CFG_PATTERN =
+    /(?:#\[cfg\(target_os|#\[cfg\(target_arch|#if defined\(__linux__\)|#ifdef _WIN32)/;
+
+/** Matches compile error or unsupported platform fallbacks. */
+export const STDLIB_FALLBACK_PATTERN = /(?:compile_error!|#error|unsupported platform|cfg\(not\(any\()/;
+
+/** Matches no_std or kernel bare-metal context indicators. */
+export const STDLIB_NO_STD_CONTEXT_PATTERN = /(?:#!\[no_std\]|#!\[no_core\]|\/no_std\/|\/core\/)/;
+
+/** Matches implicit heap allocations in no_std/kernel contexts. */
+export const STDLIB_IMPLICIT_ALLOC_PATTERN =
+    /(?:\bBox::new\s*\(|\bVec::new\s*\(|\balloc::boxed::Box\b|\balloc::vec::Vec\b|\b(?:malloc|calloc)\s*\()/;
+
+/** Matches bare panic, unwrap, or abort in public routines. */
+export const STDLIB_RUST_PANIC_PATTERN = /(?:\bpanic!\s*\(|\b(?:todo!|unimplemented!)\s*\(|\.unwrap\(\))/;
+
+/** Matches exported Go function signature header. */
+export const STDLIB_GO_PUB_FN_PATTERN = /^func\s+(?:\([^)]+\)\s+)?([A-Z][a-zA-Z0-9_]*)\s*\(/;
+
+/** Matches generic function definition header. */
+export const STDLIB_FN_DEF_PATTERN = /(?:fn|function|def)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/;
+
+/** Matches recursion depth or budget limit parameter. */
+export const STDLIB_DEPTH_GUARD_PARAM_PATTERN =
+    /\b(?:depth|level|limit|fuel|recursion_limit|max_depth)\b/i;
+
+/** Matches recursion depth guard check condition in function body. */
+export const STDLIB_DEPTH_GUARD_BODY_PATTERN =
+    /\bif\s+.*(?:depth|level|limit|fuel|recursion_limit|max_depth)\b/i;
+
 export const REGEX_SYNTAX = Object.freeze({
     TS_IMPORT_DECL: TS_IMPORT_DECL_PATTERN,
     TS_EXPORT_DECL: TS_EXPORT_DECL_PATTERN,
@@ -718,6 +873,35 @@ export const REGEX_SYNTAX = Object.freeze({
     TERNARY_BOOL_RETURN: TERNARY_BOOL_RETURN_PATTERN,
     PYTHON_IF_HEADER: PYTHON_IF_HEADER_PATTERN,
     BRACE_ONLY_LINE: BRACE_ONLY_LINE_PATTERN,
+    RUST_USE_IMPORT: RUST_USE_IMPORT_PATTERN,
+    GDSCRIPT_LOAD_IMPORT: GDSCRIPT_LOAD_IMPORT_PATTERN,
+    PYTHON_DECL_HEADER: PYTHON_DECL_HEADER_PATTERN,
+    GDSCRIPT_FUNC_DECL_HEADER: GDSCRIPT_FUNC_DECL_HEADER_PATTERN,
+    RUST_FN_DECL_HEADER: RUST_FN_DECL_HEADER_PATTERN,
+    TS_IMPORT_LINE: TS_IMPORT_LINE_PATTERN,
+    TS_WILDCARD_IMPORT: TS_WILDCARD_IMPORT_PATTERN,
+    CONSTANT_ALIAS: CONSTANT_ALIAS_PATTERN,
+    DIAGNOSTIC_LOG_PREFIX: DIAGNOSTIC_LOG_PREFIX_PATTERN,
+    DIAGNOSTIC_CALL_PARENT: DIAGNOSTIC_CALL_PARENT_PATTERN,
+    DIAGNOSTIC_SINK_PARENT: DIAGNOSTIC_SINK_PARENT_PATTERN,
+    GO_FUNC_DECL_LINE: GO_FUNC_DECL_LINE_PATTERN,
+    GO_STRUCT_OR_INTERFACE: GO_STRUCT_OR_INTERFACE_PATTERN,
+    GO_CONST_DECL_LINE: GO_CONST_DECL_LINE_PATTERN,
+    GO_VAR_DECL_LINE: GO_VAR_DECL_LINE_PATTERN,
+    GO_FOR_DECL_LINE: GO_FOR_DECL_LINE_PATTERN,
+    GO_IF_SHORT_DECL: GO_IF_SHORT_DECL_PATTERN,
+    GO_SHORT_VAR_DECL: GO_SHORT_VAR_DECL_PATTERN,
+    GDSCRIPT_FOR_DECL: GDSCRIPT_FOR_DECL_PATTERN,
+    STDLIB_CRYPTO_KEYWORD: STDLIB_CRYPTO_KEYWORD_PATTERN,
+    STDLIB_TARGET_CFG: STDLIB_TARGET_CFG_PATTERN,
+    STDLIB_FALLBACK: STDLIB_FALLBACK_PATTERN,
+    STDLIB_NO_STD_CONTEXT: STDLIB_NO_STD_CONTEXT_PATTERN,
+    STDLIB_IMPLICIT_ALLOC: STDLIB_IMPLICIT_ALLOC_PATTERN,
+    STDLIB_RUST_PANIC: STDLIB_RUST_PANIC_PATTERN,
+    STDLIB_GO_PUB_FN: STDLIB_GO_PUB_FN_PATTERN,
+    STDLIB_FN_DEF: STDLIB_FN_DEF_PATTERN,
+    STDLIB_DEPTH_GUARD_PARAM: STDLIB_DEPTH_GUARD_PARAM_PATTERN,
+    STDLIB_DEPTH_GUARD_BODY: STDLIB_DEPTH_GUARD_BODY_PATTERN,
     createJsImportScanner,
     createRequireCallScanner,
     createRustUnwrapScanner,
@@ -736,50 +920,8 @@ export const REGEX_SYNTAX = Object.freeze({
 // 3. Comment & Annotation Patterns (REGEX.COMMENT)
 // ============================================================================
 
-/** Matches leading C-style // line comment. */
-export const SLASH_SLASH_COMMENT_PATTERN = /^\s*\/\//;
-
-/** Matches leading Python/Shell # line comment. */
-export const HASH_COMMENT_PATTERN = /^\s*#/;
-
-/** Matches leading SQL/Lua/Ada -- line comment. */
-export const DASH_DASH_COMMENT_PATTERN = /^\s*--/;
-
-/** Matches start of block comment. */
-export const BLOCK_COMMENT_START_PATTERN = /\/\*/;
-
-/** Matches end of block comment. */
-export const BLOCK_COMMENT_END_PATTERN = /\*\//;
-
-/** Matches any leading comment token across common languages. */
-export const COMMENT_LINE_PATTERN = /^\s*(?:\/\/|#|--|\/\*|\*)/;
-
-/** Matches eslint-disable, @ts-ignore, or @ts-expect-error suppression markers. */
-export const LINTER_SUPPRESSION_PATTERN = /(?:eslint-disable(?:-next-line|-line)?|ts-ignore|ts-expect-error)/;
-
-/** Matches ESLint disable suppression comment token. */
-export const ESLINT_DISABLE_PATTERN = /eslint-disable/;
-
-/** Matches single JSDoc tag on a line. */
-export const JSDOC_TAG_PATTERN = /^\s*\*\s*@([a-zA-Z0-9_-]+)(?:\s+(.*))?$/;
-
-/** Creates a fresh global scanner for extracting JSDoc tags. */
-export function createJsdocTagScanner(): RegExp {
-    return /@([a-zA-Z0-9_-]+)/g;
-}
-
-export const REGEX_COMMENT = Object.freeze({
-    SLASH_SLASH: SLASH_SLASH_COMMENT_PATTERN,
-    HASH: HASH_COMMENT_PATTERN,
-    DASH_DASH: DASH_DASH_COMMENT_PATTERN,
-    BLOCK_START: BLOCK_COMMENT_START_PATTERN,
-    BLOCK_END: BLOCK_COMMENT_END_PATTERN,
-    COMMENT_LINE: COMMENT_LINE_PATTERN,
-    LINTER_SUPPRESSION: LINTER_SUPPRESSION_PATTERN,
-    ESLINT_DISABLE: ESLINT_DISABLE_PATTERN,
-    JSDOC_TAG: JSDOC_TAG_PATTERN,
-    createJsdocTagScanner,
-});
+import { REGEX_COMMENT } from './regex-comment';
+export * from './regex-comment';
 
 // ============================================================================
 // 4. Literal, Quote & Format Patterns (REGEX.LITERAL)
@@ -833,6 +975,27 @@ export const RELATIVE_SPECIFIER_PREFIX_PATTERN = /^(?:\.{1,2}\/|\/[A-Za-z0-9_@.-
 /** Matches CJK ideograph character code ranges. */
 export const CJK_CHAR_PATTERN = /[　-〿一-鿿＀-￯]/;
 
+/** Matches remote URL in single or double quotes. */
+export const REMOTE_URL_PATTERN = /['"](https?:\/\/[A-Za-z0-9_./?=&%-]+)['"]/;
+
+/** Creates a fresh global scanner for remote URLs. */
+export function createRemoteUrlScanner(): RegExp {
+    return /['"](https?:\/\/[A-Za-z0-9_./?=&%-]+)['"]/g;
+}
+
+/** Matches exempted or placeholder remote URLs. */
+export const EXEMPTED_REMOTE_URL_PATTERN =
+    /(?:json-schema\.org|example\.com|localhost|127\.0\.0\.1)/;
+
+/** Matches test directory path components. */
+export const TEST_PATH_PATTERN = /[\\/](?:tests?|fixtures?|mocks?)[\\/]/i;
+
+/** Matches test file extension patterns. */
+export const TEST_FILE_EXT_PATTERN = /\.(?:test|spec)\.[a-z0-9]+$/i;
+
+/** Matches styling stylesheet file extensions. */
+export const STYLE_FILE_EXT_PATTERN = /\.(?:css|scss|less|sass)\b/i;
+
 /** Creates a fresh global scanner for replacing all whitespace sequences. */
 export function createWhitespaceGlobalScanner(): RegExp {
     return /\s+/g;
@@ -870,6 +1033,12 @@ export const REGEX_LITERAL = Object.freeze({
     GLOB_META: GLOB_META_PATTERN,
     RELATIVE_SPECIFIER_PREFIX: RELATIVE_SPECIFIER_PREFIX_PATTERN,
     CJK_CHAR: CJK_CHAR_PATTERN,
+    REMOTE_URL: REMOTE_URL_PATTERN,
+    createRemoteUrlScanner,
+    EXEMPTED_REMOTE_URL: EXEMPTED_REMOTE_URL_PATTERN,
+    TEST_PATH: TEST_PATH_PATTERN,
+    TEST_FILE_EXT: TEST_FILE_EXT_PATTERN,
+    STYLE_FILE_EXT: STYLE_FILE_EXT_PATTERN,
     createWhitespaceGlobalScanner,
     createBackslashGlobalScanner,
     normalizePathSeparators,
@@ -877,221 +1046,21 @@ export const REGEX_LITERAL = Object.freeze({
 });
 
 // ============================================================================
-// 5. Shell & Terminal Command Surface Patterns (REGEX.SHELL)
+// 5, 6, 7, 8 & 9. Domain Catalogs Integration (SHELL, SECURITY, PYTHON, GDSCRIPT, DATA)
 // ============================================================================
 
-/** Matches unescaped shell pipe operator (| but not || or |&). */
-export const SHELL_PIPE_PATTERN = /\|(?![|&])/;
+import { REGEX_SHELL } from './regex-shell';
+import { REGEX_SECURITY } from './regex-security';
+import { REGEX_PYTHON } from './regex-python';
+import { REGEX_GDSCRIPT } from './regex-gdscript';
+import { REGEX_DATA } from './regex-data';
 
-/** Matches shell variable substitution ($VAR or ${VAR}). */
-export const SHELL_ENV_VAR_PATTERN = /\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/;
-
-/** Matches shell command substitution ($(cmd) or `cmd`). */
-export const SHELL_COMMAND_SUBST_PATTERN = /\$\([^)]+\)|`[^`]+`/;
-
-/** Matches dangerous recursive rm deletion commands. */
-export const DANGEROUS_RM_RECURSIVE_PATTERN = /\brm\s+(?:-[a-zA-Z]*r[a-zA-Z]*f?|--recursive)\s+/i;
-
-/** Matches dangerous redirection overwriting system root directories. */
-export const DANGEROUS_WRITE_ROOT_PATTERN = />\s*\/(?:bin|boot|dev|etc|lib|proc|root|sys|usr)\b/;
-
-/** Matches shell script shebang line. */
-export const SHEBANG_PATTERN = /^#!\s*\/.*(?:bash|sh|zsh|ksh|env\s+\w*sh)\b/;
-
-/** Matches shell set errexit option flag (-e or -o errexit). */
-export const SET_ERREXIT_PATTERN = /\bset\s+(-[a-zA-Z]*e[a-zA-Z]*|-o\s+errexit)\b/;
-
-/** Matches shell set nounset option flag (-u or -o nounset). */
-export const SET_NOUNSET_PATTERN = /\bset\s+(-[a-zA-Z]*u[a-zA-Z]*|-o\s+nounset)\b/;
-
-/** Matches shell set pipefail option flag (-o pipefail). */
-export const SET_PIPEFAIL_PATTERN = /\bset\s+(-o\s+pipefail|-[a-zA-Z]*o[a-zA-Z]*\s+pipefail)\b/;
-
-/** Matches PowerShell [CmdletBinding()] attribute. */
-export const PS_CMDLET_BINDING_PATTERN = /\[CmdletBinding\s*\(\s*\)\]/;
-
-/** Matches PowerShell param() block start. */
-export const PS_PARAM_BLOCK_PATTERN = /^\s*param\s*\(/i;
-
-/** Matches PowerShell ErrorActionPreference assignment to Stop. */
-export const PS_ERROR_ACTION_PATTERN = /\$ErrorActionPreference\s*=\s*['"]Stop['"]/i;
-
-/** Matches dynamic Invoke-Expression or iex call with variable input. */
-export const PS_IEX_DYNAMIC_PATTERN = /\b(?:Invoke-Expression|iex)\s+["']?\$[A-Za-z_{]/i;
-
-/** Matches dynamic eval call with variable input in shell scripts. */
-export const SH_EVAL_DYNAMIC_PATTERN = /\beval\s+["']?\$[A-Za-z_{]/;
-
-/** Matches legacy backtick command substitution. */
-export const BACKTICK_CMD_PATTERN = /`[^`]+`/;
-
-/** Matches legacy single-bracket shell test construct [ ... ]. */
-export const DEPRECATED_TEST_PATTERN = /(?:^|[\s;|&(])\[[!\s\w]/;
-
-/** Matches modern double-bracket shell test construct [[ ... ]]. */
-export const MODERN_TEST_PATTERN = /\[\[/;
-
-/** Matches cd command executed without explicit error check. */
-export const CD_WITHOUT_CHECK_PATTERN = /^\s*(?:cd\s+[^\s;|&]+)(?!.*(?:\|\||&&))/;
-
-/** Matches read command invocation in shell script. */
-export const READ_CMD_PATTERN = /^\s*read\b/;
-
-/** Matches -r flag in read command. */
-export const READ_HAS_R_PATTERN = /\s-r\b/;
-
-/** Matches fragile $* parameter expansion. */
-export const DOLLAR_STAR_PATTERN = /(?:^|[\s;|&(=])\$\*(?:[\s;|&)]|$)/;
-
-/** Matches echo command with non-portable flags (-e, -n, -en, -ne). */
-export const ECHO_FLAG_PATTERN = /^\s*echo\s+-(?:e|n|en|ne)\b/;
-
-/** Matches trap registration on EXIT, 0, INT, or TERM. */
-export const SHELL_TRAP_EXIT_PATTERN = /\btrap\b.*?\b(?:EXIT|0|INT|TERM)\b/;
-
-/** Matches mktemp creation or temporary file redirection. */
-export const SHELL_MKTEMP_PATTERN = /\b(?:mktemp\b|>\s*.*?\.(?:tmp|lock)\b)/;
-
-/** Matches interactive read without timeout (-t) flag. */
-export const SH_READ_INTERACTIVE_PATTERN = /^\s*read\s+(?!-t\b)/;
-
-/** Matches shell terminal / TTY guard check ([ -t 0 ] or [[ -t 0 ]]). */
-export const SH_TTY_GUARD_PATTERN = /\[\[?\s+-t\s+0\s*\]\]?/;
-
-/** Matches predicate commands expected to return non-zero exit codes. */
-export const SH_PREDICATE_COMMANDS_PATTERN =
-    /^\s*(?:git\s+diff(?:-index)?\s+--quiet|grep\s+-[a-zA-Z]*q|diff\s+-q|cmp\s+-s)\b/;
-
-/** Matches shell exit status guards (||, &&, STATUS=, if, while). */
-export const SH_EXIT_GUARD_PATTERN = /(?:\|\||&&|;\s*STATUS=|\bif\b|\bwhile\b)/;
-
-/** Matches shell script module documentation contract header. */
-export const SHELL_DOC_HEADER_PATTERN =
-    /(?:#\s*(?:Module|Description|Purpose|Architecture Role|Responsibilities|Usage|模块归属|职责说明|架构定位|用法示例|退出语义):)/i;
-
-/** Matches PowerShell function declaration. */
-export const PS_FUNCTION_PATTERN = /^\s*function\s+([A-Za-z][A-Za-z0-9_-]*)\s*(?:\(\))?\s*\{?/;
-
-/** Matches typed parameter declaration in PowerShell. */
-export const PS_PARAM_WITH_TYPE_PATTERN = /\[[A-Za-z][A-Za-z0-9_.]*(?:\[\s*\])?\]\s*\$/;
-
-/** Matches simple untyped parameter declaration in PowerShell. */
-export const PS_PARAM_SIMPLE_PATTERN = /(?:^|[\s,])\$([A-Za-z][A-Za-z0-9_]*)\s*(?:=|,|\))/;
-
-/** Matches critical system handle creation in PowerShell (FileStream, Mutex). */
-export const PS_RESOURCE_DISPOSAL_PATTERN =
-    /(?:\[System\.IO\.FileStream\]|\[System\.Threading\.Mutex\]|New-Object\s+System\.IO\.FileStream)/i;
-
-/** Matches PowerShell finally block header. */
-export const PS_FINALLY_PATTERN = /\bfinally\s*\{/i;
-
-/** Matches interactive input cmdlets in PowerShell (Read-Host, pause, ReadLine). */
-export const PS_INTERACTIVE_PATTERN = /\b(?:Read-Host|pause)\b|\$host\.UI\.ReadLine\s*\(/i;
-
-/** Matches non-interactive terminal guard in PowerShell. */
-export const PS_INTERACTIVE_GUARD_PATTERN =
-    /\[Environment\]::UserInteractive\s+-and\s+-not\s+\[Console\]::IsOutputRedirected/i;
-
-/** Matches non-interactive override flags in PowerShell (-Force, -NonInteractive, -Batch, etc.). */
-export const PS_NON_INTERACTIVE_FLAG_PATTERN = /-(?:Force|NonInteractive|Batch|Silent|Quiet)\b/i;
-
-/** Matches PowerShell standard documentation comment or help header. */
-export const PS_DOC_HEADER_PATTERN =
-    /(?:\.(?:SYNOPSIS|DESCRIPTION)|\b(?:Module|Description|Purpose):|<#|#\s*(?:模块归属|职责说明|架构定位|用法示例|退出语义):)/i;
-
-/** Creates a fresh global scanner for PowerShell variable assignment detection. */
-export function createPsAssignScanner(): RegExp {
-    return /\$([A-Za-z_][A-Za-z0-9_]*)\s*(?:=[^=]|\+=|-=|\*=)/g;
-}
-
-/** Creates a fresh global scanner for PowerShell foreach statement variable extraction. */
-export function createPsForeachScanner(): RegExp {
-    return /foreach\s*\(\s*\$([A-Za-z_][A-Za-z0-9_]*)\s+in\b/gi;
-}
-
-/** Creates a fresh global scanner for PowerShell type-casted variable assignment detection. */
-export function createPsCastAssignScanner(): RegExp {
-    return /\[[A-Za-z_][A-Za-z0-9_.[\]]*\]\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*=/g;
-}
-
-/** Creates a fresh global scanner for PowerShell multi-variable assignment detection. */
-export function createPsMultiAssignScanner(): RegExp {
-    return /\$([A-Za-z_][A-Za-z0-9_]*)\s*,[^=\r\n]*=/g;
-}
-
-/** Creates a fresh global scanner for extracting shell environment variables. */
-export function createShellEnvVarScanner(): RegExp {
-    return /\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g;
-}
-
-export const REGEX_SHELL = Object.freeze({
-    PIPE: SHELL_PIPE_PATTERN,
-    ENV_VAR: SHELL_ENV_VAR_PATTERN,
-    COMMAND_SUBST: SHELL_COMMAND_SUBST_PATTERN,
-    DANGEROUS_RM_RECURSIVE: DANGEROUS_RM_RECURSIVE_PATTERN,
-    DANGEROUS_WRITE_ROOT: DANGEROUS_WRITE_ROOT_PATTERN,
-    SHEBANG: SHEBANG_PATTERN,
-    SET_ERREXIT: SET_ERREXIT_PATTERN,
-    SET_NOUNSET: SET_NOUNSET_PATTERN,
-    SET_PIPEFAIL: SET_PIPEFAIL_PATTERN,
-    PS_CMDLET_BINDING: PS_CMDLET_BINDING_PATTERN,
-    PS_PARAM_BLOCK: PS_PARAM_BLOCK_PATTERN,
-    PS_ERROR_ACTION: PS_ERROR_ACTION_PATTERN,
-    PS_IEX_DYNAMIC: PS_IEX_DYNAMIC_PATTERN,
-    SH_EVAL_DYNAMIC: SH_EVAL_DYNAMIC_PATTERN,
-    BACKTICK_CMD: BACKTICK_CMD_PATTERN,
-    DEPRECATED_TEST: DEPRECATED_TEST_PATTERN,
-    MODERN_TEST: MODERN_TEST_PATTERN,
-    CD_WITHOUT_CHECK: CD_WITHOUT_CHECK_PATTERN,
-    READ_CMD: READ_CMD_PATTERN,
-    READ_HAS_R: READ_HAS_R_PATTERN,
-    DOLLAR_STAR: DOLLAR_STAR_PATTERN,
-    ECHO_FLAG: ECHO_FLAG_PATTERN,
-    SHELL_TRAP_EXIT: SHELL_TRAP_EXIT_PATTERN,
-    SHELL_MKTEMP: SHELL_MKTEMP_PATTERN,
-    SH_READ_INTERACTIVE: SH_READ_INTERACTIVE_PATTERN,
-    SH_TTY_GUARD: SH_TTY_GUARD_PATTERN,
-    SH_PREDICATE_COMMANDS: SH_PREDICATE_COMMANDS_PATTERN,
-    SH_EXIT_GUARD: SH_EXIT_GUARD_PATTERN,
-    SHELL_DOC_HEADER: SHELL_DOC_HEADER_PATTERN,
-    PS_FUNCTION: PS_FUNCTION_PATTERN,
-    PS_PARAM_WITH_TYPE: PS_PARAM_WITH_TYPE_PATTERN,
-    PS_PARAM_SIMPLE: PS_PARAM_SIMPLE_PATTERN,
-    PS_RESOURCE_DISPOSAL: PS_RESOURCE_DISPOSAL_PATTERN,
-    PS_FINALLY: PS_FINALLY_PATTERN,
-    PS_INTERACTIVE: PS_INTERACTIVE_PATTERN,
-    PS_INTERACTIVE_GUARD: PS_INTERACTIVE_GUARD_PATTERN,
-    PS_NON_INTERACTIVE_FLAG: PS_NON_INTERACTIVE_FLAG_PATTERN,
-    PS_DOC_HEADER: PS_DOC_HEADER_PATTERN,
-    createPsAssignScanner,
-    createPsForeachScanner,
-    createPsCastAssignScanner,
-    createPsMultiAssignScanner,
-    createShellEnvVarScanner,
-});
-
-// ============================================================================
-// 6. Security & Taint Analysis Patterns (REGEX.SECURITY)
-// ============================================================================
-
-/** Matches high-entropy 32..64 hex characters typical of hashes or API tokens. */
-export const HEX_TOKEN_ENTROPY_PATTERN = /\b[0-9a-fA-F]{32,64}\b/;
-
-/** Matches PEM-encoded private key header. */
-export const PRIVATE_KEY_HEADER_PATTERN = /-----BEGIN\s+[A-Z\s]+PRIVATE\s+KEY-----/;
-
-/** Matches generic secret assignment tokens in code or config. */
-export const GENERIC_SECRET_ASSIGN_PATTERN = /(?:api_?key|auth_?token|client_?secret|private_?key|password)\s*[:=]\s*['"][^'"]{8,}['"]/i;
-
-/** Matches high-risk API credential and token prefixes. */
-export const CREDENTIAL_TOKEN_PATTERN = /(?:ghp_|gho_|github_pat_|sk-[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{12,}|xox[baprs]-|-----BEGIN|Bearer\s)/i;
-
-export const REGEX_SECURITY = Object.freeze({
-    HEX_TOKEN_ENTROPY: HEX_TOKEN_ENTROPY_PATTERN,
-    PRIVATE_KEY_HEADER: PRIVATE_KEY_HEADER_PATTERN,
-    GENERIC_SECRET_ASSIGN: GENERIC_SECRET_ASSIGN_PATTERN,
-    CREDENTIAL_TOKEN: CREDENTIAL_TOKEN_PATTERN,
-});
+// Re-export domain sub-modules for seamless backward compatibility
+export * from './regex-shell';
+export * from './regex-security';
+export * from './regex-python';
+export * from './regex-gdscript';
+export * from './regex-data';
 
 // ============================================================================
 // Master Catalog Facade (export const REGEX)
@@ -1107,4 +1076,7 @@ export const REGEX = Object.freeze({
     LITERAL: REGEX_LITERAL,
     SHELL: REGEX_SHELL,
     SECURITY: REGEX_SECURITY,
+    PYTHON: REGEX_PYTHON,
+    GDSCRIPT: REGEX_GDSCRIPT,
+    DATA: REGEX_DATA,
 });

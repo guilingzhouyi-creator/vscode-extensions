@@ -28,7 +28,17 @@ function checkDomainImmutability() {
   assert.ok(REGEX, 'REGEX catalog facade must be exported from core/constants');
   assert.strictEqual(Object.isFrozen(REGEX), true, 'Master REGEX catalog facade must be deeply frozen');
 
-  const requiredDomains = ['NAMING', 'SYNTAX', 'COMMENT', 'LITERAL', 'SHELL', 'SECURITY'];
+  const requiredDomains = [
+    'NAMING',
+    'SYNTAX',
+    'COMMENT',
+    'LITERAL',
+    'SHELL',
+    'SECURITY',
+    'PYTHON',
+    'GDSCRIPT',
+    'DATA',
+  ];
   for (const domain of requiredDomains) {
     const domainObj = REGEX[domain];
     assert.ok(domainObj, `Domain REGEX.${domain} must be defined`);
