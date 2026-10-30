@@ -127,7 +127,8 @@ const SHELL_SCAN_MESSAGES = {
         'Use an approved verb (e.g. Get, Set, New, Remove, Start, Stop, Invoke, ConvertTo, ConvertFrom). See `Get-Verb` for the full list.',
 } as const;
 
-const FOREACH_STATEMENT_RE = /(?:^|[\s;{}])foreach\s*\(/i;
+const FOREACH_STATEMENT_RE = REGEX.SHELL.FOREACH_STATEMENT;
+const HEREDOC_START_RE = REGEX.SHELL.HEREDOC_START;
 
 /**
  * Shell / PowerShell lint analyzer.
@@ -223,7 +224,6 @@ export class ShellLintAnalyzer implements Analyzer {
 
         let inHeredoc = false;
         let heredocDelimiter = '';
-        const HEREDOC_START_RE = /(?:^|[^<])<<-?\s*['"]?([A-Za-z0-9_]+)['"]?/;
 
         // --- Line-level checks ---
         for (let i = 0; i < lines.length; i++) {

@@ -104,6 +104,23 @@ export const TEST_SPEC_SUFFIX_PATTERN = /\.(test|spec)$/;
 /** Matches identifier starting with numeric digit. */
 export const LEADING_DIGIT_PATTERN = /^[0-9]/;
 
+/** Matches event handler or callback prefix pattern (e.g. onClick, onInit). */
+export const EVENT_CALLBACK_PATTERN = /^on[A-Z]/;
+
+/** Matches Python magic / dunder method names. */
+export const PYTHON_SPECIAL_METHOD_PATTERN = /^__[a-zA-Z0-9_]+__$/;
+
+/** Matches parser or compiler pipeline file path indicators. */
+export const PARSER_FILE_CONTEXT_PATTERN =
+    /(?:adapter|parser|lexer|walker|codec|deserializer|ast|analyzer|audit|evaluator|graph|rule)/i;
+
+/** Matches parser, syntax tree, or scanner function names. */
+export const PARSER_FUNCTION_NAME_PATTERN =
+    /(?:parse|tokenize|decode|visit|walk|match|audit|analyze|evaluate|dispatch)/i;
+
+/** Matches event loop, poller, or background daemon function names. */
+export const EVENT_LOOP_FUNCTION_NAME_PATTERN = /(?:daemon|poll|listen|loop)/i;
+
 /** Creates a fresh global scanner for stripping leading and trailing underscores. */
 export function createSnakeCleanScanner(): RegExp {
     return /^_+|_+$/g;
@@ -142,6 +159,11 @@ export const REGEX_NAMING = Object.freeze({
     LETTERS: LETTERS_PATTERN,
     TEST_SPEC_SUFFIX: TEST_SPEC_SUFFIX_PATTERN,
     LEADING_DIGIT: LEADING_DIGIT_PATTERN,
+    EVENT_CALLBACK: EVENT_CALLBACK_PATTERN,
+    PYTHON_SPECIAL_METHOD: PYTHON_SPECIAL_METHOD_PATTERN,
+    PARSER_FILE_CONTEXT: PARSER_FILE_CONTEXT_PATTERN,
+    PARSER_FUNCTION_NAME: PARSER_FUNCTION_NAME_PATTERN,
+    EVENT_LOOP_FUNCTION_NAME: EVENT_LOOP_FUNCTION_NAME_PATTERN,
     createSnakeCleanScanner,
     createOuterQuotesScanner,
     createNonAlphanumericScanner,
@@ -787,6 +809,38 @@ export const STDLIB_DEPTH_GUARD_PARAM_PATTERN =
 export const STDLIB_DEPTH_GUARD_BODY_PATTERN =
     /\bif\s+.*(?:depth|level|limit|fuel|recursion_limit|max_depth)\b/i;
 
+/** Matches inline single-line if construct returning boolean literal. */
+export const INLINE_IF_BOOL_RETURN_PATTERN =
+    /^if\s*\(([^()]+)\)\s*return\s+(true|false)\s*[;}]?\s*$/;
+
+/** Matches control-flow escape or termination statement line. */
+export const CONTROL_FLOW_ESCAPE_PATTERN =
+    /^\s*(?:return\b|throw\s+|break\b|continue\b|raise\s+|exit\b)/;
+
+/** Matches switch, case, or match branch dispatch statement. */
+export const SWITCH_OR_MATCH_PATTERN = /^\s*(?:switch\b|case\b|match\b)/;
+
+/** Matches state machine branch labels (case or default). */
+export const STATE_MACHINE_BRANCH_PATTERN = /^\s*(?:case\b|default:)/;
+
+/** Matches linter and compiler diagnostic suppression directives. */
+export const SUPPRESSION_DIRECTIVE_PATTERN =
+    /^\s*(?:\/\/|\/\*|#|\*)\s*(?:@ts-(?:ignore|expect-error|nocheck)|eslint-disable|biome-ignore|#\s*noqa)\b/i;
+
+/** Matches vague or empty throw / raise statements. */
+export const VAGUE_THROW_PATTERN =
+    /^\s*(?:throw\s+new\s+[A-Za-z0-9_$]*(?:Error|Exception)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err|invalid|unknown|bad|bug|oops|exception)['"]\s*)?\)|throw\s+['"][a-zA-Z0-9_\-\s]{0,8}['"]\s*;?|raise\s+[A-Za-z0-9_$]*(?:Exception|Error)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err)['"]\s*)?\))/i;
+
+/** Matches floating or unhandled Promise instantiation. */
+export const FLOATING_PROMISE_PATTERN =
+    /^\s*(?:Promise\.(?:all|allSettled|race|resolve|reject)|new\s+Promise)\s*\(/;
+
+/** Matches mutable module-level export let declaration. */
+export const EXPORT_LET_PATTERN = /^\s*export\s+let\s+[A-Za-z0-9_$]+/;
+
+/** Matches direct environment variable or synchronous file reading configuration access. */
+export const CONFIG_ENV_OR_FS_ACCESS_PATTERN = /process\.env|fs\.readFileSync/;
+
 export const REGEX_SYNTAX = Object.freeze({
     TS_IMPORT_DECL: TS_IMPORT_DECL_PATTERN,
     TS_EXPORT_DECL: TS_EXPORT_DECL_PATTERN,
@@ -966,6 +1020,15 @@ export const REGEX_SYNTAX = Object.freeze({
     STDLIB_FN_DEF: STDLIB_FN_DEF_PATTERN,
     STDLIB_DEPTH_GUARD_PARAM: STDLIB_DEPTH_GUARD_PARAM_PATTERN,
     STDLIB_DEPTH_GUARD_BODY: STDLIB_DEPTH_GUARD_BODY_PATTERN,
+    INLINE_IF_BOOL_RETURN: INLINE_IF_BOOL_RETURN_PATTERN,
+    CONTROL_FLOW_ESCAPE: CONTROL_FLOW_ESCAPE_PATTERN,
+    SWITCH_OR_MATCH: SWITCH_OR_MATCH_PATTERN,
+    STATE_MACHINE_BRANCH: STATE_MACHINE_BRANCH_PATTERN,
+    SUPPRESSION_DIRECTIVE: SUPPRESSION_DIRECTIVE_PATTERN,
+    VAGUE_THROW: VAGUE_THROW_PATTERN,
+    FLOATING_PROMISE: FLOATING_PROMISE_PATTERN,
+    EXPORT_LET: EXPORT_LET_PATTERN,
+    CONFIG_ENV_OR_FS_ACCESS: CONFIG_ENV_OR_FS_ACCESS_PATTERN,
     createJsImportScanner,
     createRequireCallScanner,
     createRustUnwrapScanner,
@@ -1080,6 +1143,28 @@ export function createTrailingWhitespaceScanner(): RegExp {
     return /[ \t]+$/gm;
 }
 
+/** Matches event loop, daemon, or background worker file path contexts. */
+export const EVENT_LOOP_FILE_CONTEXT_PATTERN = /(?:daemon|server|worker|poller|eventloop)/i;
+
+/** Matches fixture, mock, testdata, or benchmark path segments. */
+export const FIXTURE_OR_BENCH_PATH_PATTERN = /(?:\.bench|fixtures|testdata|__mocks__)[\\/]/i;
+
+/** Matches private implementation path segments. */
+export const PRIVATE_IMPL_PATH_PATTERN = /[\\/](?:internal|impl|private)[\\/]/i;
+
+/** Matches analyzer or business domain path indicators. */
+export const ANALYZER_OR_DOMAIN_PATH_PATTERN = /(?:analyzer|domain)/i;
+
+/** Matches interface, contract, view, or API boundary layer hints. */
+export const INTERFACE_LAYER_HINT_PATTERN = /(?:dto|api|controller|view|contract|facade)/i;
+
+/** Matches frontend script or component file extensions. */
+export const FRONTEND_SCRIPT_EXT_PATTERN = /\.(?:tsx|jsx|ts|js|vue|svelte)$/i;
+
+/** Matches build script, tooling, or git hook file paths. */
+export const SCRIPT_OR_GATE_PATH_PATTERN =
+    /(?:^|[\\/])(?:scripts|bin|tools|\.githooks|\.husky|\.github)[\\/]/i;
+
 export const REGEX_LITERAL = Object.freeze({
     SINGLE_QUOTED: SINGLE_QUOTED_STRING_PATTERN,
     DOUBLE_QUOTED: DOUBLE_QUOTED_STRING_PATTERN,
@@ -1103,6 +1188,13 @@ export const REGEX_LITERAL = Object.freeze({
     TEST_PATH: TEST_PATH_PATTERN,
     TEST_FILE_EXT: TEST_FILE_EXT_PATTERN,
     STYLE_FILE_EXT: STYLE_FILE_EXT_PATTERN,
+    EVENT_LOOP_FILE_CONTEXT: EVENT_LOOP_FILE_CONTEXT_PATTERN,
+    FIXTURE_OR_BENCH_PATH: FIXTURE_OR_BENCH_PATH_PATTERN,
+    PRIVATE_IMPL_PATH: PRIVATE_IMPL_PATH_PATTERN,
+    ANALYZER_OR_DOMAIN_PATH: ANALYZER_OR_DOMAIN_PATH_PATTERN,
+    INTERFACE_LAYER_HINT: INTERFACE_LAYER_HINT_PATTERN,
+    FRONTEND_SCRIPT_EXT: FRONTEND_SCRIPT_EXT_PATTERN,
+    SCRIPT_OR_GATE_PATH: SCRIPT_OR_GATE_PATH_PATTERN,
     createWhitespaceGlobalScanner,
     createBackslashGlobalScanner,
     normalizePathSeparators,

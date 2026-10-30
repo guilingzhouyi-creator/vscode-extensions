@@ -31,6 +31,7 @@ import {
     RULE_CPX_STM_001,
 } from '../core/scoring/dimensionLiterals';
 import { CODE_CPX_HIGH_COMPLEXITY, CODE_CPX_DEEP_NESTING } from '../core/constants/rule-codes';
+import { REGEX } from '../core/constants';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import type { NormalizedNode } from '../core/ast/multilang';
 import { NodeKind } from '../core/ast/multilang';
@@ -59,27 +60,13 @@ import { evaluateResourcePooling } from '../core/intelligence/resource-pooling-a
 /** Regular expression matching parser/AST related file path components. */
 const MODULE_TYPESCRIPT_ADAPTER = '../core/ast/typescript-adapter';
 
-const RE_PARSER_FILE_CONTEXT =
-    /(?:adapter|parser|lexer|walker|codec|deserializer|ast|analyzer|audit|evaluator|graph|rule)/i;
-
-/** Regular expression matching parser/AST related function names. */
-const RE_PARSER_FUNCTION_NAME =
-    /(?:parse|tokenize|decode|visit|walk|match|audit|analyze|evaluate|dispatch)/i;
-
-/** Regular expression detecting switch, case, or match branch dispatches. */
-const RE_SWITCH_OR_DISPATCH_LINE = /^\s*(?:switch\b|case\b|match\b)/;
-
-/** Regular expression matching event-loop/daemon file path components. */
-const RE_EVENT_LOOP_FILE_CONTEXT = /(?:daemon|server|worker|poller|eventloop)/i;
-
-/** Regular expression matching event-loop/daemon function names. */
-const RE_EVENT_LOOP_FUNCTION_NAME = /(?:daemon|poll|listen|loop)/i;
-
-/** Regular expression detecting deep control-flow jump/escape statements. */
-const RE_CONTROL_FLOW_ESCAPE = /^(?:return\b|throw\b|break\b|continue\b)/;
-
-/** Regular expression detecting case or default labels in switch statements. */
-const RE_STATE_MACHINE_BRANCH = /^(?:case\b|default:)/;
+const RE_PARSER_FILE_CONTEXT = REGEX.NAMING.PARSER_FILE_CONTEXT;
+const RE_PARSER_FUNCTION_NAME = REGEX.NAMING.PARSER_FUNCTION_NAME;
+const RE_SWITCH_OR_DISPATCH_LINE = REGEX.SYNTAX.SWITCH_OR_MATCH;
+const RE_EVENT_LOOP_FILE_CONTEXT = REGEX.LITERAL.EVENT_LOOP_FILE_CONTEXT;
+const RE_EVENT_LOOP_FUNCTION_NAME = REGEX.NAMING.EVENT_LOOP_FUNCTION_NAME;
+const RE_CONTROL_FLOW_ESCAPE = REGEX.SYNTAX.CONTROL_FLOW_ESCAPE;
+const RE_STATE_MACHINE_BRANCH = REGEX.SYNTAX.STATE_MACHINE_BRANCH;
 
 /** Syntactic keyword name for function declarations. */
 const KIND_FUNCTION_KEYWORD = 'FunctionKeyword';

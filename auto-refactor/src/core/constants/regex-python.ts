@@ -100,6 +100,18 @@ export const PY_DEF_LINE_PATTERN = /^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(([
 /** Matches transient heap allocation patterns in Python loops (list/dict/set calls or .copy()). */
 export const PY_TRANSIENT_ALLOCATION_PATTERN = /(?:(?<![.\w])(?:list|dict|set)\s*\(|\.copy\()/;
 
+/** Matches Python boolean literal return statement. */
+export const PY_RETURN_BOOL_PATTERN = /^\s*return\s+(True|False)\s*$/;
+
+/** Matches Python if statement header line. */
+export const PY_IF_STMT_PATTERN = /^\s*if\s+([^:]+):\s*$/;
+
+/** Matches Python variable assignment or type annotation binding target. */
+export const PY_ASSIGN_BINDING_PATTERN = /^([A-Za-z_]\w*)\s*[:=]/;
+
+/** Matches Python for-loop variable declaration supporting multi-variable unpacking. */
+export const PY_FOR_MULTI_VAR_PATTERN = /^for\s+([A-Za-z0-9_,\s]+)\s+in\b/;
+
 /** Creates a fresh global scanner for stripping parentheses. */
 export function createParenStripScanner(): RegExp {
     return /[()]/g;
@@ -137,6 +149,10 @@ export const REGEX_PYTHON = Object.freeze({
     CLASS_DECL: PY_CLASS_DECL_PATTERN,
     CLASS: PY_CLASS_PATTERN,
     DEF_LINE: PY_DEF_LINE_PATTERN,
+    RETURN_BOOL: PY_RETURN_BOOL_PATTERN,
+    IF_STMT: PY_IF_STMT_PATTERN,
+    ASSIGN_BINDING: PY_ASSIGN_BINDING_PATTERN,
+    FOR_MULTI_VAR: PY_FOR_MULTI_VAR_PATTERN,
     TRANSIENT_ALLOCATION: PY_TRANSIENT_ALLOCATION_PATTERN,
     IMPORT_STMT: PY_IMPORT_STMT_PATTERN,
     FROM_IMPORT_CAPTURE: PY_FROM_IMPORT_CAPTURE_PATTERN,

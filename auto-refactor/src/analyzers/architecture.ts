@@ -239,11 +239,11 @@ const FIELD_FALLBACK_CREDENTIAL = 'credential';
 
 /** Regular expression patterns */
 const RE_SENSITIVE_FIELD = REGEX.SECURITY.SENSITIVE_FIELD_ASSIGN;
-const RE_EXPORT_LET = /^\s*export\s+let\s+[A-Za-z0-9_$]+/;
-const RE_CONFIG_ACCESS = /process\.env|fs\.readFileSync/;
-const RE_PRIVATE_PATH = /\/(?:internal|impl|private)\//;
-const RE_ANALYZER_OR_DOMAIN = /analyzer|domain/;
-const RE_INTERFACE_LAYER_HINT = /(?:dto|api|controller|view|contract|facade)/i;
+const RE_EXPORT_LET = REGEX.SYNTAX.EXPORT_LET;
+const RE_CONFIG_ACCESS = REGEX.SYNTAX.CONFIG_ENV_OR_FS_ACCESS;
+const RE_PRIVATE_PATH = REGEX.LITERAL.PRIVATE_IMPL_PATH;
+const RE_ANALYZER_OR_DOMAIN = REGEX.LITERAL.ANALYZER_OR_DOMAIN_PATH;
+const RE_INTERFACE_LAYER_HINT = REGEX.LITERAL.INTERFACE_LAYER_HINT;
 
 const DEFAULT_FORBIDDEN_DEPS = (
     'express koa fastify react vue @angular svelte django fastapi flask ' +

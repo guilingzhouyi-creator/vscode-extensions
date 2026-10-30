@@ -148,10 +148,10 @@ export function auditPythonClass(
     pCtx: PythonNamingContext,
     topLevel = true,
 ): void {
-    const classMatch = /^class\s+([A-Za-z0-9_]+)/.exec(line);
+    const classMatch = REGEX.PYTHON.CLASS.exec(line);
     if (!classMatch) return;
     const className = classMatch[1];
-    if (pCtx.opts.checkTypes !== false && !/^[A-Z][a-zA-Z0-9]*$/.test(className)) {
+    if (pCtx.opts.checkTypes !== false && !REGEX.NAMING.PASCAL_CASE.test(className)) {
         pCtx.issues.push(
             pCtx.mkIssue({
                 line: lineIdx + 1,
@@ -286,12 +286,12 @@ export function auditPythonAssignment(
     pCtx: PythonNamingContext,
     topLevel = false,
 ): void {
-    const assignMatch = /^([A-Za-z_][A-Za-z0-9_]*)\s*[:=]/.exec(line);
+    const assignMatch = REGEX.PYTHON.ASSIGN_BINDING.exec(line);
     if (!assignMatch) return;
     const varName = assignMatch[1];
     auditPythonVariable(varName, lineIdx, pCtx);
 
-    const isUpper = /^[A-Z0-9_]+$/.test(varName);
+    const isUpper = REGEX.NAMING.SCREAMING_SNAKE_CASE.test(varName);
     pCtx.checkDecouplingSymbol(
         varName,
         isUpper ? KIND_CONSTANT : KIND_VARIABLE,
@@ -310,7 +310,7 @@ export function auditPythonAssignment(
  * @returns Nothing; findings are pushed into `pCtx`.
  */
 export function auditPythonForLoop(line: string, lineIdx: number, pCtx: PythonNamingContext): void {
-    const forMatch = /^for\s+([A-Za-z0-9_,\s]+)\s+in\b/.exec(line);
+    const forMatch = REGEX.PYTHON.FOR_MULTI_VAR.exec(line);
     if (!forMatch) return;
     const rawVars = forMatch[1].split(',');
     for (let i = 0; i < rawVars.length; i++) {
@@ -326,7 +326,7 @@ function checkPythonFunctionLength(
     lineIdx: number,
     pCtx: PythonNamingContext,
 ): boolean {
-    const isSpecialMethod = /^__[a-zA-Z0-9_]+__$/.test(fnName);
+    const isSpecialMethod = REGEX.NAMING.PYTHON_SPECIAL_METHOD.test(fnName);
     if (pCtx.opts.checkLengths === false || isSpecialMethod) return false;
     if (isExemptFunctionName(fnName)) return false;
 

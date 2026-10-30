@@ -318,7 +318,10 @@ export function evaluateElasticDebtBudget(
     const defaultGrowthLimit =
         options.cumulative && options.totalFiles
             ? Math.max(DEFAULT_WEIGHTED_GROWTH_LIMIT, options.totalFiles * 10)
-            : DEFAULT_WEIGHTED_GROWTH_LIMIT;
+            : Math.max(
+                  DEFAULT_WEIGHTED_GROWTH_LIMIT,
+                  Math.floor(DEFAULT_WEIGHTED_GROWTH_LIMIT * combinedFactor),
+              );
     const maxGrowthLimit = options.maxWeightedGrowth ?? defaultGrowthLimit;
 
     const violations = collectViolations(

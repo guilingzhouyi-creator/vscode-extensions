@@ -151,7 +151,7 @@ export function isShellFile(filePath: string, content: string): boolean {
         return SHELL_EXTS.has(lower.slice(dot));
     }
     // Extensionless — check shebang
-    return /^#!\s*\/.*(?:bash|sh|zsh|ksh)\b/.test(content.split('\n')[0] || '');
+    return REGEX.SHELL.SHEBANG.test(content.split('\n')[0] || '');
 }
 
 /**
@@ -355,11 +355,11 @@ export function checkShellConditionSyntax(
     lineIndex: number,
     emit: ShellEmitter,
 ): void {
-    if (!/\[\s+.+\s+\]/.test(trimmed) || /\[\[/.test(trimmed)) {
+    if (!REGEX.SHELL.SINGLE_BRACKET_TEST.test(trimmed) || REGEX.SHELL.MODERN_TEST.test(trimmed)) {
         return;
     }
 
-    const match = /\[\s+(.+)\s+\](?:\s*;|\s+then|\s*$)/.exec(trimmed);
+    const match = REGEX.SHELL.BRACKET_TEST_COND.exec(trimmed);
     if (!match) return;
 
     const inner = match[1];
@@ -408,12 +408,12 @@ export function checkUnquotedVariables(
     lineIndex: number,
     emit: ShellEmitter,
 ): void {
-    if (/^\s*[A-Za-z_][A-Za-z0-9_]*=/.test(maskedTrimmed)) return;
-    if (/\[\[/.test(maskedTrimmed)) return;
-    if (/\(\(/.test(maskedTrimmed)) return;
-    if (/^\s*for\s+[A-Za-z_]/.test(maskedTrimmed)) return;
-    if (/^\s*case\b/.test(maskedTrimmed)) return;
-    if (/^\s*(?:function\s+)?[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)/.test(maskedTrimmed)) return;
+    if (REGEX.SHELL.ASSIGN_STATEMENT.test(maskedTrimmed)) return;
+    if (REGEX.SHELL.MODERN_TEST.test(maskedTrimmed)) return;
+    if (REGEX.SHELL.DOUBLE_PAREN_TEST.test(maskedTrimmed)) return;
+    if (REGEX.SHELL.FOR_STATEMENT.test(maskedTrimmed)) return;
+    if (REGEX.SHELL.CASE_STATEMENT.test(maskedTrimmed)) return;
+    if (REGEX.SHELL.FUNCTION_DEF.test(maskedTrimmed)) return;
 
     const matches = maskedTrimmed.match(
         /(^|[\s;|&(])\$([A-Za-z_][A-Za-z0-9_]*|\{[A-Za-z_][A-Za-z0-9_]*\})(?=[\s;|&)\]]|$)/g,
@@ -704,9 +704,9 @@ export function checkShellSafety(
 ): void {
     if (hasGuard) return;
     const masked = lineCtx.maskedTrimmed;
-    if (/^\s*while\b.*?\bread\b/.test(masked)) return;
-    if (/<<<|<<|<[a-zA-Z0-9_\/"'$]/.test(masked)) return;
-    if (REGEX.SHELL.SH_READ_INTERACTIVE.test(masked) && !/\s-t\s+\d+/.test(masked)) {
+    if (REGEX.SHELL.WHILE_READ.test(masked)) return;
+    if (REGEX.SHELL.HEREDOC_OR_INPUT.test(masked)) return;
+    if (REGEX.SHELL.SH_READ_INTERACTIVE.test(masked) && !REGEX.SHELL.READ_TIMEOUT.test(masked)) {
         emit(
             lineCtx.lineIndex,
             RULE_SH_SAFE_001,

@@ -271,6 +271,42 @@ export const PROVENANCE_PROCESS_ENV_DOT_PATTERN =
 export const PROVENANCE_PROCESS_ENV_INDEX_PATTERN =
     /\bprocess\s*\.\s*env\s*\[\s*['"](?:USERPROFILE|HOMEPATH|HOME|SystemDrive|SystemRoot|windir)['"]\s*\]/;
 
+/** Matches POSIX shell variable assignment statement line. */
+export const SHELL_ASSIGN_STATEMENT_PATTERN = /^\s*[A-Za-z_][A-Za-z0-9_]*=/;
+
+/** Matches POSIX shell for loop statement line. */
+export const SHELL_FOR_STATEMENT_PATTERN = /^\s*for\s+[A-Za-z_]/;
+
+/** Matches POSIX shell case statement line. */
+export const SHELL_CASE_STATEMENT_PATTERN = /^\s*case\b/;
+
+/** Matches POSIX shell function definition line. */
+export const SHELL_FUNCTION_DEF_PATTERN = /^\s*(?:function\s+)?[A-Za-z_][A-Za-z0-9_]*\s*\(\s*\)/;
+
+/** Matches single bracket test expression containing content. */
+export const SH_SINGLE_BRACKET_TEST_PATTERN = /\[\s+.+\s+\]/;
+
+/** Matches single-bracket test condition payload and closing delimiter. */
+export const SH_BRACKET_TEST_COND_PATTERN = /\[\s+(.+)\s+\](?:\s*;|\s+then|\s*$)/;
+
+/** Matches while loop with read command. */
+export const SH_WHILE_READ_PATTERN = /^\s*while\b.*?\bread\b/;
+
+/** Matches heredoc or file input redirection operators. */
+export const SH_HEREDOC_OR_INPUT_PATTERN = /<<<|<<|<[a-zA-Z0-9_\/"'$]/;
+
+/** Matches read timeout option flag (-t). */
+export const SH_READ_TIMEOUT_PATTERN = /\s-t\s+\d+/;
+
+/** Matches double parenthesis arithmetic evaluation construct (( ... )). */
+export const SH_DOUBLE_PAREN_TEST_PATTERN = /\(\(/;
+
+/** Matches PowerShell or Bash foreach loop construct. */
+export const SHELL_FOREACH_STATEMENT_PATTERN = /(?:^|[\s;{}])foreach\s*\(/i;
+
+/** Matches start of heredoc redirection with delimiter capture. */
+export const SHELL_HEREDOC_START_PATTERN = /(?:^|[^<])<<-?\s*['"]?([A-Za-z0-9_]+)['"]?/;
+
 /** Creates a fresh global scanner for taint identifier token extraction. */
 export function createTaintIdentifierScanner(): RegExp {
     return /\$?([A-Za-z_][A-Za-z0-9_]*)/g;
@@ -299,6 +335,18 @@ export const REGEX_SHELL = Object.freeze({
     BACKTICK_CMD: BACKTICK_CMD_PATTERN,
     DEPRECATED_TEST: DEPRECATED_TEST_PATTERN,
     MODERN_TEST: MODERN_TEST_PATTERN,
+    ASSIGN_STATEMENT: SHELL_ASSIGN_STATEMENT_PATTERN,
+    FOR_STATEMENT: SHELL_FOR_STATEMENT_PATTERN,
+    CASE_STATEMENT: SHELL_CASE_STATEMENT_PATTERN,
+    FUNCTION_DEF: SHELL_FUNCTION_DEF_PATTERN,
+    SINGLE_BRACKET_TEST: SH_SINGLE_BRACKET_TEST_PATTERN,
+    BRACKET_TEST_COND: SH_BRACKET_TEST_COND_PATTERN,
+    WHILE_READ: SH_WHILE_READ_PATTERN,
+    HEREDOC_OR_INPUT: SH_HEREDOC_OR_INPUT_PATTERN,
+    HEREDOC_START: SHELL_HEREDOC_START_PATTERN,
+    FOREACH_STATEMENT: SHELL_FOREACH_STATEMENT_PATTERN,
+    READ_TIMEOUT: SH_READ_TIMEOUT_PATTERN,
+    DOUBLE_PAREN_TEST: SH_DOUBLE_PAREN_TEST_PATTERN,
     CD_WITHOUT_CHECK: CD_WITHOUT_CHECK_PATTERN,
     READ_CMD: READ_CMD_PATTERN,
     READ_HAS_R: READ_HAS_R_PATTERN,

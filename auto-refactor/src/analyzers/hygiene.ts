@@ -26,6 +26,7 @@ import { auditPythonHygiene } from './hygiene-python-helper';
 import { auditFileBasics, auditFileNaming } from './hygiene-file-helper';
 import { auditCloneBlocks, DEFAULT_MIN_CLONE_LINES } from './hygiene-clone-helper';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
+import { REGEX } from '../core/constants';
 
 interface HygieneOptions {
     checkDeadCode?: boolean;
@@ -61,14 +62,10 @@ const STUB_WORD_TOKENS = Buffer.from(ENCODED_STUB_TOKEN_LIST, ENCODING_BASE64)
     .toString(ENCODING_UTF8)
     .split(DELIMITER_COMMA);
 const UNRESOLVED_MARKER_PATTERN = new RegExp(`\\b(?:${STUB_WORD_TOKENS.join('|')})\\b`, 'i');
-const TERMINAL_STMT_RE = /^\s*(?:return\b|throw\s+|break;|continue;|raise\s+|exit\b)/;
-
-const SUPPRESSION_DIRECTIVE_RE =
-    /^\s*(?:\/\/|\/\*|#|\*)\s*(?:@ts-(?:ignore|expect-error|nocheck)|eslint-disable|biome-ignore|#\s*noqa)\b/i;
-const VAGUE_THROW_RE =
-    /^\s*(?:throw\s+new\s+[A-Za-z0-9_$]*(?:Error|Exception)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err|invalid|unknown|bad|bug|oops|exception)['"]\s*)?\)|throw\s+['"][a-zA-Z0-9_\-\s]{0,8}['"]\s*;?|raise\s+[A-Za-z0-9_$]*(?:Exception|Error)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err)['"]\s*)?\))/i;
-const FLOATING_PROMISE_RE =
-    /^\s*(?:Promise\.(?:all|allSettled|race|resolve|reject)|new\s+Promise)\s*\(/;
+const TERMINAL_STMT_RE = REGEX.SYNTAX.CONTROL_FLOW_ESCAPE;
+const SUPPRESSION_DIRECTIVE_RE = REGEX.SYNTAX.SUPPRESSION_DIRECTIVE;
+const VAGUE_THROW_RE = REGEX.SYNTAX.VAGUE_THROW;
+const FLOATING_PROMISE_RE = REGEX.SYNTAX.FLOATING_PROMISE;
 /** Character code of '\r' (carriage return), stripped from CRLF line endings. */
 const CHAR_CODE_CR = 13;
 /** Character code of the space character, counted as leading indentation. */

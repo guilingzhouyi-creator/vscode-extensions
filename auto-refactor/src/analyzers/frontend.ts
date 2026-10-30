@@ -107,7 +107,7 @@ const FRONTEND_EXTENSIONS = new Set([
     '.js',
 ]);
 
-const SCRIPT_EXT_RE = /\.(?:tsx|jsx|ts|js|vue|svelte)$/i;
+const SCRIPT_EXT_RE = REGEX.LITERAL.FRONTEND_SCRIPT_EXT;
 
 /**
  * Decide whether a line is metadata or a literal rather than executable markup or CSS.

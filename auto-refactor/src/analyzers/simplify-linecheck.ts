@@ -314,12 +314,12 @@ function auditTernaryBoolReturn(context: LineAuditContext): void {
 function auditInlineBoolReturn(context: LineAuditContext): void {
     for (let lineIndex = 0; lineIndex < context.lines.length; lineIndex++) {
         const trimmed = context.lines[lineIndex].trim();
-        const match = /^if\s*\((.+)\)\s*return\s+(true|false)\s*[;}]?\s*$/.exec(trimmed);
+        const match = REGEX.SYNTAX.INLINE_IF_BOOL_RETURN.exec(trimmed);
         if (!match) continue;
         const ifBool = match[2] === 'true';
         const searchLineIndex = advancePastBlanksAndComments(context.lines, lineIndex + 1);
         if (searchLineIndex >= context.lines.length) continue;
-        const nextBool = /^return\s+(true|false)\s*[;}]?\s*$/.exec(
+        const nextBool = REGEX.SYNTAX.RETURN_BOOL.exec(
             context.lines[searchLineIndex].trim(),
         );
         if (!nextBool) continue;
@@ -453,7 +453,7 @@ function auditPyBoolWithElse(spec: PythonBoolCheckSpec): void {
         calculateIndentWidth(spec.context.lines[searchLineIndex]) <= spec.ifIndent
     )
         return;
-    const elseBoolMatch = /^return\s+(True|False)\s*$/.exec(
+    const elseBoolMatch = REGEX.PYTHON.RETURN_BOOL.exec(
         spec.context.lines[searchLineIndex].trim(),
     );
     if (!elseBoolMatch || spec.ifBool === (elseBoolMatch[1] === 'True')) return;
@@ -475,7 +475,7 @@ interface PyNoElseSpec {
 }
 
 function auditPyBoolNoElse(spec: PyNoElseSpec): void {
-    const afterBool = /^return\s+(True|False)\s*$/.exec(spec.afterTrimmed);
+    const afterBool = REGEX.PYTHON.RETURN_BOOL.exec(spec.afterTrimmed);
     if (!afterBool || spec.ifBool === (afterBool[1] === 'True')) return;
 
     emitBooleanIssue(
@@ -489,7 +489,7 @@ function auditPyBoolNoElse(spec: PyNoElseSpec): void {
 function auditPythonBoolReturn(context: LineAuditContext): void {
     for (let lineIndex = 0; lineIndex < context.lines.length; lineIndex++) {
         const trimmed = context.lines[lineIndex].trim();
-        if (!/^if\s+(.+):\s*$/.test(trimmed)) continue;
+        if (!REGEX.PYTHON.IF_STMT.test(trimmed)) continue;
 
         const ifIndent = calculateIndentWidth(context.lines[lineIndex]);
         const bodyLineIndex = advancePastBlanksAndComments(context.lines, lineIndex + 1);
@@ -500,7 +500,7 @@ function auditPythonBoolReturn(context: LineAuditContext): void {
             continue;
 
         const bodyTrimmed = context.lines[bodyLineIndex].trim();
-        const boolMatch = /^return\s+(True|False)\s*$/.exec(bodyTrimmed);
+        const boolMatch = REGEX.PYTHON.RETURN_BOOL.exec(bodyTrimmed);
         if (!boolMatch) continue;
         const ifBool = boolMatch[1] === 'True';
 

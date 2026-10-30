@@ -242,7 +242,10 @@ function validateDebtLedger(report) {
     try {
       const prev = JSON.parse(fs.readFileSync(BASELINE_OUTPUT, 'utf8'));
       baselineDebt = prev?.metrics?.byDebtTier;
-    } catch {}
+    } catch (_err) {
+      // ignore: fallback to cumulative evaluation when baseline cannot be parsed
+      baselineDebt = undefined;
+    }
   }
 
   const evaluation = evaluateElasticDebtBudget(tiers, {

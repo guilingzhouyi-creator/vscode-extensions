@@ -21,6 +21,7 @@ import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { REGEX } from '../core/constants';
 import { ANALYZER_TYPESCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import type { SourceMaskConfig } from '../core/policy/source-mask';
+import { sharedMemoryGovernor, CacheEvictionTier } from '../core/memory/memory-governor';
 import {
     DeclarativeModernAnalyzer,
     type DeclarativeLineRule,
@@ -467,6 +468,24 @@ interface CompiledTypePatterns {
 
 const typePatternsByNameMap = new Map<string, CompiledTypePatterns>();
 const wordPatternByWordMap = new Map<string, RegExp>();
+
+sharedMemoryGovernor.register({
+    name: 'ts-modern.typePatternsByNameMap',
+    tier: CacheEvictionTier.Intermediate,
+    clear: () => {
+        typePatternsByNameMap.clear();
+    },
+    getSize: () => typePatternsByNameMap.size,
+});
+
+sharedMemoryGovernor.register({
+    name: 'ts-modern.wordPatternByWordMap',
+    tier: CacheEvictionTier.Intermediate,
+    clear: () => {
+        wordPatternByWordMap.clear();
+    },
+    getSize: () => wordPatternByWordMap.size,
+});
 const REGEXP_GLOBAL_FLAG = 'g';
 
 function getCompiledWordPattern(word: string): RegExp {
