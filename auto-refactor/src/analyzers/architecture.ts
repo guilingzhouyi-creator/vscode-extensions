@@ -40,6 +40,7 @@ import {
     createLineIssue,
     type LineIssueDraft,
 } from '../core/rules/diagnostic-catalog';
+import { REGEX } from '../core/constants';
 
 /**
  * Threshold keys the architecture rules additionally read from the global `thresholds` block.
@@ -237,8 +238,7 @@ const SEC_LEVEL_BASIC = 'basic';
 const FIELD_FALLBACK_CREDENTIAL = 'credential';
 
 /** Regular expression patterns */
-const RE_SENSITIVE_FIELD =
-    /\b(?:passwordHash|passwordSalt|secretKey|clientSecret|privateKey|authToken)\s*[:=]/i;
+const RE_SENSITIVE_FIELD = REGEX.SECURITY.SENSITIVE_FIELD_ASSIGN;
 const RE_EXPORT_LET = /^\s*export\s+let\s+[A-Za-z0-9_$]+/;
 const RE_CONFIG_ACCESS = /process\.env|fs\.readFileSync/;
 const RE_PRIVATE_PATH = /\/(?:internal|impl|private)\//;

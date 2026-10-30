@@ -80,8 +80,6 @@ const MAX_RECENT_COMMENT_LINES = 8;
  */
 const MAX_DOCSTRING_SCAN_LINES = 3;
 
-const REGEX_ESCAPE_REPLACEMENT = '\\$&';
-
 /**
  * Compose the comment-directive matcher for a single analyze call.
  *
@@ -94,9 +92,7 @@ const REGEX_ESCAPE_REPLACEMENT = '\\$&';
 function buildDirectiveRe(extraTokens?: string[]): RegExp {
     const tokens = (extraTokens || []).map((token) => String(token).trim()).filter(Boolean);
     if (tokens.length === 0) return REGEX.COMMENT.GENERIC_DIRECTIVE;
-    const literals = tokens.map((token) =>
-        token.replace(/[.*+?^${}()|[\]\\]/g, REGEX_ESCAPE_REPLACEMENT),
-    );
+    const literals = tokens.map((token) => REGEX.escape(token));
     const generic = REGEX.COMMENT.GENERIC_DIRECTIVE.source.replace(/^\^/, '');
     return new RegExp(`^(?:${generic}|${literals.join('|')})`, 'i');
 }
@@ -117,8 +113,7 @@ const SEVERITY_WARNING: Severity = 'warning';
 const SEVERITY_ERROR: Severity = 'error';
 
 /** Precompiled pattern of test and fixture path segments used for path exemption checks. */
-const EXEMPT_TERMINOLOGY_PATH_RE =
-    /\/(?:tests|test|fixtures)\/|scripts\/validate-|src\/core\/praxis\/presentation\/dictionaries\//;
+const EXEMPT_TERMINOLOGY_PATH_RE = REGEX.COMMENT.EXEMPT_TERMINOLOGY_PATH;
 
 /** Character codes for high-throughput zero-allocation char inspections. */
 const CHAR_CODE_LF = 10;
@@ -138,8 +133,8 @@ const SINGLE_QUOTE = "'";
  */
 const COMMENT_MARKERS: readonly string[] = Object.freeze(['//', '/*', '*/', '#', '*']);
 const RUST_COMMENT_MARKERS: readonly string[] = Object.freeze(['//', '/*', '*/', '*']);
-const URL_OR_INLINE_CODE_RE = /https?:\/\/\S+|`[^`]{20,}`/;
-const HEADER_COMMENT_PREFIX_RE = /^\s*(\/\/|\/\*|\*|#|##|""")/;
+const URL_OR_INLINE_CODE_RE = REGEX.COMMENT.URL_OR_INLINE_CODE;
+const HEADER_COMMENT_PREFIX_RE = REGEX.COMMENT.HEADER_PREFIX;
 
 const HEADER_DEPENDENCY_TRIGGER_ZH = '依赖与触发';
 const HEADER_EXIT_DESIGN_ZH = '退出语义与设计依据';
@@ -161,7 +156,7 @@ const SIX_FIELD_PATTERNS: ReadonlyArray<{
 }> = Object.freeze(
     SIX_FIELD_HEADERS_EN.map((headerEn, i) => {
         const headerZh = SIX_FIELD_HEADERS_ZH[i];
-        const esc = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, REGEX_ESCAPE_REPLACEMENT);
+        const esc = (str: string) => REGEX.escape(str);
         const aliases = SIX_FIELD_ALIASES_ZH[headerZh] || [headerZh];
         const allZh = aliases.map(esc).join('|');
         return Object.freeze({

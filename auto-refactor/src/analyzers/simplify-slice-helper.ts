@@ -800,24 +800,7 @@ export function isNormalizedNode(node: unknown): node is NormalizedNode {
     );
 }
 
-/**
- * Recursively visits all nodes in a normalized AST tree in pre-order depth-first sequence.
- *
- * @param node - Root normalized node to begin traversal.
- * @param visitor - Consumer callback invoked for each node.
- */
-export function walkNormalizedTree(
-    node: NormalizedNode,
-    visitor: (nodeItem: NormalizedNode) => void,
-): void {
-    visitor(node);
-    const children = node.children;
-    if (children) {
-        for (let i = 0; i < children.length; i++) {
-            walkNormalizedTree(children[i], visitor);
-        }
-    }
-}
+export { walkNormalizedTree } from '../core/ast/ast-query';
 
 /**
  * Determines whether a normalized AST node introduces an additional nesting indentation layer.

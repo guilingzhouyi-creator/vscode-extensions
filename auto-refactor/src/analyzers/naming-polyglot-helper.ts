@@ -28,45 +28,23 @@ import {
     TAXONOMY_GOV_NORM,
     type NamingActionablePayload,
 } from './naming-candidate-helper';
-import type { NamingOptions } from './naming';
+import {
+    toPascalCase,
+    toUpperSnakeCase,
+    type PolyglotFindingInput,
+    type IssueFactory,
+    type PolyglotNamingContext,
+    type ExtractedFunctionTarget,
+} from '../core/naming';
 
-/**
- * Diagnostic record payload for polyglot language naming findings.
- */
-export interface PolyglotFindingInput {
-    readonly line: number;
-    readonly column: number;
-    readonly rule: string;
-    readonly message: string;
-    readonly severity: Severity;
-    readonly detail: Record<string, unknown>;
-    readonly suggestion?: string;
-    readonly actionable?: NamingActionablePayload;
-}
-
-/**
- * Factory callback converting a structured polyglot finding into a standardized issue record.
- */
-export type IssueFactory = (finding: PolyglotFindingInput) => Issue;
-
-/**
- * Execution context carrying options, context, and issue accumulator for polyglot audits.
- */
-export interface PolyglotNamingContext {
-    readonly opts: NamingOptions;
-    readonly ctx: AnalyzerContext;
-    readonly mkIssue: IssueFactory;
-    readonly issues: Issue[];
-}
-
-/**
- * Target descriptor for an extracted polyglot function declaration.
- */
-export interface ExtractedFunctionTarget {
-    readonly fnName: string;
-    readonly lineIdx: number;
-    readonly isSnake: boolean;
-}
+export {
+    toPascalCase,
+    toUpperSnakeCase,
+    type PolyglotFindingInput,
+    type IssueFactory,
+    type PolyglotNamingContext,
+    type ExtractedFunctionTarget,
+};
 
 const MIN_POLYGLOT_FUNCTION_LENGTH = 3;
 const MIN_POLYGLOT_VARIABLE_LENGTH = 3;
@@ -74,17 +52,6 @@ const MIN_POLYGLOT_VARIABLE_LENGTH = 3;
 const BENCHMARK_PREFIX = 'Benchmark';
 const FUZZ_PREFIX = 'Fuzz';
 const EXAMPLE_PREFIX = 'Example';
-
-export function toPascalCase(ident: string): string {
-    return ident
-        .split(/[_-]/)
-        .map((part) => (part.length > 0 ? part[0].toUpperCase() + part.slice(1) : ''))
-        .join('');
-}
-
-export function toUpperSnakeCase(ident: string): string {
-    return camelToSnake(ident).toUpperCase();
-}
 
 export function buildPolyglotActionable(
     name: string,

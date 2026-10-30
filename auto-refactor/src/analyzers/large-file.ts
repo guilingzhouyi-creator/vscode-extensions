@@ -47,6 +47,7 @@ import {
     RULE_VOL_DOC_001 as RULE_VOL_DOC,
 } from '../core/constants/rule-catalog.generated';
 import { DIAGNOSTIC_CATALOG, createLineIssue } from '../core/rules/diagnostic-catalog';
+import { countControlFlowBranches } from '../core/ast/block-scope-utils';
 
 /** Architectural token representing benign constant library classification. */
 export const ARCH_BENIGN_CONSTANT_LIBRARY = 'ARCH_BENIGN_CONSTANT_LIBRARY';
@@ -140,9 +141,9 @@ function isBenignConstantLibrary(filePath: string, content: string, metrics: Fil
         return false;
     }
     const strippedContent = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
-    const controlFlowMatches =
-        strippedContent.match(/\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/g) || [];
-    return controlFlowMatches.length <= MAX_BENIGN_BRANCHES;
+    return (
+        countControlFlowBranches(strippedContent, MAX_BENIGN_BRANCHES + 1) <= MAX_BENIGN_BRANCHES
+    );
 }
 
 function shouldExemptElastic(evalCtx: AnalysisEvaluationContext): boolean {

@@ -14,7 +14,7 @@
  *   zero mutable state and zero side effects.
  */
 
-import type { NamingCandidate } from './naming-candidate-helper';
+import type { NamingCandidate } from '../core/naming';
 
 /**
  * Allowed short identifier names commonly accepted across domains: standard coordinates,

@@ -213,7 +213,23 @@ function shouldSkipSecrets(normPath: string, level: SecurityLevel, opts: Secrets
     return isTestOrFixture && ignoreInTests;
 }
 
+const DEFAULT_COMPILED_PATTERNS: readonly CompiledSecretPattern[] = Object.freeze(
+    DEFAULT_PATTERNS.map((entry) => ({
+        name: entry.name,
+        re: new RegExp(entry.source),
+    })),
+);
+
+const customPatternsCache = new WeakMap<SecretsOptions, CompiledSecretPattern[]>();
+
 function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
+    if (!opts.patterns && !opts.extraPatterns) {
+        return DEFAULT_COMPILED_PATTERNS as CompiledSecretPattern[];
+    }
+    const cached = customPatternsCache.get(opts);
+    if (cached !== undefined) {
+        return cached;
+    }
     const base = opts.patterns
         ? opts.patterns.map((source, i) => ({ name: `${PATTERN_CUSTOM_PREFIX}${i + 1}`, source }))
         : DEFAULT_PATTERNS;
@@ -248,6 +264,7 @@ function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
         }
     }
 
+    customPatternsCache.set(opts, compiled);
     return compiled;
 }
 

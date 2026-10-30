@@ -17,6 +17,7 @@
 import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
+import { REGEX } from '../core/constants';
 
 const ANALYZER_CONCURRENCY = 'concurrency';
 
@@ -24,17 +25,16 @@ const RULE_PRF_LEAK_001 = 'PRF-LEAK-001';
 const RULE_RSM_LOCK_001 = 'RSM-LOCK-001';
 
 /** Pattern detecting event subscription or listener attachment calls. */
-const RE_LISTENER_ATTACH = /\.(?:on|addListener|addEventListener|subscribe)\s*\(/;
+const RE_LISTENER_ATTACH = REGEX.DATA.LISTENER_ATTACH;
 
 /** Pattern detecting teardown or cleanup method calls. */
-const RE_TEARDOWN_DRAIN =
-    /\.(?:off|removeListener|removeEventListener|unsubscribe|teardown|dispose|flush|drain)\s*\(/;
+const RE_TEARDOWN_DRAIN = REGEX.DATA.TEARDOWN_DRAIN;
 
 /** Pattern detecting lock acquisition. */
-const RE_LOCK_ACQUIRE = /\b(?:acquire|lock|mutex\.lock)\s*\(/i;
+const RE_LOCK_ACQUIRE = REGEX.DATA.LOCK_ACQUIRE;
 
 /** Pattern detecting await keyword. */
-const RE_AWAIT_KEYWORD = /\bawait\s+/;
+const RE_AWAIT_KEYWORD = REGEX.DATA.AWAIT_KEYWORD;
 
 interface LockScopeState {
     isInsideLockScope: boolean;

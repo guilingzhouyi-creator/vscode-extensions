@@ -38,6 +38,7 @@ import { inspectConstantLibraryTopology } from '../core/architecture/constant-li
 import { detectConstantDrift } from '../core/architecture/constant-drift-guard';
 import { arbitrateConstantOwnership } from '../core/architecture/constant-ownership-arbiter';
 import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
+import { countControlFlowBranches } from '../core/ast/block-scope-utils';
 import {
     formatConstantDeclarationSuggestion,
     isConstantDefinitionFile,
@@ -341,9 +342,7 @@ export class ConstantsAnalyzer implements Analyzer {
         const lines = content.split(/\r?\n/).slice(parent.start.line - 1, parent.end.line);
         if (lines.length > 20) return true;
         const body = lines.join('\n');
-        const cfMatches =
-            body.match(/\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/g) || [];
-        return cfMatches.length >= 2;
+        return countControlFlowBranches(body, 2) >= 2;
     }
 
     private buildMagicNumberIssue(

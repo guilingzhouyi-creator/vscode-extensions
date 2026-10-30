@@ -19,55 +19,23 @@ import type { AgentActionablePayload, AnalyzerContext, Severity } from '../core/
 import type { DiagnosticDescriptor } from '../core/messages/types';
 import { auditFunctionSemantics, isExemptFunctionName } from './naming-path-helper';
 
-/** Candidate naming proposal derived by the inference pipeline. */
-export interface NamingCandidate {
-    readonly name: string;
-    readonly confidence: number;
-    readonly source: 'type_inference' | 'initializer_call' | 'abbreviation_expansion';
-    readonly rationale: string;
-}
+import type {
+    NamingCandidate,
+    CrossFileReferenceSummary,
+    CrossFileUsageContext,
+    StandardizationProposal,
+    ClarificationRequest,
+    NamingActionablePayload,
+} from '../core/naming';
 
-/** Summary of a cross-file symbol reference site. */
-export interface CrossFileReferenceSummary {
-    readonly file: string;
-    readonly line: number | null;
-    readonly caller?: string | null;
-}
-
-/** Usage context tracking cross-file references for an identifier. */
-export interface CrossFileUsageContext {
-    readonly symbolName: string;
-    readonly definitionFile: string;
-    readonly crossFileReferenceCount: number;
-    readonly references: readonly CrossFileReferenceSummary[];
-    readonly isCrossFile: boolean;
-}
-
-/** Machine-actionable proposal suggesting identifier standardization. */
-export interface StandardizationProposal {
-    readonly originalName: string;
-    readonly suggestedName: string;
-    readonly confidence: number;
-    readonly candidates: readonly NamingCandidate[];
-    readonly rationale: string;
-    readonly safeToAutomate: boolean;
-}
-
-/** Request requiring clarification or human judgment for ambiguous naming. */
-export interface ClarificationRequest {
-    readonly symbolName: string;
-    readonly filePath: string;
-    readonly crossFileContext: CrossFileUsageContext;
-    readonly ambiguityReasons: readonly string[];
-    readonly candidates: readonly NamingCandidate[];
-    readonly requiresHumanReview: boolean;
-}
-
-/** Actionable payload attaching naming proposals or clarification requests. */
-export interface NamingActionablePayload extends AgentActionablePayload {
-    standardizationProposal?: StandardizationProposal;
-    clarificationRequest?: ClarificationRequest;
-}
+export type {
+    NamingCandidate,
+    CrossFileReferenceSummary,
+    CrossFileUsageContext,
+    StandardizationProposal,
+    ClarificationRequest,
+    NamingActionablePayload,
+};
 
 /** Rule code for variable name length constraints. */
 export const RULE_NAM_LEN_001 = 'NAM-LEN-001';

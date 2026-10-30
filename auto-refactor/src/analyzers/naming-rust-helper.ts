@@ -16,15 +16,13 @@
 
 import { SEVERITY_WARNING } from '../core/types';
 import { hasTransientJargon } from './naming-path-helper';
-import type { PolyglotNamingContext } from './naming-polyglot-helper';
+import { toPascalCase, toUpperSnakeCase, type PolyglotNamingContext } from '../core/naming';
 import { REGEX } from '../core/constants';
 import { calculateBraceDelta } from '../core/ast/block-scope-utils';
 import {
     auditExtractedFunction,
     auditPolyglotVariable,
     buildPolyglotActionable,
-    toPascalCase,
-    toUpperSnakeCase,
 } from './naming-polyglot-helper';
 
 const RUST_FN_RE = REGEX.RUST.FN;

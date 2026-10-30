@@ -15,19 +15,18 @@ import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ExposureMessages } from '../core/messages/exposure';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
+import { REGEX } from '../core/constants';
 /** Canonical analyzer identifier for production bundle artifact and secret hygiene audits. */
 export const ANALYZER_PRODUCTION_HYGIENE_ID = 'production-hygiene';
 
 const PROD_OUTPUT_DIRS = ['/dist/', '/build/', '/out/', '/release/'];
 
-const SENSITIVE_BACKEND_ENV_RE =
-    /\bprocess\.env\.(?:[A-Z0-9_]*(?:SECRET|PRIVATE|DATABASE_URL|DB_PASS|API_KEY|TOKEN)[A-Z0-9_]*)\b/;
+const SENSITIVE_BACKEND_ENV_RE = REGEX.SECURITY.SENSITIVE_BACKEND_ENV;
 
-const LOCAL_ABSOLUTE_PATH_RE =
-    /(?:[A-Za-z]:[\\/]|(?:\/(?:Users|home|workspace|root)[\\/]))[a-zA-Z0-9_.-]+/;
+const LOCAL_ABSOLUTE_PATH_RE = REGEX.SECURITY.LOCAL_ABSOLUTE_PATH;
 
 /** Regular expression matching public sourceMappingURL directives excluding inline data URIs. */
-export const SOURCE_MAP_PUBLIC_DIRECTIVE_RE = /\bsourceMappingURL=(?!data:application\/json)/;
+export const SOURCE_MAP_PUBLIC_DIRECTIVE_RE = REGEX.SECURITY.SOURCE_MAP_PUBLIC_DIRECTIVE;
 
 function makeProdHygieneIssue(
     file: string,
@@ -69,7 +68,7 @@ function isProductionArtifact(filePath: string): boolean {
 function auditDebugResidueAndPaths(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (/\bconsole\.(?:debug|trace)\s*\(/.test(line)) {
+        if (REGEX.SECURITY.CONSOLE_DEBUG_TRACE.test(line)) {
             issues.push(
                 makeProdHygieneIssue(
                     file,
@@ -83,7 +82,7 @@ function auditDebugResidueAndPaths(file: string, rawLines: string[], issues: Iss
             );
         }
         if (
-            /\b(?:TODO|FIXME)\b/.test(line) &&
+            REGEX.SECURITY.PENDING_TODO_FIXME.test(line) &&
             !line.includes('// license') &&
             !line.includes('/*')
         ) {
