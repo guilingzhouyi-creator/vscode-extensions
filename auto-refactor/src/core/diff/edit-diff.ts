@@ -148,6 +148,52 @@ function reallocateLineBuffers(
     return { starts: nextStarts, hashes: nextHashes, capacity: nextCapacity };
 }
 
+const INITIAL_SCRATCH_CAPACITY = 16384;
+let scratchStarts: Int32Array = new Int32Array(INITIAL_SCRATCH_CAPACITY);
+let scratchHashes: Uint32Array = new Uint32Array(INITIAL_SCRATCH_CAPACITY);
+let scratchInUse = false;
+
+interface WorkingBuffers {
+    starts: Int32Array;
+    hashes: Uint32Array;
+    capacity: number;
+    isScratch: boolean;
+}
+
+function acquireLineBuffers(capacity: number): WorkingBuffers {
+    if (!scratchInUse) {
+        scratchInUse = true;
+        if (scratchStarts.length < capacity) {
+            const nextCap = Math.max(capacity, scratchStarts.length << 1);
+            scratchStarts = new Int32Array(nextCap);
+            scratchHashes = new Uint32Array(nextCap);
+        }
+        return {
+            starts: scratchStarts,
+            hashes: scratchHashes,
+            capacity: scratchStarts.length,
+            isScratch: true,
+        };
+    }
+    return {
+        starts: new Int32Array(capacity),
+        hashes: new Uint32Array(capacity),
+        capacity,
+        isScratch: false,
+    };
+}
+
+function growWorkingBuffers(buffers: WorkingBuffers): void {
+    const resized = reallocateLineBuffers(buffers.starts, buffers.hashes, buffers.capacity);
+    buffers.starts = resized.starts;
+    buffers.hashes = resized.hashes;
+    buffers.capacity = resized.capacity;
+    if (buffers.isScratch) {
+        scratchStarts = resized.starts as Int32Array;
+        scratchHashes = resized.hashes as Uint32Array;
+    }
+}
+
 /**
  * Compute line starts and 32-bit FNV-1a line hashes in one pass over the source.
  *
@@ -156,38 +202,41 @@ function reallocateLineBuffers(
  */
 export function computeLineStartsAndHashes(content: string): LineIndex {
     const len = content.length;
-    let capacity = Math.max(MIN_LINE_CAPACITY, Math.ceil(len / SOURCE_CHARS_PER_LINE_SLOT));
-    let startsBuf: Int32Array = new Int32Array(capacity);
-    let hashesBuf: Uint32Array = new Uint32Array(capacity);
-    startsBuf[0] = 0;
-    let lineCount = 1;
+    const initialCap = Math.max(MIN_LINE_CAPACITY, Math.ceil(len / SOURCE_CHARS_PER_LINE_SLOT));
+    const buffers = acquireLineBuffers(initialCap);
 
-    let hash = FNV1A_32_OFFSET_BASIS;
-    for (let i = 0; i < len; i++) {
-        const code = content.charCodeAt(i);
-        if (code === LINE_FEED_CODE) {
-            if (lineCount >= capacity) {
-                const resized = reallocateLineBuffers(startsBuf, hashesBuf, capacity);
-                startsBuf = resized.starts;
-                hashesBuf = resized.hashes;
-                capacity = resized.capacity;
+    try {
+        buffers.starts[0] = 0;
+        let lineCount = 1;
+        let hash = FNV1A_32_OFFSET_BASIS;
+
+        for (let i = 0; i < len; i++) {
+            const code = content.charCodeAt(i);
+            if (code !== LINE_FEED_CODE) {
+                hash ^= code;
+                hash = Math.imul(hash, FNV1A_32_PRIME);
+                continue;
             }
-            hashesBuf[lineCount - 1] = hash >>> 0;
-            startsBuf[lineCount] = i + 1;
+            if (lineCount >= buffers.capacity) {
+                growWorkingBuffers(buffers);
+            }
+            buffers.hashes[lineCount - 1] = hash >>> 0;
+            buffers.starts[lineCount] = i + 1;
             lineCount++;
             hash = FNV1A_32_OFFSET_BASIS;
-        } else {
-            hash ^= code;
-            hash = Math.imul(hash, FNV1A_32_PRIME);
+        }
+        buffers.hashes[lineCount - 1] = hash >>> 0;
+
+        const starts: number[] = new Array(lineCount);
+        for (let i = 0; i < lineCount; i++) starts[i] = buffers.starts[i];
+        const hashes = buffers.hashes.slice(0, lineCount);
+
+        return { starts, hashes };
+    } finally {
+        if (buffers.isScratch) {
+            scratchInUse = false;
         }
     }
-    hashesBuf[lineCount - 1] = hash >>> 0;
-
-    const starts: number[] = new Array(lineCount);
-    for (let i = 0; i < lineCount; i++) starts[i] = startsBuf[i];
-    const hashes = hashesBuf.slice(0, lineCount);
-
-    return { starts, hashes };
 }
 
 /**

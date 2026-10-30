@@ -38,31 +38,41 @@ export const SINGLE_LETTER_IDENTIFIER_PATTERN = /^[a-zA-Z]$/;
 /** Matches identifier containing double underscores or illegal punctuation. */
 export const MALFORMED_IDENTIFIER_PUNCTUATION_PATTERN = /_{2,}|[^a-zA-Z0-9_$]/;
 
+import { sharedRegexPool } from '../data-structures/regex-pool';
+
+const PATTERN_CAMEL_TO_SNAKE = '([a-z0-9])([A-Z])';
+const PATTERN_SNAKE_TO_CAMEL = '_([a-z0-9])';
+const PATTERN_KEBAB_TO_CAMEL = '-([a-z0-9])';
+const FLAG_GLOBAL = 'g';
+
 /** Standard replacement template token for converting camelCase to snake_case. */
 export const CAMEL_TO_SNAKE_REPLACEMENT = '$1_$2';
 
 /** Converts a camelCase identifier to lower_snake_case using SSOT patterns. */
 export function camelToSnake(name: string): string {
-    return name.replace(createCamelToSnakeScanner(), CAMEL_TO_SNAKE_REPLACEMENT).toLowerCase();
+    const scanner = sharedRegexPool.borrow(PATTERN_CAMEL_TO_SNAKE, FLAG_GLOBAL);
+    const result = name.replace(scanner, CAMEL_TO_SNAKE_REPLACEMENT).toLowerCase();
+    sharedRegexPool.return(scanner, PATTERN_CAMEL_TO_SNAKE, FLAG_GLOBAL);
+    return result;
 }
 
-/** Creates a fresh global scanner for converting camelCase to snake_case. */
+/** Creates or borrows a global scanner for converting camelCase to snake_case. */
 export function createCamelToSnakeScanner(): RegExp {
-    return /([a-z0-9])([A-Z])/g;
+    return sharedRegexPool.borrow(PATTERN_CAMEL_TO_SNAKE, FLAG_GLOBAL);
 }
 
-/** Creates a fresh global scanner for converting snake_case to camelCase. */
+/** Creates or borrows a global scanner for converting snake_case to camelCase. */
 export function createSnakeToCamelScanner(): RegExp {
-    return /_([a-z0-9])/g;
+    return sharedRegexPool.borrow(PATTERN_SNAKE_TO_CAMEL, FLAG_GLOBAL);
 }
 
 /** Matches semantic event handler, solver, resolver, dispatcher, or input method name prefixes. */
 export const HANDLER_OR_SOLVER_PATTERN =
     /^(?:on[A-Z]|handle[A-Z]|resolve[A-Z]|solve[A-Z]|dispatch[A-Z]|_on_[a-z0-9]|_input$|_gui_input$|_unhandled_input$)/;
 
-/** Creates a fresh global scanner for converting kebab-case to camelCase. */
+/** Creates or borrows a global scanner for converting kebab-case to camelCase. */
 export function createKebabToCamelScanner(): RegExp {
-    return /-([a-z0-9])/g;
+    return sharedRegexPool.borrow(PATTERN_KEBAB_TO_CAMEL, FLAG_GLOBAL);
 }
 
 /** Matches transient milestone or construction jargon in symbol and file names. */
@@ -553,6 +563,15 @@ export const TRANSIENT_TS_CONTAINER_PATTERN =
 export const BLOCKING_IO_PATTERN =
     /\b(?:fs\.readFileSync|fs\.writeFileSync|execSync|spawnSync|socket\.send|db\.query)\b/;
 
+/** Matches C-family control-flow branch headers (if, for, while, switch, catch). */
+export const CONTROL_FLOW_BRANCH_PATTERN =
+    /\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/;
+
+/** Creates a fresh global scanner for counting C-family control-flow branches. */
+export function createControlFlowBranchScanner(): RegExp {
+    return /\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/g;
+}
+
 /** Matches valid JS/TS identifier name. */
 export const VALID_IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/;
 
@@ -880,6 +899,8 @@ export const REGEX_SYNTAX = Object.freeze({
     TS_INTERFACE_HEADER: TS_INTERFACE_HEADER_PATTERN,
     TS_TYPE_ALIAS_HEADER: TS_TYPE_ALIAS_HEADER_PATTERN,
     LOOP_HEADER: LOOP_HEADER_PATTERN,
+    CONTROL_FLOW_BRANCH: CONTROL_FLOW_BRANCH_PATTERN,
+    createControlFlowBranchScanner: createControlFlowBranchScanner,
     TRANSIENT_TS_CONTAINER: TRANSIENT_TS_CONTAINER_PATTERN,
     BLOCKING_IO: BLOCKING_IO_PATTERN,
     VALID_IDENTIFIER: VALID_IDENTIFIER_PATTERN,

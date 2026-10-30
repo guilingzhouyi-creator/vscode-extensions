@@ -82,6 +82,19 @@ export const DATA_ONLINE_ROUTE_DECORATOR_PATTERN =
 /** Matches HTTP server framework initialization calls. */
 export const DATA_SERVER_FRAMEWORK_INIT_PATTERN = /\b(?:express|fastify|koa|router)\s*\(\s*\)/;
 
+/** Matches event subscription or listener attachment calls. */
+export const DATA_LISTENER_ATTACH_PATTERN = /\.(?:on|addListener|addEventListener|subscribe)\s*\(/;
+
+/** Matches teardown, cleanup, or resource drain method calls. */
+export const DATA_TEARDOWN_DRAIN_PATTERN =
+    /\.(?:off|removeListener|removeEventListener|unsubscribe|teardown|dispose|flush|drain)\s*\(/;
+
+/** Matches lock or mutex acquisition method calls. */
+export const DATA_LOCK_ACQUIRE_PATTERN = /\b(?:acquire|lock|mutex\.lock)\s*\(/i;
+
+/** Matches await keyword in asynchronous execution paths. */
+export const DATA_AWAIT_KEYWORD_PATTERN = /\bawait\s+/;
+
 export const REGEX_DATA = Object.freeze({
     STORAGE_RECEIVER_QUERY: DATA_STORAGE_RECEIVER_QUERY_PATTERN,
     DIRECT_QUERY_METHOD: DATA_DIRECT_QUERY_METHOD_PATTERN,
@@ -101,4 +114,8 @@ export const REGEX_DATA = Object.freeze({
     REGEX_LITERAL_LINE: DATA_REGEX_LITERAL_LINE_PATTERN,
     ONLINE_ROUTE_DECORATOR: DATA_ONLINE_ROUTE_DECORATOR_PATTERN,
     SERVER_FRAMEWORK_INIT: DATA_SERVER_FRAMEWORK_INIT_PATTERN,
+    LISTENER_ATTACH: DATA_LISTENER_ATTACH_PATTERN,
+    TEARDOWN_DRAIN: DATA_TEARDOWN_DRAIN_PATTERN,
+    LOCK_ACQUIRE: DATA_LOCK_ACQUIRE_PATTERN,
+    AWAIT_KEYWORD: DATA_AWAIT_KEYWORD_PATTERN,
 });

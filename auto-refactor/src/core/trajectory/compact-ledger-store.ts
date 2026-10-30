@@ -191,10 +191,10 @@ export function serializeNdjsonLine(record: CompactTrajectoryRecord): string {
     // the sole step: a record whose score vector carried ten two-decimal values
     // stayed over budget and the ledger guard then blocked the whole audit.
     const ladder: Array<(rec: CompactTrajectoryRecord) => CompactTrajectoryRecord> = [
-        (rec) => ({ ...rec, score: { ...rec.score, vec: rec.score.vec.map(roundToTenth) } }),
         trimSecondaryVerification,
         (rec) => ({ ...rec, mod: rec.mod.slice(0, 8), agent: rec.agent.slice(0, 8) }),
         (rec) => ({ ...rec, id: rec.id.slice(-8) }),
+        (rec) => ({ ...rec, score: { ...rec.score, vec: rec.score.vec.map(roundToTenth) } }),
         (rec) => ({ ...rec, score: { ...rec.score, vec: rec.score.vec.map(roundToWhole) } }),
         (rec) => ({ ...rec, score: { ...rec.score, qed: roundToWhole(rec.score.qed) } }),
     ];

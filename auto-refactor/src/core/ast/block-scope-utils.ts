@@ -28,6 +28,28 @@ const PREFIX_BLOCK_COMMENT_START = '/*';
 
 const BRACE_ONLY_LINE_PATTERN = /^[{}]+$/;
 
+import { createControlFlowBranchScanner } from '../constants/regex-patterns';
+
+/**
+ * Counts control-flow branch keyword headers in text without creating intermediate arrays.
+ * Terminates early as soon as earlyExitThreshold is met.
+ *
+ * @param text - Source code text.
+ * @param earlyExitThreshold - Optional threshold to terminate search early (default Infinity).
+ * @returns Count of control flow branch headers found.
+ */
+export function countControlFlowBranches(text: string, earlyExitThreshold = Infinity): number {
+    const scanner = createControlFlowBranchScanner();
+    let count = 0;
+    while (scanner.exec(text) !== null) {
+        count++;
+        if (count >= earlyExitThreshold) {
+            break;
+        }
+    }
+    return count;
+}
+
 /**
  * Calculates net brace change ({ minus }) in a code segment without regex or heap allocations.
  *

@@ -71,6 +71,27 @@ export const PATH_TRAVERSAL_PATTERN =
 export const SENSITIVE_LOG_PATTERN =
     /\b(?:console\.(?:log|warn|error|info|debug)|logger\.(?:log|warn|error|info|debug))\s*\([^)]*(?:password|passwd|secretKey|client_secret|apiKey|authToken|bearerToken|accessToken)/i;
 
+/** Matches backend secret or token references accessed through process.env in client/production files. */
+export const SENSITIVE_BACKEND_ENV_PATTERN =
+    /\bprocess\.env\.(?:[A-Z0-9_]*(?:SECRET|PRIVATE|DATABASE_URL|DB_PASS|API_KEY|TOKEN)[A-Z0-9_]*)\b/;
+
+/** Matches local developer absolute directory paths (e.g. C:\... or /Users/... or /home/...). */
+export const LOCAL_ABSOLUTE_PATH_PATTERN =
+    /(?:[A-Za-z]:[\\/]|(?:\/(?:Users|home|workspace|root)[\\/]))[a-zA-Z0-9_.-]+/;
+
+/** Matches public sourceMappingURL directives excluding inline data URIs. */
+export const SOURCE_MAP_PUBLIC_DIRECTIVE_PATTERN = /\bsourceMappingURL=(?!data:application\/json)/;
+
+/** Matches console debug or trace logging calls. */
+export const CONSOLE_DEBUG_TRACE_PATTERN = /\bconsole\.(?:debug|trace)\s*\(/;
+
+/** Matches pending developer markers (TODO / FIXME). */
+export const PENDING_TODO_FIXME_PATTERN = /\b(?:TODO|FIXME)\b/;
+
+/** Matches sensitive authentication and secret field assignments. */
+export const SENSITIVE_FIELD_ASSIGN_PATTERN =
+    /\b(?:passwordHash|passwordSalt|secretKey|clientSecret|privateKey|authToken)\s*[:=]/i;
+
 export const REGEX_SECURITY = Object.freeze({
     HEX_TOKEN_ENTROPY: HEX_TOKEN_ENTROPY_PATTERN,
     PRIVATE_KEY_HEADER: PRIVATE_KEY_HEADER_PATTERN,
@@ -88,4 +109,10 @@ export const REGEX_SECURITY = Object.freeze({
     BROKEN_CRYPTO: BROKEN_CRYPTO_PATTERN,
     PATH_TRAVERSAL: PATH_TRAVERSAL_PATTERN,
     SENSITIVE_LOG: SENSITIVE_LOG_PATTERN,
+    SENSITIVE_BACKEND_ENV: SENSITIVE_BACKEND_ENV_PATTERN,
+    LOCAL_ABSOLUTE_PATH: LOCAL_ABSOLUTE_PATH_PATTERN,
+    SOURCE_MAP_PUBLIC_DIRECTIVE: SOURCE_MAP_PUBLIC_DIRECTIVE_PATTERN,
+    CONSOLE_DEBUG_TRACE: CONSOLE_DEBUG_TRACE_PATTERN,
+    PENDING_TODO_FIXME: PENDING_TODO_FIXME_PATTERN,
+    SENSITIVE_FIELD_ASSIGN: SENSITIVE_FIELD_ASSIGN_PATTERN,
 });

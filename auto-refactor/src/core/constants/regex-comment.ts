@@ -76,6 +76,16 @@ export const COMMENT_SHORT_SEPARATOR_PATTERN = /^─{2}(?!─)/;
 /** Long separator token prefix (3+ glyphs followed by content text). */
 export const COMMENT_LONG_SEPARATOR_PATTERN = /^─{3,}\s*[^\s─]/;
 
+/** Matches URLs or extended inline code blocks within documentation. */
+export const COMMENT_URL_OR_INLINE_CODE_PATTERN = /https?:\/\/\S+|`[^`]{20,}`/;
+
+/** Matches polyglot file header comment prefix delimiters (//, /*, *, #, ##, """). */
+export const COMMENT_HEADER_PREFIX_PATTERN = /^\s*(\/\/|\/\*|\*|#|##|""")/;
+
+/** Matches terminology audit exemption path segments. */
+export const COMMENT_EXEMPT_TERMINOLOGY_PATH_PATTERN =
+    /\/(?:tests|test|fixtures)\/|scripts\/validate-|src\/core\/praxis\/presentation\/dictionaries\//;
+
 export const REGEX_COMMENT = Object.freeze({
     SLASH_SLASH: SLASH_SLASH_COMMENT_PATTERN,
     HASH: HASH_COMMENT_PATTERN,
@@ -95,4 +105,7 @@ export const REGEX_COMMENT = Object.freeze({
     BARE_SEPARATOR: COMMENT_BARE_SEPARATOR_PATTERN,
     SHORT_SEPARATOR: COMMENT_SHORT_SEPARATOR_PATTERN,
     LONG_SEPARATOR: COMMENT_LONG_SEPARATOR_PATTERN,
+    URL_OR_INLINE_CODE: COMMENT_URL_OR_INLINE_CODE_PATTERN,
+    HEADER_PREFIX: COMMENT_HEADER_PREFIX_PATTERN,
+    EXEMPT_TERMINOLOGY_PATH: COMMENT_EXEMPT_TERMINOLOGY_PATH_PATTERN,
 });
