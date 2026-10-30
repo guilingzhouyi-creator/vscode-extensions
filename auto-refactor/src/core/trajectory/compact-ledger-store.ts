@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type {
     CompactTrajectoryRecord,
+    CompactVerificationTelemetry,
     ElocCounters,
     TrajectoryQualityMetrics,
     WeeklyTrajectorySummary,
@@ -49,6 +50,54 @@ export const DEFAULT_LEDGER_DIR_NAME = '.refactor-trajectory';
  * @param params.gateCode - Composite gate outcome code.
  * @returns Ultra-compact CompactTrajectoryRecord.
  */
+/**
+ * Normalizes optional verification and manifold telemetry into compact rounded fields.
+ */
+function normalizeCompactVerification(
+    vrf?: CompactVerificationTelemetry,
+): CompactVerificationTelemetry | undefined {
+    if (!vrf) {
+        return undefined;
+    }
+    const normalized: CompactVerificationTelemetry = {};
+    if (typeof vrf.k === 'number' && Number.isFinite(vrf.k)) {
+        normalized.k = Math.round(Math.max(0, Math.min(1, vrf.k)) * 100) / 100;
+    }
+    if (typeof vrf.cr === 'number' && Number.isFinite(vrf.cr)) {
+        normalized.cr = Math.round(Math.max(0, Math.min(100, vrf.cr)) * 10) / 10;
+    }
+    if (typeof vrf.ci === 'number' && Number.isFinite(vrf.ci)) {
+        normalized.ci = Math.round(Math.max(0, Math.min(1, vrf.ci)) * 100) / 100;
+    }
+    if (typeof vrf.dm === 'number' && Number.isFinite(vrf.dm)) {
+        normalized.dm = Math.round(Math.max(0, vrf.dm) * 100) / 100;
+    }
+    if (typeof vrf.tau === 'number' && Number.isFinite(vrf.tau)) {
+        normalized.tau = Math.round(Math.max(0, vrf.tau) * 10) / 10;
+    }
+    if (vrf.q === 1) {
+        normalized.q = 1;
+    }
+    return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+/**
+ * Trims secondary verification telemetry fields (tau, ci) to reclaim bytes under budget pressure.
+ */
+function trimSecondaryVerification(rec: CompactTrajectoryRecord): CompactTrajectoryRecord {
+    if (!rec.vrf) {
+        return rec;
+    }
+    const trimmedVrf: CompactVerificationTelemetry = {
+        ...(rec.vrf.k !== undefined ? { k: rec.vrf.k } : {}),
+        ...(rec.vrf.cr !== undefined ? { cr: rec.vrf.cr } : {}),
+        ...(rec.vrf.dm !== undefined ? { dm: rec.vrf.dm } : {}),
+        ...(rec.vrf.q !== undefined ? { q: rec.vrf.q } : {}),
+    };
+    const { vrf: _dropped, ...rest } = rec;
+    return Object.keys(trimmedVrf).length > 0 ? { ...rest, vrf: trimmedVrf } : rest;
+}
+
 export function formatCompactRecord(params: {
     runId: string;
     revision: string;
@@ -60,9 +109,21 @@ export function formatCompactRecord(params: {
     metrics: TrajectoryQualityMetrics;
     gatePass: boolean;
     gateCode?: string;
+    vrf?: CompactVerificationTelemetry;
 }): CompactTrajectoryRecord {
-    const { runId, revision, sig, module, agent, timestamp, counters, metrics, gatePass, gateCode } =
-        params;
+    const {
+        runId,
+        revision,
+        sig,
+        module,
+        agent,
+        timestamp,
+        counters,
+        metrics,
+        gatePass,
+        gateCode,
+        vrf,
+    } = params;
 
     // 0.01 precision is required downstream: the self-audit baseline compares
     // trajectory vectors against stored values at two decimals.
@@ -73,6 +134,7 @@ export function formatCompactRecord(params: {
     const boundedRev = revision.slice(0, 8);
     const boundedMod = module.length > 12 ? module.slice(0, 12) : module;
     const boundedAgent = agent.length > 12 ? agent.slice(0, 12) : agent;
+    const normalizedVrf = normalizeCompactVerification(vrf);
 
     // The compact ledger enforces a hard 350B per-record budget. `code` is
     // redundant when the gate passed ('PASS' duplicates pass:true), so it is
@@ -108,6 +170,7 @@ export function formatCompactRecord(params: {
             reg: metrics.debtDelta.regressionFindingsCount,
         },
         gate,
+        ...(normalizedVrf ? { vrf: normalizedVrf } : {}),
     };
 }
 
@@ -131,6 +194,7 @@ export function serializeNdjsonLine(record: CompactTrajectoryRecord): string {
         (rec) => ({ ...rec, mod: rec.mod.slice(0, 8), agent: rec.agent.slice(0, 8) }),
         (rec) => ({ ...rec, id: rec.id.slice(-8) }),
         (rec) => ({ ...rec, score: { ...rec.score, vec: rec.score.vec.map(roundToTenth) } }),
+        trimSecondaryVerification,
         (rec) => ({ ...rec, score: { ...rec.score, vec: rec.score.vec.map(roundToWhole) } }),
         (rec) => ({ ...rec, score: { ...rec.score, qed: roundToWhole(rec.score.qed) } }),
     ];

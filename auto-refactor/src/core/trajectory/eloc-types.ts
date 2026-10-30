@@ -140,6 +140,72 @@ export interface TrajectoryQualityMetrics {
 }
 
 /**
+ * Ultra-compact verification & 5D manifold telemetry block for NDJSON ledger (< 350B budget).
+ */
+export interface CompactVerificationTelemetry {
+    /** IKCE mutation kill rate K in [0, 1] (rounded to 2 decimals). */
+    k?: number;
+    /** Agent Bayesian posterior credit score in [0, 100] (rounded to 1 decimal). */
+    cr?: number;
+    /** Bayesian 95% credible interval lower bound in [0, 1] (rounded to 2 decimals). */
+    ci?: number;
+    /** 5D Riemannian Mahalanobis distance norm (rounded to 2 decimals). */
+    dm?: number;
+    /** Code structural density tau (rounded to 1 decimal). */
+    tau?: number;
+    /** Quarantine isolation flag (1 when quarantined, omitted when 0/false). */
+    q?: 1;
+}
+
+/**
+ * Steady-state defensive stability metrics for weekly and lifetime windows.
+ */
+export interface WeeklyStabilityMetrics {
+    /** Total runs in the window with zero regression findings (debt.reg === 0). */
+    zeroRegressionRuns: number;
+    /** Consecutive trailing runs at window end with zero regressions and gate pass. */
+    zeroRegressionStreak: number;
+    /** Ratio of pure semantic ELOC to physical changed ELOC (semanticTotal / max(1, changedTotal)). */
+    semanticPurityRatio: number;
+    /** Ratio of unique deduplicated AST ELOC to cumulative processed ELOC. */
+    uniqueCoverageRatio: number;
+    /** Minimum composite score observed across runs in the window. */
+    scoreFloor: number;
+    /** Maximum composite score observed across runs in the window. */
+    scoreCeiling: number;
+}
+
+/**
+ * Aggregated in-kernel verification (TKCV / IKCE / Bayesian Credit / Quarantine) summary.
+ */
+export interface WeeklyVerificationSummary {
+    /** Number of runs in the window carrying verification telemetry. */
+    verifiedRuns: number;
+    /** Mean IKCE mutation kill rate K across verified runs. */
+    meanMutationKillRate: number;
+    /** Minimum IKCE mutation kill rate K observed. */
+    minMutationKillRate: number;
+    /** Mean posterior Bayesian agent credit score in [0, 100]. */
+    meanBayesianCredit: number;
+    /** Minimum 95% Bayesian credible interval lower bound in [0, 1]. */
+    minBayesianCiLower: number;
+    /** Total candidate runs isolated into quarantine during the window. */
+    quarantineCount: number;
+}
+
+/**
+ * Aggregated 5D Riemannian phase-space manifold and structural density summary.
+ */
+export interface WeeklyManifoldSummary {
+    /** Mean 5D Riemannian Mahalanobis distance norm across measured runs. */
+    meanMahalanobisDistance: number;
+    /** Peak 5D Riemannian Mahalanobis distance norm observed. */
+    maxMahalanobisDistance: number;
+    /** Mean structural token density tau across measured runs. */
+    meanTau?: number;
+}
+
+/**
  * Compact trajectory ledger record stored in NDJSON (< 350 bytes per entry).
  */
 export interface CompactTrajectoryRecord {
@@ -182,6 +248,8 @@ export interface CompactTrajectoryRecord {
         pass: boolean;
         code?: string;
     };
+    /** Optional ultra-compact verification & 5D manifold telemetry. */
+    vrf?: CompactVerificationTelemetry;
 }
 
 /**
@@ -226,4 +294,10 @@ export interface WeeklyTrajectorySummary {
     meanCompositeScore: number;
     /** Pass rate percentage of composite quality gate. */
     gatePassRate: number;
+    /** Steady-state defensive stability metrics across the window. */
+    stability?: WeeklyStabilityMetrics;
+    /** Aggregated in-kernel verification & Bayesian credit metrics. */
+    verification?: WeeklyVerificationSummary;
+    /** Aggregated 5D Riemannian manifold and density metrics. */
+    manifold?: WeeklyManifoldSummary;
 }
