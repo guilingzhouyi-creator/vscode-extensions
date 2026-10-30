@@ -33,6 +33,7 @@ import { PerformanceMessages } from '../messages/performance';
 import { maskedLinesOfPath } from '../policy/source-mask';
 import type { NativeDominatorTreeResult, NativeDataflowResult } from '../native/native-types';
 import { nativeCore } from '../native/native-bridge';
+import { REGEX } from '../constants';
 
 // The incremental metrics live in their own module (this file crossed the repository's own
 // large-file fail threshold); re-exported here so the public surface stays one import site.
@@ -348,8 +349,6 @@ export class DataFlowGraph {
     }
 }
 
-const REGEX_ESCAPE_REPLACEMENT = '\\$&';
-
 /**
  * Escape a literal for use inside a `RegExp`.
  *
@@ -357,7 +356,7 @@ const REGEX_ESCAPE_REPLACEMENT = '\\$&';
  * @returns The same text with regex metacharacters escaped.
  */
 function escapeRegExp(rawText: string): string {
-    return rawText.replace(/[.*+?^${}()|[\]\\]/g, REGEX_ESCAPE_REPLACEMENT);
+    return REGEX.escape(rawText);
 }
 
 /**

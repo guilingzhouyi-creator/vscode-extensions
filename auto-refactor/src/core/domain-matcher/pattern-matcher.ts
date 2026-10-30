@@ -28,6 +28,7 @@ import type {
 import { CfgBuilder } from '../cfg/cfg-builder';
 import { DefUseAnalyzer } from '../cfg/def-use-chain';
 import type { FlowAnalysisResult } from '../cfg/types';
+import { REGEX } from '../constants';
 
 /** Variable assignment extraction pattern: const/let/var x = ... or x := ... */
 const VARIABLE_ASSIGNMENT_RE = /(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=/;
@@ -60,7 +61,7 @@ const boundaryPatternCache = new WeakMap<BoundaryIsolationPattern, CompiledBound
  * @returns Escaped regex string safe for RegExp construction.
  */
 function escapeRegExp(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return REGEX.escape(str);
 }
 
 /** Global RegExp object cache pool to eliminate redundant allocations (PRF-MEM-001). */
@@ -99,17 +100,17 @@ function compileBoundaryPattern(pattern: BoundaryIsolationPattern): CompiledBoun
     const filePathRegex =
         stringIndicators.length > 0
             ? getOrCreateRegExp(
-                  stringIndicators
-                      .map((indicator) => escapeRegExp(indicator.toLowerCase()))
-                      .join('|'),
-              )
+                stringIndicators
+                    .map((indicator) => escapeRegExp(indicator.toLowerCase()))
+                    .join('|'),
+            )
             : null;
 
     const headerRegex =
         stringIndicators.length > 0
             ? getOrCreateRegExp(
-                  stringIndicators.map((indicator) => escapeRegExp(indicator)).join('|'),
-              )
+                stringIndicators.map((indicator) => escapeRegExp(indicator)).join('|'),
+            )
             : null;
 
     const targets: CompiledBoundaryTarget[] = [];

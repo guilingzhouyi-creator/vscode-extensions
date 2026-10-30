@@ -73,6 +73,9 @@ export const GD_GAME_STATE_COUPLE_PATTERN = /\bGameState\.[a-zA-Z0-9_]+\(/;
 export const GD_RPC_MODIFIER_PATTERN =
     /^\s*(?:remote|master|puppet|slave|remotesync|mastersync|puppetsync|sync)\s+func\b/;
 
+/** Matches transient heap allocation patterns in GDScript loops (.duplicate()). */
+export const GD_TRANSIENT_ALLOCATION_PATTERN = /\b(?:\/duplicate\(true\)|\.duplicate\()/;
+
 export const REGEX_GDSCRIPT = Object.freeze({
     LEGACY_CONNECT: GD_LEGACY_CONNECT_PATTERN,
     SUPER_RESET: GD_SUPER_RESET_PATTERN,
@@ -91,4 +94,5 @@ export const REGEX_GDSCRIPT = Object.freeze({
     RELATIVE_PATH: GD_RELATIVE_PATH_PATTERN,
     GAME_STATE_COUPLE: GD_GAME_STATE_COUPLE_PATTERN,
     RPC_MODIFIER: GD_RPC_MODIFIER_PATTERN,
+    TRANSIENT_ALLOCATION: GD_TRANSIENT_ALLOCATION_PATTERN,
 });

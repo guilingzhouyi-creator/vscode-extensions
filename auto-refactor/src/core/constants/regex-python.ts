@@ -17,7 +17,7 @@ export const PY_BLOCK_OPEN_PATTERN = /:\s*(?:#.*)?$/;
 
 /** Matches Python direct variable assignment excluding compound operators. */
 export const PY_ASSIGN_PATTERN =
-    /^\s*([A-Za-z_]\w*)\s*=(?!=|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|<<=|>>=|\*\*=|\/\/=)/;
+    /^\s*([A-Za-z_]\w*)\s*(?::[^=]+)?=(?!=|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|<<=|>>=|\*\*=|\/\/=)/;
 
 /** Matches Python for-loop variable declaration. */
 export const PY_FOR_VAR_PATTERN = /^\s*for\s+([A-Za-z_]\w*)\s+in\b/;
@@ -26,7 +26,7 @@ export const PY_FOR_VAR_PATTERN = /^\s*for\s+([A-Za-z_]\w*)\s+in\b/;
 export const PY_WITH_AS_PATTERN = /^\s*(?:async\s+)?with\b.*\bas\s+([A-Za-z_]\w*)\s*[:,#]/;
 
 /** Matches Python except clause target variable. */
-export const PY_EXCEPT_AS_PATTERN = /^\s*except\b.*\bas\s+([A-Za-z_]\w*)\s*:/;
+export const PY_EXCEPT_AS_PATTERN = /^\s*except\b[^:]*\bas\s+([A-Za-z_]\w*)\s*:/;
 
 /** Matches Python simple import statement. */
 export const PY_IMPORT_SIMPLE_PATTERN = /^\s*import\s+([A-Za-z_]\w*)/;
@@ -91,6 +91,15 @@ export const PY_AS_ALIAS_CAPTURE_PATTERN = /^(.+?)\s+as\s+([A-Za-z_]\w*)$/;
 /** Matches valid Python identifier name. */
 export const PY_VALID_IDENTIFIER_PATTERN = /^[A-Za-z_]\w*$/;
 
+/** Matches Python class definition declaration line. */
+export const PY_CLASS_PATTERN = /^\s*class\s+([A-Za-z_]\w*)/;
+
+/** Matches Python function definition declaration line. */
+export const PY_DEF_LINE_PATTERN = /^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(([^)]*)\)/;
+
+/** Matches transient heap allocation patterns in Python loops (list/dict/set calls or .copy()). */
+export const PY_TRANSIENT_ALLOCATION_PATTERN = /(?:(?<![.\w])(?:list|dict|set)\s*\(|\.copy\()/;
+
 /** Creates a fresh global scanner for stripping parentheses. */
 export function createParenStripScanner(): RegExp {
     return /[()]/g;
@@ -99,6 +108,11 @@ export function createParenStripScanner(): RegExp {
 /** Creates a fresh scanner for stripping Python pointer/star prefixes (*args, **kwargs). */
 export function createStarPrefixStripScanner(): RegExp {
     return /^\*{1,2}/;
+}
+
+/** Creates a fresh global scanner for with statement target bindings. */
+export function createWithAsScanner(): RegExp {
+    return /\bas\s+([A-Za-z_]\w*)\s*(?:,|:)/g;
 }
 
 export const REGEX_PYTHON = Object.freeze({
@@ -121,6 +135,9 @@ export const REGEX_PYTHON = Object.freeze({
     TIMEZONE_UTC: PY_TIMEZONE_UTC_PATTERN,
     OPEN_CALL: PY_OPEN_CALL_PATTERN,
     CLASS_DECL: PY_CLASS_DECL_PATTERN,
+    CLASS: PY_CLASS_PATTERN,
+    DEF_LINE: PY_DEF_LINE_PATTERN,
+    TRANSIENT_ALLOCATION: PY_TRANSIENT_ALLOCATION_PATTERN,
     IMPORT_STMT: PY_IMPORT_STMT_PATTERN,
     FROM_IMPORT_CAPTURE: PY_FROM_IMPORT_CAPTURE_PATTERN,
     IMPORT_CAPTURE: PY_IMPORT_CAPTURE_PATTERN,
@@ -128,4 +145,5 @@ export const REGEX_PYTHON = Object.freeze({
     VALID_IDENTIFIER: PY_VALID_IDENTIFIER_PATTERN,
     createParenStripScanner,
     createStarPrefixStripScanner,
+    createWithAsScanner,
 });

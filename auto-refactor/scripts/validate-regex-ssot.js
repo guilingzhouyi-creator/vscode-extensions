@@ -38,6 +38,8 @@ function checkDomainImmutability() {
     'PYTHON',
     'GDSCRIPT',
     'DATA',
+    'GO',
+    'RUST',
   ];
   for (const domain of requiredDomains) {
     const domainObj = REGEX[domain];

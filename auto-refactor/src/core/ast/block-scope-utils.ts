@@ -14,6 +14,10 @@
 
 const CHAR_SPACE = 32;
 const CHAR_TAB = 9;
+const CHAR_OPEN_PAREN = 40; // '('
+const CHAR_CLOSE_PAREN = 41; // ')'
+const CHAR_OPEN_BRACKET = 91; // '['
+const CHAR_CLOSE_BRACKET = 93; // ']'
 const CHAR_OPEN_BRACE = 123; // '{'
 const CHAR_CLOSE_BRACE = 125; // '}'
 
@@ -23,6 +27,62 @@ const PREFIX_STAR = '*';
 const PREFIX_BLOCK_COMMENT_START = '/*';
 
 const BRACE_ONLY_LINE_PATTERN = /^[{}]+$/;
+
+/**
+ * Calculates net brace change ({ minus }) in a code segment without regex or heap allocations.
+ *
+ * @param codeLine - Source code string (comments stripped if needed).
+ * @returns Net brace change (positive for net open, negative for net close).
+ */
+export function calculateBraceDelta(codeLine: string): number {
+    let delta = 0;
+    for (let i = 0; i < codeLine.length; i++) {
+        const code = codeLine.charCodeAt(i);
+        if (code === CHAR_OPEN_BRACE) delta++;
+        else if (code === CHAR_CLOSE_BRACE) delta--;
+    }
+    return delta;
+}
+
+/**
+ * Counts open and close braces in a code string without regex allocations.
+ *
+ * @param codeLine - Code string.
+ * @returns Tuple of [openCount, closeCount].
+ */
+export function countBraces(codeLine: string): [number, number] {
+    let open = 0;
+    let close = 0;
+    for (let i = 0; i < codeLine.length; i++) {
+        const code = codeLine.charCodeAt(i);
+        if (code === CHAR_OPEN_BRACE) open++;
+        else if (code === CHAR_CLOSE_BRACE) close++;
+    }
+    return [open, close];
+}
+
+/**
+ * Calculates net delimiter depth change (open minus close for (), [], {}) in code without allocations.
+ *
+ * @param codeLine - Code segment.
+ * @returns Net delimiter delta.
+ */
+export function calculateDelimiterDelta(codeLine: string): number {
+    let depth = 0;
+    for (let i = 0; i < codeLine.length; i++) {
+        const code = codeLine.charCodeAt(i);
+        if (code === CHAR_OPEN_PAREN || code === CHAR_OPEN_BRACKET || code === CHAR_OPEN_BRACE) {
+            depth++;
+        } else if (
+            code === CHAR_CLOSE_PAREN ||
+            code === CHAR_CLOSE_BRACKET ||
+            code === CHAR_CLOSE_BRACE
+        ) {
+            depth--;
+        }
+    }
+    return depth;
+}
 
 /**
  * Checks whether a line is empty or starts with a comment delimiter.

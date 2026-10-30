@@ -541,6 +541,42 @@ export const TS_INTERFACE_HEADER_PATTERN = /^(?:export\s+)?interface\s+([A-Za-z0
 /** Matches type alias declaration header for block extraction. */
 export const TS_TYPE_ALIAS_HEADER_PATTERN = /^(?:export\s+)?type\s+([A-Za-z0-9_$]+)\s*=/;
 
+/** Matches general loop header statement across programming languages. */
+export const LOOP_HEADER_PATTERN =
+    /\b(?:for\s*\(|for\s+[a-zA-Z0-9_$]+(?:\s*,\s*[a-zA-Z0-9_$]+)?\s*(?:in|range|:=)|for\s*\{|while\s*\(|while\s+[^{:\n]+|loop\s*\{|do\s*\{)\b/;
+
+/** Matches transient container heap allocation in TypeScript/JavaScript loops. */
+export const TRANSIENT_TS_CONTAINER_PATTERN =
+    /\b(?:new\s+(?:Array|Object|Map|Set|WeakMap|WeakSet|Int[0-9]+Array|Uint[0-9]+Array|Float[0-9]+Array)|\/duplicate\(true\)|\.clone\()/;
+
+/** Matches synchronous or blocking I/O calls inside performance-critical paths or loops. */
+export const BLOCKING_IO_PATTERN =
+    /\b(?:fs\.readFileSync|fs\.writeFileSync|execSync|spawnSync|socket\.send|db\.query)\b/;
+
+/** Matches valid JS/TS identifier name. */
+export const VALID_IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/;
+
+/** Matches special regular expression characters for escaping. */
+export const REGEX_ESCAPE_PATTERN = /[.*+?^${}()|[\]\\]/;
+
+/** Creates a fresh global scanner for escaping regular expression characters. */
+export function createRegexEscapeScanner(): RegExp {
+    return /[.*+?^${}()|[\]\\]/g;
+}
+
+/**
+ * Safely escapes special regular expression characters in a string.
+ *
+ * @param text - Raw input text.
+ * @returns Escaped string safe for RegExp constructor.
+ */
+export function escapeRegex(text: string): string {
+    return text.replace(createRegexEscapeScanner(), '\\$&');
+}
+
+/** Matches line-ending argument list terminator punctuation. */
+export const PREV_LINE_ARG_TERMINATOR_PATTERN = /[(=,[]$/;
+
 // --- Rust Modernization & Expressions ---
 /** Matches try! macro call. */
 export const RUST_TRY_MACRO_PATTERN = /\btry!\s*\(/;
@@ -843,6 +879,13 @@ export const REGEX_SYNTAX = Object.freeze({
     TS_CLASS_HEADER: TS_CLASS_HEADER_PATTERN,
     TS_INTERFACE_HEADER: TS_INTERFACE_HEADER_PATTERN,
     TS_TYPE_ALIAS_HEADER: TS_TYPE_ALIAS_HEADER_PATTERN,
+    LOOP_HEADER: LOOP_HEADER_PATTERN,
+    TRANSIENT_TS_CONTAINER: TRANSIENT_TS_CONTAINER_PATTERN,
+    BLOCKING_IO: BLOCKING_IO_PATTERN,
+    VALID_IDENTIFIER: VALID_IDENTIFIER_PATTERN,
+    REGEX_ESCAPE: REGEX_ESCAPE_PATTERN,
+    createRegexEscapeScanner: createRegexEscapeScanner,
+    PREV_LINE_ARG_TERMINATOR: PREV_LINE_ARG_TERMINATOR_PATTERN,
     RUST_TRY_MACRO: RUST_TRY_MACRO_PATTERN,
     RUST_EXTERN_CRATE: RUST_EXTERN_CRATE_PATTERN,
     RUST_MACRO_USE: RUST_MACRO_USE_PATTERN,
@@ -1046,7 +1089,7 @@ export const REGEX_LITERAL = Object.freeze({
 });
 
 // ============================================================================
-// 5, 6, 7, 8 & 9. Domain Catalogs Integration (SHELL, SECURITY, PYTHON, GDSCRIPT, DATA)
+// 5~11. Domain Catalogs Integration (SHELL, SECURITY, PYTHON, GDSCRIPT, DATA, GO, RUST)
 // ============================================================================
 
 import { REGEX_SHELL } from './regex-shell';
@@ -1054,6 +1097,8 @@ import { REGEX_SECURITY } from './regex-security';
 import { REGEX_PYTHON } from './regex-python';
 import { REGEX_GDSCRIPT } from './regex-gdscript';
 import { REGEX_DATA } from './regex-data';
+import { REGEX_GO } from './regex-go';
+import { REGEX_RUST } from './regex-rust';
 
 // Re-export domain sub-modules for seamless backward compatibility
 export * from './regex-shell';
@@ -1061,6 +1106,8 @@ export * from './regex-security';
 export * from './regex-python';
 export * from './regex-gdscript';
 export * from './regex-data';
+export * from './regex-go';
+export * from './regex-rust';
 
 // ============================================================================
 // Master Catalog Facade (export const REGEX)
@@ -1079,4 +1126,7 @@ export const REGEX = Object.freeze({
     PYTHON: REGEX_PYTHON,
     GDSCRIPT: REGEX_GDSCRIPT,
     DATA: REGEX_DATA,
+    GO: REGEX_GO,
+    RUST: REGEX_RUST,
+    escape: escapeRegex,
 });
