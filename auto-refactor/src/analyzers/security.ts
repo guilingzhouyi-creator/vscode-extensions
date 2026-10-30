@@ -44,6 +44,7 @@ import { NodeKind } from '../core/ast/multilang';
 import { SecurityMessages } from '../core/messages/security';
 import { nativeCore } from '../core/native';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
+import { REGEX } from '../core/constants';
 
 /**
  * Optional per-file configuration for the security analyzer.
@@ -78,29 +79,23 @@ export interface LineAuditContext {
     readonly isTestOrFixture: boolean;
 }
 
-const DYNAMIC_EXEC_RE = /\b(eval\s*\(|new\s+Function\s*\(|execScript\s*\()/;
-const PYTHON_EXEC_RE = /\b(exec\s*\(|eval\s*\(|compile\s*\([^)]*['"]exec['"]\))/;
-const GDSCRIPT_EXEC_RE = /\bExpression\.new\s*\(\)\.execute\b/;
+const DYNAMIC_EXEC_RE = REGEX.SECURITY.DANGEROUS_EVAL;
+const PYTHON_EXEC_RE = REGEX.SECURITY.PYTHON_EXEC;
+const GDSCRIPT_EXEC_RE = REGEX.SECURITY.GDSCRIPT_EXEC;
 
-const SHELL_INJECTION_RE =
-    /\b(?:child_process\s*\.\s*(?:exec|execSync)|exec|execSync)\s*\(\s*(?:`[^`]*\${|['"][^'"]*['"]\s*\+)/;
-const PYTHON_SHELL_INJECTION_RE =
-    /\b(?:os\.system|subprocess\.(?:call|Popen|run))\s*\([^)]*shell\s*=\s*True/;
+const SHELL_INJECTION_RE = REGEX.SECURITY.SHELL_INJECTION;
+const PYTHON_SHELL_INJECTION_RE = REGEX.SECURITY.PYTHON_SHELL_INJECTION;
 
-const PROTO_POLLUTION_RE =
-    /(?:__proto__\s*=|\[\s*['"]__proto__['"]\s*\]\s*=|constructor\s*\.\s*prototype\s*=)/;
+const PROTO_POLLUTION_RE = REGEX.SECURITY.PROTO_POLLUTION;
 
-const INSECURE_RANDOM_CTX_RE = /(?:token|secret|key|salt|nonce|auth|pass|session|pwd|credential)/i;
-const INSECURE_RANDOM_CALL_RE = /\b(?:Math\.random\s*\(\)|rand\s*\(\)|random\.random\s*\(\))/;
+const INSECURE_RANDOM_CTX_RE = REGEX.SECURITY.INSECURE_RANDOM_CTX;
+const INSECURE_RANDOM_CALL_RE = REGEX.SECURITY.INSECURE_RANDOM_CALL;
 
-const BROKEN_CRYPTO_RE =
-    /\b(?:createHash\s*\(\s*['"](?:md5|sha1)['"]|crypto\.createHash\s*\(\s*['"](?:md5|sha1)['"]|hashlib\.(?:md5|sha1)\s*\()/i;
+const BROKEN_CRYPTO_RE = REGEX.SECURITY.BROKEN_CRYPTO;
 
-const PATH_TRAVERSAL_RE =
-    /\b(?:readFile|readFileSync|createReadStream|unlink|rmdir)\s*\([^)]*(?:req\.(?:query|params|body)|request\.(?:query|params|body)|urlParams|searchParams|userInput)/;
+const PATH_TRAVERSAL_RE = REGEX.SECURITY.PATH_TRAVERSAL;
 
-const SENSITIVE_LOG_RE =
-    /\b(?:console\.(?:log|warn|error|info|debug)|logger\.(?:log|warn|error|info|debug))\s*\([^)]*(?:password|passwd|secretKey|client_secret|apiKey|authToken|bearerToken|accessToken)/i;
+const SENSITIVE_LOG_RE = REGEX.SECURITY.SENSITIVE_LOG;
 
 /** Regex matching file paths treated as tests, fixtures, samples, or benchmarks. */
 const RE_TEST_OR_FIXTURE = /(?:tests?|specs?|fixtures?|samples?|benchmark|dist|mock)/i;
@@ -333,6 +328,10 @@ interface ScanSession {
 export class SecurityAnalyzer implements Analyzer {
     name = ANALYZER_SECURITY;
     private issues: Issue[] = [];
+
+    public resetState(): void {
+        this.issues = [];
+    }
 
     /**
      * Analyze raw file content line by line and return bounded security findings.

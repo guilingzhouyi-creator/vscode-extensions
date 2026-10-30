@@ -92,32 +92,7 @@ const GDSCRIPT_MASK: SourceMaskConfig = {
     quoteChars: '"\'`',
 };
 
-// --- Regex Patterns ---
-
-const RPC_MODIFIER_RE =
-    /^\s*(?:remote|master|puppet|slave|remotesync|mastersync|puppetsync|sync)\s+func\b/;
-const LEGACY_CONNECT_RE = /\.connect\s*\(\s*"[^"]*"\s*,\s*(?:self|[A-Za-z_]\w*)\s*,\s*"[^"]*"\s*\)/;
-
-const SUPER_RESET_RE = /\bsuper(?:\.reset_state\s*\(\s*\)|\s*\(\s*\))/;
-const DEBOUNCE_ACTION_BUTTON_RE = /\b(?:btn|button|action)_[a-zA-Z0-9_]*\.pressed\.connect\b/;
-const DEBOUNCE_HANDLER_RE = /func\s+_on_(?:btn|button|action)_[a-zA-Z0-9_]*_pressed\b/;
-const FSM_STATE_MUTATION_RE = /\bcurrent_state\s*=\s*/;
-const OBSERVER_APPEND_RE = /\b(?:listeners|observers|subscribers)\.append\s*\(/;
-const WEAKREF_TOKEN_RE = /\b([a-zA-Z0-9_]+)\s*\(/;
 const WEAKREF_SAFE_CALLS = new Set(['weakref', 'is_instance_valid']);
-const RESPONSIVE_LAYOUT_RE =
-    /position\s*=\s*Vector2\([0-9\s.,-]+\)|size\s*=\s*Vector2\([0-9\s.,-]+\)/;
-const UNIDIRECTIONAL_FLOW_RE = /\b(?:AppState|GameStore|PlayerData)\.[a-zA-Z0-9_]+\s*=[^=]/;
-const SCREEN_EXTENDS_RE = /^\s*extends\s+(?:Control|Node2D|CanvasLayer)\s*$/;
-const DESIGN_TOKEN_RE = /\bColor\s*\(/;
-const STATUS_BAR_RE = /\bProgressBar\.new\s*\(|\bfunc\s+_ready\(\):\s*(?:(?!StatusBar).)*$/;
-const VIRTUAL_LIST_RE =
-    /(?:\b(?:list|_list)\.add_child\s*\(\s*item\s*\)|for\s+[a-zA-Z0-9_]+\s+in\s+[a-zA-Z0-9_.]+\s*:\s*.*add_child\()/;
-const I18N_BINDING_RE =
-    /(?:title|heading|text|subtitle)\s*=\s*"[A-Z][A-Za-z0-9_ ]{3,}"|\btext\s*=\s*"[A-Z0-9_ ]{4,}"/;
-const EXPLICIT_NODE_PATH_RE =
-    /\$"?\.\.\/[a-zA-Z0-9_/]+"?|\bget_node\("?\.\.\/|\b(?:get_parent\s*\(\s*\)|find_child\s*\()/;
-const GAME_STATE_COUPLE_RE = /\bGameState\.[a-zA-Z0-9_]+\(/;
 
 const FSM_EXEMPT_PATH_TOKENS = new Set([
     'fsm',
@@ -167,7 +142,7 @@ function isFsmExemptPath(file: string): boolean {
 }
 
 function hasWeakRefCall(line: string): boolean {
-    const match = WEAKREF_TOKEN_RE.exec(line);
+    const match = REGEX.GDSCRIPT.WEAKREF_TOKEN.exec(line);
     return match !== null && WEAKREF_SAFE_CALLS.has(match[1]);
 }
 
@@ -207,7 +182,7 @@ function scanMultiLineResetState(
             if (bodyIndent <= funcIndent) {
                 break;
             }
-            if (SUPER_RESET_RE.test(bodyLine)) {
+            if (REGEX.GDSCRIPT.SUPER_RESET.test(bodyLine)) {
                 hasSuper = true;
                 break;
             }
@@ -333,7 +308,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_RPC_001,
                 severity: SEV_WARN,
-                pattern: RPC_MODIFIER_RE,
+                pattern: REGEX.GDSCRIPT.RPC_MODIFIER,
                 message: 'RPC keywords before `func` were replaced by the `@rpc` annotation.',
                 suggestion:
                     'Annotate the function (`@rpc("any_peer", "call_local")`) and drop the keyword.',
@@ -352,7 +327,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                     'Connect directly to the signal with a Callable: `signal_name.connect(target.method)`.',
                 condition: (ctx) =>
                     ctx.maskedLine.includes(TOKEN_DOT_CONNECT) &&
-                    LEGACY_CONNECT_RE.test(ctx.rawLine),
+                    REGEX.GDSCRIPT.LEGACY_CONNECT.test(ctx.rawLine),
                 actionable: {
                     action: ACT_REPLACE_TOKEN,
                     codeId: '007',
@@ -367,8 +342,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
                     'Connect through debounce gate or use DebouncedButton to prevent rapid click spam.',
                 condition: (ctx) =>
                     isFrontendFile(ctx.file) &&
-                    (DEBOUNCE_ACTION_BUTTON_RE.test(ctx.maskedLine) ||
-                        DEBOUNCE_HANDLER_RE.test(ctx.maskedLine)),
+                    (REGEX.GDSCRIPT.DEBOUNCE_ACTION_BUTTON.test(ctx.maskedLine) ||
+                        REGEX.GDSCRIPT.DEBOUNCE_HANDLER.test(ctx.maskedLine)),
                 actionable: {
                     action: ACT_GUARD_CLAUSE,
                     codeId: '009',
@@ -382,7 +357,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 suggestion:
                     'Route state changes through state_machine.transition_to(State) to preserve lifecycle hooks.',
                 condition: (ctx) =>
-                    !isFsmExemptPath(ctx.file) && FSM_STATE_MUTATION_RE.test(ctx.maskedLine),
+                    !isFsmExemptPath(ctx.file) &&
+                    REGEX.GDSCRIPT.FSM_STATE_MUTATION.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_SIMPLIFY_CONTROL,
                     codeId: '010',
@@ -400,7 +376,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                     (ctx.file.includes(TOKEN_REGISTRY) ||
                         ctx.file.includes(TOKEN_MANAGER) ||
                         ctx.file.includes(TOKEN_BUS)) &&
-                    OBSERVER_APPEND_RE.test(ctx.maskedLine) &&
+                    REGEX.GDSCRIPT.OBSERVER_APPEND.test(ctx.maskedLine) &&
                     !hasWeakRefCall(ctx.maskedLine),
                 actionable: {
                     action: ACT_GUARD_CLAUSE,
@@ -415,7 +391,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 suggestion:
                     'Anchor nodes using Container layouts or apply responsive scale factors.',
                 condition: (ctx) =>
-                    isViewFile(ctx.file) && RESPONSIVE_LAYOUT_RE.test(ctx.maskedLine),
+                    isViewFile(ctx.file) && REGEX.GDSCRIPT.RESPONSIVE_ANCHOR.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_DECOMPOSE_MODULE,
                     codeId: '012',
@@ -429,7 +405,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 suggestion:
                     'Dispatch actions through the unidirectional flow dispatcher instead of direct mutation.',
                 condition: (ctx) =>
-                    isViewFile(ctx.file) && UNIDIRECTIONAL_FLOW_RE.test(ctx.maskedLine),
+                    isViewFile(ctx.file) && REGEX.GDSCRIPT.UNIDIRECTIONAL_FLOW.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_DECOUPLE_FACADE,
                     codeId: '013',
@@ -442,7 +418,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 message: 'View script does not inherit from BaseScreen.',
                 suggestion:
                     'Inherit from BaseScreen to participate in screen lifecycle and transition protocols.',
-                condition: (ctx) => isViewFile(ctx.file) && SCREEN_EXTENDS_RE.test(ctx.maskedLine),
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && REGEX.GDSCRIPT.SCREEN_EXTENDS.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_REPLACE_TOKEN,
                     codeId: '015',
@@ -454,7 +431,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 severity: SEV_INFO,
                 message: 'Hardcoded color or theme override bypassing design token constants.',
                 suggestion: 'Reference ThemeTokens color constants or use design token overrides.',
-                condition: (ctx) => isViewFile(ctx.file) && DESIGN_TOKEN_RE.test(ctx.maskedLine),
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && REGEX.GDSCRIPT.DESIGN_TOKEN.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_REPLACE_TOKEN,
                     codeId: '016',
@@ -467,7 +445,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 message: 'Screen ready handler missing status bar registration.',
                 suggestion:
                     'Register screen with the status bar coordinator during _ready() setup.',
-                condition: (ctx) => isViewFile(ctx.file) && STATUS_BAR_RE.test(ctx.maskedLine),
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && REGEX.GDSCRIPT.STATUS_BAR.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_GUARD_CLAUSE,
                     codeId: '017',
@@ -480,7 +459,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 message: 'Unbounded loop child instantiation without virtual recycling.',
                 suggestion:
                     'Use VirtualListContainer recycling to maintain bounded node allocations.',
-                condition: (ctx) => isViewFile(ctx.file) && VIRTUAL_LIST_RE.test(ctx.maskedLine),
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && REGEX.GDSCRIPT.VIRTUAL_LIST.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_DECOMPOSE_MODULE,
                     codeId: '018',
@@ -492,7 +472,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 severity: SEV_INFO,
                 message: 'Static UI text string bound without tr() translation wrapper.',
                 suggestion: 'Wrap user-facing strings with tr("KEY") for localization.',
-                condition: (ctx) => isViewFile(ctx.file) && I18N_BINDING_RE.test(ctx.rawLine),
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && REGEX.GDSCRIPT.I18N_RAW_TEXT.test(ctx.rawLine),
                 actionable: {
                     action: ACT_REPLACE_TOKEN,
                     codeId: '019',
@@ -505,7 +486,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 message: 'Brittle relative node path navigation (../) in view.',
                 suggestion: 'Mark target nodes as unique (%NodeName) and access via %Name syntax.',
                 condition: (ctx) =>
-                    isViewFile(ctx.file) && EXPLICIT_NODE_PATH_RE.test(ctx.maskedLine),
+                    isViewFile(ctx.file) && REGEX.GDSCRIPT.RELATIVE_PATH.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_REPLACE_TOKEN,
                     codeId: '020',
@@ -519,7 +500,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 suggestion:
                     'Bind through ViewBinding layer or dispatch structured presentation actions.',
                 condition: (ctx) =>
-                    isViewFile(ctx.file) && GAME_STATE_COUPLE_RE.test(ctx.maskedLine),
+                    isViewFile(ctx.file) && REGEX.GDSCRIPT.GAME_STATE_COUPLE.test(ctx.maskedLine),
                 actionable: {
                     action: ACT_DECOUPLE_FACADE,
                     codeId: '021',

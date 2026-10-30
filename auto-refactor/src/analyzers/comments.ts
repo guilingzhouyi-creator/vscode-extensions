@@ -39,6 +39,7 @@ import {
     DEFAULT_RULES_FAST_CANDIDATE_RE,
 } from '../core/governance/terminology-engine';
 import type { CommentLanguageKind } from '../core/comments/comment-types';
+import { REGEX } from '../core/constants';
 
 interface CommentOptions {
     level?: CommentLevel;
@@ -61,51 +62,7 @@ interface CommentOptions {
     enableSemanticDutyCheck?: boolean;
 }
 
-/**
- * Polyglot export & public symbol declaration patterns:
- * - TypeScript / JavaScript: export (function, class, interface, type, enum, const, let, var)
- * - GDScript: class_name, func, static func (public without leading _)
- * - Python: def, class (public without leading _)
- * - Rust: pub fn, pub struct, pub enum, pub trait, pub type
- * - Go: func CapitalizedName
- */
-const EXPORT_RE =
-    /^\s*(?:export\s+(?:declare\s+)?(?:async\s+)?(?:function|class|interface|type|enum|const|let|var)\s+|class_name\s+|(?:static\s+)?func\s+|def\s+|class\s+|pub\s+(?:async\s+)?(?:fn|struct|enum|trait|type)\s+|func\s+)([A-Za-z0-9_$]+)/;
-
-/**
- * Comment-hygiene constants.
- *
- * `MOJIBAKE_RE` catches the replacement character plus the two classic double-decoding
- * artifacts (UTF-8 read as Latin-1, and the Windows-1252 smart-quote pair U+00E2 U+20AC).
- * The pattern is written with code-point escapes so this file never matches its own rule.
- * `GENERIC_DIRECTIVE_RE` exempts tool directives from the width limit; it covers the Python
- * tooling family and their TS/JS equivalents so one rule serves every supported language.
- * Project-specific markers are never hardcoded: declare them per project via
- * `comments.options.directiveTokens`.
- */
-const MOJIBAKE_RE = /\ufffd|\u00c3[\u0080-\u00bf]|\u00e2\u20ac/;
 const MAX_COMMENT_WIDTH = 100;
-const GENERIC_DIRECTIVE_RE =
-    /^(?:noqa\b|type:\s*ignore|pragma:|mypy:|pyright:|ruff:|fmt:|isort:|nosec\b|eslint-disable|prettier-ignore|@ts-(?:ignore|expect-error)|@ts-nocheck|nolint\b|istanbul\s+ignore|c8\s+ignore|coverage:\s*ignore)/i;
-
-/**
- * The `async` KEYWORD, not the substring.
- *
- * A bare `includes('async')` matched the string literal in
- * `export type TransferType = 'direct' | 'async' | 'event'` and reported a type alias as an
- * asynchronous routine. The keyword form requires `async` to be followed by an identifier,
- * a `(` or a `*`, so occurrences inside a literal, a property key (`{ async: true }`) or
- * prose cannot match.
- */
-const ASYNC_DECLARATION_RE = /\basync\b\s*(?=[A-Za-z_$(*])/;
-
-/**
- * Type-only declarations, which can never carry concurrency semantics.
- *
- * A `type`/`interface`/`enum` alias describes shape, not execution, so it is exempt from the
- * concurrency-notice requirement even if one of its members happens to be spelled `async`.
- */
-const TYPE_ONLY_DECLARATION_RE = /^\s*(?:export\s+)?(?:declare\s+)?(?:type|interface|enum)\b/;
 
 /**
  * Number of leading lines scanned when looking for the file-header comment (CMT-HDR-001/002/003).
@@ -136,17 +93,14 @@ const REGEX_ESCAPE_REPLACEMENT = '\\$&';
  */
 function buildDirectiveRe(extraTokens?: string[]): RegExp {
     const tokens = (extraTokens || []).map((token) => String(token).trim()).filter(Boolean);
-    if (tokens.length === 0) return GENERIC_DIRECTIVE_RE;
+    if (tokens.length === 0) return REGEX.COMMENT.GENERIC_DIRECTIVE;
     const literals = tokens.map((token) =>
         token.replace(/[.*+?^${}()|[\]\\]/g, REGEX_ESCAPE_REPLACEMENT),
     );
-    const generic = GENERIC_DIRECTIVE_RE.source.replace(/^\^/, '');
+    const generic = REGEX.COMMENT.GENERIC_DIRECTIVE.source.replace(/^\^/, '');
     return new RegExp(`^(?:${generic}|${literals.join('|')})`, 'i');
 }
-/** Bare rule of separator glyphs — decorative only, exempt from the consistency rule. */
-const BARE_SEPARATOR_RE = /^[─═\-=]{3,}$/;
-const SHORT_SEPARATOR_RE = /^─{2}(?!─)/;
-const LONG_SEPARATOR_RE = /^─{3,}\s*[^\s─]/;
+
 /** File-level banners are only tolerated in substantial modules. */
 const BANNER_LINE_LIMIT = 150;
 
@@ -412,7 +366,7 @@ export class CommentAnalyzer implements Analyzer {
     }
 
     private checkMojibake(line: string, lineIdx: number, state: FileAuditState): void {
-        if (!MOJIBAKE_RE.test(line)) return;
+        if (!REGEX.COMMENT.MOJIBAKE.test(line)) return;
         const desc = CommentMessages.MOJIBAKE(state.file);
         state.issues.push(
             this.createIssue(state.ctx, lineIdx, {
@@ -507,9 +461,9 @@ export class CommentAnalyzer implements Analyzer {
         shortLines: number[],
         longLines: number[],
     ): void {
-        if (BARE_SEPARATOR_RE.test(body)) return;
-        if (SHORT_SEPARATOR_RE.test(body)) shortLines.push(lineNo);
-        else if (LONG_SEPARATOR_RE.test(body)) longLines.push(lineNo);
+        if (REGEX.COMMENT.BARE_SEPARATOR.test(body)) return;
+        if (REGEX.COMMENT.SHORT_SEPARATOR.test(body)) shortLines.push(lineNo);
+        else if (REGEX.COMMENT.LONG_SEPARATOR.test(body)) longLines.push(lineNo);
     }
 
     private auditBannerSmallFile(
@@ -825,7 +779,7 @@ export class CommentAnalyzer implements Analyzer {
     }
 
     private processPublicApiLine(params: PublicApiLineParams, state: FileAuditState): void {
-        const match = params.trimmed.match(EXPORT_RE);
+        const match = params.trimmed.match(REGEX.COMMENT.POLYGLOT_EXPORT);
         if (!match) return;
 
         const symbol = match[1];
@@ -931,8 +885,8 @@ export class CommentAnalyzer implements Analyzer {
 
     private auditAsyncConcurrency(params: DocQualityParams, state: FileAuditState): void {
         const isAsync =
-            !TYPE_ONLY_DECLARATION_RE.test(params.trimmed) &&
-            ASYNC_DECLARATION_RE.test(params.trimmed);
+            !REGEX.COMMENT.TYPE_ONLY_DECLARATION.test(params.trimmed) &&
+            REGEX.COMMENT.ASYNC_DECLARATION.test(params.trimmed);
         if (!isAsync) return;
 
         const hasConcurrency =

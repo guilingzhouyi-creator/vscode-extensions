@@ -29,6 +29,7 @@ import {
     CODE_STB_TIMING_ATTACK,
     CODE_STB_UNBOUNDED_RECURSION,
     CODE_STB_CONDITIONAL_COMPILATION,
+    REGEX,
 } from '../core/constants';
 
 /** Relevant source extensions for standard library and systems runtime analysis */
@@ -45,23 +46,6 @@ const STDLIB_EXTS = new Set([
     '.ts',
     '.js',
 ]);
-
-const TEST_PATH_RE =
-    /(?:\/tests?\/|\/fixtures\/|_test\.[a-z]+|\.test\.[a-z]+|\.spec\.[a-z]+|^test_)/i;
-const CRYPTO_KEYWORD_RE =
-    /(?:crypto|hash|token|secret|digest|cipher|signature|subtle|constant_time|hmac|sha256|blake3|keccak|aes_)/i;
-const TARGET_CFG_RE =
-    /(?:#\[cfg\(target_os|#\[cfg\(target_arch|#if defined\(__linux__\)|#ifdef _WIN32)/;
-const FALLBACK_RE = /(?:compile_error!|#error|unsupported platform|cfg\(not\(any\()/;
-const NO_STD_CONTEXT_RE = /(?:#!\[no_std\]|#!\[no_core\]|\/no_std\/|\/core\/)/;
-const IMPLICIT_ALLOC_RE =
-    /(?:\bBox::new\s*\(|\bVec::new\s*\(|\balloc::boxed::Box\b|\balloc::vec::Vec\b|\b(?:malloc|calloc)\s*\()/;
-const RUST_PUB_FN_RE = /^\s*pub(?:\s*\([^)]*\))?\s*(?:async\s+)?(?:unsafe\s+)?fn\s+([a-zA-Z0-9_]+)/;
-const RUST_PANIC_RE = /(?:\bpanic!\s*\(|\b(?:todo!|unimplemented!)\s*\(|\.unwrap\(\))/;
-const GO_PUB_FN_RE = /^func\s+(?:\([^)]+\)\s+)?([A-Z][a-zA-Z0-9_]*)\s*\(/;
-const FN_DEF_RE = /(?:fn|function|def)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/;
-const DEPTH_GUARD_PARAM_RE = /\b(?:depth|level|limit|fuel|recursion_limit|max_depth)\b/i;
-const DEPTH_GUARD_BODY_RE = /\bif\s+.*(?:depth|level|limit|fuel|recursion_limit|max_depth)\b/i;
 
 /**
  * Entry-point names that are invoked by an external driver rather than by the function itself.
@@ -175,7 +159,7 @@ function buildRecursionFrame(name: string, params: string, depthBefore: number):
         bodyDepth: depthBefore + 1,
         bareCallPattern: new RegExp(`(?:^|[^\\w.])${name}\\s*\\(`),
         anyCallPattern: new RegExp(`\\b${name}\\s*\\(`),
-        guarded: DEPTH_GUARD_PARAM_RE.test(params) || ENTRY_POINT_NAMES.has(name),
+        guarded: REGEX.SYNTAX.STDLIB_DEPTH_GUARD_PARAM.test(params) || ENTRY_POINT_NAMES.has(name),
     };
 }
 
@@ -198,7 +182,7 @@ function recordSelfCall(
     line: number,
     sites: RecursionSite[],
 ): void {
-    if (DEPTH_GUARD_BODY_RE.test(code)) {
+    if (REGEX.SYNTAX.STDLIB_DEPTH_GUARD_BODY.test(code)) {
         frame.guarded = true;
         return;
     }
@@ -270,7 +254,7 @@ function collectRecursionSites(content: string): RecursionSite[] {
             continue;
         }
 
-        const declaration = FN_DEF_RE.exec(code);
+        const declaration = REGEX.SYNTAX.STDLIB_FN_DEF.exec(code);
         if (declaration !== null) {
             const openIndex = findBodyBrace(code, declaration.index + declaration[0].length);
             const params =
@@ -331,7 +315,7 @@ export class StdlibAnalyzer implements Analyzer {
         if (!STDLIB_EXTS.has(ext)) return [];
 
         const issues: Issue[] = [];
-        const isTest = TEST_PATH_RE.test(file);
+        const isTest = REGEX.LITERAL.TEST_PATH.test(file);
 
         if (!isTest) {
             this.checkPublicApiPanics(content, file, ext, issues);
@@ -441,7 +425,7 @@ export class StdlibAnalyzer implements Analyzer {
             const trimmed = line.trim();
             if (isComment(trimmed)) continue;
 
-            const pubMatch = RUST_PUB_FN_RE.exec(line);
+            const pubMatch = REGEX.SYNTAX.RUST_FN.exec(line);
             if (pubMatch) {
                 inFn = true;
                 fnName = pubMatch[1];
@@ -451,7 +435,7 @@ export class StdlibAnalyzer implements Analyzer {
 
             depth += (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
 
-            if (RUST_PANIC_RE.test(line)) {
+            if (REGEX.SYNTAX.STDLIB_RUST_PANIC.test(line)) {
                 this.emitIssue(
                     issues,
                     file,
@@ -478,7 +462,7 @@ export class StdlibAnalyzer implements Analyzer {
             const trimmed = line.trim();
             if (isComment(trimmed)) continue;
 
-            const pubGo = GO_PUB_FN_RE.exec(line);
+            const pubGo = REGEX.SYNTAX.STDLIB_GO_PUB_FN.exec(line);
             if (pubGo) {
                 inFn = true;
                 fnName = pubGo[1];
@@ -514,14 +498,14 @@ export class StdlibAnalyzer implements Analyzer {
         issues: Issue[],
     ): void {
         if (ext !== '.rs' && ext !== '.c' && ext !== '.cpp') return;
-        if (!NO_STD_CONTEXT_RE.test(content + ' ' + file)) return;
+        if (!REGEX.SYNTAX.STDLIB_NO_STD_CONTEXT.test(content + ' ' + file)) return;
 
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (isComment(line.trim())) continue;
 
-            if (IMPLICIT_ALLOC_RE.test(line)) {
+            if (REGEX.SYNTAX.STDLIB_IMPLICIT_ALLOC.test(line)) {
                 this.emitIssue(
                     issues,
                     file,
@@ -571,7 +555,10 @@ export class StdlibAnalyzer implements Analyzer {
      * STDLIB-CONST-001: Flag short-circuit early returns in cryptographic hash comparisons.
      */
     private checkConstantTimeComparisons(content: string, file: string, issues: Issue[]): void {
-        if (!CRYPTO_KEYWORD_RE.test(file) && !CRYPTO_KEYWORD_RE.test(content.slice(0, 1000))) {
+        if (
+            !REGEX.SYNTAX.STDLIB_CRYPTO_KEYWORD.test(file) &&
+            !REGEX.SYNTAX.STDLIB_CRYPTO_KEYWORD.test(content.slice(0, 1000))
+        ) {
             return;
         }
 
@@ -631,8 +618,8 @@ export class StdlibAnalyzer implements Analyzer {
         issues: Issue[],
     ): void {
         if (ext !== '.rs' && ext !== '.c' && ext !== '.h') return;
-        if (!TARGET_CFG_RE.test(content)) return;
-        if (FALLBACK_RE.test(content)) return;
+        if (!REGEX.SYNTAX.STDLIB_TARGET_CFG.test(content)) return;
+        if (REGEX.SYNTAX.STDLIB_FALLBACK.test(content)) return;
 
         this.emitIssue(
             issues,

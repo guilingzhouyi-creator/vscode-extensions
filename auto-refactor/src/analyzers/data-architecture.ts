@@ -23,36 +23,8 @@ import type {
 import {
     analyzeDataAccessSites,
     isOfflineOrMigrationContext,
-    DANGLING_RESOURCE_PATH_RE,
 } from '../core/intelligence/dataArchitecture';
-
-/** Pattern detecting query or fetch calls against database/storage. */
-const QUERY_CALL_RE =
-    /(?:(?:repo|repository|db|database|pool|client|model|dao|collection|prisma|table|session|orm|store)\s*\.\s*(?:find|findAll|select|query|fetch|get)\w*|\.(?:findById|findOne|findFirst|findMany|fetchRecords|getBy\w+|queryAll))\s*\(/i;
-
-/**
- * Excludes in-memory store receivers (caches, AST indexes, token tables) from persistent DB query
- * hazards.
- */
-const MEMORY_STORE_RECEIVER_RE =
-    /\b(?:index|cache|memory|map|local|token|entry|ast|symbol)Store\b/i;
-
-/** Pattern detecting unpaginated/unbounded query keywords. */
-const UNBOUNDED_QUERY_RE =
-    /(?:\b(?:findAll|selectAll|getAll|find\(\s*\)|select\(\s*\))\b|\bSELECT\s+\*)/i;
-
-/** Pattern detecting JSON serialization/deserialization calls. */
-const SERIALIZATION_RE = /\bJSON\.(?:parse|stringify)\s*\(/;
-
-/** Pattern detecting invariant or parameter validation checks. */
-const VALIDATION_RE = /\b(?:assert|validate|checkNotNull|ensureValid|requireNonEmpty)\s*\(/;
-
-/** Pattern detecting raw database driver calls. */
-const DRIVER_CALL_RE = /\b(?:db\.query|pool\.execute|client\.query|execSql|rawQuery)\s*\(/;
-
-/** Pattern detecting loop headers or array iteration methods. */
-const LOOP_HEADER_RE = /\b(?:for\s*\(|for\s+[a-zA-Z0-9_$]+\s+in|while\s*\(|do\s*\{)\b/;
-const ITERATION_METHOD_RE = /\.(?:map|forEach|filter|flatMap)\s*\(/;
+import { REGEX, isDataQueryCall } from '../core/constants';
 
 /** Default keyword indicators for online request/response paths. */
 const DEFAULT_ONLINE_KEYWORDS = [
@@ -100,21 +72,16 @@ function isOnlineExecutionContext(
 
     return (
         matchesPattern ||
-        /@(?:Get|Post|Put|Delete|Patch|Route|Query|Mutation)\b/.test(content) ||
-        /\b(?:express|fastify|koa|router)\s*\(\s*\)/.test(content)
+        REGEX.DATA.ONLINE_ROUTE_DECORATOR.test(content) ||
+        REGEX.DATA.SERVER_FRAMEWORK_INIT.test(content)
     );
 }
 
-/** Pattern matching function, class, or async procedure declaration signatures. */
-const FN_DECL_RE = /\b(?:function|class|async\s+function|def|func)\s+([A-Za-z0-9_$]+)/;
-const METHOD_DECL_RE = /\b(?:async\s+)?([A-Za-z0-9_$]+)\s*\([^)]*\)\s*(?::\s*[^{]+)?\s*\{/;
-const CONTROL_KEYWORD_RE = /^(?:if|for|while|switch|catch)$/;
-
 function extractSymbolFromLine(trimmed: string): string | null {
-    const fnMatch = trimmed.match(FN_DECL_RE);
+    const fnMatch = trimmed.match(REGEX.DATA.FN_DECL);
     if (fnMatch) return fnMatch[1];
-    const methodMatch = trimmed.match(METHOD_DECL_RE);
-    if (methodMatch && !CONTROL_KEYWORD_RE.test(methodMatch[1])) {
+    const methodMatch = trimmed.match(REGEX.DATA.METHOD_DECL);
+    if (methodMatch && !REGEX.DATA.CONTROL_KEYWORD.test(methodMatch[1])) {
         return methodMatch[1];
     }
     return null;
@@ -125,7 +92,7 @@ function updateLoopTracker(
     currentIndent: number,
     tracker: { inLoop: boolean; loopIndent: number },
 ): void {
-    if (LOOP_HEADER_RE.test(trimmed)) {
+    if (REGEX.DATA.LOOP_HEADER.test(trimmed)) {
         tracker.inLoop = true;
         tracker.loopIndent = currentIndent >= 0 ? currentIndent : 0;
     } else if (tracker.inLoop && trimmed === '}' && currentIndent <= tracker.loopIndent) {
@@ -144,23 +111,13 @@ interface SiteMeta {
 type OperationKind = 'query' | 'serialization' | 'validation' | 'driver-call' | 'resource-registry';
 
 /**
- * A line that is (part of) a regular-expression literal rather than a call expression.
- *
- * A pattern such as `/assert(?:\.ok)?\(\s*true\s*\)/` contains the text `assert(` without calling
- * `assert`, and this repository defines its own detectors that way. The first branch covers a
- * literal at the start of a statement or argument list, the second covers a continued or closing
- * fragment whose text ends the literal.
- */
-const REGEX_LITERAL_LINE_RE = /^\s*\/(?![*/])|\/[gimsuy]*\s*[,;)]?\s*$/;
-
-/**
  * Report whether the line is regular-expression source instead of executable code.
  *
  * @param trimmed - Line text with surrounding whitespace removed.
  * @returns True when the line cannot contain a real call site.
  */
 function isRegexLiteralLine(trimmed: string): boolean {
-    return REGEX_LITERAL_LINE_RE.test(trimmed);
+    return REGEX.DATA.REGEX_LITERAL_LINE.test(trimmed);
 }
 
 function pushSite(
@@ -183,19 +140,19 @@ function pushSite(
 }
 
 function checkAndPushSite(trimmed: string, meta: SiteMeta, sites: DataAccessSite[]): void {
-    if (DRIVER_CALL_RE.test(trimmed)) {
+    if (REGEX.DATA.DRIVER_CALL.test(trimmed)) {
         pushSite(sites, meta, trimmed, 'driver-call');
     }
-    if (QUERY_CALL_RE.test(trimmed) && !MEMORY_STORE_RECEIVER_RE.test(trimmed)) {
-        pushSite(sites, meta, trimmed, 'query', UNBOUNDED_QUERY_RE.test(trimmed));
+    if (isDataQueryCall(trimmed) && !REGEX.DATA.MEMORY_STORE_RECEIVER.test(trimmed)) {
+        pushSite(sites, meta, trimmed, 'query', REGEX.DATA.UNBOUNDED_QUERY.test(trimmed));
     }
-    if (SERIALIZATION_RE.test(trimmed)) {
+    if (REGEX.DATA.SERIALIZATION.test(trimmed)) {
         pushSite(sites, meta, trimmed, 'serialization');
     }
-    if (VALIDATION_RE.test(trimmed)) {
+    if (REGEX.DATA.VALIDATION.test(trimmed)) {
         pushSite(sites, meta, trimmed, 'validation');
     }
-    if (DANGLING_RESOURCE_PATH_RE.test(trimmed)) {
+    if (REGEX.DATA.DANGLING_RESOURCE_PATH.test(trimmed)) {
         pushSite(sites, meta, trimmed, 'resource-registry');
     }
 }
@@ -241,8 +198,8 @@ export class DataArchitectureAnalyzer implements Analyzer {
             // outside iteration
             const inIter =
                 inLoopBefore ||
-                (loopTracker.inLoop && !LOOP_HEADER_RE.test(trimmed)) ||
-                ITERATION_METHOD_RE.test(trimmed);
+                (loopTracker.inLoop && !REGEX.DATA.LOOP_HEADER.test(trimmed)) ||
+                REGEX.DATA.ITERATION_METHOD.test(trimmed);
             if (!isRegexLiteralLine(trimmed)) {
                 checkAndPushSite(
                     trimmed,

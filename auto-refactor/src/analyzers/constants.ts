@@ -49,6 +49,10 @@ import {
     CODE_CONST_MAGIC_NUMBER,
     CODE_CONST_NESTED_CONSTANT,
     SEVERITY_WARNING,
+    REGEX,
+    createOuterQuotesScanner,
+    createNonAlphanumericScanner,
+    createWhitespaceGlobalScanner,
 } from '../core/constants';
 
 import {
@@ -73,39 +77,6 @@ import {
     buildDuplicateIssue,
 } from './constants-literal-helper';
 
-/** Regular expression matching test directory path components. */
-const RE_TEST_PATH = /[\\/](?:tests?|fixtures?|mocks?)[\\/]/i;
-
-/** Regular expression matching test file extension patterns. */
-const RE_TEST_FILE_EXT = /\.(?:test|spec)\.[a-z0-9]+$/i;
-
-/** Regular expression matching styling stylesheet extensions. */
-const RE_STYLE_FILE_EXT = /\.(?:css|scss|less|sass)\b/i;
-
-/** Regular expression identifying diagnostic or logging message prefixes. */
-const RE_DIAGNOSTIC_LOG_PREFIX =
-    /^(?:error|failed|warning|info|debug|trace|fatal|assert|[A-Z0-9]+-[A-Z0-9]+-[0-9]+):/i;
-
-/** Regular expression identifying diagnostic or logging invocation parent contexts. */
-const RE_DIAGNOSTIC_CALL_PARENT =
-    /(?:log(?:ger\b|ging\b|\()|console\.|print\(|new\s+error|raise\s+|reject\(|exit\(|warn(?:ing)?\(|echo\s+|write-host\b|panic!|bail!|anyhow!|eprintln!|println!|tracing::|violations\.push|push_violation|findings\.append|issues\.append|auditfinding|finding\(|violation\(|diagnostic\()/i;
-
-/** Regular expression stripping enclosing quotes from string literals. */
-const RE_OUTER_QUOTES = /^['"`]|['"`]$/g;
-
-/** Regular expression matching non-alphanumeric character sequences for name cleanup. */
-const RE_NON_ALPHANUMERIC = /[^A-Za-z0-9]+/g;
-
-/** Regular expression splitting strings along whitespace boundaries. */
-const RE_WHITESPACE = /\s+/;
-
-/** Regular expression detecting identifiers starting with numeric digits. */
-const RE_LEADING_DIGIT = /^[0-9]/;
-
-/** Regular expression detecting redundant uppercase constant aliases. */
-const RE_CONSTANT_ALIAS =
-    /^(?:export\s+)?const\s+([A-Z][A-Z0-9_]{2,})\s*(?::\s*[^=]+)?\s*=\s*([A-Z][A-Z0-9_]{2,})\s*;?$/;
-
 function isAlgorithmContext(role: string, filePath: string): boolean {
     if (role === 'algorithm_computation') return true;
     return filePath.includes('/ast/') || filePath.includes('\\ast\\');
@@ -120,7 +91,7 @@ function isAlgorithmContext(role: string, filePath: string): boolean {
  */
 function isExemptFromConstantScan(role: string, filePath: string): boolean {
     if (role === 'test_suite') return true;
-    return RE_TEST_PATH.test(filePath) || RE_TEST_FILE_EXT.test(filePath);
+    return REGEX.LITERAL.TEST_PATH.test(filePath) || REGEX.LITERAL.TEST_FILE_EXT.test(filePath);
 }
 
 /** Canonical rule catalog location referenced by drift diagnostics. */
@@ -164,9 +135,13 @@ export class ConstantsAnalyzer implements Analyzer {
     private literals: LiteralRecord[] = [];
     private issues: Issue[] = [];
 
-    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+    public resetState(): void {
         this.literals = [];
         this.issues = [];
+    }
+
+    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+        this.resetState();
 
         const { TypeScriptAdapter } =
             require('../core/ast/typescript-adapter') as typeof import('../core/ast/typescript-adapter');
@@ -310,7 +285,7 @@ export class ConstantsAnalyzer implements Analyzer {
     ): void {
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
         if (isExemptFromConstantScan(roleInference.role, ctx.filePath)) return;
-        if (ctx.filePath.includes('-styles.') || RE_STYLE_FILE_EXT.test(ctx.filePath)) return;
+        if (ctx.filePath.includes('-styles.') || REGEX.LITERAL.STYLE_FILE_EXT.test(ctx.filePath)) return;
 
         const isConstLib = isConstantDefinitionFile(ctx.filePath, ctx.content);
         const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath, ctx.content);
@@ -469,9 +444,13 @@ export class ConstantsAnalyzer implements Analyzer {
         if (drifted.length > 0) return false;
         if (isTerminalStatusBadge(inner)) return false;
         if (inner.startsWith('[') && inner.includes(']')) return true;
-        if (RE_DIAGNOSTIC_LOG_PREFIX.test(inner)) return true;
+        if (REGEX.SYNTAX.DIAGNOSTIC_LOG_PREFIX.test(inner)) return true;
         const parentText = lit.parent?.text?.toLowerCase();
-        return Boolean(parentText && RE_DIAGNOSTIC_CALL_PARENT.test(parentText));
+        return Boolean(
+            parentText &&
+                (REGEX.SYNTAX.DIAGNOSTIC_CALL_PARENT.test(parentText) ||
+                    REGEX.SYNTAX.DIAGNOSTIC_SINK_PARENT.test(parentText)),
+        );
     }
 
     private isHardcodedContextAllowed(
@@ -657,15 +636,15 @@ export class ConstantsAnalyzer implements Analyzer {
             return 'EXTRACTED_NUMBER';
         }
         const cleaned = value
-            .replace(RE_OUTER_QUOTES, '')
-            .replace(RE_NON_ALPHANUMERIC, ' ')
+            .replace(createOuterQuotesScanner(), '')
+            .replace(createNonAlphanumericScanner(), ' ')
             .trim()
-            .split(RE_WHITESPACE)
+            .split(createWhitespaceGlobalScanner())
             .slice(0, SUGGESTED_NAME_MAX_WORDS)
             .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
             .join('');
         const name = cleaned ? `${cleaned.toUpperCase()}_TEXT` : 'EXTRACTED_STRING';
-        return RE_LEADING_DIGIT.test(name) ? `CONST_${name}` : name;
+        return REGEX.NAMING.LEADING_DIGIT.test(name) ? `CONST_${name}` : name;
     }
 
     private detectNestedConstants(ctx: AnalyzerContext, out: Issue[]): void {
@@ -686,7 +665,7 @@ export class ConstantsAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         out: Issue[],
     ): void {
-        const aliasMatch = trimmed.match(RE_CONSTANT_ALIAS);
+        const aliasMatch = trimmed.match(REGEX.SYNTAX.CONSTANT_ALIAS);
         if (!aliasMatch) return;
 
         const [, aliasName, targetName] = aliasMatch;

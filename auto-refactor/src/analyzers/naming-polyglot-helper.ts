@@ -131,14 +131,6 @@ function extractCommaSeparatedNames(raw: string): string[] {
     return names;
 }
 
-const GO_FUNC_RE = /^\s*func\s+(?:\([^)]+\)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\(/;
-const GO_TYPE_RE = /^\s*(?:type\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s+(?:struct|interface)\b/;
-const GO_CONST_RE = /^\s*const\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*)/;
-const GO_VAR_RE = /^\s*var\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*)/;
-const GO_FOR_RE = /^\s*for\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*)\s*:?=/;
-const GO_IF_SHORT_RE = /^\s*if\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*)\s*:=/;
-const GO_SHORT_VAR_RE = /^\s*([a-zA-Z_][a-zA-Z0-9_]*(?:\s*,\s*[a-zA-Z_][a-zA-Z0-9_]*)*)\s*:=/;
-
 const GO_KEYWORDS = new Set([
     'break',
     'default',
@@ -166,8 +158,6 @@ const GO_KEYWORDS = new Set([
     'return',
     'var',
 ]);
-
-const GDSCRIPT_FOR_RE = /^\s*for\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\b/;
 
 const GO_EXEMPT_NAMES = new Set([
     'init',
@@ -569,19 +559,19 @@ interface GoLineScanState {
 }
 
 function extractGoVariableBindings(line: string): { names: string[]; isLoop: boolean } | null {
-    const forMatch = GO_FOR_RE.exec(line);
+    const forMatch = REGEX.SYNTAX.GO_FOR_DECL_LINE.exec(line);
     if (forMatch) {
         return { names: extractCommaSeparatedNames(forMatch[1]), isLoop: true };
     }
-    const ifMatch = GO_IF_SHORT_RE.exec(line);
+    const ifMatch = REGEX.SYNTAX.GO_IF_SHORT_DECL.exec(line);
     if (ifMatch) {
         return { names: extractCommaSeparatedNames(ifMatch[1]), isLoop: false };
     }
-    const shortVarMatch = GO_SHORT_VAR_RE.exec(line);
+    const shortVarMatch = REGEX.SYNTAX.GO_SHORT_VAR_DECL.exec(line);
     if (shortVarMatch) {
         return { names: extractCommaSeparatedNames(shortVarMatch[1]), isLoop: false };
     }
-    const varMatch = GO_VAR_RE.exec(line);
+    const varMatch = REGEX.SYNTAX.GO_VAR_DECL_LINE.exec(line);
     if (varMatch) {
         return { names: extractCommaSeparatedNames(varMatch[1]), isLoop: false };
     }
@@ -589,13 +579,13 @@ function extractGoVariableBindings(line: string): { names: string[]; isLoop: boo
 }
 
 function auditGoDeclarations(line: string, lineIdx: number, pCtx: PolyglotNamingContext): void {
-    const typeMatch = GO_TYPE_RE.exec(line);
+    const typeMatch = REGEX.SYNTAX.GO_STRUCT_OR_INTERFACE.exec(line);
     if (typeMatch) {
         auditGoType(typeMatch[1], lineIdx, pCtx);
         return;
     }
 
-    const constMatch = GO_CONST_RE.exec(line);
+    const constMatch = REGEX.SYNTAX.GO_CONST_DECL_LINE.exec(line);
     if (constMatch) {
         const names = extractCommaSeparatedNames(constMatch[1]);
         for (let i = 0; i < names.length; i++) {
@@ -623,7 +613,7 @@ function scanGoLine(
     state: GoLineScanState,
     pCtx: PolyglotNamingContext,
 ): void {
-    const fnMatch = GO_FUNC_RE.exec(line);
+    const fnMatch = REGEX.SYNTAX.GO_FUNC_DECL_LINE.exec(line);
     if (fnMatch) {
         const isTest = isGoFunctionExempt(fnMatch[1]);
         if (isTest) {
@@ -796,7 +786,7 @@ function auditGDScriptLine(line: string, lineIdx: number, pCtx: PolyglotNamingCo
         return;
     }
 
-    const forMatch = GDSCRIPT_FOR_RE.exec(line);
+    const forMatch = REGEX.SYNTAX.GDSCRIPT_FOR_DECL.exec(line);
     if (forMatch) {
         auditPolyglotVariable(forMatch[1], lineIdx, false, true, pCtx, 'gdscript');
         return;

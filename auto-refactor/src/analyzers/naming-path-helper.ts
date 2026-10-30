@@ -13,7 +13,7 @@
 
 import * as path from 'path';
 import type { AnalyzerContext, Issue } from '../core/types';
-import { camelToSnake } from '../core/constants';
+import { camelToSnake, REGEX, createSnakeCleanScanner } from '../core/constants';
 import {
     parseStructuredResourceNaming,
     RECOGNIZED_RESOURCE_BASE_TYPES,
@@ -47,13 +47,7 @@ const SUGGESTION_RENAME_DIR_KEBAB = 'Rename directory to kebab-case.';
 const SUGGESTION_USE_ENGLISH_DOMAINS =
     'Use recognizable English domain terms containing vowels for file name segments.';
 const DEFAULT_LANGUAGE_TYPESCRIPT = 'typescript';
-const EXEMPT_PREFIX_RE = /^(?:test_|on_)/;
 const NAME_TEST_LITERAL = 'test';
-
-const VOWEL_RE = /[aeiouy]/i;
-const LETTERS_RE = /[a-z]/i;
-const SNAKE_CLEAN_RE = /^_+|_+$/g;
-const TEST_SPEC_SUFFIX_RE = /\.(test|spec)$/;
 
 /**
  * Checks whether a word segment or token satisfies English morpheme phonetics.
@@ -66,7 +60,7 @@ const TEST_SPEC_SUFFIX_RE = /\.(test|spec)$/;
 export function isMorphemePhonetic(token: string): boolean {
     const lower = token.toLowerCase();
     if (lower === 'xyz') return false;
-    return VOWEL_RE.test(lower) || ALLOWED_ACRONYMS.has(lower);
+    return REGEX.NAMING.VOWEL.test(lower) || ALLOWED_ACRONYMS.has(lower);
 }
 
 const ALLOWED_ACRONYMS_LIST =
@@ -91,13 +85,12 @@ export const ALLOWED_SHORT_FILE_STEMS = new Set(
     'ui en zh db io ci os vm fs re id ip swar'.split(' '),
 );
 
-/** Regular expression matching transient construction jargon in symbol and file names. */
-export const TRANSIENT_JARGON_RE =
-    /\b(p[0-9]+|phase[\s_]*[0-9]+|st[\s_]*[0-9]+|temp|tmp|w\x69p|new)\b/i;
-/** Regular expression matching standalone jargon tokens. */
-export const JARGON_TOKEN_RE = /^(p\d+|phase\d*|st\d+|temp|tmp|w\x69p)$/;
-/** Regular expression matching prefix tokens for multi-part jargon. */
-export const JARGON_PREFIX_TOKEN_RE = /^(?:p|st|phase)$/;
+/** Regular expression matching transient construction jargon in symbol and file names (SSOT pointer). */
+export const TRANSIENT_JARGON_RE = REGEX.NAMING.TRANSIENT_JARGON;
+/** Regular expression matching standalone jargon tokens (SSOT pointer). */
+export const JARGON_TOKEN_RE = REGEX.NAMING.JARGON_TOKEN;
+/** Regular expression matching prefix tokens for multi-part jargon (SSOT pointer). */
+export const JARGON_PREFIX_TOKEN_RE = REGEX.NAMING.JARGON_PREFIX_TOKEN;
 
 export function hasTransientJargon(name: string): boolean {
     const tokens = camelToSnake(name).split(/[^a-z0-9]+/);
@@ -126,9 +119,6 @@ const IGNORED_DIRS = new Set(
 const JS_TS_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const SNAKE_EXTS = new Set(['.py', '.rs', '.gd']);
 
-const ANALYZER_OR_ENGINE_PATH_RE =
-    /(?:\/(?:analyzers|core|engine|tests|scripts|test)\/|-(?:analyzer|rules|helper)\.ts$)/;
-
 /**
  * Determines if a file is an analyzer implementation or core engine component
  * where base types (e.g. constants, rules, config) form the architectural engine
@@ -138,7 +128,7 @@ const ANALYZER_OR_ENGINE_PATH_RE =
  * @returns True when file is part of analyzer/engine implementations.
  */
 export function isAnalyzerOrEngineFile(filePath: string): boolean {
-    return ANALYZER_OR_ENGINE_PATH_RE.test(filePath.replace(/\\/g, '/').toLowerCase());
+    return REGEX.NAMING.ANALYZER_OR_ENGINE_PATH.test(filePath.replace(/\\/g, '/').toLowerCase());
 }
 
 /**
@@ -421,7 +411,7 @@ function splitCamelStem(stem: string): string[] {
  */
 export function splitFileNameSegments(nameWithoutExt: string, ext: string): string[] {
     const isSnake = ext === '.py' || ext === '.rs' || ext === '.gd';
-    const cleaned = isSnake ? nameWithoutExt.replace(SNAKE_CLEAN_RE, '') : nameWithoutExt;
+    const cleaned = isSnake ? nameWithoutExt.replace(createSnakeCleanScanner(), '') : nameWithoutExt;
     const separator = isSnake ? '_' : '-';
     return cleaned
         .split(separator)
@@ -483,7 +473,7 @@ function checkFileMorphemes(
 ): void {
     for (const seg of segments) {
         if (seg.length < 2) continue;
-        const hasLetters = LETTERS_RE.test(seg);
+        const hasLetters = REGEX.NAMING.LETTERS.test(seg);
         if (hasLetters && !isMorphemePhonetic(seg)) {
             pCtx.issues.push(
                 pCtx.mkIssue({
@@ -513,7 +503,7 @@ function checkFileWordsAndMorphemes(target: FileNamingTarget, pCtx: PathNamingCo
         return;
     }
 
-    const stemWithoutSuffix = target.nameWithoutExt.replace(TEST_SPEC_SUFFIX_RE, '');
+    const stemWithoutSuffix = target.nameWithoutExt.replace(REGEX.NAMING.TEST_SPEC_SUFFIX, '');
     const segments = splitFileNameSegments(stemWithoutSuffix, target.ext);
     if (segments.length === 0) return;
 
@@ -703,7 +693,7 @@ export function isExemptFunctionName(name: string, isAccessor?: boolean): boolea
     if (EXEMPT_METHOD_NAMES.has(name)) return true;
     if (EVENT_CALLBACK_RE.test(name)) return true;
     if (PYTHON_SPECIAL_METHOD_RE.test(name)) return true;
-    if (EXEMPT_PREFIX_RE.test(name) || name === NAME_TEST_LITERAL) return true;
+    if (REGEX.NAMING.EXEMPT_PREFIX.test(name) || name === NAME_TEST_LITERAL) return true;
     return isAccessor === true;
 }
 
@@ -784,7 +774,7 @@ function checkFunctionMorphemes(name: string, tokens: string[]): FunctionSemanti
     for (const token of tokens) {
         const tokenLower = token.toLowerCase();
         if (token.length >= 2) {
-            const hasLetters = LETTERS_RE.test(token);
+            const hasLetters = REGEX.NAMING.LETTERS.test(token);
             if (hasLetters && !isMorphemePhonetic(token)) {
                 return {
                     type: TYPE_INVALID_MORPHEME,

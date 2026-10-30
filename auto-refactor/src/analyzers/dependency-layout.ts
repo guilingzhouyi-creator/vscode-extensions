@@ -30,34 +30,14 @@ import {
     findNearestManifestInventory,
     loadProjectManifestDependencies,
 } from '../core/intelligence/dependency-provenance';
-
-/** Pattern detecting remote URLs. */
-const REMOTE_URL_RE = /['"](https?:\/\/[A-Za-z0-9_./?=&%-]+)['"]/g;
-
-/** Pattern detecting exempted/placeholder URLs (schemas, test hosts, local addresses). */
-const EXEMPTED_REMOTE_URL_RE = /(?:json-schema\.org|example\.com|localhost|127\.0\.0\.1)/;
-
-/** Patterns for polyglot import extraction */
-const PY_IMPORT_RE = /^\s*(?:from\s+([A-Za-z0-9_.]+)\s+import|import\s+([A-Za-z0-9_.]+))/;
-const RUST_USE_RE = /^\s*use\s+([A-Za-z0-9_:]+)/;
-const GDSCRIPT_IMPORT_RE = /(?:preload|load)\s*\(\s*['"](?:res:\/\/)?([^'"]+)['"]\s*\)/;
-
-/**
- * Patterns detecting function or class declarations across indentation-based languages.
- */
-const PY_DECL_RE = /^\s*(?:def|class)\s+[A-Za-z0-9_]+/;
-const GDSCRIPT_DECL_RE = /^\s*func\s+[A-Za-z0-9_]+/;
-const RUST_DECL_RE = /^\s*(?:pub\s+)?(?:async\s+)?fn\s+[A-Za-z0-9_]+/;
-const TS_IMPORT_RE =
-    /^\s*(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?|const\s+.*=\s*require\()['"]([^'"]+)['"]/;
-const TS_WILDCARD_RE = /\b(?:import\s+\*\s+as|import\s+\*)/;
+import { REGEX, createRemoteUrlScanner } from '../core/constants';
 
 function isPolyglotImportLine(trimmed: string, language: string): boolean {
-    if (language === 'python') return PY_IMPORT_RE.test(trimmed);
-    if (language === 'rust') return RUST_USE_RE.test(trimmed);
-    if (language === 'gdscript') return GDSCRIPT_IMPORT_RE.test(trimmed);
+    if (language === 'python') return REGEX.SYNTAX.PYTHON_FROM_IMPORT.test(trimmed);
+    if (language === 'rust') return REGEX.SYNTAX.RUST_USE_IMPORT.test(trimmed);
+    if (language === 'gdscript') return REGEX.SYNTAX.GDSCRIPT_LOAD_IMPORT.test(trimmed);
     if (language === 'go') return /^package\s+|^import\b/.test(trimmed);
-    return TS_IMPORT_RE.test(trimmed);
+    return REGEX.SYNTAX.TS_IMPORT_LINE.test(trimmed);
 }
 
 function buildEnrichedOptions(
@@ -414,7 +394,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
             return checkIndentFunctionState(
                 line,
                 trimmed,
-                PY_DECL_RE,
+                REGEX.SYNTAX.PYTHON_DECL_HEADER,
                 currentIndent,
                 inFunction,
                 functionIndent,
@@ -424,7 +404,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
             return checkIndentFunctionState(
                 line,
                 trimmed,
-                GDSCRIPT_DECL_RE,
+                REGEX.SYNTAX.GDSCRIPT_FUNC_DECL_HEADER,
                 currentIndent,
                 inFunction,
                 functionIndent,
@@ -483,15 +463,16 @@ export class DependencyLayoutAnalyzer implements Analyzer {
     private extractRemoteResources(ctx: AnalyzerContext, resources: ExternalResourceRef[]): void {
         const lines =
             this.fileLines.length > 0 ? this.fileLines : ctx.content ? ctx.content.split('\n') : [];
+        const urlScanner = createRemoteUrlScanner();
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const lineNum = i + 1;
-            REMOTE_URL_RE.lastIndex = 0;
+            urlScanner.lastIndex = 0;
             let urlMatch: RegExpExecArray | null;
 
-            while ((urlMatch = REMOTE_URL_RE.exec(line)) !== null) {
+            while ((urlMatch = urlScanner.exec(line)) !== null) {
                 const url = urlMatch[1];
-                if (!EXEMPTED_REMOTE_URL_RE.test(url)) {
+                if (!REGEX.LITERAL.EXEMPTED_REMOTE_URL.test(url)) {
                     resources.push({
                         file: ctx.filePath,
                         line: lineNum,
@@ -607,7 +588,7 @@ function checkRustFunctionState(
     trimmed: string,
     inFunction: boolean,
 ): { inFunction: boolean; functionIndent: number } {
-    if (RUST_DECL_RE.test(line)) {
+    if (REGEX.SYNTAX.RUST_FN_DECL_HEADER.test(line)) {
         return { inFunction: true, functionIndent: 0 };
     }
     if (inFunction && trimmed === '}') {
@@ -624,7 +605,7 @@ function parsePythonLineImport(
     inFunction: boolean,
     options?: DependencyLayoutOptions,
 ): ImportStatementInfo | null {
-    const pyMatch = trimmed.match(PY_IMPORT_RE);
+    const pyMatch = trimmed.match(REGEX.SYNTAX.PYTHON_FROM_IMPORT);
     if (!pyMatch) return null;
     const mod = pyMatch[1] || pyMatch[2];
     const isWildcard = trimmed.includes('import *');
@@ -651,7 +632,7 @@ function parseRustLineImport(
     inFunction: boolean,
     options?: DependencyLayoutOptions,
 ): ImportStatementInfo | null {
-    const rustMatch = trimmed.match(RUST_USE_RE);
+    const rustMatch = trimmed.match(REGEX.SYNTAX.RUST_USE_IMPORT);
     if (!rustMatch) return null;
     const mod = rustMatch[1];
     const isWildcard = trimmed.endsWith('::*;');
@@ -678,7 +659,7 @@ function parseGdscriptLineImport(
     inFunction: boolean,
     options?: DependencyLayoutOptions,
 ): ImportStatementInfo | null {
-    const gdMatch = trimmed.match(GDSCRIPT_IMPORT_RE);
+    const gdMatch = trimmed.match(REGEX.SYNTAX.GDSCRIPT_LOAD_IMPORT);
     if (!gdMatch) return null;
     const mod = gdMatch[1];
     const category = categorizeImport(mod, 'gdscript');
@@ -701,11 +682,11 @@ function parseTsLineImport(
     filePath: string,
     lineNum: number,
 ): ImportStatementInfo | null {
-    const topMatch = trimmed.match(TS_IMPORT_RE);
+    const topMatch = trimmed.match(REGEX.SYNTAX.TS_IMPORT_LINE);
     if (!topMatch) return null;
     const specifier = topMatch[1];
     const category = categorizeImport(specifier, 'typescript');
-    const isWildcard = TS_WILDCARD_RE.test(trimmed);
+    const isWildcard = REGEX.SYNTAX.TS_WILDCARD_IMPORT.test(trimmed);
     const isTypeOnly = /^\s*import\s+type\b/.test(trimmed);
     return {
         file: filePath,

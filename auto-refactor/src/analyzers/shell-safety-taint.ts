@@ -44,19 +44,19 @@ export type DeleteDialect = 'powershell' | 'shell' | 'javascript';
  * because deleting either destroys data no script owns.
  */
 export const FORBIDDEN_OPERANDS: readonly RegExp[] = Object.freeze([
-    /^\.$/,
-    /^\.\.$/,
-    /^[/\\]$/,
-    /^[A-Za-z]:[/\\]?$/,
-    /^~[/\\]?$/,
-    /^\$HOME$/i,
-    /^\$\{HOME\}$/i,
-    /^\$PSHOME$/i,
-    /^\$PROFILE$/i,
-    /^\$env:(?:USERPROFILE|HOMEPATH|HOME|SYSTEMDRIVE|SYSTEMROOT|WINDIR|PROGRAMFILES)$/i,
-    /^\$\{env:(?:USERPROFILE|HOMEPATH|HOME|SYSTEMDRIVE|SYSTEMROOT|WINDIR|PROGRAMFILES)\}$/i,
-    /^%(?:USERPROFILE|HOMEPATH|HOMEDRIVE|SYSTEMDRIVE|SYSTEMROOT|WINDIR)%$/i,
-    /^\/(?:home|users|root|etc|usr|var|bin|sbin|lib|opt|boot|dev|proc|sys)(?:\/[^/]*)?$/i,
+    REGEX.SHELL.ROOT_DIR_DOT,
+    REGEX.SHELL.ROOT_DIR_DOTDOT,
+    REGEX.SHELL.ROOT_DIR_SLASH,
+    REGEX.SHELL.ROOT_DIR_DRIVE,
+    REGEX.SHELL.ROOT_DIR_TILDE,
+    REGEX.SHELL.ROOT_DIR_HOME_VAR,
+    REGEX.SHELL.ROOT_DIR_HOME_BRACE,
+    REGEX.SHELL.ROOT_DIR_PSHOME,
+    REGEX.SHELL.ROOT_DIR_PROFILE,
+    REGEX.SHELL.ROOT_DIR_ENV_USERPROFILE,
+    REGEX.SHELL.ROOT_DIR_ENV_BRACE,
+    REGEX.SHELL.ROOT_DIR_WIN_VAR,
+    REGEX.SHELL.ROOT_DIR_SYSTEM_PATH,
 ]);
 
 /**
@@ -66,16 +66,16 @@ export const FORBIDDEN_OPERANDS: readonly RegExp[] = Object.freeze([
  * tainted binding inherits the taint.
  */
 export const TAINT_SOURCES: readonly RegExp[] = Object.freeze([
-    /\$HOME\b/i,
-    /\$\{HOME\}/i,
-    /\$PSHOME\b/i,
-    /\$PROFILE\b/i,
-    /\$env:(?:USERPROFILE|HOMEPATH|HOME|SYSTEMDRIVE|SYSTEMROOT|WINDIR)\b/i,
-    /\$\{env:(?:USERPROFILE|HOMEPATH|HOME|SYSTEMDRIVE|SYSTEMROOT|WINDIR)\}/i,
-    /%(?:USERPROFILE|HOMEPATH|HOMEDRIVE|SYSTEMDRIVE|SYSTEMROOT|WINDIR)%/i,
-    /\bos\s*\.\s*homedir\s*\(/,
-    /\bprocess\s*\.\s*env\s*\.\s*(?:USERPROFILE|HOMEPATH|HOME|SystemDrive|SystemRoot|windir)\b/,
-    /\bprocess\s*\.\s*env\s*\[\s*['"](?:USERPROFILE|HOMEPATH|HOME|SystemDrive|SystemRoot|windir)['"]\s*\]/,
+    REGEX.SHELL.PROVENANCE_HOME_VAR,
+    REGEX.SHELL.PROVENANCE_HOME_BRACE,
+    REGEX.SHELL.PROVENANCE_PSHOME,
+    REGEX.SHELL.PROVENANCE_PROFILE,
+    REGEX.SHELL.PROVENANCE_ENV_USERPROFILE,
+    REGEX.SHELL.PROVENANCE_ENV_BRACE,
+    REGEX.SHELL.PROVENANCE_WIN_VAR,
+    REGEX.SHELL.PROVENANCE_OS_HOMEDIR,
+    REGEX.SHELL.PROVENANCE_PROCESS_ENV_DOT,
+    REGEX.SHELL.PROVENANCE_PROCESS_ENV_INDEX,
 ]);
 
 /**
@@ -110,28 +110,27 @@ export const READONLY_AUTOMATIC_VARIABLES: readonly string[] = Object.freeze([
 const READONLY_AUTOMATIC_SET: ReadonlySet<string> = new Set(READONLY_AUTOMATIC_VARIABLES);
 
 /** PowerShell delete cmdlets and their common aliases. */
-const PS_DELETE_RE = /\b(?:Remove-Item|rm|del|erase|rd|rmdir)\b/i;
+const PS_DELETE_RE = REGEX.SHELL.PS_DELETE;
 
 /** POSIX shell delete command. */
-const SH_DELETE_RE = /\brm\b/;
+const SH_DELETE_RE = REGEX.SHELL.SH_DELETE;
 
 /**
  * JavaScript recursive-delete entry points; `rimraf`, `removeSync` and `rmtree` recurse by nature.
  */
-const JS_DELETE_RE =
-    /\b(?:rmSync|rimraf|removeSync)\s*\(|\bfs\s*\.\s*rm\s*\(|\bshutil\s*\.\s*rmtree\s*\(/;
+const JS_DELETE_RE = REGEX.SHELL.NODE_INHERENTLY_RECURSIVE_DELETE;
 
 /** JavaScript delete calls that need no recursion flag because they recurse by definition. */
-const JS_INHERENTLY_RECURSIVE_RE = /\brimraf\b|\bremoveSync\b|\brmtree\b/;
+const JS_INHERENTLY_RECURSIVE_RE = REGEX.SHELL.JS_INHERENTLY_RECURSIVE;
 
 /** Recursion may be decided at run time (`-Recurse:$flag`), so any mention counts. */
-const PS_RECURSIVE_RE = /-Recurse|\s-[a-zA-Z]*[rR]\b/;
+const PS_RECURSIVE_RE = REGEX.SHELL.PS_RECURSIVE_FLAG;
 
 /** POSIX recursion flag, short or long form. */
-const SH_RECURSIVE_RE = /(?:^|\s)(?:-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)\b/;
+const SH_RECURSIVE_RE = REGEX.SHELL.SH_RECURSIVE_FLAG;
 
 /** JavaScript recursion flag inside the options object. */
-const JS_RECURSIVE_RE = /\brecursive\s*:\s*true\b/;
+const JS_RECURSIVE_RE = REGEX.SHELL.JS_RECURSIVE_PROP;
 
 /** How far forward a multi-line JavaScript call may state `recursive: true`. */
 const JS_STATEMENT_WINDOW = 6;
@@ -144,14 +143,14 @@ const JS_STATEMENT_WINDOW = 6;
  * literal is never a delete statement: a real `Remove-Item` or `rm` never begins with a bracket,
  * brace or comma. Without this, the guard reported its own negative corpus.
  */
-const NON_STATEMENT_PREFIX_RE = /^(?:#|\/\/|\*|["'`]|\[["'`])/;
+const NON_STATEMENT_PREFIX_RE = REGEX.SHELL.NON_STATEMENT_PREFIX;
 
 /** Binding shapes that carry provenance: assignment, the three loop forms, and callbacks. */
-const ASSIGN_RE = /(?:^|[\s(,])(?:const|let|var)?\s*\$?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^\r\n]*)$/;
-const PS_LOOP_RE = /foreach\s*\(\s*\$([A-Za-z_][A-Za-z0-9_]*)\s+in\s+([^)]*)/i;
-const SH_LOOP_RE = /\bfor\s+([A-Za-z_][A-Za-z0-9_]*)\s+in\s+([^;\r\n]*)/;
-const JS_LOOP_RE = /\bfor\s*\(\s*(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s+of\s+([^)]*)\)/;
-const JS_EACH_RE = /\.\s*forEach\s*\(\s*\(?\s*([A-Za-z_][A-Za-z0-9_]*)/;
+const ASSIGN_RE = REGEX.SHELL.TAINT_ASSIGN;
+const PS_LOOP_RE = REGEX.SHELL.TAINT_PS_LOOP;
+const SH_LOOP_RE = REGEX.SHELL.TAINT_SH_LOOP;
+const JS_LOOP_RE = REGEX.SHELL.TAINT_JS_LOOP;
+const JS_EACH_RE = REGEX.SHELL.TAINT_JS_EACH;
 
 /** Upper bound on identifiers visited while following one provenance chain. */
 const TAINT_VISIT_LIMIT = 64;
@@ -421,7 +420,7 @@ export function taintChain(operand: string, bindings: Map<string, string[]>): st
     let head = 0;
     while (head < queue.length && seen.size < TAINT_VISIT_LIMIT) {
         const [expression, trail] = queue[head++]!;
-        for (const token of expression.matchAll(/\$?([A-Za-z_][A-Za-z0-9_]*)/g)) {
+        for (const token of expression.matchAll(REGEX.SHELL.createTaintIdentifierScanner())) {
             const name = token[1];
             if (seen.has(name)) continue;
             seen.add(name);

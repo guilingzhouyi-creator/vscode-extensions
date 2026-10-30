@@ -19,6 +19,7 @@ import type { Analyzer, AnalyzerContext, Issue, AgentActionType, Severity } from
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { REGEX } from '../core/constants';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
+import { isCommentOrBlankLine, calculateIndentWidth } from '../core/ast/block-scope-utils';
 import {
     PY_STDLIB_NAMES,
     PY_LOCAL_ROOTS,
@@ -55,39 +56,37 @@ const BLOCK_KIND_WITH = 'with';
 const BLOCK_KIND_OTHER = 'other';
 const PREFIX_OS_PATH = 'os.path.';
 
-const BLOCK_OPEN_RE = /:\s*(?:#.*)?$/;
+const BLOCK_OPEN_RE = REGEX.PYTHON.BLOCK_OPEN;
 
 /* Shadowing detection (PYM-SHADOW-001) --------------------------------------------------- */
 
 /** Direct assignment: `name = value` — excludes `==`, `+=`, `-=`, etc. */
-const ASSIGN_RE = /^\s*([A-Za-z_]\w*)\s*=(?!=|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|<<=|>>=|\*\*=|\/\/=)/;
+const ASSIGN_RE = REGEX.PYTHON.ASSIGN;
 /** for loop variable: `for x in ...:` */
-const FOR_VAR_RE = /^\s*for\s+([A-Za-z_]\w*)\s+in\b/;
+const FOR_VAR_RE = REGEX.PYTHON.FOR_VAR;
 /** with statement target: `with ... as f:` */
-const WITH_AS_RE = /^\s*(?:async\s+)?with\b.*\bas\s+([A-Za-z_]\w*)\s*[:,#]/;
+const WITH_AS_RE = REGEX.PYTHON.WITH_AS;
 /** except clause target: `except Exception as e:` */
-const EXCEPT_AS_RE = /^\s*except\b.*\bas\s+([A-Za-z_]\w*)\s*:/;
+const EXCEPT_AS_RE = REGEX.PYTHON.EXCEPT_AS;
 /** import statement: `import os` or `from sys import path` */
-const IMPORT_SIMPLE_RE = /^\s*import\s+([A-Za-z_]\w*)/;
-const IMPORT_FROM_RE = /^\s*from\s+[A-Za-z_.\w]+\s+import\s+(.+)$/;
+const IMPORT_SIMPLE_RE = REGEX.PYTHON.IMPORT_SIMPLE;
+const IMPORT_FROM_RE = REGEX.PYTHON.IMPORT_FROM;
 
-const BLOCKING_CALL_RE =
-    /\b(?:time\.sleep|requests\.(?:get|post|put|patch|delete|request)|urllib\.request\.urlopen)\s*\(/;
-const SYNC_ORM_CALL_RE = /(?<![\w.])(?:[A-Za-z_]\w*\.)*(?:session|Session)\.(?:query|execute)\s*\(/;
-const AWAITED_ORM_CALL_RE = /await\s+[^=;]*\b(?:session|Session)\.(?:query|execute)\s*\(/;
-const PERCENT_FORMAT_RE = /(?:'[^']*%[sdrfioxeg%][^']*'|"[^"]*%[sdrfioxeg%][^"]*")\s*%/;
-const RAISE_RE = /^raise\s+\S/;
+const BLOCKING_CALL_RE = REGEX.PYTHON.BLOCKING_CALL;
+const SYNC_ORM_CALL_RE = REGEX.PYTHON.SYNC_ORM_CALL;
+const AWAITED_ORM_CALL_RE = REGEX.PYTHON.AWAITED_ORM_CALL;
+const PERCENT_FORMAT_RE = REGEX.PYTHON.PERCENT_FORMAT;
+const RAISE_RE = REGEX.PYTHON.RAISE;
 
 /** Maximum number of following lines inspected for a `from` cause clause on a multi-line raise. */
 const RAISE_CAUSE_LOOKAHEAD_LINES = 5;
 
 /** Block kind for an `async def` frame; mirrors the Python `async` keyword token. */
 const PYTHON_ASYNC_KEYWORD = 'async';
-const ABC_IMPORT_RE = /^from\s+typing\s+import\s+(.+)$/;
-const PY_PEP604_ANN_ASSIGN_RE =
-    /^\s*[A-Za-z_]\w*\s*:\s*(?:typing\.)?(?:Optional|Union)\s*\[[^\]]*\]\s*=/;
-const PY_PEP604_ALIAS_RE = /^\s*[A-Za-z_]\w*\s*=\s*(?:typing\.)?(?:Optional|Union)\s*\[/;
-const PY_DATACLASS_RE = /^@(?:dataclasses\.)?dataclass\b/;
+const ABC_IMPORT_RE = REGEX.PYTHON.ABC_IMPORT;
+const PY_PEP604_ANN_ASSIGN_RE = REGEX.PYTHON.PEP604_ANN_ASSIGN;
+const PY_PEP604_ALIAS_RE = REGEX.PYTHON.PEP604_ALIAS;
+const PY_DATACLASS_RE = REGEX.PYTHON.DATACLASS;
 
 const SECTION_LABEL_STDLIB = 'stdlib';
 const SECTION_LABEL_THIRD_PARTY = 'third-party';
@@ -410,10 +409,10 @@ export class PythonModernAnalyzer implements Analyzer {
         for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
             let line = lines[lineIndex];
             if (line.endsWith('\r')) line = line.slice(0, -1);
-            const trimmed = line.trim();
-            if (trimmed === '' || trimmed.startsWith('#')) continue;
+            if (isCommentOrBlankLine(line)) continue;
 
-            const indent = line.length - line.trimStart().length;
+            const trimmed = line.trim();
+            const indent = calculateIndentWidth(line);
             this.popScopesForIndent(indent, blocks, varScopes);
 
             const scanCtx: PyLineScanContext = { line, trimmed, lineIndex, emit };
@@ -497,7 +496,7 @@ export class PythonModernAnalyzer implements Analyzer {
             emit(lineIndex, SPEC_FSTRING, { line: trimmed });
         }
 
-        if (/\btimezone\.utc\b/.test(line)) {
+        if (REGEX.PYTHON.TIMEZONE_UTC.test(line)) {
             emit(lineIndex, SPEC_DATETIME, { line: trimmed });
         }
 
@@ -526,7 +525,7 @@ export class PythonModernAnalyzer implements Analyzer {
         const abcImport = ABC_IMPORT_RE.exec(trimmed);
         if (abcImport) {
             const offenders = abcImport[1]
-                .replace(/[()]/g, '')
+                .replace(REGEX.PYTHON.createParenStripScanner(), '')
                 .split(',')
                 .map((part) =>
                     part
@@ -582,7 +581,7 @@ export class PythonModernAnalyzer implements Analyzer {
     }
 
     private auditUnmanagedOpen(scanCtx: PyLineScanContext, inWith: boolean): void {
-        if (!inWith && /\bopen\s*\(/.test(scanCtx.line) && !REGEX.SYNTAX.PYTHON_WITH.test(scanCtx.line)) {
+        if (!inWith && REGEX.PYTHON.OPEN_CALL.test(scanCtx.line) && !REGEX.SYNTAX.PYTHON_WITH.test(scanCtx.line)) {
             scanCtx.emit(scanCtx.lineIndex, SPEC_OPEN, { line: scanCtx.trimmed });
         }
     }
@@ -628,7 +627,7 @@ export class PythonModernAnalyzer implements Analyzer {
             probeLineIndex++;
         }
         const next = probeLineIndex < lines.length ? lines[probeLineIndex].trim() : '';
-        if (/^class\s+[A-Za-z_]\w*\s*:/.test(next) && !/\bslots\s*=/.test(scanCtx.trimmed)) {
+        if (REGEX.PYTHON.CLASS_DECL.test(next) && !/\bslots\s*=/.test(scanCtx.trimmed)) {
             scanCtx.emit(scanCtx.lineIndex, SPEC_SLOTS, { line: scanCtx.trimmed });
         }
     }
@@ -644,7 +643,7 @@ export class PythonModernAnalyzer implements Analyzer {
             !this.hasKind(blocks, BLOCK_KIND_DEF) &&
             !this.hasKind(blocks, PYTHON_ASYNC_KEYWORD) &&
             !this.hasKind(blocks, BLOCK_KIND_CLASS);
-        if (moduleLevel && /^(?:import|from)\s+/.test(scanCtx.trimmed)) {
+        if (moduleLevel && REGEX.PYTHON.IMPORT_STMT.test(scanCtx.trimmed)) {
             acc.records.push({
                 line: scanCtx.lineIndex + 1,
                 text: scanCtx.trimmed,
@@ -661,8 +660,8 @@ export class PythonModernAnalyzer implements Analyzer {
      * @returns 0 for stdlib, 1 for third-party, 2 for first-party/local.
      */
     private classifyImportSection(text: string, file: string): number {
-        const fromMatch = /^from\s+([A-Za-z_][\w.]*)\s+import\b/.exec(text);
-        const importMatch = /^import\s+([A-Za-z_][\w.]*)/.exec(text);
+        const fromMatch = REGEX.PYTHON.FROM_IMPORT_CAPTURE.exec(text);
+        const importMatch = REGEX.PYTHON.IMPORT_CAPTURE.exec(text);
         const module = fromMatch?.[1] ?? importMatch?.[1] ?? '';
         if (module === '' || module.startsWith('.')) {
             return SECTION_LOCAL_INDEX;
@@ -869,7 +868,7 @@ export class PythonModernAnalyzer implements Analyzer {
         targetLine: number,
         shadowCtx: PyShadowContext,
     ): boolean {
-        if (!/^(?:import|from)\s+/.test(codeOnly)) return false;
+        if (!REGEX.PYTHON.IMPORT_STMT.test(codeOnly)) return false;
         const moduleScope = this.getTopScope(shadowCtx);
 
         const simpleImp = IMPORT_SIMPLE_RE.exec(line);
@@ -883,11 +882,11 @@ export class PythonModernAnalyzer implements Analyzer {
             for (const item of items) {
                 const trimmedItem = item.trim();
                 if (trimmedItem === '' || trimmedItem === '(' || trimmedItem === ')') continue;
-                const clean = trimmedItem.replace(/[()]/g, '').trim();
+                const clean = trimmedItem.replace(REGEX.PYTHON.createParenStripScanner(), '').trim();
                 if (clean === '') continue;
-                const asMatch = /^(.+?)\s+as\s+([A-Za-z_]\w*)$/.exec(clean);
+                const asMatch = REGEX.PYTHON.AS_ALIAS_CAPTURE.exec(clean);
                 const name = asMatch ? asMatch[2] : clean.split(/\s+/)[0];
-                if (/^[A-Za-z_]\w*$/.test(name)) {
+                if (REGEX.PYTHON.VALID_IDENTIFIER.test(name)) {
                     this.registerBinding(name, targetLine, moduleScope, shadowCtx);
                 }
             }
@@ -1027,7 +1026,7 @@ export class PythonModernAnalyzer implements Analyzer {
     private sanitizeParamName(part: string): string | null {
         const trimmed = part.trim();
         if (trimmed === '' || trimmed === '/' || trimmed === '*') return null;
-        let cleaned = trimmed.replace(/^\*{1,2}/, '').trim();
+        let cleaned = trimmed.replace(REGEX.PYTHON.createStarPrefixStripScanner(), '').trim();
         const eqIdx = cleaned.indexOf('=');
         const colonIdx = cleaned.indexOf(':');
         if (colonIdx !== -1 && (eqIdx === -1 || colonIdx < eqIdx)) {
@@ -1036,7 +1035,7 @@ export class PythonModernAnalyzer implements Analyzer {
         if (eqIdx !== -1) {
             cleaned = cleaned.slice(0, eqIdx).trim();
         }
-        return /^[A-Za-z_]\w*$/.test(cleaned) ? cleaned : null;
+        return REGEX.PYTHON.VALID_IDENTIFIER.test(cleaned) ? cleaned : null;
     }
 
     private resolveBlockKind(trimmed: string): BlockKind {
