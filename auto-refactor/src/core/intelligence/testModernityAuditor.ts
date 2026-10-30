@@ -52,32 +52,13 @@ const SEVERITY_ERROR_LITERAL = 'error';
 /** Pre-compiled patterns for symbol risk weighting. */
 const RE_CRITICAL_SYMBOLS = /(?:payment|auth|crypto|security)/;
 const RE_CORE_DOMAIN_SYMBOLS = /(?:service|repository|domain|pipeline|controller)/;
+import { isTestFilePath } from '../path';
+export { isTestFilePath };
+
 const RE_LOW_RISK_SYMBOLS = /(?:util|helper|format)/;
 
 /** Node kinds eligible for business-to-test semantic mapping. */
 const ELIGIBLE_NODE_KINDS: ReadonlySet<string> = new Set(['function', 'type', 'module']);
-
-/**
- * Detect whether a file path corresponds to a test file.
- *
- * @param filePath - File path string to evaluate.
- * @returns True if path matches known test file naming patterns.
- */
-export function isTestFilePath(filePath: string): boolean {
-    const lower = filePath.toLowerCase().replace(/\\/g, '/');
-    return (
-        lower.includes('.test.') ||
-        lower.includes('.spec.') ||
-        lower.includes('__tests__/') ||
-        lower.includes(TEST_DIR_NAME) ||
-        lower.startsWith('tests/') ||
-        lower.startsWith('test_') ||
-        lower.endsWith(PYTHON_TEST_SUFFIX) ||
-        lower.endsWith(GDSCRIPT_TEST_SUFFIX) ||
-        lower.endsWith(RUST_TEST_SUFFIX) ||
-        lower.includes(TEST_FILE_PREFIX)
-    );
-}
 
 const TAUTOLOGY_PATTERNS: readonly RegExp[] = [
     /expect\(\s*(?:true|false|1|0|'[^']*'|"[^"]*")\s*\)\s*\.(?:toBe|toEqual|toStrictEqual)\(\s*(?:true|false|1|0|'[^']*'|"[^"]*")\s*\)/,

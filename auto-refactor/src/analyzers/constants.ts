@@ -91,8 +91,7 @@ function isAlgorithmContext(role: string, filePath: string): boolean {
  * @returns True if file is test suite, fixture, or script infrastructure.
  */
 function isExemptFromConstantScan(role: string, filePath: string): boolean {
-    if (role === 'test_suite') return true;
-    return REGEX.LITERAL.TEST_PATH.test(filePath) || REGEX.LITERAL.TEST_FILE_EXT.test(filePath);
+    return isTestFile(role, filePath);
 }
 
 /** Canonical rule catalog location referenced by drift diagnostics. */

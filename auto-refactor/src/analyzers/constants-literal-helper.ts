@@ -22,7 +22,9 @@ import {
     RULE_DUPLICATE_LITERAL,
     CODE_CONST_DUPLICATE_LITERAL,
     SEVERITY_WARNING,
+    REGEX,
 } from '../core/constants';
+import { isTestFilePath, isFixtureOrMockPath } from '../core/path';
 import { stripQuotes } from '../core/scanner/text-scanner-utils';
 
 export { stripQuotes };
@@ -70,7 +72,7 @@ export const SCRIPT_AND_GATE_BENIGN_TOKENS = new Set([
     'raw',
 ]);
 
-const SCRIPT_OR_GATE_FILE_RE = /(?:^|[\\/])(?:scripts|bin|tools|\.githooks)[\\/]/i;
+const SCRIPT_OR_GATE_FILE_RE = REGEX.LITERAL.SCRIPT_OR_GATE_PATH;
 
 /**
  * Checks whether a file path points to a tooling script or gate runner.
@@ -495,8 +497,8 @@ export function isDataOrConfigFile(role: string, filePath: string, content?: str
 export function isTestFile(role: string, filePath: string): boolean {
     return (
         role === ROLE_TEST_SUITE ||
-        /[\\/](?:tests?|fixtures?|mocks?)[\\/]/i.test(filePath) ||
-        /\.(?:test|spec)\.[a-z0-9]+$/i.test(filePath)
+        isTestFilePath(filePath) ||
+        isFixtureOrMockPath(filePath)
     );
 }
 

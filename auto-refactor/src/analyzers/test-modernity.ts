@@ -29,6 +29,7 @@ import { DualTrackTestEvaluator } from '../core/scoring/dual-track-test-evaluato
 import { partitionFileZones } from '../core/intelligence/zone-partitioner';
 import { analyzeCodeDensity } from '../core/intelligence/code-density-analyzer';
 import { REGEX, normalizePathSeparators } from '../core/constants';
+import { isTestFilePath } from '../core/path';
 
 /** Test block names recognized during AST traversal. */
 const TEST_BLOCK_NAMES = new Set([
@@ -120,19 +121,6 @@ function createLineCaseRecord(name: string, line: number): CaseRecord {
         tautologicalCount: 0,
         obsoleteCount: 0,
     };
-}
-
-function isTestFilePath(filePath: string): boolean {
-    const lowerPath = normalizePathSeparators(filePath).toLowerCase();
-    return (
-        lowerPath.includes('test') ||
-        lowerPath.includes('spec') ||
-        lowerPath.includes('__tests__') ||
-        lowerPath.endsWith('_test.py') ||
-        lowerPath.startsWith('test_') ||
-        lowerPath.endsWith('_test.gd') ||
-        lowerPath.includes('/test_')
-    );
 }
 
 /**

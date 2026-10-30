@@ -22,6 +22,8 @@ import { loc } from '../../utils/ast';
 import { ANALYZER_GOVERNANCE } from '../scoring/dimensionLiterals';
 
 /** Canonical rule identifier for deprecated usage in production code. */
+import { isTestFilePath } from '../path';
+
 export const MOD_DEP_RULE_ID = 'MOD-DEP-001';
 
 /**
@@ -31,16 +33,7 @@ export const MOD_DEP_RULE_ID = 'MOD-DEP-001';
  * @returns True if path matches test conventions.
  */
 export function isTestFile(filePath: string): boolean {
-    const normalized = filePath.replace(/\\/g, '/').toLowerCase();
-    return (
-        normalized.includes('/tests/') ||
-        normalized.includes('/test/') ||
-        normalized.includes('/__tests__/') ||
-        normalized.endsWith('.test.ts') ||
-        normalized.endsWith('.spec.ts') ||
-        normalized.endsWith('.test.js') ||
-        normalized.endsWith('.spec.js')
-    );
+    return isTestFilePath(filePath);
 }
 
 /**

@@ -19,6 +19,7 @@ import {
     createSnakeCleanScanner,
     normalizePathSeparators,
 } from '../core/constants';
+import { isFixtureOrMockPath, isBenchmarkPath } from '../core/path';
 import { toKebabCase, splitIdentifierWords } from '../core/naming/case-converter';
 import {
     parseStructuredResourceNaming,
@@ -322,10 +323,8 @@ function dispatchNamingStrategy(
     if (issue) issues.push(issue);
 }
 
-const FIXTURE_OR_BENCH_PATH_RE = /\/(?:\.bench|fixtures|testdata|__mocks__)\//;
-
 function isFixtureOrBenchPath(filePath: string): boolean {
-    return FIXTURE_OR_BENCH_PATH_RE.test(normalizePathSeparators(filePath).toLowerCase());
+    return isFixtureOrMockPath(filePath) || isBenchmarkPath(filePath);
 }
 
 interface FileLengthAuditOptions {
@@ -674,8 +673,8 @@ export const ALLOWED_SINGLE_LETTER_TOKENS: ReadonlySet<string> = new Set([
     'g',
 ]);
 
-const EVENT_CALLBACK_RE = /^on[A-Z]/;
-const PYTHON_SPECIAL_METHOD_RE = /^__[a-zA-Z0-9_]+__$/;
+const EVENT_CALLBACK_RE = REGEX.NAMING.EVENT_CALLBACK;
+const PYTHON_SPECIAL_METHOD_RE = REGEX.NAMING.PYTHON_SPECIAL_METHOD;
 
 /**
  * Determines whether a function or method name is exempt from verb-noun naming rules.

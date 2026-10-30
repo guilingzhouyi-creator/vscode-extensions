@@ -15,6 +15,7 @@ import { SEVERITY_ERROR } from '../types';
 import type { EightPillarBreakdown, PrimaryQualityPillar } from './eightPillarModel';
 import { ALL_PRIMARY_PILLARS, synthesizeEightPillars } from './eightPillarModel';
 import { computeRiskWeightedPenalties } from './riskWeightModel';
+import { isTestFilePath } from '../path';
 import { computeEffectiveCodeDensity, type EffectiveDensityResult } from './effectiveDensity';
 import { detectScoreGaming } from './antiGaming';
 import type { QualityDimension, QualityGrade } from './scoringTypes';
@@ -52,15 +53,6 @@ const DEFAULT_PROJECT_COMPOSITE = 100.0;
 const RATIO_SCALE_HUNDRED = 100;
 const RATIO_SCALE_THOUSAND = 1000;
 const BOUNDED_SCORE_MIN = 15;
-
-const TEST_PATH_INFIX_TEST = '.test.';
-const TEST_PATH_INFIX_SPEC = '.spec.';
-const TEST_PATH_DIR_TESTS = '/tests/';
-const TEST_PATH_DIR_TEST = '/test/';
-const TEST_PATH_DIR_DUNDER = '/__tests__/';
-const TEST_PATH_PREFIX_TEST = 'test_';
-const TEST_PATH_SUFFIX_PY = '_test.py';
-const TEST_PATH_SUFFIX_GD = '_test.gd';
 
 const DIMENSION_MAINTAINABILITY = 'maintainability';
 const DIMENSION_ARCH_CONSISTENCY = 'architectureConsistency';
@@ -197,23 +189,6 @@ function computeDensityDeduction(
         return 0;
     }
     return 0;
-}
-
-/**
- * Detects whether a path belongs to test, benchmark, or specification suites.
- */
-function isTestFilePath(filePath: string): boolean {
-    const lower = filePath.toLowerCase().replace(/\\/g, '/');
-    return (
-        lower.includes(TEST_PATH_INFIX_TEST) ||
-        lower.includes(TEST_PATH_INFIX_SPEC) ||
-        lower.includes(TEST_PATH_DIR_DUNDER) ||
-        lower.includes(TEST_PATH_DIR_TESTS) ||
-        lower.includes(TEST_PATH_DIR_TEST) ||
-        lower.startsWith(TEST_PATH_PREFIX_TEST) ||
-        lower.endsWith(TEST_PATH_SUFFIX_PY) ||
-        lower.endsWith(TEST_PATH_SUFFIX_GD)
-    );
 }
 
 function computeDimensionIndices(

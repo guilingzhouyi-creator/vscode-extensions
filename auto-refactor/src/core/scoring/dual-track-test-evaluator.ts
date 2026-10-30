@@ -19,6 +19,7 @@ import * as path from 'path';
 import type { IntraFileZoneProfile, SemanticZoneSegment } from '../intelligence/zone-partitioner';
 import { ZONE_EMBEDDED_TEST } from '../intelligence/zone-partitioner';
 import { isToolOrTestScript } from '../governance/pathScope';
+import { isTestFilePath } from '../path';
 import { RULE_TST_TOP_001 } from './dimensionLiterals';
 import { DualTrackTestMessages } from '../messages';
 import { REGEX } from '../constants';
@@ -108,9 +109,6 @@ function hasTestCallSite(content: string): boolean {
     }
     return false;
 }
-
-const PATH_TESTS_DIR = '/tests/';
-const PATH_TEST_DIR = '/test/';
 
 /** Remediation actions available to resolve test topology contract violations. */
 export type TopologyAction = 'extract_test_suite' | 'relocate_test_zone' | 'annotate_test_intent';
@@ -222,10 +220,6 @@ function buildEvaluationResult(params: EvaluationResultParams): DualTrackEvaluat
         findings,
     };
 }
-
-const TS_JS_TEST_PATTERN = /\.(?:test|spec)\.[jt]sx?$/i;
-const PY_TEST_PATTERN = /(?:^|\/|\\)test_.*\.py$|.*_test\.py$/i;
-const GDSCRIPT_TEST_PATTERN = /(?:^|\/|\\)tests?\/.*\.gd$/i;
 
 /** Languages permitted to house embedded unit test zones in production source files. */
 const PERMITTED_EMBEDDED_LANGUAGES = new Set(['.rs', '.py']);
@@ -483,13 +477,7 @@ export class DualTrackTestEvaluator {
     }
 
     private isExplicitTestPath(filePath: string): boolean {
-        return (
-            TS_JS_TEST_PATTERN.test(filePath) ||
-            PY_TEST_PATTERN.test(filePath) ||
-            GDSCRIPT_TEST_PATTERN.test(filePath) ||
-            filePath.includes(PATH_TESTS_DIR) ||
-            filePath.includes(PATH_TEST_DIR)
-        );
+        return isTestFilePath(filePath);
     }
 
     private evaluateExplicitTestFile(

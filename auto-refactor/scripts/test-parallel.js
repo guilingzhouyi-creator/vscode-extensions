@@ -406,6 +406,10 @@ const PARALLEL_SUITES = [
     script: 'scripts/validate-elastic-debt-budget.js',
   },
   {
+    name: 'validate-path-classifier',
+    script: 'scripts/validate-path-classifier.js',
+  },
+  {
     name: 'validate-diff',
     script: 'scripts/validate-diff.js',
   },

@@ -1062,6 +1062,18 @@ export * from './core/intelligence/callChainImpactTracer';
 export * from './core/guidance/agentConstraintGenerator';
 
 // ---- Scale-Adaptive Sparse Review Scheduler & Elastic Code Density ----
+export {
+    type FileCategory,
+    normalizePathForClassification,
+    isFixtureOrMockPath,
+    isBenchmarkPath,
+    isScriptOrGatePath,
+    isDocumentationPath,
+    isGeneratedOrDistPath,
+    isExemptFromArchitectureRules,
+    classifyFilePath,
+    PathClassifier,
+} from './core/path';
 export * from './core/intelligence/code-density-analyzer';
 export * from './core/intelligence/file-role-inference';
 export * from './core/intelligence/elastic-budget-matrix';

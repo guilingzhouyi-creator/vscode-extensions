@@ -45,6 +45,7 @@ import {
 } from '../utils/safe-regex';
 import { scanNativeSecrets } from '../core/native/native-bridge';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
+import { isTestFilePath, isFixtureOrMockPath, isBenchmarkPath } from '../core/path';
 
 /** Named regex source pair used by the built-in and caller-supplied pattern tables. */
 interface PatternDef {
@@ -207,7 +208,10 @@ interface ResolvedEntropyConfig {
 
 function shouldSkipSecrets(normPath: string, level: SecurityLevel, opts: SecretsOptions): boolean {
     if (level === LEVEL_OFF) return true;
-    const isTestOrFixture = /(?:tests?|specs?|fixtures?|mocks?|benchmark)[\\/]/i.test(normPath);
+    const isTestOrFixture =
+        isTestFilePath(normPath) ||
+        isFixtureOrMockPath(normPath) ||
+        isBenchmarkPath(normPath);
     const ignoreInTests =
         opts.ignoreInTests !== undefined ? opts.ignoreInTests : level !== LEVEL_FULL;
     return isTestOrFixture && ignoreInTests;

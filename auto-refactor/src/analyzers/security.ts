@@ -45,6 +45,12 @@ import { SecurityMessages } from '../core/messages/security';
 import { nativeCore } from '../core/native';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { REGEX } from '../core/constants';
+import {
+    isTestFilePath,
+    isFixtureOrMockPath,
+    isBenchmarkPath,
+    isGeneratedOrDistPath,
+} from '../core/path';
 
 /**
  * Optional per-file configuration for the security analyzer.
@@ -96,9 +102,6 @@ const BROKEN_CRYPTO_RE = REGEX.SECURITY.BROKEN_CRYPTO;
 const PATH_TRAVERSAL_RE = REGEX.SECURITY.PATH_TRAVERSAL;
 
 const SENSITIVE_LOG_RE = REGEX.SECURITY.SENSITIVE_LOG;
-
-/** Regex matching file paths treated as tests, fixtures, samples, or benchmarks. */
-const RE_TEST_OR_FIXTURE = /(?:tests?|specs?|fixtures?|samples?|benchmark|dist|mock)/i;
 
 /** Regex matching backslash path separators. */
 const RE_BACKSLASH = /\\/g;
@@ -265,7 +268,13 @@ function normalizePath(filePath: string): string {
 }
 
 function isTestOrFixturePath(file: string): boolean {
-    return !file ? false : RE_TEST_OR_FIXTURE.test(file);
+    if (!file) return false;
+    return (
+        isTestFilePath(file) ||
+        isFixtureOrMockPath(file) ||
+        isBenchmarkPath(file) ||
+        isGeneratedOrDistPath(file)
+    );
 }
 
 function formatIssueId(topic: string, file: string, line: number): string {
