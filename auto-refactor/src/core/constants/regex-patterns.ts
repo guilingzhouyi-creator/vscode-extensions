@@ -1120,6 +1120,7 @@ import { REGEX_GDSCRIPT } from './regex-gdscript';
 import { REGEX_DATA } from './regex-data';
 import { REGEX_GO } from './regex-go';
 import { REGEX_RUST } from './regex-rust';
+import { REGEX_TEST } from './regex-test';
 
 // Re-export domain sub-modules for seamless backward compatibility
 export * from './regex-shell';
@@ -1129,6 +1130,7 @@ export * from './regex-gdscript';
 export * from './regex-data';
 export * from './regex-go';
 export * from './regex-rust';
+export * from './regex-test';
 
 // ============================================================================
 // Master Catalog Facade (export const REGEX)
@@ -1149,5 +1151,6 @@ export const REGEX = Object.freeze({
     DATA: REGEX_DATA,
     GO: REGEX_GO,
     RUST: REGEX_RUST,
+    TEST: REGEX_TEST,
     escape: escapeRegex,
 });

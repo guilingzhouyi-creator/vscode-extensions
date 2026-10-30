@@ -92,6 +92,38 @@ export const PENDING_TODO_FIXME_PATTERN = /\b(?:TODO|FIXME)\b/;
 export const SENSITIVE_FIELD_ASSIGN_PATTERN =
     /\b(?:passwordHash|passwordSalt|secretKey|clientSecret|privateKey|authToken)\s*[:=]/i;
 
+/** Matches internal or administrative API endpoint call expressions. */
+export const INTERNAL_ENDPOINT_CALL_PATTERN =
+    /(?:fetch|axios\.(?:get|post|put|delete)|request)\s*\(\s*['"`](?:https?:\/\/[^'"`]+)?\/(?:api\/)?(?:internal|admin\/internal|actuator|debug|private)\//i;
+
+/** Matches internal or administrative API endpoint path strings. */
+export const INTERNAL_ENDPOINT_PATH_PATTERN =
+    /['"`]\/(?:internal|admin\/internal|actuator|debug)\/[a-zA-Z0-9_/-]+['"`]/i;
+
+/** Matches CSS visual hiding used as authorization on privileged markup elements. */
+export const CSS_AUTH_BYPASS_PATTERN =
+    /<(?:button|div|span|form)[^>]*(?:style\s*=\s*['"][^'"]*display\s*:\s*none|hidden\b)[^>]*(?:admin|manage|delete|grant|privileged)/i;
+
+/** Matches inactive or disabled feature flags delivering dead execution branches to clients. */
+export const FEATURE_FLAG_DEAD_GATE_PATTERN =
+    /\bif\s*\(\s*(?:FEATURE_FLAGS\.[A-Z0-9_]+\s*===?\s*false|!FEATURE_FLAGS\.[A-Z0-9_]+)\s*\)\s*\{/i;
+
+/** Matches unreleased, debug, or internal staging routes packaged for clients. */
+export const CLIENT_DEBUG_ROUTE_PATTERN =
+    /\b(?:path|route)\s*:\s*['"`]\/(?:test|sandbox|debug|preview|internal-only)[a-zA-Z0-9_/-]*['"`]/i;
+
+/** Matches message event listener registrations on window or global context. */
+export const MESSAGE_LISTENER_PATTERN =
+    /(?:addEventListener\s*\(\s*['"`]message['"`]|(?:window\.)?onmessage\s*=)/i;
+
+/** Matches sensitive client-side action triggers requiring user activation. */
+export const SENSITIVE_ACTION_TRIGGER_PATTERN =
+    /\b(?:window\.open\s*\(|localStorage\.setItem\s*\(|sessionStorage\.setItem\s*\(|\.download\s*=|vscode\.postMessage\s*\(|document\.execCommand\s*\()/i;
+
+/** Matches user activation or origin checks guarding synthetic message handling. */
+export const USER_ACTIVATION_OR_ORIGIN_PATTERN =
+    /\b(?:(?:event|e|ev|msg)\.userActivation\b|userActivation\.(?:isActive|hasBeenActive)|\.origin\b)/i;
+
 export const REGEX_SECURITY = Object.freeze({
     HEX_TOKEN_ENTROPY: HEX_TOKEN_ENTROPY_PATTERN,
     PRIVATE_KEY_HEADER: PRIVATE_KEY_HEADER_PATTERN,
@@ -115,4 +147,12 @@ export const REGEX_SECURITY = Object.freeze({
     CONSOLE_DEBUG_TRACE: CONSOLE_DEBUG_TRACE_PATTERN,
     PENDING_TODO_FIXME: PENDING_TODO_FIXME_PATTERN,
     SENSITIVE_FIELD_ASSIGN: SENSITIVE_FIELD_ASSIGN_PATTERN,
+    INTERNAL_ENDPOINT_CALL: INTERNAL_ENDPOINT_CALL_PATTERN,
+    INTERNAL_ENDPOINT_PATH: INTERNAL_ENDPOINT_PATH_PATTERN,
+    CSS_AUTH_BYPASS: CSS_AUTH_BYPASS_PATTERN,
+    FEATURE_FLAG_DEAD_GATE: FEATURE_FLAG_DEAD_GATE_PATTERN,
+    CLIENT_DEBUG_ROUTE: CLIENT_DEBUG_ROUTE_PATTERN,
+    MESSAGE_LISTENER: MESSAGE_LISTENER_PATTERN,
+    SENSITIVE_ACTION_TRIGGER: SENSITIVE_ACTION_TRIGGER_PATTERN,
+    USER_ACTIVATION_OR_ORIGIN: USER_ACTIVATION_OR_ORIGIN_PATTERN,
 });

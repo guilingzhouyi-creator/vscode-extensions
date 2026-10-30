@@ -40,6 +40,7 @@ function checkDomainImmutability() {
     'DATA',
     'GO',
     'RUST',
+    'TEST',
   ];
   for (const domain of requiredDomains) {
     const domainObj = REGEX[domain];
