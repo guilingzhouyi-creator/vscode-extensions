@@ -15,7 +15,11 @@
  */
 
 import type { Issue, ScanReport, Severity } from '../types';
-import type { QualityScoreBreakdown, QualityScoreRationale } from '../scoring/scoringTypes';
+import type {
+    QualityDimension,
+    QualityScoreBreakdown,
+    QualityScoreRationale,
+} from '../scoring/scoringTypes';
 import { ALL_QUALITY_DIMENSIONS, DEFAULT_QUALITY_WEIGHTS } from '../scoring/scoringTypes';
 import {
     filterActiveTopologyBuckets,
@@ -41,6 +45,7 @@ import {
     type AgentAuditReport,
 } from './aas-types';
 import { resolveQualityGrade } from '../scoring/scorer-formulas';
+import { buildFixRecipe } from './aas-remediation';
 
 export * from './aas-types';
 
@@ -50,10 +55,15 @@ const DEFAULT_MAX_TOTAL_DEFECTS = 500;
 const DEFAULT_CONTEXT_RADIUS = 1;
 const DEFAULT_MAX_MESSAGE_CHARS = 160;
 const DEFAULT_BOTTLENECKS_LIMIT = 8;
+const DEFAULT_TOP_BOTTLENECKS_LIMIT = 3;
 const DEFAULT_VERIFY_COMMAND = 'npm test';
 const ELLIPSIS = '…';
 
 const ROUND_SCALE_HUNDRED = 100;
+const ROUND_SCALE_THOUSAND = 1000;
+const MAX_HEALTH_SCORE = 100;
+const HEALTHY_SCORE_THRESHOLD = 90;
+const WARNING_SCORE_THRESHOLD = 75;
 const MAX_SUGGESTION_CHARS = 80;
 const ELLIPSIS_TRUNCATE_CHARS = 77;
 
@@ -288,12 +298,12 @@ function extractTopBottlenecks(lossMap?: Map<string, { loss: number; count: numb
     const totalLoss = sorted.reduce((sum, item) => sum + item.loss, 0);
     return {
         ...(totalLoss > 0 ? { totalLoss } : {}),
-        topBottlenecks: sorted.slice(0, 3),
+        topBottlenecks: sorted.slice(0, DEFAULT_TOP_BOTTLENECKS_LIMIT),
     };
 }
 
 /**
- * Projects detailed ten-dimensional metrics including weights, confidence, and bottlenecks (AAS v1.1).
+ * Projects detailed ten-dimensional metrics with weights and bottlenecks (AAS v1.1).
  */
 function projectDimensionDetails(
     breakdown?: QualityScoreBreakdown,
@@ -307,7 +317,7 @@ function projectDimensionDetails(
 
     Object.entries(breakdown.indices).forEach(([dimension, scoreValue]) => {
         if (typeof scoreValue !== 'number' || !Number.isFinite(scoreValue)) return;
-        const evaluated = !notEvaluatedSet.has(dimension as any);
+        const evaluated = !notEvaluatedSet.has(dimension as QualityDimension);
         const fallbackWeight = (DEFAULT_QUALITY_WEIGHTS as Record<string, number>)[dimension];
         const weightVal = breakdown.weights && typeof (breakdown.weights as Record<string, number>)[dimension] === 'number'
             ? (breakdown.weights as Record<string, number>)[dimension]
@@ -318,7 +328,7 @@ function projectDimensionDetails(
             score: Math.round(scoreValue * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
             grade: resolveQualityGrade(scoreValue),
             evaluated,
-            ...(weightVal !== undefined ? { weight: Math.round(weightVal * 1000) / 1000 } : {}),
+            ...(weightVal !== undefined ? { weight: Math.round(weightVal * ROUND_SCALE_THOUSAND) / ROUND_SCALE_THOUSAND } : {}),
             ...(breakdown.confidence !== undefined
                 ? { confidence: Math.round(breakdown.confidence * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED }
                 : {}),
@@ -422,12 +432,12 @@ function computeDimensionSummary(indices?: Record<string, number>): AasHealth['d
     let warningCount = 0;
     let failingCount = 0;
     let lowestDimension: string | undefined;
-    let lowestScore = 100;
+    let lowestScore = MAX_HEALTH_SCORE;
 
     Object.entries(indices).forEach(([dimension, scoreValue]) => {
         if (typeof scoreValue !== 'number' || !Number.isFinite(scoreValue)) return;
-        if (scoreValue >= 90) healthyCount++;
-        else if (scoreValue >= 75) warningCount++;
+        if (scoreValue >= HEALTHY_SCORE_THRESHOLD) healthyCount++;
+        else if (scoreValue >= WARNING_SCORE_THRESHOLD) warningCount++;
         else failingCount++;
 
         if (scoreValue < lowestScore) {
@@ -537,71 +547,6 @@ function extractBottlenecks(
         if (extractedBottlenecks.length > 0) return extractedBottlenecks;
     }
     return extractFrequencyBottlenecks(report.issues, limit);
-}
-
-/**
- * Resolves concise semantic action verb from canonical rule identifier.
- */
-function resolveActionFromRule(rule: string): string {
-    if (rule.startsWith('NAM-')) return 'rename_identifier';
-    if (rule.startsWith('CST-') || rule === 'hardcoded-string' || rule === 'magic-number') {
-        return 'extract_constant';
-    }
-    if (rule.startsWith('BIG-') || rule === 'large-file') return 'split_file';
-    if (rule.startsWith('CPX-') || rule === 'high-complexity') return 'decompose_complexity';
-    if (rule.startsWith('SIM-')) return 'simplify_code';
-    if (rule.startsWith('PRF-')) return 'optimize_performance';
-    if (rule.startsWith('ARCH-')) return 'decouple_architecture';
-    if (rule.startsWith('DEP-')) return 'resolve_dependency';
-    if (rule.startsWith('SEC-')) return 'harden_security';
-    if (rule.startsWith('HYG-')) return 'sanitize_hygiene';
-    return 'refactor';
-}
-
-/**
- * Extracts concise, single-clause suggestion template (<= 80 chars) to prevent prose bloat.
- */
-function cleanSuggestion(rawContent: string): string | undefined {
-    if (!rawContent) return undefined;
-    let trimmed = rawContent.trim();
-    trimmed = trimmed.replace(
-        /^(?:Please\s+|Consider\s+|It\s+is\s+(?:recommended|required)\s+to\s+|You\s+should\s+|Ensure\s+that\s+|Try\s+to\s+)/i,
-        '',
-    );
-    if (trimmed.length <= MAX_SUGGESTION_CHARS) return trimmed;
-    const match = trimmed.match(/^([^.!?\n]+[.!?]?)/);
-    const firstClause = match
-        ? match[1].trim()
-        : trimmed.slice(0, ELLIPSIS_TRUNCATE_CHARS) + ELLIPSIS;
-    return firstClause.length <= MAX_SUGGESTION_CHARS
-        ? firstClause
-        : firstClause.slice(0, ELLIPSIS_TRUNCATE_CHARS) + ELLIPSIS;
-}
-
-/**
- * Builds actionable remediation recipe from issue metadata.
- */
-function buildFixRecipe(issue: Issue): AasFixRecipe | undefined {
-    const actionable = issue.actionable;
-    if (actionable?.action) {
-        const conciseTemplate = actionable.templateSnippet
-            ? cleanSuggestion(actionable.templateSnippet)
-            : undefined;
-        return {
-            action: actionable.action,
-            ...(actionable.patch ? { patch: actionable.patch } : {}),
-            ...(conciseTemplate ? { template: conciseTemplate } : {}),
-            ...(actionable.safeToAutomate !== undefined ? { safeToAutomate: actionable.safeToAutomate } : {}),
-        };
-    }
-    if (issue.suggestion) {
-        const concise = cleanSuggestion(issue.suggestion);
-        return {
-            action: resolveActionFromRule(issue.rule),
-            ...(concise ? { template: concise } : {}),
-        };
-    }
-    return undefined;
 }
 
 /**

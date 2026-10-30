@@ -84,127 +84,39 @@ export const MAX_VARIABLE_NAME_LENGTH = 42;
 /** Maximum permitted length for function and method identifiers. */
 export const MAX_FUNCTION_NAME_LENGTH = 35;
 
-/**
- * Allowed short identifier names commonly accepted across domains: standard coordinates,
- * loop counters, and explicit discards.
- */
-export const ALLOWED_SHORT_NAMES: ReadonlySet<string> = new Set(
-    'x y z dx dy w h id ip i j k _'.split(' '),
-);
+import {
+    ALLOWED_SHORT_NAMES,
+    ABBREVIATION_PAIRS,
+    COMMON_ABBREVIATIONS,
+    APPROVED_DOMAIN_ABBREVIATIONS,
+    UNAPPROVED_ABBREVIATION_SET,
+    POLYSEMIC_ABBREVIATIONS,
+    PRIMITIVE_TYPE_NAMES,
+    extractMorphemeTokens,
+    appendSegmentTokens,
+    hasSegmentSeparators,
+    getIdentifierTokens,
+    formatTokenCase,
+    inferFromAbbreviationDictionary,
+    findUnapprovedAbbreviation,
+} from './naming-abbreviation-dictionary';
 
-/**
- * Common truncated abbreviations dictionary with standard English expansions.
- */
-const ABBREVIATION_PAIRS: ReadonlyArray<readonly [string, string]> = Object.freeze([
-    ['usr', 'user'],
-    ['mgr', 'manager'],
-    ['btn', 'button'],
-    ['cnt', 'count'],
-    ['ptr', 'pointer'],
-    ['cur', 'current'],
-    ['auth_mgr', 'authManager'],
-    ['tbl', 'table'],
-    ['chk', 'check'],
-    ['cb', 'callback'],
-    ['cfg', 'config'],
-    ['ctx', 'context'],
-    ['doc', 'document'],
-    ['err', 'error'],
-    ['idx', 'index'],
-    ['len', 'length'],
-    ['msg', 'message'],
-    ['num', 'number'],
-    ['pos', 'position'],
-    ['prev', 'previous'],
-    ['req', 'request'],
-    ['res', 'response'],
-    ['src', 'source'],
-    ['str', 'string'],
-    ['fn', 'function'],
-    ['sf', 'sourceFile'],
-    ['db', 'database'],
-    ['fs', 'fileSystem'],
-    ['el', 'element'],
-    ['ns', 'namespace'],
-    ['op', 'operator'],
-    ['re', 'regexPattern'],
-    ['param', 'parameter'],
-    ['arg', 'argument'],
-    ['cmd', 'command'],
-    ['opt', 'option'],
-    ['prop', 'property'],
-    ['val', 'value'],
-]);
-
-/**
- * Common truncated abbreviations dictionary with standard English expansions.
- */
-export const COMMON_ABBREVIATIONS: Readonly<Record<string, string>> = Object.freeze(
-    Object.fromEntries(ABBREVIATION_PAIRS),
-);
-
-/**
- * Approved industry-standard domain abbreviations accepted across engineering teams.
- */
-export const APPROVED_DOMAIN_ABBREVIATIONS: ReadonlySet<string> = new Set([
-    'fs',
-    're',
-    'cmd',
-    'arg',
-    'args',
-    'param',
-    'params',
-    'fn',
-    'db',
-    'prop',
-    'props',
-    'op',
-    'ops',
-    'ns',
-    'ast',
-    'id',
-    'ids',
-    'len',
-    'idx',
-    'src',
-    'dst',
-    'buf',
-    'ctx',
-]);
-
-/**
- * Unapproved abbreviations triggering NAM-ABR-001 warnings.
- */
-export const UNAPPROVED_ABBREVIATION_SET: ReadonlySet<string> = new Set([
-    'usr',
-    'mgr',
-    'btn',
-    'cnt',
-    'ptr',
-    'cur',
-    'auth_mgr',
-    'tbl',
-    'chk',
-    'cb',
-    'sf',
-    'el',
-]);
-
-/**
- * Polysemic abbreviations that introduce semantic ambiguity.
- */
-export const POLYSEMIC_ABBREVIATIONS: ReadonlySet<string> = new Set([
-    'cur',
-    'res',
-    'sec',
-    'auth',
-    'doc',
-    'cnt',
-]);
-
-const PRIMITIVE_TYPE_NAMES: ReadonlySet<string> = new Set(
-    'string number boolean any unknown void never symbol bigint object undefined null'.split(' '),
-);
+export {
+    ALLOWED_SHORT_NAMES,
+    ABBREVIATION_PAIRS,
+    COMMON_ABBREVIATIONS,
+    APPROVED_DOMAIN_ABBREVIATIONS,
+    UNAPPROVED_ABBREVIATION_SET,
+    POLYSEMIC_ABBREVIATIONS,
+    PRIMITIVE_TYPE_NAMES,
+    extractMorphemeTokens,
+    appendSegmentTokens,
+    hasSegmentSeparators,
+    getIdentifierTokens,
+    formatTokenCase,
+    inferFromAbbreviationDictionary,
+    findUnapprovedAbbreviation,
+};
 
 const RISK_LOW = 'Low';
 
@@ -425,106 +337,6 @@ export function inferFromInitializerCall(node: ts.Node | undefined): NamingCandi
     };
 }
 
-const TOKEN_SPLIT_PATTERN = /([A-Z]+(?=[A-Z][a-z0-9]|$)|[A-Z]?[a-z0-9]+)/g;
-
-function extractMorphemeTokens(text: string): string[] {
-    TOKEN_SPLIT_PATTERN.lastIndex = 0;
-    const tokens: string[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = TOKEN_SPLIT_PATTERN.exec(text)) !== null) {
-        if (match[0].length > 0) {
-            tokens.push(match[0]);
-        }
-    }
-    return tokens;
-}
-
-function appendSegmentTokens(segment: string, target: string[]): void {
-    if (!segment) return;
-    const matchedTokens = extractMorphemeTokens(segment);
-    if (matchedTokens.length > 0) {
-        target.push(...matchedTokens);
-    } else {
-        target.push(segment);
-    }
-}
-
-function hasSegmentSeparators(name: string): boolean {
-    return name.includes('_') || name.includes('-');
-}
-
-/**
- * Tokenize an identifier into discrete semantic morpheme tokens.
- * Accurately parses camelCase, PascalCase, snake_case, and UPPER_SNAKE_CASE.
- *
- * @param name - Identifier string to tokenize.
- * @returns Array of morpheme token strings.
- */
-export function getIdentifierTokens(name: string): string[] {
-    if (!name) return [];
-
-    if (!hasSegmentSeparators(name)) {
-        const singleTokens = extractMorphemeTokens(name);
-        return singleTokens.length > 0 ? singleTokens : [name];
-    }
-
-    const segments = name.split(/[_-]+/);
-    const tokens: string[] = [];
-    for (const segment of segments) {
-        appendSegmentTokens(segment, tokens);
-    }
-    return tokens.length > 0 ? tokens : [name];
-}
-
-function formatTokenCase(text: string, isFirst: boolean): string {
-    return isFirst ? text.toLowerCase() : text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-/**
- * Infer naming candidate from abbreviation expansion dictionary (Stage 3).
- *
- * @param name - Identifier name to analyze.
- * @returns Inferred naming candidate or null if no expansion possible.
- */
-export function inferFromAbbreviationDictionary(name: string): NamingCandidate | null {
-    if (!name) return null;
-    const lower = name.toLowerCase();
-
-    if (COMMON_ABBREVIATIONS[lower]) {
-        return {
-            name: COMMON_ABBREVIATIONS[lower],
-            confidence: 0.92,
-            source: SOURCE_ABBREVIATION_EXPANSION,
-            rationale: `Expanded unapproved abbreviation '${name}' -> '${COMMON_ABBREVIATIONS[lower]}'`,
-        };
-    }
-
-    const tokens = getIdentifierTokens(name);
-    if (tokens.length === 0) return null;
-
-    let hasExpanded = false;
-    const expandedTokens = tokens.map((token, tokenIdx) => {
-        const expanded = COMMON_ABBREVIATIONS[token.toLowerCase()];
-        if (expanded) {
-            hasExpanded = true;
-            return formatTokenCase(expanded, tokenIdx === 0);
-        }
-        return formatTokenCase(token, tokenIdx === 0);
-    });
-
-    if (!hasExpanded) return null;
-
-    const candidateName = expandedTokens.join('');
-    if (candidateName === name) return null;
-
-    return {
-        name: candidateName,
-        confidence: 0.92,
-        source: SOURCE_ABBREVIATION_EXPANSION,
-        rationale: `Expanded truncated token segment(s) in identifier '${name}'`,
-    };
-}
-
 /**
  * Three-stage naming candidate inference pipeline.
  *
@@ -562,42 +374,6 @@ export function inferNamingCandidates(name: string, node?: ts.Node): NamingCandi
     }
 
     return deduplicated;
-}
-
-/**
- * Find unapproved abbreviation in an identifier.
- *
- * @param name - Identifier name to inspect.
- * @param allowedCustomSet - Optional custom set of approved domain abbreviation tokens.
- * @returns Unapproved abbreviation record or null if compliant.
- */
-export function findUnapprovedAbbreviation(
-    name: string,
-    allowedCustomSet?: ReadonlySet<string>,
-): { unapproved: string; expanded?: string } | null {
-    if (!name) return null;
-    const lower = name.toLowerCase();
-
-    if (allowedCustomSet?.has(lower) || APPROVED_DOMAIN_ABBREVIATIONS.has(lower)) {
-        return null;
-    }
-
-    if (UNAPPROVED_ABBREVIATION_SET.has(lower)) {
-        return { unapproved: name, expanded: COMMON_ABBREVIATIONS[lower] };
-    }
-
-    const tokens = getIdentifierTokens(name);
-    for (const token of tokens) {
-        const tokenLower = token.toLowerCase();
-        if (allowedCustomSet?.has(tokenLower) || APPROVED_DOMAIN_ABBREVIATIONS.has(tokenLower)) {
-            continue;
-        }
-        if (UNAPPROVED_ABBREVIATION_SET.has(tokenLower)) {
-            return { unapproved: token, expanded: COMMON_ABBREVIATIONS[tokenLower] };
-        }
-    }
-
-    return null;
 }
 
 /** Lightweight contract representing a cross-file symbol query index. */
