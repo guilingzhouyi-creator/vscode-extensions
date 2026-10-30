@@ -1,7 +1,7 @@
 {
   "schema": "global-tooling-rules/v1",
   "generatedAt": "2026-10-22T11:27:31.751Z",
-  "totalRules": 17,
+  "totalRules": 18,
   "rules": [
     {
       "id": "GUARD-CHAIN-001",
@@ -104,6 +104,12 @@
       "family": "GUARD",
       "severity": "error",
       "summary": "Read-only automatic variable shadowing guard: assigning to $HOME, $PSHOME, $PID, $Host, $Error, $ExecutionContext, $ShellId, $PSVersionTable, $IsWindows, $IsLinux, $IsMacOS, $PSCulture, $PSUICulture or $PSEdition throws, so the name keeps its previous value and every later read silently addresses a different object than the author intended."
+    },
+    {
+      "id": "GUARD-JAIL-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Zero-Intersection Path Jail confinement guard: candidate file paths and subagent write scopes must not contain '..' traversal segments, drive or root escapes, or unauthorized cross-session paths."
     }
   ]
 }

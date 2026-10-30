@@ -44,3 +44,18 @@ pub const TIER_CARD_WORKTREE: &str = "card_worktree";
 
 /// Tier descriptor for ephemeral subagent worktree.
 pub const TIER_SUBAGENT_WORKTREE: &str = "subagent_worktree";
+
+/// Path segment identifying telemetry namespace.
+pub const PATH_SEGMENT_TELEMETRY: &str = "telemetry";
+
+/// Path segment identifying telemetry ledger stream.
+pub const PATH_SEGMENT_LEDGER: &str = "ledger";
+
+/// Path segment identifying telemetry summary.
+pub const PATH_SEGMENT_SUMMARY: &str = "summary";
+
+/// Path segment identifying commit telemetry receipts.
+pub const PATH_SEGMENT_COMMIT: &str = "commit";
+
+/// Canonical prefix for all telemetry refs (`refs/fractal/telemetry/`).
+pub const REF_TELEMETRY_PREFIX: &str = "refs/fractal/telemetry/";

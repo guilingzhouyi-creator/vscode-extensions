@@ -77,7 +77,7 @@ flowchart TD
 | **合并与分支拓扑** | 服务端无锁变更集 + Spanner 锁分支 | **In-Core 3-way Tree Merge + 拓扑裁决器**（77.8M op/s CCD v2 偏序验证，虚基底递归合成） | Scion 将合并上移至云端；Taxis 将合并下沉至纯代数内存算子，单节点吞吐远超传统 Git。 |
 | **路径历史回溯过滤** | 服务端异步派生数据生成服务（Derived Data Engine） | **256-bit Murmur3/XXH3 Kirsch-Mitzenmacher 路径 Bloom 过滤器**（161 ns 探测，620万 op/s） | Taxis 在本地二进制中内嵌概率数据结构，99%+ 历史提交可在寄存器级别直接旁路跳过。 |
 | **协议与生态兼容度** | 专有协议与专有客户端，与原生 Git 协议分道 | **双向兼容**：原生 Git 40-byte SHA-1 / PacketLine 协议 + Taxis 自相似分形命名空间 | Taxis 既可作为智能体极速内核，又可随时与现有 GitHub / Git 基础设施无损互通。 |
-| **权限与审查机制** | 配套自研审查系统 **Antique**（独立平台服务） | **原生内置 UAC 阶段晋升账本 + Auto 审查系统质量信封**（1h 租约防覆写，人类单向确认） | Scion 将审查剥离为外置系统；Taxis 将 UAC 权限与质量棘轮作为一等公民内置于状态机。 |
+| **权限与审查机制** | 配套自研审查系统 **Antique**（独立平台服务） | **双自动化区域 + TKCV 5 维形式化验证器 (<5ms) + IKCE 微变异盲测打擂 (K >= 60%) + 密码学影子审计链** | Antique 依赖外部平台服务；Taxis 将形式化推导、变异打擂打假与防篡改影子链直接下沉至内核，抗欺骗能力代际超越。 |
 | **存储峰值与低磁盘弹性** | 强依赖无限云端 Blob 存储与远端截断 | **TIPSE 原位逆向截断/前向打洞 + 微包递进轮转**（峰值空间收敛至 $\max(S_a, S_e) + \Delta_w$） | Scion 依赖无限云端扩展；Taxis 专为受限容器/边缘环境设计，在物理存储紧绷下保持零 ENOSPC 运行。 |
 
 ---
@@ -106,7 +106,9 @@ graph TD
 - **刚性指标**：
   - `sparse_mount_latency_ms`: 虚拟工作树就绪耗时 $\le 5 \text{ ms}$；
   - `first_file_read_latency_us`: 首个源码文件读取耗时 $\le 50 \ \mu\text{s}$；
-  - `cow_cleanup_latency_ms`: 沙箱任务结束回收耗时 $\le 2 \text{ ms}$。
+  - `cow_cleanup_latency_ms`: 沙箱任务结束回收耗时 $\le 2 \text{ ms}$；
+  - `direct_bypass_reclaim_ms`: Direct-Bypass 自动化测试缓存回收耗时 $\le 20 \text{ ms}$；
+  - `tkcv_invariant_verification_ms`: TKCV 5 维形式化不变式推导耗时 $\le 5 \text{ ms}$。
 
 ### 2. 维度二：高并发并发合并与代数合成吞吐（Concurrent Merge Throughput）
 - **基准场景**：模拟 100 个并发智能体在正交路径高频提交；

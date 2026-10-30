@@ -1,7 +1,7 @@
 {
   "schema": "fractal-git-rules/v1",
   "generatedAt": "2026-10-24T08:32:58.507Z",
-  "totalRules": 17,
+  "totalRules": 24,
   "rules": [
     {
       "id": "FGT-COR-001",
@@ -18,38 +18,38 @@
     {
       "id": "FGT-IDX-001",
       "family": "IDX",
-      "severity": "warning",
-      "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution and lock-free slot allocation (advisory: no dedicated executable enforcer yet)"
+      "severity": "error",
+      "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution, lock-free slot allocation, and deterministic read-tree/write-tree round-trip equivalence"
     },
     {
       "id": "FGT-ALG-001",
       "family": "ALG",
-      "severity": "warning",
-      "summary": "Myers diff, 3-way merge, and FastCDC chunking algorithm boundary and determinism guard (advisory: no dedicated executable enforcer yet)"
+      "severity": "error",
+      "summary": "Myers diff, 3-way merge, Interval Tree O(log N + K) overlap query, and FastCDC chunking algorithm boundary and determinism guard"
     },
     {
       "id": "FGT-POL-001",
       "family": "POL",
-      "severity": "warning",
-      "summary": "Resource recycling pool bounded governor: Zero unbounded transient memory allocations and lifecycle reclamation (advisory: no dedicated executable enforcer yet)"
+      "severity": "error",
+      "summary": "Resource recycling pool bounded governor: PathJail confinement, zero unbounded transient memory allocations, and deterministic lifecycle reclamation"
     },
     {
       "id": "FGT-STO-001",
       "family": "STO",
-      "severity": "warning",
-      "summary": "Storage layer crash safety: Append-only WAL journal consistency, loose ODB integrity, and CAS block deduplication (advisory: no dedicated executable enforcer yet)"
+      "severity": "error",
+      "summary": "Storage layer crash safety: Append-only WAL journal consistency, loose ODB integrity, and CAS block deduplication"
     },
     {
       "id": "FGT-TOP-001",
       "family": "TOP",
-      "severity": "warning",
-      "summary": "DAG topology traversal guard: Cycle detection, ancestor generation indexing, and branch divergence safety (advisory: no dedicated executable enforcer yet)"
+      "severity": "error",
+      "summary": "DAG topology traversal and Poset commutation guard: Cycle detection, ancestor generation indexing, and 3-way structural conflict detection"
     },
     {
       "id": "FGT-TRN-001",
       "family": "TRN",
-      "severity": "warning",
-      "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance guard (advisory: no dedicated executable enforcer yet)"
+      "severity": "error",
+      "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance and timeout guard"
     },
     {
       "id": "FGT-GAT-001",
@@ -104,6 +104,48 @@
       "family": "BRG",
       "severity": "error",
       "summary": "Pre-review zone gate bridge verification guard: Strict rule catalog closure and sub-10ms AST slice check"
+    },
+    {
+      "id": "FGT-VRF-001",
+      "family": "VRF",
+      "severity": "error",
+      "summary": "Taxis Kernel Code Verifier (TKCV) formal AST invariant guard: Enforce CFG soundness, handle lifecycle symmetry, parameter arity, and zero transient loop allocations"
+    },
+    {
+      "id": "FGT-MUT-001",
+      "family": "MUT",
+      "severity": "error",
+      "summary": "In-Kernel Canary Engine (IKCE) blind mutation kill rate guard: Candidate verification slice must achieve mutation kill rate K >= threshold with round-trip equivalence"
+    },
+    {
+      "id": "FGT-TAU-001",
+      "family": "TAU",
+      "severity": "error",
+      "summary": "In-Kernel Canary Engine (IKCE) anti-tautology guard: Prohibit vacuous or tautological assertions (assert!(true), identical-operand equality) in verification slices"
+    },
+    {
+      "id": "FGT-BYP-001",
+      "family": "BYP",
+      "severity": "error",
+      "summary": "Direct-Bypass test cache reclamation guard: Transient refs/taxis/test-cache entries must be physically reclaimed immediately after gate evaluation without leaking into canonical CAS"
+    },
+    {
+      "id": "FGT-QRN-001",
+      "family": "QRN",
+      "severity": "error",
+      "summary": "Pre-Review Zone quarantine isolation and Bayesian credit circuit-breaker guard: Candidates failing kernel invariants or credit thresholds must be isolated into refs/taxis/quarantine"
+    },
+    {
+      "id": "FGT-AUD-001",
+      "family": "AUD",
+      "severity": "error",
+      "summary": "Cryptographic shadow audit hash-chain guard: AuditRecord entries must stay <= 350 bytes with strictly monotonic Lamport clocks and verified HMAC-SHA256 signatures"
+    },
+    {
+      "id": "FGT-PYR-001",
+      "family": "PYR",
+      "severity": "error",
+      "summary": "Four-tier pyramid audit folding guard: Milestone card compression and weekly folding must preserve Merkle root integrity and deterministic summary aggregation"
     }
   ]
 }

@@ -666,3 +666,26 @@ fn bundle_prerequisites_are_recorded_and_fetched() {
         "fetched prerequisite bundle tree diverges from the source"
     );
 }
+
+#[test]
+fn quality_trace_and_audit_smoke_test() {
+    let dir = test_temp_dir("quality_trace_");
+    let repo = dir.path().join("repo");
+    fs::create_dir_all(&repo).expect("create repo dir");
+    run_taxis_ok(&repo, &["init"]);
+
+    // Test text trace output
+    let trace_out = run_taxis_ok(&repo, &["quality", "trace"]);
+    assert!(trace_out.contains("TAXIS EVOLUTION QUALITY TRACE"));
+    assert!(trace_out.contains("Pillar 1: Cryptographic Integrity"));
+    assert!(trace_out.contains("Pillar 2: Invariants & Blind Mutation Canary"));
+    assert!(trace_out.contains("Pillar 3: 5D Riemann Phase Space & Technical Debt"));
+
+    // Test json trace output
+    let trace_json = run_taxis_ok(&repo, &["--json", "quality", "trace"]);
+    assert!(trace_json.contains("\"chain_verified\": true"));
+
+    // Test audit output
+    let audit_out = run_taxis_ok(&repo, &["quality", "audit"]);
+    assert!(audit_out.contains("No audit records found"));
+}

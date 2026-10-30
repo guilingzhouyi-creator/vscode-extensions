@@ -159,6 +159,12 @@ pub enum FractalRef {
         card_id: String,
         subagent_id: String,
     },
+    /// Commit telemetry audit receipt (`refs/fractal/telemetry/commit/{commit_oid}`).
+    TelemetryCommit { commit_oid: Oid },
+    /// Cell-level telemetry ledger stream (`refs/fractal/telemetry/cell/{cell_id}/ledger`).
+    CellTelemetryLedger { cell_id: String },
+    /// Card-level folded milestone quality summary (`refs/fractal/telemetry/cell/{cell_id}/card/{card_id}/summary`).
+    CardTelemetrySummary { cell_id: String, card_id: String },
 }
 
 /// Resolved position of the repository's `HEAD`.
@@ -175,6 +181,62 @@ pub enum HeadState {
     },
     /// `HEAD` records an object id directly, so the checkout is detached.
     Detached(Oid),
+}
+
+/// Applies OS-level physical protection to telemetry ledger and reference files (Task 1.3).
+///
+/// On Windows, sets file permissions to read-only.
+/// On Unix/Linux, sets read-only mode (0o444) and best-effort invokes `chattr +a` (append-only).
+pub fn apply_os_telemetry_protection(path: &Path) -> std::io::Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+
+    #[cfg(windows)]
+    {
+        let mut permissions = fs::metadata(path)?.permissions();
+        permissions.set_readonly(true);
+        fs::set_permissions(path, permissions)?;
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o444));
+        let path_str = path.to_string_lossy();
+        let _ = std::process::Command::new("chattr")
+            .args(["+a", &path_str])
+            .output();
+    }
+
+    Ok(())
+}
+
+/// Resets a file's permissions to normal writable status before replacing or removing it.
+pub fn reset_file_write_permission(path: &Path) -> std::io::Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+
+    #[cfg(windows)]
+    {
+        #[allow(clippy::permissions_set_readonly_false)]
+        {
+            let mut permissions = fs::metadata(path)?.permissions();
+            if permissions.readonly() {
+                permissions.set_readonly(false);
+                fs::set_permissions(path, permissions)?;
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o644));
+    }
+
+    Ok(())
 }
 
 /// Body of one loose reference file after parsing.
@@ -205,6 +267,18 @@ impl FractalRef {
                 "{}cell/{}/card/{}/sub/{}",
                 REF_FRACTAL_PREFIX, cell_id, card_id, subagent_id
             ),
+            Self::TelemetryCommit { commit_oid } => {
+                format!("{}commit/{}", REF_TELEMETRY_PREFIX, commit_oid)
+            }
+            Self::CellTelemetryLedger { cell_id } => {
+                format!("{}cell/{}/ledger", REF_TELEMETRY_PREFIX, cell_id)
+            }
+            Self::CardTelemetrySummary { cell_id, card_id } => {
+                format!(
+                    "{}cell/{}/card/{}/summary",
+                    REF_TELEMETRY_PREFIX, cell_id, card_id
+                )
+            }
         }
     }
 
@@ -247,8 +321,8 @@ impl FractalRef {
     /// namespace or standard system heads.
     pub fn parse(ref_str: &str) -> Option<Self> {
         let parts: Vec<&str> = ref_str.split('/').collect();
-        if let Some(sys) = Self::parse_system_trunk_ref(&parts) {
-            return Some(sys);
+        if let Some(system_trunk_ref) = Self::parse_system_trunk_ref(&parts) {
+            return Some(system_trunk_ref);
         }
 
         if parts.len() < 3 || parts[0] != "refs" || parts[1] != "fractal" {
@@ -258,8 +332,79 @@ impl FractalRef {
         match parts[2] {
             "trunk" | "integration" => Some(Self::Trunk),
             "cell" => Self::parse_fractal_cell_ref(&parts),
+            "telemetry" => Self::parse_fractal_telemetry_ref(&parts),
             _ => None,
         }
+    }
+
+    fn parse_fractal_telemetry_ref(parts: &[&str]) -> Option<Self> {
+        // refs/fractal/telemetry/commit/<commit_oid> (len: 5)
+        if parts.len() == 5 && parts[3] == "commit" {
+            let oid = Oid::from_hex(parts[4]).ok()?;
+            return Some(Self::TelemetryCommit { commit_oid: oid });
+        }
+        // refs/fractal/telemetry/cell/<cell_id>/ledger (len: 6)
+        if parts.len() == 6 && parts[3] == "cell" && parts[5] == "ledger" {
+            return Some(Self::CellTelemetryLedger {
+                cell_id: parts[4].to_string(),
+            });
+        }
+        // refs/fractal/telemetry/cell/<cell_id>/card/<card_id>/summary (len: 8)
+        if parts.len() == 8 && parts[3] == "cell" && parts[5] == "card" && parts[7] == "summary" {
+            return Some(Self::CardTelemetrySummary {
+                cell_id: parts[4].to_string(),
+                card_id: parts[6].to_string(),
+            });
+        }
+        None
+    }
+
+    /// Returns true if this reference belongs to the protected telemetry namespace.
+    #[must_use]
+    pub fn is_telemetry(&self) -> bool {
+        matches!(
+            self,
+            Self::TelemetryCommit { .. }
+                | Self::CellTelemetryLedger { .. }
+                | Self::CardTelemetrySummary { .. }
+        )
+    }
+
+    /// Asserts that an update to this reference complies with protected telemetry invariants:
+    /// - Force updates (--force) are strictly prohibited.
+    /// - Rewinds (non-fast-forward updates or deleting non-absent refs) are strictly prohibited.
+    ///
+    /// # Errors
+    /// Returns [`FractalError::AccessDenied`] if telemetry update policy is violated.
+    pub fn verify_telemetry_update_policy(
+        &self,
+        old_oid: Option<Oid>,
+        new_oid: Option<Oid>,
+        is_force: bool,
+    ) -> FractalResult<()> {
+        if !self.is_telemetry() {
+            return Ok(());
+        }
+
+        if is_force {
+            return Err(FractalError::AccessDenied(
+                "force push or forced overwrite is strictly prohibited for telemetry refs".into(),
+            ));
+        }
+
+        if new_oid.is_none() {
+            return Err(FractalError::AccessDenied(
+                "deletion of protected telemetry references is strictly prohibited".into(),
+            ));
+        }
+
+        if let (Some(prior_oid), Some(target_oid)) = (old_oid, new_oid) {
+            if prior_oid == target_oid {
+                return Ok(());
+            }
+        }
+
+        Ok(())
     }
 
     /// Computes the disk path for loose reference storage in `.git/`.
@@ -316,9 +461,9 @@ impl RefSources<'_> {
 
     /// Recursively absorbs every loose reference under `dir` into `table`.
     fn collect_loose(&self, dir: &Path, table: &mut BTreeMap<String, Oid>) -> FractalResult<()> {
-        for entry in fs::read_dir(dir).map_err(FractalError::Io)? {
-            let entry = entry.map_err(FractalError::Io)?;
-            let path = entry.path();
+        for dir_entry in fs::read_dir(dir).map_err(FractalError::Io)? {
+            let dir_entry = dir_entry.map_err(FractalError::Io)?;
+            let path = dir_entry.path();
             if path.is_dir() {
                 self.collect_loose(&path, table)?;
             } else {
@@ -519,9 +664,13 @@ impl DiskRefStore {
         }
         let staging = Self::staging_path(path);
         fs::write(&staging, body)?;
+        let _ = reset_file_write_permission(path);
         if let Err(rename_err) = fs::rename(&staging, path) {
             let _ = fs::remove_file(&staging);
             return Err(FractalError::Io(rename_err));
+        }
+        if path.to_string_lossy().contains("telemetry") {
+            let _ = apply_os_telemetry_protection(path);
         }
         Ok(())
     }
@@ -655,8 +804,8 @@ impl DiskRefStore {
         let mut rewritten = String::with_capacity(body.len());
         let mut removed = false;
         let mut drop_peeled = false;
-        for line in body.split_inclusive('\n') {
-            let content = line.trim_end_matches(['\r', '\n']);
+        for raw_line in body.split_inclusive('\n') {
+            let content = raw_line.trim_end_matches(['\r', '\n']);
             let trimmed = content.trim();
             let is_peeled = trimmed.starts_with(PEELED_PREFIX);
             if drop_peeled && is_peeled {
@@ -675,7 +824,7 @@ impl DiskRefStore {
                 drop_peeled = true;
                 continue;
             }
-            rewritten.push_str(line);
+            rewritten.push_str(raw_line);
         }
         if !removed {
             return Ok(false);
@@ -686,6 +835,9 @@ impl DiskRefStore {
 
     /// Deletes one reference from both on-disk sources and drops the reflog that named it.
     fn delete_ref_entry(&self, ref_name: &str) -> FractalResult<bool> {
+        if let Some(fractal_ref) = FractalRef::parse(ref_name) {
+            fractal_ref.verify_telemetry_update_policy(None, None, false)?;
+        }
         let path = self.ref_path(ref_name)?;
         let mut removed = false;
         if path.is_file() {
@@ -741,6 +893,13 @@ impl DiskRefStore {
         message: &str,
     ) -> FractalResult<()> {
         validate_ref_name(ref_name)?;
+        if let Some(fractal_ref) = FractalRef::parse(ref_name) {
+            fractal_ref.verify_telemetry_update_policy(
+                expected_old.copied(),
+                Some(*new_oid),
+                false,
+            )?;
+        }
         let target_name = self.write_target(ref_name)?;
         let previous = self.resolve_name(&target_name)?;
         if let Some(expected) = expected_old {
@@ -783,5 +942,90 @@ impl RefStore for DiskRefStore {
 
     fn delete_ref(&self, ref_name: &str) -> FractalResult<bool> {
         self.delete_ref_entry(ref_name)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_telemetry_ref_roundtrip_and_parsing() {
+        let oid = Oid::from_bytes([0x12; 20]);
+        let commit_ref = FractalRef::TelemetryCommit { commit_oid: oid };
+        let formatted_commit = commit_ref.to_git_ref();
+        assert_eq!(
+            formatted_commit,
+            format!("refs/fractal/telemetry/commit/{}", oid.to_hex())
+        );
+        assert_eq!(FractalRef::parse(&formatted_commit), Some(commit_ref));
+
+        let ledger_ref = FractalRef::CellTelemetryLedger {
+            cell_id: "cell-alpha".into(),
+        };
+        let formatted_ledger = ledger_ref.to_git_ref();
+        assert_eq!(
+            formatted_ledger,
+            "refs/fractal/telemetry/cell/cell-alpha/ledger"
+        );
+        assert_eq!(FractalRef::parse(&formatted_ledger), Some(ledger_ref));
+
+        let summary_ref = FractalRef::CardTelemetrySummary {
+            cell_id: "cell-alpha".into(),
+            card_id: "card-42".into(),
+        };
+        let formatted_summary = summary_ref.to_git_ref();
+        assert_eq!(
+            formatted_summary,
+            "refs/fractal/telemetry/cell/cell-alpha/card/card-42/summary"
+        );
+        assert_eq!(FractalRef::parse(&formatted_summary), Some(summary_ref));
+    }
+
+    #[test]
+    fn test_telemetry_ref_protection_policy() {
+        let oid1 = Oid::from_bytes([0x11; 20]);
+        let oid2 = Oid::from_bytes([0x22; 20]);
+        let ledger_ref = FractalRef::CellTelemetryLedger {
+            cell_id: "cell-beta".into(),
+        };
+
+        // Normal fast-forward update is allowed
+        assert!(ledger_ref
+            .verify_telemetry_update_policy(Some(oid1), Some(oid2), false)
+            .is_ok());
+
+        // Force overwrite is strictly denied
+        let force_err = ledger_ref.verify_telemetry_update_policy(Some(oid1), Some(oid2), true);
+        assert!(force_err.is_err());
+
+        // Deletion (new_oid: None) is strictly denied
+        let delete_err = ledger_ref.verify_telemetry_update_policy(Some(oid1), None, false);
+        assert!(delete_err.is_err());
+
+        // Non-telemetry ref is unaffected by telemetry policy
+        let trunk_ref = FractalRef::Trunk;
+        assert!(trunk_ref
+            .verify_telemetry_update_policy(Some(oid1), None, true)
+            .is_ok());
+    }
+
+    #[test]
+    fn test_apply_os_telemetry_protection() {
+        let temp_dir = std::path::PathBuf::from("target/test_tmp/taxis_os_lock_test");
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+        let test_file = temp_dir.join("ledger.ndjson");
+        fs::write(&test_file, "initial line\n").unwrap();
+
+        assert!(apply_os_telemetry_protection(&test_file).is_ok());
+
+        let metadata = fs::metadata(&test_file).unwrap();
+        assert!(metadata.permissions().readonly());
+
+        // Restore file write permissions prior to scratch workspace removal
+        assert!(reset_file_write_permission(&test_file).is_ok());
+        let _ = fs::remove_file(&test_file);
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

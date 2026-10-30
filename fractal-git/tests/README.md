@@ -7,7 +7,7 @@
 
 ## 目录分层架构
 
-## 深度测试套件矩阵 (31 项 Rust 集成测试 + 3 项 TypeScript 端到端测试)
+## 深度测试套件矩阵 (911 项 Rust 确定性测试 + 3 项 TypeScript 端到端测试)
 
 | 领域分类 | 测试套件文件 | 覆盖的核心机制与断言重点 |
 | :--- | :--- | :--- |
@@ -17,11 +17,13 @@
 | **虚拟索引与工作树** | `test_index.rs`<br>`test_in_memory_index.rs`<br>`test_bounded_worktree.rs`<br>`test_relocate.rs`<br>`test_project_leases.rs` | 无锁内存虚拟树并发构建、冲突槽四阶段解析、有界工作树生命周期、Junction 重定位、租约控制 |
 | **Git 对等与差分** | `test_git_differential.rs`<br>`test_config_parity.rs`<br>`test_read_commands.rs`<br>`test_edge_porcelain.rs`<br>`test_conflict_modes.rs`<br>`test_submodules.rs` | 系统 Git baseline 57 个向量逐字节差分、配置读写、读命令退出码、瓷器命令边缘用例、子模块路径防护 |
 | **治理生命周期与传输** | `test_governance.rs`<br>`test_governance_pipeline.rs`<br>`test_git_hooks.rs`<br>`test_operations.rs`<br>`test_interactive_operations.rs`<br>`test_pools.rs`<br>`test_refs.rs`<br>`test_uac_promotions.rs`<br>`test_self_hosted_ipc.rs`<br>`test_remote_transport.rs` | 提交信息规范与禁词拦截、分级 Hook 管道、Git 钩子执行器、操作图撤销、内存池复用、引用事务、晋级账本、IPC 帧协议与 Smart Protocol |
+| **内核验证器与影子审计** | `fg-gate` (verifier/canary/credit)<br>`fg-topology` (audit/pyramid) | TKCV 5 维形式化推导不变式断言、IKCE 内存微变异打擂与空断言打假 ($K \ge 60\%$)、Jeffreys Beta(0.5, 0.5) 动态信用更新、`.taxis/quarantine/` 检疫隔离、`refs/fractal/telemetry/*` 影子审计链单向性与 OS 级保护锁 |
 | **TypeScript 端到端** | `fractal-lifecycle.test.ts`<br>`git-parity.test.ts`<br>`workspace-orchestration.test.ts` | 门禁拦截与物理回收、Pure-TS 对象物化差分、多 Agent MCTS 变体打擂与提拔编排 |
 
 ---
 
 ## 验收断言与质量红线
 1. **并发无锁率**：并发多线程构建测试必须保证 `0%` 锁等待或冲突；
-2. **生命周期回收率**：瞬态工作树在合入后物理槽位必须完全回收；
-3. **零孤儿用例**：所有测试用例必须有清晰的断言意图与结构化输入输出，严禁无断言的假测试。
+2. **生命周期回收率**：瞬态工作树在合入后物理槽位必须在 `<50ms` 完全回收，Direct-Bypass 测试缓存 `<20ms` 回收；
+3. **变异杀伤底线**：隐藏微变异打擂击杀率必须满足 $K \ge 60\%$，刚性粉碎空断言；
+4. **零孤儿用例**：所有测试用例必须有清晰的断言意图与结构化输入输出，严禁无断言的假测试。

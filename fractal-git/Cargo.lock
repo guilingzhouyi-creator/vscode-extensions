@@ -176,6 +176,8 @@ dependencies = [
  "fg-core",
  "fg-object",
  "fg-topology",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

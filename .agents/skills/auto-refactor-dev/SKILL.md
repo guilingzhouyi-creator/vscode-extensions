@@ -6,7 +6,7 @@ description: >-
 
 # auto-refactor-dev — 静态重构引擎、双轨算子与 Praxis SDK 开发规范
 
-本技能规范了 `auto-refactor/` 的六层架构、Rust+TS 双轨 100% 字节等价、<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器四阶段流水线（Stage 0~3）、<!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->治理体系（<!-- METRICS:BEGIN test-suite-count -->**185 套**<!-- METRICS:END test-suite-count -->测试）、Praxis 客户端 SDK 与一体两面三层拓扑 Diff 引擎。
+本技能规范了 `auto-refactor/` 的六层架构、Rust+TS 双轨 100% 字节等价、<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器四阶段流水线（Stage 0~3）、<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->治理体系（<!-- METRICS:BEGIN test-suite-count -->**190 套**<!-- METRICS:END test-suite-count -->测试）、Praxis 客户端 SDK 与一体两面三层拓扑 Diff 引擎。
 
 ---
 
@@ -23,9 +23,12 @@ description: >-
 
 ## 一、 六层架构、Rust+TS 双轨等价性与项目中立公理
 
-1. **六层架构**：L1 原生算子（`crates/ops-{diff,graph,pattern,mask,clone}`）$\to$ L2 统一语法树与 8 语言 `SemanticGraph` $\to$ L3（<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->分析器与 <!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->）$\to$ L4 Sparse MoE 路由器与 `<10ms` AST 切片 $\to$ L5 10 支柱质量与 CAI 2.0 演化平面 $\to$ L6 Praxis 交付层；
+1. **六层架构**：L1 原生算子（`crates/ops-{diff,graph,pattern,mask,clone}`）$\to$ L2 统一语法树与 8 语言 `SemanticGraph` $\to$ L3（<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->分析器与 <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->）$\to$ L4 Sparse MoE 路由器与 `<10ms` AST 切片 $\to$ L5 10 支柱质量与 CAI 2.0 演化平面 $\to$ L6 Praxis 交付层；
 2. **Rust+TS 100% 字节等价铁律**：Rust N-API 算子与 `src/core/native/*-shim.ts` 在 JSON 键序、UTF-8/LF 行列偏移、支配树排序与 4 位浮点精度上必须 100% 等价（由 `validate-native-parity.js` 与 `validate-equivalence.js` 看守）；
-3. **项目中立性刚性公理 (`validate-project-neutrality.js`)**：核心分析器与规则严禁硬编码外部特定业务路径（如 `WebGames/` 或 `workspace-timing/` 私有模块名），框架规则仅能通过标准配置指纹（`project.godot`、`package.json`、`go.mod`）推断 `Archetype Context`。
+3. **项目中立性刚性公理 (`validate-project-neutrality.js`)**：核心分析器与规则严禁硬编码外部特定业务路径（如 `WebGames/` 或 `workspace-timing/` 私有模块名），框架规则仅能通过标准配置指纹（`project.godot`、`package.json`、`go.mod`）推断 `Archetype Context`；
+4. **多语言路径分类单一真源库 (`src/core/path/index.ts`)**：全域路径分类与豁免逻辑必须收口于 `PathClassifier` 门面及独立谓词（`isTestFilePath`、`isFixtureOrMockPath`、`isBenchmarkPath`、`isScriptOrGatePath`、`isGeneratedOrDistPath`）。分析器严禁编写私有局部路径正则表达式，杜绝跨语言判定标准漂移与代码冗余；
+5. **进程级缓存治理器接入 (`MemoryGovernor`)**：分析器内长周期驻留的 AST 符号索引或正则模式缓存，必须统一注册至 `sharedMemoryGovernor`（分层指定 `CacheEvictionTier`），在高内存水位下自动淘汰；
+6. **动态弹性债务限额与非一票否决 (`elastic-debt-budget.ts`)**：技术债务增长判定遵循工程规模与健康度自适应动态调节模型，对于 Critical 和 High 级别债务实施风险密度与自适应上限弹性审查，杜绝大仓微幅变动下的机械一票否决。
 
 ---
 
@@ -40,7 +43,9 @@ description: >-
 | **Stage 2: 单文件 AST 与现代化** | `simplify`, `complexity`, `stdlib`, `ts-modern`, `python-modern`, `rust-modern`, `gdscript-modern`, `go-modern`, `frontend` | 单文件 AST 与控制流图（`<10ms` 切片）；平铺逻辑、$\text{CC}\le 15 / \text{Depth}\le 4$、多语言现代惯用法 |
 | **Stage 3: 全工程语义图拓扑** | `performance`, `architecture`, `data-architecture`, `dependency-layout`, `dependency-graph`, `gate-architecture`, `gdscript-game`, `vscode-extension`, `client-exposure`, `test-modernity`, `governance` | 跨文件 `SemanticGraph`（Tarjan SCC / 支配树）；循环零分配、门面承载、依赖环、目录隔离、单源规则核验 |
 
-- **规则登记**：遵循 `FAMILY-TOPIC-NNN`，同步注册于 `src/core/rules/`、`dimensionRuleTable.ts`（单 Finding 扣分维度 $\text{AxesPerFinding} \le 4$）与 `scripts/common/rule-catalog.json`；所有 `scripts/validate-*.js` 必须在 `scripts/test-parallel.js`（<!-- METRICS:BEGIN test-suite-count -->**185 套**<!-- METRICS:END test-suite-count -->测试）显式纳管（`validate-suite-manifest.js`）。
+- **规则登记**：遵循 `FAMILY-TOPIC-NNN`，同步注册于 `src/core/rules/`、`dimensionRuleTable.ts`（单 Finding 扣分维度 $\text{AxesPerFinding} \le 4$）与 `scripts/common/rule-catalog.json`；所有 `scripts/validate-*.js` 必须在 `scripts/test-parallel.js`（<!-- METRICS:BEGIN test-suite-count -->**190 套**<!-- METRICS:END test-suite-count -->测试）显式纳管（`validate-suite-manifest.js`）。
+- **正则常量单一真源 (SSOT) 规范**：分析器内严禁内联局部正则表达式字面量或重复 `new RegExp`，必须收口至 `src/core/constants/regex-patterns.ts` 及其领域子模块（`REGEX.*`），并由 `validate-regex-ssot.js` 断言 100% ReDoS 免疫与零可变状态泄漏；处理含内嵌语法的定界块（如条件内的正则或字符串）时，在确保静态安全的前提下，严禁使用盲目收窄的排除型字符集导致解析截断。
+- **顶层门面通配导出防歧义**：对外入口（`src/api.ts`）在聚合新领域模块时，禁止对存在同名工具函数（如 `isTestFilePath`）的底层模块施加双重通配导出（`export *`），必须采用具名解构导出，杜绝 `TS2308` 导出歧义。
 
 ---
 

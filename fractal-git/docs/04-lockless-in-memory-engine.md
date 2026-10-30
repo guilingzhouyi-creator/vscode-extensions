@@ -80,6 +80,7 @@ sequenceDiagram
   participant Codec as GitObjectCodec
   participant ODB as 本地 .git/objects/
   participant Ref as FractalRef
+  participant Telemetry as 影子审计链 (refs/fractal/telemetry/*)
 
   VFS->>Mat: 传入优胜快照清单 (Vec<CasFileDescriptor>)
   
@@ -94,8 +95,13 @@ sequenceDiagram
   Mat->>Codec: 组装 GitCommit 对象 (Tree OID + Parent OID + Agent Meta)
   Codec->>ODB: 写入 GitCommit 对象
   
-  Mat->>Ref: update_oid(git_dir, commit_oid)
-  Note over Ref: 过渡文件原子 rename 推进指针，耗时 <1ms
+  par 步骤 A：推进代码分支指针
+    Mat->>Ref: update_oid(git_dir, commit_oid)
+    Note over Ref: 过渡文件原子 rename 推进指针，耗时 <1ms
+  and 步骤 B：追加密码学影子审计链
+    Mat->>Telemetry: 追加 SHA-256 哈希块并推进 telemetry 分支
+    Note over Telemetry: 调用 Win32 只读锁 / Linux chattr +a 物理加固
+  end
   
   Mat-->>VFS: 返回物化成功结果 (commit_oid, tree_oid)
 ```
@@ -104,4 +110,5 @@ sequenceDiagram
 - **单个文件 Blob 写入**：$< 0.2\text{ms}$（内存 zlib + 磁盘原子落盘）；
 - **100 个文件嵌套目录树构建**：$< 2\text{ms}$；
 - **端到端 Commit 物化与 Ref 推进**：$< 8\text{ms}$；
+- **影子审计链落盘与 OS 级加固**：$< 1.5\text{ms}$；
 - **多 Agent 并发锁争用发生率**：**0.0%**。

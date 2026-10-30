@@ -56,13 +56,15 @@ pub mod reclaimer {
 pub use fg_core::constants;
 pub use fg_core::error::{FractalError, FractalResult};
 pub use fg_core::models::{
-    ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityTier, AutoQualityScoreEnvelope,
+    ActorIdentity, AgentCommitMeta, AgentPushContext, AuditHashChain, AuditIkceVerdict,
+    AuditRecord, AuditScore, AuditTkcvVerdict, AuthorityTier, AutoQualityScoreEnvelope,
     BlackboardCollision, BlockProvenanceEntry, BlockProvenanceParams, CardBlackboard, ChangeId,
     ConflictPresentationMode, DiffCoherenceMode, FileMode, FileUid, FractalSubLease, GitSignature,
     HumanUacProof, IndexStage, IntentLease, LeaseStatus, MutationBudget, Oid, PraxisCardContext,
     ProjectLease, ProjectLeaseCache, ProvenanceLedger, RegistrationOrigin, ReservationStatus,
     ReservedFileToken, SliceAuthorization, StagedPromotionRequest, StagedPromotionStatus,
-    SubAuthorizationZone, TaxisPolicy, ValidatedCommitWitness,
+    SubAuthorizationZone, TaxisPolicy, UnsignedAuditRecordParams, ValidatedCommitWitness,
+    AUDIT_RECORD_BYTE_BUDGET, GENESIS_PREV_HASH,
 };
 pub use fg_core::traits::{
     AgentWorktreeHandle, GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore,
@@ -135,7 +137,10 @@ pub use fg_topology::operation::{Operation, OperationGraph, OperationMetadata, R
 pub use fg_topology::project_store::{DiskProjectStore, PROJECTS_CACHE_FILE, PROJECTS_DIR};
 pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use fg_topology::provenance::{DiskProvenanceStore, PROVENANCE_FILE};
-pub use fg_topology::refs::{DiskRefStore, FractalRef, HeadState};
+pub use fg_topology::pyramid_folding::{CardMilestoneRecord, PyramidFolder};
+pub use fg_topology::refs::{
+    apply_os_telemetry_protection, reset_file_write_permission, DiskRefStore, FractalRef, HeadState,
+};
 pub use fg_topology::state_machine::{FractalWorkspaceNode, WorktreeState};
 pub use fg_topology::telemetry::{
     CommitCountVerdict, CommitCounter, CommitTelemetryConfig, TelemetryCommitNode,
@@ -149,8 +154,16 @@ pub use fg_transport::packetline::{PacketLine, PKT_DELIM, PKT_FLUSH};
 pub use fg_transport::smart_protocol::ProtocolV2Handler;
 
 // Gate & Policy exports
+pub use fg_gate::auto_audit_hook::AutoAuditHook;
+pub use fg_gate::canary::{
+    CanaryConfig, CanaryReport, MutantDescriptor, MutationKind, ShadowCanaryEngine,
+};
 pub use fg_gate::commit_guard::CommitMessageGuard;
 pub use fg_gate::conflict_guard::ConflictGuard;
+pub use fg_gate::credit::{
+    AgentCreditController, AgentCreditScore, QuarantineLedger, QuarantineRecord,
+    QuarantineRequestParams, QuarantineStatus,
+};
 pub use fg_gate::git_hook::{
     hook_argument_path, GitHookOutcome, GitHookRunner, GitHookStatus, HookConfig,
 };
@@ -160,6 +173,9 @@ pub use fg_gate::hook::{
 };
 pub use fg_gate::pre_receive::PreReceiveGuard;
 pub use fg_gate::quota_governor::QuotaGovernor;
+pub use fg_gate::verifier::{
+    KernelAstVerifier, VerifierConfig, VerifierViolation, ViolationSeverity,
+};
 
 // Benchmark & Performance Ratchet exports
 pub mod bench;

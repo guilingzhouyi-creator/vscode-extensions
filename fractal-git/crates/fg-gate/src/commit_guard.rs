@@ -185,7 +185,9 @@ impl CommitMessageGuard {
                         "GUARD-MSG-001: Mandatory scope is missing in header (expected '<type>(<scope>): <summary>')".into(),
                     );
                 }
-                Some(sc) if sc.is_empty() || sc.chars().any(char::is_whitespace) => {
+                Some(scope_text)
+                    if scope_text.is_empty() || scope_text.chars().any(char::is_whitespace) =>
+                {
                     violations.push(
                         "GUARD-MSG-001: Mandatory scope is empty or contains whitespace".into(),
                     );
@@ -234,8 +236,8 @@ impl CommitMessageGuard {
 
                     let (sec_name, inline_content) = if let Some(colon) = inside.find(':') {
                         let name = inside[..colon].trim();
-                        let val = inside[colon + 1..].trim();
-                        (name, val)
+                        let inline_payload = inside[colon + 1..].trim();
+                        (name, inline_payload)
                     } else {
                         (inside, after)
                     };
@@ -243,11 +245,13 @@ impl CommitMessageGuard {
                     let norm_sec = sec_name.trim().to_string();
                     headings.push((norm_sec.clone(), trimmed.to_string()));
 
-                    let val = inline_content.trim_start_matches(':').trim();
-                    if !val.is_empty() {
-                        current_content.push(val.to_string());
-                        if !norm_sec.eq_ignore_ascii_case("project") && !norm_sec.contains("项目") {
-                            substantive_chars += val.chars().filter(|c| !c.is_whitespace()).count();
+                    let payload_text = inline_content.trim_start_matches(':').trim();
+                    if !payload_text.is_empty() {
+                        current_content.push(payload_text.to_string());
+                        if !norm_sec.eq_ignore_ascii_case("project") && !norm_sec.contains("项目")
+                        {
+                            substantive_chars +=
+                                payload_text.chars().filter(|c| !c.is_whitespace()).count();
                         }
                     }
 
@@ -256,9 +260,9 @@ impl CommitMessageGuard {
                 }
             }
 
-            let is_in_project = current_section.as_ref().is_some_and(|sec| {
-                sec.eq_ignore_ascii_case("project") || sec.contains("项目")
-            });
+            let is_in_project = current_section
+                .as_ref()
+                .is_some_and(|sec| sec.eq_ignore_ascii_case("project") || sec.contains("项目"));
 
             if !is_in_project {
                 substantive_chars += trimmed.chars().filter(|c| !c.is_whitespace()).count();
@@ -281,7 +285,8 @@ impl CommitMessageGuard {
         let lower = name.trim().to_lowercase();
         if lower == "project" || lower == "项目" || lower == "项目归属" {
             1
-        } else if lower == "why" || lower == "动机" || lower == "背景" || lower == "动机背景" {
+        } else if lower == "why" || lower == "动机" || lower == "背景" || lower == "动机背景"
+        {
             2
         } else if matches!(
             lower.as_str(),
@@ -359,8 +364,8 @@ impl CommitMessageGuard {
         if !commit_type.eq_ignore_ascii_case("fix") {
             return;
         }
-        let has_fixed = sections.keys().any(|k| {
-            let lower = k.to_lowercase();
+        let has_fixed = sections.keys().any(|section_key| {
+            let lower = section_key.to_lowercase();
             lower == "fixed" || lower == "修复"
         });
         if !has_fixed {
@@ -443,16 +448,15 @@ impl CommitMessageGuard {
         });
         match found_project {
             None => violations.push("CMG-PRJ-001: Missing mandatory [Project] section".into()),
-            Some((_, val)) => {
+            Some((_, project_tag)) => {
                 if !policy.allowed_projects.is_empty() {
-                    let matches_allowed = policy
-                        .allowed_projects
-                        .iter()
-                        .any(|allowed| val.to_lowercase().contains(&allowed.to_lowercase()));
+                    let matches_allowed = policy.allowed_projects.iter().any(|allowed| {
+                        project_tag.to_lowercase().contains(&allowed.to_lowercase())
+                    });
                     if !matches_allowed {
                         violations.push(format!(
                             "CMG-PRJ-001: Project '{}' not in allowed list: {:?}",
-                            val, policy.allowed_projects
+                            project_tag, policy.allowed_projects
                         ));
                     }
                 }
@@ -566,10 +570,10 @@ impl CommitMessageGuard {
 
         let substantive_count = plain
             .chars()
-            .filter(|&c| {
-                !c.is_whitespace()
+            .filter(|&ch| {
+                !ch.is_whitespace()
                     && !matches!(
-                        c,
+                        ch,
                         '。' | '，'
                             | ','
                             | '、'
@@ -651,7 +655,9 @@ impl CommitMessageGuard {
 
             if policy.require_falsifiable_verification {
                 let assertions = Self::extract_verification_assertions(ver_content);
-                let has_falsifiable = assertions.iter().any(|entry| Self::is_falsifiable_assertion(entry));
+                let has_falsifiable = assertions
+                    .iter()
+                    .any(|entry| Self::is_falsifiable_assertion(entry));
                 if !has_falsifiable {
                     violations.push(
                         "CMG-STY-006: [Verification] must contain at least one substantive falsifiable technical assertion (not a raw shell command or placeholder)".into(),
@@ -685,8 +691,8 @@ impl CommitMessageGuard {
             );
         }
 
-        if let Some(sc) = scope {
-            let norm_scope = sc.to_lowercase();
+        if let Some(declared_scope) = scope {
+            let norm_scope = declared_scope.to_lowercase();
             let is_broad_scope = norm_scope.contains("root")
                 || norm_scope.contains("all")
                 || norm_scope.contains("core");
@@ -695,7 +701,7 @@ impl CommitMessageGuard {
                 if !norm_path.contains(&norm_scope) && !is_broad_scope {
                     violations.push(format!(
                         "FGT-GAT-001: Out-of-scope mutation: path '{}' does not match declared scope '{}'",
-                        path, sc
+                        path, declared_scope
                     ));
                     break;
                 }

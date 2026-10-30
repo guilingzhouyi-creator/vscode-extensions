@@ -13,6 +13,7 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-STO-001`: Storage layer crash safety guard
 //! - `FGT-GAT-001`: Gate and violation boundary isolation guard
+//! - `FGT-QRN-001`: Pre-Review Zone quarantine isolation and circuit-breaker guard
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::FileUid;

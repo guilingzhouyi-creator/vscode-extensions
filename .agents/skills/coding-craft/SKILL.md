@@ -1,12 +1,12 @@
 ---
 name: coding-craft
 description: >-
-  【触发：写代码/重构/命名/错误处理/类型设计/SSOT/空捕获】编写、生成或审查任何代码时必须遵循。坚持命名即契约、显式失败语义、类型穷尽、最小接口暴露与单向依赖，对接 508 条 SSOT 规则。
+  【触发：写代码/重构/命名/错误处理/类型设计/SSOT/空捕获】编写、生成或审查任何代码时必须遵循。坚持命名即契约、显式失败语义、类型穷尽、最小接口暴露与单向依赖，对接 516 条 SSOT 规则。
 ---
 
 # coding-craft — 通用编程工艺、多语言惯用法与六大规范性思维约束
 
-本技能回答**动手写一个函数时，除体积与复杂度预算外必须守住的工艺底线與元认知防线**。规则真源位于 `scripts/common/rule-catalog.json`（<!-- METRICS:BEGIN rule-family-count-all -->**61 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**508 条规则**<!-- METRICS:END rule-total -->）。
+本技能回答**动手写一个函数时，除体积与复杂度预算外必须守住的工艺底线與元认知防线**。规则真源位于 `scripts/common/rule-catalog.json`（<!-- METRICS:BEGIN rule-family-count-all -->**68 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**516 条规则**<!-- METRICS:END rule-total -->）。
 
 ---
 
@@ -26,12 +26,15 @@ description: >-
 | 工艺域 | 刚性可判定判据 | 典型违规反模式（命中即阻断） | 关联规则族 |
 | :--- | :--- | :--- | :--- |
 | **1. 命名即契约** | 不读实现即可推断输入、输出与副作用；函数用动词、布尔用 `is/has/should`、集合用复数；长度 $3\sim 30$ 字符；**兼容别名用具名重导出 `export { orig as alias };`** | `data`、`res`、`tmp`、`handleData`、单字母变量（非循环）、批次代号（`phase2`）、`export const alias = orig;` | `NAM-VAG-001`、`NAM-SGL-001`、`NAM-DEC-001`、`NAM-JRG-002` |
-| **2. 失败语义显式** | 同模块仅用一种失败表达（判别联合 `Result` 或带 `code` 强类型异常）；错误消息含【动作+对象+期望+实际】 | `catch {}` 空捕获、裸 `unwrap()`/`expect()`、`|| true` 吞错、以 `null` 代替失败 | `ERR-FLT-001`、`ERR-MSG-001`、`RSM-UNWRAP-001`、`PS-ERROR-001` |
+| **2. 失败语义显式** | 同模块仅用一种失败表达（判别联合 `Result` 或带 `code` 强类型异常）；错误消息含【动作+对象+期望+实际】；**降级 catch 必须显式注释意图** | `catch {}` 空捕获（`GOV-EXC-001` 定级 Critical）、裸 `unwrap()`/`expect()`、`|| true` 吞错、以 `null` 代替失败 | `ERR-FLT-001`、`ERR-MSG-001`、`GOV-EXC-001`、`RSM-UNWRAP-001`、`PS-ERROR-001` |
 | **3. 类型收窄与穷尽** | 联合类型在消费点经 `switch` + `assertNever` 穷尽；外部数据在入口执行一次 Schema 校验后全程收窄 | `as any`、双重断言 `as unknown as T`、`!` 非空断言、`default: return null` | `TSM-ANY-001`、`TSM-TYPE-001` |
 | **4. 接口最小暴露** | 默认私有，仅跨模块调用方才导出；`export type` 与值分离；门面满足 $\text{ELOC}\ge 15$ 或 `Object.freeze`；**虚表代理豁免标记须落在函数声明行及其上方五行窗口内，`HYG-WRAP-001` 才不会判为空心转发** | 全量 `export *`、为单测导出私有函数、$\le 3$ 行纯转发跳板（见 [facade-discipline](../facade-discipline/SKILL.md)）、豁免注释超出该窗口致漏检 | `EXP-*`、`ARCH-FAC-001`、`ARCH-ABS-001`、`HYG-WRAP-001` |
 | **5. 依赖方向单向** | 严格自上而下 `Interface -> Service -> Domain -> Infra`；同层零环；开发依赖禁入生产路径 | 基础设施反向 import 领域模型、动态 import 掩盖循环依赖、未声明幽灵依赖 | `DEP-INV-001`、`DEP-DEV-001`、`MOD-BWD-001` |
 | **6. 可测性设计** | 时间（`Clock`）与随机（Seed PRNG）可注入；纯计算与薄 I/O 适配层分离；无模块加载期副作用单例 | 函数内直调 `Date.now()`/`Math.random()`、顶层 `setInterval`、同义反复断言 | `TST-DEN-001`、`TST-SKP-001`、`TST-ORC-001`、`TST-TAU-001` |
 | **7. 排版与有效密度** | 单行 $\le 100$ 字符且 Token 密度 $\tau \in [2.5, 22.0]$；形参 $\ge 4$ 封装为只读参数对象；长链式拆为具名中间常量 | 多形参每行一个垂直展开致 $\tau < 2.5$、单行堆叠致 $\tau > 22.0$、孤立标点占行 | `SIM-ARGS-001`、`VOL-DIL-001`、`GUARD-AST-001` |
+
+> [!IMPORTANT]
+> **GOV-EXC-001 异常安全与降级注释契约**：空 `catch {}` 块不仅会吞没未知错误，更会被 AST 语法分析器定级为 Critical 级技术债务阻断门禁。任何预期内的 fail-soft 或降级 catch 块，其体内**必须包含显式意图标注**（如 `// ignore: fallback to cumulative...` 或 `// intentional: soft fail`）。
 
 ---
 
@@ -70,7 +73,7 @@ node scripts/common/evaluate-eloc-budget.js && node scripts/common/validate-code
 
 | 资源 | 用途 |
 | :--- | :--- |
-| [rule-family-map.md](references/rule-family-map.md) | <!-- METRICS:BEGIN rule-family-count-all -->**61 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**508 条规则**<!-- METRICS:END rule-total -->的「一句话准则 + 全量 ID」权威映射表 |
+| [rule-family-map.md](references/rule-family-map.md) | <!-- METRICS:BEGIN rule-family-count-all -->**68 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**516 条规则**<!-- METRICS:END rule-total -->的「一句话准则 + 全量 ID」权威映射表 |
 | [normative-thinking-constraints.md](references/normative-thinking-constraints.md) | Agent 六大高级编程规范性思维约束（状态闭合、双向闭包、反机械应付、负空间、零分配、自证探针） |
 | [python-idioms.md](references/python-idioms.md) | 七域编程工艺改写范例与 `PYM` 族现代 Python 惯用法完整指南 |
 | [code-review-checklist.md](templates/code-review-checklist.md) | 可直接用于评审与自检的七域工艺检查清单 |

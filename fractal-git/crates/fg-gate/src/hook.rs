@@ -226,6 +226,9 @@ impl HookPipeline {
         let mut pipeline = Self::new();
         pipeline.register(Arc::new(HygieneConflictHook));
         pipeline.register(Arc::new(CommitGovernanceHook));
+        pipeline.register(Arc::new(crate::auto_audit_hook::AutoAuditHook::new(
+            HookTier::SubToCard,
+        )));
         pipeline.register(Arc::new(UacPromotionGateHook));
         pipeline
     }

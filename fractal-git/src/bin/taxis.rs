@@ -20,8 +20,8 @@ use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
     archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, commit,
     config, daemon, diff, doctor, hash_object, init, log, merge, operation, project, projection,
-    promotion, quarantine, read, rebase, reclaim, relocate, remote, repack, reset, rev_list,
-    revert, stash, status, submodule, tag, unarchive, undo, verify, worktree,
+    promotion, quality, quarantine, read, rebase, reclaim, relocate, remote, repack, reset,
+    rev_list, revert, stash, status, submodule, tag, unarchive, undo, verify, worktree,
 };
 
 use fg_core::models::current_unix_seconds;
@@ -68,6 +68,7 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["stash"], "stash"),
         (&["wt", "worktree"], "worktree"),
         (&["pm", "promo", "promotion"], "promotion"),
+        (&["quality", "trace"], "quality"),
         (&["quarantine", "quar"], "quarantine"),
         (&["bb", "blackboard"], "blackboard"),
         (&["bench", "benchmark"], "bench"),
@@ -281,6 +282,7 @@ fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
         "config" => config::handle_config(ctx),
         "submodule" => submodule::handle_submodule(ctx),
         "project" => project::handle_project(ctx),
+        "quality" => quality::handle_quality(ctx),
         "quarantine" => quarantine::handle_quarantine(ctx),
         "archive" => archive::handle_archive(ctx),
         "unarchive" => unarchive::handle_unarchive(ctx),

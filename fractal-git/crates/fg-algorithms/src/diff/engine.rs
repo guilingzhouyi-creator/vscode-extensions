@@ -108,7 +108,7 @@ impl DiffEngine {
                     self.compute_imara_flags(old_text, new_text, Algorithm::Histogram)
                 }
             }
-            DiffAlgorithm::Histogram => {
+            DiffAlgorithm::Histogram | DiffAlgorithm::Auto => {
                 self.compute_imara_flags(old_text, new_text, Algorithm::Histogram)
             }
             DiffAlgorithm::Myers => {
@@ -131,7 +131,6 @@ impl DiffEngine {
                 .run(&mut old_changed, &mut new_changed);
                 (old_changed, new_changed)
             }
-            DiffAlgorithm::Auto => unreachable!(),
         }
     }
 

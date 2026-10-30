@@ -30,7 +30,7 @@ description: >-
 2. **实现或优化 Git Plumbing 协议与存储算子**（Loose Object、DIRC 索引、Packfile、Tree Diff、Commit Graph）；
 3. **开发多智能体 Cell 虚拟工作树、并发暂存区或偏序集同态冲突检测（CCD v2）**；
 4. **维护 `fractal-git/src/bin/` 原生命令层（`taxis` CLI）或 `fractal-git/ts/` TypeScript 门面层**；
-5. **排查 `fractal-git` 专属门禁（<!-- METRICS:BEGIN rule-fractal-git -->**17 条规则**<!-- METRICS:END rule-fractal-git -->，`FGT-*`）与 Scion 对标基准回归**。
+5. **排查 `fractal-git` 专属门禁（<!-- METRICS:BEGIN rule-fractal-git -->**24 条规则**<!-- METRICS:END rule-fractal-git -->，`FGT-*`）与 Scion 对标基准回归**。
 
 ---
 
@@ -69,6 +69,12 @@ description: >-
 ### 4. 热路径零瞬态堆分配与双端门面等价 (`FGT-PRF-001` / `FGT-FAC-001` / `FGT-BRG-001`)
 - **池化借还闭环 (`FGT-PRF-001`)**：对象解压、差分扫描与树遍历严禁在循环内分配临时 `Vec<u8>` 或 `String`，一律从 `fg-pools` 借用并在 Drop 时自动归还清空容量；
 - **门面实质承载 (`FGT-FAC-001` / `FGT-BRG-001`)**：每个微 Crate 的 `lib.rs` 及 `fractal-git/ts/` TypeScript 门面必须承载实质协议转换、参数校验或错误映射，严禁 $\le 3$ 行纯透传跳板。
+
+### 5. 双专属自动化区域、内核形式化验证与密码学影子审计链 (`FGT-GAT-001`)
+- **双自动化区域与检疫隔离 (`FGT-BYP-001` / `FGT-QRN-001`)**：高频测试走 Direct-Bypass SSD 内存测试缓存区，`<20ms` 物理回收，绝不向 Git ODB 写入未验证碎片；触发高危违规的快照强制打入 `refs/fractal/quarantine/*` 物理隔离区，提交走预审区（Pre-Review Zone）；
+- **TKCV 形式化推导验证 (`FGT-VRF-001`)**：在内核层执行 5 维代码不变式静态抽象推导（单次 $<5\text{ms}$），刚性拦截虚构代码；
+- **IKCE 隐藏微变异盲测打擂 (`FGT-MUT-001` / `FGT-TAU-001`)**：纯内存注入微变异体，强制要求测试击杀率 $K \ge 60\%$，刚性粉碎空断言与恒真式；
+- **防篡改影子审计链与金字塔折叠 (`FGT-AUD-001` / `FGT-PYR-001`)**：独立维护 `refs/fractal/telemetry/*` HMAC 单向哈希链与四级金字塔时间折叠，施加 OS 底层防护（Win32 只读锁 + Linux `chattr +a` 仅追加属性）。
 
 ---
 

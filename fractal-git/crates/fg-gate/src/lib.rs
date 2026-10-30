@@ -10,19 +10,26 @@
 //! Domain Governance Rules: FGT-GAT-001 (protocol gate facade), FGT-COR-001, CMG-STY-001.
 
 pub mod authority;
+pub mod auto_audit_hook;
+pub mod canary;
 pub mod commit_guard;
 pub mod conflict_guard;
+pub mod credit;
 pub mod git_hook;
 pub mod hook;
 pub mod pre_receive;
 pub mod quota_governor;
+pub mod verifier;
 
 pub use authority::{
     resolve_authority_secret, AuthorityClaims, AuthoritySecret, AUTHORITY_REMEDIATION,
     AUTHORITY_SECRET_ENV,
 };
+pub use auto_audit_hook::AutoAuditHook;
+pub use canary::{CanaryConfig, CanaryReport, MutationKind, ShadowCanaryEngine};
 pub use commit_guard::CommitMessageGuard;
 pub use conflict_guard::ConflictGuard;
+pub use credit::{AgentCreditController, AgentCreditScore, QuarantineRequestParams};
 pub use git_hook::{
     hook_argument_path, read_core_authority_secret, GitHookOutcome, GitHookRunner, GitHookStatus,
     HookConfig,
@@ -35,3 +42,4 @@ pub use pre_receive::{ActorIdentity, AgentPushContext, PreReceiveGuard};
 pub use quota_governor::{
     QuotaGovernor, DEFAULT_MAX_CONCURRENT_WORKTREES, DEFAULT_MAX_WORKSPACE_DISK_BYTES,
 };
+pub use verifier::{KernelAstVerifier, VerifierConfig, VerifierViolation, ViolationSeverity};

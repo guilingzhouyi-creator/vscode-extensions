@@ -33,12 +33,14 @@ const SCAN_TARGETS = Object.freeze([
   '.github/workflows',
   'fractal-git/scripts',
   'fractal-git/ts',
+  'fractal-git/crates',
+  'fractal-git/src',
   'WebGames/scripts',
   'workspace-timing/scripts',
   '.agents/subagents',
 ]);
 
-const SCAN_EXTENSIONS = new Set(['.js', '.ps1', '.sh', '.yml', '.yaml', '.ts', '.md']);
+const SCAN_EXTENSIONS = new Set(['.js', '.ps1', '.sh', '.yml', '.yaml', '.ts', '.rs', '.md']);
 const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', 'archive', 'target', '.godot', 'reports']);
 
 /**

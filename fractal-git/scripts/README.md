@@ -10,7 +10,7 @@
 | 脚本路径 | 平台/Shell | 换行契约 | 核心职责 | 调用示例 |
 | :--- | :--- | :---: | :--- | :--- |
 | **`ps1/build.ps1`** | Windows (pwsh 7+) | **CRLF** | 执行微 Crate 拓扑、Plumbing 等价性、TS 门面与 Rust 完整构建 | `pwsh -File scripts/ps1/build.ps1` |
-| **`ps1/audit-taxis.ps1`** | Windows (pwsh 7+) | **CRLF** | Taxis 五级质量与性能门禁总督（拓扑、767项回归、基准棘轮、综合分、晋级账本） | `pwsh -File scripts/ps1/audit-taxis.ps1 -Fast` |
+| **`ps1/audit-taxis.ps1`** | Windows (pwsh 7+) | **CRLF** | Taxis 五级质量与性能门禁总督（拓扑、911项回归、基准棘轮、综合分、晋级账本） | `pwsh -File scripts/ps1/audit-taxis.ps1 -Fast` |
 | **`ps1/gate-rust.ps1`** | Windows (pwsh 7+) | **CRLF** | Rust 规范质量门禁（rustfmt, clippy -D warnings, 零堆分配, 单测） | `pwsh -File scripts/ps1/gate-rust.ps1` |
 | **`sh/build.sh`** | Linux / WSL (bash) | **LF** | 遵循 `set -euo pipefail` 的 Linux 完整构建与测试流水线 | `bash scripts/sh/build.sh` |
 | **`sh/audit-taxis.sh`** | Linux / WSL (bash) | **LF** | 遵循 `set -euo pipefail` 的 Linux 五级质量门禁运行器 | `bash scripts/sh/audit-taxis.sh` |

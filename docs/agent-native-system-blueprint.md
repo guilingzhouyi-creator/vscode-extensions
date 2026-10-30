@@ -227,7 +227,7 @@ flowchart TD
         AgentBranch["Agent-Worktree 分支 (卡生命周期)"]
     end
 
-    subgraph SubAgentWorktree ["SubAgent 临时工作树 (subagent/temp)"]
+    subgraph SubAgentWorktree ["SubAgent 临时工作树 (subagent/transient)"]
         SubBranch["SubAgent 瞬时分支 (任务级，完成即回收)"]
     end
 
@@ -246,6 +246,14 @@ flowchart TD
 1. **离散事件水位预审（SpacePlan）**：在触碰物理磁盘前，基于宽整型时序仿真计算最低槽位水位，空间不达标提前熔断；
 2. **逆向就地截断与前向打洞（In-Place Extraction）**：逆向解压并动态回收 ZIP/TAR 物理尾部，结合 POSIX/Win32 稀疏文件打洞技术，空间动态反哺；
 3. **微分型包递进轮转（Micro-Pack Slicing）**：流式切片打包松散对象，逐片校验并即时物理销毁旧对象，彻底消融 GC 死锁。
+
+### 3. 双专属自动化提交区域、内核验证器与密码学影子审计链
+为了消解高频多智能体并发测试对 Git DAG 历史的污染、大模型自觉性不可靠导致的虚假测试及作弊代码风险，Taxis 全量落地双专属自动化提交区域与内核形式化验证体系：
+1. **Direct-Bypass 极速自动化测试缓存区**：建立基于 LayerVFS 内存分层与 Direct-Bypass Inode 直通回收机制的专用测试环境，高频测试物理回收延迟 $<20\text{ms}$，绝不向 Git ODB 写入未验证碎片；
+2. **TKCV (Taxis Kernel Correctness Verifier) 形式化推导验证器**：纯内存静态形式化推导 5 维代码不变式（AST 闭包、符号可达、纯函数等价、内存生命周期单向性、类型错误穷尽），单次增量耗时 $<5\text{ms}$，刚性拦截虚构代码；
+3. **IKCE (In-Kernel Canary Engine) 隐藏微变异盲测打擂**：纯内存注入微变异算子，强制要求测试用例变异击杀率 $K \ge 60\%$，彻底粉碎“空断言”与无意义测试打卡作弊；
+4. **Jeffreys Beta(0.5, 0.5) 动态信用评级与检疫隔离**：基于客观共轭后验动态核算 Agent 信用分，分级自适应调度门禁；严重违规时工作树瞬间剥夺写权限并物理移送至 `.taxis/quarantine/` 隔离检疫；
+5. **密码学防篡改影子审计链 (`refs/fractal/telemetry/*`)**：单向不可逆 SHA-256 哈希链，预审物化时双载荷锁定提交与审计块，并施加操作系统底层安全保护（Win32 只读锁 + Linux `chattr +a` 仅追加属性）。
 
 ---
 
@@ -271,8 +279,8 @@ flowchart LR
 ```
 
 ### 1. 单源规则全闭包治理
-全工作区所有规则严格收口至单源目录（SSOT <!-- METRICS:BEGIN rule-total -->**508 条规则**<!-- METRICS:END rule-total -->）：
-- `auto-refactor` 承载 <!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor -->（静态重构与 AST 切片守卫）；
+全工作区所有规则严格收口至单源目录（SSOT <!-- METRICS:BEGIN rule-total -->**516 条规则**<!-- METRICS:END rule-total -->）：
+- `auto-refactor` 承载 <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->（静态重构与 AST 切片守卫）；
 - `workspace-timing` 承载 <!-- METRICS:BEGIN rule-workspace-timing -->**49 条规则**<!-- METRICS:END rule-workspace-timing -->（VS Code 扩展分层与崩溃安全）；
 - `WebGames` 承载 <!-- METRICS:BEGIN rule-webgames -->**50 条规则**<!-- METRICS:END rule-webgames -->（配置驱动与游戏对象池）；
 - 全局基础设施承载 **35 项**基础设施守卫契约（物理卫生八维与脚本同构）；

@@ -1,12 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-23T07:21:49.722Z",
-  "totalRules": 508,
+  "generatedAt": "2026-10-30T06:15:27.493Z",
+  "totalRules": 516,
   "counts": {
-    "autoRefactor": 374,
+    "autoRefactor": 375,
     "workspaceTiming": 49,
     "webGames": 50,
-    "fractalGit": 17,
+    "fractalGit": 24,
     "globalTooling": 18
   },
   "rules": [
@@ -1346,8 +1346,17 @@
       "project": "fractal-git",
       "namespace": "FGT",
       "family": "ALG",
-      "severity": "warning",
-      "summary": "Myers diff, 3-way merge, and FastCDC chunking algorithm boundary and determinism guard (advisory: no dedicated executable enforcer yet)",
+      "severity": "error",
+      "summary": "Myers diff, 3-way merge, Interval Tree O(log N + K) overlap query, and FastCDC chunking algorithm boundary and determinism guard",
+      "canonical": true
+    },
+    {
+      "id": "FGT-AUD-001",
+      "project": "fractal-git",
+      "namespace": "FGT",
+      "family": "AUD",
+      "severity": "error",
+      "summary": "Cryptographic shadow audit hash-chain guard: AuditRecord entries must stay <= 350 bytes with strictly monotonic Lamport clocks and verified HMAC-SHA256 signatures",
       "canonical": true
     },
     {
@@ -1357,6 +1366,15 @@
       "family": "BRG",
       "severity": "error",
       "summary": "Pre-review zone gate bridge verification guard: Strict rule catalog closure and sub-10ms AST slice check",
+      "canonical": true
+    },
+    {
+      "id": "FGT-BYP-001",
+      "project": "fractal-git",
+      "namespace": "FGT",
+      "family": "BYP",
+      "severity": "error",
+      "summary": "Direct-Bypass test cache reclamation guard: Transient refs/taxis/test-cache entries must be physically reclaimed immediately after gate evaluation without leaking into canonical CAS",
       "canonical": true
     },
     {
@@ -1418,8 +1436,8 @@
       "project": "fractal-git",
       "namespace": "FGT",
       "family": "IDX",
-      "severity": "warning",
-      "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution and lock-free slot allocation (advisory: no dedicated executable enforcer yet)",
+      "severity": "error",
+      "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution, lock-free slot allocation, and deterministic read-tree/write-tree round-trip equivalence",
       "canonical": true
     },
     {
@@ -1429,6 +1447,15 @@
       "family": "LCK",
       "severity": "warning",
       "summary": "Lock-free in-memory index concurrency guard: Prohibit blocking standard Mutex in virtual staging tree (advisory: no dedicated executable enforcer yet)",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MUT-001",
+      "project": "fractal-git",
+      "namespace": "FGT",
+      "family": "MUT",
+      "severity": "error",
+      "summary": "In-Kernel Canary Engine (IKCE) blind mutation kill rate guard: Candidate verification slice must achieve mutation kill rate K >= threshold with round-trip equivalence",
       "canonical": true
     },
     {
@@ -1445,8 +1472,8 @@
       "project": "fractal-git",
       "namespace": "FGT",
       "family": "POL",
-      "severity": "warning",
-      "summary": "Resource recycling pool bounded governor: Zero unbounded transient memory allocations and lifecycle reclamation (advisory: no dedicated executable enforcer yet)",
+      "severity": "error",
+      "summary": "Resource recycling pool bounded governor: PathJail confinement, zero unbounded transient memory allocations, and deterministic lifecycle reclamation",
       "canonical": true
     },
     {
@@ -1456,6 +1483,24 @@
       "family": "PRF",
       "severity": "error",
       "summary": "Zero transient heap allocation guard in hot loops: Prohibit string/vec/clone allocation in critical paths (ADV-PRF-002)",
+      "canonical": true
+    },
+    {
+      "id": "FGT-PYR-001",
+      "project": "fractal-git",
+      "namespace": "FGT",
+      "family": "PYR",
+      "severity": "error",
+      "summary": "Four-tier pyramid audit folding guard: Milestone card compression and weekly folding must preserve Merkle root integrity and deterministic summary aggregation",
+      "canonical": true
+    },
+    {
+      "id": "FGT-QRN-001",
+      "project": "fractal-git",
+      "namespace": "FGT",
+      "family": "QRN",
+      "severity": "error",
+      "summary": "Pre-Review Zone quarantine isolation and Bayesian credit circuit-breaker guard: Candidates failing kernel invariants or credit thresholds must be isolated into refs/taxis/quarantine",
       "canonical": true
     },
     {
@@ -1472,8 +1517,17 @@
       "project": "fractal-git",
       "namespace": "FGT",
       "family": "STO",
-      "severity": "warning",
-      "summary": "Storage layer crash safety: Append-only WAL journal consistency, loose ODB integrity, and CAS block deduplication (advisory: no dedicated executable enforcer yet)",
+      "severity": "error",
+      "summary": "Storage layer crash safety: Append-only WAL journal consistency, loose ODB integrity, and CAS block deduplication",
+      "canonical": true
+    },
+    {
+      "id": "FGT-TAU-001",
+      "project": "fractal-git",
+      "namespace": "FGT",
+      "family": "TAU",
+      "severity": "error",
+      "summary": "In-Kernel Canary Engine (IKCE) anti-tautology guard: Prohibit vacuous or tautological assertions (assert!(true), identical-operand equality) in verification slices",
       "canonical": true
     },
     {
@@ -1481,8 +1535,8 @@
       "project": "fractal-git",
       "namespace": "FGT",
       "family": "TOP",
-      "severity": "warning",
-      "summary": "DAG topology traversal guard: Cycle detection, ancestor generation indexing, and branch divergence safety (advisory: no dedicated executable enforcer yet)",
+      "severity": "error",
+      "summary": "DAG topology traversal and Poset commutation guard: Cycle detection, ancestor generation indexing, and 3-way structural conflict detection",
       "canonical": true
     },
     {
@@ -1490,8 +1544,17 @@
       "project": "fractal-git",
       "namespace": "FGT",
       "family": "TRN",
-      "severity": "warning",
-      "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance guard (advisory: no dedicated executable enforcer yet)",
+      "severity": "error",
+      "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance and timeout guard",
+      "canonical": true
+    },
+    {
+      "id": "FGT-VRF-001",
+      "project": "fractal-git",
+      "namespace": "FGT",
+      "family": "VRF",
+      "severity": "error",
+      "summary": "Taxis Kernel Code Verifier (TKCV) formal AST invariant guard: Enforce CFG soundness, handle lifecycle symmetry, parameter arity, and zero transient loop allocations",
       "canonical": true
     },
     {
@@ -2104,10 +2167,10 @@
     },
     {
       "id": "GUARD-FBK-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Gate feedback vocabulary guard: operator-facing feedback must carry semantic step identifiers from the single-source registry and a closed four-state status vocabulary, never positional labels",
+      "summary": "Gate feedback vocabulary guard: operator-facing feedback must carry semantic step identifiers and a closed four-state status vocabulary, never positional labels or status synonyms.",
       "canonical": true
     },
     {
@@ -2132,6 +2195,14 @@
       "family": "GUARD",
       "severity": "error",
       "summary": "Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks.",
+      "canonical": true
+    },
+    {
+      "id": "GUARD-JAIL-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Zero-Intersection Path Jail confinement guard: candidate file paths and subagent write scopes must not contain '..' traversal segments, drive or root escapes, or unauthorized cross-session paths.",
       "canonical": true
     },
     {

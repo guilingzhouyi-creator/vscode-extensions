@@ -10,7 +10,7 @@
 //!   - Exits 128 on missing files or I/O failure, matching Git semantics.
 //!   - Does not require a repository unless `-w` is passed.
 //!
-//! Domain Governance Rules: FGT-OBJ-001 (object codec), FGT-COR-001, FGT-CLI-001.
+//! Domain Governance Rules: FGT-OBJ-001 (object codec), FGT-COR-001, FGT-GAT-001.
 
 use std::fs;
 use std::io::{self, Read};

@@ -11,7 +11,7 @@
 
 而在分形 Git 中，版本控制体系遵循数学意义上的**分形公理（Fractal Axioms）**：
 
-$$\text{FractalNode} = \langle \text{BaselineRef}, \text{PreReviewZone}, \text{GateVerifier}, \text{SpawnChildren}, \text{ReclaimRule} \rangle$$
+$$\text{FractalNode} = \langle \text{BaselineRef}, \text{DirectBypassZone}, \text{PreReviewZone}, \text{KernelVerifier}, \text{TelemetryChain}, \text{ReclaimRule} \rangle$$
 
 ### 1.1 自相似性（Self-Similarity）
 无论是系统级主干、部门级集成分支、任务卡工作树，还是最底层的子智能体探索分支，**每个节点运转着完全同一套状态转移与门禁裁决状态机**：
@@ -20,7 +20,7 @@ $$\text{FractalNode} = \langle \text{BaselineRef}, \text{PreReviewZone}, \text{G
    - 但同一个父级工作树相对于其所在的 Cell 而言，它自身又是一个**“子分支”**；
    - Cell 集成主树相对于内部所有 Agent 而言是**“主干”**，但相对于系统全局 Trunk 而言它又是一个**“子分支”**。
 2. **尺度缩放与无限递归**：
-   当 SubAgent 面临复杂推演时，若需继续派发 Sub-SubAgent（微观变体探针打擂），整套分形拓扑、预审区检验与物化回收规则**无须任何特殊分支代码，天然支持向下无限递归展开与向上收敛**。
+   当 SubAgent 面临复杂推演时，若需继续派发 Sub-SubAgent（微观变体探针打擂），整套分形拓扑、Direct-Bypass 快速测试、预审区检验、TKCV 形式化推导与物化回收规则**无须任何特殊分支代码，天然支持向下无限递归展开与向上收敛**。
 
 ### 1.2 时间尺度分形（Temporal Fractal）
 分形不仅体现在空间命名空间（`refs/fractal/...`）的拓扑嵌套上，更体现在**生命周期的自相似收缩**上：
@@ -82,7 +82,9 @@ $$\text{FractalNode} = \langle \text{BaselineRef}, \text{PreReviewZone}, \text{G
 │  - 纯内存无锁 Tree 结构          │ │  - 完全兼容原生 Git 对象格式   │
 │  - 精确到 AST 符号坐标的指令     │ │  - VS Code UI 双语诊断卡片    │
 │  - LayerVFS CAS 块哈希指纹      │ │  - git log 可读的清晰拓扑图谱 │
-│  - 纳秒级序列化，零多余排版      │ │  - 语义化高对比度状态徽章     │
+│  - TKCV 五维形式化不变式推导    │ │  - 语义化高对比度状态徽章     │
+│  - IKCE 微变异盲测打擂杀伤率    │ │  - 密码学防篡改审计可追溯     │
+│  - 纳秒级序列化，零多余排版      │ │  - 双载荷 Commit 结构完全透明 │
 └─────────────────────────────────┘ └─────────────────────────────────┘
 ```
 
@@ -104,7 +106,7 @@ $$\text{FractalNode} = \langle \text{BaselineRef}, \text{PreReviewZone}, \text{G
 分形 Git 的设计哲学是：**微观层自治，宏观层受控**。
 
 1. **底层机器面（微观放手）**：
-   在 SubAgent $\to$ Parent Card Worktree 阶段，属于每秒发生的高频微观算法打擂，由 Auto 门禁与系统内核全自动流转、自动物化提交、自动物理回收，**无需人类在微观细节上耗费任何精力**；
+   在 SubAgent $\to$ Parent Card Worktree 阶段，属于每秒发生的高频微观算法打擂，由 Direct-Bypass 极速测试缓存、TKCV 形式化推导、IKCE 盲测打擂与系统内核全自动流转、自动物化提交、自动物理回收（$<20\text{ms}$ / $<50\text{ms}$），**无需人类在微观细节上耗费任何精力**；
 2. **人类第一道关卡（战术级·领域把关）——部门集成主树**：
    由 Cell 领域负责人掌舵，通过一体两面的人类卡片审阅部门内各任务卡的整合效果，防范领域逻辑冲突与重复造轮子；
 3. **人类第二道关卡（战略级·发布准入）——全局系统主树**：

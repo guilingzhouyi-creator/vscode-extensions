@@ -159,6 +159,12 @@ impl AuthoritySecret {
         let canonical = format!("{TOKEN_PREFIX}|{subject}|{issued_at}|{expires_at}");
         hmac_sha1(&self.0, canonical.as_bytes())
     }
+
+    /// Signs an arbitrary binary payload with HMAC-SHA1 using this secret.
+    #[must_use]
+    pub fn sign_payload(&self, payload: &[u8]) -> [u8; 20] {
+        hmac_sha1(&self.0, payload)
+    }
 }
 
 /// Returns the current Unix time in seconds, clamped at zero.

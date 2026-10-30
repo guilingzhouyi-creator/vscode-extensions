@@ -1,8 +1,8 @@
 {
   "schema": "auto-refactor-rules-registry-snapshot/v1",
-  "generatedAt": "2026-10-20T09:04:19.010Z",
+  "generatedAt": "2026-10-30T06:58:27.391Z",
   "source": "auto-refactor/dist/core/rules/registry.js",
-  "totalRules": 363,
+  "totalRules": 375,
   "rules": [
     {
       "id": "analyzer-error",
@@ -1013,6 +1013,12 @@
       "summary": "Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun."
     },
     {
+      "id": "GUARD-DESTR-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Recursive delete operand is a filesystem root, an ancestor directory, a home or profile directory, or an expression derived from one through assignments or loop aliases."
+    },
+    {
       "id": "GUARD-ERR-001",
       "family": "GUARD",
       "severity": "error",
@@ -1023,6 +1029,12 @@
       "family": "GUARD",
       "severity": "error",
       "summary": "Gate pipeline lacks static validation for facade substantive bearing (ELOC >= 15) and vacuous forwarding elimination."
+    },
+    {
+      "id": "GUARD-FBK-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate feedback vocabulary guard: operator-facing feedback must carry semantic step identifiers and a closed four-state status vocabulary, never positional labels or status synonyms."
     },
     {
       "id": "GUARD-HOOK-001",
@@ -1091,6 +1103,12 @@
       "summary": "Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected)."
     },
     {
+      "id": "GUARD-VAR-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "PowerShell binding writes a read-only automatic variable, so the write throws and the name keeps its previous value."
+    },
+    {
       "id": "high-algorithmic-complexity",
       "family": "PRF",
       "severity": "warning",
@@ -1137,6 +1155,12 @@
       "family": "HYG",
       "severity": "warning",
       "summary": "Unreachable dead code detected after terminating control flow (return, throw, break, raise)."
+    },
+    {
+      "id": "HYG-DIR-001",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Lingering empty directory: an active source or tooling directory keeps no entries once ignored trees are excluded."
     },
     {
       "id": "HYG-EMP-001",
@@ -2133,6 +2157,54 @@
       "family": "DEP",
       "severity": "warning",
       "summary": "Module is never imported by any other file (outside entry whitelist)."
+    },
+    {
+      "id": "VOL-DIL-001",
+      "family": "VOL",
+      "severity": "error",
+      "summary": "Vertical logic dilution guard: effective logic density must stay inside the dynamic floor, so a file cannot be padded with blank lines or trivial stubs."
+    },
+    {
+      "id": "VOL-DOC-001",
+      "family": "VOL",
+      "severity": "error",
+      "summary": "High-load logic architecture contract guard: modules with ELOC >= 600 must maintain a comment ratio of at least 8%."
+    },
+    {
+      "id": "VOL-ELOC-001",
+      "family": "VOL",
+      "severity": "error",
+      "summary": "Effective code volume budget guard: single file ELOC must not exceed 900."
+    },
+    {
+      "id": "VOL-LOC-001",
+      "family": "VOL",
+      "severity": "error",
+      "summary": "Physical line count budget guard: single file raw LOC must not exceed 1400."
+    },
+    {
+      "id": "VOL-POR-001",
+      "family": "VOL",
+      "severity": "warning",
+      "summary": "Plumbing overhead ratio budget: wiring lines (imports, re-exports, forwarding glue) must not exceed 60% of a module whose role does not make wiring its job."
+    },
+    {
+      "id": "VOL-RATIO-001",
+      "family": "VOL",
+      "severity": "warning",
+      "summary": "Dynamic dilution envelope guard: physical line count must not exceed the 1:3 ratio envelope."
+    },
+    {
+      "id": "VOL-TAU-001",
+      "family": "VOL",
+      "severity": "warning",
+      "summary": "Token density floor: semantic tokens per effective line must not fall below 2.5, so a module cannot be fragmented into lone arguments, isolated brackets, or single-token lines."
+    },
+    {
+      "id": "VOL-TAU-002",
+      "family": "VOL",
+      "severity": "warning",
+      "summary": "Token density ceiling: semantic tokens per effective line must not exceed 22, so a single line cannot pack more concepts than a reader can hold at once."
     },
     {
       "id": "VSC-I18N-001",

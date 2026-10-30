@@ -5,6 +5,7 @@
 //! Responsibilities: Central re-export point for OID, ChangeId, generation numbers, and policy.
 //! Exit Semantics & Design Rationale: Exposes core immutable domain abstractions without cycles.
 
+pub mod audit_chain;
 pub mod authority;
 pub mod blackboard;
 pub mod bloom;
@@ -29,6 +30,10 @@ pub mod slice_auth;
 pub mod submodule;
 pub mod uac;
 
+pub use audit_chain::{
+    AuditHashChain, AuditIkceVerdict, AuditRecord, AuditScore, AuditTkcvVerdict,
+    UnsignedAuditRecordParams, AUDIT_RECORD_BYTE_BUDGET, GENESIS_PREV_HASH,
+};
 pub use authority::{
     current_unix_seconds, AuthorityClaims, AuthoritySecret, AUTHORITY_REMEDIATION,
     AUTHORITY_SECRET_ENV,

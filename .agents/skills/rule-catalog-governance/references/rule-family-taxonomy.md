@@ -6,7 +6,7 @@
 
 ## 一、 核心规则家族前缀矩阵
 
-本表按主题族编排，分组与 [rule-family-map.md](../../coding-craft/references/rule-family-map.md) 逐组对应，共收录 <!-- METRICS:BEGIN rule-family-count-all -->**61 个规则族**<!-- METRICS:END rule-family-count-all -->。族名即 ID 的主题段：规范形取第一段，带项目命名空间的形式（如 `FGT-ALG-001`）取第二段，单段历史 ID 的族由目录生成器显式声明。族名全局唯一，同一族名可以跨项目复用。
+本表按主题族编排，分组与 [rule-family-map.md](../../coding-craft/references/rule-family-map.md) 逐组对应，共收录 <!-- METRICS:BEGIN rule-family-count-all -->**68 个规则族**<!-- METRICS:END rule-family-count-all -->。族名即 ID 的主题段：规范形取第一段，带项目命名空间的形式（如 `FGT-ALG-001`）取第二段，单段历史 ID 的族由目录生成器显式声明。族名全局唯一，同一族名可以跨项目复用。
 
 ### 命名、注释与文档（5 族）
 
@@ -73,31 +73,38 @@
 | 家族 (Family) | 领域职责 | 约束范围与规模 | 典型代表规则 (SSOT 已登记) |
 | :--- | :--- | :--- | :--- |
 | **`GOV`** | 运行时治理契约 | 异常不得吞、日志必须可脱敏、类型契约不得双写、防刷分熔断必须真实触发。族内 36 个 ID，跨 2 个项目（auto-refactor、WebGames） | `GOV-AGN-001` |
-| **`GUARD`** | 门禁与守卫 | AST 切片预算、语义步骤登记、反馈状态词闭包、双平台同构对、SSOT 零漂移。族内 26 个 ID，跨 2 个项目（auto-refactor、global-tooling） | `GUARD-AST-001` |
+| **`GUARD`** | 门禁与守卫 | AST 切片预算、语义步骤登记、反馈状态词闭包、双平台同构对、沙箱隔离与 SSOT 零漂移。族内 27 个 ID，跨 2 个项目（auto-refactor、global-tooling） | `GUARD-AST-001` |
 | **`HYG`** | 物理卫生 | 零空文件、`.ps1` CRLF 其余 LF、UTF-8 无 BOM、单 EOF、纯空格缩进、目录名 kebab-case。族内 19 个 ID，仅 auto-refactor | `HYG-BOM-001` |
 | **`CMG`** | 提交说明规范 | 必填项目归属、实质字数下限、零黑话、零夸大、验证段禁流水账。族内 9 个 ID，仅 global-tooling | `CMG-PRJ-001` |
 | **`RCFG`** | 规则元治理 | 规则 ID 双向闭包、计数口径与真源一致、表现层与底层诊断去重。族内 7 个 ID，跨 2 个项目（workspace-timing、global-tooling），layer L3 | `L3-REVIEW-CONFIG` |
 | **`SCR`** | 脚本库标准（layer: L3） | 脚本命名、头契约与注册表双向完备：既无孤儿也无悬空。族内 5 个 ID，仅 workspace-timing，layer L3 | `L3-SCRIPT-STANDARD` |
 | **`ARF`** | 重构门槛（layer: L5） | 重构必须有净收益与等价性证明，禁止表面搬移。族内 2 个 ID，仅 workspace-timing，layer L5 | `ARF-*` |
 
-### fractal-git 原生内核（14 族）
+### fractal-git 原生内核（21 族）
 
 | 家族 (Family) | 领域职责 | 约束范围与规模 | 典型代表规则 (SSOT 已登记) |
 | :--- | :--- | :--- | :--- |
 | **`ALG`** | 算法等价性 | 原生算子必须与参考实现差分等价。族内 1 个 ID，仅 fractal-git | `FGT-ALG-001` |
+| **`AUD`** | 密码学影子审计链 | 审计记录必须携带 HMAC 签名与前驱哈希链完整性校验。族内 1 个 ID，仅 fractal-git | `FGT-AUD-001` |
 | **`BRG`** | 桥接层 | FFI/桥接边界必须显式声明所有权与生命周期。族内 1 个 ID，仅 fractal-git | `FGT-BRG-001` |
+| **`BYP`** | 测试直通缓存回收 | 高频测试直通工作区必须原子回收且禁止向 Git ODB 写入未验证对象。族内 1 个 ID，仅 fractal-git | `FGT-BYP-001` |
 | **`CAS`** | 无锁 CAS | CAS 循环必须处理 ABA 与内存序。族内 1 个 ID，仅 fractal-git | `FGT-CAS-001` |
 | **`COR`** | 核心不变量 | 核心数据结构的前置/后置不变式必须可断言。族内 1 个 ID，仅 fractal-git | `FGT-COR-001` |
 | **`FAC`** | 门面承载 | crate 门面必须实质承载，禁止空壳转发。族内 1 个 ID，仅 fractal-git | `FGT-FAC-001` |
 | **`GAT`** | 门禁自审 | 内核门禁必须自证检出能力。族内 1 个 ID，仅 fractal-git | `FGT-GAT-001` |
 | **`IDX`** | 索引安全 | 索引访问必须边界检查或形式证明。族内 1 个 ID，仅 fractal-git | `FGT-IDX-001` |
 | **`LCK`** | 锁纪律 | 禁跨 await 持锁、锁粒度最小化。族内 1 个 ID，仅 fractal-git | `FGT-LCK-001` |
+| **`MUT`** | 隐藏微变异盲测 | 微变异盲测击杀率必须满足门禁下界契约。族内 1 个 ID，仅 fractal-git | `FGT-MUT-001` |
 | **`OBJ`** | 对象生命周期 | 对象池借还必须成对且幂等。族内 1 个 ID，仅 fractal-git | `FGT-OBJ-001` |
 | **`POL`** | 策略注入 | 策略必须可替换，禁止硬编码分支。族内 1 个 ID，仅 fractal-git | `FGT-POL-001` |
+| **`PYR`** | 四级金字塔折叠 | 历史审计链分层折叠必须严格保真单向汇总与预算约束。族内 1 个 ID，仅 fractal-git | `FGT-PYR-001` |
+| **`QRN`** | 物理隔离检疫 | 触发高危违规的快照必须打入隔离区并阻断向主干晋升。族内 1 个 ID，仅 fractal-git | `FGT-QRN-001` |
 | **`SAF`** | unsafe 最小化 | `unsafe` 必须有 `// SAFETY:` 证明且作用域最小。族内 1 个 ID，仅 fractal-git | `FGT-SAF-001` |
 | **`STO`** | 存储层 | 持久化写入必须原子且可恢复。族内 1 个 ID，仅 fractal-git | `FGT-STO-001` |
+| **`TAU`** | 反恒真断言检验 | 严禁以空断言或恒真式规避微变异盲测。族内 1 个 ID，仅 fractal-git | `FGT-TAU-001` |
 | **`TOP`** | 拓扑 | 模块拓扑单向，禁止反向引用。族内 1 个 ID，仅 fractal-git | `FGT-TOP-001` |
 | **`TRN`** | 事务 | 事务边界必须显式，失败须回滚。族内 1 个 ID，仅 fractal-git | `FGT-TRN-001` |
+| **`VRF`** | 内核五维形式化验证 | 暂存快照晋升前必须通过五维代码不变式推导校验。族内 1 个 ID，仅 fractal-git | `FGT-VRF-001` |
 
 ---
 

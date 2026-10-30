@@ -129,4 +129,12 @@ pub enum FractalError {
     /// The host filesystem does not support a required capability (e.g. hole punching / sparse files).
     #[error("Unsupported filesystem capability: {0}")]
     UnsupportedFilesystemCapability(String),
+
+    /// A cryptographic audit hash-chain or telemetry signature check failed.
+    #[error("Audit log integrity violation: {0}")]
+    AuditIntegrityViolation(String),
+
+    /// An operation was denied due to namespace protection or permission constraints.
+    #[error("Access denied: {0}")]
+    AccessDenied(String),
 }

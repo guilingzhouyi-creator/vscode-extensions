@@ -71,11 +71,11 @@ flowchart LR
 
 ### 1. 规则总量单源分布矩阵
 
-全工作区单源目录收录规则严格闭环为 <!-- METRICS:BEGIN rule-total -->**508 条规则**<!-- METRICS:END rule-total -->，分布于四大子系统：
+全工作区单源目录收录规则严格闭环为 <!-- METRICS:BEGIN rule-total -->**516 条规则**<!-- METRICS:END rule-total -->，分布于四大子系统：
 
 | 子系统领域 | 规则承载模块 | 规则收录范围 | 核心审查职责 |
 | :--- | :--- | :--- | :--- |
-| **`auto-refactor`** | `src/core/rules/` | <!-- METRICS:BEGIN rule-auto-refactor -->**374 条规则**<!-- METRICS:END rule-auto-refactor --> | 静态分析重构、AST 局部切片守卫、十维质量评分、多语言现代化 |
+| **`auto-refactor`** | `src/core/rules/` | <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor --> | 静态分析重构、AST 局部切片守卫、十维质量评分、多语言现代化 |
 | **`workspace-timing`** | `scripts/src/review/` | <!-- METRICS:BEGIN rule-workspace-timing -->**49 条规则**<!-- METRICS:END rule-workspace-timing --> | VS Code 扩展五层架构解耦、双写崩溃恢复、UI 双语与无障碍 |
 | **`WebGames`** | `mod_sdk/docs/` | <!-- METRICS:BEGIN rule-webgames -->**50 条规则**<!-- METRICS:END rule-webgames --> | 卡拉尔配置驱动、视图单向快照注入、对象池零堆分配、异步排空 |
 | **全局治理与脚本** | `scripts/common/` | **35 项**通用基础设施规则 | 物理卫生八维、双平台脚本同构、递归删除安全、门禁调用契约 |

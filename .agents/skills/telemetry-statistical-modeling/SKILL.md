@@ -81,7 +81,19 @@ description: >-
 
 ---
 
-## 六、 验证命令与关联资产
+## 六、 弹性技术债务自适应限额数学模型 (Elastic Debt Budgeting Model)
+
+针对大型与异构工程，技术债务增长判定绝非僵死的一票否决，而是基于**工程规模与健康度自适应调节**的弹性包络模型：
+1. **复合调节因子计算**：
+   $$\text{scaleFactor} = \max\left(1.0, \sqrt{\frac{N_{\text{files}}}{200}}\right), \quad \text{healthFactor} = \max\left(0.5, \frac{S_{\text{composite}}}{100}\right), \quad \text{combinedFactor} = \text{scaleFactor} \times \text{healthFactor}$$
+2. **动态增长上限自适应平滑上浮**：
+   $$\text{effectiveGrowthLimit} = \max\left(\text{DEFAULT\_LIMIT}, \lfloor \text{DEFAULT\_LIMIT} \times \text{combinedFactor} \rfloor\right)$$
+3. **分层弹性审查与 PERMITTED_ELASTIC 裁定**：
+   - **Critical / High 债务弹性审查**：依据全仓文件规模自适应赋予微幅弹性缓冲（如 Critical 允许量 $\lfloor 0.005 \times N_{\text{files}} \rfloor$，High 允许量 $\lfloor 0.015 \times N_{\text{files}} \rfloor$），在加权总分未突破且健康度极佳时判定为 `PERMITTED_ELASTIC` 合法放行，杜绝良性微构下的误拦截。
+
+---
+
+## 七、 验证命令与关联资产
 
 ```powershell
 node auto-refactor/scripts/validate-autonomy-scorer.js && node auto-refactor/scripts/validate-project-neutrality.js

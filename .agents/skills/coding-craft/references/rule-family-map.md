@@ -333,13 +333,13 @@
 
 ### `GUARD` — 门禁与守卫
 
-准则：AST 切片预算、语义步骤登记、反馈状态词闭包、双平台同构对、SSOT 零漂移。
+准则：AST 切片预算、语义步骤登记、反馈状态词闭包、双平台同构对、沙箱边界与 SSOT 零漂移。
 
 - **error**：`GUARD-AST-001`、`GUARD-BASE-001`、`GUARD-CHAIN-001`、`GUARD-COUNT-001`、`GUARD-DESTR-001`、
   `GUARD-DOC-001`、`GUARD-ENT-001`、`GUARD-ERR-001`、`GUARD-FAC-001`、`GUARD-FBK-001`、`GUARD-HYG-001`、
-  `GUARD-ISO-001`、`GUARD-MSG-001`、`GUARD-MSG-002`、`GUARD-MSG-003`、`GUARD-ORD-001`、`GUARD-PROC-001`、
-  `GUARD-ROUTE-001`、`GUARD-SHELL-001`、`GUARD-SSOT-001`、`GUARD-STEP-001`、`GUARD-SYS-001`、
-  `GUARD-VAR-001`
+  `GUARD-ISO-001`、`GUARD-JAIL-001`、`GUARD-MSG-001`、`GUARD-MSG-002`、`GUARD-MSG-003`、`GUARD-ORD-001`、
+  `GUARD-PROC-001`、`GUARD-ROUTE-001`、`GUARD-SHELL-001`、`GUARD-SSOT-001`、`GUARD-STEP-001`、
+  `GUARD-SYS-001`、`GUARD-VAR-001`
 - warning / info：`GUARD-BUDGET-001`、`GUARD-HOOK-001`、`GUARD-PAIR-001`
 
 ### `HYG` — 物理卫生
@@ -385,13 +385,25 @@
 
 准则：原生算子必须与参考实现差分等价。
 
-- warning / info：`FGT-ALG-001`
+- **error**：`FGT-ALG-001`
+
+### `AUD` — 密码学影子审计链
+
+准则：审计记录必须携带 HMAC 签名与前驱哈希链完整性校验。
+
+- **error**：`FGT-AUD-001`
 
 ### `BRG` — 桥接层
 
 准则：FFI/桥接边界必须显式声明所有权与生命周期。
 
 - **error**：`FGT-BRG-001`
+
+### `BYP` — 测试直通缓存回收
+
+准则：高频测试直通工作区必须原子回收且禁止向 Git ODB 写入未验证对象。
+
+- **error**：`FGT-BYP-001`
 
 ### `CAS` — 无锁 CAS
 
@@ -421,13 +433,19 @@
 
 准则：索引访问必须边界检查或形式证明。
 
-- warning / info：`FGT-IDX-001`
+- **error**：`FGT-IDX-001`
 
 ### `LCK` — 锁纪律
 
 准则：禁跨 await 持锁、锁粒度最小化。
 
 - warning / info：`FGT-LCK-001`
+
+### `MUT` — 隐藏微变异盲测
+
+准则：微变异盲测击杀率必须满足门禁下界契约。
+
+- **error**：`FGT-MUT-001`
 
 ### `OBJ` — 对象生命周期
 
@@ -439,7 +457,19 @@
 
 准则：策略必须可替换，禁止硬编码分支。
 
-- warning / info：`FGT-POL-001`
+- **error**：`FGT-POL-001`
+
+### `PYR` — 四级金字塔折叠
+
+准则：历史审计链分层折叠必须严格保真单向汇总与预算约束。
+
+- **error**：`FGT-PYR-001`
+
+### `QRN` — 物理隔离检疫
+
+准则：触发高危违规的快照必须打入隔离区并阻断向主干晋升。
+
+- **error**：`FGT-QRN-001`
 
 ### `SAF` — unsafe 最小化
 
@@ -451,18 +481,30 @@
 
 准则：持久化写入必须原子且可恢复。
 
-- warning / info：`FGT-STO-001`
+- **error**：`FGT-STO-001`
+
+### `TAU` — 反恒真断言检验
+
+准则：严禁以空断言或恒真式规避微变异盲测。
+
+- **error**：`FGT-TAU-001`
 
 ### `TOP` — 拓扑
 
 准则：模块拓扑单向，禁止反向引用。
 
-- warning / info：`FGT-TOP-001`
+- **error**：`FGT-TOP-001`
 
 ### `TRN` — 事务
 
 准则：事务边界必须显式，失败须回滚。
 
-- warning / info：`FGT-TRN-001`
+- **error**：`FGT-TRN-001`
+
+### `VRF` — 内核五维形式化验证
+
+准则：暂存快照晋升前必须通过五维代码不变式推导校验。
+
+- **error**：`FGT-VRF-001`
 
 ---

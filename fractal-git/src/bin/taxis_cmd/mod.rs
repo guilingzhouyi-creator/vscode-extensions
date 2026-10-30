@@ -37,6 +37,7 @@ pub mod operation;
 pub mod project;
 pub mod projection;
 pub mod promotion;
+pub mod quality;
 pub mod quarantine;
 pub mod read;
 pub mod read_cat_file;

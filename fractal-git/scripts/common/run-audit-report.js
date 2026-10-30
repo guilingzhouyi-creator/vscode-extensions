@@ -353,6 +353,13 @@ async function main() {
       anti_gaming_passed: finalAntiGaming,
       summary_report: `Auto-Refactor Quality Gate: ${passChecks}/${totalChecks} checks green, Composite=${finalCompositeScore}, CAI=${caiLabel}, structural deltas unmeasured`,
     },
+    taxisVerification: {
+      tkcvInvariantsClean: staticPassCount === staticCheckers.length,
+      ikceSuitePassed: testResult.isClean,
+      bayesianCreditScore: bayesian.credibleScore,
+      bayesianCiLower: finalCiLower,
+      auditRecordByteCeiling: 350,
+    },
     violations,
     warnings,
   };
