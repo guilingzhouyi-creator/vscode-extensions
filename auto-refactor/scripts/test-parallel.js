@@ -390,6 +390,18 @@ const PARALLEL_SUITES = [
     script: 'scripts/validate-security.js',
   },
   {
+    name: 'validate-pools-optimization',
+    script: 'scripts/validate-pools-optimization.js',
+  },
+  {
+    name: 'validate-ast-query',
+    script: 'scripts/validate-ast-query.js',
+  },
+  {
+    name: 'validate-memory-governor',
+    script: 'scripts/validate-memory-governor.js',
+  },
+  {
     name: 'validate-diff',
     script: 'scripts/validate-diff.js',
   },

@@ -20,6 +20,7 @@
 
 import type { NormalizedNode } from './multilang';
 import { fastDigest } from '../memory/domainFingerprint';
+import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
 
 /** Default minimum matching lines required to trigger AST subtree reuse. */
 export const DEFAULT_MIN_MATCH_LINES = 3;
@@ -128,6 +129,7 @@ export class AstPrefixRadixCache {
     private hitCount = 0;
     private missCount = 0;
     private totalMatchedLinesSum = 0;
+    private readonly unregister?: () => void;
 
     public constructor(options: AstPrefixRadixCacheOptions = {}) {
         this.minMatchLines = options.minMatchLines ?? DEFAULT_MIN_MATCH_LINES;
@@ -143,6 +145,21 @@ export class AstPrefixRadixCache {
             lastAccessTime: Date.now(),
             hitCount: 0,
         };
+
+        this.unregister = sharedMemoryGovernor.register({
+            name: 'ast-prefix-radix-cache',
+            tier: CacheEvictionTier.Intermediate,
+            clear: () => this.clear(),
+            getSize: () => this.nodeCount,
+        });
+    }
+
+    /**
+     * Unregisters this cache from the global memory governor and clears entries.
+     */
+    public dispose(): void {
+        this.clear();
+        this.unregister?.();
     }
 
     /**

@@ -46,6 +46,7 @@ import {
 } from './aas-types';
 import { resolveQualityGrade } from '../scoring/scorer-formulas';
 import { buildFixRecipe } from './aas-remediation';
+import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
 
 export * from './aas-types';
 
@@ -199,9 +200,25 @@ export function compressDiagnosticSentence(rawText: string): string {
 class AnchorCache {
     private readonly cache = new Map<string, string | null>();
     private readonly customReader?: (relPath: string) => string | undefined;
+    private readonly unregister?: () => void;
 
     constructor(customReader?: (relPath: string) => string | undefined) {
         this.customReader = customReader;
+        this.unregister = sharedMemoryGovernor.register({
+            name: 'aas-reporter:anchor-cache',
+            tier: CacheEvictionTier.Ephemeral,
+            clear: () => this.clear(),
+            getSize: () => this.cache.size,
+        });
+    }
+
+    public clear(): void {
+        this.cache.clear();
+    }
+
+    public dispose(): void {
+        this.clear();
+        this.unregister?.();
     }
 
     public getAnchor(
