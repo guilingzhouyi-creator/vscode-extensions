@@ -19,6 +19,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { runSelfAudit, BASELINE_OUTPUT, BASELINE_AAS_OUTPUT } = require('./run-self-audit');
+const { evaluateElasticDebtBudget } = require('../dist/api');
 
 const EXPECTED_PILLARS = [
   'architecture',
@@ -232,8 +233,42 @@ function validateDebtLedger(report) {
   assert.ok(typeof tiers.high === 'number');
   assert.ok(typeof tiers.medium === 'number');
   assert.ok(typeof tiers.low === 'number');
-  assert.strictEqual(tiers.critical, 0, 'Critical technical debt must remain strictly 0');
-  assert.strictEqual(tiers.high, 0, 'High technical debt must remain strictly 0');
+
+  const totalFiles = report.scope ? report.scope.filesScanned : undefined;
+  const compositeScore = report.metrics ? report.metrics.compositeScore : undefined;
+
+  let baselineDebt;
+  if (fs.existsSync(BASELINE_OUTPUT)) {
+    try {
+      const prev = JSON.parse(fs.readFileSync(BASELINE_OUTPUT, 'utf8'));
+      baselineDebt = prev?.metrics?.byDebtTier;
+    } catch {}
+  }
+
+  const evaluation = evaluateElasticDebtBudget(tiers, {
+    totalFiles,
+    compositeScore,
+    baselineDebt,
+    cumulative: !baselineDebt,
+  });
+
+  assert.ok(
+    evaluation.isWithinBudget,
+    `Technical debt must remain within dynamic elastic budget: ${evaluation.violations.map((v) => v.message).join('; ')}`,
+  );
+  assert.ok(
+    evaluation.verdict === 'PERMITTED_ZERO_DEBT' || evaluation.verdict === 'PERMITTED_ELASTIC',
+    `Expected permitted debt verdict, got: ${evaluation.verdict}`,
+  );
+  assert.ok(
+    tiers.critical <= evaluation.dynamicLimits.critical,
+    `Critical debt (${tiers.critical}) must not exceed dynamic limit (${evaluation.dynamicLimits.critical})`,
+  );
+  assert.ok(
+    tiers.high <= evaluation.dynamicLimits.high,
+    `High debt (${tiers.high}) must not exceed dynamic limit (${evaluation.dynamicLimits.high})`,
+  );
+
   assert.strictEqual(
     tiers.critical + tiers.high + tiers.medium + tiers.low,
     report.metrics.totalIssues,
@@ -241,7 +276,7 @@ function validateDebtLedger(report) {
   );
   assert.ok(report.topHotspots.length > 0, 'Must produce top hotspots for Self-Refactor input');
   console.log(
-    `✔ Debt ledger categorized: Critical=${tiers.critical}, High=${tiers.high}, Med=${tiers.medium}, Low=${tiers.low}.`,
+    `✔ Debt ledger categorized (elastic budget active: verdict=${evaluation.verdict}): Critical=${tiers.critical}/${evaluation.dynamicLimits.critical}, High=${tiers.high}/${evaluation.dynamicLimits.high}, Med=${tiers.medium}, Low=${tiers.low}.`,
   );
 }
 

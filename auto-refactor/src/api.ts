@@ -1065,6 +1065,7 @@ export * from './core/guidance/agentConstraintGenerator';
 export * from './core/intelligence/code-density-analyzer';
 export * from './core/intelligence/file-role-inference';
 export * from './core/intelligence/elastic-budget-matrix';
+export * from './core/intelligence/elastic-debt-budget';
 export * from './core/intelligence/bumpy-road-analyzer';
 export * from './core/intelligence/main-sequence-evaluator';
 export * from './core/intelligence/compression-distance';

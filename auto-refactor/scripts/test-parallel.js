@@ -402,6 +402,10 @@ const PARALLEL_SUITES = [
     script: 'scripts/validate-memory-governor.js',
   },
   {
+    name: 'validate-elastic-debt-budget',
+    script: 'scripts/validate-elastic-debt-budget.js',
+  },
+  {
     name: 'validate-diff',
     script: 'scripts/validate-diff.js',
   },

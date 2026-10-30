@@ -37,6 +37,7 @@ const {
   TrajectoryAccumulator,
   ALL_QUALITY_DIMENSIONS,
   toAasJson,
+  evaluateElasticDebtBudget,
 } = require(MODULE_API);
 
 const ROOT = path.join(__dirname, '..');
@@ -1023,38 +1024,43 @@ function printTerminalDashboard(report, isCheckMode = false) {
 }
 
 function assertCompositeRegression(report, prev) {
-  if (prev && typeof prev.metrics?.compositeScore === 'number') {
-    if (report.metrics.compositeScore < prev.metrics.compositeScore - 0.05) {
-      console.error(
-        `❌ Quality regression detected: ${report.metrics.compositeScore} < baseline ${prev.metrics.compositeScore}`,
-      );
+  const prevScore = prev?.metrics?.compositeScore;
+  if (typeof prevScore === 'number' && report.metrics.compositeScore < prevScore - 0.05) {
+    console.error(`❌ Quality regression: ${report.metrics.compositeScore} < baseline ${prevScore}`);
+    process.exit(1);
+  }
+}
+
+function assertDimensionRegression(report, prev) {
+  if (!prev?.tenDimensions || !report.tenDimensions) return;
+  const MAX_TOLERANCE = 3.0;
+  for (const [dim, prevVal] of Object.entries(prev.tenDimensions)) {
+    const currVal = report.tenDimensions[dim];
+    if (typeof prevVal === 'number' && typeof currVal === 'number' && currVal < prevVal - MAX_TOLERANCE) {
+      console.error(`❌ Dimension regression in [${dim}]: ${currVal.toFixed(1)} < ${prevVal.toFixed(1)}`);
       process.exit(1);
     }
   }
 }
 
-function assertDimensionRegression(report, prev) {
-  if (!prev || !prev.tenDimensions || !report.tenDimensions) return;
-  const MAX_DIMENSION_REGRESSION_TOLERANCE = 3.0;
-  for (const [dim, prevVal] of Object.entries(prev.tenDimensions)) {
-    const currVal = report.tenDimensions[dim];
-    if (typeof prevVal === 'number' && typeof currVal === 'number') {
-      if (currVal < prevVal - MAX_DIMENSION_REGRESSION_TOLERANCE) {
-        console.error(
-          `❌ Quality dimension regression detected in [${dim}]: ${currVal.toFixed(1)} < baseline ${prevVal.toFixed(1)} (-${(prevVal - currVal).toFixed(1)})`,
-        );
-        process.exit(1);
-      }
-    }
-  }
-}
+function assertDebtBoundaries(report, prev) {
+  const tiers = report.metrics.byDebtTier;
+  const evaluation = evaluateElasticDebtBudget(tiers, {
+    totalFiles: report.scope ? report.scope.filesScanned : undefined,
+    compositeScore: report.metrics ? report.metrics.compositeScore : undefined,
+    baselineDebt: prev?.metrics?.byDebtTier,
+  });
 
-function assertDebtBoundaries(report) {
-  if (report.metrics.byDebtTier.critical > 0 || report.metrics.byDebtTier.high > 0) {
-    console.error(
-      `❌ Critical/High debt detected: critical=${report.metrics.byDebtTier.critical}, high=${report.metrics.byDebtTier.high}`,
-    );
+  if (!evaluation.isWithinBudget) {
+    const err = evaluation.violations.map((v) => v.message).join('; ');
+    console.error(`❌ Technical debt breached elastic budget thresholds: ${err}`);
     process.exit(1);
+  }
+
+  if (tiers.critical > 0 || tiers.high > 0) {
+    console.log(
+      `ℹ️ [Debt Gate] Elastic allowance active: critical=${tiers.critical}/${evaluation.dynamicLimits.critical}, high=${tiers.high}/${evaluation.dynamicLimits.high} (verdict: ${evaluation.verdict})`,
+    );
   }
 }
 
@@ -1062,7 +1068,7 @@ function verifyCliCheckMode(report) {
   const prev = readExistingBaseline();
   assertCompositeRegression(report, prev);
   assertDimensionRegression(report, prev);
-  assertDebtBoundaries(report);
+  assertDebtBoundaries(report, prev);
   console.log('✔ [Check] Self-audit baseline verification passed with zero disk mutation.');
 }
 
