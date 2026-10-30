@@ -690,14 +690,18 @@ async function runFourLaneConcurrentPipeline(parallelList, vitestPromise, passed
   });
 
   const daemonPromise = runSequentialSuites(DAEMON_SUITES, bail, passed, failed);
-  const selfAuditPromise = runSelfAuditLane(bail, passed, failed);
   const unitPromise = vitestPromise.then((unitResult) => {
     if (unitResult) {
       recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
     }
   });
 
-  await Promise.all([parallelPromise, daemonPromise, selfAuditPromise, unitPromise]);
+  // Await parallel worker pool completion to ensure all temporary test workspaces are cleanly
+  // torn down before running the full repository self-audit lane
+  await parallelPromise;
+  const selfAuditPromise = runSelfAuditLane(bail, passed, failed);
+
+  await Promise.all([daemonPromise, selfAuditPromise, unitPromise]);
 }
 
 // ── Main Runner ──
