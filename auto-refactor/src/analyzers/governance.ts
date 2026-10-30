@@ -167,6 +167,18 @@ export class GovernanceAnalyzer implements Analyzer {
         this.registry = registry || getDefaultGovernanceRegistry();
     }
 
+    public resetState(): void {
+        this.violations = [];
+        this.capabilities = undefined as any;
+        this.lines = [];
+        this.maskedLines = [];
+        this.hasCheckedFile = false;
+        this.nodeRules = [];
+        this.fileRules = [];
+        this.reusableEvalCtx = null;
+        this.nodeRulesByKind.clear();
+    }
+
     private ensureInitialized(ctx: AnalyzerContext): void {
         if (!this.capabilities) {
             this.capabilities = resolveLanguageProfile(ctx.filePath, ctx.adapter?.id);

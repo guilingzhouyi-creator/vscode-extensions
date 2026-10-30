@@ -349,11 +349,18 @@ export class ComplexityAnalyzer implements Analyzer {
         lines: string[];
     }> = [];
 
-    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+    public resetState(): void {
         this.issues = [];
         this.loopSites.clear();
         this.functionCCs = [];
         this.fileFunctions = [];
+        this.maskedLines = [];
+        this.cachedLines = [];
+        this.maskedFor = '';
+    }
+
+    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+        this.resetState();
         this.maskedLines = maskedLinesOfPath(ctx.filePath, ctx.content);
         this.cachedLines = ctx.content ? ctx.content.split('\n') : [];
         this.maskedFor = ctx.filePath;

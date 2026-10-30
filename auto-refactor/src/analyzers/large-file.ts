@@ -639,6 +639,10 @@ export class LargeFileAnalyzer implements Analyzer {
         ]);
     }
 
+    public resetState(): void {
+        this.reset();
+    }
+
     private reset(): void {
         this.lines = 0;
         this.nonBlankLines = 0;

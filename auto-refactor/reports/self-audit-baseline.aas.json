@@ -2,7 +2,7 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-29T15:41:22.807Z",
+  "timestamp": "2026-10-30T04:26:11.301Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
@@ -8354,8 +8354,5 @@
       }
     ]
   },
-  "truncated": 3091,
-  "notes": [
-    "dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph"
-  ]
+  "truncated": 3091
 }

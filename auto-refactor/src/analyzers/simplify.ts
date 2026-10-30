@@ -246,6 +246,12 @@ export class SimplifyAnalyzer implements Analyzer {
     private contentLines: string[] | null = null;
     private cachedSourceFile: ts.SourceFile | null | undefined = undefined;
 
+    public resetState(): void {
+        this.longFunctions = [];
+        this.contentLines = null;
+        this.cachedSourceFile = undefined;
+    }
+
     private getContentLines(ctx: AnalyzerContext): string[] {
         if (!this.contentLines) {
             this.contentLines = ctx.content ? ctx.content.split('\n') : [];
