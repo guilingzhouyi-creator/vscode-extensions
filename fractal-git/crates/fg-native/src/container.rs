@@ -21,7 +21,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::checksum::crc32c;
 use crate::constants::{
@@ -488,43 +488,29 @@ impl ContainerBuilder {
     /// Propagates [`NativeError::Io`] from the lock acquisition, staging write, or rename.
     pub fn write_atomic(&self, path: &Path) -> NativeResult<()> {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)?;
+            }
         }
 
         let lock_path = path.with_extension("txc.lock");
         let _lock_guard = ContainerFileLock::acquire(&lock_path, 5000)?;
 
         let bytes = self.build();
-        let parent = path.parent().unwrap_or_else(|| Path::new("."));
-        let staging: PathBuf = parent.join(format!(
-            ".repo_{}_{}.txc.tmp",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
-
-        fs::write(&staging, &bytes)?;
-
-        let mut renamed = fs::rename(&staging, path);
-        if renamed.is_err() {
-            for _ in 0..3 {
-                std::thread::sleep(std::time::Duration::from_millis(10));
-                renamed = fs::rename(&staging, path);
-                if renamed.is_ok() {
-                    break;
-                }
-            }
-        }
-
-        if let Err(err) = renamed {
-            let _ = fs::remove_file(&staging);
-            return Err(NativeError::Io(err));
-        }
-
+        fg_core::write_file_atomic(path, &bytes, true)?;
         Ok(())
     }
+}
+
+/// Properly aligned Win32 `OVERLAPPED` ABI structure required by `LockFileEx` on 64-bit Windows.
+#[cfg(windows)]
+#[repr(C)]
+struct Win32Overlapped {
+    internal: usize,
+    internal_high: usize,
+    offset: u32,
+    offset_high: u32,
+    event: *mut core::ffi::c_void,
 }
 
 /// Cross-process advisory lock ensuring atomic concurrent access to repository container files.
@@ -556,7 +542,7 @@ impl ContainerFileLock {
                 dwReserved: u32,
                 nNumberOfBytesToLockLow: u32,
                 nNumberOfBytesToLockHigh: u32,
-                lpOverlapped: *mut core::ffi::c_void,
+                lpOverlapped: *mut Win32Overlapped,
             ) -> i32;
             fn CloseHandle(hObject: *mut core::ffi::c_void) -> i32;
         }
@@ -574,7 +560,10 @@ impl ContainerFileLock {
         let mut wide_path: Vec<u16> = path.as_os_str().encode_wide().collect();
         wide_path.push(0);
 
-        // SAFETY: `wide_path` is a NUL-terminated wide string outliving CreateFileW.
+        // SAFETY:
+        // - Preconditions: `wide_path` is a valid NUL-terminated UTF-16 buffer on the stack.
+        // - Invariants: Optional security/template pointers are null; Win32 does not retain `wide_path`.
+        // - Postconditions: Returns either `INVALID_HANDLE_VALUE` or a valid open kernel file handle.
         let handle = unsafe {
             CreateFileW(
                 wide_path.as_ptr(),
@@ -596,8 +585,17 @@ impl ContainerFileLock {
         let mut sleep_ms = 5u64;
 
         loop {
-            let mut overlapped: [u8; 32] = [0; 32];
-            // SAFETY: `handle` is an open handle; overlapped buffer is valid.
+            let mut overlapped = Win32Overlapped {
+                internal: 0,
+                internal_high: 0,
+                offset: 0,
+                offset_high: 0,
+                event: std::ptr::null_mut(),
+            };
+            // SAFETY:
+            // - Preconditions: `handle` is an open file handle; `overlapped` is `#[repr(C)]` pointer-aligned and zeroed.
+            // - Invariants: Synchronous `LOCKFILE_FAIL_IMMEDIATELY` completes before `overlapped` leaves scope.
+            // - Postconditions: Non-zero return indicates byte 0 is exclusively locked by `handle`.
             let locked = unsafe {
                 LockFileEx(
                     handle,
@@ -605,7 +603,7 @@ impl ContainerFileLock {
                     0,
                     1,
                     0,
-                    overlapped.as_mut_ptr().cast(),
+                    &mut overlapped,
                 )
             };
 
@@ -614,7 +612,10 @@ impl ContainerFileLock {
             }
 
             if start.elapsed() >= timeout {
-                // SAFETY: Close handle on timeout failure.
+                // SAFETY:
+                // - Preconditions: `handle` was opened above and is not wrapped in `ContainerFileLock`.
+                // - Invariants: Closed exactly once on the error exit path.
+                // - Postconditions: Kernel handle is released with zero descriptor leak.
                 unsafe { CloseHandle(handle) };
                 return Err(NativeError::Io(std::io::Error::new(
                     std::io::ErrorKind::TimedOut,
@@ -646,7 +647,10 @@ impl Drop for ContainerFileLock {
             fn CloseHandle(hObject: *mut core::ffi::c_void) -> i32;
         }
 
-        // SAFETY: `self.handle` is valid handle held during lock lifecycle.
+        // SAFETY:
+        // - Preconditions: `self.handle` is a live kernel file handle holding the 1-byte lock at offset 0.
+        // - Invariants: `Drop` executes once at end of `ContainerFileLock` lifetime.
+        // - Postconditions: Byte lock is released and kernel handle is closed.
         unsafe {
             UnlockFile(self.handle, 0, 0, 1, 0);
             CloseHandle(self.handle);

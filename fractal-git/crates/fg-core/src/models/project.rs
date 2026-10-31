@@ -16,6 +16,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::repo_path::path_matches_scope;
 use crate::error::{FractalError, FractalResult};
 
 /// Default master TTL duration for controlled project leases (7 days in seconds).
@@ -198,16 +199,14 @@ impl ProjectLease {
 
     /// Checks if a given relative workspace file path falls within this project's path jails.
     pub fn contains_path(&self, rel_path: &str) -> bool {
-        let normalized_path = rel_path.replace('\\', "/");
-        if self.root_path != "." && !self.root_path.is_empty() {
-            let trimmed_root = self.root_path.trim_matches(['/', '\\']);
-            if normalized_path == trimmed_root
-                || normalized_path.starts_with(&format!("{trimmed_root}/"))
-            {
-                return true;
-            }
+        if self.root_path != "."
+            && !self.root_path.is_empty()
+            && path_matches_scope(rel_path, &self.root_path)
+        {
+            return true;
         }
 
+        let normalized_path = rel_path.replace('\\', "/");
         self.path_jails
             .iter()
             .any(|pattern| glob_match(pattern, &normalized_path))
@@ -367,24 +366,27 @@ impl ProjectLeaseCache {
         let mut evicted_ids = Vec::new();
 
         for lease in self.leases.values_mut() {
-            if lease.is_expired(now_secs) {
-                if lease.status == LeaseStatus::Active {
+            if !lease.is_expired(now_secs) {
+                continue;
+            }
+            match lease.status {
+                LeaseStatus::Active => {
                     lease.freeze();
                     lease.dormant_cycles = 1;
-                } else if lease.status == LeaseStatus::Frozen {
+                }
+                LeaseStatus::Frozen => {
                     lease.dormant_cycles = lease.dormant_cycles.saturating_add(1);
                     if lease.dormant_cycles >= eviction_dormant_threshold {
                         lease.evict();
                         evicted_ids.push(lease.id.clone());
                     }
                 }
+                LeaseStatus::Evicted => {}
             }
         }
 
-        for evicted_id in &evicted_ids {
-            self.leases.remove(evicted_id);
-        }
-
+        self.leases
+            .retain(|_, lease| lease.status != LeaseStatus::Evicted);
         evicted_ids
     }
 }
@@ -396,11 +398,13 @@ fn glob_match(pattern: &str, target_path: &str) -> bool {
     }
 
     if let Some(prefix) = pattern.strip_suffix("/**") {
-        return target_path == prefix || target_path.starts_with(&format!("{prefix}/"));
+        return path_matches_scope(target_path, prefix);
     }
 
     if let Some(suffix) = pattern.strip_prefix("*.") {
-        return target_path.ends_with(&format!(".{suffix}"));
+        return target_path
+            .rsplit_once('.')
+            .is_some_and(|(_, ext)| ext == suffix);
     }
 
     pattern == target_path

@@ -19,10 +19,7 @@
 //! - `FGT-OBJ-001`: Git plumbing byte parity and merge reproducibility guard
 //! - `FGT-PRF-001`: Pure algorithmic computation with minimal allocation
 
-use crate::diff::compact::{Compaction, Side};
-use crate::diff::xdiff::mark_changed;
-use crate::diff::xdiff_prepare::prepare;
-use crate::diff::{split_lines, text_ends_with_newline};
+use crate::diff::{compute_xdiff_change_flags, split_lines, text_ends_with_newline};
 
 /// Result of a 3-way text merge operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,6 +61,15 @@ struct ClusterRange {
     end_idx: usize,
     base_start: usize,
     base_end: usize,
+}
+
+struct ClusterEmitScratch<'a, 'b> {
+    base_lines: &'a [&'a str],
+    ours_label: &'b str,
+    theirs_label: &'b str,
+    ours_reconstructed: Vec<&'a str>,
+    theirs_reconstructed: Vec<&'a str>,
+    content: Vec<u8>,
 }
 
 /// Appends a line followed by a newline byte into the buffer.
@@ -152,7 +158,6 @@ impl TextThreeWayMerge {
         let ours_edits = Self::extract_edits(&base_lines, &ours_lines, base_str, ours_str);
         let theirs_edits = Self::extract_edits(&base_lines, &theirs_lines, base_str, theirs_str);
 
-        // If either side has no edits, the other side wins cleanly
         if ours_edits.is_empty() {
             return TextMergeResult {
                 is_clean: true,
@@ -168,172 +173,167 @@ impl TextThreeWayMerge {
             };
         }
 
-        let mut all_edits: Vec<TaggedEdit<'_>> =
-            Vec::with_capacity(ours_edits.len() + theirs_edits.len());
-        for &edit in &ours_edits {
+        let all_edits = Self::collect_sorted_edits(&ours_edits, &theirs_edits);
+        let cluster_ranges = Self::group_overlapping_clusters(&all_edits);
+
+        let estimated_cap = base_str.len() + ours_str.len() + theirs_str.len() + 256;
+        let mut scratch = ClusterEmitScratch {
+            base_lines: &base_lines,
+            ours_label,
+            theirs_label,
+            ours_reconstructed: Vec::with_capacity(64),
+            theirs_reconstructed: Vec::with_capacity(64),
+            content: Vec::with_capacity(estimated_cap),
+        };
+        let mut base_cursor = 0usize;
+        let mut conflict_count = 0usize;
+
+        for range in &cluster_ranges {
+            if range.base_start > base_cursor {
+                for line in &base_lines[base_cursor..range.base_start] {
+                    write_line(&mut scratch.content, line);
+                }
+            }
+
+            let cluster_edits = &all_edits[range.start_idx..range.end_idx];
+            if !Self::emit_cluster_resolution(*range, cluster_edits, &mut scratch) {
+                conflict_count += 1;
+            }
+            base_cursor = range.base_end;
+        }
+
+        if base_cursor < base_lines.len() {
+            for line in &base_lines[base_cursor..] {
+                write_line(&mut scratch.content, line);
+            }
+        }
+
+        let needs_trailing_newline = text_ends_with_newline(ours_str)
+            || text_ends_with_newline(theirs_str)
+            || text_ends_with_newline(base_str)
+            || conflict_count > 0;
+        if !needs_trailing_newline && scratch.content.ends_with(b"\n") {
+            scratch.content.pop();
+        }
+
+        TextMergeResult {
+            is_clean: conflict_count == 0,
+            conflict_count,
+            content: scratch.content,
+        }
+    }
+
+    fn collect_sorted_edits<'a>(
+        ours_edits: &[LineEdit<'a>],
+        theirs_edits: &[LineEdit<'a>],
+    ) -> Vec<TaggedEdit<'a>> {
+        let mut all_edits = Vec::with_capacity(ours_edits.len() + theirs_edits.len());
+        for &edit in ours_edits {
             all_edits.push(TaggedEdit {
                 side: EditSide::Ours,
                 edit,
             });
         }
-        for &edit in &theirs_edits {
+        for &edit in theirs_edits {
             all_edits.push(TaggedEdit {
                 side: EditSide::Theirs,
                 edit,
             });
         }
-
-        // Sort edits primarily by base_start, then by base_end
         all_edits.sort_by(|a, b| {
             a.edit
                 .base_start
                 .cmp(&b.edit.base_start)
                 .then_with(|| a.edit.base_end.cmp(&b.edit.base_end))
         });
+        all_edits
+    }
 
-        // Cluster overlapping or adjacent edits (touching without intervening unchanged base lines)
-        let mut cluster_ranges: Vec<ClusterRange> = Vec::new();
-        let mut cluster_start_idx = 0usize;
-        let mut cluster_base_start = 0usize;
-        let mut cluster_base_end = 0usize;
-        let mut has_cluster = false;
+    fn group_overlapping_clusters(all_edits: &[TaggedEdit<'_>]) -> Vec<ClusterRange> {
+        let Some(first) = all_edits.first() else {
+            return Vec::new();
+        };
+        let mut cluster_ranges = Vec::new();
+        let mut start_idx = 0usize;
+        let mut base_start = first.edit.base_start;
+        let mut base_end = first.edit.base_end;
 
-        for (idx, tagged) in all_edits.iter().enumerate() {
-            if !has_cluster {
-                cluster_start_idx = idx;
-                cluster_base_start = tagged.edit.base_start;
-                cluster_base_end = tagged.edit.base_end;
-                has_cluster = true;
-            } else if tagged.edit.base_start <= cluster_base_end {
-                // Overlaps or adjacent: group into same cluster
-                cluster_base_end = cluster_base_end.max(tagged.edit.base_end);
-            } else {
-                // Separated by at least one unchanged base line
-                cluster_ranges.push(ClusterRange {
-                    start_idx: cluster_start_idx,
-                    end_idx: idx,
-                    base_start: cluster_base_start,
-                    base_end: cluster_base_end,
-                });
-                cluster_start_idx = idx;
-                cluster_base_start = tagged.edit.base_start;
-                cluster_base_end = tagged.edit.base_end;
+        for (idx, tagged) in all_edits.iter().enumerate().skip(1) {
+            if tagged.edit.base_start <= base_end {
+                base_end = base_end.max(tagged.edit.base_end);
+                continue;
             }
-        }
-        if has_cluster {
             cluster_ranges.push(ClusterRange {
-                start_idx: cluster_start_idx,
-                end_idx: all_edits.len(),
-                base_start: cluster_base_start,
-                base_end: cluster_base_end,
+                start_idx,
+                end_idx: idx,
+                base_start,
+                base_end,
             });
+            start_idx = idx;
+            base_start = tagged.edit.base_start;
+            base_end = tagged.edit.base_end;
         }
+        cluster_ranges.push(ClusterRange {
+            start_idx,
+            end_idx: all_edits.len(),
+            base_start,
+            base_end,
+        });
+        cluster_ranges
+    }
 
-        let estimated_cap = base_str.len() + ours_str.len() + theirs_str.len() + 256;
-        let mut content: Vec<u8> = Vec::with_capacity(estimated_cap);
-        let mut base_cursor = 0usize;
-        let mut conflict_count = 0usize;
+    /// Reconciles one edit cluster into `scratch.content`, returning `true` when resolved cleanly or `false` on conflict.
+    fn emit_cluster_resolution<'a>(
+        range: ClusterRange,
+        cluster_edits: &[TaggedEdit<'a>],
+        scratch: &mut ClusterEmitScratch<'a, '_>,
+    ) -> bool {
+        scratch.ours_reconstructed.clear();
+        scratch.theirs_reconstructed.clear();
 
-        let mut ours_reconstructed: Vec<&str> = Vec::with_capacity(64);
-        let mut theirs_reconstructed: Vec<&str> = Vec::with_capacity(64);
+        let has_ours = cluster_edits.iter().any(|e| e.side == EditSide::Ours);
+        let has_theirs = cluster_edits.iter().any(|e| e.side == EditSide::Theirs);
 
-        for range in &cluster_ranges {
-            let cluster_start = range.base_start;
-            let cluster_end = range.base_end;
-            let cluster_edits = &all_edits[range.start_idx..range.end_idx];
+        Self::reconstruct_cluster_slice(
+            scratch.base_lines,
+            range.base_start,
+            range.base_end,
+            cluster_edits,
+            EditSide::Ours,
+            &mut scratch.ours_reconstructed,
+        );
+        Self::reconstruct_cluster_slice(
+            scratch.base_lines,
+            range.base_start,
+            range.base_end,
+            cluster_edits,
+            EditSide::Theirs,
+            &mut scratch.theirs_reconstructed,
+        );
 
-            // Emit unchanged base lines before this cluster
-            if cluster_start > base_cursor {
-                for line in &base_lines[base_cursor..cluster_start] {
-                    write_line(&mut content, line);
-                }
+        if scratch.ours_reconstructed == scratch.theirs_reconstructed || !has_theirs {
+            for line in scratch.ours_reconstructed.iter() {
+                write_line(&mut scratch.content, line);
             }
-
-            ours_reconstructed.clear();
-            theirs_reconstructed.clear();
-
-            let mut has_ours = false;
-            let mut has_theirs = false;
-
-            for e in cluster_edits {
-                if e.side == EditSide::Ours {
-                    has_ours = true;
-                } else {
-                    has_theirs = true;
-                }
+            return true;
+        }
+        if !has_ours {
+            for line in scratch.theirs_reconstructed.iter() {
+                write_line(&mut scratch.content, line);
             }
-
-            Self::reconstruct_cluster_slice(
-                &base_lines,
-                cluster_start,
-                cluster_end,
-                cluster_edits,
-                EditSide::Ours,
-                &mut ours_reconstructed,
-            );
-            Self::reconstruct_cluster_slice(
-                &base_lines,
-                cluster_start,
-                cluster_end,
-                cluster_edits,
-                EditSide::Theirs,
-                &mut theirs_reconstructed,
-            );
-
-            if ours_reconstructed == theirs_reconstructed {
-                // Both made the exact same modification: clean merge
-                for line in &ours_reconstructed {
-                    write_line(&mut content, line);
-                }
-            } else if !has_theirs {
-                // Only ours modified this region
-                for line in &ours_reconstructed {
-                    write_line(&mut content, line);
-                }
-            } else if !has_ours {
-                // Only theirs modified this region
-                for line in &theirs_reconstructed {
-                    write_line(&mut content, line);
-                }
-            } else {
-                // Real conflict: emit localized conflict markers
-                conflict_count += 1;
-                write_conflict_marker(&mut content, "<<<<<<<", ours_label);
-                for line in &ours_reconstructed {
-                    write_line(&mut content, line);
-                }
-                content.extend_from_slice(b"=======\n");
-                for line in &theirs_reconstructed {
-                    write_line(&mut content, line);
-                }
-                write_conflict_marker(&mut content, ">>>>>>>", theirs_label);
-            }
-
-            base_cursor = cluster_end;
+            return true;
         }
 
-        // Emit any trailing unchanged base lines
-        if base_cursor < base_lines.len() {
-            for line in &base_lines[base_cursor..] {
-                write_line(&mut content, line);
-            }
+        write_conflict_marker(&mut scratch.content, "<<<<<<<", scratch.ours_label);
+        for line in scratch.ours_reconstructed.iter() {
+            write_line(&mut scratch.content, line);
         }
-
-        // Format result text preserving newline expectations
-        let needs_trailing_newline = text_ends_with_newline(ours_str)
-            || text_ends_with_newline(theirs_str)
-            || text_ends_with_newline(base_str)
-            || conflict_count > 0;
-
-        if !needs_trailing_newline && content.ends_with(b"\n") {
-            content.pop();
+        scratch.content.extend_from_slice(b"=======\n");
+        for line in scratch.theirs_reconstructed.iter() {
+            write_line(&mut scratch.content, line);
         }
-
-        TextMergeResult {
-            is_clean: conflict_count == 0,
-            conflict_count,
-            content,
-        }
+        write_conflict_marker(&mut scratch.content, ">>>>>>>", scratch.theirs_label);
+        false
     }
 
     /// Reconstructs the lines produced by one side over a cluster region into reusable buffer.
@@ -375,25 +375,8 @@ impl TextThreeWayMerge {
             return Vec::new();
         }
 
-        let old_records: Vec<&[u8]> = base_str.split_inclusive('\n').map(str::as_bytes).collect();
-        let new_records: Vec<&[u8]> = target_str
-            .split_inclusive('\n')
-            .map(str::as_bytes)
-            .collect();
-        let (prepared_old, prepared_new) = prepare(&old_records, &new_records);
-        let (mut old_changed, mut new_changed) = mark_changed(&prepared_old, &prepared_new);
-
-        Compaction::new(
-            Side {
-                hashes: &prepared_old.classes,
-                texts: base_lines,
-            },
-            Side {
-                hashes: &prepared_new.classes,
-                texts: target_lines,
-            },
-        )
-        .run(&mut old_changed, &mut new_changed);
+        let (old_changed, new_changed) =
+            compute_xdiff_change_flags(base_str, target_str, base_lines, target_lines);
 
         let mut edits = Vec::new();
         let mut old_cursor = 0usize;

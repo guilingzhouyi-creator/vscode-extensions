@@ -18,72 +18,370 @@ use std::path::PathBuf;
 mod taxis_cmd;
 use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
-    archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, commit,
-    config, daemon, diff, doctor, hash_object, init, log, merge, operation, project, projection,
-    promotion, quality, quarantine, read, rebase, reclaim, relocate, remote, repack, reset,
-    rev_list, revert, stash, status, submodule, tag, unarchive, undo, verify, worktree,
+    archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, clone,
+    commit, config, daemon, diff, doctor, hash_object, index_plumbing, init, log, maintenance,
+    merge, operation, project, projection, promotion, quality, quarantine, read, rebase, reclaim,
+    relocate, remote, repack, reset, rev_list, revert, stage, stash, status, submodule, tag,
+    unarchive, undo, verify, worktree,
 };
 
 use fg_core::models::current_unix_seconds;
 use fg_gate::authority::resolve_authority_secret;
 use fractal_git::constants::cli::CliTag;
 
-fn resolve_canonical_subcommand(raw: &str) -> &str {
-    const ALIASES: &[(&[&str], &str)] = &[
-        (&["st", "status"], "status"),
-        (&["ci", "commit"], "commit"),
-        (&["br", "branch"], "branch"),
-        (&["di", "diff"], "diff"),
-        (&["co", "checkout"], "checkout"),
-        (&["sw", "switch"], "switch"),
-        (&["gate", "check", "verify"], "verify"),
-        (&["init"], "init"),
-        (&["doctor"], "doctor"),
-        (&["relocate"], "relocate"),
-        (&["git-export", "export"], "git-export"),
-        (&["git-import", "import"], "git-import"),
-        (&["gc", "clean", "reclaim"], "reclaim"),
-        (&["repack", "pack-objects"], "repack"),
-        (&["remote"], "remote"),
-        (&["fetch"], "fetch"),
-        (&["push"], "push"),
-        (&["pull"], "pull"),
-        (&["config", "cfg"], "config"),
-        (&["submodule", "sub"], "submodule"),
-        (&["project", "pj"], "project"),
-        (&["archive"], "archive"),
-        (&["unarchive", "extract"], "unarchive"),
-        (&["bundle"], "bundle"),
-        (&["blame"], "blame"),
-        (&["bisect"], "bisect"),
-        (&["serve", "daemon"], "daemon"),
-        (&["lg", "log"], "log"),
-        (&["sh", "show"], "show"),
-        (&["rb", "rebase"], "rebase"),
-        (&["mg", "merge"], "merge"),
-        (&["cp", "cherry-pick"], "cherry-pick"),
-        (&["reset"], "reset"),
-        (&["tag"], "tag"),
-        (&["revert"], "revert"),
-        (&["stash"], "stash"),
-        (&["wt", "worktree"], "worktree"),
-        (&["pm", "promo", "promotion"], "promotion"),
-        (&["quality", "trace"], "quality"),
-        (&["quarantine", "quar"], "quarantine"),
-        (&["bb", "blackboard"], "blackboard"),
-        (&["bench", "benchmark"], "bench"),
-        (&["undo"], "undo"),
-        (&["op", "operation"], "operation"),
-        (&["hash-object"], "hash-object"),
-        (&["rev-list"], "rev-list"),
-        (&["authority", "auth"], "authority"),
-        (&["version", "-v", "--version"], "version"),
-        (&["help", "-h", "--help"], "help"),
-    ];
+/// Specification for one Taxis CLI subcommand and its accepted aliases.
+struct CommandSpec {
+    canonical: &'static str,
+    aliases: &'static [&'static str],
+    handler: fn(&CliContext),
+}
 
-    for (aliases, target) in ALIASES {
-        if aliases.contains(&raw) {
-            return target;
+const COMMAND_TABLE: &[CommandSpec] = &[
+    CommandSpec {
+        canonical: "init",
+        aliases: &["init"],
+        handler: init::handle_init,
+    },
+    CommandSpec {
+        canonical: "doctor",
+        aliases: &["doctor"],
+        handler: doctor::handle_doctor,
+    },
+    CommandSpec {
+        canonical: "relocate",
+        aliases: &["relocate"],
+        handler: relocate::handle_relocate,
+    },
+    CommandSpec {
+        canonical: "git-export",
+        aliases: &["git-export", "export"],
+        handler: projection::handle_git_export,
+    },
+    CommandSpec {
+        canonical: "git-import",
+        aliases: &["git-import", "import"],
+        handler: projection::handle_git_import,
+    },
+    CommandSpec {
+        canonical: "status",
+        aliases: &["st", "status"],
+        handler: status::handle_status,
+    },
+    CommandSpec {
+        canonical: "add",
+        aliases: &["add"],
+        handler: stage::handle_add,
+    },
+    CommandSpec {
+        canonical: "rm",
+        aliases: &["rm"],
+        handler: stage::handle_rm,
+    },
+    CommandSpec {
+        canonical: "mv",
+        aliases: &["mv"],
+        handler: stage::handle_mv,
+    },
+    CommandSpec {
+        canonical: "restore",
+        aliases: &["restore"],
+        handler: stage::handle_restore,
+    },
+    CommandSpec {
+        canonical: "branch",
+        aliases: &["br", "branch"],
+        handler: branch::handle_branch,
+    },
+    CommandSpec {
+        canonical: "commit",
+        aliases: &["ci", "commit"],
+        handler: commit::handle_commit,
+    },
+    CommandSpec {
+        canonical: "diff",
+        aliases: &["di", "diff"],
+        handler: diff::handle_diff,
+    },
+    CommandSpec {
+        canonical: "hash-object",
+        aliases: &["hash-object"],
+        handler: hash_object::handle_hash_object,
+    },
+    CommandSpec {
+        canonical: "write-tree",
+        aliases: &["write-tree"],
+        handler: index_plumbing::handle_write_tree,
+    },
+    CommandSpec {
+        canonical: "commit-tree",
+        aliases: &["commit-tree"],
+        handler: index_plumbing::handle_commit_tree,
+    },
+    CommandSpec {
+        canonical: "update-index",
+        aliases: &["update-index"],
+        handler: index_plumbing::handle_update_index,
+    },
+    CommandSpec {
+        canonical: "rev-parse",
+        aliases: &["rev-parse"],
+        handler: index_plumbing::handle_rev_parse,
+    },
+    CommandSpec {
+        canonical: "cat-file",
+        aliases: &["cat-file"],
+        handler: read::handle_cat_file,
+    },
+    CommandSpec {
+        canonical: "ls-tree",
+        aliases: &["ls-tree"],
+        handler: read::handle_ls_tree,
+    },
+    CommandSpec {
+        canonical: "ls-files",
+        aliases: &["ls-files"],
+        handler: read::handle_ls_files,
+    },
+    CommandSpec {
+        canonical: "show-ref",
+        aliases: &["show-ref"],
+        handler: read::handle_show_ref,
+    },
+    CommandSpec {
+        canonical: "for-each-ref",
+        aliases: &["for-each-ref"],
+        handler: read::handle_for_each_ref,
+    },
+    CommandSpec {
+        canonical: "check-ignore",
+        aliases: &["check-ignore"],
+        handler: read::handle_check_ignore,
+    },
+    CommandSpec {
+        canonical: "log",
+        aliases: &["lg", "log"],
+        handler: log::handle_log,
+    },
+    CommandSpec {
+        canonical: "show",
+        aliases: &["sh", "show"],
+        handler: log::handle_show,
+    },
+    CommandSpec {
+        canonical: "checkout",
+        aliases: &["co", "checkout", "sw", "switch"],
+        handler: checkout::handle_checkout,
+    },
+    CommandSpec {
+        canonical: "merge",
+        aliases: &["mg", "merge"],
+        handler: merge::handle_merge,
+    },
+    CommandSpec {
+        canonical: "reset",
+        aliases: &["reset"],
+        handler: reset::handle_reset,
+    },
+    CommandSpec {
+        canonical: "tag",
+        aliases: &["tag"],
+        handler: tag::handle_tag,
+    },
+    CommandSpec {
+        canonical: "cherry-pick",
+        aliases: &["cp", "cherry-pick"],
+        handler: cherry_pick::handle_cherry_pick,
+    },
+    CommandSpec {
+        canonical: "revert",
+        aliases: &["revert"],
+        handler: revert::handle_revert,
+    },
+    CommandSpec {
+        canonical: "stash",
+        aliases: &["stash"],
+        handler: stash::handle_stash,
+    },
+    CommandSpec {
+        canonical: "rebase",
+        aliases: &["rb", "rebase"],
+        handler: rebase::handle_rebase,
+    },
+    CommandSpec {
+        canonical: "worktree",
+        aliases: &["wt", "worktree"],
+        handler: worktree::handle_worktree,
+    },
+    CommandSpec {
+        canonical: "blackboard",
+        aliases: &["bb", "blackboard"],
+        handler: blackboard::handle_blackboard,
+    },
+    CommandSpec {
+        canonical: "promotion",
+        aliases: &["pm", "promo", "promotion"],
+        handler: promotion::handle_promotion,
+    },
+    CommandSpec {
+        canonical: "bench",
+        aliases: &["bench", "benchmark"],
+        handler: bench::handle_bench,
+    },
+    CommandSpec {
+        canonical: "undo",
+        aliases: &["undo"],
+        handler: undo::handle_undo,
+    },
+    CommandSpec {
+        canonical: "operation",
+        aliases: &["op", "operation"],
+        handler: operation::handle_operation,
+    },
+    CommandSpec {
+        canonical: "rev-list",
+        aliases: &["rev-list"],
+        handler: rev_list::handle_rev_list,
+    },
+    CommandSpec {
+        canonical: "verify",
+        aliases: &["gate", "check", "verify"],
+        handler: verify::handle_verify,
+    },
+    CommandSpec {
+        canonical: "authority",
+        aliases: &["authority", "auth"],
+        handler: handle_authority,
+    },
+    CommandSpec {
+        canonical: "reclaim",
+        aliases: &["reclaim"],
+        handler: reclaim::handle_reclaim,
+    },
+    CommandSpec {
+        canonical: "gc",
+        aliases: &["gc"],
+        handler: maintenance::handle_gc,
+    },
+    CommandSpec {
+        canonical: "clean",
+        aliases: &["clean"],
+        handler: maintenance::handle_clean,
+    },
+    CommandSpec {
+        canonical: "fsck",
+        aliases: &["fsck"],
+        handler: maintenance::handle_fsck,
+    },
+    CommandSpec {
+        canonical: "clone",
+        aliases: &["clone"],
+        handler: clone::handle_clone,
+    },
+    CommandSpec {
+        canonical: "repack",
+        aliases: &["repack", "pack-objects"],
+        handler: repack::handle_repack,
+    },
+    CommandSpec {
+        canonical: "remote",
+        aliases: &["remote"],
+        handler: remote::handle_remote,
+    },
+    CommandSpec {
+        canonical: "fetch",
+        aliases: &["fetch"],
+        handler: remote::handle_fetch,
+    },
+    CommandSpec {
+        canonical: "push",
+        aliases: &["push"],
+        handler: remote::handle_push,
+    },
+    CommandSpec {
+        canonical: "pull",
+        aliases: &["pull"],
+        handler: remote::handle_pull,
+    },
+    CommandSpec {
+        canonical: "config",
+        aliases: &["config", "cfg"],
+        handler: config::handle_config,
+    },
+    CommandSpec {
+        canonical: "submodule",
+        aliases: &["submodule", "sub"],
+        handler: submodule::handle_submodule,
+    },
+    CommandSpec {
+        canonical: "project",
+        aliases: &["project", "pj"],
+        handler: project::handle_project,
+    },
+    CommandSpec {
+        canonical: "quality",
+        aliases: &["quality", "trace"],
+        handler: quality::handle_quality,
+    },
+    CommandSpec {
+        canonical: "quarantine",
+        aliases: &["quarantine", "quar"],
+        handler: quarantine::handle_quarantine,
+    },
+    CommandSpec {
+        canonical: "archive",
+        aliases: &["archive"],
+        handler: archive::handle_archive,
+    },
+    CommandSpec {
+        canonical: "unarchive",
+        aliases: &["unarchive", "extract"],
+        handler: unarchive::handle_unarchive,
+    },
+    CommandSpec {
+        canonical: "bundle",
+        aliases: &["bundle"],
+        handler: bundle::handle_bundle,
+    },
+    CommandSpec {
+        canonical: "blame",
+        aliases: &["blame"],
+        handler: blame::handle_blame,
+    },
+    CommandSpec {
+        canonical: "bisect",
+        aliases: &["bisect"],
+        handler: bisect::handle_bisect,
+    },
+    CommandSpec {
+        canonical: "daemon",
+        aliases: &["serve", "daemon"],
+        handler: daemon::handle_daemon,
+    },
+    CommandSpec {
+        canonical: "version",
+        aliases: &["version", "-v", "--version"],
+        handler: handle_version,
+    },
+    CommandSpec {
+        canonical: "help",
+        aliases: &["help", "-h", "--help"],
+        handler: handle_help,
+    },
+];
+
+fn handle_version(_ctx: &CliContext) {
+    print_banner();
+    println!("Version: 0.1.0 (Rust Stable, 10 Micro-Crates)");
+}
+
+fn handle_help(_ctx: &CliContext) {
+    print_help();
+}
+
+fn resolve_canonical_subcommand(raw: &str) -> &str {
+    for spec in COMMAND_TABLE {
+        if spec.aliases.contains(&raw) {
+            return spec.canonical;
         }
     }
     raw
@@ -237,66 +535,13 @@ fn extract_effective_subcommand(filtered_args: &[String]) -> (&str, Vec<String>)
 
 /// Routes effective canonical subcommand to designated handler function.
 fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
-    match effective_subcommand {
-        "init" => init::handle_init(ctx),
-        "doctor" => doctor::handle_doctor(ctx),
-        "relocate" => relocate::handle_relocate(ctx),
-        "git-export" => projection::handle_git_export(ctx),
-        "git-import" => projection::handle_git_import(ctx),
-        "status" => status::handle_status(ctx),
-        "branch" => branch::handle_branch(ctx),
-        "commit" => commit::handle_commit(ctx),
-        "diff" => diff::handle_diff(ctx),
-        "hash-object" => hash_object::handle_hash_object(ctx),
-        "cat-file" => read::handle_cat_file(ctx),
-        "ls-tree" => read::handle_ls_tree(ctx),
-        "ls-files" => read::handle_ls_files(ctx),
-        "show-ref" => read::handle_show_ref(ctx),
-        "for-each-ref" => read::handle_for_each_ref(ctx),
-        "check-ignore" => read::handle_check_ignore(ctx),
-        "log" => log::handle_log(ctx),
-        "show" => log::handle_show(ctx),
-        "checkout" | "switch" => checkout::handle_checkout(ctx),
-        "merge" => merge::handle_merge(ctx),
-        "reset" => reset::handle_reset(ctx),
-        "tag" => tag::handle_tag(ctx),
-        "cherry-pick" => cherry_pick::handle_cherry_pick(ctx),
-        "revert" => revert::handle_revert(ctx),
-        "stash" => stash::handle_stash(ctx),
-        "rebase" => rebase::handle_rebase(ctx),
-        "worktree" => worktree::handle_worktree(ctx),
-        "blackboard" => blackboard::handle_blackboard(ctx),
-        "promotion" => promotion::handle_promotion(ctx),
-        "bench" => bench::handle_bench(ctx),
-        "undo" => undo::handle_undo(ctx),
-        "operation" => operation::handle_operation(ctx),
-        "rev-list" => rev_list::handle_rev_list(ctx),
-        "verify" => verify::handle_verify(ctx),
-        "authority" => handle_authority(ctx),
-        "reclaim" => reclaim::handle_reclaim(ctx),
-        "repack" | "pack-objects" => repack::handle_repack(ctx),
-        "remote" => remote::handle_remote(ctx),
-        "fetch" => remote::handle_fetch(ctx),
-        "push" => remote::handle_push(ctx),
-        "pull" => remote::handle_pull(ctx),
-        "config" => config::handle_config(ctx),
-        "submodule" => submodule::handle_submodule(ctx),
-        "project" => project::handle_project(ctx),
-        "quality" => quality::handle_quality(ctx),
-        "quarantine" => quarantine::handle_quarantine(ctx),
-        "archive" => archive::handle_archive(ctx),
-        "unarchive" => unarchive::handle_unarchive(ctx),
-        "bundle" => bundle::handle_bundle(ctx),
-        "blame" => blame::handle_blame(ctx),
-        "bisect" => bisect::handle_bisect(ctx),
-        "daemon" => daemon::handle_daemon(ctx),
-        "version" => {
-            print_banner();
-            println!("Version: 0.1.0 (Rust Stable, 10 Micro-Crates)");
+    for spec in COMMAND_TABLE {
+        if spec.canonical == effective_subcommand {
+            (spec.handler)(ctx);
+            return;
         }
-        "help" => print_help(),
-        other => reject_unimplemented(other),
     }
+    reject_unimplemented(effective_subcommand);
 }
 
 /// Issues and verifies HMAC authority credentials.

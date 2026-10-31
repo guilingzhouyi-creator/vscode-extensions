@@ -23,9 +23,11 @@
 use crate::delta_codec::{decode_block_payload, select_block_encoding, EncodedBlock};
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{compute_object_oid, ObjectKind, Oid};
+use fg_core::write_file_atomic;
 use fg_pools::ByteLruCache;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Default in-memory block cache capacity for CasBackend (64 MiB).
 pub const DEFAULT_CAS_CACHE_BYTES: usize = 64 * 1024 * 1024;
@@ -60,7 +62,7 @@ fn split_full_block<'a>(oid: &Oid, stored: &'a [u8]) -> FractalResult<(ObjectKin
 /// Disk-backed Content-Addressed Block Store with integrated byte-budgeted LRU cache.
 pub struct CasBackend {
     root_dir: PathBuf,
-    cache: Option<ByteLruCache<Oid, Vec<u8>>>,
+    cache: Option<ByteLruCache<Oid, Arc<[u8]>>>,
 }
 
 impl CasBackend {
@@ -152,18 +154,14 @@ impl CasBackend {
                 encoded_buffer.push(depth as u8);
                 encoded_buffer.extend_from_slice(&delta_payload);
 
-                let staging_path = pfx_path.with_extension("tmp");
-                fs::write(&staging_path, &encoded_buffer)?;
-                fs::rename(&staging_path, pfx_path)?;
+                write_file_atomic(pfx_path, &encoded_buffer, false)?;
             }
             EncodedBlock::Full { .. } => {
                 let mut full_buffer = Vec::with_capacity(1 + payload_bytes.len());
                 full_buffer.push(kind.as_u8());
                 full_buffer.extend_from_slice(payload_bytes);
 
-                let staging_path = path.with_extension("tmp");
-                fs::write(&staging_path, &full_buffer)?;
-                fs::rename(&staging_path, path)?;
+                write_file_atomic(path, &full_buffer, false)?;
             }
         }
         Ok(())
@@ -187,7 +185,7 @@ impl CasBackend {
 
         if path.exists() || pfx_path.exists() {
             if let Some(ref cache) = self.cache {
-                cache.insert(oid, payload_bytes.to_vec(), payload_bytes.len());
+                cache.insert(oid, Arc::<[u8]>::from(payload_bytes), payload_bytes.len());
             }
             return Ok(oid); // Deduplicated immutable block
         }
@@ -209,7 +207,7 @@ impl CasBackend {
         Self::write_encoded_block(kind, encoding, &path, &pfx_path, payload_bytes)?;
 
         if let Some(ref cache) = self.cache {
-            cache.insert(oid, payload_bytes.to_vec(), payload_bytes.len());
+            cache.insert(oid, Arc::<[u8]>::from(payload_bytes), payload_bytes.len());
         }
 
         Ok(oid)
@@ -224,7 +222,7 @@ impl CasBackend {
     pub fn get_block(&self, oid: &Oid) -> FractalResult<Vec<u8>> {
         if let Some(ref cache) = self.cache {
             if let Some(cached) = cache.get(oid) {
-                return Ok(cached);
+                return Ok(cached.as_ref().to_vec());
             }
         }
         self.get_block_with_kind(oid).map(|(_, payload)| payload)
@@ -240,17 +238,22 @@ impl CasBackend {
         let path = self.block_path(oid);
         let pfx_path = self.pfx_block_path(oid);
 
-        let (kind, block_bytes) = if path.exists() {
-            let stored = fs::read(&path)?;
-            let (recorded_kind, payload) = split_full_block(oid, &stored)?;
-            (recorded_kind, payload.to_vec())
-        } else if pfx_path.exists() {
-            self.read_delta_block(oid, &pfx_path)?
-        } else {
-            return Err(FractalError::ObjectCodec(format!(
-                "CAS block not found: {}",
-                oid.to_hex()
-            )));
+        let (kind, block_bytes) = match fs::read(&path) {
+            Ok(stored) => {
+                let (recorded_kind, payload) = split_full_block(oid, &stored)?;
+                (recorded_kind, payload.to_vec())
+            }
+            Err(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => {
+                if pfx_path.exists() {
+                    self.read_delta_block(oid, &pfx_path)?
+                } else {
+                    return Err(FractalError::ObjectCodec(format!(
+                        "CAS block not found: {}",
+                        oid.to_hex()
+                    )));
+                }
+            }
+            Err(io_err) => return Err(FractalError::Io(io_err)),
         };
 
         let computed = compute_object_oid(kind, &block_bytes);
@@ -263,7 +266,11 @@ impl CasBackend {
         }
 
         if let Some(ref cache) = self.cache {
-            cache.insert(*oid, block_bytes.clone(), block_bytes.len());
+            cache.insert(
+                *oid,
+                Arc::<[u8]>::from(block_bytes.as_slice()),
+                block_bytes.len(),
+            );
         }
 
         Ok((kind, block_bytes))
@@ -308,7 +315,7 @@ impl CasBackend {
     /// Checks if target block exists without reading full bytes.
     pub fn has_block(&self, oid: &Oid) -> bool {
         if let Some(ref cache) = self.cache {
-            if cache.get(oid).is_some() {
+            if cache.contains(oid) {
                 return true;
             }
         }

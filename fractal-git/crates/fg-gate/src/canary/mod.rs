@@ -161,8 +161,7 @@ impl ShadowCanaryEngine {
 
     /// Detects tautological, trivial, or deceptive assertions in test code.
     pub fn detect_tautological_assertions(&self, test_code: &str) -> Vec<(usize, String)> {
-        let mut tautologies = Vec::new();
-        let trivial_patterns = [
+        const TRIVIAL_PATTERNS: [(&str, &str); 6] = [
             ("assert!(true)", "Trivial assert!(true) assertion detected"),
             (
                 "assert!(1 == 1)",
@@ -180,44 +179,24 @@ impl ShadowCanaryEngine {
             ("assert_eq!(0, 0)", "Trivial assert_eq!(0, 0) detected"),
         ];
 
+        let mut tautologies = Vec::new();
         for (line_index, source_line) in test_code.lines().enumerate() {
             let trimmed = source_line.trim();
-            let line_num = line_index + 1;
-
             if trimmed.starts_with("//") {
                 continue;
             }
+            let line_num = line_index + 1;
 
-            let mut flagged_line = false;
-            for (pattern, description) in &trivial_patterns {
-                if trimmed.contains(pattern) {
-                    tautologies.push((line_num, (*description).to_string()));
-                    flagged_line = true;
-                    break;
-                }
-            }
-
-            if flagged_line {
+            if let Some((_, description)) = TRIVIAL_PATTERNS
+                .iter()
+                .find(|(pattern, _)| trimmed.contains(pattern))
+            {
+                tautologies.push((line_num, (*description).to_string()));
                 continue;
             }
 
-            // Check self-comparison like `assert_eq!(x, x)`
-            let clean_assertion = trimmed.trim_end_matches(';').trim();
-            if clean_assertion.starts_with("assert_eq!(") {
-                if let Some(inner_expr) = clean_assertion.strip_prefix("assert_eq!(") {
-                    if let Some(arg_tokens) = inner_expr.strip_suffix(')') {
-                        let operands: Vec<&str> = arg_tokens.split(',').map(|s| s.trim()).collect();
-                        if operands.len() == 2 && operands[0] == operands[1] {
-                            tautologies.push((
-                                line_num,
-                                format!(
-                                    "Self-assert identity assert_eq!({}, {}) detected",
-                                    operands[0], operands[1]
-                                ),
-                            ));
-                        }
-                    }
-                }
+            if let Some(self_assert_msg) = extract_self_comparison_tautology(trimmed) {
+                tautologies.push((line_num, self_assert_msg));
             }
         }
 
@@ -235,100 +214,93 @@ impl ShadowCanaryEngine {
             }
 
             let trimmed = source_line.trim();
-            let line_num = line_index + 1;
-
             if trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.is_empty() {
                 continue;
             }
 
-            // Detect enclosing function signature
-            if (trimmed.starts_with("fn ")
-                || trimmed.starts_with("pub fn ")
-                || trimmed.starts_with("pub(crate) fn "))
-                && trimmed.contains('(')
-            {
-                if let Some(fn_pos) = trimmed.find("fn ") {
-                    let after = &trimmed[fn_pos + 3..];
-                    if let Some(open_paren) = after.find('(') {
-                        let fn_name = after[..open_paren].trim().to_string();
-                        if !fn_name.is_empty() {
-                            current_fn = Some(fn_name);
-                        }
-                    }
-                }
+            if let Some(fn_name) = try_parse_enclosing_fn(trimmed) {
+                current_fn = Some(fn_name);
             }
 
-            // 1. Relational operator inversion
-            let rel_inversions = [
-                (" == ", " != "),
-                (" != ", " == "),
-                (" > ", " <= "),
-                (" < ", " >= "),
-                (" >= ", " < "),
-                (" <= ", " > "),
-            ];
-
-            for (from, to) in &rel_inversions {
-                if trimmed.contains(from) {
-                    let mutated = trimmed.replacen(from, to, 1);
-                    mutants.push(MutantDescriptor {
-                        id: mutants.len() + 1,
-                        line: line_num,
-                        kind: MutationKind::OperatorInversion,
-                        enclosing_fn: current_fn.clone(),
-                        original_snippet: trimmed.to_string(),
-                        mutated_snippet: mutated,
-                    });
-                    break;
-                }
-            }
-
-            if mutants.len() >= self.config.max_mutants_per_slice {
-                break;
-            }
-
-            // 2. Boolean literal inversion
-            if trimmed.contains("true") && !trimmed.contains("assert") {
-                let mutated = trimmed.replacen("true", "false", 1);
-                mutants.push(MutantDescriptor {
-                    id: mutants.len() + 1,
-                    line: line_num,
-                    kind: MutationKind::BooleanFlip,
-                    enclosing_fn: current_fn.clone(),
-                    original_snippet: trimmed.to_string(),
-                    mutated_snippet: mutated,
-                });
-            } else if trimmed.contains("false") && !trimmed.contains("assert") {
-                let mutated = trimmed.replacen("false", "true", 1);
-                mutants.push(MutantDescriptor {
-                    id: mutants.len() + 1,
-                    line: line_num,
-                    kind: MutationKind::BooleanFlip,
-                    enclosing_fn: current_fn.clone(),
-                    original_snippet: trimmed.to_string(),
-                    mutated_snippet: mutated,
-                });
-            }
-
-            if mutants.len() >= self.config.max_mutants_per_slice {
-                break;
-            }
-
-            // 3. Boundary off-by-one shifts
-            if trimmed.contains(" + 1") {
-                let mutated = trimmed.replacen(" + 1", " - 1", 1);
-                mutants.push(MutantDescriptor {
-                    id: mutants.len() + 1,
-                    line: line_num,
-                    kind: MutationKind::BoundaryShift,
-                    enclosing_fn: current_fn.clone(),
-                    original_snippet: trimmed.to_string(),
-                    mutated_snippet: mutated,
-                });
-            }
+            self.synthesize_line_mutants(
+                SourceLineContext {
+                    trimmed,
+                    line_num: line_index + 1,
+                    enclosing_fn: current_fn.as_deref(),
+                },
+                &mut mutants,
+            );
         }
 
         mutants
+    }
+
+    /// Synthesizes relational, boolean, and boundary micro-mutants for a single source line.
+    fn synthesize_line_mutants(
+        &self,
+        ctx: SourceLineContext<'_>,
+        mutants: &mut Vec<MutantDescriptor>,
+    ) {
+        const REL_INVERSIONS: [(&str, &str); 6] = [
+            (" == ", " != "),
+            (" != ", " == "),
+            (" > ", " <= "),
+            (" < ", " >= "),
+            (" >= ", " < "),
+            (" <= ", " > "),
+        ];
+
+        let max_mutants = self.config.max_mutants_per_slice;
+        if let Some((from, to)) = REL_INVERSIONS
+            .iter()
+            .find(|(from, _)| ctx.trimmed.contains(from))
+        {
+            push_mutant(
+                mutants,
+                ctx,
+                (
+                    MutationKind::OperatorInversion,
+                    ctx.trimmed.replacen(from, to, 1),
+                ),
+            );
+        }
+
+        if mutants.len() >= max_mutants {
+            return;
+        }
+
+        if !ctx.trimmed.contains("assert") {
+            if ctx.trimmed.contains("true") {
+                push_mutant(
+                    mutants,
+                    ctx,
+                    (
+                        MutationKind::BooleanFlip,
+                        ctx.trimmed.replacen("true", "false", 1),
+                    ),
+                );
+            } else if ctx.trimmed.contains("false") {
+                push_mutant(
+                    mutants,
+                    ctx,
+                    (
+                        MutationKind::BooleanFlip,
+                        ctx.trimmed.replacen("false", "true", 1),
+                    ),
+                );
+            }
+        }
+
+        if mutants.len() < max_mutants && ctx.trimmed.contains(" + 1") {
+            push_mutant(
+                mutants,
+                ctx,
+                (
+                    MutationKind::BoundaryShift,
+                    ctx.trimmed.replacen(" + 1", " - 1", 1),
+                ),
+            );
+        }
     }
 
     /// Evaluates whether a given mutant is killed by inspecting test coverage and semantic anchors.
@@ -357,6 +329,60 @@ impl ShadowCanaryEngine {
 
         tokens.iter().any(|token| test_code.contains(token))
     }
+}
+
+/// Detects self-comparison tautologies such as `assert_eq!(x, x)`.
+fn extract_self_comparison_tautology(trimmed: &str) -> Option<String> {
+    let clean_assertion = trimmed.trim_end_matches(';').trim();
+    let inner_expr = clean_assertion.strip_prefix("assert_eq!(")?;
+    let arg_tokens = inner_expr.strip_suffix(')')?;
+    let (lhs, rhs) = arg_tokens.split_once(',')?;
+    if rhs.contains(',') {
+        return None;
+    }
+    let lhs_trimmed = lhs.trim();
+    let rhs_trimmed = rhs.trim();
+    (lhs_trimmed == rhs_trimmed)
+        .then(|| format!("Self-assert identity assert_eq!({lhs_trimmed}, {rhs_trimmed}) detected"))
+}
+
+/// Extracts the function name from a single-line Rust `fn` declaration.
+fn try_parse_enclosing_fn(trimmed: &str) -> Option<String> {
+    let is_fn_decl = trimmed.starts_with("fn ")
+        || trimmed.starts_with("pub fn ")
+        || trimmed.starts_with("pub(crate) fn ");
+    if !is_fn_decl || !trimmed.contains('(') {
+        return None;
+    }
+    let fn_pos = trimmed.find("fn ")?;
+    let after = &trimmed[fn_pos + 3..];
+    let open_paren = after.find('(')?;
+    let fn_name = after[..open_paren].trim();
+    (!fn_name.is_empty()).then(|| fn_name.to_string())
+}
+
+/// Lexical context for one candidate source line during mutant synthesis.
+#[derive(Clone, Copy)]
+struct SourceLineContext<'a> {
+    trimmed: &'a str,
+    line_num: usize,
+    enclosing_fn: Option<&'a str>,
+}
+
+/// Appends a synthesized `MutantDescriptor` to `mutants`.
+fn push_mutant(
+    mutants: &mut Vec<MutantDescriptor>,
+    ctx: SourceLineContext<'_>,
+    mutation: (MutationKind, String),
+) {
+    mutants.push(MutantDescriptor {
+        id: mutants.len() + 1,
+        line: ctx.line_num,
+        kind: mutation.0,
+        enclosing_fn: ctx.enclosing_fn.map(str::to_string),
+        original_snippet: ctx.trimmed.to_string(),
+        mutated_snippet: mutation.1,
+    });
 }
 
 /// Helper identifying non-differentiating programming language keywords.

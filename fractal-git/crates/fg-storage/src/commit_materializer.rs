@@ -15,13 +15,14 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use fg_algorithms::traverse::flatten_tree_with;
 use fg_core::constants::git::{OBJ_BLOB, OBJ_COMMIT, OBJ_TREE};
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::{FileMode, GitSignature, Oid};
+use fg_core::models::{parse_loose_header, FileMode, GitSignature, ObjectKind, Oid};
 use fg_core::traits::{OdbStore, RefStore};
 use fg_index::InMemoryIndexTree;
-use fg_object::borrowed::{GitCommitRef, GitTreeRef};
-use fg_object::{GitBlob, GitCommit, GitTree};
+use fg_object::borrowed::GitCommitRef;
+use fg_object::{GitCommit, GitTree};
 
 /// Request describing one commit to materialize.
 #[derive(Debug, Clone)]
@@ -35,6 +36,21 @@ pub struct CommitMaterializationRequest {
     /// Author signature.
     pub author: GitSignature,
     /// Git reference to advance, e.g. `refs/fractal/cell/main`.
+    pub target_ref: String,
+}
+
+/// Request describing one commit materialized directly from staged index entries.
+#[derive(Debug, Clone)]
+pub struct IndexCommitRequest {
+    /// Staged `(path, mode, blob_oid)` entries representing the complete target tree.
+    pub entries: Vec<(String, FileMode, Oid)>,
+    /// Commit message body (already validated by the caller's policy).
+    pub message: String,
+    /// Author signature.
+    pub author: GitSignature,
+    /// Committer signature.
+    pub committer: GitSignature,
+    /// Git reference to advance, e.g. `refs/heads/main`.
     pub target_ref: String,
 }
 
@@ -86,6 +102,77 @@ pub fn write_commit_objects_with_parents(
     write_commit_objects_inner(odb, ref_store, request, additional_parents)
 }
 
+/// Persists all hierarchical Git tree objects from `index_tree` in a single sort, serialize, and
+/// SHA-1 pass per directory (`FGT-PRF-001`), returning the root tree OID.
+pub fn persist_index_tree(
+    index_tree: &InMemoryIndexTree,
+    odb: &(impl OdbStore + ?Sized),
+) -> FractalResult<Oid> {
+    index_tree.write_tree_with_payload_persister(|payload| odb.write_object(OBJ_TREE, payload))
+}
+
+/// Serializes `commit` (including optional `Praxis-Agent-Meta`, `FGT-OBJ-001`), persists it to
+/// `odb`, and verifies that the stored OID agrees with `commit.oid()`.
+pub fn persist_commit_object(
+    commit: &GitCommit,
+    odb: &(impl OdbStore + ?Sized),
+) -> FractalResult<Oid> {
+    let commit_oid = odb.write_object(OBJ_COMMIT, &commit.to_payload())?;
+    if commit_oid != *commit.oid() {
+        return Err(FractalError::HashMismatch {
+            expected: commit.oid_hex(),
+            actual: commit_oid.to_hex(),
+        });
+    }
+    Ok(commit_oid)
+}
+
+/// Writes tree objects and a commit object directly from staged `(path, mode, oid)` index entries.
+///
+/// Unlike [`write_commit_objects_with_parents`], which hashes working-tree files on top of the
+/// parent commit's tree, this function builds the tree strictly from the staged entries already
+/// recorded in `.git/index` (or `repo.txc`). That preserves staged deletions and partial staging
+/// without absorbing unstaged working-tree edits.
+pub fn write_index_commit_objects_with_parents(
+    odb: &impl OdbStore,
+    ref_store: &impl RefStore,
+    request: &IndexCommitRequest,
+    additional_parents: &[Oid],
+) -> FractalResult<MaterializedCommit> {
+    let parent_oid = ref_store.get_ref(&request.target_ref)?;
+    let mut parent_oids: Vec<Oid> = parent_oid.iter().copied().collect();
+    parent_oids.extend(additional_parents.iter().copied());
+
+    let mut index_tree = InMemoryIndexTree::new();
+    let mut blob_oids = Vec::with_capacity(request.entries.len());
+    let mut modes = Vec::with_capacity(request.entries.len());
+    for (path, mode, oid) in &request.entries {
+        index_tree.stage_oid(path, *mode, *oid)?;
+        blob_oids.push(*oid);
+        modes.push(*mode);
+    }
+
+    let tree_oid = persist_index_tree(&index_tree, odb)?;
+
+    let commit = GitCommit::new(
+        tree_oid,
+        parent_oids,
+        request.author.clone(),
+        request.committer.clone(),
+        request.message.clone(),
+        None,
+    );
+    let commit_oid = persist_commit_object(&commit, odb)?;
+
+    Ok(MaterializedCommit {
+        commit_oid,
+        tree_oid,
+        blob_oids,
+        parent_oid,
+        modes,
+    })
+}
+
 fn write_commit_objects_inner(
     odb: &impl OdbStore,
     ref_store: &impl RefStore,
@@ -104,15 +191,18 @@ fn write_commit_objects_inner(
 
     let mut index_tree = InMemoryIndexTree::new();
     if let Some(parent_commit_oid) = parent_oid {
-        if let Ok(raw_parent) = odb.read_object(&parent_commit_oid) {
-            if let Ok(parent_payload) = split_raw_payload(&raw_parent) {
-                if let Ok(commit_ref) = GitCommitRef::parse(parent_payload) {
-                    if let Ok(parent_entries) = read_full_tree_entries(odb, commit_ref.tree_oid()) {
-                        index_tree = index_tree.graft_onto_parent(&parent_entries);
-                    }
-                }
-            }
+        let raw_parent = odb.read_object(&parent_commit_oid)?;
+        let (parent_kind, parent_payload) = parse_loose_header(&raw_parent)?;
+        if parent_kind != ObjectKind::Commit {
+            return Err(FractalError::ObjectCodec(format!(
+                "parent object {} has kind '{}', expected 'commit'",
+                parent_commit_oid.to_hex(),
+                parent_kind.as_str()
+            )));
         }
+        let commit_ref = GitCommitRef::parse(parent_payload)?;
+        let parent_entries = read_full_tree_entries(odb, commit_ref.tree_oid())?;
+        index_tree = index_tree.graft_onto_parent(&parent_entries);
     }
 
     let mut blob_oids = Vec::with_capacity(request.files.len());
@@ -122,23 +212,13 @@ fn write_commit_objects_inner(
         let absolute_path = request.work_root.join(relative_path);
         let mode = staged_file_mode(&absolute_path, relative_path)?;
         let payload = read_staged_file(&absolute_path, relative_path, mode)?;
-        let blob = GitBlob::from_bytes(payload);
-        let persisted_oid = odb.write_object(OBJ_BLOB, blob.payload())?;
-        if persisted_oid != *blob.oid() {
-            return Err(FractalError::HashMismatch {
-                expected: blob.oid().to_string(),
-                actual: persisted_oid.to_hex(),
-            });
-        }
-        index_tree.stage_oid(relative_path, mode, *blob.oid())?;
-        blob_oids.push(*blob.oid());
+        let persisted_oid = odb.write_object(OBJ_BLOB, &payload)?;
+        index_tree.stage_oid(relative_path, mode, persisted_oid)?;
+        blob_oids.push(persisted_oid);
         modes.push(mode);
     }
 
-    let tree_oid = index_tree.write_tree_with_persister(|tree| {
-        odb.write_object(OBJ_TREE, &serialize_tree_payload(tree))?;
-        Ok(())
-    })?;
+    let tree_oid = persist_index_tree(&index_tree, odb)?;
 
     let commit = GitCommit::new(
         tree_oid,
@@ -148,13 +228,7 @@ fn write_commit_objects_inner(
         request.message.clone(),
         None,
     );
-    let commit_oid = odb.write_object(OBJ_COMMIT, &serialize_commit_payload(&commit))?;
-    if commit_oid != *commit.oid() {
-        return Err(FractalError::HashMismatch {
-            expected: commit.oid_hex(),
-            actual: commit_oid.to_hex(),
-        });
-    }
+    let commit_oid = persist_commit_object(&commit, odb)?;
 
     Ok(MaterializedCommit {
         commit_oid,
@@ -165,46 +239,37 @@ fn write_commit_objects_inner(
     })
 }
 
-/// Splits the loose object header (`"<type> <size>\0"`) returning the raw payload slice.
-fn split_raw_payload(raw: &[u8]) -> FractalResult<&[u8]> {
-    let nul_pos = raw
-        .iter()
-        .position(|&b| b == 0)
-        .ok_or_else(|| FractalError::ObjectCodec("missing null byte in object header".into()))?;
-    Ok(&raw[nul_pos + 1..])
-}
-
-/// Recursively reads all entries from a Git tree hierarchy into a flat path -> (FileMode, Oid) map.
+/// Recursively reads all entries from a Git tree hierarchy into a flat `path -> (FileMode, Oid)` map.
 pub fn read_full_tree_entries(
-    odb: &impl OdbStore,
+    odb: &(impl OdbStore + ?Sized),
     root_tree_oid: &Oid,
 ) -> FractalResult<BTreeMap<String, (FileMode, Oid)>> {
-    let mut entries = BTreeMap::new();
     if *root_tree_oid == Oid::ZERO {
-        return Ok(entries);
+        return Ok(BTreeMap::new());
     }
-    let mut stack = vec![(String::new(), *root_tree_oid)];
-
-    while let Some((prefix, tree_oid)) = stack.pop() {
-        let raw_bytes = odb.read_object(&tree_oid)?;
-        let payload = split_raw_payload(&raw_bytes)?;
-        let tree_ref = GitTreeRef::from_bytes(payload);
-        for entry_res in tree_ref.iter() {
-            let entry = entry_res?;
-            let full_path = if prefix.is_empty() {
-                entry.name.to_string()
-            } else {
-                format!("{}/{}", prefix, entry.name)
-            };
-            if entry.mode == FileMode::Directory {
-                stack.push((full_path, entry.oid));
-            } else {
-                entries.insert(full_path, (entry.mode, entry.oid));
+    let mut flat = BTreeMap::new();
+    flatten_tree_with(
+        root_tree_oid,
+        "",
+        &|oid| {
+            let raw_bytes = odb.read_object(oid)?;
+            let (kind, payload) = parse_loose_header(&raw_bytes)?;
+            if kind != ObjectKind::Tree {
+                return Err(FractalError::ObjectCodec(format!(
+                    "tree walk expected 'tree' for {}, found '{}'",
+                    oid.to_hex(),
+                    kind.as_str()
+                )));
             }
-        }
-    }
+            Ok(payload.to_vec())
+        },
+        &mut flat,
+    )?;
 
-    Ok(entries)
+    Ok(flat
+        .into_iter()
+        .map(|(path, entry)| (path, (entry.mode, entry.oid)))
+        .collect())
 }
 
 /// Materializes `request` into the object database, advancing the target reference on success.
@@ -293,32 +358,68 @@ fn staged_file_error(
 }
 
 /// Serializes tree entries into the canonical Git tree payload (type header excluded).
+#[must_use]
 pub fn serialize_tree_payload(tree: &GitTree) -> Vec<u8> {
-    let mut payload = Vec::with_capacity(tree.entries().len() * 40);
-    for entry in tree.entries() {
-        payload.extend_from_slice(entry.mode.as_octal_str().as_bytes());
-        payload.push(b' ');
-        payload.extend_from_slice(entry.name.as_bytes());
-        payload.push(0);
-        payload.extend_from_slice(entry.oid.as_bytes());
-    }
-    payload
+    tree.to_payload()
 }
 
-/// Serializes a commit into the canonical Git commit payload (type header excluded).
-///
-/// The message is appended verbatim: Git hashes exactly the message bytes it received, so adding a
-/// newline here would diverge from the object id Git computed for the same commit.
+/// Serializes a commit into the canonical Git commit payload (type header excluded), preserving
+/// any attached `Praxis-Agent-Meta` header (`FGT-OBJ-001`).
+#[must_use]
 pub fn serialize_commit_payload(commit: &GitCommit) -> Vec<u8> {
-    use std::io::Write;
-    let mut payload = Vec::with_capacity(256 + commit.message().len());
-    let _ = writeln!(payload, "tree {}", commit.tree_oid());
-    for parent in commit.parent_oids() {
-        let _ = writeln!(payload, "parent {}", parent);
+    commit.to_payload()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{persist_commit_object, serialize_commit_payload};
+    use crate::loose::LooseOdb;
+    use fg_core::models::{AgentCommitMeta, GitSignature, Oid};
+    use fg_object::GitCommit;
+
+    fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
+        let base = std::env::current_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .join("target")
+            .join("test_tmp");
+        let _ = std::fs::create_dir_all(&base);
+        tempfile::Builder::new()
+            .prefix(prefix)
+            .tempdir_in(&base)
+            .or_else(|_| tempfile::tempdir())
+            .expect("create test tempdir")
     }
-    let _ = writeln!(payload, "author {}", commit.author().to_git_line());
-    let _ = writeln!(payload, "committer {}", commit.committer().to_git_line());
-    payload.push(b'\n');
-    payload.extend_from_slice(commit.message().as_bytes());
-    payload
+
+    #[test]
+    fn commit_serialization_preserves_agent_meta_without_hash_mismatch() {
+        let dir = test_temp_dir("commit_materializer_");
+        let odb = LooseOdb::without_cache(dir.path());
+        let sig = GitSignature::new("Agent", "agent@example.com", 1_700_000_000);
+        let meta = AgentCommitMeta {
+            card_context: fg_core::models::PraxisCardContext {
+                card_id: "card-01".to_string(),
+                cell_id: "cell-alpha".to_string(),
+                agent_uid: "fg-refactor".to_string(),
+                role: Some("refactor".to_string()),
+            },
+            quality_score: 98.0,
+            gate_status: "PASSED".to_string(),
+            timestamp_ms: 1_700_000_000_000,
+        };
+        let commit = GitCommit::new(
+            Oid::from_bytes([0x11; 20]),
+            vec![],
+            sig.clone(),
+            sig,
+            "feat(storage): preserve agent meta\n".to_string(),
+            Some(meta),
+        );
+
+        let payload = serialize_commit_payload(&commit);
+        assert!(std::str::from_utf8(&payload)
+            .expect("utf8")
+            .contains("Praxis-Agent-Meta: "));
+        let persisted = persist_commit_object(&commit, &odb).expect("persist commit with meta");
+        assert_eq!(persisted, *commit.oid());
+    }
 }

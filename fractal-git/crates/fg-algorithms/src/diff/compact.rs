@@ -408,6 +408,120 @@ fn penalized_position(
     best_shift
 }
 
+/// Slides `group` upward as far as identical neighbour lines allow, keeping `other_group` in lockstep.
+fn slide_up_all<Id: Copy + PartialEq>(
+    side: &Side<'_, Id>,
+    changed: &mut [bool],
+    other: &[bool],
+    group: &mut ChangeGroup,
+    other_group: &mut ChangeGroup,
+) -> bool {
+    while slide_up(side, changed, group).is_some() {
+        let Some(step) = previous_group(other, *other_group) else {
+            return false;
+        };
+        *other_group = step;
+    }
+    true
+}
+
+/// Slides `group` downward as far as identical neighbour lines allow, recording the lowest aligned counterpart.
+fn slide_down_all<Id: Copy + PartialEq>(
+    side: &Side<'_, Id>,
+    changed: &mut [bool],
+    other: &[bool],
+    group: &mut ChangeGroup,
+    other_group: &mut ChangeGroup,
+    matching_other: &mut isize,
+) -> bool {
+    while slide_down(side, changed, group).is_some() {
+        let Some(step) = next_group(other, *other_group) else {
+            return false;
+        };
+        *other_group = step;
+        if !other_group.is_empty() {
+            *matching_other = group.end as isize;
+        }
+    }
+    true
+}
+
+/// Slides `group` up and down until absorbed adjacent runs stabilize, returning `(group_size, earliest_end, matching_other)`.
+fn explore_group_bounds<Id: Copy + PartialEq>(
+    side: &Side<'_, Id>,
+    changed: &mut [bool],
+    other: &[bool],
+    group: &mut ChangeGroup,
+    other_group: &mut ChangeGroup,
+) -> Option<(usize, isize, isize)> {
+    let mut group_size = group.len();
+    loop {
+        let mut matching_other = -1isize;
+        if !slide_up_all(side, changed, other, group, other_group) {
+            return None;
+        }
+        let earliest_end = group.end as isize;
+        if !other_group.is_empty() {
+            matching_other = earliest_end;
+        }
+        if !slide_down_all(
+            side,
+            changed,
+            other,
+            group,
+            other_group,
+            &mut matching_other,
+        ) {
+            return None;
+        }
+        if group_size == group.len() {
+            return Some((group_size, earliest_end, matching_other));
+        }
+        group_size = group.len();
+    }
+}
+
+/// Pulls `group` back from its lowest reachable position to either an aligned counterpart or the lowest-penalty indent split.
+fn settle_group_position<Id: Copy + PartialEq>(
+    side: &Side<'_, Id>,
+    changed: &mut [bool],
+    other: &[bool],
+    group: &mut ChangeGroup,
+    other_group: &mut ChangeGroup,
+    bounds: (usize, isize, isize),
+) -> bool {
+    let (group_size, earliest_end, matching_other) = bounds;
+    if (group.end as isize) == earliest_end {
+        // The run could not move at all, so there is no position to choose between.
+        return true;
+    }
+    if matching_other != -1 {
+        // A run on the other side can be met line for line; splitting a change into an
+        // unrelated deletion and addition reads as two edits and hides that they pair up.
+        while other_group.is_empty() {
+            if slide_up(side, changed, group).is_none() {
+                return false;
+            }
+            let Some(step) = previous_group(other, *other_group) else {
+                return false;
+            };
+            *other_group = step;
+        }
+        return true;
+    }
+    let best = penalized_position(side.texts, *group, group_size, earliest_end);
+    while (group.end as isize) > best {
+        if slide_up(side, changed, group).is_none() {
+            return false;
+        }
+        let Some(step) = previous_group(other, *other_group) else {
+            return false;
+        };
+        *other_group = step;
+    }
+    true
+}
+
 /// Compacts the changed flags of one side against the other side's flags.
 ///
 /// Returns `false` if the two sides' run sequences fall out of step, which indicates the flags no
@@ -425,75 +539,24 @@ fn compact_side<Id: Copy + PartialEq>(
 
     loop {
         if !group.is_empty() {
-            let mut group_size = group.len();
-            let mut earliest_end;
-            let mut matching_other;
-            loop {
-                matching_other = -1;
-                while slide_up(side, changed, &mut group).is_some() {
-                    match previous_group(other, other_group) {
-                        Some(step) => other_group = step,
-                        None => return false,
-                    }
-                }
-                earliest_end = group.end as isize;
-                if !other_group.is_empty() {
-                    matching_other = group.end as isize;
-                }
-                loop {
-                    if slide_down(side, changed, &mut group).is_none() {
-                        break;
-                    }
-                    match next_group(other, other_group) {
-                        Some(step) => other_group = step,
-                        None => return false,
-                    }
-                    if !other_group.is_empty() {
-                        matching_other = group.end as isize;
-                    }
-                }
-                if group_size == group.len() {
-                    break;
-                }
-                group_size = group.len();
-            }
-
-            if (group.end as isize) == earliest_end {
-                // The run could not move at all, so there is no position to choose between.
-            } else if matching_other != -1 {
-                // A run on the other side can be met line for line; splitting a change into an
-                // unrelated deletion and addition reads as two edits and hides that they pair up.
-                while other_group.is_empty() {
-                    if slide_up(side, changed, &mut group).is_none() {
-                        return false;
-                    }
-                    match previous_group(other, other_group) {
-                        Some(step) => other_group = step,
-                        None => return false,
-                    }
-                }
-            } else {
-                let best = penalized_position(side.texts, group, group_size, earliest_end);
-                while (group.end as isize) > best {
-                    if slide_up(side, changed, &mut group).is_none() {
-                        return false;
-                    }
-                    match previous_group(other, other_group) {
-                        Some(step) => other_group = step,
-                        None => return false,
-                    }
-                }
+            let Some(bounds) =
+                explore_group_bounds(side, changed, other, &mut group, &mut other_group)
+            else {
+                return false;
+            };
+            if !settle_group_position(side, changed, other, &mut group, &mut other_group, bounds) {
+                return false;
             }
         }
 
-        match next_group(changed, group) {
-            Some(step) => group = step,
-            None => return true,
-        }
-        match next_group(other, other_group) {
-            Some(step) => other_group = step,
-            None => return false,
-        }
+        let Some(next_self) = next_group(changed, group) else {
+            return true;
+        };
+        let Some(next_other) = next_group(other, other_group) else {
+            return false;
+        };
+        group = next_self;
+        other_group = next_other;
     }
 }
 

@@ -47,7 +47,7 @@ impl GitCommit {
             &author,
             &committer,
             &message,
-            &agent_meta,
+            agent_meta.as_ref(),
         );
         let oid = Self::compute_commit_oid(&payload);
 
@@ -121,16 +121,23 @@ impl GitCommit {
         self.agent_meta.as_ref()
     }
 
-    /// Returns the raw Git loose object format: `commit <size>\0<content>`
-    pub fn to_raw_object(&self) -> Vec<u8> {
-        let payload = Self::serialize_commit_payload(
+    /// Returns the canonical commit body payload bytes (without the `commit <size>\0` loose header),
+    /// including `Praxis-Agent-Meta` trailer lines when `agent_meta` is present.
+    #[must_use]
+    pub fn to_payload(&self) -> Vec<u8> {
+        Self::serialize_commit_payload(
             &self.tree_oid,
             &self.parent_oids,
             &self.author,
             &self.committer,
             &self.message,
-            &self.agent_meta,
-        );
+            self.agent_meta.as_ref(),
+        )
+    }
+
+    /// Returns the raw Git loose object format: `commit <size>\0<content>`
+    pub fn to_raw_object(&self) -> Vec<u8> {
+        let payload = self.to_payload();
         raw_object(ObjectKind::Commit, &payload)
     }
 
@@ -147,7 +154,7 @@ impl GitCommit {
         author: &GitSignature,
         committer: &GitSignature,
         message: &str,
-        agent_meta: &Option<AgentCommitMeta>,
+        agent_meta: Option<&AgentCommitMeta>,
     ) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(256 + message.len());
         use std::io::Write;

@@ -144,10 +144,84 @@ pub fn safe_join(root: &Path, rel: &str) -> FractalResult<PathBuf> {
     Ok(joined)
 }
 
+/// Reports whether `candidate` equals `scope` or lies strictly within the directory subtree `scope`,
+/// normalizing `'\\'` and `'/'` separators on the fly with zero heap allocation.
+///
+/// Enforces a strict `'/'` component boundary so `"crates/fg-core-evil"` never matches `"crates/fg-core"`.
+/// An empty `scope` (or separator-only `"/"`) matches nothing; `"*"` or `"**"` matches any non-empty
+/// candidate. Trailing `"/**"` or `"/*"` on `scope` is treated as subtree containment under the prefix.
+#[must_use]
+pub fn path_matches_scope(candidate: &str, scope: &str) -> bool {
+    let trimmed_scope = scope.trim_matches(['/', '\\']);
+    if trimmed_scope.is_empty() {
+        return false;
+    }
+    let trimmed_candidate = candidate.trim_matches(['/', '\\']);
+    if trimmed_scope == "*" || trimmed_scope == "**" {
+        return !trimmed_candidate.is_empty();
+    }
+    let clean_scope = trimmed_scope
+        .strip_suffix("/**")
+        .or_else(|| trimmed_scope.strip_suffix("\\**"))
+        .or_else(|| trimmed_scope.strip_suffix("/*"))
+        .or_else(|| trimmed_scope.strip_suffix("\\*"))
+        .unwrap_or(trimmed_scope)
+        .trim_end_matches(['/', '\\']);
+    if clean_scope.is_empty() {
+        return false;
+    }
+
+    let cand_bytes = trimmed_candidate.as_bytes();
+    let scope_bytes = clean_scope.as_bytes();
+    if cand_bytes.len() < scope_bytes.len() {
+        return false;
+    }
+
+    for (&cb, &sb) in cand_bytes[..scope_bytes.len()]
+        .iter()
+        .zip(scope_bytes.iter())
+    {
+        let cn = if cb == b'\\' { b'/' } else { cb };
+        let sn = if sb == b'\\' { b'/' } else { sb };
+        if cn != sn {
+            return false;
+        }
+    }
+
+    if cand_bytes.len() == scope_bytes.len() {
+        return true;
+    }
+    matches!(cand_bytes[scope_bytes.len()], b'/' | b'\\')
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{safe_join, validate_repo_relative_path, RepoPath};
+    use super::{path_matches_scope, safe_join, validate_repo_relative_path, RepoPath};
     use std::path::Path;
+
+    #[test]
+    fn test_path_matches_scope_enforces_component_boundary() {
+        assert!(path_matches_scope(
+            "crates/fg-core/src/lib.rs",
+            "crates/fg-core"
+        ));
+        assert!(path_matches_scope(
+            "crates/fg-core/src/lib.rs",
+            "crates/fg-core/"
+        ));
+        assert!(path_matches_scope(
+            "crates\\fg-core\\src\\lib.rs",
+            "crates/fg-core/**"
+        ));
+        assert!(path_matches_scope("crates/fg-core", "crates/fg-core"));
+        assert!(!path_matches_scope(
+            "crates/fg-core-evil/src/lib.rs",
+            "crates/fg-core"
+        ));
+        assert!(!path_matches_scope("crates/fg-core-evil", "crates/fg-core"));
+        assert!(!path_matches_scope("crates/fg-core/src/lib.rs", ""));
+        assert!(path_matches_scope("crates/fg-core/src/lib.rs", "*"));
+    }
 
     #[test]
     fn test_accepts_ordinary_relative_paths() {

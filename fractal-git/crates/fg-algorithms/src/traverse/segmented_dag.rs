@@ -101,14 +101,16 @@ impl SegmentedCommitDag {
         let mut children = vec![Vec::new(); oids.len()];
 
         for (oid, parent_list) in commits {
-            if let Some(&child_idx) = oid_to_index.get(oid) {
-                for parent_oid in parent_list {
-                    if let Some(&parent_idx) = oid_to_index.get(parent_oid) {
-                        parents[child_idx as usize].push(parent_idx);
-                        children[parent_idx as usize].push(child_idx);
-                        in_degree[child_idx as usize] += 1;
-                    }
-                }
+            let Some(&child_idx) = oid_to_index.get(oid) else {
+                continue;
+            };
+            for parent_oid in parent_list {
+                let Some(&parent_idx) = oid_to_index.get(parent_oid) else {
+                    continue;
+                };
+                parents[child_idx as usize].push(parent_idx);
+                children[parent_idx as usize].push(child_idx);
+                in_degree[child_idx as usize] += 1;
             }
         }
 
@@ -132,9 +134,11 @@ impl SegmentedCommitDag {
             visited_count += 1;
 
             for &child_idx in &children[node_idx as usize] {
-                // Propagate parent reachability to child
-                let parent_bitmap = reachability[node_idx as usize].clone();
-                reachability[child_idx as usize] |= parent_bitmap;
+                Self::or_reachability_in_place(
+                    &mut reachability,
+                    child_idx as usize,
+                    node_idx as usize,
+                );
 
                 in_degree[child_idx as usize] = in_degree[child_idx as usize].saturating_sub(1);
                 if in_degree[child_idx as usize] == 0 {
@@ -146,11 +150,13 @@ impl SegmentedCommitDag {
         // If cycle or unvisited nodes remain, do iterative fixpoint pass
         if visited_count < oids.len() {
             for (node_idx, parent_list) in parents.iter().enumerate() {
-                let mut accumulated_parent_bitmap = RoaringBitmap::new();
                 for &parent_idx in parent_list {
-                    accumulated_parent_bitmap |= &reachability[parent_idx as usize];
+                    Self::or_reachability_in_place(
+                        &mut reachability,
+                        node_idx,
+                        parent_idx as usize,
+                    );
                 }
-                reachability[node_idx] |= accumulated_parent_bitmap;
             }
         }
 
@@ -159,6 +165,19 @@ impl SegmentedCommitDag {
             oid_to_index,
             reachability,
             parents,
+        }
+    }
+
+    /// Merges `reachability[src]` into `reachability[dst]` in-place via disjoint slice borrows
+    /// with zero `RoaringBitmap::clone()` allocation (`FGT-PRF-001`).
+    #[inline]
+    fn or_reachability_in_place(reachability: &mut [RoaringBitmap], dst: usize, src: usize) {
+        if dst < src {
+            let (left, right) = reachability.split_at_mut(src);
+            left[dst] |= &right[0];
+        } else if dst > src {
+            let (left, right) = reachability.split_at_mut(dst);
+            right[0] |= &left[src];
         }
     }
 

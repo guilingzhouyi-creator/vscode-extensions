@@ -26,7 +26,6 @@ pub const PROVENANCE_FILE: &str = "provenance.json";
 #[derive(Debug, Clone)]
 pub struct DiskProvenanceStore {
     file_path: PathBuf,
-    staging_dir: PathBuf,
 }
 
 impl DiskProvenanceStore {
@@ -35,7 +34,6 @@ impl DiskProvenanceStore {
         let root = git_dir.as_ref();
         Self {
             file_path: root.join(PROVENANCE_FILE),
-            staging_dir: root.to_path_buf(),
         }
     }
 
@@ -54,25 +52,8 @@ impl DiskProvenanceStore {
 
     /// Atomically persists the ledger to disk using a unique temporary file.
     pub fn save(&self, ledger: &ProvenanceLedger) -> FractalResult<()> {
-        if let Some(parent) = self.file_path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent).map_err(FractalError::Io)?;
-            }
-        }
-
-        let seq = std::process::id();
-        let staging_path = self.staging_dir.join(format!(".provenance-{seq}.tmp"));
-
         let json_bytes = serde_json::to_vec_pretty(ledger).map_err(FractalError::Json)?;
-
-        fs::write(&staging_path, &json_bytes).map_err(FractalError::Io)?;
-
-        if let Err(rename_err) = fs::rename(&staging_path, &self.file_path) {
-            let _ = fs::remove_file(&staging_path);
-            return Err(FractalError::Io(rename_err));
-        }
-
-        Ok(())
+        fg_core::write_file_atomic(&self.file_path, &json_bytes, false).map_err(FractalError::Io)
     }
 
     /// Appends a batch of newly derived block provenance entries and atomically persists them.

@@ -2,6 +2,11 @@
 //! File Path: crates/fg-storage/src/in_place/hole_puncher.rs
 //! Architecture Role: Manages physical hole punching (deallocating file extents) for forward
 //!   stream extraction (e.g. `.tar.gz`) without shifting logical file offsets.
+//! Dependencies & Triggers: Invoked by `extract_targz_forward_hole_punch` during low-disk stream reclamation.
+//! Responsibilities: Mark backing files sparse and punch zeroed extents via Win32 `FSCTL_SET_ZERO_DATA`
+//!   or Linux `fallocate(FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE)`.
+//! Exit Semantics & Design Rationale: Preserves logical archive offsets while returning consumed physical
+//!   volume clusters to the filesystem allocator; degrades explicitly with `UnsupportedFilesystemCapability`.
 //!
 //! Domain Governance Rules: FGT-COR-001, FGT-PRF-001, FGT-SAF-001.
 
@@ -129,8 +134,9 @@ mod sys {
         let handle = file.as_raw_handle();
         let mut bytes_returned: u32 = 0;
 
-        // SAFETY: `handle` is an active Win32 handle owned by `file`.
-        // FSCTL_SET_SPARSE takes no input buffer and produces no output buffer.
+        // SAFETY: Invariant: `FSCTL_SET_SPARSE` requires only an open file handle and accepts null I/O buffers.
+        // Precondition: `handle` is borrowed from `file` and remains open for the duration of the synchronous FFI call.
+        // Postcondition: Non-zero status confirms sparse attribute enabled; `0` leaves OS error for `last_os_error()`.
         let success = unsafe {
             DeviceIoControl(
                 handle,
@@ -162,16 +168,25 @@ mod sys {
                 "punch sparse hole: range offset + length overflowed u64".to_string(),
             )
         })?;
+        let start_i64 = i64::try_from(offset).map_err(|_| {
+            FractalError::PolicyViolation("punch sparse hole: offset exceeds i64::MAX".to_string())
+        })?;
+        let end_i64 = i64::try_from(beyond_final_zero).map_err(|_| {
+            FractalError::PolicyViolation(
+                "punch sparse hole: end offset exceeds i64::MAX".to_string(),
+            )
+        })?;
 
         let info = FileZeroDataInformation {
-            file_offset: offset as i64,
-            beyond_final_zero: beyond_final_zero as i64,
+            file_offset: start_i64,
+            beyond_final_zero: end_i64,
         };
 
         let mut bytes_returned: u32 = 0;
 
-        // SAFETY: `handle` is an active Win32 handle owned by `file`.
-        // `info` is allocated on the stack and resides in valid memory for the duration of the call.
+        // SAFETY: Invariant: Synchronous `FSCTL_SET_ZERO_DATA` reads `FileZeroDataInformation` without retaining pointers.
+        // Precondition: `handle` is open, `info` is `#[repr(C)]` on stack with validated non-negative `i64` bounds.
+        // Postcondition: Non-zero status zeroes `[start_i64, end_i64)` into sparse extents; `0` leaves `last_os_error()`.
         let success = unsafe {
             DeviceIoControl(
                 handle,
@@ -216,16 +231,26 @@ mod sys {
     /// Punches a sparse hole using Linux kernel `fallocate` with `FALLOC_FL_PUNCH_HOLE`.
     pub fn punch_hole(file: &File, offset: u64, length: u64) -> FractalResult<()> {
         let fd = file.as_raw_fd();
+        let offset_i64 = i64::try_from(offset).map_err(|_| {
+            FractalError::PolicyViolation(
+                "punch sparse hole: offset exceeds off_t range".to_string(),
+            )
+        })?;
+        let length_i64 = i64::try_from(length).map_err(|_| {
+            FractalError::PolicyViolation(
+                "punch sparse hole: length exceeds off_t range".to_string(),
+            )
+        })?;
 
-        // SAFETY: `fd` is a valid open file descriptor borrowed from `file`.
-        // `FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE` is the standard Linux kernel interface
-        // for deallocating block ranges without altering inode file size.
+        // SAFETY: Invariant: `fallocate(FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE)` deallocates blocks without altering size.
+        // Precondition: `fd` is an open writable descriptor borrowed from `file`; `offset_i64` and `length_i64` are non-negative.
+        // Postcondition: Returns `0` on success or `-1` (leaving `errno` set) without invalidating `fd`.
         let fallocate_status = unsafe {
             fallocate(
                 fd,
                 FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
-                offset as i64,
-                length as i64,
+                offset_i64,
+                length_i64,
             )
         };
 

@@ -9,6 +9,7 @@
 //!     Taxis-native container lives in `fg-native` and shares nothing with them, which is what keeps
 //!     "read Git repositories" separable from "Taxis has its own format".
 
+pub mod fanout;
 pub mod idx_file;
 pub mod idx_writer;
 pub mod midx_file;

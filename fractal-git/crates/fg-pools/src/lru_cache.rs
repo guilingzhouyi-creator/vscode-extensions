@@ -124,6 +124,15 @@ impl<K: Hash + Eq + Clone, V> LruInner<K, V> {
         }
     }
 
+    fn contains(&mut self, key: &K) -> bool {
+        if let Some(&slot_index) = self.entries.get(key) {
+            self.promote_to_mru(slot_index);
+            true
+        } else {
+            false
+        }
+    }
+
     fn get(&mut self, key: &K) -> Option<&V> {
         if let Some(&slot_index) = self.entries.get(key) {
             self.promote_to_mru(slot_index);
@@ -190,7 +199,7 @@ pub struct ByteLruCache<K, V> {
     inner: Mutex<LruInner<K, V>>,
 }
 
-impl<K: Hash + Eq + Clone, V: Clone> ByteLruCache<K, V> {
+impl<K: Hash + Eq + Clone, V> ByteLruCache<K, V> {
     /// Constructs a cache with maximum byte budget (e.g. 128 MB = 128 * 1024 * 1024).
     pub fn new(max_bytes: usize) -> Self {
         Self {
@@ -198,9 +207,10 @@ impl<K: Hash + Eq + Clone, V: Clone> ByteLruCache<K, V> {
         }
     }
 
-    /// Retrieves an entry if present, marking it as most-recently-used.
-    pub fn get(&self, key: &K) -> Option<V> {
-        self.inner.lock().get(key).cloned()
+    /// Checks whether `key` is resident in the cache and promotes it to most-recently-used
+    /// without cloning the cached value (`FGT-PRF-001`).
+    pub fn contains(&self, key: &K) -> bool {
+        self.inner.lock().contains(key)
     }
 
     /// Inserts an entry along with its physical byte footprint.
@@ -231,5 +241,13 @@ impl<K: Hash + Eq + Clone, V: Clone> ByteLruCache<K, V> {
     /// Clears all cached items and resets byte footprint to zero.
     pub fn clear(&self) {
         self.inner.lock().clear();
+    }
+}
+
+impl<K: Hash + Eq + Clone, V: Clone> ByteLruCache<K, V> {
+    /// Retrieves a cloned entry (cheap `O(1)` refcount bump when `V = Arc<[u8]>`) if present,
+    /// marking it as most-recently-used.
+    pub fn get(&self, key: &K) -> Option<V> {
+        self.inner.lock().get(key).cloned()
     }
 }

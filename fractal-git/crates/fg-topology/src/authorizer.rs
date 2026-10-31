@@ -2,7 +2,15 @@
 //! File Path: crates/fg-topology/src/authorizer.rs
 //! Architecture Role: Defines the core authorization interface and cryptographic nonce
 //!   challenge-response verifier for GUI-exclusive human promotions into System Trunk.
+//! Dependencies & Triggers: Invoked by `PromotionStagingLedger::apply_uac_approval` during trunk elevation.
+//! Responsibilities: Validate request binding, constant-time 32-byte challenge nonce match, 1-hour lease
+//!   window, non-empty human operator identity, and GUI session attribution, plus append audit trail entries.
+//! Exit Semantics & Design Rationale: Uses `fg_core::ct_eq_bytes` for constant-time nonce comparison
+//!   (`STDLIB-CONST-001`) and fails closed on expired leases or anonymous sessions.
+//!
+//! Domain Governance Rules: FGT-TOP-001, FGT-COR-001, STDLIB-CONST-001.
 
+use fg_core::ct_eq_bytes;
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{HumanUacProof, StagedPromotionRequest};
 use std::sync::Mutex;
@@ -68,8 +76,8 @@ impl HumanUacAuthorizer for StandardNonceAuthorizer {
             )));
         }
 
-        // 2. Nonce equality check
-        if proof.signed_nonce != request.challenge_nonce {
+        // 2. Constant-time cryptographic nonce equality check
+        if !ct_eq_bytes(&proof.signed_nonce, &request.challenge_nonce) {
             return Err(FractalError::AuthProofInvalid(
                 "UAC challenge nonce mismatch: proof contains invalid cryptographic nonce".into(),
             ));

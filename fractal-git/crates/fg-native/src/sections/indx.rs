@@ -273,8 +273,7 @@ impl IndxSection {
             });
         }
 
-        let mut entries = Vec::with_capacity(declared.min(1024));
-        let mut previous_key: Option<(String, IndexStage)> = None;
+        let mut entries: Vec<IndexEntry> = Vec::with_capacity(declared.min(1024));
 
         for position in 0..declared {
             let path = reader.read_string("entry_path")?;
@@ -287,14 +286,13 @@ impl IndxSection {
             validate_path(path.as_str(), mode)?;
             validate_flags(flags)?;
 
-            if let Some((previous_path, previous_stage)) = previous_key.as_ref() {
-                let ascending = (previous_path.as_str(), *previous_stage) < (path.as_str(), stage);
+            if let Some(previous) = entries.last() {
+                let ascending = previous.sort_key() < (path.as_str(), stage);
                 if !ascending {
                     return Err(NativeError::IndexOutOfOrder { position });
                 }
             }
 
-            previous_key = Some((path.clone(), stage));
             entries.push(IndexEntry {
                 path,
                 mode,

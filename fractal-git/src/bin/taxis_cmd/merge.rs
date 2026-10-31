@@ -24,26 +24,26 @@ use fg_algorithms::merge::{
     BlockThreeWayMerge, ConflictEntry, TextThreeWayMerge, ThreeWayMerge, ThreeWayMergeResult,
 };
 use fg_algorithms::traverse::DagWalker;
-use fg_core::constants::git::{OBJ_BLOB, OBJ_COMMIT, OBJ_TREE};
+use fg_core::constants::git::OBJ_BLOB;
 use fg_core::models::{
     ConflictPresentationMode, CorrectedCommitDate, FileMode, GitSignature, IndexStage, Oid,
 };
 use fg_core::traits::OdbStore;
 use fg_index::{InMemoryIndexTree, IndexEntry};
 use fg_object::GitCommit;
-use fg_storage::commit_materializer::{serialize_commit_payload, serialize_tree_payload};
+use fg_storage::commit_materializer::{persist_commit_object, persist_index_tree};
 use fg_storage::LooseOdb;
 use fg_topology::conflict_tree::{ConflictSlice, ConflictTreeManager};
 use fractal_git::constants::cli::CliTag;
-use fractal_git::{DiskRefStore, OperationGraph, RepoViewSnapshot};
 
 use super::checkout::{
     assert_worktree_cleanliness, materialize_files, remove_stale_files, update_dirc_index,
     update_references,
 };
 use super::commit_walk::parse_commit_record;
-use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
+use super::common::{fail_io, print_json, reject, CliContext};
 use super::config::RepoConfig;
+use super::operation::{record_head_operation, HeadOperationSpec};
 use super::repo_view::RepoView;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
 
@@ -61,10 +61,7 @@ struct MergeOptions {
 /// Dispatches the `merge` command.
 pub fn handle_merge(ctx: &CliContext) {
     let opts = parse_merge_options(&ctx.args);
-    let view = match RepoView::open(ctx) {
-        Ok(opened) => opened,
-        Err(open_err) => fail_fatal(open_err),
-    };
+    let view = RepoView::open_or_exit(ctx);
 
     if opts.abort {
         handle_merge_abort(&view);
@@ -385,56 +382,8 @@ fn execute_three_way_merge(
             mut merged_tree,
             conflicts,
         } => {
-            let mut remaining_conflicts = Vec::new();
-            let odb = LooseOdb::new(view.git_dir());
-
-            for conflict in conflicts {
-                let mut resolved = false;
-                if let (Some(ours_oid), Some(theirs_oid)) = (conflict.ours_oid, conflict.theirs_oid)
-                {
-                    let base_payload = conflict
-                        .base_oid
-                        .and_then(|oid| view.blob_payload(&oid).ok())
-                        .unwrap_or_default();
-                    let ours_payload = view.blob_payload(&ours_oid).unwrap_or_default();
-                    let theirs_payload = view.blob_payload(&theirs_oid).unwrap_or_default();
-
-                    let merge_res = TextThreeWayMerge::merge(
-                        &base_payload,
-                        &ours_payload,
-                        &theirs_payload,
-                        "HEAD",
-                        &opts.target,
-                    );
-
-                    if merge_res.is_clean {
-                        if let Ok(new_oid) = odb.write_object(OBJ_BLOB, &merge_res.content) {
-                            merged_tree.insert(conflict.path.clone(), new_oid);
-                            resolved = true;
-                        }
-                    } else {
-                        // Semantic block fallback: reconcile disjoint functions & import set-union
-                        let block_res = BlockThreeWayMerge::merge(
-                            &base_payload,
-                            &ours_payload,
-                            &theirs_payload,
-                            "HEAD",
-                            &opts.target,
-                        );
-                        if block_res.is_clean {
-                            if let Ok(new_oid) = odb.write_object(OBJ_BLOB, &block_res.content) {
-                                merged_tree.insert(conflict.path.clone(), new_oid);
-                                resolved = true;
-                            }
-                        }
-                    }
-                }
-
-                if !resolved {
-                    remaining_conflicts.push(conflict);
-                }
-            }
-
+            let remaining_conflicts =
+                resolve_auto_mergable_conflicts(view, &opts.target, (&mut merged_tree, conflicts));
             if remaining_conflicts.is_empty() {
                 let m_ctx = CleanMergeContext {
                     view,
@@ -465,6 +414,65 @@ fn execute_three_way_merge(
             }
         }
     }
+}
+
+/// Attempts text 3-way merge and semantic block fallback on tree-level conflicts.
+fn resolve_auto_mergable_conflicts(
+    view: &RepoView,
+    target_label: &str,
+    tree_and_conflicts: (&mut BTreeMap<String, Oid>, Vec<ConflictEntry>),
+) -> Vec<ConflictEntry> {
+    let (merged_tree, conflicts) = tree_and_conflicts;
+    let mut remaining_conflicts = Vec::new();
+    let odb = LooseOdb::new(view.git_dir());
+
+    for conflict in conflicts {
+        if let Some(new_oid) = try_auto_merge_conflict_blob(view, &odb, (&conflict, target_label)) {
+            merged_tree.insert(conflict.path.clone(), new_oid);
+        } else {
+            remaining_conflicts.push(conflict);
+        }
+    }
+    remaining_conflicts
+}
+
+/// Attempts text or block-level 3-way merge for a single conflicting file.
+fn try_auto_merge_conflict_blob(
+    view: &RepoView,
+    odb: &LooseOdb,
+    conflict_and_label: (&ConflictEntry, &str),
+) -> Option<Oid> {
+    let (conflict, target_label) = conflict_and_label;
+    let (ours_oid, theirs_oid) = (conflict.ours_oid?, conflict.theirs_oid?);
+    let base_payload = conflict
+        .base_oid
+        .and_then(|oid| view.blob_payload(&oid).ok())
+        .unwrap_or_default();
+    let ours_payload = view.blob_payload(&ours_oid).unwrap_or_default();
+    let theirs_payload = view.blob_payload(&theirs_oid).unwrap_or_default();
+
+    let merge_res = TextThreeWayMerge::merge(
+        &base_payload,
+        &ours_payload,
+        &theirs_payload,
+        "HEAD",
+        target_label,
+    );
+    if merge_res.is_clean {
+        return odb.write_object(OBJ_BLOB, &merge_res.content).ok();
+    }
+
+    let block_res = BlockThreeWayMerge::merge(
+        &base_payload,
+        &ours_payload,
+        &theirs_payload,
+        "HEAD",
+        target_label,
+    );
+    if block_res.is_clean {
+        return odb.write_object(OBJ_BLOB, &block_res.content).ok();
+    }
+    None
 }
 
 /// Context parameter object for completing a clean merge.
@@ -502,14 +510,8 @@ fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<Stri
     }
 
     let odb = LooseOdb::new(m_ctx.view.git_dir());
-    let merged_root_tree = match in_mem_index.write_tree_with_persister(|tree| {
-        let payload = serialize_tree_payload(tree);
-        odb.write_object(OBJ_TREE, &payload)?;
-        Ok(())
-    }) {
-        Ok(oid) => oid,
-        Err(err) => fail_io("persist merged tree", err),
-    };
+    let merged_root_tree = persist_index_tree(&in_mem_index, &odb)
+        .unwrap_or_else(|err| fail_io("persist merged tree", err));
 
     let default_msg = format!("Merge branch '{}'", m_ctx.opts.target);
     let commit_msg = m_ctx.opts.message.as_deref().unwrap_or(&default_msg);
@@ -528,11 +530,8 @@ fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<Stri
         None,
     );
 
-    let commit_payload = serialize_commit_payload(&commit);
-    let commit_oid = match odb.write_object(OBJ_COMMIT, &commit_payload) {
-        Ok(oid) => oid,
-        Err(err) => fail_io("persist merge commit", err),
-    };
+    let commit_oid = persist_commit_object(&commit, &odb)
+        .unwrap_or_else(|err| fail_io("persist merge commit", err));
 
     remove_stale_files(m_ctx.view.work_root(), m_ctx.ours_files, &new_files);
     let index_entries = materialize_files(m_ctx.view, &new_files);
@@ -617,69 +616,8 @@ fn finish_conflicted_merge(
         println!("Auto-merging {}", conflict.path);
         println!("CONFLICT (content): Merge conflict in {}", conflict.path);
 
-        let mode = c_ctx
-            .ours_files
-            .get(&conflict.path)
-            .or_else(|| c_ctx.theirs_files.get(&conflict.path))
-            .map(|e| e.mode)
-            .unwrap_or(FileMode::RegularFile);
+        push_conflict_stage_entries(c_ctx, conflict, &mut index_entries);
 
-        if let Some(base_oid) = conflict.base_oid {
-            index_entries.push(IndexEntry {
-                path: conflict.path.clone(),
-                mode: c_ctx
-                    .base_files
-                    .get(&conflict.path)
-                    .map(|e| e.mode)
-                    .unwrap_or(mode),
-                oid: base_oid,
-                stage: IndexStage::Base,
-                size: 0,
-                mtime_seconds: 0,
-                mtime_nanos: 0,
-                assume_valid: false,
-                skip_worktree: false,
-                intent_to_add: false,
-            });
-        }
-        if let Some(ours_oid) = conflict.ours_oid {
-            index_entries.push(IndexEntry {
-                path: conflict.path.clone(),
-                mode: c_ctx
-                    .ours_files
-                    .get(&conflict.path)
-                    .map(|e| e.mode)
-                    .unwrap_or(mode),
-                oid: ours_oid,
-                stage: IndexStage::Ours,
-                size: 0,
-                mtime_seconds: 0,
-                mtime_nanos: 0,
-                assume_valid: false,
-                skip_worktree: false,
-                intent_to_add: false,
-            });
-        }
-        if let Some(theirs_oid) = conflict.theirs_oid {
-            index_entries.push(IndexEntry {
-                path: conflict.path.clone(),
-                mode: c_ctx
-                    .theirs_files
-                    .get(&conflict.path)
-                    .map(|e| e.mode)
-                    .unwrap_or(mode),
-                oid: theirs_oid,
-                stage: IndexStage::Theirs,
-                size: 0,
-                mtime_seconds: 0,
-                mtime_nanos: 0,
-                assume_valid: false,
-                skip_worktree: false,
-                intent_to_add: false,
-            });
-        }
-
-        // Render localized conflict marker in working tree
         let base_payload = conflict
             .base_oid
             .and_then(|oid| c_ctx.view.blob_payload(&oid).ok())
@@ -695,12 +633,12 @@ fn finish_conflicted_merge(
 
         let marker_bytes = render_conflict_file_payload(
             c_ctx.conflict_mode,
-            &base_payload,
-            &ours_payload,
-            &theirs_payload,
-            &c_ctx.opts.target,
-            conflict.ours_oid.is_some(),
-            conflict.theirs_oid.is_some(),
+            (&base_payload, &ours_payload, &theirs_payload),
+            (
+                &c_ctx.opts.target,
+                conflict.ours_oid.is_some(),
+                conflict.theirs_oid.is_some(),
+            ),
         );
 
         let target_path = c_ctx.view.work_root().join(&conflict.path);
@@ -749,16 +687,54 @@ fn finish_conflicted_merge(
     std::process::exit(1);
 }
 
+/// Appends stage 1/2/3 `IndexEntry` slots for one conflicting file.
+fn push_conflict_stage_entries(
+    c_ctx: &ConflictedMergeContext<'_>,
+    conflict: &ConflictEntry,
+    index_entries: &mut Vec<IndexEntry>,
+) {
+    let default_mode = c_ctx
+        .ours_files
+        .get(&conflict.path)
+        .or_else(|| c_ctx.theirs_files.get(&conflict.path))
+        .map(|e| e.mode)
+        .unwrap_or(FileMode::RegularFile);
+
+    let stages = [
+        (conflict.base_oid, c_ctx.base_files, IndexStage::Base),
+        (conflict.ours_oid, c_ctx.ours_files, IndexStage::Ours),
+        (conflict.theirs_oid, c_ctx.theirs_files, IndexStage::Theirs),
+    ];
+    for (oid_opt, files_map, stage) in stages {
+        if let Some(oid) = oid_opt {
+            let mode = files_map
+                .get(&conflict.path)
+                .map(|e| e.mode)
+                .unwrap_or(default_mode);
+            index_entries.push(IndexEntry {
+                path: conflict.path.clone(),
+                mode,
+                oid,
+                stage,
+                size: 0,
+                mtime_seconds: 0,
+                mtime_nanos: 0,
+                assume_valid: false,
+                skip_worktree: false,
+                intent_to_add: false,
+            });
+        }
+    }
+}
+
 /// Renders file content according to active conflict mode.
 fn render_conflict_file_payload(
     mode: ConflictPresentationMode,
-    base: &[u8],
-    ours: &[u8],
-    theirs: &[u8],
-    target_label: &str,
-    has_ours: bool,
-    has_theirs: bool,
+    payloads: (&[u8], &[u8], &[u8]),
+    target_and_presence: (&str, bool, bool),
 ) -> Vec<u8> {
+    let (base, ours, theirs) = payloads;
+    let (target_label, has_ours, has_theirs) = target_and_presence;
     match mode {
         ConflictPresentationMode::AgentAlgebraic => {
             if has_ours {
@@ -771,8 +747,7 @@ fn render_conflict_file_payload(
         }
         ConflictPresentationMode::GitCompat => {
             if has_ours && has_theirs {
-                let merge_res = TextThreeWayMerge::merge(base, ours, theirs, "HEAD", target_label);
-                merge_res.content
+                TextThreeWayMerge::merge(base, ours, theirs, "HEAD", target_label).content
             } else if has_ours {
                 ours.to_vec()
             } else if has_theirs {
@@ -833,38 +808,12 @@ fn record_merge_operation(
     target: &str,
     branch_name: Option<&str>,
 ) {
-    let ref_store = DiskRefStore::new(view.git_dir());
-    let mut op_graph = match OperationGraph::load_or_init(view.git_dir()) {
-        Ok(graph) => graph,
-        Err(_) => return,
-    };
-    let current_time_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|dur| dur.as_millis() as i64)
-        .unwrap_or(0);
-
-    let mut branches = BTreeMap::new();
-    if let Ok(all_refs) = ref_store.list_all() {
-        for (name, oid) in all_refs {
-            branches.insert(name, oid);
-        }
-    }
-    if let Some(branch) = branch_name {
-        branches.insert(format!("refs/heads/{branch}"), merged_commit);
-    }
-
-    let view_snapshot = RepoViewSnapshot {
-        head_oid: Some(merged_commit),
-        branches,
-        staged_promotions: Vec::new(),
-        timestamp_ms: current_time_ms,
-    };
-
-    let _ = op_graph.record_operation(
-        view_snapshot,
-        "operator".to_string(),
-        "merge",
-        format!("merge: {target}"),
-        current_time_ms,
-    );
+    record_head_operation(HeadOperationSpec {
+        git_dir: view.git_dir(),
+        head_oid: merged_commit,
+        branch_or_ref: branch_name,
+        actor: "operator",
+        command: "merge",
+        description: format!("merge: {target}"),
+    });
 }

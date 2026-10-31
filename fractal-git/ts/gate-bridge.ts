@@ -24,6 +24,28 @@ const RE_LOOP_ALLOC_RS =
 const RE_UNWRAP_RS = /(?:\.unwrap\(\)|\.expect\()/;
 
 /**
+ * Detects line-anchored Git conflict markers (`<<<<<<<`, exact `=======`, `>>>>>>>`),
+ * matching `fg-gate::conflict_guard::scan_conflict_markers` without false positives on
+ * Markdown/ASCII divider banners (`========`).
+ */
+function hasLineAnchoredConflictMarker(text: string): boolean {
+    const lines = text.split('\n');
+    for (const rawLine of lines) {
+        const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+        if (
+            line === '<<<<<<<' ||
+            line.startsWith('<<<<<<< ') ||
+            line === '=======' ||
+            line === '>>>>>>>' ||
+            line.startsWith('>>>>>>> ')
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Checks a single staged file against hygiene and zero-allocation constraints.
  *
  * @param file - Staged file entry to inspect.
@@ -34,16 +56,18 @@ function auditSingleFile(file: StagedFileEntry, violations: string[]): void {
         ? file.content
         : Buffer.from(file.content).toString('utf8');
 
-    // 1. Zero physical empty or whitespace-only files (HYG-EMP-001)
-    if (text.trim().length === 0) {
+    // 1. Zero physical empty (HYG-EMP-001) or whitespace-only files (HYG-EMP-002)
+    if (text.length === 0) {
         violations.push(`HYG-EMP-001: Empty physical file detected at ${file.path}`);
+        return;
+    }
+    if (text.trim().length === 0) {
+        violations.push(`HYG-EMP-002: Whitespace-only physical file detected at ${file.path}`);
         return;
     }
 
     // 2. Unresolved Git merge conflict markers (FGT-GAT-001)
-    const hasMarkers = RE_CONFLICT_MARKERS.test(text) ||
-        text.includes('<<<<<<<') || text.includes('=======') || text.includes('>>>>>>>');
-    if (hasMarkers) {
+    if (RE_CONFLICT_MARKERS.test(text) && hasLineAnchoredConflictMarker(text)) {
         violations.push(`FGT-GAT-001: Unresolved Git conflict marker detected in ${file.path}`);
     }
 

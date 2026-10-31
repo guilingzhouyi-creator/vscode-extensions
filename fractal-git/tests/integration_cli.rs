@@ -27,5 +27,8 @@ mod test_edge_porcelain;
 #[path = "rust/test_interactive_operations.rs"]
 mod test_interactive_operations;
 
+#[path = "rust/test_offline_workflow_parity.rs"]
+mod test_offline_workflow_parity;
+
 #[path = "rust/test_operations.rs"]
 mod test_operations;

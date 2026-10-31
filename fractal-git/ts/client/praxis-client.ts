@@ -3,12 +3,27 @@
  * File Path: ts/client/praxis-client.ts
  * Architecture Role: High-level ergonomic client API for autonomous agents to interact
  *   with the Fractal Git engine: spawning worktrees, staging, requesting review, and merging.
+ * Dependencies & Triggers: Consumes `../contracts`, `../constants`, `../native-binding`,
+ *   and `../gate-bridge`.
+ * Responsibilities: Manage per-subagent staged buffers, enforce Pre-Review Zone gate approval
+ *   prior to commit materialization (`FGT-GAT-001`), and attach `Praxis-Agent-Meta` trailers.
+ * Exit Semantics & Design Rationale: Rejects commits with an explicit Error whenever
+ *   `verifyPreReviewZone` fails, preventing unverified agent mutations from entering the DAG.
  */
 
-import type { FractalRefDescriptor, MaterializeCommitResult, StagedFileEntry } from "../contracts";
-import { GIT_FILE_MODE } from "../constants";
-import { materializeCommitPure } from "../native-binding";
-import { verifyPreReviewZone } from "../gate-bridge";
+import type { FractalRefDescriptor, MaterializeCommitResult, StagedFileEntry } from '../contracts';
+import { GIT_FILE_MODE } from '../constants';
+import { materializeCommitPure } from '../native-binding';
+import { verifyPreReviewZone } from '../gate-bridge';
+
+/**
+ * Immutable facade metadata descriptor for the Fractal Git Client SDK.
+ */
+export const FRACTAL_CLIENT_FACADE_INFO = Object.freeze({
+    subsystem: 'fractal-git',
+    tier: 'client',
+    protocolVersion: '1.0.0',
+});
 
 /**
  * Ergonomic worktree handle for an autonomous agent performing isolated mutations.
@@ -36,10 +51,10 @@ export class PraxisGitClient {
     public spawnSubAgentWorktree(
         cellId: string,
         cardId: string,
-        subagentId: string
+        subagentId: string,
     ): AgentWorktreeHandle {
         const ref: FractalRefDescriptor = {
-            tier: "subagent_worktree",
+            tier: 'subagent_worktree',
             gitRef: `refs/fractal/cell/${cellId}/card/${cardId}/sub/${subagentId}`,
             cellId,
             cardId,
@@ -55,7 +70,7 @@ export class PraxisGitClient {
             stageFile: (
                 path: string,
                 content: Uint8Array | string,
-                executable: boolean = false
+                executable = false,
             ) => {
                 stagedFiles.push({
                     path,
@@ -65,11 +80,18 @@ export class PraxisGitClient {
             },
             submitForPreReview: (): MaterializeCommitResult => {
                 const verdict = verifyPreReviewZone(stagedFiles);
+                if (!verdict.passed) {
+                    const reasons = verdict.violations.join('; ');
+                    throw new Error(
+                        `Pre-Review Zone gate rejected subagent worktree '${worktreeId}' ` +
+                        `(score: ${verdict.score}): ${reasons}`,
+                    );
+                }
                 return materializeCommitPure(this.gitDir, {
                     targetRef: ref,
                     parentCommitOids: [],
                     files: stagedFiles,
-                    message: `feat(subagent): atomic task commit\n\n[Project: fractal-git]`,
+                    message: 'feat(subagent): atomic task commit\n\n[Project: fractal-git]',
                     authorName: `${cellId}:${subagentId}`,
                     authorEmail: `${subagentId}@${cellId}.praxis.local`,
                     agentMeta: {
@@ -79,7 +101,7 @@ export class PraxisGitClient {
                             agentUid: subagentId,
                         },
                         qualityScore: verdict.score,
-                        gateStatus: verdict.passed ? "approved" : "rejected",
+                        gateStatus: 'approved',
                         timestampMs: Date.now(),
                     },
                 });

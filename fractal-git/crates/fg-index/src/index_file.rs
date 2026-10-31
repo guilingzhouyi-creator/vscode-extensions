@@ -547,7 +547,8 @@ fn write_entry(
     if version == INDEX_VERSION_MAX {
         let common = common_prefix_len(previous_path, &entry.path);
         let strip = previous_path.len() - common;
-        buffer.extend_from_slice(&encode_offset_varint(strip as u64));
+        let (varint_buf, varint_start) = fg_core::encode_git_offset_varint(strip as u64);
+        buffer.extend_from_slice(&varint_buf[varint_start..]);
         buffer.extend_from_slice(&entry.path.as_bytes()[common..]);
         buffer.push(0);
     } else {
@@ -570,18 +571,6 @@ fn common_prefix_len(left: &str, right: &str) -> usize {
         common -= 1;
     }
     common
-}
-
-/// Encodes a version 4 path strip count; the exact inverse of read_offset_varint.
-fn encode_offset_varint(mut value: u64) -> Vec<u8> {
-    let mut encoded = vec![(value & 0x7f) as u8];
-    value >>= 7;
-    while value != 0 {
-        value -= 1;
-        encoded.insert(0, 0x80 | (value & 0x7f) as u8);
-        value >>= 7;
-    }
-    encoded
 }
 
 /// Appends the trailing SHA-1 of everything written so far.
@@ -821,23 +810,12 @@ fn read_v4_path(
 
 /// Reads the version 4 prefix-length varint (same shape as a pack offset varint).
 fn read_offset_varint(bytes: &[u8], start: usize) -> Result<(u64, usize), String> {
-    let mut byte = *bytes
-        .get(start)
+    let tail = bytes
+        .get(start..)
+        .filter(|slice| !slice.is_empty())
         .ok_or_else(|| "version 4 prefix varint is missing".to_string())?;
-    let mut cursor = start + 1;
-    let mut value = u64::from(byte & 0x7f);
-    while byte & 0x80 != 0 {
-        byte = *bytes
-            .get(cursor)
-            .ok_or_else(|| "version 4 prefix varint is truncated".to_string())?;
-        cursor += 1;
-        value = value
-            .checked_add(1)
-            .and_then(|current| current.checked_shl(7))
-            .map(|current| current | u64::from(byte & 0x7f))
-            .ok_or_else(|| "version 4 prefix varint overflows u64".to_string())?;
-    }
-    Ok((value, cursor - start))
+    fg_core::decode_git_offset_varint(tail)
+        .ok_or_else(|| "version 4 prefix varint is truncated or overflows u64".to_string())
 }
 
 /// Rejects paths that would escape the worktree if materialized.

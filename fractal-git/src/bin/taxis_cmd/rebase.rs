@@ -29,24 +29,22 @@ use std::process::Command;
 
 use fg_algorithms::merge::{ThreeWayMerge, ThreeWayMergeResult};
 use fg_algorithms::traverse::DagWalker;
-use fg_core::constants::git::{OBJ_COMMIT, OBJ_TREE};
 use fg_core::models::{
     CorrectedCommitDate, FileMode, GitSignature, Oid, RebaseAction, RebaseItem, RebasePlan,
 };
-use fg_core::traits::OdbStore;
 use fg_index::InMemoryIndexTree;
 use fg_object::GitCommit;
-use fg_storage::commit_materializer::{serialize_commit_payload, serialize_tree_payload};
+use fg_storage::commit_materializer::{persist_commit_object, persist_index_tree};
 use fg_storage::LooseOdb;
 use fractal_git::constants::cli::CliTag;
-use fractal_git::{DiskRefStore, OperationGraph, RepoViewSnapshot};
 
 use super::checkout::{
     assert_worktree_cleanliness, materialize_files, remove_stale_files, update_dirc_index,
     update_references,
 };
 use super::commit_walk::{parse_commit_record, walk_commits, CommitRecord};
-use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
+use super::common::{fail_io, print_json, reject, CliContext};
+use super::operation::{record_head_operation, HeadOperationSpec};
 use super::rebase_state::{
     committer_signature, conclude_rebase, format_offset_minutes, handle_rebase_abort,
     handle_rebase_continue, persist_state, rebase_state_dir, write_orig_head, RebaseOutcomeContext,
@@ -318,15 +316,8 @@ impl<'a> ReplaySession<'a> {
             let _ = in_mem_index.stage_oid(path, mode, *oid);
         }
 
-        let persisted = in_mem_index.write_tree_with_persister(|tree| {
-            let payload = serialize_tree_payload(tree);
-            self.odb.write_object(OBJ_TREE, &payload)?;
-            Ok(())
-        });
-        match persisted {
-            Ok(oid) => Ok(oid),
-            Err(err) => fail_io("persist rebased tree", err),
-        }
+        Ok(persist_index_tree(&in_mem_index, &self.odb)
+            .unwrap_or_else(|err| fail_io("persist rebased tree", err)))
     }
 
     fn resolve_tree_oid(&self, commit: Oid) -> (Oid, Oid) {
@@ -352,11 +343,8 @@ impl<'a> ReplaySession<'a> {
             message.to_string(),
             None,
         );
-        let payload = serialize_commit_payload(&commit);
-        match self.odb.write_object(OBJ_COMMIT, &payload) {
-            Ok(oid) => oid,
-            Err(err) => fail_io("persist rebased commit", err),
-        }
+        persist_commit_object(&commit, &self.odb)
+            .unwrap_or_else(|err| fail_io("persist rebased commit", err))
     }
 
     fn conflict_stop(&self, conflict: MergeConflict) -> StepOutcome {
@@ -396,10 +384,7 @@ pub fn handle_rebase(ctx: &CliContext) {
         None => reject(CliTag::ERROR, "rebase expects an upstream branch or commit"),
     };
 
-    let view = match RepoView::open(ctx) {
-        Ok(opened) => opened,
-        Err(open_err) => fail_fatal(open_err),
-    };
+    let view = RepoView::open_or_exit(ctx);
 
     if rebase_state_dir(view.git_dir()).is_dir() {
         reject(
@@ -726,38 +711,12 @@ pub(crate) fn record_rebase_op(
     upstream: &str,
     branch_name: Option<&str>,
 ) {
-    let ref_store = DiskRefStore::new(view.git_dir());
-    let mut op_graph = match OperationGraph::load_or_init(view.git_dir()) {
-        Ok(graph) => graph,
-        Err(_) => return,
-    };
-    let current_time_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|dur| dur.as_millis() as i64)
-        .unwrap_or(0);
-
-    let mut branches = BTreeMap::new();
-    if let Ok(all_refs) = ref_store.list_all() {
-        for (name, oid) in all_refs {
-            branches.insert(name, oid);
-        }
-    }
-    if let Some(branch) = branch_name {
-        branches.insert(format!("refs/heads/{branch}"), new_head);
-    }
-
-    let view_snapshot = RepoViewSnapshot {
-        head_oid: Some(new_head),
-        branches,
-        staged_promotions: Vec::new(),
-        timestamp_ms: current_time_ms,
-    };
-
-    let _ = op_graph.record_operation(
-        view_snapshot,
-        "operator".to_string(),
-        "rebase",
-        format!("rebase onto {upstream}"),
-        current_time_ms,
-    );
+    record_head_operation(HeadOperationSpec {
+        git_dir: view.git_dir(),
+        head_oid: new_head,
+        branch_or_ref: branch_name,
+        actor: "operator",
+        command: "rebase",
+        description: format!("rebase onto {upstream}"),
+    });
 }

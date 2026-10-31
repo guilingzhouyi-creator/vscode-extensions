@@ -27,17 +27,13 @@ use std::path::{Path, PathBuf};
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;
 
+use crate::backends::fanout::{
+    binary_search_oid_table, fanout_range, read_be_u32, read_be_u64, FANOUT_BUCKETS,
+    FANOUT_ENTRY_LEN, OID_LEN,
+};
+
 /// Magic word at the head of a version 2 index file, `\xfftOc`.
 const IDX_V2_MAGIC: [u8; 4] = [0xff, b't', b'O', b'c'];
-
-/// Byte width of one object id.
-const OID_LEN: usize = 20;
-
-/// Number of fanout buckets: one per possible first byte.
-const FANOUT_BUCKETS: usize = 256;
-
-/// Byte width of one fanout entry.
-const FANOUT_ENTRY_LEN: usize = 4;
 
 /// Byte width of one CRC32 entry.
 const CRC_ENTRY_LEN: usize = 4;
@@ -173,13 +169,15 @@ impl PackIndex {
     /// Returns the byte offset of `oid` inside the pack, or `None` when the id is absent.
     pub fn lookup(&self, oid: &Oid) -> Option<u64> {
         let target = oid.as_bytes();
-        let low = if target[0] == 0 {
-            0
+        let fanout_start = if self.version == 1 { 0 } else { V2_HEADER_LEN };
+        let (low, high) = fanout_range(&self.bytes, fanout_start, target[0]);
+        let stride = if self.version == 1 {
+            OFFSET_ENTRY_LEN + OID_LEN
         } else {
-            self.fanout_bucket(usize::from(target[0]) - 1)
+            OID_LEN
         };
-        let high = self.fanout_bucket(usize::from(target[0]));
-        let found = self.binary_search(low, high, target)?;
+        let found =
+            binary_search_oid_table(&self.bytes, self.oid_table_start, stride, low, high, target)?;
         Some(self.offset_at(found))
     }
 
@@ -199,16 +197,16 @@ impl PackIndex {
     pub fn offset_at(&self, index: usize) -> u64 {
         if self.version == 1 {
             let base = self.offset_table_start + index * (OFFSET_ENTRY_LEN + OID_LEN);
-            return u64::from(read_u32(&self.bytes, base));
+            return u64::from(read_be_u32(&self.bytes, base));
         }
         let base = self.offset_table_start + index * OFFSET_ENTRY_LEN;
-        let word = read_u32(&self.bytes, base);
+        let word = read_be_u32(&self.bytes, base);
         if word & LARGE_OFFSET_FLAG == 0 {
             return u64::from(word);
         }
         let slot = (word & !LARGE_OFFSET_FLAG) as usize;
         let large_base = self.large_offset_table_start + slot * LARGE_OFFSET_ENTRY_LEN;
-        read_u64(&self.bytes, large_base)
+        read_be_u64(&self.bytes, large_base)
     }
 
     /// Byte offset of the object id stored at `index`, honouring the version 1 interleave.
@@ -219,29 +217,6 @@ impl PackIndex {
             ),
             _ => Some(self.oid_table_start + index * OID_LEN),
         }
-    }
-
-    /// Cumulative count for fanout bucket `bucket`.
-    fn fanout_bucket(&self, bucket: usize) -> usize {
-        let base = if self.version == 1 { 0 } else { V2_HEADER_LEN };
-        read_u32(&self.bytes, base + bucket * FANOUT_ENTRY_LEN) as usize
-    }
-
-    /// Binary-searches the id table within the `[low, high)` fanout hull.
-    fn binary_search(&self, low: usize, high: usize, target: &[u8; OID_LEN]) -> Option<usize> {
-        let mut left = low;
-        let mut right = high;
-        while left < right {
-            let mid = left + (right - left) / 2;
-            let start = self.oid_start(mid)?;
-            let candidate = self.bytes.get(start..start + OID_LEN)?;
-            match candidate.cmp(&target[..]) {
-                std::cmp::Ordering::Less => left = mid + 1,
-                std::cmp::Ordering::Greater => right = mid,
-                std::cmp::Ordering::Equal => return Some(mid),
-            }
-        }
-        None
     }
 
     /// Compiles all object offsets into an Elias-Fano quasi-succinct compressed structure.
@@ -272,25 +247,7 @@ fn read_fanout_last(bytes: &[u8], fanout_start: usize, path: &Path) -> FractalRe
             path.display()
         )));
     }
-    Ok(read_u32(bytes, base) as usize)
-}
-
-/// Reads a big-endian `u32`, yielding zero when the slice is short.
-fn read_u32(bytes: &[u8], start: usize) -> u32 {
-    match bytes.get(start..start + 4) {
-        Some(slice) => u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]]),
-        None => 0,
-    }
-}
-
-/// Reads a big-endian `u64`, yielding zero when the slice is short.
-fn read_u64(bytes: &[u8], start: usize) -> u64 {
-    match bytes.get(start..start + 8) {
-        Some(slice) => u64::from_be_bytes([
-            slice[0], slice[1], slice[2], slice[3], slice[4], slice[5], slice[6], slice[7],
-        ]),
-        None => 0,
-    }
+    Ok(read_be_u32(bytes, base) as usize)
 }
 
 #[cfg(test)]

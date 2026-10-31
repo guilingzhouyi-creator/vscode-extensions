@@ -148,7 +148,11 @@ function prepareCargo() {
     if (!process.env.CARGO_TARGET_DIR) {
       const defaultTarget = path.join(os.tmpdir(), 'taxis-cargo-target');
       if (!fs.existsSync(defaultTarget)) {
-        try { fs.mkdirSync(defaultTarget, { recursive: true }); } catch {}
+        try {
+          fs.mkdirSync(defaultTarget, { recursive: true });
+        } catch (_err) {
+          // Best-effort directory creation; cargo will surface any fatal I/O error if unusable.
+        }
       }
       process.env.CARGO_TARGET_DIR = defaultTarget;
     }

@@ -25,11 +25,12 @@
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use flate2::read::ZlibDecoder;
 
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::{compute_object_oid, ObjectKind, Oid};
+use fg_core::models::{compute_object_oid, parse_loose_header, ObjectKind, Oid};
 use fg_pools::ByteLruCache;
 
 use crate::backends::idx_file::PackIndex;
@@ -68,11 +69,11 @@ struct LoadedPack {
     bitmap: Option<PackBitmap>,
 }
 
-/// A cached object: kind plus payload.
+/// A cached object: kind plus reference-counted immutable payload (`FGT-PRF-001`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct CachedObject {
     kind: ObjectKind,
-    payload: Vec<u8>,
+    payload: Arc<[u8]>,
 }
 
 impl OdbRouter {
@@ -297,10 +298,11 @@ impl OdbRouter {
     /// objects still resolved — a partial failure that looks like a repository with gaps.
     fn read_loose(&self, oid: &Oid) -> FractalResult<Option<PackedObject>> {
         let path = self.loose_object_path(oid);
-        if !path.is_file() {
-            return Ok(None);
-        }
-        let raw = fs::read(&path)?;
+        let raw = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(io_err) => return Err(FractalError::Io(io_err)),
+        };
         let mut decoder = ZlibDecoder::new(&raw[..]);
         let mut inflated = Vec::new();
         decoder.read_to_end(&mut inflated).map_err(|io_err| {
@@ -343,7 +345,7 @@ impl OdbRouter {
         let hit = cache.get(oid)?;
         Some(PackedObject {
             kind: hit.kind,
-            payload: hit.payload,
+            payload: hit.payload.as_ref().to_vec(),
         })
     }
 
@@ -353,7 +355,7 @@ impl OdbRouter {
             let size = object.payload.len();
             let entry = CachedObject {
                 kind: object.kind,
-                payload: object.payload.clone(),
+                payload: Arc::<[u8]>::from(object.payload.as_slice()),
             };
             cache.insert(*oid, entry, size);
         }
@@ -413,56 +415,16 @@ impl DeltaBaseSource for OdbRouter {
 /// Returns [`FractalError::ObjectCodec`] when the header is absent, names an unknown type, declares a
 /// length that disagrees with the payload, or is not NUL-terminated.
 fn split_object_header(raw: &[u8], oid: &Oid) -> FractalResult<(ObjectKind, Vec<u8>)> {
-    let nul = raw.iter().position(|byte| *byte == 0).ok_or_else(|| {
-        FractalError::ObjectCodec(format!(
-            "loose object {} has no NUL-terminated header",
-            oid.to_hex()
-        ))
+    let (kind, payload) = parse_loose_header(raw).map_err(|err| {
+        FractalError::ObjectCodec(format!("loose object {}: {err}", oid.to_hex()))
     })?;
-    let header = std::str::from_utf8(&raw[..nul]).map_err(|utf_err| {
-        FractalError::ObjectCodec(format!(
-            "loose object {} header is not UTF-8: {utf_err}",
-            oid.to_hex()
-        ))
-    })?;
-    let (type_name, length_text) = header.split_once(' ').ok_or_else(|| {
-        FractalError::ObjectCodec(format!(
-            "loose object {} header '{header}' has no length field",
-            oid.to_hex()
-        ))
-    })?;
-    let kind = parse_object_kind(type_name).ok_or_else(|| {
-        FractalError::ObjectCodec(format!(
-            "loose object {} declares unknown type '{type_name}'",
-            oid.to_hex()
-        ))
-    })?;
-    let declared: usize = length_text.parse().map_err(|parse_err| {
-        FractalError::ObjectCodec(format!(
-            "loose object {} declares a non-numeric length '{length_text}': {parse_err}",
-            oid.to_hex()
-        ))
-    })?;
-    let payload = raw[nul + 1..].to_vec();
-    if payload.len() != declared {
-        return Err(FractalError::ObjectCodec(format!(
-            "loose object {} declares {declared} bytes but carries {}",
-            oid.to_hex(),
-            payload.len()
-        )));
-    }
-    Ok((kind, payload))
+    Ok((kind, payload.to_vec()))
 }
 
 /// Maps a header type name to its kind.
+#[cfg(test)]
 fn parse_object_kind(name: &str) -> Option<ObjectKind> {
-    match name {
-        "blob" => Some(ObjectKind::Blob),
-        "tree" => Some(ObjectKind::Tree),
-        "commit" => Some(ObjectKind::Commit),
-        "tag" => Some(ObjectKind::Tag),
-        _ => None,
-    }
+    ObjectKind::from_header_name(name)
 }
 
 #[cfg(test)]

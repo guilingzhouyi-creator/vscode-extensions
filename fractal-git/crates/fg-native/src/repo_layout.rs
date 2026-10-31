@@ -340,33 +340,18 @@ pub fn hide_directory(directory: &Path) -> NativeResult<()> {
 /// Returns [`NativeError::Io`] when the attributes cannot be read on Windows.
 #[cfg(windows)]
 pub fn is_directory_hidden(directory: &Path) -> NativeResult<bool> {
-    use std::os::windows::ffi::OsStrExt;
-
-    #[link(name = "kernel32")]
-    extern "system" {
-        fn GetFileAttributesW(lp_file_name: *const u16) -> u32;
-    }
+    use std::os::windows::fs::MetadataExt;
 
     const FILE_ATTRIBUTE_HIDDEN: u32 = 0x0000_0002;
-    const INVALID_FILE_ATTRIBUTES: u32 = u32::MAX;
-
-    let mut wide_path: Vec<u16> = directory.as_os_str().encode_wide().collect();
-    wide_path.push(0);
-
-    // SAFETY: `wide_path` is NUL-terminated UTF-16 and outlives the call; the function returns a
-    // status word and does not retain the pointer.
-    let attributes = unsafe { GetFileAttributesW(wide_path.as_ptr()) };
-    if attributes == INVALID_FILE_ATTRIBUTES {
-        return Err(NativeError::Io(std::io::Error::last_os_error()));
-    }
-    Ok(attributes & FILE_ATTRIBUTE_HIDDEN != 0)
+    let metadata = std::fs::symlink_metadata(directory)?;
+    Ok(metadata.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0)
 }
 
 /// Marks `directory` hidden; a no-op on platforms without a hidden attribute.
 ///
 /// # Errors
 ///
-/// Never fails on this platform.
+/// Infallible no-op on platforms without a Win32 hidden attribute.
 #[cfg(not(windows))]
 pub fn hide_directory(_directory: &Path) -> NativeResult<()> {
     Ok(())
@@ -376,7 +361,7 @@ pub fn hide_directory(_directory: &Path) -> NativeResult<()> {
 ///
 /// # Errors
 ///
-/// Never fails on this platform.
+/// Infallible no-op on platforms without a Win32 hidden attribute.
 #[cfg(not(windows))]
 pub fn is_directory_hidden(_directory: &Path) -> NativeResult<bool> {
     Ok(false)

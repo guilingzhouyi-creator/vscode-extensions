@@ -41,8 +41,8 @@ pub use document::RepoDocument;
 pub use error::{NativeError, NativeResult};
 pub use junction::create_junction;
 pub use repo_identity::{
-    generate_repo_id, repo_id_from_hex, repo_id_to_hex, store_path, store_root, REPO_ID_HEX_LEN,
-    STORES_DIR_NAME, STORE_DIR_NAME,
+    fill_random_bytes, generate_repo_id, repo_id_from_hex, repo_id_to_hex, store_path, store_root,
+    REPO_ID_HEX_LEN, STORES_DIR_NAME, STORE_DIR_NAME,
 };
 pub use repo_layout::{
     attempt_hide, classify_workspace_entry, container_path, hide_directory, is_directory_hidden,

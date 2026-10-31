@@ -203,22 +203,22 @@ impl InMemoryIndexTree {
 
     /// Returns a scoped copy holding only entries under one of the given prefixes.
     ///
-    /// An empty scope list, or a list containing `*`, means "everything".
-    pub fn filter_by_scope(&self, scope_prefixes: &[String]) -> Self {
+    /// An empty scope list, or a list containing `*`, means "everything". Component boundaries
+    /// are strictly enforced via [`fg_core::path_matches_scope`] (`FGT-TOP-001`).
+    pub fn filter_by_scope<S: AsRef<str>>(&self, scope_prefixes: &[S]) -> Self {
         let selects_all = scope_prefixes.is_empty()
             || scope_prefixes
                 .iter()
-                .any(|scope_prefix| scope_prefix == "*");
+                .any(|scope_prefix| scope_prefix.as_ref().trim() == "*");
         if selects_all {
             return self.clone();
         }
 
         let mut filtered = Self::new();
         for (path, entry) in &self.entries {
-            let in_scope = scope_prefixes.iter().any(|prefix| {
-                let prefix_clean = prefix.trim_matches('/').replace('\\', "/");
-                path.starts_with(&prefix_clean)
-            });
+            let in_scope = scope_prefixes
+                .iter()
+                .any(|prefix| fg_core::path_matches_scope(path, prefix.as_ref()));
             if in_scope {
                 filtered.entries.insert(path.clone(), entry.clone());
             }
@@ -376,6 +376,111 @@ impl InMemoryIndexTree {
         persist_tree(&root_tree)?;
         Ok(*root_tree.oid())
     }
+
+    /// Pops directory frames down to `target_len`, serializing and persisting each subtree once.
+    fn pop_and_persist_payloads_down_to<F>(
+        dir_stack: &mut Vec<DirectoryFrame>,
+        target_len: usize,
+        persist_payload: &mut F,
+    ) -> FractalResult<()>
+    where
+        F: FnMut(&[u8]) -> FractalResult<Oid>,
+    {
+        while dir_stack.len() > target_len {
+            if let Some(mut completed_frame) = dir_stack.pop() {
+                let raw_payload = GitTree::serialize_sorted_entries(&mut completed_frame.entries);
+                let subtree_oid = persist_payload(&raw_payload)?;
+                if let Some(parent_frame) = dir_stack.last_mut() {
+                    parent_frame.entries.push(GitTreeEntry::new(
+                        FileMode::Directory,
+                        completed_frame.dir_name,
+                        subtree_oid,
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Appends one staged entry into the frame stack using single-pass payload persistence.
+    fn append_entry_to_payload_tree<F>(
+        dir_stack: &mut Vec<DirectoryFrame>,
+        path: &str,
+        entry: &StagingEntry,
+        persist_payload: &mut F,
+    ) -> FractalResult<()>
+    where
+        F: FnMut(&[u8]) -> FractalResult<Oid>,
+    {
+        let (dir_path_opt, entry_name) = match path.rfind('/') {
+            Some(slash_idx) => (Some(&path[..slash_idx]), &path[slash_idx + 1..]),
+            None => (None, path),
+        };
+
+        let (common_depth, mismatch_branch) =
+            Self::resolve_directory_branch(dir_path_opt, dir_stack);
+
+        Self::pop_and_persist_payloads_down_to(dir_stack, common_depth + 1, persist_payload)?;
+        Self::push_mismatch_branches(dir_stack, mismatch_branch);
+
+        let mode = if entry.is_sparse_directory() {
+            FileMode::Directory
+        } else {
+            entry.mode
+        };
+
+        if let Some(current_frame) = dir_stack.last_mut() {
+            current_frame
+                .entries
+                .push(GitTreeEntry::new(mode, entry_name.to_owned(), entry.oid));
+        }
+        Ok(())
+    }
+
+    /// Builds hierarchical Git trees in a single canonical sort + serialize + hash pass per
+    /// directory (`FGT-PRF-001`), delegating OID computation directly to `persist_tree_payload`
+    /// (typically `|payload| odb.write_object("tree", payload)`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::IndexConflict`] when any conflict stage remains unresolved, and
+    /// propagates storage persister errors.
+    pub fn write_tree_with_payload_persister<F>(
+        &self,
+        mut persist_tree_payload: F,
+    ) -> FractalResult<Oid>
+    where
+        F: FnMut(&[u8]) -> FractalResult<Oid>,
+    {
+        if self.has_conflicts() {
+            return Err(FractalError::IndexConflict(format!(
+                "Cannot build tree: {} unmerged conflicts remain in index",
+                self.conflicts.len()
+            )));
+        }
+
+        if self.entries.is_empty() {
+            return persist_tree_payload(&[]);
+        }
+
+        let mut dir_stack: Vec<DirectoryFrame> = vec![DirectoryFrame::new("")];
+        for (path, entry) in &self.entries {
+            Self::append_entry_to_payload_tree(
+                &mut dir_stack,
+                path,
+                entry,
+                &mut persist_tree_payload,
+            )?;
+        }
+
+        Self::pop_and_persist_payloads_down_to(&mut dir_stack, 1, &mut persist_tree_payload)?;
+
+        let Some(mut root_frame) = dir_stack.pop() else {
+            return Ok(Oid::ZERO);
+        };
+        let raw_payload = GitTree::serialize_sorted_entries(&mut root_frame.entries);
+        persist_tree_payload(&raw_payload)
+    }
 }
 
 #[cfg(test)]
@@ -517,15 +622,44 @@ mod tests {
             .stage_oid("src/a.rs", FileMode::RegularFile, oid_from(1))
             .expect("stage");
         index
+            .stage_oid("src-extra/evil.rs", FileMode::RegularFile, oid_from(3))
+            .expect("stage");
+        index
             .stage_oid("docs/b.md", FileMode::RegularFile, oid_from(2))
             .expect("stage");
 
         let scoped = index.filter_by_scope(&["src".to_owned()]);
         assert_eq!(scoped.entry_count(), 1);
         assert!(scoped.entries().contains_key("src/a.rs"));
+        assert!(!scoped.entries().contains_key("src-extra/evil.rs"));
 
         let all = index.filter_by_scope(&["*".to_owned()]);
-        assert_eq!(all.entry_count(), 2);
+        assert_eq!(all.entry_count(), 3);
+    }
+
+    #[test]
+    fn payload_persister_matches_tree_persister_byte_for_byte() {
+        let mut index = InMemoryIndexTree::new();
+        index
+            .stage_oid("src/lib.rs", FileMode::RegularFile, oid_from(1))
+            .expect("stage");
+        index
+            .stage_oid("src/deep/mod.rs", FileMode::RegularFile, oid_from(2))
+            .expect("stage");
+        index
+            .stage_oid("README.md", FileMode::RegularFile, oid_from(3))
+            .expect("stage");
+
+        let expected = index.write_tree_with_persister(|_| Ok(())).expect("tree");
+        let actual = index
+            .write_tree_with_payload_persister(|payload| {
+                Ok(fg_core::models::compute_object_oid(
+                    fg_core::models::ObjectKind::Tree,
+                    payload,
+                ))
+            })
+            .expect("payload tree");
+        assert_eq!(actual, expected);
     }
 
     #[test]

@@ -1,19 +1,34 @@
 //! Module: fg-storage — Loose Git Object Database Store
 //! File Path: crates/fg-storage/src/loose.rs
-//! Architecture Role: Implements OdbStore trait for standard on-disk Git loose object storage
-//!   (`.git/objects/xx/yyyy...`) with zlib compression and atomic temporary file renames.
+//! Architecture Role: Implements `OdbStore` for standard on-disk Git loose object storage
+//!   (`.git/objects/xx/yyyy...`) with zlib compression, pooled staging buffers, and atomic writes.
+//! Dependencies & Triggers: Consumed by commit materialization, CAS bridge, projection, and CLI reads.
+//! Responsibilities: Persist canonical `<type> <len>\0<payload>` loose objects atomically with zlib
+//!   level-1 framing, decompress loose objects through thread-cached `PageBufferPool` guards without
+//!   draining pool capacity, and serve hot reads from an `Arc<[u8]>` byte-budgeted LRU cache.
+//! Exit Semantics & Design Rationale:
+//!   - `ByteLruCache` stores `Arc<[u8]>` so cache lookups bump an atomic reference count under the
+//!     mutex instead of cloning multi-megabyte buffers while holding the shard lock (`FGT-PRF-001`).
+//!   - `PooledBuffer` is borrowed as `&[u8]` rather than `take()`n so buffers return to the pool warm.
+//!
+//! ### Domain Governance Rules (SSOT):
+//! - `FGT-STO-001`: Storage layer crash safety guard
+//! - `FGT-PRF-001`: Zero transient heap allocation guard in hot paths
+//! - `FGT-POL-001`: Memory pool capacity retention guard
 
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
 use sha1::{Digest, Sha1};
-use std::fs::{self, File};
+use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;
 use fg_core::traits::OdbStore;
+use fg_core::write_file_atomic;
 use fg_pools::{BufferSizeClass, ByteLruCache, PageBufferPool};
 
 /// Default in-memory object cache capacity for LooseOdb (32 MiB).
@@ -22,7 +37,7 @@ pub const DEFAULT_ODB_CACHE_BYTES: usize = 32 * 1024 * 1024;
 /// On-disk loose object database backend with integrated byte-budgeted LRU cache.
 pub struct LooseOdb {
     git_dir: PathBuf,
-    cache: Option<ByteLruCache<Oid, Vec<u8>>>,
+    cache: Option<ByteLruCache<Oid, Arc<[u8]>>>,
     pool: PageBufferPool,
 }
 
@@ -106,15 +121,7 @@ impl LooseOdb {
         encoder.write_all(raw_payload)?;
         let compressed = encoder.finish()?;
 
-        // Write to temporary sibling file and atomically rename to avoid partial writes
-        let staging_path = obj_path.with_extension("tmp");
-        {
-            let mut file = File::create(&staging_path)?;
-            file.write_all(&compressed)?;
-            file.sync_all()?;
-        }
-
-        fs::rename(&staging_path, &obj_path)?;
+        write_file_atomic(&obj_path, &compressed, true)?;
         Ok(())
     }
 }
@@ -129,28 +136,31 @@ impl OdbStore for LooseOdb {
     fn read_object(&self, oid: &Oid) -> FractalResult<Vec<u8>> {
         if let Some(ref cache) = self.cache {
             if let Some(cached) = cache.get(oid) {
-                return Ok(cached);
+                return Ok(cached.as_ref().to_vec());
             }
         }
 
         let path = Self::object_path(&self.git_dir, oid);
-        if !path.exists() {
-            return Err(FractalError::ObjectCodec(format!(
-                "Object not found: {}",
-                oid.to_hex()
-            )));
-        }
+        let compressed_bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => {
+                return Err(FractalError::ObjectCodec(format!(
+                    "Object not found: {}",
+                    oid.to_hex()
+                )));
+            }
+            Err(io_err) => return Err(FractalError::Io(io_err)),
+        };
 
-        let compressed_bytes = fs::read(&path)?;
         let mut decoder = ZlibDecoder::new(&compressed_bytes[..]);
         let mut pooled_buffer = self.pool.acquire_guard_sized(BufferSizeClass::Page);
         pooled_buffer.clear();
         decoder.read_to_end(&mut pooled_buffer)?;
-        let uncompressed = pooled_buffer.take();
+        let uncompressed = pooled_buffer.as_slice().to_vec();
 
         if let Some(ref cache) = self.cache {
             let size = uncompressed.len();
-            cache.insert(*oid, uncompressed.clone(), size);
+            cache.insert(*oid, Arc::<[u8]>::from(uncompressed.as_slice()), size);
         }
 
         Ok(uncompressed)
@@ -159,7 +169,6 @@ impl OdbStore for LooseOdb {
     fn write_object(&self, object_type: &str, payload: &[u8]) -> FractalResult<Oid> {
         let mut pooled_buffer = self.pool.acquire_guard_sized(BufferSizeClass::Page);
         pooled_buffer.clear();
-        use std::io::Write;
         write!(pooled_buffer, "{} {}\0", object_type, payload.len())?;
         pooled_buffer.extend_from_slice(payload);
 
@@ -172,7 +181,7 @@ impl OdbStore for LooseOdb {
 
         if let Some(ref cache) = self.cache {
             let size = pooled_buffer.len();
-            cache.insert(oid, pooled_buffer.take(), size);
+            cache.insert(oid, Arc::<[u8]>::from(pooled_buffer.as_slice()), size);
         }
 
         Ok(oid)
@@ -180,7 +189,7 @@ impl OdbStore for LooseOdb {
 
     fn has_object(&self, oid: &Oid) -> bool {
         if let Some(ref cache) = self.cache {
-            if cache.get(oid).is_some() {
+            if cache.contains(oid) {
                 return true;
             }
         }

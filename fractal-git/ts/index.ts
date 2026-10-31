@@ -44,9 +44,9 @@ export * from './constants';
 export * from './orchestration/workspace-manager';
 export * from './orchestration/tournament-runner';
 export * from './cli/commands';
-export * from './client';
-export * from './vfs';
-export * from './tui';
+export * from './client/praxis-client';
+export * from './vfs/vfs-adapter';
+export * from './tui/tree-renderer';
 export { computeGitBlobOid, verifyPreReviewZone, writeLooseObjectToDisk };
 
 /**
@@ -97,10 +97,16 @@ export class FractalGitEngine {
     public reclaimWorkspace(
         workspaceId: string,
         targetRef: FractalRefDescriptor,
-        physicalDir?: string,
-        deleteRef = false,
+        options: { physicalDir?: string; deleteRef?: boolean } | string = {},
     ): ReclamationSummary {
-        return reclaimWorkspacePure(this.gitDir, workspaceId, targetRef, physicalDir, deleteRef);
+        const normalized = typeof options === 'string'
+            ? { physicalDir: options, deleteRef: false }
+            : options;
+        return reclaimWorkspacePure(this.gitDir, workspaceId, {
+            targetRef,
+            physicalDir: normalized.physicalDir,
+            deleteRef: normalized.deleteRef ?? false,
+        });
     }
 }
 

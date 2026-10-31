@@ -161,17 +161,16 @@ impl RefsSection {
             });
         }
 
-        let mut records = Vec::with_capacity(declared.min(1024));
-        let mut previous_name: Option<String> = None;
+        let mut records: Vec<RefRecord> = Vec::with_capacity(declared.min(1024));
 
         for _ in 0..declared {
             let name = reader.read_string("ref_name")?;
 
-            if let Some(previous) = previous_name.as_ref() {
-                if previous.as_str() >= name.as_str() {
+            if let Some(previous) = records.last() {
+                if previous.name.as_str() >= name.as_str() {
                     return Err(NativeError::SectionTableUnsorted {
                         tag: SECTION_TAG,
-                        previous: leak_tag(previous),
+                        previous: leak_tag(&previous.name),
                     });
                 }
             }
@@ -188,7 +187,6 @@ impl RefsSection {
                 }
             };
 
-            previous_name = Some(name.clone());
             records.push(RefRecord { name, oid, peeled });
         }
 

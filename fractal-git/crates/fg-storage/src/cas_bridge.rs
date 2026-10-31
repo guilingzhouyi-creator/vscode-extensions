@@ -12,11 +12,14 @@
 
 use std::path::Path;
 
+use fg_core::constants::git::OBJ_BLOB;
 use fg_core::error::FractalResult;
 use fg_core::models::{AgentCommitMeta, FileMode, GitSignature, Oid};
+use fg_core::traits::OdbStore;
 use fg_index::InMemoryIndexTree;
-use fg_object::{GitBlob, GitCommit};
+use fg_object::GitCommit;
 
+use crate::commit_materializer::{persist_commit_object, persist_index_tree};
 use crate::loose::LooseOdb;
 
 /// File payload descriptor from a LayerVFS winning snapshot.
@@ -45,21 +48,16 @@ impl CasToGitMaterializer {
     /// Materializes a snapshot bundle directly into `.git/objects/`
     /// and returns the created Commit Oid.
     pub fn materialize(git_dir: &Path, request: MaterializeRequest) -> FractalResult<Oid> {
+        let odb = LooseOdb::without_cache(git_dir);
         let mut index = InMemoryIndexTree::new();
 
-        // 1. Write blobs and record into virtual tree builder
         for file in request.files {
-            let blob = GitBlob::from_bytes(file.payload);
-            LooseOdb::write_loose_object_raw(git_dir, blob.oid(), &blob.to_raw_object())?;
-            index.stage_oid(&file.path, file.mode, *blob.oid())?;
+            let blob_oid = odb.write_object(OBJ_BLOB, &file.payload)?;
+            index.stage_oid(&file.path, file.mode, blob_oid)?;
         }
 
-        // 2. Recursively persist tree structure using callback to LooseOdb
-        let root_tree_oid = index.write_tree_with_persister(|tree| {
-            LooseOdb::write_loose_object_raw(git_dir, tree.oid(), &tree.to_raw_object())
-        })?;
+        let root_tree_oid = persist_index_tree(&index, &odb)?;
 
-        // 3. Assemble and persist canonical GitCommit object
         let commit = GitCommit::new(
             root_tree_oid,
             request.parent_commit_oids,
@@ -69,8 +67,6 @@ impl CasToGitMaterializer {
             request.agent_meta,
         );
 
-        LooseOdb::write_loose_object_raw(git_dir, commit.oid(), &commit.to_raw_object())?;
-
-        Ok(*commit.oid())
+        persist_commit_object(&commit, &odb)
     }
 }

@@ -2,8 +2,16 @@
 //! File Path: crates/fg-topology/src/worktree.rs
 //! Architecture Role: Models physical and virtual worktree bindings with Path Jail isolation,
 //!   preventing concurrent agents from cross-contaminating files or touching unauthorized trees.
+//! Dependencies & Triggers: Consumed by worktree lifecycle state machines, CLI worktree commands, and pre-commit verifiers.
+//! Responsibilities: Enforce component-boundary-aware subpath envelopes (`PathJail`, `ScopeProjection`)
+//!   and validate hierarchical parent-to-child scope subsumption without privilege escalation.
+//! Exit Semantics & Design Rationale: Delegates prefix matching to `fg_core::path_matches_scope` so sibling
+//!   directories sharing a string prefix (e.g. `crates/fg-core-evil` vs `crates/fg-core`) never bypass isolation.
+//!
+//! Domain Governance Rules: FGT-TOP-001, FGT-COR-001.
 
 use fg_core::error::{FractalError, FractalResult};
+use fg_core::path_matches_scope;
 use std::path::PathBuf;
 
 use crate::refs::FractalRef;
@@ -32,10 +40,9 @@ impl PathJail {
         if self.allowed_prefixes.is_empty() {
             return true;
         }
-        let clean = relative_path.trim_matches('/').replace('\\', "/");
         self.allowed_prefixes
             .iter()
-            .any(|prefix| clean.starts_with(prefix))
+            .any(|prefix| path_matches_scope(relative_path, prefix))
     }
 
     /// Enforces jail boundary, returning error if path is unauthorized.
@@ -84,11 +91,9 @@ impl ScopeProjection {
         if self.is_full {
             return true;
         }
-        let clean = relative_path.trim_matches('/').replace('\\', "/");
-        self.scopes.iter().any(|prefix| {
-            let p_clean = prefix.trim_matches('/').replace('\\', "/");
-            clean.starts_with(&p_clean)
-        })
+        self.scopes
+            .iter()
+            .any(|prefix| path_matches_scope(relative_path, prefix))
     }
 
     /// Asserts that a child projection's scopes are strictly a subset of this parent projection.
@@ -105,11 +110,10 @@ impl ScopeProjection {
             });
         }
         for child_scope in &child.scopes {
-            let c_clean = child_scope.trim_matches('/').replace('\\', "/");
-            let permitted = self.scopes.iter().any(|parent_scope| {
-                let p_clean = parent_scope.trim_matches('/').replace('\\', "/");
-                c_clean.starts_with(&p_clean)
-            });
+            let permitted = self
+                .scopes
+                .iter()
+                .any(|parent_scope| path_matches_scope(child_scope, parent_scope));
             if !permitted {
                 return Err(FractalError::TopologyBreach {
                     source_ref: child_scope.clone(),
@@ -194,7 +198,25 @@ impl FractalWorktree {
     pub fn has_physical_path(&self) -> bool {
         self.physical_path
             .as_ref()
-            .map(|disk_path| disk_path.exists())
-            .unwrap_or(false)
+            .is_some_and(|disk_path| disk_path.exists())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PathJail, ScopeProjection};
+
+    #[test]
+    fn path_jail_enforces_directory_component_boundaries() {
+        let jail = PathJail::new(vec!["crates/fg-core".to_string()]);
+        assert!(jail.is_permitted("crates/fg-core/src/lib.rs"));
+        assert!(jail.is_permitted("crates\\fg-core\\Cargo.toml"));
+        assert!(!jail.is_permitted("crates/fg-core-evil/src/lib.rs"));
+
+        let parent = ScopeProjection::scoped(vec!["crates/fg-core".to_string()]);
+        let valid_child = ScopeProjection::scoped(vec!["crates/fg-core/src".to_string()]);
+        let evil_child = ScopeProjection::scoped(vec!["crates/fg-core-evil".to_string()]);
+        assert!(parent.assert_subsumes(&valid_child).is_ok());
+        assert!(parent.assert_subsumes(&evil_child).is_err());
     }
 }

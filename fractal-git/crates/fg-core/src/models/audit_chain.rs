@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::authority::AuthoritySecret;
+use super::authority::{ct_eq_bytes, AuthoritySecret};
 use super::hex::encode_hex;
 use crate::error::{FractalError, FractalResult};
 
@@ -200,7 +200,10 @@ impl AuditRecord {
         let payload = self.canonical_payload();
         let expected_signature = secret.sign_payload(payload.as_bytes());
         let expected_hex = encode_hex(&expected_signature);
-        self.sig == expected_hex[..SIGNATURE_HEX_LEN]
+        ct_eq_bytes(
+            self.sig.as_bytes(),
+            &expected_hex.as_bytes()[..SIGNATURE_HEX_LEN],
+        )
     }
 
     /// Computes the chaining hash fingerprint of this record (used as `prev` for next record).

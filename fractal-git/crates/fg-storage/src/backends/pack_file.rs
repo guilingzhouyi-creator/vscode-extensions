@@ -23,12 +23,15 @@
 //!
 //! Domain Governance Rules: FGT-STO-001 (pack reader and delta chain recursion guard), FGT-COR-001, FGT-PRF-001.
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use flate2::read::ZlibDecoder;
 
+use fg_core::decode_git_offset_varint;
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{compute_object_oid, ObjectKind, Oid};
 
@@ -87,12 +90,6 @@ const SIZE_FIRST_CONTINUATION_SHIFT: u32 = 4;
 
 /// Payload bits carried by one continuation byte.
 const SIZE_CONTINUATION_MASK: u8 = 0x7f;
-
-/// Continuation bit of the offset varint in an `OFS_DELTA` header.
-const OFFSET_CONTINUE: u8 = 0x80;
-
-/// Payload bits of one offset varint byte.
-const OFFSET_PAYLOAD_MASK: u8 = 0x7f;
 
 /// Supplies the base object for a `REF_DELTA` whose base lives elsewhere.
 pub trait DeltaBaseSource {
@@ -198,6 +195,10 @@ impl PackFile {
     }
 
     /// Scans and indexes every object in the packfile, returning the pack SHA-1 trailer and entry metadata.
+    ///
+    /// Inflates each object stream once (capturing `total_in` simultaneously) and caches resolved
+    /// entries by byte offset and `Oid` so `OFS_DELTA` and intra-pack `REF_DELTA` chains resolve in
+    /// $O(1)$ without re-inflating base streams.
     pub fn index_objects(
         &self,
         resolver: &dyn DeltaBaseSource,
@@ -207,60 +208,106 @@ impl PackFile {
         pack_sha_bytes.copy_from_slice(&self.bytes[trailer_start..]);
         let pack_oid = Oid::from_bytes(pack_sha_bytes);
 
-        let mut entries = Vec::with_capacity(self.object_count as usize);
+        let capacity = self.object_count as usize;
+        let mut entries = Vec::with_capacity(capacity);
+        let mut by_offset: HashMap<u64, (ObjectKind, Arc<[u8]>)> = HashMap::with_capacity(capacity);
+        let mut by_oid: HashMap<Oid, (ObjectKind, Arc<[u8]>)> = HashMap::with_capacity(capacity);
         let mut cursor = PACK_HEADER_LEN;
 
         for _ in 0..self.object_count {
             let start_offset = cursor as u64;
-            let (type_code, declared_size, post_header) = self.decode_header(cursor)?;
+            let (kind, payload, end_offset) =
+                self.decode_indexed_entry(cursor, resolver, &by_offset, &by_oid)?;
+            let oid = compute_object_oid(kind, payload.as_ref());
+            let crc = crc32_ieee(&self.bytes[cursor..end_offset]);
 
-            // Read the object payload to compute canonical OID
-            let object = self.read_at(start_offset, resolver)?;
-            let oid = compute_object_oid(object.kind, &object.payload);
-
-            // Determine compressed extent using ZlibDecoder total_in
-            let slice_start = match type_code {
-                TYPE_OFS_DELTA => {
-                    let (_, after_offset) =
-                        decode_ofs_offset(&self.bytes, post_header, start_offset)?;
-                    after_offset
-                }
-                TYPE_REF_DELTA => post_header + 20,
-                _ => post_header,
-            };
-
-            let slice = self.bytes.get(slice_start..).ok_or_else(|| {
-                FractalError::CorruptStore(format!(
-                    "packfile '{}' payload region missing at {slice_start}",
-                    self.path.display()
-                ))
-            })?;
-
-            let mut decoder = ZlibDecoder::new(slice);
-            let mut sink = Vec::with_capacity(declared_size);
-            decoder.read_to_end(&mut sink).map_err(|e| {
-                FractalError::CorruptStore(format!(
-                    "packfile '{}' failed to inflate during index: {e}",
-                    self.path.display()
-                ))
-            })?;
-
-            let consumed = decoder.total_in() as usize;
-            let end_offset = slice_start + consumed;
-
-            let compressed_slice = &self.bytes[cursor..end_offset];
-            let crc = crc32_ieee(compressed_slice);
-
+            by_offset.insert(start_offset, (kind, Arc::clone(&payload)));
+            by_oid.insert(oid, (kind, payload));
             entries.push(PackEntryMeta {
                 oid,
                 offset: start_offset,
                 crc32: crc,
             });
-
             cursor = end_offset;
         }
 
         Ok((pack_oid, entries))
+    }
+
+    /// Decodes and inflates one sequential entry during `index_objects`, returning `(kind, payload, end_offset)`.
+    fn decode_indexed_entry(
+        &self,
+        cursor: usize,
+        resolver: &dyn DeltaBaseSource,
+        by_offset: &HashMap<u64, (ObjectKind, Arc<[u8]>)>,
+        by_oid: &HashMap<Oid, (ObjectKind, Arc<[u8]>)>,
+    ) -> FractalResult<(ObjectKind, Arc<[u8]>, usize)> {
+        let start_offset = cursor as u64;
+        self.check_offset(start_offset)?;
+        let (type_code, declared_size, post_header) = self.decode_header(cursor)?;
+
+        match type_code {
+            TYPE_OFS_DELTA => {
+                let (base_offset, slice_start) =
+                    decode_ofs_offset(&self.bytes, post_header, start_offset)?;
+                let (delta, consumed) =
+                    self.inflate_with_consumed(slice_start, declared_size, start_offset)?;
+                let (kind, reconstructed) = if let Some((base_kind, base_bytes)) =
+                    by_offset.get(&base_offset)
+                {
+                    let applied = apply_git_delta(base_bytes.as_ref(), &delta).map_err(|err| {
+                        FractalError::CorruptStore(format!(
+                            "delta at offset {start_offset} could not be applied: {err}"
+                        ))
+                    })?;
+                    (*base_kind, applied)
+                } else {
+                    let base = self.read_at(base_offset, resolver)?;
+                    let resolved = reconstruct(base, &delta, start_offset)?;
+                    (resolved.kind, resolved.payload)
+                };
+                Ok((kind, Arc::from(reconstructed), slice_start + consumed))
+            }
+            TYPE_REF_DELTA => {
+                let base_oid = self.read_base_oid(post_header, start_offset)?;
+                let slice_start = post_header + base_oid.as_bytes().len();
+                let (delta, consumed) =
+                    self.inflate_with_consumed(slice_start, declared_size, start_offset)?;
+                let (kind, reconstructed) = if let Some((base_kind, base_bytes)) =
+                    by_oid.get(&base_oid)
+                {
+                    let applied = apply_git_delta(base_bytes.as_ref(), &delta).map_err(|err| {
+                        FractalError::CorruptStore(format!(
+                            "delta at offset {start_offset} could not be applied: {err}"
+                        ))
+                    })?;
+                    (*base_kind, applied)
+                } else {
+                    let (base_kind, base_payload) = resolver.read_base(&base_oid)?;
+                    let resolved = reconstruct(
+                        PackedObject {
+                            kind: base_kind,
+                            payload: base_payload,
+                        },
+                        &delta,
+                        start_offset,
+                    )?;
+                    (resolved.kind, resolved.payload)
+                };
+                Ok((kind, Arc::from(reconstructed), slice_start + consumed))
+            }
+            other => {
+                let kind = type_from_code(other).ok_or_else(|| {
+                    FractalError::CorruptStore(format!(
+                        "packfile '{}' object at offset {start_offset} declares unknown type {other}",
+                        self.path.display()
+                    ))
+                })?;
+                let (payload, consumed) =
+                    self.inflate_with_consumed(post_header, declared_size, start_offset)?;
+                Ok((kind, Arc::from(payload), post_header + consumed))
+            }
+        }
     }
 
     /// Reads one object, decrementing the shared chain budget for every delta followed.
@@ -375,6 +422,17 @@ impl PackFile {
 
     /// Inflates a zlib stream that must decode to exactly `declared_size` bytes.
     fn inflate(&self, start: usize, declared_size: usize, offset: u64) -> FractalResult<Vec<u8>> {
+        self.inflate_with_consumed(start, declared_size, offset)
+            .map(|(out, _)| out)
+    }
+
+    /// Inflates a single zlib stream at `start`, returning `(decompressed_bytes, compressed_bytes_consumed)`.
+    fn inflate_with_consumed(
+        &self,
+        start: usize,
+        declared_size: usize,
+        offset: u64,
+    ) -> FractalResult<(Vec<u8>, usize)> {
         let slice = self.bytes.get(start..).ok_or_else(|| {
             FractalError::CorruptStore(format!(
                 "packfile '{}' object at offset {offset} has no payload region",
@@ -396,7 +454,7 @@ impl PackFile {
                 out.len()
             )));
         }
-        Ok(out)
+        Ok((out, decoder.total_in() as usize))
     }
 }
 
@@ -413,40 +471,25 @@ fn type_from_code(code: u8) -> Option<ObjectKind> {
 
 /// Decodes the backward offset of an `OFS_DELTA`, returning the absolute base offset.
 ///
-/// The encoding is a big-endian varint with an implicit +1 per continuation, so the result is the
-/// distance *behind* the current object, not an absolute offset.
+/// The encoding is Git's bijective base-128 varint with an implicit +1 per continuation, so the
+/// result is the distance *behind* the current object, not an absolute offset.
 fn decode_ofs_offset(bytes: &[u8], start: usize, offset: u64) -> FractalResult<(u64, usize)> {
-    let mut cursor = start;
-    let mut byte = *bytes.get(cursor).ok_or_else(|| {
+    let slice = bytes.get(start..).ok_or_else(|| {
         FractalError::CorruptStore(format!(
             "OFS_DELTA at offset {offset} has no base-offset byte"
         ))
     })?;
-    cursor += 1;
-    let mut distance = u64::from(byte & OFFSET_PAYLOAD_MASK);
-    while byte & OFFSET_CONTINUE != 0 {
-        byte = *bytes.get(cursor).ok_or_else(|| {
-            FractalError::CorruptStore(format!(
-                "OFS_DELTA at offset {offset} has a truncated base offset"
-            ))
-        })?;
-        cursor += 1;
-        distance = distance
-            .checked_add(1)
-            .and_then(|value| value.checked_shl(7))
-            .map(|value| value | u64::from(byte & OFFSET_PAYLOAD_MASK))
-            .ok_or_else(|| {
-                FractalError::CorruptStore(format!(
-                    "OFS_DELTA at offset {offset} base offset overflows u64"
-                ))
-            })?;
-    }
+    let (distance, consumed) = decode_git_offset_varint(slice).ok_or_else(|| {
+        FractalError::CorruptStore(format!(
+            "OFS_DELTA at offset {offset} has a truncated or overflowing base offset"
+        ))
+    })?;
     let base = offset.checked_sub(distance).ok_or_else(|| {
         FractalError::CorruptStore(format!(
             "OFS_DELTA at offset {offset} points {distance} bytes back, past the pack start"
         ))
     })?;
-    Ok((base, cursor))
+    Ok((base, start + consumed))
 }
 
 /// Applies a delta stream to its base and reports the base's kind for the result.
@@ -537,9 +580,23 @@ mod tests {
 
     #[test]
     fn follows_an_ofs_delta_to_its_base() {
-        let (pack, _, delta_offset) = pack_with_ofs_delta();
+        let (pack, base_offset, delta_offset) = pack_with_ofs_delta();
         let object = pack.read_at(delta_offset, &NoBase).expect("read delta");
         assert_eq!(object.kind, ObjectKind::Blob);
+        assert_eq!(object.payload, b"hello there\n");
+
+        let (_, indexed) = pack.index_objects(&NoBase).expect("index pack once");
+        assert_eq!(indexed.len(), 2);
+        assert_eq!(indexed[0].offset, base_offset);
+        assert_eq!(indexed[1].offset, delta_offset);
+        assert_eq!(
+            indexed[0].oid,
+            fg_core::models::compute_object_oid(ObjectKind::Blob, b"hello world\n")
+        );
+        assert_eq!(
+            indexed[1].oid,
+            fg_core::models::compute_object_oid(ObjectKind::Blob, b"hello there\n")
+        );
     }
 
     #[test]

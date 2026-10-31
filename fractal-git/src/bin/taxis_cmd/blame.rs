@@ -13,7 +13,7 @@ use fg_algorithms::diff::split_lines;
 use fg_core::models::Oid;
 use fractal_git::constants::cli::CliTag;
 
-use super::commit_walk::parse_commit_record;
+use super::commit_walk::{parse_commit_record, CommitRecord};
 use super::common::{print_json, reject, CliContext};
 use super::repo_view::RepoView;
 use super::tree_view::flatten_commit_tree;
@@ -27,6 +27,16 @@ struct BlameOptions {
     revision: Option<String>,
 }
 
+/// Mutable state across commit steps in `run_blame_walk`.
+struct BlameWalkState<'a> {
+    lines: &'a [String],
+    attributions: Vec<Option<BlameLine>>,
+    unattributed: usize,
+    current_commit: Oid,
+    current_content: String,
+    active_mapping: Vec<Option<usize>>,
+}
+
 /// Dispatches `taxis blame`.
 pub fn handle_blame(ctx: &CliContext) {
     let opts = parse_blame_options(&ctx.args);
@@ -36,39 +46,32 @@ pub fn handle_blame(ctx: &CliContext) {
     };
 
     let target_rev = opts.revision.as_deref().unwrap_or("HEAD");
-    let target_commit_oid = match view.resolve(target_rev) {
-        Ok(oid) => oid,
-        Err(err) => reject(
+    let target_commit_oid = view.resolve(target_rev).unwrap_or_else(|err| {
+        reject(
             CliTag::ERROR,
             format!("resolve revision '{target_rev}': {err}"),
-        ),
-    };
-
-    let head_files = match flatten_commit_tree(&view, &target_commit_oid) {
-        Ok(files) => files,
-        Err(err) => reject(
+        )
+    });
+    let head_files = flatten_commit_tree(&view, &target_commit_oid).unwrap_or_else(|err| {
+        reject(
             CliTag::ERROR,
             format!("read tree for '{target_rev}': {err}"),
-        ),
-    };
-
-    let target_entry = match head_files.get(&opts.file_path) {
-        Some(entry) => entry,
-        None => reject(
+        )
+    });
+    let target_entry = head_files.get(&opts.file_path).unwrap_or_else(|| {
+        reject(
             CliTag::ERROR,
             format!("fatal: no such path '{}' in {target_rev}", opts.file_path),
-        ),
-    };
-
-    let target_payload = match view.blob_payload(&target_entry.oid) {
-        Ok(bytes) => bytes,
-        Err(err) => reject(CliTag::ERROR, format!("read blob: {err}")),
-    };
+        )
+    });
+    let target_payload = view
+        .blob_payload(&target_entry.oid)
+        .unwrap_or_else(|err| reject(CliTag::ERROR, format!("read blob: {err}")));
 
     let target_text = String::from_utf8_lossy(&target_payload).to_string();
     let lines: Vec<String> = split_lines(&target_text)
         .into_iter()
-        .map(|s| s.to_string())
+        .map(str::to_string)
         .collect();
     if lines.is_empty() {
         if ctx.json_mode {
@@ -82,31 +85,14 @@ pub fn handle_blame(ctx: &CliContext) {
     }
 
     let line_attributions = run_blame_walk(
-        &view,
-        &opts.file_path,
+        (&view, &opts.file_path),
         target_commit_oid,
-        &target_text,
-        &lines,
+        (&target_text, &lines),
     );
-
-    // Apply -L line range filtering if specified
     let filtered_lines: Vec<BlameLine> = line_attributions
         .into_iter()
-        .filter(|bl| {
-            if let Some(start) = opts.start_line {
-                if bl.line_no < start {
-                    return false;
-                }
-            }
-            if let Some(end) = opts.end_line {
-                if bl.line_no > end {
-                    return false;
-                }
-            }
-            true
-        })
+        .filter(|bl| line_within_range(bl.line_no, opts.start_line, opts.end_line))
         .collect();
-
     let hunks = BlameEngine::aggregate_hunks(&filtered_lines);
 
     if ctx.json_mode {
@@ -128,120 +114,44 @@ pub fn handle_blame(ctx: &CliContext) {
     }
 }
 
+/// Checks whether a 1-based line number falls within `[start_line, end_line]`.
+fn line_within_range(line_no: usize, start_line: Option<usize>, end_line: Option<usize>) -> bool {
+    start_line.is_none_or(|start| line_no >= start) && end_line.is_none_or(|end| line_no <= end)
+}
+
+/// Walks parent commits along the first-parent chain to attribute each line of `file_path`.
 fn run_blame_walk(
-    view: &RepoView,
-    file_path: &str,
+    view_and_path: (&RepoView, &str),
     start_commit: Oid,
-    start_content: &str,
-    lines: &[String],
+    content_and_lines: (&str, &[String]),
 ) -> Vec<BlameLine> {
-    let mut attributions: Vec<Option<BlameLine>> = vec![None; lines.len()];
-    let mut current_unattributed = lines.len();
-
-    let mut current_commit = start_commit;
-    let mut current_content = start_content.to_string();
-
-    // Map from current_content line index (0-based) to original file line index (0-based)
-    let mut active_mapping: Vec<Option<usize>> = (0..lines.len()).map(Some).collect();
-
+    let (view, file_path) = view_and_path;
+    let (start_content, lines) = content_and_lines;
+    let mut state = BlameWalkState {
+        lines,
+        attributions: vec![None; lines.len()],
+        unattributed: lines.len(),
+        current_commit: start_commit,
+        current_content: start_content.to_string(),
+        active_mapping: (0..lines.len()).map(Some).collect(),
+    };
     let mut visited = std::collections::HashSet::new();
 
-    while current_unattributed > 0 && !visited.contains(&current_commit) {
-        visited.insert(current_commit);
-
-        let commit_obj = match view.object(&current_commit) {
-            Ok(obj) => obj,
-            Err(_) => break,
+    while state.unattributed > 0 && visited.insert(state.current_commit) {
+        let Ok(commit_obj) = view.object(&state.current_commit) else {
+            break;
         };
-        let commit_record = match parse_commit_record(current_commit, &commit_obj.payload) {
-            Ok(rec) => rec,
-            Err(_) => break,
+        let Ok(commit_record) = parse_commit_record(state.current_commit, &commit_obj.payload)
+        else {
+            break;
         };
-
-        let parent_oid = commit_record.parents.first().copied();
-
-        match parent_oid {
-            Some(p_oid) => {
-                let parent_files = flatten_commit_tree(view, &p_oid).unwrap_or_default();
-                let parent_blob_oid = parent_files.get(file_path).map(|e| e.oid);
-
-                match parent_blob_oid {
-                    Some(b_oid) => {
-                        let parent_bytes = view.blob_payload(&b_oid).unwrap_or_default();
-                        let parent_content = String::from_utf8_lossy(&parent_bytes).to_string();
-
-                        let line_map =
-                            BlameEngine::compute_line_mapping(&parent_content, &current_content);
-
-                        let mut next_mapping = vec![None; parent_content.lines().count()];
-
-                        for (cur_idx, &opt_parent_idx) in line_map.iter().enumerate() {
-                            if let Some(orig_idx) = active_mapping.get(cur_idx).copied().flatten() {
-                                match opt_parent_idx {
-                                    Some(p_idx) => {
-                                        // Line came from parent
-                                        if p_idx < next_mapping.len() {
-                                            next_mapping[p_idx] = Some(orig_idx);
-                                        }
-                                    }
-                                    None => {
-                                        // Line was introduced in current_commit!
-                                        if attributions[orig_idx].is_none() {
-                                            attributions[orig_idx] = Some(BlameLine {
-                                                line_no: orig_idx + 1,
-                                                commit_oid: current_commit,
-                                                author_name: commit_record.author_name.clone(),
-                                                commit_time: commit_record.author_time,
-                                                content: lines[orig_idx].clone(),
-                                            });
-                                            current_unattributed -= 1;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        current_commit = p_oid;
-                        current_content = parent_content;
-                        active_mapping = next_mapping;
-                    }
-                    None => {
-                        // File was created in current_commit! All remaining unattributed lines belong to current_commit
-                        for (orig_idx, slot) in attributions.iter_mut().enumerate() {
-                            if slot.is_none() {
-                                *slot = Some(BlameLine {
-                                    line_no: orig_idx + 1,
-                                    commit_oid: current_commit,
-                                    author_name: commit_record.author_name.clone(),
-                                    commit_time: commit_record.author_time,
-                                    content: lines[orig_idx].clone(),
-                                });
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-            None => {
-                // Root commit: all remaining lines belong to root commit
-                for (orig_idx, slot) in attributions.iter_mut().enumerate() {
-                    if slot.is_none() {
-                        *slot = Some(BlameLine {
-                            line_no: orig_idx + 1,
-                            commit_oid: current_commit,
-                            author_name: commit_record.author_name.clone(),
-                            commit_time: commit_record.author_time,
-                            content: lines[orig_idx].clone(),
-                        });
-                    }
-                }
-                break;
-            }
+        if !step_blame_commit(view, file_path, (&commit_record, &mut state)) {
+            break;
         }
     }
 
-    // Default any remaining fallback to start_commit
-    attributions
+    state
+        .attributions
         .into_iter()
         .enumerate()
         .map(|(idx, opt)| {
@@ -254,6 +164,72 @@ fn run_blame_walk(
             })
         })
         .collect()
+}
+
+/// Processes one commit step in the blame walk; returns `false` when the walk terminates.
+fn step_blame_commit(
+    view: &RepoView,
+    file_path: &str,
+    record_and_state: (&CommitRecord, &mut BlameWalkState<'_>),
+) -> bool {
+    let (commit_record, state) = record_and_state;
+    let Some(parent_oid) = commit_record.parents.first().copied() else {
+        attribute_remaining_lines(commit_record, state);
+        return false;
+    };
+    let parent_files = flatten_commit_tree(view, &parent_oid).unwrap_or_default();
+    let Some(parent_entry) = parent_files.get(file_path) else {
+        attribute_remaining_lines(commit_record, state);
+        return false;
+    };
+
+    let parent_bytes = view.blob_payload(&parent_entry.oid).unwrap_or_default();
+    let parent_content = String::from_utf8_lossy(&parent_bytes).to_string();
+    let line_map = BlameEngine::compute_line_mapping(&parent_content, &state.current_content);
+    let mut next_mapping = vec![None; parent_content.lines().count()];
+
+    for (cur_idx, &opt_parent_idx) in line_map.iter().enumerate() {
+        let Some(orig_idx) = state.active_mapping.get(cur_idx).copied().flatten() else {
+            continue;
+        };
+        match opt_parent_idx {
+            Some(p_idx) if p_idx < next_mapping.len() => {
+                next_mapping[p_idx] = Some(orig_idx);
+            }
+            None if state.attributions[orig_idx].is_none() => {
+                state.attributions[orig_idx] =
+                    Some(make_blame_line(orig_idx, commit_record, state.lines));
+                state.unattributed -= 1;
+            }
+            _ => {}
+        }
+    }
+
+    state.current_commit = parent_oid;
+    state.current_content = parent_content;
+    state.active_mapping = next_mapping;
+    true
+}
+
+/// Attributes all remaining unattributed lines to `commit_record`.
+fn attribute_remaining_lines(commit_record: &CommitRecord, state: &mut BlameWalkState<'_>) {
+    for (orig_idx, slot) in state.attributions.iter_mut().enumerate() {
+        if slot.is_none() {
+            *slot = Some(make_blame_line(orig_idx, commit_record, state.lines));
+        }
+    }
+    state.unattributed = 0;
+}
+
+/// Builds a [`BlameLine`] for original 0-based line index `orig_idx`.
+fn make_blame_line(orig_idx: usize, record: &CommitRecord, lines: &[String]) -> BlameLine {
+    BlameLine {
+        line_no: orig_idx + 1,
+        commit_oid: record.oid,
+        author_name: record.author_name.clone(),
+        commit_time: record.author_time,
+        content: lines[orig_idx].clone(),
+    }
 }
 
 fn parse_blame_options(args: &[String]) -> BlameOptions {

@@ -14,10 +14,8 @@
 use fg_core::models::Oid;
 use serde::{Deserialize, Serialize};
 
-use crate::diff::compact::{Compaction, Side};
+use crate::diff::compute_xdiff_change_flags;
 use crate::diff::patch::split_lines;
-use crate::diff::xdiff::mark_changed;
-use crate::diff::xdiff_prepare::prepare;
 
 /// Line attribution metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,28 +66,8 @@ impl BlameEngine {
             return (0..child_len).map(Some).collect();
         }
 
-        let old_records: Vec<&[u8]> = parent_content
-            .split_inclusive('\n')
-            .map(str::as_bytes)
-            .collect();
-        let new_records: Vec<&[u8]> = child_content
-            .split_inclusive('\n')
-            .map(str::as_bytes)
-            .collect();
-        let (prepared_old, prepared_new) = prepare(&old_records, &new_records);
-        let (mut old_changed, mut new_changed) = mark_changed(&prepared_old, &prepared_new);
-
-        Compaction::new(
-            Side {
-                hashes: &prepared_old.classes,
-                texts: &old_lines,
-            },
-            Side {
-                hashes: &prepared_new.classes,
-                texts: &new_lines,
-            },
-        )
-        .run(&mut old_changed, &mut new_changed);
+        let (old_changed, new_changed) =
+            compute_xdiff_change_flags(parent_content, child_content, &old_lines, &new_lines);
 
         let mut mapping = vec![None; child_len];
         let mut old_cursor = 0usize;

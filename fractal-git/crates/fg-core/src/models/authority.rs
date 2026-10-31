@@ -147,7 +147,7 @@ impl AuthoritySecret {
         }
         let expected = self.sign(&claims.subject, claims.issued_at, claims.expires_at);
         let presented = parse_hex_mac(token)?;
-        if !constant_time_eq(&expected, &presented) {
+        if !ct_eq_bytes(&expected, &presented) {
             return Err(FractalError::AuthProofInvalid(format!(
                 "{BREACH_TAG} authority token MAC mismatch; {AUTHORITY_REMEDIATION}"
             )));
@@ -256,8 +256,10 @@ fn parse_hex_mac(token: &str) -> FractalResult<[u8; 20]> {
     })
 }
 
-/// Constant-time equality over equal-length byte slices.
-fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+/// Constant-time equality over equal-length byte slices, mitigating timing side-channels on MACs
+/// and challenge nonces.
+#[must_use]
+pub fn ct_eq_bytes(left: &[u8], right: &[u8]) -> bool {
     if left.len() != right.len() {
         return false;
     }

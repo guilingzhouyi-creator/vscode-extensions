@@ -26,7 +26,6 @@ pub mod ignore;
 pub mod index_file;
 pub mod index_tail;
 pub mod lockless_tree;
-pub mod quarantine;
 pub mod submodules;
 pub mod virtual_inode;
 
@@ -35,13 +34,13 @@ pub use config::{write_config_entry, RepoConfig};
 pub use conflict_stage::ConflictStageSlot;
 pub use dirty_guard::{DirtyCollision, DirtyCollisionKind, DirtyWorktreeGuard};
 pub use entry::StagingEntry;
+pub use fg_core::models::quarantine::{
+    self, default_quarantine_dir, IsolateMutationRequest, QuarantineLedger, QuarantineRecord,
+    QuarantineStatus,
+};
 pub use ignore::{IgnoreMatch, IgnoreMatcher, IgnorePattern};
 pub use index_file::{encode_dirc_v2, write_dirc_v2, GitIndex, IndexEntry};
 pub use lockless_tree::InMemoryIndexTree;
-pub use quarantine::{
-    default_quarantine_dir, IsolateMutationRequest, QuarantineLedger, QuarantineRecord,
-    QuarantineStatus,
-};
 pub use submodules::GitModules;
 pub use virtual_inode::VirtualInodeTable;
 

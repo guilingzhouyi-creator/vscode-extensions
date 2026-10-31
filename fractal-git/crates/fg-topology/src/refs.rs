@@ -26,7 +26,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use fg_core::constants::git::REF_HEAD;
 use fg_core::error::{FractalError, FractalResult};
@@ -44,9 +43,6 @@ const PEELED_PREFIX: &str = "^";
 
 /// Maximum symbolic indirection depth before the chain is declared corrupt.
 const MAX_SYMBOLIC_DEPTH: usize = 8;
-
-/// Monotonic counter making atomic-write staging names unique within one process.
-static STAGING_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Characters `git check-ref-format` forbids anywhere in a reference name.
 const FORBIDDEN_REF_CHARS: [char; 8] = [' ', '~', '^', ':', '?', '*', '[', '\\'];
@@ -649,26 +645,10 @@ impl DiskRefStore {
         Ok(path)
     }
 
-    /// Builds a staging path unique to this process and call, so writers never share one file.
-    fn staging_path(path: &Path) -> PathBuf {
-        let sequence = STAGING_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let mut staging = path.as_os_str().to_owned();
-        staging.push(format!(".{}-{}.tmp", std::process::id(), sequence));
-        PathBuf::from(staging)
-    }
-
     /// Publishes `body` at `path` through a staging file and a single rename.
     fn write_atomic(&self, path: &Path, body: String) -> FractalResult<()> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let staging = Self::staging_path(path);
-        fs::write(&staging, body)?;
         let _ = reset_file_write_permission(path);
-        if let Err(rename_err) = fs::rename(&staging, path) {
-            let _ = fs::remove_file(&staging);
-            return Err(FractalError::Io(rename_err));
-        }
+        fg_core::write_file_atomic(path, body.as_bytes(), false)?;
         if path.to_string_lossy().contains("telemetry") {
             let _ = apply_os_telemetry_protection(path);
         }

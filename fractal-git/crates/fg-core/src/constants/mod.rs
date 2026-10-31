@@ -26,7 +26,7 @@ pub use rules::*;
 
 /// Validates whether a given rule identifier is a registered Fractal Git rule.
 ///
-/// Ensures compliance with `RCFG-RULE-DRIFT` by verifying against the 17 authoritative rules.
+/// Ensures compliance with `RCFG-RULE-DRIFT` by verifying against the 24 authoritative rules.
 #[inline]
 pub fn is_registered_fgt_rule(rule_id: &str) -> bool {
     ALL_FGT_RULES.contains(&rule_id)

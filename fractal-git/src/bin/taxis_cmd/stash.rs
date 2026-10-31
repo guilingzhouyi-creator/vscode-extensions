@@ -18,19 +18,19 @@
 use std::collections::BTreeMap;
 use std::fs;
 
-use fg_core::constants::git::{OBJ_BLOB, OBJ_COMMIT, OBJ_TREE};
+use fg_core::constants::git::OBJ_BLOB;
 use fg_core::models::{FileMode, GitSignature};
 use fg_core::traits::OdbStore;
 use fg_index::InMemoryIndexTree;
-use fg_object::{GitBlob, GitCommit};
-use fg_storage::commit_materializer::{serialize_commit_payload, serialize_tree_payload};
+use fg_object::GitCommit;
+use fg_storage::commit_materializer::{persist_commit_object, persist_index_tree};
 use fg_storage::LooseOdb;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{DiskRefStore, RefStore};
 
 use super::checkout::{materialize_files, remove_stale_files, update_dirc_index};
 use super::commit_walk::parse_commit_record;
-use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
+use super::common::{fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 use super::status::collect_status;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff};
@@ -38,10 +38,7 @@ use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff};
 /// Dispatches the `stash` command.
 pub fn handle_stash(ctx: &CliContext) {
     let subcmd = ctx.args.first().map(|s| s.as_str()).unwrap_or("push");
-    let view = match RepoView::open(ctx) {
-        Ok(opened) => opened,
-        Err(open_err) => fail_fatal(open_err),
-    };
+    let view = RepoView::open_or_exit(ctx);
 
     match subcmd {
         "push" | "save" => handle_stash_push(&view, ctx),
@@ -115,9 +112,9 @@ fn handle_stash_push(view: &RepoView, ctx: &CliContext) {
         let full_path = view.work_root().join(path);
         if full_path.is_file() {
             if let Ok(bytes) = fs::read(&full_path) {
-                let blob = GitBlob::from_bytes(bytes);
-                let _ = odb.write_object(OBJ_BLOB, blob.payload());
-                let _ = in_mem_index.stage_oid(path, tree_entry.mode, *blob.oid());
+                if let Ok(blob_oid) = odb.write_object(OBJ_BLOB, &bytes) {
+                    let _ = in_mem_index.stage_oid(path, tree_entry.mode, blob_oid);
+                }
             }
         }
     }
@@ -127,22 +124,15 @@ fn handle_stash_push(view: &RepoView, ctx: &CliContext) {
         let full_path = view.work_root().join(&entry.path);
         if full_path.is_file() {
             if let Ok(bytes) = fs::read(&full_path) {
-                let blob = GitBlob::from_bytes(bytes);
-                let _ = odb.write_object(OBJ_BLOB, blob.payload());
-                let mode = FileMode::RegularFile;
-                let _ = in_mem_index.stage_oid(&entry.path, mode, *blob.oid());
+                if let Ok(blob_oid) = odb.write_object(OBJ_BLOB, &bytes) {
+                    let _ = in_mem_index.stage_oid(&entry.path, FileMode::RegularFile, blob_oid);
+                }
             }
         }
     }
 
-    let stash_tree_oid = match in_mem_index.write_tree_with_persister(|tree| {
-        let payload = serialize_tree_payload(tree);
-        odb.write_object(OBJ_TREE, &payload)?;
-        Ok(())
-    }) {
-        Ok(oid) => oid,
-        Err(err) => fail_io("persist stash tree", err),
-    };
+    let stash_tree_oid = persist_index_tree(&in_mem_index, &odb)
+        .unwrap_or_else(|err| fail_io("persist stash tree", err));
 
     let timestamp_sec = chrono::Utc::now().timestamp();
     let author = GitSignature::new("Taxis Operator", "operator@taxis.internal", timestamp_sec);
@@ -163,11 +153,8 @@ fn handle_stash_push(view: &RepoView, ctx: &CliContext) {
         None,
     );
 
-    let commit_payload = serialize_commit_payload(&stash_commit);
-    let stash_commit_oid = match odb.write_object(OBJ_COMMIT, &commit_payload) {
-        Ok(oid) => oid,
-        Err(err) => fail_io("persist stash commit", err),
-    };
+    let stash_commit_oid = persist_commit_object(&stash_commit, &odb)
+        .unwrap_or_else(|err| fail_io("persist stash commit", err));
 
     // Update refs/stash
     let ref_store = DiskRefStore::new(view.git_dir());

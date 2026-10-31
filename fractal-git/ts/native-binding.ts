@@ -79,6 +79,17 @@ interface ResolvedSignatures {
     readonly committer: GitSignature;
 }
 
+/** Monotonic counter guaranteeing unique temporary filenames within the same millisecond. */
+let tempFileSequence = 0;
+
+/**
+ * Generates a collision-free temporary file path next to `targetPath`.
+ */
+function nextTempFilePath(targetPath: string): string {
+    tempFileSequence = (tempFileSequence + 1) & 0x7fffffff;
+    return `${targetPath}.tmp_${process.pid}_${Date.now()}_${tempFileSequence}`;
+}
+
 /**
  * Computes canonical Git SHA-1 OID for a blob header + payload.
  */
@@ -110,7 +121,7 @@ export function writeLooseObjectToDisk(
     if (!fs.existsSync(targetFile)) {
         fs.mkdirSync(targetDir, { recursive: true });
         const compressed = zlib.deflateSync(raw);
-        const tmpFile = `${targetFile}.tmp_${Date.now()}`;
+        const tmpFile = nextTempFilePath(targetFile);
         fs.writeFileSync(tmpFile, compressed);
         fs.renameSync(tmpFile, targetFile);
     }
@@ -334,6 +345,14 @@ function resolveSignatures(req: MaterializeCommitRequest): ResolvedSignatures {
     return { author, committer: req.committerSignature ?? author };
 }
 
+interface CommitPayloadInput {
+    readonly treeOid: string;
+    readonly parentOids: readonly string[];
+    readonly message: string;
+    readonly agentMeta: FractalCommitMeta | undefined;
+    readonly signatures: ResolvedSignatures;
+}
+
 /**
  * Assembles the canonical commit payload: object headers, one blank line, then the message.
  *
@@ -342,22 +361,16 @@ function resolveSignatures(req: MaterializeCommitRequest): ResolvedSignatures {
  * blank line as a `Praxis-Agent-Meta` trailer. The payload always ends with exactly one newline,
  * matching `git commit-tree` fed the same message bytes.
  */
-function buildCommitPayload(
-    treeOid: string,
-    parentOids: readonly string[],
-    message: string,
-    agentMeta: FractalCommitMeta | undefined,
-    signatures: ResolvedSignatures,
-): Buffer {
-    const headerLines = [`tree ${assertObjectId(treeOid, 'tree')}`];
-    for (const parentOid of parentOids) {
+function buildCommitPayload(input: CommitPayloadInput): Buffer {
+    const headerLines = [`tree ${assertObjectId(input.treeOid, 'tree')}`];
+    for (const parentOid of input.parentOids) {
         headerLines.push(`parent ${assertObjectId(parentOid, 'parent')}`);
     }
-    headerLines.push(`author ${formatSignature(signatures.author, 'author')}`);
-    headerLines.push(`committer ${formatSignature(signatures.committer, 'committer')}`);
+    headerLines.push(`author ${formatSignature(input.signatures.author, 'author')}`);
+    headerLines.push(`committer ${formatSignature(input.signatures.committer, 'committer')}`);
 
-    const trailer = agentMeta ? `\n\nPraxis-Agent-Meta: ${JSON.stringify(agentMeta)}` : '';
-    const payloadText = `${headerLines.join('\n')}\n\n${message}${trailer}\n`;
+    const trailer = input.agentMeta ? `\n\nPraxis-Agent-Meta: ${JSON.stringify(input.agentMeta)}` : '';
+    const payloadText = `${headerLines.join('\n')}\n\n${input.message}${trailer}\n`;
     return Buffer.from(payloadText, 'utf8');
 }
 
@@ -379,7 +392,7 @@ function resolveRefPath(gitDir: string, gitRef: string): string {
 function writeRefFile(gitDir: string, gitRef: string, commitOid: string): void {
     const refPath = resolveRefPath(gitDir, gitRef);
     fs.mkdirSync(path.dirname(refPath), { recursive: true });
-    const tmpRef = `${refPath}.tmp_${Date.now()}`;
+    const tmpRef = nextTempFilePath(refPath);
     fs.writeFileSync(tmpRef, `${commitOid}\n`, 'utf8');
     fs.renameSync(tmpRef, refPath);
 }
@@ -399,13 +412,13 @@ export function materializeCommitPure(
 
     // 2. Serialize the commit payload in git's canonical header order.
     const signatures = resolveSignatures(req);
-    const commitPayload = buildCommitPayload(
+    const commitPayload = buildCommitPayload({
         treeOid,
-        req.parentCommitOids,
-        req.message,
-        req.agentMeta,
+        parentOids: req.parentCommitOids,
+        message: req.message,
+        agentMeta: req.agentMeta,
         signatures,
-    );
+    });
     const { oid: commitOid } = writeLooseObjectToDisk(gitDir, 'commit', commitPayload);
 
     // 3. Advance the fractal ref atomically.
@@ -420,25 +433,32 @@ export function materializeCommitPure(
 }
 
 /**
+ * Options controlling physical worktree and ref removal during workspace reclamation.
+ */
+export interface ReclaimWorkspaceOptions {
+    readonly targetRef: FractalRefDescriptor;
+    readonly physicalDir?: string;
+    readonly deleteRef?: boolean;
+}
+
+/**
  * Pure-TS physical workspace reclamation engine.
  */
 export function reclaimWorkspacePure(
     gitDir: string,
     workspaceId: string,
-    targetRef: FractalRefDescriptor,
-    physicalDir?: string,
-    deleteRef = false,
+    options: ReclaimWorkspaceOptions,
 ): ReclamationSummary {
     const startMs = Date.now();
     let removed = false;
 
-    if (physicalDir && fs.existsSync(physicalDir)) {
-        fs.rmSync(physicalDir, { recursive: true, force: true });
+    if (options.physicalDir && fs.existsSync(options.physicalDir)) {
+        fs.rmSync(options.physicalDir, { recursive: true, force: true });
         removed = true;
     }
 
-    if (deleteRef) {
-        const refPath = path.join(gitDir, targetRef.gitRef);
+    if (options.deleteRef) {
+        const refPath = path.join(gitDir, options.targetRef.gitRef);
         if (fs.existsSync(refPath)) {
             fs.unlinkSync(refPath);
         }
@@ -446,7 +466,7 @@ export function reclaimWorkspacePure(
 
     return {
         workspaceId,
-        targetRef: targetRef.gitRef,
+        targetRef: options.targetRef.gitRef,
         physicalPathRemoved: removed,
         durationMs: Date.now() - startMs,
     };

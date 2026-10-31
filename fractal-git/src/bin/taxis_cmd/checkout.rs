@@ -31,7 +31,7 @@ use fg_native::RepoDocument;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{DiskRefStore, RefStore};
 
-use super::common::{fail_fatal, fail_io, reject, CliContext};
+use super::common::{fail_io, reject, CliContext};
 use super::repo_view::RepoView;
 use super::status::collect_status;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
@@ -54,10 +54,7 @@ pub fn handle_checkout(ctx: &CliContext) {
     }
 
     let opts = parse_checkout_options(&ctx.args);
-    let view = match RepoView::open(ctx) {
-        Ok(opened) => opened,
-        Err(open_err) => fail_fatal(open_err),
-    };
+    let view = RepoView::open_or_exit(ctx);
 
     let (target_commit, tree_oid) = match view.resolve_tree(&opts.target) {
         Ok(resolved) => resolved,
@@ -238,7 +235,7 @@ fn same_tree_entry(left: &TreeEntry, right: &TreeEntry) -> bool {
 }
 
 /// Loads the normal-stage index entries keyed by path, tolerating a missing or unreadable index.
-fn load_index_entries(git_dir: &Path) -> BTreeMap<String, IndexEntry> {
+pub(crate) fn load_index_entries(git_dir: &Path) -> BTreeMap<String, IndexEntry> {
     fg_index::GitIndex::load(git_dir.join("index"))
         .map(|index| {
             index
@@ -468,7 +465,7 @@ fn describe_worktree_file(full_path: &Path, path: &str, tree_entry: &TreeEntry) 
 }
 
 /// Reads the stat cache tuple for a worktree file, falling back to the payload length.
-fn worktree_stat(full_path: &Path, fallback_size: u32) -> (u32, u32, u32) {
+pub(crate) fn worktree_stat(full_path: &Path, fallback_size: u32) -> (u32, u32, u32) {
     let Ok(meta) = fs::metadata(full_path) else {
         return (fallback_size, 0, 0);
     };
@@ -483,11 +480,44 @@ fn worktree_stat(full_path: &Path, fallback_size: u32) -> (u32, u32, u32) {
     )
 }
 
-/// Persists the materialized entries into the binary DIRC index file.
+/// Converts `IndexEntry` slice into a native `IndxSection` in memory without re-reading disk.
+pub(crate) fn build_native_index_section(entries: &[IndexEntry]) -> fg_native::IndxSection {
+    let mut native_indx = fg_native::IndxSection::new();
+    for entry in entries {
+        let _ = native_indx.upsert(NativeIndexEntry {
+            path: entry.path.clone(),
+            mode: entry.mode,
+            oid: entry.oid,
+            stage: entry.stage,
+            stat: StatCache {
+                size: u64::from(entry.size),
+                mtime_secs: i64::from(entry.mtime_seconds),
+                mtime_nanos: entry.mtime_nanos,
+                ctime_secs: i64::from(entry.mtime_seconds),
+                ctime_nanos: entry.mtime_nanos,
+                dev: 0,
+                ino: 0,
+                uid: 0,
+                gid: 0,
+            },
+            flags: 0,
+        });
+    }
+    native_indx
+}
+
+/// Persists the materialized entries into the binary DIRC index file and native container `indx` section.
 pub(crate) fn update_dirc_index(git_dir: &Path, entries: &[IndexEntry]) {
     let index_path = git_dir.join("index");
     if let Err(err) = write_dirc_v2(&index_path, entries) {
         fail_io(format!("write index '{}'", index_path.display()), err);
+    }
+    let container_path = fg_native::container_path(git_dir);
+    if container_path.is_file() {
+        if let Ok(mut doc) = RepoDocument::load(&container_path) {
+            doc.indx = build_native_index_section(entries);
+            let _ = doc.save_atomic(&container_path);
+        }
     }
 }
 
@@ -594,33 +624,6 @@ pub(crate) fn update_references(
             } else {
                 doc.head = NativeHeadState::Detached { oid: target_commit };
             }
-
-            // Sync doc.indx from written DIRC index
-            if let Ok(parsed) = fg_index::GitIndex::load(git_dir.join("index")) {
-                let mut native_indx = fg_native::IndxSection::new();
-                for entry in parsed.entries() {
-                    let _ = native_indx.upsert(NativeIndexEntry {
-                        path: entry.path.clone(),
-                        mode: entry.mode,
-                        oid: entry.oid,
-                        stage: entry.stage,
-                        stat: StatCache {
-                            size: u64::from(entry.size),
-                            mtime_secs: i64::from(entry.mtime_seconds),
-                            mtime_nanos: entry.mtime_nanos,
-                            ctime_secs: i64::from(entry.mtime_seconds),
-                            ctime_nanos: entry.mtime_nanos,
-                            dev: 0,
-                            ino: 0,
-                            uid: 0,
-                            gid: 0,
-                        },
-                        flags: 0,
-                    });
-                }
-                doc.indx = native_indx;
-            }
-
             let _ = doc.save_atomic(&container_path);
         }
     }

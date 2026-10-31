@@ -10,8 +10,8 @@
 //!   - Values are quoted only when Git's writer would quote them.
 //!   - Every rewrite is re-parsed and compared before it can replace the file.
 
-use std::fs::{self, OpenOptions};
-use std::io::{self, Write};
+use std::fs;
+use std::io;
 use std::path::Path;
 
 use crate::config::{ConfigEntry, ConfigError, ConfigKey, ConfigWriteMode};
@@ -514,47 +514,13 @@ pub(crate) fn read_text(path: &Path) -> Result<Option<String>, ConfigError> {
 }
 
 pub(crate) fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<(), ConfigError> {
-    let parent = match path.parent() {
-        Some(directory) if !directory.as_os_str().is_empty() => directory,
-        _ => Path::new("."),
-    };
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("config");
-    let mut last_conflict = None;
-    for attempt in 0..16 {
-        let temporary = parent.join(format!(
-            ".{file_name}.taxis-tmp-{}-{attempt}",
-            std::process::id()
-        ));
-        match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-        {
-            Ok(mut handle) => {
-                let written = handle.write_all(bytes).and_then(|()| handle.sync_all());
-                drop(handle);
-                if let Err(error) = written {
-                    let _ = fs::remove_file(&temporary);
-                    return Err(ConfigError::Io(error));
-                }
-                return match fs::rename(&temporary, path) {
-                    Ok(()) => Ok(()),
-                    Err(error) => {
-                        let _ = fs::remove_file(&temporary);
-                        Err(ConfigError::Io(error))
-                    }
-                };
-            }
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-                last_conflict = Some(error);
-            }
-            Err(error) => return Err(ConfigError::Io(error)),
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() && !parent.is_dir() {
+            return Err(ConfigError::Io(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("parent directory '{}' does not exist", parent.display()),
+            )));
         }
     }
-    Err(ConfigError::Io(last_conflict.unwrap_or_else(|| {
-        io::Error::other("could not create a temporary config file")
-    })))
+    fg_core::write_file_atomic(path, bytes, true).map_err(ConfigError::Io)
 }

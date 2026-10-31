@@ -12,7 +12,7 @@
 //! Domain Governance Rules: FGT-STO-001 (pack index generation), FGT-COR-001, FGT-PRF-001.
 
 use sha1::{Digest, Sha1};
-use std::io::Write;
+use std::io::{BufWriter, Write};
 
 use super::pack_writer::PackEntryMeta;
 use fg_core::error::FractalResult;
@@ -42,18 +42,19 @@ impl IdxWriter {
     pub fn write_idx<W: Write>(
         mut entries: Vec<PackEntryMeta>,
         pack_sha1: &Oid,
-        mut writer: W,
+        writer: W,
     ) -> FractalResult<Oid> {
         // Sort entries strictly in ascending lexicographical order by 20-byte OID
         entries.sort_by(|a, b| a.oid.as_bytes().cmp(b.oid.as_bytes()));
 
+        let mut buffered = BufWriter::with_capacity(64 * 1024, writer);
         let mut hasher = Sha1::new();
 
         // 1. Header: \xfftOc + version 2 (8 bytes)
         let mut header = [0u8; 8];
         header[..4].copy_from_slice(&IDX_V2_MAGIC);
         header[4..8].copy_from_slice(&IDX_VERSION_2.to_be_bytes());
-        writer.write_all(&header)?;
+        buffered.write_all(&header)?;
         hasher.update(header);
 
         // 2. Fan-out table (256 * 4 bytes = 1024 bytes)
@@ -75,21 +76,21 @@ impl IdxWriter {
 
         for &count in &fanout_counts {
             let bytes = count.to_be_bytes();
-            writer.write_all(&bytes)?;
+            buffered.write_all(&bytes)?;
             hasher.update(bytes);
         }
 
         // 3. OID table (N * 20 bytes)
         for entry in &entries {
             let oid_bytes = entry.oid.as_bytes();
-            writer.write_all(oid_bytes)?;
+            buffered.write_all(oid_bytes)?;
             hasher.update(oid_bytes);
         }
 
         // 4. CRC32 table (N * 4 bytes)
         for entry in &entries {
             let crc_bytes = entry.crc32.to_be_bytes();
-            writer.write_all(&crc_bytes)?;
+            buffered.write_all(&crc_bytes)?;
             hasher.update(crc_bytes);
         }
 
@@ -100,11 +101,11 @@ impl IdxWriter {
                 let slot = large_offsets.len() as u32;
                 large_offsets.push(entry.offset);
                 let flag_word = (LARGE_OFFSET_FLAG | slot).to_be_bytes();
-                writer.write_all(&flag_word)?;
+                buffered.write_all(&flag_word)?;
                 hasher.update(flag_word);
             } else {
                 let offset_bytes = (entry.offset as u32).to_be_bytes();
-                writer.write_all(&offset_bytes)?;
+                buffered.write_all(&offset_bytes)?;
                 hasher.update(offset_bytes);
             }
         }
@@ -112,18 +113,19 @@ impl IdxWriter {
         // 6. 64-bit Large offsets table (if any, M * 8 bytes)
         for &large_off in &large_offsets {
             let bytes = large_off.to_be_bytes();
-            writer.write_all(&bytes)?;
+            buffered.write_all(&bytes)?;
             hasher.update(bytes);
         }
 
         // 7. Trailer: Pack SHA-1 (20 bytes)
         let pack_bytes = pack_sha1.as_bytes();
-        writer.write_all(pack_bytes)?;
+        buffered.write_all(pack_bytes)?;
         hasher.update(pack_bytes);
 
         // 8. Trailer: Index SHA-1 (20 bytes)
         let idx_sha1: [u8; 20] = hasher.finalize().into();
-        writer.write_all(&idx_sha1)?;
+        buffered.write_all(&idx_sha1)?;
+        buffered.flush()?;
 
         Ok(Oid::from_bytes(idx_sha1))
     }

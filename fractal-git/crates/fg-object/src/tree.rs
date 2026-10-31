@@ -93,11 +93,17 @@ pub struct GitTree {
 }
 
 impl GitTree {
+    /// Sorts `entries` in-place using Git's canonical tree comparator and returns the raw tree
+    /// payload bytes (`<octal-mode> <name>\0<20B-oid>`, without the loose `tree <size>\0` header).
+    #[must_use]
+    pub fn serialize_sorted_entries(entries: &mut [GitTreeEntry]) -> Vec<u8> {
+        entries.sort_by(GitTreeEntry::cmp_canonical);
+        Self::serialize_entries(entries)
+    }
+
     /// Builds and sorts a canonical GitTree from an entry collection.
     pub fn new(mut entries: Vec<GitTreeEntry>) -> Self {
-        entries.sort_by(|left_entry, right_entry| left_entry.cmp_canonical(right_entry));
-
-        let raw_payload = Self::serialize_entries(&entries);
+        let raw_payload = Self::serialize_sorted_entries(&mut entries);
         let oid = Self::compute_tree_oid(&raw_payload);
         Self { entries, oid }
     }
@@ -117,9 +123,15 @@ impl GitTree {
         &self.entries
     }
 
+    /// Returns the canonical tree payload bytes without the loose `tree <size>\0` header.
+    #[must_use]
+    pub fn to_payload(&self) -> Vec<u8> {
+        Self::serialize_entries(&self.entries)
+    }
+
     /// Returns the raw Git loose object format: `tree <size>\0<entries>`
     pub fn to_raw_object(&self) -> Vec<u8> {
-        raw_object(ObjectKind::Tree, &Self::serialize_entries(&self.entries))
+        raw_object(ObjectKind::Tree, &self.to_payload())
     }
 
     fn serialize_entries(entries: &[GitTreeEntry]) -> Vec<u8> {

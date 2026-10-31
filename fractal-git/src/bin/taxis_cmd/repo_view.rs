@@ -71,6 +71,11 @@ impl RepoView {
         })
     }
 
+    /// Opens the repository named by the CLI context or exits with fatal status 128.
+    pub fn open_or_exit(ctx: &CliContext) -> Self {
+        Self::open(ctx).unwrap_or_else(|err| super::common::fail_fatal(err))
+    }
+
     /// Configuration values that change what a comparison reports.
     pub fn config(&self) -> RepoConfig {
         self.config
@@ -256,6 +261,24 @@ impl RepoView {
     ///
     /// Returns [`FractalError::ObjectCodec`] naming the unresolved input.
     pub fn resolve(&self, revision: &str) -> FractalResult<Oid> {
+        if let Some(inner) = revision.strip_suffix("^{tree}") {
+            return Ok(self.resolve_tree(inner)?.1);
+        }
+        if let Some(inner) = revision.strip_suffix("^{}") {
+            let resolved = self.resolve(inner)?;
+            return self.peel(&resolved);
+        }
+        if let Some(inner) = revision.strip_suffix("^{commit}") {
+            let peeled = self.peel(&self.resolve(inner)?)?;
+            let kind = self.object(&peeled)?.kind;
+            if kind != ObjectKind::Commit {
+                return Err(FractalError::ObjectCodec(format!(
+                    "'{revision}' resolves to a {}, not a commit",
+                    kind.as_str()
+                )));
+            }
+            return Ok(peeled);
+        }
         let (base, steps) = split_ancestry_suffix(revision);
         if steps.is_empty() {
             return self.resolve_base(base);
@@ -282,6 +305,20 @@ impl RepoView {
         let Some((revision, path)) = spec.split_once(':') else {
             return self.resolve(spec);
         };
+        if revision.is_empty() {
+            let normalized = path.strip_prefix("0:").unwrap_or(path);
+            let index = self.index()?.ok_or_else(|| {
+                FractalError::ObjectCodec(format!("path '{normalized}' is not in the index"))
+            })?;
+            return index
+                .entries()
+                .iter()
+                .find(|entry| entry.path == normalized)
+                .map(|entry| entry.oid)
+                .ok_or_else(|| {
+                    FractalError::ObjectCodec(format!("path '{normalized}' is not in the index"))
+                });
+        }
         let mut current = self.peel(&self.resolve(revision)?)?;
         let mut object = self.object(&current)?;
         if object.kind == ObjectKind::Commit {

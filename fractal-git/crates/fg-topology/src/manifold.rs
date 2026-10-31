@@ -18,6 +18,7 @@
 //! - `ADV-PRF-002`: Loop transient allocation detox
 //! - `SIM-ARGS-001`: Parameter object convergence
 
+use fg_core::jeffreys_beta_trials;
 use fg_core::models::{AuditHashChain, AuditRecord, AuthoritySecret};
 use serde::{Deserialize, Serialize};
 
@@ -150,16 +151,10 @@ impl TrinityManifoldEvaluator {
         let record_count = records.len();
         let avg_mutant_kill_rate = total_kill_rate / record_count as f64;
 
-        // Jeffreys Beta posterior
-        let alpha = 0.5 + passed_trials as f64;
-        let beta = 0.5 + (total_trials.saturating_sub(passed_trials)) as f64;
-        let denom = alpha + beta;
-        let bayesian_mean = (alpha / denom) * 100.0;
-
-        let posterior_variance = (alpha * beta) / (denom * denom * (denom + 1.0));
-        let credit_std_dev = posterior_variance.sqrt() * 100.0;
-        let credible_lower = (bayesian_mean - 1.96 * credit_std_dev).clamp(0.0, 100.0);
-        let credible_upper = (bayesian_mean + 1.96 * credit_std_dev).clamp(0.0, 100.0);
+        let posterior = jeffreys_beta_trials(passed_trials as u64, total_trials as u64);
+        let bayesian_mean = posterior.mean * 100.0;
+        let credible_lower = posterior.ci95_lower * 100.0;
+        let credible_upper = posterior.ci95_upper * 100.0;
 
         // Net technical debt delta: positive quality and zero allocations reduce debt
         let net_debt_delta = (total_net_quality * 2.5) - (total_allocs as f64 * 5.0);

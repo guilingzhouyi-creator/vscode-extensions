@@ -19,50 +19,13 @@
 //! - `FGT-GAT-001`: Protocol gate facade and rule compliance
 //! - `FGT-STO-001`: Storage crash safety and zero work loss
 
-use std::fs;
 use std::path::Path;
 
 use fg_core::error::{FractalError, FractalResult};
+pub use fg_core::models::quarantine::{
+    IsolateMutationRequest, QuarantineLedger, QuarantineRecord, QuarantineStatus,
+};
 use serde::{Deserialize, Serialize};
-
-/// Status of an isolated modification in quarantine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum QuarantineStatus {
-    /// Modification is safely preserved in quarantine and excluded from commit tree.
-    Isolated,
-    /// Modification was approved, re-applied, or incorporated into worktree.
-    Restored,
-    /// Modification was explicitly discarded by supervisor or rollback action.
-    Discarded,
-}
-
-/// Structured record describing a quarantined modification and reason for interception.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct QuarantineRecord {
-    /// Unique identifier for this quarantine entry (e.g. "quar-1729000-001").
-    pub quarantine_id: String,
-    /// Project identifier where violation occurred.
-    pub project_id: String,
-    /// SubAgent identifier that attempted the unauthorized mutation.
-    pub agent_id: String,
-    /// Target repository-relative file path.
-    pub rel_path: String,
-    /// Relative path to stored unified patch or raw payload.
-    pub patch_file: String,
-    /// Human-readable root reason for interception.
-    pub reason: String,
-    /// Unix timestamp when isolation took place.
-    pub quarantined_at: u64,
-    /// Current lifecycle status.
-    pub status: QuarantineStatus,
-}
-
-/// Quarantine ledger index stored in `.taxis/quarantine/quarantine_index.json`.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct QuarantineLedger {
-    /// Recorded quarantine entries.
-    pub records: Vec<QuarantineRecord>,
-}
 
 /// Statistical Jeffreys Beta credit evaluation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -129,28 +92,14 @@ impl AgentCreditController {
         total_trials: usize,
         gaming_signals: bool,
     ) -> AgentCreditScore {
-        let alpha_0 = 0.5;
-        let beta_0 = 0.5;
-
-        let alpha = alpha_0 + passed_trials as f64;
-        let beta = beta_0 + (total_trials.saturating_sub(passed_trials)) as f64;
-        let denom = alpha + beta;
-
-        let posterior_mean = alpha / denom;
-
-        // Normal approximation for Beta variance: Var = (alpha * beta) / (denom^2 * (denom + 1))
-        let variance = (alpha * beta) / (denom * denom * (denom + 1.0));
-        let std_dev = variance.sqrt();
-
-        let lower = (posterior_mean - 1.96 * std_dev).clamp(0.0, 1.0);
-        let upper = (posterior_mean + 1.96 * std_dev).clamp(0.0, 1.0);
+        let posterior = fg_core::jeffreys_beta_trials(passed_trials as u64, total_trials as u64);
 
         AgentCreditScore {
             total_trials,
             passed_trials,
-            posterior_mean,
-            credible_interval_lower: lower,
-            credible_interval_upper: upper,
+            posterior_mean: posterior.mean,
+            credible_interval_lower: posterior.ci95_lower,
+            credible_interval_upper: posterior.ci95_upper,
             gaming_detected: gaming_signals,
         }
     }
@@ -164,34 +113,17 @@ impl AgentCreditController {
         if params.credit.gaming_detected {
             let reason = "BLOCK_GAMING_DETECTED: Deceptive test evasion or tautological assertion intercepted";
 
-            // Atomically isolate to quarantine directory
-            fs::create_dir_all(params.quarantine_dir)?;
-            let quarantine_id = format!("quar-{}-001", params.now_secs);
-            let patch_filename = format!("{quarantine_id}.patch");
-            let patch_path = params.quarantine_dir.join(&patch_filename);
-            fs::write(&patch_path, params.patch_or_content)?;
-
-            let record = QuarantineRecord {
-                quarantine_id,
-                project_id: params.project_id.to_string(),
-                agent_id: params.agent_id.to_string(),
-                rel_path: params.rel_path.to_string(),
-                patch_file: patch_filename,
-                reason: reason.to_string(),
-                quarantined_at: params.now_secs,
-                status: QuarantineStatus::Isolated,
-            };
-
-            let index_path = params.quarantine_dir.join("quarantine_index.json");
-            let mut ledger = if index_path.exists() {
-                let index_bytes = fs::read(&index_path)?;
-                serde_json::from_slice::<QuarantineLedger>(&index_bytes).unwrap_or_default()
-            } else {
-                QuarantineLedger::default()
-            };
-            ledger.records.push(record);
-            let serialized = serde_json::to_vec_pretty(&ledger)?;
-            fs::write(&index_path, serialized)?;
+            QuarantineLedger::isolate_mutation(IsolateMutationRequest {
+                quarantine_dir: params.quarantine_dir,
+                project_id: params.project_id,
+                agent_id: params.agent_id,
+                rel_path: params.rel_path,
+                file_uid: None,
+                patch_or_content: params.patch_or_content,
+                reason,
+                current_time: params.now_secs,
+                nonce: 0,
+            })?;
 
             return Err(FractalError::GateRejection {
                 score: params.credit.posterior_mean,

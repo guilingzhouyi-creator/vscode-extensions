@@ -39,7 +39,7 @@ impl ConflictGuard {
                 });
             }
 
-            if text.contains("<<<<<<<") || text.contains("=======") || text.contains(">>>>>>>") {
+            if has_conflict_marker_line(text) {
                 return Err(FractalError::GateRejection {
                     score: 20.0,
                     violations: vec![format!(
@@ -54,6 +54,23 @@ impl ConflictGuard {
 
         Ok(())
     }
+}
+
+/// Checks whether any line in `text` starts with a standard Git 2-way or diff3 conflict marker.
+///
+/// Anchoring at line start and requiring an exact 7-character `=======` divider prevents false
+/// positives on ASCII section banners (`// ==========`) or string literals mentioning markers.
+fn has_conflict_marker_line(text: &str) -> bool {
+    text.split('\n').any(|raw_line| {
+        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        line == "<<<<<<<"
+            || line.starts_with("<<<<<<< ")
+            || line == "|||||||"
+            || line.starts_with("||||||| ")
+            || line == "======="
+            || line == ">>>>>>>"
+            || line.starts_with(">>>>>>> ")
+    })
 }
 
 impl GateVerifier for ConflictGuard {
@@ -82,5 +99,27 @@ impl GateVerifier for ConflictGuard {
             score,
             violations,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_conflict_guard_rejects_git_conflict_markers() {
+        let conflicted = format!(
+            "fn main() {{\n{} HEAD\n    let x = 1;\n=======\n    let x = 2;\n{} feature\n}}\n",
+            "<<<<<<<", ">>>>>>>"
+        );
+        assert!(ConflictGuard::assert_clean_content("src/main.rs", conflicted.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn test_conflict_guard_allows_ascii_section_banners_and_comments() {
+        let clean = "// ============================================================\n\
+                     // ======= Section Header =======\n\
+                     fn main() {\n    println!(\"ok\");\n}\n";
+        assert!(ConflictGuard::assert_clean_content("src/main.rs", clean.as_bytes()).is_ok());
     }
 }

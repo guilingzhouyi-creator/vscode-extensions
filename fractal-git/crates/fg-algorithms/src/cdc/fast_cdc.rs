@@ -8,14 +8,13 @@
 //!   normalized chunking and zero-allocation streaming iterators.
 //! Exit Semantics & Design Rationale:
 //!   - Complies with USENIX ATC '16 FastCDC: 256-entry SplitMix64 Gear Table
-//!     plus dual-mask normalization ($M_s, M_l$).
-//!   - FastCdcIter provides zero-heap streaming chunk iteration over continuous byte buffers.
-//!   - Cyclomatic Complexity CC <= 15 across all chunking routines.
+//!     plus dual-mask normalization (`mask_s`, `mask_l`).
+//!   - `FastCdcIter` provides zero-heap streaming chunk iteration over continuous byte buffers.
+//!   - Delegates Git blob digest framing to `fg_core::models::compute_object_oid`.
 //!
 //! Domain Governance Rules: FGT-ALG-001 (FastCDC chunking), FGT-COR-001, FGT-PRF-001.
 
-use fg_core::models::Oid;
-use sha1::{Digest, Sha1};
+use fg_core::models::{compute_object_oid, ObjectKind, Oid};
 
 /// Default minimum chunk size threshold (4 KiB) below which no boundary check is performed.
 pub const DEFAULT_MIN_CHUNK: usize = 1024 * 4;
@@ -27,7 +26,7 @@ pub const DEFAULT_AVG_CHUNK: usize = 1024 * 16;
 pub const DEFAULT_MAX_CHUNK: usize = 1024 * 64;
 
 /// Compile-time generation of the 256-entry 64-bit Gear Hash lookup table using SplitMix64.
-/// Produces ideal entropy diffusion across byte values without runtime initialization overhead.
+/// Produces uniform entropy diffusion across byte values without runtime initialization overhead.
 const fn generate_gear_table() -> [u64; 256] {
     let mut table = [0u64; 256];
     let mut state = 0x9e3779b97f4a7c15u64;
@@ -44,7 +43,7 @@ const fn generate_gear_table() -> [u64; 256] {
     table
 }
 
-/// Static 256-entry Gear Hash lookup table in .rodata.
+/// Static 256-entry Gear Hash lookup table in `.rodata`.
 pub static GEAR_TABLE: [u64; 256] = generate_gear_table();
 
 /// Descriptor of a content-defined chunk.
@@ -107,7 +106,7 @@ impl FastCdcChunker {
         }
     }
 
-    /// Splits an input buffer into content-defined chunk descriptors (allocates a Vec).
+    /// Splits an input buffer into content-defined chunk descriptors (allocates a `Vec`).
     pub fn chunk(&self, input_bytes: &[u8]) -> Vec<ChunkDescriptor> {
         self.iter(input_bytes).collect()
     }
@@ -131,7 +130,7 @@ impl FastCdcChunker {
         let mut fingerprint: u64 = 0;
         let mut found = false;
 
-        // Phase 1: Small mask normalization window [min_size..midpoint)
+        // Small-mask normalization window [min_size..midpoint)
         while cut_offset < midpoint {
             let byte = slice[cut_offset];
             fingerprint = (fingerprint << 1).wrapping_add(GEAR_TABLE[byte as usize]);
@@ -142,7 +141,7 @@ impl FastCdcChunker {
             }
         }
 
-        // Phase 2: Large mask normalization window [midpoint..max_cut)
+        // Large-mask normalization window [midpoint..max_cut)
         if !found {
             while cut_offset < max_cut {
                 let byte = slice[cut_offset];
@@ -165,51 +164,15 @@ impl FastCdcChunker {
     }
 
     pub(crate) fn make_chunk_from_slice(slice: &[u8], offset: usize) -> ChunkDescriptor {
-        let length = slice.len();
-        let mut hasher = Sha1::new();
-
-        // Stack-allocated Git blob header to ensure loop zero-heap allocation (FGT-PRF-001)
-        let mut header_buffer = [0u8; 32];
-        let header_len = Self::write_blob_header(&mut header_buffer, length);
-        hasher.update(&header_buffer[..header_len]);
-        hasher.update(slice);
-        let hash: [u8; 20] = hasher.finalize().into();
-        let oid = Oid::from_bytes(hash);
-
         ChunkDescriptor {
             offset,
-            length,
-            oid,
+            length: slice.len(),
+            oid: compute_object_oid(ObjectKind::Blob, slice),
         }
     }
 
     fn make_chunk(input_bytes: &[u8], offset: usize, length: usize) -> ChunkDescriptor {
         Self::make_chunk_from_slice(&input_bytes[offset..offset + length], offset)
-    }
-
-    #[inline]
-    fn write_blob_header(buf: &mut [u8; 32], length: usize) -> usize {
-        buf[..5].copy_from_slice(b"blob ");
-        let mut cursor = 5;
-        if length == 0 {
-            buf[cursor] = b'0';
-            cursor += 1;
-        } else {
-            let mut digits = [0u8; 20];
-            let mut digit_count = 0;
-            let mut remaining = length;
-            while remaining > 0 {
-                digits[digit_count] = b'0' + (remaining % 10) as u8;
-                remaining /= 10;
-                digit_count += 1;
-            }
-            for digit_index in (0..digit_count).rev() {
-                buf[cursor] = digits[digit_index];
-                cursor += 1;
-            }
-        }
-        buf[cursor] = 0;
-        cursor + 1
     }
 }
 

@@ -77,8 +77,7 @@ test('FractalGitEngine materializes commit and updates ref in temp git repo', ()
                 tier: 'subagent_worktree',
                 gitRef: 'refs/fractal/cell/cell-alpha/card/card-101/sub/sub-1',
             },
-            fakeWorktree,
-            true,
+            { physicalDir: fakeWorktree, deleteRef: true },
         );
 
         assert.strictEqual(reclaim.physicalPathRemoved, true);

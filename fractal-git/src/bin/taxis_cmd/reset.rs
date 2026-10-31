@@ -22,13 +22,14 @@ use std::fs;
 use fg_core::models::{IndexStage, Oid};
 use fg_index::IndexEntry;
 use fractal_git::constants::cli::CliTag;
-use fractal_git::{DiskRefStore, OperationGraph, RepoViewSnapshot};
+use fractal_git::DiskRefStore;
 
 use super::checkout::{
     materialize_files, plan_worktree_path, preflight_worktree_paths, remove_stale_files,
-    update_dirc_index, update_references,
+    update_dirc_index, update_references, worktree_stat,
 };
 use super::common::{fail_fatal, print_json, reject, CliContext};
+use super::operation::{record_head_operation, HeadOperationSpec};
 use super::repo_view::RepoView;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
 
@@ -252,19 +253,7 @@ fn rebuild_mixed_dirc_index(view: &RepoView, target_files: &BTreeMap<String, Tre
             Ok(full_path) => full_path,
             Err(detail) => reject(CliTag::ERROR, detail),
         };
-        let (size, mtime_sec, mtime_nano) = if let Ok(meta) = fs::metadata(&full_path) {
-            let mtime = meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-            let duration = mtime
-                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .unwrap_or_default();
-            (
-                meta.len() as u32,
-                duration.as_secs() as u32,
-                duration.subsec_nanos(),
-            )
-        } else {
-            (0, 0, 0)
-        };
+        let (size, mtime_sec, mtime_nano) = worktree_stat(&full_path, 0);
 
         index_entries.push(IndexEntry {
             path: path.clone(),
@@ -290,40 +279,14 @@ fn record_reset_operation(
     opts: &ResetOptions,
     branch_name: Option<&str>,
 ) {
-    let ref_store = DiskRefStore::new(view.git_dir());
-    let mut op_graph = match OperationGraph::load_or_init(view.git_dir()) {
-        Ok(graph) => graph,
-        Err(_) => return,
-    };
-    let current_time_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|dur| dur.as_millis() as i64)
-        .unwrap_or(0);
-
-    let mut branches = BTreeMap::new();
-    if let Ok(all_refs) = ref_store.list_all() {
-        for (name, oid) in all_refs {
-            branches.insert(name, oid);
-        }
-    }
-    if let Some(branch) = branch_name {
-        branches.insert(format!("refs/heads/{branch}"), target_commit);
-    }
-
-    let view_snapshot = RepoViewSnapshot {
-        head_oid: Some(target_commit),
-        branches,
-        staged_promotions: Vec::new(),
-        timestamp_ms: current_time_ms,
-    };
-
-    let _ = op_graph.record_operation(
-        view_snapshot,
-        "operator".to_string(),
-        "reset",
-        format!("reset ({:?}): {}", opts.mode, opts.target),
-        current_time_ms,
-    );
+    record_head_operation(HeadOperationSpec {
+        git_dir: view.git_dir(),
+        head_oid: target_commit,
+        branch_or_ref: branch_name,
+        actor: "operator",
+        command: "reset",
+        description: format!("reset ({:?}): {}", opts.mode, opts.target),
+    });
 }
 
 /// Prints formatted human or JSON response for reset.

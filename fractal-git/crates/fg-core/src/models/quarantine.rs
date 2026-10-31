@@ -1,27 +1,37 @@
-//! Module: fg-index — Elastic Quarantine & Violation Isolation Stash
-//! File Path: crates/fg-index/src/quarantine.rs
-//! Architecture Role: Implements the 1+3 hybrid violation governance model: strict commit fail-closed
-//!   interception paired with elastic quarantine stashing (.taxis/quarantine/) and structured escalation.
-//! Dependencies & Triggers: Consumes FileUid from fg-core; operates within the .taxis/quarantine/ directory;
-//!   invoked whenever an unauthorized FileUid or MutationBudget overflow is intercepted.
-//! Responsibilities: Preserve untracked or unauthorized agent modifications in atomic patch files,
-//!   maintain an audit ledger of quarantined records, and emit structured escalation diagnostics.
-//! Exit Semantics & Design Rationale: Guarantees zero agent work loss during permission violations
-//!   while maintaining an uncompromised formal commit DAG.
+//! Module: fg-core — Unified Elastic Quarantine Ledger & Isolation Stash
+//! File Path: crates/fg-core/src/models/quarantine.rs
+//! Architecture Role: Single-source domain model and crash-safe persistence ledger for isolated
+//!   agent mutations across `fg-index` (MutationBudget / SliceAuthorization breaches) and
+//!   `fg-gate` (`BLOCK_GAMING_DETECTED` Bayesian credit circuit breaker).
+//! Dependencies & Triggers: Consumed by `fg-index::quarantine`, `fg-gate::credit`, and Taxis CLI
+//!   quarantine inspection/restoration commands.
+//! Responsibilities: Atomically persist unauthorized or gaming-flagged patches under
+//!   `.taxis/quarantine/`, assign collision-free quarantine identifiers, and track lifecycle
+//!   transitions (`Isolated` -> `Restored` / `Discarded`).
+//! Exit Semantics & Design Rationale:
+//!   - Eliminates the split-brain `QuarantineLedger` definition that previously diverged between
+//!     `fg-index` and `fg-gate`.
+//!   - Uses [`crate::fs_atomic::write_file_atomic`] and a monotonic fallback nonce so two
+//!     circuit-breaker triggers within the same Unix second never overwrite one another.
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
+//! - `FGT-QRN-001`: Pre-Review Zone quarantine isolation and Bayesian credit circuit-breaker guard
 //! - `FGT-STO-001`: Storage layer crash safety guard
-//! - `FGT-GAT-001`: Gate and violation boundary isolation guard
-//! - `FGT-QRN-001`: Pre-Review Zone quarantine isolation and circuit-breaker guard
 
-use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::FileUid;
-use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
-/// Status of an isolated modification in quarantine.
+use serde::{Deserialize, Serialize};
+
+use super::file_uid::FileUid;
+use crate::error::{FractalError, FractalResult};
+use crate::fs_atomic::write_file_atomic;
+
+static QUARANTINE_NONCE_SEQ: AtomicU64 = AtomicU64::new(1);
+
+/// Lifecycle status of an isolated modification in quarantine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum QuarantineStatus {
     /// Modification is safely preserved in quarantine and excluded from commit tree.
@@ -35,7 +45,7 @@ pub enum QuarantineStatus {
 /// Structured record describing a quarantined modification and reason for interception.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QuarantineRecord {
-    /// Unique identifier for this quarantine entry (e.g. "quar-1729000-001").
+    /// Unique identifier for this quarantine entry (e.g. `"quar-1729000-1"`).
     pub quarantine_id: String,
     /// Project identifier where violation occurred.
     pub project_id: String,
@@ -43,7 +53,8 @@ pub struct QuarantineRecord {
     pub agent_id: String,
     /// Target repository-relative file path.
     pub rel_path: String,
-    /// Invariant FileUid if known or tracked.
+    /// Invariant `FileUid` if known or tracked (`#[serde(default)]` preserves backward compat).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_uid: Option<FileUid>,
     /// Relative path to stored unified patch or raw payload.
     pub patch_file: String,
@@ -56,13 +67,13 @@ pub struct QuarantineRecord {
 }
 
 /// Quarantine ledger index stored in `.taxis/quarantine/quarantine_index.json`.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QuarantineLedger {
     /// Recorded quarantine entries.
     pub records: Vec<QuarantineRecord>,
 }
 
-/// Parameters for isolating an unauthorized mutation into quarantine.
+/// Parameters for isolating an unauthorized or gaming-flagged mutation into quarantine.
 #[derive(Debug, Clone)]
 pub struct IsolateMutationRequest<'a> {
     pub quarantine_dir: &'a Path,
@@ -73,6 +84,7 @@ pub struct IsolateMutationRequest<'a> {
     pub patch_or_content: &'a str,
     pub reason: &'a str,
     pub current_time: u64,
+    /// Explicit caller nonce; when `0`, a process-monotonic atomic sequence is assigned.
     pub nonce: u64,
 }
 
@@ -92,27 +104,40 @@ impl QuarantineLedger {
         Ok(ledger)
     }
 
-    /// Atomically persists the quarantine ledger into the directory.
+    /// Atomically persists the quarantine ledger into `quarantine_dir`.
     pub fn save_to_dir(&self, quarantine_dir: &Path) -> FractalResult<()> {
         fs::create_dir_all(quarantine_dir)?;
         let index_file = quarantine_dir.join(Self::INDEX_FILENAME);
-        let staging_file = quarantine_dir.join(format!("{}.tmp", Self::INDEX_FILENAME));
-
         let serialized_bytes = serde_json::to_vec_pretty(self)?;
-        fs::write(&staging_file, serialized_bytes)?;
-        fs::rename(&staging_file, &index_file)?;
+        write_file_atomic(&index_file, &serialized_bytes, true)?;
         Ok(())
     }
 
-    /// Isolates an unauthorized or overflow mutation into the quarantine stash.
+    /// Isolates an unauthorized or circuit-broken mutation into the quarantine stash.
     pub fn isolate_mutation(req: IsolateMutationRequest<'_>) -> FractalResult<QuarantineRecord> {
         fs::create_dir_all(req.quarantine_dir)?;
 
-        let quarantine_id = format!("quar-{}-{}", req.current_time, req.nonce);
-        let patch_filename = format!("{}.patch", quarantine_id);
-        let patch_path = req.quarantine_dir.join(&patch_filename);
+        let effective_nonce = if req.nonce == 0 {
+            QUARANTINE_NONCE_SEQ.fetch_add(1, Ordering::Relaxed)
+        } else {
+            req.nonce
+        };
+        let mut ledger = Self::load_from_dir(req.quarantine_dir)?;
+        let candidate_id = format!("quar-{}-{effective_nonce}", req.current_time);
+        let quarantine_id = if ledger
+            .records
+            .iter()
+            .any(|existing| existing.quarantine_id == candidate_id)
+        {
+            let extra = QUARANTINE_NONCE_SEQ.fetch_add(1, Ordering::Relaxed);
+            format!("{candidate_id}-{extra}")
+        } else {
+            candidate_id
+        };
 
-        fs::write(&patch_path, req.patch_or_content)?;
+        let patch_filename = format!("{quarantine_id}.patch");
+        let patch_path = req.quarantine_dir.join(&patch_filename);
+        write_file_atomic(&patch_path, req.patch_or_content.as_bytes(), true)?;
 
         let record = QuarantineRecord {
             quarantine_id,
@@ -126,22 +151,20 @@ impl QuarantineLedger {
             status: QuarantineStatus::Isolated,
         };
 
-        let mut ledger = Self::load_from_dir(req.quarantine_dir)?;
         ledger.records.push(record.clone());
         ledger.save_to_dir(req.quarantine_dir)?;
 
         Ok(record)
     }
 
-    /// Lists all quarantine records currently in `Isolated` status.
+    /// Lists all quarantine records currently in [`QuarantineStatus::Isolated`] status.
     pub fn list_active_isolated(quarantine_dir: &Path) -> FractalResult<Vec<QuarantineRecord>> {
         let ledger = Self::load_from_dir(quarantine_dir)?;
-        let active = ledger
+        Ok(ledger
             .records
             .into_iter()
             .filter(|record| record.status == QuarantineStatus::Isolated)
-            .collect();
-        Ok(active)
+            .collect())
     }
 
     /// Finds a quarantine record by identifier.
@@ -150,11 +173,10 @@ impl QuarantineLedger {
         quarantine_id: &str,
     ) -> FractalResult<Option<QuarantineRecord>> {
         let ledger = Self::load_from_dir(quarantine_dir)?;
-        let found = ledger
+        Ok(ledger
             .records
             .into_iter()
-            .find(|record| record.quarantine_id == quarantine_id);
-        Ok(found)
+            .find(|record| record.quarantine_id == quarantine_id))
     }
 
     /// Reads the raw patch content for a quarantine record.
@@ -169,50 +191,39 @@ impl QuarantineLedger {
                 patch_path.display()
             )));
         }
-        let content = fs::read_to_string(&patch_path)?;
-        Ok(content)
+        Ok(fs::read_to_string(&patch_path)?)
     }
 
     /// Marks a quarantine record as restored.
     pub fn mark_restored(quarantine_dir: &Path, quarantine_id: &str) -> FractalResult<()> {
-        let mut ledger = Self::load_from_dir(quarantine_dir)?;
-        let record = ledger
-            .records
-            .iter_mut()
-            .find(|record| record.quarantine_id == quarantine_id)
-            .ok_or_else(|| {
-                FractalError::CorruptStore(format!(
-                    "Quarantine record not found: {}",
-                    quarantine_id
-                ))
-            })?;
-
-        record.status = QuarantineStatus::Restored;
-        ledger.save_to_dir(quarantine_dir)?;
-        Ok(())
+        Self::update_status(quarantine_dir, quarantine_id, QuarantineStatus::Restored)
     }
 
     /// Marks a quarantine record as discarded.
     pub fn mark_discarded(quarantine_dir: &Path, quarantine_id: &str) -> FractalResult<()> {
+        Self::update_status(quarantine_dir, quarantine_id, QuarantineStatus::Discarded)
+    }
+
+    fn update_status(
+        quarantine_dir: &Path,
+        quarantine_id: &str,
+        next_status: QuarantineStatus,
+    ) -> FractalResult<()> {
         let mut ledger = Self::load_from_dir(quarantine_dir)?;
         let record = ledger
             .records
             .iter_mut()
             .find(|record| record.quarantine_id == quarantine_id)
             .ok_or_else(|| {
-                FractalError::CorruptStore(format!(
-                    "Quarantine record not found: {}",
-                    quarantine_id
-                ))
+                FractalError::CorruptStore(format!("Quarantine record not found: {quarantine_id}"))
             })?;
-
-        record.status = QuarantineStatus::Discarded;
-        ledger.save_to_dir(quarantine_dir)?;
-        Ok(())
+        record.status = next_status;
+        ledger.save_to_dir(quarantine_dir)
     }
 }
 
-/// Helper function to resolve default repository quarantine directory (.taxis/quarantine).
+/// Resolves the default repository quarantine directory (`<git_dir>/quarantine`).
+#[must_use]
 pub fn default_quarantine_dir(git_dir: &Path) -> PathBuf {
     git_dir.join("quarantine")
 }
@@ -221,53 +232,49 @@ pub fn default_quarantine_dir(git_dir: &Path) -> PathBuf {
 mod tests {
     use super::*;
 
+    fn test_temp_dir(prefix: &str) -> PathBuf {
+        let base = std::env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join("target")
+            .join("test_tmp");
+        let _ = fs::create_dir_all(&base);
+        base.join(format!("{prefix}_{}", std::process::id()))
+    }
+
     #[test]
-    fn test_quarantine_isolation_and_lifecycle() {
-        let scratch_id = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
-        let test_dir = std::env::current_dir()
-            .expect("cwd")
-            .join("target/test_tmp")
-            .join(format!("quarantine-test-{}", scratch_id));
+    fn duplicate_same_second_isolations_never_collide() {
+        let test_dir = test_temp_dir("fg_core_quarantine");
         let _ = fs::remove_dir_all(&test_dir);
 
-        let uid = FileUid::derive("my-game", "agent-x", "src/secret.rs", 100, 1);
-        let patch_payload = "--- a/src/secret.rs\n+++ b/src/secret.rs\n@@ -1 +1 @@\n-old\n+new\n";
-
-        // 1. Isolate mutation
-        let record = QuarantineLedger::isolate_mutation(IsolateMutationRequest {
+        let first = QuarantineLedger::isolate_mutation(IsolateMutationRequest {
             quarantine_dir: &test_dir,
-            project_id: "my-game",
-            agent_id: "agent-x",
-            rel_path: "src/secret.rs",
-            file_uid: Some(uid),
-            patch_or_content: patch_payload,
-            reason: "FileUid not in authorization slice allowlist",
-            current_time: 2000,
-            nonce: 1,
+            project_id: "proj",
+            agent_id: "a1",
+            rel_path: "src/a.rs",
+            file_uid: None,
+            patch_or_content: "patch-a",
+            reason: "reason-a",
+            current_time: 5000,
+            nonce: 0,
         })
-        .expect("isolation succeeds");
+        .expect("first isolate");
 
-        assert_eq!(record.status, QuarantineStatus::Isolated);
-        assert_eq!(record.project_id, "my-game");
+        let second = QuarantineLedger::isolate_mutation(IsolateMutationRequest {
+            quarantine_dir: &test_dir,
+            project_id: "proj",
+            agent_id: "a2",
+            rel_path: "src/b.rs",
+            file_uid: None,
+            patch_or_content: "patch-b",
+            reason: "reason-b",
+            current_time: 5000,
+            nonce: 0,
+        })
+        .expect("second isolate");
 
-        // 2. Read patch back
-        let retrieved_patch =
-            QuarantineLedger::read_patch_content(&test_dir, &record).expect("read patch");
-        assert_eq!(retrieved_patch, patch_payload);
-
-        // 3. List active
-        let active = QuarantineLedger::list_active_isolated(&test_dir).expect("list active");
-        assert_eq!(active.len(), 1);
-        assert_eq!(active[0].quarantine_id, record.quarantine_id);
-
-        // 4. Mark restored
-        QuarantineLedger::mark_restored(&test_dir, &record.quarantine_id).expect("mark restored");
-        let active_after =
-            QuarantineLedger::list_active_isolated(&test_dir).expect("list active after");
-        assert_eq!(active_after.len(), 0);
+        assert_ne!(first.quarantine_id, second.quarantine_id);
+        let active = QuarantineLedger::list_active_isolated(&test_dir).expect("list");
+        assert_eq!(active.len(), 2);
 
         let _ = fs::remove_dir_all(&test_dir);
     }

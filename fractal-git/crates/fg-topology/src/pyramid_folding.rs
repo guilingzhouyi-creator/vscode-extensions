@@ -22,6 +22,7 @@
 //! - `SIM-ARGS-001`: Parameter object convergence
 
 use fg_core::error::{FractalError, FractalResult};
+use fg_core::jeffreys_beta_trials;
 use fg_core::models::{
     AuditIkceVerdict, AuditRecord, AuditScore, AuditTkcvVerdict, AuthoritySecret,
     UnsignedAuditRecordParams,
@@ -112,10 +113,8 @@ impl PyramidFolder {
             killed_mutants += batch_killed;
         }
 
-        // Consolidated Jeffreys Beta posterior credit: alpha_0 = 0.5, beta_0 = 0.5
-        let alpha = 0.5 + killed_mutants as f64;
-        let beta = 0.5 + (total_mutants.saturating_sub(killed_mutants)) as f64;
-        let credit_posterior_mean = (alpha / (alpha + beta)) * 100.0;
+        let posterior = jeffreys_beta_trials(killed_mutants as u64, total_mutants as u64);
+        let credit_posterior_mean = posterior.mean * 100.0;
         let mean_d_norm = d_norm_sum / (records.len() as f32);
 
         let mut milestone_record = AuditRecord::new_unsigned(UnsignedAuditRecordParams {

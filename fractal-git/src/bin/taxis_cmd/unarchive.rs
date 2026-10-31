@@ -14,21 +14,22 @@
 //! - `FGT-COR-001`: Core error contract guard
 
 use std::io::{Read, Seek, SeekFrom};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use fg_algorithms::space_plan::{check_headroom, SpacePlanConfig};
-use fg_core::models::{current_unix_seconds, FileMode, GitSignature, TaxisPolicy};
+use fg_core::models::{current_unix_seconds, FileMode, GitSignature, Oid, TaxisPolicy};
 use fg_core::traits::{OdbStore, RefStore};
 use fg_gate::commit_guard::CommitMessageGuard;
 use fg_gate::pre_receive::PreReceiveGuard;
 use fg_index::InMemoryIndexTree;
 use fg_object::GitCommit;
-use fg_storage::commit_materializer::{serialize_commit_payload, serialize_tree_payload};
+use fg_storage::commit_materializer::{persist_commit_object, persist_index_tree};
 use fg_storage::in_place::{
     extract_member_payload, extract_tar_in_place_with_journal, extract_tar_standard,
     extract_targz_forward_hole_punch, extract_zip_in_place_with_journal, extract_zip_standard,
     index_tar_archive, read_zip_central_directory, read_zip_eocd, sanitize_relative_path,
-    BundleConsumeOptions, InPlaceBundleConsumer, InPlaceJournal, InPlaceLogEntry, TailTruncator,
+    BundleConsumeOptions, InPlaceBundleConsumer, InPlaceExtractionReport, InPlaceJournal,
+    InPlaceLogEntry, TailTruncator,
 };
 use fg_storage::loose::LooseOdb;
 use fg_topology::refs::FractalRef;
@@ -57,40 +58,7 @@ pub fn handle_unarchive(ctx: &CliContext) {
     }
 
     let opts = parse_unarchive_options(&ctx.args);
-
-    if !opts.archive_path.exists() {
-        fail_fatal(format!(
-            "archive file '{}' does not exist",
-            opts.archive_path.display()
-        ));
-    }
-
-    let file_len = match opts.archive_path.metadata() {
-        Ok(m) => m.len(),
-        Err(e) => fail_io("stat archive file", e),
-    };
-
-    let filename = opts
-        .archive_path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-
-    let is_zip = filename.ends_with(".zip");
-    let is_targz = filename.ends_with(".tar.gz") || filename.ends_with(".tgz");
-    let is_tar = filename.ends_with(".tar");
-    let is_bundle = filename.ends_with(".bundle");
-
-    if !is_zip && !is_tar && !is_targz && !is_bundle {
-        reject(
-            CliTag::ERROR,
-            format!(
-                "unsupported archive format for '{}'. Must be .zip, .tar, .tar.gz, or .bundle",
-                opts.archive_path.display()
-            ),
-        );
-    }
+    let (file_len, profile) = resolve_archive_profile(&opts);
 
     let mut config =
         SpacePlanConfig::adaptive_for_archive_size(file_len, Some(opts.safety_headroom_bytes));
@@ -98,44 +66,34 @@ pub fn handle_unarchive(ctx: &CliContext) {
         config.batch_window_bytes = batch_win;
     }
 
-    let probe_dir = if opts.to_odb || is_bundle {
-        match RepoView::open(ctx) {
-            Ok(v) => v.git_dir().to_path_buf(),
-            Err(_) => PathBuf::from(".git"),
-        }
+    let probe_dir = if opts.to_odb || profile.is_bundle {
+        RepoView::open(ctx)
+            .map(|v| v.git_dir().to_path_buf())
+            .unwrap_or_else(|_| PathBuf::from(".git"))
     } else {
         opts.dest_dir.clone()
     };
 
-    let free_space = match query_available_free_space(&probe_dir) {
-        Ok(bytes) => bytes,
-        Err(err) => reject(
+    let free_space = query_available_free_space(&probe_dir).unwrap_or_else(|err| {
+        reject(
             CliTag::ERROR,
             format!(
                 "cannot determine free disk space for probe path '{}' (fail-closed): {err}",
                 probe_dir.display()
             ),
-        ),
-    };
+        )
+    });
 
-    if opts.to_odb && !is_zip && !is_tar {
+    if opts.to_odb && !profile.is_zip && !profile.is_tar {
         reject(
             CliTag::ERROR,
             "--to-odb is currently supported for .zip and .tar archives",
         );
     }
 
-    let profile = ArchiveProfile {
-        is_zip,
-        is_tar,
-        is_bundle,
-    };
-
     // 1. Preflight SpacePlan simulation shared by the dry-run, to-odb, and execution paths.
-    let plan_report = match build_preflight_plan(&opts, profile, file_len, free_space, &config) {
-        Ok(report) => report,
-        Err(err) => reject(CliTag::ERROR, format!("preflight planning failed: {err}")),
-    };
+    let plan_report = build_preflight_plan(&opts, profile, file_len, free_space, &config)
+        .unwrap_or_else(|err| reject(CliTag::ERROR, format!("preflight planning failed: {err}")));
 
     // 2. `--dry-run` projects the trough curve and touches nothing else: no truncation, no
     // worktree files, no ODB objects, no ref updates.
@@ -160,25 +118,83 @@ pub fn handle_unarchive(ctx: &CliContext) {
         );
     }
 
-    // Special handling for Git Bundle v2 ingestion
-    if is_bundle {
+    if profile.is_bundle {
         handle_bundle_ingestion(ctx, &opts);
         return;
     }
 
-    // Direct CAS ODB Ingestion mode (Decision 3)
     if opts.to_odb {
-        handle_unarchive_to_odb(ctx, &opts, is_zip, is_tar);
+        handle_unarchive_to_odb(ctx, &opts, profile);
         return;
     }
 
-    // 4. Execute extraction (destination creation happens only after preflight passes)
-    if let Err(err) = std::fs::create_dir_all(&opts.dest_dir) {
-        fail_io("create destination directory", err);
+    execute_worktree_extraction(
+        ctx,
+        &opts,
+        (&profile, &config, plan_report.steps.len(), file_len),
+    );
+}
+
+fn resolve_archive_profile(opts: &UnarchiveOptions) -> (u64, ArchiveProfile) {
+    if !opts.archive_path.exists() {
+        fail_fatal(format!(
+            "archive file '{}' does not exist",
+            opts.archive_path.display()
+        ));
     }
 
+    let file_len = opts
+        .archive_path
+        .metadata()
+        .unwrap_or_else(|e| fail_io("stat archive file", e))
+        .len();
+
+    let filename = opts
+        .archive_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    let is_zip = filename.ends_with(".zip");
+    let is_targz = filename.ends_with(".tar.gz") || filename.ends_with(".tgz");
+    let is_tar = filename.ends_with(".tar");
+    let is_bundle = filename.ends_with(".bundle");
+
+    if !is_zip && !is_tar && !is_targz && !is_bundle {
+        reject(
+            CliTag::ERROR,
+            format!(
+                "unsupported archive format for '{}'. Must be .zip, .tar, .tar.gz, or .bundle",
+                opts.archive_path.display()
+            ),
+        );
+    }
+
+    (
+        file_len,
+        ArchiveProfile {
+            is_zip,
+            is_tar,
+            is_bundle,
+        },
+    )
+}
+
+fn open_extraction_journal(
+    ctx: &CliContext,
+    opts: &UnarchiveOptions,
+    session_meta: (usize, u64),
+) -> (
+    Option<fg_storage::in_place::InPlaceResumeState>,
+    Option<InPlaceJournal>,
+) {
+    if !opts.in_place {
+        return (None, None);
+    }
+    let (total_members, file_len) = session_meta;
     let journal_path = opts.dest_dir.join(".taxis_unarchive.wal");
-    let resume_state = if opts.in_place && journal_path.exists() {
+    let resume_state = if journal_path.exists() {
         match InPlaceJournal::replay(&journal_path) {
             Ok(state) if !state.is_completed && !state.extracted_members.is_empty() => {
                 if !ctx.json_mode {
@@ -195,36 +211,39 @@ pub fn handle_unarchive(ctx: &CliContext) {
         None
     };
 
+    let mut journal = InPlaceJournal::open(&journal_path)
+        .unwrap_or_else(|e| fail_io("open extraction WAL journal", e));
+    if resume_state.is_none() {
+        let _ = journal.append(&InPlaceLogEntry::SessionInit {
+            archive_path: opts.archive_path.display().to_string(),
+            target_path: opts.dest_dir.display().to_string(),
+            total_members,
+            initial_archive_len: file_len,
+        });
+    }
+    (resume_state, Some(journal))
+}
+
+fn execute_worktree_extraction(
+    ctx: &CliContext,
+    opts: &UnarchiveOptions,
+    plan: (&ArchiveProfile, &SpacePlanConfig, usize, u64),
+) {
+    let (profile, config, total_members, file_len) = plan;
+    if let Err(err) = std::fs::create_dir_all(&opts.dest_dir) {
+        fail_io("create destination directory", err);
+    }
+
+    let (resume_state, mut journal) = open_extraction_journal(ctx, opts, (total_members, file_len));
     let already_extracted = resume_state.as_ref().map(|s| &s.extracted_members);
-    let mut journal = if opts.in_place {
-        match InPlaceJournal::open(&journal_path) {
-            Ok(mut j) => {
-                if resume_state.is_none() {
-                    let _ = j.append(&InPlaceLogEntry::SessionInit {
-                        archive_path: opts.archive_path.display().to_string(),
-                        target_path: opts.dest_dir.display().to_string(),
-                        total_members: plan_report.steps.len(),
-                        initial_archive_len: file_len,
-                    });
-                }
-                Some(j)
-            }
-            Err(e) => fail_io("open extraction WAL journal", e),
-        }
-    } else {
-        None
-    };
 
-    // Forward .tar.gz extraction reports punched (sparse) bytes instead of tail-truncated bytes;
-    // keep that distinction visible in the summary instead of folding it into truncation counters.
     let mut hole_punched_bytes: Option<u64> = None;
-
     let result = if profile.is_zip {
         if opts.in_place {
             extract_zip_in_place_with_journal(
                 &opts.archive_path,
                 &opts.dest_dir,
-                &config,
+                config,
                 journal.as_mut(),
                 already_extracted,
             )
@@ -236,7 +255,7 @@ pub fn handle_unarchive(ctx: &CliContext) {
             extract_tar_in_place_with_journal(
                 &opts.archive_path,
                 &opts.dest_dir,
-                &config,
+                config,
                 journal.as_mut(),
                 already_extracted,
             )
@@ -262,153 +281,200 @@ pub fn handle_unarchive(ctx: &CliContext) {
             if let Some(j) = journal {
                 let _ = j.remove();
             }
+            report_extraction_result(ctx, opts, (&report, hole_punched_bytes));
+        }
+        Err(err) => reject(
+            CliTag::ERROR,
+            format!("extraction aborted with error: {err}"),
+        ),
+    }
+}
 
-            if ctx.json_mode {
-                print_json(&json!({
-                    "archive": opts.archive_path.display().to_string(),
-                    "in_place": opts.in_place,
-                    "files_extracted": report.files_extracted,
-                    "total_extracted_bytes": report.total_extracted_bytes,
-                    "total_truncated_bytes": report.total_truncated_bytes,
-                    "hole_punched_bytes": hole_punched_bytes,
-                    "final_archive_len": report.final_archive_len,
-                }));
-            } else {
-                println!(
-                    "Successfully extracted {} files from {} ({}).",
-                    report.files_extracted,
-                    opts.archive_path.display(),
-                    format_bytes(report.total_extracted_bytes)
-                );
-                if !opts.in_place {
-                    println!(
-                        "Source archive retained intact ({}, {} truncated).",
-                        format_bytes(report.final_archive_len),
-                        format_bytes(report.total_truncated_bytes)
-                    );
-                } else if let Some(punched) = hole_punched_bytes {
-                    println!(
-                        "Reclaimed {} of disk space via forward hole punching; archive retained \
-                         at {} (sparse).",
-                        format_bytes(punched),
-                        format_bytes(report.final_archive_len)
-                    );
-                } else {
-                    println!(
-                        "Reclaimed {} of disk space via tail-truncation.",
-                        format_bytes(report.total_truncated_bytes)
-                    );
-                }
-            }
-        }
-        Err(err) => {
-            reject(
-                CliTag::ERROR,
-                format!("extraction aborted with error: {err}"),
-            );
-        }
+fn report_extraction_result(
+    ctx: &CliContext,
+    opts: &UnarchiveOptions,
+    outcome: (&InPlaceExtractionReport, Option<u64>),
+) {
+    let (report, hole_punched_bytes) = outcome;
+    if ctx.json_mode {
+        print_json(&json!({
+            "archive": opts.archive_path.display().to_string(),
+            "in_place": opts.in_place,
+            "files_extracted": report.files_extracted,
+            "total_extracted_bytes": report.total_extracted_bytes,
+            "total_truncated_bytes": report.total_truncated_bytes,
+            "hole_punched_bytes": hole_punched_bytes,
+            "final_archive_len": report.final_archive_len,
+        }));
+        return;
+    }
+
+    println!(
+        "Successfully extracted {} files from {} ({}).",
+        report.files_extracted,
+        opts.archive_path.display(),
+        format_bytes(report.total_extracted_bytes)
+    );
+    if !opts.in_place {
+        println!(
+            "Source archive retained intact ({}, {} truncated).",
+            format_bytes(report.final_archive_len),
+            format_bytes(report.total_truncated_bytes)
+        );
+    } else if let Some(punched) = hole_punched_bytes {
+        println!(
+            "Reclaimed {} of disk space via forward hole punching; archive retained at {} (sparse).",
+            format_bytes(punched),
+            format_bytes(report.final_archive_len)
+        );
+    } else {
+        println!(
+            "Reclaimed {} of disk space via tail-truncation.",
+            format_bytes(report.total_truncated_bytes)
+        );
     }
 }
 
 /// Ingests a Git Bundle v2 operand into the repository ODB, honoring the in-place switch.
 fn handle_bundle_ingestion(ctx: &CliContext, opts: &UnarchiveOptions) {
-    let view = match RepoView::open(ctx) {
-        Ok(v) => v,
-        Err(err) => reject(
+    let view = RepoView::open(ctx).unwrap_or_else(|err| {
+        reject(
             CliTag::ERROR,
             format!("open repository for bundle ingestion: {err}"),
-        ),
-    };
-    let git_dir = view.git_dir();
+        )
+    });
     let consume_options = BundleConsumeOptions {
         truncate_source: opts.in_place,
     };
-    match InPlaceBundleConsumer::consume_bundle(&opts.archive_path, git_dir, &consume_options) {
-        Ok(report) => {
-            if ctx.json_mode {
-                print_json(&json!({
-                    "status": "success",
-                    "format": "bundle",
-                    "pack_oid": report.pack_oid.to_hex(),
-                    "object_count": report.object_count,
-                    "bundle_bytes_reclaimed": report.bundle_bytes_reclaimed,
-                    "source_truncated": report.source_truncated,
-                    "source_retained_bytes": report.source_retained_bytes,
-                    "references_advanced": report.references_advanced.iter().map(|(r, o)| {
-                        json!({ "ref": r, "oid": o.to_hex() })
-                    }).collect::<Vec<_>>(),
-                }));
-            } else {
-                println!("=== Taxis Bundle Ingestion ===");
-                println!("Packfile Ingested:       {}", report.pack_oid.to_hex());
-                println!("Objects Extracted:       {}", report.object_count);
-                println!(
-                    "Source Bundle:           {}",
-                    if report.source_truncated {
-                        format!(
-                            "truncated ({} reclaimed)",
-                            format_bytes(report.bundle_bytes_reclaimed)
-                        )
-                    } else {
-                        format!(
-                            "retained ({} on disk)",
-                            format_bytes(report.source_retained_bytes)
-                        )
-                    }
-                );
-                println!("References Advanced:");
-                for (name, oid) in &report.references_advanced {
-                    println!("  {} -> {}", oid.to_hex(), name);
-                }
-            }
+    let report =
+        InPlaceBundleConsumer::consume_bundle(&opts.archive_path, view.git_dir(), &consume_options)
+            .unwrap_or_else(|err| {
+                reject(
+                    CliTag::ERROR,
+                    format!("consume bundle '{}': {err}", opts.archive_path.display()),
+                )
+            });
+
+    if ctx.json_mode {
+        print_json(&json!({
+            "status": "success",
+            "format": "bundle",
+            "pack_oid": report.pack_oid.to_hex(),
+            "object_count": report.object_count,
+            "bundle_bytes_reclaimed": report.bundle_bytes_reclaimed,
+            "source_truncated": report.source_truncated,
+            "source_retained_bytes": report.source_retained_bytes,
+            "references_advanced": report.references_advanced.iter().map(|(r, o)| {
+                json!({ "ref": r, "oid": o.to_hex() })
+            }).collect::<Vec<_>>(),
+        }));
+        return;
+    }
+
+    println!("=== Taxis Bundle Ingestion ===");
+    println!("Packfile Ingested:       {}", report.pack_oid.to_hex());
+    println!("Objects Extracted:       {}", report.object_count);
+    println!(
+        "Source Bundle:           {}",
+        if report.source_truncated {
+            format!(
+                "truncated ({} reclaimed)",
+                format_bytes(report.bundle_bytes_reclaimed)
+            )
+        } else {
+            format!(
+                "retained ({} on disk)",
+                format_bytes(report.source_retained_bytes)
+            )
         }
-        Err(err) => {
-            reject(
-                CliTag::ERROR,
-                format!("consume bundle '{}': {err}", opts.archive_path.display()),
-            );
-        }
+    );
+    println!("References Advanced:");
+    for (name, oid) in &report.references_advanced {
+        println!("  {} -> {}", oid.to_hex(), name);
     }
 }
 
-/// Ingests archive entries directly into CAS ODB bypassing working tree files (Decision 3).
-fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bool, is_tar: bool) {
-    if opts.dry_run {
-        reject(
-            CliTag::ERROR,
-            "--to-odb dry-run must be served by the preflight projection path",
-        );
+struct OdbIngestState {
+    loose_odb: LooseOdb,
+    index_tree: InMemoryIndexTree,
+    total_blobs: usize,
+    total_blob_bytes: u64,
+    accumulated_reclaim: u64,
+    batch_window: u64,
+    in_place: bool,
+}
+
+impl OdbIngestState {
+    fn new(git_dir: &Path, opts: &UnarchiveOptions) -> Self {
+        Self {
+            loose_odb: LooseOdb::new(git_dir),
+            index_tree: InMemoryIndexTree::new(),
+            total_blobs: 0,
+            total_blob_bytes: 0,
+            accumulated_reclaim: 0,
+            batch_window: opts.batch_window_bytes.unwrap_or(16 * 1024 * 1024),
+            in_place: opts.in_place,
+        }
     }
 
-    let view = match RepoView::open(ctx) {
-        Ok(v) => v,
-        Err(err) => reject(
-            CliTag::ERROR,
-            format!("open repository for --to-odb: {err}"),
-        ),
-    };
-    let git_dir = view.git_dir();
-    let loose_odb = LooseOdb::new(git_dir);
-    let mut index_tree = InMemoryIndexTree::new();
+    fn stage_member_to_odb(&mut self, name: &str, executable: bool, payload: &[u8]) {
+        let blob_oid = self
+            .loose_odb
+            .write_object("blob", payload)
+            .unwrap_or_else(|err| reject(CliTag::ERROR, format!("write blob to ODB: {err}")));
 
-    let mut total_blobs = 0;
-    let mut total_blob_bytes: u64 = 0;
+        let rel_path = sanitize_relative_path(name)
+            .unwrap_or_else(|err| reject(CliTag::ERROR, format!("sanitize path '{name}': {err}")));
 
-    if is_zip {
-        let mut truncator = match TailTruncator::open_read_write(&opts.archive_path) {
-            Ok(truncator_instance) => truncator_instance,
-            Err(err) => fail_io("open archive for in-place extraction", err),
-        };
-        let eocd = match read_zip_eocd(truncator.file_mut()) {
-            Ok(parsed_eocd) => parsed_eocd,
-            Err(err) => reject(CliTag::ERROR, format!("read zip headers: {err}")),
-        };
-        let mut members = match read_zip_central_directory(truncator.file_mut(), &eocd) {
-            Ok(central_directory_members) => central_directory_members,
-            Err(err) => reject(CliTag::ERROR, format!("read zip central directory: {err}")),
+        let mode = if executable {
+            FileMode::ExecutableFile
+        } else {
+            FileMode::RegularFile
         };
 
-        if opts.in_place {
+        let rel_path_str = rel_path.to_string_lossy().replace('\\', "/");
+        if let Err(err) = self.index_tree.stage_oid(&rel_path_str, mode, blob_oid) {
+            reject(CliTag::ERROR, format!("stage path in index tree: {err}"));
+        }
+
+        self.total_blobs += 1;
+        self.total_blob_bytes = self.total_blob_bytes.saturating_add(payload.len() as u64);
+    }
+
+    fn maybe_truncate_batch(
+        &mut self,
+        truncator: &mut TailTruncator,
+        step_info: (u64, u64, bool, &str),
+    ) {
+        if !self.in_place {
+            return;
+        }
+        let (target_offset, step_reclaim, is_last, label) = step_info;
+        self.accumulated_reclaim = self.accumulated_reclaim.saturating_add(step_reclaim);
+        if (self.accumulated_reclaim >= self.batch_window || is_last)
+            && target_offset < truncator.current_len()
+        {
+            if let Err(err) = truncator.truncate_to(target_offset) {
+                reject(
+                    CliTag::ERROR,
+                    format!("truncate archive member tail '{label}': {err}"),
+                );
+            }
+            self.accumulated_reclaim = 0;
+        }
+    }
+
+    fn ingest_zip(&mut self, archive_path: &Path) {
+        let mut truncator = TailTruncator::open_read_write(archive_path)
+            .unwrap_or_else(|err| fail_io("open archive for in-place extraction", err));
+        let eocd = read_zip_eocd(truncator.file_mut())
+            .unwrap_or_else(|err| reject(CliTag::ERROR, format!("read zip headers: {err}")));
+        let mut members =
+            read_zip_central_directory(truncator.file_mut(), &eocd).unwrap_or_else(|err| {
+                reject(CliTag::ERROR, format!("read zip central directory: {err}"))
+            });
+
+        if self.in_place {
             members.sort_by_key(|member| std::cmp::Reverse(member.local_header_offset));
             if eocd.central_directory_offset < truncator.current_len() {
                 if let Err(err) = truncator.truncate_to(eocd.central_directory_offset) {
@@ -421,70 +487,35 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         }
 
         let total_members = members.len();
-        let mut accumulated_reclaim: u64 = 0;
-        let batch_window = opts.batch_window_bytes.unwrap_or(16 * 1024 * 1024);
-
         for (idx, member) in members.iter().enumerate() {
             if member.is_dir {
                 continue;
             }
-            let payload = match extract_member_payload(truncator.file_mut(), member) {
-                Ok(payload_bytes) => payload_bytes,
-                Err(err) => reject(
-                    CliTag::ERROR,
-                    format!("decompress zip member '{}': {err}", member.name),
+            let payload =
+                extract_member_payload(truncator.file_mut(), member).unwrap_or_else(|err| {
+                    reject(
+                        CliTag::ERROR,
+                        format!("decompress zip member '{}': {err}", member.name),
+                    )
+                });
+            let executable = (member.external_attributes >> 16) & 0o111 != 0;
+            self.stage_member_to_odb(&member.name, executable, &payload);
+
+            let reclaimed_step = truncator
+                .current_len()
+                .saturating_sub(member.local_header_offset);
+            self.maybe_truncate_batch(
+                &mut truncator,
+                (
+                    member.local_header_offset,
+                    reclaimed_step,
+                    idx + 1 == total_members,
+                    &member.name,
                 ),
-            };
-
-            let blob_oid = match loose_odb.write_object("blob", &payload) {
-                Ok(oid) => oid,
-                Err(err) => reject(CliTag::ERROR, format!("write blob to ODB: {err}")),
-            };
-
-            let rel_path = match sanitize_relative_path(&member.name) {
-                Ok(sanitized_path) => sanitized_path,
-                Err(err) => reject(
-                    CliTag::ERROR,
-                    format!("sanitize path '{}': {err}", member.name),
-                ),
-            };
-
-            let mode = if (member.external_attributes >> 16) & 0o111 != 0 {
-                FileMode::ExecutableFile
-            } else {
-                FileMode::RegularFile
-            };
-
-            let rel_path_str = rel_path.to_string_lossy().replace('\\', "/");
-            if let Err(err) = index_tree.stage_oid(&rel_path_str, mode, blob_oid) {
-                reject(CliTag::ERROR, format!("stage path in index tree: {err}"));
-            }
-
-            total_blobs += 1;
-            total_blob_bytes = total_blob_bytes.saturating_add(payload.len() as u64);
-
-            if opts.in_place {
-                let reclaimed_step = truncator
-                    .current_len()
-                    .saturating_sub(member.local_header_offset);
-                accumulated_reclaim = accumulated_reclaim.saturating_add(reclaimed_step);
-
-                let is_last = idx + 1 == total_members;
-                if (accumulated_reclaim >= batch_window || is_last)
-                    && member.local_header_offset < truncator.current_len()
-                {
-                    if let Err(err) = truncator.truncate_to(member.local_header_offset) {
-                        reject(
-                            CliTag::ERROR,
-                            format!("truncate zip member tail '{}': {err}", member.name),
-                        );
-                    }
-                    accumulated_reclaim = 0;
-                }
-            }
+            );
         }
 
-        if opts.in_place && truncator.current_len() > 0 {
+        if self.in_place && truncator.current_len() > 0 {
             if let Err(err) = truncator.truncate_to(0) {
                 reject(
                     CliTag::ERROR,
@@ -492,29 +523,23 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
                 );
             }
         }
-    } else if is_tar {
-        let mut truncator = match TailTruncator::open_read_write(&opts.archive_path) {
-            Ok(truncator_instance) => truncator_instance,
-            Err(err) => fail_io("open archive for in-place extraction", err),
-        };
-        let mut members = match index_tar_archive(truncator.file_mut()) {
-            Ok(tar_members) => tar_members,
-            Err(err) => reject(CliTag::ERROR, format!("index tar archive: {err}")),
-        };
+    }
 
-        if opts.in_place {
+    fn ingest_tar(&mut self, archive_path: &Path) {
+        let mut truncator = TailTruncator::open_read_write(archive_path)
+            .unwrap_or_else(|err| fail_io("open archive for in-place extraction", err));
+        let mut members = index_tar_archive(truncator.file_mut())
+            .unwrap_or_else(|err| reject(CliTag::ERROR, format!("index tar archive: {err}")));
+
+        if self.in_place {
             members.sort_by_key(|member| std::cmp::Reverse(member.header_offset));
         }
 
         let total_members = members.len();
-        let mut accumulated_reclaim: u64 = 0;
-        let batch_window = opts.batch_window_bytes.unwrap_or(16 * 1024 * 1024);
-
         for (idx, member) in members.iter().enumerate() {
             if member.is_dir {
                 continue;
             }
-
             if let Err(err) = truncator
                 .file_mut()
                 .seek(SeekFrom::Start(member.header_offset + 512))
@@ -526,51 +551,20 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
                 reject(CliTag::ERROR, format!("read tar payload: {err}"));
             }
 
-            let blob_oid = match loose_odb.write_object("blob", &payload) {
-                Ok(oid) => oid,
-                Err(err) => reject(CliTag::ERROR, format!("write blob to ODB: {err}")),
-            };
-
-            let rel_path = match sanitize_relative_path(&member.name) {
-                Ok(sanitized_path) => sanitized_path,
-                Err(err) => reject(
-                    CliTag::ERROR,
-                    format!("sanitize path '{}': {err}", member.name),
+            let executable = (member.mode & 0o111) != 0;
+            self.stage_member_to_odb(&member.name, executable, &payload);
+            self.maybe_truncate_batch(
+                &mut truncator,
+                (
+                    member.header_offset,
+                    member.total_span,
+                    idx + 1 == total_members,
+                    &member.name,
                 ),
-            };
-
-            let mode = if (member.mode & 0o111) != 0 {
-                FileMode::ExecutableFile
-            } else {
-                FileMode::RegularFile
-            };
-
-            let rel_path_str = rel_path.to_string_lossy().replace('\\', "/");
-            if let Err(err) = index_tree.stage_oid(&rel_path_str, mode, blob_oid) {
-                reject(CliTag::ERROR, format!("stage path in index tree: {err}"));
-            }
-
-            total_blobs += 1;
-            total_blob_bytes = total_blob_bytes.saturating_add(payload.len() as u64);
-
-            if opts.in_place {
-                accumulated_reclaim = accumulated_reclaim.saturating_add(member.total_span);
-                let is_last = idx + 1 == total_members;
-                if (accumulated_reclaim >= batch_window || is_last)
-                    && member.header_offset < truncator.current_len()
-                {
-                    if let Err(err) = truncator.truncate_to(member.header_offset) {
-                        reject(
-                            CliTag::ERROR,
-                            format!("truncate tar member tail '{}': {err}", member.name),
-                        );
-                    }
-                    accumulated_reclaim = 0;
-                }
-            }
+            );
         }
 
-        if opts.in_place && truncator.current_len() > 0 {
+        if self.in_place && truncator.current_len() > 0 {
             if let Err(err) = truncator.truncate_to(0) {
                 reject(
                     CliTag::ERROR,
@@ -579,15 +573,32 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
             }
         }
     }
+}
 
-    // Build hierarchical trees directly in ODB
-    let root_tree_oid = match index_tree.write_tree_with_persister(|tree| {
-        let payload = serialize_tree_payload(tree);
-        loose_odb.write_object("tree", &payload).map(|_| ())
-    }) {
-        Ok(oid) => oid,
-        Err(e) => reject(CliTag::ERROR, format!("persist trees to ODB: {e}")),
-    };
+/// Ingests archive entries directly into CAS ODB bypassing working tree files (Decision 3).
+fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, profile: ArchiveProfile) {
+    if opts.dry_run {
+        reject(
+            CliTag::ERROR,
+            "--to-odb dry-run must be served by the preflight projection path",
+        );
+    }
+
+    let view = RepoView::open(ctx).unwrap_or_else(|err| {
+        reject(
+            CliTag::ERROR,
+            format!("open repository for --to-odb: {err}"),
+        )
+    });
+    let mut state = OdbIngestState::new(view.git_dir(), opts);
+    if profile.is_zip {
+        state.ingest_zip(&opts.archive_path);
+    } else if profile.is_tar {
+        state.ingest_tar(&opts.archive_path);
+    }
+
+    let root_tree_oid = persist_index_tree(&state.index_tree, &state.loose_odb)
+        .unwrap_or_else(|e| reject(CliTag::ERROR, format!("persist trees to ODB: {e}")));
 
     if opts.tree_only {
         if ctx.json_mode {
@@ -595,8 +606,8 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
                 "status": "success",
                 "mode": "tree_only",
                 "tree_oid": root_tree_oid.to_hex(),
-                "blobs_written": total_blobs,
-                "total_blob_bytes": total_blob_bytes,
+                "blobs_written": state.total_blobs,
+                "total_blob_bytes": state.total_blob_bytes,
             }));
         } else {
             println!("{}", root_tree_oid.to_hex());
@@ -604,35 +615,29 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         return;
     }
 
-    // Assemble commit and advance ref under full governance
-    let ref_store = DiskRefStore::new(git_dir);
-    let target_ref_str = opts
-        .branch
-        .as_deref()
-        .map(|branch_name| {
-            if branch_name.starts_with("refs/") {
-                branch_name.to_string()
-            } else {
-                format!("refs/heads/{branch_name}")
-            }
-        })
-        .unwrap_or_else(|| format!("refs/heads/import-{}", current_unix_seconds()));
+    commit_ingested_odb_tree(
+        ctx,
+        opts,
+        (
+            &view,
+            &state.loose_odb,
+            root_tree_oid,
+            state.total_blobs,
+            state.total_blob_bytes,
+        ),
+    );
+}
 
-    let target_ref = match FractalRef::parse(&target_ref_str) {
-        Some(fref) => fref,
-        None => {
-            if let Some(branch) = target_ref_str.strip_prefix("refs/heads/") {
-                FractalRef::SystemTrunk {
-                    branch: branch.to_string(),
-                }
-            } else {
-                FractalRef::CellMain {
-                    cell_id: "cell-default".into(),
-                }
-            }
-        }
-    };
-
+fn resolve_odb_actor_and_policy(
+    ctx: &CliContext,
+    git_dir: &Path,
+) -> (
+    Option<String>,
+    String,
+    String,
+    TaxisPolicy,
+    fg_core::models::ActorIdentity,
+) {
     let human_author = find_arg_value(&ctx.args, &["--human"])
         .map(String::from)
         .or_else(|| std::env::var("TAXIS_HUMAN_AUTHOR").ok());
@@ -667,15 +672,27 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         &cell_id,
         authority_secret.as_ref(),
     );
+    (human_author, agent_id, cell_id, policy, actor)
+}
 
-    // 1. Enforce PreReceiveGuard authorization (P1-7)
+fn commit_ingested_odb_tree(
+    ctx: &CliContext,
+    opts: &UnarchiveOptions,
+    ingest: (&RepoView, &LooseOdb, Oid, usize, u64),
+) {
+    let (view, loose_odb, root_tree_oid, total_blobs, total_blob_bytes) = ingest;
+    let git_dir = view.git_dir();
+    let ref_store = DiskRefStore::new(git_dir);
+    let target_ref = resolve_odb_target_ref(opts);
+    let (human_author, agent_id, cell_id, policy, actor) =
+        resolve_odb_actor_and_policy(ctx, git_dir);
+
     if let Err(auth_err) = PreReceiveGuard::assert_actor_authorized(&target_ref, &actor, &policy) {
         reject(
             CliTag::AUTHORITY_BREACH,
             format!(
-                "Push to '{}' rejected by PreReceiveGuard: {}",
-                target_ref.to_git_ref(),
-                auth_err
+                "Push to '{}' rejected by PreReceiveGuard: {auth_err}",
+                target_ref.to_git_ref()
             ),
         );
     }
@@ -685,7 +702,6 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("archive");
-
     let initial_msg = opts.message.clone().unwrap_or_else(|| {
         format!(
             "feat(core): import archive '{archive_name}' into ODB\n\n\
@@ -695,10 +711,8 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
              [Verification]\nAsserted tree integrity and actor authorization."
         )
     });
-
     let touched_files = vec![archive_name.to_string()];
 
-    // 2. Validate commit message prior to hooks (Option B: Dual-validation)
     if let Err(gov_err) =
         CommitMessageGuard::parse_and_verify(&initial_msg, &policy, Some(&touched_files))
     {
@@ -711,25 +725,19 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         );
     }
 
-    // 3. Verify project lease authorization
     super::commit::verify_project_lease_authorization(git_dir, &touched_files);
-
-    // 4. Assert hook pipeline approved
-    let source_ref = target_ref.to_git_ref();
+    let target_ref_name = target_ref.to_git_ref();
     super::git_hooks::assert_pipeline_approved(
-        &source_ref,
-        &target_ref.to_git_ref(),
+        &target_ref_name,
+        &target_ref_name,
         &actor,
         &policy,
         &touched_files,
         &initial_msg,
     );
 
-    // 5. Run commit hook chain
     let hook_runner = super::git_hooks::discover(git_dir, view.work_root());
     let final_msg = super::git_hooks::run_commit_chain(&hook_runner, git_dir, &initial_msg);
-
-    // 6. Post-hook commit message validation (Option B: Dual-validation)
     if let Err(gov_err) =
         CommitMessageGuard::parse_and_verify(&final_msg, &policy, Some(&touched_files))
     {
@@ -742,7 +750,7 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         );
     }
 
-    let parent_oid = ref_store.get_ref(&target_ref.to_git_ref()).ok().flatten();
+    let parent_oid = ref_store.get_ref(&target_ref_name).ok().flatten();
     let parent_oids = parent_oid.map(|p| vec![p]).unwrap_or_default();
     let now_secs = current_unix_seconds();
     let sig = match human_author {
@@ -758,50 +766,85 @@ fn handle_unarchive_to_odb(ctx: &CliContext, opts: &UnarchiveOptions, is_zip: bo
         final_msg,
         None,
     );
-    let commit_payload = serialize_commit_payload(&commit);
-    let commit_oid = match loose_odb.write_object("commit", &commit_payload) {
-        Ok(oid) => oid,
-        Err(e) => reject(CliTag::ERROR, format!("write commit to ODB: {e}")),
-    };
+    let commit_oid = persist_commit_object(&commit, loose_odb)
+        .unwrap_or_else(|e| reject(CliTag::ERROR, format!("write commit to ODB: {e}")));
 
-    // 7. Execute reference-transaction (preparing -> prepared -> write -> committed / aborted)
     let branch_update = super::git_hooks::ReferenceUpdate {
         previous: parent_oid,
         next: commit_oid.to_hex(),
-        name: target_ref.to_git_ref(),
+        name: target_ref_name.clone(),
     };
     if let Err(err_msg) =
         super::git_hooks::execute_reference_transaction(&hook_runner, &[branch_update], || {
             ref_store
-                .update_ref(&target_ref.to_git_ref(), &commit_oid, parent_oid.as_ref())
-                .map_err(|e| format!("advance ref '{}': {e}", target_ref.to_git_ref()))
+                .update_ref(&target_ref_name, &commit_oid, parent_oid.as_ref())
+                .map_err(|e| format!("advance ref '{target_ref_name}': {e}"))
         })
     {
         reject(CliTag::ERROR, err_msg);
     }
 
-    let target_ref = target_ref.to_git_ref();
+    report_odb_ingestion(
+        ctx,
+        (
+            &target_ref_name,
+            root_tree_oid,
+            commit_oid,
+            total_blobs,
+            total_blob_bytes,
+        ),
+    );
+}
 
+fn report_odb_ingestion(ctx: &CliContext, summary: (&str, Oid, Oid, usize, u64)) {
+    let (target_ref_name, root_tree_oid, commit_oid, total_blobs, total_blob_bytes) = summary;
     if ctx.json_mode {
         print_json(&json!({
             "status": "success",
             "mode": "to_odb",
             "commit_oid": commit_oid.to_hex(),
             "tree_oid": root_tree_oid.to_hex(),
-            "ref": target_ref,
+            "ref": target_ref_name,
             "blobs_written": total_blobs,
             "total_blob_bytes": total_blob_bytes,
         }));
-    } else {
-        println!("=== Taxis In-Place Direct ODB Ingestion ===");
-        println!("Target Branch Ref:   {}", target_ref);
-        println!("Root Tree OID:       {}", root_tree_oid.to_hex());
-        println!("Created Commit OID:  {}", commit_oid.to_hex());
-        println!(
-            "Blobs Persisted:     {} ({})",
-            total_blobs,
-            format_bytes(total_blob_bytes)
-        );
-        println!("Working Tree:        Bypassed (Zero disk files allocated)");
+        return;
     }
+
+    println!("=== Taxis In-Place Direct ODB Ingestion ===");
+    println!("Target Branch Ref:   {target_ref_name}");
+    println!("Root Tree OID:       {}", root_tree_oid.to_hex());
+    println!("Created Commit OID:  {}", commit_oid.to_hex());
+    println!(
+        "Blobs Persisted:     {} ({})",
+        total_blobs,
+        format_bytes(total_blob_bytes)
+    );
+    println!("Working Tree:        Bypassed (Zero disk files allocated)");
+}
+
+fn resolve_odb_target_ref(opts: &UnarchiveOptions) -> FractalRef {
+    let target_ref_str = opts
+        .branch
+        .as_deref()
+        .map(|branch_name| {
+            if branch_name.starts_with("refs/") {
+                branch_name.to_string()
+            } else {
+                format!("refs/heads/{branch_name}")
+            }
+        })
+        .unwrap_or_else(|| format!("refs/heads/import-{}", current_unix_seconds()));
+
+    FractalRef::parse(&target_ref_str).unwrap_or_else(|| {
+        if let Some(branch) = target_ref_str.strip_prefix("refs/heads/") {
+            FractalRef::SystemTrunk {
+                branch: branch.to_string(),
+            }
+        } else {
+            FractalRef::CellMain {
+                cell_id: "cell-default".into(),
+            }
+        }
+    })
 }

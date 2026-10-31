@@ -30,9 +30,7 @@ use super::common::{fail_fatal, fail_usage, print_json, reject, CliContext, EXIT
 pub use super::read_cat_file::handle_cat_file;
 use super::read_cat_file::{object_kind_of, well_formed_object_name};
 use super::repo_view::RepoView;
-
-/// NUL byte, used as the record separator in every `-z` form.
-const NUL: u8 = 0;
+use super::tree_view::write_record;
 
 /// The format `for-each-ref` uses when no `--format` is given.
 ///
@@ -41,16 +39,18 @@ const NUL: u8 = 0;
 /// separator, so every line differs from Git's even though both list the same references.
 const DEFAULT_FOR_EACH_REF_FORMAT: &str = "%(objectname) %(objecttype)\t%(refname)";
 
-/// Dispatches `ls-tree`.
-///
-/// Supports `-r` (recurse), `-t` (print subtrees), `-d` (print only subtrees), `-z`, `--full-tree`,
-/// `--name-only`, and a trailing path filter.
-pub fn handle_ls_tree(ctx: &CliContext) {
-    let view = match RepoView::open(ctx) {
-        Ok(opened) => opened,
-        Err(open_err) => fail_fatal(open_err),
-    };
+/// Parsed CLI options for `ls-tree`.
+struct LsTreeOptions {
+    visibility: TreeVisibility,
+    explicit_trees: bool,
+    name_only: bool,
+    nul_terminated: bool,
+    revision: Option<String>,
+    paths: Vec<String>,
+}
 
+/// Parses command-line flags and pathspecs for `ls-tree`.
+fn parse_ls_tree_options(args: &[String]) -> LsTreeOptions {
     let mut recursive = false;
     let mut trees_only = false;
     let mut include_trees = false;
@@ -59,7 +59,7 @@ pub fn handle_ls_tree(ctx: &CliContext) {
     let mut revision: Option<String> = None;
     let mut paths: Vec<String> = Vec::new();
 
-    for argument in &ctx.args {
+    for argument in args {
         match argument.as_str() {
             "-r" => recursive = true,
             "-t" => include_trees = true,
@@ -81,28 +81,29 @@ pub fn handle_ls_tree(ctx: &CliContext) {
         }
     }
 
-    // `-t` and `-d` are not opposites, and neither one decides visibility on its own:
-    //
-    //   (no flag)  direct entries, trees included
-    //   -d         direct entries, trees only
-    //   -r         recursive, blobs only
-    //   -r -t      recursive, trees and blobs
-    //   -r -d      recursive, trees only
-    //
-    // So a tree row is printed when `-t` asks for it, when `-d` restricts the listing to trees, or
-    // when the walk is not recursive — the last case because a level listing *is* mostly its
-    // directories. Treating `-t` as the switch that reveals them hides every directory from the
-    // default form, which is the form scripts use to enumerate one level.
-    let visibility = TreeVisibility {
-        recursive,
-        trees_only,
-        include_trees: include_trees || trees_only || !recursive,
-    };
+    LsTreeOptions {
+        visibility: TreeVisibility {
+            recursive,
+            trees_only,
+            include_trees: include_trees || trees_only || !recursive,
+        },
+        explicit_trees: include_trees,
+        name_only,
+        nul_terminated,
+        revision,
+        paths,
+    }
+}
 
-    // Git requires the tree-ish explicitly: `git ls-tree` exits 129 with a usage line. Defaulting
-    // to HEAD invents a listing for an argument the caller never supplied, and a script that
-    // misspelled the revision would read the wrong tree without noticing.
-    let Some(revision) = revision else {
+/// Dispatches `ls-tree`.
+///
+/// Supports `-r` (recurse), `-t` (print subtrees), `-d` (print only subtrees), `-z`, `--full-tree`,
+/// `--name-only`, and a trailing path filter.
+pub fn handle_ls_tree(ctx: &CliContext) {
+    let view = RepoView::open_or_exit(ctx);
+    let opts = parse_ls_tree_options(&ctx.args);
+
+    let Some(revision) = opts.revision else {
         fail_usage("taxis ls-tree [<options>] <tree-ish> [<path>...]");
     };
     let (_, tree_oid) = match view.resolve_tree(&revision) {
@@ -111,20 +112,21 @@ pub fn handle_ls_tree(ctx: &CliContext) {
     };
 
     let mut rows: Vec<TreeRow> = Vec::new();
-    if paths.is_empty() {
-        if let Err(walk_err) = collect_tree_rows(&view, &tree_oid, "", visibility, &mut rows) {
+    if opts.paths.is_empty() {
+        if let Err(walk_err) = collect_tree_rows(&view, (&tree_oid, "", opts.visibility), &mut rows)
+        {
             reject(CliTag::ERROR, walk_err);
         }
     } else {
-        for spec in &paths {
-            if let Err(walk_err) =
-                collect_path_rows(&view, &tree_oid, spec, visibility, include_trees, &mut rows)
-            {
+        for spec in &opts.paths {
+            if let Err(walk_err) = collect_path_rows(
+                &view,
+                (&tree_oid, spec, opts.visibility, opts.explicit_trees),
+                &mut rows,
+            ) {
                 reject(CliTag::ERROR, walk_err);
             }
         }
-        // Merged listings are re-sorted into tree order: Git emits one order no matter how many
-        // path arguments were given or in what order, and duplicate paths are printed once.
         rows.sort_by_cached_key(tree_order_key);
         rows.dedup_by(|left, right| left.path == right.path);
     }
@@ -154,7 +156,7 @@ pub fn handle_ls_tree(ctx: &CliContext) {
 
     let mut sink = std::io::stdout();
     for row in &rows {
-        let line = if name_only {
+        let line = if opts.name_only {
             row.path.clone()
         } else {
             format!(
@@ -165,7 +167,7 @@ pub fn handle_ls_tree(ctx: &CliContext) {
                 row.path
             )
         };
-        let _ = write_record(&mut sink, &line, nul_terminated);
+        let _ = write_record(&mut sink, &line, opts.nul_terminated);
     }
 }
 
@@ -221,11 +223,10 @@ impl TreeVisibility {
 /// Collects every row a whole-tree listing prints, in Git's canonical order.
 fn collect_tree_rows(
     view: &RepoView,
-    tree_oid: &Oid,
-    prefix: &str,
-    visibility: TreeVisibility,
+    tree_prefix_vis: (&Oid, &str, TreeVisibility),
     rows: &mut Vec<TreeRow>,
 ) -> FractalResult<()> {
+    let (tree_oid, prefix, visibility) = tree_prefix_vis;
     let object = view.object(tree_oid)?;
     for entry in GitTreeRef::from_bytes(&object.payload).iter() {
         let entry = entry?;
@@ -245,7 +246,7 @@ fn collect_tree_rows(
                 });
             }
             if visibility.recursive {
-                collect_tree_rows(view, &entry.oid, &path, visibility, rows)?;
+                collect_tree_rows(view, (&entry.oid, &path, visibility), rows)?;
             }
             continue;
         }
@@ -263,18 +264,12 @@ fn collect_tree_rows(
 }
 
 /// Resolves one `ls-tree` path argument and collects the rows it selects.
-///
-/// A trailing slash is not cosmetic: `a` names the tree entry itself, while `a/` names what it
-/// contains. Resolving the argument component by component is what keeps a missing path silent
-/// instead of letting a prefix filter list the root tree under a name that does not exist.
 fn collect_path_rows(
     view: &RepoView,
-    root_oid: &Oid,
-    spec: &str,
-    visibility: TreeVisibility,
-    explicit_trees: bool,
+    query: (&Oid, &str, TreeVisibility, bool),
     rows: &mut Vec<TreeRow>,
 ) -> FractalResult<()> {
+    let (root_oid, spec, visibility, explicit_trees) = query;
     let lists_contents = spec.ends_with('/');
     let trimmed = spec.trim_end_matches('/');
     let segments: Vec<&str> = trimmed
@@ -315,8 +310,6 @@ fn collect_path_rows(
         if kind != ObjectKind::Tree {
             return Ok(());
         }
-        // The directory named by a trailing-slash argument is only printed when -t asks for tree
-        // rows; without it Git lists the directory's contents and not the directory itself.
         if explicit_trees {
             rows.push(TreeRow {
                 mode,
@@ -325,7 +318,7 @@ fn collect_path_rows(
                 path: path.clone(),
             });
         }
-        collect_tree_rows(view, &oid, &path, visibility, rows)?;
+        collect_tree_rows(view, (&oid, &path, visibility), rows)?;
         return Ok(());
     }
     if visibility.shows(kind) {
@@ -337,36 +330,18 @@ fn collect_path_rows(
         });
     }
     if kind == ObjectKind::Tree && visibility.recursive {
-        collect_tree_rows(view, &oid, &path, visibility, rows)?;
+        collect_tree_rows(view, (&oid, &path, visibility), rows)?;
     }
     Ok(())
 }
 
 /// Builds the byte key Git sorts tree entries by.
-///
-/// Git compares a directory name as if it ended with `/`, which keeps `a` before `a/b` while a
-/// blob named `a.txt` sorts between them; reusing that rule for merged listings keeps multi-path
-/// output in the same order as a single tree walk.
 fn tree_order_key(row: &TreeRow) -> Vec<u8> {
     let mut key = row.path.as_bytes().to_vec();
     if row.kind == ObjectKind::Tree {
         key.push(b'/');
     }
     key
-}
-
-/// Writes one record, honouring the `-z` terminator.
-fn write_record(
-    sink: &mut impl std::io::Write,
-    text: &str,
-    nul_terminated: bool,
-) -> std::io::Result<()> {
-    sink.write_all(text.as_bytes())?;
-    if nul_terminated {
-        sink.write_all(&[NUL])
-    } else {
-        sink.write_all(b"\n")
-    }
 }
 
 /// Dispatches `ls-files`.
@@ -476,32 +451,31 @@ pub fn handle_for_each_ref(ctx: &CliContext) {
     run_show_ref(ctx, true)
 }
 
-/// Shared body of the two reference-listing commands.
-fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
-    let view = match RepoView::open(ctx) {
-        Ok(opened) => opened,
-        Err(open_err) => fail_fatal(open_err),
-    };
+/// Parsed options for `show-ref` and `for-each-ref`.
+struct ShowRefOptions<'a> {
+    format: Option<String>,
+    patterns: Vec<String>,
+    verify_only: bool,
+    include_head: bool,
+    namespace: Option<&'a str>,
+}
+
+/// Parses command-line options for `show-ref` / `for-each-ref`.
+fn parse_show_ref_options(args: &[String], is_for_each_ref: bool) -> ShowRefOptions<'static> {
     let mut format: Option<String> = None;
     let mut patterns: Vec<String> = Vec::new();
     let mut verify_only = false;
     let mut include_head = false;
-    let mut namespace: Option<&str> = None;
+    let mut namespace: Option<&'static str> = None;
 
-    for argument in &ctx.args {
+    for argument in args {
         if let Some(value) = argument.strip_prefix("--format=") {
             format = Some(value.to_string());
             continue;
         }
         match argument.as_str() {
             "--verify" => verify_only = true,
-            // `--head` exists on `show-ref` only. `for-each-ref --head` is an unknown option in Git
-            // (exit 129), so accepting it here would quietly change what the caller sees.
             "--head" if !is_for_each_ref => include_head = true,
-            // `--heads`, `--tags`, and `--branches` restrict the listing to one namespace. They are
-            // not cosmetic: a repository that keeps `refs/original/*` backups (what `git filter-branch`
-            // leaves behind) lists those under a bare `show-ref` but must not list them under
-            // `--heads`, because that backup namespace is not a branch.
             "--heads" | "--branches" => namespace = Some("refs/heads/"),
             "--tags" => namespace = Some("refs/tags/"),
             "--" => {}
@@ -518,23 +492,35 @@ fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
     if is_for_each_ref && format.is_none() {
         format = Some(DEFAULT_FOR_EACH_REF_FORMAT.to_string());
     }
+    ShowRefOptions {
+        format,
+        patterns,
+        verify_only,
+        include_head,
+        namespace,
+    }
+}
 
-    let mut refs: Vec<(String, Oid)> = match view_references(&view, &patterns) {
+/// Shared body of the two reference-listing commands.
+fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
+    let view = RepoView::open_or_exit(ctx);
+    let opts = parse_show_ref_options(&ctx.args, is_for_each_ref);
+
+    let mut refs: Vec<(String, Oid)> = match view_references(&view, &opts.patterns) {
         Ok(listed) => listed,
         Err(list_err) => reject(CliTag::ERROR, list_err),
     };
-    if let Some(prefix) = namespace {
+    if let Some(prefix) = opts.namespace {
         refs.retain(|(name, _)| name.starts_with(prefix));
     }
     refs.sort_by(|left, right| left.0.cmp(&right.0));
 
-    if verify_only {
-        refs = verify_exact_refs(&view, &refs, &patterns);
+    if opts.verify_only {
+        refs = verify_exact_refs(&view, &refs, &opts.patterns);
     }
-    if include_head {
+    if opts.include_head {
         match view.head_commit() {
             Ok(Some(head_oid)) => {
-                // --verify HEAD already produced the row; inserting again would print it twice.
                 if !refs.iter().any(|(name, _)| name == "HEAD") {
                     refs.insert(0, ("HEAD".to_string(), head_oid));
                 }
@@ -543,9 +529,7 @@ fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
             Err(head_err) => fail_fatal(head_err),
         }
     }
-    if !verify_only && !is_for_each_ref && refs.is_empty() && !ctx.json_mode {
-        // Git exits 1 without printing when there is nothing to list, which is how scripts detect an
-        // empty repository without parsing output. for-each-ref stays successful on an empty repo.
+    if !opts.verify_only && !is_for_each_ref && refs.is_empty() && !ctx.json_mode {
         std::process::exit(EXIT_REJECTED);
     }
 
@@ -570,13 +554,13 @@ fn run_show_ref(ctx: &CliContext, is_for_each_ref: bool) {
     }
 
     for (name, oid) in &refs {
-        match format.as_deref() {
+        match opts.format.as_deref() {
             Some(template) => {
                 let object_type = view
                     .object(oid)
                     .map(|object| object.kind.as_str().to_string())
                     .unwrap_or_else(|_| "missing".to_string());
-                match render_ref_format(template, name, oid, &object_type) {
+                match render_ref_format(template, (name, oid, &object_type)) {
                     Ok(rendered) => println!("{rendered}"),
                     Err(render_err) => reject(CliTag::ERROR, render_err),
                 }
@@ -663,12 +647,7 @@ fn reject_unknown_ref_option(option: &str, is_for_each_ref: bool) -> ! {
 /// Returns the name of the first unknown placeholder. Git exits 128 with `unknown field name`; an
 /// empty substitution would instead print a blank column that looks like missing data, and the
 /// caller would have no way to tell a typo from a repository that lacks the field.
-fn render_ref_format(
-    template: &str,
-    name: &str,
-    oid: &Oid,
-    object_type: &str,
-) -> Result<String, String> {
+fn render_ref_format(template: &str, ref_data: (&str, &Oid, &str)) -> Result<String, String> {
     let mut rendered = String::with_capacity(template.len() + 48);
     let mut cursor = 0usize;
     while let Some(start) = template[cursor..].find("%(") {
@@ -679,7 +658,7 @@ fn render_ref_format(
             return Ok(rendered);
         };
         let key = &template[start + 2..start + end];
-        rendered.push_str(&resolve_ref_field(key, name, oid, object_type)?);
+        rendered.push_str(&resolve_ref_field(key, ref_data)?);
         cursor = start + end + 1;
     }
     rendered.push_str(&template[cursor..]);
@@ -687,12 +666,8 @@ fn render_ref_format(
 }
 
 /// Resolves one `%(...)` field.
-fn resolve_ref_field(
-    key: &str,
-    name: &str,
-    oid: &Oid,
-    object_type: &str,
-) -> Result<String, String> {
+fn resolve_ref_field(key: &str, ref_data: (&str, &Oid, &str)) -> Result<String, String> {
+    let (name, oid, object_type) = ref_data;
     let value = match key {
         "refname" => name.to_string(),
         "refname:short" => name
@@ -785,7 +760,7 @@ pub fn handle_check_ignore(ctx: &CliContext) {
     }
 
     if ctx.json_mode {
-        report_check_ignore_json(&matcher, &repo_root, &matches, matched_count);
+        report_check_ignore_json(&matcher, &repo_root, (&matches, matched_count));
         if matched_count == 0 {
             std::process::exit(1);
         }
@@ -818,10 +793,6 @@ pub fn handle_check_ignore(ctx: &CliContext) {
 }
 
 /// Renders a pattern file's path the way Git does: repository-relative with forward slashes.
-///
-/// Git prints `.gitignore:69:...` for a root rule and `sub/.gitignore:1:...` for a nested one. An
-/// absolute path is not wrong, but it cannot be compared against Git's output and it leaks the
-/// checkout location into reports.
 fn display_rule_source(repo_root: &Path, source: &Path) -> String {
     match source.strip_prefix(repo_root) {
         Ok(relative) => relative.to_string_lossy().replace('\\', "/"),
@@ -833,9 +804,9 @@ fn display_rule_source(repo_root: &Path, source: &Path) -> String {
 fn report_check_ignore_json(
     matcher: &IgnoreMatcher,
     repo_root: &Path,
-    matches: &[(String, Option<fg_index::IgnoreMatch>)],
-    matched_count: usize,
+    matches_and_count: (&[(String, Option<fg_index::IgnoreMatch>)], usize),
 ) {
+    let (matches, matched_count) = matches_and_count;
     let rendered: Vec<serde_json::Value> = matches
         .iter()
         .map(|(path, decided)| {
@@ -871,7 +842,7 @@ mod tests {
     /// `%(objecttype)` placeholder, and a test that opened a real repository would be an
     /// integration test rather than a unit test of the formatter.
     fn render_ref_format_for_test(template: &str, name: &str, oid: &Oid) -> String {
-        render_ref_format(template, name, oid, "commit").expect("render")
+        render_ref_format(template, (name, oid, "commit")).expect("render")
     }
 
     #[test]
@@ -897,7 +868,9 @@ mod tests {
     fn an_unknown_placeholder_is_rejected() {
         // Git exits 128 with "unknown field name"; an empty substitution would print a blank column
         // that a caller cannot distinguish from missing data.
-        assert!(render_ref_format("%(nonesuch)", "refs/heads/main", &Oid::ZERO, "commit").is_err());
+        assert!(
+            render_ref_format("%(nonesuch)", ("refs/heads/main", &Oid::ZERO, "commit")).is_err()
+        );
     }
 
     #[test]

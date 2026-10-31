@@ -134,12 +134,7 @@ impl MetaSection {
 
     /// Returns the lowercase hexadecimal repository identifier used as the store directory name.
     pub fn repo_id_hex(&self) -> String {
-        let mut hex = String::with_capacity(REPO_ID_LEN * 2);
-        for byte in self.repo_id {
-            use std::fmt::Write;
-            let _ = write!(&mut hex, "{byte:02x}");
-        }
-        hex
+        fg_core::models::hex::encode_hex(&self.repo_id)
     }
 
     /// Serializes the section payload.

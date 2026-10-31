@@ -2,14 +2,15 @@
 //! File Path: crates/fg-algorithms/src/diff/engine.rs
 //! Architecture Role: Coordinates tiered diff algorithms (64-bit Bit-Parallel, Imara Histogram,
 //!   and Git xdiff Myers) based on input size, language characteristics, and explicit user flags.
-//! Dependencies & Triggers: Consumed by PatchGenerator, taxis diff, and CLI porcelain.
-//! Responsibilities: Selects optimal diff algorithm, executes alignment, and returns uniform
-//!   (old_changed, new_changed) vectors or UnifiedPatch.
+//! Dependencies & Triggers: Consumed by PatchGenerator, TextThreeWayMerge, BlameEngine, taxis diff,
+//!   and CLI porcelain.
+//! Responsibilities: Selects optimal diff algorithm, executes alignment + compaction without redundant
+//!   `split_lines` passes, and returns uniform `(old_changed, new_changed)` vectors or `UnifiedPatchRef`.
 //! Exit Semantics & Design Rationale:
-//!   - Adaptive routing: <= 64 lines defaults to register-level bit-parallel Myers (zero heap alloc).
-//!   - General files default to Imara Histogram diff, avoiding pathological O(ND) Myers behavior
-//!     and semantic mismatches on closing delimiters.
-//!   - Explicit Myers fallback preserves byte-for-byte Git xdiff compatibility when required.
+//!   - Adaptive routing: `<= 64` lines defaults to register-level bit-parallel Myers.
+//!   - General files default to Imara Histogram diff, avoiding pathological `O(ND)` Myers behavior.
+//!   - `compute_xdiff_change_flags` centralizes the `prepare -> mark_changed -> Compaction` pipeline
+//!     previously duplicated across `engine`, `text_merge`, and `blame`.
 //!
 //! Domain Governance Rules: FGT-ALG-001 (diff engine), FGT-COR-001, FGT-PRF-001.
 
@@ -19,21 +20,62 @@ use crate::diff::bit_parallel::{bit_parallel_diff, BIT_PARALLEL_MAX_LINES};
 use crate::diff::compact::{Compaction, Side};
 use crate::diff::patch::{split_lines, trim_common_tail, PatchGenerator, UnifiedPatchRef};
 use crate::diff::xdiff::mark_changed;
-use crate::diff::xdiff_prepare::prepare;
+use crate::diff::xdiff_prepare::{prepare, PreparedSide};
 
 /// Strategy to select the diff algorithm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DiffAlgorithm {
-    /// Adaptive routing based on input size and characteristics.
-    /// Uses Bit-Parallel for <= 64 lines, Histogram for larger inputs.
+    /// Adaptive routing based on input size (`<= 64` lines Bit-Parallel, Histogram otherwise).
     #[default]
     Auto,
-    /// Fast 64-bit register-level bit-parallel Myers (requires <= 64 lines).
+    /// Fast 64-bit register-level bit-parallel Myers (requires `<= 64` lines).
     BitParallel,
     /// Imara Histogram diff (patience-style, semantic block alignment).
     Histogram,
-    /// Traditional Myers O(ND) algorithm matching Git's xdiff.
+    /// Traditional Myers `O(ND)` algorithm matching Git's xdiff.
     Myers,
+}
+
+/// Runs record classification, line alignment, and Git indent-heuristic compaction over pre-split lines.
+fn run_compacted_alignment<F>(
+    old_text: &str,
+    new_text: &str,
+    old_lines: &[&str],
+    new_lines: &[&str],
+    align_fn: F,
+) -> (Vec<bool>, Vec<bool>)
+where
+    F: FnOnce(&PreparedSide, &PreparedSide) -> (Vec<bool>, Vec<bool>),
+{
+    let old_records: Vec<&[u8]> = old_text.split_inclusive('\n').map(str::as_bytes).collect();
+    let new_records: Vec<&[u8]> = new_text.split_inclusive('\n').map(str::as_bytes).collect();
+    let (prepared_old, prepared_new) = prepare(&old_records, &new_records);
+    let (mut old_changed, mut new_changed) = align_fn(&prepared_old, &prepared_new);
+    Compaction::new(
+        Side {
+            hashes: &prepared_old.classes,
+            texts: old_lines,
+        },
+        Side {
+            hashes: &prepared_new.classes,
+            texts: new_lines,
+        },
+    )
+    .run(&mut old_changed, &mut new_changed);
+    (old_changed, new_changed)
+}
+
+/// Computes Git `xdiff` Myers change flags + indent compaction over pre-split lines.
+pub fn compute_xdiff_change_flags(
+    old_text: &str,
+    new_text: &str,
+    old_lines: &[&str],
+    new_lines: &[&str],
+) -> (Vec<bool>, Vec<bool>) {
+    if old_text == new_text {
+        return (vec![false; old_lines.len()], vec![false; new_lines.len()]);
+    }
+    run_compacted_alignment(old_text, new_text, old_lines, new_lines, mark_changed)
 }
 
 /// Diff engine facade providing unified text comparison.
@@ -58,78 +100,45 @@ impl DiffEngine {
     /// Computes the change masks `(old_changed, new_changed)` for two texts.
     pub fn compute_change_flags(&self, old_text: &str, new_text: &str) -> (Vec<bool>, Vec<bool>) {
         if old_text == new_text {
-            let old_count = split_lines(old_text).len();
-            let new_count = split_lines(new_text).len();
-            return (vec![false; old_count], vec![false; new_count]);
+            let line_count = old_text.split_inclusive('\n').count();
+            return (vec![false; line_count], vec![false; line_count]);
         }
-
         let old_lines = split_lines(old_text);
         let new_lines = split_lines(new_text);
+        self.compute_change_flags_with_lines(old_text, new_text, &old_lines, &new_lines)
+    }
 
+    /// Computes change masks reusing caller-provided `old_lines` and `new_lines` slices (`FGT-PRF-001`).
+    pub fn compute_change_flags_with_lines(
+        &self,
+        old_text: &str,
+        new_text: &str,
+        old_lines: &[&str],
+        new_lines: &[&str],
+    ) -> (Vec<bool>, Vec<bool>) {
+        if old_text == new_text {
+            return (vec![false; old_lines.len()], vec![false; new_lines.len()]);
+        }
+
+        let fits_bit_parallel =
+            old_lines.len() <= BIT_PARALLEL_MAX_LINES && new_lines.len() <= BIT_PARALLEL_MAX_LINES;
         let selected_algorithm = match self.algorithm {
-            DiffAlgorithm::Auto => {
-                if old_lines.len() <= BIT_PARALLEL_MAX_LINES
-                    && new_lines.len() <= BIT_PARALLEL_MAX_LINES
-                {
-                    DiffAlgorithm::BitParallel
-                } else {
-                    DiffAlgorithm::Histogram
-                }
-            }
+            DiffAlgorithm::Auto if fits_bit_parallel => DiffAlgorithm::BitParallel,
+            DiffAlgorithm::Auto => DiffAlgorithm::Histogram,
             other => other,
         };
 
         match selected_algorithm {
-            DiffAlgorithm::BitParallel => {
-                if old_lines.len() <= BIT_PARALLEL_MAX_LINES
-                    && new_lines.len() <= BIT_PARALLEL_MAX_LINES
-                {
-                    let old_records: Vec<&[u8]> =
-                        old_text.split_inclusive('\n').map(str::as_bytes).collect();
-                    let new_records: Vec<&[u8]> =
-                        new_text.split_inclusive('\n').map(str::as_bytes).collect();
-                    let (prepared_old, prepared_new) = prepare(&old_records, &new_records);
-                    let (mut old_changed, mut new_changed) =
-                        bit_parallel_diff(&prepared_old.classes, &prepared_new.classes);
-                    Compaction::new(
-                        Side {
-                            hashes: &prepared_old.classes,
-                            texts: &old_lines,
-                        },
-                        Side {
-                            hashes: &prepared_new.classes,
-                            texts: &new_lines,
-                        },
-                    )
-                    .run(&mut old_changed, &mut new_changed);
-                    (old_changed, new_changed)
-                } else {
-                    // Fall back to Histogram if lines exceeded 64
-                    self.compute_imara_flags(old_text, new_text, Algorithm::Histogram)
-                }
+            DiffAlgorithm::BitParallel if fits_bit_parallel => {
+                run_compacted_alignment(old_text, new_text, old_lines, new_lines, |old_p, new_p| {
+                    bit_parallel_diff(&old_p.classes, &new_p.classes)
+                })
             }
-            DiffAlgorithm::Histogram | DiffAlgorithm::Auto => {
+            DiffAlgorithm::BitParallel | DiffAlgorithm::Histogram | DiffAlgorithm::Auto => {
                 self.compute_imara_flags(old_text, new_text, Algorithm::Histogram)
             }
             DiffAlgorithm::Myers => {
-                let old_records: Vec<&[u8]> =
-                    old_text.split_inclusive('\n').map(str::as_bytes).collect();
-                let new_records: Vec<&[u8]> =
-                    new_text.split_inclusive('\n').map(str::as_bytes).collect();
-                let (prepared_old, prepared_new) = prepare(&old_records, &new_records);
-                let (mut old_changed, mut new_changed) = mark_changed(&prepared_old, &prepared_new);
-                Compaction::new(
-                    Side {
-                        hashes: &prepared_old.classes,
-                        texts: &old_lines,
-                    },
-                    Side {
-                        hashes: &prepared_new.classes,
-                        texts: &new_lines,
-                    },
-                )
-                .run(&mut old_changed, &mut new_changed);
-                (old_changed, new_changed)
+                compute_xdiff_change_flags(old_text, new_text, old_lines, new_lines)
             }
         }
     }
@@ -154,7 +163,7 @@ impl DiffEngine {
         (old_changed, new_changed)
     }
 
-    /// Generates a UnifiedPatch using the configured diff algorithm.
+    /// Generates a `UnifiedPatchRef` using a single `split_lines` pass per side.
     pub fn generate_patch<'a>(
         &self,
         file_path: &'a str,
@@ -175,9 +184,14 @@ impl DiffEngine {
             (old_text, new_text)
         };
 
-        let (old_changed, new_changed) = self.compute_change_flags(effective_old, effective_new);
         let old_lines = split_lines(effective_old);
         let new_lines = split_lines(effective_new);
+        let (old_changed, new_changed) = self.compute_change_flags_with_lines(
+            effective_old,
+            effective_new,
+            &old_lines,
+            &new_lines,
+        );
 
         PatchGenerator::build_unified_patch_from_flags(
             file_path,

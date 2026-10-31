@@ -519,17 +519,49 @@ fn normalize_glob_text(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 
+/// Advances reachability states for one glob token with zero transient `Vec<bool>` allocation.
+fn step_glob_token(pattern_char: char, text_chars: &[char], reachable: &[bool], next: &mut [bool]) {
+    let length = text_chars.len();
+    match pattern_char {
+        '*' => {
+            let mut active = false;
+            for offset in 0..=length {
+                active |= reachable[offset];
+                next[offset] = active;
+                if offset < length && text_chars[offset] == '/' {
+                    active = false;
+                }
+            }
+        }
+        '?' => {
+            for offset in 0..length {
+                if reachable[offset] && text_chars[offset] != '/' {
+                    next[offset + 1] = true;
+                }
+            }
+        }
+        literal => {
+            for offset in 0..length {
+                if reachable[offset] && text_chars[offset] == literal {
+                    next[offset + 1] = true;
+                }
+            }
+        }
+    }
+}
+
 /// Matches text against a glob where double-star spans separators and star stays in one segment.
 fn glob_matches(pattern: &str, text: &str) -> bool {
     let pattern_chars: Vec<char> = pattern.chars().collect();
     let text_chars: Vec<char> = text.chars().collect();
     let length = text_chars.len();
     let mut reachable = vec![false; length + 1];
+    let mut next = vec![false; length + 1];
     reachable[0] = true;
     let mut index = 0usize;
     while index < pattern_chars.len() {
+        next.fill(false);
         let pattern_char = pattern_chars[index];
-        let mut next = vec![false; length + 1];
         if pattern_char == '*' && pattern_chars.get(index + 1) == Some(&'*') {
             index += 2;
             while pattern_chars.get(index) == Some(&'*') {
@@ -544,35 +576,10 @@ fn glob_matches(pattern: &str, text: &str) -> bool {
                 index += 1;
             }
         } else {
-            match pattern_char {
-                '*' => {
-                    let mut active = false;
-                    for offset in 0..=length {
-                        active |= reachable[offset];
-                        next[offset] = active;
-                        if offset < length && text_chars[offset] == '/' {
-                            active = false;
-                        }
-                    }
-                }
-                '?' => {
-                    for offset in 0..length {
-                        if reachable[offset] && text_chars[offset] != '/' {
-                            next[offset + 1] = true;
-                        }
-                    }
-                }
-                literal => {
-                    for offset in 0..length {
-                        if reachable[offset] && text_chars[offset] == literal {
-                            next[offset + 1] = true;
-                        }
-                    }
-                }
-            }
+            step_glob_token(pattern_char, &text_chars, &reachable, &mut next);
             index += 1;
         }
-        reachable = next;
+        std::mem::swap(&mut reachable, &mut next);
     }
     reachable[length]
 }

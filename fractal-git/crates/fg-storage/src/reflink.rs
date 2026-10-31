@@ -15,11 +15,13 @@
 //! - `FGT-STO-001`: Storage layer crash safety guard
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-PRF-001`: Zero transient heap allocations on hot path queries
+//! - `FGT-SAF-001`: Unsafe block proof and raw pointer isolation guard
 
 use std::fs;
 use std::path::Path;
 
 use fg_core::error::{FractalError, FractalResult};
+use fg_core::write_file_atomic;
 
 /// Classification of physical file instantiation strategy used.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,21 +97,11 @@ pub fn detach_for_write(path: &Path) -> FractalResult<bool> {
     }
 
     if is_readonly(path) {
-        let parent = path.parent().unwrap_or_else(|| Path::new("."));
-        let temp_path = parent.join(format!(
-            ".detach_{}_{}.tmp",
-            std::process::id(),
-            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
-        ));
-
-        // Read contents before removing hardlink
+        // Read contents before detaching the shared hardlink, then stage and replace atomically.
         let contents = fs::read(path)?;
-        fs::write(&temp_path, contents)?;
-
-        // Ensure target is removable on Windows even if readonly
         let _ = set_readonly(path, false);
         fs::remove_file(path)?;
-        fs::rename(&temp_path, path)?;
+        write_file_atomic(path, &contents, false)?;
         set_readonly(path, false)?;
         return Ok(true);
     }
@@ -142,6 +134,12 @@ fn win_block_clone(src: &Path, dst: &Path) -> FractalResult<()> {
             lpBytesReturned: *mut u32,
             lpOverlapped: *mut core::ffi::c_void,
         ) -> i32;
+        fn SetFilePointerEx(
+            hFile: *mut core::ffi::c_void,
+            liDistanceToMove: i64,
+            lpNewFilePointer: *mut i64,
+            dwMoveMethod: u32,
+        ) -> i32;
         fn SetEndOfFile(hFile: *mut core::ffi::c_void) -> i32;
         fn CloseHandle(hObject: *mut core::ffi::c_void) -> i32;
     }
@@ -153,6 +151,7 @@ fn win_block_clone(src: &Path, dst: &Path) -> FractalResult<()> {
     const OPEN_EXISTING: u32 = 3;
     const CREATE_ALWAYS: u32 = 2;
     const FILE_ATTRIBUTE_NORMAL: u32 = 0x0000_0080;
+    const FILE_BEGIN: u32 = 0;
     const INVALID_HANDLE_VALUE: *mut core::ffi::c_void = -1isize as *mut core::ffi::c_void;
     const FSCTL_DUPLICATE_EXTENTS_TO_FILE: u32 = 0x0009_8344;
 
@@ -165,7 +164,13 @@ fn win_block_clone(src: &Path, dst: &Path) -> FractalResult<()> {
     }
 
     let src_meta = fs::metadata(src)?;
-    let src_len = src_meta.len() as i64;
+    let src_len = i64::try_from(src_meta.len()).map_err(|_| {
+        FractalError::CorruptStore(format!(
+            "source path '{}' length {} exceeds i64 extent range",
+            src.display(),
+            src_meta.len()
+        ))
+    })?;
     if src_len == 0 {
         // Zero-length files do not need extent cloning; a simple create suffices.
         fs::write(dst, [])?;
@@ -177,7 +182,9 @@ fn win_block_clone(src: &Path, dst: &Path) -> FractalResult<()> {
     let mut dst_wide: Vec<u16> = dst.as_os_str().encode_wide().collect();
     dst_wide.push(0);
 
-    // SAFETY: `src_wide` is a valid NUL-terminated UTF-16 buffer outliving CreateFileW.
+    // SAFETY: Invariant: `CreateFileW` reads a NUL-terminated UTF-16 path without retaining pointers.
+    // Precondition: `src_wide` ends with `0u16` and stays alive across the FFI call.
+    // Postcondition: Returns either `INVALID_HANDLE_VALUE` (checked immediately) or an owned handle.
     let h_src = unsafe {
         CreateFileW(
             src_wide.as_ptr(),
@@ -193,7 +200,9 @@ fn win_block_clone(src: &Path, dst: &Path) -> FractalResult<()> {
         return Err(FractalError::Io(std::io::Error::last_os_error()));
     }
 
-    // SAFETY: `dst_wide` is a valid NUL-terminated UTF-16 buffer outliving CreateFileW.
+    // SAFETY: Invariant: `CreateFileW` creates/truncates the UTF-16 path without retaining pointers.
+    // Precondition: `dst_wide` ends with `0u16` and stays alive across the FFI call.
+    // Postcondition: Returns either `INVALID_HANDLE_VALUE` (checked immediately) or an owned handle.
     let h_dst = unsafe {
         CreateFileW(
             dst_wide.as_ptr(),
@@ -206,14 +215,37 @@ fn win_block_clone(src: &Path, dst: &Path) -> FractalResult<()> {
         )
     };
     if h_dst == INVALID_HANDLE_VALUE {
-        // SAFETY: `h_src` was validated as non-invalid above.
-        unsafe { CloseHandle(h_src) };
-        return Err(FractalError::Io(std::io::Error::last_os_error()));
+        let os_err = std::io::Error::last_os_error();
+        // SAFETY: Invariant: `CloseHandle` releases an open Win32 kernel handle once.
+        // Precondition: `h_src != INVALID_HANDLE_VALUE` was verified above and is not used afterwards.
+        // Postcondition: `h_src` is closed before returning the `CreateFileW` error.
+        unsafe {
+            CloseHandle(h_src);
+        }
+        return Err(FractalError::Io(os_err));
     }
 
-    // Set target file size to match source file before cloning extents
-    // SAFETY: `h_dst` is an open writable handle.
-    let _ = unsafe { SetEndOfFile(h_dst) };
+    // Advance the destination file pointer to `src_len` and commit EOF so ReFS extent duplication
+    // sees a destination range `[0, src_len)` within target EOF (`FGT-SAF-001`).
+    // SAFETY: Invariant: `SetFilePointerEx` and `SetEndOfFile` operate on an open writable file handle.
+    // Precondition: `h_dst` is valid and `src_len > 0` fits in non-negative `i64`; `lpNewFilePointer` is null.
+    // Postcondition: Non-zero status confirms `h_dst` logical length equals `src_len`.
+    let resize_ok = unsafe {
+        SetFilePointerEx(h_dst, src_len, std::ptr::null_mut(), FILE_BEGIN) != 0
+            && SetEndOfFile(h_dst) != 0
+    };
+    if !resize_ok {
+        let os_err = std::io::Error::last_os_error();
+        // SAFETY: Invariant: Both handles are open and exclusively owned by this stack frame.
+        // Precondition: `h_dst` and `h_src` were validated against `INVALID_HANDLE_VALUE`.
+        // Postcondition: Both handles are closed prior to unlinking the partial destination file.
+        unsafe {
+            CloseHandle(h_dst);
+            CloseHandle(h_src);
+        }
+        let _ = fs::remove_file(dst);
+        return Err(FractalError::Io(os_err));
+    }
 
     let clone_params = DuplicateExtentsData {
         file_handle: h_src,
@@ -223,7 +255,9 @@ fn win_block_clone(src: &Path, dst: &Path) -> FractalResult<()> {
     };
 
     let mut bytes_returned: u32 = 0;
-    // SAFETY: `h_dst` is target handle; `clone_params` contains open `h_src` handle and valid offsets.
+    // SAFETY: Invariant: Synchronous `FSCTL_DUPLICATE_EXTENTS_TO_FILE` reads `DuplicateExtentsData` in-place.
+    // Precondition: `h_dst` and `h_src` are open handles, `clone_params` is `#[repr(C)]`, and `bytes_returned` is valid.
+    // Postcondition: Kernel either clones extents (non-zero return) or leaves an error retrievable via `last_os_error`.
     let success = unsafe {
         DeviceIoControl(
             h_dst,
@@ -236,17 +270,24 @@ fn win_block_clone(src: &Path, dst: &Path) -> FractalResult<()> {
             std::ptr::null_mut(),
         )
     };
+    let ioctl_err = if success == 0 {
+        Some(std::io::Error::last_os_error())
+    } else {
+        None
+    };
 
-    // SAFETY: Closing both handles cleanly to avoid leaks.
+    // SAFETY: Invariant: Both Win32 handles were opened in this function and have not been closed yet.
+    // Precondition: `DeviceIoControl` has completed synchronously (`lpOverlapped` was null).
+    // Postcondition: Both handles are released without handle leaks on either success or fallback paths.
     unsafe {
         CloseHandle(h_dst);
         CloseHandle(h_src);
     }
 
-    if success == 0 {
+    if let Some(err) = ioctl_err {
         // If block cloning failed (e.g. partition is standard NTFS), remove half-created target
         let _ = fs::remove_file(dst);
-        return Err(FractalError::Io(std::io::Error::last_os_error()));
+        return Err(FractalError::Io(err));
     }
 
     Ok(())
@@ -268,7 +309,9 @@ fn linux_block_clone(src: &Path, dst: &Path) -> FractalResult<()> {
         .mode(0o644)
         .open(dst)?;
 
-    // SAFETY: `src_file` and `dst_file` are valid open file descriptors.
+    // SAFETY: Invariant: `FICLONE` ioctl clones file extents between two open Linux file descriptors.
+    // Precondition: Both `src_file` and `dst_file` are open descriptors outliving the `ioctl` syscall.
+    // Postcondition: Returns `0` on success or `-1` (leaving `errno` set) without invalidating either fd.
     let ioctl_status = unsafe { libc::ioctl(dst_file.as_raw_fd(), FICLONE, src_file.as_raw_fd()) };
 
     if ioctl_status != 0 {

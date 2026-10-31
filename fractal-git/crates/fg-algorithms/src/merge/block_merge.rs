@@ -133,34 +133,38 @@ impl BlockThreeWayMerge {
         let (_ours_header, ours_imports, ours_body) = Self::split_imports_and_body(ours);
         let (_theirs_header, theirs_imports, theirs_body) = Self::split_imports_and_body(theirs);
 
-        // If neither branch touched imports, fallback to line merge directly
+        // If neither branch touched imports, fallback to body block merge directly
         if ours_imports.is_empty() && theirs_imports.is_empty() && base_imports.is_empty() {
-            return Self::merge_body_blocks(base, ours, theirs, ours_label, theirs_label, fallback);
+            return Self::merge_body_blocks_or_fallback(
+                base,
+                ours,
+                theirs,
+                ours_label,
+                theirs_label,
+                &fallback,
+            )
+            .unwrap_or_else(|| Self::from_text_fallback(fallback));
         }
 
         // 1. Reconcile header imports via 3-way Set Union
         let (merged_imports, dedupe_count) =
             Self::reconcile_imports(&base_imports, &ours_imports, &theirs_imports);
 
-        // 2. Reconcile remaining body
-        let body_merge = Self::merge_body_blocks(
+        // 2. Reconcile remaining body without cloning `fallback.content`
+        let Some(body_merge) = Self::merge_body_blocks_or_fallback(
             &base_body,
             &ours_body,
             &theirs_body,
             ours_label,
             theirs_label,
-            fallback.clone(),
-        );
+            &fallback,
+        ) else {
+            return Self::from_text_fallback(fallback);
+        };
 
         // If body merge still has conflicts and didn't improve, fallback
         if !body_merge.is_clean && body_merge.conflict_count >= fallback.conflict_count {
-            return BlockMergeResult {
-                is_clean: false,
-                conflict_count: fallback.conflict_count,
-                resolved_blocks_count: 0,
-                deduplicated_imports_count: 0,
-                content: fallback.content,
-            };
+            return Self::from_text_fallback(fallback);
         }
 
         // 3. Assemble unified document
@@ -189,6 +193,16 @@ impl BlockThreeWayMerge {
             resolved_blocks_count: body_merge.resolved_blocks_count + 1,
             deduplicated_imports_count: dedupe_count,
             content: result_buf,
+        }
+    }
+
+    fn from_text_fallback(fallback: TextMergeResult) -> BlockMergeResult {
+        BlockMergeResult {
+            is_clean: fallback.is_clean,
+            conflict_count: fallback.conflict_count,
+            resolved_blocks_count: 0,
+            deduplicated_imports_count: 0,
+            content: fallback.content,
         }
     }
 
@@ -282,19 +296,19 @@ impl BlockThreeWayMerge {
     }
 
     /// Decomposes the body into top-level semantic declaration blocks and merges disjoint blocks.
-    fn merge_body_blocks(
+    /// Returns `None` when block-level decomposition does not improve over `fallback`.
+    fn merge_body_blocks_or_fallback(
         base: &str,
         ours: &str,
         theirs: &str,
         ours_label: &str,
         theirs_label: &str,
-        fallback: TextMergeResult,
-    ) -> BlockMergeResult {
+        fallback: &TextMergeResult,
+    ) -> Option<BlockMergeResult> {
         let base_blocks = Self::extract_top_level_blocks(base);
         let ours_blocks = Self::extract_top_level_blocks(ours);
         let theirs_blocks = Self::extract_top_level_blocks(theirs);
 
-        // If decomposition yielded zero or only 1 block, fall back to line merge
         if base_blocks.len() <= 1 && ours_blocks.len() <= 1 && theirs_blocks.len() <= 1 {
             let text_merge_result = TextThreeWayMerge::merge(
                 base.as_bytes(),
@@ -303,124 +317,108 @@ impl BlockThreeWayMerge {
                 ours_label,
                 theirs_label,
             );
-            return BlockMergeResult {
+            return Some(BlockMergeResult {
                 is_clean: text_merge_result.is_clean,
                 conflict_count: text_merge_result.conflict_count,
                 resolved_blocks_count: 0,
                 deduplicated_imports_count: 0,
                 content: text_merge_result.content,
-            };
+            });
         }
 
-        let mut all_block_keys: BTreeSet<String> = BTreeSet::new();
-        for k in base_blocks
+        let all_block_keys: BTreeSet<&str> = base_blocks
             .keys()
             .chain(ours_blocks.keys())
             .chain(theirs_blocks.keys())
-        {
-            all_block_keys.insert(k.clone());
-        }
+            .map(String::as_str)
+            .collect();
 
-        let mut merged_blocks = Vec::new();
-        let mut conflict_count = 0;
-        let mut resolved_count = 0;
+        let mut merged_blocks = Vec::with_capacity(all_block_keys.len());
+        let mut conflict_count = 0usize;
+        let mut resolved_count = 0usize;
 
-        for key in &all_block_keys {
-            let b_val = base_blocks.get(key).map(|s| s.as_str());
-            let o_val = ours_blocks.get(key).map(|s| s.as_str());
-            let t_val = theirs_blocks.get(key).map(|s| s.as_str());
+        for key in all_block_keys {
+            let b_val = base_blocks.get(key).map(String::as_str);
+            let o_val = ours_blocks.get(key).map(String::as_str);
+            let t_val = theirs_blocks.get(key).map(String::as_str);
 
-            match (b_val, o_val, t_val) {
-                // Both unchanged or identical
-                (_, Some(o), Some(t)) if o == t => {
-                    merged_blocks.push(o.to_string());
-                    resolved_count += 1;
-                }
-                // Unchanged in ours, modified in theirs
-                (Some(b), Some(o), Some(t)) if o == b => {
-                    merged_blocks.push(t.to_string());
-                    resolved_count += 1;
-                }
-                // Unchanged in theirs, modified in ours
-                (Some(b), Some(o), Some(t)) if t == b => {
-                    merged_blocks.push(o.to_string());
-                    resolved_count += 1;
-                }
-                // Added only in ours
-                (None, Some(o), None) => {
-                    merged_blocks.push(o.to_string());
-                    resolved_count += 1;
-                }
-                // Added only in theirs
-                (None, None, Some(t)) => {
-                    merged_blocks.push(t.to_string());
-                    resolved_count += 1;
-                }
-                // Deleted in ours, unchanged in theirs
-                (Some(b), None, Some(t)) if t == b => {
-                    // Clean deletion by ours
-                    resolved_count += 1;
-                }
-                // Deleted in theirs, unchanged in ours
-                (Some(b), Some(o), None) if o == b => {
-                    // Clean deletion by theirs
-                    resolved_count += 1;
-                }
-                // Both modified the same block differently: run localized text merge on this block!
-                (b_opt, Some(o), Some(t)) => {
-                    let b_bytes = b_opt.unwrap_or("").as_bytes();
-                    let block_res = TextThreeWayMerge::merge(
-                        b_bytes,
-                        o.as_bytes(),
-                        t.as_bytes(),
-                        ours_label,
-                        theirs_label,
-                    );
-                    if !block_res.is_clean {
-                        conflict_count += block_res.conflict_count;
-                    } else {
-                        resolved_count += 1;
-                    }
-                    merged_blocks.push(String::from_utf8_lossy(&block_res.content).to_string());
-                }
-                // Other complex delete/modify conflicts
-                (Some(b), o_opt, t_opt) => {
-                    let o_bytes = o_opt.unwrap_or("").as_bytes();
-                    let t_bytes = t_opt.unwrap_or("").as_bytes();
-                    let block_res = TextThreeWayMerge::merge(
-                        b.as_bytes(),
-                        o_bytes,
-                        t_bytes,
-                        ours_label,
-                        theirs_label,
-                    );
-                    if !block_res.is_clean {
-                        conflict_count += block_res.conflict_count;
-                    }
-                    merged_blocks.push(String::from_utf8_lossy(&block_res.content).to_string());
-                }
-                (None, None, None) => {}
+            let (block_opt, block_conflicts, block_resolved) =
+                Self::reconcile_single_block(b_val, o_val, t_val, ours_label, theirs_label);
+            conflict_count += block_conflicts;
+            resolved_count += block_resolved;
+            if let Some(rendered) = block_opt {
+                merged_blocks.push(rendered);
             }
         }
 
-        // If block merge produced no improvement over fallback, return fallback
         if conflict_count >= fallback.conflict_count && !fallback.is_clean {
-            return BlockMergeResult {
-                is_clean: false,
-                conflict_count: fallback.conflict_count,
-                resolved_blocks_count: 0,
-                deduplicated_imports_count: 0,
-                content: fallback.content,
-            };
+            return None;
         }
 
-        let content = merged_blocks.join("\n\n").into_bytes();
-        BlockMergeResult {
+        Some(BlockMergeResult {
             is_clean: conflict_count == 0,
             conflict_count,
             resolved_blocks_count: resolved_count,
             deduplicated_imports_count: 0,
-            content,
+            content: merged_blocks.join("\n\n").into_bytes(),
+        })
+    }
+
+    /// Reconciles one declaration block across `(base, ours, theirs)`, returning `(rendered_block, conflicts, resolved)`.
+    fn reconcile_single_block(
+        b_val: Option<&str>,
+        o_val: Option<&str>,
+        t_val: Option<&str>,
+        ours_label: &str,
+        theirs_label: &str,
+    ) -> (Option<String>, usize, usize) {
+        match (b_val, o_val, t_val) {
+            (_, Some(o), Some(t)) if o == t => (Some(o.to_string()), 0, 1),
+            (Some(b), Some(o), Some(t)) if o == b => (Some(t.to_string()), 0, 1),
+            (Some(b), Some(o), Some(t)) if t == b => (Some(o.to_string()), 0, 1),
+            (None, Some(o), None) => (Some(o.to_string()), 0, 1),
+            (None, None, Some(t)) => (Some(t.to_string()), 0, 1),
+            (Some(b), None, Some(t)) if t == b => (None, 0, 1),
+            (Some(b), Some(o), None) if o == b => (None, 0, 1),
+            (b_opt, Some(o), Some(t)) => {
+                let block_res = TextThreeWayMerge::merge(
+                    b_opt.unwrap_or("").as_bytes(),
+                    o.as_bytes(),
+                    t.as_bytes(),
+                    ours_label,
+                    theirs_label,
+                );
+                let (conflicts, resolved) = if block_res.is_clean {
+                    (0, 1)
+                } else {
+                    (block_res.conflict_count, 0)
+                };
+                (
+                    Some(String::from_utf8_lossy(&block_res.content).into_owned()),
+                    conflicts,
+                    resolved,
+                )
+            }
+            (Some(b), o_opt, t_opt) => {
+                let block_res = TextThreeWayMerge::merge(
+                    b.as_bytes(),
+                    o_opt.unwrap_or("").as_bytes(),
+                    t_opt.unwrap_or("").as_bytes(),
+                    ours_label,
+                    theirs_label,
+                );
+                let conflicts = if block_res.is_clean {
+                    0
+                } else {
+                    block_res.conflict_count
+                };
+                (
+                    Some(String::from_utf8_lossy(&block_res.content).into_owned()),
+                    conflicts,
+                    0,
+                )
+            }
+            (None, None, None) => (None, 0, 0),
         }
     }
 

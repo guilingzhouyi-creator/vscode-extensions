@@ -8,11 +8,13 @@
 //! Exit Semantics & Design Rationale: fully interoperable with Git `commit-graph.c` chunk layout
 //!   (CGPH magic, OIDF, OIDL, and CDAT chunks) eliminating commit object traversal latency.
 
+use crate::backends::fanout::{binary_search_oid_table, fanout_range, OID_LEN};
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;
+use fg_core::write_file_atomic;
 use sha1::{Digest, Sha1};
-use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 
 const COMMIT_GRAPH_MAGIC: &[u8; 4] = b"CGPH";
@@ -165,17 +167,8 @@ impl CommitGraphWriter {
 
     /// Atomically persists the commit-graph to disk.
     pub fn write_to_file(&mut self, target_path: &Path) -> FractalResult<()> {
-        if let Some(parent_dir) = target_path.parent() {
-            fs::create_dir_all(parent_dir)?;
-        }
         let graph_bytes = self.build_bytes()?;
-        let staging_path = target_path.with_extension("tmp");
-        {
-            let mut file = File::create(&staging_path)?;
-            file.write_all(&graph_bytes)?;
-            file.sync_all()?;
-        }
-        fs::rename(&staging_path, target_path)?;
+        write_file_atomic(target_path, &graph_bytes, true)?;
         Ok(())
     }
 }
@@ -338,43 +331,16 @@ impl CommitGraphReader {
         if self.num_commits == 0 {
             return None;
         }
-
-        let first_byte = target_oid.as_bytes()[0] as usize;
-        let range_start = if first_byte == 0 {
-            0
-        } else {
-            let offset = self.oidf_offset + (first_byte - 1) * 4;
-            let bytes: [u8; 4] = self.binary_buffer[offset..offset + 4].try_into().ok()?;
-            u32::from_be_bytes(bytes) as usize
-        };
-
-        let offset = self.oidf_offset + first_byte * 4;
-        let bytes: [u8; 4] = self.binary_buffer[offset..offset + 4].try_into().ok()?;
-        let range_end = u32::from_be_bytes(bytes) as usize;
-
-        if range_start >= range_end {
-            return None;
-        }
-
-        let mut low = range_start;
-        let mut high = range_end;
-
-        while low < high {
-            let mid = low + (high - low) / 2;
-            let entry_offset = self.oidl_offset + mid * 20;
-            let entry_bytes: [u8; 20] = self.binary_buffer[entry_offset..entry_offset + 20]
-                .try_into()
-                .ok()?;
-            let entry_oid = Oid::from_bytes(entry_bytes);
-
-            match entry_oid.cmp(target_oid) {
-                std::cmp::Ordering::Less => low = mid + 1,
-                std::cmp::Ordering::Greater => high = mid,
-                std::cmp::Ordering::Equal => return Some(mid),
-            }
-        }
-
-        None
+        let target = target_oid.as_bytes();
+        let (low, high) = fanout_range(&self.binary_buffer, self.oidf_offset, target[0]);
+        binary_search_oid_table(
+            &self.binary_buffer,
+            self.oidl_offset,
+            OID_LEN,
+            low,
+            high,
+            target,
+        )
     }
 
     /// Extracts complete commit entry at zero-based commit index position.

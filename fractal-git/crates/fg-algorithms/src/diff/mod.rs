@@ -21,7 +21,7 @@ pub mod xdiff_prepare;
 
 pub use bit_parallel::{bit_parallel_diff, BIT_PARALLEL_MAX_LINES};
 pub use compact::{Compaction, Side};
-pub use engine::{DiffAlgorithm, DiffEngine};
+pub use engine::{compute_xdiff_change_flags, DiffAlgorithm, DiffEngine};
 pub use patch::{
     split_lines, text_ends_with_newline, PatchGenerator, PatchHunk, PatchHunkRef, PatchLine,
     PatchLineRef, UnifiedPatch, UnifiedPatchRef, DEFAULT_HUNK_CONTEXT,

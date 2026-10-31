@@ -52,7 +52,7 @@ impl BisectState {
     pub fn save(&self, dir: &Path) -> Result<(), FractalError> {
         let path = dir.join(BISECT_STATE_FILE);
         let serialized_bytes = serde_json::to_vec_pretty(self)?;
-        std::fs::write(&path, serialized_bytes)?;
+        fg_core::write_file_atomic(&path, &serialized_bytes, false)?;
         Ok(())
     }
 
@@ -108,47 +108,15 @@ impl BisectEngine {
     where
         F: FnMut(&Oid) -> Option<Vec<Oid>>,
     {
-        // 1. Collect all reachable ancestors of bad commit (including bad itself)
-        let mut bad_ancestors: HashSet<Oid> = HashSet::new();
-        let mut queue: VecDeque<Oid> = VecDeque::new();
-        queue.push_back(*bad);
-        bad_ancestors.insert(*bad);
+        // 1. Collect all reachable ancestors of bad and good commits
+        let bad_ancestors = collect_ancestors(std::slice::from_ref(bad), None, &mut parent_fn);
+        let good_ancestors = collect_ancestors(good, None, &mut parent_fn);
 
-        while let Some(current) = queue.pop_front() {
-            if let Some(parents) = parent_fn(&current) {
-                for p in parents {
-                    if bad_ancestors.insert(p) {
-                        queue.push_back(p);
-                    }
-                }
-            }
-        }
-
-        // 2. Collect all reachable ancestors of good commits (including good themselves)
-        let mut good_ancestors: HashSet<Oid> = HashSet::new();
-        for g in good {
-            if good_ancestors.insert(*g) {
-                queue.push_back(*g);
-            }
-        }
-
-        while let Some(current) = queue.pop_front() {
-            if let Some(parents) = parent_fn(&current) {
-                for p in parents {
-                    if good_ancestors.insert(p) {
-                        queue.push_back(p);
-                    }
-                }
-            }
-        }
-
-        // 3. Candidate set: bad_ancestors \ good_ancestors
-        let mut candidates: BTreeSet<Oid> = BTreeSet::new();
-        for c in &bad_ancestors {
-            if !good_ancestors.contains(c) {
-                candidates.insert(*c);
-            }
-        }
+        // 2. Candidate set: bad_ancestors \ good_ancestors
+        let candidates: BTreeSet<Oid> = bad_ancestors
+            .into_iter()
+            .filter(|commit| !good_ancestors.contains(commit))
+            .collect();
 
         if candidates.is_empty() {
             return BisectStep::Finished {
@@ -162,7 +130,7 @@ impl BisectEngine {
             return BisectStep::Found { first_bad };
         }
 
-        // 4. Compute candidate weights (number of ancestors of c within the candidate set)
+        // 3. Compute candidate weights (number of ancestors of c within the candidate set)
         let skipped_set: HashSet<Oid> = skipped.iter().copied().collect();
         let total_candidates = candidates.len();
         let target_weight = total_candidates / 2;
@@ -170,45 +138,26 @@ impl BisectEngine {
         let mut best_candidate: Option<Oid> = None;
         let mut best_diff = usize::MAX;
 
-        for c in &candidates {
-            if skipped_set.contains(c) {
+        for candidate in &candidates {
+            if skipped_set.contains(candidate) {
                 continue;
             }
-
-            // Count ancestors of c that are in candidates set
-            let mut c_ancestors: HashSet<Oid> = HashSet::new();
-            let mut sub_queue: VecDeque<Oid> = VecDeque::new();
-            c_ancestors.insert(*c);
-            sub_queue.push_back(*c);
-
-            while let Some(curr) = sub_queue.pop_front() {
-                if let Some(parents) = parent_fn(&curr) {
-                    for p in parents {
-                        if candidates.contains(&p) && c_ancestors.insert(p) {
-                            sub_queue.push_back(p);
-                        }
-                    }
-                }
-            }
-
-            let weight = c_ancestors.len();
-            let diff = weight.abs_diff(target_weight);
-
+            let c_ancestors = collect_ancestors(
+                std::slice::from_ref(candidate),
+                Some(&candidates),
+                &mut parent_fn,
+            );
+            let diff = c_ancestors.len().abs_diff(target_weight);
             if diff < best_diff {
                 best_diff = diff;
-                best_candidate = Some(*c);
+                best_candidate = Some(*candidate);
             }
         }
 
-        let selected = match best_candidate {
-            Some(c) => c,
-            None => {
-                // All remaining candidates were skipped; pick the first non-skipped or the bad commit
-                return BisectStep::Finished {
-                    message: "All remaining candidates are skipped; cannot bisect further."
-                        .to_string(),
-                };
-            }
+        let Some(selected) = best_candidate else {
+            return BisectStep::Finished {
+                message: "All remaining candidates are skipped; cannot bisect further.".to_string(),
+            };
         };
 
         let est_steps = (total_candidates as f64).log2().ceil().max(1.0) as usize;
@@ -219,4 +168,36 @@ impl BisectEngine {
             estimated_steps: est_steps,
         }
     }
+}
+
+/// Collects all reachable ancestors from `seeds`, optionally restricted to `allowed`.
+fn collect_ancestors<F>(
+    seeds: &[Oid],
+    allowed: Option<&BTreeSet<Oid>>,
+    parent_fn: &mut F,
+) -> HashSet<Oid>
+where
+    F: FnMut(&Oid) -> Option<Vec<Oid>>,
+{
+    let mut ancestors = HashSet::new();
+    let mut queue = VecDeque::new();
+    for seed in seeds {
+        if ancestors.insert(*seed) {
+            queue.push_back(*seed);
+        }
+    }
+    while let Some(current) = queue.pop_front() {
+        let Some(parents) = parent_fn(&current) else {
+            continue;
+        };
+        for parent in parents {
+            if allowed.is_some_and(|set| !set.contains(&parent)) {
+                continue;
+            }
+            if ancestors.insert(parent) {
+                queue.push_back(parent);
+            }
+        }
+    }
+    ancestors
 }

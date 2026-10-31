@@ -39,7 +39,6 @@ const PROJECT_MARKERS: &[&str] = &[
 /// Filesystem storage driver for controlled project leases and auto-discovery.
 #[derive(Debug, Clone)]
 pub struct DiskProjectStore {
-    base_dir: PathBuf,
     cache_file_path: PathBuf,
 }
 
@@ -48,10 +47,7 @@ impl DiskProjectStore {
     pub fn new(git_dir: impl AsRef<Path>) -> Self {
         let base_dir = git_dir.as_ref().join(PROJECTS_DIR);
         let cache_file_path = base_dir.join(PROJECTS_CACHE_FILE);
-        Self {
-            base_dir,
-            cache_file_path,
-        }
+        Self { cache_file_path }
     }
 
     /// Loads active project leases, optionally sniffing workspace root to discover unmapped projects.
@@ -95,21 +91,9 @@ impl DiskProjectStore {
 
     /// Atomically persists the project lease cache to disk using a unique staging file.
     pub fn save(&self, cache: &ProjectLeaseCache) -> FractalResult<()> {
-        if !self.base_dir.exists() {
-            fs::create_dir_all(&self.base_dir).map_err(FractalError::Io)?;
-        }
-
         let serialized_bytes = serde_json::to_vec_pretty(cache).map_err(FractalError::Json)?;
-        let temporary_path = self.base_dir.join(format!(
-            "{}.tmp.{}",
-            PROJECTS_CACHE_FILE,
-            std::process::id()
-        ));
-
-        fs::write(&temporary_path, &serialized_bytes).map_err(FractalError::Io)?;
-        fs::rename(&temporary_path, &self.cache_file_path).map_err(FractalError::Io)?;
-
-        Ok(())
+        fg_core::write_file_atomic(&self.cache_file_path, &serialized_bytes, false)
+            .map_err(FractalError::Io)
     }
 
     /// Touches a specific project by id to record recent activity and reset dormant counter.

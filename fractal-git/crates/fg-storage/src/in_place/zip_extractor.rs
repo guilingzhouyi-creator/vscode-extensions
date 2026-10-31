@@ -3,6 +3,11 @@
 //! Architecture Role: Implements reverse (tail-first) ZIP decompression with in-place tail truncation.
 //!   Reclaims disk space as extraction progresses, bounded by an adaptive batch window.
 //!   Also exposes non-destructive standard extraction for read-only callers.
+//! Dependencies & Triggers: Invoked by `taxis unarchive` for low-disk `.zip` repository ingestion.
+//! Responsibilities: Parse EOCD and Central Directory headers, verify IEEE CRC32 payloads, enforce
+//!   Path Jail boundaries, flush WAL entries prior to tail truncation, and self-heal partial ZIP tails.
+//! Exit Semantics & Design Rationale: Propagates WAL sync errors before any physical truncation and
+//!   synthesizes a valid Central Directory tail for unextracted members if an extraction step fails.
 //!
 //! Domain Governance Rules: FGT-STO-001, FGT-PRF-001, FGT-COR-001, FGT-SAF-001.
 
@@ -359,6 +364,102 @@ pub fn extract_zip_in_place<P: AsRef<Path>, D: AsRef<Path>>(
     extract_zip_in_place_with_journal(archive_path, dest_dir, config, None, None)
 }
 
+/// Extracts or resumes a single non-directory ZIP member during reverse in-place extraction.
+fn extract_single_zip_member_in_place(
+    truncator: &mut TailTruncator,
+    dest: &Path,
+    member: &ZipMember,
+    journal: &mut Option<&mut InPlaceJournal>,
+    already_extracted: Option<&std::collections::HashSet<String>>,
+) -> FractalResult<u64> {
+    let rel_path = sanitize_relative_path(&member.name)?;
+    let target_path = dest.join(&rel_path);
+
+    let is_already_done =
+        already_extracted.is_some_and(|set| set.contains(&member.name)) && target_path.exists();
+    if is_already_done {
+        return Ok(target_path
+            .metadata()
+            .map(|m| m.len())
+            .unwrap_or(member.uncompressed_size));
+    }
+
+    let payload = extract_member_payload(truncator.file_mut(), member)?;
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent).map_err(FractalError::Io)?;
+    }
+    fs::write(&target_path, &payload).map_err(FractalError::Io)?;
+    let _ = apply_zip_unix_permissions(&target_path, member.external_attributes);
+
+    if let Some(j) = journal.as_mut() {
+        j.append_unbuffered(&InPlaceLogEntry::MemberExtracted {
+            name: member.name.clone(),
+            extracted_bytes: payload.len() as u64,
+            local_header_offset: member.local_header_offset,
+            crc32: member.crc32,
+        })?;
+    }
+    Ok(payload.len() as u64)
+}
+
+/// Runs the reverse member loop and records `current_extracted_idx` for self-healing recovery.
+fn run_reverse_zip_loop(
+    members: &[ZipMember],
+    truncator: &mut TailTruncator,
+    dest: &Path,
+    config: &SpacePlanConfig,
+    journal: &mut Option<&mut InPlaceJournal>,
+    already_extracted: Option<&std::collections::HashSet<String>>,
+    current_extracted_idx: &mut usize,
+) -> FractalResult<(usize, u64)> {
+    let mut files_extracted = 0usize;
+    let mut total_extracted_bytes: u64 = 0;
+    let mut accumulated_reclaim: u64 = 0;
+    let total_members = members.len();
+
+    for (idx, member) in members.iter().enumerate() {
+        *current_extracted_idx = idx;
+        if member.is_dir {
+            let rel_path = sanitize_relative_path(&member.name)?;
+            fs::create_dir_all(dest.join(rel_path)).map_err(FractalError::Io)?;
+            continue;
+        }
+
+        let payload_len = extract_single_zip_member_in_place(
+            truncator,
+            dest,
+            member,
+            journal,
+            already_extracted,
+        )?;
+
+        files_extracted += 1;
+        total_extracted_bytes = total_extracted_bytes.saturating_add(payload_len);
+
+        let reclaimed_step = truncator
+            .current_len()
+            .saturating_sub(member.local_header_offset);
+        accumulated_reclaim = accumulated_reclaim.saturating_add(reclaimed_step);
+
+        let is_last = idx + 1 == total_members;
+        if (accumulated_reclaim >= config.batch_window_bytes || is_last)
+            && member.local_header_offset < truncator.current_len()
+        {
+            if let Some(j) = journal.as_mut() {
+                j.append(&InPlaceLogEntry::BatchTruncated {
+                    new_len: member.local_header_offset,
+                    freed_bytes: accumulated_reclaim,
+                })?;
+            }
+            truncator.truncate_to(member.local_header_offset)?;
+            accumulated_reclaim = 0;
+        }
+    }
+
+    *current_extracted_idx = total_members;
+    Ok((files_extracted, total_extracted_bytes))
+}
+
 /// Executes in-place reverse ZIP extraction with optional write-ahead logging (WAL),
 /// crash resilience, and skip set for auto-resuming aborted extractions.
 pub fn extract_zip_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
@@ -378,127 +479,44 @@ pub fn extract_zip_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
     // Sort descending by local_header_offset (tail-first order)
     members.sort_by_key(|a| std::cmp::Reverse(a.local_header_offset));
 
-    let mut files_extracted = 0;
-    let mut total_extracted_bytes: u64 = 0;
-    let mut accumulated_reclaim: u64 = 0;
-    let total_members = members.len();
-
-    // The Central Directory itself can be immediately lopped off if it sits at the tail!
+    // The Central Directory itself can be immediately lopped off once indexed in memory.
     if eocd.central_directory_offset < truncator.current_len() {
         if let Some(j) = journal.as_mut() {
-            let _ = j.append(&InPlaceLogEntry::BatchTruncated {
+            j.append(&InPlaceLogEntry::BatchTruncated {
                 new_len: eocd.central_directory_offset,
                 freed_bytes: truncator
                     .current_len()
                     .saturating_sub(eocd.central_directory_offset),
-            });
+            })?;
         }
         truncator.truncate_to(eocd.central_directory_offset)?;
     }
 
-    let mut current_extracted_idx = 0;
-    let mut run_extraction = || -> FractalResult<()> {
-        for (idx, member) in members.iter().enumerate() {
-            current_extracted_idx = idx;
-            if member.is_dir {
-                let rel_path = sanitize_relative_path(&member.name)?;
-                let target_path = dest.join(rel_path);
-                fs::create_dir_all(&target_path).map_err(FractalError::Io)?;
-                continue;
-            }
-
-            let rel_path = sanitize_relative_path(&member.name)?;
-            let target_path = dest.join(&rel_path);
-
-            // If resuming and member was already extracted, skip payload extraction if file exists
-            let is_already_done = already_extracted
-                .map(|set| set.contains(&member.name))
-                .unwrap_or(false)
-                && target_path.exists();
-
-            let payload_len = if is_already_done {
-                target_path
-                    .metadata()
-                    .map(|m| m.len())
-                    .unwrap_or(member.uncompressed_size)
-            } else {
-                // 1. Extract and verify payload
-                let payload = extract_member_payload(truncator.file_mut(), member)?;
-                if let Some(parent) = target_path.parent() {
-                    fs::create_dir_all(parent).map_err(FractalError::Io)?;
-                }
-                fs::write(&target_path, &payload).map_err(FractalError::Io)?;
-
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    if member.external_attributes > 0 {
-                        let mode = (member.external_attributes >> 16) & 0o7777;
-                        if mode != 0 {
-                            let _ =
-                                fs::set_permissions(&target_path, fs::Permissions::from_mode(mode));
-                        }
-                    }
-                }
-
-                if let Some(j) = journal.as_mut() {
-                    let _ = j.append_unbuffered(&InPlaceLogEntry::MemberExtracted {
-                        name: member.name.clone(),
-                        extracted_bytes: payload.len() as u64,
-                        local_header_offset: member.local_header_offset,
-                        crc32: member.crc32,
-                    });
-                }
-                payload.len() as u64
-            };
-
-            files_extracted += 1;
-            total_extracted_bytes = total_extracted_bytes.saturating_add(payload_len);
-
-            let reclaimed_step = truncator
-                .current_len()
-                .saturating_sub(member.local_header_offset);
-            accumulated_reclaim = accumulated_reclaim.saturating_add(reclaimed_step);
-
-            // 2. Batch window evaluation
-            let is_last = idx + 1 == total_members;
-            if (accumulated_reclaim >= config.batch_window_bytes || is_last)
-                && member.local_header_offset < truncator.current_len()
-            {
-                if let Some(j) = journal.as_mut() {
-                    let _ = j.append(&InPlaceLogEntry::BatchTruncated {
-                        new_len: member.local_header_offset,
-                        freed_bytes: accumulated_reclaim,
-                    });
-                }
-                truncator.truncate_to(member.local_header_offset)?;
-                accumulated_reclaim = 0;
-            }
-        }
-        current_extracted_idx = total_members;
-        Ok(())
-    };
-
-    match run_extraction() {
-        Ok(()) => {
-            // If completely processed, truncate file to 0
+    let mut current_extracted_idx = 0usize;
+    match run_reverse_zip_loop(
+        &members,
+        &mut truncator,
+        dest,
+        config,
+        &mut journal,
+        already_extracted,
+        &mut current_extracted_idx,
+    ) {
+        Ok((files_extracted, total_extracted_bytes)) => {
             if truncator.current_len() > 0 {
                 truncator.truncate_to(0)?;
             }
             if let Some(j) = journal.as_mut() {
-                let _ = j.append(&InPlaceLogEntry::SessionCompleted);
+                j.append(&InPlaceLogEntry::SessionCompleted)?;
             }
-            let report = InPlaceExtractionReport {
+            Ok(InPlaceExtractionReport {
                 files_extracted,
                 total_extracted_bytes,
                 total_truncated_bytes: truncator.total_truncated_bytes(),
                 final_archive_len: truncator.current_len(),
-            };
-            Ok(report)
+            })
         }
         Err(err) => {
-            // ArchiveRestorer self-healing on failure:
-            // Remaining members are those from current_extracted_idx onwards
             let remaining_members = &members[current_extracted_idx..];
             if !remaining_members.is_empty() && truncator.current_len() > 0 {
                 let _ =

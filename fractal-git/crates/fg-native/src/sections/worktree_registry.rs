@@ -154,11 +154,9 @@ impl WorktreeRecord {
         if self.is_full {
             return true;
         }
-        let candidate = relative_path.trim_matches('/').replace('\\', "/");
-        self.scopes.iter().any(|scope| {
-            let prefix = scope.trim_matches('/').replace('\\', "/");
-            !prefix.is_empty() && candidate.starts_with(&prefix)
-        })
+        self.scopes
+            .iter()
+            .any(|scope| fg_core::path_matches_scope(relative_path, scope))
     }
 }
 
@@ -296,13 +294,12 @@ impl WktrSection {
             });
         }
 
-        let mut records = Vec::with_capacity(declared.min(64));
-        let mut previous_path: Option<String> = None;
+        let mut records: Vec<WorktreeRecord> = Vec::with_capacity(declared.min(64));
 
         for _ in 0..declared {
             let path = reader.read_string("worktree_path")?;
-            if let Some(previous) = previous_path.as_ref() {
-                if previous.as_str() >= path.as_str() {
+            if let Some(previous) = records.last() {
+                if previous.path.as_str() >= path.as_str() {
                     return Err(NativeError::SectionTableUnsorted {
                         tag: SECTION_TAG,
                         previous: "worktree path",
@@ -331,15 +328,13 @@ impl WktrSection {
             let tier = WorktreeTier::from_u8(reader.read_u8("worktree_tier")?)?;
 
             let record = WorktreeRecord {
-                path: path.clone(),
+                path,
                 mode,
                 scopes,
                 is_full,
                 tier,
             };
             validate_record(&record)?;
-
-            previous_path = Some(path);
             records.push(record);
         }
 

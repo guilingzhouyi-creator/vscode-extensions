@@ -79,6 +79,73 @@ impl DagWalker {
         false
     }
 
+    /// Shared monotonic-cutoff max-heap ancestor search powering both generation-number and CCD v2
+    /// reachability checks (`D9`).
+    fn is_ancestor_by_cutoff<F>(
+        ancestor: &Oid,
+        descendant: &Oid,
+        ancestor_cutoff: u64,
+        descendant_cutoff: u64,
+        mut get_node: F,
+    ) -> bool
+    where
+        F: FnMut(&Oid) -> Option<(u64, Vec<Oid>)>,
+    {
+        if ancestor == descendant {
+            return true;
+        }
+        if ancestor_cutoff >= descendant_cutoff {
+            return false;
+        }
+
+        let mut visited: FastOidSet = FastOidSet::default();
+        let mut heap: BinaryHeap<QueueItem> = BinaryHeap::new();
+        let mut node_cache: FastOidMap<Vec<Oid>> = FastOidMap::default();
+
+        heap.push(QueueItem {
+            gen: descendant_cutoff,
+            oid: *descendant,
+        });
+        visited.insert(*descendant);
+
+        while let Some(item) = heap.pop() {
+            if item.gen < ancestor_cutoff {
+                continue;
+            }
+            if &item.oid == ancestor {
+                return true;
+            }
+
+            let Some(parents) = node_cache
+                .remove(&item.oid)
+                .or_else(|| get_node(&item.oid).map(|(_, parents)| parents))
+            else {
+                continue;
+            };
+
+            for parent in parents {
+                if &parent == ancestor {
+                    return true;
+                }
+                if !visited.insert(parent) {
+                    continue;
+                }
+                let Some((p_cutoff, p_parents)) = get_node(&parent) else {
+                    continue;
+                };
+                if p_cutoff >= ancestor_cutoff {
+                    heap.push(QueueItem {
+                        gen: p_cutoff,
+                        oid: parent,
+                    });
+                    node_cache.insert(parent, p_parents);
+                }
+            }
+        }
+
+        false
+    }
+
     /// Generation-number accelerated ancestor evaluation.
     /// Fast-path invariant: If ancestor_gen >= descendant_gen and ancestor != descendant,
     /// returns false in O(1) time.
@@ -89,71 +156,12 @@ impl DagWalker {
         descendant: &Oid,
         ancestor_gen: u64,
         descendant_gen: u64,
-        mut get_node: F,
+        get_node: F,
     ) -> bool
     where
         F: FnMut(&Oid) -> Option<(u64, Vec<Oid>)>,
     {
-        if ancestor == descendant {
-            return true;
-        }
-
-        // O(1) Invariant: An ancestor strictly must have a lower generation
-        // number than its descendant!
-        if ancestor_gen >= descendant_gen {
-            return false;
-        }
-
-        let mut visited: FastOidSet = FastOidSet::default();
-        let mut heap: BinaryHeap<QueueItem> = BinaryHeap::new();
-        let mut node_cache: FastOidMap<Vec<Oid>> = FastOidMap::default();
-
-        heap.push(QueueItem {
-            gen: descendant_gen,
-            oid: *descendant,
-        });
-        visited.insert(*descendant);
-
-        while let Some(item) = heap.pop() {
-            // Cutoff pruning: no parent of this node can have generation >= ancestor_gen!
-            if item.gen < ancestor_gen {
-                continue;
-            }
-
-            if &item.oid == ancestor {
-                return true;
-            }
-
-            let parents = match node_cache
-                .remove(&item.oid)
-                .or_else(|| get_node(&item.oid).map(|(_, parents)| parents))
-            {
-                Some(parents) => parents,
-                None => continue,
-            };
-
-            for parent in parents {
-                if &parent == ancestor {
-                    return true;
-                }
-
-                if !visited.insert(parent) {
-                    continue;
-                }
-
-                if let Some((p_gen, p_parents)) = get_node(&parent) {
-                    if p_gen >= ancestor_gen {
-                        heap.push(QueueItem {
-                            gen: p_gen,
-                            oid: parent,
-                        });
-                        node_cache.insert(parent, p_parents);
-                    }
-                }
-            }
-        }
-
-        false
+        Self::is_ancestor_by_cutoff(ancestor, descendant, ancestor_gen, descendant_gen, get_node)
     }
 
     /// Corrected Commit Date (CCD v2) accelerated ancestor evaluation.
@@ -173,62 +181,16 @@ impl DagWalker {
         if ancestor == descendant {
             return true;
         }
-
-        // O(1) Poset Homomorphism Invariant: Ancestor strictly must have CCD < descendant_ccd
         if !ancestor_ccd.can_be_ancestor_of(&descendant_ccd) {
             return false;
         }
-
-        let mut visited: FastOidSet = FastOidSet::default();
-        let mut heap: BinaryHeap<QueueItem> = BinaryHeap::new();
-        let mut node_cache: FastOidMap<Vec<Oid>> = FastOidMap::default();
-
-        heap.push(QueueItem {
-            gen: descendant_ccd.0,
-            oid: *descendant,
-        });
-        visited.insert(*descendant);
-
-        while let Some(item) = heap.pop() {
-            // Cutoff pruning: no parent of this node can have CCD >= ancestor_ccd!
-            if item.gen < ancestor_ccd.0 {
-                continue;
-            }
-
-            if &item.oid == ancestor {
-                return true;
-            }
-
-            let parents = match node_cache
-                .remove(&item.oid)
-                .or_else(|| get_node(&item.oid).map(|(_, parents)| parents))
-            {
-                Some(parents) => parents,
-                None => continue,
-            };
-
-            for parent in parents {
-                if &parent == ancestor {
-                    return true;
-                }
-
-                if !visited.insert(parent) {
-                    continue;
-                }
-
-                if let Some((p_ccd, p_parents)) = get_node(&parent) {
-                    if p_ccd.0 >= ancestor_ccd.0 {
-                        heap.push(QueueItem {
-                            gen: p_ccd.0,
-                            oid: parent,
-                        });
-                        node_cache.insert(parent, p_parents);
-                    }
-                }
-            }
-        }
-
-        false
+        Self::is_ancestor_by_cutoff(
+            ancestor,
+            descendant,
+            ancestor_ccd.0,
+            descendant_ccd.0,
+            |oid| get_node(oid).map(|(ccd, parents)| (ccd.0, parents)),
+        )
     }
 
     /// Performs breadth-first topological walk from start commit down to root.
@@ -350,6 +312,50 @@ impl DagWalker {
         Self::prune_redundant_merge_bases(&candidate_bases, get_node, node_cache)
     }
 
+    fn ensure_cached_ccd<F>(
+        oid: &Oid,
+        get_node: &mut F,
+        node_cache: &mut FastOidMap<(CorrectedCommitDate, Vec<Oid>)>,
+    ) -> Option<CorrectedCommitDate>
+    where
+        F: FnMut(&Oid) -> Option<(CorrectedCommitDate, Vec<Oid>)>,
+    {
+        if let Some((ccd, _)) = node_cache.get(oid) {
+            return Some(*ccd);
+        }
+        let loaded = get_node(oid)?;
+        let ccd = loaded.0;
+        node_cache.insert(*oid, loaded);
+        Some(ccd)
+    }
+
+    fn propagate_merge_base_parents<F>(
+        parents: &[Oid],
+        flags_to_propagate: u8,
+        flags_map: &mut FastOidMap<u8>,
+        queue: &mut BinaryHeap<QueueItem>,
+        get_node: &mut F,
+        node_cache: &mut FastOidMap<(CorrectedCommitDate, Vec<Oid>)>,
+    ) where
+        F: FnMut(&Oid) -> Option<(CorrectedCommitDate, Vec<Oid>)>,
+    {
+        for &parent in parents {
+            let entry = flags_map.entry(parent).or_insert(0);
+            let old_flags = *entry;
+            let new_flags = old_flags | flags_to_propagate;
+            if new_flags == old_flags {
+                continue;
+            }
+            *entry = new_flags;
+            if let Some(p_ccd) = Self::ensure_cached_ccd(&parent, get_node, node_cache) {
+                queue.push(QueueItem {
+                    gen: p_ccd.0,
+                    oid: parent,
+                });
+            }
+        }
+    }
+
     fn collect_candidate_merge_bases<F>(
         commit_a: &Oid,
         commit_b: &Oid,
@@ -386,18 +392,14 @@ impl DagWalker {
         let mut min_common_ccd: Option<u64> = None;
 
         while let Some(item) = queue.pop() {
-            let current_flags = *flags_map.get(&item.oid).unwrap_or(&0);
+            let current_flags = flags_map.get(&item.oid).copied().unwrap_or(0);
+            let is_common = (current_flags & FLAG_COMMON) == FLAG_COMMON;
 
-            // Cutoff: if current item's generation is strictly below the lowest
-            // common ancestor found and all active elements are already stale, we can prune
-            if let Some(min_ccd) = min_common_ccd {
-                if item.gen < min_ccd && (current_flags & FLAG_COMMON) == FLAG_COMMON {
-                    continue;
-                }
+            if is_common && min_common_ccd.is_some_and(|min_ccd| item.gen < min_ccd) {
+                continue;
             }
 
-            if (current_flags & FLAG_COMMON) == FLAG_COMMON && (current_flags & FLAG_STALE) == 0 {
-                // Potential merge base
+            if is_common && (current_flags & FLAG_STALE) == 0 {
                 if let Some(flags_mut) = flags_map.get_mut(&item.oid) {
                     *flags_mut |= FLAG_RESULT | FLAG_STALE;
                     candidate_bases.push(item.oid);
@@ -407,42 +409,25 @@ impl DagWalker {
                 }
             }
 
-            let node = match node_cache.entry(item.oid) {
-                std::collections::hash_map::Entry::Occupied(e) => Some(e.get().clone()),
-                std::collections::hash_map::Entry::Vacant(e) => {
-                    get_node(&item.oid).map(|n| e.insert(n).clone())
-                }
-            };
-
-            if let Some((_, parents)) = node {
-                let parent_flags_to_propagate = if (current_flags & FLAG_COMMON) == FLAG_COMMON {
-                    current_flags | FLAG_STALE
-                } else {
-                    current_flags
-                };
-
-                for parent in parents {
-                    let entry = flags_map.entry(parent).or_insert(0);
-                    let old_flags = *entry;
-                    let new_flags = old_flags | parent_flags_to_propagate;
-
-                    if new_flags != old_flags {
-                        *entry = new_flags;
-                        let p_node = match node_cache.entry(parent) {
-                            std::collections::hash_map::Entry::Occupied(e) => Some(e.get().clone()),
-                            std::collections::hash_map::Entry::Vacant(e) => {
-                                get_node(&parent).map(|n| e.insert(n).clone())
-                            }
-                        };
-                        if let Some((p_ccd, _)) = p_node {
-                            queue.push(QueueItem {
-                                gen: p_ccd.0,
-                                oid: parent,
-                            });
-                        }
-                    }
-                }
+            if Self::ensure_cached_ccd(&item.oid, &mut get_node, node_cache).is_none() {
+                continue;
             }
+            let Some((_, parents)) = node_cache.get(&item.oid).cloned() else {
+                continue;
+            };
+            let flags_to_propagate = if is_common {
+                current_flags | FLAG_STALE
+            } else {
+                current_flags
+            };
+            Self::propagate_merge_base_parents(
+                &parents,
+                flags_to_propagate,
+                &mut flags_map,
+                &mut queue,
+                &mut get_node,
+                node_cache,
+            );
         }
 
         candidate_bases
@@ -456,42 +441,35 @@ impl DagWalker {
     where
         F: FnMut(&Oid) -> Option<(CorrectedCommitDate, Vec<Oid>)>,
     {
-        // Post-filter: eliminate any candidate that is an ancestor of another candidate
         let mut cached_lookup = |oid: &Oid| -> Option<(CorrectedCommitDate, Vec<Oid>)> {
             if let Some(cached) = node_cache.get(oid) {
                 return Some(cached.clone());
             }
-            if let Some(loaded) = get_node(oid) {
-                node_cache.insert(*oid, loaded.clone());
-                return Some(loaded);
-            }
-            None
+            let loaded = get_node(oid)?;
+            node_cache.insert(*oid, loaded.clone());
+            Some(loaded)
         };
 
-        let mut final_bases = Vec::new();
+        let mut final_bases = Vec::with_capacity(candidate_bases.len());
         for (i, cand) in candidate_bases.iter().enumerate() {
             let cand_ccd = cached_lookup(cand)
                 .map(|(commit_date, _)| commit_date)
                 .unwrap_or(CorrectedCommitDate(0));
-            let mut is_redundant = false;
-
-            for (j, other) in candidate_bases.iter().enumerate() {
-                if i != j {
-                    let other_ccd = cached_lookup(other)
-                        .map(|(commit_date, _)| commit_date)
-                        .unwrap_or(CorrectedCommitDate(0));
-                    if DagWalker::is_ancestor_with_ccd(
-                        cand,
-                        other,
-                        cand_ccd,
-                        other_ccd,
-                        &mut cached_lookup,
-                    ) {
-                        is_redundant = true;
-                        break;
-                    }
+            let is_redundant = candidate_bases.iter().enumerate().any(|(j, other)| {
+                if i == j {
+                    return false;
                 }
-            }
+                let other_ccd = cached_lookup(other)
+                    .map(|(commit_date, _)| commit_date)
+                    .unwrap_or(CorrectedCommitDate(0));
+                DagWalker::is_ancestor_with_ccd(
+                    cand,
+                    other,
+                    cand_ccd,
+                    other_ccd,
+                    &mut cached_lookup,
+                )
+            });
 
             if !is_redundant {
                 final_bases.push(*cand);

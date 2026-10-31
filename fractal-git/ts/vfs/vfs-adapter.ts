@@ -3,9 +3,24 @@
  * File Path: ts/vfs/vfs-adapter.ts
  * Architecture Role: Adapts LayerVFS in-memory virtual inodes and write-buffers
  *   into StagedFileEntry candidates for atomic Fractal Git materialization.
+ * Dependencies & Triggers: Consumes `../contracts` (`StagedFileEntry`); invoked by
+ *   agent VFS bridges.
+ * Responsibilities: Maintain versioned in-memory file snapshots, enforce strict directory-boundary
+ *   scope projection (`FGT-TOP-001`), and project dirty virtual files into Git staging candidates.
+ * Exit Semantics & Design Rationale: Directory boundary checks require either exact equality or a
+ *   trailing `'/'` boundary so scope `'src/core'` never leaks `'src/core-hack/x.ts'`.
  */
 
-import type { StagedFileEntry } from "../contracts";
+import type { StagedFileEntry } from '../contracts';
+
+/**
+ * Immutable facade metadata descriptor for the Fractal Git VFS driver.
+ */
+export const FRACTAL_VFS_FACADE_INFO = Object.freeze({
+    subsystem: 'fractal-git',
+    tier: 'vfs',
+    driverVersion: '1.0.0',
+});
 
 /**
  * Virtual file system node representing an in-memory file snapshot.
@@ -26,6 +41,26 @@ export interface ScopeProjectionConfig {
 }
 
 /**
+ * Checks whether `candidatePath` falls within at least one scope prefix on a `'/'` boundary.
+ */
+function isWithinScope(candidatePath: string, scopePrefixes?: readonly string[]): boolean {
+    if (!scopePrefixes || scopePrefixes.length === 0 || scopePrefixes.includes('*')) {
+        return true;
+    }
+    const clean = candidatePath.replace(/^[/\\]+/, '').replace(/\\/g, '/');
+    return scopePrefixes.some((prefix) => {
+        const cleanPrefix = prefix
+            .replace(/^[/\\]+/, '')
+            .replace(/\\/g, '/')
+            .replace(/\/+$/, '');
+        if (cleanPrefix.length === 0) {
+            return true;
+        }
+        return clean === cleanPrefix || clean.startsWith(`${cleanPrefix}/`);
+    });
+}
+
+/**
  * Adapter integrating in-memory virtual inodes into candidate staging trees.
  */
 export class LayerVfsAdapter {
@@ -37,7 +72,7 @@ export class LayerVfsAdapter {
     public writeVirtualFile(
         path: string,
         content: Uint8Array | string,
-        executable: boolean = false
+        executable = false,
     ): void {
         const existing = this.virtualFiles.get(path);
         const version = existing ? existing.version + 1 : 1;
@@ -61,23 +96,13 @@ export class LayerVfsAdapter {
      */
     public toScopedStagedCandidates(scopePrefixes: string[]): StagedFileEntry[] {
         const candidates: StagedFileEntry[] = [];
-        const isFull = scopePrefixes.length === 0 || scopePrefixes.includes("*");
-
         for (const [path, node] of this.virtualFiles.entries()) {
-            if (!isFull) {
-                const clean = path.replace(/^[/\\]+/, "").replace(/\\/g, "/");
-                const matched = scopePrefixes.some((prefix) => {
-                    const cleanPrefix = prefix.replace(/^[/\\]+/, "").replace(/\\/g, "/");
-                    return clean.startsWith(cleanPrefix);
-                });
-                if (!matched) {
-                    continue;
-                }
+            if (!isWithinScope(path, scopePrefixes)) {
+                continue;
             }
-
             candidates.push({
                 path,
-                mode: node.executable ? "100755" : "100644",
+                mode: node.executable ? '100755' : '100644',
                 content: node.content,
             });
         }
@@ -92,21 +117,9 @@ export class LayerVfsAdapter {
         scopePrefixes?: string[],
     ): number {
         let count = 0;
-        const isFull = !scopePrefixes || scopePrefixes.length === 0 || scopePrefixes.includes("*");
-
         for (const entry of entries) {
-            if (!entry.content) {
+            if (!entry.content || !isWithinScope(entry.path, scopePrefixes)) {
                 continue;
-            }
-            if (!isFull && scopePrefixes) {
-                const clean = entry.path.replace(/^[/\\]+/, "").replace(/\\/g, "/");
-                const matched = scopePrefixes.some((p) => {
-                    const cp = p.replace(/^[/\\]+/, "").replace(/\\/g, "/");
-                    return clean.startsWith(cp);
-                });
-                if (!matched) {
-                    continue;
-                }
             }
             const isExecutable = entry.mode ? (entry.mode & 0o111) !== 0 : false;
             this.writeVirtualFile(entry.path, entry.content, isExecutable);

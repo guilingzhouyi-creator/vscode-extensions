@@ -20,6 +20,7 @@
 use std::path::Path;
 
 use fg_core::error::{FractalError, FractalResult};
+use fg_core::models::hex::encode_hex;
 use sha1::{Digest, Sha1};
 
 use crate::index_file::{EXTENSION_HEADER_LEN, HEADER_LEN, OID_LEN};
@@ -64,8 +65,8 @@ pub(crate) fn verify_checksum(bytes: &[u8], path: &Path) -> FractalResult<usize>
         return Err(FractalError::CorruptStore(format!(
             "index '{}' checksum mismatch: stored {}, computed {}",
             path.display(),
-            hex_string(stored),
-            hex_string(&computed)
+            encode_hex(stored),
+            encode_hex(&computed)
         )));
     }
     Ok(payload_len)
@@ -120,18 +121,6 @@ pub(crate) fn parse_extensions(
 /// Renders a four-byte extension signature for diagnostics.
 pub(crate) fn extension_label(signature: &[u8; 4]) -> String {
     String::from_utf8_lossy(signature).into_owned()
-}
-
-/// Renders bytes as lowercase hexadecimal for checksum diagnostics.
-fn hex_string(bytes: &[u8]) -> String {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    let mut rendered = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        let byte = *byte;
-        rendered.push(DIGITS[usize::from(byte >> 4)] as char);
-        rendered.push(DIGITS[usize::from(byte & 0x0f)] as char);
-    }
-    rendered
 }
 
 /// Reads a big-endian `u32`, yielding zero when the slice is short.

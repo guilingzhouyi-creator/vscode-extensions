@@ -37,8 +37,9 @@ pub use cas_backend::CasBackend;
 pub use cas_bridge::{CasFileDescriptor, CasToGitMaterializer, MaterializeRequest};
 pub use commit_graph::{CommitGraphEntry, CommitGraphReader, CommitGraphWriter};
 pub use commit_materializer::{
-    materialize_commit, serialize_commit_payload, serialize_tree_payload,
-    CommitMaterializationRequest, MaterializedCommit,
+    materialize_commit, persist_commit_object, persist_index_tree, serialize_commit_payload,
+    serialize_tree_payload, write_index_commit_objects_with_parents, CommitMaterializationRequest,
+    IndexCommitRequest, MaterializedCommit,
 };
 pub use delta_codec::{
     apply_delta_program, decode_block_payload, generate_delta_program, select_block_encoding,

@@ -3,6 +3,11 @@
 //! Architecture Role: Implements reverse tail-truncation for uncompressed Tar and forward
 //!   stream hole-punching for Gzip-compressed Tar (.tar.gz).
 //!   Also exposes non-destructive standard extraction for read-only callers.
+//! Dependencies & Triggers: Invoked by `taxis unarchive` and bundle consumers during low-disk archive ingestion.
+//! Responsibilities: Parse UStar 512-byte headers, enforce Path Jail sanitization, record WAL entries
+//!   strictly prior to archive truncation, and reclaim consumed storage extents.
+//! Exit Semantics & Design Rationale: Any WAL append or `sync_all` error aborts immediately before
+//!   `TailTruncator::truncate_to` executes so an aborted run remains replayable (`FGT-STO-001`).
 //!
 //! Domain Governance Rules: FGT-STO-001, FGT-PRF-001, FGT-COR-001.
 
@@ -168,6 +173,51 @@ pub fn extract_tar_in_place<P: AsRef<Path>, D: AsRef<Path>>(
     extract_tar_in_place_with_journal(archive_path, dest_dir, config, None, None)
 }
 
+/// Extracts or resumes a single non-directory tar member during reverse in-place extraction.
+fn extract_single_tar_member_in_place(
+    truncator: &mut TailTruncator,
+    dest: &Path,
+    member: &TarMember,
+    journal: &mut Option<&mut InPlaceJournal>,
+    already_extracted: Option<&std::collections::HashSet<String>>,
+) -> FractalResult<u64> {
+    let rel_path = sanitize_relative_path(&member.name)?;
+    let target_path = dest.join(&rel_path);
+
+    let is_already_done =
+        already_extracted.is_some_and(|set| set.contains(&member.name)) && target_path.exists();
+    if is_already_done {
+        return Ok(target_path
+            .metadata()
+            .map(|m| m.len())
+            .unwrap_or(member.size));
+    }
+
+    truncator
+        .file_mut()
+        .seek(SeekFrom::Start(
+            member.header_offset + TAR_BLOCK_SIZE as u64,
+        ))
+        .map_err(FractalError::Io)?;
+    let mut payload = vec![0u8; member.size as usize];
+    truncator
+        .file_mut()
+        .read_exact(&mut payload)
+        .map_err(FractalError::Io)?;
+
+    write_tar_member(&target_path, &payload, member.mode)?;
+
+    if let Some(j) = journal.as_mut() {
+        j.append_unbuffered(&InPlaceLogEntry::MemberExtracted {
+            name: member.name.clone(),
+            extracted_bytes: payload.len() as u64,
+            local_header_offset: member.header_offset,
+            crc32: 0,
+        })?;
+    }
+    Ok(payload.len() as u64)
+}
+
 /// Extracts an uncompressed Tar archive in reverse (tail-first) order with write-ahead logging (WAL),
 /// tail truncation, and optional skip set for auto-resume.
 pub fn extract_tar_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
@@ -194,55 +244,20 @@ pub fn extract_tar_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
     for (idx, member) in members.iter().enumerate() {
         if member.is_dir {
             let rel_path = sanitize_relative_path(&member.name)?;
-            let target_path = dest.join(rel_path);
-            fs::create_dir_all(&target_path).map_err(FractalError::Io)?;
+            fs::create_dir_all(dest.join(rel_path)).map_err(FractalError::Io)?;
             continue;
         }
 
-        let rel_path = sanitize_relative_path(&member.name)?;
-        let target_path = dest.join(&rel_path);
-
-        let is_already_done = already_extracted
-            .map(|set| set.contains(&member.name))
-            .unwrap_or(false)
-            && target_path.exists();
-
-        let payload_len = if is_already_done {
-            target_path
-                .metadata()
-                .map(|m| m.len())
-                .unwrap_or(member.size)
-        } else {
-            // Read payload
-            truncator
-                .file_mut()
-                .seek(SeekFrom::Start(member.header_offset + 512))
-                .map_err(FractalError::Io)?;
-            let mut payload = vec![0u8; member.size as usize];
-            truncator
-                .file_mut()
-                .read_exact(&mut payload)
-                .map_err(FractalError::Io)?;
-
-            if let Some(parent) = target_path.parent() {
-                fs::create_dir_all(parent).map_err(FractalError::Io)?;
-            }
-            fs::write(&target_path, &payload).map_err(FractalError::Io)?;
-
-            if let Some(j) = journal.as_mut() {
-                let _ = j.append_unbuffered(&InPlaceLogEntry::MemberExtracted {
-                    name: member.name.clone(),
-                    extracted_bytes: payload.len() as u64,
-                    local_header_offset: member.header_offset,
-                    crc32: 0,
-                });
-            }
-            payload.len() as u64
-        };
+        let payload_len = extract_single_tar_member_in_place(
+            &mut truncator,
+            dest,
+            member,
+            &mut journal,
+            already_extracted,
+        )?;
 
         files_extracted += 1;
         total_extracted_bytes = total_extracted_bytes.saturating_add(payload_len);
-
         accumulated_reclaim = accumulated_reclaim.saturating_add(member.total_span);
 
         let is_last = idx + 1 == total_members;
@@ -250,10 +265,10 @@ pub fn extract_tar_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
             && member.header_offset < truncator.current_len()
         {
             if let Some(j) = journal.as_mut() {
-                let _ = j.append(&InPlaceLogEntry::BatchTruncated {
+                j.append(&InPlaceLogEntry::BatchTruncated {
                     new_len: member.header_offset,
                     freed_bytes: accumulated_reclaim,
-                });
+                })?;
             }
             truncator.truncate_to(member.header_offset)?;
             accumulated_reclaim = 0;
@@ -264,7 +279,7 @@ pub fn extract_tar_in_place_with_journal<P: AsRef<Path>, D: AsRef<Path>>(
         truncator.truncate_to(0)?;
     }
     if let Some(j) = journal.as_mut() {
-        let _ = j.append(&InPlaceLogEntry::SessionCompleted);
+        j.append(&InPlaceLogEntry::SessionCompleted)?;
     }
 
     Ok(InPlaceExtractionReport {

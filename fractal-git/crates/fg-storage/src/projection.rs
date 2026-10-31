@@ -16,11 +16,10 @@
 //! - `FGT-OBJ-001`: Git object model serialization guard
 
 use std::fs;
-use std::io::Write;
 use std::path::Path;
 
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::{IndexStage, Oid};
+use fg_core::models::{raw_object, IndexStage, Oid};
 use fg_index::{write_dirc_v2, GitIndex, IndexEntry};
 use fg_native::sections::head::HeadState;
 use fg_native::sections::indx::{
@@ -149,16 +148,16 @@ fn export_cas_objects_to_git(native_dir: &Path, git_dir: &Path) -> FractalResult
     // 1. Check CAS blocks under native_dir and native_dir/objects
     for cas_root in [native_dir.to_path_buf(), native_dir.join("objects")] {
         let cas = CasBackend::new(&cas_root);
-        if let Ok(oids) = cas.list_all_oids() {
-            for oid in oids {
-                if exported_oids.insert(oid) {
-                    if let Ok((kind, payload)) = cas.get_block_with_kind(&oid) {
-                        let mut raw_object = Vec::with_capacity(32 + payload.len());
-                        write!(raw_object, "{} {}\0", kind.as_str(), payload.len())?;
-                        raw_object.extend_from_slice(&payload);
-                        LooseOdb::write_loose_object_raw(git_dir, &oid, &raw_object)?;
-                    }
-                }
+        let Ok(oids) = cas.list_all_oids() else {
+            continue;
+        };
+        for oid in oids {
+            if !exported_oids.insert(oid) {
+                continue;
+            }
+            if let Ok((kind, payload)) = cas.get_block_with_kind(&oid) {
+                let framed = raw_object(kind, &payload);
+                LooseOdb::write_loose_object_raw(git_dir, &oid, &framed)?;
             }
         }
     }
@@ -166,31 +165,41 @@ fn export_cas_objects_to_git(native_dir: &Path, git_dir: &Path) -> FractalResult
     // 2. Check ODB router under native_dir/objects (loose objects & packs)
     let odb_path = native_dir.join("objects");
     if odb_path.is_dir() {
-        if let Ok(router) = OdbRouter::open(&odb_path) {
-            if let Ok(oids) = router.all_oids() {
-                for oid in oids {
-                    if exported_oids.insert(oid) {
-                        if let Ok(Some(obj)) = router.read(&oid) {
-                            let mut raw_object = Vec::with_capacity(32 + obj.payload.len());
-                            write!(raw_object, "{} {}\0", obj.kind.as_str(), obj.payload.len())?;
-                            raw_object.extend_from_slice(&obj.payload);
-                            LooseOdb::write_loose_object_raw(git_dir, &oid, &raw_object)?;
-                        }
-                    }
-                }
-            }
-        }
+        export_odb_router_objects(&odb_path, git_dir, &mut exported_oids)?;
     }
 
     Ok(exported_oids.len())
 }
 
-/// Traverses a tree recursively to collect index entries for all leaf blobs.
+fn export_odb_router_objects(
+    odb_path: &Path,
+    git_dir: &Path,
+    exported_oids: &mut std::collections::BTreeSet<Oid>,
+) -> FractalResult<()> {
+    let Ok(router) = OdbRouter::open(odb_path) else {
+        return Ok(());
+    };
+    let Ok(oids) = router.all_oids() else {
+        return Ok(());
+    };
+    for oid in oids {
+        if !exported_oids.insert(oid) {
+            continue;
+        }
+        if let Ok(Some(obj)) = router.read(&oid) {
+            let framed = raw_object(obj.kind, &obj.payload);
+            LooseOdb::write_loose_object_raw(git_dir, &oid, &framed)?;
+        }
+    }
+    Ok(())
+}
+
+/// Traverses a tree recursively to collect index entries for all leaf blobs using an in-place path buffer.
 fn collect_tree_entries_recursive(
     router: &OdbRouter,
     work_root: &Path,
     tree_oid: &Oid,
-    current_prefix: &str,
+    path_buf: &mut String,
     out: &mut Vec<IndexEntry>,
 ) -> FractalResult<()> {
     let Some(tree_obj) = router.read(tree_oid)? else {
@@ -199,32 +208,19 @@ fn collect_tree_entries_recursive(
     let tree_ref = fg_object::GitTreeRef::from_bytes(&tree_obj.payload);
     for entry_res in tree_ref.iter() {
         let entry = entry_res?;
-        let full_path = if current_prefix.is_empty() {
-            entry.name.to_string()
-        } else {
-            format!("{}/{}", current_prefix, entry.name)
-        };
+        let saved_len = path_buf.len();
+        if saved_len > 0 {
+            path_buf.push('/');
+        }
+        path_buf.push_str(entry.name);
 
         if entry.mode.is_tree() {
-            collect_tree_entries_recursive(router, work_root, &entry.oid, &full_path, out)?;
+            collect_tree_entries_recursive(router, work_root, &entry.oid, path_buf, out)?;
         } else {
-            let disk_file = work_root.join(&full_path);
-            let (size, mtime_sec, mtime_nano) = if let Ok(meta) = fs::metadata(&disk_file) {
-                let mtime = meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-                let duration = mtime
-                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                    .unwrap_or_default();
-                (
-                    meta.len() as u32,
-                    duration.as_secs() as u32,
-                    duration.subsec_nanos(),
-                )
-            } else {
-                (0, 0, 0)
-            };
-
+            let disk_file = work_root.join(path_buf.as_str());
+            let (size, mtime_sec, mtime_nano) = read_disk_stat_triple(&disk_file);
             out.push(IndexEntry {
-                path: full_path,
+                path: path_buf.clone(),
                 mode: entry.mode,
                 oid: entry.oid,
                 stage: IndexStage::Normal,
@@ -236,8 +232,24 @@ fn collect_tree_entries_recursive(
                 intent_to_add: false,
             });
         }
+        path_buf.truncate(saved_len);
     }
     Ok(())
+}
+
+fn read_disk_stat_triple(disk_file: &Path) -> (u32, u32, u32) {
+    let Ok(meta) = fs::metadata(disk_file) else {
+        return (0, 0, 0);
+    };
+    let mtime = meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+    let duration = mtime
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap_or_default();
+    (
+        meta.len() as u32,
+        duration.as_secs() as u32,
+        duration.subsec_nanos(),
+    )
 }
 
 fn resolve_head_commit_oid(git_dir: &Path) -> Option<Oid> {
@@ -251,6 +263,26 @@ fn resolve_head_commit_oid(git_dir: &Path) -> Option<Oid> {
     } else {
         Oid::from_hex(trimmed).ok()
     }
+}
+
+fn rebuild_index_entries_from_head(git_dir: &Path) -> Option<Vec<IndexEntry>> {
+    let work_root = git_dir.parent().unwrap_or(git_dir);
+    let commit_oid = resolve_head_commit_oid(git_dir)?;
+    let router = OdbRouter::open(git_dir.join("objects")).ok()?;
+    let commit_obj = router.read(&commit_oid).ok()??;
+    let commit_ref = fg_object::GitCommitRef::parse(&commit_obj.payload).ok()?;
+
+    let mut git_entries = Vec::new();
+    let mut path_buf = String::with_capacity(128);
+    collect_tree_entries_recursive(
+        &router,
+        work_root,
+        commit_ref.tree_oid(),
+        &mut path_buf,
+        &mut git_entries,
+    )
+    .ok()?;
+    (!git_entries.is_empty()).then_some(git_entries)
 }
 
 /// Exports native `INDX` section into canonical Git DIRC v2 index file.
@@ -289,28 +321,9 @@ fn export_index_to_git(
         }
     }
 
-    let work_root = git_dir.parent().unwrap_or(git_dir);
-    if let Some(commit_oid) = resolve_head_commit_oid(git_dir) {
-        if let Ok(router) = OdbRouter::open(git_dir.join("objects")) {
-            if let Ok(Some(commit_obj)) = router.read(&commit_oid) {
-                if let Ok(commit_ref) = fg_object::GitCommitRef::parse(&commit_obj.payload) {
-                    let mut git_entries = Vec::new();
-                    if collect_tree_entries_recursive(
-                        &router,
-                        work_root,
-                        commit_ref.tree_oid(),
-                        "",
-                        &mut git_entries,
-                    )
-                    .is_ok()
-                        && !git_entries.is_empty()
-                    {
-                        write_dirc_v2(&git_dir.join("index"), &git_entries)?;
-                        return Ok(git_entries.len());
-                    }
-                }
-            }
-        }
+    if let Some(git_entries) = rebuild_index_entries_from_head(git_dir) {
+        write_dirc_v2(&git_dir.join("index"), &git_entries)?;
+        return Ok(git_entries.len());
     }
 
     let empty_entries: Vec<IndexEntry> = Vec::new();
@@ -399,16 +412,8 @@ fn import_git_objects_to_cas(
     for oid in &oids {
         if let Some(packed) = router.read(oid)? {
             cas.put_block(packed.kind, &packed.payload)?;
-
-            let mut raw_object = Vec::with_capacity(32 + packed.payload.len());
-            write!(
-                raw_object,
-                "{} {}\0",
-                packed.kind.as_str(),
-                packed.payload.len()
-            )?;
-            raw_object.extend_from_slice(&packed.payload);
-            LooseOdb::write_loose_object_raw(native_dir, oid, &raw_object)?;
+            let framed = raw_object(packed.kind, &packed.payload);
+            LooseOdb::write_loose_object_raw(native_dir, oid, &framed)?;
         }
     }
     Ok(oids.len())

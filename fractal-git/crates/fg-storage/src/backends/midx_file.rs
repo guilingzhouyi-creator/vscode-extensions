@@ -9,7 +9,7 @@
 //! Exit Semantics & Design Rationale:
 //!   - `OOFF` entries are 8 bytes: a 4-byte pack position followed by a 4-byte offset word. A reader
 //!     that assumes a single 4-byte offset lands one object early on every entry after the first,
-//!     which still produces decodable garbage. The width is asserted against the chunk span in
+//!     which still produces corrupted offsets. The width is asserted against the chunk span in
 //!     [`MultiPackIndex::parse`] so that mistake fails loudly instead of silently.
 //!   - The large-offset table (`LOFF`) is optional. When the chunk is absent, a 32-bit offset equal
 //!     to or above `0x8000_0000` is an error rather than a wrapped value.
@@ -24,6 +24,10 @@ use std::path::Path;
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;
 
+use crate::backends::fanout::{
+    binary_search_oid_table, fanout_range, read_be_u32, read_be_u64, FANOUT_BUCKETS, OID_LEN,
+};
+
 /// Magic at the head of a multi-pack-index file, ASCII `MIDX`.
 const MIDX_MAGIC: [u8; 4] = *b"MIDX";
 
@@ -35,12 +39,6 @@ const MIDX_HASH_SHA1: u8 = 1;
 
 /// Byte length of one chunk-directory entry: 4-byte id plus 8-byte offset.
 const CHUNK_ENTRY_LEN: usize = 12;
-
-/// Byte width of one object id.
-const OID_LEN: usize = 20;
-
-/// Number of fanout buckets in the `OIDF` chunk.
-const FANOUT_BUCKETS: usize = 256;
 
 /// Byte length of the fixed header before the chunk directory.
 const MIDX_HEADER_LEN: usize = 12;
@@ -150,7 +148,7 @@ impl MultiPackIndex {
                 bytes[base + 2],
                 bytes[base + 3],
             ];
-            let offset = read_u64(&bytes, base + 4) as usize;
+            let offset = read_be_u64(&bytes, base + 4) as usize;
             match id {
                 CHUNK_PNAM => pnam = Some(offset),
                 CHUNK_OIDF => oidf = Some(offset),
@@ -168,7 +166,7 @@ impl MultiPackIndex {
             )));
         };
 
-        let object_count = read_u32(&bytes, oidf + (FANOUT_BUCKETS - 1) * 4) as usize;
+        let object_count = read_be_u32(&bytes, oidf + (FANOUT_BUCKETS - 1) * 4) as usize;
         let expected_span = object_count * OOFF_ENTRY_LEN;
         let actual_span = match loff {
             Some(loff_offset) if loff_offset > ooff => loff_offset - ooff,
@@ -210,22 +208,18 @@ impl MultiPackIndex {
     /// Returns where `oid` lives, or `None` when the id is absent.
     pub fn lookup(&self, oid: &Oid) -> Option<PackLocation> {
         let target = oid.as_bytes();
-        let low = if target[0] == 0 {
-            0
-        } else {
-            self.fanout(usize::from(target[0]) - 1)
-        };
-        let high = self.fanout(usize::from(target[0]));
-        let index = self.binary_search(low, high, target)?;
+        let (low, high) = fanout_range(&self.bytes, self.oid_fanout, target[0]);
+        let index =
+            binary_search_oid_table(&self.bytes, self.oid_lookup, OID_LEN, low, high, target)?;
         let base = self.object_offset + index * OOFF_ENTRY_LEN;
-        let pack_id = read_u32(&self.bytes, base);
-        let word = read_u32(&self.bytes, base + 4);
+        let pack_id = read_be_u32(&self.bytes, base);
+        let word = read_be_u32(&self.bytes, base + 4);
         let offset = if word & LARGE_OFFSET_FLAG == 0 {
             u64::from(word)
         } else {
             let slot = (word & !LARGE_OFFSET_FLAG) as usize;
             let table = self.large_offset?;
-            read_u64(&self.bytes, table + slot * 8)
+            read_be_u64(&self.bytes, table + slot * 8)
         };
         Some(PackLocation { pack_id, offset })
     }
@@ -240,28 +234,6 @@ impl MultiPackIndex {
         let mut raw = [0u8; OID_LEN];
         raw.copy_from_slice(slice);
         Some(Oid::from_bytes(raw))
-    }
-
-    /// Cumulative count for fanout bucket `bucket`.
-    fn fanout(&self, bucket: usize) -> usize {
-        read_u32(&self.bytes, self.oid_fanout + bucket * 4) as usize
-    }
-
-    /// Binary-searches the `OIDL` table inside the fanout hull.
-    fn binary_search(&self, low: usize, high: usize, target: &[u8; OID_LEN]) -> Option<usize> {
-        let mut left = low;
-        let mut right = high;
-        while left < right {
-            let mid = left + (right - left) / 2;
-            let start = self.oid_lookup + mid * OID_LEN;
-            let candidate = self.bytes.get(start..start + OID_LEN)?;
-            match candidate.cmp(&target[..]) {
-                std::cmp::Ordering::Less => left = mid + 1,
-                std::cmp::Ordering::Greater => right = mid,
-                std::cmp::Ordering::Equal => return Some(mid),
-            }
-        }
-        None
     }
 }
 
@@ -284,24 +256,6 @@ fn read_pack_names(bytes: &[u8], start: usize) -> Vec<String> {
         cursor = end + 1;
     }
     names
-}
-
-/// Reads a big-endian `u32`, yielding zero when the slice is short.
-fn read_u32(bytes: &[u8], start: usize) -> u32 {
-    match bytes.get(start..start + 4) {
-        Some(slice) => u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]]),
-        None => 0,
-    }
-}
-
-/// Reads a big-endian `u64`, yielding zero when the slice is short.
-fn read_u64(bytes: &[u8], start: usize) -> u64 {
-    match bytes.get(start..start + 8) {
-        Some(slice) => u64::from_be_bytes([
-            slice[0], slice[1], slice[2], slice[3], slice[4], slice[5], slice[6], slice[7],
-        ]),
-        None => 0,
-    }
 }
 
 /// Builds a synthetic multi-pack index holding two objects in one pack.

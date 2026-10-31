@@ -33,6 +33,17 @@ pub const STORES_DIR_NAME: &str = "stores";
 /// Length of the hexadecimal spelling of a repository id.
 pub const REPO_ID_HEX_LEN: usize = REPO_ID_LEN * 2;
 
+/// Fills `dest` with cryptographically strong bytes from the operating system's random source.
+///
+/// # Errors
+///
+/// Returns [`NativeError::RandomUnavailable`] when the platform random source cannot be read.
+pub fn fill_random_bytes(dest: &mut [u8]) -> NativeResult<()> {
+    getrandom::fill(dest).map_err(|random_err| NativeError::RandomUnavailable {
+        reason: random_err.to_string(),
+    })
+}
+
 /// Fills a fresh repository identifier from the operating system's random source.
 ///
 /// # Errors
@@ -40,22 +51,13 @@ pub const REPO_ID_HEX_LEN: usize = REPO_ID_LEN * 2;
 /// Returns [`NativeError::RandomUnavailable`] when the platform random source cannot be read.
 pub fn generate_repo_id() -> NativeResult<[u8; REPO_ID_LEN]> {
     let mut repo_id = [0u8; REPO_ID_LEN];
-    getrandom::fill(&mut repo_id).map_err(|random_err| NativeError::RandomUnavailable {
-        reason: random_err.to_string(),
-    })?;
+    fill_random_bytes(&mut repo_id)?;
     Ok(repo_id)
 }
 
 /// Renders a repository id as its lowercase hexadecimal spelling.
 pub fn repo_id_to_hex(repo_id: &[u8; REPO_ID_LEN]) -> String {
-    use std::fmt::Write;
-
-    let mut hex = String::with_capacity(REPO_ID_HEX_LEN);
-    for byte in repo_id {
-        // Writing into a `String` cannot fail.
-        let _ = write!(&mut hex, "{byte:02x}");
-    }
-    hex
+    fg_core::models::hex::encode_hex(repo_id)
 }
 
 /// Parses the lowercase hexadecimal spelling of a repository id.
@@ -72,27 +74,19 @@ pub fn repo_id_from_hex(hex: &str) -> NativeResult<[u8; REPO_ID_LEN]> {
             reason: "expected exactly 32 hexadecimal characters",
         });
     }
-
-    let mut repo_id = [0u8; REPO_ID_LEN];
-    let mut index = 0;
-    while index < REPO_ID_LEN {
-        let pair = &hex[index * 2..index * 2 + 2];
-        if !pair
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-        {
-            return Err(NativeError::InvalidRepoIdHex {
-                reason: "must contain only the lowercase characters 0-9 and a-f",
-            });
-        }
-        // The character set was just restricted to lowercase hexadecimal, so parsing cannot fail.
-        let parsed = u8::from_str_radix(pair, 16).map_err(|_| NativeError::InvalidRepoIdHex {
+    if !hex
+        .bytes()
+        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(NativeError::InvalidRepoIdHex {
             reason: "must contain only the lowercase characters 0-9 and a-f",
-        })?;
-        repo_id[index] = parsed;
-        index += 1;
+        });
     }
-    Ok(repo_id)
+    fg_core::models::hex::decode_fixed_hex::<REPO_ID_LEN>(hex).map_err(|_| {
+        NativeError::InvalidRepoIdHex {
+            reason: "must contain only the lowercase characters 0-9 and a-f",
+        }
+    })
 }
 
 /// Returns the directory that holds every release-mode store: `<home>/.taxis/stores`.

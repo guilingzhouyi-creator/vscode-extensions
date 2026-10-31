@@ -1,66 +1,62 @@
 //! Module: fg-algorithms — Bayesian Statistics & Mathematical Modeling
-//! File Path: crates/fg-algorithms/src/math/posterior.rs
+//! File Path: crates/fg-algorithms/src/math.rs
 //! Architecture Role: Pure mathematical modeling library for objective software quality metrics.
-//!   Implements conjugate posterior estimation using non-informative Jeffreys priors
-//!   Beta(0.5, 0.5).
+//!   Evaluates conjugate posterior score envelopes over `fg_core::jeffreys_beta_from_counts`
+//!   using non-informative Jeffreys priors `Beta(0.5, 0.5)`.
 //! Dependencies & Triggers: Consumed by Taxis UAC Promotion Ledger,
 //!   Auto-Refactor telemetry, and CLI.
 //! Responsibilities: Compute mathematically sound posterior means, variances,
 //!   and 95% credible intervals strictly from objective observation counts
 //!   without subjective manual bias.
 //! Exit Semantics & Design Rationale:
-//!   - Complies with workspace governance axiom §3: zero subjective constants like -2.0.
-//!   - Closed-form analytical equations guarantee microsecond execution latency
-//!     and zero memory allocation.
+//!   - Delegates core Beta(0.5, 0.5) math to `fg_core::jeffreys_beta_from_counts` (`FGT-COR-001`).
+//!   - Closed-form analytical equations guarantee sub-microsecond execution latency
+//!     and zero memory allocation (`FGT-PRF-001`).
 //!
 //! Domain Governance Rules: FGT-ALG-001 (Bayesian statistical modeling), FGT-COR-001, FGT-PRF-001.
 
-/// Full posterior statistical score estimate.
+use fg_core::jeffreys_beta_from_counts;
+
+/// Full posterior statistical score estimate on a `[0.0, 100.0]` percentage scale.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PosteriorScoreEstimate {
-    /// Observed raw composite score in [0.0, 100.0].
+    /// Observed raw composite score in `[0.0, 100.0]`.
     pub raw_score: f64,
-    /// Conjugate posterior mean in [0.0, 100.0].
+    /// Conjugate posterior mean in `[0.0, 100.0]`.
     pub posterior_mean: f64,
-    /// Posterior variance.
+    /// Posterior variance in `[0.0, 1.0]` probability space.
     pub variance: f64,
-    /// 95% credible interval lower bound (mean - 1.96 * std_dev) in [0.0, 100.0].
+    /// 95% credible interval lower bound (`mean - 1.96 * std_dev`) in `[0.0, 100.0]`.
     pub credible_lower_95: f64,
 }
 
 /// Evaluates a full Bayesian posterior score envelope from an observed composite score.
 ///
-/// Uses non-informative Jeffreys prior Beta(0.5, 0.5) over an effective observation scale n = 50.0.
-/// The conjugate posterior is Beta(alpha, beta) where:
-/// - alpha = p * n + 0.5
-/// - beta  = (1.0 - p) * n + 0.5
-/// - mean  = alpha / (alpha + beta)
-/// - var   = (alpha * beta) / ((alpha + beta)^2 * (alpha + beta + 1))
+/// Uses non-informative Jeffreys prior `Beta(0.5, 0.5)` over an effective observation scale `n = 50.0`.
+#[must_use]
 pub fn evaluate_score_envelope(composite_score: f64) -> PosteriorScoreEstimate {
     let success_probability = (composite_score / 100.0).clamp(0.0, 1.0);
     let effective_sample_size = 50.0;
-    let alpha = success_probability * effective_sample_size + 0.5;
-    let beta = (1.0 - success_probability) * effective_sample_size + 0.5;
-    let total = alpha + beta;
-    let mean = alpha / total;
-    let variance = (alpha * beta) / (total * total * (total + 1.0));
-    let std_dev = variance.sqrt();
-    let lower_bound = (mean - 1.96 * std_dev).max(0.0);
+    let passed = success_probability * effective_sample_size;
+    let failed = (1.0 - success_probability) * effective_sample_size;
+    let posterior = jeffreys_beta_from_counts(passed, failed);
 
     let round_1dec = |sample_val: f64| (sample_val * 1000.0).round() / 10.0;
 
     PosteriorScoreEstimate {
         raw_score: composite_score,
-        posterior_mean: round_1dec(mean),
-        variance,
-        credible_lower_95: round_1dec(lower_bound),
+        posterior_mean: round_1dec(posterior.mean),
+        variance: posterior.variance,
+        credible_lower_95: round_1dec(posterior.ci95_lower),
     }
 }
 
-/// Computes the Jeffreys Beta(0.5, 0.5) conjugate posterior credible interval lower bound
+/// Computes the Jeffreys `Beta(0.5, 0.5)` conjugate posterior credible interval lower bound
 /// (95% confidence).
-/// Returns a rounded percentage value in [0.0, 100.0] with 1 decimal place precision.
+///
+/// Returns a rounded percentage value in `[0.0, 100.0]` with 1 decimal place precision.
 #[inline]
+#[must_use]
 pub fn compute_jeffreys_credible_lower(composite_score: f64) -> f64 {
     evaluate_score_envelope(composite_score).credible_lower_95
 }

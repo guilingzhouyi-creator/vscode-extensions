@@ -250,7 +250,6 @@ dependencies = [
  "fg-native",
  "serde",
  "serde_json",
- "sha1",
 ]
 
 [[package]]

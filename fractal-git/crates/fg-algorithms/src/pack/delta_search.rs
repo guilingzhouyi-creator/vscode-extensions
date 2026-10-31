@@ -3,16 +3,20 @@
 //! Architecture Role: Implements Git-compatible packfile delta encoding and sliding-window
 //!   delta base search heuristics.
 //! Dependencies & Triggers: Consumed by PackWriter and RepackEngine in fg-storage.
-//! Responsibilities: Git delta opcode encoding, sliding-window search, and cycle-free delta chain generation.
+//! Responsibilities: Git delta search, basename locality hashing, and cycle-free delta chain generation.
 //! Exit Semantics & Design Rationale:
 //!   - Git delta format uses little-endian 7-bit varints for base/target sizes and bitfield copy opcodes.
-//!   - Sliding window sorts objects by (kind, basename_hash, size) to cluster similar objects together.
+//!   - Sliding window sorts objects by `(kind, basename_hash, size)` to cluster similar objects together.
 //!   - Hard ceiling on delta depth (`MAX_DELTA_DEPTH = 50`) prevents long reconstruction chains.
 //!
 //! Domain Governance Rules: FGT-ALG-001 (pack delta search), FGT-COR-001, FGT-PRF-001.
 
-use fg_core::models::{ObjectKind, Oid};
 use std::collections::HashMap;
+
+use fg_core::models::{ObjectKind, Oid};
+
+pub use crate::pack::delta_opcodes::write_varint;
+use crate::pack::delta_opcodes::{emit_insert_ops, emit_match_copies};
 
 /// Default window size for sliding-window delta search (10 objects).
 pub const DEFAULT_DELTA_WINDOW: usize = 10;
@@ -23,16 +27,10 @@ pub const MAX_DELTA_DEPTH: usize = 50;
 /// Minimum match length to trigger a Git delta copy instruction (4 bytes).
 const MIN_MATCH_LEN: usize = 4;
 
-/// Maximum chunk size for a single Git delta insert instruction (127 bytes).
-const MAX_INSERT_LEN: usize = 127;
-
-/// Opcode bit identifying a copy instruction.
-const OPCODE_COPY: u8 = 0x80;
-
-/// Computes a fast 32-bit FNV-1a hash of a filename or path's basename.
+/// Computes a zero-allocation 32-bit FNV-1a hash of a filename or path's basename.
+#[must_use]
 pub fn compute_basename_hash(path: &str) -> u32 {
-    let clean = path.replace('\\', "/");
-    let basename = clean.rsplit('/').next().unwrap_or(&clean);
+    let basename = path.rsplit(['/', '\\']).next().unwrap_or(path);
     let mut hash: u32 = 0x811c9dc5;
     for &byte in basename.as_bytes() {
         hash ^= u32::from(byte);
@@ -53,7 +51,7 @@ pub struct PackDeltaItem {
 impl PackDeltaItem {
     /// Constructs a new packable delta item.
     pub fn new(oid: Oid, kind: ObjectKind, payload: Vec<u8>, path: Option<&str>) -> Self {
-        let basename_hash = path.map(compute_basename_hash).unwrap_or(0);
+        let basename_hash = path.map_or(0, compute_basename_hash);
         Self {
             oid,
             kind,
@@ -86,98 +84,10 @@ pub struct PackDeltaChain {
     pub depth: usize,
 }
 
-/// Encodes a variable-length integer into Git's 7-bit varint stream format.
-pub fn write_varint(mut value: usize, buffer: &mut Vec<u8>) {
-    loop {
-        let mut byte = (value & 0x7f) as u8;
-        value >>= 7;
-        if value > 0 {
-            byte |= 0x80;
-            buffer.push(byte);
-        } else {
-            buffer.push(byte);
-            break;
-        }
-    }
-}
-
-/// Maximum byte count a single Git copy opcode can encode: three size bytes, 24 bits.
-const COPY_MAX_LEN: usize = 0x00ff_ffff;
-
-/// Emits one Git copy opcode and its variable-length operand bytes.
-///
-/// Git packs the copy offset into at most four bytes (opcode bits `0x01..=0x08`) and the copy
-/// length into at most three bytes (opcode bits `0x10..=0x40`), each byte omitted when it is zero.
-/// An omitted length therefore decodes as 65536, which is why a length of exactly `0x10000` must
-/// not emit any size byte, and why a longer match has to be split by [`emit_match_copies`].
-fn emit_copy_op(offset: usize, len: usize, out: &mut Vec<u8>) {
-    debug_assert!(len > 0, "git copy opcode cannot encode a zero length");
-    debug_assert!(
-        len <= COPY_MAX_LEN,
-        "git copy length {len} exceeds the 0xFFFFFF ceiling"
-    );
-    debug_assert!(
-        offset <= u32::MAX as usize,
-        "git copy offset cannot be encoded beyond four bytes"
-    );
-
-    let mut opcode = OPCODE_COPY;
-    let mut operands = [0u8; 7];
-    let mut operand_index = 0;
-
-    for shift in [0u32, 8, 16, 24] {
-        let byte = ((offset >> shift) & 0xff) as u8;
-        if byte != 0 {
-            opcode |= 1u8 << (shift / 8);
-            operands[operand_index] = byte;
-            operand_index += 1;
-        }
-    }
-
-    if len != 0x10000 {
-        for (index, shift) in [0u32, 8, 16].iter().enumerate() {
-            let byte = ((len >> shift) & 0xff) as u8;
-            if byte != 0 {
-                opcode |= 0x10u8 << index;
-                operands[operand_index] = byte;
-                operand_index += 1;
-            }
-        }
-    }
-
-    out.push(opcode);
-    out.extend_from_slice(&operands[..operand_index]);
-}
-
-/// Emits the copy opcodes for one matched byte run.
-///
-/// A single Git copy opcode carries at most [`COPY_MAX_LEN`] bytes, so a longer match is split into
-/// consecutive chunks with strictly increasing offsets; the concatenation still reproduces the
-/// original run byte-for-byte.
-fn emit_match_copies(mut offset: usize, mut len: usize, out: &mut Vec<u8>) {
-    while len > 0 {
-        let chunk = len.min(COPY_MAX_LEN);
-        emit_copy_op(offset, chunk, out);
-        offset += chunk;
-        len -= chunk;
-    }
-}
-
-/// Emits one or more Git insert opcodes with literal payload bytes.
-fn emit_insert_ops(bytes: &[u8], out: &mut Vec<u8>) {
-    let mut cursor = 0;
-    while cursor < bytes.len() {
-        let chunk_len = (bytes.len() - cursor).min(MAX_INSERT_LEN);
-        out.push(chunk_len as u8);
-        out.extend_from_slice(&bytes[cursor..cursor + chunk_len]);
-        cursor += chunk_len;
-    }
-}
-
 /// Encodes a Git-compatible delta stream from `base` to `target`.
 ///
 /// Always returns `Some(delta_bytes)`; callers compare the delta length against the original
-/// object size to decide whether storing the delta is actually worthwhile.
+/// object size to decide whether storing the delta is worthwhile.
 pub fn encode_git_delta(base: &[u8], target: &[u8]) -> Option<Vec<u8>> {
     let mut out = Vec::with_capacity(target.len().min(1024));
     write_varint(base.len(), &mut out);
@@ -186,13 +96,7 @@ pub fn encode_git_delta(base: &[u8], target: &[u8]) -> Option<Vec<u8>> {
     if target.is_empty() {
         return Some(out);
     }
-    if base.is_empty() {
-        emit_insert_ops(target, &mut out);
-        return Some(out);
-    }
-    if base.len() > u32::MAX as usize {
-        // Git copy opcodes address the base with at most four offset bytes, so a base above 4 GiB
-        // is not addressable; emit the target as literal inserts instead of truncating offsets.
+    if base.is_empty() || base.len() > u32::MAX as usize {
         emit_insert_ops(target, &mut out);
         return Some(out);
     }
@@ -224,13 +128,11 @@ pub fn encode_git_delta(base: &[u8], target: &[u8]) -> Option<Vec<u8>> {
         ]);
 
         if let Some(&base_pos) = index.get(&key) {
-            let mut match_len = 0;
-            while target_cursor + match_len < target.len()
-                && base_pos + match_len < base.len()
-                && target[target_cursor + match_len] == base[base_pos + match_len]
-            {
-                match_len += 1;
-            }
+            let match_len = base[base_pos..]
+                .iter()
+                .zip(&target[target_cursor..])
+                .take_while(|(left, right)| left == right)
+                .count();
 
             if match_len >= MIN_MATCH_LEN {
                 if pending_insert_start < target_cursor {
@@ -252,8 +154,8 @@ pub fn encode_git_delta(base: &[u8], target: &[u8]) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// Determines sorting order rank for ObjectKind to maximize delta locality.
-fn kind_rank(kind: ObjectKind) -> u8 {
+/// Determines sorting order rank for `ObjectKind` to maximize delta locality.
+const fn kind_rank(kind: ObjectKind) -> u8 {
     match kind {
         ObjectKind::Commit => 1,
         ObjectKind::Tree => 2,
@@ -262,10 +164,29 @@ fn kind_rank(kind: ObjectKind) -> u8 {
     }
 }
 
+fn select_smaller_delta(
+    delta_fossil: Option<Vec<u8>>,
+    delta_std: Option<Vec<u8>>,
+) -> Option<Vec<u8>> {
+    match (delta_fossil, delta_std) {
+        (Some(delta_f), Some(delta_s)) => {
+            if delta_f.len() <= delta_s.len() {
+                Some(delta_f)
+            } else {
+                Some(delta_s)
+            }
+        }
+        (Some(delta_f), None) => Some(delta_f),
+        (None, Some(delta_s)) => Some(delta_s),
+        (None, None) => None,
+    }
+}
+
 /// Evaluates sliding window delta compression over a collection of pack items.
 ///
 /// Objects are sorted deterministically, and each object searches up to `window_size`
-/// predecessors of the same type for optimal delta compression.
+/// predecessors of the same type for optimal delta compression. Full object payloads are
+/// moved into `DeltaResolution::Full` after the window pass without cloning (`FGT-PRF-001`).
 pub fn find_pack_deltas(
     mut items: Vec<PackDeltaItem>,
     window_size: usize,
@@ -281,21 +202,17 @@ pub fn find_pack_deltas(
 
     let count = items.len();
     let mut depths = vec![0usize; count];
-    let mut resolutions = Vec::with_capacity(count);
+    let mut chosen_deltas: Vec<Option<(usize, Oid, Vec<u8>)>> = Vec::with_capacity(count);
 
     for item_index in 0..count {
         let target = &items[item_index];
-        let original_size = target.payload.len();
-        let mut best_delta: Option<(usize, Vec<u8>)> = None;
-        let mut best_size = (original_size * 4) / 5; // Require at least 20% size savings
+        let mut best_delta: Option<(usize, Oid, Vec<u8>)> = None;
+        let mut best_size = (target.payload.len() * 4) / 5;
 
         let window_start = item_index.saturating_sub(window_size);
         for candidate_index in window_start..item_index {
             let candidate = &items[candidate_index];
-            if candidate.kind != target.kind {
-                continue;
-            }
-            if depths[candidate_index] >= max_depth {
+            if candidate.kind != target.kind || depths[candidate_index] >= max_depth {
                 continue;
             }
 
@@ -309,66 +226,60 @@ pub fn find_pack_deltas(
             };
             let delta_std = encode_git_delta(&candidate.payload, &target.payload);
 
-            let candidate_delta = match (delta_fossil, delta_std) {
-                (Some(delta_f), Some(delta_s)) => {
-                    if delta_f.len() <= delta_s.len() {
-                        Some(delta_f)
-                    } else {
-                        Some(delta_s)
-                    }
-                }
-                (Some(delta_f), None) => Some(delta_f),
-                (None, Some(delta_s)) => Some(delta_s),
-                (None, None) => None,
-            };
-
-            if let Some(delta) = candidate_delta {
+            if let Some(delta) = select_smaller_delta(delta_fossil, delta_std) {
                 if delta.len() < best_size {
                     best_size = delta.len();
-                    best_delta = Some((candidate_index, delta));
+                    best_delta = Some((candidate_index, candidate.oid, delta));
                 }
             }
         }
 
-        if let Some((base_index, delta_payload)) = best_delta {
-            depths[item_index] = depths[base_index] + 1;
-            resolutions.push(PackDeltaChain {
-                oid: target.oid,
-                kind: target.kind,
-                resolution: DeltaResolution::Delta {
-                    base_oid: items[base_index].oid,
+        if let Some((base_index, _, _)) = &best_delta {
+            depths[item_index] = depths[*base_index] + 1;
+        }
+        chosen_deltas.push(best_delta);
+    }
+
+    items
+        .into_iter()
+        .zip(depths.into_iter().zip(chosen_deltas))
+        .map(|(item, (depth, chosen))| {
+            let original_size = item.payload.len();
+            let resolution = match chosen {
+                Some((base_index, base_oid, delta_payload)) => DeltaResolution::Delta {
+                    base_oid,
                     base_index,
                     delta_payload,
                 },
-                original_size,
-                depth: depths[item_index],
-            });
-        } else {
-            depths[item_index] = 0;
-            resolutions.push(PackDeltaChain {
-                oid: target.oid,
-                kind: target.kind,
-                resolution: DeltaResolution::Full {
-                    payload: target.payload.clone(),
+                None => DeltaResolution::Full {
+                    payload: item.payload,
                 },
+            };
+            PackDeltaChain {
+                oid: item.oid,
+                kind: item.kind,
+                resolution,
                 original_size,
-                depth: 0,
-            });
-        }
-    }
-
-    resolutions
+                depth,
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pack::delta_opcodes::{emit_copy_op, COPY_MAX_LEN, MAX_INSERT_LEN, OPCODE_COPY};
 
     #[test]
     fn test_compute_basename_hash_consistency() {
         assert_eq!(
             compute_basename_hash("src/lib.rs"),
             compute_basename_hash("crates/fg-algorithms/src/lib.rs")
+        );
+        assert_eq!(
+            compute_basename_hash("src\\lib.rs"),
+            compute_basename_hash("src/lib.rs")
         );
         assert_ne!(
             compute_basename_hash("src/lib.rs"),
@@ -396,7 +307,7 @@ mod tests {
         let mut items = Vec::new();
         for i in 0..15 {
             let payload =
-                format!("version {} of common file with identical footer\n", i).into_bytes();
+                format!("version {i} of common file with identical footer\n").into_bytes();
             let mut oid_bytes = [0u8; 20];
             oid_bytes[0] = i as u8;
             items.push(PackDeltaItem::new(
@@ -417,8 +328,6 @@ mod tests {
         }
     }
 
-    /// One decoded Git delta operation, kept local to the tests so the checks do not depend on
-    /// `fg-storage` going through the same decoder that production code uses.
     #[derive(Debug, PartialEq, Eq)]
     enum TestOp {
         Copy { offset: usize, len: usize },
@@ -449,7 +358,6 @@ mod tests {
         }
     }
 
-    /// Parses a Git delta stream into its header sizes and ordered operations.
     fn parse_delta_for_test(delta: &[u8]) -> (usize, usize, Vec<TestOp>) {
         let mut cursor = 0;
         let base_size = read_varint_test(delta, &mut cursor);

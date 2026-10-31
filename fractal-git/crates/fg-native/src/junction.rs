@@ -91,12 +91,16 @@ pub fn create_junction(link_path: &Path, _target: &Path) -> NativeResult<()> {
 /// Builds the `REPARSE_DATA_BUFFER` payload for a mount point.
 #[cfg(windows)]
 fn encode_mount_point_buffer(target: &Path) -> NativeResult<Vec<u8>> {
-    // The substitute name is the object-manager form; the print name is the human form.
-    let target_text = target.display().to_string();
-    let substitute = format!(r"\??\{target_text}");
+    // Strip extended-length verbatim `\\?\` prefix before prepending `\??\` so canonicalized
+    // paths never produce an invalid `\??\\\?\` NT object-manager target.
+    let raw_target_text = target.display().to_string();
+    let clean_target = raw_target_text
+        .strip_prefix(r"\\?\")
+        .unwrap_or(raw_target_text.as_str());
+    let substitute = format!(r"\??\{clean_target}");
 
     let substitute_units: Vec<u16> = substitute.encode_utf16().collect();
-    let print_units: Vec<u16> = target_text.encode_utf16().collect();
+    let print_units: Vec<u16> = clean_target.encode_utf16().collect();
 
     let substitute_bytes = substitute_units.len() * 2;
     let print_bytes = print_units.len() * 2;

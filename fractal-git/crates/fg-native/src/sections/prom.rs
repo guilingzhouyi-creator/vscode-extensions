@@ -116,13 +116,13 @@ pub struct PromotionRecord {
 }
 
 impl PromotionRecord {
-    /// Serializes one record body (without the leading request-id length).
+    /// Serializes one record body directly into `writer` without per-record heap allocation.
     ///
     /// # Errors
     ///
     /// Returns [`NativeError::NonFiniteScore`] when any score is `NaN` or infinite, and propagates
     /// string-encoding failures.
-    fn encode_body(&self) -> NativeResult<Vec<u8>> {
+    fn write_body_into(&self, writer: &mut FieldWriter) -> NativeResult<()> {
         if !self.composite_score.is_finite()
             || !self.cai_index.is_finite()
             || !self.credible_interval_lower.is_finite()
@@ -130,7 +130,6 @@ impl PromotionRecord {
             return Err(NativeError::NonFiniteScore);
         }
 
-        let mut writer = FieldWriter::with_capacity(160);
         writer.write_oid(&self.candidate_oid);
         writer.write_string("source_ref", &self.source_ref)?;
         writer.write_string("target_ref", &self.target_ref)?;
@@ -144,7 +143,7 @@ impl PromotionRecord {
         writer.write_bytes(&self.challenge_nonce);
         writer.write_string("agent_uid", &self.agent_uid)?;
         writer.write_string("summary", &self.summary)?;
-        Ok(writer.finish())
+        Ok(())
     }
 }
 
@@ -322,8 +321,7 @@ impl PromSection {
 /// Propagates request-id encoding failures and score validation.
 fn write_record(writer: &mut FieldWriter, record: &PromotionRecord) -> NativeResult<()> {
     writer.write_string("request_id", &record.request_id)?;
-    writer.write_bytes(&record.encode_body()?);
-    Ok(())
+    record.write_body_into(writer)
 }
 
 /// Reads one record.

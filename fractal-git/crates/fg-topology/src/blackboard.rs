@@ -56,24 +56,9 @@ impl DiskBlackboardStore {
 
     /// Atomically persists the blackboard state to disk using a unique temporary file.
     pub fn save(&self, board: &CardBlackboard) -> FractalResult<()> {
-        if !self.base_dir.exists() {
-            fs::create_dir_all(&self.base_dir).map_err(FractalError::Io)?;
-        }
-
         let target_path = self.card_path(&board.card_id);
-        let seq = std::process::id();
-        let staging_path = self.base_dir.join(format!(".{}-{seq}.tmp", board.card_id));
-
         let json_bytes = serde_json::to_vec_pretty(board).map_err(FractalError::Json)?;
-
-        fs::write(&staging_path, &json_bytes).map_err(FractalError::Io)?;
-
-        if let Err(rename_err) = fs::rename(&staging_path, &target_path) {
-            let _ = fs::remove_file(&staging_path);
-            return Err(FractalError::Io(rename_err));
-        }
-
-        Ok(())
+        fg_core::write_file_atomic(&target_path, &json_bytes, false).map_err(FractalError::Io)
     }
 
     /// Removes a blackboard file when a Card worktree is reclaimed or merged.

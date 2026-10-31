@@ -194,7 +194,7 @@ impl KernelAstVerifier {
                 .config
                 .path_jail_roots
                 .iter()
-                .any(|root| normalized.starts_with(root.trim_start_matches('/')));
+                .any(|root| fg_core::path_matches_scope(&normalized, root));
             if !in_jail {
                 return Some(VerifierViolation {
                     rule_id: "GUARD-JAIL-001".into(),
@@ -219,60 +219,28 @@ impl KernelAstVerifier {
         content: &str,
         violations: &mut Vec<VerifierViolation>,
     ) {
-        let mut loop_depth = 0usize;
-        let mut brace_balance = 0isize;
-        let mut loop_start_brace = 0isize;
+        let mut state = LoopBraceState::default();
 
         for (line_index, source_line) in content.lines().enumerate() {
             let trimmed = source_line.trim();
-            let line_num = line_index + 1;
-
-            // Skip comments
-            if trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('*') {
+            if is_comment_line(trimmed) {
                 continue;
             }
-
-            // Detect loop constructs
-            let is_loop_stmt = trimmed.starts_with("for ")
-                || trimmed.starts_with("while ")
-                || trimmed.starts_with("loop {")
-                || trimmed.starts_with("loop{")
-                || trimmed.contains(".for_each(")
-                || trimmed.contains(".forEach(");
-
-            if is_loop_stmt {
-                loop_depth += 1;
-                loop_start_brace = brace_balance;
+            if is_loop_header(trimmed) {
+                state.enter_loop();
             }
-
-            // Track braces
-            for ch in source_line.chars() {
-                match ch {
-                    '{' => brace_balance += 1,
-                    '}' => {
-                        brace_balance -= 1;
-                        if loop_depth > 0 && brace_balance <= loop_start_brace {
-                            loop_depth = loop_depth.saturating_sub(1);
-                        }
-                    }
-                    _ => {}
-                }
+            state.observe_line(source_line);
+            if state.depth == 0 {
+                continue;
             }
-
-            if loop_depth > 0 {
-                // Check for transient heap allocations inside active loop scope
-                for (pattern, diagnosis) in FORBIDDEN_ALLOC_PATTERNS {
-                    if trimmed.contains(pattern) {
-                        violations.push(VerifierViolation {
-                            rule_id: "ADV-PRF-002".into(),
-                            file: file_path.to_string(),
-                            line: line_num,
-                            message: (*diagnosis).to_string(),
-                            severity: ViolationSeverity::Block,
-                        });
-                        break;
-                    }
-                }
+            if let Some(diagnosis) = find_forbidden_alloc_diagnosis(trimmed) {
+                violations.push(VerifierViolation {
+                    rule_id: "ADV-PRF-002".into(),
+                    file: file_path.to_string(),
+                    line: line_index + 1,
+                    message: diagnosis.to_string(),
+                    severity: ViolationSeverity::Block,
+                });
             }
         }
     }
@@ -285,58 +253,20 @@ impl KernelAstVerifier {
         violations: &mut Vec<VerifierViolation>,
     ) {
         for (line_index, source_line) in content.lines().enumerate() {
-            let trimmed = source_line.trim();
-            let line_num = line_index + 1;
-
-            // Target function definitions
-            if (trimmed.starts_with("fn ")
-                || trimmed.starts_with("pub fn ")
-                || trimmed.starts_with("pub(crate) fn "))
-                && trimmed.contains('(')
-            {
-                let after_fn = if let Some(pos) = trimmed.find("fn ") {
-                    &trimmed[pos + 3..]
-                } else {
-                    trimmed
-                };
-
-                if let Some(open_idx) = after_fn.find('(') {
-                    let sig_tail = &after_fn[open_idx + 1..];
-                    if let Some(close_idx) = sig_tail.find(')') {
-                        let params_str = &sig_tail[..close_idx].trim();
-                        if params_str.is_empty() {
-                            continue;
-                        }
-
-                        let raw_params = split_params_respecting_brackets(params_str);
-                        let mut effective_params = 0usize;
-
-                        for param_token in raw_params {
-                            let trimmed_param = param_token.trim();
-                            if trimmed_param == "self"
-                                || trimmed_param == "&self"
-                                || trimmed_param == "&mut self"
-                                || trimmed_param.is_empty()
-                            {
-                                continue;
-                            }
-                            effective_params += 1;
-                        }
-
-                        if effective_params > self.config.max_parameters {
-                            violations.push(VerifierViolation {
-                                rule_id: "SIM-ARGS-001".into(),
-                                file: file_path.to_string(),
-                                line: line_num,
-                                message: format!(
-                                    "Parameter count {} exceeds limit of {} (SIM-ARGS-001); pack parameters into a structured parameter object",
-                                    effective_params, self.config.max_parameters
-                                ),
-                                severity: ViolationSeverity::Block,
-                            });
-                        }
-                    }
-                }
+            let Some(effective_params) = count_effective_fn_parameters(source_line.trim()) else {
+                continue;
+            };
+            if effective_params > self.config.max_parameters {
+                violations.push(VerifierViolation {
+                    rule_id: "SIM-ARGS-001".into(),
+                    file: file_path.to_string(),
+                    line: line_index + 1,
+                    message: format!(
+                        "Parameter count {} exceeds limit of {} (SIM-ARGS-001); pack parameters into a structured parameter object",
+                        effective_params, self.config.max_parameters
+                    ),
+                    severity: ViolationSeverity::Block,
+                });
             }
         }
     }
@@ -348,7 +278,7 @@ impl KernelAstVerifier {
         content: &str,
         violations: &mut Vec<VerifierViolation>,
     ) {
-        let handle_creators = [
+        const HANDLE_CREATORS: [(&str, &str); 4] = [
             (
                 "File::create(",
                 "File handle created; ensure explicit drop or RAII closure",
@@ -369,24 +299,20 @@ impl KernelAstVerifier {
 
         for (line_index, source_line) in content.lines().enumerate() {
             let trimmed = source_line.trim();
-            let line_num = line_index + 1;
-
             if trimmed.starts_with("//") {
                 continue;
             }
-
-            for (creator, advice) in &handle_creators {
-                if trimmed.contains(creator) {
-                    // Check if assigned to an unmanaged bare variable or discarded
-                    if trimmed.starts_with(creator) {
-                        violations.push(VerifierViolation {
-                            rule_id: "PRF-LEAK-001".into(),
-                            file: file_path.to_string(),
-                            line: line_num,
-                            message: format!("Unmanaged resource handle creation without variable binding: {advice}"),
-                            severity: ViolationSeverity::Warn,
-                        });
-                    }
+            for (creator, advice) in &HANDLE_CREATORS {
+                if trimmed.starts_with(creator) {
+                    violations.push(VerifierViolation {
+                        rule_id: "PRF-LEAK-001".into(),
+                        file: file_path.to_string(),
+                        line: line_index + 1,
+                        message: format!(
+                            "Unmanaged resource handle creation without variable binding: {advice}"
+                        ),
+                        severity: ViolationSeverity::Warn,
+                    });
                 }
             }
         }
@@ -439,6 +365,86 @@ impl KernelAstVerifier {
             }
         }
     }
+}
+
+/// Reports whether `trimmed` is a single-line or block-comment continuation line.
+fn is_comment_line(trimmed: &str) -> bool {
+    trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('*')
+}
+
+/// Reports whether `trimmed` begins a Rust or JS/TS loop construct.
+fn is_loop_header(trimmed: &str) -> bool {
+    trimmed.starts_with("for ")
+        || trimmed.starts_with("while ")
+        || trimmed.starts_with("loop {")
+        || trimmed.starts_with("loop{")
+        || trimmed.contains(".for_each(")
+        || trimmed.contains(".forEach(")
+}
+
+/// Tracks brace balance and active loop nesting depth during lexical scanning.
+#[derive(Default)]
+struct LoopBraceState {
+    depth: usize,
+    brace_balance: isize,
+    loop_start_brace: isize,
+}
+
+impl LoopBraceState {
+    fn enter_loop(&mut self) {
+        self.depth += 1;
+        self.loop_start_brace = self.brace_balance;
+    }
+
+    fn observe_line(&mut self, source_line: &str) {
+        for ch in source_line.chars() {
+            match ch {
+                '{' => self.brace_balance += 1,
+                '}' => {
+                    self.brace_balance -= 1;
+                    if self.depth > 0 && self.brace_balance <= self.loop_start_brace {
+                        self.depth = self.depth.saturating_sub(1);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Finds the first matching forbidden loop-allocation diagnosis in `trimmed`.
+fn find_forbidden_alloc_diagnosis(trimmed: &str) -> Option<&'static str> {
+    FORBIDDEN_ALLOC_PATTERNS
+        .iter()
+        .find_map(|(pattern, diagnosis)| trimmed.contains(pattern).then_some(*diagnosis))
+}
+
+/// Counts non-`self` parameters in a single-line Rust function signature, if present.
+fn count_effective_fn_parameters(trimmed: &str) -> Option<usize> {
+    let is_fn_decl = trimmed.starts_with("fn ")
+        || trimmed.starts_with("pub fn ")
+        || trimmed.starts_with("pub(crate) fn ");
+    if !is_fn_decl || !trimmed.contains('(') {
+        return None;
+    }
+    let after_fn = trimmed
+        .find("fn ")
+        .map_or(trimmed, |pos| &trimmed[pos + 3..]);
+    let open_idx = after_fn.find('(')?;
+    let sig_tail = &after_fn[open_idx + 1..];
+    let close_idx = sig_tail.find(')')?;
+    let params_str = sig_tail[..close_idx].trim();
+    if params_str.is_empty() {
+        return Some(0);
+    }
+    let count = split_params_respecting_brackets(params_str)
+        .into_iter()
+        .map(str::trim)
+        .filter(|param| {
+            !param.is_empty() && *param != "self" && *param != "&self" && *param != "&mut self"
+        })
+        .count();
+    Some(count)
 }
 
 /// Splits a parameter list by comma while respecting nested generics `<...>` and tuples `(...)`.
@@ -503,6 +509,9 @@ mod tests {
             .is_none());
         assert!(verifier
             .verify_path_jail("crates/fg-pools/src/lib.rs")
+            .is_some());
+        assert!(verifier
+            .verify_path_jail("crates/fg-core-evil/src/lib.rs")
             .is_some());
     }
 

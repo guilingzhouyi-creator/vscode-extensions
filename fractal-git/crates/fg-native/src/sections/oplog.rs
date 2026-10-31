@@ -124,15 +124,20 @@ impl OpLogEntry {
     /// Field order here is part of the identity contract: reordering fields changes every id.
     fn encode_canonical(&self) -> NativeResult<Vec<u8>> {
         let mut writer = FieldWriter::with_capacity(128);
-        write_parent_ids(&mut writer, &self.parent_ids);
+        self.write_canonical_into(&mut writer)?;
+        Ok(writer.finish())
+    }
+
+    fn write_canonical_into(&self, writer: &mut FieldWriter) -> NativeResult<()> {
+        write_parent_ids(writer, &self.parent_ids);
         writer.write_optional_oid(self.head_oid.as_ref());
-        write_branches(&mut writer, &self.branches)?;
-        write_strings(&mut writer, "staged_promotion", &self.staged_promotions)?;
+        write_branches(writer, &self.branches)?;
+        write_strings(writer, "staged_promotion", &self.staged_promotions)?;
         writer.write_i64(self.timestamp_ms);
         writer.write_string("actor", &self.actor)?;
         writer.write_string("command", &self.command)?;
         writer.write_string("description", &self.description)?;
-        Ok(writer.finish())
+        Ok(())
     }
 }
 
@@ -288,7 +293,7 @@ impl OpLogSection {
         writer.write_u32(self.entries.len() as u32);
         for entry in &self.entries {
             writer.write_oid(&entry.op_id);
-            writer.write_bytes(&entry.encode_canonical()?);
+            entry.write_canonical_into(&mut writer)?;
         }
         Ok(writer.finish())
     }

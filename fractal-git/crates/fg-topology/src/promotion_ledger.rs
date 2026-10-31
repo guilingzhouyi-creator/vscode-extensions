@@ -216,7 +216,7 @@ impl PromotionStagingLedger {
                         agent_uid,
                         policy,
                         current_time_ms,
-                    });
+                    })?;
                     self.ledger_data.active_candidate = Some(new_request);
                     self.persist()?;
                     return Ok(new_req_id);
@@ -242,7 +242,7 @@ impl PromotionStagingLedger {
             agent_uid,
             policy,
             current_time_ms,
-        });
+        })?;
         self.ledger_data.active_candidate = Some(new_request);
         self.persist()?;
         Ok(req_id)
@@ -352,20 +352,18 @@ impl PromotionStagingLedger {
         )
     }
 
-    fn build_request(&self, params: StagedPromotionParams<'_>) -> StagedPromotionRequest {
-        // Generate cryptographic 32-byte challenge nonce
+    fn build_request(
+        &self,
+        params: StagedPromotionParams<'_>,
+    ) -> FractalResult<StagedPromotionRequest> {
+        // Fill unpredictable 32-byte UAC challenge nonce from the OS CSPRNG
         let mut nonce = [0u8; 32];
-        let seed = format!(
-            "{}:{}:{}",
-            params.request_id, params.current_time_ms, params.agent_uid
-        );
-        let hash = sha1_hash_32(seed.as_bytes());
-        nonce.copy_from_slice(&hash);
+        fg_native::fill_random_bytes(&mut nonce).map_err(native_to_domain)?;
 
         let expires_at_ms =
             params.current_time_ms + (params.policy.staged_promotion_ttl_seconds as i64) * 1000;
 
-        StagedPromotionRequest {
+        Ok(StagedPromotionRequest {
             request_id: params.request_id,
             source_ref: "refs/fractal/trunk".into(),
             target_ref: "refs/heads/main".into(),
@@ -377,7 +375,7 @@ impl PromotionStagingLedger {
             expires_at_ms,
             summary: params.summary,
             agent_uid: params.agent_uid,
-        }
+        })
     }
 }
 
@@ -495,18 +493,4 @@ fn to_request(record: &PromotionRecord) -> StagedPromotionRequest {
         summary: record.summary.clone(),
         agent_uid: record.agent_uid.clone(),
     }
-}
-
-fn sha1_hash_32(input_bytes: &[u8]) -> [u8; 32] {
-    use sha1::{Digest, Sha1};
-    let mut hasher = Sha1::new();
-    hasher.update(input_bytes);
-    let mut digest_prefix: [u8; 20] = hasher.finalize().into();
-
-    let mut digest_buffer = [0u8; 32];
-    digest_buffer[..20].copy_from_slice(&digest_prefix);
-    // Fill remaining 12 bytes with inverted hash
-    digest_prefix.reverse();
-    digest_buffer[20..32].copy_from_slice(&digest_prefix[..12]);
-    digest_buffer
 }

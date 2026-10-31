@@ -5,7 +5,8 @@
 //!   instead of hashing payload bytes on its own.
 //! Dependencies & Triggers: Consumed by the object codecs (`fg-object`), the content-addressed
 //!   block store (`fg-storage`), and the projection layer that writes a `.git` snapshot.
-//! Responsibilities: Frame a payload with `<type> <decimal length>\0` and hash the frame with SHA-1.
+//! Responsibilities: Frame a payload with `<type> <decimal length>\0`, parse loose headers back into
+//!   `(ObjectKind, payload)`, and hash the frame with SHA-1.
 //! Exit Semantics & Design Rationale:
 //!   - The type is part of the identity. Hashing the payload alone would give a blob and a tree
 //!     with identical bytes the same id, which makes a projection table unavoidable and lets a
@@ -19,6 +20,7 @@
 
 use sha1::{Digest, Sha1};
 
+use crate::error::{FractalError, FractalResult};
 use crate::models::oid::Oid;
 
 /// Width of the stack buffer that holds `<type> <length>\0`.
@@ -77,6 +79,17 @@ impl ObjectKind {
             _ => None,
         }
     }
+
+    /// Decodes the canonical lowercase Git header type name (`blob`, `tree`, `commit`, `tag`).
+    pub fn from_header_name(name: &str) -> Option<Self> {
+        match name {
+            "blob" => Some(Self::Blob),
+            "tree" => Some(Self::Tree),
+            "commit" => Some(Self::Commit),
+            "tag" => Some(Self::Tag),
+            _ => None,
+        }
+    }
 }
 
 /// Writes the object header for `kind` and `payload_len` into `buffer`.
@@ -118,9 +131,40 @@ pub fn raw_object(kind: ObjectKind, payload: &[u8]) -> Vec<u8> {
     raw
 }
 
+/// Parses a raw Git loose object frame (`<type> <decimal length>\0<payload>`) into its typed kind
+/// and borrowed payload slice, verifying that the declared decimal size matches `payload.len()`.
+///
+/// # Errors
+/// Returns [`FractalError::ObjectCodec`] if the NUL delimiter is absent, the header is malformed,
+/// the type name is unknown, or the declared byte count disagrees with the trailing payload slice.
+pub fn parse_loose_header(raw: &[u8]) -> FractalResult<(ObjectKind, &[u8])> {
+    let nul_pos = raw.iter().position(|&byte| byte == 0).ok_or_else(|| {
+        FractalError::ObjectCodec("missing NUL delimiter in loose object header".into())
+    })?;
+    let header = std::str::from_utf8(&raw[..nul_pos])
+        .map_err(|_| FractalError::ObjectCodec("invalid UTF-8 in loose object header".into()))?;
+    let (type_str, len_str) = header.split_once(' ').ok_or_else(|| {
+        FractalError::ObjectCodec("missing space separator in loose object header".into())
+    })?;
+    let kind = ObjectKind::from_header_name(type_str).ok_or_else(|| {
+        FractalError::ObjectCodec(format!("unknown loose object type '{type_str}'"))
+    })?;
+    let declared_len = len_str.parse::<usize>().map_err(|_| {
+        FractalError::ObjectCodec(format!("invalid loose object length '{len_str}'"))
+    })?;
+    let payload = &raw[nul_pos + 1..];
+    if payload.len() != declared_len {
+        return Err(FractalError::ObjectCodec(format!(
+            "loose object length mismatch: header declared {declared_len} bytes, actual {}",
+            payload.len()
+        )));
+    }
+    Ok((kind, payload))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{compute_object_oid, raw_object, ObjectKind};
+    use super::{compute_object_oid, parse_loose_header, raw_object, ObjectKind};
 
     #[test]
     fn empty_blob_matches_the_well_known_id() {
@@ -160,9 +204,13 @@ mod tests {
     }
 
     #[test]
-    fn raw_object_frames_the_payload() {
+    fn raw_object_frames_and_parses_back() {
         let raw = raw_object(ObjectKind::Blob, b"abc");
         assert_eq!(raw, b"blob 3\0abc");
+        let (kind, payload) = parse_loose_header(&raw).expect("parse loose frame");
+        assert_eq!(kind, ObjectKind::Blob);
+        assert_eq!(payload, b"abc");
+        assert!(parse_loose_header(b"blob 9\0abc").is_err());
     }
 
     #[test]
@@ -174,6 +222,7 @@ mod tests {
             ObjectKind::Tag,
         ] {
             assert_eq!(ObjectKind::from_u8(kind.as_u8()), Some(kind));
+            assert_eq!(ObjectKind::from_header_name(kind.as_str()), Some(kind));
         }
         assert_eq!(ObjectKind::from_u8(0), None);
         assert_eq!(ObjectKind::from_u8(5), None);

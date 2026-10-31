@@ -2,6 +2,17 @@
 //! File Path: crates/fg-gate/src/pre_receive.rs
 //! Architecture Role: Implements protocol-level authentication and push privilege validation,
 //!   enforcing human-exclusive control on dual trunks and agent sandbox boundary isolation.
+//! Dependencies & Triggers: Invoked by `AutoAuditHook`, `PromotionBridge`, and `taxis push` CLI.
+//! Responsibilities: Enforce force-push prohibition (`FGT-GAT-001`), dual-trunk human MAC authority,
+//!   and autonomous SubAgent / Card cell namespace confinement (`FGT-TOP-001`).
+//! Exit Semantics & Design Rationale:
+//!   - Fail-closed authorization: any missing secret, invalid MAC, or cross-cell reference push
+//!     immediately halts with `FractalError::TopologyBreach`.
+//!
+//! ### Domain Governance Rules (SSOT):
+//! - `FGT-COR-001`: Core data model and error contract guard
+//! - `FGT-GAT-001`: Protocol gate facade and rule compliance
+//! - `FGT-TOP-001`: Worktree topology and reference namespace guard
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{current_unix_seconds, AUTHORITY_REMEDIATION};
@@ -43,125 +54,85 @@ impl PreReceiveGuard {
         }
 
         // Rule 2: Human control boundary on dual trunks
-        if policy.human_controlled_trunks {
-            match target_ref {
-                FractalRef::SystemTrunk { branch } => {
-                    match actor {
-                        ActorIdentity::Agent(push_context) => {
-                            return Err(FractalError::TopologyBreach {
-                                source_ref: format!(
-                                    "{}:{}",
-                                    push_context.cell_id, push_context.agent_uid
-                                ),
-                                target_ref: format!(
-                                    "{}{}",
-                                    fg_core::constants::git::REF_HEADS_PREFIX,
-                                    branch
-                                ),
-                                reason: "Human Control Breach: System Trunk is strictly \
-                                         human-controlled; agent direct promotion is forbidden"
-                                    .into(),
-                            });
-                        }
-                        ActorIdentity::Human { .. } => {
-                            Self::assert_human_authority(target_ref, actor, policy)?;
-                        }
-                    }
-                    return Ok(());
-                }
-                FractalRef::Trunk => {
-                    match actor {
-                        ActorIdentity::Agent(push_context) => {
-                            return Err(FractalError::TopologyBreach {
-                                source_ref: format!(
-                                    "{}:{}",
-                                    push_context.cell_id, push_context.agent_uid
-                                ),
-                                target_ref: fg_core::constants::refs::REF_FRACTAL_TRUNK.into(),
-                                reason: "Human Control Breach: Integration Trunk is strictly \
-                                         human-controlled; promotions require human sign-off"
-                                    .into(),
-                            });
-                        }
-                        ActorIdentity::Human { .. } => {
-                            Self::assert_human_authority(target_ref, actor, policy)?;
-                        }
-                    }
-                    return Ok(());
-                }
-                _ => {}
-            }
+        if policy.human_controlled_trunks && Self::assert_trunk_control(target_ref, actor, policy)?
+        {
+            return Ok(());
         }
 
         // Rule 3: Tier isolation for autonomous agents
         if let ActorIdentity::Agent(ref push_context) = actor {
-            match target_ref {
-                FractalRef::SystemTrunk { .. } | FractalRef::Trunk => {
-                    return Err(FractalError::TopologyBreach {
-                        source_ref: format!("{}:{}", push_context.cell_id, push_context.agent_uid),
-                        target_ref: target_ref.to_git_ref(),
-                        reason: "Direct agent push to trunk hierarchy is forbidden".into(),
-                    });
-                }
-                FractalRef::SubAgentWorktree { cell_id, .. } => {
-                    if cell_id != &push_context.cell_id {
-                        return Err(FractalError::TopologyBreach {
-                            source_ref: format!(
-                                "{}:{}",
-                                push_context.cell_id, push_context.agent_uid
-                            ),
-                            target_ref: target_ref.to_git_ref(),
-                            reason: "Cross-cell push breach in subagent tier".into(),
-                        });
-                    }
-                }
-                FractalRef::CardWorktree { cell_id, .. } => {
-                    if cell_id != &push_context.cell_id {
-                        return Err(FractalError::TopologyBreach {
-                            source_ref: format!(
-                                "{}:{}",
-                                push_context.cell_id, push_context.agent_uid
-                            ),
-                            target_ref: target_ref.to_git_ref(),
-                            reason: "Cross-cell push breach in card tier".into(),
-                        });
-                    }
-                }
-                FractalRef::CellMain { cell_id } => {
-                    if cell_id != &push_context.cell_id {
-                        return Err(FractalError::TopologyBreach {
-                            source_ref: format!(
-                                "{}:{}",
-                                push_context.cell_id, push_context.agent_uid
-                            ),
-                            target_ref: target_ref.to_git_ref(),
-                            reason: "Cross-cell push breach in cell main tier".into(),
-                        });
-                    }
-                }
-                FractalRef::CellTelemetryLedger { cell_id }
-                | FractalRef::CardTelemetrySummary { cell_id, .. } => {
-                    if cell_id != &push_context.cell_id {
-                        return Err(FractalError::TopologyBreach {
-                            source_ref: format!(
-                                "{}:{}",
-                                push_context.cell_id, push_context.agent_uid
-                            ),
-                            target_ref: target_ref.to_git_ref(),
-                            reason: "Cross-cell push breach in telemetry tier".into(),
-                        });
-                    }
-                }
-                FractalRef::TelemetryCommit { .. } => {
-                    return Err(FractalError::TopologyBreach {
-                        source_ref: format!("{}:{}", push_context.cell_id, push_context.agent_uid),
-                        target_ref: target_ref.to_git_ref(),
-                        reason: "Direct agent push to commit telemetry is forbidden; must be issued by kernel audit hook".into(),
-                    });
-                }
-            }
+            Self::assert_agent_cell_isolation(target_ref, push_context)?;
         }
 
+        Ok(())
+    }
+
+    /// Enforces human-only promotion on `SystemTrunk` and `Trunk`, returning `Ok(true)` if handled.
+    fn assert_trunk_control(
+        target_ref: &FractalRef,
+        actor: &ActorIdentity,
+        policy: &TaxisPolicy,
+    ) -> FractalResult<bool> {
+        let (target_display, agent_reason) = match target_ref {
+            FractalRef::SystemTrunk { branch } => (
+                format!("{}{}", fg_core::constants::git::REF_HEADS_PREFIX, branch),
+                "Human Control Breach: System Trunk is strictly human-controlled; agent direct promotion is forbidden",
+            ),
+            FractalRef::Trunk => (
+                fg_core::constants::refs::REF_FRACTAL_TRUNK.into(),
+                "Human Control Breach: Integration Trunk is strictly human-controlled; promotions require human sign-off",
+            ),
+            _ => return Ok(false),
+        };
+
+        match actor {
+            ActorIdentity::Agent(push_context) => Err(FractalError::TopologyBreach {
+                source_ref: format!("{}:{}", push_context.cell_id, push_context.agent_uid),
+                target_ref: target_display,
+                reason: agent_reason.into(),
+            }),
+            ActorIdentity::Human { .. } => {
+                Self::assert_human_authority(target_ref, actor, policy)?;
+                Ok(true)
+            }
+        }
+    }
+
+    /// Enforces cell-level reference confinement for autonomous agents.
+    fn assert_agent_cell_isolation(
+        target_ref: &FractalRef,
+        push_context: &AgentPushContext,
+    ) -> FractalResult<()> {
+        let source_ref = format!("{}:{}", push_context.cell_id, push_context.agent_uid);
+        let (target_cell, tier_label) = match target_ref {
+            FractalRef::SystemTrunk { .. } | FractalRef::Trunk => {
+                return Err(FractalError::TopologyBreach {
+                    source_ref,
+                    target_ref: target_ref.to_git_ref(),
+                    reason: "Direct agent push to trunk hierarchy is forbidden".into(),
+                });
+            }
+            FractalRef::TelemetryCommit { .. } => {
+                return Err(FractalError::TopologyBreach {
+                    source_ref,
+                    target_ref: target_ref.to_git_ref(),
+                    reason: "Direct agent push to commit telemetry is forbidden; must be issued by kernel audit hook".into(),
+                });
+            }
+            FractalRef::SubAgentWorktree { cell_id, .. } => (cell_id, "subagent"),
+            FractalRef::CardWorktree { cell_id, .. } => (cell_id, "card"),
+            FractalRef::CellMain { cell_id } => (cell_id, "cell main"),
+            FractalRef::CellTelemetryLedger { cell_id }
+            | FractalRef::CardTelemetrySummary { cell_id, .. } => (cell_id, "telemetry"),
+        };
+
+        if target_cell != &push_context.cell_id {
+            return Err(FractalError::TopologyBreach {
+                source_ref,
+                target_ref: target_ref.to_git_ref(),
+                reason: format!("Cross-cell push breach in {tier_label} tier"),
+            });
+        }
         Ok(())
     }
 

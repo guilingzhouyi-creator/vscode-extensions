@@ -13,6 +13,8 @@
 
 pub mod constants;
 pub mod error;
+pub mod fs_atomic;
+pub mod math;
 pub mod models;
 pub mod traits;
 
@@ -22,7 +24,12 @@ pub use constants::{
 };
 
 pub use error::{FractalError, FractalResult};
-pub use models::{safe_join, validate_repo_relative_path};
+pub use fs_atomic::write_file_atomic;
+pub use math::{
+    decode_git_offset_varint, encode_git_offset_varint, jeffreys_beta_from_counts,
+    jeffreys_beta_trials, JeffreysPosterior,
+};
+pub use models::{ct_eq_bytes, path_matches_scope, safe_join, validate_repo_relative_path};
 pub use models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityClaims, AuthoritySecret,
     AuthorityTier, AutoQualityScoreEnvelope, BlackboardCollision, BlockProvenanceEntry,

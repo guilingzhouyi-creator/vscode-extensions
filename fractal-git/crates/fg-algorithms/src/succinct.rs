@@ -1,5 +1,5 @@
-//! Module: fg-algorithms::succinct::elias_fano — Quasi-Succinct Monotonic Integer Compression
-//! File Path: crates/fg-algorithms/src/succinct/elias_fano.rs
+//! Module: fg-algorithms::succinct — Quasi-Succinct Monotonic Integer Compression
+//! File Path: crates/fg-algorithms/src/succinct.rs
 //! Architecture Role: Pure algorithmic quasi-succinct encoder/decoder for monotonic non-decreasing
 //!   integer sequences (e.g., commit timestamps, generation numbers, pack index offsets).
 //! Dependencies & Triggers: Consumed by fg-storage (CommitGraph CDAT, Pack Index v2 offsets).
@@ -23,10 +23,10 @@ const INVENTORY_INTERVAL: usize = 64;
 
 /// Elias-Fano quasi-succinct representation of a monotonic non-decreasing integer sequence.
 ///
-/// Encodes a sequence 0 <= s_0 <= s_1 <= ... <= s_{n-1} <= U into:
-/// - Low bits: compact array of n elements, each occupying l = floor(log2(U / n)) bits.
-/// - High bits: unary encoded bitvector marking bucket transitions, occupying <= 2n + 1 bits.
-/// - High inventory: sampling table for O(1) select1 operations.
+/// Encodes a sequence `0 <= s_0 <= s_1 <= ... <= s_{n-1} <= U` into:
+/// - Low bits: compact array of `n` elements, each occupying `l = floor(log2(U / n))` bits.
+/// - High bits: unary encoded bitvector marking bucket transitions, occupying `<= 2n + 1` bits.
+/// - High inventory: sampling table for `O(1)` `select1` operations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EliasFano {
     /// Total count of elements in the encoded sequence.
@@ -39,12 +39,12 @@ pub struct EliasFano {
     low_words: Vec<u64>,
     /// High bits unary-encoded bitvector stored as 64-bit words.
     high_words: Vec<u64>,
-    /// Sampled word indices for every INVENTORY_INTERVAL-th set bit (one) in high_words.
+    /// Sampled word indices for every `INVENTORY_INTERVAL`-th set bit (one) in `high_words`.
     high_inventory: Vec<usize>,
 }
 
 impl EliasFano {
-    /// Compresses a non-decreasing slice of 64-bit integers into an EliasFano structure.
+    /// Compresses a non-decreasing slice of 64-bit integers into an `EliasFano` structure.
     ///
     /// # Errors
     /// Returns `FractalError::ObjectCodec` if the input slice is not monotonically non-decreasing.
@@ -60,13 +60,11 @@ impl EliasFano {
             });
         }
 
-        // Verify monotonicity and determine universe upper bound
         let mut previous_value = values[0];
         for &current_value in &values[1..] {
             if current_value < previous_value {
                 return Err(FractalError::ObjectCodec(format!(
-                    "EliasFano input is not monotonic: previous={}, current={}",
-                    previous_value, current_value
+                    "EliasFano input is not monotonic: previous={previous_value}, current={current_value}"
                 )));
             }
             previous_value = current_value;
@@ -75,7 +73,6 @@ impl EliasFano {
         let count = values.len();
         let universe = values[count - 1];
 
-        // Compute optimal low bits width: l = floor(log2(U / n)) if U >= n, else 0
         let low_bit_width = if universe >= count as u64 && count > 0 {
             let ratio = universe / count as u64;
             if ratio > 0 {
@@ -113,10 +110,7 @@ impl EliasFano {
         self.universe
     }
 
-    /// Retrieves the integer at `index` in O(1) time.
-    ///
-    /// # Panics / Out-of-Bounds
-    /// Returns `None` if `index >= self.len()`.
+    /// Retrieves the integer at `index` in `O(1)` time, returning `None` if `index >= self.len()`.
     pub fn get(&self, index: usize) -> Option<u64> {
         if index >= self.count {
             return None;
@@ -127,9 +121,9 @@ impl EliasFano {
         Some((high << self.low_bit_width) | low)
     }
 
-    /// Finds the first index and value whose stored integer is >= `target_value` (successor query).
+    /// Finds the first index and value whose stored integer is `>= target_value` (successor query).
     ///
-    /// Runs in O(log n) time via binary search over the O(1) `get()` index.
+    /// Runs in `O(log n)` time via binary search over the `O(1)` `get()` index.
     pub fn successor(&self, target_value: u64) -> Option<(usize, u64)> {
         if self.is_empty() || target_value > self.universe {
             return None;
@@ -153,9 +147,9 @@ impl EliasFano {
         candidate
     }
 
-    /// Finds the last index and value whose stored integer is <= `target_value` (predecessor query).
+    /// Finds the last index and value whose stored integer is `<= target_value` (predecessor query).
     ///
-    /// Runs in O(log n) time via binary search over the O(1) `get()` index.
+    /// Runs in `O(log n)` time via binary search over the `O(1)` `get()` index.
     pub fn predecessor(&self, target_value: u64) -> Option<(usize, u64)> {
         if self.is_empty() {
             return None;
@@ -220,7 +214,7 @@ impl EliasFano {
         buf.extend_from_slice(&Self::MAGIC);
         buf.extend_from_slice(&1u16.to_be_bytes());
         buf.push(self.low_bit_width);
-        buf.push(0); // reserved
+        buf.push(0);
         buf.extend_from_slice(&(self.count as u64).to_be_bytes());
         buf.extend_from_slice(&self.universe.to_be_bytes());
         buf.extend_from_slice(&(self.low_words.len() as u32).to_be_bytes());
@@ -298,29 +292,12 @@ impl EliasFano {
         }
 
         let mut cursor = 36;
-        let mut low_words = Vec::with_capacity(low_words_len);
-        for _ in 0..low_words_len {
-            let mut word_bytes = [0u8; 8];
-            word_bytes.copy_from_slice(&bytes[cursor..cursor + 8]);
-            low_words.push(u64::from_le_bytes(word_bytes));
-            cursor += 8;
-        }
-
-        let mut high_words = Vec::with_capacity(high_words_len);
-        for _ in 0..high_words_len {
-            let mut word_bytes = [0u8; 8];
-            word_bytes.copy_from_slice(&bytes[cursor..cursor + 8]);
-            high_words.push(u64::from_le_bytes(word_bytes));
-            cursor += 8;
-        }
-
-        let mut high_inventory = Vec::with_capacity(inventory_len);
-        for _ in 0..inventory_len {
-            let mut word_bytes = [0u8; 8];
-            word_bytes.copy_from_slice(&bytes[cursor..cursor + 8]);
-            high_inventory.push(u64::from_le_bytes(word_bytes) as usize);
-            cursor += 8;
-        }
+        let low_words = read_le_u64_vec(bytes, &mut cursor, low_words_len);
+        let high_words = read_le_u64_vec(bytes, &mut cursor, high_words_len);
+        let high_inventory = read_le_u64_vec(bytes, &mut cursor, inventory_len)
+            .into_iter()
+            .map(|word| word as usize)
+            .collect();
 
         Ok(Self {
             count,
@@ -365,7 +342,7 @@ impl EliasFano {
         }
     }
 
-    /// Computes high bucket value h_i = select1(index) - index using hardware POPCNT.
+    /// Computes high bucket value `h_i = select1(index) - index` using hardware POPCNT.
     #[inline]
     fn select_high_bucket(&self, index: usize) -> u64 {
         let select_pos = self.select_high_1(index);
@@ -377,13 +354,11 @@ impl EliasFano {
         let inventory_idx = target_rank / INVENTORY_INTERVAL;
         let mut word_idx = self.high_inventory.get(inventory_idx).copied().unwrap_or(0);
 
-        // Count ones before `word_idx`
         let mut ones_accum = 0usize;
         for &word in &self.high_words[..word_idx] {
             ones_accum += word.count_ones() as usize;
         }
 
-        // Advance words until target_rank falls within current word
         while word_idx < self.high_words.len() {
             let word = self.high_words[word_idx];
             let ones_in_word = word.count_ones() as usize;
@@ -400,13 +375,21 @@ impl EliasFano {
     }
 }
 
-/// Helper: finds 0-based bit position of the `rank`-th set bit in a 64-bit word.
-///
-/// `rank` = 0 finds the 1st one, `rank` = 1 finds the 2nd one, etc.
+fn read_le_u64_vec(bytes: &[u8], cursor: &mut usize, word_count: usize) -> Vec<u64> {
+    let mut words = Vec::with_capacity(word_count);
+    for _ in 0..word_count {
+        let mut word_bytes = [0u8; 8];
+        word_bytes.copy_from_slice(&bytes[*cursor..*cursor + 8]);
+        words.push(u64::from_le_bytes(word_bytes));
+        *cursor += 8;
+    }
+    words
+}
+
+/// Finds 0-based bit position of the `rank`-th set bit in a 64-bit word.
 #[inline]
 fn select_in_word(word: u64, mut rank: u32) -> u32 {
     let mut current = word;
-    // Clear lowest set bit `rank` times using BLSR instruction
     while rank > 0 && current > 0 {
         current &= current - 1;
         rank -= 1;
@@ -414,7 +397,7 @@ fn select_in_word(word: u64, mut rank: u32) -> u32 {
     current.trailing_zeros()
 }
 
-/// Incremental builder for EliasFano data structure.
+/// Incremental builder for `EliasFano` data structure.
 #[derive(Debug)]
 pub struct EliasFanoBuilder {
     count: usize,
@@ -458,7 +441,6 @@ impl EliasFanoBuilder {
     pub fn push(&mut self, value: u64) {
         let width = self.low_bit_width as usize;
 
-        // 1. Append low bits
         if width > 0 {
             let low_mask = if width >= 64 {
                 u64::MAX
@@ -485,7 +467,6 @@ impl EliasFanoBuilder {
             }
         }
 
-        // 2. Append high bit (a single 1 at position h_i + inserted)
         let high_value = if self.low_bit_width >= 64 {
             0
         } else {
@@ -501,7 +482,6 @@ impl EliasFanoBuilder {
 
         self.high_words[word_idx] |= 1u64 << bit_in_word;
 
-        // Record inventory sampling
         if self.inserted.is_multiple_of(INVENTORY_INTERVAL) {
             self.high_inventory.push(word_idx);
         }
@@ -510,9 +490,8 @@ impl EliasFanoBuilder {
         self.high_bits_len = self.high_bits_len.max(one_pos + 1);
     }
 
-    /// Finalizes and returns the immutable EliasFano data structure.
+    /// Finalizes and returns the immutable `EliasFano` data structure.
     pub fn build(mut self) -> EliasFano {
-        // Trim trailing zeros from vectors if capacity exceeded
         let total_low_bits = self.count * self.low_bit_width as usize;
         let required_low_words = total_low_bits.div_ceil(64);
         self.low_words.truncate(required_low_words);
@@ -597,10 +576,9 @@ mod tests {
         assert_eq!(elias_fano.universe(), 47);
 
         for (i, &expected) in values.iter().enumerate() {
-            assert_eq!(elias_fano.get(i), Some(expected), "mismatch at index {}", i);
+            assert_eq!(elias_fano.get(i), Some(expected), "mismatch at index {i}");
         }
 
-        // Test iterator equivalence
         let recovered: Vec<u64> = elias_fano.iter().collect();
         assert_eq!(recovered, values);
     }
@@ -621,7 +599,6 @@ mod tests {
 
     #[test]
     fn test_elias_fano_large_universe_sparse() {
-        // Simulates commit timestamps and packfile byte offsets
         let mut values = Vec::new();
         let mut current = 1_700_000_000u64;
         for i in 0..1000 {
@@ -636,15 +613,12 @@ mod tests {
             assert_eq!(elias_fano.get(i), Some(expected));
         }
 
-        // Verify compression efficiency
         let bits_per_integer = elias_fano.bits_per_int();
         assert!(
             bits_per_integer < 32.0,
-            "Bits per integer {} should be far lower than 64",
-            bits_per_integer
+            "Bits per integer {bits_per_integer} should be far lower than 64"
         );
 
-        // Predecessor / successor search checks
         let mid_value = values[500];
         assert_eq!(elias_fano.successor(mid_value), Some((500, mid_value)));
         assert_eq!(elias_fano.predecessor(mid_value), Some((500, mid_value)));
@@ -652,7 +626,6 @@ mod tests {
 
     #[test]
     fn test_elias_fano_dense_ratio() {
-        // High density sequence (e.g. generation numbers, sequential commit offsets)
         let values: Vec<u64> = (0..2000).map(|i| i * 3 + (i % 2)).collect();
         let elias_fano = EliasFano::from_slice(&values).expect("dense sequence should succeed");
         assert_eq!(elias_fano.len(), 2000);
@@ -664,8 +637,7 @@ mod tests {
         let bits_per_integer = elias_fano.bits_per_int();
         assert!(
             bits_per_integer <= 5.0,
-            "Bits per integer {} should approach theoretical bound of ~3-4 bits",
-            bits_per_integer
+            "Bits per integer {bits_per_integer} should approach theoretical bound of ~3-4 bits"
         );
     }
 
@@ -688,7 +660,6 @@ mod tests {
             assert_eq!(restored.get(i), original.get(i));
         }
 
-        // Tamper payload byte and assert checksum failure
         let mut corrupted = bytes.clone();
         corrupted[10] ^= 0x55;
         assert!(EliasFano::from_bytes(&corrupted).is_err());

@@ -31,7 +31,8 @@ pub struct FlattenedTreeEntry {
     pub oid: Oid,
 }
 
-/// Flattens one tree recursively into `flat` using an arbitrary payload reader.
+/// Flattens one tree recursively into `flat` using an arbitrary payload reader and a single
+/// reusable path buffer (`FGT-PRF-001`).
 pub fn flatten_tree_with<F, P>(
     tree_oid: &Oid,
     prefix: &str,
@@ -42,40 +43,60 @@ where
     F: Fn(&Oid) -> FractalResult<P>,
     P: AsRef<[u8]>,
 {
+    let mut path_buf = String::with_capacity(prefix.len() + 128);
+    path_buf.push_str(prefix);
+    flatten_tree_into(tree_oid, &mut path_buf, read_payload, flat)
+}
+
+fn flatten_tree_into<F, P>(
+    tree_oid: &Oid,
+    path_buf: &mut String,
+    read_payload: &F,
+    flat: &mut BTreeMap<String, FlattenedTreeEntry>,
+) -> FractalResult<()>
+where
+    F: Fn(&Oid) -> FractalResult<P>,
+    P: AsRef<[u8]>,
+{
     let payload = read_payload(tree_oid)?;
     for entry in GitTreeRef::from_bytes(payload.as_ref()).iter() {
         let entry = entry?;
-        let path = if prefix.is_empty() {
-            entry.name.to_string()
-        } else {
-            format!("{prefix}/{}", entry.name)
-        };
+        let prev_len = path_buf.len();
+        if !path_buf.is_empty() {
+            path_buf.push('/');
+        }
+        path_buf.push_str(entry.name);
         if entry.mode.is_tree() {
-            flatten_tree_with(&entry.oid, &path, read_payload, flat)?;
+            let descend_res = flatten_tree_into(&entry.oid, path_buf, read_payload, flat);
+            path_buf.truncate(prev_len);
+            descend_res?;
             continue;
         }
         flat.insert(
-            path,
+            path_buf.clone(),
             FlattenedTreeEntry {
                 mode: entry.mode,
                 oid: entry.oid,
             },
         );
+        path_buf.truncate(prev_len);
     }
     Ok(())
 }
 
-/// Reads the `tree` header of a commit payload.
+/// Reads the `tree` header of a commit payload directly from raw header bytes without scanning
+/// or requiring UTF-8 validity in the commit message body.
 pub fn commit_tree_oid(payload: &[u8]) -> FractalResult<Oid> {
-    let text = std::str::from_utf8(payload).map_err(|utf_err| {
-        FractalError::ObjectCodec(format!("commit payload is not UTF-8: {utf_err}"))
-    })?;
-    for line in text.lines() {
+    for raw_line in payload.split(|&byte| byte == b'\n') {
+        let line = raw_line.strip_suffix(b"\r").unwrap_or(raw_line);
         if line.is_empty() {
             break;
         }
-        if let Some(value) = line.strip_prefix("tree ") {
-            return Oid::from_hex(value.trim());
+        if let Some(hex_bytes) = line.strip_prefix(b"tree ") {
+            let hex_str = std::str::from_utf8(hex_bytes).map_err(|utf_err| {
+                FractalError::ObjectCodec(format!("commit 'tree' header is not ASCII: {utf_err}"))
+            })?;
+            return Oid::from_hex(hex_str.trim());
         }
     }
     Err(FractalError::ObjectCodec(

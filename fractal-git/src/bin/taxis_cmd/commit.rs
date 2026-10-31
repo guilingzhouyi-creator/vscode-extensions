@@ -25,30 +25,49 @@ use fg_native::sections::head::HeadState as NativeHeadState;
 use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
 use fg_native::sections::refs::RefRecord;
 use fg_native::RepoDocument;
-use fg_storage::commit_materializer::write_commit_objects_with_parents;
+use fg_object::borrowed::GitCommitRef;
+use fg_storage::commit_materializer::{
+    write_commit_objects_with_parents, write_index_commit_objects_with_parents, IndexCommitRequest,
+};
 use fg_topology::project_store::DiskProjectStore;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::RefStore;
 use fractal_git::{
     ActorIdentity, AgentPushContext, BlockProvenanceEntry, BlockProvenanceParams,
     CommitMaterializationRequest, CommitMessageGuard, DiskProvenanceStore, DiskRefStore,
-    FractalRef, GitSignature, LooseOdb, OperationGraph, PreReceiveGuard, RepoViewSnapshot,
-    TaxisPolicy, ValidatedCommitWitness, WalJournal, WalRecord,
+    FractalRef, GitSignature, LooseOdb, PreReceiveGuard, TaxisPolicy, ValidatedCommitWitness,
+    WalJournal, WalRecord,
 };
 
+use super::checkout::worktree_stat;
 use super::common::{fail_io, find_all_arg_values, find_arg_value, print_json, reject, CliContext};
+use super::operation::{record_head_operation, HeadOperationSpec};
 
 /// Path handed to the tree builder when the caller supplies no `--file` flag.
 const DEFAULT_COMMIT_FILE: &str = "README.md";
 
 /// Dispatches atomic commit creation with governance and identity checks.
 pub fn handle_commit(ctx: &CliContext) {
+    if ctx
+        .args
+        .iter()
+        .any(|arg| arg == "-a" || arg == "--all" || arg == "-am")
+    {
+        super::stage::stage_tracked_for_commit(ctx);
+    }
+
     let cell_id = find_arg_value(&ctx.args, &["--cell"]).unwrap_or("cell-default");
     let card_id = find_arg_value(&ctx.args, &["--card"]).unwrap_or("card-000");
     let agent_id = find_arg_value(&ctx.args, &["--agent"]).unwrap_or("agent-primary");
     let human_author = find_arg_value(&ctx.args, &["--human"]).map(String::from);
     let auth_token = find_arg_value(&ctx.args, &["--token"]).map(String::from);
-    let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or("workspace-strict");
+    let git_native_default = !fg_native::container_path(&ctx.git_dir).is_file()
+        && !has_taxis_governance_flags(&ctx.args);
+    let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or(if git_native_default {
+        "git-native"
+    } else {
+        "workspace-strict"
+    });
     let explicit_target = find_arg_value(&ctx.args, &["--target"]);
     let target_ref_str = match explicit_target {
         Some(t) => t.to_string(),
@@ -64,13 +83,18 @@ pub fn handle_commit(ctx: &CliContext) {
     if let Some(secret) = authority_secret.as_ref() {
         policy.authority_secret = Some(secret.clone());
     }
-    let actor = resolve_actor_identity(
-        human_author.as_deref(),
-        auth_token,
-        agent_id,
-        cell_id,
-        authority_secret.as_ref(),
-    );
+    let actor = if git_native_default {
+        let sig = resolve_git_native_signature(ctx);
+        ActorIdentity::human(sig.name, sig.email, "git-native")
+    } else {
+        resolve_actor_identity(
+            human_author.as_deref(),
+            auth_token,
+            agent_id,
+            cell_id,
+            authority_secret.as_ref(),
+        )
+    };
     let target_ref = match FractalRef::parse(&target_ref_str) {
         Some(fref) => fref,
         None => {
@@ -137,8 +161,11 @@ pub fn handle_commit(ctx: &CliContext) {
         &target_ref,
     );
 
-    // Synchronize staged index (.taxis/index and doc.indx) preserving existing tracked files
+    let declared_files = find_all_arg_values(&ctx.args, &["--file", "--add"]);
     let index_file = ctx.git_dir.join("index");
+    let used_direct_index = declared_files.is_empty() && index_file.is_file();
+
+    // Synchronize staged index (.taxis/index and doc.indx) preserving existing tracked files
     let mut index_entry_map = std::collections::BTreeMap::new();
     if let Ok(existing_index) = fg_index::GitIndex::load(&index_file) {
         for entry in existing_index.entries() {
@@ -158,73 +185,63 @@ pub fn handle_commit(ctx: &CliContext) {
         .map(|d| d.indx.clone())
         .unwrap_or_else(fg_native::IndxSection::new);
 
-    for (i, path) in staged_files.iter().enumerate() {
-        let blob_oid = materialized.blob_oids.get(i).copied().unwrap_or(Oid::ZERO);
-        let full_path = work_root.join(path);
-        let (size, mtime_sec, mtime_nano) = if let Ok(meta) = fs::metadata(&full_path) {
-            let mtime = meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-            let duration = mtime
-                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                .unwrap_or_default();
-            (
-                meta.len() as u32,
-                duration.as_secs() as u32,
-                duration.subsec_nanos(),
-            )
-        } else {
-            (0, 0, 0)
-        };
-        let mode = materialized
-            .modes
-            .get(i)
-            .copied()
-            .unwrap_or(FileMode::RegularFile);
+    if !used_direct_index {
+        for (i, path) in staged_files.iter().enumerate() {
+            let blob_oid = materialized.blob_oids.get(i).copied().unwrap_or(Oid::ZERO);
+            let full_path = work_root.join(path);
+            let (size, mtime_sec, mtime_nano) = worktree_stat(&full_path, 0);
+            let mode = materialized
+                .modes
+                .get(i)
+                .copied()
+                .unwrap_or(FileMode::RegularFile);
 
-        if let Some(ref w) = wal {
-            let _ = w.append(&WalRecord::StageFile {
-                tx_id: tx_id.clone(),
-                path: path.clone(),
-                oid: blob_oid,
-            });
-        }
+            if let Some(ref w) = wal {
+                let _ = w.append(&WalRecord::StageFile {
+                    tx_id: tx_id.clone(),
+                    path: path.clone(),
+                    oid: blob_oid,
+                });
+            }
 
-        index_entry_map.insert(
-            path.clone(),
-            IndexEntry {
+            index_entry_map.insert(
+                path.clone(),
+                IndexEntry {
+                    path: path.clone(),
+                    mode,
+                    oid: blob_oid,
+                    stage: IndexStage::Normal,
+                    size,
+                    mtime_seconds: mtime_sec,
+                    mtime_nanos: mtime_nano,
+                    assume_valid: false,
+                    skip_worktree: false,
+                    intent_to_add: false,
+                },
+            );
+            let _ = native_indx.upsert(NativeIndexEntry {
                 path: path.clone(),
                 mode,
                 oid: blob_oid,
                 stage: IndexStage::Normal,
-                size,
-                mtime_seconds: mtime_sec,
-                mtime_nanos: mtime_nano,
-                assume_valid: false,
-                skip_worktree: false,
-                intent_to_add: false,
-            },
-        );
-        let _ = native_indx.upsert(NativeIndexEntry {
-            path: path.clone(),
-            mode,
-            oid: blob_oid,
-            stage: IndexStage::Normal,
-            stat: StatCache {
-                size: u64::from(size),
-                mtime_secs: i64::from(mtime_sec),
-                mtime_nanos: mtime_nano,
-                ctime_secs: i64::from(mtime_sec),
-                ctime_nanos: mtime_nano,
-                dev: 0,
-                ino: 0,
-                uid: 0,
-                gid: 0,
-            },
-            flags: 0,
-        });
-    }
+                stat: StatCache {
+                    size: u64::from(size),
+                    mtime_secs: i64::from(mtime_sec),
+                    mtime_nanos: mtime_nano,
+                    ctime_secs: i64::from(mtime_sec),
+                    ctime_nanos: mtime_nano,
+                    dev: 0,
+                    ino: 0,
+                    uid: 0,
+                    gid: 0,
+                },
+                flags: 0,
+            });
+        }
 
-    let final_index_entries: Vec<IndexEntry> = index_entry_map.into_values().collect();
-    let _ = write_dirc_v2(&index_file, &final_index_entries);
+        let final_index_entries: Vec<IndexEntry> = index_entry_map.into_values().collect();
+        let _ = write_dirc_v2(&index_file, &final_index_entries);
+    }
 
     if let Some(ref w) = wal {
         let _ = w.append(&WalRecord::UpdateRef {
@@ -347,7 +364,7 @@ fn human_email(human_name: &str) -> String {
 
 /// Extracts commit message or generates conventional semantic default.
 fn resolve_commit_message(args: &[String], card_id: &str) -> String {
-    find_arg_value(args, &["-m"])
+    find_arg_value(args, &["-m", "-am", "--message"])
         .map(String::from)
         .unwrap_or_else(|| {
             format!(
@@ -360,6 +377,29 @@ fn resolve_commit_message(args: &[String], card_id: &str) -> String {
                 card_id
             )
         })
+}
+
+/// Reports whether the caller explicitly supplied Taxis governance or actor flags.
+fn has_taxis_governance_flags(args: &[String]) -> bool {
+    args.iter().any(|arg| {
+        matches!(
+            arg.as_str(),
+            "--policy" | "--agent" | "--human" | "--cell" | "--card" | "--token" | "--target"
+        )
+    })
+}
+
+/// Resolves author signature from Git environment variables or `.git/config`.
+fn resolve_git_native_signature(ctx: &CliContext) -> GitSignature {
+    if let Ok(view) = super::repo_view::RepoView::open(ctx) {
+        return super::index_plumbing::resolve_git_signature(
+            &view,
+            "GIT_AUTHOR_NAME",
+            "GIT_AUTHOR_EMAIL",
+            "GIT_AUTHOR_DATE",
+        );
+    }
+    GitSignature::new("Taxis User", "taxis@local", current_unix_seconds())
 }
 
 /// Collects every path the caller declares as part of this commit, or reads from index.
@@ -444,38 +484,79 @@ fn materialize_staged_files(
     target_ref: &FractalRef,
 ) -> fractal_git::MaterializedCommit {
     let timestamp_sec = chrono::Utc::now().timestamp();
-    let author = match human_author {
-        Some(human_name) => GitSignature::new(human_name, human_email(human_name), timestamp_sec),
-        None => GitSignature::for_agent(agent_id, cell_id, timestamp_sec),
+    let git_native_default = !fg_native::container_path(&ctx.git_dir).is_file()
+        && !has_taxis_governance_flags(&ctx.args);
+    let author = if git_native_default {
+        resolve_git_native_signature(ctx)
+    } else {
+        match human_author {
+            Some(human_name) => {
+                GitSignature::new(human_name, human_email(human_name), timestamp_sec)
+            }
+            None => GitSignature::for_agent(agent_id, cell_id, timestamp_sec),
+        }
+    };
+    let committer = if git_native_default {
+        super::repo_view::RepoView::open(ctx)
+            .map(|view| {
+                super::index_plumbing::resolve_git_signature(
+                    &view,
+                    "GIT_COMMITTER_NAME",
+                    "GIT_COMMITTER_EMAIL",
+                    "GIT_COMMITTER_DATE",
+                )
+            })
+            .unwrap_or_else(|_| author.clone())
+    } else {
+        author.clone()
     };
 
-    let request = CommitMaterializationRequest {
-        files: staged_files.to_vec(),
-        work_root: super::repo_view::resolve_work_root(&ctx.git_dir),
-        message: message.to_string(),
-        author,
-        target_ref: target_ref.to_git_ref(),
-    };
-
+    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
+    let target_ref_name = target_ref.to_git_ref();
     let odb = LooseOdb::new(&ctx.git_dir);
     let ref_store = DiskRefStore::new(&ctx.git_dir);
-    let hook_runner = super::git_hooks::discover(&ctx.git_dir, &request.work_root);
+    let hook_runner = super::git_hooks::discover(&ctx.git_dir, &work_root);
     let active_head = resolve_active_head_ref(&ctx.git_dir);
     let previous_head = ref_store.get_ref("HEAD").ok().flatten();
     let merge_heads = read_merge_heads(&ctx.git_dir);
-    let materialized =
+    let declared_files = find_all_arg_values(&ctx.args, &["--file", "--add"]);
+    let index_file = ctx.git_dir.join("index");
+
+    let materialized = if declared_files.is_empty() && index_file.is_file() {
+        materialize_from_git_index(
+            ctx,
+            &odb,
+            &GitIndexCommitParams {
+                ref_store: &ref_store,
+                index_file: &index_file,
+                message,
+                author: &author,
+                committer: &committer,
+                target_ref: &target_ref_name,
+                merge_heads: &merge_heads,
+            },
+        )
+    } else {
+        let request = CommitMaterializationRequest {
+            files: staged_files.to_vec(),
+            work_root: work_root.clone(),
+            message: message.to_string(),
+            author,
+            target_ref: target_ref_name.clone(),
+        };
         match write_commit_objects_with_parents(&odb, &ref_store, &request, &merge_heads) {
             Ok(written) => written,
             Err(materialize_err) => fail_io("materialize commit", materialize_err),
-        };
+        }
+    };
 
     let branch_update = super::git_hooks::ReferenceUpdate {
         previous: materialized.parent_oid,
         next: materialized.commit_oid.to_hex(),
-        name: request.target_ref.clone(),
+        name: target_ref_name.clone(),
     };
     let mut head_update: Vec<super::git_hooks::ReferenceUpdate> = Vec::new();
-    if active_head.as_deref() == Some(request.target_ref.as_str()) {
+    if active_head.as_deref() == Some(target_ref_name.as_str()) {
         head_update.push(super::git_hooks::ReferenceUpdate {
             previous: previous_head,
             next: materialized.commit_oid.to_hex(),
@@ -498,7 +579,7 @@ fn materialize_staged_files(
         );
     }
     if let Err(update_err) = ref_store.update_ref(
-        &request.target_ref,
+        &target_ref_name,
         &materialized.commit_oid,
         materialized.parent_oid.as_ref(),
     ) {
@@ -508,6 +589,78 @@ fn materialize_staged_files(
     let _ = super::git_hooks::run_reference_transaction(&hook_runner, "committed", branch_rows);
     clear_merge_state(&ctx.git_dir, !merge_heads.is_empty());
     materialized
+}
+
+/// Parameter bundle for materializing a commit directly from `.git/index`.
+struct GitIndexCommitParams<'a> {
+    ref_store: &'a DiskRefStore,
+    index_file: &'a Path,
+    message: &'a str,
+    author: &'a GitSignature,
+    committer: &'a GitSignature,
+    target_ref: &'a str,
+    merge_heads: &'a [Oid],
+}
+
+/// Materializes a commit directly from `.git/index` entries (`write_index_commit_objects_with_parents`).
+fn materialize_from_git_index(
+    ctx: &CliContext,
+    odb: &LooseOdb,
+    params: &GitIndexCommitParams<'_>,
+) -> fractal_git::MaterializedCommit {
+    let loaded = match fg_index::GitIndex::load(params.index_file) {
+        Ok(idx) => idx,
+        Err(err) => fail_io("load git index", err),
+    };
+    let entries: Vec<(String, FileMode, Oid)> = loaded
+        .entries()
+        .iter()
+        .filter(|entry| entry.stage == IndexStage::Normal)
+        .map(|entry| (entry.path.clone(), entry.mode, entry.oid))
+        .collect();
+    let allow_empty = ctx.args.iter().any(|arg| arg == "--allow-empty");
+    let request = IndexCommitRequest {
+        entries: entries.clone(),
+        message: params.message.to_string(),
+        author: params.author.clone(),
+        committer: params.committer.clone(),
+        target_ref: params.target_ref.to_string(),
+    };
+    let written = match write_index_commit_objects_with_parents(
+        odb,
+        params.ref_store,
+        &request,
+        params.merge_heads,
+    ) {
+        Ok(materialized) => materialized,
+        Err(err) => fail_io("materialize index commit", err),
+    };
+    if !allow_empty
+        && params.merge_heads.is_empty()
+        && is_unchanged_commit(ctx, &written, entries.is_empty())
+    {
+        reject(CliTag::ERROR, "nothing to commit, working tree clean");
+    }
+    written
+}
+
+/// Reports whether the newly built tree is identical to the parent commit's tree.
+fn is_unchanged_commit(
+    ctx: &CliContext,
+    materialized: &fractal_git::MaterializedCommit,
+    index_is_empty: bool,
+) -> bool {
+    let Some(parent_oid) = materialized.parent_oid else {
+        return index_is_empty;
+    };
+    if let Ok(view) = super::repo_view::RepoView::open(ctx) {
+        if let Ok(parent_obj) = view.object(&parent_oid) {
+            if let Ok(commit_ref) = GitCommitRef::parse(&parent_obj.payload) {
+                return *commit_ref.tree_oid() == materialized.tree_oid;
+            }
+        }
+    }
+    false
 }
 
 /// Reads every pending `MERGE_HEAD` parent recorded by the three-way merge path.
@@ -602,39 +755,16 @@ fn record_commit_in_operation_graph(
     actor: &ActorIdentity,
     witness: &ValidatedCommitWitness,
 ) {
-    let ref_store = DiskRefStore::new(&ctx.git_dir);
-    let mut op_graph = match OperationGraph::load_or_init(&ctx.git_dir) {
-        Ok(graph) => graph,
-        Err(graph_err) => fail_io("open operation graph", graph_err),
-    };
-    let current_time_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|dur| dur.as_millis() as i64)
-        .unwrap_or(0);
-
-    let mut branches = std::collections::BTreeMap::new();
-    if let Ok(all_refs) = ref_store.list_all() {
-        for (name, oid) in all_refs {
-            branches.insert(name, oid);
-        }
-    }
-    branches.insert(target_ref.to_git_ref(), *commit_oid);
-
-    let view_snapshot = RepoViewSnapshot {
-        head_oid: Some(*commit_oid),
-        branches,
-        staged_promotions: Vec::new(),
-        timestamp_ms: current_time_ms,
-    };
-    if let Err(record_err) = op_graph.record_operation(
-        view_snapshot,
-        actor.display_name(),
-        "commit",
-        format!("commit: {}", witness.commit_type),
-        current_time_ms,
-    ) {
-        fail_io("record commit operation", record_err);
-    }
+    let git_ref = target_ref.to_git_ref();
+    let actor_name = actor.display_name();
+    record_head_operation(HeadOperationSpec {
+        git_dir: &ctx.git_dir,
+        head_oid: *commit_oid,
+        branch_or_ref: Some(&git_ref),
+        actor: &actor_name,
+        command: "commit",
+        description: format!("commit: {}", witness.commit_type),
+    });
 }
 
 /// Records mechanical block-level provenance with host nanosecond physical timestamps.
