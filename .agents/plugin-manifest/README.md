@@ -34,7 +34,7 @@
     ├── defensive-security-and-taint-safety/ # 污点防御与破坏操作守卫
     ├── docs-archive-governance/# 蓝图与历史全宗元数据治理
     ├── facade-discipline/      # 门面实质承载与跳板文件消融
-    ├── fractal-git-dev/        # fractal-git 10 微 Crate 与 Plumbing 协议
+    ├── fractal-git-dev/        # fractal-git 10 大内核子系统与 Plumbing 协议
     ├── gate-governance/        # 跨平台自动化门禁与环境隔离
     ├── release-package-workflow/# 扩展打包、热同步自愈与发布流
     ├── rule-catalog-governance/# 单源规则字典与元治理
@@ -73,7 +73,7 @@
 - **`workspace-timing-dev`**：`workspace-timing/` 扩展专有研发规范；
 - **`auto-refactor-dev`**：`auto-refactor/` 静态分析引擎专有研发规范；
 - **`webgames-workflow`**：`WebGames/` Godot 引擎四阶段方案与配置驱动；
-- **`fractal-git-dev`**：`fractal-git/` 10 微 Crate 分层与 Plumbing 二进制协议规范；
+- **`fractal-git-dev`**：`fractal-git/` 10 大内核子系统分层与 Plumbing 二进制协议规范；
 - **`defensive-security-and-taint-safety`**：污点数据流隔离与破坏操作前置守卫；
 - **`state-concurrency-and-crash-recovery`**：原子状态跃迁、重入锁与崩溃恢复。
 

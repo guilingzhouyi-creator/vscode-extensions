@@ -240,7 +240,7 @@
         },
         {
           "id": "RUST-TAXIS-19",
-          "title": "fractal-git 微 Crate 回归套件",
+          "title": "fractal-git 内核子系统回归套件",
           "ruleId": "GUARD-SYS-001"
         },
         {
@@ -389,7 +389,7 @@
         },
         {
           "id": "RUST-AUDIT-06",
-          "title": "fractal-git 微 Crate 回归套件",
+          "title": "fractal-git 内核子系统回归套件",
           "ruleId": "GUARD-SYS-001"
         }
       ]
@@ -403,12 +403,12 @@
       "steps": [
         {
           "id": "CRATE-TOPOLOGY-01",
-          "title": "微 Crate DAG 拓扑与零分配边界",
+          "title": "内核子系统 DAG 拓扑与零分配边界",
           "ruleId": "FGT-COR-001"
         },
         {
           "id": "CRATE-REGRESSION-02",
-          "title": "多 Crate 回归测试套件",
+          "title": "内核子系统回归测试套件",
           "ruleId": "FGT-GAT-001"
         },
         {

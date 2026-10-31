@@ -54,7 +54,7 @@ description: >-
    - **`auto-refactor`**：规则与单元用例必须在 `scripts/test-parallel.js` 注册，保障 <!-- METRICS:BEGIN test-suite-count -->**190 套**<!-- METRICS:END test-suite-count -->测试并发/串行全绿且 TS/Rust 100% 字节等价；
    - **`workspace-timing`**：`src/test/` 下 <!-- METRICS:BEGIN ws-test-case-count -->**207 项**<!-- METRICS:END ws-test-case-count -->单元测试由 `npm run test:fast` 与 `npm run review` 全量覆盖；
    - **`WebGames`**：继承 `TestCase` 并在 `config/infrastructure/domains.json` 与 `test_registry.gd` 双向注册，严禁 `tests/unit/` 根目录散落脚本；
-   - **`fractal-git`**：10 微 Crate 测试与并发 CAS/零分配校验统一纳管于 Cargo Workspace 与 `audit-taxis.ps1`。
+   - **`fractal-git`**：10 大内核子系统测试与并发 CAS/零分配校验统一纳管于 Cargo Workspace 与 `audit-taxis.ps1`。
 2. **性能耗时棘轮 (`TB-REGRESSION`) 与超时尾日志转储**：
    - 纯逻辑单测单项 $\le 10\text{ms}$；本地流式门禁内存判定约 $1\text{ms}$、端到端（含 Node 启动约 $80\text{ms}$）约 $160\text{ms}$；
    - 套件总耗时受 $1.15 \times \text{Baseline}$ 单调棘轮约束，超限触发 `TB-REGRESSION` 阻断；

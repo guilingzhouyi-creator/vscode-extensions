@@ -42,7 +42,7 @@ const SLICE_DEFINITIONS = Object.freeze({
     ]
   }),
   rust: Object.freeze({
-    title: 'fractal-git Rust 拓扑与微 Crate 门禁',
+    title: 'fractal-git Rust 拓扑与内核子系统门禁',
     commands: [
       'node fractal-git/scripts/common/validate-crate-topology.js',
       'node fractal-git/scripts/common/check-zero-alloc-boundary.js',

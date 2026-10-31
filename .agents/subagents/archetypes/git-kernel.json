@@ -1,6 +1,6 @@
 {
   "archetype": "git-kernel",
-  "displayName": "Rust 微 Crate 内核、Plumbing 等价性与无锁拓扑 (fractal-git)",
+  "displayName": "Rust 内核子系统、Plumbing 等价性与无锁拓扑 (fractal-git)",
   "rootDirectory": "fractal-git",
   "allowedExtensions": [".rs", ".toml", ".json", ".md", ".js", ".ps1", ".sh"],
   "pathJail": {
@@ -22,7 +22,7 @@
     "constraint-driven-development"
   ],
   "rigidAxioms": [
-    "10 微 Crate 分层拓扑（fg-core/object/index/algorithms/pools/storage/native/topology/transport/gate）单向依赖，零循环",
+    "10 大内核子系统分层拓扑（fg-core/object/index/algorithms/pools/storage/native/topology/transport/gate）单向依赖，零循环",
     "Rust 体系规则闭环 (FGT-* + RSM-* + STDLIB-*)：生产路径零裸 unwrap/expect/panic!/unreachable!，错误一律 thiserror 强类型传播",
     "资深类型设计：Sealed Trait 与 Type-State 编译期状态机，#[repr(transparent)] Newtype 消除原始混淆，#[must_use] 防遗漏",
     "借用签名与循环零瞬态堆分配：形参禁 &String/&Vec<T> (RSM-STR-001)，fg-pools 时代戳复用池，禁无谓比较 .clone() (RSM-CLONE-001)",

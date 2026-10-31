@@ -1,10 +1,10 @@
-# Taxis 10 微 Crate 拓扑、Plumbing 二进制协议与 CCD v2 冲突检测深水区指南
+# Taxis 10 大内核子系统拓扑、Plumbing 二进制协议与 CCD v2 冲突检测深水区指南
 
-本指南提供 `fractal-git`（Taxis）内核在微 Crate 边界划分、Git Plumbing 字节级协议实现以及偏序集同态冲突检测（CCD v2）的完整工程细则。
+本指南提供 `fractal-git`（Taxis）内核在子系统边界划分、Git Plumbing 字节级协议实现以及偏序集同态冲突检测（CCD v2）的完整工程细则。
 
 ---
 
-## 一、 10 大微 Crate 职责边界与禁区矩阵 (`FGT-TOP-001` / `FGT-DEP-001`)
+## 一、 10 大内核子系统职责边界与禁区矩阵 (`FGT-TOP-001` / `FGT-DEP-001`)
 
 1. **`fg-core`**：定义 `ObjectId`（20/32 字节定长栈数组）、`CrateError` 基础特征与 `constants/` 单源常量表；严禁引入文件 I/O 或并发锁；
 2. **`fg-object`**：纯内存零拷贝解析与编码 Git `blob`、`tree`、`commit`、`tag` 对象；Tree 条目排序必须对子目录名按隐式追加 `0x2F` (`/`) 比较字节序；

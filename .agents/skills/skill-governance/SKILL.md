@@ -40,7 +40,7 @@ description: >-
 | :--- | :--- | :--- | :--- |
 | **Layer 1: 通用工程与算法突破层**<br/>*(Universal Methodology)* | **11 项** — 跨语言、跨项目通用认知、编程工艺、交互物理学与算子原语 | `algorithmic-operator-engineering`, `coding-craft`, `complexity-budget`, `constraint-driven-development`, `debugging-and-error-recovery`, `defensive-security-and-taint-safety`, `facade-discipline`, `interaction-design-physics`, `spec-driven-development`, `state-concurrency-and-crash-recovery`, `telemetry-statistical-modeling` | 仅定义恒定不变的工程/数学/算法公理；通过映射表桥接不同语言栈，零项目特定硬编码 |
 | **Layer 2: 工作区统一治理底座层**<br/>*(Workspace Unified Governance)* | **8 项** — 全仓同构门禁、单源目录与多智能体协同 | `batch-commit`, `docs-archive-governance`, `gate-governance`, `release-package-workflow`, `rule-catalog-governance`, `skill-governance`, `subagent-orchestration`, `test-benchmark-engineering` | 唯一绑定 `AGENTS.md`、`rule-catalog.json` 与 `subagent-catalog.json` 动态真源 (SSOT) |
-| **Layer 3: 子项目领域适配器层**<br/>*(Domain Adapters)* | **5 项** — 四大受控项目专属架构红线与系统工程规范 | `auto-refactor-dev` (Node/Rust), `workspace-timing-dev` (VS Code), `webgames-workflow` (Godot 4.7 GDScript), `fractal-git-dev` (Taxis 10 微 Crate), `rust-engineering` (Rust 系统工程规范) | 声明子项目与技术栈专有拓扑、生命周期与领域边界，通用复杂度/算子/门面能力通过指针委托至 Layer 1/2 |
+| **Layer 3: 子项目领域适配器层**<br/>*(Domain Adapters)* | **5 项** — 四大受控项目专属架构红线与系统工程规范 | `auto-refactor-dev` (Node/Rust), `workspace-timing-dev` (VS Code), `webgames-workflow` (Godot 4.7 GDScript), `fractal-git-dev` (Taxis 10 大内核子系统), `rust-engineering` (Rust 系统工程规范) | 声明子项目与技术栈专有拓扑、生命周期与领域边界，通用复杂度/算子/门面能力通过指针委托至 Layer 1/2 |
 
 每个技能必须作为一个高内聚的自包含工程单元存在，位于 `.agents/skills/<skill-name>/` 下，标准“四件套”目录结构如下：
 

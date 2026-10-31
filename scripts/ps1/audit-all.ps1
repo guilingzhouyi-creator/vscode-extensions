@@ -61,6 +61,9 @@ if (-not $Json -and -not $Agent) {
 $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 $failed = $false
 
+. "$PSScriptRoot/lib/gate-failure-collector.ps1"
+Initialize-GateFailureCollector -RepoRoot $repoRoot
+
 $transientDir = [System.IO.Path]::GetTempPath()
 $randSuffix = [System.Guid]::NewGuid().ToString().Substring(0, 8)
 $logHygieneOut = Join-Path $transientDir "audit-hygiene-$randSuffix.json"
@@ -125,6 +128,7 @@ try {
 if ($codeHygiene -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0 -or $codeDensity -ne 0 -or $codeEloc -ne 0) {
     $statusHygiene = "BLOCK"
     $failed = $true
+    Save-AuditPillar1Failures -CodeHygiene $codeHygiene -LogHygiene $logHygieneOut -CodeIso $codeIso -LogIso $logIsoOut -CodeGi $codeGi -LogGi $logGiOut -CodeDensity $codeDensity -LogDensity $logDensityOut -CodeEloc $codeEloc -LogEloc $logElocOut
 } else {
     $statusHygiene = "PASS"
 }
@@ -171,6 +175,15 @@ $failingRuleSteps = @($ruleStepCodes | Where-Object { $_ -ne 0 })
 if ($failingRuleSteps.Count -gt 0) {
     $statusRules = "BLOCK"
     $failed = $true
+    $ruleLogs = @(
+        $logCatalogOut, $logFeedbackOut, $logOrderingOut, $logSkillsOut,
+        $logClosureOut, $logScoringClosureOut, $logReachOut, $logRuleSourceOut, $logDocsOut,
+        $logLedgerOut, $logSubagentOut, $logCascadeOut, $logDocAnchorsOut, $logMetricCoverageOut,
+        $logFamilyContractOut, $logDocReachOut, $logCommitHistoryOut,
+        $logDestructiveOut, $logChainsOut, $logCountsOut, $logParityOut,
+        $logGateProofOut, $logDocMetricsOut
+    )
+    Save-AuditPillar2FailuresByCodes -Codes $ruleStepCodes -Logs $ruleLogs
 } else {
     $statusRules = "PASS"
 }
@@ -316,28 +329,23 @@ if ($statusFg -ne "PASS") {
 
 if ($failed) {
     try {
-        $diagDir = Join-Path $repoRoot ".audit-logs"
-        if (-not (Test-Path $diagDir)) {
-            [void](New-Item -ItemType Directory -Path $diagDir -Force)
-        }
-        $timestamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
         if ($statusWt -ne "PASS") {
-            if (Test-Path $logWtOut) { Copy-Item -Path $logWtOut -Destination (Join-Path $diagDir "fail-workspace-timing-$timestamp.out.log") -Force -ErrorAction SilentlyContinue }
-            if (Test-Path $logWtErr) { Copy-Item -Path $logWtErr -Destination (Join-Path $diagDir "fail-workspace-timing-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
+            $wtLog = if (Test-Path $logWtErr) { $logWtErr } else { $logWtOut }
+            Save-AuditStepFailure -PillarId "timing-03" -StepId "workspace-timing-review" -StepName "workspace-timing 六层审查门禁" -Command "npm run review" -ExitCode 1 -LogFile $wtLog -AasLayer "L4_QUALITY" -ActionableFix "cd workspace-timing && npm run test:fast" -VerificationCommand "cd workspace-timing && npm run test:fast"
         }
         if ($statusWg -ne "PASS") {
-            if (Test-Path $logWgOut) { Copy-Item -Path $logWgOut -Destination (Join-Path $diagDir "fail-webgames-$timestamp.out.log") -Force -ErrorAction SilentlyContinue }
-            if (Test-Path $logWgErr) { Copy-Item -Path $logWgErr -Destination (Join-Path $diagDir "fail-webgames-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
+            $wgLog = if (Test-Path $logWgErr) { $logWgErr } else { $logWgOut }
+            Save-AuditStepFailure -PillarId "webgames-04" -StepId "webgames-domain-audit" -StepName "WebGames 全域质量门禁" -Command "python WebGames/scripts/py/audit_runner.py" -ExitCode 1 -LogFile $wgLog -AasLayer "L4_QUALITY" -ActionableFix "cd WebGames && pwsh scripts/ps1/audit-all.ps1" -VerificationCommand "cd WebGames && pwsh scripts/ps1/audit-all.ps1"
         }
         if ($statusAr -ne "PASS") {
-            if (Test-Path $logArOut) { Copy-Item -Path $logArOut -Destination (Join-Path $diagDir "fail-auto-refactor-$timestamp.out.log") -Force -ErrorAction SilentlyContinue }
-            if (Test-Path $logArErr) { Copy-Item -Path $logArErr -Destination (Join-Path $diagDir "fail-auto-refactor-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
+            $arLog = if (Test-Path $logArErr) { $logArErr } else { $logArOut }
+            Save-AuditStepFailure -PillarId "engine-05" -StepId "auto-refactor-tests" -StepName "auto-refactor 全量回归套件" -Command "npm test" -ExitCode 1 -LogFile $arLog -AasLayer "L4_QUALITY" -ActionableFix "cd auto-refactor && npm test" -VerificationCommand "cd auto-refactor && npm test"
         }
         if ($statusFg -ne "PASS") {
-            if (Test-Path $logFgOut) { Copy-Item -Path $logFgOut -Destination (Join-Path $diagDir "fail-fractal-git-$timestamp.out.log") -Force -ErrorAction SilentlyContinue }
-            if (Test-Path $logFgErr) { Copy-Item -Path $logFgErr -Destination (Join-Path $diagDir "fail-fractal-git-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
+            $fgLog = if (Test-Path $logFgErr) { $logFgErr } else { $logFgOut }
+            Save-AuditStepFailure -PillarId "rust-06" -StepId "fractal-git-taxis" -StepName "fractal-git 内核子系统回归套件" -Command "pwsh fractal-git/scripts/ps1/audit-taxis.ps1" -ExitCode 1 -LogFile $fgLog -AasLayer "L4_QUALITY" -ActionableFix "pwsh fractal-git/scripts/ps1/audit-taxis.ps1" -VerificationCommand "pwsh fractal-git/scripts/ps1/audit-taxis.ps1"
         }
-        Write-GateHost "💡 失败审查完整日志已保留至: .audit-logs/" -ForegroundColor Yellow
+        Write-GateHost "💡 失败审查完整日志已保留至: .audit-logs/failures/" -ForegroundColor Yellow
         Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--prune" -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
     } catch {
         # 归档日志失败不阻断异常主流程
@@ -858,7 +866,11 @@ $qualityVectorObj = $dynamicDimensions
 
 $quantMetrics = $null
 try {
-    $quantJson = & $nodeCmd "scripts/common/evaluate-workspace-quant.js" --json 2>$null
+    $quantArgs = @("scripts/common/evaluate-workspace-quant.js", "--json")
+    if ($failed) {
+        $quantArgs += "--blocked"
+    }
+    $quantJson = & $nodeCmd @quantArgs 2>$null
     if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($quantJson)) {
         $quantMetrics = $quantJson | ConvertFrom-Json
     }
@@ -903,7 +915,10 @@ $summary = [ordered]@{
     tenDimensions = $qualityVectorObj
     qualityVector = $qualityVectorObj
     quant = $quantMetrics
+    failures = if ($failed) { @(Get-AuditFailures) } else { @() }
 }
+
+Save-AuditFailureSnapshot -ElapsedSec $elapsedSec -GitRevision (git rev-parse --short HEAD 2>$null) -NodeCmd $nodeCmd
 
 # 无论审查通过或失败，第一时间原子持久化全工作区最新审查快照与历史分数轨迹
 try {
@@ -912,6 +927,7 @@ try {
 } catch {
     # 留痕失败不阻断门禁主流程
 }
+
 
 
 try {
@@ -995,7 +1011,7 @@ $sysDefinitions = @(
     @{ num = " 3."; name = "auto-refactor";    score = $scoreAr;      note = "(CLI静态引擎基线)" },
     @{ num = " 4."; name = "workspace-timing"; score = $scoreWt;      note = "(VSCode扩展门禁)" },
     @{ num = " 5."; name = "WebGames配置架构"; score = $scoreWg;      note = "(卡拉尔领域配置)" },
-    @{ num = " 6."; name = "fractal-git";      score = $scoreFg;      note = "(10微Crate/Rust)" }
+    @{ num = " 6."; name = "fractal-git";      score = $scoreFg;      note = "(10子系统/Rust)" }
 )
 
 foreach ($sys in $sysDefinitions) {
@@ -1099,7 +1115,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
         [void]$md.AppendLine(("| 3 | auto-refactor | {0} | {1:F1} | `[{2}]` | CLI静态引擎质量基线 |" -f $badgeAr, $scoreAr, (Get-ProgressBar $scoreAr)))
         [void]$md.AppendLine(("| 4 | workspace-timing | {0} | {1:F1} | `[{2}]` | VSCode扩展审查门禁 |" -f $badgeWt, $scoreWt, (Get-ProgressBar $scoreWt)))
         [void]$md.AppendLine(("| 5 | WebGames配置架构 | {0} | {1:F1} | `[{2}]` | 卡拉尔领域配置审查 |" -f $badgeWg, $scoreWg, (Get-ProgressBar $scoreWg)))
-        [void]$md.AppendLine(("| 6 | fractal-git | {0} | {1:F1} | `[{2}]` | 10微Crate/Rust回归套件 |" -f $badgeFg, $scoreFg, (Get-ProgressBar $scoreFg)))
+        [void]$md.AppendLine(("| 6 | fractal-git | {0} | {1:F1} | `[{2}]` | 10子系统/Rust回归套件 |" -f $badgeFg, $scoreFg, (Get-ProgressBar $scoreFg)))
         [void]$md.AppendLine()
         [void]$md.AppendLine(("> **耗时**: {0}s &nbsp;|&nbsp; **全局状态**: {1}" -f $elapsedSec, $globalStatus))
         [void]$md.AppendLine()

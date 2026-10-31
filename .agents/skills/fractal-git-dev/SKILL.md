@@ -1,12 +1,12 @@
 ---
 name: fractal-git-dev
 description: >-
-  【触发：taxis/版本控制内核/CAS/偏序集/实现子命令/字节等价/FGT规则】开发或修改 fractal-git (Taxis) 模块时必须使用。看守 10 微 Crate 分层拓扑、Git Plumbing 二进制等价、偏序集冲突检测与 CAS 无锁索引树。
+  【触发：taxis/版本控制内核/CAS/偏序集/实现子命令/字节等价/FGT规则】开发或修改 fractal-git (Taxis) 模块时必须使用。看守 10 大内核子系统分层拓扑、Git Plumbing 二进制等价、偏序集冲突检测与 CAS 无锁索引树。
 ---
 
 # fractal-git-dev — Taxis 分形 Git 高性能版本控制内核开发规范
 
-本技能是 `fractal-git/`（Taxis 分形版本控制内核）的专属架构与研发规范，确立了 10 大微 Crate 严格单向拓扑、Git Plumbing 二进制协议 100% 字节等价、偏序集同态交换冲突检测（CCD v2）、Cell 虚拟工作树无锁 CAS 快照物化、时代戳复用池（`fg-pools`）与 Rust $\leftrightarrow$ TypeScript 门面桥接标准。
+本技能是 `fractal-git/`（Taxis 分形版本控制内核）的专属架构与研发规范，确立了 10 大内核子系统严格单向拓扑、Git Plumbing 二进制协议 100% 字节等价、偏序集同态交换冲突检测（CCD v2）、Cell 虚拟工作树无锁 CAS 快照物化、世代戳复用池（`fg-pools`）与 Rust $\leftrightarrow$ TypeScript 门面桥接标准。
 
 > 通用 Rust 语言级范式（Type-State、`thiserror`、`// SAFETY:` 证明）请同步遵循 [rust-engineering](../rust-engineering/SKILL.md)。
 
@@ -26,7 +26,7 @@ description: >-
 ## 一、 适用场景与触发条件
 
 在以下任一研发或审查场景中，必须激活本技能：
-1. **修改或新增 `fractal-git/crates/` 下的 10 大微 Crate 源码**；
+1. **修改或新增 `fractal-git/crates/` 下的 10 大内核子系统源码**；
 2. **实现或优化 Git Plumbing 协议与存储算子**（Loose Object、DIRC 索引、Packfile、Tree Diff、Commit Graph）；
 3. **开发多智能体 Cell 虚拟工作树、并发暂存区或偏序集同态冲突检测（CCD v2）**；
 4. **维护 `fractal-git/src/bin/` 原生命令层（`taxis` CLI）或 `fractal-git/ts/` TypeScript 门面层**；
@@ -34,14 +34,14 @@ description: >-
 
 ---
 
-## 二、 10 大微 Crate 四层单向拓扑契约 (`FGT-TOP-001` / `FGT-DEP-001`)
+## 二、 10 大内核子系统四层单向拓扑契约 (`FGT-TOP-001` / `FGT-DEP-001`)
 
-`fractal-git` 严禁单体大泥球设计，全内核拆分为职责正交的 10 个微 Crate，依赖箭头必须严格自上而下，零循环依赖：
+`fractal-git` 严禁单体紧耦合设计，全内核拆分为职责正交的 10 个内核子系统，依赖箭头必须严格自上而下，零循环依赖：
 
-| 拓扑层级 | 微 Crate 名称 | 核心职责与领域边界 | 允许依赖的下层 Crate |
+| 拓扑层级 | 内核子系统名称 | 核心职责与领域边界 | 允许依赖的下层 Crate |
 | :--- | :--- | :--- | :--- |
 | **Layer 0: 领域原语层** | `fg-core` | OID 哈希原语、强类型错误枚举、全局 SSOT 常量（`constants/`）、类型状态标记 | 零内部 Crate 依赖（纯底座） |
-| **Layer 1: 对象与池化层** | `fg-object`, `fg-pools` | Git 四大对象（Blob/Tree/Commit/Tag）零拷贝解析；时代戳 `BufferPool` / `WorktreePool` | `fg-core` |
+| **Layer 1: 对象与池化层** | `fg-object`, `fg-pools` | Git 四大对象（Blob/Tree/Commit/Tag）零拷贝解析；世代戳 `BufferPool` / `WorktreePool` | `fg-core` |
 | **Layer 2: 索引、存储与算法** | `fg-index`, `fg-storage`, `fg-algorithms` | 无锁内存索引树与 DIRC 编解码；原子 CAS 落盘存储；SWAR 行差分、Kirsch-Mitzenmacher 双哈希布隆过滤器与 CCD v2 | `fg-core`, `fg-object`, `fg-pools` |
 | **Layer 3: 拓扑、传输与门面** | `fg-topology`, `fg-transport`, `fg-gate`, `fg-native` | 引用图与 Cell 分叉拓扑；协议传输封装；Taxis 内核门禁自检（`FGT-GAT-001`）；N-API / CLI 桥接门面（`FGT-BRG-001`） | Layer 0 ~ Layer 2 |
 
@@ -68,20 +68,20 @@ description: >-
 
 ### 4. 热路径零瞬态堆分配与双端门面等价 (`FGT-PRF-001` / `FGT-FAC-001` / `FGT-BRG-001`)
 - **池化借还闭环 (`FGT-PRF-001`)**：对象解压、差分扫描与树遍历严禁在循环内分配临时 `Vec<u8>` 或 `String`，一律从 `fg-pools` 借用并在 Drop 时自动归还清空容量；
-- **门面实质承载 (`FGT-FAC-001` / `FGT-BRG-001`)**：每个微 Crate 的 `lib.rs` 及 `fractal-git/ts/` TypeScript 门面必须承载实质协议转换、参数校验或错误映射，严禁 $\le 3$ 行纯透传跳板。
+- **门面实质承载 (`FGT-FAC-001` / `FGT-BRG-001`)**：每个内核子系统的 `lib.rs` 及 `fractal-git/ts/` TypeScript 门面必须承载实质协议转换、参数校验或错误映射，严禁 $\le 3$ 行纯透传跳板。
 
-### 5. 双专属自动化区域、内核形式化验证与密码学影子审计链 (`FGT-GAT-001`)
+### 5. 双专属自动化区域、内核形式化验证与密码学独立审计链 (`FGT-GAT-001`)
 - **双自动化区域与检疫隔离 (`FGT-BYP-001` / `FGT-QRN-001`)**：高频测试走 Direct-Bypass SSD 内存测试缓存区，`<20ms` 物理回收，绝不向 Git ODB 写入未验证碎片；触发高危违规的快照强制打入 `refs/fractal/quarantine/*` 物理隔离区，提交走预审区（Pre-Review Zone）；
 - **TKCV 形式化推导验证 (`FGT-VRF-001`)**：在内核层执行 5 维代码不变式静态抽象推导（单次 $<5\text{ms}$），刚性拦截虚构代码；
-- **IKCE 隐藏微变异盲测打擂 (`FGT-MUT-001` / `FGT-TAU-001`)**：纯内存注入微变异体，强制要求测试击杀率 $K \ge 60\%$，刚性粉碎空断言与恒真式；
-- **防篡改影子审计链与金字塔折叠 (`FGT-AUD-001` / `FGT-PYR-001`)**：独立维护 `refs/fractal/telemetry/*` HMAC 单向哈希链与四级金字塔时间折叠，施加 OS 底层防护（Win32 只读锁 + Linux `chattr +a` 仅追加属性）。
+- **IKCE 隐藏微变异盲测评估 (`FGT-MUT-001` / `FGT-TAU-001`)**：纯内存注入微变异体，强制要求测试击杀率 $K \ge 60\%$，刚性粉碎空断言与恒真式；
+- **防篡改独立审计链与四级时间折叠 (`FGT-AUD-001` / `FGT-PYR-001`)**：独立维护 `refs/fractal/telemetry/*` HMAC 单向哈希链与四级时间折叠汇总，施加 OS 底层防护（Win32 只读锁 + Linux `chattr +a` 仅追加属性）。
 
 ---
 
 ## 四、 本地预审与全量验证命令
 
 ```powershell
-# 1. 验证 10 微 Crate 拓扑单向性与零循环依赖
+# 1. 验证 10 大内核子系统拓扑单向性与零循环依赖
 node fractal-git/scripts/common/validate-crate-topology.js
 
 # 2. 运行 Rust 零 Panic、// SAFETY: 证明与 SSOT 规则引用核验
@@ -99,5 +99,5 @@ pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1
 
 ## 五、 关联深水区参考与实操样板
 
-- [crate-topology-and-plumbing-protocol.md](references/crate-topology-and-plumbing-protocol.md)：10 微 Crate 依赖矩阵、Git Plumbing 二进制帧格式、CCD v2 偏序集同态数学模型与三层冲突仲裁指南；
+- [crate-topology-and-plumbing-protocol.md](references/crate-topology-and-plumbing-protocol.md)：10 大内核子系统依赖矩阵、Git Plumbing 二进制帧格式、CCD v2 偏序集同态数学模型与三层冲突仲裁指南；
 - [cell-cas-transaction-skeleton.rs](templates/cell-cas-transaction-skeleton.rs)：Cell 虚拟工作树无锁 CAS 快照晋升、世代号防 ABA 与事务原子回滚标准 Rust 样板。

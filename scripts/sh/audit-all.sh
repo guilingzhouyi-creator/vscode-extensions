@@ -249,9 +249,9 @@ fi
 
 # 判定在 cargo 套件与静态校验都完成后渲染：缺一不可。
 if [[ "$STATUS_FG" == "PASS" ]]; then
-    write_step_verdict "RUST-AUDIT-06" PASS "fractal-git 微 Crate 回归套件与静态校验通过"
+    write_step_verdict "RUST-AUDIT-06" PASS "fractal-git 内核子系统回归套件与静态校验通过"
 else
-    write_step_verdict "RUST-AUDIT-06" BLOCK "fractal-git 微 Crate 回归套件或静态校验未通过"
+    write_step_verdict "RUST-AUDIT-06" BLOCK "fractal-git 内核子系统回归套件或静态校验未通过"
 fi
 
 if command -v "$NODE_BIN" &>/dev/null && [[ -f "fractal-git/scripts/common/run-audit-report.js" ]]; then
@@ -308,14 +308,14 @@ if [[ "$STATUS_FG" != "PASS" ]]; then
 fi
 
 if [[ "$FAILED" -ne 0 ]]; then
-    DIAG_DIR="$ROOT_DIR/.audit-logs"
+    DIAG_DIR="$ROOT_DIR/.audit-logs/failures"
     mkdir -p "$DIAG_DIR" 2>/dev/null || true
     TIMESTAMP=$(date +"%Y%m%d-%H%M%S" 2>/dev/null || echo "unknown")
-    [[ "$STATUS_WT" != "PASS" && -s "$LOG_WT" ]] && cp "$LOG_WT" "$DIAG_DIR/fail-workspace-timing-$TIMESTAMP.log" 2>/dev/null || true
-    [[ "$STATUS_WG" != "PASS" && -s "$LOG_WG" ]] && cp "$LOG_WG" "$DIAG_DIR/fail-webgames-$TIMESTAMP.log" 2>/dev/null || true
-    [[ "$STATUS_AR" != "PASS" && -s "$LOG_AR" ]] && cp "$LOG_AR" "$DIAG_DIR/fail-auto-refactor-$TIMESTAMP.log" 2>/dev/null || true
-    [[ "$STATUS_FG" != "PASS" && -s "$LOG_FG" ]] && cp "$LOG_FG" "$DIAG_DIR/fail-fractal-git-$TIMESTAMP.log" 2>/dev/null || true
-    echo "💡 失败审查完整日志已保留至: .audit-logs/" >&2
+    [[ "$STATUS_WT" != "PASS" && -s "$LOG_WT" ]] && cp "$LOG_WT" "$DIAG_DIR/fail-timing-03-workspace-timing-$TIMESTAMP.err.log" 2>/dev/null || true
+    [[ "$STATUS_WG" != "PASS" && -s "$LOG_WG" ]] && cp "$LOG_WG" "$DIAG_DIR/fail-webgames-04-domain-audit-$TIMESTAMP.err.log" 2>/dev/null || true
+    [[ "$STATUS_AR" != "PASS" && -s "$LOG_AR" ]] && cp "$LOG_AR" "$DIAG_DIR/fail-engine-05-auto-refactor-$TIMESTAMP.err.log" 2>/dev/null || true
+    [[ "$STATUS_FG" != "PASS" && -s "$LOG_FG" ]] && cp "$LOG_FG" "$DIAG_DIR/fail-rust-06-fractal-git-$TIMESTAMP.err.log" 2>/dev/null || true
+    echo "💡 失败审查完整日志已保留至: .audit-logs/failures/" >&2
     "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --prune >/dev/null 2>&1 || true
 fi
 
@@ -879,7 +879,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
     { num: " 3.", name: "auto-refactor",    score: scoreAr,      note: "(CLI静态引擎基线)" },
     { num: " 4.", name: "workspace-timing", score: scoreWt,      note: "(VSCode扩展门禁)" },
     { num: " 5.", name: "WebGames配置架构", score: scoreWg,      note: "(卡拉尔领域配置)" },
-    { num: " 6.", name: "fractal-git",      score: scoreFg,      note: "(10微Crate/Rust)" }
+    { num: " 6.", name: "fractal-git",      score: scoreFg,      note: "(10子系统/Rust)" }
   ];
 
   for (const sys of sysDefinitions) {
@@ -959,7 +959,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
     md += `| 3 | auto-refactor | ${passBadge(statusAr)} | ${scoreAr.toFixed(1)} | \`[${makeBar(scoreAr, 20)}]\` | CLI静态引擎质量基线 |\n`;
     md += `| 4 | workspace-timing | ${passBadge(statusWt)} | ${scoreWt.toFixed(1)} | \`[${makeBar(scoreWt, 20)}]\` | VSCode扩展审查门禁 |\n`;
     md += `| 5 | WebGames配置架构 | ${passBadge(statusWg)} | ${scoreWg.toFixed(1)} | \`[${makeBar(scoreWg, 20)}]\` | 卡拉尔领域配置审查 |\n`;
-    md += `| 6 | fractal-git | ${passBadge(statusFg)} | ${scoreFg.toFixed(1)} | \`[${makeBar(scoreFg, 20)}]\` | 10微Crate/Rust回归套件 |\n\n`;
+    md += `| 6 | fractal-git | ${passBadge(statusFg)} | ${scoreFg.toFixed(1)} | \`[${makeBar(scoreFg, 20)}]\` | 10子系统/Rust回归套件 |\n\n`;
     md += `> **耗时**: ${elapsedSec}s &nbsp;|&nbsp; **全局状态**: ${globalStatus}\n\n`;
 
     md += "### 🎯 auto-refactor 静态引擎十维工程质量全景指数\n\n";

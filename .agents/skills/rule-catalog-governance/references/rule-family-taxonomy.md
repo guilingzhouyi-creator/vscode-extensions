@@ -85,7 +85,7 @@
 | 家族 (Family) | 领域职责 | 约束范围与规模 | 典型代表规则 (SSOT 已登记) |
 | :--- | :--- | :--- | :--- |
 | **`ALG`** | 算法等价性 | 原生算子必须与参考实现差分等价。族内 1 个 ID，仅 fractal-git | `FGT-ALG-001` |
-| **`AUD`** | 密码学影子审计链 | 审计记录必须携带 HMAC 签名与前驱哈希链完整性校验。族内 1 个 ID，仅 fractal-git | `FGT-AUD-001` |
+| **`AUD`** | 密码学遥测审计链 | 审计记录必须携带 HMAC 签名与前驱哈希链完整性校验。族内 1 个 ID，仅 fractal-git | `FGT-AUD-001` |
 | **`BRG`** | 桥接层 | FFI/桥接边界必须显式声明所有权与生命周期。族内 1 个 ID，仅 fractal-git | `FGT-BRG-001` |
 | **`BYP`** | 测试直通缓存回收 | 高频测试直通工作区必须原子回收且禁止向 Git ODB 写入未验证对象。族内 1 个 ID，仅 fractal-git | `FGT-BYP-001` |
 | **`CAS`** | 无锁 CAS | CAS 循环必须处理 ABA 与内存序。族内 1 个 ID，仅 fractal-git | `FGT-CAS-001` |
@@ -94,14 +94,14 @@
 | **`GAT`** | 门禁自审 | 内核门禁必须自证检出能力。族内 1 个 ID，仅 fractal-git | `FGT-GAT-001` |
 | **`IDX`** | 索引安全 | 索引访问必须边界检查或形式证明。族内 1 个 ID，仅 fractal-git | `FGT-IDX-001` |
 | **`LCK`** | 锁纪律 | 禁跨 await 持锁、锁粒度最小化。族内 1 个 ID，仅 fractal-git | `FGT-LCK-001` |
-| **`MUT`** | 隐藏微变异盲测 | 微变异盲测击杀率必须满足门禁下界契约。族内 1 个 ID，仅 fractal-git | `FGT-MUT-001` |
+| **`MUT`** | 内核微变异击杀率验证 | 内核微变异击杀率必须满足门禁下界契约。族内 1 个 ID，仅 fractal-git | `FGT-MUT-001` |
 | **`OBJ`** | 对象生命周期 | 对象池借还必须成对且幂等。族内 1 个 ID，仅 fractal-git | `FGT-OBJ-001` |
 | **`POL`** | 策略注入 | 策略必须可替换，禁止硬编码分支。族内 1 个 ID，仅 fractal-git | `FGT-POL-001` |
-| **`PYR`** | 四级金字塔折叠 | 历史审计链分层折叠必须严格保真单向汇总与预算约束。族内 1 个 ID，仅 fractal-git | `FGT-PYR-001` |
+| **`PYR`** | 四级分层时间折叠汇总 | 历史审计链分层折叠必须严格保真单向汇总与预算约束。族内 1 个 ID，仅 fractal-git | `FGT-PYR-001` |
 | **`QRN`** | 物理隔离检疫 | 触发高危违规的快照必须打入隔离区并阻断向主干晋升。族内 1 个 ID，仅 fractal-git | `FGT-QRN-001` |
 | **`SAF`** | unsafe 最小化 | `unsafe` 必须有 `// SAFETY:` 证明且作用域最小。族内 1 个 ID，仅 fractal-git | `FGT-SAF-001` |
 | **`STO`** | 存储层 | 持久化写入必须原子且可恢复。族内 1 个 ID，仅 fractal-git | `FGT-STO-001` |
-| **`TAU`** | 反恒真断言检验 | 严禁以空断言或恒真式规避微变异盲测。族内 1 个 ID，仅 fractal-git | `FGT-TAU-001` |
+| **`TAU`** | 反恒真断言检验 | 严禁以空断言或恒真式规避内核微变异检验。族内 1 个 ID，仅 fractal-git | `FGT-TAU-001` |
 | **`TOP`** | 拓扑 | 模块拓扑单向，禁止反向引用。族内 1 个 ID，仅 fractal-git | `FGT-TOP-001` |
 | **`TRN`** | 事务 | 事务边界必须显式，失败须回滚。族内 1 个 ID，仅 fractal-git | `FGT-TRN-001` |
 | **`VRF`** | 内核五维形式化验证 | 暂存快照晋升前必须通过五维代码不变式推导校验。族内 1 个 ID，仅 fractal-git | `FGT-VRF-001` |

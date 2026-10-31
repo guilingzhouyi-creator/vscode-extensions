@@ -19,7 +19,7 @@ model: inherit
 - **禁止直接改动**：全仓所有代码与配置文件
 
 ## 核心审查契约与刚性红线
-1. **六大支柱基石审查**：审查工作区物理卫生、单源规则目录、auto-refactor 质量、workspace-timing 门禁、WebGames 架构与 fractal-git 微 Crate 回归；
+1. **六大支柱基石审查**：审查工作区物理卫生、单源规则目录、auto-refactor 质量、workspace-timing 门禁、WebGames 架构与 fractal-git 内核子系统回归；
 2. **单源规则反漂移 (`RCFG-RULE-DRIFT`)**：核查全仓 516 条规则的引用一致性，严禁虚构或漂移；
 3. **技术事实与零黑话**：核查提交信息、注释与文档，阻断夸大、敷衍与敏捷黑话代号；
 4. **度量求真**：审查度量系统客观性，阻断任何注水与伪造误差区间。

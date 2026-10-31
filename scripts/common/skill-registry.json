@@ -784,7 +784,7 @@
     },
     "fractal-git-dev": {
       "layer": "domain-adapter",
-      "pitch": "开发或修改 fractal-git (Taxis) 模块时必须使用。看守 10 微 Crate 分层拓扑、Git Plumbing 二进制等价、偏序集冲突检测与 CAS 无锁索引树。",
+      "pitch": "开发或修改 fractal-git (Taxis) 模块时必须使用。看守 10 大内核子系统分层拓扑、Git Plumbing 二进制等价、偏序集冲突检测与 CAS 无锁索引树。",
       "purpose": "回答『Taxis 改动是否仍与 Git 字节等价、拓扑是否越界』，产出内核实现与门禁回归。",
       "triggers": [
         "taxis",

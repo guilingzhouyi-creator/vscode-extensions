@@ -66,7 +66,7 @@ description: >-
 1. **`autoRefactor` (<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->)**：涵盖 <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子、双轨体积预算（`VOL-`）、物理卫生（`HYG-`）与架构质量模型；
 2. **`workspaceTiming` (<!-- METRICS:BEGIN rule-workspace-timing -->**49 条规则**<!-- METRICS:END rule-workspace-timing -->)**：11 个主题族分治 VS Code 扩展审查（编译、测试、lint、分层依赖、硬编码、脚本库、文档发布、审查配置、资源拓扑、测试预算、重构门槛），每条规则另带 `layer` 字段标注其所属的 `L0`~`L5` 执行层；
 3. **`webGames` (<!-- METRICS:BEGIN rule-webgames -->**50 条规则**<!-- METRICS:END rule-webgames -->)**：涵盖 Godot 游戏工程的资产与艺术工单规格（`ART-`）、运行时治理（`GOV-`）、高性能脚本契约（`ADV-`）与资源配置审查规则（`RES-`）；
-4. **`fractalGit` (<!-- METRICS:BEGIN rule-fractal-git -->**24 条规则**<!-- METRICS:END rule-fractal-git -->)**：涵盖 10 微 Crate 分层拓扑、无锁 CAS、循环零堆分配、类型状态机与 `// SAFETY:` 证明契约（`FGT-*`）；
+4. **`fractalGit` (<!-- METRICS:BEGIN rule-fractal-git -->**24 条规则**<!-- METRICS:END rule-fractal-git -->)**：涵盖 10 大内核子系统分层拓扑、无锁 CAS、循环零堆分配、类型状态机与 `// SAFETY:` 证明契约（`FGT-*`）；
 5. **`globalTooling` (<!-- METRICS:BEGIN rule-global-tooling -->**18 条规则**<!-- METRICS:END rule-global-tooling -->)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`008`, `CMG-PRJ-001`）、单源规则计数闭包（`RCFG-COUNTS-001`）以及跨平台脚本工程化、沙箱边界、门禁步骤状态闭包与文档数字同步守卫（`GUARD-BASE-001`, `GUARD-CHAIN-001`, `GUARD-DOC-001`, `GUARD-ISO-001`, `GUARD-JAIL-001`, `GUARD-ORD-001`, `GUARD-SHELL-001`, `GUARD-STEP-001`）；
 
 ---
@@ -119,7 +119,7 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 | **`workspace-timing`** | 49 条 | 11 个主题族：`ARF`, `BLD`, `DOC`, `HC`, `LAY`, `LINT`, `RCFG`, `RES`, `SCR`, `TB`, `TST`；执行层由每条规则的 `layer` 字段（`L0`~`L5`）表达，不作族名前缀 | VS Code 扩展生命周期、分层存储安全、i18n 对齐、时间守恒与状态栏治理 |
 | **`WebGames`** | 50 条 | Godot 专属契约：`ADV-`（高性能脚本与引擎约束）、`ART-`（艺术工单与资产规格）、`GOV-`、`PRF-`、`RES-`、`UUID-`、`SIM-` | Godot 4 游戏逻辑、节点树信号契约、文档双语归档与配置单源治理 |
 | **`global-tooling`** | <!-- METRICS:BEGIN rule-global-tooling -->**18 条规则**<!-- METRICS:END rule-global-tooling --> | 通用门禁与治理族：`CMG-`（提交说明规范）、`GUARD-`（平台脚本、门禁步骤与文档数字守卫）、`RCFG-`（单源规则计数闭包） | 跨平台工作区门禁、提交说明防虚构、沙箱隔离与文档规模指标同步 |
-| **`fractal-git`** | <!-- METRICS:BEGIN rule-fractal-git -->**24 条规则**<!-- METRICS:END rule-fractal-git --> | `FGT-` 项目命名空间下的主题族（ID 第二段即族名）：`ALG`, `AUD`, `BRG`, `BYP`, `CAS`, `COR`, `DEP`, `ERR`, `FAC`, `GAT`, `IDX`, `LCK`, `MUT`, `OBJ`, `POL`, `PRF`, `PYR`, `QRN`, `SAF`, `STO`, `TAU`, `TOP`, `TRN`, `VRF` | 10 微 Crate 拓扑、锁纪律与 CAS 正确性、内核形式化验证、微变异盲测、隔离检疫与影子审计链 |
+| **`fractal-git`** | <!-- METRICS:BEGIN rule-fractal-git -->**24 条规则**<!-- METRICS:END rule-fractal-git --> | `FGT-` 项目命名空间下的主题族（ID 第二段即族名）：`ALG`, `AUD`, `BRG`, `BYP`, `CAS`, `COR`, `DEP`, `ERR`, `FAC`, `GAT`, `IDX`, `LCK`, `MUT`, `OBJ`, `POL`, `PRF`, `PYR`, `QRN`, `SAF`, `STO`, `TAU`, `TOP`, `TRN`, `VRF` | 10 大内核子系统拓扑、锁纪律与 CAS 正确性、内核形式化验证、微变异盲测评估、隔离检疫与独立审计链 |
 
 ---
 

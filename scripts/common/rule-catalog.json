@@ -1,6 +1,6 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-30T06:15:27.493Z",
+  "generatedAt": "2026-10-31T13:16:14.767Z",
   "totalRules": 516,
   "counts": {
     "autoRefactor": 375,
@@ -1356,7 +1356,7 @@
       "namespace": "FGT",
       "family": "AUD",
       "severity": "error",
-      "summary": "Cryptographic shadow audit hash-chain guard: AuditRecord entries must stay <= 350 bytes with strictly monotonic Lamport clocks and verified HMAC-SHA256 signatures",
+      "summary": "Cryptographic telemetry audit hash-chain guard: AuditRecord entries must stay <= 350 bytes with strictly monotonic Lamport clocks and verified HMAC-SHA256 signatures",
       "canonical": true
     },
     {
@@ -1401,7 +1401,7 @@
       "namespace": "FGT",
       "family": "DEP",
       "severity": "error",
-      "summary": "Micro-crate DAG single-direction dependency guard: Zero circular dependency and strict L1->L2->L3 layer isolation",
+      "summary": "Subsystem DAG single-direction dependency guard: Zero circular dependency and strict L1->L2->L3 layer isolation",
       "canonical": true
     },
     {
@@ -1419,7 +1419,7 @@
       "namespace": "FGT",
       "family": "FAC",
       "severity": "warning",
-      "summary": "Facade substantial burden and immutable freeze guard: Enforce ARCH-FAC-001 with ELOC budget and Object.freeze (advisory: no dedicated executable enforcer yet)",
+      "summary": "Facade substantial burden and immutable freeze guard: Enforce substantial facade implementation with ELOC budget and deep object freezing (advisory: no dedicated executable enforcer yet)",
       "canonical": true
     },
     {
@@ -1482,7 +1482,7 @@
       "namespace": "FGT",
       "family": "PRF",
       "severity": "error",
-      "summary": "Zero transient heap allocation guard in hot loops: Prohibit string/vec/clone allocation in critical paths (ADV-PRF-002)",
+      "summary": "Zero transient heap allocation guard in hot loops: Prohibit string, vector, and clone allocations in critical paths",
       "canonical": true
     },
     {
@@ -1491,7 +1491,7 @@
       "namespace": "FGT",
       "family": "PYR",
       "severity": "error",
-      "summary": "Four-tier pyramid audit folding guard: Milestone card compression and weekly folding must preserve Merkle root integrity and deterministic summary aggregation",
+      "summary": "Four-tier hierarchical audit rollup guard: Milestone card compression and periodic rollup must preserve Merkle root integrity and deterministic summary aggregation",
       "canonical": true
     },
     {

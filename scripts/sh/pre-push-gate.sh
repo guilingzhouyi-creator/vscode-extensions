@@ -372,7 +372,7 @@ if [[ "$RUN_FG" -eq 1 ]]; then
         if ! run_gate_step 120 "RUST-TAXIS-19" "$ROOT_DIR" "$CARGO_BIN" test --workspace --manifest-path fractal-git/Cargo.toml; then
             FAILED=1
         else
-            log_gate "  ✔ fractal-git 10大微 Crate 回归测试套件通过（未检测到 gate-rust.sh，仅执行 cargo test）"
+            log_gate "  ✔ fractal-git 10大内核子系统回归测试套件通过（未检测到 gate-rust.sh，仅执行 cargo test）"
         fi
     fi
 else

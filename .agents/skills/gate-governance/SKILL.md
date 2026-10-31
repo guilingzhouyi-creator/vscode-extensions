@@ -49,7 +49,7 @@ description: >-
 - **双模式审查机制**：
   1. **定向切片 (Targeted Slices)**：
      - `hygiene`: 仓库八维物理卫生、文档规模一致性、规则ID闭包、反馈词表与 Shell 兼容（~5s）；
-     - `rust`: fractal-git 微 Crate 拓扑、零堆分配边界、`cargo fmt --check`、`cargo check`、`cargo clippy -D warnings`（~8s）；
+     - `rust`: fractal-git 内核子系统拓扑、零堆分配边界、`cargo fmt --check`、`cargo check`、`cargo clippy -D warnings`（~8s）；
      - `timing`: workspace-timing 编译与 205+ 项单元测试（~7s）；
      - `auto-refactor`: 静态引擎多维自审与 AST 单元测试（~8s）；
      - `webgames`: 129 张配置表静态审查与 349 个 Mermaid 图表解析（~8s）；
@@ -85,7 +85,7 @@ description: >-
 - **`workspace-timing/**`** $\rightarrow$ 路由至 VS Code 扩展套件：触发快速增量编译（`npm run compile`）、单元测试（`npm run test:fast`）与双语字典审查（`npm run review`）；
 - **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->与 <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->的 auto-refactor 规则自测（`npm test`，套件总数由运行期汇总输出）、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
 - **`WebGames/**`** $\rightarrow$ 路由至 Godot 引擎套件：触发 GDScript 语法审查（`check-gdscript.sh`）、无头回归套件（`test-run.ps1`）与配置同构审计；
-- **`fractal-git/**`** $\rightarrow$ 路由至 Rust 原生版本控制内核套件：触发 10 微 Crate 编译与 Clippy 零容忍检查（`cargo clippy --all-targets -- -D warnings`）、内核单元测试（`cargo test`）与 Taxis 专项架构审计（`fractal-git/scripts/ps1/audit-taxis.ps1`）；
+- **`fractal-git/**`** $\rightarrow$ 路由至 Rust 原生版本控制内核套件：触发 10 大内核子系统编译与 Clippy 零容忍检查（`cargo clippy --all-targets -- -D warnings`）、内核单元测试（`cargo test`）与 Taxis 专项架构审计（`fractal-git/scripts/ps1/audit-taxis.ps1`）；
 - **`scripts/**` / `.github/**` / `AGENTS.md` / `.agents/skills/**` / 根目录配置** $\rightarrow$ 标记为 `governance` 域：触发工作区单源规则目录一致性、技能集规范性核验与全宗审计（`audit-all.ps1`，内置 `validate-skills.js`）。
 
 ### 2. 分流执行原则
