@@ -300,6 +300,10 @@ export interface QualityScoreBreakdown {
      * (TDR).
      */
     technicalDebt?: import('./technical-debt-ratio').TechnicalDebtAssessment;
+    /**
+     * Optional quantitative financial capital debt and volatility-adjusted risk metrics.
+     */
+    quant?: import('./quantitative-risk-model').QuantitativeRiskAssessment;
     /** Average effective code density ratio across evaluated files. */
     effectiveCodeDensity?: number;
     /** 5D Riemannian manifold and tensor density summary. */

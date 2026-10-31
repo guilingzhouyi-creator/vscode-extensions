@@ -97,8 +97,32 @@ export interface AasHealth {
         readonly q: number;
         readonly dm: number;
     };
+    /** Quantitative financial capital debt and risk engineering metrics */
+    readonly quant?: AasQuantMetrics;
     /** Aggregate counter summary */
     readonly counts: AasCounts;
+}
+
+/** Quantitative financial capital debt and risk engineering indicators. */
+export interface AasQuantMetrics {
+    /** Interest coverage ratio (multiple) */
+    readonly icr: number;
+    /** Quality Sharpe ratio */
+    readonly qsr: number;
+    /** Quality Sortino downside ratio */
+    readonly sortino: number;
+    /** File-level technical debt Gini coefficient [0.0 .. 1.0] */
+    readonly debtGini: number;
+    /** Rule family normalized Shannon entropy [0.0 .. 1.0] */
+    readonly defectEntropy: number;
+    /** 95% Value at Risk maximum anticipated drop (%) */
+    readonly var95: number;
+    /** Historical maximum drawdown (%) */
+    readonly mdd: number;
+    /** Ornstein-Uhlenbeck mean-reversion half-life in commits */
+    readonly halfLifeCommits: number;
+    /** Qualitative debt governance status */
+    readonly status?: string;
 }
 
 /** Bottleneck entry ranking rules by composite score point loss. */
@@ -279,6 +303,7 @@ export interface AasReportOptions {
             readonly q: number;
             readonly dm: number;
         };
+        readonly quant?: AasQuantMetrics;
     };
 }
 

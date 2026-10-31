@@ -441,6 +441,33 @@ function resolveHealthGamingDefense(
 }
 
 /**
+ * Resolves quantitative financial capital debt and risk indicators.
+ */
+function resolveHealthQuant(
+    report: ScanReport,
+    override?: AasHealth['quant'],
+): AasHealth['quant'] | undefined {
+    if (override) return override;
+    const quantMetrics = (report.qualityScore as any)?.quant;
+    if (!quantMetrics) return undefined;
+    const fin = quantMetrics.financial;
+    const risk = quantMetrics.riskRatios;
+    const ineq = quantMetrics.inequality;
+    const stoch = quantMetrics.stochastic;
+    return {
+        icr: roundMetric(fin?.interestCoverageRatio) ?? 0,
+        qsr: roundMetric(risk?.qsr) ?? 0,
+        sortino: roundMetric(risk?.sortino) ?? 0,
+        debtGini: roundMetric(ineq?.debtGini) ?? 0,
+        defectEntropy: roundMetric(ineq?.defectEntropy) ?? 0,
+        var95: roundMetric(risk?.var95) ?? 0,
+        mdd: roundMetric(risk?.mdd) ?? 0,
+        halfLifeCommits: roundMetric(stoch?.halfLifeCommits) ?? 0,
+        ...(fin?.status ? { status: fin.status } : {}),
+    };
+}
+
+/**
  * Summarizes dimensional health status distribution.
  */
 function computeDimensionSummary(indices?: Record<string, number>): AasHealth['dimensionSummary'] | undefined {
@@ -484,6 +511,7 @@ function buildHealth(report: ScanReport, counts: AasCounts, options?: AasReportO
     const sqale = resolveHealthSqale(report, override?.sqale);
     const polyglot = resolveHealthPolyglot(report, override?.polyglot);
     const gamingDefense = resolveHealthGamingDefense(report, override?.gamingDefense);
+    const quant = resolveHealthQuant(report, override?.quant);
     const vrf = override?.vrf;
     const dimensionSummary = options?.includeDimensionDetails
         ? computeDimensionSummary(report.qualityScore?.indices)
@@ -498,6 +526,7 @@ function buildHealth(report: ScanReport, counts: AasCounts, options?: AasReportO
         ...(sqale ? { sqale } : {}),
         ...(polyglot ? { polyglot } : {}),
         ...(gamingDefense ? { gamingDefense } : {}),
+        ...(quant ? { quant } : {}),
         ...(dimensionSummary ? { dimensionSummary } : {}),
         ...(vrf ? { vrf } : {}),
         counts,

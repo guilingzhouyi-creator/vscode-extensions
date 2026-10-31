@@ -98,7 +98,12 @@ function renderTriPlaneVector(triPlane: UnifiedQualityAssessment): void {
  * Renders technical debt, density tensor, and polyglot metrics.
  */
 function renderTechnicalDebtAndDensity(scoreBreakdown: QualityScoreBreakdown): void {
-    if (!scoreBreakdown.technicalDebt && !scoreBreakdown.densityTensorSummary && !scoreBreakdown.polyglotGeneralization) {
+    if (
+        !scoreBreakdown.technicalDebt &&
+        !scoreBreakdown.densityTensorSummary &&
+        !scoreBreakdown.polyglotGeneralization &&
+        !scoreBreakdown.quant
+    ) {
         return;
     }
     process.stdout.write(`-------------------------------------------\n`);
@@ -125,6 +130,16 @@ function renderTechnicalDebtAndDensity(scoreBreakdown: QualityScoreBreakdown): v
         process.stdout.write(
             `Polyglot Generalization : ${polyglotMetrics.index.toFixed(1)} / 100 ` +
                 `(${polyglotMetrics.languageCount} langs, mean: ${polyglotMetrics.meanScore.toFixed(1)}, penalty: ${polyglotMetrics.dispersionPenalty.toFixed(2)})\n`,
+        );
+    }
+    if (scoreBreakdown.quant) {
+        const quant = scoreBreakdown.quant;
+        const statusBadge = quant.financial.status === 'de-leveraging' ? '[De-leveraging]' :
+            quant.financial.status === 'balanced' ? '[Balanced]' : '[Insolvent]';
+        process.stdout.write(
+            `Quantitative Risk Model : ICR: ${quant.financial.interestCoverageRatio.toFixed(2)}x ${statusBadge} ` +
+                `| QSR: ${quant.riskRatios.qsr.toFixed(1)} | Sortino: ${quant.riskRatios.sortino.toFixed(1)} ` +
+                `| Gini: ${quant.inequality.debtGini.toFixed(2)} | Entropy: ${quant.inequality.defectEntropy.toFixed(2)}\n`,
         );
     }
 }
