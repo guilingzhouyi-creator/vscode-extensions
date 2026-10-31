@@ -134,12 +134,17 @@ function renderTechnicalDebtAndDensity(scoreBreakdown: QualityScoreBreakdown): v
     }
     if (scoreBreakdown.quant) {
         const quant = scoreBreakdown.quant;
-        const statusBadge = quant.financial.status === 'de-leveraging' ? '[De-leveraging]' :
-            quant.financial.status === 'balanced' ? '[Balanced]' : '[Insolvent]';
+        const statusBadge = quant.financial.status === 'de-leveraging' ? '[Active-Clearing]' :
+            quant.financial.status === 'balanced' ? '[Balanced]' : '[Deficit-Growing]';
+        const rcrVal = quant.financial.rcr ?? quant.financial.interestCoverageRatio;
+        const erqVal = quant.riskRatios.erq ?? quant.riskRatios.qsr;
+        const ddrVal = quant.riskRatios.ddr ?? quant.riskRatios.sortino;
+        const dsiVal = quant.inequality.dsi ?? quant.inequality.debtGini;
+        const rcdVal = quant.inequality.rcd ?? quant.inequality.defectEntropy;
         process.stdout.write(
-            `Quantitative Risk Model : ICR: ${quant.financial.interestCoverageRatio.toFixed(2)}x ${statusBadge} ` +
-                `| QSR: ${quant.riskRatios.qsr.toFixed(1)} | Sortino: ${quant.riskRatios.sortino.toFixed(1)} ` +
-                `| Gini: ${quant.inequality.debtGini.toFixed(2)} | Entropy: ${quant.inequality.defectEntropy.toFixed(2)}\n`,
+            `Resilience Quant (ADR-Q) : RCR: ${rcrVal.toFixed(2)}x ${statusBadge} ` +
+                `| ERQ: ${erqVal.toFixed(1)} | DDR: ${ddrVal.toFixed(1)} ` +
+                `| DSI: ${dsiVal.toFixed(2)} | RCD: ${rcdVal.toFixed(2)}\n`,
         );
     }
 }

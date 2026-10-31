@@ -239,9 +239,21 @@ describe('Quantitative Risk Model Engine', () => {
             );
 
             expect(assessment.financial.status).toBe('de-leveraging');
+            expect(assessment.financial.rcr).toBe(assessment.financial.interestCoverageRatio);
+            expect(assessment.financial.clearanceStatus).toBe('active-clearing');
             expect(assessment.riskRatios.isSampleSufficient).toBe(true);
+            expect(assessment.riskRatios.erq).toBe(assessment.riskRatios.qsr);
+            expect(assessment.riskRatios.ddr).toBe(assessment.riskRatios.sortino);
+            expect(assessment.riskRatios.edb95).toBe(assessment.riskRatios.var95);
+            expect(assessment.riskRatios.ptd).toBe(assessment.riskRatios.mdd);
             expect(assessment.inequality.totalDebtItems).toBe(18);
+            expect(assessment.inequality.dsi).toBe(assessment.inequality.debtGini);
+            expect(assessment.inequality.rcd).toBe(assessment.inequality.defectEntropy);
             expect(assessment.stochastic.isFatTailed).toBe(false);
+            expect(assessment.stochastic.ehl).toBe(assessment.stochastic.halfLifeCommits);
+            expect(assessment.debtDynamics).toBeDefined();
+            expect(assessment.temporalResilience).toBeDefined();
+            expect(assessment.spatialDispersion).toBeDefined();
         });
     });
 });

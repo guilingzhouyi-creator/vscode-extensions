@@ -441,7 +441,7 @@ function resolveHealthGamingDefense(
 }
 
 /**
- * Resolves quantitative financial capital debt and risk indicators.
+ * Resolves quantitative architecture dynamics and resilience indicators (ADR-Q).
  */
 function resolveHealthQuant(
     report: ScanReport,
@@ -454,15 +454,35 @@ function resolveHealthQuant(
     const risk = quantMetrics.riskRatios;
     const ineq = quantMetrics.inequality;
     const stoch = quantMetrics.stochastic;
+
+    const rcr = roundMetric(fin?.rcr ?? fin?.interestCoverageRatio) ?? 0;
+    const erq = roundMetric(risk?.erq ?? risk?.qsr) ?? 0;
+    const ddr = roundMetric(risk?.ddr ?? risk?.sortino) ?? 0;
+    const dsi = roundMetric(ineq?.dsi ?? ineq?.debtGini) ?? 0;
+    const rcd = roundMetric(ineq?.rcd ?? ineq?.defectEntropy) ?? 0;
+    const edb95 = roundMetric(risk?.edb95 ?? risk?.var95) ?? 0;
+    const ptd = roundMetric(risk?.ptd ?? risk?.mdd) ?? 0;
+    const ehl = roundMetric(stoch?.ehl ?? stoch?.halfLifeCommits) ?? 0;
+
     return {
-        icr: roundMetric(fin?.interestCoverageRatio) ?? 0,
-        qsr: roundMetric(risk?.qsr) ?? 0,
-        sortino: roundMetric(risk?.sortino) ?? 0,
-        debtGini: roundMetric(ineq?.debtGini) ?? 0,
-        defectEntropy: roundMetric(ineq?.defectEntropy) ?? 0,
-        var95: roundMetric(risk?.var95) ?? 0,
-        mdd: roundMetric(risk?.mdd) ?? 0,
-        halfLifeCommits: roundMetric(stoch?.halfLifeCommits) ?? 0,
+        // Native terminology
+        rcr,
+        erq,
+        ddr,
+        edb95,
+        ptd,
+        dsi,
+        rcd,
+        ehl,
+        // Legacy aliases for backward compatibility
+        icr: rcr,
+        qsr: erq,
+        sortino: ddr,
+        debtGini: dsi,
+        defectEntropy: rcd,
+        var95: edb95,
+        mdd: ptd,
+        halfLifeCommits: ehl,
         ...(fin?.status ? { status: fin.status } : {}),
     };
 }

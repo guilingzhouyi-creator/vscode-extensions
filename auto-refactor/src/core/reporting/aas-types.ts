@@ -103,23 +103,39 @@ export interface AasHealth {
     readonly counts: AasCounts;
 }
 
-/** Quantitative financial capital debt and risk engineering indicators. */
+/** Architecture Dynamics and Resilience Quantitative indicators (ADR-Q). */
 export interface AasQuantMetrics {
-    /** Interest coverage ratio (multiple) */
+    /** Native term: Remediation Clearance Ratio (RCR, alias for icr) */
+    readonly rcr?: number;
+    /** Native term: Engineering Resilience Quotient (ERQ, alias for qsr) */
+    readonly erq?: number;
+    /** Native term: Downside Defense Ratio (DDR, alias for sortino) */
+    readonly ddr?: number;
+    /** Native term: Extreme Degradation Bound at 95% confidence (EDB-95, alias for var95) */
+    readonly edb95?: number;
+    /** Native term: Peak-to-Trough Degradation (PTD, alias for mdd) */
+    readonly ptd?: number;
+    /** Native term: Debt Skewness Index (DSI, alias for debtGini) */
+    readonly dsi?: number;
+    /** Native term: Root-Cause Dispersion (RCD, alias for defectEntropy) */
+    readonly rcd?: number;
+    /** Native term: Elastic Healing Half-Life in commits (EHL, alias for halfLifeCommits) */
+    readonly ehl?: number;
+    /** Interest coverage ratio (multiple) [Legacy Alias] */
     readonly icr: number;
-    /** Quality Sharpe ratio */
+    /** Quality Sharpe ratio [Legacy Alias] */
     readonly qsr: number;
-    /** Quality Sortino downside ratio */
+    /** Quality Sortino downside ratio [Legacy Alias] */
     readonly sortino: number;
-    /** File-level technical debt Gini coefficient [0.0 .. 1.0] */
+    /** File-level technical debt Gini coefficient [0.0 .. 1.0] [Legacy Alias] */
     readonly debtGini: number;
-    /** Rule family normalized Shannon entropy [0.0 .. 1.0] */
+    /** Rule family normalized Shannon entropy [0.0 .. 1.0] [Legacy Alias] */
     readonly defectEntropy: number;
-    /** 95% Value at Risk maximum anticipated drop (%) */
+    /** 95% Value at Risk maximum anticipated drop (%) [Legacy Alias] */
     readonly var95: number;
-    /** Historical maximum drawdown (%) */
+    /** Historical maximum drawdown (%) [Legacy Alias] */
     readonly mdd: number;
-    /** Ornstein-Uhlenbeck mean-reversion half-life in commits */
+    /** Ornstein-Uhlenbeck mean-reversion half-life in commits [Legacy Alias] */
     readonly halfLifeCommits: number;
     /** Qualitative debt governance status */
     readonly status?: string;

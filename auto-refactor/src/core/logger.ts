@@ -214,7 +214,7 @@ function ensureExitBarrierRegistered(): void {
             try {
                 ring.flushSync();
             } catch {
-                /* Suppress secondary exit exception */
+                /* best-effort: suppress secondary exit exception during process termination */
             }
         }
     };

@@ -75,7 +75,15 @@ export interface FinancialDebtMetrics {
     readonly principalHours: number;
     readonly interestDragHours: number;
     readonly interestCoverageRatio: number;
+    /** Native term: Remediation Clearance Ratio (RCR) */
+    readonly rcr: number;
+    /** Native term: Technical Deficit Stock (TDS) in hours */
+    readonly deficitStockHours: number;
+    /** Native term: Complexity Friction Drag (CFD) in hours */
+    readonly frictionDragHours: number;
     readonly status: 'de-leveraging' | 'balanced' | 'insolvent' | 'insufficient_samples';
+    /** Native status tag */
+    readonly clearanceStatus: 'active-clearing' | 'balanced' | 'deficit-growing' | 'insufficient_samples';
 }
 
 /**
@@ -95,6 +103,14 @@ export interface QualityRiskMetrics {
     readonly sortino: number;
     readonly var95: number;
     readonly mdd: number;
+    /** Native term: Engineering Resilience Quotient (ERQ, alias for qsr) */
+    readonly erq: number;
+    /** Native term: Downside Defense Ratio (DDR, alias for sortino) */
+    readonly ddr: number;
+    /** Native term: Extreme Degradation Bound at 95% confidence (EDB-95, alias for var95) */
+    readonly edb95: number;
+    /** Native term: Peak-to-Trough Degradation (PTD, alias for mdd) */
+    readonly ptd: number;
     readonly meanScore: number;
     readonly standardDeviation: number;
     readonly downsideDeviation: number;
@@ -115,6 +131,10 @@ export interface InequalityInput {
 export interface InequalityMetrics {
     readonly debtGini: number;
     readonly defectEntropy: number;
+    /** Native term: Debt Skewness Index (DSI, alias for debtGini) */
+    readonly dsi: number;
+    /** Native term: Root-Cause Dispersion (RCD, alias for defectEntropy) */
+    readonly rcd: number;
     readonly totalDebtItems: number;
 }
 
@@ -131,19 +151,27 @@ export interface StochasticInput {
  */
 export interface StochasticMetrics {
     readonly halfLifeCommits: number;
+    /** Native term: Elastic Healing Half-Life in commits (EHL, alias for halfLifeCommits) */
+    readonly ehl: number;
     readonly reversionRateTheta: number;
     readonly kurtosisCc: number;
     readonly isFatTailed: boolean;
 }
 
 /**
- * Unified quantitative risk assessment aggregating all four domains.
+ * Unified quantitative risk assessment aggregating all mathematical domains.
  */
 export interface QuantitativeRiskAssessment {
     readonly financial: FinancialDebtMetrics;
     readonly riskRatios: QualityRiskMetrics;
     readonly inequality: InequalityMetrics;
     readonly stochastic: StochasticMetrics;
+    /** Native alias: Debt Dynamics domain */
+    readonly debtDynamics?: FinancialDebtMetrics;
+    /** Native alias: Temporal Resilience domain */
+    readonly temporalResilience?: QualityRiskMetrics;
+    /** Native alias: Spatial Dispersion domain */
+    readonly spatialDispersion?: InequalityMetrics;
 }
 
 /**
@@ -207,7 +235,11 @@ export function computeFinancialDebtLedger(input: FinancialDebtInput): Financial
             principalHours,
             interestDragHours,
             interestCoverageRatio: 2.0,
+            rcr: 2.0,
+            deficitStockHours: principalHours,
+            frictionDragHours: interestDragHours,
             status: 'balanced',
+            clearanceStatus: 'balanced',
         };
     }
 
@@ -230,11 +262,20 @@ export function computeFinancialDebtLedger(input: FinancialDebtInput): Financial
         else status = 'insolvent';
     }
 
+    const finalIcr = Math.min(RATIO_SATURATION_CEILING, icr);
+    const clearanceStatus: FinancialDebtMetrics['clearanceStatus'] =
+        status === 'de-leveraging' ? 'active-clearing' :
+        status === 'balanced' ? 'balanced' : 'deficit-growing';
+
     return {
         principalHours,
         interestDragHours,
-        interestCoverageRatio: Math.min(RATIO_SATURATION_CEILING, icr),
+        interestCoverageRatio: finalIcr,
+        rcr: finalIcr,
+        deficitStockHours: principalHours,
+        frictionDragHours: interestDragHours,
         status,
+        clearanceStatus,
     };
 }
 
@@ -320,6 +361,10 @@ export function computeQualityRiskRatios(input: QualityRiskInput): QualityRiskMe
             sortino: 0.0,
             var95: 0.0,
             mdd: 0.0,
+            erq: 0.0,
+            ddr: 0.0,
+            edb95: 0.0,
+            ptd: 0.0,
             meanScore: roundTwoDecimals(fallbackMean),
             standardDeviation: 0.0,
             downsideDeviation: 0.0,
@@ -347,12 +392,18 @@ export function computeQualityRiskRatios(input: QualityRiskInput): QualityRiskMe
     }
 
     const { var95, mdd } = computeVarAndMdd(samples);
+    const finalQsr = roundTwoDecimals(qsr);
+    const finalSortino = roundTwoDecimals(sortino);
 
     return {
-        qsr: roundTwoDecimals(qsr),
-        sortino: roundTwoDecimals(sortino),
+        qsr: finalQsr,
+        sortino: finalSortino,
         var95,
         mdd,
+        erq: finalQsr,
+        ddr: finalSortino,
+        edb95: var95,
+        ptd: mdd,
         meanScore: roundTwoDecimals(meanScore),
         standardDeviation: roundTwoDecimals(stdDev),
         downsideDeviation: roundTwoDecimals(downsideDev),
@@ -420,6 +471,8 @@ export function computeDebtInequality(input: InequalityInput): InequalityMetrics
     return {
         debtGini,
         defectEntropy,
+        dsi: debtGini,
+        rcd: defectEntropy,
         totalDebtItems: Math.round(totalDebtItems),
     };
 }
@@ -515,6 +568,7 @@ export function computeStochasticDynamics(input: StochasticInput): StochasticMet
 
     return {
         halfLifeCommits: halfLife,
+        ehl: halfLife,
         reversionRateTheta: theta,
         kurtosisCc: kurtosis,
         isFatTailed,
@@ -536,10 +590,17 @@ export function evaluateQuantitativeRiskModel(
     inequalityInput: InequalityInput,
     stochasticInput: StochasticInput,
 ): QuantitativeRiskAssessment {
+    const financial = computeFinancialDebtLedger(financialInput);
+    const riskRatios = computeQualityRiskRatios(riskInput);
+    const inequality = computeDebtInequality(inequalityInput);
+    const stochastic = computeStochasticDynamics(stochasticInput);
     return {
-        financial: computeFinancialDebtLedger(financialInput),
-        riskRatios: computeQualityRiskRatios(riskInput),
-        inequality: computeDebtInequality(inequalityInput),
-        stochastic: computeStochasticDynamics(stochasticInput),
+        financial,
+        riskRatios,
+        inequality,
+        stochastic,
+        debtDynamics: financial,
+        temporalResilience: riskRatios,
+        spatialDispersion: inequality,
     };
 }

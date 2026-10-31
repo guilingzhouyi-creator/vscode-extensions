@@ -2,63 +2,63 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-31T04:28:09.043Z",
+  "timestamp": "2026-10-31T09:46:10.852Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.14,
+    "score": 99.13,
     "grade": "A+",
-    "cai": 88.03,
+    "cai": 88.06,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.918,
       "averagePor": 0.082,
-      "averageColumnDensity": 0.867,
-      "averageSpatialDensity": 0.45,
-      "averageMahalanobisDistance": 4.539,
+      "averageColumnDensity": 0.868,
+      "averageSpatialDensity": 0.451,
+      "averageMahalanobisDistance": 4.529,
       "averageFisherSimplexDistance": 0.093
     },
     "sqale": {
       "tdr": 0.0042,
-      "remediationMinutes": 30695,
+      "remediationMinutes": 31082,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.36,
-      "meanScore": 96.36,
+      "index": 96.35,
+      "meanScore": 96.35,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "counts": {
-      "files": 806,
-      "total": 4453,
+      "files": 807,
+      "total": 4498,
       "errors": 0,
-      "warns": 3778,
-      "info": 675,
+      "warns": 3822,
+      "info": 676,
       "suppressed": 161
     }
   },
   "usability": {
-    "proven": 50,
-    "patchable": 1896,
-    "advisory": 2507,
-    "uncalibrated": 4242,
+    "proven": 52,
+    "patchable": 1918,
+    "advisory": 2528,
+    "uncalibrated": 4285,
     "needsHuman": 6
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 97.88,
-    "semanticPurity": 98.18,
+    "architectureConsistency": 97.87,
+    "semanticPurity": 98.17,
     "codeSecurity": 99.78,
-    "performanceEfficiency": 99.57,
-    "standardization": 83.68,
-    "modernity": 97.73,
-    "maintainability": 92.81,
+    "performanceEfficiency": 99.52,
+    "standardization": 83.64,
+    "modernity": 97.74,
+    "maintainability": 92.75,
     "commentQuality": 99.3,
-    "duplication": 94.75,
-    "techDebtRisk": 100
+    "duplication": 94.69,
+    "techDebtRisk": 99.98
   },
   "bottlenecks": [
     {
@@ -70,44 +70,44 @@
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3330,
-      "count": 232
+      "loss": 3345,
+      "count": 233
     },
     {
       "rule": "metric",
       "dim": "architectureConsistency",
-      "loss": 2520,
-      "count": 252
+      "loss": 2530,
+      "count": 253
     },
     {
       "rule": "NAM-DEC-001",
       "dim": "architectureConsistency",
-      "loss": 2400,
-      "count": 240
+      "loss": 2420,
+      "count": 242
     },
     {
       "rule": "SIM-TRN-001",
       "dim": "standardization",
-      "loss": 2360,
-      "count": 236
+      "loss": 2380,
+      "count": 238
     },
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2190,
-      "count": 438
+      "loss": 2195,
+      "count": 439
+    },
+    {
+      "rule": "hardcoded-string",
+      "dim": "duplication",
+      "loss": 2148,
+      "count": 716
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
       "loss": 2120,
       "count": 212
-    },
-    {
-      "rule": "hardcoded-string",
-      "dim": "duplication",
-      "loss": 2115,
-      "count": 705
     }
   ],
   "topology": {
@@ -744,7 +744,7 @@
     ],
     "src/core/reporting/aas-types.ts": [
       {
-        "line": 248,
+        "line": 288,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
         "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 54",
@@ -757,7 +757,7 @@
     ],
     "src/core/reporting/quality-printer.ts": [
       {
-        "line": 107,
+        "line": 112,
         "col": 75,
         "rule": "magic-number",
         "sev": "WARN",
@@ -766,9 +766,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 107,
+              "startLine": 112,
               "startCol": 75,
-              "endLine": 107,
+              "endLine": 112,
               "endCol": 77
             },
             "replacementText": "CONST_60"
@@ -778,7 +778,7 @@
         "tier": "T2"
       },
       {
-        "line": 107,
+        "line": 112,
         "col": 33,
         "rule": "NUM-PREC-001",
         "sev": "WARN",
@@ -792,7 +792,49 @@
         "tier": "T2"
       },
       {
-        "line": 176,
+        "line": 137,
+        "col": 56,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 137,
+              "startCol": 56,
+              "endLine": 137,
+              "endCol": 71
+            },
+            "replacementText": "DELEVERAGING_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 138,
+        "col": 40,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 138,
+              "startCol": 40,
+              "endLine": 138,
+              "endCol": 50
+            },
+            "replacementText": "BALANCED_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 196,
         "col": 76,
         "rule": "GOV-TYP-003",
         "sev": "WARN",
@@ -804,7 +846,7 @@
         "tier": "T3"
       },
       {
-        "line": 176,
+        "line": 196,
         "rule": "TSM-ANY-001",
         "sev": "WARN",
         "msg": "Explicit `any` disables checking for every value it touches",
@@ -816,7 +858,7 @@
         "tier": "T2"
       },
       {
-        "line": 177,
+        "line": 197,
         "col": 81,
         "rule": "magic-number",
         "sev": "WARN",
@@ -825,9 +867,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 177,
+              "startLine": 197,
               "startCol": 81,
-              "endLine": 177,
+              "endLine": 197,
               "endCol": 84
             },
             "replacementText": "DURATION_100MS"
@@ -837,7 +879,7 @@
         "tier": "T2"
       },
       {
-        "line": 238,
+        "line": 258,
         "rule": "CPX-TRV-001",
         "sev": "WARN",
         "msg": "Tautological loop traversal detected in 'printAutonomyAssessment': iteration exhibits zero or negligible state mutation entropy delta (deltaEntropy: 0 <= 0.05)",
@@ -8400,32 +8442,8 @@
           "safeToAutomate": false
         },
         "tier": "T1"
-      },
-      {
-        "line": 472,
-        "col": 5,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'forEachChild' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
-        "fix": {
-          "action": "replace_token",
-          "template": "iterable",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 547,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 438",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        },
-        "tier": "T3"
       }
     ]
   },
-  "truncated": 3278
+  "truncated": 3322
 }
