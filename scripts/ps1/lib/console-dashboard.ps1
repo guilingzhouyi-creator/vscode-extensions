@@ -99,3 +99,64 @@ function Get-GradeFromScore {
     param([double]$Score)
     return (Get-GradeTag $Score).Replace("[", "").Replace("]", "").Trim()
 }
+
+function Format-QuantDashboardBlock {
+    [CmdletBinding()]
+    param(
+        [psobject]$Quant,
+        [int]$TargetWidth = 71
+    )
+    $sepTitle = "─ [资本负债与量化风险模型 (Financial & Risk)] "
+    $sep = "├" + $sepTitle + ("─" * ($TargetWidth - (Get-DisplayWidth $sepTitle))) + "┤"
+    Write-GateHost $sep -ForegroundColor Cyan
+
+    $icrVal = [double]$Quant.icr
+    $icrStatus = if ($Quant.status -eq "de-leveraging") { "强去杠杆 🟢" } elseif ($Quant.status -eq "balanced") { "平稳受控 🟡" } else { "滑坡在险 🔴" }
+    $qsrVal = [double]$Quant.qsr
+    $sortinoVal = [double]$Quant.sortino
+    $sortinoStatus = if ($sortinoVal -ge 999.0) { "无下行退化 🟢" } elseif ($sortinoVal -ge 5.0) { "低度在险 🟢" } else { "破位退化 🔴" }
+    $giniVal = [double]$Quant.debtGini
+    $giniStatus = if ($giniVal -ge 0.70) { "寡头集中 🟡" } else { "弥散平铺 🟢" }
+    $entropyVal = [double]$Quant.defectEntropy
+    $entropyStatus = if ($entropyVal -le 0.40) { "规则聚焦 🟢" } else { "弥散分布 🟡" }
+    $varVal = [double]$Quant.var95
+    $halfLifeVal = [double]$Quant.halfLifeCommits
+
+    $rows = @(
+        @{ text = " · 利息覆盖率 (ICR)   : {0:F2}x  [{1}] (重构偿债/利息覆盖)" -f $icrVal, $icrStatus; color = if ($Quant.status -eq "de-leveraging") { "Green" } elseif ($Quant.status -eq "balanced") { "Yellow" } else { "Red" } },
+        @{ text = " · 质量夏普比 (QSR)   : {0:F2}  [质量超额稳健] (单位波动超额收益)" -f $qsrVal; color = if ($qsrVal -ge 1.0) { "Green" } else { "Yellow" } },
+        @{ text = " · 索提诺比率 (Sortino): {0:F1}  [{1}] (及格线下行风险)" -f $sortinoVal, $sortinoStatus; color = if ($sortinoVal -ge 1.0) { "Green" } else { "Yellow" } },
+        @{ text = " · 债务基尼系数 (Gini) : {0:F2}   [{1}] (文件级债务集中度)" -f $giniVal, $giniStatus; color = if ($giniVal -ge 0.70) { "Yellow" } else { "Green" } },
+        @{ text = " · 规则信息熵 (Entropy): {0:F2}   [{1}] (规则类别扩散度)" -f $entropyVal, $entropyStatus; color = if ($entropyVal -le 0.40) { "Green" } else { "Yellow" } },
+        @{ text = " · 在险价值 (VaR 95%)  : {0:F2}%  (95%置信单次最大预期下滑)" -f $varVal; color = if ($varVal -le 10.0) { "Green" } else { "Yellow" } },
+        @{ text = " · 自愈半衰期 (t1/2)   : {0:F1} 步 (受损回归稳态基线步数)" -f $halfLifeVal; color = if ($halfLifeVal -le 5.0) { "Green" } else { "Yellow" } }
+    )
+    foreach ($r in $rows) {
+        Write-GateHost (Format-DashboardRow $r.text $TargetWidth) -ForegroundColor $r.color
+    }
+}
+
+function Format-QuantMarkdownBlock {
+    [CmdletBinding()]
+    param(
+        [System.Text.StringBuilder]$Builder,
+        [psobject]$Quant
+    )
+    [void]$Builder.AppendLine("### 📈 资本负债与风险量化看板 (Quantitative Risk Model)")
+    [void]$Builder.AppendLine()
+    [void]$Builder.AppendLine("| 量化指标 | 观测实值 | 状态/评级 | 业务与战术指导释义 |")
+    [void]$Builder.AppendLine("| :--- | :---: | :---: | :--- |")
+    $qStatus = if ($Quant.status -eq "de-leveraging") { "🟢 强去杠杆" } elseif ($Quant.status -eq "balanced") { "🟡 平稳受控" } else { "🔴 滑坡在险" }
+    $qSortinoStatus = if ([double]$Quant.sortino -ge 999.0) { "🟢 无下行退化" } else { "🟡 破位监控" }
+    $qGiniStatus = if ([double]$Quant.debtGini -ge 0.70) { "🟡 寡头集中" } else { "🟢 弥散平铺" }
+    $qEntropyStatus = if ([double]$Quant.defectEntropy -le 0.40) { "🟢 规则聚焦" } else { "🟡 弥散分布" }
+    [void]$Builder.AppendLine(("| 利息覆盖率 (ICR) | {0:F2}x | {1} | 重构偿债产能与新增负债利息比值 |" -f [double]$Quant.icr, $qStatus))
+    [void]$Builder.AppendLine(("| 质量夏普比率 (QSR) | {0:F2} | 稳健度 | 单位工程质量波动下的超额及格收益 |" -f [double]$Quant.qsr))
+    [void]$Builder.AppendLine(("| 索提诺比率 (Sortino) | {0:F1} | {1} | 仅惩罚跌破及格线(90分)的下行破位退化 |" -f [double]$Quant.sortino, $qSortinoStatus))
+    [void]$Builder.AppendLine(("| 技术债基尼系数 (Gini) | {0:F2} | {1} | 全仓技术债务在文件间的分布不均度 |" -f [double]$Quant.debtGini, $qGiniStatus))
+    [void]$Builder.AppendLine(("| 规则家族信息熵 (Entropy) | {0:F2} | {1} | 缺陷在不同规则家族维度的集中/扩散度 |" -f [double]$Quant.defectEntropy, $qEntropyStatus))
+    [void]$Builder.AppendLine(("| 在险价值 (VaR 95%) | {0:F2}% | 风险极值 | 95%置信度下单次提交最大预期回撤极限 |" -f [double]$Quant.var95))
+    [void]$Builder.AppendLine(("| 最大历史回撤 (MDD) | {0:F2}% | 历史极差 | 历史滑动窗口内相对历史峰值的最大跌落 |" -f [double]$Quant.mdd))
+    [void]$Builder.AppendLine(("| 自愈半衰期 (t1/2) | {0:F1} 步 | 恢复速度 | 突发扰动受损后回到基线所需的提交步数 |" -f [double]$Quant.halfLifeCommits))
+    [void]$Builder.AppendLine()
+}

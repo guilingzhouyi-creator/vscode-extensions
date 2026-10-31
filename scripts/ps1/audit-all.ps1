@@ -856,6 +856,16 @@ foreach ($d in $dimDefinitions) {
 
 $qualityVectorObj = $dynamicDimensions
 
+$quantMetrics = $null
+try {
+    $quantJson = & $nodeCmd "scripts/common/evaluate-workspace-quant.js" --json 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($quantJson)) {
+        $quantMetrics = $quantJson | ConvertFrom-Json
+    }
+} catch {
+    $quantMetrics = $null
+}
+
 $summary = [ordered]@{
     protocolVersion = "1.0.0"
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
@@ -892,6 +902,7 @@ $summary = [ordered]@{
     arCompositeScore = $compositeScore
     tenDimensions = $qualityVectorObj
     qualityVector = $qualityVectorObj
+    quant = $quantMetrics
 }
 
 # 无论审查通过或失败，第一时间原子持久化全工作区最新审查快照与历史分数轨迹
@@ -949,6 +960,7 @@ if ($Agent) {
         compositeHealth = [double]$wsHealthStr
         grade = $wsGrade
         subsystems = $subsystemsStatus
+        quant = $quantMetrics
         agentDirectives = [ordered]@{
             targetFiles = @()
             remediationPriority = $failedSubsystems
@@ -1047,6 +1059,10 @@ if ($null -ne $qualityVectorObj) {
     Write-GateHost (Format-DashboardRow " [离线基线快照未就绪 - 优雅降级模式]" $targetWidth) -ForegroundColor Yellow
 }
 
+if ($null -ne $quantMetrics) {
+    Format-QuantDashboardBlock $quantMetrics $targetWidth
+}
+
 Write-GateHost ("├" + ("─" * $targetWidth) + "┤") -ForegroundColor Cyan
 $bottomSummary = " 耗时: {0}s" -f $elapsedSec
 if ($null -ne $totalDebt) { $bottomSummary += "  |  技术债: {0}项" -f $totalDebt }
@@ -1122,6 +1138,9 @@ if ($env:GITHUB_STEP_SUMMARY) {
             [void]$md.AppendLine("> ⚠️ [离线基线快照未就绪 - 优雅降级模式]")
         }
         [void]$md.AppendLine()
+        if ($null -ne $quantMetrics) {
+            Format-QuantMarkdownBlock $md $quantMetrics
+        }
         [System.IO.File]::AppendAllText($env:GITHUB_STEP_SUMMARY, $md.ToString(), [System.Text.Encoding]::UTF8)
     } catch {
         # 优雅降级：写入 Step Summary 失败绝不中断门禁

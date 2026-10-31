@@ -19,6 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { evaluateWorkspaceQuant } = require('./evaluate-workspace-quant');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const AUDIT_LOG_DIR = path.join(REPO_ROOT, '.audit-logs');
@@ -241,6 +242,55 @@ function renderDimensionTableRows(dimensions) {
  * @param {object} data - Normalized audit snapshot payload.
  * @returns {string} Markdown text.
  */
+/**
+ * Build standardized Markdown quantitative risk table rows.
+ *
+ * @param {object} quant - Quantitative metrics envelope.
+ * @returns {string[]} Markdown table lines.
+ */
+/**
+ * Build standardized Markdown polyglot table rows.
+ *
+ * @param {object} breakdown - Polyglot breakdown data.
+ * @returns {string[]} Markdown table lines.
+ */
+function renderPolyglotTableRows(breakdown) {
+  if (!breakdown || typeof breakdown !== "object") return [];
+  const rows = ["", MD_POLY_HEADER, "", MD_POLY_TABLE_HDR_1, MD_POLY_TABLE_HDR_2];
+  for (const item of Object.values(breakdown)) {
+    const status = item.score >= GRADE_A ? STATUS_EXCELLENT : item.score >= GRADE_B ? STATUS_GOOD : STATUS_LAGGING;
+    rows.push(`| ${item.label} | ${item.files} | ${item.loc} | ${item.weight} | ${item.score.toFixed(1)} | ${status} |`);
+  }
+  return rows;
+}
+
+function renderQuantTableRows(quant) {
+  const statusBadge =
+    quant.status === "de-leveraging"
+      ? "🟢 强去杠杆"
+      : quant.status === "balanced"
+        ? "🟡 平稳受控"
+        : "🔴 滑坡在险";
+  const giniBadge = Number(quant.debtGini) >= 0.7 ? "🟡 寡头集中" : "🟢 弥散均衡";
+  const entropyBadge = Number(quant.defectEntropy) <= 0.4 ? "🟢 规则聚焦" : "🟡 弥散分布";
+
+  return [
+    "",
+    "### 📈 资本负债与风险量化看板 (Quantitative Risk Model)",
+    "",
+    "| 量化指标 | 观测实值 | 状态/评级 | 业务与战术指导释义 |",
+    "| :--- | :---: | :---: | :--- |",
+    `| 利息覆盖率 (ICR) | ${Number(quant.icr).toFixed(2)}x | ${statusBadge} | 重构偿债产能与新增负债利息比值 |`,
+    `| 质量夏普比率 (QSR) | ${Number(quant.qsr).toFixed(2)} | 稳健度 | 单位工程质量波动下的超额及格收益 |`,
+    `| 索提诺比率 (Sortino) | ${Number(quant.sortino).toFixed(2)} | 下行风险 | 仅惩罚跌破及格线(90分)的下行破位退化 |`,
+    `| 技术债基尼系数 (Gini) | ${Number(quant.debtGini).toFixed(2)} | ${giniBadge} | 全仓技术债务在文件间的分布不均度 |`,
+    `| 规则家族信息熵 (Entropy) | ${Number(quant.defectEntropy).toFixed(2)} | ${entropyBadge} | 缺陷在不同规则家族维度的集中/扩散度 |`,
+    `| 在险价值 (VaR 95%) | ${Number(quant.var95).toFixed(2)}% | 风险极值 | 95%置信度下单次提交最大预期回撤极限 |`,
+    `| 最大历史回撤 (MDD) | ${Number(quant.mdd).toFixed(2)}% | 历史极差 | 历史滑动窗口内相对历史峰值的最大跌落 |`,
+    `| 自愈半衰期 (t1/2) | ${Number(quant.halfLifeCommits).toFixed(1)} 步 | 恢复速度 | 突发扰动受损后回到基线所需的提交步数 |`,
+  ];
+}
+
 function renderMarkdownDashboard(data) {
   const wsHealthStr = Number(data.workspaceHealthScore).toFixed(2);
   const wsGrade = data.grade || getGradeFromScore(data.workspaceHealthScore);
@@ -268,17 +318,7 @@ function renderMarkdownDashboard(data) {
 
   lines.push(...renderSubsystemsTableRows(data));
 
-  if (data.polyglotBreakdown && typeof data.polyglotBreakdown === 'object') {
-    lines.push('');
-    lines.push(MD_POLY_HEADER);
-    lines.push('');
-    lines.push(MD_POLY_TABLE_HDR_1);
-    lines.push(MD_POLY_TABLE_HDR_2);
-    for (const item of Object.values(data.polyglotBreakdown)) {
-      const status = item.score >= GRADE_A ? STATUS_EXCELLENT : item.score >= GRADE_B ? STATUS_GOOD : STATUS_LAGGING;
-      lines.push(`| ${item.label} | ${item.files} | ${item.loc} | ${item.weight} | ${item.score.toFixed(1)} | ${status} |`);
-    }
-  }
+  lines.push(...renderPolyglotTableRows(data.polyglotBreakdown));
 
   lines.push('');
   lines.push(MD_DIM_SECTION_HEADER);
@@ -288,6 +328,10 @@ function renderMarkdownDashboard(data) {
     lines.push(...renderDimensionTableRows(data.tenDimensions));
   } else {
     lines.push(MD_DIM_DEGRADED_NOTICE);
+  }
+
+  if (data.quant && typeof data.quant === 'object') {
+    lines.push(...renderQuantTableRows(data.quant));
   }
 
   lines.push('');
@@ -334,6 +378,7 @@ function recordAuditRun(inputPayload) {
   const nowIso = inputPayload.timestamp || new Date().toISOString();
   const healthScore = Number(inputPayload.workspaceHealthScore ?? inputPayload.compositeScore ?? 0);
   const grade = inputPayload.grade || getGradeFromScore(healthScore);
+  const quant = inputPayload.quant || evaluateWorkspaceQuant(REPO_ROOT);
 
   const normalized = {
     protocolVersion: PROTOCOL_VERSION,
@@ -356,6 +401,7 @@ function recordAuditRun(inputPayload) {
     projects: inputPayload.projects || {},
     projectScores: inputPayload.projectScores || {},
     tenDimensions: inputPayload.tenDimensions || inputPayload.qualityVector || null,
+    quant,
   };
 
   // 1. Persist audit-latest.json snapshot
@@ -373,6 +419,19 @@ function recordAuditRun(inputPayload) {
       score: normalized.workspaceHealthScore,
       grade: normalized.grade,
       cai: normalized.autonomyRate,
+      ...(quant ? {
+        quant: {
+          icr: quant.icr,
+          qsr: quant.qsr,
+          sortino: quant.sortino,
+          debtGini: quant.debtGini,
+          defectEntropy: quant.defectEntropy,
+          var95: quant.var95,
+          mdd: quant.mdd,
+          halfLifeCommits: quant.halfLifeCommits,
+          status: quant.status,
+        },
+      } : {}),
       counts: {
         total: normalized.totalDebt ?? 0,
         subsystems: Object.keys(normalized.projects || {}).length,

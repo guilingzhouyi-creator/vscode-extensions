@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**95 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**96 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -69,6 +69,7 @@
 | `common/` | Node.js | `validate-trajectory-ledger.js` | audit / ledger（全工作区演化轨迹账本哈希单调性与完整性校验器） | 本地 CLI、CI |
 | `common/` | Node.js | `record-workspace-audit.js` | telemetry / audit（统一审查结论汇总落盘与跨项目得分聚合） | `audit-all` |
 | `common/` | Node.js | `evaluate-polyglot-balance.js` | audit / balance（异构多语言均衡指数与离散度惩罚度量） | `audit-all` |
+| `common/` | Node.js | `evaluate-workspace-quant.js` | telemetry / quant（资本负债与量化风险模型：利息覆盖率、夏普比率、索提诺比率、基尼系数与自愈半衰期评估） | `audit-all`、本地 CLI |
 | `common/` | Node.js | `analyze-commit-terminology.js` | audit / terminology（历史提交术语频次与新兴黑话风险诊断，落盘 `.audit-logs/`） | 本地 CLI（诊断报告，不参与门禁裁决） |
 | `common/` | Node.js | `log-rotator.js` | tooling / hygiene（门禁失败快照保留、尾部截断 <=100KB 与 FIFO <=2MB 轮转清理管理器） | `pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`audit-all` |
 | `common/` | Node.js | `workspace-walker.js` | tooling / traversal（全工作区目录迭代遍历、物理黑名单过滤与文件收集 SSOT 工具） | 门禁与体积审查脚本集 |
