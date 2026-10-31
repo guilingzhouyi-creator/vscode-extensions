@@ -153,10 +153,81 @@ export interface PathFindingInput {
 export type IssueFactory = (finding: PathFindingInput) => Issue;
 
 const MAX_STRUCTURED_RESOURCE_BUDGET = 1000;
-const SYNTHETIC_NODES_PER_ELOC = 4;
-const SYNTHETIC_SYMBOL_COUNT = 5;
-const SYNTHETIC_LITERAL_COUNT = 10;
-const SYNTHETIC_AST_DEPTH = 3;
+const RESOURCE_SYMBOL_DECL_RE =
+    /\b(?:const|let|var|function|class|interface|type|enum|def|fn)\s+[A-Za-z_$]/g;
+const RESOURCE_LITERAL_TOKEN_RE = /(?:['"`]|(?:\b\d+(?:\.\d+)?\b)|\b(?:true|false|null)\b)/g;
+const RESOURCE_AST_TOKEN_RE = /\b[A-Za-z0-9_$]+\b|[{}()[\].,:;=?+\-*/%&|^~<>!]+/g;
+const RESOURCE_EXEC_STMT_RE = /\b(?:if|for|while|switch|try|catch)\s*\(/g;
+const MIN_EXECUTABLE_LOGIC_STATEMENTS = 5;
+
+function countRegexMatchesOnLine(line: string, pattern: RegExp): number {
+    pattern.lastIndex = 0;
+    let count = 0;
+    while (pattern.exec(line) !== null) {
+        count++;
+    }
+    return count;
+}
+
+function isIgnorableResourceLine(trimmed: string): boolean {
+    return trimmed.length === 0 || trimmed.startsWith('//') || trimmed.startsWith('#');
+}
+
+function advanceResourceBracketDepth(
+    trimmed: string,
+    state: { currentDepth: number; maxDepth: number },
+): void {
+    for (let j = 0; j < trimmed.length; j++) {
+        const ch = trimmed.charCodeAt(j);
+        if (ch === 123 || ch === 91) {
+            state.currentDepth++;
+            if (state.currentDepth > state.maxDepth) {
+                state.maxDepth = state.currentDepth;
+            }
+        } else if ((ch === 125 || ch === 93) && state.currentDepth > 0) {
+            state.currentDepth--;
+        }
+    }
+}
+
+function measureStructuredResourceMetrics(lines: readonly string[]): {
+    eloc: number;
+    astNodeCount: number;
+    symbolCount: number;
+    literalCount: number;
+    astDepth: number;
+    isExecutableLogic: boolean;
+} {
+    let eloc = 0;
+    let astNodeCount = 0;
+    let symbolCount = 0;
+    let literalCount = 0;
+    let execCount = 0;
+    const depthState = { currentDepth: 0, maxDepth: 1 };
+
+    for (let i = 0; i < lines.length; i++) {
+        const trimmed = lines[i].trim();
+        if (isIgnorableResourceLine(trimmed)) {
+            continue;
+        }
+        eloc++;
+        astNodeCount += countRegexMatchesOnLine(trimmed, RESOURCE_AST_TOKEN_RE);
+        symbolCount += countRegexMatchesOnLine(trimmed, RESOURCE_SYMBOL_DECL_RE);
+        literalCount += countRegexMatchesOnLine(trimmed, RESOURCE_LITERAL_TOKEN_RE);
+        execCount += countRegexMatchesOnLine(trimmed, RESOURCE_EXEC_STMT_RE);
+        advanceResourceBracketDepth(trimmed, depthState);
+    }
+
+    return {
+        eloc: Math.max(1, eloc),
+        astNodeCount: Math.max(1, astNodeCount),
+        symbolCount,
+        literalCount,
+        astDepth: depthState.maxDepth,
+        isExecutableLogic:
+            execCount >= MIN_EXECUTABLE_LOGIC_STATEMENTS && execCount > symbolCount,
+    };
+}
 
 /**
  * Audits single file for structured resource topology compliance.
@@ -177,21 +248,18 @@ export function auditStructuredResourceFile(
     if (!RECOGNIZED_RESOURCE_BASE_TYPES.has(parts.baseType.toLowerCase())) return;
 
     const lines = (content || '').split('\n');
-    const eloc = Math.max(
-        1,
-        lines.filter((line) => line.trim().length > 0 && !line.trim().startsWith('//')).length,
-    );
+    const metrics = measureStructuredResourceMetrics(lines);
     const findings = auditStructuredResourceTopology(
         [
             {
                 filePath,
-                eloc,
-                astNodeCount: eloc * SYNTHETIC_NODES_PER_ELOC,
-                symbolCount: SYNTHETIC_SYMBOL_COUNT,
-                literalCount: SYNTHETIC_LITERAL_COUNT,
-                astDepth: SYNTHETIC_AST_DEPTH,
+                eloc: metrics.eloc,
+                astNodeCount: metrics.astNodeCount,
+                symbolCount: metrics.symbolCount,
+                literalCount: metrics.literalCount,
+                astDepth: metrics.astDepth,
                 language: path.extname(filePath).slice(1) || DEFAULT_LANGUAGE_TYPESCRIPT,
-                isExecutableLogic: false,
+                isExecutableLogic: metrics.isExecutableLogic,
             },
         ],
         MAX_STRUCTURED_RESOURCE_BUDGET,
@@ -704,11 +772,11 @@ const TYPE_SINGLE_LETTER = 'single_letter' as const;
 export interface FunctionSemanticsFinding {
     /** Type tag classifying the semantic finding. */
     type:
-        | typeof TYPE_VERB_NOUN
-        | typeof TYPE_TOO_FEW_WORDS
-        | typeof TYPE_TOO_MANY_WORDS
-        | typeof TYPE_INVALID_MORPHEME
-        | typeof TYPE_SINGLE_LETTER;
+    | typeof TYPE_VERB_NOUN
+    | typeof TYPE_TOO_FEW_WORDS
+    | typeof TYPE_TOO_MANY_WORDS
+    | typeof TYPE_INVALID_MORPHEME
+    | typeof TYPE_SINGLE_LETTER;
     /** Offending token if applicable. */
     token?: string;
     /** Measured word count. */

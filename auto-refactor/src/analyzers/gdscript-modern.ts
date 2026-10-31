@@ -523,6 +523,10 @@ export class GdscriptModernAnalyzer implements Analyzer {
         });
     }
 
+    public resetState(): void {
+        this.delegate.resetState();
+    }
+
     public finalize(ctx: AnalyzerContext): Issue[] {
         return this.delegate.finalize(ctx);
     }

@@ -138,7 +138,7 @@ function isBootstrapExpression(expr: ts.Expression): boolean {
  */
 function expressionMentionsRequire(expr: ts.Expression): boolean {
     let current: ts.Expression = expr;
-    for (;;) {
+    for (; ;) {
         if (ts.isPropertyAccessExpression(current)) {
             current = current.expression;
             continue;
@@ -163,7 +163,10 @@ function findFirstTsDeclarationLine(sourceFile: ts.SourceFile): number | undefin
     return undefined;
 }
 
-function findFirstPolyglotDeclarationLine(lines: string[], language: string): number | undefined {
+function findFirstPolyglotDeclarationLine(
+    lines: readonly string[],
+    language: string,
+): number | undefined {
     for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trim();
         if (
@@ -205,7 +208,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
     name = 'dependency-layout' as const;
 
     /** Cached split lines of current file under analysis to eliminate repeated full-file splits. */
-    private fileLines: string[] = [];
+    private fileLines: readonly string[] = [];
 
     analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         const options = (ctx.config.analyzers['dependency-layout']?.options ||
@@ -213,7 +216,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         const normPath = ctx.filePath.replace(/\\/g, '/');
         const language = inferLanguageFromPath(normPath);
 
-        this.fileLines = ctx.content ? ctx.content.split('\n') : [];
+        this.fileLines = ctx.lines ?? (ctx.content ? ctx.content.split('\n') : []);
 
         const imports: ImportStatementInfo[] = [];
         const resources: ExternalResourceRef[] = [];
@@ -259,7 +262,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
     private resolveFirstDeclarationLine(
         language: string,
         sourceFile: ts.SourceFile | undefined,
-        lines: string[],
+        lines: readonly string[],
     ): number | undefined {
         if (
             language === 'typescript' &&
@@ -366,16 +369,16 @@ export class DependencyLayoutAnalyzer implements Analyzer {
             inFunction = state.inFunction;
             functionIndent = state.functionIndent;
 
-            const parsed = this.parseLineImport(
+            const parsed = parseLineImportBySpec({
                 trimmed,
                 language,
                 lines,
-                i,
+                lineIndex: i,
                 lineNum,
-                ctx.filePath,
+                filePath: ctx.filePath,
                 inFunction,
                 options,
-            );
+            });
             if (parsed) {
                 imports.push(parsed);
             }
@@ -416,48 +419,8 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         return { inFunction, functionIndent };
     }
 
-    private parseLineImport(
-        trimmed: string,
-        language: string,
-        lines: string[],
-        i: number,
-        lineNum: number,
-        filePath: string,
-        inFunction: boolean,
-        options?: DependencyLayoutOptions,
-    ): ImportStatementInfo | null {
-        const contextText = `${trimmed} ${lines[i - 1] || ''} ${lines[i + 1] || ''}`;
-        if (language === 'python') {
-            return parsePythonLineImport(
-                trimmed,
-                contextText,
-                filePath,
-                lineNum,
-                inFunction,
-                options,
-            );
-        }
-        if (language === 'rust') {
-            return parseRustLineImport(
-                trimmed,
-                contextText,
-                filePath,
-                lineNum,
-                inFunction,
-                options,
-            );
-        }
-        if (language === 'gdscript') {
-            return parseGdscriptLineImport(
-                trimmed,
-                contextText,
-                filePath,
-                lineNum,
-                inFunction,
-                options,
-            );
-        }
-        return parseTsLineImport(trimmed, filePath, lineNum);
+    private hasRemoteSchemeMarker(line: string): boolean {
+        return line.includes('://');
     }
 
     private extractRemoteResources(ctx: AnalyzerContext, resources: ExternalResourceRef[]): void {
@@ -466,6 +429,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         const urlScanner = createRemoteUrlScanner();
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            if (!this.hasRemoteSchemeMarker(line)) continue;
             const lineNum = i + 1;
             urlScanner.lastIndex = 0;
             let urlMatch: RegExpExecArray | null;
@@ -485,12 +449,13 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         }
     }
 
-    private getSurroundingText(contentOrLines: string | string[], line: number): string {
-        const lines = Array.isArray(contentOrLines)
-            ? contentOrLines
-            : contentOrLines
-              ? contentOrLines.split('\n')
-              : this.fileLines;
+    private getSurroundingText(contentOrLines: string | readonly string[], line: number): string {
+        const lines =
+            typeof contentOrLines === 'string'
+                ? contentOrLines.length > 0
+                    ? contentOrLines.split('\n')
+                    : this.fileLines
+                : contentOrLines;
         const prev = lines[line - 2] || '';
         const current = lines[line - 1] || '';
         const next = lines[line] || '';
@@ -597,106 +562,90 @@ function checkRustFunctionState(
     return { inFunction, functionIndent: 0 };
 }
 
-function parsePythonLineImport(
-    trimmed: string,
-    contextText: string,
-    filePath: string,
-    lineNum: number,
-    inFunction: boolean,
-    options?: DependencyLayoutOptions,
-): ImportStatementInfo | null {
-    const pyMatch = trimmed.match(REGEX.SYNTAX.PYTHON_FROM_IMPORT);
-    if (!pyMatch) return null;
-    const mod = pyMatch[1] || pyMatch[2];
-    const isWildcard = trimmed.includes('import *');
-    const category = categorizeImport(mod, 'python');
-    const exemption = extractExemptionReason(contextText, options?.lazyImportExemptMarkers);
+interface LanguageImportSpec {
+    readonly pattern: RegExp;
+    readonly extractSpecifier: (match: RegExpMatchArray) => string;
+    readonly isWildcard: (trimmed: string) => boolean;
+    readonly isTypeOnly?: (trimmed: string) => boolean;
+    readonly supportsFunctionAndExemption: boolean;
+}
+
+const LANGUAGE_IMPORT_SPECS: Readonly<Record<string, LanguageImportSpec>> = Object.freeze({
+    python: {
+        pattern: REGEX.SYNTAX.PYTHON_FROM_IMPORT,
+        extractSpecifier: (match) => match[1] || match[2],
+        isWildcard: (trimmed) => trimmed.includes('import *'),
+        supportsFunctionAndExemption: true,
+    },
+    rust: {
+        pattern: REGEX.SYNTAX.RUST_USE_IMPORT,
+        extractSpecifier: (match) => match[1],
+        isWildcard: (trimmed) => trimmed.endsWith('::*;'),
+        supportsFunctionAndExemption: true,
+    },
+    gdscript: {
+        pattern: REGEX.SYNTAX.GDSCRIPT_LOAD_IMPORT,
+        extractSpecifier: (match) => match[1],
+        isWildcard: () => false,
+        supportsFunctionAndExemption: true,
+    },
+    typescript: {
+        pattern: REGEX.SYNTAX.TS_IMPORT_LINE,
+        extractSpecifier: (match) => match[1],
+        isWildcard: (trimmed) => REGEX.SYNTAX.TS_WILDCARD_IMPORT.test(trimmed),
+        isTypeOnly: (trimmed) => /^\s*import\s+type\b/.test(trimmed),
+        supportsFunctionAndExemption: false,
+    },
+});
+
+interface LineImportParseInput {
+    readonly trimmed: string;
+    readonly language: string;
+    readonly lines: readonly string[];
+    readonly lineIndex: number;
+    readonly lineNum: number;
+    readonly filePath: string;
+    readonly inFunction: boolean;
+    readonly options?: DependencyLayoutOptions;
+}
+
+function parseLineImportBySpec(input: LineImportParseInput): ImportStatementInfo | null {
+    const spec = LANGUAGE_IMPORT_SPECS[input.language] ?? LANGUAGE_IMPORT_SPECS.typescript;
+    const match = input.trimmed.match(spec.pattern);
+    if (!match) return null;
+
+    const moduleSpecifier = spec.extractSpecifier(match);
+    const categoryLang = (
+        input.language in LANGUAGE_IMPORT_SPECS ? input.language : 'typescript'
+    ) as 'python' | 'rust' | 'gdscript' | 'typescript';
+    const category = categorizeImport(moduleSpecifier, categoryLang);
+    const isWildcard = spec.isWildcard(input.trimmed);
+
+    if (!spec.supportsFunctionAndExemption) {
+        return {
+            file: input.filePath,
+            line: input.lineNum,
+            rawText: input.trimmed,
+            moduleSpecifier,
+            category,
+            isInsideFunction: false,
+            hasAuditExemption: false,
+            isWildcard,
+            isTypeOnly: spec.isTypeOnly ? spec.isTypeOnly(input.trimmed) : undefined,
+        };
+    }
+
+    const contextText = `${input.trimmed} ${input.lines[input.lineIndex - 1] || ''} ${input.lines[input.lineIndex + 1] || ''}`;
+    const exemption = extractExemptionReason(contextText, input.options?.lazyImportExemptMarkers);
     return {
-        file: filePath,
-        line: lineNum,
-        rawText: trimmed,
-        moduleSpecifier: mod,
+        file: input.filePath,
+        line: input.lineNum,
+        rawText: input.trimmed,
+        moduleSpecifier,
         category,
-        isInsideFunction: inFunction,
+        isInsideFunction: input.inFunction,
         hasAuditExemption: exemption !== undefined,
         exemptionReason: exemption,
         isWildcard,
-    };
-}
-
-function parseRustLineImport(
-    trimmed: string,
-    contextText: string,
-    filePath: string,
-    lineNum: number,
-    inFunction: boolean,
-    options?: DependencyLayoutOptions,
-): ImportStatementInfo | null {
-    const rustMatch = trimmed.match(REGEX.SYNTAX.RUST_USE_IMPORT);
-    if (!rustMatch) return null;
-    const mod = rustMatch[1];
-    const isWildcard = trimmed.endsWith('::*;');
-    const category = categorizeImport(mod, 'rust');
-    const exemption = extractExemptionReason(contextText, options?.lazyImportExemptMarkers);
-    return {
-        file: filePath,
-        line: lineNum,
-        rawText: trimmed,
-        moduleSpecifier: mod,
-        category,
-        isInsideFunction: inFunction,
-        hasAuditExemption: exemption !== undefined,
-        exemptionReason: exemption,
-        isWildcard,
-    };
-}
-
-function parseGdscriptLineImport(
-    trimmed: string,
-    contextText: string,
-    filePath: string,
-    lineNum: number,
-    inFunction: boolean,
-    options?: DependencyLayoutOptions,
-): ImportStatementInfo | null {
-    const gdMatch = trimmed.match(REGEX.SYNTAX.GDSCRIPT_LOAD_IMPORT);
-    if (!gdMatch) return null;
-    const mod = gdMatch[1];
-    const category = categorizeImport(mod, 'gdscript');
-    const exemption = extractExemptionReason(contextText, options?.lazyImportExemptMarkers);
-    return {
-        file: filePath,
-        line: lineNum,
-        rawText: trimmed,
-        moduleSpecifier: mod,
-        category,
-        isInsideFunction: inFunction,
-        hasAuditExemption: exemption !== undefined,
-        exemptionReason: exemption,
-        isWildcard: false,
-    };
-}
-
-function parseTsLineImport(
-    trimmed: string,
-    filePath: string,
-    lineNum: number,
-): ImportStatementInfo | null {
-    const topMatch = trimmed.match(REGEX.SYNTAX.TS_IMPORT_LINE);
-    if (!topMatch) return null;
-    const specifier = topMatch[1];
-    const category = categorizeImport(specifier, 'typescript');
-    const isWildcard = REGEX.SYNTAX.TS_WILDCARD_IMPORT.test(trimmed);
-    const isTypeOnly = /^\s*import\s+type\b/.test(trimmed);
-    return {
-        file: filePath,
-        line: lineNum,
-        rawText: trimmed,
-        moduleSpecifier: specifier,
-        category,
-        isInsideFunction: false,
-        hasAuditExemption: false,
-        isWildcard,
-        isTypeOnly,
     };
 }

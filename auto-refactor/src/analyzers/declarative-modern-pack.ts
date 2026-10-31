@@ -25,7 +25,12 @@ import type {
     Issue,
     Severity,
 } from '../core/types';
-import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
+import {
+    maskSourceText,
+    getLanguageIdFromPath,
+    maskPresetForLanguage,
+    type SourceMaskConfig,
+} from '../core/policy/source-mask';
 import { buildCanonicalIssue } from '../core/reporting/canonical-issue-builder';
 
 /** Immutable context provided to individual rule condition evaluations. */
@@ -61,6 +66,10 @@ export interface DeclarativeLineRule {
     readonly suggestion: string;
     /** Positive pattern to match against masked line. */
     readonly pattern?: RegExp;
+    /** Optional substring trigger(s) checked via fast `.includes()` before regex matching. */
+    readonly fastTrigger?: string | readonly string[];
+    /** Optional bitmask flags required on the line from `LineFeatureTape`. */
+    readonly requiredLineFlags?: number;
     /** Negative pattern: if matched, suppression is applied. */
     readonly negativePattern?: RegExp;
     /** Custom boolean predicate for non-regex structural rules. */
@@ -88,6 +97,10 @@ export interface DeclarativeModernPackConfig {
     ) => void;
 }
 
+function containsTriggerToken(line: string, token: string): boolean {
+    return line.includes(token);
+}
+
 /**
  * Generic declarative analyzer that runs declarative pattern rules over masked source lines.
  */
@@ -113,6 +126,13 @@ export class DeclarativeModernAnalyzer implements Analyzer {
             });
         }
         this.actionMap = actionMap;
+    }
+
+    /**
+     * Resets any per-file state. Declarative analyzer rules are stateless.
+     */
+    public resetState(): void {
+        // Stateless rule evaluations - safe for pool reuse
     }
 
     /**
@@ -159,10 +179,22 @@ export class DeclarativeModernAnalyzer implements Analyzer {
             return [];
         }
 
-        const { raw, masked } = maskSourceText(content, this.config.maskConfig);
+        const canReuseContextMask =
+            Boolean(context.lines && context.maskedLines) &&
+            this.config.maskConfig === maskPresetForLanguage(getLanguageIdFromPath(file));
+        const { raw, masked } = canReuseContextMask
+            ? { raw: context.lines!, masked: context.maskedLines! }
+            : maskSourceText(content, this.config.maskConfig);
         const issues: Issue[] = [];
 
-        this.scanLines(file, raw, masked, issues, context.options);
+        this.scanLines({
+            file,
+            rawLines: raw,
+            maskedLines: masked,
+            issues,
+            options: context.options,
+            lineFlags: context.lineFlags,
+        });
 
         if (this.config.multiLineScanner) {
             this.config.multiLineScanner(raw, masked, file, issues);
@@ -174,14 +206,27 @@ export class DeclarativeModernAnalyzer implements Analyzer {
     /**
      * Iterates over masked lines and evaluates declarative rules.
      */
-    private scanLines(
-        file: string,
-        rawLines: readonly string[],
-        maskedLines: readonly string[],
-        issues: Issue[],
-        options?: Record<string, unknown>,
-    ): void {
+    private scanLines(input: {
+        readonly file: string;
+        readonly rawLines: readonly string[];
+        readonly maskedLines: readonly string[];
+        readonly issues: Issue[];
+        readonly options?: Record<string, unknown>;
+        readonly lineFlags?: Uint32Array;
+    }): void {
+        const { file, rawLines, maskedLines, issues, options, lineFlags } = input;
         const totalLines = rawLines.length;
+        const mutableCtx = {
+            file,
+            lineIndex: 0,
+            lineNumber: 1,
+            rawLine: '',
+            trimmed: '',
+            maskedLine: '',
+            allRawLines: rawLines,
+            allMaskedLines: maskedLines,
+            options,
+        };
 
         for (let lineIndex = 0; lineIndex < totalLines; lineIndex++) {
             const rawLine = rawLines[lineIndex];
@@ -192,31 +237,52 @@ export class DeclarativeModernAnalyzer implements Analyzer {
                 continue;
             }
 
-            const ctx: LineScanContext = {
-                file,
-                lineIndex,
-                lineNumber: lineIndex + 1,
-                rawLine,
-                trimmed,
-                maskedLine,
-                allRawLines: rawLines,
-                allMaskedLines: maskedLines,
-                options,
-            };
+            mutableCtx.lineIndex = lineIndex;
+            mutableCtx.lineNumber = lineIndex + 1;
+            mutableCtx.rawLine = rawLine;
+            mutableCtx.trimmed = trimmed;
+            mutableCtx.maskedLine = maskedLine;
 
-            this.evaluateRulesOnLine(ctx, issues);
+            this.evaluateRulesOnLine(
+                mutableCtx,
+                issues,
+                lineFlags ? lineFlags[lineIndex] : undefined,
+            );
         }
     }
 
     /**
      * Evaluates all configured rules on a single line context.
      */
-    private evaluateRulesOnLine(ctx: LineScanContext, issues: Issue[]): void {
+    private evaluateRulesOnLine(
+        ctx: LineScanContext,
+        issues: Issue[],
+        lineFlag?: number,
+    ): void {
         for (const rule of this.config.rules) {
+            if (
+                rule.requiredLineFlags !== undefined &&
+                lineFlag !== undefined &&
+                (lineFlag & rule.requiredLineFlags) !== rule.requiredLineFlags
+            ) {
+                continue;
+            }
             if (this.isRuleViolation(rule, ctx)) {
                 issues.push(this.createIssue(rule, ctx));
             }
         }
+    }
+
+    private matchesFastTrigger(
+        trigger: string | readonly string[] | undefined,
+        maskedLine: string,
+    ): boolean {
+        if (!trigger) return true;
+        if (typeof trigger === 'string') return containsTriggerToken(maskedLine, trigger);
+        for (let i = 0; i < trigger.length; i++) {
+            if (containsTriggerToken(maskedLine, trigger[i])) return true;
+        }
+        return false;
     }
 
     /**
@@ -224,6 +290,9 @@ export class DeclarativeModernAnalyzer implements Analyzer {
      */
     private isRuleViolation(rule: DeclarativeLineRule, ctx: LineScanContext): boolean {
         if (!rule.pattern && !rule.condition) {
+            return false;
+        }
+        if (!this.matchesFastTrigger(rule.fastTrigger, ctx.maskedLine)) {
             return false;
         }
 

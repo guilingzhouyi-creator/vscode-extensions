@@ -303,7 +303,14 @@ function createAnalyzerEntries(context: AnalyzerEntriesContext): StreamingEntry[
     });
 
     const streamingEntries: StreamingEntry[] = streaming.map((loadedItem) => {
-        const analyzerInstance = instantiateAnalyzer(loadedItem.mod, loadedItem.name);
+        let analyzerInstance: any;
+        const candidate = loadedItem.analyzer as any;
+        if (candidate && typeof candidate.resetState === 'function') {
+            candidate.resetState();
+            analyzerInstance = candidate;
+        } else {
+            analyzerInstance = instantiateAnalyzer(loadedItem.mod, loadedItem.name);
+        }
         return {
             analyzer: analyzerInstance as unknown as StreamingEntry['analyzer'],
             ctx: buildContext(loadedItem.options),

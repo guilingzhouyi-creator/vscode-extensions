@@ -104,7 +104,7 @@ export { WorkerPoolManager, WorkerPoolEntry } from './worker-pool';
 export { WarmSession, createWarmSession } from './scanner/cache-key-helper';
 export type { ScanWithCacheOptions } from './scanner/cache-scanner';
 export type { ScanWithDiffOptions } from './scanner/diff-scanner';
-export { summarizeUncertainty } from './reporting/uncertaintySummary';
+export { summarizeUncertainty } from './reporting/canonical-issue-builder';
 
 /**
  * Facade for the scan pipeline: resolves analyzers once per instance and exposes cold,
@@ -187,7 +187,7 @@ export class Scanner implements ScannerContext {
             this.plan = resolveAnalyzers(sparseConfig, config.baseDir || process.cwd());
             this.logger.info(
                 `sparse routing applied for archetype "${detectedArchetype}": ` +
-                    `${this.plan.length} active, ${sparseResult.skippedAnalyzers.size} skipped`,
+                `${this.plan.length} active, ${sparseResult.skippedAnalyzers.size} skipped`,
             );
         }
 
@@ -396,7 +396,7 @@ export class Scanner implements ScannerContext {
         const report = this.buildReport(files.length, issues, fileMetrics, durationMs);
         this.logger.info(
             `done in ${durationMs}ms: ${report.summary.issuesTotal} issue(s) ` +
-                `[error=${report.summary.bySeverity.error}, warning=${report.summary.bySeverity.warning}, info=${report.summary.bySeverity.info}]`,
+            `[error=${report.summary.bySeverity.error}, warning=${report.summary.bySeverity.warning}, info=${report.summary.bySeverity.info}]`,
         );
         printScanTiming({ startAt, discoverAt: startAt, parseAnalyzeAt, sortedAt, durationMs });
         return report;

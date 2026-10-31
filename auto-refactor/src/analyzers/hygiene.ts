@@ -142,6 +142,10 @@ export interface StubsAuditContext {
 export class HygieneAnalyzer implements Analyzer {
     name = 'hygiene' as const;
 
+    public resetState(): void {
+        // Stateless hygiene analyzer - safe for pool reuse
+    }
+
     analyze(
         sourceFile: import('typescript').SourceFile | undefined,
         ctx: AnalyzerContext,

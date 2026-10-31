@@ -84,6 +84,10 @@ interface DocsOptions {
 export class DocsAnalyzer implements Analyzer {
     name = 'docs' as const;
 
+    public resetState(): void {
+        // Stateless markdown analyzer - safe for pool reuse
+    }
+
     /**
      * Streaming-path entry point; the engine invokes it once per discovered file.
      *
@@ -181,7 +185,9 @@ export class DocsAnalyzer implements Analyzer {
         const exemptMarkers = options.exemptMarkers
             ? [...DEFAULT_EXEMPT_MARKERS, ...options.exemptMarkers]
             : DEFAULT_EXEMPT_MARKERS;
-        const exemptMarkersRe = new RegExp(exemptMarkers.map((marker) => REGEX.escape(marker)).join('|'));
+        const exemptMarkersRe = new RegExp(
+            exemptMarkers.map((marker) => REGEX.escape(marker)).join('|'),
+        );
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (exemptMarkersRe.test(line)) continue;

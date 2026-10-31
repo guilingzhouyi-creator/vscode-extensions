@@ -166,6 +166,27 @@ function isExemptPath(file: string): boolean {
     return EXEMPT_PATH_RE.test(file.toLowerCase());
 }
 
+const XMLNS_SVG_RE = /xmlns=['"]http:\/\/www\.w3\.org\/2000\/svg['"]/;
+const MAPPING_TEMPLATE_RAW_RE = /\.(?:map)\s*\([^)]*=>\s*`[^`]*(?:<tr|<li|<div|<option)/i;
+const MAPPING_TEMPLATE_MASKED_RE = /\.(?:map)\s*\([^)]*=>/i;
+const MAPPING_TEMPLATE_NEXT_RE = /`[^`]*(?:<tr|<li|<div|<option)/i;
+const BOUNDS_CHECK_RE =
+    /(?:\.slice\s*\(|isExpanded|expanded|fold|collapse|limit|maxCount|truncate|showAll|threshold)/i;
+const COLOR_STYLE_RE =
+    /(?:style\s*=\s*['"][^'"]*?(?:color|background|fill|stroke)\s*:\s*|fill\s*=\s*['"]|stroke\s*=\s*['"])(#[0-9a-fA-F]{3,6}|black|white)\b/i;
+const HTML_TAG_PRECHECK_RE = /<(?:div|span|p|table|td|th|tr|svg|path|circle|rect|style)\b/i;
+const TRANSITION_PROP_RE =
+    /transition\s*:[^;]*\b(width|height|top|bottom|left|right|margin|padding)\b/i;
+const FORM_CONTROL_RE = /<(?:input|select)\b/i;
+const FORM_HIDDEN_RE = /type\s*=\s*['"]hidden['"]/i;
+const FORM_A11Y_RE = /aria-label|aria-labelledby|role\s*=\s*['"]switch['"]/i;
+const FORM_LABEL_FOR_RE = /<label\b[^>]*\bfor\s*=/i;
+const FORM_WINDOW_A11Y_RE =
+    /aria-label|aria-labelledby|role\s*=\s*['"]switch['"]|<label\b[^>]*\bfor\s*=/i;
+const TAG_NAME_RE = /<([a-z]+)/i;
+const JITTER_BORDER_RE =
+    /:(?:hover|focus|focus-visible|active)\b[^{]*\{[^}]*?\bborder(?:-width)?\s*:\s*[1-9]\d*px/i;
+
 /**
  * Checks whether an SVG markup fragment belongs to a standalone SVG graphic rather than a Webview
  * document.
@@ -180,7 +201,7 @@ function isStandaloneSvgLine(line: string, rawLines: string[], index: number): b
     const start = Math.max(0, index - 10);
     const end = Math.min(rawLines.length, index + 10);
     for (let j = start; j < end; j++) {
-        if (/xmlns=['"]http:\/\/www\.w3\.org\/2000\/svg['"]/.test(rawLines[j])) {
+        if (XMLNS_SVG_RE.test(rawLines[j])) {
             return true;
         }
     }
@@ -193,6 +214,10 @@ function isStandaloneSvgLine(line: string, rawLines: string[], index: number): b
  */
 export class VscodeExtensionAnalyzer implements Analyzer {
     readonly name = ANALYZER_VSCODE_EXTENSION;
+
+    public resetState(): void {
+        // Stateless analyzer - safe for pool reuse
+    }
 
     /**
      * Streaming finalization hook invoked per file.
@@ -386,19 +411,16 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             const raw = rawLines[i];
             const masked = maskedLines[i];
             const isMapping =
-                /\.(?:map)\s*\([^)]*=>\s*`[^`]*(?:<tr|<li|<div|<option)/i.test(raw) ||
-                (/\.(?:map)\s*\([^)]*=>/i.test(masked) &&
+                MAPPING_TEMPLATE_RAW_RE.test(raw) ||
+                (MAPPING_TEMPLATE_MASKED_RE.test(masked) &&
                     i + 1 < rawLines.length &&
-                    /`[^`]*(?:<tr|<li|<div|<option)/i.test(rawLines[i + 1]));
+                    MAPPING_TEMPLATE_NEXT_RE.test(rawLines[i + 1]));
 
             if (isMapping) {
                 const windowStart = Math.max(0, i - COLLECTION_WINDOW_BEFORE);
                 const windowEnd = Math.min(rawLines.length, i + COLLECTION_WINDOW_AFTER);
                 const surrounding = rawLines.slice(windowStart, windowEnd).join(LINE_BREAK);
-                const hasBounds =
-                    /(?:\.slice\s*\(|isExpanded|expanded|fold|collapse|limit|maxCount|truncate|showAll|threshold)/i.test(
-                        surrounding,
-                    );
+                const hasBounds = BOUNDS_CHECK_RE.test(surrounding);
                 if (!hasBounds) {
                     violations.push({ line: i + 1, text: raw.trim() });
                 }
@@ -411,17 +433,15 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         rawLines: string[],
     ): Array<{ line: number; text: string; color: string }> {
         const violations: Array<{ line: number; text: string; color: string }> = [];
-        const colorRe =
-            /(?:style\s*=\s*['"][^'"]*?(?:color|background|fill|stroke)\s*:\s*|fill\s*=\s*['"]|stroke\s*=\s*['"])(#[0-9a-fA-F]{3,6}|black|white)\b/i;
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            if (!/<(?:div|span|p|table|td|th|tr|svg|path|circle|rect|style)\b/i.test(line)) {
+            if (!HTML_TAG_PRECHECK_RE.test(line)) {
                 continue;
             }
             if (isStandaloneSvgLine(line, rawLines, i)) {
                 continue;
             }
-            const matchResult = colorRe.exec(line);
+            const matchResult = COLOR_STYLE_RE.exec(line);
             if (matchResult) {
                 const matchedColor = matchResult[1].toLowerCase();
                 if (MONOCHROME_COLORS.has(matchedColor) && !line.includes(THEME_CSS_VAR_PREFIX)) {
@@ -436,11 +456,9 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         rawLines: string[],
     ): Array<{ line: number; text: string; prop: string }> {
         const violations: Array<{ line: number; text: string; prop: string }> = [];
-        const transitionRegex =
-            /transition\s*:[^;]*\b(width|height|top|bottom|left|right|margin|padding)\b/i;
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            const matchResult = transitionRegex.exec(line);
+            const matchResult = TRANSITION_PROP_RE.exec(line);
             if (matchResult) {
                 violations.push({ line: i + 1, text: line.trim(), prop: matchResult[1] });
             }
@@ -454,24 +472,19 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string; tag: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            if (!/<(?:input|select)\b/i.test(line)) continue;
-            if (/type\s*=\s*['"]hidden['"]/i.test(line)) continue;
+            if (!FORM_CONTROL_RE.test(line)) continue;
+            if (FORM_HIDDEN_RE.test(line)) continue;
 
-            const hasA11y =
-                /aria-label|aria-labelledby|role\s*=\s*['"]switch['"]/i.test(line) ||
-                /<label\b[^>]*\bfor\s*=/i.test(line);
+            const hasA11y = FORM_A11Y_RE.test(line) || FORM_LABEL_FOR_RE.test(line);
             if (hasA11y) continue;
 
             const windowStart = Math.max(0, i - FORM_A11Y_WINDOW_BEFORE);
             const windowEnd = Math.min(rawLines.length, i + FORM_A11Y_WINDOW_AFTER);
             const surrounding = rawLines.slice(windowStart, windowEnd).join(LINE_BREAK);
-            const windowHasA11y =
-                /aria-label|aria-labelledby|role\s*=\s*['"]switch['"]|<label\b[^>]*\bfor\s*=/i.test(
-                    surrounding,
-                );
+            const windowHasA11y = FORM_WINDOW_A11Y_RE.test(surrounding);
             if (windowHasA11y) continue;
 
-            const tag = /<([a-z]+)/i.exec(line)?.[1] ?? DEFAULT_FORM_TAG;
+            const tag = TAG_NAME_RE.exec(line)?.[1] ?? DEFAULT_FORM_TAG;
             violations.push({ line: i + 1, text: line.trim(), tag });
         }
         return violations;
@@ -479,11 +492,9 @@ export class VscodeExtensionAnalyzer implements Analyzer {
 
     private detectDynamicBorderJitter(rawLines: string[]): Array<{ line: number; text: string }> {
         const violations: Array<{ line: number; text: string }> = [];
-        const jitterRe =
-            /:(?:hover|focus|focus-visible|active)\b[^{]*\{[^}]*?\bborder(?:-width)?\s*:\s*[1-9]\d*px/i;
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            if (jitterRe.test(line)) {
+            if (JITTER_BORDER_RE.test(line)) {
                 violations.push({ line: i + 1, text: line.trim() });
             }
         }

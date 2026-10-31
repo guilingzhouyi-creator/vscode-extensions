@@ -77,6 +77,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-VAR-001',
         severity: SEVERITY_WARNING,
+        fastTrigger: 'var',
         pattern: REGEX.SYNTAX.TS_VAR_DECL,
         message:
             '`var` is function-scoped and hoisted; block-scoped `const` (or `let`) states intent.',
@@ -90,6 +91,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-CTOR-001',
         severity: SEVERITY_WARNING,
+        fastTrigger: 'new',
         pattern: REGEX.SYNTAX.TS_WRAPPER_CTOR,
         message: 'Wrapper constructor called with `new`; a literal or the primitive is equivalent.',
         suggestion: 'Use `[]`, `{}`, `String(x)`, `Number(x)` or `Boolean(x)` instead of `new`.',
@@ -102,6 +104,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-ARGS-001',
         severity: SEVERITY_WARNING,
+        fastTrigger: 'arguments',
         pattern: REGEX.SYNTAX.TS_ARGUMENTS_USE,
         message: '`arguments` is array-like, untyped and unavailable in arrow functions.',
         suggestion: 'Take a rest parameter (`(...args: T[])`) and use it directly.',
@@ -114,6 +117,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-SPREAD-001',
         severity: SEVERITY_WARNING,
+        fastTrigger: 'Object.assign',
         pattern: REGEX.SYNTAX.TS_OBJECT_ASSIGN,
         message: '`Object.assign({}, …)` shallow-merges where object spread says the same thing.',
         suggestion:
@@ -127,6 +131,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: RULE_TSM_INCLUDES,
         severity: SEVERITY_WARNING,
+        fastTrigger: 'indexOf',
         pattern: REGEX.SYNTAX.TS_INDEX_OF_BOUNDARY,
         message: '`indexOf` compared against -1/0 is less direct than the boolean the check wants.',
         suggestion:
@@ -140,6 +145,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-SUBSTR-001',
         severity: SEVERITY_WARNING,
+        fastTrigger: '.substr',
         pattern: REGEX.SYNTAX.TS_SUBSTR,
         message: '`String.prototype.substr` is deprecated and absent from the language standard.',
         suggestion: 'Use `slice(start, start + length)`, which has identical semantics here.',
@@ -152,6 +158,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: RULE_TSM_REQUIRE,
         severity: SEVERITY_WARNING,
+        fastTrigger: 'require',
         pattern: REGEX.SYNTAX.TS_REQUIRE_CALL,
         condition: (ctx: LineScanContext) =>
             REGEX.SYNTAX.TS_ESM_SYNTAX.test(ctx.allMaskedLines.join('\n')),
@@ -166,6 +173,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'TSM-ANY-001',
         severity: SEVERITY_WARNING,
+        fastTrigger: 'any',
         pattern: REGEX.SYNTAX.TS_ANY_TYPE,
         condition: (ctx: LineScanContext) => isTypedPath(ctx.file),
         message: 'Explicit `any` disables checking for every value it touches.',

@@ -32,6 +32,8 @@ import {
     REGEX,
 } from '../core/constants';
 import { calculateBraceDelta } from '../core/ast/block-scope-utils';
+import { LeasedRegexPool, sharedRegexPool } from '../core/data-structures/regex-pool';
+import { getMaskedSourceOfPath } from '../core/policy/source-mask';
 
 /** Relevant source extensions for standard library and systems runtime analysis */
 const STDLIB_EXTS = new Set([
@@ -155,11 +157,12 @@ interface RecursionSite {
  * @returns Frame tracking that function body.
  */
 function buildRecursionFrame(name: string, params: string, depthBefore: number): RecursionFrame {
+    const escaped = LeasedRegexPool.escape(name);
     return {
         name,
         bodyDepth: depthBefore + 1,
-        bareCallPattern: new RegExp(`(?:^|[^\\w.])${name}\\s*\\(`),
-        anyCallPattern: new RegExp(`\\b${name}\\s*\\(`),
+        bareCallPattern: sharedRegexPool.getCompiled(`(?:^|[^\\w.])${escaped}\\s*\\(`),
+        anyCallPattern: sharedRegexPool.getCompiled(`\\b${escaped}\\s*\\(`),
         guarded: REGEX.SYNTAX.STDLIB_DEPTH_GUARD_PARAM.test(params) || ENTRY_POINT_NAMES.has(name),
     };
 }
@@ -206,8 +209,10 @@ function recordSelfCall(
  * @param content - Whole file content.
  * @returns Self-invocations that no guard covers.
  */
-function collectRecursionSites(content: string): RecursionSite[] {
-    const lines = content.split('\n');
+function collectRecursionSites(
+    lines: readonly string[],
+    maskedLines?: readonly string[],
+): RecursionSite[] {
     const sites: RecursionSite[] = [];
     const frames: RecursionFrame[] = [];
     let depth = 0;
@@ -235,7 +240,7 @@ function collectRecursionSites(content: string): RecursionSite[] {
     };
 
     for (let i = 0; i < lines.length; i++) {
-        const code = stripLiteralsAndComments(lines[i]);
+        const code = maskedLines ? maskedLines[i] : stripLiteralsAndComments(lines[i]);
         const depthBefore = depth;
         const lineNumber = i + 1;
 
@@ -287,7 +292,7 @@ function isComment(trimmed: string): boolean {
     return /^(?:\/\/|\/\*|\*)/.test(trimmed);
 }
 
-function hasSafetyComment(lines: string[], i: number): boolean {
+function hasSafetyComment(lines: readonly string[], i: number): boolean {
     const start = Math.max(0, i - 4);
     for (let k = i - 1; k >= start; k--) {
         if (/^(?:\/\/|\/\*)\s*SAFETY:/i.test(lines[k].trim())) return true;
@@ -300,6 +305,10 @@ function hasSafetyComment(lines: string[], i: number): boolean {
  */
 export class StdlibAnalyzer implements Analyzer {
     name = ANALYZER_STDLIB;
+
+    public resetState(): void {
+        // Stateless standard library analyzer - safe for pool reuse
+    }
 
     finalize(ctx: AnalyzerContext): Issue[] {
         return this.analyze(undefined, ctx);
@@ -317,15 +326,19 @@ export class StdlibAnalyzer implements Analyzer {
 
         const issues: Issue[] = [];
         const isTest = REGEX.LITERAL.TEST_PATH.test(file);
+        const ms =
+            ctx.lines && ctx.maskedLines
+                ? { raw: ctx.lines, masked: ctx.maskedLines }
+                : getMaskedSourceOfPath(file, content);
 
         if (!isTest) {
-            this.checkPublicApiPanics(content, file, ext, issues);
-            this.checkNoStdImplicitAllocations(content, file, ext, issues);
+            this.checkPublicApiPanics(ms.raw, file, ext, issues);
+            this.checkNoStdImplicitAllocations(content, ms.raw, file, ext, issues);
         }
-        this.checkUnsafeSafetyContracts(content, file, ext, issues);
-        this.checkConstantTimeComparisons(content, file, issues);
+        this.checkUnsafeSafetyContracts(ms.raw, file, ext, issues);
+        this.checkConstantTimeComparisons(content, ms.raw, file, issues);
         if (!isTest) {
-            this.checkUnboundedRecursion(content, file, issues);
+            this.checkUnboundedRecursion(ms.raw, ms.masked, file, issues);
             this.checkPlatformPortabilityFallback(content, file, ext, issues);
         }
 
@@ -403,20 +416,42 @@ export class StdlibAnalyzer implements Analyzer {
      * STDLIB-PANIC-001: Flag bare panic/unwrap in public API functions.
      */
     private checkPublicApiPanics(
-        content: string,
+        lines: readonly string[],
         file: string,
         ext: string,
         issues: Issue[],
     ): void {
         if (ext === '.rs') {
-            this.checkRustPublicPanics(content, file, issues);
+            this.checkBracedPublicPanics(lines, file, issues, {
+                fnHeaderRe: REGEX.SYNTAX.RUST_FN,
+                panicRe: REGEX.SYNTAX.STDLIB_RUST_PANIC,
+                formatMessage: (fnName) =>
+                    `Public API \`${fnName}\` contains potentially crashing naked panic/unwrap invocation.`,
+                suggestion:
+                    'Public APIs should return Result<T, E> or Option<T>; handle unwraps explicitly using match or the ? operator.',
+            });
         } else if (ext === '.go') {
-            this.checkGoPublicPanics(content, file, issues);
+            this.checkBracedPublicPanics(lines, file, issues, {
+                fnHeaderRe: REGEX.SYNTAX.STDLIB_GO_PUB_FN,
+                panicRe: REGEX.GO.PANIC,
+                formatMessage: (fnName) =>
+                    `Public function \`${fnName}\` contains direct panic invocation.`,
+                suggestion: 'Return explicit error parameter and handle it at call sites.',
+            });
         }
     }
 
-    private checkRustPublicPanics(content: string, file: string, issues: Issue[]): void {
-        const lines = content.split('\n');
+    private checkBracedPublicPanics(
+        lines: readonly string[],
+        file: string,
+        issues: Issue[],
+        spec: {
+            fnHeaderRe: RegExp;
+            panicRe: RegExp;
+            formatMessage: (fnName: string) => string;
+            suggestion: string;
+        },
+    ): void {
         let inFn = false;
         let fnName = '';
         let depth = 0;
@@ -426,7 +461,7 @@ export class StdlibAnalyzer implements Analyzer {
             const trimmed = line.trim();
             if (isComment(trimmed)) continue;
 
-            const pubMatch = REGEX.SYNTAX.RUST_FN.exec(line);
+            const pubMatch = spec.fnHeaderRe.exec(line);
             if (pubMatch) {
                 inFn = true;
                 fnName = pubMatch[1];
@@ -436,52 +471,15 @@ export class StdlibAnalyzer implements Analyzer {
 
             depth += calculateBraceDelta(line);
 
-            if (REGEX.SYNTAX.STDLIB_RUST_PANIC.test(line)) {
+            if (spec.panicRe.test(line)) {
                 this.emitIssue(
                     issues,
                     file,
                     i + 1,
                     'STDLIB-PANIC-001',
                     SEVERITY_WARNING,
-                    `Public API \`${fnName}\` contains potentially crashing naked panic/unwrap invocation.`,
-                    'Public APIs should return Result<T, E> or Option<T>; handle unwraps explicitly using match or the ? operator.',
-                    { functionName: fnName },
-                );
-            }
-            if (depth <= 0 && line.includes('}')) inFn = false;
-        }
-    }
-
-    private checkGoPublicPanics(content: string, file: string, issues: Issue[]): void {
-        const lines = content.split('\n');
-        let inFn = false;
-        let fnName = '';
-        let depth = 0;
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const trimmed = line.trim();
-            if (isComment(trimmed)) continue;
-
-            const pubGo = REGEX.SYNTAX.STDLIB_GO_PUB_FN.exec(line);
-            if (pubGo) {
-                inFn = true;
-                fnName = pubGo[1];
-                depth = 0;
-            }
-            if (!inFn) continue;
-
-            depth += calculateBraceDelta(line);
-
-            if (REGEX.GO.PANIC.test(line)) {
-                this.emitIssue(
-                    issues,
-                    file,
-                    i + 1,
-                    'STDLIB-PANIC-001',
-                    SEVERITY_WARNING,
-                    `Public function \`${fnName}\` contains direct panic invocation.`,
-                    'Return explicit error parameter and handle it at call sites.',
+                    spec.formatMessage(fnName),
+                    spec.suggestion,
                     { functionName: fnName },
                 );
             }
@@ -494,6 +492,7 @@ export class StdlibAnalyzer implements Analyzer {
      */
     private checkNoStdImplicitAllocations(
         content: string,
+        lines: readonly string[],
         file: string,
         ext: string,
         issues: Issue[],
@@ -501,7 +500,6 @@ export class StdlibAnalyzer implements Analyzer {
         if (ext !== '.rs' && ext !== '.c' && ext !== '.cpp') return;
         if (!REGEX.SYNTAX.STDLIB_NO_STD_CONTEXT.test(content + ' ' + file)) return;
 
-        const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (isComment(line.trim())) continue;
@@ -524,14 +522,13 @@ export class StdlibAnalyzer implements Analyzer {
      * STDLIB-UNSAFE-001: Enforce // SAFETY: contract proofs on unsafe blocks.
      */
     private checkUnsafeSafetyContracts(
-        content: string,
+        lines: readonly string[],
         file: string,
         ext: string,
         issues: Issue[],
     ): void {
         if (ext !== '.rs' && ext !== '.c' && ext !== '.cpp') return;
 
-        const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (isComment(line.trim())) continue;
@@ -555,7 +552,12 @@ export class StdlibAnalyzer implements Analyzer {
     /**
      * STDLIB-CONST-001: Flag short-circuit early returns in cryptographic hash comparisons.
      */
-    private checkConstantTimeComparisons(content: string, file: string, issues: Issue[]): void {
+    private checkConstantTimeComparisons(
+        content: string,
+        lines: readonly string[],
+        file: string,
+        issues: Issue[],
+    ): void {
         if (
             !REGEX.SYNTAX.STDLIB_CRYPTO_KEYWORD.test(file) &&
             !REGEX.SYNTAX.STDLIB_CRYPTO_KEYWORD.test(content.slice(0, 1000))
@@ -563,7 +565,6 @@ export class StdlibAnalyzer implements Analyzer {
             return;
         }
 
-        const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmed = line.trim();
@@ -594,8 +595,13 @@ export class StdlibAnalyzer implements Analyzer {
      * function and carries no depth guard. Brace tracking keeps the function context scoped to its
      * own body, so a later call site outside that body is not mistaken for recursion.
      */
-    private checkUnboundedRecursion(content: string, file: string, issues: Issue[]): void {
-        for (const site of collectRecursionSites(content)) {
+    private checkUnboundedRecursion(
+        lines: readonly string[],
+        maskedLines: readonly string[],
+        file: string,
+        issues: Issue[],
+    ): void {
+        for (const site of collectRecursionSites(lines, maskedLines)) {
             this.emitIssue(
                 issues,
                 file,

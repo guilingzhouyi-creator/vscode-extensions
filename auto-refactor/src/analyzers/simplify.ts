@@ -254,7 +254,8 @@ export class SimplifyAnalyzer implements Analyzer {
 
     private getContentLines(ctx: AnalyzerContext): string[] {
         if (!this.contentLines) {
-            this.contentLines = ctx.content ? ctx.content.split('\n') : [];
+            this.contentLines =
+                (ctx.lines as string[] | undefined) ?? (ctx.content ? ctx.content.split('\n') : []);
         }
         return this.contentLines;
     }
@@ -612,9 +613,11 @@ export class SimplifyAnalyzer implements Analyzer {
         if (!content) return [];
         const file = ctx.filePath.replace(/\\/g, '/');
         const opts = (ctx.options || {}) as SimplifyOptions;
-        const lines = content
-            .split('\n')
-            .map((lineStr) => (lineStr.endsWith('\r') ? lineStr.slice(0, -1) : lineStr));
+        const lines =
+            (ctx.lines as string[] | undefined) ??
+            content
+                .split('\n')
+                .map((lineStr) => (lineStr.endsWith('\r') ? lineStr.slice(0, -1) : lineStr));
         const issues: Issue[] = [];
 
         this.detectCommentedOutCode(lines, file, opts, issues);

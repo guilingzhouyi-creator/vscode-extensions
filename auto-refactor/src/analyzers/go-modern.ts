@@ -159,6 +159,7 @@ const GO_MODERN_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'GOM-ERR-001',
         severity: SEVERITY_WARNING,
+        fastTrigger: '_',
         message: 'Error return value is discarded with `_`, silently hiding potential failures.',
         suggestion:
             'Check the error explicitly (`if err != nil { return err }`) or document why it is safe to ignore.',
@@ -172,6 +173,7 @@ const GO_MODERN_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'GOM-CTX-001',
         severity: SEVERITY_WARNING,
+        fastTrigger: 'context.Context',
         message: '`context.Context` should be the first parameter of a function.',
         suggestion:
             'Move `ctx context.Context` to be the first parameter — this is the Go convention and matches `ctx`-first APIs like `net/http` and database drivers.',
@@ -185,6 +187,7 @@ const GO_MODERN_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'GOM-STYLE-001',
         severity: SEVERITY_INFO,
+        fastTrigger: 'func',
         message: 'Receiver name does not follow Go naming conventions.',
         suggestion:
             'Use a short (1-2 letter) abbreviation of the type name (e.g. `s` for `Server`, `c` for `Client`), and keep it consistent across all methods of the type.',
@@ -198,6 +201,7 @@ const GO_MODERN_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'GOM-STYLE-002',
         severity: SEVERITY_INFO,
+        fastTrigger: 'error',
         message: 'Error variable does not follow Go naming conventions (should start with `err`).',
         suggestion:
             'Rename the variable to start with `err` (e.g. `errOpen` instead of `openErr` or `err` for a general error).',
@@ -212,6 +216,7 @@ const GO_MODERN_RULES: readonly DeclarativeLineRule[] = [
     {
         rule: 'GOM-STYLE-003',
         severity: SEVERITY_INFO,
+        fastTrigger: 'package',
         message: 'Package is missing a documentation comment.',
         suggestion:
             'Add a comment before `package` that starts with `Package <name> ` and briefly describes the package purpose (Go convention for godoc).',
@@ -239,6 +244,10 @@ export class GoModernAnalyzer implements Analyzer {
             maskConfig: GO_MASK,
             rules: GO_MODERN_RULES,
         });
+    }
+
+    public resetState(): void {
+        this.delegate.resetState();
     }
 
     public finalize(ctx: AnalyzerContext): Issue[] {

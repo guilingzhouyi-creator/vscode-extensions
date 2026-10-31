@@ -25,11 +25,15 @@ import {
     computeTestModernityMetrics,
     evaluateTestModernityThresholds,
 } from '../core/intelligence/testModernity';
-import { DualTrackTestEvaluator } from '../core/scoring/dual-track-test-evaluator';
-import { partitionFileZones } from '../core/intelligence/zone-partitioner';
+import {
+    DualTrackTestEvaluator,
+    hasEmbeddedMarkers,
+} from '../core/scoring/dual-track-test-evaluator';
+import { partitionFileZones, type IntraFileZoneProfile } from '../core/intelligence/zone-partitioner';
 import { analyzeCodeDensity } from '../core/intelligence/code-density-analyzer';
 import { REGEX, normalizePathSeparators } from '../core/constants';
 import { isTestFilePath } from '../core/path';
+import { isToolOrTestScript } from '../core/governance/pathScope';
 
 /** Test block names recognized during AST traversal. */
 const TEST_BLOCK_NAMES = new Set([
@@ -130,10 +134,27 @@ export class TestModernityAnalyzer implements Analyzer {
     name = 'test-modernity' as const;
     private dualTrackEvaluator = new DualTrackTestEvaluator();
 
-    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+    private resolveZoneProfile(
+        ctx: AnalyzerContext,
+        isExplicitTest: boolean,
+        ext: string,
+    ): IntraFileZoneProfile | undefined {
+        if (
+            !isExplicitTest &&
+            !isToolOrTestScript(ctx.filePath) &&
+            (ext === '.rs' || ext === '.py' || hasEmbeddedMarkers(ctx.content, ext))
+        ) {
+            const density = analyzeCodeDensity(ctx.content, ctx.filePath);
+            return partitionFileZones(ctx.content, ctx.filePath, density, ctx.root);
+        }
+        return undefined;
+    }
+
+    private collectDualTrackIssues(
+        ctx: AnalyzerContext,
+        zoneProfile?: IntraFileZoneProfile,
+    ): Issue[] {
         const issues: Issue[] = [];
-        const density = analyzeCodeDensity(ctx.content, ctx.filePath);
-        const zoneProfile = partitionFileZones(ctx.content, ctx.filePath, density, ctx.root);
         const dualTrackResult = this.dualTrackEvaluator.evaluateFile(
             ctx.filePath,
             ctx.content,
@@ -158,6 +179,15 @@ export class TestModernityAnalyzer implements Analyzer {
             issue.location.end.column = finding.column;
             issues.push(issue);
         }
+        return issues;
+    }
+
+    analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
+        const isExplicitTest = isTestFilePath(ctx.filePath);
+        const dotIdx = ctx.filePath.lastIndexOf('.');
+        const ext = dotIdx >= 0 ? ctx.filePath.slice(dotIdx).toLowerCase() : '';
+        const zoneProfile = this.resolveZoneProfile(ctx, isExplicitTest, ext);
+        const issues: Issue[] = this.collectDualTrackIssues(ctx, zoneProfile);
 
         if (!isTestFilePath(ctx.filePath)) {
             return issues;

@@ -26,7 +26,7 @@ import type {
     RuleEvaluationContext,
 } from '../core/governance/types';
 import { resolveLanguageProfile } from '../core/governance/languageProfiles';
-import { maskedLinesOf } from '../core/policy/source-mask';
+import { getMaskedSource } from '../core/policy/source-mask';
 import { TypeScriptAdapter } from '../core/ast/typescript-adapter';
 import type { GovernanceRegistry } from '../core/governance/registry';
 import { getDefaultGovernanceRegistry } from '../core/governance/registry';
@@ -182,12 +182,17 @@ export class GovernanceAnalyzer implements Analyzer {
     private ensureInitialized(ctx: AnalyzerContext): void {
         if (!this.capabilities) {
             this.capabilities = resolveLanguageProfile(ctx.filePath, ctx.adapter?.id);
-            this.lines = ctx.content ? ctx.content.split(/\r?\n/) : [];
-            // Built once per file through the shared mask so every content-oriented rule reads the
-            // same view; a per-rule mask would let each rule drift back to raw-line heuristics.
-            this.maskedLines = ctx.content
-                ? maskedLinesOf(ctx.content, this.capabilities.languageId)
-                : [];
+            if (ctx.lines && ctx.maskedLines) {
+                this.lines = ctx.lines as string[];
+                this.maskedLines = ctx.maskedLines as string[];
+            } else if (ctx.content) {
+                const ms = getMaskedSource(ctx.content, this.capabilities.languageId);
+                this.lines = ms.raw;
+                this.maskedLines = ms.masked;
+            } else {
+                this.lines = [];
+                this.maskedLines = [];
+            }
             const rules = this.registry.getRulesForLanguage(
                 this.capabilities.languageId,
                 ctx.options,

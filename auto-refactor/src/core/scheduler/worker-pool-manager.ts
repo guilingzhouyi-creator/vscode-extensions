@@ -18,6 +18,7 @@ import type {
     SchedulerMetrics,
     TaskPriority,
 } from './execution-scheduler';
+import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
 
 const MAX_BOOSTED_PRIORITY = 40;
 const PRIORITY_BOOST_STEP = 10;
@@ -94,6 +95,19 @@ export class WorkerPoolManager implements IExecutionScheduler {
         this.maxQueueDepth = Math.max(MIN_QUEUE_DEPTH_LIMIT, options?.maxQueueDepth ?? 10_000);
         this.starvationAgeMs = Math.max(MIN_STARVATION_AGE_MS, options?.starvationAgeMs ?? 3_000);
         this.defaultTaskTimeoutMs = options?.defaultTaskTimeoutMs ?? 30_000;
+
+        sharedMemoryGovernor.register({
+            name: `workerPoolManager:${Math.random().toString(36).slice(2)}`,
+            tier: CacheEvictionTier.Ephemeral,
+            clear: () => this.analyzerInstancePool.clear(),
+            getSize: () => {
+                let count = 0;
+                for (const bucket of this.analyzerInstancePool.values()) {
+                    count += bucket.length;
+                }
+                return count;
+            },
+        });
     }
 
     /**
@@ -173,7 +187,11 @@ export class WorkerPoolManager implements IExecutionScheduler {
     public acquireAnalyzer<T>(domain: string, factory: () => T): T {
         const bucket = this.analyzerInstancePool.get(domain);
         if (bucket && bucket.length > 0) {
-            return bucket.pop() as T;
+            const inst = bucket.pop() as T;
+            if (inst && typeof (inst as any).resetState === 'function') {
+                (inst as any).resetState();
+            }
+            return inst;
         }
         return factory();
     }
@@ -182,6 +200,9 @@ export class WorkerPoolManager implements IExecutionScheduler {
      * Returns an analyzer instance to the reusable object pool.
      */
     public releaseAnalyzer<T>(domain: string, instance: T): void {
+        if (instance && typeof (instance as any).resetState === 'function') {
+            (instance as any).resetState();
+        }
         let bucket = this.analyzerInstancePool.get(domain);
         if (!bucket) {
             bucket = [];

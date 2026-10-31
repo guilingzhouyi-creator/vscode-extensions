@@ -336,20 +336,20 @@ type PyEmitter = (
 ) => void;
 
 interface PyLineScanContext {
-    readonly line: string;
-    readonly trimmed: string;
-    readonly lineIndex: number;
+    line: string;
+    trimmed: string;
+    lineIndex: number;
     readonly emit: PyEmitter;
 }
 
 interface PyBlockContext {
-    readonly inExcept: boolean;
-    readonly inWith: boolean;
-    readonly inAsync: boolean;
+    inExcept: boolean;
+    inWith: boolean;
+    inAsync: boolean;
 }
 
 interface PyShadowContext {
-    readonly indent: number;
+    indent: number;
     readonly varScopes: VarScope[];
     readonly opts: ShadowingOptions;
     readonly emit: PyEmitter;
@@ -358,6 +358,52 @@ interface PyShadowContext {
 interface PyImportAccumulator {
     readonly file: string;
     readonly records: ImportRecord[];
+}
+
+interface PySingleLineRule {
+    readonly spec: IssueSpec;
+    readonly fastTrigger: string | readonly string[];
+    readonly matches: (line: string) => boolean;
+}
+
+const PYTHON_SINGLE_LINE_RULES: readonly PySingleLineRule[] = Object.freeze([
+    {
+        spec: SPEC_PATH,
+        fastTrigger: PREFIX_OS_PATH,
+        matches: (line: string) => line.includes(PREFIX_OS_PATH),
+    },
+    {
+        spec: SPEC_FSTRING,
+        fastTrigger: '%',
+        matches: (line: string) => PERCENT_FORMAT_RE.test(line),
+    },
+    {
+        spec: SPEC_DATETIME,
+        fastTrigger: 'timezone.utc',
+        matches: (line: string) => REGEX.PYTHON.TIMEZONE_UTC.test(line),
+    },
+    {
+        spec: SPEC_UNION,
+        fastTrigger: ['Optional', 'Union'],
+        matches: (line: string) =>
+            PY_PEP604_ANN_ASSIGN_RE.test(line) || PY_PEP604_ALIAS_RE.test(line),
+    },
+]);
+
+function containsPyTriggerToken(line: string, token: string): boolean {
+    return line.includes(token);
+}
+
+function hasFastTrigger(trigger: string | readonly string[], line: string): boolean {
+    if (typeof trigger === 'string') {
+        return containsPyTriggerToken(line, trigger);
+    }
+    for (let i = 0; i < trigger.length; i++) {
+        if (containsPyTriggerToken(line, trigger[i])) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -369,6 +415,10 @@ interface PyImportAccumulator {
  */
 export class PythonModernAnalyzer implements Analyzer {
     name = 'python-modern' as const;
+
+    public resetState(): void {
+        // Stateless python modernization scanner - safe for pool reuse
+    }
 
     /**
      * Streaming-path entry point: the engine invokes this once per file. A content-only analyzer
@@ -393,7 +443,7 @@ export class PythonModernAnalyzer implements Analyzer {
         const content = ctx.content || '';
         const file = ctx.filePath.replace(/\\/g, '/');
         if (!file.endsWith('.py') || content.length === 0) return [];
-        const lines = content.split('\n');
+        const lines = ctx.lines ?? content.split('\n');
         const blocks: Block[] = [];
         const importRecords: ImportRecord[] = [];
         const issues: Issue[] = [];
@@ -406,6 +456,19 @@ export class PythonModernAnalyzer implements Analyzer {
         const shadowOpts = this.resolveShadowingOptions(ctx.options);
         const importAcc: PyImportAccumulator = { file, records: importRecords };
 
+        const scanCtx: PyLineScanContext = { line: '', trimmed: '', lineIndex: 0, emit };
+        const blockCtx: PyBlockContext = {
+            inExcept: false,
+            inWith: false,
+            inAsync: false,
+        };
+        const shadowCtx: PyShadowContext = {
+            indent: 0,
+            varScopes,
+            opts: shadowOpts,
+            emit,
+        };
+
         for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
             let line = lines[lineIndex];
             if (line.endsWith('\r')) line = line.slice(0, -1);
@@ -415,18 +478,13 @@ export class PythonModernAnalyzer implements Analyzer {
             const indent = calculateIndentWidth(line);
             this.popScopesForIndent(indent, blocks, varScopes);
 
-            const scanCtx: PyLineScanContext = { line, trimmed, lineIndex, emit };
-            const blockCtx: PyBlockContext = {
-                inExcept: this.hasKind(blocks, BLOCK_KIND_EXCEPT),
-                inWith: this.hasKind(blocks, BLOCK_KIND_WITH),
-                inAsync: this.hasKind(blocks, PYTHON_ASYNC_KEYWORD),
-            };
-            const shadowCtx: PyShadowContext = {
-                indent,
-                varScopes,
-                opts: shadowOpts,
-                emit,
-            };
+            scanCtx.line = line;
+            scanCtx.trimmed = trimmed;
+            scanCtx.lineIndex = lineIndex;
+            blockCtx.inExcept = this.hasKind(blocks, BLOCK_KIND_EXCEPT);
+            blockCtx.inWith = this.hasKind(blocks, BLOCK_KIND_WITH);
+            blockCtx.inAsync = this.hasKind(blocks, PYTHON_ASYNC_KEYWORD);
+            shadowCtx.indent = indent;
 
             this.auditModernSyntax(scanCtx);
             this.auditModernTyping(scanCtx);
@@ -488,20 +546,11 @@ export class PythonModernAnalyzer implements Analyzer {
         const trimmed = scanCtx.trimmed;
         const emit = scanCtx.emit;
 
-        if (line.includes(PREFIX_OS_PATH)) {
-            emit(lineIndex, SPEC_PATH, { line: trimmed });
-        }
-
-        if (PERCENT_FORMAT_RE.test(line)) {
-            emit(lineIndex, SPEC_FSTRING, { line: trimmed });
-        }
-
-        if (REGEX.PYTHON.TIMEZONE_UTC.test(line)) {
-            emit(lineIndex, SPEC_DATETIME, { line: trimmed });
-        }
-
-        if (PY_PEP604_ANN_ASSIGN_RE.test(line) || PY_PEP604_ALIAS_RE.test(line)) {
-            emit(lineIndex, SPEC_UNION, { line: trimmed });
+        for (let i = 0; i < PYTHON_SINGLE_LINE_RULES.length; i++) {
+            const rule = PYTHON_SINGLE_LINE_RULES[i];
+            if (hasFastTrigger(rule.fastTrigger, line) && rule.matches(line)) {
+                emit(lineIndex, rule.spec, { line: trimmed });
+            }
         }
     }
 
@@ -511,7 +560,7 @@ export class PythonModernAnalyzer implements Analyzer {
         const trimmed = scanCtx.trimmed;
         const emit = scanCtx.emit;
 
-        if (REGEX.SYNTAX.PYTHON_PEP585.test(line)) {
+        if (line.includes('[') && REGEX.SYNTAX.PYTHON_PEP585.test(line)) {
             const hit = REGEX.SYNTAX.PYTHON_PEP585.exec(line)?.[1] ?? '';
             const spec: IssueSpec = {
                 rule: RULE_PYM_GENERIC_001,
@@ -522,6 +571,7 @@ export class PythonModernAnalyzer implements Analyzer {
             emit(lineIndex, spec, { line: trimmed, name: hit });
         }
 
+        if (!trimmed.includes('typing')) return;
         const abcImport = ABC_IMPORT_RE.exec(trimmed);
         if (abcImport) {
             const offenders = abcImport[1]
@@ -581,7 +631,11 @@ export class PythonModernAnalyzer implements Analyzer {
     }
 
     private auditUnmanagedOpen(scanCtx: PyLineScanContext, inWith: boolean): void {
-        if (!inWith && REGEX.PYTHON.OPEN_CALL.test(scanCtx.line) && !REGEX.SYNTAX.PYTHON_WITH.test(scanCtx.line)) {
+        if (
+            !inWith &&
+            REGEX.PYTHON.OPEN_CALL.test(scanCtx.line) &&
+            !REGEX.SYNTAX.PYTHON_WITH.test(scanCtx.line)
+        ) {
             scanCtx.emit(scanCtx.lineIndex, SPEC_OPEN, { line: scanCtx.trimmed });
         }
     }
@@ -882,7 +936,9 @@ export class PythonModernAnalyzer implements Analyzer {
             for (const item of items) {
                 const trimmedItem = item.trim();
                 if (trimmedItem === '' || trimmedItem === '(' || trimmedItem === ')') continue;
-                const clean = trimmedItem.replace(REGEX.PYTHON.createParenStripScanner(), '').trim();
+                const clean = trimmedItem
+                    .replace(REGEX.PYTHON.createParenStripScanner(), '')
+                    .trim();
                 if (clean === '') continue;
                 const asMatch = REGEX.PYTHON.AS_ALIAS_CAPTURE.exec(clean);
                 const name = asMatch ? asMatch[2] : clean.split(/\s+/)[0];

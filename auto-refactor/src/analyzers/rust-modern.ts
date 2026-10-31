@@ -360,6 +360,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-TRY-001',
                 severity: SEVERITY_WARNING,
+                fastTrigger: 'try!',
                 pattern: REGEX.SYNTAX.RUST_TRY_MACRO,
                 message: '`try!` predates the `?` operator and obscures the error path.',
                 suggestion:
@@ -374,6 +375,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-EXTERN-001',
                 severity: SEVERITY_WARNING,
+                fastTrigger: 'extern',
                 pattern: REGEX.SYNTAX.RUST_EXTERN_CRATE,
                 message:
                     '`extern crate` is obsolete since edition 2018: dependencies resolve by path.',
@@ -388,6 +390,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-MACRO-001',
                 severity: SEVERITY_WARNING,
+                fastTrigger: 'macro_use',
                 pattern: REGEX.SYNTAX.RUST_MACRO_USE,
                 message: '`#[macro_use]` imports macros textually, so their origin is invisible.',
                 suggestion:
@@ -401,6 +404,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-CLONE-001',
                 severity: SEVERITY_INFO,
+                fastTrigger: '.clone()',
                 pattern: REGEX.SYNTAX.RUST_NEEDLESS_CLONE,
                 message:
                     '`.clone()` result is only compared or measured, so the copy is invisible work.',
@@ -415,6 +419,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-UNWRAP-001',
                 severity: SEVERITY_INFO,
+                fastTrigger: '.unwrap()',
                 pattern: REGEX.SYNTAX.RUST_UNWRAP,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message:
@@ -430,6 +435,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-CAST-001',
                 severity: SEVERITY_INFO,
+                fastTrigger: 'as',
                 pattern: REGEX.SYNTAX.RUST_NUMERIC_CAST,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message: 'Naked `as` numeric cast can silently truncate or wrap on overflow.',
@@ -457,6 +463,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-FORMAT-001',
                 severity: SEVERITY_WARNING,
+                fastTrigger: '!',
                 message: 'Positional `{}` captures drift out of sync with the argument list.',
                 suggestion: 'Inline the binding (`format!("{value}")`) so the compiler checks it.',
                 condition: (ctx) =>
@@ -471,6 +478,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-ELSE-001',
                 severity: SEVERITY_WARNING,
+                fastTrigger: 'if',
                 message:
                     '`if let ... else { return/break }` can be simplified with `let ... else` syntax.',
                 suggestion:
@@ -485,6 +493,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-FIND-001',
                 severity: SEVERITY_INFO,
+                fastTrigger: 'for',
                 message:
                     'Manual `for ... in` loop searching with an immediate return can be simplified.',
                 suggestion: 'Use iterator methods like `.find()`, `.any()`, or `.position()`.',
@@ -498,6 +507,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-EXP-001',
                 severity: SEVERITY_INFO,
+                fastTrigger: '.expect',
                 pattern: REGEX.SYNTAX.RUST_EXPECT_CALL,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message:
@@ -513,6 +523,7 @@ export class RustModernAnalyzer implements Analyzer {
             {
                 rule: 'RSM-PNC-001',
                 severity: SEVERITY_ERROR,
+                fastTrigger: '!',
                 pattern: REGEX.SYNTAX.RUST_CRASH_MACRO,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message:
@@ -539,6 +550,11 @@ export class RustModernAnalyzer implements Analyzer {
                 scanUnsafeSafetyProofs(file, raw, masked, this.delegate, issues);
             },
         });
+    }
+
+    public resetState(): void {
+        this.fnSigState = { inParams: false, inSig: false };
+        this.delegate.resetState();
     }
 
     public finalize(ctx: AnalyzerContext): Issue[] {

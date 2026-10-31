@@ -66,11 +66,11 @@ function computeMaxBranchDepth(node: NormalizedNode, currentDepth = 0): number {
  * @returns Contract presence and explicit dispatch annotation indicators.
  */
 function inspectFunctionContract(
-    content: string,
+    ctx: AnalyzerContext,
     startLine: number,
 ): { hasContract: boolean; isExplicitDispatch: boolean } {
-    if (!content || startLine <= 1) return { hasContract: false, isExplicitDispatch: false };
-    const lines = content.split('\n');
+    if (!ctx.content || startLine <= 1) return { hasContract: false, isExplicitDispatch: false };
+    const lines = ctx.lines ?? ctx.content.split('\n');
     const checkStart = Math.max(0, startLine - JSDOC_LOOKAHEAD_LINES);
     const preceding = lines.slice(checkStart, startLine - 1).join('\n');
 
@@ -102,22 +102,23 @@ export function evaluateStructuredClarity(
     baseFail: number,
 ): StructuredClarityResult {
     const maxDepth = computeMaxBranchDepth(node, 0);
-    const startLine = node.start?.line ?? 1;
-    const { hasContract, isExplicitDispatch } = inspectFunctionContract(ctx.content, startLine);
-
-    if (maxDepth <= 2 && hasContract) {
-        const multiplier = isExplicitDispatch ? 2.0 : 1.5;
-        const effectiveWarn = Math.round(baseWarn * multiplier);
-        const effectiveFail = Math.round(baseFail * multiplier);
-        return {
-            maxDepth,
-            isStructurallyClear: true,
-            effectiveWarn,
-            effectiveFail,
-            rationale: isExplicitDispatch
-                ? 'Annotated structured dispatch: threshold relaxed by 100%'
-                : 'Documented shallow control-flow: threshold relaxed by 50%',
-        };
+    if (maxDepth <= 2) {
+        const startLine = node.start?.line ?? 1;
+        const { hasContract, isExplicitDispatch } = inspectFunctionContract(ctx, startLine);
+        if (hasContract) {
+            const multiplier = isExplicitDispatch ? 2.0 : 1.5;
+            const effectiveWarn = Math.round(baseWarn * multiplier);
+            const effectiveFail = Math.round(baseFail * multiplier);
+            return {
+                maxDepth,
+                isStructurallyClear: true,
+                effectiveWarn,
+                effectiveFail,
+                rationale: isExplicitDispatch
+                    ? 'Annotated structured dispatch: threshold relaxed by 100%'
+                    : 'Documented shallow control-flow: threshold relaxed by 50%',
+            };
+        }
     }
 
     return {

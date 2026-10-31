@@ -43,7 +43,7 @@ import {
     safeRegexExecLoop,
     safeRegexTest,
 } from '../utils/safe-regex';
-import { scanNativeSecrets } from '../core/native/native-bridge';
+import { scanNativeSecrets, nativeShannonEntropy } from '../core/native/native-bridge';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { isTestFilePath, isFixtureOrMockPath, isBenchmarkPath } from '../core/path';
 
@@ -171,29 +171,6 @@ export interface SecretsOptions {
     ignoreMarkers?: string[];
 }
 
-/**
- * Compute the Shannon entropy of a token in bits per character.
- *
- * @param sourceText - Token to measure; an empty string yields 0 instead of dividing by zero.
- * @returns Entropy in bits per character, using a base-2 logarithm over the character histogram.
- */
-function computeShannonEntropy(sourceText: string): number {
-    if (!sourceText) return 0;
-    const charFrequencyMap = new Map<string, number>();
-    for (let charIndex = 0; charIndex < sourceText.length; charIndex++) {
-        const charToken = sourceText[charIndex];
-        const previousCount = charFrequencyMap.get(charToken) ?? 0;
-        charFrequencyMap.set(charToken, previousCount + 1);
-    }
-    let entropyValue = 0;
-    const totalChars = sourceText.length;
-    for (const charCount of charFrequencyMap.values()) {
-        const probability = charCount / totalChars;
-        entropyValue -= probability * Math.log2(probability);
-    }
-    return entropyValue;
-}
-
 interface CompiledSecretPattern {
     name: string;
     re: RegExp;
@@ -209,9 +186,7 @@ interface ResolvedEntropyConfig {
 function shouldSkipSecrets(normPath: string, level: SecurityLevel, opts: SecretsOptions): boolean {
     if (level === LEVEL_OFF) return true;
     const isTestOrFixture =
-        isTestFilePath(normPath) ||
-        isFixtureOrMockPath(normPath) ||
-        isBenchmarkPath(normPath);
+        isTestFilePath(normPath) || isFixtureOrMockPath(normPath) || isBenchmarkPath(normPath);
     const ignoreInTests =
         opts.ignoreInTests !== undefined ? opts.ignoreInTests : level !== LEVEL_FULL;
     return isTestOrFixture && ignoreInTests;
@@ -294,6 +269,10 @@ function resolveEntropyConfig(opts: SecretsOptions, level: SecurityLevel): Resol
  */
 export class SecretsAnalyzer implements Analyzer {
     name = 'secrets' as const;
+
+    public resetState(): void {
+        // Stateless secrets analyzer - safe for pool reuse
+    }
 
     /**
      * Analyze one file and return bounded secret findings.
@@ -463,7 +442,7 @@ export class SecretsAnalyzer implements Analyzer {
             TOKEN_RE,
             context.lineText,
             (tokenMatch) => {
-                const tokenEntropy = computeShannonEntropy(tokenMatch[0]);
+                const tokenEntropy = nativeShannonEntropy(tokenMatch[0]);
                 if (
                     tokenEntropy >= entropy.threshold &&
                     tokenMatch[0].length >= entropy.minLength

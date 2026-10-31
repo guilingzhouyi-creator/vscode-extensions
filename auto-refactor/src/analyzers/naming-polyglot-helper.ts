@@ -275,7 +275,7 @@ export function auditExtractedFunction(
 }
 
 /** Single-letter identifiers that carry conventional loop or discard meaning. */
-const TOLERATED_SINGLE_LETTERS: ReadonlySet<string> = new Set(['_', 'i', 'j', 'k']);
+export const TOLERATED_SINGLE_LETTERS: ReadonlySet<string> = new Set(['_', 'i', 'j', 'k']);
 
 /**
  * Resolve whether a one-character name is an untolerated single letter.
@@ -283,7 +283,7 @@ const TOLERATED_SINGLE_LETTERS: ReadonlySet<string> = new Set(['_', 'i', 'j', 'k
  * @param varName - Candidate identifier.
  * @returns `true` only for single ASCII letters outside the `_`/`i`/`j`/`k` allowlist.
  */
-function isUntoleratedSingleLetter(varName: string): boolean {
+export function isUntoleratedSingleLetter(varName: string): boolean {
     if (varName.length !== 1 || !REGEX.NAMING.SINGLE_LETTER.test(varName)) return false;
     return !TOLERATED_SINGLE_LETTERS.has(varName);
 }
@@ -822,7 +822,7 @@ export function auditPolyglotSource(
     const auditor = createPolyglotLineAuditor(ext, pCtx);
     if (!auditor) return;
 
-    const lines = content.split(/\r?\n/);
+    const lines = pCtx.ctx?.lines ?? content.split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (line) {

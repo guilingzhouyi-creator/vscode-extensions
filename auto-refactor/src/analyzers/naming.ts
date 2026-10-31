@@ -159,6 +159,10 @@ export class NamingAnalyzer implements Analyzer {
     readonly name = ANALYZER_NAMING;
     private readonly decouplingAuditor = new NamingDecouplingAuditor();
 
+    public resetState(): void {
+        // Stateless polyglot naming analyzer - safe for pool reuse
+    }
+
     analyze(sourceFile: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         const issues: Issue[] = [];
         const opts = (ctx.options || {}) as NamingOptions;

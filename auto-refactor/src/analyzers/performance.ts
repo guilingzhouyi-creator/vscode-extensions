@@ -166,6 +166,10 @@ interface PerformanceFinding {
 export class PerformanceAnalyzer implements Analyzer {
     name = 'performance' as const;
 
+    public resetState(): void {
+        // Stateless performance line-scanner - safe for pool reuse
+    }
+
     /**
      * Analyze one source file and collect every performance issue found in its raw content.
      *

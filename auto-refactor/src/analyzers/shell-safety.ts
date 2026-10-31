@@ -134,6 +134,10 @@ function collectDestructiveFindings(
 export class ShellSafetyAnalyzer implements Analyzer {
     readonly name = ANALYZER_SHELL_SAFETY;
 
+    public resetState(): void {
+        // Stateless shell safety analyzer - safe for pool reuse
+    }
+
     /**
      * Streaming-path entry point: the engine invokes this once per file.
      *

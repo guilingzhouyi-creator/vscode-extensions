@@ -15,6 +15,12 @@
  */
 
 import type { NamingCandidate } from '../core/naming';
+import {
+    extractMorphemeTokens,
+    splitIdentifierTokens as getIdentifierTokens,
+} from '../core/naming/case-converter';
+
+export { extractMorphemeTokens, getIdentifierTokens };
 
 /**
  * Allowed short identifier names commonly accepted across domains: standard coordinates,
@@ -139,19 +145,6 @@ export const PRIMITIVE_TYPE_NAMES: ReadonlySet<string> = new Set(
 );
 
 const SOURCE_ABBREVIATION_EXPANSION = 'abbreviation_expansion';
-const TOKEN_SPLIT_PATTERN = /([A-Z]+(?=[A-Z][a-z0-9]|$)|[A-Z]?[a-z0-9]+)/g;
-
-export function extractMorphemeTokens(text: string): string[] {
-    TOKEN_SPLIT_PATTERN.lastIndex = 0;
-    const tokens: string[] = [];
-    let match: RegExpExecArray | null;
-    while ((match = TOKEN_SPLIT_PATTERN.exec(text)) !== null) {
-        if (match[0].length > 0) {
-            tokens.push(match[0]);
-        }
-    }
-    return tokens;
-}
 
 export function appendSegmentTokens(segment: string, target: string[]): void {
     if (!segment) return;
@@ -165,29 +158,6 @@ export function appendSegmentTokens(segment: string, target: string[]): void {
 
 export function hasSegmentSeparators(name: string): boolean {
     return name.includes('_') || name.includes('-');
-}
-
-/**
- * Tokenize an identifier into discrete semantic morpheme tokens.
- * Accurately parses camelCase, PascalCase, snake_case, and UPPER_SNAKE_CASE.
- *
- * @param name - Identifier string to tokenize.
- * @returns Array of morpheme token strings.
- */
-export function getIdentifierTokens(name: string): string[] {
-    if (!name) return [];
-
-    if (!hasSegmentSeparators(name)) {
-        const singleTokens = extractMorphemeTokens(name);
-        return singleTokens.length > 0 ? singleTokens : [name];
-    }
-
-    const segments = name.split(/[_-]+/);
-    const tokens: string[] = [];
-    for (const segment of segments) {
-        appendSegmentTokens(segment, tokens);
-    }
-    return tokens.length > 0 ? tokens : [name];
 }
 
 export function formatTokenCase(text: string, isFirst: boolean): string {

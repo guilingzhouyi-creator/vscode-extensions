@@ -136,6 +136,10 @@ const HEREDOC_START_RE = REGEX.SHELL.HEREDOC_START;
 export class ShellLintAnalyzer implements Analyzer {
     name = 'shell-lint' as const;
 
+    public resetState(): void {
+        // Stateless shell lint analyzer - safe for pool reuse
+    }
+
     /**
      * Streaming-path entry point: the engine invokes this once per file.
      */

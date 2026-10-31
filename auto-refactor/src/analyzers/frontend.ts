@@ -634,6 +634,10 @@ function auditContainerQueryAndAntiSquash(file: string, rawLines: string[], issu
 export class FrontendAnalyzer implements Analyzer {
     readonly name = ANALYZER_FRONTEND_ID;
 
+    public resetState(): void {
+        // Stateless frontend analyzer - safe for pool reuse
+    }
+
     analyze(_sourceFile: unknown, context: AnalyzerContext): Issue[] {
         const file = context.filePath;
         const ext = path.extname(file).toLowerCase();

@@ -259,6 +259,10 @@ function shouldRunSubAudit(
 export class CommentAnalyzer implements Analyzer {
     name = 'comments' as const;
 
+    public resetState(): void {
+        // Stateless line analyzer - safe for pool reuse
+    }
+
     analyze(
         sourceFile: import('typescript').SourceFile | undefined,
         ctx: AnalyzerContext,

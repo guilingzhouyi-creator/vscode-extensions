@@ -41,6 +41,7 @@ import {
     type LineIssueDraft,
 } from '../core/rules/diagnostic-catalog';
 import { REGEX } from '../core/constants';
+import { sharedMemoryGovernor, CacheEvictionTier } from '../core/memory/memory-governor';
 
 /**
  * Threshold keys the architecture rules additionally read from the global `thresholds` block.
@@ -297,7 +298,23 @@ function auditEvolutionRules(
     return issues;
 }
 
+const MAX_SEGMENT_CACHE_SIZE = 2048;
+const pathSegmentCache = new Map<string, Set<string>>();
+const dirSegmentCache = new Map<string, Set<string>>();
+
+sharedMemoryGovernor.register({
+    name: 'ArchitectureAnalyzer.segmentCaches',
+    tier: CacheEvictionTier.Ephemeral,
+    clear: () => {
+        pathSegmentCache.clear();
+        dirSegmentCache.clear();
+    },
+    getSize: () => pathSegmentCache.size + dirSegmentCache.size,
+});
+
 function buildPathSegmentSet(norm: string): Set<string> {
+    const cached = pathSegmentCache.get(norm);
+    if (cached) return cached;
     const segments = norm.split('/');
     const set = new Set<string>();
     const len = segments.length;
@@ -311,6 +328,8 @@ function buildPathSegmentSet(norm: string): Set<string> {
             addStrippedExtension(current, set);
         }
     }
+    if (pathSegmentCache.size >= MAX_SEGMENT_CACHE_SIZE) pathSegmentCache.clear();
+    pathSegmentCache.set(norm, set);
     return set;
 }
 
@@ -334,6 +353,8 @@ function matchUserLayer(
 }
 
 function buildDirectorySegmentSet(norm: string): Set<string> {
+    const cached = dirSegmentCache.get(norm);
+    if (cached) return cached;
     const segments = norm.split('/');
     const dirSet = new Set<string>();
     const count = segments.length;
@@ -347,6 +368,8 @@ function buildDirectorySegmentSet(norm: string): Set<string> {
             dirSet.add(current);
         }
     }
+    if (dirSegmentCache.size >= MAX_SEGMENT_CACHE_SIZE) dirSegmentCache.clear();
+    dirSegmentCache.set(norm, dirSet);
     return dirSet;
 }
 

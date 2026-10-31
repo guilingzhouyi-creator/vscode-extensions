@@ -37,7 +37,8 @@ import type { NormalizedNode } from '../core/ast/multilang';
 import { NodeKind } from '../core/ast/multilang';
 import { locN } from '../utils/normalized';
 import { runStreaming } from '../core/ast/traverse';
-import { maskedLinesOfPath } from '../core/policy/source-mask';
+import { getMaskedSourceOfPath } from '../core/policy/source-mask';
+import { PathClassifier } from '../core/path';
 import { globToRegExp } from '../core/file-discovery';
 import type { LoopSite } from '../core/intelligence/semanticComplexity';
 import { detectComplexityAmplification } from '../core/intelligence/semanticComplexity';
@@ -348,8 +349,9 @@ export class ComplexityAnalyzer implements Analyzer {
 
     analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         this.resetState();
-        this.maskedLines = maskedLinesOfPath(ctx.filePath, ctx.content);
-        this.cachedLines = ctx.content ? ctx.content.split('\n') : [];
+        const ms = getMaskedSourceOfPath(ctx.filePath, ctx.content || '');
+        this.maskedLines = ms.masked;
+        this.cachedLines = ms.raw;
         this.maskedFor = ctx.filePath;
 
         const { TypeScriptAdapter } = require(
@@ -375,11 +377,17 @@ export class ComplexityAnalyzer implements Analyzer {
         return cyclomaticComplexity;
     }
 
-    private ensureFileState(filePath: string, content?: string): void {
-        if (this.maskedFor === filePath) return;
-        this.maskedLines = maskedLinesOfPath(filePath, content || '');
-        this.cachedLines = content ? content.split('\n') : [];
-        this.maskedFor = filePath;
+    private ensureFileState(ctx: AnalyzerContext): void {
+        if (this.maskedFor === ctx.filePath) return;
+        if (ctx.lines && ctx.maskedLines) {
+            this.cachedLines = ctx.lines as string[];
+            this.maskedLines = ctx.maskedLines as string[];
+        } else {
+            const ms = getMaskedSourceOfPath(ctx.filePath, ctx.content || '');
+            this.cachedLines = ms.raw;
+            this.maskedLines = ms.masked;
+        }
+        this.maskedFor = ctx.filePath;
         this.functionCCs = [];
         this.fileFunctions = [];
     }
@@ -459,7 +467,7 @@ export class ComplexityAnalyzer implements Analyzer {
 
         // The engine drives visit/finalize directly (only the standalone contract calls
         // analyze), so the masked view is built here on first use per file.
-        this.ensureFileState(ctx.filePath, ctx.content);
+        this.ensureFileState(ctx);
 
         // Collect loop sites within the function boundaries
         const fnSites = findLoopSitesInFunction(
@@ -727,15 +735,8 @@ export class ComplexityAnalyzer implements Analyzer {
 
     private isTautologyExempt(normFile: string): boolean {
         return (
-            normFile.includes('/test/') ||
-            normFile.includes('/tests/') ||
-            normFile.includes('/fixtures/') ||
-            normFile.includes('/bench') ||
-            normFile.includes('/scripts/') ||
-            normFile.startsWith('scripts/') ||
-            /(?:^|[\\/])(?:gate|validate|bench|test)[-_].*\.[a-z0-9]+$/i.test(normFile) ||
-            normFile.endsWith('.test.ts') ||
-            normFile.endsWith('.spec.ts')
+            PathClassifier.isExemptFromArchitecture(normFile) ||
+            /(?:^|[\\/])(?:gate|validate|bench|test)[-_].*\.[a-z0-9]+$/i.test(normFile)
         );
     }
 

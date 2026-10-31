@@ -600,6 +600,22 @@ export interface AnalyzerContext {
      */
     lineStats?: { lines: number; nonBlankLines: number };
     /**
+     * Raw source lines split ONCE per file and shared across all analyzers.
+     */
+    lines?: readonly string[];
+    /**
+     * Comment/literal-masked source lines computed ONCE per file and shared across all analyzers.
+     */
+    maskedLines?: readonly string[];
+    /**
+     * Single-pass per-line lexical feature bitmask tape (`LINE_FLAG_*`) shared across analyzers.
+     */
+    lineFlags?: Uint32Array;
+    /**
+     * Single-pass per-line leading whitespace indentation widths shared across analyzers.
+     */
+    lineIndents?: Uint16Array;
+    /**
      * Normalized AST root for this file. Present in the streaming path for every language;
      * external plugins may ignore it and use `sourceFile` instead.
      */

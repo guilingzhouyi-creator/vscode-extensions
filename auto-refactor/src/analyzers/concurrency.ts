@@ -83,9 +83,18 @@ export class ConcurrencyAnalyzer implements Analyzer {
      * @returns Array of identified concurrency issues.
      */
     public analyze(_sourceFile: ts.SourceFile | undefined, context: AnalyzerContext): Issue[] {
+        return this.finalize(context);
+    }
+
+    /**
+     * Streaming finalize pass for OXC and multi-language execution without materializing ts.SourceFile.
+     *
+     * @param context - Analyzer execution context with file path and content.
+     * @returns Array of identified concurrency issues.
+     */
+    public finalize(context: AnalyzerContext): Issue[] {
         const issues: Issue[] = [];
-        const content = context.content;
-        const lines = content.split('\n');
+        const lines = context.content.split('\n');
 
         let hasListenerAttach = false;
         let hasTeardown = false;

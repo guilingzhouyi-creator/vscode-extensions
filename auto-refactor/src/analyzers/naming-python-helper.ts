@@ -23,11 +23,12 @@ import {
     ALLOWED_SHORT_NAMES,
     MAX_VARIABLE_NAME_LENGTH,
     MAX_FUNCTION_NAME_LENGTH,
-    COMMON_ABBREVIATIONS,
-    ACTION_REPLACE_TOKEN,
-    TAXONOMY_GOV_NORM,
     type NamingActionablePayload,
 } from './naming-candidate-helper';
+import {
+    buildPolyglotActionable,
+    isUntoleratedSingleLetter,
+} from './naming-polyglot-helper';
 
 /** Structured diagnostic payload for Python naming findings. */
 export interface PythonFindingInput {
@@ -88,13 +89,6 @@ export interface PythonNamingContext {
 const MIN_PYTHON_FUNCTION_LENGTH = 3;
 const MIN_CLUSTER_SYMBOLS = 4;
 
-const TOLERATED_SINGLE_LETTERS: ReadonlySet<string> = new Set(['_', 'i', 'j', 'k']);
-
-function isUntoleratedSingleLetter(varName: string): boolean {
-    if (varName.length !== 1 || !REGEX.NAMING.SINGLE_LETTER.test(varName)) return false;
-    return !TOLERATED_SINGLE_LETTERS.has(varName);
-}
-
 function buildPythonActionable(
     name: string,
     rule: string,
@@ -103,30 +97,7 @@ function buildPythonActionable(
     suggestedName?: string,
     safeToAutomate = false,
 ): NamingActionablePayload {
-    const candidate = suggestedName ?? COMMON_ABBREVIATIONS[name];
-    return {
-        action: ACTION_REPLACE_TOKEN,
-        code: rule,
-        taxonomy: TAXONOMY_GOV_NORM,
-        safeToAutomate,
-        targetSymbol: candidate ?? name,
-        templateSnippet: candidate,
-        patch: candidate
-            ? {
-                  range: {
-                      startLine: line,
-                      startCol: column,
-                      endLine: line,
-                      endCol: column + name.length,
-                  },
-                  replacementText: candidate,
-              }
-            : undefined,
-        targetArguments: {
-            originalName: name,
-            ...(candidate ? { suggestedName: candidate } : {}),
-        },
-    };
+    return buildPolyglotActionable(name, rule, line, column, suggestedName, safeToAutomate);
 }
 
 const KIND_TYPE: SymbolDeclarationKind = 'type';

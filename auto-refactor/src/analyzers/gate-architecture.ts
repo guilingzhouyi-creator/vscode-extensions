@@ -21,6 +21,7 @@ import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { auditGateArchitecture } from '../core/governance/gate-governance';
 import type { GateGovernanceOptions } from '../core/governance/gate-governance';
+import { sharedMemoryGovernor, CacheEvictionTier } from '../core/memory/memory-governor';
 
 const GATE_MANIFEST_NAMES = new Set([
     'package.json',
@@ -82,6 +83,15 @@ export class GateArchitectureAnalyzer implements Analyzer {
     name = 'gate-architecture' as const;
 
     private static auditCache = new Map<string, Issue[]>();
+
+    static {
+        sharedMemoryGovernor.register({
+            name: 'GateArchitectureAnalyzer.auditCache',
+            tier: CacheEvictionTier.Intermediate,
+            clear: () => GateArchitectureAnalyzer.auditCache.clear(),
+            getSize: () => GateArchitectureAnalyzer.auditCache.size,
+        });
+    }
 
     /**
      * Clear cached audits (useful in test harnesses).
