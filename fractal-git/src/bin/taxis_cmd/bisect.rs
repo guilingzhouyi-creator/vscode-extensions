@@ -3,8 +3,8 @@
 //! Architecture Role: Dispatches `taxis bisect`, orchestrating binary search across the commit DAG
 //!   to isolate bug origins using topological centroid midpoint selection and automated run loops.
 //! Dependencies & Triggers: Dispatched by `taxis bisect`.
-//! Responsibilities: CLI option parsing, bisect session lifecycle (start, good, bad, skip, reset, run),
-//!   DAG ancestor exploration, and automated regression verification.
+//! Responsibilities: CLI option parsing, bisect session lifecycle (start, good, bad, skip,
+//!   reset, run), DAG ancestor exploration, and automated regression verification.
 //! Exit Semantics & Design Rationale:
 //!   - Supports human-readable Git-compatible porcelain and machine-readable JSON outputs.
 //!   - Automated `run` loop supports test scripts (0=good, 125=skip, 1..124=bad).
@@ -21,6 +21,37 @@ use super::commit_walk::parse_commit_record;
 use super::common::{print_json, reject, CliContext};
 use super::repo_view::RepoView;
 
+const HEAD_REV: &str = "HEAD";
+const SUB_START: &str = "start";
+const SUB_BAD: &str = "bad";
+const SUB_GOOD: &str = "good";
+const SUB_SKIP: &str = "skip";
+const SUB_RESET: &str = "reset";
+const SUB_RUN: &str = "run";
+const SUB_STATUS: &str = "status";
+const SUB_LOG: &str = "log";
+const SUB_HELP: &str = "help";
+const OPT_HELP_SHORT: &str = "-h";
+const OPT_HELP_LONG: &str = "--help";
+const LABEL_REVISION: &str = "revision";
+const HEX_SHORT_LEN: usize = 8;
+const EXIT_CODE_SKIP: i32 = 125;
+
+fn is_bisect_help_command(sub: &str) -> bool {
+    sub == OPT_HELP_SHORT || sub == OPT_HELP_LONG || sub == SUB_HELP
+}
+
+fn dispatch_marking_subcommand(ctx: &CliContext, sub: &str, sub_args: &[String]) -> bool {
+    match sub {
+        SUB_START => handle_bisect_start(ctx, sub_args),
+        SUB_BAD => handle_bisect_mark(ctx, sub_args, true),
+        SUB_GOOD => handle_bisect_mark(ctx, sub_args, false),
+        SUB_SKIP => handle_bisect_skip(ctx, sub_args),
+        _ => return false,
+    }
+    true
+}
+
 /// Dispatches `taxis bisect`.
 pub fn handle_bisect(ctx: &CliContext) {
     if ctx.args.is_empty() {
@@ -31,15 +62,18 @@ pub fn handle_bisect(ctx: &CliContext) {
     let sub = ctx.args[0].as_str();
     let sub_args = &ctx.args[1..];
 
+    if is_bisect_help_command(sub) {
+        print_bisect_help();
+        return;
+    }
+    if dispatch_marking_subcommand(ctx, sub, sub_args) {
+        return;
+    }
+
     match sub {
-        "start" => handle_bisect_start(ctx, sub_args),
-        "bad" => handle_bisect_mark(ctx, sub_args, true),
-        "good" => handle_bisect_mark(ctx, sub_args, false),
-        "skip" => handle_bisect_skip(ctx, sub_args),
-        "reset" => handle_bisect_reset(ctx, sub_args),
-        "run" => handle_bisect_run(ctx, sub_args),
-        "status" | "log" => handle_bisect_status(ctx),
-        "-h" | "--help" | "help" => print_bisect_help(),
+        SUB_RESET => handle_bisect_reset(ctx, sub_args),
+        SUB_RUN => handle_bisect_run(ctx, sub_args),
+        SUB_STATUS | SUB_LOG => handle_bisect_status(ctx),
         other => reject(
             CliTag::ERROR,
             format!("unknown bisect subcommand '{other}'"),
@@ -61,46 +95,48 @@ fn print_bisect_help() {
     );
 }
 
-fn handle_bisect_start(ctx: &CliContext, args: &[String]) {
-    let view = match RepoView::open(ctx) {
-        Ok(v) => v,
-        Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
-    };
+fn open_repo_or_reject(ctx: &CliContext) -> RepoView {
+    RepoView::open(ctx)
+        .unwrap_or_else(|err| reject(CliTag::ERROR, format!("open repository: {err}")))
+}
 
-    let orig_head = match view.resolve("HEAD") {
-        Ok(oid) => oid,
-        Err(err) => reject(CliTag::ERROR, format!("resolve HEAD: {err}")),
-    };
+fn resolve_oid_or_reject(view: &RepoView, rev: &str, label: &str) -> Oid {
+    view.resolve(rev)
+        .unwrap_or_else(|err| reject(CliTag::ERROR, format!("resolve {label} '{rev}': {err}")))
+}
 
-    let bad_oid = if !args.is_empty() {
-        match view.resolve(&args[0]) {
-            Ok(oid) => oid,
-            Err(err) => reject(
-                CliTag::ERROR,
-                format!("resolve bad commit '{}': {err}", args[0]),
-            ),
-        }
-    } else {
-        orig_head
-    };
-
-    let mut state = BisectState::new(orig_head, bad_oid);
-
-    if args.len() > 1 {
-        for good_arg in &args[1..] {
-            match view.resolve(good_arg) {
-                Ok(oid) => state.good.push(oid),
-                Err(err) => reject(
-                    CliTag::ERROR,
-                    format!("resolve good commit '{good_arg}': {err}"),
-                ),
-            }
-        }
+fn load_state_or_reject(view: &RepoView) -> BisectState {
+    match BisectState::load(view.git_dir()) {
+        Ok(Some(s)) => s,
+        Ok(None) => reject(CliTag::ERROR, "no bisection in progress (use 'taxis bisect start')"),
+        Err(err) => reject(CliTag::ERROR, format!("read bisect state: {err}")),
     }
+}
 
+fn save_state_or_reject(view: &RepoView, state: &BisectState) {
     if let Err(err) = state.save(view.git_dir()) {
         reject(CliTag::ERROR, format!("save bisect state: {err}"));
     }
+}
+
+fn handle_bisect_start(ctx: &CliContext, args: &[String]) {
+    let view = open_repo_or_reject(ctx);
+    let orig_head = resolve_oid_or_reject(&view, HEAD_REV, "HEAD");
+
+    let bad_oid = match args.first() {
+        Some(arg) => resolve_oid_or_reject(&view, arg, "bad commit"),
+        None => orig_head,
+    };
+
+    let mut state = BisectState::new(orig_head, bad_oid);
+    if args.len() > 1 {
+        for good_arg in &args[1..] {
+            let oid = resolve_oid_or_reject(&view, good_arg, "good commit");
+            state.good.push(oid);
+        }
+    }
+
+    save_state_or_reject(&view, &state);
 
     if ctx.json_mode {
         print_json(&serde_json::json!({
@@ -110,7 +146,7 @@ fn handle_bisect_start(ctx: &CliContext, args: &[String]) {
             "orig_head": state.orig_head.to_hex(),
         }));
     } else {
-        println!("Bisecting: started at bad={}", &state.bad.to_hex()[..8]);
+        println!("Bisecting: started at bad={}", &state.bad.to_hex()[..HEX_SHORT_LEN]);
     }
 
     if !state.good.is_empty() {
@@ -119,86 +155,37 @@ fn handle_bisect_start(ctx: &CliContext, args: &[String]) {
 }
 
 fn handle_bisect_mark(ctx: &CliContext, args: &[String], is_bad: bool) {
-    let view = match RepoView::open(ctx) {
-        Ok(v) => v,
-        Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
-    };
+    let view = open_repo_or_reject(ctx);
+    let mut state = load_state_or_reject(&view);
+    let rev = args.first().map(|s| s.as_str()).unwrap_or(HEAD_REV);
 
-    let mut state = match BisectState::load(view.git_dir()) {
-        Ok(Some(s)) => s,
-        Ok(None) => reject(
-            CliTag::ERROR,
-            "no bisection in progress (use 'taxis bisect start')",
-        ),
-        Err(err) => reject(CliTag::ERROR, format!("read bisect state: {err}")),
-    };
-
-    let rev = if !args.is_empty() {
-        args[0].as_str()
-    } else {
-        "HEAD"
-    };
-
-    let oid = match view.resolve(rev) {
-        Ok(o) => o,
-        Err(err) => reject(CliTag::ERROR, format!("resolve revision '{rev}': {err}")),
-    };
-
+    let oid = resolve_oid_or_reject(&view, rev, LABEL_REVISION);
     if is_bad {
         state.bad = oid;
     } else if !state.good.contains(&oid) {
         state.good.push(oid);
     }
 
-    if let Err(err) = state.save(view.git_dir()) {
-        reject(CliTag::ERROR, format!("save bisect state: {err}"));
-    }
-
+    save_state_or_reject(&view, &state);
     advance_bisect(ctx, &view, &mut state);
 }
 
 fn handle_bisect_skip(ctx: &CliContext, args: &[String]) {
-    let view = match RepoView::open(ctx) {
-        Ok(v) => v,
-        Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
-    };
+    let view = open_repo_or_reject(ctx);
+    let mut state = load_state_or_reject(&view);
+    let rev = args.first().map(|s| s.as_str()).unwrap_or(HEAD_REV);
 
-    let mut state = match BisectState::load(view.git_dir()) {
-        Ok(Some(s)) => s,
-        Ok(None) => reject(
-            CliTag::ERROR,
-            "no bisection in progress (use 'taxis bisect start')",
-        ),
-        Err(err) => reject(CliTag::ERROR, format!("read bisect state: {err}")),
-    };
-
-    let rev = if !args.is_empty() {
-        args[0].as_str()
-    } else {
-        "HEAD"
-    };
-
-    let oid = match view.resolve(rev) {
-        Ok(o) => o,
-        Err(err) => reject(CliTag::ERROR, format!("resolve revision '{rev}': {err}")),
-    };
-
+    let oid = resolve_oid_or_reject(&view, rev, LABEL_REVISION);
     if !state.skipped.contains(&oid) {
         state.skipped.push(oid);
     }
 
-    if let Err(err) = state.save(view.git_dir()) {
-        reject(CliTag::ERROR, format!("save bisect state: {err}"));
-    }
-
+    save_state_or_reject(&view, &state);
     advance_bisect(ctx, &view, &mut state);
 }
 
 fn handle_bisect_reset(ctx: &CliContext, args: &[String]) {
-    let view = match RepoView::open(ctx) {
-        Ok(v) => v,
-        Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
-    };
+    let view = open_repo_or_reject(ctx);
 
     let state = match BisectState::load(view.git_dir()) {
         Ok(Some(s)) => s,
@@ -213,13 +200,11 @@ fn handle_bisect_reset(ctx: &CliContext, args: &[String]) {
         Err(err) => reject(CliTag::ERROR, format!("read bisect state: {err}")),
     };
 
-    let target_rev = if !args.is_empty() {
-        args[0].clone()
-    } else {
-        state.orig_head.to_hex()
-    };
+    let target_rev = args
+        .first()
+        .cloned()
+        .unwrap_or_else(|| state.orig_head.to_hex());
 
-    // Checkout target commit
     let checkout_ctx = CliContext {
         git_dir: ctx.git_dir.clone(),
         json_mode: false,
@@ -242,24 +227,21 @@ fn handle_bisect_reset(ctx: &CliContext, args: &[String]) {
 }
 
 fn handle_bisect_status(ctx: &CliContext) {
-    let view = match RepoView::open(ctx) {
-        Ok(v) => v,
-        Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
-    };
-
-    let state = match BisectState::load(view.git_dir()) {
-        Ok(Some(s)) => s,
+    let view = open_repo_or_reject(ctx);
+    match BisectState::load(view.git_dir()) {
+        Ok(Some(s)) => render_bisect_status(ctx, &s),
         Ok(None) => {
             if ctx.json_mode {
                 print_json(&serde_json::json!({ "active": false }));
             } else {
                 println!("No bisection in progress.");
             }
-            return;
         }
         Err(err) => reject(CliTag::ERROR, format!("read bisect state: {err}")),
-    };
+    }
+}
 
+fn render_bisect_status(ctx: &CliContext, state: &BisectState) {
     if ctx.json_mode {
         print_json(&serde_json::json!({
             "active": state.active,
@@ -268,17 +250,54 @@ fn handle_bisect_status(ctx: &CliContext) {
             "good": state.good.iter().map(|o| o.to_hex()).collect::<Vec<_>>(),
             "skipped": state.skipped.iter().map(|o| o.to_hex()).collect::<Vec<_>>(),
         }));
-    } else {
-        println!("Bisection in progress:");
-        println!("  bad:       {}", state.bad.to_hex());
-        for g in &state.good {
-            println!("  good:      {}", g.to_hex());
-        }
-        for s in &state.skipped {
-            println!("  skipped:   {}", s.to_hex());
-        }
-        println!("  orig_head: {}", state.orig_head.to_hex());
+        return;
     }
+
+    println!("Bisection in progress:");
+    println!("  bad:       {}", state.bad.to_hex());
+    for g in &state.good {
+        println!("  good:      {}", g.to_hex());
+    }
+    for s in &state.skipped {
+        println!("  skipped:   {}", s.to_hex());
+    }
+    println!("  orig_head: {}", state.orig_head.to_hex());
+}
+
+fn update_state_for_run_code(view: &RepoView, state: &mut BisectState, code: i32) {
+    let curr_head = resolve_oid_or_reject(view, HEAD_REV, "HEAD");
+    if code == 0 {
+        if !state.good.contains(&curr_head) {
+            state.good.push(curr_head);
+        }
+    } else if code == EXIT_CODE_SKIP {
+        if !state.skipped.contains(&curr_head) {
+            state.skipped.push(curr_head);
+        }
+    } else {
+        state.bad = curr_head;
+    }
+}
+
+fn execute_single_run_iteration(
+    ctx: &CliContext,
+    program: &str,
+    prog_args: &[String],
+) -> BisectStep {
+    let view = open_repo_or_reject(ctx);
+    let mut state = load_state_or_reject(&view);
+
+    println!("Running: {} {:?}", program, prog_args);
+    let status = match Command::new(program).args(prog_args).status() {
+        Ok(s) => s,
+        Err(err) => reject(CliTag::ERROR, format!("execute command '{program}': {err}")),
+    };
+
+    let code = status.code().unwrap_or(1);
+    update_state_for_run_code(&view, &mut state, code);
+    save_state_or_reject(&view, &state);
+
+    advance_bisect(ctx, &view, &mut state)
 }
 
 fn handle_bisect_run(ctx: &CliContext, args: &[String]) {
@@ -290,53 +309,7 @@ fn handle_bisect_run(ctx: &CliContext, args: &[String]) {
     let prog_args = &args[1..];
 
     loop {
-        let view = match RepoView::open(ctx) {
-            Ok(v) => v,
-            Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
-        };
-
-        let mut state = match BisectState::load(view.git_dir()) {
-            Ok(Some(s)) => s,
-            Ok(None) => reject(CliTag::ERROR, "no bisection in progress"),
-            Err(err) => reject(CliTag::ERROR, format!("read bisect state: {err}")),
-        };
-
-        println!("Running: {} {:?}", program, prog_args);
-        let status = match Command::new(program).args(prog_args).status() {
-            Ok(s) => s,
-            Err(err) => reject(CliTag::ERROR, format!("execute command '{program}': {err}")),
-        };
-
-        let code = status.code().unwrap_or(1);
-        if code == 0 {
-            let curr_head = match view.resolve("HEAD") {
-                Ok(o) => o,
-                Err(err) => reject(CliTag::ERROR, format!("resolve HEAD: {err}")),
-            };
-            if !state.good.contains(&curr_head) {
-                state.good.push(curr_head);
-            }
-        } else if code == 125 {
-            let curr_head = match view.resolve("HEAD") {
-                Ok(o) => o,
-                Err(err) => reject(CliTag::ERROR, format!("resolve HEAD: {err}")),
-            };
-            if !state.skipped.contains(&curr_head) {
-                state.skipped.push(curr_head);
-            }
-        } else {
-            let curr_head = match view.resolve("HEAD") {
-                Ok(o) => o,
-                Err(err) => reject(CliTag::ERROR, format!("resolve HEAD: {err}")),
-            };
-            state.bad = curr_head;
-        }
-
-        if let Err(err) = state.save(view.git_dir()) {
-            reject(CliTag::ERROR, format!("save bisect state: {err}"));
-        }
-
-        let step = advance_bisect(ctx, &view, &mut state);
+        let step = execute_single_run_iteration(ctx, program, prog_args);
         match step {
             BisectStep::Found { .. } | BisectStep::Finished { .. } => break,
             BisectStep::Step { .. } => {}
@@ -360,13 +333,17 @@ fn advance_bisect(ctx: &CliContext, view: &RepoView, state: &mut BisectState) ->
         None
     });
 
-    match &step {
+    render_bisect_step(ctx, &step);
+    step
+}
+
+fn render_bisect_step(ctx: &CliContext, step: &BisectStep) {
+    match step {
         BisectStep::Step {
             candidate,
             remaining_candidates,
             estimated_steps,
         } => {
-            // Materialize candidate commit in worktree
             let checkout_ctx = CliContext {
                 git_dir: ctx.git_dir.clone(),
                 json_mode: false,
@@ -388,7 +365,7 @@ fn advance_bisect(ctx: &CliContext, view: &RepoView, state: &mut BisectState) ->
                 );
                 println!(
                     "[{}] Checking out candidate commit",
-                    &candidate.to_hex()[..8]
+                    &candidate.to_hex()[..HEX_SHORT_LEN]
                 );
             }
         }
@@ -413,6 +390,4 @@ fn advance_bisect(ctx: &CliContext, view: &RepoView, state: &mut BisectState) ->
             }
         }
     }
-
-    step
 }
