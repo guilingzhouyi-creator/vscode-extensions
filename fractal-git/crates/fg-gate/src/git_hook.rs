@@ -14,7 +14,7 @@
 //!   the budget is killed and downgraded to `TimedOut` so an unresponsive script degrades rather
 //!   than deadlocks the mutation.
 //!
-//! Domain Governance Rules: FGT-GAT-001 (hook contracts), FGT-COR-001, PRF-LEAK-001.
+//! Domain Governance Rules: FGT-GAT-001 (hook contracts), FGT-COR-001.
 
 use std::collections::BTreeMap;
 use std::io::Write;

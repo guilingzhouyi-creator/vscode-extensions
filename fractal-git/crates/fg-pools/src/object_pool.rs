@@ -1,12 +1,12 @@
 //! Module: fg-pools — Zero-Allocation Object Recycle Pool
 //! File Path: crates/fg-pools/src/object_pool.rs
-//! Architecture Role: Implements high-throughput object recycling for AST and Tree entries,
-//!   eliminating loop-internal heap allocations (ADV-PRF-002) via pre-warmed capacity slots.
+//! Architecture Role: Implements high-throughput object recycling for tree entries and buffers,
+//!   eliminating loop-internal heap allocations via pre-warmed capacity slots.
 //! Dependencies & Triggers: Consumed by tree builders, diff engines, and index parsing pipelines.
 //! Responsibilities: Pool pre-warmed capacity slots, reset state on reclaim, and guard life cycles via RAII.
 //! Exit Semantics & Design Rationale: Returns cleanly reset instances without reallocating underlying buffers.
 //!
-//! Domain Governance Rules: FGT-PRF-001 (zero heap loop allocation), FGT-COR-001, PRF-LEAK-001.
+//! Domain Governance Rules: FGT-PRF-001 (zero heap loop allocation), FGT-COR-001, FGT-POL-001.
 
 use parking_lot::Mutex;
 use std::mem::ManuallyDrop;

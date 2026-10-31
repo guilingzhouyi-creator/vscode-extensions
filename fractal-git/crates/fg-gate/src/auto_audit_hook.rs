@@ -2,7 +2,7 @@
 //! File Path: crates/fg-gate/src/auto_audit_hook.rs
 //! Architecture Role: Concrete `FractalHook` implementation executing the in-kernel TKCV and IKCE
 //!   verification pipelines on staged files. On validation success, synthesizes a cryptographically signed
-//!   `AuditRecord` appending to shadow telemetry; on invariant or gaming failure, activates quarantine.
+//!   `AuditRecord` appending to independent telemetry; on invariant or gaming failure, activates quarantine.
 //!
 //! Dependencies & Triggers: Registered into `HookPipeline` during staged commit and promotion reviews.
 //! Responsibilities: End-to-end static invariant proof, blind test canary mutation, dynamic credit evaluation,
@@ -31,7 +31,7 @@ use fg_core::models::{
 };
 use fg_topology::refs::DiskRefStore;
 
-use crate::canary::{CanaryConfig, ShadowCanaryEngine};
+use crate::canary::{CanaryConfig, KernelCanaryEngine};
 use crate::credit::{AgentCreditController, AgentCreditScore, QuarantineRequestParams};
 use crate::hook::{FractalHook, HookContext, HookTier, HookVerdict};
 use crate::verifier::{KernelAstVerifier, VerifierConfig, ViolationSeverity};
@@ -40,7 +40,7 @@ use crate::verifier::{KernelAstVerifier, VerifierConfig, ViolationSeverity};
 pub struct AutoAuditHook {
     tier: HookTier,
     verifier: KernelAstVerifier,
-    canary: ShadowCanaryEngine,
+    canary: KernelCanaryEngine,
     credit_controller: AgentCreditController,
     quarantine_dir: Option<PathBuf>,
     telemetry_store: Option<Arc<DiskRefStore>>,
@@ -53,7 +53,7 @@ impl AutoAuditHook {
         Self {
             tier,
             verifier: KernelAstVerifier::new(VerifierConfig::default()),
-            canary: ShadowCanaryEngine::new(CanaryConfig::default()),
+            canary: KernelCanaryEngine::new(CanaryConfig::default()),
             credit_controller: AgentCreditController::default(),
             quarantine_dir: None,
             telemetry_store: None,
@@ -75,7 +75,7 @@ impl AutoAuditHook {
         self
     }
 
-    /// Attaches a ref store for persisting shadow telemetry records.
+    /// Attaches a ref store for persisting telemetry records.
     #[must_use]
     pub fn with_telemetry_store(mut self, store: Arc<DiskRefStore>) -> Self {
         self.telemetry_store = Some(store);
@@ -101,7 +101,7 @@ impl AutoAuditHook {
                     "[{}] {}:{}: {}",
                     violation.rule_id, violation.file, violation.line, violation.message
                 ));
-                if violation.rule_id == "ADV-PRF-002" {
+                if violation.rule_id == "FGT-PRF-001" || violation.rule_id == "ADV-PRF-002" {
                     transient_allocs += 1;
                 }
             }

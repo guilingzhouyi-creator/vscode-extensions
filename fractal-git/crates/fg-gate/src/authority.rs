@@ -8,7 +8,7 @@
 //! Exit Semantics & Design Rationale: A missing or malformed secret is a typed
 //!   rejection, never a silently disabled check.
 //!
-//! Domain Governance Rules: FGT-GAT-001 (gate enforcement), FGT-COR-001, GUARD-VAR-001.
+//! Domain Governance Rules: FGT-GAT-001 (gate enforcement), FGT-COR-001.
 
 use std::path::Path;
 

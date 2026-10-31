@@ -6,7 +6,7 @@
 //! Responsibilities: Manage pre-warmed worktree slots, track acquisition epochs, and enforce bounded slot reuse.
 //! Exit Semantics & Design Rationale: Provides sub-millisecond slot provisioning; resets epochs on recycling.
 //!
-//! Domain Governance Rules: FGT-PRF-001 (worktree slot pooling), FGT-COR-001, PRF-LEAK-001.
+//! Domain Governance Rules: FGT-PRF-001 (worktree slot pooling), FGT-COR-001, FGT-POL-001.
 
 use fg_core::error::{FractalError, FractalResult};
 use parking_lot::Mutex;

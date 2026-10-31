@@ -58,7 +58,7 @@ impl Default for AgentCreditController {
     }
 }
 
-/// Parameters for isolating a rejected or gaming mutation into quarantine (`SIM-ARGS-001`).
+/// Consolidated parameter object for isolating a rejected or gaming mutation into quarantine.
 #[derive(Debug, Clone)]
 pub struct QuarantineRequestParams<'a> {
     /// Evaluated agent credit score snapshot.

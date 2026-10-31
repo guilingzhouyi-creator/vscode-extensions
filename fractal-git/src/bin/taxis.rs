@@ -371,7 +371,7 @@ const COMMAND_TABLE: &[CommandSpec] = &[
 
 fn handle_version(_ctx: &CliContext) {
     print_banner();
-    println!("Version: 0.1.0 (Rust Stable, 10 Micro-Crates)");
+    println!("Version: 0.1.0 (Rust Stable, 10 Kernel Subsystems)");
 }
 
 fn handle_help(_ctx: &CliContext) {

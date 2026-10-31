@@ -54,7 +54,7 @@ pub struct MutantDescriptor {
     pub mutated_snippet: String,
 }
 
-/// Configuration parameters for `ShadowCanaryEngine`.
+/// Configuration parameters for `KernelCanaryEngine`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CanaryConfig {
     /// Minimum acceptable mutant kill rate (default: 0.60).
@@ -75,7 +75,7 @@ impl Default for CanaryConfig {
     }
 }
 
-/// Comprehensive report produced by `ShadowCanaryEngine`.
+/// Comprehensive report produced by `KernelCanaryEngine`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CanaryReport {
     /// Total number of valid mutants synthesized.
@@ -94,11 +94,14 @@ pub struct CanaryReport {
 
 /// Inline Kernel Canary Engine (IKCE) verifying test efficacy via real-time micro-mutation.
 #[derive(Debug, Clone)]
-pub struct ShadowCanaryEngine {
+pub struct KernelCanaryEngine {
     config: CanaryConfig,
 }
 
-impl ShadowCanaryEngine {
+/// Backward-compatible alias for [`KernelCanaryEngine`].
+pub type ShadowCanaryEngine = KernelCanaryEngine;
+
+impl KernelCanaryEngine {
     /// Creates a new canary engine instance with the given configuration.
     pub const fn new(config: CanaryConfig) -> Self {
         Self { config }
@@ -415,7 +418,7 @@ mod tests {
 
     #[test]
     fn test_detect_tautological_assertions() {
-        let engine = ShadowCanaryEngine::new(CanaryConfig::default());
+        let engine = KernelCanaryEngine::new(CanaryConfig::default());
         let tests = r#"
             #[test]
             fn test_fake() {
@@ -431,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_generate_mutants_synthesizes_operators() {
-        let engine = ShadowCanaryEngine::new(CanaryConfig::default());
+        let engine = KernelCanaryEngine::new(CanaryConfig::default());
         let source = r#"
             pub fn is_valid(x: i32) -> bool {
                 if x > 10 {
@@ -450,7 +453,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_slice_passes_with_comprehensive_tests() {
-        let engine = ShadowCanaryEngine::new(CanaryConfig::default());
+        let engine = KernelCanaryEngine::new(CanaryConfig::default());
         let source = r#"
             pub fn compute_threshold(score: i32) -> bool {
                 score >= 80
@@ -471,7 +474,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_slice_fails_on_tautology() {
-        let engine = ShadowCanaryEngine::new(CanaryConfig::default());
+        let engine = KernelCanaryEngine::new(CanaryConfig::default());
         let source = r#"
             pub fn compute(x: i32) -> i32 {
                 x + 1

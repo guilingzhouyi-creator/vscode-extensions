@@ -25,7 +25,7 @@ pub const DEFAULT_PAGE_SIZE: usize = 64 * 1024;
 const THREAD_CACHE_MAX: usize = 8;
 
 /// Upper bound on retained buffer capacity (2 MiB) to prevent transient giant blobs from
-/// permanently pinning thread-local or shared pool memory (`PRF-LEAK-001`).
+/// permanently pinning thread-local or shared pool memory.
 pub const MAX_RETAINED_BUFFER_BYTES: usize = 2 * 1024 * 1024;
 
 thread_local! {

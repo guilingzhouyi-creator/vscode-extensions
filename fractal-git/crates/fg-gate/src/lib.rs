@@ -7,7 +7,7 @@
 //! Responsibilities: Commit message governance, conflict marker detection, and pre-receive policy.
 //! Exit Semantics & Design Rationale: Fail-closed verification preventing policy-violating commits.
 //!
-//! Domain Governance Rules: FGT-GAT-001 (protocol gate facade), FGT-COR-001, CMG-STY-001.
+//! Domain Governance Rules: FGT-GAT-001 (protocol gate facade), FGT-COR-001.
 
 pub mod authority;
 pub mod auto_audit_hook;
@@ -26,7 +26,9 @@ pub use authority::{
     AUTHORITY_SECRET_ENV,
 };
 pub use auto_audit_hook::AutoAuditHook;
-pub use canary::{CanaryConfig, CanaryReport, MutationKind, ShadowCanaryEngine};
+pub use canary::{
+    CanaryConfig, CanaryReport, KernelCanaryEngine, MutationKind, ShadowCanaryEngine,
+};
 pub use commit_guard::CommitMessageGuard;
 pub use conflict_guard::ConflictGuard;
 pub use credit::{AgentCreditController, AgentCreditScore, QuarantineRequestParams};

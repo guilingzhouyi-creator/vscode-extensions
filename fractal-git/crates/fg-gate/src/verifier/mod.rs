@@ -3,9 +3,9 @@
 //! Architecture Role: In-kernel formal invariant verification engine (modeled on Linux eBPF Verifier).
 //!   Performs static AST/CFG structural proofs on submitted changes prior to staging or promotion:
 //!   - Path Jail & boundary confinement (`GUARD-JAIL-001`)
-//!   - Loop transient heap allocation elimination (`ADV-PRF-002`, `FGT-PRF-001`)
-//!   - Handle lifecycle paired closing and leak prevention (`PRF-LEAK-001`)
-//!   - Parameter convergence and multi-argument compression (`SIM-ARGS-001`)
+//!   - Loop transient heap allocation elimination (`FGT-PRF-001`)
+//!   - Handle lifecycle paired closing and leak prevention (`FGT-VRF-001`)
+//!   - Parameter convergence and multi-argument compression (`FGT-VRF-001`)
 //!   - Recursive destructive operation guards (`GUARD-DESTR-001`)
 //!
 //! Dependencies & Triggers: Consumed by `AutoAuditHook` and `HookPipeline` across all tiers.
@@ -18,9 +18,7 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-GAT-001`: Protocol gate facade and rule compliance
 //! - `FGT-VRF-001`: TKCV formal AST invariant verifier guard
-//! - `ADV-PRF-002`: Loop transient allocation detox
-//! - `PRF-LEAK-001`: Handle lifecycle paired closing
-//! - `SIM-ARGS-001`: Parameter object convergence
+//! - `FGT-PRF-001`: Zero transient heap allocation in hot paths
 //! - `GUARD-DESTR-001`: Anti-destruction taint safety guard
 
 use serde::{Deserialize, Serialize};
@@ -37,7 +35,7 @@ pub enum ViolationSeverity {
 /// A structured formal invariant violation emitted by `KernelAstVerifier`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerifierViolation {
-    /// Canonical SSOT rule ID (e.g. "ADV-PRF-002", "GUARD-JAIL-001").
+    /// Canonical SSOT rule ID (e.g. "FGT-PRF-001", "GUARD-JAIL-001").
     pub rule_id: String,
     /// Repository-relative or workspace-relative file path where violation was detected.
     pub file: String,
@@ -49,39 +47,39 @@ pub struct VerifierViolation {
     pub severity: ViolationSeverity,
 }
 
-/// SSOT forbidden allocation patterns and diagnostics inside hot loop scopes (`ADV-PRF-002`).
+/// SSOT forbidden allocation patterns and diagnostics inside hot loop scopes (`FGT-PRF-001`).
 const FORBIDDEN_ALLOC_PATTERNS: &[(&str, &str)] = &[
     (
         concat!("Vec::", "new()"),
-        "ADV-PRF-002: Transient Vec allocation inside loop; hoist buffer or use SmallVec",
+        "FGT-PRF-001: Transient Vec allocation inside loop; hoist buffer or use SmallVec",
     ),
     (
         concat!("vec!", "["),
-        "ADV-PRF-002: Transient vec! macro inside loop; hoist pre-allocated buffer",
+        "FGT-PRF-001: Transient vec! macro inside loop; hoist pre-allocated buffer",
     ),
     (
         concat!("String::", "new()"),
-        "ADV-PRF-002: Transient String::new inside loop; reuse a clearing scratch buffer",
+        "FGT-PRF-001: Transient String::new inside loop; reuse a clearing scratch buffer",
     ),
     (
         concat!("String::", "from("),
-        "ADV-PRF-002: Transient String::from inside loop; avoid heap conversion in hot loop",
+        "FGT-PRF-001: Transient String::from inside loop; avoid heap conversion in hot loop",
     ),
     (
         concat!("format!", "("),
-        "ADV-PRF-002: Transient format! string allocation inside loop; use write! into scratch",
+        "FGT-PRF-001: Transient format! string allocation inside loop; use write! into scratch",
     ),
     (
         concat!("Box::", "new("),
-        "ADV-PRF-002: Transient Box::new heap allocation inside loop",
+        "FGT-PRF-001: Transient Box::new heap allocation inside loop",
     ),
     (
         concat!(".to_", "string()"),
-        "ADV-PRF-002: Transient .to_string() inside loop; use string slices or scratch",
+        "FGT-PRF-001: Transient .to_string() inside loop; use string slices or scratch",
     ),
     (
         concat!(".to_", "vec()"),
-        "ADV-PRF-002: Transient .to_vec() slice clone inside loop",
+        "FGT-PRF-001: Transient .to_vec() slice clone inside loop",
     ),
 ];
 
@@ -90,11 +88,11 @@ const FORBIDDEN_ALLOC_PATTERNS: &[(&str, &str)] = &[
 pub struct VerifierConfig {
     /// Allowed Path Jail root prefixes. If empty, all relative paths are permitted unless traversing `..`.
     pub path_jail_roots: Vec<String>,
-    /// Maximum allowed individual parameter count before enforcing `SIM-ARGS-001` (default: 3).
+    /// Maximum allowed individual parameter count before enforcing parameter objects (default: 3).
     pub max_parameters: usize,
-    /// Whether to enforce loop transient heap allocation detox (`ADV-PRF-002`).
+    /// Whether to enforce loop transient heap allocation elimination (`FGT-PRF-001`).
     pub enforce_no_heap_alloc_in_loops: bool,
-    /// Whether to enforce handle lifecycle paired closing (`PRF-LEAK-001`).
+    /// Whether to enforce handle lifecycle paired closing (`FGT-VRF-001`).
     pub enforce_paired_handle_drop: bool,
     /// Whether to enforce destructive operation guards (`GUARD-DESTR-001`).
     pub enforce_destructive_guards: bool,
@@ -212,7 +210,7 @@ impl KernelAstVerifier {
         None
     }
 
-    /// Verifies that no transient heap allocations occur inside loop bodies (`ADV-PRF-002`).
+    /// Verifies that no transient heap allocations occur inside loop bodies (`FGT-PRF-001`).
     fn verify_loop_allocations(
         &self,
         file_path: &str,
@@ -235,7 +233,7 @@ impl KernelAstVerifier {
             }
             if let Some(diagnosis) = find_forbidden_alloc_diagnosis(trimmed) {
                 violations.push(VerifierViolation {
-                    rule_id: "ADV-PRF-002".into(),
+                    rule_id: "FGT-PRF-001".into(),
                     file: file_path.to_string(),
                     line: line_index + 1,
                     message: diagnosis.to_string(),
@@ -245,7 +243,7 @@ impl KernelAstVerifier {
         }
     }
 
-    /// Verifies parameter count limits enforcing parameter objects (`SIM-ARGS-001`).
+    /// Verifies parameter count limits enforcing parameter objects (`FGT-VRF-001`).
     fn verify_parameter_counts(
         &self,
         file_path: &str,
@@ -258,11 +256,11 @@ impl KernelAstVerifier {
             };
             if effective_params > self.config.max_parameters {
                 violations.push(VerifierViolation {
-                    rule_id: "SIM-ARGS-001".into(),
+                    rule_id: "FGT-VRF-001".into(),
                     file: file_path.to_string(),
                     line: line_index + 1,
                     message: format!(
-                        "Parameter count {} exceeds limit of {} (SIM-ARGS-001); pack parameters into a structured parameter object",
+                        "Parameter count {} exceeds limit of {}; pack parameters into a structured parameter object",
                         effective_params, self.config.max_parameters
                     ),
                     severity: ViolationSeverity::Block,
@@ -271,7 +269,7 @@ impl KernelAstVerifier {
         }
     }
 
-    /// Verifies handle lifecycle paired closing and leak prevention (`PRF-LEAK-001`).
+    /// Verifies handle lifecycle paired closing and leak prevention (`FGT-VRF-001`).
     fn verify_handle_lifecycles(
         &self,
         file_path: &str,
@@ -305,7 +303,7 @@ impl KernelAstVerifier {
             for (creator, advice) in &HANDLE_CREATORS {
                 if trimmed.starts_with(creator) {
                     violations.push(VerifierViolation {
-                        rule_id: "PRF-LEAK-001".into(),
+                        rule_id: "FGT-VRF-001".into(),
                         file: file_path.to_string(),
                         line: line_index + 1,
                         message: format!(
@@ -531,7 +529,7 @@ mod tests {
         assert!(!violations.is_empty());
         assert!(violations
             .iter()
-            .any(|violation| violation.rule_id == "ADV-PRF-002"));
+            .any(|violation| violation.rule_id == "FGT-PRF-001"));
     }
 
     #[test]
@@ -546,7 +544,7 @@ mod tests {
         let violations = verifier.verify_source_slice("src/func.rs", code);
         assert!(violations
             .iter()
-            .any(|violation| violation.rule_id == "SIM-ARGS-001"));
+            .any(|violation| violation.rule_id == "FGT-VRF-001"));
 
         let ok_code = r#"
             pub fn valid_params_struct(params: &MyParams) -> usize {
@@ -556,7 +554,7 @@ mod tests {
         let ok_violations = verifier.verify_source_slice("src/func.rs", ok_code);
         assert!(ok_violations
             .iter()
-            .all(|violation| violation.rule_id != "SIM-ARGS-001"));
+            .all(|violation| violation.rule_id != "FGT-VRF-001"));
     }
 
     #[test]

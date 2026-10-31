@@ -9,7 +9,7 @@
 //! Exit Semantics & Design Rationale: Fails closed with structured GateRejection; produces
 //!   non-forgeable ValidatedCommitWitness only on complete verification.
 //!
-//! Domain Governance Rules: FGT-GAT-001 (gate governance), FGT-COR-001, CMG-STY-001..006.
+//! Domain Governance Rules: FGT-GAT-001 (gate governance), FGT-COR-001.
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{DiffCoherenceMode, TaxisPolicy, ValidatedCommitWitness};

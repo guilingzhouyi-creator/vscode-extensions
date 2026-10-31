@@ -1,12 +1,13 @@
 //! Module: fg-pools — Resource Pooling & Zero-Heap Allocation Subsystem
 //! File Path: crates/fg-pools/src/lib.rs
-//! Architecture Role: Pure high-performance resource pooling subsystem strictly adhering
-//!   to ADV-PRF-002, providing reusable buffers, AST object recyclers, and virtual sandbox slots.
+//! Architecture Role: Pure high-performance resource pooling subsystem strictly guaranteeing
+//!   zero transient heap allocations in critical hot loops, providing reusable byte buffers,
+//!   object recyclers, and virtual worktree slots.
 //! Dependencies & Triggers: Consumed by fg-storage, fg-algorithms, fg-topology, and Taxis CLI.
 //! Responsibilities: Buffer size classes, page recycling, object pooling, and worktree slots.
 //! Exit Semantics & Design Rationale: Bounded capacity with reset-state contracts on release.
 //!
-//! Domain Governance Rules: FGT-PRF-001 (resource pooling subsystem), FGT-COR-001, ADV-PRF-002.
+//! Domain Governance Rules: FGT-PRF-001 (resource pooling subsystem), FGT-COR-001, FGT-POL-001.
 
 pub mod buffer_pool;
 pub mod lru_cache;

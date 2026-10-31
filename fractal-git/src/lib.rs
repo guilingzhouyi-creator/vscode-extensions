@@ -2,7 +2,7 @@
 //! File Path: src/lib.rs
 //! Architecture Role: Central unified facade for the Fractal Git high-performance kernel,
 //!   orchestrating fg-core, fg-object, fg-index, fg-algorithms, fg-pools, fg-native, fg-storage,
-//!   fg-topology, fg-transport, and fg-gate micro-crates into one ergonomic public API.
+//!   fg-topology, fg-transport, and fg-gate kernel subsystems into one ergonomic public API.
 //! Dependencies & Triggers: Depended upon by the Taxis CLI binary and integration test suites.
 //! Responsibilities: Unified root API facade and rule catalog.
 //! Exit Semantics & Design Rationale:
@@ -138,7 +138,9 @@ pub use fg_topology::operation::{Operation, OperationGraph, OperationMetadata, R
 pub use fg_topology::project_store::{DiskProjectStore, PROJECTS_CACHE_FILE, PROJECTS_DIR};
 pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use fg_topology::provenance::{DiskProvenanceStore, PROVENANCE_FILE};
-pub use fg_topology::pyramid_folding::{CardMilestoneRecord, PyramidFolder};
+pub use fg_topology::pyramid_folding::{
+    CardMilestoneRecord, HierarchicalRollupFolder, PyramidFolder,
+};
 pub use fg_topology::refs::{
     apply_os_telemetry_protection, reset_file_write_permission, DiskRefStore, FractalRef, HeadState,
 };
@@ -157,7 +159,8 @@ pub use fg_transport::smart_protocol::ProtocolV2Handler;
 // Gate & Policy exports
 pub use fg_gate::auto_audit_hook::AutoAuditHook;
 pub use fg_gate::canary::{
-    CanaryConfig, CanaryReport, MutantDescriptor, MutationKind, ShadowCanaryEngine,
+    CanaryConfig, CanaryReport, KernelCanaryEngine, MutantDescriptor, MutationKind,
+    ShadowCanaryEngine,
 };
 pub use fg_gate::commit_guard::CommitMessageGuard;
 pub use fg_gate::conflict_guard::ConflictGuard;

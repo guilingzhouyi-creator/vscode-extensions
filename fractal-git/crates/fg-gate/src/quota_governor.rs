@@ -6,7 +6,7 @@
 //! Responsibilities: Enforce maximum active concurrent worktree slots and cumulative byte limits.
 //! Exit Semantics & Design Rationale: Fails immediately with QuotaExceeded error when limits are reached.
 //!
-//! Domain Governance Rules: FGT-GAT-001 (quota governance), FGT-COR-001, PRF-LEAK-001.
+//! Domain Governance Rules: FGT-GAT-001 (quota governance), FGT-COR-001, FGT-POL-001.
 
 use fg_core::error::{FractalError, FractalResult};
 

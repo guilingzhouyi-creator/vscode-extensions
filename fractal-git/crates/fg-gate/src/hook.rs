@@ -117,7 +117,7 @@ impl FractalHook for HygieneConflictHook {
         for path in ctx.staged_files {
             if path.is_empty() {
                 return Ok(HookVerdict::Block {
-                    reason: "HYG-EMP-001: Attempted to stage empty path entry".into(),
+                    reason: "FGT-GAT-001: Attempted to stage empty path entry".into(),
                 });
             }
         }

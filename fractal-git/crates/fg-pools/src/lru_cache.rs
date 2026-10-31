@@ -13,7 +13,7 @@
 //!     heterogeneous objects (2KB tree vs 50MB blob).
 //!   - Thread-safe interior mutability powered by parking_lot Mutex.
 //!
-//! Domain Governance Rules: FGT-PRF-001 (bounded memory caching), FGT-COR-001, PRF-LEAK-001.
+//! Domain Governance Rules: FGT-PRF-001 (bounded memory caching), FGT-COR-001, FGT-POL-001.
 
 use parking_lot::Mutex;
 use std::collections::HashMap;

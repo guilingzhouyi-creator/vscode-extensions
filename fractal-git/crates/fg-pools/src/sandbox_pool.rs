@@ -6,7 +6,7 @@
 //! Responsibilities: Maintain pre-allocated slot descriptors, acquire/release lifecycle state.
 //! Exit Semantics & Design Rationale: Bounded capacity with FIFO recycling; returns None if exhausted.
 //!
-//! Domain Governance Rules: FGT-PRF-001 (slot allocation hygiene), FGT-BYP-001 (Direct-Bypass scratch reclamation), FGT-COR-001, PRF-LEAK-001.
+//! Domain Governance Rules: FGT-PRF-001 (slot allocation hygiene), FGT-BYP-001 (Direct-Bypass scratch reclamation), FGT-COR-001, FGT-POL-001.
 
 use parking_lot::Mutex;
 use std::collections::VecDeque;
