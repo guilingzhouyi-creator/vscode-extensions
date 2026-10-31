@@ -58,6 +58,21 @@ const DEFAULT_MAX_BYTES_PER_FILE = DEFAULT_MAX_LOG_MEGABYTES * BYTES_PER_MIB;
 /** Default maximum number of rotated historical log file archives to retain. */
 const DEFAULT_MAX_ROTATED_FILES = 3;
 
+/** Relative repository path token replacing absolute file paths in logs. */
+const WORKSPACE_PATH_TOKEN = '<workspace>/';
+
+/** Stable class name for toolchain errors. */
+const ERROR_NAME_AUTO_REFACTOR = 'AutoRefactorError';
+
+/** Node process exit event identifier. */
+const PROCESS_EVENT_EXIT = 'exit';
+
+/** Node process beforeExit event identifier. */
+const PROCESS_EVENT_BEFORE_EXIT = 'beforeExit';
+
+/** Numeric radix for base-36 timestamp encoding. */
+const RADIX_BASE_36 = 36;
+
 /** Regular expression used to strip ANSI escape codes when writing to log files. */
 const ANSI_ESCAPE_REGEX = /\u001b\[[0-9;]*m/g;
 
@@ -70,11 +85,11 @@ const DRIVE_PATH_REGEX = /[a-zA-Z]:[\\/][^ \r\n\t"']+/g;
 /**
  * Normalizes absolute local paths to repository-relative representation.
  */
-export function sanitizePath(value: string): string {
-    if (typeof value !== 'string') return value;
-    return value.replace(DRIVE_PATH_REGEX, (match) => {
-        const norm = match.replace(/\\/g, '/');
-        return norm.replace(/^[a-zA-Z]:\/[^/]+\/[^/]+\//, '<workspace>/');
+export function sanitizePath(inputPathString: string): string {
+    if (typeof inputPathString !== 'string') return inputPathString;
+    return inputPathString.replace(DRIVE_PATH_REGEX, (matchSegment) => {
+        const normalizedDrivePath = matchSegment.replace(/\\/g, '/');
+        return normalizedDrivePath.replace(/^[a-zA-Z]:\/[^/]+\/[^/]+\//, WORKSPACE_PATH_TOKEN);
     });
 }
 
@@ -82,36 +97,36 @@ export function sanitizePath(value: string): string {
  * Safely serializes arbitrary objects to JSON, handling circular references, BigInt,
  * and redacting sensitive credentials and system paths.
  *
- * @param data - The value or object graph to serialize.
+ * @param payloadData - The value or object graph to serialize.
  * @returns Serialized JSON string.
  */
-export function safeSerializeJson(data: unknown): string {
-    const seen = new WeakSet<object>();
+export function safeSerializeJson(payloadData: unknown): string {
+    const seenObjects = new WeakSet<object>();
 
     try {
-        return JSON.stringify(data, (key, value) => {
-            if (key && SENSITIVE_KEY_REGEX.test(key)) {
+        return JSON.stringify(payloadData, (entryKey, entryValue) => {
+            if (entryKey && SENSITIVE_KEY_REGEX.test(entryKey)) {
                 return '[REDACTED]';
             }
-            if (typeof value === 'bigint') {
-                return `${value.toString()}n`;
+            if (typeof entryValue === 'bigint') {
+                return `${entryValue.toString()}n`;
             }
-            if (typeof value === 'function') {
-                return `[Function${value.name ? ': ' + value.name : ''}]`;
+            if (typeof entryValue === 'function') {
+                return `[Function${entryValue.name ? ': ' + entryValue.name : ''}]`;
             }
-            if (typeof value === 'symbol') {
-                return value.toString();
+            if (typeof entryValue === 'symbol') {
+                return entryValue.toString();
             }
-            if (typeof value === 'string') {
-                return sanitizePath(value);
+            if (typeof entryValue === 'string') {
+                return sanitizePath(entryValue);
             }
-            if (typeof value === 'object' && value !== null) {
-                if (seen.has(value)) {
+            if (typeof entryValue === 'object' && entryValue !== null) {
+                if (seenObjects.has(entryValue)) {
                     return '[Circular]';
                 }
-                seen.add(value);
+                seenObjects.add(entryValue);
             }
-            return value;
+            return entryValue;
         });
     } catch {
         return '{"level":"error","message":"[safeSerializeJson: Serialization Failed]"}';
@@ -126,6 +141,21 @@ export type LogLevel = 'silent' | 'error' | 'warn' | 'info' | 'debug';
 
 /** Output format for emitted log lines. */
 export type LogFormat = 'text' | 'json';
+
+/** Default text output format name. */
+const LOG_FORMAT_DEFAULT_TEXT: LogFormat = 'text';
+
+/** Warning level name identifier. */
+const LOG_LEVEL_WARN_NAME: LogLevel = 'warn';
+
+/** Error level name identifier. */
+const LOG_LEVEL_ERROR_NAME: LogLevel = 'error';
+
+/** Info level name identifier. */
+const LOG_LEVEL_INFO_NAME: LogLevel = 'info';
+
+/** Debug level name identifier. */
+const LOG_LEVEL_DEBUG_NAME: LogLevel = 'debug';
 
 /** Arbitrary structured contextual key-value map. */
 export type LogContext = Record<string, unknown>;
@@ -183,12 +213,19 @@ export class AutoRefactorError extends Error {
         public override readonly cause?: unknown,
     ) {
         super(message);
-        this.name = 'AutoRefactorError';
+        this.name = ERROR_NAME_AUTO_REFACTOR;
         Object.setPrototypeOf(this, AutoRefactorError.prototype);
     }
 }
 
 const syncFsAppendText = fs.appendFileSync.bind(fs);
+const syncFsExists = fs.existsSync.bind(fs);
+const syncFsUnlink = fs.unlinkSync.bind(fs);
+const syncFsRename = fs.renameSync.bind(fs);
+const syncFsOpen = fs.openSync.bind(fs);
+const syncFsClose = fs.closeSync.bind(fs);
+const syncFsStat = fs.statSync.bind(fs);
+const syncFsMkdir = fs.mkdirSync.bind(fs);
 
 /**
  * Synchronous log I/O barrier isolating synchronous disk writes for emergency exit semantics.
@@ -197,17 +234,32 @@ export const LogIoBarrier = {
     appendSync: (filePath: string, data: string): void => {
         syncFsAppendText(filePath, data);
     },
+    exists: (targetPath: string): boolean => syncFsExists(targetPath),
+    unlink: (targetPath: string): void => {
+        syncFsUnlink(targetPath);
+    },
+    rename: (srcPath: string, destPath: string): void => {
+        syncFsRename(srcPath, destPath);
+    },
+    truncate: (targetPath: string): void => {
+        const fileDescriptor = syncFsOpen(targetPath, 'w');
+        syncFsClose(fileDescriptor);
+    },
+    statSize: (targetPath: string): number => syncFsStat(targetPath).size,
+    ensureDir: (dirPath: string): void => {
+        syncFsMkdir(dirPath, { recursive: true });
+    },
 };
 
 const activeRingBuffers = new Set<LogRingBuffer>();
-let isExitBarrierRegistered = false;
+const exitBarrierState = { isRegistered: false };
 
 /**
  * Ensures global synchronous flush barrier on process termination to avoid dangling logs.
  */
 function ensureExitBarrierRegistered(): void {
-    if (isExitBarrierRegistered) return;
-    isExitBarrierRegistered = true;
+    if (exitBarrierState.isRegistered) return;
+    exitBarrierState.isRegistered = true;
 
     const flushAllActiveBuffers = () => {
         for (const ring of activeRingBuffers) {
@@ -220,8 +272,8 @@ function ensureExitBarrierRegistered(): void {
     };
 
     if (typeof process !== 'undefined' && typeof process.on === 'function') {
-        process.on('exit', flushAllActiveBuffers);
-        process.on('beforeExit', flushAllActiveBuffers);
+        process.on(PROCESS_EVENT_EXIT, flushAllActiveBuffers);
+        process.on(PROCESS_EVENT_BEFORE_EXIT, flushAllActiveBuffers);
     }
 }
 
@@ -279,13 +331,13 @@ export class LogRingBuffer {
     private shiftLogRotation(index: number): void {
         const src = `${this.filePath}.${index}`;
         const dest = `${this.filePath}.${index + 1}`;
-        if (!fs.existsSync(src)) return;
+        if (!LogIoBarrier.exists(src)) return;
 
         try {
             if (index === this.maxRotatedFiles - 1) {
-                fs.unlinkSync(src);
+                LogIoBarrier.unlink(src);
             } else {
-                fs.renameSync(src, dest);
+                LogIoBarrier.rename(src, dest);
             }
         } catch {
             /* best-effort */
@@ -294,10 +346,10 @@ export class LogRingBuffer {
 
     private tryStandardRotation(targetPath: string): boolean {
         try {
-            if (fs.existsSync(targetPath)) {
-                fs.unlinkSync(targetPath);
+            if (LogIoBarrier.exists(targetPath)) {
+                LogIoBarrier.unlink(targetPath);
             }
-            fs.renameSync(this.filePath, targetPath);
+            LogIoBarrier.rename(this.filePath, targetPath);
             return true;
         } catch {
             /* best-effort: standard rename failed under contention, proceed to fallbacks */
@@ -307,8 +359,8 @@ export class LogRingBuffer {
 
     private tryTimestampedRename(): boolean {
         try {
-            const timestamped = `${this.filePath}.${Date.now().toString(36)}.locked.rot`;
-            fs.renameSync(this.filePath, timestamped);
+            const timestamped = `${this.filePath}.${Date.now().toString(RADIX_BASE_36)}.locked.rot`;
+            LogIoBarrier.rename(this.filePath, timestamped);
             return true;
         } catch {
             /* best-effort: timestamped rename contention, proceed to in-place truncation */
@@ -318,8 +370,7 @@ export class LogRingBuffer {
 
     private tryInPlaceTruncate(): void {
         try {
-            const fd = fs.openSync(this.filePath, 'w');
-            fs.closeSync(fd);
+            LogIoBarrier.truncate(this.filePath);
         } catch {
             /* best-effort: fail-soft fallback when file is held exclusively */
         }
@@ -353,9 +404,9 @@ export class LogRingBuffer {
      */
     private rotateIfNecessary(additionalBytes: number): void {
         try {
-            if (!fs.existsSync(this.filePath)) return;
-            const stat = fs.statSync(this.filePath);
-            if (stat.size + additionalBytes <= this.maxBytesPerFile) return;
+            if (!LogIoBarrier.exists(this.filePath)) return;
+            const currentSize = LogIoBarrier.statSize(this.filePath);
+            if (currentSize + additionalBytes <= this.maxBytesPerFile) return;
 
             for (let i = this.maxRotatedFiles - 1; i >= 1; i--) {
                 this.shiftLogRotation(i);
@@ -538,14 +589,14 @@ export class Logger {
      * @param options - Additional formatting and ring buffer options.
      */
     constructor(
-        private level: LogLevel = 'info',
+        private level: LogLevel = LOG_LEVEL_INFO_NAME,
         private filePath?: string,
         options?: LoggerOptions,
     ) {
-        this.format = options?.format ?? 'text';
+        this.format = options?.format ?? LOG_FORMAT_DEFAULT_TEXT;
         if (filePath) {
             try {
-                fs.mkdirSync(path.dirname(filePath), { recursive: true });
+                LogIoBarrier.ensureDir(path.dirname(filePath));
                 this.ringBuffer = new LogRingBuffer(filePath, {
                     capacity: options?.capacity,
                     maxBytesPerFile: options?.maxBytesPerFile,
@@ -575,22 +626,22 @@ export class Logger {
 
     /** Returns true if debug messages are emitted under the current log level. */
     isDebugEnabled(): boolean {
-        return this.isLevelEnabled('debug');
+        return this.isLevelEnabled(LOG_LEVEL_DEBUG_NAME);
     }
 
     /** Returns true if info messages are emitted under the current log level. */
     isInfoEnabled(): boolean {
-        return this.isLevelEnabled('info');
+        return this.isLevelEnabled(LOG_LEVEL_INFO_NAME);
     }
 
     /** Returns true if warning messages are emitted under the current log level. */
     isWarnEnabled(): boolean {
-        return this.isLevelEnabled('warn');
+        return this.isLevelEnabled(LOG_LEVEL_WARN_NAME);
     }
 
     /** Returns true if error messages are emitted under the current log level. */
     isErrorEnabled(): boolean {
-        return this.isLevelEnabled('error');
+        return this.isLevelEnabled(LOG_LEVEL_ERROR_NAME);
     }
 
     /**
@@ -637,28 +688,28 @@ export class Logger {
      * Emit an error-level diagnostic when the configured threshold allows it.
      */
     error(msgOrSupplier: LogMessageSupplier, errorOrContext?: unknown, context?: LogContext): void {
-        this.emit('error', msgOrSupplier, errorOrContext, context);
+        this.emit(LOG_LEVEL_ERROR_NAME, msgOrSupplier, errorOrContext, context);
     }
 
     /**
      * Emit a warning-level diagnostic when the configured threshold allows it.
      */
     warn(msgOrSupplier: LogMessageSupplier, errorOrContext?: unknown, context?: LogContext): void {
-        this.emit('warn', msgOrSupplier, errorOrContext, context);
+        this.emit(LOG_LEVEL_WARN_NAME, msgOrSupplier, errorOrContext, context);
     }
 
     /**
      * Emit an info-level diagnostic when the configured threshold allows it.
      */
     info(msgOrSupplier: LogMessageSupplier, context?: LogContext): void {
-        this.emit('info', msgOrSupplier, context);
+        this.emit(LOG_LEVEL_INFO_NAME, msgOrSupplier, context);
     }
 
     /**
      * Emit a debug-level diagnostic when the configured threshold allows it.
      */
     debug(msgOrSupplier: LogMessageSupplier, context?: LogContext): void {
-        this.emit('debug', msgOrSupplier, context);
+        this.emit(LOG_LEVEL_DEBUG_NAME, msgOrSupplier, context);
     }
 
     /**

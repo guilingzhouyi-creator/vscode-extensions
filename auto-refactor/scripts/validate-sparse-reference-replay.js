@@ -79,16 +79,31 @@ function buildCallGraph(callers) {
   return new CallGraph(index);
 }
 
-/** Assert the planner leaves a genuinely local edit untouched. */
-function assertLocalEditStaysBounded() {
-  const planner = new SparseReferenceReplayManager();
-  const edited = SOURCE.replace('const rate = 0.2;', 'const rate = 0.25;');
+/** Helper to compute a sparse tax window for testing. */
+function computeTestTaxWindow(planner, editedContent, changedLines = [4, 9]) {
+  return planner.computeSparseReplayWindow({
+    filePath: 'src/tax.ts',
+    oldContent: SOURCE,
+    newContent: editedContent,
+    changedLines,
+  });
+}
+
+/** Helper to compute a bounded replay window for the local tax rate edit. */
+function computeTaxRateEditWindow(planner = new SparseReferenceReplayManager()) {
+  const edited = SOURCE.replaceAll('const rate = 0.2;', 'const rate = 0.25;');
   const window = planner.computeSparseReplayWindow({
     filePath: 'src/tax.ts',
     oldContent: SOURCE,
     newContent: edited,
     changedLines: [4, 4],
   });
+  return { planner, window };
+}
+
+/** Assert the planner leaves a genuinely local edit untouched. */
+function assertLocalEditStaysBounded() {
+  const { window } = computeTaxRateEditWindow();
   assert.strictEqual(window.isBounded, true, 'local edit must stay bounded');
   assert.strictEqual(window.requiresFullReplay, false, 'local edit must not replay the file');
   assert.strictEqual(window.isSparseBridged, false, 'local edit needs no sparse references');
@@ -101,7 +116,7 @@ function assertLocalEditStaysBounded() {
 /** Assert adjacent anchors merge into one compound window instead of a whole-file replay. */
 function assertCompoundAnchorsMerge() {
   const planner = new SparseReferenceReplayManager();
-  const edited = SOURCE.replace('return amount * 0.9;', 'return amount * 0.85;');
+  const edited = SOURCE.replaceAll('return amount * 0.9;', 'return amount * 0.85;');
   const baseline = new SwaBoundedReplayManager().computeReplayWindow(
     'src/tax.ts',
     SOURCE,
@@ -115,12 +130,7 @@ function assertCompoundAnchorsMerge() {
   );
   assert.strictEqual(baseline.requiresFullReplay, true, 'baseline manager replays the file');
 
-  const window = planner.computeSparseReplayWindow({
-    filePath: 'src/tax.ts',
-    oldContent: SOURCE,
-    newContent: edited,
-    changedLines: [4, 9],
-  });
+  const window = computeTestTaxWindow(planner, edited);
   assert.strictEqual(window.reason, REASON_COMPOUND_ANCHOR_WINDOW, 'planner merges the anchors');
   assert.strictEqual(window.isBounded, true, 'compound window is bounded');
   assert.strictEqual(window.requiresFullReplay, false, 'compound window avoids full replay');
@@ -136,30 +146,40 @@ function assertCompoundAnchorsMerge() {
 /** Assert an anchor span larger than the cap still degrades honestly. */
 function assertOversizedSpanDegrades() {
   const planner = new SparseReferenceReplayManager(undefined, { maxCompoundWindowLines: 2 });
-  const edited = SOURCE.replace('return amount * 0.9;', 'return amount * 0.85;');
-  const window = planner.computeSparseReplayWindow({
-    filePath: 'src/tax.ts',
-    oldContent: SOURCE,
-    newContent: edited,
-    changedLines: [4, 9],
-  });
+  const edited = SOURCE.replaceAll('return amount * 0.9;', 'return amount * 0.85;');
+  const window = computeTestTaxWindow(planner, edited);
   assert.strictEqual(window.isBounded, false, 'a span above the cap cannot be bounded');
   assert.strictEqual(window.requiresFullReplay, true, 'oversized span replays the file');
   assert.strictEqual(window.reason, REASON_MULTI_ANCHOR_SPAN, 'reason stays truthful');
   console.log('  ✔ oversized anchor span still reports a full replay');
 }
 
+/** Helper to compute sparse replay window for tax signature mutations. */
+function computeTaxSignatureMutationWindow(planner, resolver) {
+  const edited = SOURCE.replaceAll(
+    'export function calculateTax(amount: number): number {',
+    'export function calculateTax(amount: number, discount: number = 0): number {',
+  );
+  return planner.computeSparseReplayWindow({
+    filePath: 'src/tax.ts',
+    oldContent: SOURCE,
+    newContent: edited,
+    changedLines: [3, 3],
+    resolveReferences: resolver,
+  });
+}
+
 /** Assert a signature mutation becomes a bounded window with sparse references attached. */
 function assertSignatureMutationIsBridged() {
   const planner = new SparseReferenceReplayManager();
-  const edited = SOURCE.replace(
+  const baselineEdited = SOURCE.replaceAll(
     'export function calculateTax(amount: number): number {',
     'export function calculateTax(amount: number, discount: number = 0): number {',
   );
   const baseline = new SwaBoundedReplayManager().computeReplayWindow(
     'src/tax.ts',
     SOURCE,
-    edited,
+    baselineEdited,
     [3, 3],
   );
   assert.strictEqual(
@@ -170,13 +190,10 @@ function assertSignatureMutationIsBridged() {
   assert.strictEqual(baseline.requiresFullReplay, true, 'baseline manager replays the file');
 
   const callGraph = buildCallGraph(5);
-  const window = planner.computeSparseReplayWindow({
-    filePath: 'src/tax.ts',
-    oldContent: SOURCE,
-    newContent: edited,
-    changedLines: [3, 3],
-    resolveReferences: createCallGraphReferenceResolver(callGraph),
-  });
+  const window = computeTaxSignatureMutationWindow(
+    planner,
+    createCallGraphReferenceResolver(callGraph),
+  );
   assert.strictEqual(window.reason, REASON_SPARSE_BRIDGED_SIGNATURE, 'planner bridges the change');
   assert.strictEqual(window.isBounded, true, 'bridged window is bounded');
   assert.strictEqual(window.requiresFullReplay, false, 'bridged window avoids full replay');
@@ -194,17 +211,10 @@ function assertSignatureMutationIsBridged() {
 /** Assert the sparse reference budget caps the retained call sites. */
 function assertSparseBudgetIsEnforced() {
   const planner = new SparseReferenceReplayManager(undefined, { maxSparseReferences: 3 });
-  const edited = SOURCE.replace(
-    'export function calculateTax(amount: number): number {',
-    'export function calculateTax(amount: number, discount: number = 0): number {',
+  const window = computeTaxSignatureMutationWindow(
+    planner,
+    createCallGraphReferenceResolver(buildCallGraph(40)),
   );
-  const window = planner.computeSparseReplayWindow({
-    filePath: 'src/tax.ts',
-    oldContent: SOURCE,
-    newContent: edited,
-    changedLines: [3, 3],
-    resolveReferences: createCallGraphReferenceResolver(buildCallGraph(40)),
-  });
   assert.strictEqual(window.sparseReferences.length, 3, 'reference budget caps the window');
   assert.ok(
     window.effectiveSpanLines <= DEFAULT_MAX_COMPOUND_WINDOW_LINES,
@@ -216,16 +226,7 @@ function assertSparseBudgetIsEnforced() {
 /** Assert a signature mutation without a resolver degrades honestly instead of pretending. */
 function assertSignatureWithoutResolverDegrades() {
   const planner = new SparseReferenceReplayManager();
-  const edited = SOURCE.replace(
-    'export function calculateTax(amount: number): number {',
-    'export function calculateTax(amount: number, discount: number = 0): number {',
-  );
-  const window = planner.computeSparseReplayWindow({
-    filePath: 'src/tax.ts',
-    oldContent: SOURCE,
-    newContent: edited,
-    changedLines: [3, 3],
-  });
+  const window = computeTaxSignatureMutationWindow(planner, undefined);
   assert.strictEqual(window.isBounded, false, 'no resolver means no bridging');
   assert.strictEqual(window.requiresFullReplay, true, 'no resolver means full replay');
   assert.strictEqual(window.isSparseBridged, false, 'no resolver means no bridge flag');
@@ -233,9 +234,9 @@ function assertSignatureWithoutResolverDegrades() {
 }
 
 /** Assert import mutations stay a whole-file replay: module resolution changed everywhere. */
-function assertImportMutationStaysFullReplay() {
+function assertImportMutationReplay() {
   const planner = new SparseReferenceReplayManager();
-  const edited = SOURCE.replace(
+  const edited = SOURCE.replaceAll(
     'import { util } from "./util";',
     'import { util, extra } from "./util";',
   );
@@ -273,14 +274,7 @@ function assertResolverRankingAndDeterminism() {
 
 /** Assert the planner forwards issue pruning to the bounded manager. */
 function assertPruningDelegates() {
-  const planner = new SparseReferenceReplayManager();
-  const edited = SOURCE.replace('const rate = 0.2;', 'const rate = 0.25;');
-  const window = planner.computeSparseReplayWindow({
-    filePath: 'src/tax.ts',
-    oldContent: SOURCE,
-    newContent: edited,
-    changedLines: [4, 4],
-  });
+  const { planner, window } = computeTaxRateEditWindow();
   const issues = [
     { location: { start: { line: 1 } } },
     { location: { start: { line: 4 } } },
@@ -292,7 +286,7 @@ function assertPruningDelegates() {
   console.log('  ✔ issue pruning delegates to the bounded manager');
 }
 
-/** Assert window shifting ensures containment on large declarations (P0-1). */
+/** Assert window shifting ensures containment on large declarations (containment). */
 function assertWindowShiftingGuaranteesContainment() {
   const swa = new SwaBoundedReplayManager();
   const lineCount = 400;
@@ -304,7 +298,7 @@ function assertWindowShiftingGuaranteesContainment() {
   const source = lines.join('\n');
 
   // Test 1: Edit at line 129 (previously outside 1..128)
-  const edited129 = source.replace('const step129 = 129;', 'const step129 = 9999;');
+  const edited129 = source.replaceAll('const step129 = 129;', 'const step129 = 9999;');
   const win129 = swa.computeReplayWindow('src/batch.ts', source, edited129, [129, 129]);
   assert.strictEqual(win129.isBounded, true, 'line 129 edit must remain bounded');
   assert.strictEqual(win129.requiresFullReplay, false, 'line 129 edit must not replay full file');
@@ -315,7 +309,7 @@ function assertWindowShiftingGuaranteesContainment() {
   assert.ok(win129.effectiveSpanLines <= 128, 'shifted window span must not exceed cap');
 
   // Test 2: Edit at line 200
-  const edited200 = source.replace('const step200 = 200;', 'const step200 = 9999;');
+  const edited200 = source.replaceAll('const step200 = 200;', 'const step200 = 9999;');
   const win200 = swa.computeReplayWindow('src/batch.ts', source, edited200, [200, 200]);
   assert.strictEqual(win200.isBounded, true, 'line 200 edit must remain bounded');
   assert.ok(
@@ -326,8 +320,8 @@ function assertWindowShiftingGuaranteesContainment() {
 
   // Test 3: Edit spanning 200 lines (50 to 250) exceeds cap and must degrade
   const editedOver = source
-    .replace('const step50 = 50;', 'const step50 = 9999;')
-    .replace('const step250 = 250;', 'const step250 = 9999;');
+    .replaceAll('const step50 = 50;', 'const step50 = 9999;')
+    .replaceAll('const step250 = 250;', 'const step250 = 9999;');
   const winOver = swa.computeReplayWindow('src/batch.ts', source, editedOver, [50, 250]);
   assert.strictEqual(winOver.isBounded, false, 'oversized edit span must not be bounded');
   assert.strictEqual(
@@ -340,10 +334,10 @@ function assertWindowShiftingGuaranteesContainment() {
     REASON_CHANGE_SPAN_EXCEEDS_CAP,
     'must report REASON_CHANGE_SPAN_EXCEEDS_CAP',
   );
-  console.log('  ✔ window shifting strictly guarantees change containment (P0-1)');
+  console.log('  ✔ window shifting strictly guarantees change containment (containment)');
 }
 
-/** Assert signature mutation retains entire declaration body (P0-2). */
+/** Assert signature mutation retains entire declaration body (full-declaration). */
 function assertSignaturePreservesFullDeclaration() {
   const planner = new SparseReferenceReplayManager();
   const multilineSource = [
@@ -355,7 +349,7 @@ function assertSignaturePreservesFullDeclaration() {
     '    return tax;',
     '}',
   ].join('\n');
-  const edited = multilineSource.replace(
+  const edited = multilineSource.replaceAll(
     'export function calculateTax(',
     'export function calculateTaxNew(',
   );
@@ -382,11 +376,11 @@ function assertSignaturePreservesFullDeclaration() {
     'effective span matches total declaration lines',
   );
   assert.strictEqual(window.isSparseBridged, true, 'bridging flag active');
-  console.log('  ✔ signature window covers complete declaration body (P0-2)');
+  console.log('  ✔ signature window covers complete declaration body (full-declaration)');
 }
 
-/** Assert statement declarations are independent and caches are isolated (P0-3). */
-function assertStatementAnchorsIndependentAndCacheIsolated() {
+/** Assert statement declarations are independent and caches are isolated (cache-isolation). */
+function assertStatementAnchorIsolation() {
   const swa = new SwaBoundedReplayManager();
   const source = [
     'const A = 1;',
@@ -435,10 +429,13 @@ function assertStatementAnchorsIndependentAndCacheIsolated() {
   const textAnchorsAgain = swa.indexAnchors('src/stmts.ts', source);
   assert.strictEqual(textAnchorsAgain.length, 4, 'Text cache must remain isolated from AST cache');
   assert.strictEqual(textAnchorsAgain[0].name, 'A');
-  console.log('  ✔ statement anchors are independent and AST/text caches are isolated (P0-3)');
+  console.log('  ✔ statement anchors are independent and AST/text caches are isolated (cache-isolation)');
 }
 
-/** Assert cross-language declarations in GDScript and Rust are accurately recognized (P0-4). */
+/**
+ * Assert cross-language declarations in GDScript and Rust are accurately recognized
+ * (polyglot-anchors).
+ */
 function assertCrossLanguageDeclarationsSupported() {
   const swa = new SwaBoundedReplayManager();
 
@@ -480,11 +477,11 @@ function assertCrossLanguageDeclarationsSupported() {
   assert.strictEqual(rsAnchors[1].name, 'compute');
   assert.strictEqual(rsAnchors[1].startLine, 2);
   assert.strictEqual(rsAnchors[1].endLine, 4);
-  console.log('  ✔ cross-language GDScript and Rust anchors supported (P0-4)');
+  console.log('  ✔ cross-language GDScript and Rust anchors supported (polyglot-anchors)');
 }
 
-/** Assert adaptive window capacity calibration based on density metrics (P4-1). */
-function assertAdaptiveWindowCapCalibration() {
+/** Assert adaptive window capacity calibration resolution based on density metrics. */
+function assertWindowCapResolution() {
   const planner = new SparseReferenceReplayManager();
 
   // 1. Without density: returns default cap (256)
@@ -513,6 +510,11 @@ function assertAdaptiveWindowCapCalibration() {
   // Extreme high density (> 0.95): clamped to MIN_ADAPTIVE_WINDOW_CAP (>= 64)
   const extremeDenseCap = resolveWindowCap({ effectiveDensity: 1.0 });
   assert.ok(extremeDenseCap >= MIN_ADAPTIVE_WINDOW_CAP, 'must respect min cap');
+}
+
+/** Assert compound span acceptance changes dynamically with code density. */
+function assertAdaptiveWindowIntegration() {
+  const planner = new SparseReferenceReplayManager();
 
   // 5. Integration: compound span acceptance changes with density
   const lines = ['export function f1(): void {'];
@@ -523,8 +525,8 @@ function assertAdaptiveWindowCapCalibration() {
   lines.push('}');
   const content = lines.join('\n');
   const edited = content
-    .replace('const x0 = 0;', 'const x0 = 999;')
-    .replace('const y0 = 0;', 'const y0 = 999;');
+    .replaceAll('const x0 = 0;', 'const x0 = 999;')
+    .replaceAll('const y0 = 0;', 'const y0 = 999;');
 
   // Under normal default (cap 256), 200 lines is accepted:
   const winDefault = planner.computeSparseReplayWindow({
@@ -557,8 +559,8 @@ function assertAdaptiveWindowCapCalibration() {
   bigLines.push('}');
   const bigContent = bigLines.join('\n');
   const bigEdited = bigContent
-    .replace('const a0 = 0;', 'const a0 = 999;')
-    .replace('const b0 = 0;', 'const b0 = 999;');
+    .replaceAll('const a0 = 0;', 'const a0 = 999;')
+    .replaceAll('const b0 = 0;', 'const b0 = 999;');
 
   const winBigSparse = planner.computeSparseReplayWindow({
     filePath: 'src/sparse-compound.ts',
@@ -570,7 +572,7 @@ function assertAdaptiveWindowCapCalibration() {
   assert.strictEqual(winBigSparse.isBounded, true, '300 lines fits low-density 475 cap');
   assert.strictEqual(winBigSparse.reason, REASON_COMPOUND_ANCHOR_WINDOW);
 
-  console.log('  ✔ adaptive window capacity calibrated from code density metrics (P4-1)');
+  console.log('  ✔ adaptive window capacity calibrated from code density metrics (adaptive-window-cap)');
 }
 
 function main() {
@@ -581,15 +583,16 @@ function main() {
   assertSignatureMutationIsBridged();
   assertSparseBudgetIsEnforced();
   assertSignatureWithoutResolverDegrades();
-  assertImportMutationStaysFullReplay();
+  assertImportMutationReplay();
   assertResolverRankingAndDeterminism();
   assertPruningDelegates();
   assertWindowShiftingGuaranteesContainment();
   assertSignaturePreservesFullDeclaration();
-  assertStatementAnchorsIndependentAndCacheIsolated();
+  assertStatementAnchorIsolation();
   assertCrossLanguageDeclarationsSupported();
-  assertAdaptiveWindowCapCalibration();
-  console.log('=== ALL SPARSE REFERENCE VALIDATION TESTS PASSED (14/14) ===');
+  assertWindowCapResolution();
+  assertAdaptiveWindowIntegration();
+  console.log('=== ALL SPARSE REFERENCE VALIDATION TESTS PASSED (15/15) ===');
 }
 
 main();

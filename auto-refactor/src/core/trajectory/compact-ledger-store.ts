@@ -35,21 +35,39 @@ export const LEDGER_RECORD_LIMIT = 350;
 /** Default relative directory name for refactor trajectory storage. */
 export const DEFAULT_LEDGER_DIR_NAME = '.refactor-trajectory';
 
-/**
- * Serializes multi-tier counters, quality metrics, and metadata into a compact record.
- *
- * @param params - Execution context, counters, and quality metrics.
- * @param params.runId - Unique run identifier.
- * @param params.revision - Commit hash or revision short SHA.
- * @param params.module - Module or domain identifier.
- * @param params.agent - Actor or Agent identifier.
- * @param params.timestamp - Run timestamp in milliseconds.
- * @param params.counters - Four-tier orthogonal ELOC counters.
- * @param params.metrics - Trajectory quality metrics.
- * @param params.gatePass - Composite gate pass boolean.
- * @param params.gateCode - Composite gate outcome code.
- * @returns Ultra-compact CompactTrajectoryRecord.
- */
+/** Multiplier factor for standard two-decimal percentage precision. */
+const PERCENTAGE_FACTOR = 100;
+
+/** Multiplier factor for single-decimal precision. */
+const DECIMALS_FACTOR = 10;
+
+/** Maximum character length for long identifiers (module, agent, runId suffix). */
+const BOUNDED_TEXT_LENGTH_LONG = 12;
+
+/** Maximum character length for short commit revisions and signatures. */
+const BOUNDED_TEXT_LENGTH_SHORT = 8;
+
+/** Precision multiplier for six-decimal QED values. */
+const PRECISION_MILLIONTHS = 1000000;
+
+/** Subdirectory name holding weekly summaries. */
+const DIR_NAME_WEEKLY_SUMMARIES = 'weekly-summaries';
+
+/** File name for active rolling runs NDJSON ledger. */
+const FILE_NAME_ACTIVE_RUNS = 'active-runs.ndjson';
+
+/** File name for cold archive runs NDJSON ledger. */
+const FILE_NAME_ARCHIVE_RUNS = 'archive-runs.ndjson';
+
+/** File name for aggregated lifetime trajectory summary. */
+const FILE_NAME_LIFETIME_SUMMARY = 'lifetime.summary.json';
+
+/** Upper percentage bound for compact verification confidence ratio. */
+const MAX_COMPACT_CR_PERCENT = 100;
+
+/** Run interval for triggering background pruning checks on active ledger. */
+const PRUNING_CHECK_INTERVAL_RUNS = 10;
+
 /**
  * Normalizes optional verification and manifold telemetry into compact rounded fields.
  */
@@ -61,19 +79,23 @@ function normalizeCompactVerification(
     }
     const normalized: CompactVerificationTelemetry = {};
     if (typeof vrf.k === 'number' && Number.isFinite(vrf.k)) {
-        normalized.k = Math.round(Math.max(0, Math.min(1, vrf.k)) * 100) / 100;
+        normalized.k =
+            Math.round(Math.max(0, Math.min(1, vrf.k)) * PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR;
     }
     if (typeof vrf.cr === 'number' && Number.isFinite(vrf.cr)) {
-        normalized.cr = Math.round(Math.max(0, Math.min(100, vrf.cr)) * 10) / 10;
+        normalized.cr =
+            Math.round(Math.max(0, Math.min(MAX_COMPACT_CR_PERCENT, vrf.cr)) * DECIMALS_FACTOR) /
+            DECIMALS_FACTOR;
     }
     if (typeof vrf.ci === 'number' && Number.isFinite(vrf.ci)) {
-        normalized.ci = Math.round(Math.max(0, Math.min(1, vrf.ci)) * 100) / 100;
+        normalized.ci =
+            Math.round(Math.max(0, Math.min(1, vrf.ci)) * PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR;
     }
     if (typeof vrf.dm === 'number' && Number.isFinite(vrf.dm)) {
-        normalized.dm = Math.round(Math.max(0, vrf.dm) * 100) / 100;
+        normalized.dm = Math.round(Math.max(0, vrf.dm) * PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR;
     }
     if (typeof vrf.tau === 'number' && Number.isFinite(vrf.tau)) {
-        normalized.tau = Math.round(Math.max(0, vrf.tau) * 10) / 10;
+        normalized.tau = Math.round(Math.max(0, vrf.tau) * DECIMALS_FACTOR) / DECIMALS_FACTOR;
     }
     if (vrf.q === 1) {
         normalized.q = 1;
@@ -98,7 +120,39 @@ function trimSecondaryVerification(rec: CompactTrajectoryRecord): CompactTraject
     return Object.keys(trimmedVrf).length > 0 ? { ...rest, vrf: trimmedVrf } : rest;
 }
 
-export function formatCompactRecord(params: {
+/**
+ * Formats four-tier orthogonal ELOC counters into compact ledger representation.
+ */
+function buildElocSection(counters: ElocCounters) {
+    return {
+        proc: counters.processed,
+        uniq: counters.unique,
+        chg: counters.changed,
+        sem: counters.semantic,
+        reloc: counters.relocated,
+        cosm: counters.cosmetic,
+    };
+}
+
+/**
+ * Formats quality score metrics into rounded compact representation.
+ */
+function buildScoreSection(metrics: TrajectoryQualityMetrics) {
+    const compactVector = metrics.scoreVector.map(
+        (scoreVal: number) => Math.round(scoreVal * PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR,
+    );
+    return {
+        bef: Math.round(metrics.beforeScore * PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR,
+        aft: Math.round(metrics.afterScore * PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR,
+        vec: compactVector,
+        qed: Math.round(metrics.qed * PRECISION_MILLIONTHS) / PRECISION_MILLIONTHS,
+    };
+}
+
+/**
+ * Parameter payload for compact record formatting.
+ */
+export interface CompactRecordParams {
     runId: string;
     revision: string;
     sig?: string;
@@ -110,7 +164,15 @@ export function formatCompactRecord(params: {
     gatePass: boolean;
     gateCode?: string;
     vrf?: CompactVerificationTelemetry;
-}): CompactTrajectoryRecord {
+}
+
+/**
+ * Formats raw execution counters and trajectory metrics into an ultra-compact ledger record.
+ *
+ * @param params - Execution context, counters, and quality metrics.
+ * @returns Serialized compact trajectory record bounded within schema constraints.
+ */
+export function formatCompactRecord(params: CompactRecordParams): CompactTrajectoryRecord {
     const {
         runId,
         revision,
@@ -125,20 +187,20 @@ export function formatCompactRecord(params: {
         vrf,
     } = params;
 
-    // 0.01 precision is required downstream: the self-audit baseline compares
-    // trajectory vectors against stored values at two decimals.
-    const compactVector = metrics.scoreVector.map(
-        (scoreVal: number) => Math.round(scoreVal * 100) / 100,
-    );
-    const boundedId = runId.length > 12 ? runId.slice(-12) : runId;
-    const boundedRev = revision.slice(0, 8);
-    const boundedMod = module.length > 12 ? module.slice(0, 12) : module;
-    const boundedAgent = agent.length > 12 ? agent.slice(0, 12) : agent;
+    const boundedId =
+        runId.length > BOUNDED_TEXT_LENGTH_LONG ? runId.slice(-BOUNDED_TEXT_LENGTH_LONG) : runId;
+    const boundedRev = revision.slice(0, BOUNDED_TEXT_LENGTH_SHORT);
+    const boundedMod =
+        module.length > BOUNDED_TEXT_LENGTH_LONG
+            ? module.slice(0, BOUNDED_TEXT_LENGTH_LONG)
+            : module;
+    const boundedAgent =
+        agent.length > BOUNDED_TEXT_LENGTH_LONG ? agent.slice(0, BOUNDED_TEXT_LENGTH_LONG) : agent;
     const normalizedVrf = normalizeCompactVerification(vrf);
+    const boundedSig = sig && sig.length > BOUNDED_TEXT_LENGTH_SHORT
+        ? sig.slice(0, BOUNDED_TEXT_LENGTH_SHORT)
+        : sig;
 
-    // The compact ledger enforces a hard 350B per-record budget. `code` is
-    // redundant when the gate passed ('PASS' duplicates pass:true), so it is
-    // omitted in that case to reclaim bytes without losing information.
     const gate = gatePass
         ? { pass: true }
         : { pass: false, code: gateCode ?? 'REJECT_QUALITY_REGRESSION' };
@@ -146,24 +208,12 @@ export function formatCompactRecord(params: {
     return {
         t: timestamp ?? Date.now(),
         rev: boundedRev,
-        ...(sig ? { sig: sig.length > 8 ? sig.slice(0, 8) : sig } : {}),
+        ...(boundedSig ? { sig: boundedSig } : {}),
         id: boundedId,
         mod: boundedMod,
         agent: boundedAgent,
-        eloc: {
-            proc: counters.processed,
-            uniq: counters.unique,
-            chg: counters.changed,
-            sem: counters.semantic,
-            reloc: counters.relocated,
-            cosm: counters.cosmetic,
-        },
-        score: {
-            bef: Math.round(metrics.beforeScore * 100) / 100,
-            aft: Math.round(metrics.afterScore * 100) / 100,
-            vec: compactVector,
-            qed: Math.round(metrics.qed * 1000000) / 1000000,
-        },
+        eloc: buildElocSection(counters),
+        score: buildScoreSection(metrics),
         debt: {
             add: metrics.debtDelta.addedDebtPoints,
             res: metrics.debtDelta.resolvedDebtPoints,
@@ -192,8 +242,12 @@ export function serializeNdjsonLine(record: CompactTrajectoryRecord): string {
     // stayed over budget and the ledger guard then blocked the whole audit.
     const ladder: Array<(rec: CompactTrajectoryRecord) => CompactTrajectoryRecord> = [
         trimSecondaryVerification,
-        (rec) => ({ ...rec, mod: rec.mod.slice(0, 8), agent: rec.agent.slice(0, 8) }),
-        (rec) => ({ ...rec, id: rec.id.slice(-8) }),
+        (rec) => ({
+            ...rec,
+            mod: rec.mod.slice(0, BOUNDED_TEXT_LENGTH_SHORT),
+            agent: rec.agent.slice(0, BOUNDED_TEXT_LENGTH_SHORT),
+        }),
+        (rec) => ({ ...rec, id: rec.id.slice(-BOUNDED_TEXT_LENGTH_SHORT) }),
         (rec) => ({ ...rec, score: { ...rec.score, vec: rec.score.vec.map(roundToTenth) } }),
         (rec) => ({ ...rec, score: { ...rec.score, vec: rec.score.vec.map(roundToWhole) } }),
         (rec) => ({ ...rec, score: { ...rec.score, qed: roundToWhole(rec.score.qed) } }),
@@ -215,14 +269,17 @@ export function serializeNdjsonLine(record: CompactTrajectoryRecord): string {
 }
 
 /** Rounds a score to one decimal place. */
-function roundToTenth(value: number): number {
-    return Math.round(value * 10) / 10;
+function roundToTenth(numericScore: number): number {
+    return Number.isFinite(numericScore) ? Math.round(numericScore * DECIMALS_FACTOR) / DECIMALS_FACTOR : 0;
 }
 
-/** Rounds a score to an integer. */
-function roundToWhole(value: number): number {
-    return Math.round(value);
+/** Rounds a score to an integer with finite value guard. */
+function roundToWhole(numericScore: number): number {
+    return Number.isFinite(numericScore) ? Math.round(numericScore) : 0;
 }
+
+const syncFsExists = fs.existsSync.bind(fs);
+const syncFsMkdir = fs.mkdirSync.bind(fs);
 
 /**
  * Ensures that the ledger directory structure exists.
@@ -230,20 +287,22 @@ function roundToWhole(value: number): number {
  * @param ledgerDir - Absolute or relative path to ledger directory.
  */
 export function ensureLedgerDirectory(ledgerDir: string): void {
-    if (!fs.existsSync(ledgerDir)) {
-        fs.mkdirSync(ledgerDir, { recursive: true });
+    if (!syncFsExists(ledgerDir)) {
+        syncFsMkdir(ledgerDir, { recursive: true });
     }
-    const weeklyDir = path.join(ledgerDir, 'weekly-summaries');
-    if (!fs.existsSync(weeklyDir)) {
-        fs.mkdirSync(weeklyDir, { recursive: true });
+    const weeklyDir = path.join(ledgerDir, DIR_NAME_WEEKLY_SUMMARIES);
+    if (!syncFsExists(weeklyDir)) {
+        syncFsMkdir(weeklyDir, { recursive: true });
     }
 }
 
 /** Approximate byte size per NDJSON line used for stat heuristic before read. */
 const ESTIMATED_LINE_BYTES = 200;
 
-/** In-memory append counter to throttle stat/pruning checks. */
-let appendCounter = 0;
+/** In-memory state holder for throttling ledger stat/pruning checks. */
+const ledgerStoreState = {
+    appendCounter: 0,
+};
 
 /**
  * Persists pruned trajectory runs into an append-only cold archive file.
@@ -252,14 +311,28 @@ let appendCounter = 0;
  * @param ledgerDir - Root trajectory ledger directory.
  * @param prunedLines - Array of serialized NDJSON record lines that were slid out.
  */
-async function archivePrunedRuns(ledgerDir: string, prunedLines: string[]): Promise<void> {
+async function saveArchivedPrunedRuns(ledgerDir: string, prunedLines: string[]): Promise<void> {
     if (prunedLines.length === 0) return;
     try {
-        const archiveFile = path.join(ledgerDir, 'archive-runs.ndjson');
+        const archiveFile = path.join(ledgerDir, FILE_NAME_ARCHIVE_RUNS);
         await fs.promises.appendFile(archiveFile, prunedLines.join('\n') + '\n', 'utf8');
     } catch {
         // Best-effort: ignore cold archive write failures
     }
+}
+
+/**
+ * Persists recent lines to active NDJSON and archives pruned overflow.
+ */
+async function commitPrunedRunSlices(
+    activeFile: string,
+    lines: string[],
+    maxRollingRuns: number,
+): Promise<void> {
+    const prunedLines = lines.slice(0, lines.length - maxRollingRuns);
+    const recentLines = lines.slice(-maxRollingRuns);
+    await saveArchivedPrunedRuns(path.dirname(activeFile), prunedLines);
+    await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
 }
 
 /**
@@ -280,10 +353,7 @@ export async function pruneActiveRuns(
             .split('\n')
             .filter((lineText) => lineText.trim().length > 0);
         if (lines.length > maxRollingRuns) {
-            const prunedLines = lines.slice(0, lines.length - maxRollingRuns);
-            const recentLines = lines.slice(-maxRollingRuns);
-            await archivePrunedRuns(path.dirname(activeFile), prunedLines);
-            await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
+            await commitPrunedRunSlices(activeFile, lines, maxRollingRuns);
         }
     } catch (err: unknown) {
         if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -312,10 +382,7 @@ async function pruneActiveRunsIfOversized(
             .split('\n')
             .filter((lineText) => lineText.trim().length > 0);
         if (lines.length > maxRollingRuns * 1.5) {
-            const prunedLines = lines.slice(0, lines.length - maxRollingRuns);
-            const recentLines = lines.slice(-maxRollingRuns);
-            await archivePrunedRuns(path.dirname(activeFile), prunedLines);
-            await fs.promises.writeFile(activeFile, recentLines.join('\n') + '\n', 'utf8');
+            await commitPrunedRunSlices(activeFile, lines, maxRollingRuns);
         }
     } catch (err: unknown) {
         if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') {
@@ -338,12 +405,12 @@ export async function appendTrajectoryRecord(
     maxRollingRuns = DEFAULT_MAX_ROLLING_RUNS,
 ): Promise<void> {
     ensureLedgerDirectory(ledgerDir);
-    const activeFile = path.join(ledgerDir, 'active-runs.ndjson');
+    const activeFile = path.join(ledgerDir, FILE_NAME_ACTIVE_RUNS);
     const line = serializeNdjsonLine(record) + '\n';
 
     await fs.promises.appendFile(activeFile, line, 'utf8');
-    appendCounter++;
-    if (appendCounter % 10 === 0) {
+    ledgerStoreState.appendCounter++;
+    if (ledgerStoreState.appendCounter % PRUNING_CHECK_INTERVAL_RUNS === 0) {
         await pruneActiveRunsIfOversized(activeFile, maxRollingRuns);
     }
 }
@@ -363,6 +430,28 @@ export function parseCompactRecordSafe(line: string): CompactTrajectoryRecord | 
 }
 
 /**
+ * Parses lines of serialized NDJSON content into an array of CompactTrajectoryRecord.
+ */
+function parseNdjsonRecords(content: string, limit?: number): CompactTrajectoryRecord[] {
+    const lines = content
+        .trim()
+        .split('\n')
+        .filter((lineText) => lineText.trim().length > 0);
+    const targetLines =
+        limit !== undefined && limit > 0 && lines.length > limit ? lines.slice(-limit) : lines;
+    const records: CompactTrajectoryRecord[] = [];
+
+    for (const line of targetLines) {
+        const parsed = parseCompactRecordSafe(line);
+        if (parsed !== null) {
+            records.push(parsed);
+        }
+    }
+
+    return records;
+}
+
+/**
  * Reads recent trajectory records from active NDJSON file.
  * Reentrant and idempotent async read-only routine.
  *
@@ -372,30 +461,13 @@ export function parseCompactRecordSafe(line: string): CompactTrajectoryRecord | 
  */
 export async function readRecentRecords(
     ledgerDir: string,
-    limit = 100,
+    limit = DEFAULT_MAX_ROLLING_RUNS,
 ): Promise<CompactTrajectoryRecord[]> {
-    const activeFile = path.join(ledgerDir, 'active-runs.ndjson');
-    if (!fs.existsSync(activeFile)) {
-        return [];
-    }
+    const activeFile = path.join(ledgerDir, FILE_NAME_ACTIVE_RUNS);
 
     try {
         const content = await fs.promises.readFile(activeFile, 'utf8');
-        const lines = content
-            .trim()
-            .split('\n')
-            .filter((lineText) => lineText.trim().length > 0);
-        const targetLines = limit > 0 && lines.length > limit ? lines.slice(-limit) : lines;
-        const records: CompactTrajectoryRecord[] = [];
-
-        for (const line of targetLines) {
-            const parsed = parseCompactRecordSafe(line);
-            if (parsed !== null) {
-                records.push(parsed);
-            }
-        }
-
-        return records;
+        return parseNdjsonRecords(content, limit);
     } catch {
         return [];
     }
@@ -411,17 +483,11 @@ export async function readRecentRecords(
 export async function readLifetimeSummary(
     ledgerDir: string,
 ): Promise<WeeklyTrajectorySummary | null> {
-    const lifetimeFile = path.join(ledgerDir, 'lifetime.summary.json');
-    if (!fs.existsSync(lifetimeFile)) {
-        return null;
-    }
+    const lifetimeFile = path.join(ledgerDir, FILE_NAME_LIFETIME_SUMMARY);
     try {
         const raw = await fs.promises.readFile(lifetimeFile, 'utf8');
         return JSON.parse(raw) as WeeklyTrajectorySummary;
-    } catch (err: unknown) {
-        if (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') {
-            return null;
-        }
+    } catch {
         return null;
     }
 }
@@ -438,7 +504,7 @@ export async function writeLifetimeSummary(
     summary: WeeklyTrajectorySummary,
 ): Promise<void> {
     ensureLedgerDirectory(ledgerDir);
-    const lifetimeFile = path.join(ledgerDir, 'lifetime.summary.json');
+    const lifetimeFile = path.join(ledgerDir, FILE_NAME_LIFETIME_SUMMARY);
     const compactStagingPath = `${lifetimeFile}.compact-tmp-${process.pid}-${Date.now()}`;
     const payload = JSON.stringify(summary, null, 2) + '\n';
     try {
@@ -464,24 +530,10 @@ export async function writeLifetimeSummary(
 export async function readArchivedRecords(
     ledgerDir: string,
 ): Promise<CompactTrajectoryRecord[]> {
-    const archiveFile = path.join(ledgerDir, 'archive-runs.ndjson');
-    if (!fs.existsSync(archiveFile)) {
-        return [];
-    }
+    const archiveFile = path.join(ledgerDir, FILE_NAME_ARCHIVE_RUNS);
     try {
         const content = await fs.promises.readFile(archiveFile, 'utf8');
-        const lines = content
-            .trim()
-            .split('\n')
-            .filter((lineText) => lineText.trim().length > 0);
-        const records: CompactTrajectoryRecord[] = [];
-        for (const line of lines) {
-            const parsed = parseCompactRecordSafe(line);
-            if (parsed !== null) {
-                records.push(parsed);
-            }
-        }
-        return records;
+        return parseNdjsonRecords(content);
     } catch {
         return [];
     }

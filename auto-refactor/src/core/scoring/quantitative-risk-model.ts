@@ -9,7 +9,8 @@
  *   1. Compute financial debt ledger: principal, interest drag, and interest coverage ratio (ICR).
  *   2. Compute risk-adjusted quality metrics: Sharpe ratio (QSR), Sortino ratio, VaR 95%, MDD.
  *   3. Compute debt inequality economics: Gini coefficient and rule family Shannon entropy.
- *   4. Compute stochastic dynamics: Ornstein-Uhlenbeck mean-reversion half-life and excess kurtosis.
+ *   4. Compute stochastic dynamics: Ornstein-Uhlenbeck mean-reversion half-life and
+ *      excess kurtosis.
  * Exit Semantics & Design Rationale: Pure, non-throwing, zero I/O functions. Strictly bounded
  *   to CC <= 12, Depth <= 3, and execution time <= 3ms.
  */
@@ -46,6 +47,25 @@ export const EPSILON_FLOAT = 1e-4;
 
 /** Threshold for excess kurtosis signifying heavy-tailed (Leptokurtic) distribution. */
 export const FAT_TAIL_KURTOSIS_THRESHOLD = 3.0;
+
+/** Numeric scale factor for percentages and rounding. */
+const PERCENT_SCALE = 100.0;
+
+/** Normal distribution baseline kurtosis subtracted for excess kurtosis. */
+const NORMAL_DISTRIBUTION_KURTOSIS = 3.0;
+
+/** Minimum sample count required for kurtosis calculation. */
+const MIN_KURTOSIS_SAMPLE_COUNT = 4;
+
+const STATUS_DE_LEVERAGING = 'de-leveraging' as const;
+const STATUS_BALANCED = 'balanced' as const;
+const STATUS_INSOLVENT = 'insolvent' as const;
+const STATUS_INSUFFICIENT_SAMPLES = 'insufficient_samples' as const;
+
+const CLEARANCE_ACTIVE_CLEARING = 'active-clearing' as const;
+const CLEARANCE_BALANCED = 'balanced' as const;
+const CLEARANCE_DEFICIT_GROWING = 'deficit-growing' as const;
+const CLEARANCE_INSUFFICIENT_SAMPLES = 'insufficient_samples' as const;
 
 /**
  * Single file record carrying remediation effort and topological centrality.
@@ -177,9 +197,8 @@ export interface QuantitativeRiskAssessment {
 /**
  * Helper to round a number to two decimal places safely.
  */
-function roundTwoDecimals(value: number): number {
-    if (!Number.isFinite(value)) return 0.0;
-    return Math.round(value * 100) / 100;
+function roundTwoDecimals(inputNumericValue: number): number {
+    return Number.isFinite(inputNumericValue) ? Math.round(inputNumericValue * PERCENT_SCALE) / PERCENT_SCALE : 0.0;
 }
 
 /**
@@ -235,17 +254,17 @@ function evaluateCoverageRatioAndStatus(
 ): { icr: number; status: FinancialDebtMetrics['status'] } {
     if (safeAccrual <= 0) {
         if (safeYield > 0) {
-            return { icr: RATIO_SATURATION_CEILING, status: 'de-leveraging' };
+            return { icr: RATIO_SATURATION_CEILING, status: STATUS_DE_LEVERAGING };
         }
-        return { icr: 1.0, status: 'balanced' };
+        return { icr: 1.0, status: STATUS_BALANCED };
     }
 
     const icr = roundTwoDecimals(safeYield / (safeAccrual + EPSILON_FLOAT));
-    let status: FinancialDebtMetrics['status'] = 'insolvent';
+    let status: FinancialDebtMetrics['status'] = STATUS_INSOLVENT;
     if (icr >= 2.0) {
-        status = 'de-leveraging';
+        status = STATUS_DE_LEVERAGING;
     } else if (icr >= 1.0) {
-        status = 'balanced';
+        status = STATUS_BALANCED;
     }
     return { icr, status };
 }
@@ -255,12 +274,12 @@ function evaluateCoverageRatioAndStatus(
  */
 function resolveClearanceStatus(status: FinancialDebtMetrics['status']): FinancialDebtMetrics['clearanceStatus'] {
     switch (status) {
-        case 'de-leveraging':
-            return 'active-clearing';
-        case 'balanced':
-            return 'balanced';
+        case STATUS_DE_LEVERAGING:
+            return CLEARANCE_ACTIVE_CLEARING;
+        case STATUS_BALANCED:
+            return CLEARANCE_BALANCED;
         default:
-            return 'deficit-growing';
+            return CLEARANCE_DEFICIT_GROWING;
     }
 }
 
@@ -286,8 +305,8 @@ export function computeFinancialDebtLedger(input: FinancialDebtInput): Financial
             rcr: 0.0,
             deficitStockHours: principalHours,
             frictionDragHours: interestDragHours,
-            status: 'insufficient_samples',
-            clearanceStatus: 'insufficient_samples',
+            status: STATUS_INSUFFICIENT_SAMPLES,
+            clearanceStatus: CLEARANCE_INSUFFICIENT_SAMPLES,
         };
     }
 
@@ -318,7 +337,7 @@ function computeScoreDeviations(
     mean: number,
     baseline: number,
 ): { stdDev: number; downsideDev: number } {
-    const n = samples.length;
+    const sampleCount = samples.length;
     let sumVariance = 0;
     let sumDownside = 0;
 
@@ -329,25 +348,25 @@ function computeScoreDeviations(
         sumDownside += downDiff * downDiff;
     }
 
-    const stdDev = n > 1 ? Math.sqrt(sumVariance / (n - 1)) : 0;
-    const downsideDev = Math.sqrt(sumDownside / n);
+    const stdDev = sampleCount > 1 ? Math.sqrt(sumVariance / (sampleCount - 1)) : 0;
+    const downsideDev = Math.sqrt(sumDownside / sampleCount);
     return { stdDev, downsideDev };
 }
 
 /**
  * Computes consecutive step Value at Risk (95%) and Maximum Drawdown.
  */
-function computeVarAndMdd(samples: readonly number[]): { var95: number; mdd: number } {
-    const n = samples.length;
+function computeRiskAndDrawdown(samples: readonly number[]): { var95: number; mdd: number } {
+    const sampleCount = samples.length;
     let peak = samples[0];
     let maxDrawdownPct = 0;
 
     const deltas: number[] = [];
-    for (let i = 1; i < n; i++) {
+    for (let i = 1; i < sampleCount; i++) {
         deltas.push(samples[i] - samples[i - 1]);
         if (samples[i] > peak) peak = samples[i];
         if (peak > 0) {
-            const currentDd = ((peak - samples[i]) / peak) * 100.0;
+            const currentDd = ((peak - samples[i]) / peak) * PERCENT_SCALE;
             if (currentDd > maxDrawdownPct) maxDrawdownPct = currentDd;
         }
     }
@@ -356,10 +375,10 @@ function computeVarAndMdd(samples: readonly number[]): { var95: number; mdd: num
         return { var95: 0.0, mdd: roundTwoDecimals(maxDrawdownPct) };
     }
 
-    const deltaMean = deltas.reduce((acc, d) => acc + d, 0) / deltas.length;
+    const deltaMean = deltas.reduce((accumulator, delta) => accumulator + delta, 0) / deltas.length;
     let deltaVariance = 0;
-    for (const d of deltas) {
-        const diff = d - deltaMean;
+    for (const delta of deltas) {
+        const diff = delta - deltaMean;
         deltaVariance += diff * diff;
     }
     const deltaStd = Math.sqrt(deltaVariance / (deltas.length - 1));
@@ -422,7 +441,7 @@ export function computeQualityRiskRatios(input: QualityRiskInput): QualityRiskMe
         sortino = Math.min(RATIO_SATURATION_CEILING, Math.max(0.0, excessScore / downsideDev));
     }
 
-    const { var95, mdd } = computeVarAndMdd(samples);
+    const { var95, mdd } = computeRiskAndDrawdown(samples);
     const finalQsr = roundTwoDecimals(qsr);
     const finalSortino = roundTwoDecimals(sortino);
 
@@ -446,17 +465,17 @@ export function computeQualityRiskRatios(input: QualityRiskInput): QualityRiskMe
  * Computes file-level technical debt Gini coefficient from ascending sorted slice.
  */
 function calculateGiniCoefficient(sortedDebts: readonly number[], totalSum: number): number {
-    const n = sortedDebts.length;
-    if (n === 0 || totalSum <= 0) return 0.0;
+    const itemCount = sortedDebts.length;
+    if (itemCount === 0 || totalSum <= 0) return 0.0;
 
     let numerator = 0;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < itemCount; i++) {
         const rank = i + 1;
-        const weight = 2 * rank - n - 1;
+        const weight = 2 * rank - itemCount - 1;
         numerator += weight * sortedDebts[i];
     }
 
-    const gini = numerator / (n * totalSum);
+    const gini = numerator / (itemCount * totalSum);
     return Math.max(0.0, Math.min(1.0, roundTwoDecimals(gini)));
 }
 
@@ -466,10 +485,10 @@ function calculateGiniCoefficient(sortedDebts: readonly number[], totalSum: numb
 function calculateCategoryEntropy(categoryCounts?: Record<string, number>): number {
     if (!categoryCounts) return 0.0;
     const activeCounts = Object.values(categoryCounts).filter((c) => Number.isFinite(c) && c > 0);
-    const k = activeCounts.length;
-    if (k <= 1) return 0.0;
+    const activeCategoryCount = activeCounts.length;
+    if (activeCategoryCount <= 1) return 0.0;
 
-    const totalViolations = activeCounts.reduce((acc, c) => acc + c, 0);
+    const totalViolations = activeCounts.reduce((accumulator, count) => accumulator + count, 0);
     if (totalViolations <= 0) return 0.0;
 
     let shannon = 0;
@@ -478,7 +497,7 @@ function calculateCategoryEntropy(categoryCounts?: Record<string, number>): numb
         shannon -= prob * Math.log2(prob);
     }
 
-    const maxShannon = Math.log2(k);
+    const maxShannon = Math.log2(activeCategoryCount);
     if (maxShannon <= 0) return 0.0;
     return Math.max(0.0, Math.min(1.0, roundTwoDecimals(shannon / maxShannon)));
 }
@@ -495,7 +514,7 @@ export function computeDebtInequality(input: InequalityInput): InequalityMetrics
         .slice()
         .sort((a, b) => a - b);
 
-    const totalDebtItems = validDebts.reduce((acc, d) => acc + d, 0);
+    const totalDebtItems = validDebts.reduce((accumulator, debt) => accumulator + debt, 0);
     const debtGini = calculateGiniCoefficient(validDebts, totalDebtItems);
     const defectEntropy = calculateCategoryEntropy(input.ruleCategoryCounts);
 
@@ -512,19 +531,19 @@ export function computeDebtInequality(input: InequalityInput): InequalityMetrics
  * Estimates discrete Ornstein-Uhlenbeck lag-1 autocorrelation and half-life in commits.
  */
 function estimateOuHalfLife(scores: readonly number[]): { halfLife: number; theta: number } {
-    const n = scores.length;
-    if (n < MIN_RISK_SAMPLE_SIZE) {
+    const scoreCount = scores.length;
+    if (scoreCount < MIN_RISK_SAMPLE_SIZE) {
         return { halfLife: 1.0, theta: 1.0 };
     }
 
-    const mean = scores.reduce((acc, s) => acc + s, 0) / n;
+    const mean = scores.reduce((accumulator, score) => accumulator + score, 0) / scoreCount;
     let covLag = 0;
     let variance = 0;
 
-    for (let t = 1; t < n; t++) {
+    for (let t = 1; t < scoreCount; t++) {
         covLag += (scores[t] - mean) * (scores[t - 1] - mean);
     }
-    for (let t = 0; t < n; t++) {
+    for (let t = 0; t < scoreCount; t++) {
         const diff = scores[t] - mean;
         variance += diff * diff;
     }
@@ -543,7 +562,7 @@ function estimateOuHalfLife(scores: readonly number[]): { halfLife: number; thet
     const halfLife = Math.log(2.0) / theta;
 
     return {
-        halfLife: Math.max(0.1, Math.min(50.0, roundTwoDecimals(halfLife))),
+        halfLife: Math.max(0.1, Math.min(MAX_RISK_WINDOW_SIZE, roundTwoDecimals(halfLife))),
         theta: roundTwoDecimals(theta),
     };
 }
@@ -552,32 +571,32 @@ function estimateOuHalfLife(scores: readonly number[]): { halfLife: number; thet
  * Computes excess kurtosis for cyclomatic complexity values to detect heavy-tail risks.
  */
 function calculateExcessKurtosis(values?: readonly number[]): { kurtosis: number; isFatTailed: boolean } {
-    if (!values || values.length < 4) {
+    if (!values || values.length < MIN_KURTOSIS_SAMPLE_COUNT) {
         return { kurtosis: 0.0, isFatTailed: false };
     }
 
     const validVals = values.filter((v) => Number.isFinite(v));
-    const m = validVals.length;
-    if (m < 4) return { kurtosis: 0.0, isFatTailed: false };
+    const validSampleCount = validVals.length;
+    if (validSampleCount < MIN_KURTOSIS_SAMPLE_COUNT) return { kurtosis: 0.0, isFatTailed: false };
 
-    const mean = validVals.reduce((acc, v) => acc + v, 0) / m;
+    const mean = validVals.reduce((accumulator, val) => accumulator + val, 0) / validSampleCount;
     let secondMoment = 0;
     let fourthMoment = 0;
 
-    for (const v of validVals) {
-        const diff = v - mean;
+    for (const val of validVals) {
+        const diff = val - mean;
         const diffSq = diff * diff;
         secondMoment += diffSq;
         fourthMoment += diffSq * diffSq;
     }
 
-    const variance = secondMoment / m;
+    const variance = secondMoment / validSampleCount;
     if (variance < EPSILON_FLOAT) {
         return { kurtosis: 0.0, isFatTailed: false };
     }
 
-    const meanFourthMoment = fourthMoment / m;
-    const kurtosis = meanFourthMoment / (variance * variance) - 3.0;
+    const meanFourthMoment = fourthMoment / validSampleCount;
+    const kurtosis = meanFourthMoment / (variance * variance) - NORMAL_DISTRIBUTION_KURTOSIS;
     const roundedKurt = roundTwoDecimals(kurtosis);
 
     return {

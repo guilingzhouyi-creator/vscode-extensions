@@ -2,13 +2,13 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-31T12:41:27.985Z",
+  "timestamp": "2026-10-31T13:11:38.195Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.16,
+    "score": 99.18,
     "grade": "A+",
-    "cai": 88.09,
+    "cai": 88.11,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
@@ -16,48 +16,48 @@
       "averagePor": 0.082,
       "averageColumnDensity": 0.867,
       "averageSpatialDensity": 0.451,
-      "averageMahalanobisDistance": 4.53,
+      "averageMahalanobisDistance": 4.529,
       "averageFisherSimplexDistance": 0.093
     },
     "sqale": {
-      "tdr": 0.004,
-      "remediationMinutes": 29462,
+      "tdr": 0.0039,
+      "remediationMinutes": 28637,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.42,
-      "meanScore": 96.42,
+      "index": 96.45,
+      "meanScore": 96.45,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "counts": {
       "files": 807,
-      "total": 4295,
+      "total": 4193,
       "errors": 0,
-      "warns": 3631,
-      "info": 664,
+      "warns": 3543,
+      "info": 650,
       "suppressed": 113
     }
   },
   "usability": {
     "proven": 49,
-    "patchable": 1804,
-    "advisory": 2442,
-    "uncalibrated": 4133,
+    "patchable": 1756,
+    "advisory": 2388,
+    "uncalibrated": 4031,
     "needsHuman": 6
   },
   "defaultVerify": "npm test",
   "dimensions": {
     "architectureConsistency": 97.87,
-    "semanticPurity": 98.18,
+    "semanticPurity": 98.2,
     "codeSecurity": 99.78,
-    "performanceEfficiency": 99.57,
-    "standardization": 83.99,
-    "modernity": 97.91,
-    "maintainability": 92.95,
-    "commentQuality": 99.37,
-    "duplication": 94.93,
+    "performanceEfficiency": 99.67,
+    "standardization": 84.11,
+    "modernity": 98,
+    "maintainability": 93.02,
+    "commentQuality": 99.39,
+    "duplication": 95.09,
     "techDebtRisk": 100
   },
   "bottlenecks": [
@@ -82,32 +82,32 @@
     {
       "rule": "metric",
       "dim": "architectureConsistency",
-      "loss": 2530,
-      "count": 253
+      "loss": 2520,
+      "count": 252
     },
     {
       "rule": "SIM-TRN-001",
       "dim": "standardization",
-      "loss": 2280,
-      "count": 228
+      "loss": 2260,
+      "count": 226
     },
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2145,
-      "count": 429
+      "loss": 2125,
+      "count": 425
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2070,
-      "count": 207
+      "loss": 2050,
+      "count": 205
     },
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 2031,
-      "count": 677
+      "loss": 1965,
+      "count": 655
     }
   ],
   "topology": {
@@ -8252,5 +8252,5 @@
       }
     ]
   },
-  "truncated": 3131
+  "truncated": 3043
 }
