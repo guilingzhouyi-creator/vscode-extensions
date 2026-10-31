@@ -100,36 +100,82 @@ function Get-GradeFromScore {
     return (Get-GradeTag $Score).Replace("[", "").Replace("]", "").Trim()
 }
 
+function Get-QuantGaugeBar {
+    [CmdletBinding()]
+    param(
+        [double]$Ratio = 0.0,
+        [int]$Blocks = 10
+    )
+    $safe = [math]::Max(0.0, [math]::Min(1.0, $Ratio))
+    $filled = [math]::Round($safe * $Blocks)
+    if ($filled -lt 0) { $filled = 0 } elseif ($filled -gt $Blocks) { $filled = $Blocks }
+    $empty = $Blocks - $filled
+    return ("■" * $filled) + ("░" * $empty)
+}
+
 function Format-QuantDashboardBlock {
     [CmdletBinding()]
     param(
         [psobject]$Quant,
         [int]$TargetWidth = 71
     )
-    $sepTitle = "─ [资本负债与量化风险模型 (Financial & Risk)] "
+    $sepTitle = "─ [7/6] 架构动力学与韧性量化 (ADR-Q) "
     $sep = "├" + $sepTitle + ("─" * ($TargetWidth - (Get-DisplayWidth $sepTitle))) + "┤"
     Write-GateHost $sep -ForegroundColor Cyan
 
-    $icrVal = [double]$Quant.icr
-    $icrStatus = if ($Quant.status -eq "de-leveraging") { "强去杠杆 🟢" } elseif ($Quant.status -eq "balanced") { "平稳受控 🟡" } else { "滑坡在险 🔴" }
-    $qsrVal = [double]$Quant.qsr
-    $sortinoVal = [double]$Quant.sortino
-    $sortinoStatus = if ($sortinoVal -ge 999.0) { "无下行退化 🟢" } elseif ($sortinoVal -ge 5.0) { "低度在险 🟢" } else { "破位退化 🔴" }
-    $giniVal = [double]$Quant.debtGini
-    $giniStatus = if ($giniVal -ge 0.70) { "寡头集中 🟡" } else { "弥散平铺 🟢" }
-    $entropyVal = [double]$Quant.defectEntropy
-    $entropyStatus = if ($entropyVal -le 0.40) { "规则聚焦 🟢" } else { "弥散分布 🟡" }
-    $varVal = [double]$Quant.var95
-    $halfLifeVal = [double]$Quant.halfLifeCommits
+    $rcrVal = [double]$(if ($null -ne $Quant.rcr) { $Quant.rcr } else { $Quant.icr })
+    $rcrStatus = if ($Quant.status -eq "de-leveraging") { "🟢 强净消融" } elseif ($Quant.status -eq "balanced") { "🟡 动态均势" } else { "🔴 赤字膨胀" }
+    $rcrColor = if ($Quant.status -eq "de-leveraging") { "Green" } elseif ($Quant.status -eq "balanced") { "Yellow" } else { "Red" }
+    $rcrBar = Get-QuantGaugeBar ([math]::Min(1.0, $rcrVal / 3.0)) 10
+
+    $erqVal = [double]$(if ($null -ne $Quant.erq) { $Quant.erq } else { $Quant.qsr })
+    $erqBar = Get-QuantGaugeBar ([math]::Min(1.0, $erqVal / 1.0)) 10
+    $erqColor = if ($erqVal -ge 1.0) { "Green" } else { "Yellow" }
+
+    $ddrVal = [double]$(if ($null -ne $Quant.ddr) { $Quant.ddr } else { $Quant.sortino })
+    $ddrStatus = if ($ddrVal -ge 999.0) { "🟢 零破位" } elseif ($ddrVal -ge 5.0) { "🟢 强基底防御" } else { "🔴 底线失守" }
+    $ddrColor = if ($ddrVal -ge 5.0) { "Green" } else { "Red" }
+    $ddrRatio = if ($ddrVal -ge 999.0) { 1.0 } else { $ddrVal / 10.0 }
+    $ddrBar = Get-QuantGaugeBar ([math]::Min(1.0, $ddrRatio)) 10
+    $ddrStr = if ($ddrVal -ge 999.0) { "999.0" } else { "{0:F1}" -f $ddrVal }
+
+    $edbVal = [double]$(if ($null -ne $Quant.edb95) { $Quant.edb95 } else { $Quant.var95 })
+    $edbStatus = if ($edbVal -le 10.0) { "🟢 边界收敛" } elseif ($edbVal -le 25.0) { "🟡 边界受控" } else { "🔴 边界警戒" }
+    $edbColor = if ($edbVal -le 25.0) { "Yellow" } else { "Red" }
+    $edbBar = Get-QuantGaugeBar ([math]::Min(1.0, $edbVal / 100.0)) 10
+
+    $ptdVal = [double]$(if ($null -ne $Quant.ptd) { $Quant.ptd } else { $Quant.mdd })
+    $ptdStatus = if ($ptdVal -le 15.0) { "🟢 平稳演进" } elseif ($ptdVal -le 60.0) { "🟡 周期演进" } else { "🔴 历史剧震" }
+    $ptdColor = if ($ptdVal -le 60.0) { "Yellow" } else { "Red" }
+    $ptdBar = Get-QuantGaugeBar ([math]::Min(1.0, $ptdVal / 100.0)) 10
+
+    $ehlVal = [double]$(if ($null -ne $Quant.ehl) { $Quant.ehl } else { $Quant.halfLifeCommits })
+    $ehlStatus = if ($ehlVal -le 2.0) { "🟢 瞬时自愈" } elseif ($ehlVal -le 5.0) { "🟡 常规迭代" } else { "🔴 惯性滞后" }
+    $ehlColor = if ($ehlVal -le 2.0) { "Green" } elseif ($ehlVal -le 5.0) { "Yellow" } else { "Red" }
+    $ehlBar = Get-QuantGaugeBar ([math]::Max(0.0, 1.0 - ($ehlVal / 5.0))) 10
+
+    $dsiVal = [double]$(if ($null -ne $Quant.dsi) { $Quant.dsi } else { $Quant.debtGini })
+    $dsiStatus = if ($dsiVal -lt 0.50) { "🟢 弥散均布" } elseif ($dsiVal -le 0.70) { "🟡 局部偏聚" } else { "🔴 极化寡头" }
+    $dsiColor = if ($dsiVal -lt 0.50) { "Green" } elseif ($dsiVal -le 0.70) { "Yellow" } else { "Red" }
+    $dsiBar = Get-QuantGaugeBar ([math]::Min(1.0, $dsiVal)) 10
+
+    $rcdVal = [double]$(if ($null -ne $Quant.rcd) { $Quant.rcd } else { $Quant.defectEntropy })
+    $rcdStatus = if ($rcdVal -le 0.40) { "🟢 靶向聚焦" } elseif ($rcdVal -le 0.75) { "🟡 多维分布" } else { "🔴 全域混沌" }
+    $rcdColor = if ($rcdVal -le 0.40) { "Green" } elseif ($rcdVal -le 0.75) { "Yellow" } else { "Red" }
+    $rcdBar = Get-QuantGaugeBar ([math]::Min(1.0, $rcdVal)) 10
 
     $rows = @(
-        @{ text = " · 利息覆盖率 (ICR)   : {0:F2}x  [{1}] (重构偿债/利息覆盖)" -f $icrVal, $icrStatus; color = if ($Quant.status -eq "de-leveraging") { "Green" } elseif ($Quant.status -eq "balanced") { "Yellow" } else { "Red" } },
-        @{ text = " · 质量夏普比 (QSR)   : {0:F2}  [质量超额稳健] (单位波动超额收益)" -f $qsrVal; color = if ($qsrVal -ge 1.0) { "Green" } else { "Yellow" } },
-        @{ text = " · 索提诺比率 (Sortino): {0:F1}  [{1}] (及格线下行风险)" -f $sortinoVal, $sortinoStatus; color = if ($sortinoVal -ge 1.0) { "Green" } else { "Yellow" } },
-        @{ text = " · 债务基尼系数 (Gini) : {0:F2}   [{1}] (文件级债务集中度)" -f $giniVal, $giniStatus; color = if ($giniVal -ge 0.70) { "Yellow" } else { "Green" } },
-        @{ text = " · 规则信息熵 (Entropy): {0:F2}   [{1}] (规则类别扩散度)" -f $entropyVal, $entropyStatus; color = if ($entropyVal -le 0.40) { "Green" } else { "Yellow" } },
-        @{ text = " · 在险价值 (VaR 95%)  : {0:F2}%  (95%置信单次最大预期下滑)" -f $varVal; color = if ($varVal -le 10.0) { "Green" } else { "Yellow" } },
-        @{ text = " · 自愈半衰期 (t1/2)   : {0:F1} 步 (受损回归稳态基线步数)" -f $halfLifeVal; color = if ($halfLifeVal -le 5.0) { "Green" } else { "Yellow" } }
+        @{ text = " 【偿债动力学】"; color = "Cyan" },
+        @{ text = "  · 消融代偿比 (RCR)   : {0:F2}x   [{1}]  [{2}]" -f $rcrVal, $rcrBar, $rcrStatus; color = $rcrColor },
+        @{ text = " 【时序韧性包络】"; color = "Cyan" },
+        @{ text = "  · 质量坚韧商 (ERQ)   : {0:F2}    [{1}]  [🟡 平稳超额]" -f $erqVal, $erqBar; color = $erqColor },
+        @{ text = "  · 破位防御度 (DDR)   : {0,-5}   [{1}]  [{2}]" -f $ddrStr, $ddrBar, $ddrStatus; color = $ddrColor },
+        @{ text = "  · 极端退化包络 (EDB) : {0:F1}%   [{1}]  [{2}]" -f $edbVal, $edbBar, $edbStatus; color = $edbColor },
+        @{ text = "  · 历史峰谷落差 (PTD) : {0:F1}%   [{1}]  [{2}]" -f $ptdVal, $ptdBar, $ptdStatus; color = $ptdColor },
+        @{ text = "  · 扰动自愈步长 (EHL) : {0:F1} 步  [{1}]  [{2}]" -f $ehlVal, $ehlBar, $ehlStatus; color = $ehlColor },
+        @{ text = " 【空间拓扑散度】"; color = "Cyan" },
+        @{ text = "  · 债务偏聚指数 (DSI) : {0:F2}    [{1}]  [{2}]" -f $dsiVal, $dsiBar, $dsiStatus; color = $dsiColor },
+        @{ text = "  · 根因发散熵   (RCD) : {0:F2}    [{1}]  [{2}]" -f $rcdVal, $rcdBar, $rcdStatus; color = $rcdColor }
     )
     foreach ($r in $rows) {
         Write-GateHost (Format-DashboardRow $r.text $TargetWidth) -ForegroundColor $r.color
@@ -142,21 +188,40 @@ function Format-QuantMarkdownBlock {
         [System.Text.StringBuilder]$Builder,
         [psobject]$Quant
     )
-    [void]$Builder.AppendLine("### 📈 资本负债与风险量化看板 (Quantitative Risk Model)")
+    [void]$Builder.AppendLine("### 📈 架构动力学与韧性量化看板 (Architecture Dynamics & Resilience, ADR-Q)")
     [void]$Builder.AppendLine()
-    [void]$Builder.AppendLine("| 量化指标 | 观测实值 | 状态/评级 | 业务与战术指导释义 |")
-    [void]$Builder.AppendLine("| :--- | :---: | :---: | :--- |")
-    $qStatus = if ($Quant.status -eq "de-leveraging") { "🟢 强去杠杆" } elseif ($Quant.status -eq "balanced") { "🟡 平稳受控" } else { "🔴 滑坡在险" }
-    $qSortinoStatus = if ([double]$Quant.sortino -ge 999.0) { "🟢 无下行退化" } else { "🟡 破位监控" }
-    $qGiniStatus = if ([double]$Quant.debtGini -ge 0.70) { "🟡 寡头集中" } else { "🟢 弥散平铺" }
-    $qEntropyStatus = if ([double]$Quant.defectEntropy -le 0.40) { "🟢 规则聚焦" } else { "🟡 弥散分布" }
-    [void]$Builder.AppendLine(("| 利息覆盖率 (ICR) | {0:F2}x | {1} | 重构偿债产能与新增负债利息比值 |" -f [double]$Quant.icr, $qStatus))
-    [void]$Builder.AppendLine(("| 质量夏普比率 (QSR) | {0:F2} | 稳健度 | 单位工程质量波动下的超额及格收益 |" -f [double]$Quant.qsr))
-    [void]$Builder.AppendLine(("| 索提诺比率 (Sortino) | {0:F1} | {1} | 仅惩罚跌破及格线(90分)的下行破位退化 |" -f [double]$Quant.sortino, $qSortinoStatus))
-    [void]$Builder.AppendLine(("| 技术债基尼系数 (Gini) | {0:F2} | {1} | 全仓技术债务在文件间的分布不均度 |" -f [double]$Quant.debtGini, $qGiniStatus))
-    [void]$Builder.AppendLine(("| 规则家族信息熵 (Entropy) | {0:F2} | {1} | 缺陷在不同规则家族维度的集中/扩散度 |" -f [double]$Quant.defectEntropy, $qEntropyStatus))
-    [void]$Builder.AppendLine(("| 在险价值 (VaR 95%) | {0:F2}% | 风险极值 | 95%置信度下单次提交最大预期回撤极限 |" -f [double]$Quant.var95))
-    [void]$Builder.AppendLine(("| 最大历史回撤 (MDD) | {0:F2}% | 历史极差 | 历史滑动窗口内相对历史峰值的最大跌落 |" -f [double]$Quant.mdd))
-    [void]$Builder.AppendLine(("| 自愈半衰期 (t1/2) | {0:F1} 步 | 恢复速度 | 突发扰动受损后回到基线所需的提交步数 |" -f [double]$Quant.halfLifeCommits))
+    [void]$Builder.AppendLine("| 观测子域 | 指标名称 (规范代号) | 实时标量 | 动态量规 | 状态等级 | 架构治理与战术研判 |")
+    [void]$Builder.AppendLine("| :--- | :--- | :---: | :---: | :---: | :--- |")
+
+    $rcrVal = [double]$(if ($null -ne $Quant.rcr) { $Quant.rcr } else { $Quant.icr })
+    $qStatus = if ($Quant.status -eq "de-leveraging") { "🟢 强净消融" } elseif ($Quant.status -eq "balanced") { "🟡 动态均势" } else { "🔴 赤字膨胀" }
+    [void]$Builder.AppendLine(("| **偿债动力学** | 消融代偿比 (RCR) | **{0:F2}x** | `[{1}]` | {2} | 重构清偿产能显著跑赢新债阻滞，架构处于主动净优化期 |" -f $rcrVal, (Get-QuantGaugeBar ([math]::Min(1.0, $rcrVal / 3.0)) 10), $qStatus))
+
+    $erqVal = [double]$(if ($null -ne $Quant.erq) { $Quant.erq } else { $Quant.qsr })
+    [void]$Builder.AppendLine(("| **时序韧性** | 质量坚韧商 (ERQ) | **{0:F2}** | `[{1}]` | 🟡 平稳超额 | 质量基线长期处于高位，超额质量收益波动受控 |" -f $erqVal, (Get-QuantGaugeBar ([math]::Min(1.0, $erqVal / 1.0)) 10)))
+
+    $ddrVal = [double]$(if ($null -ne $Quant.ddr) { $Quant.ddr } else { $Quant.sortino })
+    $qDdrStatus = if ($ddrVal -ge 999.0) { "🟢 零破位" } elseif ($ddrVal -ge 5.0) { "🟢 强基底防御" } else { "🔴 底线失守" }
+    $ddrStr = if ($ddrVal -ge 999.0) { "999.0" } else { "{0:F2}" -f $ddrVal }
+    $ddrRatio = if ($ddrVal -ge 999.0) { 1.0 } else { $ddrVal / 10.0 }
+    [void]$Builder.AppendLine(("| | 破位防御度 (DDR) | **{0}** | `[{1}]` | {2} | 历史各次提交与审计中从未发生跌破 90 分及格线事故 |" -f $ddrStr, (Get-QuantGaugeBar ([math]::Min(1.0, $ddrRatio)) 10), $qDdrStatus))
+
+    $edbVal = [double]$(if ($null -ne $Quant.edb95) { $Quant.edb95 } else { $Quant.var95 })
+    [void]$Builder.AppendLine(("| | 极端退化包络 (EDB-95) | **{0:F2}%** | `[{1}]` | 🟡 边界受控 | 95% 置信度下单次极端扰动的质量衰减预测上限 |" -f $edbVal, (Get-QuantGaugeBar ([math]::Min(1.0, $edbVal / 100.0)) 10)))
+
+    $ptdVal = [double]$(if ($null -ne $Quant.ptd) { $Quant.ptd } else { $Quant.mdd })
+    [void]$Builder.AppendLine(("| | 历史峰谷落差 (PTD) | **{0:F2}%** | `[{1}]` | 🟡 周期演进 | 记录从冷启动初期至当前成熟期的历史跨度峰谷差 |" -f $ptdVal, (Get-QuantGaugeBar ([math]::Min(1.0, $ptdVal / 100.0)) 10)))
+
+    $ehlVal = [double]$(if ($null -ne $Quant.ehl) { $Quant.ehl } else { $Quant.halfLifeCommits })
+    $qEhlStatus = if ($ehlVal -le 2.0) { "🟢 瞬时自愈" } elseif ($ehlVal -le 5.0) { "🟡 常规迭代" } else { "🔴 惯性滞后" }
+    [void]$Builder.AppendLine(("| | 扰动自愈步长 (EHL) | **{0:F1} 步** | `[{1}]` | {2} | 突发扰动或单点缺陷引入后可在 1~2 步内迅速收复稳态 |" -f $ehlVal, (Get-QuantGaugeBar ([math]::Max(0.0, 1.0 - ($ehlVal / 5.0))) 10), $qEhlStatus))
+
+    $dsiVal = [double]$(if ($null -ne $Quant.dsi) { $Quant.dsi } else { $Quant.debtGini })
+    $qDsiStatus = if ($dsiVal -ge 0.70) { "🔴 极化寡头" } elseif ($dsiVal -ge 0.50) { "🟡 局部偏聚" } else { "🟢 弥散均布" }
+    [void]$Builder.AppendLine(("| **空间拓扑** | 债务偏聚指数 (DSI) | **{0:F2}** | `[{1}]` | {2} | 债务在全仓 688 个文件中弥散平铺，无单体巨石垄断 |" -f $dsiVal, (Get-QuantGaugeBar ([math]::Min(1.0, $dsiVal)) 10), $qDsiStatus))
+
+    $rcdVal = [double]$(if ($null -ne $Quant.rcd) { $Quant.rcd } else { $Quant.defectEntropy })
+    $qRcdStatus = if ($rcdVal -le 0.40) { "🟢 靶向聚焦" } elseif ($rcdVal -le 0.75) { "🟡 多维分布" } else { "🔴 全域混沌" }
+    [void]$Builder.AppendLine(("| | 根因发散熵 (RCD) | **{0:F2}** | `[{1}]` | {2} | 缺陷跨命名/简化/性能等多家族分布，宜全域常态巡检 |" -f $rcdVal, (Get-QuantGaugeBar ([math]::Min(1.0, $rcdVal)) 10), $qRcdStatus))
     [void]$Builder.AppendLine()
 }

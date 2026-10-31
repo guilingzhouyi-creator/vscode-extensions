@@ -157,15 +157,32 @@ function evaluateWorkspaceQuant(root = REPO_ROOT) {
             { historyScores: scores },
         );
 
+        const rcr = assessment.financial.rcr ?? assessment.financial.interestCoverageRatio;
+        const erq = assessment.riskRatios.erq ?? assessment.riskRatios.qsr;
+        const ddr = assessment.riskRatios.ddr ?? assessment.riskRatios.sortino;
+        const dsi = assessment.inequality.dsi ?? assessment.inequality.debtGini;
+        const rcd = assessment.inequality.rcd ?? assessment.inequality.defectEntropy;
+        const edb95 = assessment.riskRatios.edb95 ?? assessment.riskRatios.var95;
+        const ptd = assessment.riskRatios.ptd ?? assessment.riskRatios.mdd;
+        const ehl = assessment.stochastic.ehl ?? assessment.stochastic.halfLifeCommits;
+
         return {
-            icr: assessment.financial.interestCoverageRatio,
-            qsr: assessment.riskRatios.qsr,
-            sortino: assessment.riskRatios.sortino,
-            debtGini: assessment.inequality.debtGini,
-            defectEntropy: assessment.inequality.defectEntropy,
-            var95: assessment.riskRatios.var95,
-            mdd: assessment.riskRatios.mdd,
-            halfLifeCommits: assessment.stochastic.halfLifeCommits,
+            rcr,
+            erq,
+            ddr,
+            dsi,
+            rcd,
+            edb95,
+            ptd,
+            ehl,
+            icr: rcr,
+            qsr: erq,
+            sortino: ddr,
+            debtGini: dsi,
+            defectEntropy: rcd,
+            var95: edb95,
+            mdd: ptd,
+            halfLifeCommits: ehl,
             status: assessment.financial.status,
             sampleCount: scores.length,
             isSampleSufficient: scores.length >= MIN_SAMPLES,
@@ -175,6 +192,14 @@ function evaluateWorkspaceQuant(root = REPO_ROOT) {
 
     // Graceful fallback if dist is unbuilt
     return {
+        rcr: 2.0,
+        erq: 0.0,
+        ddr: 0.0,
+        dsi: 0.45,
+        rcd: 0.75,
+        edb95: 0.0,
+        ptd: 0.0,
+        ehl: 1.0,
         icr: 2.0,
         qsr: 0.0,
         sortino: 0.0,
@@ -206,19 +231,22 @@ if (require.main === module) {
     } else {
         const statusBadge =
             result.status === 'de-leveraging'
-                ? '🟢 强去杠杆'
+                ? '🟢 [强净消融]'
                 : result.status === 'balanced'
-                  ? '🟡 平稳受控'
-                  : '🔴 滑坡在险';
-        process.stdout.write(`\n=== 资本负债与量化风险模型 (Financial Engineering & Risk) ===\n`);
-        process.stdout.write(`  • 利息覆盖率 (ICR)   : ${result.icr.toFixed(2)}x [${statusBadge}]\n`);
-        process.stdout.write(`  • 质量夏普比 (QSR)   : ${result.qsr.toFixed(2)}\n`);
-        process.stdout.write(`  • 索提诺比率 (Sortino): ${result.sortino.toFixed(2)}\n`);
-        process.stdout.write(`  • 债务基尼系数 (Gini) : ${result.debtGini.toFixed(2)}\n`);
-        process.stdout.write(`  • 规则信息熵 (Entropy): ${result.defectEntropy.toFixed(2)}\n`);
-        process.stdout.write(`  • 在险价值 (VaR 95%)  : ${result.var95.toFixed(2)}%\n`);
-        process.stdout.write(`  • 最大历史回撤 (MDD)  : ${result.mdd.toFixed(2)}%\n`);
-        process.stdout.write(`  • 自愈半衰期 (t1/2)   : ${result.halfLifeCommits.toFixed(1)} 步\n`);
-        process.stdout.write(`=================================================================\n\n`);
+                  ? '🟡 [动态均势]'
+                  : '🔴 [赤字膨胀]';
+        process.stdout.write(`\n=== 架构动力学与韧性量化模型 (Architecture Dynamics & Resilience, ADR-Q) ===\n`);
+        process.stdout.write(` 【偿债动力学】\n`);
+        process.stdout.write(`  • 消融代偿比 (RCR)   : ${result.rcr.toFixed(2)}x ${statusBadge}\n`);
+        process.stdout.write(` 【时序韧性包络】\n`);
+        process.stdout.write(`  • 质量坚韧商 (ERQ)   : ${result.erq.toFixed(2)}\n`);
+        process.stdout.write(`  • 破位防御度 (DDR)   : ${result.ddr.toFixed(2)}\n`);
+        process.stdout.write(`  • 极端退化包络 (EDB) : ${result.edb95.toFixed(2)}%\n`);
+        process.stdout.write(`  • 历史峰谷落差 (PTD) : ${result.ptd.toFixed(2)}%\n`);
+        process.stdout.write(`  • 扰动自愈步长 (EHL) : ${result.ehl.toFixed(1)} 步\n`);
+        process.stdout.write(` 【空间拓扑散度】\n`);
+        process.stdout.write(`  • 债务偏聚指数 (DSI) : ${result.dsi.toFixed(2)}\n`);
+        process.stdout.write(`  • 根因发散熵   (RCD) : ${result.rcd.toFixed(2)}\n`);
+        process.stdout.write(`=========================================================================\n`);
     }
 }
