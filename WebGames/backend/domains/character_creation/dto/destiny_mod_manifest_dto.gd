@@ -220,32 +220,42 @@ static func _populate_starter_kits_dict(raw_val: Variant, target: Dictionary) ->
                 _normalize_kit_dict(d_entry)
                 target[str(k)] = d_entry
 
-static func _normalize_kit_dict(kit: Dictionary) -> void:
-    if kit.has("initial_gold") and not kit.has("bonus_gold"):
+static func _normalize_kit_gold(kit: Dictionary) -> void:
+    var has_init: bool = kit.has("initial_gold")
+    var has_bonus: bool = kit.has("bonus_gold")
+    if has_init and not has_bonus:
         kit["bonus_gold"] = kit["initial_gold"]
-    elif kit.has("bonus_gold") and not kit.has("initial_gold"):
+    elif has_bonus and not has_init:
         kit["initial_gold"] = kit["bonus_gold"]
-    elif not kit.has("initial_gold") and not kit.has("bonus_gold"):
+    elif not has_init and not has_bonus:
         kit["initial_gold"] = 50
         kit["bonus_gold"] = 50
 
+static func _build_items_from_init(init_arr: Array) -> Array[Dictionary]:
+    var new_items: Array[Dictionary] = []
+    for it in init_arr:
+        if it is Dictionary:
+            var cid: String = str(it.get("canonical_id", it.get("item_id", "")))
+            var cnt: int = int(it.get("count", it.get("quantity", 1)))
+            var slot_val: String = str(it.get("slot", "INVENTORY"))
+            new_items.append({"item_id": cid, "quantity": cnt, "slot": slot_val})
+    return new_items
+
+static func _build_init_from_items(items_arr: Array) -> Array[Dictionary]:
+    var new_init: Array[Dictionary] = []
+    for it in items_arr:
+        if it is Dictionary:
+            var cid: String = str(it.get("item_id", it.get("canonical_id", "")))
+            var cnt: int = int(it.get("quantity", it.get("count", 1)))
+            new_init.append({"canonical_id": cid, "count": cnt})
+    return new_init
+
+static func _normalize_kit_dict(kit: Dictionary) -> void:
+    _normalize_kit_gold(kit)
     var has_init := kit.has("initial_items") and kit["initial_items"] is Array
     var has_items := kit.has("items") and kit["items"] is Array
 
     if has_init and not has_items:
-        var new_items: Array[Dictionary] = []
-        for it in (kit["initial_items"] as Array):
-            if it is Dictionary:
-                var cid: String = str(it.get("canonical_id", it.get("item_id", "")))
-                var cnt: int = int(it.get("count", it.get("quantity", 1)))
-                var slot_val: String = str(it.get("slot", "INVENTORY"))
-                new_items.append({"item_id": cid, "quantity": cnt, "slot": slot_val})
-        kit["items"] = new_items
+        kit["items"] = _build_items_from_init(kit["initial_items"] as Array)
     elif has_items and not has_init:
-        var new_init: Array[Dictionary] = []
-        for it in (kit["items"] as Array):
-            if it is Dictionary:
-                var cid: String = str(it.get("item_id", it.get("canonical_id", "")))
-                var cnt: int = int(it.get("quantity", it.get("count", 1)))
-                new_init.append({"canonical_id": cid, "count": cnt})
-        kit["initial_items"] = new_init
+        kit["initial_items"] = _build_init_from_items(kit["items"] as Array)
