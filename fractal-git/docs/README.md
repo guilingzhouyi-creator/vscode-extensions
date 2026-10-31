@@ -17,9 +17,9 @@
 | [**`06-anthropic-scion-benchmark-and-parity-spec.md`**](06-anthropic-scion-benchmark-and-parity-spec.md) | **Anthropic Scion 架构解构与 Taxis 五维基准压测规范** | 复盘 Claude 团队高频代码合并场景与 Scion 三级解耦流式架构；确立 Taxis 正式版本五维基准测试套件（检出延迟、高并发合并、路径 Bloom 剪枝、内存零堆分配与离线弹性）及演进路线。 |
 | [**`07-taxis-construction-progress.md`**](07-taxis-construction-progress.md) | **Taxis 1.0 施工进度实测对齐版** | 以代码与门禁实测替换计划书 §十九 的滞后陈述：批次状态总表、`fg-native` 实际构成、六处设计错误修正证据、`relocate` 实现要点与仍未开始部分。 |
 | [**`08-taxis-in-place-storage-engine.md`**](08-taxis-in-place-storage-engine.md) | **Taxis 就地存储引擎 (TIPSE) 规约** | 阐明逆向尾部截断（Tail-First）、前向打洞（Hole Punching）、离散水位模拟器（SpacePlan）、WAL崩溃可逆恢复与微分型包递进轮转（Micro-Pack Slicing）。 |
-| [**`09-test-cache-and-shadow-audit-spec.md`**](09-test-cache-and-shadow-audit-spec.md) | **专属测试与缓存区、内核验证器与密码学影子审计规约** | 阐明 Direct-Bypass 独占测试与编译缓存直通空间、TKCV 形式化抽象推导器、IKCE 内存微变异打擂引擎、贝叶斯动态信用与 `refs/fractal/telemetry/*` 密码学防篡改审计链及金字塔折叠台账。 |
+| [**`09-test-cache-and-telemetry-audit-spec.md`**](09-test-cache-and-telemetry-audit-spec.md) | **专属测试与缓存区、内核验证器与密码学独立遥测审计规约** | 阐明 Direct-Bypass 独占测试与编译缓存直通空间、TKCV 形式化抽象推导器、IKCE 内存微变异击杀率验证引擎、贝叶斯动态信用与 `refs/fractal/telemetry/*` 密码学不可篡改遥测审计哈希链及分层树状归约台账。 |
 | [**`ARCHITECTURE.md`**](ARCHITECTURE.md) | **系统架构总览与快速规范查阅手册** | 包含 Mermaid 分形拓扑图、生命周期状态转移矩阵与核心接口速查表。 |
-| [**`DIRECTORY_SPEC.md`**](DIRECTORY_SPEC.md) | **全域目录职责矩阵与单向依赖扩展指引** | 规范 10 大微 Crate 物理职责、单向依赖 DAG 拓扑图与架构扩展路由准则。 |
+| [**`DIRECTORY_SPEC.md`**](DIRECTORY_SPEC.md) | **全域目录职责矩阵与单向依赖扩展指引** | 规范 10 大内核子系统物理职责、单向依赖 DAG 拓扑图与架构扩展路由准则。 |
 
 ---
 
@@ -34,7 +34,7 @@
 - **虚拟分支物化耗时**：`5 ~ 10ms`（从 LayerVFS 快照到写入 `.git/objects/`）
 - **Direct-Bypass 槽位测试与缓存隔离物理回收**：`< 20ms`（完全绕过 LayerVFS，享受物理 SSD 原生 I/O）
 - **TKCV 形式化推导全量校验耗时**：`< 5ms`（纯内存 AST/CFG 扫描，零外部进程开销）
-- **IKCE 隐藏微变异盲测击杀率刚性下限**：`K >= 60.0%`（破除大模型空断言虚假刷分）
+- **IKCE 隐藏微变异盲测击杀率刚性下限**：`K >= 60.0%`（破除空断言与恒真测试虚假通过）
 - **密码学防篡改审计收据体积**：`< 350B`（单行紧凑 NDJSON + HMAC-SHA1 链式签名）
 - **SubAgent 物理空间回收耗时**：`< 50ms`（完成即物理卸载，DAG 拓扑全息留存）
 - **原位解压峰值空间占用**：`max(S_archive, S_extracted) + Delta_batch`（根治 2x 磁盘悬崖与 ENOSPC）

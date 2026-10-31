@@ -70,7 +70,7 @@ enum TreeNode {
 
 ## 3. LayerVFS CAS 块到 Git Commit 的原子物化流水线
 
-当 Agent 在 LayerVFS 中经过 MCTS 打擂评选出最优解后，物化器在 **`< 10ms`** 内完成从虚拟时空向 Git 物理对象的跨越：
+当 Agent 在 LayerVFS 中经过候选变体评估选出最优解后，物化器在 **`< 10ms`** 内完成从虚拟时空向 Git 物理对象的跨越：
 
 ```mermaid
 sequenceDiagram
@@ -80,7 +80,7 @@ sequenceDiagram
   participant Codec as GitObjectCodec
   participant ODB as 本地 .git/objects/
   participant Ref as FractalRef
-  participant Telemetry as 影子审计链 (refs/fractal/telemetry/*)
+  participant Telemetry as 独立遥测审计链 (refs/fractal/telemetry/*)
 
   VFS->>Mat: 传入优胜快照清单 (Vec<CasFileDescriptor>)
   
@@ -98,7 +98,7 @@ sequenceDiagram
   par 步骤 A：推进代码分支指针
     Mat->>Ref: update_oid(git_dir, commit_oid)
     Note over Ref: 过渡文件原子 rename 推进指针，耗时 <1ms
-  and 步骤 B：追加密码学影子审计链
+  and 步骤 B：追加密码学独立遥测审计链
     Mat->>Telemetry: 追加 SHA-256 哈希块并推进 telemetry 分支
     Note over Telemetry: 调用 Win32 只读锁 / Linux chattr +a 物理加固
   end
@@ -110,5 +110,5 @@ sequenceDiagram
 - **单个文件 Blob 写入**：$< 0.2\text{ms}$（内存 zlib + 磁盘原子落盘）；
 - **100 个文件嵌套目录树构建**：$< 2\text{ms}$；
 - **端到端 Commit 物化与 Ref 推进**：$< 8\text{ms}$；
-- **影子审计链落盘与 OS 级加固**：$< 1.5\text{ms}$；
+- **独立遥测审计链落盘与 OS 级加固**：$< 1.5\text{ms}$；
 - **多 Agent 并发锁争用发生率**：**0.0%**。

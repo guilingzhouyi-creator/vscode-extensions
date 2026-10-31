@@ -154,7 +154,7 @@ vscode-extensions/              ← 工作区根目录
 │   ├── backend/                ← 核心计算与领域模型
 │   ├── frontend/               ← 视图表现层
 │   └── config/                 ← 配置表文件
-├── fractal-git/                ← 【项目四】分形 Git 内核（10 微 Crate）
+├── fractal-git/                ← 【项目四】分形 Git 内核（10 大内核子系统）
 ├── .agents/                    ← 治理技能集与专员注册表
 ├── docs/                       ← 顶层蓝图与系统性规范
 └── dist/                       ← 打包生成目录（已忽略）
@@ -194,7 +194,7 @@ bash scripts/sh/audit-all.sh            # Linux / macOS
 | [AGENTS.md](./AGENTS.md) | 工作区顶层治理总枢：按作业场景索引到技能真源与本地预审命令 | 动手改任何代码之前 |
 | [.agents/skills/](./.agents/skills) | <!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count -->研发技能，分通用工程、治理底座与项目适配三层 | 需要具体作业规范时 |
 | [docs/system-spec/README.md](./docs/system-spec/README.md) | 系统性规范总索引：质量评分模型、脚本治理体系、门禁审计清单 | 想理解度量与门禁如何构造时 |
-| [fractal-git/docs/README.md](./fractal-git/docs/README.md) | 分形 Git 内核文档：10 微 Crate 架构、无锁引擎与对标基准 | 阅读或改动 `fractal-git/` 时 |
+| [fractal-git/docs/README.md](./fractal-git/docs/README.md) | 分形 Git 内核文档：10 大内核子系统架构、无锁引擎与对标基准 | 阅读或改动 `fractal-git/` 时 |
 | [scripts/README.md](./scripts/README.md) | 仓库级脚本库清单与职能域矩阵 | 新增脚本或排查门禁时 |
 
 统一审查入口为 `bash scripts/sh/audit-all.sh` 与 `.\scripts\ps1\audit-all.ps1`，两者为同构双实现。

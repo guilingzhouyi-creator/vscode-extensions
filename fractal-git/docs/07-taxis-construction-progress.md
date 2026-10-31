@@ -20,7 +20,7 @@
 | **R2** commit-graph 布局与图链 | 计划书 §二 D5/D6 | ✅ **已完成** | `commit_graph.rs` 拆 `generation`/`time` 两字；`base_graph_count()` + 越界父位丢弃 |
 | **R3** tag 对象 codec | 计划书 §二 D12 | ✅ **已完成** | `fg-object/src/tag.rs`；真实 tag 载荷逐字节复算 OID 一致 |
 | **P1–P4** 兼容投影层 | 计划书 §十八 | ✅ **已全部完成** | `fg-storage/src/backends/` (1,655 行，26 测试)、`fg-index/src/index_file.rs` (656 行)、`fg-storage/src/projection.rs` (735 行) |
-| **C1** `fg-repo` | 计划书 §十八 | ✅ **架构收口闭环** | 遵循 10 微 Crate 封闭 DAG 契约，由根 Crate `src/lib.rs`、`repo_view.rs` (709 行) 与 `fg-native::RepoDocument` 承载 |
+| **C1** `fg-repo` | 计划书 §十八 | ✅ **架构收口闭环** | 遵循 10 大内核子系统封闭 DAG 契约，由根 Crate `src/lib.rs`、`repo_view.rs` (709 行) 与 `fg-native::RepoDocument` 承载 |
 | **C2** init / doctor / relocate | 计划书 §十八 | ✅ **已全部落地** | `taxis_cmd/{init,doctor,relocate}.rs`（合计 852 行）+ `test_relocate.rs` |
 | **C3** `.gitignore` 与属性匹配器 | 计划书 §十八 | ✅ **已全部完成** | `fg-index/src/ignore.rs` (496 行，14 测试)、`attributes.rs` (505 行，16 测试) 与 `read.rs` (`check-ignore`) |
 | **C4** `status` 三方比对 | 计划书 §十八 | ✅ **已全部落地** | `taxis_cmd/status.rs` (860 行，17 测试) 与 `tree_view.rs` (130 行) 原生实现三方比对与 stat cache |
@@ -80,18 +80,18 @@
 
 | # | 问题 | 处置 |
 | :---: | :--- | :--- |
-| 1 | 十处口径仍写「9 微 Crate」 | 全部改为 10，含门禁输出文案与 SubAgent 定义 |
+| 1 | 十处口径仍写「9 个子系统」 | 全部改为 10，含门禁输出文案与 SubAgent 定义 |
 | 2 | `fg-native` 的 `tempfile` 是零引用 dev-dependency | 删除（`fg-storage` 仍需要，`Cargo.lock` 保留） |
 | 3 | `relocate` 零实现，但 §15.4.3 与 §18 C2 都列为必做 | 新增 `taxis_cmd/relocate.rs`（381 行）+ `tests/rust/test_relocate.rs`（7 项） |
 | 4 | `doctor.rs:211` 的 `match` 触发 `clippy::match_like_matches_macro` | 改为 `matches!` |
 | 5 | `test_operation_graph_disk_persistence_roundtrip` 失败 | 测试假设 JSON 时代「自动建日志」行为；改为先用 `container_path` 建容器 |
-| 6 | `DIRECTORY_SPEC.md` 缺 `fg-native` 行、写「7 大微 Crate」、mermaid 缺节点 | 补行、改数、加节点与依赖边 |
+| 6 | `DIRECTORY_SPEC.md` 缺 `fg-native` 行、写「7 大子系统」、mermaid 缺节点 | 补行、改数、加节点与依赖边 |
 | 7 | `fractal-git/README.md` 目录树与责任表缺 `fg-native` | 补入 |
 | 8 | `taxis_cmd` 12 个历史 `*_cmd.rs` 命名与其余模块分裂 | 全部通过 `git mv` 规范化为 `*.rs`，并同步更新 Rustdoc 模块路径与调用方 |
 | 9 | `tree_view` 基础设施混在 `status` 造成反向依赖 | 抽离 `tree_view.rs` 承载树扁平化与 stat cache 对齐，解耦 `status/checkout/diff/merge` |
 | 10 | `taxis.rs` 顶层内联 7 大子命令导致体积膨胀至 953 行 | 抽离 `branch`, `undo`, `operation`, `rev_list`, `verify`, `reclaim`, `daemon` 至独立模块，`taxis.rs` 收敛至 289 行清晰路由 |
 | 11 | `taxis branch` 缺乏创建/删除/重命名完整功能 | 原生实现 `create_branch`, `delete_branch`, `rename_branch`, `list_branches`，与 Git 完全等价 |
-| 12 | 多微 Crate 测试套件与基准棘轮全面扩充 | 全仓 911 项测试 100% 通过，TB-REGRESSION 棘轮稳定通过 |
+| 12 | 多内核子系统测试套件与基准棘轮全面扩充 | 全仓 911 项测试 100% 通过，TB-REGRESSION 棘轮稳定通过 |
 | 13 | 补齐行级三方合并算子 `TextThreeWayMerge` | 下沉至 `fg-algorithms/src/merge/text_merge.rs`，提供标准三方冲突标记与内容合成 |
 | 14 | 抽离通用树扁平化算子 `tree_flatten` | 下沉至 `fg-algorithms/src/traverse/tree_flatten.rs`，解耦 `taxis_cmd/tree_view.rs` |
 | 15 | 抽离 `stat_layout` 统计排版算子 | 下沉至 `fg-algorithms/src/diff/stat_layout.rs`，解耦 diff 统计渲染 |
@@ -170,7 +170,7 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 | :--- | :--- |
 | `audit-all.ps1 -Fast` | 综合健康分 95.51（A+），fractal-git 支柱 93.86（5/5 检查） |
 | `audit-taxis.ps1 -Fast` | PASS，911 项测试通过，Composite=93.86 / CAI=72.96% |
-| `validate-crate-topology.js` | PASS（10 微 Crate 封闭单向 DAG） |
+| `validate-crate-topology.js` | PASS（10 大内核子系统封闭单向 DAG） |
 | `check-zero-alloc-boundary.js` | PASS（174 生产文件通过零分配、安全与文档契约） |
 | `validate-rust-conformance.js` | PASS（237 个生产 Rust 源文件 100% 工业级合规） |
 | `validate-git-parity.js` | PASS（57 个 Git 基准向量全匹配） |
@@ -203,14 +203,14 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 | 2 | **P2** DIRC 解析 + refs 扩展 | ✅ 已完成 | `crates/fg-index/src/index_file.rs`（656 行，支持 DIRC v2/v3/v4 前缀压缩与扩展节解码）+ `crates/fg-topology/src/refs.rs`（408 行，支持 packed-refs 二分查找与原子安全落盘） | 10 项 DIRC 测试 + 14 项 refs 集成测试通过 |
 | 3 | **P3** 树与历史遍历 | ✅ 已完成 | `fg-storage/src/commit_graph.rs`（380 行，CDAT 双字拆分与 BASE 图链支持）+ `fg-algorithms/src/traverse/{dag_walk,tree_flatten}.rs`（659 行，拓扑排序与世代号剪枝）+ `taxis_cmd/commit_walk.rs`（359 行） | 16 项遍历测试通过，145 个越界父位按规则丢弃 |
 | 4 | **P4** git-export / git-import | ✅ 已完成 | `crates/fg-storage/src/projection.rs`（735 行）+ `src/bin/taxis_cmd/projection.rs`（179 行），实现原生 TAXC 容器与传统 Git ODB 对象的双向无损往返投影 | 投影往返测试通过，支持全量与增量同步 |
-| 5 | **C1** 仓储模型收口 (`fg-repo`) | ✅ 架构收口 | 遵循工作区强制之「10 微 Crate 封闭单向 DAG」拓扑（`DIRECTORY_SPEC.md`），严禁拆立多余 crate。仓储聚合模型由根 Crate `src/lib.rs`、`repo_view.rs`（709 行）与 `fg-native::RepoDocument` 完整承载 | 11 项工作区视图与装配测试通过 |
+| 5 | **C1** 仓储模型收口 (`fg-repo`) | ✅ 架构收口 | 遵循工作区强制之「10 大内核子系统封闭单向 DAG」拓扑（`DIRECTORY_SPEC.md`），严禁拆立多余 crate。仓储聚合模型由根 Crate `src/lib.rs`、`repo_view.rs`（709 行）与 `fg-native::RepoDocument` 完整承载 | 11 项工作区视图与装配测试通过 |
 | 6 | **C2** init / doctor / relocate | ✅ 已完成 | `src/bin/taxis_cmd/{init,doctor,relocate}.rs`（合计 852 行），完整实现工作区初始化、多维健康体检、及基于 Win32 Junction 的原子搬迁 | 7 项搬迁测试（`test_relocate.rs`）及体检断言全绿 |
 | 7 | **C3** `.gitignore` 与属性匹配器 | ✅ 已完成 | `crates/fg-index/src/ignore.rs`（496 行，14 项测试，支持 glob 通配、多层否定与目录前缀）+ `attributes.rs`（505 行，16 项测试）+ `read.rs`（`check-ignore` 原生命令） | 30 项单元测试通过，完全与 gitignore 规范等价 |
 | 8 | **C4** `status` 三方比对 | ✅ 已完成 | `src/bin/taxis_cmd/status.rs`（860 行，17 项测试）与 `tree_view.rs`（130 行），基于 stat cache、原生索引与 HEAD 树执行高效三方比对 | 14 项比对与输出格式测试全绿，支持人类与 JSON 格式 |
 | 9 | **C5** git 兼容 diff / porcelain | ✅ 已完成 | 34 个子命令全部原生落地于 `src/bin/taxis_cmd/`；补齐 `TextThreeWayMerge`（560 行）行级三方合并算子与 `stat_layout`（210 行）紧凑排版算子 | 67 项 diff/merge 算法测试全绿 |
 | 10 | **C6** 与宿主 Git 二进制切割 | ✅ 切割完成 | 生产源码扫描实测 `Command::new("git")` 归零（0 处引用；仅差分测试夹具调用系统 git 作为 reference baseline），未知命令统一由 `reject_unimplemented` 明确拒绝，Taxis 实现原生自举运行；用户自带 hook 脚本由本地 POSIX 解释器执行 | 源码静态断言验证 0 处外部 Git 进程依赖 |
 
-**C6 达成证明**：全仓经过架构解耦与算子下沉后，核心与边缘瓷器命令已不再依赖宿主 Git 二进制，所有数据读写、索引匹配、历史遍历、对象序列化均基于 10 微 Crate 内核自举运行。`GitHookRunner` 只执行用户在 `core.hooksPath` 中自备的脚本，属于钩子契约的协作面，不构成对宿主 Git 二进制的依赖。
+**C6 达成证明**：全仓经过架构解耦与算子下沉后，核心与边缘瓷器命令已不再依赖宿主 Git 二进制，所有数据读写、索引匹配、历史遍历、对象序列化均基于 10 大内核子系统自举运行。`GitHookRunner` 只执行用户在 `core.hooksPath` 中自备的脚本，属于钩子契约的协作面，不构成对宿主 Git 二进制的依赖。
 
 ---
 
@@ -241,7 +241,7 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 | `FGT-LCK-001` | 声明 · 警示 | `tests/rust/test_in_memory_index.rs` 覆盖无锁构建 |
 | `FGT-FAC-001` | 声明 · 警示 | `auto-refactor/scripts/validate-facade-governance.js` 覆盖工作区门面，未覆盖本仓门面 |
 
-其余 21 项 `error` 级条目的执行面已全量落到内核校验器与审查脚本：`FGT-COR-001`、`FGT-ALG-001`、`FGT-IDX-001`、`FGT-POL-001`、`FGT-STO-001`、`FGT-TOP-001`、`FGT-TRN-001`、`FGT-OBJ-001`、`FGT-DEP-001`、`FGT-PRF-001`、`FGT-SAF-001`、`FGT-ERR-001`、`FGT-GAT-001`、`FGT-BRG-001`，以及双自动化区域与验证遥测专属条目 `FGT-VRF-001`（TKCV 五维推导）、`FGT-MUT-001`（IKCE 微变异击杀率）、`FGT-TAU-001`（IKCE 反恒真断言）、`FGT-BYP-001`（Direct-Bypass 测试缓存回收）、`FGT-QRN-001`（物理隔离检疫）、`FGT-AUD-001`（HMAC 影子审计链）与 `FGT-PYR-001`（四级金字塔时间折叠）。
+其余 21 项 `error` 级条目的执行面已全量落到内核校验器与审查脚本：`FGT-COR-001`、`FGT-ALG-001`、`FGT-IDX-001`、`FGT-POL-001`、`FGT-STO-001`、`FGT-TOP-001`、`FGT-TRN-001`、`FGT-OBJ-001`、`FGT-DEP-001`、`FGT-PRF-001`、`FGT-SAF-001`、`FGT-ERR-001`、`FGT-GAT-001`、`FGT-BRG-001`，以及双自动化区域与验证遥测专属条目 `FGT-VRF-001`（TKCV 五维推导）、`FGT-MUT-001`（IKCE 微变异击杀率）、`FGT-TAU-001`（IKCE 反恒真断言）、`FGT-BYP-001`（Direct-Bypass 测试缓存回收）、`FGT-QRN-001`（物理隔离检疫）、`FGT-AUD-001`（HMAC 独立遥测审计链）与 `FGT-PYR-001`（四级分层时间折叠）。
 
 ---
 
@@ -264,32 +264,32 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 
 ---
 
-## 十二、双专属自动化提交区域与影子审计链闭环 (Automation & Shadow Audit V3)
+## 十二、双专属自动化提交区域与独立遥测审计链闭环 (Automation & Telemetry Audit V3)
 
-为消融高频并发自动化测试对 Git DAG 历史的污染、大模型自觉性缺陷与作弊测试风险，全量落地双专属自动化提交区域与内核形式化验证体系（详见专册 [`09-test-cache-and-shadow-audit-spec.md`](09-test-cache-and-shadow-audit-spec.md)）：
+为消融高频并发自动化测试对 Git DAG 历史的污染、大模型自觉性缺陷与虚假测试风险，全量落地双专属自动化提交区域与内核形式化验证体系（详见专册 [`09-test-cache-and-telemetry-audit-spec.md`](09-test-cache-and-telemetry-audit-spec.md)）：
 
 1. **Direct-Bypass 极速自动化测试缓存区**：
    - 彻底切断快速单测对 Git ODB 的污染；
    - 采用 LayerVFS 内存分层与 Direct-Bypass Inode 直通回收协议，单次回收物理延迟 $<20\text{ms}$；
-   - 支撑千次级高频循环测试与微变异盲测打擂。
+   - 支撑千次级高频循环测试与微变异击杀率验证。
 2. **TKCV (Taxis Kernel Correctness Verifier) 形式化推导验证器**：
    - 纯内存静态抽象推导五维形式化不变式（AST 闭包、符号活性、纯函数等价、内存生命周期单向性、类型错误穷尽）；
    - 增量扫描延迟 $<5\text{ms}$，刚性拦截虚构代码与死函数。
-3. **IKCE (In-Kernel Canary Engine) 隐藏微变异盲测打擂**：
+3. **IKCE (In-Kernel Canary Engine) 隐藏微变异击杀率验证**：
    - 纯内存注入算子反转、边界偏移与空操作微变异体；
    - 刚性强制击杀率 $K = \frac{D_{\text{killed}}}{D_{\text{total}}} \ge 60\%$；
-   - 彻底粉碎“空断言”、“无 assert 测试打卡”等大模型作弊行为。
+   - 彻底粉碎“空断言”、“无 assert 测试打卡”等测试失效行为。
 4. **Jeffreys Beta(0.5, 0.5) 动态信用评级与检疫隔离**：
    - 共轭后验自适应评级模型（$\text{Credit} = 100 \times \frac{\alpha}{\alpha + \beta}$）；
    - 评级联动调度（高信度极速通道 vs 低信度全量盲测）；
    - 触发欺骗时瞬间剥夺写权限并物理移送至 `.taxis/quarantine/` 隔离检疫。
-5. **密码学防篡改影子审计链 (`refs/fractal/telemetry/*`)**：
+5. **密码学防篡改遥测审计哈希链 (`refs/fractal/telemetry/*`)**：
    - 单向 SHA-256 哈希链，独立于代码分支命名空间；
    - 提交物化时双载荷锁定（Git Commit + 审计链块）；
    - 操作系统级底层加固（Windows Win32 只读锁 + Linux `chattr +a` 仅追加属性）。
-6. **三位一体金字塔折叠与 CLI 命令面**：
+6. **三位一体分层历史归约与 CLI 命令面**：
    - 单行 NDJSON 严格 $<350$ 字节契约与 `cat_sort_uniq` 高效归纳；
-   - 金字塔三维演化流形（时间轴、空间轴、信用轴）折叠压缩；
+   - 分层三维演化流形（时间轴、空间轴、信用轴）归约压缩；
    - 命令行完整接线：`taxis quality trace/audit` 与 `taxis quarantine list/resolve`。
 
-全量 10 大微 Crate 架构封闭单向 DAG，测试集扩充至 **911 项测试 100% 绿色通行**，代码零瞬态分配与 100% 物理卫生合规。
+全量 10 大内核子系统架构封闭单向 DAG，测试集扩充至 **911 项测试 100% 绿色通行**，代码零瞬态分配与 100% 物理卫生合规。

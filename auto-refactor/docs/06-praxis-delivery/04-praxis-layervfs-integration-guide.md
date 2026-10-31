@@ -28,7 +28,7 @@ flowchart TD
         FAST_CDC["FastCDC 动态分块器 (4KB min / 8KB avg / 32KB max)"]
         SQLITE["SQLite WAL 单文件存储 + L1 内存 Overlay"]
         PROJ["物理投影引擎 (projectWorkspace)"]
-        MCTS["MCTS 树形打擂裁判 (MctsExplorer)"]
+        MCTS["MCTS 候选变体评估仲裁器 (MctsExplorer)"]
     end
 
     subgraph HostOS["物理执行隔离平面 (OS Temp / Sandbox CWD)"]
@@ -121,9 +121,9 @@ await sandbox.close();
 
 ---
 
-### 3.3 MCTS 多智能体并行打擂与自动优胜提拔
+### 3.3 MCTS 多智能体并发变体评估与择优晋级
 
-针对高难度重构任务，让多位 Agent 平行打擂，由 Auto 启发式质量模型充当裁判：
+针对高难度重构任务，支持多 Agent 并发生成变异方案并进行形式化评估，由 Auto 启发式质量模型执行仲裁：
 
 ```ts
 import { createMctsExplorer } from '@auto-refactor';

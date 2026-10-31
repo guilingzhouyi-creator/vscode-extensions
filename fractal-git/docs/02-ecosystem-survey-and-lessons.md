@@ -51,8 +51,8 @@ Google 主导的 `jj`（Jujutsu）是目前开源界具有代表性的现代版�
 ```mermaid
 flowchart LR
   subgraph JJ_FAILURES["Jujutsu (jj) 在 Agent 场景下的三大失效点"]
-    F1["1. 提交吞噬 (Commit Absorption)<br/>工作区自动吸纳变动，导致 Agent 多步探索 (实现->测试->文档) 被暴力压平成单一大 Commit，摧毁细粒度回滚能力"]
-    F2["2. 单写者限制 (Single-Writer Lock)<br/>单个 workspace 强制单进程写入，多 SubAgent 并发打擂时直接引发数据踩踏与操作互斥"]
+    F1["1. 提交吞噬 (Commit Absorption)<br/>工作区自动吸纳变动，导致 Agent 多步探索 (实现->测试->文档) 被强制合并压平成单一大 Commit，摧毁细粒度回滚能力"]
+    F2["2. 单写者限制 (Single-Writer Lock)<br/>单个 workspace 强制单进程写入，多 SubAgent 并发探索变体时直接引发数据踩踏与操作互斥"]
     F3["3. 混部状态延迟 (Colocated Desync)<br/>与原有 Git 混部时存在索引刷新时差，导致依赖原生 git 命令的工具频繁发生递归报错"]
   end
 ```
@@ -64,14 +64,14 @@ flowchart LR
 
 ## 3. 对 `plasma-ai/fractal` 的对比与超越
 
-GitHub 上的开源项目 `plasma-ai/fractal` 敏锐地提出了“将代码库看作由 Git Worktrees 构成的递归树”的宏观概念，但其底层技术路线存在致命工程死穴：
+GitHub 上的开源项目 `plasma-ai/fractal` 敏锐地提出了“将代码库看作由 Git Worktrees 构成的递归树”的宏观概念，但其底层技术路线存在重大工程架构缺陷：
 
 | 关键架构维度 | `plasma-ai/fractal` (当前开源方案) | `fractal-git` (本项目架构) | 架构代际差 |
 | :--- | :--- | :--- | :--- |
 | **底层实现栈** | **纯 Python 脚本**（封装原生 `git` CLI） | **Rust 原生内核**（gix plumbing）+ TS 编排 | Python 子进程开销巨大；Rust 微秒级操作，高并发零锁 |
 | **工作区物理机制** | **原生物理 `git worktree add`**<br/>在磁盘真实全量拷贝目录与文件 | **LayerVFS 内存虚拟树 + 稀疏按需投影** | `plasma-ai` 启动数个工作树磁盘瞬间打满；我们 **`<3ms` 零物理拷贝** |
 | **索引与阶段机制** | 原生 Git Index 索引区（易发生锁冲突） | **无锁内存虚拟索引（InMemoryTreeBuilder）** | 消除 `index.lock` 文件锁争用，并发冲突率降为 0 |
-| **质量与安全防线** | **依赖模型自身检查 diff**<br/>（易被幻觉误导，无客观门禁） | **内核验证把关（TKCV 5维推导 <5ms）+ IKCE 隐藏微变异打擂（击杀率 K >= 60%）+ 密码学影子审计链** | 不依赖模型自觉！形式化与微变异打擂双重一票否决 |
+| **质量与安全防线** | **依赖模型自身检查 diff**<br/>（易被幻觉误导，无客观门禁） | **内核验证把关（TKCV 5维推导 <5ms）+ IKCE 隐藏微变异击杀率验证（击杀率 K >= 60%）+ 密码学遥测审计哈希链** | 不依赖模型自觉！形式化与微变异击杀率验证双重一票否决 |
 | **全生命周期回收** | Python 脆弱的 `rm -rf` 脚本 | **Praxis 底层宿主毫秒级物理卸载与 DAG 保全** | 物理磁盘零残留，Git DAG 拓扑全息留存 |
 
 ---

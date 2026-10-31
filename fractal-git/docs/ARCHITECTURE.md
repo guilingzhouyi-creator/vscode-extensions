@@ -22,7 +22,7 @@ flowchart TD
   CELL_MAIN --- CARD_WT
   CARD_WT -.- SUB_WT
 
-  subgraph TELEMETRY_CHAIN["Shadow Audit Namespace (refs/fractal/telemetry/*)"]
+  subgraph TELEMETRY_CHAIN["Telemetry Audit Namespace (refs/fractal/telemetry/*)"]
     AUDIT_ROOT["Global Telemetry Chain Root"]
     AGENT_CHAIN["Per-Agent Monotonic Hash Chain"]
     AUDIT_ROOT --- AGENT_CHAIN
@@ -112,7 +112,7 @@ stateDiagram-v2
 
 ---
 
-## 4. In-Kernel Quality & Shadow Verification Subsystems
+## 4. In-Kernel Quality & Independent Verification Subsystems
 
 ### 4.1 TKCV (Taxis Kernel Correctness Verifier)
 - **Execution Overhead**: Linear AST inspection executed in $<5\text{ms}$;
@@ -134,7 +134,7 @@ stateDiagram-v2
   $$\text{Credit} = 100 \times \frac{\alpha}{\alpha + \beta} \quad (\text{Prior: } \text{Beta}(0.5, 0.5))$$
 - **Adaptive Gate Scheduling**: Automatically bypasses deep canary rounds for high-credit agents ($\text{Credit} \ge 90$) while enforcing full isolation for low-credit agents ($\text{Credit} < 60$).
 
-### 4.4 Cryptographic Shadow Audit Chain (`refs/fractal/telemetry/*`)
+### 4.4 Cryptographic Telemetry Audit Chain (`refs/fractal/telemetry/*`)
 - **Isolation**: Stored under isolated reference namespace `refs/fractal/telemetry/*` outside regular branch graphs;
 - **Hash-Linked Immutable Trail**: Each verification event references previous telemetry block hash via SHA-256;
 - **OS-Level Tamper Resistance**: Enforces read-only ACL on Windows and `chattr +a` (append-only) attributes on Linux.
@@ -191,7 +191,7 @@ Detailed specification: [`08-taxis-in-place-storage-engine.md`](08-taxis-in-plac
 
 ## 8. Crate Topology & Architectural Dependency Matrix
 
-Fractal Git is strictly architected as 10 focused micro-crates with a unidirectional acyclic dependency graph:
+Fractal Git is strictly architected as 10 focused kernel subsystems with a unidirectional acyclic dependency graph:
 
 ```
 [Layer 5: Presentation & CLI]

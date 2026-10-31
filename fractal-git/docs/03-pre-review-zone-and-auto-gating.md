@@ -1,7 +1,7 @@
 # 03. 提交预审区双轨互锁、内核验证器与检疫隔离规约
 
 > **所属模块**：`fractal-git/docs/`  
-> **核心议题**：阐明从传统 Git 盲目暂存向“提交预审区（Pre-Review Zone）”与“Direct-Bypass 极速测试缓存区”的范式跃迁，以及内核级抽象验证器（TKCV）、隐藏盲测打擂（IKCE）、贝叶斯信用动态评级与检疫隔离（Quarantine）刚性闭环。
+> **核心议题**：阐明从传统 Git 盲目暂存向“提交预审区（Pre-Review Zone）”与“Direct-Bypass 极速测试缓存区”的范式跃迁，以及内核级抽象验证器（TKCV）、隐藏微变异击杀率验证（IKCE）、贝叶斯信用动态评级与检疫隔离（Quarantine）刚性闭环。
 
 ---
 
@@ -27,7 +27,7 @@ flowchart TD
 
   subgraph ZONE_B["自动化区域 B：内核验证把关提交预审区 (Pre-Review Zone)"]
     TKCV["轨 A1：TKCV 内核形式化验证器 (<5ms)<br/>5 维形式化不变式抽象推导"]
-    IKCE["轨 A2：IKCE 隐藏微变异盲测打擂<br/>算子/边界内存变异 (击杀率 K >= 60%)"]
+    IKCE["轨 A2：IKCE 隐藏微变异盲测验证<br/>算子/边界内存变异 (击杀率 K >= 60%)"]
     ROLE["轨 B：主观协同审阅 (Peer Review)<br/>任务卡契约对齐与 Path Jail 边界核算"]
     CREDIT["动态信用控制器 (AgentCreditController)<br/>Jeffreys Beta(0.5, 0.5) 评级更新"]
   end
@@ -35,24 +35,24 @@ flowchart TD
   ROUTER -->|"快速调试 / 本地单测验证"| ZONE_A
   ROUTER -->|"正式提交意图 (Candidate Commit)"| ZONE_B
 
-  ZONE_B -->|"欺骗违规 / 变异打擂未过 / 信用过低"| QUARANTINE["检疫隔离区 (.taxis/quarantine/)<br/>剥夺写权限，锁定现场取证"]
+  ZONE_B -->|"欺骗违规 / 变异击杀率未达标 / 信用过低"| QUARANTINE["检疫隔离区 (.taxis/quarantine/)<br/>剥夺写权限，锁定现场取证"]
   ZONE_B -->|"形式化推导通过 + 变异全绿 + 信用达标"| GATE_PASS["签发 GateApproved 状态凭证"]
 
-  GATE_PASS --> ATOMIC_COMMIT["原子物化至生产 DAG 历史<br/>同步固化 refs/fractal/telemetry/* 影子审计链"]
+  GATE_PASS --> ATOMIC_COMMIT["原子物化至生产 DAG 历史<br/>同步固化 refs/fractal/telemetry/* 密码学遥测审计哈希链"]
   GATE_PASS --> GC_PRZ["工作树瞬时物理回收 (<50ms)"]
 ```
 
 ### 1.3 提交预审区的核心公理与刚性底线
 1. **未达标禁止物化（No Gate, No Commit）**：在未取得 `WorktreeState::GateApproved` 状态前，底层内核拒绝为该工作树生成任何 Git Commit 对象，拒绝推进任何 Git 引用指针；
-2. **瞬态试错零污染**：Agent 在预审区内的试错、微调与多次打擂全在内存快照中进行，不污染底层的 Git ODB 历史；
-3. **“测试通过非达标”防线公理**：单测全绿仅代表已知输入未崩溃，必须同时通过内核验证器（TKCV）形式化推导与变异打擂（IKCE）考验；
-4. **全生命周期防篡改留痕**：每一次预审的胜出、驳回或检疫，均通过单向密码学哈希链原子写入 `refs/fractal/telemetry/*` 影子审计分支。
+2. **瞬态试错零污染**：Agent 在预审区内的试错、微调与多次候选变体验证全在内存快照中进行，不污染底层的 Git ODB 历史；
+3. **“测试通过非达标”防线公理**：单测全绿仅代表已知输入未崩溃，必须同时通过内核验证器（TKCV）形式化推导与微变异击杀率（IKCE）考验；
+4. **全生命周期防篡改留痕**：每一次预审的胜出、驳回或检疫，均通过单向密码学哈希链原子写入 `refs/fractal/telemetry/*` 遥测审计分支。
 
 ---
 
 ## 2. 内核形式化推导验证器（TKCV - Taxis Kernel Correctness Verifier）
 
-为了消解“智能体写死虚假测试”、“空断言”和“通过死代码绕过静态分析”的作弊行为，Taxis 内置了轻量级形式化推导验证器，直接在内核层对代码 AST 与控制流展开 5 维不变式校验。
+为了消解“智能体写死虚假测试”、“空断言”和“通过死代码绕过静态分析”等规避检测与指标刷分行为，Taxis 内置了轻量级形式化推导验证器，直接在内核层对代码 AST 与控制流展开 5 维不变式校验。
 
 ### 2.1 五维形式化抽象推导不变式
 
@@ -60,7 +60,7 @@ flowchart TD
 +---------------------------------------------------------------------------------+
 |                  TKCV 形式化抽象推导 5 维不变式矩阵                              |
 +---+--------------------+------------------------+-------------------------------+
-| # | 不变式名称         | 形式化检验目标         | 防范的作弊 / 质量退化手段     |
+| # | 不变式名称         | 形式化检验目标         | 防范的规避手段与质量退化      |
 +---+--------------------+------------------------+-------------------------------+
 | 1 | AST 平衡性与闭包   | 括号/作用域 100% 封闭  | 语法截断、半成品代码提交      |
 | 2 | 符号可达性与活性   | 零死函数、无孤立导出   | 编写假实现但无实际调用链路    |
@@ -77,11 +77,11 @@ flowchart TD
 
 ---
 
-## 3. 隐藏盲测打擂引擎（IKCE - In-Kernel Canary Engine）
+## 3. 隐藏微变异击杀率验证引擎（IKCE - In-Kernel Canary Engine）
 
-静态分析能阻止低级语法与结构作弊，但无法探知测试用例是否具有真实断言价值。Taxis 引入内核隐藏微变异打擂引擎，充当代码审查的“金丝雀（Canary）”。
+静态分析能阻止语法与结构违规，但无法探知测试用例是否具有真实断言价值。Taxis 引入内核隐藏微变异击杀率验证引擎，充当代码审查的“金丝雀（Canary）”。
 
-### 3.1 盲测用例打擂与变异算子注入
+### 3.1 盲测用例变异测试与算子注入
 在 Agent 提交代码后，IKCE 自动在内存中对生产代码实施微扰动（Micro-Mutation），生成若干变异体（Mutants）：
 
 ```mermaid
@@ -109,7 +109,7 @@ flowchart LR
 $$K = \frac{D_{\text{killed}}}{D_{\text{total}}} \times 100\%$$
 
 - **击杀门槛刚性基线**：$K \ge 60\%$。
-- **空断言打假算法（Zero-Assertion Detection）**：若单元测试在多个关键逻辑变异体注入后依然 100% 全绿通过，判定该测试集存在“空断言”或“假测试”。
+- **无效断言甄别算法（Zero-Assertion Detection）**：若单元测试在多个关键逻辑变异体注入后依然 100% 全绿通过，判定该测试集存在“空断言”或“假测试”。
 - **惩罚性动作**：变异击杀率低于 $60\%$ 的提交将被立即打回，并计入 Agent 信用扣分；低于 $30\%$ 的提交判定为恶意欺骗，直接移送检疫隔离。
 
 ---
@@ -130,12 +130,12 @@ Taxis 摒弃基于主观印象的信誉机制，采用完全客观的共轭后�
 | 信用分区间 | 评级定位 | 预审流水线调度策略 |
 | :--- | :--- | :--- |
 | **$[90, 100]$** | 高信度智能体 (Trusted) | 启用极速通道：TKCV 验证 + 5 个代表性变异体抽检，预审耗时 $<50\text{ms}$ |
-| **$[75, 90)$** | 常规智能体 (Standard) | 完整通道：TKCV 验证 + 全量微变异打擂 ($K \ge 60\%$) |
+| **$[75, 90)$** | 常规智能体 (Standard) | 完整通道：TKCV 验证 + 全量微变异击杀率验证 ($K \ge 60\%$) |
 | **$[60, 75)$** | 观察期智能体 (Probation) | 深度穿透：变异击杀率要求提高至 $75\%$，且引入历史用例全量回归校验 |
 | **$[0, 60)$** | 不信任智能体 (Distrusted) | 冻结独立提交权限：所有产出强制直达检疫隔离区，由高级审计专员人工复审 |
 
 ### 4.3 物理检疫隔离机制（Quarantine Isolation）
-当代码触发严重作弊特征（如恶意篡改审计日志、连续两次变异击杀率 $<30\%$、或存在高危指令注入风险）时，内核立即执行物理隔离：
+当代码触发严重违规特征（如恶意篡改审计日志、连续两次变异击杀率 $<30\%$、或存在高危指令注入风险）时，内核立即执行物理隔离：
 
 ```
 .taxis/
@@ -153,9 +153,9 @@ Taxis 摒弃基于主观印象的信誉机制，采用完全客观的共轭后�
 
 ---
 
-## 5. 密码学防篡改影子审计链（`refs/fractal/telemetry/*`）
+## 5. 密码学防篡改独立遥测审计链（`refs/fractal/telemetry/*`）
 
-### 5.1 影子链数据拓扑
+### 5.1 独立遥测链数据拓扑
 审计链独立于常规代码分支（如 `refs/heads/main`），存储在 Git 原生底层但隔离的命名空间中：
 
 ```
@@ -194,9 +194,9 @@ sequenceDiagram
   participant Agent as 编码 Agent
   participant Harness as Praxis 宿主监测内核
   participant TKCV as 内核验证器 (TKCV)
-  participant IKCE as 盲测变异打擂 (IKCE)
+  participant IKCE as 微变异验证 (IKCE)
   participant ODB as Git ODB / Ref 存储
-  participant Telemetry as 影子审计链
+  participant Telemetry as 遥测审计哈希链
   participant Disk as 物理存储 / LayerVFS
 
   Agent->>Harness: 发起提交申请: submit_candidate(tree_oid)
@@ -208,7 +208,7 @@ sequenceDiagram
     Harness->>Telemetry: 记录违规条目 (AuditStatus::Rejected)
     Harness-->>Agent: 注入结构化 TKCV 诊断，打回返工
   else 静态推导通过
-    Harness->>IKCE: 注入微变异体，启动盲测打擂
+    Harness->>IKCE: 注入微变异体，启动击杀率验证
     alt 击杀率不足 (K < 60%)
       IKCE-->>Harness: 击杀率过低 / 空断言预警
       Harness->>Telemetry: 记录违规条目 (AuditStatus::Quarantined)
@@ -219,7 +219,7 @@ sequenceDiagram
       
       par 步骤 1：原子物化提交
         Harness->>ODB: 写入 Git Commit 对象并推进分支
-      and 步骤 2：追加影子审计链
+      and 步骤 2：追加独立遥测审计链
         Harness->>Telemetry: 原子追加并推进 refs/fractal/telemetry/*
       and 步骤 3：毫秒级空间回收
         Harness->>Disk: 卸载工作树，回收物理存储 (<50ms)
@@ -232,5 +232,5 @@ sequenceDiagram
 
 ### 6.2 物理回收耗时与资源释放契约
 1. **Direct-Bypass 测试缓存回收**：测试完成即刻清空，全量物理回收耗时 **$< 20\text{ms}$**；
-2. **SubAgent 瞬态树回收**：打擂分出胜负后，未采纳候选分支内存即刻注销，胜出分支物化合入后 **$< 50\text{ms}$** 完成工作树目录擦除；
+2. **SubAgent 瞬态树回收**：变体评估仲裁后，未采纳候选分支内存即刻注销，胜出分支物化合入后 **$< 50\text{ms}$** 完成工作树目录擦除；
 3. **零垃圾残留保障**：物理文件系统由内核使用严格的句柄闭合与文件锁释放策略，坚决避免 Windows 系统上常见的 `EBUSY` 或 `AccessDenied` 句柄泄露挂起问题。

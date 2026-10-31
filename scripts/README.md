@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**96 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**97 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -72,6 +72,7 @@
 | `common/` | Node.js | `evaluate-workspace-quant.js` | telemetry / quant（资本负债与量化风险模型：利息覆盖率、夏普比率、索提诺比率、基尼系数与自愈半衰期评估） | `audit-all`、本地 CLI |
 | `common/` | Node.js | `analyze-commit-terminology.js` | audit / terminology（历史提交术语频次与新兴黑话风险诊断，落盘 `.audit-logs/`） | 本地 CLI（诊断报告，不参与门禁裁决） |
 | `common/` | Node.js | `log-rotator.js` | tooling / hygiene（门禁失败快照保留、尾部截断 <=100KB 与 FIFO <=2MB 轮转清理管理器） | `pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`audit-all` |
+| `common/` | Node.js | `gate-failure-contract.js` | gate / failure（门禁失败命名拓扑学与格式物理卫生契约：规范四段式命名、8 项 Header 注入、ANSI 脱水与 GateFailureEnvelope 模式校验） | `audit-all`、`log-rotator`、CI |
 | `common/` | Node.js | `workspace-walker.js` | tooling / traversal（全工作区目录迭代遍历、物理黑名单过滤与文件收集 SSOT 工具） | 门禁与体积审查脚本集 |
 | `common/` | JSON | `commit-msg-forbidden-terms.json` | data / ssot（提交信息四维禁词与白名单单源字典） | `validate-commit-msg-style` |
 | `common/` | JSON | `doc-metrics.json` | data / ssot（治理文档规模指标的真源映射、渲染模板与脚本库语义登记表） | `sync-doc-metrics` |
@@ -279,7 +280,7 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 > | `EXTENSION-TESTS-14` ~ `EXTENSION-REVIEW-15` | workspace-timing 单元测试与六层审查 |
 > | `LEDGER-CONSTRAINT-16` | 长期轨迹账本物理约束 |
 > | `DOMAIN-AUDIT-17` ~ `DOMAIN-MERMAID-18` | WebGames 全域质量与文档 Mermaid 真解析 |
-> | `RUST-TAXIS-19` | fractal-git 微 Crate 回归套件 |
+> | `RUST-TAXIS-19` | fractal-git 内核子系统回归套件 |
 > | `COMMIT-CONTRACT-20` ~ `COMMIT-HISTORY-21` | 提交信息词法契约自测与待推送历史审查 |
 > | `CHANGE-ENTROPY-22` | 推送集变更熵与跨域扩散 |
 > | `FEEDBACK-VOCABULARY-23` | 反馈词表语义化与四态状态词闭包 |
