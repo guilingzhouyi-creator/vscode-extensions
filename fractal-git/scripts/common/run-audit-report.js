@@ -1,14 +1,14 @@
 /**
  * Module: Fractal Git — Automated Quality Audit & Auto-Refactor Report Generator
  * File Path: fractal-git/scripts/common/run-audit-report.js
- * Architecture Role: Primary quality auditor synthesizing micro-crate static invariant checks,
- *   multi-crate test regression telemetry, and genuine deep AST analysis via auto-refactor SDK.
+ * Architecture Role: Primary quality auditor synthesizing kernel subsystem static invariant checks,
+ *   subsystem test regression telemetry, and genuine deep AST analysis via auto-refactor SDK.
  * Dependencies & Triggers: Consumed by audit-all.ps1/sh, audit-taxis.ps1/sh, and CI pipelines;
  *   invokes validate-crate-topology, check-zero-alloc-boundary, validate-git-parity,
  *   validate-gate-bridge, and dynamically requires auto-refactor/dist/api.js.
  * Responsibilities:
- *   1. Execute static micro-crate DAG topology, Git parity, and zero-allocation checks;
- *   2. Run Cargo multi-crate test suite and parse ok/failed assertions deterministically;
+ *   1. Execute static kernel subsystem DAG topology, Git parity, and zero-allocation checks;
+ *   2. Run Cargo subsystem test suite and parse ok/failed assertions deterministically;
  *   3. Invoke auto-refactor programmatic AST scanner to compute genuine Tri-Plane and CAI scores;
  *   4. Persist structured, mathematically proven findings into reports/audit-latest.json.
  * Exit Semantics & Design Rationale: Exits 0 on clean verification, 1 on hard invariant violation;
@@ -56,7 +56,7 @@ function runStaticChecker(relativeScript) {
 }
 
 /**
- * Runs Cargo multi-crate tests and parses test count output.
+ * Runs Cargo subsystem tests and parses test count output.
  *
  * @param {boolean} fastMode - Skip full execution in fast check mode.
  * @returns {object} Test run outcome metrics including counts and output text.
@@ -79,7 +79,7 @@ function runCargoTests(fastMode) {
   }
   const cargoCmd = cargoResolution.command;
   // `--workspace` is mandatory: without it only the root package is compiled, so the ten
-  // micro-crates' unit tests never enter the audit and the reported test count is a fraction of
+  // kernel subsystems' unit tests never enter the audit and the reported test count is a fraction of
   // the suite. Every other Rust gate was corrected to pass it; this caller was missed, which is
   // exactly the kind of single-site omission a shared invocation would have prevented.
   const args = fastMode

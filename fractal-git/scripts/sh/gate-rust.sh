@@ -75,7 +75,7 @@ if [[ "${FAST_MODE}" -eq 1 ]]; then
 else
     cargo test --workspace --manifest-path "${MANIFEST}"
 fi
-echo "✔ All micro-crate unit and integration tests passed."
+echo "✔ All kernel subsystem unit and integration tests passed."
 
 echo ""
 echo "=== ALL FRACTAL GIT RUST GATE STAGES PASSED SUCCESSFULLY ==="

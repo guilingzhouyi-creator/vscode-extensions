@@ -2,7 +2,7 @@
 .SYNOPSIS
     Fractal Git Windows PowerShell Automated Build Pipeline
 .DESCRIPTION
-    Compiles Rust 10 micro-crates, verifies TypeScript facades, and validates DAG topology.
+    Compiles Rust 10 kernel subsystems, verifies TypeScript facades, and validates DAG topology.
     Adheres strictly to CRLF line endings, explicit working directories, and zero black-box claims.
 #>
 [CmdletBinding()]
@@ -29,11 +29,11 @@ Write-Host "  Fractal Git (Taxis) Build Pipeline (PowerShell 7+)" -ForegroundCol
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "Project Root: $ProjectRoot"
 
-# 1. Micro-crates DAG topology validation
+# 1. Subsystems DAG topology validation
 $nodeCmd = if (Get-Command node.exe -ErrorAction SilentlyContinue) { "node.exe" } elseif (Get-Command node -ErrorAction SilentlyContinue) { "node" } else { $null }
 $topologyScript = Join-Path $ProjectRoot "scripts\common\validate-crate-topology.js"
 if ($nodeCmd -and (Test-Path $topologyScript)) {
-    Write-Host "Validating Micro-Crate DAG Topology..." -ForegroundColor Gray
+    Write-Host "Validating Subsystems DAG Topology..." -ForegroundColor Gray
     $proc = Start-Process -FilePath $nodeCmd -ArgumentList $topologyScript -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
     if ($proc.ExitCode -ne 0) { exit $proc.ExitCode }
 } else {
@@ -65,7 +65,7 @@ if ($nodeCmd -and (Test-Path $tscPath)) {
 
 # 4. Native Rust Cargo check/build
 if (-not $SkipRust) {
-    Write-Host "Verifying Native Rust Micro-Crate Kernel..." -ForegroundColor Gray
+    Write-Host "Verifying Native Rust Kernel Subsystems..." -ForegroundColor Gray
     $cargoCmd = if (Get-Command cargo.exe -ErrorAction SilentlyContinue) { "cargo.exe" } elseif (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
     if ($cargoCmd) {
         $manifestPath = Join-Path $ProjectRoot "Cargo.toml"

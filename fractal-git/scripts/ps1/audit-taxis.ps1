@@ -3,7 +3,7 @@
 # 文件路径: fractal-git/scripts/ps1/audit-taxis.ps1
 # 架构定位: 五级质量与性能审查 Runner (Windows PowerShell)，与 audit-taxis.sh 保持同构
 # 依赖与触发: 触发方: 本地 CLI / CI | 上游: fractal-git 静态校验与 cargo | 下游: 审查报告与晋级账本 | 运行时: PowerShell 7+
-# 职责说明: 依次执行微 Crate 拓扑与零分配边界、回归套件、微基准棘轮、质量分数包络与自举晋级桥接
+# 职责说明: 依次执行内核子系统拓扑与零分配边界、回归套件、微基准棘轮、质量分数包络与自举晋级桥接
 # 退出语义与设计依据: 退出码: 0=五级全通过, 1=存在阻断违规 | 设计依据: AGENTS.md 质量度量求真公理
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -151,7 +151,7 @@ Write-GateHost "  Taxis (Fractal Git) Industrial Audit & Auto-Refactor Quality G
 Write-GateHost "==========================================================================" -ForegroundColor Cyan
 
 # -----------------------------------------------------------------------------
-# 微 Crate 拓扑与架构分层
+# 内核子系统拓扑与架构分层
 # -----------------------------------------------------------------------------
 Write-StepBanner -StepId "CRATE-TOPOLOGY-01"
 if (-not $nodeCmd) {
@@ -178,7 +178,7 @@ if (-not $nodeCmd) {
 }
 
 # -----------------------------------------------------------------------------
-# 多 Crate 回归测试套件
+# 内核子系统回归测试套件
 # -----------------------------------------------------------------------------
 Write-StepBanner -StepId "CRATE-REGRESSION-02"
 if (-not $cargoCmd) {
@@ -320,7 +320,7 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
         "--score", $compositeScore.ToString("F1"),
         "--cai", $caiScore.ToString("F1"),
         "--ci-lower", $ciLower.ToString("F1"),
-        "--summary", "Dogfooding self-audit verified: clean topology, zero-alloc boundary, $passedTotal passing tests, and TB-REGRESSION baseline ratchet preserved."
+        "--summary", "In-house self-audit verified: clean topology, zero-alloc boundary, $passedTotal passing tests, and TB-REGRESSION baseline ratchet preserved."
     )
     # 落盘断言检查的是容器本身：账本是容器的一个节，不存在独立的账本文件。
     # 先前这里断言 `fractal/staged_promotions.json`，那个文件在账本二进制化后已不存在，

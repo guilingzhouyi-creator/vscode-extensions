@@ -6,7 +6,7 @@
  *   multi-agent orchestration, and developer CLI diagnostics.
  * Dependencies & Triggers: Consumed by Praxis review clients, VS Code extension, and CLI scripts.
  * Responsibilities: Expose high-level workspace management factories, enforce frozen export
- *   discipline adhering to ARCH-FAC-001, and provide end-to-end atomic commit APIs.
+ *   discipline with substantial domain operations, and provide end-to-end atomic commit APIs.
  * Exit Semantics & Design Rationale: Guarantees ELOC >= 15 with deep object freezing; encapsulates
  *   low-level Git object manipulation behind ergonomic agent-native operations. The active and only
  *   engine is the pure-TypeScript reference implementation in ts/native-binding.ts: this package
@@ -42,7 +42,7 @@ import {
 export type * from './contracts';
 export * from './constants';
 export * from './orchestration/workspace-manager';
-export * from './orchestration/tournament-runner';
+export * from './orchestration/variant-evaluator';
 export * from './cli/commands';
 export * from './client/praxis-client';
 export * from './vfs/vfs-adapter';
@@ -120,7 +120,7 @@ export function createFractalGitEngine(gitDir: string): Readonly<FractalGitEngin
 
 
 /**
- * Root facade immutable descriptor object satisfying ARCH-FAC-001.
+ * Root facade immutable descriptor object.
  */
 export const FractalGit = Object.freeze({
     createEngine: createFractalGitEngine,

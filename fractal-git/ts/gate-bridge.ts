@@ -56,13 +56,13 @@ function auditSingleFile(file: StagedFileEntry, violations: string[]): void {
         ? file.content
         : Buffer.from(file.content).toString('utf8');
 
-    // 1. Zero physical empty (HYG-EMP-001) or whitespace-only files (HYG-EMP-002)
+    // 1. Zero physical empty or whitespace-only files (FGT-GAT-001)
     if (text.length === 0) {
-        violations.push(`HYG-EMP-001: Empty physical file detected at ${file.path}`);
+        violations.push(`FGT-GAT-001: Empty physical file detected at ${file.path}`);
         return;
     }
     if (text.trim().length === 0) {
-        violations.push(`HYG-EMP-002: Whitespace-only physical file detected at ${file.path}`);
+        violations.push(`FGT-GAT-001: Whitespace-only physical file detected at ${file.path}`);
         return;
     }
 

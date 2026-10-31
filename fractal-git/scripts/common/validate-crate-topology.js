@@ -1,7 +1,7 @@
 /**
- * Module: Fractal Git — Micro-Crates Dependency Topology Validator
+ * Module: Fractal Git — Subsystems Dependency Topology Validator
  * File Path: fractal-git/scripts/common/validate-crate-topology.js
- * Architecture Role: Enforces strict unidirectional DAG layering across 9 micro-crates,
+ * Architecture Role: Enforces strict unidirectional DAG layering across 10 kernel subsystems,
  *   preventing reverse dependencies, layer bypasses, and cyclic coupling.
  * Dependencies & Triggers: Consumes fractal-git/Cargo.toml and all crates/*\/Cargo.toml manifests;
  *   invoked by pre-commit-gate, audit-all.ps1, and local CI.
@@ -40,7 +40,7 @@ const CRATE_LAYERS = Object.freeze({
 });
 
 /**
- * Explicit whitelist of allowed internal dependencies for each micro-crate.
+ * Explicit whitelist of allowed internal dependencies for each kernel subsystem.
  */
 const ALLOWED_INTERNAL_DEPS = Object.freeze({
   'fg-core': new Set([]),
@@ -140,7 +140,7 @@ function validateCrateDependencies(crateName, dependencies, violations) {
   const allowedSet = ALLOWED_INTERNAL_DEPS[crateName];
 
   if (currentLayer === undefined || !allowedSet) {
-    violations.push(`FGT-DEP-001: Unregistered micro-crate '${crateName}' not mapped in architecture layer matrix`);
+    violations.push(`FGT-DEP-001: Unregistered kernel subsystem '${crateName}' not mapped in architecture layer matrix`);
     return;
   }
 
@@ -167,10 +167,10 @@ function validateCrateDependencies(crateName, dependencies, violations) {
 }
 
 /**
- * Main execution function asserting workspace micro-crate topology.
+ * Main execution function asserting workspace kernel subsystem topology.
  */
 function runTopologyValidation() {
-  console.log('=== [FGT-DEP-001] Validating Fractal Git Micro-Crates Topology ===');
+  console.log('=== [FGT-DEP-001] Validating Fractal Git Kernel Subsystems Topology ===');
   const violations = [];
 
   if (!fs.existsSync(ROOT_CARGO_TOML)) {
@@ -188,12 +188,12 @@ function runTopologyValidation() {
     console.error('FGT-DEP-001: Workspace manifest declares no members; topology cannot be verified');
     process.exit(1);
   }
-  console.log(`Inspecting ${manifestMembers.length} micro-crates under ${path.relative(process.cwd(), CRATES_DIR)}...`);
+  console.log(`Inspecting ${manifestMembers.length} kernel subsystems under ${path.relative(process.cwd(), CRATES_DIR)}...`);
 
   for (const crate of manifestMembers) {
     const manifestPath = path.join(CRATES_DIR, crate, 'Cargo.toml');
     if (!fs.existsSync(manifestPath)) {
-      violations.push(`FGT-DEP-001: Missing manifest for registered micro-crate at ${path.relative(PROJECT_ROOT, manifestPath)}`);
+      violations.push(`FGT-DEP-001: Missing manifest for registered subsystem at ${path.relative(PROJECT_ROOT, manifestPath)}`);
       continue;
     }
     const content = fs.readFileSync(manifestPath, 'utf8');
@@ -209,7 +209,7 @@ function runTopologyValidation() {
     process.exit(1);
   }
 
-  console.log('✔  Micro-crate unidirectional DAG layering is 100% compliant with DIRECTORY_SPEC.md.');
+  console.log('✔  Subsystems unidirectional DAG layering is 100% compliant with DIRECTORY_SPEC.md.');
   process.exit(0);
 }
 

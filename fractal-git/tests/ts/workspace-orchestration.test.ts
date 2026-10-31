@@ -1,11 +1,12 @@
 /**
- * Integration Test: Workspace Orchestration & MCTS Tournament Selection
+ * Integration Test: Workspace Orchestration & MCTS Variant Evaluation Selection
  * File Path: tests/ts/workspace-orchestration.test.ts
  */
 
 import * as assert from 'node:assert';
 import { test } from 'node:test';
 import {
+    evaluateBranchVariants,
     runVariantTournament,
     WorkspaceOrchestrator,
 } from '../../ts/index';
@@ -58,4 +59,9 @@ test('runVariantTournament picks highest-scoring clean variant and discards flaw
     assert.strictEqual(outcome.winner.variantId, 'var-clean-winner');
     assert.strictEqual(outcome.winnerScore, 100);
     assert.deepStrictEqual(outcome.discardedVariantIds, ['var-flawed-conflict']);
+
+    const modernOutcome = evaluateBranchVariants(candidates);
+    assert.strictEqual(modernOutcome.winner.variantId, 'var-clean-winner');
+    assert.strictEqual(modernOutcome.winnerScore, 100);
+    assert.deepStrictEqual(modernOutcome.discardedVariantIds, ['var-flawed-conflict']);
 });

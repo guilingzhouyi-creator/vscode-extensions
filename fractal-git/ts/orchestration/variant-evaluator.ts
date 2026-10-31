@@ -1,8 +1,8 @@
 /**
- * Module: Fractal Git — Tournament Runner (MCTS Selection Engine)
- * File Path: ts/orchestration/tournament-runner.ts
- * Architecture Role: Evaluates parallel SubAgent exploration candidates, ranking quality
- *   scores through Auto gating and picking winning variants for upstream materialization.
+ * Module: Fractal Git — Branch Variant Evaluator (MCTS Selection Engine)
+ * File Path: ts/orchestration/variant-evaluator.ts
+ * Architecture Role: Evaluates parallel SubAgent exploration candidate variants, ranking quality
+ *   scores through verification gates and selecting winning variants for upstream persistence.
  * Dependencies & Triggers: Consumed when multi-agent rollouts finish exploring variant solutions.
  * Responsibilities: Run gate checks across candidates, select highest-scoring branch,
  *   and discard lower-quality variants.
@@ -14,7 +14,7 @@ import type { StagedFileEntry } from '../contracts';
 import { verifyPreReviewZone } from '../gate-bridge';
 
 /**
- * A candidate exploration variant produced by a SubAgent.
+ * A candidate exploration variant produced by an agent.
  */
 export interface CandidateVariant {
     readonly variantId: string;
@@ -23,9 +23,9 @@ export interface CandidateVariant {
 }
 
 /**
- * Result of a tournament adjudication.
+ * Result of a branch variant evaluation and selection.
  */
-export interface TournamentOutcome {
+export interface VariantEvaluationOutcome {
     readonly winner: CandidateVariant;
     readonly winnerScore: number;
     readonly discardedVariantIds: readonly string[];
@@ -33,11 +33,19 @@ export interface TournamentOutcome {
 }
 
 /**
- * Adjudicates competing candidate variants through automated review gates.
+ * Legacy compatibility alias for VariantEvaluationOutcome.
  */
-export function runVariantTournament(candidates: readonly CandidateVariant[]): TournamentOutcome {
+export type TournamentOutcome = VariantEvaluationOutcome;
+
+/**
+ * Evaluates competing candidate branch variants through pre-review verification gates.
+ *
+ * @param candidates - Collection of candidate variants to evaluate.
+ * @returns The evaluation outcome containing the winning candidate and scores.
+ */
+export function evaluateBranchVariants(candidates: readonly CandidateVariant[]): VariantEvaluationOutcome {
     if (candidates.length === 0) {
-        throw new Error('Cannot run tournament with zero candidate variants');
+        throw new Error('Cannot evaluate zero candidate variants');
     }
 
     const scores = new Map<string, number>();
@@ -79,3 +87,8 @@ export function runVariantTournament(candidates: readonly CandidateVariant[]): T
         allScores: scores,
     };
 }
+
+/**
+ * Legacy compatibility alias for evaluateBranchVariants.
+ */
+export const runVariantTournament = evaluateBranchVariants;

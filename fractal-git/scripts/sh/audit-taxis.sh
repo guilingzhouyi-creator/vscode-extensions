@@ -4,7 +4,7 @@
 # 文件路径: fractal-git/scripts/sh/audit-taxis.sh
 # 架构定位: 五级质量与性能审查 Runner (Linux Bash)，与 audit-taxis.ps1 保持同构
 # 依赖与触发: 触发方: 本地 CLI / CI | 上游: fractal-git 静态校验与 cargo | 下游: 审查报告与晋级账本 | 运行时: Bash 4+
-# 职责说明: 依次执行微 Crate 拓扑与零分配边界、回归套件、微基准棘轮、质量分数包络与自举晋级桥接
+# 职责说明: 依次执行内核子系统拓扑与零分配边界、回归套件、微基准棘轮、质量分数包络与自举晋级桥接
 # 退出语义与设计依据: 退出码: 0=五级全通过, 1=存在阻断违规 | 设计依据: AGENTS.md 质量度量求真公理
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -60,10 +60,10 @@ if command -v node &>/dev/null; then
     node "${PROJECT_ROOT}/scripts/common/check-zero-alloc-boundary.js" || TOPO_STATUS=$?
     node "${PROJECT_ROOT}/scripts/common/validate-git-parity.js" --require-git || TOPO_STATUS=$?
     if [[ "${TOPO_STATUS}" -ne 0 ]]; then
-        write_step_verdict "CRATE-TOPOLOGY-01" BLOCK "微 Crate 拓扑、零分配边界或 Git 对等校验未通过"
+        write_step_verdict "CRATE-TOPOLOGY-01" BLOCK "内核子系统拓扑、零分配边界或 Git 对等校验未通过"
         exit 1
     fi
-    write_step_verdict "CRATE-TOPOLOGY-01" PASS "微 Crate 拓扑、零分配边界与 Git 对等校验通过"
+    write_step_verdict "CRATE-TOPOLOGY-01" PASS "内核子系统拓扑、零分配边界与 Git 对等校验通过"
 else
     # node 是可安装的运行时，不是可选投票项；缺失即无法完成该级审查。
     write_step_verdict "CRATE-TOPOLOGY-01" BLOCK "未检测到 node 运行时，静态拓扑与零分配审查无法执行"
@@ -71,7 +71,7 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 多 Crate 回归测试套件
+# 内核子系统回归测试套件
 # -----------------------------------------------------------------------------
 echo ""
 write_step_banner "CRATE-REGRESSION-02"
@@ -186,7 +186,7 @@ else
         --score "${COMPOSITE_SCORE}" \
         --cai "${CAI_SCORE}" \
         --ci-lower "${CI_LOWER}" \
-        --summary "Dogfooding self-audit verified: clean topology, zero-alloc boundary, ${PASSED_TOTAL} passing tests, and TB-REGRESSION baseline ratchet preserved." \
+        --summary "In-house self-audit verified: clean topology, zero-alloc boundary, ${PASSED_TOTAL} passing tests, and TB-REGRESSION baseline ratchet preserved." \
         || PROMO_STATUS=$?
     if [[ "${PROMO_STATUS}" -ne 0 ]]; then
         write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "自举晋级暂存请求失败"

@@ -1,13 +1,13 @@
 /**
  * Module: Fractal Git — Zero-Allocation & Rust Concurrency Safety Scanner
  * File Path: fractal-git/scripts/common/check-zero-alloc-boundary.js
- * Architecture Role: Statically inspects Rust micro-crate sources to enforce zero transient heap
- *   allocations in hot loops (ADV-PRF-002), zero naked unwraps (FGT-ERR-001),
+ * Architecture Role: Statically inspects Rust kernel subsystem sources to enforce zero transient heap
+ *   allocations in hot loops (FGT-PRF-001), zero naked unwraps (FGT-ERR-001),
  *   and documented unsafe proofs (FGT-SAF-001).
  * Dependencies & Triggers: Scans every .rs file under crates/ (skipping target/ and tests/);
  *   invoked by CI, audit-all.ps1, and the fractal-git gate.
  * Responsibilities:
- *   1. Traverse Rust source files in production micro-crates, skipping both tests/ trees and
+ *   1. Traverse Rust source files in production kernel subsystems, skipping both tests/ trees and
  *      in-file #[cfg(test)] modules, where panic! is the idiomatic assertion failure channel;
  *   2. Detect transient heap allocation patterns inside loop blocks (FGT-PRF-001);
  *   3. Enforce strong-typed error propagation by flagging unwrap/expect/panic (FGT-ERR-001);
@@ -290,7 +290,7 @@ function runZeroAllocBoundaryCheck() {
   // the crate boundary, while `src/bin/` ships in the same binary and carries far more imperative
   // control flow than most crates do.
   collectRustSources(BIN_DIR, rustFiles);
-  console.log(`Auditing ${rustFiles.length} production Rust source files across micro-crates...`);
+  console.log(`Auditing ${rustFiles.length} production Rust source files across kernel subsystems...`);
 
   for (const file of rustFiles) {
     scanRustFile(file, violations);
@@ -304,7 +304,7 @@ function runZeroAllocBoundaryCheck() {
     process.exit(1);
   }
 
-  console.log('✔  All micro-crates satisfy zero-alloc, safety, doc, and naming contracts.');
+  console.log('✔  All kernel subsystems satisfy zero-alloc, safety, doc, and naming contracts.');
   process.exit(0);
 }
 

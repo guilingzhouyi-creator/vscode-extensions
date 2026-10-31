@@ -3,7 +3,7 @@
  * File Path: ts/orchestration/workspace-manager.ts
  * Architecture Role: Manages allocation and lifecycle routing of fractal workspaces
  *   bound to individual PraxisCardContext instances.
- * Dependencies & Triggers: Consumed by agent runners and the tournament coordinator.
+ * Dependencies & Triggers: Consumed by agent runners and the variant evaluation coordinator.
  * Responsibilities: Track active workspace records, allocate unique branches,
  *   and coordinate cleanup.
  * Exit Semantics & Design Rationale: CC <= 15 and Depth <= 4; isolates agent failures

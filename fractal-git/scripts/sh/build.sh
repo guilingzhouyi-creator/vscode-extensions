@@ -4,8 +4,8 @@
 # 文件路径: fractal-git/scripts/sh/build.sh
 # 架构定位: 原生内核与 TS 门面编译 Runner (Linux Bash)，与 build.ps1 保持同构
 # 依赖与触发: 触发方: 本地 CLI / CI | 上游: Cargo.toml / tsconfig.json / scripts/common 校验器 | 下游: 编译产物 | 运行时: Bash 4+
-# 职责说明: 依次执行微 Crate 拓扑校验、Plumbing 二进制等价校验、TypeScript 编译与 Rust 原生构建
-# 退出语义与设计依据: 退出码: 0=构建成功, 1=构建失败, 2=用法错误 | 设计依据: AGENTS.md fractal-git 十微 Crate 分层契约
+# 职责说明: 依次执行内核子系统拓扑校验、Plumbing 二进制等价校验、TypeScript 编译与 Rust 原生构建
+# 退出语义与设计依据: 退出码: 0=构建成功, 1=构建失败, 2=用法错误 | 设计依据: AGENTS.md fractal-git 十大内核子系统分层契约
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   bash fractal-git/scripts/sh/build.sh
@@ -46,9 +46,9 @@ echo "Project Root: ${PROJECT_ROOT}"
 
 cd "${PROJECT_ROOT}" || exit 1
 
-# 1. Micro-crates DAG topology validation
+# 1. Subsystems DAG topology validation
 if command -v node >/dev/null 2>&1; then
-    echo "Validating Micro-Crate DAG Topology..."
+    echo "Validating Subsystems DAG Topology..."
     node "${PROJECT_ROOT}/scripts/common/validate-crate-topology.js"
 fi
 
@@ -70,7 +70,7 @@ fi
 # 4. Native Rust Cargo check/build
 if [[ "${SKIP_RUST}" -eq 0 ]]; then
     if command -v cargo >/dev/null 2>&1; then
-        echo "Verifying Native Rust Micro-Crate Kernel..."
+        echo "Verifying Native Rust Kernel Subsystems..."
         if [[ "${FAST_MODE}" -eq 1 ]]; then
             cargo check --manifest-path "${PROJECT_ROOT}/Cargo.toml" --all-targets
         else

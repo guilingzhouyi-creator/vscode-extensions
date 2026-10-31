@@ -87,7 +87,7 @@ if ($procTest.ExitCode -ne 0) {
     Write-Error "✖ BLOCK Cargo test suite regression detected."
     exit 1
 }
-Write-Host "✔ All micro-crate unit and integration tests passed." -ForegroundColor Green
+Write-Host "✔ All kernel subsystem unit and integration tests passed." -ForegroundColor Green
 
 Write-Host "`n=== ALL FRACTAL GIT RUST GATE STAGES PASSED SUCCESSFULLY ===" -ForegroundColor Green
 exit 0
