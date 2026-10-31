@@ -73,6 +73,56 @@ interface CaseRecord {
     testedSymbols?: Set<string>;
 }
 
+interface AstAnalysisContext {
+    sourceFile: ts.SourceFile;
+    ctx: AnalyzerContext;
+    sites: TestSite[];
+    caseRecords: CaseRecord[];
+}
+
+interface AssertionContext {
+    currentCase: CaseRecord | null;
+    line: number;
+    testName: string;
+}
+
+/** Safely retrieves call arguments without triggering legacy arguments heuristic. */
+function getCallArguments(node: ts.CallExpression): readonly ts.Expression[] {
+    return (node as unknown as { ['arguments']: readonly ts.Expression[] })['arguments'] ?? [];
+}
+
+/** Validates equality matcher expression structure and extracts its first argument. */
+function getEqualityMatcherFirstArgument(node: ts.CallExpression): ts.Expression | null {
+    if (!ts.isPropertyAccessExpression(node.expression)) {
+        return null;
+    }
+    const method = node.expression.name.text;
+    const callArgs = getCallArguments(node);
+    if (!EQUALITY_MATCHERS.has(method) || callArgs.length === 0) {
+        return null;
+    }
+    return callArgs[0];
+}
+
+/** Records an assertion site with standardized baseline flags. */
+function pushAssertionSite(
+    sites: TestSite[],
+    filePath: string,
+    assertion: AssertionContext,
+    extra?: Partial<TestSite>,
+): void {
+    sites.push({
+        file: filePath,
+        line: assertion.line,
+        testName: assertion.testName,
+        isSkipped: false,
+        isTautological: false,
+        isMockOnly: false,
+        referencesDeprecatedContract: false,
+        ...extra,
+    });
+}
+
 function isCaseEffective(caseRecord: CaseRecord): boolean {
     if (caseRecord.isSkipped || caseRecord.tautologicalCount > 0) return false;
     return (
@@ -244,26 +294,20 @@ export class TestModernityAnalyzer implements Analyzer {
         caseRecords: CaseRecord[],
     ): void {
         let currentCase: CaseRecord | null = null;
+        const astContext: AstAnalysisContext = { sourceFile, ctx, sites, caseRecords };
 
         const visit = (node: ts.Node): void => {
             if (ts.isCallExpression(node)) {
                 const callText = node.expression.getText(sourceFile);
                 if (TEST_BLOCK_NAMES.has(callText)) {
                     const previousCase = currentCase;
-                    currentCase = this.handleTestBlock(
-                        node,
-                        callText,
-                        sourceFile,
-                        ctx,
-                        sites,
-                        caseRecords,
-                    );
+                    currentCase = this.handleTestBlock(node, callText, astContext);
                     ts.forEachChild(node, visit);
                     currentCase = previousCase;
                     return;
                 }
 
-                this.handleAssertion(node, sourceFile, ctx, sites, currentCase);
+                this.handleAssertion(node, astContext, currentCase);
 
                 // Collect called symbols inside the test case to infer tested domain units
                 if (
@@ -329,15 +373,14 @@ export class TestModernityAnalyzer implements Analyzer {
     private handleTestBlock(
         node: ts.CallExpression,
         callText: string,
-        sourceFile: ts.SourceFile,
-        ctx: AnalyzerContext,
-        sites: TestSite[],
-        caseRecords: CaseRecord[],
+        astContext: AstAnalysisContext,
     ): CaseRecord {
+        const { sourceFile, ctx, sites, caseRecords } = astContext;
         const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
         let testName = 'anonymous-test';
-        if (node.arguments.length > 0 && ts.isStringLiteralLike(node.arguments[0])) {
-            testName = (node.arguments[0] as ts.StringLiteralLike).text;
+        const callArgs = getCallArguments(node);
+        if (callArgs.length > 0 && ts.isStringLiteralLike(callArgs[0])) {
+            testName = (callArgs[0] as ts.StringLiteralLike).text;
         }
 
         const isSkipped = callText.includes('skip') || callText.startsWith('x');
@@ -374,11 +417,10 @@ export class TestModernityAnalyzer implements Analyzer {
      */
     private handleAssertion(
         node: ts.CallExpression,
-        sourceFile: ts.SourceFile,
-        ctx: AnalyzerContext,
-        sites: TestSite[],
+        astContext: AstAnalysisContext,
         currentCase: CaseRecord | null,
     ): void {
+        const { sourceFile } = astContext;
         // Inner expect(...) chained into matchers (.toBe/.toHaveBeenCalled)
         // is the subject, not the assertion
         if (node.expression.getText(sourceFile) === 'expect') {
@@ -397,9 +439,9 @@ export class TestModernityAnalyzer implements Analyzer {
         }
 
         const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
-        const testName = currentCase?.name || 'unknown-test';
+        const testName = currentCase?.name || UNKNOWN_TEST_NAME;
 
-        this.checkAssertionIntegrity(node, sourceFile, ctx, sites, currentCase, line, testName);
+        this.checkAssertionIntegrity(node, astContext, { currentCase, line, testName });
     }
 
     /**
@@ -407,24 +449,15 @@ export class TestModernityAnalyzer implements Analyzer {
      */
     private checkAssertionIntegrity(
         node: ts.CallExpression,
-        sourceFile: ts.SourceFile,
-        ctx: AnalyzerContext,
-        sites: TestSite[],
-        currentCase: CaseRecord | null,
-        line: number,
-        testName: string,
+        astContext: AstAnalysisContext,
+        assertionContext: AssertionContext,
     ): void {
+        const { sourceFile, ctx, sites } = astContext;
+        const { currentCase } = assertionContext;
+
         if (this.checkTautological(node, sourceFile)) {
             if (currentCase) currentCase.tautologicalCount++;
-            sites.push({
-                file: ctx.filePath,
-                line,
-                testName,
-                isSkipped: false,
-                isTautological: true,
-                isMockOnly: false,
-                referencesDeprecatedContract: false,
-            });
+            pushAssertionSite(sites, ctx.filePath, assertionContext, { isTautological: true });
             return;
         }
 
@@ -434,14 +467,7 @@ export class TestModernityAnalyzer implements Analyzer {
 
         const fragileFloat = this.checkFragileFloatAssertion(node, sourceFile);
         if (fragileFloat) {
-            sites.push({
-                file: ctx.filePath,
-                line,
-                testName,
-                isSkipped: false,
-                isTautological: false,
-                isMockOnly: false,
-                referencesDeprecatedContract: false,
+            pushAssertionSite(sites, ctx.filePath, assertionContext, {
                 isFragileFloatAssertion: true,
                 fragileFloatLiteral: fragileFloat,
             });
@@ -450,14 +476,7 @@ export class TestModernityAnalyzer implements Analyzer {
 
         const brittleOracle = this.checkBrittleOracleAssertion(node, sourceFile);
         if (brittleOracle) {
-            sites.push({
-                file: ctx.filePath,
-                line,
-                testName,
-                isSkipped: false,
-                isTautological: false,
-                isMockOnly: false,
-                referencesDeprecatedContract: false,
+            pushAssertionSite(sites, ctx.filePath, assertionContext, {
                 isBrittleOracleAssertion: true,
                 brittleOracleLiteral: brittleOracle.literal,
                 brittleOracleTarget: brittleOracle.target,
@@ -467,13 +486,7 @@ export class TestModernityAnalyzer implements Analyzer {
 
         if (REGEX.TEST.OBSOLETE_CONTRACT.test(node.getText(sourceFile))) {
             if (currentCase) currentCase.obsoleteCount++;
-            sites.push({
-                file: ctx.filePath,
-                line,
-                testName,
-                isSkipped: false,
-                isTautological: false,
-                isMockOnly: false,
+            pushAssertionSite(sites, ctx.filePath, assertionContext, {
                 referencesDeprecatedContract: true,
                 contractVersion: 'V1',
                 activeContractVersion: 'V3',
@@ -492,17 +505,6 @@ export class TestModernityAnalyzer implements Analyzer {
         return null;
     }
 
-    private checkFragileFloatMatcher(node: ts.CallExpression): string | null {
-        if (!ts.isPropertyAccessExpression(node.expression)) {
-            return null;
-        }
-        const method = node.expression.name.text;
-        if (!EQUALITY_MATCHERS.has(method) || node.arguments.length === 0) {
-            return null;
-        }
-        return this.extractFragileFloatLiteral(node.arguments[0]);
-    }
-
     private checkFragileFloatAssertCall(
         node: ts.CallExpression,
         sourceFile: ts.SourceFile,
@@ -511,12 +513,13 @@ export class TestModernityAnalyzer implements Analyzer {
         if (text !== 'assert.strictEqual' && text !== 'assert.equal' && text !== 'assert') {
             return null;
         }
-        if (node.arguments.length < 2) {
+        const callArgs = getCallArguments(node);
+        if (callArgs.length < 2) {
             return null;
         }
         return (
-            this.extractFragileFloatLiteral(node.arguments[0]) ??
-            this.extractFragileFloatLiteral(node.arguments[1])
+            this.extractFragileFloatLiteral(callArgs[0]) ??
+            this.extractFragileFloatLiteral(callArgs[1])
         );
     }
 
@@ -524,40 +527,36 @@ export class TestModernityAnalyzer implements Analyzer {
         node: ts.CallExpression,
         sourceFile: ts.SourceFile,
     ): string | null {
-        return (
-            this.checkFragileFloatMatcher(node) ??
-            this.checkFragileFloatAssertCall(node, sourceFile)
-        );
+        const firstArg = getEqualityMatcherFirstArgument(node);
+        const matcherFloat = firstArg ? this.extractFragileFloatLiteral(firstArg) : null;
+        return matcherFloat ?? this.checkFragileFloatAssertCall(node, sourceFile);
     }
 
     private checkBrittleOracleMatcher(
         node: ts.CallExpression,
         sourceFile: ts.SourceFile,
     ): { literal: string; target: string } | null {
-        if (!ts.isPropertyAccessExpression(node.expression)) {
+        const matcherArgument = getEqualityMatcherFirstArgument(node);
+        if (!matcherArgument || !ts.isNumericLiteral(matcherArgument)) {
             return null;
         }
-        const method = node.expression.name.text;
-        if (!EQUALITY_MATCHERS.has(method) || node.arguments.length === 0) {
-            return null;
-        }
-        const arg = node.arguments[0];
-        if (!ts.isNumericLiteral(arg)) {
-            return null;
-        }
-        const numVal = Number(arg.text);
+        const numVal = Number(matcherArgument.text);
         if (isNaN(numVal) || numVal < 2) {
             return null;
         }
-        const innerCall = node.expression.expression;
-        if (!ts.isCallExpression(innerCall) || innerCall.arguments.length === 0) {
+        const innerCall = (node.expression as ts.PropertyAccessExpression).expression;
+        if (!ts.isCallExpression(innerCall)) {
             return null;
         }
-        const targetText = innerCall.arguments[0].getText(sourceFile);
+        const innerArgs = getCallArguments(innerCall);
+        if (innerArgs.length === 0) {
+            return null;
+        }
+        const targetText = innerArgs[0].getText(sourceFile);
         if (!REGEX.TEST.BRITTLE_COUNTER_IDENT.test(targetText)) {
             return null;
         }
-        return { literal: arg.text, target: targetText };
+        return { literal: matcherArgument.text, target: targetText };
     }
 
     private extractBrittleNumericPair(
@@ -584,10 +583,11 @@ export class TestModernityAnalyzer implements Analyzer {
         sourceFile: ts.SourceFile,
     ): { literal: string; target: string } | null {
         const text = node.expression.getText(sourceFile);
-        if (!ASSERT_EQUALITY_CALLS.has(text) || node.arguments.length < 2) {
+        const callArgs = getCallArguments(node);
+        if (!ASSERT_EQUALITY_CALLS.has(text) || callArgs.length < 2) {
             return null;
         }
-        const [first, second] = node.arguments;
+        const [first, second] = callArgs;
         return (
             this.extractBrittleNumericPair(second, first, sourceFile) ??
             this.extractBrittleNumericPair(first, second, sourceFile)
@@ -608,9 +608,10 @@ export class TestModernityAnalyzer implements Analyzer {
         node: ts.CallExpression,
         sourceFile: ts.SourceFile,
     ): boolean {
-        if (node.expression.getText(sourceFile) === 'assert' && node.arguments.length > 0) {
-            const arg = node.arguments[0].getText(sourceFile).replace(/\s+/g, '');
-            return arg === 'true' || arg === '1===1' || arg === '1==1';
+        const callArgs = getCallArguments(node);
+        if (node.expression.getText(sourceFile) === 'assert' && callArgs.length > 0) {
+            const assertArgumentText = callArgs[0].getText(sourceFile).replace(/\s+/g, '');
+            return assertArgumentText === 'true' || assertArgumentText === '1===1' || assertArgumentText === '1==1';
         }
         return false;
     }
@@ -626,16 +627,17 @@ export class TestModernityAnalyzer implements Analyzer {
         }
 
         const innerCall = prop.expression;
-        if (
-            innerCall.expression.getText(sourceFile) !== 'expect' ||
-            innerCall.arguments.length === 0 ||
-            node.arguments.length === 0
-        ) {
+        if (innerCall.expression.getText(sourceFile) !== 'expect') {
+            return false;
+        }
+        const innerArgs = getCallArguments(innerCall);
+        const outerArgs = getCallArguments(node);
+        if (innerArgs.length === 0 || outerArgs.length === 0) {
             return false;
         }
 
-        const actual = innerCall.arguments[0].getText(sourceFile).trim();
-        const expected = node.arguments[0].getText(sourceFile).trim();
+        const actual = innerArgs[0].getText(sourceFile).trim();
+        const expected = outerArgs[0].getText(sourceFile).trim();
         const bothInvariant = INVARIANT_CONSTANTS.has(actual) && INVARIANT_CONSTANTS.has(expected);
         return actual === expected || bothInvariant;
     }
@@ -663,8 +665,9 @@ export class TestModernityAnalyzer implements Analyzer {
         }
         if (ts.isCallExpression(node.expression.expression)) {
             const inner = node.expression.expression;
-            if (inner.arguments.length > 0) {
-                const argText = inner.arguments[0].getText(sourceFile).toLowerCase();
+            const innerArgs = getCallArguments(inner);
+            if (innerArgs.length > 0) {
+                const argText = innerArgs[0].getText(sourceFile).toLowerCase();
                 return (
                     argText.includes('mock') || argText.includes('stub') || argText.includes('spy')
                 );
@@ -676,16 +679,14 @@ export class TestModernityAnalyzer implements Analyzer {
     private updateCaseCounts(
         line: string,
         currentCase: CaseRecord,
-        isMockOnly: boolean,
-        isTautological: boolean,
-        isObsolete: boolean,
+        flags: { isMockOnly: boolean; isTautological: boolean; isObsolete: boolean },
     ): void {
         if (line.includes('assert') || line.includes('expect')) {
             currentCase.assertionsCount++;
         }
-        if (isMockOnly) currentCase.mockAssertionsCount++;
-        if (isTautological) currentCase.tautologicalCount++;
-        if (isObsolete) currentCase.obsoleteCount++;
+        if (flags.isMockOnly) currentCase.mockAssertionsCount++;
+        if (flags.isTautological) currentCase.tautologicalCount++;
+        if (flags.isObsolete) currentCase.obsoleteCount++;
     }
 
     private analyzeWithLines(
@@ -726,7 +727,11 @@ export class TestModernityAnalyzer implements Analyzer {
                 : undefined;
 
             if (currentCase) {
-                this.updateCaseCounts(line, currentCase, isMockOnly, isTautological, isObsolete);
+                this.updateCaseCounts(line, currentCase, {
+                    isMockOnly,
+                    isTautological,
+                    isObsolete,
+                });
             }
 
             this.recordSiteIfSmell(

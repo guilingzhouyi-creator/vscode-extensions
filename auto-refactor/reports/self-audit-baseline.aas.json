@@ -2,49 +2,49 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-31T12:13:55.427Z",
+  "timestamp": "2026-10-31T12:41:27.985Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.15,
+    "score": 99.16,
     "grade": "A+",
-    "cai": 88.07,
+    "cai": 88.09,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.918,
       "averagePor": 0.082,
       "averageColumnDensity": 0.867,
-      "averageSpatialDensity": 0.45,
-      "averageMahalanobisDistance": 4.54,
+      "averageSpatialDensity": 0.451,
+      "averageMahalanobisDistance": 4.53,
       "averageFisherSimplexDistance": 0.093
     },
     "sqale": {
-      "tdr": 0.0041,
-      "remediationMinutes": 29939,
+      "tdr": 0.004,
+      "remediationMinutes": 29462,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.39,
-      "meanScore": 96.39,
+      "index": 96.42,
+      "meanScore": 96.42,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "counts": {
       "files": 807,
-      "total": 4385,
+      "total": 4295,
       "errors": 0,
-      "warns": 3721,
+      "warns": 3631,
       "info": 664,
       "suppressed": 113
     }
   },
   "usability": {
     "proven": 49,
-    "patchable": 1831,
-    "advisory": 2505,
-    "uncalibrated": 4223,
+    "patchable": 1804,
+    "advisory": 2442,
+    "uncalibrated": 4133,
     "needsHuman": 6
   },
   "defaultVerify": "npm test",
@@ -53,19 +53,19 @@
     "semanticPurity": 98.18,
     "codeSecurity": 99.78,
     "performanceEfficiency": 99.57,
-    "standardization": 83.75,
-    "modernity": 97.76,
-    "maintainability": 92.9,
+    "standardization": 83.99,
+    "modernity": 97.91,
+    "maintainability": 92.95,
     "commentQuality": 99.37,
-    "duplication": 94.91,
+    "duplication": 94.93,
     "techDebtRisk": 100
   },
   "bottlenecks": [
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 4240,
-      "count": 424
+      "loss": 4160,
+      "count": 416
     },
     {
       "rule": "large-file",
@@ -94,14 +94,14 @@
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2180,
-      "count": 436
+      "loss": 2145,
+      "count": 429
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2100,
-      "count": 210
+      "loss": 2070,
+      "count": 207
     },
     {
       "rule": "hardcoded-string",
@@ -8252,5 +8252,5 @@
       }
     ]
   },
-  "truncated": 3221
+  "truncated": 3131
 }

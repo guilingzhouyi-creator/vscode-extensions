@@ -32,12 +32,28 @@ const HISTORY_FILE = path.join(__dirname, 'bench-history.json');
 const FILES = 1001;
 const MIXED = 100;
 
-const args = process.argv.slice(2);
-const parser = (args.find((a) => a.startsWith('--parser=')) || '--parser=oxc').split('=')[1];
+const commandArguments = process.argv.slice(2);
+const parser = (commandArguments.find((arg) => arg.startsWith('--parser=')) || '--parser=oxc').split('=')[1];
 const workers =
-  parseInt((args.find((a) => a.startsWith('--workers=')) || '--workers=4').split('=')[1], 10) || 4;
+  parseInt((commandArguments.find((arg) => arg.startsWith('--workers=')) || '--workers=4').split('=')[1], 10) || 4;
 
-// ---- corpus ----
+const DEFAULT_WARM_THRESHOLDS = Object.freeze({
+  magicNumberMin: 2,
+  duplicateLiteralThreshold: 3,
+  hardcodedStringMinLength: 3,
+  fileLinesWarn: 400,
+  fileLinesFail: 800,
+  fileFunctionsWarn: 15,
+  complexityWarn: 8,
+  complexityFail: 12,
+});
+
+const DEFAULT_CORE_ANALYZERS = Object.freeze({
+  constants: { enabled: true },
+  'large-file': { enabled: true },
+  complexity: { enabled: true },
+});
+
 // Synthetic fixture exports are interpolated so the line-oriented strict comment scanner does
 // not read them as real public API declarations; the generated corpus bytes stay identical.
 const TEMPLATES = [
@@ -68,44 +84,36 @@ ${'export'} function page(): string {
 `,
 ];
 
-function rmRetry(p) {
+/** Recursively removes a directory with fallback rename if locked. */
+function removeDirectoryWithRetry(targetDirectoryPath) {
   try {
-    fs.rmSync(p, { recursive: true, force: true });
+    fs.rmSync(targetDirectoryPath, { recursive: true, force: true });
   } catch {
     try {
-      fs.renameSync(p, path.join(os.tmpdir(), `ar-stale-${path.basename(p)}-${Date.now()}`));
+      fs.renameSync(
+        targetDirectoryPath,
+        path.join(os.tmpdir(), `ar-stale-${path.basename(targetDirectoryPath)}-${Date.now()}`),
+      );
     } catch {
-      /* ignore */
+      /* best-effort fallback */
     }
   }
 }
 
+/** Generates the benchmark corpus fixture files and configuration. */
 function buildCorpus() {
-  rmRetry(CORPUS);
+  removeDirectoryWithRetry(CORPUS);
   fs.mkdirSync(path.join(CORPUS, 'src'), { recursive: true });
-  for (let i = 0; i < FILES; i++) {
-    fs.writeFileSync(path.join(CORPUS, 'src', `bench_${i}.ts`), TEMPLATES[i % TEMPLATES.length]);
+  for (let fileIndex = 0; fileIndex < FILES; fileIndex++) {
+    fs.writeFileSync(path.join(CORPUS, 'src', `bench_${fileIndex}.ts`), TEMPLATES[fileIndex % TEMPLATES.length]);
   }
-  const config = {
+  const configuration = {
     format: 'json',
     failOnIssue: false,
     include: ['**/*.ts'],
     exclude: ['node_modules', '.git', 'dist'],
-    thresholds: {
-      magicNumberMin: 2,
-      duplicateLiteralThreshold: 3,
-      hardcodedStringMinLength: 3,
-      fileLinesWarn: 400,
-      fileLinesFail: 800,
-      fileFunctionsWarn: 15,
-      complexityWarn: 8,
-      complexityFail: 12,
-    },
-    analyzers: {
-      constants: { enabled: true },
-      'large-file': { enabled: true },
-      complexity: { enabled: true },
-    },
+    thresholds: DEFAULT_WARM_THRESHOLDS,
+    analyzers: DEFAULT_CORE_ANALYZERS,
     customAnalyzers: [],
     logLevel: 'silent',
     workers,
@@ -113,27 +121,30 @@ function buildCorpus() {
     failOnAnalyzerError: false,
     parser,
   };
-  fs.writeFileSync(path.join(CORPUS, 'auto-refactor.config.json'), JSON.stringify(config, null, 2));
+  fs.writeFileSync(path.join(CORPUS, 'auto-refactor.config.json'), JSON.stringify(configuration, null, 2));
 }
 
-function modifyFiles(n) {
-  for (let i = 0; i < n; i++) {
+/** Modifies a subset of corpus files to simulate code churn. */
+function updateSampleCorpusFiles(sampleCount) {
+  for (let fileIndex = 0; fileIndex < sampleCount; fileIndex++) {
     fs.writeFileSync(
-      path.join(CORPUS, 'src', `bench_${i}.ts`),
-      `export function f(a: number, b: number): number {\n  if (a > ${1000 + i}) return a * ${7 + (i % 9)};\n  if (b < 5) return b + ${50 + i};\n  return a + b;\n}\n`,
+      path.join(CORPUS, 'src', `bench_${fileIndex}.ts`),
+      `export function f(a: number, b: number): number {\n  if (a > ${1000 + fileIndex}) return a * ${7 + (fileIndex % 9)};\n  if (b < 5) return b + ${50 + fileIndex};\n  return a + b;\n}\n`,
     );
   }
 }
 
-function daemonStart() {
-  const r = spawnSync(process.execPath, [CLI, 'daemon', 'start', '--root', CORPUS], {
+/** Spawns the daemon process synchronously and returns true if successful. */
+function startDaemonSafely() {
+  const spawnResult = spawnSync(process.execPath, [CLI, 'daemon', 'start', '--root', CORPUS], {
     stdio: 'ignore',
     timeout: 20000,
   });
-  return r.status === 0;
+  return spawnResult.status === 0;
 }
 
-function daemonStop() {
+/** Stops any running daemon process for the test corpus. */
+function stopDaemonSafely() {
   try {
     spawnSync(process.execPath, [CLI, 'daemon', 'stop', '--root', CORPUS], {
       stdio: 'ignore',
@@ -144,69 +155,75 @@ function daemonStop() {
   }
 }
 
-const baseOpts = { root: CORPUS, format: 'json', logLevel: 'silent' };
+const baseScanOptions = { root: CORPUS, format: 'json', logLevel: 'silent' };
 
-async function main() {
-  buildCorpus();
-  daemonStop();
-  rmRetry(CACHE_DIR);
-
-  const run = (label, ms, extra = '') => {
-    console.log(
-      `  ${label.padEnd(16)} ${ms.toFixed(1).padStart(8)} ms${extra ? `  ${extra}` : ''}`,
-    );
-    return ms;
-  };
-
+/** Formats and logs the duration of a benchmark stage. */
+function printBenchmarkTiming(label, durationMs, extraDescription = '') {
   console.log(
-    `bench-warm: ${FILES} files, parser=${parser}, workers=${workers} (pipeline-level for S1-S5, CLI-spawn for S6)`,
+    `  ${label.padEnd(16)} ${durationMs.toFixed(1).padStart(8)} ms${extraDescription ? `  ${extraDescription}` : ''}`,
+  );
+  return durationMs;
+}
+
+/** Measures baseline cold scan and subsequent warm pool iterations S1 to S4. */
+async function runColdAndWarmStages() {
+  const startTimeCold = performance.now();
+  const coldScanReport = await scan({ ...baseScanOptions });
+  const coldScanDurationMs = printBenchmarkTiming(
+    'S1 cold',
+    performance.now() - startTimeCold,
+    `issues=${coldScanReport.summary.issuesTotal}`,
   );
 
-  // S1 cold — pure pipeline, no daemon, no cache.
-  const t0 = performance.now();
-  const r1 = await scan({ ...baseOpts });
-  const s1 = run('S1 cold', performance.now() - t0, `issues=${r1.summary.issuesTotal}`);
+  const isDaemonStarted = startDaemonSafely();
+  if (!isDaemonStarted) throw new Error('daemon failed to start for bench');
 
-  // Pre-start the daemon so S2 measures a COLD pool (not the ~2s spawn).
-  const started = daemonStart();
-  if (!started) throw new Error('daemon failed to start for bench');
-
-  // S2 warm-1st — daemon cold pool + empty cache.
-  const t2 = performance.now();
-  const r2 = await scanWarm({ ...baseOpts, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
-  const s2 = run(
+  const startTimeWarmFirst = performance.now();
+  const warmFirstReport = await scanWarm({ ...baseScanOptions, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
+  const warmFirstDurationMs = printBenchmarkTiming(
     'S2 warm-1st',
-    performance.now() - t2,
-    `daemon=${r2.stats.daemonUsed} analyzed=${r2.stats.analyzed}`,
+    performance.now() - startTimeWarmFirst,
+    `daemon=${warmFirstReport.stats.daemonUsed} analyzed=${warmFirstReport.stats.analyzed}`,
   );
 
-  // S3/S4 warm-2nd/3rd — hot pool + hot cache.
-  const t3 = performance.now();
-  const r3 = await scanWarm({ ...baseOpts, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
-  const s3 = run(
+  const startTimeWarmSecond = performance.now();
+  const warmSecondReport = await scanWarm({ ...baseScanOptions, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
+  const warmSecondDurationMs = printBenchmarkTiming(
     'S3 warm-2nd',
-    performance.now() - t3,
-    `cacheHit=${r3.stats.cacheHit}/${r3.stats.cacheTotal} analyzed=${r3.stats.analyzed} daemonMs=${r3.stats.daemonMs}`,
+    performance.now() - startTimeWarmSecond,
+    `cacheHit=${warmSecondReport.stats.cacheHit}/${warmSecondReport.stats.cacheTotal} analyzed=${warmSecondReport.stats.analyzed} daemonMs=${warmSecondReport.stats.daemonMs}`,
   );
 
-  const t4 = performance.now();
-  const r4 = await scanWarm({ ...baseOpts, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
-  const s4 = run('S4 warm-3rd', performance.now() - t4, `analyzed=${r4.stats.analyzed}`);
+  const startTimeWarmThird = performance.now();
+  const warmThirdReport = await scanWarm({ ...baseScanOptions, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
+  const warmThirdDurationMs = printBenchmarkTiming(
+    'S4 warm-3rd',
+    performance.now() - startTimeWarmThird,
+    `analyzed=${warmThirdReport.stats.analyzed}`,
+  );
 
-  // S5 mixed-10% — 100 files changed.
-  modifyFiles(MIXED);
-  const t5 = performance.now();
-  const r5 = await scanWarm({ ...baseOpts, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
-  const s5 = run(
+  return {
+    coldScanDurationMs,
+    warmFirstDurationMs,
+    warmSecondDurationMs,
+    warmThirdDurationMs,
+  };
+}
+
+/** Measures partial corpus modifications S5 and isolated CLI respawn S6. */
+async function runMixedAndCliStages() {
+  updateSampleCorpusFiles(MIXED);
+  const startTimeMixed = performance.now();
+  const mixedReport = await scanWarm({ ...baseScanOptions, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
+  const mixedDurationMs = printBenchmarkTiming(
     'S5 mixed-10%',
-    performance.now() - t5,
-    `cacheHit=${r5.stats.cacheHit}/${r5.stats.cacheTotal} analyzed=${r5.stats.analyzed}`,
+    performance.now() - startTimeMixed,
+    `cacheHit=${mixedReport.stats.cacheHit}/${mixedReport.stats.cacheTotal} analyzed=${mixedReport.stats.analyzed}`,
   );
 
-  // S6 cold-2nd — fresh CLI process + hot DISK cache (cross-process proof).
-  daemonStop();
-  const t6 = performance.now();
-  const r6 = spawnSync(
+  stopDaemonSafely();
+  const startTimeCli = performance.now();
+  const cliSpawnResult = spawnSync(
     process.execPath,
     [
       CLI,
@@ -224,28 +241,52 @@ async function main() {
     ],
     { stdio: 'ignore', timeout: 120000 },
   );
-  const s6 = run(
+  const cliDurationMs = printBenchmarkTiming(
     'S6 cold-2nd',
-    performance.now() - t6,
-    r6.status === 0 ? '(cli spawn, hot disk cache)' : `FAILED status=${r6.status}`,
+    performance.now() - startTimeCli,
+    cliSpawnResult.status === 0 ? '(cli spawn, hot disk cache)' : `FAILED status=${cliSpawnResult.status}`,
   );
 
-  const ratio = (slow, fast) => (fast > 0 ? slow / fast : 0);
-  const r3x = ratio(s1, s3);
-  const r4x = ratio(s1, s4);
-  console.log('');
-  console.log('  speedup vs S1 (higher is better)');
-  console.log(`  S2 warm-1st    ${ratio(s1, s2).toFixed(1)}x`);
-  console.log(`  S3 warm-2nd    ${r3x.toFixed(1)}x   (gate >= 5x)`);
-  console.log(`  S4 warm-3rd    ${r4x.toFixed(1)}x   (gate >= 5x)`);
-  console.log(`  S5 mixed-10%   ${ratio(s1, s5).toFixed(1)}x`);
-  console.log(`  S6 cold-2nd    ${ratio(s1, s6).toFixed(1)}x  (cross-process)`);
+  return {
+    mixedDurationMs,
+    cliDurationMs,
+  };
+}
 
-  const pass = r3x >= 5 && r4x >= 5;
-  console.log(
-    pass ? '\nACCEPTANCE: ✔ PASS (S3/S4 >= 5x vs S1)' : '\nACCEPTANCE: ✖ BLOCK (S3/S4 < 5x vs S1)',
-  );
+/** Orchestrates execution of all benchmark stages and aggregates timings. */
+async function executeBenchmarkPipeline() {
+  const coldAndWarmTimings = await runColdAndWarmStages();
+  const mixedAndCliTimings = await runMixedAndCliStages();
+  return {
+    ...coldAndWarmTimings,
+    ...mixedAndCliTimings,
+  };
+}
 
+/** Loads recorded benchmark entries from history file if present. */
+function loadHistory() {
+  if (!fs.existsSync(HISTORY_FILE)) return { entries: [], benchWarm: [] };
+  try {
+    const parsedData = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+    return {
+      entries: Array.isArray(parsedData.entries) ? parsedData.entries : [],
+      benchWarm: Array.isArray(parsedData.benchWarm) ? parsedData.benchWarm : [],
+    };
+  } catch {
+    return { entries: [], benchWarm: [] };
+  }
+}
+
+/** Persists benchmark history safely via atomic rename. */
+function saveHistory(historyRecord) {
+  const historyPayload = { ...historyRecord, schemaVersion: 1 };
+  const temporaryHistoryPath = `${HISTORY_FILE}.tmp-${process.pid}`;
+  fs.writeFileSync(temporaryHistoryPath, JSON.stringify(historyPayload, null, 2) + '\n', 'utf8');
+  fs.renameSync(temporaryHistoryPath, HISTORY_FILE);
+}
+
+/** Appends benchmark outcome to history file for long-term tracking. */
+function recordBenchmarkHistory(timings, isPass, speedupS3, speedupS4) {
   const history = loadHistory();
   history.benchWarm.push({
     date: new Date().toISOString(),
@@ -253,48 +294,65 @@ async function main() {
     workers,
     files: FILES,
     mixed: MIXED,
-    s1cold: Math.round(s1 * 10) / 10,
-    s2warm1st: Math.round(s2 * 10) / 10,
-    s3warm2nd: Math.round(s3 * 10) / 10,
-    s4warm3rd: Math.round(s4 * 10) / 10,
-    s5mixed: Math.round(s5 * 10) / 10,
-    s6cold2nd: Math.round(s6 * 10) / 10,
-    speedupS3: Math.round(r3x * 10) / 10,
-    speedupS4: Math.round(r4x * 10) / 10,
-    accept: pass,
+    s1cold: Math.round(timings.coldScanDurationMs * 10) / 10,
+    s2warm1st: Math.round(timings.warmFirstDurationMs * 10) / 10,
+    s3warm2nd: Math.round(timings.warmSecondDurationMs * 10) / 10,
+    s4warm3rd: Math.round(timings.warmThirdDurationMs * 10) / 10,
+    s5mixed: Math.round(timings.mixedDurationMs * 10) / 10,
+    s6cold2nd: Math.round(timings.cliDurationMs * 10) / 10,
+    speedupS3: Math.round(speedupS3 * 10) / 10,
+    speedupS4: Math.round(speedupS4 * 10) / 10,
+    accept: isPass,
     env: { node: process.version, os: process.platform },
   });
   saveHistory(history);
   console.log(`history: ${HISTORY_FILE} (benchWarm entries: ${history.benchWarm.length})`);
-
-  daemonStop();
-  process.exit(pass ? 0 : 1);
 }
 
-function loadHistory() {
-  if (!fs.existsSync(HISTORY_FILE)) return { entries: [], benchWarm: [] };
+async function main() {
+  buildCorpus();
+  stopDaemonSafely();
+  removeDirectoryWithRetry(CACHE_DIR);
+
+  console.log(
+    `bench-warm: ${FILES} files, parser=${parser}, workers=${workers} (pipeline-level for S1-S5, CLI-spawn for S6)`,
+  );
+
+  const timings = await executeBenchmarkPipeline();
+
+  const computeSpeedupRatio = (slowMs, fastMs) => (fastMs > 0 ? slowMs / fastMs : 0);
+  const speedupS3 = computeSpeedupRatio(timings.coldScanDurationMs, timings.warmSecondDurationMs);
+  const speedupS4 = computeSpeedupRatio(timings.coldScanDurationMs, timings.warmThirdDurationMs);
+
+  console.log('');
+  console.log('  speedup vs S1 (higher is better)');
+  console.log(
+    `  S2 warm-1st    ${computeSpeedupRatio(timings.coldScanDurationMs, timings.warmFirstDurationMs).toFixed(1)}x`,
+  );
+  console.log(`  S3 warm-2nd    ${speedupS3.toFixed(1)}x   (gate >= 5x)`);
+  console.log(`  S4 warm-3rd    ${speedupS4.toFixed(1)}x   (gate >= 5x)`);
+  console.log(
+    `  S5 mixed-10%   ${computeSpeedupRatio(timings.coldScanDurationMs, timings.mixedDurationMs).toFixed(1)}x`,
+  );
+  console.log(
+    `  S6 cold-2nd    ${computeSpeedupRatio(timings.coldScanDurationMs, timings.cliDurationMs).toFixed(1)}x  (cross-process)`,
+  );
+
+  const isAcceptable = speedupS3 >= 5 && speedupS4 >= 5;
+  console.log(
+    isAcceptable ? '\nACCEPTANCE: ✔ PASS (S3/S4 >= 5x vs S1)' : '\nACCEPTANCE: ✖ BLOCK (S3/S4 < 5x vs S1)',
+  );
+
+  recordBenchmarkHistory(timings, isAcceptable, speedupS3, speedupS4);
+
+  stopDaemonSafely();
+  process.exit(isAcceptable ? 0 : 1);
+}
+
+main().catch((executionError) => {
+  console.error(executionError);
   try {
-    const d = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
-    return {
-      entries: Array.isArray(d.entries) ? d.entries : [],
-      benchWarm: Array.isArray(d.benchWarm) ? d.benchWarm : [],
-    };
-  } catch {
-    return { entries: [], benchWarm: [] };
-  }
-}
-
-function saveHistory(history) {
-  const data = { ...history, schemaVersion: 1 };
-  const tmp = `${HISTORY_FILE}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, HISTORY_FILE);
-}
-
-main().catch((e) => {
-  console.error(e);
-  try {
-    daemonStop();
+    stopDaemonSafely();
   } catch {
     /* ignore */
   }
