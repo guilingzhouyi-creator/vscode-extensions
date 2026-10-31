@@ -15,6 +15,80 @@ pub struct StatisticalMoments {
     pub count: usize,
 }
 
+/// Online Welford accumulator maintaining exact unrounded internal second moments
+/// for sequential streaming without rounding degradation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WelfordAccumulator {
+    pub count: usize,
+    pub mean: f64,
+    pub m2: f64,
+}
+
+impl Default for WelfordAccumulator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl WelfordAccumulator {
+    pub const fn new() -> Self {
+        Self {
+            count: 0,
+            mean: 0.0,
+            m2: 0.0,
+        }
+    }
+
+    #[inline]
+    pub fn update(&mut self, value: f64) {
+        if !value.is_finite() {
+            return;
+        }
+        self.count += 1;
+        let delta = value - self.mean;
+        self.mean += delta / (self.count as f64);
+        let delta2 = value - self.mean;
+        self.m2 += delta * delta2;
+    }
+
+    #[inline]
+    pub fn merge(&mut self, other: &WelfordAccumulator) {
+        if other.count == 0 {
+            return;
+        }
+        if self.count == 0 {
+            *self = *other;
+            return;
+        }
+        let n_a = self.count as f64;
+        let n_b = other.count as f64;
+        let n = n_a + n_b;
+        let delta = other.mean - self.mean;
+        self.mean += delta * (n_b / n);
+        self.m2 += other.m2 + delta * delta * (n_a * n_b / n);
+        self.count += other.count;
+    }
+
+    pub fn finish(&self) -> StatisticalMoments {
+        if self.count == 0 {
+            return StatisticalMoments {
+                mean: 0.0,
+                variance: 0.0,
+                standard_deviation: 0.0,
+                count: 0,
+            };
+        }
+        let variance = self.m2 / (self.count as f64);
+        let std_dev = variance.max(0.0).sqrt();
+        StatisticalMoments {
+            mean: round_precision(self.mean, DEFAULT_PRECISION_DIGITS),
+            variance: round_precision(variance, DEFAULT_PRECISION_DIGITS),
+            standard_deviation: round_precision(std_dev, DEFAULT_PRECISION_DIGITS),
+            count: self.count,
+        }
+    }
+}
+
 const DEFAULT_PRECISION_DIGITS: i32 = 4;
 const DEFAULT_POPOVICIU_MAX_SIGMA: f64 = 50.0;
 const DEFAULT_DISPERSION_PENALTY_RATIO: f64 = 0.5;
@@ -144,6 +218,26 @@ pub fn compute_standard_deviation(values: &[f64]) -> f64 {
     compute_statistical_moments(values).standard_deviation
 }
 
+/// Merges two precomputed statistical moment structures using Chan-Golub-LeVeque
+/// pairwise formula.
+pub fn merge_statistical_moments(
+    a: &StatisticalMoments,
+    b: &StatisticalMoments,
+) -> StatisticalMoments {
+    let mut acc_a = WelfordAccumulator {
+        count: a.count,
+        mean: a.mean,
+        m2: a.variance * (a.count as f64),
+    };
+    let acc_b = WelfordAccumulator {
+        count: b.count,
+        mean: b.mean,
+        m2: b.variance * (b.count as f64),
+    };
+    acc_a.merge(&acc_b);
+    acc_a.finish()
+}
+
 /// Calculates Popoviciu's inequality dispersion discount factor:
 /// D = max(0, 1.0 - gamma * (sigma / sigma_max))
 ///
@@ -218,6 +312,44 @@ mod tests {
         assert_eq!(moments.mean, 30.0);
         assert_eq!(moments.variance, 200.0);
         assert!((moments.standard_deviation - 14.1421).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_welford_accumulator_and_merge_equivalence() {
+        let part_a = vec![10.0, 20.0, 30.0];
+        let part_b = vec![40.0, 50.0];
+        let full = vec![10.0, 20.0, 30.0, 40.0, 50.0];
+
+        let mut acc_a = WelfordAccumulator::new();
+        for &v in &part_a {
+            acc_a.update(v);
+        }
+        let mut acc_b = WelfordAccumulator::new();
+        for &v in &part_b {
+            acc_b.update(v);
+        }
+
+        let full_moments = compute_statistical_moments(&full);
+
+        // Accumulator merge
+        let mut acc_merged = acc_a;
+        acc_merged.merge(&acc_b);
+        let merged_from_acc = acc_merged.finish();
+
+        assert_eq!(merged_from_acc.count, full_moments.count);
+        assert_eq!(merged_from_acc.mean, full_moments.mean);
+        assert_eq!(merged_from_acc.variance, full_moments.variance);
+        assert_eq!(merged_from_acc.standard_deviation, full_moments.standard_deviation);
+
+        // Function merge
+        let moments_a = acc_a.finish();
+        let moments_b = acc_b.finish();
+        let merged_moments = merge_statistical_moments(&moments_a, &moments_b);
+
+        assert_eq!(merged_moments.count, full_moments.count);
+        assert_eq!(merged_moments.mean, full_moments.mean);
+        assert_eq!(merged_moments.variance, full_moments.variance);
+        assert_eq!(merged_moments.standard_deviation, full_moments.standard_deviation);
     }
 
     #[test]

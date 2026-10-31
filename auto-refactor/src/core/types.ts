@@ -442,6 +442,8 @@ export interface ProjectProfile {
     isPolyglot: boolean;
     partitions: ProjectPartition[];
     archetype?: ProjectArchetype;
+    /** Total number of discovered code files across all partitions during profiling */
+    totalDiscoveredFiles?: number;
 }
 
 /**

@@ -163,13 +163,13 @@ function mergeThresholds(
         ...(overrides.thresholds || {}),
         ...(cliEffectiveLoc
             ? {
-                  effectiveLocWarn: cliEffectiveLoc,
-                  effectiveLocFail: Math.round(cliEffectiveLoc * 2),
-                  ...(!cliFileLinesWarn ? { fileLinesWarn: Math.max(400, cliEffectiveLoc) } : {}),
-                  ...(!cliFileLinesFail
-                      ? { fileLinesFail: Math.max(800, Math.round(cliEffectiveLoc * 2)) }
-                      : {}),
-              }
+                effectiveLocWarn: cliEffectiveLoc,
+                effectiveLocFail: Math.round(cliEffectiveLoc * 2),
+                ...(!cliFileLinesWarn ? { fileLinesWarn: Math.max(400, cliEffectiveLoc) } : {}),
+                ...(!cliFileLinesFail
+                    ? { fileLinesFail: Math.max(800, Math.round(cliEffectiveLoc * 2)) }
+                    : {}),
+            }
             : {}),
         ...(cliFileLinesWarn ? { fileLinesWarn: cliFileLinesWarn } : {}),
         ...(cliFileLinesFail ? { fileLinesFail: cliFileLinesFail } : {}),
@@ -185,9 +185,13 @@ function mergeThresholds(
 function scaleFromProfile(profile: ReturnType<typeof detectProjectProfile>): ScaleGrade {
     const languages = profile?.languages || {};
     const sampleCount = Object.values(languages).reduce((sumAcc, countVal) => sumAcc + countVal, 0);
+    const effectiveFileCount =
+        typeof profile?.totalDiscoveredFiles === 'number' && profile.totalDiscoveredFiles > 0
+            ? profile.totalDiscoveredFiles
+            : sampleCount * 2;
     return evaluateScaleGrade({
-        fileCount: sampleCount * 2,
-        sloc: sampleCount * 2 * SLOC_PER_LANGUAGE_SAMPLE,
+        fileCount: effectiveFileCount,
+        sloc: effectiveFileCount * SLOC_PER_LANGUAGE_SAMPLE,
     });
 }
 

@@ -439,6 +439,12 @@ function processSampledItem(
     return item.isFile() ? recordSampledFile(item.name, languages) : 0;
 }
 
+/** Result of stratified directory language sampling. */
+interface SampleLanguagesResult {
+    languages: Record<string, number>;
+    totalDiscoveredFiles: number;
+}
+
 /**
  * Sample items within a single directory during language discovery.
  *
@@ -448,7 +454,8 @@ function processSampledItem(
  * @param dirQueue - Queue of directories scheduled for inspection.
  * @param languages - Map of language identifier to observed count.
  * @param currentSampled - Number of files sampled prior to this directory.
- * @returns Number of new files sampled from this directory.
+ * @param maxSampleFiles - Upper ceiling for detailed language distribution samples.
+ * @returns Tuple of [newlySampledCount, newlyDiscoveredCodeFilesCount].
  */
 function sampleItemsInDirectory(
     current: DirectoryQueueItem,
@@ -457,53 +464,97 @@ function sampleItemsInDirectory(
     dirQueue: DirectoryQueueItem[],
     languages: Record<string, number>,
     currentSampled: number,
-): number {
+    maxSampleFiles: number,
+): [number, number] {
     let newlySampled = 0;
+    let newlyDiscovered = 0;
     const items = readDirectoryEntries(current.dir);
-    for (const item of items) {
-        if (currentSampled + newlySampled >= LANGUAGE_SAMPLE_MAX_FILES) break;
-        newlySampled += processSampledItem(
-            item,
-            current,
-            rootResolved,
-            directorySemantics,
-            dirQueue,
-            languages,
-        );
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.isDirectory()) {
+            queueSampledDirectory(
+                item,
+                current.dir,
+                current.depth,
+                rootResolved,
+                directorySemantics,
+                dirQueue,
+            );
+            continue;
+        }
+        if (!item.isFile()) {
+            continue;
+        }
+        const ext = path.extname(item.name).toLowerCase();
+        const lang = EXT_TO_LANG[ext];
+        if (!lang) {
+            continue;
+        }
+        newlyDiscovered++;
+        if (currentSampled + newlySampled < maxSampleFiles) {
+            languages[lang] = (languages[lang] || 0) + 1;
+            newlySampled++;
+        }
     }
-    return newlySampled;
+    return [newlySampled, newlyDiscovered];
 }
 
 /**
- * Iteratively sample directory files to determine language distribution.
+ * Iteratively sample directory files using BFS stratified sampling to determine language distribution
+ * and discover total code file volume without LIFO truncation blind spots.
  *
  * @param rootResolved - Absolute project root directory path.
  * @param directorySemantics - Map to record directory semantics for discovered subdirectories.
- * @returns Map of language identifier to observed file count.
+ * @param partitions - Optional detected project partitions to ensure fair multi-stratum representation.
+ * @returns Map of language identifier to observed file count and total discovered code files.
  */
 function sampleDirectoryLanguages(
     rootResolved: string,
     directorySemantics: Record<string, ArchitectureLayer>,
-): Record<string, number> {
+    partitions: ProjectPartition[] = [],
+): SampleLanguagesResult {
     const languages: Record<string, number> = {};
     let sampled = 0;
-    const dirQueue: DirectoryQueueItem[] = [{ dir: rootResolved, depth: 0 }];
+    let totalDiscoveredFiles = 0;
+    const maxSampleBudget = Math.max(
+        LANGUAGE_SAMPLE_MAX_FILES,
+        Math.min(2500, partitions.length * 150),
+    );
 
-    while (dirQueue.length > 0 && sampled < LANGUAGE_SAMPLE_MAX_FILES) {
-        const current = dirQueue.pop()!;
+    const dirQueue: DirectoryQueueItem[] = [{ dir: rootResolved, depth: 0 }];
+    const seenDirs = new Set<string>([rootResolved]);
+
+    // Seed partition roots for fair multi-stratum discovery
+    for (let i = 0; i < partitions.length; i++) {
+        const partitionDir = path.resolve(rootResolved, partitions[i].path);
+        if (!seenDirs.has(partitionDir) && fs.existsSync(partitionDir)) {
+            dirQueue.push({ dir: partitionDir, depth: 1 });
+            seenDirs.add(partitionDir);
+        }
+    }
+
+    let queueHead = 0;
+    while (queueHead < dirQueue.length) {
+        const current = dirQueue[queueHead++];
         if (current.depth > LANGUAGE_SAMPLE_MAX_DEPTH) continue;
 
-        sampled += sampleItemsInDirectory(
+        const [newSampled, newDiscovered] = sampleItemsInDirectory(
             current,
             rootResolved,
             directorySemantics,
             dirQueue,
             languages,
             sampled,
+            maxSampleBudget,
         );
+        sampled += newSampled;
+        totalDiscoveredFiles += newDiscovered;
     }
 
-    return languages;
+    return {
+        languages,
+        totalDiscoveredFiles: Math.max(totalDiscoveredFiles, sampled),
+    };
 }
 
 /**
@@ -546,7 +597,11 @@ export function detectProjectProfile(root: string): ProjectProfile {
         directorySemantics,
     );
 
-    const languages = sampleDirectoryLanguages(rootResolved, directorySemantics);
+    const { languages, totalDiscoveredFiles } = sampleDirectoryLanguages(
+        rootResolved,
+        directorySemantics,
+        partitions,
+    );
     const primaryLanguage = resolvePrimaryLanguage(languages);
 
     const distinctLanguages = Object.keys(languages);
@@ -559,6 +614,7 @@ export function detectProjectProfile(root: string): ProjectProfile {
         directorySemantics,
         isPolyglot,
         partitions,
+        totalDiscoveredFiles,
     };
     const archetype = detectProjectArchetype(root, partialProfile);
 

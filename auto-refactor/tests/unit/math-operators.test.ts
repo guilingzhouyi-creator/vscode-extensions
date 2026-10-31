@@ -34,6 +34,9 @@ import {
     computeWeightedGeometricMean,
     computePopoviciuDispersionPenalty,
     computePowerResonance,
+    computeStatisticalMoments,
+    mergeStatisticalMoments,
+    OnlineWelfordAccumulator,
 } from '../../src/core/math';
 
 describe('Core Math — Pure Mathematical Operators', () => {
@@ -175,6 +178,39 @@ describe('Core Math — Pure Mathematical Operators', () => {
             expect(computePopoviciuDispersionPenalty(0)).toBe(1.0);
             // Maximum theoretical sigma = 50.0 => penalty = 1.0 - (50/50)*0.5 = 0.5
             expect(computePopoviciuDispersionPenalty(50.0)).toBe(0.5);
+        });
+
+        it('computeStatisticalMoments and mergeStatisticalMoments satisfy Chan-Golub-LeVeque equivalence', () => {
+            const partA = [10, 20, 30];
+            const partB = [40, 50];
+            const full = [10, 20, 30, 40, 50];
+
+            const fullMoments = computeStatisticalMoments(full);
+            expect(fullMoments.count).toBe(5);
+            expect(fullMoments.mean).toBe(30.0);
+            expect(fullMoments.variance).toBe(200.0);
+            expect(Math.abs(fullMoments.standardDeviation - 14.1421)).toBeLessThan(1e-3);
+
+            const momentsA = computeStatisticalMoments(partA);
+            const momentsB = computeStatisticalMoments(partB);
+            const merged = mergeStatisticalMoments(momentsA, momentsB);
+
+            expect(merged.count).toBe(fullMoments.count);
+            expect(merged.mean).toBeCloseTo(fullMoments.mean, 4);
+            expect(merged.variance).toBeCloseTo(fullMoments.variance, 4);
+            expect(merged.standardDeviation).toBeCloseTo(fullMoments.standardDeviation, 4);
+
+            const accA = new OnlineWelfordAccumulator();
+            partA.forEach((v) => accA.update(v));
+            const accB = new OnlineWelfordAccumulator();
+            partB.forEach((v) => accB.update(v));
+
+            accA.merge(accB);
+            const accMerged = accA.finish();
+            expect(accMerged.count).toBe(fullMoments.count);
+            expect(accMerged.mean).toBeCloseTo(fullMoments.mean, 4);
+            expect(accMerged.variance).toBeCloseTo(fullMoments.variance, 4);
+            expect(accMerged.standardDeviation).toBeCloseTo(fullMoments.standardDeviation, 4);
         });
     });
 

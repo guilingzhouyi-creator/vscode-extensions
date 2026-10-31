@@ -301,6 +301,15 @@ export interface QualityScoreBreakdown {
      */
     technicalDebt?: import('./technical-debt-ratio').TechnicalDebtAssessment;
     /**
+     * Optional spatial Popoviciu dispersion metrics and penalty across evaluated files.
+     */
+    dispersionMetrics?: {
+        mean: number;
+        variance: number;
+        standardDeviation: number;
+        penaltyFactor: number;
+    };
+    /**
      * Optional quantitative financial capital debt and volatility-adjusted risk metrics.
      */
     quant?: import('./quantitative-risk-model').QuantitativeRiskAssessment;
@@ -353,6 +362,7 @@ export interface QualityScoreBreakdown {
         composite: string;
         coverage: string;
         confidence: string;
+        dispersion?: string;
         gradeCutoffs: { grade: string; min: number }[];
         dimensionWeights: Record<string, number>;
         familyDimensions: Record<string, string>;

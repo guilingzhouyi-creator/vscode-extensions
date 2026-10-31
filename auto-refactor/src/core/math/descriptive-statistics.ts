@@ -104,7 +104,7 @@ export function computeStandardDeviation(
 }
 
 /**
- * Computes central tendency and dispersion moments in a unified pass.
+ * Computes central tendency and dispersion moments in a unified single pass using Welford's algorithm.
  *
  * @param values - Input sequence of numbers.
  * @returns Complete statistical moments.
@@ -114,39 +114,133 @@ export function computeStatisticalMoments(values: readonly number[]): Statistica
         return Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
     }
 
-    let sum = 0;
-    let validCount = 0;
+    let count = 0;
+    let mean = 0;
+    let m2 = 0;
+
     for (let i = 0; i < values.length; i++) {
         const val = values[i];
         if (Number.isFinite(val)) {
-            sum += val;
-            validCount++;
+            count++;
+            const delta = val - mean;
+            mean += delta / count;
+            const delta2 = val - mean;
+            m2 += delta * delta2;
         }
     }
 
-    if (validCount === 0) {
+    if (count === 0) {
         return Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
     }
 
-    const mean = safeDivide(sum, validCount);
-    let squaredDiffSum = 0;
-    for (let i = 0; i < values.length; i++) {
-        const val = values[i];
-        if (Number.isFinite(val)) {
-            const diff = val - mean;
-            squaredDiffSum += diff * diff;
-        }
-    }
-
-    const variance = safeDivide(squaredDiffSum, validCount);
-    const standardDeviation = Math.sqrt(Number.isFinite(variance) ? variance : 0);
+    const variance = safeDivide(m2, count);
+    const standardDeviation = Math.sqrt(Math.max(0, variance));
 
     return Object.freeze({
         mean: roundPrecision(mean),
         variance: roundPrecision(variance),
         standardDeviation: roundPrecision(standardDeviation),
-        count: validCount,
+        count,
     });
+}
+
+/**
+ * Merges two precomputed statistical moment records using Chan-Golub-LeVeque
+ * pairwise algorithm.
+ *
+ * @param a - First statistical moments record.
+ * @param b - Second statistical moments record.
+ * @returns Merged statistical moments.
+ */
+export function mergeStatisticalMoments(
+    a: StatisticalMoments,
+    b: StatisticalMoments,
+): StatisticalMoments {
+    if (!a || a.count === 0) {
+        return b || Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
+    }
+    if (!b || b.count === 0) {
+        return a;
+    }
+
+    const nA = a.count;
+    const nB = b.count;
+    const n = nA + nB;
+
+    const delta = b.mean - a.mean;
+    const mean = a.mean + delta * (nB / n);
+
+    const m2A = a.variance * nA;
+    const m2B = b.variance * nB;
+    const m2 = m2A + m2B + delta * delta * ((nA * nB) / n);
+
+    const variance = safeDivide(m2, n);
+    const standardDeviation = Math.sqrt(Math.max(0, variance));
+
+    return Object.freeze({
+        mean: roundPrecision(mean),
+        variance: roundPrecision(variance),
+        standardDeviation: roundPrecision(standardDeviation),
+        count: n,
+    });
+}
+
+/**
+ * Online accumulator for statistical moments maintaining unrounded second central moments.
+ */
+export class OnlineWelfordAccumulator {
+    private count = 0;
+    private mean = 0;
+    private m2 = 0;
+
+    /**
+     * Appends an observation to the accumulator.
+     */
+    update(value: number): void {
+        if (!Number.isFinite(value)) return;
+        this.count++;
+        const delta = value - this.mean;
+        this.mean += delta / this.count;
+        const delta2 = value - this.mean;
+        this.m2 += delta * delta2;
+    }
+
+    /**
+     * Merges another accumulator into this one using Chan-Golub-LeVeque formula.
+     */
+    merge(other: OnlineWelfordAccumulator): void {
+        if (!other || other.count === 0) return;
+        if (this.count === 0) {
+            this.count = other.count;
+            this.mean = other.mean;
+            this.m2 = other.m2;
+            return;
+        }
+        const nA = this.count;
+        const nB = other.count;
+        const n = nA + nB;
+        const delta = other.mean - this.mean;
+        this.mean += delta * (nB / n);
+        this.m2 += other.m2 + delta * delta * ((nA * nB) / n);
+        this.count = n;
+    }
+
+    /**
+     * Finalizes and produces frozen statistical moments.
+     */
+    finish(): StatisticalMoments {
+        if (this.count === 0) {
+            return Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
+        }
+        const variance = safeDivide(this.m2, this.count);
+        const standardDeviation = Math.sqrt(Math.max(0, variance));
+        return Object.freeze({
+            mean: roundPrecision(this.mean),
+            variance: roundPrecision(variance),
+            standardDeviation: roundPrecision(standardDeviation),
+            count: this.count,
+        });
+    }
 }
 
 /**

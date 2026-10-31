@@ -287,6 +287,105 @@ function normalizeScoreOptions(
     };
 }
 
+const FUNCTION_DECL_REGEX =
+    /(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)|(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>|def\s+([a-zA-Z0-9_$]+)|fn\s+([a-zA-Z0-9_$]+)|func\s+([a-zA-Z0-9_$]+)/g;
+
+const BRANCH_KEYWORD_REGEX = /\b(if|else|for|while|case|catch)\b|\?|&&|\|\|/g;
+
+interface DiscoveredFunctionMatch {
+    name: string;
+    startLine: number;
+}
+
+function discoverFunctionDeclarations(lines: string[]): DiscoveredFunctionMatch[] {
+    const matches: DiscoveredFunctionMatch[] = [];
+    for (let i = 0; i < lines.length; i++) {
+        FUNCTION_DECL_REGEX.lastIndex = 0;
+        const match = FUNCTION_DECL_REGEX.exec(lines[i]);
+        if (match) {
+            const name = match[1] || match[2] || match[3] || match[4] || match[5] || 'anonymous';
+            matches.push({ name, startLine: i + 1 });
+        }
+    }
+    return matches;
+}
+
+function computeFunctionBranchComplexity(
+    lines: string[],
+    startLine: number,
+    endLine: number,
+): number {
+    let branchCount = 0;
+    const maxLine = Math.min(endLine, lines.length);
+    for (let l = startLine - 1; l < maxLine; l++) {
+        const lineMatches = lines[l].match(BRANCH_KEYWORD_REGEX);
+        if (lineMatches) {
+            branchCount += lineMatches.length;
+        }
+    }
+    return 1 + branchCount;
+}
+
+function computeFunctionIssueDeduction(
+    issues: Issue[],
+    startLine: number,
+    endLine: number,
+    cyclomaticComplexity: number,
+): number {
+    let deduction = 0;
+    for (let j = 0; j < issues.length; j++) {
+        const issueLine = issues[j].location?.start?.line;
+        if (typeof issueLine === 'number' && issueLine >= startLine && issueLine <= endLine) {
+            deduction += issues[j].severity === SEVERITY_ERROR ? 15 : 5;
+        }
+    }
+    if (cyclomaticComplexity > 15) {
+        deduction += (cyclomaticComplexity - 15) * 3;
+    }
+    return deduction;
+}
+
+/**
+ * Extracts function boundaries, estimated complexity, and local quality scores.
+ */
+function extractFunctionQualityScores(content: string, issues: Issue[]): FunctionQualityScore[] {
+    if (!content || content.length === 0) return [];
+
+    const lines = content.split('\n');
+    const matches = discoverFunctionDeclarations(lines);
+    if (matches.length === 0) return [];
+
+    const functions: FunctionQualityScore[] = [];
+    for (let i = 0; i < matches.length; i++) {
+        const current = matches[i];
+        const nextStart = i + 1 < matches.length ? matches[i + 1].startLine : lines.length + 1;
+        const endLine = Math.max(current.startLine, nextStart - 1);
+        const fnLoc = endLine - current.startLine + 1;
+
+        const cyclomaticComplexity = computeFunctionBranchComplexity(
+            lines,
+            current.startLine,
+            endLine,
+        );
+        const deduction = computeFunctionIssueDeduction(
+            issues,
+            current.startLine,
+            endLine,
+            cyclomaticComplexity,
+        );
+        const score = clampScore(DIMENSION_MAX_SCORE - deduction);
+
+        functions.push({
+            functionName: current.name,
+            loc: fnLoc,
+            cyclomaticComplexity,
+            score,
+        });
+    }
+
+    return functions;
+}
+
 function evaluateFileQuality(opt: ScoreFileQualityOptions): FileQualityScore {
     const { filePath, content, issues } = opt;
     const domainName = opt.domainName ?? DEFAULT_DOMAIN_NAME;
@@ -332,6 +431,7 @@ function evaluateFileQuality(opt: ScoreFileQualityOptions): FileQualityScore {
     );
 
     const densityMetrics = buildFileDensityMetrics(densityResult);
+    const functions = extractFunctionQualityScores(content, allIssues);
 
     return {
         filePath,
@@ -342,7 +442,7 @@ function evaluateFileQuality(opt: ScoreFileQualityOptions): FileQualityScore {
         tenDimensions: { ...indices },
         effectiveDensity: densityResult.effectiveDensity,
         densityMetrics,
-        functions: [],
+        functions,
         issues: allIssues,
         loc,
     };

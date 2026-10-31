@@ -24,6 +24,7 @@ import type {
 } from './scoringTypes';
 import { calculatePolyglotGeneralizationIndex } from './modernization-formulas';
 import { nativeStatisticalMoments } from '../native/native-bridge';
+import { computePopoviciuDispersionPenalty } from '../math';
 import {
     ALL_QUALITY_DIMENSIONS,
     DEFAULT_QUALITY_WEIGHTS,
@@ -225,6 +226,8 @@ export class QualityScorer {
                     'exp(sum(weights[d] * ln(max(compositeIndexFloor, indices[d])) for d in evaluated) / sum(weights[d] for d in evaluated))',
                 coverage: 'sum(weights[d] for d in evaluated) / sum(weights[d] for all dimensions)',
                 confidence: 'clamp(baseConfidenceFromLines * coverage, floor, 1)',
+                dispersion:
+                    'Popoviciu inequality: D = clamp(1.0 - gamma * (sigma / sigma_max), 0, 1), sigma_max = 50.0',
                 gradeCutoffs: [
                     { grade: 'A+', min: GRADE_A_PLUS_MIN },
                     { grade: 'A', min: GRADE_A_MIN },
@@ -325,6 +328,17 @@ export class QualityScorer {
         const polyglotGeneralization = this.computePolyglotMetrics(fileQualityScores);
         const technicalDebt = evaluateTechnicalDebtAssessment(allIssues ?? [], totalWeight);
 
+        const fileScores = Object.values(fileQualityScores).map((f) => f.compositeScore);
+        const moments = nativeStatisticalMoments(fileScores);
+        const penaltyFactor = computePopoviciuDispersionPenalty(moments.standardDeviation);
+        const dispersionMetrics = {
+            mean: Math.round(moments.mean * SCORE_ROUNDING) / SCORE_ROUNDING,
+            variance: Math.round(moments.variance * SCORE_ROUNDING) / SCORE_ROUNDING,
+            standardDeviation:
+                Math.round(moments.standardDeviation * SCORE_ROUNDING) / SCORE_ROUNDING,
+            penaltyFactor: Math.round(penaltyFactor * SCORE_ROUNDING) / SCORE_ROUNDING,
+        };
+
         return {
             indices: rawScores,
             compositeScore,
@@ -332,6 +346,7 @@ export class QualityScorer {
             confidence,
             weights: { ...effectiveWeights },
             technicalDebt,
+            dispersionMetrics,
             formulas: {
                 indexMapping:
                     'density dims (Michaelis-Menten / Hill rational decay): index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
@@ -344,6 +359,8 @@ export class QualityScorer {
                     'exp(sum(weights[d] * ln(max(compositeIndexFloor, indices[d])) for d in evaluated) / sum(weights[d] for d in evaluated))',
                 coverage: 'sum(weights[d] for d in evaluated) / sum(weights[d] for all dimensions)',
                 confidence: 'clamp(baseConfidenceFromLines * coverage, floor, 1)',
+                dispersion:
+                    'Popoviciu inequality: D = clamp(1.0 - gamma * (sigma / sigma_max), 0, 1), sigma_max = 50.0',
                 gradeCutoffs: [
                     { grade: 'A+', min: GRADE_A_PLUS_MIN },
                     { grade: 'A', min: GRADE_A_MIN },
