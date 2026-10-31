@@ -2,7 +2,7 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-31T02:33:50.487Z",
+  "timestamp": "2026-10-31T04:28:09.043Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
@@ -21,7 +21,7 @@
     },
     "sqale": {
       "tdr": 0.0042,
-      "remediationMinutes": 30707,
+      "remediationMinutes": 30695,
       "grade": "A"
     },
     "polyglot": {
@@ -33,18 +33,18 @@
     },
     "counts": {
       "files": 806,
-      "total": 4454,
+      "total": 4453,
       "errors": 0,
-      "warns": 3779,
+      "warns": 3778,
       "info": 675,
       "suppressed": 161
     }
   },
   "usability": {
     "proven": 50,
-    "patchable": 1897,
+    "patchable": 1896,
     "advisory": 2507,
-    "uncalibrated": 4243,
+    "uncalibrated": 4242,
     "needsHuman": 6
   },
   "defaultVerify": "npm test",
@@ -53,8 +53,8 @@
     "semanticPurity": 98.18,
     "codeSecurity": 99.78,
     "performanceEfficiency": 99.57,
-    "standardization": 83.67,
-    "modernity": 97.74,
+    "standardization": 83.68,
+    "modernity": 97.73,
     "maintainability": 92.81,
     "commentQuality": 99.3,
     "duplication": 94.75,
@@ -100,8 +100,8 @@
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2130,
-      "count": 213
+      "loss": 2120,
+      "count": 212
     },
     {
       "rule": "hardcoded-string",
@@ -8427,8 +8427,5 @@
       }
     ]
   },
-  "truncated": 3279,
-  "notes": [
-    "dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph"
-  ]
+  "truncated": 3278
 }
