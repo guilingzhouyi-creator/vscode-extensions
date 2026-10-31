@@ -190,27 +190,27 @@ function evaluateWorkspaceQuant(root = REPO_ROOT) {
         };
     }
 
-    // Graceful fallback if dist is unbuilt
+    // Graceful fallback if dist is unbuilt or evaluation is unavailable
     return {
-        rcr: 2.0,
+        rcr: 0.0,
         erq: 0.0,
         ddr: 0.0,
-        dsi: 0.45,
-        rcd: 0.75,
+        dsi: 0.0,
+        rcd: 0.0,
         edb95: 0.0,
         ptd: 0.0,
-        ehl: 1.0,
-        icr: 2.0,
+        ehl: 0.0,
+        icr: 0.0,
         qsr: 0.0,
         sortino: 0.0,
-        debtGini: 0.45,
-        defectEntropy: 0.75,
+        debtGini: 0.0,
+        defectEntropy: 0.0,
         var95: 0.0,
         mdd: 0.0,
-        halfLifeCommits: 1.0,
-        status: 'balanced',
+        halfLifeCommits: 0.0,
+        status: 'insufficient_samples',
         sampleCount: scores.length,
-        isSampleSufficient: scores.length >= MIN_SAMPLES,
+        isSampleSufficient: false,
         totalFindings,
     };
 }
@@ -234,7 +234,9 @@ if (require.main === module) {
                 ? '🟢 [强净消融]'
                 : result.status === 'balanced'
                   ? '🟡 [动态均势]'
-                  : '🔴 [赤字膨胀]';
+                  : result.status === 'insufficient_samples'
+                    ? '⚪ [样本匮乏]'
+                    : '🔴 [赤字膨胀]';
         process.stdout.write(`\n=== 架构动力学与韧性量化模型 (Architecture Dynamics & Resilience, ADR-Q) ===\n`);
         process.stdout.write(` 【偿债动力学】\n`);
         process.stdout.write(`  • 消融代偿比 (RCR)   : ${result.rcr.toFixed(2)}x ${statusBadge}\n`);

@@ -119,7 +119,7 @@ function Format-QuantDashboardBlock {
         [psobject]$Quant,
         [int]$TargetWidth = 71
     )
-    $sepTitle = "─ [7/6] 架构动力学与韧性量化 (ADR-Q) "
+    $sepTitle = "─ [6/6] 架构动力学与韧性量化 (ADR-Q) "
     $sep = "├" + $sepTitle + ("─" * ($TargetWidth - (Get-DisplayWidth $sepTitle))) + "┤"
     Write-GateHost $sep -ForegroundColor Cyan
 
@@ -218,7 +218,7 @@ function Format-QuantMarkdownBlock {
 
     $dsiVal = [double]$(if ($null -ne $Quant.dsi) { $Quant.dsi } else { $Quant.debtGini })
     $qDsiStatus = if ($dsiVal -ge 0.70) { "🔴 极化寡头" } elseif ($dsiVal -ge 0.50) { "🟡 局部偏聚" } else { "🟢 弥散均布" }
-    [void]$Builder.AppendLine(("| **空间拓扑** | 债务偏聚指数 (DSI) | **{0:F2}** | `[{1}]` | {2} | 债务在全仓 688 个文件中弥散平铺，无单体巨石垄断 |" -f $dsiVal, (Get-QuantGaugeBar ([math]::Min(1.0, $dsiVal)) 10), $qDsiStatus))
+    [void]$Builder.AppendLine(("| **空间拓扑** | 债务偏聚指数 (DSI) | **{0:F2}** | `[{1}]` | {2} | 债务在全仓代码文件中弥散平铺，无单体巨石垄断 |" -f $dsiVal, (Get-QuantGaugeBar ([math]::Min(1.0, $dsiVal)) 10), $qDsiStatus))
 
     $rcdVal = [double]$(if ($null -ne $Quant.rcd) { $Quant.rcd } else { $Quant.defectEntropy })
     $qRcdStatus = if ($rcdVal -le 0.40) { "🟢 靶向聚焦" } elseif ($rcdVal -le 0.75) { "🟡 多维分布" } else { "🔴 全域混沌" }

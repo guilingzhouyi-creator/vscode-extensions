@@ -282,10 +282,84 @@ function getEhlBadge(val) {
   return '🔴 惯性滞后';
 }
 
+function getErqBadge(val) {
+  if (val >= 1.0) return '🟢 稳健超额';
+  if (val >= 0.5) return '🟡 平稳受控';
+  return '🔴 波动剧烈';
+}
+
+function getEdbBadge(val) {
+  if (val <= 10.0) return '🟢 边界收敛';
+  if (val <= 25.0) return '🟡 边界受控';
+  return '🔴 边界警戒';
+}
+
+function getPtdBadge(val) {
+  if (val <= 15.0) return '🟢 平稳演进';
+  if (val <= 60.0) return '🟡 周期演进';
+  return '🔴 历史剧震';
+}
+
 function getQuantStatusBadge(status) {
   if (status === 'de-leveraging') return '🟢 强净消融';
   if (status === 'balanced') return '🟡 动态均势';
+  if (status === 'insufficient_samples') return '⚪ 样本匮乏';
   return '🔴 赤字膨胀';
+}
+
+function getDdrBadge(val) {
+  if (val >= 999.0) return '🟢 零破位';
+  if (val >= 5.0) return '🟢 强基底防御';
+  return '🔴 底线失守';
+}
+
+function getRcrNote(status) {
+  if (status === 'de-leveraging') return '重构清偿产能显著跑赢新增阻滞，架构处于主动净消融期';
+  if (status === 'balanced') return '重构产能与债务增量动态对冲，系统维持演进均势';
+  if (status === 'insufficient_samples') return '样本与观测时序匮乏，暂未采集到有效偿债流量';
+  return '新增债务阻滞超出重构清偿速度，需警惕赤字累积';
+}
+
+function getErqNote(val) {
+  if (val >= 1.0) return '质量基线长期处于高位，超额质量收益稳定受控';
+  if (val >= 0.5) return '质量表现高于基线，扰动波动处于可接受包络';
+  return '质量受压接近及格线，工程超额收益偏低';
+}
+
+function getDdrNote(val) {
+  if (val >= 999.0) return '历史各次审计未检出跌破及格线事故';
+  if (val >= 5.0) return '下行防御垫层充沛，破位回撤风险受控';
+  return '存在跌破质量底线风险，下行防御亟待加固';
+}
+
+function getEdbNote(val) {
+  if (val <= 10.0) return '95%置信度下单次扰动最大质量衰减预测极低';
+  if (val <= 25.0) return '单次极端扰动下的质量衰减处于受控预测上限';
+  return '极端扰动下质量回撤预测偏大，防御边界需收紧';
+}
+
+function getPtdNote(val) {
+  if (val <= 15.0) return '历史质量轨迹平稳，未见大幅度周期落差';
+  if (val <= 60.0) return '记录从初期至当前演化周期内的正常峰谷差';
+  return '历史峰谷落差过大，工程质量曾出现剧烈震荡';
+}
+
+function getEhlNote(val) {
+  if (val <= 2.0) return '突发扰动或单点缺陷可在1~2步迭代内迅速收复稳态';
+  if (val <= 5.0) return '系统具备自愈趋势，需数步迭代回到稳态基线';
+  return '自愈半衰周期偏长，存在缺陷惯性滞后风险';
+}
+
+function getDsiNote(val) {
+  if (val < 0.5) return '技术债务在全仓代码中弥散平铺，无单体巨石垄断';
+  if (val <= 0.7) return '部分核心模块显现技术债务局部偏聚，需重点关照';
+  return '少数模块垄断全仓绝大部分债务，存在单体极化风险';
+}
+
+function getRcdNote(val) {
+  if (val <= 0.4) return '缺陷高度集中在少数规则家族，可执行靶向消除';
+  if (val <= 0.75) return '缺陷跨多家族规则分布，宜展开多维常态巡检';
+  return '缺陷在各规则家族全域混沌发散，需系统性治理';
 }
 
 function renderQuantTableRows(quant) {
@@ -299,7 +373,10 @@ function renderQuantTableRows(quant) {
   const ehlVal = Number(quant.ehl ?? quant.halfLifeCommits ?? 1.0);
 
   const statusBadge = getQuantStatusBadge(quant.status);
-  const ddrBadge = ddrVal >= 999.0 ? '🟢 零破位' : ddrVal >= 5.0 ? '🟢 强基底防御' : '🔴 底线失守';
+  const ddrBadge = getDdrBadge(ddrVal);
+  const erqBadge = getErqBadge(erqVal);
+  const edbBadge = getEdbBadge(edbVal);
+  const ptdBadge = getPtdBadge(ptdVal);
   const dsiBadge = getDsiBadge(dsiVal);
   const rcdBadge = getRcdBadge(rcdVal);
   const ehlBadge = getEhlBadge(ehlVal);
@@ -313,20 +390,29 @@ function renderQuantTableRows(quant) {
   const ptdBar = getProgressBar(Math.min(100, ptdVal), 10);
   const ehlBar = getProgressBar(Math.max(0, 100 - (ehlVal / 5.0) * 100), 10);
 
+  const rcrNote = getRcrNote(quant.status);
+  const erqNote = getErqNote(erqVal);
+  const ddrNote = getDdrNote(ddrVal);
+  const edbNote = getEdbNote(edbVal);
+  const ptdNote = getPtdNote(ptdVal);
+  const ehlNote = getEhlNote(ehlVal);
+  const dsiNote = getDsiNote(dsiVal);
+  const rcdNote = getRcdNote(rcdVal);
+
   return [
     '',
     '### 📈 架构动力学与韧性量化看板 (Architecture Dynamics & Resilience, ADR-Q)',
     '',
     '| 观测子域 | 指标名称 (规范代号) | 实时标量 | 动态量规 | 状态等级 | 架构治理与战术研判 |',
     '| :--- | :--- | :---: | :---: | :---: | :--- |',
-    `| **偿债动力学** | 消融代偿比 (RCR) | **${rcrVal.toFixed(2)}x** | \`[${rcrBar}]\` | ${statusBadge} | 重构清偿产能显著跑赢新债阻滞，架构处于主动净优化期 |`,
-    `| **时序韧性** | 质量坚韧商 (ERQ) | **${erqVal.toFixed(2)}** | \`[${erqBar}]\` | 🟡 平稳超额 | 质量基线长期处于高位，超额质量收益波动受控 |`,
-    `| | 破位防御度 (DDR) | **${ddrVal >= 999 ? '999.0' : ddrVal.toFixed(2)}** | \`[${ddrBar}]\` | ${ddrBadge} | 历史各次提交与审计中从未发生跌破 90 分及格线事故 |`,
-    `| | 极端退化包络 (EDB-95) | **${edbVal.toFixed(2)}%** | \`[${edbBar}]\` | 🟡 边界受控 | 95% 置信度下单次极端扰动的质量衰减预测上限 |`,
-    `| | 历史峰谷落差 (PTD) | **${ptdVal.toFixed(2)}%** | \`[${ptdBar}]\` | 🟡 周期演进 | 记录从冷启动初期至当前成熟期的历史跨度峰谷差 |`,
-    `| | 扰动自愈步长 (EHL) | **${ehlVal.toFixed(1)} 步** | \`[${ehlBar}]\` | ${ehlBadge} | 突发扰动或单点缺陷引入后可在 1~2 步内迅速收复稳态 |`,
-    `| **空间拓扑** | 债务偏聚指数 (DSI) | **${dsiVal.toFixed(2)}** | \`[${dsiBar}]\` | ${dsiBadge} | 债务在全仓 688 个文件中弥散平铺，无单体巨石垄断 |`,
-    `| | 根因发散熵 (RCD) | **${rcdVal.toFixed(2)}** | \`[${rcdBar}]\` | ${rcdBadge} | 缺陷跨命名/简化/性能等多家族分布，宜全域常态巡检 |`,
+    `| **偿债动力学** | 消融代偿比 (RCR) | **${rcrVal.toFixed(2)}x** | \`[${rcrBar}]\` | ${statusBadge} | ${rcrNote} |`,
+    `| **时序韧性** | 质量坚韧商 (ERQ) | **${erqVal.toFixed(2)}** | \`[${erqBar}]\` | ${erqBadge} | ${erqNote} |`,
+    `| | 破位防御度 (DDR) | **${ddrVal >= 999 ? '999.0' : ddrVal.toFixed(2)}** | \`[${ddrBar}]\` | ${ddrBadge} | ${ddrNote} |`,
+    `| | 极端退化包络 (EDB-95) | **${edbVal.toFixed(2)}%** | \`[${edbBar}]\` | ${edbBadge} | ${edbNote} |`,
+    `| | 历史峰谷落差 (PTD) | **${ptdVal.toFixed(2)}%** | \`[${ptdBar}]\` | ${ptdBadge} | ${ptdNote} |`,
+    `| | 扰动自愈步长 (EHL) | **${ehlVal.toFixed(1)} 步** | \`[${ehlBar}]\` | ${ehlBadge} | ${ehlNote} |`,
+    `| **空间拓扑** | 债务偏聚指数 (DSI) | **${dsiVal.toFixed(2)}** | \`[${dsiBar}]\` | ${dsiBadge} | ${dsiNote} |`,
+    `| | 根因发散熵 (RCD) | **${rcdVal.toFixed(2)}** | \`[${rcdBar}]\` | ${rcdBadge} | ${rcdNote} |`,
   ];
 }
 
@@ -371,28 +457,6 @@ function renderMarkdownDashboard(data) {
 
   if (data.quant && typeof data.quant === 'object') {
     lines.push(...renderQuantTableRows(data.quant));
-  }
-
-  if (data.quant && typeof data.quant === 'object') {
-    lines.push('');
-    lines.push('### 📈 资本负债与量化风险模型 (Quantitative Risk Model)');
-    lines.push('');
-    lines.push('| 量化指标 | 观测实值 | 状态/评级 | 业务与战术指导释义 |');
-    lines.push('| :--- | :---: | :---: | :--- |');
-    const statusBadge =
-      data.quant.status === 'de-leveraging'
-        ? '🟢 强去杠杆'
-        : data.quant.status === 'balanced'
-          ? '🟡 平稳受控'
-          : '🔴 滑坡在险';
-    lines.push(`| 利息覆盖率 (ICR) | ${Number(data.quant.icr).toFixed(2)}x | ${statusBadge} | 重构偿债产能与新增负债利息比值 |`);
-    lines.push(`| 质量夏普比率 (QSR) | ${Number(data.quant.qsr).toFixed(2)} | 稳健度 | 单位工程质量波动下的超额及格收益 |`);
-    lines.push(`| 索提诺比率 (Sortino) | ${Number(data.quant.sortino).toFixed(2)} | 下行风险 | 仅惩罚跌破及格线(90分)的下行破位退化 |`);
-    lines.push(`| 技术债基尼系数 (Gini) | ${Number(data.quant.debtGini).toFixed(2)} | ${Number(data.quant.debtGini) >= 0.7 ? '🟡 寡头集中' : '🟢 弥散均衡'} | 全仓技术债务在文件间的分布不均度 |`);
-    lines.push(`| 规则家族信息熵 (Entropy) | ${Number(data.quant.defectEntropy).toFixed(2)} | ${Number(data.quant.defectEntropy) <= 0.4 ? '🟢 规则聚焦' : '🟡 弥散分布'} | 缺陷在不同规则家族维度的集中/扩散度 |`);
-    lines.push(`| 在险价值 (VaR 95%) | ${Number(data.quant.var95).toFixed(2)}% | 风险极值 | 95%置信度下单次提交最大预期回撤极限 |`);
-    lines.push(`| 最大历史回撤 (MDD) | ${Number(data.quant.mdd).toFixed(2)}% | 历史极差 | 历史滑动窗口内相对历史峰值的最大跌落 |`);
-    lines.push(`| 自愈半衰期 (t1/2) | ${Number(data.quant.halfLifeCommits).toFixed(1)} 步 | 恢复速度 | 突发扰动受损后回到基线所需的提交步数 |`);
   }
 
   lines.push('');
