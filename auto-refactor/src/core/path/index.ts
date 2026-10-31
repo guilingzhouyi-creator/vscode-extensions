@@ -2,14 +2,15 @@
  * Module: Core Path — Single Source of Truth for Polyglot Repository Path Classification
  * File Path: src/core/path/index.ts
  * Architecture Role: Centralizes filesystem path classification across all analyzers,
- *   scorers, and audit reporters, eliminating ad-hoc regex drift for tests, fixtures,
+ *   scorers, and audit reporters, eliminating fragmented regex drift for tests, fixtures,
  *   scripts, gates, benchmarks, mocks, and documentation across TypeScript, Python,
  *   Rust, Go, Shell, and GDScript codebases.
  * Dependencies & Triggers: Zero external dependencies; imports normalizePathSeparators
  *   from ../constants; consumed by analyzers, scorers, and pipeline gates.
  * Responsibilities:
  *   1. Classify file paths into canonical FileCategory domains;
- *   2. Accurately identify polyglot test suites (TypeScript/JavaScript, Python, Rust, GDScript, Go);
+ *   2. Accurately identify polyglot test suites (TypeScript/JavaScript, Python, Rust,
+ *      GDScript, Go);
  *   3. Identify fixtures, mock directories, synthetic testdata, and sample files;
  *   4. Identify operational scripts, gate hooks, workflow files, and tooling;
  *   5. Identify generated artifacts, distribution bundles, and third-party modules;
@@ -28,14 +29,41 @@ import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-govern
 export type FileCategory =
     'test' | 'fixture' | 'benchmark' | 'script' | 'documentation' | 'generated' | 'source';
 
+const CATEGORY_TEST: FileCategory = 'test';
+const CATEGORY_FIXTURE: FileCategory = 'fixture';
+const CATEGORY_BENCHMARK: FileCategory = 'benchmark';
+const CATEGORY_SCRIPT: FileCategory = 'script';
+const CATEGORY_DOCUMENTATION: FileCategory = 'documentation';
+const CATEGORY_GENERATED: FileCategory = 'generated';
+const CATEGORY_SOURCE: FileCategory = 'source';
+
+/**
+ * Single source of truth dictionary for canonical file category classifications.
+ */
+export const FILE_CATEGORIES = Object.freeze({
+    TEST: CATEGORY_TEST,
+    FIXTURE: CATEGORY_FIXTURE,
+    BENCHMARK: CATEGORY_BENCHMARK,
+    SCRIPT: CATEGORY_SCRIPT,
+    DOCUMENTATION: CATEGORY_DOCUMENTATION,
+    GENERATED: CATEGORY_GENERATED,
+    SOURCE: CATEGORY_SOURCE,
+});
+
 const MAX_PATH_CACHE_ENTRIES = 4096;
-const pathCategoryCache = new Map<string, FileCategory>();
+const CACHE_NAME_PATH_CATEGORY = 'PathClassifier.pathNormToCategoryCache';
+const PATH_PREFIX_TEST = 'test/';
+const PATH_PREFIX_DOCS = 'docs/';
+const PATH_SEGMENT_DOCS = '/docs/';
+
+const pathNormToCategoryCache = new Map<string, FileCategory>();
+const EVICTION_TIER_INTERMEDIATE = CacheEvictionTier.Intermediate;
 
 sharedMemoryGovernor.register({
-    name: 'PathClassifier.pathCategoryCache',
-    tier: CacheEvictionTier.Intermediate,
-    clear: () => pathCategoryCache.clear(),
-    getSize: () => pathCategoryCache.size,
+    name: CACHE_NAME_PATH_CATEGORY,
+    tier: EVICTION_TIER_INTERMEDIATE,
+    clear: () => pathNormToCategoryCache.clear(),
+    getSize: () => pathNormToCategoryCache.size,
 });
 
 function compileSubstringMatcher(indicators: readonly string[]): RegExp {
@@ -156,8 +184,7 @@ const RE_GENERATED_OR_DIST = compileSubstringMatcher(GENERATED_OR_DIST_INDICATOR
  * @returns Clean normalized lowercase POSIX path.
  */
 export function normalizePathForClassification(filePath: string): string {
-    if (!filePath) return '';
-    return normalizePathSeparators(filePath).toLowerCase();
+    return filePath ? normalizePathSeparators(filePath).toLowerCase() : '';
 }
 
 /**
@@ -174,7 +201,11 @@ export function isTestFilePath(filePath: string): boolean {
     // Fixtures, mocks, and testdata directories contain static payload data, not test suites
     if (RE_FIXTURE_OR_MOCK.test(norm)) return false;
 
-    return RE_TEST_SUFFIXES.test(norm) || RE_TEST_SUBSTRINGS.test(norm) || norm.startsWith('test/');
+    return (
+        RE_TEST_SUFFIXES.test(norm) ||
+        RE_TEST_SUBSTRINGS.test(norm) ||
+        norm.startsWith(PATH_PREFIX_TEST)
+    );
 }
 
 /**
@@ -185,8 +216,7 @@ export function isTestFilePath(filePath: string): boolean {
  */
 export function isFixtureOrMockPath(filePath: string): boolean {
     const norm = normalizePathForClassification(filePath);
-    if (!norm) return false;
-    return RE_FIXTURE_OR_MOCK.test(norm);
+    return norm ? RE_FIXTURE_OR_MOCK.test(norm) : false;
 }
 
 /**
@@ -197,8 +227,7 @@ export function isFixtureOrMockPath(filePath: string): boolean {
  */
 export function isBenchmarkPath(filePath: string): boolean {
     const norm = normalizePathForClassification(filePath);
-    if (!norm) return false;
-    return RE_BENCHMARK.test(norm);
+    return norm ? RE_BENCHMARK.test(norm) : false;
 }
 
 /**
@@ -209,8 +238,7 @@ export function isBenchmarkPath(filePath: string): boolean {
  */
 export function isScriptOrGatePath(filePath: string): boolean {
     const norm = normalizePathForClassification(filePath);
-    if (!norm) return false;
-    return RE_SCRIPT_OR_GATE.test(norm);
+    return norm ? RE_SCRIPT_OR_GATE.test(norm) : false;
 }
 
 /**
@@ -222,25 +250,25 @@ export function isScriptOrGatePath(filePath: string): boolean {
 export function isDocumentationPath(filePath: string): boolean {
     const norm = normalizePathForClassification(filePath);
     if (!norm) return false;
-    if (norm.includes('/docs/') || norm.startsWith('docs/')) return true;
+    if (norm.includes(PATH_SEGMENT_DOCS) || norm.startsWith(PATH_PREFIX_DOCS)) return true;
     return RE_DOC_EXTENSIONS.test(norm);
 }
 
 /**
- * Evaluates whether a file path represents generated code, build output, or third-party dependencies.
+ * Evaluates whether a file path represents generated code, build output,
+ * or third-party dependencies.
  *
  * @param filePath - File path to inspect.
  * @returns True if path represents generated or bundled artifacts.
  */
 export function isGeneratedOrDistPath(filePath: string): boolean {
     const norm = normalizePathForClassification(filePath);
-    if (!norm) return false;
-    return RE_GENERATED_OR_DIST.test(norm);
+    return norm ? RE_GENERATED_OR_DIST.test(norm) : false;
 }
 
 /**
  * Evaluates whether a file path is exempt from strict business architecture constraints
- * (e.g., tests, fixtures, benchmarks, or operational scripts).
+ * (for example: tests, fixtures, benchmarks, or operational scripts).
  *
  * @param filePath - File path to inspect.
  * @returns True if file is in an exempted development/test/tooling domain.
@@ -248,26 +276,34 @@ export function isGeneratedOrDistPath(filePath: string): boolean {
 export function isExemptFromArchitectureRules(filePath: string): boolean {
     const category = classifyFilePath(filePath);
     return (
-        category === 'test' ||
-        category === 'fixture' ||
-        category === 'benchmark' ||
-        category === 'script' ||
-        category === 'generated'
+        category === FILE_CATEGORIES.TEST ||
+        category === FILE_CATEGORIES.FIXTURE ||
+        category === FILE_CATEGORIES.BENCHMARK ||
+        category === FILE_CATEGORIES.SCRIPT ||
+        category === FILE_CATEGORIES.GENERATED
     );
 }
 
 function computeFileCategory(norm: string): FileCategory {
-    if (RE_GENERATED_OR_DIST.test(norm)) return 'generated';
-    if (RE_BENCHMARK.test(norm)) return 'benchmark';
-    if (RE_FIXTURE_OR_MOCK.test(norm)) return 'fixture';
-    if (RE_TEST_SUFFIXES.test(norm) || RE_TEST_SUBSTRINGS.test(norm) || norm.startsWith('test/')) {
-        return 'test';
+    if (RE_GENERATED_OR_DIST.test(norm)) return FILE_CATEGORIES.GENERATED;
+    if (RE_BENCHMARK.test(norm)) return FILE_CATEGORIES.BENCHMARK;
+    if (RE_FIXTURE_OR_MOCK.test(norm)) return FILE_CATEGORIES.FIXTURE;
+    if (
+        RE_TEST_SUFFIXES.test(norm) ||
+        RE_TEST_SUBSTRINGS.test(norm) ||
+        norm.startsWith(PATH_PREFIX_TEST)
+    ) {
+        return FILE_CATEGORIES.TEST;
     }
-    if (RE_SCRIPT_OR_GATE.test(norm)) return 'script';
-    if (norm.includes('/docs/') || norm.startsWith('docs/') || RE_DOC_EXTENSIONS.test(norm)) {
-        return 'documentation';
+    if (RE_SCRIPT_OR_GATE.test(norm)) return FILE_CATEGORIES.SCRIPT;
+    if (
+        norm.includes(PATH_SEGMENT_DOCS) ||
+        norm.startsWith(PATH_PREFIX_DOCS) ||
+        RE_DOC_EXTENSIONS.test(norm)
+    ) {
+        return FILE_CATEGORIES.DOCUMENTATION;
     }
-    return 'source';
+    return FILE_CATEGORIES.SOURCE;
 }
 
 /**
@@ -278,16 +314,16 @@ function computeFileCategory(norm: string): FileCategory {
  */
 export function classifyFilePath(filePath: string): FileCategory {
     const norm = normalizePathForClassification(filePath);
-    if (!norm) return 'source';
+    if (!norm) return FILE_CATEGORIES.SOURCE;
 
-    const cached = pathCategoryCache.get(norm);
+    const cached = pathNormToCategoryCache.get(norm);
     if (cached !== undefined) return cached;
 
     const category = computeFileCategory(norm);
-    if (pathCategoryCache.size >= MAX_PATH_CACHE_ENTRIES) {
-        pathCategoryCache.clear();
+    if (pathNormToCategoryCache.size >= MAX_PATH_CACHE_ENTRIES) {
+        pathNormToCategoryCache.clear();
     }
-    pathCategoryCache.set(norm, category);
+    pathNormToCategoryCache.set(norm, category);
     return category;
 }
 

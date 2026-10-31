@@ -2,70 +2,70 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-31T11:54:39.510Z",
+  "timestamp": "2026-10-31T12:13:55.427Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.14,
+    "score": 99.15,
     "grade": "A+",
-    "cai": 88.05,
+    "cai": 88.07,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.918,
       "averagePor": 0.082,
-      "averageColumnDensity": 0.868,
-      "averageSpatialDensity": 0.451,
-      "averageMahalanobisDistance": 4.529,
+      "averageColumnDensity": 0.867,
+      "averageSpatialDensity": 0.45,
+      "averageMahalanobisDistance": 4.54,
       "averageFisherSimplexDistance": 0.093
     },
     "sqale": {
-      "tdr": 0.0042,
-      "remediationMinutes": 30601,
+      "tdr": 0.0041,
+      "remediationMinutes": 29939,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.35,
-      "meanScore": 96.35,
+      "index": 96.39,
+      "meanScore": 96.39,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "counts": {
       "files": 807,
-      "total": 4463,
+      "total": 4385,
       "errors": 0,
-      "warns": 3790,
-      "info": 673,
-      "suppressed": 136
+      "warns": 3721,
+      "info": 664,
+      "suppressed": 113
     }
   },
   "usability": {
-    "proven": 50,
-    "patchable": 1883,
-    "advisory": 2530,
-    "uncalibrated": 4277,
+    "proven": 49,
+    "patchable": 1831,
+    "advisory": 2505,
+    "uncalibrated": 4223,
     "needsHuman": 6
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 97.79,
+    "architectureConsistency": 97.87,
     "semanticPurity": 98.18,
     "codeSecurity": 99.78,
-    "performanceEfficiency": 99.56,
-    "standardization": 83.61,
-    "modernity": 97.74,
-    "maintainability": 92.83,
-    "commentQuality": 99.35,
-    "duplication": 94.77,
+    "performanceEfficiency": 99.57,
+    "standardization": 83.75,
+    "modernity": 97.76,
+    "maintainability": 92.9,
+    "commentQuality": 99.37,
+    "duplication": 94.91,
     "techDebtRisk": 100
   },
   "bottlenecks": [
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 4260,
-      "count": 426
+      "loss": 4240,
+      "count": 424
     },
     {
       "rule": "large-file",
@@ -76,8 +76,8 @@
     {
       "rule": "NAM-DEC-001",
       "dim": "architectureConsistency",
-      "loss": 2700,
-      "count": 270
+      "loss": 2620,
+      "count": 262
     },
     {
       "rule": "metric",
@@ -88,26 +88,26 @@
     {
       "rule": "SIM-TRN-001",
       "dim": "standardization",
-      "loss": 2380,
-      "count": 238
+      "loss": 2280,
+      "count": 228
     },
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2195,
-      "count": 439
-    },
-    {
-      "rule": "hardcoded-string",
-      "dim": "duplication",
-      "loss": 2142,
-      "count": 714
+      "loss": 2180,
+      "count": 436
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2120,
-      "count": 212
+      "loss": 2100,
+      "count": 210
+    },
+    {
+      "rule": "hardcoded-string",
+      "dim": "duplication",
+      "loss": 2031,
+      "count": 677
     }
   ],
   "topology": {
@@ -134,7 +134,6 @@
       "scripts/migrate-report-artifacts.js",
       "scripts/migrate-trajectory-summaries.js",
       "scripts/run-self-audit.js",
-      "scripts/validate-file-preflight-gate.js",
       "scripts/validate-suppression-gate.js",
       "src/analyzers/complexity-loops.ts",
       "src/analyzers/concurrency.ts",
@@ -179,7 +178,8 @@
       "src/core/ast/ts-projector.ts",
       "src/core/ast/typescript-adapter.ts",
       "src/core/ast/utf8.ts",
-      "src/core/cfg/def-use-chain.ts"
+      "src/core/cfg/def-use-chain.ts",
+      "src/core/codemod/patch-engine.ts"
     ]
   },
   "files": {
@@ -2204,538 +2204,6 @@
           "safeToAutomate": false
         },
         "tier": "T2"
-      }
-    ],
-    "scripts/validate-file-preflight-gate.js": [
-      {
-        "line": 18,
-        "col": 22,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 18,
-              "startCol": 22,
-              "endLine": 18,
-              "endCol": 28
-            },
-            "replacementText": "PATH_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 21,
-        "col": 37,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 21,
-              "startCol": 37,
-              "endLine": 21,
-              "endCol": 43
-            },
-            "replacementText": "DIST_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 21,
-        "col": 45,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 21,
-              "startCol": 45,
-              "endLine": 21,
-              "endCol": 51
-            },
-            "replacementText": "CORE_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 21,
-        "col": 53,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 21,
-              "startCol": 53,
-              "endLine": 21,
-              "endCol": 64
-            },
-            "replacementText": "CONSTANTS_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 21,
-        "col": 66,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 21,
-              "startCol": 66,
-              "endLine": 21,
-              "endCol": 84
-            },
-            "replacementText": "ANALYZERBITMASK_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 22,
-        "col": 39,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 22,
-              "startCol": 39,
-              "endLine": 22,
-              "endCol": 45
-            },
-            "replacementText": "DIST_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 22,
-        "col": 47,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 22,
-              "startCol": 47,
-              "endLine": 22,
-              "endCol": 53
-            },
-            "replacementText": "CORE_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 22,
-        "col": 55,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 22,
-              "startCol": 55,
-              "endLine": 22,
-              "endCol": 64
-            },
-            "replacementText": "SCANNER_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 22,
-        "col": 66,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 22,
-              "startCol": 66,
-              "endLine": 22,
-              "endCol": 87
-            },
-            "replacementText": "FILEPREFLIGHTGATE_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 23,
-        "col": 39,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 23,
-              "startCol": 39,
-              "endLine": 23,
-              "endCol": 45
-            },
-            "replacementText": "DIST_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 23,
-        "col": 47,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 23,
-              "startCol": 47,
-              "endLine": 23,
-              "endCol": 53
-            },
-            "replacementText": "CORE_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 23,
-        "col": 55,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 23,
-              "startCol": 55,
-              "endLine": 23,
-              "endCol": 66
-            },
-            "replacementText": "CONSTANTS_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 23,
-        "col": 68,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 23,
-              "startCol": 68,
-              "endLine": 23,
-              "endCol": 80
-            },
-            "replacementText": "RULECODES_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 25,
-        "rule": "NAM-GLB-002",
-        "sev": "WARN",
-        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Refactor top-level mutable state into function-scoped variables, class instan…"
-        },
-        "tier": "T3"
-      },
-      {
-        "line": 53,
-        "col": 46,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 32 should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 53,
-              "startCol": 46,
-              "endLine": 53,
-              "endCol": 48
-            },
-            "replacementText": "CONST_32"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 59,
-        "col": 41,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 32 should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 59,
-              "startCol": 41,
-              "endLine": 59,
-              "endCol": 43
-            },
-            "replacementText": "CONST_32"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 82,
-        "col": 42,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 82,
-              "startCol": 42,
-              "endLine": 82,
-              "endCol": 49
-            },
-            "replacementText": "X1_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 83,
-        "col": 38,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 83,
-              "startCol": 38,
-              "endLine": 83,
-              "endCol": 49
-            },
-            "replacementText": "TSMODERN_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 84,
-        "col": 38,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 84,
-              "startCol": 38,
-              "endLine": 84,
-              "endCol": 51
-            },
-            "replacementText": "RUSTMODERN_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 85,
-        "col": 38,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 85,
-              "startCol": 38,
-              "endLine": 85,
-              "endCol": 50
-            },
-            "replacementText": "SHELLLINT_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 88,
-        "col": 37,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 88,
-              "startCol": 37,
-              "endLine": 88,
-              "endCol": 48
-            },
-            "replacementText": "TSMODERN_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 90,
-        "col": 33,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 90,
-              "startCol": 33,
-              "endLine": 90,
-              "endCol": 48
-            },
-            "replacementText": "PYTHONMODERN_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 96,
-        "col": 7,
-        "rule": "NAM-GLB-001",
-        "sev": "WARN",
-        "msg": "Top-level constant 'cleanCode' should follow UPPER_SNAKE_CASE naming convention",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Rename 'cleanCode' to an uppercase snake_case constant (e.g. 'CLEAN_CODE')."
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 99,
-        "col": 36,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 99,
-              "startCol": 36,
-              "endLine": 99,
-              "endCol": 45
-            },
-            "replacementText": "SECRETS_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 107,
-        "col": 7,
-        "rule": "NAM-GLB-001",
-        "sev": "WARN",
-        "msg": "Top-level constant 'secretCode' should follow UPPER_SNAKE_CASE naming convention",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Rename 'secretCode' to an uppercase snake_case constant (e.g. 'SECRET_CODE')."
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 110,
-        "col": 36,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 110,
-              "startCol": 36,
-              "endLine": 110,
-              "endCol": 45
-            },
-            "replacementText": "SECRETS_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 114,
-        "col": 7,
-        "rule": "NAM-GLB-001",
-        "sev": "WARN",
-        "msg": "Top-level constant 'commentCode' should follow UPPER_SNAKE_CASE naming convention",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Rename 'commentCode' to an uppercase snake_case constant (e.g. 'COMMENT_CODE')."
-        },
-        "tier": "T1"
       }
     ],
     "scripts/validate-suppression-gate.js": [
@@ -6591,7 +6059,7 @@
           "action": "rename_identifier",
           "template": "Rename '_ADAPTER_ID_RUST' to an uppercase snake_case constant (e."
         },
-        "tier": "T1"
+        "tier": "T3"
       },
       {
         "line": 71,
@@ -8267,8 +7735,522 @@
           "safeToAutomate": true
         },
         "tier": "T2"
+      },
+      {
+        "line": 49,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 65 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 49,
+              "startCol": 18,
+              "endLine": 49,
+              "endCol": 20
+            },
+            "replacementText": "CONST_65"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 49,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 90 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 49,
+              "startCol": 32,
+              "endLine": 49,
+              "endCol": 34
+            },
+            "replacementText": "CONST_90"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 50,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 97 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 50,
+              "startCol": 18,
+              "endLine": 50,
+              "endCol": 20
+            },
+            "replacementText": "CONST_97"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 50,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 122 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 50,
+              "startCol": 32,
+              "endLine": 50,
+              "endCol": 35
+            },
+            "replacementText": "CONST_122"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 51,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 95 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 51,
+              "startCol": 18,
+              "endLine": 51,
+              "endCol": 20
+            },
+            "replacementText": "CONST_95"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 60,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 48 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 60,
+              "startCol": 18,
+              "endLine": 60,
+              "endCol": 20
+            },
+            "replacementText": "CONST_48"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 60,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 57 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 60,
+              "startCol": 32,
+              "endLine": 60,
+              "endCol": 34
+            },
+            "replacementText": "CONST_57"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 61,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 65 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 61,
+              "startCol": 18,
+              "endLine": 61,
+              "endCol": 20
+            },
+            "replacementText": "CONST_65"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 61,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 90 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 61,
+              "startCol": 32,
+              "endLine": 61,
+              "endCol": 34
+            },
+            "replacementText": "CONST_90"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 62,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 97 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 62,
+              "startCol": 18,
+              "endLine": 62,
+              "endCol": 20
+            },
+            "replacementText": "CONST_97"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 62,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 122 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 62,
+              "startCol": 32,
+              "endLine": 62,
+              "endCol": 35
+            },
+            "replacementText": "CONST_122"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 63,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 95 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 63,
+              "startCol": 18,
+              "endLine": 63,
+              "endCol": 20
+            },
+            "replacementText": "CONST_95"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 64,
+        "col": 18,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 36 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 64,
+              "startCol": 18,
+              "endLine": 64,
+              "endCol": 20
+            },
+            "replacementText": "CONST_36"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 79,
+        "col": 75,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 46 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 79,
+              "startCol": 75,
+              "endLine": 79,
+              "endCol": 77
+            },
+            "replacementText": "CONST_46"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 145,
+        "col": 49,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 145,
+              "startCol": 49,
+              "endLine": 145,
+              "endCol": 55
+            },
+            "replacementText": "READ_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 147,
+        "col": 28,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 147,
+              "startCol": 28,
+              "endLine": 147,
+              "endCol": 37
+            },
+            "replacementText": "CLEANUP_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 149,
+        "col": 28,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 149,
+              "startCol": 28,
+              "endLine": 149,
+              "endCol": 41
+            },
+            "replacementText": "DEREFERENCE_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 178,
+        "col": 52,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 178,
+              "startCol": 52,
+              "endLine": 178,
+              "endCol": 72
+            },
+            "replacementText": "ANONYMOUSASYNCCALL_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 270,
+        "col": 34,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 270,
+              "startCol": 34,
+              "endLine": 270,
+              "endCol": 43
+            },
+            "replacementText": "CLEANUP_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      }
+    ],
+    "src/core/codemod/patch-engine.ts": [
+      {
+        "line": 50,
+        "col": 12,
+        "rule": "GOV-PRF-004",
+        "sev": "WARN",
+        "msg": "Synchronous fs call blocks the host event loop (UI jank / request stall source)",
+        "fix": {
+          "action": "refactor",
+          "template": "Use fs/promises or the host async fs API (e.g. vscode.workspace.fs)."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 59,
+        "col": 12,
+        "rule": "GOV-PRF-004",
+        "sev": "WARN",
+        "msg": "Synchronous fs call blocks the host event loop (UI jank / request stall source)",
+        "fix": {
+          "action": "refactor",
+          "template": "Use fs/promises or the host async fs API (e.g. vscode.workspace.fs)."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 88,
+        "col": 11,
+        "rule": "NAM-JRG-002",
+        "sev": "WARN",
+        "msg": "Symbol or test identifier 'tmpPath' contains transient construction jargon or milestone marker",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace transient process markers with semantic domain naming."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 105,
+        "col": 11,
+        "rule": "NAM-JRG-002",
+        "sev": "WARN",
+        "msg": "Symbol or test identifier 'tmpPath' contains transient construction jargon or milestone marker",
+        "fix": {
+          "action": "rename_identifier",
+          "template": "Replace transient process markers with semantic domain naming."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 128,
+        "col": 19,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'issueToFix' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T1"
+      },
+      {
+        "line": 224,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 178",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 345,
+        "col": 54,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 3 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 345,
+              "startCol": 54,
+              "endLine": 345,
+              "endCol": 55
+            },
+            "replacementText": "CONST_3"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 346,
+        "col": 68,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 4 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 346,
+              "startCol": 68,
+              "endLine": 346,
+              "endCol": 69
+            },
+            "replacementText": "CONST_4"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
       }
     ]
   },
-  "truncated": 3290
+  "truncated": 3221
 }

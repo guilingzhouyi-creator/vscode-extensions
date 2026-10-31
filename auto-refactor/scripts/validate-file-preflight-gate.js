@@ -14,24 +14,63 @@
  */
 'use strict';
 
-const assert = require('assert');
-const path = require('path');
+const MODULE_ASSERT = 'assert';
+const MODULE_PATH = 'path';
+const assert = require(MODULE_ASSERT);
+const path = require(MODULE_PATH);
 
 const ROOT = path.join(__dirname, '..');
-const bitmaskPath = path.join(ROOT, 'dist', 'core', 'constants', 'analyzer-bitmask');
-const preflightPath = path.join(ROOT, 'dist', 'core', 'scanner', 'file-preflight-gate');
-const ruleCodesPath = path.join(ROOT, 'dist', 'core', 'constants', 'rule-codes');
+const DIR_DIST = 'dist';
+const DIR_CORE = 'core';
+const DIR_CONSTANTS = 'constants';
+const DIR_SCANNER = 'scanner';
+const FILE_ANALYZER_BITMASK = 'analyzer-bitmask';
+const FILE_FILE_PREFLIGHT_GATE = 'file-preflight-gate';
+const FILE_RULE_CODES = 'rule-codes';
 
-let bitmaskModule, preflightModule, ruleCodesModule;
-try {
-  bitmaskModule = require(bitmaskPath);
-  preflightModule = require(preflightPath);
-  ruleCodesModule = require(ruleCodesPath);
-} catch (err) {
-  console.error('✖ BLOCK Unable to load modules from dist. Run npm run build first.');
-  console.error(err);
-  process.exit(1);
+const BITMASK_PATH = path.join(ROOT, DIR_DIST, DIR_CORE, DIR_CONSTANTS, FILE_ANALYZER_BITMASK);
+const PREFLIGHT_PATH = path.join(ROOT, DIR_DIST, DIR_CORE, DIR_SCANNER, FILE_FILE_PREFLIGHT_GATE);
+const RULE_CODES_PATH = path.join(ROOT, DIR_DIST, DIR_CORE, DIR_CONSTANTS, FILE_RULE_CODES);
+
+const EXPECTED_BUILTIN_ANALYZERS_COUNT = 32;
+
+const TARGET_ANALYZERS = Object.freeze({
+  constants: 'constants',
+  tsModern: 'ts-modern',
+  rustModern: 'rust-modern',
+  shellLint: 'shell-lint',
+  pythonModern: 'python-modern',
+  secrets: 'secrets',
+  comments: 'comments',
+});
+
+const SAMPLE_PATH_PY = 'src/model.py';
+const SAMPLE_PATH_TS = 'src/model.ts';
+const SAMPLE_PATH_MATH = 'src/math.ts';
+const SAMPLE_PATH_CONFIG = 'src/config.ts';
+const SAMPLE_PATH_LIB = 'src/lib.ts';
+
+const SAMPLE_CODE_PY = 'x = 1';
+const SAMPLE_CODE_TS = 'const x: number = 1;';
+const SAMPLE_CLEAN_CODE = 'const a = 1;\nconst b = 2;\n';
+const SAMPLE_SECRET_CODE = 'const ghp_token = "ghp_1234567890abcdef";';
+const SAMPLE_COMMENT_CODE = '// This is an architectural comment\nconst x = 1;';
+
+function loadPreflightModules() {
+  try {
+    return Object.freeze({
+      bitmask: require(BITMASK_PATH),
+      preflight: require(PREFLIGHT_PATH),
+      ruleCodes: require(RULE_CODES_PATH),
+    });
+  } catch (err) {
+    console.error('✖ BLOCK Unable to load modules from dist. Run npm run build first.');
+    console.error(err);
+    process.exit(1);
+  }
 }
+
+const { bitmask, preflight, ruleCodes } = loadPreflightModules();
 
 const {
   AnalyzerBit,
@@ -42,21 +81,33 @@ const {
   hasAnalyzerBit,
   analyzerMaskToNames,
   analyzerNamesToMask,
-} = bitmaskModule;
+} = bitmask;
 
-const { evaluateFilePreflightMask, isFileAnalyzerActive } = preflightModule;
-const { BUILTIN_ANALYZERS } = ruleCodesModule;
+const { evaluateFilePreflightMask, isFileAnalyzerActive } = preflight;
+const { BUILTIN_ANALYZERS } = ruleCodes;
 
 console.log('=== Validating 32-Bit AnalyzerBitmask & FilePreflightGate ===');
 
 // 1. Bitmask integrity assertions
-assert.strictEqual(BUILTIN_ANALYZERS.length, 32, 'Expected 32 built-in analyzers');
+assert.strictEqual(
+  BUILTIN_ANALYZERS.length,
+  EXPECTED_BUILTIN_ANALYZERS_COUNT,
+  'Expected 32 built-in analyzers',
+);
 assert.strictEqual(ALL_ANALYZERS_MASK | 0, -1, 'Expected 32-bit mask (0xFFFFFFFF)');
 assert.strictEqual(AnalyzerBit.CONSTANTS, 1, 'AnalyzerBit.CONSTANTS must equal 1');
-assert.strictEqual(ANALYZER_NAME_TO_BIT['constants'], 1, 'ANALYZER_NAME_TO_BIT constants check');
+assert.strictEqual(
+  ANALYZER_NAME_TO_BIT[TARGET_ANALYZERS.constants],
+  1,
+  'ANALYZER_NAME_TO_BIT constants check',
+);
 
 const namesFromAll = analyzerMaskToNames(ALL_ANALYZERS_MASK);
-assert.strictEqual(namesFromAll.length, 32, 'Decoded mask must yield all 32 analyzer names');
+assert.strictEqual(
+  namesFromAll.length,
+  EXPECTED_BUILTIN_ANALYZERS_COUNT,
+  'Decoded mask must yield all 32 analyzer names',
+);
 
 const encodedMask = analyzerNamesToMask(BUILTIN_ANALYZERS);
 assert.strictEqual(
@@ -79,48 +130,57 @@ for (let i = 0; i < BUILTIN_ANALYZERS.length; i++) {
 console.log('✔ 32-Bit Analyzer Bitmask Taxonomy & Bidirectional Lookup verified.');
 
 // 2. Extension pruning assertions
-const pyMask = evaluateFilePreflightMask('x = 1', 'src/model.py');
-assert(!isFileAnalyzerActive(pyMask, 'ts-modern'), 'ts-modern must be pruned for .py files');
-assert(!isFileAnalyzerActive(pyMask, 'rust-modern'), 'rust-modern must be pruned for .py files');
-assert(!isFileAnalyzerActive(pyMask, 'shell-lint'), 'shell-lint must be pruned for .py files');
-
-const tsMask = evaluateFilePreflightMask('const x: number = 1;', 'src/model.ts');
-assert(isFileAnalyzerActive(tsMask, 'ts-modern'), 'ts-modern must be active for .ts files');
+const pyMask = evaluateFilePreflightMask(SAMPLE_CODE_PY, SAMPLE_PATH_PY);
 assert(
-  !isFileAnalyzerActive(tsMask, 'python-modern'),
+  !isFileAnalyzerActive(pyMask, TARGET_ANALYZERS.tsModern),
+  'ts-modern must be pruned for .py files',
+);
+assert(
+  !isFileAnalyzerActive(pyMask, TARGET_ANALYZERS.rustModern),
+  'rust-modern must be pruned for .py files',
+);
+assert(
+  !isFileAnalyzerActive(pyMask, TARGET_ANALYZERS.shellLint),
+  'shell-lint must be pruned for .py files',
+);
+
+const tsMask = evaluateFilePreflightMask(SAMPLE_CODE_TS, SAMPLE_PATH_TS);
+assert(
+  isFileAnalyzerActive(tsMask, TARGET_ANALYZERS.tsModern),
+  'ts-modern must be active for .ts files',
+);
+assert(
+  !isFileAnalyzerActive(tsMask, TARGET_ANALYZERS.pythonModern),
   'python-modern must be pruned for .ts files',
 );
 console.log('✔ Language extension pruning verified.');
 
 // 3. Syntactic token pruning assertions
-const cleanCode = 'const a = 1;\nconst b = 2;\n';
-const cleanMask = evaluateFilePreflightMask(cleanCode, 'src/math.ts');
+const cleanMask = evaluateFilePreflightMask(SAMPLE_CLEAN_CODE, SAMPLE_PATH_MATH);
 assert(
-  !isFileAnalyzerActive(cleanMask, 'secrets'),
+  !isFileAnalyzerActive(cleanMask, TARGET_ANALYZERS.secrets),
   'secrets must be pruned when secret keywords absent',
 );
 assert(
-  !isFileAnalyzerActive(cleanMask, 'comments'),
+  !isFileAnalyzerActive(cleanMask, TARGET_ANALYZERS.comments),
   'comments must be pruned when comment tokens absent',
 );
 
-const secretCode = 'const ghp_token = "ghp_1234567890abcdef";';
-const secretMask = evaluateFilePreflightMask(secretCode, 'src/config.ts');
+const secretMask = evaluateFilePreflightMask(SAMPLE_SECRET_CODE, SAMPLE_PATH_CONFIG);
 assert(
-  isFileAnalyzerActive(secretMask, 'secrets'),
+  isFileAnalyzerActive(secretMask, TARGET_ANALYZERS.secrets),
   'secrets must be active when secret keywords present',
 );
 
-const commentCode = '// This is an architectural comment\nconst x = 1;';
-const commentMask = evaluateFilePreflightMask(commentCode, 'src/lib.ts');
+const commentMask = evaluateFilePreflightMask(SAMPLE_COMMENT_CODE, SAMPLE_PATH_LIB);
 assert(
-  isFileAnalyzerActive(commentMask, 'comments'),
+  isFileAnalyzerActive(commentMask, TARGET_ANALYZERS.comments),
   'comments must be active when comment tokens present',
 );
 console.log('✔ Syntactic token trigger pre-filtering verified.');
 
 // 4. Bypass escape hatch verification
-const bypassMask = evaluateFilePreflightMask(cleanCode, 'src/math.ts', {
+const bypassMask = evaluateFilePreflightMask(SAMPLE_CLEAN_CODE, SAMPLE_PATH_MATH, {
   bypassPreflight: true,
 });
 assert.strictEqual(
