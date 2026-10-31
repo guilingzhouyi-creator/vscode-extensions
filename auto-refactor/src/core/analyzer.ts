@@ -58,6 +58,11 @@ import {
 } from './intelligence/semanticComplexity';
 import { QualityScorer } from './scoring/qualityScorer';
 import type { QualityWeights } from './scoring/scoringTypes';
+import {
+    defaultAdaptiveExpertBiasRouter,
+    type ExpertTelemetrySnapshot,
+} from './router/adaptive-bias-router';
+import { ANALYZER_NAME_TO_BIT } from './constants/analyzer-bitmask';
 import { ChangeTrajectoryManager } from './trajectory/changeTrajectory';
 import { detectProjectArchetype } from './profiler/projectProfiler';
 import { ALL_BUILTIN_ANALYZERS, routeArchetypeToAnalyzers } from './router/sparseRuleRouter';
@@ -194,6 +199,7 @@ export class Scanner implements ScannerContext {
         this.logger.debug(
             `resolved ${this.plan.length} analyzer(s): ${this.plan.map((planItem) => planItem.name).join(', ') || '(none)'}`,
         );
+        this.loadRouterBiasState();
     }
 
     /**
@@ -558,12 +564,65 @@ export class Scanner implements ScannerContext {
      * @param durationMs - Total scan duration in milliseconds.
      * @returns Assembled ScanReport structure.
      */
+    private loadRouterBiasState(): void {
+        if (this.config.cacheEnabled === false) return;
+        const stateFile = path.join(this.config.root, '.auto-refactor-cache', 'router-bias.json');
+        try {
+            if (fs.existsSync(stateFile)) {
+                const content = fs.readFileSync(stateFile, 'utf8');
+                const snapshot = JSON.parse(content);
+                defaultAdaptiveExpertBiasRouter.importSnapshot(snapshot);
+            }
+        } catch {
+            // Safe fallback on corrupted or unreadable cache
+        }
+    }
+
+    private saveRouterBiasState(issues: Issue[], filesScanned: number): void {
+        if (this.config.cacheEnabled === false) return;
+        try {
+            const cacheDir = path.join(this.config.root, '.auto-refactor-cache');
+            if (!fs.existsSync(cacheDir)) {
+                fs.mkdirSync(cacheDir, { recursive: true });
+            }
+
+            const findingsByAnalyzer: Record<string, number> = {};
+            for (let i = 0; i < issues.length; i++) {
+                const analyzer = issues[i].analyzer;
+                findingsByAnalyzer[analyzer] = (findingsByAnalyzer[analyzer] || 0) + 1;
+            }
+
+            const telemetry: ExpertTelemetrySnapshot[] = [];
+            for (const [name, bit] of Object.entries(ANALYZER_NAME_TO_BIT)) {
+                const yieldCount = findingsByAnalyzer[name] || 0;
+                telemetry.push({
+                    bit,
+                    currentQueueDepth: 0,
+                    rollingAvgLatencyUs: 1000,
+                    totalDispatches: filesScanned,
+                    actionableFindingsYield: yieldCount,
+                });
+            }
+
+            defaultAdaptiveExpertBiasRouter.calibrateBiases(telemetry);
+            const snapshot = defaultAdaptiveExpertBiasRouter.exportSnapshot();
+            fs.writeFileSync(
+                path.join(cacheDir, 'router-bias.json'),
+                JSON.stringify(snapshot, null, 2),
+                'utf8',
+            );
+        } catch {
+            // Zero-crash guarantee
+        }
+    }
+
     public buildReport(
         filesScanned: number,
         issues: Issue[],
         fileMetrics: FileMetric[],
         durationMs: number,
     ): ScanReport {
+        this.saveRouterBiasState(issues, filesScanned);
         return buildScanReport({
             host: {
                 config: this.config,

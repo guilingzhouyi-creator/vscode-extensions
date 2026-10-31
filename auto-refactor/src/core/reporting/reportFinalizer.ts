@@ -12,6 +12,7 @@
  */
 
 import * as fs from 'fs';
+import * as path from 'path';
 import type {
     ScanConfig,
     ScanReport,
@@ -54,7 +55,13 @@ import type { RuleCalibrationStats } from '../scoring/confidence-calibration';
 import { loadCalibrationCorpus } from '../scoring/calibration-corpus';
 import { buildConfidenceModelAsset } from '../scoring/confidence-model-asset';
 import { buildReviewQueue, countNeedsHuman, writeReviewQueue } from './review-queue';
-import { BehavioralHotspotEvaluator, type FileHotspotInput } from '../evolution';
+import {
+    BehavioralHotspotEvaluator,
+    GitHistoryMiner,
+    type GitFileHistoryProfile,
+    type FileHotspotInput,
+} from '../evolution';
+import { resolveHistoricalQualityScore } from '../scoring/rolling-sampling-governor';
 
 export { BASELINE_GRANULARITY_GROUPED, groupCounts };
 
@@ -765,10 +772,11 @@ function refreshQualityScores(
         dynamicTelemetry && dynamicTelemetry.isObserved !== false
             ? computeDynamicQualityVector(dynamicTelemetry)
             : undefined;
+    const historicalScore = resolveHistoricalQualityScore(config);
     report.triPlaneQuality = computeUnifiedQualityScore(
         staticVector,
         dynamicVector,
-        undefined,
+        historicalScore,
         resolveGovernanceProfile(config),
     );
     report.autonomy = evaluateProjectAutonomy(
@@ -804,13 +812,31 @@ function shouldRefreshQualityScores(
     );
 }
 
-function buildHotspotInput(metric: FileMetric, defectCount: number): FileHotspotInput {
+function buildHotspotInput(
+    metric: FileMetric,
+    defectCount: number,
+    profile?: GitFileHistoryProfile,
+    evaluator?: BehavioralHotspotEvaluator,
+): FileHotspotInput {
+    const commits30Days =
+        profile && evaluator
+            ? evaluator.extract30DayCommitsFromProfile(profile)
+            : (profile?.recentCommits?.length ?? 0);
+    const commits7Days =
+        profile && evaluator ? evaluator.extract7DayCommitsFromProfile(profile) : undefined;
+    const activeAuthorsCount =
+        profile && evaluator ? evaluator.extractActiveAuthorsFromProfile(profile) : undefined;
+
     return {
         filePath: metric.file,
-        commits30Days: 1,
+        commits30Days,
+        commits7Days,
         eloc: metric.lines,
         cyclomaticComplexity: Math.max(1, metric.maxNestingDepth * 2),
         defectCount,
+        totalCommits: profile?.totalCommits,
+        activeAuthorsCount,
+        lastModifiedTimestamp: profile?.lastModifiedTimestamp ?? undefined,
     };
 }
 
@@ -1045,6 +1071,9 @@ function applyEvolutionPass(context: PostScanPassContext): void {
     }
     try {
         const evaluator = new BehavioralHotspotEvaluator();
+        const miner = new GitHistoryMiner();
+        const rootDir = context.report.root || context.config.root || process.cwd();
+        const gitProfiles = miner.mineRepositoryHistoryBatch(rootDir);
         const inputs: FileHotspotInput[] = [];
         const issuesByFile = groupIssuesByFile(context.report.issues);
 
@@ -1052,7 +1081,10 @@ function applyEvolutionPass(context: PostScanPassContext): void {
             const metric = context.report.fileMetrics[i];
             const fileIssues = issuesByFile.get(metric.file);
             const defectCount = fileIssues ? fileIssues.length : 0;
-            inputs.push(buildHotspotInput(metric, defectCount));
+            const profile =
+                gitProfiles.get(metric.file) ||
+                gitProfiles.get(path.resolve(rootDir, metric.file));
+            inputs.push(buildHotspotInput(metric, defectCount, profile, evaluator));
         }
 
         const hotspotResults = evaluator.evaluateBatch(inputs);

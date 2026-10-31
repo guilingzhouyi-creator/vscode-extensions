@@ -422,3 +422,44 @@ export class RollingSamplingGovernor {
         }
     }
 }
+
+/**
+ * Resolves the historical feedback quality score Q_f from configuration or persistent rolling sampling state.
+ *
+ * @param config - Scan configuration or execution options carrying workspace root and cache switches.
+ * @returns Historical composite quality score in [0.0, 100.0], or undefined if unobserved.
+ */
+export function resolveHistoricalQualityScore(config: {
+    root: string;
+    cacheEnabled?: boolean;
+    historicalScore?: number;
+}): number | undefined {
+    if (typeof config.historicalScore === 'number' && Number.isFinite(config.historicalScore)) {
+        return clampScore(config.historicalScore);
+    }
+    if (config.cacheEnabled === false) {
+        return undefined;
+    }
+    try {
+        const cacheDir = path.join(config.root, DEFAULT_CACHE_DIR);
+        const stateFile = path.join(cacheDir, DEFAULT_STATE_FILENAME);
+        if (!fs.existsSync(stateFile)) {
+            return undefined;
+        }
+        const raw = fs.readFileSync(stateFile, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.samples) && parsed.samples.length > 0) {
+            const governor = new RollingSamplingGovernor({ stateFilePath: stateFile });
+            const state = governor.evaluateState();
+            if (state.mesoMoments.count > 0) {
+                return clampScore(state.mesoMoments.mean);
+            }
+            if (state.fastMoments.count > 0) {
+                return clampScore(state.fastMoments.mean);
+            }
+        }
+    } catch {
+        // Zero-crash fallback when cache file is corrupted or unreadable
+    }
+    return undefined;
+}

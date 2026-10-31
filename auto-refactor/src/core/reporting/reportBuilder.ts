@@ -31,6 +31,7 @@ import {
     computeUnifiedQualityScore,
     type GovernanceProjectProfile,
 } from '../scoring/fusion-scorer';
+import { resolveHistoricalQualityScore } from '../scoring/rolling-sampling-governor';
 import type { ReviewMemoryManager } from '../memory/reviewMemory';
 import type { ReviewMemoryRecord } from '../memory/types';
 import { extractCodeDomains, computeAstDigest } from '../memory/domainFingerprint';
@@ -376,10 +377,11 @@ export function buildScanReport(params: BuildScanReportContext): ScanReport {
         dynamicTelemetry && dynamicTelemetry.isObserved !== false
             ? computeDynamicQualityVector(dynamicTelemetry)
             : undefined;
+    const historicalScore = resolveHistoricalQualityScore(cfg);
     const triPlaneQuality = computeUnifiedQualityScore(
         staticVector,
         dynamicVector,
-        undefined,
+        historicalScore,
         resolveGovernanceProfile(cfg),
     );
     const autonomy = evaluateProjectAutonomy(

@@ -294,10 +294,14 @@ function parsePackageJson(manifestPath: string, inventory: ProjectManifestInvent
     }
 }
 
-function parseCargoSection(trimmed: string): 'prod' | 'dev' | 'build' | null {
+function parseCargoSection(
+    trimmed: string,
+): 'prod' | 'dev' | 'build' | 'package' | 'workspace' | null {
     if (/^\[(?:workspace\.)?dependencies\]/i.test(trimmed)) return 'prod';
     if (/^\[(?:workspace\.)?dev-dependencies\]/i.test(trimmed)) return 'dev';
     if (/^\[(?:workspace\.)?build-dependencies\]/i.test(trimmed)) return 'build';
+    if (/^\[package\]/i.test(trimmed)) return 'package';
+    if (/^\[workspace\]/i.test(trimmed)) return 'workspace';
     return null;
 }
 
@@ -309,7 +313,13 @@ function parseCargoDepLine(
     if (trimmed.startsWith('#')) return;
     const match = /^([a-zA-Z0-9_-]+)\s*=/.exec(trimmed);
     if (!match) return;
-    const pkg = match[1].replace(/-/g, '_');
+    const rawName = match[1];
+    const pkg = rawName.replace(/-/g, '_');
+    if (/path\s*=\s*["']/.test(trimmed)) {
+        inventory.pathAliases.add(rawName);
+        inventory.pathAliases.add(pkg);
+        return;
+    }
     inventory.allDependencies.add(pkg);
     if (currentSection === 'prod') {
         inventory.prodDependencies.add(pkg);
@@ -318,26 +328,67 @@ function parseCargoDepLine(
     }
 }
 
+function ingestCargoPackageLine(trimmed: string, inventory: ProjectManifestInventory): void {
+    const nameMatch = /^name\s*=\s*["']([a-zA-Z0-9_-]+)["']/.exec(trimmed);
+    if (!nameMatch) return;
+    inventory.pathAliases.add(nameMatch[1]);
+    inventory.pathAliases.add(nameMatch[1].replace(/-/g, '_'));
+}
+
+function ingestCargoWorkspaceMember(trimmed: string, inventory: ProjectManifestInventory): void {
+    const memberMatch = /["']([^"']+)["']/.exec(trimmed);
+    if (!memberMatch) return;
+    const segs = memberMatch[1].split('/');
+    const memberName = segs[segs.length - 1];
+    if (!memberName) return;
+    inventory.pathAliases.add(memberName);
+    inventory.pathAliases.add(memberName.replace(/-/g, '_'));
+}
+
+function processCargoManifestLine(
+    trimmed: string,
+    currentSection: 'prod' | 'dev' | 'build' | 'package' | 'workspace' | null,
+    inventory: ProjectManifestInventory,
+): void {
+    if (!currentSection) return;
+    if (currentSection === 'package') {
+        ingestCargoPackageLine(trimmed, inventory);
+    } else if (currentSection === 'workspace') {
+        ingestCargoWorkspaceMember(trimmed, inventory);
+    } else {
+        parseCargoDepLine(trimmed, currentSection, inventory);
+    }
+}
+
+/**
+ * Ingests package names and workspace members from a Cargo manifest into inventory path aliases.
+ */
+function ingestCargoWorkspaceInfo(manifestPath: string, inventory: ProjectManifestInventory): void {
+    const raw = tryReadUtf8Text(manifestPath);
+    if (!raw) return;
+    let currentSection: 'prod' | 'dev' | 'build' | 'package' | 'workspace' | null = null;
+    for (const line of raw.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        if (trimmed.startsWith('[')) {
+            currentSection = parseCargoSection(trimmed);
+            continue;
+        }
+        processCargoManifestLine(trimmed, currentSection, inventory);
+    }
+}
+
 /**
  * Extract external package dependencies declared in Cargo.toml.
  */
 function parseCargoToml(manifestPath: string, inventory: ProjectManifestInventory): void {
-    try {
-        const raw = fs.readFileSync(manifestPath, 'utf8');
-        let currentSection: 'prod' | 'dev' | 'build' | null = null;
-        for (const line of raw.split('\n')) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-            if (trimmed.startsWith('[')) {
-                currentSection = parseCargoSection(trimmed);
-                continue;
-            }
-            if (currentSection) {
-                parseCargoDepLine(trimmed, currentSection, inventory);
-            }
-        }
-    } catch {
-        // best-effort fallback: ignored when manifest is corrupt or unreadable
+    ingestCargoWorkspaceInfo(manifestPath, inventory);
+
+    // Recursively discover enclosing root workspace Cargo.toml if running inside a member crate
+    const parentDir = path.dirname(path.dirname(manifestPath));
+    const parentCargo = path.join(parentDir, MANIFEST_CARGO_TOML);
+    if (parentCargo !== manifestPath && fs.existsSync(parentCargo)) {
+        ingestCargoWorkspaceInfo(parentCargo, inventory);
     }
 }
 
@@ -835,7 +886,11 @@ function isRelativeOrInternalPrefix(trimmed: string): boolean {
 function matchesPathAlias(trimmed: string, pathAliases?: Set<string>): boolean {
     if (!pathAliases || pathAliases.size === 0) return false;
     for (const alias of pathAliases) {
-        if (trimmed === alias || trimmed.startsWith(alias + '/')) {
+        if (
+            trimmed === alias ||
+            trimmed.startsWith(alias + '/') ||
+            trimmed.startsWith(alias + '::')
+        ) {
             return true;
         }
     }

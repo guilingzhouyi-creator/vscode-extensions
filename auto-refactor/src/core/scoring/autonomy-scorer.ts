@@ -326,7 +326,7 @@ export interface ImportAttributionContext {
 
 function recordSingleSpecifier(spec: string, ctx: ImportAttributionContext): void {
     if (!isValidPackageSpecifier(spec)) return;
-    const kind = classifyImportProvenance(spec, ctx.currentFile, ctx.manifestDeps);
+    const kind = classifyImportProvenance(spec, ctx.currentFile, ctx.manifestDeps, ctx.fileInv?.pathAliases);
     if (kind === KIND_INTERNAL) {
         ctx.state.internalSymbolCalls++;
         if (ctx.isCritical) ctx.state.criticalPathInternalCalls++;
@@ -682,7 +682,7 @@ function collectExtPackages(
     let pkgs: string[] | undefined;
     for (const spec of specifiers) {
         if (!isValidPackageSpecifier(spec)) continue;
-        if (classifyImportProvenance(spec, file, manifestDeps) === KIND_EXTERNAL_SDK) {
+        if (classifyImportProvenance(spec, file, manifestDeps, fileInv?.pathAliases) === KIND_EXTERNAL_SDK) {
             if (isProductionExternalSdk(spec, file, fileInv)) {
                 pkgs = appendExtPackage(pkgs, spec);
             }
@@ -763,11 +763,11 @@ export function evaluateProjectAutonomy(
 ): AutonomyEvaluation {
     const legacy: LegacyAutonomyArgs | undefined = Array.isArray(metricsOrContext)
         ? {
-              issues: restArgs[0],
-              config: restArgs[1],
-              fileContents: restArgs[2],
-              symbolIndex: restArgs[3],
-          }
+            issues: restArgs[0],
+            config: restArgs[1],
+            fileContents: restArgs[2],
+            symbolIndex: restArgs[3],
+        }
         : undefined;
     const ctx = normalizeAutonomyContext(metricsOrContext, legacy);
     const { fileMetrics, issues, config, fileContents, symbolIndex } = ctx;

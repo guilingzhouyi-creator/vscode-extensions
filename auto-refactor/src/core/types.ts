@@ -702,6 +702,8 @@ export interface ScanConfig {
     telemetry?: string;
     /** Loaded dynamic telemetry evidence DTO for tri-plane fusion quality synthesis. */
     telemetryData?: import('./dynamic/dynamic-types').DynamicEvidenceDTO;
+    /** Optional historical composite quality score (Q_f) for tri-plane fusion quality synthesis. */
+    historicalScore?: number;
 
     // ---- unified execution / observability controls ----
     /** Log verbosity. Default 'info'. Logs go to stderr so stdout stays machine-readable. */
