@@ -49,6 +49,95 @@ export function fingerprintCorpus(stats: readonly RuleCalibrationStats[]): strin
     return sha256Hex(canonical).slice(0, CORPUS_DIGEST_CHARS);
 }
 
+/**
+ * Outcome counts accumulated for an individual rule.
+ */
+export interface RuleOutcomeCounts {
+    readonly fixedCount?: number;
+    readonly regressionCount?: number;
+    readonly persistentCount?: number;
+}
+
+function recordPositiveCount(n?: number): number {
+    return typeof n === 'number' && n > 0 ? n : 0;
+}
+
+function mergeExistingStats(
+    target: Map<string, { tp: number; fp: number }>,
+    stats: readonly RuleCalibrationStats[],
+): void {
+    for (let i = 0; i < stats.length; i++) {
+        const item = stats[i];
+        target.set(item.rule, {
+            tp: item.truePositives,
+            fp: item.falsePositives,
+        });
+    }
+}
+
+function mergeFixOutcomes(
+    target: Map<string, { tp: number; fp: number }>,
+    fixResultsMap: Record<string, RuleOutcomeCounts>,
+): void {
+    for (const [rule, outcome] of Object.entries(fixResultsMap)) {
+        if (!rule || !outcome) continue;
+        const current = target.get(rule) || { tp: 0, fp: 0 };
+        const fixed = recordPositiveCount(outcome.fixedCount);
+        const regressed = recordPositiveCount(outcome.regressionCount);
+
+        current.tp += fixed;
+        current.fp += regressed;
+        if (current.tp > 0 || current.fp > 0) {
+            target.set(rule, current);
+        }
+    }
+}
+
+function mergeRefutations(
+    target: Map<string, { tp: number; fp: number }>,
+    refutedIssues: readonly { rule: string }[],
+): void {
+    for (let i = 0; i < refutedIssues.length; i++) {
+        const rule = refutedIssues[i]?.rule;
+        if (!rule) continue;
+        const current = target.get(rule) || { tp: 0, fp: 0 };
+        current.fp += 1;
+        target.set(rule, current);
+    }
+}
+
+/**
+ * Harvests online calibration counts from review outcomes, fix tracking, and wider-context refutations.
+ *
+ * @param fixResultsMap - Map of ruleId to observed fix outcomes (e.g. from ReviewMemory).
+ * @param refutedIssues - Optional list of issues refuted during confidence-rework.
+ * @param existingStats - Optional existing corpus stats to merge with.
+ * @returns Combined calibration statistics array.
+ */
+export function harvestOnlineCalibrationCounts(
+    fixResultsMap: Record<string, RuleOutcomeCounts>,
+    refutedIssues: readonly { rule: string }[] = [],
+    existingStats: readonly RuleCalibrationStats[] = [],
+): RuleCalibrationStats[] {
+    const countsByRule = new Map<string, { tp: number; fp: number }>();
+    mergeExistingStats(countsByRule, existingStats);
+    mergeFixOutcomes(countsByRule, fixResultsMap);
+    mergeRefutations(countsByRule, refutedIssues);
+
+    const merged: RuleCalibrationStats[] = [];
+    for (const [rule, { tp, fp }] of countsByRule.entries()) {
+        if (tp + fp > 0) {
+            merged.push({
+                rule,
+                truePositives: tp,
+                falsePositives: fp,
+            });
+        }
+    }
+
+    return merged.sort((a, b) => a.rule.localeCompare(b.rule));
+}
+
 /** One corpus entry as it appears on disk. */
 interface CorpusEntryDocument {
     readonly rule?: unknown;

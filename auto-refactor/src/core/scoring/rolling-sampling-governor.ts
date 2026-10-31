@@ -149,6 +149,105 @@ function computeStabilityFactor(standardError: number): number {
     return clampRange(Math.round(factor * PRECISION_TEN_THOUSAND) / PRECISION_TEN_THOUSAND, 0.1, 1.0);
 }
 
+/** Tunable scoring curve and scale parameters. */
+export interface TunableParameters {
+    readonly saturationHalfpoint: number;
+    readonly macroFileKneeScale: number;
+    readonly scoringScaleFactor: number;
+    readonly staticPlaneWeight: number;
+    readonly dynamicPlaneWeight: number;
+    readonly historicalPlaneWeight: number;
+}
+
+/** Baseline prior values for tunable parameters. */
+export const DEFAULT_TUNABLE_PRIORS: TunableParameters = Object.freeze({
+    saturationHalfpoint: 30.0,
+    macroFileKneeScale: 10.0,
+    scoringScaleFactor: 1.0,
+    staticPlaneWeight: 0.65,
+    dynamicPlaneWeight: 0.25,
+    historicalPlaneWeight: 0.10,
+});
+
+/** Bounded numerical corridors for safety guards. */
+export const TUNABLE_BOUNDS = Object.freeze({
+    saturationHalfpoint: { min: 18.0, max: 50.0 },
+    macroFileKneeScale: { min: 6.0, max: 18.0 },
+    scoringScaleFactor: { min: 0.50, max: 2.50 },
+    staticPlaneWeight: { min: 0.40, max: 0.85 },
+    dynamicPlaneWeight: { min: 0.10, max: 0.45 },
+    historicalPlaneWeight: { min: 0.05, max: 0.25 },
+});
+
+export const EMPIRICAL_BAYES_SHRINKAGE_ANCHOR = 10;
+
+/**
+ * Tunes scoring parameters using confidence-gated Empirical-Bayes shrinkage.
+ *
+ * @param rollingState - Evaluated multi-pass rolling state.
+ * @param priors - Optional baseline prior parameters (defaults to DEFAULT_TUNABLE_PRIORS).
+ * @returns Bounded tuned parameter set.
+ */
+export function tuneParametersEmpiricalBayes(
+    rollingState: RollingMeanDifferenceState,
+    priors: TunableParameters = DEFAULT_TUNABLE_PRIORS,
+): TunableParameters {
+    const n = rollingState.sampleCount;
+    const cStat = rollingState.statisticalConfidence;
+    const kappa = (n / (n + EMPIRICAL_BAYES_SHRINKAGE_ANCHOR)) * Math.pow(cStat, 2);
+
+    if (kappa < 0.05) {
+        return priors;
+    }
+
+    const hObserved = priors.saturationHalfpoint - rollingState.deltaMean12 * 0.25;
+    const tunedH = clampRange(
+        (1 - kappa) * priors.saturationHalfpoint + kappa * hObserved,
+        TUNABLE_BOUNDS.saturationHalfpoint.min,
+        TUNABLE_BOUNDS.saturationHalfpoint.max,
+    );
+
+    const kObserved =
+        priors.macroFileKneeScale +
+        (rollingState.fastMoments.standardDeviation > 15 ? 1.5 : -1.0);
+    const tunedK = clampRange(
+        (1 - kappa) * priors.macroFileKneeScale + kappa * kObserved,
+        TUNABLE_BOUNDS.macroFileKneeScale.min,
+        TUNABLE_BOUNDS.macroFileKneeScale.max,
+    );
+
+    const scaleObserved =
+        priors.scoringScaleFactor * (1.0 + (rollingState.isRegimeShift ? 0.15 : 0.0));
+    const tunedScale = clampRange(
+        (1 - kappa) * priors.scoringScaleFactor + kappa * scaleObserved,
+        TUNABLE_BOUNDS.scoringScaleFactor.min,
+        TUNABLE_BOUNDS.scoringScaleFactor.max,
+    );
+
+    const deltaWf = rollingState.stabilityFactor > 0.8 ? 0.03 : -0.02;
+    const rawWf = clampRange(
+        (1 - kappa) * priors.historicalPlaneWeight +
+            kappa * (priors.historicalPlaneWeight + deltaWf),
+        TUNABLE_BOUNDS.historicalPlaneWeight.min,
+        TUNABLE_BOUNDS.historicalPlaneWeight.max,
+    );
+    const remaining = 1.0 - rawWf;
+    const rawWs =
+        remaining *
+        (priors.staticPlaneWeight /
+            (priors.staticPlaneWeight + priors.dynamicPlaneWeight));
+    const rawWd = remaining - rawWs;
+
+    return Object.freeze({
+        saturationHalfpoint: Math.round(tunedH * 100) / 100,
+        macroFileKneeScale: Math.round(tunedK * 100) / 100,
+        scoringScaleFactor: Math.round(tunedScale * 100) / 100,
+        staticPlaneWeight: Math.round(rawWs * 1000) / 1000,
+        dynamicPlaneWeight: Math.round(rawWd * 1000) / 1000,
+        historicalPlaneWeight: Math.round(rawWf * 1000) / 1000,
+    });
+}
+
 /**
  * Multi-pass objective rolling sampling governor.
  */

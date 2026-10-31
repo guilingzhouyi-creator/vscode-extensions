@@ -78,6 +78,8 @@ export interface ReworkPlanInput {
      * did not run at all, which no amount of widening the window will reveal.
      */
     readonly skippedAnalyzers?: readonly string[];
+    /** Optional map of rule IDs to empirical Bayes calibrated posterior confidence scores. */
+    readonly calibratedRuleConfidences?: ReadonlyMap<string, number>;
 }
 
 /** Outcome of one candidate after the second scan. */
@@ -133,7 +135,16 @@ export const DEFAULT_WINDOW_EXPANSION_FACTOR = 2;
  * @param issue - Finding whose confidence to resolve.
  * @returns Confidence in the unit interval.
  */
-export function resolveIssueConfidence(issue: Issue): number {
+export function resolveIssueConfidence(
+    issue: Issue,
+    calibratedRuleConfidences?: ReadonlyMap<string, number>,
+): number {
+    if (calibratedRuleConfidences && calibratedRuleConfidences.has(issue.rule)) {
+        const cal = calibratedRuleConfidences.get(issue.rule);
+        if (typeof cal === 'number' && Number.isFinite(cal)) {
+            return Math.min(1, Math.max(0, cal));
+        }
+    }
     const reported = issue.evidence?.confidence;
     if (typeof reported === 'number' && Number.isFinite(reported)) {
         return Math.min(1, Math.max(0, reported));
@@ -212,7 +223,7 @@ export function planRework(input: ReworkPlanInput): ReworkCandidate[] {
     const candidates: ReworkCandidate[] = [];
     for (const issue of input.issues) {
         if (issue.severity === SEVERITY_ERROR) continue;
-        const confidence = resolveIssueConfidence(issue);
+        const confidence = resolveIssueConfidence(issue, input.calibratedRuleConfidences);
         if (confidence >= input.confidenceThreshold) continue;
         candidates.push({
             issue,
