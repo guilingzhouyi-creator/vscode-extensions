@@ -370,7 +370,7 @@ function renderQuantTableRows(quant) {
   const rcdVal = Number(quant.rcd ?? quant.defectEntropy ?? 0);
   const edbVal = Number(quant.edb95 ?? quant.var95 ?? 0);
   const ptdVal = Number(quant.ptd ?? quant.mdd ?? 0);
-  const ehlVal = Number(quant.ehl ?? quant.halfLifeCommits ?? 1.0);
+  const ehlVal = Number(quant.ehl ?? quant.halfLifeCommits ?? 0.0);
 
   const statusBadge = getQuantStatusBadge(quant.status);
   const ddrBadge = getDdrBadge(ddrVal);
@@ -565,7 +565,7 @@ function recordAuditRun(inputPayload) {
     subsystems: normalized.projects,
     projectScores: normalized.projectScores,
     dimensions: normalized.tenDimensions,
-    defaultVerify: 'pwsh -File scripts/ps1/audit-all.ps1 -Fast',
+    defaultVerify: 'pwsh -File scripts/ps1/audit-all.ps1',
   };
   fs.writeFileSync(LATEST_AAS_PATH, JSON.stringify(aasSnapshot, null, 2), 'utf8');
 

@@ -44,9 +44,9 @@ function readJsonSafely(filePath) {
 }
 
 /**
- * Load recent audit history scores from jsonl ledger.
+ * Safely parse non-empty JSON lines from a ledger file.
  */
-function loadRecentScores(historyPath, windowSize = DEFAULT_SLIDING_WINDOW) {
+function loadRecentAuditEntries(historyPath, windowSize = DEFAULT_SLIDING_WINDOW) {
     try {
         if (!fs.existsSync(historyPath)) return [];
         const content = fs.readFileSync(historyPath, 'utf8');
@@ -55,22 +55,70 @@ function loadRecentScores(historyPath, windowSize = DEFAULT_SLIDING_WINDOW) {
             .map((line) => line.trim())
             .filter((line) => line.length > 0);
         const recent = lines.slice(-windowSize);
-        const scores = [];
+        const entries = [];
         for (const line of recent) {
             try {
                 const entry = JSON.parse(line);
-                const score = Number(entry.score);
-                if (Number.isFinite(score)) {
-                    scores.push(score);
+                if (entry && typeof entry === 'object') {
+                    entries.push(entry);
                 }
             } catch {
                 // Ignore corrupted lines
             }
         }
-        return scores;
+        return entries;
     } catch {
         return [];
     }
+}
+
+/**
+ * Load recent audit history scores from jsonl ledger.
+ */
+function loadRecentScores(historyPath, windowSize = DEFAULT_SLIDING_WINDOW) {
+    const entries = loadRecentAuditEntries(historyPath, windowSize);
+    const scores = [];
+    for (const entry of entries) {
+        const score = Number(entry.score);
+        if (Number.isFinite(score)) {
+            scores.push(score);
+        }
+    }
+    return scores;
+}
+
+/**
+ * Extract empirical refactoring yield and debt accrual deltas from history ledger.
+ */
+function extractDebtDeltas(historyPath, windowSize = DEFAULT_SLIDING_WINDOW) {
+    const entries = loadRecentAuditEntries(historyPath, windowSize);
+    const validDebts = [];
+    for (const entry of entries) {
+        const debt = Number(entry.debt);
+        if (Number.isFinite(debt)) {
+            validDebts.push(debt);
+        }
+    }
+    if (validDebts.length < 2) {
+        return { yieldMinutes: undefined, accrualMinutes: undefined };
+    }
+    let totalYield = 0;
+    let totalAccrual = 0;
+    let transitionCount = 0;
+    for (let i = 1; i < validDebts.length; i++) {
+        const delta = validDebts[i] - validDebts[i - 1];
+        if (delta < 0) {
+            totalYield += Math.abs(delta);
+            transitionCount++;
+        } else if (delta > 0) {
+            totalAccrual += delta;
+            transitionCount++;
+        }
+    }
+    if (transitionCount === 0) {
+        return { yieldMinutes: undefined, accrualMinutes: undefined };
+    }
+    return { yieldMinutes: totalYield, accrualMinutes: totalAccrual };
 }
 
 /**
@@ -142,15 +190,16 @@ function evaluateWorkspaceQuant(root = REPO_ROOT) {
 
     const scores = loadRecentScores(historyPath, DEFAULT_SLIDING_WINDOW);
     const { fileDebts, ruleCategoryCounts, totalFindings } = extractDebtDistribution(sigsPath);
+    const { yieldMinutes, accrualMinutes } = extractDebtDeltas(historyPath, DEFAULT_SLIDING_WINDOW);
 
     const engine = resolveQuantEngine();
 
     if (engine) {
         const assessment = engine.evaluateQuantitativeRiskModel(
             {
-                totalRemediationMinutes: totalFindings * 10,
-                refactoringYieldMinutes: 120,
-                debtAccrualMinutes: 40,
+                totalRemediationMinutes: totalFindings,
+                refactoringYieldMinutes: yieldMinutes,
+                debtAccrualMinutes: accrualMinutes,
             },
             { historyScores: scores },
             { fileDebts, ruleCategoryCounts },
@@ -219,6 +268,7 @@ module.exports = {
     evaluateWorkspaceQuant,
     loadRecentScores,
     extractDebtDistribution,
+    extractDebtDeltas,
 };
 
 if (require.main === module) {

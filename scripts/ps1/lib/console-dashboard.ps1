@@ -124,13 +124,14 @@ function Format-QuantDashboardBlock {
     Write-GateHost $sep -ForegroundColor Cyan
 
     $rcrVal = [double]$(if ($null -ne $Quant.rcr) { $Quant.rcr } else { $Quant.icr })
-    $rcrStatus = if ($Quant.status -eq "de-leveraging") { "🟢 强净消融" } elseif ($Quant.status -eq "balanced") { "🟡 动态均势" } else { "🔴 赤字膨胀" }
-    $rcrColor = if ($Quant.status -eq "de-leveraging") { "Green" } elseif ($Quant.status -eq "balanced") { "Yellow" } else { "Red" }
+    $rcrStatus = if ($Quant.status -eq "de-leveraging") { "🟢 强净消融" } elseif ($Quant.status -eq "balanced") { "🟡 动态均势" } elseif ($Quant.status -eq "insufficient_samples") { "⚪ 样本匮乏" } else { "🔴 赤字膨胀" }
+    $rcrColor = if ($Quant.status -eq "de-leveraging") { "Green" } elseif ($Quant.status -eq "balanced") { "Yellow" } elseif ($Quant.status -eq "insufficient_samples") { "Gray" } else { "Red" }
     $rcrBar = Get-QuantGaugeBar ([math]::Min(1.0, $rcrVal / 3.0)) 10
 
     $erqVal = [double]$(if ($null -ne $Quant.erq) { $Quant.erq } else { $Quant.qsr })
     $erqBar = Get-QuantGaugeBar ([math]::Min(1.0, $erqVal / 1.0)) 10
-    $erqColor = if ($erqVal -ge 1.0) { "Green" } else { "Yellow" }
+    $erqStatus = if ($erqVal -ge 1.0) { "🟢 稳健超额" } elseif ($erqVal -ge 0.10) { "🟡 平稳超额" } else { "🔴 波动剧烈" }
+    $erqColor = if ($erqVal -ge 1.0) { "Green" } elseif ($erqVal -ge 0.10) { "Yellow" } else { "Red" }
 
     $ddrVal = [double]$(if ($null -ne $Quant.ddr) { $Quant.ddr } else { $Quant.sortino })
     $ddrStatus = if ($ddrVal -ge 999.0) { "🟢 零破位" } elseif ($ddrVal -ge 5.0) { "🟢 强基底防御" } else { "🔴 底线失守" }
@@ -168,7 +169,7 @@ function Format-QuantDashboardBlock {
         @{ text = " 【偿债动力学】"; color = "Cyan" },
         @{ text = "  · 消融代偿比 (RCR)   : {0:F2}x   [{1}]  [{2}]" -f $rcrVal, $rcrBar, $rcrStatus; color = $rcrColor },
         @{ text = " 【时序韧性包络】"; color = "Cyan" },
-        @{ text = "  · 质量坚韧商 (ERQ)   : {0:F2}    [{1}]  [🟡 平稳超额]" -f $erqVal, $erqBar; color = $erqColor },
+        @{ text = "  · 质量坚韧商 (ERQ)   : {0:F2}    [{1}]  [{2}]" -f $erqVal, $erqBar, $erqStatus; color = $erqColor },
         @{ text = "  · 破位防御度 (DDR)   : {0,-5}   [{1}]  [{2}]" -f $ddrStr, $ddrBar, $ddrStatus; color = $ddrColor },
         @{ text = "  · 极端退化包络 (EDB) : {0:F1}%   [{1}]  [{2}]" -f $edbVal, $edbBar, $edbStatus; color = $edbColor },
         @{ text = "  · 历史峰谷落差 (PTD) : {0:F1}%   [{1}]  [{2}]" -f $ptdVal, $ptdBar, $ptdStatus; color = $ptdColor },
@@ -194,34 +195,95 @@ function Format-QuantMarkdownBlock {
     [void]$Builder.AppendLine("| :--- | :--- | :---: | :---: | :---: | :--- |")
 
     $rcrVal = [double]$(if ($null -ne $Quant.rcr) { $Quant.rcr } else { $Quant.icr })
-    $qStatus = if ($Quant.status -eq "de-leveraging") { "🟢 强净消融" } elseif ($Quant.status -eq "balanced") { "🟡 动态均势" } else { "🔴 赤字膨胀" }
-    [void]$Builder.AppendLine(("| **偿债动力学** | 消融代偿比 (RCR) | **{0:F2}x** | `[{1}]` | {2} | 重构清偿产能显著跑赢新债阻滞，架构处于主动净优化期 |" -f $rcrVal, (Get-QuantGaugeBar ([math]::Min(1.0, $rcrVal / 3.0)) 10), $qStatus))
+    $qStatus = if ($Quant.status -eq "de-leveraging") { "🟢 强净消融" } elseif ($Quant.status -eq "balanced") { "🟡 动态均势" } elseif ($Quant.status -eq "insufficient_samples") { "⚪ 样本匮乏" } else { "🔴 赤字膨胀" }
+    $rcrNote = if ($Quant.status -eq "de-leveraging") {
+        "重构清偿产能显著跑赢新增阻滞，架构处于主动净消融期"
+    } elseif ($Quant.status -eq "balanced") {
+        "重构产能与债务增量动态对冲，系统维持演进均势"
+    } elseif ($Quant.status -eq "insufficient_samples") {
+        "样本与观测时序匮乏，暂未采集到有效偿债流量"
+    } else {
+        "新增债务阻滞超出重构清偿速度，需警惕赤字累积"
+    }
+    [void]$Builder.AppendLine(("| **偿债动力学** | 消融代偿比 (RCR) | **{0:F2}x** | `[{1}]` | {2} | {3} |" -f $rcrVal, (Get-QuantGaugeBar ([math]::Min(1.0, $rcrVal / 3.0)) 10), $qStatus, $rcrNote))
 
     $erqVal = [double]$(if ($null -ne $Quant.erq) { $Quant.erq } else { $Quant.qsr })
-    [void]$Builder.AppendLine(("| **时序韧性** | 质量坚韧商 (ERQ) | **{0:F2}** | `[{1}]` | 🟡 平稳超额 | 质量基线长期处于高位，超额质量收益波动受控 |" -f $erqVal, (Get-QuantGaugeBar ([math]::Min(1.0, $erqVal / 1.0)) 10)))
+    $qErqStatus = if ($erqVal -ge 1.0) { "🟢 稳健超额" } elseif ($erqVal -ge 0.5) { "🟡 平稳受控" } else { "🔴 波动剧烈" }
+    $erqNote = if ($erqVal -ge 1.0) {
+        "质量基线长期处于高位，超额质量收益稳定受控"
+    } elseif ($erqVal -ge 0.5) {
+        "质量表现高于基线，扰动波动处于可接受包络"
+    } else {
+        "质量受压接近及格线，工程超额收益偏低"
+    }
+    [void]$Builder.AppendLine(("| **时序韧性** | 质量坚韧商 (ERQ) | **{0:F2}** | `[{1}]` | {2} | {3} |" -f $erqVal, (Get-QuantGaugeBar ([math]::Min(1.0, $erqVal / 1.0)) 10), $qErqStatus, $erqNote))
 
     $ddrVal = [double]$(if ($null -ne $Quant.ddr) { $Quant.ddr } else { $Quant.sortino })
     $qDdrStatus = if ($ddrVal -ge 999.0) { "🟢 零破位" } elseif ($ddrVal -ge 5.0) { "🟢 强基底防御" } else { "🔴 底线失守" }
     $ddrStr = if ($ddrVal -ge 999.0) { "999.0" } else { "{0:F2}" -f $ddrVal }
     $ddrRatio = if ($ddrVal -ge 999.0) { 1.0 } else { $ddrVal / 10.0 }
-    [void]$Builder.AppendLine(("| | 破位防御度 (DDR) | **{0}** | `[{1}]` | {2} | 历史各次提交与审计中从未发生跌破 90 分及格线事故 |" -f $ddrStr, (Get-QuantGaugeBar ([math]::Min(1.0, $ddrRatio)) 10), $qDdrStatus))
+    $ddrNote = if ($ddrVal -ge 999.0) {
+        "历史各次审计未检出跌破及格线事故"
+    } elseif ($ddrVal -ge 5.0) {
+        "下行防御垫层充沛，破位回撤风险受控"
+    } else {
+        "存在跌破质量底线风险，下行防御亟待加固"
+    }
+    [void]$Builder.AppendLine(("| | 破位防御度 (DDR) | **{0}** | `[{1}]` | {2} | {3} |" -f $ddrStr, (Get-QuantGaugeBar ([math]::Min(1.0, $ddrRatio)) 10), $qDdrStatus, $ddrNote))
 
     $edbVal = [double]$(if ($null -ne $Quant.edb95) { $Quant.edb95 } else { $Quant.var95 })
-    [void]$Builder.AppendLine(("| | 极端退化包络 (EDB-95) | **{0:F2}%** | `[{1}]` | 🟡 边界受控 | 95% 置信度下单次极端扰动的质量衰减预测上限 |" -f $edbVal, (Get-QuantGaugeBar ([math]::Min(1.0, $edbVal / 100.0)) 10)))
+    $qEdbStatus = if ($edbVal -le 10.0) { "🟢 边界收敛" } elseif ($edbVal -le 25.0) { "🟡 边界受控" } else { "🔴 边界警戒" }
+    $edbNote = if ($edbVal -le 10.0) {
+        "95%置信度下单次扰动最大质量衰减预测极低"
+    } elseif ($edbVal -le 25.0) {
+        "单次极端扰动下的质量衰减处于受控预测上限"
+    } else {
+        "极端扰动下质量回撤预测偏大，防御边界需收紧"
+    }
+    [void]$Builder.AppendLine(("| | 极端退化包络 (EDB-95) | **{0:F2}%** | `[{1}]` | {2} | {3} |" -f $edbVal, (Get-QuantGaugeBar ([math]::Min(1.0, $edbVal / 100.0)) 10), $qEdbStatus, $edbNote))
 
     $ptdVal = [double]$(if ($null -ne $Quant.ptd) { $Quant.ptd } else { $Quant.mdd })
-    [void]$Builder.AppendLine(("| | 历史峰谷落差 (PTD) | **{0:F2}%** | `[{1}]` | 🟡 周期演进 | 记录从冷启动初期至当前成熟期的历史跨度峰谷差 |" -f $ptdVal, (Get-QuantGaugeBar ([math]::Min(1.0, $ptdVal / 100.0)) 10)))
+    $qPtdStatus = if ($ptdVal -le 15.0) { "🟢 平稳演进" } elseif ($ptdVal -le 60.0) { "🟡 周期演进" } else { "🔴 历史剧震" }
+    $ptdNote = if ($ptdVal -le 15.0) {
+        "历史质量轨迹平稳，未见大幅度周期落差"
+    } elseif ($ptdVal -le 60.0) {
+        "记录从初期至当前演化周期内的正常峰谷差"
+    } else {
+        "历史峰谷落差过大，工程质量曾出现剧烈震荡"
+    }
+    [void]$Builder.AppendLine(("| | 历史峰谷落差 (PTD) | **{0:F2}%** | `[{1}]` | {2} | {3} |" -f $ptdVal, (Get-QuantGaugeBar ([math]::Min(1.0, $ptdVal / 100.0)) 10), $qPtdStatus, $ptdNote))
 
     $ehlVal = [double]$(if ($null -ne $Quant.ehl) { $Quant.ehl } else { $Quant.halfLifeCommits })
     $qEhlStatus = if ($ehlVal -le 2.0) { "🟢 瞬时自愈" } elseif ($ehlVal -le 5.0) { "🟡 常规迭代" } else { "🔴 惯性滞后" }
-    [void]$Builder.AppendLine(("| | 扰动自愈步长 (EHL) | **{0:F1} 步** | `[{1}]` | {2} | 突发扰动或单点缺陷引入后可在 1~2 步内迅速收复稳态 |" -f $ehlVal, (Get-QuantGaugeBar ([math]::Max(0.0, 1.0 - ($ehlVal / 5.0))) 10), $qEhlStatus))
+    $ehlNote = if ($ehlVal -le 2.0) {
+        "突发扰动或单点缺陷可在 1~2 步内迅速收复稳态"
+    } elseif ($ehlVal -le 5.0) {
+        "系统具备自愈趋势，需数步迭代回到稳态基线"
+    } else {
+        "自愈半衰周期偏长，存在缺陷惯性滞后风险"
+    }
+    [void]$Builder.AppendLine(("| | 扰动自愈步长 (EHL) | **{0:F1} 步** | `[{1}]` | {2} | {3} |" -f $ehlVal, (Get-QuantGaugeBar ([math]::Max(0.0, 1.0 - ($ehlVal / 5.0))) 10), $qEhlStatus, $ehlNote))
 
     $dsiVal = [double]$(if ($null -ne $Quant.dsi) { $Quant.dsi } else { $Quant.debtGini })
     $qDsiStatus = if ($dsiVal -ge 0.70) { "🔴 极化寡头" } elseif ($dsiVal -ge 0.50) { "🟡 局部偏聚" } else { "🟢 弥散均布" }
-    [void]$Builder.AppendLine(("| **空间拓扑** | 债务偏聚指数 (DSI) | **{0:F2}** | `[{1}]` | {2} | 债务在全仓代码文件中弥散平铺，无单体巨石垄断 |" -f $dsiVal, (Get-QuantGaugeBar ([math]::Min(1.0, $dsiVal)) 10), $qDsiStatus))
+    $dsiNote = if ($dsiVal -lt 0.50) {
+        "技术债务在全仓代码中弥散平铺，无单体巨石垄断"
+    } elseif ($dsiVal -le 0.70) {
+        "部分核心模块显现技术债务局部偏聚，需重点关照"
+    } else {
+        "少数模块垄断全仓绝大部分债务，存在单体极化风险"
+    }
+    [void]$Builder.AppendLine(("| **空间拓扑** | 债务偏聚指数 (DSI) | **{0:F2}** | `[{1}]` | {2} | {3} |" -f $dsiVal, (Get-QuantGaugeBar ([math]::Min(1.0, $dsiVal)) 10), $qDsiStatus, $dsiNote))
 
     $rcdVal = [double]$(if ($null -ne $Quant.rcd) { $Quant.rcd } else { $Quant.defectEntropy })
     $qRcdStatus = if ($rcdVal -le 0.40) { "🟢 靶向聚焦" } elseif ($rcdVal -le 0.75) { "🟡 多维分布" } else { "🔴 全域混沌" }
-    [void]$Builder.AppendLine(("| | 根因发散熵 (RCD) | **{0:F2}** | `[{1}]` | {2} | 缺陷跨命名/简化/性能等多家族分布，宜全域常态巡检 |" -f $rcdVal, (Get-QuantGaugeBar ([math]::Min(1.0, $rcdVal)) 10), $qRcdStatus))
+    $rcdNote = if ($rcdVal -le 0.40) {
+        "缺陷高度集中在少数规则家族，可执行靶向消除"
+    } elseif ($rcdVal -le 0.75) {
+        "缺陷跨多家族规则分布，宜展开多维常态巡检"
+    } else {
+        "缺陷在各规则家族全域混沌发散，需系统性治理"
+    }
+    [void]$Builder.AppendLine(("| | 根因发散熵 (RCD) | **{0:F2}** | `[{1}]` | {2} | {3} |" -f $rcdVal, (Get-QuantGaugeBar ([math]::Min(1.0, $rcdVal)) 10), $qRcdStatus, $rcdNote))
     [void]$Builder.AppendLine()
 }
