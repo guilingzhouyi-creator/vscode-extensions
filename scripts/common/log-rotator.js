@@ -35,6 +35,7 @@ const PROTECTED_SNAPSHOT_FILES = new Set([
   FAILURE_SNAPSHOT_NAME,
   'audit-latest.json',
   'audit-latest.md',
+  'audit-latest.aas.json',
   'audit-history.jsonl',
   'commit-guardrail-latest.json',
   'commit-guardrail-history.jsonl',
@@ -57,6 +58,34 @@ function resolveLogGroupKey(fileName) {
   if (fileName.startsWith('last-commit-msg')) return 'last-commit-msg';
   if (fileName.startsWith('last-pre-push')) return 'last-pre-push';
   return 'general';
+}
+
+/**
+ * Atomically writes data to disk using temporary file staging to prevent torn writes.
+ *
+ * @param {string} filePath - Target destination file path.
+ * @param {string|Buffer} content - Data to write.
+ * @param {string} [encoding='utf8'] - String encoding format.
+ */
+function writeAtomicFileSync(filePath, content, encoding = UTF8) {
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const tmpPath = `${filePath}.${Date.now().toString(36)}.${Math.random().toString(36).slice(2, 6)}.tmp`;
+  try {
+    fs.writeFileSync(tmpPath, content, encoding);
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    if (fs.existsSync(tmpPath)) {
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch {
+        // Suppress secondary cleanup error
+      }
+    }
+    throw err;
+  }
 }
 
 /**
@@ -85,7 +114,7 @@ function truncateLogFile(filePath, maxBytes = DEFAULT_MAX_FILE_BYTES, headBytes 
     fs.closeSync(fd);
 
     const merged = Buffer.concat([headBuf, Buffer.from(TRUNCATION_MARKER, UTF8), tailBuf]);
-    fs.writeFileSync(filePath, merged);
+    writeAtomicFileSync(filePath, merged);
     return true;
   } catch {
     return false;
@@ -93,8 +122,22 @@ function truncateLogFile(filePath, maxBytes = DEFAULT_MAX_FILE_BYTES, headBytes 
 }
 
 /**
+ * Removes zero-byte orphan file safely with fail-soft error handling.
+ *
+ * @param {string} fullPath - File path to unlink.
+ */
+function removeZeroByteFileSafely(fullPath) {
+  try {
+    fs.unlinkSync(fullPath);
+  } catch {
+    // Best-effort cleanup of zero-byte orphan logs
+  }
+}
+
+/**
  * Collect valid log file entries from the target audit directory.
  * Excludes protected long-term audit snapshots and history ledgers.
+ * Purges zero-byte garbage files on discovery to preserve physical hygiene.
  *
  * @param {string} targetDir - Directory to inspect.
  * @returns {Array<object>} Collected log entry descriptors.
@@ -112,15 +155,20 @@ function collectAuditLogEntries(targetDir) {
       }
       const fullPath = path.join(targetDir, name);
       const stat = fs.statSync(fullPath);
-      if (stat.isFile()) {
-        entries.push({
-          name,
-          fullPath,
-          size: stat.size,
-          mtimeMs: stat.mtimeMs,
-          group: resolveLogGroupKey(name),
-        });
+      if (!stat.isFile()) {
+        continue;
       }
+      if (stat.size === 0) {
+        removeZeroByteFileSafely(fullPath);
+        continue;
+      }
+      entries.push({
+        name,
+        fullPath,
+        size: stat.size,
+        mtimeMs: stat.mtimeMs,
+        group: resolveLogGroupKey(name),
+      });
     }
   } catch {
     return [];
@@ -337,7 +385,7 @@ function writeFailureSnapshot(snapshotData, targetDir = DEFAULT_LOG_DIR) {
     }
     const snapshotPath = path.join(targetDir, FAILURE_SNAPSHOT_NAME);
     const payload = formatAgentEnvelope(snapshotData, targetDir);
-    fs.writeFileSync(snapshotPath, JSON.stringify(payload, null, 2), UTF8);
+    writeAtomicFileSync(snapshotPath, JSON.stringify(payload, null, 2), UTF8);
     return snapshotPath;
   } catch {
     return null;
@@ -523,6 +571,7 @@ module.exports = {
   PROTOCOL_VERSION,
   truncateLogFile,
   pruneAuditLogs,
+  writeAtomicFileSync,
   formatAgentEnvelope,
   writeFailureSnapshot,
   viewLastFailure,

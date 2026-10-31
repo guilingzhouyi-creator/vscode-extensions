@@ -321,22 +321,29 @@ function evaluateCommits(commits, frozenRules) {
   let blocked = 0;
   let frozen = 0;
   const receiptsDir = path.resolve(__dirname, "../../.git/gate-receipts");
+  const { verifyRecordSignature } = require("./gate-receipts");
   for (const commit of commits) {
-    // 门禁收据有效性断言：拦截 --no-verify 或未记录的脏提交
+    // 门禁收据有效性断言：拦截 --no-verify、签名伪造或损坏的脏提交
     const receiptPath = path.join(receiptsDir, `${commit.sha}.json`);
     if (fs.existsSync(receiptPath)) {
       try {
         const receipt = JSON.parse(fs.readFileSync(receiptPath, ENCODING_UTF8));
-        if (receipt.verified === false || receipt.bypass === true) {
+        const sigCheck = verifyRecordSignature(receipt);
+        if (receipt.verified === false || receipt.bypass === true || !sigCheck.ok) {
           blocked += 1;
-          printBlock(commit, [
-            "门禁收据无效或检测到 --no-verify 绕过 (verified=false, bypass=true)",
-            "请使用 git commit --amend 重新合规提交",
-          ]);
+          const reason = !sigCheck.ok
+            ? `门禁收据签名不可信 (${sigCheck.reason})`
+            : "门禁收据无效或检测到 --no-verify 绕过 (verified=false, bypass=true)";
+          printBlock(commit, [reason, "请使用 git commit --amend 重新合规提交"]);
           continue;
         }
-      } catch {
-        // 忽略收据解析异常
+      } catch (err) {
+        blocked += 1;
+        printBlock(commit, [
+          "门禁收据文件损坏或无法解析: " + err.message,
+          "请使用 git commit --amend 重新合规提交",
+        ]);
+        continue;
       }
     }
 

@@ -987,7 +987,12 @@ function logSingleGateResult(spec, items) {
 
 function reportHumanViolations(violationsByGate) {
   for (let i = 0; i < GATE_SPECS.length; i++) {
-    logSingleGateResult(GATE_SPECS[i], violationsByGate[i]);
+    logSingleGateResult(GATE_SPECS[i], violationsByGate[i] || []);
+  }
+  for (let i = GATE_SPECS.length; i < violationsByGate.length; i++) {
+    for (const v of violationsByGate[i] || []) {
+      console.error(`✖ BLOCK  ${v.ruleId || STEP_NAME}  ${v.message}`);
+    }
   }
 }
 
@@ -1049,18 +1054,11 @@ function collectProjectViolations(repoRoot, stagedFiles) {
  */
 function reportEmptyStaging(isAgentMode) {
   if (isAgentMode) {
-    console.log(
-      JSON.stringify(
-        {
-          protocolVersion: PROTOCOL_VERSION,
-          status: STATUS_PASS,
-          gate: FAST_STAGED_GATE,
-          summary: 'Staged area is empty, fast-staged review skipped.',
-        },
-        null,
-        2,
-      ),
-    );
+    const payload = {
+      protocolVersion: PROTOCOL_VERSION, status: STATUS_PASS, gate: FAST_STAGED_GATE,
+      summary: 'Staged area is empty, fast-staged review skipped.',
+    };
+    console.log(JSON.stringify(payload, null, 2));
   } else {
     console.log('ℹ️  暂存区无文件变更，跳过 fast-staged 检查。');
   }
@@ -1075,24 +1073,14 @@ function reportEmptyStaging(isAgentMode) {
  */
 function reportPassingVerdict(isAgentMode, warnings) {
   if (isAgentMode) {
-    console.log(
-      JSON.stringify(
-        {
-          protocolVersion: PROTOCOL_VERSION,
-          status: STATUS_PASS,
-          gate: FAST_STAGED_GATE,
-          summary: 'All fast-staged hygiene and security checks passed.',
-          warnings: warnings.slice(0, 20),
-        },
-        null,
-        2,
-      ),
-    );
+    const payload = {
+      protocolVersion: PROTOCOL_VERSION, status: STATUS_PASS, gate: FAST_STAGED_GATE,
+      summary: 'All fast-staged hygiene and security checks passed.', warnings: warnings.slice(0, 20),
+    };
+    console.log(JSON.stringify(payload, null, 2));
     return;
   }
-  for (const spec of GATE_SPECS) {
-    console.log(`  ✔  ${spec.id}  ${spec.name}`);
-  }
+  for (const spec of GATE_SPECS) console.log(`  ✔  ${spec.id}  ${spec.name}`);
   if (warnings.length > 0) {
     console.warn(`  ⚠ [WARN] ${warnings.length} 处缩进宽度不符合契约（仅告警，不阻断）`);
     for (const item of warnings.slice(0, 5)) {
@@ -1112,23 +1100,18 @@ function reportBlockingVerdict(isAgentMode, buckets, warnings) {
   const allViolations = buckets.flat();
   const { writeFailureSnapshot } = require('./log-rotator');
   const envelope = {
-    gate: FAST_STAGED_GATE,
-    step: STEP_NAME,
-    failedCommand: SCRIPT_NAME,
-    exitCode: 1,
+    gate: FAST_STAGED_GATE, step: STEP_NAME, failedCommand: SCRIPT_NAME, exitCode: 1,
     summary: `Fast staged check blocked commit due to ${allViolations.length} physical hygiene or security violations.`,
-    violations: allViolations,
-    warnings: warnings.slice(0, 20),
+    violations: allViolations, warnings: warnings.slice(0, 20),
     targetFiles: Array.from(new Set(allViolations.map((v) => v.file).filter(Boolean))),
     verificationCommand: SCRIPT_NAME,
   };
   writeFailureSnapshot(envelope);
-
   if (isAgentMode) {
     console.log(JSON.stringify(envelope, null, 2));
     process.exit(1);
   }
-  reportHumanViolations(buckets.slice(0, 6));
+  reportHumanViolations(buckets);
   process.exit(1);
 }
 
@@ -1158,14 +1141,8 @@ function runFastStaged() {
   const headViolations = !range ? checkHeadReceipt(repoRoot) : [];
 
   const buckets = [
-    headViolations,
-    gate1Violations,
-    lineEndingViolations,
-    gate3Violations,
-    nomenclatureViolations,
-    volumeViolations,
-    gate6Violations,
-    projectViolations,
+    gate1Violations, lineEndingViolations, gate3Violations, nomenclatureViolations,
+    volumeViolations, gate6Violations, projectViolations, headViolations,
   ];
 
   if (buckets.some((bucket) => bucket.length > 0)) {

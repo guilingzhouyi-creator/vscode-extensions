@@ -113,7 +113,7 @@ if [[ -f "`$ROOT_DIR/.githooks/$hook" ]]; then
 fi
 exit 0
 "@
-            [System.IO.File]::WriteAllText($dest, $proxyContent, [System.Text.UTF8Encoding]::new($false))
+            [System.IO.File]::WriteAllText($dest, $proxyContent.Replace("`r`n", "`n"), [System.Text.UTF8Encoding]::new($false))
         }
         Write-Host "✅ 已为物理目录 .git/hooks 部署双轨代理转发脚本 (Dual-Track Hook Resilience)" -ForegroundColor Green
     }

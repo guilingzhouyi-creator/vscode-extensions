@@ -72,13 +72,13 @@ function rotateHistoryLedgerIfNeeded(ledgerPath) {
 
   try {
     const stat = fs.statSync(ledgerPath);
-    if (stat.size < MAX_HISTORY_BYTES) {
-      return;
-    }
+    const isOverBytes = stat.size >= MAX_HISTORY_BYTES;
 
     const raw = fs.readFileSync(ledgerPath, UTF8);
     const lines = raw.split(/\r?\n/).filter(Boolean);
-    if (lines.length <= MAX_HISTORY_LINES) {
+    const isOverLines = lines.length > MAX_HISTORY_LINES;
+
+    if (!isOverBytes && !isOverLines) {
       return;
     }
 

@@ -298,25 +298,40 @@ function readStagedBuffersBatch(repoRoot, relPaths) {
 function checkHeadReceipt(repoRoot) {
   const root = repoRoot || DEFAULT_REPO_ROOT;
   const violations = [];
+  let headSha = '';
   try {
-    const headSha = runGit(['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-    if (!headSha || headSha.length !== 40) return violations;
-
-    const receiptPath = path.join(root, '.git', 'gate-receipts', `${headSha}.json`);
-    if (fs.existsSync(receiptPath)) {
-      const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
-      if (receipt.verified === false || receipt.bypass === true) {
-        violations.push({
-          file: 'HEAD',
-          ruleId: 'GUARD-HEAD-001',
-          severity: 'BLOCK',
-          message: `当前分支 HEAD 提交 (${headSha.slice(0, 8)}) 未经门禁验证 (verified=false, bypass=true)。`,
-          actionableFix: '严禁在违规提交之上堆叠新改动！请先执行规范重写: git commit --amend',
-        });
-      }
-    }
+    headSha = runGit(['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
   } catch {
-    // Repository without commits or git invocation failed
+    // intentional: repository without commits or git invocation failed
+    return violations;
+  }
+  if (!headSha || headSha.length !== 40) return violations;
+
+  const receiptPath = path.join(root, '.git', 'gate-receipts', `${headSha}.json`);
+  if (!fs.existsSync(receiptPath)) return violations;
+
+  try {
+    const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+    const { verifyRecordSignature } = require('./gate-receipts');
+    const sigCheck = verifyRecordSignature(receipt);
+    if (receipt.verified === false || receipt.bypass === true || !sigCheck.ok) {
+      const detail = !sigCheck.ok ? `签名校验失败: ${sigCheck.reason}` : 'verified=false, bypass=true';
+      violations.push({
+        file: 'HEAD',
+        ruleId: 'GUARD-HOOK-001',
+        severity: 'BLOCK',
+        message: `当前分支 HEAD 提交 (${headSha.slice(0, 8)}) 未经可信门禁验证 (${detail})。`,
+        actionableFix: '严禁在违规提交之上堆叠新改动！请先执行规范重写: git commit --amend',
+      });
+    }
+  } catch (err) {
+    violations.push({
+      file: 'HEAD',
+      ruleId: 'GUARD-HOOK-001',
+      severity: 'BLOCK',
+      message: `当前分支 HEAD 提交 (${headSha.slice(0, 8)}) 门禁收据损坏 (${err.message})。`,
+      actionableFix: '严禁在收据损坏提交之上堆叠新改动！请先执行规范重写: git commit --amend',
+    });
   }
   return violations;
 }

@@ -1131,4 +1131,6 @@ if (require.main === module) {
 module.exports = {
   run,
   parseCommandArgs,
+  verifyRecordSignature,
+  hasVerifiedReceipt,
 };
