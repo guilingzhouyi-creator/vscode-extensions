@@ -21,7 +21,7 @@ import type {
     FileMetric,
 } from '../types';
 import type { Scanner } from '../analyzer';
-import { summarizeUncertainty } from './uncertaintySummary';
+import { summarizeUncertainty } from './canonical-issue-builder';
 import type { Logger } from '../logger';
 import { globToRegExp } from '../file-discovery';
 import { runCyclePass } from '../dependency-graph';
@@ -45,7 +45,10 @@ import { computeDynamicQualityVector } from '../dynamic/dynamic-quality-scorer';
 import { computeUnifiedQualityScore } from '../scoring/fusion-scorer';
 import type { GovernanceProjectProfile } from '../scoring/fusion-scorer';
 import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
-import { FindingConfidenceArbiter } from '../scoring/finding-confidence-arbiter';
+import {
+    FindingConfidenceArbiter,
+    INLINE_DIRECTIVE_PATTERN,
+} from '../scoring/finding-confidence-arbiter';
 import type { ArbitratedFinding } from '../scoring/finding-confidence-arbiter';
 import type { RuleCalibrationStats } from '../scoring/confidence-calibration';
 import { loadCalibrationCorpus } from '../scoring/calibration-corpus';
@@ -500,8 +503,8 @@ function matchSuppression(issue: Issue, index: SuppressionIndex): SuppressionRul
         typeof issue.detail?.function === 'string'
             ? issue.detail.function
             : typeof issue.detail?.name === 'string'
-              ? issue.detail.name
-              : EMPTY_STRING;
+                ? issue.detail.name
+                : EMPTY_STRING;
     const candidates = index.candidateRulesByAnalyzer.get(issue.analyzer) ?? index.generalRules;
     const normalizedFilePath = issue.location.file.replace(/\\/g, '/');
 
@@ -515,39 +518,39 @@ function matchSuppression(issue: Issue, index: SuppressionIndex): SuppressionRul
     );
 }
 
-async function resolveFileContent(
+async function resolveFileDirectiveLines(
     file: string | undefined,
-    fileCache: Map<string, string>,
-): Promise<string> {
+    fileCache: Map<string, string[] | null>,
+): Promise<string[] | null> {
     if (!file) {
-        return '';
+        return null;
     }
-    const cached = fileCache.get(file);
-    if (cached !== undefined) {
-        return cached;
+    if (fileCache.has(file)) {
+        return fileCache.get(file) ?? null;
     }
     if (!fs.existsSync(file)) {
-        fileCache.set(file, '');
-        return '';
+        fileCache.set(file, null);
+        return null;
     }
     try {
         const content = await fs.promises.readFile(file, 'utf8');
-        fileCache.set(file, content);
-        return content;
+        const lines = INLINE_DIRECTIVE_PATTERN.test(content) ? content.split('\n') : null;
+        fileCache.set(file, lines);
+        return lines;
     } catch {
-        fileCache.set(file, '');
-        return '';
+        fileCache.set(file, null);
+        return null;
     }
 }
 
 function applySingleIssueSuppression(
     issue: Issue,
-    fileContent: string,
+    fileLines: string[] | null,
     arbiter: FindingConfidenceArbiter,
     index: SuppressionIndex | null,
 ): boolean {
-    if (fileContent) {
-        const inlineCheck = arbiter.checkInlineSuppression(issue, fileContent);
+    if (fileLines) {
+        const inlineCheck = arbiter.checkInlineSuppression(issue, fileLines);
         if (inlineCheck.isSuppressed) {
             issue.suppression = {
                 reason: inlineCheck.reason || 'Suppressed via inline comment directive',
@@ -590,11 +593,11 @@ async function applySuppressions(
     const arbiter = new FindingConfidenceArbiter();
     const index = suppressions.length > 0 ? buildSuppressionIndex(suppressions) : null;
     let suppressedCount = 0;
-    const fileCache = new Map<string, string>();
+    const fileCache = new Map<string, string[] | null>();
 
     for (const issue of report.issues) {
-        const fileContent = await resolveFileContent(issue.location?.file, fileCache);
-        if (applySingleIssueSuppression(issue, fileContent, arbiter, index)) {
+        const fileLines = await resolveFileDirectiveLines(issue.location?.file, fileCache);
+        if (applySingleIssueSuppression(issue, fileLines, arbiter, index)) {
             suppressedCount++;
         }
     }
@@ -689,33 +692,56 @@ function resolveGovernanceProfile(config: ScanConfig): GovernanceProjectProfile 
     return { stage, scale, domain };
 }
 
+function collectDirtyFiles(report: ScanReport, initialIssueCount: number): Set<string> {
+    const dirtyFiles = new Set<string>();
+    const issues = report.issues;
+    for (let i = 0; i < issues.length; i++) {
+        const issue = issues[i];
+        const file = issue.location?.file;
+        if (!file) continue;
+        if (i >= initialIssueCount || issue.suppression !== undefined) {
+            dirtyFiles.add(file);
+        }
+    }
+    return dirtyFiles;
+}
+
 /**
  * Recomputes quality scores, tri-plane vectors, and project autonomy indices.
  *
  * @param report - Report to enrich with updated scores.
  * @param config - Resolved scan configuration.
  * @param reportScanner - Scanner instance providing index cache when available.
+ * @param initialIssueCount - Count of issues prior to post-scan passes.
  */
 function refreshQualityScores(
     report: ScanReport,
     config: ScanConfig,
     reportScanner: Scanner | null,
+    initialIssueCount = 0,
 ): void {
     const effectiveScorerArchetype = config.reviewProfile ?? config.archetype;
     const scorer =
         reportScanner && typeof reportScanner.getQualityScorer === 'function'
             ? reportScanner.getQualityScorer()
             : new QualityScorer(
-                  config.scoringWeights as unknown as Record<string, number>,
-                  effectiveScorerArchetype,
-              );
+                config.scoringWeights as unknown as Record<string, number>,
+                effectiveScorerArchetype,
+            );
 
+    const existingScores = report.fileQualityScores;
+    const dirtyFiles = existingScores ? collectDirtyFiles(report, initialIssueCount) : null;
     const issuesByFile = groupIssuesByFile(report.issues);
     const fileQualityScores: Record<string, QualityScoreBreakdown> = {};
     const fileMetrics = report.fileMetrics ?? [];
 
     const fallbackIssues = EMPTY_ISSUES as unknown as Issue[];
     for (const metric of fileMetrics) {
+        const cached = existingScores?.[metric.file];
+        if (cached && dirtyFiles && !dirtyFiles.has(metric.file)) {
+            fileQualityScores[metric.file] = cached;
+            continue;
+        }
         const fileIssues = issuesByFile.get(metric.file) || fallbackIssues;
         fileQualityScores[metric.file] = scorer.evaluateFile(
             metric.file,
@@ -817,8 +843,8 @@ function resolveRuleTiers(
                 finding.tier === 'prescriptive'
                     ? 'T1'
                     : finding.tier === 'actionable'
-                      ? 'T2'
-                      : 'T3',
+                        ? 'T2'
+                        : 'T3',
             rank: currentRank,
         });
     }
@@ -886,7 +912,7 @@ async function loadCalibrationStats(
     if (loaded.rejections.length > 0) {
         logger.info(
             `${PASS_ARBITRATION}: ${loaded.rejections.length} calibration corpus entry(ies) ` +
-                `rejected (${loaded.rejections.join('; ')})`,
+            `rejected (${loaded.rejections.join('; ')})`,
         );
     }
     return loaded.stats;
@@ -996,8 +1022,8 @@ async function applyArbitrationPass(
         }
         logger.info(
             `${PASS_ARBITRATION}: ${arbitration.prescriptiveCount} prescriptive / ` +
-                `${arbitration.actionableCount} actionable / ${arbitration.advisoryCount} advisory, ` +
-                `${arbitration.blockingCount} blocking, ${writtenCount} queued for review`,
+            `${arbitration.actionableCount} actionable / ${arbitration.advisoryCount} advisory, ` +
+            `${arbitration.blockingCount} blocking, ${writtenCount} queued for review`,
         );
     } catch (arbitrationError) {
         logger.info(`${PASS_ARBITRATION}: degraded (${String(arbitrationError)})`);
@@ -1036,10 +1062,11 @@ function applyEvolutionPass(context: PostScanPassContext): void {
             const triPlane = context.report.triPlaneQuality as unknown as Record<string, unknown>;
             triPlane.hotspots = topHotspots;
 
-            const arbiter = new FindingConfidenceArbiter();
-            const arbitration = arbiter.arbitrate(context.report.issues);
-            if (arbitration.noisyRules && arbitration.noisyRules.length > 0) {
-                triPlane.noisyRules = arbitration.noisyRules;
+            const noisyRules =
+                context.report.summary.arbitration?.noisyRules ??
+                new FindingConfidenceArbiter().arbitrate(context.report.issues).noisyRules;
+            if (noisyRules && noisyRules.length > 0) {
+                triPlane.noisyRules = noisyRules;
             }
         }
     } catch (evolutionError) {
@@ -1059,13 +1086,13 @@ export async function finalizeReport(
     ...finalizeArguments:
         | [context: FinalizeReportContext]
         | [
-              report: ScanReport,
-              config: ScanConfig,
-              options: FinalizeBaselineOptions,
-              logger: Logger,
-              reportScanner?: Scanner | null,
-              scope?: PostScanScope,
-          ]
+            report: ScanReport,
+            config: ScanConfig,
+            options: FinalizeBaselineOptions,
+            logger: Logger,
+            reportScanner?: Scanner | null,
+            scope?: PostScanScope,
+        ]
 ): Promise<void> {
     const firstArg = finalizeArguments[0];
     const isContextObject =
@@ -1078,13 +1105,13 @@ export async function finalizeReport(
     const context: FinalizeReportContext = isContextObject
         ? (firstArg as FinalizeReportContext)
         : {
-              report: finalizeArguments[0] as ScanReport,
-              config: finalizeArguments[1] as ScanConfig,
-              options: finalizeArguments[2] as FinalizeBaselineOptions,
-              logger: finalizeArguments[3] as Logger,
-              reportScanner: finalizeArguments[4] ?? null,
-              scope: finalizeArguments[5] ?? POST_SCAN_SCOPE_FULL,
-          };
+            report: finalizeArguments[0] as ScanReport,
+            config: finalizeArguments[1] as ScanConfig,
+            options: finalizeArguments[2] as FinalizeBaselineOptions,
+            logger: finalizeArguments[3] as Logger,
+            reportScanner: finalizeArguments[4] ?? null,
+            scope: finalizeArguments[5] ?? POST_SCAN_SCOPE_FULL,
+        };
 
     const { report, config, options, logger } = context;
     const reportScanner = context.reportScanner ?? null;
@@ -1130,7 +1157,7 @@ export async function finalizeReport(
     if (warnings.length > 0) report.summary.warnings = warnings;
 
     if (shouldRefreshQualityScores(report, initialIssueCount, suppressedCount)) {
-        refreshQualityScores(report, config, reportScanner);
+        refreshQualityScores(report, config, reportScanner, initialIssueCount);
     }
 
     applyEvolutionPass(passContext);

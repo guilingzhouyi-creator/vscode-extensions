@@ -12,7 +12,7 @@
  */
 
 import type { Issue } from '../types';
-import { computeEffectiveCodeDensity } from './effectiveDensity';
+import { computeEffectiveCodeDensity, type EffectiveDensityResult } from './effectiveDensity';
 import { evaluateNetCognitiveCost } from './cognitive-cost-model';
 import {
     extractConstantEntities,
@@ -22,7 +22,6 @@ import {
 import { evaluateEffectiveCommentDensity } from '../comments/comment-density-model';
 import { calculateShannonEntropy } from '../math';
 import { AntiGamingMessages } from '../messages';
-import { tokenizeCode, calculateTokenShannonEntropy } from '../intelligence/token-entropy';
 import { DEFAULT_SCORING_CONFIG, type AntiGamingScoringConfig } from './scoring-parameters';
 
 /**
@@ -175,11 +174,10 @@ export interface AntiGamingResult {
  */
 function checkArtificialSplitting(
     filePath: string,
-    content: string,
+    density: EffectiveDensityResult,
     issues: Issue[],
     gamingKinds: GamingPatternKind[],
 ): number {
-    const density = computeEffectiveCodeDensity(content);
     // Check mechanical call hop inflation (CPX-HOP-001)
     if (density.forwardingCount >= FORWARDING_HOP_THRESHOLD) {
         const hopCost = evaluateNetCognitiveCost(
@@ -419,22 +417,16 @@ function checkTautologicalPadding(
  */
 function checkLowEntropyTokenPadding(
     filePath: string,
-    content: string,
+    density: EffectiveDensityResult,
     issues: Issue[],
     gamingKinds: GamingPatternKind[],
 ): number {
-    const totalLines = content.split(/\r?\n/).length;
-    if (totalLines < LOW_ENTROPY_MIN_LINES) {
+    const totalLines = density.physicalLineCount ?? density.totalLoc;
+    if (totalLines < LOW_ENTROPY_MIN_LINES || density.tokenEntropy === undefined) {
         return 0.0;
     }
 
-    const tokenStream = tokenizeCode(content);
-    if (tokenStream.rawTokens.length === 0) {
-        return 0.0;
-    }
-
-    const entropyResult = calculateTokenShannonEntropy(tokenStream.rawTokens);
-    if (entropyResult.entropy < LOW_ENTROPY_SHANNON_THRESHOLD) {
+    if (density.tokenEntropy < LOW_ENTROPY_SHANNON_THRESHOLD) {
         gamingKinds.push(GAMING_KIND_LOW_ENTROPY_TOKEN);
         issues.push(
             createGamingIssue({
@@ -442,14 +434,14 @@ function checkLowEntropyTokenPadding(
                 idSuffix: ID_SUFFIX_LOW_ENTROPY,
                 message: AntiGamingMessages.LOW_ENTROPY_TOKEN_MESSAGE(
                     totalLines,
-                    entropyResult.entropy,
+                    density.tokenEntropy,
                 ),
                 suggestion: AntiGamingMessages.LOW_ENTROPY_TOKEN_SUGGESTION,
                 gamingKind: GAMING_KIND_LOW_ENTROPY_TOKEN,
                 detail: {
                     totalLines,
-                    entropy: entropyResult.entropy,
-                    vocabularySize: entropyResult.vocabularySize,
+                    entropy: density.tokenEntropy,
+                    vocabularySize: density.vocabularySize ?? 0,
                 },
             }),
         );
@@ -557,15 +549,16 @@ export function evaluateAntiGamingConjunction(
 export function detectScoreGaming(filePath: string, content: string): AntiGamingResult {
     const issues: Issue[] = [];
     const gamingKinds: GamingPatternKind[] = [];
+    const density = computeEffectiveCodeDensity(content);
 
-    const splitPenalty = checkArtificialSplitting(filePath, content, issues, gamingKinds);
+    const splitPenalty = checkArtificialSplitting(filePath, density, issues, gamingKinds);
     const testPenalty = checkTautologicalTestPadding(filePath, content, issues, gamingKinds);
     const commentPenalty = checkTautologicalCommentPadding(filePath, content, issues, gamingKinds);
     const entropyPenalty = checkNamingEntropyAnomaly(filePath, content, issues, gamingKinds);
     const traversalPenalty = checkTautologicalPadding(filePath, content, issues, gamingKinds);
     const lowEntropyTokenPenalty = checkLowEntropyTokenPadding(
         filePath,
-        content,
+        density,
         issues,
         gamingKinds,
     );

@@ -15,6 +15,9 @@
  */
 
 import { RULE_NAM_DEC_001 } from '../scoring/dimensionLiterals';
+import { splitIdentifierTokens } from '../naming/case-converter';
+
+export { splitIdentifierTokens };
 
 const TYPE_WARN_CHARS = 35;
 const TYPE_ERROR_CHARS = 45;
@@ -186,36 +189,6 @@ export interface SymbolEntry {
  */
 function isClusterEligible(entry: SymbolEntry): boolean {
     return entry.topLevel !== false && CLUSTER_ELIGIBLE_KINDS.has(entry.kind);
-}
-
-/**
- * Tokenize an identifier into semantic segments.
- * Supports camelCase, PascalCase, snake_case, and UPPER_SNAKE_CASE.
- *
- * @param name - The identifier name to tokenize.
- * @returns Array of individual token strings.
- */
-export function splitIdentifierTokens(name: string): string[] {
-    if (!name || typeof name !== 'string') return [];
-
-    // Snake case / UPPER_SNAKE_CASE
-    if (name.includes('_')) {
-        return name
-            .split('_')
-            .map((token) => token.trim())
-            .filter((token) => token.length > 0);
-    }
-
-    // PascalCase / camelCase / acronyms (e.g., HTTPResponseHandler -> HTTP, Response, Handler)
-    const tokenList: string[] = [];
-    const pattern = /([A-Z]+(?=[A-Z][a-z0-9]|$)|[A-Z][a-z0-9]*|[a-z0-9]+)/g;
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(name)) !== null) {
-        if (match[0].length > 0) {
-            tokenList.push(match[0]);
-        }
-    }
-    return tokenList.length > 0 ? tokenList : [name];
 }
 
 /**

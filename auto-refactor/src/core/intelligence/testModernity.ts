@@ -13,11 +13,6 @@
  *   returns structured diagnostics and metrics.
  */
 
-export {
-    computeTestModernityMetrics,
-    evaluateTestModernityThresholds,
-} from './testModernityMetrics';
-
 import type {
     Issue,
     SemanticEvidenceStep,
@@ -25,13 +20,18 @@ import type {
     TestDebtTicket,
     TestModernityMetricSummary,
 } from '../types';
-import { SEVERITY_WARNING, SEVERITY_INFO } from '../types';
+import { SEVERITY_WARNING, SEVERITY_INFO, LANGUAGE_TYPESCRIPT } from '../types';
 import {
     CODE_TST_SKIPPED,
     CODE_TST_TAUTOLOGICAL,
     CODE_TST_FRAGILE_FLOAT,
     CODE_TST_BRITTLE_ORACLE,
 } from '../constants/rule-codes';
+
+const METRIC_SCALE = 1000;
+const PERCENT_SCALE = 100;
+const MAX_SCORE_CAP = 80;
+const RULE_TST_DEN_001 = 'TST-DEN-001';
 
 const KIND_CONDITION = 'condition';
 const KIND_CALL = 'call';
@@ -108,174 +108,149 @@ export interface BusinessTestMappingResult {
     uncoveredSymbols: string[];
 }
 
-function createDeprecatedContractIssue(site: TestSite): Issue {
+interface TestSiteIssueSpec {
+    site: TestSite;
+    rule: string;
+    message: string;
+    suggestion: string;
+    confidence: number;
+    evidenceKind: typeof KIND_CALL | typeof KIND_CONDITION;
+    evidenceDescription: string;
+    secondaryEvidenceDescription?: string;
+    currentBehavior: string;
+    triggerCondition: string;
+    risk: string;
+    suggestedFix: string;
+    verificationMethod: string;
+    actionable?: Issue['actionable'];
+}
+
+/**
+ * Construct a standardized test modernity diagnostic issue for a single test site.
+ */
+function buildTestSiteIssue(spec: TestSiteIssueSpec): Issue {
+    const { site } = spec;
     const evidence: SemanticEvidenceStep[] = [
         {
-            kind: KIND_CALL,
-            description: `Test '${site.testName}' verifies obsolete contract version ${site.contractVersion}`,
-            file: site.file,
-            line: site.line,
-            symbol: site.testName,
-        },
-        {
-            kind: KIND_CONDITION,
-            description: `Active production contract version is ${site.activeContractVersion}`,
+            kind: spec.evidenceKind,
+            description: spec.evidenceDescription,
             file: site.file,
             line: site.line,
             symbol: site.testName,
         },
     ];
+    if (spec.secondaryEvidenceDescription) {
+        evidence.push({
+            kind: KIND_CONDITION,
+            description: spec.secondaryEvidenceDescription,
+            file: site.file,
+            line: site.line,
+            symbol: site.testName,
+        });
+    }
 
     const detail: SemanticReviewDetail = {
         language: 'typescript',
         module: MODULE_TEST_SUITE,
         symbol: site.testName,
         codeDomain: CODE_DOMAIN_TEST_MODERNITY,
-        currentBehavior: `Test suite verifies deprecated contract ${site.contractVersion} while production code is on ${site.activeContractVersion}.`,
+        currentBehavior: spec.currentBehavior,
         semanticEvidenceChain: evidence,
+        triggerCondition: spec.triggerCondition,
+        risk: spec.risk,
+        blastRadius: [site.file],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix: spec.suggestedFix,
+        impactedCallers: [],
+        impactedTests: [site.file],
+        verificationMethod: spec.verificationMethod,
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
+        canAutofix: false,
+    };
+
+    const issue: Issue = {
+        id: `${ANALYZER_TEST_MODERNITY}:${spec.rule}:${site.file}:${site.line}`,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        rule: spec.rule,
+        severity: SEVERITY_WARNING,
+        message: spec.message,
+        location: {
+            file: site.file,
+            start: { line: site.line, column: 1 },
+            end: { line: site.line, column: DEFAULT_END_COLUMN },
+        },
+        detail,
+        suggestion: spec.suggestion,
+        evidence: {
+            confidence: spec.confidence,
+            requiresRuntime: false,
+        },
+    };
+    if (spec.actionable) {
+        issue.actionable = spec.actionable;
+    }
+    return issue;
+}
+
+function createDeprecatedContractIssue(site: TestSite): Issue {
+    return buildTestSiteIssue({
+        site,
+        rule: RULE_TST_ILS_001,
+        message: `Test integrity illusion: '${site.testName}' asserts deprecated contract (${site.contractVersion} vs active ${site.activeContractVersion}).`,
+        suggestion: `Migrate test assertions to verify current contract ${site.activeContractVersion}.`,
+        confidence: 0.95,
+        evidenceKind: KIND_CALL,
+        evidenceDescription: `Test '${site.testName}' verifies obsolete contract version ${site.contractVersion}`,
+        secondaryEvidenceDescription: `Active production contract version is ${site.activeContractVersion}`,
+        currentBehavior: `Test suite verifies deprecated contract ${site.contractVersion} while production code is on ${site.activeContractVersion}.`,
         triggerCondition:
             'Test targets obsolete contract version without explicit legacy compatibility declaration',
         risk: 'Test integrity illusion: test passes successfully against obsolete APIs, falsely creating confidence of coverage for active V3 code.',
-        blastRadius: [site.file],
-        isDeterministic: true,
-        requiresManualConfirm: false,
         suggestedFix: `Update test signatures to match active contract ${site.activeContractVersion}, or move to legacy compatibility suite.`,
-        impactedCallers: [],
-        impactedTests: [site.file],
         verificationMethod:
             'Execute test runner and assert test verifies active business schema fields.',
-        ruleVersion: DEFAULT_RULE_VERSION,
-        configVersion: DEFAULT_CONFIG_VERSION,
-        canAutofix: false,
-    };
-
-    return {
-        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_ILS_001}:${site.file}:${site.line}`,
-        analyzer: ANALYZER_TEST_MODERNITY,
-        rule: RULE_TST_ILS_001,
-        severity: SEVERITY_WARNING,
-        message: `Test integrity illusion: '${site.testName}' asserts deprecated contract (${site.contractVersion} vs active ${site.activeContractVersion}).`,
-        location: {
-            file: site.file,
-            start: { line: site.line, column: 1 },
-            end: { line: site.line, column: DEFAULT_END_COLUMN },
-        },
-        detail,
-        suggestion: `Migrate test assertions to verify current contract ${site.activeContractVersion}.`,
-        evidence: {
-            confidence: 0.95,
-            requiresRuntime: false,
-        },
-    };
+    });
 }
 
 function createMockOnlyIssue(site: TestSite): Issue {
-    const evidence: SemanticEvidenceStep[] = [
-        {
-            kind: KIND_CALL,
-            description: `Test '${site.testName}' configures mock and asserts only mock configuration`,
-            file: site.file,
-            line: site.line,
-            symbol: site.testName,
-        },
-    ];
-
-    const detail: SemanticReviewDetail = {
-        language: 'typescript',
-        module: MODULE_TEST_SUITE,
-        symbol: site.testName,
-        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
+    return buildTestSiteIssue({
+        site,
+        rule: RULE_TST_ILS_001,
+        message: `Test integrity illusion: '${site.testName}' verifies mock stubs only without real domain assertions.`,
+        suggestion:
+            'Verify actual business invariants and side-effects rather than mock parameters.',
+        confidence: 0.9,
+        evidenceKind: KIND_CALL,
+        evidenceDescription: `Test '${site.testName}' configures mock and asserts only mock configuration`,
         currentBehavior: `Test '${site.testName}' asserts only the mock stub's own return value without exercising business state transitions.`,
-        semanticEvidenceChain: evidence,
         triggerCondition:
             'Assertion verifies mock instance rather than actual domain invariants or state',
         risk: 'Mock-only validation masks real production bugs when business domain logic breaks.',
-        blastRadius: [site.file],
-        isDeterministic: true,
-        requiresManualConfirm: false,
         suggestedFix:
             'Assert on real domain outputs, state mutations, or event emissions rather than mock stubs.',
-        impactedCallers: [],
-        impactedTests: [site.file],
         verificationMethod:
             'Introduce an intentional bug in domain logic and verify the test catches it.',
-        ruleVersion: DEFAULT_RULE_VERSION,
-        configVersion: DEFAULT_CONFIG_VERSION,
-        canAutofix: false,
-    };
-
-    return {
-        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_ILS_001}:${site.file}:${site.line}`,
-        analyzer: ANALYZER_TEST_MODERNITY,
-        rule: RULE_TST_ILS_001,
-        severity: SEVERITY_WARNING,
-        message: `Test integrity illusion: '${site.testName}' verifies mock stubs only without real domain assertions.`,
-        location: {
-            file: site.file,
-            start: { line: site.line, column: 1 },
-            end: { line: site.line, column: DEFAULT_END_COLUMN },
-        },
-        detail,
-        suggestion:
-            'Verify actual business invariants and side-effects rather than mock parameters.',
-        evidence: {
-            confidence: 0.9,
-            requiresRuntime: false,
-        },
-    };
+    });
 }
 
 function createSkippedTestIssue(site: TestSite): Issue {
-    const evidence: SemanticEvidenceStep[] = [
-        {
-            kind: KIND_CONDITION,
-            description: `Test '${site.testName}' explicitly skipped or disabled`,
-            file: site.file,
-            line: site.line,
-            symbol: site.testName,
-        },
-    ];
-
-    const detail: SemanticReviewDetail = {
-        language: 'typescript',
-        module: MODULE_TEST_SUITE,
-        symbol: site.testName,
-        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
-        currentBehavior: `Permanently skipped or disabled test case in '${site.file}'.`,
-        semanticEvidenceChain: evidence,
-        triggerCondition: 'Test suite contains skipped tests (.skip, xit, @pytest.mark.skip)',
-        risk: 'Skipped tests decay over time and mask regressions in active business domains.',
-        blastRadius: [site.file],
-        isDeterministic: true,
-        requiresManualConfirm: false,
-        suggestedFix:
-            'Re-enable and fix the test, or formally register as a tracked test debt ticket.',
-        impactedCallers: [],
-        impactedTests: [site.file],
-        verificationMethod: 'Execute test suite and confirm test runs to completion.',
-        ruleVersion: DEFAULT_RULE_VERSION,
-        configVersion: DEFAULT_CONFIG_VERSION,
-        canAutofix: false,
-    };
-
-    return {
-        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_SKP_001}:${site.file}:${site.line}`,
-        analyzer: ANALYZER_TEST_MODERNITY,
+    return buildTestSiteIssue({
+        site,
         rule: RULE_TST_SKP_001,
-        severity: SEVERITY_WARNING,
         message: `Orphaned skipped test case '${site.testName}' in active test suite.`,
-        location: {
-            file: site.file,
-            start: { line: site.line, column: 1 },
-            end: { line: site.line, column: DEFAULT_END_COLUMN },
-        },
-        detail,
         suggestion:
             'Re-enable the test case or document milestone convergence in test debt registry.',
-        evidence: {
-            confidence: 1.0,
-            requiresRuntime: false,
-        },
+        confidence: 1.0,
+        evidenceKind: KIND_CONDITION,
+        evidenceDescription: `Test '${site.testName}' explicitly skipped or disabled`,
+        currentBehavior: `Permanently skipped or disabled test case in '${site.file}'.`,
+        triggerCondition: 'Test suite contains skipped tests (.skip, xit, @pytest.mark.skip)',
+        risk: 'Skipped tests decay over time and mask regressions in active business domains.',
+        suggestedFix:
+            'Re-enable and fix the test, or formally register as a tracked test debt ticket.',
+        verificationMethod: 'Execute test suite and confirm test runs to completion.',
         actionable: {
             action: 'simplify_control_flow',
             code: CODE_TST_SKIPPED,
@@ -283,60 +258,25 @@ function createSkippedTestIssue(site: TestSite): Issue {
             safeToAutomate: false,
             templateSnippet: 'Re-enable test and verify assertions.',
         },
-    };
+    });
 }
 
 function createTautologicalIssue(site: TestSite): Issue {
-    const evidence: SemanticEvidenceStep[] = [
-        {
-            kind: KIND_CONDITION,
-            description: `Tautological assertion in test '${site.testName}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.testName,
-        },
-    ];
-
-    const detail: SemanticReviewDetail = {
-        language: 'typescript',
-        module: MODULE_TEST_SUITE,
-        symbol: site.testName,
-        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
+    return buildTestSiteIssue({
+        site,
+        rule: RULE_TST_TAU_001,
+        message: `Tautological or non-verifying assertion in '${site.testName}'.`,
+        suggestion: 'Assert specific business values and invariants rather than constant truth.',
+        confidence: 1.0,
+        evidenceKind: KIND_CONDITION,
+        evidenceDescription: `Tautological assertion in test '${site.testName}'`,
         currentBehavior: `Test contains non-verifying or tautological assertion (e.g. expect(true).toBe(true)).`,
-        semanticEvidenceChain: evidence,
         triggerCondition:
             'Assertion expression evaluates to an invariant constant truth without testing runtime logic',
         risk: 'Artificially inflates assertion metrics without testing functional behavior.',
-        blastRadius: [site.file],
-        isDeterministic: true,
-        requiresManualConfirm: false,
         suggestedFix:
             'Replace tautological assertion with meaningful verification of domain outcomes.',
-        impactedCallers: [],
-        impactedTests: [site.file],
         verificationMethod: 'Run test with fault injection to verify failure capability.',
-        ruleVersion: DEFAULT_RULE_VERSION,
-        configVersion: DEFAULT_CONFIG_VERSION,
-        canAutofix: false,
-    };
-
-    return {
-        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_TAU_001}:${site.file}:${site.line}`,
-        analyzer: ANALYZER_TEST_MODERNITY,
-        rule: RULE_TST_TAU_001,
-        severity: SEVERITY_WARNING,
-        message: `Tautological or non-verifying assertion in '${site.testName}'.`,
-        location: {
-            file: site.file,
-            start: { line: site.line, column: 1 },
-            end: { line: site.line, column: DEFAULT_END_COLUMN },
-        },
-        detail,
-        suggestion: 'Assert specific business values and invariants rather than constant truth.',
-        evidence: {
-            confidence: 1.0,
-            requiresRuntime: false,
-        },
         actionable: {
             action: 'extract_pure_predicate',
             code: CODE_TST_TAUTOLOGICAL,
@@ -344,62 +284,27 @@ function createTautologicalIssue(site: TestSite): Issue {
             safeToAutomate: false,
             templateSnippet: 'expect(result).toBe(expectedBusinessValue);',
         },
-    };
+    });
 }
 
 function createFragileFloatIssue(site: TestSite): Issue {
     const floatLit = site.fragileFloatLiteral ?? 'float';
-    const evidence: SemanticEvidenceStep[] = [
-        {
-            kind: KIND_CONDITION,
-            description: `Fragile floating-point assertion against naked literal '${floatLit}' in test '${site.testName}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.testName,
-        },
-    ];
-
-    const detail: SemanticReviewDetail = {
-        language: 'typescript',
-        module: MODULE_TEST_SUITE,
-        symbol: site.testName,
-        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
+    return buildTestSiteIssue({
+        site,
+        rule: RULE_TST_FLT_001,
+        message: `Fragile floating-point assertion: '${site.testName}' asserts naked float literal '${floatLit}' without epsilon tolerance.`,
+        suggestion: `Derive expected value via mathematical formula (e.g. Math.round(formula * 100) / 100) or use tolerance assertion.`,
+        confidence: 1.0,
+        evidenceKind: KIND_CONDITION,
+        evidenceDescription: `Fragile floating-point assertion against naked literal '${floatLit}' in test '${site.testName}'`,
         currentBehavior: `Test asserts calculated floating-point result against naked magic literal '${floatLit}' without formula derivation or tolerance.`,
-        semanticEvidenceChain: evidence,
         triggerCondition:
             'Assertion performs direct strict equality against a naked floating-point literal',
         risk: 'Floating-point roundoff errors and machine epsilon variance cause brittle test failures across platforms.',
-        blastRadius: [site.file],
-        isDeterministic: true,
-        requiresManualConfirm: false,
         suggestedFix:
             'Use tolerance matcher (e.g. toBeCloseTo, isScoreEqual) or derive expectation via shared formula.',
-        impactedCallers: [],
-        impactedTests: [site.file],
         verificationMethod:
             'Assert test failure with epsilon perturbation or replace with toBeCloseTo matcher.',
-        ruleVersion: DEFAULT_RULE_VERSION,
-        configVersion: DEFAULT_CONFIG_VERSION,
-        canAutofix: false,
-    };
-
-    return {
-        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_FLT_001}:${site.file}:${site.line}`,
-        analyzer: ANALYZER_TEST_MODERNITY,
-        rule: RULE_TST_FLT_001,
-        severity: SEVERITY_WARNING,
-        message: `Fragile floating-point assertion: '${site.testName}' asserts naked float literal '${floatLit}' without epsilon tolerance.`,
-        location: {
-            file: site.file,
-            start: { line: site.line, column: 1 },
-            end: { line: site.line, column: DEFAULT_END_COLUMN },
-        },
-        detail,
-        suggestion: `Derive expected value via mathematical formula (e.g. Math.round(formula * 100) / 100) or use tolerance assertion.`,
-        evidence: {
-            confidence: 1.0,
-            requiresRuntime: false,
-        },
         actionable: {
             action: 'replace_with_tolerance_assertion',
             code: CODE_TST_FRAGILE_FLOAT,
@@ -411,63 +316,28 @@ function createFragileFloatIssue(site: TestSite): Issue {
                 toleranceDecimals: 2,
             },
         },
-    };
+    });
 }
 
 function createBrittleOracleIssue(site: TestSite): Issue {
     const oracleLit = site.brittleOracleLiteral ?? 'scalar';
     const oracleTarget = site.brittleOracleTarget ?? 'entity total';
-    const evidence: SemanticEvidenceStep[] = [
-        {
-            kind: KIND_CONDITION,
-            description: `Brittle oracle assertion against exact literal '${oracleLit}' on '${oracleTarget}' in test '${site.testName}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.testName,
-        },
-    ];
-
-    const detail: SemanticReviewDetail = {
-        language: 'typescript',
-        module: MODULE_TEST_SUITE,
-        symbol: site.testName,
-        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
+    return buildTestSiteIssue({
+        site,
+        rule: RULE_TST_ORC_001,
+        message: `Brittle assertion oracle: '${site.testName}' asserts exact scalar literal '${oracleLit}' on '${oracleTarget}' without bounded corridor.`,
+        suggestion: `Replace exact scalar assertion with bounded corridor (e.g. assertWithinCorridor or >= baseline) to guard against fragile breakdown.`,
+        confidence: 1.0,
+        evidenceKind: KIND_CONDITION,
+        evidenceDescription: `Brittle oracle assertion against exact literal '${oracleLit}' on '${oracleTarget}' in test '${site.testName}'`,
         currentBehavior: `Test asserts exact scalar equality against naked magic literal '${oracleLit}' on entity metric '${oracleTarget}' without corridor or dynamic derivation.`,
-        semanticEvidenceChain: evidence,
         triggerCondition:
             'Assertion performs exact equality against a hardcoded physical total or entity count literal',
         risk: 'Brittle test oracle breaks on normal workspace evolution (file additions, rule expansions) rather than detecting real functional regressions.',
-        blastRadius: [site.file],
-        isDeterministic: true,
-        requiresManualConfirm: false,
         suggestedFix:
             'Use invariant corridor assertion (e.g. assertWithinCorridor, >= baseline) or dynamic derivation.',
-        impactedCallers: [],
-        impactedTests: [site.file],
         verificationMethod:
             'Assert test resilience across incremental fixture/rule count expansion.',
-        ruleVersion: DEFAULT_RULE_VERSION,
-        configVersion: DEFAULT_CONFIG_VERSION,
-        canAutofix: false,
-    };
-
-    return {
-        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_ORC_001}:${site.file}:${site.line}`,
-        analyzer: ANALYZER_TEST_MODERNITY,
-        rule: RULE_TST_ORC_001,
-        severity: SEVERITY_WARNING,
-        message: `Brittle assertion oracle: '${site.testName}' asserts exact scalar literal '${oracleLit}' on '${oracleTarget}' without bounded corridor.`,
-        location: {
-            file: site.file,
-            start: { line: site.line, column: 1 },
-            end: { line: site.line, column: DEFAULT_END_COLUMN },
-        },
-        detail,
-        suggestion: `Replace exact scalar assertion with bounded corridor (e.g. assertWithinCorridor or >= baseline) to guard against fragile breakdown.`,
-        evidence: {
-            confidence: 1.0,
-            requiresRuntime: false,
-        },
         actionable: {
             action: 'replace_with_tolerance_assertion',
             code: CODE_TST_BRITTLE_ORACLE,
@@ -479,7 +349,7 @@ function createBrittleOracleIssue(site: TestSite): Issue {
                 targetExpression: oracleTarget,
             },
         },
-    };
+    });
 }
 
 function createTestDebtIssue(debt: TestDebtTicket): Issue {
@@ -592,6 +462,114 @@ export function analyzeTestModernitySites(
         if (isUnindexedDebt(debt)) {
             issues.push(createTestDebtIssue(debt));
         }
+    }
+
+    return issues;
+}
+
+/**
+ * Calculate Effective Modern Test Density (EMTD) and Current Business Contract Coverage (CBCR).
+ *
+ * EMTD = 1000 * (sum(w_s * c_s * f_s * e_s * u_s)) / max(1, ActiveTestNLOC)
+ * CBCR = sum(w_s * c_s * f_s) / sum(w_s)
+ *
+ * @param units - Set of active business semantic units.
+ * @param activeTestNloc - Non-comment, non-fixture test lines of code.
+ * @returns Computed metrics summary.
+ */
+export function computeTestModernityMetrics(
+    units: ActiveSemanticUnit[],
+    activeTestNloc: number,
+): TestModernityMetricSummary {
+    let weightedQualitySum = 0;
+    let weightedFreshCoverageSum = 0;
+    let totalWeight = 0;
+    let coveredCount = 0;
+
+    for (const unit of units) {
+        totalWeight += unit.riskWeight;
+        if (unit.isCovered) {
+            coveredCount += 1;
+            const freshCoverage = unit.riskWeight * unit.freshness;
+            weightedFreshCoverageSum += freshCoverage;
+            const qualityTerm =
+                unit.riskWeight * unit.freshness * unit.effectiveness * unit.uniqueness;
+            weightedQualitySum += qualityTerm;
+        }
+    }
+
+    const nlocDivisor = Math.max(1, activeTestNloc);
+    const emtd = Math.round((METRIC_SCALE * weightedQualitySum) / nlocDivisor);
+    const cbcr = totalWeight > 0 ? weightedFreshCoverageSum / totalWeight : 1.0;
+
+    return {
+        emtd,
+        cbcr: Math.round(cbcr * METRIC_SCALE) / METRIC_SCALE,
+        activeTestNloc,
+        activeSemanticUnits: units.length,
+        coveredSemanticUnits: coveredCount,
+    };
+}
+
+/**
+ * Evaluate computed test metrics against thresholds and emit TST-DEN-001 if below minimum.
+ *
+ * @param metrics - Calculated EMTD and CBCR summary.
+ * @param domain - Evaluated business domain name.
+ * @param options - Modernity thresholds.
+ * @returns Diagnostic issues for low test density or coverage.
+ */
+export function evaluateTestModernityThresholds(
+    metrics: TestModernityMetricSummary,
+    domain: string,
+    options: TestModernityOptions = {},
+): Issue[] {
+    const minEmtd = options.minEmtd ?? PERCENT_SCALE;
+    const minCbcr = options.minCbcr ?? 0.7;
+    const issues: Issue[] = [];
+
+    if (metrics.emtd < minEmtd || metrics.cbcr < minCbcr) {
+        const detail: SemanticReviewDetail = {
+            language: LANGUAGE_TYPESCRIPT,
+            module: MODULE_TEST_SUITE,
+            symbol: domain,
+            codeDomain: CODE_DOMAIN_TEST_MODERNITY,
+            currentBehavior: `Test suite achieves EMTD score ${metrics.emtd} (min ${minEmtd}) and CBCR rate ${metrics.cbcr} (min ${minCbcr}).`,
+            semanticEvidenceChain: [],
+            triggerCondition:
+                'Effective Modern Test Density (EMTD) or Current Contract Coverage (CBCR) below configured threshold',
+            risk: 'Critical business behaviors and state transitions lack effective modern fault-detecting test coverage.',
+            blastRadius: [domain],
+            isDeterministic: true,
+            requiresManualConfirm: false,
+            suggestedFix:
+                'Add contract tests and negative boundary verification for active domain semantic units.',
+            impactedCallers: [],
+            impactedTests: [],
+            verificationMethod: 'Recalculate EMTD and CBCR after augmenting test suites.',
+            ruleVersion: DEFAULT_RULE_VERSION,
+            configVersion: DEFAULT_CONFIG_VERSION,
+            canAutofix: false,
+        };
+
+        issues.push({
+            id: `test-modernity:TST-DEN-001:${domain}:1`,
+            analyzer: ANALYZER_TEST_MODERNITY,
+            rule: RULE_TST_DEN_001,
+            severity: SEVERITY_INFO,
+            message: `Low test density in domain '${domain}': EMTD=${metrics.emtd} (min ${minEmtd}), CBCR=${metrics.cbcr} (min ${minCbcr}).`,
+            location: {
+                file: `tests/unit/${domain}.test.ts`,
+                start: { line: 1, column: 1 },
+                end: { line: 1, column: MAX_SCORE_CAP },
+            },
+            detail,
+            suggestion: 'Increase effective contract assertions for active domain workflows.',
+            evidence: {
+                confidence: 0.9,
+                requiresRuntime: false,
+            },
+        });
     }
 
     return issues;

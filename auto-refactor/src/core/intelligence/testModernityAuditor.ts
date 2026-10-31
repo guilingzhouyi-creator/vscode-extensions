@@ -20,11 +20,11 @@ import type {
     TestModernityOptions,
     BusinessTestMappingResult,
 } from './testModernity';
-import { analyzeTestModernitySites } from './testModernity';
 import {
+    analyzeTestModernitySites,
     computeTestModernityMetrics,
     evaluateTestModernityThresholds,
-} from './testModernityMetrics';
+} from './testModernity';
 import { isCommentLine } from '../scanner/text-scanner-utils';
 
 /** Permitted test file naming suffixes and directories. */

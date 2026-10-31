@@ -73,6 +73,8 @@ const MARKER_PY_MAIN = 'if __name__ == "__main__":';
 const TEST_CALL_SITE_RE =
     /(?:^|[;{}\s])(?:await\s+)?(?:describe|it|test)(?:\.(?:each|skip|only|concurrent|todo|failing|serial))?\s*\(/;
 
+const TEST_CALL_FAST_PRECHECK_RE = /\b(?:describe|it|test)\b/;
+
 /**
  * Strip string, template and regular-expression literals plus trailing line comments.
  *
@@ -103,7 +105,9 @@ function stripNonExecutableText(line: string): string {
  * @returns True when some code line declares a test suite or case.
  */
 function hasTestCallSite(content: string): boolean {
+    if (!TEST_CALL_FAST_PRECHECK_RE.test(content)) return false;
     for (const line of content.split(/\r\n|\n/)) {
+        if (!TEST_CALL_FAST_PRECHECK_RE.test(line)) continue;
         if (REGEX.COMMENT.COMMENT_LINE.test(line)) continue;
         if (TEST_CALL_SITE_RE.test(stripNonExecutableText(line))) return true;
     }
@@ -252,7 +256,7 @@ function countContentLines(content: string): number {
  * @param ext - Lower-case file extension including the dot.
  * @returns True when the file declares an embedded test zone.
  */
-function hasEmbeddedMarkers(content: string, ext: string): boolean {
+export function hasEmbeddedMarkers(content: string, ext: string): boolean {
     if (hasTestCallSite(content)) return true;
     if (ext === '.py' && content.includes(MARKER_PY_MAIN)) return true;
     if (ext !== '.rs') return false;

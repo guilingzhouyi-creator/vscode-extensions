@@ -43,6 +43,9 @@ export interface EffectiveDensityResult {
     noiseIndex: number;
     gaussianHealth: number;
     isLowDensity: boolean;
+    physicalLineCount?: number;
+    tokenEntropy?: number;
+    vocabularySize?: number;
     tokenCount?: number;
     tokensPerEloc?: number;
     columnDensity?: number;
@@ -256,6 +259,8 @@ export function computeEffectiveCodeDensity(
     let por = 0;
     let sufr = 0;
     let compositeDensity = 0;
+    let tokenEntropy: number | undefined;
+    let vocabularySize: number | undefined;
     let spatialDensity: number | undefined;
     let mahalanobisDistance: number | undefined;
     let dominantDeficitAxis: DensityAxis | undefined;
@@ -276,6 +281,8 @@ export function computeEffectiveCodeDensity(
         sufr = reuseMetrics.sufr;
 
         const entropyResult = calculateTokenShannonEntropy(tokenStream.rawTokens);
+        tokenEntropy = entropyResult.entropy;
+        vocabularySize = entropyResult.vocabularySize;
         const entropyFactor = calculateGoldilocksEntropyFactor(entropyResult.entropy);
 
         const compositeInputs = {
@@ -305,6 +312,9 @@ export function computeEffectiveCodeDensity(
         noiseIndex,
         gaussianHealth,
         isLowDensity,
+        physicalLineCount: lines.length,
+        tokenEntropy,
+        vocabularySize,
         tokenCount,
         tokensPerEloc,
         columnDensity,

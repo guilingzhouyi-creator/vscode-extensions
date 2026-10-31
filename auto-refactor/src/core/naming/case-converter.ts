@@ -17,6 +17,67 @@ import { camelToSnake } from '../constants/regex-patterns';
 
 const WORD_SEPARATOR_PATTERN = /[_\-\s]+/;
 const SPLIT_CAMEL_CASE_PATTERN = /([a-z0-9])([A-Z])/g;
+const MORPHEME_TOKEN_PATTERN = /([A-Z]+(?=[A-Z][a-z0-9]|$)|[A-Z]?[a-z0-9]+)/g;
+
+/**
+ * Extracts camelCase / PascalCase / acronym morpheme tokens from a single segment without delimiters.
+ *
+ * @param segment - Delimiter-free identifier segment.
+ * @returns Array of matched morpheme tokens (preserving original casing).
+ */
+export function extractMorphemeTokens(segment: string): string[] {
+    if (!segment) return [];
+    MORPHEME_TOKEN_PATTERN.lastIndex = 0;
+    const tokens: string[] = [];
+    let match: RegExpExecArray | null;
+    while ((match = MORPHEME_TOKEN_PATTERN.exec(segment)) !== null) {
+        if (match[0].length > 0) {
+            tokens.push(match[0]);
+        }
+    }
+    return tokens;
+}
+
+const UNIFORM_CASE_SEGMENT_RE = /^(?:[A-Z0-9]+|[a-z0-9]+)$/;
+
+function appendSegmentTokens(segment: string, tokens: string[]): void {
+    const trimmed = segment.trim();
+    if (!trimmed) return;
+    if (UNIFORM_CASE_SEGMENT_RE.test(trimmed)) {
+        tokens.push(trimmed);
+        return;
+    }
+    const subTokens = extractMorphemeTokens(trimmed);
+    if (subTokens.length > 0) {
+        tokens.push(...subTokens);
+    } else {
+        tokens.push(trimmed);
+    }
+}
+
+/**
+ * Tokenizes an identifier into semantic segments (preserving original casing).
+ * Supports camelCase, PascalCase, acronyms (e.g. HTTPResponse -> HTTP, Response),
+ * snake_case, UPPER_SNAKE_CASE, and kebab-case.
+ *
+ * @param name - Identifier string to tokenize.
+ * @returns Array of individual token strings.
+ */
+export function splitIdentifierTokens(name: string): string[] {
+    if (!name || typeof name !== 'string') return [];
+
+    if (name.indexOf('_') === -1 && name.indexOf('-') === -1) {
+        const singleTokens = extractMorphemeTokens(name);
+        return singleTokens.length > 0 ? singleTokens : [name];
+    }
+
+    const segments = name.split(/[_-]+/);
+    const tokens: string[] = [];
+    for (let i = 0; i < segments.length; i++) {
+        appendSegmentTokens(segments[i], tokens);
+    }
+    return tokens.length > 0 ? tokens : [name];
+}
 
 /**
  * Converts a snake_case, kebab-case, or compound identifier into UpperPascalCase.

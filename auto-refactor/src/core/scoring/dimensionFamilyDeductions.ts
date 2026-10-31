@@ -72,75 +72,96 @@ const RULE_IMPORT_CYCLE = 'import-cycle';
 /** Performance rule for a transient allocation inside a loop body. */
 const RULE_PRF_TRANSIENT_ALLOCATION = 'PRF-MEM-001';
 
-/**
- * Apply deductions for architecture consistency issues.
- *
- * @param issue - Analyzed issue finding.
- * @param apply - Deduction callback function.
- */
-export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplier): void {
-    if (issue.analyzer !== ANALYZER_ARCHITECTURE && issue.analyzer !== ANALYZER_DEPENDENCY_GRAPH)
-        return;
+const DIMENSION_PERFORMANCE_EFFICIENCY = 'performanceEfficiency';
 
-    const line = issue.location?.start?.line;
-    const ruleId = issue.rule;
-    const msg = issue.message;
-
-    if (ruleId === RULE_ARCH_LEAK_002) {
-        // Charged to two axes on purpose: a leaked credential is an architecture breach and
-        // a security defect. The security-side rationale carries a [dual-axis] tag so the
-        // report can distinguish this from an accidental double charge.
-        apply(
-            DIMENSION_ARCHITECTURE_CONSISTENCY,
-            DEDUCTION_DTO_CREDENTIAL_LEAK,
-            ScoringRationales.DTO_CREDENTIAL_LEAK(msg),
-            ruleId,
-            line,
-        );
-        apply(
-            DIMENSION_CODE_SECURITY,
-            DEDUCTION_DTO_CREDENTIAL_LEAK,
-            ScoringRationales.DTO_CREDENTIAL_LEAK_SECURITY_AXIS(msg),
-            ruleId,
-            line,
-        );
-    } else if (
-        RULES_LAYER_CONSTRAINT.includes(ruleId) ||
-        // Fragment fallback for custom architecture analyzers whose rule ids this engine cannot
-        // know; built-in rules match by id first so a rename cannot silently drop the deduction.
-        ruleId.includes(FRAGMENT_LAYER) ||
-        ruleId.includes(FRAGMENT_BOUNDARY) ||
-        ruleId.includes(FRAGMENT_LEAK)
-    ) {
-        apply(
-            DIMENSION_ARCHITECTURE_CONSISTENCY,
-            DEDUCTION_LAYER_CONSTRAINT_VIOLATION,
-            ScoringRationales.LAYER_CONSTRAINT_VIOLATION(msg),
-            ruleId,
-            line,
-        );
-    } else if (
-        ruleId === RULE_IMPORT_CYCLE ||
-        ruleId.includes(FRAGMENT_CYCLE) ||
-        ruleId.includes(FRAGMENT_CIRCULAR)
-    ) {
-        apply(
-            DIMENSION_ARCHITECTURE_CONSISTENCY,
-            DEDUCTION_CIRCULAR_DEPENDENCY,
-            ScoringRationales.CIRCULAR_DEPENDENCY(msg),
-            ruleId,
-            line,
-        );
-    } else {
-        apply(
-            DIMENSION_ARCHITECTURE_CONSISTENCY,
-            DEDUCTION_ARCHITECTURE_DESIGN_VIOLATION,
-            ScoringRationales.ARCHITECTURE_DESIGN_VIOLATION(msg),
-            ruleId,
-            line,
-        );
-    }
+interface FamilyDeductionEntry {
+    readonly dimension:
+    | typeof DIMENSION_ARCHITECTURE_CONSISTENCY
+    | typeof DIMENSION_CODE_SECURITY
+    | typeof DIMENSION_PERFORMANCE_EFFICIENCY;
+    readonly deduction: number;
+    readonly rationale: (msg: string) => string;
 }
+
+interface FamilyRuleSpec {
+    readonly matches: (ruleId: string, analyzer?: string) => boolean;
+    readonly entries: readonly FamilyDeductionEntry[];
+}
+
+function containsRuleFragment(ruleId: string, fragment: string): boolean {
+    return ruleId.includes(fragment);
+}
+
+function hasRuleOrFragment(
+    ruleId: string,
+    rules: readonly string[],
+    fragments: readonly string[],
+): boolean {
+    if (rules.includes(ruleId)) {
+        return true;
+    }
+    for (let i = 0; i < fragments.length; i++) {
+        if (containsRuleFragment(ruleId, fragments[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const ARCHITECTURE_FAMILY_RULES: readonly FamilyRuleSpec[] = [
+    {
+        matches: (ruleId) => ruleId === RULE_ARCH_LEAK_002,
+        entries: [
+            {
+                dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+                deduction: DEDUCTION_DTO_CREDENTIAL_LEAK,
+                rationale: ScoringRationales.DTO_CREDENTIAL_LEAK,
+            },
+            {
+                dimension: DIMENSION_CODE_SECURITY,
+                deduction: DEDUCTION_DTO_CREDENTIAL_LEAK,
+                rationale: ScoringRationales.DTO_CREDENTIAL_LEAK_SECURITY_AXIS,
+            },
+        ],
+    },
+    {
+        matches: (ruleId) =>
+            hasRuleOrFragment(ruleId, RULES_LAYER_CONSTRAINT, [
+                FRAGMENT_LAYER,
+                FRAGMENT_BOUNDARY,
+                FRAGMENT_LEAK,
+            ]),
+        entries: [
+            {
+                dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+                deduction: DEDUCTION_LAYER_CONSTRAINT_VIOLATION,
+                rationale: ScoringRationales.LAYER_CONSTRAINT_VIOLATION,
+            },
+        ],
+    },
+    {
+        matches: (ruleId) =>
+            hasRuleOrFragment(ruleId, [RULE_IMPORT_CYCLE], [FRAGMENT_CYCLE, FRAGMENT_CIRCULAR]),
+        entries: [
+            {
+                dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+                deduction: DEDUCTION_CIRCULAR_DEPENDENCY,
+                rationale: ScoringRationales.CIRCULAR_DEPENDENCY,
+            },
+        ],
+    },
+    {
+        matches: () => true,
+        entries: [
+            {
+                dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
+                deduction: DEDUCTION_ARCHITECTURE_DESIGN_VIOLATION,
+                rationale: ScoringRationales.ARCHITECTURE_DESIGN_VIOLATION,
+            },
+        ],
+    },
+];
+
 type SecurityDeductionRuleHandler = (msg: string) => { deduction: number; rationale: string };
 
 const SECURITY_RULE_MAP: Record<string, SecurityDeductionRuleHandler> = {
@@ -174,6 +195,68 @@ const SECURITY_RULE_MAP: Record<string, SecurityDeductionRuleHandler> = {
     }),
 };
 
+const PERFORMANCE_FAMILY_RULES: readonly FamilyRuleSpec[] = [
+    {
+        matches: (ruleId) =>
+            hasRuleOrFragment(
+                ruleId,
+                [RULE_PRF_TRANSIENT_ALLOCATION],
+                [FRAGMENT_LOOP, FRAGMENT_ALLOC],
+            ),
+        entries: [
+            {
+                dimension: DIMENSION_PERFORMANCE_EFFICIENCY,
+                deduction: DEDUCTION_TRANSIENT_LOOP_ALLOCATION,
+                rationale: ScoringRationales.TRANSIENT_LOOP_ALLOCATION,
+            },
+        ],
+    },
+    {
+        matches: () => true,
+        entries: [
+            {
+                dimension: DIMENSION_PERFORMANCE_EFFICIENCY,
+                deduction: DEDUCTION_INEFFICIENT_ALGORITHM,
+                rationale: ScoringRationales.INEFFICIENT_ALGORITHM_PATH,
+            },
+        ],
+    },
+];
+
+function dispatchFamilyRules(
+    issue: Issue,
+    rules: readonly FamilyRuleSpec[],
+    apply: DeductionApplier,
+): void {
+    const line = issue.location?.start?.line;
+    const ruleId = issue.rule;
+    const msg = issue.message;
+    for (let i = 0; i < rules.length; i++) {
+        const spec = rules[i];
+        if (!spec.matches(ruleId, issue.analyzer)) {
+            continue;
+        }
+        for (let j = 0; j < spec.entries.length; j++) {
+            const entry = spec.entries[j];
+            apply(entry.dimension, entry.deduction, entry.rationale(msg), ruleId, line);
+        }
+        return;
+    }
+}
+
+/**
+ * Apply deductions for architecture consistency issues.
+ *
+ * @param issue - Analyzed issue finding.
+ * @param apply - Deduction callback function.
+ */
+export function applyArchitectureDeductions(issue: Issue, apply: DeductionApplier): void {
+    if (issue.analyzer !== ANALYZER_ARCHITECTURE && issue.analyzer !== ANALYZER_DEPENDENCY_GRAPH) {
+        return;
+    }
+    dispatchFamilyRules(issue, ARCHITECTURE_FAMILY_RULES, apply);
+}
+
 function resolveSecurityDeduction(
     analyzer: string | undefined,
     rule: string,
@@ -189,20 +272,14 @@ function resolveSecurityDeduction(
     }
     if (
         analyzer === ANALYZER_SECRETS ||
-        rule.includes(FRAGMENT_SECRET) ||
-        rule.includes(FRAGMENT_TOKEN) ||
-        rule.includes(FRAGMENT_KEY)
+        hasRuleOrFragment(rule, [], [FRAGMENT_SECRET, FRAGMENT_TOKEN, FRAGMENT_KEY])
     ) {
         return {
             deduction: DEDUCTION_HARDCODED_CREDENTIAL,
             rationale: ScoringRationales.HARDCODED_CREDENTIAL(msg),
         };
     }
-    if (
-        rule.includes(FRAGMENT_EVAL) ||
-        rule.includes(FRAGMENT_UNSAFE) ||
-        rule.includes(FRAGMENT_SANITIZATION)
-    ) {
+    if (hasRuleOrFragment(rule, [], [FRAGMENT_EVAL, FRAGMENT_UNSAFE, FRAGMENT_SANITIZATION])) {
         return {
             deduction: DEDUCTION_POTENTIAL_INJECTION,
             rationale: ScoringRationales.POTENTIAL_INJECTION_RISK(msg),
@@ -231,10 +308,6 @@ export function applySecurityDeductions(issue: Issue, apply: DeductionApplier): 
         issue.location?.start?.line,
     );
 }
-/**
- * Quality dimension id scored for performance-efficiency findings.
- */
-const DIMENSION_PERFORMANCE_EFFICIENCY = 'performanceEfficiency';
 
 /**
  * Apply deductions for performance efficiency issues.
@@ -244,32 +317,5 @@ const DIMENSION_PERFORMANCE_EFFICIENCY = 'performanceEfficiency';
  */
 export function applyPerformanceDeductions(issue: Issue, apply: DeductionApplier): void {
     if (issue.analyzer !== ANALYZER_PERFORMANCE) return;
-
-    const line = issue.location?.start?.line;
-    const ruleId = issue.rule;
-    const msg = issue.message;
-
-    if (
-        ruleId === RULE_PRF_TRANSIENT_ALLOCATION ||
-        ruleId.includes(FRAGMENT_LOOP) ||
-        ruleId.includes(FRAGMENT_ALLOC)
-    ) {
-        apply(
-            DIMENSION_PERFORMANCE_EFFICIENCY,
-            DEDUCTION_TRANSIENT_LOOP_ALLOCATION,
-            ScoringRationales.TRANSIENT_LOOP_ALLOCATION(msg),
-            ruleId,
-            line,
-        );
-    } else {
-        // Blocking-I/O and nested-loop findings both land here: the model has no dedicated I/O
-        // deduction, and an unlisted rule must still deduct rather than silently score 100.
-        apply(
-            DIMENSION_PERFORMANCE_EFFICIENCY,
-            DEDUCTION_INEFFICIENT_ALGORITHM,
-            ScoringRationales.INEFFICIENT_ALGORITHM_PATH(msg),
-            ruleId,
-            line,
-        );
-    }
+    dispatchFamilyRules(issue, PERFORMANCE_FAMILY_RULES, apply);
 }

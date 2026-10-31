@@ -39,7 +39,7 @@ import type { ChangeTrajectoryManager } from '../trajectory/changeTrajectory';
 import type { SymbolIndex } from '../intelligence/symbolIndex';
 import type { LiteralIndex } from '../intelligence/literalIndex';
 import { CallGraph } from '../intelligence/callGraph';
-import { summarizeUncertainty } from './uncertaintySummary';
+import { summarizeUncertainty } from './canonical-issue-builder';
 import { analyzerCoverage } from '../scanner/worker-scheduler';
 import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
 
@@ -173,10 +173,10 @@ function buildMemoryRecord(
     const codeDomains = extractCodeDomains(undefined, '', fileIssues);
     const revisionHash = sha256Hex(
         metric.file +
-            ':' +
-            (Number.isFinite(score.compositeScore) ? score.compositeScore : UNMEASURED_TOKEN) +
-            ':' +
-            lastAudited,
+        ':' +
+        (Number.isFinite(score.compositeScore) ? score.compositeScore : UNMEASURED_TOKEN) +
+        ':' +
+        lastAudited,
     );
     const revisionId = revisionHash.slice(0, REVISION_ID_LENGTH);
     const existingRecord = host.reviewMemory.getRecord(metric.file);
@@ -332,17 +332,17 @@ function resolveGovernanceProfile(cfg: ScanConfig): GovernanceProjectProfile {
         cfg.maturityTier === MATURITY_INDUSTRIAL
             ? STAGE_INDUSTRIAL_INFRA
             : cfg.maturityTier === MATURITY_DEMO || cfg.maturityTier === MATURITY_PROTOTYPE
-              ? STAGE_PROTOTYPE
-              : STAGE_PRODUCTION;
+                ? STAGE_PROTOTYPE
+                : STAGE_PRODUCTION;
 
     const scale: GovernanceProjectProfile['scale'] =
         cfg.scaleGrade === SCALE_ENTERPRISE
             ? SCALE_MASSIVE
             : cfg.scaleGrade === SCALE_GRADE_LARGE
-              ? SCALE_LARGE
-              : cfg.scaleGrade === SCALE_GRADE_MEDIUM
-                ? SCALE_MEDIUM
-                : SCALE_SMALL;
+                ? SCALE_LARGE
+                : cfg.scaleGrade === SCALE_GRADE_MEDIUM
+                    ? SCALE_MEDIUM
+                    : SCALE_SMALL;
 
     let domain: GovernanceProjectProfile['domain'] = DOMAIN_CORE_FRAMEWORK;
     if (cfg.archetype === ARCHETYPE_LIBRARY) domain = DOMAIN_ALGORITHM_LIB;

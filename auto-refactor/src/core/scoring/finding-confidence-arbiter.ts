@@ -93,7 +93,7 @@ export const DIRECTIVE_REFACTOR_IGNORE_RULE = 'refactor-ignore-rule';
 export const DIRECTIVE_REFACTOR_IGNORE = 'refactor-ignore';
 
 /** Pre-compiled regex for inline suppression directives. */
-const INLINE_DIRECTIVE_PATTERN =
+export const INLINE_DIRECTIVE_PATTERN =
     /(?:@refactor-suppress(?:-next-line)?|refactor-ignore-rule|refactor-ignore)\b(?:\s*[:(]?\s*([^*/\r\n]*))?/i;
 
 /** Pre-compiled regex for stripping comment syntax. */
@@ -638,25 +638,35 @@ type InlineSuppressionResult = {
     reason?: string;
 };
 
+function splitContentIfHasDirective(
+    content: string,
+    customDirectiveTokens?: string[],
+): string[] | undefined {
+    const hasCustom = Boolean(customDirectiveTokens && customDirectiveTokens.length > 0);
+    if (!hasCustom && !INLINE_DIRECTIVE_PATTERN.test(content)) {
+        return undefined;
+    }
+    return content.split('\n');
+}
+
 function resolveFileLines(
     fileContentOrLines?: string | string[],
     fileContentMap?: Map<string, string>,
     filePath?: string,
+    customDirectiveTokens?: string[],
 ): string[] | undefined {
     if (Array.isArray(fileContentOrLines)) {
         return fileContentOrLines;
     }
     if (typeof fileContentOrLines === 'string') {
-        return fileContentOrLines.split('\n');
+        return splitContentIfHasDirective(fileContentOrLines, customDirectiveTokens);
     }
-    if (fileContentMap && filePath) {
-        const normPath = normalizePath(filePath);
-        const content = fileContentMap.get(normPath) || fileContentMap.get(filePath);
-        if (content) {
-            return content.split('\n');
-        }
+    if (!fileContentMap || !filePath) {
+        return undefined;
     }
-    return undefined;
+    const normPath = normalizePath(filePath);
+    const content = fileContentMap.get(normPath) || fileContentMap.get(filePath);
+    return content ? splitContentIfHasDirective(content, customDirectiveTokens) : undefined;
 }
 
 function checkLineDirectiveAt(
@@ -772,6 +782,7 @@ export class FindingConfidenceArbiter {
             fileContentOrLines,
             this.fileContentMap,
             issue.location.file,
+            this.customDirectiveTokens,
         );
         if (!lines || lines.length === 0) {
             return { isSuppressed: false };

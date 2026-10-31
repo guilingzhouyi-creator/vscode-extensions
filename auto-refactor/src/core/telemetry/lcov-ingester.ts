@@ -569,3 +569,96 @@ export class LcovIngester {
         };
     }
 }
+
+const LCOV_SUMMARY_MULTIPLIER = 1000;
+const LCOV_SUMMARY_DIVISOR = 10;
+
+function trimLcovLineBounds(
+    lcovText: string,
+    pos: number,
+    nextNewline: number,
+): { start: number; end: number } {
+    let end =
+        nextNewline > pos && lcovText.charCodeAt(nextNewline - 1) === ASCII_CR
+            ? nextNewline - 1
+            : nextNewline;
+    let start = pos;
+    while (start < end && lcovText.charCodeAt(start) <= ASCII_SPACE) {
+        start++;
+    }
+    while (end > start && lcovText.charCodeAt(end - 1) <= ASCII_SPACE) {
+        end--;
+    }
+    return { start, end };
+}
+
+function roundCoveragePercentage(hit: number, found: number, fallbackPct: number): number {
+    if (found <= 0) {
+        return fallbackPct;
+    }
+    return Math.round((hit / found) * LCOV_SUMMARY_MULTIPLIER) / LCOV_SUMMARY_DIVISOR;
+}
+
+/**
+ * Aggregate overall line and branch coverage percentages from raw LCOV text
+ * using zero-allocation cursor scanning.
+ *
+ * @param lcovText - Raw LCOV format string.
+ * @returns Aggregated line and branch coverage percentages in [0, 100].
+ */
+export function aggregateLcovCoverageSummary(lcovText: string): {
+    lineCoveragePct: number;
+    branchCoveragePct: number;
+} {
+    if (!lcovText || typeof lcovText !== 'string') {
+        return { lineCoveragePct: 0.0, branchCoveragePct: 0.0 };
+    }
+
+    let totalLinesFound = 0;
+    let totalLinesHit = 0;
+    let totalBranchesFound = 0;
+    let totalBranchesHit = 0;
+    const scratchState: LcovParserState = {
+        currentPath: null,
+        linesFound: 0,
+        linesHit: 0,
+        branchesFound: 0,
+        branchesHit: 0,
+        lineHits: new Map<number, number>(),
+    };
+
+    let pos = 0;
+    const textLen = lcovText.length;
+    while (pos < textLen) {
+        const nextNewline = findNextLineBreak(lcovText, pos, textLen);
+        const { start, end } = trimLcovLineBounds(lcovText, pos, nextNewline);
+        pos = nextNewline + 1;
+        if (start >= end) {
+            continue;
+        }
+
+        const firstChar = lcovText.charCodeAt(start);
+        if (firstChar === ASCII_UPPER_L) {
+            scratchState.linesFound = 0;
+            scratchState.linesHit = 0;
+            handleLineRecord(lcovText, start, end, scratchState);
+            totalLinesFound += scratchState.linesFound;
+            totalLinesHit += scratchState.linesHit;
+        } else if (firstChar === ASCII_UPPER_B) {
+            scratchState.branchesFound = 0;
+            scratchState.branchesHit = 0;
+            handleBranchRecord(lcovText, start, end, scratchState);
+            totalBranchesFound += scratchState.branchesFound;
+            totalBranchesHit += scratchState.branchesHit;
+        }
+    }
+
+    const lineCoveragePct = roundCoveragePercentage(totalLinesHit, totalLinesFound, 0);
+    const branchCoveragePct = roundCoveragePercentage(
+        totalBranchesHit,
+        totalBranchesFound,
+        lineCoveragePct,
+    );
+
+    return { lineCoveragePct, branchCoveragePct };
+}

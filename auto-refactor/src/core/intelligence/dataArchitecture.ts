@@ -14,8 +14,35 @@
  *   database dependencies; issues include full evidence chains and risk assessments.
  */
 
-export { isOfflineOrMigrationContext } from './dataAccessContext';
 export * from './data-architecture-sites';
+
+/** Fragments whose presence in a path or symbol marks an offline or migration context. */
+export const OFFLINE_CONTEXT_HINTS: ReadonlySet<string> = new Set([
+    'migration',
+    'seed',
+    'fixture',
+    'batch',
+    'job',
+    'task',
+    'cron',
+    'cli',
+    'script',
+    'tool',
+]);
+
+/** Precompiled case-insensitive regex for single-pass context matching. */
+const OFFLINE_CONTEXT_PATTERN = new RegExp([...OFFLINE_CONTEXT_HINTS].join('|'), 'i');
+
+/**
+ * Identify whether a file or function belongs to an offline, migration, or admin task.
+ *
+ * @param filePath - Repository-relative file path.
+ * @param symbol - Function or class symbol name.
+ * @returns True when the context is an offline or migration job.
+ */
+export function isOfflineOrMigrationContext(filePath: string, symbol: string): boolean {
+    return OFFLINE_CONTEXT_PATTERN.test(filePath) || OFFLINE_CONTEXT_PATTERN.test(symbol);
+}
 
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
 import { isToolOrTestScript } from '../governance/pathScope';

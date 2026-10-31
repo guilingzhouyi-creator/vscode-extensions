@@ -22,6 +22,7 @@ import type { ScanReport } from '../types';
 import type { PraxisPresentationOptions } from '../praxis/presentation/presentation-types';
 import { toAasJson, type AasReportOptions } from '../reporting/aas-reporter';
 import { createAuditReceipt, serializeAuditReceipt } from '../reporting/audit-receipt';
+import { toJson, toSarif } from '../reporters';
 import {
     toAgentReview,
     toCapp,
@@ -267,7 +268,7 @@ function renderMarkdownIssuesSection(issues: ScanReport['issues']): string[] {
 registerReporter({
     name: 'json',
     format(report: ScanReport, options?: { pretty?: boolean }): string {
-        return JSON.stringify(report, null, options?.pretty !== false ? 2 : 0);
+        return options?.pretty === false ? JSON.stringify(report) : toJson(report);
     },
 });
 
@@ -298,46 +299,7 @@ registerReporter({
 registerReporter({
     name: 'sarif',
     format(report: ScanReport): string {
-        const sarif = {
-            $schema:
-                'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json',
-            version: '2.1.0',
-            runs: [
-                {
-                    tool: {
-                        driver: {
-                            name: report.tool,
-                            version: report.version,
-                            rules: Array.from(
-                                new Set(report.issues.map((issue) => issue.rule)),
-                            ).map((ruleId) => ({ id: ruleId })),
-                        },
-                    },
-                    results: report.issues.map((issue) => ({
-                        ruleId: issue.rule,
-                        level:
-                            issue.severity === 'error'
-                                ? 'error'
-                                : issue.severity === 'warning'
-                                  ? 'warning'
-                                  : 'note',
-                        message: { text: issue.message },
-                        locations: [
-                            {
-                                physicalLocation: {
-                                    artifactLocation: { uri: issue.location.file },
-                                    region: {
-                                        startLine: issue.location.start.line,
-                                        startColumn: issue.location.start.column || 1,
-                                    },
-                                },
-                            },
-                        ],
-                    })),
-                },
-            ],
-        };
-        return JSON.stringify(sarif, null, 2);
+        return toSarif(report);
     },
 });
 
@@ -357,8 +319,8 @@ registerReporter({
             score >= BADGE_GREEN_MIN_SCORE
                 ? '#4c1'
                 : score >= BADGE_YELLOW_MIN_SCORE
-                  ? '#dfb317'
-                  : '#e05d44';
+                    ? '#dfb317'
+                    : '#e05d44';
         return `<svg xmlns="http://www.w3.org/2000/svg" width="110" height="20">
   <linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
   <mask id="a"><rect width="110" height="20" rx="3" fill="#fff"/></mask>

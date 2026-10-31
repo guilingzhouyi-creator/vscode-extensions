@@ -165,7 +165,7 @@ export function computeWeightedDebtPoints(
             counts.high * weights.high +
             counts.medium * weights.medium +
             counts.low * weights.low) *
-            100,
+        100,
     ) / 100;
 }
 
@@ -319,9 +319,9 @@ export function evaluateElasticDebtBudget(
         options.cumulative && options.totalFiles
             ? Math.max(DEFAULT_WEIGHTED_GROWTH_LIMIT, options.totalFiles * 10)
             : Math.max(
-                  DEFAULT_WEIGHTED_GROWTH_LIMIT,
-                  Math.floor(DEFAULT_WEIGHTED_GROWTH_LIMIT * combinedFactor),
-              );
+                DEFAULT_WEIGHTED_GROWTH_LIMIT,
+                Math.floor(DEFAULT_WEIGHTED_GROWTH_LIMIT * combinedFactor),
+            );
     const maxGrowthLimit = options.maxWeightedGrowth ?? defaultGrowthLimit;
 
     const violations = collectViolations(
@@ -355,5 +355,372 @@ export function evaluateElasticDebtBudget(
         healthElasticityFactor: healthFactor,
         rationale,
         violations,
+    };
+}
+
+const CRITICAL_RULE_RE = /^(?:ARCH-|clean-layer-violation$|expensive-loop-operation$)/;
+const HIGH_RULE_RE = /^(?:high-complexity$|CPX-|PRF-|DAT-|TST-TAU|GOV-GAM)/;
+const MEDIUM_RULE_RE = /^(?:large-file$|BIG-|SIM-|duplicate-literal$|GOV-LOG)/;
+const CODE_EXTENSIONS = new Set(['.ts', '.tsx', '.rs', '.go', '.gd', '.py']);
+const DOC_EXTENSIONS = new Set(['.json', '.md', '.yaml', '.yml', '.txt']);
+const LINE_SHIFT_TOLERANCE = 10;
+
+/** Minimal issue shape accepted by debt tiering and ledger builders. */
+export interface DebtIssueLike {
+    readonly id?: string;
+    readonly rule?: string;
+    readonly severity?: string;
+    readonly message?: string;
+    readonly file?: string;
+    readonly line?: number;
+    readonly location?: {
+        readonly file?: string;
+        readonly start?: { readonly line?: number };
+    };
+}
+
+/** Partitioned technical debt ledger entry. */
+export interface DebtLedgerEntry {
+    readonly id?: string;
+    readonly rule?: string;
+    readonly tier: ElasticDebtTier;
+    readonly severity?: string;
+    readonly file: string;
+    readonly line: number;
+    readonly message?: string;
+}
+
+/** Result of partitioning scan issues into debt tiers and per-file groups. */
+export interface DebtLedgerResult<T extends DebtIssueLike = DebtIssueLike> {
+    readonly debtByTier: DebtTierCounts;
+    readonly criticalItems: DebtLedgerEntry[];
+    readonly highItems: DebtLedgerEntry[];
+    readonly fileIssuesMap: Map<string, T[]>;
+}
+
+/**
+ * Classifies an issue finding into technical debt tiers (critical, high, medium, low).
+ */
+export function classifyElasticDebtTier(issue: DebtIssueLike): ElasticDebtTier {
+    const rule = issue.rule || '';
+    const sev = issue.severity || 'warning';
+    if (sev === 'error' || CRITICAL_RULE_RE.test(rule)) {
+        return 'critical';
+    }
+    if (rule === 'CPX-TRV-001') {
+        return 'medium';
+    }
+    if (HIGH_RULE_RE.test(rule)) {
+        return 'high';
+    }
+    if (sev === 'info') {
+        return 'low';
+    }
+    return MEDIUM_RULE_RE.test(rule) ? 'medium' : 'low';
+}
+
+/**
+ * Partitions issues into technical debt tiers and groups them by file path.
+ */
+export function buildDebtLedger<T extends DebtIssueLike>(
+    issues: readonly T[],
+): DebtLedgerResult<T> {
+    const debtByTier: DebtTierCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+    const criticalItems: DebtLedgerEntry[] = [];
+    const highItems: DebtLedgerEntry[] = [];
+    const fileIssuesMap = new Map<string, T[]>();
+
+    for (const issue of issues) {
+        const tier = classifyElasticDebtTier(issue);
+        debtByTier[tier]++;
+        const filePath = issue.location?.file || issue.file || 'unknown';
+        let fileList = fileIssuesMap.get(filePath);
+        if (!fileList) {
+            fileList = [];
+            fileIssuesMap.set(filePath, fileList);
+        }
+        fileList.push(issue);
+
+        if (tier === 'critical' || tier === 'high') {
+            const entry: DebtLedgerEntry = {
+                id: issue.id,
+                rule: issue.rule,
+                tier,
+                severity: issue.severity,
+                file: filePath,
+                line: issue.location?.start?.line || issue.line || 1,
+                message: issue.message,
+            };
+            if (tier === 'critical') criticalItems.push(entry);
+            else highItems.push(entry);
+        }
+    }
+
+    return { debtByTier, criticalItems, highItems, fileIssuesMap };
+}
+
+function normalizeRepoRelativeDebtPath(rawPath: string | undefined): string {
+    if (!rawPath) return '';
+    let norm = rawPath.replace(/\\/g, '/');
+    const repoIdx = norm.indexOf('auto-refactor/');
+    if (repoIdx !== -1) {
+        norm = norm.slice(repoIdx + 'auto-refactor/'.length);
+    } else if (norm.startsWith('./')) {
+        norm = norm.slice(2);
+    }
+    return norm;
+}
+
+function extractIssueSignatureDesc(issue: DebtIssueLike): {
+    rule: string;
+    normFile: string;
+    line: number;
+    tier: ElasticDebtTier;
+} {
+    const rawFile = issue.location ? issue.location.file : issue.file;
+    const normFile = normalizeRepoRelativeDebtPath(rawFile);
+    const rule = issue.rule || 'UNKNOWN';
+    const rawLine = issue.location?.start ? issue.location.start.line : issue.line;
+    const line = typeof rawLine === 'number' ? rawLine : 1;
+    return { rule, normFile, line, tier: classifyElasticDebtTier(issue) };
+}
+
+/**
+ * Serializes current issues into a compact per-file defect signature map.
+ */
+export function serializeBaselineSignatures(
+    issues: readonly DebtIssueLike[],
+): Record<string, Array<{ r: string; l: number; t: ElasticDebtTier }>> {
+    const files: Record<string, Array<{ r: string; l: number; t: ElasticDebtTier }>> = {};
+    for (const issue of issues) {
+        const desc = extractIssueSignatureDesc(issue);
+        if (!desc.normFile) continue;
+        let list = files[desc.normFile];
+        if (!list) {
+            list = [];
+            files[desc.normFile] = list;
+        }
+        list.push({ r: desc.rule, l: desc.line, t: desc.tier });
+    }
+    return files;
+}
+
+interface PreviousDefectCandidate {
+    rule: string;
+    line: number;
+    tier: ElasticDebtTier;
+    matched: boolean;
+}
+
+function calculateDiscreteTierWeight(tier: ElasticDebtTier): number {
+    if (tier === 'critical') return DEFAULT_TIER_WEIGHTS.critical;
+    if (tier === 'high') return DEFAULT_TIER_WEIGHTS.high;
+    if (tier === 'medium') return DEFAULT_TIER_WEIGHTS.medium;
+    return 0;
+}
+
+function matchPreviousDefectCandidate(
+    candidates: PreviousDefectCandidate[] | undefined,
+    line: number,
+): boolean {
+    if (!candidates || candidates.length === 0) return false;
+    for (const cand of candidates) {
+        if (!cand.matched && Math.abs(cand.line - line) <= LINE_SHIFT_TOLERANCE) {
+            cand.matched = true;
+            return true;
+        }
+    }
+    for (const cand of candidates) {
+        if (!cand.matched) {
+            cand.matched = true;
+            return true;
+        }
+    }
+    return false;
+}
+
+const VALID_ELASTIC_TIERS = new Set<string>(['critical', 'high', 'medium', 'low']);
+
+function resolveStringProp(
+    raw: Record<string, unknown>,
+    keys: readonly [string, string],
+    defaultVal: string,
+): string {
+    const val = raw[keys[0]] ?? raw[keys[1]];
+    return val !== undefined && val !== null ? String(val) : defaultVal;
+}
+
+function parseDefectRecord(raw: Record<string, unknown>): PreviousDefectCandidate {
+    const rule = resolveStringProp(raw, ['r', 'rule'], 'UNKNOWN');
+    const rawLine = raw.l ?? raw.line;
+    const line = typeof rawLine === 'number' ? rawLine : 1;
+    const rawTier = resolveStringProp(raw, ['t', 'tier'], '');
+    const tier: ElasticDebtTier = VALID_ELASTIC_TIERS.has(rawTier)
+        ? (rawTier as ElasticDebtTier)
+        : classifyElasticDebtTier({
+            rule,
+            severity: resolveStringProp(raw, ['sev', 'severity'], rawTier || 'warning'),
+        });
+    return { rule, line, tier, matched: false };
+}
+
+function buildPreviousDefectsLookup(
+    filesMap: Record<string, unknown> | null | undefined,
+): Map<string, PreviousDefectCandidate[]> {
+    const prevSignatures = new Map<string, PreviousDefectCandidate[]>();
+    if (!filesMap || typeof filesMap !== 'object') return prevSignatures;
+
+    for (const [fileRel, defectList] of Object.entries(filesMap)) {
+        if (!Array.isArray(defectList)) continue;
+        const normFile = normalizeRepoRelativeDebtPath(fileRel);
+        for (const defect of defectList) {
+            if (!defect || typeof defect !== 'object') continue;
+            const entry = parseDefectRecord(defect as Record<string, unknown>);
+            const key = `${entry.rule}#${normFile}`;
+            let group = prevSignatures.get(key);
+            if (!group) {
+                group = [];
+                prevSignatures.set(key, group);
+            }
+            group.push(entry);
+        }
+    }
+    return prevSignatures;
+}
+
+function computeDiscreteDebtPoints(byDebtTier: Partial<DebtTierCounts> | null | undefined): number {
+    if (!byDebtTier) return 0;
+    return (
+        (byDebtTier.critical || 0) * DEFAULT_TIER_WEIGHTS.critical +
+        (byDebtTier.high || 0) * DEFAULT_TIER_WEIGHTS.high +
+        (byDebtTier.medium || 0) * DEFAULT_TIER_WEIGHTS.medium
+    );
+}
+
+/** Input options for computing structural debt delta across runs. */
+export interface StructuralDebtDeltaInput {
+    readonly prevFilesMap?: Record<string, unknown> | null;
+    readonly currentIssues: readonly DebtIssueLike[];
+    readonly currentDebtByTier?: Partial<DebtTierCounts> | null;
+    readonly prevBaseline?: {
+        readonly metrics?: { readonly byDebtTier?: Partial<DebtTierCounts> };
+    } | null;
+}
+
+function sumUnmatchedPreviousCandidates(
+    prevSignatures: Map<string, PreviousDefectCandidate[]>,
+): number {
+    let resolvedDebtPoints = 0;
+    for (const candidates of prevSignatures.values()) {
+        for (const cand of candidates) {
+            if (!cand.matched) {
+                resolvedDebtPoints += calculateDiscreteTierWeight(cand.tier);
+            }
+        }
+    }
+    return resolvedDebtPoints;
+}
+
+/**
+ * Computes structural added/resolved debt points and regression count with +/-10 line tolerance.
+ */
+export function calculateStructuralDebtDelta(input: StructuralDebtDeltaInput): {
+    addedDebtPoints: number;
+    resolvedDebtPoints: number;
+    regressionFindingsCount: number;
+} {
+    if (!input.prevBaseline && !input.prevFilesMap) {
+        return { addedDebtPoints: 0, resolvedDebtPoints: 0, regressionFindingsCount: 0 };
+    }
+    if (!input.prevFilesMap) {
+        const currPts = computeDiscreteDebtPoints(input.currentDebtByTier);
+        const prevTier = input.prevBaseline?.metrics?.byDebtTier;
+        const prevPts = prevTier ? computeDiscreteDebtPoints(prevTier) : currPts;
+        return {
+            addedDebtPoints: Math.max(0, currPts - prevPts),
+            resolvedDebtPoints: Math.max(0, prevPts - currPts),
+            regressionFindingsCount: 0,
+        };
+    }
+
+    const prevSignatures = buildPreviousDefectsLookup(input.prevFilesMap);
+    let addedDebtPoints = 0;
+    let regressionFindingsCount = 0;
+    for (const issue of input.currentIssues) {
+        const desc = extractIssueSignatureDesc(issue);
+        const key = `${desc.rule}#${desc.normFile}`;
+        if (!matchPreviousDefectCandidate(prevSignatures.get(key), desc.line)) {
+            addedDebtPoints += calculateDiscreteTierWeight(desc.tier);
+            if (desc.tier === 'critical' || desc.tier === 'high') {
+                regressionFindingsCount++;
+            }
+        }
+    }
+
+    return {
+        addedDebtPoints,
+        resolvedDebtPoints: sumUnmatchedPreviousCandidates(prevSignatures),
+        regressionFindingsCount,
+    };
+}
+
+function resolveFileSemanticWeight(filePath: string): number {
+    const norm = (filePath || '').replace(/\\/g, '/').toLowerCase();
+    if (norm.includes('test') || norm.endsWith('.test.ts')) return 0.7;
+    const dot = norm.lastIndexOf('.');
+    const ext = dot !== -1 ? norm.slice(dot) : '';
+    if (CODE_EXTENSIONS.has(ext)) return 0.85;
+    if (DOC_EXTENSIONS.has(ext)) return 0.3;
+    return 0.75;
+}
+
+function shouldIncludeInElocDiff(filePath: string): boolean {
+    const norm = normalizeRepoRelativeDebtPath(filePath).toLowerCase();
+    if (!norm) return false;
+    return !(
+        norm.startsWith('reports/') ||
+        norm.startsWith('.refactor-trajectory/') ||
+        norm.startsWith('dist/') ||
+        norm.startsWith('node_modules/')
+    );
+}
+
+/**
+ * Estimates physical and semantic changed ELOC from `git diff --numstat` output.
+ */
+export function estimateChangedElocFromNumstat(numstatRaw: string | undefined):
+    | {
+        changed: number;
+        semantic: number;
+        added: number;
+        deleted: number;
+        modified: number;
+    }
+    | undefined {
+    if (!numstatRaw || !numstatRaw.trim()) return undefined;
+    let realAdded = 0;
+    let realDeleted = 0;
+    let changed = 0;
+    let weightedSemantic = 0;
+    for (const line of numstatRaw.trim().split('\n')) {
+        const parts = line.split('\t');
+        if (parts.length < 3) continue;
+        const add = parseInt(parts[0], 10) || 0;
+        const del = parseInt(parts[1], 10) || 0;
+        const lineTotal = add + del;
+        const file = parts[2] || '';
+        if (lineTotal === 0 || !shouldIncludeInElocDiff(file)) continue;
+        realAdded += add;
+        realDeleted += del;
+        changed += lineTotal;
+        weightedSemantic += lineTotal * resolveFileSemanticWeight(file);
+    }
+    if (changed === 0) return undefined;
+    return {
+        changed,
+        semantic: Math.max(1, Math.round(weightedSemantic)),
+        added: realAdded,
+        deleted: realDeleted,
+        modified: Math.min(realAdded, realDeleted),
     };
 }

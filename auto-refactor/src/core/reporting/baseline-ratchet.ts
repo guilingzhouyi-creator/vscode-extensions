@@ -27,7 +27,101 @@ import {
     type BaselinePayload,
     type BaselineSnapshot,
 } from './baselineManager';
-import { tryReadExistingBaseline, readBaselineFile } from './baseline-io';
+
+/** Minimum component count in a grouped baseline key: analyzer|rule|filePath. */
+const MIN_GROUP_KEY_PARTS = 3;
+
+/** Group key delimiter token. */
+const GROUP_KEY_SEPARATOR = '|';
+
+/** Forward slash replacement token. */
+const FORWARD_SLASH = '/';
+
+/** Typeof 'object' string comparison token. */
+const TYPEOF_OBJECT = 'object';
+
+/** Error object code property name token. */
+const PROPERTY_CODE = 'code';
+
+/** File not found error code for asynchronous baseline reading. */
+const ERROR_CODE_ENOENT = 'ENOENT';
+
+/**
+ * Type guard for ENOENT filesystem errors.
+ */
+export function isEnoentError(error: unknown): boolean {
+    if (!error || typeof error !== TYPEOF_OBJECT) {
+        return false;
+    }
+    return (error as Record<string, unknown>)[PROPERTY_CODE] === ERROR_CODE_ENOENT;
+}
+
+/**
+ * Log read errors unless the file is cleanly absent.
+ */
+export function logBaselineReadError(err: unknown, logger: Logger): void {
+    if (isEnoentError(err)) return;
+    logger.warn(`Failed to read baseline file: ${err}`);
+}
+
+/**
+ * Read baseline file asynchronously, ignoring missing files.
+ */
+export function readBaselineFile(baselinePath: string, logger: Logger): Promise<string | null> {
+    return fs.promises.readFile(baselinePath, 'utf8').catch((err: unknown) => {
+        logBaselineReadError(err, logger);
+        return null;
+    });
+}
+
+/**
+ * Asynchronously read and parse existing baseline if available.
+ */
+export async function tryReadExistingBaseline(filePath: string): Promise<BaselinePayload | null> {
+    try {
+        const raw = await fs.promises.readFile(filePath, 'utf8');
+        return JSON.parse(raw) as BaselinePayload;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Remap a grouped baseline key if its file portion matches a path remap dictionary.
+ * Group key format: `${analyzer}|${rule}|${filePath}`.
+ */
+export function remapGroupKey(key: string, pathRemap?: Record<string, string>): string {
+    if (!pathRemap) return key;
+    const parts = key.split(GROUP_KEY_SEPARATOR);
+    if (parts.length < MIN_GROUP_KEY_PARTS) return key;
+    const filePath = parts.slice(2).join(GROUP_KEY_SEPARATOR);
+    const normalizedKey = filePath.replace(/\\/g, FORWARD_SLASH);
+    const target = pathRemap[filePath] ?? pathRemap[normalizedKey];
+    if (target) {
+        return `${parts[0]}|${parts[1]}|${target.replace(/\\/g, FORWARD_SLASH)}`;
+    }
+    return key;
+}
+
+/**
+ * Normalizes existing baseline groups with path remapping for refactoring migrations (GOV-RTC-002).
+ */
+export function normalizeGroupsForRename(
+    groups: GroupedBaselineRow[],
+    pathRemap?: Record<string, string>,
+): GroupedBaselineRow[] {
+    if (!pathRemap || Object.keys(pathRemap).length === 0) return groups;
+    return groups.map((group) => {
+        const remappedKey = remapGroupKey(group.key, pathRemap);
+        if (remappedKey !== group.key) {
+            return {
+                ...group,
+                key: remappedKey,
+            };
+        }
+        return group;
+    });
+}
 
 /**
  * Canonical rule identifier for baseline refactoring rename path normalization (GOV-RTC-002).
@@ -58,10 +152,6 @@ export interface BaselineUpdateOptions {
      */
     pathRemap?: Record<string, string>;
 }
-
-import { remapGroupKey, normalizeGroupsForRename } from './baseline-rename-normalizer';
-
-export { remapGroupKey, normalizeGroupsForRename };
 
 /**
  * Mutating state container used while comparing baseline groups.
@@ -215,12 +305,12 @@ function resolveGroupsForUpdate(
         if (result.expandedKeys.length > 0) {
             logger.warn(
                 `Baseline update rejected ${result.expandedKeys.length} expansion(s) ` +
-                    `under ratchet-down policy. New debt must be fixed or suppressed.`,
+                `under ratchet-down policy. New debt must be fixed or suppressed.`,
             );
         }
         logger.info(
             `baseline ratchet-down: pruned=${result.prunedKeys.length} ` +
-                `decreasedCount=${result.decreasedCount} totalGroups=${result.groups.length}`,
+            `decreasedCount=${result.decreasedCount} totalGroups=${result.groups.length}`,
         );
         return result.groups;
     }
@@ -330,7 +420,7 @@ function applyBaselinePayload(
     const legacyNotice = snapshot.severityAware ? '' : LEGACY_ESCALATION_NOTICE;
     logger.info(
         `baseline ratchet(${baselineData.granularity ?? 'id'}): accepted=${accepted} ` +
-            `newIssues=${newIssues.length}${legacyNotice}`,
+        `newIssues=${newIssues.length}${legacyNotice}`,
     );
 }
 

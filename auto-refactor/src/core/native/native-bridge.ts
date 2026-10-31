@@ -1232,3 +1232,28 @@ export const nativeBitParallelMyersDistance = (pattern: Uint32Array, text: Uint3
  */
 export const nativeSimHash64 = (tokens: readonly string[]): string =>
     nativeCore.computeSimHash64(tokens);
+
+/**
+ * Masks source code comments and literals into a single compact joined string.
+ *
+ * @param content - Target source code content.
+ * @param config - Lexical masking configuration.
+ * @returns Masked single-string payload.
+ */
+export const nativeMaskSourceCodeCompact = (content: string, config: NativeMaskConfig): string =>
+    !content ? '' : nativeCore.maskSourceCodeCompact(content, config);
+
+/**
+ * Analyzes variable scope bindings for shadowing across nested lexical scopes.
+ *
+ * @param scopes - Array of lexical scope descriptors.
+ * @param bindings - Array of variable binding descriptors.
+ * @returns Detected shadowing pairs.
+ */
+export const nativeAnalyzeScopeShadowing = (
+    scopes: readonly NativeScopeInput[],
+    bindings: readonly NativeBindingInput[],
+): NativeShadowingResult[] =>
+    !scopes || !bindings || scopes.length === 0 || bindings.length === 0
+        ? []
+        : nativeCore.analyzeScopeShadowing(scopes, bindings);

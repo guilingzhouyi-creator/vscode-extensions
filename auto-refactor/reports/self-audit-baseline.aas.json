@@ -2,82 +2,82 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-10-30T10:32:31.270Z",
+  "timestamp": "2026-10-31T02:33:50.487Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.17,
+    "score": 99.14,
     "grade": "A+",
-    "cai": 87.98,
+    "cai": 88.03,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
-      "averageTspr": 0.917,
-      "averagePor": 0.083,
-      "averageColumnDensity": 0.864,
-      "averageSpatialDensity": 0.446,
-      "averageMahalanobisDistance": 4.591,
-      "averageFisherSimplexDistance": 0.097
+      "averageTspr": 0.918,
+      "averagePor": 0.082,
+      "averageColumnDensity": 0.867,
+      "averageSpatialDensity": 0.45,
+      "averageMahalanobisDistance": 4.539,
+      "averageFisherSimplexDistance": 0.093
     },
     "sqale": {
-      "tdr": 0.0041,
-      "remediationMinutes": 30018,
+      "tdr": 0.0042,
+      "remediationMinutes": 30707,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.43,
-      "meanScore": 96.43,
+      "index": 96.36,
+      "meanScore": 96.36,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "counts": {
-      "files": 820,
-      "total": 4370,
+      "files": 806,
+      "total": 4454,
       "errors": 0,
-      "warns": 3710,
-      "info": 660,
-      "suppressed": 162
+      "warns": 3779,
+      "info": 675,
+      "suppressed": 161
     }
   },
   "usability": {
-    "proven": 56,
-    "patchable": 1831,
-    "advisory": 2483,
-    "uncalibrated": 4152,
+    "proven": 50,
+    "patchable": 1897,
+    "advisory": 2507,
+    "uncalibrated": 4243,
     "needsHuman": 6
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 97.9,
-    "semanticPurity": 98.29,
-    "codeSecurity": 99.79,
-    "performanceEfficiency": 99.52,
-    "standardization": 83.7,
-    "modernity": 97.98,
-    "maintainability": 92.84,
-    "commentQuality": 99.33,
-    "duplication": 94.91,
+    "architectureConsistency": 97.88,
+    "semanticPurity": 98.18,
+    "codeSecurity": 99.78,
+    "performanceEfficiency": 99.57,
+    "standardization": 83.67,
+    "modernity": 97.74,
+    "maintainability": 92.81,
+    "commentQuality": 99.3,
+    "duplication": 94.75,
     "techDebtRisk": 100
   },
   "bottlenecks": [
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 4380,
-      "count": 438
+      "loss": 4300,
+      "count": 430
     },
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3310,
-      "count": 230
+      "loss": 3330,
+      "count": 232
     },
     {
       "rule": "metric",
       "dim": "architectureConsistency",
-      "loss": 2470,
-      "count": 247
+      "loss": 2520,
+      "count": 252
     },
     {
       "rule": "NAM-DEC-001",
@@ -88,26 +88,26 @@
     {
       "rule": "SIM-TRN-001",
       "dim": "standardization",
-      "loss": 2300,
-      "count": 230
+      "loss": 2360,
+      "count": 236
     },
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2195,
-      "count": 439
+      "loss": 2190,
+      "count": 438
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2120,
-      "count": 212
+      "loss": 2130,
+      "count": 213
     },
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 2019,
-      "count": 673
+      "loss": 2115,
+      "count": 705
     }
   ],
   "topology": {
@@ -142,6 +142,7 @@
       "src/analyzers/hygiene-file-helper.ts",
       "src/analyzers/hygiene.ts",
       "src/analyzers/large-file.ts",
+      "src/analyzers/naming-path-helper.ts",
       "src/analyzers/naming-python-helper.ts",
       "src/analyzers/performance-helpers.ts",
       "src/analyzers/rust-modern.ts",
@@ -176,9 +177,7 @@
       "src/core/ast/swar.ts",
       "src/core/ast/traverse.ts",
       "src/core/ast/ts-predicates.ts",
-      "src/core/ast/ts-projector.ts",
-      "src/core/ast/typescript-adapter.ts",
-      "src/core/ast/utf8.ts"
+      "src/core/ast/ts-projector.ts"
     ]
   },
   "files": {
@@ -539,17 +538,6 @@
     "src/core/reporters/reporterRegistry.ts": [
       {
         "line": 1,
-        "rule": "large-file",
-        "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 421 >= warn threshold 400; functions 22 >= warn threshold 20)",
-        "fix": {
-          "action": "split_file",
-          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
-        },
-        "tier": "T3"
-      },
-      {
-        "line": 1,
         "rule": "NAM-FIL-001",
         "sev": "WARN",
         "msg": "File name 'reporterRegistry.ts' violates strict kebab-case naming convention for TypeScript/JavaScript",
@@ -560,7 +548,7 @@
         "tier": "T1"
       },
       {
-        "line": 93,
+        "line": 94,
         "col": 10,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
@@ -572,7 +560,7 @@
         "tier": "T1"
       },
       {
-        "line": 149,
+        "line": 150,
         "col": 11,
         "rule": "NAM-VAG-001",
         "sev": "WARN",
@@ -584,7 +572,7 @@
         "tier": "T3"
       },
       {
-        "line": 168,
+        "line": 169,
         "col": 10,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
@@ -596,32 +584,8 @@
         "tier": "T1"
       },
       {
-        "line": 174,
-        "col": 72,
-        "rule": "GOV-TYP-003",
-        "sev": "WARN",
-        "msg": "Avoid naked `any` type annotations; prefer `unknown` or specific union types",
-        "fix": {
-          "action": "refactor",
-          "template": "Replace with a strongly-typed interface, generic parameter, or `unknown`."
-        },
-        "tier": "T3"
-      },
-      {
-        "line": 174,
-        "rule": "TSM-ANY-001",
-        "sev": "WARN",
-        "msg": "Explicit `any` disables checking for every value it touches",
-        "fix": {
-          "action": "replace_token",
-          "template": "unknown",
-          "safeToAutomate": false
-        },
-        "tier": "T2"
-      },
-      {
         "line": 175,
-        "col": 65,
+        "col": 72,
         "rule": "GOV-TYP-003",
         "sev": "WARN",
         "msg": "Avoid naked `any` type annotations; prefer `unknown` or specific union types",
@@ -645,6 +609,30 @@
       },
       {
         "line": 176,
+        "col": 65,
+        "rule": "GOV-TYP-003",
+        "sev": "WARN",
+        "msg": "Avoid naked `any` type annotations; prefer `unknown` or specific union types",
+        "fix": {
+          "action": "refactor",
+          "template": "Replace with a strongly-typed interface, generic parameter, or `unknown`."
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 176,
+        "rule": "TSM-ANY-001",
+        "sev": "WARN",
+        "msg": "Explicit `any` disables checking for every value it touches",
+        "fix": {
+          "action": "replace_token",
+          "template": "unknown",
+          "safeToAutomate": false
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 177,
         "col": 47,
         "rule": "NUM-PREC-001",
         "sev": "WARN",
@@ -658,7 +646,7 @@
         "tier": "T2"
       },
       {
-        "line": 177,
+        "line": 178,
         "col": 68,
         "rule": "GOV-TYP-003",
         "sev": "WARN",
@@ -670,7 +658,7 @@
         "tier": "T3"
       },
       {
-        "line": 177,
+        "line": 178,
         "rule": "TSM-ANY-001",
         "sev": "WARN",
         "msg": "Explicit `any` disables checking for every value it touches",
@@ -682,7 +670,7 @@
         "tier": "T2"
       },
       {
-        "line": 189,
+        "line": 190,
         "col": 11,
         "rule": "NAM-VAG-001",
         "sev": "WARN",
@@ -694,7 +682,7 @@
         "tier": "T3"
       },
       {
-        "line": 198,
+        "line": 199,
         "col": 10,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
@@ -706,7 +694,7 @@
         "tier": "T1"
       },
       {
-        "line": 224,
+        "line": 225,
         "col": 26,
         "rule": "NUM-PREC-001",
         "sev": "WARN",
@@ -720,7 +708,7 @@
         "tier": "T2"
       },
       {
-        "line": 245,
+        "line": 246,
         "col": 10,
         "rule": "NAM-DEC-001",
         "sev": "WARN",
@@ -732,7 +720,7 @@
         "tier": "T1"
       },
       {
-        "line": 362,
+        "line": 324,
         "rule": "HYG-STB-002",
         "sev": "WARN",
         "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'w3'",
@@ -743,7 +731,7 @@
         "tier": "T3"
       },
       {
-        "line": 363,
+        "line": 325,
         "rule": "HYG-DED-001",
         "sev": "WARN",
         "msg": "Dead code detected: Statement is unreachable following a terminal control flow statement (return/throw/break/continue)",
@@ -955,7 +943,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 1015 >= warn threshold 400)",
+        "msg": "File is large; consider splitting (lines 1031 >= warn threshold 400)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -1869,7 +1857,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 1105 >= warn threshold 400; functions 54 >= warn threshold 20)",
+        "msg": "File is large; consider splitting (lines 793 >= warn threshold 400; functions 36 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -1877,7 +1865,7 @@
         "tier": "T3"
       },
       {
-        "line": 49,
+        "line": 54,
         "col": 60,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -1886,9 +1874,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 49,
+              "startLine": 54,
               "startCol": 60,
-              "endLine": 49,
+              "endLine": 54,
               "endCol": 86
             },
             "replacementText": "FILE_PATH_BASELINESIGNATURESJSON_TEXT"
@@ -1898,7 +1886,7 @@
         "tier": "T2"
       },
       {
-        "line": 309,
+        "line": 205,
         "col": 53,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -1907,9 +1895,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 309,
+              "startLine": 205,
               "startCol": 53,
-              "endLine": 309,
+              "endLine": 205,
               "endCol": 79
             },
             "replacementText": "FILE_PATH_BASELINESIGNATURESJSON_TEXT"
@@ -1919,52 +1907,7 @@
         "tier": "T2"
       },
       {
-        "line": 340,
-        "col": 56,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "Magic number 10 should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 340,
-              "startCol": 56,
-              "endLine": 340,
-              "endCol": 58
-            },
-            "replacementText": "DURATION_10MS"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 398,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'tallyAddedAndRegressionDebt' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'ha…",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 501,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'shouldIncludeFileInElocDiff' has too many word segments (6 > 5); consider decomposing responsibilities",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 570,
+        "line": 257,
         "col": 45,
         "rule": "magic-number",
         "sev": "WARN",
@@ -1973,9 +1916,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 570,
+              "startLine": 257,
               "startCol": 45,
-              "endLine": 570,
+              "endLine": 257,
               "endCol": 46
             },
             "replacementText": "CONST_8"
@@ -1985,7 +1928,7 @@
         "tier": "T2"
       },
       {
-        "line": 580,
+        "line": 267,
         "col": 26,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -1994,9 +1937,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 580,
+              "startLine": 267,
               "startCol": 26,
-              "endLine": 580,
+              "endLine": 267,
               "endCol": 33
             },
             "replacementText": "REF_TEXT"
@@ -2006,7 +1949,7 @@
         "tier": "T2"
       },
       {
-        "line": 580,
+        "line": 267,
         "col": 58,
         "rule": "magic-number",
         "sev": "WARN",
@@ -2015,9 +1958,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 580,
+              "startLine": 267,
               "startCol": 58,
-              "endLine": 580,
+              "endLine": 267,
               "endCol": 59
             },
             "replacementText": "CONST_7"
@@ -2027,7 +1970,7 @@
         "tier": "T2"
       },
       {
-        "line": 580,
+        "line": 267,
         "col": 76,
         "rule": "magic-number",
         "sev": "WARN",
@@ -2036,9 +1979,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 580,
+              "startLine": 267,
               "startCol": 76,
-              "endLine": 580,
+              "endLine": 267,
               "endCol": 77
             },
             "replacementText": "CONST_8"
@@ -2048,7 +1991,7 @@
         "tier": "T2"
       },
       {
-        "line": 581,
+        "line": 268,
         "col": 32,
         "rule": "magic-number",
         "sev": "WARN",
@@ -2057,9 +2000,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 581,
+              "startLine": 268,
               "startCol": 32,
-              "endLine": 581,
+              "endLine": 268,
               "endCol": 33
             },
             "replacementText": "CONST_5"
@@ -2069,7 +2012,7 @@
         "tier": "T2"
       },
       {
-        "line": 583,
+        "line": 270,
         "col": 89,
         "rule": "magic-number",
         "sev": "WARN",
@@ -2078,9 +2021,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 583,
+              "startLine": 270,
               "startCol": 89,
-              "endLine": 583,
+              "endLine": 270,
               "endCol": 90
             },
             "replacementText": "CONST_8"
@@ -2090,7 +2033,7 @@
         "tier": "T2"
       },
       {
-        "line": 758,
+        "line": 445,
         "col": 55,
         "rule": "magic-number",
         "sev": "WARN",
@@ -2099,9 +2042,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 758,
+              "startLine": 445,
               "startCol": 55,
-              "endLine": 758,
+              "endLine": 445,
               "endCol": 56
             },
             "replacementText": "CONST_4"
@@ -2111,7 +2054,7 @@
         "tier": "T2"
       },
       {
-        "line": 759,
+        "line": 446,
         "col": 40,
         "rule": "magic-number",
         "sev": "WARN",
@@ -2120,9 +2063,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 759,
+              "startLine": 446,
               "startCol": 40,
-              "endLine": 759,
+              "endLine": 446,
               "endCol": 42
             },
             "replacementText": "CONST_16"
@@ -2132,7 +2075,7 @@
         "tier": "T2"
       },
       {
-        "line": 767,
+        "line": 454,
         "col": 55,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -2141,9 +2084,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 767,
+              "startLine": 454,
               "startCol": 55,
-              "endLine": 767,
+              "endLine": 454,
               "endCol": 67
             },
             "replacementText": "SELFAUDIT_TEXT"
@@ -2153,7 +2096,7 @@
         "tier": "T2"
       },
       {
-        "line": 998,
+        "line": 686,
         "col": 11,
         "rule": "NAM-LEN-001",
         "sev": "WARN",
@@ -2165,7 +2108,7 @@
         "tier": "T2"
       },
       {
-        "line": 1000,
+        "line": 688,
         "col": 109,
         "rule": "magic-number",
         "sev": "WARN",
@@ -2174,9 +2117,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 1000,
+              "startLine": 688,
               "startCol": 109,
-              "endLine": 1000,
+              "endLine": 688,
               "endCol": 111
             },
             "replacementText": "CONST_60"
@@ -2186,7 +2129,7 @@
         "tier": "T2"
       },
       {
-        "line": 1004,
+        "line": 692,
         "col": 11,
         "rule": "NAM-LEN-001",
         "sev": "WARN",
@@ -3754,7 +3697,18 @@
         "tier": "T2"
       },
       {
-        "line": 115,
+        "line": 90,
+        "rule": "CMT-WID-001",
+        "sev": "WARN",
+        "msg": "Comment/docstring line exceeds 100 columns (found 104)",
+        "fix": {
+          "action": "refactor",
+          "template": "Wrap the comment at word boundaries; long directives keep their exemption"
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 124,
         "col": 65,
         "rule": "magic-number",
         "sev": "WARN",
@@ -3763,9 +3717,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 115,
+              "startLine": 124,
               "startCol": 65,
-              "endLine": 115,
+              "endLine": 124,
               "endCol": 67
             },
             "replacementText": "CONST_30"
@@ -3775,7 +3729,7 @@
         "tier": "T2"
       },
       {
-        "line": 122,
+        "line": 131,
         "col": 31,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -3784,9 +3738,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 122,
+              "startLine": 131,
               "startCol": 31,
-              "endLine": 122,
+              "endLine": 131,
               "endCol": 40
             },
             "replacementText": "WARNING_TEXT"
@@ -3996,7 +3950,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 543 >= warn threshold 400; functions 20 >= warn threshold 20)",
+        "msg": "File is large; consider splitting (lines 547 >= warn threshold 400; functions 21 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -4015,7 +3969,7 @@
         "tier": "T1"
       },
       {
-        "line": 281,
+        "line": 285,
         "col": 43,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4024,9 +3978,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 281,
+              "startLine": 285,
               "startCol": 43,
-              "endLine": 281,
+              "endLine": 285,
               "endCol": 44
             },
             "replacementText": "CONST_3"
@@ -4036,7 +3990,7 @@
         "tier": "T2"
       },
       {
-        "line": 285,
+        "line": 289,
         "col": 32,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4045,9 +3999,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 285,
+              "startLine": 289,
               "startCol": 32,
-              "endLine": 285,
+              "endLine": 289,
               "endCol": 42
             },
             "replacementText": "MAKEFILE_TEXT"
@@ -4237,12 +4191,12 @@
         "tier": "T3"
       }
     ],
-    "src/analyzers/naming-python-helper.ts": [
+    "src/analyzers/naming-path-helper.ts": [
       {
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 496 >= warn threshold 400)",
+        "msg": "File is large; consider splitting (lines 902 >= warn threshold 400; functions 34 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -4250,7 +4204,139 @@
         "tier": "T3"
       },
       {
-        "line": 98,
+        "line": 95,
+        "rule": "CMT-WID-001",
+        "sev": "WARN",
+        "msg": "Comment/docstring line exceeds 100 columns (found 105)",
+        "fix": {
+          "action": "refactor",
+          "template": "Wrap the comment at word boundaries; long directives keep their exemption"
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 181,
+        "col": 15,
+        "rule": "NAM-LEN-001",
+        "sev": "WARN",
+        "msg": "symbol 'ch' too short (<= 2 characters)",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 182,
+        "col": 20,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 123 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 182,
+              "startCol": 20,
+              "endLine": 182,
+              "endCol": 23
+            },
+            "replacementText": "CONST_123"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 182,
+        "col": 34,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 91 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 182,
+              "startCol": 34,
+              "endLine": 182,
+              "endCol": 36
+            },
+            "replacementText": "CONST_91"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 187,
+        "col": 28,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 125 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 187,
+              "startCol": 28,
+              "endLine": 187,
+              "endCol": 31
+            },
+            "replacementText": "CONST_125"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 187,
+        "col": 42,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 93 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 187,
+              "startCol": 42,
+              "endLine": 187,
+              "endCol": 44
+            },
+            "replacementText": "CONST_93"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 464,
+        "col": 10,
+        "rule": "HYG-WRAP-001",
+        "sev": "WARN",
+        "msg": "Function `splitCamelStem` is a vacuous passthrough wrapper directly forwarding arguments to `splitIdentifierWords`",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Directly invoke the underlying target or introduce necessary validation, tran…"
+        },
+        "tier": "T1"
+      }
+    ],
+    "src/analyzers/naming-python-helper.ts": [
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 467 >= warn threshold 400)",
+        "fix": {
+          "action": "split_file",
+          "template": "Split the file into smaller focused units to reduce cognitive load and format…"
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 92,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
         "msg": "Function \"buildPythonActionable\" has 6 parameters (limit 4). Introduce a parameter object",
@@ -4262,7 +4348,7 @@
         "tier": "T1"
       },
       {
-        "line": 187,
+        "line": 158,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -4274,7 +4360,7 @@
         "tier": "T1"
       },
       {
-        "line": 208,
+        "line": 179,
         "col": 26,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4283,9 +4369,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 208,
+              "startLine": 179,
               "startCol": 26,
-              "endLine": 208,
+              "endLine": 179,
               "endCol": 27
             },
             "replacementText": "CONST_3"
@@ -4295,7 +4381,7 @@
         "tier": "T2"
       },
       {
-        "line": 218,
+        "line": 189,
         "col": 78,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4304,9 +4390,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 218,
+              "startLine": 189,
               "startCol": 78,
-              "endLine": 218,
+              "endLine": 189,
               "endCol": 79
             },
             "replacementText": "CONST_3"
@@ -4344,7 +4430,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 553 >= warn threshold 400; functions 22 >= warn threshold 20)",
+        "msg": "File is large; consider splitting (lines 569 >= warn threshold 400; functions 23 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -4403,12 +4489,117 @@
         "col": 5,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"RustModernAnalyzer.<anonymous>\" spans 185 lines (limit 60)",
+        "msg": "Function \"RustModernAnalyzer.<anonymous>\" spans 196 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "safeToAutomate": false
         },
         "tier": "T1"
+      },
+      {
+        "line": 363,
+        "col": 30,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 363,
+              "startCol": 30,
+              "endLine": 363,
+              "endCol": 36
+            },
+            "replacementText": "TRY_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 378,
+        "col": 30,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 378,
+              "startCol": 30,
+              "endLine": 378,
+              "endCol": 38
+            },
+            "replacementText": "EXTERN_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 393,
+        "col": 30,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 393,
+              "startCol": 30,
+              "endLine": 393,
+              "endCol": 41
+            },
+            "replacementText": "MACROUSE_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 407,
+        "col": 30,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 407,
+              "startCol": 30,
+              "endLine": 407,
+              "endCol": 40
+            },
+            "replacementText": "CLONE_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 422,
+        "col": 30,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 422,
+              "startCol": 30,
+              "endLine": 422,
+              "endCol": 41
+            },
+            "replacementText": "UNWRAP_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
       }
     ],
     "src/analyzers/simplify-inlining.ts": [
@@ -4534,7 +4725,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 636 >= warn threshold 400; functions 21 >= warn threshold 20)",
+        "msg": "File is large; consider splitting (lines 642 >= warn threshold 400; functions 23 >= warn threshold 20)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -4553,7 +4744,7 @@
         "tier": "T1"
       },
       {
-        "line": 94,
+        "line": 96,
         "col": 13,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4562,9 +4753,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 94,
+              "startLine": 96,
               "startCol": 13,
-              "endLine": 94,
+              "endLine": 96,
               "endCol": 19
             },
             "replacementText": "CONST_1RE_TEXT"
@@ -4574,7 +4765,7 @@
         "tier": "T2"
       },
       {
-        "line": 122,
+        "line": 124,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -4586,10 +4777,10 @@
         "tier": "T1"
       },
       {
-        "line": 209,
+        "line": 212,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"collectRecursionSites\" spans 76 lines (limit 60)",
+        "msg": "Function \"collectRecursionSites\" spans 78 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
@@ -4598,7 +4789,7 @@
         "tier": "T1"
       },
       {
-        "line": 221,
+        "line": 226,
         "col": 23,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -4611,7 +4802,7 @@
         "tier": "T1"
       },
       {
-        "line": 287,
+        "line": 292,
         "col": 5,
         "rule": "CMP-DEN-001",
         "sev": "WARN",
@@ -4624,8 +4815,8 @@
         "conf": 0.8
       },
       {
-        "line": 290,
-        "col": 44,
+        "line": 295,
+        "col": 53,
         "rule": "NAM-SGL-001",
         "sev": "WARN",
         "msg": "Single-letter variable name 'i' hurts code readability",
@@ -4636,7 +4827,7 @@
         "tier": "T3"
       },
       {
-        "line": 291,
+        "line": 296,
         "col": 35,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4645,9 +4836,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 291,
+              "startLine": 296,
               "startCol": 35,
-              "endLine": 291,
+              "endLine": 296,
               "endCol": 36
             },
             "replacementText": "CONST_4"
@@ -4657,7 +4848,19 @@
         "tier": "T2"
       },
       {
-        "line": 335,
+        "line": 329,
+        "col": 15,
+        "rule": "NAM-LEN-001",
+        "sev": "WARN",
+        "msg": "symbol 'ms' too short (<= 2 characters)",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 348,
         "col": 5,
         "rule": "SIM-ARGS-001",
         "sev": "WARN",
@@ -4670,7 +4873,7 @@
         "tier": "T1"
       },
       {
-        "line": 335,
+        "line": 348,
         "col": 5,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
@@ -4683,7 +4886,7 @@
         "tier": "T1"
       },
       {
-        "line": 365,
+        "line": 378,
         "col": 25,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4692,9 +4895,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 365,
+              "startLine": 378,
               "startCol": 25,
-              "endLine": 365,
+              "endLine": 378,
               "endCol": 55
             },
             "replacementText": "USECONSTANTTIMECOMPARISON_TEXT"
@@ -4704,7 +4907,7 @@
         "tier": "T2"
       },
       {
-        "line": 370,
+        "line": 383,
         "col": 25,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4713,9 +4916,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 370,
+              "startLine": 383,
               "startCol": 25,
-              "endLine": 370,
+              "endLine": 383,
               "endCol": 42
             },
             "replacementText": "GUARDRECURSION_TEXT"
@@ -4725,10 +4928,23 @@
         "tier": "T2"
       },
       {
-        "line": 456,
+        "line": 493,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "Function \"checkNoStdImplicitAllocations\" has 5 parameters (limit 4). Introduce a parameter object",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface CheckNoStdImplicitAllocationsOptions {",
+          "safeToAutomate": false
+        },
+        "tier": "T1"
+      },
+      {
+        "line": 525,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 419",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 495",
         "fix": {
           "action": "sanitize_hygiene",
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
@@ -4736,7 +4952,7 @@
         "tier": "T3"
       },
       {
-        "line": 561,
+        "line": 563,
         "col": 71,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4745,9 +4961,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 561,
+              "startLine": 563,
               "startCol": 71,
-              "endLine": 561,
+              "endLine": 563,
               "endCol": 75
             },
             "replacementText": "DURATION_1S"
@@ -4762,7 +4978,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 493 >= warn threshold 400)",
+        "msg": "File is large; consider splitting (lines 504 >= warn threshold 400)",
         "fix": {
           "action": "split_file",
           "template": "Split the file into smaller focused units to reduce cognitive load and format…"
@@ -4792,28 +5008,7 @@
         "tier": "T1"
       },
       {
-        "line": 175,
-        "col": 23,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "Hardcoded string should be extracted into a named constant",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 175,
-              "startCol": 23,
-              "endLine": 175,
-              "endCol": 59
-            },
-            "replacementText": "XMLNSHTTPWWWW3_TEXT"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2"
-      },
-      {
-        "line": 175,
+        "line": 169,
         "rule": "HYG-STB-002",
         "sev": "WARN",
         "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'w3'",
@@ -4824,7 +5019,7 @@
         "tier": "T3"
       },
       {
-        "line": 176,
+        "line": 196,
         "col": 23,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -4833,9 +5028,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 176,
+              "startLine": 196,
               "startCol": 23,
-              "endLine": 176,
+              "endLine": 196,
               "endCol": 59
             },
             "replacementText": "XMLNSHTTPWWWW3_TEXT"
@@ -4845,7 +5040,7 @@
         "tier": "T2"
       },
       {
-        "line": 176,
+        "line": 196,
         "rule": "HYG-STB-002",
         "sev": "WARN",
         "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'w3'",
@@ -4856,7 +5051,39 @@
         "tier": "T3"
       },
       {
-        "line": 180,
+        "line": 197,
+        "col": 23,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "Hardcoded string should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 197,
+              "startCol": 23,
+              "endLine": 197,
+              "endCol": 59
+            },
+            "replacementText": "XMLNSHTTPWWWW3_TEXT"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2"
+      },
+      {
+        "line": 197,
+        "rule": "HYG-STB-002",
+        "sev": "WARN",
+        "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'w3'",
+        "fix": {
+          "action": "sanitize_hygiene",
+          "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
+        },
+        "tier": "T3"
+      },
+      {
+        "line": 201,
         "col": 39,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4865,9 +5092,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 180,
+              "startLine": 201,
               "startCol": 39,
-              "endLine": 180,
+              "endLine": 201,
               "endCol": 41
             },
             "replacementText": "DURATION_10MS"
@@ -4877,7 +5104,7 @@
         "tier": "T2"
       },
       {
-        "line": 181,
+        "line": 202,
         "col": 51,
         "rule": "magic-number",
         "sev": "WARN",
@@ -4886,9 +5113,9 @@
           "action": "extract_constant",
           "patch": {
             "range": {
-              "startLine": 181,
+              "startLine": 202,
               "startCol": 51,
-              "endLine": 181,
+              "endLine": 202,
               "endCol": 53
             },
             "replacementText": "DURATION_10MS"
@@ -4898,18 +5125,7 @@
         "tier": "T2"
       },
       {
-        "line": 183,
-        "rule": "HYG-STB-002",
-        "sev": "WARN",
-        "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'w3'",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Remove ticket or transient batch codes from long-term codebase assets; use ne…"
-        },
-        "tier": "T3"
-      },
-      {
-        "line": 215,
+        "line": 240,
         "col": 5,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
@@ -8208,164 +8424,11 @@
           "template": "Extract shared logic into a private helper function, utility method, or reusa…"
         },
         "tier": "T3"
-      },
-      {
-        "line": 595,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"applyCheapNonFunctionProps\" has 5 parameters (limit 4). Introduce a parameter object",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface ApplyCheapNonFunctionPropsOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 606,
-        "col": 13,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'cheapProject' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run')",
-        "fix": {
-          "action": "replace_token",
-          "template": "normalizedNode",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      }
-    ],
-    "src/core/ast/typescript-adapter.ts": [
-      {
-        "line": 91,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"resolveNodePositions\" has 5 parameters (limit 4). Introduce a parameter object",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface ResolveNodePositionsOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 115,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"resolveNodeName\" has 7 parameters (limit 4). Introduce a parameter object",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface ResolveNodeNameOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 132,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"buildNormalizedNode\" has 8 parameters (limit 4). Introduce a parameter object",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface BuildNormalizedNodeOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 189,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"applyNodeHierarchy\" has 7 parameters (limit 4). Introduce a parameter object",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface ApplyNodeHierarchyOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 211,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"tryReuseSubtree\" has 5 parameters (limit 4). Introduce a parameter object",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface TryReuseSubtreeOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 237,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"recordSpanCache\" has 5 parameters (limit 4). Introduce a parameter object",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface RecordSpanCacheOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 245,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 219",
-        "fix": {
-          "action": "sanitize_hygiene",
-          "template": "Extract shared logic into a private helper function, utility method, or reusa…"
-        },
-        "tier": "T3"
-      },
-      {
-        "line": 256,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"traverseChildren\" has 5 parameters (limit 4). Introduce a parameter object",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface TraverseChildrenOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      },
-      {
-        "line": 273,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "Function \"mapNode\" has 6 parameters (limit 4). Introduce a parameter object",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface MapNodeOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T1"
-      }
-    ],
-    "src/core/ast/utf8.ts": [
-      {
-        "line": 1,
-        "rule": "NAM-FIL-001",
-        "sev": "WARN",
-        "msg": "File name 'utf8.ts' has too few word segments (1 < 2); lacks domain specificity",
-        "fix": {
-          "action": "rename_identifier",
-          "template": "Expand file name 'utf8."
-        },
-        "tier": "T1"
       }
     ]
   },
-  "truncated": 3210
+  "truncated": 3279,
+  "notes": [
+    "dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph"
+  ]
 }

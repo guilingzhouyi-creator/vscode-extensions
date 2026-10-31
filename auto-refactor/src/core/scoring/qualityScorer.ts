@@ -23,7 +23,7 @@ import type {
     PolyglotGeneralizationMetrics,
 } from './scoringTypes';
 import { calculatePolyglotGeneralizationIndex } from './modernization-formulas';
-import { computeStatisticalMoments } from '../math/descriptive-statistics';
+import { nativeStatisticalMoments } from '../native/native-bridge';
 import {
     ALL_QUALITY_DIMENSIONS,
     DEFAULT_QUALITY_WEIGHTS,
@@ -387,7 +387,7 @@ export class QualityScorer {
         if (activeLangKeys.length === 0) return undefined;
 
         const index = calculatePolyglotGeneralizationIndex(langScores);
-        const moments = computeStatisticalMoments(Object.values(langScores));
+        const moments = nativeStatisticalMoments(Object.values(langScores));
         const meanScore = Math.round(moments.mean * SCORE_ROUNDING) / SCORE_ROUNDING;
         const standardDeviation =
             Math.round(moments.standardDeviation * SCORE_ROUNDING) / SCORE_ROUNDING;

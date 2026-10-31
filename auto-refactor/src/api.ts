@@ -792,7 +792,7 @@ function logWarmStats(logger: Logger, stats?: WarmStats | null): void {
     if (!stats) return;
     logger.info(
         `warm: daemonUsed=${stats.daemonUsed} cacheHit=${stats.cacheHit}/${stats.cacheTotal} ` +
-            `l1=${stats.l1Hit} l2=${stats.l2Hit} analyzed=${stats.analyzed} poolWarm=${stats.poolWarm} daemonMs=${stats.daemonMs}`,
+        `l1=${stats.l1Hit} l2=${stats.l2Hit} analyzed=${stats.analyzed} poolWarm=${stats.poolWarm} daemonMs=${stats.daemonMs}`,
     );
 }
 
@@ -993,7 +993,6 @@ export type {
     ContextSliceRegion,
     ContextSliceOptions,
 } from './core/intelligence/contextSlice';
-export * from './core/intelligence/dataArchitecture';
 // ---- Quality Quantification & Scoring Engine ----
 export * from './core/scoring';
 export * from './core/math';
@@ -1006,7 +1005,6 @@ export * from './core/data-structures/id-interner';
 export * from './core/dynamic';
 
 // ---- Audit Snapshot & Sandbox Baseline Extensions ----
-export * from './core/snapshot/types';
 export * from './core/snapshot/snapshotManager';
 
 // ---- Unified Semantic IR & Topology Graph ----
@@ -1026,7 +1024,6 @@ export * from './core/reporting/aas-types';
 export { buildAasReport, toAasJson } from './core/reporting/aas-reporter';
 
 // ---- Praxis Diff Governance Subsystem Facade & SPI ----
-export * from './core/praxis';
 export {
     IncrementalDiffStream,
     gridRow,

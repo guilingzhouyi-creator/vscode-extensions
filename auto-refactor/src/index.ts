@@ -53,6 +53,10 @@ import { daemonCommand } from './cli/daemonCmd';
 import { selfTestCommand } from './cli/selfTestCmd';
 import { reviewCommand } from './cli/review-cmd';
 import { analyzeCodeDensity } from './core/intelligence/code-density-analyzer';
+import {
+    buildDebtLedger,
+    calculateStructuralDebtDelta,
+} from './core/intelligence/elastic-debt-budget';
 
 /** Decimal radix used when parsing numeric CLI arguments such as `--line`. */
 const DECIMAL_RADIX = 10;
@@ -171,7 +175,7 @@ async function handleSymbolsCommand(args: string[]): Promise<void> {
         }
         process.stdout.write(
             `  coverage defs=${symbolQueryResult.stats.definitions} refs=${symbolQueryResult.stats.references} ` +
-                `crossFile=${symbolQueryResult.stats.crossFileReferences} (${symbolQueryResult.stats.builtFrom})\n`,
+            `crossFile=${symbolQueryResult.stats.crossFileReferences} (${symbolQueryResult.stats.builtFrom})\n`,
         );
         process.exit(0);
     } catch (error: unknown) {
@@ -719,6 +723,42 @@ async function executeGateScan(root: string): Promise<{
     return { scanResult, unsuppressedErrors, staticPass };
 }
 
+async function resolveGateDebtDelta(
+    root: string,
+    issues: ScanReport['issues'],
+    staticPass: boolean,
+    regressionCount: number,
+): Promise<{ resolvedDebtPoints: number; addedDebtPoints: number }> {
+    const sigPath = path.join(root, TRAJECTORY_DIR_NAME, 'baseline-signatures.json');
+    if (await checkPathExists(sigPath)) {
+        try {
+            const raw = await fs.promises.readFile(sigPath, 'utf8');
+            const parsed = JSON.parse(raw) as { files?: Record<string, unknown> };
+            if (parsed && typeof parsed.files === 'object') {
+                const { debtByTier } = buildDebtLedger(issues || []);
+                const delta = calculateStructuralDebtDelta({
+                    prevFilesMap: parsed.files,
+                    currentIssues: issues || [],
+                    currentDebtByTier: debtByTier,
+                });
+                return {
+                    resolvedDebtPoints: delta.resolvedDebtPoints,
+                    addedDebtPoints: delta.addedDebtPoints,
+                };
+            }
+        } catch {
+            return {
+                resolvedDebtPoints: staticPass ? RESOLVED_POINTS_STATIC_PASS : 0,
+                addedDebtPoints: regressionCount * ADDED_POINTS_PER_REGRESSION,
+            };
+        }
+    }
+    return {
+        resolvedDebtPoints: staticPass ? RESOLVED_POINTS_STATIC_PASS : 0,
+        addedDebtPoints: regressionCount * ADDED_POINTS_PER_REGRESSION,
+    };
+}
+
 async function getGateEvaluationData(
     root: string,
     scanData: {
@@ -746,8 +786,12 @@ async function getGateEvaluationData(
         staticPass,
         historicalBeforeScore,
     );
-    const resolvedDebtPoints = staticPass ? RESOLVED_POINTS_STATIC_PASS : 0;
-    const addedDebtPoints = regressionCount * ADDED_POINTS_PER_REGRESSION;
+    const { resolvedDebtPoints, addedDebtPoints } = await resolveGateDebtDelta(
+        root,
+        scanResult.issues,
+        staticPass,
+        regressionCount,
+    );
 
     const counters = buildTrajectoryCounters(processedEloc, density, ratio);
     const metrics = buildGateMetrics({
