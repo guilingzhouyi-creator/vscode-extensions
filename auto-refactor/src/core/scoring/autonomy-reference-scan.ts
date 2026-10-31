@@ -147,7 +147,12 @@ interface BoundImportRefParams {
  */
 function processBoundImportRef(params: BoundImportRefParams): void {
     const { boundPkg, file, isCritical, effectiveDeps, fileInv, state } = params;
-    const boundKind = classifyImportProvenance(boundPkg, file, effectiveDeps);
+    const boundKind = classifyImportProvenance(
+        boundPkg,
+        file,
+        effectiveDeps,
+        fileInv?.pathAliases,
+    );
     if (boundKind === KIND_STDLIB) {
         state.stdlibCalls++;
         return;
