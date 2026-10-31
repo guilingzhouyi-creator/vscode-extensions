@@ -687,6 +687,62 @@ async function runTests() {
   });
   console.log('✔  Test 14: Variable naming cleanliness and single-letter elimination verified');
 
+  // Test 15: Architecture Dynamics & Resilience (ADR-Q) truthfulness & omission
+  const quantTestReport = {
+    ...cleanReport,
+    qualityScore: {
+      compositeScore: 92.5,
+      grade: 'A',
+      quant: {
+        financial: {
+          principalHours: 10,
+          interestDragHours: 0.8,
+          interestCoverageRatio: 2.5,
+          rcr: 2.5,
+          status: 'de-leveraging',
+          clearanceStatus: 'active-clearing',
+          deficitStockHours: 10,
+          frictionDragHours: 0.8,
+        },
+        riskRatios: {
+          isSampleSufficient: false,
+          erq: 1.2,
+          qsr: 1.2,
+          ddr: 999.0,
+          sortino: 999.0,
+          // edb95 & ptd are omitted (undefined) due to insufficient sample
+        },
+        inequality: {
+          totalDebtItems: 5,
+          dsi: 0.35,
+          debtGini: 0.35,
+          rcd: 0.25,
+          defectEntropy: 0.25,
+          topFileDebtShare: 0.1,
+          categoryShares: {},
+        },
+        stochastic: {
+          sampleCount: 3,
+          isSampleSufficient: false,
+          isFatTailed: false,
+          ehl: 1.5,
+          halfLifeCommits: 1.5,
+        },
+        debtDynamics: {},
+        temporalResilience: {},
+        spatialDispersion: {},
+      },
+    },
+  };
+
+  const quantDoc = buildAasReport(quantTestReport);
+  assert.ok(quantDoc.health.quant, 'Health block must contain quant when present in qualityScore');
+  assert.strictEqual(quantDoc.health.quant.rcr, 2.5);
+  assert.strictEqual(quantDoc.health.quant.status, 'de-leveraging');
+  assert.strictEqual(quantDoc.health.quant.edb95, undefined, 'Omitted risk metric must remain undefined, never defaulted to 0');
+  assert.strictEqual(quantDoc.health.quant.ptd, undefined, 'Omitted drawdown metric must remain undefined, never defaulted to 0');
+  console.log('✔  Test 15: ADR-Q truthfulness, omission discipline, and legacy parity verified');
+
   console.log('\n--- All Agent Audit Schema (AAS v1.0 / v1.1) Tests Passed! ---');
 }
 

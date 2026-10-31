@@ -38,6 +38,7 @@ import {
     type AasDimensionDetail,
     type AasFixRecipe,
     type AasHealth,
+    type AasQuantMetrics,
     type AasReportOptions,
     type AasSeverity,
     type AasUsability,
@@ -448,43 +449,35 @@ function resolveHealthQuant(
     override?: AasHealth['quant'],
 ): AasHealth['quant'] | undefined {
     if (override) return override;
-    const quantMetrics = (report.qualityScore as any)?.quant;
+    const quantMetrics = report.qualityScore?.quant;
     if (!quantMetrics) return undefined;
     const fin = quantMetrics.financial;
     const risk = quantMetrics.riskRatios;
     const ineq = quantMetrics.inequality;
     const stoch = quantMetrics.stochastic;
 
-    const rcr = roundMetric(fin?.rcr ?? fin?.interestCoverageRatio) ?? 0;
-    const erq = roundMetric(risk?.erq ?? risk?.qsr) ?? 0;
-    const ddr = roundMetric(risk?.ddr ?? risk?.sortino) ?? 0;
-    const dsi = roundMetric(ineq?.dsi ?? ineq?.debtGini) ?? 0;
-    const rcd = roundMetric(ineq?.rcd ?? ineq?.defectEntropy) ?? 0;
-    const edb95 = roundMetric(risk?.edb95 ?? risk?.var95) ?? 0;
-    const ptd = roundMetric(risk?.ptd ?? risk?.mdd) ?? 0;
-    const ehl = roundMetric(stoch?.ehl ?? stoch?.halfLifeCommits) ?? 0;
+    const rcr = roundMetric(fin?.rcr ?? fin?.interestCoverageRatio);
+    const erq = roundMetric(risk?.erq ?? risk?.qsr);
+    const ddr = roundMetric(risk?.ddr ?? risk?.sortino);
+    const dsi = roundMetric(ineq?.dsi ?? ineq?.debtGini);
+    const rcd = roundMetric(ineq?.rcd ?? ineq?.defectEntropy);
+    const edb95 = roundMetric(risk?.edb95 ?? risk?.var95);
+    const ptd = roundMetric(risk?.ptd ?? risk?.mdd);
+    const ehl = roundMetric(stoch?.ehl ?? stoch?.halfLifeCommits);
 
-    return {
-        // Native terminology
-        rcr,
-        erq,
-        ddr,
-        edb95,
-        ptd,
-        dsi,
-        rcd,
-        ehl,
-        // Legacy aliases for backward compatibility
-        icr: rcr,
-        qsr: erq,
-        sortino: ddr,
-        debtGini: dsi,
-        defectEntropy: rcd,
-        var95: edb95,
-        mdd: ptd,
-        halfLifeCommits: ehl,
+    const quant: AasQuantMetrics = {
+        ...(rcr !== undefined ? { rcr, icr: rcr } : {}),
+        ...(erq !== undefined ? { erq, qsr: erq } : {}),
+        ...(ddr !== undefined ? { ddr, sortino: ddr } : {}),
+        ...(edb95 !== undefined ? { edb95, var95: edb95 } : {}),
+        ...(ptd !== undefined ? { ptd, mdd: ptd } : {}),
+        ...(dsi !== undefined ? { dsi, debtGini: dsi } : {}),
+        ...(rcd !== undefined ? { rcd, defectEntropy: rcd } : {}),
+        ...(ehl !== undefined ? { ehl, halfLifeCommits: ehl } : {}),
         ...(fin?.status ? { status: fin.status } : {}),
     };
+
+    return Object.keys(quant).length > 0 ? quant : undefined;
 }
 
 /**
@@ -927,40 +920,44 @@ export function buildAasReport(
 ): AgentAuditReport {
     const defaultVerify = options.defaultVerify ?? DEFAULT_VERIFY_COMMAND;
     const anchorCache = new AnchorCache(options.fileReader);
-    const counts = resolveCounts(report);
-    const verdict = resolveVerdict(counts);
-    const health = buildHealth(report, counts, options);
-    const usability = resolveUsability(report);
-    const dimensions = projectDimensions(report.qualityScore);
-    const dimensionDetails = projectDimensionDetails(report.qualityScore, options);
-    const bottlenecks = extractBottlenecks(report);
-    const { files, topology, truncatedCount } = groupDefects(
-        report,
-        anchorCache,
-        options,
-        defaultVerify,
-    );
+    try {
+        const counts = resolveCounts(report);
+        const verdict = resolveVerdict(counts);
+        const health = buildHealth(report, counts, options);
+        const usability = resolveUsability(report);
+        const dimensions = projectDimensions(report.qualityScore);
+        const dimensionDetails = projectDimensionDetails(report.qualityScore, options);
+        const bottlenecks = extractBottlenecks(report);
+        const { files, topology, truncatedCount } = groupDefects(
+            report,
+            anchorCache,
+            options,
+            defaultVerify,
+        );
 
-    return {
-        schema: AAS_SCHEMA_ID,
-        tool: report.tool,
-        version: report.version,
-        timestamp: report.generatedAt,
-        root: report.root,
-        verdict,
-        health,
-        ...(usability ? { usability } : {}),
-        defaultVerify,
-        ...(dimensions ? { dimensions } : {}),
-        ...(dimensionDetails ? { dimensionDetails } : {}),
-        bottlenecks,
-        topology,
-        files,
-        ...(truncatedCount > 0 ? { truncated: truncatedCount } : {}),
-        ...(report.summary.warnings && report.summary.warnings.length > 0
-            ? { notes: report.summary.warnings }
-            : {}),
-    };
+        return {
+            schema: AAS_SCHEMA_ID,
+            tool: report.tool,
+            version: report.version,
+            timestamp: report.generatedAt,
+            root: report.root,
+            verdict,
+            health,
+            ...(usability ? { usability } : {}),
+            defaultVerify,
+            ...(dimensions ? { dimensions } : {}),
+            ...(dimensionDetails ? { dimensionDetails } : {}),
+            bottlenecks,
+            topology,
+            files,
+            ...(truncatedCount > 0 ? { truncated: truncatedCount } : {}),
+            ...(report.summary.warnings && report.summary.warnings.length > 0
+                ? { notes: report.summary.warnings }
+                : {}),
+        };
+    } finally {
+        anchorCache.dispose();
+    }
 }
 
 /**

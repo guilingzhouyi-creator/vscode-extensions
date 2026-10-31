@@ -11,15 +11,17 @@ import {
 
 describe('Quantitative Risk Model Engine', () => {
     describe('computeFinancialDebtLedger', () => {
-        it('should compute principal and interest drag from total remediation minutes', () => {
+        it('should compute principal and mark status as insufficient_samples when yield/accrual are omitted', () => {
             const result = computeFinancialDebtLedger({
                 totalRemediationMinutes: 600, // 10 hours
             });
 
             expect(result.principalHours).toBe(10);
             expect(result.interestDragHours).toBe(0.8); // 10 * 0.08 = 0.8 hours
-            expect(result.interestCoverageRatio).toBe(2.0);
-            expect(result.status).toBe('balanced');
+            expect(result.interestCoverageRatio).toBe(0.0);
+            expect(result.rcr).toBe(0.0);
+            expect(result.status).toBe('insufficient_samples');
+            expect(result.clearanceStatus).toBe('insufficient_samples');
         });
 
         it('should compute churn and fan-in weighted interest drag from file items', () => {
@@ -251,9 +253,9 @@ describe('Quantitative Risk Model Engine', () => {
             expect(assessment.inequality.rcd).toBe(assessment.inequality.defectEntropy);
             expect(assessment.stochastic.isFatTailed).toBe(false);
             expect(assessment.stochastic.ehl).toBe(assessment.stochastic.halfLifeCommits);
-            expect(assessment.debtDynamics).toBeDefined();
-            expect(assessment.temporalResilience).toBeDefined();
-            expect(assessment.spatialDispersion).toBeDefined();
+            expect(assessment.debtDynamics).toBe(assessment.financial);
+            expect(assessment.temporalResilience).toBe(assessment.riskRatios);
+            expect(assessment.spatialDispersion).toBe(assessment.inequality);
         });
     });
 });

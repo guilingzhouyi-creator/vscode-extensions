@@ -14,6 +14,7 @@
 
 import type { QualityDimension, Severity } from '../types';
 import type { CompactVerificationTelemetry } from '../trajectory/eloc-types';
+import type { FinancialDebtMetrics } from '../scoring/quantitative-risk-model';
 
 /** Protocol schema identifier for AAS v1.0 reports. */
 export const AAS_SCHEMA_ID = 'aas-v1';
@@ -39,6 +40,15 @@ export interface AasCounts {
     /** Suppressed defects count */
     readonly suppressed?: number;
 }
+
+/** Optional in-kernel verification & 5D Riemannian manifold health telemetry */
+export type AasVrfTelemetry = {
+    readonly k: number;
+    readonly cr: number;
+    readonly ci: number;
+    readonly q: number;
+    readonly dm: number;
+} | CompactVerificationTelemetry;
 
 /** Executive health block containing composite score, letter grade, and CAI. */
 export interface AasHealth {
@@ -90,13 +100,7 @@ export interface AasHealth {
         readonly lowestScore?: number;
     };
     /** Optional in-kernel verification & 5D Riemannian manifold health telemetry */
-    readonly vrf?: {
-        readonly k: number;
-        readonly cr: number;
-        readonly ci: number;
-        readonly q: number;
-        readonly dm: number;
-    };
+    readonly vrf?: AasVrfTelemetry;
     /** Quantitative financial capital debt and risk engineering metrics */
     readonly quant?: AasQuantMetrics;
     /** Aggregate counter summary */
@@ -122,23 +126,23 @@ export interface AasQuantMetrics {
     /** Native term: Elastic Healing Half-Life in commits (EHL, alias for halfLifeCommits) */
     readonly ehl?: number;
     /** Interest coverage ratio (multiple) [Legacy Alias] */
-    readonly icr: number;
+    readonly icr?: number;
     /** Quality Sharpe ratio [Legacy Alias] */
-    readonly qsr: number;
+    readonly qsr?: number;
     /** Quality Sortino downside ratio [Legacy Alias] */
-    readonly sortino: number;
+    readonly sortino?: number;
     /** File-level technical debt Gini coefficient [0.0 .. 1.0] [Legacy Alias] */
-    readonly debtGini: number;
+    readonly debtGini?: number;
     /** Rule family normalized Shannon entropy [0.0 .. 1.0] [Legacy Alias] */
-    readonly defectEntropy: number;
+    readonly defectEntropy?: number;
     /** 95% Value at Risk maximum anticipated drop (%) [Legacy Alias] */
-    readonly var95: number;
+    readonly var95?: number;
     /** Historical maximum drawdown (%) [Legacy Alias] */
-    readonly mdd: number;
+    readonly mdd?: number;
     /** Ornstein-Uhlenbeck mean-reversion half-life in commits [Legacy Alias] */
-    readonly halfLifeCommits: number;
+    readonly halfLifeCommits?: number;
     /** Qualitative debt governance status */
-    readonly status?: string;
+    readonly status?: FinancialDebtMetrics['status'];
 }
 
 /** Bottleneck entry ranking rules by composite score point loss. */
@@ -312,13 +316,7 @@ export interface AasReportOptions {
             readonly netDebtDelta?: number;
             readonly reason?: string;
         };
-        readonly vrf?: {
-            readonly k: number;
-            readonly cr: number;
-            readonly ci: number;
-            readonly q: number;
-            readonly dm: number;
-        };
+        readonly vrf?: AasVrfTelemetry;
         readonly quant?: AasQuantMetrics;
     };
 }

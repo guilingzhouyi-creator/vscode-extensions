@@ -134,8 +134,11 @@ function renderTechnicalDebtAndDensity(scoreBreakdown: QualityScoreBreakdown): v
     }
     if (scoreBreakdown.quant) {
         const quant = scoreBreakdown.quant;
-        const statusBadge = quant.financial.status === 'de-leveraging' ? '[Active-Clearing]' :
-            quant.financial.status === 'balanced' ? '[Balanced]' : '[Deficit-Growing]';
+        const statusBadge =
+            quant.financial.status === 'de-leveraging' ? '[Active-Clearing]' :
+            quant.financial.status === 'balanced' ? '[Balanced]' :
+            quant.financial.status === 'insufficient_samples' ? '[Insufficient-Samples]' :
+            '[Deficit-Growing]';
         const rcrVal = quant.financial.rcr ?? quant.financial.interestCoverageRatio;
         const erqVal = quant.riskRatios.erq ?? quant.riskRatios.qsr;
         const ddrVal = quant.riskRatios.ddr ?? quant.riskRatios.sortino;

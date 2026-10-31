@@ -234,12 +234,12 @@ export function computeFinancialDebtLedger(input: FinancialDebtInput): Financial
         return {
             principalHours,
             interestDragHours,
-            interestCoverageRatio: 2.0,
-            rcr: 2.0,
+            interestCoverageRatio: 0.0,
+            rcr: 0.0,
             deficitStockHours: principalHours,
             frictionDragHours: interestDragHours,
-            status: 'balanced',
-            clearanceStatus: 'balanced',
+            status: 'insufficient_samples',
+            clearanceStatus: 'insufficient_samples',
         };
     }
 
