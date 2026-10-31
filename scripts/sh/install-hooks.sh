@@ -77,6 +77,33 @@ else
 fi
 
 echo "✅ 已配置 git config core.hooksPath = $effective_hooks_path"
+
+# 部署物理 .git/hooks 代理转发脚本，实现双轨兜底防御 (Dual-Track Hook Resilience)
+git_dir_raw="$(git rev-parse --git-dir 2>/dev/null || true)"
+if [[ -n "$git_dir_raw" ]]; then
+    if [[ "$git_dir_raw" = /* ]]; then
+        git_dir="$git_dir_raw"
+    else
+        git_dir="$(pwd)/$git_dir_raw"
+    fi
+    physical_hooks="$git_dir/hooks"
+    mkdir -p "$physical_hooks"
+    for hook in "${REQUIRED_HOOKS[@]}"; do
+        dest="$physical_hooks/$hook"
+        cat > "$dest" << 'EOF'
+#!/usr/bin/env bash
+# Physical Hook Fallback Proxy — mirrors .githooks
+ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+HOOK_NAME="$(basename "$0")"
+if [[ -f "$ROOT_DIR/.githooks/$HOOK_NAME" ]]; then
+    exec bash "$ROOT_DIR/.githooks/$HOOK_NAME" "$@"
+fi
+exit 0
+EOF
+        chmod +x "$dest" 2>/dev/null || true
+    done
+    echo "✅ 已为物理目录 .git/hooks 部署双轨代理转发脚本 (Dual-Track Hook Resilience)"
+fi
 echo "✅ 已为 ${REQUIRED_HOOKS[*]} 设置并回读索引可执行位 100755"
 for hook in "${REQUIRED_HOOKS[@]}"; do
     echo "✅ $hook 门禁 (.githooks/$hook -> pwsh / bash 双运行期路由)"

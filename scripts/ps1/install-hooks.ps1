@@ -92,6 +92,34 @@ if (Test-Path -Path $receiptsEngine -PathType Leaf) {
 
 $effectiveHooksPath = (git config --get core.hooksPath) -join ''
 Write-Host "✅ 已配置 git config core.hooksPath = $effectiveHooksPath" -ForegroundColor Green
+
+# 部署物理 .git/hooks 代理转发脚本，实现双轨兜底防御 (Dual-Track Hook Resilience)
+try {
+    $gitDirRaw = (git rev-parse --git-dir 2>$null) -join ''
+    if ($gitDirRaw) {
+        $gitDir = if ([System.IO.Path]::IsPathRooted($gitDirRaw)) { $gitDirRaw } else { Join-Path $gitRoot $gitDirRaw }
+        $physicalHooks = Join-Path $gitDir "hooks"
+        if (-not (Test-Path -Path $physicalHooks)) {
+            [void](New-Item -ItemType Directory -Path $physicalHooks -Force)
+        }
+        foreach ($hook in $requiredHooks) {
+            $dest = Join-Path $physicalHooks $hook
+            $proxyContent = @"
+#!/usr/bin/env bash
+# Physical Hook Fallback Proxy — mirrors .githooks
+ROOT_DIR="`$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+if [[ -f "`$ROOT_DIR/.githooks/$hook" ]]; then
+    exec bash "`$ROOT_DIR/.githooks/$hook" "`$@"
+fi
+exit 0
+"@
+            [System.IO.File]::WriteAllText($dest, $proxyContent, [System.Text.UTF8Encoding]::new($false))
+        }
+        Write-Host "✅ 已为物理目录 .git/hooks 部署双轨代理转发脚本 (Dual-Track Hook Resilience)" -ForegroundColor Green
+    }
+} catch {
+    # 物理钩子镜像为防御兜底，异常不中断流程
+}
 Write-Host "✅ 已为 $($requiredHooks -join ', ') 设置索引可执行位 (git update-index --chmod=+x)" -ForegroundColor Green
 foreach ($hook in $requiredHooks) {
     Write-Host "✅ $hook 门禁 (.githooks/$hook -> pwsh / bash 双运行期路由)" -ForegroundColor Green

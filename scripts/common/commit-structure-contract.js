@@ -28,15 +28,24 @@
  * @module commit-structure-contract
  */
 
-'use strict';
+"use strict";
 
-const path = require('path');
+const path = require("path");
 
-const TERMS_FILE = path.join(__dirname, 'commit-msg-forbidden-terms.json');
+const TERMS_FILE = path.join(__dirname, "commit-msg-forbidden-terms.json");
 
 /** Commit types that carry production-grade obligations (body density, sections, project scope). */
-const CRITICAL_TYPES = Object.freeze(['feat', 'fix', 'refactor', 'perf']);
-const ALL_TYPES = Object.freeze(['feat', 'fix', 'refactor', 'docs', 'test', 'chore', 'style', 'perf']);
+const CRITICAL_TYPES = Object.freeze(["feat", "fix", "refactor", "perf"]);
+const ALL_TYPES = Object.freeze([
+  "feat",
+  "fix",
+  "refactor",
+  "docs",
+  "test",
+  "chore",
+  "style",
+  "perf",
+]);
 const MIN_BODY_SUBSTANTIVE = 30;
 const NON_CRITICAL_MIN_BODY_SUBSTANTIVE = 15;
 const HEADER_MIN = 4;
@@ -50,12 +59,12 @@ const HEADER_MAX = 80;
  * produces — a caller filtering on it would silently match nothing.
  */
 const STEP = Object.freeze({
-  header: 'HEADER-FORM-01',
-  split: 'BODY-SPLIT-03',
-  density: 'BODY-DENSITY-04',
-  sections: 'BODY-SECTIONS-05',
-  project: 'PROJECT-SCOPE-06',
-  batch: 'BATCH-CODE-07',
+  header: "HEADER-FORM-01",
+  split: "BODY-SPLIT-03",
+  density: "BODY-DENSITY-04",
+  sections: "BODY-SECTIONS-05",
+  project: "PROJECT-SCOPE-06",
+  batch: "BATCH-CODE-07",
 });
 
 /**
@@ -67,15 +76,23 @@ const STEP = Object.freeze({
  * real contract violation, not a localization difference.
  */
 const HEADER = new RegExp(
-  `^(${ALL_TYPES.join('|')})\\(([\\w\\-/,@.\\u4e00-\\u9fff]+(?:,\\s*[\\w\\-/,@.\\u4e00-\\u9fff]+)*)\\): ([\\s\\S]{${HEADER_MIN},${HEADER_MAX}})$`,
-  'u',
+  `^(${ALL_TYPES.join("|")})\\(([\\w\\-/,@.\\u4e00-\\u9fff]+(?:,\\s*[\\w\\-/,@.\\u4e00-\\u9fff]+)*)\\): ([\\s\\S]{${HEADER_MIN},${HEADER_MAX}})$`,
+  "u",
 );
 
 /** A trailing ASCII or full-width period. */
 const TRAILING_PERIOD = /[.。]$/;
 
 /** Bare construction-batch codenames that carry no technical meaning. */
-const BATCH_CODE = /\b(phase\d+|st\d+|p\d+|sprint\s*\d+|w[1-9]|pass\s*[1-6])\b/i;
+const BATCH_CODE =
+  /\b(phase\d+|st\d+|p\d+|sprint\s*\d+|w[1-9]|pass\s*[1-6])\b/i;
+
+/** Matches unreplaced template angle-bracket placeholders like `<...>` (e.g. `<type>`, `<scope>`, `<workspace-timing>`). */
+const TEMPLATE_PLACEHOLDER = /<[a-zA-Z\u4e00-\u9fff\-_/|、\s]{2,80}>/;
+
+/** Unresolved markers indicating incomplete or deferred technical thoughts. */
+const UNRESOLVED_MARKERS =
+  /\b(TODO|FIXME|TBD|XXX)\b|(?:\b|[^a-zA-Z0-9])(待补充|待确认|待办|未完待续)(?:\b|[^a-zA-Z0-9])/i;
 
 /** Section headings, matched case-insensitively in both languages. */
 const SECTION = Object.freeze({
@@ -86,7 +103,8 @@ const SECTION = Object.freeze({
 });
 
 /** Project-scope headings, including the inline `[Project: a, b]` and `[Project] a, b` forms. */
-const PROJECT_HEADING = /^\[(?:Project(?:\s*\/\s*(?:项目|项目归属))?|项目归属|项目)(?:\s*:\s*(.*?))?\](?:\s*:?\s*(.*))?$/i;
+const PROJECT_HEADING =
+  /^\[(?:Project(?:\s*\/\s*(?:项目|项目归属))?|项目归属|项目)(?:\s*:\s*(.*?))?\](?:\s*:?\s*(.*))?$/i;
 
 /**
  * Reads the controlled project enumeration from the forbidden-terms dictionary.
@@ -98,7 +116,7 @@ const PROJECT_HEADING = /^\[(?:Project(?:\s*\/\s*(?:项目|项目归属))?|项�
  */
 function controlledProjects() {
   try {
-    const resolver = require('./project-registry-resolver');
+    const resolver = require("./project-registry-resolver");
     const dynamicNames = resolver.getControlledProjectNames();
     if (dynamicNames && dynamicNames.length > 0) {
       return dynamicNames;
@@ -107,15 +125,28 @@ function controlledProjects() {
     // Fall back to dictionary if resolver fails
   }
   try {
-    const dictionary = JSON.parse(require('fs').readFileSync(TERMS_FILE, 'utf8'));
-    const rule = (dictionary.rules || []).find((r) => r.id === 'CMG-PRJ-001');
-    const declared = rule && Array.isArray(rule.controlledProjects) ? rule.controlledProjects : [];
+    const dictionary = JSON.parse(
+      require("fs").readFileSync(TERMS_FILE, "utf8"),
+    );
+    const rule = (dictionary.rules || []).find((r) => r.id === "CMG-PRJ-001");
+    const declared =
+      rule && Array.isArray(rule.controlledProjects)
+        ? rule.controlledProjects
+        : [];
     if (declared.length > 0) return declared.map((p) => p.toLowerCase());
   } catch {
     // A missing dictionary must not silently accept every project name; fall back to the shipped
     // enumeration so the guard still rejects an unauthorised identifier.
   }
-  return ['workspace-timing', 'auto-refactor', 'webgames', 'web-games', 'fractal-git', 'fractalgit', 'governance'];
+  return [
+    "workspace-timing",
+    "auto-refactor",
+    "webgames",
+    "web-games",
+    "fractal-git",
+    "fractalgit",
+    "governance",
+  ];
 }
 
 /**
@@ -127,12 +158,12 @@ function controlledProjects() {
 function parseMessage(content) {
   const lines = String(content)
     .split(/\r?\n/)
-    .map((line) => line.replace(/\s+$/, ''))
+    .map((line) => line.replace(/\s+$/, ""))
     .filter((line) => !/^\s*#/.test(line));
-  const header = (lines[0] || '').trim();
-  const body = lines.slice(2).join('\n');
+  const header = (lines[0] || "").trim();
+  const body = lines.slice(2).join("\n");
   const typeMatch = /^([a-z]+)/.exec(header);
-  return { lines, header, body, type: typeMatch ? typeMatch[1] : '' };
+  return { lines, header, body, type: typeMatch ? typeMatch[1] : "" };
 }
 
 /**
@@ -154,10 +185,10 @@ function countSubstantive(bodyLines) {
       continue;
     }
     if (inProjectBlock) {
-      if (trimmed === '' || trimmed.startsWith('-')) continue;
+      if (trimmed === "" || trimmed.startsWith("-")) continue;
       inProjectBlock = false;
     }
-    total += trimmed.replace(/\s/g, '').length;
+    total += trimmed.replace(/\s/g, "").length;
   }
   return total;
 }
@@ -178,9 +209,9 @@ function collectProjects(body) {
     for (const part of String(value).split(/[,，、]/)) {
       const cleaned = part
         .trim()
-        .replace(/^-\s*/, '')
-        .replace(/\s*[（(].*$/, '')
-        .replace(/\s+.*$/, '')
+        .replace(/^-\s*/, "")
+        .replace(/\s*[（(].*$/, "")
+        .replace(/\s+.*$/, "")
         .trim();
       if (cleaned) declared.push(cleaned);
     }
@@ -195,7 +226,7 @@ function collectProjects(body) {
       continue;
     }
     if (!inSection) continue;
-    if (line === '') continue;
+    if (line === "") continue;
     if (/^\[.*\]/.test(line)) {
       inSection = false;
       continue;
@@ -208,13 +239,16 @@ function collectProjects(body) {
 }
 
 /** Bare command line invocations that carry no assertion fact. */
-const BARE_CMD = /^`?(?:npm|npx|node|pwsh|bash|git|vitest|cargo|tsc|python)\b[^。；]*$/i;
+const BARE_CMD =
+  /^`?(?:npm|npx|node|pwsh|bash|git|vitest|cargo|tsc|python)\b[^。；]*$/i;
 
 /** Trivial single-word completions without verifiable technical assertion. */
-const HEDGE_WORD = /^(?:ok|done|已(?:经)?(?:改好|修复|完成|测试)|无问题|没问题|通过|pass)[。.!！]?$/i;
+const HEDGE_WORD =
+  /^(?:ok|done|已(?:经)?(?:改好|修复|完成|测试)|无问题|没问题|通过|pass)[。.!！]?$/i;
 
 /** Speculative hedge phrases indicating unverified assumptions. */
-const HEDGE_PHRASE = /(应该|大概|基本(?:上)?没问题|没问题|无问题|已经(?:改|修)好|已(?:经)?完成(?:修改|修复)|不出意外|按理)/;
+const HEDGE_PHRASE =
+  /(应该|大概|基本(?:上)?没问题|没问题|无问题|已经(?:改|修)好|已(?:经)?完成(?:修改|修复)|不出意外|按理)/;
 
 /**
  * Checks the header line shape, trailing period, and the blank separator.
@@ -227,16 +261,26 @@ function checkHeaderShape(parsed, add) {
   if (!HEADER.test(header)) {
     add(
       STEP.header,
-      'GUARD-MSG-001',
+      "GUARD-MSG-001",
       `提交标题不符合格式契约: ${header}`,
-      `expected <type>(<scope>): <summary>, ${HEADER_MIN}~${HEADER_MAX} characters, type in ${ALL_TYPES.join('/')}, scope is required`,
+      `expected <type>(<scope>): <summary>, ${HEADER_MIN}~${HEADER_MAX} characters, type in ${ALL_TYPES.join("/")}, scope is required`,
     );
   }
   if (TRAILING_PERIOD.test(header)) {
-    add(STEP.header, 'GUARD-MSG-001', `提交标题末尾包含句号: ${header}`, 'remove the trailing period');
+    add(
+      STEP.header,
+      "GUARD-MSG-001",
+      `提交标题末尾包含句号: ${header}`,
+      "remove the trailing period",
+    );
   }
-  if (lines.length > 1 && (lines[1] || '').trim() !== '') {
-    add(STEP.split, 'GUARD-MSG-001', '标题与正文之间缺少空行', 'line 2 must be blank');
+  if (lines.length > 1 && (lines[1] || "").trim() !== "") {
+    add(
+      STEP.split,
+      "GUARD-MSG-001",
+      "标题与正文之间缺少空行",
+      "line 2 must be blank",
+    );
   }
 }
 
@@ -249,27 +293,40 @@ function checkHeaderShape(parsed, add) {
 function checkBodySections(parsed, add) {
   const { lines, body, type } = parsed;
   const isCritical = CRITICAL_TYPES.includes(type);
-  const minSubstantive = isCritical ? MIN_BODY_SUBSTANTIVE : NON_CRITICAL_MIN_BODY_SUBSTANTIVE;
+  const minSubstantive = isCritical
+    ? MIN_BODY_SUBSTANTIVE
+    : NON_CRITICAL_MIN_BODY_SUBSTANTIVE;
   const substantive = countSubstantive(lines.slice(2));
   if (substantive < minSubstantive) {
     add(
       STEP.density,
-      'GUARD-MSG-001',
+      "GUARD-MSG-001",
       `正文实质信息量不足 (${substantive} < ${minSubstantive})`,
       isCritical
-        ? 'add technical facts under [Why], [Changed] and [Verification]'
-        : 'add technical facts under [Why] and [Verification]',
+        ? "add technical facts under [Why], [Changed] and [Verification]"
+        : "add technical facts under [Why] and [Verification]",
     );
   }
   const missing = [];
-  if (!SECTION.why.test(body)) missing.push('[Why]');
-  if (isCritical && !SECTION.change.test(body)) missing.push('[Changed/Added/Fixed]');
-  if (!SECTION.verification.test(body)) missing.push('[Verification]');
+  if (!SECTION.why.test(body)) missing.push("[Why]");
+  if (isCritical && !SECTION.change.test(body))
+    missing.push("[Changed/Added/Fixed]");
+  if (!SECTION.verification.test(body)) missing.push("[Verification]");
   if (missing.length > 0) {
-    add(STEP.sections, 'GUARD-MSG-001', `缺少必需区块: ${missing.join(', ')}`, 'add the listed sections');
+    add(
+      STEP.sections,
+      "GUARD-MSG-001",
+      `缺少必需区块: ${missing.join(", ")}`,
+      "add the listed sections",
+    );
   }
-  if (type === 'fix' && !SECTION.fixed.test(body)) {
-    add(STEP.sections, 'GUARD-MSG-001', 'fix 提交缺少 [Fixed] 区块', 'state the defect and its root cause');
+  if (type === "fix" && !SECTION.fixed.test(body)) {
+    add(
+      STEP.sections,
+      "GUARD-MSG-001",
+      "fix 提交缺少 [Fixed] 区块",
+      "state the defect and its root cause",
+    );
   }
 }
 
@@ -280,11 +337,11 @@ function checkBodySections(parsed, add) {
  * @returns {boolean} True if the item carries substantive technical assertions.
  */
 function isFalsifiableItem(item) {
-  const plain = item.replace(/`[^`]*`/g, '').trim();
+  const plain = item.replace(/`[^`]*`/g, "").trim();
   if (!plain) return false;
   if (HEDGE_WORD.test(plain) || HEDGE_PHRASE.test(plain)) return false;
   if (BARE_CMD.test(plain)) return false;
-  const substantive = plain.replace(/[\s。，,、；;：:!！\-*]/g, '').length;
+  const substantive = plain.replace(/[\s。，,、；;：:!！\-*]/g, "").length;
   return substantive >= 8;
 }
 
@@ -307,15 +364,15 @@ function extractVerificationItems(body) {
       inside = false;
       continue;
     }
-    if (inside && line !== '') {
+    if (inside && line !== "") {
       collected.push(line);
     }
   }
   const bullets = collected
     .filter((l) => /^[-*]\s+/.test(l))
-    .map((l) => l.replace(/^[-*]\s+/, '').trim());
+    .map((l) => l.replace(/^[-*]\s+/, "").trim());
   if (bullets.length > 0) return bullets;
-  const prose = collected.join(' ').trim();
+  const prose = collected.join(" ").trim();
   return prose ? [prose] : [];
 }
 
@@ -332,9 +389,9 @@ function checkVerificationAssertion(body, add) {
   if (!hasRealAssertion) {
     add(
       STEP.sections,
-      'GUARD-MSG-001',
-      '验证结论缺少实质技术断言或仅包含敷衍占位符/裸命令',
-      'provide at least one concrete, falsifiable technical assertion under [Verification]',
+      "GUARD-MSG-001",
+      "验证结论缺少实质技术断言或仅包含敷衍占位符/裸命令",
+      "provide at least one concrete, falsifiable technical assertion under [Verification]",
     );
   }
 }
@@ -348,7 +405,8 @@ function checkVerificationAssertion(body, add) {
 function getSectionRank(name) {
   if (/^(project|项目|项目归属)$/.test(name)) return 1;
   if (/^(why|动机|背景|动机背景)$/.test(name)) return 2;
-  if (/^(added|changed|fixed|removed|新增|变更|修改|修复|删除)$/.test(name)) return 3;
+  if (/^(added|changed|fixed|removed|新增|变更|修改|修复|删除)$/.test(name))
+    return 3;
   if (/^(verification|验证|验证结论)$/.test(name)) return 4;
   return 99;
 }
@@ -373,9 +431,9 @@ function checkSectionOrderAndDuplication(body, add) {
     if (seen.has(h.name)) {
       add(
         STEP.sections,
-        'GUARD-MSG-001',
+        "GUARD-MSG-001",
         `正文存在重复区块: ${h.raw}`,
-        'each section must appear at most once',
+        "each section must appear at most once",
       );
     }
     seen.add(h.name);
@@ -387,9 +445,9 @@ function checkSectionOrderAndDuplication(body, add) {
       if (r < lastRank) {
         add(
           STEP.sections,
-          'GUARD-MSG-001',
+          "GUARD-MSG-001",
           `区块顺序颠倒: ${h.raw}`,
-          'sections must follow order: [Project] -> [Why] -> [Changed/Added/Fixed] -> [Verification]',
+          "sections must follow order: [Project] -> [Why] -> [Changed/Added/Fixed] -> [Verification]",
         );
         break;
       }
@@ -410,9 +468,9 @@ function checkProjectScope(body, options, add) {
   if (declared.length === 0) {
     add(
       STEP.project,
-      'CMG-PRJ-001',
-      '缺少项目归属区块或未声明任何项目',
-      'declare [Project / 项目归属] with at least one controlled project',
+      "CMG-PRJ-001",
+      "缺少项目归属区块或未声明任何项目",
+      "declare [Project / 项目归属] with at least one controlled project",
     );
     return;
   }
@@ -422,18 +480,18 @@ function checkProjectScope(body, options, add) {
   if (invalid.length > 0) {
     add(
       STEP.project,
-      'CMG-PRJ-001',
-      `项目归属包含未授权标识: ${invalid.join(', ')}`,
-      `allowed: ${[...legal].join(', ')}`,
+      "CMG-PRJ-001",
+      `项目归属包含未授权标识: ${invalid.join(", ")}`,
+      `allowed: ${[...legal].join(", ")}`,
     );
   }
   try {
-    const resolver = require('./project-registry-resolver');
+    const resolver = require("./project-registry-resolver");
     for (const p of declared) {
-      if (resolver.getProjectStatus(p) === 'Frozen') {
+      if (resolver.getProjectStatus(p) === "Frozen") {
         add(
           STEP.project,
-          'CMG-PRJ-001',
+          "CMG-PRJ-001",
           `项目 '${p}' TTL 租约已过期，提交权限已被拒绝 (Commit Lockdown)`,
           `run 'taxis project renew ${p}' to unfreeze commit privileges`,
         );
@@ -461,10 +519,110 @@ function checkBatchCodenames(body, add) {
   });
   if (batchLines.length === 0) return;
   const first = batchLines[0];
-  add(STEP.batch, 'CMG-STY-001', `正文包含批次代号: ${first.token}`, 'describe the technical fact instead', {
-    line: first.line,
-    token: first.token,
-  });
+  add(
+    STEP.batch,
+    "CMG-STY-001",
+    `正文包含批次代号: ${first.token}`,
+    "describe the technical fact instead",
+    {
+      line: first.line,
+      token: first.token,
+    },
+  );
+}
+
+/**
+ * Checks for unreplaced template angle-bracket placeholders in the header or body.
+ *
+ * @param {{header: string, body: string}} parsed - Parsed message parts.
+ * @param add - Finding sink.
+ */
+function checkTemplatePlaceholders(parsed, add) {
+  const content = parsed.header + "\n\n" + parsed.body;
+  const lines = content.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const m = TEMPLATE_PLACEHOLDER.exec(line);
+    if (m && !line.includes("](" + m[0])) {
+      add(
+        STEP.density,
+        "GUARD-MSG-001",
+        `提交信息残留未替换的模板尖括号占位符: "${m[0]}" (第 ${i + 1} 行)`,
+        "replace template placeholders with substantive technical facts",
+      );
+      break;
+    }
+  }
+}
+
+/**
+ * Verifies that declared structured sections carry substantive body text, not just bare headings.
+ *
+ * @param {string} body - Commit body.
+ * @param add - Finding sink.
+ */
+function checkEmptySections(body, add) {
+  const lines = body.split(/\r?\n/);
+  let currentSection = null;
+  let sectionContentLength = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const headingMatch = /^\[([a-zA-Z\u4e00-\u9fff\s/]+)\]/.exec(line);
+    if (headingMatch) {
+      if (currentSection !== null && sectionContentLength === 0) {
+        add(
+          STEP.sections,
+          "GUARD-MSG-001",
+          `结构化区块 ${currentSection} 为空壳，缺少实质内容`,
+          `fill in substantive facts under ${currentSection} or remove it`,
+        );
+      }
+      currentSection = headingMatch[0];
+      sectionContentLength = 0;
+      continue;
+    }
+    if (currentSection !== null && line.length > 0) {
+      const substantive = line.replace(/^[-*]\s*/, "").trim();
+      if (substantive.length > 0) {
+        sectionContentLength += substantive.length;
+      }
+    }
+  }
+  if (currentSection !== null && sectionContentLength === 0) {
+    add(
+      STEP.sections,
+      "GUARD-MSG-001",
+      `结构化区块 ${currentSection} 为空壳，缺少实质内容`,
+      `fill in substantive facts under ${currentSection} or remove it`,
+    );
+  }
+}
+
+/**
+ * Checks for unresolved markers (TODO/FIXME/TBD/待补充) in header or body.
+ *
+ * @param {{header: string, body: string}} parsed - Parsed message parts.
+ * @param add - Finding sink.
+ */
+function checkUnresolvedMarkers(parsed, add) {
+  const content = parsed.header + "\n\n" + parsed.body;
+  const lines = content.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/`[^`]*(?:TODO|FIXME|TBD)[^`]*`/.test(line)) continue;
+    const m = UNRESOLVED_MARKERS.exec(line);
+    if (m) {
+      const token = m[1] || m[2] || m[0];
+      add(
+        STEP.density,
+        "CMG-STY-001",
+        `提交信息包含未决占位标记 "${token}" (第 ${i + 1} 行)`,
+        "resolve all TODO/TBD markers before committing to the repository",
+      );
+      break;
+    }
+  }
 }
 
 /**
@@ -480,14 +638,17 @@ function verifyStructure(content, options = {}) {
   const add = (step, ruleId, message, detail, extra) =>
     findings.push({ step, ruleId, message, detail, ...(extra || {}) });
 
-  if (parsed.header === '') {
-    add(STEP.header, 'GUARD-MSG-001', '提交标题为空', 'header is empty');
+  if (parsed.header === "") {
+    add(STEP.header, "GUARD-MSG-001", "提交标题为空", "header is empty");
     return findings;
   }
 
   checkHeaderShape(parsed, add);
+  checkTemplatePlaceholders(parsed, add);
+  checkUnresolvedMarkers(parsed, add);
   checkProjectScope(parsed.body, options, add);
   checkBodySections(parsed, add);
+  checkEmptySections(parsed.body, add);
   checkSectionOrderAndDuplication(parsed.body, add);
   checkVerificationAssertion(parsed.body, add);
   checkBatchCodenames(parsed.body, add);
@@ -502,39 +663,258 @@ function verifyStructure(content, options = {}) {
 function runSelfProbes() {
   const failures = [];
   const expect = (label, actual, wanted) => {
-    if (actual !== wanted) failures.push(`probe "${label}": expected ${wanted}, got ${actual}`);
+    if (actual !== wanted)
+      failures.push(`probe "${label}": expected ${wanted}, got ${actual}`);
   };
-  const project = '[Project / 项目归属]\n- governance';
-  const why = '[Why / 动机背景]\n- 现有判定在空指针分支上缺少保护，构造边界输入时会抛出异常并中断门禁流程。';
-  const fixed = '[Fixed / 修复缺陷]\n- 修复空指针分支缺少保护导致异常穿透到调用方的缺陷，根因是判定顺序先解引用后判空。';
-  const verify = '[Verification / 验证结论]\n- 以空输入复核，门禁给出结构化阻断而非异常中断。';
-  const build = (header, body) => [header, '', body, ''].join('\n');
-  const clean = build('fix(gate): 修复空指针分支的判定顺序', [project, why, fixed, verify].join('\n\n'));
+  const project = "[Project / 项目归属]\n- governance";
+  const why =
+    "[Why / 动机背景]\n- 现有判定在空指针分支上缺少保护，构造边界输入时会抛出异常并中断门禁流程。";
+  const fixed =
+    "[Fixed / 修复缺陷]\n- 修复空指针分支缺少保护导致异常穿透到调用方的缺陷，根因是判定顺序先解引用后判空。";
+  const verify =
+    "[Verification / 验证结论]\n- 以空输入复核，门禁给出结构化阻断而非异常中断。";
+  const build = (header, body) => [header, "", body, ""].join("\n");
+  const clean = build(
+    "fix(gate): 修复空指针分支的判定顺序",
+    [project, why, fixed, verify].join("\n\n"),
+  );
   const steps = (msg) => verifyStructure(msg).map((f) => f.step);
 
-  expect('compliant-message-passes', steps(clean).length, 0);
-  expect('chinese-scope-accepted', steps(build('fix(门禁): 修复空指针分支的判定顺序', [project, why, fixed, verify].join('\n\n'))).length, 0);
-  expect('short-header-rejected', steps(build('fix(gate): abc', [project, why, fixed, verify].join('\n\n'))).includes(STEP.header), true);
-  expect('missing-scope-rejected', steps(build('fix: 修复空指针分支的判定顺序', [project, why, fixed, verify].join('\n\n'))).includes(STEP.header), true);
-  expect('empty-scope-rejected', steps(build('fix(): 修复空指针分支的判定顺序', [project, why, fixed, verify].join('\n\n'))).includes(STEP.header), true);
-  expect('trailing-period-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序。', [project, why, fixed, verify].join('\n\n'))).includes(STEP.header), true);
-  expect('unknown-type-rejected', steps(build('update(gate): 修复空指针分支的判定顺序', [project, why, fixed, verify].join('\n\n'))).includes(STEP.header), true);
-  expect('missing-blank-line-rejected', steps(['fix(gate): 修复空指针分支的判定顺序', project, why, fixed, verify, ''].join('\n')).includes(STEP.split), true);
-  expect('thin-body-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, '[Why]\n- 短', '[Fixed]\n- 短', '[Verification]\n- 短断言结果合格通过'].join('\n\n'))).includes(STEP.density), true);
-  expect('missing-verification-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, why, fixed].join('\n\n'))).includes(STEP.sections), true);
-  expect('fix-without-fixed-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, why, '[Changed]\n- 补充显式判空与早返回，避免异常穿透到调用方。', verify].join('\n\n'))).includes(STEP.sections), true);
-  expect('missing-project-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [why, fixed, verify].join('\n\n'))).includes(STEP.project), true);
-  expect('invalid-project-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', ['[Project / 项目归属]\n- unknown', why, fixed, verify].join('\n\n'))).includes(STEP.project), true);
-  expect('batch-codename-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, '[Why]\n- 本 Sprint 3 内补齐判定顺序保护，构造边界输入时会抛出异常并中断门禁流程。', fixed, verify].join('\n\n'))).includes(STEP.batch), true);
-  expect('duplicate-section-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, why, why, fixed, verify].join('\n\n'))).includes(STEP.sections), true);
-  expect('out-of-order-section-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, verify, why, fixed].join('\n\n'))).includes(STEP.sections), true);
-  expect('bare-cmd-verification-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, why, fixed, '[Verification]\n- npm test'].join('\n\n'))).includes(STEP.sections), true);
-  expect('hedge-verification-rejected', steps(build('fix(gate): 修复空指针分支的判定顺序', [project, why, fixed, '[Verification]\n- 应该没问题了'].join('\n\n'))).includes(STEP.sections), true);
+  expect("compliant-message-passes", steps(clean).length, 0);
+  expect(
+    "chinese-scope-accepted",
+    steps(
+      build(
+        "fix(门禁): 修复空指针分支的判定顺序",
+        [project, why, fixed, verify].join("\n\n"),
+      ),
+    ).length,
+    0,
+  );
+  expect(
+    "short-header-rejected",
+    steps(
+      build("fix(gate): abc", [project, why, fixed, verify].join("\n\n")),
+    ).includes(STEP.header),
+    true,
+  );
+  expect(
+    "missing-scope-rejected",
+    steps(
+      build(
+        "fix: 修复空指针分支的判定顺序",
+        [project, why, fixed, verify].join("\n\n"),
+      ),
+    ).includes(STEP.header),
+    true,
+  );
+  expect(
+    "empty-scope-rejected",
+    steps(
+      build(
+        "fix(): 修复空指针分支的判定顺序",
+        [project, why, fixed, verify].join("\n\n"),
+      ),
+    ).includes(STEP.header),
+    true,
+  );
+  expect(
+    "trailing-period-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序。",
+        [project, why, fixed, verify].join("\n\n"),
+      ),
+    ).includes(STEP.header),
+    true,
+  );
+  expect(
+    "unknown-type-rejected",
+    steps(
+      build(
+        "update(gate): 修复空指针分支的判定顺序",
+        [project, why, fixed, verify].join("\n\n"),
+      ),
+    ).includes(STEP.header),
+    true,
+  );
+  expect(
+    "missing-blank-line-rejected",
+    steps(
+      [
+        "fix(gate): 修复空指针分支的判定顺序",
+        project,
+        why,
+        fixed,
+        verify,
+        "",
+      ].join("\n"),
+    ).includes(STEP.split),
+    true,
+  );
+  expect(
+    "thin-body-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [
+          project,
+          "[Why]\n- 短",
+          "[Fixed]\n- 短",
+          "[Verification]\n- 短断言结果合格通过",
+        ].join("\n\n"),
+      ),
+    ).includes(STEP.density),
+    true,
+  );
+  expect(
+    "missing-verification-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [project, why, fixed].join("\n\n"),
+      ),
+    ).includes(STEP.sections),
+    true,
+  );
+  expect(
+    "fix-without-fixed-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [
+          project,
+          why,
+          "[Changed]\n- 补充显式判空与早返回，避免异常穿透到调用方。",
+          verify,
+        ].join("\n\n"),
+      ),
+    ).includes(STEP.sections),
+    true,
+  );
+  expect(
+    "missing-project-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [why, fixed, verify].join("\n\n"),
+      ),
+    ).includes(STEP.project),
+    true,
+  );
+  expect(
+    "invalid-project-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        ["[Project / 项目归属]\n- unknown", why, fixed, verify].join("\n\n"),
+      ),
+    ).includes(STEP.project),
+    true,
+  );
+  expect(
+    "batch-codename-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [
+          project,
+          "[Why]\n- 本 Sprint 3 内补齐判定顺序保护，构造边界输入时会抛出异常并中断门禁流程。",
+          fixed,
+          verify,
+        ].join("\n\n"),
+      ),
+    ).includes(STEP.batch),
+    true,
+  );
+  expect(
+    "duplicate-section-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [project, why, why, fixed, verify].join("\n\n"),
+      ),
+    ).includes(STEP.sections),
+    true,
+  );
+  expect(
+    "out-of-order-section-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [project, verify, why, fixed].join("\n\n"),
+      ),
+    ).includes(STEP.sections),
+    true,
+  );
+  expect(
+    "bare-cmd-verification-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [project, why, fixed, "[Verification]\n- npm test"].join("\n\n"),
+      ),
+    ).includes(STEP.sections),
+    true,
+  );
+  expect(
+    "hedge-verification-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [project, why, fixed, "[Verification]\n- 应该没问题了"].join("\n\n"),
+      ),
+    ).includes(STEP.sections),
+    true,
+  );
+  expect(
+    "template-placeholder-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [project, why, fixed, "[Verification]\n- <在此处补充技术断言>"].join(
+          "\n\n",
+        ),
+      ),
+    ).includes(STEP.density),
+    true,
+  );
+  expect(
+    "empty-section-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [project, "[Why]", fixed, verify].join("\n\n"),
+      ),
+    ).includes(STEP.sections),
+    true,
+  );
+  expect(
+    "unresolved-marker-rejected",
+    steps(
+      build(
+        "fix(gate): 修复空指针分支的判定顺序",
+        [project, why, fixed, "[Verification]\n- 待补充验证用例与断言"].join(
+          "\n\n",
+        ),
+      ),
+    ).includes(STEP.density),
+    true,
+  );
   // Compliant non-critical message (docs) passes with Why and Verification
-  const docsClean = build('docs(gate): 补充判定顺序说明与契约设计', [project, why, verify].join('\n\n'));
-  expect('compliant-docs-message-passes', steps(docsClean).length, 0);
+  const docsClean = build(
+    "docs(gate): 补充判定顺序说明与契约设计",
+    [project, why, verify].join("\n\n"),
+  );
+  expect("compliant-docs-message-passes", steps(docsClean).length, 0);
   // Non-critical type without body or sections rejected
-  expect('docs-without-body-rejected', steps(build('docs(gate): 补充判定顺序说明', '简短说明')).includes(STEP.sections), true);
+  expect(
+    "docs-without-body-rejected",
+    steps(build("docs(gate): 补充判定顺序说明", "简短说明")).includes(
+      STEP.sections,
+    ),
+    true,
+  );
   return failures;
 }
 

@@ -26,7 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { getSafeGitEnv, getStagedFiles: queryStagedFiles, readStagedBufferSafe, readStagedBuffersBatch } = require('./git-env');
+const { getSafeGitEnv, getStagedFiles: queryStagedFiles, readStagedBufferSafe, readStagedBuffersBatch, checkHeadReceipt } = require('./git-env');
 const {
   evaluateCodeMetrics,
   classifyCStyleLine,
@@ -1155,8 +1155,10 @@ function runFastStaged() {
   const diffText = getStagedDiff(repoRoot, range);
   const { gate3Violations, gate6Violations } = checkDiffStream(diffText);
   const projectViolations = collectProjectViolations(repoRoot, stagedFiles);
+  const headViolations = !range ? checkHeadReceipt(repoRoot) : [];
 
   const buckets = [
+    headViolations,
     gate1Violations,
     lineEndingViolations,
     gate3Violations,
@@ -1183,6 +1185,7 @@ module.exports = {
   checkDiffStream,
   calculateEloc,
   runFastStaged,
+  checkHeadReceipt,
   isMorphemeValid,
   validateFilenameSegments,
   validateFilenameLength,

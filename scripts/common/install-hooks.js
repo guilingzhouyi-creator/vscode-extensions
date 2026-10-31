@@ -18,31 +18,31 @@
  *   it commits to a managed worktree because a silent skip is exactly how hooksPath rot returns.
  */
 
-'use strict';
+"use strict";
 
-const { spawnSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+const { spawnSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
 
-const GIT_COMMAND = 'git';
-const HOOKS_DIRECTORY = '.githooks';
-const HOOKS_PATH_KEY = 'core.hooksPath';
-const RECEIPTS_ENGINE = 'scripts/common/gate-receipts.js';
+const GIT_COMMAND = "git";
+const HOOKS_DIRECTORY = ".githooks";
+const HOOKS_PATH_KEY = "core.hooksPath";
+const RECEIPTS_ENGINE = "scripts/common/gate-receipts.js";
 const REQUIRED_HOOKS = Object.freeze([
-    'pre-commit',
-    'commit-msg',
-    'pre-merge-commit',
-    'post-commit',
-    'post-merge',
-    'pre-push',
-    'post-rewrite',
+  "pre-commit",
+  "commit-msg",
+  "pre-merge-commit",
+  "post-commit",
+  "post-merge",
+  "pre-push",
+  "post-rewrite",
 ]);
-const MODE_EXECUTABLE = '100755';
+const MODE_EXECUTABLE = "100755";
 const EXIT_OK = 0;
 const EXIT_FAILURE = 1;
 const EXIT_USAGE = 2;
-const ENCODING_UTF8 = 'utf8';
-const STDIO_CAPTURED = ['ignore', 'pipe', 'pipe'];
+const ENCODING_UTF8 = "utf8";
+const STDIO_CAPTURED = ["ignore", "pipe", "pipe"];
 
 /**
  * Runs one Git command inside an explicit working directory.
@@ -55,18 +55,18 @@ const STDIO_CAPTURED = ['ignore', 'pipe', 'pipe'];
  * @returns {{ok: boolean, status: number|null, stdout: string, stderr: string}} Normalized result.
  */
 function runGit(args, cwd) {
-    const result = spawnSync(GIT_COMMAND, args, {
-        cwd,
-        encoding: ENCODING_UTF8,
-        stdio: STDIO_CAPTURED,
-        windowsHide: true,
-    });
-    const stdout = typeof result.stdout === 'string' ? result.stdout : '';
-    const stderr = typeof result.stderr === 'string' ? result.stderr : '';
-    if (result.error) {
-        return { ok: false, status: null, stdout, stderr: result.error.message };
-    }
-    return { ok: result.status === 0, status: result.status, stdout, stderr };
+  const result = spawnSync(GIT_COMMAND, args, {
+    cwd,
+    encoding: ENCODING_UTF8,
+    stdio: STDIO_CAPTURED,
+    windowsHide: true,
+  });
+  const stdout = typeof result.stdout === "string" ? result.stdout : "";
+  const stderr = typeof result.stderr === "string" ? result.stderr : "";
+  if (result.error) {
+    return { ok: false, status: null, stdout, stderr: result.error.message };
+  }
+  return { ok: result.status === 0, status: result.status, stdout, stderr };
 }
 
 /**
@@ -76,9 +76,9 @@ function runGit(args, cwd) {
  * @returns {string} Short failure description.
  */
 function describeGitFailure(result) {
-    const detail = result.stderr.trim();
-    if (detail.length > 0) return detail;
-    return `退出码 ${result.status === null ? '未知' : result.status}`;
+  const detail = result.stderr.trim();
+  if (detail.length > 0) return detail;
+  return `退出码 ${result.status === null ? "未知" : result.status}`;
 }
 
 /**
@@ -88,12 +88,13 @@ function describeGitFailure(result) {
  * @returns {{ok: boolean, root: string}} Probe outcome; `root` is empty when unsupported.
  */
 function probeWorktree(cwd) {
-    const probe = runGit(['rev-parse', '--is-inside-work-tree'], cwd);
-    if (!probe.ok || probe.stdout.trim() !== 'true') return { ok: false, root: '' };
-    const topLevel = runGit(['rev-parse', '--show-toplevel'], cwd);
-    const root = topLevel.stdout.trim();
-    if (!topLevel.ok || root.length === 0) return { ok: false, root: '' };
-    return { ok: true, root };
+  const probe = runGit(["rev-parse", "--is-inside-work-tree"], cwd);
+  if (!probe.ok || probe.stdout.trim() !== "true")
+    return { ok: false, root: "" };
+  const topLevel = runGit(["rev-parse", "--show-toplevel"], cwd);
+  const root = topLevel.stdout.trim();
+  if (!topLevel.ok || root.length === 0) return { ok: false, root: "" };
+  return { ok: true, root };
 }
 
 /**
@@ -103,11 +104,19 @@ function probeWorktree(cwd) {
  * @returns {{ok: boolean, value: string|null, error: string}} Read outcome.
  */
 function readHooksPath(root) {
-    const result = runGit(['config', '--get', HOOKS_PATH_KEY], root);
-    if (result.status === 1) return { ok: true, value: null, error: '' };
-    if (!result.ok) return { ok: false, value: null, error: describeGitFailure(result) };
-    const values = result.stdout.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
-    return { ok: true, value: values.length > 0 ? values[values.length - 1] : null, error: '' };
+  const result = runGit(["config", "--get", HOOKS_PATH_KEY], root);
+  if (result.status === 1) return { ok: true, value: null, error: "" };
+  if (!result.ok)
+    return { ok: false, value: null, error: describeGitFailure(result) };
+  const values = result.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  return {
+    ok: true,
+    value: values.length > 0 ? values[values.length - 1] : null,
+    error: "",
+  };
 }
 
 /**
@@ -118,10 +127,11 @@ function readHooksPath(root) {
  * @returns {boolean} True when both spellings resolve to the same directory.
  */
 function pointsAtHooksDirectory(root, candidate) {
-    const expected = path.resolve(root, HOOKS_DIRECTORY);
-    const actual = path.resolve(root, candidate);
-    if (process.platform === 'win32') return actual.toLowerCase() === expected.toLowerCase();
-    return actual === expected;
+  const expected = path.resolve(root, HOOKS_DIRECTORY);
+  const actual = path.resolve(root, candidate);
+  if (process.platform === "win32")
+    return actual.toLowerCase() === expected.toLowerCase();
+  return actual === expected;
 }
 
 /**
@@ -131,7 +141,9 @@ function pointsAtHooksDirectory(root, candidate) {
  * @returns {string[]} Missing hook names in declaration order.
  */
 function findMissingHookFiles(root) {
-    return REQUIRED_HOOKS.filter((hook) => !isRegularFile(path.join(root, HOOKS_DIRECTORY, hook)));
+  return REQUIRED_HOOKS.filter(
+    (hook) => !isRegularFile(path.join(root, HOOKS_DIRECTORY, hook)),
+  );
 }
 
 /**
@@ -141,11 +153,11 @@ function findMissingHookFiles(root) {
  * @returns {boolean} True for a readable regular file.
  */
 function isRegularFile(target) {
-    try {
-        return fs.statSync(target).isFile();
-    } catch {
-        return false;
-    }
+  try {
+    return fs.statSync(target).isFile();
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -155,16 +167,17 @@ function isRegularFile(target) {
  * @returns {{ok: boolean, modes: Map<string, string>, error: string}} Read outcome.
  */
 function readIndexModes(root) {
-    const result = runGit(['ls-files', '-s', HOOKS_DIRECTORY], root);
-    if (!result.ok) return { ok: false, modes: new Map(), error: describeGitFailure(result) };
-    const modes = new Map();
-    for (const line of result.stdout.split('\n')) {
-        const tabIndex = line.indexOf('\t');
-        const spaceIndex = line.indexOf(' ');
-        if (tabIndex === -1 || spaceIndex === -1) continue;
-        modes.set(line.slice(tabIndex + 1).trim(), line.slice(0, spaceIndex));
-    }
-    return { ok: true, modes, error: '' };
+  const result = runGit(["ls-files", "-s", HOOKS_DIRECTORY], root);
+  if (!result.ok)
+    return { ok: false, modes: new Map(), error: describeGitFailure(result) };
+  const modes = new Map();
+  for (const line of result.stdout.split("\n")) {
+    const tabIndex = line.indexOf("\t");
+    const spaceIndex = line.indexOf(" ");
+    if (tabIndex === -1 || spaceIndex === -1) continue;
+    modes.set(line.slice(tabIndex + 1).trim(), line.slice(0, spaceIndex));
+  }
+  return { ok: true, modes, error: "" };
 }
 
 /**
@@ -175,9 +188,10 @@ function readIndexModes(root) {
  * @returns {string[]} Problem descriptions.
  */
 function evaluateHooksPath(root, value) {
-    if (value === null) return [`${HOOKS_PATH_KEY} 未设置，需要指向 ${HOOKS_DIRECTORY}`];
-    if (pointsAtHooksDirectory(root, value)) return [];
-    return [`${HOOKS_PATH_KEY} 为 ${value}，需要指向 ${HOOKS_DIRECTORY}`];
+  if (value === null)
+    return [`${HOOKS_PATH_KEY} 未设置，需要指向 ${HOOKS_DIRECTORY}`];
+  if (pointsAtHooksDirectory(root, value)) return [];
+  return [`${HOOKS_PATH_KEY} 为 ${value}，需要指向 ${HOOKS_DIRECTORY}`];
 }
 
 /**
@@ -187,15 +201,17 @@ function evaluateHooksPath(root, value) {
  * @returns {string[]} Problem descriptions.
  */
 function evaluateIndexModes(modes) {
-    const problems = [];
-    for (const hook of REQUIRED_HOOKS) {
-        const entry = `${HOOKS_DIRECTORY}/${hook}`;
-        const mode = modes.get(entry);
-        if (mode !== MODE_EXECUTABLE) {
-            problems.push(`${entry} 索引模式为 ${mode || '缺失'}，需要 ${MODE_EXECUTABLE}`);
-        }
+  const problems = [];
+  for (const hook of REQUIRED_HOOKS) {
+    const entry = `${HOOKS_DIRECTORY}/${hook}`;
+    const mode = modes.get(entry);
+    if (mode !== MODE_EXECUTABLE) {
+      problems.push(
+        `${entry} 索引模式为 ${mode || "缺失"}，需要 ${MODE_EXECUTABLE}`,
+      );
     }
-    return problems;
+  }
+  return problems;
 }
 
 /**
@@ -205,16 +221,60 @@ function evaluateIndexModes(modes) {
  * @returns {{problems: string[], hooksPath: string|null}} Verification outcome.
  */
 function verifyInstallation(root) {
-    const configuration = readHooksPath(root);
-    if (!configuration.ok) return { problems: [`读取 ${HOOKS_PATH_KEY} 失败: ${configuration.error}`], hooksPath: null };
-    const index = readIndexModes(root);
-    if (!index.ok) return { problems: [`读取索引模式失败: ${index.error}`], hooksPath: configuration.value };
-    const problems = [
-        ...evaluateHooksPath(root, configuration.value),
-        ...evaluateIndexModes(index.modes),
-        ...findMissingHookFiles(root).map((hook) => `缺少钩子载体 ${HOOKS_DIRECTORY}/${hook}`),
-    ];
-    return { problems, hooksPath: configuration.value };
+  const configuration = readHooksPath(root);
+  if (!configuration.ok)
+    return {
+      problems: [`读取 ${HOOKS_PATH_KEY} 失败: ${configuration.error}`],
+      hooksPath: null,
+    };
+  const index = readIndexModes(root);
+  if (!index.ok)
+    return {
+      problems: [`读取索引模式失败: ${index.error}`],
+      hooksPath: configuration.value,
+    };
+  const problems = [
+    ...evaluateHooksPath(root, configuration.value),
+    ...evaluateIndexModes(index.modes),
+    ...findMissingHookFiles(root).map(
+      (hook) => `缺少钩子载体 ${HOOKS_DIRECTORY}/${hook}`,
+    ),
+  ];
+  return { problems, hooksPath: configuration.value };
+}
+
+/**
+ * Mirrors proxy forwarders into the physical .git/hooks directory for dual-track resilience.
+ *
+ * @param {string} root - Worktree root.
+ * @returns {void}
+ */
+function mirrorPhysicalHooks(root) {
+  try {
+    const gitDirRes = runGit(["rev-parse", "--git-dir"], root);
+    if (!gitDirRes.ok) return;
+    const gitDir = path.resolve(root, gitDirRes.stdout.trim());
+    const physicalHooksDir = path.join(gitDir, "hooks");
+    if (!fs.existsSync(physicalHooksDir))
+      fs.mkdirSync(physicalHooksDir, { recursive: true });
+
+    for (const hook of REQUIRED_HOOKS) {
+      const dest = path.join(physicalHooksDir, hook);
+      const content = [
+        "#!/usr/bin/env bash",
+        "# Physical Hook Fallback Proxy — mirrors .githooks",
+        'ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"',
+        `if [[ -f "$ROOT_DIR/.githooks/${hook}" ]]; then`,
+        `    exec bash "$ROOT_DIR/.githooks/${hook}" "$@"`,
+        "fi",
+        "exit 0",
+        "",
+      ].join("\n");
+      fs.writeFileSync(dest, content, { encoding: "utf8", mode: 0o755 });
+    }
+  } catch {
+    // Non-fatal physical mirror failure
+  }
 }
 
 /**
@@ -224,17 +284,26 @@ function verifyInstallation(root) {
  * @returns {string[]} One problem description per failed write.
  */
 function applyHookWiring(root) {
-    const configuration = runGit(['config', HOOKS_PATH_KEY, HOOKS_DIRECTORY], root);
-    if (!configuration.ok) {
-        return [`写入 ${HOOKS_PATH_KEY} 失败: ${describeGitFailure(configuration)}`];
-    }
-    const problems = [];
-    for (const hook of REQUIRED_HOOKS) {
-        const entry = `${HOOKS_DIRECTORY}/${hook}`;
-        const chmod = runGit(['update-index', '--chmod=+x', entry], root);
-        if (!chmod.ok) problems.push(`设置 ${entry} 索引可执行位失败: ${describeGitFailure(chmod)}`);
-    }
-    return problems;
+  const configuration = runGit(
+    ["config", HOOKS_PATH_KEY, HOOKS_DIRECTORY],
+    root,
+  );
+  if (!configuration.ok) {
+    return [
+      `写入 ${HOOKS_PATH_KEY} 失败: ${describeGitFailure(configuration)}`,
+    ];
+  }
+  const problems = [];
+  for (const hook of REQUIRED_HOOKS) {
+    const entry = `${HOOKS_DIRECTORY}/${hook}`;
+    const chmod = runGit(["update-index", "--chmod=+x", entry], root);
+    if (!chmod.ok)
+      problems.push(
+        `设置 ${entry} 索引可执行位失败: ${describeGitFailure(chmod)}`,
+      );
+  }
+  mirrorPhysicalHooks(root);
+  return problems;
 }
 
 /**
@@ -244,20 +313,25 @@ function applyHookWiring(root) {
  * @returns {{status: 'refreshed'|'skipped'|'failed', detail: string}} Baseline outcome.
  */
 function refreshReceiptBaseline(root) {
-    const engine = path.join(root, RECEIPTS_ENGINE);
-    if (!isRegularFile(engine)) return { status: 'skipped', detail: '未找到门禁收据引擎' };
-    const result = spawnSync(process.execPath, [engine, 'baseline'], {
-        cwd: root,
-        encoding: ENCODING_UTF8,
-        stdio: STDIO_CAPTURED,
-        windowsHide: true,
-    });
-    if (result.error) return { status: 'failed', detail: result.error.message };
-    if (result.status !== 0) {
-        const detail = typeof result.stderr === 'string' ? result.stderr.trim() : '';
-        return { status: 'failed', detail: detail.length > 0 ? detail : `退出码 ${result.status}` };
-    }
-    return { status: 'refreshed', detail: '' };
+  const engine = path.join(root, RECEIPTS_ENGINE);
+  if (!isRegularFile(engine))
+    return { status: "skipped", detail: "未找到门禁收据引擎" };
+  const result = spawnSync(process.execPath, [engine, "baseline"], {
+    cwd: root,
+    encoding: ENCODING_UTF8,
+    stdio: STDIO_CAPTURED,
+    windowsHide: true,
+  });
+  if (result.error) return { status: "failed", detail: result.error.message };
+  if (result.status !== 0) {
+    const detail =
+      typeof result.stderr === "string" ? result.stderr.trim() : "";
+    return {
+      status: "failed",
+      detail: detail.length > 0 ? detail : `退出码 ${result.status}`,
+    };
+  }
+  return { status: "refreshed", detail: "" };
 }
 
 /**
@@ -267,10 +341,12 @@ function refreshReceiptBaseline(root) {
  * @returns {void}
  */
 function printInstallationSummary(hooksPath) {
-    console.log(`✔ PASS install-hooks ${HOOKS_PATH_KEY}=${hooksPath === null ? HOOKS_DIRECTORY : hooksPath}`);
-    for (const hook of REQUIRED_HOOKS) {
-        console.log(`✔ PASS ${HOOKS_DIRECTORY}/${hook} mode=${MODE_EXECUTABLE}`);
-    }
+  console.log(
+    `✔ PASS install-hooks ${HOOKS_PATH_KEY}=${hooksPath === null ? HOOKS_DIRECTORY : hooksPath}`,
+  );
+  for (const hook of REQUIRED_HOOKS) {
+    console.log(`✔ PASS ${HOOKS_DIRECTORY}/${hook} mode=${MODE_EXECUTABLE}`);
+  }
 }
 
 /**
@@ -280,7 +356,8 @@ function printInstallationSummary(hooksPath) {
  * @returns {void}
  */
 function reportProblems(problems) {
-    for (const problem of problems) console.error(`✖ BLOCK install-hooks ${problem}`);
+  for (const problem of problems)
+    console.error(`✖ BLOCK install-hooks ${problem}`);
 }
 
 /**
@@ -291,14 +368,14 @@ function reportProblems(problems) {
  * @returns {number} Process exit code.
  */
 function runCheck(root, quiet) {
-    const verification = verifyInstallation(root);
-    if (verification.problems.length > 0) {
-        reportProblems(verification.problems);
-        console.error('▲ WARN install-hooks 去掉 --check 重新运行即可自愈上述问题');
-        return EXIT_FAILURE;
-    }
-    if (!quiet) printInstallationSummary(verification.hooksPath);
-    return EXIT_OK;
+  const verification = verifyInstallation(root);
+  if (verification.problems.length > 0) {
+    reportProblems(verification.problems);
+    console.error("▲ WARN install-hooks 去掉 --check 重新运行即可自愈上述问题");
+    return EXIT_FAILURE;
+  }
+  if (!quiet) printInstallationSummary(verification.hooksPath);
+  return EXIT_OK;
 }
 
 /**
@@ -309,32 +386,35 @@ function runCheck(root, quiet) {
  * @returns {number} Process exit code.
  */
 function runInstall(root, quiet) {
-    const missing = findMissingHookFiles(root);
-    if (missing.length > 0) {
-        reportProblems(missing.map((hook) => `缺少钩子载体 ${HOOKS_DIRECTORY}/${hook}`));
-        return EXIT_FAILURE;
-    }
-    const writeProblems = applyHookWiring(root);
-    if (writeProblems.length > 0) {
-        reportProblems(writeProblems);
-        return EXIT_FAILURE;
-    }
-    const verification = verifyInstallation(root);
-    if (verification.problems.length > 0) {
-        reportProblems(verification.problems);
-        return EXIT_FAILURE;
-    }
-    const baseline = refreshReceiptBaseline(root);
-    if (baseline.status === 'failed') {
-        reportProblems([`门禁收据基线写入失败: ${baseline.detail}`]);
-        return EXIT_FAILURE;
-    }
-    if (!quiet) {
-        printInstallationSummary(verification.hooksPath);
-        if (baseline.status === 'refreshed') console.log('✔ PASS gate-receipts baseline=refreshed');
-        else console.log(`↷ SKIP gate-receipts baseline ${baseline.detail}`);
-    }
-    return EXIT_OK;
+  const missing = findMissingHookFiles(root);
+  if (missing.length > 0) {
+    reportProblems(
+      missing.map((hook) => `缺少钩子载体 ${HOOKS_DIRECTORY}/${hook}`),
+    );
+    return EXIT_FAILURE;
+  }
+  const writeProblems = applyHookWiring(root);
+  if (writeProblems.length > 0) {
+    reportProblems(writeProblems);
+    return EXIT_FAILURE;
+  }
+  const verification = verifyInstallation(root);
+  if (verification.problems.length > 0) {
+    reportProblems(verification.problems);
+    return EXIT_FAILURE;
+  }
+  const baseline = refreshReceiptBaseline(root);
+  if (baseline.status === "failed") {
+    reportProblems([`门禁收据基线写入失败: ${baseline.detail}`]);
+    return EXIT_FAILURE;
+  }
+  if (!quiet) {
+    printInstallationSummary(verification.hooksPath);
+    if (baseline.status === "refreshed")
+      console.log("✔ PASS gate-receipts baseline=refreshed");
+    else console.log(`↷ SKIP gate-receipts baseline ${baseline.detail}`);
+  }
+  return EXIT_OK;
 }
 
 /**
@@ -344,20 +424,20 @@ function runInstall(root, quiet) {
  * @returns {{ok: true, check: boolean, quiet: boolean}|{ok: false, argument: string}} Parse result.
  */
 function parseArguments(argv) {
-    let check = false;
-    let quiet = false;
-    for (const argument of argv) {
-        if (argument === '--check') {
-            check = true;
-            continue;
-        }
-        if (argument === '--quiet') {
-            quiet = true;
-            continue;
-        }
-        return { ok: false, argument };
+  let check = false;
+  let quiet = false;
+  for (const argument of argv) {
+    if (argument === "--check") {
+      check = true;
+      continue;
     }
-    return { ok: true, check, quiet };
+    if (argument === "--quiet") {
+      quiet = true;
+      continue;
+    }
+    return { ok: false, argument };
+  }
+  return { ok: true, check, quiet };
 }
 
 /**
@@ -366,9 +446,11 @@ function parseArguments(argv) {
  * @returns {void}
  */
 function printUsage() {
-    console.error('用法: node scripts/common/install-hooks.js [--check] [--quiet]');
-    console.error('  --check   只校验 core.hooksPath 与索引模式，不写入任何配置');
-    console.error('  --quiet   通过时不输出逐项明细');
+  console.error(
+    "用法: node scripts/common/install-hooks.js [--check] [--quiet]",
+  );
+  console.error("  --check   只校验 core.hooksPath 与索引模式，不写入任何配置");
+  console.error("  --quiet   通过时不输出逐项明细");
 }
 
 /**
@@ -378,28 +460,32 @@ function printUsage() {
  * @returns {number} Process exit code.
  */
 function main(argv) {
-    const parsed = parseArguments(argv);
-    if (!parsed.ok) {
-        reportProblems([`未知参数 ${parsed.argument}`]);
-        printUsage();
-        return EXIT_USAGE;
-    }
-    const worktree = probeWorktree(process.cwd());
-    if (!worktree.ok) {
-        console.warn('▲ WARN install-hooks 当前目录不在 Git 工作树内，跳过钩子自愈');
-        return EXIT_OK;
-    }
-    return parsed.check ? runCheck(worktree.root, parsed.quiet) : runInstall(worktree.root, parsed.quiet);
+  const parsed = parseArguments(argv);
+  if (!parsed.ok) {
+    reportProblems([`未知参数 ${parsed.argument}`]);
+    printUsage();
+    return EXIT_USAGE;
+  }
+  const worktree = probeWorktree(process.cwd());
+  if (!worktree.ok) {
+    console.warn(
+      "▲ WARN install-hooks 当前目录不在 Git 工作树内，跳过钩子自愈",
+    );
+    return EXIT_OK;
+  }
+  return parsed.check
+    ? runCheck(worktree.root, parsed.quiet)
+    : runInstall(worktree.root, parsed.quiet);
 }
 
 if (require.main === module) {
-    process.exitCode = main(process.argv.slice(2));
+  process.exitCode = main(process.argv.slice(2));
 }
 
 module.exports = {
-    main,
-    parseArguments,
-    pointsAtHooksDirectory,
-    evaluateHooksPath,
-    evaluateIndexModes,
+  main,
+  parseArguments,
+  pointsAtHooksDirectory,
+  evaluateHooksPath,
+  evaluateIndexModes,
 };

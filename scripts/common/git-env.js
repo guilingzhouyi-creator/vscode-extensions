@@ -287,6 +287,40 @@ function readStagedBuffersBatch(repoRoot, relPaths) {
   return results;
 }
 
+/**
+ * Gate 0: Head Receipt Ratchet Guard (Anti-Bypass).
+ * Verifies that the current HEAD commit carries an authentically verified gate receipt.
+ * Prevents stacking new changes on top of an unverified (--no-verify) commit.
+ *
+ * @param {string} [repoRoot] - Repository root.
+ * @returns {Array<object>} Array of violations if HEAD was bypassed.
+ */
+function checkHeadReceipt(repoRoot) {
+  const root = repoRoot || DEFAULT_REPO_ROOT;
+  const violations = [];
+  try {
+    const headSha = runGit(['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+    if (!headSha || headSha.length !== 40) return violations;
+
+    const receiptPath = path.join(root, '.git', 'gate-receipts', `${headSha}.json`);
+    if (fs.existsSync(receiptPath)) {
+      const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+      if (receipt.verified === false || receipt.bypass === true) {
+        violations.push({
+          file: 'HEAD',
+          ruleId: 'GUARD-HEAD-001',
+          severity: 'BLOCK',
+          message: `当前分支 HEAD 提交 (${headSha.slice(0, 8)}) 未经门禁验证 (verified=false, bypass=true)。`,
+          actionableFix: '严禁在违规提交之上堆叠新改动！请先执行规范重写: git commit --amend',
+        });
+      }
+    }
+  } catch {
+    // Repository without commits or git invocation failed
+  }
+  return violations;
+}
+
 module.exports = Object.freeze({
   DEFAULT_REPO_ROOT,
   GitRangeError,
@@ -297,4 +331,5 @@ module.exports = Object.freeze({
   readStagedContentSafe,
   readStagedBufferSafe,
   readStagedBuffersBatch,
+  checkHeadReceipt,
 });
