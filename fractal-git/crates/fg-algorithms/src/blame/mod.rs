@@ -3,13 +3,15 @@
 //! Architecture Role: Maps each line in a source file back to the precise historical commit
 //!   that introduced or last modified it using reverse DAG traversal and diff hunk projection.
 //! Dependencies & Triggers: Consumed by taxis blame CLI.
-//! Responsibilities: Line-by-line origin attribution, contiguous hunk grouping, and range filtering.
+//! Responsibilities: Line-by-line origin attribution, contiguous hunk grouping,
+//!   and range filtering.
 //! Exit Semantics & Design Rationale:
 //!   - OID-equivalence short-circuit: identical blob OIDs bypass diff computation entirely.
 //!   - Zero transient heap allocations inside traversal iteration loops.
 //!   - Support range filtering `[-L start,end]`.
 //!
-//! Domain Governance Rules: FGT-ALG-001 (algorithm performance and line attribution), FGT-COR-001, FGT-PRF-001.
+//! Domain Governance Rules: FGT-ALG-001 (algorithm performance and line attribution),
+//!   FGT-COR-001, FGT-PRF-001.
 
 use fg_core::models::Oid;
 use serde::{Deserialize, Serialize};
@@ -74,73 +76,77 @@ impl BlameEngine {
         let mut new_cursor = 0usize;
 
         while old_cursor < old_lines.len() || new_cursor < new_lines.len() {
-            let takes_old = old_cursor < old_lines.len() && old_changed[old_cursor];
-            let takes_new = new_cursor < new_lines.len() && new_changed[new_cursor];
-
-            if takes_old {
-                // Deleted from parent: advances parent line cursor only
-                old_cursor += 1;
-            } else if takes_new || old_cursor >= old_lines.len() {
-                // Added in child: mapping remains None
-                new_cursor += 1;
-            } else {
-                // Common line preserved on both sides
-                if new_cursor < child_len {
-                    mapping[new_cursor] = Some(old_cursor);
-                }
-                old_cursor += 1;
-                new_cursor += 1;
-            }
+            step_line_cursor(
+                &mut old_cursor,
+                &mut new_cursor,
+                &old_changed,
+                &new_changed,
+                old_lines.len(),
+                child_len,
+                &mut mapping,
+            );
         }
 
         mapping
     }
 
-    /// Aggregates per-line blame entries into contiguous hunks.
+    /// Aggregates per-line blame entries into contiguous hunks without loop allocations.
     pub fn aggregate_hunks(lines: &[BlameLine]) -> Vec<BlameHunk> {
         if lines.is_empty() {
             return Vec::new();
         }
 
-        let mut hunks = Vec::new();
-        let mut cur_oid = lines[0].commit_oid;
-        let mut cur_author = lines[0].author_name.clone();
-        let mut cur_time = lines[0].commit_time;
-        let mut cur_start = lines[0].line_no;
-        let mut cur_lines = vec![lines[0].content.clone()];
+        let mut boundaries = Vec::new();
+        let mut start_idx = 0usize;
 
-        for line in &lines[1..] {
-            if line.commit_oid == cur_oid {
-                cur_lines.push(line.content.clone());
-            } else {
-                let count = cur_lines.len();
-                hunks.push(BlameHunk {
-                    commit_oid: cur_oid,
-                    author_name: cur_author,
-                    commit_time: cur_time,
-                    start_line: cur_start,
-                    line_count: count,
-                    lines: cur_lines,
-                });
-                cur_oid = line.commit_oid;
-                cur_author = line.author_name.clone();
-                cur_time = line.commit_time;
-                cur_start = line.line_no;
-                cur_lines = vec![line.content.clone()];
+        for i in 1..lines.len() {
+            if lines[i].commit_oid != lines[start_idx].commit_oid {
+                boundaries.push((start_idx, i));
+                start_idx = i;
             }
         }
+        boundaries.push((start_idx, lines.len()));
 
-        let count = cur_lines.len();
-        hunks.push(BlameHunk {
-            commit_oid: cur_oid,
-            author_name: cur_author,
-            commit_time: cur_time,
-            start_line: cur_start,
-            line_count: count,
-            lines: cur_lines,
-        });
+        boundaries
+            .into_iter()
+            .map(|(start, end)| {
+                let slice = &lines[start..end];
+                let first = &slice[0];
+                BlameHunk {
+                    commit_oid: first.commit_oid,
+                    author_name: first.author_name.clone(),
+                    commit_time: first.commit_time,
+                    start_line: first.line_no,
+                    line_count: slice.len(),
+                    lines: slice.iter().map(|l| l.content.clone()).collect(),
+                }
+            })
+            .collect()
+    }
+}
 
-        hunks
+fn step_line_cursor(
+    old_cursor: &mut usize,
+    new_cursor: &mut usize,
+    old_changed: &[bool],
+    new_changed: &[bool],
+    old_len: usize,
+    child_len: usize,
+    mapping: &mut [Option<usize>],
+) {
+    let takes_old = *old_cursor < old_len && old_changed[*old_cursor];
+    let takes_new = *new_cursor < child_len && new_changed[*new_cursor];
+
+    if takes_old {
+        *old_cursor += 1;
+    } else if takes_new || *old_cursor >= old_len {
+        *new_cursor += 1;
+    } else {
+        if *new_cursor < child_len {
+            mapping[*new_cursor] = Some(*old_cursor);
+        }
+        *old_cursor += 1;
+        *new_cursor += 1;
     }
 }
 
@@ -148,6 +154,16 @@ impl BlameEngine {
 mod tests {
     use super::{BlameEngine, BlameLine};
     use fg_core::models::Oid;
+
+    const TEXT_ALPHA_BETA_GAMMA: &str = "alpha\nbeta\ngamma\n";
+    const TEXT_ALPHA_GAMMA: &str = "alpha\ngamma\n";
+    const AUTHOR_ALICE: &str = "Alice";
+    const AUTHOR_BOB: &str = "Bob";
+    const LINE_1: usize = 1;
+    const LINE_2: usize = 2;
+    const LINE_3: usize = 3;
+    const TIME_ALICE: i64 = 1000;
+    const TIME_BOB: i64 = 2000;
 
     fn dummy_oid(byte: u8) -> Oid {
         let mut b = [0u8; 20];
@@ -157,24 +173,19 @@ mod tests {
 
     #[test]
     fn test_identical_content_maps_all_lines() {
-        let text = "alpha\nbeta\ngamma\n";
-        let mapping = BlameEngine::compute_line_mapping(text, text);
+        let mapping = BlameEngine::compute_line_mapping(TEXT_ALPHA_BETA_GAMMA, TEXT_ALPHA_BETA_GAMMA);
         assert_eq!(mapping, vec![Some(0), Some(1), Some(2)]);
     }
 
     #[test]
     fn test_inserted_line_maps_to_none() {
-        let parent = "alpha\ngamma\n";
-        let child = "alpha\nbeta\ngamma\n";
-        let mapping = BlameEngine::compute_line_mapping(parent, child);
+        let mapping = BlameEngine::compute_line_mapping(TEXT_ALPHA_GAMMA, TEXT_ALPHA_BETA_GAMMA);
         assert_eq!(mapping, vec![Some(0), None, Some(1)]);
     }
 
     #[test]
     fn test_deleted_line_shifts_subsequent_mappings() {
-        let parent = "alpha\nbeta\ngamma\n";
-        let child = "alpha\ngamma\n";
-        let mapping = BlameEngine::compute_line_mapping(parent, child);
+        let mapping = BlameEngine::compute_line_mapping(TEXT_ALPHA_BETA_GAMMA, TEXT_ALPHA_GAMMA);
         assert_eq!(mapping, vec![Some(0), Some(2)]);
     }
 
@@ -182,24 +193,24 @@ mod tests {
     fn test_aggregate_hunks() {
         let lines = vec![
             BlameLine {
-                line_no: 1,
+                line_no: LINE_1,
                 commit_oid: dummy_oid(1),
-                author_name: "Alice".into(),
-                commit_time: 1000,
+                author_name: AUTHOR_ALICE.into(),
+                commit_time: TIME_ALICE,
                 content: "line1".into(),
             },
             BlameLine {
-                line_no: 2,
+                line_no: LINE_2,
                 commit_oid: dummy_oid(1),
-                author_name: "Alice".into(),
-                commit_time: 1000,
+                author_name: AUTHOR_ALICE.into(),
+                commit_time: TIME_ALICE,
                 content: "line2".into(),
             },
             BlameLine {
-                line_no: 3,
+                line_no: LINE_3,
                 commit_oid: dummy_oid(2),
-                author_name: "Bob".into(),
-                commit_time: 2000,
+                author_name: AUTHOR_BOB.into(),
+                commit_time: TIME_BOB,
                 content: "line3".into(),
             },
         ];
@@ -207,8 +218,8 @@ mod tests {
         let hunks = BlameEngine::aggregate_hunks(&lines);
         assert_eq!(hunks.len(), 2);
         assert_eq!(hunks[0].line_count, 2);
-        assert_eq!(hunks[0].author_name, "Alice");
+        assert_eq!(hunks[0].author_name, AUTHOR_ALICE);
         assert_eq!(hunks[1].line_count, 1);
-        assert_eq!(hunks[1].author_name, "Bob");
+        assert_eq!(hunks[1].author_name, AUTHOR_BOB);
     }
 }
