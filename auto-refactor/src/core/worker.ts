@@ -40,21 +40,34 @@ import {
 
 type LineStats = ReturnType<typeof countLineStats>;
 
+/**
+ * Serialized analyzer descriptor transferred across worker boundary.
+ */
 interface Desc {
+    /** Unique rule or analyzer identifier name. */
     name: string;
+    /** Absolute filesystem path to the compiled analyzer module. */
     modulePath: string;
+    /** User-supplied or preset rule options dictionary. */
     options: Record<string, unknown>;
 }
 
+/**
+ * Materialized analyzer instance cached within worker thread memory.
+ */
 interface LoadedAnalyzer {
+    /** Analyzer identifier name. */
     name: string;
+    /** Executable analyzer contract object. */
     analyzer: {
         name?: string;
         analyze?(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[];
         visit?(...args: unknown[]): void;
         finalize?(ctx: AnalyzerContext): Issue[];
     };
+    /** Configured analyzer options. */
     options: Record<string, unknown>;
+    /** Loaded module export object. */
     mod: unknown;
 }
 
@@ -230,14 +243,28 @@ function splitAnalyzers(instances: LoadedAnalyzer[]): {
     return { streaming, legacy };
 }
 
+/**
+ * Context for initializing a language adapter AST parser or zero-copy projector.
+ */
 interface AstProjectorInitContext {
+    /** Target language AST adapter. */
     adapter: LanguageAdapter;
+    /** Raw source file text contents. */
     content: string;
+    /** Relative or normalized file path for diagnostics. */
     file: string;
+    /** Identifier list of active streaming analyzers. */
     streamingNames: string[];
+    /** Number of legacy non-streaming analyzers registered. */
     legacyCount: number;
 }
 
+/**
+ * Initializes AST representation via projector or full parse fallback.
+ *
+ * @param context Projector initialization parameters.
+ * @returns Projected node root, optional full AST, and normalized root node.
+ */
 function initAstOrProjector(context: AstProjectorInitContext): {
     proj: NodeProjector | null;
     ast: NormalizedAst | null;
@@ -266,18 +293,36 @@ function initAstOrProjector(context: AstProjectorInitContext): {
     return { proj, ast, rootForCtx };
 }
 
+/**
+ * Context for assembling streaming visitor entries across loaded analyzers.
+ */
 interface AnalyzerEntriesContext {
+    /** Loaded streaming analyzer instances. */
     streaming: LoadedAnalyzer[];
+    /** Metric collector instance for line and cyclomatic telemetry. */
     metric: FileMetricCollector;
+    /** Target normalized AST root node. */
     rootForEntries: NormalizedNode;
+    /** Relative file path being inspected. */
     file: string;
+    /** Source file text content. */
     content: string;
+    /** Language AST adapter. */
     adapter: LanguageAdapter;
+    /** Optional TypeScript SourceFile handle when in TS mode. */
     sourceFile: ts.SourceFile | undefined;
+    /** Scan configuration options. */
     config: ScanConfig;
+    /** Precomputed line metrics. */
     lineStats: LineStats;
 }
 
+/**
+ * Assembles bound streaming visitor entries with initialized analyzer contexts.
+ *
+ * @param context Analyzer entry builder parameters.
+ * @returns Array of streaming visitor entries ready for traversal dispatch.
+ */
 function createAnalyzerEntries(context: AnalyzerEntriesContext): StreamingEntry[] {
     const {
         streaming,
@@ -321,19 +366,38 @@ function createAnalyzerEntries(context: AnalyzerEntriesContext): StreamingEntry[
     return streamingEntries;
 }
 
+/**
+ * Context for executing streaming traversal pass over projected or normalized AST.
+ */
 interface StreamingExecutionContext {
+    /** Projector handle if zero-copy projection succeeded. */
     proj: NodeProjector | null;
+    /** Bound streaming visitor entries. */
     entries: StreamingEntry[];
+    /** Language AST adapter. */
     adapter: LanguageAdapter;
+    /** Full normalized AST if parsed directly. */
     ast: NormalizedAst | null;
+    /** Source file text content. */
     content: string;
+    /** Relative file path. */
     file: string;
+    /** Loaded streaming analyzer instances. */
     streaming: LoadedAnalyzer[];
+    /** Optional TypeScript SourceFile handle. */
     sourceFile: ts.SourceFile | undefined;
+    /** Scan configuration options. */
     config: ScanConfig;
+    /** Precomputed line metrics. */
     lineStats: LineStats;
 }
 
+/**
+ * Dispatches streaming traversal over AST nodes and collects issues.
+ *
+ * @param context Streaming execution parameters.
+ * @returns Discovered issues and metric collector outcome.
+ */
 function executeStreamingAnalyzers(context: StreamingExecutionContext): {
     issues: Issue[];
     metricCollector: FileMetricCollector;

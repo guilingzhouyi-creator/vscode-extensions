@@ -130,25 +130,49 @@ async function checkPathExists(targetPath: string): Promise<boolean> {
     }
 }
 
+/**
+ * Context for directory traversal during codebase file collection.
+ */
 interface DirectoryProcessingContext {
+    /** Current directory path being enumerated. */
     curr: string;
+    /** Directory entry items returned by readdir. */
     entries: fs.Dirent[];
+    /** Traversal FIFO directory queue. */
     queue: string[];
+    /** Set of supported file extensions. */
     supportedExts: Set<string>;
+    /** Set of directories ignored during recursive traversal. */
     ignoredDirs: Set<string>;
 }
 
+/**
+ * Context bundling telemetry metrics for Praxis composite gate evaluation.
+ */
 interface GateMetricsContext {
+    /** Quality score prior to current execution. */
     beforeScore: number;
+    /** Evaluated composite score for current codebase state. */
     currentScore: number;
+    /** Multi-dimensional quality vector across evaluated planes. */
     scoreVector: number[];
+    /** Trajectory counters tracking added, resolved, and regression deltas. */
     counters: ReturnType<typeof buildTrajectoryCounters>;
+    /** Net technical debt points successfully resolved. */
     resolvedDebtPoints: number;
+    /** Technical debt points newly introduced. */
     addedDebtPoints: number;
+    /** Count of secondary regressions observed. */
     regressionCount: number;
+    /** List of unsuppressed gate error findings. */
     unsuppressedErrors: Array<{ id?: string; rule?: string }>;
 }
 
+/**
+ * Dispatches the `symbols` subcommand to query cross-file definitions and call sites.
+ *
+ * @param args CLI arguments array containing target symbol identifier and optional options.
+ */
 async function handleSymbolsCommand(args: string[]): Promise<void> {
     const target = args[args.indexOf(CMD_SYMBOLS) + 1];
     if (!target) {
@@ -184,6 +208,11 @@ async function handleSymbolsCommand(args: string[]): Promise<void> {
     }
 }
 
+/**
+ * Dispatches the `guide` subcommand to render contextual rule guidance for a file or line.
+ *
+ * @param args CLI arguments array containing target file path and optional domain/line flags.
+ */
 function handleGuideCommand(args: string[]): void {
     const targetFile = args[args.indexOf(CMD_GUIDE) + 1];
     if (!targetFile) {
@@ -201,6 +230,11 @@ function handleGuideCommand(args: string[]): void {
     process.exit(0);
 }
 
+/**
+ * Prints recent active run trajectory records from persistent ndjson log.
+ *
+ * @param activeRunsFile Path to active-runs.ndjson log file.
+ */
 async function printRecentActiveRuns(activeRunsFile: string): Promise<void> {
     if (!(await checkPathExists(activeRunsFile))) return;
     const rawContent = await fs.promises.readFile(activeRunsFile, 'utf8');
@@ -221,6 +255,11 @@ async function printRecentActiveRuns(activeRunsFile: string): Promise<void> {
     }
 }
 
+/**
+ * Reads and prints lifetime refactoring trajectory summary metrics.
+ *
+ * @param customRoot Optional custom repository root path override.
+ */
 async function printLedgerSummary(customRoot?: string): Promise<void> {
     const baseDir = customRoot ? path.resolve(customRoot) : process.cwd();
     let ledgerDir = path.join(baseDir, TRAJECTORY_DIR_NAME);
@@ -275,6 +314,11 @@ async function printLedgerSummary(customRoot?: string): Promise<void> {
     }
 }
 
+/**
+ * Prints historical refactoring trajectory entries for an individual target file.
+ *
+ * @param targetFile Relative path to the target file.
+ */
 function printFileTrajectory(targetFile: string): void {
     const traj = getChangeTrajectory(targetFile);
     if (!traj || traj.revisions.length === 0) {
@@ -302,6 +346,11 @@ function printFileTrajectory(targetFile: string): void {
     process.exit(0);
 }
 
+/**
+ * Dispatches the `trajectory` subcommand to query ledger or file history.
+ *
+ * @param args CLI arguments array.
+ */
 async function handleTrajectoryCommand(args: string[]): Promise<void> {
     const rawTarget = args[args.indexOf(CMD_TRAJECTORY) + 1];
     const isSummary =
@@ -318,6 +367,13 @@ async function handleTrajectoryCommand(args: string[]): Promise<void> {
     printFileTrajectory(rawTarget);
 }
 
+/**
+ * Computes raw physical lines of code and effective logical code lines.
+ *
+ * @param content Source code string.
+ * @param filePath Optional file path for language-aware parsing.
+ * @returns Object with physical LOC and effective ELOC.
+ */
 function countLinesEloc(content: string, filePath?: string): { loc: number; eloc: number } {
     const metrics = analyzeCodeDensity(content, filePath);
     return {
@@ -326,6 +382,12 @@ function countLinesEloc(content: string, filePath?: string): { loc: number; eloc
     };
 }
 
+/**
+ * Traverses entries within a directory and accumulates file counts and line metrics.
+ *
+ * @param context Directory enumeration context.
+ * @returns Delta counts for discovered files, LOC, and ELOC.
+ */
 async function processDirectoryEntries(
     context: DirectoryProcessingContext,
 ): Promise<{ files: number; loc: number; eloc: number }> {
@@ -356,6 +418,12 @@ async function processDirectoryEntries(
     return { files, loc, eloc };
 }
 
+/**
+ * Recursively scans target directory to accumulate project-level file and line statistics.
+ *
+ * @param targetRoot Root directory path to inspect.
+ * @returns Aggregated file count, physical LOC, and effective ELOC totals.
+ */
 async function collectDirectoryStats(
     targetRoot: string,
 ): Promise<{ totalFiles: number; totalLoc: number; totalEloc: number }> {

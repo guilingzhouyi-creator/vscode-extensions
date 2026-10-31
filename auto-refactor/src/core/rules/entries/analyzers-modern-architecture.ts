@@ -32,6 +32,18 @@ import {
     ANALYZER_PERFORMANCE,
 } from '../../scoring/dimensionLiterals';
 
+/**
+ * Helper to construct a canonical language-agnostic rule definition.
+ *
+ * @param ruleId Unique rule identifier adhering to 3-3-3 uppercase taxonomy.
+ * @param family Architectural rule family category.
+ * @param analyzer Corresponding analyzer engine identifier.
+ * @param defaultSeverity Baseline failure severity.
+ * @param summary Concise diagnostic description.
+ * @param remediation Actionable developer remediation advice.
+ * @param docsAnchor Path anchor to official rule documentation.
+ * @returns Fully populated immutable RuleDefinition.
+ */
 function defineLanguageAgnosticRule(
     ruleId: string,
     family: typeof RULE_FAMILY_ARCHITECTURE | typeof RULE_FAMILY_PERFORMANCE,
@@ -54,6 +66,15 @@ function defineLanguageAgnosticRule(
     });
 }
 
+/**
+ * Convenience helper to construct an architecture discipline rule definition.
+ *
+ * @param ruleId Unique rule identifier.
+ * @param summary Diagnostic message summary.
+ * @param remediation Corrective action guide.
+ * @param docsAnchor Documentation hyperlink anchor.
+ * @returns Populated RuleDefinition.
+ */
 function defineArchitectureRule(
     ruleId: string,
     summary: string,
@@ -71,6 +92,16 @@ function defineArchitectureRule(
     );
 }
 
+/**
+ * Convenience helper to construct a performance efficiency rule definition.
+ *
+ * @param ruleId Unique rule identifier.
+ * @param defaultSeverity Severity level (warning or error).
+ * @param summary Diagnostic message summary.
+ * @param remediation Corrective action guide.
+ * @param docsAnchor Documentation hyperlink anchor.
+ * @returns Populated RuleDefinition.
+ */
 function definePerformanceRule(
     ruleId: string,
     defaultSeverity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
@@ -93,6 +124,11 @@ function definePerformanceRule(
  * Modern architecture rule definitions covering complexity, data, and performance.
  */
 export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
+    // -------------------------------------------------------------------------
+    // Architecture & Modular Boundary Discipline (ARCH-*)
+    // Validates clean layer separation, prevents cyclic abstractions, suppresses
+    // vacuous pass-through trampolines, and ensures cohesive module boundaries.
+    // -------------------------------------------------------------------------
     defineLanguageAgnosticRule(
         'ARCH-ABS-001',
         RULE_FAMILY_ARCHITECTURE,
@@ -293,6 +329,11 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
             'library, rules to policies, converters to infra.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-utl-001',
     ),
+    // -------------------------------------------------------------------------
+    // Cognitive Complexity & Control-Flow Depth Budgets (CPX-*)
+    // Enforces maximum cyclomatic complexity (CC <= 15) and nesting depth (<= 4),
+    // detects polynomial time expansion, and restricts recursive call cascades.
+    // -------------------------------------------------------------------------
     defineRule({
         id: 'CPX-AMP-001',
         family: RULE_FAMILY_COMPLEXITY,
@@ -460,6 +501,11 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
             'Eliminate vacuous iteration loop or replace with direct expression / slice lookup.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-trv-001',
     }),
+    // -------------------------------------------------------------------------
+    // Data Architecture, Defensive Boundaries & Serialization (DAT-*)
+    // Audits trust boundaries to eliminate redundant validations, isolates persistence
+    // logic behind repositories, and prevents unnecessary serialization roundtrips.
+    // -------------------------------------------------------------------------
     defineRule({
         id: 'DAT-DEF-001',
         family: RULE_FAMILY_DATA_ARCHITECTURE,
@@ -541,6 +587,11 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
             'exclusively at network boundaries.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-ser-001',
     }),
+    // -------------------------------------------------------------------------
+    // Dependency Structure, Layout & Topology Contracts (DEP-*)
+    // Prevents production code from importing devDependencies, enforces unidirectional
+    // layering topology, disallows wildcard imports, and audits dependency versions.
+    // -------------------------------------------------------------------------
     defineRule({
         id: 'DEP-DEV-001',
         family: RULE_FAMILY_DEPENDENCY,
@@ -695,6 +746,11 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         remediation: 'Use explicit named imports to clearly declare module dependency surface.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-wld-001',
     }),
+    // -------------------------------------------------------------------------
+    // Performance Efficiency, Algorithmic Scaling & Pooling (PRF-*)
+    // Identifies O(N*M) nested collection scans, detects missing resource pooling,
+    // enforces state reset contracts on pools, and suppresses negative-return pooling.
+    // -------------------------------------------------------------------------
     definePerformanceRule(
         'PRF-ALG-002',
         SEVERITY_WARNING,
@@ -737,6 +793,11 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
             'achieve zero-copy slot reuse.',
         'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-pol-004',
     ),
+    // -------------------------------------------------------------------------
+    // Test Modernity, Reliability & Flakiness Prevention (TST-*)
+    // Enforces deterministic clock and RNG isolation, eliminates orphaned tests,
+    // audits test execution time budgets, and maintains high assertion density.
+    // -------------------------------------------------------------------------
     defineRule({
         id: 'TST-DBT-001',
         family: RULE_FAMILY_TEST_MODERNITY,

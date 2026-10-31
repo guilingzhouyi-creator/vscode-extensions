@@ -5,6 +5,12 @@
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+/// Maximum fixed-point iterations permitted for dataflow convergence.
+pub const MAX_DATAFLOW_ITERATIONS: usize = 500;
+
+/// Number of bits per 64-bit word utilized in bit-parallel operations.
+pub const BITS_PER_U64_WORD: usize = 64;
+
 /// Result of graph analysis containing detected cycles, topological order, and SCCs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GraphAnalysis {
@@ -39,6 +45,44 @@ impl<'a> TarjanState<'a> {
         }
     }
 
+    fn connect_neighbor(&mut self, node: &str, neighbor: &str) {
+        if !self.indices.contains_key(neighbor) {
+            self.strong_connect(neighbor);
+            let n_low = self.lowlinks.get(neighbor).copied().unwrap_or(0);
+            if let Some(curr_low) = self.lowlinks.get_mut(node) {
+                *curr_low = (*curr_low).min(n_low);
+            }
+        } else if self.on_stack.contains(neighbor) {
+            let n_idx = self.indices.get(neighbor).copied().unwrap_or(0);
+            if let Some(curr_low) = self.lowlinks.get_mut(node) {
+                *curr_low = (*curr_low).min(n_idx);
+            }
+        }
+    }
+
+    fn pop_scc_component(&mut self, node: &str) {
+        let mut scc = Vec::new();
+        while let Some(w) = self.stack.pop() {
+            self.on_stack.remove(&w);
+            let is_node = w == node;
+            scc.push(w);
+            if is_node {
+                break;
+            }
+        }
+        self.sccs.push(scc.clone());
+
+        if scc.len() > 1 {
+            self.cycles.push(scc);
+        } else if let Some(single) = scc.first() {
+            if let Some(neighbors) = self.adjacency.get(single) {
+                if neighbors.contains(single) {
+                    self.cycles.push(vec![single.clone(), single.clone()]);
+                }
+            }
+        }
+    }
+
     fn strong_connect(&mut self, node: &str) {
         self.indices.insert(node.to_string(), self.index_counter);
         self.lowlinks.insert(node.to_string(), self.index_counter);
@@ -48,43 +92,13 @@ impl<'a> TarjanState<'a> {
 
         if let Some(neighbors) = self.adjacency.get(node) {
             for neighbor in neighbors {
-                if !self.indices.contains_key(neighbor) {
-                    self.strong_connect(neighbor);
-                    let n_low = self.lowlinks.get(neighbor).copied().unwrap_or(0);
-                    if let Some(curr_low) = self.lowlinks.get_mut(node) {
-                        *curr_low = (*curr_low).min(n_low);
-                    }
-                } else if self.on_stack.contains(neighbor) {
-                    let n_idx = self.indices.get(neighbor).copied().unwrap_or(0);
-                    if let Some(curr_low) = self.lowlinks.get_mut(node) {
-                        *curr_low = (*curr_low).min(n_idx);
-                    }
-                }
+                self.connect_neighbor(node, neighbor);
             }
         }
 
         let is_root = self.lowlinks.get(node) == self.indices.get(node);
         if is_root {
-            let mut scc = Vec::new();
-            while let Some(w) = self.stack.pop() {
-                self.on_stack.remove(&w);
-                let is_node = w == node;
-                scc.push(w);
-                if is_node {
-                    break;
-                }
-            }
-            self.sccs.push(scc.clone());
-
-            if scc.len() > 1 {
-                self.cycles.push(scc);
-            } else if let Some(single) = scc.first() {
-                if let Some(neighbors) = self.adjacency.get(single) {
-                    if neighbors.contains(single) {
-                        self.cycles.push(vec![single.clone(), single.clone()]);
-                    }
-                }
-            }
+            self.pop_scc_component(node);
         }
     }
 }
@@ -121,6 +135,24 @@ pub fn run_analyze_dependency_graph(edges: &[Vec<String>]) -> GraphAnalysis {
     let sccs = tarjan.sccs;
 
     // 2. Kahn's Topological Sort
+    let topological_order = kahn_topological_sort(&adjacency, &in_degree, &all_nodes);
+
+    let is_acyclic = cycles.is_empty();
+
+    GraphAnalysis {
+        cycles,
+        topological_order,
+        strongly_connected_components: sccs,
+        is_acyclic,
+    }
+}
+
+/// Computes deterministic topological order with cycle-node preservation via Kahn's algorithm.
+fn kahn_topological_sort(
+    adjacency: &HashMap<String, HashSet<String>>,
+    in_degree: &HashMap<String, usize>,
+    all_nodes: &BTreeSet<String>,
+) -> Vec<String> {
     let mut in_degree_copy = in_degree.clone();
     let mut queue: BTreeSet<String> = BTreeSet::new();
     for (node, &deg) in &in_degree_copy {
@@ -146,20 +178,13 @@ pub fn run_analyze_dependency_graph(edges: &[Vec<String>]) -> GraphAnalysis {
     }
 
     // Append any unvisited nodes from cycles to ensure total coverage
-    for node in &all_nodes {
+    for node in all_nodes {
         if !topological_order.contains(node) {
             topological_order.push(node.clone());
         }
     }
 
-    let is_acyclic = cycles.is_empty();
-
-    GraphAnalysis {
-        cycles,
-        topological_order,
-        strongly_connected_components: sccs,
-        is_acyclic,
-    }
+    topological_order
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -416,6 +441,92 @@ pub fn compute_dominator_tree(
     }
 }
 
+/// Configuration parameter object for dataflow equations solver.
+#[derive(Debug, Clone)]
+pub struct DataflowConfig<'a> {
+    pub entry: &'a str,
+    pub nodes: &'a [String],
+    pub edges: &'a [Vec<String>],
+    pub forward: bool,
+    pub gen_map: &'a HashMap<String, Vec<String>>,
+    pub kill_map: &'a HashMap<String, Vec<String>>,
+}
+
+/// Helper for executing a single forward dataflow node convergence step.
+fn step_forward_dataflow_node(
+    node_idx: usize,
+    preds: &[usize],
+    gen_set: &BTreeSet<String>,
+    kill_set: &BTreeSet<String>,
+    in_sets: &mut [BTreeSet<String>],
+    out_sets: &mut [BTreeSet<String>],
+) -> bool {
+    let mut new_in = BTreeSet::new();
+    for &p in preds {
+        for val in &out_sets[p] {
+            new_in.insert(val.clone());
+        }
+    }
+    let in_changed = if new_in != in_sets[node_idx] {
+        in_sets[node_idx] = new_in;
+        true
+    } else {
+        false
+    };
+
+    let mut new_out = gen_set.clone();
+    for val in in_sets[node_idx].iter() {
+        if !kill_set.contains(val) {
+            new_out.insert(val.clone());
+        }
+    }
+    let out_changed = if new_out != out_sets[node_idx] {
+        out_sets[node_idx] = new_out;
+        true
+    } else {
+        false
+    };
+    in_changed || out_changed
+}
+
+/// Helper for executing a single backward dataflow node convergence step.
+fn step_backward_dataflow_node(
+    node_idx: usize,
+    succs: &[usize],
+    gen_set: &BTreeSet<String>,
+    kill_set: &BTreeSet<String>,
+    in_sets: &mut [BTreeSet<String>],
+    out_sets: &mut [BTreeSet<String>],
+) -> bool {
+    let mut new_out = BTreeSet::new();
+    for &s in succs {
+        for val in &in_sets[s] {
+            new_out.insert(val.clone());
+        }
+    }
+    let out_changed = if new_out != out_sets[node_idx] {
+        out_sets[node_idx] = new_out;
+        true
+    } else {
+        false
+    };
+
+    let mut new_in = gen_set.clone();
+    for val in out_sets[node_idx].iter() {
+        if !kill_set.contains(val) {
+            new_in.insert(val.clone());
+        }
+    }
+    let in_changed = if new_in != in_sets[node_idx] {
+        in_sets[node_idx] = new_in;
+        true
+    } else {
+        false
+    };
+    out_changed || in_changed
+}
+
+/// Solves intra-procedural forward or backward dataflow equations using backward-compatible signature.
 pub fn solve_dataflow(
     entry: &str,
     nodes: &[String],
@@ -424,7 +535,20 @@ pub fn solve_dataflow(
     gen_map: &HashMap<String, Vec<String>>,
     kill_map: &HashMap<String, Vec<String>>,
 ) -> DataflowResult {
-    let graph = IndexedGraph::build(entry, nodes, edges);
+    let config = DataflowConfig {
+        entry,
+        nodes,
+        edges,
+        forward,
+        gen_map,
+        kill_map,
+    };
+    solve_dataflow_configured(&config)
+}
+
+/// Solves intra-procedural forward or backward dataflow equations using structured config object.
+pub fn solve_dataflow_configured(config: &DataflowConfig<'_>) -> DataflowResult {
+    let graph = IndexedGraph::build(config.entry, config.nodes, config.edges);
     let total = graph.all_node_names.len();
     let all_node_names = &graph.all_node_names;
     let succs = &graph.succs;
@@ -436,7 +560,8 @@ pub fn solve_dataflow(
     let gen_sets: Vec<BTreeSet<String>> = (0..total)
         .map(|i| {
             let name = &all_node_names[i];
-            gen_map
+            config
+                .gen_map
                 .get(name)
                 .cloned()
                 .unwrap_or_default()
@@ -448,7 +573,8 @@ pub fn solve_dataflow(
     let kill_sets: Vec<BTreeSet<String>> = (0..total)
         .map(|i| {
             let name = &all_node_names[i];
-            kill_map
+            config
+                .kill_map
                 .get(name)
                 .cloned()
                 .unwrap_or_default()
@@ -460,59 +586,32 @@ pub fn solve_dataflow(
     let mut iterations = 0;
     let mut changed = true;
 
-    while changed && iterations < 500 {
+    while changed && iterations < MAX_DATAFLOW_ITERATIONS {
         changed = false;
         iterations += 1;
 
         for i in 0..total {
-            if forward {
-                // In[i] = Union over p in Preds[i] of Out[p]
-                let mut new_in = BTreeSet::new();
-                for &p in &preds[i] {
-                    for val in &out_sets[p] {
-                        new_in.insert(val.clone());
-                    }
-                }
-                if new_in != in_sets[i] {
-                    in_sets[i] = new_in;
-                    changed = true;
-                }
-
-                // Out[i] = Gen[i] Union (In[i] \ Kill[i])
-                let mut new_out = gen_sets[i].clone();
-                for val in &in_sets[i] {
-                    if !kill_sets[i].contains(val) {
-                        new_out.insert(val.clone());
-                    }
-                }
-                if new_out != out_sets[i] {
-                    out_sets[i] = new_out;
-                    changed = true;
-                }
+            let node_changed = if config.forward {
+                step_forward_dataflow_node(
+                    i,
+                    &preds[i],
+                    &gen_sets[i],
+                    &kill_sets[i],
+                    &mut in_sets,
+                    &mut out_sets,
+                )
             } else {
-                // Backward analysis: Out[i] = Union over s in Succs[i] of In[s]
-                let mut new_out = BTreeSet::new();
-                for &s in &succs[i] {
-                    for val in &in_sets[s] {
-                        new_out.insert(val.clone());
-                    }
-                }
-                if new_out != out_sets[i] {
-                    out_sets[i] = new_out;
-                    changed = true;
-                }
-
-                // In[i] = Gen[i] Union (Out[i] \ Kill[i])
-                let mut new_in = gen_sets[i].clone();
-                for val in &out_sets[i] {
-                    if !kill_sets[i].contains(val) {
-                        new_in.insert(val.clone());
-                    }
-                }
-                if new_in != in_sets[i] {
-                    in_sets[i] = new_in;
-                    changed = true;
-                }
+                step_backward_dataflow_node(
+                    i,
+                    &succs[i],
+                    &gen_sets[i],
+                    &kill_sets[i],
+                    &mut in_sets,
+                    &mut out_sets,
+                )
+            };
+            if node_changed {
+                changed = true;
             }
         }
     }
@@ -561,8 +660,8 @@ pub fn compute_bit_parallel_warshall(matrix: &mut [u64], words_per_row: usize, s
     }
 
     for k in 0..size {
-        let k_word_idx = k / 64;
-        let k_bit_mask = 1u64 << (k % 64);
+        let k_word_idx = k / BITS_PER_U64_WORD;
+        let k_bit_mask = 1u64 << (k % BITS_PER_U64_WORD);
         let k_row = k * words_per_row;
 
         for i in 0..size {

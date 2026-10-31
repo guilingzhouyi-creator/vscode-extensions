@@ -103,18 +103,31 @@ pub fn mask_source_code_compact(content: &str, config: &MaskConfig) -> String {
         }
         first = false;
         let line = raw_slice.strip_suffix('\r').unwrap_or(raw_slice);
-        mask_line_into(line, &mut state, config, &mut buf, &mut output);
+        let mut target = MaskTarget::new(&mut buf, &mut output);
+        mask_line_into(line, &mut state, config, &mut target);
     }
 
     output
+}
+
+/// Mutable working scratch buffer and final destination string for line masking.
+struct MaskTarget<'a> {
+    scratch: &'a mut Vec<u8>,
+    output: &'a mut String,
+}
+
+impl<'a> MaskTarget<'a> {
+    #[inline]
+    fn new(scratch: &'a mut Vec<u8>, output: &'a mut String) -> Self {
+        Self { scratch, output }
+    }
 }
 
 fn mask_line_into(
     line: &str,
     state: &mut MaskState,
     config: &MaskConfig,
-    buf: &mut Vec<u8>,
-    output: &mut String,
+    target: &mut MaskTarget<'_>,
 ) {
     // Fast path: no open quote or block comment, no raw string, and no trigger chars present
     if state.quote.is_none()
@@ -122,7 +135,7 @@ fn mask_line_into(
         && state.raw_string.is_none()
         && !has_trigger_char(line, config)
     {
-        output.push_str(line);
+        target.output.push_str(line);
         return;
     }
 
@@ -140,7 +153,7 @@ fn mask_line_into(
                 line.encode_utf16().count()
             };
             for _ in 0..space_count {
-                output.push(' ');
+                target.output.push(' ');
             }
             return;
         }
@@ -154,23 +167,24 @@ fn mask_line_into(
             line.encode_utf16().count()
         };
         for _ in 0..space_count {
-            output.push(' ');
+            target.output.push(' ');
         }
         return;
     }
 
     if line.is_ascii() {
-        mask_line_ascii_into(line.as_bytes(), state, config, buf, output);
+        mask_line_ascii_into(line.as_bytes(), state, config, target);
     } else {
         let masked = mask_line_utf16(line, state, config);
-        output.push_str(&masked);
+        target.output.push_str(&masked);
     }
 }
 
 fn mask_line(line: &str, state: &mut MaskState, config: &MaskConfig) -> String {
     let mut out = String::with_capacity(line.len());
     let mut buf = Vec::with_capacity(256);
-    mask_line_into(line, state, config, &mut buf, &mut out);
+    let mut target = MaskTarget::new(&mut buf, &mut out);
+    mask_line_into(line, state, config, &mut target);
     out
 }
 
@@ -405,10 +419,10 @@ fn mask_line_ascii_into(
     line: &[u8],
     state: &mut MaskState,
     config: &MaskConfig,
-    out: &mut Vec<u8>,
-    output: &mut String,
+    target: &mut MaskTarget<'_>,
 ) {
     let len = line.len();
+    let out = &mut *target.scratch;
     out.clear();
     out.extend_from_slice(line);
     let mut index = 0;
@@ -475,8 +489,8 @@ fn mask_line_ascii_into(
 
     // SAFETY: Input slice was guaranteed valid UTF-8, and masking exclusively substitutes
     // bytes with ASCII space (0x20), maintaining UTF-8 boundary integrity without allocation.
-    let s = unsafe { std::str::from_utf8_unchecked(out) };
-    output.push_str(s);
+    let s = unsafe { std::str::from_utf8_unchecked(target.scratch) };
+    target.output.push_str(s);
 }
 
 fn opens_regex_literal_u16(units: &[u16], index: usize) -> bool {

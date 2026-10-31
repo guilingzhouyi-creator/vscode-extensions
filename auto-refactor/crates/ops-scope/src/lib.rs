@@ -139,6 +139,48 @@ pub struct ShadowingDefect {
     pub binding_kind: u8,
 }
 
+/// Scope boundary descriptor parameter object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScopeDescriptor {
+    pub parent: Option<u32>,
+    pub kind: ScopeKind,
+    pub start_line: u32,
+    pub end_line: u32,
+}
+
+impl ScopeDescriptor {
+    #[must_use]
+    pub const fn new(parent: Option<u32>, kind: ScopeKind, start_line: u32, end_line: u32) -> Self {
+        Self {
+            parent,
+            kind,
+            start_line,
+            end_line,
+        }
+    }
+}
+
+/// Scope binding declaration parameter object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BindingDeclaration<'a> {
+    pub scope_id: u32,
+    pub symbol_name: &'a str,
+    pub kind: BindingKind,
+    pub line: u32,
+}
+
+impl<'a> BindingDeclaration<'a> {
+    #[must_use]
+    pub const fn new(scope_id: u32, symbol_name: &'a str, kind: BindingKind, line: u32) -> Self {
+        Self {
+            scope_id,
+            symbol_name,
+            kind,
+            line,
+        }
+    }
+}
+
 /// Contiguous Flat Arena hosting the full hierarchy of scopes and declaration bindings.
 #[derive(Debug, Default, Clone)]
 pub struct FlatScopeArena {
@@ -168,26 +210,20 @@ impl FlatScopeArena {
         }
     }
 
-    /// Registers a new scope boundary in the arena, returning its unique scope ID.
-    pub fn add_scope(
-        &mut self,
-        parent: Option<u32>,
-        kind: ScopeKind,
-        start_line: u32,
-        end_line: u32,
-    ) -> u32 {
+    /// Registers a new scope boundary via structured descriptor, returning its unique scope ID.
+    pub fn add_scope_descriptor(&mut self, desc: ScopeDescriptor) -> u32 {
         let id = self.scopes.len() as u32;
         self.scopes.push(ScopeNode {
             id,
-            parent,
-            kind,
-            start_line,
-            end_line,
+            parent: desc.parent,
+            kind: desc.kind,
+            start_line: desc.start_line,
+            end_line: desc.end_line,
         });
         self.scope_children.push(Vec::new());
         self.scope_bindings.push(Vec::new());
 
-        if let Some(parent_id) = parent {
+        if let Some(parent_id) = desc.parent {
             if let Some(children) = self.scope_children.get_mut(parent_id as usize) {
                 children.push(id);
             }
@@ -195,21 +231,37 @@ impl FlatScopeArena {
         id
     }
 
-    /// Registers a binding declaration under a specific scope ID.
-    pub fn add_binding(&mut self, scope_id: u32, symbol_name: &str, kind: BindingKind, line: u32) {
-        let symbol_id = self.interner.intern(symbol_name);
+    /// Registers a new scope boundary in the arena (convenience forwarder).
+    pub fn add_scope(
+        &mut self,
+        parent: Option<u32>,
+        kind: ScopeKind,
+        start_line: u32,
+        end_line: u32,
+    ) -> u32 {
+        self.add_scope_descriptor(ScopeDescriptor::new(parent, kind, start_line, end_line))
+    }
+
+    /// Registers a binding declaration under a specific scope ID using structured parameter object.
+    pub fn add_binding_declaration(&mut self, decl: BindingDeclaration<'_>) {
+        let symbol_id = self.interner.intern(decl.symbol_name);
         let binding_idx = self.bindings.len() as u32;
         self.bindings.push(ScopeBinding {
-            scope_id,
+            scope_id: decl.scope_id,
             symbol_id,
-            kind,
-            line,
+            kind: decl.kind,
+            line: decl.line,
         });
-        if (scope_id as usize) >= self.scope_bindings.len() {
+        if (decl.scope_id as usize) >= self.scope_bindings.len() {
             self.scope_bindings
-                .resize(scope_id as usize + 1, Vec::new());
+                .resize(decl.scope_id as usize + 1, Vec::new());
         }
-        self.scope_bindings[scope_id as usize].push(binding_idx);
+        self.scope_bindings[decl.scope_id as usize].push(binding_idx);
+    }
+
+    /// Registers a binding declaration under a specific scope ID (convenience forwarder).
+    pub fn add_binding(&mut self, scope_id: u32, symbol_name: &str, kind: BindingKind, line: u32) {
+        self.add_binding_declaration(BindingDeclaration::new(scope_id, symbol_name, kind, line));
     }
 
     /// Looks up a symbol starting from a given scope and walking up ancestor scopes.

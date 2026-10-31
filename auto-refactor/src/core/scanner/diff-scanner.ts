@@ -58,78 +58,153 @@ import {
     type ScanWithDiffOptions,
 } from './diff-hints';
 
+/**
+ * Execution context for persistent worker pool execution across file misses.
+ */
 interface PersistentPoolContext {
+    /** Scanner context hosting configurations, caches, and telemetry. */
     readonly scanner: ScannerContext;
+    /** Relative paths of files requiring fresh worker analysis. */
     readonly missFiles: string[];
+    /** Absolute filesystem repository root. */
     readonly absRoot: string;
+    /** Current scan configuration options and threshold matrices. */
     readonly cfg: ScanConfig;
+    /** Hash fingerprint uniquely identifying analyzer definitions and configurations. */
     readonly poolFp: string;
+    /** Diff scan options including optional persistent worker pool handle. */
     readonly opts: ScanWithDiffOptions;
+    /** In-memory buffer preloads mapped by relative file path. */
     readonly preloaded: Map<string, Buffer>;
+    /** Worker analyzer descriptor manifests. */
     readonly workerDescs: WorkerAnalyzerDesc[];
+    /** Effective number of parallel worker threads allocated. */
     readonly effWorkers: number;
 }
 
+/**
+ * Execution context for ephemeral one-shot worker pool execution.
+ */
 interface TransientPoolContext {
+    /** Scanner context hosting configurations, caches, and telemetry. */
     readonly scanner: ScannerContext;
+    /** Relative paths of files requiring fresh worker analysis. */
     readonly missFiles: string[];
+    /** Absolute filesystem repository root. */
     readonly absRoot: string;
+    /** Current scan configuration options and threshold matrices. */
     readonly cfg: ScanConfig;
+    /** In-memory buffer preloads mapped by relative file path. */
     readonly preloaded: Map<string, Buffer>;
+    /** Worker analyzer descriptor manifests. */
     readonly workerDescs: WorkerAnalyzerDesc[];
+    /** Effective number of parallel worker threads allocated. */
     readonly effWorkers: number;
 }
 
+/**
+ * Pipeline state context for committing newly analyzed batch results into cache and metrics.
+ */
 interface RecordAnalyzedContext {
+    /** Queue of candidate files routed for full analysis. */
     readonly toAnalyze: DiffRoutingState['toAnalyze'];
+    /** Fresh analysis results produced by worker execution. */
     readonly results: { issues: Issue[]; metric: FileMetric | null }[];
+    /** Positional lookup array mapping target file indices to results. */
     readonly perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[];
+    /** Memory session bucket mapping relative paths to analyzed outcomes. */
     readonly sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>;
+    /** Whether Level 2 persistent disk cache is active. */
     readonly l2Enabled: boolean;
+    /** Underlying persistent disk cache store. */
     readonly cache: CacheStore;
+    /** File fingerprints mapped by relative path. */
     readonly fpByRel: Map<string, Fingerprint>;
 }
 
+/**
+ * Pipeline state context for scheduling and running cache miss batches.
+ */
 interface DiffMissBatchesContext {
+    /** Scanner context hosting configurations, caches, and telemetry. */
     readonly scanner: ScannerContext;
+    /** Queue of candidate files routed for full analysis. */
     readonly toAnalyze: DiffRoutingState['toAnalyze'];
+    /** Full set of discovered project files. */
     readonly files: string[];
+    /** Absolute filesystem repository root. */
     readonly absRoot: string;
+    /** Current scan configuration options and threshold matrices. */
     readonly cfg: ScanConfig;
+    /** Pool fingerprint identifying analyzer setup. */
     readonly poolFp: string;
+    /** Whether Level 2 persistent disk cache is active. */
     readonly l2Enabled: boolean;
+    /** Diff scan options including optional persistent worker pool handle. */
     readonly opts: ScanWithDiffOptions;
+    /** Memory session bucket mapping relative paths to analyzed outcomes. */
     readonly sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>;
+    /** Positional lookup array mapping target file indices to results. */
     readonly perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[];
+    /** File fingerprints mapped by relative path. */
     readonly fpByRel: Map<string, Fingerprint>;
+    /** Underlying persistent disk cache store. */
     readonly cache: CacheStore;
 }
 
+/**
+ * Pipeline state context for executing incremental AST delta scans.
+ */
 interface DiffIncrementalFilesContext {
+    /** Scanner context hosting configurations, caches, and telemetry. */
     readonly scanner: ScannerContext;
+    /** Queue of files eligible for incremental delta AST scanning. */
     readonly toIncremental: DiffRoutingState['toIncremental'];
+    /** Incremental state cache bucket holding previous syntax and line tables. */
     readonly incBucket: Map<string, IncrementalFileState>;
+    /** Whether Level 2 persistent disk cache is active. */
     readonly l2Enabled: boolean;
+    /** Memory session bucket mapping relative paths to analyzed outcomes. */
     readonly sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>;
+    /** Positional lookup array mapping target file indices to results. */
     readonly perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[];
+    /** File fingerprints mapped by relative path. */
     readonly fpByRel: Map<string, Fingerprint>;
+    /** Underlying persistent disk cache store. */
     readonly cache: CacheStore;
 }
 
+/**
+ * Context for committing routing state, cache updates, and RSS pruning.
+ */
 interface CommitRoutingContext {
+    /** Mutated routing state partitioned into hit, miss, and incremental sets. */
     readonly routingState: DiffRoutingState;
+    /** Underlying persistent disk cache store. */
     readonly cache: CacheStore;
+    /** Incremental state cache bucket holding previous syntax and line tables. */
     readonly incBucket: Map<string, IncrementalFileState>;
+    /** Warm session cache handles and buckets. */
     readonly session: ReturnType<typeof createWarmSession>;
+    /** Scanner context hosting configurations, caches, and telemetry. */
     readonly scanner: ScannerContext;
 }
 
+/**
+ * Context for computing telemetry summary metrics for a diff-driven scan run.
+ */
 interface CreateDiffStatsContext {
+    /** Mutated routing state partitioned into hit, miss, and incremental sets. */
     readonly routingState: DiffRoutingState;
+    /** Total number of discovered files. */
     readonly totalFiles: number;
+    /** Number of files requiring full analysis. */
     readonly totalAnalyzed: number;
+    /** Cache miss batch statistics. */
     readonly missStats: { poolWarm: boolean };
+    /** Incremental processing counters. */
     readonly incStats: { incrementalFiles: number; incrementalHit: number };
+    /** Number of files bypassed via diff ignore filters. */
     readonly diffIgnored: number;
 }
 
@@ -372,24 +447,14 @@ function filterDiffHints(
 }
 
 function computeIssueSortOrder(leftIssue: Issue, rightIssue: Issue): number {
-    const fileComparison =
-        leftIssue.location.file < rightIssue.location.file
-            ? -1
-            : leftIssue.location.file > rightIssue.location.file
-              ? 1
-              : 0;
-    if (fileComparison !== 0) return fileComparison;
+    if (leftIssue.location.file < rightIssue.location.file) return -1;
+    if (leftIssue.location.file > rightIssue.location.file) return 1;
 
     const lineComparison = leftIssue.location.start.line - rightIssue.location.start.line;
     if (lineComparison !== 0) return lineComparison;
 
-    const analyzerComparison =
-        leftIssue.analyzer < rightIssue.analyzer
-            ? -1
-            : leftIssue.analyzer > rightIssue.analyzer
-              ? 1
-              : 0;
-    if (analyzerComparison !== 0) return analyzerComparison;
+    if (leftIssue.analyzer < rightIssue.analyzer) return -1;
+    if (leftIssue.analyzer > rightIssue.analyzer) return 1;
 
     return leftIssue.rule < rightIssue.rule ? -1 : 1;
 }
