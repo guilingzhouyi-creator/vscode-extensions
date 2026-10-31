@@ -462,9 +462,15 @@ export function buildDebtLedger<T extends DebtIssueLike>(
 function normalizeRepoRelativeDebtPath(rawPath: string | undefined): string {
     if (!rawPath) return '';
     let norm = rawPath.replace(/\\/g, '/');
-    const repoIdx = norm.indexOf('auto-refactor/');
+    const cwdNorm = process.cwd().replace(/\\/g, '/');
+    if (norm.startsWith(cwdNorm + '/')) {
+        norm = norm.slice(cwdNorm.length + 1);
+    }
+    const lastSlash = cwdNorm.lastIndexOf('/');
+    const pkgPrefix = (lastSlash !== -1 ? cwdNorm.slice(lastSlash + 1) : cwdNorm) + '/';
+    const repoIdx = pkgPrefix.length > 1 ? norm.indexOf(pkgPrefix) : -1;
     if (repoIdx !== -1) {
-        norm = norm.slice(repoIdx + 'auto-refactor/'.length);
+        norm = norm.slice(repoIdx + pkgPrefix.length);
     } else if (norm.startsWith('./')) {
         norm = norm.slice(2);
     }

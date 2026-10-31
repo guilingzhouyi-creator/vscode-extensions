@@ -61,6 +61,63 @@ const DEFAULT_MAX_ROTATED_FILES = 3;
 /** Regular expression used to strip ANSI escape codes when writing to log files. */
 const ANSI_ESCAPE_REGEX = /\u001b\[[0-9;]*m/g;
 
+/** Sensitive key names to redact in context payloads. */
+const SENSITIVE_KEY_REGEX = /^(?:authorization|token|secret|password|bearer|apikey|cookie)$/i;
+
+/** File system absolute drive letter pattern across lines and messages */
+const DRIVE_PATH_REGEX = /[a-zA-Z]:[\\/][^ \r\n\t"']+/g;
+
+/**
+ * Normalizes absolute local paths to repository-relative representation.
+ */
+export function sanitizePath(value: string): string {
+    if (typeof value !== 'string') return value;
+    return value.replace(DRIVE_PATH_REGEX, (match) => {
+        const norm = match.replace(/\\/g, '/');
+        return norm.replace(/^[a-zA-Z]:\/[^/]+\/[^/]+\//, '<workspace>/');
+    });
+}
+
+/**
+ * Safely serializes arbitrary objects to JSON, handling circular references, BigInt,
+ * and redacting sensitive credentials and system paths.
+ *
+ * @param data - The value or object graph to serialize.
+ * @returns Serialized JSON string.
+ */
+export function safeSerializeJson(data: unknown): string {
+    const seen = new WeakSet<object>();
+
+    try {
+        return JSON.stringify(data, (key, value) => {
+            if (key && SENSITIVE_KEY_REGEX.test(key)) {
+                return '[REDACTED]';
+            }
+            if (typeof value === 'bigint') {
+                return `${value.toString()}n`;
+            }
+            if (typeof value === 'function') {
+                return `[Function${value.name ? ': ' + value.name : ''}]`;
+            }
+            if (typeof value === 'symbol') {
+                return value.toString();
+            }
+            if (typeof value === 'string') {
+                return sanitizePath(value);
+            }
+            if (typeof value === 'object' && value !== null) {
+                if (seen.has(value)) {
+                    return '[Circular]';
+                }
+                seen.add(value);
+            }
+            return value;
+        });
+    } catch {
+        return '{"level":"error","message":"[safeSerializeJson: Serialization Failed]"}';
+    }
+}
+
 /**
  * Severity-ordered log levels. Higher numeric value = more verbose.
  * `silent` suppresses all output.
@@ -142,6 +199,32 @@ export const LogIoBarrier = {
     },
 };
 
+const activeRingBuffers = new Set<LogRingBuffer>();
+let isExitBarrierRegistered = false;
+
+/**
+ * Ensures global synchronous flush barrier on process termination to avoid dangling logs.
+ */
+function ensureExitBarrierRegistered(): void {
+    if (isExitBarrierRegistered) return;
+    isExitBarrierRegistered = true;
+
+    const flushAllActiveBuffers = () => {
+        for (const ring of activeRingBuffers) {
+            try {
+                ring.flushSync();
+            } catch {
+                /* Suppress secondary exit exception */
+            }
+        }
+    };
+
+    if (typeof process !== 'undefined' && typeof process.on === 'function') {
+        process.on('exit', flushAllActiveBuffers);
+        process.on('beforeExit', flushAllActiveBuffers);
+    }
+}
+
 /**
  * In-memory circular buffer for batching disk appends with size-capping and rotation.
  */
@@ -179,6 +262,8 @@ export class LogRingBuffer {
             this.maxRotatedFiles = options.maxRotatedFiles ?? DEFAULT_MAX_ROTATED_FILES;
         }
         this.buffer = new Array<string>(this.capacity);
+        activeRingBuffers.add(this);
+        ensureExitBarrierRegistered();
     }
 
     /**
@@ -215,7 +300,31 @@ export class LogRingBuffer {
             }
             fs.renameSync(this.filePath, firstRotated);
         } catch {
-            /* best-effort: fail-soft fallback */
+            // Fallback for Windows file lock (EBUSY / EPERM):
+            // Try unique timestamped fallback name to break lock contention
+            try {
+                const timestamped = `${this.filePath}.${Date.now().toString(36)}.locked.rot`;
+                fs.renameSync(this.filePath, timestamped);
+            } catch {
+                // If rename is entirely blocked by lock, try truncating active file in-place
+                try {
+                    const fd = fs.openSync(this.filePath, 'w');
+                    fs.closeSync(fd);
+                } catch {
+                    /* best-effort: fail-soft fallback */
+                }
+            }
+        }
+    }
+
+    /**
+     * Release ring buffer resources and deregister from process exit barrier.
+     */
+    public dispose(): void {
+        activeRingBuffers.delete(this);
+        if (this.timer) {
+            clearTimeout(this.timer);
+            this.timer = null;
         }
     }
 
@@ -358,12 +467,12 @@ function formatTextMessage(params: FormatLogMessageParams): string {
     if (params.errorObj) {
         line += ` [Error: ${params.errorObj.message}]`;
         if (params.errorObj.stack) {
-            line += `\n${params.errorObj.stack}`;
+            line += `\n${sanitizePath(params.errorObj.stack)}`;
         }
         if (params.errorObj.cause != null) {
             const cause = params.errorObj.cause;
             const causeStr = cause instanceof Error ? cause.stack || cause.message : String(cause);
-            line += `\n[Caused by]: ${causeStr}`;
+            line += `\n[Caused by]: ${sanitizePath(causeStr)}`;
         }
     }
     return line;
@@ -385,14 +494,14 @@ function formatJsonMessage(params: FormatLogMessageParams): string {
         record.error = {
             name: params.errorObj.name,
             message: params.errorObj.message,
-            stack: params.errorObj.stack,
+            stack: params.errorObj.stack ? sanitizePath(params.errorObj.stack) : undefined,
             cause:
                 params.errorObj.cause instanceof Error
                     ? params.errorObj.cause.message
                     : params.errorObj.cause,
         };
     }
-    return JSON.stringify(record);
+    return safeSerializeJson(record);
 }
 
 /**
@@ -539,6 +648,7 @@ export class Logger {
     close(): void {
         if (this.ringBuffer) {
             this.ringBuffer.flushSync();
+            this.ringBuffer.dispose();
         }
     }
 
@@ -548,6 +658,7 @@ export class Logger {
     async closeAsync(): Promise<void> {
         if (this.ringBuffer) {
             await this.ringBuffer.flushAsync();
+            this.ringBuffer.dispose();
         }
     }
 

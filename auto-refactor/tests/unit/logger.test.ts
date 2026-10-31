@@ -15,6 +15,8 @@ import {
     LogIoBarrier,
     AutoRefactorError,
     LOG_LEVELS,
+    safeSerializeJson,
+    sanitizePath,
     type LogLevel,
 } from '../../src/core/logger';
 
@@ -188,6 +190,40 @@ describe('Logger & Diagnostic Primitives', () => {
             expect(parsed.error.message).toBe('invalid type argument');
             expect(parsed.error.stack).toBeDefined();
         });
+
+        it('handles circular references in context safely when format is json', () => {
+            const logger = new Logger('info', undefined, { format: 'json' });
+            const circular: Record<string, unknown> = { name: 'cycle-node' };
+            circular.self = circular;
+
+            expect(() => logger.info('Circular state in json', circular)).not.toThrow();
+            expect(writtenStderr.length).toBe(1);
+            const parsed = JSON.parse(writtenStderr[0].trim());
+            expect(parsed.context.name).toBe('cycle-node');
+            expect(parsed.context.self).toBe('[Circular]');
+        });
+
+        it('serializes BigInt and redacts sensitive keys in JSON output', () => {
+            const logger = new Logger('info', undefined, { format: 'json' });
+            logger.info('Sensitive state', {
+                token: 'secret-auth-token-12345',
+                password: 'super-password',
+                apiKey: 'ak-live-9999',
+                durationNs: BigInt(9876543210),
+            });
+
+            const parsed = JSON.parse(writtenStderr[0].trim());
+            expect(parsed.context.token).toBe('[REDACTED]');
+            expect(parsed.context.password).toBe('[REDACTED]');
+            expect(parsed.context.apiKey).toBe('[REDACTED]');
+            expect(parsed.context.durationNs).toBe('9876543210n');
+        });
+
+        it('sanitizes local absolute drive paths in error stacks', () => {
+            const sanitized = sanitizePath('C:\\CODE_game-development\\vscode-extensions\\file.ts');
+            expect(sanitized).not.toContain('C:\\');
+            expect(sanitized).toContain('<workspace>/');
+        });
     });
 
     describe('7. File Logging & ANSI Stripping', () => {
@@ -284,6 +320,12 @@ describe('Logger & Diagnostic Primitives', () => {
             expect(content).toContain('Over capacity 24');
             expect(content).toContain('Over capacity 15');
         });
+
+        it('releases ring buffer from global exit set on dispose()', () => {
+            const logPath = path.join(tmpDir, 'dispose-test.log');
+            const ring = new LogRingBuffer(logPath);
+            expect(() => ring.dispose()).not.toThrow();
+        });
     });
 
     describe('9. File Size Rotation & Archive Retention', () => {
@@ -333,6 +375,35 @@ describe('Logger & Diagnostic Primitives', () => {
             expect(fs.existsSync(logPath)).toBe(true);
             expect(fs.existsSync(`${logPath}.1`)).toBe(true);
             expect(fs.existsSync(`${logPath}.2`)).toBe(false);
+        });
+
+        it('falls back gracefully when rotation encounters locked file contention', () => {
+            const logPath = path.join(tmpDir, 'locked-rotation.log');
+            const ring = new LogRingBuffer(logPath, {
+                maxBytesPerFile: 50,
+                maxRotatedFiles: 3,
+            });
+
+            ring.push('Line 1 filling buffer capacity for locked rotation test.');
+            ring.flushSync();
+
+            // Simulate file contention/lock on destination .1 by creating it as a blocking directory
+            const blockedDest = `${logPath}.1`;
+            fs.mkdirSync(blockedDest);
+
+            try {
+                // Next push will trigger rotation, rename to .1 will hit EPERM, entering fallback
+                ring.push('Line 2 exceeding capacity triggering rotation fallback.');
+                expect(() => ring.flushSync()).not.toThrow();
+                expect(fs.existsSync(logPath)).toBe(true);
+            } finally {
+                ring.dispose();
+                try {
+                    fs.rmdirSync(blockedDest);
+                } catch {
+                    /* ignore */
+                }
+            }
         });
     });
 
