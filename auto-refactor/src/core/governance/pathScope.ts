@@ -14,6 +14,14 @@
  *     repository came to carry 472 debug-logging findings on its own scripts.
  */
 
+import {
+    normalizePathForClassification,
+    isTestFilePath,
+    isFixtureOrMockPath,
+    isBenchmarkPath,
+    isScriptOrGatePath,
+} from '../path';
+
 /**
  * Split a path into its non-empty segments on either separator style.
  *
@@ -21,8 +29,7 @@
  * @returns Lowercased path segments in order.
  */
 function segmentsOf(filePath: string): string[] {
-    return filePath
-        .replace(/\\/g, '/')
+    return normalizePathForClassification(filePath)
         .split('/')
         .filter((segment) => segment.length > 0);
 }
@@ -41,7 +48,12 @@ function segmentsOf(filePath: string): string[] {
 export function pathHasSegment(filePath: string, directory: string): boolean {
     const wanted = directory.replace(/^\/+|\/+$/g, '').toLowerCase();
     if (wanted.length === 0) return false;
-    return segmentsOf(filePath).some((segment) => segment.toLowerCase() === wanted);
+    const norm = normalizePathForClassification(filePath);
+    if (!norm) return false;
+    if (norm === wanted || norm.startsWith(`${wanted}/`) || norm.endsWith(`/${wanted}`)) {
+        return true;
+    }
+    return norm.includes(`/${wanted}/`);
 }
 
 /**
@@ -81,7 +93,12 @@ export const TOOL_SCRIPT_SEGMENTS = ['scripts', 'bin', 'tools'] as const;
  * @returns True when the path resides inside test or fixture directories.
  */
 export function isTestOrFixturePath(filePath: string): boolean {
-    return TEST_OR_FIXTURE_SEGMENTS.some((segment) => pathHasSegment(filePath, segment));
+    return (
+        TEST_OR_FIXTURE_SEGMENTS.some((segment) => pathHasSegment(filePath, segment)) ||
+        isTestFilePath(filePath) ||
+        isFixtureOrMockPath(filePath) ||
+        isBenchmarkPath(filePath)
+    );
 }
 
 /**
@@ -91,7 +108,10 @@ export function isTestOrFixturePath(filePath: string): boolean {
  * @returns True when the path resides inside tooling script directories.
  */
 export function isToolScriptPath(filePath: string): boolean {
-    return TOOL_SCRIPT_SEGMENTS.some((segment) => pathHasSegment(filePath, segment));
+    return (
+        TOOL_SCRIPT_SEGMENTS.some((segment) => pathHasSegment(filePath, segment)) ||
+        isScriptOrGatePath(filePath)
+    );
 }
 
 /**

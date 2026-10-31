@@ -19,18 +19,34 @@
  */
 
 import { normalizePathSeparators } from '../constants';
+import { LeasedRegexPool, sharedRegexPool } from '../data-structures/regex-pool';
+import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
 
 /**
  * Standardized repository file category classifications.
  */
 export type FileCategory =
-    | 'test'
-    | 'fixture'
-    | 'benchmark'
-    | 'script'
-    | 'documentation'
-    | 'generated'
-    | 'source';
+    'test' | 'fixture' | 'benchmark' | 'script' | 'documentation' | 'generated' | 'source';
+
+const MAX_PATH_CACHE_ENTRIES = 4096;
+const pathCategoryCache = new Map<string, FileCategory>();
+
+sharedMemoryGovernor.register({
+    name: 'PathClassifier.pathCategoryCache',
+    tier: CacheEvictionTier.Intermediate,
+    clear: () => pathCategoryCache.clear(),
+    getSize: () => pathCategoryCache.size,
+});
+
+function compileSubstringMatcher(indicators: readonly string[]): RegExp {
+    const pattern = indicators.map((s) => LeasedRegexPool.escape(s)).join('|');
+    return sharedRegexPool.getCompiled(`(?:${pattern})`);
+}
+
+function compileSuffixMatcher(suffixes: readonly string[]): RegExp {
+    const pattern = suffixes.map((s) => LeasedRegexPool.escape(s)).join('|');
+    return sharedRegexPool.getCompiled(`(?:${pattern})$`);
+}
 
 const TEST_SUBSTRINGS: readonly string[] = Object.freeze([
     '.test.',
@@ -125,6 +141,14 @@ const GENERATED_OR_DIST_INDICATORS: readonly string[] = Object.freeze([
     '_generated.',
 ]);
 
+const RE_TEST_SUFFIXES = compileSuffixMatcher(TEST_SUFFIXES);
+const RE_TEST_SUBSTRINGS = compileSubstringMatcher(TEST_SUBSTRINGS);
+const RE_FIXTURE_OR_MOCK = compileSubstringMatcher(FIXTURE_OR_MOCK_INDICATORS);
+const RE_BENCHMARK = compileSubstringMatcher(BENCHMARK_INDICATORS);
+const RE_SCRIPT_OR_GATE = compileSubstringMatcher(SCRIPT_OR_GATE_INDICATORS);
+const RE_DOC_EXTENSIONS = compileSuffixMatcher(DOC_EXTENSIONS);
+const RE_GENERATED_OR_DIST = compileSubstringMatcher(GENERATED_OR_DIST_INDICATORS);
+
 /**
  * Normalizes a file path to lowercase with forward slashes for deterministic classification.
  *
@@ -148,17 +172,9 @@ export function isTestFilePath(filePath: string): boolean {
     if (!norm) return false;
 
     // Fixtures, mocks, and testdata directories contain static payload data, not test suites
-    if (isFixtureOrMockPath(norm)) return false;
+    if (RE_FIXTURE_OR_MOCK.test(norm)) return false;
 
-    for (let i = 0; i < TEST_SUFFIXES.length; i++) {
-        if (norm.endsWith(TEST_SUFFIXES[i])) return true;
-    }
-
-    for (let i = 0; i < TEST_SUBSTRINGS.length; i++) {
-        if (norm.includes(TEST_SUBSTRINGS[i])) return true;
-    }
-
-    return false;
+    return RE_TEST_SUFFIXES.test(norm) || RE_TEST_SUBSTRINGS.test(norm) || norm.startsWith('test/');
 }
 
 /**
@@ -170,12 +186,7 @@ export function isTestFilePath(filePath: string): boolean {
 export function isFixtureOrMockPath(filePath: string): boolean {
     const norm = normalizePathForClassification(filePath);
     if (!norm) return false;
-
-    for (let i = 0; i < FIXTURE_OR_MOCK_INDICATORS.length; i++) {
-        if (norm.includes(FIXTURE_OR_MOCK_INDICATORS[i])) return true;
-    }
-
-    return false;
+    return RE_FIXTURE_OR_MOCK.test(norm);
 }
 
 /**
@@ -187,12 +198,7 @@ export function isFixtureOrMockPath(filePath: string): boolean {
 export function isBenchmarkPath(filePath: string): boolean {
     const norm = normalizePathForClassification(filePath);
     if (!norm) return false;
-
-    for (let i = 0; i < BENCHMARK_INDICATORS.length; i++) {
-        if (norm.includes(BENCHMARK_INDICATORS[i])) return true;
-    }
-
-    return false;
+    return RE_BENCHMARK.test(norm);
 }
 
 /**
@@ -204,12 +210,7 @@ export function isBenchmarkPath(filePath: string): boolean {
 export function isScriptOrGatePath(filePath: string): boolean {
     const norm = normalizePathForClassification(filePath);
     if (!norm) return false;
-
-    for (let i = 0; i < SCRIPT_OR_GATE_INDICATORS.length; i++) {
-        if (norm.includes(SCRIPT_OR_GATE_INDICATORS[i])) return true;
-    }
-
-    return false;
+    return RE_SCRIPT_OR_GATE.test(norm);
 }
 
 /**
@@ -221,14 +222,8 @@ export function isScriptOrGatePath(filePath: string): boolean {
 export function isDocumentationPath(filePath: string): boolean {
     const norm = normalizePathForClassification(filePath);
     if (!norm) return false;
-
     if (norm.includes('/docs/') || norm.startsWith('docs/')) return true;
-
-    for (let i = 0; i < DOC_EXTENSIONS.length; i++) {
-        if (norm.endsWith(DOC_EXTENSIONS[i])) return true;
-    }
-
-    return false;
+    return RE_DOC_EXTENSIONS.test(norm);
 }
 
 /**
@@ -240,12 +235,7 @@ export function isDocumentationPath(filePath: string): boolean {
 export function isGeneratedOrDistPath(filePath: string): boolean {
     const norm = normalizePathForClassification(filePath);
     if (!norm) return false;
-
-    for (let i = 0; i < GENERATED_OR_DIST_INDICATORS.length; i++) {
-        if (norm.includes(GENERATED_OR_DIST_INDICATORS[i])) return true;
-    }
-
-    return false;
+    return RE_GENERATED_OR_DIST.test(norm);
 }
 
 /**
@@ -256,13 +246,28 @@ export function isGeneratedOrDistPath(filePath: string): boolean {
  * @returns True if file is in an exempted development/test/tooling domain.
  */
 export function isExemptFromArchitectureRules(filePath: string): boolean {
+    const category = classifyFilePath(filePath);
     return (
-        isTestFilePath(filePath) ||
-        isFixtureOrMockPath(filePath) ||
-        isBenchmarkPath(filePath) ||
-        isScriptOrGatePath(filePath) ||
-        isGeneratedOrDistPath(filePath)
+        category === 'test' ||
+        category === 'fixture' ||
+        category === 'benchmark' ||
+        category === 'script' ||
+        category === 'generated'
     );
+}
+
+function computeFileCategory(norm: string): FileCategory {
+    if (RE_GENERATED_OR_DIST.test(norm)) return 'generated';
+    if (RE_BENCHMARK.test(norm)) return 'benchmark';
+    if (RE_FIXTURE_OR_MOCK.test(norm)) return 'fixture';
+    if (RE_TEST_SUFFIXES.test(norm) || RE_TEST_SUBSTRINGS.test(norm) || norm.startsWith('test/')) {
+        return 'test';
+    }
+    if (RE_SCRIPT_OR_GATE.test(norm)) return 'script';
+    if (norm.includes('/docs/') || norm.startsWith('docs/') || RE_DOC_EXTENSIONS.test(norm)) {
+        return 'documentation';
+    }
+    return 'source';
 }
 
 /**
@@ -272,13 +277,18 @@ export function isExemptFromArchitectureRules(filePath: string): boolean {
  * @returns Assigned FileCategory.
  */
 export function classifyFilePath(filePath: string): FileCategory {
-    if (isGeneratedOrDistPath(filePath)) return 'generated';
-    if (isBenchmarkPath(filePath)) return 'benchmark';
-    if (isFixtureOrMockPath(filePath)) return 'fixture';
-    if (isTestFilePath(filePath)) return 'test';
-    if (isScriptOrGatePath(filePath)) return 'script';
-    if (isDocumentationPath(filePath)) return 'documentation';
-    return 'source';
+    const norm = normalizePathForClassification(filePath);
+    if (!norm) return 'source';
+
+    const cached = pathCategoryCache.get(norm);
+    if (cached !== undefined) return cached;
+
+    const category = computeFileCategory(norm);
+    if (pathCategoryCache.size >= MAX_PATH_CACHE_ENTRIES) {
+        pathCategoryCache.clear();
+    }
+    pathCategoryCache.set(norm, category);
+    return category;
 }
 
 /**

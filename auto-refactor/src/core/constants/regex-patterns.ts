@@ -13,6 +13,27 @@
  *     zero side effects and strictly immune to ReDoS back-tracking traps.
  */
 
+import { sharedRegexPool } from '../data-structures/regex-pool';
+import { REGEX_COMMENT } from './regex-comment';
+import { REGEX_SHELL } from './regex-shell';
+import { REGEX_SECURITY } from './regex-security';
+import { REGEX_PYTHON } from './regex-python';
+import { REGEX_GDSCRIPT } from './regex-gdscript';
+import { REGEX_DATA } from './regex-data';
+import { REGEX_GO } from './regex-go';
+import { REGEX_RUST } from './regex-rust';
+import { REGEX_TEST } from './regex-test';
+
+export * from './regex-comment';
+export * from './regex-shell';
+export * from './regex-security';
+export * from './regex-python';
+export * from './regex-gdscript';
+export * from './regex-data';
+export * from './regex-go';
+export * from './regex-rust';
+export * from './regex-test';
+
 // ============================================================================
 // 1. Naming & Identifier Patterns (REGEX.NAMING)
 // ============================================================================
@@ -37,8 +58,6 @@ export const SINGLE_LETTER_IDENTIFIER_PATTERN = /^[a-zA-Z]$/;
 
 /** Matches identifier containing double underscores or illegal punctuation. */
 export const MALFORMED_IDENTIFIER_PUNCTUATION_PATTERN = /_{2,}|[^a-zA-Z0-9_$]/;
-
-import { sharedRegexPool } from '../data-structures/regex-pool';
 
 const PATTERN_CAMEL_TO_SNAKE = '([a-z0-9])([A-Z])';
 const PATTERN_SNAKE_TO_CAMEL = '_([a-z0-9])';
@@ -243,17 +262,20 @@ export const PYTHON_PEP585_PATTERN = /\b(?:typing\.)?(List|Dict|Set|FrozenSet|Tu
 export const PYTHON_CLASS_PATTERN = /^\s*class\s+([A-Za-z0-9_]+)/;
 
 /** Matches Python import statement. */
-export const PYTHON_FROM_IMPORT_PATTERN = /^\s*(?:from\s+([A-Za-z0-9_.]+)\s+import|import\s+([A-Za-z0-9_.]+))/;
+export const PYTHON_FROM_IMPORT_PATTERN =
+    /^\s*(?:from\s+([A-Za-z0-9_.]+)\s+import|import\s+([A-Za-z0-9_.]+))/;
 
 // --- Rust ---
 /** Matches Rust use declaration. */
 export const RUST_USE_PATTERN = /^\s*use\s+(?:crate|super|[a-zA-Z0-9_]+)::/;
 
 /** Matches Rust function declaration. */
-export const RUST_FN_PATTERN = /^\s*(?:pub(?:\([^)]+\))?\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+([A-Za-z0-9_]+)/;
+export const RUST_FN_PATTERN =
+    /^\s*(?:pub(?:\([^)]+\))?\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+([A-Za-z0-9_]+)/;
 
 /** Matches Rust struct or enum declaration. */
-export const RUST_STRUCT_OR_ENUM_PATTERN = /^\s*(?:pub(?:\([^)]+\))?\s+)?(?:struct|enum)\s+([A-Za-z0-9_]+)/;
+export const RUST_STRUCT_OR_ENUM_PATTERN =
+    /^\s*(?:pub(?:\([^)]+\))?\s+)?(?:struct|enum)\s+([A-Za-z0-9_]+)/;
 
 /** Matches Rust test attribute header (e.g. #[test], #[tokio::test], #[cfg(test)], #[rstest]). */
 export const RUST_TEST_ATTR_PATTERN = /#\[[^\]]*(?:test|cfg\(test\))[^\]]*\]/;
@@ -295,7 +317,8 @@ export const GDSCRIPT_RESET_STATE_FUNC_PATTERN = /^\s*func\s+reset_state\s*\(\s*
 export const GDSCRIPT_RESET_STATE_CALL_PATTERN = /(?:\.|\b)reset_state\s*\(/;
 
 /** Matches legacy Godot 3 Pool*Array types. */
-export const GDSCRIPT_POOL_ARRAY_PATTERN = /\bPool(?:Byte|Int|Real|String|Vector2|Vector3|Color)Array\b/;
+export const GDSCRIPT_POOL_ARRAY_PATTERN =
+    /\bPool(?:Byte|Int|Real|String|Vector2|Vector3|Color)Array\b/;
 
 /** Matches legacy Godot 3 onready var keyword prefix. */
 export const GDSCRIPT_ONREADY_PATTERN = /^\s*onready\s+var\b/;
@@ -328,7 +351,8 @@ export const GO_IMPORT_PATTERN = /^\s*(?:import\s+)?['"]([^'"]+)['"]/;
 export const GO_TYPE_DEF_PATTERN = /^type\s+([A-Za-z_][A-Za-z0-9_]*)\s+(struct|interface)\b/;
 
 /** Matches Go method declaration with receiver. */
-export const GO_METHOD_DECL_PATTERN = /^func\s+\((?:[^)]+)\)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\(/;
+export const GO_METHOD_DECL_PATTERN =
+    /^func\s+\((?:[^)]+)\)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\(/;
 
 /** Matches Go func declaration with optional generics. */
 export const GO_FUNC_DECL_PATTERN = /^func\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\(/;
@@ -393,7 +417,8 @@ export function createFloatLiteralScanner(): RegExp {
 export const JSX_IMG_WITHOUT_ALT_PATTERN = /<img\b(?![^>]*\balt\s*=)[^>]*>/i;
 
 /** Matches interactive div or span without semantic tag. */
-export const JSX_INTERACTIVE_TAG_PATTERN = /<(?:div|span)\b[^>]*\bon(?:click|keydown|keyup)\s*=[^>]*>/i;
+export const JSX_INTERACTIVE_TAG_PATTERN =
+    /<(?:div|span)\b[^>]*\bon(?:click|keydown|keyup)\s*=[^>]*>/i;
 
 /** Matches role attribute in JSX/HTML. */
 export const JSX_ROLE_ATTR_PATTERN = /\brole\s*=\s*(?:['"][^'"]+['"]|\{[^}]+\})/i;
@@ -402,31 +427,37 @@ export const JSX_ROLE_ATTR_PATTERN = /\brole\s*=\s*(?:['"][^'"]+['"]|\{[^}]+\})/
 export const JSX_TABINDEX_ATTR_PATTERN = /\btabindex\s*=\s*(?:['"]?[-\d]+['"]?|\{[^}]+\})/i;
 
 /** Matches Enter key event listener condition. */
-export const JSX_ENTER_KEY_EVENT_PATTERN = /\b(?:e|event)\.(?:key\s*===?\s*['"]Enter['"]|code\s*===?\s*['"]Enter['"]|keyCode\s*===?\s*13\b)/i;
+export const JSX_ENTER_KEY_EVENT_PATTERN =
+    /\b(?:e|event)\.(?:key\s*===?\s*['"]Enter['"]|code\s*===?\s*['"]Enter['"]|keyCode\s*===?\s*13\b)/i;
 
 /** Matches IME composition state guard expression. */
 export const JSX_IME_GUARD_PATTERN = /\b(?:isComposing|keyCode\s*===?\s*229|which\s*===?\s*229)\b/;
 
 /** Matches dynamic timer, countdown, or counter display elements. */
-export const JSX_TIMER_DISPLAY_PATTERN = /(?:\{\s*(?:format(?:Time|Duration|Timer)|[a-zA-Z0-9_]*(?:elapsed|timer|stopwatch|countdown)[a-zA-Z0-9_]*)\b|<(?:span|div|p)\b[^>]*\b(?:timer|stopwatch|clock|counter|elapsed|duration)[^>]*>)/i;
+export const JSX_TIMER_DISPLAY_PATTERN =
+    /(?:\{\s*(?:format(?:Time|Duration|Timer)|[a-zA-Z0-9_]*(?:elapsed|timer|stopwatch|countdown)[a-zA-Z0-9_]*)\b|<(?:span|div|p)\b[^>]*\b(?:timer|stopwatch|clock|counter|elapsed|duration)[^>]*>)/i;
 
 /** Matches tabular-nums CSS font variant class or property. */
 export const JSX_TABULAR_NUMS_PATTERN = /\b(?:tabular-nums|tnum|font-variant-numeric)\b/i;
 
 /** Matches bordered container elements. */
-export const JSX_CONTAINER_BORDER_PATTERN = /<(?:div|section|aside|nav|fieldset)\b[^>]*\bclass(?:Name)?\s*=\s*['"][^'"]*\b(?:border|border-(?:gray|slate|zinc|neutral|stone|solid|dashed|\d{3}))\b[^'"]*['"]/i;
+export const JSX_CONTAINER_BORDER_PATTERN =
+    /<(?:div|section|aside|nav|fieldset)\b[^>]*\bclass(?:Name)?\s*=\s*['"][^'"]*\b(?:border|border-(?:gray|slate|zinc|neutral|stone|solid|dashed|\d{3}))\b[^'"]*['"]/i;
 
 /** Matches bordered child control elements. */
-export const JSX_CHILD_BORDER_PATTERN = /<(?:button|input|select|span)\b[^>]*\bclass(?:Name)?\s*=\s*['"][^'"]*(?<![tbrl]-)\bborder(?:\s+|-[a-z0-9]+|\b)(?![tbrl]-)[^'"]*['"]/i;
+export const JSX_CHILD_BORDER_PATTERN =
+    /<(?:button|input|select|span)\b[^>]*\bclass(?:Name)?\s*=\s*['"][^'"]*(?<![tbrl]-)\bborder(?:\s+|-[a-z0-9]+|\b)(?![tbrl]-)[^'"]*['"]/i;
 
 /** Matches closing container tags (div or section). */
 export const JSX_CLOSING_CONTAINER_PATTERN = /<\/(?:div|section)>/i;
 
 /** Matches CSS transition or animation properties triggering layout reflow. */
-export const CSS_REFLOW_PROPERTIES_PATTERN = /\b(?:transition|animation)\s*:[^;]*\b(?:width|height|top|left|right|bottom|margin|padding)\b/i;
+export const CSS_REFLOW_PROPERTIES_PATTERN =
+    /\b(?:transition|animation)\s*:[^;]*\b(?:width|height|top|left|right|bottom|margin|padding)\b/i;
 
 /** Matches CSS anti-squash properties for CJK typography. */
-export const CSS_ANTI_SQUASH_PATTERN = /\b(?:text-balance|text-wrap:\s*balance\b|textWrap:\s*['"]balance['"]|break-words|overflow-wrap:\s*(?:break-word|anywhere)\b|overflowWrap:\s*['"](?:break-word|anywhere)['"]|word-break:\s*break-word\b)/i;
+export const CSS_ANTI_SQUASH_PATTERN =
+    /\b(?:text-balance|text-wrap:\s*balance\b|textWrap:\s*['"]balance['"]|break-words|overflow-wrap:\s*(?:break-word|anywhere)\b|overflowWrap:\s*['"](?:break-word|anywhere)['"]|word-break:\s*break-word\b)/i;
 
 /** Matches CSS @media query rule. */
 export const CSS_MEDIA_QUERY_PATTERN = /@media\b/i;
@@ -435,13 +466,16 @@ export const CSS_MEDIA_QUERY_PATTERN = /@media\b/i;
 export const CSS_LOCAL_CLASS_OR_ID_PATTERN = /(?:\.[a-zA-Z_-][\w-]*|#[a-zA-Z_-][\w-]*)\s*\{/;
 
 /** Matches line opening a RegExp literal. */
-export const REGEX_LITERAL_LINE_PATTERN = /^\s*(?:const|let|var)?\s*[\w$]+\s*(?::[^=]+)?=\s*\/(?![*/])/;
+export const REGEX_LITERAL_LINE_PATTERN =
+    /^\s*(?:const|let|var)?\s*[\w$]+\s*(?::[^=]+)?=\s*\/(?![*/])/;
 
 /** Matches single or double quoted pure string assignment line. */
-export const PURE_STRING_ASSIGNMENT_PATTERN = /^\s*[\w$'"]+\s*:\s*(?:'[^'\r\n]*'|"[^"\r\n]*")\s*,?\s*$/;
+export const PURE_STRING_ASSIGNMENT_PATTERN =
+    /^\s*[\w$'"]+\s*:\s*(?:'[^'\r\n]*'|"[^"\r\n]*")\s*,?\s*$/;
 
 /** Matches a standalone string literal line. */
-export const STRING_VALUE_LINE_PATTERN = /^\s*(?:(?:const|let|var)\s+[\w$]+(?:\s*:\s*[^=]+)?\s*=\s*)?(?:'[^'\r\n]*'|"[^"\r\n]*")\s*;?\s*$/;
+export const STRING_VALUE_LINE_PATTERN =
+    /^\s*(?:(?:const|let|var)\s+[\w$]+(?:\s*:\s*[^=]+)?\s*=\s*)?(?:'[^'\r\n]*'|"[^"\r\n]*")\s*;?\s*$/;
 
 /** Creates a fresh global scanner for React hook function declarations. */
 export function createJsxHookDeclScanner(): RegExp {
@@ -460,7 +494,8 @@ export function createJsxInterfacePropsScanner(): RegExp {
 
 // --- Type System & Inference ---
 /** Matches GDScript weak variable assignment without explicit type or inference. */
-export const GDSCRIPT_WEAK_VAR_PATTERN = /^\s*(?:@\w+\s+)?(?:static\s+)?var\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=(?!=)/;
+export const GDSCRIPT_WEAK_VAR_PATTERN =
+    /^\s*(?:@\w+\s+)?(?:static\s+)?var\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=(?!=)/;
 
 /** Matches ambiguous Variant right-hand side initializers. */
 export const GDSCRIPT_VARIANT_RHS_PATTERN = /^\s*(?:null|\[\]|\{\}|Variant)/;
@@ -472,13 +507,15 @@ export const GDSCRIPT_VARIANT_CALL_PATTERN = /\.get\(|\bget\(.*Variant|Variant.*
 export const GDSCRIPT_COLLECTION_ACCESS_PATTERN = /^\s*[a-zA-Z_][a-zA-Z0-9_]*\s*[\[.]/;
 
 /** Matches known non-Variant singleton calls. */
-export const GDSCRIPT_NON_VARIANT_SINGLETONS_PATTERN = /(?:GameConfig|DeterministicRNG|UniqueIdGenerator)\./;
+export const GDSCRIPT_NON_VARIANT_SINGLETONS_PATTERN =
+    /(?:GameConfig|DeterministicRNG|UniqueIdGenerator)\./;
 
 /** Matches dictionary get prefix call. */
 export const GDSCRIPT_DICT_GET_PATTERN = /^d\.get\(/;
 
 /** Matches GDScript func definition lacking return type arrow. */
-export const GDSCRIPT_FUNC_NO_RETURN_PATTERN = /^\s*(?:static\s+)?func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\s*(?!->)\s*:/;
+export const GDSCRIPT_FUNC_NO_RETURN_PATTERN =
+    /^\s*(?:static\s+)?func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\s*(?!->)\s*:/;
 
 /** Matches start of Python def header. */
 export const PYTHON_FUNC_START_PATTERN = /^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
@@ -487,10 +524,12 @@ export const PYTHON_FUNC_START_PATTERN = /^\s*(?:async\s+)?def\s+([a-zA-Z_][a-zA
 export const PYTHON_RETURN_TYPE_PATTERN = /\)\s*->\s*[^:]+:/;
 
 /** Matches exported TypeScript function declaration header. */
-export const TS_EXPORT_FN_PATTERN = /^\s*export\s+(?:default\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\(/;
+export const TS_EXPORT_FN_PATTERN =
+    /^\s*export\s+(?:default\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\(/;
 
 /** Matches exported TypeScript const arrow function declaration header. */
-export const TS_EXPORT_CONST_ARROW_PATTERN = /^\s*export\s+const\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?\(/;
+export const TS_EXPORT_CONST_ARROW_PATTERN =
+    /^\s*export\s+const\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?\(/;
 
 /** Matches TypeScript function signature return type suffix. */
 export const TS_FN_RETURN_TYPE_SUFFIX_PATTERN = /\)\s*:\s*[^{;]+(?:\{|;)/;
@@ -544,7 +583,8 @@ export const TS_ARGUMENTS_USE_PATTERN = /\barguments\s*(?:\[|\.|\))/;
 export const TS_OBJECT_ASSIGN_PATTERN = /\bObject\s*\.\s*assign\s*\(\s*\{\s*\}/;
 
 /** Matches indexOf comparison against boundary (-1 or 0). */
-export const TS_INDEX_OF_BOUNDARY_PATTERN = /\.\s*indexOf\s*\([^)]*\)\s*(?:!==?\s*-1|===?\s*-1|>=?\s*0|>\s*-1)/;
+export const TS_INDEX_OF_BOUNDARY_PATTERN =
+    /\.\s*indexOf\s*\([^)]*\)\s*(?:!==?\s*-1|===?\s*-1|>=?\s*0|>\s*-1)/;
 
 /** Matches deprecated String.prototype.substr call. */
 export const TS_SUBSTR_PATTERN = /\.\s*substr\s*\(/;
@@ -559,10 +599,12 @@ export const TS_REPLACE_CALL_PATTERN = /\.replace\(/;
 export const TS_NAMED_IMPORT_PATTERN = /^\s*import\s+\{([^}]*)\}\s+from\s/;
 
 /** Matches standalone function declaration header for block extraction. */
-export const TS_FUNCTION_HEADER_PATTERN = /^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/;
+export const TS_FUNCTION_HEADER_PATTERN =
+    /^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(/;
 
 /** Matches method declaration header with optional modifiers and return type. */
-export const TS_METHOD_HEADER_PATTERN = /^(?:(?:public|private|protected|static|async)\s+)*([A-Za-z0-9_$]+)\s*\([^)]*\)\s*(?::\s*[^,{]+)?\s*\{/;
+export const TS_METHOD_HEADER_PATTERN =
+    /^(?:(?:public|private|protected|static|async)\s+)*([A-Za-z0-9_$]+)\s*\([^)]*\)\s*(?::\s*[^,{]+)?\s*\{/;
 
 /** Matches class declaration header for block extraction. */
 export const TS_CLASS_HEADER_PATTERN = /^(?:export\s+)?(?:abstract\s+)?class\s+([A-Za-z0-9_$]+)/;
@@ -635,16 +677,19 @@ export const RUST_AMP_STRING_PATTERN = /&\s*String\b/;
 export const RUST_NEEDLESS_CLONE_PATTERN = /\.clone\(\)\s*(?:==|!=|\.len\(\)|\.is_empty\(\))/;
 
 /** Matches naked numeric as cast. */
-export const RUST_NUMERIC_CAST_PATTERN = /\bas\s+(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|f32|f64)\b/;
+export const RUST_NUMERIC_CAST_PATTERN =
+    /\bas\s+(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|f32|f64)\b/;
 
 /** Matches formatting macro invocation. */
-export const RUST_FORMAT_CALL_PATTERN = /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\(/;
+export const RUST_FORMAT_CALL_PATTERN =
+    /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\(/;
 
 /** Matches positional placeholder {} in formatting macro. */
 export const RUST_POSITIONAL_PLACEHOLDER_PATTERN = /!\s*\(\s*"[^"]*\{\}/;
 
 /** Matches multiline format call with empty positional placeholder. */
-export const RUST_MULTILINE_FORMAT_PATTERN = /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\([^;]*"[^"]*\{\}/;
+export const RUST_MULTILINE_FORMAT_PATTERN =
+    /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\([^;]*"[^"]*\{\}/;
 
 /** Matches if let pattern matching statement. */
 export const RUST_IF_LET_PATTERN = /\bif\s+let\s+[^{]+=\s*/;
@@ -659,7 +704,8 @@ export const RUST_FOR_FIND_PATTERN = /\bfor\s+[^{]+\{\s*if\s+[^{]+\{\s*return\b/
 export const RUST_ASYNC_FN_PATTERN = /\basync\s+(?:unsafe\s+)?(?:extern(?:\s+"[^"]+")?\s+)?fn\b/;
 
 /** Matches synchronous standard library Mutex/RwLock acquisition without await. */
-export const RUST_STD_LOCK_PATTERN = /(?:std::sync::(?:Mutex|RwLock)|\.(?:lock|read|write)\s*\(\s*\)(?!\s*\.await))/;
+export const RUST_STD_LOCK_PATTERN =
+    /(?:std::sync::(?:Mutex|RwLock)|\.(?:lock|read|write)\s*\(\s*\)(?!\s*\.await))/;
 
 /** Matches .await keyword expression. */
 export const RUST_AWAIT_PATTERN = /\.await\b/;
@@ -672,16 +718,19 @@ export const RUST_EXPECT_CALL_PATTERN = /\.expect\s*\(/;
 
 // --- Code Simplification & Block Structure ---
 /** Matches code assignment or invocation expression line. */
-export const ASSIGN_LINE_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*\s*(?:[-+*/%]?=|\+\+|--|\.[A-Za-z_]\w*\s*=|\()/;
+export const ASSIGN_LINE_PATTERN =
+    /^[A-Za-z_][A-Za-z0-9_]*\s*(?:[-+*/%]?=|\+\+|--|\.[A-Za-z_]\w*\s*=|\()/;
 
 /** Matches debug print / console logging calls across languages. */
-export const DEBUG_PRINT_CALL_PATTERN = /\b(?:print|pprint|breakpoint|dbg!|println!|eprintln!)\s*\(|\bconsole\.(?:log|debug|info|trace)\s*\(/;
+export const DEBUG_PRINT_CALL_PATTERN =
+    /\b(?:print|pprint|breakpoint|dbg!|println!|eprintln!)\s*\(|\bconsole\.(?:log|debug|info|trace)\s*\(/;
 
 /** Matches Python empty body pass statement. */
 export const PYTHON_EMPTY_BODY_PATTERN = /^pass\s*$/;
 
 /** Matches function with empty brace body on a single line. */
-export const BRACE_EMPTY_ONE_LINER_PATTERN = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\s*\}\s*$/;
+export const BRACE_EMPTY_ONE_LINER_PATTERN =
+    /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\s*\}\s*$/;
 
 /** Matches function header line opening a brace. */
 export const BRACE_OPEN_FN_PATTERN = /\b(?:function|fn|func)\s+[A-Za-z_]\w*[^;{]*\{\s*$/;
@@ -702,7 +751,8 @@ export const ELSE_CLAUSE_PATTERN = /^\s*\}\s*else\b/;
 export const RETURN_BOOL_PATTERN = /^\s*return\s+(true|false)\s*[;}]?\s*$/;
 
 /** Matches return statement with boolean ternary expression. */
-export const TERNARY_BOOL_RETURN_PATTERN = /return\s+[^;]+\?\s*(?:true|false)\s*:\s*(?:true|false)\s*[;}]/;
+export const TERNARY_BOOL_RETURN_PATTERN =
+    /return\s+[^;]+\?\s*(?:true|false)\s*:\s*(?:true|false)\s*[;}]/;
 
 /** Matches Python if statement header line. */
 export const PYTHON_IF_HEADER_PATTERN = /^(\s*)if\s+.*:\s*$/;
@@ -714,7 +764,8 @@ export const BRACE_ONLY_LINE_PATTERN = /^[{}]+$/;
 export const RUST_USE_IMPORT_PATTERN = /^\s*use\s+([A-Za-z0-9_:]+)/;
 
 /** Matches GDScript preload or load import statement. */
-export const GDSCRIPT_LOAD_IMPORT_PATTERN = /(?:preload|load)\s*\(\s*['"](?:res:\/\/)?([^'"]+)['"]\s*\)/;
+export const GDSCRIPT_LOAD_IMPORT_PATTERN =
+    /(?:preload|load)\s*\(\s*['"](?:res:\/\/)?([^'"]+)['"]\s*\)/;
 
 /** Matches Python function or class declaration header. */
 export const PYTHON_DECL_HEADER_PATTERN = /^\s*(?:def|class)\s+[A-Za-z0-9_]+/;
@@ -783,7 +834,8 @@ export const STDLIB_TARGET_CFG_PATTERN =
     /(?:#\[cfg\(target_os|#\[cfg\(target_arch|#if defined\(__linux__\)|#ifdef _WIN32)/;
 
 /** Matches compile error or unsupported platform fallbacks. */
-export const STDLIB_FALLBACK_PATTERN = /(?:compile_error!|#error|unsupported platform|cfg\(not\(any\()/;
+export const STDLIB_FALLBACK_PATTERN =
+    /(?:compile_error!|#error|unsupported platform|cfg\(not\(any\()/;
 
 /** Matches no_std or kernel bare-metal context indicators. */
 export const STDLIB_NO_STD_CONTEXT_PATTERN = /(?:#!\[no_std\]|#!\[no_core\]|\/no_std\/|\/core\/)/;
@@ -793,7 +845,8 @@ export const STDLIB_IMPLICIT_ALLOC_PATTERN =
     /(?:\bBox::new\s*\(|\bVec::new\s*\(|\balloc::boxed::Box\b|\balloc::vec::Vec\b|\b(?:malloc|calloc)\s*\()/;
 
 /** Matches bare panic, unwrap, or abort in public routines. */
-export const STDLIB_RUST_PANIC_PATTERN = /(?:\bpanic!\s*\(|\b(?:todo!|unimplemented!)\s*\(|\.unwrap\(\))/;
+export const STDLIB_RUST_PANIC_PATTERN =
+    /(?:\bpanic!\s*\(|\b(?:todo!|unimplemented!)\s*\(|\.unwrap\(\))/;
 
 /** Matches exported Go function signature header. */
 export const STDLIB_GO_PUB_FN_PATTERN = /^func\s+(?:\([^)]+\)\s+)?([A-Z][a-zA-Z0-9_]*)\s*\(/;
@@ -1046,9 +1099,7 @@ export const REGEX_SYNTAX = Object.freeze({
 // ============================================================================
 // 3. Comment & Annotation Patterns (REGEX.COMMENT)
 // ============================================================================
-
-import { REGEX_COMMENT } from './regex-comment';
-export * from './regex-comment';
+// (Delegated to ./regex-comment; imported at top of file)
 
 // ============================================================================
 // 4. Literal, Quote & Format Patterns (REGEX.LITERAL)
@@ -1088,7 +1139,8 @@ export const URL_ENDPOINT_PATTERN = /^(?:https?|wss?|ftp):\/\/[^\s"'`<>]+$/i;
 export const PATH_PREFIX_PATTERN = /^(?:\/|[a-zA-Z]:[\\/]|\.\.?[\\/])/;
 
 /** Matches common file extensions for assets, configs, and scripts. */
-export const FILE_EXTENSION_PATTERN = /\.(?:json|ya?ml|toml|png|jpe?g|gif|svg|ico|css|scss|html|wasm|proto|graphql|sql|md)$/i;
+export const FILE_EXTENSION_PATTERN =
+    /\.(?:json|ya?ml|toml|png|jpe?g|gif|svg|ico|css|scss|html|wasm|proto|graphql|sql|md)$/i;
 
 /** Matches inline XML SVG opening tag. */
 export const INLINE_SVG_PATTERN = /^\s*<svg(?:\s+[^>]*>|>)/i;
@@ -1097,7 +1149,8 @@ export const INLINE_SVG_PATTERN = /^\s*<svg(?:\s+[^>]*>|>)/i;
 export const GLOB_META_PATTERN = /[*?{}[\]]/;
 
 /** Matches relative or directory specifier prefix. */
-export const RELATIVE_SPECIFIER_PREFIX_PATTERN = /^(?:\.{1,2}\/|\/[A-Za-z0-9_@.-]+\/|[A-Za-z0-9_@.-]+\/)/;
+export const RELATIVE_SPECIFIER_PREFIX_PATTERN =
+    /^(?:\.{1,2}\/|\/[A-Za-z0-9_@.-]+\/|[A-Za-z0-9_@.-]+\/)/;
 
 /** Matches CJK ideograph character code ranges. */
 export const CJK_CHAR_PATTERN = /[　-〿一-鿿＀-￯]/;
@@ -1204,25 +1257,7 @@ export const REGEX_LITERAL = Object.freeze({
 // ============================================================================
 // 5~11. Domain Catalogs Integration (SHELL, SECURITY, PYTHON, GDSCRIPT, DATA, GO, RUST)
 // ============================================================================
-
-import { REGEX_SHELL } from './regex-shell';
-import { REGEX_SECURITY } from './regex-security';
-import { REGEX_PYTHON } from './regex-python';
-import { REGEX_GDSCRIPT } from './regex-gdscript';
-import { REGEX_DATA } from './regex-data';
-import { REGEX_GO } from './regex-go';
-import { REGEX_RUST } from './regex-rust';
-import { REGEX_TEST } from './regex-test';
-
-// Re-export domain sub-modules for seamless backward compatibility
-export * from './regex-shell';
-export * from './regex-security';
-export * from './regex-python';
-export * from './regex-gdscript';
-export * from './regex-data';
-export * from './regex-go';
-export * from './regex-rust';
-export * from './regex-test';
+// (Sub-modules imported at top of file)
 
 // ============================================================================
 // Master Catalog Facade (export const REGEX)

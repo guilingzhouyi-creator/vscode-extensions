@@ -185,8 +185,8 @@ function updateWiringState(
     matchIndex: number,
     content: string,
 ): void {
-    const gap = content.slice(state.lastIndex, matchIndex);
-    if (state.braceDepth === 0 && gap.includes('\n')) {
+    const nlIdx = content.indexOf('\n', state.lastIndex);
+    if (state.braceDepth === 0 && nlIdx !== -1 && nlIdx < matchIndex) {
         state.inWiringContext = false;
     }
     if (rawToken === 'import' || rawToken === 'export') {

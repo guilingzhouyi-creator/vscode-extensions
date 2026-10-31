@@ -123,9 +123,11 @@ const CHAR_SPACE = 32;
  * Checks whether a line has at least two question marks and a colon.
  */
 function hasLineTernaryCandidate(line: string): boolean {
-    if (!line.includes(TOKEN_QUESTION) || !line.includes(TOKEN_COLON)) return false;
     const firstQ = line.indexOf(TOKEN_QUESTION);
-    return line.indexOf(TOKEN_QUESTION, firstQ + 1) > firstQ;
+    if (firstQ === -1) return false;
+    const secondQ = line.indexOf(TOKEN_QUESTION, firstQ + 1);
+    if (secondQ === -1) return false;
+    return line.indexOf(TOKEN_COLON, firstQ + 1) !== -1;
 }
 
 /**
@@ -146,9 +148,11 @@ function countLogicalOperatorChars(line: string): number {
  * Checks whether a line has enough logical operator characters to reach `MAX_LOGICAL_OPERATORS`.
  */
 function hasLineLogicalCandidate(line: string, hasAnd: boolean, hasOr: boolean): boolean {
-    const matchesAnd = hasAnd && line.includes(TOKEN_LOGICAL_AND);
-    const matchesOr = hasOr && line.includes(TOKEN_LOGICAL_OR);
-    if (!matchesAnd && !matchesOr) return false;
+    const andIdx = hasAnd ? line.indexOf(TOKEN_LOGICAL_AND) : -1;
+    const orIdx = hasOr ? line.indexOf(TOKEN_LOGICAL_OR) : -1;
+    if (andIdx === -1 && orIdx === -1) return false;
+    if (orIdx === -1 && line.indexOf(TOKEN_LOGICAL_AND, andIdx + 2) === -1) return false;
+    if (andIdx === -1 && line.indexOf(TOKEN_LOGICAL_OR, orIdx + 2) === -1) return false;
     return countLogicalOperatorChars(line) >= MAX_LOGICAL_OPERATORS * 2;
 }
 
@@ -368,8 +372,11 @@ function evaluateSingleLineStatement(
  * Checks whether a line has any non-whitespace character after the first semicolon.
  */
 function hasPackedSemicolonCandidate(line: string): boolean {
-    if (!line.includes(TOKEN_SEMICOLON)) return false;
-    for (let i = line.indexOf(TOKEN_SEMICOLON) + 1; i < line.length; i++) {
+    const len = line.length;
+    const firstSemi = line.indexOf(TOKEN_SEMICOLON);
+    if (firstSemi === -1 || firstSemi === len - 1) return false;
+    if (line.charCodeAt(len - 1) > CHAR_SPACE) return true;
+    for (let i = firstSemi + 1; i < len - 1; i++) {
         if (line.charCodeAt(i) > CHAR_SPACE) return true;
     }
     return false;

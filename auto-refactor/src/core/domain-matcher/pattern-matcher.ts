@@ -29,6 +29,7 @@ import { CfgBuilder } from '../cfg/cfg-builder';
 import { DefUseAnalyzer } from '../cfg/def-use-chain';
 import type { FlowAnalysisResult } from '../cfg/types';
 import { REGEX } from '../constants';
+import { sharedRegexPool } from '../data-structures/regex-pool';
 
 /** Variable assignment extraction pattern: const/let/var x = ... or x := ... */
 const VARIABLE_ASSIGNMENT_RE = /(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=/;
@@ -75,6 +76,7 @@ function getOrCreateRegExp(pattern: string, flags?: string): RegExp {
         REGEXP_CACHE_POOL.set(key, cached);
     }
     return cached;
+    return sharedRegexPool.getCompiled(pattern, flags ?? '');
 }
 
 /**
@@ -100,17 +102,17 @@ function compileBoundaryPattern(pattern: BoundaryIsolationPattern): CompiledBoun
     const filePathRegex =
         stringIndicators.length > 0
             ? getOrCreateRegExp(
-                stringIndicators
-                    .map((indicator) => escapeRegExp(indicator.toLowerCase()))
-                    .join('|'),
-            )
+                  stringIndicators
+                      .map((indicator) => escapeRegExp(indicator.toLowerCase()))
+                      .join('|'),
+              )
             : null;
 
     const headerRegex =
         stringIndicators.length > 0
             ? getOrCreateRegExp(
-                stringIndicators.map((indicator) => escapeRegExp(indicator)).join('|'),
-            )
+                  stringIndicators.map((indicator) => escapeRegExp(indicator)).join('|'),
+              )
             : null;
 
     const targets: CompiledBoundaryTarget[] = [];

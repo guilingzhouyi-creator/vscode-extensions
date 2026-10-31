@@ -21,6 +21,7 @@ import type {
     ConcurrencyMetric,
     ExecutionEvidenceMetric,
 } from './dynamic-types';
+import { aggregateLcovCoverageSummary } from '../telemetry/lcov-ingester';
 
 const RANK_MEDIAN = 50;
 const RANK_TAIL_95 = 95;
@@ -45,16 +46,6 @@ const DEFAULT_INVOCATIONS_PER_HOUR = 3600;
 const DEFAULT_LINE_COVERAGE_PCT = 80.0;
 const DEFAULT_BRANCH_COVERAGE_PCT = 75.0;
 const DEFAULT_ACTIVE_DATASETS = 100;
-
-const LCOV_PREFIX_LEN_3 = 3;
-const LCOV_PREFIX_LEN_4 = 4;
-const LCOV_PERCENT_MULTIPLIER = 1000;
-const LCOV_PERCENT_DIVISOR = 10;
-
-const LCOV_LINE_FOUND_PREFIX = 'LF:';
-const LCOV_LINE_HIT_PREFIX = 'LH:';
-const LCOV_BRANCH_FOUND_PREFIX = 'BRF:';
-const LCOV_BRANCH_HIT_PREFIX = 'BRH:';
 
 const SYNTHETIC_BENCHMARK_ENV = 'synthetic_benchmark';
 const UNOBSERVED_DEFAULT_ENV = 'unobserved_default';
@@ -148,11 +139,6 @@ function parseExecution(raw: Record<string, number>): ExecutionEvidenceMetric {
     };
 }
 
-function parseLcovMetric(line: string, prefixLen: number): number {
-    const parsedMetric = parseInt(line.slice(prefixLen).trim(), 10);
-    return Number.isNaN(parsedMetric) ? 0 : parsedMetric;
-}
-
 /**
  * Parses raw benchmark telemetry JSON into normalized DynamicEvidenceDTO.
  *
@@ -204,46 +190,7 @@ export function parseLcovCoverage(lcovContent: string): Partial<ExecutionEvidenc
     if (!lcovContent || typeof lcovContent !== 'string') {
         return { ...EMPTY_COVERAGE_METRIC };
     }
-
-    let linesFound = 0;
-    let linesHit = 0;
-    let branchesFound = 0;
-    let branchesHit = 0;
-
-    const lines = lcovContent.split(/\r?\n/);
-    for (const line of lines) {
-        if (line.startsWith(LCOV_LINE_FOUND_PREFIX)) {
-            linesFound += parseLcovMetric(line, LCOV_PREFIX_LEN_3);
-            continue;
-        }
-        if (line.startsWith(LCOV_LINE_HIT_PREFIX)) {
-            linesHit += parseLcovMetric(line, LCOV_PREFIX_LEN_3);
-            continue;
-        }
-        if (line.startsWith(LCOV_BRANCH_FOUND_PREFIX)) {
-            branchesFound += parseLcovMetric(line, LCOV_PREFIX_LEN_4);
-            continue;
-        }
-        if (line.startsWith(LCOV_BRANCH_HIT_PREFIX)) {
-            branchesHit += parseLcovMetric(line, LCOV_PREFIX_LEN_4);
-            continue;
-        }
-    }
-
-    const computedLinePct =
-        linesFound > 0
-            ? Math.round((linesHit / linesFound) * LCOV_PERCENT_MULTIPLIER) / LCOV_PERCENT_DIVISOR
-            : 0;
-    const computedBranchPct =
-        branchesFound > 0
-            ? Math.round((branchesHit / branchesFound) * LCOV_PERCENT_MULTIPLIER) /
-              LCOV_PERCENT_DIVISOR
-            : computedLinePct;
-
-    return {
-        lineCoveragePct: computedLinePct,
-        branchCoveragePct: computedBranchPct,
-    };
+    return aggregateLcovCoverageSummary(lcovContent);
 }
 
 /** Backward-compatible export alias for parseLcovCoverage. */

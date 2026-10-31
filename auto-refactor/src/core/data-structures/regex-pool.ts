@@ -14,6 +14,8 @@
  *   fail-safe semantics.
  */
 
+import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
+
 const DEFAULT_BUCKET_CAPACITY = 16;
 const DEFAULT_MAX_DISTINCT_PATTERNS = 256;
 
@@ -32,6 +34,7 @@ export interface RegexPoolOptions {
  */
 export class LeasedRegexPool {
     private readonly buckets = new Map<string, RegExp[]>();
+    private readonly compiledCache = new Map<string, RegExp>();
     private readonly bucketCapacity: number;
     private readonly maxDistinctPatterns: number;
 
@@ -41,6 +44,39 @@ export class LeasedRegexPool {
             8,
             options?.maxDistinctPatterns ?? DEFAULT_MAX_DISTINCT_PATTERNS,
         );
+    }
+
+    /**
+     * Escapes regex control characters in a string literal.
+     * Guaranteed single source of truth for safe regex string escaping.
+     */
+    public static escape(str: string): string {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    /**
+     * Retrieves or compiles a bounded cached RegExp instance.
+     * Guaranteed immutable reuse for stateless regex tests and matches.
+     *
+     * @param pattern - Regular expression pattern source string.
+     * @param flags - Optional regular expression flags (e.g. 'i'). Avoid 'g'/'y'.
+     * @returns A cached RegExp instance with bounded memory eviction.
+     */
+    public getCompiled(pattern: string, flags = ''): RegExp {
+        const key = this.buildKey(pattern, flags);
+        const cached = this.compiledCache.get(key);
+        if (cached !== undefined) {
+            return cached;
+        }
+        if (this.compiledCache.size >= this.maxDistinctPatterns) {
+            const firstKey = this.compiledCache.keys().next().value;
+            if (firstKey !== undefined) {
+                this.compiledCache.delete(firstKey);
+            }
+        }
+        const compiled = new RegExp(pattern, flags);
+        this.compiledCache.set(key, compiled);
+        return compiled;
     }
 
     /**
@@ -112,13 +148,14 @@ export class LeasedRegexPool {
      */
     public clear(): void {
         this.buckets.clear();
+        this.compiledCache.clear();
     }
 
     /**
      * Current number of distinct pattern buckets retained in the pool.
      */
     public get distinctPatternsCount(): number {
-        return this.buckets.size;
+        return this.buckets.size + this.compiledCache.size;
     }
 
     private buildKey(pattern: string, flags: string): string {
@@ -128,3 +165,10 @@ export class LeasedRegexPool {
 
 /** Global singleton instance for shared scanner leasing across workers. */
 export const sharedRegexPool = new LeasedRegexPool();
+
+sharedMemoryGovernor.register({
+    name: 'sharedRegexPool',
+    tier: CacheEvictionTier.Ephemeral,
+    clear: () => sharedRegexPool.clear(),
+    getSize: () => sharedRegexPool.distinctPatternsCount,
+});

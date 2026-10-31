@@ -350,18 +350,27 @@ function tryReadUtf8Text(filePath: string): string | null {
     }
 }
 
+const TOML_DEPS_HEADER_RE = /(?:dependencies|requires)/i;
+const TOML_DEP_SPEC_RE = /["']([a-zA-Z0-9_.-]+)(?:[><=~;]|$)/;
+const DEP_PUNCT_RE = /[-.]/g;
+const REQ_DEP_NAME_RE = /^([a-zA-Z0-9_.-]+)/;
+const GO_REQUIRE_STMT_RE = /^require\s+/;
+const WHITESPACE_SPLIT_RE = /\s+/;
+const SLASH_STAR_SUFFIX_RE = /\/\*$/;
+const STAR_SUFFIX_RE = /\*$/;
+
 /** Parse dependency names from pyproject.toml contents. */
 function parsePyprojectDeps(raw: string, target: Set<string>): void {
     let inDeps = false;
     for (const line of raw.split('\n')) {
         const trimmed = line.trim();
         if (trimmed.startsWith('[')) {
-            inDeps = /(?:dependencies|requires)/i.test(trimmed);
+            inDeps = TOML_DEPS_HEADER_RE.test(trimmed);
             continue;
         }
         if (inDeps && trimmed && !trimmed.startsWith('#')) {
-            const match = /["']([a-zA-Z0-9_.-]+)(?:[><=~;]|$)/.exec(trimmed);
-            if (match) target.add(match[1].toLowerCase().replace(/[-.]/g, '_'));
+            const match = TOML_DEP_SPEC_RE.exec(trimmed);
+            if (match) target.add(match[1].toLowerCase().replace(DEP_PUNCT_RE, '_'));
         }
     }
 }
@@ -371,8 +380,8 @@ function parseRequirementsDeps(raw: string, target: Set<string>): void {
     for (const line of raw.split('\n')) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('#')) continue;
-        const match = /^([a-zA-Z0-9_.-]+)/.exec(trimmed);
-        if (match) target.add(match[1].toLowerCase().replace(/[-.]/g, '_'));
+        const match = REQ_DEP_NAME_RE.exec(trimmed);
+        if (match) target.add(match[1].toLowerCase().replace(DEP_PUNCT_RE, '_'));
     }
 }
 
@@ -415,7 +424,7 @@ function parseGoMod(manifestPath: string, inventory: ProjectManifestInventory): 
                 continue;
             }
             if ((inRequire || trimmed.startsWith(GO_REQUIRE_PREFIX)) && trimmed) {
-                const parts = trimmed.replace(/^require\s+/, '').split(/\s+/);
+                const parts = trimmed.replace(GO_REQUIRE_STMT_RE, '').split(WHITESPACE_SPLIT_RE);
                 if (parts[0]) {
                     inventory.allDependencies.add(parts[0]);
                     inventory.prodDependencies.add(parts[0]);
@@ -438,7 +447,7 @@ function resolveExtendsPath(dir: string, extendsTarget: string): string {
 function ingestCompilerPaths(pathsRecord: unknown, target: Set<string>): void {
     if (!pathsRecord || typeof pathsRecord !== 'object') return;
     for (const key of Object.keys(pathsRecord as Record<string, unknown>)) {
-        const prefix = key.replace(/\/\*$/, '').replace(/\*$/, '');
+        const prefix = key.replace(SLASH_STAR_SUFFIX_RE, '').replace(STAR_SUFFIX_RE, '');
         if (prefix) target.add(prefix);
     }
 }
@@ -967,7 +976,7 @@ function parseGoSumLockfile(absRoot: string, direct: number): SupplyChainProfile
         for (const line of raw.split('\n')) {
             const trimmed = line.trim();
             if (!trimmed) continue;
-            const mod = trimmed.split(/\s+/)[0];
+            const mod = trimmed.split(WHITESPACE_SPLIT_RE)[0];
             if (mod) modules.add(mod);
         }
         return buildSupplyChainProfile({

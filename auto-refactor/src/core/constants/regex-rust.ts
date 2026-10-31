@@ -34,8 +34,7 @@ export const RUST_CONST_PATTERN =
     /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:const|static)\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
 
 /** Matches Rust let variable binding statement. */
-export const RUST_LET_PATTERN =
-    /^\s*let\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*(?::[^=]+)?\s*=/;
+export const RUST_LET_PATTERN = /^\s*let\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*(?::[^=]+)?\s*=/;
 
 /** Matches Rust for-loop variable binding header. */
 export const RUST_FOR_PATTERN = /^\s*for\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\b/;
@@ -58,6 +57,69 @@ export function createRustCloseBraceScanner(): RegExp {
     return /\}/g;
 }
 
+/** Matches try! macro call. */
+export const RUST_TRY_MACRO_PATTERN = /\btry!\s*\(/;
+
+/** Matches extern crate declaration. */
+export const RUST_EXTERN_CRATE_PATTERN = /^\s*extern\s+crate\s+[A-Za-z_]\w*\s*;/;
+
+/** Matches #[macro_use] attribute. */
+export const RUST_MACRO_USE_PATTERN = /#\[\s*macro_use\s*\]/;
+
+/** Matches &String parameter in function signature. */
+export const RUST_AMP_STRING_PATTERN = /&\s*String\b/;
+
+/** Matches needless .clone() immediately before comparison or length check. */
+export const RUST_NEEDLESS_CLONE_PATTERN = /\.clone\(\)\s*(?:==|!=|\.len\(\)|\.is_empty\(\))/;
+
+/** Matches naked numeric as cast. */
+export const RUST_NUMERIC_CAST_PATTERN =
+    /\bas\s+(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|f32|f64)\b/;
+
+/** Matches formatting macro invocation. */
+export const RUST_FORMAT_CALL_PATTERN =
+    /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\(/;
+
+/** Matches positional placeholder {} in formatting macro. */
+export const RUST_POSITIONAL_PLACEHOLDER_PATTERN = /!\s*\(\s*"[^"]*\{\}/;
+
+/** Matches multiline format call with empty positional placeholder. */
+export const RUST_MULTILINE_FORMAT_PATTERN =
+    /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\([^;]*"[^"]*\{\}/;
+
+/** Matches if let pattern matching statement. */
+export const RUST_IF_LET_PATTERN = /\bif\s+let\s+[^{]+=\s*/;
+
+/** Matches for ... in loop header. */
+export const RUST_FOR_IN_PATTERN = /\bfor\s+(?:[A-Za-z_]\w*|\([A-Za-z0-9_,\s]+\))\s+in\b/;
+
+/** Matches for ... in loop with immediate conditional return. */
+export const RUST_FOR_FIND_PATTERN = /\bfor\s+[^{]+\{\s*if\s+[^{]+\{\s*return\b/;
+
+/** Matches async function declaration. */
+export const RUST_ASYNC_FN_PATTERN = /\basync\s+(?:unsafe\s+)?(?:extern(?:\s+"[^"]+")?\s+)?fn\b/;
+
+/** Matches synchronous standard library Mutex/RwLock acquisition without await. */
+export const RUST_STD_LOCK_PATTERN =
+    /(?:std::sync::(?:Mutex|RwLock)|\.(?:lock|read|write)\s*\(\s*\)(?!\s*\.await))/;
+
+/** Matches .await keyword expression. */
+export const RUST_AWAIT_PATTERN = /\.await\b/;
+
+/** Matches panic!, todo!, unimplemented!, or unreachable! macro calls. */
+export const RUST_CRASH_MACRO_PATTERN = /\b(?:panic|todo|unimplemented|unreachable)!\s*\(/;
+
+/** Matches .expect() method call. */
+export const RUST_EXPECT_CALL_PATTERN = /\.expect\s*\(/;
+
+/** Matches Rust naked unwrap method invocation. */
+export const RUST_UNWRAP_PATTERN = /\.unwrap\s*\(/;
+
+/** Creates a fresh global scanner for Rust .unwrap() and .expect() calls. */
+export function createRustUnwrapScanner(): RegExp {
+    return /\.(?:unwrap|expect)\s*\(/g;
+}
+
 /**
  * Frozen Rust domain regex catalog namespace.
  */
@@ -72,6 +134,25 @@ export const REGEX_RUST = Object.freeze({
     FOR: RUST_FOR_PATTERN,
     TUPLE_LET: RUST_TUPLE_LET_PATTERN,
     TRANSIENT_ALLOCATION: RUST_TRANSIENT_ALLOCATION_PATTERN,
+    TRY_MACRO: RUST_TRY_MACRO_PATTERN,
+    EXTERN_CRATE: RUST_EXTERN_CRATE_PATTERN,
+    MACRO_USE: RUST_MACRO_USE_PATTERN,
+    AMP_STRING: RUST_AMP_STRING_PATTERN,
+    NEEDLESS_CLONE: RUST_NEEDLESS_CLONE_PATTERN,
+    NUMERIC_CAST: RUST_NUMERIC_CAST_PATTERN,
+    FORMAT_CALL: RUST_FORMAT_CALL_PATTERN,
+    POSITIONAL_PLACEHOLDER: RUST_POSITIONAL_PLACEHOLDER_PATTERN,
+    MULTILINE_FORMAT: RUST_MULTILINE_FORMAT_PATTERN,
+    IF_LET: RUST_IF_LET_PATTERN,
+    FOR_IN: RUST_FOR_IN_PATTERN,
+    FOR_FIND: RUST_FOR_FIND_PATTERN,
+    ASYNC_FN: RUST_ASYNC_FN_PATTERN,
+    STD_LOCK: RUST_STD_LOCK_PATTERN,
+    AWAIT: RUST_AWAIT_PATTERN,
+    CRASH_MACRO: RUST_CRASH_MACRO_PATTERN,
+    EXPECT_CALL: RUST_EXPECT_CALL_PATTERN,
+    UNWRAP: RUST_UNWRAP_PATTERN,
     createOpenBraceScanner: createRustOpenBraceScanner,
     createCloseBraceScanner: createRustCloseBraceScanner,
+    createRustUnwrapScanner: createRustUnwrapScanner,
 });

@@ -63,7 +63,8 @@ export const DATA_DANGLING_RESOURCE_PATH_PATTERN =
 export const DATA_DANGLING_TARGET_PATTERN = /^(?:""|''|res:\/\/?|\/)?$|\/$/;
 
 /** Matches function, class, or async procedure declaration signatures. */
-export const DATA_FN_DECL_PATTERN = /\b(?:function|class|async\s+function|def|func)\s+([A-Za-z0-9_$]+)/;
+export const DATA_FN_DECL_PATTERN =
+    /\b(?:function|class|async\s+function|def|func)\s+([A-Za-z0-9_$]+)/;
 
 /** Matches class method declaration signatures with opening brace. */
 export const DATA_METHOD_DECL_PATTERN =

@@ -32,6 +32,13 @@ import type {
 import { countLineStats } from '../../utils/linestats';
 import { adapterFor } from '../ast/adapters';
 import { unsupportedLanguageDiagnostic } from '../ast/language-support';
+import {
+    getLanguageIdFromPath,
+    getMaskedSource,
+    computeLineFeatureTape,
+    type MaskedSource,
+    type LineFeatureTape,
+} from '../policy/source-mask';
 import type { StreamingEntry } from '../ast/traverse';
 import {
     FileMetricCollector,
@@ -87,6 +94,9 @@ interface FileContextBase {
     lineStats: { lines: number; nonBlankLines: number };
     seed?: IncrementalFileState;
     preflightMask: number;
+    maskedSource?: MaskedSource;
+    featureTape?: LineFeatureTape;
+    lazySourceFileResolved?: boolean;
 }
 
 /** Outcome of the streaming phase, including the state the legacy phase must reuse. */
@@ -183,6 +193,32 @@ function prepareParse(
     return { proj: null, ast, rootForCtx: ast.root };
 }
 
+function ensureMaskedSource(base: FileContextBase): MaskedSource {
+    if (!base.maskedSource) {
+        base.maskedSource = getMaskedSource(base.content, getLanguageIdFromPath(base.rel));
+    }
+    return base.maskedSource;
+}
+
+function ensureFeatureTape(base: FileContextBase): LineFeatureTape {
+    if (!base.featureTape) {
+        const ms = ensureMaskedSource(base);
+        base.featureTape = computeLineFeatureTape(ms.raw, ms.masked);
+    }
+    return base.featureTape;
+}
+
+function ensureSourceFile(base: FileContextBase): ts.SourceFile | undefined {
+    if (base.sourceFile !== undefined || base.lazySourceFileResolved) {
+        return base.sourceFile;
+    }
+    base.lazySourceFileResolved = true;
+    if (base.adapter.id === 'typescript' || base.adapter.id === 'oxc') {
+        base.sourceFile = require('../../utils/ast').createSourceFile(base.rel, base.content);
+    }
+    return base.sourceFile;
+}
+
 /**
  * Build one analyzer context from the shared per-file values.
  *
@@ -201,7 +237,21 @@ function makeContext(
         content: base.content,
         root,
         adapter: base.adapter,
-        sourceFile: base.sourceFile,
+        get sourceFile(): ts.SourceFile | undefined {
+            return ensureSourceFile(base);
+        },
+        get lines(): readonly string[] {
+            return ensureMaskedSource(base).raw;
+        },
+        get maskedLines(): readonly string[] {
+            return ensureMaskedSource(base).masked;
+        },
+        get lineFlags(): Uint32Array {
+            return ensureFeatureTape(base).lineFlags;
+        },
+        get lineIndents(): Uint16Array {
+            return ensureFeatureTape(base).lineIndents;
+        },
         config: base.config,
         options,
         lineStats: base.lineStats,

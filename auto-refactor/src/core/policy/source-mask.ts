@@ -46,6 +46,30 @@ export interface SourceMaskConfig {
 }
 
 import { nativeCore } from '../native/native-bridge';
+import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
+
+/** Bitmask flag indicating a line is completely blank (whitespace only). */
+export const LINE_FLAG_BLANK = 1 << 0;
+/** Bitmask flag indicating a line contains only comments (blank after masking). */
+export const LINE_FLAG_COMMENT_ONLY = 1 << 1;
+/** Bitmask flag indicating a line contains `(` (candidate call or declaration). */
+export const LINE_FLAG_HAS_CALL_PAREN = 1 << 2;
+/** Bitmask flag indicating a line contains `?` and `:` (candidate ternary). */
+export const LINE_FLAG_HAS_TERNARY = 1 << 3;
+/** Bitmask flag indicating a line contains `&&` or `||` (candidate logical chain). */
+export const LINE_FLAG_HAS_LOGICAL_OP = 1 << 4;
+/** Bitmask flag indicating a line contains `{` or `}` (scope brace). */
+export const LINE_FLAG_HAS_BRACE = 1 << 5;
+/** Bitmask flag indicating a line contains `;` (statement terminator). */
+export const LINE_FLAG_HAS_SEMICOLON = 1 << 6;
+/** Bitmask flag indicating a line contains non-ASCII characters (charCode >= 128). */
+export const LINE_FLAG_HAS_NON_ASCII = 1 << 7;
+
+/** Single-pass per-line feature tape shared across analyzers. */
+export interface LineFeatureTape {
+    readonly lineFlags: Uint32Array;
+    readonly lineIndents: Uint16Array;
+}
 
 /** Raw lines plus the masked view used by the keyword rules. */
 export interface MaskedSource {
@@ -230,8 +254,10 @@ const CHAR_LOWER_B = 98;
 const CHAR_LOWER_C = 99;
 const CHAR_LOWER_R = 114;
 const CHAR_LOWER_Z = 122;
+const CHAR_EXCLAMATION = 33;
 const TRIGGER_DIRECT = 1;
 const TRIGGER_RAW_PREFIX = 2;
+const TRIGGER_LT_PREFIX = 3;
 const NATIVE_DISPATCH_MIN_LEN = 50000;
 const HTML_COMMENT_OPEN = '<!--';
 const HTML_COMMENT_CLOSE = '-->';
@@ -257,10 +283,8 @@ const REGEX_PREFIX_TABLE = (() => {
  * @returns Both views; `raw` feeds evidence text, `masked` feeds the rule patterns.
  */
 export function maskSourceTextJs(content: string, config: SourceMaskConfig): MaskedSource {
-    const lines = content.split('\n');
-    const len = lines.length;
-    const raw: string[] = [];
-    raw.length = len;
+    const raw = content.split('\n');
+    const len = raw.length;
     const masked: string[] = [];
     masked.length = len;
     const state: MaskState = {
@@ -269,13 +293,20 @@ export function maskSourceTextJs(content: string, config: SourceMaskConfig): Mas
         rawString: null,
         triggerTable: getTriggerTable(config),
         close: config.blockComment?.close ?? '',
+        config,
     };
+    if (content.indexOf('\r') === -1) {
+        for (let i = 0; i < len; i++) {
+            masked[i] = maskLine(raw[i], state, config);
+        }
+        return { raw, masked };
+    }
     for (let i = 0; i < len; i++) {
-        let line = lines[i];
+        let line = raw[i];
         if (line.length > 0 && line.charCodeAt(line.length - 1) === CHAR_CR) {
             line = line.slice(0, -1);
+            raw[i] = line;
         }
-        raw[i] = line;
         masked[i] = maskLine(line, state, config);
     }
     return { raw, masked };
@@ -335,6 +366,136 @@ export function maskPresetForLanguage(languageId: string | null | undefined): So
     return languageId ? (SOURCE_MASK_PRESETS[languageId] ?? DEFAULT_MASK) : DEFAULT_MASK;
 }
 
+let lastMaskContent: string | null = null;
+let lastMaskPreset: SourceMaskConfig | null = null;
+let lastMaskedSource: MaskedSource | null = null;
+
+sharedMemoryGovernor.register({
+    name: 'SourceMask.lastMaskedSource',
+    tier: CacheEvictionTier.Ephemeral,
+    clear: () => {
+        lastMaskContent = null;
+        lastMaskPreset = null;
+        lastMaskedSource = null;
+    },
+    getSize: () => (lastMaskedSource ? 1 : 0),
+});
+
+/**
+ * Build or retrieve the memoized `{ raw, masked }` source view for a file.
+ *
+ * @param content - Full file content as read from disk.
+ * @param languageId - Canonical language id, or null to fall back to default preset.
+ * @returns Shared `MaskedSource` with `raw` and `masked` line arrays.
+ */
+export function getMaskedSource(
+    content: string,
+    languageId: string | null | undefined,
+): MaskedSource {
+    const preset = maskPresetForLanguage(languageId);
+    if (content === lastMaskContent && preset === lastMaskPreset && lastMaskedSource !== null) {
+        return lastMaskedSource;
+    }
+    const result = maskSourceText(content, preset);
+    lastMaskContent = content;
+    lastMaskPreset = preset;
+    lastMaskedSource = result;
+    return result;
+}
+
+/**
+ * Build or retrieve the memoized `{ raw, masked }` source view from a file path and content.
+ *
+ * @param filePath - Path of the source file, used to infer the language.
+ * @param content - Full file content as read from disk.
+ * @returns Shared `MaskedSource` with `raw` and `masked` line arrays.
+ */
+export function getMaskedSourceOfPath(filePath: string, content: string): MaskedSource {
+    return getMaskedSource(content, getLanguageIdFromPath(filePath));
+}
+
+const CHAR_BIT_QUESTION = 1 << 16;
+const CHAR_BIT_COLON = 1 << 17;
+const CHAR_BIT_BOTH_TERNARY = CHAR_BIT_QUESTION | CHAR_BIT_COLON;
+const CHAR_BIT_MASK_PUBLIC = 0xffff;
+
+const LINE_CHAR_FLAG_TABLE = (() => {
+    const table = new Uint32Array(ASCII_TABLE_SIZE);
+    table[40 /* '(' */] = LINE_FLAG_HAS_CALL_PAREN;
+    table[59 /* ';' */] = LINE_FLAG_HAS_SEMICOLON;
+    table[123 /* '{' */] = LINE_FLAG_HAS_BRACE;
+    table[125 /* '}' */] = LINE_FLAG_HAS_BRACE;
+    table[63 /* '?' */] = CHAR_BIT_QUESTION;
+    table[58 /* ':' */] = CHAR_BIT_COLON;
+    return table;
+})();
+
+function measureIndentAndNonAscii(rawLine: string, indentOut: Uint16Array, idx: number): number {
+    const rLen = rawLine.length;
+    let indent = 0;
+    while (indent < rLen) {
+        const c = rawLine.charCodeAt(indent);
+        if (c !== CHAR_SPACE && c !== CHAR_TAB) break;
+        indent++;
+    }
+    indentOut[idx] = indent;
+    if (indent === rLen) return LINE_FLAG_BLANK;
+    for (let j = indent; j < rLen; j++) {
+        if (rawLine.charCodeAt(j) >= ASCII_TABLE_SIZE) return LINE_FLAG_HAS_NON_ASCII;
+    }
+    return 0;
+}
+
+function scanSingleLineFlags(
+    rawLine: string,
+    maskedLine: string,
+    indentOut: Uint16Array,
+    idx: number,
+): number {
+    let flags = measureIndentAndNonAscii(rawLine, indentOut, idx);
+    if ((flags & LINE_FLAG_BLANK) !== 0) return flags;
+
+    const indent = indentOut[idx];
+    let hasCodeChar = false;
+    const mLen = maskedLine.length;
+    for (let j = indent; j < mLen; j++) {
+        const code = maskedLine.charCodeAt(j);
+        if (code <= CHAR_SPACE) continue;
+        hasCodeChar = true;
+        if (code < ASCII_TABLE_SIZE) {
+            flags |= LINE_CHAR_FLAG_TABLE[code];
+            if ((code === 38 || code === 124) && maskedLine.charCodeAt(j + 1) === code) {
+                flags |= LINE_FLAG_HAS_LOGICAL_OP;
+            }
+        }
+    }
+    if (!hasCodeChar) return (flags & CHAR_BIT_MASK_PUBLIC) | LINE_FLAG_COMMENT_ONLY;
+    if ((flags & CHAR_BIT_BOTH_TERNARY) === CHAR_BIT_BOTH_TERNARY) {
+        flags |= LINE_FLAG_HAS_TERNARY;
+    }
+    return flags & CHAR_BIT_MASK_PUBLIC;
+}
+
+/**
+ * Compute single-pass line feature flags and leading indentation widths from `raw` and `masked` lines.
+ *
+ * @param raw - Raw source lines without trailing carriage returns.
+ * @param masked - Comment/literal-masked lines of matching length.
+ * @returns Compact typed arrays `lineFlags` (`Uint32Array`) and `lineIndents` (`Uint16Array`).
+ */
+export function computeLineFeatureTape(
+    raw: readonly string[],
+    masked: readonly string[],
+): LineFeatureTape {
+    const len = raw.length;
+    const lineFlags = new Uint32Array(len);
+    const lineIndents = new Uint16Array(len);
+    for (let i = 0; i < len; i++) {
+        lineFlags[i] = scanSingleLineFlags(raw[i], masked[i] ?? '', lineIndents, i);
+    }
+    return { lineFlags, lineIndents };
+}
+
 /**
  * Build the masked view of a file, resolving the syntax from a language id when one is known.
  *
@@ -347,7 +508,7 @@ export function maskPresetForLanguage(languageId: string | null | undefined): So
  * @returns One masked string per line, each the same length as its raw line.
  */
 export function getMaskedLines(content: string, languageId: string | null | undefined): string[] {
-    return maskSourceText(content, maskPresetForLanguage(languageId)).masked;
+    return getMaskedSource(content, languageId).masked;
 }
 
 /** Legacy alias for backward compatibility. */
@@ -383,6 +544,8 @@ interface MaskState {
     triggerTable: Uint8Array;
     /** Block-comment closing delimiter, or empty string if none. */
     close: string;
+    /** Active language masking syntax configuration. */
+    config: SourceMaskConfig;
 }
 
 /** Trigger-character lookup table per config, built once per config instance. */
@@ -433,7 +596,9 @@ function getTriggerTable(config: SourceMaskConfig): Uint8Array {
         if (blockChar < ASCII_TABLE_SIZE) table[blockChar] = TRIGGER_DIRECT;
     }
     if (config.regexLiterals) table[CHAR_SLASH] = TRIGGER_DIRECT;
-    if (config.htmlComment) table[CHAR_LESS_THAN] = TRIGGER_DIRECT;
+    if (config.htmlComment && table[CHAR_LESS_THAN] !== TRIGGER_DIRECT) {
+        table[CHAR_LESS_THAN] = TRIGGER_LT_PREFIX;
+    }
 
     TRIGGER_TABLE_CACHE.set(config, table);
     return table;
@@ -695,35 +860,23 @@ function scanMultiLineState(
     return -1;
 }
 
-/** Context bundle for inspecting a candidate masked span at a specific line offset. */
-interface MaskSpanContext {
-    readonly line: string;
-    readonly index: number;
-    readonly code: number;
-    readonly state: MaskState;
-    readonly config: SourceMaskConfig;
-}
-
 /**
  * Fast-path check and scan for quote tokens (', ", `).
  */
-function scanQuoteFast(ctx: MaskSpanContext): number {
-    if (
-        ctx.code !== CHAR_SINGLE_QUOTE &&
-        ctx.code !== CHAR_DOUBLE_QUOTE &&
-        ctx.code !== CHAR_BACKTICK
-    ) {
+function scanQuoteFast(line: string, index: number, state: MaskState): number {
+    const code = line.charCodeAt(index);
+    if (code !== CHAR_SINGLE_QUOTE && code !== CHAR_DOUBLE_QUOTE && code !== CHAR_BACKTICK) {
         return -1;
     }
-    const char = ctx.line[ctx.index];
-    if (!ctx.config.quoteChars.includes(char)) {
+    const char = line[index];
+    if (!state.config.quoteChars.includes(char)) {
         return -1;
     }
-    if (ctx.code === CHAR_BACKTICK && !ctx.config.multilineTemplates) {
-        return ctx.index + 1;
+    if (code === CHAR_BACKTICK && !state.config.multilineTemplates) {
+        return index + 1;
     }
-    ctx.state.quote = char;
-    return scanQuotedSpan(ctx.line, ctx.index + 1, char, ctx.state);
+    state.quote = char;
+    return scanQuotedSpan(line, index + 1, char, state);
 }
 
 /**
@@ -758,24 +911,26 @@ function scanSlashFast(
 /**
  * Fast-path check and scan for hash comments, HTML comments, or raw strings.
  */
-function scanOtherPrefixFast(ctx: MaskSpanContext): number {
-    if (ctx.code === CHAR_HASH && ctx.config.lineComment === COMMENT_HASH_LINE) {
-        return ctx.line.length;
+function scanOtherPrefixFast(line: string, index: number, state: MaskState): number {
+    const code = line.charCodeAt(index);
+    const config = state.config;
+    if (code === CHAR_HASH && config.lineComment === COMMENT_HASH_LINE) {
+        return line.length;
     }
-    if (ctx.code === CHAR_LESS_THAN) {
-        if (ctx.config.htmlComment && ctx.line.startsWith(HTML_COMMENT_OPEN, ctx.index)) {
-            ctx.state.inHtmlComment = true;
-            const cIdx = ctx.line.indexOf(HTML_COMMENT_CLOSE, ctx.index + HTML_COMMENT_OPEN.length);
+    if (code === CHAR_LESS_THAN) {
+        if (config.htmlComment && line.startsWith(HTML_COMMENT_OPEN, index)) {
+            state.inHtmlComment = true;
+            const cIdx = line.indexOf(HTML_COMMENT_CLOSE, index + HTML_COMMENT_OPEN.length);
             if (cIdx !== -1) {
-                ctx.state.inHtmlComment = false;
+                state.inHtmlComment = false;
                 return cIdx + HTML_COMMENT_CLOSE.length;
             }
-            return ctx.line.length;
+            return line.length;
         }
         return -1;
     }
-    if (ctx.code === CHAR_LOWER_R || ctx.code === CHAR_LOWER_B || ctx.code === CHAR_LOWER_C) {
-        return scanOpeningRawString(ctx.line, ctx.index, ctx.config, ctx.state);
+    if (code === CHAR_LOWER_R || code === CHAR_LOWER_B || code === CHAR_LOWER_C) {
+        return scanOpeningRawString(line, index, config, state);
     }
     return -1;
 }
@@ -811,15 +966,14 @@ function scanNextMaskSpan(
     }
 
     const code = line.charCodeAt(index);
-    const spanCtx: MaskSpanContext = { line, index, code, state, config };
-    const qEnd = scanQuoteFast(spanCtx);
-    if (qEnd !== -1) return qEnd;
-
     if (code === CHAR_SLASH) {
         return scanSlashFast(line, index, state, config);
     }
 
-    const pEnd = scanOtherPrefixFast(spanCtx);
+    const qEnd = scanQuoteFast(line, index, state);
+    if (qEnd !== -1) return qEnd;
+
+    const pEnd = scanOtherPrefixFast(line, index, state);
     return pEnd !== -1 ? pEnd : scanFallback(line, index, state, config);
 }
 
@@ -851,6 +1005,17 @@ function isRawStringCandidate(line: string, index: number, code: number): boolea
 }
 
 /**
+ * Checks whether a trigger table entry at `index` should halt normal-code scanning.
+ */
+function isTriggerHit(line: string, index: number, trig: number): boolean {
+    if (trig === TRIGGER_DIRECT) return true;
+    if (trig === TRIGGER_LT_PREFIX) {
+        return line.charCodeAt(index + 1) === CHAR_EXCLAMATION;
+    }
+    return trig === TRIGGER_RAW_PREFIX && isRawStringCandidate(line, index, line.charCodeAt(index));
+}
+
+/**
  * Advance `startIndex` to the next character that can trigger a comment, quote, or regex span.
  */
 function advanceToNextTrigger(line: string, startIndex: number, triggerTable: Uint8Array): number {
@@ -860,10 +1025,7 @@ function advanceToNextTrigger(line: string, startIndex: number, triggerTable: Ui
         const code = line.charCodeAt(index);
         if (code < ASCII_TABLE_SIZE) {
             const trig = triggerTable[code];
-            if (
-                trig === TRIGGER_DIRECT ||
-                (trig === TRIGGER_RAW_PREFIX && isRawStringCandidate(line, index, code))
-            ) {
+            if (trig !== 0 && isTriggerHit(line, index, trig)) {
                 break;
             }
         }

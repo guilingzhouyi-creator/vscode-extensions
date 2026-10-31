@@ -14,6 +14,7 @@
  */
 
 import { isVocabularyEnumeration } from './markerScope';
+import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
 
 /** Categorical classifications for terminology defects */
 export type TerminologyCategory =
@@ -407,20 +408,39 @@ function buildCompiledWhitelistRegexes(whitelist: readonly string[]): {
 }
 
 const DEFAULT_WHITELIST_COMPILED = buildCompiledWhitelistRegexes(DEFAULT_TECHNICAL_WHITELIST);
+const MAX_TERMINOLOGY_CACHE_SIZE = 128;
 const ASCII_PATTERN_RE_CACHE = new Map<string, RegExp>();
 const CUSTOM_WHITELIST_CACHE = new Map<
     string,
     { asciiRe: RegExp | null; nonAsciiRe: RegExp | null }
 >();
 
+sharedMemoryGovernor.register({
+    name: 'terminologyEngineCaches',
+    tier: CacheEvictionTier.Ephemeral,
+    clear: () => {
+        ASCII_PATTERN_RE_CACHE.clear();
+        CUSTOM_WHITELIST_CACHE.clear();
+    },
+    getSize: () => ASCII_PATTERN_RE_CACHE.size + CUSTOM_WHITELIST_CACHE.size,
+});
+
 function getOrCompileAsciiPattern(asciiPat: string): RegExp {
     let patternRegex = ASCII_PATTERN_RE_CACHE.get(asciiPat);
     if (!patternRegex) {
+        if (ASCII_PATTERN_RE_CACHE.size >= MAX_TERMINOLOGY_CACHE_SIZE) {
+            const firstKey = ASCII_PATTERN_RE_CACHE.keys().next().value;
+            if (firstKey !== undefined) {
+                ASCII_PATTERN_RE_CACHE.delete(firstKey);
+            }
+        }
         const unescaped = asciiPat.replace(/\\[a-zA-Z]/g, '');
         const isExactCase = !/[a-z]/.test(unescaped) && /[A-Z]/.test(unescaped);
         const flags = isExactCase ? 'g' : 'gi';
         patternRegex = new RegExp(asciiPat, flags);
         ASCII_PATTERN_RE_CACHE.set(asciiPat, patternRegex);
+    } else {
+        patternRegex.lastIndex = 0;
     }
     return patternRegex;
 }

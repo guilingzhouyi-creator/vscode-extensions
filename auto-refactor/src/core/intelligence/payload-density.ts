@@ -14,6 +14,7 @@
  *   numerical stability across extreme boundary conditions.
  */
 
+import type { Severity } from '../types';
 import type { ClassifiedToken } from './token-entropy';
 export {
     evaluateSpatialDensityManifold,
@@ -31,6 +32,70 @@ export type {
     SpatialDensityEvaluation,
     SimplexPoint2D,
 } from './density-vector-space';
+
+/** Rule id: token density floor — lines fragmented until each carries almost no payload. */
+export const RULE_VOL_TAU_FLOOR = 'VOL-TAU-001';
+/** Rule id: token density ceiling — one line packed with more concepts than a reader can hold. */
+export const RULE_VOL_TAU_CEILING = 'VOL-TAU-002';
+
+/** Lowest semantic tokens per effective line a module may carry. */
+export const MIN_TOKENS_PER_ELOC = 2.5;
+
+/** Highest semantic tokens per effective line a module may carry before a line is congested. */
+export const MAX_TOKENS_PER_ELOC = 22.0;
+
+/** Effective lines below which the band carries no signal. */
+export const MIN_TAU_SAMPLE_ELOC = 10;
+
+/** One band verdict: which rule fired, at what severity, and how to explain it. */
+export interface TokenDensityFinding {
+    readonly rule: string;
+    readonly severity: Severity;
+    readonly message: string;
+    readonly suggestion: string;
+}
+
+const TAU_SEVERITY_WARNING: Severity = 'warning';
+const SUGGESTION_COMPACT =
+    'Collapse vertically fragmented calls and declarations onto cohesive statements, and pass four or more parameters as a single parameter object.';
+const SUGGESTION_SPLIT =
+    'Extract intermediate variables from monolithic chained expressions and spread nested logic across dedicated lines.';
+
+/**
+ * Evaluate the token-density band for one module.
+ *
+ * @param tokensPerEloc - Measured semantic tokens per effective line, or undefined when unmeasured.
+ * @param eloc - Effective lines of code the ratio was computed over.
+ * @returns The band finding, or null when the module sits inside the band or cannot be judged.
+ */
+export function evaluateTokenDensityBand(
+    tokensPerEloc: number | undefined,
+    eloc: number,
+): TokenDensityFinding | null {
+    if (eloc < MIN_TAU_SAMPLE_ELOC) return null;
+    if (tokensPerEloc === undefined || tokensPerEloc <= 0) return null;
+    if (tokensPerEloc < MIN_TOKENS_PER_ELOC) {
+        return {
+            rule: RULE_VOL_TAU_FLOOR,
+            severity: TAU_SEVERITY_WARNING,
+            message:
+                `Token density floor breached: tau = ${tokensPerEloc.toFixed(2)} tokens per effective line, ` +
+                `below the ${MIN_TOKENS_PER_ELOC} floor across ${eloc} ELOC.`,
+            suggestion: SUGGESTION_COMPACT,
+        };
+    }
+    if (tokensPerEloc > MAX_TOKENS_PER_ELOC) {
+        return {
+            rule: RULE_VOL_TAU_CEILING,
+            severity: TAU_SEVERITY_WARNING,
+            message:
+                `Token density ceiling breached: tau = ${tokensPerEloc.toFixed(2)} tokens per effective line, ` +
+                `above the ${MAX_TOKENS_PER_ELOC} ceiling across ${eloc} ELOC.`,
+            suggestion: SUGGESTION_SPLIT,
+        };
+    }
+    return null;
+}
 
 /**
  * Weighted token semantic payload ratio (TSPR) and plumbing overhead ratio (POR).

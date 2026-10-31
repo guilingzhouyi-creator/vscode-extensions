@@ -20,6 +20,19 @@ const MAX_SPECIFIER_LENGTH = 200;
 const INVALID_SPECIFIER_PATTERN = /\$\{|\|\||&&|==|[;,()]/;
 const WINDOWS_DRIVE_PREFIX_PATTERN = /^[a-zA-Z]:[\\/]/;
 
+const AS_SPLIT_RE = /\s+as\s+/;
+const BRACED_CLAUSE_RE = /\{([\s\S]*?)\}/;
+const BRACED_STRIP_RE = /\{[\s\S]*?\}/;
+const COMMA_GLOBAL_RE = /,/g;
+const PY_FROM_IMPORT_RE = /^from\s+([A-Za-z0-9_.]+)\s+import\s+(.*)/;
+const PY_IMPORT_RE = /^import\s+(.*)/;
+const RUST_USE_PREFIX_RE = /^\s*(?:pub\s+)?use\s+([A-Za-z0-9_]+)::(.+);/;
+const RUST_USE_DIRECT_RE = /^\s*(?:pub\s+)?use\s+([A-Za-z0-9_]+)(?:\s+as\s+([A-Za-z0-9_]+))?;/;
+const RUST_AS_ALIAS_RE = /([A-Za-z0-9_:]+)\s+as\s+([A-Za-z0-9_]+)/;
+const GD_PRELOAD_DECL_RE =
+    /^(?:const|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/;
+const GD_PRELOAD_CALL_RE = /(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/;
+
 /** File import profile containing extracted specifiers and local symbol bindings */
 export interface FileImportProfile {
     specifiers: string[];
@@ -78,19 +91,16 @@ function parseImportClause(clause: string, pkg: string, symbolToPkg: Map<string,
         symbolToPkg.set(nsMatch[1], pkg);
         return;
     }
-    const namedMatch = /\{([\s\S]*?)\}/.exec(clause);
+    const namedMatch = BRACED_CLAUSE_RE.exec(clause);
     if (namedMatch) {
         const items = namedMatch[1].split(',');
         for (const item of items) {
-            const parts = item.trim().split(/\s+as\s+/);
+            const parts = item.trim().split(AS_SPLIT_RE);
             const local = (parts[1] || parts[0] || '').trim();
             if (local) symbolToPkg.set(local, pkg);
         }
     }
-    const defaultPart = clause
-        .replace(/\{[\s\S]*?\}/, '')
-        .replace(/,/g, '')
-        .trim();
+    const defaultPart = clause.replace(BRACED_STRIP_RE, '').replace(COMMA_GLOBAL_RE, '').trim();
     if (defaultPart && !defaultPart.startsWith('*')) {
         symbolToPkg.set(defaultPart, pkg);
     }
@@ -113,7 +123,8 @@ function extractTsJsImportLine(
     specifiers: Set<string>,
     symbolToPkg: Map<string, string>,
 ): void {
-    const importFromMatch = /^(?:export\s+)?import\s+(?:type\s+)?(.*?)\s+from\s+['"]([^'"]+)['"]/.exec(trimmed);
+    const importFromMatch =
+        /^(?:export\s+)?import\s+(?:type\s+)?(.*?)\s+from\s+['"]([^'"]+)['"]/.exec(trimmed);
     if (importFromMatch) {
         const spec = importFromMatch[2].trim();
         if (!isValidPackageSpecifier(spec)) return;
@@ -122,9 +133,10 @@ function extractTsJsImportLine(
         parseImportClause(importFromMatch[1].trim(), pkg, symbolToPkg);
         return;
     }
-    const requireMatch = /^(?:export\s+)?(?:const|let|var)\s+(.*?)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/.exec(
-        trimmed,
-    );
+    const requireMatch =
+        /^(?:export\s+)?(?:const|let|var)\s+(.*?)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/.exec(
+            trimmed,
+        );
     if (requireMatch) {
         const spec = requireMatch[2].trim();
         if (!isValidPackageSpecifier(spec)) return;
@@ -149,7 +161,10 @@ function extractTsJsImportLine(
         }
         return;
     }
-    const exportFromMatch = /^export\s+(?:type\s+)?(?:\{[\s\S]*?\}|\*|\*\s+as\s+[A-Za-z0-9_$]+)?\s*from\s+['"]([^'"]+)['"]/.exec(trimmed);
+    const exportFromMatch =
+        /^export\s+(?:type\s+)?(?:\{[\s\S]*?\}|\*|\*\s+as\s+[A-Za-z0-9_$]+)?\s*from\s+['"]([^'"]+)['"]/.exec(
+            trimmed,
+        );
     if (exportFromMatch) {
         const spec = exportFromMatch[1].trim();
         if (isValidPackageSpecifier(spec)) {
@@ -170,7 +185,12 @@ function isMultiLineImportStart(trimmed: string): boolean {
 }
 
 function isMultiLineImportEnd(trimmed: string): boolean {
-    return trimmed.includes('from ') || trimmed.endsWith(';') || trimmed.includes("'") || trimmed.includes('"');
+    return (
+        trimmed.includes('from ') ||
+        trimmed.endsWith(';') ||
+        trimmed.includes("'") ||
+        trimmed.includes('"')
+    );
 }
 
 function extractTsJsImportProfile(
@@ -217,7 +237,7 @@ function parsePythonFromClause(
     const pkg = spec.split('.')[0].toLowerCase();
     const items = rawItems.split(',');
     for (const item of items) {
-        const parts = item.trim().split(/\s+as\s+/);
+        const parts = item.trim().split(AS_SPLIT_RE);
         const local = (parts[1] || parts[0] || '').trim();
         if (local) symbolToPkg.set(local, pkg);
     }
@@ -230,7 +250,7 @@ function parsePythonImportClause(
 ): void {
     const items = rawItems.split(',');
     for (const item of items) {
-        const parts = item.trim().split(/\s+as\s+/);
+        const parts = item.trim().split(AS_SPLIT_RE);
         const mod = parts[0].trim();
         const local = (parts[1] || parts[0] || '').trim();
         if (!mod) continue;
@@ -249,12 +269,12 @@ function extractPythonImportProfile(
     for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('#')) continue;
-        const fromMatch = /^from\s+([A-Za-z0-9_.]+)\s+import\s+(.*)/.exec(trimmed);
+        const fromMatch = PY_FROM_IMPORT_RE.exec(trimmed);
         if (fromMatch) {
             parsePythonFromClause(fromMatch[1].trim(), fromMatch[2], specifiers, symbolToPkg);
             continue;
         }
-        const importMatch = /^import\s+(.*)/.exec(trimmed);
+        const importMatch = PY_IMPORT_RE.exec(trimmed);
         if (importMatch) {
             parsePythonImportClause(importMatch[1], specifiers, symbolToPkg);
         }
@@ -316,13 +336,13 @@ function parseRustUseRemainder(
     remainder: string,
     symbolToPkg: Map<string, string>,
 ): void {
-    const groupMatch = /\{([\s\S]*?)\}/.exec(remainder);
+    const groupMatch = BRACED_CLAUSE_RE.exec(remainder);
     if (groupMatch) {
         const items = groupMatch[1].split(',');
         for (const item of items) {
             const clean = item.trim();
             if (!clean || clean === 'self' || clean === '*') continue;
-            const asMatch = /([A-Za-z0-9_:]+)\s+as\s+([A-Za-z0-9_]+)/.exec(clean);
+            const asMatch = RUST_AS_ALIAS_RE.exec(clean);
             if (asMatch) {
                 symbolToPkg.set(asMatch[2].trim(), rootPkg);
             } else {
@@ -333,7 +353,7 @@ function parseRustUseRemainder(
         }
         return;
     }
-    const singleAs = /([A-Za-z0-9_:]+)\s+as\s+([A-Za-z0-9_]+)/.exec(remainder);
+    const singleAs = RUST_AS_ALIAS_RE.exec(remainder);
     if (singleAs) {
         symbolToPkg.set(singleAs[2].trim(), rootPkg);
     } else {
@@ -354,10 +374,9 @@ function extractRustImportProfile(
     for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('//')) continue;
-        const useMatch = /^\s*(?:pub\s+)?use\s+([A-Za-z0-9_]+)::(.+);/.exec(trimmed);
+        const useMatch = RUST_USE_PREFIX_RE.exec(trimmed);
         if (!useMatch) {
-            const directMatch =
-                /^\s*(?:pub\s+)?use\s+([A-Za-z0-9_]+)(?:\s+as\s+([A-Za-z0-9_]+))?;/.exec(trimmed);
+            const directMatch = RUST_USE_DIRECT_RE.exec(trimmed);
             if (directMatch) {
                 const pkg = directMatch[1];
                 specifiers.add(pkg);
@@ -380,16 +399,13 @@ function extractGdScriptImportProfile(
     for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('#')) continue;
-        const declMatch =
-            /^(?:const|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/.exec(
-                trimmed,
-            );
+        const declMatch = GD_PRELOAD_DECL_RE.exec(trimmed);
         if (declMatch) {
             specifiers.add(declMatch[2]);
             symbolToPkg.set(declMatch[1], declMatch[2]);
             continue;
         }
-        const match = /(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/.exec(trimmed);
+        const match = GD_PRELOAD_CALL_RE.exec(trimmed);
         if (match) specifiers.add(match[1]);
     }
 }

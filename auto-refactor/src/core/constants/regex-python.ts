@@ -112,6 +112,15 @@ export const PY_ASSIGN_BINDING_PATTERN = /^([A-Za-z_]\w*)\s*[:=]/;
 /** Matches Python for-loop variable declaration supporting multi-variable unpacking. */
 export const PY_FOR_MULTI_VAR_PATTERN = /^for\s+([A-Za-z0-9_,\s]+)\s+in\b/;
 
+/** Matches Python empty body pass statement. */
+export const PYTHON_EMPTY_BODY_PATTERN = /^pass\s*$/;
+
+/** Matches Python if statement header line. */
+export const PYTHON_IF_HEADER_PATTERN = /^\s*if\s+[^:]+:\s*$/;
+
+/** Matches Python def or class declaration header. */
+export const PYTHON_DECL_HEADER_PATTERN = /^\s*(?:def|class)\s+[a-zA-Z_]\w*\b/;
+
 /** Creates a fresh global scanner for stripping parentheses. */
 export function createParenStripScanner(): RegExp {
     return /[()]/g;
@@ -159,6 +168,9 @@ export const REGEX_PYTHON = Object.freeze({
     IMPORT_CAPTURE: PY_IMPORT_CAPTURE_PATTERN,
     AS_ALIAS_CAPTURE: PY_AS_ALIAS_CAPTURE_PATTERN,
     VALID_IDENTIFIER: PY_VALID_IDENTIFIER_PATTERN,
+    EMPTY_BODY: PYTHON_EMPTY_BODY_PATTERN,
+    IF_HEADER: PYTHON_IF_HEADER_PATTERN,
+    DECL_HEADER: PYTHON_DECL_HEADER_PATTERN,
     createParenStripScanner,
     createStarPrefixStripScanner,
     createWithAsScanner,

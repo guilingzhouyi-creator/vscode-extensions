@@ -15,6 +15,9 @@
  */
 import { fileNameEndsWith, isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
+import { REGEX } from '../../constants';
+import { sharedRegexPool } from '../../data-structures/regex-pool';
+import { sharedMemoryGovernor, CacheEvictionTier } from '../../memory/memory-governor';
 
 /** ASCII code for a space, skipped while advancing past a line's leading whitespace. */
 const CHAR_CODE_SPACE = 32;
@@ -37,18 +40,32 @@ interface CachedDbgPattern {
     callRe: RegExp;
 }
 
+const MAX_DBG_PATTERN_CACHE_SIZE = 64;
 const DBG_PATTERN_CACHE = new Map<string, CachedDbgPattern[]>();
+
+sharedMemoryGovernor.register({
+    name: 'DBG_PATTERN_CACHE',
+    tier: CacheEvictionTier.Ephemeral,
+    clear: () => DBG_PATTERN_CACHE.clear(),
+    getSize: () => DBG_PATTERN_CACHE.size,
+});
 
 function getDbgPatterns(identifiers: string[]): CachedDbgPattern[] {
     const key = identifiers.join('|');
     let patterns = DBG_PATTERN_CACHE.get(key);
     if (!patterns) {
+        if (DBG_PATTERN_CACHE.size >= MAX_DBG_PATTERN_CACHE_SIZE) {
+            const firstKey = DBG_PATTERN_CACHE.keys().next().value;
+            if (firstKey !== undefined) {
+                DBG_PATTERN_CACHE.delete(firstKey);
+            }
+        }
         patterns = identifiers.map((dbg) => {
-            const escaped = dbg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const escaped = REGEX.escape(dbg);
             return {
                 id: dbg,
-                wordRe: new RegExp(`\\b${escaped}\\b`),
-                callRe: new RegExp(`\\b${escaped}\\s*(?:\\(|;|\\b)`),
+                wordRe: sharedRegexPool.getCompiled(`\\b${escaped}\\b`),
+                callRe: sharedRegexPool.getCompiled(`\\b${escaped}\\s*(?:\\(|;|\\b)`),
             };
         });
         DBG_PATTERN_CACHE.set(key, patterns);

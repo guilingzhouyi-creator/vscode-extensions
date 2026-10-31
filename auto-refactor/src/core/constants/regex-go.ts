@@ -39,6 +39,37 @@ export const GO_PACKAGE_COMMENT_PATTERN = /^\s*\/\/\s*Package\s+/;
 /** Matches Go panic invocation. */
 export const GO_PANIC_PATTERN = /\bpanic\s*\(/;
 
+/** Matches Go func declaration line. */
+export const GO_FUNC_DECL_LINE_PATTERN = /^\s*func\s+(?:\([^)]+\)\s+)?[a-zA-Z_]\w*\s*\(/;
+
+/** Matches Go struct or interface type declaration. */
+export const GO_STRUCT_OR_INTERFACE_PATTERN = /^\s*type\s+[a-zA-Z_]\w*\s+(?:struct|interface)\b/;
+
+/** Matches Go const declaration line. */
+export const GO_CONST_DECL_LINE_PATTERN = /^\s*const\s+(?:\([^)]*\)|[a-zA-Z_]\w*)/;
+
+/** Matches Go var declaration line. */
+export const GO_VAR_DECL_LINE_PATTERN = /^\s*var\s+(?:\([^)]*\)|[a-zA-Z_]\w*)/;
+
+/** Matches Go for loop declaration line. */
+export const GO_FOR_DECL_LINE_PATTERN = /^\s*for\b/;
+
+/** Matches Go if statement with short variable declaration. */
+export const GO_IF_SHORT_DECL_PATTERN = /^\s*if\s+[^;]+;\s*/;
+
+/** Matches Go short variable declaration line. */
+export const GO_SHORT_VAR_DECL_PATTERN = /^\s*([a-zA-Z_][a-zA-Z0-9_,\s]*)\s*:=/;
+
+/** Creates a fresh global scanner for Go named literal instantiations. */
+export function createGoNamedLiteralScanner(): RegExp {
+    return /\b([a-zA-Z_]\w*)\s*\{/g;
+}
+
+/** Creates a fresh global scanner for Go call expressions. */
+export function createGoCallExprScanner(): RegExp {
+    return /\b([a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)?)\s*\(/g;
+}
+
 /**
  * Frozen Go domain regex catalog namespace.
  */
@@ -51,4 +82,13 @@ export const REGEX_GO = Object.freeze({
     TRANSIENT_ALLOCATION: GO_TRANSIENT_ALLOCATION_PATTERN,
     PACKAGE_COMMENT: GO_PACKAGE_COMMENT_PATTERN,
     PANIC: GO_PANIC_PATTERN,
+    FUNC_DECL_LINE: GO_FUNC_DECL_LINE_PATTERN,
+    STRUCT_OR_INTERFACE: GO_STRUCT_OR_INTERFACE_PATTERN,
+    CONST_DECL_LINE: GO_CONST_DECL_LINE_PATTERN,
+    VAR_DECL_LINE: GO_VAR_DECL_LINE_PATTERN,
+    FOR_DECL_LINE: GO_FOR_DECL_LINE_PATTERN,
+    IF_SHORT_DECL: GO_IF_SHORT_DECL_PATTERN,
+    SHORT_VAR_DECL: GO_SHORT_VAR_DECL_PATTERN,
+    createNamedLiteralScanner: createGoNamedLiteralScanner,
+    createCallExprScanner: createGoCallExprScanner,
 });

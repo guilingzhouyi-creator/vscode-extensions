@@ -76,6 +76,24 @@ export const GD_RPC_MODIFIER_PATTERN =
 /** Matches transient heap allocation patterns in GDScript loops (.duplicate()). */
 export const GD_TRANSIENT_ALLOCATION_PATTERN = /\b(?:\/duplicate\(true\)|\.duplicate\()/;
 
+/** Matches GDScript func declaration. */
+export const GDSCRIPT_FUNC_PATTERN = /^\s*(?:static\s+)?func\s+([A-Za-z0-9_]+)\s*\(/;
+
+/** Matches GDScript load/preload import line. */
+export const GDSCRIPT_LOAD_IMPORT_PATTERN =
+    /^(?:const|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/;
+
+/** Matches GDScript function declaration header. */
+export const GDSCRIPT_FUNC_DECL_HEADER_PATTERN = /^\s*(?:static\s+)?func\s+[a-zA-Z_]\w*\s*\(/;
+
+/** Matches GDScript for loop declaration line. */
+export const GDSCRIPT_FOR_DECL_PATTERN = /^\s*for\s+[a-zA-Z_]\w*\s+in\b/;
+
+/** Creates a fresh global scanner for GDScript preload/load calls. */
+export function createGdscriptPreloadScanner(): RegExp {
+    return /(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+}
+
 export const REGEX_GDSCRIPT = Object.freeze({
     LEGACY_CONNECT: GD_LEGACY_CONNECT_PATTERN,
     SUPER_RESET: GD_SUPER_RESET_PATTERN,
@@ -95,4 +113,9 @@ export const REGEX_GDSCRIPT = Object.freeze({
     GAME_STATE_COUPLE: GD_GAME_STATE_COUPLE_PATTERN,
     RPC_MODIFIER: GD_RPC_MODIFIER_PATTERN,
     TRANSIENT_ALLOCATION: GD_TRANSIENT_ALLOCATION_PATTERN,
+    FUNC: GDSCRIPT_FUNC_PATTERN,
+    LOAD_IMPORT: GDSCRIPT_LOAD_IMPORT_PATTERN,
+    FUNC_DECL_HEADER: GDSCRIPT_FUNC_DECL_HEADER_PATTERN,
+    FOR_DECL: GDSCRIPT_FOR_DECL_PATTERN,
+    createGdscriptPreloadScanner: createGdscriptPreloadScanner,
 });
