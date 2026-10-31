@@ -83,13 +83,15 @@ description: >-
 
 ## 六、 弹性技术债务自适应限额数学模型 (Elastic Debt Budgeting Model)
 
-针对大型与异构工程，技术债务增长判定绝非僵死的一票否决，而是基于**工程规模与健康度自适应调节**的弹性包络模型：
+针对大型与异构工程，技术债务增长判定绝非僵死的一票否决，而是基于**工程规模与健康度自适应调节**的弹性包络模型（实现于 `auto-refactor/src/core/intelligence/elastic-debt-budget.ts`）：
 1. **复合调节因子计算**：
-   $$\text{scaleFactor} = \max\left(1.0, \sqrt{\frac{N_{\text{files}}}{200}}\right), \quad \text{healthFactor} = \max\left(0.5, \frac{S_{\text{composite}}}{100}\right), \quad \text{combinedFactor} = \text{scaleFactor} \times \text{healthFactor}$$
+   - 亚线性规模因子：$\text{scaleFactor} = \max\left(1.0, \text{round}_2\left(\sqrt{N_{\text{files}} / 200}\right)\right)$；
+   - 健康度阶梯弹性因子（$\text{healthFactor}$）：$S \ge 98 \to 1.25$（A+）、$S \ge 95 \to 1.10$（A）、$S \ge 90 \to 1.00$（B）、$S \ge 80 \to 0.70$（C）、$S < 80 \to 0.40$；
+   - 组合因子：$\text{combinedFactor} = \text{scaleFactor} \times \text{healthFactor}$。
 2. **动态增长上限自适应平滑上浮**：
-   $$\text{effectiveGrowthLimit} = \max\left(\text{DEFAULT\_LIMIT}, \lfloor \text{DEFAULT\_LIMIT} \times \text{combinedFactor} \rfloor\right)$$
+   $$\text{effectiveGrowthLimit} = \max\left(10, \lfloor \text{DEFAULT\_LIMIT} \times \text{combinedFactor} \rfloor\right)$$
 3. **分层弹性审查与 PERMITTED_ELASTIC 裁定**：
-   - **Critical / High 债务弹性审查**：依据全仓文件规模自适应赋予微幅弹性缓冲（如 Critical 允许量 $\lfloor 0.005 \times N_{\text{files}} \rfloor$，High 允许量 $\lfloor 0.015 \times N_{\text{files}} \rfloor$），在加权总分未突破且健康度极佳时判定为 `PERMITTED_ELASTIC` 合法放行，杜绝良性微构下的误拦截。
+   - **Critical / High 债务弹性审查**：基准配额（`baseCritical=2, baseHigh=5`）乘以 $\text{combinedFactor}$ 动态伸缩，在单层差量与加权总增长（`critical×10 + high×3 + medium×1 + low×0.2`）均未突破包络时判定为 `PERMITTED_ELASTIC` 合法放行，突破任一阈值则触发 `BLOCKED_EXCEEDED_BUDGET` 熔断。
 
 ---
 

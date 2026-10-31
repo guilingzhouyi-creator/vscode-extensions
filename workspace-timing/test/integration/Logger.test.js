@@ -16,6 +16,10 @@ const {
   removeLogSink,
   clearLogSinks,
   getLogSinksCount,
+  takeLoggerSnapshot,
+  restoreLoggerSnapshot,
+  resetLoggerState,
+  withScopedLogger,
   log,
   logger,
 } = require('../../out/integration/logger');
@@ -179,5 +183,38 @@ describe('Logger（统一日志与双轨事件汇流引擎）', () => {
     assert.strictEqual(logger.isDebugEnabled(), true);
     assert.strictEqual(logger.isInfoEnabled(), true);
     assert.strictEqual(logger.isLevelEnabled(LogLevel.Warn), true);
+  });
+
+  it('日志器状态快照与作用域沙箱化隔离 (withScopedLogger)', async () => {
+    setLogLevel(LogLevel.Error);
+    const outerSink = () => {};
+    addLogSink(outerSink);
+
+    await withScopedLogger(
+      async () => {
+        assert.strictEqual(getLogLevel(), LogLevel.Info);
+        assert.strictEqual(getLogSinksCount(), 1);
+
+        const innerSink = () => {};
+        addLogSink(innerSink);
+        assert.strictEqual(getLogSinksCount(), 2);
+      },
+      { level: LogLevel.Info, sinks: [() => {}] }
+    );
+
+    // 作用域外状态应完整复原
+    assert.strictEqual(getLogLevel(), LogLevel.Error);
+    assert.strictEqual(getLogSinksCount(), 1);
+  });
+
+  it('错误堆栈中的本地驱动器绝对路径被安全规范化脱敏', () => {
+    const errorWithDrive = new Error('File not found at C:\\CODE_game-development\\vscode-extensions\\src\\app.ts');
+    const received = [];
+    addLogSink((entry) => received.push(entry));
+
+    log(LogLevel.Error, 'Path leak check', errorWithDrive);
+    assert.strictEqual(received.length, 1);
+    assert.ok(!received[0].detail.includes('C:\\CODE_game-development'));
+    assert.ok(received[0].detail.includes('<workspace>/'));
   });
 });

@@ -115,6 +115,72 @@ export function getLogSinksCount(): number {
   return _sinks.size;
 }
 
+/**
+ * 快照表示当前日志系统的配置状态。
+ */
+export interface LoggerSnapshot {
+  readonly minLevel: LogLevel;
+  readonly sinks: ReadonlyArray<LogSink>;
+}
+
+/**
+ * 捕获当前日志器状态快照（用于测试隔离与沙箱上下文）。
+ */
+export function takeLoggerSnapshot(): LoggerSnapshot {
+  return {
+    minLevel: _minLevel,
+    sinks: Array.from(_sinks),
+  };
+}
+
+/**
+ * 依据快照恢复日志器状态。
+ *
+ * @param snapshot - 之前捕获的状态快照
+ */
+export function restoreLoggerSnapshot(snapshot: LoggerSnapshot): void {
+  _minLevel = snapshot.minLevel;
+  _sinks.clear();
+  for (const sink of snapshot.sinks) {
+    _sinks.add(sink);
+  }
+}
+
+/**
+ * 重置日志器至初始纯净状态（等级为 Debug，接收器清空）。
+ */
+export function resetLoggerState(): void {
+  _minLevel = LogLevel.Debug;
+  _sinks.clear();
+}
+
+/**
+ * 在隔离的作用域内执行回调，执行完毕后自动恢复先前的日志级别与接收器。
+ *
+ * @param action - 待执行的回调函数
+ * @param scopeOptions - 作用域内覆盖的配置项
+ */
+export async function withScopedLogger<T>(
+  action: () => Promise<T> | T,
+  scopeOptions: { level?: LogLevel; sinks?: LogSink[] } = {}
+): Promise<T> {
+  const snapshot = takeLoggerSnapshot();
+  try {
+    if (scopeOptions.level !== undefined) {
+      setLogLevel(scopeOptions.level);
+    }
+    if (scopeOptions.sinks !== undefined) {
+      _sinks.clear();
+      for (const s of scopeOptions.sinks) {
+        _sinks.add(s);
+      }
+    }
+    return await action();
+  } finally {
+    restoreLoggerSnapshot(snapshot);
+  }
+}
+
 const levelLabels: Record<LogLevel, string> = {
   [LogLevel.Debug]: 'DEBUG',
   [LogLevel.Info]: 'INFO',
@@ -124,6 +190,18 @@ const levelLabels: Record<LogLevel, string> = {
 };
 
 const MAX_CAUSE_DEPTH = 5;
+const DRIVE_PATH_REGEX = /[a-zA-Z]:[\\/][^ \r\n\t"']+/g;
+
+/**
+ * 规范化绝对驱动器路径，避免本地宿主环境绝对路径泄露。
+ */
+function sanitizePath(val: string): string {
+  if (!val || typeof val !== 'string') return val;
+  return val.replace(DRIVE_PATH_REGEX, (match) => {
+    const norm = match.replace(/\\/g, '/');
+    return norm.replace(/^[a-zA-Z]:\/[^/]+\/[^/]+\//, '<workspace>/');
+  });
+}
 
 /**
  * 递归展开并提取 Error 的堆栈及其 cause 因果链。
@@ -143,9 +221,9 @@ function extractErrorDetails(err: unknown): { message: string; stack?: string } 
       }
       depth++;
     }
-    return { message: err.message, stack: detail };
+    return { message: err.message, stack: sanitizePath(detail) };
   }
-  return { message: String(err) };
+  return { message: sanitizePath(String(err)) };
 }
 
 /**
