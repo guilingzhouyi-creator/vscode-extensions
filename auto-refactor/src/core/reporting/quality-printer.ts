@@ -95,61 +95,83 @@ function renderTriPlaneVector(triPlane: UnifiedQualityAssessment): void {
 }
 
 /**
+ * Renders SQALE technical debt line.
+ */
+function renderSqaleDebtLine(technicalDebt: QualityScoreBreakdown['technicalDebt']): void {
+    if (!technicalDebt) return;
+    const remediationHours = (technicalDebt.totalRemediationMinutes / 60).toFixed(1);
+    process.stdout.write(
+        `SQALE Technical Debt    : ${technicalDebt.technicalDebtRatio.toFixed(1)}% ` +
+            `[Grade: ${technicalDebt.sqaleGrade}] (Remediation: ${remediationHours}h / ${technicalDebt.totalRemediationMinutes}min)\n`,
+    );
+}
+
+/**
+ * Renders 5D density tensor line.
+ */
+function renderDensityTensorLine(densityTensor: QualityScoreBreakdown['densityTensorSummary']): void {
+    if (!densityTensor) return;
+    const distanceSuffix = densityTensor.averageMahalanobisDistance !== undefined
+        ? ` | Mahalanobis: ${densityTensor.averageMahalanobisDistance.toFixed(2)}`
+        : '';
+    process.stdout.write(
+        `5D Density Tensor       : Density ${(densityTensor.compositeDensity * PERCENT_SCALE).toFixed(1)}% ` +
+            `[TSPR: ${(densityTensor.averageTspr * PERCENT_SCALE).toFixed(0)}% | POR: ${(densityTensor.averagePor * PERCENT_SCALE).toFixed(0)}%${distanceSuffix}]\n`,
+    );
+}
+
+/**
+ * Renders polyglot generalization metrics line.
+ */
+function renderPolyglotLine(polyglotMetrics: QualityScoreBreakdown['polyglotGeneralization']): void {
+    if (!polyglotMetrics) return;
+    process.stdout.write(
+        `Polyglot Generalization : ${polyglotMetrics.index.toFixed(1)} / 100 ` +
+            `(${polyglotMetrics.languageCount} langs, mean: ${polyglotMetrics.meanScore.toFixed(1)}, penalty: ${polyglotMetrics.dispersionPenalty.toFixed(2)})\n`,
+    );
+}
+
+/**
+ * Renders architecture dynamics and resilience (ADR-Q) quant line.
+ */
+function renderResilienceQuantLine(quant: QualityScoreBreakdown['quant']): void {
+    if (!quant) return;
+    const status = quant.financial.status;
+    const statusBadge =
+        status === 'de-leveraging' ? '[Active-Clearing]' :
+        status === 'balanced' ? '[Balanced]' :
+        status === 'insufficient_samples' ? '[Insufficient-Samples]' :
+        '[Deficit-Growing]';
+    const rcrVal = quant.financial.rcr ?? quant.financial.interestCoverageRatio;
+    const erqVal = quant.riskRatios.erq ?? quant.riskRatios.qsr;
+    const ddrVal = quant.riskRatios.ddr ?? quant.riskRatios.sortino;
+    const dsiVal = quant.inequality.dsi ?? quant.inequality.debtGini;
+    const rcdVal = quant.inequality.rcd ?? quant.inequality.defectEntropy;
+    process.stdout.write(
+        `Resilience Quant (ADR-Q) : RCR: ${rcrVal.toFixed(2)}x ${statusBadge} ` +
+            `| ERQ: ${erqVal.toFixed(1)} | DDR: ${ddrVal.toFixed(1)} ` +
+            `| DSI: ${dsiVal.toFixed(2)} | RCD: ${rcdVal.toFixed(2)}\n`,
+    );
+}
+
+/**
  * Renders technical debt, density tensor, and polyglot metrics.
  */
 function renderTechnicalDebtAndDensity(scoreBreakdown: QualityScoreBreakdown): void {
-    if (
-        !scoreBreakdown.technicalDebt &&
-        !scoreBreakdown.densityTensorSummary &&
-        !scoreBreakdown.polyglotGeneralization &&
-        !scoreBreakdown.quant
-    ) {
+    const hasAnyMetric = Boolean(
+        scoreBreakdown.technicalDebt ||
+        scoreBreakdown.densityTensorSummary ||
+        scoreBreakdown.polyglotGeneralization ||
+        scoreBreakdown.quant,
+    );
+    if (!hasAnyMetric) {
         return;
     }
     process.stdout.write(`-------------------------------------------\n`);
-    if (scoreBreakdown.technicalDebt) {
-        const technicalDebt = scoreBreakdown.technicalDebt;
-        const remediationHours = (technicalDebt.totalRemediationMinutes / 60).toFixed(1);
-        process.stdout.write(
-            `SQALE Technical Debt    : ${technicalDebt.technicalDebtRatio.toFixed(1)}% ` +
-                `[Grade: ${technicalDebt.sqaleGrade}] (Remediation: ${remediationHours}h / ${technicalDebt.totalRemediationMinutes}min)\n`,
-        );
-    }
-    if (scoreBreakdown.densityTensorSummary) {
-        const densityTensor = scoreBreakdown.densityTensorSummary;
-        const distanceSuffix = densityTensor.averageMahalanobisDistance !== undefined
-            ? ` | Mahalanobis: ${densityTensor.averageMahalanobisDistance.toFixed(2)}`
-            : '';
-        process.stdout.write(
-            `5D Density Tensor       : Density ${(densityTensor.compositeDensity * PERCENT_SCALE).toFixed(1)}% ` +
-                `[TSPR: ${(densityTensor.averageTspr * PERCENT_SCALE).toFixed(0)}% | POR: ${(densityTensor.averagePor * PERCENT_SCALE).toFixed(0)}%${distanceSuffix}]\n`,
-        );
-    }
-    if (scoreBreakdown.polyglotGeneralization) {
-        const polyglotMetrics = scoreBreakdown.polyglotGeneralization;
-        process.stdout.write(
-            `Polyglot Generalization : ${polyglotMetrics.index.toFixed(1)} / 100 ` +
-                `(${polyglotMetrics.languageCount} langs, mean: ${polyglotMetrics.meanScore.toFixed(1)}, penalty: ${polyglotMetrics.dispersionPenalty.toFixed(2)})\n`,
-        );
-    }
-    if (scoreBreakdown.quant) {
-        const quant = scoreBreakdown.quant;
-        const statusBadge =
-            quant.financial.status === 'de-leveraging' ? '[Active-Clearing]' :
-            quant.financial.status === 'balanced' ? '[Balanced]' :
-            quant.financial.status === 'insufficient_samples' ? '[Insufficient-Samples]' :
-            '[Deficit-Growing]';
-        const rcrVal = quant.financial.rcr ?? quant.financial.interestCoverageRatio;
-        const erqVal = quant.riskRatios.erq ?? quant.riskRatios.qsr;
-        const ddrVal = quant.riskRatios.ddr ?? quant.riskRatios.sortino;
-        const dsiVal = quant.inequality.dsi ?? quant.inequality.debtGini;
-        const rcdVal = quant.inequality.rcd ?? quant.inequality.defectEntropy;
-        process.stdout.write(
-            `Resilience Quant (ADR-Q) : RCR: ${rcrVal.toFixed(2)}x ${statusBadge} ` +
-                `| ERQ: ${erqVal.toFixed(1)} | DDR: ${ddrVal.toFixed(1)} ` +
-                `| DSI: ${dsiVal.toFixed(2)} | RCD: ${rcdVal.toFixed(2)}\n`,
-        );
-    }
+    renderSqaleDebtLine(scoreBreakdown.technicalDebt);
+    renderDensityTensorLine(scoreBreakdown.densityTensorSummary);
+    renderPolyglotLine(scoreBreakdown.polyglotGeneralization);
+    renderResilienceQuantLine(scoreBreakdown.quant);
 }
 
 /**

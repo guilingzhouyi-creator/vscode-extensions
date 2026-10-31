@@ -206,24 +206,72 @@ function calculateDragFromFiles(
 }
 
 /**
+ * Resolves total principal minutes and interest drag from debt inputs.
+ */
+function resolvePrincipalAndDragMinutes(input: FinancialDebtInput): { totalMinutes: number; dragMinutes: number } {
+    const friction = typeof input.dragFriction === 'number' ? input.dragFriction : DEFAULT_DRAG_FRICTION_COEFFICIENT;
+    const initialMinutes = typeof input.totalRemediationMinutes === 'number' ? input.totalRemediationMinutes : 0;
+
+    if (!input.fileDebts || input.fileDebts.length === 0) {
+        return {
+            totalMinutes: initialMinutes,
+            dragMinutes: initialMinutes * friction,
+        };
+    }
+
+    const fileAgg = calculateDragFromFiles(input.fileDebts, friction);
+    return {
+        totalMinutes: initialMinutes > 0 ? initialMinutes : fileAgg.principalMinutes,
+        dragMinutes: fileAgg.dragMinutes,
+    };
+}
+
+/**
+ * Evaluates coverage ratio (ICR/RCR) and status based on yield and accrual.
+ */
+function evaluateCoverageRatioAndStatus(
+    safeYield: number,
+    safeAccrual: number,
+): { icr: number; status: FinancialDebtMetrics['status'] } {
+    if (safeAccrual <= 0) {
+        if (safeYield > 0) {
+            return { icr: RATIO_SATURATION_CEILING, status: 'de-leveraging' };
+        }
+        return { icr: 1.0, status: 'balanced' };
+    }
+
+    const icr = roundTwoDecimals(safeYield / (safeAccrual + EPSILON_FLOAT));
+    let status: FinancialDebtMetrics['status'] = 'insolvent';
+    if (icr >= 2.0) {
+        status = 'de-leveraging';
+    } else if (icr >= 1.0) {
+        status = 'balanced';
+    }
+    return { icr, status };
+}
+
+/**
+ * Maps operational status to clearance state.
+ */
+function resolveClearanceStatus(status: FinancialDebtMetrics['status']): FinancialDebtMetrics['clearanceStatus'] {
+    switch (status) {
+        case 'de-leveraging':
+            return 'active-clearing';
+        case 'balanced':
+            return 'balanced';
+        default:
+            return 'deficit-growing';
+    }
+}
+
+/**
  * Computes financial capital debt metrics, interest drag, and interest coverage ratio (ICR).
  *
  * @param input - Debt items, churn data, and refactoring yield measurements.
  * @returns Evaluated financial debt metrics.
  */
 export function computeFinancialDebtLedger(input: FinancialDebtInput): FinancialDebtMetrics {
-    const friction = input.dragFriction ?? DEFAULT_DRAG_FRICTION_COEFFICIENT;
-    let totalMinutes = input.totalRemediationMinutes ?? 0;
-    let dragMinutes = 0;
-
-    if (input.fileDebts && input.fileDebts.length > 0) {
-        const fileAgg = calculateDragFromFiles(input.fileDebts, friction);
-        if (totalMinutes <= 0) totalMinutes = fileAgg.principalMinutes;
-        dragMinutes = fileAgg.dragMinutes;
-    } else {
-        dragMinutes = totalMinutes * friction;
-    }
-
+    const { totalMinutes, dragMinutes } = resolvePrincipalAndDragMinutes(input);
     const principalHours = roundTwoDecimals(totalMinutes / MINUTES_IN_HOUR);
     const interestDragHours = roundTwoDecimals(dragMinutes / MINUTES_IN_HOUR);
 
@@ -243,29 +291,12 @@ export function computeFinancialDebtLedger(input: FinancialDebtInput): Financial
         };
     }
 
-    const safeYield = Math.max(0, yieldMin ?? 0);
-    const safeAccrual = Math.max(0, accrualMin ?? 0);
-
-    let icr: number;
-    let status: FinancialDebtMetrics['status'];
-
-    if (safeAccrual <= 0 && safeYield > 0) {
-        icr = RATIO_SATURATION_CEILING;
-        status = 'de-leveraging';
-    } else if (safeAccrual <= 0 && safeYield <= 0) {
-        icr = 1.0;
-        status = 'balanced';
-    } else {
-        icr = roundTwoDecimals(safeYield / (safeAccrual + EPSILON_FLOAT));
-        if (icr >= 2.0) status = 'de-leveraging';
-        else if (icr >= 1.0) status = 'balanced';
-        else status = 'insolvent';
-    }
+    const safeYield = Math.max(0, typeof yieldMin === 'number' ? yieldMin : 0);
+    const safeAccrual = Math.max(0, typeof accrualMin === 'number' ? accrualMin : 0);
+    const { icr, status } = evaluateCoverageRatioAndStatus(safeYield, safeAccrual);
 
     const finalIcr = Math.min(RATIO_SATURATION_CEILING, icr);
-    const clearanceStatus: FinancialDebtMetrics['clearanceStatus'] =
-        status === 'de-leveraging' ? 'active-clearing' :
-        status === 'balanced' ? 'balanced' : 'deficit-growing';
+    const clearanceStatus = resolveClearanceStatus(status);
 
     return {
         principalHours,

@@ -33,6 +33,7 @@ const ROOT = path.join(__dirname, '..');
 const CORPUS = path.join(__dirname, '.corpus');
 const RUST_CORPUS = path.join(__dirname, '.rust-corpus');
 const SAMPLES = path.join(ROOT, 'samples');
+const DAEMON_HANDSHAKE_RETRY_DELAY_MS = 100;
 
 const DEFAULT_TMP_DIR = process.env.AUTO_REFACTOR_TMPDIR || path.join(os.tmpdir(), 'ar-temp');
 try {
@@ -443,7 +444,7 @@ async function main() {
     let w = await warmScan();
     if (!w.stats.daemonUsed) {
       // Under high parallel test contention (16+ workers), give daemon handshake one fast retry
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, DAEMON_HANDSHAKE_RETRY_DELAY_MS));
       w = await warmScan();
     }
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));

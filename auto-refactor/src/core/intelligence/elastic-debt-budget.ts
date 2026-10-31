@@ -4,20 +4,53 @@
  * Architecture Role: Evaluates newly introduced technical debt against dynamic, scale-aware,
  *   and quality-fused elastic budget envelopes instead of brittle rigid zero-tolerance deadlocks.
  * Dependencies & Triggers: Zero external dependencies; consumes purely numerical debt counts,
- *   project scale metrics, and composite quality scores. Triggered by scan gates, self-audit, and ratchets.
+ *   project scale metrics, and composite quality scores. Triggered by scan gates, ratchets,
+ *   and workspace self-audit routines.
  * Responsibilities:
- *   1. Calculate scale and health-damped dynamic debt allowances for Critical, High, Medium, and Low tiers;
- *   2. Support elastic non-zero envelopes for Critical and High debt during architectural transitions;
+ *   1. Calculate scale and health-damped dynamic debt allowances for Critical, High, Medium,
+ *      and Low tiers;
+ *   2. Support elastic non-zero envelopes for Critical and High debt during transitions;
  *   3. Compute composite weighted technical debt scores with health score fusion;
  *   4. Supply actionable arbitration verdicts (PERMITTED_ELASTIC vs BLOCKED_EXCEEDED_BUDGET).
- * Exit Semantics & Design Rationale: CC <= 10, Depth <= 3; strictly non-throwing; returns structured
- *   ElasticDebtBudgetEvaluation. Prevents false-positive deployment blockages on healthy large-scale codebases.
+ * Exit Semantics & Design Rationale: CC <= 10, Depth <= 3; strictly non-throwing; returns
+ *   structured ElasticDebtBudgetEvaluation without spurious breakage on healthy codebases.
  */
 
 /**
  * Standardized technical debt tier categories.
  */
 export type ElasticDebtTier = 'critical' | 'high' | 'medium' | 'low';
+
+const TIER_CRITICAL: ElasticDebtTier = 'critical';
+const TIER_HIGH: ElasticDebtTier = 'high';
+const TIER_MEDIUM: ElasticDebtTier = 'medium';
+const TIER_LOW: ElasticDebtTier = 'low';
+
+const PROP_PAIR_RULE: readonly [string, string] = Object.freeze(['r', 'rule']);
+const PROP_PAIR_TIER: readonly [string, string] = Object.freeze(['t', 'tier']);
+const PROP_PAIR_SEVERITY: readonly [string, string] = Object.freeze(['sev', 'severity']);
+
+const SCORE_TIER_A_PLUS = 98.0;
+const SCORE_TIER_A = 95.0;
+const SCORE_TIER_B_PLUS = 90.0;
+const SCORE_TIER_B = 80.0;
+
+const FACTOR_A_PLUS = 1.25;
+const FACTOR_A = 1.10;
+const FACTOR_B_PLUS = 1.00;
+const FACTOR_B = 0.70;
+const FACTOR_DEGRADED = 0.40;
+
+const PERCENT_SCALE_HUNDRED = 100;
+const DEFAULT_LIMIT_MIN_CRITICAL = 1;
+const DEFAULT_LIMIT_MIN_HIGH = 2;
+const DEFAULT_LIMIT_MIN_MEDIUM = 10;
+const DEFAULT_LIMIT_MIN_LOW = 50;
+const SCALE_RATIO_TEN = 10;
+const PATH_SEPARATOR_SLASH = '/';
+const UNKNOWN_RULE_IDENTIFIER = 'UNKNOWN';
+const SEVERITY_WARNING = 'warning';
+const NUMSTAT_MIN_PARTS = 3;
 
 /**
  * Technical debt counts partitioned by severity tier.
@@ -43,7 +76,7 @@ export interface DebtTierWeights {
  * Configuration options for evaluating elastic technical debt budgets.
  */
 export interface ElasticDebtBudgetOptions {
-    /** Base critical debt allowance (default: 2; permits transition elasticity instead of 0-veto) */
+    /** Base critical debt allowance (default: 2; permits transition elasticity) */
     readonly baseCriticalAllowance?: number;
     /** Base high debt allowance (default: 5; permits transition elasticity) */
     readonly baseHighAllowance?: number;
@@ -136,11 +169,11 @@ function resolveHealthElasticityFactor(compositeScore?: number): number {
     if (compositeScore === undefined || Number.isNaN(compositeScore)) {
         return 1.0;
     }
-    if (compositeScore >= 98.0) return 1.25;
-    if (compositeScore >= 95.0) return 1.10;
-    if (compositeScore >= 90.0) return 1.00;
-    if (compositeScore >= 80.0) return 0.70;
-    return 0.40;
+    if (compositeScore >= SCORE_TIER_A_PLUS) return FACTOR_A_PLUS;
+    if (compositeScore >= SCORE_TIER_A) return FACTOR_A;
+    if (compositeScore >= SCORE_TIER_B_PLUS) return FACTOR_B_PLUS;
+    if (compositeScore >= SCORE_TIER_B) return FACTOR_B;
+    return FACTOR_DEGRADED;
 }
 
 /**
@@ -150,7 +183,7 @@ function resolveScaleFactor(totalFiles?: number): number {
     if (!totalFiles || totalFiles <= 0) {
         return 1.0;
     }
-    return Math.max(1.0, Math.round(Math.sqrt(totalFiles / REFERENCE_FILE_SCALE) * 100) / 100);
+    return Math.max(1.0, Math.round(Math.sqrt(totalFiles / REFERENCE_FILE_SCALE) * PERCENT_SCALE_HUNDRED) / PERCENT_SCALE_HUNDRED);
 }
 
 /**
@@ -165,18 +198,10 @@ export function computeWeightedDebtPoints(
             counts.high * weights.high +
             counts.medium * weights.medium +
             counts.low * weights.low) *
-        100,
-    ) / 100;
+        PERCENT_SCALE_HUNDRED,
+    ) / PERCENT_SCALE_HUNDRED;
 }
 
-/**
- * Evaluates observed technical debt against elastic, dynamic, scale-aware budgets.
- * Crucially, Critical and High debt levels are treated elastically rather than via absolute one-vote veto.
- *
- * @param observed - Current observed debt counts.
- * @param options - Calibration options (files, score, baseline, allowances).
- * @returns Comprehensive ElasticDebtBudgetEvaluation result.
- */
 function computeRawObserved(observed: Partial<DebtTierCounts>): DebtTierCounts {
     return {
         critical: Math.max(0, observed.critical ?? 0),
@@ -210,13 +235,13 @@ function computeDynamicLimits(options: ElasticDebtBudgetOptions, factor: number)
     const baseLow =
         options.baseLowAllowance ??
         (isCumulative && options.totalFiles
-            ? Math.max(DEFAULT_BASE_LOW, options.totalFiles * 10)
+            ? Math.max(DEFAULT_BASE_LOW, options.totalFiles * SCALE_RATIO_TEN)
             : DEFAULT_BASE_LOW);
     return {
-        critical: Math.max(1, Math.floor(baseCrit * factor)),
-        high: Math.max(2, Math.floor(baseHigh * factor)),
-        medium: Math.max(10, Math.floor(baseMed * factor)),
-        low: Math.max(50, Math.floor(baseLow * factor)),
+        critical: Math.max(DEFAULT_LIMIT_MIN_CRITICAL, Math.floor(baseCrit * factor)),
+        high: Math.max(DEFAULT_LIMIT_MIN_HIGH, Math.floor(baseHigh * factor)),
+        medium: Math.max(DEFAULT_LIMIT_MIN_MEDIUM, Math.floor(baseMed * factor)),
+        low: Math.max(DEFAULT_LIMIT_MIN_LOW, Math.floor(baseLow * factor)),
     };
 }
 
@@ -245,24 +270,27 @@ function checkTierLimit(
     };
 }
 
-function collectViolations(
-    raw: DebtTierCounts,
-    delta: DebtTierCounts,
-    limits: DebtTierCounts,
-    weightedScore: number,
-    weightedGrowth: number,
-    maxGrowthLimit: number,
-): DebtTierViolation[] {
+interface ViolationCheckParams {
+    readonly raw: DebtTierCounts;
+    readonly delta: DebtTierCounts;
+    readonly limits: DebtTierCounts;
+    readonly weightedScore: number;
+    readonly weightedGrowth: number;
+    readonly maxGrowthLimit: number;
+}
+
+function collectViolations(params: ViolationCheckParams): DebtTierViolation[] {
+    const { raw, delta, limits, weightedScore, weightedGrowth, maxGrowthLimit } = params;
     const violations: DebtTierViolation[] = [];
-    const critViolation = checkTierLimit('critical', raw.critical, delta.critical, limits.critical);
+    const critViolation = checkTierLimit(TIER_CRITICAL, raw.critical, delta.critical, limits.critical);
     if (critViolation) violations.push(critViolation);
-    const highViolation = checkTierLimit('high', raw.high, delta.high, limits.high);
+    const highViolation = checkTierLimit(TIER_HIGH, raw.high, delta.high, limits.high);
     if (highViolation) violations.push(highViolation);
-    const medViolation = checkTierLimit('medium', raw.medium, delta.medium, limits.medium);
+    const medViolation = checkTierLimit(TIER_MEDIUM, raw.medium, delta.medium, limits.medium);
     if (medViolation) violations.push(medViolation);
     if (weightedGrowth > maxGrowthLimit) {
         violations.push({
-            tier: 'critical',
+            tier: TIER_CRITICAL,
             observed: weightedScore,
             delta: weightedGrowth,
             limit: maxGrowthLimit,
@@ -272,14 +300,20 @@ function collectViolations(
     return violations;
 }
 
-function determineVerdictAndRationale(
-    raw: DebtTierCounts,
-    delta: DebtTierCounts,
-    violations: DebtTierViolation[],
-    scaleFactor: number,
-    healthFactor: number,
-    limits: DebtTierCounts,
-): { verdict: ElasticDebtBudgetVerdict; rationale: string } {
+interface VerdictDecisionParams {
+    readonly raw: DebtTierCounts;
+    readonly delta: DebtTierCounts;
+    readonly violations: readonly DebtTierViolation[];
+    readonly scaleFactor: number;
+    readonly healthFactor: number;
+    readonly limits: DebtTierCounts;
+}
+
+function determineVerdictAndRationale(params: VerdictDecisionParams): {
+    verdict: ElasticDebtBudgetVerdict;
+    rationale: string;
+} {
+    const { raw, delta, violations, scaleFactor, healthFactor, limits } = params;
     if (raw.critical === 0 && raw.high === 0 && delta.medium === 0) {
         return {
             verdict: 'PERMITTED_ZERO_DEBT',
@@ -301,6 +335,13 @@ function determineVerdictAndRationale(
     };
 }
 
+/**
+ * Evaluates observed technical debt against elastic, dynamic, scale-aware budgets.
+ *
+ * @param observed - Current observed debt counts.
+ * @param options - Calibration options (files, score, baseline, allowances).
+ * @returns Comprehensive ElasticDebtBudgetEvaluation result.
+ */
 export function evaluateElasticDebtBudget(
     observed: Partial<DebtTierCounts>,
     options: ElasticDebtBudgetOptions = {},
@@ -317,31 +358,31 @@ export function evaluateElasticDebtBudget(
     const weightedGrowth = computeWeightedDebtPoints(deltaDebt, weights);
     const defaultGrowthLimit =
         options.cumulative && options.totalFiles
-            ? Math.max(DEFAULT_WEIGHTED_GROWTH_LIMIT, options.totalFiles * 10)
+            ? Math.max(DEFAULT_WEIGHTED_GROWTH_LIMIT, options.totalFiles * SCALE_RATIO_TEN)
             : Math.max(
                 DEFAULT_WEIGHTED_GROWTH_LIMIT,
                 Math.floor(DEFAULT_WEIGHTED_GROWTH_LIMIT * combinedFactor),
             );
     const maxGrowthLimit = options.maxWeightedGrowth ?? defaultGrowthLimit;
 
-    const violations = collectViolations(
-        rawObserved,
-        deltaDebt,
-        dynamicLimits,
+    const violations = collectViolations({
+        raw: rawObserved,
+        delta: deltaDebt,
+        limits: dynamicLimits,
         weightedScore,
         weightedGrowth,
         maxGrowthLimit,
-    );
+    });
     const isWithinBudget = violations.length === 0;
 
-    const { verdict, rationale } = determineVerdictAndRationale(
-        rawObserved,
-        deltaDebt,
+    const { verdict, rationale } = determineVerdictAndRationale({
+        raw: rawObserved,
+        delta: deltaDebt,
         violations,
         scaleFactor,
         healthFactor,
-        dynamicLimits,
-    );
+        limits: dynamicLimits,
+    });
 
     return {
         isWithinBudget,
@@ -403,20 +444,20 @@ export interface DebtLedgerResult<T extends DebtIssueLike = DebtIssueLike> {
  */
 export function classifyElasticDebtTier(issue: DebtIssueLike): ElasticDebtTier {
     const rule = issue.rule || '';
-    const sev = issue.severity || 'warning';
+    const sev = issue.severity || SEVERITY_WARNING;
     if (sev === 'error' || CRITICAL_RULE_RE.test(rule)) {
-        return 'critical';
+        return TIER_CRITICAL;
     }
     if (rule === 'CPX-TRV-001') {
-        return 'medium';
+        return TIER_MEDIUM;
     }
     if (HIGH_RULE_RE.test(rule)) {
-        return 'high';
+        return TIER_HIGH;
     }
     if (sev === 'info') {
-        return 'low';
+        return TIER_LOW;
     }
-    return MEDIUM_RULE_RE.test(rule) ? 'medium' : 'low';
+    return MEDIUM_RULE_RE.test(rule) ? TIER_MEDIUM : TIER_LOW;
 }
 
 /**
@@ -441,7 +482,7 @@ export function buildDebtLedger<T extends DebtIssueLike>(
         }
         fileList.push(issue);
 
-        if (tier === 'critical' || tier === 'high') {
+        if (tier === TIER_CRITICAL || tier === TIER_HIGH) {
             const entry: DebtLedgerEntry = {
                 id: issue.id,
                 rule: issue.rule,
@@ -451,7 +492,7 @@ export function buildDebtLedger<T extends DebtIssueLike>(
                 line: issue.location?.start?.line || issue.line || 1,
                 message: issue.message,
             };
-            if (tier === 'critical') criticalItems.push(entry);
+            if (tier === TIER_CRITICAL) criticalItems.push(entry);
             else highItems.push(entry);
         }
     }
@@ -461,13 +502,13 @@ export function buildDebtLedger<T extends DebtIssueLike>(
 
 function normalizeRepoRelativeDebtPath(rawPath: string | undefined): string {
     if (!rawPath) return '';
-    let norm = rawPath.replace(/\\/g, '/');
-    const cwdNorm = process.cwd().replace(/\\/g, '/');
-    if (norm.startsWith(cwdNorm + '/')) {
+    let norm = rawPath.replace(/\\/g, PATH_SEPARATOR_SLASH);
+    const cwdNorm = process.cwd().replace(/\\/g, PATH_SEPARATOR_SLASH);
+    if (norm.startsWith(cwdNorm + PATH_SEPARATOR_SLASH)) {
         norm = norm.slice(cwdNorm.length + 1);
     }
-    const lastSlash = cwdNorm.lastIndexOf('/');
-    const pkgPrefix = (lastSlash !== -1 ? cwdNorm.slice(lastSlash + 1) : cwdNorm) + '/';
+    const lastSlash = cwdNorm.lastIndexOf(PATH_SEPARATOR_SLASH);
+    const pkgPrefix = (lastSlash !== -1 ? cwdNorm.slice(lastSlash + 1) : cwdNorm) + PATH_SEPARATOR_SLASH;
     const repoIdx = pkgPrefix.length > 1 ? norm.indexOf(pkgPrefix) : -1;
     if (repoIdx !== -1) {
         norm = norm.slice(repoIdx + pkgPrefix.length);
@@ -485,7 +526,7 @@ function extractIssueSignatureDesc(issue: DebtIssueLike): {
 } {
     const rawFile = issue.location ? issue.location.file : issue.file;
     const normFile = normalizeRepoRelativeDebtPath(rawFile);
-    const rule = issue.rule || 'UNKNOWN';
+    const rule = issue.rule || UNKNOWN_RULE_IDENTIFIER;
     const rawLine = issue.location?.start ? issue.location.start.line : issue.line;
     const line = typeof rawLine === 'number' ? rawLine : 1;
     return { rule, normFile, line, tier: classifyElasticDebtTier(issue) };
@@ -519,9 +560,9 @@ interface PreviousDefectCandidate {
 }
 
 function calculateDiscreteTierWeight(tier: ElasticDebtTier): number {
-    if (tier === 'critical') return DEFAULT_TIER_WEIGHTS.critical;
-    if (tier === 'high') return DEFAULT_TIER_WEIGHTS.high;
-    if (tier === 'medium') return DEFAULT_TIER_WEIGHTS.medium;
+    if (tier === TIER_CRITICAL) return DEFAULT_TIER_WEIGHTS.critical;
+    if (tier === TIER_HIGH) return DEFAULT_TIER_WEIGHTS.high;
+    if (tier === TIER_MEDIUM) return DEFAULT_TIER_WEIGHTS.medium;
     return 0;
 }
 
@@ -557,15 +598,15 @@ function resolveStringProp(
 }
 
 function parseDefectRecord(raw: Record<string, unknown>): PreviousDefectCandidate {
-    const rule = resolveStringProp(raw, ['r', 'rule'], 'UNKNOWN');
+    const rule = resolveStringProp(raw, PROP_PAIR_RULE, UNKNOWN_RULE_IDENTIFIER);
     const rawLine = raw.l ?? raw.line;
     const line = typeof rawLine === 'number' ? rawLine : 1;
-    const rawTier = resolveStringProp(raw, ['t', 'tier'], '');
+    const rawTier = resolveStringProp(raw, PROP_PAIR_TIER, '');
     const tier: ElasticDebtTier = VALID_ELASTIC_TIERS.has(rawTier)
         ? (rawTier as ElasticDebtTier)
         : classifyElasticDebtTier({
             rule,
-            severity: resolveStringProp(raw, ['sev', 'severity'], rawTier || 'warning'),
+            severity: resolveStringProp(raw, PROP_PAIR_SEVERITY, rawTier || SEVERITY_WARNING),
         });
     return { rule, line, tier, matched: false };
 }
@@ -710,7 +751,7 @@ export function estimateChangedElocFromNumstat(numstatRaw: string | undefined):
     let weightedSemantic = 0;
     for (const line of numstatRaw.trim().split('\n')) {
         const parts = line.split('\t');
-        if (parts.length < 3) continue;
+        if (parts.length < NUMSTAT_MIN_PARTS) continue;
         const add = parseInt(parts[0], 10) || 0;
         const del = parseInt(parts[1], 10) || 0;
         const lineTotal = add + del;

@@ -195,6 +195,8 @@ export function compressDiagnosticSentence(rawText: string): string {
     return messageText.trim().replace(/\.$/, '');
 }
 
+let anchorCacheSeq = 0;
+
 /**
  * In-memory anchor extractor avoiding direct synchronous filesystem operations.
  */
@@ -205,8 +207,9 @@ class AnchorCache {
 
     constructor(customReader?: (relPath: string) => string | undefined) {
         this.customReader = customReader;
+        const instanceId = ++anchorCacheSeq;
         this.unregister = sharedMemoryGovernor.register({
-            name: 'aas-reporter:anchor-cache',
+            name: `aas-reporter:anchor-cache:${instanceId}`,
             tier: CacheEvictionTier.Ephemeral,
             clear: () => this.clear(),
             getSize: () => this.cache.size,
@@ -442,6 +445,21 @@ function resolveHealthGamingDefense(
 }
 
 /**
+ * Helper to conditionally assign ADR-Q native indicator and its historical alias pair.
+ */
+function assignQuantPair(
+    target: Record<string, unknown>,
+    primaryKey: string,
+    aliasKey: string,
+    val: number | undefined,
+): void {
+    if (val !== undefined) {
+        target[primaryKey] = val;
+        target[aliasKey] = val;
+    }
+}
+
+/**
  * Resolves quantitative architecture dynamics and resilience indicators (ADR-Q).
  */
 function resolveHealthQuant(
@@ -451,33 +469,23 @@ function resolveHealthQuant(
     if (override) return override;
     const quantMetrics = report.qualityScore?.quant;
     if (!quantMetrics) return undefined;
-    const fin = quantMetrics.financial;
-    const risk = quantMetrics.riskRatios;
-    const ineq = quantMetrics.inequality;
-    const stoch = quantMetrics.stochastic;
+    const { financial: fin, riskRatios: risk, inequality: ineq, stochastic: stoch } = quantMetrics;
 
-    const rcr = roundMetric(fin?.rcr ?? fin?.interestCoverageRatio);
-    const erq = roundMetric(risk?.erq ?? risk?.qsr);
-    const ddr = roundMetric(risk?.ddr ?? risk?.sortino);
-    const dsi = roundMetric(ineq?.dsi ?? ineq?.debtGini);
-    const rcd = roundMetric(ineq?.rcd ?? ineq?.defectEntropy);
-    const edb95 = roundMetric(risk?.edb95 ?? risk?.var95);
-    const ptd = roundMetric(risk?.ptd ?? risk?.mdd);
-    const ehl = roundMetric(stoch?.ehl ?? stoch?.halfLifeCommits);
+    const quant: Record<string, unknown> = {};
+    assignQuantPair(quant, 'rcr', 'icr', roundMetric(fin?.rcr ?? fin?.interestCoverageRatio));
+    assignQuantPair(quant, 'erq', 'qsr', roundMetric(risk?.erq ?? risk?.qsr));
+    assignQuantPair(quant, 'ddr', 'sortino', roundMetric(risk?.ddr ?? risk?.sortino));
+    assignQuantPair(quant, 'edb95', 'var95', roundMetric(risk?.edb95 ?? risk?.var95));
+    assignQuantPair(quant, 'ptd', 'mdd', roundMetric(risk?.ptd ?? risk?.mdd));
+    assignQuantPair(quant, 'dsi', 'debtGini', roundMetric(ineq?.dsi ?? ineq?.debtGini));
+    assignQuantPair(quant, 'rcd', 'defectEntropy', roundMetric(ineq?.rcd ?? ineq?.defectEntropy));
+    assignQuantPair(quant, 'ehl', 'halfLifeCommits', roundMetric(stoch?.ehl ?? stoch?.halfLifeCommits));
 
-    const quant: AasQuantMetrics = {
-        ...(rcr !== undefined ? { rcr, icr: rcr } : {}),
-        ...(erq !== undefined ? { erq, qsr: erq } : {}),
-        ...(ddr !== undefined ? { ddr, sortino: ddr } : {}),
-        ...(edb95 !== undefined ? { edb95, var95: edb95 } : {}),
-        ...(ptd !== undefined ? { ptd, mdd: ptd } : {}),
-        ...(dsi !== undefined ? { dsi, debtGini: dsi } : {}),
-        ...(rcd !== undefined ? { rcd, defectEntropy: rcd } : {}),
-        ...(ehl !== undefined ? { ehl, halfLifeCommits: ehl } : {}),
-        ...(fin?.status ? { status: fin.status } : {}),
-    };
+    if (fin?.status) {
+        quant.status = fin.status;
+    }
 
-    return Object.keys(quant).length > 0 ? quant : undefined;
+    return Object.keys(quant).length > 0 ? (quant as unknown as AasHealth['quant']) : undefined;
 }
 
 /**

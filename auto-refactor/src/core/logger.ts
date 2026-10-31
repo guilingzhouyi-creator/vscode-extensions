@@ -292,29 +292,48 @@ export class LogRingBuffer {
         }
     }
 
+    private tryStandardRotation(targetPath: string): boolean {
+        try {
+            if (fs.existsSync(targetPath)) {
+                fs.unlinkSync(targetPath);
+            }
+            fs.renameSync(this.filePath, targetPath);
+            return true;
+        } catch {
+            /* best-effort: standard rename failed under contention, proceed to fallbacks */
+            return false;
+        }
+    }
+
+    private tryTimestampedRename(): boolean {
+        try {
+            const timestamped = `${this.filePath}.${Date.now().toString(36)}.locked.rot`;
+            fs.renameSync(this.filePath, timestamped);
+            return true;
+        } catch {
+            /* best-effort: timestamped rename contention, proceed to in-place truncation */
+            return false;
+        }
+    }
+
+    private tryInPlaceTruncate(): void {
+        try {
+            const fd = fs.openSync(this.filePath, 'w');
+            fs.closeSync(fd);
+        } catch {
+            /* best-effort: fail-soft fallback when file is held exclusively */
+        }
+    }
+
     private rotateActiveLogFile(): void {
         const firstRotated = `${this.filePath}.1`;
-        try {
-            if (fs.existsSync(firstRotated)) {
-                fs.unlinkSync(firstRotated);
-            }
-            fs.renameSync(this.filePath, firstRotated);
-        } catch {
-            // Fallback for Windows file lock (EBUSY / EPERM):
-            // Try unique timestamped fallback name to break lock contention
-            try {
-                const timestamped = `${this.filePath}.${Date.now().toString(36)}.locked.rot`;
-                fs.renameSync(this.filePath, timestamped);
-            } catch {
-                // If rename is entirely blocked by lock, try truncating active file in-place
-                try {
-                    const fd = fs.openSync(this.filePath, 'w');
-                    fs.closeSync(fd);
-                } catch {
-                    /* best-effort: fail-soft fallback */
-                }
-            }
+        if (this.tryStandardRotation(firstRotated)) {
+            return;
         }
+        if (this.tryTimestampedRename()) {
+            return;
+        }
+        this.tryInPlaceTruncate();
     }
 
     /**
