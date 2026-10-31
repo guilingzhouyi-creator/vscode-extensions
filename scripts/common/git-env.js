@@ -288,7 +288,7 @@ function readStagedBuffersBatch(repoRoot, relPaths) {
 }
 
 /**
- * Gate 0: Head Receipt Ratchet Guard (Anti-Bypass).
+ * Head Receipt Ratchet Guard (Anti-Bypass).
  * Verifies that the current HEAD commit carries an authentically verified gate receipt.
  * Prevents stacking new changes on top of an unverified (--no-verify) commit.
  *
