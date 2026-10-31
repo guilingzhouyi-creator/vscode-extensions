@@ -362,6 +362,7 @@ export function calculateConfidenceFromVolume(
     lines: number,
     coverage: number,
     scope: 'file' | 'project',
+    stabilityFactor = 1.0,
 ): number {
     const effective = scope === 'file' ? Math.min(lines, CONFIDENCE_LINE_CAP) : lines;
     // A repository's total is unbounded, so the ramp is scaled by an order of magnitude
@@ -375,9 +376,12 @@ export function calculateConfidenceFromVolume(
             Math.round((CONFIDENCE_FLOOR + effective / scale) * PERCENT_SCALE) / PERCENT_SCALE,
         ),
     );
+    const safeStability = Math.min(1.0, Math.max(0.1, stabilityFactor));
+    const effectiveFloor = CONFIDENCE_FLOOR * safeStability;
     return (
-        Math.round(Math.max(CONFIDENCE_FLOOR, baseConfidence * coverage) * PERCENT_SCALE) /
-        PERCENT_SCALE
+        Math.round(
+            Math.max(effectiveFloor, baseConfidence * coverage * safeStability) * PERCENT_SCALE,
+        ) / PERCENT_SCALE
     );
 }
 

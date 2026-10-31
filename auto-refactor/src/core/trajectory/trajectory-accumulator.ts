@@ -39,6 +39,10 @@ import {
     DEFAULT_LEDGER_DIR_NAME,
 } from './compact-ledger-store';
 import { compactLedger } from './trajectory-compactor';
+import {
+    RollingSamplingGovernor,
+    type RollingMeanDifferenceState,
+} from '../scoring/rolling-sampling-governor';
 
 /**
  * Options for recording a review audit run.
@@ -98,6 +102,8 @@ export interface AuditRunResult {
     qualityMetrics: TrajectoryQualityMetrics;
     /** Whether this run was initialized as the first baseline run. */
     isFirstBaseline: boolean;
+    /** Evaluated multi-pass rolling mean-difference state. */
+    rollingState?: RollingMeanDifferenceState;
 }
 
 /**
@@ -383,10 +389,14 @@ function deriveGateDecision(
 export class TrajectoryAccumulator {
     private readonly ledgerDir: string;
     private readonly fingerprintCache: BlockFingerprintCache;
+    private readonly rollingGovernor: RollingSamplingGovernor;
 
-    constructor(customLedgerDir?: string) {
+    constructor(customLedgerDir?: string, workspaceRoot?: string) {
         this.ledgerDir = customLedgerDir ?? path.join(process.cwd(), DEFAULT_LEDGER_DIR_NAME);
         this.fingerprintCache = new BlockFingerprintCache();
+        this.rollingGovernor = new RollingSamplingGovernor({
+            workspaceRoot: workspaceRoot ?? process.cwd(),
+        });
     }
 
     /**
@@ -456,7 +466,15 @@ export class TrajectoryAccumulator {
 
         await writeLifetimeSummary(targetLedgerDir, updatedLifetime);
 
-        // 7. Auto-compact weekly if active runs accumulate
+        // 7. Record into Rolling Sampling Governor
+        const rollingState = this.rollingGovernor.recordSample({
+            timestamp: record.t,
+            compositeScore: record.score.aft,
+            effectiveLines: counters.processed,
+            runId: record.id,
+        });
+
+        // 8. Auto-compact weekly if active runs accumulate
         await compactLedger(targetLedgerDir);
 
         return {
@@ -465,7 +483,22 @@ export class TrajectoryAccumulator {
             runEloc: counters,
             qualityMetrics,
             isFirstBaseline,
+            rollingState,
         };
+    }
+
+    /**
+     * Retrieves the rolling sampling governor instance.
+     */
+    public getRollingGovernor(): RollingSamplingGovernor {
+        return this.rollingGovernor;
+    }
+
+    /**
+     * Reads current multi-pass rolling mean-difference state.
+     */
+    public getRollingState(): RollingMeanDifferenceState {
+        return this.rollingGovernor.evaluateState();
     }
 
     /**
