@@ -1,7 +1,7 @@
 //! Module: fg-core — Crash-Safe Atomic File Persistence
 //! File Path: crates/fg-core/src/fs_atomic.rs
 //! Architecture Role: Single-source temporary-staging-plus-rename atomic file writer shared across
-//!   all Taxis micro-crates (`fg-core`, `fg-native`, `fg-index`, `fg-storage`, `fg-topology`, `fg-gate`).
+//!   all Taxis kernel subsystems (`fg-core`, `fg-native`, `fg-index`, `fg-storage`, `fg-topology`, `fg-gate`).
 //! Dependencies & Triggers: Invoked whenever a container, index, ref, ledger, or metadata snapshot
 //!   must replace an on-disk file without partial-write tearing or concurrent staging collisions.
 //! Responsibilities: Create parent directories, generate process- and thread-unique `.tmp` staging

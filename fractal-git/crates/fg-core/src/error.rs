@@ -9,7 +9,7 @@
 
 use thiserror::Error;
 
-/// Unified Result alias for fallible domain operations across Fractal Git micro-crates.
+/// Unified Result alias for fallible domain operations across Fractal Git kernel subsystems.
 pub type FractalResult<T> = Result<T, FractalError>;
 
 /// Strongly-typed domain error enumeration representing all recoverable failure modes.

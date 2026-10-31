@@ -7,7 +7,7 @@
 //!   - `cat_sort_uniq` idempotent merge algorithm for concurrent multi-agent branches.
 //!
 //! SSOT Domain Governance Rules:
-//! - `FGT-AUD-001`: Cryptographic shadow audit hash-chain and <= 350B budget guard.
+//! - `FGT-AUD-001`: Cryptographic telemetry audit hash-chain and <= 350B budget guard.
 //! - `FGT-COR-001`: Core domain error and model closure.
 //! - `FGT-STO-001`: Crash-safe and tamper-evident storage guarantees.
 
@@ -52,7 +52,7 @@ pub struct AuditTkcvVerdict {
 /// In-kernel canary engine (IKCE) hidden blind-test outcome snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct AuditIkceVerdict {
-    /// Shadow mutation kill ratio (0.0 to 1.0, e.g. 0.95 = 95% killed).
+    /// Canary mutation kill ratio (0.0 to 1.0, e.g. 0.95 = 95% killed).
     pub mut_kill: f32,
     /// Whether round-trip and idempotency invariants held true.
     pub roundtrip: bool,
@@ -105,7 +105,7 @@ pub struct AuditRecord {
     pub sig: String,
 }
 
-/// Parameter object for constructing an unsigned audit record (`SIM-ARGS-001`).
+/// Consolidated parameter object for constructing an unsigned cryptographic audit record.
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnsignedAuditRecordParams {
     /// Unix timestamp in seconds.

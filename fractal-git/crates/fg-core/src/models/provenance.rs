@@ -39,7 +39,7 @@ pub struct BlockProvenanceEntry {
     pub base_commit: Oid,
 }
 
-/// Parameters for constructing a validated block provenance entry (SIM-ARGS-001).
+/// Consolidated parameters for constructing a validated block provenance entry.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockProvenanceParams {
     pub file_path: String,

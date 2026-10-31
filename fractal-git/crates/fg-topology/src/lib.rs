@@ -36,7 +36,7 @@ pub use operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapsh
 pub use project_store::{DiskProjectStore, PROJECTS_CACHE_FILE, PROJECTS_DIR};
 pub use promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use provenance::{DiskProvenanceStore, PROVENANCE_FILE};
-pub use pyramid_folding::{CardMilestoneRecord, PyramidFolder};
+pub use pyramid_folding::{CardMilestoneRecord, HierarchicalRollupFolder, PyramidFolder};
 pub use refs::{DiskRefStore, FractalRef, HeadState};
 pub use state_machine::{FractalWorkspaceNode, WorktreeState};
 pub use submodule::{SubmoduleController, SubmoduleStatus};

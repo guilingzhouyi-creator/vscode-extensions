@@ -11,7 +11,7 @@
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
-//! - `SIM-ARGS-001`: Parameter and payload object convergence
+//! - `FGT-TRN-001`: Transaction boundaries and bounded mutation enforcement
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;

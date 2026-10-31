@@ -3,7 +3,7 @@
 //! Architecture Role: Root foundation crate defining atomic models, global error types,
 //!   and dependency-inversion trait abstractions (OdbStore, RefStore,
 //!   GateVerifier, WorktreeReclaimer).
-//! Dependencies & Triggers: Depended upon by all Taxis micro-crates and CLI binary.
+//! Dependencies & Triggers: Depended upon by all Taxis kernel subsystems and CLI binary.
 //! Responsibilities: Core atomic domain models, zero-panic error classification,
 //!   and trait contracts.
 //! Exit Semantics & Design Rationale: Standardizes fundamental types with

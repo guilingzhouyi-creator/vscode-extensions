@@ -6,7 +6,7 @@
 //! Responsibilities: Encode and decode structured IPC command frames over streaming buffers.
 //! Exit Semantics & Design Rationale: Framing uses 4-byte big-endian length prefix; fails closed on malformed frames.
 //!
-//! Domain Governance Rules: FGT-TRN-001 (transport protocol), FGT-COR-001, PRF-LEAK-001.
+//! Domain Governance Rules: FGT-TRN-001 (transport protocol), FGT-COR-001.
 
 use fg_core::error::FractalResult;
 use fg_core::models::{HumanUacProof, StagedPromotionRequest};

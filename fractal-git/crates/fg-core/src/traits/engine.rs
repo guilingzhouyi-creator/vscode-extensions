@@ -10,7 +10,7 @@
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
-//! - `PRF-LEAK-001`: Explicit symmetric handle disposal contract
+//! - `FGT-POL-001`: Explicit symmetric handle lifecycle and resource bounding contract
 
 use std::path::Path;
 

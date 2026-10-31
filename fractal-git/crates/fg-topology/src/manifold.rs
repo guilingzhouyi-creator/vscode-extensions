@@ -15,8 +15,7 @@
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-TOP-001`: Fractal topology reference guard
-//! - `ADV-PRF-002`: Loop transient allocation detox
-//! - `SIM-ARGS-001`: Parameter object convergence
+//! - `FGT-PRF-001`: Hot-path zero transient heap allocation guard
 
 use fg_core::jeffreys_beta_trials;
 use fg_core::models::{AuditHashChain, AuditRecord, AuthoritySecret};

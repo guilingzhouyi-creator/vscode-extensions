@@ -6,7 +6,7 @@
 /// FGT-ALG-001: Myers diff, 3-way merge, and FastCDC chunking algorithm boundary guard.
 pub const RULE_FGT_ALG_001: &str = "FGT-ALG-001";
 
-/// FGT-AUD-001: Cryptographic shadow audit hash-chain and <= 350B budget guard.
+/// FGT-AUD-001: Cryptographic telemetry audit hash-chain and <= 350B budget guard.
 pub const RULE_FGT_AUD_001: &str = "FGT-AUD-001";
 
 /// FGT-BRG-001: Pre-review zone gate bridge verification guard.
@@ -21,7 +21,7 @@ pub const RULE_FGT_CAS_001: &str = "FGT-CAS-001";
 /// FGT-COR-001: Core data model and error contract guard.
 pub const RULE_FGT_COR_001: &str = "FGT-COR-001";
 
-/// FGT-DEP-001: Micro-crate DAG single-direction dependency guard.
+/// FGT-DEP-001: Subsystem DAG single-direction dependency guard.
 pub const RULE_FGT_DEP_001: &str = "FGT-DEP-001";
 
 /// FGT-ERR-001: Zero unwrap and expect panic guard.
@@ -51,7 +51,7 @@ pub const RULE_FGT_POL_001: &str = "FGT-POL-001";
 /// FGT-PRF-001: Zero transient heap allocation guard in hot loops.
 pub const RULE_FGT_PRF_001: &str = "FGT-PRF-001";
 
-/// FGT-PYR-001: Four-tier pyramid audit folding Merkle integrity guard.
+/// FGT-PYR-001: Four-tier hierarchical audit rollup Merkle integrity guard.
 pub const RULE_FGT_PYR_001: &str = "FGT-PYR-001";
 
 /// FGT-QRN-001: Pre-Review Zone quarantine isolation and Bayesian credit circuit-breaker guard.

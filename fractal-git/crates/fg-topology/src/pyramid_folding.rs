@@ -1,6 +1,6 @@
-//! Module: fg-topology — Pyramid Folding Ledger & SubAgent Increment Compressor
+//! Module: fg-topology — Hierarchical Rollup Ledger & SubAgent Increment Compressor
 //! File Path: crates/fg-topology/src/pyramid_folding.rs
-//! Architecture Role: Implements the hierarchical pyramid folding mechanism (Level 1 SubAgent -> Level 2 Card).
+//! Architecture Role: Implements the hierarchical rollup mechanism (Level 1 SubAgent -> Level 2 Card).
 //!   Compresses high-frequency micro-audit records emitted by ephemeral SubAgents into a compact,
 //!   tamper-evident Card Milestone record without losing cryptographic chain provenance.
 //!
@@ -16,10 +16,9 @@
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
-//! - `FGT-PYR-001`: Four-tier pyramid audit folding and milestone compression guard
+//! - `FGT-PYR-001`: Hierarchical audit folding and milestone compression guard
 //! - `FGT-TOP-001`: Fractal topology reference guard
-//! - `ADV-PRF-002`: Loop transient allocation detox
-//! - `SIM-ARGS-001`: Parameter object convergence
+//! - `FGT-PRF-001`: Hot-path zero transient heap allocation guard
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::jeffreys_beta_trials;
@@ -49,21 +48,24 @@ impl CardMilestoneRecord {
     }
 }
 
-/// Pyramid folding engine compressing multi-agent micro-records into milestones.
+/// Hierarchical rollup engine compressing multi-agent micro-records into milestones.
 #[derive(Debug, Default)]
-pub struct PyramidFolder;
+pub struct HierarchicalRollupFolder;
 
-impl PyramidFolder {
-    /// Creates a new `PyramidFolder` instance.
+/// Backward-compatible alias for [`HierarchicalRollupFolder`].
+pub type PyramidFolder = HierarchicalRollupFolder;
+
+impl HierarchicalRollupFolder {
+    /// Creates a new `HierarchicalRollupFolder` instance.
     pub fn new() -> Self {
         Self
     }
 
-    /// Folds a slice of `AuditRecord`s into a single consolidated `CardMilestoneRecord`.
+    /// Rolls up a slice of `AuditRecord`s into a single consolidated `CardMilestoneRecord`.
     ///
     /// # Errors
-    /// Returns [`FractalError::EmptySet`] if `records` is empty.
-    pub fn fold_records(
+    /// Returns [`FractalError::PolicyViolation`] if `records` is empty.
+    pub fn rollup_records(
         &self,
         records: &[AuditRecord],
         card_id: &str,
@@ -156,6 +158,16 @@ impl PyramidFolder {
             total_mutants_evaluated: total_mutants,
             total_mutants_killed: killed_mutants,
         })
+    }
+
+    /// Backward-compatible alias for [`Self::rollup_records`].
+    pub fn fold_records(
+        &self,
+        records: &[AuditRecord],
+        card_id: &str,
+        secret: &AuthoritySecret,
+    ) -> FractalResult<CardMilestoneRecord> {
+        self.rollup_records(records, card_id, secret)
     }
 }
 
