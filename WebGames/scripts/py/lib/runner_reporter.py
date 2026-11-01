@@ -257,8 +257,64 @@ def render_console_summary(summary: PipelineExecutionSummary) -> int:
     return 0
 
 
+def _read_latest_refactor_score(reports_dir: Path) -> float | None:
+    """读取 auto-refactor-latest.json 中的真实静态/三平面综合得分，缺失时返回 None（禁止伪造兜底分）。"""
+    refactor_report_path = reports_dir / "auto-refactor-latest.json"
+    if not refactor_report_path.exists():
+        return None
+    try:
+        payload = json.loads(refactor_report_path.read_text(encoding="utf-8"))
+        tri_score = (payload.get("triPlaneQuality") or {}).get("totalScore")
+        if isinstance(tri_score, (int, float)):
+            return round(float(tri_score), 2)
+        qs_score = (payload.get("qualityScore") or {}).get("compositeScore")
+        if isinstance(qs_score, (int, float)):
+            return round(float(qs_score), 2)
+    except (OSError, ValueError, TypeError):
+        return None
+    return None
+
+
+def persist_audit_latest_report(summary: PipelineExecutionSummary) -> None:
+    """持久化 WebGames/reports/audit-latest.json 统一门禁快照供全仓聚合器读取。"""
+    webgames_root = Path(__file__).resolve().parents[3]
+    reports_dir = webgames_root / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    fail_count = sum(1 for r in summary.results if r.returncode != 0)
+    pass_count = len(summary.results) - fail_count
+    warn_count = sum(1 for r in summary.results if r.returncode == 0 and bool(warning_slice(r.stderr)))
+    is_pass = bool(summary.all_passed and not summary.registry_issues and fail_count == 0)
+    payload = {
+        "schema": "webgames-audit-report/v1",
+        "project": "WebGames",
+        "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "status": "PASS" if is_pass else "BLOCK",
+        "summary": {
+            "checks": len(summary.results),
+            "byStatus": {
+                "PASS": pass_count,
+                "BLOCK": fail_count,
+            },
+            "bySeverity": {
+                "error": fail_count + len(summary.registry_issues),
+                "warning": warn_count,
+            },
+            "compositeScore": _read_latest_refactor_score(reports_dir),
+        },
+        "wallElapsedSec": round(summary.wall_elapsed, 3),
+        "registryIssues": list(summary.registry_issues),
+    }
+    latest_path = reports_dir / "audit-latest.json"
+    latest_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
 def finalize_audit_outputs(args: argparse.Namespace, summary: PipelineExecutionSummary) -> int:
-    """统一输出 SARIF、JSON 报告或终端汇总面板。"""
+    """统一输出 SARIF、JSON 报告或终端汇总面板，并写入 reports/audit-latest.json。"""
+    persist_audit_latest_report(summary)
     if args.sarif_out or args.format == "sarif":
         export_sarif_report(args, summary)
     if args.format == "json":

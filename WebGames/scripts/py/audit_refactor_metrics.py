@@ -43,6 +43,7 @@ AUTO_REFACTOR_DIR = WORKSPACE_ROOT / "auto-refactor"
 AUTO_REFACTOR_CLI = AUTO_REFACTOR_DIR / "dist" / "index.js"
 
 LINE_WIDTH = 80
+DETAILED_SCORE_THRESHOLD = 95
 BORDER_HORIZ = "─"
 MINUS_CHAR = "-"
 ARG_ENGINE_ARG = "--engine-arg"
@@ -66,6 +67,7 @@ class RefactorAuditOptions:
     maturity_tier: str = ""
     security_level: str = ""
     classify_literals: bool = False
+    cli_path: str = ""
 
 
 @dataclass(slots=True)
@@ -197,7 +199,7 @@ def _render_quality_score_card(qs: dict[str, Any], show_detailed: bool = False) 
         "techDebtRisk": "技术债务收敛 (Tech Debt Risk)",
     }
 
-    if show_detailed or composite < LINE_WIDTH:
+    if show_detailed or composite < DETAILED_SCORE_THRESHOLD:
         print("  ┌" + BORDER_HORIZ * 46 + "┬" + BORDER_HORIZ * 28 + "┐")
         print("  │ 评估维度                                     │ 指标得分                   │")
         print("  ├" + BORDER_HORIZ * 46 + "┼" + BORDER_HORIZ * 28 + "┤")
@@ -266,10 +268,12 @@ def _build_refactor_cmd(
     if opts.classify_literals:
         print("【提示】--classify-literals 由项目配置 classifyLiterals 承载（引擎 CLI 无此开关），本次按配置执行。")
 
+    cli_target = Path(opts.cli_path).resolve() if opts.cli_path else AUTO_REFACTOR_CLI
+    engine_dir = cli_target.parent.parent if opts.cli_path else AUTO_REFACTOR_DIR
     cmd = [
         ctx.node_bin,
         str(ctx.runner),
-        "--engine", str(AUTO_REFACTOR_DIR),
+        "--engine", str(engine_dir),
         "--root", str(ctx.target_root),
         "--format", ctx.cli_format,
         "--out", str(ctx.report_path),
@@ -334,6 +338,8 @@ def _partition_issues(issues: list[dict[str, Any]]) -> tuple[dict[str, list[dict
     by_an: dict[str, list[dict[str, Any]]] = {}
     dups: list[dict[str, Any]] = []
     for it in issues:
+        if it.get("clusteredInto") or it.get("suppression"):
+            continue
         an = it.get("analyzer", "")
         if an:
             by_an.setdefault(an, []).append(it)
@@ -378,18 +384,20 @@ def _render_audit_console_report(report: dict[str, Any], opts: RefactorAuditOpti
     return 0
 
 
-def _resolve_audit_runtime() -> tuple[str, Path] | None:
-    """验证并定位 Node.js 运行时及通用 runner 路径。"""
+def _resolve_audit_runtime(opts: RefactorAuditOptions | None = None) -> tuple[str, Path] | None:
+    """验证并定位 Node.js 运行时及通用 runner 路径（缺失即 fail-closed 阻断）。"""
     node_bin = find_node_executable()
     if not node_bin:
-        print("【提示】未检测到 Node.js 运行时环境，自动安全跳过 auto-refactor 分析（优雅降级）。")
+        print("【ERROR】未检测到 Node.js 运行时环境，auto-refactor 门禁阻断（fail-closed）。")
         return None
-    if not AUTO_REFACTOR_CLI.exists():
-        print(f"【提示】auto-refactor 尚未编译构建 ({AUTO_REFACTOR_CLI} 不存在)，自动跳过分析。")
+    cli_target = Path(opts.cli_path).resolve() if (opts and opts.cli_path) else AUTO_REFACTOR_CLI
+    if not cli_target.exists():
+        print(f"【ERROR】auto-refactor CLI 入口不存在 ({cli_target})，门禁阻断（fail-closed）。")
         return None
-    runner = AUTO_REFACTOR_DIR / "templates" / "consumer" / "run.mjs"
+    engine_dir = cli_target.parent.parent if (opts and opts.cli_path) else AUTO_REFACTOR_DIR
+    runner = engine_dir / "templates" / "consumer" / "run.mjs"
     if not runner.exists():
-        print(f"【提示】引擎未提供通用 runner ({runner})，自动跳过分析。")
+        print(f"【ERROR】引擎未提供通用 runner ({runner})，门禁阻断（fail-closed）。")
         return None
     return node_bin, runner
 
@@ -407,8 +415,8 @@ def _execute_refactor_process(cmd: list[str]) -> tuple[int, str, str]:
         )
         return r.returncode, r.stdout, r.stderr
     except Exception as exc:
-        print(f"【WARN】调用 auto-refactor 执行异常: {exc}，安全降级跳过。")
-        return 0, "", ""
+        print(f"【ERROR】调用 auto-refactor 执行异常: {exc}，审查阻断（fail-closed）。")
+        return 2, "", str(exc)
 
 
 def _parse_report_payload(raw_output: str, stderr: str) -> dict[str, Any] | None:
@@ -454,7 +462,31 @@ def _read_temp_report(report_path: Path) -> str | None:
 
 
 def _dispatch_audit_output(report: dict[str, Any], opts: RefactorAuditOptions) -> int:
-    """派发审查报告输出或控制台卡片。"""
+    """派发审查报告输出或控制台卡片，并持久化最新质量快照供工作区门禁读取。"""
+    try:
+        latest_dir = ROOT / "reports"
+        latest_dir.mkdir(parents=True, exist_ok=True)
+        latest_path = latest_dir / "auto-refactor-latest.json"
+        latest_path.write_text(
+            json.dumps(
+                {
+                    "tool": report.get("tool", "auto-refactor"),
+                    "version": report.get("version", ""),
+                    "generatedAt": report.get("createdAt", ""),
+                    "summary": report.get("summary", {}),
+                    "qualityScore": report.get("qualityScore", {}),
+                    "triPlaneQuality": report.get("triPlaneQuality", {}),
+                    "governance": report.get("governance"),
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+    except OSError:
+        pass
     if opts.json_output:
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
@@ -469,9 +501,9 @@ def run_refactor_audit(opts: RefactorAuditOptions | None = None, **kwargs: Any) 
     print(f"🔭 卡拉尔世界引擎：auto-refactor {mode_tag}")
     print("=" * LINE_WIDTH)
 
-    runtime = _resolve_audit_runtime()
+    runtime = _resolve_audit_runtime(active_opts)
     if not runtime:
-        return 0
+        return 1
     node_bin, runner = runtime
 
     target_root = _resolve_target_root(active_opts.slice_name)
@@ -485,8 +517,8 @@ def run_refactor_audit(opts: RefactorAuditOptions | None = None, **kwargs: Any) 
 
     ret_code, _stdout, stderr = _execute_refactor_process(cmd)
     if ret_code not in (0, 1):
-        print(f"【WARN】auto-refactor 返回非零码 {ret_code}: {stderr.strip()[:200]}，安全降级跳过。")
-        return 0
+        print(f"【ERROR】auto-refactor 返回非零崩溃码 {ret_code}: {stderr.strip()[:200]}，审查阻断（fail-closed）。")
+        return 1
 
     raw_output = _read_temp_report(report_path)
     if raw_output is None:
@@ -522,6 +554,7 @@ def main() -> int:
     ap.add_argument("--update-baseline", type=str, default="", help="更新基线文件路径")
     ap.add_argument("--analyzers", type=str, default="", help="透传 auto-refactor 分析器子集（逗号分隔）")
     ap.add_argument("--config", type=str, default="", help="透传 auto-refactor 配置文件路径")
+    ap.add_argument("--cli-path", type=str, default="", help="覆盖 auto-refactor CLI 入口路径")
     ap.add_argument(
         "--maturity-tier",
         type=str,
@@ -557,6 +590,7 @@ def main() -> int:
         maturity_tier=args.maturity_tier,
         security_level=args.security_level,
         classify_literals=args.classify_literals,
+        cli_path=args.cli_path,
     )
     return run_refactor_audit(opts)
 

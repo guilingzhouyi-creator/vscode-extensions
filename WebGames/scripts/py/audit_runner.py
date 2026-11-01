@@ -168,7 +168,7 @@ AUDIT_TASKS: list[AuditTask] = [
         task_id="refactor_metrics",
         name="auto-refactor 静态复杂度与重构建议",
         script_name="audit_refactor_metrics.py",
-        default_args=[],
+        default_args=["--strict"],
         scopes={"gd", "config"},
     ),
     AuditTask(

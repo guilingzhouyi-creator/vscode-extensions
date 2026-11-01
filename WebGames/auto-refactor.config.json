@@ -34,7 +34,7 @@
     },
     "governance": {
       "enabled": true,
-      "options": { "maxNestingDepth": 5, "maxInheritanceDepth": 2 }
+      "options": { "maxNestingDepth": 4, "maxInheritanceDepth": 2 }
     },
     "architecture": {
       "enabled": true,
@@ -86,6 +86,10 @@
         "godotTargetVersion": "4.x"
       }
     },
+    "gdscript-game": {
+      "enabled": true,
+      "severity": "warning"
+    },
     "dependency-graph": {
       "enabled": true,
       "options": {
@@ -111,7 +115,11 @@
       }
     },
     "comments": {
-      "enabled": false
+      "enabled": true,
+      "severity": "warning",
+      "options": {
+        "requireHeader": false
+      }
     }
   }
 }
