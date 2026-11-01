@@ -861,10 +861,6 @@ function main() {
   console.log(MSG_USAGE);
 }
 
-  // Default: if invoked without parameters, print usage
-  console.log(MSG_USAGE);
-}
-
 if (require.main === module) {
   main();
 }
