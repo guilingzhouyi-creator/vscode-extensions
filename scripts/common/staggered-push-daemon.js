@@ -26,12 +26,16 @@ const {
   hasPushedToday,
   getUtcDateString,
   getLocalDateString,
+  getStaggeredPushStatus,
 } = require('./staggered-push-orchestrator');
 
 // Timing constants (Objective UTC standard: 13:30 UTC = 21:30 CST / 05:30 PST / 06:30 PDT)
 const TARGET_UTC_HOUR = 13;
 const TARGET_UTC_MINUTE = 30;
 const POLL_INTERVAL_MS = 30000; // 30 seconds
+const FAILURE_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes backoff cooldown on failure
+
+let lastFailureEpoch = 0;
 
 /**
  * Checks whether the current time falls within or after the daily scheduled trigger window (in UTC).
@@ -62,20 +66,29 @@ function checkAndRunTick() {
     return null;
   }
 
+  // Failure backoff protection: avoid rapid spin if offline or proxy is temporarily down
+  if (lastFailureEpoch > 0 && Date.now() - lastFailureEpoch < FAILURE_COOLDOWN_MS) {
+    return null;
+  }
+
   console.log(`[${now.toISOString()}] Target window active (13:30+ UTC / 21:30 CST), executing staggered push...`);
   const outcome = executeStaggeredPush();
 
   if (outcome.status === 'PASS') {
+    lastFailureEpoch = 0;
     console.log(`✔ [STAGGERED-PUSH] ${outcome.summary}`);
     if (outcome.commits && outcome.commits.length > 0) {
       outcome.commits.forEach((c) => console.log(`   - ${c}`));
     }
   } else if (outcome.status === 'SKIP') {
+    lastFailureEpoch = 0;
     console.log(`⚡ [SKIP] ${outcome.summary}`);
   } else if (outcome.status === 'IDLE') {
+    lastFailureEpoch = 0;
     console.log(`✔ [IDLE] ${outcome.summary}`);
   } else {
-    console.error(`✖ [BLOCK] ${outcome.summary}`);
+    lastFailureEpoch = Date.now();
+    console.error(`✖ [BLOCK] ${outcome.summary} (cooling down 5m before retry)`);
   }
 
   return outcome;
@@ -108,6 +121,24 @@ function startDaemon() {
 }
 
 if (require.main === module) {
+  const args = process.argv.slice(2);
+  if (args.includes('--status') || args.includes('-s')) {
+    if (typeof getStaggeredPushStatus === 'function') {
+      const statusObj = getStaggeredPushStatus();
+      if (args.includes('--json')) {
+        process.stdout.write(JSON.stringify(statusObj, null, 2) + '\n');
+      } else {
+        console.log('=== Staggered Push Daemon Objective Status ===');
+        console.log(`Current Time (UTC): ${statusObj.currentTimeUtc}`);
+        console.log(`Today Date (UTC):   ${statusObj.todayUtcDate}`);
+        console.log(`Target Window:      ${statusObj.targetUtcWindow}`);
+        console.log(`Window Active:      ${statusObj.isWindowActive ? 'YES (Window Open)' : 'NO (Waiting)'}`);
+        console.log(`Pushed Today (UTC): ${statusObj.hasPushedToday ? 'YES (Completed)' : 'NO (Pending)'}`);
+        console.log(`Backlog Commits:    ${statusObj.backlogCount >= 0 ? statusObj.backlogCount : 'Unknown'}`);
+      }
+    }
+    process.exit(0);
+  }
   startDaemon();
 }
 
@@ -119,4 +150,5 @@ module.exports = {
   TARGET_UTC_HOUR,
   TARGET_UTC_MINUTE,
   POLL_INTERVAL_MS,
+  FAILURE_COOLDOWN_MS,
 };
