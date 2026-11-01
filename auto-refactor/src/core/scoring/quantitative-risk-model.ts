@@ -15,7 +15,7 @@
  *   to CC <= 12, Depth <= 3, and execution time <= 3ms.
  */
 
-/** Standard baseline score for excess return calculations (and safety floor). */
+/** Standard fallback baseline score when historical sampling is unavailable. */
 export const RISK_BASELINE_SCORE = 90.0;
 
 /** Default sliding window size for historical quality risk analysis. */
@@ -246,15 +246,42 @@ function resolvePrincipalAndDragMinutes(input: FinancialDebtInput): { totalMinut
 }
 
 /**
- * Evaluates coverage ratio (ICR/RCR) and status based on yield and accrual.
+ * Computes dynamic baseline support floor from continuous historical samples.
+ * Uses 5th percentile (95% confidence support floor Q0.05) as objective empirical
+ * support level, aligned with VaR-95 without hardcoded expectation values.
+ *
+ * @param samples - Array of historical composite scores.
+ * @returns Empirically estimated baseline support score.
+ */
+export function computeEmpiricalBaseline(samples: readonly number[]): number {
+    if (samples.length === 0) return 0.0;
+    if (samples.length < MIN_RISK_SAMPLE_SIZE) {
+        const sum = samples.reduce((acc, v) => acc + v, 0);
+        return roundTwoDecimals(sum / samples.length);
+    }
+    const sorted = samples.slice().sort((a, b) => a - b);
+    const rank = 0.05 * (sorted.length - 1);
+    const lowerIndex = Math.floor(rank);
+    const upperIndex = Math.ceil(rank);
+    const weight = rank - lowerIndex;
+    const quantileVal = sorted[lowerIndex] + weight * (sorted[upperIndex] - sorted[lowerIndex]);
+    return roundTwoDecimals(quantileVal);
+}
+
+/**
+ * Evaluates coverage ratio (ICR/RCR) and status based on yield, accrual, and ongoing friction drag.
  */
 function evaluateCoverageRatioAndStatus(
     safeYield: number,
     safeAccrual: number,
+    dragMinutes = 0,
 ): { icr: number; status: FinancialDebtMetrics['status'] } {
     if (safeAccrual <= 0) {
         if (safeYield > 0) {
-            return { icr: RATIO_SATURATION_CEILING, status: STATUS_DE_LEVERAGING };
+            // When accrual is zero, evaluate yield against continuous friction drag from existing debt stock
+            const effectiveDrag = Math.max(1.0, dragMinutes);
+            const icr = roundTwoDecimals(safeYield / effectiveDrag);
+            return { icr, status: STATUS_DE_LEVERAGING };
         }
         return { icr: 1.0, status: STATUS_BALANCED };
     }
@@ -312,7 +339,7 @@ export function computeFinancialDebtLedger(input: FinancialDebtInput): Financial
 
     const safeYield = Math.max(0, typeof yieldMin === 'number' ? yieldMin : 0);
     const safeAccrual = Math.max(0, typeof accrualMin === 'number' ? accrualMin : 0);
-    const { icr, status } = evaluateCoverageRatioAndStatus(safeYield, safeAccrual);
+    const { icr, status } = evaluateCoverageRatioAndStatus(safeYield, safeAccrual, dragMinutes);
 
     const finalIcr = Math.min(RATIO_SATURATION_CEILING, icr);
     const clearanceStatus = resolveClearanceStatus(status);
@@ -422,21 +449,23 @@ export function computeQualityRiskRatios(input: QualityRiskInput): QualityRiskMe
         };
     }
 
-    const baseline = input.baselineScore ?? RISK_BASELINE_SCORE;
+    const baseline = typeof input.baselineScore === 'number' && Number.isFinite(input.baselineScore)
+        ? input.baselineScore
+        : computeEmpiricalBaseline(samples);
     const meanScore = samples.reduce((acc, v) => acc + v, 0) / samples.length;
     const { stdDev, downsideDev } = computeScoreDeviations(samples, meanScore, baseline);
 
     const excessScore = meanScore - baseline;
     let qsr: number;
     if (stdDev < EPSILON_FLOAT) {
-        qsr = excessScore >= 0 ? RATIO_SATURATION_CEILING : 0.0;
+        qsr = excessScore > 0 ? roundTwoDecimals(excessScore / 0.05) : 0.0;
     } else {
         qsr = Math.min(RATIO_SATURATION_CEILING, Math.max(0.0, excessScore / stdDev));
     }
 
     let sortino: number;
     if (downsideDev < EPSILON_FLOAT) {
-        sortino = excessScore >= 0 ? RATIO_SATURATION_CEILING : 0.0;
+        sortino = excessScore > 0 ? roundTwoDecimals(excessScore / 0.05) : 0.0;
     } else {
         sortino = Math.min(RATIO_SATURATION_CEILING, Math.max(0.0, excessScore / downsideDev));
     }

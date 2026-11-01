@@ -5,6 +5,7 @@ import {
     computeDebtInequality,
     computeStochasticDynamics,
     evaluateQuantitativeRiskModel,
+    computeEmpiricalBaseline,
     RISK_BASELINE_SCORE,
     RATIO_SATURATION_CEILING,
 } from '../../../src/core/scoring/quantitative-risk-model';
@@ -63,15 +64,29 @@ describe('Quantitative Risk Model Engine', () => {
             expect(result.status).toBe('insolvent');
         });
 
-        it('should handle zero debt accrual with positive refactoring yield gracefully', () => {
+        it('should evaluate continuous debt clearance against drag when debt accrual is zero', () => {
             const result = computeFinancialDebtLedger({
                 totalRemediationMinutes: 300,
                 refactoringYieldMinutes: 60,
                 debtAccrualMinutes: 0,
             });
 
-            expect(result.interestCoverageRatio).toBe(RATIO_SATURATION_CEILING);
+            // 60 min yield / (300 * 0.08 = 24 min drag) = 2.5x coverage
+            expect(result.interestCoverageRatio).toBe(2.5);
             expect(result.status).toBe('de-leveraging');
+        });
+    });
+
+    describe('computeEmpiricalBaseline', () => {
+        it('should derive 5th percentile empirical support level from sample trajectory', () => {
+            const samples = [92.0, 95.0, 93.0, 96.0, 94.0, 97.0];
+            // sorted: [92, 93, 94, 95, 96, 97], rank = 0.05 * 5 = 0.25 -> 92 + 0.25 * 1 = 92.25
+            expect(computeEmpiricalBaseline(samples)).toBe(92.25);
+        });
+
+        it('should fallback to mean for short sample lists', () => {
+            expect(computeEmpiricalBaseline([90.0, 94.0])).toBe(92.0);
+            expect(computeEmpiricalBaseline([])).toBe(0.0);
         });
     });
 
@@ -87,7 +102,7 @@ describe('Quantitative Risk Model Engine', () => {
             expect(result.meanScore).toBe(95.17);
         });
 
-        it('should saturate QSR and Sortino when variance is zero for scores >= baseline', () => {
+        it('should handle flat scores with zero excess over dynamic empirical baseline', () => {
             const result = computeQualityRiskRatios({
                 historyScores: [98.0, 98.0, 98.0, 98.0, 98.0, 98.0],
             });
@@ -96,13 +111,24 @@ describe('Quantitative Risk Model Engine', () => {
             expect(result.meanScore).toBe(98.0);
             expect(result.standardDeviation).toBe(0.0);
             expect(result.downsideDeviation).toBe(0.0);
-            expect(result.qsr).toBe(RATIO_SATURATION_CEILING);
-            expect(result.sortino).toBe(RATIO_SATURATION_CEILING);
+            expect(result.qsr).toBe(0.0);
+            expect(result.sortino).toBe(0.0);
             expect(result.mdd).toBe(0.0);
         });
 
-        it('should compute valid Sharpe and Sortino ratios for fluctuating series', () => {
-            // Scores oscillating above baseline 90
+        it('should compute valid Sharpe and Sortino ratios for fluctuating series with empirical baseline', () => {
+            const history = [92.0, 95.0, 93.0, 96.0, 94.0, 97.0];
+            const result = computeQualityRiskRatios({
+                historyScores: history,
+            });
+
+            expect(result.isSampleSufficient).toBe(true);
+            expect(result.meanScore).toBe(94.5);
+            expect(result.standardDeviation).toBeGreaterThan(0);
+            expect(result.qsr).toBeGreaterThan(0.5);
+        });
+
+        it('should evaluate regularized Sortino when explicit baseline is provided without downside breaches', () => {
             const history = [92.0, 95.0, 93.0, 96.0, 94.0, 97.0];
             const result = computeQualityRiskRatios({
                 historyScores: history,
@@ -112,9 +138,9 @@ describe('Quantitative Risk Model Engine', () => {
             expect(result.isSampleSufficient).toBe(true);
             expect(result.meanScore).toBe(94.5);
             expect(result.standardDeviation).toBeGreaterThan(0);
-            // Since all scores >= 90, downside deviation should be 0, so Sortino saturates
             expect(result.downsideDeviation).toBe(0.0);
-            expect(result.sortino).toBe(RATIO_SATURATION_CEILING);
+            // excessScore = 4.5, downsideDev = 0 -> regularized to 4.5 / 0.05 = 90.0
+            expect(result.sortino).toBe(90.0);
             expect(result.qsr).toBeGreaterThan(2.0);
         });
 
