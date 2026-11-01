@@ -34,7 +34,7 @@ flowchart TD
     POOL["src/core/worker-pool.ts (并行解析线程池)"]
   end
 
-  subgraph L3["L3. 四层规则金字塔与内置分析器矩阵 (Rule Pyramid & 32 Analyzers)"]
+  subgraph L3["L3. 四层规则分层体系与内置分析器矩阵 (Rule Hierarchy & 32 Analyzers)"]
     REG["src/core/rules/registry.ts (375 条单一真源规则注册表)"]
     STAGES["src/core/router/sparseRuleRouter.ts (4 阶执行阶段: Stage 0~3)"]
     ANALYZERS["src/analyzers/*.ts (32 个内置分析器模块)"]
@@ -49,7 +49,7 @@ flowchart TD
   subgraph L1["L1. Rust N-API 原生加速算子层 (Rust Cargo Workspace + Dual-Track Shim)"]
     CRATES["crates/* (auto-refactor-core / ops-diff / ops-graph / ops-pattern / ops-mask / ops-clone)"]
     BRIDGE["src/core/native/native-bridge.ts (动态探测 + 自适应微尺寸门限分流)"]
-    SHIM["src/core/native/*-shim.ts (100% 字节等价纯 JS 回退桥)"]
+    SHIM["src/core/native/*-shim.ts (双端字节等价纯 JS 回退桥)"]
   end
 
   L6 --> L5
@@ -62,7 +62,7 @@ flowchart TD
 
 ### 1.1 六层拓扑职责分工公理
 
-- **L1 原生算子层**：基于 Rust 2021 Edition 构建的 6 Crate 工作区，通过 N-API (`crates/auto-refactor-core/`) 暴露底层高性能差分、支配树、数据流求解、词法脱敏与克隆检测算子；同时在 TypeScript 侧提供 100% 字节等价的纯 JS Shim，保证任何环境零编译即可运行。
+- **L1 原生算子层**：基于 Rust 2021 Edition 构建的 6 Crate 工作区，通过 N-API (`crates/auto-refactor-core/`) 暴露底层高性能差分、支配树、数据流求解、词法脱敏与克隆检测算子；同时在 TypeScript 侧提供双端字节等价的纯 JS Shim，保证任何环境零编译即可运行。
 - **L2 语义拓扑层**：屏蔽 TypeScript、JavaScript、Python、Rust、Go、Shell、GDScript 等语言的具体 AST 差异，构建统一的 `NormalizedNode` 语法树与跨模块语义拓扑图（`SemanticGraph`）。
 - **L3 规则分析层**：维护由单一真源注册表（`src/core/rules/registry.ts`）严格看守的 375 条内置规则（360 条规范命名规则 + 15 条历史兼容别名规则，全工作区 SSOT 单源收录 516 条）与 32 个内置分析器，划分为 4 个离散执行阶段。
 - **L4 调度路由层**：集成 Cedar 稀疏混合专家门控（Sparse MoE Router）、双轨并发管道（`DualTrackPipeline`）与负载总督（`LoadGovernor`），以 `< 15ms` 极速返回前台推测性结论，并在后台异步执行全图闭包分析与资源熔断保护。
@@ -87,7 +87,7 @@ flowchart TD
 系统内所有可触发规则均由 [`src/core/rules/registry.ts`](../../src/core/rules/registry.ts) 统一管理：
 - **375 条注册规则**：包含 360 条规范命名规则（如 `CONST-LAY-001`、`GOV-SLC-001`、`GOV-AGN-001`、`HYG-DED-001`）与 15 条向后兼容的历史别名规则（如 `import-cycle`、`clean-layer-violation`）。
 - **30 个标准规则族系**：由 `CANONICAL_TOPIC_CATALOG` 建立映射，确保无规则名称漂移（Zero Rule Drift）。
-- **门禁严格约束**：通过 `node scripts/validate-rules-registry.js` 门禁断言文档、分析器工厂与注册表 100% 覆盖对齐。
+- **门禁严格约束**：通过 `node scripts/validate-rules-registry.js` 门禁断言文档、分析器工厂与注册表完全覆盖对齐。
 
 ---
 
@@ -229,7 +229,7 @@ export interface SliceFeatureVector {
    - 内存压力优先级高于 CPU 压力；
    - 立即将后台并发度强制收缩为 1（`maxDeepConcurrency = 1`）；
    - 将协同让渡间隔缩短为最高频的 5ms（`MEMORY_PRESSURE_YIELD_INTERVAL_MS = 5`）；
-   - 设置 `throttleDeepTrack = true`，主动牺牲深轨吞吐换取宿主进程生存，从物理机制上彻底消除 Node 进程 OOM 崩溃。
+   - 设置 `throttleDeepTrack = true`，主动牺牲深轨吞吐换取宿主进程生存，从物理机制上有效防范 Node 进程 OOM 异常。
 
 ---
 

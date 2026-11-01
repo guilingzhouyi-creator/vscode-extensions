@@ -1,17 +1,17 @@
-# 01. 四层规则金字塔、32 个内置分析器与 375 条全量规则字典 (360 规范 + 15 历史别名)
+# 01. 四层规则分层架构、32 个内置分析器与 375 条全量规则字典 (360 规范 + 15 历史别名)
 
 > **所属层级**：L4 规则引擎与内置分析器 (`docs/04-analyzers-and-rules/`)  
 > **对应代码真源**：`src/core/rules/registry.ts`、`src/core/rules/entries/*.ts`、`src/core/analyzer-registry.ts`、`src/analyzers/*.ts`
 
 ---
 
-## 1. 四层规则金字塔与双轨文案架构
+## 1. 四层规则分层架构与双轨文案架构
 
 `auto-refactor` 将全部 **375 条内置规则**（含 **360 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（375/375）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **516 条全仓 SSOT 活跃规则**。
 
-### 1.1 四层规则金字塔拓扑
+### 1.1 四层规则分层拓扑
 
-| 金字塔层级 | 规则数量 | 包含规则族前缀 | 核心守护边界 |
+| 分层层级 | 规则数量 | 包含规则族前缀 | 核心守护边界 |
 | :--- | :---: | :--- | :--- |
 | **Layer 1：全域安全与卫生底线** | 69 条 | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、代码物理卫生、注释质量 (ECD-C) 与文档结构完整性 |
 | **Layer 2：语言族现代化与标准库** | 112 条 | `TSM` / `MOD` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
@@ -20,7 +20,7 @@
 
 ### 1.2 双轨文案分层契约（Dual-Track Wording Architecture）
 
-- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，516 条全仓 SSOT）的唯一真源底座。
+- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为规范英文标准（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，516 条全仓 SSOT）的唯一真源底座。
 - **人读/呈现轨（Human & Presentation Track）**：由 **Praxis 表现层**（`src/core/praxis/presentation/`）与 `PraxisI18nProvider` 独占承载，采用模块化领域分包双语字典（`zh-cn/` 与 `en/`），面向人类工程师与 IDE 富文本诊断卡片（`PraxisDiagnosticCard`）提供完整、专业、细粒度的人机可读本地化转译与交互式修复指引。
 
 ### 1.3 标准 3-3-3 命名拓扑公理、权威三字母映射与三阶双轨别名等价网络
@@ -41,7 +41,7 @@
 #### 1.3.2 权威三字母映射机制（CANONICAL_3LETTER_GLOSSARY）
 当前规则库处于现代化规范演进阶段，存量规则中尚存部分因历史演进保留的非 3 字母主题码（例如 `ARGS`、`FLAT`、`DISP`、`RECURSION`、`DATETIME`、`ONREADY` 等）。为保障分类学平滑收敛，引擎建立了以下刚性机制：
 1. **单一真源映射词典**：`src/core/rules/topic-catalog.ts` 声明并冻结包含 104+ 项（注册 107 项）的 `CANONICAL_3LETTER_GLOSSARY`，为全部存量非标主题码预先分配确切的 3 字母权威映射（如 `FLAT -> FLT`、`DISP -> DSP`、`RECURSION -> REC`、`DATETIME -> DTT`、`ONREADY -> RDY`、`CONNECT -> CNT`、`WRAP -> WRP`、`CAST -> CST`、`ELSE -> ELS`、`FIND -> FND`、`LOCK -> LCK` 等）；
-2. **门禁 100% 覆盖率断言**：门禁脚本 `scripts/validate-rules-registry.js` 新增 `validateTopicGlossaryCoverage()` 校验环节，通过纯函数 `auditNonStandardTopicCoverage(RULE_REGISTRY)` 强制断言：所有已注册的 canonical 规则中长度 != 3 的主题码，必须在 `CANONICAL_3LETTER_GLOSSARY` 中保持 100% 完备映射（`missingGlossaryEntries === []`），杜绝任何未经收敛规划的非标主题逃逸入库；
+2. **门禁覆盖率断言**：门禁脚本 `scripts/validate-rules-registry.js` 新增 `validateTopicGlossaryCoverage()` 校验环节，通过纯函数 `auditNonStandardTopicCoverage(RULE_REGISTRY)` 强制断言：所有已注册的 canonical 规则中长度 != 3 的主题码，必须在 `CANONICAL_3LETTER_GLOSSARY` 中保持完备映射（`missingGlossaryEntries === []`），杜绝任何未经收敛规划的非标主题逃逸入库；
 3. **单源投影工具**：提供 `toCanonicalRuleId()` 与 `normalizeTopicCode()` 纯函数，确保多源输入与历史 ID 能够单向确定性投影为规范三字母形态。
 
 #### 1.3.3 三阶双轨别名等价网络（areAliasForms）

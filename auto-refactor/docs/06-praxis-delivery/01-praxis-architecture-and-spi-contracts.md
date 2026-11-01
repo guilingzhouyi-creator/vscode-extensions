@@ -160,4 +160,4 @@ flowchart LR
 - [03. Praxis 团队联调操作手册与交付验收矩阵](./03-praxis-integration-runbook-and-acceptance.md)
 - [04. Praxis-LayerVFS 瞬时工作区对接手册与联调规范](./04-praxis-layervfs-integration-guide.md)
 - [06. LayerVFS 虚拟分叉与 MCTS 探索树架构规范](../01-architecture/06-layervfs-virtual-storage-and-mcts.md)
-- [PRAXIS_HANDOFF_REPORT.md](../PRAXIS_HANDOFF_REPORT.md)
+- [praxis-integration-guide.md](../praxis-integration-guide.md)

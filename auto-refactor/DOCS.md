@@ -11,9 +11,9 @@
 
 | 技术栈层次 | 核心模块与物理路径 | 关键技术构件与真实规模指标 |
 | :--- | :--- | :--- |
-| **L1. Rust N-API 原生加速内核** | `crates/auto-refactor-core`<br/>`crates/ops-{diff,graph,pattern,mask,clone,math,vector,scope}`<br/>`src/core/native/` | **Cargo 工作区十个成员 Crate**：线性空间 Myers 差分与字内并行距离、Tarjan SCC 与迭代式支配树、单趟词法脱敏状态机、MinHash+LSH 克隆检测、最稀有字节预筛多模式扫描、统计矩与向量几何、作用域遮蔽检测；配齐 `src/core/native/` 纯 TS 100% 字节等价回退桥 |
+| **L1. Rust N-API 原生加速内核** | `crates/auto-refactor-core`<br/>`crates/ops-{diff,graph,pattern,mask,clone,math,vector,scope}`<br/>`src/core/native/` | **Cargo 工作区十个成员 Crate**：线性空间 Myers 差分与字内并行距离、Tarjan SCC 与迭代式支配树、单趟词法脱敏状态机、MinHash+LSH 克隆检测、最稀有字节预筛多模式扫描、统计矩与向量几何、作用域遮蔽检测；配齐 `src/core/native/` 纯 TS 双端字节等价回退桥 |
 | **L2. 跨语言解析与语义图底座** | `src/core/ast/`<br/>`src/core/semantic/`<br/>`src/core/cfg/` | **`NormalizedNode` + `SemanticGraph`**：支持 **TS/JS** (`oxc-parser` 0.144.0 + `typescript` 5.3)、**Python** (`tree-sitter-python`)、**Rust** (`tree-sitter-rust`)、**Go**、**GDScript 4**、**Shell**、**YAML**、**Markdown** 八大生态；按需投影 CFG / DFG / CallGraph |
-| **L3. 四层规则分层体系与分析器** | `src/core/rules/registry.ts`<br/>`src/analyzers/*.ts`<br/>`src/core/messages/` | <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器包（完整覆盖包括 `ANALYZER_GO_MODERN`、`ANALYZER_SHELL_LINT`、`ANALYZER_GATE_ARCHITECTURE` 在内的领域专家）、<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->注册规则（<!-- METRICS:BEGIN rule-auto-refactor-canonical -->**360 条**<!-- METRICS:END rule-auto-refactor-canonical --> Canonical `FAMILY-TOPIC-NNN` + <!-- METRICS:BEGIN rule-auto-refactor-legacy -->**15 条**<!-- METRICS:END rule-auto-refactor-legacy --> Legacy Aliases，文档覆盖率 100%（<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->全部有定义行）；全工作区 SSOT 单源目录统一收录 <!-- METRICS:BEGIN rule-total -->**516 条规则**<!-- METRICS:END rule-total -->）；机读纯英文（SARIF 2.1.0 / CAPP）+ 人读标准中文双轨文案解耦 |
+| **L3. 四层规则分层体系与分析器** | `src/core/rules/registry.ts`<br/>`src/analyzers/*.ts`<br/>`src/core/messages/` | <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器包（完整覆盖包括 `ANALYZER_GO_MODERN`、`ANALYZER_SHELL_LINT`、`ANALYZER_GATE_ARCHITECTURE` 在内的领域专家）、<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->注册规则（<!-- METRICS:BEGIN rule-auto-refactor-canonical -->**360 条**<!-- METRICS:END rule-auto-refactor-canonical --> Canonical `FAMILY-TOPIC-NNN` + <!-- METRICS:BEGIN rule-auto-refactor-legacy -->**15 条**<!-- METRICS:END rule-auto-refactor-legacy --> Legacy Aliases，文档覆盖率保持双向闭环（<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->全部有定义行）；全工作区 SSOT 单源目录统一收录 <!-- METRICS:BEGIN rule-total -->**516 条规则**<!-- METRICS:END rule-total -->）；机读纯英文（SARIF 2.1.0 / CAPP）+ 人读标准中文双轨文案解耦 |
 | **L4. 稀疏路由与双轨并发调度** | `src/core/router/sparseMoEGate.ts`<br/>`src/core/pipeline/dualTrackPipeline.ts`<br/>`src/core/scheduler/` | **27 专家 Sparse MoE 变更熵密（CED）路由器**（增量分析器绕过率 $\ge 70\%$）、`< 10ms` `ASTSliceExtractor` 局部切片快轨 + 全仓跨文件深轨、L1/L2 两级缓存与跨平台 NDJSON Daemon |
 | **L5. 三平面质量度量与自治度** | `src/core/scoring/`<br/>`src/core/dynamic/`<br/>`src/core/evolution/` | **静态平面**（10 大支柱 + 倒数型密度饱和曲线 + 算术/几何混合短板惩罚）+ **动态遥测平面** (`DynamicEvidenceDTO` + `RiskFusionEngine`) + **演化反馈平面**（Git 挖掘 + 梯度下降调权 + 代码自治度指数 **CAI**） |
 | **L6. Praxis 交付与 LayerVFS 体系** | `src/core/praxis/`<br/>`src/core/praxis/vfs/`<br/>`src/core/ring-buffer.ts`<br/>`src/core/rollback.ts` | **LayerVFS 虚拟分叉与零拷贝沙箱**：FastCDC 动态切块 + SQLite WAL CAS 去重存储（Fork `< 3ms`，Rollback `< 1ms`）、沙箱受控物理投影（零阻塞 I/O，超时 124 退出码）、MCTS 重构探索锦标赛（UCT 剪枝 + 圈复杂度增量评估）；**6 大正式治理门面** + **统一客户端 SDK (`PraxisReviewClient`)** |
@@ -30,7 +30,7 @@
 | [docs/01-architecture/02-pipeline-and-caching.md](./docs/01-architecture/02-pipeline-and-caching.md) | L1/L2 两级增量缓存、`TopologyCache`、`CacheKey` 指纹隔离与 `scanAsymmetric` | ✅ 已对齐 |
 | [docs/01-architecture/03-daemon-and-ipc.md](./docs/01-architecture/03-daemon-and-ipc.md) | 跨平台守护进程（Named Pipe / UDS）、NDJSON 协议、RSS 自愈与冷扫描无损降级 | ✅ 已对齐 |
 | [docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md](./docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md) | Praxis 分形 Git 工作树、LayerVFS 虚拟分支、`L1/L2/L3A` 三级门禁与级联回滚 | ✅ 已对齐 |
-| [docs/01-architecture/05-rust-native-operator-kernel.md](./docs/01-architecture/05-rust-native-operator-kernel.md) | Rust 6 Crate 原生算子库（`ops-diff/graph/pattern/mask/clone`）与纯 TS Shim 100% 字节等价规范 | ✅ 已对齐 |
+| [docs/01-architecture/05-rust-native-operator-kernel.md](./docs/01-architecture/05-rust-native-operator-kernel.md) | Rust 6 Crate 原生算子库（`ops-diff/graph/pattern/mask/clone`）与纯 TS Shim 双轨字节等价规范 | ✅ 已对齐 |
 | [docs/01-architecture/06-layervfs-virtual-storage-and-mcts.md](./docs/01-architecture/06-layervfs-virtual-storage-and-mcts.md) | LayerVFS 虚拟分叉、FastCDC 动态切块、SQLite WAL CAS 存储、沙箱受控物理投影与 MCTS 重构锦标赛 | ✅ 已对齐 |
 
 ### 🌲 第二层：跨语言解析、语义 IR 与图分析底座 (`docs/02-parsers-and-ast/`)
@@ -38,7 +38,7 @@
 | 文档路径 | 核心主题 | 状态 |
 | :--- | :--- | :---: |
 | [docs/02-parsers-and-ast/01-multilang-abstraction.md](./docs/02-parsers-and-ast/01-multilang-abstraction.md) | `NormalizedNode` 统一语法树、`SemanticGraph` 跨语言语义 IR 与八语言适配矩阵 | ✅ 已对齐 |
-| [docs/02-parsers-and-ast/02-oxc-fastpath.md](./docs/02-parsers-and-ast/02-oxc-fastpath.md) | Rust `oxc-parser` Mode A 零物化流式快轨、Mode B 物化补偿与 100% 字节等价验证 | ✅ 已对齐 |
+| [docs/02-parsers-and-ast/02-oxc-fastpath.md](./docs/02-parsers-and-ast/02-oxc-fastpath.md) | Rust `oxc-parser` Mode A 零物化流式快轨、Mode B 物化补偿与双轨字节等价验证 | ✅ 已对齐 |
 | [docs/02-parsers-and-ast/03-lazy-projection.md](./docs/02-parsers-and-ast/03-lazy-projection.md) | 零物化懒投影控制流图 (`CFG`)、支配树、数据流图 (`DFG`) 与跨文件调用图 (`CallGraph`) | ✅ 已对齐 |
 
 ### ⚡ 第三层：行级增量计算、向量化 Diff 与流式底座 (`docs/03-incremental-and-diff/`)
@@ -64,15 +64,16 @@
 | [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 六大核心算子基准性能台账、热路径消融评测与 <!-- METRICS:BEGIN test-suite-count -->**190 套**<!-- METRICS:END test-suite-count -->测试套件防劣化回归护栏 | ✅ 已对齐 |
 | [docs/05-specs-and-benchmarks/03-comment-and-header-standard.md](./docs/05-specs-and-benchmarks/03-comment-and-header-standard.md) | 六字段模块文件头契约、有效注释密度 (ECD-C) 算法与 `gate:comments` 棘轮 | ✅ 已对齐 |
 | [docs/05-specs-and-benchmarks/04-cross-language-generalization.md](./docs/05-specs-and-benchmarks/04-cross-language-generalization.md) | 项目中立性护栏 (`validate-project-neutrality`) 与文件语义角色推导 (`file-role-inference.ts`) | ✅ 已对齐 |
-| [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | `baseline.json` 1.2.0 信用消耗语义、单向棘轮与兄弟工程 (`workspace-timing` / `WebGames`) 接入 | ✅ 已对齐 |
+| [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | 外部工程接入指南 —— `baseline.json` 1.2.0 信用模型、自适应弹性债务限额、AAS 协议与 `fractal-git` / `workspace-timing` / `WebGames` 接入规范 | ✅ 已对齐 |
 | [docs/05-specs-and-benchmarks/06-modernization-program.md](./docs/05-specs-and-benchmarks/06-modernization-program.md) | 五大语言现代化规则包 (`*-modern`)、常量单源拓扑治理与结构债 ABC 分类治理法 | ✅ 已对齐 |
 | [docs/05-specs-and-benchmarks/07-quantified-quality-standard.md](./docs/05-specs-and-benchmarks/07-quantified-quality-standard.md) | 三平面质量量化模型（静态十大支柱 + 动态遥测 + 演化反馈）与代码自治度指数 (`CAI`) | ✅ 已对齐 |
+| [docs/05-specs-and-benchmarks/08-compact-agent-schema.md](./docs/05-specs-and-benchmarks/08-compact-agent-schema.md) | AAS v1.0 智能体原生审查契约 —— 文件聚合、L1~L5 架构依赖拓扑排序、高密度代码锚点切片与 5D 黎曼流形相空间张量 | ✅ 已对齐 |
 
 ### 🤝 第六层：对接 Praxis 团队交付文档专层 (`docs/06-praxis-delivery/`)
 
 | 文档路径 | 核心主题 | 状态 |
 | :--- | :--- | :---: |
-| [docs/PRAXIS_HANDOFF_REPORT.md](./docs/PRAXIS_HANDOFF_REPORT.md) | **Praxis 团队对接交付总报告（Executive Handoff Report）** | ✅ 已交付 |
+| [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | **外部工程与工作区子系统审查接入总指南**（AAS v1.0 协议、自适应弹性债务预算与多工程接入契约） | ✅ 已交付 |
 | [docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md](./docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md) | Praxis 对接架构全景、核心数据契约（`PraxisCardContext` / `ReviewDiffHunk`）与核心 SPI 扩展插槽手册 | ✅ 已交付 |
 | [docs/06-praxis-delivery/02-praxis-six-governance-services-api.md](./docs/06-praxis-delivery/02-praxis-six-governance-services-api.md) | Praxis 治理服务门面、工作区管理器与统一客户端 SDK (`PraxisReviewClient`) API 手册 | ✅ 已交付 |
 | [docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md](./docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | Praxis 团队端到端 TypeScript 联调代码范例、异常降级 SLA 与 <!-- METRICS:BEGIN test-suite-count -->**190 套**<!-- METRICS:END test-suite-count -->自动化验收矩阵 | ✅ 已交付 |

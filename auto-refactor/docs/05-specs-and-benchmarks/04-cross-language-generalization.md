@@ -83,7 +83,7 @@ flowchart TD
 
 | 规则类别 | 守护层级 | 目标语义载体 | 规则示例 | 跨语言泛化特征 |
 | :--- | :--- | :--- | :--- | :--- |
-| **通用架构与拓扑规则** | Layer 1 / Layer 3 | `SemanticGraph`、`DependencyGraph`、`ControlFlowGraph` | `ARCH-LAY-001` (分层防腐)、`DEP-CYC-002` (依赖成环)、`ARCH-DIR-001` (核心逆流)、`GOV-AGN-001` (多 Agent 协作防冲突) | **100% 跨语言中立**：无论工程由 TS、Python 还是 Rust 编写，领域层禁止反向依赖基础设施层的架构契约完全同构。 |
+| **通用架构与拓扑规则** | Layer 1 / Layer 3 | `SemanticGraph`、`DependencyGraph`、`ControlFlowGraph` | `ARCH-LAY-001` (分层防腐)、`DEP-CYC-002` (依赖成环)、`ARCH-DIR-001` (核心逆流)、`GOV-AGN-001` (多 Agent 协作防冲突) | **跨语言中立**：无论工程由 TS、Python 还是 Rust 编写，领域层禁止反向依赖基础设施层的架构契约完全同构。 |
 | **语言专属现代化规则** | Layer 2 | 语言特定的 AST 语法节点 (`NormalizedNode`) | `TSM-NULLISH-001` (`??` 替代)、`PYM-PATH-001` (`pathlib` 现代化)、`RSM-LOCK-001` (跨 await 锁死锁防御)、`GOM-CTX-001` (Goroutine Context 管控) | **深度绑定语言惯用法**：仅在对应语言文件激活，针对该语言的新版本语法特性与安全陷阱进行深度重构。 |
 
 > [!NOTE]
@@ -107,7 +107,7 @@ flowchart TD
 
 ## 5. 关联文档导航
 
-- [01. 四层规则金字塔、32 个内置分析器与 375 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
+- [01. 四层规则分层架构、32 个内置分析器与 375 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
 - [02. 自定义分析器插件与语义模式扩展规范](../04-analyzers-and-rules/02-custom-analyzer-plugin.md)
 - [06. 多语言现代化规则包与常量单源治理](./06-modernization-program.md)
 - [07. 三平面质量量化模型与代码自治度 (CAI) 规范](./07-quantified-quality-standard.md)

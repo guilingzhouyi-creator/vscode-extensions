@@ -14,7 +14,7 @@ flowchart TD
     subgraph S["1. 静态质量平面 (Static Plane - S)"]
         D10["10 大细粒度质量维度 (QualityDimension)"] --> P8["8 大战略支柱 (PrimaryQualityPillar)"]
         P8 --> HYP["双曲饱和衰减模型 (Reciprocal Hyperbolic Saturation)"]
-        HYP --> CEIL["安全暴露面动态天花板 & 致命支柱硬顶"]
+        HYP --> CEIL["安全暴露面动态上限 & 致命支柱硬顶"]
         CEIL --> GEO["加权几何平均综合评分 (Floor = 15)"]
     end
 
@@ -59,7 +59,7 @@ flowchart TD
 
 ---
 
-## 3. 静态评分数学内核：衰减、天花板与几何平均
+## 3. 静态评分数学内核：衰减、上限约束与几何平均
 
 ### 3.1 双曲饱和衰减模型 (Hyperbolic Saturation Decay)
 
@@ -73,16 +73,16 @@ $$\text{density} = \frac{\text{rawPoints}}{\text{effectiveScale}}, \qquad \text{
   - 当违规密度恰好达到半饱和点（$\text{density} = 30$）时，$\text{Score} = 50.0$；
   - 当负债密度趋向于无穷大时，得分单调渐近趋于 $0$，严格维持单调序，绝不提前死锁在 0 分。
 
-### 3.2 安全暴露面动态天花板与致命支柱硬顶 (Ceilings)
+### 3.2 安全暴露面动态上限与致命支柱硬顶 (Ceilings)
 
-1. **安全暴露面动态天花板 (`computeSecurityCeiling`)**：
+1. **安全暴露面动态上限 (`computeSecurityCeiling`)**：
    干净代码的安全上限绝非盲目给满 100 分，而是根据 API 攻击暴露面动态测定：
    $$\text{expTerm} = 0.6 \cdot \min\left(1.0, \frac{\text{expSymbols}}{30}\right), \quad \text{locTerm} = 0.4 \cdot \min\left(1.0, \frac{\text{lines}}{500}\right)$$
    $$\text{discount} = 0.5 \cdot (\text{expTerm} + \text{locTerm}), \quad \text{securityCeiling} = 100.0 - \text{discount} \in [99.50, 100.00]$$
-   安全得分在天花板基础上直接扣减违规：$\text{Score}_{\text{security}} = \max(0, \text{securityCeiling} - \text{rawPoints})$。
+   安全得分在动态上限基础上直接扣减违规：$\text{Score}_{\text{security}} = \max(0, \text{securityCeiling} - \text{rawPoints})$。
 
 2. **致命支柱硬顶约束 (`PillarCeilingConstraint`)**：
-   当出现不可宽恕的架构硬伤时，强制对所在支柱施加最高分上限，彻底杜绝被海量水代码稀释：
+   当出现严重架构缺陷时，强制对所在支柱施加最高分上限，杜绝低质代码稀释：
    - **架构致命违规**（如跨层逆向穿透）：$\text{MaxScore}_{\text{architecture}} \le 40$；
    - **性能致命违规**（如超高复杂度死循环）：$\text{MaxScore}_{\text{performance}} \le 45$；
    - **安全致命违规**（如高危明文密钥泄露）：$\text{MaxScore}_{\text{security}} \le 30$。
@@ -148,7 +148,7 @@ $$\text{CAI} = \sum_{k=1}^6 w_k R_k \in [0.0, 100.0]$$
 
 | 自治等级 | 得分阈值 | 行业定性与架构特征 |
 | :--- | :---: | :--- |
-| **`L5_INDEPENDENT`** | $\ge 95.0$ | **完全自主研发**：核心算法与领域模型 100% 自研，极度轻量且精准的外部依赖 |
+| **`L5_INDEPENDENT`** | $\ge 95.0$ | **完全自主研发**：核心算法与领域模型自研率高，极度轻量且精准的外部依赖 |
 | **`L4_HIGH_AUTONOMY`** | $\ge 85.0$ | **高自主度**：核心业务内核自主实现，规范集成标准开源生态 |
 | **`L3_BALANCED`** | $\ge 70.0$ | **均衡依赖**：核心业务自研，与主流框架和云平台中度深度绑定 |
 | **`L2_FRAMEWORK_DEPENDENT`** | $\ge 50.0$ | **框架依赖型**：实质性业务逻辑作为第三方 SDK 胶水代码存在 |
@@ -198,7 +198,7 @@ $$\mu = \frac{\alpha}{\alpha + \beta}, \qquad r = \frac{N}{N + N_0}, \qquad \tex
 
 1. **零观测即中性**：$N = 0 \Rightarrow r = 0 \Rightarrow \text{Calibrated} = \text{Raw}$。引入校准不是全局静默改分。
 2. **小样本不得夺权**：$N = 2 \Rightarrow r \approx 0.17$，后验无法压过分析器自评；$N \ge N_0$ 才置 `isReliable = true`。
-3. **无证据不得乐观**：`Actionable` 档在零观测时落在 $\text{CONFIDENCE\_ACTIONABLE\_FLOOR} = 0.90$，而非旧实现假设的 $0.95$ 天花板。「没有证据」与「近乎确定」被彻底分开。
+3. **无证据不得乐观**：`Actionable` 档在零观测时落在 $\text{CONFIDENCE\_ACTIONABLE\_FLOOR} = 0.90$，而非旧实现假设的 $0.95$ 上限。「没有证据」与「高度确定」被明确区隔。
 
 ### 6.3 可裁决分层的三档与严重性底线
 
@@ -230,7 +230,7 @@ $$\text{ECE} = \sum_{b=1}^{B} \frac{|S_b|}{|S|} \left| \text{acc}(S_b) - \text{c
 | **严重度** | `summary.bySeverity` | 这条 finding 有多吵 |
 | **裁决** | `summary.arbitration` / AAS `usability` | 这条 finding 能不能直接用 |
 
-`summary.arbitration` 记录三档计数、`blockingCount`、`gateVerdict`、`uncalibratedCount`、`reviewQueueCount`（人工必读）、`advisoryOnlyRules`、`ruleTiers`（逐规则最强档）。AAS 报告头部输出 `usability ∈ {proven, patchable, advisory, uncalibrated, needsHuman}`，逐缺陷携带 `tier` 与 `conf`；未裁决时**整块省略**而非输出零值，否则与「什么都没扫到」不可区分。
+`summary.arbitration` 记录三档计数、`blockingCount`、`gateVerdict`、`uncalibratedCount`、`reviewQueueCount`（人工必读）、`advisoryOnlyRules`、`ruleTiers`（逐规则最高档）。AAS 报告头部输出 `usability ∈ {proven, patchable, advisory, uncalibrated, needsHuman}`，逐缺陷携带 `tier` 与 `conf`；未裁决时**整块省略**而非输出零值，否则与「什么都没扫到」不可区分。
 
 **退出码只由严重度决定**，不读裁决。两个问题有不同的失败代价：「这条有多吵」的答案错了会漏掉真缺陷，「这条能不能直接用」的答案错了只是多花一次人工复核。用推断出来的档位去收窄门禁，等于让一个可能过度匹配的分层器替操作者决定是否放行——而操作者已经有显式、可审计的撤权通道（`quarantined` / `canary` / `deprecated`），由 `enforceSeverityFloor` 强制执行。因此 `advisoryOnlyRules` 是**报告元数据**，供上层消费者读取，不参与退出码计算。
 

@@ -1,8 +1,10 @@
 # Praxis 团队对接交付总报告 (Executive Handoff Report)
 
-> **交付版本**：`auto-refactor` v0.4.0  
-> **交付状态**：全栈已落地并通过 <!-- METRICS:BEGIN test-suite-count -->**190 套**<!-- METRICS:END test-suite-count -->自动化门禁与回归套件全量验证  
-> **历史文档归档位置**：[`archive/auto-refactor/docs-snapshot-20261018/`](../../archive/auto-refactor/docs-snapshot-20261018/)、[`archive/auto-refactor/docs-snapshot-20261010/`](../../archive/auto-refactor/docs-snapshot-20261010/) 与 [`archive/auto-refactor/docs-snapshot-20260928/`](../../archive/auto-refactor/docs-snapshot-20260928/)
+> 档号: AUTOREF-ARCHIVE-202610-PRAXIS-HANDOFF  
+> 验收状态: PASS / LOCKED  
+> 归档时间: 2026-11-01  
+> 密级: 内部技术档案（只读存证，历史里程碑交付留痕）  
+> 说明: 本文件为 2026-10-18 针对 Praxis 团队阶段性成果交付的总结报告。当前系统的跨工程与智能体对接总指南已升级收口至 `auto-refactor/docs/05-specs-and-benchmarks/05-consumer-integration.md`。
 
 ---
 

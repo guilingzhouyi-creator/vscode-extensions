@@ -18,7 +18,7 @@
 | **`go-modern`** | `GOM-*` | 5 条 | 拦截未纳管 Goroutine 泄漏（强制 `context.Context`），循环变量捕获闭包陷阱修复，错误包装链 (`%w`) 与 `time.Duration` 安全 |
 | **`frontend`** | `UI-*` | 8 条 | 表现层工程现代化：淘汰废弃框架生命周期钩子，消除跨层业务单例侵入，规范组件响应式订阅与解绑 |
 | **`stdlib`** | `STDLIB-*` | 6 条 | 现代标准库手写轮子替换：原生 `Array.prototype.flat/flatMap`、`Object.entries`、`Promise.allSettled` 代替第三方低效垫片 |
-| **`simplify`** | `SIM-*` | 13 条 | 控制流简化：前置卫语句拍平金字塔嵌套 (`SIM-GUARD-001`, `SIM-FLAT-002`)，单行三元折叠 (`SIM-TRN-001`)，参数聚合对象提炼 |
+| **`simplify`** | `SIM-*` | 13 条 | 控制流简化：前置卫语句拍平深度嵌套 (`SIM-GUARD-001`, `SIM-FLAT-002`)，单行三元折叠 (`SIM-TRN-001`)，参数聚合对象提炼 |
 | **`complexity`** | `CPX-*` | 13 条 | 分支收敛与认知复杂度度量：函数认知复杂度上限控制，嵌套循环/深层 switch 查表化，多返回值收口与异常统一传播 |
 
 ---
@@ -96,13 +96,13 @@ flowchart TD
 - **B 类（本质密集算法内核）**：
   如 Myers 差分、Histogram 求解、Tarjan 强连通分量 $\rightarrow$ **保持算法内聚并在 JSDoc 题头明确标注数学不变量与时间复杂度**，严禁强行拆碎。
 - **C 类（深层嵌套业务缠绕）**：
-  缺少卫语句导致多层缩进金字塔 $\rightarrow$ **使用 Guard Clauses 提前返回拍平控制流，并按正交职责提取纯函数**。
+  缺少卫语句导致多层深度缩进 $\rightarrow$ **使用 Guard Clauses 提前返回拍平控制流，并按正交职责提取纯函数**。
 
 ---
 
 ## 5. 关联文档导航
 
-- [01. 四层规则金字塔、32 个内置分析器与 375 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
+- [01. 四层规则分层架构、32 个内置分析器与 375 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
 - [02. 自定义分析器插件与语义模式扩展规范](../04-analyzers-and-rules/02-custom-analyzer-plugin.md)
 - [04. 跨语言泛化审查与项目中立性规范](./04-cross-language-generalization.md)
 - [07. 三平面质量量化模型与代码自治度 (CAI) 规范](./07-quantified-quality-standard.md)

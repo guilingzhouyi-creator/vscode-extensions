@@ -137,7 +137,7 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
   ): Promise<PraxisDiffGovernanceResult> {
     // 1. 动态将变更源码提取至 SemanticGraph
     // 2. 依次运行五大专项审查：
-    //    - Layer 1 金字塔静态规则
+    //    - Layer 1 基础静态规则
     //    - PerformanceAudit 性能审查
     //    - DataArchAudit 数据架构审查
     //    - TestModernityAudit 测试现代化审查

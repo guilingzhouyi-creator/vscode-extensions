@@ -28,7 +28,7 @@ $$\text{FinalConfig} = \text{BuiltInDefaults} \;\triangleleft\; \text{ConfigFile
 | `failOnIssue` | `boolean` | `false` | 当存在未抑制的 `error` 级发现时返回退出码 `1` |
 | `failOnSeverity` | `'info' \| 'warning' \| 'error'` | `'error'` | 广义门禁阻断阈值（仅统计未被 `suppressions` 命中的有效发现） |
 | `commentLevel` | `'off' \| 'basic' \| 'standard' \| 'strict'` | `'standard'` | 四档注释与文件头审计等级（`standard` 强制六字段模块头与 ECD-C） |
-| `securityLevel` | `'off' \| 'basic' \| 'full'` | `'basic'` | 安全与密钥扫描深度档位（`off` 时彻底禁用 `security` 与 `secrets`） |
+| `securityLevel` | `'off' \| 'basic' \| 'full'` | `'basic'` | 安全与密钥扫描深度档位（`off` 时禁用 `security` 与 `secrets`） |
 | `autoTuneScale` | `boolean` | `true` | 是否根据项目代码规模自适应缩放弹性阈值 ([`scaleTuner.ts`](../../src/core/profiler/scaleTuner.ts)) |
 | `classifyLiterals` | `boolean` | `true` | 启用语义字面量分类（自动豁免分隔符、编码格式名、HTTP 动词等良性字面量） |
 | `thresholds` | `ThresholdsConfig` | 见下表 | 圈复杂度、物理行数、有效代码行、重复字面量与魔法数阈值 |

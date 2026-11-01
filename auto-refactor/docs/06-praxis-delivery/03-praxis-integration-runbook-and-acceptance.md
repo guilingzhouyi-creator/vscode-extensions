@@ -139,4 +139,4 @@ Praxis 交付以 <!-- METRICS:BEGIN test-suite-count -->**190 套**<!-- METRICS:
 - [02. Praxis 核心治理服务与开发者 SDK 门面手册](./02-praxis-six-governance-services-api.md)
 - [04. Praxis-LayerVFS 瞬时工作区对接手册与联调规范](./04-praxis-layervfs-integration-guide.md)
 - [06. LayerVFS 虚拟分叉与 MCTS 探索树架构规范](../01-architecture/06-layervfs-virtual-storage-and-mcts.md)
-- [PRAXIS_HANDOFF_REPORT.md](../PRAXIS_HANDOFF_REPORT.md)
+- [praxis-integration-guide.md](../praxis-integration-guide.md)
