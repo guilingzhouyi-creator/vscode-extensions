@@ -71,13 +71,16 @@ function isPythonLiteralNode(kind: NodeKind, sitterNode: TreeSitterNode): boolea
     );
 }
 
-function resolvePythonNodeName(
-    sitterNode: TreeSitterNode,
-    kind: NodeKind,
-    fnLike: boolean,
-    isClassDefining: boolean,
-    isBinding: boolean,
-): string | undefined {
+interface PythonNodeNameOptions {
+    sitterNode: TreeSitterNode;
+    kind: NodeKind;
+    fnLike: boolean;
+    isClassDefining: boolean;
+    isBinding: boolean;
+}
+
+function resolvePythonNodeName(options: PythonNodeNameOptions): string | undefined {
+    const { sitterNode, kind, fnLike, isClassDefining, isBinding } = options;
     if (sitterNode.type === 'call') return callNameOf(sitterNode) ?? undefined;
     const shouldName =
         fnLike ||
@@ -140,13 +143,13 @@ function extractPythonParameters(sitterNode: TreeSitterNode): string[] | undefin
         sitterNode.namedChildren?.find((childNode) => childNode.type === 'parameters');
     if (!resolvedParamsNode) return undefined;
 
-    const result: string[] = [];
+    const extractedParams: string[] = [];
     const children = resolvedParamsNode.namedChildren || [];
     for (let i = 0; i < children.length; i++) {
         const paramName = extractSinglePythonParam(children[i]);
-        if (paramName) result.push(paramName);
+        if (paramName) extractedParams.push(paramName);
     }
-    return result;
+    return extractedParams;
 }
 
 /**
@@ -190,7 +193,7 @@ export class PythonAdapter extends BaseAstAdapter {
         const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
         const isClassDefining = kind === NodeKind.Class;
         const isBinding = introducesBinding(sitterNode);
-        const name = resolvePythonNodeName(sitterNode, kind, fnLike, isClassDefining, isBinding);
+        const name = resolvePythonNodeName({ sitterNode, kind, fnLike, isClassDefining, isBinding });
 
         const node: NormalizedNode = {
             kind,

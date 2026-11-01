@@ -155,7 +155,7 @@ function resolveScoreVector(
     return new Array<number>(SCORE_VECTOR_LENGTH).fill(fallbackScore);
 }
 
-function createInitialStability(record: CompactTrajectoryRecord): WeeklyStabilityMetrics {
+function buildInitialStability(record: CompactTrajectoryRecord): WeeklyStabilityMetrics {
     const isZeroReg = record.debt.reg === 0;
     const isPassing = record.gate.pass;
     const chg = record.eloc.chg;
@@ -177,7 +177,7 @@ function createInitialStability(record: CompactTrajectoryRecord): WeeklyStabilit
     };
 }
 
-function createInitialVerification(
+function buildInitialVerification(
     vrf?: CompactVerificationTelemetry,
 ): WeeklyVerificationSummary | undefined {
     if (!vrf) return undefined;
@@ -194,7 +194,7 @@ function createInitialVerification(
     };
 }
 
-function createInitialManifold(
+function buildInitialManifold(
     vrf?: CompactVerificationTelemetry,
 ): WeeklyManifoldSummary | undefined {
     if (!vrf || (vrf.dm === undefined && vrf.tau === undefined)) return undefined;
@@ -209,7 +209,7 @@ function createInitialManifold(
 /**
  * Constructs cumulative lifetime summary from initial record.
  */
-function createInitialLifetimeSummary(record: CompactTrajectoryRecord): WeeklyTrajectorySummary {
+function buildInitialLifetimeSummary(record: CompactTrajectoryRecord): WeeklyTrajectorySummary {
     const netDebt = record.debt.res - record.debt.add;
     const semanticKilo =
         record.eloc.sem > 0
@@ -220,9 +220,9 @@ function createInitialLifetimeSummary(record: CompactTrajectoryRecord): WeeklyTr
     const densityYield = Math.round((netDebt / baseKilo) * 100) / 100;
     const kMean = Math.round(record.score.qed * 1000 * 10000) / 10000;
 
-    const stability = createInitialStability(record);
-    const verification = createInitialVerification(record.vrf);
-    const manifold = createInitialManifold(record.vrf);
+    const stability = buildInitialStability(record);
+    const verification = buildInitialVerification(record.vrf);
+    const manifold = buildInitialManifold(record.vrf);
 
     return {
         weekId: 'LIFETIME',
@@ -327,15 +327,21 @@ function updateLifetimeSummary(
 }
 
 /**
+ * Options for deriving four-tier orthogonal ELOC counters.
+ */
+export interface ElocCounterDerivationOptions {
+    processedEloc: number;
+    uniqueIncrement: number;
+    isFirstBaseline: boolean;
+    existingLifetime: WeeklyTrajectorySummary | null;
+    diffCounters?: Partial<ElocCounters>;
+}
+
+/**
  * Resolves four-tier orthogonal ELOC counters.
  */
-function deriveElocCounters(
-    processedEloc: number,
-    uniqueIncrement: number,
-    isFirstBaseline: boolean,
-    existingLifetime: WeeklyTrajectorySummary | null,
-    diffCounters?: Partial<ElocCounters>,
-): ElocCounters {
+function deriveElocCounters(options: ElocCounterDerivationOptions): ElocCounters {
+    const { processedEloc, uniqueIncrement, isFirstBaseline, existingLifetime, diffCounters } = options;
     let uniqueCount = uniqueIncrement;
     if (!isFirstBaseline && existingLifetime) {
         uniqueCount = Math.max(existingLifetime.eloc.uniqueTotal, uniqueIncrement);
@@ -362,12 +368,12 @@ function deriveElocCounters(
  */
 function deriveDebtDelta(options: AuditRunOptions) {
     const add = options.addedDebtPoints || 0;
-    const res = options.resolvedDebtPoints || 0;
+    const resolvedDebt = options.resolvedDebtPoints || 0;
     const reg = options.regressionFindingsCount || 0;
     return {
         addedDebtPoints: add,
-        resolvedDebtPoints: res,
-        netDebtCleared: res - add,
+        resolvedDebtPoints: resolvedDebt,
+        netDebtCleared: resolvedDebt - add,
         regressionFindingsCount: reg,
         regressionFindingIds: [] as string[],
     };
@@ -425,13 +431,13 @@ export class TrajectoryAccumulator {
         );
 
         // 2. Derive Four-tier Orthogonal Counters
-        const counters = deriveElocCounters(
+        const counters = deriveElocCounters({
             processedEloc,
             uniqueIncrement,
             isFirstBaseline,
             existingLifetime,
-            options.diffCounters,
-        );
+            diffCounters: options.diffCounters,
+        });
 
         // 3. Compute Quality Efficiency & Technical Debt Delta
         const scoreVector = resolveScoreVector(options.scoreVector, options.afterScore);
@@ -472,7 +478,7 @@ export class TrajectoryAccumulator {
         // 6. Update Lifetime Trajectory Summary
         const updatedLifetime = existingLifetime
             ? updateLifetimeSummary(existingLifetime, record)
-            : createInitialLifetimeSummary(record);
+            : buildInitialLifetimeSummary(record);
 
         await writeLifetimeSummary(targetLedgerDir, updatedLifetime);
 

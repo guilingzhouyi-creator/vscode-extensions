@@ -23,7 +23,7 @@ import { GuidanceMessages } from '../messages';
 import type {
     AgentTopologyLayer,
     AgentImmutableConstraints,
-    AgentCodeDensityConstraintSpec,
+    AgentDensityConstraintSpec,
     AgentVerificationDirective,
     AgentClarificationRequest,
 } from '../reporters/agent-directives-types';
@@ -772,7 +772,7 @@ function buildContractRulesList(flags: {
     preservesPurity: boolean;
     immutableStateSnapshot: boolean;
     noExternalSideEffects: boolean;
-    densitySpec?: AgentCodeDensityConstraintSpec;
+    densitySpec?: AgentDensityConstraintSpec;
 }): string[] {
     const density = flags.densitySpec;
     const elocLimit = density ? density.maxEloc : 900;
@@ -828,7 +828,7 @@ export function generateImmutableConstraints(
     const noExternalSideEffects =
         layer === LAYER_L1_CONTRACT || layer === LAYER_L2_OPERATOR || layer === LAYER_L5_GOVERNANCE;
 
-    let densitySpec: AgentCodeDensityConstraintSpec | undefined = undefined;
+    let densitySpec: AgentDensityConstraintSpec | undefined = undefined;
     if (filePath && filePath !== DEFAULT_UNKNOWN_BASENAME) {
         const roleResult = inferFineGrainedFileRole(filePath);
         const roleBudget = getRoleBudget(roleResult.role);

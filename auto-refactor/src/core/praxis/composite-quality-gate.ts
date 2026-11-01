@@ -281,17 +281,20 @@ function resolveVerdictCode(
     return COMPOSITE_VERDICT.PASS;
 }
 
+interface GateSummaryTextOptions {
+    stage: GateStage;
+    passed: boolean;
+    verdictCode: CompositeVerdictCode;
+    options: CompositeGateOptions;
+    violations: string[];
+    warnings: string[];
+}
+
 /**
  * Formats a clean feedback report for agent and CI environments.
  */
-function formatGateSummaryText(
-    stage: GateStage,
-    passed: boolean,
-    verdictCode: CompositeVerdictCode,
-    options: CompositeGateOptions,
-    violations: string[],
-    warnings: string[],
-): string {
+function formatGateSummaryText(params: GateSummaryTextOptions): string {
+    const { stage, passed, verdictCode, options, violations, warnings } = params;
     const lines: string[] = [
         `==================== COMPOSITE QUALITY GATE [${stage.toUpperCase()}] ====================`,
         `  Status: ${passed ? '✔ PASS' : '✖ BLOCK'} (${verdictCode})`,
@@ -331,14 +334,14 @@ export function evaluateCompositeGate(options: CompositeGateOptions): CompositeG
     const { violations, warnings } = collectGateViolations(options, thresholds, stage);
     const verdictCode = resolveVerdictCode(options, violations, warnings, thresholds);
     const passed = violations.length === 0;
-    const summaryText = formatGateSummaryText(
+    const summaryText = formatGateSummaryText({
         stage,
         passed,
         verdictCode,
         options,
         violations,
         warnings,
-    );
+    });
 
     return {
         passed,

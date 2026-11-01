@@ -179,15 +179,18 @@ function longestCommonSuffix(stmtsA: string[], stmtsB: string[]): string[] {
     return common.reverse();
 }
 
-function checkDisjointPair(
-    fnA: ComplexFunctionDescriptor,
-    fnB: ComplexFunctionDescriptor,
-    similarity: number,
-    overlap: number,
-    filePath: string,
-    disjointPairs: [string, string][],
-    issues: Issue[],
-): void {
+interface DisjointPairCheckOptions {
+    fnA: ComplexFunctionDescriptor;
+    fnB: ComplexFunctionDescriptor;
+    similarity: number;
+    overlap: number;
+    filePath: string;
+    disjointPairs: [string, string][];
+    issues: Issue[];
+}
+
+function checkDisjointPair(options: DisjointPairCheckOptions): void {
+    const { fnA, fnB, similarity, overlap, filePath, disjointPairs, issues } = options;
     if (fnA.cc >= 12 && fnB.cc >= 12 && similarity < 0.12 && overlap < 0.6) {
         disjointPairs.push([fnA.name, fnB.name]);
         issues.push({
@@ -218,13 +221,16 @@ function checkDisjointPair(
     }
 }
 
-function checkSkeletonCandidate(
-    fnA: ComplexFunctionDescriptor,
-    fnB: ComplexFunctionDescriptor,
-    filePath: string,
-    skeletonCandidates: CohesionSkeletonResult['skeletonCandidates'],
-    issues: Issue[],
-): void {
+interface SkeletonCandidateCheckOptions {
+    fnA: ComplexFunctionDescriptor;
+    fnB: ComplexFunctionDescriptor;
+    filePath: string;
+    skeletonCandidates: CohesionSkeletonResult['skeletonCandidates'];
+    issues: Issue[];
+}
+
+function checkSkeletonCandidate(options: SkeletonCandidateCheckOptions): void {
+    const { fnA, fnB, filePath, skeletonCandidates, issues } = options;
     const cleanA = cleanStatements(fnA.lines);
     const cleanB = cleanStatements(fnB.lines);
     if (cleanA.length < 4 || cleanB.length < 4) return;
@@ -301,23 +307,23 @@ export function analyzeFunctionCohesionAndSkeleton(
             const similarity = computeJaccardSimilarity(tokenSets[i], tokenSets[j]);
             const overlap = computeOverlapCoefficient(tokenSets[i], tokenSets[j]);
 
-            checkDisjointPair(
-                functions[i],
-                functions[j],
+            checkDisjointPair({
+                fnA: functions[i],
+                fnB: functions[j],
                 similarity,
                 overlap,
                 filePath,
                 disjointPairs,
                 issues,
-            );
+            });
 
-            checkSkeletonCandidate(
-                functions[i],
-                functions[j],
+            checkSkeletonCandidate({
+                fnA: functions[i],
+                fnB: functions[j],
                 filePath,
                 skeletonCandidates,
                 issues,
-            );
+            });
         }
     }
 

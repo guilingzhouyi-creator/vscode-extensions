@@ -64,12 +64,12 @@ function isConstantLiteral(expr: ts.Expression): boolean {
     ) {
         return true;
     }
-    const k = expr.kind;
+    const syntaxKind = expr.kind;
     if (
-        k === ts.SyntaxKind.TrueKeyword ||
-        k === ts.SyntaxKind.FalseKeyword ||
-        k === ts.SyntaxKind.NullKeyword ||
-        k === ts.SyntaxKind.UndefinedKeyword
+        syntaxKind === ts.SyntaxKind.TrueKeyword ||
+        syntaxKind === ts.SyntaxKind.FalseKeyword ||
+        syntaxKind === ts.SyntaxKind.NullKeyword ||
+        syntaxKind === ts.SyntaxKind.UndefinedKeyword
     ) {
         return true;
     }

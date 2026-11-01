@@ -184,13 +184,16 @@ function inferNonTestLineZone(line: string, defaultZone: SemanticZoneType): Sema
     return defaultZone;
 }
 
-function stepHeuristicLine(
-    line: string,
-    lineNum: number,
-    tracker: EmbeddedTestTracker,
-    currentZone: SemanticZoneType,
-    rawSegments: Array<{ zone: SemanticZoneType; line: number }>,
-): SemanticZoneType {
+interface StepHeuristicLineOptions {
+    line: string;
+    lineNum: number;
+    tracker: EmbeddedTestTracker;
+    currentZone: SemanticZoneType;
+    rawSegments: Array<{ zone: SemanticZoneType; line: number }>;
+}
+
+function stepHeuristicLine(params: StepHeuristicLineOptions): SemanticZoneType {
+    const { line, lineNum, tracker, currentZone, rawSegments } = params;
     if (EMBEDDED_TEST_HEADER_PATTERN.test(line)) {
         tracker.inEmbeddedTest = true;
     }
@@ -231,7 +234,7 @@ function partitionByTextHeuristics(
             checkCommentIntent(line, tracker);
             continue;
         }
-        currentZone = stepHeuristicLine(line, i + 1, tracker, currentZone, rawSegments);
+        currentZone = stepHeuristicLine({ line, lineNum: i + 1, tracker, currentZone, rawSegments });
     }
 
     const intentRatio =
@@ -239,19 +242,28 @@ function partitionByTextHeuristics(
             ? +(tracker.testIntentAnnotatedCount / tracker.testCaseCount).toFixed(2)
             : 1.0;
 
-    return coalesceSegments(rawSegments, filePath, totalLines, effectiveLoc, intentRatio);
+    return coalesceSegments({
+        items: rawSegments,
+        filePath,
+        totalLines,
+        effectiveLoc,
+        intentAnnotatedRatio: intentRatio,
+    });
+}
+
+interface CoalesceSegmentsOptions {
+    items: Array<{ zone: SemanticZoneType; line: number }>;
+    filePath: string;
+    totalLines: number;
+    effectiveLoc: number;
+    intentAnnotatedRatio?: number;
 }
 
 /**
  * Coalesces consecutive line/node classifications into structured zone segments.
  */
-function coalesceSegments(
-    items: Array<{ zone: SemanticZoneType; line: number }>,
-    filePath: string,
-    totalLines: number,
-    effectiveLoc: number,
-    intentAnnotatedRatio = 1.0,
-): IntraFileZoneProfile {
+function coalesceSegments(params: CoalesceSegmentsOptions): IntraFileZoneProfile {
+    const { items, filePath, totalLines, effectiveLoc, intentAnnotatedRatio = 1.0 } = params;
     if (items.length === 0) {
         return {
             filePath,
@@ -281,9 +293,9 @@ function coalesceSegments(
     let declCount = 1;
 
     for (let i = 1; i < items.length; i++) {
-        const item = items[i];
-        if (item.zone === curZone) {
-            endLine = item.line;
+        const zoneDecl = items[i];
+        if (zoneDecl.zone === curZone) {
+            endLine = zoneDecl.line;
             declCount++;
         } else {
             segments.push({
@@ -294,9 +306,9 @@ function coalesceSegments(
                 declarationsCount: declCount,
                 summary: `${curZone}: lines ${startLine}-${endLine}`,
             });
-            curZone = item.zone;
-            startLine = item.line;
-            endLine = item.line;
+            curZone = zoneDecl.zone;
+            startLine = zoneDecl.line;
+            endLine = zoneDecl.line;
             declCount = 1;
         }
     }
@@ -405,5 +417,5 @@ export function partitionFileZones(
         return partitionByTextHeuristics(content, filePath, totalLines, effectiveLoc);
     }
 
-    return coalesceSegments(items, filePath, totalLines, effectiveLoc);
+    return coalesceSegments({ items, filePath, totalLines, effectiveLoc });
 }

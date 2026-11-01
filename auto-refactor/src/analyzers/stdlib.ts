@@ -223,14 +223,15 @@ function collectRecursionSites(
         while (frames.length > 0 && depth < frames[frames.length - 1]!.bodyDepth) frames.pop();
     };
 
-    const openFrame = (
-        name: string,
-        params: string,
-        depthBefore: number,
-        code: string,
-        openIndex: number,
-        lineNumber: number,
-    ): void => {
+    const openFrame = (options: {
+        name: string;
+        params: string;
+        depthBefore: number;
+        code: string;
+        openIndex: number;
+        lineNumber: number;
+    }): void => {
+        const { name, params, depthBefore, code, openIndex, lineNumber } = options;
         const frame = buildRecursionFrame(name, params, depthBefore);
         frames.push(frame);
         depth = depthBefore + braceDelta(code);
@@ -250,7 +251,7 @@ function collectRecursionSites(
             const params = pendingParams + (openIndex >= 0 ? code.slice(0, openIndex) : code);
             pendingName = null;
             if (openIndex >= 0) {
-                openFrame(declaredName, params, depthBefore, code, openIndex, lineNumber);
+                openFrame({ name: declaredName, params, depthBefore, code, openIndex, lineNumber });
             } else {
                 pendingName = declaredName;
                 pendingParams = params;
@@ -268,7 +269,7 @@ function collectRecursionSites(
                     ? declaration[2] + code.slice(declaration.index, openIndex)
                     : declaration[2];
             if (openIndex >= 0) {
-                openFrame(declaration[1], params, depthBefore, code, openIndex, lineNumber);
+                openFrame({ name: declaration[1], params, depthBefore, code, openIndex, lineNumber });
             } else {
                 pendingName = declaration[1];
                 pendingParams = params;
@@ -292,12 +293,22 @@ function isComment(trimmed: string): boolean {
     return /^(?:\/\/|\/\*|\*)/.test(trimmed);
 }
 
-function hasSafetyComment(lines: readonly string[], i: number): boolean {
-    const start = Math.max(0, i - 4);
-    for (let k = i - 1; k >= start; k--) {
+function hasSafetyComment(lines: readonly string[], lineIndex: number): boolean {
+    const start = Math.max(0, lineIndex - 4);
+    for (let k = lineIndex - 1; k >= start; k--) {
         if (/^(?:\/\/|\/\*)\s*SAFETY:/i.test(lines[k].trim())) return true;
     }
-    return i + 1 < lines.length && /^(?:\/\/|\/\*)\s*SAFETY:/i.test(lines[i + 1].trim());
+    return lineIndex + 1 < lines.length && /^(?:\/\/|\/\*)\s*SAFETY:/i.test(lines[lineIndex + 1].trim());
+}
+
+interface StdlibIssueDescriptor {
+    file: string;
+    line: number;
+    rule: string;
+    severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR;
+    message: string;
+    suggestion: string;
+    detail?: Record<string, unknown>;
 }
 
 /**
@@ -333,7 +344,7 @@ export class StdlibAnalyzer implements Analyzer {
 
         if (!isTest) {
             this.checkPublicApiPanics(ms.raw, file, ext, issues);
-            this.checkNoStdImplicitAllocations(content, ms.raw, file, ext, issues);
+            this.checkNoStdImplicitAllocations({ content, lines: ms.raw, file, ext, issues });
         }
         this.checkUnsafeSafetyContracts(ms.raw, file, ext, issues);
         this.checkConstantTimeComparisons(content, ms.raw, file, issues);
@@ -345,16 +356,8 @@ export class StdlibAnalyzer implements Analyzer {
         return issues;
     }
 
-    private emitIssue(
-        issues: Issue[],
-        file: string,
-        line: number,
-        rule: string,
-        severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
-        message: string,
-        suggestion: string,
-        detail: Record<string, unknown> = {},
-    ): void {
+    private emitIssue(issues: Issue[], descriptor: StdlibIssueDescriptor): void {
+        const { file, line, rule, severity, message, suggestion, detail = {} } = descriptor;
         const actionableMap: Record<
             string,
             { action: AgentActionType; code: string; safe: boolean }
@@ -472,16 +475,15 @@ export class StdlibAnalyzer implements Analyzer {
             depth += calculateBraceDelta(line);
 
             if (spec.panicRe.test(line)) {
-                this.emitIssue(
-                    issues,
+                this.emitIssue(issues, {
                     file,
-                    i + 1,
-                    'STDLIB-PANIC-001',
-                    SEVERITY_WARNING,
-                    spec.formatMessage(fnName),
-                    spec.suggestion,
-                    { functionName: fnName },
-                );
+                    line: i + 1,
+                    rule: 'STDLIB-PANIC-001',
+                    severity: SEVERITY_WARNING,
+                    message: spec.formatMessage(fnName),
+                    suggestion: spec.suggestion,
+                    detail: { functionName: fnName },
+                });
             }
             if (depth <= 0 && line.includes('}')) inFn = false;
         }
@@ -490,13 +492,14 @@ export class StdlibAnalyzer implements Analyzer {
     /**
      * STDLIB-ALLOC-001: Intercept implicit heap escapes in no_std / systems contexts.
      */
-    private checkNoStdImplicitAllocations(
-        content: string,
-        lines: readonly string[],
-        file: string,
-        ext: string,
-        issues: Issue[],
-    ): void {
+    private checkNoStdImplicitAllocations(options: {
+        content: string;
+        lines: readonly string[];
+        file: string;
+        ext: string;
+        issues: Issue[];
+    }): void {
+        const { content, lines, file, ext, issues } = options;
         if (ext !== '.rs' && ext !== '.c' && ext !== '.cpp') return;
         if (!REGEX.SYNTAX.STDLIB_NO_STD_CONTEXT.test(content + ' ' + file)) return;
 
@@ -505,15 +508,14 @@ export class StdlibAnalyzer implements Analyzer {
             if (isComment(line.trim())) continue;
 
             if (REGEX.SYNTAX.STDLIB_IMPLICIT_ALLOC.test(line)) {
-                this.emitIssue(
-                    issues,
+                this.emitIssue(issues, {
                     file,
-                    i + 1,
-                    'STDLIB-ALLOC-001',
-                    SEVERITY_ERROR,
-                    'Implicit dynamic heap allocation detected in no_std bare-metal context.',
-                    'Use fixed-capacity stack buffer, reference slices, or preallocated memory pool in no_std context.',
-                );
+                    line: i + 1,
+                    rule: 'STDLIB-ALLOC-001',
+                    severity: SEVERITY_ERROR,
+                    message: 'Implicit dynamic heap allocation detected in no_std bare-metal context.',
+                    suggestion: 'Use fixed-capacity stack buffer, reference slices, or preallocated memory pool in no_std context.',
+                });
             }
         }
     }
@@ -535,15 +537,14 @@ export class StdlibAnalyzer implements Analyzer {
 
             if (/\bunsafe\s*(?:\{|fn\b|trait\b|impl\b)/.test(line)) {
                 if (!hasSafetyComment(lines, i)) {
-                    this.emitIssue(
-                        issues,
+                    this.emitIssue(issues, {
                         file,
-                        i + 1,
-                        'STDLIB-UNSAFE-001',
-                        SEVERITY_ERROR,
-                        'Unsafe block lacks mandatory // SAFETY: invariant contract proof.',
-                        'Prepend // SAFETY: explaining why caller preconditions and memory invariants are upheld.',
-                    );
+                        line: i + 1,
+                        rule: 'STDLIB-UNSAFE-001',
+                        severity: SEVERITY_ERROR,
+                        message: 'Unsafe block lacks mandatory // SAFETY: invariant contract proof.',
+                        suggestion: 'Prepend // SAFETY: explaining why caller preconditions and memory invariants are upheld.',
+                    });
                 }
             }
         }
@@ -575,15 +576,14 @@ export class StdlibAnalyzer implements Analyzer {
                     trimmed,
                 )
             ) {
-                this.emitIssue(
-                    issues,
+                this.emitIssue(issues, {
                     file,
-                    i + 1,
-                    'STDLIB-CONST-001',
-                    SEVERITY_WARNING,
-                    'Timing side-channel vulnerability: short-circuit byte comparison in cryptographic context.',
-                    'Use constant-time comparison (e.g. constant_time_eq or bitwise XOR accumulator) to prevent early termination.',
-                );
+                    line: i + 1,
+                    rule: 'STDLIB-CONST-001',
+                    severity: SEVERITY_WARNING,
+                    message: 'Timing side-channel vulnerability: short-circuit byte comparison in cryptographic context.',
+                    suggestion: 'Use constant-time comparison (e.g. constant_time_eq or bitwise XOR accumulator) to prevent early termination.',
+                });
             }
         }
     }
@@ -602,16 +602,15 @@ export class StdlibAnalyzer implements Analyzer {
         issues: Issue[],
     ): void {
         for (const site of collectRecursionSites(lines, maskedLines)) {
-            this.emitIssue(
-                issues,
+            this.emitIssue(issues, {
                 file,
-                site.line,
-                'STDLIB-RECURSION-001',
-                SEVERITY_WARNING,
-                `Function \`${site.functionName}\` has recursive self-invocation without explicit depth limit parameter or guard.`,
-                'Introduce explicit depth/recursion_limit parameter returning error upon limit, or convert to iterative loop.',
-                { functionName: site.functionName },
-            );
+                line: site.line,
+                rule: 'STDLIB-RECURSION-001',
+                severity: SEVERITY_WARNING,
+                message: `Function \`${site.functionName}\` has recursive self-invocation without explicit depth limit parameter or guard.`,
+                suggestion: 'Introduce explicit depth/recursion_limit parameter returning error upon limit, or convert to iterative loop.',
+                detail: { functionName: site.functionName },
+            });
         }
     }
 
@@ -628,14 +627,13 @@ export class StdlibAnalyzer implements Analyzer {
         if (!REGEX.SYNTAX.STDLIB_TARGET_CFG.test(content)) return;
         if (REGEX.SYNTAX.STDLIB_FALLBACK.test(content)) return;
 
-        this.emitIssue(
-            issues,
+        this.emitIssue(issues, {
             file,
-            1,
-            'STDLIB-PORT-001',
-            SEVERITY_WARNING,
-            'Platform-specific conditional compilation block lacks compile_error! or #error fallback for unsupported platforms.',
-            'Add #[cfg(not(any(...)))] compile_error!("Unsupported target OS/Arch"); fallback guard.',
-        );
+            line: 1,
+            rule: 'STDLIB-PORT-001',
+            severity: SEVERITY_WARNING,
+            message: 'Platform-specific conditional compilation block lacks compile_error! or #error fallback for unsupported platforms.',
+            suggestion: 'Add #[cfg(not(any(...)))] compile_error!("Unsupported target OS/Arch"); fallback guard.',
+        });
     }
 }

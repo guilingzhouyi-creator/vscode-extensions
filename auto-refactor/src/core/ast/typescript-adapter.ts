@@ -48,6 +48,23 @@ import {
 export { TsNodeProjector } from './ts-projector';
 export * from './ts-predicates';
 
+interface TsAdapterNodeFlags {
+    readonly isLiteral: boolean;
+    readonly fnLike: boolean;
+    readonly isClassDefining: boolean;
+    readonly isBinding: boolean;
+    readonly isCall: boolean;
+}
+
+interface NodeHierarchyContext {
+    readonly tsNode: ts.Node;
+    readonly parentTs: ts.Node | undefined;
+    readonly grandparentTs: ts.Node | undefined;
+    readonly greatGrandparentTs: ts.Node | undefined;
+    readonly isLiteral: boolean;
+    readonly sourceFile: ts.SourceFile;
+}
+
 /**
  * Default LanguageAdapter for TypeScript and JavaScript family files.
  */
@@ -90,15 +107,13 @@ export class TypeScriptAdapter extends BaseAstAdapter {
 
     private resolveNodePositions(
         tsNode: ts.Node,
-        isLiteral: boolean,
-        fnLike: boolean,
-        isCall: boolean,
+        flags: TsAdapterNodeFlags,
         sourceFile: ts.SourceFile,
     ): { start?: Position; end?: Position } {
         const needsPos =
-            isLiteral ||
-            fnLike ||
-            isCall ||
+            flags.isLiteral ||
+            flags.fnLike ||
+            flags.isCall ||
             tsNode.kind === ts.SyntaxKind.FunctionKeyword ||
             tsNode.kind === ts.SyntaxKind.SourceFile ||
             ts.isClassDeclaration(tsNode) ||
@@ -115,14 +130,11 @@ export class TypeScriptAdapter extends BaseAstAdapter {
     private resolveNodeName(
         tsNode: ts.Node,
         kind: NodeKind,
-        isCall: boolean,
-        fnLike: boolean,
-        isClassDefining: boolean,
-        isBinding: boolean,
+        flags: TsAdapterNodeFlags,
         sourceFile: ts.SourceFile,
     ): string | undefined {
-        if (isCall) return calleeNameOf(tsNode, sourceFile) ?? undefined;
-        if (fnLike || isClassDefining || isBinding) return nameOf(tsNode, sourceFile) ?? undefined;
+        if (flags.isCall) return calleeNameOf(tsNode, sourceFile) ?? undefined;
+        if (flags.fnLike || flags.isClassDefining || flags.isBinding) return nameOf(tsNode, sourceFile) ?? undefined;
         if (kind === NodeKind.Variable || kind === NodeKind.Constant) {
             return nameOf(tsNode, sourceFile) ?? undefined;
         }
@@ -132,43 +144,31 @@ export class TypeScriptAdapter extends BaseAstAdapter {
     private buildNormalizedNode(
         tsNode: ts.Node,
         kind: NodeKind,
-        isLiteral: boolean,
-        fnLike: boolean,
-        isClassDefining: boolean,
-        isBinding: boolean,
-        isCall: boolean,
+        flags: TsAdapterNodeFlags,
         sourceFile: ts.SourceFile,
     ): NormalizedNode {
-        const pos = this.resolveNodePositions(tsNode, isLiteral, fnLike, isCall, sourceFile);
+        const pos = this.resolveNodePositions(tsNode, flags, sourceFile);
         return {
             kind,
             rawKind: tsNode.kind === ts.SyntaxKind.FunctionKeyword ? 'FunctionKeyword' : undefined,
-            text: isLiteral ? tsNode.getText(sourceFile) : undefined,
+            text: flags.isLiteral ? tsNode.getText(sourceFile) : undefined,
             start: pos.start,
             end: pos.end,
-            name: this.resolveNodeName(
-                tsNode,
-                kind,
-                isCall,
-                fnLike,
-                isClassDefining,
-                isBinding,
-                sourceFile,
-            ),
-            calleeReceiver: isCall
+            name: this.resolveNodeName(tsNode, kind, flags, sourceFile),
+            calleeReceiver: flags.isCall
                 ? (calleeReceiverOf(tsNode, sourceFile) ?? undefined)
                 : undefined,
             isNumeric: kind === NodeKind.NumericLiteral,
             isString: kind === NodeKind.StringLiteral,
             branchWeight: branchWeightOf(tsNode),
-            functionLike: fnLike,
-            isClassDefining,
-            introducesBinding: isBinding,
-            bindingName: isBinding ? bindingName(tsNode, sourceFile) : null,
-            hasFunctionInitializer: isBinding,
+            functionLike: flags.fnLike,
+            isClassDefining: flags.isClassDefining,
+            introducesBinding: flags.isBinding,
+            bindingName: flags.isBinding ? bindingName(tsNode, sourceFile) : null,
+            hasFunctionInitializer: flags.isBinding,
             increasesNesting: CONTROL_OR_BLOCK.has(tsNode.kind),
             isConstructor: ts.isConstructorDeclaration(tsNode),
-            parameters: fnLike ? this.extractFnParameters(tsNode, sourceFile) : undefined,
+            parameters: flags.fnLike ? this.extractFnParameters(tsNode, sourceFile) : undefined,
         };
     }
 
@@ -186,15 +186,9 @@ export class TypeScriptAdapter extends BaseAstAdapter {
         return tsNode.parameters.map((paramNode) => paramNode.name.getText(sourceFile));
     }
 
-    private applyNodeHierarchy(
-        node: NormalizedNode,
-        tsNode: ts.Node,
-        parentTs: ts.Node | undefined,
-        grandparentTs: ts.Node | undefined,
-        greatGrandparentTs: ts.Node | undefined,
-        isLiteral: boolean,
-        sourceFile: ts.SourceFile,
-    ): void {
+    private applyNodeHierarchy(node: NormalizedNode, context: NodeHierarchyContext): void {
+        const { tsNode, parentTs, grandparentTs, greatGrandparentTs, isLiteral, sourceFile } =
+            context;
         const topLevel = !!parentTs && ts.isSourceFile(parentTs) && isTopLevelDecl(tsNode);
         node.topLevel = topLevel;
         node.exported =
@@ -210,11 +204,14 @@ export class TypeScriptAdapter extends BaseAstAdapter {
 
     private tryReuseSubtree(
         node: NormalizedNode,
-        tsNode: ts.Node,
-        fnLike: boolean,
-        sourceFile: ts.SourceFile,
-        seed?: ProjectionSeed,
+        options: {
+            tsNode: ts.Node;
+            fnLike: boolean;
+            sourceFile: ts.SourceFile;
+            seed?: ProjectionSeed;
+        },
     ): boolean {
+        const { tsNode, fnLike, sourceFile, seed } = options;
         if (!seed || !fnLike) return false;
         const startPos = posOf(tsNode.getStart(sourceFile), sourceFile);
         const span: ReusedSpan = {
@@ -279,39 +276,31 @@ export class TypeScriptAdapter extends BaseAstAdapter {
         seed?: ProjectionSeed,
     ): NormalizedNode {
         const kind = kindOf(tsNode);
-        const isLiteral = kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral;
-        const fnLike = isFunctionLike(tsNode);
-        const isBinding = introducesBinding(tsNode);
-        const isClassDefining = ts.isClassDeclaration(tsNode) || ts.isClassExpression(tsNode);
-        const isCall = kind === NodeKind.Call;
+        const flags: TsAdapterNodeFlags = {
+            isLiteral: kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral,
+            fnLike: isFunctionLike(tsNode),
+            isBinding: introducesBinding(tsNode),
+            isClassDefining: ts.isClassDeclaration(tsNode) || ts.isClassExpression(tsNode),
+            isCall: kind === NodeKind.Call,
+        };
 
-        const node = this.buildNormalizedNode(
-            tsNode,
-            kind,
-            isLiteral,
-            fnLike,
-            isClassDefining,
-            isBinding,
-            isCall,
-            sourceFile,
-        );
-        this.applyNodeHierarchy(
-            node,
+        const node = this.buildNormalizedNode(tsNode, kind, flags, sourceFile);
+        this.applyNodeHierarchy(node, {
             tsNode,
             parentTs,
             grandparentTs,
             greatGrandparentTs,
-            isLiteral,
+            isLiteral: flags.isLiteral,
             sourceFile,
-        );
+        });
 
-        if (this.tryReuseSubtree(node, tsNode, fnLike, sourceFile, seed)) {
+        if (this.tryReuseSubtree(node, { tsNode, fnLike: flags.fnLike, sourceFile, seed })) {
             return node;
         }
 
         const kids = this.traverseChildren(tsNode, parentTs, grandparentTs, sourceFile, seed);
         node.children = kids;
-        this.recordSpanCache(seed, fnLike, tsNode, sourceFile, kids);
+        this.recordSpanCache(seed, flags.fnLike, tsNode, sourceFile, kids);
         return node;
     }
 }

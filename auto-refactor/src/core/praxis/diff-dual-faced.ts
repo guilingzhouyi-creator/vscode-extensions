@@ -263,14 +263,14 @@ export function buildDualFacedHunks(
     issues?: Issue[],
     hasConflict?: boolean,
 ): DualFacedDiffHunk[] {
-    const result: DualFacedDiffHunk[] = [];
+    const dualFacedHunks: DualFacedDiffHunk[] = [];
     for (const hunk of hunks) {
-        result.push({
+        dualFacedHunks.push({
             hunkId: hunk.hunkId,
             agentFace: buildAgentFace(filePath, hunk),
             humanFace: buildHumanFace(hunk, issues, hasConflict),
             rawHunk: hunk,
         });
     }
-    return result;
+    return dualFacedHunks;
 }

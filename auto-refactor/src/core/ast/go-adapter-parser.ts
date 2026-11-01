@@ -459,22 +459,19 @@ function computeSegmentOffset(rawLine: string, segment: string): number {
     return lead;
 }
 
+interface StringLiteralScanOptions {
+    trimmed: string;
+    line: string;
+    lineNum: number;
+    out: NormalizedNode[];
+    inImport: boolean;
+}
+
 /**
  * Detect string literals on a line.
- *
- * @param trimmed - Trimmed current line.
- * @param line - Raw current line.
- * @param lineNum - 1-based line number.
- * @param out - Output array to append nodes to.
- * @param inImport - Whether we are inside an import block (strings are tolerated).
  */
-function parseStringLiterals(
-    trimmed: string,
-    line: string,
-    lineNum: number,
-    out: NormalizedNode[],
-    inImport: boolean,
-): void {
+function parseStringLiterals(options: StringLiteralScanOptions): void {
+    const { trimmed, line, lineNum, out, inImport } = options;
     const baseOffset = computeSegmentOffset(line, trimmed);
     const scanner = REGEX.SYNTAX.createStringLiteralScanner();
     let match: RegExpExecArray | null;
@@ -602,24 +599,21 @@ export interface ParseContext {
     }>;
 }
 
+interface GoLineContext {
+    codeOnly: string;
+    rawLine: string;
+    lineNum: number;
+    ctx: ParseContext;
+    children: NormalizedNode[];
+}
+
 /**
  * Update brace depth, create Block nodes for open braces, and pop context stack
  * when closing braces. Called from every code path that contains braces so the
  * nesting state stays consistent regardless of statement type.
- *
- * @param codeOnly - Line with comments stripped.
- * @param rawLine - Raw source line.
- * @param lineNum - 1-based line number.
- * @param ctx - Parse context (mutated in place).
- * @param children - Output array to append Block nodes to.
  */
-function trackBraceDelta(
-    codeOnly: string,
-    rawLine: string,
-    lineNum: number,
-    ctx: ParseContext,
-    children: NormalizedNode[],
-): void {
+function trackBraceDelta(lineCtx: GoLineContext): void {
+    const { codeOnly, rawLine, lineNum, ctx, children } = lineCtx;
     const delta = braceDelta(codeOnly);
     if (delta === 0) return;
     // Push block nodes for each open brace
@@ -695,13 +689,8 @@ function handlePackageAndImport(
     return false;
 }
 
-function handleTypeOrFunc(
-    codeOnly: string,
-    rawLine: string,
-    lineNum: number,
-    ctx: ParseContext,
-    children: NormalizedNode[],
-): boolean {
+function handleTypeOrFunc(lineCtx: GoLineContext): boolean {
+    const { codeOnly, rawLine, lineNum, ctx, children } = lineCtx;
     const typeNode = parseTypeDeclaration(codeOnly, rawLine, lineNum);
     if (typeNode) {
         children.push(typeNode);
@@ -709,7 +698,7 @@ function handleTypeOrFunc(
             ctx.inStruct = true;
             ctx.braceStack.push({ depth: ctx.braceDepth, kind: 'struct' });
         }
-        trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
+        trackBraceDelta(lineCtx);
         return true;
     }
     const funcNode = parseFuncOrMethod(codeOnly, rawLine, lineNum);
@@ -718,20 +707,14 @@ function handleTypeOrFunc(
         if (codeOnly.includes(OPEN_BRACE)) {
             ctx.braceStack.push({ depth: ctx.braceDepth, kind: 'func' });
         }
-        trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
+        trackBraceDelta(lineCtx);
         return true;
     }
     return false;
 }
 
-function handleVarOrConst(
-    codeOnly: string,
-    rawLine: string,
-    lineNum: number,
-    wasTopLevel: boolean,
-    ctx: ParseContext,
-    children: NormalizedNode[],
-): boolean {
+function handleVarOrConst(lineCtx: GoLineContext, wasTopLevel: boolean): boolean {
+    const { codeOnly, rawLine, lineNum, ctx, children } = lineCtx;
     if (wasTopLevel && REGEX.SYNTAX.GO_VAR_BLOCK_START.test(codeOnly)) {
         ctx.inVarBlock = true;
         return true;
@@ -740,7 +723,7 @@ function handleVarOrConst(
     if (varNode) {
         varNode.topLevel = wasTopLevel;
         children.push(varNode);
-        trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
+        trackBraceDelta(lineCtx);
         return true;
     }
     if (wasTopLevel && REGEX.SYNTAX.GO_CONST_BLOCK_START.test(codeOnly)) {
@@ -751,19 +734,14 @@ function handleVarOrConst(
     if (constNode) {
         constNode.topLevel = wasTopLevel;
         children.push(constNode);
-        trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
+        trackBraceDelta(lineCtx);
         return true;
     }
     return false;
 }
 
-function handleBlockEntries(
-    codeOnly: string,
-    rawLine: string,
-    lineNum: number,
-    ctx: ParseContext,
-    children: NormalizedNode[],
-): boolean {
+function handleBlockEntries(lineCtx: GoLineContext): boolean {
+    const { codeOnly, rawLine, lineNum, ctx, children } = lineCtx;
     if (!ctx.inConstBlock && !ctx.inVarBlock) return false;
     if (codeOnly === ')') {
         ctx.inConstBlock = false;
@@ -775,39 +753,21 @@ function handleBlockEntries(
     return true;
 }
 
-function handleDeclarationLine(
-    codeOnly: string,
-    rawLine: string,
-    lineNum: number,
-    ctx: ParseContext,
-    children: NormalizedNode[],
-): boolean {
-    const wasTopLevel = ctx.braceDepth === 0;
+function handleDeclarationLine(lineCtx: GoLineContext): boolean {
+    const wasTopLevel = lineCtx.ctx.braceDepth === 0;
     return (
-        handlePackageAndImport(codeOnly, wasTopLevel, ctx) ||
-        handleTypeOrFunc(codeOnly, rawLine, lineNum, ctx, children) ||
-        handleVarOrConst(codeOnly, rawLine, lineNum, wasTopLevel, ctx, children) ||
-        handleBlockEntries(codeOnly, rawLine, lineNum, ctx, children)
+        handlePackageAndImport(lineCtx.codeOnly, wasTopLevel, lineCtx.ctx) ||
+        handleTypeOrFunc(lineCtx) ||
+        handleVarOrConst(lineCtx, wasTopLevel) ||
+        handleBlockEntries(lineCtx)
     );
 }
 
 /**
  * Handle control-flow statements: if/for/switch/select and case/default labels.
- *
- * @param codeOnly - Line with line comment stripped.
- * @param rawLine - Raw source line.
- * @param lineNum - 1-based line number.
- * @param ctx - Parse context (mutated in place).
- * @param children - Output array to append nodes to.
- * @returns True when the line is a control-flow statement that was fully handled.
  */
-function handleControlFlowLine(
-    codeOnly: string,
-    rawLine: string,
-    lineNum: number,
-    ctx: ParseContext,
-    children: NormalizedNode[],
-): boolean {
+function handleControlFlowLine(lineCtx: GoLineContext): boolean {
+    const { codeOnly, rawLine, lineNum, ctx, children } = lineCtx;
     const cfNode = parseControlFlow(codeOnly, rawLine, lineNum);
     if (!cfNode) return false;
 
@@ -820,7 +780,7 @@ function handleControlFlowLine(
             kind: cfMatch[1] as 'switch' | 'select',
         });
     }
-    trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
+    trackBraceDelta(lineCtx);
     parseCallExpressions(codeOnly, rawLine, lineNum, children);
     parseNumericLiterals(codeOnly, rawLine, lineNum, children);
     parseNamedLiterals(codeOnly, rawLine, lineNum, children);
@@ -851,11 +811,13 @@ export function processGoLine(
     const codeOnly = stripLineComment(trimmed);
     if (!codeOnly) return;
 
+    const lineCtx: GoLineContext = { codeOnly, rawLine, lineNum, ctx, children };
+
     // Declarations: top-level declarations (package, import, type, func, var, const)
-    if (handleDeclarationLine(codeOnly, rawLine, lineNum, ctx, children)) return;
+    if (handleDeclarationLine(lineCtx)) return;
 
     // Control flow: branch and loop constructs (if/for/switch/select)
-    if (handleControlFlowLine(codeOnly, rawLine, lineNum, ctx, children)) return;
+    if (handleControlFlowLine(lineCtx)) return;
 
     // Statements: case labels, simple statements, and struct field definitions
     const caseNode = parseCaseLabel(codeOnly, rawLine, lineNum, ctx.inSwitchSelect);
@@ -881,13 +843,19 @@ export function processGoLine(
     }
 
     // Literals and calls: string/numeric/named literals and function invocations
-    parseStringLiterals(codeOnly, rawLine, lineNum, children, ctx.inImport);
+    parseStringLiterals({
+        trimmed: codeOnly,
+        line: rawLine,
+        lineNum,
+        out: children,
+        inImport: ctx.inImport,
+    });
     parseNumericLiterals(codeOnly, rawLine, lineNum, children);
     parseNamedLiterals(codeOnly, rawLine, lineNum, children);
     parseCallExpressions(codeOnly, rawLine, lineNum, children);
 
     // Block nesting: brace depth tracking and block boundary management
-    trackBraceDelta(codeOnly, rawLine, lineNum, ctx, children);
+    trackBraceDelta(lineCtx);
 }
 
 /**

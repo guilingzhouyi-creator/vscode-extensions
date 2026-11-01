@@ -154,14 +154,17 @@ export function auditUnpooledHotspots(sites: AllocationSiteContext[]): Issue[] {
     return issues;
 }
 
-function createPoolIssue(
-    rule: typeof RULE_PRF_POL_002 | typeof RULE_PRF_POL_003,
-    severity: typeof SEVERITY_ERROR | typeof SEVERITY_WARNING,
-    pool: PoolComponentContext,
-    message: string,
-    detail: Record<string, unknown>,
-    suggestion: string,
-): Issue {
+interface PoolIssueOptions {
+    rule: typeof RULE_PRF_POL_002 | typeof RULE_PRF_POL_003;
+    severity: typeof SEVERITY_ERROR | typeof SEVERITY_WARNING;
+    pool: PoolComponentContext;
+    message: string;
+    detail: Record<string, unknown>;
+    suggestion: string;
+}
+
+function createPoolIssue(options: PoolIssueOptions): Issue {
+    const { rule, severity, pool, message, detail, suggestion } = options;
     return {
         id: `performance:${rule}:${pool.filePath}:${pool.line}`,
         analyzer: ANALYZER_PERFORMANCE,
@@ -190,38 +193,38 @@ function checkPoolSoundness(pool: PoolComponentContext): Issue | null {
         reasons.push('missing maximum capacity cap (risk of unbounded memory growth/leak)');
     }
 
-    return createPoolIssue(
-        RULE_PRF_POL_002,
-        SEVERITY_ERROR,
+    return createPoolIssue({
+        rule: RULE_PRF_POL_002,
+        severity: SEVERITY_ERROR,
         pool,
-        `Unsound resource pool implementation in "${pool.poolName}": ${reasons.join(' and ')}.`,
-        {
+        message: `Unsound resource pool implementation in "${pool.poolName}": ${reasons.join(' and ')}.`,
+        detail: {
             poolName: pool.poolName,
             poolKind: pool.poolKind,
             hasResetContract: pool.hasResetContract,
             hasCapacityCap: pool.hasCapacityCap,
         },
-        'Implement an explicit reset_state() lifecycle hook and bound the pool with a capacity limit.',
-    );
+        suggestion: 'Implement an explicit reset_state() lifecycle hook and bound the pool with a capacity limit.',
+    });
 }
 
 function checkPoolROI(pool: PoolComponentContext): Issue | null {
     if (!pool.targetIsTinyOrPrimitive || pool.poolKind !== 'object_pool') {
         return null;
     }
-    return createPoolIssue(
-        RULE_PRF_POL_003,
-        SEVERITY_WARNING,
+    return createPoolIssue({
+        rule: RULE_PRF_POL_003,
+        severity: SEVERITY_WARNING,
         pool,
-        `Negative-ROI excessive pooling: "${pool.poolName}" pools lightweight tiny object "${pool.targetType}". ` +
+        message: `Negative-ROI excessive pooling: "${pool.poolName}" pools lightweight tiny object "${pool.targetType}". ` +
             `Pool management overhead exceeds direct transient GC cost.`,
-        {
+        detail: {
             poolName: pool.poolName,
             targetType: pool.targetType,
             reason: 'Micro-object pooling overhead penalty',
         },
-        'Dismantle pooling indirection for tiny immutable value objects; rely on fast generational heap allocation instead.',
-    );
+        suggestion: 'Dismantle pooling indirection for tiny immutable value objects; rely on fast generational heap allocation instead.',
+    });
 }
 
 /**

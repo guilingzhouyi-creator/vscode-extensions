@@ -366,11 +366,11 @@ export function getMaskedSource(
     if (content === lastMaskContent && preset === lastMaskPreset && lastMaskedSource !== null) {
         return lastMaskedSource;
     }
-    const result = maskSourceText(content, preset);
+    const maskedSource = maskSourceText(content, preset);
     lastMaskContent = content;
     lastMaskPreset = preset;
-    lastMaskedSource = result;
-    return result;
+    lastMaskedSource = maskedSource;
+    return maskedSource;
 }
 
 /**

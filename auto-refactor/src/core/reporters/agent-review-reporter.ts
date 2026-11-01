@@ -39,7 +39,7 @@ import type {
     AgentActionableDirective,
     AgentDirectiveEnvelope,
     AgentBuilderDirective,
-    AgentReviewerCrossCheckPoint,
+    AgentReviewerCheckPoint,
     AgentDirectivesMetrics,
     AgentReviewDirectivesPayload,
     AgentDirectiveTrack,
@@ -352,7 +352,7 @@ function buildBuilderDirectives(directives: AgentActionableDirective[]): AgentBu
 
 function buildReviewerDirectives(
     directives: AgentActionableDirective[],
-): AgentReviewerCrossCheckPoint[] {
+): AgentReviewerCheckPoint[] {
     return directives.map((directive) => ({
         checkPointId: `CP-${directive.directiveId}`,
         targetFile: directive.targetContext.filePath,

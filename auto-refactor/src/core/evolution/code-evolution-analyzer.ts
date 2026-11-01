@@ -210,8 +210,8 @@ export class CodeEvolutionAnalyzer {
         totalCommits: number,
     ): number {
         const authors = Object.keys(authorCounts);
-        const k = authors.length;
-        if (k <= 1 || totalCommits <= 1) {
+        const authorCount = authors.length;
+        if (authorCount <= 1 || totalCommits <= 1) {
             return 0.0;
         }
 
@@ -224,7 +224,7 @@ export class CodeEvolutionAnalyzer {
             }
         }
 
-        const maxEntropy = Math.log(k) / Math.LN2;
+        const maxEntropy = Math.log(authorCount) / Math.LN2;
         if (maxEntropy <= 0.0001) {
             return 0.0;
         }

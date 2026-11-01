@@ -135,13 +135,16 @@ function isHollowCommentOnlyFile(content: string, filePath: string): boolean {
     return true;
 }
 
-function reportEolMismatch(
-    file: string,
-    filePath: string,
-    expectedEol: string,
-    actualEol: string,
-    issues: Issue[],
-): void {
+interface EolMismatchOptions {
+    file: string;
+    filePath: string;
+    expectedEol: string;
+    actualEol: string;
+    issues: Issue[];
+}
+
+function reportEolMismatch(params: EolMismatchOptions): void {
+    const { file, filePath, expectedEol, actualEol, issues } = params;
     const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(file, expectedEol, actualEol);
     issues.push(
         createLineIssue(ANALYZER_HYGIENE, filePath, {
@@ -311,11 +314,11 @@ export function auditFileBasics(
 
     if (file.endsWith('.ps1')) {
         if (!content.includes('\r\n') && content.includes('\n')) {
-            reportEolMismatch(file, ctx.filePath, EOL_CRLF, EOL_LF, issues);
+            reportEolMismatch({ file, filePath: ctx.filePath, expectedEol: EOL_CRLF, actualEol: EOL_LF, issues });
         }
     } else if (/\.(?:ts|js|json|md|sh|rs|py|gd)$/.test(file)) {
         if (content.includes('\r\n')) {
-            reportEolMismatch(file, ctx.filePath, EOL_LF, EOL_CRLF, issues);
+            reportEolMismatch({ file, filePath: ctx.filePath, expectedEol: EOL_LF, actualEol: EOL_CRLF, issues });
         }
     }
 
@@ -329,13 +332,16 @@ function isExemptRootScript(baseName: string, lowerBase: string): boolean {
     return EXEMPT_ROOT_BASENAMES.has(lowerBase);
 }
 
-function auditDirectoryConventions(
-    file: string,
-    baseName: string,
-    ext: string,
-    ctx: AnalyzerContext,
-    issues: Issue[],
-): void {
+interface DirectoryConventionsOptions {
+    file: string;
+    baseName: string;
+    ext: string;
+    ctx: AnalyzerContext;
+    issues: Issue[];
+}
+
+function auditDirectoryConventions(params: DirectoryConventionsOptions): void {
+    const { file, baseName, ext, ctx, issues } = params;
     const normalized = file.replace(/^\.\//, '');
     if (normalized.includes('/')) {
         return;
@@ -376,7 +382,7 @@ export function auditFileNaming(file: string, ctx: AnalyzerContext, issues: Issu
     const ext = path.extname(baseName);
     const nameWithoutExt = baseName.slice(0, baseName.length - ext.length);
 
-    auditDirectoryConventions(file, baseName, ext, ctx, issues);
+    auditDirectoryConventions({ file, baseName, ext, ctx, issues });
 
     if (isExemptFileName(nameWithoutExt)) {
         return;

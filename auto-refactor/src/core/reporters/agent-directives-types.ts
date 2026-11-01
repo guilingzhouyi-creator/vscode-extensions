@@ -70,7 +70,7 @@ export interface AgentRuleContract {
 /**
  * Structured code density, volume, and plumbing budget specification for Agent guidance.
  */
-export interface AgentCodeDensityConstraintSpec {
+export interface AgentDensityConstraintSpec {
     /** Target file architectural role (FineGrainedFileRole) */
     readonly role?: string;
     /** Effective lines of code ceiling (VOL-ELOC-001) */
@@ -108,7 +108,7 @@ export interface AgentImmutableConstraints {
      */
     readonly elocBudgetConstraint: boolean;
     /** Structured code density, volume, and plumbing constraint specification */
-    readonly densitySpec?: AgentCodeDensityConstraintSpec;
+    readonly densitySpec?: AgentDensityConstraintSpec;
     /** Prohibition against introducing external side effects or unsolicited dependencies */
     readonly noExternalSideEffects: boolean;
     /** List of explicit invariant rules and constraints to enforce */
@@ -323,9 +323,9 @@ export interface AgentBuilderDirective {
 }
 
 /**
- * Reviewer Agent cross-check point for independent validation and regression verification.
+ * Reviewer Agent check point for independent validation and regression verification.
  */
-export interface AgentReviewerCrossCheckPoint {
+export interface AgentReviewerCheckPoint {
     /** Checkpoint identifier */
     readonly checkPointId: string;
     /** Target file under verification */
@@ -374,7 +374,7 @@ export interface AgentReviewDirectivesPayload {
     /** Sequential task items for Builder Agent execution */
     readonly builderDirectives: readonly AgentBuilderDirective[];
     /** Verification checkpoints for Reviewer Agent validation */
-    readonly reviewerDirectives: readonly AgentReviewerCrossCheckPoint[];
+    readonly reviewerDirectives: readonly AgentReviewerCheckPoint[];
     /** Summary metrics */
     readonly metrics: AgentDirectivesMetrics;
 }

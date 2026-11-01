@@ -259,16 +259,19 @@ const RULE_LOCK_AWAIT: DeclarativeLineRule = Object.freeze({
     },
 });
 
+interface RustMultiLineScanContext {
+    file: string;
+    raw: readonly string[];
+    masked: readonly string[];
+    delegate: DeclarativeModernAnalyzer;
+    issues: Issue[];
+}
+
 /**
  * Scan all async functions in file for std guard instances held across `.await`.
  */
-function scanAsyncLockIssues(
-    file: string,
-    raw: readonly string[],
-    masked: readonly string[],
-    delegate: DeclarativeModernAnalyzer,
-    issues: Issue[],
-): void {
+function scanAsyncLockIssues(context: RustMultiLineScanContext): void {
+    const { file, raw, masked, delegate, issues } = context;
     for (let i = 0; i < masked.length; i += 1) {
         if (!REGEX.SYNTAX.RUST_ASYNC_FN.test(masked[i])) {
             continue;
@@ -313,13 +316,8 @@ const RULE_UNSAFE_SAFETY: DeclarativeLineRule = Object.freeze({
 /**
  * Scan source lines for unsafe blocks/functions lacking preceding `// SAFETY:` proof comments.
  */
-function scanUnsafeSafetyProofs(
-    file: string,
-    raw: readonly string[],
-    masked: readonly string[],
-    delegate: DeclarativeModernAnalyzer,
-    issues: Issue[],
-): void {
+function scanUnsafeSafetyProofs(context: RustMultiLineScanContext): void {
+    const { file, raw, masked, delegate, issues } = context;
     if (RUST_TEST_FILE_RE.test(file)) {
         return;
     }
@@ -546,8 +544,15 @@ export class RustModernAnalyzer implements Analyzer {
             maskConfig: RUST_MASK,
             rules,
             multiLineScanner: (raw, masked, file, issues) => {
-                scanAsyncLockIssues(file, raw, masked, this.delegate, issues);
-                scanUnsafeSafetyProofs(file, raw, masked, this.delegate, issues);
+                const scanContext: RustMultiLineScanContext = {
+                    file,
+                    raw,
+                    masked,
+                    delegate: this.delegate,
+                    issues,
+                };
+                scanAsyncLockIssues(scanContext);
+                scanUnsafeSafetyProofs(scanContext);
             },
         });
     }

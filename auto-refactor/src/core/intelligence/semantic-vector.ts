@@ -53,10 +53,10 @@ function fnv1a64(str: string): bigint {
  * @param x 32-bit unsigned integer.
  * @returns Number of set bits.
  */
-function popcount32(x: number): number {
-    let val = x - ((x >>> 1) & 0x55555555);
-    val = (val & 0x33333333) + ((val >>> 2) & 0x33333333);
-    return (((val + (val >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
+function popcount32(value32: number): number {
+    let accumulatedBits = value32 - ((value32 >>> 1) & 0x55555555);
+    accumulatedBits = (accumulatedBits & 0x33333333) + ((accumulatedBits >>> 2) & 0x33333333);
+    return (((accumulatedBits + (accumulatedBits >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
 }
 
 /**

@@ -283,9 +283,9 @@ export function buildScopeGraph(adapter: LanguageAdapter, root: NormalizedNode):
     /** Record a binding in the current scope, if the node introduces one. */
     function recordBinding(node: NormalizedNode): void {
         if (!currentScope) return;
-        const info = bindingOf(node);
-        if (!info) return;
-        const [name, kind] = info;
+        const bindingInfo = bindingOf(node);
+        if (!bindingInfo) return;
+        const [name, kind] = bindingInfo;
         // First declaration wins (defensive: same name declared twice in one scope
         // is a language-level error, not a scope-graph concern).
         if (!currentScope.bindings.has(name)) {
@@ -425,15 +425,7 @@ export class ScopeGraphStreamer {
      * Pre-order hook: record bindings and enter new scopes.
      * Called by runStreaming for each node (excluding the root).
      */
-    visit(
-        node: NormalizedNode,
-        _ctx: AnalyzerContext,
-        _parent: NormalizedNode | undefined,
-        _grandparent: NormalizedNode | undefined,
-        _depth: number,
-        _className: string | null,
-        _binding: string | null,
-    ): void {
+    visit(node: NormalizedNode): void {
         // 1. Record any binding this node introduces into the CURRENT (parent) scope.
         //    For function/class declarations, the name belongs to the enclosing scope,
         //    not the scope introduced by the function/class itself.
@@ -465,15 +457,7 @@ export class ScopeGraphStreamer {
      * Post-order hook: leave scopes introduced by this node.
      * Called by runStreaming after recursing into children.
      */
-    leave(
-        node: NormalizedNode,
-        _ctx: AnalyzerContext,
-        _parent: NormalizedNode | undefined,
-        _grandparent: NormalizedNode | undefined,
-        _depth: number,
-        _className: string | null,
-        _binding: string | null,
-    ): void {
+    leave(node: NormalizedNode): void {
         if (scopeKindForNode(node) !== null) {
             this.scopeStack.pop();
             this.currentScope = this.scopeStack[this.scopeStack.length - 1] ?? null;
@@ -501,9 +485,9 @@ export class ScopeGraphStreamer {
     /** Record a binding in the current scope, if the node introduces one. */
     private recordBinding(node: NormalizedNode): void {
         if (!this.currentScope) return;
-        const info = bindingOf(node);
-        if (!info) return;
-        const [name, kind] = info;
+        const bindingInfo = bindingOf(node);
+        if (!bindingInfo) return;
+        const [name, kind] = bindingInfo;
         // First declaration wins (defensive: same name declared twice in one scope
         // is a language-level error, not a scope-graph concern).
         if (!this.currentScope.bindings.has(name)) {

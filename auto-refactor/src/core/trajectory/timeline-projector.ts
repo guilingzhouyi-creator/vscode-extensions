@@ -169,10 +169,10 @@ export function parseDurationToMs(duration?: string | number): number {
         return DEFAULT_SINCE_DURATION_MS;
     }
 
-    const value = parseFloat(match[1]);
+    const durationQuantity = parseFloat(match[1]);
     const unitKey = (match[2] || 'h').toLowerCase();
     const multiplier = DURATION_MULTIPLIERS[unitKey];
-    return multiplier ? Math.round(value * multiplier) : DEFAULT_SINCE_DURATION_MS;
+    return multiplier ? Math.round(durationQuantity * multiplier) : DEFAULT_SINCE_DURATION_MS;
 }
 
 /**
@@ -606,12 +606,12 @@ function foldIdleIntervals(rawStepBuckets: RawStepBucket[]): TimelineBucketSnaps
     let idleEndTimeMs = 0;
 
     for (let index = 0; index < rawStepBuckets.length; index++) {
-        const item = rawStepBuckets[index];
-        if (item.records.length === 0) {
+        const stepBucket = rawStepBuckets[index];
+        if (stepBucket.records.length === 0) {
             if (idleRunCount === 0) {
-                idleEndTimeMs = item.endTimeMs;
+                idleEndTimeMs = stepBucket.endTimeMs;
             }
-            idleStartTimeMs = item.startTimeMs;
+            idleStartTimeMs = stepBucket.startTimeMs;
             idleRunCount++;
             continue;
         }
@@ -625,7 +625,12 @@ function foldIdleIntervals(rawStepBuckets: RawStepBucket[]): TimelineBucketSnaps
         });
         idleRunCount = 0;
         foldedSnapshots.push(
-            foldSingleBucket(item.bucketId, item.startTimeMs, item.endTimeMs, item.records),
+            foldSingleBucket(
+                stepBucket.bucketId,
+                stepBucket.startTimeMs,
+                stepBucket.endTimeMs,
+                stepBucket.records,
+            ),
         );
     }
 

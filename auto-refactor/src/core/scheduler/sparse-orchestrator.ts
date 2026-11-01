@@ -52,6 +52,18 @@ export type DomainAuditExecutor = (
 ) => Promise<Issue[]>;
 
 /**
+ * Configuration options for initializing a SparseOrchestrator instance.
+ */
+export interface SparseOrchestratorOptions {
+    readonly partitioner?: DynamicPartitioner;
+    readonly cache?: ReviewContextCache;
+    readonly eventBus?: ReviewEventBus;
+    readonly tensorPartitioner?: TensorPartitioner;
+    readonly topologyCache?: TopologyCacheManager;
+    readonly quotaGateway?: AgentQuotaGateway;
+}
+
+/**
  * Seven-stage sparse review pipeline orchestrator.
  */
 export class SparseOrchestrator {
@@ -63,20 +75,13 @@ export class SparseOrchestrator {
     private readonly quotaGateway: AgentQuotaGateway;
     private customExecutor?: DomainAuditExecutor;
 
-    public constructor(
-        partitioner = defaultDynamicPartitioner,
-        cache = defaultReviewContextCache,
-        eventBus = defaultReviewEventBus,
-        tensorPartitioner = defaultTensorPartitioner,
-        topologyCache = defaultTopologyCacheManager,
-        quotaGateway = defaultAgentQuotaGateway,
-    ) {
-        this.partitioner = partitioner;
-        this.cache = cache;
-        this.eventBus = eventBus;
-        this.tensorPartitioner = tensorPartitioner;
-        this.topologyCache = topologyCache;
-        this.quotaGateway = quotaGateway;
+    public constructor(options: SparseOrchestratorOptions = {}) {
+        this.partitioner = options.partitioner ?? defaultDynamicPartitioner;
+        this.cache = options.cache ?? defaultReviewContextCache;
+        this.eventBus = options.eventBus ?? defaultReviewEventBus;
+        this.tensorPartitioner = options.tensorPartitioner ?? defaultTensorPartitioner;
+        this.topologyCache = options.topologyCache ?? defaultTopologyCacheManager;
+        this.quotaGateway = options.quotaGateway ?? defaultAgentQuotaGateway;
     }
 
     /**

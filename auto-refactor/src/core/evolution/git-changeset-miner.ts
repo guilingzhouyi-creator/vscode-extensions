@@ -67,7 +67,7 @@ export interface MineGitNumstatOptions {
 /** Normalized entropy ceiling above which a changeset counts as diffused. */
 export const DEFAULT_MAX_DIFFUSION_ENTROPY = 0.85;
 /** Minimum changed-file count before diffusion entropy is evaluated at all. */
-export const DEFAULT_MIN_FILES_FOR_ENTROPY_CHECK = 8;
+export const DEFAULT_MIN_ENTROPY_FILES = 8;
 /** Minimum distinct subsystem count before a changeset counts as diffused. */
 export const DEFAULT_MIN_SUBSYSTEMS_FOR_DIFFUSION = 2;
 
@@ -187,9 +187,9 @@ function computeRawShannonEntropy(
     const count = fileChanges.length;
 
     for (let i = 0; i < count; i++) {
-        const item = fileChanges[i];
-        if (item.total > 0) {
-            const prob = item.total / sumDelta;
+        const fileChange = fileChanges[i];
+        if (fileChange.total > 0) {
+            const prob = fileChange.total / sumDelta;
             rawEntropy -= prob * (Math.log(prob) / Math.LN2);
         }
     }
@@ -226,7 +226,7 @@ export function computeChangeEntropy(
 ): ChangeEntropyResult {
     const fileCount = fileChanges.length;
     const knownSubs = options?.knownSubsystems ?? DEFAULT_KNOWN_SUBSYSTEMS;
-    const minFiles = options?.minFilesForEntropy ?? DEFAULT_MIN_FILES_FOR_ENTROPY_CHECK;
+    const minFiles = options?.minFilesForEntropy ?? DEFAULT_MIN_ENTROPY_FILES;
     const maxDiffusion = options?.maxDiffusionEntropy ?? DEFAULT_MAX_DIFFUSION_ENTROPY;
     const minSubs = options?.minSubsystemsForDiffusion ?? DEFAULT_MIN_SUBSYSTEMS_FOR_DIFFUSION;
 
@@ -262,10 +262,10 @@ export function computeChangeEntropy(
     const subSet = new Set<string>();
 
     for (let i = 0; i < fileCount; i++) {
-        const item = fileChanges[i];
-        sumDelta += item.total;
-        dirSet.add(normalizePathSeparators(path.dirname(item.filePath)));
-        subSet.add(resolveSubsystem(item.filePath, knownSubs));
+        const fileChange = fileChanges[i];
+        sumDelta += fileChange.total;
+        dirSet.add(normalizePathSeparators(path.dirname(fileChange.filePath)));
+        subSet.add(resolveSubsystem(fileChange.filePath, knownSubs));
     }
 
     if (sumDelta === 0) {
@@ -336,14 +336,14 @@ export function mineGitNumstat(options?: MineGitNumstatOptions): string {
             args.push(options.commitRange);
         }
 
-        const res = childProcess.spawnSync(CMD_GIT, args, {
+        const gitResult = childProcess.spawnSync(CMD_GIT, args, {
             cwd: options?.cwd || process.cwd(),
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'ignore'],
             maxBuffer: MAX_EXEC_BUFFER_BYTES,
         });
 
-        return res.status === 0 && res.stdout ? res.stdout : '';
+        return gitResult.status === 0 && gitResult.stdout ? gitResult.stdout : '';
     } catch {
         return '';
     }

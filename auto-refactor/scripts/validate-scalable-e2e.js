@@ -44,14 +44,11 @@ async function testEndToEndScalablePipeline() {
   const topologyCache = new TopologyCacheManager(50);
   const tensorPartitioner = new TensorPartitioner(10);
 
-  const orchestrator = new SparseOrchestrator(
-    undefined,
-    undefined,
-    undefined,
+  const orchestrator = new SparseOrchestrator({
     tensorPartitioner,
     topologyCache,
     quotaGateway,
-  );
+  });
 
   // Setup multi-module code corpus with circular dependency and duplicate exported symbol
   const files = [

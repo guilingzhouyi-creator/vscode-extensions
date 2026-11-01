@@ -158,6 +158,17 @@ function kindInfoFor(astNode: ts.Node): TsKindInfo {
     };
 }
 
+interface TsSyntaxFlags {
+    readonly fnLike: boolean;
+    readonly isLiteral: boolean;
+    readonly isScope: boolean;
+    readonly isFuncKw: boolean;
+    readonly isClassDefining: boolean;
+    readonly isBinding: boolean;
+    readonly topLevel: boolean;
+    readonly symbolCall: boolean;
+}
+
 /**
  * Lazy projection source for TypeScript-family files.
  */
@@ -210,64 +221,37 @@ export class TsNodeProjector implements NodeProjector {
         if (this.isSourceFile(rawNode)) return { kind: NodeKind.SourceFile };
 
         const kindMeta = kindInfoFor(rawNode);
-        const fnLike = kindMeta.fnLike;
-        const isLiteral = kindMeta.literal !== 0;
-        const isScope = kindMeta.increasesNesting;
-        const isFuncKw = rawNode.kind === ts.SyntaxKind.FunctionKeyword;
-        const isClassDefining = kindMeta.isClassDefining;
-        const isBinding = introducesBinding(rawNode);
-        const topLevel = !!parentRaw && this.isSourceFile(parentRaw) && isTopLevelDecl(rawNode);
-        const symbolCall = this.policy.needSymbols === true && kindMeta.kind === NodeKind.Call;
-        const isObservable = this.isObservableSyntax(
-            fnLike,
-            isClassDefining,
-            isBinding,
-            isScope,
-            symbolCall,
-            isFuncKw,
-            topLevel,
-        );
+        const flags: TsSyntaxFlags = {
+            fnLike: kindMeta.fnLike,
+            isLiteral: kindMeta.literal !== 0,
+            isScope: kindMeta.increasesNesting,
+            isFuncKw: rawNode.kind === ts.SyntaxKind.FunctionKeyword,
+            isClassDefining: kindMeta.isClassDefining,
+            isBinding: introducesBinding(rawNode),
+            topLevel: !!parentRaw && this.isSourceFile(parentRaw) && isTopLevelDecl(rawNode),
+            symbolCall: this.policy.needSymbols === true && kindMeta.kind === NodeKind.Call,
+        };
+        const isObservable = this.isObservableSyntax(flags);
 
-        if (
-            this.shouldCollapseToPlaceholder(kindMeta, isLiteral, isFuncKw, rawNode, isObservable)
-        ) {
+        if (this.shouldCollapseToPlaceholder(kindMeta, flags, rawNode, isObservable)) {
             return OTHER_PLACEHOLDER;
         }
 
-        const node = this.buildProjectedNode(
-            rawNode,
-            kindMeta,
-            fnLike,
-            isLiteral,
-            isScope,
-            isFuncKw,
-            isClassDefining,
-            isBinding,
-            topLevel,
-        );
+        const node = this.buildProjectedNode(rawNode, kindMeta, flags);
         this.applyProjectedMetadata(
             node,
             rawNode,
             parentRaw as ts.Node | undefined,
             grandparentRaw as ts.Node | undefined,
-            isLiteral,
-            fnLike,
+            flags,
         );
         return node;
     }
 
-    private isObservableSyntax(
-        fnLike: boolean,
-        isClassDefining: boolean,
-        isBinding: boolean,
-        isScope: boolean,
-        symbolCall: boolean,
-        isFuncKw: boolean,
-        topLevel: boolean,
-    ): boolean {
-        if (fnLike || isClassDefining || isBinding) return true;
-        if (isScope || symbolCall || topLevel) return true;
-        return isFuncKw && Boolean(this.policy.needComplexity);
+    private isObservableSyntax(flags: TsSyntaxFlags): boolean {
+        if (flags.fnLike || flags.isClassDefining || flags.isBinding) return true;
+        if (flags.isScope || flags.symbolCall || flags.topLevel) return true;
+        return flags.isFuncKw && Boolean(this.policy.needComplexity);
     }
 
     private isPlaceholderFastPath(
@@ -291,28 +275,25 @@ export class TsNodeProjector implements NodeProjector {
 
     private shouldCollapseToPlaceholder(
         kindMeta: TsKindInfo,
-        isLiteral: boolean,
-        isFuncKw: boolean,
+        flags: TsSyntaxFlags,
         astNode: ts.Node,
         isObservable: boolean,
     ): boolean {
-        if (this.isPlaceholderFastPath(kindMeta, isLiteral, isFuncKw, astNode)) return true;
-        if (isLiteral) return false;
+        if (this.isPlaceholderFastPath(kindMeta, flags.isLiteral, flags.isFuncKw, astNode)) return true;
+        if (flags.isLiteral) return false;
         return !isObservable;
     }
 
     private resolveProjectedPositions(
         astNode: ts.Node,
         isCall: boolean,
-        isLiteral: boolean,
-        fnLike: boolean,
-        isFuncKw: boolean,
+        flags: TsSyntaxFlags,
         wantsSymbols: boolean,
         declaration: boolean,
     ): { start?: Position; end?: Position } {
         const needsPos =
             isCall ||
-            (this.policy.needPositions && (isLiteral || fnLike || isFuncKw)) ||
+            (this.policy.needPositions && (flags.isLiteral || flags.fnLike || flags.isFuncKw)) ||
             (wantsSymbols && declaration);
         if (!needsPos) return {};
         return {
@@ -364,50 +345,42 @@ export class TsNodeProjector implements NodeProjector {
     private buildProjectedNode(
         astNode: ts.Node,
         kindMeta: TsKindInfo,
-        fnLike: boolean,
-        isLiteral: boolean,
-        isScope: boolean,
-        isFuncKw: boolean,
-        isClassDefining: boolean,
-        isBinding: boolean,
-        topLevel: boolean,
+        flags: TsSyntaxFlags,
     ): NormalizedNode {
         const isCall = kindMeta.kind === NodeKind.Call;
         const wantsSymbols = this.policy.needSymbols === true;
-        const declaration = fnLike || isClassDefining || isBinding;
+        const declaration = flags.fnLike || flags.isClassDefining || flags.isBinding;
         const pos = this.resolveProjectedPositions(
             astNode,
             isCall,
-            isLiteral,
-            fnLike,
-            isFuncKw,
+            flags,
             wantsSymbols,
             declaration,
         );
 
         const node: NormalizedNode = {
             kind: kindMeta.kind,
-            rawKind: this.resolveProjectedRawKind(isFuncKw),
-            text: isLiteral && this.policy.needLiterals ? astNode.getText(this.sf) : undefined,
+            rawKind: this.resolveProjectedRawKind(flags.isFuncKw),
+            text: flags.isLiteral && this.policy.needLiterals ? astNode.getText(this.sf) : undefined,
             start: pos.start,
             end: pos.end,
             name: this.resolveProjectedName(astNode, isCall, wantsSymbols, declaration),
             calleeReceiver: isCall ? (calleeReceiverOf(astNode, this.sf) ?? undefined) : undefined,
-            functionLike: fnLike,
-            isClassDefining,
-            introducesBinding: isBinding,
+            functionLike: flags.fnLike,
+            isClassDefining: flags.isClassDefining,
+            introducesBinding: flags.isBinding,
             bindingName: this.resolveProjectedBindingName(
                 astNode,
-                isBinding,
+                flags.isBinding,
                 wantsSymbols,
                 declaration,
             ),
-            increasesNesting: isScope,
+            increasesNesting: flags.isScope,
             isConstructor:
                 Boolean(this.policy.needComplexity) && ts.isConstructorDeclaration(astNode),
-            parameters: fnLike ? this.extractFnParameters(astNode) : undefined,
-            topLevel,
-            exported: this.isExportedTopLevel(astNode, topLevel),
+            parameters: flags.fnLike ? this.extractFnParameters(astNode) : undefined,
+            topLevel: flags.topLevel,
+            exported: this.isExportedTopLevel(astNode, flags.topLevel),
         };
         return node;
     }
@@ -431,10 +404,9 @@ export class TsNodeProjector implements NodeProjector {
         astNode: ts.Node,
         parentRaw: ts.Node | undefined,
         grandparentRaw: ts.Node | undefined,
-        isLiteral: boolean,
-        fnLike: boolean,
+        flags: TsSyntaxFlags,
     ): void {
-        if (isLiteral && this.policy.needLiterals) {
+        if (flags.isLiteral && this.policy.needLiterals) {
             node.isConstBound = isConstBoundOf(
                 astNode,
                 parentRaw,
@@ -443,7 +415,7 @@ export class TsNodeProjector implements NodeProjector {
             );
             node.tolerated = isToleratedOf(astNode, parentRaw, this.sf, grandparentRaw);
         }
-        if (this.policy.needComplexity && fnLike) {
+        if (this.policy.needComplexity && flags.fnLike) {
             node.children = this.projectSubtree(astNode, parentRaw, grandparentRaw);
         }
     }

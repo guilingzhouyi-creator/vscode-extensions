@@ -91,7 +91,7 @@ const CANONICAL_DIMENSIONS = Object.freeze([
     { key: 'commentQuality', num: '10', name: '注释质量', labelEn: '注释质量 (Comment Quality)' },
 ]);
 
-function renderMarkdownProgressBar(score: number, width = 12): string {
+function formatScoreProgressBar(score: number, width = 12): string {
     const clamped = Math.max(0, Math.min(100, score));
     const filled = Math.round((clamped / 100) * width);
     const empty = width - filled;
@@ -147,26 +147,26 @@ export function listReporters(): string[] {
  * Groups top scoring rationales by dimension key to explain score deductions.
  */
 function groupTopRationalesByDimension(rationales?: Array<{ dimension: string; delta: number; reason: string; rule?: string; line?: number }>): Map<string, string[]> {
-    const result = new Map<string, string[]>();
-    if (!rationales || rationales.length === 0) return result;
+    const rationalesMap = new Map<string, string[]>();
+    if (!rationales || rationales.length === 0) return rationalesMap;
     CANONICAL_DIMENSIONS.forEach((dimensionDef) => {
-        result.set(dimensionDef.key, []);
+        rationalesMap.set(dimensionDef.key, []);
     });
     for (const rationale of rationales) {
-        const list = result.get(rationale.dimension);
+        const list = rationalesMap.get(rationale.dimension);
         if (list && list.length < 2) {
             const ruleText = rationale.rule ? `\`${rationale.rule}\` ` : '';
             const lineText = rationale.line ? ` (L${rationale.line})` : '';
             list.push(`${ruleText}${rationale.delta}分${lineText}: ${rationale.reason}`);
         }
     }
-    return result;
+    return rationalesMap;
 }
 
 /**
  * Formats a single markdown table row for a canonical quality dimension.
  */
-function renderMarkdownDimensionRow(
+function formatDimensionRow(
     dimensionDef: (typeof CANONICAL_DIMENSIONS)[number],
     qualityScore: NonNullable<ScanReport['qualityScore']>,
     notEvaluatedSet: Set<string>,
@@ -187,16 +187,16 @@ function renderMarkdownDimensionRow(
     if (dimensionScore < BADGE_YELLOW_MIN_SCORE) status = STATUS_FAIL;
     else if (dimensionScore < DIMENSION_PASS_MIN_SCORE) status = STATUS_WARN;
 
-    const bar = renderMarkdownProgressBar(dimensionScore);
+    const progressBar = formatScoreProgressBar(dimensionScore);
     const hints = rationalesByDimension.get(dimensionDef.key);
     const guidance = hints && hints.length > 0 ? hints.join('; ') : '健康达标 (无显式扣分)';
-    return `| ${dimensionDef.num} | ${dimensionDef.labelEn} | ${scoreText} | ${weightText} | ${status} | ${bar} | ${guidance.replace(/\|/g, '\\|')} |`;
+    return `| ${dimensionDef.num} | ${dimensionDef.labelEn} | ${scoreText} | ${weightText} | ${status} | ${progressBar} | ${guidance.replace(/\|/g, '\\|')} |`;
 }
 
 /**
  * Renders the complete ten-dimensional quality scorecard in markdown.
  */
-function renderMarkdownQualityScorecard(qualityScore: NonNullable<ScanReport['qualityScore']>): string[] {
+function formatQualityScorecard(qualityScore: NonNullable<ScanReport['qualityScore']>): string[] {
     const compositeText = Number.isFinite(qualityScore.compositeScore)
         ? `${qualityScore.compositeScore} / 100`
         : 'N/A';
@@ -214,7 +214,7 @@ function renderMarkdownQualityScorecard(qualityScore: NonNullable<ScanReport['qu
     const rationalesByDimension = groupTopRationalesByDimension(qualityScore.rationales);
     const notEvaluatedSet = new Set(qualityScore.notEvaluated ?? []);
     for (const dimensionDef of CANONICAL_DIMENSIONS) {
-        section.push(renderMarkdownDimensionRow(dimensionDef, qualityScore, notEvaluatedSet, rationalesByDimension));
+        section.push(formatDimensionRow(dimensionDef, qualityScore, notEvaluatedSet, rationalesByDimension));
     }
 
     if (qualityScore.technicalDebt || qualityScore.densityTensorSummary) {
@@ -243,7 +243,7 @@ function renderMarkdownQualityScorecard(qualityScore: NonNullable<ScanReport['qu
 /**
  * Renders detected issues summary table in markdown.
  */
-function renderMarkdownIssuesSection(issues: ScanReport['issues']): string[] {
+function formatIssuesSection(issues: ScanReport['issues']): string[] {
     if (issues.length === 0) return [];
     const section: string[] = [
         ``,
@@ -285,11 +285,11 @@ registerReporter({
         ];
 
         if (qualityScore) {
-            lines.push(...renderMarkdownQualityScorecard(qualityScore));
+            lines.push(...formatQualityScorecard(qualityScore));
         }
 
         if (issues.length > 0) {
-            lines.push(...renderMarkdownIssuesSection(issues));
+            lines.push(...formatIssuesSection(issues));
         }
 
         return lines.join('\n');

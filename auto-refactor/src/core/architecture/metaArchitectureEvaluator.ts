@@ -49,6 +49,26 @@ const RE_CONST = /[\/\\](?:constants?|literals?|enums?)[\/\\]/i;
 const RE_UTILITY_FILE =
     /(?:^|[\/\\])(?:utils?|helpers?|common|tools?|misc|shared-utils?)(?:\.[a-zA-Z0-9]+)?$/i;
 
+interface TaxonomyAuditOptions {
+    nodes: SemanticArchitectureNode[];
+    edges: SemanticArchitectureEdge[];
+    graph: SemanticArchitectureGraph;
+    flagTaxonomy: boolean;
+    issues: Issue[];
+}
+
+interface BuildAuditResultOptions {
+    graph: SemanticArchitectureGraph;
+    nodes: SemanticArchitectureNode[];
+    edges: SemanticArchitectureEdge[];
+    issues: Issue[];
+    inversionCount: number;
+    privateBypassCount: number;
+    configMaturity: ArchitectureAuditResult['configMaturity'];
+    fileTaxonomyResult: FileTaxonomyAuditResult | undefined;
+    boundaryDisciplineResult: BoundaryDisciplineResult | undefined;
+}
+
 /**
  * Evaluator engine for SemanticArchitectureGraph.
  */
@@ -137,12 +157,9 @@ export class MetaArchitectureEvaluator {
     }
 
     private evaluateTaxonomyAudit(
-        nodes: SemanticArchitectureNode[],
-        edges: SemanticArchitectureEdge[],
-        graph: SemanticArchitectureGraph,
-        flagTaxonomy: boolean,
-        issues: Issue[],
+        params: TaxonomyAuditOptions,
     ): FileTaxonomyAuditResult | undefined {
+        const { nodes, edges, graph, flagTaxonomy, issues } = params;
         if (!flagTaxonomy) return undefined;
 
         const fanInMap = new Map<string, number>();
@@ -225,17 +242,18 @@ export class MetaArchitectureEvaluator {
         return boundaryDisciplineResult;
     }
 
-    private buildAuditResult(
-        graph: SemanticArchitectureGraph,
-        nodes: SemanticArchitectureNode[],
-        edges: SemanticArchitectureEdge[],
-        issues: Issue[],
-        inversionCount: number,
-        privateBypassCount: number,
-        configMaturity: ArchitectureAuditResult['configMaturity'],
-        fileTaxonomyResult: FileTaxonomyAuditResult | undefined,
-        boundaryDisciplineResult: BoundaryDisciplineResult | undefined,
-    ): ArchitectureAuditResult {
+    private buildAuditResult(params: BuildAuditResultOptions): ArchitectureAuditResult {
+        const {
+            graph,
+            nodes,
+            edges,
+            issues,
+            inversionCount,
+            privateBypassCount,
+            configMaturity,
+            fileTaxonomyResult,
+            boundaryDisciplineResult,
+        } = params;
         const headlessBreachCount = graph.findHeadlessViolations().length;
         const layerDistribution = graph.computeDistribution();
         const nodeMap = new Map<string, SemanticArchitectureNode>();
@@ -287,20 +305,20 @@ export class MetaArchitectureEvaluator {
             options.flagConfigHardcoding ?? true,
             issues,
         );
-        const fileTaxonomyResult = this.evaluateTaxonomyAudit(
+        const fileTaxonomyResult = this.evaluateTaxonomyAudit({
             nodes,
             edges,
             graph,
-            options.flagFileTaxonomy ?? true,
+            flagTaxonomy: options.flagFileTaxonomy ?? true,
             issues,
-        );
+        });
         const boundaryDisciplineResult = this.evaluateDisciplineAudit(
             nodes,
             options.flagBoundaryDiscipline ?? true,
             issues,
         );
 
-        return this.buildAuditResult(
+        return this.buildAuditResult({
             graph,
             nodes,
             edges,
@@ -310,7 +328,7 @@ export class MetaArchitectureEvaluator {
             configMaturity,
             fileTaxonomyResult,
             boundaryDisciplineResult,
-        );
+        });
     }
 }
 

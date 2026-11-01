@@ -104,7 +104,7 @@ export interface RadixCacheTelemetry {
 /**
  * Configuration options for AstPrefixRadixCache.
  */
-export interface AstPrefixRadixCacheOptions {
+export interface AstRadixCacheOptions {
     /** Minimum matched lines to consider a prefix hit (defaults to 3). */
     readonly minMatchLines?: number;
     /** Maximum lines inspected from the file head (defaults to 64). */
@@ -141,7 +141,7 @@ export class AstPrefixRadixCache {
     private totalMatchedLinesSum = 0;
     private readonly unregister?: () => void;
 
-    public constructor(options: AstPrefixRadixCacheOptions = {}) {
+    public constructor(options: AstRadixCacheOptions = {}) {
         this.minMatchLines = options.minMatchLines ?? DEFAULT_MIN_MATCH_LINES;
         this.maxPrefixScanLines = options.maxPrefixScanLines ?? DEFAULT_MAX_PREFIX_SCAN_LINES;
         this.maxTreeNodes = options.maxTreeNodes ?? MAX_RADIX_TREE_NODES;
