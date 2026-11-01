@@ -2,15 +2,20 @@
  * Module: Workspace Rule Catalog Generator & SSOT Consolidator
  * File Path: scripts/common/generate-rule-catalog.js
  * Architecture Role: Single source of truth consolidator for all active static analysis and review rules
- *   across auto-refactor, workspace-timing, WebGames, and global tooling.
- * Dependencies & Triggers: Consumes registry.js, review-rules.json, and audit_config.py;
- *   invoked by audit-all, pre-commit-gate, pre-push-gate, CI, and local verification.
+ *   across auto-refactor, workspace-timing, WebGames, fractal-git, and global tooling.
+ * Dependencies & Triggers: Consumes registry.js, review-rules.json, commit-msg-forbidden-terms.json,
+ *   and rule-sources/*.json; invoked by audit-all, pre-commit-gate, pre-push-gate, CI, and local verification.
  * Responsibilities:
  *   1. Discover and aggregate rule metadata across all sub-projects;
- *   2. Validate standard 3-3-3 topology, severity mappings, and non-empty summaries;
- *   3. Generate canonical rule-catalog.json (SSOT) or assert zero drift in check-only mode.
+ *   2. Project every source onto one catalog shape, carrying each rule's own label and its
+ *      enforcement flag so no per-rule semantics has to be recovered from prose;
+ *   3. Validate standard 3-3-3 topology, severity mappings, and non-empty summaries;
+ *   4. Generate canonical rule-catalog.json (SSOT) or assert zero drift in check-only mode.
  * Exit Semantics & Design Rationale: Exits 0 on clean catalog generation or parity check, 1 on schema/drift error.
  *   Provides immutable baseline reference preventing rule ID hallucinations across commits and PRs.
+ *   Every summary is written in English regardless of the source language: the catalog is read by
+ *   agents and gates, and a row that switched language with its source would make the same query
+ *   return different vocabularies per project.
  */
 'use strict';
 
@@ -35,6 +40,9 @@ const PROJECT_COUNT_KEYS = Object.freeze({
 
 /** Tracked declaration the canonical-id pattern and legacy reason are read from. */
 const RULE_TYPES_SOURCE = path.join(ROOT, 'auto-refactor/src/core/rules/types.ts');
+
+/** Fallback summary for a commit rule that declares neither an English summary nor a title. */
+const DEFAULT_COMMIT_RULE_SUMMARY = 'Commit message style and text governance rule';
 
 /**
  * Reads one exported `const NAME = <literal>;` declaration out of the rule-types source.
@@ -96,37 +104,87 @@ function readRuleSource(file, label) {
   return list;
 }
 
-function mapRuleEntry(r) {
-  if (!r || !r.id) return null;
-  return {
-    id: r.id,
-    project: 'auto-refactor',
-    family: r.family || 'general',
-    severity: r.defaultSeverity || r.severity || 'error',
-    summary: r.summary || '',
+/**
+ * Projects one source rule into a catalog entry using the shape every source shares.
+ *
+ * The five flat rule sources (auto-refactor registry, auto-refactor snapshot, WebGames,
+ * fractal-git, global tooling) differ only in how they name a family, where their severity lives,
+ * and which extra fields they carry. Each used to spell out its own id/project/family/severity/
+ * summary object, so a change to the common shape had to be made five times and a source that
+ * forgot one of them produced an entry no other guard expected. The per-source decisions are
+ * expressed as small resolvers instead, and `passThrough` names the fields a source contributes
+ * beyond the common shape so nothing is copied by accident.
+ *
+ * @param {object} rule - One source rule entry.
+ * @param {object} options - Projection options.
+ * @param {string} options.project - Owning project name written to the catalog.
+ * @param {function(object): string} options.resolveFamily - Derives the theme family.
+ * @param {function(object): string} options.resolveSeverity - Derives the severity.
+ * @param {function(object): string} [options.resolveSummary] - Derives the summary; defaults to `summary`.
+ * @param {Array<string>} [options.passThrough] - Extra source fields copied when present.
+ * @param {function(object): Object} [options.resolveExtras] - Derives conditional extra fields.
+ * @returns {object|null} Catalog entry, or null when the rule carries no id.
+ */
+function projectRule(rule, options) {
+  if (!rule || !rule.id) return null;
+  const resolveSummary = options.resolveSummary || ((r) => r.summary || '');
+  const extras = options.resolveExtras ? options.resolveExtras(rule) : {};
+  const entry = {
+    id: rule.id,
+    project: options.project,
+    family: options.resolveFamily(rule),
+    severity: options.resolveSeverity(rule),
+    summary: resolveSummary(rule),
+    ...extras,
   };
+  for (const field of options.passThrough || []) {
+    if (rule[field] !== undefined) entry[field] = rule[field];
+  }
+  return entry;
+}
+
+/** Severity resolution shared by the sources that publish a single severity field. */
+function defaultSeverity(rule) {
+  return rule.defaultSeverity || rule.severity || 'error';
+}
+
+/**
+ * Reads one committed rule source catalog and projects every entry.
+ *
+ * @param {string} file - Absolute source catalog path.
+ * @param {string} label - Human-readable source label for diagnostics.
+ * @param {object} options - Projection options forwarded to `projectRule`.
+ * @returns {Array<object>} Catalog entries.
+ */
+function readProjectedSource(file, label, options) {
+  return readRuleSource(file, label)
+    .map((rule) => projectRule(rule, options))
+    .filter(Boolean);
 }
 
 function collectAutoRefactorRules() {
+  const options = {
+    project: 'auto-refactor',
+    resolveFamily: (r) => r.family || 'general',
+    resolveSeverity: defaultSeverity,
+  };
   const registryPath = path.join(ROOT, 'auto-refactor/dist/core/rules/registry.js');
   if (fs.existsSync(registryPath)) {
     try {
       const { RULE_REGISTRY } = require(registryPath);
       const list = Array.isArray(RULE_REGISTRY) ? RULE_REGISTRY : Object.values(RULE_REGISTRY);
-      const mapped = list.map(mapRuleEntry).filter(Boolean);
+      const mapped = list.map((rule) => projectRule(rule, options)).filter(Boolean);
       if (mapped.length > 0) return mapped;
     } catch (err) {
       console.warn('Warning: Could not load auto-refactor compiled registry:', err.message);
     }
   }
 
-  return readRuleSource(AUTO_REFACTOR_SOURCE, 'auto-refactor rules registry snapshot').map((r) => ({
-    id: r.id,
-    project: 'auto-refactor',
-    family: r.family || 'general',
-    severity: r.severity || 'error',
-    summary: r.summary || '',
-  }));
+  return readProjectedSource(
+    AUTO_REFACTOR_SOURCE,
+    'auto-refactor rules registry snapshot',
+    options,
+  );
 }
 
 /**
@@ -158,6 +216,11 @@ function withCanonicalVerdict(rule) {
  * no cross-project family aggregate could be compared. A checker without a declared family aborts
  * the run rather than falling back to a layer: a silent fallback is what produced that ambiguity.
  *
+ * `ruleTitles` supplies the per-rule label. Without it every child rule inherited the checker title,
+ * so twelve DOC-CL and DOC-RD rules shared one summary string and the catalog could not say what
+ * any individual rule checked. A child rule with no entry keeps the composed `title (id)` form
+ * rather than failing, because the projection is a reporting surface, not the enforcement boundary.
+ *
  * @param {object} checker - One entry of `review-rules.json#checkers`.
  * @param {Array<object>} rules - Collector for emitted catalog entries.
  * @returns {void}
@@ -175,12 +238,25 @@ function processCheckerRules(checker, rules) {
     layer: checker.layer,
     severity: 'error',
   };
+  const ruleTitles = checker.ruleTitles || {};
   if (checker.id) {
-    rules.push({ ...base, id: checker.id, summary: checker.title || '' });
+    const selfTitle = ruleTitles[checker.id] || checker.title || '';
+    rules.push({
+      ...base,
+      id: checker.id,
+      summary: selfTitle,
+      ...(ruleTitles[checker.id] ? { title: ruleTitles[checker.id] } : {}),
+    });
   }
   for (const rid of checker.ruleIds || []) {
     if (!rid || rid === checker.id) continue;
-    rules.push({ ...base, id: rid, summary: `${checker.title} (${rid})` });
+    const title = ruleTitles[rid];
+    rules.push({
+      ...base,
+      id: rid,
+      summary: title || `${checker.title} (${rid})`,
+      ...(title ? { title } : {}),
+    });
   }
 }
 
@@ -202,14 +278,32 @@ function collectWorkspaceTimingRules() {
   return rules;
 }
 
+/**
+ * Projects one WebGames rule into a catalog entry.
+ *
+ * `title` and `enforced` are carried through rather than dropped: the title is the per-rule label
+ * the catalog previously lacked (every WebGames row fell back to a shared placeholder string), and
+ * `enforced: false` is the machine-readable form of the old hand-written
+ * `[documentation-defined; not enforced]` suffix. Dropping either would push the semantics back
+ * into prose and let a documentation-only rule read as an enforced gate.
+ *
+ * @param {object} r - Source rule entry.
+ * @returns {object} Catalog entry.
+ */
 function collectWebGamesRules() {
-  return readRuleSource(WEBGAMES_SOURCE, 'WebGames rule catalog').map((r) => ({
-    id: r.id,
+  return readProjectedSource(WEBGAMES_SOURCE, 'WebGames rule catalog', {
     project: 'WebGames',
-    family: r.family || r.id.split('-')[0],
-    severity: r.severity || 'error',
-    summary: r.summary || '',
-  }));
+    resolveFamily: (r) => r.family || r.id.split('-')[0],
+    resolveSeverity: defaultSeverity,
+    // `title` is the per-rule label the catalog previously lacked; `enforced: false` is the
+    // machine-readable form of the old hand-written `[documentation-defined; not enforced]`
+    // suffix. Dropping either would push the semantics back into prose and let a documentation-only
+    // rule read as an enforced gate, so the enforcement flag is emitted only when it is false.
+    resolveExtras: (r) => ({
+      ...(r.title ? { title: r.title } : {}),
+      ...(r.enforced === false ? { enforced: false } : {}),
+    }),
+  });
 }
 
 /**
@@ -220,23 +314,20 @@ function collectWebGamesRules() {
  * the whole kernel taxonomy, so the second segment is the family and the namespace is asserted
  * rather than assumed.
  *
- * @param {Array<object>} entries - Source rule entries.
  * @returns {Array<object>} Catalog entries.
  */
 function collectFractalGitRules() {
-  return readRuleSource(FRACTAL_GIT_SOURCE, 'fractal-git rule catalog').map((r) => {
-    const segments = r.id.split('-');
-    if (segments.length < 3 || segments[0] !== 'FGT') {
-      throw new Error(`fractal-git rule '${r.id}' does not follow [NS]-[FAMILY]-[TOPIC]-[SEQ]`);
-    }
-    return {
-      id: r.id,
-      project: 'fractal-git',
-      namespace: segments[0],
-      family: r.family || segments[1],
-      severity: r.severity || 'error',
-      summary: r.summary || '',
-    };
+  return readProjectedSource(FRACTAL_GIT_SOURCE, 'fractal-git rule catalog', {
+    project: 'fractal-git',
+    resolveFamily: (r) => {
+      const segments = r.id.split('-');
+      if (segments.length < 3 || segments[0] !== 'FGT') {
+        throw new Error(`fractal-git rule '${r.id}' does not follow [NS]-[FAMILY]-[TOPIC]-[SEQ]`);
+      }
+      return r.family || segments[1];
+    },
+    resolveSeverity: defaultSeverity,
+    resolveExtras: (r) => ({ namespace: r.id.split('-')[0] }),
   });
 }
 
@@ -245,13 +336,21 @@ function collectCommitMsgRules() {
   if (!fs.existsSync(termsFile)) return [];
   try {
     const config = JSON.parse(fs.readFileSync(termsFile, 'utf8'));
-    return (config.rules || []).map((r) => ({
-      id: r.id,
-      project: 'global-tooling',
-      family: 'CMG',
-      severity: r.severity || 'error',
-      summary: r.title || 'Commit message style and text governance rule',
-    }));
+    return (config.rules || [])
+      .map((rule) =>
+        projectRule(rule, {
+          project: 'global-tooling',
+          resolveFamily: () => 'CMG',
+          resolveSeverity: defaultSeverity,
+          // `summary` is the objective English statement of the rule; `title` and the operator-facing
+          // `reason`/`guidance` stay localized for the terminal. The catalog prefers the English form
+          // so one bilingual rule does not enter the SSOT with two different languages depending on
+          // which field happened to exist.
+          resolveSummary: (r) => r.summary || r.title || DEFAULT_COMMIT_RULE_SUMMARY,
+          passThrough: ['title'],
+        }),
+      )
+      .filter(Boolean);
   } catch (err) {
     console.warn('Warning: Could not load commit-msg-forbidden-terms.json:', err.message);
     return [];
@@ -259,13 +358,11 @@ function collectCommitMsgRules() {
 }
 
 function collectPlatformGovernanceRules() {
-  return readRuleSource(GLOBAL_SOURCE, 'global tooling rule catalog').map((r) => ({
-    id: r.id,
+  return readProjectedSource(GLOBAL_SOURCE, 'global tooling rule catalog', {
     project: 'global-tooling',
-    family: r.family || r.id.split('-')[0],
-    severity: r.severity || 'error',
-    summary: r.summary || '',
-  }));
+    resolveFamily: (r) => r.family || r.id.split('-')[0],
+    resolveSeverity: defaultSeverity,
+  });
 }
 
 function collectGlobalToolingRules() {

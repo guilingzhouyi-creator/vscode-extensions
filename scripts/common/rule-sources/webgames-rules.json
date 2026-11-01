@@ -7,301 +7,451 @@
       "id": "ADV-BND-001",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+      "title": "Cross-domain private member access ban",
+      "summary": "Inside backend/domains one sub-domain must not read or write another sub-domain's underscore-prefixed members or call its private methods. Such access bypasses the anti-corruption seam, so a refactor in one domain silently breaks another; interaction must go through public contract methods, DTO payloads or EventBus events.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-CFG-001",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_71_用户会话全生命周期与主页HUD事件流双轨闭环治理/KALAR-DEV-2026-ST67-003_阶段3_配置驱动扩展与全域EventBus无头接线工程化.md)"
+      "title": "GameConfig-only configuration reads",
+      "summary": "Business thresholds, enums, copy text and numeric values must be read through GameConfig.get_int, get_float or get_string with an explicit safe default; a bare get_value() call outside the facade returns an untyped Variant and is a violation. Untyped reads hide the real source of truth and defeat configuration reload.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-CFG-002",
       "family": "ADV",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_70_配置库唯一事实提纯与冗余收敛治理/KALAR-DEV-2026-ST66-002_阶段2_配置血缘静态判重引擎与漂移检测算法实现.md) [documentation-defined; not enforced]"
+      "title": "Duplicate configuration table detection",
+      "summary": "Configuration tables whose key-order independent digest matches another table form a duplicate group and must be reconciled against the uniqueness manifest before they may coexist. An unregistered duplicate group becomes two competing sources of truth; the engine only reports the group and never rewrites the tables itself.",
+      "sourceRef": "WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_70_配置库唯一事实提纯与冗余收敛治理/KALAR-DEV-2026-ST66-002_阶段2_配置血缘静态判重引擎与漂移检测算法实现.md",
+      "enforced": false
     },
     {
       "id": "ADV-DEC-001",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+      "title": "Domain model scene-tree decoupling",
+      "summary": "A pure domain model or solver must extend RefCounted or Object; extending Node, Node2D, Control or any other scene-tree type couples domain logic to render-tree lifetime and blocks headless testing. Presentation interaction must travel through EventBus broadcasts or DTO arguments.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-EVT-001",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/infrastructure/event_bus/event_bus_core.gd)"
+      "title": "EventBus channel naming convention",
+      "summary": "A channel must be shaped <domain_id>.<event_name> where the first segment is an id already registered as a game domain, and channel values must come from the channel registry rather than scattered bare strings. An unregistered prefix such as auth or hud breaks routing and leaves the event untraceable.",
+      "sourceRef": "WebGames/backend/infrastructure/event_bus/event_bus_core.gd",
+      "enforced": true
     },
     {
       "id": "ADV-EVT-002",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+      "title": "Channel narrative key alignment",
+      "summary": "Every channel event_name must have a matching template key in that domain's narrative table unless the channel is declared as purely structured. A missing key silently drops the user-visible copy at run time while the event itself still dispatches, so the defect surfaces only as blank text.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-EVT-003",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+      "title": "Channel registry single source alignment",
+      "summary": "The ids registered in the event bus channel registry must equal the EventChannelDefinition constant values. Any difference means two sources of truth, so the publisher and the subscriber stop agreeing on the same channel.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-EVT-004",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+      "severity": "warning",
+      "title": "Broadcast payload narrative completeness",
+      "summary": "A literal payload passed to emit_domain_event must carry the fields the narrative renderer needs to fill its template; a purely structured event may omit them but must declare that explicitly. An incomplete payload renders as empty or colourless narrative text.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-LAM-001",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+      "severity": "warning",
+      "title": "Lambda capture lifetime safety",
+      "summary": "In GDScript 4 a lambda captures built-in typed locals by value and captured objects can form reference cycles, so assigning to a captured primitive inside the closure never updates the outer variable. Mutable state must travel through a Callable or a RefCounted holder object.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-NAM-001",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+      "title": "Unified identifier naming scheme",
+      "summary": "Class and enum names must be PascalCase, variables, functions and parameters snake_case, constants UPPER_SNAKE_CASE, private members underscore-prefixed, and static var must never be UPPER_SNAKE. One scheme across the code base keeps a symbol's kind predictable from its spelling alone.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-POOL-001",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/dto/destiny_mod_manifest_dto.gd)"
+      "title": "Object pool lifecycle contract",
+      "summary": "A class that enters ObjectPool must implement reset_state() and be fully reset when borrowed, and ownership must be validated on return to reject a double return. Residual state leaks into the next borrower and a double return corrupts pool bookkeeping.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-PRF-001",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/starter_loadout_dispatcher.gd)"
+      "severity": "warning",
+      "title": "Zero repeated work inside loops",
+      "summary": "A loop body must not re-read GameConfig.get_* each iteration, rebuild the same string every pass, or run a linear Array.find() scan. Cache the value or build a Dictionary index before entering the loop, because per-iteration repeated work multiplies straight into the frame budget on a hot path.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-PRF-002",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/agent_playthrough_session.gd)"
+      "severity": "warning",
+      "title": "No transient heap allocation in hot loops",
+      "summary": "A per-frame or high-frequency loop body must not call .new() or .duplicate(true) on every iteration; bounded low-frequency paths such as turn-level, event-driven or load-time code are exempt once the magnitude bound is documented in a comment. Per-iteration allocation causes garbage collection pauses and memory fragmentation.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-PRF-003",
       "family": "ADV",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]"
+      "title": "Loop string formatting elimination",
+      "summary": "A loop must not run percent placeholders or string formatting per iteration; precompile the template or assemble the text from a lookup table. Each iteration otherwise allocates a transient String and re-parses the format pattern.",
+      "sourceRef": "WebGames/docs/模板/GD老练风格硬性规范标准.md",
+      "enforced": false
     },
     {
       "id": "ADV-PRF-004",
       "family": "ADV",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]"
+      "title": "Loop linear search elimination",
+      "summary": "A loop must not locate items with Array.find() or repeated containment scans; build a Dictionary hash index during setup. Linear scanning makes the surrounding loop cost O(N) per lookup instead of O(1).",
+      "sourceRef": "WebGames/docs/模板/GD老练风格硬性规范标准.md",
+      "enforced": false
     },
     {
       "id": "ADV-RNG-001",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第08期_75到84/Phase_77_前端基础架构重构与根骨架施工细则/KALAR-DEV-2026-ST73-003_阶段3_UI可视化状态容器与全域Mock闭环工程化.md)"
+      "title": "Deterministic random dispatch only",
+      "summary": "Calling the Godot globals randf(), randi(), randomize(), randf_range(), randi_range() or randfn() is a violation; randomness must be drawn through DeterministicRNG with a controlled seed. Unseeded global randomness makes replays, arbitration and defect reproduction non-repeatable.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-SIG-001",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+      "title": "Signal emission argument contract",
+      "summary": "Arguments passed to emit_signal() or signal.emit() must match the signal declaration in count and type, and a bare null must not be emitted into a typed parameter. A mismatch crashes or silently corrupts the receiving side.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-TYP-001",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+      "severity": "warning",
+      "title": "Explicit typing and static inference",
+      "summary": "Property variables must declare an explicit type, and local variables must use := inference or declare a type rather than a bare untyped var. An untyped declaration lets a wrong value type travel silently until it fails far from its origin.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-TYP-002",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+      "title": "Function signature type completeness",
+      "summary": "Every business function must annotate each parameter type and declare its return type, using -> void when nothing is returned; bare parameters or a missing return annotation are violations. An unannotated signature cannot be statically checked, so type defects surface only at run time.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-TYP-003",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+      "severity": "warning",
+      "title": "No blind inference from dynamic returns",
+      "summary": "A := binding must not be applied to a dictionary get(), pop_front() or pop_back() result that may be null or Variant, because inference then hides the type defect. Declare the expected type with an explicit default and guard it, since this is exactly where a null slips past the compiler.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "ADV-UI-001",
       "family": "ADV",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]"
+      "title": "Batched presentation redraw",
+      "summary": "A presentation node must not redraw on every single property change; mark the state dirty and flush the redraw once per frame through a deferred call. Redrawing per mutation multiplies layout work inside one frame and drops frames.",
+      "sourceRef": "WebGames/docs/模板/GD老练风格硬性规范标准.md",
+      "enforced": false
     },
     {
       "id": "ART-AUD-005",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
+      "title": "Audio delivery container format",
+      "summary": "The art delivery contract lists the audio asset category with the Ogg container as its required format, alongside 32-bit PNG textures and TTF or OTF fonts. A delivery in an unlisted container cannot be imported by the asset pipeline, so the ticket cannot close.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/README.md",
+      "enforced": false
     },
     {
       "id": "ART-ICO-012",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
+      "title": "Icon legibility acceptance baseline",
+      "summary": "The art delivery contract lists the icon asset category against a legibility definition of done: contrast at or above 4.5:1 against the #0F131A dark base, and no smearing or clumping when scaled down to 16px. An icon that fails either check is unreadable in dense list and slot layouts.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/README.md",
+      "enforced": false
     },
     {
       "id": "ART-REC-001",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Nine-patch container four-spec slicing",
+      "summary": "Universal containers ship as four nine-patch specifications with fixed per-file slice margins: 128x128 panel at 16px, 64x64 card at 8px, 96x96 modal at 12px and 32x32 tooltip at 4px. Fixed slice margins keep corners and borders undistorted across each file's supported size range.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-REC-002",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Button variant state matrix",
+      "summary": "Each of the Primary, Secondary, Danger and Flat variants ships four state slices, normal, hover, pressed and disabled, for sixteen files at 48x48 with 6px slice margins and 4px corner radius; the pressed slice shifts content down 1px and drops its 2px drop shadow to 0. A missing state forces the engine to reuse normal and erases press feedback.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-REC-003",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Five-layer slot assembly",
+      "summary": "A slot is five stacked 48x48 layers rather than one flat image: recess base, centred 32x32 icon, 2px quality frame whose centre 44x44 stays fully transparent, state overlay, and a count badge anchored bottom-right. Separating frame and badge from the icon is what lets one icon serve every tier and stack count.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-REC-004",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Meter skin three-layer suite",
+      "summary": "Bars are built from a 64x16 track sliced 4px left and right, a 64x16 fill sliced 2px each side, and a pure white 60 percent opacity damage buffer layer beneath the fill; bar height is restricted to 16px or 20px and stretched horizontally only. Mixing arbitrary heights or vertical slices breaks alignment across HP, MP, AP and experience bars.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-REC-005",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Badge tag and divider micro-assets",
+      "summary": "Status dots are 16x16 circles with one colour each for error, warning and info; rarity tags are 60x20 plates with 2px corner radius at 25 percent opacity carrying a 1px quality-coloured left rule; dividers are a 256x2 fading line plus an 8x8 centre stud. Without these fixed micro-sizes the badge, tag and divider components cannot be shared across views.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-REC-006",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Currency icon dual resolution set",
+      "summary": "The eight economic assets, three coin tiers, four mana crystal grades and rations, ship at both 16x16 and 32x32 with a 1px dark anti-aliasing shadow ring, each mapped to one backend economy field. Dual resolution keeps the top-bar strip crisp without a separately downscaled variant per layout.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-REC-007",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Vital and affliction glyph style",
+      "summary": "Vital, buff and debuff glyphs are all 24x24 black 1px outline silhouettes so they stay legible on any bar colour or dark background. A glyph that adds fill detail disappears against the dark UI and leaves the player unable to tell a buff from a debuff.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-REC-008",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Navigation icon line style",
+      "summary": "The eight named HUD navigation icons are 24x24 clean cool-silver line art at #A0AEC0 with a gold #ECC94B highlight across the whole glyph on hover, each mapped to one of the eight named navigation entries. A different line weight makes one entry read as belonging to another system.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-REC-009",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Category archetype slot icons",
+      "summary": "Item icons ship as visual category archetypes on a 48x48 canvas with the silhouette confined to 32x32 and 8px padding, carrying no frame and no outer glow. Because tier frame and count come from the slot layers, one archetype icon serves every item sharing that shape and function.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-SPEC-001",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Physical verb icon set",
+      "summary": "Ten 48x48 transparent PNG verb icons are required, each encoding one physical motion, with explicit trajectory angles where the specification fixes them: stab at 0 degrees, parry at 15 degrees, hack at 30 degrees, lift at 45 degrees and chop at 90 degrees. A verb icon whose motion angle contradicts its action reads as the wrong move during combat.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-SPEC-002",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Elemental rune archetype set",
+      "summary": "Six 48x48 transparent PNG runes are required, one per elemental archetype, each drawn as an arcane vector mark. Binding one rune per archetype keeps a newly authored spell on the existing art slot instead of requiring a bespoke icon.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-SPEC-003",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Story relic silhouette framing",
+      "summary": "Story relic assets are RGBA 32-bit transparent PNG on a 48x48 canvas with the core silhouette confined to 36x36 and a 1px dark outline separating it from the background. The outline and inset margin are what keep a relic legible when it is rendered over narrative dialogue art.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-SPEC-004",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Monochrome woodcut portrait style",
+      "summary": "Portraits are 256x256 monochrome woodcut renders with hard black and white silhouette contrast. A full-colour or soft-shaded portrait breaks the unified print aesthetic the narrative layer is built on.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-SPEC-005",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Story keyframe aspect ratio",
+      "summary": "Each story keyframe illustration is a 512x256 landscape plate in a 16:9 or 2:1 layout. A non-matching aspect ratio cannot be placed in the narrative panel without cropping the focal subject.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-SPEC-006",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Frontier map base sheet",
+      "summary": "The regional map is a single 1920x1080 high-definition base sheet in a European parchment hand-charted nautical style. The fixed sheet size is what lets map markers address positions by stable coordinates.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-SPEC-007",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Typography coverage and role split",
+      "summary": "Three TrueType or OpenType font files must each cover the full 6763 simplified CJK glyph set of the GB2312 and GBK range, the complete ASCII range and full-width punctuation, and each is restricted to one role: display headline, body reading and terminal monospace. A partial glyph set renders as missing-glyph boxes, and one face reused for all three roles erases the size and rhythm hierarchy.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-SPEC-008",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+      "title": "Audio fidelity and asset inventory",
+      "summary": "All nineteen audio assets are Ogg Vorbis at a 44.1kHz sample rate and 16-bit depth with no clipping and no noise floor, inventoried across paper foley, UI interaction, impact and ambience. A clipping or off-spec asset is audible to the player as a defect regardless of how the game logic behaves.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md",
+      "enforced": false
     },
     {
       "id": "ART-UI-001",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
+      "title": "Asset key binding to code",
+      "summary": "The art delivery contract requires each asset key to be snake_case and to match the name the code binds one to one. A key that diverges from its binding name leaves the asset unloaded while the engine falls back to a placeholder.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/README.md",
+      "enforced": false
     },
     {
       "id": "ART-VIG-003",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
+      "title": "Alpha channel and edge cleanliness",
+      "summary": "The art delivery acceptance checklist requires a texture placed on the #0F131A dark base to show no white fringe and no colour-fringed edges, and the delivery format is 32-bit PNG with a full alpha channel. Edge fringe is the most visible defect once the asset is composited onto the near-black UI surface.",
+      "sourceRef": "WebGames/docs/艺术工单需求表/README.md",
+      "enforced": false
     },
     {
       "id": "GOV-HOK-001",
       "family": "GOV",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]"
+      "title": "Lifecycle hook registration label",
+      "summary": "This identifier exists only as a design label in project documentation: no audit script registers it and no checkable criterion is implemented, so no machine verdict exists for it. Treating it as a passing gate would present unimplemented coverage as verified.",
+      "sourceRef": "WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md",
+      "enforced": false
     },
     {
       "id": "PRF-DUP-001",
       "family": "PRF",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]"
+      "title": "Deep copy duplication label",
+      "summary": "This identifier exists only as a design label in project documentation: the hotspot scanner reports deep-copy candidates under its own findings and registers no rule with this id, so no criterion is checkable. Claiming it as a passing rule would present a hint-level scan as a semantic proof.",
+      "sourceRef": "WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md",
+      "enforced": false
     },
     {
       "id": "RES-SHUT-001",
       "family": "RES",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]"
+      "title": "Shutdown resource priority label",
+      "summary": "This identifier exists only as a design label in project documentation: no audit script registers it and no assertion verifies shutdown resource release ordering, so no criterion is checkable. Generic resource lifecycle coverage must not be described as proof of shutdown priority.",
+      "sourceRef": "WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md",
+      "enforced": false
     },
     {
       "id": "SIM-CMP-001",
       "family": "SIM",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+      "severity": "warning",
+      "title": "Single function control flow depth",
+      "summary": "Control flow nesting inside one function must not exceed five levels. Deeper nesting raises cognitive load sharply, so guard clauses with early returns or extracted sub-functions are required instead.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "SIM-DED-001",
       "family": "SIM",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+      "severity": "warning",
+      "title": "Redundant and dead code removal",
+      "summary": "A pass statement left after an already effective statement, or a boolean branch returning true in one arm and false in the other, is a violation and must be reduced to the bare condition. Redundant statements inflate the read path and mask the real logic.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "SIM-INH-001",
       "family": "SIM",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+      "title": "Inheritance depth ceiling",
+      "summary": "A class inheritance chain must not exceed two levels, meaning it either extends RefCounted directly or extends one business base class. Longer inheritance trees are prohibited in favour of composition, because each added level multiplies the surface a subclass must obey.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "SIM-WRP-001",
       "family": "SIM",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+      "severity": "warning",
+      "title": "Empty forwarding wrapper removal",
+      "summary": "A wrapper class holding only one or two single-line forwarding methods, with no data conversion, validation or interception, is a violation. Such a layer adds indirection that must be maintained while contributing no behaviour, so the underlying service should be used directly.",
+      "sourceRef": "WebGames/scripts/config/code_governance_rules.json",
+      "enforced": true
     },
     {
       "id": "UUID-REENTRANT-001",
       "family": "UUID",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/tests/integration/pipelines/test_game_lifecycle_pipeline.gd)"
+      "title": "Shutdown request reentrancy key",
+      "summary": "This identifier appears only as an idempotency key literal in lifecycle pipeline test data and is registered by no audit script, so no checkable criterion exists for it. The behaviour it names is covered by that pipeline's shutdown reentrancy and stopped-state idempotency assertions.",
+      "sourceRef": "WebGames/tests/integration/pipelines/test_game_lifecycle_pipeline.gd",
+      "enforced": false
     }
   ]
 }

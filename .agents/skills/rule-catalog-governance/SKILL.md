@@ -55,12 +55,27 @@ description: >-
         "project": "auto-refactor",
         "family": "ARCH",
         "severity": "error",
-        "summary": "门面承载不足或导出可变状态",
+        "summary": "Facade carries too little substance or exports mutable state.",
         "canonical": true
       }
     ]
   }
   ```
+
+### 摘要客观化与逐条可辨识契约
+
+`summary` 是规则库唯一被 agent 与门禁共同读取的语义字段，因此三条契约缺一不可：
+
+1. **英文客观底座**：所有 `summary` 一律英文客观陈述「判据 + 为何重要」，严禁中文、严禁把来源路径或 `(source: …)` 之类包裹文本塞进摘要，严禁 `[documentation-defined; not enforced]` 这类手写状态后缀。中文只允许存在于 `sourceRef`（真实路径事实）与表现层双语字典。
+2. **逐条可辨识**：同一 checker 下的每条规则必须拥有专属摘要，严禁多规则共用一个标题（历史上 `DOC-CL-*` 与 `DOC-RD-*` 两组规则曾整体共用同一中文标题，导致规则目录无法回答任何单条规则在检查什么）。来源侧通过 `ruleTitles`（workspace-timing `checkers[]`）或逐条 `title`（WebGames 规则源）提供，生成器负责投影。
+3. **强制状态结构化**：未落地强制的规则必须携带布尔 `enforced: false` 并由生成器投影进目录；「只在文档里存在」这一事实必须可被机器读取，不得退化为散文后缀。
+
+| 来源 | 逐条标签字段 | 强制状态字段 |
+| :--- | :--- | :--- |
+| `rules-review-rules` (`workspace-timing`) | `checkers[].ruleTitles.<ruleId>` | —（该域以 checker `enabled` 表达） |
+| `rule-sources/webgames-rules.json` | `rules[].title` | `rules[].enforced` |
+| `commit-msg-forbidden-terms.json` | `rules[].title`（终端本地化）+ `rules[].summary`（英文客观摘要） | — |
+| `rule-sources/{fractal-git,global}-rules.json` | `rules[].summary` 逐条独立 | — |
 
 ### 规则分布矩阵
 1. **`autoRefactor` (<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->)**：涵盖 <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子、双轨体积预算（`VOL-`）、物理卫生（`HYG-`）与架构质量模型；
@@ -127,8 +142,8 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 
 向工作区新增或调整规则时，必须依项目标准流程注册，严禁未注册先引用：
 1. **`auto-refactor` (375 规则体系)**：在 `src/core/rules/entries/` 定义规则对象；在 `dimensionRuleTable.ts` 绑定权重（遵守 `MAX_AXES_PER_FINDING <= 4`）；在 `tests/rules/` 编写专属测试；若涉原生算子保证 Rust 与 TS 100% 等价；
-2. **`workspace-timing` (49 规则体系)**：在 `scripts/config/review-rules.json` 中为每个 checker 声明 `family`（主题族）与 `layer`（`L0`~`L5` 执行层）两个字段，二者都必须存在：`generate-rule-catalog.js` 缺 `family` 即抛错，杜绝以层号冒充族名；
-3. **`WebGames` (50 规则体系)**：在 `scripts/config/docs_governance_rules.json` 或 `scripts/py/audit_docs.py` 中登记规则元数据；
+2. **`workspace-timing` (49 规则体系)**：在 `scripts/config/review-rules.json` 中为每个 checker 声明 `family`（主题族）与 `layer`（`L0`~`L5` 执行层）两个字段，二者都必须存在：`generate-rule-catalog.js` 缺 `family` 即抛错，杜绝以层号冒充族名；同一 checker 下的每条规则还必须在 `ruleTitles` 中给出专属英文短语，键集须与 `ruleIds` 完全相等；
+3. **`WebGames` (50 规则体系)**：在 `scripts/common/rule-sources/webgames-rules.json` 规则源中登记，每条必须给出英文 `title`（≤ 60 字符）与 `summary`（判据 + 理由），并以 `enforced` 布尔标注是否已落地强制；`sourceRef` 单独承载真实来源路径；
 4. **`fractal-git` (24 规则体系) 与 `global-tooling` (18 规则体系)**：分别在 `scripts/common/rule-sources/fractal-git-rules.json` 与 `scripts/common/rule-sources/global-rules.json` 规则源中登记；
 5. **全仓同步触发与 `--check-only` 零漂移断言**：新增或修改规则后必须运行 `node scripts/common/generate-rule-catalog.js` 同步真源；在门禁与 CI 中运行 `node scripts/common/generate-rule-catalog.js --check-only` 阻断规则漂移。
 

@@ -1,6 +1,6 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-31T13:16:14.767Z",
+  "generatedAt": "2026-11-01T05:08:28.502Z",
   "totalRules": 516,
   "counts": {
     "autoRefactor": 375,
@@ -15,7 +15,8 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)",
+      "summary": "Inside backend/domains one sub-domain must not read or write another sub-domain's underscore-prefixed members or call its private methods. Such access bypasses the anti-corruption seam, so a refactor in one domain silently breaks another; interaction must go through public contract methods, DTO payloads or EventBus events.",
+      "title": "Cross-domain private member access ban",
       "canonical": true
     },
     {
@@ -23,7 +24,8 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_71_用户会话全生命周期与主页HUD事件流双轨闭环治理/KALAR-DEV-2026-ST67-003_阶段3_配置驱动扩展与全域EventBus无头接线工程化.md)",
+      "summary": "Business thresholds, enums, copy text and numeric values must be read through GameConfig.get_int, get_float or get_string with an explicit safe default; a bare get_value() call outside the facade returns an untyped Variant and is a violation. Untyped reads hide the real source of truth and defeat configuration reload.",
+      "title": "GameConfig-only configuration reads",
       "canonical": true
     },
     {
@@ -31,7 +33,9 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_70_配置库唯一事实提纯与冗余收敛治理/KALAR-DEV-2026-ST66-002_阶段2_配置血缘静态判重引擎与漂移检测算法实现.md) [documentation-defined; not enforced]",
+      "summary": "Configuration tables whose key-order independent digest matches another table form a duplicate group and must be reconciled against the uniqueness manifest before they may coexist. An unregistered duplicate group becomes two competing sources of truth; the engine only reports the group and never rewrites the tables itself.",
+      "title": "Duplicate configuration table detection",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -39,7 +43,8 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)",
+      "summary": "A pure domain model or solver must extend RefCounted or Object; extending Node, Node2D, Control or any other scene-tree type couples domain logic to render-tree lifetime and blocks headless testing. Presentation interaction must travel through EventBus broadcasts or DTO arguments.",
+      "title": "Domain model scene-tree decoupling",
       "canonical": true
     },
     {
@@ -47,7 +52,8 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/infrastructure/event_bus/event_bus_core.gd)",
+      "summary": "A channel must be shaped <domain_id>.<event_name> where the first segment is an id already registered as a game domain, and channel values must come from the channel registry rather than scattered bare strings. An unregistered prefix such as auth or hud breaks routing and leaves the event untraceable.",
+      "title": "EventBus channel naming convention",
       "canonical": true
     },
     {
@@ -55,7 +61,8 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)",
+      "summary": "Every channel event_name must have a matching template key in that domain's narrative table unless the channel is declared as purely structured. A missing key silently drops the user-visible copy at run time while the event itself still dispatches, so the defect surfaces only as blank text.",
+      "title": "Channel narrative key alignment",
       "canonical": true
     },
     {
@@ -63,23 +70,26 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)",
+      "summary": "The ids registered in the event bus channel registry must equal the EventChannelDefinition constant values. Any difference means two sources of truth, so the publisher and the subscriber stop agreeing on the same channel.",
+      "title": "Channel registry single source alignment",
       "canonical": true
     },
     {
       "id": "ADV-EVT-004",
       "project": "WebGames",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)",
+      "severity": "warning",
+      "summary": "A literal payload passed to emit_domain_event must carry the fields the narrative renderer needs to fill its template; a purely structured event may omit them but must declare that explicitly. An incomplete payload renders as empty or colourless narrative text.",
+      "title": "Broadcast payload narrative completeness",
       "canonical": true
     },
     {
       "id": "ADV-LAM-001",
       "project": "WebGames",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)",
+      "severity": "warning",
+      "summary": "In GDScript 4 a lambda captures built-in typed locals by value and captured objects can form reference cycles, so assigning to a captured primitive inside the closure never updates the outer variable. Mutable state must travel through a Callable or a RefCounted holder object.",
+      "title": "Lambda capture lifetime safety",
       "canonical": true
     },
     {
@@ -87,7 +97,8 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)",
+      "summary": "Class and enum names must be PascalCase, variables, functions and parameters snake_case, constants UPPER_SNAKE_CASE, private members underscore-prefixed, and static var must never be UPPER_SNAKE. One scheme across the code base keeps a symbol's kind predictable from its spelling alone.",
+      "title": "Unified identifier naming scheme",
       "canonical": true
     },
     {
@@ -95,23 +106,26 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/dto/destiny_mod_manifest_dto.gd)",
+      "summary": "A class that enters ObjectPool must implement reset_state() and be fully reset when borrowed, and ownership must be validated on return to reject a double return. Residual state leaks into the next borrower and a double return corrupts pool bookkeeping.",
+      "title": "Object pool lifecycle contract",
       "canonical": true
     },
     {
       "id": "ADV-PRF-001",
       "project": "WebGames",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/starter_loadout_dispatcher.gd)",
+      "severity": "warning",
+      "summary": "A loop body must not re-read GameConfig.get_* each iteration, rebuild the same string every pass, or run a linear Array.find() scan. Cache the value or build a Dictionary index before entering the loop, because per-iteration repeated work multiplies straight into the frame budget on a hot path.",
+      "title": "Zero repeated work inside loops",
       "canonical": true
     },
     {
       "id": "ADV-PRF-002",
       "project": "WebGames",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/agent_playthrough_session.gd)",
+      "severity": "warning",
+      "summary": "A per-frame or high-frequency loop body must not call .new() or .duplicate(true) on every iteration; bounded low-frequency paths such as turn-level, event-driven or load-time code are exempt once the magnitude bound is documented in a comment. Per-iteration allocation causes garbage collection pauses and memory fragmentation.",
+      "title": "No transient heap allocation in hot loops",
       "canonical": true
     },
     {
@@ -119,7 +133,9 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]",
+      "summary": "A loop must not run percent placeholders or string formatting per iteration; precompile the template or assemble the text from a lookup table. Each iteration otherwise allocates a transient String and re-parses the format pattern.",
+      "title": "Loop string formatting elimination",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -127,7 +143,9 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]",
+      "summary": "A loop must not locate items with Array.find() or repeated containment scans; build a Dictionary hash index during setup. Linear scanning makes the surrounding loop cost O(N) per lookup instead of O(1).",
+      "title": "Loop linear search elimination",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -135,7 +153,8 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第08期_75到84/Phase_77_前端基础架构重构与根骨架施工细则/KALAR-DEV-2026-ST73-003_阶段3_UI可视化状态容器与全域Mock闭环工程化.md)",
+      "summary": "Calling the Godot globals randf(), randi(), randomize(), randf_range(), randi_range() or randfn() is a violation; randomness must be drawn through DeterministicRNG with a controlled seed. Unseeded global randomness makes replays, arbitration and defect reproduction non-repeatable.",
+      "title": "Deterministic random dispatch only",
       "canonical": true
     },
     {
@@ -143,15 +162,17 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)",
+      "summary": "Arguments passed to emit_signal() or signal.emit() must match the signal declaration in count and type, and a bare null must not be emitted into a typed parameter. A mismatch crashes or silently corrupts the receiving side.",
+      "title": "Signal emission argument contract",
       "canonical": true
     },
     {
       "id": "ADV-TYP-001",
       "project": "WebGames",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)",
+      "severity": "warning",
+      "summary": "Property variables must declare an explicit type, and local variables must use := inference or declare a type rather than a bare untyped var. An untyped declaration lets a wrong value type travel silently until it fails far from its origin.",
+      "title": "Explicit typing and static inference",
       "canonical": true
     },
     {
@@ -159,15 +180,17 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)",
+      "summary": "Every business function must annotate each parameter type and declare its return type, using -> void when nothing is returned; bare parameters or a missing return annotation are violations. An unannotated signature cannot be statically checked, so type defects surface only at run time.",
+      "title": "Function signature type completeness",
       "canonical": true
     },
     {
       "id": "ADV-TYP-003",
       "project": "WebGames",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)",
+      "severity": "warning",
+      "summary": "A := binding must not be applied to a dictionary get(), pop_front() or pop_back() result that may be null or Variant, because inference then hides the type defect. Declare the expected type with an explicit default and guard it, since this is exactly where a null slips past the compiler.",
+      "title": "No blind inference from dynamic returns",
       "canonical": true
     },
     {
@@ -175,7 +198,9 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]",
+      "summary": "A presentation node must not redraw on every single property change; mark the state dirty and flush the redraw once per frame through a deferred call. Redrawing per mutation multiplies layout work inside one frame and drops frames.",
+      "title": "Batched presentation redraw",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -425,7 +450,8 @@
       "layer": "L5",
       "severity": "error",
       "id": "ARF-*",
-      "summary": "auto-refactor 结构审查（经适配层隔离，工具不可用时优雅降级） (ARF-*)",
+      "summary": "Dynamic namespace for adapter-mapped external findings",
+      "title": "Dynamic namespace for adapter-mapped external findings",
       "canonical": false,
       "legacyReason": "wildcard-container-not-a-detectable-rule"
     },
@@ -434,7 +460,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]",
+      "summary": "The art delivery contract lists the audio asset category with the Ogg container as its required format, alongside 32-bit PNG textures and TTF or OTF fonts. A delivery in an unlisted container cannot be imported by the asset pipeline, so the ticket cannot close.",
+      "title": "Audio delivery container format",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -442,7 +470,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]",
+      "summary": "The art delivery contract lists the icon asset category against a legibility definition of done: contrast at or above 4.5:1 against the #0F131A dark base, and no smearing or clumping when scaled down to 16px. An icon that fails either check is unreadable in dense list and slot layouts.",
+      "title": "Icon legibility acceptance baseline",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -450,7 +480,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Universal containers ship as four nine-patch specifications with fixed per-file slice margins: 128x128 panel at 16px, 64x64 card at 8px, 96x96 modal at 12px and 32x32 tooltip at 4px. Fixed slice margins keep corners and borders undistorted across each file's supported size range.",
+      "title": "Nine-patch container four-spec slicing",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -458,7 +490,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Each of the Primary, Secondary, Danger and Flat variants ships four state slices, normal, hover, pressed and disabled, for sixteen files at 48x48 with 6px slice margins and 4px corner radius; the pressed slice shifts content down 1px and drops its 2px drop shadow to 0. A missing state forces the engine to reuse normal and erases press feedback.",
+      "title": "Button variant state matrix",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -466,7 +500,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "A slot is five stacked 48x48 layers rather than one flat image: recess base, centred 32x32 icon, 2px quality frame whose centre 44x44 stays fully transparent, state overlay, and a count badge anchored bottom-right. Separating frame and badge from the icon is what lets one icon serve every tier and stack count.",
+      "title": "Five-layer slot assembly",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -474,7 +510,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Bars are built from a 64x16 track sliced 4px left and right, a 64x16 fill sliced 2px each side, and a pure white 60 percent opacity damage buffer layer beneath the fill; bar height is restricted to 16px or 20px and stretched horizontally only. Mixing arbitrary heights or vertical slices breaks alignment across HP, MP, AP and experience bars.",
+      "title": "Meter skin three-layer suite",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -482,7 +520,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Status dots are 16x16 circles with one colour each for error, warning and info; rarity tags are 60x20 plates with 2px corner radius at 25 percent opacity carrying a 1px quality-coloured left rule; dividers are a 256x2 fading line plus an 8x8 centre stud. Without these fixed micro-sizes the badge, tag and divider components cannot be shared across views.",
+      "title": "Badge tag and divider micro-assets",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -490,7 +530,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "The eight economic assets, three coin tiers, four mana crystal grades and rations, ship at both 16x16 and 32x32 with a 1px dark anti-aliasing shadow ring, each mapped to one backend economy field. Dual resolution keeps the top-bar strip crisp without a separately downscaled variant per layout.",
+      "title": "Currency icon dual resolution set",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -498,7 +540,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Vital, buff and debuff glyphs are all 24x24 black 1px outline silhouettes so they stay legible on any bar colour or dark background. A glyph that adds fill detail disappears against the dark UI and leaves the player unable to tell a buff from a debuff.",
+      "title": "Vital and affliction glyph style",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -506,7 +550,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "The eight named HUD navigation icons are 24x24 clean cool-silver line art at #A0AEC0 with a gold #ECC94B highlight across the whole glyph on hover, each mapped to one of the eight named navigation entries. A different line weight makes one entry read as belonging to another system.",
+      "title": "Navigation icon line style",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -514,7 +560,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Item icons ship as visual category archetypes on a 48x48 canvas with the silhouette confined to 32x32 and 8px padding, carrying no frame and no outer glow. Because tier frame and count come from the slot layers, one archetype icon serves every item sharing that shape and function.",
+      "title": "Category archetype slot icons",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -522,7 +570,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Ten 48x48 transparent PNG verb icons are required, each encoding one physical motion, with explicit trajectory angles where the specification fixes them: stab at 0 degrees, parry at 15 degrees, hack at 30 degrees, lift at 45 degrees and chop at 90 degrees. A verb icon whose motion angle contradicts its action reads as the wrong move during combat.",
+      "title": "Physical verb icon set",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -530,7 +580,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Six 48x48 transparent PNG runes are required, one per elemental archetype, each drawn as an arcane vector mark. Binding one rune per archetype keeps a newly authored spell on the existing art slot instead of requiring a bespoke icon.",
+      "title": "Elemental rune archetype set",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -538,7 +590,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Story relic assets are RGBA 32-bit transparent PNG on a 48x48 canvas with the core silhouette confined to 36x36 and a 1px dark outline separating it from the background. The outline and inset margin are what keep a relic legible when it is rendered over narrative dialogue art.",
+      "title": "Story relic silhouette framing",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -546,7 +600,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Portraits are 256x256 monochrome woodcut renders with hard black and white silhouette contrast. A full-colour or soft-shaded portrait breaks the unified print aesthetic the narrative layer is built on.",
+      "title": "Monochrome woodcut portrait style",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -554,7 +610,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Each story keyframe illustration is a 512x256 landscape plate in a 16:9 or 2:1 layout. A non-matching aspect ratio cannot be placed in the narrative panel without cropping the focal subject.",
+      "title": "Story keyframe aspect ratio",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -562,7 +620,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "The regional map is a single 1920x1080 high-definition base sheet in a European parchment hand-charted nautical style. The fixed sheet size is what lets map markers address positions by stable coordinates.",
+      "title": "Frontier map base sheet",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -570,7 +630,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "Three TrueType or OpenType font files must each cover the full 6763 simplified CJK glyph set of the GB2312 and GBK range, the complete ASCII range and full-width punctuation, and each is restricted to one role: display headline, body reading and terminal monospace. A partial glyph set renders as missing-glyph boxes, and one face reused for all three roles erases the size and rhythm hierarchy.",
+      "title": "Typography coverage and role split",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -578,7 +640,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]",
+      "summary": "All nineteen audio assets are Ogg Vorbis at a 44.1kHz sample rate and 16-bit depth with no clipping and no noise floor, inventoried across paper foley, UI interaction, impact and ambience. A clipping or off-spec asset is audible to the player as a defect regardless of how the game logic behaves.",
+      "title": "Audio fidelity and asset inventory",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -586,7 +650,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]",
+      "summary": "The art delivery contract requires each asset key to be snake_case and to match the name the code binds one to one. A key that diverges from its binding name leaves the asset unloaded while the engine falls back to a placeholder.",
+      "title": "Asset key binding to code",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -594,7 +660,9 @@
       "project": "WebGames",
       "family": "ART",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]",
+      "summary": "The art delivery acceptance checklist requires a texture placed on the #0F131A dark base to show no white fringe and no colour-fringed edges, and the delivery format is 32-bit PNG with a full alpha channel. Edge fringe is the most visible defect once the asset is composited onto the near-black UI surface.",
+      "title": "Alpha channel and edge cleanliness",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -611,7 +679,8 @@
       "project": "global-tooling",
       "family": "CMG",
       "severity": "error",
-      "summary": "项目归属格式区与合法枚举校验",
+      "summary": "The project attribution section must name one project from the closed enumeration, so a commit can be routed to its owning project without prose parsing.",
+      "title": "项目归属格式区与合法枚举校验",
       "canonical": true
     },
     {
@@ -619,7 +688,8 @@
       "project": "global-tooling",
       "family": "CMG",
       "severity": "error",
-      "summary": "临时性与敷衍口吻词汇拦截",
+      "summary": "Commit messages are a long-lived technical record, so provisional or offhand wording such as wip, temporary, hack or placeholder must not stand in for an objective statement of what changed.",
+      "title": "临时性与敷衍口吻词汇拦截",
       "canonical": true
     },
     {
@@ -627,7 +697,8 @@
       "project": "global-tooling",
       "family": "CMG",
       "severity": "error",
-      "summary": "过度肯定与绝对化夸大表述拦截",
+      "summary": "Absolute or promotional phrasing such as flawless, ultimate, bulletproof or 100% safe asserts a guarantee no test can establish, so a commit must state the mechanism and its verified coverage instead.",
+      "title": "过度肯定与绝对化夸大表述拦截",
       "canonical": true
     },
     {
@@ -635,7 +706,8 @@
       "project": "global-tooling",
       "family": "CMG",
       "severity": "error",
-      "summary": "过度否定与情绪化贬损表述拦截",
+      "summary": "Dismissive or emotional phrasing about prior work or other contributors belongs in review discussion, not in the permanent commit record, which must describe the change rather than judge it.",
+      "title": "过度否定与情绪化贬损表述拦截",
       "canonical": true
     },
     {
@@ -643,7 +715,8 @@
       "project": "global-tooling",
       "family": "CMG",
       "severity": "error",
-      "summary": "风格元叙事、口号与宣传套话拦截",
+      "summary": "Slogans, marketing copy and narrative about the writing process describe intent rather than change, so a commit must name the affected behaviour or symbol instead.",
+      "title": "风格元叙事、口号与宣传套话拦截",
       "canonical": true
     },
     {
@@ -651,7 +724,8 @@
       "project": "global-tooling",
       "family": "CMG",
       "severity": "error",
-      "summary": "程序化流水账与形式主义元叙事拦截",
+      "summary": "A step-by-step narration of the authoring session records how the work was produced rather than what the repository now contains, so the message must describe the resulting state.",
+      "title": "程序化流水账与形式主义元叙事拦截",
       "canonical": true
     },
     {
@@ -659,7 +733,8 @@
       "project": "global-tooling",
       "family": "CMG",
       "severity": "error",
-      "summary": "执行标签区域零执行数字纪律",
+      "summary": "Execution-tag sections must not carry counts or scores, because a hand-written figure is a second source of truth that expires silently while the gate keeps passing.",
+      "title": "执行标签区域零执行数字纪律",
       "canonical": true
     },
     {
@@ -667,7 +742,8 @@
       "project": "global-tooling",
       "family": "CMG",
       "severity": "error",
-      "summary": "提交标题动词契约与祈使语态拦截",
+      "summary": "The commit subject must open with an imperative verb describing the change, so the subject reads as an instruction the repository now satisfies.",
+      "title": "提交标题动词契约与祈使语态拦截",
       "canonical": true
     },
     {
@@ -675,7 +751,8 @@
       "project": "global-tooling",
       "family": "CMG",
       "severity": "error",
-      "summary": "第一人称主观叙述与非客观人称拦截",
+      "summary": "First-person and subjective narration attributes the change to a speaker rather than the code base, so the message must use impersonal, objective phrasing.",
+      "title": "第一人称主观叙述与非客观人称拦截",
       "canonical": true
     },
     {
@@ -1157,7 +1234,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-CL-001",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-001)",
+      "summary": "Changelog lacks an Unreleased accumulation section",
+      "title": "Changelog lacks an Unreleased accumulation section",
       "canonical": true
     },
     {
@@ -1166,7 +1244,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-CL-002",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-002)",
+      "summary": "Version heading format or descending order violation",
+      "title": "Version heading format or descending order violation",
       "canonical": true
     },
     {
@@ -1175,7 +1254,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-CL-003",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-003)",
+      "summary": "Latest changelog version out of sync with package manifest",
+      "title": "Latest changelog version out of sync with package manifest",
       "canonical": true
     },
     {
@@ -1184,7 +1264,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-CL-004",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-004)",
+      "summary": "Section heading outside the standard category table",
+      "title": "Section heading outside the standard category table",
       "canonical": true
     },
     {
@@ -1193,7 +1274,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-CL-005",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-005)",
+      "summary": "Change entry without a bold lead-in phrase",
+      "title": "Change entry without a bold lead-in phrase",
       "canonical": true
     },
     {
@@ -1202,7 +1284,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-CL-006",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-006)",
+      "summary": "Invalid or future-dated version release date",
+      "title": "Invalid or future-dated version release date",
       "canonical": true
     },
     {
@@ -1211,7 +1294,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-CL-007",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-007)",
+      "summary": "Changelog cites a nonexistent code symbol or setting",
+      "title": "Changelog cites a nonexistent code symbol or setting",
       "canonical": true
     },
     {
@@ -1220,7 +1304,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-CL-008",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-008)",
+      "summary": "Internal jargon or math notation in release notes",
+      "title": "Internal jargon or math notation in release notes",
       "canonical": true
     },
     {
@@ -1229,7 +1314,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-CL-009",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-009)",
+      "summary": "Engineering process wording in product release notes",
+      "title": "Engineering process wording in product release notes",
       "canonical": true
     },
     {
@@ -1262,7 +1348,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-RD-001",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-001)",
+      "summary": "README missing a required section anchor",
+      "title": "README missing a required section anchor",
       "canonical": true
     },
     {
@@ -1271,7 +1358,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-RD-002",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-002)",
+      "summary": "Released version absent from or stale in the README roadmap",
+      "title": "Released version absent from or stale in the README roadmap",
       "canonical": true
     },
     {
@@ -1280,7 +1368,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "DOC-RD-003",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-003)",
+      "summary": "Roadmap summary citing fabricated settings or jargon",
+      "title": "Roadmap summary citing fabricated settings or jargon",
       "canonical": true
     },
     {
@@ -1344,217 +1433,217 @@
     {
       "id": "FGT-ALG-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "ALG",
       "severity": "error",
       "summary": "Myers diff, 3-way merge, Interval Tree O(log N + K) overlap query, and FastCDC chunking algorithm boundary and determinism guard",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-AUD-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "AUD",
       "severity": "error",
       "summary": "Cryptographic telemetry audit hash-chain guard: AuditRecord entries must stay <= 350 bytes with strictly monotonic Lamport clocks and verified HMAC-SHA256 signatures",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-BRG-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "BRG",
       "severity": "error",
       "summary": "Pre-review zone gate bridge verification guard: Strict rule catalog closure and sub-10ms AST slice check",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-BYP-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "BYP",
       "severity": "error",
       "summary": "Direct-Bypass test cache reclamation guard: Transient refs/taxis/test-cache entries must be physically reclaimed immediately after gate evaluation without leaking into canonical CAS",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-CAS-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "CAS",
       "severity": "warning",
       "summary": "LayerVFS CAS snapshot materializer bridge: Fixed-time O(1) page cache mapping and atomic tree commit (advisory: no dedicated executable enforcer yet)",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-COR-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "COR",
       "severity": "error",
       "summary": "Core data model and error contract guard: Zero-panic Result propagation and immutable OID hashing semantics",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-DEP-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "DEP",
       "severity": "error",
       "summary": "Subsystem DAG single-direction dependency guard: Zero circular dependency and strict L1->L2->L3 layer isolation",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-ERR-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "ERR",
       "severity": "error",
       "summary": "Zero unwrap and expect panic guard: Enforce strong-typed Result propagation across production crates",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-FAC-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "FAC",
       "severity": "warning",
       "summary": "Facade substantial burden and immutable freeze guard: Enforce substantial facade implementation with ELOC budget and deep object freezing (advisory: no dedicated executable enforcer yet)",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-GAT-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "GAT",
       "severity": "error",
       "summary": "Fractal Git domain gate guard: AST complexity constraints (CC <= 15), non-blocking I/O, and platform portability",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-IDX-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "IDX",
       "severity": "error",
       "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution, lock-free slot allocation, and deterministic read-tree/write-tree round-trip equivalence",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-LCK-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "LCK",
       "severity": "warning",
       "summary": "Lock-free in-memory index concurrency guard: Prohibit blocking standard Mutex in virtual staging tree (advisory: no dedicated executable enforcer yet)",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-MUT-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "MUT",
       "severity": "error",
       "summary": "In-Kernel Canary Engine (IKCE) blind mutation kill rate guard: Candidate verification slice must achieve mutation kill rate K >= threshold with round-trip equivalence",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-OBJ-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "OBJ",
       "severity": "error",
       "summary": "Git object model serialization guard: Strict standard loose/pack object header format and SHA-1/SHA-256 dual compatibility",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-POL-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "POL",
       "severity": "error",
       "summary": "Resource recycling pool bounded governor: PathJail confinement, zero unbounded transient memory allocations, and deterministic lifecycle reclamation",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-PRF-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "PRF",
       "severity": "error",
       "summary": "Zero transient heap allocation guard in hot loops: Prohibit string, vector, and clone allocations in critical paths",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-PYR-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "PYR",
       "severity": "error",
       "summary": "Four-tier hierarchical audit rollup guard: Milestone card compression and periodic rollup must preserve Merkle root integrity and deterministic summary aggregation",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-QRN-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "QRN",
       "severity": "error",
       "summary": "Pre-Review Zone quarantine isolation and Bayesian credit circuit-breaker guard: Candidates failing kernel invariants or credit thresholds must be isolated into refs/taxis/quarantine",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-SAF-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "SAF",
       "severity": "error",
       "summary": "Documented unsafe block safety proof guard: Prohibit bare undocumented unsafe blocks in Rust crates",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-STO-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "STO",
       "severity": "error",
       "summary": "Storage layer crash safety: Append-only WAL journal consistency, loose ODB integrity, and CAS block deduplication",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-TAU-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "TAU",
       "severity": "error",
       "summary": "In-Kernel Canary Engine (IKCE) anti-tautology guard: Prohibit vacuous or tautological assertions (assert!(true), identical-operand equality) in verification slices",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-TOP-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "TOP",
       "severity": "error",
       "summary": "DAG topology traversal and Poset commutation guard: Cycle detection, ancestor generation indexing, and 3-way structural conflict detection",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-TRN-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "TRN",
       "severity": "error",
       "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance and timeout guard",
+      "namespace": "FGT",
       "canonical": true
     },
     {
       "id": "FGT-VRF-001",
       "project": "fractal-git",
-      "namespace": "FGT",
       "family": "VRF",
       "severity": "error",
       "summary": "Taxis Kernel Code Verifier (TKCV) formal AST invariant guard: Enforce CFG soundness, handle lifecycle symmetry, parameter arity, and zero transient loop allocations",
+      "namespace": "FGT",
       "canonical": true
     },
     {
@@ -1890,7 +1979,9 @@
       "project": "WebGames",
       "family": "GOV",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]",
+      "summary": "This identifier exists only as a design label in project documentation: no audit script registers it and no checkable criterion is implemented, so no machine verdict exists for it. Treating it as a passing gate would present unimplemented coverage as verified.",
+      "title": "Lifecycle hook registration label",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -2307,7 +2398,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "HC-ABS-PATH",
-      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-ABS-PATH)",
+      "summary": "Hardcoded absolute path or file URI literal",
+      "title": "Hardcoded absolute path or file URI literal",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2317,7 +2409,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "HC-CJK-LITERAL",
-      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-CJK-LITERAL)",
+      "summary": "Inline CJK literal inside the presentation layer",
+      "title": "Inline CJK literal inside the presentation layer",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2327,7 +2420,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "HC-MAGIC-NUM",
-      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-MAGIC-NUM)",
+      "summary": "Numeric literal outside an exempt constant home",
+      "title": "Numeric literal outside an exempt constant home",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2337,7 +2431,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "HC-SECRET",
-      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-SECRET)",
+      "summary": "Credential or secret pattern embedded in source",
+      "title": "Credential or secret pattern embedded in source",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2347,7 +2442,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "HC-UI-STRING",
-      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-UI-STRING)",
+      "summary": "Host message API call with a string literal bypassing i18n",
+      "title": "Host message API call with a string literal bypassing i18n",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2545,7 +2641,8 @@
       "layer": "L0",
       "severity": "error",
       "id": "L0-COMPILE",
-      "summary": "TypeScript 编译零错误（tsc）",
+      "summary": "TypeScript compiler diagnostic-free build check",
+      "title": "TypeScript compiler diagnostic-free build check",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2555,7 +2652,8 @@
       "layer": "L0",
       "severity": "error",
       "id": "L0-TEST",
-      "summary": "单元测试全绿（mocha 全量）",
+      "summary": "Failing unit test case in the suite",
+      "title": "Failing unit test case in the suite",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2565,7 +2663,8 @@
       "layer": "L1",
       "severity": "error",
       "id": "L1-*",
-      "summary": "代码质量（eslint 全量：命名/未用/错误处理等规则族） (L1-*)",
+      "summary": "Dynamic namespace for generated eslint rule identifiers",
+      "title": "Dynamic namespace for generated eslint rule identifiers",
       "canonical": false,
       "legacyReason": "wildcard-container-not-a-detectable-rule"
     },
@@ -2575,7 +2674,7 @@
       "layer": "L1",
       "severity": "error",
       "id": "L1-LINT",
-      "summary": "代码质量（eslint 全量：命名/未用/错误处理等规则族）",
+      "summary": "Static code quality through the full eslint rule set",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2585,7 +2684,7 @@
       "layer": "L2",
       "severity": "error",
       "id": "L2-LAYERS",
-      "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明）",
+      "summary": "Layer dependency matrix conformance and import cycle freedom",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2595,7 +2694,7 @@
       "layer": "L3",
       "severity": "error",
       "id": "L3-DOC-LAYOUT",
-      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步",
+      "summary": "Changelog and README text layout contracts",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2605,7 +2704,7 @@
       "layer": "L3",
       "severity": "error",
       "id": "L3-HARDCODE",
-      "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定",
+      "summary": "Hardcoded path, UI string, secret and magic number checks",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2615,7 +2714,7 @@
       "layer": "L3",
       "severity": "error",
       "id": "L3-RESOURCE-TOPO",
-      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀",
+      "summary": "Structured resource naming topology and split fitness",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2625,7 +2724,7 @@
       "layer": "L3",
       "severity": "error",
       "id": "L3-REVIEW-CONFIG",
-      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康",
+      "summary": "Review configuration governance and meta-audit",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2635,7 +2734,7 @@
       "layer": "L3",
       "severity": "error",
       "id": "L3-SCRIPT-STANDARD",
-      "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断）",
+      "summary": "Script naming, header contract and registry completeness",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2645,7 +2744,7 @@
       "layer": "L4",
       "severity": "error",
       "id": "L4-TEST-BUDGET",
-      "summary": "测试套件时长预算回归（基线棘轮）",
+      "summary": "Test suite duration budget regression ratchet",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2655,7 +2754,7 @@
       "layer": "L5",
       "severity": "error",
       "id": "L5-REFACTOR",
-      "summary": "auto-refactor 结构审查（经适配层隔离，工具不可用时优雅降级）",
+      "summary": "External structural refactor scan via an isolated adapter",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2674,7 +2773,8 @@
       "layer": "L2",
       "severity": "error",
       "id": "LAY-CYCLE",
-      "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明） (LAY-CYCLE)",
+      "summary": "Import cycle across the dependency graph",
+      "title": "Import cycle across the dependency graph",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2684,7 +2784,8 @@
       "layer": "L2",
       "severity": "error",
       "id": "LAY-IMPORT",
-      "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明） (LAY-IMPORT)",
+      "summary": "Cross-layer or unlicensed external import",
+      "title": "Cross-layer or unlicensed external import",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2694,7 +2795,8 @@
       "layer": "L2",
       "severity": "error",
       "id": "LAY-UNRESOLVED",
-      "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明） (LAY-UNRESOLVED)",
+      "summary": "Relative import not resolvable to a declared layer",
+      "title": "Relative import not resolvable to a declared layer",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -2929,7 +3031,9 @@
       "project": "WebGames",
       "family": "PRF",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]",
+      "summary": "This identifier exists only as a design label in project documentation: the hotspot scanner reports deep-copy candidates under its own findings and registers no rule with this id, so no criterion is checkable. Claiming it as a passing rule would present a hint-level scan as a semantic proof.",
+      "title": "Deep copy duplication label",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -3210,7 +3314,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "RCFG-GLOBS",
-      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-GLOBS)",
+      "summary": "Tool scan glob matching zero files",
+      "title": "Tool scan glob matching zero files",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3220,7 +3325,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "RCFG-MATRIX",
-      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-MATRIX)",
+      "summary": "Dependency matrix mapping or layer reference invalid",
+      "title": "Dependency matrix mapping or layer reference invalid",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3230,7 +3336,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "RCFG-RULE-DRIFT",
-      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-RULE-DRIFT)",
+      "summary": "Declared rule without implementation or undeclared finding",
+      "title": "Declared rule without implementation or undeclared finding",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3240,7 +3347,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "RCFG-SCHEMA",
-      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-SCHEMA)",
+      "summary": "Registry schema, required field or origin validation breach",
+      "title": "Registry schema, required field or origin validation breach",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3250,7 +3358,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "RCFG-TOOL-PATH",
-      "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-TOOL-PATH)",
+      "summary": "Adapter tool path, timeout or report contract problem",
+      "title": "Adapter tool path, timeout or report contract problem",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3259,7 +3368,9 @@
       "project": "WebGames",
       "family": "RES",
       "severity": "info",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]",
+      "summary": "This identifier exists only as a design label in project documentation: no audit script registers it and no assertion verifies shutdown resource release ordering, so no criterion is checkable. Generic resource lifecycle coverage must not be described as proof of shutdown priority.",
+      "title": "Shutdown resource priority label",
+      "enforced": false,
       "canonical": true
     },
     {
@@ -3268,7 +3379,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "RES-TOPO-NAMING-DEPTH",
-      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-NAMING-DEPTH)",
+      "summary": "Resource file name exceeding three naming tiers",
+      "title": "Resource file name exceeding three naming tiers",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3278,7 +3390,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "RES-TOPO-OVER-DESCRIPTIVE",
-      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-OVER-DESCRIPTIVE)",
+      "summary": "Resource file name piling more than four tokens",
+      "title": "Resource file name piling more than four tokens",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3288,7 +3401,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "RES-TOPO-OVER-GENERIC",
-      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-OVER-GENERIC)",
+      "summary": "Oversized single-tier resource file needing a domain split",
+      "title": "Oversized single-tier resource file needing a domain split",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3298,7 +3412,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "RES-TOPO-OVER-SPECIALIZED",
-      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-OVER-SPECIALIZED)",
+      "summary": "Three-tier resource file below the fragmentation floor",
+      "title": "Three-tier resource file below the fragmentation floor",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3308,7 +3423,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "RES-TOPO-RESP-MISMATCH",
-      "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-RESP-MISMATCH)",
+      "summary": "Resource file mixing executable logic below purity floor",
+      "title": "Resource file mixing executable logic below purity floor",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3430,7 +3546,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "SCR-DANGLING",
-      "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-DANGLING)",
+      "summary": "Registry entry pointing at a missing checker file",
+      "title": "Registry entry pointing at a missing checker file",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3440,7 +3557,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "SCR-HEADER",
-      "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-HEADER)",
+      "summary": "Script header contract missing a mandatory tag",
+      "title": "Script header contract missing a mandatory tag",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3450,7 +3568,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "SCR-NAMING",
-      "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-NAMING)",
+      "summary": "Script file name deviates from kebab-case",
+      "title": "Script file name deviates from kebab-case",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3460,7 +3579,8 @@
       "layer": "L3",
       "severity": "error",
       "id": "SCR-ORPHAN",
-      "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-ORPHAN)",
+      "summary": "Checker script absent from the review registry",
+      "title": "Checker script absent from the review registry",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3717,8 +3837,9 @@
       "id": "SIM-CMP-001",
       "project": "WebGames",
       "family": "SIM",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)",
+      "severity": "warning",
+      "summary": "Control flow nesting inside one function must not exceed five levels. Deeper nesting raises cognitive load sharply, so guard clauses with early returns or extracted sub-functions are required instead.",
+      "title": "Single function control flow depth",
       "canonical": true
     },
     {
@@ -3733,8 +3854,9 @@
       "id": "SIM-DED-001",
       "project": "WebGames",
       "family": "SIM",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)",
+      "severity": "warning",
+      "summary": "A pass statement left after an already effective statement, or a boolean branch returning true in one arm and false in the other, is a violation and must be reduced to the bare condition. Redundant statements inflate the read path and mask the real logic.",
+      "title": "Redundant and dead code removal",
       "canonical": true
     },
     {
@@ -3782,7 +3904,8 @@
       "project": "WebGames",
       "family": "SIM",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)",
+      "summary": "A class inheritance chain must not exceed two levels, meaning it either extends RefCounted directly or extends one business base class. Longer inheritance trees are prohibited in favour of composition, because each added level multiplies the surface a subclass must obey.",
+      "title": "Inheritance depth ceiling",
       "canonical": true
     },
     {
@@ -3821,8 +3944,9 @@
       "id": "SIM-WRP-001",
       "project": "WebGames",
       "family": "SIM",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)",
+      "severity": "warning",
+      "summary": "A wrapper class holding only one or two single-line forwarding methods, with no data conversion, validation or interception, is a violation. Such a layer adds indirection that must be maintained while contributing no behaviour, so the underlying service should be used directly.",
+      "title": "Empty forwarding wrapper removal",
       "canonical": true
     },
     {
@@ -3879,7 +4003,8 @@
       "layer": "L4",
       "severity": "error",
       "id": "TB-NO-BASELINE",
-      "summary": "测试套件时长预算回归（基线棘轮） (TB-NO-BASELINE)",
+      "summary": "No duration baseline recorded, regression undecidable",
+      "title": "No duration baseline recorded, regression undecidable",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -3889,7 +4014,8 @@
       "layer": "L4",
       "severity": "error",
       "id": "TB-REGRESSION",
-      "summary": "测试套件时长预算回归（基线棘轮） (TB-REGRESSION)",
+      "summary": "Test suite duration exceeding its baseline budget",
+      "title": "Test suite duration exceeding its baseline budget",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },
@@ -4132,7 +4258,9 @@
       "project": "WebGames",
       "family": "UUID",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/tests/integration/pipelines/test_game_lifecycle_pipeline.gd)",
+      "summary": "This identifier appears only as an idempotency key literal in lifecycle pipeline test data and is registered by no audit script, so no checkable criterion exists for it. The behaviour it names is covered by that pipeline's shutdown reentrancy and stopped-state idempotency assertions.",
+      "title": "Shutdown request reentrancy key",
+      "enforced": false,
       "canonical": true
     },
     {

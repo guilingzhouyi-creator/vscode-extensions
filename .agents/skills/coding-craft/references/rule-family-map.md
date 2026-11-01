@@ -100,10 +100,10 @@
 
 准则：形参 ≥ 4 收为参数对象、禁布尔旗标参数、禁空实现与空壳继承、守卫子句替代嵌套。
 
-- **error**：`SIM-CMP-001`、`SIM-DED-001`、`SIM-INH-001`、`SIM-WRP-001`
-- warning / info：`SIM-ARGS-001`、`SIM-ARGS-002`、`SIM-BOOL-001`、`SIM-COMC-001`、`SIM-ELSE-001`、`SIM-EMPTY-001`、
+- **error**：`SIM-INH-001`
+- warning / info：`SIM-ARGS-001`、`SIM-ARGS-002`、`SIM-BOOL-001`、`SIM-CMP-001`、`SIM-COMC-001`、`SIM-DED-001`、`SIM-ELSE-001`、`SIM-EMPTY-001`、
   `SIM-FLAT-002`、`SIM-GUARD-001`、`SIM-IMM-001`、`SIM-INL-001`、`SIM-LONG-001`、`SIM-PRNT-001`、
-  `SIM-TRN-001`
+  `SIM-TRN-001`、`SIM-WRP-001`
 
 ### `ARCH` — 架构边界与门面承载
 
@@ -275,9 +275,9 @@
 准则：循环零堆分配、连续缓冲区、对象池 `reset_state()`、随机源可播种、事件派发有界。
 
 - **error**：`ADV-BND-001`、`ADV-CFG-001`、`ADV-DEC-001`、`ADV-EVT-001`、`ADV-EVT-002`、`ADV-EVT-003`、
-  `ADV-EVT-004`、`ADV-LAM-001`、`ADV-NAM-001`、`ADV-POOL-001`、`ADV-PRF-001`、`ADV-PRF-002`、
-  `ADV-RNG-001`、`ADV-SIG-001`、`ADV-TYP-001`、`ADV-TYP-002`、`ADV-TYP-003`
-- warning / info：`ADV-CFG-002`、`ADV-PRF-003`、`ADV-PRF-004`、`ADV-UI-001`
+  `ADV-NAM-001`、`ADV-POOL-001`、`ADV-RNG-001`、`ADV-SIG-001`、`ADV-TYP-002`
+- warning / info：`ADV-CFG-002`、`ADV-EVT-004`、`ADV-LAM-001`、`ADV-PRF-001`、`ADV-PRF-002`、`ADV-PRF-003`、
+  `ADV-PRF-004`、`ADV-TYP-001`、`ADV-TYP-003`、`ADV-UI-001`
 
 ### `UUID` — 重入与幂等
 
