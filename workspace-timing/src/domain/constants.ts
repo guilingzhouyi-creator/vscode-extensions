@@ -73,6 +73,7 @@ export const TIMING_COMMAND_IDS = Object.freeze({
     SET_MODE_AI: 'workspaceTiming.setModeAi',
     SET_MODE_MANUAL: 'workspaceTiming.setModeManual',
     SET_MODE_AUTO: 'workspaceTiming.setModeAuto',
+    TRIGGER_AI_ACTIVITY: 'workspaceTiming.triggerAiActivity',
     DEBUG_SAVE: 'workspaceTiming.debugSave',
     NEW_PERIOD: 'workspaceTiming.newPeriod',
     RESET: 'workspaceTiming.reset',

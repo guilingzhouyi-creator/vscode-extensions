@@ -10,7 +10,7 @@
 ## ✨ 功能亮点 | Features
 
 - ⏱ **自动无感计时** · Auto-timing — 打开项目即自动开始计时，实时统计编码时长，零弹窗、零打扰。
-- 🤖 **开发者与 AI 协作双轨感知** · Dual-track AI sensing — 智能监听键盘输入与外部智能体文件改动事件，在运行期动态区分手动编码与 AI 协作工时。
+- 🤖 **开发者与 AI 协作双轨感知** · Dual-track AI sensing — 智能监听键盘输入与外部智能体文件改动事件，毫秒级感知大模型与智能体大段生成代码，深度适配全生态 AI 伴生工具目录，并在人机协同审阅期间提供抗误触保护，智能区分手动编码与 AI 协作工时。
 - ⏸ **自适应空闲暂停与智能截断** · Smart idle auto-pause — 离开键盘超时自动切入空闲暂停态，并在恢复活动时智能截断离开期间的无效等待时长，保证工时记录真实客观。
 - 🎯 **周工作上限与健康提醒** · Weekly limit & rest reminders — 自定义周工时目标，动态渐变进度条与阈值分割线，达标超限贴心提醒劳逸结合。
 - 📈 **高精度平滑活跃曲线** · Smooth activity curve — 5 档等分物理刻度与全宽自适应，实时直观呈现专注节奏。
@@ -42,6 +42,11 @@
 | `Workspace Timing: Restore from Backup File` | 从 JSON 备份文件还原 | Restore timing data from a JSON backup file |
 | `Workspace Timing: Reset Timing Data` | 重置本工作区全部数据 | Reset workspace timing data completely |
 | `Workspace Timing: Force Save Now (Debug)` | 立即强制存盘（调试用） | Force immediate flush & checkpoint |
+| `Workspace Timing: Toggle Activity Mode (Manual/AI/Auto)` | 切换活动模式（人工/AI/自动） | Toggle activity mode (Manual/AI/Auto) |
+| `Workspace Timing: Switch to AI Collaboration Mode` | 切换为 AI 自主协作模式 | Switch to AI collaboration mode |
+| `Workspace Timing: Switch to Manual Dev Mode` | 切换为人工开发模式 | Switch to manual development mode |
+| `Workspace Timing: Switch to Auto Sensing Mode` | 切换为自动智能感知模式 | Switch to automatic sensing mode |
+| `Workspace Timing: Trigger AI / Agent Activity Heartbeat` | 触发 AI / 智能体活跃心跳 | Trigger AI / agent activity heartbeat |
 
 > 💡 **状态栏快捷交互**：直接点击状态栏右侧的时钟图标，可在三种模式间无缝切换：  
 > `今日 30m · 累计 2h` → `累计 2h · 今日 30m` → `30m`（仅今日）
@@ -73,6 +78,7 @@
 | `workspaceTiming.idleTimeoutMinutes` | `5` | 空闲超时判定分钟数（0 = 禁用空闲暂停，范围 0~120） |
 | `workspaceTiming.aiDetectionEnabled` | `true` | 是否启用开发者与 AI 协作双轨工时智能感知 |
 | `workspaceTiming.aiCooldownSeconds` | `120` | AI 协作活跃冷却观察窗口（秒，范围 10~600） |
+| `workspaceTiming.chartDualTrackDisplay` | `true` | 在周报与日报图表中展示人工与 AI 双轨堆叠和曲线对比 |
 | `workspaceTiming.storage.backupToFile` | `true` | 启用工作区本地文件备份 |
 | `workspaceTiming.storage.journalEnabled` | `true` | 启用实时数据防丢保护 |
 | `workspaceTiming.storage.ringBufferCapacity` | `1024` | 实时记录缓存上限 |

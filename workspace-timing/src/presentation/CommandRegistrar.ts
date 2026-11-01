@@ -16,7 +16,7 @@ import { LogLevel, log } from '../integration/logger';
 import { persistTimingConfig } from '../integration/ConfigWatcher';
 import { t, format } from '../i18n/index';
 import { TimeAggregator } from '../domain/TimeAggregator';
-import { ActivityWatcher } from '../integration/ActivityWatcher';
+import type { ActivityWatcher } from '../integration/ActivityWatcher';
 import { exportTimingToFile, exportAggregatedToFile } from './dashboardMessages';
 import {
     TIMING_COMMAND_IDS,
@@ -145,6 +145,13 @@ export class CommandRegistrar {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
             activityWatcher.setModeOverride(null);
             vscode.window.showInformationMessage(t()['cmd.activityModeAuto']);
+        });
+
+        /** 注册主动触发 AI 活跃心跳命令契约（供外部脚本、CLI Agent 调用） */
+        this.registerCommand(TIMING_COMMAND_IDS.TRIGGER_AI_ACTIVITY, (...args: unknown[]) => {
+            if (!activityWatcher) { this.noWorkspaceMsg(); return; }
+            const source = typeof args[0] === 'string' ? args[0] : 'command';
+            activityWatcher.triggerAiActivity(source);
         });
     }
 

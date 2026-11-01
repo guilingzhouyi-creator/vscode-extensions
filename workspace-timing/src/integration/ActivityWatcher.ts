@@ -1,10 +1,10 @@
 /**
- * Module: ActivityWatcher — Host Interaction, File Change & Git Activity Watcher
+ * Module: ActivityWatcher — Host Interaction & Agent Activity Watcher
  * File Path: src/integration/ActivityWatcher.ts
  * Architecture Role: Integration layer observer detecting user interactions, external file changes, and Git events
- * Dependencies & Triggers: Consumes vscode editor/workspace events and vscode.git extension API; notifies ActivityWatcherListener
- * Responsibilities: Monitor keyboard/editor input, detect AI agent filesystem/git modifications, manage activity modes (manual/ai/idle), and enforce cooldown windows
- * Exit Semantics & Design Rationale: Pure listener and event dispatcher with zero storage or UI side effects; encapsulates host event subscriptions and releases all listeners cleanly on dispose.
+ * Dependencies & Triggers: Consumes vscode editor events and FileWatcherCoordinator; notifies ActivityWatcherListener
+ * Responsibilities: Monitor keyboard/editor input, detect AI agent modifications, manage activity modes (manual/ai/idle), and enforce cooldown windows
+ * Exit Semantics & Design Rationale: Pure listener and event dispatcher with zero storage or UI side effects; encapsulates subscriptions and releases all listeners cleanly on dispose.
  * Contract Invariant & Boundary: Event debounce invariant: debounced heartbeats clamp high-frequency keyboard/fs bursts to minimum intervals; lifecycle ownership: 100% of VS Code Disposables are registered to subscriptions and cleared on dispose.
  */
 
@@ -16,9 +16,16 @@ import {
     DEFAULT_IDLE_TIMEOUT_MINUTES,
     DEFAULT_AI_COOLDOWN_SECONDS,
     DEFAULT_AI_DETECTION_ENABLED,
-    DEFAULT_AI_BURST_WINDOW_MS,
 } from '../domain/models';
 import { LogLevel, log } from './logger';
+import {
+    classifyTextDocumentChange,
+    CLASSIFY_AI_BURST,
+    CLASSIFY_UNDO_REDO,
+    CLASSIFY_EMPTY,
+} from './edit-dynamics';
+import { isPathIgnored } from './agent-signature-catalog';
+import { createFileWatcherCoordinator } from './file-watcher-coordinator';
 
 /** 监测器状态枚举（包含工作模式与内部空闲态） */
 export type WatcherMode = ActivityMode | 'idle';
@@ -30,84 +37,37 @@ const WATCHER_MODE_IDLE: WatcherMode = 'idle';
 
 /** 静态日志文案常量 */
 const MSG_WATCHER_STARTED = 'ActivityWatcher: started';
-const MSG_GIT_ACTIVATION_SKIPPED = 'ActivityWatcher: git activation skipped';
-const MSG_GIT_BIND_FAILED = 'ActivityWatcher: failed to bind git extension';
-const MSG_GIT_READ_API_FAILED = 'ActivityWatcher: failed to read git api';
-const MSG_REPO_BIND_FAILED = 'ActivityWatcher: failed to bind repo';
 const MSG_WATCHER_DISPOSED = 'ActivityWatcher: disposed';
 const MSG_MODE_OVERRIDE_CLEARED = 'ActivityWatcher: mode override cleared, restored to auto sensing';
 const MSG_EXTERNAL_AI_TRIGGERED = 'ActivityWatcher: external AI activity triggered';
 
 /**
  * 架构契约：活动监听观察者回调端口 (ActivityWatcherListener)
- * 职责契约：向应用层 Scheduler / Orchestrator 发送活动感知心跳与空闲切片通知。
  */
 export interface ActivityWatcherListener {
-    /** 契约通知：活跃心跳通知（人工操作或 AI 协作中） */
     onActivity(mode: ActivityMode, timestampMs: number): void;
-    /** 契约通知：空闲超时触发 */
     onIdle(timestampMs: number): void;
-    /** 契约通知：活动模式切换通知（可选） */
     onModeChange?(mode: WatcherMode, previousMode: WatcherMode, timestampMs: number): void;
 }
 
 /**
  * 架构契约：活动检测参数配置项 (ActivityWatcherOptions)
- * 边界保证：超时与冷却数值受领域模型 models.ts 中合法域约束保护。
  */
 export interface ActivityWatcherOptions {
-    /** 空闲判定超时时间（分钟，0 表示不启用） */
     idleTimeoutMinutes: number;
-    /** 是否开启 AI / 外部变更智能检测 */
     aiDetectionEnabled: boolean;
-    /** AI 外部写入停止后的冷却观察窗口（秒） */
     aiCooldownSeconds: number;
 }
 
-/** 默认活动检测配置 */
 export const DEFAULT_ACTIVITY_OPTIONS: Readonly<ActivityWatcherOptions> = {
     idleTimeoutMinutes: DEFAULT_IDLE_TIMEOUT_MINUTES,
     aiDetectionEnabled: DEFAULT_AI_DETECTION_ENABLED,
     aiCooldownSeconds: DEFAULT_AI_COOLDOWN_SECONDS,
 };
 
-/** 排除的文件路径正则（严格忽略依赖、编译产物与测试覆盖率目录，O(M) 单 pass 匹配） */
-const IGNORED_PATH_REGEX = /[/\\](node_modules|\.git|dist|out|build|\.vscode-test|coverage)($|[/\\])/i;
-
-/** 智能体与自动化工具特征路径正则（命中时属 100% 确认的 AI/Agent 协作信号） */
-const AGENT_PATH_REGEX = /[/\\](\.agents|\.gemini|\.claude|\.cursor|scratch|\.refactor-trajectory)($|[/\\])/i;
-
-
-/** 判断给定的文件 URI 是否属于被忽略的目录（命中 Agent 特征路径优先放行） */
-function isIgnoredUri(uri: vscode.Uri): boolean {
-    if (AGENT_PATH_REGEX.test(uri.fsPath)) {
-        return false;
-    }
-    return IGNORED_PATH_REGEX.test(uri.fsPath);
-}
-
-/** VS Code 内置 Git 扩展结构声明（用于运行时安全获取 Git API） */
-interface GitExtensionApi {
-    repositories?: ReadonlyArray<{
-        state?: {
-            onDidChange?: vscode.Event<void>;
-        };
-    }>;
-    onDidOpenRepository?: vscode.Event<{
-        state?: {
-            onDidChange?: vscode.Event<void>;
-        };
-    }>;
-}
-
-interface GitExtension {
-    getAPI?(version: number): GitExtensionApi;
-}
-
 /**
  * 架构契约：活动监测器 (ActivityWatcher)
- * 设计依据：监听 VS Code 编辑器操作、源码文件变动与 Git 状态，判定工作区处于 manual/ai/idle 状态。
- * 不变量保证：保证在 dispose 时 100% 释放所有宿主订阅事件与定时器。
+ * 职责：监听 VS Code 编辑器操作与 FileWatcherCoordinator 外部信号，判定工作区处于 manual/ai/idle 状态。
  */
 export class ActivityWatcher implements vscode.Disposable {
     private readonly subscriptions: vscode.Disposable[] = [];
@@ -127,6 +87,7 @@ export class ActivityWatcher implements vscode.Disposable {
     private _isStarted: boolean = false;
     private _modeOverride: ActivityMode | null = null;
     private _lastExternalSignalMs: number = 0;
+    private _fileCoordinator: vscode.Disposable | null = null;
 
     constructor(
         options?: Partial<ActivityWatcherOptions>,
@@ -141,22 +102,18 @@ export class ActivityWatcher implements vscode.Disposable {
         }
     }
 
-    /** 注册或替换监听回调 */
     public setListener(listener: ActivityWatcherListener): void {
         this._listener = listener;
     }
 
-    /** 获取当前活动模式 */
     public getCurrentMode(): WatcherMode {
         return this._mode;
     }
 
-    /** 获取最近一次活动时间戳 (ms) */
     public getLastActivityMs(): number {
         return this._lastActivityMs;
     }
 
-    /** 运行时手动指定或清除模式覆盖 */
     public setModeOverride(mode: ActivityMode | null): void {
         this._modeOverride = mode;
         const now = Date.now();
@@ -175,12 +132,10 @@ export class ActivityWatcher implements vscode.Disposable {
         }
     }
 
-    /** 获取当前模式覆盖状态 */
     public getModeOverride(): ActivityMode | null {
         return this._modeOverride;
     }
 
-    /** 轮转模式覆盖：Auto(null) -> AI -> Manual -> Auto(null) */
     public toggleModeOverride(): ActivityMode | null {
         if (this._modeOverride === null) {
             this.setModeOverride(WATCHER_MODE_AI);
@@ -192,26 +147,29 @@ export class ActivityWatcher implements vscode.Disposable {
         return this._modeOverride;
     }
 
-    /** 主动触发外部 AI 活动心跳（由外部感知源或命令调用） */
-    public triggerAiActivity(_source?: string): void {
-        if (!this._options.aiDetectionEnabled) {
-            return;
+    /** 激活 AI 状态时间戳与模式（消除重复判断） */
+    private activateAiState(now: number): boolean {
+        if (!this._options.aiDetectionEnabled || this._modeOverride === WATCHER_MODE_MANUAL) {
+            return false;
         }
-        if (this._modeOverride === WATCHER_MODE_MANUAL) {
-            return;
-        }
-        const now = Date.now();
         this._lastAiActivityMs = now;
         this._lastExternalSignalMs = now;
         this._lastActivityMs = now;
-        log(LogLevel.Debug, MSG_EXTERNAL_AI_TRIGGERED);
         if (this._mode !== WATCHER_MODE_AI) {
             this.setMode(WATCHER_MODE_AI, now);
         }
+        return true;
+    }
+
+    public triggerAiActivity(_source?: string): void {
+        const now = Date.now();
+        if (!this.activateAiState(now)) {
+            return;
+        }
+        log(LogLevel.Debug, MSG_EXTERNAL_AI_TRIGGERED);
         this.notifyActivity(WATCHER_MODE_AI, now);
     }
 
-    /** 动态更新配置项 */
     public updateConfig(options: Partial<ActivityWatcherOptions>): void {
         this._options = {
             ...this._options,
@@ -220,7 +178,6 @@ export class ActivityWatcher implements vscode.Disposable {
         log(LogLevel.Debug, `ActivityWatcher: config updated (idleTimeout=${this._options.idleTimeoutMinutes}m, aiEnabled=${this._options.aiDetectionEnabled}, cooldown=${this._options.aiCooldownSeconds}s)`);
     }
 
-    /** 启动所有事件监听与周期性定时器 */
     public start(): void {
         if (this._isStarted) {
             return;
@@ -228,8 +185,11 @@ export class ActivityWatcher implements vscode.Disposable {
         this._isStarted = true;
 
         this.initEditorListeners();
-        this.initFileSystemWatcher();
-        this.initGitWatcher();
+
+        this._fileCoordinator = createFileWatcherCoordinator(uri => {
+            this.handleExternalSignal(uri);
+        });
+        this.subscriptions.push(this._fileCoordinator);
 
         this._tickInterval = setInterval(() => {
             this.tick();
@@ -238,164 +198,68 @@ export class ActivityWatcher implements vscode.Disposable {
         log(LogLevel.Info, MSG_WATCHER_STARTED);
     }
 
-    /** 监听编辑器键盘输入与交互（智能区分主动键入与只读审阅/外部文档刷新） */
     private initEditorListeners(): void {
         this.subscriptions.push(
-            vscode.workspace.onDidChangeTextDocument(e => {
-                this.handleDocumentChange(e);
-            }),
+            vscode.workspace.onDidChangeTextDocument(e => this.handleDocumentChange(e)),
         );
         this.subscriptions.push(
-            vscode.window.onDidChangeTextEditorSelection(() => {
-                this.handlePassiveInteraction();
-            }),
+            vscode.window.onDidChangeTextEditorSelection(() => this.handlePassiveInteraction()),
         );
         this.subscriptions.push(
-            vscode.window.onDidChangeTextEditorVisibleRanges(() => {
-                this.handlePassiveInteraction();
-            }),
+            vscode.window.onDidChangeTextEditorVisibleRanges(() => this.handlePassiveInteraction()),
         );
         this.subscriptions.push(
             vscode.window.onDidChangeWindowState(e => {
-                if (e.focused) {
-                    this.handlePassiveInteraction();
-                }
+                if (e.focused) this.handlePassiveInteraction();
             }),
         );
     }
 
-    /** 处理文档内容变更：区分前台手动输入与后台/重载外部写入 */
     private handleDocumentChange(e: vscode.TextDocumentChangeEvent): void {
-        if (e.contentChanges.length === 0) {
-            return;
-        }
-        if (e.document.uri.scheme !== 'file' && e.document.uri.scheme !== 'untitled') {
-            return;
-        }
-        if (isIgnoredUri(e.document.uri)) {
-            return;
-        }
+        if (e.contentChanges.length === 0) return;
+        if (e.document.uri.scheme !== 'file' && e.document.uri.scheme !== 'untitled') return;
+        if (isPathIgnored(e.document.uri.fsPath)) return;
 
         const activeDoc = vscode.window.activeTextEditor?.document;
         const isForeground = activeDoc !== undefined && activeDoc.uri.toString() === e.document.uri.toString();
         const now = Date.now();
+        const gapMs = now - this._lastExternalSignalMs;
 
-        // 后台文档发生写入，非当前前台键盘输入，确系外部 Agent/自动化工具写入
-        if (!isForeground) {
+        const classification = classifyTextDocumentChange(
+            {
+                contentChanges: e.contentChanges,
+                isDocumentDirty: e.document.isDirty,
+                isForeground,
+                reason: e.reason,
+            },
+            gapMs,
+        );
+
+        if (classification === CLASSIFY_AI_BURST) {
             this.handleExternalSignal(e.document.uri);
             return;
         }
-
-        const change = e.contentChanges[0];
-        const isSingleKeyTyping = e.contentChanges.length === 1 && change.text.length <= 3 && !change.text.includes('\n');
-
-        // 前台文档若非单键打字且在外部写入短窗口（1200ms）内发生变动，极大概率是外部写盘后 VS Code 的文件重载
-        if (!isSingleKeyTyping && (now - this._lastExternalSignalMs < DEFAULT_AI_BURST_WINDOW_MS)) {
-            this.handleExternalSignal(e.document.uri);
+        if (classification === CLASSIFY_UNDO_REDO || classification === CLASSIFY_EMPTY) {
             return;
         }
-
-        // 否则判定为前台键盘输入，记录人工活动
         this.recordManualActivity();
     }
 
-    /** 处理选区、滚动与焦点等只读审阅操作（AI 协作冷却期内不强制切回人工） */
     private handlePassiveInteraction(): void {
         const now = Date.now();
         const cooldownMs = this._options.aiCooldownSeconds * MS_PER_SECOND;
 
-        // 若当前处于 AI 模式且在冷却观察期内：用户移动选区或滚动属于“代码审阅/等待执行”，维持 AI 协作
         if (this._mode === WATCHER_MODE_AI && (now - this._lastAiActivityMs < cooldownMs)) {
             this._lastActivityMs = now;
             return;
         }
-
-        // 若用户手动锁定了 AI 模式，同样不切回人工
         if (this._modeOverride === WATCHER_MODE_AI) {
             this._lastActivityMs = now;
             return;
         }
-
         this.recordManualActivity();
     }
 
-    /** 监听文件系统源码变动（AI / Agent 外部写入信号） */
-    private initFileSystemWatcher(): void {
-        const watcher = vscode.workspace.createFileSystemWatcher('**/*');
-        const handleUri = (uri: vscode.Uri): void => {
-            if (isIgnoredUri(uri)) {
-                return;
-            }
-            this.handleExternalSignal(uri);
-        };
-
-        this.subscriptions.push(
-            watcher.onDidChange(handleUri),
-            watcher.onDidCreate(handleUri),
-            watcher.onDidDelete(handleUri),
-            watcher,
-        );
-    }
-
-    /** 监听 Git 仓库变更（工作区增量变动信号） */
-    private initGitWatcher(): void {
-        try {
-            const gitExt = vscode.extensions.getExtension<GitExtension>('vscode.git');
-            if (!gitExt) {
-                return;
-            }
-            if (gitExt.isActive) {
-                this.bindGitApi(gitExt.exports);
-            } else {
-                gitExt.activate().then(
-                    exports => this.bindGitApi(exports),
-                    err => log(LogLevel.Debug, MSG_GIT_ACTIVATION_SKIPPED, err as Error),
-                );
-            }
-        } catch (err) {
-            log(LogLevel.Debug, MSG_GIT_BIND_FAILED, err as Error);
-        }
-    }
-
-    /** 绑定 Git API 仓库状态事件 */
-    private bindGitApi(exports: GitExtension | undefined): void {
-        try {
-            const gitApi = exports?.getAPI?.(1);
-            if (!gitApi) {
-                return;
-            }
-            const repos = gitApi.repositories ?? [];
-            for (const repo of repos) {
-                this.bindRepo(repo);
-            }
-            if (gitApi.onDidOpenRepository) {
-                this.subscriptions.push(
-                    gitApi.onDidOpenRepository(repo => {
-                        this.bindRepo(repo);
-                    }),
-                );
-            }
-        } catch (err) {
-            log(LogLevel.Debug, MSG_GIT_READ_API_FAILED, err as Error);
-        }
-    }
-
-    /** 绑定单个 Git 仓库的变更监听 */
-    private bindRepo(repo: { state?: { onDidChange?: vscode.Event<void> } }): void {
-        try {
-            if (repo?.state?.onDidChange) {
-                this.subscriptions.push(
-                    repo.state.onDidChange(() => {
-                        this.handleExternalSignal();
-                    }),
-                );
-            }
-        } catch (err) {
-            log(LogLevel.Debug, MSG_REPO_BIND_FAILED, err as Error);
-        }
-    }
-
-    /** 算法契约：记录人工活动并做 1000ms 窗口防抖心跳聚合 (Debounced heartbeat) */
     private recordManualActivity(): void {
         if (this._modeOverride === WATCHER_MODE_AI) {
             this._lastActivityMs = Date.now();
@@ -409,7 +273,6 @@ export class ActivityWatcher implements vscode.Disposable {
         if (this._mode !== WATCHER_MODE_MANUAL) {
             this.setMode(WATCHER_MODE_MANUAL, now);
         }
-
         if (this._debounceTimer !== null) {
             return;
         }
@@ -427,24 +290,11 @@ export class ActivityWatcher implements vscode.Disposable {
         }, MS_PER_SECOND);
     }
 
-    /** 算法契约：处理外部信号（文件系统写入或 Git 变更，经 1000ms 窗口防抖节流） */
     private handleExternalSignal(_uri?: vscode.Uri): void {
-        if (!this._options.aiDetectionEnabled) {
-            return;
-        }
-        if (this._modeOverride === WATCHER_MODE_MANUAL) {
-            return;
-        }
-
         const now = Date.now();
-        this._lastAiActivityMs = now;
-        this._lastExternalSignalMs = now;
-        this._lastActivityMs = now;
-
-        if (this._mode !== WATCHER_MODE_AI) {
-            this.setMode(WATCHER_MODE_AI, now);
+        if (!this.activateAiState(now)) {
+            return;
         }
-
         if (this._aiDebounceTimer !== null) {
             return;
         }
@@ -462,7 +312,6 @@ export class ActivityWatcher implements vscode.Disposable {
         }, MS_PER_SECOND);
     }
 
-    /** 算法契约：周期性检测空闲超时阈值与 AI 冷却窗口 */
     private tick(): void {
         const now = Date.now();
         if (this._modeOverride !== null) {
@@ -478,11 +327,8 @@ export class ActivityWatcher implements vscode.Disposable {
         }
     }
 
-    /** 边界契约：检查人工编码是否达到配置的空闲超时阈值 */
     private checkManualIdle(now: number): void {
-        if (this._options.idleTimeoutMinutes <= 0) {
-            return;
-        }
+        if (this._options.idleTimeoutMinutes <= 0) return;
         const idleLimitMs = this._options.idleTimeoutMinutes * MS_PER_MINUTE;
         if (now - this._lastManualActivityMs >= idleLimitMs) {
             const idleStartMs = this._lastManualActivityMs;
@@ -491,7 +337,6 @@ export class ActivityWatcher implements vscode.Disposable {
         }
     }
 
-    /** 边界契约：检查 AI 协作冷却观察窗口 (Cooldown observation window) */
     private checkAiCooldown(now: number): void {
         const cooldownMs = this._options.aiCooldownSeconds * MS_PER_SECOND;
         if (now - this._lastAiActivityMs < cooldownMs) {
@@ -504,23 +349,18 @@ export class ActivityWatcher implements vscode.Disposable {
         }
     }
 
-    /** 架构契约：切换当前工作区活动模式并触发事件通知 */
     private setMode(newMode: WatcherMode, timestampMs: number): void {
-        if (this._mode === newMode) {
-            return;
-        }
+        if (this._mode === newMode) return;
         const previous = this._mode;
         this._mode = newMode;
         log(LogLevel.Debug, `ActivityWatcher: mode switched from ${previous} to ${newMode}`);
         this._listener?.onModeChange?.(newMode, previous, timestampMs);
     }
 
-    /** 架构契约：向监听方派发活跃心跳通知 */
     private notifyActivity(mode: ActivityMode, timestampMs: number): void {
         this._listener?.onActivity(mode, timestampMs);
     }
 
-    /** 生命周期契约：释放所有宿主事件监听器与周期性计时器 */
     public dispose(): void {
         if (this._debounceTimer !== null) {
             clearTimeout(this._debounceTimer);

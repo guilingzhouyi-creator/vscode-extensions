@@ -10,6 +10,10 @@ const Module = require('module');
 // 注入轻量 mock vscode 模块支持纯 Node 脱机快速测试
 const mockEmitters = {
     docChange: [],
+    docSave: [],
+    filesCreate: [],
+    filesDelete: [],
+    filesRename: [],
     selectionChange: [],
     visibleRangesChange: [],
     windowStateChange: [],
@@ -30,6 +34,22 @@ const mockVscode = {
     workspace: {
         onDidChangeTextDocument(fn) {
             mockEmitters.docChange.push(fn);
+            return { dispose: () => {} };
+        },
+        onDidSaveTextDocument(fn) {
+            mockEmitters.docSave.push(fn);
+            return { dispose: () => {} };
+        },
+        onDidCreateFiles(fn) {
+            mockEmitters.filesCreate.push(fn);
+            return { dispose: () => {} };
+        },
+        onDidDeleteFiles(fn) {
+            mockEmitters.filesDelete.push(fn);
+            return { dispose: () => {} };
+        },
+        onDidRenameFiles(fn) {
+            mockEmitters.filesRename.push(fn);
             return { dispose: () => {} };
         },
         createFileSystemWatcher() {
@@ -89,6 +109,10 @@ describe('ActivityWatcher（AI 自主协作与双轨工时智能感知）', func
         activities.length = 0;
         modeChanges.length = 0;
         mockEmitters.docChange.length = 0;
+        mockEmitters.docSave.length = 0;
+        mockEmitters.filesCreate.length = 0;
+        mockEmitters.filesDelete.length = 0;
+        mockEmitters.filesRename.length = 0;
         mockEmitters.selectionChange.length = 0;
         mockEmitters.visibleRangesChange.length = 0;
         mockEmitters.windowStateChange.length = 0;
@@ -232,5 +256,44 @@ describe('ActivityWatcher（AI 自主协作与双轨工时智能感知）', func
         };
         mockEmitters.fsChange.forEach(fn => fn(geminiUri));
         assert.strictEqual(watcher.getCurrentMode(), 'ai', '.gemini 目录文件变动被识别为 AI 活动');
+    });
+
+    it('前台瞬间大段文本注入（>=30字符）无需外部信号先验，直接判定为 AI 模式', function () {
+        const foregroundDocEvent = {
+            document: {
+                ...activeEditorDoc,
+                isDirty: true,
+            },
+            contentChanges: [
+                {
+                    text: 'export function processBatchQueue(items: string[]): void {\n    console.log(items);\n}',
+                    rangeLength: 0,
+                },
+            ],
+        };
+        mockEmitters.docChange.forEach(fn => fn(foregroundDocEvent));
+        assert.strictEqual(watcher.getCurrentMode(), 'ai', '前台突发大文本注入必须切入 AI 模式');
+    });
+
+    it('VS Code 显式文件创建事务 (onDidCreateFiles) 自动激活 AI 协作模式', function () {
+        const newFileUri = {
+            scheme: 'file',
+            fsPath: 'C:\\workspace\\src\\new-module.ts',
+            toString: () => 'file:///workspace/src/new-module.ts',
+        };
+        mockEmitters.filesCreate.forEach(fn => fn({ files: [newFileUri] }));
+        assert.strictEqual(watcher.getCurrentMode(), 'ai', '显式文件创建必须激活 AI 模式');
+    });
+
+    it('保存 Agent 专属特征文件 (CLAUDE.md) 自动激活 AI 协作模式', function () {
+        const claudeDoc = {
+            uri: {
+                scheme: 'file',
+                fsPath: 'C:\\workspace\\CLAUDE.md',
+                toString: () => 'file:///workspace/CLAUDE.md',
+            },
+        };
+        mockEmitters.docSave.forEach(fn => fn(claudeDoc));
+        assert.strictEqual(watcher.getCurrentMode(), 'ai', '保存 CLAUDE.md 必须激活 AI 模式');
     });
 });
