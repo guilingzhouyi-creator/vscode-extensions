@@ -40,6 +40,33 @@ const DEFAULT_PING_TIMEOUT_MS = 1000;
 /** Rejection message used when the socket is missing or already destroyed. */
 const NOT_CONNECTED_ERROR = 'NOT_CONNECTED';
 
+/** Message and event type string literals for wire protocol messages. */
+const MSG_TYPE_CONNECT = 'connect';
+const MSG_TYPE_HELLO = 'hello';
+const MSG_TYPE_SCAN = 'scan';
+const MSG_TYPE_SCAN_DIFF = 'scan_diff';
+const MSG_TYPE_PING = 'ping';
+const MSG_TYPE_SHUTDOWN = 'shutdown';
+const MSG_TYPE_CLIENT_REQUEST = 'client-request';
+
+function formatDaemonOptions(options: DaemonScanOptions): DaemonScanOptions {
+    return {
+        cache: options.cache,
+        cacheDir: options.cacheDir,
+        cacheCustom: options.cacheCustom,
+        workers: options.workers,
+        parser: options.parser,
+    };
+}
+
+function formatDaemonDiffOptions(options: DaemonScanDiffOptions): DaemonScanDiffOptions {
+    return {
+        ...formatDaemonOptions(options),
+        verifyDiskContent: options.verifyDiskContent,
+        delta: options.delta,
+    };
+}
+
 /**
  * Result of a successful warm scan: the report bytes a cold scan would produce plus the daemon
  * cache/incremental statistics kept outside ScanReport.
@@ -47,6 +74,21 @@ const NOT_CONNECTED_ERROR = 'NOT_CONNECTED';
 export interface WarmScanResult {
     report: ScanReport;
     stats: WarmStats;
+}
+
+/** Configuration options for single-run warm scans sent to daemon */
+export interface DaemonScanOptions {
+    cache: boolean;
+    cacheDir?: string;
+    cacheCustom?: boolean;
+    workers?: number;
+    parser?: string;
+}
+
+/** Configuration options for incremental diff scans sent to daemon */
+export interface DaemonScanDiffOptions extends DaemonScanOptions {
+    verifyDiskContent: boolean;
+    delta: boolean;
 }
 
 /**
@@ -82,6 +124,73 @@ export class DaemonClient {
         readonly projectHash: string = projectHashFor(root),
     ) {}
 
+    private handleInFlightRejections(error: Error): void {
+        if (this.pendingScan) {
+            this.pendingScan.reject(error);
+            this.pendingScan = null;
+        }
+        if (this.pendingScanDiff) {
+            this.pendingScanDiff.reject(error);
+            this.pendingScanDiff = null;
+        }
+        if (this.pendingPong) {
+            this.pendingPong.reject(error);
+            this.pendingPong = null;
+        }
+    }
+
+    private attachSocketHandlers(
+        socket: net.Socket,
+        timer: NodeJS.Timeout,
+        resolve: () => void,
+        reject: (error: Error) => void,
+    ): void {
+        let settled = false;
+        const fail = (error: Error) => {
+            if (settled) return;
+            settled = true;
+            try {
+                socket.destroy();
+            } catch {
+                /* ignore */
+            }
+            reject(error);
+        };
+
+        socket.on(MSG_TYPE_CONNECT, () => {
+            this.pendingHello = {
+                resolve: (_ack) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve();
+                },
+                reject: fail,
+            };
+            this.sendDaemonMessage({
+                v: 1,
+                id: ++this.nextId,
+                type: MSG_TYPE_HELLO,
+                version: PROTOCOL_SOFTWARE_VERSION,
+                protocol: PROTOCOL_VERSION,
+                projectHash: this.projectHash,
+            });
+            setTimeout(() => {
+                if (!settled) fail(new Error('HANDSHAKE_TIMEOUT'));
+            }, HANDSHAKE_TIMEOUT_MS);
+        });
+
+        socket.on('data', (chunk: Buffer) => this.onData(chunk.toString('utf8')));
+        socket.on('error', (err) => {
+            if (!settled) fail(new Error(`CONNECT_ERROR: ${err.message}`));
+            this.handleInFlightRejections(new Error(`DAEMON_DISCONNECT: ${err.message}`));
+        });
+        socket.on('close', () => {
+            if (!settled) fail(new Error('CONNECTION_CLOSED'));
+            this.handleInFlightRejections(new Error('DAEMON_DISCONNECT: connection closed'));
+        });
+    }
+
     /** Look up the registry + connect + handshake. Rejects on ANY failure (→ caller degrades). */
     connect(timeoutMs: number = CONNECT_TIMEOUT_MS): Promise<void> {
         return new Promise((resolve, reject) => {
@@ -102,100 +211,26 @@ export class DaemonClient {
 
             const socket = net.connect(registry.pipe);
             this.socket = socket;
-            let settled = false;
-            const fail = (error: Error) => {
-                if (settled) return;
-                settled = true;
+            const timer = setTimeout(() => {
                 try {
                     socket.destroy();
                 } catch {
                     /* ignore */
                 }
-                reject(error);
-            };
+                reject(new Error(`CONNECT_TIMEOUT after ${timeoutMs}ms`));
+            }, timeoutMs);
 
-            const timer = setTimeout(
-                () => fail(new Error(`CONNECT_TIMEOUT after ${timeoutMs}ms`)),
-                timeoutMs,
-            );
-
-            socket.on('connect', () => {
-                // Connected — start the hello handshake.
-                this.pendingHello = {
-                    resolve: (_ack) => {
-                        if (settled) return;
-                        settled = true;
-                        clearTimeout(timer);
-                        resolve();
-                    },
-                    reject: fail,
-                };
-                this.send({
-                    v: 1,
-                    id: ++this.nextId,
-                    type: 'hello',
-                    version: PROTOCOL_SOFTWARE_VERSION,
-                    protocol: PROTOCOL_VERSION,
-                    projectHash: this.projectHash,
-                });
-                // Handshake deadline (in addition to the connect deadline).
-                setTimeout(() => {
-                    if (!settled) fail(new Error('HANDSHAKE_TIMEOUT'));
-                }, HANDSHAKE_TIMEOUT_MS);
-            });
-
-            socket.on('data', (chunk: Buffer) => this.onData(chunk.toString('utf8')));
-            socket.on('error', (err) => {
-                if (!settled) fail(new Error(`CONNECT_ERROR: ${err.message}`));
-                // Mid-scan daemon crash: reject any in-flight request so the caller
-                // degrades to cold.
-                if (this.pendingScan) {
-                    this.pendingScan.reject(new Error(`DAEMON_DISCONNECT: ${err.message}`));
-                    this.pendingScan = null;
-                }
-                if (this.pendingScanDiff) {
-                    this.pendingScanDiff.reject(new Error(`DAEMON_DISCONNECT: ${err.message}`));
-                    this.pendingScanDiff = null;
-                }
-                if (this.pendingPong) {
-                    this.pendingPong.reject(new Error(`DAEMON_DISCONNECT: ${err.message}`));
-                    this.pendingPong = null;
-                }
-            });
-            socket.on('close', () => {
-                if (!settled) fail(new Error('CONNECTION_CLOSED'));
-                if (this.pendingScan) {
-                    this.pendingScan.reject(
-                        new Error('DAEMON_DISCONNECT: connection closed before scan_done'),
-                    );
-                    this.pendingScan = null;
-                }
-                if (this.pendingScanDiff) {
-                    this.pendingScanDiff.reject(
-                        new Error('DAEMON_DISCONNECT: connection closed before scan_done'),
-                    );
-                    this.pendingScanDiff = null;
-                }
-                if (this.pendingPong) {
-                    this.pendingPong.reject(new Error('DAEMON_DISCONNECT: connection closed'));
-                    this.pendingPong = null;
-                }
-            });
+            this.attachSocketHandlers(socket, timer, resolve, reject);
         });
     }
 
-    /** Run one warm scan. Must be connected first. Rejects on daemon error/timeout/close. */
-    scan(
-        config: ScanConfig,
-        options: {
-            cache: boolean;
-            cacheDir?: string;
-            cacheCustom?: boolean;
-            workers?: number;
-            parser?: string;
-        },
-    ): Promise<WarmScanResult> {
-        return new Promise((resolve, reject) => {
+    private executeTimedRequest<T>(
+        timeoutMs: number,
+        timeoutMessage: string,
+        registerPending: (pending: { resolve: (payload: T) => void; reject: (err: Error) => void }) => void,
+        dispatchSend: (messageId: number, requestId: string) => void,
+    ): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
             if (!this.socket || this.socket.destroyed) {
                 reject(new Error(NOT_CONNECTED_ERROR));
                 return;
@@ -206,40 +241,48 @@ export class DaemonClient {
             const timer = setTimeout(() => {
                 if (!settled) {
                     settled = true;
-                    reject(new Error('SCAN_TIMEOUT'));
+                    reject(new Error(timeoutMessage));
                 }
-            }, SCAN_TIMEOUT_MS);
-            this.pendingScan = {
-                resolve: (scanResult) => {
+            }, timeoutMs);
+            registerPending({
+                resolve: (resultPayload: T) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
-                    resolve(scanResult);
+                    resolve(resultPayload);
                 },
-                reject: (error) => {
+                reject: (err: Error) => {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
-                    reject(error);
-                },
-            };
-            this.send({
-                v: 1,
-                id: messageId,
-                type: 'scan',
-                params: {
-                    requestId,
-                    config: config as unknown as Record<string, unknown>,
-                    options: {
-                        cache: options.cache,
-                        cacheDir: options.cacheDir,
-                        cacheCustom: options.cacheCustom,
-                        workers: options.workers,
-                        parser: options.parser,
-                    },
+                    reject(err);
                 },
             });
+            dispatchSend(messageId, requestId);
         });
+    }
+
+    /** Run one warm scan. Must be connected first. Rejects on daemon error/timeout/close. */
+    scan(config: ScanConfig, options: DaemonScanOptions): Promise<WarmScanResult> {
+        return this.executeTimedRequest<WarmScanResult>(
+            SCAN_TIMEOUT_MS,
+            'SCAN_TIMEOUT',
+            (pending) => {
+                this.pendingScan = pending;
+            },
+            (messageId, requestId) => {
+                this.sendDaemonMessage({
+                    v: 1,
+                    id: messageId,
+                    type: MSG_TYPE_SCAN,
+                    params: {
+                        requestId,
+                        config: config as unknown as Record<string, unknown>,
+                        options: formatDaemonOptions(options),
+                    },
+                });
+            },
+        );
     }
 
     /** Whether the connected daemon advertised the `diff` capability (old daemons don't). */
@@ -251,64 +294,28 @@ export class DaemonClient {
     scanDiff(
         config: ScanConfig,
         diffs: Array<Record<string, unknown>>,
-        options: {
-            cache: boolean;
-            cacheDir?: string;
-            cacheCustom?: boolean;
-            workers?: number;
-            parser?: string;
-            verifyDiskContent: boolean;
-            delta: boolean;
-        },
+        options: DaemonScanDiffOptions,
     ): Promise<{ report: unknown; stats: unknown }> {
-        return new Promise((resolve, reject) => {
-            if (!this.socket || this.socket.destroyed) {
-                reject(new Error(NOT_CONNECTED_ERROR));
-                return;
-            }
-            const requestId = `r${++this.nextId}`;
-            const messageId = this.nextId;
-            let settled = false;
-            const timer = setTimeout(() => {
-                if (!settled) {
-                    settled = true;
-                    reject(new Error('SCAN_TIMEOUT'));
-                }
-            }, SCAN_TIMEOUT_MS);
-            this.pendingScanDiff = {
-                resolve: (diffResult) => {
-                    if (settled) return;
-                    settled = true;
-                    clearTimeout(timer);
-                    resolve(diffResult);
-                },
-                reject: (error) => {
-                    if (settled) return;
-                    settled = true;
-                    clearTimeout(timer);
-                    reject(error);
-                },
-            };
-            this.send({
-                v: 1,
-                id: messageId,
-                type: 'scan_diff',
-                params: {
-                    requestId,
-                    config: config as unknown as Record<string, unknown>,
-                    diffs,
-                    options: {
-                        cache: options.cache,
-                        cacheDir: options.cacheDir,
-                        cacheCustom: options.cacheCustom,
-                        workers: options.workers,
-                        parser: options.parser,
-                        verifyDiskContent: options.verifyDiskContent,
-                        delta: options.delta,
+        return this.executeTimedRequest<{ report: unknown; stats: unknown }>(
+            SCAN_TIMEOUT_MS,
+            'SCAN_TIMEOUT',
+            (pending) => {
+                this.pendingScanDiff = pending;
+            },
+            (messageId, requestId) => {
+                this.sendDaemonMessage({
+                    v: 1,
+                    id: messageId,
+                    type: MSG_TYPE_SCAN_DIFF,
+                    params: {
+                        requestId,
+                        config: config as unknown as Record<string, unknown>,
+                        diffs,
+                        options: formatDaemonDiffOptions(options),
                     },
-                },
-            });
-        });
+                });
+            },
+        );
     }
 
     /** Ping the daemon (status command). Rejects when not running / no response. */
@@ -339,14 +346,19 @@ export class DaemonClient {
                     reject(error);
                 },
             };
-            this.send({ v: 1, id: ++this.nextId, type: 'ping' });
+            this.sendDaemonMessage({ v: 1, id: ++this.nextId, type: MSG_TYPE_PING });
         });
     }
 
     /** Ask the daemon to shut down (daemon stop). Best-effort. */
     shutdown(): void {
         try {
-            this.send({ v: 1, id: ++this.nextId, type: 'shutdown', reason: 'client-request' });
+            this.sendDaemonMessage({
+                v: 1,
+                id: ++this.nextId,
+                type: MSG_TYPE_SHUTDOWN,
+                reason: MSG_TYPE_CLIENT_REQUEST,
+            });
         } catch {
             /* ignore */
         }
@@ -370,10 +382,12 @@ export class DaemonClient {
 
     /** Disposes client socket connections and drains active event subscriptions. */
     dispose(): void {
+        this.caps = null;
+        this.registry = null;
         this.close();
     }
 
-    private send(msg: DaemonMessage): void {
+    private sendDaemonMessage(msg: DaemonMessage): void {
         if (!this.socket || this.socket.destroyed) throw new Error(NOT_CONNECTED_ERROR);
         this.socket.write(encodeMessage(msg as DaemonMessage));
     }
@@ -466,13 +480,7 @@ export class DaemonClient {
 export interface WarmScanParams {
     readonly root: string;
     readonly config: ScanConfig;
-    readonly options: {
-        cache: boolean;
-        cacheDir?: string;
-        cacheCustom?: boolean;
-        workers?: number;
-        parser?: string;
-    };
+    readonly options: DaemonScanOptions;
     readonly logger?: Logger;
 }
 
@@ -481,41 +489,17 @@ export interface WarmScanParams {
  * of throwing whenever the daemon is missing, drifts, times out, or disconnects, so the caller
  * can degrade to a cold scan. Each call owns its client and shares no state across calls.
  *
- * @param rootOrParams - Project root or structured WarmScanParams bundle.
- * @param config - Resolved scan config forwarded to the daemon (when rootOrParams is string).
- * @param options - Caching and worker options forwarded unchanged to the daemon scan.
- * @param logger - Sink for diagnostic messages while probing the daemon path.
+ * @param params - Structured WarmScanParams bundle containing root, config, options, and logger.
  * @returns Warm-scan result, or null when the daemon path is unusable; this async call resolves
  *          after the client closes.
  */
-export async function tryWarmScan(
-    rootOrParams: string | WarmScanParams,
-    config?: ScanConfig,
-    options?: {
-        cache: boolean;
-        cacheDir?: string;
-        cacheCustom?: boolean;
-        workers?: number;
-        parser?: string;
-    },
-    logger?: Logger,
-): Promise<WarmScanResult | null> {
-    const params: WarmScanParams =
-        typeof rootOrParams === 'string'
-            ? {
-                  root: rootOrParams,
-                  config: config!,
-                  options: options!,
-                  logger,
-              }
-            : rootOrParams;
-
+export async function tryWarmScan(params: WarmScanParams): Promise<WarmScanResult | null> {
     const client = new DaemonClient(params.root);
     try {
         await client.connect();
-        const result = await client.scan(params.config, params.options);
+        const warmScanResult = await client.scan(params.config, params.options);
         client.close();
-        return result;
+        return warmScanResult;
     } catch (error) {
         client.close();
         params.logger?.debug(
@@ -530,15 +514,7 @@ export interface WarmScanDiffParams {
     readonly root: string;
     readonly config: ScanConfig;
     readonly diffs: Array<Record<string, unknown>>;
-    readonly options: {
-        cache: boolean;
-        cacheDir?: string;
-        cacheCustom?: boolean;
-        workers?: number;
-        parser?: string;
-        verifyDiskContent: boolean;
-        delta: boolean;
-    };
+    readonly options: DaemonScanDiffOptions;
     readonly logger?: Logger;
 }
 
@@ -548,40 +524,14 @@ export interface WarmScanDiffParams {
  * that capability, so callers fall back to an in-process diff scan. Each call owns its client
  * and shares no state across calls.
  *
- * @param rootOrParams - Project root or structured WarmScanDiffParams bundle.
- * @param config - Resolved scan config forwarded to the daemon (when rootOrParams is string).
- * @param diffs - Changed-file payloads encoded for the daemon protocol.
- * @param options - Caching, diff, and worker options forwarded unchanged.
- * @param logger - Optional Logger instance for recording debug diagnostics.
+ * @param params - Structured WarmScanDiffParams bundle containing root, config, diffs,
+ *                 options, and logger.
  * @returns Diff-scan result `{ report, stats }`, or null when unusable; this async call
  *          resolves after the client closes.
  */
 export async function tryWarmScanDiff(
-    rootOrParams: string | WarmScanDiffParams,
-    config?: ScanConfig,
-    diffs?: Array<Record<string, unknown>>,
-    options?: {
-        cache: boolean;
-        cacheDir?: string;
-        cacheCustom?: boolean;
-        workers?: number;
-        parser?: string;
-        verifyDiskContent: boolean;
-        delta: boolean;
-    },
-    logger?: Logger,
+    params: WarmScanDiffParams,
 ): Promise<{ report: unknown; stats: unknown } | null> {
-    const params: WarmScanDiffParams =
-        typeof rootOrParams === 'string'
-            ? {
-                  root: rootOrParams,
-                  config: config!,
-                  diffs: diffs!,
-                  options: options!,
-                  logger,
-              }
-            : rootOrParams;
-
     const client = new DaemonClient(params.root);
     try {
         await client.connect();
@@ -590,9 +540,9 @@ export async function tryWarmScanDiff(
             params.logger?.debug('warm scan diff rejected: daemon lacks diff capability');
             return null;
         }
-        const result = await client.scanDiff(params.config, params.diffs, params.options);
+        const diffScanResult = await client.scanDiff(params.config, params.diffs, params.options);
         client.close();
-        return result;
+        return diffScanResult;
     } catch (error) {
         client.close();
         params.logger?.debug(

@@ -239,17 +239,10 @@ function buildWarmOptions(options: ScanOptions, defaultCache: boolean): LazyWarm
 
 interface DaemonClientModuleExports {
     tryWarmScan: (
-        params: WarmScanParams | string,
-        config?: ScanConfig,
-        options?: LazyWarmScanOptions,
-        logger?: Logger,
+        params: WarmScanParams,
     ) => Promise<{ report: ScanReport; stats: WarmStats } | null>;
     tryWarmScanDiff: (
-        params: DiffWarmScanParams | string,
-        config?: ScanConfig,
-        diffs?: DiffInput[],
-        options?: WarmScanDiffOptions,
-        logger?: Logger,
+        params: DiffWarmScanParams,
     ) => Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats } | null>;
 }
 
