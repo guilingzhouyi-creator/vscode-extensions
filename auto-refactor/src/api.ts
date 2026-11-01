@@ -239,16 +239,16 @@ function buildWarmOptions(options: ScanOptions, defaultCache: boolean): LazyWarm
 
 interface DaemonClientModuleExports {
     tryWarmScan: (
-        root: string,
-        config: ScanConfig,
-        options: LazyWarmScanOptions,
+        params: WarmScanParams | string,
+        config?: ScanConfig,
+        options?: LazyWarmScanOptions,
         logger?: Logger,
     ) => Promise<{ report: ScanReport; stats: WarmStats } | null>;
     tryWarmScanDiff: (
-        root: string,
-        config: ScanConfig,
-        diffs: DiffInput[],
-        options: WarmScanDiffOptions,
+        params: DiffWarmScanParams | string,
+        config?: ScanConfig,
+        diffs?: DiffInput[],
+        options?: WarmScanDiffOptions,
         logger?: Logger,
     ) => Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats } | null>;
 }
@@ -264,6 +264,13 @@ function loadDaemonModule<T>(modulePath: string): T {
     return dynamicRequire(modulePath);
 }
 
+interface WarmScanParams {
+    readonly root: string;
+    readonly config: ScanConfig;
+    readonly options: LazyWarmScanOptions;
+    readonly logger?: Logger;
+}
+
 /** Lazy daemon-client access (keeps the default scan() module graph daemon-free). */
 function runLazyWarmScan(
     root: string,
@@ -272,7 +279,7 @@ function runLazyWarmScan(
     logger?: Logger,
 ): Promise<{ report: ScanReport; stats: WarmStats } | null> {
     const { tryWarmScan } = loadDaemonModule<DaemonClientModuleExports>(MODULE_DAEMON_CLIENT);
-    return tryWarmScan(root, config, options, logger);
+    return tryWarmScan({ root, config, options, logger });
 }
 
 /** Lazy daemon auto-start access (only used by daemon:'on'). */
@@ -295,7 +302,7 @@ function runLazyWarmScanDiff(
     params: DiffWarmScanParams,
 ): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats } | null> {
     const { tryWarmScanDiff } = loadDaemonModule<DaemonClientModuleExports>(MODULE_DAEMON_CLIENT);
-    return tryWarmScanDiff(params.root, params.config, params.diffs, params.options, params.logger);
+    return tryWarmScanDiff(params);
 }
 
 function resolvePostScanScope(

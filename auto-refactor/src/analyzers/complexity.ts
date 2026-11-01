@@ -37,6 +37,7 @@ import type { NormalizedNode } from '../core/ast/multilang';
 import { NodeKind } from '../core/ast/multilang';
 import { locN } from '../utils/normalized';
 import { runStreaming } from '../core/ast/traverse';
+import { TypeScriptAdapter } from '../core/ast/typescript-adapter';
 import { getMaskedSourceOfPath } from '../core/policy/source-mask';
 import { PathClassifier } from '../core/path';
 import { globToRegExp } from '../core/file-discovery';
@@ -354,9 +355,6 @@ export class ComplexityAnalyzer implements Analyzer {
         this.cachedLines = ms.raw;
         this.maskedFor = ctx.filePath;
 
-        const { TypeScriptAdapter } = require(
-            MODULE_TYPESCRIPT_ADAPTER,
-        ) as typeof import('../core/ast/typescript-adapter');
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(sourceFile.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [

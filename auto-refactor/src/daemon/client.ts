@@ -462,27 +462,36 @@ export class DaemonClient {
     }
 }
 
+/** Parameters for executing a one-shot warm scan against daemon */
+export interface WarmScanParams {
+    readonly root: string;
+    readonly config: ScanConfig;
+    readonly options: {
+        cache: boolean;
+        cacheDir?: string;
+        cacheCustom?: boolean;
+        workers?: number;
+        parser?: string;
+    };
+    readonly logger?: Logger;
+}
+
 /**
  * One-shot convenience: connect, run one warm scan, and close the client. Returns null instead
  * of throwing whenever the daemon is missing, drifts, times out, or disconnects, so the caller
  * can degrade to a cold scan. Each call owns its client and shares no state across calls.
  *
- * @param root - Project root whose registry entry identifies the daemon.
- * @param config - Resolved scan config forwarded to the daemon.
+ * @param rootOrParams - Project root or structured WarmScanParams bundle.
+ * @param config - Resolved scan config forwarded to the daemon (when rootOrParams is string).
  * @param options - Caching and worker options forwarded unchanged to the daemon scan.
- * @param options.cache - Whether the daemon may read/write the L2 cache.
- * @param options.cacheDir - Optional override for the cache directory.
- * @param options.cacheCustom - Whether custom-analyzer modules may use the L2 cache.
- * @param options.workers - Optional daemon worker-count override.
- * @param options.parser - Optional parser selection override ('typescript' | 'oxc').
  * @param logger - Sink for diagnostic messages while probing the daemon path.
  * @returns Warm-scan result, or null when the daemon path is unusable; this async call resolves
  *          after the client closes.
  */
 export async function tryWarmScan(
-    root: string,
-    config: ScanConfig,
-    options: {
+    rootOrParams: string | WarmScanParams,
+    config?: ScanConfig,
+    options?: {
         cache: boolean;
         cacheDir?: string;
         cacheCustom?: boolean;
@@ -491,19 +500,46 @@ export async function tryWarmScan(
     },
     logger?: Logger,
 ): Promise<WarmScanResult | null> {
-    const client = new DaemonClient(root);
+    const params: WarmScanParams =
+        typeof rootOrParams === 'string'
+            ? {
+                  root: rootOrParams,
+                  config: config!,
+                  options: options!,
+                  logger,
+              }
+            : rootOrParams;
+
+    const client = new DaemonClient(params.root);
     try {
         await client.connect();
-        const result = await client.scan(config, options);
+        const result = await client.scan(params.config, params.options);
         client.close();
         return result;
     } catch (error) {
         client.close();
-        logger?.debug(
+        params.logger?.debug(
             `warm scan fallback to cold scan: ${error instanceof Error ? error.message : String(error)}`,
         );
         return null;
     }
+}
+
+/** Parameters for executing a one-shot warm diff scan against daemon */
+export interface WarmScanDiffParams {
+    readonly root: string;
+    readonly config: ScanConfig;
+    readonly diffs: Array<Record<string, unknown>>;
+    readonly options: {
+        cache: boolean;
+        cacheDir?: string;
+        cacheCustom?: boolean;
+        workers?: number;
+        parser?: string;
+        verifyDiskContent: boolean;
+        delta: boolean;
+    };
+    readonly logger?: Logger;
 }
 
 /**
@@ -512,26 +548,19 @@ export async function tryWarmScan(
  * that capability, so callers fall back to an in-process diff scan. Each call owns its client
  * and shares no state across calls.
  *
- * @param root - Project root whose registry entry identifies the daemon.
- * @param config - Resolved scan config forwarded to the daemon.
+ * @param rootOrParams - Project root or structured WarmScanDiffParams bundle.
+ * @param config - Resolved scan config forwarded to the daemon (when rootOrParams is string).
  * @param diffs - Changed-file payloads encoded for the daemon protocol.
  * @param options - Caching, diff, and worker options forwarded unchanged.
- * @param options.cache - Whether the daemon may read/write the L2 cache.
- * @param options.cacheDir - Optional override for the cache directory.
- * @param options.cacheCustom - Whether custom-analyzer modules may use the L2 cache.
- * @param options.workers - Optional daemon worker-count override.
- * @param options.parser - Optional parser selection override ('typescript' | 'oxc').
- * @param options.verifyDiskContent - When true, the daemon re-reads disk content before reuse.
- * @param options.delta - When true, request the changed-file subset instead of a full report.
  * @param logger - Optional Logger instance for recording debug diagnostics.
  * @returns Diff-scan result `{ report, stats }`, or null when unusable; this async call
  *          resolves after the client closes.
  */
 export async function tryWarmScanDiff(
-    root: string,
-    config: ScanConfig,
-    diffs: Array<Record<string, unknown>>,
-    options: {
+    rootOrParams: string | WarmScanDiffParams,
+    config?: ScanConfig,
+    diffs?: Array<Record<string, unknown>>,
+    options?: {
         cache: boolean;
         cacheDir?: string;
         cacheCustom?: boolean;
@@ -542,20 +571,31 @@ export async function tryWarmScanDiff(
     },
     logger?: Logger,
 ): Promise<{ report: unknown; stats: unknown } | null> {
-    const client = new DaemonClient(root);
+    const params: WarmScanDiffParams =
+        typeof rootOrParams === 'string'
+            ? {
+                  root: rootOrParams,
+                  config: config!,
+                  diffs: diffs!,
+                  options: options!,
+                  logger,
+              }
+            : rootOrParams;
+
+    const client = new DaemonClient(params.root);
     try {
         await client.connect();
         if (!client.hasDiffCap()) {
             client.close();
-            logger?.debug('warm scan diff rejected: daemon lacks diff capability');
+            params.logger?.debug('warm scan diff rejected: daemon lacks diff capability');
             return null;
         }
-        const result = await client.scanDiff(config, diffs, options);
+        const result = await client.scanDiff(params.config, params.diffs, params.options);
         client.close();
         return result;
     } catch (error) {
         client.close();
-        logger?.debug(
+        params.logger?.debug(
             `warm scan diff fallback to cold scan: ${error instanceof Error ? error.message : String(error)}`,
         );
         return null;

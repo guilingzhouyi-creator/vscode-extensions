@@ -634,36 +634,48 @@ function resolveRawColumn(rawLine: string, term: string, hintIndex: number): num
     return col >= 0 ? col : hintIndex;
 }
 
+/** Immutable execution context for auditing a single prose line */
+export interface LineAuditContext {
+    readonly sanitized: string;
+    readonly rawLine: string;
+    readonly lineNum: number;
+    readonly lowerRawLine: string;
+}
+
+/** Rule set and options dispatch bundle */
+export interface LineAuditDispatchOptions {
+    readonly rules: readonly TerminologyRule[];
+    readonly options: TerminologyAuditOptions;
+    readonly allowedCategorySet: ReadonlySet<TerminologyCategory> | null;
+}
+
 /**
  * Resolves case-insensitive column index in raw line with single boundary probe.
  */
 function resolveAsciiRawColumn(
-    rawLine: string,
+    context: LineAuditContext,
     term: string,
     hintIndex: number,
-    lowerRawLine: string,
 ): number {
     const termLen = term.length;
     const lowerTerm = term.toLowerCase();
 
     // 1. Fast prefix/boundary probe at hintIndex (O(termLen), zero full-string scan)
-    if (hintIndex >= 0 && hintIndex + termLen <= rawLine.length) {
-        if (lowerRawLine.startsWith(lowerTerm, hintIndex)) {
+    if (hintIndex >= 0 && hintIndex + termLen <= context.rawLine.length) {
+        if (context.lowerRawLine.startsWith(lowerTerm, hintIndex)) {
             return hintIndex;
         }
     }
 
     // 2. Fallback single scan on pre-lowercased line
-    const col = lowerRawLine.indexOf(lowerTerm);
+    const col = context.lowerRawLine.indexOf(lowerTerm);
     return col >= 0 ? col : hintIndex;
 }
 
 /** Check pattern match on a single line appending directly into accumulator */
 function collectLinePatterns(
     outFindings: TerminologyFinding[],
-    sanitized: string,
-    rawLine: string,
-    lineNum: number,
+    context: LineAuditContext,
     rule: TerminologyRule,
 ): void {
     const lexicon = getOrCompileRuleLexicon(rule);
@@ -673,7 +685,7 @@ function collectLinePatterns(
     const seenTerms = new Set<string>();
     let match: RegExpExecArray | null;
 
-    while ((match = lexicon.patternRe.exec(sanitized)) !== null) {
+    while ((match = lexicon.patternRe.exec(context.sanitized)) !== null) {
         const pattern = match[0];
         if (!lexicon.patternSet.has(pattern) || seenTerms.has(pattern)) {
             continue;
@@ -681,12 +693,12 @@ function collectLinePatterns(
         seenTerms.add(pattern);
 
         const sanitizedCol = match.index;
-        if (isVocabularyEnumeration(sanitized, sanitizedCol, pattern)) {
+        if (isVocabularyEnumeration(context.sanitized, sanitizedCol, pattern)) {
             continue;
         }
 
-        const col = resolveRawColumn(rawLine, pattern, sanitizedCol);
-        if (col >= 0 && isVocabularyEnumeration(rawLine, col, pattern)) {
+        const col = resolveRawColumn(context.rawLine, pattern, sanitizedCol);
+        if (col >= 0 && isVocabularyEnumeration(context.rawLine, col, pattern)) {
             continue;
         }
 
@@ -694,49 +706,33 @@ function collectLinePatterns(
             category: rule.category,
             severity: rule.severity,
             term: pattern,
-            line: lineNum,
+            line: context.lineNum,
             column: Math.max(1, col + 1),
             message: `Prose contains ${rule.category} terminology \`${pattern}\`: ${rule.reason}`,
             guidance: rule.guidance,
-            contextSnippet: rawLine.trim().slice(0, 100),
+            contextSnippet: context.rawLine.trim().slice(0, 100),
         });
     }
-}
-
-/** Check pattern match on a single line */
-function _checkLinePatterns(
-    sanitized: string,
-    rawLine: string,
-    lineNum: number,
-    rule: TerminologyRule,
-): TerminologyFinding[] {
-    const findings: TerminologyFinding[] = [];
-    collectLinePatterns(findings, sanitized, rawLine, lineNum, rule);
-    return findings;
 }
 
 /** Check ascii regex patterns on a single line appending directly into accumulator */
 function collectLineAsciiPatterns(
     outFindings: TerminologyFinding[],
-    sanitized: string,
-    rawLine: string,
-    lineNum: number,
+    context: LineAuditContext,
     rule: TerminologyRule,
-    lowerRawLine?: string,
 ): void {
-    const lowerRaw = lowerRawLine ?? rawLine.toLowerCase();
     for (const asciiPat of rule.asciiPatterns) {
         const asciiRegex = getOrCompileAsciiPattern(asciiPat);
         asciiRegex.lastIndex = 0;
         let match: RegExpExecArray | null;
-        while ((match = asciiRegex.exec(sanitized)) !== null) {
+        while ((match = asciiRegex.exec(context.sanitized)) !== null) {
             const term = match[0];
-            if (isVocabularyEnumeration(sanitized, match.index, term)) {
+            if (isVocabularyEnumeration(context.sanitized, match.index, term)) {
                 continue;
             }
 
-            const actualCol = resolveAsciiRawColumn(rawLine, term, match.index, lowerRaw);
-            if (isVocabularyEnumeration(rawLine, actualCol, term)) {
+            const actualCol = resolveAsciiRawColumn(context, term, match.index);
+            if (isVocabularyEnumeration(context.rawLine, actualCol, term)) {
                 continue;
             }
 
@@ -744,47 +740,30 @@ function collectLineAsciiPatterns(
                 category: rule.category,
                 severity: rule.severity,
                 term,
-                line: lineNum,
+                line: context.lineNum,
                 column: Math.max(1, actualCol + 1),
                 message: `Prose contains ${rule.category} term \`${term}\`: ${rule.reason}`,
                 guidance: rule.guidance,
-                contextSnippet: rawLine.trim().slice(0, 100),
+                contextSnippet: context.rawLine.trim().slice(0, 100),
             });
         }
     }
 }
 
-/** Check ascii regex patterns on a single line */
-function _checkLineAsciiPatterns(
-    sanitized: string,
-    rawLine: string,
-    lineNum: number,
-    rule: TerminologyRule,
-): TerminologyFinding[] {
-    const findings: TerminologyFinding[] = [];
-    collectLineAsciiPatterns(findings, sanitized, rawLine, lineNum, rule);
-    return findings;
-}
-
 function auditLineAgainstRules(
     findings: TerminologyFinding[],
-    sanitized: string,
-    rawLine: string,
-    lineNum: number,
-    rules: readonly TerminologyRule[],
-    options: TerminologyAuditOptions,
-    allowedCategorySet: ReadonlySet<TerminologyCategory> | null,
-    lowerRawLine: string,
+    context: LineAuditContext,
+    dispatch: LineAuditDispatchOptions,
 ): void {
-    for (const rule of rules) {
-        if (allowedCategorySet && !allowedCategorySet.has(rule.category)) {
+    for (const rule of dispatch.rules) {
+        if (dispatch.allowedCategorySet && !dispatch.allowedCategorySet.has(rule.category)) {
             continue;
         }
-        if (options.checkPatterns !== false) {
-            collectLinePatterns(findings, sanitized, rawLine, lineNum, rule);
+        if (dispatch.options.checkPatterns !== false) {
+            collectLinePatterns(findings, context, rule);
         }
-        if (options.checkAscii !== false) {
-            collectLineAsciiPatterns(findings, sanitized, rawLine, lineNum, rule, lowerRawLine);
+        if (dispatch.options.checkAscii !== false) {
+            collectLineAsciiPatterns(findings, context, rule);
         }
     }
 }
@@ -821,22 +800,24 @@ export function auditTerminologyProse(
         ? new Set<TerminologyCategory>(options.allowedCategories)
         : null;
 
+    const dispatch: LineAuditDispatchOptions = {
+        rules,
+        options,
+        allowedCategorySet,
+    };
+
     for (let i = 0; i < lines.length; i++) {
         const rawLine = lines[i];
         if (!isEligibleProseLine(rawLine, isDefaultRules)) continue;
 
         const sanitized = sanitizeLineForTerminology(rawLine, customWhitelist);
-        const lowerRawLine = rawLine.toLowerCase();
-        auditLineAgainstRules(
-            findings,
+        const context: LineAuditContext = {
             sanitized,
             rawLine,
-            i + 1,
-            rules,
-            options,
-            allowedCategorySet,
-            lowerRawLine,
-        );
+            lineNum: i + 1,
+            lowerRawLine: rawLine.toLowerCase(),
+        };
+        auditLineAgainstRules(findings, context, dispatch);
     }
 
     return findings.length === 0 ? EMPTY_TERMINOLOGY_FINDINGS : Object.freeze(findings);

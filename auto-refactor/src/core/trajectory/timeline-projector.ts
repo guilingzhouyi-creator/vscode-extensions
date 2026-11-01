@@ -195,14 +195,26 @@ function tryParseRecordLine(
     }
 }
 
+/** Query criteria for reading and accumulating trajectory records backwards */
+export interface TrajectoryReverseQuery {
+    readonly cutoffTimeMs: number;
+    readonly maxRecords: number;
+    readonly accumulator: CompactTrajectoryRecord[];
+}
+
+/** Time boundary and identifier for a timeline bucket */
+export interface TimelineBucketBoundary {
+    readonly bucketId: string;
+    readonly startTimeMs: number;
+    readonly endTimeMs: number;
+}
+
 /**
  * Parses reverse chunk lines in a single buffer segment.
  */
 function processChunkTextLines(
     chunkText: string,
-    cutoffTimeMs: number,
-    maxRecords: number,
-    accumulator: CompactTrajectoryRecord[],
+    query: TrajectoryReverseQuery,
 ): { reachedCutoff: boolean; malformedCount: number; leftover: string } {
     let malformedCount = 0;
     const lines = chunkText.split('\n');
@@ -212,12 +224,12 @@ function processChunkTextLines(
         const line = lines[i].trim();
         if (!line) continue;
 
-        const outcome = tryParseRecordLine(line, cutoffTimeMs, accumulator);
+        const outcome = tryParseRecordLine(line, query.cutoffTimeMs, query.accumulator);
         if (!outcome.isValid) {
             malformedCount++;
             continue;
         }
-        if (outcome.reachedCutoff || accumulator.length >= maxRecords) {
+        if (outcome.reachedCutoff || query.accumulator.length >= query.maxRecords) {
             return { reachedCutoff: true, malformedCount, leftover };
         }
     }
@@ -230,9 +242,7 @@ function processChunkTextLines(
  */
 async function readArchiveChunksReverse(
     archivePath: string,
-    cutoffTimeMs: number,
-    maxRecords: number,
-    accumulator: CompactTrajectoryRecord[],
+    query: TrajectoryReverseQuery,
 ): Promise<number> {
     let malformedCount = 0;
     let fileHandle: fs.promises.FileHandle | null = null;
@@ -246,27 +256,22 @@ async function readArchiveChunksReverse(
         let currentFilePosition = stats.size;
         let pendingLineSegment = '';
 
-        while (currentFilePosition > 0 && accumulator.length < maxRecords) {
+        while (currentFilePosition > 0 && query.accumulator.length < query.maxRecords) {
             const readSize = Math.min(REVERSE_CHUNK_SIZE, currentFilePosition);
             currentFilePosition -= readSize;
 
             const { bytesRead } = await fileHandle.read(chunkBuffer, 0, readSize, currentFilePosition);
             const chunkText = chunkBuffer.toString('utf8', 0, bytesRead) + pendingLineSegment;
 
-            const parseResult = processChunkTextLines(
-                chunkText,
-                cutoffTimeMs,
-                maxRecords,
-                accumulator,
-            );
+            const parseResult = processChunkTextLines(chunkText, query);
             malformedCount += parseResult.malformedCount;
             pendingLineSegment = parseResult.leftover;
 
             if (parseResult.reachedCutoff) break;
         }
 
-        if (pendingLineSegment.trim() && accumulator.length < maxRecords) {
-            const outcome = tryParseRecordLine(pendingLineSegment.trim(), cutoffTimeMs, accumulator);
+        if (pendingLineSegment.trim() && query.accumulator.length < query.maxRecords) {
+            const outcome = tryParseRecordLine(pendingLineSegment.trim(), query.cutoffTimeMs, query.accumulator);
             if (!outcome.isValid) malformedCount++;
         }
     } catch {
@@ -285,9 +290,7 @@ async function readArchiveChunksReverse(
  */
 async function readActiveLedgerReverse(
     activePath: string,
-    cutoffTimeMs: number,
-    maxRecords: number,
-    accumulator: CompactTrajectoryRecord[],
+    query: TrajectoryReverseQuery,
 ): Promise<{ reachedCutoff: boolean; earliestTimestamp: number; malformedCount: number }> {
     let malformedCount = 0;
     let earliestTimestamp = Infinity;
@@ -304,18 +307,18 @@ async function readActiveLedgerReverse(
             const line = lines[i].trim();
             if (!line) continue;
 
-            const outcome = tryParseRecordLine(line, cutoffTimeMs, accumulator);
+            const outcome = tryParseRecordLine(line, query.cutoffTimeMs, query.accumulator);
             if (!outcome.isValid) {
                 malformedCount++;
                 continue;
             }
 
-            const latestInserted = accumulator[accumulator.length - 1];
+            const latestInserted = query.accumulator[query.accumulator.length - 1];
             if (latestInserted) {
                 earliestTimestamp = Math.min(earliestTimestamp, latestInserted.t);
             }
 
-            if (outcome.reachedCutoff || accumulator.length >= maxRecords) {
+            if (outcome.reachedCutoff || query.accumulator.length >= query.maxRecords) {
                 return { reachedCutoff: true, earliestTimestamp, malformedCount };
             }
         }
@@ -344,13 +347,14 @@ export async function readRecordsTieredReverse(
     const rawReverseList: CompactTrajectoryRecord[] = [];
     let malformedCount = 0;
 
-    const activePath = path.join(ledgerDir, FILE_ACTIVE_RUNS);
-    const activeOutcome = await readActiveLedgerReverse(
-        activePath,
+    const query: TrajectoryReverseQuery = {
         cutoffTimeMs,
         maxRecords,
-        rawReverseList,
-    );
+        accumulator: rawReverseList,
+    };
+
+    const activePath = path.join(ledgerDir, FILE_ACTIVE_RUNS);
+    const activeOutcome = await readActiveLedgerReverse(activePath, query);
     malformedCount += activeOutcome.malformedCount;
 
     if (activeOutcome.reachedCutoff || rawReverseList.length >= maxRecords) {
@@ -359,12 +363,7 @@ export async function readRecordsTieredReverse(
 
     const archivePath = path.join(ledgerDir, FILE_ARCHIVE_RUNS);
     if (activeOutcome.earliestTimestamp > cutoffTimeMs && fs.existsSync(archivePath)) {
-        const archiveMalformedCount = await readArchiveChunksReverse(
-            archivePath,
-            cutoffTimeMs,
-            maxRecords,
-            rawReverseList,
-        );
+        const archiveMalformedCount = await readArchiveChunksReverse(archivePath, query);
         malformedCount += archiveMalformedCount;
     }
 
@@ -375,11 +374,10 @@ export async function readRecordsTieredReverse(
  * Accumulates single bucket metrics with hybrid latest and semantic-weighted score.
  */
 function foldSingleBucket(
-    bucketId: string,
-    startTimeMs: number,
-    endTimeMs: number,
+    boundary: TimelineBucketBoundary,
     records: CompactTrajectoryRecord[],
 ): TimelineBucketSnapshot {
+    const { bucketId, startTimeMs, endTimeMs } = boundary;
     if (records.length === 0) {
         return {
             bucketId,
@@ -527,7 +525,12 @@ function aggregateSemanticBuckets(
 
     const snapshots: TimelineBucketSnapshot[] = [];
     for (const group of groupMap.values()) {
-        snapshots.push(foldSingleBucket(group.key, group.startMs, group.endMs, group.records));
+        snapshots.push(
+            foldSingleBucket(
+                { bucketId: group.key, startTimeMs: group.startMs, endTimeMs: group.endMs },
+                group.records,
+            ),
+        );
     }
 
     snapshots.sort((a, b) => b.endTimeMs - a.endTimeMs);
@@ -591,7 +594,14 @@ function flushPendingIdle(options: IdleFlushOptions): void {
     }
     if (idleCount === 1 && prevBucket) {
         destinationBuckets.push(
-            foldSingleBucket(prevBucket.bucketId, prevBucket.startTimeMs, prevBucket.endTimeMs, []),
+            foldSingleBucket(
+                {
+                    bucketId: prevBucket.bucketId,
+                    startTimeMs: prevBucket.startTimeMs,
+                    endTimeMs: prevBucket.endTimeMs,
+                },
+                [],
+            ),
         );
     }
 }
@@ -626,9 +636,11 @@ function foldIdleIntervals(rawStepBuckets: RawStepBucket[]): TimelineBucketSnaps
         idleRunCount = 0;
         foldedSnapshots.push(
             foldSingleBucket(
-                stepBucket.bucketId,
-                stepBucket.startTimeMs,
-                stepBucket.endTimeMs,
+                {
+                    bucketId: stepBucket.bucketId,
+                    startTimeMs: stepBucket.startTimeMs,
+                    endTimeMs: stepBucket.endTimeMs,
+                },
                 stepBucket.records,
             ),
         );

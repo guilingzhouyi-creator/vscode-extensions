@@ -19,6 +19,7 @@
  */
 import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import { TypeScriptAdapter } from '../core/ast/typescript-adapter';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import type { NormalizedNode } from '../core/ast/multilang';
 import { NodeKind } from '../core/ast/multilang';
@@ -143,8 +144,6 @@ export class ConstantsAnalyzer implements Analyzer {
     analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         this.resetState();
 
-        const { TypeScriptAdapter } =
-            require('../core/ast/typescript-adapter') as typeof import('../core/ast/typescript-adapter');
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(sourceFile.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [
