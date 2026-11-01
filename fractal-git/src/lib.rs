@@ -134,14 +134,14 @@ pub use fg_topology::blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
 pub use fg_topology::conflict_tree::{
     AgentConflictSliceReport, ConflictSlice, ConflictTreeManager,
 };
-pub use fg_topology::operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
-pub use fg_topology::project_store::{DiskProjectStore, PROJECTS_CACHE_FILE, PROJECTS_DIR};
-pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
-pub use fg_topology::provenance::{DiskProvenanceStore, PROVENANCE_FILE};
 pub use fg_topology::history_rollup::{
     CardMilestoneRecord, HierarchicalHistoryRollup, HierarchicalRollupFolder, MilestoneRollupEntry,
     PyramidFolder,
 };
+pub use fg_topology::operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
+pub use fg_topology::project_store::{DiskProjectStore, PROJECTS_CACHE_FILE, PROJECTS_DIR};
+pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
+pub use fg_topology::provenance::{DiskProvenanceStore, PROVENANCE_FILE};
 pub use fg_topology::refs::{
     apply_os_telemetry_protection, reset_file_write_permission, DiskRefStore, FractalRef, HeadState,
 };

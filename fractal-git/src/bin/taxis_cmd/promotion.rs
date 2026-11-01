@@ -190,7 +190,9 @@ fn handle_stage_request(
                     "  Lease Expiry      : 1 Hour (TTL = {}s)",
                     policy.staged_promotion_ttl_seconds
                 );
-                println!("  Promotion Gate    : Awaiting Human Physical Click in GUI Elevation Modal");
+                println!(
+                    "  Promotion Gate    : Awaiting Human Physical Click in GUI Elevation Modal"
+                );
             }
         }
         Err(err) => {

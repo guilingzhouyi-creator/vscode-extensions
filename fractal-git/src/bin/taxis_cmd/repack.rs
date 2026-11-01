@@ -83,9 +83,7 @@ fn parse_repack_options(args: &[String]) -> (RepackOptions, bool, bool) {
                 let flag = args[cursor].as_str();
                 let raw = match args.get(cursor + 1) {
                     Some(value) => value.as_str(),
-                    None => {
-                        fail_usage(format!("{flag} requires a size value (e.g. {flag} 64M)"))
-                    }
+                    None => fail_usage(format!("{flag} requires a size value (e.g. {flag} 64M)")),
                 };
                 match parse_byte_size(raw) {
                     Some(bytes) if bytes >= 1024 * 1024 => options.max_pack_bytes = bytes,
