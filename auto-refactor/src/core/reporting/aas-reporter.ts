@@ -21,10 +21,7 @@ import type {
     QualityScoreRationale,
 } from '../scoring/scoringTypes';
 import { ALL_QUALITY_DIMENSIONS, DEFAULT_QUALITY_WEIGHTS } from '../scoring/scoringTypes';
-import {
-    filterActiveTopologyBuckets,
-    executeFileTopologyPipeline,
-} from './agent-audit-pipeline';
+import { filterActiveTopologyBuckets, executeFileTopologyPipeline } from './agent-audit-pipeline';
 import {
     formatAnchorSlice,
     generateVerificationDirective,
@@ -36,9 +33,7 @@ import {
     type AasCounts,
     type AasDefectRecord,
     type AasDimensionDetail,
-    type AasFixRecipe,
     type AasHealth,
-    type AasQuantMetrics,
     type AasReportOptions,
     type AasSeverity,
     type AasUsability,
@@ -46,10 +41,11 @@ import {
     type AgentAuditReport,
 } from './aas-types';
 import { resolveQualityGrade } from '../scoring/scorer-formulas';
-import { buildFixRecipe } from './aas-remediation';
+import { buildFixRecipe, compressDiagnosticSentence } from './aas-remediation';
 import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
 
 export * from './aas-types';
+export { compressDiagnosticSentence };
 
 const DEFAULT_MAX_FILES = 200;
 const DEFAULT_MAX_DEFECTS_PER_FILE = 50;
@@ -66,8 +62,6 @@ const ROUND_SCALE_THOUSAND = 1000;
 const MAX_HEALTH_SCORE = 100;
 const HEALTHY_SCORE_THRESHOLD = 90;
 const WARNING_SCORE_THRESHOLD = 75;
-const MAX_SUGGESTION_CHARS = 80;
-const ELLIPSIS_TRUNCATE_CHARS = 77;
 
 const SEVERITY_ERROR: Severity = 'error';
 const SEVERITY_WARNING: Severity = 'warning';
@@ -111,88 +105,9 @@ function resolveVerdict(counts: AasCounts): AasVerdict {
  */
 function trimMessage(text: string, maxChars: number = DEFAULT_MAX_MESSAGE_CHARS): string {
     const cleanedText = (text || '').replace(/\s+/g, ' ').trim();
-    return cleanedText.length <= maxChars ? cleanedText : cleanedText.slice(0, Math.max(1, maxChars - 1)) + ELLIPSIS;
-}
-
-/**
- * Compresses diagnostic narrative into high-information-density token sentence.
- *
- * Implements the Five-Principle Compression Protocol (see
- * token-frugal-sentence-and-diagnostic-spec.md).
- *
- * @param rawText - Raw narrative diagnostic string.
- * @returns Concise token-dense diagnostic sentence.
- */
-export function compressDiagnosticSentence(rawText: string): string {
-    if (!rawText) return '';
-    let messageText = rawText.replace(/\s+/g, ' ').trim();
-
-    messageText = messageText.replace(
-        /Identifier\s+('?[a-zA-Z0-9_$-]+'?)\s+contains\s+unapproved\s+truncated\s+abbreviation\s+('?[a-zA-Z0-9_$-]+'?)\.?/i,
-        'identifier $1 unapproved abbr $2',
-    );
-    messageText = messageText.replace(
-        /Identifier\s+('?[a-zA-Z0-9_$-]+'?)\s+is\s+vague\s+and\s+uninformative;\s*lacks\s+domain\s+context\.?/i,
-        'identifier $1 lacks domain context',
-    );
-    messageText = messageText.replace(
-        /(?:Function\s+or\s+method\s+name|Local\s+variable\s+name|Variable\s+name)\s+('?[a-zA-Z0-9_$-]+'?)\s+is\s+too\s+short\s*\(([^)]+)\)[^.]*\.?/i,
-        'symbol $1 too short ($2)',
-    );
-    messageText = messageText.replace(
-        /(?:Function\s+or\s+method\s+name|Variable\s+name)\s+('?[a-zA-Z0-9_$-]+'?)\s+is\s+excessively\s+long\s*\(([^)]+)\)[^.]*\.?/i,
-        'symbol $1 too long ($2)',
-    );
-    messageText = messageText.replace(
-        /Cognitive\s+complexity\s*\((\d+)\)\s*exceeds\s*threshold\s*\((\d+)\)\s*in\s*(?:function|method)?\s*('?[a-zA-Z0-9_$-]+'?)/i,
-        'CC $1 > $2 in $3',
-    );
-    messageText = messageText.replace(/Effective\s+code\s+volume\s+budget\s+exceeded\.?/i, 'ELOC budget exceeded');
-    messageText = messageText.replace(/Physical\s+line\s+count\s+ceiling\s+exceeded\.?/i, 'LOC ceiling exceeded');
-    messageText = messageText.replace(/Dynamic\s+dilution\s+envelope\s+exceeded\.?/i, 'dilution envelope exceeded');
-    messageText = messageText.replace(
-        /Effective\s+logic\s+density\s+below\s+floor\s+threshold\.?/i,
-        'token density below floor',
-    );
-    messageText = messageText.replace(
-        /(?:Function|Method)\s+has\s+(\d+)\s+positional\s+parameters?\s+exceeding\s+threshold\s+of\s+(\d+)\.?/i,
-        'params $1 > $2',
-    );
-    messageText = messageText.replace(
-        /Synchronous\s+('?[a-zA-Z0-9_$.-]+'?)\s+blocks\s+event\s+loop\.?/i,
-        'sync $1 blocks event loop',
-    );
-    messageText = messageText.replace(
-        /Sync\s+I\/O\s+in\s+async\s+(?:method|function)\.?/i,
-        'sync IO in async fn',
-    );
-    messageText = messageText.replace(
-        /Zero\s+transient\s+heap\s+allocation\s+(?:in\s+hot\s+loop\s+bodies\s+)?violated\.?/i,
-        'loop transient heap allocation',
-    );
-    messageText = messageText.replace(
-        /Control\s+flow\s+nesting\s+depth\s*\((\d+)\)\s*exceeds\s*(?:limit|threshold)\s*(?:\((\d+)\)|\s*(\d+))\.?/i,
-        'nesting depth $1 > $2$3',
-    );
-    messageText = messageText.replace(
-        /Procedure\s+line\s+count\s*\((\d+)\)\s*exceeds\s*(?:single-responsibility\s+)?limit\s*(?:\((\d+)\)|\s*(\d+))\.?/i,
-        'procedure lines $1 > $2$3',
-    );
-    messageText = messageText.replace(
-        /Magic\s+number\s+(\d+)\s+detected(?:[^.]*)?\.?/i,
-        'magic number $1',
-    );
-    messageText = messageText.replace(
-        /Literal\s+string\s+("?[^"]+"?|'?[^']+'?)\s+should\s+be\s+constant\.?/i,
-        'literal string $1 not constant',
-    );
-    messageText = messageText.replace(
-        /(?:Facade\s+method\s+merely\s+delegates\s+to\s+[^.]*|Single-target\s+pass-through\s+trampoline\s+detected)\.?/i,
-        'trampoline pass-through',
-    );
-
-    messageText = messageText.replace(/^(?:Notice|Warning|Error|Violation|Failed):\s*/i, '');
-    return messageText.trim().replace(/\.$/, '');
+    return cleanedText.length <= maxChars
+        ? cleanedText
+        : cleanedText.slice(0, Math.max(1, maxChars - 1)) + ELLIPSIS;
 }
 
 let anchorCacheSeq = 0;
@@ -247,11 +162,14 @@ class AnchorCache {
  * Projects ten-dimensional quality vector scores if present.
  */
 function projectDimensions(
-    breakdown?: QualityScoreBreakdown,
+    report: ScanReport,
+    overrideDimensions?: Partial<Record<string, number>>,
 ): Partial<Record<string, number>> | undefined {
-    if (!breakdown?.indices) return undefined;
+    const sourceIndices =
+        overrideDimensions ?? report.governance?.tenDimensions ?? report.qualityScore?.indices;
+    if (!sourceIndices) return undefined;
     const projectedScores: Record<string, number> = {};
-    for (const [dimensionName, scoreValue] of Object.entries(breakdown.indices)) {
+    for (const [dimensionName, scoreValue] of Object.entries(sourceIndices)) {
         if (typeof scoreValue === 'number' && Number.isFinite(scoreValue)) {
             projectedScores[dimensionName] = scoreValue;
         }
@@ -262,7 +180,11 @@ function projectDimensions(
 /**
  * Appends a rule loss occurrence to a dimension's loss map without in-loop allocation.
  */
-function recordRuleLoss(lossMap: Map<string, { loss: number; count: number }>, rule: string, delta: number): void {
+function recordRuleLoss(
+    lossMap: Map<string, { loss: number; count: number }>,
+    rule: string,
+    delta: number,
+): void {
     const currentLoss = lossMap.get(rule);
     if (currentLoss) {
         currentLoss.loss += Math.abs(delta);
@@ -290,7 +212,9 @@ function getOrCreateLossMap(
 /**
  * Collects rule loss statistics grouped by dimension key.
  */
-function collectDimensionRuleLosses(rationales?: QualityScoreRationale[]): Map<string, Map<string, { loss: number; count: number }>> {
+function collectDimensionRuleLosses(
+    rationales?: QualityScoreRationale[],
+): Map<string, Map<string, { loss: number; count: number }>> {
     const dimensionRationales = new Map<string, Map<string, { loss: number; count: number }>>();
     if (!rationales || rationales.length === 0) return dimensionRationales;
 
@@ -340,18 +264,26 @@ function projectDimensionDetails(
         if (typeof scoreValue !== 'number' || !Number.isFinite(scoreValue)) return;
         const evaluated = !notEvaluatedSet.has(dimension as QualityDimension);
         const fallbackWeight = (DEFAULT_QUALITY_WEIGHTS as Record<string, number>)[dimension];
-        const weightVal = breakdown.weights && typeof (breakdown.weights as Record<string, number>)[dimension] === 'number'
-            ? (breakdown.weights as Record<string, number>)[dimension]
-            : fallbackWeight;
+        const weightVal =
+            breakdown.weights &&
+            typeof (breakdown.weights as Record<string, number>)[dimension] === 'number'
+                ? (breakdown.weights as Record<string, number>)[dimension]
+                : fallbackWeight;
         const bottlenecks = extractTopBottlenecks(dimensionRationales.get(dimension));
 
         details[dimension] = {
             score: Math.round(scoreValue * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
             grade: resolveQualityGrade(scoreValue),
             evaluated,
-            ...(weightVal !== undefined ? { weight: Math.round(weightVal * ROUND_SCALE_THOUSAND) / ROUND_SCALE_THOUSAND } : {}),
+            ...(weightVal !== undefined
+                ? { weight: Math.round(weightVal * ROUND_SCALE_THOUSAND) / ROUND_SCALE_THOUSAND }
+                : {}),
             ...(breakdown.confidence !== undefined
-                ? { confidence: Math.round(breakdown.confidence * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED }
+                ? {
+                    confidence:
+                        Math.round(breakdown.confidence * ROUND_SCALE_HUNDRED) /
+                        ROUND_SCALE_HUNDRED,
+                }
                 : {}),
             ...bottlenecks,
         };
@@ -372,7 +304,10 @@ function roundMetric(metricValue: number | undefined | null): number | undefined
 /**
  * Resolves composite health score with optional override.
  */
-function resolveHealthScore(overrideScore?: number | null, rawScore?: number | null): number | null {
+function resolveHealthScore(
+    overrideScore?: number | null,
+    rawScore?: number | null,
+): number | null {
     const candidateScore = overrideScore !== undefined ? overrideScore : (rawScore ?? null);
     const roundedScore = roundMetric(candidateScore);
     return roundedScore !== undefined ? roundedScore : null;
@@ -437,12 +372,25 @@ function resolveHealthGamingDefense(
             ...(arbitration.semanticChangeRatio !== undefined
                 ? { semanticRatio: roundMetric(arbitration.semanticChangeRatio) }
                 : {}),
-            ...(arbitration.netDebtDelta !== undefined ? { netDebtDelta: arbitration.netDebtDelta } : {}),
+            ...(arbitration.netDebtDelta !== undefined
+                ? { netDebtDelta: arbitration.netDebtDelta }
+                : {}),
             ...(arbitration.gamingReason ? { reason: arbitration.gamingReason } : {}),
         };
     }
     return undefined;
 }
+
+const LEGACY_QUANT_ALIAS_KEYS: readonly string[] = [
+    'icr',
+    'qsr',
+    'sortino',
+    'var95',
+    'mdd',
+    'debtGini',
+    'defectEntropy',
+    'halfLifeCommits',
+];
 
 /**
  * Helper to conditionally assign ADR-Q native indicator and its historical alias pair.
@@ -451,11 +399,11 @@ function assignQuantPair(
     target: Record<string, unknown>,
     primaryKey: string,
     aliasKey: string,
-    val: number | undefined,
+    metricValue: number | undefined,
 ): void {
-    if (val !== undefined) {
-        target[primaryKey] = val;
-        target[aliasKey] = val;
+    if (metricValue !== undefined) {
+        target[primaryKey] = metricValue;
+        target[aliasKey] = metricValue;
     }
 }
 
@@ -465,6 +413,7 @@ function assignQuantPair(
 function resolveHealthQuant(
     report: ScanReport,
     override?: AasHealth['quant'],
+    includeAlias = false,
 ): AasHealth['quant'] | undefined {
     if (override) return override;
     const quantMetrics = report.qualityScore?.quant;
@@ -479,7 +428,18 @@ function resolveHealthQuant(
     assignQuantPair(quant, 'ptd', 'mdd', roundMetric(risk?.ptd ?? risk?.mdd));
     assignQuantPair(quant, 'dsi', 'debtGini', roundMetric(ineq?.dsi ?? ineq?.debtGini));
     assignQuantPair(quant, 'rcd', 'defectEntropy', roundMetric(ineq?.rcd ?? ineq?.defectEntropy));
-    assignQuantPair(quant, 'ehl', 'halfLifeCommits', roundMetric(stoch?.ehl ?? stoch?.halfLifeCommits));
+    assignQuantPair(
+        quant,
+        'ehl',
+        'halfLifeCommits',
+        roundMetric(stoch?.ehl ?? stoch?.halfLifeCommits),
+    );
+
+    if (!includeAlias) {
+        for (const legacyKey of LEGACY_QUANT_ALIAS_KEYS) {
+            delete quant[legacyKey];
+        }
+    }
 
     if (fin?.status) {
         quant.status = fin.status;
@@ -491,7 +451,9 @@ function resolveHealthQuant(
 /**
  * Summarizes dimensional health status distribution.
  */
-function computeDimensionSummary(indices?: Record<string, number>): AasHealth['dimensionSummary'] | undefined {
+function computeDimensionSummary(
+    indices?: Record<string, number>,
+): AasHealth['dimensionSummary'] | undefined {
     if (!indices) return undefined;
     let healthyCount = 0;
     let warningCount = 0;
@@ -515,8 +477,56 @@ function computeDimensionSummary(indices?: Record<string, number>): AasHealth['d
         healthyCount,
         warningCount,
         failingCount,
-        ...(lowestDimension ? { lowestDimension, lowestScore: Math.round(lowestScore * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED } : {}),
+        ...(lowestDimension
+            ? {
+                lowestDimension,
+                lowestScore: Math.round(lowestScore * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
+            }
+            : {}),
     };
+}
+
+interface ResolvedCoreHealthFields {
+    readonly score: number | null;
+    readonly grade: string;
+    readonly density: number | undefined;
+    readonly tensorSummary: AasHealth['tensorSummary'];
+    readonly pillars: AasHealth['pillars'];
+}
+
+function resolveCoreHealthFields(
+    report: ScanReport,
+    override?: Partial<AasHealth> & { readonly dimensions?: Partial<Record<string, number>> },
+): ResolvedCoreHealthFields {
+    const governance = report.governance;
+    const qualityScore = report.qualityScore;
+    const rawScore = governance
+        ? governance.hierarchicalCompositeScore
+        : qualityScore?.compositeScore;
+    const rawGrade = governance ? governance.grade : qualityScore?.grade;
+    const rawDensity = governance
+        ? governance.effectiveCodeDensity
+        : qualityScore?.effectiveCodeDensity;
+    const rawTensor = governance
+        ? governance.densityTensorSummary
+        : qualityScore?.densityTensorSummary;
+
+    return {
+        score: resolveHealthScore(override?.score, rawScore),
+        grade: override?.grade ?? rawGrade ?? 'N/A',
+        density: roundMetric(override?.density ?? rawDensity),
+        tensorSummary: override?.tensorSummary ?? rawTensor,
+        pillars: override?.pillars ?? governance?.eightPillars?.pillars,
+    };
+}
+
+function resolveDimensionIndicesSource(
+    report: ScanReport,
+    override?: { readonly dimensions?: Partial<Record<string, number>> },
+): Record<string, number> | undefined {
+    if (override?.dimensions) return override.dimensions as Record<string, number>;
+    if (report.governance?.tenDimensions) return report.governance.tenDimensions;
+    return report.qualityScore?.indices;
 }
 
 /**
@@ -524,31 +534,33 @@ function computeDimensionSummary(indices?: Record<string, number>): AasHealth['d
  */
 function buildHealth(report: ScanReport, counts: AasCounts, options?: AasReportOptions): AasHealth {
     const override = options?.healthOverride;
-    const score = resolveHealthScore(override?.score, report.qualityScore?.compositeScore);
-    const grade = override?.grade ?? report.qualityScore?.grade ?? 'N/A';
+    const coreFields = resolveCoreHealthFields(report, override);
     const computedCai = resolveHealthCai(report, override?.cai);
-    const density = roundMetric(override?.density ?? report.qualityScore?.effectiveCodeDensity);
-    const tensorSummary = override?.tensorSummary ?? report.qualityScore?.densityTensorSummary;
     const sqale = resolveHealthSqale(report, override?.sqale);
     const polyglot = resolveHealthPolyglot(report, override?.polyglot);
     const gamingDefense = resolveHealthGamingDefense(report, override?.gamingDefense);
-    const quant = resolveHealthQuant(report, override?.quant);
+    const quant = resolveHealthQuant(
+        report,
+        override?.quant,
+        options?.includeLegacyQuantAliases === true,
+    );
     const vrf = override?.vrf;
     const dimensionSummary = options?.includeDimensionDetails
-        ? computeDimensionSummary(report.qualityScore?.indices)
+        ? computeDimensionSummary(resolveDimensionIndicesSource(report, override))
         : undefined;
 
     return {
-        score,
-        grade,
+        score: coreFields.score,
+        grade: coreFields.grade,
         ...(computedCai !== undefined ? { cai: computedCai } : {}),
-        ...(density !== undefined ? { density } : {}),
-        ...(tensorSummary ? { tensorSummary } : {}),
+        ...(coreFields.density !== undefined ? { density: coreFields.density } : {}),
+        ...(coreFields.tensorSummary ? { tensorSummary: coreFields.tensorSummary } : {}),
         ...(sqale ? { sqale } : {}),
         ...(polyglot ? { polyglot } : {}),
         ...(gamingDefense ? { gamingDefense } : {}),
         ...(quant ? { quant } : {}),
         ...(dimensionSummary ? { dimensionSummary } : {}),
+        ...(coreFields.pillars ? { pillars: coreFields.pillars } : {}),
         ...(vrf ? { vrf } : {}),
         counts,
     };
@@ -652,12 +664,36 @@ interface DefectRecordParams {
 function projectAdjudicationFields(
     issue: Issue,
     tier: 'T1' | 'T2' | 'T3' | undefined,
-): { tier?: 'T1' | 'T2' | 'T3'; conf?: number } {
-    const fields: { tier?: 'T1' | 'T2' | 'T3'; conf?: number } = {};
-    if (tier) fields.tier = tier;
-    const confidence = issue.evidence?.confidence;
-    if (typeof confidence === 'number') fields.conf = Number(confidence.toFixed(2));
+): { tier?: 'T1' | 'T2' | 'T3'; conf?: number; also?: readonly string[] } {
+    const fields: { tier?: 'T1' | 'T2' | 'T3'; conf?: number; also?: readonly string[] } = {};
+    const resolvedTier = issue.adjudicatedTier ?? tier;
+    if (resolvedTier) fields.tier = resolvedTier;
+    const confidence = issue.evidence?.confidence ?? issue.adjudicatedConfidence;
+    if (typeof confidence === 'number' && Number.isFinite(confidence)) {
+        fields.conf = Number(confidence.toFixed(2));
+    }
+    if (issue.correlatedRules && issue.correlatedRules.length > 0) {
+        fields.also = issue.correlatedRules;
+    }
     return fields;
+}
+
+function resolveDefectAnchor(
+    params: DefectRecordParams,
+    severityTier: AasSeverity,
+    startLine: number,
+    endLine: number,
+): string | undefined {
+    if (params.skipAnchor === true) return undefined;
+    const effectiveTier = params.issue.adjudicatedTier ?? params.tier;
+    const shouldEmit =
+        severityTier === AAS_SEV_BLOCK ||
+        effectiveTier === 'T1' ||
+        params.options.includeWarningAnchors === true;
+    if (!shouldEmit) return undefined;
+    const radius = params.options.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
+    const boundedEndLine = Math.min(endLine, startLine + 1);
+    return params.anchorCache.getAnchor(params.file, startLine, boundedEndLine, radius);
 }
 
 /**
@@ -671,15 +707,11 @@ function buildDefectRecord(params: DefectRecordParams): AasDefectRecord {
     const severityTier = mapSeverity(issue.severity);
     const rawMessage = trimMessage(issue.message);
     const compressedMessage =
-        params.options.compressSentences !== false ? compressDiagnosticSentence(rawMessage) : rawMessage;
+        params.options.compressSentences !== false
+            ? compressDiagnosticSentence(rawMessage)
+            : rawMessage;
 
-    const shouldSkipAnchor = params.skipAnchor === true;
-    const radius = params.options.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
-    const anchor =
-        !shouldSkipAnchor && severityTier !== AAS_SEV_INFO
-            ? params.anchorCache.getAnchor(params.file, startLine, endLine, radius)
-            : undefined;
-
+    const anchor = resolveDefectAnchor(params, severityTier, startLine, endLine);
     const fixRecipe = buildFixRecipe(issue);
     const verifyCmd = generateVerificationDirective(
         issue,
@@ -720,6 +752,43 @@ interface EmitDefectsParams {
     readonly ruleTiers?: Readonly<Record<string, 'T1' | 'T2' | 'T3'>>;
 }
 
+const DEFAULT_MAX_PER_RULE_PER_FILE = 5;
+
+function appendFoldedRuleLine(
+    lastDefectByRule: Map<string, AasDefectRecord>,
+    ruleId: string,
+    lineNumber: number,
+): void {
+    const existingDefect = lastDefectByRule.get(ruleId);
+    if (!existingDefect) return;
+    const mutableDefect = existingDefect as { moreLines?: number[] };
+    if (!mutableDefect.moreLines) {
+        mutableDefect.moreLines = [lineNumber];
+    } else if (!mutableDefect.moreLines.includes(lineNumber)) {
+        mutableDefect.moreLines.push(lineNumber);
+    }
+}
+
+function resolveEffectiveRuleTier(
+    issue: Issue,
+    ruleTiers: Readonly<Record<string, 'T1' | 'T2' | 'T3'>> | undefined,
+): 'T1' | 'T2' | 'T3' | undefined {
+    return issue.adjudicatedTier ?? (ruleTiers ? ruleTiers[issue.rule] : undefined);
+}
+
+function shouldFoldRepeatedRule(
+    issue: Issue,
+    confidenceTier: 'T1' | 'T2' | 'T3' | undefined,
+    currentRuleCount: number,
+    maxPerRule: number,
+): boolean {
+    return (
+        issue.severity !== SEVERITY_ERROR &&
+        confidenceTier !== 'T1' &&
+        currentRuleCount >= maxPerRule
+    );
+}
+
 /**
  * Emits defect records for a single file respecting per-file and total caps.
  */
@@ -733,21 +802,31 @@ function emitDefectsForFile(params: EmitDefectsParams): {
     let previousCoveredToLine = -1;
     const shouldDeduplicate = params.options.deduplicateAnchors !== false;
     const radius = params.options.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
+    const maxPerRule = params.options.maxPerRulePerFile ?? DEFAULT_MAX_PER_RULE_PER_FILE;
+    const maxAllowed = Math.min(params.maxPerFile, params.remainingBudget);
+    const ruleCountMap = new Map<string, number>();
+    const lastDefectByRule = new Map<string, AasDefectRecord>();
 
     for (const issue of params.issues) {
-        if (emitted.length >= params.maxPerFile || emitted.length >= params.remainingBudget) {
+        if (emitted.length >= maxAllowed) {
             omittedCount++;
             continue;
         }
         const startLine = issue.location?.start?.line ?? 1;
         const endLine = issue.location?.end?.line ?? startLine;
-        const isCoveredByPreviousAnchor =
+        const confidenceTier = resolveEffectiveRuleTier(issue, params.ruleTiers);
+        const currentRuleCount = ruleCountMap.get(issue.rule) ?? 0;
+        if (shouldFoldRepeatedRule(issue, confidenceTier, currentRuleCount, maxPerRule)) {
+            appendFoldedRuleLine(lastDefectByRule, issue.rule, startLine);
+            omittedCount++;
+            continue;
+        }
+
+        const skipAnchor =
             shouldDeduplicate &&
             startLine >= previousCoveredFromLine &&
             endLine <= previousCoveredToLine;
-        const skipAnchor = isCoveredByPreviousAnchor;
 
-        const confidenceTier = params.ruleTiers ? params.ruleTiers[issue.rule] : undefined;
         const defectRecord = buildDefectRecord({
             issue,
             file: params.filePath,
@@ -764,6 +843,8 @@ function emitDefectsForFile(params: EmitDefectsParams): {
             previousCoveredToLine = endLine + radius;
         }
         emitted.push(defectRecord);
+        ruleCountMap.set(issue.rule, currentRuleCount + 1);
+        lastDefectByRule.set(issue.rule, defectRecord);
     }
 
     return { emitted, omittedCount };
@@ -909,7 +990,11 @@ function groupDefects(
         ...(ruleTiers ? { ruleTiers } : {}),
     };
 
-    const truncatedCount = processDefectFiles(emissionContext, pipelineCtx.topologyBuckets, resultFiles);
+    const truncatedCount = processDefectFiles(
+        emissionContext,
+        pipelineCtx.topologyBuckets,
+        resultFiles,
+    );
     const topology = filterActiveTopologyBuckets(pipelineCtx.topologyBuckets);
 
     return { files: resultFiles, topology, truncatedCount };
@@ -933,7 +1018,7 @@ export function buildAasReport(
         const verdict = resolveVerdict(counts);
         const health = buildHealth(report, counts, options);
         const usability = resolveUsability(report);
-        const dimensions = projectDimensions(report.qualityScore);
+        const dimensions = projectDimensions(report, options.healthOverride?.dimensions);
         const dimensionDetails = projectDimensionDetails(report.qualityScore, options);
         const bottlenecks = extractBottlenecks(report);
         const { files, topology, truncatedCount } = groupDefects(

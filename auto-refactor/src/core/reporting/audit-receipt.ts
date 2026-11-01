@@ -3,7 +3,8 @@
  * File Path: src/core/reporting/audit-receipt.ts
  * Architecture Role: Token-frugal standardized audit receipt protocol (< 1KB payload)
  *   enabling multi-project, cross-language health state ingestion for AI Agents and unified gates.
- * Dependencies & Triggers: Consumes ../types (ScanReport); invoked by report formatters and audit gates.
+ * Dependencies & Triggers: Consumes ../types (ScanReport); invoked by report formatters and
+ *   audit gates.
  * Responsibilities:
  *   1. Define strongly-typed AuditReceipt schema for cross-project interoperability.
  *   2. Project verbose scan reports into minimal executive health receipts (< 1KB).
@@ -13,6 +14,7 @@
 
 import type { ScanReport } from '../types';
 
+/** Wire schema version discriminator for Universal Audit Receipt payloads. */
 export const AUDIT_RECEIPT_SCHEMA_VERSION = '1.0' as const;
 
 /**

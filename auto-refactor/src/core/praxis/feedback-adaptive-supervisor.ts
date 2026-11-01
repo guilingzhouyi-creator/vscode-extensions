@@ -908,7 +908,10 @@ export class FeedbackAdaptiveSupervisor {
         const diskPath = path.resolve(filePath);
         this.snapshotMemoryCache.set(diskPath, snapshot);
         try {
-            PraxisIoBarrier.writeSync(filePath, JSON.stringify(snapshot, null, JSON_INDENT_SPACES));
+            PraxisIoBarrier.writeSync(
+                filePath,
+                JSON.stringify(snapshot, null, JSON_INDENT_SPACES) + '\n',
+            );
         } catch {
             // Best-effort disk persistence: memory snapshot remains valid when disk write fails
         }
@@ -935,6 +938,7 @@ export class FeedbackAdaptiveSupervisor {
     /**
      * Asynchronously serializes and writes the governance snapshot to a JSON file.
      * Updates in-memory snapshot cache and persists to disk asynchronously.
+     * Concurrency: Requires external synchronization per destination file path.
      *
      * @param filePath - Destination JSON file path.
      * @param projectProfile - Project profile identifier.
@@ -950,7 +954,7 @@ export class FeedbackAdaptiveSupervisor {
         await fs.promises.mkdir(parentDirectory, { recursive: true });
         await fs.promises.writeFile(
             filePath,
-            JSON.stringify(snapshot, null, JSON_INDENT_SPACES),
+            JSON.stringify(snapshot, null, JSON_INDENT_SPACES) + '\n',
             ENCODING_UTF8,
         );
     }

@@ -12,7 +12,6 @@
  * Exit Semantics & Design Rationale: Type declarations only; CC = 0, zero runtime overhead.
  */
 
-import type { QualityDimension, Severity } from '../types';
 import type { CompactVerificationTelemetry } from '../trajectory/eloc-types';
 import type { FinancialDebtMetrics } from '../scoring/quantitative-risk-model';
 
@@ -42,13 +41,15 @@ export interface AasCounts {
 }
 
 /** Optional in-kernel verification & 5D Riemannian manifold health telemetry */
-export type AasVrfTelemetry = {
-    readonly k: number;
-    readonly cr: number;
-    readonly ci: number;
-    readonly q: number;
-    readonly dm: number;
-} | CompactVerificationTelemetry;
+export type AasVrfTelemetry =
+    | {
+        readonly k: number;
+        readonly cr: number;
+        readonly ci: number;
+        readonly q: number;
+        readonly dm: number;
+    }
+    | CompactVerificationTelemetry;
 
 /** Executive health block containing composite score, letter grade, and CAI. */
 export interface AasHealth {
@@ -99,6 +100,8 @@ export interface AasHealth {
         readonly lowestDimension?: string;
         readonly lowestScore?: number;
     };
+    /** Optional eight strategic quality pillars synthesized natively by the kernel */
+    readonly pillars?: Readonly<Record<string, number>>;
     /** Optional in-kernel verification & 5D Riemannian manifold health telemetry */
     readonly vrf?: AasVrfTelemetry;
     /** Quantitative financial capital debt and risk engineering metrics */
@@ -212,6 +215,10 @@ export interface AasDefectRecord {
     readonly conf?: number;
     /** Confidence tier: T1 proven (blocks), T2 patchable, T3 suggestion only. */
     readonly tier?: 'T1' | 'T2' | 'T3';
+    /** Secondary overlapping rules merged at the same location via OVERLAP_CLUSTERS. */
+    readonly also?: readonly string[];
+    /** Additional line numbers in the same file when T3 rule occurrences exceed per-file cap. */
+    readonly moreLines?: readonly number[];
 }
 
 /**
@@ -263,8 +270,12 @@ export interface AasReportOptions {
     readonly maxFiles?: number;
     /** Maximum defects per file */
     readonly maxDefectsPerFile?: number;
+    /** Maximum non-blocking defects per rule per file before folding into moreLines (default: 5) */
+    readonly maxPerRulePerFile?: number;
     /** Maximum total defects across all files */
     readonly maxTotalDefects?: number;
+    /** Whether to include legacy ADR-Q alias keys in health.quant (defaults to false) */
+    readonly includeLegacyQuantAliases?: boolean;
     /** Include detailed ten-dimensional metrics breakdown (defaults to true when uncompressed) */
     readonly includeDimensionDetails?: boolean;
     /** Include info-level findings (defaults to false to conserve tokens) */
@@ -279,6 +290,8 @@ export interface AasReportOptions {
     readonly contextRadius?: number;
     /** Whether to deduplicate anchor code slices for defects on the same line (defaults to true) */
     readonly deduplicateAnchors?: boolean;
+    /** Include source anchor slices on non-blocking WARN defects (defaults to false) */
+    readonly includeWarningAnchors?: boolean;
     /** Base repository root directory for resolving file contents */
     readonly baseDir?: string;
     /** Custom file reader for anchor code extraction */
@@ -318,6 +331,7 @@ export interface AasReportOptions {
         };
         readonly vrf?: AasVrfTelemetry;
         readonly quant?: AasQuantMetrics;
+        readonly dimensions?: Partial<Record<string, number>>;
     };
 }
 

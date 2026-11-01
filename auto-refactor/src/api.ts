@@ -15,9 +15,6 @@
  *     (config/runtime error). Warm scans degrade to cold on any daemon failure so report bytes
  *     stay identical, and lazy daemon imports keep the default cold path free of net/child_process.
  */
-import * as fs from 'fs';
-import * as cp from 'child_process';
-import { promisify } from 'util';
 import type {
     ScanConfig,
     ScanReport,
@@ -36,7 +33,7 @@ import type {
     DynamicEvidenceDTO,
     QualityReviewProfile,
 } from './core/types';
-import { resolveConfig, TOOL_VERSION } from './core/config/config';
+import { resolveConfig } from './core/config/config';
 import { Scanner } from './core/analyzer';
 import { CacheStore } from './core/cache';
 import { render } from './core/reporters';
@@ -53,6 +50,14 @@ import {
     POST_SCAN_SCOPE_FULL,
     POST_SCAN_SCOPE_INCREMENTAL,
 } from './core/reporting/reportFinalizer';
+import {
+    evaluateGateExitCode,
+    executeDiffScanMode,
+    handleScanError,
+    logWarmStats,
+    persistCliScanTrajectory,
+    writeRenderedReport,
+} from './core/reporting/cli-scan-support';
 // NOTE: daemon client / daemonCmd are imported LAZILY inside scanWarm/scanAndRender so the
 // default scan() path (and CLI boot) never pays for the daemon module graph (net, child_process).
 // This preserves the "single-run zero cost" guarantee
@@ -72,24 +77,6 @@ const DAEMON_MODE_OFF = 'off';
 
 /** Standard error and status strings. */
 const MSG_SCAN_ABORTED = 'Scan aborted by user';
-const TOOL_NAME_AUTO_REFACTOR = 'auto-refactor';
-const MSG_REPORT_WRITTEN_PREFIX = 'report written to ';
-const DEFAULT_ERROR_CODE_SCAN_FAILED = 'SCAN_FAILED';
-const GIT_RENAME_ARROW_SEPARATOR = ' -> ';
-const GIT_RENAME_ARROW_LENGTH = 4;
-const NUL_PATH_WIN32 = 'NUL';
-const NUL_PATH_POSIX = '/dev/null';
-const GIT_PROMPT_DISABLED = '0';
-const PLATFORM_WIN32 = 'win32';
-const GIT_SUBCOMMAND_STATUS = 'status';
-const GIT_FLAG_PORCELAIN = '--porcelain';
-
-const SEVERITY_GATE_RANK = Object.freeze({
-    info: 0,
-    warning: 1,
-    error: 2,
-    disabled: 99,
-});
 
 /**
  * Options accepted by the programmatic API. A strict subset of ScanConfig — everything not
@@ -218,6 +205,10 @@ export interface ScanOptions {
     telemetry?: string;
     /** In-memory dynamic runtime evidence for Tri-Plane dynamic quality scoring. */
     telemetryData?: DynamicEvidenceDTO;
+    /** Persist scan outcome and four-tier ELOC counters into `.refactor-trajectory`. */
+    recordTrajectory?: boolean;
+    /** Fast/slice mode skipping Git history mining, full LCOV scan, and weight backprop. */
+    fastMode?: boolean;
 }
 
 const MODULE_DAEMON_CLIENT = './daemon/client';
@@ -307,6 +298,12 @@ function runLazyWarmScanDiff(
     return tryWarmScanDiff(params.root, params.config, params.diffs, params.options, params.logger);
 }
 
+function resolvePostScanScope(
+    options: ScanOptions,
+): typeof POST_SCAN_SCOPE_FULL | typeof POST_SCAN_SCOPE_INCREMENTAL {
+    return options.diff || options.fastMode ? POST_SCAN_SCOPE_INCREMENTAL : POST_SCAN_SCOPE_FULL;
+}
+
 /**
  * Programmatic entry point. Call `await scan(...)` with root and options; inspect
  * `report.summary.bySeverity.error` to evaluate gate outcomes.
@@ -370,7 +367,14 @@ export async function scan(options: ScanOptions = {}): Promise<ScanReport> {
 
         // The post-scan pipeline (suppressions / dependency graph / baseline) is part of scan(), so
         // library callers and the CLI observe exactly the same report.
-        await finalizeReport(report, config, options, logger, reportScanner);
+        await finalizeReport(
+            report,
+            config,
+            options,
+            logger,
+            reportScanner,
+            resolvePostScanScope(options),
+        );
         return report;
     } finally {
         logger.close();
@@ -409,24 +413,39 @@ export async function scanWarm(
             if (warm) {
                 // Daemon reports arrive unfinalized (the daemon runs the raw scanner), so apply the
                 // same post-scan pipeline here with no in-process graph to reuse.
-                await finalizeReport(warm.report, config, options, logger, null);
+                await finalizeReport(
+                    warm.report,
+                    config,
+                    options,
+                    logger,
+                    null,
+                    resolvePostScanScope(options),
+                );
                 return warm;
             }
         }
 
         // ---- degrade to cold ----
         const scanner = new Scanner(config, logger);
+        const postScanScope = resolvePostScanScope(options);
         if (options.cache !== false) {
             const cache = new CacheStore(options.cacheDir, config.root, { logger });
             const cachedScan = await scanner.scanWithCache({
                 cache,
                 cacheCustom: options.cacheCustom,
             });
-            await finalizeReport(cachedScan.report, config, options, logger, scanner);
+            await finalizeReport(
+                cachedScan.report,
+                config,
+                options,
+                logger,
+                scanner,
+                postScanScope,
+            );
             return cachedScan;
         }
         const report = await scanner.scan();
-        await finalizeReport(report, config, options, logger, scanner);
+        await finalizeReport(report, config, options, logger, scanner, postScanScope);
         return {
             report,
             stats: {
@@ -600,100 +619,6 @@ export async function scanDiffDelta(
     return { report: deltaOutcome.report as DiffDeltaReport, stats: deltaOutcome.stats };
 }
 
-/** Git status porcelain prefixes indicating rename or copy operations. */
-const GIT_RENAME_STATUS_PREFIXES = new Set([
-    'R',
-    'RM',
-    'RD',
-    'RC',
-    'RA',
-    'R ',
-    ' R',
-    'MR',
-    'DR',
-    'CR',
-    'C',
-]);
-
-function isGitRenameStatus(status: string): boolean {
-    return GIT_RENAME_STATUS_PREFIXES.has(status) || status.startsWith('R');
-}
-
-function parseGitPorcelainLine(line: string): string | null {
-    const trimmed = line.trim();
-    if (!trimmed) return null;
-    const parts = trimmed.split(/\s+/);
-    const raw = parts.slice(1).join(' ').replace(/^"|"$/g, '');
-    const arrowIdx = isGitRenameStatus(parts[0]) ? raw.indexOf(GIT_RENAME_ARROW_SEPARATOR) : -1;
-    const target = (arrowIdx !== -1 ? raw.slice(arrowIdx + GIT_RENAME_ARROW_LENGTH) : raw).trim();
-    return target ? target.replace(/\\/g, '/') : null;
-}
-
-const execFileAsync = promisify(cp.execFile);
-
-async function collectGitChangedFiles(root: string): Promise<string[]> {
-    try {
-        const nulPath = process.platform === PLATFORM_WIN32 ? NUL_PATH_WIN32 : NUL_PATH_POSIX;
-        const gitEnv = {
-            ...process.env,
-            GIT_TERMINAL_PROMPT: GIT_PROMPT_DISABLED,
-            GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL || nulPath,
-            GIT_CONFIG_SYSTEM: process.env.GIT_CONFIG_SYSTEM || nulPath,
-        };
-        const { stdout: commandOutput } = await execFileAsync(
-            'git',
-            [GIT_SUBCOMMAND_STATUS, GIT_FLAG_PORCELAIN],
-            {
-                cwd: root,
-                encoding: 'utf8',
-                env: gitEnv,
-            },
-        );
-        const changedFiles: string[] = [];
-        for (const line of (commandOutput || '').split(/\r?\n/)) {
-            const parsed = parseGitPorcelainLine(line);
-            if (parsed) changedFiles.push(parsed);
-        }
-        return changedFiles;
-    } catch {
-        return [];
-    }
-}
-
-function createEmptyDiffReport(config: ScanConfig): ScanReport {
-    const currentToolVersion = TOOL_VERSION;
-    return {
-        tool: TOOL_NAME_AUTO_REFACTOR,
-        version: currentToolVersion,
-        generatedAt: new Date().toISOString(),
-        root: config.root,
-        config,
-        summary: {
-            filesScanned: 0,
-            issuesTotal: 0,
-            bySeverity: { info: 0, warning: 0, error: 0 },
-            byAnalyzer: {},
-            durationMs: 1,
-        },
-        issues: [],
-        fileMetrics: [],
-    };
-}
-
-async function executeDiffScanMode(
-    config: ScanConfig,
-    logger: Logger,
-): Promise<{ report: ScanReport; stats: WarmStats | null; scanner: Scanner | null }> {
-    const changedFiles = await collectGitChangedFiles(config.root);
-    if (changedFiles.length === 0) {
-        return { report: createEmptyDiffReport(config), stats: null, scanner: null };
-    }
-    const include = [...new Set(changedFiles)].sort();
-    const scanner = new Scanner({ ...config, include }, logger);
-    const report = await scanner.scan();
-    return { report, stats: null, scanner };
-}
-
 async function executeStandardScanMode(
     config: ScanConfig,
     options: ScanOptions,
@@ -721,92 +646,6 @@ async function executeStandardScanMode(
     }
     const report = await scanner.scan();
     return { report, stats: null, scanner };
-}
-
-async function writeRenderedReport(
-    report: ScanReport,
-    config: ScanConfig,
-    logger: Logger,
-): Promise<void> {
-    const text = render(report, config.format);
-    if (config.out) {
-        await fs.promises.writeFile(config.out, text + '\n', 'utf8');
-        logger.info(`${MSG_REPORT_WRITTEN_PREFIX}${config.out}`);
-    } else {
-        process.stdout.write(text + '\n');
-    }
-}
-
-/**
- * Resolves the severity rank a gate blocks at, or null when the gate is disabled.
- *
- * @param config - Effective scan config.
- * @returns Rank threshold, or null when no failure condition is configured.
- */
-function resolveGateThreshold(config: ScanConfig): number | null {
-    if (config.failOnSeverity) return SEVERITY_GATE_RANK[config.failOnSeverity];
-    if (config.failOnIssue) return SEVERITY_GATE_RANK.error;
-    return null;
-}
-
-/**
- * Decides the CI exit code from the severity threshold the operator configured.
- *
- * The gate is deliberately severity-driven and nothing else. Tier classification answers "may I
- * use this result" and lives in `summary.arbitration` and the AAS `usability` block, where a
- * consumer reads it; it does not decide the exit code, because the two questions have different
- * failure costs. Loosening a gate on an inferred tier would let an over-matching classifier hide
- * a real defect, and the operator already has an explicit, auditable way to withdraw a rule's
- * authority: the lifecycle state (`quarantined` / `canary` / `deprecated`), which the arbiter
- * applies and which the severity floor respects.
- *
- * The severity floor is what keeps the two consistent: a finding the analyzer marked `error` on
- * an active rule stays blocking no matter what tier the arbiter would have inferred, so "advisory
- * never blocks" holds by construction rather than by subtracting findings here.
- *
- * @param report - Completed scan report.
- * @param config - Effective scan config carrying the fail-on settings.
- * @returns 0 when nothing blocks, 1 when a blocking finding exists.
- */
-function evaluateGateExitCode(report: ScanReport, config: ScanConfig): number {
-    const threshold = resolveGateThreshold(config);
-    if (threshold === null) return 0;
-    const ratchetUsed = report.summary.ratchetBaselineUsed === true;
-    // A suppressed finding stays in the report for auditing but never decides a gate: that is
-    // the documented contract of `suppression` (report.schema.json) and what gate-self.js
-    // already assumed, so the exit code must agree with it instead of counting the finding.
-    for (const issue of report.issues) {
-        if (issue.suppression || (ratchetUsed && issue.isNew !== true)) continue;
-        if (SEVERITY_GATE_RANK[issue.severity] >= threshold) return 1;
-    }
-    return 0;
-}
-
-/**
- * Emits warm scan statistics to logger if present.
- *
- * @param logger - Active logger instance.
- * @param stats - Optional warm stats payload.
- */
-function logWarmStats(logger: Logger, stats?: WarmStats | null): void {
-    if (!stats) return;
-    logger.info(
-        `warm: daemonUsed=${stats.daemonUsed} cacheHit=${stats.cacheHit}/${stats.cacheTotal} ` +
-        `l1=${stats.l1Hit} l2=${stats.l2Hit} analyzed=${stats.analyzed} poolWarm=${stats.poolWarm} daemonMs=${stats.daemonMs}`,
-    );
-}
-
-/**
- * Maps uncaught scan exceptions to formatted stderr output and exit code 2.
- *
- * @param error - Unknown thrown error.
- * @returns Error exit code 2.
- */
-function handleScanError(error: unknown): number {
-    const msg = error instanceof Error ? error.message : String(error);
-    const code = error instanceof AutoRefactorError ? error.code : DEFAULT_ERROR_CODE_SCAN_FAILED;
-    process.stderr.write(`[auto-refactor] ERROR (${code}): ${msg}\n`);
-    return 2;
 }
 
 /**
@@ -837,8 +676,12 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
         const { report, stats, scanner } = scanResult;
         logWarmStats(logger, stats);
 
-        const scope = options.diff ? POST_SCAN_SCOPE_INCREMENTAL : POST_SCAN_SCOPE_FULL;
+        const scope = resolvePostScanScope(options);
         await finalizeReport(report, config, options, logger, scanner, scope);
+
+        if (options.recordTrajectory) {
+            await persistCliScanTrajectory(report, config, logger);
+        }
 
         await writeRenderedReport(report, config, logger);
 

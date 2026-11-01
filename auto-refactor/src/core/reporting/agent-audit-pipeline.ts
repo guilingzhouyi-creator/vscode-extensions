@@ -75,6 +75,24 @@ function getOrCreateFileBucket<KeyType, ValueType>(
     return freshBucket;
 }
 
+function computeIssuePriorityWeight(issue: Issue): number {
+    const severityScore =
+        issue.severity === 'error' ? 300 : issue.severity === 'warning' ? 200 : 100;
+    const tierScore =
+        issue.adjudicatedTier === 'T1' ? 30 : issue.adjudicatedTier === 'T2' ? 20 : 10;
+    return severityScore + tierScore;
+}
+
+function sortFileIssuesByPriority(issueList: Issue[]): void {
+    if (issueList.length <= 1) return;
+    issueList.sort((leftIssue, rightIssue) => {
+        const weightDiff =
+            computeIssuePriorityWeight(rightIssue) - computeIssuePriorityWeight(leftIssue);
+        if (weightDiff !== 0) return weightDiff;
+        return (leftIssue.location?.start?.line || 0) - (rightIssue.location?.start?.line || 0);
+    });
+}
+
 /**
  * Partitions diagnostic findings by repository-relative file path.
  *
@@ -90,9 +108,16 @@ export function partitionIssuesByFile(
 ): Map<string, Issue[]> {
     const partitionedFileMap = new Map<string, Issue[]>();
     for (const diagnosticIssue of issues) {
+        if (diagnosticIssue.clusteredInto) continue;
         if (!includeInfo && diagnosticIssue.severity === 'info') continue;
-        const normalizedFile = normalizeRepoRelativePath(diagnosticIssue.location?.file || 'unknown', baseDir);
+        const normalizedFile = normalizeRepoRelativePath(
+            diagnosticIssue.location?.file || 'unknown',
+            baseDir,
+        );
         getOrCreateFileBucket(partitionedFileMap, normalizedFile).push(diagnosticIssue);
+    }
+    for (const issueList of partitionedFileMap.values()) {
+        sortFileIssuesByPriority(issueList);
     }
     return partitionedFileMap;
 }
@@ -138,19 +163,39 @@ export function buildFileDominantLayerMap(
     return dominantLayerMap;
 }
 
+function computeFileUrgencyScore(issues: readonly Issue[] | undefined): number {
+    if (!issues || issues.length === 0) return 0;
+    let maxWeight = 0;
+    let blockingOrActionableCount = 0;
+    for (const item of issues) {
+        const weight = computeIssuePriorityWeight(item);
+        if (weight > maxWeight) maxWeight = weight;
+        if (
+            item.severity === 'error' ||
+            item.adjudicatedTier === 'T1' ||
+            item.adjudicatedTier === 'T2'
+        ) {
+            blockingOrActionableCount += 1;
+        }
+    }
+    return maxWeight * 1000 + Math.min(999, blockingOrActionableCount);
+}
+
 /**
- * Sorts file paths by topological priority (L1 -> L5), breaking ties alphabetically.
+ * Sorts file paths by topological priority (L1 -> L5), then urgency, breaking ties alphabetically.
  *
  * Implements an O(N) Radix Bucket partition followed by local bucket sorting to eliminate
  * redundant Map lookups in comparator loops.
  *
  * @param filePaths - List of file paths to sort
  * @param fileLayerMap - Mapping of file to its dominant layer
+ * @param fileMap - Optional partitioned issues map for intra-layer urgency ranking
  * @returns Topologically sorted array of file paths
  */
 export function sortFilesByArchitecturalLayer(
     filePaths: string[],
     fileLayerMap: Map<string, AgentTopologyLayer>,
+    fileMap?: Map<string, Issue[]>,
 ): string[] {
     const bucketContract: string[] = [];
     const bucketOperator: string[] = [];
@@ -158,8 +203,12 @@ export function sortFilesByArchitecturalLayer(
     const bucketPresentation: string[] = [];
     const bucketGovernance: string[] = [];
     const bucketUnranked: string[] = [];
+    const urgencyByFile = new Map<string, number>();
 
     for (const filePath of filePaths) {
+        if (fileMap) {
+            urgencyByFile.set(filePath, computeFileUrgencyScore(fileMap.get(filePath)));
+        }
         const dominantLayer = fileLayerMap.get(filePath);
         switch (dominantLayer) {
             case 'L1_CONTRACT':
@@ -183,16 +232,21 @@ export function sortFilesByArchitecturalLayer(
         }
     }
 
-    const alphabeticalComparator = (filePathA: string, filePathB: string): number => {
+    const intraLayerComparator = (filePathA: string, filePathB: string): number => {
+        if (fileMap) {
+            const urgencyDiff =
+                (urgencyByFile.get(filePathB) ?? 0) - (urgencyByFile.get(filePathA) ?? 0);
+            if (urgencyDiff !== 0) return urgencyDiff;
+        }
         return filePathA.localeCompare(filePathB);
     };
 
-    bucketContract.sort(alphabeticalComparator);
-    bucketOperator.sort(alphabeticalComparator);
-    bucketConfig.sort(alphabeticalComparator);
-    bucketPresentation.sort(alphabeticalComparator);
-    bucketGovernance.sort(alphabeticalComparator);
-    bucketUnranked.sort(alphabeticalComparator);
+    bucketContract.sort(intraLayerComparator);
+    bucketOperator.sort(intraLayerComparator);
+    bucketConfig.sort(intraLayerComparator);
+    bucketPresentation.sort(intraLayerComparator);
+    bucketGovernance.sort(intraLayerComparator);
+    bucketUnranked.sort(intraLayerComparator);
 
     return [
         ...bucketContract,
@@ -263,7 +317,11 @@ export function executeFileTopologyPipeline(
 ): PartitionedFileContext {
     const fileMap = partitionIssuesByFile(issues, baseDir, includeInfo);
     const fileLayerMap = buildFileDominantLayerMap(fileMap);
-    const sortedFiles = sortFilesByArchitecturalLayer(Array.from(fileMap.keys()), fileLayerMap);
+    const sortedFiles = sortFilesByArchitecturalLayer(
+        Array.from(fileMap.keys()),
+        fileLayerMap,
+        fileMap,
+    );
     const topologyBuckets = createEmptyTopologyBuckets();
 
     return {

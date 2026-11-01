@@ -17,6 +17,8 @@ import { ZH_CN_LANGUAGE_RULES } from './zh-cn/rules-languages';
 import { ZH_CN_SECURITY_RULES } from './zh-cn/rules-security';
 
 export { ZH_CN_COMMON } from './zh-cn/common';
+export { ZH_CN_ACTION_VERBS, ZH_CN_TAXONOMY } from './zh-cn/taxonomy';
+export type { ZhCnTaxonomyEntry } from './zh-cn/taxonomy';
 
 /**
  * 完整中文规则本地化字典表（聚合架构、语言、规范、安全等领域子表）。

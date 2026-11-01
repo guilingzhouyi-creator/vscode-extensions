@@ -12,14 +12,12 @@
  */
 
 import * as fs from 'fs';
-import * as path from 'path';
 import type {
     ScanConfig,
     ScanReport,
     ScanSummary,
     Issue,
     SuppressionRule,
-    FileMetric,
 } from '../types';
 import type { Scanner } from '../analyzer';
 import { summarizeUncertainty } from './canonical-issue-builder';
@@ -50,18 +48,26 @@ import {
     FindingConfidenceArbiter,
     INLINE_DIRECTIVE_PATTERN,
 } from '../scoring/finding-confidence-arbiter';
-import type { ArbitratedFinding } from '../scoring/finding-confidence-arbiter';
+import {
+    countUncalibrated,
+    resolveAdvisoryOnlyRules,
+    resolveRuleTiers,
+    stampAdjudicatedIssues,
+} from '../scoring/finding-arbitration-batch';
 import type { RuleCalibrationStats } from '../scoring/confidence-calibration';
-import { loadCalibrationCorpus } from '../scoring/calibration-corpus';
 import { buildConfidenceModelAsset } from '../scoring/confidence-model-asset';
 import { buildReviewQueue, countNeedsHuman, writeReviewQueue } from './review-queue';
 import {
-    BehavioralHotspotEvaluator,
-    GitHistoryMiner,
-    type GitFileHistoryProfile,
-    type FileHotspotInput,
-} from '../evolution';
-import { resolveHistoricalQualityScore } from '../scoring/rolling-sampling-governor';
+    recordHistoricalQualitySample,
+    resolveHistoricalQualityScore,
+} from '../scoring/rolling-sampling-governor';
+import {
+    applyAnalyzerSeverityCaps,
+    enrichEvolutionAndCoverage,
+    loadEnrichedCalibrationStats,
+    syncAdaptiveSupervisorState,
+    synthesizeNativeGovernance,
+} from './post-scan-enrichment';
 
 export { BASELINE_GRANULARITY_GROUPED, groupCounts };
 
@@ -706,35 +712,40 @@ function collectDirtyFiles(report: ScanReport, initialIssueCount: number): Set<s
         const issue = issues[i];
         const file = issue.location?.file;
         if (!file) continue;
-        if (i >= initialIssueCount || issue.suppression !== undefined) {
+        if (
+            i >= initialIssueCount ||
+            issue.suppression !== undefined ||
+            issue.clusteredInto !== undefined
+        ) {
             dirtyFiles.add(file);
         }
     }
     return dirtyFiles;
 }
 
+interface RefreshQualityScoresParams {
+    readonly report: ScanReport;
+    readonly config: ScanConfig;
+    readonly reportScanner: Scanner | null;
+    readonly scope: PostScanScope;
+    readonly initialIssueCount?: number;
+}
+
 /**
  * Recomputes quality scores, tri-plane vectors, and project autonomy indices.
  *
- * @param report - Report to enrich with updated scores.
- * @param config - Resolved scan configuration.
- * @param reportScanner - Scanner instance providing index cache when available.
- * @param initialIssueCount - Count of issues prior to post-scan passes.
+ * @param params - Context carrying report, resolved config, scanner, scope, and initial count.
  */
-function refreshQualityScores(
-    report: ScanReport,
-    config: ScanConfig,
-    reportScanner: Scanner | null,
-    initialIssueCount = 0,
-): void {
+async function refreshQualityScores(params: RefreshQualityScoresParams): Promise<void> {
+    const { report, config, reportScanner, scope, initialIssueCount = 0 } = params;
     const effectiveScorerArchetype = config.reviewProfile ?? config.archetype;
     const scorer =
         reportScanner && typeof reportScanner.getQualityScorer === 'function'
             ? reportScanner.getQualityScorer()
             : new QualityScorer(
-                config.scoringWeights as unknown as Record<string, number>,
-                effectiveScorerArchetype,
-            );
+                  config.scoringWeights as unknown as Record<string, number>,
+                  effectiveScorerArchetype,
+              );
 
     const existingScores = report.fileQualityScores;
     const dirtyFiles = existingScores ? collectDirtyFiles(report, initialIssueCount) : null;
@@ -773,12 +784,26 @@ function refreshQualityScores(
             ? computeDynamicQualityVector(dynamicTelemetry)
             : undefined;
     const historicalScore = resolveHistoricalQualityScore(config);
+    const supervisorWeights = await syncAdaptiveSupervisorState({
+        config,
+        scope,
+        historicalScore,
+        currentCompositeScore: projectQualityScore.compositeScore,
+    });
     report.triPlaneQuality = computeUnifiedQualityScore(
         staticVector,
         dynamicVector,
         historicalScore,
-        resolveGovernanceProfile(config),
+        {
+            ...resolveGovernanceProfile(config),
+            supervisorWeights,
+        },
     );
+    const totalEffectiveLines = fileMetrics.reduce(
+        (acc, item) => acc + (item.nonBlankLines || 0),
+        0,
+    );
+    recordHistoricalQualitySample(config, projectQualityScore.compositeScore, totalEffectiveLines);
     report.autonomy = evaluateProjectAutonomy(
         fileMetrics,
         report.issues,
@@ -788,6 +813,11 @@ function refreshQualityScores(
             ? reportScanner.getSymbolIndex()
             : undefined,
     );
+    report.governance = await synthesizeNativeGovernance({
+        report,
+        config,
+        scope,
+    });
 }
 
 /**
@@ -804,144 +834,16 @@ function shouldRefreshQualityScores(
     suppressedCount: number,
 ): boolean {
     if (report.issues.length !== initialIssueCount || suppressedCount > 0) return true;
+    for (let i = 0; i < report.issues.length; i++) {
+        if (report.issues[i].clusteredInto) return true;
+    }
     return (
         !report.qualityScore ||
         !report.fileQualityScores ||
         !report.triPlaneQuality ||
-        !report.autonomy
+        !report.autonomy ||
+        !report.governance
     );
-}
-
-function buildHotspotInput(
-    metric: FileMetric,
-    defectCount: number,
-    profile?: GitFileHistoryProfile,
-    evaluator?: BehavioralHotspotEvaluator,
-): FileHotspotInput {
-    const commits30Days =
-        profile && evaluator
-            ? evaluator.extract30DayCommitsFromProfile(profile)
-            : (profile?.recentCommits?.length ?? 0);
-    const commits7Days =
-        profile && evaluator ? evaluator.extract7DayCommitsFromProfile(profile) : undefined;
-    const activeAuthorsCount =
-        profile && evaluator ? evaluator.extractActiveAuthorsFromProfile(profile) : undefined;
-
-    return {
-        filePath: metric.file,
-        commits30Days,
-        commits7Days,
-        eloc: metric.lines,
-        cyclomaticComplexity: Math.max(1, metric.maxNestingDepth * 2),
-        defectCount,
-        totalCommits: profile?.totalCommits,
-        activeAuthorsCount,
-        lastModifiedTimestamp: profile?.lastModifiedTimestamp ?? undefined,
-    };
-}
-
-/**
- * Maps each rule to the strongest tier the arbiter assigned it in this report.
- *
- * Strongest, not weakest: a rule that proved one finding is a proven rule even if other
- * occurrences were only advisory, so a downstream reader can never mistake it for harmless.
- *
- * Derived from the full `findings` list rather than `activeFindings`. Clustering collapses
- * overlapping findings into a primary plus subordinates, so a rule whose every occurrence was
- * clustered away would vanish from `activeFindings` and silently lose its tier — a gate input
- * that changes meaning depending on whether clustering happens to be enabled.
- *
- * @param findings - Every arbitrated finding, including suppressed and clustered ones.
- * @returns Rule id to tier map, using the AAS tier vocabulary.
- */
-function resolveRuleTiers(
-    findings: readonly { issue: { rule: string }; tier: string; isSuppressed: boolean }[],
-): Record<string, 'T1' | 'T2' | 'T3'> {
-    const rank: Record<string, number> = { prescriptive: 3, actionable: 2, advisory: 1 };
-    const best = new Map<string, { tier: 'T1' | 'T2' | 'T3'; rank: number }>();
-    for (const finding of findings) {
-        if (finding.isSuppressed) continue;
-        const currentRank = rank[finding.tier] ?? 0;
-        const existing = best.get(finding.issue.rule);
-        if (existing && existing.rank >= currentRank) continue;
-        best.set(finding.issue.rule, {
-            tier:
-                finding.tier === 'prescriptive'
-                    ? 'T1'
-                    : finding.tier === 'actionable'
-                        ? 'T2'
-                        : 'T3',
-            rank: currentRank,
-        });
-    }
-    const tiers: Record<string, 'T1' | 'T2' | 'T3'> = {};
-    for (const [rule, entry] of best) tiers[rule] = entry.tier;
-    return tiers;
-}
-
-/**
- * Groups arbitrated findings by rule and reports which rules never reached a blocking tier.
- *
- * This is report metadata; the exit code does not read it. Narrowing the gate from here would
- * override the operator's explicit `failOnSeverity`, and the severity floor already guarantees
- * that an advisory finding cannot block on its own. Two properties still matter, because a
- * consumer reading the list must not misread it as an exemption it is not:
- *
- * - Grouping, not per-finding. A rule that blocks on one line and advises on another cannot be
- *   predicted by a reader, so only a rule whose every occurrence was non-blocking is exempt.
- * - Full `findings`, not `activeFindings`. Clustering replaces an overlapping group with a single
- *   primary, so deriving this from the clustered list would let a blocking rule disappear from
- *   the map entirely and be treated as advisory — turning an internal reporting option into a
- *   silent gate loosening.
- *
- * @param findings - Every arbitrated finding, including suppressed and clustered ones.
- * @returns Rule ids whose every active finding was classified non-blocking.
- */
-function resolveAdvisoryOnlyRules(
-    findings: readonly { issue: { rule: string }; mustBlock: boolean; isSuppressed: boolean }[],
-): string[] {
-    const blockingRules = new Set<string>();
-    const activeRules = new Set<string>();
-    for (const finding of findings) {
-        if (finding.isSuppressed) continue;
-        activeRules.add(finding.issue.rule);
-        if (finding.mustBlock) blockingRules.add(finding.issue.rule);
-    }
-    const advisoryOnly: string[] = [];
-    for (const rule of activeRules) {
-        if (!blockingRules.has(rule)) advisoryOnly.push(rule);
-    }
-    return advisoryOnly;
-}
-
-/**
- * Loads the calibration corpus named by the caller, if any.
- *
- * The read is asynchronous because this runs inside the already-async post-scan pipeline, where a
- * synchronous read would stall the event loop for the whole file. A missing file yields no
- * statistics rather than an error — the pre-calibration behaviour — and every rejected entry is
- * reported rather than the first: a corpus that has half rotted should say so once, not fail
- * silently until someone audits it.
- *
- * @param corpusPath - Path supplied by the caller, or undefined.
- * @param logger - Logger used to surface rejected entries.
- * @returns Accepted rule statistics; empty when no corpus was named or none was usable.
- */
-async function loadCalibrationStats(
-    corpusPath: string | undefined,
-    logger: Logger,
-): Promise<RuleCalibrationStats[]> {
-    const loaded = await loadCalibrationCorpus(corpusPath, async (filePath) => {
-        if (!fs.existsSync(filePath)) return undefined;
-        return fs.promises.readFile(filePath, 'utf8');
-    });
-    if (loaded.rejections.length > 0) {
-        logger.info(
-            `${PASS_ARBITRATION}: ${loaded.rejections.length} calibration corpus entry(ies) ` +
-            `rejected (${loaded.rejections.join('; ')})`,
-        );
-    }
-    return loaded.stats;
 }
 
 /**
@@ -953,9 +855,9 @@ async function loadCalibrationStats(
  * @param stats - Accepted per-rule outcome counts.
  * @returns Partial summary fields to spread, empty when there is no evidence.
  */
-function projectModelProvenance(
-    stats: readonly RuleCalibrationStats[],
-): { model?: NonNullable<ScanSummary['arbitration']>['model'] } {
+function projectModelProvenance(stats: readonly RuleCalibrationStats[]): {
+    model?: NonNullable<ScanSummary['arbitration']>['model'];
+} {
     if (stats.length === 0) return {};
     const asset = buildConfidenceModelAsset(stats);
     return {
@@ -966,20 +868,6 @@ function projectModelProvenance(
             observationCount: asset.observationCount,
         },
     };
-}
-
-/**
- * Counts active findings whose rule carries no outcome history.
- *
- * @param findings - Every arbitrated finding, including suppressed and clustered ones.
- * @returns Number of non-suppressed findings scored from the analyzer's self-report alone.
- */
-function countUncalibrated(findings: readonly ArbitratedFinding[]): number {
-    let count = 0;
-    for (const finding of findings) {
-        if (!finding.isSuppressed && finding.confidenceSource === 'uncalibrated') count += 1;
-    }
-    return count;
 }
 
 /**
@@ -1015,6 +903,7 @@ async function applyArbitrationPass(
             ruleCalibrationStats.length > 0 ? { ruleCalibrationStats } : undefined,
         );
         const arbitration = arbiter.arbitrate(report.issues);
+        stampAdjudicatedIssues(arbitration.findings);
         const advisoryOnlyRules = resolveAdvisoryOnlyRules(arbitration.findings);
         const ruleTiers = resolveRuleTiers(arbitration.findings);
         const queueRecords = buildReviewQueue(arbitration.findings);
@@ -1048,63 +937,11 @@ async function applyArbitrationPass(
         }
         logger.info(
             `${PASS_ARBITRATION}: ${arbitration.prescriptiveCount} prescriptive / ` +
-            `${arbitration.actionableCount} actionable / ${arbitration.advisoryCount} advisory, ` +
-            `${arbitration.blockingCount} blocking, ${writtenCount} queued for review`,
+                `${arbitration.actionableCount} actionable / ${arbitration.advisoryCount} advisory, ` +
+                `${arbitration.blockingCount} blocking, ${writtenCount} queued for review`,
         );
     } catch (arbitrationError) {
         logger.info(`${PASS_ARBITRATION}: degraded (${String(arbitrationError)})`);
-    }
-}
-
-/**
- * Executes behavioral hotspot evaluation across scanned files, ranking top refactoring hotspots.
- *
- * @param context - Current post-scan execution context.
- */
-function applyEvolutionPass(context: PostScanPassContext): void {
-    if (
-        context.scope !== POST_SCAN_SCOPE_FULL ||
-        !context.report.fileMetrics ||
-        context.report.fileMetrics.length === 0
-    ) {
-        return;
-    }
-    try {
-        const evaluator = new BehavioralHotspotEvaluator();
-        const miner = new GitHistoryMiner();
-        const rootDir = context.report.root || context.config.root || process.cwd();
-        const gitProfiles = miner.mineRepositoryHistoryBatch(rootDir);
-        const inputs: FileHotspotInput[] = [];
-        const issuesByFile = groupIssuesByFile(context.report.issues);
-
-        for (let i = 0; i < context.report.fileMetrics.length; i++) {
-            const metric = context.report.fileMetrics[i];
-            const fileIssues = issuesByFile.get(metric.file);
-            const defectCount = fileIssues ? fileIssues.length : 0;
-            const profile =
-                gitProfiles.get(metric.file) ||
-                gitProfiles.get(path.resolve(rootDir, metric.file));
-            inputs.push(buildHotspotInput(metric, defectCount, profile, evaluator));
-        }
-
-        const hotspotResults = evaluator.evaluateBatch(inputs);
-        const topHotspots = hotspotResults.slice(0, 5);
-
-        if (context.report.triPlaneQuality) {
-            const triPlane = context.report.triPlaneQuality as unknown as Record<string, unknown>;
-            triPlane.hotspots = topHotspots;
-
-            const noisyRules =
-                context.report.summary.arbitration?.noisyRules ??
-                new FindingConfidenceArbiter().arbitrate(context.report.issues).noisyRules;
-            if (noisyRules && noisyRules.length > 0) {
-                triPlane.noisyRules = noisyRules;
-            }
-        }
-    } catch (evolutionError) {
-        context.logger.info(
-            `Behavioral hotspot evolution pass degraded: ${String(evolutionError)}`,
-        );
     }
 }
 
@@ -1174,25 +1011,41 @@ export async function finalizeReport(
     applySemanticComplexityPass(passContext);
     applyEmptyDirectoryPass(passContext);
 
+    const cappedCount = applyAnalyzerSeverityCaps(report, config);
     postScanPasses.push(PASS_SUPPRESSIONS);
     const suppressedCount = await applySuppressions(report, config.suppressions ?? []);
     report.summary.suppressedCount = suppressedCount;
 
-    await applyArbitrationPass(
-        passContext,
-        options.reviewQueue,
-        await loadCalibrationStats(options.confidenceCorpus, logger),
-    );
+    const calibrationStats = await loadEnrichedCalibrationStats({
+        corpusPath: options.confidenceCorpus,
+        rootDir: config.root,
+        scope,
+        logger,
+        reportScanner,
+    });
+    await applyArbitrationPass(passContext, options.reviewQueue, calibrationStats);
     postScanPasses.push(PASS_ARBITRATION);
 
     report.summary.postScanPasses = postScanPasses;
     if (warnings.length > 0) report.summary.warnings = warnings;
 
-    if (shouldRefreshQualityScores(report, initialIssueCount, suppressedCount)) {
-        refreshQualityScores(report, config, reportScanner, initialIssueCount);
+    if (shouldRefreshQualityScores(report, initialIssueCount, suppressedCount + cappedCount)) {
+        await refreshQualityScores({
+            report,
+            config,
+            reportScanner,
+            scope,
+            initialIssueCount,
+        });
     }
 
-    applyEvolutionPass(passContext);
+    await enrichEvolutionAndCoverage({
+        report,
+        config,
+        scope,
+        logger,
+        reportScanner,
+    });
 
     await finalizeBaseline({
         report,
