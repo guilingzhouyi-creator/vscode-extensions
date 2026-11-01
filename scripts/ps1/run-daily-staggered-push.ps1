@@ -20,7 +20,8 @@ param(
     [switch]$Preflight,
     [switch]$AllowBypass,
     [switch]$VerifyRemote,
-    [string]$RemoteSlice
+    [string]$RemoteSlice,
+    [switch]$Status
 )
 
 Set-StrictMode -Version Latest
@@ -56,6 +57,9 @@ if ($Preflight) {
 }
 if ($AllowBypass) {
     $nodeArgs += "--allow-bypass"
+}
+if ($Status) {
+    $nodeArgs += "--status"
 }
 if ($Count -gt 0) {
     $nodeArgs += @("--count", $Count.ToString())
