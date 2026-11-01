@@ -84,7 +84,7 @@ export function countBraces(codeLine: string): [number, number] {
 }
 
 /**
- * Calculates net delimiter depth change (open minus close for (), [], {}) in code without allocations.
+ * Calculates net delimiter depth change (open minus close for (), [], {}) without allocations.
  *
  * @param codeLine - Code segment.
  * @returns Net delimiter delta.

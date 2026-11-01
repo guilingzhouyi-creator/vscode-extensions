@@ -48,7 +48,7 @@ import {
 } from './native-shims-structural';
 import { scanSecretsShim } from './native-shims-metrics';
 import { countLineStats } from '../../utils/linestats';
-import { maskSourceTextJs } from '../policy/source-mask';
+import { maskSourceText } from '../policy/source-mask';
 import {
     countDuplicateLinesShim,
     detectCloneBlocksShim,
@@ -80,9 +80,9 @@ export { HASH_COEFFS };
 const DEFAULT_CONTEXT_LINES = 3;
 const DEFAULT_MINHASH_PERMUTATIONS = 64;
 const KIB_FACTOR = 1024;
-const LARGE_DIFF_KIB = 64;
+const LARGE_DIFF_KIB = 4;
 const LARGE_DIFF_BYTES_THRESHOLD = LARGE_DIFF_KIB * KIB_FACTOR;
-const LARGE_GRAPH_EDGES_THRESHOLD = 1500;
+const LARGE_GRAPH_EDGES_THRESHOLD = 128;
 const MIN_NATIVE_TRIGRAM_TOKEN_COUNT = 500;
 
 const NATIVE_BINDING_PATH = '../../../crates/auto-refactor-core/index.node';
@@ -186,7 +186,7 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     private maskSource(content: string, config: NativeMaskConfig) {
-        return maskSourceTextJs(content, {
+        return maskSourceText(content, {
             lineComment: config.lineComment,
             blockComment:
                 config.blockCommentOpen && config.blockCommentClose

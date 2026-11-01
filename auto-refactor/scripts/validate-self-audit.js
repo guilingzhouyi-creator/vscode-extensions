@@ -154,10 +154,10 @@ function validateEightPillarsAndMetrics(report) {
   }
   assert.ok(Math.abs(weightSum - 1.0) < 0.001, `Pillar weights sum must be 1.0: ${weightSum}`);
 
-  // Composite health score and code density validations
+  // Composite health score and code density validations (industrial-grade floor)
   assert.ok(
-    report.metrics.compositeScore >= 85,
-    `Composite score must be >= 85: ${report.metrics.compositeScore}`,
+    report.metrics.compositeScore >= 95,
+    `Composite score must be >= 95: ${report.metrics.compositeScore}`,
   );
   assert.strictEqual(
     report.eightPillars.compositeScore,
@@ -166,8 +166,8 @@ function validateEightPillarsAndMetrics(report) {
   );
   assert.ok(['A+', 'A'].includes(report.metrics.grade));
   assert.ok(
-    report.metrics.effectiveCodeDensity >= 0.85 && report.metrics.effectiveCodeDensity <= 1.0,
-    `Code density must be in [0.85, 1.0]: ${report.metrics.effectiveCodeDensity}`,
+    report.metrics.effectiveCodeDensity >= 0.9 && report.metrics.effectiveCodeDensity <= 1.0,
+    `Code density must be in [0.90, 1.0]: ${report.metrics.effectiveCodeDensity}`,
   );
   if (report.metrics.densityTensorSummary) {
     const dts = report.metrics.densityTensorSummary;
@@ -344,10 +344,7 @@ function validateBaselineFileOnDisk(report, baselinePath = BASELINE_OUTPUT) {
  */
 function validateAasReportOnDisk(report, aasPath = BASELINE_AAS_OUTPUT) {
   console.log('3. Validating AAS v1.0 Agent-Native Report Emission...');
-  assert.ok(
-    fs.existsSync(aasPath),
-    `${aasPath} must be emitted by the producer`,
-  );
+  assert.ok(fs.existsSync(aasPath), `${aasPath} must be emitted by the producer`);
   const aasDoc = JSON.parse(fs.readFileSync(aasPath, 'utf8'));
   assert.strictEqual(aasDoc.schema, 'aas-v1', 'AAS document must declare aas-v1 schema');
   assert.strictEqual(aasDoc.tool, 'auto-refactor');

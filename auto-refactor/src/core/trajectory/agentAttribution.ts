@@ -12,6 +12,9 @@
 
 import type { AgentAttribution, AgentPatchSlice, FileRevision } from './types';
 
+/** Scale factor that rounds a score to the engine's two-decimal precision. */
+const SCORE_ROUNDING_FACTOR = 100;
+
 /** Internal mutable state tracker used during accumulation to avoid in-loop array lookups. */
 interface MutableAttribution {
     attr: AgentAttribution;
@@ -19,6 +22,16 @@ interface MutableAttribution {
     introducedIssuesSet: Set<string>;
     resolvedIssuesSet: Set<string>;
     scores: number[];
+}
+
+/**
+ * Rounds a score to the engine's two-decimal precision.
+ *
+ * @param value - Raw score.
+ * @returns Score rounded to 0.01 precision.
+ */
+function roundToHundredths(value: number): number {
+    return Math.round(value * SCORE_ROUNDING_FACTOR) / SCORE_ROUNDING_FACTOR;
 }
 
 /**
@@ -38,8 +51,8 @@ function createMutableAttribution(agentUid: string): MutableAttribution {
             introducedIssues: [],
             resolvedIssues: [],
             netIssueDelta: 0,
-            averageQualityScore: 100,
-            scoreImpact: 0,
+            averageQualityScore: null,
+            scoreImpact: null,
         },
         filesModifiedSet: new Set<string>(),
         introducedIssuesSet: new Set<string>(),
@@ -78,24 +91,26 @@ function accumulatePatchMetrics(mutable: MutableAttribution, patch: AgentPatchSl
  * @param baselineScore - Starting baseline quality score.
  * @returns Fully populated, immutable AgentAttribution record.
  */
-function finalizeAttribution(mutable: MutableAttribution, baselineScore: number): AgentAttribution {
+function finalizeAttribution(
+    mutable: MutableAttribution,
+    baselineScore: number | null,
+): AgentAttribution {
     const { attr, filesModifiedSet, introducedIssuesSet, resolvedIssuesSet, scores } = mutable;
     attr.filesModified = Array.from(filesModifiedSet);
     attr.introducedIssues = Array.from(introducedIssuesSet);
     attr.resolvedIssues = Array.from(resolvedIssuesSet);
     attr.netIssueDelta = attr.resolvedIssues.length - attr.introducedIssues.length;
 
-    if (scores.length > 0) {
-        // One unmeasured revision would poison the whole sum, so only real measurements are
-        // averaged; a NaN here would report a fabricated average for the agent.
-        const measured = scores.filter((value) => Number.isFinite(value));
-        if (measured.length > 0) {
-            const sum = measured.reduce((acc, val) => acc + val, 0);
-            attr.averageQualityScore = Math.round((sum / measured.length) * 100) / 100;
-        }
-        const lastScore = scores[scores.length - 1];
-        if (Number.isFinite(lastScore) && Number.isFinite(baselineScore)) {
-            attr.scoreImpact = Math.round((lastScore - baselineScore) * 100) / 100;
+    // One unmeasured revision would poison the whole sum, so only real measurements are
+    // averaged. When none survive, the average stays null instead of claiming a clean score the
+    // scans never produced.
+    const measured = scores.filter((value) => Number.isFinite(value));
+    if (measured.length > 0) {
+        const sum = measured.reduce((acc, val) => acc + val, 0);
+        attr.averageQualityScore = roundToHundredths(sum / measured.length);
+        const lastScore = measured[measured.length - 1];
+        if (baselineScore !== null && Number.isFinite(baselineScore)) {
+            attr.scoreImpact = roundToHundredths(lastScore - baselineScore);
         }
     }
     return attr;
@@ -131,13 +146,18 @@ export class AgentAttributionTracker {
                 mutable.attr.linesAdded += rev.diffSummary.addedLines;
                 mutable.attr.linesDeleted += rev.diffSummary.deletedLines;
             }
-            const compScore = rev.qualityScore?.compositeScore ?? 100;
-            mutable.scores.push(compScore);
+            // An unmeasured revision contributes no score rather than a substitute: pushing a
+            // constant here would fabricate a measurement the scan never produced.
+            const measuredScore = rev.qualityScore?.compositeScore;
+            if (typeof measuredScore === 'number') {
+                mutable.scores.push(measuredScore);
+            }
 
             this.trackRevisionIssues(rev, i > 0 ? revisions[i - 1] : undefined, mutable);
         }
 
-        const baseline = revisions[0]?.qualityScore?.compositeScore ?? 100;
+        const firstScore = revisions[0]?.qualityScore?.compositeScore;
+        const baseline = typeof firstScore === 'number' ? firstScore : null;
         const attributions: Record<string, AgentAttribution> = {};
         for (const uid of Object.keys(mutables)) {
             attributions[uid] = finalizeAttribution(mutables[uid], baseline);
@@ -192,7 +212,9 @@ export class AgentAttributionTracker {
 
         const attributions: Record<string, AgentAttribution> = {};
         for (const uid of Object.keys(mutables)) {
-            attributions[uid] = finalizeAttribution(mutables[uid], 100);
+            // Patch slices carry no baseline, so score impact stays unmeasured rather than being
+            // computed against an assumed clean starting score.
+            attributions[uid] = finalizeAttribution(mutables[uid], null);
         }
 
         return attributions;

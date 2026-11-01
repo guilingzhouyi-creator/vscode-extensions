@@ -165,7 +165,7 @@ export interface WeeklyStabilityMetrics {
     zeroRegressionRuns: number;
     /** Consecutive trailing runs at window end with zero regressions and gate pass. */
     zeroRegressionStreak: number;
-    /** Ratio of pure semantic ELOC to physical changed ELOC (semanticTotal / max(1, changedTotal)). */
+    /** Ratio of pure semantic ELOC to physical changed ELOC: sem / max(1, changed). */
     semanticPurityRatio: number;
     /** Ratio of unique deduplicated AST ELOC to cumulative processed ELOC. */
     uniqueCoverageRatio: number;
@@ -181,14 +181,19 @@ export interface WeeklyStabilityMetrics {
 export interface WeeklyVerificationSummary {
     /** Number of runs in the window carrying verification telemetry. */
     verifiedRuns: number;
-    /** Mean IKCE mutation kill rate K across verified runs. */
-    meanMutationKillRate: number;
-    /** Minimum IKCE mutation kill rate K observed. */
-    minMutationKillRate: number;
-    /** Mean posterior Bayesian agent credit score in [0, 100]. */
-    meanBayesianCredit: number;
-    /** Minimum 95% Bayesian credible interval lower bound in [0, 1]. */
-    minBayesianCiLower: number;
+    /**
+     * Mean IKCE mutation kill rate K across verified runs, or null when no run reported K.
+     *
+     * Null rather than a substitute of 1.0: a 100% kill rate is the strongest claim this metric
+     * can make, and it must never be the value reported for an absence of evidence.
+     */
+    meanMutationKillRate: number | null;
+    /** Minimum IKCE mutation kill rate K observed, or null when no run reported K. */
+    minMutationKillRate: number | null;
+    /** Mean posterior Bayesian agent credit score in [0, 100], or null when no run reported it. */
+    meanBayesianCredit: number | null;
+    /** Minimum 95% Bayesian credible interval lower bound in [0, 1], or null when unreported. */
+    minBayesianCiLower: number | null;
     /** Total candidate runs isolated into quarantine during the window. */
     quarantineCount: number;
 }

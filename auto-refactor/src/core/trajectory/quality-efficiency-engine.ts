@@ -19,6 +19,24 @@ import {
 } from '../scoring/scoringTypes';
 
 /**
+ * Score assumed for a dimension that carries no measurement.
+ *
+ * A dimension with no deduction has no evidence against it, so it reads at the clean ceiling
+ * rather than at zero: treating an absent index as a failure would penalize every module the
+ * scan did not reach, and the two-decimal composite would then understate quality in proportion
+ * to how narrow the analyzer selection was. The consequence is that an unmeasured dimension and a
+ * genuinely clean one are indistinguishable in the composite, which is why the callers that can
+ * distinguish them (`patchQuality`) report `unavailable` instead of relying on this value.
+ */
+const UNMEASURED_DIMENSION_SCORE = 100;
+
+/** Weight assumed for a dimension the caller supplied no weight for. */
+const FALLBACK_DIMENSION_WEIGHT = 0.1;
+
+/** Scale factor that rounds a composite to two decimal places. */
+const COMPOSITE_ROUNDING = 100;
+
+/**
  * Converts a 10-dimensional Quality Score Record to an ordered float array.
  *
  * @param record - Partial or complete map of dimension scores.
@@ -29,7 +47,7 @@ export function recordToVector(record: Partial<Record<QualityDimension, number>>
         const val = record[dim];
         return typeof val === 'number' && Number.isFinite(val)
             ? Math.max(0, Math.min(100, val))
-            : 100;
+            : UNMEASURED_DIMENSION_SCORE;
     });
 }
 
@@ -43,7 +61,7 @@ export function vectorToRecord(vector: number[]): Record<QualityDimension, numbe
     const record = {} as Record<QualityDimension, number>;
     for (let i = 0; i < ALL_QUALITY_DIMENSIONS.length; i++) {
         const dim = ALL_QUALITY_DIMENSIONS[i];
-        record[dim] = vector[i] ?? 100;
+        record[dim] = vector[i] ?? UNMEASURED_DIMENSION_SCORE;
     }
     return record;
 }
@@ -64,14 +82,14 @@ export function computeCompositeFromVector(
 
     for (let i = 0; i < ALL_QUALITY_DIMENSIONS.length; i++) {
         const dim = ALL_QUALITY_DIMENSIONS[i];
-        const dimWeight = weights[dim] ?? DEFAULT_QUALITY_WEIGHTS[dim] ?? 0.1;
-        const val = vector[i] ?? 100;
+        const dimWeight = weights[dim] ?? DEFAULT_QUALITY_WEIGHTS[dim] ?? FALLBACK_DIMENSION_WEIGHT;
+        const val = vector[i] ?? UNMEASURED_DIMENSION_SCORE;
         weightedSum += val * dimWeight;
         totalWeight += dimWeight;
     }
 
-    if (totalWeight === 0) return 100;
-    return Math.round((weightedSum / totalWeight) * 100) / 100;
+    if (totalWeight === 0) return UNMEASURED_DIMENSION_SCORE;
+    return Math.round((weightedSum / totalWeight) * COMPOSITE_ROUNDING) / COMPOSITE_ROUNDING;
 }
 
 /**
@@ -106,7 +124,7 @@ function computeDimensionDeltas(
     const dimensionDeltas: Partial<Record<QualityDimension, number>> = {};
     for (let i = 0; i < ALL_QUALITY_DIMENSIONS.length; i++) {
         const dim = ALL_QUALITY_DIMENSIONS[i];
-        const afterVal = scoreVector[i] ?? 100;
+        const afterVal = scoreVector[i] ?? UNMEASURED_DIMENSION_SCORE;
         const beforeVal = baseVector[i] ?? afterVal;
         const delta = Math.round((afterVal - beforeVal) * 100) / 100;
         if (delta !== 0) {

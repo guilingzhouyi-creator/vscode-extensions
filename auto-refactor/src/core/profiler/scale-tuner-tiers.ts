@@ -28,21 +28,21 @@ export const COMMENT_LEVEL_BASIC = 'basic';
 export const COMMENT_LEVEL_STRICT = 'strict';
 
 /** File line warning threshold for demo tier. */
-export const DEMO_FILE_LINES_WARN = 800;
-/** File line failure threshold for demo tier. */
-export const DEMO_FILE_LINES_FAIL = 1_500;
+export const DEMO_FILE_LINES_WARN = 600;
+/** File line failure threshold for demo tier (capped at workspace 1400 LOC industrial ceiling). */
+export const DEMO_FILE_LINES_FAIL = 1_400;
 /** Complexity warning threshold for demo tier. */
-export const DEMO_COMPLEXITY_WARN = 20;
+export const DEMO_COMPLEXITY_WARN = 15;
 /** Complexity failure threshold for demo tier. */
-export const DEMO_COMPLEXITY_FAIL = 35;
+export const DEMO_COMPLEXITY_FAIL = 20;
 /** File line warning threshold for prototype tier. */
-export const PROTOTYPE_FILE_LINES_WARN = 600;
+export const PROTOTYPE_FILE_LINES_WARN = 500;
 /** File line failure threshold for prototype tier. */
 export const PROTOTYPE_FILE_LINES_FAIL = 1_200;
 /** Complexity warning threshold for prototype tier. */
-export const PROTOTYPE_COMPLEXITY_WARN = 15;
+export const PROTOTYPE_COMPLEXITY_WARN = 12;
 /** Complexity failure threshold for prototype tier. */
-export const PROTOTYPE_COMPLEXITY_FAIL = 25;
+export const PROTOTYPE_COMPLEXITY_FAIL = 15;
 /** File line warning threshold for industrial tier. */
 export const INDUSTRIAL_FILE_LINES_WARN = 350;
 /**
@@ -125,16 +125,16 @@ function tuneByDemoTier(analyzerName: string, tuned: Record<string, any>): void 
     switch (analyzerName) {
         case ANALYZER_COMMENTS:
             tuned.requireHeader = false;
-            tuned.level = COMMENT_LEVEL_OFF;
+            tuned.level = COMMENT_LEVEL_BASIC;
             break;
         case ANALYZER_ARCHITECTURE:
-            tuned.enforceCleanLayers = false;
-            tuned.allowSkipLayers = true;
-            tuned.checkDtoCredentialLeakage = false;
+            tuned.enforceCleanLayers = true;
+            tuned.allowSkipLayers = false;
+            tuned.checkDtoCredentialLeakage = true;
             break;
         case ANALYZER_HYGIENE:
-            tuned.checkDeadCode = false;
-            tuned.checkTemporaryStubs = false;
+            tuned.checkDeadCode = true;
+            tuned.checkTemporaryStubs = true;
             break;
         case ANALYZER_SIMPLIFY:
             tuned.maxTernaryLength = DEMO_MAX_TERNARY_LENGTH;
@@ -156,10 +156,12 @@ function tuneByPrototypeTier(analyzerName: string, tuned: Record<string, any>): 
             tuned.level = COMMENT_LEVEL_BASIC;
             break;
         case ANALYZER_ARCHITECTURE:
-            tuned.allowSkipLayers = true;
+            tuned.enforceCleanLayers = true;
+            tuned.allowSkipLayers = false;
             break;
         case ANALYZER_HYGIENE:
-            tuned.checkTemporaryStubs = false;
+            tuned.checkDeadCode = true;
+            tuned.checkTemporaryStubs = true;
             break;
     }
 }

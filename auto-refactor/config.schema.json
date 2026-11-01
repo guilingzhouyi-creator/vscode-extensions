@@ -220,6 +220,15 @@
             "type": "boolean",
             "default": true
           },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "description": "Optional maximum severity ceiling for findings emitted by this analyzer."
+          },
           "options": {
             "type": "object"
           }

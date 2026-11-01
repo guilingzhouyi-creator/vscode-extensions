@@ -326,6 +326,32 @@ class Reader {
     }
 }
 
+const CORE_ISSUE_FIELD_NAMES = new Set<string>([
+    'id',
+    'analyzer',
+    'rule',
+    'severity',
+    'message',
+    'location',
+    'detail',
+    'suggestion',
+    'actionable',
+]);
+
+function extractIssueExtraFields(issue: Issue): Record<string, unknown> | undefined {
+    const rawRecord = issue as unknown as Record<string, unknown>;
+    const extras: Record<string, unknown> = {};
+    let hasExtras = false;
+    for (const key of Object.keys(rawRecord)) {
+        if (CORE_ISSUE_FIELD_NAMES.has(key)) continue;
+        const fieldValue = rawRecord[key];
+        if (fieldValue === undefined) continue;
+        extras[key] = fieldValue;
+        hasExtras = true;
+    }
+    return hasExtras ? extras : undefined;
+}
+
 /**
  * Write an optional floating-point metric field.
  *
@@ -413,6 +439,13 @@ export function encodeResults(results: FileResult[]): Buffer {
             } else {
                 writer.writeU8(0);
             }
+            const extraFields = extractIssueExtraFields(issue);
+            if (extraFields !== undefined) {
+                writer.writeU8(1);
+                writer.writeValue(extraFields);
+            } else {
+                writer.writeU8(0);
+            }
         }
         if (fileResult.symbols) {
             writer.writeU8(1);
@@ -478,6 +511,10 @@ function decodeSingleIssue(reader: Reader): Issue {
     const suggestion = hasSuggestion ? reader.readString() : undefined;
     const hasActionable = reader.readU8();
     const actionable = hasActionable ? (reader.readValue() as Issue['actionable']) : undefined;
+    const hasExtraFields = reader.readU8();
+    const extraFields = hasExtraFields
+        ? (reader.readValue() as Record<string, unknown>)
+        : undefined;
     return {
         id: issueId,
         analyzer,
@@ -492,6 +529,7 @@ function decodeSingleIssue(reader: Reader): Issue {
         detail,
         ...(suggestion !== undefined ? { suggestion } : {}),
         ...(actionable !== undefined ? { actionable } : {}),
+        ...(extraFields ?? {}),
     };
 }
 

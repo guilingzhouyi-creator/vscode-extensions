@@ -126,25 +126,33 @@ function evaluateFileBatchEloc(
     };
 }
 
+/** Fallback score applied when the caller supplies neither a vector nor an after score. */
+const DEFAULT_FALLBACK_SCORE = 100;
+
+/** Number of dimensions in the canonical quality vector. */
+const SCORE_VECTOR_LENGTH = 10;
+
 /**
- * Creates default 10-dimensional score vector if not provided.
+ * Creates a 10-dimensional score vector, flat at the measured after score when none was supplied.
+ *
+ * A flat vector is an honest placeholder rather than a fabricated measurement: it reproduces the
+ * single composite the caller did report across all ten axes, so the composite recomputed from it
+ * equals that score and no dimension delta is invented. The `DEFAULT_FALLBACK_SCORE` floor only
+ * applies when the caller reported no score at all, and in that case the quality metrics downstream
+ * are already marked unmeasured by the caller.
+ *
+ * @param scoreVector - Caller-supplied vector, used verbatim when it has the canonical length.
+ * @param fallbackScore - Score replicated across all axes when no valid vector is supplied.
+ * @returns Ten-element score vector.
  */
-function resolveScoreVector(scoreVector?: number[], fallbackScore = 100): number[] {
-    if (scoreVector && scoreVector.length === 10) {
+function resolveScoreVector(
+    scoreVector?: number[],
+    fallbackScore = DEFAULT_FALLBACK_SCORE,
+): number[] {
+    if (scoreVector && scoreVector.length === SCORE_VECTOR_LENGTH) {
         return scoreVector;
     }
-    return [
-        fallbackScore,
-        fallbackScore,
-        fallbackScore,
-        fallbackScore,
-        fallbackScore,
-        fallbackScore,
-        fallbackScore,
-        fallbackScore,
-        fallbackScore,
-        fallbackScore,
-    ];
+    return new Array<number>(SCORE_VECTOR_LENGTH).fill(fallbackScore);
 }
 
 function createInitialStability(record: CompactTrajectoryRecord): WeeklyStabilityMetrics {
@@ -173,13 +181,15 @@ function createInitialVerification(
     vrf?: CompactVerificationTelemetry,
 ): WeeklyVerificationSummary | undefined {
     if (!vrf) return undefined;
-    const killRate = vrf.k ?? 1;
+    // Each field mirrors the record exactly, including absence: an unreported kill rate or
+    // credible bound stays null so the aggregate can weight only the runs that measured it.
+    const killRate = vrf.k ?? null;
     return {
         verifiedRuns: 1,
         meanMutationKillRate: killRate,
         minMutationKillRate: killRate,
-        meanBayesianCredit: vrf.cr ?? 100,
-        minBayesianCiLower: vrf.ci ?? 1,
+        meanBayesianCredit: vrf.cr ?? null,
+        minBayesianCiLower: vrf.ci ?? null,
         quarantineCount: vrf.q === 1 ? 1 : 0,
     };
 }
@@ -208,7 +218,7 @@ function createInitialLifetimeSummary(record: CompactTrajectoryRecord): WeeklyTr
     const netYield = Math.round((netDebt / semanticKilo) * 100) / 100;
     const baseKilo = Math.max(1, record.eloc.uniq / 1000);
     const densityYield = Math.round((netDebt / baseKilo) * 100) / 100;
-    const kMean = Math.round(record.score.qed * 1000 * 100) / 100;
+    const kMean = Math.round(record.score.qed * 1000 * 10000) / 10000;
 
     const stability = createInitialStability(record);
     const verification = createInitialVerification(record.vrf);
@@ -264,7 +274,7 @@ function updateLifetimeSummary(
     const qedMean =
         Math.round(((prev.qed.mean * prev.totalRuns + record.score.qed) / totalRuns) * 1000000) /
         1000000;
-    const kMean = Math.round(qedMean * 1000 * 100) / 100;
+    const kMean = Math.round(qedMean * 1000 * 10000) / 10000;
 
     const totalAdded = prev.debt.totalAdded + record.debt.add;
     const totalResolved = prev.debt.totalResolved + record.debt.res;

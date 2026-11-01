@@ -368,6 +368,16 @@
       "type": "object",
       "description": "In-house self-development assessment (CAI). Present when scoring ran.",
       "additionalProperties": true
+    },
+    "governance": {
+      "type": "object",
+      "description": "Native eight-pillar and hierarchical domain governance synthesis.",
+      "additionalProperties": true
+    },
+    "evolution": {
+      "type": "object",
+      "description": "Git code evolution fragility, temporal coupling, and LCOV coverage damping summary.",
+      "additionalProperties": true
     }
   },
   "additionalProperties": false,

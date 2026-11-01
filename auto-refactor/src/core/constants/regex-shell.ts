@@ -317,6 +317,7 @@ export function createShellEnvVarScanner(): RegExp {
     return /\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g;
 }
 
+/** Frozen domain namespace aggregating Bash, POSIX shell, and PowerShell audit patterns. */
 export const REGEX_SHELL = Object.freeze({
     PIPE: SHELL_PIPE_PATTERN,
     ENV_VAR: SHELL_ENV_VAR_PATTERN,

@@ -339,7 +339,10 @@ mod tests {
         assert_eq!(merged_from_acc.count, full_moments.count);
         assert_eq!(merged_from_acc.mean, full_moments.mean);
         assert_eq!(merged_from_acc.variance, full_moments.variance);
-        assert_eq!(merged_from_acc.standard_deviation, full_moments.standard_deviation);
+        assert_eq!(
+            merged_from_acc.standard_deviation,
+            full_moments.standard_deviation
+        );
 
         // Function merge
         let moments_a = acc_a.finish();
@@ -349,7 +352,10 @@ mod tests {
         assert_eq!(merged_moments.count, full_moments.count);
         assert_eq!(merged_moments.mean, full_moments.mean);
         assert_eq!(merged_moments.variance, full_moments.variance);
-        assert_eq!(merged_moments.standard_deviation, full_moments.standard_deviation);
+        assert_eq!(
+            merged_moments.standard_deviation,
+            full_moments.standard_deviation
+        );
     }
 
     #[test]

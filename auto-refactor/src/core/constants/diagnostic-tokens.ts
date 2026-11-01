@@ -85,6 +85,30 @@ export const DIAG_STATUS_WARN = 'warn';
 export const DIAG_STATUS_FAIL = 'fail';
 
 // ============================================================================
+// Metric Budget Thresholds
+// ============================================================================
+
+/**
+ * Maximum control-flow nesting depth a function may reach before it is reported.
+ *
+ * One declaration for the two consumers that enforce it: the `GOV-LOG-001` governance rule and the
+ * `maintainability` dimension deduction. They previously carried independent literals, so the rule
+ * that reports deep nesting and the score that penalizes it could disagree about what "deep" means
+ * while both read as authoritative. A caller may still override the limit through
+ * `governance.maxNestingDepth`; this is the default both fall back to.
+ */
+export const MAX_CONTROL_FLOW_NESTING_DEPTH = 5;
+
+/**
+ * Maximum number of public symbols a single module may export before the deduction applies.
+ *
+ * Declared here rather than beside the deduction table because it is a budget a reader will
+ * compare against `MAX_CONTROL_FLOW_NESTING_DEPTH`; keeping both budget thresholds in one section
+ * is what makes the two limits discoverable together.
+ */
+export const MAX_MODULE_EXPORTED_SYMBOLS = 30;
+
+// ============================================================================
 // Actionable Remediation Markers
 // ============================================================================
 

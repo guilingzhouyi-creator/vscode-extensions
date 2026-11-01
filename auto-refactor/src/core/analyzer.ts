@@ -60,6 +60,7 @@ import { QualityScorer } from './scoring/qualityScorer';
 import type { QualityWeights } from './scoring/scoringTypes';
 import {
     defaultAdaptiveExpertBiasRouter,
+    TARGET_QUEUE_DEPTH,
     type ExpertTelemetrySnapshot,
 } from './router/adaptive-bias-router';
 import { ANALYZER_NAME_TO_BIT } from './constants/analyzer-bitmask';
@@ -192,7 +193,7 @@ export class Scanner implements ScannerContext {
             this.plan = resolveAnalyzers(sparseConfig, config.baseDir || process.cwd());
             this.logger.info(
                 `sparse routing applied for archetype "${detectedArchetype}": ` +
-                `${this.plan.length} active, ${sparseResult.skippedAnalyzers.size} skipped`,
+                    `${this.plan.length} active, ${sparseResult.skippedAnalyzers.size} skipped`,
             );
         }
 
@@ -402,7 +403,7 @@ export class Scanner implements ScannerContext {
         const report = this.buildReport(files.length, issues, fileMetrics, durationMs);
         this.logger.info(
             `done in ${durationMs}ms: ${report.summary.issuesTotal} issue(s) ` +
-            `[error=${report.summary.bySeverity.error}, warning=${report.summary.bySeverity.warning}, info=${report.summary.bySeverity.info}]`,
+                `[error=${report.summary.bySeverity.error}, warning=${report.summary.bySeverity.warning}, info=${report.summary.bySeverity.info}]`,
         );
         printScanTiming({ startAt, discoverAt: startAt, parseAnalyzeAt, sortedAt, durationMs });
         return report;
@@ -555,30 +556,21 @@ export class Scanner implements ScannerContext {
         );
     }
 
-    /**
-     * Build unified ScanReport from scanned files, collected issues, and metrics.
-     *
-     * @param filesScanned - Total count of files scanned.
-     * @param issues - Aggregated issues list.
-     * @param fileMetrics - Per-file metric records.
-     * @param durationMs - Total scan duration in milliseconds.
-     * @returns Assembled ScanReport structure.
-     */
     private loadRouterBiasState(): void {
         if (this.config.cacheEnabled === false) return;
         const stateFile = path.join(this.config.root, '.auto-refactor-cache', 'router-bias.json');
-        try {
-            if (fs.existsSync(stateFile)) {
-                const content = fs.readFileSync(stateFile, 'utf8');
+        void fs.promises
+            .readFile(stateFile, 'utf8')
+            .then((content) => {
                 const snapshot = JSON.parse(content);
                 defaultAdaptiveExpertBiasRouter.importSnapshot(snapshot);
-            }
-        } catch {
-            // Safe fallback on corrupted or unreadable cache
-        }
+            })
+            .catch((err) => {
+                void err;
+            });
     }
 
-    private saveRouterBiasState(issues: Issue[], filesScanned: number): void {
+    private saveRouterBiasState(issues: Issue[], filesScanned: number, durationMs: number): void {
         if (this.config.cacheEnabled === false) return;
         try {
             const cacheDir = path.join(this.config.root, '.auto-refactor-cache');
@@ -588,17 +580,26 @@ export class Scanner implements ScannerContext {
 
             const findingsByAnalyzer: Record<string, number> = {};
             for (let i = 0; i < issues.length; i++) {
-                const analyzer = issues[i].analyzer;
+                const issue = issues[i];
+                if (issue.suppression || issue.clusteredInto) continue;
+                const analyzer = issue.analyzer;
                 findingsByAnalyzer[analyzer] = (findingsByAnalyzer[analyzer] || 0) + 1;
             }
 
+            const entries = Object.entries(ANALYZER_NAME_TO_BIT);
+            const activeCount = Math.max(1, entries.length);
+            const avgLatencyUs = Math.max(
+                1,
+                Math.round(((durationMs || 1) * 1000) / Math.max(1, filesScanned * activeCount)),
+            );
+
             const telemetry: ExpertTelemetrySnapshot[] = [];
-            for (const [name, bit] of Object.entries(ANALYZER_NAME_TO_BIT)) {
+            for (const [name, bit] of entries) {
                 const yieldCount = findingsByAnalyzer[name] || 0;
                 telemetry.push({
                     bit,
-                    currentQueueDepth: 0,
-                    rollingAvgLatencyUs: 1000,
+                    currentQueueDepth: TARGET_QUEUE_DEPTH,
+                    rollingAvgLatencyUs: avgLatencyUs,
                     totalDispatches: filesScanned,
                     actionableFindingsYield: yieldCount,
                 });
@@ -606,23 +607,36 @@ export class Scanner implements ScannerContext {
 
             defaultAdaptiveExpertBiasRouter.calibrateBiases(telemetry);
             const snapshot = defaultAdaptiveExpertBiasRouter.exportSnapshot();
-            fs.writeFileSync(
-                path.join(cacheDir, 'router-bias.json'),
-                JSON.stringify(snapshot, null, 2),
-                'utf8',
-            );
-        } catch {
-            // Zero-crash guarantee
+            void fs.promises
+                .writeFile(
+                    path.join(cacheDir, 'router-bias.json'),
+                    JSON.stringify(snapshot, null, 2),
+                    'utf8',
+                )
+                .catch((err) => {
+                    void err;
+                });
+        } catch (err) {
+            void err;
         }
     }
 
+    /**
+     * Build unified ScanReport from scanned files, collected issues, and metrics.
+     *
+     * @param filesScanned - Total count of files scanned.
+     * @param issues - Aggregated issues list.
+     * @param fileMetrics - Per-file metric records.
+     * @param durationMs - Total scan duration in milliseconds.
+     * @returns Assembled ScanReport structure.
+     */
     public buildReport(
         filesScanned: number,
         issues: Issue[],
         fileMetrics: FileMetric[],
         durationMs: number,
     ): ScanReport {
-        this.saveRouterBiasState(issues, filesScanned);
+        this.saveRouterBiasState(issues, filesScanned, durationMs);
         return buildScanReport({
             host: {
                 config: this.config,

@@ -399,35 +399,60 @@ async function runTests() {
     compressDiagnosticSentence("Synchronous 'fs.readFileSync' blocks event loop."),
     "sync 'fs.readFileSync' blocks event loop",
   );
+  assert.strictEqual(compressDiagnosticSentence('Sync I/O in async method'), 'sync IO in async fn');
   assert.strictEqual(
-    compressDiagnosticSentence("Sync I/O in async method"),
-    "sync IO in async fn",
+    compressDiagnosticSentence('Zero transient heap allocation in hot loop bodies violated'),
+    'loop transient heap allocation',
   );
   assert.strictEqual(
-    compressDiagnosticSentence("Zero transient heap allocation in hot loop bodies violated"),
-    "loop transient heap allocation",
+    compressDiagnosticSentence('Control flow nesting depth (5) exceeds limit (4)'),
+    'nesting depth 5 > 4',
   );
   assert.strictEqual(
-    compressDiagnosticSentence("Control flow nesting depth (5) exceeds limit (4)"),
-    "nesting depth 5 > 4",
+    compressDiagnosticSentence('Procedure line count (120) exceeds limit (80)'),
+    'procedure lines 120 > 80',
   );
   assert.strictEqual(
-    compressDiagnosticSentence("Procedure line count (120) exceeds limit (80)"),
-    "procedure lines 120 > 80",
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence("Magic number 42 detected without semantic constant."),
-    "magic number 42",
+    compressDiagnosticSentence('Magic number 42 detected without semantic constant.'),
+    'magic number 42',
   );
   assert.strictEqual(
     compressDiagnosticSentence("Literal string 'prod' should be constant."),
     "literal string 'prod' not constant",
   );
   assert.strictEqual(
-    compressDiagnosticSentence("Facade method merely delegates to inner without value-add"),
-    "trampoline pass-through",
+    compressDiagnosticSentence('Facade method merely delegates to inner without value-add'),
+    'trampoline pass-through',
   );
-  console.log('✔  Test 9: High-efficiency Token sentence compression engine verified (12 rules)');
+  assert.strictEqual(
+    compressDiagnosticSentence(
+      'String literal "\'use strict\'" (len=12) appears to be a hardcoded UI message or config value.',
+    ),
+    'hardcoded string "\'use strict\'" (12c)',
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence('Numeric literal 42 should be extracted to a named constant.'),
+    'magic number 42',
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence(
+      'File has 850 lines (max 600); 12 exports. See split suggestions in detail.',
+    ),
+    'file 850 > 600 lines (12 exports)',
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence(
+      "Function 'runTask' declares 5 parameters (limit: 3); pack cohesive options into a parameter object.",
+    ),
+    "fn 'runTask' 5 > 3 params",
+  );
+  assert.strictEqual(
+    compressDiagnosticSentence(
+      "CommonJS 'require(...)' detected in TypeScript module; use ES module 'import' syntax.",
+    ),
+    'CommonJS require() in ESM',
+  );
+  console.log('✔  Test 9: High-efficiency Token sentence compression engine verified (22 rules)');
 
   // Test 10: Scale report >= 70% token savings ratchet
   const scaleIssues = [];
@@ -499,7 +524,9 @@ async function runTests() {
   assert.ok(mdOutput.includes('标准化'), 'Missing 标准化');
   assert.ok(mdOutput.includes('现代化'), 'Missing 现代化');
   assert.ok(mdOutput.includes('注释质量'), 'Missing 注释质量');
-  console.log('✔  Test 11: Ten-Dimensional rich metrics (AAS v1.1) & complete Markdown table verified');
+  console.log(
+    '✔  Test 11: Ten-Dimensional rich metrics (AAS v1.1) & complete Markdown table verified',
+  );
 
   // Test 12: Truthful metrics mapping (SQALE, Polyglot, Gaming defense, and CAI isolation)
   const enrichedReport = createMockScanReport({
@@ -550,7 +577,11 @@ async function runTests() {
   });
 
   const enrichedDoc = buildAasReport(enrichedReport);
-  assert.strictEqual(enrichedDoc.health.cai, 88.4, 'Health CAI must strictly reflect autonomy index');
+  assert.strictEqual(
+    enrichedDoc.health.cai,
+    88.4,
+    'Health CAI must strictly reflect autonomy index',
+  );
   assert.deepStrictEqual(
     enrichedDoc.health.sqale,
     { tdr: 4.5, remediationMinutes: 120, grade: 'A' },
@@ -558,7 +589,13 @@ async function runTests() {
   );
   assert.deepStrictEqual(
     enrichedDoc.health.polyglot,
-    { index: 91.2, meanScore: 89.5, dispersionPenalty: 0.95, standardDeviation: 5.2, languageCount: 3 },
+    {
+      index: 91.2,
+      meanScore: 89.5,
+      dispersionPenalty: 0.95,
+      standardDeviation: 5.2,
+      languageCount: 3,
+    },
     'Polyglot metrics must be preserved in independent health block',
   );
   assert.deepStrictEqual(
@@ -577,7 +614,13 @@ async function runTests() {
     autonomy: undefined,
     qualityScore: {
       ...test11Report.qualityScore,
-      polyglotGeneralization: { index: 95.0, meanScore: 95.0, dispersionPenalty: 1.0, standardDeviation: 0, languageCount: 1 },
+      polyglotGeneralization: {
+        index: 95.0,
+        meanScore: 95.0,
+        dispersionPenalty: 1.0,
+        standardDeviation: 0,
+        languageCount: 1,
+      },
     },
   });
   const nonAutonomyDoc = buildAasReport(nonAutonomyReport);
@@ -597,7 +640,11 @@ async function runTests() {
         rule: 'hardcoded-string',
         severity: 'error',
         message: 'Literal string detected.',
-        location: { file: 'src/app.ts', start: { line: 3, column: 10 }, end: { line: 3, column: 16 } },
+        location: {
+          file: 'src/app.ts',
+          start: { line: 3, column: 10 },
+          end: { line: 3, column: 16 },
+        },
       },
       {
         id: 'dup:2',
@@ -605,7 +652,11 @@ async function runTests() {
         rule: 'magic-number',
         severity: 'error',
         message: 'Magic number detected.',
-        location: { file: 'src/app.ts', start: { line: 3, column: 12 }, end: { line: 3, column: 14 } },
+        location: {
+          file: 'src/app.ts',
+          start: { line: 3, column: 12 },
+          end: { line: 3, column: 14 },
+        },
       },
       {
         id: 'dup:3',
@@ -613,7 +664,11 @@ async function runTests() {
         rule: 'high-complexity',
         severity: 'error',
         message: 'High complexity on line 5.',
-        location: { file: 'src/app.ts', start: { line: 5, column: 1 }, end: { line: 5, column: 10 } },
+        location: {
+          file: 'src/app.ts',
+          start: { line: 5, column: 1 },
+          end: { line: 5, column: 10 },
+        },
       },
     ],
   });
@@ -739,9 +794,109 @@ async function runTests() {
   assert.ok(quantDoc.health.quant, 'Health block must contain quant when present in qualityScore');
   assert.strictEqual(quantDoc.health.quant.rcr, 2.5);
   assert.strictEqual(quantDoc.health.quant.status, 'de-leveraging');
-  assert.strictEqual(quantDoc.health.quant.edb95, undefined, 'Omitted risk metric must remain undefined, never defaulted to 0');
-  assert.strictEqual(quantDoc.health.quant.ptd, undefined, 'Omitted drawdown metric must remain undefined, never defaulted to 0');
+  assert.strictEqual(
+    quantDoc.health.quant.edb95,
+    undefined,
+    'Omitted risk metric must remain undefined, never defaulted to 0',
+  );
+  assert.strictEqual(
+    quantDoc.health.quant.ptd,
+    undefined,
+    'Omitted drawdown metric must remain undefined, never defaulted to 0',
+  );
+  assert.strictEqual(
+    quantDoc.health.quant.icr,
+    undefined,
+    'Legacy alias icr must be omitted by default',
+  );
+  assert.strictEqual(
+    quantDoc.health.quant.debtGini,
+    undefined,
+    'Legacy alias debtGini must be omitted by default',
+  );
+
+  const quantLegacyDoc = buildAasReport(quantTestReport, { includeLegacyQuantAliases: true });
+  assert.strictEqual(
+    quantLegacyDoc.health.quant.icr,
+    2.5,
+    'Legacy alias icr included when requested',
+  );
+  assert.strictEqual(
+    quantLegacyDoc.health.quant.debtGini,
+    0.35,
+    'Legacy alias debtGini included when requested',
+  );
   console.log('✔  Test 15: ADR-Q truthfulness, omission discipline, and legacy parity verified');
+
+  // Test 16: Per-finding adjudication stamp, correlated rules (`also`),
+  // `moreLines` folding, & healthOverride.dimensions
+  const foldingIssues = [];
+  for (let idx = 1; idx <= 7; idx++) {
+    foldingIssues.push({
+      id: `const:hardcoded-string:src/noisy.ts:${idx * 10}`,
+      analyzer: 'constants',
+      rule: 'hardcoded-string',
+      severity: 'warning',
+      message: `String literal "msg_${idx}" (len=5) appears to be a hardcoded UI message or config value.`,
+      location: {
+        file: 'src/noisy.ts',
+        start: { line: idx * 10, column: 5 },
+        end: { line: idx * 10, column: 12 },
+      },
+      adjudicatedTier: 'T3',
+      adjudicatedConfidence: 0.6123,
+      correlatedRules: idx === 1 ? ['GOV-CFG-001'] : undefined,
+      actionable: {
+        action: 'extract_constant',
+        patch: 'HARDCODED_MSG_TEXT',
+        safeToAutomate: true,
+      },
+      suggestion: 'Extract to constant (e.g. MSG_CONST). Avoid inline strings.',
+    });
+  }
+  const foldingReport = createMockScanReport({ issues: foldingIssues });
+  const foldingDoc = buildAasReport(foldingReport, {
+    maxPerRulePerFile: 5,
+    healthOverride: {
+      dimensions: {
+        architectureConsistency: 94.2,
+        codeSecurity: 99.1,
+      },
+    },
+  });
+  const noisyDefects = foldingDoc.files['src/noisy.ts'];
+  assert.strictEqual(noisyDefects.length, 5, 'Should fold occurrences beyond maxPerRulePerFile=5');
+  assert.strictEqual(noisyDefects[0].tier, 'T3', 'Should project per-finding adjudicatedTier');
+  assert.strictEqual(noisyDefects[0].conf, 0.61, 'Should project rounded adjudicatedConfidence');
+  assert.deepStrictEqual(
+    noisyDefects[0].also,
+    ['GOV-CFG-001'],
+    'Should project correlatedRules into also',
+  );
+  assert.strictEqual(
+    noisyDefects[0].fix.template,
+    undefined,
+    'Generic placeholder patch (*_TEXT) and prose suggestion must not pollute fix.template',
+  );
+  const { cleanSuggestion } = require('../dist/core/reporting/aas-remediation');
+  assert.strictEqual(
+    cleanSuggestion('Extract to constant (e.g. MSG_CONST). Avoid inline strings.'),
+    'Extract to constant (e.g. MSG_CONST)',
+    'cleanSuggestion must preserve parenthetical e.g. without mid-abbreviation truncation',
+  );
+  assert.deepStrictEqual(
+    noisyDefects[4].moreLines,
+    [60, 70],
+    '5th occurrence must aggregate folded lines [60, 70] in moreLines',
+  );
+  assert.strictEqual(
+    foldingDoc.dimensions.architectureConsistency,
+    94.2,
+    'healthOverride.dimensions must override raw scan dimension score',
+  );
+  console.log(
+    '✔  Test 16: Per-finding adjudication, also correlation, moreLines folding, and healthOverride.dimensions verified',
+  );
 
   console.log('\n--- All Agent Audit Schema (AAS v1.0 / v1.1) Tests Passed! ---');
 }

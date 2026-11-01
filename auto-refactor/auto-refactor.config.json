@@ -93,6 +93,18 @@
     },
     "gate-architecture": {
       "enabled": true
+    },
+    "concurrency": {
+      "enabled": true
+    },
+    "production-hygiene": {
+      "enabled": true
+    },
+    "dependency-layout": {
+      "enabled": true
+    },
+    "rust-modern": {
+      "enabled": true
     }
   },
   "logLevel": "info",

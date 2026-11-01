@@ -55,7 +55,9 @@ const FILE_ACTIVE_RUNS = 'active-runs.ndjson';
  */
 function computeSafeRatio(numerator: number, denominator: number): number {
     if (denominator <= 0) return 1;
-    return Math.round((numerator / denominator) * RATIO_SCALE_TEN_THOUSAND) / RATIO_SCALE_TEN_THOUSAND;
+    return (
+        Math.round((numerator / denominator) * RATIO_SCALE_TEN_THOUSAND) / RATIO_SCALE_TEN_THOUSAND
+    );
 }
 
 function computeUniqueCoverageRatio(uniqueTotal: number, processedTotal: number): number {
@@ -76,8 +78,7 @@ export function getIsoWeekId(timestamp: number): string {
     const weekNo = Math.ceil(
         ((dateObj.getTime() - yearStart.getTime()) / MILLISECONDS_PER_DAY + 1) / DAYS_PER_WEEK,
     );
-    const paddedWeek =
-        weekNo < TWO_DIGIT_DECIMAL_LIMIT ? `0${weekNo}` : `${weekNo}`;
+    const paddedWeek = weekNo < TWO_DIGIT_DECIMAL_LIMIT ? `0${weekNo}` : `${weekNo}`;
     return `${dateObj.getUTCFullYear()}-W${paddedWeek}`;
 }
 
@@ -114,14 +115,8 @@ function deriveRecordsStability(params: RecordsStabilityParams): WeeklyStability
         if (record.score.aft > scoreCeiling) scoreCeiling = record.score.aft;
     }
 
-    const semanticPurityRatio = computeSafeRatio(
-        params.semanticTotal,
-        params.changedTotal,
-    );
-    const uniqueCoverageRatio = computeUniqueCoverageRatio(
-        params.maxUnique,
-        params.processedTotal,
-    );
+    const semanticPurityRatio = computeSafeRatio(params.semanticTotal, params.changedTotal);
+    const uniqueCoverageRatio = computeUniqueCoverageRatio(params.maxUnique, params.processedTotal);
 
     return {
         zeroRegressionRuns,
@@ -136,6 +131,7 @@ function deriveRecordsStability(params: RecordsStabilityParams): WeeklyStability
 interface VerificationBatchState {
     verifiedRuns: number;
     killSum: number;
+    killCount: number;
     minKill: number;
     creditSum: number;
     creditCount: number;
@@ -150,6 +146,7 @@ function updateVerificationBatchState(
     state.verifiedRuns += 1;
     if (typeof vrf.k === 'number') {
         state.killSum += vrf.k;
+        state.killCount += 1;
         state.minKill = Math.min(state.minKill, vrf.k);
     }
     if (typeof vrf.cr === 'number') {
@@ -166,6 +163,12 @@ function updateVerificationBatchState(
 
 /**
  * Accumulates in-kernel verification telemetry across a batch of compact records.
+ *
+ * Each mean is taken over the runs that actually reported that field, not over `verifiedRuns`.
+ * A run that carried only one telemetry key would otherwise dilute every other mean toward zero,
+ * and the `minKill === Infinity` guard would report a spurious 1.0 for a batch that never measured
+ * a kill rate at all. Null is returned for an unmeasured field so the absence survives to the
+ * summary instead of being published as a clean result.
  */
 function deriveRecordsVerification(
     records: CompactTrajectoryRecord[],
@@ -173,6 +176,7 @@ function deriveRecordsVerification(
     const state: VerificationBatchState = {
         verifiedRuns: 0,
         killSum: 0,
+        killCount: 0,
         minKill: Infinity,
         creditSum: 0,
         creditCount: 0,
@@ -190,20 +194,23 @@ function deriveRecordsVerification(
         return undefined;
     }
 
+    const meanKill =
+        state.killCount > 0
+            ? Math.round((state.killSum / state.killCount) * RATIO_SCALE_TEN_THOUSAND) /
+              RATIO_SCALE_TEN_THOUSAND
+            : null;
     const meanCredit =
         state.creditCount > 0
             ? Math.round((state.creditSum / state.creditCount) * PERCENT_MULTIPLIER) /
               PERCENT_MULTIPLIER
-            : DEFAULT_MAX_SCORE;
+            : null;
 
     return {
         verifiedRuns: state.verifiedRuns,
-        meanMutationKillRate:
-            Math.round((state.killSum / state.verifiedRuns) * RATIO_SCALE_TEN_THOUSAND) /
-            RATIO_SCALE_TEN_THOUSAND,
-        minMutationKillRate: state.minKill === Infinity ? 1 : state.minKill,
+        meanMutationKillRate: meanKill,
+        minMutationKillRate: state.minKill === Infinity ? null : state.minKill,
         meanBayesianCredit: meanCredit,
-        minBayesianCiLower: state.minCi === Infinity ? 1 : state.minCi,
+        minBayesianCiLower: state.minCi === Infinity ? null : state.minCi,
         quarantineCount: state.quarantineCount,
     };
 }
@@ -249,8 +256,7 @@ function deriveRecordsManifold(
         ...(tauCount > 0
             ? {
                   meanTau:
-                      Math.round((tauSum / tauCount) * PERCENT_MULTIPLIER) /
-                      PERCENT_MULTIPLIER,
+                      Math.round((tauSum / tauCount) * PERCENT_MULTIPLIER) / PERCENT_MULTIPLIER,
               }
             : {}),
     };
@@ -447,7 +453,9 @@ function computeQedMeans(qedSum: number, totalRuns: number): MeanQedMetrics {
             : 0;
     return {
         meanQed,
-        kMean: Math.round(meanQed * KILO_DIVISOR * PERCENT_MULTIPLIER) / PERCENT_MULTIPLIER,
+        kMean:
+            Math.round(meanQed * KILO_DIVISOR * RATIO_SCALE_TEN_THOUSAND) /
+            RATIO_SCALE_TEN_THOUSAND,
     };
 }
 
@@ -547,6 +555,7 @@ interface WeeklySummaryAccumulator {
     scoreCeiling: number;
     verifiedRuns: number;
     killWeightedSum: number;
+    killRuns: number;
     minKill: number;
     creditWeightedSum: number;
     minCi: number;
@@ -584,6 +593,7 @@ function createWeeklyAccumulator(): WeeklySummaryAccumulator {
         scoreCeiling: -Infinity,
         verifiedRuns: 0,
         killWeightedSum: 0,
+        killRuns: 0,
         minKill: Infinity,
         creditWeightedSum: 0,
         minCi: Infinity,
@@ -603,8 +613,7 @@ function mergeExtendedSummaryBlocks(
 ): void {
     const stab = snapshot.stability;
     const weekZeroRegRuns =
-        stab?.zeroRegressionRuns ??
-        (snapshot.debt.totalRegressions === 0 ? snapshot.totalRuns : 0);
+        stab?.zeroRegressionRuns ?? (snapshot.debt.totalRegressions === 0 ? snapshot.totalRuns : 0);
     acc.zeroRegressionRuns += weekZeroRegRuns;
     if (weekZeroRegRuns === snapshot.totalRuns && snapshot.gatePassRate >= DEFAULT_MAX_SCORE) {
         acc.zeroRegressionStreak += snapshot.totalRuns;
@@ -620,10 +629,21 @@ function mergeExtendedSummaryBlocks(
     if (snapshot.verification && snapshot.verification.verifiedRuns > 0) {
         const vrf = snapshot.verification;
         acc.verifiedRuns += vrf.verifiedRuns;
-        acc.killWeightedSum += vrf.meanMutationKillRate * vrf.verifiedRuns;
-        acc.minKill = Math.min(acc.minKill, vrf.minMutationKillRate);
-        acc.creditWeightedSum += vrf.meanBayesianCredit * vrf.verifiedRuns;
-        acc.minCi = Math.min(acc.minCi, vrf.minBayesianCiLower);
+        // Weight every field by the runs that reported it, so a snapshot with a null kill rate
+        // cannot pull the lifetime mean toward zero or claim an unmeasured 1.0 minimum.
+        if (vrf.meanMutationKillRate !== null) {
+            acc.killWeightedSum += vrf.meanMutationKillRate * vrf.verifiedRuns;
+            acc.killRuns += vrf.verifiedRuns;
+        }
+        if (vrf.minMutationKillRate !== null) {
+            acc.minKill = Math.min(acc.minKill, vrf.minMutationKillRate);
+        }
+        if (vrf.meanBayesianCredit !== null) {
+            acc.creditWeightedSum += vrf.meanBayesianCredit * vrf.verifiedRuns;
+        }
+        if (vrf.minBayesianCiLower !== null) {
+            acc.minCi = Math.min(acc.minCi, vrf.minBayesianCiLower);
+        }
         acc.quarantineCount += vrf.quarantineCount;
     }
 
@@ -688,26 +708,24 @@ function buildAggregatedVerification(
         return undefined;
     }
     const meanKill =
-        Math.round((acc.killWeightedSum / acc.verifiedRuns) * RATIO_SCALE_TEN_THOUSAND) /
-        RATIO_SCALE_TEN_THOUSAND;
-    const minKill = acc.minKill === Infinity ? 1 : acc.minKill;
+        acc.killRuns > 0
+            ? Math.round((acc.killWeightedSum / acc.killRuns) * RATIO_SCALE_TEN_THOUSAND) /
+              RATIO_SCALE_TEN_THOUSAND
+            : null;
     const meanCredit =
         Math.round((acc.creditWeightedSum / acc.verifiedRuns) * PERCENT_MULTIPLIER) /
         PERCENT_MULTIPLIER;
-    const minCi = acc.minCi === Infinity ? 1 : acc.minCi;
     return {
         verifiedRuns: acc.verifiedRuns,
         meanMutationKillRate: meanKill,
-        minMutationKillRate: minKill,
+        minMutationKillRate: acc.minKill === Infinity ? null : acc.minKill,
         meanBayesianCredit: meanCredit,
-        minBayesianCiLower: minCi,
+        minBayesianCiLower: acc.minCi === Infinity ? null : acc.minCi,
         quarantineCount: acc.quarantineCount,
     };
 }
 
-function buildAggregatedManifold(
-    acc: WeeklySummaryAccumulator,
-): WeeklyManifoldSummary | undefined {
+function buildAggregatedManifold(acc: WeeklySummaryAccumulator): WeeklyManifoldSummary | undefined {
     if (acc.manifoldWeeks <= 0) {
         return undefined;
     }

@@ -382,6 +382,20 @@ function buildDefaultAnalyzerOptions(
     return opts;
 }
 
+function buildMergedAnalyzerDeclaration(
+    decl: Partial<AnalyzerDeclaration> | undefined,
+    mergedOptions: Record<string, unknown>,
+): AnalyzerDeclaration {
+    const nextDecl: AnalyzerDeclaration = {
+        enabled: decl?.enabled !== false,
+        options: mergedOptions,
+    };
+    if (decl?.severity) {
+        nextDecl.severity = decl.severity;
+    }
+    return nextDecl;
+}
+
 /**
  * Merges analyzer declarations from baseline configurations with file-level overrides.
  *
@@ -406,15 +420,13 @@ export function mergeAnalyzerDeclarations(
                 analyzerDefaults,
                 globalThresholds,
             );
-            analyzers[name] = {
-                enabled: decl?.enabled !== false,
-                options: mergeAnalyzerOptionsHierarchy(
-                    defaults,
-                    globalLayer,
-                    analyzers[name]?.options,
-                    decl?.options,
-                ),
-            };
+            const mergedOptions = mergeAnalyzerOptionsHierarchy(
+                defaults,
+                globalLayer,
+                analyzers[name]?.options,
+                decl?.options,
+            );
+            analyzers[name] = buildMergedAnalyzerDeclaration(decl, mergedOptions);
         }
     }
     for (const name of Object.keys(analyzers)) {

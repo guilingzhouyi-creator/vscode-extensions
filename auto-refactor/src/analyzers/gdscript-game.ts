@@ -47,8 +47,8 @@ const GAME_HOT_PATH_PATTERN: HotPathPattern = Object.freeze({
     allocationPatterns: [
         /\b(?:[A-Z][a-zA-Z0-9_]*|Array|Dictionary)\.new\s*\(/,
         /\.duplicate\s*\(\s*(?:true|false)?\s*\)/,
-        /\[\s*\]/,
-        /\{\s*\}/,
+        /(?:^|[=:(,+\s])\[\s{0,2}\]/,
+        /(?:^|[=:(,+\s])\{\s{0,2}\}/,
     ],
     poolExemptions: [/\.acquire\s*\(/, /\.reset_state\s*\(/],
 });
@@ -98,7 +98,6 @@ const KEYWORD_POOL = 'pool';
 const KEYWORD_FACTORY = 'factory';
 
 const POOL_ACQUIRE_NAMES: ReadonlySet<string> = new Set(['acquire', 'get_obj']);
-const POOL_RESET_NAMES: ReadonlySet<string> = new Set(['reset_state']);
 
 const MSG_POOL_MISSING_RESET = 'Object pool acquisition logic missing reset_state() contract.';
 const SUGGEST_POOL_MISSING_RESET =
@@ -176,8 +175,7 @@ function auditPoolContracts(file: string, raw: readonly string[], issues: Issue[
         if (funcDef && POOL_ACQUIRE_NAMES.has(funcDef[1])) {
             hasAcquireOrGet = true;
         }
-        const resetCall = REGEX.SYNTAX.GDSCRIPT_RESET_STATE_CALL.exec(line);
-        if (resetCall && POOL_RESET_NAMES.has(resetCall[1])) {
+        if (REGEX.SYNTAX.GDSCRIPT_RESET_STATE_CALL.test(line)) {
             hasResetInvocation = true;
         }
     }

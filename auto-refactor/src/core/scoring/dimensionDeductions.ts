@@ -21,13 +21,7 @@ import {
     DIMENSION_ARCHITECTURE_CONSISTENCY,
     DIMENSION_MAINTAINABILITY,
     DIMENSION_TECH_DEBT_RISK,
-    DIMENSION_PERFORMANCE_EFFICIENCY,
     DIMENSION_MODERNITY,
-    DIMENSION_STANDARDIZATION,
-    DIMENSION_COMMENT_QUALITY,
-    DIMENSION_CODE_SECURITY,
-    DIMENSION_SEMANTIC_PURITY,
-    DIMENSION_DUPLICATION,
     FRAGMENT_ERROR,
     FRAGMENT_WARNING,
     RULE_MOD_BWD_001,
@@ -721,6 +715,9 @@ export function applyIssueDeductions(
     apply: DeductionApplier,
     options?: IssueDeductionOptions,
 ): void {
+    if (issue.clusteredInto) {
+        return;
+    }
     const evoMul = options?.evolutionMultiplier ?? 1.0;
     const impMul = options?.impactMultiplier ?? 1.0;
     const combinedMultiplier = evoMul * impMul;
@@ -776,6 +773,7 @@ export function applyMetricDeductions(metric: FileMetric, apply: DeductionApplie
             DIMENSION_MAINTAINABILITY,
             DEDUCTION_NESTING_DEPTH_OVERFLOW,
             ScoringRationales.MAX_NESTING_DEPTH_OVERFLOW(metric.maxNestingDepth),
+            'CPX-NEST-001',
         );
     }
     if (metric.exportedSymbols > MAX_EXPORTED_SYMBOLS) {
@@ -783,6 +781,7 @@ export function applyMetricDeductions(metric: FileMetric, apply: DeductionApplie
             DIMENSION_ARCHITECTURE_CONSISTENCY,
             DEDUCTION_EXCESSIVE_EXPORTED_SYMBOLS,
             ScoringRationales.EXCESSIVE_EXPORTED_SYMBOLS(metric.exportedSymbols),
+            'ARCH-BND-001',
         );
     }
 }

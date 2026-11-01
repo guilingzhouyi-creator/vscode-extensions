@@ -6,10 +6,14 @@
  * Dependencies & Triggers: Consumed by types.ts, terminology-engine.ts, reporters, and analyzers.
  * Responsibilities:
  *   1. Declare the canonical 6-domain defect taxonomies (Taxonomy).
- *   2. Declare the 16+ machine-actionable remediation verbs (Remediation Actions).
+ *   2. Declare the machine-actionable remediation verbs (Remediation Actions).
  *   3. Declare standardized diagnostic verdicts (BLOCK, WARN, INFO, PASS).
  *   4. Provide deterministic catalog lookups and format helpers for dual-faced presentation.
- * Exit Semantics & Design Rationale: Fully immutable, frozen catalogs; zero side-effects.
+ * Exit Semantics & Design Rationale: Fully immutable, frozen catalogs; zero side-effects. Every
+ *   field is English because this module is machine-facing: a translation here would be prose the
+ *   i18n cleanliness guard cannot see, and an agent reading the catalog would receive a mix of
+ *   languages depending on which entry it happened to look up. The localized rendering of each
+ *   taxonomy and verb lives in the presentation dictionaries, keyed by the same codes.
  */
 
 /** Six canonical defect taxonomies governing workspace quality dimensions */
@@ -21,8 +25,6 @@ export interface DefectTaxonomySpec {
     readonly code: DefectTaxonomyCategory;
     readonly title: string;
     readonly description: string;
-    readonly zhTitle: string;
-    readonly zhDescription: string;
 }
 
 /** Single source of truth specifications for defect taxonomies */
@@ -33,48 +35,36 @@ export const DEFECT_TAXONOMY_SPECS: Readonly<Record<DefectTaxonomyCategory, Defe
             title: 'Architectural Layer Boundary',
             description:
                 'Boundary compliance, clean separation of concerns, and dependency graph integrity.',
-            zhTitle: '架构分层与依赖边界',
-            zhDescription: '分层拓扑隔离、领域依赖纯净度与循环依赖防护。',
         }),
         CTRL_FLOW: Object.freeze({
             code: 'CTRL_FLOW',
             title: 'Control Flow & Complexity',
             description:
                 'Cyclomatic complexity, nesting depth limits, and guard-clause flattening.',
-            zhTitle: '控制流与复杂度预算',
-            zhDescription: '单函数圈复杂度、控制流嵌套深度与卫语句平铺控制流。',
         }),
         NUM_PREC: Object.freeze({
             code: 'NUM_PREC',
             title: 'Numerical & Floating-Point Precision',
             description:
                 'Precision rounding standards (0.01), IEEE 754 negative zero prevention, and compact ledger boundaries.',
-            zhTitle: '数值精度与截断安全',
-            zhDescription: '浮点数两位小数精度对齐、IEEE 754 负零消除与紧凑账本单行物理预算。',
         }),
         TEST_MODERN: Object.freeze({
             code: 'TEST_MODERN',
             title: 'Test Modernity & Invariant Verification',
             description:
                 'Elimination of tautological assertions, fragile floating-point equality, and mock-only integrity illusions.',
-            zhTitle: '测试现代性与断言真伪',
-            zhDescription: '杜绝同义反复虚假断言、浮点裸字面量脆弱等值与仅验证桩对象的假象测试。',
         }),
         GOV_NORM: Object.freeze({
             code: 'GOV_NORM',
             title: 'Engineering Norms & Terminology Sanitization',
             description:
                 'Physical naming conventions, zero empty files, and objective technical prose sanitization.',
-            zhTitle: '工程规范与技术用语客观化',
-            zhDescription: '物理命名对齐、全工作区零空文件守卫与去口号化求真务实技术用语。',
         }),
         SEC_GUARD: Object.freeze({
             code: 'SEC_GUARD',
             title: 'Security & Secret Guard',
             description:
                 'High-entropy secret detection, token leaks, and defensive security boundaries.',
-            zhTitle: '安全防护与凭证防泄漏',
-            zhDescription: '高熵敏感密钥防泄漏、协议路径防护与安全鉴权拦截。',
         }),
     });
 
@@ -113,7 +103,6 @@ export interface ActionVerbSpec {
     readonly verb: StandardActionVerb;
     readonly taxonomy: DefectTaxonomyCategory;
     readonly description: string;
-    readonly zhDescription: string;
     readonly safeToAutomateDefault: boolean;
     readonly typicalFixTemplate: string;
 }
@@ -126,7 +115,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'CTRL_FLOW',
             description:
                 'Extract multi-branch or regex conditions into an independent, stateless pure function to reduce CC.',
-            zhDescription: '将复合判定或正则提取为无状态纯函数以降低圈复杂度。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'function isPredicateName(arg: Type): boolean { return ...; }',
         }),
@@ -135,7 +123,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'CTRL_FLOW',
             description:
                 'Invert branching condition to return early, flattening nested indentation.',
-            zhDescription: '逆向断言提前返回以平铺深层控制流嵌套。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'if (!condition) return defaultValue;',
         }),
@@ -144,7 +131,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'NUM_PREC',
             description:
                 'Normalize calculation rounding to 0.01 precision and normalize IEEE 754 negative zero.',
-            zhDescription: '规范四舍五入缩放系数至两位小数 (0.01) 并消除 -0 符号差异。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'Math.round(val * 100) / 100 + 0',
         }),
@@ -153,7 +139,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'TEST_MODERN',
             description:
                 'Replace brittle floating-point direct equality with tolerance matchers (e.g. toBeCloseTo or isScoreEqual).',
-            zhDescription: '将脆弱的浮点绝对等值断言替换为容差比较函数或 toBeCloseTo。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'expect(actual).toBeCloseTo(expected, 2)',
         }),
@@ -162,7 +147,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'GOV_NORM',
             description:
                 'Replace informal, hyperbolic, or speculative terminology with objective factual statements.',
-            zhDescription: '将临时性、夸大性或主观评价词汇替换为客观中立的技术事实陈述。',
             safeToAutomateDefault: false,
             typicalFixTemplate: 'State verifiable technical scope and bounds.',
         }),
@@ -171,7 +155,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'ARCH_LAYER',
             description:
                 'Eliminate single-line vacuous trampoline files or satisfy facade ELOC/contract budget.',
-            zhDescription: '消除单行空包转发跳板或为门面注入实质契约校验与不可变性冻结。',
             safeToAutomateDefault: false,
             typicalFixTemplate: 'Inline export target and delete trampoline module.',
         }),
@@ -180,7 +163,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'GOV_NORM',
             description:
                 'Extract naked literal number or string into a single-source-of-truth constant.',
-            zhDescription: '将裸字面量提取为模块或领域级单一真源常量。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'const CONSTANT_NAME = value;',
         }),
@@ -189,7 +171,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'CTRL_FLOW',
             description:
                 'Hoist invariants, regex compilations, or object allocations outside of hot loops.',
-            zhDescription: '将循环内不变分配、正则构建或配置解析提升至循环外。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'const invariant = init(); while (...) { use(invariant); }',
         }),
@@ -198,7 +179,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'ARCH_LAYER',
             description:
                 'Restrict excessive symbol or module visibility to private/internal boundaries.',
-            zhDescription: '收敛过度导出的符号或模块至私有/局部作用域。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'Remove export modifier or relocate to internal file.',
         }),
@@ -207,7 +187,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'CTRL_FLOW',
             description:
                 'Decompose a monolithic function into focused, single-responsibility sub-procedures.',
-            zhDescription: '将超长函数拆解为职责单一的独立子过程。',
             safeToAutomateDefault: false,
             typicalFixTemplate: 'Extract sub-steps into helper procedures.',
         }),
@@ -215,7 +194,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             verb: 'simplify_control_flow',
             taxonomy: 'CTRL_FLOW',
             description: 'Simplify convoluted boolean expressions or nested ternary operators.',
-            zhDescription: '简化冗长布尔逻辑或多重嵌套三元表达式。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'Simplify boolean flags via lookup tables or early exits.',
         }),
@@ -223,7 +201,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             verb: 'replace_token',
             taxonomy: 'GOV_NORM',
             description: 'Replace obsolete or deprecated language keywords and syntax tokens.',
-            zhDescription: '替换过时或废弃的语法关键字与绑定模式。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'Replace var with const/let.',
         }),
@@ -232,7 +209,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'GOV_NORM',
             description:
                 'Provide structured JSDoc contract declarations (@param, @returns, @throws).',
-            zhDescription: '补齐结构化 JSDoc 契约声明与参数文档。',
             safeToAutomateDefault: true,
             typicalFixTemplate: '/** @param x - Description\n * @returns Result */',
         }),
@@ -241,7 +217,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'CTRL_FLOW',
             description:
                 'Add depth or visited-set guard to recursive traversals to prevent stack overflow.',
-            zhDescription: '为递归遍历追加深度上限或已访问集合以杜绝调用栈溢出。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'if (depth > MAX_DEPTH || visited.has(node)) return;',
         }),
@@ -250,7 +225,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'SEC_GUARD',
             description:
                 'Use timing-safe equality comparison for cryptographic tokens and signatures.',
-            zhDescription: '使用恒定时间比对函数比对安全敏感口令或签名以防时序侧信道攻击。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'crypto.timingSafeEqual(bufA, bufB)',
         }),
@@ -258,7 +232,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             verb: 'scaffold_constant_library',
             taxonomy: 'GOV_NORM',
             description: 'Organize scattered domain literals into a cohesive constant registry.',
-            zhDescription: '将离散常量归拢为结构化常量字典或拓扑库。',
             safeToAutomateDefault: false,
             typicalFixTemplate: 'Export clustered constants under a domain namespace.',
         }),
@@ -266,7 +239,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             verb: 'scaffold_gate_system',
             taxonomy: 'GOV_NORM',
             description: 'Establish standard pre-commit or pre-push verification gates.',
-            zhDescription: '落地标准化提交前或推送前双层质量守卫流水线。',
             safeToAutomateDefault: false,
             typicalFixTemplate: 'Wire script into hooks and manifest.',
         }),
@@ -275,7 +247,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'GOV_NORM',
             description:
                 'Request clarification when specifications, naming intent, or structural requirements are ambiguous.',
-            zhDescription: '在规格要求、命名意图或结构定义模糊时发起澄清请求。',
             safeToAutomateDefault: false,
             typicalFixTemplate: 'Request clarification from team or domain specification.',
         }),
@@ -284,7 +255,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'GOV_NORM',
             description:
                 'Rename symbol to adhere to canonical naming conventions and communicate clear semantic intent.',
-            zhDescription: '重命名符号以符合规范命名标准并表达明确语义意图。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'Rename identifier across declarations and references.',
         }),
@@ -293,7 +263,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'CTRL_FLOW',
             description:
                 'Group multiple related function parameters into a cohesive parameter object or options interface.',
-            zhDescription: '将过多的关联函数参数归拢封装为参数对象或选项接口。',
             safeToAutomateDefault: false,
             typicalFixTemplate:
                 'interface Options { ... }\nfunction target(options: Options): void;',
@@ -303,7 +272,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'ARCH_LAYER',
             description:
                 'Decompose an oversized or multi-responsibility module into cohesive single-responsibility submodules.',
-            zhDescription: '将过大或多职责模块拆解为内聚的单一职责子模块。',
             safeToAutomateDefault: false,
             typicalFixTemplate: 'Extract cohesive procedures and types into dedicated submodules.',
         }),
@@ -312,7 +280,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'CTRL_FLOW',
             description:
                 'Inline a single-use orphan function into its sole call site to eliminate parameter mud and enhance locality.',
-            zhDescription: '将单次调用孤儿微函数就地内联至调用点以消除参数泥团并增强局部内聚。',
             safeToAutomateDefault: true,
             typicalFixTemplate: '// Inline orphan function body into call site',
         }),
@@ -321,7 +288,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'ARCH_LAYER',
             description:
                 'Melt a single-target forwarding wrapper or trampoline so callers directly access the underlying target.',
-            zhDescription: '消融单目标透明转发跳板使调用方直接引用目标底层实现。',
             safeToAutomateDefault: true,
             typicalFixTemplate:
                 '// Redirect call directly to destination symbol and eliminate trampoline',
@@ -331,7 +297,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'GOV_NORM',
             description:
                 'Merge vertically fragmented line breaks or over-split chain calls into concise statements.',
-            zhDescription: '紧凑化过度垂直分散的代码换行或碎片化链式调用为紧凑语句。',
             safeToAutomateDefault: true,
             typicalFixTemplate: '// Consolidate fragmented expressions onto cohesive lines',
         }),
@@ -340,7 +305,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'CTRL_FLOW',
             description:
                 'Break down horizontally congested expressions (tau > 20 tokens/line) with intermediate local constants.',
-            zhDescription: '通过提取局部只读中间常量分解单行严重拥挤的复合表达式。',
             safeToAutomateDefault: true,
             typicalFixTemplate: 'const intermediate = ...;\nreturn use(intermediate);',
         }),
@@ -349,7 +313,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'ARCH_LAYER',
             description:
                 'Enrich an empty facade with parameter contract verification, domain aggregation, or immutability freezing.',
-            zhDescription: '为接线比率超标的门面注入参数契约校验、不可变冻结保障或领域聚合逻辑。',
             safeToAutomateDefault: false,
             typicalFixTemplate: 'export const Facade = Object.freeze({ ... });',
         }),
@@ -358,7 +321,6 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             taxonomy: 'CTRL_FLOW',
             description:
                 'Eliminate zero-entropy state transitions or trivial loops with direct access or pure filters.',
-            zhDescription: '移除代数条件熵增趋零的形式主义循环，替换为直接查找或高阶纯函数。',
             safeToAutomateDefault: true,
             typicalFixTemplate: '// Replace loop with direct lookup or pure filter',
         }),
@@ -372,12 +334,29 @@ interface TaxonomyPrefixMapping {
     readonly category: DefectTaxonomyCategory;
 }
 
+/**
+ * Prefix-to-taxonomy mappings, most specific first.
+ *
+ * Prefixes are matched against the whole rule id, so a family entry such as `SIM-` would claim
+ * every rule in that family. That is why control-flow coverage names the two topics that are
+ * genuinely about branching and nesting (`SIM-CMP`, `SIM-FLAT`) rather than the whole `SIM`
+ * family, which also holds dead-code, inheritance and wrapper rules that no control-flow taxonomy
+ * describes. A rule whose family has no dedicated taxonomy falls through to GOV_NORM, and the
+ * caller can distinguish that from an explicit norm rule by the family prefix.
+ *
+ * `ADV-BND` and `ADV-DEC` are architecture boundaries; the remaining `ADV-*` topics (typing,
+ * naming, configuration, runtime contract) are engineering norms. Naming the boundary topics
+ * explicitly keeps them out of GOV_NORM without giving the whole `ADV-` family the wrong label.
+ */
 const TAXONOMY_PREFIX_MAPPINGS: readonly TaxonomyPrefixMapping[] = Object.freeze([
-    { prefixes: ['ADV-CMP', 'ADV-NST', 'SIM-'], category: 'CTRL_FLOW' },
+    { prefixes: ['ADV-CMP', 'ADV-NST', 'SIM-CMP', 'SIM-FLAT'], category: 'CTRL_FLOW' },
     { prefixes: ['NUM-', 'PREC-'], category: 'NUM_PREC' },
     { prefixes: ['TST-', 'TEST-'], category: 'TEST_MODERN' },
-    { prefixes: ['SEC-', 'SECRET-'], category: 'SEC_GUARD' },
-    { prefixes: ['ARCH-', 'LAYER-', 'DEP-', 'FAC-'], category: 'ARCH_LAYER' },
+    { prefixes: ['SEC-', 'SECRET-', 'ADV-RNG'], category: 'SEC_GUARD' },
+    {
+        prefixes: ['ARCH-', 'LAYER-', 'LAY-', 'DEP-', 'FAC-', 'ADV-BND', 'ADV-DEC'],
+        category: 'ARCH_LAYER',
+    },
 ]);
 
 function matchesTaxonomyPrefix(upper: string, prefixes: readonly string[]): boolean {

@@ -53,6 +53,17 @@ const BENCHMARK_PREFIX = 'Benchmark';
 const FUZZ_PREFIX = 'Fuzz';
 const EXAMPLE_PREFIX = 'Example';
 
+/**
+ * Builds a structured token-replacement remediation payload for polyglot naming findings.
+ *
+ * @param name - Observed identifier triggering the naming rule.
+ * @param rule - Canonical naming rule identifier.
+ * @param line - 1-based source line number of the identifier.
+ * @param column - 1-based starting column of the identifier.
+ * @param suggestedName - Optional explicit replacement identifier candidate.
+ * @param safeToAutomate - Whether automated renaming can apply without semantic review.
+ * @returns Structured actionable remediation payload with optional text patch.
+ */
 export function buildPolyglotActionable(
     name: string,
     rule: string,
@@ -231,6 +242,12 @@ function auditFunctionLengthBounds(
     return false;
 }
 
+/**
+ * Audits an extracted polyglot function declaration for jargon, length bounds, and verb semantics.
+ *
+ * @param target - Extracted function name, source line index, and casing convention.
+ * @param pCtx - Shared polyglot naming context and issue sink.
+ */
 export function auditExtractedFunction(
     target: ExtractedFunctionTarget,
     pCtx: PolyglotNamingContext,
@@ -408,6 +425,16 @@ function auditVariableVaguenessAndJargon(
     }
 }
 
+/**
+ * Audits a local or module variable in Rust, Go, or GDScript against length and semantic rules.
+ *
+ * @param varName - Extracted variable identifier.
+ * @param lineIdx - 0-based source line index.
+ * @param inTest - Whether the declaration resides inside a test scope.
+ * @param inLoop - Whether the declaration is a loop induction binding.
+ * @param pCtx - Shared polyglot naming context and issue sink.
+ * @param lang - Source language identifier for diagnostic attribution.
+ */
 export function auditPolyglotVariable(
     varName: string,
     lineIdx: number,

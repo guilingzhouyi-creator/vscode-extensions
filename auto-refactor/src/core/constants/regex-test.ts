@@ -2,10 +2,11 @@
  * Module: Core Constants — Test & Modernity Regular Expression Catalog
  * File Path: src/core/constants/regex-test.ts
  * Architecture Role: Single source of truth (SSOT) for polyglot test framework declaration,
- *     tautological assertion, brittle counter, mock stub, and floating-point comparison regular expressions.
- * Dependencies & Triggers: Zero external dependencies; consumed by test modernity analyzers and quality gates.
+ *     tautological assertion, brittle counter, mock stub, and float comparison patterns.
+ * Dependencies & Triggers: Zero external dependencies; consumed by test modernity analyzers.
  * Responsibilities:
- *     1. Centralize canonical test framework declaration and assertion patterns across TS, Python, and GDScript.
+ *     1. Centralize canonical test declaration and assertion patterns across TS, Python, and
+ *        GDScript.
  *     2. Enforce the state-separation discipline: stateless immutable constants vs fresh factories.
  *     3. Expose frozen REGEX_TEST domain namespace.
  * Exit Semantics & Design Rationale: Pure, frozen regex constants; strictly immune to ReDoS

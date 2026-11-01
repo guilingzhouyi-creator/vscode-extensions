@@ -3,7 +3,8 @@
  * File Path: src/core/constants/regex-go.ts
  * Architecture Role: Single source of truth (SSOT) for Go syntax, receiver naming,
  *     error handling, and modernization regular expressions.
- * Dependencies & Triggers: Zero external dependencies; consumed by go-modern and complexity analyzers.
+ * Dependencies & Triggers: Zero external dependencies; consumed by go-modern and complexity
+ *     analyzers.
  * Responsibilities:
  *     1. Centralize canonical Go patterns (unchecked errors, context params, function signatures).
  *     2. Enforce the state-separation discipline: stateless immutable constants vs fresh factories.

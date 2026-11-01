@@ -103,6 +103,9 @@ function isIndustrialQualified(version: string, isPrivate: boolean | undefined):
     return (
         version.startsWith(VERSION_PREFIX_V1) ||
         version.startsWith(VERSION_PREFIX_V2) ||
+        (!version.startsWith(VERSION_PREFIX_PROTO) &&
+            version !== VERSION_ZERO &&
+            version.length > 0) ||
         isPrivate === false
     );
 }

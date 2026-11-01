@@ -45,7 +45,6 @@ export interface SourceMaskConfig {
     rawStrings?: boolean;
 }
 
-import { nativeCore } from '../native/native-bridge';
 import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
 
 /** Bitmask flag indicating a line is completely blank (whitespace only). */
@@ -258,7 +257,6 @@ const CHAR_EXCLAMATION = 33;
 const TRIGGER_DIRECT = 1;
 const TRIGGER_RAW_PREFIX = 2;
 const TRIGGER_LT_PREFIX = 3;
-const NATIVE_DISPATCH_MIN_LEN = 50000;
 const HTML_COMMENT_OPEN = '<!--';
 const HTML_COMMENT_CLOSE = '-->';
 const DOUBLE_QUOTE_STR = '"';
@@ -274,15 +272,15 @@ const REGEX_PREFIX_TABLE = (() => {
 })();
 
 /**
- * Pure JavaScript implementation of source masking.
+ * Split content into raw lines and a masked copy, keeping every index in place.
  *
- * Preserved as deterministic fallback when native operators are unavailable.
+ * Uses the deterministic pure JavaScript lexical state machine directly.
  *
  * @param content - Full file content as read from disk.
  * @param config - Comment and quote syntax of the language being scanned.
  * @returns Both views; `raw` feeds evidence text, `masked` feeds the rule patterns.
  */
-export function maskSourceTextJs(content: string, config: SourceMaskConfig): MaskedSource {
+export function maskSourceText(content: string, config: SourceMaskConfig): MaskedSource {
     const raw = content.split('\n');
     const len = raw.length;
     const masked: string[] = [];
@@ -310,34 +308,6 @@ export function maskSourceTextJs(content: string, config: SourceMaskConfig): Mas
         masked[i] = maskLine(line, state, config);
     }
     return { raw, masked };
-}
-
-/**
- * Split content into raw lines and a masked copy, keeping every index in place.
- *
- * Automatically dispatches to high-performance native SIMD operator when available,
- * falling back seamlessly to deterministic pure JS execution.
- *
- * @param content - Full file content as read from disk.
- * @param config - Comment and quote syntax of the language being scanned.
- * @returns Both views; `raw` feeds evidence text, `masked` feeds the rule patterns.
- */
-export function maskSourceText(content: string, config: SourceMaskConfig): MaskedSource {
-    if (content.length > NATIVE_DISPATCH_MIN_LEN) {
-        try {
-            return nativeCore.maskSourceCode(content, {
-                lineComment: config.lineComment,
-                blockCommentOpen: config.blockComment?.open,
-                blockCommentClose: config.blockComment?.close,
-                quoteChars: config.quoteChars,
-                multilineTemplates: config.multilineTemplates,
-                regexLiterals: config.regexLiterals,
-            });
-        } catch (_err) {
-            return maskSourceTextJs(content, config);
-        }
-    }
-    return maskSourceTextJs(content, config);
 }
 
 /**
@@ -477,7 +447,7 @@ function scanSingleLineFlags(
 }
 
 /**
- * Compute single-pass line feature flags and leading indentation widths from `raw` and `masked` lines.
+ * Compute single-pass line feature flags and leading indentation widths from `raw` and `masked`.
  *
  * @param raw - Raw source lines without trailing carriage returns.
  * @param masked - Comment/literal-masked lines of matching length.

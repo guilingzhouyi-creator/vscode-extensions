@@ -216,11 +216,13 @@ function buildAliasMap(): Record<string, string> {
     return Object.freeze(map);
 }
 
+/** Frozen lookup mapping interactive PowerShell aliases to canonical cmdlet names. */
 export const POWERSHELL_ALIASES: Record<string, string> = buildAliasMap();
 
 const PS_VERB_TOKENS =
     'Add Approve Assert Backup Block Build Checkpoint Clear Close Compare Complete Compress Confirm Connect Convert ConvertFrom ConvertTo Copy Debug Deny Disable Disconnect Dismount Edit Enable Enter Exit Expand Export Find Format Get Grant Group Hide Import Initialize Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop Protect Publish Push Put Read Receive Redo Register Remove Rename Repair Request Reset Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Split Start Step Stop Submit Suspend Switch Sync Test Trace Undo Uninstall Unlock Unprotect Unpublish Unregister Update Use Wait Watch Write';
 
+/** Canonical Microsoft-approved PowerShell verb set in PascalCase. */
 export const PS_APPROVED_VERBS = new Set(PS_VERB_TOKENS.split(' '));
 
 /**
@@ -238,6 +240,7 @@ export const PS_APPROVED_VERBS_FOLDED = new Set(
 
 /* ---- Emitter and State Types ---- */
 
+/** Callback contract for emitting a line-level shell or PowerShell diagnostic issue. */
 export type ShellEmitter = (
     lineIdx: number,
     rule: string,
@@ -247,6 +250,7 @@ export type ShellEmitter = (
     detail: Record<string, unknown>,
 ) => void;
 
+/** Mutable line-by-line tracking state for PowerShell function and parameter block parsing. */
 export interface PowerShellScanState {
     inFunction: boolean;
     functionName: string;
@@ -257,6 +261,7 @@ export interface PowerShellScanState {
     hasUntypedParam: boolean;
 }
 
+/** Pre-tokenized raw and string-masked representations of a single shell script line. */
 export interface ShellLineScanContext {
     raw: string;
     trimmed: string;

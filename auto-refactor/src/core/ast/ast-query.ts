@@ -105,7 +105,8 @@ export function selectDescendants(
 }
 
 /**
- * Finds the first node in pre-order traversal that satisfies the predicate, short-circuiting immediately.
+ * Finds the first node in pre-order traversal satisfying the predicate, short-circuiting
+ * immediately upon match.
  *
  * @param root - Subtree root node.
  * @param predicate - Match condition.
@@ -153,7 +154,7 @@ export function collectCalls(root: NormalizedNode, calleeName?: string): Normali
 }
 
 /**
- * Computes the maximum syntactic nesting depth of the given subtree without allocating intermediate arrays.
+ * Computes maximum syntactic nesting depth of the subtree without allocating intermediate arrays.
  *
  * @param root - Subtree root node.
  * @returns Maximum depth reached by any leaf in the subtree (0 for single root).

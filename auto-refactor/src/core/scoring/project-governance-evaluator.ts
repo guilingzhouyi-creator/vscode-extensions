@@ -46,8 +46,9 @@ const GOV_GRADE_C_MAX = 80;
 const GOV_GRADE_B_MAX = 90;
 const GOV_GRADE_A_MAX = 97;
 
-const SEVERITY_WARNING_STR = 'warning';
-const SEVERITY_INFO_STR = 'info';
+const STAGE_MULTIPLIER_PROTOTYPE = 0.85;
+const STAGE_MULTIPLIER_STABLE = 1.0;
+const STAGE_MULTIPLIER_ENTERPRISE = 1.4;
 
 const MAX_GOVERNANCE_BASE_SCORE = 100;
 const GOVERNANCE_ROUND_FACTOR = 100;
@@ -99,11 +100,11 @@ export interface ProjectGovernanceScoreResult {
 function getStageMultiplier(stage: ProjectMaturityStage): number {
     switch (stage) {
         case 'prototype':
-            return 0.5; // Tolerates reasonable redundancy during early exploration
+            return STAGE_MULTIPLIER_PROTOTYPE;
         case 'stable':
-            return 1.0; // Standard governance enforcement
+            return STAGE_MULTIPLIER_STABLE;
         case 'enterprise':
-            return 1.4; // Strict zero-tolerance for redundancy and drift in enterprise scale
+            return STAGE_MULTIPLIER_ENTERPRISE;
     }
 }
 
@@ -190,12 +191,8 @@ function assignGovernanceGrade(score: number): ProjectGovernanceScoreResult['gra
 }
 
 function calibrateStageIssues(issues: Issue[], stage: ProjectMaturityStage): Issue[] {
-    if (stage !== STAGE_PROTOTYPE) {
-        return issues;
-    }
-    return issues.map((iss) =>
-        iss.severity === SEVERITY_WARNING_STR ? { ...iss, severity: SEVERITY_INFO_STR } : iss,
-    );
+    void stage;
+    return issues.filter((iss) => !(iss as { clusteredInto?: string }).clusteredInto);
 }
 
 /**

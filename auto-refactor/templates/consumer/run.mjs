@@ -63,6 +63,16 @@ function parseArgs(argv) {
             (opts[bare.slice(2)] ??= []).push(value);
             continue;
         }
+        if (bare === '--update-baseline') {
+            if (eq >= 0) {
+                opts['update-baseline'] = arg.slice(eq + 1) || true;
+            } else if (argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')) {
+                opts['update-baseline'] = argv[++i];
+            } else {
+                opts['update-baseline'] = true;
+            }
+            continue;
+        }
         if (flagWithValue.has(bare)) {
             const value = eq >= 0 ? arg.slice(eq + 1) : argv[++i];
             if (value === undefined) throw new Error(`missing value for ${bare}`);

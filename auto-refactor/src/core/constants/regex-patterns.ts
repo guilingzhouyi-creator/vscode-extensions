@@ -7,7 +7,8 @@
  * Responsibilities:
  *     1. Centralize canonical regular expression patterns partitioned into semantic domains.
  *     2. Enforce the state-separation discipline: stateless immutable constants vs fresh factories.
- *     3. Expose frozen domain namespaces (NAMING, SYNTAX, COMMENT, LITERAL, SHELL, SECURITY, PYTHON, GDSCRIPT).
+ *     3. Expose frozen domain namespaces (NAMING, SYNTAX, COMMENT, LITERAL, SHELL, SECURITY,
+ *        PYTHON, GDSCRIPT).
  *     4. Provide backward-compatible named exports with zero mutable lastIndex state leakage.
  * Exit Semantics & Design Rationale: Pure, frozen regex constants and deterministic factories;
  *     zero side effects and strictly immune to ReDoS back-tracking traps.
@@ -155,6 +156,7 @@ export function createNonAlphanumericScanner(): RegExp {
     return /[^A-Za-z0-9]+/g;
 }
 
+/** Frozen domain namespace aggregating identifier casing, jargon, and tokenization patterns. */
 export const REGEX_NAMING = Object.freeze({
     CAMEL_CASE: CAMEL_CASE_PATTERN,
     PASCAL_CASE: PASCAL_CASE_PATTERN,
@@ -573,7 +575,7 @@ export const TS_REQUIRE_CALL_PATTERN = /\brequire\s*\(/;
 /** Matches ESM import/export syntax header. */
 export const TS_ESM_SYNTAX_PATTERN = /^\s*(?:import|export)\b/m;
 
-/** Matches primitive wrapper constructor instantiations (new Array/Object/String/Number/Boolean). */
+/** Matches primitive wrapper constructor calls (new Array/Object/String/Number/Boolean). */
 export const TS_WRAPPER_CTOR_PATTERN = /\bnew\s+(?:Array|Object|String|Number|Boolean)\s*\(/;
 
 /** Matches usage of the legacy arguments object. */
@@ -894,6 +896,7 @@ export const EXPORT_LET_PATTERN = /^\s*export\s+let\s+[A-Za-z0-9_$]+/;
 /** Matches direct environment variable or synchronous file reading configuration access. */
 export const CONFIG_ENV_OR_FS_ACCESS_PATTERN = /process\.env|fs\.readFileSync/;
 
+/** Frozen domain namespace aggregating polyglot declaration, import, and syntax patterns. */
 export const REGEX_SYNTAX = Object.freeze({
     TS_IMPORT_DECL: TS_IMPORT_DECL_PATTERN,
     TS_EXPORT_DECL: TS_EXPORT_DECL_PATTERN,
@@ -1218,6 +1221,7 @@ export const FRONTEND_SCRIPT_EXT_PATTERN = /\.(?:tsx|jsx|ts|js|vue|svelte)$/i;
 export const SCRIPT_OR_GATE_PATH_PATTERN =
     /(?:^|[\\/])(?:scripts|bin|tools|\.githooks|\.husky|\.github)[\\/]/i;
 
+/** Frozen domain namespace aggregating literal, path, URL, and whitespace patterns. */
 export const REGEX_LITERAL = Object.freeze({
     SINGLE_QUOTED: SINGLE_QUOTED_STRING_PATTERN,
     DOUBLE_QUOTED: DOUBLE_QUOTED_STRING_PATTERN,

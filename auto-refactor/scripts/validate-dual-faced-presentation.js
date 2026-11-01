@@ -28,6 +28,10 @@ const {
   ACTION_VERB_SPECS,
   isStandardActionVerb,
 } = require('../dist/api');
+const {
+  ZH_CN_TAXONOMY,
+  ZH_CN_ACTION_VERBS,
+} = require('../dist/core/praxis/presentation/dictionaries/zh-cn');
 
 function createSampleScanReport() {
   const issues = [
@@ -172,7 +176,20 @@ function testStandardTerminologySSOT() {
     assert(spec, `Defect taxonomy spec missing for ${cat}`);
     assert.strictEqual(spec.code, cat);
     assert(spec.title.length > 0, `Taxonomy title empty for ${cat}`);
-    assert(spec.zhTitle.length > 0, `Taxonomy zhTitle empty for ${cat}`);
+    assert(spec.description.length > 0, `Taxonomy description empty for ${cat}`);
+    // The localized prose lives in the presentation dictionary, not in the engine SSOT: the engine
+    // must stay free of human-facing translations so the i18n cleanliness guard can hold it there.
+    const localized = ZH_CN_TAXONOMY[cat];
+    assert(localized, `Taxonomy zh-CN entry missing for ${cat}`);
+    assert(localized.title.length > 0, `Taxonomy zhTitle empty for ${cat}`);
+    assert(localized.description.length > 0, `Taxonomy zhDescription empty for ${cat}`);
+  }
+
+  for (const verb of Object.keys(ACTION_VERB_SPECS)) {
+    assert(
+      typeof ZH_CN_ACTION_VERBS[verb] === 'string' && ZH_CN_ACTION_VERBS[verb].length > 0,
+      `Action verb zh-CN description missing for ${verb}`,
+    );
   }
 
   assert.strictEqual(resolveRuleTaxonomy('NUM-PREC-001'), 'NUM_PREC');
@@ -181,6 +198,19 @@ function testStandardTerminologySSOT() {
   assert.strictEqual(resolveRuleTaxonomy('ADV-NST-001'), 'CTRL_FLOW');
   assert.strictEqual(resolveRuleTaxonomy('ARCH-FAC-001'), 'ARCH_LAYER');
   assert.strictEqual(resolveRuleTaxonomy('SEC-CST-001'), 'SEC_GUARD');
+
+  // Control-flow coverage names the branching topics, not the whole SIM family: dead-code,
+  // inheritance and wrapper rules share that family but no control-flow taxonomy describes them.
+  assert.strictEqual(resolveRuleTaxonomy('SIM-CMP-001'), 'CTRL_FLOW');
+  assert.strictEqual(resolveRuleTaxonomy('SIM-FLAT-002'), 'CTRL_FLOW');
+  assert.strictEqual(resolveRuleTaxonomy('SIM-DED-001'), 'GOV_NORM');
+  assert.strictEqual(resolveRuleTaxonomy('SIM-INH-001'), 'GOV_NORM');
+  // Boundary and unseeded-random topics are claimed by their real taxonomy rather than falling
+  // through to the norm bucket alongside every other ADV rule.
+  assert.strictEqual(resolveRuleTaxonomy('ADV-BND-001'), 'ARCH_LAYER');
+  assert.strictEqual(resolveRuleTaxonomy('ADV-DEC-001'), 'ARCH_LAYER');
+  assert.strictEqual(resolveRuleTaxonomy('ADV-RNG-001'), 'SEC_GUARD');
+  assert.strictEqual(resolveRuleTaxonomy('ADV-TYP-001'), 'GOV_NORM');
 
   const actionKeys = Object.keys(ACTION_VERB_SPECS);
   assert(actionKeys.length >= 16, `Expected at least 16 action verbs, got ${actionKeys.length}`);

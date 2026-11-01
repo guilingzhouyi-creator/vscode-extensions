@@ -107,6 +107,39 @@ export const AUTO_TUNE_SECRET_ENTROPY_THRESHOLD = 4.2;
 
 const EMPTY_ANALYZER_OPTIONS: Record<string, unknown> = Object.freeze({});
 
+const LANG_TYPESCRIPT = 'typescript';
+const LANG_JAVASCRIPT = 'javascript';
+const LANG_RUST = 'rust';
+const LANG_PYTHON = 'python';
+const LANG_GDSCRIPT = 'gdscript';
+const LANG_GO = 'go';
+const LANG_SHELL = 'shell';
+const LANG_POWERSHELL = 'powershell';
+
+const AUTO_TUNE_CORE_ANALYZERS: readonly string[] = Object.freeze([
+    ANALYZER_GOVERNANCE,
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_PERFORMANCE,
+    ANALYZER_COMMENTS,
+    ANALYZER_HYGIENE,
+    ANALYZER_SECURITY,
+    ANALYZER_SIMPLIFY,
+    ANALYZER_CONCURRENCY,
+    ANALYZER_PRODUCTION_HYGIENE,
+    ANALYZER_DEPENDENCY_LAYOUT,
+]);
+
+const AUTO_TUNE_LANGUAGE_ANALYZERS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+    [LANG_TYPESCRIPT]: Object.freeze([ANALYZER_TYPESCRIPT_MODERN]),
+    [LANG_JAVASCRIPT]: Object.freeze([ANALYZER_TYPESCRIPT_MODERN]),
+    [LANG_RUST]: Object.freeze([ANALYZER_RUST_MODERN]),
+    [LANG_PYTHON]: Object.freeze([ANALYZER_PYTHON_MODERN]),
+    [LANG_GDSCRIPT]: Object.freeze([ANALYZER_GDSCRIPT_MODERN, ANALYZER_GDSCRIPT_GAME]),
+    [LANG_GO]: Object.freeze([ANALYZER_GO_MODERN]),
+    [LANG_SHELL]: Object.freeze([ANALYZER_SHELL_LINT, ANALYZER_SHELL_SAFETY]),
+    [LANG_POWERSHELL]: Object.freeze([ANALYZER_SHELL_LINT, ANALYZER_SHELL_SAFETY]),
+});
+
 /** Effective scale grade resolved by the tuning stage. */
 type ScaleGrade = NonNullable<ScanConfig['scaleGrade']>;
 
@@ -276,6 +309,47 @@ function resolveMaturityTier(
 }
 
 /**
+ * Auto-enable universal governance analyzers and language-matched packs when `autoTuneScale` is
+ * active and neither the config file nor CLI pinned an explicit analyzer map.
+ *
+ * @param profile - Detected polyglot project profile.
+ * @param analyzers - Mutable analyzer declaration map to update in place.
+ */
+function autoActivateProfileAnalyzers(
+    profile: ReturnType<typeof detectProjectProfile>,
+    analyzers: Record<string, AnalyzerDeclaration>,
+): void {
+    for (const analyzerId of AUTO_TUNE_CORE_ANALYZERS) {
+        if (analyzers[analyzerId]) {
+            analyzers[analyzerId].enabled = true;
+        }
+    }
+    const languages = profile?.languages || {};
+    for (const [languageKey, sampleCount] of Object.entries(languages)) {
+        if (sampleCount <= 0) continue;
+        const matchedPacks = AUTO_TUNE_LANGUAGE_ANALYZERS[languageKey];
+        if (!matchedPacks) continue;
+        for (const packId of matchedPacks) {
+            if (analyzers[packId]) {
+                analyzers[packId].enabled = true;
+            }
+        }
+    }
+}
+
+function hasExplicitThresholdOverrides(
+    fileCfg: Partial<ScanConfig>,
+    overrides: ConfigOverrides,
+): boolean {
+    return Boolean(
+        fileCfg.thresholds ||
+        overrides.thresholds ||
+        overrides.effectiveLoc !== undefined ||
+        overrides.fileLinesWarn !== undefined,
+    );
+}
+
+/**
  * Auto-tune scale grades, maturity tiers, and corresponding thresholds/analyzer options.
  *
  * @param root - Project root directory.
@@ -294,16 +368,14 @@ export function applyAutoTuning(
 ): AutoTuningResult {
     const profile = fileCfg.profile || overrides.profile || detectProjectProfile(root);
     const autoTuneScale = overrides.autoTuneScale ?? fileCfg.autoTuneScale ?? false;
-    const hasExplicitThresholds = Boolean(
-        fileCfg.thresholds ||
-        overrides.thresholds ||
-        overrides.effectiveLoc !== undefined ||
-        overrides.fileLinesWarn !== undefined,
-    );
+    const hasExplicitThresholds = hasExplicitThresholdOverrides(fileCfg, overrides);
     let tunedThresholds = mergeThresholds(baseThresholds, fileCfg, overrides);
     let scaleGrade = fileCfg.scaleGrade || overrides.scaleGrade;
 
     if (autoTuneScale) {
+        if (!fileCfg.analyzers && !overrides.analyzers) {
+            autoActivateProfileAnalyzers(profile, analyzers);
+        }
         scaleGrade ||= scaleFromProfile(profile);
         tunedThresholds = applyScaleTuning(
             scaleGrade,

@@ -322,7 +322,10 @@ function isSecretLeakMatch(issue: Issue): boolean {
     if (issue.rule.startsWith(RULE_PREFIX_SEC) && issue.severity === SEVERITY_ERROR_STR) {
         return true;
     }
-    return SECRET_KEYWORD_PATTERN.test(issue.rule) || SECRET_KEYWORD_PATTERN.test(issue.message);
+    return (
+        issue.severity === SEVERITY_ERROR_STR &&
+        (SECRET_KEYWORD_PATTERN.test(issue.rule) || SECRET_KEYWORD_PATTERN.test(issue.message))
+    );
 }
 
 function isSyntaxOrParserMatch(issue: Issue): boolean {
@@ -330,9 +333,8 @@ function isSyntaxOrParserMatch(issue: Issue): boolean {
         return true;
     }
     return (
-        SYNTAX_KEYWORD_PATTERN.test(issue.rule) ||
-        SYNTAX_KEYWORD_PATTERN.test(issue.analyzer) ||
-        SYNTAX_KEYWORD_PATTERN.test(issue.message)
+        issue.severity === SEVERITY_ERROR_STR &&
+        (SYNTAX_KEYWORD_PATTERN.test(issue.rule) || SYNTAX_KEYWORD_PATTERN.test(issue.analyzer))
     );
 }
 

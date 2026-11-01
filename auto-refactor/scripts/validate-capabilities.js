@@ -137,8 +137,8 @@ async function main() {
     hardcodedStringMinLength: 3,
   };
   const demoThresholds = getMaturityTunedThresholds('demo', baseThresholds);
-  assert.strictEqual(demoThresholds.fileLinesWarn, 800);
-  assert.strictEqual(demoThresholds.complexityWarn, 20);
+  assert.strictEqual(demoThresholds.fileLinesWarn, 600);
+  assert.strictEqual(demoThresholds.complexityWarn, 15);
 
   const industrialThresholds = getMaturityTunedThresholds('industrial', baseThresholds);
   assert.strictEqual(industrialThresholds.fileLinesWarn, 350);
@@ -148,7 +148,7 @@ async function main() {
     requireHeader: true,
   });
   assert.strictEqual(demoCommentOpts.requireHeader, false);
-  assert.strictEqual(demoCommentOpts.level, 'off');
+  assert.strictEqual(demoCommentOpts.level, 'basic');
 
   const indCommentOpts = getMaturityTunedAnalyzerOptions('industrial', 'comments', {
     requireHeader: false,

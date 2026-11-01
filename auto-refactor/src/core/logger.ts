@@ -740,4 +740,58 @@ export class Logger {
             await this.ringBuffer.flushAsync();
         }
     }
+
+    /**
+     * Record a catastrophic analyzer crash to the failures archive.
+     */
+    recordCrash(payload: FailureSnapshotPayload, workspaceRoot?: string): string | null {
+        return recordAnalyzerCrash(payload, workspaceRoot);
+    }
+}
+
+/**
+ * Diagnostic options for persisting a fatal analyzer crash or scan failure record.
+ */
+export interface FailureSnapshotPayload {
+    readonly ruleId?: string;
+    readonly filePath?: string;
+    readonly message: string;
+    readonly stack?: string;
+    readonly errorName?: string;
+    readonly context?: Record<string, unknown>;
+}
+
+/**
+ * Persists an unhandled analyzer crash or catastrophic scan failure to structured NDJSON archive.
+ *
+ * @param payload - Diagnostic snapshot payload.
+ * @param workspaceRoot - Root of the current repository/workspace.
+ * @returns Path to the updated failure log or null on failure.
+ */
+export function recordAnalyzerCrash(
+    payload: FailureSnapshotPayload,
+    workspaceRoot?: string,
+): string | null {
+    try {
+        const root = workspaceRoot || process.cwd();
+        const failuresDir = path.join(root, '.audit-logs', 'failures');
+        if (!fs.existsSync(failuresDir)) {
+            fs.mkdirSync(failuresDir, { recursive: true });
+        }
+        const crashLogPath = path.join(failuresDir, 'auto-refactor-crashes.ndjson');
+        const entry = {
+            timestamp: new Date().toISOString(),
+            ruleId: payload.ruleId || 'ENGINE-CRASH',
+            filePath: payload.filePath ? sanitizePath(payload.filePath) : undefined,
+            errorName: payload.errorName || 'Error',
+            message: sanitizePath(payload.message),
+            stack: payload.stack ? sanitizePath(payload.stack) : undefined,
+            context: payload.context,
+        };
+        const line = safeSerializeJson(entry) + '\n';
+        LogIoBarrier.appendSync(crashLogPath, line);
+        return crashLogPath;
+    } catch {
+        return null;
+    }
 }

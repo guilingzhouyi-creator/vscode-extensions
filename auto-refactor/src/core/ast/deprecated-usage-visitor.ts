@@ -21,9 +21,9 @@ import { SEVERITY_WARNING } from '../types';
 import { loc } from '../../utils/ast';
 import { ANALYZER_GOVERNANCE } from '../scoring/dimensionLiterals';
 
-/** Canonical rule identifier for deprecated usage in production code. */
 import { isTestFilePath } from '../path';
 
+/** Canonical rule identifier for deprecated usage in production code. */
 export const MOD_DEP_RULE_ID = 'MOD-DEP-001';
 
 /**

@@ -285,7 +285,9 @@ export const ANALYZER_MODERN_GDSCRIPT_RULES: readonly RuleDefinition[] = [
         canonical: true,
         languages: [LANGUAGE_GDSCRIPT],
         defaultSeverity: SEVERITY_WARNING,
-        summary: 'Bare tool keyword detected.',
+        summary:
+            'The bare tool keyword is used instead of the @tool annotation, so the script does not ' +
+            'run inside the editor and its exported properties stay unavailable in the inspector.',
         remediation: 'Use the @tool annotation on the first line of the script.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gdm-tool-001',
     }),

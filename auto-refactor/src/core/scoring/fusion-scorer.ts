@@ -32,6 +32,8 @@ export interface GovernanceProjectProfile {
     domain?: 'algorithm_lib' | 'core_framework' | 'business_app' | 'cli_tool';
     /** Quality and risk posture */
     riskTolerance?: 'strict_zero_defect' | 'balanced' | 'speed_priority';
+    /** Learned tri-plane weights supplied by FeedbackAdaptiveSupervisor */
+    supervisorWeights?: FusionWeights;
 }
 
 /**
@@ -93,8 +95,22 @@ const STAGE_WEIGHT_MAP: Readonly<Record<string, readonly [number, number, number
 
 const DEFAULT_FUSION_WEIGHTS: readonly [number, number, number] = [0.5, 0.35, 0.15];
 
-/** Resolves raw tri-plane weights from static configuration lookup table. */
-function resolveRawTriplaneWeights(domain: string, stage: string): [number, number, number] {
+/** Resolves raw tri-plane weights from supervisor snapshot or static configuration lookup table. */
+function resolveRawTriplaneWeights(
+    profile: GovernanceProjectProfile,
+    domain: string,
+    stage: string,
+): [number, number, number] {
+    const learned = profile.supervisorWeights;
+    if (
+        learned &&
+        Number.isFinite(learned.Ws) &&
+        Number.isFinite(learned.Wd) &&
+        Number.isFinite(learned.Wf) &&
+        learned.Ws + learned.Wd + learned.Wf > 0
+    ) {
+        return [learned.Ws, learned.Wd, learned.Wf];
+    }
     const stageOverride = STAGE_WEIGHT_MAP[stage];
     if (stageOverride) {
         return [stageOverride[0], stageOverride[1], stageOverride[2]];
@@ -127,7 +143,7 @@ export function resolveAdaptiveFusionWeights(
 
     const domain = profile.domain ?? DOMAIN_CORE_FRAMEWORK;
     const stage = profile.stage ?? STAGE_PRODUCTION;
-    const [rawWs, rawWd, rawWf] = resolveRawTriplaneWeights(domain, stage);
+    const [rawWs, rawWd, rawWf] = resolveRawTriplaneWeights(profile, domain, stage);
 
     const effectiveWs = rawWs;
     const effectiveWd = hasDynamicEvidence ? rawWd : 0.0;

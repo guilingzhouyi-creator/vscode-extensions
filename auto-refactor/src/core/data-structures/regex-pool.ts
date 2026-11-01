@@ -30,7 +30,7 @@ export interface RegexPoolOptions {
 }
 
 /**
- * High-throughput leased RegExp pool ensuring zero-allocation execution for stateful global scanners.
+ * High-throughput leased RegExp pool providing zero-allocation reuse for stateful scanners.
  */
 export class LeasedRegexPool {
     private readonly buckets = new Map<string, RegExp[]>();

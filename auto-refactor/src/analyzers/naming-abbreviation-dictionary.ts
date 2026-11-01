@@ -140,12 +140,19 @@ export const POLYSEMIC_ABBREVIATIONS: ReadonlySet<string> = new Set([
     'cnt',
 ]);
 
+/** Canonical TypeScript primitive type keywords excluded from domain noun extraction. */
 export const PRIMITIVE_TYPE_NAMES: ReadonlySet<string> = new Set(
     'string number boolean any unknown void never symbol bigint object undefined null'.split(' '),
 );
 
 const SOURCE_ABBREVIATION_EXPANSION = 'abbreviation_expansion';
 
+/**
+ * Splits a delimiter-free identifier segment into morpheme tokens and appends them in place.
+ *
+ * @param segment - Raw identifier segment without separators.
+ * @param target - Destination token accumulator mutated in place.
+ */
 export function appendSegmentTokens(segment: string, target: string[]): void {
     if (!segment) return;
     const matchedTokens = extractMorphemeTokens(segment);
@@ -156,10 +163,23 @@ export function appendSegmentTokens(segment: string, target: string[]): void {
     }
 }
 
+/**
+ * Checks whether an identifier contains snake_case or kebab-case segment separators.
+ *
+ * @param name - Identifier string to inspect.
+ * @returns True when underscore or hyphen delimiters are present.
+ */
 export function hasSegmentSeparators(name: string): boolean {
     return name.includes('_') || name.includes('-');
 }
 
+/**
+ * Formats an expanded word token into camelCase position casing.
+ *
+ * @param text - Expanded dictionary word token.
+ * @param isFirst - Whether the token occupies the leading camelCase segment.
+ * @returns Lowercased token when leading, or capitalized token otherwise.
+ */
 export function formatTokenCase(text: string, isFirst: boolean): string {
     return isFirst ? text.toLowerCase() : text.charAt(0).toUpperCase() + text.slice(1);
 }

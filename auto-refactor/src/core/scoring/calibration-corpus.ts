@@ -107,7 +107,8 @@ function mergeRefutations(
 }
 
 /**
- * Harvests online calibration counts from review outcomes, fix tracking, and wider-context refutations.
+ * Harvests online calibration counts from review outcomes, fix tracking, and wider-context
+ * refutations.
  *
  * @param fixResultsMap - Map of ruleId to observed fix outcomes (e.g. from ReviewMemory).
  * @param refutedIssues - Optional list of issues refuted during confidence-rework.

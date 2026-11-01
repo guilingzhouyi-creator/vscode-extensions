@@ -3,7 +3,8 @@
  * File Path: src/core/constants/regex-rust.ts
  * Architecture Role: Single source of truth (SSOT) for Rust syntax, unsafe blocks,
  *     safety proof comments, and declaration regular expressions.
- * Dependencies & Triggers: Zero external dependencies; consumed by rust-modern and naming-rust-helper.
+ * Dependencies & Triggers: Zero external dependencies; consumed by rust-modern and
+ *     naming-rust-helper.
  * Responsibilities:
  *     1. Centralize canonical Rust patterns (unsafe blocks, safety comments, fn/struct/let).
  *     2. Enforce the state-separation discipline: stateless immutable constants vs fresh factories.

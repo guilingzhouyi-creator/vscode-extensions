@@ -7,7 +7,8 @@
  *   ledger writer that appends twice, a corpus projection that is never read back by the arbiter.
  *   The suite therefore drives the real CLI against a scratch directory and asserts the posterior
  *   actually moves.
- * Dependencies & Triggers: consumes ../dist/cli/reviewCmd, ../dist/core/reporting/review-queue-intake,
+ * Dependencies & Triggers: consumes ../dist/cli/reviewCmd,
+ *   ../dist/core/reporting/review-queue-intake,
  *   ../dist/core/scoring/review-verdict-ledger and ../dist/core/scoring/calibration-corpus;
  *   registered in scripts/test-parallel.js and run by `npm test`.
  * Responsibilities:
@@ -261,7 +262,7 @@ function verifyVocabulary() {
     console.log('  ✔ two distinct verdicts, and one occurrence identity shape.');
 }
 
-/** Stage 7: one answer must not silently cover unrelated rules, and a dry run must write nothing. */
+/** Stage 7: one answer must not cover unrelated rules, and a dry run writes nothing. */
 function verifyCrossRuleGuardAndDryRun() {
     console.log('\n7. Verifying a cross-rule batch is refused and a dry run writes nothing...');
     const dir = scratch();

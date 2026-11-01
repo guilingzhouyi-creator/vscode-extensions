@@ -28,8 +28,16 @@ import { SEVERITY_WARNING, SEVERITY_INFO, SEVERITY_ERROR } from '../types';
 const ANOMALY_KIND_REINTRODUCED = 're-introduced-issue';
 const ANOMALY_KIND_DUPLICATE_FIX = 'duplicate-fix';
 
-/** Default per-dimension quality score used when a revision omits an index. */
-const DEFAULT_QUALITY_SCORE = 100;
+/**
+ * Delta reported for a dimension that either revision did not measure.
+ *
+ * Zero, not a fabricated comparison. A missing index means the dimension was never scored for
+ * that revision; substituting a clean `100` for it would charge the whole unmeasured range as a
+ * regression when only one side carried the index, and would report a quiet `0` change when
+ * neither side did. Zero states that no change was observed, which is the only claim the evidence
+ * supports, and it never crosses a regression threshold.
+ */
+const UNMEASURED_DIMENSION_DELTA = 0;
 
 /** Composite-score drop magnitude that triggers a quality-regression anomaly. */
 const COMPOSITE_REGRESSION_THRESHOLD = 5.0;
@@ -59,8 +67,13 @@ function calculateDimensionDeltas(
 ): Record<QualityDimension, number> {
     const dimensionDeltas = {} as Record<QualityDimension, number>;
     for (const dim of ALL_QUALITY_DIMENSIONS) {
-        const prevScore = previous.qualityScore.indices[dim] ?? DEFAULT_QUALITY_SCORE;
-        const currScore = current.qualityScore.indices[dim] ?? DEFAULT_QUALITY_SCORE;
+        const prevScore = previous.qualityScore.indices[dim];
+        const currScore = current.qualityScore.indices[dim];
+        // Both sides must be measured for a delta to mean anything; see UNMEASURED_DIMENSION_DELTA.
+        if (prevScore === undefined || currScore === undefined) {
+            dimensionDeltas[dim] = UNMEASURED_DIMENSION_DELTA;
+            continue;
+        }
         dimensionDeltas[dim] =
             Math.round((currScore - prevScore) * SCORE_DELTA_ROUND_SCALE) / SCORE_DELTA_ROUND_SCALE;
     }

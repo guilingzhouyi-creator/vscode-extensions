@@ -87,7 +87,8 @@ export class ConcurrencyAnalyzer implements Analyzer {
     }
 
     /**
-     * Streaming finalize pass for OXC and multi-language execution without materializing ts.SourceFile.
+     * Streaming finalize pass for OXC and polyglot execution without materializing
+     * a TypeScript SourceFile.
      *
      * @param context - Analyzer execution context with file path and content.
      * @returns Array of identified concurrency issues.

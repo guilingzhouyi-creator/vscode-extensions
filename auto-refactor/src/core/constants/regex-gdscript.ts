@@ -94,6 +94,7 @@ export function createGdscriptPreloadScanner(): RegExp {
     return /(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 }
 
+/** Frozen domain namespace aggregating Godot GDScript syntax and game-loop patterns. */
 export const REGEX_GDSCRIPT = Object.freeze({
     LEGACY_CONNECT: GD_LEGACY_CONNECT_PATTERN,
     SUPER_RESET: GD_SUPER_RESET_PATTERN,

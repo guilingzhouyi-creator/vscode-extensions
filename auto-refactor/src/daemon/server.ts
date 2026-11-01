@@ -556,6 +556,12 @@ export async function runDaemonMain(argv: string[]): Promise<void> {
     });
 }
 
+/**
+ * Boots the background IPC daemon server for the provided CLI argv slice.
+ *
+ * @param argv - Command-line arguments forwarded to daemon option parsing.
+ * @returns Promise resolving once the IPC socket listener and signal handlers are bound.
+ */
 export const daemonMain = runDaemonMain;
 
 if (require.main === module) {

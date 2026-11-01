@@ -92,13 +92,19 @@ export const ALLOWED_SHORT_FILE_STEMS = new Set(
     'ui en zh db io ci os vm fs re id ip swar'.split(' '),
 );
 
-/** Regular expression matching transient construction jargon in symbol and file names (SSOT pointer). */
+/** Pattern matching transient construction jargon in symbol and file names (SSOT pointer). */
 export const TRANSIENT_JARGON_RE = REGEX.NAMING.TRANSIENT_JARGON;
 /** Regular expression matching standalone jargon tokens (SSOT pointer). */
 export const JARGON_TOKEN_RE = REGEX.NAMING.JARGON_TOKEN;
 /** Regular expression matching prefix tokens for multi-part jargon (SSOT pointer). */
 export const JARGON_PREFIX_TOKEN_RE = REGEX.NAMING.JARGON_PREFIX_TOKEN;
 
+/**
+ * Checks whether an identifier or file stem contains transient process or iteration markers.
+ *
+ * @param name - Symbol or file stem to tokenize and inspect.
+ * @returns True if any constituent token matches standalone or numbered jargon rules.
+ */
 export function hasTransientJargon(name: string): boolean {
     const tokens = camelToSnake(name).split(/[^a-z0-9]+/);
     for (let i = 0; i < tokens.length; i++) {

@@ -236,6 +236,14 @@ export interface Issue {
      * a severity downgrade applied by the same rule.
      */
     suppression?: { reason: string; downgraded: boolean };
+    /** Per-finding adjudicated confidence tier ('T1' | 'T2' | 'T3') from post-scan arbitration. */
+    adjudicatedTier?: 'T1' | 'T2' | 'T3';
+    /** Per-finding adjudicated confidence score in [0, 1] from post-scan arbitration. */
+    adjudicatedConfidence?: number;
+    /** Secondary overlapping rule IDs merged into this primary finding via OVERLAP_CLUSTERS. */
+    correlatedRules?: readonly string[];
+    /** Primary rule ID into which this secondary finding was merged via OVERLAP_CLUSTERS. */
+    clusteredInto?: string;
 }
 
 /**
@@ -489,6 +497,8 @@ export interface SuppressionRule {
 export interface AnalyzerDeclaration {
     /** Set false to skip this analyzer without removing the declaration. Default: true. */
     enabled?: boolean;
+    /** Optional maximum severity ceiling for findings emitted by this analyzer. */
+    severity?: Severity;
     /** Per-analyzer options, deep-merged on top of the global `thresholds` into `ctx.options`. */
     options?: Record<string, any>;
 }
@@ -986,6 +996,92 @@ export interface ScanSummary {
 }
 
 /**
+ * File-level hotspot summary record produced by hierarchical eight-pillar governance synthesis.
+ */
+export interface HierarchicalHotspotEntry {
+    readonly filePath: string;
+    readonly domain: string;
+    readonly totalIssues: number;
+    readonly criticalCount: number;
+    readonly highCount: number;
+    readonly compositeScore: number;
+    readonly effectiveDensity: number;
+}
+
+/**
+ * Domain-level quality rollup produced by hierarchical eight-pillar governance synthesis.
+ */
+export interface HierarchicalDomainSummary {
+    readonly domainName: string;
+    readonly compositeScore: number;
+    readonly pillars: Record<import('./scoring/eightPillarModel').PrimaryQualityPillar, number>;
+    readonly moduleCount: number;
+}
+
+/**
+ * Native eight-pillar and hierarchical domain quality governance attached to ScanReport.
+ */
+export interface HierarchicalGovernanceSummary {
+    /** Project-level composite score aggregated by hierarchicalScorer [15.0, 100.0] */
+    readonly hierarchicalCompositeScore: number;
+    /** Letter grade derived from hierarchicalCompositeScore */
+    readonly grade: string;
+    /** Eight strategic quality pillars synthesized from file/dimension indices */
+    readonly eightPillars: import('./scoring/eightPillarModel').EightPillarBreakdown;
+    /** Weighted ten-dimension quality vector aggregated by hierarchicalScorer */
+    readonly tenDimensions: Record<import('./scoring/scoringTypes').QualityDimension, number>;
+    /** Mean effective code density across scanned files */
+    readonly effectiveCodeDensity: number;
+    /** 5D Riemannian manifold and spatial code density tensor summary */
+    readonly densityTensorSummary?: {
+        readonly compositeDensity: number;
+        readonly averageTspr: number;
+        readonly averagePor: number;
+        readonly averageColumnDensity: number;
+        readonly averageSpatialDensity?: number;
+        readonly averageMahalanobisDistance?: number;
+        readonly averageFisherSimplexDistance?: number;
+    };
+    /** Domain-level hierarchical pillar breakdowns */
+    readonly domains: readonly HierarchicalDomainSummary[];
+    /** Top refactoring hotspot files ranked by active defect concentration */
+    readonly topHotspots: readonly HierarchicalHotspotEntry[];
+}
+
+/**
+ * High-vulnerability evolving file record identified by Git history churn and author entropy.
+ */
+export interface EvolutionFragileFileEntry {
+    readonly file: string;
+    readonly fragilityScore: number;
+    readonly churnCount: number;
+    readonly authorEntropy: number;
+}
+
+/**
+ * Temporally coupled file pair co-changing across commits in repository history.
+ */
+export interface EvolutionTemporalCouplingEntry {
+    readonly fileA: string;
+    readonly fileB: string;
+    readonly supportCommits: number;
+    readonly couplingConfidence: number;
+    readonly isCrossModule: boolean;
+}
+
+/**
+ * Code evolution fragility, temporal coupling, and LCOV coverage damping summary on ScanReport.
+ */
+export interface EvolutionSummary {
+    /** High-vulnerability evolving files sorted by V_evo(f) descending */
+    readonly fragileFiles: readonly EvolutionFragileFileEntry[];
+    /** Temporally coupled file pairs co-changing in git history */
+    readonly temporalCouplings: readonly EvolutionTemporalCouplingEntry[];
+    /** Count of scanned files where LCOV line-level coverage damping was evaluated */
+    readonly coverageDampingAppliedCount: number;
+}
+
+/**
  * Complete scan result serialized by every reporter: tool provenance, the effective config,
  * aggregate summary, issues, per-file metrics, and optional quality-score breakdowns.
  */
@@ -1011,6 +1107,14 @@ export interface ScanReport {
      * In-house self-development ratio and code autonomy index (CAI).
      */
     autonomy?: import('./scoring/autonomy-scorer').AutonomyEvaluation;
+    /**
+     * Native eight-pillar and hierarchical domain governance synthesis.
+     */
+    governance?: HierarchicalGovernanceSummary;
+    /**
+     * Git code evolution fragility, temporal coupling, and LCOV coverage damping summary.
+     */
+    evolution?: EvolutionSummary;
 }
 
 export * from './scoring/scoringTypes';

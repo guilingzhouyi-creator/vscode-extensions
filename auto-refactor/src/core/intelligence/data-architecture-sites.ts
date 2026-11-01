@@ -7,7 +7,8 @@
  *   consumed by dataArchitecture facade and DataArchitectureAnalyzer.
  * Responsibilities:
  *   1. Define DataAccessSite and DataArchitectureOptions contracts;
- *   2. Implement site-level diagnostic auditors (unbounded queries, N+1 loop calls, leaky abstractions);
+ *   2. Implement site-level diagnostic auditors (unbounded queries, N+1 loop calls, and
+ *      leaky abstractions);
  *   3. Enforce bidirectional physical asset path validation for resource registries (DAT-RES-001);
  *   4. Construct structured, reproducible evidence chains and Section VII diagnostic issues.
  * Exit Semantics & Design Rationale: Pure in-memory AST and pattern reasoning without external
@@ -82,6 +83,7 @@ export interface DataArchitectureOptions {
     offlinePathPatterns?: string[];
 }
 
+/** Minimal input payload for constructing a global file-level semantic review detail record. */
 export interface SimpleReviewContext {
     readonly filePath: string;
     readonly behavior: string;
@@ -90,6 +92,12 @@ export interface SimpleReviewContext {
     readonly evidence?: SemanticEvidenceStep[];
 }
 
+/**
+ * Builds a deterministic semantic review detail payload for line-level data architecture rules.
+ *
+ * @param ctx - File path, observed behavior, risk rationale, and remediation summary.
+ * @returns Populated SemanticReviewDetail record scoped to the target file.
+ */
 export function buildSimpleReviewDetail(ctx: SimpleReviewContext): SemanticReviewDetail {
     return {
         language: LANGUAGE_TYPESCRIPT,
@@ -113,6 +121,7 @@ export function buildSimpleReviewDetail(ctx: SimpleReviewContext): SemanticRevie
     };
 }
 
+/** Descriptor parameters for instantiating a canonical data-architecture diagnostic issue. */
 export interface DataArchitectureIssueContext {
     readonly filePath: string;
     readonly line: number;
@@ -124,6 +133,12 @@ export interface DataArchitectureIssueContext {
     readonly suggestion: string;
 }
 
+/**
+ * Constructs a standardized data-architecture Issue record with semantic review metadata.
+ *
+ * @param ctx - Rule metadata, source coordinates, risk summary, and remediation guidance.
+ * @returns Canonical Issue record ready for analyzer emission.
+ */
 export function createDataArchitectureIssue(ctx: DataArchitectureIssueContext): Issue {
     return {
         id: `data-architecture:${ctx.rule}:${ctx.filePath}:${ctx.line}`,
@@ -146,6 +161,14 @@ export function createDataArchitectureIssue(ctx: DataArchitectureIssueContext): 
     };
 }
 
+/**
+ * Creates a DAT-NPL-001 error issue for a storage query dispatched inside an iteration loop.
+ *
+ * @param filePath - Repository-relative source file path.
+ * @param line - 1-based line number of the query site.
+ * @param text - Matched query expression snippet.
+ * @returns Populated DAT-NPL-001 Issue record.
+ */
 export function createLoopQueryIssue(filePath: string, line: number, text: string): Issue {
     return createDataArchitectureIssue({
         filePath,
@@ -159,6 +182,14 @@ export function createLoopQueryIssue(filePath: string, line: number, text: strin
     });
 }
 
+/**
+ * Creates a DAT-QRY-001 warning issue for an unpaginated query on an online request path.
+ *
+ * @param filePath - Repository-relative source file path.
+ * @param line - 1-based line number of the query site.
+ * @param text - Matched query expression snippet.
+ * @returns Populated DAT-QRY-001 Issue record.
+ */
 export function createUnboundedQueryIssue(filePath: string, line: number, text: string): Issue {
     return createDataArchitectureIssue({
         filePath,
@@ -172,6 +203,14 @@ export function createUnboundedQueryIssue(filePath: string, line: number, text: 
     });
 }
 
+/**
+ * Creates a DAT-SER-001 info issue for repetitive JSON serialization inside an iteration loop.
+ *
+ * @param filePath - Repository-relative source file path.
+ * @param line - 1-based line number of the serialization call.
+ * @param text - Matched serialization expression snippet.
+ * @returns Populated DAT-SER-001 Issue record.
+ */
 export function createLoopSerializationIssue(filePath: string, line: number, text: string): Issue {
     return createDataArchitectureIssue({
         filePath,
@@ -185,6 +224,14 @@ export function createLoopSerializationIssue(filePath: string, line: number, tex
     });
 }
 
+/**
+ * Creates a DAT-LAY-001 warning issue for raw persistence driver calls in domain modules.
+ *
+ * @param filePath - Repository-relative source file path.
+ * @param line - 1-based line number of the driver call.
+ * @param text - Matched driver invocation snippet.
+ * @returns Populated DAT-LAY-001 Issue record.
+ */
 export function createLeakyAbstractionIssue(filePath: string, line: number, text: string): Issue {
     return createDataArchitectureIssue({
         filePath,
@@ -203,6 +250,15 @@ export const DANGLING_RESOURCE_PATH_RE = REGEX.DATA.DANGLING_RESOURCE_PATH;
 
 const DANGLING_TARGET_RE = REGEX.DATA.DANGLING_TARGET;
 
+/**
+ * Creates a DAT-RES-001 warning issue for broken or unmapped resource registry entries.
+ *
+ * @param filePath - Repository-relative source file path.
+ * @param line - 1-based line number of the registry entry.
+ * @param text - Matched registration expression snippet.
+ * @param detailMsg - Explanation of the broken or missing physical asset mapping.
+ * @returns Populated DAT-RES-001 Issue record.
+ */
 export function createResourceRegistryIssue(
     filePath: string,
     line: number,
@@ -245,6 +301,7 @@ export function checkResourceRegistrySite(site: DataAccessSite): Issue | null {
     return null;
 }
 
+/** Evidence, trigger, risk, and verification descriptors for a site-level review detail. */
 export interface SiteDetailOptions {
     readonly behavior: string;
     readonly evidence: SemanticEvidenceStep[];
@@ -255,6 +312,13 @@ export interface SiteDetailOptions {
     readonly reliable?: boolean;
 }
 
+/**
+ * Assembles a symbol-scoped SemanticReviewDetail record from a concrete data access site.
+ *
+ * @param site - Observed data access site carrying file and enclosing symbol coordinates.
+ * @param options - Evidence chain, risk assessment, and remediation instructions.
+ * @returns Populated SemanticReviewDetail bound to the site symbol.
+ */
 export function buildSiteDetail(site: DataAccessSite, options: SiteDetailOptions): SemanticReviewDetail {
     const isDeterministic = options.reliable ?? true;
     return {
@@ -279,6 +343,7 @@ export function buildSiteDetail(site: DataAccessSite, options: SiteDetailOptions
     };
 }
 
+/** Rule, severity, message, and confidence parameters for wrapping a site finding into an Issue. */
 export interface SiteIssueOptions {
     readonly rule: string;
     readonly severity: 'warning' | 'error' | 'info';
@@ -288,6 +353,13 @@ export interface SiteIssueOptions {
     readonly confidence?: number;
 }
 
+/**
+ * Wraps a pre-built SemanticReviewDetail and rule metadata into a site-anchored Issue record.
+ *
+ * @param site - Observed data access site providing file and line coordinates.
+ * @param options - Rule code, severity, diagnostic message, and confidence override.
+ * @returns Canonical Issue record with static evidence confidence.
+ */
 export function buildSiteIssue(site: DataAccessSite, options: SiteIssueOptions): Issue {
     return {
         id: `data-architecture:${options.rule}:${site.file}:${site.line}`,
@@ -306,6 +378,7 @@ export function buildSiteIssue(site: DataAccessSite, options: SiteIssueOptions):
     };
 }
 
+/** Unified specification combining site coordinates, rule metadata, and evidence steps. */
 export interface DiagnosticSpec {
     readonly site: DataAccessSite;
     readonly rule: string;
@@ -321,6 +394,12 @@ export interface DiagnosticSpec {
     readonly reliable?: boolean;
 }
 
+/**
+ * Constructs a complete site-level diagnostic Issue from a unified DiagnosticSpec.
+ *
+ * @param spec - Complete site finding specification including evidence and verification method.
+ * @returns Canonical Issue record combining detail payload and location span.
+ */
 export function buildSiteFinding(spec: DiagnosticSpec): Issue {
     const detail = buildSiteDetail(spec.site, {
         behavior: spec.behavior,
@@ -341,6 +420,12 @@ export function buildSiteFinding(spec: DiagnosticSpec): Issue {
     });
 }
 
+/**
+ * Audits a data access site for unpaginated fetches on an online request path (DAT-QRY-001).
+ *
+ * @param site - Observed data access site descriptor.
+ * @returns Populated DAT-QRY-001 Issue when online and unbounded, or null otherwise.
+ */
 export function checkUnboundedQuerySite(site: DataAccessSite): Issue | null {
     if (!site.isOnlinePath || !site.isUnboundedQuery) return null;
     return buildSiteFinding({
@@ -372,6 +457,12 @@ export function checkUnboundedQuerySite(site: DataAccessSite): Issue | null {
     });
 }
 
+/**
+ * Audits a data access site for persistent storage queries inside iteration loops (DAT-NPL-001).
+ *
+ * @param site - Observed data access site descriptor.
+ * @returns Populated DAT-NPL-001 Issue when a query runs in loop scope, or null otherwise.
+ */
 export function checkLoopQuerySite(site: DataAccessSite): Issue | null {
     if (!site.isLoopContext || site.operationKind !== OP_KIND_QUERY) return null;
     return buildSiteFinding({
@@ -403,6 +494,12 @@ export function checkLoopQuerySite(site: DataAccessSite): Issue | null {
     });
 }
 
+/**
+ * Audits a data access site for repeated JSON serialization inside iteration loops (DAT-SER-001).
+ *
+ * @param site - Observed data access site descriptor.
+ * @returns Populated DAT-SER-001 Issue when serialization runs in loop scope, or null otherwise.
+ */
 export function checkRedundantSerializationSite(site: DataAccessSite): Issue | null {
     if (site.operationKind !== OP_KIND_SERIALIZATION || !site.isLoopContext) return null;
     return buildSiteFinding({
@@ -435,6 +532,13 @@ export function checkRedundantSerializationSite(site: DataAccessSite): Issue | n
     });
 }
 
+/**
+ * Audits an internal non-perimeter site for repeated redundant validation checks (DAT-DEF-001).
+ *
+ * @param site - Observed data access site descriptor.
+ * @param validationCounts - Per-symbol accumulator tracking observed validation call counts.
+ * @returns Populated DAT-DEF-001 Issue once internal validation count exceeds two, or null.
+ */
 export function checkDefensiveExcessSite(
     site: DataAccessSite,
     validationCounts: Map<string, number>,
@@ -478,6 +582,12 @@ export function checkDefensiveExcessSite(
     });
 }
 
+/**
+ * Audits a site for direct persistence driver invocations outside repository modules (DAT-LAY-001).
+ *
+ * @param site - Observed data access site descriptor.
+ * @returns Populated DAT-LAY-001 Issue when domain code invokes a storage driver, or null.
+ */
 export function checkLeakyAbstractionSite(site: DataAccessSite): Issue | null {
     if (
         site.operationKind !== OP_KIND_DRIVER_CALL ||
@@ -509,6 +619,14 @@ export function checkLeakyAbstractionSite(site: DataAccessSite): Issue | null {
     });
 }
 
+/**
+ * Evaluates all enabled data-architecture auditors against one site and appends matched issues.
+ *
+ * @param site - Observed data access site descriptor.
+ * @param options - Rule enablement switches for data architecture checks.
+ * @param validationCounts - Mutable per-symbol validation counter map.
+ * @param issues - Destination accumulator receiving emitted Issue records.
+ */
 export function collectSiteIssues(
     site: DataAccessSite,
     options: DataArchitectureOptions,

@@ -197,9 +197,10 @@ export function formatCompactRecord(params: CompactRecordParams): CompactTraject
     const boundedAgent =
         agent.length > BOUNDED_TEXT_LENGTH_LONG ? agent.slice(0, BOUNDED_TEXT_LENGTH_LONG) : agent;
     const normalizedVrf = normalizeCompactVerification(vrf);
-    const boundedSig = sig && sig.length > BOUNDED_TEXT_LENGTH_SHORT
-        ? sig.slice(0, BOUNDED_TEXT_LENGTH_SHORT)
-        : sig;
+    const boundedSig =
+        sig && sig.length > BOUNDED_TEXT_LENGTH_SHORT
+            ? sig.slice(0, BOUNDED_TEXT_LENGTH_SHORT)
+            : sig;
 
     const gate = gatePass
         ? { pass: true }
@@ -270,7 +271,8 @@ export function serializeNdjsonLine(record: CompactTrajectoryRecord): string {
 
 /** Rounds a score to one decimal place. */
 function roundToTenth(numericScore: number): number {
-    return Number.isFinite(numericScore) ? Math.round(numericScore * DECIMALS_FACTOR) / DECIMALS_FACTOR : 0;
+    if (!Number.isFinite(numericScore)) return 0;
+    return Math.round(numericScore * DECIMALS_FACTOR) / DECIMALS_FACTOR;
 }
 
 /** Rounds a score to an integer with finite value guard. */
@@ -527,9 +529,7 @@ export async function writeLifetimeSummary(
  * @param ledgerDir - Ledger directory path.
  * @returns Array of parsed CompactTrajectoryRecord items from cold storage.
  */
-export async function readArchivedRecords(
-    ledgerDir: string,
-): Promise<CompactTrajectoryRecord[]> {
+export async function readArchivedRecords(ledgerDir: string): Promise<CompactTrajectoryRecord[]> {
     const archiveFile = path.join(ledgerDir, FILE_NAME_ARCHIVE_RUNS);
     try {
         const content = await fs.promises.readFile(archiveFile, 'utf8');

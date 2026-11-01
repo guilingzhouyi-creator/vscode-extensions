@@ -136,6 +136,7 @@ export function createWithAsScanner(): RegExp {
     return /\bas\s+([A-Za-z_]\w*)\s*(?:,|:)/g;
 }
 
+/** Frozen domain namespace aggregating Python syntax, typing, and async safety patterns. */
 export const REGEX_PYTHON = Object.freeze({
     BLOCK_OPEN: PY_BLOCK_OPEN_PATTERN,
     ASSIGN: PY_ASSIGN_PATTERN,

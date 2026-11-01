@@ -21,6 +21,15 @@ const WEIGHT_DELTA = 0.3;
 const WEIGHT_DENSITY = 0.2;
 const PENALTY_PER_ISSUE = 2.0;
 
+/** Score of a candidate excluded before scoring, so it sorts below every measured patch. */
+const EXCLUDED_CANDIDATE_SCORE = -100;
+
+/** Delta score recorded on an anti-gaming rejection, distinct from a merely degraded patch. */
+const GAMING_REJECTION_DELTA = -50;
+
+/** Scale factor converting a unit-interval density ratio into a reported percentage. */
+const PERCENT_SCALE = 100;
+
 /**
  * Computes the unified arbitration composite score for ranking.
  *
@@ -46,9 +55,21 @@ export function computeArbitrationScore(
 
 /**
  * Base helper constructing an excluded/rejected arbitration candidate.
+ *
+ * `compositeScore` keeps the patch's own measured quality so an excluded candidate is still
+ * auditable; `arbitrationScore` carries the ranking value, which for an excluded candidate is the
+ * floor that puts it below every scored patch.
+ *
+ * @param patch - Candidate patch slice.
+ * @param compositeScore - Measured composite quality of the patch.
+ * @param density - Effective code density after the patch.
+ * @param deltaScore - Measured before/after composite delta.
+ * @param reasons - Exclusion rationales shown to the caller.
+ * @returns Excluded arbitration candidate.
  */
 function createBaseExcludedCandidate(
     patch: AgentPatchSlice,
+    compositeScore: number,
     density: number,
     deltaScore: number,
     reasons: string[],
@@ -57,7 +78,8 @@ function createBaseExcludedCandidate(
         agentUid: patch.agentUid,
         patchId: patch.patchId,
         filePath: patch.filePath,
-        compositeScore: -100,
+        compositeScore,
+        arbitrationScore: EXCLUDED_CANDIDATE_SCORE,
         deltaScore,
         density,
         issuesCount: patch.ruleHitIds?.length || 0,
@@ -69,39 +91,68 @@ function createBaseExcludedCandidate(
 
 /**
  * Creates candidate record rejected by anti-gaming filter.
+ *
+ * @param patch - Candidate patch slice.
+ * @param compositeScore - Measured composite quality of the patch.
+ * @param density - Effective code density after the patch.
+ * @returns Rejected arbitration candidate.
  */
-function createGamingCandidate(patch: AgentPatchSlice, density: number): PatchArbitrationCandidate {
-    return createBaseExcludedCandidate(patch, density, -50, [
+function createGamingCandidate(
+    patch: AgentPatchSlice,
+    compositeScore: number,
+    density: number,
+): PatchArbitrationCandidate {
+    return createBaseExcludedCandidate(patch, compositeScore, density, GAMING_REJECTION_DELTA, [
         'Rejected by anti-gaming filter: metric manipulation detected',
     ]);
 }
 
 /**
  * Creates candidate record excluded because no quality dimension was measured.
+ *
+ * @param patch - Candidate patch slice.
+ * @param compositeScore - Measured composite quality of the patch, or NaN when unmeasured.
+ * @param density - Effective code density after the patch.
+ * @param deltaScore - Measured before/after composite delta.
+ * @returns Excluded arbitration candidate.
  */
 function createUnmeasuredCandidate(
     patch: AgentPatchSlice,
+    compositeScore: number,
     density: number,
     deltaScore: number,
 ): PatchArbitrationCandidate {
-    return createBaseExcludedCandidate(patch, density, deltaScore, [
+    return createBaseExcludedCandidate(patch, compositeScore, density, deltaScore, [
         'Excluded from arbitration: no quality dimension was measured',
     ]);
 }
 
 /**
  * Builds human-readable reason strings for scored candidates.
+ *
+ * The arbitration score is reported next to the composite score it was derived from, because the
+ * two answer different questions and a reader that saw only one would mistake the ranking value
+ * for the patch's quality.
+ *
+ * @param compositeScore - Measured composite quality of the patch.
+ * @param arbitrationScore - Score the ranking compared on.
+ * @param deltaScore - Measured before/after composite delta.
+ * @param density - Effective code density after the patch.
+ * @param issuesCount - Rule hits introduced by the patch.
+ * @returns Ordered reason strings.
  */
 function buildScoredReasons(
     compositeScore: number,
+    arbitrationScore: number,
     deltaScore: number,
     density: number,
     issuesCount: number,
 ): string[] {
     const reasons: string[] = [
         `Quality Score: ${compositeScore}`,
-        `Delta Score: +${deltaScore}`,
-        `Effective Density: ${(density * 100).toFixed(1)}%`,
+        `Arbitration Score: ${arbitrationScore}`,
+        `Delta Score: ${deltaScore}`,
+        `Effective Density: ${(density * PERCENT_SCALE).toFixed(1)}%`,
     ];
     if (issuesCount > 0) {
         reasons.push(`Issues Introduced: ${issuesCount}`);
@@ -111,6 +162,9 @@ function buildScoredReasons(
 
 /**
  * Evaluates a single candidate patch slice.
+ *
+ * @param patch - Candidate patch slice under evaluation.
+ * @returns Scored or excluded arbitration candidate.
  */
 function evaluateCandidateSlice(patch: AgentPatchSlice): PatchArbitrationCandidate {
     const oldContent = patch.oldContent || '';
@@ -125,14 +179,25 @@ function evaluateCandidateSlice(patch: AgentPatchSlice): PatchArbitrationCandida
     });
 
     const density = qualityResult.effectiveDensityAfter;
+    // The patch may arrive without a self-reported composite score. The before/after evaluation
+    // already measured one, so ranking uses that measurement instead of substituting a constant
+    // that no scan produced: a fabricated 90 would rank every unselfreported patch identically.
+    const compositeScore = patch.compositeScore ?? qualityResult.afterScore;
+    if (!Number.isFinite(compositeScore)) {
+        return createUnmeasuredCandidate(patch, compositeScore, density, 0);
+    }
     if (qualityResult.verdict === 'gaming_rejected') {
-        return createGamingCandidate(patch, density);
+        return createGamingCandidate(patch, compositeScore, density);
     }
     if (qualityResult.verdict === 'unavailable') {
-        return createUnmeasuredCandidate(patch, density, qualityResult.deltaScore ?? 0);
+        return createUnmeasuredCandidate(
+            patch,
+            compositeScore,
+            density,
+            qualityResult.deltaScore ?? 0,
+        );
     }
 
-    const compositeScore = patch.compositeScore ?? 90;
     const deltaScore = qualityResult.deltaScore ?? 0;
     const arbitrationScore = computeArbitrationScore(
         compositeScore,
@@ -145,13 +210,20 @@ function evaluateCandidateSlice(patch: AgentPatchSlice): PatchArbitrationCandida
         agentUid: patch.agentUid,
         patchId: patch.patchId,
         filePath: patch.filePath,
-        compositeScore: arbitrationScore,
+        compositeScore,
+        arbitrationScore,
         deltaScore,
         density,
         issuesCount,
         rank: 0,
         isRecommended: false,
-        reasons: buildScoredReasons(compositeScore, deltaScore, density, issuesCount),
+        reasons: buildScoredReasons(
+            compositeScore,
+            arbitrationScore,
+            deltaScore,
+            density,
+            issuesCount,
+        ),
     };
 }
 
@@ -167,10 +239,10 @@ export class PatchArbiter {
 
         const candidates = patches.map(evaluateCandidateSlice);
 
-        // Sort descending by arbitration score, with tie-break on agentUid
+        // Sort descending by arbitration score, then by measured delta, then stably by agent id.
         candidates.sort((candidateA, candidateB) => {
-            if (candidateB.compositeScore !== candidateA.compositeScore) {
-                return candidateB.compositeScore - candidateA.compositeScore;
+            if (candidateB.arbitrationScore !== candidateA.arbitrationScore) {
+                return candidateB.arbitrationScore - candidateA.arbitrationScore;
             }
             if (candidateB.deltaScore !== candidateA.deltaScore) {
                 return candidateB.deltaScore - candidateA.deltaScore;
@@ -178,12 +250,14 @@ export class PatchArbiter {
             return candidateA.agentUid.localeCompare(candidateB.agentUid);
         });
 
-        // Assign ranks and mark the top non-gaming candidate as recommended
+        // Assign ranks and recommend the top patch that scored above the exclusion floor. Testing
+        // the arbitration score rather than zero keeps a legitimately negative but ranked patch
+        // from being labelled exclusions-only, and keeps every excluded candidate at the floor.
         let recommendedSet = false;
         for (let i = 0; i < candidates.length; i++) {
             const cand = candidates[i];
             cand.rank = i + 1;
-            if (!recommendedSet && cand.compositeScore > 0) {
+            if (!recommendedSet && cand.arbitrationScore > EXCLUDED_CANDIDATE_SCORE) {
                 cand.isRecommended = true;
                 recommendedSet = true;
             }

@@ -305,7 +305,7 @@ export class BidirectionalAuditScheduler {
         let backwardDurationMs = 0;
         let overlapCount = 0;
 
-        // --- Phase 1: Warmup (Step 0: F_0) ---
+        // --- Pipeline Warmup (Initial Forward Slot F_0) ---
         const warmupStart = Date.now();
         const f0Exec = await executeDualTrack(scanner, [inputs[0]], dualOptions);
         forwardDurationMs += Date.now() - warmupStart;
@@ -324,7 +324,7 @@ export class BidirectionalAuditScheduler {
             isOverlap: false,
         });
 
-        // --- Phase 2: DualPipe Overlap (Step 1 to count - 1: F_k in parallel with D_{k-1}) ---
+        // --- DualPipe Steady-State Overlap (F_k concurrent with D_{k-1}) ---
         for (let k = 1; k < count; k++) {
             const currentForwardInput = inputs[k];
             const previousBackwardSlot = this.ringBuffer.pop();
@@ -361,7 +361,7 @@ export class BidirectionalAuditScheduler {
             });
         }
 
-        // --- Phase 3: Cooldown (Step count: D_{count - 1}) ---
+        // --- Pipeline Drain (Terminal Backward Slot D_{count - 1}) ---
         const finalSlot = this.ringBuffer.pop();
         if (finalSlot) {
             const cooldownStart = Date.now();

@@ -9,7 +9,7 @@
  *     1. Centralize canonical line/block comment tokens, JSDoc tags, and mojibake signatures.
  *     2. Provide tool directive exemptions and decorative separator patterns.
  *     3. Expose frozen REGEX_COMMENT domain namespace.
- * Exit Semantics & Design Rationale: Pure, frozen regex constants and deterministic scanner factories;
+ * Exit Semantics & Design Rationale: Pure, frozen regex constants and deterministic factories;
  *     zero side effects and strictly immune to ReDoS back-tracking traps.
  */
 

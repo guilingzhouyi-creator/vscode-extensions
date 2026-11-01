@@ -118,6 +118,7 @@ try {
     (issue) =>
       issue.isNew &&
       !issue.suppression &&
+      !issue.clusteredInto &&
       ({ info: 0, warning: 1, error: 2 }[issue.severity] ?? 1) >=
         ({ info: 0, warning: 1, error: 2 }[severity] ?? 2),
   );

@@ -139,8 +139,15 @@ export interface AgentAttribution {
     introducedIssues: string[];
     resolvedIssues: string[];
     netIssueDelta: number;
-    averageQualityScore: number;
-    scoreImpact: number;
+    /**
+     * Mean of the measured composite scores, or null when no revision carried one.
+     *
+     * Null rather than a substitute constant: an agent whose work was never scored has an unknown
+     * average, and reporting a number there asserts a measurement that does not exist.
+     */
+    averageQualityScore: number | null;
+    /** Last measured composite score minus the baseline, or null when either was unmeasured. */
+    scoreImpact: number | null;
 }
 
 /** Specific architectural collision detected between concurrent agent modifications */
@@ -178,7 +185,10 @@ export interface PatchArbitrationCandidate {
     agentUid: string;
     patchId: string;
     filePath: string;
+    /** Composite quality measured for this patch, preserving the measurement behind the ranking. */
     compositeScore: number;
+    /** Ranking value derived from the composite score, delta, density and issue count. */
+    arbitrationScore: number;
     deltaScore: number;
     density: number;
     issuesCount: number;

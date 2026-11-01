@@ -249,6 +249,18 @@ function resolveTargetFiles(explicitFiles, isSmoke) {
   return [];
 }
 
+function isIssueWithinSlices(issue, allSlices) {
+  if (!Array.isArray(allSlices) || allSlices.length === 0) return true;
+  const issueFile = String(issue.location?.file || '').replace(/\\/g, '/');
+  const issueLine = issue.location?.start?.line || 1;
+  if (issueLine <= 1) return true;
+  const matchingSlices = allSlices.filter(
+    (slice) => String(slice.filePath || '').replace(/\\/g, '/') === issueFile,
+  );
+  if (matchingSlices.length === 0) return true;
+  return matchingSlices.some((slice) => issueLine >= slice.startLine && issueLine <= slice.endLine);
+}
+
 /**
  * Read and print blocking summary from temporary report file.
  *
@@ -256,8 +268,9 @@ function resolveTargetFiles(explicitFiles, isSmoke) {
  * @param summaryParams.fileCount - Scanned file count.
  * @param summaryParams.severity - Configured severity.
  * @param summaryParams.exitCode - CLI exit code.
+ * @param summaryParams.allSlices - Extracted AST slices for range filtering.
  */
-function reportBlockingSummary({ fileCount, severity, exitCode }) {
+function reportBlockingSummary({ fileCount, severity, exitCode, allSlices }) {
   let blockingCount = 0;
   try {
     const report = JSON.parse(readTextFile(REPORT));
@@ -266,6 +279,8 @@ function reportBlockingSummary({ fileCount, severity, exitCode }) {
       (issue) =>
         issue.isNew &&
         !issue.suppression &&
+        !issue.clusteredInto &&
+        isIssueWithinSlices(issue, allSlices) &&
         (SEVERITY_WEIGHT_MAP[issue.severity] ?? 1) >= targetWeight,
     );
     blockingCount = blocking.length;
@@ -292,9 +307,10 @@ function reportBlockingSummary({ fileCount, severity, exitCode }) {
  * @param scanParams.targetFiles - Files to scan.
  * @param scanParams.activeAnalyzers - Selected analyzer subset.
  * @param scanParams.severity - Blocking severity threshold.
+ * @param scanParams.allSlices - Extracted AST slices.
  * @returns Process exit code.
  */
-function executeTargetedScan({ targetFiles, activeAnalyzers, severity }) {
+function executeTargetedScan({ targetFiles, activeAnalyzers, severity, allSlices }) {
   const cliArgs = [
     CLI,
     'scan',
@@ -328,7 +344,7 @@ function executeTargetedScan({ targetFiles, activeAnalyzers, severity }) {
     return EXIT_USAGE_ERROR;
   }
   const exitCode = result.status === null ? EXIT_USAGE_ERROR : result.status;
-  reportBlockingSummary({ fileCount: targetFiles.length, severity, exitCode });
+  reportBlockingSummary({ fileCount: targetFiles.length, severity, exitCode, allSlices });
   return exitCode;
 }
 
@@ -383,7 +399,7 @@ async function main() {
     process.exit(EXIT_PASS);
   }
 
-  const exitCode = executeTargetedScan({ targetFiles, activeAnalyzers, severity });
+  const exitCode = executeTargetedScan({ targetFiles, activeAnalyzers, severity, allSlices });
   process.exit(exitCode);
 }
 

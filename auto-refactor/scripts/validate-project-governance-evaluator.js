@@ -59,8 +59,8 @@ function testLifecycleCalibration() {
   const protoResult = evaluateProjectGovernance({ ...sampleInput, stage: 'prototype' });
   assert(protoResult.stage === 'prototype', 'Evaluated prototype stage');
   assert(
-    protoResult.calibratedIssues[0].severity === 'info',
-    'Prototype stage downgraded warning to info',
+    protoResult.calibratedIssues[0].severity === 'warning',
+    'Prototype stage preserves industrial warning severity without demo downgrade',
   );
 
   const stableResult = evaluateProjectGovernance({ ...sampleInput, stage: 'stable' });

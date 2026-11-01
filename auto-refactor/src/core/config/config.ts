@@ -30,6 +30,7 @@ import type {
     DynamicEvidenceDTO,
 } from '../types';
 import { DEFAULT_TOLERATED_CALL_ARGUMENTS } from '../policy/literal-policy-engine';
+import { MAX_CONTROL_FLOW_NESTING_DEPTH } from '../constants/diagnostic-tokens';
 import { ERR_INVALID_CUSTOM_ANALYZER } from '../router/sliceTypes';
 
 import { SPECIALIZED_ANALYZERS, applyAutoTuning } from './config-tuning';
@@ -148,7 +149,6 @@ export const DEFAULT_EFFECTIVE_LOC_FAIL = 900;
 const DEFAULT_COMPLEXITY_WARN = 10;
 const DEFAULT_COMPLEXITY_FAIL = 20;
 /** governance analyzer defaults. */
-const DEFAULT_MAX_NESTING_DEPTH = 5;
 const DEFAULT_MAX_INHERITANCE_DEPTH = 2;
 /** dependency-graph defaults. */
 const DEFAULT_MAX_CYCLES_REPORTED = 20;
@@ -254,7 +254,7 @@ function getCoreAnalyzerDefaults(): Record<string, Record<string, any>> {
             allocationAllowPatterns: [],
         },
         governance: {
-            maxNestingDepth: DEFAULT_MAX_NESTING_DEPTH,
+            maxNestingDepth: MAX_CONTROL_FLOW_NESTING_DEPTH,
             maxInheritanceDepth: DEFAULT_MAX_INHERITANCE_DEPTH,
             blockingIoAllowPatterns: [],
             allocationAllowPatterns: [],

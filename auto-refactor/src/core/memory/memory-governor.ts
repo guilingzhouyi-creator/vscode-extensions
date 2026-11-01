@@ -20,7 +20,7 @@
 export enum CacheEvictionTier {
     /** Ephemeral caches: trivial to reconstruct, high churn (e.g. anchor slices, regex leases). */
     Ephemeral = 1,
-    /** Intermediate caches: moderate reconstruction cost (e.g. Radix prefix trees, review context). */
+    /** Intermediate caches: moderate rebuild cost (e.g. Radix prefix trees, review context). */
     Intermediate = 2,
     /** Durable caches: high reconstruction cost, only cleared under severe memory pressure. */
     Durable = 3,

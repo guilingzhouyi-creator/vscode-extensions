@@ -16,6 +16,7 @@
  */
 
 import type { Issue } from '../types';
+import { rulesShareCluster } from '../rules/overlap-clusters';
 import type {
     ArbitratedFinding,
     ExecutablePatch,
@@ -210,6 +211,26 @@ export function applyNoisyRuleDemotions(
     }
 }
 
+function resolveTierWeight(tier: FindingConfidenceTier): number {
+    if (tier === TIER_PRESCRIPTIVE) return TIER_WEIGHT_PRESCRIPTIVE;
+    if (tier === TIER_ACTIONABLE) return TIER_WEIGHT_ACTIONABLE;
+    return TIER_WEIGHT_ADVISORY;
+}
+
+function stampClusterCorrelation(primary: ArbitratedFinding, secondaries: Issue[]): void {
+    const secondaryRules = new Set<string>(primary.issue.correlatedRules ?? []);
+    for (let i = 0; i < secondaries.length; i++) {
+        const secondaryIssue = secondaries[i];
+        if (secondaryIssue.rule !== primary.issue.rule) {
+            secondaryRules.add(secondaryIssue.rule);
+        }
+        secondaryIssue.clusteredInto = primary.issue.rule;
+    }
+    if (secondaryRules.size > 0) {
+        primary.issue.correlatedRules = Array.from(secondaryRules).sort();
+    }
+}
+
 function resolveClusterPrimary(cluster: ArbitratedFinding[]): {
     primary: ArbitratedFinding;
     secondaryCount: number;
@@ -218,19 +239,12 @@ function resolveClusterPrimary(cluster: ArbitratedFinding[]): {
         return { primary: cluster[0], secondaryCount: 0 };
     }
 
-    const tierWeight = (tier: FindingConfidenceTier) =>
-        tier === TIER_PRESCRIPTIVE
-            ? TIER_WEIGHT_PRESCRIPTIVE
-            : tier === TIER_ACTIONABLE
-              ? TIER_WEIGHT_ACTIONABLE
-              : TIER_WEIGHT_ADVISORY;
-
     let bestIdx = 0;
     for (let i = 1; i < cluster.length; i++) {
         const best = cluster[bestIdx];
         const cand = cluster[i];
-        const wBest = tierWeight(best.tier);
-        const wCand = tierWeight(cand.tier);
+        const wBest = resolveTierWeight(best.tier);
+        const wCand = resolveTierWeight(cand.tier);
         if (wCand > wBest || (wCand === wBest && cand.confidence > best.confidence)) {
             bestIdx = i;
         }
@@ -245,7 +259,78 @@ function resolveClusterPrimary(cluster: ArbitratedFinding[]): {
     }
 
     primary.clusteredFindings = (primary.clusteredFindings || []).concat(secondaries);
+    stampClusterCorrelation(primary, secondaries);
     return { primary, secondaryCount: secondaries.length };
+}
+
+function clusterSemanticFileFindings(fileFindings: ArbitratedFinding[]): {
+    primaries: ArbitratedFinding[];
+    clusteredCount: number;
+} {
+    if (fileFindings.length <= 1) {
+        return { primaries: fileFindings, clusteredCount: 0 };
+    }
+    fileFindings.sort(
+        (itemA, itemB) => itemA.issue.location.start.line - itemB.issue.location.start.line,
+    );
+    const consumed = new Uint8Array(fileFindings.length);
+    const primaries: ArbitratedFinding[] = [];
+    const reusableCluster: ArbitratedFinding[] = [];
+    let clusteredCount = 0;
+
+    for (let i = 0; i < fileFindings.length; i++) {
+        if (consumed[i] === 1) continue;
+        const anchor = fileFindings[i];
+        reusableCluster.length = 0;
+        reusableCluster.push(anchor);
+        consumed[i] = 1;
+
+        for (let j = i + 1; j < fileFindings.length; j++) {
+            if (consumed[j] === 1) continue;
+            const candidate = fileFindings[j];
+            if (candidate.issue.location.start.line - anchor.issue.location.start.line > 2) {
+                break;
+            }
+            if (rulesShareCluster(anchor.issue.rule, candidate.issue.rule)) {
+                reusableCluster.push(candidate);
+                consumed[j] = 1;
+            }
+        }
+
+        const outcome = resolveClusterPrimary(reusableCluster);
+        primaries.push(outcome.primary);
+        clusteredCount += outcome.secondaryCount;
+    }
+
+    return { primaries, clusteredCount };
+}
+
+/**
+ * Clusters semantically overlapping findings sharing an OVERLAP_CLUSTERS definition.
+ *
+ * @param candidates - List of active arbitrated findings.
+ * @returns Deduplicated primary findings and total clustered secondary count.
+ */
+export function clusterSemanticOverlapFindings(candidates: ArbitratedFinding[]): {
+    primaries: ArbitratedFinding[];
+    clusteredCount: number;
+} {
+    if (candidates.length <= 1) {
+        return { primaries: candidates, clusteredCount: 0 };
+    }
+    const fileMap = groupFindingsByFile(candidates);
+    const primaries: ArbitratedFinding[] = [];
+    let clusteredCount = 0;
+
+    for (const fileFindings of fileMap.values()) {
+        const outcome = clusterSemanticFileFindings(fileFindings);
+        for (let i = 0; i < outcome.primaries.length; i++) {
+            primaries.push(outcome.primaries[i]);
+        }
+        clusteredCount += outcome.clusteredCount;
+    }
+
+    return { primaries, clusteredCount };
 }
 
 function appendFindingToFileMap(
@@ -344,4 +429,99 @@ export function resolveBatchClustering(
         finalActiveFindings: outcome.primaries,
         clusteredCount: outcome.clusteredCount,
     };
+}
+
+/**
+ * Stamps per-finding adjudicated tier, calibrated confidence, and semantic overlap correlations
+ * directly onto each raw Issue in-place after arbitration completes.
+ *
+ * @param findings - Full list of arbitrated findings from FindingConfidenceArbiter.
+ */
+export function stampAdjudicatedIssues(findings: readonly ArbitratedFinding[]): void {
+    const activeCandidates: ArbitratedFinding[] = [];
+    for (let i = 0; i < findings.length; i++) {
+        const finding = findings[i];
+        if (finding.isSuppressed) continue;
+        finding.issue.adjudicatedTier =
+            finding.tier === TIER_PRESCRIPTIVE
+                ? 'T1'
+                : finding.tier === TIER_ACTIONABLE
+                  ? 'T2'
+                  : 'T3';
+        finding.issue.adjudicatedConfidence = finding.confidence;
+        if (!finding.isPrunedBySlice) {
+            activeCandidates.push(finding);
+        }
+    }
+    if (activeCandidates.length > 1) {
+        clusterSemanticOverlapFindings(activeCandidates);
+    }
+}
+
+/**
+ * Maps each rule to the strongest tier the arbiter assigned it in this report.
+ *
+ * @param findings - Every arbitrated finding, including suppressed and clustered ones.
+ * @returns Rule id to tier map, using the AAS tier vocabulary.
+ */
+export function resolveRuleTiers(
+    findings: readonly { issue: { rule: string }; tier: string; isSuppressed: boolean }[],
+): Record<string, 'T1' | 'T2' | 'T3'> {
+    const rank: Record<string, number> = { prescriptive: 3, actionable: 2, advisory: 1 };
+    const best = new Map<string, { tier: 'T1' | 'T2' | 'T3'; rank: number }>();
+    for (const finding of findings) {
+        if (finding.isSuppressed) continue;
+        const currentRank = rank[finding.tier] ?? 0;
+        const existing = best.get(finding.issue.rule);
+        if (existing && existing.rank >= currentRank) continue;
+        best.set(finding.issue.rule, {
+            tier:
+                finding.tier === 'prescriptive'
+                    ? 'T1'
+                    : finding.tier === 'actionable'
+                      ? 'T2'
+                      : 'T3',
+            rank: currentRank,
+        });
+    }
+    const tiers: Record<string, 'T1' | 'T2' | 'T3'> = {};
+    for (const [rule, entry] of best) tiers[rule] = entry.tier;
+    return tiers;
+}
+
+/**
+ * Groups arbitrated findings by rule and reports which rules never reached a blocking tier.
+ *
+ * @param findings - Every arbitrated finding, including suppressed and clustered ones.
+ * @returns Rule ids whose every active finding was classified non-blocking.
+ */
+export function resolveAdvisoryOnlyRules(
+    findings: readonly { issue: { rule: string }; mustBlock: boolean; isSuppressed: boolean }[],
+): string[] {
+    const blockingRules = new Set<string>();
+    const activeRules = new Set<string>();
+    for (const finding of findings) {
+        if (finding.isSuppressed) continue;
+        activeRules.add(finding.issue.rule);
+        if (finding.mustBlock) blockingRules.add(finding.issue.rule);
+    }
+    const advisoryOnly: string[] = [];
+    for (const rule of activeRules) {
+        if (!blockingRules.has(rule)) advisoryOnly.push(rule);
+    }
+    return advisoryOnly;
+}
+
+/**
+ * Counts active findings whose rule carries no outcome history.
+ *
+ * @param findings - Every arbitrated finding, including suppressed and clustered ones.
+ * @returns Number of non-suppressed findings scored from the analyzer's self-report alone.
+ */
+export function countUncalibrated(findings: readonly ArbitratedFinding[]): number {
+    let count = 0;
+    for (const finding of findings) {
+        if (!finding.isSuppressed && finding.confidenceSource === 'uncalibrated') count += 1;
+    }
+    return count;
 }

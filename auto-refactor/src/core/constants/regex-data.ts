@@ -96,6 +96,7 @@ export const DATA_LOCK_ACQUIRE_PATTERN = /\b(?:acquire|lock|mutex\.lock)\s*\(/i;
 /** Matches await keyword in asynchronous execution paths. */
 export const DATA_AWAIT_KEYWORD_PATTERN = /\bawait\s+/;
 
+/** Frozen domain namespace aggregating data access, query, and concurrency patterns. */
 export const REGEX_DATA = Object.freeze({
     STORAGE_RECEIVER_QUERY: DATA_STORAGE_RECEIVER_QUERY_PATTERN,
     DIRECT_QUERY_METHOD: DATA_DIRECT_QUERY_METHOD_PATTERN,

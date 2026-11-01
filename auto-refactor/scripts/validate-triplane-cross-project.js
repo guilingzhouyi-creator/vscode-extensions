@@ -43,6 +43,7 @@ const {
   FeedbackIncidentLedger,
   FeedbackAdaptiveSupervisor,
 } = require('../dist/api');
+const { resolveHistoricalQualityScore } = require('../dist/core/scoring/rolling-sampling-governor');
 
 /**
  * Build dynamic evidence DTO matching project profile.
@@ -75,11 +76,11 @@ function buildProjectTelemetry(projectId) {
       circuitBreakerTrips: 0,
       degradedDegradationCount: 0,
     };
-    base.testCoverage = {
-      lineCoveragePercent: 96.5,
-      branchCoveragePercent: 92.0,
-      functionCoveragePercent: 97.2,
-      tautologicalTestCount: 0,
+    base.execution = {
+      lineCoveragePct: 96.5,
+      branchCoveragePct: 92.0,
+      callCount: 44000,
+      invocationsPerHour: 158400,
     };
   } else if (projectId === 'workspace-timing') {
     base.latency = { p50Ms: 1.2, p95Ms: 4.5, p99Ms: 8.2, budgetMs: 16.67 };
@@ -102,11 +103,11 @@ function buildProjectTelemetry(projectId) {
       circuitBreakerTrips: 0,
       degradedDegradationCount: 0,
     };
-    base.testCoverage = {
-      lineCoveragePercent: 91.4,
-      branchCoveragePercent: 88.0,
-      functionCoveragePercent: 93.5,
-      tautologicalTestCount: 0,
+    base.execution = {
+      lineCoveragePct: 91.4,
+      branchCoveragePct: 88.0,
+      callCount: 12000,
+      invocationsPerHour: 43200,
     };
   } else if (projectId === 'WebGames') {
     base.latency = { p50Ms: 0.8, p95Ms: 3.1, p99Ms: 6.5, budgetMs: 16.67 };
@@ -129,11 +130,11 @@ function buildProjectTelemetry(projectId) {
       circuitBreakerTrips: 0,
       degradedDegradationCount: 0,
     };
-    base.testCoverage = {
-      lineCoveragePercent: 89.2,
-      branchCoveragePercent: 84.5,
-      functionCoveragePercent: 90.0,
-      tautologicalTestCount: 0,
+    base.execution = {
+      lineCoveragePct: 89.2,
+      branchCoveragePct: 84.5,
+      callCount: 64800,
+      invocationsPerHour: 233280,
     };
   }
 
@@ -272,7 +273,14 @@ async function main() {
 
     // 3. Adaptive Weighting & Cross-Plane Fusion
     const weights = resolveAdaptiveFusionWeights(proj.profile, true, true);
-    const unified = computeUnifiedQualityScore(staticVector, dynamicVector, 95.0, proj.profile);
+    const observedHistory =
+      resolveHistoricalQualityScore({ root: path.resolve(__dirname, '..') }) ?? staticScore;
+    const unified = computeUnifiedQualityScore(
+      staticVector,
+      dynamicVector,
+      observedHistory,
+      proj.profile,
+    );
 
     // 4. Cross-Plane Risk Resonance
     const sampleIssue = buildProjectSampleIssue(proj.id);
@@ -282,11 +290,11 @@ async function main() {
       impactScope: 'file',
     });
 
-    const sampleDynamicRisk = computeDynamicHotspotRisk({
-      relativeExecutionFreq: 0.8,
-      latencyContributionRatio: 0.6,
-      throughputSensitivity: 0.7,
-      errorFrequency: 0.0,
+    const sampleDynamicRisk = computeDynamicHotspotRisk(proj.id, {
+      invocationsPerHour: 180000,
+      behavioralScope: 3.5,
+      resourceConsumption: 6.0,
+      businessSensitivity: 4.0,
     });
 
     const fusedRisk = fuseIssueRisks(sampleStaticRisk, sampleDynamicRisk, 1.0, {

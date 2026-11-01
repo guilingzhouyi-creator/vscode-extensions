@@ -40,6 +40,7 @@ export type EscalationType =
     | 'SPECULATIVE_INVALIDATION'
     | 'COLD_COMPENSATION_VIOLATION';
 
+/** Canonical escalation event discriminator when cold-track validation refutes a fast pass. */
 export const EVENT_COLD_COMPENSATION_VIOLATION: EscalationType = 'COLD_COMPENSATION_VIOLATION';
 
 /**

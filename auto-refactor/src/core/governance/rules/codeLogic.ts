@@ -19,9 +19,7 @@ import { isToolOrTestScript } from '../pathScope';
 import type { NormalizedNode } from '../../ast/multilang';
 import { NodeKind } from '../../ast/multilang';
 import { CODE_NUM_PRECISION_LOSSY, CODE_NUM_UNBOUNDED_CONDITION } from '../../constants/rule-codes';
-
-/** Default nesting-depth threshold for GOV-LOG-001 when `maxNestingDepth` is not configured. */
-const DEFAULT_MAX_NESTING_DEPTH = 5;
+import { MAX_CONTROL_FLOW_NESTING_DEPTH } from '../../constants/diagnostic-tokens';
 
 /** Maximum inclusive source span for a function to count as a trivial pass-through wrapper. */
 const MAX_PASSTHROUGH_LINE_COUNT = 3;
@@ -127,7 +125,7 @@ export const ExcessiveNestingRule: GovernanceRule = {
         if (isToolOrTestScript(ctx.filePath)) return null;
 
         const maxNesting = calculateMaxNesting(ctx.node);
-        const threshold = ctx.ctx.options?.maxNestingDepth ?? DEFAULT_MAX_NESTING_DEPTH;
+        const threshold = ctx.ctx.options?.maxNestingDepth ?? MAX_CONTROL_FLOW_NESTING_DEPTH;
         if (maxNesting <= threshold) return null;
 
         const fnName = ctx.node.name ?? ctx.binding ?? 'anonymous';

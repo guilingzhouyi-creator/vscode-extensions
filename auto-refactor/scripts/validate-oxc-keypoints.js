@@ -97,7 +97,7 @@ const CONFIG = {
 /**
  * Reduce a scan report to the fields that the parser-parity assertion compares.
  *
- * @param scanReport - Raw report returned by `scan`; only summary, issues, and fileMetrics are read.
+ * @param scanReport - Raw report from `scan`; reads summary, issues, and fileMetrics.
  * @returns Deterministic pretty-printed JSON used for the byte-for-byte fast-path comparison.
  */
 function normalize(scanReport) {

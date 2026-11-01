@@ -30,9 +30,11 @@ import type {
 export type { AgentTopologyLayer } from '../reporters/agent-directives-types';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
 import { getRoleBudget } from '../intelligence/elastic-budget-matrix';
+import { compressDiagnosticSentence, cleanSuggestion } from '../reporting/aas-remediation';
 
 /** Maximum number of memory rule hits rendered as frequent violations in the guidance prompt. */
 const MAX_MEMORY_RULE_HITS = 5;
+const VERBOSE_DIRECTIVE_THRESHOLD = 55;
 
 const LAYER_DOMAIN = 'domain';
 const LAYER_INFRASTRUCTURE = 'infrastructure';
@@ -162,7 +164,11 @@ function extractMemoryViolations(
     } else if (memory) {
         for (const memoryHit of memory.ruleHits.slice(0, MAX_MEMORY_RULE_HITS)) {
             frequentViolations.push(
-                GuidanceMessages.FORMAT_VIOLATION(memoryHit.rule, memoryHit.line, memoryHit.message),
+                GuidanceMessages.FORMAT_VIOLATION(
+                    memoryHit.rule,
+                    memoryHit.line,
+                    memoryHit.message,
+                ),
             );
         }
     }
@@ -461,8 +467,18 @@ function renderClarifyDirective(params: DirectiveRenderParams): CompactGuardDire
 function renderGuardDirective(params: DirectiveRenderParams): CompactGuardDirective {
     const { issue, directiveSeverity, targetFile, lineNumber } = params;
     const ruleId = issue.rule;
-    const summary = (issue.message || '').replace(/\s+/g, ' ').trim();
-    const fixHint = issue.suggestion ? issue.suggestion.replace(/\s+/g, ' ').trim() : undefined;
+    const rawMessage = (issue.message || '').replace(/\s+/g, ' ').trim();
+    const summary =
+        rawMessage.length >= VERBOSE_DIRECTIVE_THRESHOLD
+            ? compressDiagnosticSentence(rawMessage)
+            : rawMessage;
+    const rawSuggestion = issue.suggestion
+        ? issue.suggestion.replace(/\s+/g, ' ').trim()
+        : undefined;
+    const fixHint =
+        rawSuggestion && rawSuggestion.length >= VERBOSE_DIRECTIVE_THRESHOLD
+            ? cleanSuggestion(rawSuggestion)
+            : rawSuggestion;
     const fixPart = fixHint ? ` Fix: ${fixHint}` : '';
     const actionable = issue.actionable;
     const actionPart = actionable
@@ -495,7 +511,13 @@ export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective
     const lineNumber = issue.location?.start?.line ?? 1;
 
     const clarify = extractClarificationRequest(issue);
-    const renderParams: DirectiveRenderParams = { issue, directiveSeverity, targetFile, lineNumber, clarify };
+    const renderParams: DirectiveRenderParams = {
+        issue,
+        directiveSeverity,
+        targetFile,
+        lineNumber,
+        clarify,
+    };
     if (clarify) {
         return renderClarifyDirective(renderParams);
     }
@@ -515,7 +537,9 @@ export function formatCompactAgentPrompt(
     issues: Issue[],
     protocolVersion?: '1.0' | '2.0',
 ): CompactAgentPrompt {
-    const directives = issues.map(formatCompactGuardDirective);
+    const primaryIssues = issues.filter((issueItem) => !issueItem.clusteredInto);
+    const effectiveIssues = primaryIssues.length > 0 ? primaryIssues : issues;
+    const directives = effectiveIssues.map(formatCompactGuardDirective);
     const hasBlock = directives.some((directive) => directive.severity === VERDICT_BLOCK);
     const hasWarn = directives.some((directive) => directive.severity === VERDICT_WARN);
     const verdict = hasBlock ? VERDICT_BLOCK : hasWarn ? VERDICT_WARN : VERDICT_PASS;
@@ -711,16 +735,30 @@ const ZERO_HEAP_MSG_RE = /(?:loop|allocation)/;
 const IMMUTABLE_MSG_RE = /(?:immutable|freeze)/;
 
 function isPurityRequired(layer: AgentTopologyLayer, diagnosticMessage: string): boolean {
-    return layer === LAYER_L1_CONTRACT || layer === LAYER_L2_OPERATOR || PURITY_MSG_RE.test(diagnosticMessage);
-}
-
-function isZeroHeapRequired(rule: string, layer: AgentTopologyLayer, diagnosticMessage: string): boolean {
     return (
-        layer === LAYER_L2_OPERATOR || ZERO_HEAP_RULE_RE.test(rule) || ZERO_HEAP_MSG_RE.test(diagnosticMessage)
+        layer === LAYER_L1_CONTRACT ||
+        layer === LAYER_L2_OPERATOR ||
+        PURITY_MSG_RE.test(diagnosticMessage)
     );
 }
 
-function isImmutableRequired(rule: string, layer: AgentTopologyLayer, diagnosticMessage: string): boolean {
+function isZeroHeapRequired(
+    rule: string,
+    layer: AgentTopologyLayer,
+    diagnosticMessage: string,
+): boolean {
+    return (
+        layer === LAYER_L2_OPERATOR ||
+        ZERO_HEAP_RULE_RE.test(rule) ||
+        ZERO_HEAP_MSG_RE.test(diagnosticMessage)
+    );
+}
+
+function isImmutableRequired(
+    rule: string,
+    layer: AgentTopologyLayer,
+    diagnosticMessage: string,
+): boolean {
     return (
         layer === LAYER_L1_CONTRACT ||
         layer === LAYER_L3_CONFIG ||

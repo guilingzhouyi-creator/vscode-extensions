@@ -20,7 +20,6 @@ const FILE_BASELINE = 'self-audit-baseline.json';
 /** Token-frugal, topologically-grouped AAS v1.0 report. */
 const FILE_BASELINE_AAS = 'self-audit-baseline.aas.json';
 const STDIO_MODE_PIPE = 'pipe';
-const KEY_COMPOSITE_SCORE = 'compositeScore';
 const PILLAR_LABEL_WIDTH = 16;
 const DIMENSION_LABEL_WIDTH = 24;
 
@@ -31,9 +30,6 @@ const { execSync } = require(MODULE_CHILD_PROCESS);
 const {
   scan,
   createAuditSnapshot,
-  scoreFileQuality,
-  aggregateProjectScore,
-  extractDomainName,
   TrajectoryAccumulator,
   ALL_QUALITY_DIMENSIONS,
   toAasJson,
@@ -53,8 +49,6 @@ const BASELINE_AAS_OUTPUT = path.join(REPORTS_DIR, FILE_BASELINE_AAS);
 const TRAJECTORY_DIR = path.join(ROOT, '.refactor-trajectory');
 const BASELINE_SIGNATURES_FILE = path.join(TRAJECTORY_DIR, 'baseline-signatures.json');
 
-const TIER_CRITICAL = 'critical';
-const TIER_HIGH = 'high';
 const MODULE_NAME_AUTO_ENGINE = 'auto-refactor-engine';
 const AGENT_NAME_SELF_AUDIT = 'self-audit-engine';
 const DEFAULT_MAX_SCORE = 100.0;
@@ -62,62 +56,10 @@ const DIGEST_REVISION_LENGTH = 8;
 const PROGRESS_BAR_SEGMENTS = 20;
 const PROGRESS_BAR_MAX = 100;
 const HOTSPOTS_DISPLAY_LIMIT = 5;
-const TOP_HOTSPOTS_LIMIT = 10;
 const DEBT_SAMPLE_LIMIT = 50;
 const MILLISECONDS_PER_SECOND = 1000;
 const PERCENT_MULTIPLIER = 100;
 const RUN_LOG_LEVEL_WARN = 'warn';
-
-/**
- * Compute eight-pillar scores for each scanned file.
- *
- * @param fileIssuesMap - Map of file paths to their detected issues.
- * @returns Array of file quality score objects.
- */
-function computeFileScores(fileIssuesMap) {
-  const fileScores = [];
-  for (const [filePath, fIssues] of fileIssuesMap.entries()) {
-    const absPath = path.isAbsolute(filePath) ? filePath : path.join(ROOT, filePath);
-    let content = '';
-    try {
-      if (fs.existsSync(absPath)) {
-        content = fs.readFileSync(absPath, 'utf8');
-      }
-    } catch {
-      content = '';
-    }
-    const domain = extractDomainName(filePath);
-    const moduleName = path.basename(path.dirname(filePath));
-    const score = scoreFileQuality(filePath, content, fIssues, domain, moduleName);
-    fileScores.push(score);
-  }
-  return fileScores;
-}
-
-/**
- * Identify top 10 refactoring hotspots ranked by issue volume.
- *
- * @param fileScores - List of file scores.
- * @returns Top 10 hotspot summary records.
- */
-function computeTopHotspots(fileScores) {
-  return [...fileScores]
-    .sort((a, b) => b.issues.length - a.issues.length)
-    .slice(0, TOP_HOTSPOTS_LIMIT)
-    .map((f) => {
-      const cCount = f.issues.filter((i) => classifyDebtTier(i) === TIER_CRITICAL).length;
-      const hCount = f.issues.filter((i) => classifyDebtTier(i) === TIER_HIGH).length;
-      return {
-        filePath: f.filePath,
-        domain: f.domainName,
-        totalIssues: f.issues.length,
-        criticalCount: cCount,
-        highCount: hCount,
-        [KEY_COMPOSITE_SCORE]: f.compositeScore,
-        effectiveDensity: f.effectiveDensity,
-      };
-    });
-}
 
 /**
  * Collects scanned file contents for AST block fingerprinting and ELOC evaluation.
@@ -291,6 +233,8 @@ async function recordRunToTrajectory(params) {
         semantic: diffCounters?.semantic || 0,
       },
       lifetime: prevLt,
+      lifetimeSummary: prevLt,
+      isFirstBaseline: Boolean(params.prevBaseline?.trajectory?.isFirstBaseline),
       gateVerdict: { pass: true },
     };
   }
@@ -407,7 +351,7 @@ function buildBaselineReport(params) {
         domainName: d.domainName,
         compositeScore: d.compositeScore,
         pillars: d.pillars,
-        moduleCount: d.modules.length,
+        moduleCount: typeof d.moduleCount === 'number' ? d.moduleCount : (d.modules?.length ?? 0),
       })),
     },
     trajectory: {
@@ -416,22 +360,6 @@ function buildBaselineReport(params) {
       isFirstBaseline: params.trajectoryRes.isFirstBaseline,
     },
   };
-}
-
-/**
- * Populates zero-defect files into the map to avoid survivorship bias in scoring.
- *
- * @param fileIssuesMap - Map of file paths to detected issues.
- * @param fileMetrics - Array of metrics returned by scanner.
- */
-function populateZeroDefectFiles(fileIssuesMap, fileMetrics) {
-  if (!Array.isArray(fileMetrics)) return;
-  for (const m of fileMetrics) {
-    const file = m.file ?? m.filePath;
-    if (file && !fileIssuesMap.has(file)) {
-      fileIssuesMap.set(file, []);
-    }
-  }
 }
 
 /**
@@ -457,37 +385,54 @@ function resolveAuditScanConfig(options) {
   };
 }
 
+function buildFileContentLookup(scannedFilesList) {
+  const fileContentMap = new Map();
+  if (!Array.isArray(scannedFilesList)) return fileContentMap;
+  for (const entry of scannedFilesList) {
+    if (!entry || !entry.filePath || typeof entry.content !== 'string') continue;
+    const rawNormalized = entry.filePath.replace(/\\/g, '/');
+    fileContentMap.set(rawNormalized, entry.content);
+    const relPath = path.isAbsolute(entry.filePath)
+      ? path.relative(ROOT, entry.filePath).replace(/\\/g, '/')
+      : rawNormalized;
+    fileContentMap.set(relPath, entry.content);
+  }
+  return fileContentMap;
+}
+
 /**
  * Persists baseline report, AAS stream, and defect signatures to disk.
  *
  * @param params - Persistence configuration and reports.
  */
 function writeAuditOutputs(params) {
-  const { baselineOutput, aasOutput, trajectoryDir, snapshot, scanReport, baselineReport, issues } = params;
+  const {
+    baselineOutput,
+    aasOutput,
+    trajectoryDir,
+    snapshot,
+    scanReport,
+    baselineReport,
+    issues,
+    scannedFilesList,
+    skipTrajectoryWrite,
+  } = params;
   fs.writeFileSync(baselineOutput, JSON.stringify(baselineReport, null, 2) + '\n', 'utf8');
 
-  const cai = baselineReport.metrics.autonomyRate;
-  const healthOverride = {
-    score: baselineReport.metrics.compositeScore,
-    grade: baselineReport.metrics.grade,
-    density: baselineReport.metrics.effectiveCodeDensity,
-    tensorSummary: baselineReport.metrics.densityTensorSummary,
-    sqale: baselineReport.metrics.sqale,
-    polyglot: baselineReport.metrics.polyglotGeneralization,
-  };
-  if (typeof cai === 'number') {
-    healthOverride.cai = cai;
-  }
-
+  const fileContentMap = buildFileContentLookup(scannedFilesList);
   const aasContent = toAasJson(scanReport, {
     baseDir: ROOT,
-    healthOverride,
+    includeDimensionDetails: true,
+    fileReader: (relativeFilePath) =>
+      fileContentMap.get(String(relativeFilePath).replace(/\\/g, '/')),
   });
   fs.writeFileSync(aasOutput, aasContent + '\n', 'utf8');
 
-  const newSignaturesMap = serializeBaselineSignatures(issues);
-  const rev = snapshot.rulesDigest.slice(0, DIGEST_REVISION_LENGTH);
-  writeBaselineSignatures(newSignaturesMap, rev, trajectoryDir);
+  if (!skipTrajectoryWrite) {
+    const newSignaturesMap = serializeBaselineSignatures(issues);
+    const rev = snapshot.rulesDigest.slice(0, DIGEST_REVISION_LENGTH);
+    writeBaselineSignatures(newSignaturesMap, rev, trajectoryDir);
+  }
 }
 
 /**
@@ -506,18 +451,30 @@ async function runSelfAudit(options = {}) {
   const scanReport = await scan(scanConfig);
 
   const durationMs = Date.now() - startTime;
-  const issues = Array.isArray(scanReport.issues) ? scanReport.issues : [];
+  const rawIssues = Array.isArray(scanReport.issues) ? scanReport.issues : [];
+  const issues = rawIssues.filter((issue) => !issue.clusteredInto);
   const filesScanned = scanReport.summary?.filesScanned ?? 0;
 
-  const { debtByTier, criticalItems, highItems, fileIssuesMap } = buildDebtLedger(issues);
-  populateZeroDefectFiles(fileIssuesMap, scanReport.fileMetrics);
-
-  const fileScores = computeFileScores(fileIssuesMap);
-  const projectScore = aggregateProjectScore(fileScores);
-  const topHotspots = computeTopHotspots(fileScores);
+  const { debtByTier, criticalItems, highItems } = buildDebtLedger(issues);
+  const governance = scanReport.governance;
+  if (!governance) {
+    throw new Error('ScanReport is missing native governance breakdown.');
+  }
+  const projectScore = {
+    compositeScore: governance.hierarchicalCompositeScore,
+    grade: governance.grade,
+    eightPillars: governance.eightPillars,
+    tenDimensions: governance.tenDimensions,
+    effectiveCodeDensity: governance.effectiveCodeDensity,
+    densityTensorSummary: governance.densityTensorSummary,
+    domains: governance.domains,
+  };
+  const topHotspots = governance.topHotspots;
 
   const persist = options.persist !== false;
-  const trajectoryDir = options.trajectoryDir ?? (persist ? TRAJECTORY_DIR : null);
+  const skipTrajectoryWrite = Boolean(options.skipTrajectoryWrite);
+  const trajectoryDir =
+    options.trajectoryDir ?? (persist && !skipTrajectoryWrite ? TRAJECTORY_DIR : null);
 
   const scannedFilesList =
     persist || Boolean(trajectoryDir) ? collectScannedFiles(scanReport.fileMetrics) : [];
@@ -530,7 +487,7 @@ async function runSelfAudit(options = {}) {
     prevBaseline,
     issues,
     trajectoryDir,
-    persist,
+    persist: persist && !skipTrajectoryWrite,
   });
 
   const baselineReport = buildBaselineReport({
@@ -556,6 +513,8 @@ async function runSelfAudit(options = {}) {
       scanReport,
       baselineReport,
       issues,
+      scannedFilesList,
+      skipTrajectoryWrite,
     });
   }
 
@@ -690,7 +649,10 @@ function printTerminalDashboard(report, isCheckMode = false) {
   }
   if (report.metrics.densityTensorSummary) {
     const ts = report.metrics.densityTensorSummary;
-    const mDist = ts.averageMahalanobisDistance !== undefined ? ` | Mahalanobis: ${ts.averageMahalanobisDistance.toFixed(2)}` : '';
+    const mDist =
+      ts.averageMahalanobisDistance !== undefined
+        ? ` | Mahalanobis: ${ts.averageMahalanobisDistance.toFixed(2)}`
+        : '';
     console.log(
       `5D Tensor      : TSPR ${(ts.averageTspr * PERCENT_MULTIPLIER).toFixed(0)}% | POR ${(ts.averagePor * PERCENT_MULTIPLIER).toFixed(0)}% | ColDensity ${(ts.averageColumnDensity * PERCENT_MULTIPLIER).toFixed(0)}%${mDist}`,
     );
@@ -714,7 +676,9 @@ function printTerminalDashboard(report, isCheckMode = false) {
 function assertCompositeRegression(report, prev) {
   const prevScore = prev?.metrics?.compositeScore;
   if (typeof prevScore === 'number' && report.metrics.compositeScore < prevScore - 0.05) {
-    console.error(`❌ Quality regression: ${report.metrics.compositeScore} < baseline ${prevScore}`);
+    console.error(
+      `❌ Quality regression: ${report.metrics.compositeScore} < baseline ${prevScore}`,
+    );
     process.exit(1);
   }
 }
@@ -724,8 +688,14 @@ function assertDimensionRegression(report, prev) {
   const MAX_TOLERANCE = 3.0;
   for (const [dim, prevVal] of Object.entries(prev.tenDimensions)) {
     const currVal = report.tenDimensions[dim];
-    if (typeof prevVal === 'number' && typeof currVal === 'number' && currVal < prevVal - MAX_TOLERANCE) {
-      console.error(`❌ Dimension regression in [${dim}]: ${currVal.toFixed(1)} < ${prevVal.toFixed(1)}`);
+    if (
+      typeof prevVal === 'number' &&
+      typeof currVal === 'number' &&
+      currVal < prevVal - MAX_TOLERANCE
+    ) {
+      console.error(
+        `❌ Dimension regression in [${dim}]: ${currVal.toFixed(1)} < ${prevVal.toFixed(1)}`,
+      );
       process.exit(1);
     }
   }
@@ -766,9 +736,11 @@ if (require.main === module) {
   const isCheckMode =
     args.includes('--check') || args.includes('--dry-run') || args.includes('--verify');
   const isUpdateMode = args.includes('--update') || args.includes('--write');
+  const isReportsOnly = args.includes('--reports-only');
 
   runSelfAudit({
-    persist: isUpdateMode || !isCheckMode,
+    persist: isUpdateMode || isReportsOnly || !isCheckMode,
+    skipTrajectoryWrite: isReportsOnly,
     check: isCheckMode,
   })
     .then((report) => {

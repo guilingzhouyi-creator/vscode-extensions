@@ -261,9 +261,9 @@ function makeContext(
 
 /**
  * Obtain an analyzer instance for a streaming entry. Reuses the pre-instantiated planItem.instance
- * when stateless or when it implements resetState() (eliminating 25,000+ transient heap allocations
- * across repository scans under ADV-PRF-002), falling back to planItem.factory() when fresh isolation
- * is explicitly requested (e.g. after a projector failure).
+ * when stateless or when it implements resetState() (eliminating 25,000+ transient heap
+ * allocations across repository scans under ADV-PRF-002), falling back to planItem.factory() when
+ * fresh isolation is explicitly requested (e.g. after a projector failure).
  *
  * @param planItem - Resolved analyzer metadata and factory.
  * @param forceFresh - When true, bypasses instance reuse and forces fresh factory instantiation.
@@ -285,8 +285,8 @@ function resolveStreamingAnalyzer(planItem: ResolvedAnalyzer, forceFresh = false
 }
 
 /**
- * Build the streaming entries: one reusable or fresh analyzer instance per streaming analyzer, plus the
- * per-run metric collector as the final entry.
+ * Build the streaming entries: one reusable or fresh analyzer instance per streaming analyzer,
+ * plus the per-run metric collector as the final entry.
  *
  * @param partition - Streaming/legacy split; only streaming analyzers get entries.
  * @param metric - Per-run metric collector appended as the last entry.

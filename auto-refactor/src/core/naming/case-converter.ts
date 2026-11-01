@@ -20,7 +20,7 @@ const SPLIT_CAMEL_CASE_PATTERN = /([a-z0-9])([A-Z])/g;
 const MORPHEME_TOKEN_PATTERN = /([A-Z]+(?=[A-Z][a-z0-9]|$)|[A-Z]?[a-z0-9]+)/g;
 
 /**
- * Extracts camelCase / PascalCase / acronym morpheme tokens from a single segment without delimiters.
+ * Extracts camelCase, PascalCase, and acronym morpheme tokens from a delimiter-free segment.
  *
  * @param segment - Delimiter-free identifier segment.
  * @returns Array of matched morpheme tokens (preserving original casing).
@@ -128,7 +128,7 @@ export function toKebabCase(ident: string): string {
 }
 
 /**
- * Splits an identifier into individual words across camelCase, PascalCase, and delimiter boundaries.
+ * Splits an identifier into words across camelCase, PascalCase, and delimiter boundaries.
  *
  * @param ident - Source identifier string.
  * @returns Array of lowercase constituent word tokens.

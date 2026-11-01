@@ -500,12 +500,12 @@ function sampleItemsInDirectory(
 }
 
 /**
- * Iteratively sample directory files using BFS stratified sampling to determine language distribution
- * and discover total code file volume without LIFO truncation blind spots.
+ * Iteratively sample directory files using BFS stratified sampling to determine language
+ * distribution and discover total code file volume without LIFO truncation blind spots.
  *
  * @param rootResolved - Absolute project root directory path.
  * @param directorySemantics - Map to record directory semantics for discovered subdirectories.
- * @param partitions - Optional detected project partitions to ensure fair multi-stratum representation.
+ * @param partitions - Optional detected partitions ensuring fair multi-stratum representation.
  * @returns Map of language identifier to observed file count and total discovered code files.
  */
 function sampleDirectoryLanguages(

@@ -154,7 +154,7 @@ export function auditRegexSafety(pattern: string): string[] {
 
     // --- Nested quantifiers ---
     // Matches: (...)+, (...)* where the group body contains an unescaped repeating quantifier
-    // Strips non-capturing syntax prefixes (?:, ?=, ?!, ?<=, ?<!) so they don't trigger false positives.
+    // Strips non-capturing syntax prefixes (?:, ?=, ?!, ?<=, ?<!) to avoid false positives.
     const normalizedGroupPattern = pattern.replace(/\(\?[=!:<!]/g, '(');
     const nestedQuantRegex = /\((?:[^()]*[+*?][^()]*)\)[+*]/;
     if (nestedQuantRegex.test(normalizedGroupPattern)) {

@@ -36,10 +36,10 @@ const SCORE_TIER_B_PLUS = 90.0;
 const SCORE_TIER_B = 80.0;
 
 const FACTOR_A_PLUS = 1.25;
-const FACTOR_A = 1.10;
-const FACTOR_B_PLUS = 1.00;
-const FACTOR_B = 0.70;
-const FACTOR_DEGRADED = 0.40;
+const FACTOR_A = 1.1;
+const FACTOR_B_PLUS = 1.0;
+const FACTOR_B = 0.7;
+const FACTOR_DEGRADED = 0.4;
 
 const PERCENT_SCALE_HUNDRED = 100;
 const DEFAULT_LIMIT_MIN_CRITICAL = 1;
@@ -104,9 +104,7 @@ export interface ElasticDebtBudgetOptions {
  * Operational verdict returned by the elastic technical debt budget evaluator.
  */
 export type ElasticDebtBudgetVerdict =
-    | 'PERMITTED_ZERO_DEBT'
-    | 'PERMITTED_ELASTIC'
-    | 'BLOCKED_EXCEEDED_BUDGET';
+    'PERMITTED_ZERO_DEBT' | 'PERMITTED_ELASTIC' | 'BLOCKED_EXCEEDED_BUDGET';
 
 /**
  * Specific debt tier violation detail when a budget threshold is exceeded.
@@ -183,23 +181,33 @@ function resolveScaleFactor(totalFiles?: number): number {
     if (!totalFiles || totalFiles <= 0) {
         return 1.0;
     }
-    return Math.max(1.0, Math.round(Math.sqrt(totalFiles / REFERENCE_FILE_SCALE) * PERCENT_SCALE_HUNDRED) / PERCENT_SCALE_HUNDRED);
+    return Math.max(
+        1.0,
+        Math.round(Math.sqrt(totalFiles / REFERENCE_FILE_SCALE) * PERCENT_SCALE_HUNDRED) /
+            PERCENT_SCALE_HUNDRED,
+    );
 }
 
 /**
  * Computes composite weighted debt points across all tiers.
+ *
+ * @param counts - Issue counts grouped by debt tier.
+ * @param weights - Optional custom tier weights.
+ * @returns Weighted debt point total.
  */
 export function computeWeightedDebtPoints(
     counts: DebtTierCounts,
     weights: DebtTierWeights = DEFAULT_TIER_WEIGHTS,
 ): number {
-    return Math.round(
-        (counts.critical * weights.critical +
-            counts.high * weights.high +
-            counts.medium * weights.medium +
-            counts.low * weights.low) *
-        PERCENT_SCALE_HUNDRED,
-    ) / PERCENT_SCALE_HUNDRED;
+    return (
+        Math.round(
+            (counts.critical * weights.critical +
+                counts.high * weights.high +
+                counts.medium * weights.medium +
+                counts.low * weights.low) *
+                PERCENT_SCALE_HUNDRED,
+        ) / PERCENT_SCALE_HUNDRED
+    );
 }
 
 function computeRawObserved(observed: Partial<DebtTierCounts>): DebtTierCounts {
@@ -282,7 +290,12 @@ interface ViolationCheckParams {
 function collectViolations(params: ViolationCheckParams): DebtTierViolation[] {
     const { raw, delta, limits, weightedScore, weightedGrowth, maxGrowthLimit } = params;
     const violations: DebtTierViolation[] = [];
-    const critViolation = checkTierLimit(TIER_CRITICAL, raw.critical, delta.critical, limits.critical);
+    const critViolation = checkTierLimit(
+        TIER_CRITICAL,
+        raw.critical,
+        delta.critical,
+        limits.critical,
+    );
     if (critViolation) violations.push(critViolation);
     const highViolation = checkTierLimit(TIER_HIGH, raw.high, delta.high, limits.high);
     if (highViolation) violations.push(highViolation);
@@ -360,9 +373,9 @@ export function evaluateElasticDebtBudget(
         options.cumulative && options.totalFiles
             ? Math.max(DEFAULT_WEIGHTED_GROWTH_LIMIT, options.totalFiles * SCALE_RATIO_TEN)
             : Math.max(
-                DEFAULT_WEIGHTED_GROWTH_LIMIT,
-                Math.floor(DEFAULT_WEIGHTED_GROWTH_LIMIT * combinedFactor),
-            );
+                  DEFAULT_WEIGHTED_GROWTH_LIMIT,
+                  Math.floor(DEFAULT_WEIGHTED_GROWTH_LIMIT * combinedFactor),
+              );
     const maxGrowthLimit = options.maxWeightedGrowth ?? defaultGrowthLimit;
 
     const violations = collectViolations({
@@ -441,6 +454,9 @@ export interface DebtLedgerResult<T extends DebtIssueLike = DebtIssueLike> {
 
 /**
  * Classifies an issue finding into technical debt tiers (critical, high, medium, low).
+ *
+ * @param issue - Issue finding record to classify.
+ * @returns Classified technical debt tier.
  */
 export function classifyElasticDebtTier(issue: DebtIssueLike): ElasticDebtTier {
     const rule = issue.rule || '';
@@ -462,6 +478,9 @@ export function classifyElasticDebtTier(issue: DebtIssueLike): ElasticDebtTier {
 
 /**
  * Partitions issues into technical debt tiers and groups them by file path.
+ *
+ * @param issues - Read-only list of issue findings.
+ * @returns Partitioned debt ledger result.
  */
 export function buildDebtLedger<T extends DebtIssueLike>(
     issues: readonly T[],
@@ -472,6 +491,7 @@ export function buildDebtLedger<T extends DebtIssueLike>(
     const fileIssuesMap = new Map<string, T[]>();
 
     for (const issue of issues) {
+        if ((issue as { clusteredInto?: string }).clusteredInto) continue;
         const tier = classifyElasticDebtTier(issue);
         debtByTier[tier]++;
         const filePath = issue.location?.file || issue.file || 'unknown';
@@ -508,7 +528,8 @@ function normalizeRepoRelativeDebtPath(rawPath: string | undefined): string {
         norm = norm.slice(cwdNorm.length + 1);
     }
     const lastSlash = cwdNorm.lastIndexOf(PATH_SEPARATOR_SLASH);
-    const pkgPrefix = (lastSlash !== -1 ? cwdNorm.slice(lastSlash + 1) : cwdNorm) + PATH_SEPARATOR_SLASH;
+    const pkgPrefix =
+        (lastSlash !== -1 ? cwdNorm.slice(lastSlash + 1) : cwdNorm) + PATH_SEPARATOR_SLASH;
     const repoIdx = pkgPrefix.length > 1 ? norm.indexOf(pkgPrefix) : -1;
     if (repoIdx !== -1) {
         norm = norm.slice(repoIdx + pkgPrefix.length);
@@ -534,12 +555,16 @@ function extractIssueSignatureDesc(issue: DebtIssueLike): {
 
 /**
  * Serializes current issues into a compact per-file defect signature map.
+ *
+ * @param issues - Read-only list of issue findings.
+ * @returns Per-file serialized defect signature map.
  */
 export function serializeBaselineSignatures(
     issues: readonly DebtIssueLike[],
 ): Record<string, Array<{ r: string; l: number; t: ElasticDebtTier }>> {
     const files: Record<string, Array<{ r: string; l: number; t: ElasticDebtTier }>> = {};
     for (const issue of issues) {
+        if ((issue as { clusteredInto?: string }).clusteredInto) continue;
         const desc = extractIssueSignatureDesc(issue);
         if (!desc.normFile) continue;
         let list = files[desc.normFile];
@@ -605,9 +630,9 @@ function parseDefectRecord(raw: Record<string, unknown>): PreviousDefectCandidat
     const tier: ElasticDebtTier = VALID_ELASTIC_TIERS.has(rawTier)
         ? (rawTier as ElasticDebtTier)
         : classifyElasticDebtTier({
-            rule,
-            severity: resolveStringProp(raw, PROP_PAIR_SEVERITY, rawTier || SEVERITY_WARNING),
-        });
+              rule,
+              severity: resolveStringProp(raw, PROP_PAIR_SEVERITY, rawTier || SEVERITY_WARNING),
+          });
     return { rule, line, tier, matched: false };
 }
 
@@ -670,6 +695,9 @@ function sumUnmatchedPreviousCandidates(
 
 /**
  * Computes structural added/resolved debt points and regression count with +/-10 line tolerance.
+ *
+ * @param input - Structural debt delta input payload.
+ * @returns Added/resolved debt points and regression count.
  */
 export function calculateStructuralDebtDelta(input: StructuralDebtDeltaInput): {
     addedDebtPoints: number;
@@ -694,6 +722,7 @@ export function calculateStructuralDebtDelta(input: StructuralDebtDeltaInput): {
     let addedDebtPoints = 0;
     let regressionFindingsCount = 0;
     for (const issue of input.currentIssues) {
+        if ((issue as { clusteredInto?: string }).clusteredInto) continue;
         const desc = extractIssueSignatureDesc(issue);
         const key = `${desc.rule}#${desc.normFile}`;
         if (!matchPreviousDefectCandidate(prevSignatures.get(key), desc.line)) {
@@ -734,15 +763,18 @@ function shouldIncludeInElocDiff(filePath: string): boolean {
 
 /**
  * Estimates physical and semantic changed ELOC from `git diff --numstat` output.
+ *
+ * @param numstatRaw - Raw git diff numstat output string.
+ * @returns Physical and semantic ELOC change metrics, or undefined if empty.
  */
 export function estimateChangedElocFromNumstat(numstatRaw: string | undefined):
     | {
-        changed: number;
-        semantic: number;
-        added: number;
-        deleted: number;
-        modified: number;
-    }
+          changed: number;
+          semantic: number;
+          added: number;
+          deleted: number;
+          modified: number;
+      }
     | undefined {
     if (!numstatRaw || !numstatRaw.trim()) return undefined;
     let realAdded = 0;

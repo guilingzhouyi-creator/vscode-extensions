@@ -27,44 +27,16 @@ const RANK_MEDIAN = 50;
 const RANK_TAIL_95 = 95;
 const RANK_TAIL_99 = 99;
 
-const DEFAULT_MEDIAN_LATENCY_MS = 5.0;
-const DEFAULT_TAIL_95_LATENCY_MS = 12.0;
-const DEFAULT_TAIL_99_LATENCY_MS = 16.0;
-const DEFAULT_BUDGET_MS = 16.67;
-
-const DEFAULT_OPS_PER_SEC = 1000;
-const DEFAULT_TARGET_OPS_PER_SEC = 1000;
-
-const BYTES_PER_KB = 1024;
-const BYTES_PER_MB = BYTES_PER_KB * BYTES_PER_KB;
-const DEFAULT_PEAK_HEAP_MB = 50;
-const DEFAULT_PEAK_HEAP_BYTES = DEFAULT_PEAK_HEAP_MB * BYTES_PER_MB;
-const DEFAULT_ALLOCATION_RATE_MB = 1;
-const DEFAULT_ALLOCATION_RATE_BYTES = DEFAULT_ALLOCATION_RATE_MB * BYTES_PER_MB;
-
-const DEFAULT_INVOCATIONS_PER_HOUR = 3600;
-const DEFAULT_LINE_COVERAGE_PCT = 80.0;
-const DEFAULT_BRANCH_COVERAGE_PCT = 75.0;
-const DEFAULT_ACTIVE_DATASETS = 100;
+const UNMEASURED_NUMERIC_ZERO = 0;
 
 const SYNTHETIC_BENCHMARK_ENV = 'synthetic_benchmark';
 const UNOBSERVED_DEFAULT_ENV = 'unobserved_default';
 
-const FALLBACK_CONFIG = Object.freeze({
-    medianLatencyMs: 10,
-    tail95LatencyMs: 25,
-    tail99LatencyMs: 40,
-    budgetMs: 50,
-    opsPerSec: 500,
-    peakHeapMb: 64,
-    allocationRateKb: 500,
-});
-
 const EMPTY_COVERAGE_METRIC: Readonly<
     Pick<ExecutionEvidenceMetric, 'lineCoveragePct' | 'branchCoveragePct'>
 > = Object.freeze({
-    lineCoveragePct: 0.0,
-    branchCoveragePct: 0.0,
+    lineCoveragePct: UNMEASURED_NUMERIC_ZERO,
+    branchCoveragePct: UNMEASURED_NUMERIC_ZERO,
 });
 
 function readPercentile(raw: Record<string, number>, rank: number): number | undefined {
@@ -96,46 +68,46 @@ function createLatencyMetric(
 }
 
 function parseLatency(raw: Record<string, number>): LatencyMetric {
-    const medianLatency = readPercentile(raw, RANK_MEDIAN) ?? DEFAULT_MEDIAN_LATENCY_MS;
-    const tail95Latency = readPercentile(raw, RANK_TAIL_95) ?? DEFAULT_TAIL_95_LATENCY_MS;
-    const tail99Latency = readPercentile(raw, RANK_TAIL_99) ?? DEFAULT_TAIL_99_LATENCY_MS;
-    const budgetMs = raw.budgetMs ?? DEFAULT_BUDGET_MS;
+    const medianLatency = readPercentile(raw, RANK_MEDIAN) ?? UNMEASURED_NUMERIC_ZERO;
+    const tail95Latency = readPercentile(raw, RANK_TAIL_95) ?? UNMEASURED_NUMERIC_ZERO;
+    const tail99Latency = readPercentile(raw, RANK_TAIL_99) ?? UNMEASURED_NUMERIC_ZERO;
+    const budgetMs = raw.budgetMs ?? UNMEASURED_NUMERIC_ZERO;
     return createLatencyMetric(medianLatency, tail95Latency, tail99Latency, budgetMs);
 }
 
 function parseThroughput(raw: Record<string, number>): ThroughputMetric {
     return {
-        opsPerSec: raw.opsPerSec ?? raw.throughput ?? DEFAULT_OPS_PER_SEC,
-        targetOpsPerSec: raw.targetOpsPerSec ?? DEFAULT_TARGET_OPS_PER_SEC,
+        opsPerSec: raw.opsPerSec ?? raw.throughput ?? UNMEASURED_NUMERIC_ZERO,
+        targetOpsPerSec: raw.targetOpsPerSec ?? UNMEASURED_NUMERIC_ZERO,
     };
 }
 
 function parseMemory(raw: Record<string, number>): MemoryStabilityMetric {
     return {
-        peakHeapBytes: raw.peakHeapBytes ?? DEFAULT_PEAK_HEAP_BYTES,
-        allocationRateBytesPerSec: raw.allocationRateBytesPerSec ?? DEFAULT_ALLOCATION_RATE_BYTES,
-        gcPauseCount: raw.gcPauseCount ?? 0,
-        gcTotalPauseMs: raw.gcTotalPauseMs ?? 0,
-        detectedLeakBytes: raw.detectedLeakBytes ?? 0,
+        peakHeapBytes: raw.peakHeapBytes ?? UNMEASURED_NUMERIC_ZERO,
+        allocationRateBytesPerSec: raw.allocationRateBytesPerSec ?? UNMEASURED_NUMERIC_ZERO,
+        gcPauseCount: raw.gcPauseCount ?? UNMEASURED_NUMERIC_ZERO,
+        gcTotalPauseMs: raw.gcTotalPauseMs ?? UNMEASURED_NUMERIC_ZERO,
+        detectedLeakBytes: raw.detectedLeakBytes ?? UNMEASURED_NUMERIC_ZERO,
     };
 }
 
 function parseConcurrency(raw: Record<string, unknown>): ConcurrencyMetric {
     return {
-        lockWaitCount: (raw.lockWaitCount as number) ?? 0,
-        totalLockWaitMs: (raw.totalLockWaitMs as number) ?? 0,
+        lockWaitCount: (raw.lockWaitCount as number) ?? UNMEASURED_NUMERIC_ZERO,
+        totalLockWaitMs: (raw.totalLockWaitMs as number) ?? UNMEASURED_NUMERIC_ZERO,
         deadlockDetected: Boolean(raw.deadlockDetected),
-        contentionRatio: (raw.contentionRatio as number) ?? 0.0,
+        contentionRatio: (raw.contentionRatio as number) ?? UNMEASURED_NUMERIC_ZERO,
     };
 }
 
 function parseExecution(raw: Record<string, number>): ExecutionEvidenceMetric {
     return {
-        callCount: raw.callCount ?? DEFAULT_OPS_PER_SEC,
-        invocationsPerHour: raw.invocationsPerHour ?? DEFAULT_INVOCATIONS_PER_HOUR,
-        lineCoveragePct: raw.lineCoveragePct ?? DEFAULT_LINE_COVERAGE_PCT,
-        branchCoveragePct: raw.branchCoveragePct ?? DEFAULT_BRANCH_COVERAGE_PCT,
-        activeDatasetsProcessed: raw.activeDatasetsProcessed ?? DEFAULT_ACTIVE_DATASETS,
+        callCount: raw.callCount ?? UNMEASURED_NUMERIC_ZERO,
+        invocationsPerHour: raw.invocationsPerHour ?? UNMEASURED_NUMERIC_ZERO,
+        lineCoveragePct: raw.lineCoveragePct ?? UNMEASURED_NUMERIC_ZERO,
+        branchCoveragePct: raw.branchCoveragePct ?? UNMEASURED_NUMERIC_ZERO,
+        activeDatasetsProcessed: raw.activeDatasetsProcessed ?? UNMEASURED_NUMERIC_ZERO,
     };
 }
 
@@ -207,31 +179,31 @@ export function createDefaultFallbackEvidence(): DynamicEvidenceDTO {
         environment: UNOBSERVED_DEFAULT_ENV,
         isObserved: false,
         latency: createLatencyMetric(
-            FALLBACK_CONFIG.medianLatencyMs,
-            FALLBACK_CONFIG.tail95LatencyMs,
-            FALLBACK_CONFIG.tail99LatencyMs,
-            FALLBACK_CONFIG.budgetMs,
+            UNMEASURED_NUMERIC_ZERO,
+            UNMEASURED_NUMERIC_ZERO,
+            UNMEASURED_NUMERIC_ZERO,
+            UNMEASURED_NUMERIC_ZERO,
         ),
         throughput: {
-            opsPerSec: FALLBACK_CONFIG.opsPerSec,
-            targetOpsPerSec: FALLBACK_CONFIG.opsPerSec,
+            opsPerSec: UNMEASURED_NUMERIC_ZERO,
+            targetOpsPerSec: UNMEASURED_NUMERIC_ZERO,
         },
         memory: {
-            peakHeapBytes: FALLBACK_CONFIG.peakHeapMb * BYTES_PER_MB,
-            allocationRateBytesPerSec: FALLBACK_CONFIG.allocationRateKb * BYTES_PER_KB,
-            gcPauseCount: 0,
-            gcTotalPauseMs: 0,
-            detectedLeakBytes: 0,
+            peakHeapBytes: UNMEASURED_NUMERIC_ZERO,
+            allocationRateBytesPerSec: UNMEASURED_NUMERIC_ZERO,
+            gcPauseCount: UNMEASURED_NUMERIC_ZERO,
+            gcTotalPauseMs: UNMEASURED_NUMERIC_ZERO,
+            detectedLeakBytes: UNMEASURED_NUMERIC_ZERO,
         },
         concurrency: {
-            lockWaitCount: 0,
-            totalLockWaitMs: 0,
+            lockWaitCount: UNMEASURED_NUMERIC_ZERO,
+            totalLockWaitMs: UNMEASURED_NUMERIC_ZERO,
             deadlockDetected: false,
-            contentionRatio: 0.0,
+            contentionRatio: UNMEASURED_NUMERIC_ZERO,
         },
         execution: {
-            callCount: 0,
-            invocationsPerHour: 0,
+            callCount: UNMEASURED_NUMERIC_ZERO,
+            invocationsPerHour: UNMEASURED_NUMERIC_ZERO,
             ...EMPTY_COVERAGE_METRIC,
         },
         hotspots: [],

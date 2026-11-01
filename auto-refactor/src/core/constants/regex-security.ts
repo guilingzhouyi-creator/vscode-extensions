@@ -2,10 +2,11 @@
  * Module: Core Constants — Security & Vulnerability Regular Expression Catalog
  * File Path: src/core/constants/regex-security.ts
  * Architecture Role: Single source of truth (SSOT) for security audit patterns, arbitrary code
- *     execution, command injection, prototype pollution, and sensitive data leakage regular expressions.
- * Dependencies & Triggers: Zero external dependencies; consumed by security analyzer and audit guards.
+ *     execution, command injection, prototype pollution, and sensitive data leakage patterns.
+ * Dependencies & Triggers: Zero external dependencies; consumed by security analyzer and guards.
  * Responsibilities:
- *     1. Centralize canonical security patterns (dynamic execution, shell injection, broken crypto, path traversal).
+ *     1. Centralize canonical security patterns (dynamic execution, shell injection, broken
+ *        crypto, and path traversal).
  *     2. Enforce the state-separation discipline: stateless immutable constants vs fresh factories.
  *     3. Expose frozen REGEX_SECURITY domain namespace.
  * Exit Semantics & Design Rationale: Pure, frozen regex constants; zero side effects and
@@ -71,7 +72,7 @@ export const PATH_TRAVERSAL_PATTERN =
 export const SENSITIVE_LOG_PATTERN =
     /\b(?:console\.(?:log|warn|error|info|debug)|logger\.(?:log|warn|error|info|debug))\s*\([^)]*(?:password|passwd|secretKey|client_secret|apiKey|authToken|bearerToken|accessToken)/i;
 
-/** Matches backend secret or token references accessed through process.env in client/production files. */
+/** Matches backend secret or token references via process.env in client/production files. */
 export const SENSITIVE_BACKEND_ENV_PATTERN =
     /\bprocess\.env\.(?:[A-Z0-9_]*(?:SECRET|PRIVATE|DATABASE_URL|DB_PASS|API_KEY|TOKEN)[A-Z0-9_]*)\b/;
 
@@ -124,6 +125,7 @@ export const SENSITIVE_ACTION_TRIGGER_PATTERN =
 export const USER_ACTIVATION_OR_ORIGIN_PATTERN =
     /\b(?:(?:event|e|ev|msg)\.userActivation\b|userActivation\.(?:isActive|hasBeenActive)|\.origin\b)/i;
 
+/** Frozen domain namespace aggregating credential, injection, and security hazard patterns. */
 export const REGEX_SECURITY = Object.freeze({
     HEX_TOKEN_ENTROPY: HEX_TOKEN_ENTROPY_PATTERN,
     PRIVATE_KEY_HEADER: PRIVATE_KEY_HEADER_PATTERN,

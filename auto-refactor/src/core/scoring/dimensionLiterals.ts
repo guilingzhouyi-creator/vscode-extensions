@@ -106,11 +106,16 @@ export const DEDUCTION_SUBSTANDARD_COMMENT = 5;
 /** Deduction points for warning-level technical debt findings. */
 export const DEDUCTION_WARNING_TECH_DEBT = 5;
 
-/** Maximum allowable control-flow nesting depth threshold. */
-export const MAX_NESTING_DEPTH = 5;
+/**
+ * Maximum allowable control-flow nesting depth threshold.
+ *
+ * Re-exported from the constants SSOT rather than restated: the governance rule that reports deep
+ * nesting reads the same value, so the deduction and the finding cannot disagree about the limit.
+ */
+export { MAX_CONTROL_FLOW_NESTING_DEPTH as MAX_NESTING_DEPTH } from '../constants/diagnostic-tokens';
 
-/** Maximum allowable exported public symbols per module. */
-export const MAX_EXPORTED_SYMBOLS = 30;
+/** Maximum allowable exported public symbols per module, re-exported from the constants SSOT. */
+export { MAX_MODULE_EXPORTED_SYMBOLS as MAX_EXPORTED_SYMBOLS } from '../constants/diagnostic-tokens';
 
 // Re-export built-in analyzer identifiers directly from Single Source of Truth
 export {

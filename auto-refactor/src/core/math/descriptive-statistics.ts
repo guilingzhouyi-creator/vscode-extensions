@@ -104,7 +104,7 @@ export function computeStandardDeviation(
 }
 
 /**
- * Computes central tendency and dispersion moments in a unified single pass using Welford's algorithm.
+ * Computes central tendency and dispersion moments in a single pass via Welford's algorithm.
  *
  * @param values - Input sequence of numbers.
  * @returns Complete statistical moments.

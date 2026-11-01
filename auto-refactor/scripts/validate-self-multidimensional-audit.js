@@ -398,7 +398,7 @@ const REQUIRED_TEN_DIMENSIONS = [
   'techDebtRisk',
 ];
 
-const MIN_REACTIVE_DIMENSIONS = 0;
+const MIN_REACTIVE_DIMENSIONS = 4;
 const MAX_REACTIVE_DIMENSIONS = 10;
 
 function isValidDimensionScore(val) {
