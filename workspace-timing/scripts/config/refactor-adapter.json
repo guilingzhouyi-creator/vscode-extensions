@@ -21,9 +21,9 @@
     },
     "gate": {
         "blockOnSeverity": "error",
-        "whenUnavailable": "skip",
-        "whenTimeout": "skip",
-        "comment": "外部能力故障不得摧毁本项目基础设施：工具缺失/超时降级为 NOT_AVAILABLE/TIMEOUT 并留痕；但『引擎有输出而解析失败』fail-closed 阻断（损坏输出比无输出更危险，此语义继承自 WebGames 审查实践）"
+        "whenUnavailable": "fail",
+        "whenTimeout": "fail",
+        "comment": "工业门禁收口（fail-closed）：外部审查能力缺失、进程超时、异常退出或输出解析失败均严格阻断，消除静默跳过导致的假绿放行"
     },
     "ratchet": {
         "baseline": "scripts/config/refactor-baseline.json",

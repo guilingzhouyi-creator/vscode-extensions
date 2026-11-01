@@ -63,6 +63,34 @@
         },
         "architecture": {
             "enabled": true
+        },
+        "hygiene": {
+            "enabled": true,
+            "severity": "warning"
+        },
+        "security": {
+            "enabled": true,
+            "severity": "warning"
+        },
+        "simplify": {
+            "enabled": true,
+            "severity": "info"
+        },
+        "ts-modern": {
+            "enabled": true,
+            "severity": "warning"
+        },
+        "concurrency": {
+            "enabled": true,
+            "severity": "warning"
+        },
+        "production-hygiene": {
+            "enabled": true,
+            "severity": "warning"
+        },
+        "dependency-layout": {
+            "enabled": true,
+            "severity": "warning"
         }
     },
     "suppressions": [

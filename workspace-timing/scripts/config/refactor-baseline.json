@@ -1,399 +1,616 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-05T08:34:47.427Z",
+  "timestamp": "2026-11-01T05:47:05.407Z",
   "groups": [
     {
-      "key": "governance|GOV-FIL-001|src/application/dashboard-data-assembler.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/application/DisableManager.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|magic-number|src/application/dashboard-data-assembler.ts",
-      "count": 5
+      "key": "simplify|SIM-TRN-001|src/application/DisableManager.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "complexity|high-complexity|src/application/dashboard-data-assembler.ts",
-      "count": 1
+      "key": "simplify|SIM-ARGS-002|src/application/DisableManager.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/application/DisableManager.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/application/GlobalAggregator.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/application/GlobalAggregator.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/application/RecoveryService.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|magic-number|src/application/GlobalAggregator.ts",
-      "count": 3
+      "key": "ts-modern|TSM-TYPE-001|src/application/Scheduler.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/application/GlobalAggregator.ts",
-      "count": 1
+      "key": "simplify|SIM-ARGS-002|src/application/Scheduler.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/application/GlobalAggregator.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/application/SessionManager.ts",
+      "count": 4,
+      "severities": {
+        "info": 4
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/application/RecoveryService.ts",
-      "count": 1
+      "key": "simplify|SIM-ARGS-001|src/application/SessionManager.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "complexity|high-complexity|src/application/RecoveryService.ts",
-      "count": 1
+      "key": "hygiene|HYG-WRAP-002|src/application/SessionManager.ts",
+      "count": 6,
+      "severities": {
+        "info": 6
+      }
     },
     {
-      "key": "constants|magic-number|src/application/RecoveryService.ts",
-      "count": 3
+      "key": "hygiene|HYG-CLN-001|src/application/SessionManager.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/application/RecoveryService.ts",
-      "count": 1
+      "key": "hygiene|HYG-WRAP-001|src/application/SessionManager.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/application/RecoveryService.ts",
-      "count": 4
+      "key": "ts-modern|TSM-TYPE-001|src/application/TimerOrchestrator.ts",
+      "count": 8,
+      "severities": {
+        "info": 8
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/application/Scheduler.ts",
-      "count": 1
+      "key": "simplify|SIM-ARGS-001|src/application/TimerOrchestrator.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/application/Scheduler.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/application/dashboard-data-assembler.ts",
+      "count": 3,
+      "severities": {
+        "info": 3
+      }
     },
     {
-      "key": "constants|magic-number|src/application/Scheduler.ts",
-      "count": 2
+      "key": "simplify|SIM-TRN-001|src/application/dashboard-data-assembler.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-EXC-001|src/application/Scheduler.ts",
-      "count": 1
+      "key": "hygiene|HYG-WRAP-001|src/application/dashboard-data-assembler.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/application/Scheduler.ts",
-      "count": 2
+      "key": "ts-modern|TSM-TYPE-001|src/application/exporters/AggregatedCsvExporter.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/application/SessionManager.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/application/exporters/CsvExporter.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|magic-number|src/application/SessionManager.ts",
-      "count": 4
+      "key": "ts-modern|TSM-TYPE-001|src/application/exporters/ReportExporter.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/application/SessionManager.ts",
-      "count": 2
+      "key": "ts-modern|TSM-TYPE-001|src/application/exporters/index.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/application/TimerOrchestrator.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/cache/IJournalStore.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "large-file|large-file|src/application/TimerOrchestrator.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/cache/JournalWriter.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "constants|duplicate-literal|src/application/TimerOrchestrator.ts",
-      "count": 2
+      "key": "hygiene|HYG-WRAP-001|src/cache/JournalWriter.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/application/TimerOrchestrator.ts",
-      "count": 11
+      "key": "simplify|SIM-TRN-001|src/cache/JournalWriter.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|magic-number|src/application/TimerOrchestrator.ts",
-      "count": 1
+      "key": "hygiene|HYG-CLN-001|src/cache/JournalWriter.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "complexity|high-complexity|src/application/TimerOrchestrator.ts",
-      "count": 1
+      "key": "hygiene|HYG-WRAP-002|src/cache/JournalWriter.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/application/exporters/AggregatedCsvExporter.ts",
-      "count": 1
+      "key": "ts-modern|TSM-CTOR-001|src/cache/RingBuffer.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/application/exporters/AggregatedCsvExporter.ts",
-      "count": 1
+      "key": "simplify|SIM-TRN-001|src/cache/RingBuffer.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/application/exporters/CsvExporter.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/domain/TimeAggregator.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/application/exporters/CsvExporter.ts",
-      "count": 2
+      "key": "dependency-layout|DEP-WLD-001|src/domain/TimeAggregator.ts",
+      "count": 5,
+      "severities": {
+        "warning": 5
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/application/exporters/IDataExporter.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/domain/aggregator/daily-aggregator.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/application/exporters/ReportExporter.ts",
-      "count": 1
+      "key": "simplify|SIM-LONG-001|src/domain/aggregator/daily-aggregator.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/application/exporters/ReportExporter.ts",
-      "count": 10
+      "key": "simplify|SIM-TRN-001|src/domain/aggregator/duration-formatter.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/cache/ICacheStrategy.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/domain/aggregator/heatmap-aggregator.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/cache/IJournalStore.ts",
-      "count": 1
+      "key": "simplify|SIM-GUARD-001|src/domain/aggregator/heatmap-aggregator.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/cache/JournalWriter.ts",
-      "count": 1
+      "key": "simplify|SIM-TRN-001|src/domain/aggregator/heatmap-aggregator.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|magic-number|src/cache/JournalWriter.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/domain/aggregator/weekly-aggregator.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/cache/JournalWriter.ts",
-      "count": 1
+      "key": "simplify|SIM-LONG-001|src/domain/aggregator/weekly-aggregator.ts",
+      "count": 3,
+      "severities": {
+        "info": 3
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/cache/JournalWriter.ts",
-      "count": 1
+      "key": "hygiene|HYG-CLN-001|src/domain/aggregator/weekly-aggregator.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/cache/RingBuffer.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-ORD-002|src/domain/dashboard-types.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
     },
     {
-      "key": "constants|magic-number|src/cache/RingBuffer.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-WLD-001|src/extension.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/domain/history-folder.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/extension.ts",
+      "count": 8,
+      "severities": {
+        "info": 8
+      }
     },
     {
-      "key": "constants|magic-number|src/domain/history-folder.ts",
-      "count": 1
+      "key": "simplify|SIM-LONG-001|src/extension.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/domain/history-folder.ts",
-      "count": 2
+      "key": "dependency-layout|DEP-WLD-001|src/integration/ActivityWatcher.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "complexity|high-complexity|src/domain/history-folder.ts",
-      "count": 1
+      "key": "simplify|SIM-ARGS-002|src/integration/ActivityWatcher.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/domain/TimeAggregator.ts",
-      "count": 1
+      "key": "hygiene|HYG-CLN-001|src/integration/ActivityWatcher.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "large-file|large-file|src/domain/TimeAggregator.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-WLD-001|src/integration/ConfigWatcher.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "constants|duplicate-literal|src/domain/TimeAggregator.ts",
-      "count": 6
+      "key": "ts-modern|TSM-TYPE-001|src/integration/ConfigWatcher.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|magic-number|src/domain/TimeAggregator.ts",
-      "count": 8
+      "key": "hygiene|HYG-WRAP-002|src/integration/ConfigWatcher.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/domain/TimeAggregator.ts",
-      "count": 4
+      "key": "hygiene|HYG-WRAP-001|src/integration/logger.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "complexity|high-complexity|src/domain/TimeAggregator.ts",
-      "count": 3
+      "key": "hygiene|HYG-WRAP-002|src/integration/logger.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/domain/TimerEngine.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-WLD-001|src/persistence/FileStorageProvider.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "constants|magic-number|src/domain/models.ts",
-      "count": 9
+      "key": "dependency-layout|DEP-ORD-001|src/persistence/FileStorageProvider.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/extension.ts",
-      "count": 6
+      "key": "ts-modern|TSM-TYPE-001|src/persistence/FileStorageProvider.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/integration/ConfigWatcher.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-WLD-001|src/persistence/GlobalStorageProvider.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "constants|duplicate-literal|src/integration/ConfigWatcher.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/persistence/GlobalStorageProvider.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/integration/ConfigWatcher.ts",
-      "count": 15
+      "key": "simplify|SIM-TRN-001|src/persistence/GlobalStorageProvider.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "complexity|high-complexity|src/integration/ConfigWatcher.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/persistence/IStorageProvider.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/integration/logger.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-WLD-001|src/persistence/JournalStorageProvider.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/integration/logger.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-ORD-001|src/persistence/JournalStorageProvider.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|magic-number|src/integration/logger.ts",
-      "count": 2
+      "key": "ts-modern|TSM-TYPE-001|src/persistence/JournalStorageProvider.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "governance|GOV-DBG-001|src/integration/logger.ts",
-      "count": 2
+      "key": "ts-modern|TSM-TYPE-001|src/persistence/StorageCoordinator.ts",
+      "count": 3,
+      "severities": {
+        "info": 3
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/persistence/data-validator.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-WLD-001|src/persistence/WorkspaceStateProvider.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "complexity|high-complexity|src/persistence/data-validator.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/persistence/WorkspaceStateProvider.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/persistence/data-validator.ts",
-      "count": 1
+      "key": "simplify|SIM-TRN-001|src/persistence/data-validator.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|duplicate-literal|src/persistence/data-validator.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-WLD-001|src/presentation/CommandRegistrar.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/persistence/data-validator.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/presentation/CommandRegistrar.ts",
+      "count": 4,
+      "severities": {
+        "info": 4
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/persistence/FileStorageProvider.ts",
-      "count": 1
+      "key": "simplify|SIM-ARGS-001|src/presentation/CommandRegistrar.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/persistence/FileStorageProvider.ts",
-      "count": 3
+      "key": "simplify|SIM-LONG-001|src/presentation/CommandRegistrar.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/persistence/FileStorageProvider.ts",
-      "count": 4
+      "key": "dependency-layout|DEP-WLD-001|src/presentation/DashboardPanel.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "governance|GOV-EXC-001|src/persistence/FileStorageProvider.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/presentation/DashboardPanel.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/persistence/GlobalStorageProvider.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-WLD-001|src/presentation/StatusBarController.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/persistence/GlobalStorageProvider.ts",
-      "count": 3
+      "key": "hygiene|HYG-WRAP-002|src/presentation/StatusBarController.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/persistence/IStorageProvider.ts",
-      "count": 1
+      "key": "hygiene|HYG-CLN-001|src/presentation/affine-viewport.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/persistence/JournalStorageProvider.ts",
-      "count": 1
+      "key": "simplify|SIM-COMC-001|src/presentation/affine-viewport.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/persistence/JournalStorageProvider.ts",
-      "count": 3
+      "key": "dependency-layout|DEP-WLD-001|src/presentation/dashboardMessages.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "governance|GOV-EXC-001|src/persistence/JournalStorageProvider.ts",
-      "count": 1
+      "key": "ts-modern|TSM-TYPE-001|src/presentation/dashboardMessages.ts",
+      "count": 3,
+      "severities": {
+        "info": 3
+      }
     },
     {
-      "key": "complexity|high-complexity|src/persistence/JournalStorageProvider.ts",
-      "count": 1
+      "key": "hygiene|HYG-CLN-001|src/presentation/procedural-audio-synth.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/persistence/JournalStorageProvider.ts",
-      "count": 1
+      "key": "simplify|SIM-TRN-001|src/presentation/procedural-audio-synth.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-PRF-001|src/persistence/JournalStorageProvider.ts",
-      "count": 1
+      "key": "simplify|SIM-ARGS-002|src/presentation/procedural-audio-synth.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/persistence/StorageCoordinator.ts",
-      "count": 1
+      "key": "simplify|SIM-TRN-001|src/presentation/roving-focus-controller.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "governance|GOV-LOG-001|src/persistence/StorageCoordinator.ts",
-      "count": 1
+      "key": "dependency-layout|DEP-ORD-002|src/presentation/scroll-pinning.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/persistence/StorageCoordinator.ts",
-      "count": 2
+      "key": "simplify|SIM-ARGS-002|src/presentation/scroll-pinning.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-EXC-001|src/persistence/StorageCoordinator.ts",
-      "count": 3
+      "key": "simplify|SIM-INL-001|src/presentation/split-pane-resizer.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     },
     {
-      "key": "governance|GOV-FIL-001|src/persistence/WorkspaceStateProvider.ts",
-      "count": 1
+      "key": "simplify|SIM-TRN-001|src/presentation/split-pane-resizer.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
     },
     {
-      "key": "constants|hardcoded-string|src/persistence/WorkspaceStateProvider.ts",
-      "count": 4
-    },
-    {
-      "key": "governance|GOV-FIL-001|src/presentation/CommandRegistrar.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|hardcoded-string|src/presentation/CommandRegistrar.ts",
-      "count": 16
-    },
-    {
-      "key": "complexity|high-complexity|src/presentation/CommandRegistrar.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-FIL-001|src/presentation/DashboardPanel.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|magic-number|src/presentation/DashboardPanel.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|hardcoded-string|src/presentation/DashboardPanel.ts",
-      "count": 1
-    },
-    {
-      "key": "governance|GOV-FIL-001|src/presentation/StatusBarController.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|hardcoded-string|src/presentation/StatusBarController.ts",
-      "count": 5
-    },
-    {
-      "key": "constants|duplicate-literal|src/presentation/StatusBarController.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|magic-number|src/presentation/StatusBarController.ts",
-      "count": 1
-    },
-    {
-      "key": "constants|hardcoded-string|src/presentation/dashboardMessages.ts",
-      "count": 6
+      "key": "simplify|SIM-TRN-001|src/presentation/thinking-accordion-lock.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
     }
   ]
 }

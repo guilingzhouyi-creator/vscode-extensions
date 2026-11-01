@@ -11,7 +11,7 @@
 //   - 外部工具是审查能力提供者，不是本项目架构的组成部分——缺失/超时/版本漂移均不摧毁审查系统。
 
 import path from 'node:path';
-import { access, readFile } from 'node:fs/promises';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { parseArgs, helpFromHeader } from '../common/cli.js';
 import { createLogger } from '../common/logger.js';
 import { ROOT, SCRIPTS_DIR, toRel } from '../common/paths.js';
@@ -40,7 +40,6 @@ if (!cfgRes.ok) {
 }
 const cfg = cfgRes.data;
 const gate: RefactorAdapterConfig['gate'] = cfg.gate ?? {};
-const mapping: RefactorAdapterConfig['mapping'] = cfg.mapping ?? {};
 const rankSev = (s: string): number => ({ info: 0, warning: 1, error: 2 })[s] ?? 1;
 
 // ── 2. 工具解析：环境变量 > 配置候选（相对项目根），不做任何硬编码路径回退 ──
@@ -51,9 +50,13 @@ async function exists(p: string): Promise<boolean> {
 let cliPath: string | null = null;
 const envOverride = process.env[cfg.tool?.resolve?.envOverride ?? 'WT_REFACTOR_CLI'];
 const candidates: string[] = [];
-if (typeof args.flags.tool === 'string') candidates.push(path.resolve(args.flags.tool));
-if (envOverride) candidates.push(path.resolve(envOverride));
-for (const c of cfg.tool?.resolve?.candidates ?? []) candidates.push(path.resolve(ROOT, c));
+if (typeof args.flags.tool === 'string') {
+    candidates.push(path.resolve(args.flags.tool));
+} else if (envOverride) {
+    candidates.push(path.resolve(envOverride));
+} else {
+    for (const c of cfg.tool?.resolve?.candidates ?? []) candidates.push(path.resolve(ROOT, c));
+}
 
 for (const cand of candidates) {
     if (await exists(cand)) { cliPath = cand; break; }
@@ -107,8 +110,9 @@ const baselineExists = await exists(baselinePath);
 const engineDir = path.resolve(cliPath, '..', '..');
 const runnerPath = path.join(engineDir, 'templates', 'consumer', 'run.mjs');
 if (!(await exists(runnerPath))) {
-    log.warn(`引擎缺少通用 runner（${toRel(runnerPath)}）→ 视为版本过旧，按外部故障降级`);
-    finish(STATUS.NOT_AVAILABLE, [], {
+    const status = gate.whenUnavailable === 'fail' ? STATUS.FAIL : STATUS.NOT_AVAILABLE;
+    log.warn(`引擎缺少通用 runner（${toRel(runnerPath)}）→ ${status}`);
+    finish(status, [], {
         notes: [`引擎 ${toolVersion ?? '?'} 未提供 templates/consumer/run.mjs，无法执行审查`],
         tool: { resolved: toRel(cliPath), version: toolVersion },
     });
@@ -145,10 +149,14 @@ if (result.timedOut) {
     });
 }
 if (result.error || (result.code !== 0 && result.code !== 1)) {
-    // 引擎崩溃（usage/fatal）：属外部能力故障 → 降级留痕，不阻断本项目
-    log.warn(`引擎异常退出 code=${result.code}: ${(result.stderr || '').slice(0, 400)}`);
-    finish(STATUS.NOT_AVAILABLE, [], {
-        notes: [`引擎异常退出（code=${result.code}），按外部故障降级`, `stderr 摘要: ${(result.stderr || '').slice(0, 200)}`],
+    log.error(`引擎异常退出 code=${result.code}: ${(result.stderr || '').slice(0, 400)}`);
+    finish(STATUS.FAIL, [finding({
+        ruleId: 'RCFG-TOOL-PATH', severity: 'error', module: 'review-system',
+        message: `auto-refactor 引擎进程异常退出（code=${result.code ?? 'ERR'}），门禁阻断（fail-closed）`,
+        evidence: (result.stderr || String(result.error ?? '')).slice(0, 300),
+        suggestedFix: '核查 auto-refactor 构建产物完整性与运行时错误输出',
+    })], {
+        notes: [`引擎异常退出（code=${result.code}），按 fail-closed 阻断`, `stderr 摘要: ${(result.stderr || '').slice(0, 200)}`],
         tool: { resolved: toRel(cliPath), version: toolVersion, exitCode: result.code },
     });
 }
@@ -170,15 +178,38 @@ if (!report || report.tool !== 'auto-refactor' || !report.summary) {
     })], { tool: { resolved: toRel(cliPath), version: toolVersion } });
 }
 
+const latestReportDir = path.join(ROOT, 'reports');
+await mkdir(latestReportDir, { recursive: true });
+const rawReportRecord = report as unknown as Record<string, unknown>;
+await writeFile(
+    path.join(latestReportDir, 'auto-refactor-latest.json'),
+    JSON.stringify({
+        tool: report.tool,
+        version: report.version,
+        generatedAt: rawReportRecord.createdAt ?? new Date().toISOString(),
+        summary: report.summary,
+        qualityScore: report.qualityScore ?? null,
+        triPlaneQuality: report.triPlaneQuality ?? null,
+        governance: rawReportRecord.governance ?? null,
+        autonomy: rawReportRecord.autonomy ?? null,
+    }, null, 2) + '\n',
+    'utf8',
+);
+
 // ── 6. 映射为统一 Finding（0.2.0 起：豁免与棘轮由引擎原生承载，适配器只消费标注）──
 //    issue.suppression = { reason, downgraded } → 降级项留在 findings（理由随行），完全豁免进 suppressed 列表
 //    issue.isNew = true → 超出基线的新增发现（ratchet.blockOnNewSeverity 裁决阻断）
 const suppressed: Array<{ finding: Finding; reason: string }> = [];
 const findings: Finding[] = [];
 for (const issue of report.issues ?? []) {
+    if ((issue as { clusteredInto?: string }).clusteredInto) continue;
     const file = issue.location?.file ? toRel(path.resolve(scanRoot, issue.location.file)) : null;
     const sev = issue.severity ?? 'warning';
-    const ruleId = `${mapping.ruleNamespace ?? 'ARF'}-${issue.analyzer}-${issue.rule}`;
+    const detailObj = issue.detail && typeof issue.detail === 'object'
+        ? (issue.detail as Record<string, unknown>)
+        : undefined;
+    const detailCode = typeof detailObj?.ruleCode === 'string' ? detailObj.ruleCode : '';
+    const ruleId = /^[A-Z]{2,5}-[A-Z]{2,5}-\d{3}$/.test(detailCode) ? detailCode : issue.rule;
     const f = finding({
         ruleId,
         severity: sev,
@@ -227,6 +258,8 @@ finish(status, findings, {
     ],
     tool: { resolved: toRel(cliPath), version: toolVersion, durationMs: s.durationMs },
     engineSummary: s,
+    qualityScore: report.qualityScore ?? null,
+    triPlaneQuality: report.triPlaneQuality ?? null,
     suppressed,
     ratchet: { newCount: deltaFindings.length, blockOnNewSeverity: ratchetCfg.blockOnNewSeverity ?? 'warning', baseline: toRel(baselinePath) },
 });

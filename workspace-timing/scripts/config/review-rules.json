@@ -17,7 +17,10 @@
       "id": "L0-COMPILE",
       "layer": "L0",
       "family": "BLD",
-      "title": "TypeScript 编译零错误（tsc）",
+      "title": "TypeScript compilation with zero diagnostics",
+      "ruleTitles": {
+        "L0-COMPILE": "TypeScript compiler diagnostic-free build check"
+      },
       "checker": "build/compile.ts",
       "stage": 1,
       "enabled": true,
@@ -31,7 +34,10 @@
       "id": "L1-LINT",
       "layer": "L1",
       "family": "LINT",
-      "title": "代码质量（eslint 全量：命名/未用/错误处理等规则族）",
+      "title": "Static code quality through the full eslint rule set",
+      "ruleTitles": {
+        "L1-*": "Dynamic namespace for generated eslint rule identifiers"
+      },
       "checker": "audit/code-quality.ts",
       "stage": 1,
       "enabled": true,
@@ -45,7 +51,12 @@
       "id": "L2-LAYERS",
       "layer": "L2",
       "family": "LAY",
-      "title": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明）",
+      "title": "Layer dependency matrix conformance and import cycle freedom",
+      "ruleTitles": {
+        "LAY-IMPORT": "Cross-layer or unlicensed external import",
+        "LAY-CYCLE": "Import cycle across the dependency graph",
+        "LAY-UNRESOLVED": "Relative import not resolvable to a declared layer"
+      },
       "checker": "audit/layer-boundary.ts",
       "stage": 1,
       "enabled": true,
@@ -61,7 +72,14 @@
       "id": "L3-HARDCODE",
       "layer": "L3",
       "family": "HC",
-      "title": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定",
+      "title": "Hardcoded path, UI string, secret and magic number checks",
+      "ruleTitles": {
+        "HC-ABS-PATH": "Hardcoded absolute path or file URI literal",
+        "HC-UI-STRING": "Host message API call with a string literal bypassing i18n",
+        "HC-CJK-LITERAL": "Inline CJK literal inside the presentation layer",
+        "HC-SECRET": "Credential or secret pattern embedded in source",
+        "HC-MAGIC-NUM": "Numeric literal outside an exempt constant home"
+      },
       "checker": "audit/hardcode.ts",
       "stage": 1,
       "enabled": true,
@@ -79,7 +97,13 @@
       "id": "L3-SCRIPT-STANDARD",
       "layer": "L3",
       "family": "SCR",
-      "title": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断）",
+      "title": "Script naming, header contract and registry completeness",
+      "ruleTitles": {
+        "SCR-NAMING": "Script file name deviates from kebab-case",
+        "SCR-HEADER": "Script header contract missing a mandatory tag",
+        "SCR-ORPHAN": "Checker script absent from the review registry",
+        "SCR-DANGLING": "Registry entry pointing at a missing checker file"
+      },
       "checker": "audit/script-standard.ts",
       "stage": 1,
       "enabled": true,
@@ -96,7 +120,21 @@
       "id": "L3-DOC-LAYOUT",
       "layer": "L3",
       "family": "DOC",
-      "title": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步",
+      "title": "Changelog and README text layout contracts",
+      "ruleTitles": {
+        "DOC-CL-001": "Changelog lacks an Unreleased accumulation section",
+        "DOC-CL-002": "Version heading format or descending order violation",
+        "DOC-CL-003": "Latest changelog version out of sync with package manifest",
+        "DOC-CL-004": "Section heading outside the standard category table",
+        "DOC-CL-005": "Change entry without a bold lead-in phrase",
+        "DOC-CL-006": "Invalid or future-dated version release date",
+        "DOC-CL-007": "Changelog cites a nonexistent code symbol or setting",
+        "DOC-CL-008": "Internal jargon or math notation in release notes",
+        "DOC-CL-009": "Engineering process wording in product release notes",
+        "DOC-RD-001": "README missing a required section anchor",
+        "DOC-RD-002": "Released version absent from or stale in the README roadmap",
+        "DOC-RD-003": "Roadmap summary citing fabricated settings or jargon"
+      },
       "checker": "audit/text-layout.ts",
       "stage": 1,
       "enabled": true,
@@ -121,7 +159,14 @@
       "id": "L3-REVIEW-CONFIG",
       "layer": "L3",
       "family": "RCFG",
-      "title": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康",
+      "title": "Review configuration governance and meta-audit",
+      "ruleTitles": {
+        "RCFG-SCHEMA": "Registry schema, required field or origin validation breach",
+        "RCFG-MATRIX": "Dependency matrix mapping or layer reference invalid",
+        "RCFG-RULE-DRIFT": "Declared rule without implementation or undeclared finding",
+        "RCFG-GLOBS": "Tool scan glob matching zero files",
+        "RCFG-TOOL-PATH": "Adapter tool path, timeout or report contract problem"
+      },
       "checker": "audit/review-config.ts",
       "stage": 1,
       "enabled": true,
@@ -139,7 +184,14 @@
       "id": "L3-RESOURCE-TOPO",
       "layer": "L3",
       "family": "RES",
-      "title": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀",
+      "title": "Structured resource naming topology and split fitness",
+      "ruleTitles": {
+        "RES-TOPO-OVER-GENERIC": "Oversized single-tier resource file needing a domain split",
+        "RES-TOPO-OVER-SPECIALIZED": "Three-tier resource file below the fragmentation floor",
+        "RES-TOPO-NAMING-DEPTH": "Resource file name exceeding three naming tiers",
+        "RES-TOPO-OVER-DESCRIPTIVE": "Resource file name piling more than four tokens",
+        "RES-TOPO-RESP-MISMATCH": "Resource file mixing executable logic below purity floor"
+      },
       "checker": "audit/resource-topology.ts",
       "stage": 1,
       "enabled": true,
@@ -157,7 +209,10 @@
       "id": "L0-TEST",
       "layer": "L0",
       "family": "TST",
-      "title": "单元测试全绿（mocha 全量）",
+      "title": "Full unit test suite pass",
+      "ruleTitles": {
+        "L0-TEST": "Failing unit test case in the suite"
+      },
       "checker": "test/unit.ts",
       "stage": 2,
       "enabled": true,
@@ -171,7 +226,11 @@
       "id": "L4-TEST-BUDGET",
       "layer": "L4",
       "family": "TB",
-      "title": "测试套件时长预算回归（基线棘轮）",
+      "title": "Test suite duration budget regression ratchet",
+      "ruleTitles": {
+        "TB-REGRESSION": "Test suite duration exceeding its baseline budget",
+        "TB-NO-BASELINE": "No duration baseline recorded, regression undecidable"
+      },
       "checker": "benchmark/test-budget.ts",
       "stage": 2,
       "enabled": true,
@@ -188,7 +247,10 @@
       "id": "L5-REFACTOR",
       "layer": "L5",
       "family": "ARF",
-      "title": "auto-refactor 结构审查（经适配层隔离，工具不可用时优雅降级）",
+      "title": "External structural refactor scan via an isolated adapter",
+      "ruleTitles": {
+        "ARF-*": "Dynamic namespace for adapter-mapped external findings"
+      },
       "checker": "tooling/refactor-adapter.ts",
       "stage": 1,
       "enabled": true,

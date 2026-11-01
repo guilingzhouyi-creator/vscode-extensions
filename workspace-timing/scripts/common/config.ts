@@ -13,17 +13,17 @@ export type LoadResult<T> = { ok: true; data: T; error: null } | { ok: false; da
  * 由调用方决定降级或 fail-closed —— 禁止静默当 {} 用。
  */
 export async function loadJson<T = unknown>(absPath: string): Promise<LoadResult<T>> {
-  let text: string;
-  try {
-    text = await readFile(absPath, 'utf8');
-  } catch (err) {
-    return { ok: false, data: null, error: `无法读取 ${absPath}: ${(err as Error).message}` };
-  }
-  try {
-    return { ok: true, data: JSON.parse(text) as T, error: null };
-  } catch (err) {
-    return { ok: false, data: null, error: `JSON 解析失败 ${absPath}: ${(err as Error).message}` };
-  }
+    let text: string;
+    try {
+        text = await readFile(absPath, 'utf8');
+    } catch (err) {
+        return { ok: false, data: null, error: `无法读取 ${absPath}: ${(err as Error).message}` };
+    }
+    try {
+        return { ok: true, data: JSON.parse(text) as T, error: null };
+    } catch (err) {
+        return { ok: false, data: null, error: `JSON 解析失败 ${absPath}: ${(err as Error).message}` };
+    }
 }
 
 /** 必填字段校验；返回缺失字段名数组（空数组 = 通过） */
@@ -171,6 +171,11 @@ export interface RefactorAdapterConfig {
 export interface ScanReport {
   tool: string;
   version: string;
+  createdAt?: string;
+  qualityScore?: Record<string, unknown> | null;
+  triPlaneQuality?: Record<string, unknown> | null;
+  governance?: Record<string, unknown> | null;
+  autonomy?: Record<string, unknown> | null;
   summary: {
     filesScanned: number;
     issuesTotal: number;
