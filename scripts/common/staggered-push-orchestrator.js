@@ -129,6 +129,74 @@ function hasPushedToday(dateStr) {
 }
 
 /**
+ * Reads the latest recorded push receipt from the audit log.
+ *
+ * @returns {object|null} Parsed latest audit record or null.
+ */
+function getLastPushEntry() {
+  if (!fs.existsSync(AUDIT_LOG_FILE)) {
+    return null;
+  }
+  try {
+    const content = fs.readFileSync(AUDIT_LOG_FILE, 'utf8').trim();
+    if (!content) {
+      return null;
+    }
+    const lines = content.split('\n').filter((l) => l.trim().length > 0);
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        const parsed = JSON.parse(lines[i]);
+        if (parsed.action === 'PUSH') {
+          return parsed;
+        }
+      } catch {
+        // Continue seeking previous lines
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Returns a structured snapshot of the current staggered push scheduling status.
+ *
+ * @param {object} [options={}] - Options object.
+ * @param {string} [options.remote=DEFAULT_REMOTE] - Git remote.
+ * @param {string} [options.branch=DEFAULT_BRANCH] - Target branch.
+ * @returns {object} Status snapshot.
+ */
+function getStaggeredPushStatus(options = {}) {
+  const remote = options.remote || DEFAULT_REMOTE;
+  const branch = options.branch || DEFAULT_BRANCH;
+  const now = new Date();
+  const todayStr = getUtcDateString(now);
+  const pushed = hasPushedToday(todayStr);
+
+  const utcHour = now.getUTCHours();
+  const utcMinute = now.getUTCMinutes();
+  const isWindowActive = utcHour > 13 || (utcHour === 13 && utcMinute >= 30);
+
+  let backlogCount = -1;
+  try {
+    backlogCount = getUnpushedCommits(remote, branch).length;
+  } catch {
+    // Deliberate: non-fatal if repo/remote offline
+  }
+
+  return {
+    currentTimeUtc: now.toISOString(),
+    todayUtcDate: todayStr,
+    targetUtcWindow: '13:30 UTC (21:30 CST / 05:30 PST)',
+    isWindowActive,
+    hasPushedToday: pushed,
+    backlogCount,
+    lastPushEntry: getLastPushEntry(),
+  };
+}
+
+/**
  * Appends an entry to the audit NDJSON log.
  *
  * @param {object} record - Structured log record.
@@ -468,6 +536,26 @@ if (require.main === module) {
     }
   }
 
+  const statusFlag = args.includes('--status') || args.includes('-s');
+  if (statusFlag) {
+    const statusObj = getStaggeredPushStatus({ remote, branch });
+    if (jsonOutput) {
+      process.stdout.write(JSON.stringify(statusObj, null, 2) + '\n');
+    } else {
+      console.log('=== Staggered Push Objective Status ===');
+      console.log(`Current Time (UTC): ${statusObj.currentTimeUtc}`);
+      console.log(`Target Window:     ${statusObj.targetUtcWindow}`);
+      console.log(`Window Active:     ${statusObj.isWindowActive ? 'YES (Window Open)' : 'NO (Waiting)'}`);
+      console.log(`Pushed Today (UTC):${statusObj.hasPushedToday ? 'YES (Completed)' : 'NO (Pending)'}`);
+      console.log(`Backlog Commits:   ${statusObj.backlogCount >= 0 ? statusObj.backlogCount : 'Unknown'}`);
+      if (statusObj.lastPushEntry) {
+        const lastEntrySha = statusObj.lastPushEntry.targetSha ? statusObj.lastPushEntry.targetSha.slice(0, 8) : 'N/A';
+        console.log(`Last Push Action:  ${statusObj.lastPushEntry.timestamp} (${statusObj.lastPushEntry.pushedCount} commits, target: ${lastEntrySha})`);
+      }
+    }
+    process.exit(0);
+  }
+
   const outcome = executeStaggeredPush({
     dryRun,
     count,
@@ -510,5 +598,7 @@ module.exports = {
   getUtcDateString,
   getLocalDateString,
   preflightCheckpointAudit,
+  getLastPushEntry,
+  getStaggeredPushStatus,
   AUDIT_LOG_FILE,
 };
