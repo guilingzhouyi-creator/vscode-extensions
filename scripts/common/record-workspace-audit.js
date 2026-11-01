@@ -20,6 +20,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { evaluateWorkspaceQuant } = require('./evaluate-workspace-quant');
+const { ensureLf, stripAnsi } = require('./gate-failure-contract');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const AUDIT_LOG_DIR = path.join(REPO_ROOT, '.audit-logs');
@@ -100,7 +101,7 @@ const RAW_SUBSYSTEMS = [
   '3|auto-refactor|autoRefactor|CLI静态引擎质量基线',
   '4|workspace-timing|workspaceTiming|VSCode扩展审查门禁',
   '5|WebGames配置架构|webGames|卡拉尔领域配置审查',
-  '6|fractal-git|fractalGit|10微Crate/Rust回归套件',
+  '6|fractal-git|fractalGit|10子系统/Rust回归套件',
 ].join('\n');
 
 const SUBSYSTEM_DEFINITIONS = Object.freeze(
@@ -362,15 +363,29 @@ function getRcdNote(val) {
   return '缺陷在各规则家族全域混沌发散，需系统性治理';
 }
 
+/**
+ * Resolves a quantitative metric with primary and fallback keys.
+ *
+ * @param {number|null|undefined} primary - Preferred metric value.
+ * @param {number|null|undefined} fallback - Secondary fallback value.
+ * @param {number} [defaultVal=0] - Default value when both are omitted.
+ * @returns {number} Resolved metric as a number.
+ */
+function resolveQuantMetric(primary, fallback, defaultVal = 0) {
+  if (primary != null) return Number(primary);
+  if (fallback != null) return Number(fallback);
+  return defaultVal;
+}
+
 function renderQuantTableRows(quant) {
-  const rcrVal = Number(quant.rcr ?? quant.icr ?? 0);
-  const erqVal = Number(quant.erq ?? quant.qsr ?? 0);
-  const ddrVal = Number(quant.ddr ?? quant.sortino ?? 0);
-  const dsiVal = Number(quant.dsi ?? quant.debtGini ?? 0);
-  const rcdVal = Number(quant.rcd ?? quant.defectEntropy ?? 0);
-  const edbVal = Number(quant.edb95 ?? quant.var95 ?? 0);
-  const ptdVal = Number(quant.ptd ?? quant.mdd ?? 0);
-  const ehlVal = Number(quant.ehl ?? quant.halfLifeCommits ?? 0.0);
+  const rcrVal = resolveQuantMetric(quant.rcr, quant.icr);
+  const erqVal = resolveQuantMetric(quant.erq, quant.qsr);
+  const ddrVal = resolveQuantMetric(quant.ddr, quant.sortino);
+  const dsiVal = resolveQuantMetric(quant.dsi, quant.debtGini);
+  const rcdVal = resolveQuantMetric(quant.rcd, quant.defectEntropy);
+  const edbVal = resolveQuantMetric(quant.edb95, quant.var95);
+  const ptdVal = resolveQuantMetric(quant.ptd, quant.mdd);
+  const ehlVal = resolveQuantMetric(quant.ehl, quant.halfLifeCommits, 0.0);
 
   const statusBadge = getQuantStatusBadge(quant.status);
   const ddrBadge = getDdrBadge(ddrVal);
@@ -416,17 +431,62 @@ function renderQuantTableRows(quant) {
   ];
 }
 
-function renderMarkdownDashboard(data) {
+/**
+ * Renders the markdown header metadata string.
+ *
+ * @param {object} data - Normalized audit data.
+ * @returns {string} Header metadata markdown.
+ */
+function renderHeaderMeta(data) {
   const wsHealthStr = Number(data.workspaceHealthScore).toFixed(2);
   const wsGrade = data.grade || getGradeFromScore(data.workspaceHealthScore);
-  const globalBadge = data.status === STATUS_PASS ? BADGE_GLOBAL_HEALTHY : BADGE_GLOBAL_ANOMALY;
-
-  const headerMeta = [
+  return [
     `> **综合健康分**: **${wsHealthStr}** (Grade: **${wsGrade}**)`,
     data.autonomyRate != null ? `&nbsp;|&nbsp; **自研率**: **${Number(data.autonomyRate).toFixed(2)}%**` : '',
     data.polyglotIndex != null ? `&nbsp;|&nbsp; **语言均衡**: **${Number(data.polyglotIndex).toFixed(2)}**` : '',
     data.totalDebt != null ? `&nbsp;|&nbsp; **技术债总量**: **${data.totalDebt} 项**` : '',
   ].filter(Boolean).join(' ');
+}
+
+/**
+ * Renders the failure diagnostics table and crash stacks if gate was blocked.
+ *
+ * @param {object} data - Normalized audit data.
+ * @returns {string[]} Failure diagnostics markdown lines.
+ */
+function renderFailureDiagnostics(data) {
+  if (data.status !== STATUS_BLOCK || !Array.isArray(data.failures) || data.failures.length === 0) {
+    return [];
+  }
+  const lines = [
+    '### 🚨 门禁阻断与失败诊断分析 (Failure Diagnostics & Actionable Guidance)',
+    '',
+    `> ⚠️ 当前工作区审查已被阻断，共检出 **${data.failures.length}** 处失败步骤。请按下方指引单点排查修复：`,
+    '',
+    '| 序号 | 失败支柱/步骤 | 退出码 | 关键错误摘要 | 推荐修复动作 | 一键复现与验证命令 |',
+    '| :---: | :--- | :---: | :--- | :--- | :--- |',
+  ];
+  data.failures.forEach((f, idx) => {
+    const stepLabel = `\`${f.pillarId || 'UNKNOWN'}\` (${f.stepName || f.stepId || '步骤'})`;
+    const summary = stripAnsi(f.errorSummary || '返回非零退出码').replace(/\|/g, '\\|');
+    const fix = stripAnsi(f.actionableFix || '查看输出排查').replace(/\|/g, '\\|');
+    const cmd = f.verificationCommand ? `\`${stripAnsi(f.verificationCommand).replace(/\|/g, '\\|')}\`` : 'N/A';
+    lines.push(`| ${idx + 1} | ${stepLabel} | \`${f.exitCode ?? 1}\` | ${summary} | ${fix} | ${cmd} |`);
+  });
+  lines.push('', '<details>', '<summary>🔍 点击展开失败步骤详细堆栈快照 (Crash Stacks)</summary>', '');
+  for (const f of data.failures) {
+    lines.push(`#### 📌 [${f.pillarId || 'PILLAR'}] ${f.stepName || f.stepId || '步骤'}`);
+    if (f.command) lines.push(`- **执行命令**: \`${f.command}\``);
+    if (f.logFilePath) lines.push(`- **原始日志**: \`${f.logFilePath}\``);
+    lines.push('```text', stripAnsi(f.errorStackSnippet || f.errorSummary || 'No stack snippet available.'), '```', '');
+  }
+  lines.push('</details>', '');
+  return lines;
+}
+
+function renderMarkdownDashboard(data) {
+  const globalBadge = data.status === STATUS_PASS ? BADGE_GLOBAL_HEALTHY : BADGE_GLOBAL_ANOMALY;
+  const headerMeta = renderHeaderMeta(data);
 
   const lines = [
     MD_TITLE,
@@ -435,31 +495,23 @@ function renderMarkdownDashboard(data) {
     '',
     `> **记录时间**: ${data.recordedAt} &nbsp;|&nbsp; **Git Revision**: \`${data.gitRevision}\` &nbsp;|&nbsp; **模式**: ${data.fastMode ? CLI_MODE_FAST : CLI_MODE_FULL} &nbsp;|&nbsp; **耗时**: ${data.elapsedSeconds}s &nbsp;|&nbsp; **状态**: ${globalBadge}`,
     '',
+    ...renderFailureDiagnostics(data),
     MD_SUBSYS_HEADER,
     '',
     MD_SUBSYS_TABLE_HDR_1,
     MD_SUBSYS_TABLE_HDR_2,
+    ...renderSubsystemsTableRows(data),
+    ...renderPolyglotTableRows(data.polyglotBreakdown),
+    '',
+    MD_DIM_SECTION_HEADER,
+    '',
+    ...(data.tenDimensions && typeof data.tenDimensions === 'object'
+      ? renderDimensionTableRows(data.tenDimensions)
+      : [MD_DIM_DEGRADED_NOTICE]),
+    ...(data.quant && typeof data.quant === 'object' ? renderQuantTableRows(data.quant) : []),
+    '',
   ];
 
-  lines.push(...renderSubsystemsTableRows(data));
-
-  lines.push(...renderPolyglotTableRows(data.polyglotBreakdown));
-
-  lines.push('');
-  lines.push(MD_DIM_SECTION_HEADER);
-  lines.push('');
-
-  if (data.tenDimensions && typeof data.tenDimensions === 'object') {
-    lines.push(...renderDimensionTableRows(data.tenDimensions));
-  } else {
-    lines.push(MD_DIM_DEGRADED_NOTICE);
-  }
-
-  if (data.quant && typeof data.quant === 'object') {
-    lines.push(...renderQuantTableRows(data.quant));
-  }
-
-  lines.push('');
   return lines.join('\n') + '\n';
 }
 
@@ -489,55 +541,103 @@ function appendHistoryLedger(historyPath, entry, maxEntries = DEFAULT_MAX_HISTOR
 }
 
 /**
- * Record a full workspace audit run atomically.
+ * Resolves failures array from inputPayload or audit-failure-latest.json.
  *
- * @param {object} inputPayload - Raw input payload from audit-all runner.
- * @returns {object} Normalized persisted snapshot.
+ * @param {object} inputPayload - Input payload.
+ * @param {string} status - Audit status.
+ * @returns {object[]} Failures list.
  */
-function recordAuditRun(inputPayload) {
-  if (!fs.existsSync(AUDIT_LOG_DIR)) {
-    fs.mkdirSync(AUDIT_LOG_DIR, { recursive: true });
+function resolveAuditFailures(inputPayload, status) {
+  if (Array.isArray(inputPayload.failures)) {
+    return inputPayload.failures;
   }
+  if (inputPayload.failures && typeof inputPayload.failures === 'object' && Object.keys(inputPayload.failures).length > 0) {
+    return [inputPayload.failures];
+  }
+  if (status !== STATUS_BLOCK) {
+    return [];
+  }
+  const failureLatestPath = path.join(AUDIT_LOG_DIR, 'audit-failure-latest.json');
+  if (!fs.existsSync(failureLatestPath)) {
+    return [];
+  }
+  try {
+    const failureDoc = JSON.parse(fs.readFileSync(failureLatestPath, 'utf8'));
+    if (Array.isArray(failureDoc.failures)) {
+      return failureDoc.failures;
+    }
+  } catch {
+    // Safe fallback ignore
+  }
+  return [];
+}
 
+/**
+ * Formats an optional numerical value to a fixed number of decimals, returning null if missing.
+ *
+ * @param {number|string|null|undefined} val - Input raw value.
+ * @param {number|null} [decimals=null] - Decimal places to round to.
+ * @returns {number|null} Formatted number or null.
+ */
+function formatOptionalNumber(val, decimals = null) {
+  if (val == null) return null;
+  const num = Number(val);
+  return decimals != null ? Number(num.toFixed(decimals)) : num;
+}
+
+/**
+ * Normalizes input payload into standard audit schema.
+ *
+ * @param {object} inputPayload - Raw input payload.
+ * @returns {object} Normalized payload.
+ */
+function buildNormalizedPayload(inputPayload) {
   const gitRev = inputPayload.gitRevision || getGitRevision(REPO_ROOT);
   const nowIso = inputPayload.timestamp || new Date().toISOString();
-  const healthScore = Number(inputPayload.workspaceHealthScore ?? inputPayload.compositeScore ?? 0);
+  const healthScore = resolveQuantMetric(inputPayload.workspaceHealthScore, inputPayload.compositeScore);
   const grade = inputPayload.grade || getGradeFromScore(healthScore);
   const quant = inputPayload.quant || evaluateWorkspaceQuant(REPO_ROOT);
+  const status = inputPayload.status || (inputPayload.exitCode === 0 ? STATUS_PASS : STATUS_BLOCK);
+  const failures = resolveAuditFailures(inputPayload, status);
 
-  const normalized = {
+  return {
     protocolVersion: PROTOCOL_VERSION,
     recordedAt: nowIso,
     gitRevision: gitRev,
     fastMode: Boolean(inputPayload.fastMode),
-    status: inputPayload.status || (inputPayload.exitCode === 0 ? STATUS_PASS : STATUS_BLOCK),
-    exitCode: Number(inputPayload.exitCode ?? 0),
-    elapsedSeconds: Number(inputPayload.elapsedSeconds ?? 0),
+    status,
+    exitCode: Number(inputPayload.exitCode || 0),
+    elapsedSeconds: Number(inputPayload.elapsedSeconds || 0),
     workspaceHealthScore: Number(healthScore.toFixed(2)),
     grade,
-    autonomyRate: inputPayload.autonomyRate != null ? Number(Number(inputPayload.autonomyRate).toFixed(2)) : null,
-    polyglotIndex: inputPayload.polyglotIndex != null ? Number(Number(inputPayload.polyglotIndex).toFixed(2)) : null,
+    autonomyRate: formatOptionalNumber(inputPayload.autonomyRate, 2),
+    polyglotIndex: formatOptionalNumber(inputPayload.polyglotIndex, 2),
     polyglotBreakdown: inputPayload.polyglotBreakdown || null,
-    totalDebt: inputPayload.totalDebt != null ? Number(inputPayload.totalDebt) : null,
-    catalogRuleCount: inputPayload.catalogRuleCount ? Number(inputPayload.catalogRuleCount) : null,
-    // 一致性判定必须一并落盘：只存目录条数会让「两侧不等」这一事实在快照中消失。
+    totalDebt: formatOptionalNumber(inputPayload.totalDebt),
+    catalogRuleCount: formatOptionalNumber(inputPayload.catalogRuleCount),
     catalogCountConsistent:
       inputPayload.catalogCountConsistent != null ? Boolean(inputPayload.catalogCountConsistent) : null,
     projects: inputPayload.projects || {},
     projectScores: inputPayload.projectScores || {},
     tenDimensions: inputPayload.tenDimensions || inputPayload.qualityVector || null,
     quant,
+    failures,
   };
+}
 
-  // 1. Persist audit-latest.json snapshot
-  fs.writeFileSync(LATEST_JSON_PATH, JSON.stringify(normalized, null, 2), 'utf8');
-
-  // 1.1 Persist audit-latest.aas.json compact agent-native snapshot
-  const aasSnapshot = {
+/**
+ * Builds AAS snapshot object from normalized payload.
+ *
+ * @param {object} normalized - Normalized payload.
+ * @returns {object} AAS snapshot.
+ */
+function buildAasSnapshot(normalized) {
+  const quant = normalized.quant;
+  return {
     schema: 'aas-v1',
     tool: 'workspace-audit',
     version: '1.0.0',
-    timestamp: nowIso,
+    timestamp: normalized.recordedAt,
     root: REPO_ROOT,
     verdict: normalized.status,
     health: {
@@ -565,18 +665,21 @@ function recordAuditRun(inputPayload) {
     subsystems: normalized.projects,
     projectScores: normalized.projectScores,
     dimensions: normalized.tenDimensions,
+    failures: normalized.failures,
     defaultVerify: 'pwsh -File scripts/ps1/audit-all.ps1',
   };
-  fs.writeFileSync(LATEST_AAS_PATH, JSON.stringify(aasSnapshot, null, 2), 'utf8');
+}
 
-  // 2. Persist audit-latest.md dashboard
-  const mdContent = renderMarkdownDashboard(normalized);
-  fs.writeFileSync(LATEST_MD_PATH, mdContent, 'utf8');
-
-  // 3. Append compact ledger entry to audit-history.jsonl
-  const historyEntry = {
-    t: nowIso,
-    rev: gitRev,
+/**
+ * Builds compact history entry from normalized payload.
+ *
+ * @param {object} normalized - Normalized payload.
+ * @returns {object} History entry.
+ */
+function buildHistoryEntry(normalized) {
+  return {
+    t: normalized.recordedAt,
+    rev: normalized.gitRevision,
     fast: normalized.fastMode,
     status: normalized.status,
     score: normalized.workspaceHealthScore,
@@ -587,7 +690,36 @@ function recordAuditRun(inputPayload) {
     projects: normalized.projectScores,
     dimensions: normalized.tenDimensions,
     elapsed: normalized.elapsedSeconds,
+    failedSteps: normalized.failures ? normalized.failures.map((f) => f.pillarId || f.stepId).filter(Boolean) : [],
   };
+}
+
+/**
+ * Record a full workspace audit run atomically.
+ *
+ * @param {object} inputPayload - Raw input payload from audit-all runner.
+ * @returns {object} Normalized persisted snapshot.
+ */
+function recordAuditRun(inputPayload) {
+  if (!fs.existsSync(AUDIT_LOG_DIR)) {
+    fs.mkdirSync(AUDIT_LOG_DIR, { recursive: true });
+  }
+
+  const normalized = buildNormalizedPayload(inputPayload);
+
+  // 1. Persist audit-latest.json snapshot
+  fs.writeFileSync(LATEST_JSON_PATH, ensureLf(JSON.stringify(normalized, null, 2)), 'utf8');
+
+  // 1.1 Persist audit-latest.aas.json compact agent-native snapshot
+  const aasSnapshot = buildAasSnapshot(normalized);
+  fs.writeFileSync(LATEST_AAS_PATH, ensureLf(JSON.stringify(aasSnapshot, null, 2)), 'utf8');
+
+  // 2. Persist audit-latest.md dashboard
+  const mdContent = ensureLf(renderMarkdownDashboard(normalized));
+  fs.writeFileSync(LATEST_MD_PATH, mdContent, 'utf8');
+
+  // 3. Append compact ledger entry to audit-history.jsonl
+  const historyEntry = buildHistoryEntry(normalized);
   appendHistoryLedger(HISTORY_JSONL_PATH, historyEntry, DEFAULT_MAX_HISTORY_ENTRIES);
 
   return normalized;
@@ -648,6 +780,61 @@ function displayHistoryLedger() {
   }
 }
 
+/**
+ * Handles --aas and --json inspection flags.
+ *
+ * @param {string[]} args - Process arguments.
+ */
+function handleInspectFlags(args) {
+  if (args.includes('--aas')) {
+    if (fs.existsSync(LATEST_AAS_PATH)) {
+      console.log(fs.readFileSync(LATEST_AAS_PATH, 'utf8'));
+    } else {
+      console.log(JSON.stringify({ schema: 'aas-v1', status: 'NONE', message: 'No AAS snapshot recorded yet.' }, null, 2));
+    }
+    process.exit(0);
+  }
+
+  if (args.includes(FLAG_JSON)) {
+    if (fs.existsSync(LATEST_JSON_PATH)) {
+      console.log(fs.readFileSync(LATEST_JSON_PATH, 'utf8'));
+    } else {
+      console.log(JSON.stringify({ status: 'NONE', message: 'No audit snapshot recorded yet.' }, null, 2));
+    }
+    process.exit(0);
+  }
+}
+
+/**
+ * Resolves CLI record payload from file, argument string, or stdin.
+ *
+ * @param {string[]} args - Process arguments.
+ * @returns {object|null} Parsed record payload or null.
+ */
+function resolveRecordPayload(args) {
+  const recordFileIdx = args.indexOf(FLAG_RECORD_FILE);
+  if (recordFileIdx !== -1 && args[recordFileIdx + 1]) {
+    const fPath = path.resolve(process.cwd(), args[recordFileIdx + 1]);
+    if (fs.existsSync(fPath)) {
+      return JSON.parse(fs.readFileSync(fPath, 'utf8'));
+    }
+  }
+
+  const recordJsonIdx = args.indexOf(FLAG_RECORD_JSON);
+  if (recordJsonIdx !== -1 && args[recordJsonIdx + 1]) {
+    return JSON.parse(args[recordJsonIdx + 1]);
+  }
+
+  if (args.includes(FLAG_RECORD_STDIN)) {
+    const inputBuf = fs.readFileSync(0, 'utf8');
+    if (inputBuf.trim()) {
+      return JSON.parse(inputBuf);
+    }
+  }
+
+  return null;
+}
+
 function main() {
   const args = process.argv.slice(2);
 
@@ -661,53 +848,18 @@ function main() {
     return;
   }
 
-  if (args.includes('--aas')) {
-    if (fs.existsSync(LATEST_AAS_PATH)) {
-      console.log(fs.readFileSync(LATEST_AAS_PATH, 'utf8'));
-      process.exit(0);
-    } else {
-      console.log(JSON.stringify({ schema: 'aas-v1', status: 'NONE', message: 'No AAS snapshot recorded yet.' }, null, 2));
-      process.exit(0);
-    }
-  }
+  handleInspectFlags(args);
 
-  if (args.includes(FLAG_JSON)) {
-    if (fs.existsSync(LATEST_JSON_PATH)) {
-      console.log(fs.readFileSync(LATEST_JSON_PATH, 'utf8'));
-      process.exit(0);
-    } else {
-      console.log(JSON.stringify({ status: 'NONE', message: 'No audit snapshot recorded yet.' }, null, 2));
-      process.exit(0);
-    }
-  }
-
-  // Record command handling
-  let payload = null;
-  const recordFileIdx = args.indexOf(FLAG_RECORD_FILE);
-  if (recordFileIdx !== -1 && args[recordFileIdx + 1]) {
-    const fPath = path.resolve(process.cwd(), args[recordFileIdx + 1]);
-    if (fs.existsSync(fPath)) {
-      payload = JSON.parse(fs.readFileSync(fPath, 'utf8'));
-    }
-  }
-
-  const recordJsonIdx = args.indexOf(FLAG_RECORD_JSON);
-  if (recordJsonIdx !== -1 && args[recordJsonIdx + 1]) {
-    payload = JSON.parse(args[recordJsonIdx + 1]);
-  }
-
-  if (args.includes(FLAG_RECORD_STDIN)) {
-    const inputBuf = fs.readFileSync(0, 'utf8');
-    if (inputBuf.trim()) {
-      payload = JSON.parse(inputBuf);
-    }
-  }
-
+  const payload = resolveRecordPayload(args);
   if (payload) {
     const result = recordAuditRun(payload);
     console.log(`  ✔ [Audit-Persistence] 全工作区审查快照与质量轨迹已留痕 (${result.workspaceHealthScore}分, Grade: ${result.grade})`);
     process.exit(0);
   }
+
+  // Default: if invoked without parameters, print usage
+  console.log(MSG_USAGE);
+}
 
   // Default: if invoked without parameters, print usage
   console.log(MSG_USAGE);

@@ -123,6 +123,11 @@ function Format-QuantDashboardBlock {
     $sep = "├" + $sepTitle + ("─" * ($TargetWidth - (Get-DisplayWidth $sepTitle))) + "┤"
     Write-GateHost $sep -ForegroundColor Cyan
 
+    if ($Quant.isBlocked) {
+        Write-GateHost (Format-DashboardRow " ⚠️  [ADR-Q 韧性警报: 当前检测到门禁阻断冲击与破位事件!]" $TargetWidth) -ForegroundColor Red
+        Write-GateHost (Format-DashboardRow "     破位防御度(DDR)已触发下行惩罚，请优先排查并修复阻断项" $TargetWidth) -ForegroundColor Yellow
+    }
+
     $rcrVal = [double]$(if ($null -ne $Quant.rcr) { $Quant.rcr } else { $Quant.icr })
     $rcrStatus = if ($Quant.status -eq "de-leveraging") { "🟢 强净消融" } elseif ($Quant.status -eq "balanced") { "🟡 动态均势" } elseif ($Quant.status -eq "insufficient_samples") { "⚪ 样本匮乏" } else { "🔴 赤字膨胀" }
     $rcrColor = if ($Quant.status -eq "de-leveraging") { "Green" } elseif ($Quant.status -eq "balanced") { "Yellow" } elseif ($Quant.status -eq "insufficient_samples") { "Gray" } else { "Red" }
@@ -191,6 +196,10 @@ function Format-QuantMarkdownBlock {
     )
     [void]$Builder.AppendLine("### 📈 架构动力学与韧性量化看板 (Architecture Dynamics & Resilience, ADR-Q)")
     [void]$Builder.AppendLine()
+    if ($Quant.isBlocked) {
+        [void]$Builder.AppendLine("> ⚠️ **[ADR-Q 架构韧性警报]**: 当前工作区审查检测到门禁阻断冲击 (Quality Shock Event)。破位防御度 (DDR) 已触发下行惩罚，请优先处理阻断步骤以收复质量稳态基线。")
+        [void]$Builder.AppendLine()
+    }
     [void]$Builder.AppendLine("| 观测子域 | 指标名称 (规范代号) | 实时标量 | 动态量规 | 状态等级 | 架构治理与战术研判 |")
     [void]$Builder.AppendLine("| :--- | :--- | :---: | :---: | :---: | :--- |")
 

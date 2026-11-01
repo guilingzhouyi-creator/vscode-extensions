@@ -94,11 +94,6 @@ $logParityOut = Join-Path $transientDir "audit-check-parityout-$randSuffix.out.l
 $logGateProofOut = Join-Path $transientDir "audit-check-gateproof-$randSuffix.out.log"
 $logDocMetricsOut = Join-Path $transientDir "audit-check-docmetrics-$randSuffix.out.log"
 $logCatalogOut = Join-Path $transientDir "audit-check-catalogout-$randSuffix.out.log"
-$logFgTopoOut = Join-Path $transientDir "audit-check-fgtopoout-$randSuffix.out.log"
-$logFgParityOut = Join-Path $transientDir "audit-check-fgparityout-$randSuffix.out.log"
-$logFgBridgeOut = Join-Path $transientDir "audit-check-fgbridgeout-$randSuffix.out.log"
-$logFgAllocOut = Join-Path $transientDir "audit-check-fgallocout-$randSuffix.out.log"
-$logFgReportOut = Join-Path $transientDir "audit-check-fgreport-$randSuffix.out.log"
 
 # 1. 物理卫生八维刚性公理与全域巡检
 Write-StepBanner -StepId "WORKSPACE-AUDIT-01"
@@ -212,7 +207,7 @@ $logFgOut = Join-Path $transientDir "audit-fg-$randSuffix.out.log"
 $logFgErr = Join-Path $transientDir "audit-fg-$randSuffix.err.log"
 
 
-$procWt = Start-Process -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWtOut -RedirectStandardError $logWtErr -PassThru
+$procWt = Start-Process -FilePath $npmCmd -ArgumentList @("run", "review:strict") -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWtOut -RedirectStandardError $logWtErr -PassThru
 $procWg = if ($Fast) {
     Start-Process -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_runner.py", "--diff") -WorkingDirectory $repoRoot -RedirectStandardOutput $logWgOut -RedirectStandardError $logWgErr -PassThru
 } else {
@@ -223,63 +218,59 @@ $procAr = if ($Fast) {
 } else {
     Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
 }
-$resFgTopo = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-crate-topology.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgTopoOut -NoNewWindow -PassThru -Wait
-$resFgParity = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-git-parity.js --require-git" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgParityOut -NoNewWindow -PassThru -Wait
-$resFgBridge = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-gate-bridge.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgBridgeOut -NoNewWindow -PassThru -Wait
-$resFgAlloc = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/check-zero-alloc-boundary.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgAllocOut -NoNewWindow -PassThru -Wait
-
-$staticFgClean = ($resFgTopo.ExitCode -eq 0 -and $resFgParity.ExitCode -eq 0 -and $resFgBridge.ExitCode -eq 0 -and $resFgAlloc.ExitCode -eq 0)
-
-$procFg = if ($cargoCmd) {
-    if ($Fast) {
-        Start-Process -FilePath $cargoCmd -ArgumentList @("check", "--workspace", "--manifest-path", "fractal-git/Cargo.toml", "--all-targets") -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgOut -RedirectStandardError $logFgErr -PassThru
-    } else {
-        Start-Process -FilePath $cargoCmd -ArgumentList @("test", "--workspace", "--manifest-path", "fractal-git/Cargo.toml") -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgOut -RedirectStandardError $logFgErr -PassThru
-    }
+$fgReportArgs = if ($Fast) {
+    @("fractal-git/scripts/common/run-audit-report.js", "--fast")
 } else {
-    $null
+    @("fractal-git/scripts/common/run-audit-report.js")
 }
+$procFg = Start-Process -FilePath $nodeCmd -ArgumentList $fgReportArgs -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgOut -RedirectStandardError $logFgErr -PassThru
 
-$timeoutWt = if ($Fast) { 60 } else { 120 }
+$timeoutWt = if ($Fast) { 90 } else { 180 }
 $timeoutWg = if ($Fast) { 60 } else { 120 }
 $timeoutAr = if ($Fast) { 90 } else { 240 }
-$timeoutFg = if ($Fast) { 60 } else { 120 }
+$timeoutFg = if ($Fast) { 90 } else { 180 }
 
 $wtClean = Wait-ProcessWithTimeout -Process $procWt -TimeoutSeconds $timeoutWt -ProcessName "workspace-timing" -LogFiles @($logWtOut, $logWtErr)
 $wgClean = Wait-ProcessWithTimeout -Process $procWg -TimeoutSeconds $timeoutWg -ProcessName "WebGames" -LogFiles @($logWgOut, $logWgErr)
 $arClean = Wait-ProcessWithTimeout -Process $procAr -TimeoutSeconds $timeoutAr -ProcessName "auto-refactor" -LogFiles @($logArOut, $logArErr)
-$fgClean = if ($procFg) {
-    Wait-ProcessWithTimeout -Process $procFg -TimeoutSeconds $timeoutFg -ProcessName "fractal-git" -LogFiles @($logFgOut, $logFgErr)
-} else {
-    $true
-}
+$fgClean = Wait-ProcessWithTimeout -Process $procFg -TimeoutSeconds $timeoutFg -ProcessName "fractal-git" -LogFiles @($logFgOut, $logFgErr)
 
 $statusWt = if ($wtClean -and $procWt.ExitCode -eq 0) { "PASS" } else { "BLOCK" }
 $statusWg = if ($wgClean -and $procWg.ExitCode -eq 0) { "PASS" } else { "BLOCK" }
 $statusAr = if ($arClean -and $procAr.ExitCode -eq 0) { "PASS" } else { "BLOCK" }
-$statusFg = if (-not $staticFgClean) {
-    "BLOCK"
-} elseif ($null -eq $procFg) {
-    "PASS"
-} elseif ($fgClean -and $procFg.ExitCode -eq 0) {
-    "PASS"
-} else {
-    "BLOCK"
+$statusFg = if ($fgClean -and $procFg.ExitCode -eq 0) { "PASS" } else { "BLOCK" }
+if (-not $Json -and -not $Agent -and (Test-Path $logFgOut) -and $statusFg -eq "PASS") {
+    Get-Content $logFgOut -Encoding utf8 | Write-GateHost
 }
-
-if ($nodeCmd -and (Test-Path "fractal-git/scripts/common/run-audit-report.js")) {
-    $reportArgs = if ($Fast) { @("fractal-git/scripts/common/run-audit-report.js", "--fast") } else { @("fractal-git/scripts/common/run-audit-report.js") }
-    $null = Start-Process -FilePath $nodeCmd -ArgumentList $reportArgs -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgReportOut -NoNewWindow -PassThru -Wait 
-    if (-not $Json -and -not $Agent -and (Test-Path $logFgReportOut)) { Get-Content $logFgReportOut -Encoding utf8 | Write-GateHost }
-}
-
 
 if (-not $Fast -and $statusAr -eq "PASS") {
-    $procGateSelf = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArSelfOut -RedirectStandardError $logArSelfErr -PassThru
-    $gateSelfClean = Wait-ProcessWithTimeout -Process $procGateSelf -TimeoutSeconds 60 -ProcessName "auto-refactor gate-self" -LogFiles @($logArSelfOut, $logArSelfErr)
-    if (-not $gateSelfClean -or $procGateSelf.ExitCode -ne 0) {
-        $statusAr = "BLOCK"
+    foreach ($arGateScript in @("scripts/gate-self.js", "scripts/gate-comments.js", "scripts/gate-rust.js")) {
+        if ($statusAr -ne "PASS") { break }
+        $arGateTimeout = if ($arGateScript -eq "scripts/gate-rust.js") { 180 } else { 90 }
+        $procArGate = Start-Process -FilePath $nodeCmd -ArgumentList @($arGateScript) -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArSelfOut -RedirectStandardError $logArSelfErr -PassThru
+        $arGateClean = Wait-ProcessWithTimeout -Process $procArGate -TimeoutSeconds $arGateTimeout -ProcessName "auto-refactor $arGateScript" -LogFiles @($logArSelfOut, $logArSelfErr)
+        if (-not $arGateClean -or $procArGate.ExitCode -ne 0) {
+            $statusAr = "BLOCK"
+        }
     }
+}
+
+# 权威报告文件存在性校验：若子项目进程返回 0 但缺失权威报告，按 Fail-Closed 升级为 BLOCK
+if ($null -eq $rawHygieneScore) {
+    $statusHygiene = "BLOCK"
+    $failed = $true
+}
+if (-not (Test-Path (Join-Path $repoRoot "auto-refactor\reports\self-audit-baseline.json")) -and -not (Test-Path (Join-Path $repoRoot "auto-refactor\reports\self-audit-baseline.aas.json"))) {
+    $statusAr = "BLOCK"
+}
+if (-not (Test-Path (Join-Path $repoRoot "workspace-timing\reports\auto-refactor-latest.json")) -and -not (Test-Path (Join-Path $repoRoot "workspace-timing\reports\.refactor-cache\report.json")) -and -not (Test-Path (Join-Path $repoRoot "workspace-timing\reports\review\report-latest.json"))) {
+    $statusWt = "BLOCK"
+}
+if (-not (Test-Path (Join-Path $repoRoot "WebGames\reports\audit-latest.json")) -or -not (Test-Path (Join-Path $repoRoot "WebGames\reports\auto-refactor-latest.json"))) {
+    $statusWg = "BLOCK"
+}
+if (-not (Test-Path (Join-Path $repoRoot "fractal-git\reports\audit-latest.json"))) {
+    $statusFg = "BLOCK"
 }
 
 if ($statusWt -ne "PASS") {
@@ -331,7 +322,7 @@ if ($failed) {
     try {
         if ($statusWt -ne "PASS") {
             $wtLog = if (Test-Path $logWtErr) { $logWtErr } else { $logWtOut }
-            Save-AuditStepFailure -PillarId "timing-03" -StepId "workspace-timing-review" -StepName "workspace-timing 六层审查门禁" -Command "npm run review" -ExitCode 1 -LogFile $wtLog -AasLayer "L4_QUALITY" -ActionableFix "cd workspace-timing && npm run test:fast" -VerificationCommand "cd workspace-timing && npm run test:fast"
+            Save-AuditStepFailure -PillarId "timing-03" -StepId "workspace-timing-review" -StepName "workspace-timing 六层审查门禁" -Command "npm run review:strict" -ExitCode 1 -LogFile $wtLog -AasLayer "L4_QUALITY" -ActionableFix "cd workspace-timing && npm run review:strict" -VerificationCommand "cd workspace-timing && npm run review:strict"
         }
         if ($statusWg -ne "PASS") {
             $wgLog = if (Test-Path $logWgErr) { $logWgErr } else { $logWgOut }
@@ -385,24 +376,14 @@ function Get-SafeProp {
     return $null
 }
 
-# 读取 auto-refactor 十维工程质量基线 (优先读取轻量级 UAR 收据)
+# 读取 auto-refactor 十维工程质量基线（优先读取本轮最新自审基线，补充轻量级 UAR 收据并无条件执行跨项目 CAI 融合）
 $receiptPath = Join-Path $repoRoot "auto-refactor\reports\audit-receipt.json"
 $aasBaselinePath = Join-Path $repoRoot "auto-refactor\reports\self-audit-baseline.aas.json"
 $baselinePath = Join-Path $repoRoot "auto-refactor\reports\self-audit-baseline.json"
 $baseline = $null; $tenDimensions = $null; $compositeScore = $null; $totalDebt = $null; $autonomyRate = $null; $grade = $null; $notEvaluatedDims = $null
 
 try {
-    if (Test-Path $receiptPath) {
-        $receiptData = (Get-Content -Path $receiptPath -Raw -Encoding utf8) | ConvertFrom-Json
-        if ($receiptData -and $receiptData.schemaVersion -eq "1.0") {
-            if ($null -ne $receiptData.healthScore) { $compositeScore = [double]$receiptData.healthScore }
-            if ($null -ne $receiptData.grade) { $grade = [string]$receiptData.grade }
-            if ($null -ne $receiptData.issuesTotal) { $totalDebt = [int]$receiptData.issuesTotal }
-            if ($null -ne $receiptData.confidence) { $autonomyRate = [double]$receiptData.confidence * 100 }
-            $tenDimensions = $receiptData.dimensions; $baseline = $receiptData
-        }
-    }
-    if ($null -eq $baseline -and (Test-Path $aasBaselinePath)) {
+    if (Test-Path $aasBaselinePath) {
         $aasData = (Get-Content -Path $aasBaselinePath -Raw -Encoding utf8) | ConvertFrom-Json
         if ($aasData -and $aasData.schema -eq "aas-v1" -and $aasData.health) {
             $h = $aasData.health
@@ -413,53 +394,62 @@ try {
             $tenDimensions = $aasData.dimensions; $baseline = $aasData
         }
     }
-    if ($null -eq $baseline -and (Test-Path $baselinePath)) {
+    if (Test-Path $baselinePath) {
         $baselineData = (Get-Content -Path $baselinePath -Raw -Encoding utf8) | ConvertFrom-Json
         if ($baselineData) {
             $m = Get-SafeProp $baselineData "metrics"
-            $cs = if ($null -ne $m) { Get-SafeProp $m "compositeScore" } else { Get-SafeProp $baselineData "compositeScore" }
-            if ($null -ne $cs) { $compositeScore = [double]$cs }
-            $g = if ($null -ne $m) { Get-SafeProp $m "grade" } else { $null }
-            if ($null -ne $g) { $grade = [string]$g }
-            $ti = if ($null -ne $m) { (Get-SafeProp $m "totalIssues") ?? (Get-SafeProp $m "unsuppressedIssues") } else { $null }
-            if ($null -ne $ti) { $totalDebt = [int]$ti }
-            $autonomyRate = (Get-SafeProp $baselineData "autonomyRate") ?? (if ($m) { Get-SafeProp $m "autonomyRate" } else { $null }) ?? (Get-SafeProp $baselineData "cai")
-
-            # 多子系统自研率加权融合 (auto-refactor 与 fractal-git)
-            $fgAuditPath = Join-Path $repoRoot "fractal-git\reports\audit-latest.json"
-            $fgCai = $null
-            if (Test-Path $fgAuditPath) {
-                try {
-                    $fgData = Get-Content -Path $fgAuditPath -Raw -Encoding utf8 | ConvertFrom-Json
-                    if ($fgData -and $fgData.summary) {
-                        $fgCai = Get-SafeProp $fgData.summary 'caiIndex'
-                    }
-                } catch { }
+            if ($null -eq $compositeScore) {
+                $cs = if ($null -ne $m) { Get-SafeProp $m "compositeScore" } else { Get-SafeProp $baselineData "compositeScore" }
+                if ($null -ne $cs) { $compositeScore = [double]$cs }
             }
-            if ($null -ne $autonomyRate -and $null -ne $fgCai) {
-                $arCai = $autonomyRate
-                $autonomyRate = [math]::Round(([double]$arCai * 0.67 + [double]$fgCai * 0.33), 2)
+            if ($null -eq $grade) {
+                $g = if ($null -ne $m) { Get-SafeProp $m "grade" } else { $null }
+                if ($null -ne $g) { $grade = [string]$g }
             }
-
-            $polyglotData = Get-SafeProp $baselineData 'polyglotGeneralization'
-            if ($null -eq $polyglotData -and $null -ne $metricsData) {
-                $polyglotData = Get-SafeProp $metricsData 'polyglotGeneralization'
+            if ($null -eq $totalDebt) {
+                $ti = if ($null -ne $m) { (Get-SafeProp $m "totalIssues") ?? (Get-SafeProp $m "unsuppressedIssues") } else { $null }
+                if ($null -ne $ti) { $totalDebt = [int]$ti }
             }
-            $polyglotIndex = if ($null -ne $polyglotData) {
-                $pi = Get-SafeProp $polyglotData 'index'
-                if ($null -ne $pi) { [double]$pi } else { $null }
-            } else { $null }
-
-            $tenDimensions = Get-SafeProp $baselineData 'tenDimensions'
-            if ($null -ne $tenDimensions) {
+            if ($null -eq $autonomyRate) {
+                $autonomyRate = (Get-SafeProp $baselineData "autonomyRate") ?? (if ($m) { Get-SafeProp $m "autonomyRate" } else { $null }) ?? (Get-SafeProp $baselineData "cai")
+            }
+            if ($null -eq $tenDimensions) {
+                $tenDimensions = Get-SafeProp $baselineData 'tenDimensions'
+            }
+            if ($null -eq $baseline -and $null -ne $tenDimensions) {
                 $baseline = $baselineData
             }
-
             $notEvaluatedDims = Get-SafeProp $baselineData 'notEvaluated'
-            if ($null -eq $notEvaluatedDims -and $null -ne $metricsData) {
-                $notEvaluatedDims = Get-SafeProp $metricsData 'notEvaluated'
+            if ($null -eq $notEvaluatedDims -and $null -ne $m) {
+                $notEvaluatedDims = Get-SafeProp $m 'notEvaluated'
             }
         }
+    }
+    if ($null -eq $baseline -and (Test-Path $receiptPath)) {
+        $receiptData = (Get-Content -Path $receiptPath -Raw -Encoding utf8) | ConvertFrom-Json
+        if ($receiptData -and $receiptData.schemaVersion -eq "1.0") {
+            if ($null -ne $receiptData.healthScore) { $compositeScore = [double]$receiptData.healthScore }
+            if ($null -ne $receiptData.grade) { $grade = [string]$receiptData.grade }
+            if ($null -ne $receiptData.issuesTotal) { $totalDebt = [int]$receiptData.issuesTotal }
+            if ($null -ne $receiptData.confidence) { $autonomyRate = [double]$receiptData.confidence * 100 }
+            $tenDimensions = $receiptData.dimensions; $baseline = $receiptData
+        }
+    }
+
+    # 多子系统自研率无条件加权融合 (auto-refactor 与 fractal-git)
+    $fgAuditPath = Join-Path $repoRoot "fractal-git\reports\audit-latest.json"
+    $fgCai = $null
+    if (Test-Path $fgAuditPath) {
+        try {
+            $fgData = Get-Content -Path $fgAuditPath -Raw -Encoding utf8 | ConvertFrom-Json
+            if ($fgData -and $fgData.summary) {
+                $fgCai = Get-SafeProp $fgData.summary 'caiIndex'
+            }
+        } catch { }
+    }
+    if ($null -ne $autonomyRate -and $null -ne $fgCai) {
+        $arCai = [double]$autonomyRate
+        $autonomyRate = [math]::Round(($arCai * 0.67 + [double]$fgCai * 0.33), 2)
     }
 } catch {
     $baseline = $null
@@ -547,7 +537,13 @@ $ELOC_MISSING_PENALTY = 15.0
 #   - .gitignore 治理缺失 (GITIGNORE_MISSING_PENALTY = 10.0)：脏产物可被人工识别并清理，
 #     影响面局限在仓库卫生，不污染门禁判定，故扣分较轻。
 # 两项均夹到 SCORE_FLOOR，保证重复劣化不会把得分推到负值而破坏加权求和。
-$baseHygiene = if ($null -ne $rawHygieneScore) { $rawHygieneScore } else { if ($codeHygiene -eq 0) { 100.0 } else { 50.0 } }
+$baseHygiene = if ($null -ne $rawHygieneScore) {
+    $rawHygieneScore
+} else {
+    $statusHygiene = "BLOCK"
+    $failed = $true
+    $SCORE_FLOOR
+}
 if ($codeIso -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $ISO_MISSING_PENALTY) }
 if ($codeGi -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $GITIGNORE_MISSING_PENALTY) }
 if ($codeDensity -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $DENSITY_MISSING_PENALTY) }
@@ -583,7 +579,7 @@ $scoreRules = if ($statusRules -eq "PASS" -and $catalogCountConsistent) {
     [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($rulesPassedCount / [math]::Max(1, $ruleStepTotal)), 1))
 }
 
-# 3. auto-refactor 质量基线得分（基于自审综合基线动态读取，门禁失败动态连续衰减）
+# 3. auto-refactor 质量基线得分（零硬编码假高分保底，缺失基线报告一律降级至 SCORE_FLOOR 并置 BLOCK）
 $baseAr = $null
 if ($null -ne $compositeScore) {
     $baseAr = [double]$compositeScore
@@ -601,7 +597,9 @@ if ($null -ne $compositeScore) {
     }
 }
 if ($null -eq $baseAr) {
-    $baseAr = if ($statusAr -eq "PASS") { 95.0 } else { $SCORE_FLOOR }
+    $statusAr = "BLOCK"
+    $failed = $true
+    $baseAr = $SCORE_FLOOR
 }
 $scoreAr = if ($statusAr -eq "PASS") {
     $baseAr
@@ -609,18 +607,23 @@ $scoreAr = if ($statusAr -eq "PASS") {
     [math]::Max($SCORE_FLOOR, [math]::Round($baseAr - $DEGRADE_PENALTY, 1))
 }
 
-# 4. workspace-timing 审查门禁得分（优先读取真实 AST compositeScore，消除假满分 100.0）
+# 4. workspace-timing 审查门禁得分（优先读取最新 auto-refactor-latest.json，零假保底分）
 $baseWt = $null
-$wtCachePath = Join-Path $repoRoot "workspace-timing\reports\.refactor-cache\report.json"
-try {
-    if (Test-Path $wtCachePath) {
-        $wtCacheData = Get-Content -Path $wtCachePath -Raw -Encoding utf8 | ConvertFrom-Json
-        if ($wtCacheData.qualityScore -and $wtCacheData.qualityScore.compositeScore) {
-            $baseWt = [double]$wtCacheData.qualityScore.compositeScore
+foreach ($wtScoreCandidate in @(
+    (Join-Path $repoRoot "workspace-timing\reports\auto-refactor-latest.json"),
+    (Join-Path $repoRoot "workspace-timing\reports\.refactor-cache\report.json")
+)) {
+    if ($null -ne $baseWt) { break }
+    try {
+        if (Test-Path $wtScoreCandidate) {
+            $wtCacheData = Get-Content -Path $wtScoreCandidate -Raw -Encoding utf8 | ConvertFrom-Json
+            if ($wtCacheData.qualityScore -and $null -ne $wtCacheData.qualityScore.compositeScore) {
+                $baseWt = [double]$wtCacheData.qualityScore.compositeScore
+            }
         }
+    } catch {
+        $baseWt = $null
     }
-} catch {
-    $baseWt = $null
 }
 
 if ($null -eq $baseWt) {
@@ -656,7 +659,9 @@ if ($null -eq $baseWt) {
 }
 
 if ($null -eq $baseWt) {
-    $baseWt = if ($statusWt -eq "PASS") { 95.0 } else { $SCORE_FLOOR }
+    $statusWt = "BLOCK"
+    $failed = $true
+    $baseWt = $SCORE_FLOOR
 }
 
 $scoreWt = if ($statusWt -eq "PASS") {
@@ -665,15 +670,26 @@ $scoreWt = if ($statusWt -eq "PASS") {
     [math]::Max($SCORE_FLOOR, [math]::Round($baseWt - $DEGRADE_PENALTY, 1))
 }
 
-# 5. WebGames 配置架构与游戏源码得分（加权融合配置表与 663 个 GDScript 真实 AST 质量，消融假满分）
+# 5. WebGames 配置架构与游戏源码得分（读取真实 auto-refactor-latest.json 与 audit-latest.json，零假保底分）
 $baseWg = $null
-$gdScore = if ($null -ne $polyglotBreakdown -and $null -ne $polyglotBreakdown.gdscript) {
-    [double]$polyglotBreakdown.gdscript.score
+$gdScore = $null
+if ($null -ne $polyglotBreakdown -and $null -ne $polyglotBreakdown.gdscript -and $null -ne $polyglotBreakdown.gdscript.score) {
+    $gdScore = [double]$polyglotBreakdown.gdscript.score
 } else {
-    90.0
+    $wgRefactorPath = Join-Path $repoRoot "WebGames\reports\auto-refactor-latest.json"
+    try {
+        if (Test-Path $wgRefactorPath) {
+            $wgRefData = Get-Content -Path $wgRefactorPath -Raw -Encoding utf8 | ConvertFrom-Json
+            if ($wgRefData -and $wgRefData.qualityScore -and $null -ne $wgRefData.qualityScore.compositeScore) {
+                $gdScore = [double]$wgRefData.qualityScore.compositeScore
+            }
+        }
+    } catch {
+        $gdScore = $null
+    }
 }
 
-$configScore = if ($statusWg -eq "PASS") { 90.0 } else { $SCORE_FLOOR }
+$configScore = $null
 $wgReportPath = Join-Path $repoRoot "WebGames\reports\audit-latest.json"
 try {
     if (Test-Path $wgReportPath) {
@@ -697,18 +713,26 @@ try {
                 $ratioWg = $passChecksWg / $totalChecksWg
                 $rawConfig = (100.0 * $ratioWg) - ($warnCountWg * 0.035) - ($errCountWg * 5.0)
                 $configScore = [math]::Max($SCORE_FLOOR, [math]::Round($rawConfig, 1))
+            } else {
+                $rawWgComposite = Get-SafeProp $wgSummary "compositeScore"
+                if ($null -ne $rawWgComposite -and [double]$rawWgComposite -gt 0) {
+                    $configScore = [math]::Max($SCORE_FLOOR, [math]::Round([double]$rawWgComposite, 1))
+                }
             }
         }
     }
 } catch {
-    $configScore = if ($statusWg -eq "PASS") { 90.0 } else { $SCORE_FLOOR }
+    $configScore = $null
 }
 
 # 综合得分：GDScript 核心游戏代码占 80% 权重，领域配置驱动表占 20% 权重。
-# 该比例反映「游戏能否运行」与「配置是否规范」的影响力差异：配置表错误可由
-# 校验脚本单点定位，而核心逻辑缺陷会直接表现为可玩性崩溃，故核心代码权重更高。
-# 两项权重之和必须为 1.0，调整时须同步修改本契约。
-$baseWg = [math]::Round((0.8 * $gdScore) + (0.2 * $configScore), 1)
+if ($null -eq $gdScore -or $null -eq $configScore) {
+    $statusWg = "BLOCK"
+    $failed = $true
+    $baseWg = $SCORE_FLOOR
+} else {
+    $baseWg = [math]::Round((0.8 * $gdScore) + (0.2 * $configScore), 1)
+}
 
 $scoreWg = if ($statusWg -eq "PASS") {
     $baseWg
@@ -716,15 +740,7 @@ $scoreWg = if ($statusWg -eq "PASS") {
     [math]::Max($SCORE_FLOOR, [math]::Round($baseWg - $DEGRADE_PENALTY, 1))
 }
 
-# 6. fractal-git 质量基线得分（基于 audit-latest.json 真实 checks/pass/warn 连续客观计算，消融阶跃硬编码）
-#
-# 三级降级链，取第一个可用来源，缺数据只降级不抛错：
-#   ① summary.compositeScore —— Rust 侧 AST 自审的权威综合分；
-#   ② qualityEnvelope.composite_score —— 旧版报告字段（下划线命名），仅在 ① 缺失时兜底；
-#   ③ checks / bySeverity 折算 —— 未完成 AST 扫描时，用通过比例减权警告与错误；
-#      其中若存在 bayesianConfidence.credibleScore 则优先取它，因为小样本下
-#      通过比例的方差极大（4/5 与 40/50 不可等同），贝叶斯后验均值才能给出可比值。
-# 三级都不可用时，回落到五个门禁的实际通过数折算，保证看板永远有数可渲染。
+# 6. fractal-git 质量基线得分（基于 audit-latest.json 真实度量，缺失报告一律置 BLOCK 与 SCORE_FLOOR）
 $baseFg = $null
 $fgReportPath = Join-Path $repoRoot "fractal-git\reports\audit-latest.json"
 try {
@@ -732,7 +748,6 @@ try {
         $fgData = Get-Content -Path $fgReportPath -Raw -Encoding utf8 | ConvertFrom-Json
         $fgSummary = if ($null -ne $fgData) { Get-SafeProp $fgData "summary" } else { $null }
         if ($null -ne $fgSummary) {
-            # 优先读取真实 AST 深度自审综合质量得分 (compositeScore)
             $rawCompositeFg = Get-SafeProp $fgSummary "compositeScore"
             if ($null -ne $rawCompositeFg -and [double]$rawCompositeFg -gt 0) {
                 $baseFg = [double]$rawCompositeFg
@@ -744,7 +759,6 @@ try {
                 }
             }
 
-            # 若未完成 AST 扫描，退化到基于客观 checks 与贝叶斯后验均值
             if ($null -eq $baseFg) {
                 $rawChecksFg = Get-SafeProp $fgSummary "checks"
                 if ($null -ne $rawChecksFg -and [double]$rawChecksFg -gt 0) {
@@ -775,14 +789,9 @@ try {
 }
 
 if ($null -eq $baseFg) {
-    # 静态检查与测试执行状态客观加权回退（基于通过项比例衰减，杜绝盲目硬编码 100.0）
-    $fgChecksPassed = 0
-    if ($resFgTopo.ExitCode -eq 0) { $fgChecksPassed += 1 }
-    if ($resFgParity.ExitCode -eq 0) { $fgChecksPassed += 1 }
-    if ($resFgBridge.ExitCode -eq 0) { $fgChecksPassed += 1 }
-    if ($resFgAlloc.ExitCode -eq 0) { $fgChecksPassed += 1 }
-    if ($null -ne $procFg -and $procFg.ExitCode -eq 0) { $fgChecksPassed += 1 }
-    $baseFg = [math]::Max($SCORE_FLOOR, [math]::Round(90.0 * ($fgChecksPassed / 5.0), 1))
+    $statusFg = "BLOCK"
+    $failed = $true
+    $baseFg = $SCORE_FLOOR
 }
 
 $scoreFg = if ($statusFg -eq "PASS") {
@@ -790,6 +799,10 @@ $scoreFg = if ($statusFg -eq "PASS") {
 } else {
     [math]::Max($SCORE_FLOOR, [math]::Round($baseFg - $DEGRADE_PENALTY, 1))
 }
+
+$exitCode = if ($failed) { 1 } else { 0 }
+$globalStatus = if ($failed) { "🔴 存在违规异常" } else { "🟢 全域健康达标" }
+$globalColor = if ($failed) { "Red" } else { "Green" }
 
 # 全工作区综合健康分（分层加权：基础设施基石层 20% + 核心生产工程层 80%，附带极低分短板熔断阻尼）
 $rawWeighted = (0.10 * $scoreHygiene) + (0.10 * $scoreRules) + (0.25 * $scoreAr) + (0.20 * $scoreWt) + (0.20 * $scoreWg) + (0.15 * $scoreFg)
@@ -813,51 +826,26 @@ foreach ($d in $dimDefinitions) {
     } else { $null }
 
     # 各维度子系统影响因子映射 (Subsystem Domain Attribution)
-    $dimScore = switch ($dimKey) {
-        "codeSecurity" {
-            $dyn = [math]::Round([double]$scoreAr * 0.65 + [double]$scoreFg * 0.35, 1)
-            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
-        }
-        "architectureConsistency" {
-            $dyn = [math]::Round([double]$scoreAr * 0.35 + [double]$scoreRules * 0.25 + [double]$scoreWg * 0.20 + [double]$scoreFg * 0.20, 1)
-            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
-        }
-        "performanceEfficiency" {
-            $dyn = [math]::Round([double]$scoreAr * 0.40 + [double]$scoreWg * 0.35 + [double]$scoreFg * 0.25, 1)
-            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
-        }
-        "maintainability" {
-            $dyn = [math]::Round([double]$scoreAr * 0.45 + [double]$scoreWt * 0.30 + [double]$scoreHygiene * 0.25, 1)
-            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
-        }
-        "standardization" {
-            $dyn = [math]::Round([double]$scoreHygiene * 0.45 + [double]$scoreRules * 0.30 + [double]$scoreAr * 0.25, 1)
-            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
-        }
+    $dyn = switch ($dimKey) {
+        "codeSecurity" { [math]::Round([double]$scoreAr * 0.65 + [double]$scoreFg * 0.35, 1) }
+        "architectureConsistency" { [math]::Round([double]$scoreAr * 0.35 + [double]$scoreRules * 0.25 + [double]$scoreWg * 0.20 + [double]$scoreFg * 0.20, 1) }
+        "performanceEfficiency" { [math]::Round([double]$scoreAr * 0.40 + [double]$scoreWg * 0.35 + [double]$scoreFg * 0.25, 1) }
+        "maintainability" { [math]::Round([double]$scoreAr * 0.45 + [double]$scoreWt * 0.30 + [double]$scoreHygiene * 0.25, 1) }
+        "standardization" { [math]::Round([double]$scoreHygiene * 0.45 + [double]$scoreRules * 0.30 + [double]$scoreAr * 0.25, 1) }
         "modernity" {
             $polyScore = if ($null -ne $polyglotIndex) { $polyglotIndex } else { $scoreAr }
-            $dyn = [math]::Round([double]$scoreAr * 0.50 + [double]$polyScore * 0.50, 1)
-            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
+            [math]::Round([double]$scoreAr * 0.50 + [double]$polyScore * 0.50, 1)
         }
-        "semanticPurity" {
-            $dyn = [math]::Round([double]$scoreAr * 0.60 + [double]$scoreWt * 0.40, 1)
-            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
-        }
-        "duplication" {
-            $dyn = [math]::Round([double]$scoreAr * 0.65 + [double]$scoreHygiene * 0.35, 1)
-            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
-        }
-        "commentQuality" {
-            $dyn = [math]::Round([double]$scoreAr * 0.60 + [double]$scoreWt * 0.40, 1)
-            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
-        }
-        "techDebtRisk" {
-            $dyn = [math]::Round([double]$scoreAr * 0.40 + [double]$scoreWg * 0.30 + [double]$scoreFg * 0.30, 1)
-            if ($null -ne $baseVal) { [math]::Min($baseVal, $dyn) } else { $dyn }
-        }
-        default {
-            if ($null -ne $baseVal) { $baseVal } else { $scoreAr }
-        }
+        "semanticPurity" { [math]::Round([double]$scoreAr * 0.60 + [double]$scoreWt * 0.40, 1) }
+        "duplication" { [math]::Round([double]$scoreAr * 0.65 + [double]$scoreHygiene * 0.35, 1) }
+        "commentQuality" { [math]::Round([double]$scoreAr * 0.60 + [double]$scoreWt * 0.40, 1) }
+        "techDebtRisk" { [math]::Round([double]$scoreAr * 0.40 + [double]$scoreWg * 0.30 + [double]$scoreFg * 0.30, 1) }
+        default { $scoreAr }
+    }
+    $dimScore = if ($null -ne $baseVal) {
+        if ($failed) { [math]::Min($baseVal, $dyn) } else { $baseVal }
+    } else {
+        $dyn
     }
     $dynamicDimensions[$dimKey] = [math]::Max($SCORE_FLOOR, [math]::Min(100.0, [double]$dimScore))
 }

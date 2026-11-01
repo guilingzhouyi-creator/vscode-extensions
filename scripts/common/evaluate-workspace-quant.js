@@ -177,9 +177,12 @@ function resolveQuantEngine() {
  * Evaluate full workspace quantitative risk metrics.
  *
  * @param {string} root - Repository root path.
+ * @param {object} [options={}] - Runtime evaluation context.
+ * @param {boolean} [options.isBlocked=false] - Whether gate is currently in BLOCK status.
  * @returns {object} Quantitative metrics envelope.
  */
-function evaluateWorkspaceQuant(root = REPO_ROOT) {
+function evaluateWorkspaceQuant(root = REPO_ROOT, options = {}) {
+    const isBlocked = Boolean(options.isBlocked);
     const historyPath = path.join(root, '.audit-logs', 'audit-history.jsonl');
     const sigsPath = path.join(
         root,
@@ -208,12 +211,18 @@ function evaluateWorkspaceQuant(root = REPO_ROOT) {
 
         const rcr = assessment.financial.rcr ?? assessment.financial.interestCoverageRatio;
         const erq = assessment.riskRatios.erq ?? assessment.riskRatios.qsr;
-        const ddr = assessment.riskRatios.ddr ?? assessment.riskRatios.sortino;
+        let ddr = assessment.riskRatios.ddr ?? assessment.riskRatios.sortino;
         const dsi = assessment.inequality.dsi ?? assessment.inequality.debtGini;
         const rcd = assessment.inequality.rcd ?? assessment.inequality.defectEntropy;
-        const edb95 = assessment.riskRatios.edb95 ?? assessment.riskRatios.var95;
+        let edb95 = assessment.riskRatios.edb95 ?? assessment.riskRatios.var95;
         const ptd = assessment.riskRatios.ptd ?? assessment.riskRatios.mdd;
         const ehl = assessment.stochastic.ehl ?? assessment.stochastic.halfLifeCommits;
+
+        // 当门禁当前发生阻断时，将阻断事件映射为外生质量冲击 (Exogenous Shock)
+        if (isBlocked) {
+            ddr = Math.min(ddr, 0.0);
+            edb95 = Math.max(edb95, 35.0);
+        }
 
         return {
             rcr,
@@ -236,31 +245,37 @@ function evaluateWorkspaceQuant(root = REPO_ROOT) {
             sampleCount: scores.length,
             isSampleSufficient: scores.length >= MIN_SAMPLES,
             totalFindings,
+            isBlocked,
+            ...(isBlocked ? { shockLevel: 'HIGH', shockAlert: '当前检测到门禁阻断冲击 (Quality Shock Event)' } : {}),
         };
     }
 
     // Graceful fallback if dist is unbuilt or evaluation is unavailable
+    const fallbackDdr = isBlocked ? 0.0 : 0.0;
+    const fallbackEdb = isBlocked ? 35.0 : 0.0;
     return {
         rcr: 0.0,
         erq: 0.0,
-        ddr: 0.0,
+        ddr: fallbackDdr,
         dsi: 0.0,
         rcd: 0.0,
-        edb95: 0.0,
+        edb95: fallbackEdb,
         ptd: 0.0,
         ehl: 0.0,
         icr: 0.0,
         qsr: 0.0,
-        sortino: 0.0,
+        sortino: fallbackDdr,
         debtGini: 0.0,
         defectEntropy: 0.0,
-        var95: 0.0,
+        var95: fallbackEdb,
         mdd: 0.0,
         halfLifeCommits: 0.0,
         status: 'insufficient_samples',
         sampleCount: scores.length,
         isSampleSufficient: false,
         totalFindings,
+        isBlocked,
+        ...(isBlocked ? { shockLevel: 'HIGH', shockAlert: '当前检测到门禁阻断冲击 (Quality Shock Event)' } : {}),
     };
 }
 
@@ -274,7 +289,8 @@ module.exports = {
 if (require.main === module) {
     const args = process.argv.slice(2);
     const isJson = args.includes('--json');
-    const result = evaluateWorkspaceQuant(REPO_ROOT);
+    const isBlocked = args.includes('--blocked');
+    const result = evaluateWorkspaceQuant(REPO_ROOT, { isBlocked });
 
     if (isJson) {
         process.stdout.write(JSON.stringify(result, null, 2) + '\n');

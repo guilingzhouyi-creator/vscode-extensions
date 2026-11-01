@@ -8,10 +8,11 @@
  *   audit-all.sh, pre-commit gates, or standalone CLI.
  * Responsibilities:
  *   1. Survey real active multi-language source file and physical LOC distributions.
- *   2. Sample authentic, zero-injection quality scores for each stack language.
- *   3. Calculate smooth logarithmic weights w_i = ln(LOC_i + 10).
+ *   2. Sample authentic, zero-injection quality scores for each stack language, prioritizing
+ *      fresh subproject audit reports before historical workspace snapshots.
+ *   3. Calculate smooth logarithmic weights w_i = ln(LOC_i + 10) over measured languages.
  *   4. Derive weighted mean, weighted standard deviation (dispersion), and damping penalty.
- *   5. Output mathematically rigorous, auditable polyglot balance metrics.
+ *   5. Output mathematically rigorous, auditable polyglot balance metrics with null for unmeasured.
  * Exit Semantics & Design Rationale: Standalone CLI and programmatic module; zero fake scores.
  */
 
@@ -24,6 +25,9 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const AUTO_REFACTOR_ROOT = path.join(REPO_ROOT, 'auto-refactor');
 const AR_API_PATH = path.join(AUTO_REFACTOR_ROOT, 'dist/api.js');
 const BASELINE_PATH = path.join(AUTO_REFACTOR_ROOT, 'reports/self-audit-baseline.json');
+const AAS_BASELINE_PATH = path.join(AUTO_REFACTOR_ROOT, 'reports/self-audit-baseline.aas.json');
+const SHELL_ISOMORPHISM_FLOOR = 15.0;
+const SHELL_ISOMORPHISM_PENALTY = 30.0;
 
 /**
  * Popoviciu's Inequality on Variances (Popoviciu, 1935):
@@ -37,33 +41,28 @@ const POPOVICIU_MAX_SIGMA = 50.0;
  */
 const DEFAULT_DISPERSION_PENALTY_RATIO = 0.5;
 
-const LANG_CONFIG = {
-  typescript: {
+const LANG_CONFIG = Object.freeze({
+  typescript: Object.freeze({
     label: 'TypeScript / JS',
-    extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'],
-    defaultFallbackScore: 98.5,
-  },
-  gdscript: {
+    extensions: Object.freeze(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']),
+  }),
+  gdscript: Object.freeze({
     label: 'GDScript',
-    extensions: ['.gd'],
-    defaultFallbackScore: 95.0,
-  },
-  python: {
+    extensions: Object.freeze(['.gd']),
+  }),
+  python: Object.freeze({
     label: 'Python',
-    extensions: ['.py'],
-    defaultFallbackScore: 90.0,
-  },
-  shell: {
+    extensions: Object.freeze(['.py']),
+  }),
+  shell: Object.freeze({
     label: 'Shell (PS1 / Bash)',
-    extensions: ['.ps1', '.psm1', '.psd1', '.sh', '.bash', '.zsh'],
-    defaultFallbackScore: 87.5,
-  },
-  rust: {
+    extensions: Object.freeze(['.ps1', '.psm1', '.psd1', '.sh', '.bash', '.zsh']),
+  }),
+  rust: Object.freeze({
     label: 'Rust',
-    extensions: ['.rs'],
-    defaultFallbackScore: 93.5,
-  },
-};
+    extensions: Object.freeze(['.rs']),
+  }),
+});
 
 const EXCLUDED_DIRS = new Set([
   'node_modules',
@@ -80,6 +79,34 @@ const EXCLUDED_DIRS = new Set([
   '.audit-logs',
   'coverage',
 ]);
+
+/**
+ * Safely parses a JSON file when present on disk.
+ *
+ * @param {string} filePath - Absolute file path.
+ * @returns {object|null} Parsed JSON object or null.
+ */
+function readJsonIfExists(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Normalizes a numeric score into [0, 100] with two decimal places, or null when unmeasured.
+ *
+ * @param {unknown} value - Candidate numeric score.
+ * @returns {number|null} Normalized score or null.
+ */
+function clampMeasuredScore(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.round(Math.min(100, Math.max(0, value)) * 100) / 100;
+}
 
 /**
  * Counts source files and physical lines per active language across repository.
@@ -136,136 +163,177 @@ function surveyWorkspaceLanguageVolume(rootDir) {
 }
 
 /**
- * Reads TypeScript/JS quality score from auto-refactor baseline or fallback.
+ * Reads historical workspace polyglot score as a last-resort cached measurement only when
+ * fresh subproject reports are unavailable in fast mode.
  *
- * @returns {number} Score in [0, 100].
+ * @param {string} langKey - Language identifier.
+ * @returns {number|null} Cached score or null.
  */
-function sampleTypescriptScore() {
-  let arScore = null;
-  try {
-    if (fs.existsSync(BASELINE_PATH)) {
-      const raw = fs.readFileSync(BASELINE_PATH, 'utf8');
-      const data = JSON.parse(raw);
-      if (typeof data.metrics?.compositeScore === 'number') {
-        arScore = Math.min(100, Math.max(0, data.metrics.compositeScore));
-      }
-    }
-  } catch {
-    // Ignore and return fallback
+function readLegacyAuditPolyglotScore(langKey) {
+  const latestAuditPath = path.join(REPO_ROOT, '.audit-logs/audit-latest.json');
+  const data = readJsonIfExists(latestAuditPath);
+  return clampMeasuredScore(data?.polyglotBreakdown?.[langKey]?.score);
+}
+
+/**
+ * Reads TypeScript/JS quality score from fresh subproject reports first, without fake fallbacks.
+ *
+ * @param {boolean} [fastMode=false] - Allow historical workspace snapshot fallback if needed.
+ * @returns {number|null} Score in [0, 100] or null when unmeasured.
+ */
+function sampleTypescriptScore(fastMode = false) {
+  const baselineData = readJsonIfExists(BASELINE_PATH);
+  let arScore = clampMeasuredScore(
+    baselineData?.metrics?.compositeScore ?? baselineData?.compositeScore,
+  );
+  if (arScore === null) {
+    const aasData = readJsonIfExists(AAS_BASELINE_PATH);
+    arScore = clampMeasuredScore(aasData?.health?.score);
   }
 
-  // Cross-project TypeScript evidence: incorporate workspace-timing if available
-  let wtScore = null;
-  try {
-    const wtCachePath = path.join(REPO_ROOT, 'workspace-timing/reports/.refactor-cache/report.json');
-    if (fs.existsSync(wtCachePath)) {
-      const wtData = JSON.parse(fs.readFileSync(wtCachePath, 'utf8'));
-      if (typeof wtData.qualityScore?.compositeScore === 'number') {
-        wtScore = Math.min(100, Math.max(0, wtData.qualityScore.compositeScore));
-      }
-    }
-  } catch {
-    // Ignore
+  const wtLatestPath = path.join(REPO_ROOT, 'workspace-timing/reports/auto-refactor-latest.json');
+  const wtLatestData = readJsonIfExists(wtLatestPath);
+  let wtScore = clampMeasuredScore(wtLatestData?.qualityScore?.compositeScore);
+  if (wtScore === null) {
+    const wtCachePath = path.join(
+      REPO_ROOT,
+      'workspace-timing/reports/.refactor-cache/report.json',
+    );
+    const wtCacheData = readJsonIfExists(wtCachePath);
+    wtScore = clampMeasuredScore(wtCacheData?.qualityScore?.compositeScore);
   }
 
   if (arScore !== null && wtScore !== null) {
-    // Weighted blend: 75% auto-refactor (large core engine), 25% workspace-timing (client extension)
     return Math.round((arScore * 0.75 + wtScore * 0.25) * 100) / 100;
   }
   if (arScore !== null) return arScore;
   if (wtScore !== null) return wtScore;
-  return LANG_CONFIG.typescript.defaultFallbackScore;
+  return fastMode ? readLegacyAuditPolyglotScore('typescript') : null;
 }
 
 /**
- * Samples Python quality score by running a lightweight scan if available,
- * or using cached/baseline estimation.
+ * Samples Rust quality score from fractal-git's fresh audit report first, without fake fallbacks.
  *
- * @param {boolean} fastMode - Skip full scan and use cached evaluation.
- * @returns {Promise<number>} Score in [0, 100].
+ * @param {boolean} [fastMode=false] - Allow historical workspace snapshot fallback if needed.
+ * @returns {number|null} Score in [0, 100] or null when unmeasured.
+ */
+function sampleRustScore(fastMode = false) {
+  const fgReportPath = path.join(REPO_ROOT, 'fractal-git/reports/audit-latest.json');
+  const data = readJsonIfExists(fgReportPath);
+  if (data) {
+    const composite = clampMeasuredScore(data.summary?.compositeScore);
+    if (composite !== null) return composite;
+    const envelopeScore = clampMeasuredScore(data.qualityEnvelope?.composite_score);
+    if (envelopeScore !== null) return envelopeScore;
+    const credible = clampMeasuredScore(data.summary?.bayesianConfidence?.credibleScore);
+    if (credible !== null) return credible;
+  }
+  return fastMode ? readLegacyAuditPolyglotScore('rust') : null;
+}
+
+/**
+ * Reads cached language quality score, strictly prioritizing fresh subproject reports emitted in
+ * the current audit cycle before consulting `.audit-logs/audit-latest.json`.
+ *
+ * @param {string} langKey - Language key.
+ * @returns {number|null} Measured score or null.
+ */
+function readCachedPolyglotScore(langKey) {
+  if (langKey === 'typescript') {
+    return sampleTypescriptScore(true);
+  }
+  if (langKey === 'rust') {
+    return sampleRustScore(true);
+  }
+  if (langKey === 'gdscript' || langKey === 'python') {
+    const wgRefactorLatest = path.join(REPO_ROOT, 'WebGames/reports/auto-refactor-latest.json');
+    const wgRefactorData = readJsonIfExists(wgRefactorLatest);
+    const wgRefactorScore = clampMeasuredScore(wgRefactorData?.qualityScore?.compositeScore);
+    if (wgRefactorScore !== null) return wgRefactorScore;
+
+    const wgAuditLatest = path.join(REPO_ROOT, 'WebGames/reports/audit-latest.json');
+    const wgAuditData = readJsonIfExists(wgAuditLatest);
+    const wgAuditScore = clampMeasuredScore(wgAuditData?.summary?.compositeScore);
+    if (wgAuditScore !== null) return wgAuditScore;
+  }
+  return readLegacyAuditPolyglotScore(langKey);
+}
+
+/**
+ * Executes a fast read-only auto-refactor slice scan for the given glob patterns.
+ *
+ * @param {string[]} includePatterns - Glob patterns relative to repository root.
+ * @returns {Promise<number|null>} Measured composite score or null.
+ */
+async function runLanguageSliceScan(includePatterns) {
+  if (!fs.existsSync(AR_API_PATH)) {
+    return null;
+  }
+  try {
+    const { scan } = require(AR_API_PATH);
+    const scanResult = await scan({
+      root: REPO_ROOT,
+      include: includePatterns,
+      fastMode: true,
+      logLevel: 'error',
+    });
+    return clampMeasuredScore(scanResult?.qualityScore?.compositeScore);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Samples Python quality score from fresh WebGames report or live AST slice scan.
+ *
+ * @param {boolean} [fastMode=false] - Prefer fresh cached subproject report when available.
+ * @returns {Promise<number|null>} Score in [0, 100] or null when unmeasured.
  */
 async function samplePythonScore(fastMode = false) {
-  if (!fs.existsSync(AR_API_PATH)) {
-    return LANG_CONFIG.python.defaultFallbackScore;
+  if (fastMode) {
+    const cached = readCachedPolyglotScore('python');
+    if (cached !== null) return cached;
   }
-
-  try {
-    const { scan } = require(AR_API_PATH);
-    const scanResult = await scan({
-      root: REPO_ROOT,
-      include: ['WebGames/scripts/py/**/*.py'],
-      logLevel: 'error',
-    });
-    if (scanResult.qualityScore && typeof scanResult.qualityScore.compositeScore === 'number') {
-      return Math.round(scanResult.qualityScore.compositeScore * 100) / 100;
-    }
-  } catch (scanErr) {
-    // Best-effort scan fallback: ignore error and return default fallback score
-    void scanErr;
-  }
-  return LANG_CONFIG.python.defaultFallbackScore;
+  return runLanguageSliceScan(['WebGames/scripts/py/**/*.py']);
 }
 
 /**
- * Samples GDScript quality score by running auto-refactor scan across WebGames GDScripts,
- * or using cached/baseline estimation.
+ * Samples GDScript quality score from fresh WebGames report or live AST slice scan.
  *
- * @param {boolean} fastMode - Skip full scan and use cached evaluation.
- * @returns {Promise<number>} Score in [0, 100].
+ * @param {boolean} [fastMode=false] - Prefer fresh cached subproject report when available.
+ * @returns {Promise<number|null>} Score in [0, 100] or null when unmeasured.
  */
 async function sampleGdscriptScore(fastMode = false) {
-  if (!fs.existsSync(AR_API_PATH)) {
-    return LANG_CONFIG.gdscript.defaultFallbackScore;
+  if (fastMode) {
+    const cached = readCachedPolyglotScore('gdscript');
+    if (cached !== null) return cached;
   }
-
-  try {
-    const { scan } = require(AR_API_PATH);
-    const scanResult = await scan({
-      root: REPO_ROOT,
-      include: ['WebGames/**/*.gd'],
-      logLevel: 'error',
-    });
-    if (scanResult.qualityScore && typeof scanResult.qualityScore.compositeScore === 'number') {
-      return Math.round(scanResult.qualityScore.compositeScore * 100) / 100;
-    }
-  } catch (scanErr) {
-    void scanErr;
-  }
-  return LANG_CONFIG.gdscript.defaultFallbackScore;
+  return runLanguageSliceScan(['WebGames/**/*.gd']);
 }
 
 /**
  * Samples Shell quality score by executing auto-refactor scan on active ps1/sh scripts
  * combined with cross-platform isomorphism gate verification.
  *
- * @param {boolean} fastMode - Skip full scan and use cached evaluation.
- * @returns {Promise<number>} Score in [0, 100].
+ * @param {boolean} [fastMode=false] - Prefer cached score when available.
+ * @returns {Promise<number|null>} Score in [0, 100] or null when unmeasured.
  */
 async function sampleShellScore(fastMode = false) {
-  if (!fs.existsSync(AR_API_PATH)) {
-    return LANG_CONFIG.shell.defaultFallbackScore;
+  if (fastMode) {
+    const cached = readCachedPolyglotScore('shell');
+    if (cached !== null) return cached;
   }
 
-  let baseScore = LANG_CONFIG.shell.defaultFallbackScore;
-  try {
-    const { scan } = require(AR_API_PATH);
-    const scanResult = await scan({
-      root: REPO_ROOT,
-      include: [
-        'scripts/**/*.ps1',
-        'scripts/**/*.sh',
-        'WebGames/scripts/**/*.ps1',
-        'WebGames/scripts/**/*.sh',
-        'fractal-git/scripts/**/*.ps1',
-        'fractal-git/scripts/**/*.sh',
-      ],
-      logLevel: 'error',
-    });
-    if (scanResult.qualityScore && typeof scanResult.qualityScore.compositeScore === 'number') {
-      baseScore = Math.round(scanResult.qualityScore.compositeScore * 100) / 100;
-    }
-  } catch (scanErr) {
-    void scanErr;
+  let baseScore = await runLanguageSliceScan([
+    'scripts/**/*.ps1',
+    'scripts/**/*.sh',
+    'WebGames/scripts/**/*.ps1',
+    'WebGames/scripts/**/*.sh',
+    'fractal-git/scripts/**/*.ps1',
+    'fractal-git/scripts/**/*.sh',
+  ]);
+  if (baseScore === null) {
+    return null;
   }
 
   const isoScript = path.join(REPO_ROOT, 'scripts/common/validate-script-isomorphism.js');
@@ -274,7 +342,10 @@ async function sampleShellScore(fastMode = false) {
       const { execFileSync } = require('child_process');
       execFileSync(process.execPath, [isoScript], { stdio: 'pipe', encoding: 'utf8' });
     } catch {
-      baseScore = Math.max(15.0, baseScore - 30.0);
+      baseScore = Math.max(
+        SHELL_ISOMORPHISM_FLOOR,
+        Math.round((baseScore - SHELL_ISOMORPHISM_PENALTY) * 100) / 100,
+      );
     }
   }
 
@@ -282,51 +353,12 @@ async function sampleShellScore(fastMode = false) {
 }
 
 /**
- * Samples Rust quality score by reading fractal-git audit report or evaluating crate boundaries.
+ * Computes weighted mean across measured languages.
  *
- * @returns {number} Score in [0, 100].
- */
-function sampleRustScore() {
-  const fgReportPath = path.join(REPO_ROOT, 'fractal-git/reports/audit-latest.json');
-  if (fs.existsSync(fgReportPath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(fgReportPath, 'utf8'));
-      if (typeof data.summary?.compositeScore === 'number' && data.summary.compositeScore > 0) {
-        return Math.min(100, Math.max(0, data.summary.compositeScore));
-      }
-      if (typeof data.qualityEnvelope?.composite_score === 'number' && data.qualityEnvelope.composite_score > 0) {
-        return Math.min(100, Math.max(0, data.qualityEnvelope.composite_score));
-      }
-      if (typeof data.summary?.bayesianConfidence?.credibleScore === 'number') {
-        return Math.min(100, Math.max(0, data.summary.bayesianConfidence.credibleScore));
-      }
-    } catch {
-      // Fallback to static gate evaluation
-    }
-  }
-
-  const allocScript = path.join(REPO_ROOT, 'fractal-git/scripts/common/check-zero-alloc-boundary.js');
-  if (fs.existsSync(allocScript)) {
-    try {
-      const { execFileSync } = require('child_process');
-      execFileSync(process.execPath, [allocScript], { stdio: 'pipe', encoding: 'utf8' });
-      return LANG_CONFIG.rust.defaultFallbackScore;
-    } catch {
-      return 70.0;
-    }
-  }
-
-  return LANG_CONFIG.rust.defaultFallbackScore;
-}
-
-
-/**
- * Computes weighted mean across active languages.
- *
- * @param {string[]} languages - Language keys.
+ * @param {string[]} languages - Measured language keys.
  * @param {Record<string, number>} scores - Scores per language.
  * @param {Record<string, number>} weights - Weights per language.
- * @param {number} totalWeight - Sum of weights.
+ * @param {number} totalWeight - Sum of measured weights.
  * @returns {number} Weighted mean.
  */
 function computeWeightedMean(languages, scores, weights, totalWeight) {
@@ -338,13 +370,13 @@ function computeWeightedMean(languages, scores, weights, totalWeight) {
 }
 
 /**
- * Computes weighted variance across active languages.
+ * Computes weighted variance across measured languages.
  *
- * @param {string[]} languages - Language keys.
+ * @param {string[]} languages - Measured language keys.
  * @param {Record<string, number>} scores - Scores per language.
  * @param {Record<string, number>} weights - Weights per language.
  * @param {number} mean - Weighted mean.
- * @param {number} totalWeight - Sum of weights.
+ * @param {number} totalWeight - Sum of measured weights.
  * @returns {number} Weighted variance.
  */
 function computeWeightedVariance(languages, scores, weights, mean, totalWeight) {
@@ -357,11 +389,11 @@ function computeWeightedVariance(languages, scores, weights, mean, totalWeight) 
 }
 
 /**
- * Evaluates comprehensive multi-language balance across workspace.
+ * Evaluates comprehensive multi-language balance across workspace without fabricated fallbacks.
  *
  * @param {object} [options] - Evaluation options.
- * @param {boolean} [options.fast=false] - Run fast mode using cached scores.
- * @param {Record<string, number>} [options.explicitScores] - Explicit score overrides.
+ * @param {boolean} [options.fast=false] - Run fast mode prioritizing fresh subproject reports.
+ * @param {Record<string, number|null>} [options.explicitScores] - Explicit score overrides.
  * @returns {Promise<object>} Polyglot balance assessment result.
  */
 async function evaluateWorkspacePolyglotBalance(options = {}) {
@@ -371,11 +403,13 @@ async function evaluateWorkspacePolyglotBalance(options = {}) {
   const volume = surveyWorkspaceLanguageVolume(REPO_ROOT);
 
   const scores = {
-    typescript: explicit.typescript ?? sampleTypescriptScore(),
-    gdscript: explicit.gdscript ?? (await sampleGdscriptScore(fast)),
-    python: explicit.python ?? (await samplePythonScore(fast)),
-    shell: explicit.shell ?? (await sampleShellScore(fast)),
-    rust: explicit.rust ?? sampleRustScore(),
+    typescript:
+      explicit.typescript !== undefined ? explicit.typescript : sampleTypescriptScore(fast),
+    gdscript:
+      explicit.gdscript !== undefined ? explicit.gdscript : await sampleGdscriptScore(fast),
+    python: explicit.python !== undefined ? explicit.python : await samplePythonScore(fast),
+    shell: explicit.shell !== undefined ? explicit.shell : await sampleShellScore(fast),
+    rust: explicit.rust !== undefined ? explicit.rust : sampleRustScore(fast),
   };
 
   const activeLanguages = Object.keys(LANG_CONFIG).filter(
@@ -384,27 +418,69 @@ async function evaluateWorkspacePolyglotBalance(options = {}) {
 
   if (activeLanguages.length === 0) {
     return {
-      polyglotIndex: 0.0,
-      weightedMean: 0.0,
-      standardDeviation: 0.0,
-      dispersionPenalty: 0.0,
+      polyglotIndex: null,
+      weightedMean: null,
+      standardDeviation: null,
+      normalizedDispersion: null,
+      dispersionPenalty: null,
       activeLanguageCount: 0,
+      measuredLanguageCount: 0,
+      unmeasuredLanguages: [],
       breakdown: {},
     };
   }
 
-  // Calculate smooth logarithmic weights w_i = ln(LOC_i + 10)
   const weights = {};
-  let totalWeight = 0;
   for (const lang of activeLanguages) {
     const loc = Math.max(0, volume[lang].loc);
-    const w = Math.round(Math.log(loc + 10) * 100) / 100;
-    weights[lang] = w;
-    totalWeight += w;
+    weights[lang] = Math.round(Math.log(loc + 10) * 100) / 100;
   }
 
-  const sMean = computeWeightedMean(activeLanguages, scores, weights, totalWeight);
-  const variance = computeWeightedVariance(activeLanguages, scores, weights, sMean, totalWeight);
+  const measuredLanguages = activeLanguages.filter(
+    (lang) => typeof scores[lang] === 'number' && Number.isFinite(scores[lang]),
+  );
+  const unmeasuredLanguages = activeLanguages.filter((lang) => !measuredLanguages.includes(lang));
+
+  const breakdown = {};
+  for (const lang of activeLanguages) {
+    const measured = measuredLanguages.includes(lang);
+    breakdown[lang] = {
+      label: LANG_CONFIG[lang].label,
+      files: volume[lang].files,
+      loc: volume[lang].loc,
+      weight: weights[lang],
+      measured,
+      score: measured ? scores[lang] : null,
+    };
+  }
+
+  let measuredWeightSum = 0;
+  for (const lang of measuredLanguages) {
+    measuredWeightSum += weights[lang];
+  }
+
+  if (measuredLanguages.length === 0 || measuredWeightSum <= 0) {
+    return {
+      polyglotIndex: null,
+      weightedMean: null,
+      standardDeviation: null,
+      normalizedDispersion: null,
+      dispersionPenalty: null,
+      activeLanguageCount: activeLanguages.length,
+      measuredLanguageCount: 0,
+      unmeasuredLanguages,
+      breakdown,
+    };
+  }
+
+  const sMean = computeWeightedMean(measuredLanguages, scores, weights, measuredWeightSum);
+  const variance = computeWeightedVariance(
+    measuredLanguages,
+    scores,
+    weights,
+    sMean,
+    measuredWeightSum,
+  );
   const sigmaS = Math.sqrt(Math.max(0, variance));
 
   const normalizedDispersion = sigmaS / POPOVICIU_MAX_SIGMA;
@@ -414,17 +490,6 @@ async function evaluateWorkspacePolyglotBalance(options = {}) {
   );
   const polyglotScore = Math.round(sMean * dispersionPenalty * 100) / 100;
 
-  const breakdown = {};
-  for (const lang of activeLanguages) {
-    breakdown[lang] = {
-      label: LANG_CONFIG[lang].label,
-      files: volume[lang].files,
-      loc: volume[lang].loc,
-      weight: weights[lang],
-      score: scores[lang],
-    };
-  }
-
   return {
     polyglotIndex: polyglotScore,
     weightedMean: Math.round(sMean * 100) / 100,
@@ -432,42 +497,61 @@ async function evaluateWorkspacePolyglotBalance(options = {}) {
     normalizedDispersion: Math.round(normalizedDispersion * 1000) / 1000,
     dispersionPenalty: Math.round(dispersionPenalty * 1000) / 1000,
     activeLanguageCount: activeLanguages.length,
+    measuredLanguageCount: measuredLanguages.length,
+    unmeasuredLanguages,
     breakdown,
   };
 }
 
-// CLI Execution Entry Point
 if (require.main === module) {
   const args = process.argv.slice(2);
   const isJson = args.includes('--json');
   const isFast = args.includes('--fast');
+  const isRequireMeasured = args.includes('--require-measured');
 
   evaluateWorkspacePolyglotBalance({ fast: isFast })
     .then((result) => {
+      const hasUnmeasured = result.unmeasuredLanguages.length > 0;
       if (isJson) {
         process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-        process.exit(0);
+        process.exit(isRequireMeasured && hasUnmeasured ? 1 : 0);
       }
+
+      const fmtMetric = (val, digits = 2) => (typeof val === 'number' ? val.toFixed(digits) : 'N/A');
+      const fmtPct = (val) => (typeof val === 'number' ? `${(val * 100).toFixed(1)}%` : 'N/A');
 
       console.log('=================================================================');
       console.log('🌐 全工作区语言均衡与多语言质量全景评估 (Polyglot Balance)');
       console.log('=================================================================');
-      console.log(`语言均衡指数 (Polyglot Index): ${result.polyglotIndex.toFixed(2)}`);
-      console.log(`加权均值分 (Weighted Mean)   : ${result.weightedMean.toFixed(2)}`);
-      console.log(`离散度标准差 (Std Deviation) : ${result.standardDeviation.toFixed(2)}`);
-      console.log(`离散度折扣率 (Dispersion D)  : ${(result.dispersionPenalty * 100).toFixed(1)}%`);
+      console.log(`语言均衡指数 (Polyglot Index): ${fmtMetric(result.polyglotIndex)}`);
+      console.log(`加权均值分 (Weighted Mean)   : ${fmtMetric(result.weightedMean)}`);
+      console.log(`离散度标准差 (Std Deviation) : ${fmtMetric(result.standardDeviation)}`);
+      console.log(`离散度折扣率 (Dispersion D)  : ${fmtPct(result.dispersionPenalty)}`);
       console.log('-----------------------------------------------------------------');
       console.log('| 语言栈 (Language)       | 代码行数 | 对数权重 | 质量得分 | 状态 |');
       console.log('| :---------------------- | :------- | :------- | :------- | :--- |');
-      for (const [key, item] of Object.entries(result.breakdown)) {
-        const scoreStr = item.score.toFixed(1).padStart(5, ' ');
+      for (const item of Object.values(result.breakdown)) {
+        const scoreStr =
+          typeof item.score === 'number' ? item.score.toFixed(1).padStart(5, ' ') : '  N/A';
         const locStr = String(item.loc).padStart(7, ' ');
         const weightStr = item.weight.toFixed(2).padStart(5, ' ');
-        const status = item.score >= 90 ? '✔ 优秀' : item.score >= 80 ? '▲ 良好' : '✖ 滞后';
-        console.log(`| ${item.label.padEnd(23, ' ')} | ${locStr}  |  ${weightStr}   |  ${scoreStr}   | ${status} |`);
+        const status =
+          typeof item.score !== 'number'
+            ? '⚠ 未测量'
+            : item.score >= 90
+              ? '✔ 优秀'
+              : item.score >= 80
+                ? '▲ 良好'
+                : '✖ 滞后';
+        console.log(
+          `| ${item.label.padEnd(23, ' ')} | ${locStr}  |  ${weightStr}   |  ${scoreStr}   | ${status} |`,
+        );
+      }
+      if (hasUnmeasured) {
+        console.warn(`⚠ 未测量语言栈 (${result.unmeasuredLanguages.join(', ')}) — 拒绝注入假保底分`);
       }
       console.log('=================================================================');
-      process.exit(0);
+      process.exit((isRequireMeasured || !isFast) && hasUnmeasured ? 1 : 0);
     })
     .catch((err) => {
       console.error('Error evaluating polyglot balance:', err);
@@ -477,6 +561,7 @@ if (require.main === module) {
 
 module.exports = {
   LANG_CONFIG,
+  readCachedPolyglotScore,
   surveyWorkspaceLanguageVolume,
   evaluateWorkspacePolyglotBalance,
 };

@@ -114,6 +114,8 @@ CODE_LEDGER=0
 "$NODE_BIN" scripts/common/validate-trajectory-ledger.js >/dev/null 2>&1 || CODE_LEDGER=$?
 CODE_SUBAGENT=0
 "$NODE_BIN" .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js >/dev/null 2>&1 || CODE_SUBAGENT=$?
+CODE_CASCADE=0
+"$NODE_BIN" .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js >/dev/null 2>&1 || CODE_CASCADE=$?
 CODE_DOC_ANCHORS=0
 "$NODE_BIN" scripts/common/validate-doc-anchors.js >/dev/null 2>&1 || CODE_DOC_ANCHORS=$?
 CODE_METRIC_COVERAGE=0
@@ -137,7 +139,7 @@ CODE_GATE_PROOF=0
 "$NODE_BIN" scripts/common/test-gate-guards.js >/dev/null 2>&1 || CODE_GATE_PROOF=$?
 CODE_DOC_METRICS=0
 "$NODE_BIN" scripts/common/sync-doc-metrics.js >/dev/null 2>&1 || CODE_DOC_METRICS=$?
-if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_SCORING_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_RULE_SOURCE" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 || "$CODE_COMMIT_HISTORY" -ne 0 || "$CODE_DESTRUCTIVE" -ne 0 || "$CODE_CHAINS" -ne 0 || "$CODE_COUNTS" -ne 0 || "$CODE_PARITY" -ne 0 || "$CODE_GATE_PROOF" -ne 0 || "$CODE_DOC_METRICS" -ne 0 ]]; then
+if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_SCORING_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_RULE_SOURCE" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_CASCADE" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 || "$CODE_COMMIT_HISTORY" -ne 0 || "$CODE_DESTRUCTIVE" -ne 0 || "$CODE_CHAINS" -ne 0 || "$CODE_COUNTS" -ne 0 || "$CODE_PARITY" -ne 0 || "$CODE_GATE_PROOF" -ne 0 || "$CODE_DOC_METRICS" -ne 0 ]]; then
     STATUS_RULES="BLOCK"
     write_step_verdict "RULE-AUDIT-02" BLOCK "规则目录同步、闭包、可达性、规则源一致性、文档一致性、技能集、轨迹账本或破坏性操作溯源审查未通过"
     FAILED=1
@@ -160,7 +162,7 @@ write_step_banner "ENGINE-AUDIT-05"
 write_step_banner "RUST-AUDIT-06"
 
 # 并发拉起四大项目审查任务 (后台异步派发)
-(cd workspace-timing && "$NPM_BIN" run review) >"$LOG_WT" 2>&1 &
+(cd workspace-timing && "$NPM_BIN" run review:strict) >"$LOG_WT" 2>&1 &
 PID_WT=$!
 
 if [[ "$FAST_MODE" -eq 1 ]]; then
@@ -178,40 +180,36 @@ else
     PID_AR=$!
 fi
 
-if [[ -n "$CARGO_BIN" ]]; then
-    if [[ "$FAST_MODE" -eq 1 ]]; then
-        ("$CARGO_BIN" check --workspace --manifest-path fractal-git/Cargo.toml --all-targets) >"$LOG_FG" 2>&1 &
-    else
-        ("$CARGO_BIN" test --workspace --manifest-path fractal-git/Cargo.toml) >"$LOG_FG" 2>&1 &
-    fi
-    PID_FG=$!
+if [[ "$FAST_MODE" -eq 1 ]]; then
+    ("$NODE_BIN" fractal-git/scripts/common/run-audit-report.js --fast) >"$LOG_FG" 2>&1 &
 else
-    PID_FG=""
+    ("$NODE_BIN" fractal-git/scripts/common/run-audit-report.js) >"$LOG_FG" 2>&1 &
 fi
+PID_FG=$!
 
 # 看门狗超时守卫：防止子进程挂起导致审查无限阻塞
-TIMEOUT_WT=$([[ "$FAST_MODE" -eq 1 ]] && echo 60 || echo 120)
+TIMEOUT_WT=$([[ "$FAST_MODE" -eq 1 ]] && echo 90 || echo 180)
 TIMEOUT_WG=$([[ "$FAST_MODE" -eq 1 ]] && echo 60 || echo 120)
 TIMEOUT_AR=$([[ "$FAST_MODE" -eq 1 ]] && echo 90 || echo 240)
-TIMEOUT_FG=$([[ "$FAST_MODE" -eq 1 ]] && echo 60 || echo 120)
+TIMEOUT_FG=$([[ "$FAST_MODE" -eq 1 ]] && echo 90 || echo 180)
 
 STATUS_WT="PASS"
 CODE_WT=0
 wait_with_timeout "$PID_WT" "$TIMEOUT_WT" "workspace-timing" "$LOG_WT" || CODE_WT=$?
-if [[ "$CODE_WT" -ne 0 ]]; then
+if [[ "$CODE_WT" -ne 0 ]] || [[ ! -f "workspace-timing/reports/auto-refactor-latest.json" && ! -f "workspace-timing/reports/.refactor-cache/report.json" && ! -f "workspace-timing/reports/review/report-latest.json" ]]; then
     STATUS_WT="BLOCK"
-    write_step_verdict "EXTENSION-AUDIT-03" BLOCK "workspace-timing 审查门禁未通过"
+    write_step_verdict "EXTENSION-AUDIT-03" BLOCK "workspace-timing 严格审查门禁未通过或缺失权威报告"
     FAILED=1
 else
-    write_step_verdict "EXTENSION-AUDIT-03" PASS "workspace-timing 审查门禁通过"
+    write_step_verdict "EXTENSION-AUDIT-03" PASS "workspace-timing 严格审查门禁通过"
 fi
 
 STATUS_WG="PASS"
 CODE_WG=0
 wait_with_timeout "$PID_WG" "$TIMEOUT_WG" "WebGames" "$LOG_WG" || CODE_WG=$?
-if [[ "$CODE_WG" -ne 0 ]]; then
+if [[ "$CODE_WG" -ne 0 ]] || [[ ! -f "WebGames/reports/audit-latest.json" || ! -f "WebGames/reports/auto-refactor-latest.json" ]]; then
     STATUS_WG="BLOCK"
-    write_step_verdict "DOMAIN-AUDIT-04" BLOCK "WebGames 领域配置与架构审查未通过"
+    write_step_verdict "DOMAIN-AUDIT-04" BLOCK "WebGames 领域配置与架构审查未通过或缺失权威报告"
     FAILED=1
 else
     write_step_verdict "DOMAIN-AUDIT-04" PASS "WebGames 领域配置与架构审查通过"
@@ -220,55 +218,36 @@ fi
 STATUS_AR="PASS"
 CODE_AR=0
 wait_with_timeout "$PID_AR" "$TIMEOUT_AR" "auto-refactor" "$LOG_AR" || CODE_AR=$?
-if [[ "$CODE_AR" -ne 0 ]]; then
+if [[ "$CODE_AR" -ne 0 ]] || [[ ! -f "auto-refactor/reports/self-audit-baseline.json" && ! -f "auto-refactor/reports/self-audit-baseline.aas.json" ]]; then
     STATUS_AR="BLOCK"
     FAILED=1
 fi
 
 STATUS_FG="PASS"
 CODE_FG=0
-
-CODE_FG_STATIC=0
-"$NODE_BIN" fractal-git/scripts/common/validate-crate-topology.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
-"$NODE_BIN" fractal-git/scripts/common/validate-git-parity.js --require-git >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
-"$NODE_BIN" fractal-git/scripts/common/validate-gate-bridge.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
-"$NODE_BIN" fractal-git/scripts/common/check-zero-alloc-boundary.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
-
-if [[ "$CODE_FG_STATIC" -ne 0 ]]; then
+wait_with_timeout "$PID_FG" "$TIMEOUT_FG" "fractal-git" "$LOG_FG" || CODE_FG=$?
+if [[ "$CODE_FG" -ne 0 ]] || [[ ! -f "fractal-git/reports/audit-latest.json" ]]; then
     STATUS_FG="BLOCK"
     FAILED=1
 fi
 
-if [[ -n "$PID_FG" ]]; then
-    wait_with_timeout "$PID_FG" "$TIMEOUT_FG" "fractal-git" "$LOG_FG" || CODE_FG=$?
-    if [[ "$CODE_FG" -ne 0 ]]; then
-        STATUS_FG="BLOCK"
-        FAILED=1
-    fi
-fi
-
-# 判定在 cargo 套件与静态校验都完成后渲染：缺一不可。
 if [[ "$STATUS_FG" == "PASS" ]]; then
     write_step_verdict "RUST-AUDIT-06" PASS "fractal-git 内核子系统回归套件与静态校验通过"
 else
     write_step_verdict "RUST-AUDIT-06" BLOCK "fractal-git 内核子系统回归套件或静态校验未通过"
 fi
 
-if command -v "$NODE_BIN" &>/dev/null && [[ -f "fractal-git/scripts/common/run-audit-report.js" ]]; then
-    FG_REPORT_ARGS=()
-    [[ "$FAST_MODE" -eq 1 ]] && FG_REPORT_ARGS+=("--fast")
-    "$NODE_BIN" fractal-git/scripts/common/run-audit-report.js ${FG_REPORT_ARGS[@]+"${FG_REPORT_ARGS[@]}"} >>"$LOG_FG" 2>&1 || true
-fi
-
-
 if [[ "$FAST_MODE" -eq 0 && "$STATUS_AR" == "PASS" ]]; then
-    CODE_GATE_SELF=0
-    (cd auto-refactor && "$NODE_BIN" scripts/gate-self.js) >"$LOG_AR_SELF" 2>&1 || CODE_GATE_SELF=$?
-    if [[ "$CODE_GATE_SELF" -ne 0 ]]; then
-        STATUS_AR="BLOCK"
-        FAILED=1
-        cat "$LOG_AR_SELF" >> "$LOG_AR"
-    fi
+    for ar_gate_script in "scripts/gate-self.js" "scripts/gate-comments.js" "scripts/gate-rust.js"; do
+        [[ "$STATUS_AR" != "PASS" ]] && break
+        CODE_GATE_AR=0
+        (cd auto-refactor && "$NODE_BIN" "$ar_gate_script") >"$LOG_AR_SELF" 2>&1 || CODE_GATE_AR=$?
+        if [[ "$CODE_GATE_AR" -ne 0 ]]; then
+            STATUS_AR="BLOCK"
+            FAILED=1
+            cat "$LOG_AR_SELF" >> "$LOG_AR"
+        fi
+    done
 fi
 
 # 判定必须在所有影响该步骤的检查之后渲染：gate-self 与并行套件同属 ENGINE-AUDIT-05。
@@ -322,677 +301,22 @@ fi
 rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
 
 # 统一合并执行报告、十维质量看板与步骤摘要生成（消除多进程重复启动）
-"$NODE_BIN" -e '
-  const fs = require("fs");
-  const path = require("path");
-  const startTime = Number(process.argv[1]);
-  const failed = process.argv[2] === "1";
-  const jsonMode = process.argv[3] === "1";
-  const agentMode = process.argv[15] === "1";
-  const statusHygiene = process.argv[4];
-  const statusRules = process.argv[5];
-  const statusAr = process.argv[6];
-  const statusWt = process.argv[7];
-  const statusWg = process.argv[8];
-  const rootDir = process.argv[9];
-  const repoRoot = rootDir;
-  const codeHygiene = Number(process.argv[10] || 0);
-  const codeIso = Number(process.argv[11] || 0);
-  const codeCatalog = Number(process.argv[12] || 0);
-  const codeSkills = Number(process.argv[13] || 0);
-  const hygieneReportFile = process.argv[16] || "";
-  const codeGi = Number(process.argv[17] || 0);
-  const statusFg = process.argv[18] || "PASS";
-  const codeFeedback = Number(process.argv[19] || 0);
-  const codeClosure = Number(process.argv[20] || 0);
-  const codeReach = Number(process.argv[21] || 0);
-  const codeDocs = Number(process.argv[22] || 0);
-  const codeLedger = Number(process.argv[23] || 0);
-  const codeDensity = Number(process.argv[24] || 0);
-  const codeEloc = Number(process.argv[25] || 0);
-  const codeOrdering = Number(process.argv[26] || 0);
-  const codeRuleSource = Number(process.argv[27] || 0);
-  const codeSubagent = Number(process.argv[28] || 0);
-  const codeDocAnchors = Number(process.argv[29] || 0);
-  const codeMetricCoverage = Number(process.argv[30] || 0);
-  const codeFamilyContract = Number(process.argv[31] || 0);
-  const codeDocReach = Number(process.argv[32] || 0);
-  const codeCommitHistory = Number(process.argv[33] || 0);
-  const codeDestructive = Number(process.argv[34] || 0);
-  const codeChains = Number(process.argv[35] || 0);
-  const codeCounts = Number(process.argv[36] || 0);
-  const codeParity = Number(process.argv[37] || 0);
-  const codeGateProof = Number(process.argv[38] || 0);
-  const codeDocMetrics = Number(process.argv[39] || 0);
-  const receiptFile = path.join(rootDir, "auto-refactor", "reports", "audit-receipt.json");
-  const aasBaselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.aas.json");
-  const baselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.json");
-  let receiptLoaded = false;
-  if (fs.existsSync(receiptFile)) {
-    try {
-      const rc = JSON.parse(fs.readFileSync(receiptFile, "utf8"));
-      if (rc.schemaVersion === "1.0") {
-        compositeScore = rc.healthScore;
-        grade = rc.grade;
-        totalDebt = rc.issuesTotal;
-        autonomyRate = rc.confidence ? rc.confidence * 100 : 95.0;
-        tenDimensions = rc.dimensions;
-        receiptLoaded = true;
-      }
-    } catch (_) {}
-  }
-  const wtReportFile = path.join(rootDir, "workspace-timing", "reports", "review", "report-latest.json");
-  const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+REPORT_EXIT=0
+"$NODE_BIN" "$ROOT_DIR/scripts/common/render-audit-all-summary.js" \
+    "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" \
+    "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_HYGIENE" \
+    "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE" \
+    "$LOG_HYGIENE" "$CODE_GI" "$STATUS_FG" "$CODE_FEEDBACK" "$CODE_CLOSURE" \
+    "$CODE_REACH" "$CODE_DOCS" "$CODE_LEDGER" "$CODE_DENSITY" "$CODE_ELOC" \
+    "$CODE_ORDERING" "$CODE_RULE_SOURCE" "$CODE_SUBAGENT" "$CODE_DOC_ANCHORS" \
+    "$CODE_METRIC_COVERAGE" "$CODE_FAMILY_CONTRACT" "$CODE_DOC_REACH" \
+    "$CODE_COMMIT_HISTORY" "$CODE_DESTRUCTIVE" "$CODE_CHAINS" "$CODE_COUNTS" \
+    "$CODE_PARITY" "$CODE_GATE_PROOF" "$CODE_DOC_METRICS" "$CODE_SCORING_CLOSURE" \
+    "$CODE_CASCADE" "$COMMIT_LEDGER" || REPORT_EXIT=$?
 
-  const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(2);
-
-  let compositeScore = null;
-  let grade = null;
-  let totalDebt = null;
-  let autonomyRate = null;
-  let tenDimensions = null;
-  let qualityVector = null;
-
-  try {
-    if (!receiptLoaded && fs.existsSync(aasBaselineFile)) {
-      const aas = JSON.parse(fs.readFileSync(aasBaselineFile, "utf8"));
-      if (aas && aas.schema === "aas-v1" && aas.health) {
-        compositeScore = aas.health.score ?? null;
-        grade = aas.health.grade ?? null;
-        totalDebt = aas.health.counts?.total ?? null;
-        autonomyRate = aas.health.cai ?? null;
-        if (aas.dimensions) {
-          tenDimensions = aas.dimensions;
-          qualityVector = aas.dimensions;
-        }
-      }
-    }
-    if (compositeScore === null && fs.existsSync(baselineFile)) {
-      const b = JSON.parse(fs.readFileSync(baselineFile, "utf8"));
-      const m = b.metrics || {};
-      compositeScore = m.compositeScore ?? b.compositeScore ?? null;
-      grade = m.grade || null;
-      totalDebt = m.totalIssues ?? m.unsuppressedIssues ?? null;
-      autonomyRate = b.autonomyRate ?? m.autonomyRate ?? b.cai ?? null;
-      if (b.tenDimensions) {
-        tenDimensions = b.tenDimensions;
-        qualityVector = b.tenDimensions;
-      }
-    }
-    // 多子系统自研率加权融合 (auto-refactor 与 fractal-git)
-    const fgAuditPath = path.join(repoRoot, "fractal-git/reports/audit-latest.json");
-    let fgCai = null;
-    if (fs.existsSync(fgAuditPath)) {
-      try {
-        const fgData = JSON.parse(fs.readFileSync(fgAuditPath, "utf8"));
-        if (fgData && fgData.summary && fgData.summary.caiIndex != null) {
-          fgCai = Number(fgData.summary.caiIndex);
-        }
-      } catch (_) {}
-    }
-    if (autonomyRate != null && fgCai != null) {
-      autonomyRate = Number((Number(autonomyRate) * 0.67 + fgCai * 0.33).toFixed(2));
-    }
-  } catch (_) {}
-
-  const SCORE_FLOOR = 15.0;
-
-  // 1. 物理卫生基石得分（基于八维物理卫生矩阵连续客观计算与同构/.gitignore治理守卫）
-  let baseHygiene = null;
-  try {
-    if (fs.existsSync(hygieneReportFile)) {
-      const hygData = JSON.parse(fs.readFileSync(hygieneReportFile, "utf8"));
-      if (hygData && typeof hygData.score === "number") {
-        baseHygiene = hygData.score;
-      }
-    }
-  } catch (_) {
-    baseHygiene = null;
-  }
-  if (baseHygiene === null) {
-    baseHygiene = codeHygiene === 0 ? 100.0 : 50.0;
-  }
-  if (codeIso !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 20.0);
-  if (codeGi !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 10.0);
-  if (codeDensity !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 15.0);
-  if (codeEloc !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 15.0);
-  const scoreHygiene = Math.max(SCORE_FLOOR, Number(baseHygiene.toFixed(1)));
-
-  // 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性与技能文档字节等价比对动态判定）
-  const ruleCatalogPath = path.join(rootDir, "scripts", "common", "rule-catalog.json");
-  let catalogRuleCount = 0;
-  try {
-    if (fs.existsSync(ruleCatalogPath)) {
-      const catalogObj = JSON.parse(fs.readFileSync(ruleCatalogPath, "utf8"));
-      if (catalogObj && catalogObj.totalRules) {
-        catalogRuleCount = Number(catalogObj.totalRules);
-      }
-    }
-  } catch (_) {
-    catalogRuleCount = 0;
-  }
-
-  // 预先采样多语言均衡指数与各语言栈真实质量分（为 WebGames 等领域得分提供 AST 真实度量）
-  let polyglotIndex = null;
-  let polyglotBreakdown = null;
-  try {
-    const polyScript = path.join(rootDir, "scripts", "common", "evaluate-polyglot-balance.js");
-    if (fs.existsSync(polyScript)) {
-      const isFast = process.argv[14] === "1";
-      const pArgs = [polyScript, "--json"];
-      if (isFast) pArgs.push("--fast");
-      const { execFileSync } = require("child_process");
-      const pOut = execFileSync(process.execPath, pArgs, { cwd: rootDir, encoding: "utf8" });
-      const pJson = JSON.parse(pOut);
-      if (pJson && pJson.polyglotIndex != null) {
-        polyglotIndex = Number(pJson.polyglotIndex);
-        polyglotBreakdown = pJson.breakdown || null;
-      }
-    }
-  } catch (_) {}
-
-  // 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性、反馈词表、闭包、可达性与技能集规范动态判定）
-  const ruleCodes = [
-    codeCatalog, codeFeedback, codeOrdering, codeSkills, codeClosure,
-    codeReach, codeRuleSource, codeDocs, codeLedger, codeSubagent,
-    codeDocAnchors, codeMetricCoverage, codeFamilyContract, codeDocReach, codeCommitHistory,
-    codeDestructive, codeChains, codeCounts, codeParity, codeGateProof,
-    codeDocMetrics
-  ];
-  const rulesPassedCount = ruleCodes.filter((c) => c === 0).length;
-  const ruleStepTotal = ruleCodes.length;
-
-  let scoreRules = SCORE_FLOOR;
-  // 目录零漂移判定以 generate-rule-catalog.js --check-only 为唯一权威。
-  const catalogCountConsistent = codeCatalog === 0;
-  if (statusRules === "PASS" && catalogCountConsistent) {
-    scoreRules = 100.0;
-  } else {
-    scoreRules = Math.max(SCORE_FLOOR, Number((100.0 * (rulesPassedCount / Math.max(1, ruleStepTotal))).toFixed(1)));
-  }
-
-  // 3. auto-refactor 质量基线得分（基于自审综合基线动态读取，门禁失败动态连续衰减）
-  let baseAr = null;
-  if (compositeScore !== null) {
-    baseAr = Number(compositeScore);
-  } else {
-    try {
-      const arBaselinePath = path.join(repoRoot, "auto-refactor", "reports", "self-audit-baseline.json");
-      if (fs.existsSync(arBaselinePath)) {
-        const arBaseData = JSON.parse(fs.readFileSync(arBaselinePath, "utf8"));
-        if (arBaseData.metrics && arBaseData.metrics.compositeScore) {
-          baseAr = Number(arBaseData.metrics.compositeScore);
-        }
-      }
-    } catch (_) {}
-  }
-  if (baseAr === null) baseAr = statusAr === "PASS" ? 95.0 : SCORE_FLOOR;
-  const scoreAr = statusAr === "PASS" ? baseAr : Math.max(SCORE_FLOOR, Number((baseAr - 60.0).toFixed(1)));
-
-  // 4. workspace-timing 审查门禁得分（优先读取真实 AST compositeScore，消除假满分 100.0）
-  let baseWt = null;
-  try {
-    const wtCachePath = path.join(repoRoot, "workspace-timing", "reports", ".refactor-cache", "report.json");
-    if (fs.existsSync(wtCachePath)) {
-      const wtCacheData = JSON.parse(fs.readFileSync(wtCachePath, "utf8"));
-      if (wtCacheData.qualityScore && typeof wtCacheData.qualityScore.compositeScore === "number") {
-        baseWt = Number(wtCacheData.qualityScore.compositeScore.toFixed(2));
-      }
-    }
-  } catch (_) {}
-
-  if (baseWt === null) {
-    try {
-      if (fs.existsSync(wtReportFile)) {
-        const wtJson = JSON.parse(fs.readFileSync(wtReportFile, "utf8"));
-        if (wtJson && wtJson.summary && wtJson.summary.checks > 0) {
-          const totalChecks = Number(wtJson.summary.checks);
-          const passChecks = wtJson.summary.byStatus?.PASS ? Number(wtJson.summary.byStatus.PASS) : 0;
-          const warnCount = wtJson.summary.bySeverity?.warning ? Number(wtJson.summary.bySeverity.warning) : 0;
-          const errCount = wtJson.summary.bySeverity?.error ? Number(wtJson.summary.bySeverity.error) : 0;
-          if (totalChecks > 0) {
-            const ratio = passChecks / totalChecks;
-            const rawWt = (99.0 * ratio) - (warnCount * 0.5) - (errCount * 5.0);
-            baseWt = Math.max(SCORE_FLOOR, Number(rawWt.toFixed(1)));
-          }
-        }
-      }
-    } catch (_) {
-      baseWt = null;
-    }
-  }
-
-  if (baseWt === null) {
-    baseWt = statusWt === "PASS" ? 95.0 : SCORE_FLOOR;
-  }
-  const scoreWt = statusWt === "PASS" ? baseWt : Math.max(SCORE_FLOOR, Number((baseWt - 60.0).toFixed(1)));
-
-  // 5. WebGames 配置架构与游戏源码得分（加权融合配置表与 663 个 GDScript 真实 AST 质量，消融假满分）
-  let baseWg = null;
-  const gdScore = (polyglotBreakdown && polyglotBreakdown.gdscript && typeof polyglotBreakdown.gdscript.score === "number")
-    ? polyglotBreakdown.gdscript.score
-    : 90.0;
-
-  let configScore = statusWg === "PASS" ? 90.0 : SCORE_FLOOR;
-  try {
-    const wgReportPath = path.join(repoRoot, "WebGames", "reports", "audit-latest.json");
-    if (fs.existsSync(wgReportPath)) {
-      const wgData = JSON.parse(fs.readFileSync(wgReportPath, "utf8"));
-      if (wgData && wgData.summary && wgData.summary.checks > 0) {
-        const totalChecksWg = Number(wgData.summary.checks);
-        const passChecksWg = wgData.summary.byStatus && wgData.summary.byStatus.PASS ? Number(wgData.summary.byStatus.PASS) : 0;
-        const warnCountWg = wgData.summary.bySeverity && wgData.summary.bySeverity.warning ? Number(wgData.summary.bySeverity.warning) : 0;
-        const errCountWg = wgData.summary.bySeverity && wgData.summary.bySeverity.error ? Number(wgData.summary.bySeverity.error) : 0;
-        if (totalChecksWg > 0) {
-          const ratioWg = passChecksWg / totalChecksWg;
-          const rawConfig = (100.0 * ratioWg) - (warnCountWg * 0.035) - (errCountWg * 5.0);
-          configScore = Math.max(SCORE_FLOOR, Number(rawConfig.toFixed(1)));
-        }
-      }
-    }
-  } catch (_) {
-    configScore = statusWg === "PASS" ? 90.0 : SCORE_FLOOR;
-  }
-
-  baseWg = Number(((0.8 * gdScore) + (0.2 * configScore)).toFixed(1));
-  const scoreWg = statusWg === "PASS" ? baseWg : Math.max(SCORE_FLOOR, Number((baseWg - 60.0).toFixed(1)));
-
-  // 6. fractal-git 质量基线得分（基于 audit-latest.json 真实 checks/pass/warn 连续客观计算，消融阶跃硬编码）
-  let baseFg = null;
-  try {
-    const fgReportPath = path.join(repoRoot, "fractal-git", "reports", "audit-latest.json");
-    if (fs.existsSync(fgReportPath)) {
-      const fgData = JSON.parse(fs.readFileSync(fgReportPath, "utf8"));
-      if (fgData && fgData.summary) {
-        if (typeof fgData.summary.compositeScore === "number" && fgData.summary.compositeScore > 0) {
-          baseFg = Number(fgData.summary.compositeScore.toFixed(2));
-        } else if (fgData.qualityEnvelope && typeof fgData.qualityEnvelope.composite_score === "number") {
-          baseFg = Number(fgData.qualityEnvelope.composite_score.toFixed(2));
-        } else if (fgData.summary.checks > 0) {
-          const totalChecksFg = Number(fgData.summary.checks);
-          const passChecksFg = fgData.summary.byStatus && fgData.summary.byStatus.PASS ? Number(fgData.summary.byStatus.PASS) : 0;
-          const warnCountFg = fgData.summary.bySeverity && fgData.summary.bySeverity.warning ? Number(fgData.summary.bySeverity.warning) : 0;
-          const errCountFg = fgData.summary.bySeverity && fgData.summary.bySeverity.error ? Number(fgData.summary.bySeverity.error) : 0;
-          const credibleFg = fgData.summary.bayesianConfidence && fgData.summary.bayesianConfidence.credibleScore;
-          const baselineScore = typeof credibleFg === "number" ? credibleFg : (100.0 * (passChecksFg / totalChecksFg));
-          const rawFg = baselineScore - (warnCountFg * 0.035) - (errCountFg * 5.0);
-          baseFg = Math.max(SCORE_FLOOR, Number(rawFg.toFixed(1)));
-        }
-      }
-    }
-  } catch (_) {
-    baseFg = null;
-  }
-
-  if (baseFg === null) {
-    baseFg = statusFg === "PASS" ? 90.0 : SCORE_FLOOR;
-  }
-  const scoreFg = statusFg === "PASS" ? baseFg : Math.max(SCORE_FLOOR, Number((baseFg - 60.0).toFixed(1)));
-
-
-  // polyglot evaluated earlier before cornerstone scores
-
-  // 全工作区综合健康分（分层加权：基础设施基石层 20% + 核心生产工程层 80%，附带极低分短板熔断阻尼）
-  const rawWeighted = (0.10 * scoreHygiene) + (0.10 * scoreRules) + (0.25 * scoreAr) + (0.20 * scoreWt) + (0.20 * scoreWg) + (0.15 * scoreFg);
-  const minCorner = Math.min(scoreHygiene, scoreRules, scoreAr, scoreWt, scoreWg, scoreFg);
-  const damping = minCorner < 70.0 ? Math.max(0.5, minCorner / 70.0) : 1.0;
-  const workspaceHealthScore = Number((rawWeighted * damping).toFixed(2));
-  const wsHealthStr = workspaceHealthScore % 1 === 0 ? workspaceHealthScore.toFixed(1) : String(workspaceHealthScore);
-
-  function getGradeTag(score) {
-    if (score >= 95.0) return "[A+]";
-    if (score >= 90.0) return "[A ]";
-    if (score >= 85.0) return "[B+]";
-    if (score >= 80.0) return "[B ]";
-    if (score >= 75.0) return "[C+]";
-    if (score >= 70.0) return "[C ]";
-    if (score >= 60.0) return "[D ]";
-    return "[F ]";
-  }
-
-  function getGradeFromScore(score) {
-    return getGradeTag(score).replace("[", "").replace("]", "").trim();
-  }
-
-  const wsGrade = getGradeFromScore(workspaceHealthScore);
-
-  const dynamicDimensions = {};
-  for (const d of dimDefinitions) {
-    const dimKey = d.key;
-    const baseVal = (tenDimensions && typeof tenDimensions[dimKey] === "number" && !isNaN(tenDimensions[dimKey]) && tenDimensions[dimKey] > 0)
-      ? Number(tenDimensions[dimKey])
-      : null;
-
-    let dimScore = scoreAr;
-    switch (dimKey) {
-      case "codeSecurity":
-        dimScore = Math.round((scoreAr * 0.65 + scoreFg * 0.35) * 10) / 10;
-        break;
-      case "architectureConsistency":
-        dimScore = Math.round((scoreAr * 0.35 + scoreRules * 0.25 + scoreWg * 0.20 + scoreFg * 0.20) * 10) / 10;
-        break;
-      case "performanceEfficiency":
-        dimScore = Math.round((scoreAr * 0.40 + scoreWg * 0.35 + scoreFg * 0.25) * 10) / 10;
-        break;
-      case "maintainability":
-        dimScore = Math.round((scoreAr * 0.45 + scoreWt * 0.30 + scoreHygiene * 0.25) * 10) / 10;
-        break;
-      case "standardization":
-        dimScore = Math.round((scoreHygiene * 0.45 + scoreRules * 0.30 + scoreAr * 0.25) * 10) / 10;
-        break;
-      case "modernity": {
-        const polyScore = polyglotIndex != null ? polyglotIndex : scoreAr;
-        dimScore = Math.round((scoreAr * 0.50 + polyScore * 0.50) * 10) / 10;
-        break;
-      }
-      case "semanticPurity":
-        dimScore = Math.round((scoreAr * 0.60 + scoreWt * 0.40) * 10) / 10;
-        break;
-      case "duplication":
-        dimScore = Math.round((scoreAr * 0.65 + scoreHygiene * 0.35) * 10) / 10;
-        break;
-      case "commentQuality":
-        dimScore = Math.round((scoreAr * 0.60 + scoreWt * 0.40) * 10) / 10;
-        break;
-      case "techDebtRisk":
-        dimScore = Math.round((scoreAr * 0.40 + scoreWg * 0.30 + scoreFg * 0.30) * 10) / 10;
-        break;
-    }
-    if (baseVal !== null) {
-      dimScore = Math.min(baseVal, dimScore);
-    }
-    dynamicDimensions[dimKey] = Math.max(SCORE_FLOOR, Math.min(100.0, dimScore));
-  }
-  tenDimensions = dynamicDimensions;
-  qualityVector = dynamicDimensions;
-
-  const summary = {
-    protocolVersion: "1.0.0",
-    timestamp: new Date().toISOString(),
-    gitRevision: (function() {
-      try {
-        const { execSync } = require("child_process");
-        return execSync("git rev-parse --short HEAD", { cwd: rootDir, encoding: "utf8" }).trim().slice(0, 8);
-      } catch (_) { return "00000000"; }
-    })(),
-    fastMode: process.argv[14] === "1",
-    status: failed ? "BLOCK" : "PASS",
-    exitCode: failed ? 1 : 0,
-    elapsedSeconds: Number(elapsedSec),
-    workspaceHealthScore,
-    compositeScore: workspaceHealthScore,
-    grade: wsGrade,
-    autonomyRate: autonomyRate != null ? Number(autonomyRate) : null,
-    polyglotIndex: polyglotIndex != null ? Number(polyglotIndex) : null,
-    polyglotBreakdown: polyglotBreakdown,
-    totalDebt: totalDebt != null ? Number(totalDebt) : null,
-    catalogRuleCount: catalogRuleCount || null,
-    catalogCountConsistent,
-    projects: {
-      hygiene: statusHygiene,
-      rulesCatalog: statusRules,
-      autoRefactor: statusAr,
-      workspaceTiming: statusWt,
-      webGames: statusWg,
-      fractalGit: statusFg
-    },
-    projectScores: {
-      hygiene: scoreHygiene,
-      rulesCatalog: scoreRules,
-      autoRefactor: scoreAr,
-      workspaceTiming: scoreWt,
-      webGames: scoreWg,
-      fractalGit: scoreFg
-    },
-    arCompositeScore: compositeScore,
-    tenDimensions,
-    qualityVector
-  };
-
-  try {
-    const { recordAuditRun } = require(path.join(rootDir, "scripts", "common", "record-workspace-audit.js"));
-    recordAuditRun(summary);
-  } catch (_) {}
-
-  if (jsonMode) {
-    console.log(JSON.stringify(summary, null, 2));
-    process.exit(0);
-  }
-
-  if (agentMode) {
-    const subsystemsStatus = {
-      hygiene: statusHygiene,
-      rules: statusRules,
-      autoRefactor: statusAr,
-      workspaceTiming: statusWt,
-      webGames: statusWg,
-      fractalGit: statusFg
-    };
-    const failedSubsystems = [];
-    if (statusHygiene !== "PASS") failedSubsystems.push("hygiene");
-    if (statusRules !== "PASS") failedSubsystems.push("rules");
-    if (statusAr !== "PASS") failedSubsystems.push("auto-refactor");
-    if (statusWt !== "PASS") failedSubsystems.push("workspace-timing");
-    if (statusWg !== "PASS") failedSubsystems.push("WebGames");
-    if (statusFg !== "PASS") failedSubsystems.push("fractal-git");
-
-    const envelope = {
-      schema: "aas-v1",
-      protocolVersion: "1.0.0",
-      recordedAt: new Date().toISOString(),
-      status: failed ? "BLOCK" : "PASS",
-      gate: "audit-all",
-      exitCode: failed ? 1 : 0,
-      summary: failed
-        ? `Unified workspace review failed with violations in: ${failedSubsystems.join(", ")}.`
-        : "All workspace quality checks passed across 6 core subsystems.",
-      compositeHealth: workspaceHealthScore,
-      grade: wsGrade,
-      subsystems: subsystemsStatus,
-      agentDirectives: {
-        targetFiles: [],
-        remediationPriority: failedSubsystems,
-        verificationCommand: "bash scripts/sh/audit-all.sh --fast",
-        fastRecheckCommand: "bash scripts/sh/audit-all.sh --fast"
-      }
-    };
-    console.log(JSON.stringify(envelope, null, 2));
-    process.exit(failed ? 1 : 0);
-  }
-
-  function isWide(code) {
-    if (code >= 0x2500 && code <= 0x259f) return false;
-    if (code >= 0x4e00 && code <= 0x9fff) return true;
-    if (code >= 0x3400 && code <= 0x4dbf) return true;
-    if (code >= 0x2e80 && code <= 0x2fff) return true;
-    if (code >= 0xf900 && code <= 0xfaff) return true;
-    if (code >= 0xff01 && code <= 0xff60) return true;
-    if (code >= 0xffe0 && code <= 0xffe6) return true;
-    if (code >= 0x20000 && code <= 0x2a6df) return true;
-    if (code >= 0x1f300 && code <= 0x1f9ff) return true;
-    if (code === 0x2705 || code === 0x274c) return true;
-    return false;
-  }
-
-  function strWidth(str) {
-    let w = 0;
-    for (const ch of str) {
-      const code = ch.codePointAt(0);
-      w += isWide(code) ? 2 : 1;
-    }
-    return w;
-  }
-
-  function alignCell(text, width, align = "left") {
-    const dw = strWidth(text);
-    const pad = Math.max(0, width - dw);
-    if (align === "right") {
-      return " ".repeat(pad) + text;
-    } else if (align === "center") {
-      const left = Math.floor(pad / 2);
-      const right = pad - left;
-      return " ".repeat(left) + text + " ".repeat(right);
-    }
-    return text + " ".repeat(pad);
-  }
-
-  function formatDashboardRow(content = "", targetWidth = 71) {
-    const dw = strWidth(content);
-    const pad = Math.max(0, targetWidth - dw);
-    return "│" + content + " ".repeat(pad) + "│";
-  }
-
-  function makeBar(score, blocks = 20) {
-    const filled = Math.max(0, Math.min(blocks, Math.round((score / 100) * blocks)));
-    const empty = blocks - filled;
-    return "█".repeat(filled) + "░".repeat(empty);
-  }
-
-  const targetWidth = 71;
-  const borderTop = "┌" + "─".repeat(targetWidth) + "┐";
-  const borderMid = "├" + "─".repeat(targetWidth) + "┤";
-  const borderBot = "└" + "─".repeat(targetWidth) + "┘";
-
-  const sepTitle1 = "─ [全工作区六大核心子系统基石得分] ";
-  const sep1 = "├" + sepTitle1 + "─".repeat(targetWidth - strWidth(sepTitle1)) + "┤";
-
-  const sepTitle2 = "─ [auto-refactor 静态引擎十维工程质量全景指数] ";
-  const sep2 = "├" + sepTitle2 + "─".repeat(targetWidth - strWidth(sepTitle2)) + "┤";
-
-  console.log("");
-  console.log(borderTop);
-  const titleText = "全工作区统一工程审查与质量全景看板";
-  const titlePad = Math.floor((targetWidth - strWidth(titleText)) / 2);
-  console.log(formatDashboardRow(" ".repeat(titlePad) + titleText, targetWidth));
-  console.log(borderMid);
-
-  let summaryText = `综合健康分: ${wsHealthStr} (${wsGrade})`;
-  if (autonomyRate != null) summaryText += ` | 自研率: ${Number(autonomyRate).toFixed(2)}%`;
-  if (polyglotIndex != null) summaryText += ` | 语言均衡: ${Number(polyglotIndex).toFixed(2)}`;
-  console.log(formatDashboardRow(" " + summaryText, targetWidth));
-
-  console.log(sep1);
-
-  const sysDefinitions = [
-    { num: " 1.", name: "工作区物理卫生",   score: scoreHygiene, note: "(零空文件/同构)" },
-    { num: " 2.", name: "单源规则目录",     score: scoreRules,   note: `(${catalogRuleCount}规则/SSOT)` },
-    { num: " 3.", name: "auto-refactor",    score: scoreAr,      note: "(CLI静态引擎基线)" },
-    { num: " 4.", name: "workspace-timing", score: scoreWt,      note: "(VSCode扩展门禁)" },
-    { num: " 5.", name: "WebGames配置架构", score: scoreWg,      note: "(卡拉尔领域配置)" },
-    { num: " 6.", name: "fractal-git",      score: scoreFg,      note: "(10子系统/Rust)" }
-  ];
-
-  for (const sys of sysDefinitions) {
-    const bar = makeBar(sys.score, 20);
-    const scoreStr = (Number.isInteger(sys.score) ? sys.score.toFixed(1) : String(Math.round(sys.score * 100) / 100)).padStart(6);
-    const col1 = sys.num.padEnd(4);
-    const col2 = alignCell(sys.name, 17);
-    const col3 = bar;
-    const col4 = scoreStr;
-    const col5 = " " + sys.note;
-    const rowContent = col1 + col2 + col3 + " " + col4 + col5;
-    console.log(formatDashboardRow(rowContent, targetWidth));
-  }
-
-  console.log(sep2);
-
-  const dimDefinitions = [
-    { num: " 1.", name: "架构一致", key: "architectureConsistency", desc: "分层边界解耦", labelEn: "架构一致 (Architecture Consistency)" },
-    { num: " 2.", name: "语义纯度", key: "semanticPurity", desc: "纯函数数据流", labelEn: "语义纯度 (Semantic Purity)" },
-    { num: " 3.", name: "代码安全", key: "codeSecurity", desc: "输入安全防御", labelEn: "代码安全 (Code Security)" },
-    { num: " 4.", name: "性能预算", key: "performanceEfficiency", desc: "零循环堆分配", labelEn: "性能预算 (Performance Efficiency)" },
-    { num: " 5.", name: "标准化",   key: "standardization", desc: "命名契约标准", labelEn: "标准化 (Standardization)" },
-    { num: " 6.", name: "现代化",   key: "modernity", desc: "现代语法API", labelEn: "现代化 (Modernity)" },
-    { num: " 7.", name: "可维护性", key: "maintainability", desc: "控制流复杂度", labelEn: "可维护性 (Maintainability)" },
-    { num: " 8.", name: "注释质量", key: "commentQuality", desc: "JSDoc契约完备", labelEn: "注释质量 (Comment Quality)" },
-    { num: " 9.", name: "重复率",   key: "duplication", desc: "DRY原则去重", labelEn: "重复率 (Duplication)" },
-    { num: "10.", name: "技术债风险", key: "techDebtRisk", desc: "零高危债务防线", labelEn: "技术债风险 (Tech Debt Risk)" }
-  ];
-
-  if (tenDimensions && compositeScore !== null) {
-    for (const d of dimDefinitions) {
-      const rawScore = tenDimensions[d.key];
-      const parsedScore = Number(rawScore ?? 0);
-      const isNotEvaluated = rawScore == null || isNaN(parsedScore) || parsedScore <= 0;
-      let bar = " ".repeat(20);
-      let scoreStr = "   N/A";
-      let gradeTag = "";
-      if (!isNotEvaluated) {
-        bar = makeBar(parsedScore, 20);
-        scoreStr = (Number.isInteger(parsedScore) ? parsedScore.toFixed(1) : String(Math.round(parsedScore * 100) / 100)).padStart(6);
-        gradeTag = getGradeTag(parsedScore);
-      }
-      const col1 = d.num.padEnd(4);
-      const col2 = alignCell(d.name, 17);
-      const col3 = bar;
-      const col4 = scoreStr;
-      const col5 = " " + gradeTag + " " + d.desc;
-      const rowContent = col1 + col2 + col3 + " " + col4 + col5;
-      console.log(formatDashboardRow(rowContent, targetWidth));
-    }
-  } else {
-    console.log(formatDashboardRow(" [离线基线快照未就绪 - 优雅降级模式]", targetWidth));
-  }
-
-  console.log(borderMid);
-
-  const globalStatus = failed ? "🔴 存在违规异常" : "🟢 全域健康达标";
-  const bottomSummary = ` 耗时: ${elapsedSec}s${totalDebt !== null ? `  |  技术债: ${totalDebt}项` : ""}  |  全局状态: ${globalStatus}`;
-  console.log(formatDashboardRow(bottomSummary, targetWidth));
-  console.log(borderBot);
-  console.log("💡 统一审查快照已落盘至: .audit-logs/audit-latest.json | audit-latest.aas.json | audit-latest.md");
-  console.log("💡 质量历史轨迹已追加至: .audit-logs/audit-history.jsonl");
-
-  if (summaryFile) {
-    const passBadge = (s) => (s === "PASS" ? "🟢 达标" : "🔴 阻断");
-    let md = "## 🌐 全工作区跨项目统一审查与十维质量全景看板\n\n";
-    const gStr = ` (Grade: **${wsGrade}**)`;
-    const aStr = autonomyRate ? ` &nbsp;|&nbsp; **自研率**: **${autonomyRate}%**` : "";
-    const pStr = polyglotIndex !== null ? ` &nbsp;|&nbsp; **语言均衡**: **${polyglotIndex}**` : "";
-    const dStr = totalDebt !== null ? ` &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**` : "";
-    md += `> **综合健康分**: **${wsHealthStr}**${gStr}${aStr}${pStr}${dStr}\n\n`;
-    md += "### 📊 全工作区六大核心子系统基石得分\n\n";
-    md += "| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |\n";
-    md += "| :---: | :--- | :---: | :---: | :--- | :--- |\n";
-    md += `| 1 | 工作区物理卫生 | ${passBadge(statusHygiene)} | ${scoreHygiene.toFixed(1)} | \`[${makeBar(scoreHygiene, 20)}]\` | 全仓零空文件/同构契约 |\n`;
-    md += `| 2 | 单源规则目录 | ${passBadge(statusRules)} | ${scoreRules.toFixed(1)} | \`[${makeBar(scoreRules, 20)}]\` | ${catalogRuleCount}规则/SSOT一致性 |\n`;
-    md += `| 3 | auto-refactor | ${passBadge(statusAr)} | ${scoreAr.toFixed(1)} | \`[${makeBar(scoreAr, 20)}]\` | CLI静态引擎质量基线 |\n`;
-    md += `| 4 | workspace-timing | ${passBadge(statusWt)} | ${scoreWt.toFixed(1)} | \`[${makeBar(scoreWt, 20)}]\` | VSCode扩展审查门禁 |\n`;
-    md += `| 5 | WebGames配置架构 | ${passBadge(statusWg)} | ${scoreWg.toFixed(1)} | \`[${makeBar(scoreWg, 20)}]\` | 卡拉尔领域配置审查 |\n`;
-    md += `| 6 | fractal-git | ${passBadge(statusFg)} | ${scoreFg.toFixed(1)} | \`[${makeBar(scoreFg, 20)}]\` | 10子系统/Rust回归套件 |\n\n`;
-    md += `> **耗时**: ${elapsedSec}s &nbsp;|&nbsp; **全局状态**: ${globalStatus}\n\n`;
-
-    md += "### 🎯 auto-refactor 静态引擎十维工程质量全景指数\n\n";
-    if (tenDimensions && compositeScore !== null) {
-      md += "| 序号 | 质量维度 | 得分 | 进度可视化 |\n";
-      md += "| :---: | :--- | :---: | :--- |\n";
-      for (const d of dimDefinitions) {
-        const rawScore = tenDimensions[d.key];
-        const parsedScore = Number(rawScore ?? 0);
-        const isNotEvaluated = rawScore == null || isNaN(parsedScore) || parsedScore <= 0;
-        let bar = " ".repeat(20);
-        let scoreStr = "N/A";
-        if (!isNotEvaluated) {
-          bar = makeBar(parsedScore, 20);
-          scoreStr = parsedScore % 1 === 0 ? parsedScore.toFixed(1) : String(Math.round(parsedScore * 100) / 100);
-        }
-        md += `| ${d.num.trim().replace(".", "")} | ${d.labelEn} | ${scoreStr} | \`[${bar}]\` |\n`;
-      }
-    } else {
-      md += "> ⚠️ [离线基线快照未就绪 - 优雅降级模式]\n";
-    }
-    md += "\n";
-    try {
-      fs.appendFileSync(summaryFile, md, "utf8");
-    } catch (_) {}
-  }
-' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_HYGIENE" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE" "$LOG_HYGIENE" "$CODE_GI" "$STATUS_FG" "$CODE_FEEDBACK" "$CODE_CLOSURE" "$CODE_REACH" "$CODE_DOCS" "$CODE_LEDGER" "$CODE_DENSITY" "$CODE_ELOC" "$CODE_ORDERING" "$CODE_RULE_SOURCE" "$CODE_SUBAGENT" "$CODE_DOC_ANCHORS" "$CODE_METRIC_COVERAGE" "$CODE_FAMILY_CONTRACT" "$CODE_DOC_REACH" "$CODE_COMMIT_HISTORY" "$CODE_DESTRUCTIVE" "$CODE_CHAINS" "$CODE_COUNTS" "$CODE_PARITY" "$CODE_GATE_PROOF" "$CODE_DOC_METRICS"
-
-# 6. 汇流记录工作区统一质量轨迹（默认写入运行期目录，--commit-ledger 才写入受控账本）
-TRAJ_ARGS=()
-[[ "$FAILED" -ne 0 ]] && TRAJ_ARGS+=("--failed")
-[[ "$COMMIT_LEDGER" -eq 1 ]] && TRAJ_ARGS+=("--commit-ledger")
-"$NODE_BIN" scripts/common/record-workspace-trajectory.js ${TRAJ_ARGS[@]+"${TRAJ_ARGS[@]}"} >/dev/null 2>&1 || true
+if [[ "$REPORT_EXIT" -ne 0 ]]; then
+    FAILED=1
+fi
 
 if [[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]]; then
     exit "$FAILED"

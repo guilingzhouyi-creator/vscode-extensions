@@ -18,8 +18,20 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const MAX_RECORD_BYTE_SIZE = 360;
+const REPO_ROOT = path.resolve(__dirname, '..', '..');
+const MAX_RECORD_BYTE_SIZE = 350;
 const DEFAULT_MAX_ROLLING_RUNS = 100;
+
+function safeReadJson(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
 
 const CANONICAL_DIMENSIONS = [
   'architectureConsistency',
@@ -106,20 +118,25 @@ function getGitRevision(root) {
 
 function loadBaselineMetrics(root) {
   const baselinePath = path.join(root, 'auto-refactor', 'reports', 'self-audit-baseline.json');
-  if (!fs.existsSync(baselinePath)) {
+  const baseline = safeReadJson(baselinePath);
+  const latestAuditPath = path.join(root, '.audit-logs', 'audit-latest.json');
+  const latestAudit = safeReadJson(latestAuditPath);
+  if (!baseline && !latestAudit) {
     return null;
   }
-  try {
-    const raw = fs.readFileSync(baselinePath, 'utf8');
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  return {
+    ...(baseline || {}),
+    workspaceAudit: latestAudit,
+  };
 }
 
 function extractCanonicalScore(baseline) {
   if (!baseline) {
     return null;
+  }
+  const wsScore = baseline.workspaceAudit?.workspaceHealthScore;
+  if (typeof wsScore === 'number' && Number.isFinite(wsScore) && wsScore > 0) {
+    return Math.round(wsScore * 100) / 100;
   }
   const raw = baseline.metrics?.compositeScore ?? baseline.eightPillars?.compositeScore ?? null;
   if (raw === null || raw === undefined) {
@@ -130,13 +147,22 @@ function extractCanonicalScore(baseline) {
 }
 
 function extractCanonicalVector(baseline) {
-  if (!baseline || !baseline.tenDimensions || typeof baseline.tenDimensions !== 'object') {
-    return [100, 100, 100, 100, 100, 100, 100, 100, 100, 100];
+  let tenDims = baseline?.workspaceAudit?.tenDimensions;
+  if (!tenDims || typeof tenDims !== 'object') {
+    tenDims = baseline?.tenDimensions;
   }
-  return CANONICAL_DIMENSIONS.map((dim) => {
-    const val = Number(baseline.tenDimensions[dim]);
-    return Number.isFinite(val) ? Math.round(val * 100) / 100 : 100;
+  if (!tenDims || typeof tenDims !== 'object') {
+    const latestAudit = safeReadJson(path.join(REPO_ROOT, '.audit-logs', 'audit-latest.json'));
+    tenDims = latestAudit?.tenDimensions;
+  }
+  if (!tenDims || typeof tenDims !== 'object') {
+    return null;
+  }
+  const vector = CANONICAL_DIMENSIONS.map((dim) => {
+    const val = Number(tenDims[dim]);
+    return Number.isFinite(val) ? Math.round(val * 100) / 100 : null;
   });
+  return vector.some((item) => item !== null) ? vector : null;
 }
 
 /**
@@ -361,7 +387,12 @@ function buildRecordPayload(baseline, previous) {
       ...(eloc.available
         ? { eloc: { proc: eloc.proc, uniq: eloc.uniq, chg: eloc.chg, sem: eloc.sem, reloc: 0, cosm: 0 } }
         : { elocUnavailable: true }),
-      score: { bef: scoreBef, aft: scoreVal, vec: vector, qed: qedVal },
+      score: {
+        bef: scoreBef,
+        aft: scoreVal,
+        ...(vector ? { vec: vector } : {}),
+        qed: qedVal,
+      },
       debt: { add: debt.add, res: debt.res, reg: debt.reg },
     },
   };
@@ -386,6 +417,7 @@ function main() {
   const args = process.argv.slice(2);
   const isFailed = args.includes('--fail') || args.includes('--failed');
   const commitLedger = args.includes('--commit-ledger');
+  const dryRun = args.includes('--dry-run');
   const activation = parseActivationArgs(args);
   for (const warning of activation.warnings) {
     console.warn(`  ⚠ ${warning}`);
@@ -413,6 +445,16 @@ function main() {
   };
 
   const line = serializeCompactRecordLine(record);
+  if (dryRun) {
+    console.log(renderRunSummary({
+      ledgerScope: 'dry-run (no disk write)',
+      byteLen: Buffer.byteLength(line, 'utf8'),
+      revision,
+      activationBytes: 0,
+      activation,
+    }));
+    return;
+  }
   fs.appendFileSync(activeRunsPath, line + '\n', 'utf8');
   pruneActiveRunsIfExceeded(activeRunsPath, DEFAULT_MAX_ROLLING_RUNS);
 

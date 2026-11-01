@@ -57,9 +57,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Review (L0~L5 Quality Gates)
+      - name: Review (L0~L5 Strict Quality Gates)
         run: |
-          if jq -e '.scripts.review' package.json >/dev/null 2>&1; then
+          if jq -e '.scripts["review:strict"]' package.json >/dev/null 2>&1; then
+            if [ ! -f "../auto-refactor/dist/index.js" ]; then
+              (cd ../auto-refactor && npm ci --no-audit --no-fund --silent && npm run build)
+            fi
+            npm run review:strict
+          elif jq -e '.scripts.review' package.json >/dev/null 2>&1; then
             npm run review
           else
             echo "::notice::No review script in package.json, skipping."
@@ -544,8 +549,9 @@ jobs:
           node scripts/common/evaluate-eloc-budget.js --all
           # 8.7 跨平台命令面兼容层与别名优先级契约 (linux-parity)
           node scripts/common/validate-shell-parity.js
-          # 8.8 泛化 SubAgent 编排与预置目录合规
-          node scripts/common/validate-subagent-catalog.js
+          # 8.8 泛化 SubAgent 编排、预置目录与四方级联闭合合规
+          node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
+          node .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js
           # 8.9 文档锚点与交叉引用可达性
           node scripts/common/validate-doc-anchors.js
           node scripts/common/validate-doc-reachability.js

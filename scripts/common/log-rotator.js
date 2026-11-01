@@ -16,6 +16,15 @@
 
 const fs = require('fs');
 const path = require('path');
+const {
+  AUDIT_FAILURE_SNAPSHOT_NAME,
+  FAILURES_SUBDIR,
+  TIMEOUTS_SUBDIR,
+  buildFailureEnvelope,
+  stripAnsi,
+  sanitizePath,
+  ensureLf,
+} = require('./gate-failure-contract');
 
 const UTF8 = 'utf8';
 const FAILURE_SNAPSHOT_NAME = 'last-failure.json';
@@ -33,6 +42,7 @@ const TRUNCATION_MARKER = '\n--- [TRUNCATED: LOG EXCEEDED 100KB QUOTA] ---\n';
 const PROTOCOL_VERSION = '1.0.0';
 const PROTECTED_SNAPSHOT_FILES = new Set([
   FAILURE_SNAPSHOT_NAME,
+  AUDIT_FAILURE_SNAPSHOT_NAME,
   'audit-latest.json',
   'audit-latest.md',
   'audit-latest.aas.json',
@@ -49,15 +59,38 @@ const PROTECTED_SNAPSHOT_FILES = new Set([
  * @returns {string} Normalized group prefix.
  */
 function resolveLogGroupKey(fileName) {
+  const normMatch = fileName.match(
+    /^(fail-(?:hygiene-01|rules-02|timing-03|webgames-04|engine-05|rust-06)-[a-z0-9-]+)/
+  );
+  if (normMatch) return normMatch[1];
+
   if (fileName.startsWith('fail-workspace-timing')) return 'fail-workspace-timing';
   if (fileName.startsWith('fail-auto-refactor')) return 'fail-auto-refactor';
   if (fileName.startsWith('fail-webgames')) return 'fail-webgames';
+  if (fileName.startsWith('fail-fractal-git')) return 'fail-fractal-git';
+  if (fileName.startsWith('fail-hygiene')) return 'fail-hygiene';
+  if (fileName.startsWith('fail-rules')) return 'fail-rules';
   if (fileName.startsWith('timeout-prepush')) return 'timeout-prepush';
   if (fileName.startsWith('timeout-')) return 'timeout-watchdog';
   if (fileName.startsWith('last-pre-commit')) return 'last-pre-commit';
   if (fileName.startsWith('last-commit-msg')) return 'last-commit-msg';
   if (fileName.startsWith('last-pre-push')) return 'last-pre-push';
   return 'general';
+}
+
+/**
+ * Safely unlinks a temporary file without throwing secondary exceptions.
+ *
+ * @param {string} tmpPath - Temporary file path to unlink.
+ */
+function safeUnlinkTmp(tmpPath) {
+  try {
+    if (fs.existsSync(tmpPath)) {
+      fs.unlinkSync(tmpPath);
+    }
+  } catch {
+    // Suppress secondary cleanup error
+  }
 }
 
 /**
@@ -77,13 +110,7 @@ function writeAtomicFileSync(filePath, content, encoding = UTF8) {
     fs.writeFileSync(tmpPath, content, encoding);
     fs.renameSync(tmpPath, filePath);
   } catch (err) {
-    if (fs.existsSync(tmpPath)) {
-      try {
-        fs.unlinkSync(tmpPath);
-      } catch {
-        // Suppress secondary cleanup error
-      }
-    }
+    safeUnlinkTmp(tmpPath);
     throw err;
   }
 }
@@ -135,7 +162,7 @@ function removeZeroByteFileSafely(fullPath) {
 }
 
 /**
- * Collect valid log file entries from the target audit directory.
+ * Collect valid log file entries from the target audit directory and its isolated subdirectories.
  * Excludes protected long-term audit snapshots and history ledgers.
  * Purges zero-byte garbage files on discovery to preserve physical hygiene.
  *
@@ -147,31 +174,44 @@ function collectAuditLogEntries(targetDir) {
     return [];
   }
   const entries = [];
-  try {
-    const fileNames = fs.readdirSync(targetDir);
-    for (const name of fileNames) {
-      if (PROTECTED_SNAPSHOT_FILES.has(name)) {
-        continue;
+  const dirsToScan = [targetDir];
+
+  const subFailures = path.join(targetDir, FAILURES_SUBDIR);
+  if (fs.existsSync(subFailures)) {
+    dirsToScan.push(subFailures);
+  }
+  const subTimeouts = path.join(targetDir, TIMEOUTS_SUBDIR);
+  if (fs.existsSync(subTimeouts)) {
+    dirsToScan.push(subTimeouts);
+  }
+
+  for (const dir of dirsToScan) {
+    try {
+      const fileNames = fs.readdirSync(dir);
+      for (const name of fileNames) {
+        if (PROTECTED_SNAPSHOT_FILES.has(name)) {
+          continue;
+        }
+        const fullPath = path.join(dir, name);
+        const stat = fs.statSync(fullPath);
+        if (!stat.isFile()) {
+          continue;
+        }
+        if (stat.size === 0) {
+          removeZeroByteFileSafely(fullPath);
+          continue;
+        }
+        entries.push({
+          name,
+          fullPath,
+          size: stat.size,
+          mtimeMs: stat.mtimeMs,
+          group: resolveLogGroupKey(name),
+        });
       }
-      const fullPath = path.join(targetDir, name);
-      const stat = fs.statSync(fullPath);
-      if (!stat.isFile()) {
-        continue;
-      }
-      if (stat.size === 0) {
-        removeZeroByteFileSafely(fullPath);
-        continue;
-      }
-      entries.push({
-        name,
-        fullPath,
-        size: stat.size,
-        mtimeMs: stat.mtimeMs,
-        group: resolveLogGroupKey(name),
-      });
+    } catch {
+      // Continue next directory on scan failure
     }
-  } catch {
-    return [];
   }
   return entries;
 }
@@ -372,6 +412,32 @@ function formatAgentEnvelope(snapshotData, targetDir = DEFAULT_LOG_DIR) {
 }
 
 /**
+ * Record a full workspace audit failure envelope adhering to the JSON schema.
+ *
+ * @param {object} envelopeData - Raw failure attributes and collected step failures.
+ * @param {string} [targetDir] - Directory where failure snapshot is persisted.
+ * @returns {string|null} Path to recorded snapshot file or null on error.
+ */
+function writeAuditFailureSnapshot(envelopeData, targetDir = DEFAULT_LOG_DIR) {
+  try {
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    const failuresDir = path.join(targetDir, FAILURES_SUBDIR);
+    if (!fs.existsSync(failuresDir)) {
+      fs.mkdirSync(failuresDir, { recursive: true });
+    }
+    const snapshotPath = path.join(targetDir, AUDIT_FAILURE_SNAPSHOT_NAME);
+    const payload = buildFailureEnvelope(envelopeData);
+    const content = ensureLf(JSON.stringify(payload, null, 2));
+    writeAtomicFileSync(snapshotPath, content, UTF8);
+    return snapshotPath;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Record a structured failure snapshot envelope for developer triage and Agent self-healing.
  *
  * @param {object} snapshotData - Failure attributes including gate name and error summary.
@@ -529,6 +595,50 @@ function handleAgentModeCli() {
 }
 
 /**
+ * Handles the --truncate CLI command option.
+ *
+ * @param {string[]} args - Process arguments.
+ */
+function handleTruncateCli(args) {
+  const truncateIdx = args.indexOf('--truncate');
+  if (truncateIdx === -1 || !args[truncateIdx + 1]) return;
+  const targetFile = path.resolve(process.cwd(), args[truncateIdx + 1]);
+  const truncated = truncateLogFile(targetFile);
+  if (truncated) {
+    console.log(`✔ [Log-Rotator] 已截断超限日志文件: ${targetFile}`);
+  }
+  process.exit(0);
+}
+
+/**
+ * Handles the --record-failure-envelope CLI command option.
+ *
+ * @param {string[]} args - Process arguments.
+ */
+function handleRecordFailureEnvelopeCli(args) {
+  if (!args.includes('--record-failure-envelope')) return;
+  let raw = '';
+  try {
+    raw = fs.readFileSync(0, UTF8);
+  } catch {
+    raw = '';
+  }
+  if (!raw || raw.trim().length === 0) {
+    process.exit(0);
+  }
+  try {
+    const payload = JSON.parse(raw);
+    const written = writeAuditFailureSnapshot(payload);
+    if (written) {
+      console.log(`✔ [Log-Rotator] 结构化门禁阻断案卷已落盘: ${written}`);
+    }
+  } catch (err) {
+    console.error(`✖ [Log-Rotator] 写入失败案卷异常: ${err.message}`);
+  }
+  process.exit(0);
+}
+
+/**
  * CLI Entry point dispatcher.
  */
 function main() {
@@ -549,15 +659,8 @@ function main() {
     process.exit(0);
   }
 
-  const truncateIdx = args.indexOf('--truncate');
-  if (truncateIdx !== -1 && args[truncateIdx + 1]) {
-    const targetFile = path.resolve(process.cwd(), args[truncateIdx + 1]);
-    const truncated = truncateLogFile(targetFile);
-    if (truncated) {
-      console.log(`✔ [Log-Rotator] 已截断超限日志文件: ${targetFile}`);
-    }
-    process.exit(0);
-  }
+  handleTruncateCli(args);
+  handleRecordFailureEnvelopeCli(args);
 
   // Default behavior when invoked without flags: perform standard directory quota maintenance
   pruneAuditLogs();
@@ -574,6 +677,7 @@ module.exports = {
   writeAtomicFileSync,
   formatAgentEnvelope,
   writeFailureSnapshot,
+  writeAuditFailureSnapshot,
   viewLastFailure,
   DEFAULT_LOG_DIR,
   DEFAULT_MAX_FILE_BYTES,

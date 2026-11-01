@@ -44,31 +44,32 @@ const SLICE_DEFINITIONS = Object.freeze({
   rust: Object.freeze({
     title: 'fractal-git Rust 拓扑与内核子系统门禁',
     commands: [
-      'node fractal-git/scripts/common/validate-crate-topology.js',
-      'node fractal-git/scripts/common/check-zero-alloc-boundary.js',
+      'node fractal-git/scripts/common/run-audit-report.js --fast',
       '(cd fractal-git && cargo fmt --all -- --check)',
-      '(cd fractal-git && cargo check --all-targets)',
       '(cd fractal-git && cargo clippy --workspace --all-targets -- -D warnings)'
     ]
   }),
   timing: Object.freeze({
-    title: 'workspace-timing 编译与轻量单元测试',
+    title: 'workspace-timing 编译、单元测试与严格重构门禁',
     commands: [
       '(cd workspace-timing && npm run compile)',
-      '(cd workspace-timing && npm run test:fast)'
+      '(cd workspace-timing && npm run test:fast)',
+      '(cd workspace-timing && npm run review:strict)'
     ]
   }),
   'auto-refactor': Object.freeze({
-    title: 'auto-refactor 静态引擎与 AST 单元测试',
+    title: 'auto-refactor 静态引擎、AST 单元测试与自审门禁',
     commands: [
       '(cd auto-refactor && npm run build)',
-      '(cd auto-refactor && npx vitest run tests/unit)'
+      '(cd auto-refactor && npx vitest run tests/unit)',
+      '(cd auto-refactor && node scripts/gate-self.js)'
     ]
   }),
   webgames: Object.freeze({
-    title: 'WebGames 游戏配置与文档架构审查',
+    title: 'WebGames 游戏配置、架构重构与文档门禁',
     commands: [
       'python3 WebGames/scripts/py/audit_config.py --strict',
+      'python3 WebGames/scripts/py/audit_runner.py',
       'node WebGames/scripts/js/validate-mermaid.mjs'
     ]
   }),
