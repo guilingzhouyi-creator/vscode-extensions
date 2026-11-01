@@ -26,15 +26,31 @@
 
 import * as path from 'path';
 import type { Issue, Severity, AgentActionablePayload } from '../types';
-import { SEVERITY_ERROR, SEVERITY_WARNING } from '../types';
 import type { RepoArchetypeContext } from './repo-archetype';
 import { createLineIssue } from '../rules/diagnostic-catalog';
 
 /** Canonical analyzer name for gate architecture evaluation. */
 export const ANALYZER_GATE_ARCHITECTURE = 'gate-architecture';
 
+const RULE_GUARD_ISO_001 = 'GUARD-ISO-001';
+const RULE_GUARD_ROUTE_001 = 'GUARD-ROUTE-001';
+const RULE_GUARD_MSG_001 = 'GUARD-MSG-001';
+const RULE_GUARD_MSG_002 = 'GUARD-MSG-002';
+const RULE_GUARD_MSG_003 = 'GUARD-MSG-003';
+const RULE_GUARD_HYG_001 = 'GUARD-HYG-001';
+const RULE_GUARD_BUDGET_001 = 'GUARD-BUDGET-001';
+const RULE_GUARD_ERR_001 = 'GUARD-ERR-001';
+const RULE_GUARD_SSOT_001 = 'GUARD-SSOT-001';
+const RULE_GUARD_AST_001 = 'GUARD-AST-001';
+const RULE_GUARD_FAC_001 = 'GUARD-FAC-001';
+const RULE_GUARD_PROC_001 = 'GUARD-PROC-001';
+const RULE_GUARD_PAIR_001 = 'GUARD-PAIR-001';
+
 const RISK_HIGH = 'high';
 const RISK_MEDIUM = 'medium';
+
+const SEV_ERR: Severity = 'error';
+const SEV_WARN: Severity = 'warning';
 
 const CATEGORY_ARCHITECTURE = 'architecture';
 const CATEGORY_RELIABILITY = 'reliability';
@@ -102,6 +118,67 @@ export function createGateIssue(params: GateIssueParams): Issue {
     return issue;
 }
 
+const CHECK_SIGNATURES = Object.freeze([
+    {
+        name: 'hygiene',
+        ciPattern: /hygiene|0-byte|empty|crlf/i,
+        localPattern: /hygiene|0-byte|empty|crlf/i,
+    },
+    {
+        name: 'lint',
+        ciPattern: /npm run lint|eslint|cargo clippy|flake8|pylint/i,
+        localPattern: /lint|clippy|flake8|eslint/i,
+    },
+    {
+        name: 'test/regression',
+        ciPattern: /npm test|cargo test|pytest|go test/i,
+        localPattern: /npm test|cargo test|pytest|go test|run_test/i,
+    },
+]);
+
+interface SignatureParityContext {
+    readonly sig: (typeof CHECK_SIGNATURES)[number];
+    readonly workflowFile: string;
+    readonly ciContent: string;
+    readonly localContent: string;
+}
+
+function checkSingleSignatureParity(
+    params: SignatureParityContext,
+    issues: Issue[],
+): void {
+    const { sig, workflowFile, ciContent, localContent } = params;
+    const inCi = sig.ciPattern.test(ciContent);
+    const inLocal = sig.localPattern.test(localContent);
+    if (!inCi || inLocal) return;
+
+    issues.push(
+        createGateIssue({
+            ruleId: RULE_GUARD_ISO_001,
+            filePath: workflowFile,
+            line: 1,
+            severity: SEV_WARN,
+            risk: RISK_HIGH,
+            category: CATEGORY_ARCHITECTURE,
+            message:
+                `Dual-tier gate boundary is not isomorphic: remote CI enforces '${sig.name}',` +
+                `but local Git hooks lack corresponding validation.`,
+            remediation:
+                `Mirror the '${sig.name}' check in local pre-commit or pre-push gates to` +
+                `ensure local and remote defense parity.`,
+            rationale:
+                'Discrepancies between local gates and remote CI lead to unexpected PR' +
+                'failures and developer friction.',
+            extraDetail: {
+                action: 'sync_gate_parity',
+                missingCheck: sig.name,
+                targetHook: sig.name === 'test/regression' ? 'pre-push' : 'pre-commit',
+                safeToAutomate: false,
+            },
+        }),
+    );
+}
+
 /**
  * Dimension 1: GUARD-ISO-001: Dual-Tier Isomorphism.
  *
@@ -122,55 +199,69 @@ export function auditIsomorphism(context: RepoArchetypeContext, issues: Issue[])
         .join('\n')
         .toLowerCase();
 
-    const checkSignatures = [
-        {
-            name: 'hygiene',
-            ciPattern: /hygiene|0-byte|empty|crlf/i,
-            localPattern: /hygiene|0-byte|empty|crlf/i,
-        },
-        {
-            name: 'lint',
-            ciPattern: /npm run lint|eslint|cargo clippy|flake8|pylint/i,
-            localPattern: /lint|clippy|flake8|eslint/i,
-        },
-        {
-            name: 'test/regression',
-            ciPattern: /npm test|cargo test|pytest|go test/i,
-            localPattern: /npm test|cargo test|pytest|go test|run_test/i,
-        },
-    ];
+    const workflowFile = context.ci.workflowFiles[0];
+    for (const sig of CHECK_SIGNATURES) {
+        checkSingleSignatureParity(
+            { sig, workflowFile, ciContent: ciContentCombined, localContent: localContentCombined },
+            issues,
+        );
+    }
+}
 
-    for (const sig of checkSignatures) {
-        const inCi = sig.ciPattern.test(ciContentCombined);
-        const inLocal = sig.localPattern.test(localContentCombined);
+interface RoutingIssueConfig {
+    readonly relPath: string;
+    readonly message: string;
+    readonly remediation: string;
+    readonly rationale: string;
+    readonly extraDetail?: Record<string, any>;
+}
 
-        if (inCi && !inLocal) {
-            issues.push(
-                createGateIssue({
-                    ruleId: 'GUARD-ISO-001',
-                    filePath: context.ci.workflowFiles[0],
-                    line: 1,
-                    severity: SEVERITY_WARNING,
-                    risk: RISK_HIGH,
-                    category: CATEGORY_ARCHITECTURE,
-                    message:
-                        `Dual-tier gate boundary is not isomorphic: remote CI enforces '${sig.name}',` +
-                        `but local Git hooks lack corresponding validation.`,
-                    remediation:
-                        `Mirror the '${sig.name}' check in local pre-commit or pre-push gates to` +
-                        `ensure local and remote defense parity.`,
-                    rationale:
-                        'Discrepancies between local gates and remote CI lead to unexpected PR' +
-                        'failures and developer friction.',
-                    extraDetail: {
-                        action: 'sync_gate_parity',
-                        missingCheck: sig.name,
-                        targetHook: sig.name === 'test/regression' ? 'pre-push' : 'pre-commit',
-                        safeToAutomate: false,
-                    },
+function emitRoutingIssue(config: RoutingIssueConfig): GateIssueParams {
+    return {
+        ruleId: RULE_GUARD_ROUTE_001,
+        filePath: config.relPath,
+        line: 1,
+        severity: SEV_ERR,
+        risk: RISK_HIGH,
+        category: CATEGORY_RELIABILITY,
+        message: config.message,
+        remediation: config.remediation,
+        rationale: config.rationale,
+        extraDetail: config.extraDetail,
+    };
+}
+
+function checkHookRouterDegradation(
+    hookName: string,
+    content: string,
+    relPath: string,
+    issues: Issue[],
+): void {
+    if (/\bpowershell(?:\.exe)?\b/i.test(content) && !/\bpwsh\b/i.test(content)) {
+        issues.push(
+            createGateIssue(
+                emitRoutingIssue({
+                    relPath,
+                    message: `Hook router '${hookName}' invokes Windows PowerShell 5.1 (powershell.exe) directly instead of cross-platform 'pwsh'.`,
+                    remediation: 'Prioritize cross-platform pwsh and fall back gracefully to bash to prevent Windows PS 5.1 UTF-8 BOM encoding issues.',
+                    rationale: 'Windows PowerShell 5.1 misinterprets UTF-8 files without BOM, leading to silent script syntax failures in automated environments.',
+                    extraDetail: { action: 'harden_hook_router', targetFile: relPath, safeToAutomate: true },
                 }),
-            );
-        }
+            ),
+        );
+    }
+
+    if (/^#!\/bin\/sh\b/m.test(content) && /(?:\[\[|\(\(|\bfunction\b)/.test(content)) {
+        issues.push(
+            createGateIssue(
+                emitRoutingIssue({
+                    relPath,
+                    message: `Hook router '${hookName}' declares #!/bin/sh shebang but contains non-portable Bash syntax.`,
+                    remediation: 'Change shebang to #!/usr/bin/env bash or remove bashisms to prevent execution failures on Debian/Ubuntu dash.',
+                    rationale: 'On many Linux distributions /bin/sh points to dash, which fails immediately on bash-specific syntax constructs.',
+                }),
+            ),
+        );
     }
 }
 
@@ -188,55 +279,115 @@ export function auditRoutingSafety(context: RepoArchetypeContext, issues: Issue[
     ].filter((hookFile): hookFile is NonNullable<typeof hookFile> => Boolean(hookFile));
 
     for (const hook of hookFiles) {
-        const content = hook.content;
         const relPath = path.relative(context.root, hook.filePath).replace(/\\/g, '/');
+        checkHookRouterDegradation(hook.name, hook.content, relPath, issues);
+    }
+}
 
-        if (/\bpowershell(?:\.exe)?\b/i.test(content) && !/\bpwsh\b/i.test(content)) {
-            issues.push(
-                createGateIssue({
-                    ruleId: 'GUARD-ROUTE-001',
-                    filePath: relPath,
-                    line: 1,
-                    severity: SEVERITY_ERROR,
-                    risk: RISK_HIGH,
-                    category: CATEGORY_RELIABILITY,
-                    message:
-                        `Hook router '${hook.name}' invokes Windows PowerShell 5.1 (powershell.exe)` +
-                        `directly instead of cross-platform 'pwsh'.`,
-                    remediation:
-                        'Prioritize cross-platform pwsh and fall back gracefully to bash to prevent' +
-                        'Windows PS 5.1 UTF-8 BOM encoding issues.',
-                    rationale:
-                        'Windows PowerShell 5.1 misinterprets UTF-8 files without BOM, leading to' +
-                        'silent script syntax failures in automated environments.',
-                    extraDetail: {
-                        action: 'harden_hook_router',
-                        targetFile: relPath,
-                        safeToAutomate: true,
-                    },
-                }),
-            );
-        }
+function emitMissingCommitMsgHook(hookDir: string, issues: Issue[]): void {
+    issues.push(
+        createGateIssue({
+            ruleId: RULE_GUARD_MSG_001,
+            filePath: hookDir,
+            line: 1,
+            severity: SEV_WARN,
+            risk: RISK_MEDIUM,
+            category: CATEGORY_STANDARDIZATION,
+            message:
+                'Gate system lacks a commit-msg hook; commit messages are not verified for' +
+                'Conventional Commits or structural contracts.',
+            remediation:
+                'Introduce a commit-msg gate script to enforce standard conventional commits' +
+                'prefix and structured sections.',
+            rationale:
+                'Unvalidated commit messages lead to unsearchable Git history, breaking automated' +
+                'changelog and semantic release tooling.',
+            extraDetail: {
+                action: 'add_commit_msg_gate',
+                safeToAutomate: true,
+            },
+        }),
+    );
+}
 
-        if (/^#!\/bin\/sh\b/m.test(content) && /(?:\[\[|\(\(|\bfunction\b)/.test(content)) {
-            issues.push(
-                createGateIssue({
-                    ruleId: 'GUARD-ROUTE-001',
-                    filePath: relPath,
-                    line: 1,
-                    severity: SEVERITY_ERROR,
-                    risk: RISK_HIGH,
-                    category: CATEGORY_RELIABILITY,
-                    message: `Hook router '${hook.name}' declares #!/bin/sh shebang but contains non-portable Bash syntax.`,
-                    remediation:
-                        'Change shebang to #!/usr/bin/env bash or remove bashisms to prevent' +
-                        'execution failures on Debian/Ubuntu dash.',
-                    rationale:
-                        'On many Linux distributions /bin/sh points to dash, which fails immediately' +
-                        'on bash-specific syntax constructs.',
-                }),
-            );
-        }
+function auditConventionalFormat(
+    content: string,
+    gateScriptsContents: Record<string, string>,
+    relPath: string,
+    issues: Issue[],
+): void {
+    const hasConventionalCheck =
+        /(?:feat|fix|refactor|chore|test|docs|style|perf)/i.test(content) ||
+        Object.values(gateScriptsContents).some((scriptContent) =>
+            /commit-msg|conventional/i.test(scriptContent),
+        );
+
+    if (!hasConventionalCheck) {
+        issues.push(
+            createGateIssue({
+                ruleId: RULE_GUARD_MSG_001,
+                filePath: relPath,
+                line: 1,
+                severity: SEV_WARN,
+                risk: RISK_MEDIUM,
+                category: CATEGORY_STANDARDIZATION,
+                message:
+                    'Existing commit-msg gate does not enforce Conventional Commits (<type>(<scope>): <summary>) format.',
+                remediation:
+                    'Enforce Conventional Commits regex validation in commit-msg gate script.',
+                rationale:
+                    'Standardized commit message prefixes are required for automated auditing and semantic versioning.',
+            }),
+        );
+    }
+}
+
+function auditMonorepoProjectAttribution(
+    context: RepoArchetypeContext,
+    content: string,
+    relPath: string,
+    issues: Issue[],
+): void {
+    const combinedCommitScripts = [
+        content,
+        ...Object.entries(context.gateScripts.contents)
+            .filter(([k]) => /commit-msg/i.test(k))
+            .map(([, scriptContent]) => scriptContent),
+    ].join('\n');
+
+    const hasProjectScopeCheck =
+        /(?:\[Project|\[\s*Project\s*\/?\s*项目归属|IN_PROJECT_SECTION|FOUND_PROJECT_HEADER|VALID_PROJECTS)/i.test(
+            combinedCommitScripts,
+        );
+
+    if (!hasProjectScopeCheck) {
+        issues.push(
+            createGateIssue({
+                ruleId: RULE_GUARD_MSG_003,
+                filePath: relPath,
+                line: 1,
+                severity: SEV_ERR,
+                risk: RISK_HIGH,
+                category: CATEGORY_STANDARDIZATION,
+                message:
+                    'Monorepo commit-msg gate lacks [Project / 项目归属] format section and' +
+                    'subproject whitelist validation.',
+                remediation:
+                    'Implement [Project] format section validation in commit-msg gate to' +
+                    'demarcate subproject attribution.',
+                rationale:
+                    'In multi-project repositories, unattributed commits blur architecture' +
+                    'boundaries and cause cross-project contamination.',
+                extraDetail: {
+                    action: 'add_project_scope_gate',
+                    targetFile: relPath,
+                    detectedSubprojects: context.topology.subprojects.map(
+                        (subproject) => subproject.name,
+                    ),
+                    safeToAutomate: true,
+                },
+            }),
+        );
     }
 }
 
@@ -250,29 +401,7 @@ export function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[
     if (context.hooks.allHookFiles.length === 0) return;
 
     if (!context.hooks.commitMsg) {
-        issues.push(
-            createGateIssue({
-                ruleId: 'GUARD-MSG-001',
-                filePath: context.hooks.hookDir || '.githooks',
-                line: 1,
-                severity: SEVERITY_WARNING,
-                risk: RISK_MEDIUM,
-                category: CATEGORY_STANDARDIZATION,
-                message:
-                    'Gate system lacks a commit-msg hook; commit messages are not verified for' +
-                    'Conventional Commits or structural contracts.',
-                remediation:
-                    'Introduce a commit-msg gate script to enforce standard conventional commits' +
-                    'prefix and structured sections.',
-                rationale:
-                    'Unvalidated commit messages lead to unsearchable Git history, breaking automated' +
-                    'changelog and semantic release tooling.',
-                extraDetail: {
-                    action: 'add_commit_msg_gate',
-                    safeToAutomate: true,
-                },
-            }),
-        );
+        emitMissingCommitMsgHook(context.hooks.hookDir || '.githooks', issues);
         return;
     }
 
@@ -281,73 +410,76 @@ export function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[
         .relative(context.root, context.hooks.commitMsg.filePath)
         .replace(/\\/g, '/');
 
-    const hasConventionalCheck =
-        /(?:feat|fix|refactor|chore|test|docs|style|perf)/i.test(content) ||
-        Object.values(context.gateScripts.contents).some((scriptContent) =>
-            /commit-msg|conventional/i.test(scriptContent),
-        );
-
-    if (!hasConventionalCheck) {
-        issues.push(
-            createGateIssue({
-                ruleId: 'GUARD-MSG-001',
-                filePath: relPath,
-                line: 1,
-                severity: SEVERITY_WARNING,
-                risk: RISK_MEDIUM,
-                category: CATEGORY_STANDARDIZATION,
-                message:
-                    'Existing commit-msg gate does not enforce Conventional Commits (<type>(<scope>): <summary>) format.',
-                remediation:
-                    'Enforce Conventional Commits regex validation in commit-msg gate script.',
-                rationale:
-                    'Standardized commit message prefixes are required for automated auditing and semantic versioning.',
-            }),
-        );
-    }
+    auditConventionalFormat(content, context.gateScripts.contents, relPath, issues);
 
     if (context.topology.isMonorepo) {
-        const combinedCommitScripts = [
+        auditMonorepoProjectAttribution(context, content, relPath, issues);
+    }
+}
+
+function auditZeroByteHygiene(relPath: string, content: string, issues: Issue[]): boolean {
+    const hasZeroByteCheck =
+        /(?:!\s*-s|-empty|Length\s*-eq\s*0|stat\s*-c\s*%s|\.size\s*===?\s*0|0-byte)/i.test(content);
+
+    if (!hasZeroByteCheck) {
+        issues.push(
+            createGateIssue({
+                ruleId: RULE_GUARD_HYG_001,
+                filePath: relPath,
+                line: 1,
+                severity: SEV_ERR,
+                risk: RISK_HIGH,
+                category: CATEGORY_HYGIENE,
+                message:
+                    'Pre-commit gate does not enforce physical hygiene: lacks zero-byte (0-byte) empty file detection.',
+                remediation:
+                    'Add zero-byte empty file detection to pre-commit gate to block accidental empty file commits.',
+                rationale:
+                    'Zero-byte empty files pollute the codebase, break module resolution, and bypass AST static analysis.',
+                extraDetail: {
+                    action: 'add_hygiene_check',
+                    targetHook: 'pre-commit',
+                    safeToAutomate: true,
+                },
+            }),
+        );
+        return false;
+    }
+    return true;
+}
+
+function auditClutterHygiene(
+    relPath: string,
+    content: string,
+    issues: Issue[],
+): void {
+    const hasClutterGuard =
+        /(?:validate-physical-hygiene|physical-hygiene|clutter|\.actual\.json|\.tmp|\.bak|desktop\.ini|thumbs\.db|\.ds_store|root-script)/i.test(
             content,
-            ...Object.entries(context.gateScripts.contents)
-                .filter(([k]) => /commit-msg/i.test(k))
-                .map(([, scriptContent]) => scriptContent),
-        ].join('\n');
+        );
 
-        const hasProjectScopeCheck =
-            /(?:\[Project|\[\s*Project\s*\/?\s*项目归属|IN_PROJECT_SECTION|FOUND_PROJECT_HEADER|VALID_PROJECTS)/i.test(
-                combinedCommitScripts,
-            );
-
-        if (!hasProjectScopeCheck) {
-            issues.push(
-                createGateIssue({
-                    ruleId: 'GUARD-MSG-003',
-                    filePath: relPath,
-                    line: 1,
-                    severity: SEVERITY_ERROR,
-                    risk: RISK_HIGH,
-                    category: CATEGORY_STANDARDIZATION,
-                    message:
-                        'Monorepo commit-msg gate lacks [Project / 项目归属] format section and' +
-                        'subproject whitelist validation.',
-                    remediation:
-                        'Implement [Project] format section validation in commit-msg gate to' +
-                        'demarcate subproject attribution.',
-                    rationale:
-                        'In multi-project repositories, unattributed commits blur architecture' +
-                        'boundaries and cause cross-project contamination.',
-                    extraDetail: {
-                        action: 'add_project_scope_gate',
-                        targetFile: relPath,
-                        detectedSubprojects: context.topology.subprojects.map(
-                            (subproject) => subproject.name,
-                        ),
-                        safeToAutomate: true,
-                    },
-                }),
-            );
-        }
+    if (!hasClutterGuard) {
+        issues.push(
+            createGateIssue({
+                ruleId: RULE_GUARD_HYG_001,
+                filePath: relPath,
+                line: 1,
+                severity: SEV_WARN,
+                risk: RISK_HIGH,
+                category: CATEGORY_HYGIENE,
+                message:
+                    'Pre-commit gate does not enforce extended physical hygiene: lacks transient clutter (.log/.tmp/.bak) and root script pollution guards.',
+                remediation:
+                    'Integrate physical hygiene verification into pre-commit gate to intercept transient clutter and root directory script pollution.',
+                rationale:
+                    'Transient log dumps, OS metadata, and scattered root scripts pollute repository history and break execution boundary isolation.',
+                extraDetail: {
+                    action: 'add_extended_hygiene_check',
+                    targetHook: 'pre-commit',
+                    safeToAutomate: true,
+                },
+            }),
+        );
     }
 }
 
@@ -366,61 +498,8 @@ export function auditHygieneGuard(context: RepoArchetypeContext, issues: Issue[]
     const content = [preCommit.content, ...Object.values(context.gateScripts.contents)].join('\n');
     const relPath = path.relative(context.root, preCommit.filePath).replace(/\\/g, '/');
 
-    const hasZeroByteCheck =
-        /(?:!\s*-s|-empty|Length\s*-eq\s*0|stat\s*-c\s*%s|\.size\s*===?\s*0|0-byte)/i.test(content);
-
-    if (!hasZeroByteCheck) {
-        issues.push(
-            createGateIssue({
-                ruleId: 'GUARD-HYG-001',
-                filePath: relPath,
-                line: 1,
-                severity: SEVERITY_ERROR,
-                risk: RISK_HIGH,
-                category: CATEGORY_HYGIENE,
-                message:
-                    'Pre-commit gate does not enforce physical hygiene: lacks zero-byte (0-byte) empty file detection.',
-                remediation:
-                    'Add zero-byte empty file detection to pre-commit gate to block accidental empty file commits.',
-                rationale:
-                    'Zero-byte empty files pollute the codebase, break module resolution, and bypass AST static analysis.',
-                extraDetail: {
-                    action: 'add_hygiene_check',
-                    targetHook: 'pre-commit',
-                    safeToAutomate: true,
-                },
-            }),
-        );
-        return;
-    }
-
-    const hasClutterGuard =
-        /(?:validate-physical-hygiene|physical-hygiene|clutter|\.actual\.json|\.tmp|\.bak|desktop\.ini|thumbs\.db|\.ds_store|root-script)/i.test(
-            content,
-        );
-
-    if (!hasClutterGuard) {
-        issues.push(
-            createGateIssue({
-                ruleId: 'GUARD-HYG-001',
-                filePath: relPath,
-                line: 1,
-                severity: SEVERITY_WARNING,
-                risk: RISK_HIGH,
-                category: CATEGORY_HYGIENE,
-                message:
-                    'Pre-commit gate does not enforce extended physical hygiene: lacks transient clutter (.log/.tmp/.bak) and root script pollution guards.',
-                remediation:
-                    'Integrate physical hygiene verification into pre-commit gate to intercept transient clutter and root directory script pollution.',
-                rationale:
-                    'Transient log dumps, OS metadata, and scattered root scripts pollute repository history and break execution boundary isolation.',
-                extraDetail: {
-                    action: 'add_extended_hygiene_check',
-                    targetHook: 'pre-commit',
-                    safeToAutomate: true,
-                },
-            }),
-        );
+    if (auditZeroByteHygiene(relPath, content, issues)) {
+        auditClutterHygiene(relPath, content, issues);
     }
 }
 
@@ -451,10 +530,10 @@ export function auditBudgetTiering(context: RepoArchetypeContext, issues: Issue[
     if (!hasStagedFiltering && runsHeavyweightUnstaged) {
         issues.push(
             createGateIssue({
-                ruleId: 'GUARD-BUDGET-001',
+                ruleId: RULE_GUARD_BUDGET_001,
                 filePath: relPath,
                 line: 1,
-                severity: SEVERITY_WARNING,
+                severity: SEV_WARN,
                 risk: RISK_MEDIUM,
                 category: CATEGORY_PERFORMANCE,
                 message:
@@ -471,6 +550,30 @@ export function auditBudgetTiering(context: RepoArchetypeContext, issues: Issue[
     }
 }
 
+function emitStrictErrorIssue(
+    relPath: string,
+    message: string,
+    remediation: string,
+    options: { rationale: string; action: string },
+): GateIssueParams {
+    return {
+        ruleId: RULE_GUARD_ERR_001,
+        filePath: relPath,
+        line: 1,
+        severity: SEV_ERR,
+        risk: RISK_HIGH,
+        category: CATEGORY_RELIABILITY,
+        message,
+        remediation,
+        rationale: options.rationale,
+        extraDetail: {
+            action: options.action,
+            targetFile: relPath,
+            safeToAutomate: true,
+        },
+    };
+}
+
 function auditShellStrictMode(
     script: { filePath: string; content: string },
     relPath: string,
@@ -483,28 +586,17 @@ function auditShellStrictMode(
 
     if (!/set\s+-[a-z]*e/m.test(script.content)) {
         issues.push(
-            createGateIssue({
-                ruleId: 'GUARD-ERR-001',
-                filePath: relPath,
-                line: 1,
-                severity: SEVERITY_ERROR,
-                risk: RISK_HIGH,
-                category: CATEGORY_RELIABILITY,
-                message:
-                    `Gate script '${path.basename(relPath)}' lacks strict error mode ('set` +
-                    `-euo pipefail' or 'set -e').`,
-                remediation:
-                    'Add set -euo pipefail near script start to prevent silent failures and' +
-                    'false-positive gate passes.',
-                rationale:
-                    'Without set -e, command failures inside gate scripts are ignored,' +
-                    'leading to catastrophic false-pass gate releases.',
-                extraDetail: {
-                    action: 'add_strict_mode',
-                    targetFile: relPath,
-                    safeToAutomate: true,
-                },
-            }),
+            createGateIssue(
+                emitStrictErrorIssue(
+                    relPath,
+                    `Gate script '${path.basename(relPath)}' lacks strict error mode ('set -euo pipefail' or 'set -e').`,
+                    'Add set -euo pipefail near script start to prevent silent failures and false-positive gate passes.',
+                    {
+                        rationale: 'Without set -e, command failures inside gate scripts are ignored, leading to catastrophic false-pass gate releases.',
+                        action: 'add_strict_mode',
+                    },
+                ),
+            ),
         );
     }
 }
@@ -519,27 +611,17 @@ function auditPowerShellStrictMode(
 
     if (!/\$ErrorActionPreference\s*=\s*['"]?Stop['"]?/i.test(script.content)) {
         issues.push(
-            createGateIssue({
-                ruleId: 'GUARD-ERR-001',
-                filePath: relPath,
-                line: 1,
-                severity: SEVERITY_ERROR,
-                risk: RISK_HIGH,
-                category: CATEGORY_RELIABILITY,
-                message:
-                    `Gate script '${path.basename(relPath)}' lacks strict error preference` +
-                    `('$ErrorActionPreference = "Stop"').`,
-                remediation:
+            createGateIssue(
+                emitStrictErrorIssue(
+                    relPath,
+                    `Gate script '${path.basename(relPath)}' lacks strict error preference ('$ErrorActionPreference = "Stop"').`,
                     "Declare $ErrorActionPreference = 'Stop' at the top of PowerShell gate script.",
-                rationale:
-                    'PowerShell by default continues execution after non-terminating errors,' +
-                    'resulting in false-positive gate passes.',
-                extraDetail: {
-                    action: 'add_strict_error_preference',
-                    targetFile: relPath,
-                    safeToAutomate: true,
-                },
-            }),
+                    {
+                        rationale: 'PowerShell by default continues execution after non-terminating errors, resulting in false-positive gate passes.',
+                        action: 'add_strict_error_preference',
+                    },
+                ),
+            ),
         );
     }
 }
@@ -589,10 +671,10 @@ export function auditSsotSync(context: RepoArchetypeContext, issues: Issue[]): v
         if (!catalogExists) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GUARD-SSOT-001',
+                    ruleId: RULE_GUARD_SSOT_001,
                     filePath: 'scripts',
                     line: 1,
-                    severity: SEVERITY_WARNING,
+                    severity: SEV_WARN,
                     risk: RISK_MEDIUM,
                     category: CATEGORY_ARCHITECTURE,
                     message:
@@ -607,6 +689,33 @@ export function auditSsotSync(context: RepoArchetypeContext, issues: Issue[]): v
                 }),
             );
         }
+    }
+}
+
+function auditForbiddenTermsBilingualParity(termsContent: string, issues: Issue[]): void {
+    const hasEnglish = /asciiPatterns|temporary|hyperbolic|meta_narrative/i.test(termsContent);
+    const hasChinese = /[\u4e00-\u9fa5]/.test(termsContent);
+
+    if (!hasEnglish || !hasChinese) {
+        issues.push(
+            createGateIssue({
+                ruleId: RULE_GUARD_MSG_002,
+                filePath: 'scripts/common/commit-msg-forbidden-terms.json',
+                line: 1,
+                severity: SEV_WARN,
+                risk: RISK_MEDIUM,
+                category: CATEGORY_STANDARDIZATION,
+                message:
+                    'Forbidden terms dictionary lacks bidirectional bilingual coverage (must' +
+                    'contain both English and Chinese constraints).',
+                remediation:
+                    'Include both asciiPatterns (English) and patterns (Chinese) in forbidden' +
+                    'terms dictionary to prevent language bypass.',
+                rationale:
+                    'Agents or contributors can bypass single-language filters by substituting' +
+                    'equivalent foreign terms.',
+            }),
+        );
     }
 }
 
@@ -634,10 +743,10 @@ export function auditCommitMsgStyle(context: RepoArchetypeContext, issues: Issue
     if (!wiresStyleCheck) {
         issues.push(
             createGateIssue({
-                ruleId: 'GUARD-MSG-002',
+                ruleId: RULE_GUARD_MSG_002,
                 filePath: relHookPath,
                 line: 1,
-                severity: SEVERITY_WARNING,
+                severity: SEV_WARN,
                 risk: RISK_MEDIUM,
                 category: CATEGORY_STANDARDIZATION,
                 message:
@@ -659,30 +768,7 @@ export function auditCommitMsgStyle(context: RepoArchetypeContext, issues: Issue
     )?.[1];
 
     if (termsContent) {
-        const hasEnglish = /asciiPatterns|temporary|hyperbolic|meta_narrative/i.test(termsContent);
-        const hasChinese = /[\u4e00-\u9fa5]/.test(termsContent);
-
-        if (!hasEnglish || !hasChinese) {
-            issues.push(
-                createGateIssue({
-                    ruleId: 'GUARD-MSG-002',
-                    filePath: 'scripts/common/commit-msg-forbidden-terms.json',
-                    line: 1,
-                    severity: SEVERITY_WARNING,
-                    risk: RISK_MEDIUM,
-                    category: CATEGORY_STANDARDIZATION,
-                    message:
-                        'Forbidden terms dictionary lacks bidirectional bilingual coverage (must' +
-                        'contain both English and Chinese constraints).',
-                    remediation:
-                        'Include both asciiPatterns (English) and patterns (Chinese) in forbidden' +
-                        'terms dictionary to prevent language bypass.',
-                    rationale:
-                        'Agents or contributors can bypass single-language filters by substituting' +
-                        'equivalent foreign terms.',
-                }),
-            );
-        }
+        auditForbiddenTermsBilingualParity(termsContent, issues);
     }
 }
 
@@ -712,10 +798,10 @@ export function auditAstSliceGuard(context: RepoArchetypeContext, issues: Issue[
     if (!hasAstSliceCheck) {
         issues.push(
             createGateIssue({
-                ruleId: 'GUARD-AST-001',
+                ruleId: RULE_GUARD_AST_001,
                 filePath: relPath,
                 line: 1,
-                severity: SEVERITY_ERROR,
+                severity: SEV_ERR,
                 risk: RISK_HIGH,
                 category: CATEGORY_MAINTAINABILITY,
                 message:
@@ -752,14 +838,14 @@ export function auditFacadeDisciplineGuard(context: RepoArchetypeContext, issues
     if (!hasFacadeCheck) {
         issues.push(
             createGateIssue({
-                ruleId: 'GUARD-FAC-001',
+                ruleId: RULE_GUARD_FAC_001,
                 filePath: context.hooks.prePush
                     ? path
                           .relative(context.root, context.hooks.prePush.filePath)
                           .replace(/\\/g, '/')
                     : 'scripts',
                 line: 1,
-                severity: SEVERITY_ERROR,
+                severity: SEV_ERR,
                 risk: RISK_HIGH,
                 category: CATEGORY_ARCHITECTURE,
                 message:
@@ -797,10 +883,10 @@ export function auditProcessInteractiveSafety(
             if (!hasRedirectGuard) {
                 issues.push(
                     createGateIssue({
-                        ruleId: 'GUARD-PROC-001',
+                        ruleId: RULE_GUARD_PROC_001,
                         filePath: relPath,
                         line: 1,
-                        severity: SEVERITY_ERROR,
+                        severity: SEV_ERR,
                         risk: RISK_MEDIUM,
                         category: CATEGORY_RELIABILITY,
                         message:
@@ -851,10 +937,10 @@ export function auditDualPlatformPairing(context: RepoArchetypeContext, issues: 
         if (!ps1Bases.has(base)) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GUARD-PAIR-001',
+                    ruleId: RULE_GUARD_PAIR_001,
                     filePath: `scripts/sh/${base}.sh`,
                     line: 1,
-                    severity: SEVERITY_WARNING,
+                    severity: SEV_WARN,
                     risk: RISK_MEDIUM,
                     category: CATEGORY_RELIABILITY,
                     message: `Shell gate script 'scripts/sh/${base}.sh' lacks matching 'scripts/ps1/${base}.ps1'.`,
@@ -870,10 +956,10 @@ export function auditDualPlatformPairing(context: RepoArchetypeContext, issues: 
         if (!shBases.has(base)) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GUARD-PAIR-001',
+                    ruleId: RULE_GUARD_PAIR_001,
                     filePath: `scripts/ps1/${base}.ps1`,
                     line: 1,
-                    severity: SEVERITY_WARNING,
+                    severity: SEV_WARN,
                     risk: RISK_MEDIUM,
                     category: CATEGORY_RELIABILITY,
                     message: `PowerShell gate script 'scripts/ps1/${base}.ps1' lacks matching 'scripts/sh/${base}.sh'.`,
