@@ -94,9 +94,11 @@ function extractDebtDeltas(historyPath, windowSize = DEFAULT_SLIDING_WINDOW) {
     const entries = loadRecentAuditEntries(historyPath, windowSize);
     const validDebts = [];
     for (const entry of entries) {
-        const debt = Number(entry.debt);
-        if (Number.isFinite(debt)) {
-            validDebts.push(debt);
+        if (entry.debt !== null && entry.debt !== undefined) {
+            const debt = Number(entry.debt);
+            if (Number.isFinite(debt) && debt > 0) {
+                validDebts.push(debt);
+            }
         }
     }
     if (validDebts.length < 2) {
@@ -183,6 +185,10 @@ function resolveQuantEngine() {
  */
 function evaluateWorkspaceQuant(root = REPO_ROOT, options = {}) {
     const isBlocked = Boolean(options.isBlocked);
+    const windowSize =
+        typeof options.windowSize === 'number' && options.windowSize > 0
+            ? options.windowSize
+            : DEFAULT_SLIDING_WINDOW;
     const historyPath = path.join(root, '.audit-logs', 'audit-history.jsonl');
     const sigsPath = path.join(
         root,
@@ -191,9 +197,9 @@ function evaluateWorkspaceQuant(root = REPO_ROOT, options = {}) {
         'baseline-signatures.json',
     );
 
-    const scores = loadRecentScores(historyPath, DEFAULT_SLIDING_WINDOW);
+    const scores = loadRecentScores(historyPath, windowSize);
     const { fileDebts, ruleCategoryCounts, totalFindings } = extractDebtDistribution(sigsPath);
-    const { yieldMinutes, accrualMinutes } = extractDebtDeltas(historyPath, DEFAULT_SLIDING_WINDOW);
+    const { yieldMinutes, accrualMinutes } = extractDebtDeltas(historyPath, windowSize);
 
     const engine = resolveQuantEngine();
 
@@ -204,9 +210,9 @@ function evaluateWorkspaceQuant(root = REPO_ROOT, options = {}) {
                 refactoringYieldMinutes: yieldMinutes,
                 debtAccrualMinutes: accrualMinutes,
             },
-            { historyScores: scores },
+            { historyScores: scores, windowSize },
             { fileDebts, ruleCategoryCounts },
-            { historyScores: scores },
+            { historyScores: scores, windowSize },
         );
 
         const rcr = assessment.financial.rcr ?? assessment.financial.interestCoverageRatio;
@@ -290,7 +296,13 @@ if (require.main === module) {
     const args = process.argv.slice(2);
     const isJson = args.includes('--json');
     const isBlocked = args.includes('--blocked');
-    const result = evaluateWorkspaceQuant(REPO_ROOT, { isBlocked });
+    let windowSize;
+    const windowIdx = args.findIndex((a) => a === '--window' || a === '-w');
+    if (windowIdx !== -1 && args[windowIdx + 1]) {
+        const parsed = parseInt(args[windowIdx + 1], 10);
+        if (Number.isFinite(parsed) && parsed > 0) windowSize = parsed;
+    }
+    const result = evaluateWorkspaceQuant(REPO_ROOT, { isBlocked, windowSize });
 
     if (isJson) {
         process.stdout.write(JSON.stringify(result, null, 2) + '\n');

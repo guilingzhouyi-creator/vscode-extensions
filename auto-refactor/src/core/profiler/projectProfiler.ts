@@ -68,16 +68,19 @@ const DIR_LIB_TITLE = 'Lib';
 const DIR_LIBRARY = 'library';
 const DIR_CORE = 'core';
 const DIR_STD = 'std';
-const _DIR_ALLOC = 'alloc';
+const DIR_ALLOC = 'alloc';
 const DIR_KERNEL = 'kernel';
 
-const PATH_FRAGMENT_KERNEL = '/kernel';
-const PATH_FRAGMENT_RUNTIME = '/runtime';
-const PATH_FRAGMENT_BARE_METAL = '/bare-metal';
-const PATH_FRAGMENT_FREESTANDING = '/freestanding';
-const PATH_FRAGMENT_LIBRARY_CORE = '/library/core';
-const PATH_FRAGMENT_LIBRARY_STD = '/library/std';
-const PATH_FRAGMENT_LIBRARY_ALLOC = '/library/alloc';
+const KERNEL_PATH_SEGMENT = '/kernel';
+const RUNTIME_PATH_SEGMENT = '/runtime';
+const BARE_METAL_PATH_SEGMENT = '/bare-metal';
+const FREESTANDING_PATH_SEGMENT = '/freestanding';
+const CORE_LIBRARY_PATH_SEGMENT = '/library/core';
+const STD_LIBRARY_PATH_SEGMENT = '/library/std';
+const ALLOC_LIBRARY_PATH_SEGMENT = '/library/alloc';
+
+const MAX_PARTITION_SAMPLE_CAP = 2500;
+const SAMPLES_PER_PARTITION = 150;
 
 const HEADER_PREVIEW_SLICE_LIMIT = 1000;
 const VERSION_ZERO = '0.0.0';
@@ -247,36 +250,36 @@ export function inferDirectorySemantic(dirPath: string): ArchitectureLayer {
     return LAYER_SHARED;
 }
 
+interface PartitionInspectionContext {
+    readonly rootResolved: string;
+    readonly buildSystems: Set<string>;
+    readonly frameworks: Set<string>;
+    readonly partitions: ProjectPartition[];
+    readonly directorySemantics: Record<string, ArchitectureLayer>;
+}
+
 /**
- * Inspect a directory entry to identify and record a subproject partition.
+ * Inspect direct subdirectory of project root for manifest signals and architecture semantics.
  *
- * @param ent - Directory entry from root readdir.
- * @param rootResolved - Absolute path of project root directory.
- * @param buildSystems - Set to accumulate discovered build systems.
- * @param frameworks - Set to accumulate discovered frameworks.
- * @param partitions - Array to append discovered partitions to.
- * @param directorySemantics - Map to record directory semantics into.
+ * @param ent - Directory entry to inspect.
+ * @param context - Inspection context with accumulation collections.
  */
 function inspectPartitionEntry(
     ent: fs.Dirent,
-    rootResolved: string,
-    buildSystems: Set<string>,
-    frameworks: Set<string>,
-    partitions: ProjectPartition[],
-    directorySemantics: Record<string, ArchitectureLayer>,
+    context: PartitionInspectionContext,
 ): void {
     if (!ent.isDirectory() || IGNORED_DIRS.has(ent.name) || ent.name.startsWith('.')) {
         return;
     }
 
-    const subPath = path.join(rootResolved, ent.name);
+    const subPath = path.join(context.rootResolved, ent.name);
     const subStack = inspectDirectoryStack(subPath);
 
     if (subStack.buildSystem || subStack.frameworks.length > 0) {
-        if (subStack.buildSystem) buildSystems.add(subStack.buildSystem);
-        for (const framework of subStack.frameworks) frameworks.add(framework);
+        if (subStack.buildSystem) context.buildSystems.add(subStack.buildSystem);
+        for (const framework of subStack.frameworks) context.frameworks.add(framework);
 
-        partitions.push({
+        context.partitions.push({
             name: ent.name,
             path: ent.name,
             buildSystem: subStack.buildSystem,
@@ -284,7 +287,7 @@ function inspectPartitionEntry(
         });
     }
 
-    directorySemantics[ent.name] = inferDirectorySemantic(ent.name);
+    context.directorySemantics[ent.name] = inferDirectorySemantic(ent.name);
 }
 
 /**
@@ -309,18 +312,18 @@ function collectPartitions(
 
     const frameworks = new Set<string>(rootStack.frameworks);
     const partitions: ProjectPartition[] = [];
+    const partitionContext: PartitionInspectionContext = {
+        rootResolved,
+        buildSystems,
+        frameworks,
+        partitions,
+        directorySemantics,
+    };
 
     try {
         const entries = fs.readdirSync(rootResolved, { withFileTypes: true });
         for (const ent of entries) {
-            inspectPartitionEntry(
-                ent,
-                rootResolved,
-                buildSystems,
-                frameworks,
-                partitions,
-                directorySemantics,
-            );
+            inspectPartitionEntry(ent, partitionContext);
         }
     } catch {
         // Best-effort: if readdir fails, proceed with rootStack
@@ -338,34 +341,40 @@ function collectPartitions(
     return { partitions, buildSystems, frameworks };
 }
 
+interface DirectorySamplingContext {
+    readonly rootResolved: string;
+    readonly directorySemantics: Record<string, ArchitectureLayer>;
+    readonly dirQueue: DirectoryQueueItem[];
+    readonly languages: Record<string, number>;
+}
+
+interface DirectorySampleBudget {
+    readonly currentSampled: number;
+    readonly maxSampleFiles: number;
+}
+
 /**
  * Queue a discovered subdirectory for recursive sampling traversal.
  *
- * @param item - Dirent representing a subdirectory.
- * @param currentDir - Absolute path of current directory.
- * @param currentDepth - Current depth in directory hierarchy.
- * @param rootResolved - Absolute path of project root.
- * @param directorySemantics - Map to record inferred semantics into.
- * @param dirQueue - Queue of directories scheduled for inspection.
+ * @param dirEntry - Dirent representing a subdirectory.
+ * @param current - Current directory queue item.
+ * @param context - Directory sampling context.
  */
 function queueSampledDirectory(
-    item: fs.Dirent,
-    currentDir: string,
-    currentDepth: number,
-    rootResolved: string,
-    directorySemantics: Record<string, ArchitectureLayer>,
-    dirQueue: Array<{ dir: string; depth: number }>,
+    dirEntry: fs.Dirent,
+    current: DirectoryQueueItem,
+    context: DirectorySamplingContext,
 ): void {
-    if (IGNORED_DIRS.has(item.name) || item.name.startsWith('.')) {
+    if (IGNORED_DIRS.has(dirEntry.name) || dirEntry.name.startsWith('.')) {
         return;
     }
-    const subDir = path.join(currentDir, item.name);
-    const relDir = path.relative(rootResolved, subDir);
-    if (!directorySemantics[relDir]) {
-        directorySemantics[relDir] = inferDirectorySemantic(relDir);
+    const subDir = path.join(current.dir, dirEntry.name);
+    const relDir = path.relative(context.rootResolved, subDir);
+    if (!context.directorySemantics[relDir]) {
+        context.directorySemantics[relDir] = inferDirectorySemantic(relDir);
     }
-    if (currentDepth + 1 <= LANGUAGE_SAMPLE_MAX_DEPTH) {
-        dirQueue.push({ dir: subDir, depth: currentDepth + 1 });
+    if (current.depth + 1 <= LANGUAGE_SAMPLE_MAX_DEPTH) {
+        context.dirQueue.push({ dir: subDir, depth: current.depth + 1 });
     }
 }
 
@@ -406,39 +415,6 @@ interface DirectoryQueueItem {
     depth: number;
 }
 
-/**
- * Process a single sampled dirent item (directory or file).
- *
- * @param item - Dirent to evaluate.
- * @param current - Current directory queue item.
- * @param rootResolved - Project root path.
- * @param directorySemantics - Directory semantics mapping.
- * @param dirQueue - Directory queue.
- * @param languages - Language count record.
- * @returns 1 if a language file was sampled, 0 otherwise.
- */
-function processSampledItem(
-    item: fs.Dirent,
-    current: DirectoryQueueItem,
-    rootResolved: string,
-    directorySemantics: Record<string, ArchitectureLayer>,
-    dirQueue: DirectoryQueueItem[],
-    languages: Record<string, number>,
-): number {
-    if (item.isDirectory()) {
-        queueSampledDirectory(
-            item,
-            current.dir,
-            current.depth,
-            rootResolved,
-            directorySemantics,
-            dirQueue,
-        );
-        return 0;
-    }
-    return item.isFile() ? recordSampledFile(item.name, languages) : 0;
-}
-
 /** Result of stratified directory language sampling. */
 interface SampleLanguagesResult {
     languages: Record<string, number>;
@@ -449,50 +425,35 @@ interface SampleLanguagesResult {
  * Sample items within a single directory during language discovery.
  *
  * @param current - Current directory queue item.
- * @param rootResolved - Absolute path of project root directory.
- * @param directorySemantics - Map to record directory semantics into.
- * @param dirQueue - Queue of directories scheduled for inspection.
- * @param languages - Map of language identifier to observed count.
- * @param currentSampled - Number of files sampled prior to this directory.
- * @param maxSampleFiles - Upper ceiling for detailed language distribution samples.
+ * @param context - Shared sampling context.
+ * @param budget - Sampling counters and capacity limits.
  * @returns Tuple of [newlySampledCount, newlyDiscoveredCodeFilesCount].
  */
 function sampleItemsInDirectory(
     current: DirectoryQueueItem,
-    rootResolved: string,
-    directorySemantics: Record<string, ArchitectureLayer>,
-    dirQueue: DirectoryQueueItem[],
-    languages: Record<string, number>,
-    currentSampled: number,
-    maxSampleFiles: number,
+    context: DirectorySamplingContext,
+    budget: DirectorySampleBudget,
 ): [number, number] {
     let newlySampled = 0;
     let newlyDiscovered = 0;
-    const items = readDirectoryEntries(current.dir);
-    for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (item.isDirectory()) {
-            queueSampledDirectory(
-                item,
-                current.dir,
-                current.depth,
-                rootResolved,
-                directorySemantics,
-                dirQueue,
-            );
+    const dirEntries = readDirectoryEntries(current.dir);
+    for (let i = 0; i < dirEntries.length; i++) {
+        const dirEntry = dirEntries[i];
+        if (dirEntry.isDirectory()) {
+            queueSampledDirectory(dirEntry, current, context);
             continue;
         }
-        if (!item.isFile()) {
+        if (!dirEntry.isFile()) {
             continue;
         }
-        const ext = path.extname(item.name).toLowerCase();
+        const ext = path.extname(dirEntry.name).toLowerCase();
         const lang = EXT_TO_LANG[ext];
         if (!lang) {
             continue;
         }
         newlyDiscovered++;
-        if (currentSampled + newlySampled < maxSampleFiles) {
-            languages[lang] = (languages[lang] || 0) + 1;
+        if (budget.currentSampled + newlySampled < budget.maxSampleFiles) {
+            context.languages[lang] = (context.languages[lang] || 0) + 1;
             newlySampled++;
         }
     }
@@ -518,11 +479,17 @@ function sampleDirectoryLanguages(
     let totalDiscoveredFiles = 0;
     const maxSampleBudget = Math.max(
         LANGUAGE_SAMPLE_MAX_FILES,
-        Math.min(2500, partitions.length * 150),
+        Math.min(MAX_PARTITION_SAMPLE_CAP, partitions.length * SAMPLES_PER_PARTITION),
     );
 
     const dirQueue: DirectoryQueueItem[] = [{ dir: rootResolved, depth: 0 }];
     const seenDirs = new Set<string>([rootResolved]);
+    const samplingContext: DirectorySamplingContext = {
+        rootResolved,
+        directorySemantics,
+        dirQueue,
+        languages,
+    };
 
     // Seed partition roots for fair multi-stratum discovery
     for (let i = 0; i < partitions.length; i++) {
@@ -540,12 +507,8 @@ function sampleDirectoryLanguages(
 
         const [newSampled, newDiscovered] = sampleItemsInDirectory(
             current,
-            rootResolved,
-            directorySemantics,
-            dirQueue,
-            languages,
-            sampled,
-            maxSampleBudget,
+            samplingContext,
+            { currentSampled: sampled, maxSampleFiles: maxSampleBudget },
         );
         sampled += newSampled;
         totalDiscoveredFiles += newDiscovered;
@@ -709,9 +672,9 @@ function isRustStdlib(root: string, normRoot: string): boolean {
         }
     }
     return (
-        normRoot.includes(PATH_FRAGMENT_LIBRARY_CORE) ||
-        normRoot.includes(PATH_FRAGMENT_LIBRARY_STD) ||
-        normRoot.includes(PATH_FRAGMENT_LIBRARY_ALLOC) ||
+        normRoot.includes(CORE_LIBRARY_PATH_SEGMENT) ||
+        normRoot.includes(STD_LIBRARY_PATH_SEGMENT) ||
+        normRoot.includes(ALLOC_LIBRARY_PATH_SEGMENT) ||
         fs.existsSync(path.join(root, DIR_LIBRARY, DIR_CORE)) ||
         fs.existsSync(path.join(root, DIR_LIBRARY, DIR_STD))
     );
@@ -793,10 +756,10 @@ function isSystemsRuntimeArchetype(root: string, profile?: Partial<ProjectProfil
     }
     if (hasSystemsCargoName(root)) return true;
     return (
-        normRoot.includes(PATH_FRAGMENT_KERNEL) ||
-        normRoot.includes(PATH_FRAGMENT_RUNTIME) ||
-        normRoot.includes(PATH_FRAGMENT_BARE_METAL) ||
-        normRoot.includes(PATH_FRAGMENT_FREESTANDING)
+        normRoot.includes(KERNEL_PATH_SEGMENT) ||
+        normRoot.includes(RUNTIME_PATH_SEGMENT) ||
+        normRoot.includes(BARE_METAL_PATH_SEGMENT) ||
+        normRoot.includes(FREESTANDING_PATH_SEGMENT)
     );
 }
 

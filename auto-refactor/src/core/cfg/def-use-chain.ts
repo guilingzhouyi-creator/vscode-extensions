@@ -24,6 +24,21 @@ import type {
 /** Indexed access to one block of the control flow graph. */
 type BlockNode = ControlFlowGraph['blocks'][number];
 
+const USE_KIND_READ = 'read';
+const USE_KIND_CLEANUP = 'cleanup';
+const USE_KIND_DEREFERENCE = 'dereference';
+const ANONYMOUS_ASYNC_CALL = 'anonymousAsyncCall';
+
+const CHAR_CODE_ZERO = 48;
+const CHAR_CODE_NINE = 57;
+const CHAR_CODE_UPPER_A = 65;
+const CHAR_CODE_UPPER_Z = 90;
+const CHAR_CODE_LOWER_A = 97;
+const CHAR_CODE_LOWER_Z = 122;
+const CHAR_CODE_UNDERSCORE = 95;
+const CHAR_CODE_DOLLAR = 36;
+const CHAR_CODE_DOT = 46;
+
 /** Unified pattern matching resource allocation or acquisition expressions. */
 const COMBINED_RESOURCE_ALLOC_RE =
     /\b(?:createStatusBarItem|createOutputChannel|createTerminal|createFileSystemWatcher|registerCommand|registerTextEditorCommand|registerTreeDataProvider|open|connect|acquire|subscribe|addListener)\b|\bnew\s+(?:Disposable|EventEmitter|CancellationTokenSource)\b/;
@@ -32,23 +47,15 @@ const COMBINED_RESOURCE_ALLOC_RE =
 const COMBINED_RESOURCE_CLEANUP_RE =
     /\b(?:dispose|close|disconnect|release|destroy)\s*\(|\bsubscriptions\.push\s*\(/;
 
-function isResourceAllocStatement(rawText: string): boolean {
-    return COMBINED_RESOURCE_ALLOC_RE.test(rawText);
-}
-
-function isResourceCleanupStatement(rawText: string): boolean {
-    return COMBINED_RESOURCE_CLEANUP_RE.test(rawText);
-}
-
 /**
  * Checks if a character code represents an ECMAScript identifier word character [a-zA-Z0-9_].
  */
 function isWordCharCode(code: number): boolean {
     return (
-        (code >= 48 && code <= 57) ||
-        (code >= 65 && code <= 90) ||
-        (code >= 97 && code <= 122) ||
-        code === 95
+        (code >= CHAR_CODE_ZERO && code <= CHAR_CODE_NINE) ||
+        (code >= CHAR_CODE_UPPER_A && code <= CHAR_CODE_UPPER_Z) ||
+        (code >= CHAR_CODE_LOWER_A && code <= CHAR_CODE_LOWER_Z) ||
+        code === CHAR_CODE_UNDERSCORE
     );
 }
 
@@ -57,11 +64,11 @@ function isWordCharCode(code: number): boolean {
  */
 function isPropertyCharCode(code: number): boolean {
     return (
-        (code >= 48 && code <= 57) ||
-        (code >= 65 && code <= 90) ||
-        (code >= 97 && code <= 122) ||
-        code === 95 ||
-        code === 36
+        (code >= CHAR_CODE_ZERO && code <= CHAR_CODE_NINE) ||
+        (code >= CHAR_CODE_UPPER_A && code <= CHAR_CODE_UPPER_Z) ||
+        (code >= CHAR_CODE_LOWER_A && code <= CHAR_CODE_LOWER_Z) ||
+        code === CHAR_CODE_UNDERSCORE ||
+        code === CHAR_CODE_DOLLAR
     );
 }
 
@@ -76,7 +83,7 @@ function hasMemberDereference(rawText: string, variable: string): boolean {
     while ((idx = rawText.indexOf(variable, idx)) !== -1) {
         if (idx === 0 || !isWordCharCode(rawText.charCodeAt(idx - 1))) {
             const dotIdx = idx + variable.length;
-            if (dotIdx < rawText.length && rawText.charCodeAt(dotIdx) === 46) {
+            if (dotIdx < rawText.length && rawText.charCodeAt(dotIdx) === CHAR_CODE_DOT) {
                 const propIdx = dotIdx + 1;
                 if (propIdx < rawText.length && isPropertyCharCode(rawText.charCodeAt(propIdx))) {
                     return true;
@@ -109,7 +116,7 @@ export class DefUseAnalyzer {
     private static collectBlockDefinitions(block: BlockNode, defs: VariableDef[]): void {
         for (const stmt of block.statements) {
             if (stmt.definedVars.length === 0) continue;
-            const isResource = isResourceAllocStatement(stmt.rawText);
+            const isResource = COMBINED_RESOURCE_ALLOC_RE.test(stmt.rawText);
             for (let i = 0; i < stmt.definedVars.length; i++) {
                 defs.push({
                     variable: stmt.definedVars[i],
@@ -139,14 +146,14 @@ export class DefUseAnalyzer {
     private static collectBlockUses(block: BlockNode, uses: VariableUse[]): void {
         for (const stmt of block.statements) {
             if (stmt.usedVars.length === 0) continue;
-            const isCleanup = isResourceCleanupStatement(stmt.rawText);
+            const isCleanup = COMBINED_RESOURCE_CLEANUP_RE.test(stmt.rawText);
             for (let i = 0; i < stmt.usedVars.length; i++) {
                 const varName = stmt.usedVars[i];
-                let kind: VariableUse['kind'] = 'read';
+                let kind: VariableUse['kind'] = USE_KIND_READ;
                 if (isCleanup) {
-                    kind = 'cleanup';
+                    kind = USE_KIND_CLEANUP;
                 } else if (hasMemberDereference(stmt.rawText, varName)) {
-                    kind = 'dereference';
+                    kind = USE_KIND_DEREFERENCE;
                 }
                 uses.push({
                     variable: varName,
@@ -160,11 +167,6 @@ export class DefUseAnalyzer {
     }
 
     /**
-     * Performs complete flow analysis over the graph to find floating promises,
-     * unguarded null dereferences, and escaping unclosed resources.
-     * Concurrency: Thread-safe, reentrant, zero mutable static state.
-     *
-    /**
      * Identifies unhandled floating promise calls within the CFG.
      */
     private static collectFloatingPromises(cfg: ControlFlowGraph): FloatingPromiseFinding[] {
@@ -175,7 +177,7 @@ export class DefUseAnalyzer {
                     findings.push({
                         line: stmt.line,
                         rawText: stmt.rawText,
-                        callName: stmt.calls[0] || 'anonymousAsyncCall',
+                        callName: stmt.calls[0] || ANONYMOUS_ASYNC_CALL,
                     });
                 }
             }
@@ -267,7 +269,7 @@ export class DefUseAnalyzer {
         const cleanupVars = new Set<string>();
         for (let i = 0; i < uses.length; i++) {
             const useItem = uses[i];
-            if (useItem.kind === 'cleanup') {
+            if (useItem.kind === USE_KIND_CLEANUP) {
                 cleanupVars.add(useItem.variable);
             }
         }

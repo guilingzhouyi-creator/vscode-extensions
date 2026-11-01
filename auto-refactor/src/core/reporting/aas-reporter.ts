@@ -105,38 +105,33 @@ function resolveVerdict(counts: AasCounts): AasVerdict {
  */
 function trimMessage(text: string, maxChars: number = DEFAULT_MAX_MESSAGE_CHARS): string {
     const cleanedText = (text || '').replace(/\s+/g, ' ').trim();
-    return cleanedText.length <= maxChars
-        ? cleanedText
-        : cleanedText.slice(0, Math.max(1, maxChars - 1)) + ELLIPSIS;
+    if (cleanedText.length <= maxChars) return cleanedText;
+    return cleanedText.slice(0, Math.max(1, maxChars - 1)) + ELLIPSIS;
 }
-
-let anchorCacheSeq = 0;
 
 /**
  * In-memory anchor extractor avoiding direct synchronous filesystem operations.
  */
 class AnchorCache {
+    private static sequence = 0;
     private readonly cache = new Map<string, string | null>();
     private readonly customReader?: (relPath: string) => string | undefined;
     private readonly unregister?: () => void;
 
     constructor(customReader?: (relPath: string) => string | undefined) {
         this.customReader = customReader;
-        const instanceId = ++anchorCacheSeq;
+        const instanceId = ++AnchorCache.sequence;
+        const evictionTier = CacheEvictionTier.Ephemeral;
         this.unregister = sharedMemoryGovernor.register({
             name: `aas-reporter:anchor-cache:${instanceId}`,
-            tier: CacheEvictionTier.Ephemeral,
-            clear: () => this.clear(),
+            tier: evictionTier,
+            clear: () => this.cache.clear(),
             getSize: () => this.cache.size,
         });
     }
 
-    public clear(): void {
-        this.cache.clear();
-    }
-
     public dispose(): void {
-        this.clear();
+        this.cache.clear();
         this.unregister?.();
     }
 
@@ -198,13 +193,13 @@ function recordRuleLoss(
  * Resolves or creates a dimension's loss map outside lexical loop.
  */
 function getOrCreateLossMap(
-    dimensionRationales: Map<string, Map<string, { loss: number; count: number }>>,
+    dimensionToLossesMap: Map<string, Map<string, { loss: number; count: number }>>,
     dimension: string,
 ): Map<string, { loss: number; count: number }> {
-    let lossMap = dimensionRationales.get(dimension);
+    let lossMap = dimensionToLossesMap.get(dimension);
     if (!lossMap) {
         lossMap = new Map();
-        dimensionRationales.set(dimension, lossMap);
+        dimensionToLossesMap.set(dimension, lossMap);
     }
     return lossMap;
 }
@@ -215,18 +210,18 @@ function getOrCreateLossMap(
 function collectDimensionRuleLosses(
     rationales?: QualityScoreRationale[],
 ): Map<string, Map<string, { loss: number; count: number }>> {
-    const dimensionRationales = new Map<string, Map<string, { loss: number; count: number }>>();
-    if (!rationales || rationales.length === 0) return dimensionRationales;
+    const dimensionToLossesMap = new Map<string, Map<string, { loss: number; count: number }>>();
+    if (!rationales || rationales.length === 0) return dimensionToLossesMap;
 
     ALL_QUALITY_DIMENSIONS.forEach((dimension) => {
-        dimensionRationales.set(dimension, new Map());
+        dimensionToLossesMap.set(dimension, new Map());
     });
 
     for (const rationale of rationales) {
-        const lossMap = getOrCreateLossMap(dimensionRationales, rationale.dimension);
+        const lossMap = getOrCreateLossMap(dimensionToLossesMap, rationale.dimension);
         recordRuleLoss(lossMap, rationale.rule || 'unknown', rationale.delta);
     }
-    return dimensionRationales;
+    return dimensionToLossesMap;
 }
 
 /**
@@ -258,7 +253,7 @@ function projectDimensionDetails(
 
     const notEvaluatedSet = new Set(breakdown.notEvaluated ?? []);
     const details: Record<string, AasDimensionDetail> = {};
-    const dimensionRationales = collectDimensionRuleLosses(breakdown.rationales);
+    const dimensionToLossesMap = collectDimensionRuleLosses(breakdown.rationales);
 
     Object.entries(breakdown.indices).forEach(([dimension, scoreValue]) => {
         if (typeof scoreValue !== 'number' || !Number.isFinite(scoreValue)) return;
@@ -269,11 +264,12 @@ function projectDimensionDetails(
             typeof (breakdown.weights as Record<string, number>)[dimension] === 'number'
                 ? (breakdown.weights as Record<string, number>)[dimension]
                 : fallbackWeight;
-        const bottlenecks = extractTopBottlenecks(dimensionRationales.get(dimension));
+        const bottlenecks = extractTopBottlenecks(dimensionToLossesMap.get(dimension));
+        const qualityGrade = resolveQualityGrade(scoreValue);
 
         details[dimension] = {
             score: Math.round(scoreValue * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
-            grade: resolveQualityGrade(scoreValue),
+            grade: qualityGrade,
             evaluated,
             ...(weightVal !== undefined
                 ? { weight: Math.round(weightVal * ROUND_SCALE_THOUSAND) / ROUND_SCALE_THOUSAND }
@@ -304,7 +300,7 @@ function roundMetric(metricValue: number | undefined | null): number | undefined
 /**
  * Resolves composite health score with optional override.
  */
-function resolveHealthScore(
+function computeHealthScore(
     overrideScore?: number | null,
     rawScore?: number | null,
 ): number | null {
@@ -316,7 +312,7 @@ function resolveHealthScore(
 /**
  * Resolves CAI metric truthfully without falling back to polyglot generalization.
  */
-function resolveHealthCai(report: ScanReport, overrideCai?: number): number | undefined {
+function extractHealthCai(report: ScanReport, overrideCai?: number): number | undefined {
     const autonomyIndex = overrideCai ?? report.autonomy?.compositeAutonomyIndex;
     return roundMetric(autonomyIndex);
 }
@@ -324,7 +320,7 @@ function resolveHealthCai(report: ScanReport, overrideCai?: number): number | un
 /**
  * Resolves SQALE technical debt assessment.
  */
-function resolveHealthSqale(
+function deriveHealthSqale(
     report: ScanReport,
     override?: AasHealth['sqale'],
 ): AasHealth['sqale'] | undefined {
@@ -341,7 +337,7 @@ function resolveHealthSqale(
 /**
  * Resolves polyglot modernization and balance metrics.
  */
-function resolveHealthPolyglot(
+function evaluateHealthPolyglot(
     report: ScanReport,
     override?: AasHealth['polyglot'],
 ): AasHealth['polyglot'] | undefined {
@@ -360,7 +356,7 @@ function resolveHealthPolyglot(
 /**
  * Resolves anti-gaming defense circuit status.
  */
-function resolveHealthGamingDefense(
+function inspectHealthGamingDefense(
     report: ScanReport,
     override?: AasHealth['gamingDefense'],
 ): AasHealth['gamingDefense'] | undefined {
@@ -381,15 +377,33 @@ function resolveHealthGamingDefense(
     return undefined;
 }
 
+const QUANT_ALIAS_ICR = 'icr';
+const QUANT_ALIAS_QSR = 'qsr';
+const QUANT_ALIAS_SORTINO = 'sortino';
+const QUANT_ALIAS_VAR95 = 'var95';
+const QUANT_ALIAS_MDD = 'mdd';
+const QUANT_ALIAS_DEBT_GINI = 'debtGini';
+const QUANT_ALIAS_DEFECT_ENTROPY = 'defectEntropy';
+const QUANT_ALIAS_HALF_LIFE = 'halfLifeCommits';
+
+const QUANT_KEY_RCR = 'rcr';
+const QUANT_KEY_ERQ = 'erq';
+const QUANT_KEY_DDR = 'ddr';
+const QUANT_KEY_EDB95 = 'edb95';
+const QUANT_KEY_PTD = 'ptd';
+const QUANT_KEY_DSI = 'dsi';
+const QUANT_KEY_RCD = 'rcd';
+const QUANT_KEY_EHL = 'ehl';
+
 const LEGACY_QUANT_ALIAS_KEYS: readonly string[] = [
-    'icr',
-    'qsr',
-    'sortino',
-    'var95',
-    'mdd',
-    'debtGini',
-    'defectEntropy',
-    'halfLifeCommits',
+    QUANT_ALIAS_ICR,
+    QUANT_ALIAS_QSR,
+    QUANT_ALIAS_SORTINO,
+    QUANT_ALIAS_VAR95,
+    QUANT_ALIAS_MDD,
+    QUANT_ALIAS_DEBT_GINI,
+    QUANT_ALIAS_DEFECT_ENTROPY,
+    QUANT_ALIAS_HALF_LIFE,
 ];
 
 /**
@@ -410,7 +424,7 @@ function assignQuantPair(
 /**
  * Resolves quantitative architecture dynamics and resilience indicators (ADR-Q).
  */
-function resolveHealthQuant(
+function measureHealthQuant(
     report: ScanReport,
     override?: AasHealth['quant'],
     includeAlias = false,
@@ -421,17 +435,17 @@ function resolveHealthQuant(
     const { financial: fin, riskRatios: risk, inequality: ineq, stochastic: stoch } = quantMetrics;
 
     const quant: Record<string, unknown> = {};
-    assignQuantPair(quant, 'rcr', 'icr', roundMetric(fin?.rcr ?? fin?.interestCoverageRatio));
-    assignQuantPair(quant, 'erq', 'qsr', roundMetric(risk?.erq ?? risk?.qsr));
-    assignQuantPair(quant, 'ddr', 'sortino', roundMetric(risk?.ddr ?? risk?.sortino));
-    assignQuantPair(quant, 'edb95', 'var95', roundMetric(risk?.edb95 ?? risk?.var95));
-    assignQuantPair(quant, 'ptd', 'mdd', roundMetric(risk?.ptd ?? risk?.mdd));
-    assignQuantPair(quant, 'dsi', 'debtGini', roundMetric(ineq?.dsi ?? ineq?.debtGini));
-    assignQuantPair(quant, 'rcd', 'defectEntropy', roundMetric(ineq?.rcd ?? ineq?.defectEntropy));
+    assignQuantPair(quant, QUANT_KEY_RCR, QUANT_ALIAS_ICR, roundMetric(fin?.rcr ?? fin?.interestCoverageRatio));
+    assignQuantPair(quant, QUANT_KEY_ERQ, QUANT_ALIAS_QSR, roundMetric(risk?.erq ?? risk?.qsr));
+    assignQuantPair(quant, QUANT_KEY_DDR, QUANT_ALIAS_SORTINO, roundMetric(risk?.ddr ?? risk?.sortino));
+    assignQuantPair(quant, QUANT_KEY_EDB95, QUANT_ALIAS_VAR95, roundMetric(risk?.edb95 ?? risk?.var95));
+    assignQuantPair(quant, QUANT_KEY_PTD, QUANT_ALIAS_MDD, roundMetric(risk?.ptd ?? risk?.mdd));
+    assignQuantPair(quant, QUANT_KEY_DSI, QUANT_ALIAS_DEBT_GINI, roundMetric(ineq?.dsi ?? ineq?.debtGini));
+    assignQuantPair(quant, QUANT_KEY_RCD, QUANT_ALIAS_DEFECT_ENTROPY, roundMetric(ineq?.rcd ?? ineq?.defectEntropy));
     assignQuantPair(
         quant,
-        'ehl',
-        'halfLifeCommits',
+        QUANT_KEY_EHL,
+        QUANT_ALIAS_HALF_LIFE,
         roundMetric(stoch?.ehl ?? stoch?.halfLifeCommits),
     );
 
@@ -512,7 +526,7 @@ function resolveCoreHealthFields(
         : qualityScore?.densityTensorSummary;
 
     return {
-        score: resolveHealthScore(override?.score, rawScore),
+        score: computeHealthScore(override?.score, rawScore),
         grade: override?.grade ?? rawGrade ?? 'N/A',
         density: roundMetric(override?.density ?? rawDensity),
         tensorSummary: override?.tensorSummary ?? rawTensor,
@@ -535,11 +549,11 @@ function resolveDimensionIndicesSource(
 function buildHealth(report: ScanReport, counts: AasCounts, options?: AasReportOptions): AasHealth {
     const override = options?.healthOverride;
     const coreFields = resolveCoreHealthFields(report, override);
-    const computedCai = resolveHealthCai(report, override?.cai);
-    const sqale = resolveHealthSqale(report, override?.sqale);
-    const polyglot = resolveHealthPolyglot(report, override?.polyglot);
-    const gamingDefense = resolveHealthGamingDefense(report, override?.gamingDefense);
-    const quant = resolveHealthQuant(
+    const computedCai = extractHealthCai(report, override?.cai);
+    const sqale = deriveHealthSqale(report, override?.sqale);
+    const polyglot = evaluateHealthPolyglot(report, override?.polyglot);
+    const gamingDefense = inspectHealthGamingDefense(report, override?.gamingDefense);
+    const quant = measureHealthQuant(
         report,
         override?.quant,
         options?.includeLegacyQuantAliases === true,
@@ -752,7 +766,7 @@ interface EmitDefectsParams {
     readonly ruleTiers?: Readonly<Record<string, 'T1' | 'T2' | 'T3'>>;
 }
 
-const DEFAULT_MAX_PER_RULE_PER_FILE = 5;
+const DEFAULT_RULE_FILE_CAP = 5;
 
 function appendFoldedRuleLine(
     lastDefectByRule: Map<string, AasDefectRecord>,
@@ -802,7 +816,7 @@ function emitDefectsForFile(params: EmitDefectsParams): {
     let previousCoveredToLine = -1;
     const shouldDeduplicate = params.options.deduplicateAnchors !== false;
     const radius = params.options.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
-    const maxPerRule = params.options.maxPerRulePerFile ?? DEFAULT_MAX_PER_RULE_PER_FILE;
+    const maxPerRule = params.options.maxPerRulePerFile ?? DEFAULT_RULE_FILE_CAP;
     const maxAllowed = Math.min(params.maxPerFile, params.remainingBudget);
     const ruleCountMap = new Map<string, number>();
     const lastDefectByRule = new Map<string, AasDefectRecord>();
