@@ -1,11 +1,11 @@
 /**
  * Module: CLI — Trajectory & Multi-Scale Telemetry Controller
  * File Path: src/cli/trajectory-cmd.ts
- * Architecture Role: Dispatches and renders trajectory queries, unified lifetime summaries,
+ * Architecture Role: Dispatches and coordinates trajectory queries, unified lifetime summaries,
  *   rolling statistical moments, and multi-scale virtual timeline projections.
  * Dependencies & Triggers: Consumes timeline-projector, compact-ledger-store,
- *   rolling-sampling-governor, and changeTrajectory; called by CLI main entry point.
- * Responsibilities: Parse trajectory CLI arguments, resolve repository root, render ANSI-formatted
+ *   rolling-sampling-governor, and trajectory-formatter; called by CLI main entry point.
+ * Responsibilities: Parse trajectory CLI arguments, resolve repository root, coordinate
  *   integrated dashboards or JSON streams, and handle file-specific change trajectories.
  * Exit Semantics & Design Rationale: Decouples command presentation from main index.ts facade,
  *   guarantees zero-throw defensive execution, returns explicit { text, code } result bundles.
@@ -15,68 +15,41 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
     projectTimelineReport,
-    type TimelineBucketSnapshot,
     type TimelineBucketType,
-    type TimelineProjectionReport,
 } from '../core/trajectory/timeline-projector';
 import { readLifetimeSummary } from '../core/trajectory/compact-ledger-store';
-import { getChangeTrajectory } from '../api';
 import { RollingSamplingGovernor } from '../core/scoring/rolling-sampling-governor';
+import {
+    renderSparkline,
+    renderRollingMomentsSection,
+    renderTimelineTableSection,
+    buildFileTrajectoryText,
+    TRAJECTORY_BORDERS,
+    TRAJECTORY_FORMAT_METRICS,
+} from './trajectory-formatter';
+
+export { renderSparkline };
 
 /** Trajectory folder name inside repository root. */
 const TRAJECTORY_DIR_NAME = '.refactor-trajectory';
 
-/** Lifetime summary file name. */
-const LIFETIME_SUMMARY_FILE = 'lifetime.summary.json';
-
 /** Subproject folder fallback name. */
 const PROJECT_SUBDIR_NAME = 'auto-refactor';
 
-/** Display truncation length for short commit revisions. */
-const REVISION_DISPLAY_LENGTH = 8;
-
-/** Default LOC-to-equivalent ratio for display. */
-const LOC_TO_EQUIV_RATIO = 1.37;
-const MILLION_DIVISOR = 1000000;
-const LINE_CONTENT_WIDTH = 75;
-const IDLE_LINE_WIDTH = 72;
-const BUCKET_ID_COL_WIDTH = 20;
-const RUNS_COL_WIDTH = 5;
-const NUM_THOUSAND = 1000;
-
-/** Sparkline level characters from min to max. */
-const SPARKLINE_CHARS: readonly string[] = [' ', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+const CMD_TRAJECTORY_SUBCOMMAND = 'trajectory';
+const BUCKET_TYPE_HOUR = 'hour';
+const BUCKET_TYPE_DAY = 'day';
+const DEFAULT_HOURLY_WINDOW = '24h';
+const DEFAULT_DAILY_WINDOW = '14d';
 
 /**
- * Renders an array of numeric values into a visual sparkline string.
- *
- * @param values - Array of numeric samples.
- * @returns Sparkline string representing relative heights.
+ * Options extracted from CLI tokens for trajectory display.
  */
-export function renderSparkline(values: readonly number[]): string {
-    if (values.length === 0) return '';
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    if (max === min) {
-        return SPARKLINE_CHARS[SPARKLINE_CHARS.length - 1].repeat(values.length);
-    }
-    const range = max - min;
-    const steps = SPARKLINE_CHARS.length - 1;
-    return values
-        .map((val) => {
-            const normalized = Math.max(0, Math.min(1, (val - min) / range));
-            const charIndex = Math.round(normalized * steps);
-            return SPARKLINE_CHARS[charIndex];
-        })
-        .join('');
-}
-
-/** Parsed options for trajectory command execution. */
 interface TrajectoryCommandOptions {
     rootDir: string;
     targetFile?: string;
-    isSummaryOnly: boolean;
-    isJson: boolean;
+    isSummaryOnly?: boolean;
+    isJson?: boolean;
     since?: string;
     bucket?: TimelineBucketType;
     outputFilePath?: string;
@@ -86,7 +59,7 @@ interface TrajectoryCommandOptions {
 /**
  * Checks if a target path exists asynchronously.
  */
-async function pathExists(targetPath: string): Promise<boolean> {
+async function checkPathExists(targetPath: string): Promise<boolean> {
     try {
         await fs.promises.access(targetPath);
         return true;
@@ -100,11 +73,11 @@ async function pathExists(targetPath: string): Promise<boolean> {
  */
 async function resolveLedgerDir(rootDir: string): Promise<string | null> {
     const directPath = path.join(rootDir, TRAJECTORY_DIR_NAME);
-    if (await pathExists(directPath)) {
+    if (await checkPathExists(directPath)) {
         return directPath;
     }
     const subprojectPath = path.join(rootDir, PROJECT_SUBDIR_NAME, TRAJECTORY_DIR_NAME);
-    if (await pathExists(subprojectPath)) {
+    if (await checkPathExists(subprojectPath)) {
         return subprojectPath;
     }
     return null;
@@ -148,7 +121,7 @@ function findTargetFile(args: string[]): string | undefined {
     }
 
     for (const token of args) {
-        if (token.startsWith('-') || token === 'trajectory') continue;
+        if (token.startsWith('-') || token === CMD_TRAJECTORY_SUBCOMMAND) continue;
         if (flagValues.has(token)) continue;
         return token;
     }
@@ -172,11 +145,11 @@ function parseTrajectoryArgs(args: string[]): TrajectoryCommandOptions {
     let since = findOptionValue(args, '--since');
 
     if (isHourly && !bucket) {
-        bucket = 'hour';
-        if (!since) since = '24h';
+        bucket = BUCKET_TYPE_HOUR;
+        if (!since) since = DEFAULT_HOURLY_WINDOW;
     } else if (isDaily && !bucket) {
-        bucket = 'day';
-        if (!since) since = '14d';
+        bucket = BUCKET_TYPE_DAY;
+        if (!since) since = DEFAULT_DAILY_WINDOW;
     }
 
     const outputFilePath = findOptionValue(args, '--out');
@@ -192,95 +165,6 @@ function parseTrajectoryArgs(args: string[]): TrajectoryCommandOptions {
         outputFilePath,
         withSparkline,
     };
-}
-
-/**
- * Formats a single timeline row for console table output.
- */
-function formatBucketRow(snapshot: TimelineBucketSnapshot): string {
-    if (snapshot.isIdleFold) {
-        return `│ ── ${snapshot.bucketId.padEnd(IDLE_LINE_WIDTH, '·')} 0 runs │`;
-    }
-
-    const bucketIdColumn = snapshot.bucketId.padEnd(BUCKET_ID_COL_WIDTH).slice(0, BUCKET_ID_COL_WIDTH);
-    const runsCountColumn = String(snapshot.runsCount).padStart(RUNS_COL_WIDTH);
-    const semanticColumn = `${(snapshot.semanticEloc / NUM_THOUSAND).toFixed(1)}k`.padStart(9);
-    const netSign = snapshot.debtResolved >= snapshot.debtAdded ? '-' : '+';
-    const debtDeltaValue = Math.abs(snapshot.debtResolved - snapshot.debtAdded);
-    const debtDeltaColumn = `${netSign}${debtDeltaValue} pts`.padStart(11);
-    const scoreRangeText = `[${snapshot.scoreFloor.toFixed(1)}~${snapshot.scoreCeiling.toFixed(1)}]`;
-    const scoreRangeColumn = `${snapshot.latestScore.toFixed(2)} ${scoreRangeText}`.padEnd(17).slice(0, 17);
-    const weightedMeanColumn = snapshot.weightedMeanScore.toFixed(2).padStart(7);
-    const gatePassRateColumn = `${snapshot.gatePassRate.toFixed(1)}%`.padStart(7);
-
-    return `│ ${bucketIdColumn} ${runsCountColumn} ${semanticColumn} ${debtDeltaColumn} ${scoreRangeColumn} ${weightedMeanColumn} ${gatePassRateColumn} │`;
-}
-
-/**
- * Builds formatted text lines for the temporal rolling moments section.
- */
-function renderRollingMomentsSection(rootDir: string): string[] {
-    const lines: string[] = [];
-    const governor = new RollingSamplingGovernor({ workspaceRoot: rootDir });
-    const telemetry = governor.getDashboardTelemetry();
-
-    lines.push(`├─────────────────────────────────────────────────────────────────────────────┤`);
-    lines.push(`│ 📊 TEMPORAL ROLLING EQUILIBRIUM (Multi-Pass Moments)                        │`);
-
-    if (telemetry.sampleCount === 0) {
-        lines.push(`│ • Rolling Buffer: No active multi-pass samples recorded in cache.           │`);
-    } else {
-        const fastLine = `• Fast  Pass (N=5)  : Mean ${telemetry.fastWindow.mean.toFixed(2)} | σ ${telemetry.fastWindow.stdDev.toFixed(2)}  [Recent Mutation Window]`;
-        const mesoLine = `• Meso  Pass (N=20) : Mean ${telemetry.mesoWindow.mean.toFixed(2)} | σ ${telemetry.mesoWindow.stdDev.toFixed(2)}  [Medium Equilibrium]`;
-        const macroLine = `• Macro Pass (N=60) : Mean ${telemetry.macroWindow.mean.toFixed(2)} | σ ${telemetry.macroWindow.stdDev.toFixed(2)}  [Long-term Attractor]`;
-        const shiftTag = telemetry.isRegimeShift ? 'TRUE (Shift)' : 'FALSE (Stable)';
-        const statusLine = `• Regime Shift: ${shiftTag} | Z-Score: ${telemetry.studentizedZScore.toFixed(2)} | Stability Factor: ${telemetry.stabilityFactor.toFixed(2)}`;
-
-        lines.push(`│ ${fastLine.padEnd(LINE_CONTENT_WIDTH)} │`);
-        lines.push(`│ ${mesoLine.padEnd(LINE_CONTENT_WIDTH)} │`);
-        lines.push(`│ ${macroLine.padEnd(LINE_CONTENT_WIDTH)} │`);
-        lines.push(`│ ${statusLine.padEnd(LINE_CONTENT_WIDTH)} │`);
-    }
-
-    return lines;
-}
-
-/**
- * Builds formatted ASCII table for timeline projection.
- */
-function renderTimelineTableSection(
-    report: TimelineProjectionReport,
-    withSparkline = false,
-): string[] {
-    const lines: string[] = [];
-    lines.push(`├─────────────────────────────────────────────────────────────────────────────┤`);
-    const headerTitle = `⏱️  VIRTUAL TIMELINE PROJECTION (Bucket: ${report.bucketType}, Adaptive Folded)`;
-    lines.push(`│ ${headerTitle.padEnd(LINE_CONTENT_WIDTH)} │`);
-    lines.push(`│ RELATIVE WINDOW      RUNS  SEM_ELOC    DEBT(Δ)     LATEST [RANGE]   W_MEAN    GATE │`);
-    lines.push(`│ ──────────────────  ─────  ────────  ───────────  ─────────────────  ──────  ───── │`);
-
-    if (report.buckets.length === 0) {
-        lines.push(`│ No trajectory runs recorded in the requested time interval.                 │`);
-    } else {
-        for (const bucket of report.buckets) {
-            lines.push(formatBucketRow(bucket));
-        }
-
-        const activeScores = report.buckets
-            .filter((b) => !b.isIdleFold && b.runsCount > 0)
-            .map((b) => b.weightedMeanScore);
-        if (withSparkline && activeScores.length > 0) {
-            const spark = renderSparkline(activeScores);
-            const trend = activeScores[activeScores.length - 1] >= activeScores[0] ? '↗' : '↘';
-            const minScore = Math.min(...activeScores).toFixed(2);
-            const maxScore = Math.max(...activeScores).toFixed(2);
-            lines.push(`│ ──────────────────  ─────  ────────  ───────────  ─────────────────  ──────  ───── │`);
-            const sparkLine = `📈 Trend Sparkline: [${spark}] (Range: ${minScore}~${maxScore}, Dir: ${trend})`;
-            lines.push(`│ ${sparkLine.padEnd(LINE_CONTENT_WIDTH)} │`);
-        }
-    }
-
-    return lines;
 }
 
 /**
@@ -315,11 +199,19 @@ async function buildUnifiedDashboard(
         );
     }
 
+    const {
+        LOC_TO_EQUIV_RATIO,
+        MILLION_DIVISOR,
+        LINE_CONTENT_WIDTH,
+        NUM_THOUSAND,
+        TARGET_SCOPE_WIDTH,
+    } = TRAJECTORY_FORMAT_METRICS;
+
     const lines: string[] = [];
-    lines.push(`┌─────────────────────────────────────────────────────────────────────────────┐`);
+    lines.push(TRAJECTORY_BORDERS.TOP);
     lines.push(`│ 🚀 AUTO-REFACTOR INTEGRATED TRAJECTORY TELEMETRY                            │`);
-    lines.push(`├─────────────────────────────────────────────────────────────────────────────┤`);
-    lines.push(`│ Target Scope : ${rootDir.padEnd(61).slice(0, 61)} │`);
+    lines.push(TRAJECTORY_BORDERS.MIDDLE);
+    lines.push(`│ Target Scope : ${rootDir.padEnd(TARGET_SCOPE_WIDTH).slice(0, TARGET_SCOPE_WIDTH)} │`);
 
     if (lifetime) {
         const equivalentLocMillions = ((lifetime.eloc.processedTotal * LOC_TO_EQUIV_RATIO) / MILLION_DIVISOR).toFixed(2);
@@ -338,7 +230,7 @@ async function buildUnifiedDashboard(
         lines.push(...renderTimelineTableSection(timelineReport, options.withSparkline));
     }
 
-    lines.push(`└─────────────────────────────────────────────────────────────────────────────┘`);
+    lines.push(TRAJECTORY_BORDERS.BOTTOM);
 
     if (timelineReport.malformedLinesCount > 0) {
         lines.push(`[Notice: Isolated and skipped ${timelineReport.malformedLinesCount} malformed NDJSON log line(s)]`);
@@ -362,43 +254,12 @@ async function writeOutputToFile(destinationFilePath: string, content: string): 
 }
 
 /**
- * Builds formatted output for individual file change trajectory.
- */
-function buildFileTrajectoryText(targetFile: string): string {
-    const fileTrajectory = getChangeTrajectory(targetFile);
-    if (!fileTrajectory || fileTrajectory.revisions.length === 0) {
-        return `No historical trajectory recorded for ${targetFile}\n`;
-    }
-
-    const lines: string[] = [];
-    lines.push(`\n=== Change Trajectory: ${targetFile} ===`);
-    lines.push(`Total Revisions: ${fileTrajectory.totalRevisions} | Agents: ${fileTrajectory.participatingAgents.join(', ')}`);
-
-    for (const revision of fileTrajectory.revisions) {
-        const score = revision.qualityScore?.compositeScore;
-        const scoreText = typeof score === 'number' && Number.isFinite(score) ? score.toFixed(2) : 'N/A';
-        const dateStr = new Date(revision.timestamp).toISOString();
-        const shortRev = revision.revisionId.slice(0, REVISION_DISPLAY_LENGTH);
-        lines.push(`  • [${dateStr}] Rev ${shortRev} by Agent: ${revision.agentUid} | Score: ${scoreText}`);
-    }
-
-    if (fileTrajectory.activeAnomalies.length > 0) {
-        lines.push(`Active Anomalies:`);
-        for (const anomaly of fileTrajectory.activeAnomalies) {
-            lines.push(`  ⚠️ [${anomaly.kind}] ${anomaly.message}`);
-        }
-    }
-    lines.push(`========================================\n`);
-    return lines.join('\n');
-}
-
-/**
  * Dispatches the trajectory subcommand.
  *
  * @param args CLI argument tokens.
  * @returns Result object containing text presentation and exit code.
  */
-export async function trajectoryCommand(args: string[]): Promise<{ text: string; code: number }> {
+export async function executeTrajectoryCommand(args: string[]): Promise<{ text: string; code: number }> {
     const options = parseTrajectoryArgs(args);
 
     if (options.targetFile) {
@@ -436,3 +297,5 @@ export async function trajectoryCommand(args: string[]): Promise<{ text: string;
         };
     }
 }
+
+export { executeTrajectoryCommand as trajectoryCommand };
