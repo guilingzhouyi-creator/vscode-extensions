@@ -1038,7 +1038,7 @@ function collectProjectViolations(repoRoot, stagedFiles) {
         ruleId: 'CMG-PRJ-001',
         severity: SEVERITY_BLOCK,
         file: hit,
-        message: `受控项目 '${lease.id}' TTL 租约已过期，提交权限已被绝对冻结 (Commit Lockdown)。运行 'taxis project renew ${lease.id}' 续约解冻。`,
+        message: `受控项目 '${lease.id}' TTL 租约已过期，提交权限已被锁定 (Commit Lockdown)。运行 'taxis project renew ${lease.id}' 续约解冻。`,
       });
     }
   } catch {

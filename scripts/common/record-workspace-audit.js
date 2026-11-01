@@ -43,7 +43,7 @@ const STATUS_PASS = 'PASS';
 const STATUS_BLOCK = 'BLOCK';
 const BADGE_PASS = '🟢 达标';
 const BADGE_BLOCK = '🔴 阻断';
-const BADGE_GLOBAL_HEALTHY = '🟢 全域健康达标';
+const BADGE_GLOBAL_HEALTHY = '🟢 全域质量达标';
 const BADGE_GLOBAL_ANOMALY = '🔴 存在违规异常';
 
 const CHAR_FILLED = '█';
@@ -278,7 +278,7 @@ function getRcdBadge(val) {
 }
 
 function getEhlBadge(val) {
-  if (val <= 2.0) return '🟢 瞬时自愈';
+  if (val <= 2.0) return '🟢 快速自愈';
   if (val <= 5.0) return '🟡 常规迭代';
   return '🔴 惯性滞后';
 }
@@ -302,20 +302,20 @@ function getPtdBadge(val) {
 }
 
 function getQuantStatusBadge(status) {
-  if (status === 'de-leveraging') return '🟢 强净消融';
+  if (status === 'de-leveraging') return '🟢 持续偿减';
   if (status === 'balanced') return '🟡 动态均势';
   if (status === 'insufficient_samples') return '⚪ 样本匮乏';
   return '🔴 赤字膨胀';
 }
 
 function getDdrBadge(val) {
-  if (val >= 999.0) return '🟢 零破位';
-  if (val >= 5.0) return '🟢 强基底防御';
-  return '🔴 底线失守';
+  if (val >= 10.0) return '🟢 充分防御';
+  if (val >= 3.0) return '🟡 稳定防御';
+  return '🔴 底线承压';
 }
 
 function getRcrNote(status) {
-  if (status === 'de-leveraging') return '重构清偿产能显著跑赢新增阻滞，架构处于主动净消融期';
+  if (status === 'de-leveraging') return '重构清偿产能跑赢新增阻滞，架构处于主动偿减周期';
   if (status === 'balanced') return '重构产能与债务增量动态对冲，系统维持演进均势';
   if (status === 'insufficient_samples') return '样本与观测时序匮乏，暂未采集到有效偿债流量';
   return '新增债务阻滞超出重构清偿速度，需警惕赤字累积';
@@ -328,8 +328,8 @@ function getErqNote(val) {
 }
 
 function getDdrNote(val) {
-  if (val >= 999.0) return '历史各次审计未检出跌破及格线事故';
-  if (val >= 5.0) return '下行防御垫层充沛，破位回撤风险受控';
+  if (val >= 10.0) return '下行防御垫层充沛，破位回撤风险受控';
+  if (val >= 3.0) return '具备稳定防御基底，下行波动处于可控区间';
   return '存在跌破质量底线风险，下行防御亟待加固';
 }
 
@@ -420,9 +420,9 @@ function renderQuantTableRows(quant) {
     '',
     '| 观测子域 | 指标名称 (规范代号) | 实时标量 | 动态量规 | 状态等级 | 架构治理与战术研判 |',
     '| :--- | :--- | :---: | :---: | :---: | :--- |',
-    `| **偿债动力学** | 消融代偿比 (RCR) | **${rcrVal.toFixed(2)}x** | \`[${rcrBar}]\` | ${statusBadge} | ${rcrNote} |`,
+    `| **偿债动力学** | 清偿代偿比 (RCR) | **${rcrVal.toFixed(2)}x** | \`[${rcrBar}]\` | ${statusBadge} | ${rcrNote} |`,
     `| **时序韧性** | 质量坚韧商 (ERQ) | **${erqVal.toFixed(2)}** | \`[${erqBar}]\` | ${erqBadge} | ${erqNote} |`,
-    `| | 破位防御度 (DDR) | **${ddrVal >= 999 ? '999.0' : ddrVal.toFixed(2)}** | \`[${ddrBar}]\` | ${ddrBadge} | ${ddrNote} |`,
+    `| | 破位防御度 (DDR) | **${ddrVal >= 100 ? ddrVal.toFixed(1) : ddrVal.toFixed(2)}** | \`[${ddrBar}]\` | ${ddrBadge} | ${ddrNote} |`,
     `| | 极端退化包络 (EDB-95) | **${edbVal.toFixed(2)}%** | \`[${edbBar}]\` | ${edbBadge} | ${edbNote} |`,
     `| | 历史峰谷落差 (PTD) | **${ptdVal.toFixed(2)}%** | \`[${ptdBar}]\` | ${ptdBadge} | ${ptdNote} |`,
     `| | 扰动自愈步长 (EHL) | **${ehlVal.toFixed(1)} 步** | \`[${ehlBar}]\` | ${ehlBadge} | ${ehlNote} |`,

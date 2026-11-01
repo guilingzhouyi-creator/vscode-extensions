@@ -1,18 +1,20 @@
 /**
  * Module: Staggered Push Background Daemon
  * File Path: scripts/common/staggered-push-daemon.js
- * Architecture Role: Persistent workspace daemon polling local time to execute daily
- *   staggered Git pushes when the local time reaches 21:30 and the current day is unpushed.
+ * Architecture Role: Persistent workspace daemon polling UTC time to execute daily
+ *   staggered Git pushes when the UTC time reaches 13:30 (equivalent to 21:30 CST)
+ *   and the current UTC day is unpushed.
  * Dependencies & Triggers: Launched automatically by .vscode/tasks.json on folderOpen;
  *   imports execution engine from scripts/common/staggered-push-orchestrator.js.
  * Responsibilities:
- *   1. Passively inspect local time at regular intervals (POLL_INTERVAL_MS);
- *   2. Determine whether the current time has reached the target window (>= 21:30);
+ *   1. Passively inspect UTC time at regular intervals (POLL_INTERVAL_MS);
+ *   2. Determine whether the current time has reached the target window (>= 13:30 UTC);
  *   3. Enforce daily idempotence using hasPushedToday;
  *   4. Execute push batch and emit formatted heartbeat and outcome logs;
  *   5. Listen for termination signals (SIGINT, SIGTERM) to exit cleanly on VSCode close.
  * Exit Semantics & Design Rationale: Non-blocking event loop with minimal CPU footprint;
- *   exits with code 0 on termination signals.
+ *   exits with code 0 on termination signals. Objective UTC-based scheduling ensures immunity
+ *   to local OS timezone shifts and proxy cascades.
  *
  * @module staggered-push-daemon
  */
@@ -22,24 +24,25 @@
 const {
   executeStaggeredPush,
   hasPushedToday,
+  getUtcDateString,
   getLocalDateString,
 } = require('./staggered-push-orchestrator');
 
-// Timing constants
-const TARGET_HOUR = 21;
-const TARGET_MINUTE = 30;
+// Timing constants (Objective UTC standard: 13:30 UTC = 21:30 CST / 05:30 PST / 06:30 PDT)
+const TARGET_UTC_HOUR = 13;
+const TARGET_UTC_MINUTE = 30;
 const POLL_INTERVAL_MS = 30000; // 30 seconds
 
 /**
- * Checks whether the current time falls within or after the daily scheduled trigger window.
+ * Checks whether the current time falls within or after the daily scheduled trigger window (in UTC).
  *
  * @param {Date} [d=new Date()] - Date object to evaluate.
- * @returns {boolean} True if within or after 21:30 local time.
+ * @returns {boolean} True if within or after 13:30 UTC.
  */
 function isWindowActive(d = new Date()) {
-  const h = d.getHours();
-  const m = d.getMinutes();
-  return h > TARGET_HOUR || (h === TARGET_HOUR && m >= TARGET_MINUTE);
+  const h = d.getUTCHours();
+  const m = d.getUTCMinutes();
+  return h > TARGET_UTC_HOUR || (h === TARGET_UTC_HOUR && m >= TARGET_UTC_MINUTE);
 }
 
 /**
@@ -49,7 +52,7 @@ function isWindowActive(d = new Date()) {
  */
 function checkAndRunTick() {
   const now = new Date();
-  const todayStr = getLocalDateString(now);
+  const todayStr = getUtcDateString(now);
 
   if (!isWindowActive(now)) {
     return null;
@@ -59,7 +62,7 @@ function checkAndRunTick() {
     return null;
   }
 
-  console.log(`[${now.toISOString()}] Target window active (21:30+), executing staggered push...`);
+  console.log(`[${now.toISOString()}] Target window active (13:30+ UTC / 21:30 CST), executing staggered push...`);
   const outcome = executeStaggeredPush();
 
   if (outcome.status === 'PASS') {
@@ -82,10 +85,10 @@ function checkAndRunTick() {
  * Main daemon startup routine.
  */
 function startDaemon() {
-  const startMsg = `[${new Date().toISOString()}] Staggered Push Daemon started (target: 21:30 daily).`;
+  const startMsg = `[${new Date().toISOString()}] Staggered Push Daemon started (target: 13:30 UTC / 21:30 CST daily).`;
   console.log(startMsg);
 
-  // Initial check on startup (in case VSCode was opened after 21:30 today)
+  // Initial check on startup (in case VSCode was opened after 13:30 UTC today)
   checkAndRunTick();
 
   // Periodic polling interval
@@ -111,7 +114,9 @@ if (require.main === module) {
 module.exports = {
   isWindowActive,
   checkAndRunTick,
-  TARGET_HOUR,
-  TARGET_MINUTE,
+  TARGET_HOUR: TARGET_UTC_HOUR,
+  TARGET_MINUTE: TARGET_UTC_MINUTE,
+  TARGET_UTC_HOUR,
+  TARGET_UTC_MINUTE,
   POLL_INTERVAL_MS,
 };

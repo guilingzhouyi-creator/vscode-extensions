@@ -357,7 +357,7 @@ Write-StepVerdict -StepId "ENGINE-AUDIT-05" -Status $(if ($statusAr -eq "PASS") 
 Write-StepVerdict -StepId "RUST-AUDIT-06" -Status $(if ($statusFg -eq "PASS") { "PASS" } else { "BLOCK" })
 
 $exitCode = if ($failed) { 1 } else { 0 }
-$globalStatus = if ($failed) { "🔴 存在违规异常" } else { "🟢 全域健康达标" }
+$globalStatus = if ($failed) { "🔴 存在违规异常" } else { "🟢 全域质量达标" }
 $globalColor = if ($failed) { "Red" } else { "Green" }
 
 function Get-SafeProp {
@@ -502,7 +502,7 @@ try {
 #    「一个子系统全挂」与「两个子系统半挂」，保留地板才能维持相对差距的可加性。
 #
 # 2. 熔断层：取六基石最小值 minCorner，低于 70.0 时按 minCorner/70.0 线性压缩总分，
-#    压缩系数下限 0.5 防止单一子系统彻底归零。该层保证任一子系统严重劣化都会
+#    压缩系数下限 0.5 防止单一子系统归零。该层保证任一子系统严重劣化都会
 #    拖低总分，不会被其余五项高分掩盖。
 #
 # 3. 加权层：基础设施与生产工程分开计权，权重向量固定为
@@ -801,7 +801,7 @@ $scoreFg = if ($statusFg -eq "PASS") {
 }
 
 $exitCode = if ($failed) { 1 } else { 0 }
-$globalStatus = if ($failed) { "🔴 存在违规异常" } else { "🟢 全域健康达标" }
+$globalStatus = if ($failed) { "🔴 存在违规异常" } else { "🟢 全域质量达标" }
 $globalColor = if ($failed) { "Red" } else { "Green" }
 
 # 全工作区综合健康分（分层加权：基础设施基石层 20% + 核心生产工程层 80%，附带极低分短板熔断阻尼）

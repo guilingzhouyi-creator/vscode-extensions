@@ -62,30 +62,46 @@ function git(args, extraEnv = {}) {
 }
 
 /**
- * Returns the current local calendar date string in YYYY-MM-DD format.
+ * Returns the calendar date string in YYYY-MM-DD format under objective UTC standard.
  *
  * @param {Date} [d=new Date()] - Date object.
- * @returns {string} Formatted date string.
+ * @returns {string} Formatted UTC date string (YYYY-MM-DD).
  */
-function getLocalDateString(d = new Date()) {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(DATE_PAD_LEN, '0');
-  const day = String(d.getDate()).padStart(DATE_PAD_LEN, '0');
+function getUtcDateString(d = new Date()) {
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(DATE_PAD_LEN, '0');
+  const day = String(d.getUTCDate()).padStart(DATE_PAD_LEN, '0');
   return `${year}-${month}-${day}`;
 }
 
 /**
+ * Backward compatibility alias for getUtcDateString.
+ *
+ * @param {Date} [d=new Date()] - Date object.
+ * @returns {string} Formatted UTC date string (YYYY-MM-DD).
+ */
+function getLocalDateString(d = new Date()) {
+  return getUtcDateString(d);
+}
+
+/**
  * Evaluates whether an individual NDJSON record line corresponds to a successful
- * push on the target calendar date.
+ * push on the target calendar date (in UTC).
  *
  * @param {string} line - Raw JSON line from audit log.
- * @param {string} dateStr - Target date string in YYYY-MM-DD.
+ * @param {string} dateStr - Target date string in YYYY-MM-DD (UTC).
  * @returns {boolean} True if matching push action.
  */
 function isPushEntryForDate(line, dateStr) {
   try {
     const entry = JSON.parse(line);
-    return entry.action === 'PUSH' && typeof entry.timestamp === 'string' && entry.timestamp.startsWith(dateStr);
+    if (entry.action !== 'PUSH') {
+      return false;
+    }
+    if (entry.date === dateStr) {
+      return true;
+    }
+    return typeof entry.timestamp === 'string' && entry.timestamp.startsWith(dateStr);
   } catch (err) {
     // Expected: ignore malformed or partial NDJSON lines during streaming parse
     return false;
@@ -284,14 +300,14 @@ function executeStaggeredPush(options = {}) {
     verifyRemoteSlice = null,
   } = options;
 
-  const todayStr = getLocalDateString();
+  const todayStr = getUtcDateString();
 
   // 1. Check idempotency
   if (!force && !preflight && !dryRun && hasPushedToday(todayStr)) {
     return {
       status: 'SKIP',
       date: todayStr,
-      summary: `Idempotence guard: already pushed today (${todayStr}). Use --force to push another batch.`,
+      summary: `Idempotence guard: already pushed today (${todayStr} UTC). Use --force to push another batch.`,
       action: 'NONE',
     };
   }
@@ -491,6 +507,7 @@ if (require.main === module) {
 module.exports = {
   executeStaggeredPush,
   hasPushedToday,
+  getUtcDateString,
   getLocalDateString,
   preflightCheckpointAudit,
   AUDIT_LOG_FILE,

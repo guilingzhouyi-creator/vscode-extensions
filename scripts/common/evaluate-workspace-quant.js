@@ -224,10 +224,10 @@ function evaluateWorkspaceQuant(root = REPO_ROOT, options = {}) {
         const ptd = assessment.riskRatios.ptd ?? assessment.riskRatios.mdd;
         const ehl = assessment.stochastic.ehl ?? assessment.stochastic.halfLifeCommits;
 
-        // 当门禁当前发生阻断时，将阻断事件映射为外生质量冲击 (Exogenous Shock)
+        // 当门禁当前发生阻断时，将阻断事件映射为下行风险，包络采用连续采样中的真实峰谷落差
         if (isBlocked) {
             ddr = Math.min(ddr, 0.0);
-            edb95 = Math.max(edb95, 35.0);
+            edb95 = Math.max(edb95, ptd);
         }
 
         return {
@@ -252,13 +252,13 @@ function evaluateWorkspaceQuant(root = REPO_ROOT, options = {}) {
             isSampleSufficient: scores.length >= MIN_SAMPLES,
             totalFindings,
             isBlocked,
-            ...(isBlocked ? { shockLevel: 'HIGH', shockAlert: '当前检测到门禁阻断冲击 (Quality Shock Event)' } : {}),
+            ...(isBlocked ? { shockLevel: 'HIGH', shockAlert: '当前检测到门禁阻断事件 (Gate Block Event)' } : {}),
         };
     }
 
     // Graceful fallback if dist is unbuilt or evaluation is unavailable
-    const fallbackDdr = isBlocked ? 0.0 : 0.0;
-    const fallbackEdb = isBlocked ? 35.0 : 0.0;
+    const fallbackDdr = 0.0;
+    const fallbackEdb = 0.0;
     return {
         rcr: 0.0,
         erq: 0.0,
@@ -281,7 +281,7 @@ function evaluateWorkspaceQuant(root = REPO_ROOT, options = {}) {
         isSampleSufficient: false,
         totalFindings,
         isBlocked,
-        ...(isBlocked ? { shockLevel: 'HIGH', shockAlert: '当前检测到门禁阻断冲击 (Quality Shock Event)' } : {}),
+        ...(isBlocked ? { shockLevel: 'HIGH', shockAlert: '当前检测到门禁阻断事件 (Gate Block Event)' } : {}),
     };
 }
 
@@ -309,7 +309,7 @@ if (require.main === module) {
     } else {
         const statusBadge =
             result.status === 'de-leveraging'
-                ? '🟢 [强净消融]'
+                ? '🟢 [持续偿减]'
                 : result.status === 'balanced'
                   ? '🟡 [动态均势]'
                   : result.status === 'insufficient_samples'
@@ -317,7 +317,7 @@ if (require.main === module) {
                     : '🔴 [赤字膨胀]';
         process.stdout.write(`\n=== 架构动力学与韧性量化模型 (Architecture Dynamics & Resilience, ADR-Q) ===\n`);
         process.stdout.write(` 【偿债动力学】\n`);
-        process.stdout.write(`  • 消融代偿比 (RCR)   : ${result.rcr.toFixed(2)}x ${statusBadge}\n`);
+        process.stdout.write(`  • 清偿代偿比 (RCR)   : ${result.rcr.toFixed(2)}x ${statusBadge}\n`);
         process.stdout.write(` 【时序韧性包络】\n`);
         process.stdout.write(`  • 质量坚韧商 (ERQ)   : ${result.erq.toFixed(2)}\n`);
         process.stdout.write(`  • 破位防御度 (DDR)   : ${result.ddr.toFixed(2)}\n`);

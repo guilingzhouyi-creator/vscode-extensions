@@ -219,7 +219,7 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 
 工作区门禁系统（`pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`gate-fast-staged`、`validate-staged-slice`、`validate-commit-msg`）原生支持**双轨运行界面**：
 1. **人类交互模式 (默认)**：保留高对比度彩色终端、清晰横幅进度与步骤摘要；
-2. **Agent 原生消费模式 (`-Agent` / `--agent` / `--json`)**：彻底剥离控制台彩色散文与非必要输出，在标准输出 (stdout) 仅发射单份确定性、机器可读的结构化 JSON 协议包。
+2. **Agent 原生消费模式 (`-Agent` / `--agent` / `--json`)**：剥离控制台彩色散文与非必要输出，在标准输出 (stdout) 仅发射单份确定性、机器可读的结构化 JSON 协议包。
 
 ### 1. 协议包 Schema 契约 (`AgentFailureEnvelope`)
 

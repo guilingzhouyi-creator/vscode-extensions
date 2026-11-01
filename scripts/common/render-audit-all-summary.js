@@ -536,7 +536,7 @@ function renderConsoleDashboard(summary, elapsedSec) {
   renderTenDimensionsRows(summary.tenDimensions, summary.arCompositeScore);
   console.log(borderMid);
 
-  const globalStatus = summary.status === 'BLOCK' ? '🔴 存在违规异常' : '🟢 全域健康达标';
+  const globalStatus = summary.status === 'BLOCK' ? '🔴 存在违规异常' : '🟢 全域质量达标';
   const debtPart = summary.totalDebt !== null ? `  |  技术债: ${summary.totalDebt}项` : '';
   console.log(formatDashboardRow(` 耗时: ${elapsedSec}s${debtPart}  |  全局状态: ${globalStatus}`));
   console.log(borderBot);
@@ -606,7 +606,7 @@ function appendGithubStepSummary(summaryFile, summary, elapsedSec) {
   const passBadge = (s) => (s === 'PASS' ? '🟢 达标' : '🔴 阻断');
   const wsHealth = summary.workspaceHealthScore;
   const wsHealthStr = wsHealth % 1 === 0 ? wsHealth.toFixed(1) : String(wsHealth);
-  const globalStatus = summary.status === 'BLOCK' ? '🔴 存在违规异常' : '🟢 全域健康达标';
+  const globalStatus = summary.status === 'BLOCK' ? '🔴 存在违规异常' : '🟢 全域质量达标';
   const ps = summary.projectScores;
   const pj = summary.projects;
 
