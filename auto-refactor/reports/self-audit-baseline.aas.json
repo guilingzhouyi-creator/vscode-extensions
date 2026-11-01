@@ -2,13 +2,13 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-01T12:48:13.694Z",
+  "timestamp": "2026-11-01T13:11:03.274Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
     "score": 99.19,
     "grade": "A+",
-    "cai": 88.27,
+    "cai": 88.28,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
@@ -21,65 +21,76 @@
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 28418,
+      "remediationMinutes": 28374,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.51,
-      "meanScore": 96.51,
+      "index": 96.53,
+      "meanScore": 96.53,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
+    },
+    "quant": {
+      "rcr": 0,
+      "erq": 0.65,
+      "ddr": 0.8,
+      "edb95": 15.5,
+      "ptd": 36.2,
+      "dsi": 0.51,
+      "rcd": 0.67,
+      "ehl": 1,
+      "status": "insufficient_samples"
     },
     "dimensionSummary": {
       "healthyCount": 10,
       "warningCount": 0,
       "failingCount": 0,
       "lowestDimension": "standardization",
-      "lowestScore": 95.9
+      "lowestScore": 95.95
     },
     "pillars": {
       "architecture": 99.58,
-      "maintainability": 98.15,
-      "performance": 99.84,
-      "data": 98.48,
+      "maintainability": 98.16,
+      "performance": 99.83,
+      "data": 98.47,
       "testing": 99.79,
       "reliability": 99.73,
       "security": 99.88,
-      "extensibility": 97.79
+      "extensibility": 97.8
     },
     "counts": {
       "files": 815,
-      "total": 4131,
+      "total": 4104,
       "errors": 0,
-      "warns": 3551,
-      "info": 580,
-      "suppressed": 113
+      "warns": 3523,
+      "info": 581,
+      "suppressed": 112
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1698,
-    "advisory": 2433,
+    "patchable": 1702,
+    "advisory": 2402,
     "uncalibrated": 112,
     "needsHuman": 1
   },
   "defaultVerify": "npm test",
   "dimensions": {
     "architectureConsistency": 99.58,
-    "semanticPurity": 99.48,
+    "semanticPurity": 99.47,
     "codeSecurity": 99.88,
-    "performanceEfficiency": 99.84,
-    "standardization": 95.9,
+    "performanceEfficiency": 99.83,
+    "standardization": 95.95,
     "modernity": 99.79,
-    "maintainability": 98.15,
+    "maintainability": 98.16,
     "commentQuality": 99.99,
-    "duplication": 97.48,
+    "duplication": 97.47,
     "techDebtRisk": 99.98
   },
   "dimensionDetails": {
     "architectureConsistency": {
-      "score": 97.58,
+      "score": 97.57,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
@@ -94,7 +105,7 @@
       ]
     },
     "semanticPurity": {
-      "score": 98.22,
+      "score": 98.2,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -108,14 +119,14 @@
       "confidence": 1
     },
     "performanceEfficiency": {
-      "score": 99.61,
+      "score": 99.6,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.102,
       "confidence": 1
     },
     "standardization": {
-      "score": 84.5,
+      "score": 84.6,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
@@ -137,21 +148,21 @@
       "confidence": 1
     },
     "maintainability": {
-      "score": 93.52,
+      "score": 93.56,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
       "confidence": 1
     },
     "commentQuality": {
-      "score": 99.98,
+      "score": 99.96,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.074,
       "confidence": 1
     },
     "duplication": {
-      "score": 95.12,
+      "score": 95.1,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -169,7 +180,7 @@
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3430,
+      "loss": 3440,
       "count": 238
     },
     {
@@ -179,16 +190,16 @@
       "count": 314
     },
     {
-      "rule": "SIM-TRN-001",
-      "dim": "standardization",
-      "loss": 2340,
-      "count": 234
-    },
-    {
       "rule": "CPX-NEST-001",
       "dim": "maintainability",
       "loss": 2330,
       "count": 233
+    },
+    {
+      "rule": "SIM-TRN-001",
+      "dim": "standardization",
+      "loss": 2300,
+      "count": 230
     },
     {
       "rule": "NAM-DEC-001",
@@ -199,20 +210,20 @@
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2190,
-      "count": 438
+      "loss": 2175,
+      "count": 435
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2040,
-      "count": 204
+      "loss": 2030,
+      "count": 203
     },
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 1956,
-      "count": 652
+      "loss": 1965,
+      "count": 655
     }
   ],
   "topology": {
@@ -7408,5 +7419,5 @@
       }
     ]
   },
-  "truncated": 3041
+  "truncated": 3013
 }
