@@ -1,16 +1,16 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1793522767378",
-  "timestamp": "2026-11-01T08:46:12.952Z",
-  "cai": 88.22,
+  "snapshotId": "snapshot-v0.4.0-1793530106535",
+  "timestamp": "2026-11-01T10:48:30.907Z",
+  "cai": 88.24,
   "autonomy": {
-    "compositeAutonomyIndex": 88.22,
+    "compositeAutonomyIndex": 88.24,
     "grade": "L4_HIGH_AUTONOMY",
     "gradeDescription": "High autonomy: Business logic and domain kernel are fully proprietary, integrating standard open-source ecosystems reasonably",
     "dimensions": {
       "effectiveLocAutonomy": 97.78,
       "symbolCallAutonomy": 98.05,
       "domainKernelDensity": 63.32,
-      "codeOriginality": 90.39,
+      "codeOriginality": 90.53,
       "supplyChainResilience": 77.27,
       "criticalPathAutonomy": 95
     },
@@ -24,9 +24,9 @@
     },
     "confidence": {
       "sampleSufficiency": 1,
-      "lowerBound": 87.3,
-      "upperBound": 89.1,
-      "credibleScore": 88.21,
+      "lowerBound": 87.32,
+      "upperBound": 89.12,
+      "credibleScore": 88.23,
       "isLowConfidence": false
     },
     "supplyChain": {
@@ -60,15 +60,15 @@
       }
     ],
     "stats": {
-      "totalFiles": 814,
-      "proprietaryFiles": 807,
+      "totalFiles": 815,
+      "proprietaryFiles": 808,
       "vendorFiles": 0,
       "generatedFiles": 7,
-      "totalEffectiveLoc": 250238,
-      "proprietaryEffectiveLoc": 244671,
+      "totalEffectiveLoc": 250250,
+      "proprietaryEffectiveLoc": 244683,
       "vendorEffectiveLoc": 0,
       "generatedEffectiveLoc": 5567,
-      "internalSymbolCalls": 2410,
+      "internalSymbolCalls": 2413,
       "externalSdkCalls": 48,
       "stdlibCalls": 641,
       "criticalPathFiles": 23,
@@ -77,8 +77,8 @@
     }
   },
   "polyglotGeneralization": {
-    "index": 96.4,
-    "meanScore": 96.4,
+    "index": 96.5,
+    "meanScore": 96.5,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -94,21 +94,21 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 814,
-    "durationMs": 4827
+    "filesScanned": 815,
+    "durationMs": 3611
   },
   "metrics": {
-    "compositeScore": 99.15,
+    "compositeScore": 99.18,
     "grade": "A+",
-    "autonomyRate": 88.22,
+    "autonomyRate": 88.24,
     "sqale": {
-      "tdr": 0.004,
-      "remediationMinutes": 30067,
+      "tdr": 0.0038,
+      "remediationMinutes": 28669,
       "grade": "A"
     },
     "polyglotGeneralization": {
-      "index": 96.4,
-      "meanScore": 96.4,
+      "index": 96.5,
+      "meanScore": 96.5,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
@@ -120,36 +120,36 @@
       "averagePor": 0.082,
       "averageColumnDensity": 0.868,
       "averageSpatialDensity": 0.454,
-      "averageMahalanobisDistance": 4.492,
+      "averageMahalanobisDistance": 4.498,
       "averageFisherSimplexDistance": 0.093
     },
-    "totalIssues": 4329,
+    "totalIssues": 4151,
     "suppressedIssues": 113,
-    "unsuppressedIssues": 4216,
+    "unsuppressedIssues": 4038,
     "bySeverity": {
-      "info": 612,
-      "warning": 3727,
+      "info": 586,
+      "warning": 3575,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
-      "medium": 687,
-      "low": 3642
+      "medium": 645,
+      "low": 3506
     }
   },
   "eightPillars": {
     "pillars": {
-      "architecture": 99.53,
-      "maintainability": 98.04,
+      "architecture": 99.57,
+      "maintainability": 98.14,
       "performance": 99.84,
-      "data": 98.42,
+      "data": 98.47,
       "testing": 99.78,
-      "reliability": 99.72,
+      "reliability": 99.73,
       "security": 99.88,
-      "extensibility": 97.72
+      "extensibility": 97.78
     },
-    "compositeScore": 99.15,
+    "compositeScore": 99.18,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -163,27 +163,18 @@
     "ceilingsApplied": []
   },
   "tenDimensions": {
-    "architectureConsistency": 99.53,
-    "semanticPurity": 99.46,
+    "architectureConsistency": 99.57,
+    "semanticPurity": 99.48,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.84,
-    "standardization": 95.79,
+    "standardization": 95.88,
     "modernity": 99.78,
-    "maintainability": 98.04,
+    "maintainability": 98.14,
     "commentQuality": 99.99,
-    "duplication": 97.37,
+    "duplication": 97.46,
     "techDebtRisk": 99.98
   },
   "topHotspots": [
-    {
-      "filePath": "src/cli/trajectory-cmd.ts",
-      "domain": "cli",
-      "totalIssues": 29,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 96.87,
-      "effectiveDensity": 0.93
-    },
     {
       "filePath": "scripts/bench-fastpath.js",
       "domain": "scripts",
@@ -203,15 +194,6 @@
       "effectiveDensity": 0.93
     },
     {
-      "filePath": "src/core/reporting/aas-reporter.ts",
-      "domain": "reporting",
-      "totalIssues": 25,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 96.9,
-      "effectiveDensity": 0.95
-    },
-    {
       "filePath": "scripts/validate-rule-generalization.js",
       "domain": "scripts",
       "totalIssues": 24,
@@ -221,42 +203,6 @@
       "effectiveDensity": 0.97
     },
     {
-      "filePath": "src/core/profiler/projectProfiler.ts",
-      "domain": "profiler",
-      "totalIssues": 24,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 96.23,
-      "effectiveDensity": 0.94
-    },
-    {
-      "filePath": "src/core/cfg/def-use-chain.ts",
-      "domain": "cfg",
-      "totalIssues": 23,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.93,
-      "effectiveDensity": 0.9
-    },
-    {
-      "filePath": "src/core/ast/scope-graph.ts",
-      "domain": "ast",
-      "totalIssues": 22,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.07,
-      "effectiveDensity": 0.92
-    },
-    {
-      "filePath": "src/core/trajectory/timeline-projector.ts",
-      "domain": "trajectory",
-      "totalIssues": 22,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 96.97,
-      "effectiveDensity": 0.95
-    },
-    {
       "filePath": "scripts/validate-diff.js",
       "domain": "scripts",
       "totalIssues": 21,
@@ -264,14 +210,68 @@
       "highCount": 0,
       "compositeScore": 98.55,
       "effectiveDensity": 0.96
+    },
+    {
+      "filePath": "src/core/governance/gate-scenario-evaluators.ts",
+      "domain": "governance",
+      "totalIssues": 21,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 98.03,
+      "effectiveDensity": 0.96
+    },
+    {
+      "filePath": "src/core/governance/terminology-engine.ts",
+      "domain": "governance",
+      "totalIssues": 21,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 96.8,
+      "effectiveDensity": 0.95
+    },
+    {
+      "filePath": "src/daemon/client.ts",
+      "domain": "daemon",
+      "totalIssues": 21,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 97.4,
+      "effectiveDensity": 0.94
+    },
+    {
+      "filePath": "scripts/run-self-audit.js",
+      "domain": "scripts",
+      "totalIssues": 20,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 97.2,
+      "effectiveDensity": 0.95
+    },
+    {
+      "filePath": "src/core/math/descriptive-statistics.ts",
+      "domain": "math",
+      "totalIssues": 20,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 98.78,
+      "effectiveDensity": 0.92
+    },
+    {
+      "filePath": "src/core/trajectory/timeline-projector.ts",
+      "domain": "trajectory",
+      "totalIssues": 20,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 97.12,
+      "effectiveDensity": 0.95
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
       "high": 0,
-      "medium": 687,
-      "low": 3642
+      "medium": 645,
+      "low": 3506
     },
     "criticalItems": [],
     "highItems": []
@@ -295,16 +295,16 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 98.71,
+        "compositeScore": 98.76,
         "pillars": {
-          "architecture": 99.77,
-          "maintainability": 96.33,
+          "architecture": 99.71,
+          "maintainability": 96.62,
           "performance": 99.84,
-          "data": 97.33,
+          "data": 97.38,
           "testing": 99.51,
           "reliability": 99.4,
           "security": 99.84,
-          "extensibility": 97.55
+          "extensibility": 97.61
         },
         "moduleCount": 1
       },
@@ -325,16 +325,16 @@
       },
       {
         "domainName": "cli",
-        "compositeScore": 98.64,
+        "compositeScore": 99.28,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.25,
+          "maintainability": 98.93,
           "performance": 100,
-          "data": 95.21,
+          "data": 97.82,
           "testing": 100,
-          "reliability": 99.65,
-          "security": 99.84,
-          "extensibility": 94.7
+          "reliability": 100,
+          "security": 99.86,
+          "extensibility": 96.88
         },
         "moduleCount": 1
       },
@@ -370,16 +370,16 @@
       },
       {
         "domainName": "architecture",
-        "compositeScore": 99.38,
+        "compositeScore": 99.4,
         "pillars": {
           "architecture": 99.8,
-          "maintainability": 98.19,
+          "maintainability": 98.47,
           "performance": 100,
-          "data": 98.6,
+          "data": 98.5,
           "testing": 99.9,
           "reliability": 99.9,
           "security": 99.88,
-          "extensibility": 98.62
+          "extensibility": 98.55
         },
         "moduleCount": 1
       },
@@ -400,31 +400,31 @@
       },
       {
         "domainName": "ast",
-        "compositeScore": 98.88,
+        "compositeScore": 99,
         "pillars": {
-          "architecture": 99.79,
-          "maintainability": 97.04,
+          "architecture": 99.88,
+          "maintainability": 97.72,
           "performance": 100,
-          "data": 98.07,
-          "testing": 99.06,
-          "reliability": 99.68,
+          "data": 98.03,
+          "testing": 99.05,
+          "reliability": 99.64,
           "security": 99.87,
-          "extensibility": 97.5
+          "extensibility": 97.61
         },
         "moduleCount": 1
       },
       {
         "domainName": "cfg",
-        "compositeScore": 99.28,
+        "compositeScore": 99.69,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.4,
           "performance": 100,
-          "data": 96.68,
+          "data": 98.98,
           "testing": 100,
-          "reliability": 99.28,
+          "reliability": 99.7,
           "security": 99.91,
-          "extensibility": 97.99
+          "extensibility": 99.23
         },
         "moduleCount": 1
       },
@@ -565,16 +565,16 @@
       },
       {
         "domainName": "evolution",
-        "compositeScore": 99.14,
+        "compositeScore": 99.19,
         "pillars": {
-          "architecture": 99.44,
+          "architecture": 99.63,
           "maintainability": 98.34,
           "performance": 100,
           "data": 97.87,
           "testing": 99.93,
           "reliability": 99.72,
           "security": 99.89,
-          "extensibility": 97.51
+          "extensibility": 97.68
         },
         "moduleCount": 1
       },
@@ -655,16 +655,16 @@
       },
       {
         "domainName": "intelligence",
-        "compositeScore": 98.97,
+        "compositeScore": 99.01,
         "pillars": {
           "architecture": 99.56,
-          "maintainability": 98.12,
+          "maintainability": 98.38,
           "performance": 100,
           "data": 97.04,
-          "testing": 99.91,
+          "testing": 99.9,
           "reliability": 99.75,
           "security": 99.87,
-          "extensibility": 96.8
+          "extensibility": 96.86
         },
         "moduleCount": 1
       },
@@ -760,7 +760,7 @@
       },
       {
         "domainName": "policy",
-        "compositeScore": 98.74,
+        "compositeScore": 98.78,
         "pillars": {
           "architecture": 100,
           "maintainability": 99,
@@ -769,22 +769,22 @@
           "testing": 98.83,
           "reliability": 100,
           "security": 99.9,
-          "extensibility": 95.62
+          "extensibility": 95.95
         },
         "moduleCount": 1
       },
       {
         "domainName": "praxis",
-        "compositeScore": 98.7,
+        "compositeScore": 98.74,
         "pillars": {
           "architecture": 97.71,
-          "maintainability": 98.48,
+          "maintainability": 98.69,
           "performance": 99.81,
           "data": 97.25,
           "testing": 99.44,
           "reliability": 99.5,
           "security": 99.88,
-          "extensibility": 97.45
+          "extensibility": 97.51
         },
         "moduleCount": 1
       },
@@ -910,46 +910,46 @@
       },
       {
         "domainName": "profiler",
-        "compositeScore": 99.14,
+        "compositeScore": 99.67,
         "pillars": {
-          "architecture": 98.68,
-          "maintainability": 98.05,
+          "architecture": 100,
+          "maintainability": 99.22,
           "performance": 100,
-          "data": 98.9,
+          "data": 99.5,
           "testing": 100,
           "reliability": 100,
           "security": 99.88,
-          "extensibility": 97.64
+          "extensibility": 98.5
         },
         "moduleCount": 1
       },
       {
         "domainName": "reporters",
-        "compositeScore": 98.22,
+        "compositeScore": 98.79,
         "pillars": {
-          "architecture": 95.64,
+          "architecture": 99.05,
           "maintainability": 98,
           "performance": 100,
           "data": 97.93,
           "testing": 98.1,
           "reliability": 97.93,
           "security": 99.83,
-          "extensibility": 99.12
+          "extensibility": 99.61
         },
         "moduleCount": 1
       },
       {
         "domainName": "reporting",
-        "compositeScore": 99.01,
+        "compositeScore": 99.18,
         "pillars": {
-          "architecture": 99.47,
+          "architecture": 100,
           "maintainability": 98.52,
           "performance": 99.52,
-          "data": 97.57,
-          "testing": 99.67,
-          "reliability": 99.43,
+          "data": 98.01,
+          "testing": 99.72,
+          "reliability": 99.55,
           "security": 99.87,
-          "extensibility": 97.56
+          "extensibility": 97.86
         },
         "moduleCount": 1
       },
@@ -1015,10 +1015,10 @@
       },
       {
         "domainName": "scheduler",
-        "compositeScore": 98.93,
+        "compositeScore": 98.96,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.69,
+          "maintainability": 98.89,
           "performance": 99.65,
           "data": 96.6,
           "testing": 99.33,
@@ -1120,16 +1120,16 @@
       },
       {
         "domainName": "trajectory",
-        "compositeScore": 99.06,
+        "compositeScore": 99.09,
         "pillars": {
           "architecture": 99.59,
-          "maintainability": 98.07,
+          "maintainability": 98.23,
           "performance": 99.81,
           "data": 97.63,
           "testing": 99.84,
           "reliability": 99.84,
           "security": 99.88,
-          "extensibility": 97.38
+          "extensibility": 97.49
         },
         "moduleCount": 1
       },
@@ -1197,40 +1197,40 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 194643,
+      "processed": 194672,
       "unique": 154000,
-      "changed": 92,
-      "semantic": 75,
+      "changed": 6996,
+      "semantic": 2103,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 83,
-      "deleted": 9,
-      "modified": 9
+      "added": 3544,
+      "deleted": 3452,
+      "modified": 3452
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1793522767373,
+      "endMs": 1793530106530,
       "totalRuns": 454,
       "eloc": {
-        "processedTotal": 68974291,
+        "processedTotal": 69030660,
         "uniqueTotal": 154000,
-        "changedTotal": 1506182,
-        "semanticTotal": 1157413
+        "changedTotal": 1525268,
+        "semanticTotal": 1163234
       },
       "qed": {
-        "mean": -0.045879,
+        "mean": -0.045835,
         "min": -3.5,
         "max": 0.18,
-        "kMean": -45.879
+        "kMean": -45.835
       },
       "debt": {
         "totalAdded": 3435,
-        "totalResolved": 9797,
+        "totalResolved": 9839,
         "totalRegressions": 77,
-        "netYield": 5.5,
-        "densityYield": 41.31
+        "netYield": 5.51,
+        "densityYield": 41.58
       },
       "meanCompositeScore": 98.92,
       "gatePassRate": 92.74

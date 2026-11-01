@@ -1,11 +1,11 @@
 {
   "version": "1.0",
-  "lastUpdated": "2026-11-01T10:13:54.724Z",
+  "lastUpdated": "2026-11-01T10:48:28.077Z",
   "projectProfile": "standard",
   "learnedWeights": {
     "Ws": 0.531,
-    "Wd": 0.396,
-    "Wf": 0.073
+    "Wd": 0.399,
+    "Wf": 0.07
   },
   "activeIncidents": 0,
   "demotedRules": [],
