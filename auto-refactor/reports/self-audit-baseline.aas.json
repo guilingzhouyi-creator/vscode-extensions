@@ -2,7 +2,7 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-01T10:48:27.945Z",
+  "timestamp": "2026-11-01T11:13:57.762Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
@@ -21,7 +21,7 @@
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 28669,
+      "remediationMinutes": 28691,
       "grade": "A"
     },
     "polyglot": {
@@ -46,21 +46,21 @@
       "testing": 99.78,
       "reliability": 99.73,
       "security": 99.88,
-      "extensibility": 97.78
+      "extensibility": 97.77
     },
     "counts": {
       "files": 815,
-      "total": 4161,
+      "total": 4163,
       "errors": 0,
-      "warns": 3575,
+      "warns": 3577,
       "info": 586,
       "suppressed": 113
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1733,
-    "advisory": 2428,
+    "patchable": 1734,
+    "advisory": 2429,
     "uncalibrated": 165,
     "needsHuman": 1
   },
@@ -144,7 +144,7 @@
       "confidence": 1
     },
     "commentQuality": {
-      "score": 99.99,
+      "score": 99.98,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.074,
@@ -205,8 +205,8 @@
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2090,
-      "count": 209
+      "loss": 2100,
+      "count": 210
     },
     {
       "rule": "hardcoded-string",
@@ -7397,5 +7397,5 @@
       }
     ]
   },
-  "truncated": 3065
+  "truncated": 3067
 }
