@@ -451,16 +451,13 @@ function foldSingleBucket(
     const runsCount = records.length;
     const weightedMeanScore =
         semanticEloc > 0
-            ? Math.round((weightedScoreSum / semanticEloc) * ROUNDING_FACTOR_TWO_DECIMALS) /
-              ROUNDING_FACTOR_TWO_DECIMALS
-            : Math.round((unweightedScoreSum / runsCount) * ROUNDING_FACTOR_TWO_DECIMALS) /
-              ROUNDING_FACTOR_TWO_DECIMALS;
+            ? Math.round((weightedScoreSum / semanticEloc) * ROUNDING_FACTOR_TWO_DECIMALS) / ROUNDING_FACTOR_TWO_DECIMALS
+            : Math.round((unweightedScoreSum / runsCount) * ROUNDING_FACTOR_TWO_DECIMALS) / ROUNDING_FACTOR_TWO_DECIMALS;
 
     const netDebtPoints = debtResolved - debtAdded;
     const netDebtYield =
         semanticEloc > 0
-            ? Math.round((netDebtPoints / (semanticEloc / 1000)) * ROUNDING_FACTOR_TWO_DECIMALS) /
-              ROUNDING_FACTOR_TWO_DECIMALS
+            ? Math.round((netDebtPoints / (semanticEloc / 1000)) * ROUNDING_FACTOR_TWO_DECIMALS) / ROUNDING_FACTOR_TWO_DECIMALS
             : netDebtPoints;
 
     const gatePassRate =
