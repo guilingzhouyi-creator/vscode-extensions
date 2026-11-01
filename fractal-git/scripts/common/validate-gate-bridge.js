@@ -16,11 +16,71 @@
 'use strict';
 
 const fs = require('fs');
+const Module = require('module');
 const path = require('path');
 
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const REPO_ROOT = path.resolve(PROJECT_ROOT, '..');
 const RULE_CATALOG_PATH = path.join(REPO_ROOT, 'scripts/common/rule-catalog.json');
+const BRIDGE_TS_PATH = path.join(PROJECT_ROOT, 'ts/gate-bridge.ts');
+
+/**
+ * Resolves the workspace TypeScript compiler module for in-memory gate-bridge transpilation.
+ *
+ * @returns {object} Loaded TypeScript compiler API.
+ */
+function resolveTypeScriptCompiler() {
+  const candidates = [
+    path.join(REPO_ROOT, 'auto-refactor/node_modules/typescript'),
+    path.join(REPO_ROOT, 'workspace-timing/node_modules/typescript'),
+    'typescript',
+  ];
+  for (const candidate of candidates) {
+    try {
+      return require(candidate);
+    } catch {
+      // Try next workspace candidate
+    }
+  }
+  throw new Error('TypeScript compiler unavailable in workspace node_modules (Fail-Closed).');
+}
+
+/**
+ * Compiles and loads ts/gate-bridge.ts in memory so Test Cases 1-4 execute against real logic.
+ *
+ * @returns {Function} Compiled verifyPreReviewZone entrypoint.
+ */
+function loadGateBridgeVerifier() {
+  const distPath = path.join(PROJECT_ROOT, 'dist/ts/gate-bridge.js');
+  if (fs.existsSync(distPath)) {
+    const prebuilt = require(distPath);
+    if (typeof prebuilt.verifyPreReviewZone === 'function') {
+      return prebuilt.verifyPreReviewZone;
+    }
+  }
+  if (!fs.existsSync(BRIDGE_TS_PATH)) {
+    throw new Error(`Gate bridge source missing at ${BRIDGE_TS_PATH}`);
+  }
+  const ts = resolveTypeScriptCompiler();
+  const rawSource = fs.readFileSync(BRIDGE_TS_PATH, 'utf8');
+  const transpiled = ts.transpileModule(rawSource, {
+    fileName: BRIDGE_TS_PATH,
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      esModuleInterop: true,
+      strict: true,
+    },
+  });
+  const compiledModule = new Module(BRIDGE_TS_PATH, module);
+  compiledModule.filename = BRIDGE_TS_PATH;
+  compiledModule.paths = Module._nodeModulePaths(path.dirname(BRIDGE_TS_PATH));
+  compiledModule._compile(transpiled.outputText, BRIDGE_TS_PATH);
+  if (typeof compiledModule.exports.verifyPreReviewZone !== 'function') {
+    throw new Error('Transpiled ts/gate-bridge.ts did not export verifyPreReviewZone');
+  }
+  return compiledModule.exports.verifyPreReviewZone;
+}
 
 /**
  * Loads registered rule IDs from the single source of truth rule catalog.
@@ -47,25 +107,17 @@ function runGateBridgeValidation() {
   const violations = [];
   const validRuleIds = loadRegisteredRuleIds();
 
-  // Load the compiled or direct gate-bridge module
+  const rawCode = fs.existsSync(BRIDGE_TS_PATH) ? fs.readFileSync(BRIDGE_TS_PATH, 'utf8') : '';
+  if (rawCode.includes('L3-CONFLICT')) {
+    violations.push('FGT-BRG-001: Unregistered rule literal "L3-CONFLICT" detected in ts/gate-bridge.ts');
+  }
+
   let verifyPreReviewZone;
   try {
-    const bridgeModule = require(path.join(PROJECT_ROOT, 'ts/gate-bridge.ts'));
-    verifyPreReviewZone = bridgeModule.verifyPreReviewZone;
-  } catch (_err) {
-    // If running in raw Node without ts-node, load via dynamic wrapper or compiled dist
-    const distPath = path.join(PROJECT_ROOT, 'dist/ts/gate-bridge.js');
-    if (fs.existsSync(distPath)) {
-      verifyPreReviewZone = require(distPath).verifyPreReviewZone;
-    } else {
-      console.log('Note: gate-bridge.ts requires compilation, running synthetic syntax audit...');
-      // Read raw file content to check for unregistered rule literals
-      const rawCode = fs.readFileSync(path.join(PROJECT_ROOT, 'ts/gate-bridge.ts'), 'utf8');
-      if (rawCode.includes('L3-CONFLICT')) {
-        violations.push('FGT-BRG-001: Unregistered rule literal "L3-CONFLICT" detected in ts/gate-bridge.ts');
-      }
-      return concludeValidation(violations);
-    }
+    verifyPreReviewZone = loadGateBridgeVerifier();
+  } catch (loadErr) {
+    violations.push(`FGT-BRG-001: Failed to compile or load ts/gate-bridge.ts (${loadErr.message})`);
+    return concludeValidation(violations);
   }
 
   // Test Case 1: Clean code must pass with 100 score

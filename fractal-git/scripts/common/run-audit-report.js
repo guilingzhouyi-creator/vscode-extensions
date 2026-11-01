@@ -33,10 +33,12 @@ const AR_API_PATH = path.join(REPO_ROOT, 'auto-refactor/dist/api.js');
 /**
  * Executes a Node-based static checker child process.
  *
- * @param {string} relativeScript - Path relative to fractal-git root.
+ * @param {string|{script: string, args?: string[]}} checkerSpec - Script path or spec relative to fractal-git root.
  * @returns {{ name: string, passed: boolean, message: string }} Checker outcome.
  */
-function runStaticChecker(relativeScript) {
+function runStaticChecker(checkerSpec) {
+  const relativeScript = typeof checkerSpec === 'string' ? checkerSpec : checkerSpec.script;
+  const extraArgs = typeof checkerSpec === 'object' && Array.isArray(checkerSpec.args) ? checkerSpec.args : [];
   const scriptPath = path.join(PROJECT_ROOT, relativeScript);
   const name = path.basename(relativeScript, '.js');
 
@@ -44,7 +46,7 @@ function runStaticChecker(relativeScript) {
     return { name, passed: false, message: `Checker missing: ${relativeScript}` };
   }
 
-  const res = spawnSync(process.execPath, [scriptPath], {
+  const res = spawnSync(process.execPath, [scriptPath, ...extraArgs], {
     cwd: PROJECT_ROOT,
     encoding: 'utf8',
     stdio: 'pipe',
@@ -296,8 +298,9 @@ async function main() {
   const staticCheckers = [
     'scripts/common/validate-crate-topology.js',
     'scripts/common/check-zero-alloc-boundary.js',
-    'scripts/common/validate-git-parity.js',
+    { script: 'scripts/common/validate-git-parity.js', args: ['--require-git'] },
     'scripts/common/validate-gate-bridge.js',
+    ...(isFast ? [] : ['scripts/common/validate-perf-baseline.js']),
   ];
 
   const violations = [];
@@ -307,24 +310,26 @@ async function main() {
   const testResult = runCargoTests(isFast);
   evaluateCargoTestResult(testResult, violations);
 
-  const totalChecks = staticCheckers.length + testResult.totalTests;
-  const passChecks = staticPassCount + testResult.passedTests;
+  // Invoke genuine deep AST analysis via auto-refactor (Fail-Closed when unavailable)
+  const astScan = await performDeepAstScan(isFast);
+  if (astScan === null) {
+    violations.push('auto-refactor AST scanner unavailable or returned null telemetry (Fail-Closed).');
+  } else if (astScan.antiGamingPassed === false) {
+    violations.push('auto-refactor anti-gaming check rejected structural gaming.');
+  }
+
+  const astCheckTotal = 1;
+  const astCheckPass = astScan !== null && astScan.antiGamingPassed !== false ? 1 : 0;
+  const totalChecks = staticCheckers.length + testResult.totalTests + astCheckTotal;
+  const passChecks = staticPassCount + testResult.passedTests + astCheckPass;
   const isOverallPass = violations.length === 0 && testResult.isClean;
 
-  // A test run that produced no parsed result contributes zero to both counters, so the summary
-  // could read "Checks=4/4, Status=BLOCK" — arithmetic that looks like a contradiction and sends
-  // the reader hunting for a defect in whichever checker is listed. The gate verdict is right; the
-  // denominator was wrong. An unresolved run is counted as one failed check so the figures and the
-  // verdict agree, and the reason stays visible in the violations list.
   const recordedTotal = testResult.totalTests > 0 ? totalChecks : totalChecks + 1;
   const recordedPass = passChecks;
 
   const bayesian = computeBayesianCredibleScore(recordedPass, recordedTotal);
 
-  // Invoke genuine deep AST analysis via auto-refactor
-  const astScan = await performDeepAstScan(isFast);
-
-  const finalCompositeScore = astScan ? astScan.compositeScore : bayesian.credibleScore;
+  const finalCompositeScore = astScan ? astScan.compositeScore : 15.0;
   // CAI is only meaningful when the AST scanner actually ran; the surrogate
   // "perfect 100" default masked missing telemetry and is intentionally gone.
   const finalCaiIndex = astScan ? astScan.caiIndex : null;
