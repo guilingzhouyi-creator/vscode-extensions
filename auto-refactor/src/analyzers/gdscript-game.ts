@@ -69,17 +69,17 @@ const SOURCE_LAYER_INDICATORS: readonly string[] = Object.freeze([
     '@pure-logic',
 ] as const);
 
-const FORBIDDEN_TARGETS: readonly string[] = Object.freeze([
+const FORBIDDEN_TARGETS: readonly (string | RegExp)[] = Object.freeze([
     'extends Node',
     'extends Control',
     'extends Node2D',
     'extends Node3D',
     'extends CanvasItem',
-    'EventBus',
+    /\bEventBus\b/,
     'get_node(',
     '$"',
     "$' ",
-] as const);
+]);
 
 const GAME_ISOLATION_PATTERN: BoundaryIsolationPattern = Object.freeze({
     name: ISOLATION_PATTERN_NAME,
@@ -138,7 +138,8 @@ function formatHotPathMessage(allocationType: string): string {
 }
 
 function formatIsolationMessage(targetIdentifier: string): string {
-    return `Domain logic imports/references presentation or scene node '${targetIdentifier}'.`;
+    const cleanId = targetIdentifier.replace(/^\\b|\\b$/g, '');
+    return `Domain logic imports/references presentation or scene node '${cleanId}'.`;
 }
 
 interface GameIssueParams {
