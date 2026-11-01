@@ -572,16 +572,19 @@ function createIdleFoldSnapshot(startTimeMs: number, endTimeMs: number): Timelin
     };
 }
 
+interface IdleFlushOptions {
+    readonly idleCount: number;
+    readonly startTimeMs: number;
+    readonly endTimeMs: number;
+    readonly prevBucket?: RawStepBucket;
+    readonly destinationBuckets: TimelineBucketSnapshot[];
+}
+
 /**
  * Flushes pending idle sequence into folded summary or individual empty bucket.
  */
-function flushPendingIdle(
-    idleCount: number,
-    startTimeMs: number,
-    endTimeMs: number,
-    prevBucket: RawStepBucket | undefined,
-    destinationBuckets: TimelineBucketSnapshot[],
-): void {
+function flushPendingIdle(options: IdleFlushOptions): void {
+    const { idleCount, startTimeMs, endTimeMs, prevBucket, destinationBuckets } = options;
     if (idleCount >= MIN_IDLE_BUCKET_FOLD_COUNT) {
         destinationBuckets.push(createIdleFoldSnapshot(startTimeMs, endTimeMs));
         return;
@@ -613,13 +616,13 @@ function foldIdleIntervals(rawStepBuckets: RawStepBucket[]): TimelineBucketSnaps
             continue;
         }
 
-        flushPendingIdle(
-            idleRunCount,
-            idleStartTimeMs,
-            idleEndTimeMs,
-            rawStepBuckets[index - 1],
-            foldedSnapshots,
-        );
+        flushPendingIdle({
+            idleCount: idleRunCount,
+            startTimeMs: idleStartTimeMs,
+            endTimeMs: idleEndTimeMs,
+            prevBucket: rawStepBuckets[index - 1],
+            destinationBuckets: foldedSnapshots,
+        });
         idleRunCount = 0;
         foldedSnapshots.push(
             foldSingleBucket(item.bucketId, item.startTimeMs, item.endTimeMs, item.records),
@@ -627,21 +630,32 @@ function foldIdleIntervals(rawStepBuckets: RawStepBucket[]): TimelineBucketSnaps
     }
 
     const last = rawStepBuckets[rawStepBuckets.length - 1];
-    flushPendingIdle(idleRunCount, idleStartTimeMs, idleEndTimeMs, last, foldedSnapshots);
+    flushPendingIdle({
+        idleCount: idleRunCount,
+        startTimeMs: idleStartTimeMs,
+        endTimeMs: idleEndTimeMs,
+        prevBucket: last,
+        destinationBuckets: foldedSnapshots,
+    });
 
     return foldedSnapshots;
+}
+
+interface RelativeTimeAggregationOptions {
+    readonly records: CompactTrajectoryRecord[];
+    readonly referenceNowMs: number;
+    readonly cutoffTimeMs: number;
+    readonly bucketStepMs: number;
+    readonly bucketLabelPrefix: string;
 }
 
 /**
  * Partitions relative time intervals and folds consecutive idle buckets.
  */
 function aggregateRelativeTimeBuckets(
-    records: CompactTrajectoryRecord[],
-    referenceNowMs: number,
-    cutoffTimeMs: number,
-    bucketStepMs: number,
-    bucketLabelPrefix: string,
+    options: RelativeTimeAggregationOptions,
 ): TimelineBucketSnapshot[] {
+    const { records, referenceNowMs, cutoffTimeMs, bucketStepMs, bucketLabelPrefix } = options;
     const totalSteps = Math.max(1, Math.ceil((referenceNowMs - cutoffTimeMs) / bucketStepMs));
     const rawStepBuckets: RawStepBucket[] = [];
 
@@ -702,21 +716,21 @@ export async function projectTimelineReport(
     if (bucketType === 'commit' || bucketType === 'agent') {
         buckets = aggregateSemanticBuckets(records, bucketType, referenceNowMs);
     } else if (bucketType === 'hour') {
-        buckets = aggregateRelativeTimeBuckets(
+        buckets = aggregateRelativeTimeBuckets({
             records,
             referenceNowMs,
             cutoffTimeMs,
-            MS_PER_HOUR,
-            'h',
-        );
+            bucketStepMs: MS_PER_HOUR,
+            bucketLabelPrefix: 'h',
+        });
     } else {
-        buckets = aggregateRelativeTimeBuckets(
+        buckets = aggregateRelativeTimeBuckets({
             records,
             referenceNowMs,
             cutoffTimeMs,
-            MS_PER_DAY,
-            'd',
-        );
+            bucketStepMs: MS_PER_DAY,
+            bucketLabelPrefix: 'd',
+        });
     }
 
     let totalSemanticEloc = 0;

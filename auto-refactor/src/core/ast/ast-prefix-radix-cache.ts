@@ -113,6 +113,16 @@ export interface AstPrefixRadixCacheOptions {
     readonly maxTreeNodes?: number;
 }
 
+interface RadixStepOptions {
+    readonly currentNode: RadixTreeNode;
+    readonly lineKey: string;
+    readonly cumulativeLines: number;
+    readonly isTerminal: boolean;
+    readonly astSubtrees: readonly NormalizedNode[];
+    readonly importedSymbols?: readonly string[];
+    readonly now: number;
+}
+
 /**
  * SGLang RadixAttention AST Prefix Tree Cache.
  */
@@ -184,41 +194,34 @@ export class AstPrefixRadixCache {
 
         for (let i = 0; i < count; i++) {
             const lineKey = this.computeLineKey(lines[i]);
-            currentNode = this.stepChildNode(
+            currentNode = this.stepChildNode({
                 currentNode,
                 lineKey,
-                i + 1,
-                i === count - 1,
+                cumulativeLines: i + 1,
+                isTerminal: i === count - 1,
                 astSubtrees,
                 importedSymbols,
                 now,
-            );
+            });
         }
     }
 
     /**
      * Internal: Resolve or allocate next Radix child node along prefix edge.
      */
-    private stepChildNode(
-        currentNode: RadixTreeNode,
-        lineKey: string,
-        cumulativeLines: number,
-        isTerminal: boolean,
-        astSubtrees: readonly NormalizedNode[],
-        importedSymbols: readonly string[] | undefined,
-        now: number,
-    ): RadixTreeNode {
+    private stepChildNode(options: RadixStepOptions): RadixTreeNode {
+        const { currentNode, lineKey, cumulativeLines, isTerminal, astSubtrees, importedSymbols, now } = options;
         let nextNode = currentNode.children.get(lineKey);
         if (!nextNode) {
             this.evictLruIfNecessary();
-            nextNode = this.createNewRadixNode(
+            nextNode = this.createNewRadixNode({
                 lineKey,
                 cumulativeLines,
                 isTerminal,
                 astSubtrees,
                 importedSymbols,
                 now,
-            );
+            });
             currentNode.children.set(lineKey, nextNode);
             this.nodeCount++;
         } else if (isTerminal) {
@@ -232,14 +235,8 @@ export class AstPrefixRadixCache {
     /**
      * Internal: Allocate a new RadixTreeNode.
      */
-    private createNewRadixNode(
-        lineKey: string,
-        cumulativeLines: number,
-        isTerminal: boolean,
-        astSubtrees: readonly NormalizedNode[],
-        importedSymbols: readonly string[] | undefined,
-        now: number,
-    ): RadixTreeNode {
+    private createNewRadixNode(options: Omit<RadixStepOptions, 'currentNode'>): RadixTreeNode {
+        const { lineKey, cumulativeLines, isTerminal, astSubtrees, importedSymbols, now } = options;
         return {
             lineKey,
             cumulativeLines,

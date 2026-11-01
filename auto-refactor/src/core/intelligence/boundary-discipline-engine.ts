@@ -120,13 +120,16 @@ export function routeSymbolDestination(
     return { stream: 'foundation_capability_layer', category: 'formatting' };
 }
 
-function createBoundaryIssue(
-    rule: typeof RULE_ARCH_UTL_001 | typeof RULE_ARCH_ABS_001,
-    filePath: string,
-    message: string,
-    detail: Record<string, unknown>,
-    suggestion: string,
-): Issue {
+interface BoundaryIssueOptions {
+    readonly rule: typeof RULE_ARCH_UTL_001 | typeof RULE_ARCH_ABS_001;
+    readonly filePath: string;
+    readonly message: string;
+    readonly detail: Record<string, unknown>;
+    readonly suggestion: string;
+}
+
+function createBoundaryIssue(options: BoundaryIssueOptions): Issue {
+    const { rule, filePath, message, detail, suggestion } = options;
     return {
         id: `architecture:${rule}:${filePath}:1`,
         analyzer: ANALYZER_ARCHITECTURE,
@@ -155,18 +158,20 @@ function evaluateGodUtilityRisk(ctx: UtilityFileInspectionContext): Issue | null
     const categories = [
         ...new Set(ctx.exportedSymbols.map((symbolInfo) => symbolInfo.category)),
     ].join(', ');
-    return createBoundaryIssue(
-        RULE_ARCH_UTL_001,
-        ctx.filePath,
-        `Monolithic god-object utility anti-pattern detected in "${ctx.filePath}": file aggregates ` +
+    return createBoundaryIssue({
+        rule: RULE_ARCH_UTL_001,
+        filePath: ctx.filePath,
+        message:
+            `Monolithic god-object utility anti-pattern detected in "${ctx.filePath}": file aggregates ` +
             `${ctx.exportedSymbols.length} disparate symbols across ${ctx.distinctCategoryCount} distinct categories [${categories}].`,
-        {
+        detail: {
             distinctCategoryCount: ctx.distinctCategoryCount,
             symbolCount: ctx.exportedSymbols.length,
             categories,
         },
-        'Decompose catch-all utility into four canonical destinations: algorithms, constants, policy rules, and foundation.',
-    );
+        suggestion:
+            'Decompose catch-all utility into four canonical destinations: algorithms, constants, policy rules, and foundation.',
+    });
 }
 
 function evaluateOverAbstractionRisk(ctx: UtilityFileInspectionContext): Issue | null {
@@ -178,16 +183,17 @@ function evaluateOverAbstractionRisk(ctx: UtilityFileInspectionContext): Issue |
         ? 'sharing abstraction creates circular dependencies across domain boundaries'
         : `spurious delegation indirection chain depth (${ctx.delegationHopDepth} hops) yields negative net cognitive value`;
 
-    return createBoundaryIssue(
-        RULE_ARCH_ABS_001,
-        ctx.filePath,
-        `Harmful over-abstraction detected in "${ctx.filePath}": ${reason}.`,
-        {
+    return createBoundaryIssue({
+        rule: RULE_ARCH_ABS_001,
+        filePath: ctx.filePath,
+        message: `Harmful over-abstraction detected in "${ctx.filePath}": ${reason}.`,
+        detail: {
             delegationHopDepth: ctx.delegationHopDepth,
             hasCyclicDependencies: ctx.hasCyclicDependencies,
         },
-        'Inline trivial forwarding hops or permit localized implementations to prevent cyclic coupling.',
-    );
+        suggestion:
+            'Inline trivial forwarding hops or permit localized implementations to prevent cyclic coupling.',
+    });
 }
 
 /**

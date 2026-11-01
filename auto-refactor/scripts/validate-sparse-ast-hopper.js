@@ -184,8 +184,7 @@ function assertWindowEquivalence() {
     FIXTURE_ADAPTER,
     buildFixtureTree(),
     [buildRecordingEntry(boundedLines)],
-    [6, 9],
-    stats,
+    { lineBounds: [6, 9], hopperStats: stats },
   );
   assert.deepStrictEqual(
     boundedLines,
@@ -202,7 +201,10 @@ function assertEmptyWindowPrunesEverything() {
   const { runStreaming } = require('../dist/core/ast/traverse');
   const lines = [];
   const stats = createSparseHopperStats();
-  runStreaming(FIXTURE_ADAPTER, buildFixtureTree(), [buildRecordingEntry(lines)], [40, 50], stats);
+  runStreaming(FIXTURE_ADAPTER, buildFixtureTree(), [buildRecordingEntry(lines)], {
+    lineBounds: [40, 50],
+    hopperStats: stats,
+  });
   assert.deepStrictEqual(lines, [], 'nothing inside an empty span is dispatched');
   assert.strictEqual(stats.visited, 0, 'no node counted as visited');
   assert.ok(stats.pruned >= 4, 'all top-level subtrees are pruned');
@@ -348,8 +350,7 @@ function assertFileMetricExemptFromPruning() {
         ctx: { config: {}, filePath: 'fixture.ts', content: '', root: buildFixtureTree() },
       },
     ],
-    [6, 9], // Narrow window covering only 1 of 4 functions
-    stats,
+    { lineBounds: [6, 9], hopperStats: stats },
   );
   metricCollectorBounded.finalize({
     config: {},

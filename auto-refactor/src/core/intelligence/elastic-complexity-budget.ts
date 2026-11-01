@@ -243,14 +243,20 @@ function computeBudgetThresholds(
     };
 }
 
+interface BudgetThresholdsResult {
+    multipliers: Record<string, number>;
+    totalMultiplier: number;
+    effectiveWarn: number;
+    effectiveFail: number;
+    hasAlgorithmicProof: boolean;
+}
+
 function createBudgetExceededIssue(
     funcCtx: FunctionComplexityContext,
-    effectiveWarn: number,
-    effectiveFail: number,
-    totalMultiplier: number,
-    hasAlgorithmicProof: boolean,
-    multipliers: Record<string, number>,
+    thresholds: BudgetThresholdsResult,
 ): Issue {
+    const { effectiveWarn, effectiveFail, totalMultiplier, hasAlgorithmicProof, multipliers } =
+        thresholds;
     const severity = funcCtx.cc >= effectiveFail ? SEVERITY_ERROR : SEVERITY_WARNING;
     return {
         id: `complexity:${RULE_CPX_BUD_001}:${funcCtx.filePath}:${funcCtx.startLine}`,
@@ -325,16 +331,7 @@ export function evaluateElasticComplexityBudget(
 
     const isExceeded = funcCtx.cc >= effectiveWarn;
     if (isExceeded) {
-        issues.push(
-            createBudgetExceededIssue(
-                funcCtx,
-                effectiveWarn,
-                effectiveFail,
-                totalMultiplier,
-                hasAlgorithmicProof,
-                multipliers,
-            ),
-        );
+        issues.push(createBudgetExceededIssue(funcCtx, thresholds));
     }
 
     const isUnjustified =

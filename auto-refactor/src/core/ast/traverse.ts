@@ -104,23 +104,48 @@ interface ActiveHook {
     name: string;
 }
 
+/** Threaded traversal scope values for hook invocation, grouping environment parameters. */
+interface TraversalScope {
+    readonly depth: number;
+    readonly className: string | null;
+    readonly binding: string | null;
+    readonly parent?: NormalizedNode;
+    readonly grandparent?: NormalizedNode;
+}
+
 function dispatchHooks(
     active: ActiveHook[],
     node: NormalizedNode,
-    parent: NormalizedNode | undefined,
-    grandparent: NormalizedNode | undefined,
-    depth: number,
-    className: string | null,
-    binding: string | null,
+    scope: TraversalScope,
     pushError: ErrorReporter,
 ): void {
     for (let i = 0; i < active.length; i++) {
         const hook = active[i];
         try {
-            hook.fn(node, hook.ctx, parent, grandparent, depth, className, binding);
+            hook.fn(node, hook.ctx, scope.parent, scope.grandparent, scope.depth, scope.className, scope.binding);
         } catch (error) {
             pushError(hook.name, error, hook.ctx);
         }
+    }
+}
+
+interface TraversalDispatchContext {
+    readonly active: ActiveHook[];
+    readonly exempt: ActiveHook[];
+    readonly pushError: ErrorReporter;
+}
+
+function dispatchPhaseHooks(
+    dispatchCtx: TraversalDispatchContext,
+    node: NormalizedNode,
+    scope: TraversalScope,
+    shouldDispatch: boolean,
+): void {
+    if (shouldDispatch && dispatchCtx.active.length > 0) {
+        dispatchHooks(dispatchCtx.active, node, scope, dispatchCtx.pushError);
+    }
+    if (dispatchCtx.exempt.length > 0) {
+        dispatchHooks(dispatchCtx.exempt, node, scope, dispatchCtx.pushError);
     }
 }
 
@@ -229,38 +254,10 @@ function createAnalyzerErrorIssue(name: string, error: unknown, ctx: AnalyzerCon
     };
 }
 
-/**
- * Dispatch both active (window-admitted) and exempt (whole-file) hooks for one traversal event.
- *
- * @param active - Active hooks to dispatch if the node should be dispatched.
- * @param exempt - Exempt hooks that observe all non-pruned nodes regardless of window.
- * @param node - Currently visited normalized node.
- * @param shouldDispatch - Whether the node falls within the active hopper window.
- * @param parent - Immediate parent of the node.
- * @param grandparent - Grandparent of the node.
- * @param depth - Current nesting depth.
- * @param className - Active class name scope.
- * @param binding - Active binding scope.
- * @param pushError - Sink for analyzer exceptions.
- */
-function dispatchActiveAndExemptHooks(
-    active: ActiveHook[],
-    exempt: ActiveHook[],
-    node: NormalizedNode,
-    shouldDispatch: boolean,
-    parent: NormalizedNode | undefined,
-    grandparent: NormalizedNode | undefined,
-    depth: number,
-    className: string | null,
-    binding: string | null,
-    pushError: ErrorReporter,
-): void {
-    if (shouldDispatch && active.length > 0) {
-        dispatchHooks(active, node, parent, grandparent, depth, className, binding, pushError);
-    }
-    if (exempt.length > 0) {
-        dispatchHooks(exempt, node, parent, grandparent, depth, className, binding, pushError);
-    }
+/** Options for configuring the streaming AST traversal pass. */
+export interface RunStreamingOptions {
+    readonly lineBounds?: readonly [number, number];
+    readonly hopperStats?: SparseHopperStats;
 }
 
 /**
@@ -278,8 +275,7 @@ function dispatchActiveAndExemptHooks(
  *   not dispatched.
  * @param entries - Analyzer plus merged-context pairs participating in this pass, dispatched
  *   in array order.
- * @param lineBounds - Optional 1-based [first, last] audited span enabling subtree pruning.
- * @param hopperStats - Optional counters receiving visited/pruned node totals for this pass.
+ * @param options - Optional 1-based [first, last] audited span or structured traversal options.
  * @returns Issues emitted by each analyzer's `finalize`, plus at most one analyzer-error issue
  *   per analyzer that threw during `visit` or `finalize`; direct `visit` output is discarded.
  */
@@ -287,12 +283,14 @@ export function runStreaming(
     adapter: LanguageAdapter,
     root: NormalizedNode,
     entries: StreamingEntry[],
-    lineBounds?: readonly [number, number],
-    hopperStats?: SparseHopperStats,
+    options?: readonly [number, number] | RunStreamingOptions,
 ): Issue[] {
     const issues: Issue[] = [];
     const errored = new Set<string>();
-    const stats = hopperStats ?? createSparseHopperStats();
+    const isOptionsObject = Boolean(options && !Array.isArray(options));
+    const structuredOpts = isOptionsObject ? (options as RunStreamingOptions) : undefined;
+    const lineBounds = Array.isArray(options) ? options : structuredOpts?.lineBounds;
+    const stats = structuredOpts?.hopperStats ?? createSparseHopperStats();
     const window = lineBounds ? { startLine: lineBounds[0], endLine: lineBounds[1] } : undefined;
 
     const { active: activeVisits, exempt: exemptVisits } = collectVisitHooks(entries);
@@ -304,13 +302,20 @@ export function runStreaming(
         issues.push(createAnalyzerErrorIssue(name, error, ctx));
     };
 
+    const visitDispatch: TraversalDispatchContext = {
+        active: activeVisits,
+        exempt: exemptVisits,
+        pushError,
+    };
+    const leaveDispatch: TraversalDispatchContext = {
+        active: activeLeaves,
+        exempt: exemptLeaves,
+        pushError,
+    };
+
     const visitNode = (
         node: NormalizedNode,
-        parent: NormalizedNode | undefined,
-        grandparent: NormalizedNode | undefined,
-        depth: number,
-        className: string | null,
-        binding: string | null,
+        scope: TraversalScope,
     ): void => {
         const prunable = isSubtreePrunable(node, window);
         if (prunable) {
@@ -325,43 +330,35 @@ export function runStreaming(
             stats.visited += 1;
         }
 
-        dispatchActiveAndExemptHooks(
-            activeVisits,
-            exemptVisits,
-            node,
-            shouldDispatch,
-            parent,
-            grandparent,
-            depth,
-            className,
-            binding,
-            pushError,
-        );
+        dispatchPhaseHooks(visitDispatch, node, scope, shouldDispatch);
 
-        const childDepth = depth + (node.increasesNesting ? 1 : 0);
-        const cName = resolveChildScopeName(node, className);
-        const cBinding = resolveChildScopeBinding(node, binding);
+        const childDepth = scope.depth + (node.increasesNesting ? 1 : 0);
+        const cName = resolveChildScopeName(node, scope.className);
+        const cBinding = resolveChildScopeBinding(node, scope.binding);
+        const childScope: TraversalScope = {
+            depth: childDepth,
+            className: cName,
+            binding: cBinding,
+            parent: node,
+            grandparent: scope.parent,
+        };
 
         for (const childNode of adapter.children(node)) {
-            visitNode(childNode, node, parent, childDepth, cName, cBinding);
+            visitNode(childNode, childScope);
         }
 
-        dispatchActiveAndExemptHooks(
-            activeLeaves,
-            exemptLeaves,
-            node,
-            shouldDispatch,
-            parent,
-            grandparent,
-            depth,
-            className,
-            binding,
-            pushError,
-        );
+        dispatchPhaseHooks(leaveDispatch, node, scope, shouldDispatch);
     };
 
+    const rootScope: TraversalScope = {
+        depth: 0,
+        className: null,
+        binding: null,
+        parent: root,
+        grandparent: undefined,
+    };
     for (const childNode of adapter.children(root)) {
-        visitNode(childNode, root, undefined, 0, null, null);
+        visitNode(childNode, rootScope);
     }
 
     finalizeStreamingEntries(entries, issues, pushError);
@@ -470,59 +467,34 @@ function dispatchProjectedHooks(
     dispatchHooks(
         hooks,
         node,
-        scope.parentProj,
-        scope.grandparentProj,
-        scope.depth,
-        scope.className,
-        scope.binding,
+        {
+            parent: scope.parentProj,
+            grandparent: scope.grandparentProj,
+            depth: scope.depth,
+            className: scope.className,
+            binding: scope.binding,
+        },
         pushError,
     );
 }
 
-/**
- * Dispatch both active and exempt projected hooks for one lazy-projection traversal event.
- *
- * @param active - Active hooks to dispatch if the node should be dispatched.
- * @param exempt - Exempt hooks that observe all non-pruned nodes regardless of window.
- * @param node - Currently projected node.
- * @param shouldDispatch - Whether the node falls within the active hopper window.
- * @param scope - Threaded scope values for the hook contract.
- * @param pushError - Sink for analyzer exceptions.
- */
-function dispatchProjectedActiveAndExemptHooks(
-    active: ActiveHook[],
-    exempt: ActiveHook[],
-    node: NormalizedNode,
-    shouldDispatch: boolean,
-    scope: ProjectedScope,
-    pushError: ErrorReporter,
-): void {
-    if (shouldDispatch && active.length > 0) {
-        dispatchProjectedHooks(active, node, scope, pushError);
-    }
-    if (exempt.length > 0) {
-        dispatchProjectedHooks(exempt, node, scope, pushError);
-    }
+interface ProjectedDispatchContext {
+    readonly active: ActiveHook[];
+    readonly exempt: ActiveHook[];
+    readonly pushError: ErrorReporter;
 }
 
-/**
- * Notify the scan-wide node observer (cross-file symbol index) if the node is admitted.
- *
- * @param onNode - Optional scan-wide node observer.
- * @param node - Current projected node.
- * @param caller - Current function caller name.
- * @param shouldDispatch - Whether the node falls within the active hopper window.
- * @param hasExemptVisits - Whether any visits are exempt from window pruning.
- */
-function notifyProjectedObserver(
-    onNode: ((node: NormalizedNode, caller: string | null) => void) | undefined,
+function dispatchProjectedPhaseHooks(
+    dispatchCtx: ProjectedDispatchContext,
     node: NormalizedNode,
-    caller: string | null,
+    scope: ProjectedScope,
     shouldDispatch: boolean,
-    hasExemptVisits: boolean,
 ): void {
-    if (onNode && (shouldDispatch || hasExemptVisits)) {
-        onNode(node, caller);
+    if (shouldDispatch && dispatchCtx.active.length > 0) {
+        dispatchProjectedHooks(dispatchCtx.active, node, scope, dispatchCtx.pushError);
+    }
+    if (dispatchCtx.exempt.length > 0) {
+        dispatchProjectedHooks(dispatchCtx.exempt, node, scope, dispatchCtx.pushError);
     }
 }
 
@@ -594,6 +566,17 @@ export function runStreamingProjected(
         issues.push(createAnalyzerErrorIssue(name, error, ctx));
     };
 
+    const visitProjectedDispatch: ProjectedDispatchContext = {
+        active: activeVisits,
+        exempt: exemptVisits,
+        pushError,
+    };
+    const leaveProjectedDispatch: ProjectedDispatchContext = {
+        active: activeLeaves,
+        exempt: exemptLeaves,
+        pushError,
+    };
+
     const rootRaw = projector.root;
     // The root is never dispatched to visits; project it once so top-level children receive a
     // REAL SourceFile projection as `parent` (L/M top-level detection) and as ctx.root.
@@ -620,16 +603,11 @@ export function runStreamingProjected(
             stats.visited += 1;
         }
 
-        notifyProjectedObserver(onNode, node, caller, shouldDispatch, exemptVisits.length > 0);
+        if (onNode && (shouldDispatch || exemptVisits.length > 0)) {
+            onNode(node, caller);
+        }
 
-        dispatchProjectedActiveAndExemptHooks(
-            activeVisits,
-            exemptVisits,
-            node,
-            shouldDispatch,
-            scope,
-            pushError,
-        );
+        dispatchProjectedPhaseHooks(visitProjectedDispatch, node, scope, shouldDispatch);
 
         const childDepth = scope.depth + (node.increasesNesting ? 1 : 0);
         const cName = resolveChildScopeName(node, scope.className);
@@ -647,14 +625,7 @@ export function runStreamingProjected(
             visitRaw(childRaw, raw, parentRaw, childScope, cCaller);
         }
 
-        dispatchProjectedActiveAndExemptHooks(
-            activeLeaves,
-            exemptLeaves,
-            node,
-            shouldDispatch,
-            scope,
-            pushError,
-        );
+        dispatchProjectedPhaseHooks(leaveProjectedDispatch, node, scope, shouldDispatch);
     };
 
     const rootScope: ProjectedScope = {
