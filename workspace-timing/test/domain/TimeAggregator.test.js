@@ -507,22 +507,26 @@ describe('TimeAggregator：多周趋势与比例刻度计算', () => {
 
     it('双轨图表数据契约：last7Days 与 dailyDetail 满足人工与 AI 绝对守恒律与比例计算', () => {
         const todayStr = TimeAggregator.todayStr();
-        const todayStartMs = parseLocalDate(todayStr);
+        const [y, m, d] = todayStr.split('-').map(Number);
+        const s1Start = new Date(y, m - 1, d, 10, 0, 0).getTime();
+        const s1End = new Date(y, m - 1, d, 11, 0, 0).getTime();
+        const s2Start = new Date(y, m - 1, d, 14, 0, 0).getTime();
+        const s2End = new Date(y, m - 1, d, 15, 0, 0).getTime();
 
         // 创建两个会话：
         // 会话 1：10:00 - 11:00 (1h)，人工 40m，AI 20m
         // 会话 2：14:00 - 15:00 (1h)，纯 AI 60m
         const s1 = {
-            startMs: todayStartMs + 10 * 3600000,
-            endMs: todayStartMs + 11 * 3600000,
-            durationMs: 3600000,
+            startMs: s1Start,
+            endMs: s1End,
+            durationMs: s1End - s1Start,
             manualMs: 40 * 60000,
             aiMs: 20 * 60000,
         };
         const s2 = {
-            startMs: todayStartMs + 14 * 3600000,
-            endMs: todayStartMs + 15 * 3600000,
-            durationMs: 3600000,
+            startMs: s2Start,
+            endMs: s2End,
+            durationMs: s2End - s2Start,
             manualMs: 0,
             aiMs: 3600000,
         };
