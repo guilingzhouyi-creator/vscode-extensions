@@ -41,7 +41,7 @@ const HOT_PATH_PATTERN_NAME = 'gdscript-process-loops';
 const GAME_HOT_PATH_PATTERN: HotPathPattern = Object.freeze({
     name: HOT_PATH_PATTERN_NAME,
     hotPathScopes: [
-        /\bfunc\s+(?:_process|_physics_process)\s*\([^)]*\)\s*:/,
+        /\bfunc\s+(?:_process|_physics_process)\s*\([^)]*\)(?:\s*->\s*[^:]+)?\s*:/,
         /\b(?:for|while)\b.*:/,
     ],
     allocationPatterns: [

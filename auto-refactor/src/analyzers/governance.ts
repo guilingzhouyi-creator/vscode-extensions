@@ -237,12 +237,7 @@ export class GovernanceAnalyzer implements Analyzer {
     }
 
     analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
-        this.violations = [];
-        this.hasCheckedFile = false;
-        this.nodeRules = [];
-        this.fileRules = [];
-        this.reusableEvalCtx = null;
-        this.nodeRulesByKind = new Map();
+        this.resetState();
         // Standalone contract fallback
 
         const adapter = new TypeScriptAdapter();
