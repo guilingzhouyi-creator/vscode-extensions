@@ -43,10 +43,10 @@ pub struct RepackOptions {
     pub keep_loose: bool,
     /// Minimum count of loose objects required to trigger an automatic repack (default: 128).
     pub auto_repack_threshold: usize,
-    /// Enable low-disk micro-pack slicing mode (default: false).
+    /// Enable low-disk pack slicing mode (default: false).
     pub low_disk: bool,
-    /// Maximum byte size of a micro-pack slice in low-disk mode (default: 64MB).
-    pub micro_pack_bytes: u64,
+    /// Maximum byte size of a pack slice in low-disk mode (default: 64MB).
+    pub max_pack_bytes: u64,
 }
 
 impl Default for RepackOptions {
@@ -57,7 +57,7 @@ impl Default for RepackOptions {
             keep_loose: false,
             auto_repack_threshold: 128,
             low_disk: false,
-            micro_pack_bytes: 64 * 1024 * 1024,
+            max_pack_bytes: 64 * 1024 * 1024,
         }
     }
 }
@@ -498,8 +498,8 @@ impl RepackEngine {
         }))
     }
 
-    /// Progressively repacks loose objects in micro-pack slices (default 64MB, see
-    /// [`RepackOptions::micro_pack_bytes`]), immediately purging each slice's loose objects upon
+    /// Progressively repacks loose objects in pack slices (default 64MB, see
+    /// [`RepackOptions::max_pack_bytes`]), immediately purging each slice's loose objects upon
     /// verification to prevent low-disk deadlocks. Every published slice is recorded in
     /// [`RepackReport::artifacts`]; the aggregate bytes are reported in
     /// [`RepackReport::total_pack_bytes`].
@@ -517,7 +517,7 @@ impl RepackEngine {
         fs::create_dir_all(&pack_dir)?;
 
         // Partition loose objects into bounded slices based on payload size
-        let slice_limit = options.micro_pack_bytes.max(1024 * 1024);
+        let slice_limit = options.max_pack_bytes.max(1024 * 1024);
         let mut slices: Vec<Vec<(Oid, ObjectKind, Vec<u8>)>> = Vec::new();
         let mut current_slice = Vec::new();
         let mut current_slice_bytes: u64 = 0;
@@ -658,7 +658,7 @@ mod tests {
     }
 
     #[test]
-    fn test_low_disk_micro_pack_slicing() {
+    fn test_low_disk_pack_slicing() {
         let dir = test_temp_dir("repack_low_");
         let git_dir = dir.path().join("test_repo.git");
         let objects_dir = git_dir.join("objects");
@@ -676,7 +676,7 @@ mod tests {
         // Run progressive low-disk repack with 1MB slice limit
         let options = RepackOptions {
             low_disk: true,
-            micro_pack_bytes: 1024,
+            max_pack_bytes: 1024,
             keep_loose: false,
             ..Default::default()
         };
@@ -728,7 +728,7 @@ mod tests {
 
         let options = RepackOptions {
             low_disk: true,
-            micro_pack_bytes: 1024,
+            max_pack_bytes: 1024,
             keep_loose: false,
             ..Default::default()
         };

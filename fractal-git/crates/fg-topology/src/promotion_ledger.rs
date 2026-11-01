@@ -2,7 +2,7 @@
 //! File Path: crates/fg-topology/src/promotion_ledger.rs
 //! Architecture Role: Manages the staged promotion ledger, enforcing Auto quality scoring
 //!   entry barriers, lease expiry, score ratchet superiority replacements, and atomic CAS
-//!   promotion execution via [`HumanUacAuthorizer`].
+//!   promotion execution via [`ElevationAuthorizer`].
 //! Dependencies & Triggers: Consumed by `taxis promotion` and the GUI elevation bridge.
 //! Responsibilities: Stage, supersede, expire, approve, and reject promotion requests durably.
 //! Exit Semantics & Design Rationale:
@@ -17,15 +17,15 @@
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{
-    AutoQualityScoreEnvelope, HumanUacProof, Oid, StagedPromotionRequest, StagedPromotionStatus,
-    TaxisPolicy,
+    AutoQualityScoreEnvelope, ElevationAttestation, Oid, StagedPromotionRequest,
+    StagedPromotionStatus, TaxisPolicy,
 };
 use fg_core::traits::RefStore;
 use fg_native::document::RepoDocument;
 use fg_native::sections::prom::{PromSection, PromotionRecord, PromotionStatus};
 use std::path::{Path, PathBuf};
 
-use crate::authorizer::HumanUacAuthorizer;
+use crate::authorizer::ElevationAuthorizer;
 use crate::refs::FractalRef;
 
 /// Persistent ledger payload holding the active candidate and archived promotion history.
@@ -133,7 +133,7 @@ impl PromotionStagingLedger {
     ) -> Option<&StagedPromotionRequest> {
         if let Some(ref mut candidate) = self.ledger_data.active_candidate {
             if candidate.is_expired(current_time_ms)
-                && candidate.status == StagedPromotionStatus::PendingHumanUac
+                && candidate.status == StagedPromotionStatus::PendingHumanApproval
             {
                 candidate.status = StagedPromotionStatus::Expired {
                     expired_at_ms: candidate.expires_at_ms,
@@ -248,12 +248,12 @@ impl PromotionStagingLedger {
         Ok(req_id)
     }
 
-    /// Executes atomic merge into System Trunk upon valid Human GUI UAC click authorization.
-    pub fn apply_uac_approval(
+    /// Executes atomic merge into System Trunk upon valid Human GUI elevation authorization.
+    pub fn apply_elevation_approval(
         &mut self,
         request_id: &str,
-        proof: &HumanUacProof,
-        authorizer: &impl HumanUacAuthorizer,
+        proof: &ElevationAttestation,
+        authorizer: &impl ElevationAuthorizer,
         ref_store: &impl RefStore,
     ) -> FractalResult<()> {
         let mut active = match self.ledger_data.active_candidate.take() {
@@ -267,13 +267,13 @@ impl PromotionStagingLedger {
             }
             None => {
                 return Err(FractalError::PolicyViolation(
-                    "No active staged promotion awaiting human UAC approval".into(),
+                    "No active staged promotion awaiting human elevation approval".into(),
                 ));
             }
         };
 
-        // 1. Verify UAC non-forgeable proof
-        if let Err(err) = authorizer.verify_uac_proof(&active, proof) {
+        // 1. Verify elevation non-forgeable proof
+        if let Err(err) = authorizer.verify_elevation_proof(&active, proof) {
             self.ledger_data.active_candidate = Some(active);
             return Err(err);
         }
@@ -307,7 +307,7 @@ impl PromotionStagingLedger {
     }
 
     /// Records human rejection with constructive feedback injected back to the agent team.
-    pub fn reject_uac_promotion(
+    pub fn reject_elevation_promotion(
         &mut self,
         request_id: &str,
         operator: impl Into<String>,
@@ -369,7 +369,7 @@ impl PromotionStagingLedger {
             target_ref: "refs/heads/main".into(),
             candidate_commit_oid: params.candidate_commit_oid,
             auto_score: params.auto_score,
-            status: StagedPromotionStatus::PendingHumanUac,
+            status: StagedPromotionStatus::PendingHumanApproval,
             challenge_nonce: nonce,
             created_at_ms: params.current_time_ms,
             expires_at_ms,
@@ -401,7 +401,7 @@ fn native_to_domain(error: fg_native::NativeError) -> FractalError {
 /// Maps the domain status onto the container's closed discriminant set.
 fn to_status(status: &StagedPromotionStatus) -> PromotionStatus {
     match status {
-        StagedPromotionStatus::PendingHumanUac => PromotionStatus::Pending,
+        StagedPromotionStatus::PendingHumanApproval => PromotionStatus::Pending,
         StagedPromotionStatus::SupersededByHigherScore { .. } => PromotionStatus::Superseded,
         StagedPromotionStatus::Expired { .. } => PromotionStatus::Expired,
         StagedPromotionStatus::ApprovedAndPromoted { .. } => PromotionStatus::Approved,
@@ -453,7 +453,7 @@ fn to_record(request: &StagedPromotionRequest) -> FractalResult<PromotionRecord>
 /// record does carry, so a round trip through the container never invents an operator name.
 fn to_request(record: &PromotionRecord) -> StagedPromotionRequest {
     let status = match record.status {
-        PromotionStatus::Pending => StagedPromotionStatus::PendingHumanUac,
+        PromotionStatus::Pending => StagedPromotionStatus::PendingHumanApproval,
         PromotionStatus::Approved => StagedPromotionStatus::ApprovedAndPromoted {
             promoted_at_ms: record.created_at_ms,
             human_operator: String::new(),

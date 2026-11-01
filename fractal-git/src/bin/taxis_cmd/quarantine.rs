@@ -16,7 +16,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use fg_index::quarantine::{
-    default_quarantine_dir, IsolateMutationRequest, QuarantineLedger, QuarantineStatus,
+    default_quarantine_dir, IsolateMutationRequest, QuarantineRegistry, QuarantineStatus,
 };
 use fractal_git::constants::cli::CliTag;
 
@@ -78,7 +78,7 @@ fn handle_list(ctx: &CliContext, args: &[String]) {
     let show_all = args.iter().any(|arg| arg == "--all" || arg == "-a");
     let quarantine_directory = default_quarantine_dir(&ctx.git_dir);
 
-    let ledger = QuarantineLedger::load_from_dir(&quarantine_directory)
+    let ledger = QuarantineRegistry::load_from_dir(&quarantine_directory)
         .unwrap_or_else(|load_error| fail_io("load quarantine ledger", load_error));
 
     let records: Vec<_> = if show_all {
@@ -135,7 +135,7 @@ fn handle_show(ctx: &CliContext, args: &[String]) {
     let quarantine_id = &args[0];
     let quarantine_directory = default_quarantine_dir(&ctx.git_dir);
 
-    let record = QuarantineLedger::find_by_id(&quarantine_directory, quarantine_id)
+    let record = QuarantineRegistry::find_by_id(&quarantine_directory, quarantine_id)
         .unwrap_or_else(|query_error| fail_io("query quarantine record", query_error))
         .unwrap_or_else(|| {
             reject(
@@ -144,7 +144,7 @@ fn handle_show(ctx: &CliContext, args: &[String]) {
             );
         });
 
-    let patch_content = QuarantineLedger::read_patch_content(&quarantine_directory, &record)
+    let patch_content = QuarantineRegistry::read_patch_content(&quarantine_directory, &record)
         .unwrap_or_else(|read_error| fail_io("read quarantine patch", read_error));
 
     if ctx.json_mode {
@@ -187,7 +187,7 @@ fn handle_restore(ctx: &CliContext, args: &[String]) {
     let quarantine_id = &args[0];
     let quarantine_directory = default_quarantine_dir(&ctx.git_dir);
 
-    QuarantineLedger::mark_restored(&quarantine_directory, quarantine_id)
+    QuarantineRegistry::mark_restored(&quarantine_directory, quarantine_id)
         .unwrap_or_else(|restore_error| fail_io("restore quarantine record", restore_error));
 
     if ctx.json_mode {
@@ -220,7 +220,7 @@ fn handle_discard(ctx: &CliContext, args: &[String]) {
     let quarantine_id = &args[0];
     let quarantine_directory = default_quarantine_dir(&ctx.git_dir);
 
-    QuarantineLedger::mark_discarded(&quarantine_directory, quarantine_id)
+    QuarantineRegistry::mark_discarded(&quarantine_directory, quarantine_id)
         .unwrap_or_else(|discard_error| fail_io("discard quarantine record", discard_error));
 
     if ctx.json_mode {
@@ -270,7 +270,7 @@ fn handle_isolate(ctx: &CliContext, args: &[String]) {
     let current_time = current_now_secs();
     let nonce = (current_time % 10000) ^ 0xABCD;
 
-    let record = QuarantineLedger::isolate_mutation(IsolateMutationRequest {
+    let record = QuarantineRegistry::isolate_mutation(IsolateMutationRequest {
         quarantine_dir: &quarantine_directory,
         project_id,
         agent_id,

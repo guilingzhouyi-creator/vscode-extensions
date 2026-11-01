@@ -28,9 +28,10 @@ pub fn print_repack_help() {
          Options:\n\
            -w, --window <size>     Sliding window size for delta search (default: 10)\n\
            -d, --max-depth <depth> Maximum delta chain depth (default: 50)\n\
-           --low-disk              Progressively pack and purge loose objects in 64MB micro-pack slices\n\
-                                   (default; tune the slice size with --micro-pack)\n\
-           --micro-pack <size>     Micro-pack slice limit for --low-disk (default: 64M, minimum: 1M)\n\
+           --low-disk              Progressively pack and purge loose objects in 64MB pack slices\n\
+                                   (default; tune the slice size with --max-pack-size)\n\
+           --max-pack-size <size>  Pack slice limit for --low-disk (default: 64M, minimum: 1M)\n\
+           --micro-pack <size>     Compatibility alias for --max-pack-size\n\
            -k, --keep-loose        Keep loose objects on disk after creating packfile\n\
            --auto                  Only repack if loose object count exceeds threshold\n\
            --threshold <count>     Threshold for auto-repack (default: 50)\n\
@@ -78,20 +79,21 @@ fn parse_repack_options(args: &[String]) -> (RepackOptions, bool, bool) {
                 options.low_disk = true;
                 cursor += 1;
             }
-            "--micro-pack" => {
+            "--max-pack-size" | "--micro-pack" => {
+                let flag = args[cursor].as_str();
                 let raw = match args.get(cursor + 1) {
                     Some(value) => value.as_str(),
                     None => {
-                        fail_usage("--micro-pack requires a size value (e.g. --micro-pack 64M)")
+                        fail_usage(format!("{flag} requires a size value (e.g. {flag} 64M)"))
                     }
                 };
                 match parse_byte_size(raw) {
-                    Some(bytes) if bytes >= 1024 * 1024 => options.micro_pack_bytes = bytes,
+                    Some(bytes) if bytes >= 1024 * 1024 => options.max_pack_bytes = bytes,
                     Some(_) => fail_usage(format!(
-                        "--micro-pack {raw} is below the 1M floor required for slice verification"
+                        "{flag} {raw} is below the 1M floor required for slice verification"
                     )),
                     None => fail_usage(format!(
-                        "--micro-pack {raw} is not a byte size (expected e.g. 64M, 512K, 1048576)"
+                        "{flag} {raw} is not a byte size (expected e.g. 64M, 512K, 1048576)"
                     )),
                 }
                 cursor += 2;
@@ -242,7 +244,7 @@ fn report_repack_success(ctx: &CliContext, report: &RepackReport) {
         println!("Packfile Size:    {} bytes", report.pack_bytes);
         if report.artifacts.len() > 1 {
             println!(
-                "Micro-Packs:      {} published, {} bytes total",
+                "Pack Slices:      {} published, {} bytes total",
                 report.artifacts.len(),
                 report.total_pack_bytes
             );

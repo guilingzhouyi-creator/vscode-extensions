@@ -249,10 +249,10 @@ fn test_tipse_low_disk_repack_progressive() {
 
     assert_eq!(scan_loose_objects(&git_dir).expect("scan").len(), 6);
 
-    // Repack with low_disk micro-pack slicing (slice limit: 64 bytes)
+    // Repack with low_disk pack slicing (slice limit: 64 bytes)
     let options = RepackOptions {
         low_disk: true,
-        micro_pack_bytes: 64,
+        max_pack_bytes: 64,
         keep_loose: false,
         ..Default::default()
     };

@@ -1,8 +1,8 @@
-//! Module: taxis_cmd::reclaim — Worktree Sandbox Reclaimer
+//! Module: taxis_cmd::reclaim — Worktree Sandbox Reclaimer & Prune Engine
 //! File Path: src/bin/taxis_cmd/reclaim.rs
 //! Architecture Role: Reclaims orphaned or completed worktree directories registered in the
-//!   repository container's WKTR section (Garbage Collection).
-//! Dependencies & Triggers: Dispatched by `taxis reclaim` / `taxis clean` / `taxis gc`.
+//!   repository container's WKTR section (equivalent to Git's `worktree prune`).
+//! Dependencies & Triggers: Dispatched by `taxis worktree prune` and `taxis reclaim`.
 //! Responsibilities: Filesystem directory removal, container registry rewrite, and survival reporting.
 //! Exit Semantics & Design Rationale:
 //!   - Atomically deletes target worktree folders and updates the native container.

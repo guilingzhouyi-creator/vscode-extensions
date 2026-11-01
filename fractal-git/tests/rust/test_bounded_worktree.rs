@@ -19,7 +19,7 @@ use std::sync::Mutex;
 
 use fg_core::error::FractalError;
 use fg_core::models::{FileUid, MutationBudget, Oid, ReservationStatus, SliceAuthorization};
-use fg_index::quarantine::{IsolateMutationRequest, QuarantineLedger, QuarantineStatus};
+use fg_index::quarantine::{IsolateMutationRequest, QuarantineRegistry, QuarantineStatus};
 use fg_index::virtual_inode::VirtualInodeTable;
 use fg_storage::reflink::{clone_file_cow, detach_for_write, is_readonly};
 use fg_topology::worktree::ScopeProjection;
@@ -170,7 +170,7 @@ fn test_quarantine_isolation_and_restoration_cycle() {
     let patch_payload = "--- a/scripts/mod.gd\n+++ b/scripts/mod.gd\n@@ -1 +1 @@\n-old\n+new\n";
 
     // 1. Isolate
-    let record = QuarantineLedger::isolate_mutation(IsolateMutationRequest {
+    let record = QuarantineRegistry::isolate_mutation(IsolateMutationRequest {
         quarantine_dir: &quar_dir,
         project_id: "WebGames",
         agent_id: "agent-wg",
@@ -187,22 +187,22 @@ fn test_quarantine_isolation_and_restoration_cycle() {
     assert_eq!(record.rel_path, "scripts/mod.gd");
 
     // 2. Query
-    let active = QuarantineLedger::list_active_isolated(&quar_dir).expect("list active");
+    let active = QuarantineRegistry::list_active_isolated(&quar_dir).expect("list active");
     assert_eq!(active.len(), 1);
     assert_eq!(active[0].quarantine_id, record.quarantine_id);
 
     // 3. Read content
     let retrieved_patch =
-        QuarantineLedger::read_patch_content(&quar_dir, &record).expect("read patch content");
+        QuarantineRegistry::read_patch_content(&quar_dir, &record).expect("read patch content");
     assert_eq!(retrieved_patch, patch_payload);
 
     // 4. Mark restored
-    QuarantineLedger::mark_restored(&quar_dir, &record.quarantine_id).expect("mark restored");
-    let active_after = QuarantineLedger::list_active_isolated(&quar_dir).expect("list after");
+    QuarantineRegistry::mark_restored(&quar_dir, &record.quarantine_id).expect("mark restored");
+    let active_after = QuarantineRegistry::list_active_isolated(&quar_dir).expect("list after");
     assert_eq!(active_after.len(), 0);
 
     // 5. Audit history still preserves record in Restored status
-    let found = QuarantineLedger::find_by_id(&quar_dir, &record.quarantine_id)
+    let found = QuarantineRegistry::find_by_id(&quar_dir, &record.quarantine_id)
         .expect("find by id")
         .expect("record exists");
     assert_eq!(found.status, QuarantineStatus::Restored);

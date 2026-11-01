@@ -302,11 +302,28 @@ fn test_repack_rejects_malformed_micro_pack_and_unknown_flags() {
         "malformed --micro-pack must be a usage error"
     );
 
+    let malformed_max = run_taxis(
+        &repo,
+        &["repack", "--low-disk", "--max-pack-size", "not-a-size"],
+    );
+    assert_eq!(
+        malformed_max.status.code(),
+        Some(129),
+        "malformed --max-pack-size must be a usage error"
+    );
+
     let below_floor = run_taxis(&repo, &["repack", "--low-disk", "--micro-pack", "512K"]);
     assert_eq!(
         below_floor.status.code(),
         Some(129),
         "--micro-pack below the 1M floor must be rejected"
+    );
+
+    let below_floor_max = run_taxis(&repo, &["repack", "--low-disk", "--max-pack-size", "512K"]);
+    assert_eq!(
+        below_floor_max.status.code(),
+        Some(129),
+        "--max-pack-size below the 1M floor must be rejected"
     );
 
     let unknown = run_taxis(&repo, &["repack", "--definitely-not-a-flag"]);

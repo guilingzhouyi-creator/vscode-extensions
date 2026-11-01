@@ -6,8 +6,8 @@
 
 use fractal_git::server::{IpcCodec, IpcMessage};
 use fractal_git::{
-    AutoQualityScoreEnvelope, DiskRefStore, HumanUacProof, Oid, PromotionStagingLedger, RefStore,
-    StagedPromotionRequest, StagedPromotionStatus, StandardNonceAuthorizer, TaxisPolicy,
+    AutoQualityScoreEnvelope, DiskRefStore, ElevationAttestation, Oid, PromotionStagingLedger,
+    RefStore, StagedPromotionRequest, StagedPromotionStatus, StandardNonceAuthorizer, TaxisPolicy,
 };
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -105,12 +105,12 @@ fn test_scenario_1_staged_promotion_leaves_system_trunk_unchanged_with_1h_lease(
         "System Trunk must not be touched by Agent alone"
     );
 
-    // 3. Staged candidate is active with status PendingHumanUac and 1-hour TTL
+    // 3. Staged candidate is active with status PendingHumanApproval and 1-hour TTL
     let active = ledger
         .get_active_candidate(start_time_ms)
         .expect("Active candidate must exist");
     assert_eq!(active.request_id, req_id);
-    assert_eq!(active.status, StagedPromotionStatus::PendingHumanUac);
+    assert_eq!(active.status, StagedPromotionStatus::PendingHumanApproval);
     assert_eq!(active.candidate_commit_oid, candidate_oid);
     assert_eq!(
         active.expires_at_ms,
@@ -303,38 +303,38 @@ fn test_scenario_5_cryptographic_nonce_verification_and_atomic_cas_merge() {
     let active = ledger.get_active_candidate(t0 + 1000).unwrap().clone();
 
     // A. Forged / Tampered Nonce -> REJECTED
-    let bad_proof = HumanUacProof {
+    let bad_proof = ElevationAttestation {
         request_id: req_id.clone(),
         signed_nonce: [0xff; 32], // incorrect nonce!
         operator_name: "Human Architect (GUI Click)".into(),
         operator_email: "architect@deepmind.internal".into(),
-        gui_session_token: "GUI_SESSION_VERIFIED".into(),
+        approval_session_token: "GUI_SESSION_VERIFIED".into(),
         timestamp_ms: t0 + 2000,
     };
     let err_tamper = ledger
-        .apply_uac_approval(&req_id, &bad_proof, &authorizer, &ref_store)
+        .apply_elevation_approval(&req_id, &bad_proof, &authorizer, &ref_store)
         .unwrap_err();
     assert!(
         err_tamper
             .to_string()
             .contains("invalid cryptographic nonce"),
-        "Tampered nonce must fail UAC verification"
+        "Tampered nonce must fail elevation verification"
     );
     assert!(ref_store.get_ref("refs/heads/main").unwrap().is_none());
 
-    // B. Valid Human GUI UAC Proof -> ATOMIC PROMOTION!
-    let valid_proof = HumanUacProof {
+    // B. Valid Human GUI Elevation Proof -> ATOMIC PROMOTION!
+    let valid_proof = ElevationAttestation {
         request_id: req_id.clone(),
         signed_nonce: active.challenge_nonce, // correct cryptographic challenge nonce
         operator_name: "Human Architect (GUI Click)".into(),
         operator_email: "architect@deepmind.internal".into(),
-        gui_session_token: "GUI_SESSION_VERIFIED".into(),
+        approval_session_token: "GUI_SESSION_VERIFIED".into(),
         timestamp_ms: t0 + 3000,
     };
 
     ledger
-        .apply_uac_approval(&req_id, &valid_proof, &authorizer, &ref_store)
-        .expect("Valid UAC approval must succeed");
+        .apply_elevation_approval(&req_id, &valid_proof, &authorizer, &ref_store)
+        .expect("Valid elevation approval must succeed");
 
     // System Trunk (refs/heads/main) is now atomically pointing to candidate_oid!
     let main_ref = ref_store.get_ref("refs/heads/main").unwrap();
@@ -369,7 +369,7 @@ fn test_scenario_6_human_rejection_with_constructive_feedback() {
 
     // Human operator rejects in GUI modal with feedback
     ledger
-        .reject_uac_promotion(
+        .reject_elevation_promotion(
             &req_id,
             "Human Design Lead",
             "High-contrast palette missing WCAG AAA certification on borders",
@@ -389,7 +389,7 @@ fn test_scenario_7_ipc_message_roundtrip_codec() {
         target_ref: "refs/heads/main".into(),
         candidate_commit_oid: Oid::from_bytes([0x77; 20]),
         auto_score: sample_auto_score(91.5, true),
-        status: StagedPromotionStatus::PendingHumanUac,
+        status: StagedPromotionStatus::PendingHumanApproval,
         challenge_nonce: [0x5a; 32],
         created_at_ms: 1_700_000_000_000,
         expires_at_ms: 1_700_003_600_000,

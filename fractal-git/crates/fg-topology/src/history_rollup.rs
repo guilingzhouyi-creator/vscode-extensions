@@ -1,6 +1,6 @@
-//! Module: fg-topology — Hierarchical Rollup Ledger & SubAgent Increment Compressor
-//! File Path: crates/fg-topology/src/pyramid_folding.rs
-//! Architecture Role: Implements the hierarchical rollup mechanism (Level 1 SubAgent -> Level 2 Card).
+//! Module: fg-topology — Hierarchical History Rollup & Increment Consolidation
+//! File Path: crates/fg-topology/src/history_rollup.rs
+//! Architecture Role: Implements the hierarchical history rollup mechanism (Level 1 SubAgent -> Level 2 Card).
 //!   Compresses high-frequency micro-audit records emitted by ephemeral SubAgents into a compact,
 //!   tamper-evident Card Milestone record without losing cryptographic chain provenance.
 //!
@@ -11,7 +11,7 @@
 //!   - Preserving genesis and tip cryptographic fingerprints for unbroken audit verification.
 //!
 //! Exit Semantics & Design Rationale:
-//!   - Prevents git object database bloat: compresses $O(N)$ micro-records into $O(1)$ milestone records.
+//!   - Prevents git object database bloat: compresses O(N) micro-records into O(1) milestone records.
 //!   - Pure in-memory transformation, deterministic and zero-transient allocation in steady state.
 //!
 //! ### Domain Governance Rules (SSOT):
@@ -28,12 +28,12 @@ use fg_core::models::{
 };
 use serde::{Deserialize, Serialize};
 
-/// Aggregated milestone summary synthesized by folding multiple micro-audit records.
+/// Aggregated milestone summary synthesized by rolling up multiple micro-audit records.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CardMilestoneRecord {
+pub struct MilestoneRollupEntry {
     /// Consolidated audit record representing this card milestone.
     pub record: AuditRecord,
-    /// Total count of SubAgent micro-records folded into this milestone.
+    /// Total count of SubAgent micro-records rolled into this milestone.
     pub folded_records_count: usize,
     /// Total mutants evaluated across all folded increments.
     pub total_mutants_evaluated: usize,
@@ -41,27 +41,32 @@ pub struct CardMilestoneRecord {
     pub total_mutants_killed: usize,
 }
 
-impl CardMilestoneRecord {
+impl MilestoneRollupEntry {
     /// Serializes this milestone record into an NDJSON line verifying byte budget (<350B).
     pub fn to_ndjson_line(&self) -> FractalResult<String> {
         self.record.to_ndjson_line()
     }
 }
 
+/// Backward-compatible type alias during incremental migration.
+pub type CardMilestoneRecord = MilestoneRollupEntry;
+
 /// Hierarchical rollup engine compressing multi-agent micro-records into milestones.
 #[derive(Debug, Default)]
-pub struct HierarchicalRollupFolder;
+pub struct HierarchicalHistoryRollup;
 
-/// Backward-compatible alias for [`HierarchicalRollupFolder`].
-pub type PyramidFolder = HierarchicalRollupFolder;
+/// Backward-compatible type alias during incremental migration.
+pub type HierarchicalRollupFolder = HierarchicalHistoryRollup;
+/// Backward-compatible type alias during incremental migration.
+pub type PyramidFolder = HierarchicalHistoryRollup;
 
-impl HierarchicalRollupFolder {
-    /// Creates a new `HierarchicalRollupFolder` instance.
+impl HierarchicalHistoryRollup {
+    /// Creates a new `HierarchicalHistoryRollup` instance.
     pub fn new() -> Self {
         Self
     }
 
-    /// Rolls up a slice of `AuditRecord`s into a single consolidated `CardMilestoneRecord`.
+    /// Rolls up a slice of `AuditRecord`s into a single consolidated `MilestoneRollupEntry`.
     ///
     /// # Errors
     /// Returns [`FractalError::PolicyViolation`] if `records` is empty.
@@ -70,7 +75,7 @@ impl HierarchicalRollupFolder {
         records: &[AuditRecord],
         card_id: &str,
         secret: &AuthoritySecret,
-    ) -> FractalResult<CardMilestoneRecord> {
+    ) -> FractalResult<MilestoneRollupEntry> {
         if records.is_empty() {
             return Err(FractalError::PolicyViolation(
                 "Cannot fold empty audit record sequence".into(),
@@ -152,7 +157,7 @@ impl HierarchicalRollupFolder {
         // Sign using kernel secret
         milestone_record.sign(secret);
 
-        Ok(CardMilestoneRecord {
+        Ok(MilestoneRollupEntry {
             record: milestone_record,
             folded_records_count: records.len(),
             total_mutants_evaluated: total_mutants,
@@ -160,13 +165,13 @@ impl HierarchicalRollupFolder {
         })
     }
 
-    /// Backward-compatible alias for [`Self::rollup_records`].
+    /// Forwarding alias for [`Self::rollup_records`].
     pub fn fold_records(
         &self,
         records: &[AuditRecord],
         card_id: &str,
         secret: &AuthoritySecret,
-    ) -> FractalResult<CardMilestoneRecord> {
+    ) -> FractalResult<MilestoneRollupEntry> {
         self.rollup_records(records, card_id, secret)
     }
 }
@@ -205,9 +210,9 @@ mod tests {
     }
 
     #[test]
-    fn test_pyramid_folder_consolidates_records() {
+    fn test_history_rollup_consolidates_records() {
         let secret = AuthoritySecret::from_bytes(&[0x33; 32]).unwrap();
-        let folder = PyramidFolder::new();
+        let folder = HierarchicalHistoryRollup::new();
 
         let records = vec![
             make_dummy_record(1, GENESIS_PREV_HASH, 1.5, 0),
@@ -215,7 +220,7 @@ mod tests {
             make_dummy_record(3, "e5f60718", 0.5, 0),
         ];
 
-        let folded = folder.fold_records(&records, "CARD-042", &secret).unwrap();
+        let folded = folder.rollup_records(&records, "CARD-042", &secret).unwrap();
 
         assert_eq!(folded.folded_records_count, 3);
         assert_eq!(folded.record.actor, "card-CARD-042");
@@ -231,10 +236,10 @@ mod tests {
     }
 
     #[test]
-    fn test_pyramid_folder_rejects_empty_slice() {
+    fn test_history_rollup_rejects_empty_slice() {
         let secret = AuthoritySecret::from_bytes(&[0x33; 32]).unwrap();
-        let folder = PyramidFolder::new();
-        let folding_result = folder.fold_records(&[], "CARD-001", &secret);
+        let folder = HierarchicalHistoryRollup::new();
+        let folding_result = folder.rollup_records(&[], "CARD-001", &secret);
         assert!(folding_result.is_err());
     }
 }

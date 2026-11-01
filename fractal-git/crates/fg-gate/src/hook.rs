@@ -160,16 +160,16 @@ impl FractalHook for CommitGovernanceHook {
 }
 
 // -----------------------------------------------------------------------------
-// Built-in Level 3 Hook: UAC Nonce & Human Authority Gate
+// Built-in Level 3 Hook: Elevation Nonce & Human Authority Gate
 // -----------------------------------------------------------------------------
 
 /// Level 3 Hook: Strictly intercepts System Trunk promotions requiring human authority.
 #[derive(Debug, Default)]
-pub struct UacPromotionGateHook;
+pub struct ElevationPromotionGateHook;
 
-impl FractalHook for UacPromotionGateHook {
+impl FractalHook for ElevationPromotionGateHook {
     fn id(&self) -> &'static str {
-        "fgt-hook-uac-promotion-gate"
+        "fgt-hook-elevation-promotion-gate"
     }
 
     fn tier(&self) -> HookTier {
@@ -229,7 +229,7 @@ impl HookPipeline {
         pipeline.register(Arc::new(crate::auto_audit_hook::AutoAuditHook::new(
             HookTier::SubToCard,
         )));
-        pipeline.register(Arc::new(UacPromotionGateHook));
+        pipeline.register(Arc::new(ElevationPromotionGateHook));
         pipeline
     }
 

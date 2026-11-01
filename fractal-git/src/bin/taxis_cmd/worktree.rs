@@ -25,7 +25,7 @@ use super::common::{fail_io, print_json, reject, CliContext};
 /// Upper bound on projected entries walked while measuring a worktree.
 const PROJECTION_SCAN_LIMIT: usize = 20_000;
 
-/// Dispatches worktree subcommands (list, add, or falls back to passthrough).
+/// Dispatches worktree subcommands (list, add, prune, or falls back to passthrough).
 pub fn handle_worktree(ctx: &CliContext) {
     if ctx.args.is_empty() || ctx.args[0] == "list" {
         handle_worktree_list(ctx);
@@ -37,11 +37,21 @@ pub fn handle_worktree(ctx: &CliContext) {
         return;
     }
 
+    if ctx.args[0] == "prune" {
+        let pruned_ctx = CliContext {
+            git_dir: ctx.git_dir.clone(),
+            args: ctx.args[1..].to_vec(),
+            json_mode: ctx.json_mode,
+        };
+        super::reclaim::handle_reclaim(&pruned_ctx);
+        return;
+    }
+
     reject(
         CliTag::ERROR,
         format!(
             "worktree subcommand '{}' is not implemented; this build manages allocations through \
-             'worktree list' and 'worktree add'",
+             'worktree list', 'worktree add', and 'worktree prune'",
             ctx.args[0]
         ),
     )

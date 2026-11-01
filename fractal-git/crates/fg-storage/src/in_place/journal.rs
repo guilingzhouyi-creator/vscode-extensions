@@ -13,8 +13,10 @@ use std::path::{Path, PathBuf};
 use fg_core::error::{FractalError, FractalResult};
 use serde::{Deserialize, Serialize};
 
-/// Magic header for TIPSE In-Place WAL records.
-pub const TIPSE_WAL_MAGIC: &str = "TIPSE-WAL-v1";
+/// Magic header for In-Place ODB WAL records.
+pub const INPLACE_ODB_WAL_MAGIC: &str = "INPLACE-ODB-WAL-v1";
+/// Prior format magic header for backward recovery auto-upgrade.
+pub const HISTORICAL_TIPSE_WAL_MAGIC: &str = "TIPSE-WAL-v1";
 
 /// A discrete log entry recorded during in-place extraction transactions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -93,7 +95,7 @@ impl InPlaceJournal {
             .map_err(FractalError::Io)?;
 
         if is_new {
-            writeln!(file, "{TIPSE_WAL_MAGIC}").map_err(FractalError::Io)?;
+            writeln!(file, "{INPLACE_ODB_WAL_MAGIC}").map_err(FractalError::Io)?;
             file.sync_all().map_err(FractalError::Io)?;
         }
 
@@ -133,12 +135,13 @@ impl InPlaceJournal {
         let reader = BufReader::new(file);
         let mut lines = reader.lines();
 
-        // 1. Verify magic header
+        // 1. Verify magic header (supporting auto-upgrade from prior TIPSE-WAL-v1)
         if let Some(first_line) = lines.next() {
             let magic = first_line.map_err(FractalError::Io)?;
-            if magic.trim() != TIPSE_WAL_MAGIC {
+            let trimmed = magic.trim();
+            if trimmed != INPLACE_ODB_WAL_MAGIC && trimmed != HISTORICAL_TIPSE_WAL_MAGIC {
                 return Err(FractalError::CorruptStore(format!(
-                    "verify WAL magic header: expected '{TIPSE_WAL_MAGIC}', actual '{magic}'"
+                    "verify WAL magic header: expected '{INPLACE_ODB_WAL_MAGIC}', actual '{magic}'"
                 )));
             }
         } else {
@@ -285,5 +288,20 @@ mod tests {
         assert!(nested.is_file(), "journal must be created after mkdir -p");
         let state = InPlaceJournal::replay(&nested).expect("replay freshly created journal");
         assert!(!state.is_completed);
+    }
+
+    #[test]
+    fn test_prior_tipse_wal_magic_auto_upgrade() {
+        let dir = test_temp_dir("prior_wal_");
+        let prior_wal_path = dir.path().join("prior.wal");
+        std::fs::write(
+            &prior_wal_path,
+            "TIPSE-WAL-v1\n{\"SessionInit\":{\"archive_path\":\"test.zip\",\"target_path\":\"dest\",\"total_members\":1,\"initial_archive_len\":1000}}\n{\"MemberExtracted\":{\"name\":\"prior.txt\",\"extracted_bytes\":100,\"local_header_offset\":0,\"crc32\":123}}\n",
+        )
+        .expect("write prior WAL file");
+
+        let state = InPlaceJournal::replay(&prior_wal_path).expect("replay prior WAL");
+        assert!(!state.is_completed);
+        assert!(state.extracted_members.contains("prior.txt"));
     }
 }

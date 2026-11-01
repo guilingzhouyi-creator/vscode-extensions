@@ -1,9 +1,9 @@
-//! Module: taxis_cmd::promotion — Staged Promotion & Human UAC Bridge
+//! Module: taxis_cmd::promotion — Staged Promotion & Human Elevation Bridge
 //! File Path: src/bin/taxis_cmd/promotion.rs
 //! Architecture Role: Dispatches promotion subcommand requests, bridging autonomous agent
-//!   staging proposals to the System Trunk through the Human UAC physical click gate.
+//!   staging proposals to the System Trunk through the Human Elevation physical click gate.
 //! Dependencies & Triggers: Invoked when `taxis promotion` is dispatched.
-//! Responsibilities: Proposal staging, human UAC nonce authorization,
+//! Responsibilities: Proposal staging, human elevation nonce authorization,
 //!   proposal rejection, queue listing.
 //! Exit Semantics & Design Rationale: Every rejection terminates with a non-zero status.
 //!   The CLI never synthesizes an operator identity or a challenge nonce on the caller's
@@ -16,13 +16,13 @@
 
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
-    compute_jeffreys_credible_lower, AutoQualityScoreEnvelope, DiskRefStore, HumanUacProof, Oid,
-    PromotionStagingLedger, RefStore, StandardNonceAuthorizer, TaxisPolicy,
+    compute_jeffreys_credible_lower, AutoQualityScoreEnvelope, DiskRefStore, ElevationAttestation,
+    Oid, PromotionStagingLedger, RefStore, StandardNonceAuthorizer, TaxisPolicy,
 };
 
 use super::common::{find_arg_value, print_json, reject, CliContext};
 
-/// Byte length of the GUI challenge nonce carried by a UAC proof.
+/// Byte length of the GUI challenge nonce carried by an elevation proof.
 const NONCE_BYTES: usize = 32;
 
 /// Dispatches promotion subcommand requests (stage, approve, reject, list).
@@ -52,13 +52,13 @@ pub fn handle_promotion(ctx: &CliContext) {
             handle_stage_request(ctx, &mut ledger, &policy, current_time_ms);
         }
         "authorize-gui-bridge" | "approve" => {
-            handle_uac_approval(ctx, &mut ledger, current_time_ms);
+            handle_elevation_approval(ctx, &mut ledger, current_time_ms);
         }
         "reject" => {
-            handle_uac_rejection(ctx, &mut ledger, current_time_ms);
+            handle_elevation_rejection(ctx, &mut ledger, current_time_ms);
         }
         _ /* list or show */ => {
-            handle_uac_list(ctx, &mut ledger, &policy, current_time_ms);
+            handle_elevation_list(ctx, &mut ledger, &policy, current_time_ms);
         }
     }
 }
@@ -166,13 +166,13 @@ fn handle_stage_request(
                     "candidate_oid": candidate_oid.to_hex(),
                     "ttl_seconds": policy.staged_promotion_ttl_seconds,
                     "composite_score": composite_score,
-                    "uac_required": policy.uac_required_for_system_trunk
+                    "elevation_required": policy.elevation_required_for_system_trunk
                 });
                 print_json(&promo_payload);
             } else {
                 println!(
                     "{} Staged Promotion Proposal '{}'",
-                    CliTag::UAC_PROMOTION_STAGED,
+                    CliTag::PROMOTION_STAGED,
                     req_id
                 );
                 println!("  Candidate OID     : {}", candidate_oid.to_hex());
@@ -190,7 +190,7 @@ fn handle_stage_request(
                     "  Lease Expiry      : 1 Hour (TTL = {}s)",
                     policy.staged_promotion_ttl_seconds
                 );
-                println!("  Promotion Gate    : Awaiting Human Physical Click in GUI UAC Modal");
+                println!("  Promotion Gate    : Awaiting Human Physical Click in GUI Elevation Modal");
             }
         }
         Err(err) => {
@@ -211,9 +211,9 @@ fn parse_challenge_nonce(raw_nonce: Option<&str>) -> [u8; NONCE_BYTES] {
     let hex_nonce = match raw_nonce {
         Some(value) => value,
         None => reject(
-            CliTag::UAC_APPROVAL_FAILED,
+            CliTag::ELEVATION_APPROVAL_FAILED,
             concat!(
-                "missing --nonce; the challenge nonce must be read from the GUI UAC modal ",
+                "missing --nonce; the challenge nonce must be read from the GUI elevation modal ",
                 "and is never inferred from the ledger"
             ),
         ),
@@ -221,7 +221,7 @@ fn parse_challenge_nonce(raw_nonce: Option<&str>) -> [u8; NONCE_BYTES] {
 
     if hex_nonce.len() != NONCE_BYTES * 2 {
         reject(
-            CliTag::UAC_APPROVAL_FAILED,
+            CliTag::ELEVATION_APPROVAL_FAILED,
             format!(
                 "challenge nonce must be {} hex characters, received {}",
                 NONCE_BYTES * 2,
@@ -235,14 +235,14 @@ fn parse_challenge_nonce(raw_nonce: Option<&str>) -> [u8; NONCE_BYTES] {
         let pair_text = match std::str::from_utf8(pair) {
             Ok(text) => text,
             Err(utf_err) => reject(
-                CliTag::UAC_APPROVAL_FAILED,
+                CliTag::ELEVATION_APPROVAL_FAILED,
                 format!("challenge nonce is not valid hex: {}", utf_err),
             ),
         };
         nonce[byte_index] = match u8::from_str_radix(pair_text, 16) {
             Ok(byte_val) => byte_val,
             Err(radix_err) => reject(
-                CliTag::UAC_APPROVAL_FAILED,
+                CliTag::ELEVATION_APPROVAL_FAILED,
                 format!("challenge nonce is not valid hex: {}", radix_err),
             ),
         };
@@ -262,24 +262,24 @@ fn require_operator_flag(ctx: &CliContext, tag: &str) -> String {
 }
 
 /// Handles approval of an active staged proposal with an externally supplied proof.
-fn handle_uac_approval(
+fn handle_elevation_approval(
     ctx: &CliContext,
     ledger: &mut PromotionStagingLedger,
     current_time_ms: i64,
 ) {
     let req_id_opt = find_arg_value(&ctx.args, &["--id"]).map(|val| val.to_string());
-    let operator = require_operator_flag(ctx, CliTag::UAC_APPROVAL_FAILED);
+    let operator = require_operator_flag(ctx, CliTag::ELEVATION_APPROVAL_FAILED);
     let email = match find_arg_value(&ctx.args, &["--email"]) {
         Some(email_value) if !email_value.trim().is_empty() => email_value.to_string(),
         _ => reject(
-            CliTag::UAC_APPROVAL_FAILED,
+            CliTag::ELEVATION_APPROVAL_FAILED,
             "--email is required to attribute the promotion audit entry",
         ),
     };
     let session = match find_arg_value(&ctx.args, &["--session"]) {
         Some(session_value) if !session_value.trim().is_empty() => session_value.to_string(),
         _ => reject(
-            CliTag::UAC_APPROVAL_FAILED,
+            CliTag::ELEVATION_APPROVAL_FAILED,
             "--session is required; an unattributed session cannot prove a GUI click",
         ),
     };
@@ -288,25 +288,25 @@ fn handle_uac_approval(
     let active_req = match ledger.get_active_candidate(current_time_ms) {
         Some(cand) => cand.clone(),
         None => reject(
-            CliTag::UAC_APPROVAL_FAILED,
-            "no active staged promotion awaiting human UAC approval",
+            CliTag::ELEVATION_APPROVAL_FAILED,
+            "no active staged promotion awaiting human elevation approval",
         ),
     };
 
     let target_id = req_id_opt.unwrap_or(active_req.request_id.clone());
-    let proof = HumanUacProof {
+    let proof = ElevationAttestation {
         request_id: target_id.clone(),
         signed_nonce,
         operator_name: operator.clone(),
         operator_email: email,
-        gui_session_token: session,
+        approval_session_token: session,
         timestamp_ms: current_time_ms,
     };
 
     let authorizer = StandardNonceAuthorizer::new();
     let ref_store = DiskRefStore::new(&ctx.git_dir);
 
-    match ledger.apply_uac_approval(&target_id, &proof, &authorizer, &ref_store) {
+    match ledger.apply_elevation_approval(&target_id, &proof, &authorizer, &ref_store) {
         Ok(()) => {
             if ctx.json_mode {
                 let success_payload = serde_json::json!({
@@ -319,8 +319,8 @@ fn handle_uac_approval(
                 print_json(&success_payload);
             } else {
                 println!(
-                    "{} Human GUI UAC Permission Granted!",
-                    CliTag::HUMAN_UAC_VERIFIED
+                    "{} Human Elevation Permission Granted!",
+                    CliTag::HUMAN_APPROVAL_VERIFIED
                 );
                 println!("  Request ID   : {}", target_id);
                 println!("  Operator     : {}", operator);
@@ -340,33 +340,33 @@ fn handle_uac_approval(
                 });
                 print_json(&failure_payload);
             }
-            reject(CliTag::UAC_APPROVAL_FAILED, approval_err);
+            reject(CliTag::ELEVATION_APPROVAL_FAILED, approval_err);
         }
     }
 }
 
 /// Handles human operator rejection of an active staged proposal with feedback.
-fn handle_uac_rejection(
+fn handle_elevation_rejection(
     ctx: &CliContext,
     ledger: &mut PromotionStagingLedger,
     current_time_ms: i64,
 ) {
     let req_id_opt = find_arg_value(&ctx.args, &["--id"]).map(|val| val.to_string());
-    let operator = require_operator_flag(ctx, CliTag::UAC_REJECT_FAILED);
+    let operator = require_operator_flag(ctx, CliTag::ELEVATION_REJECT_FAILED);
     let feedback = find_arg_value(&ctx.args, &["--feedback", "--reason"])
-        .unwrap_or("Promotion declined in GUI UAC review")
+        .unwrap_or("Promotion declined in elevation review")
         .to_string();
 
     let active_req = match ledger.get_active_candidate(current_time_ms) {
         Some(cand) => cand.clone(),
         None => reject(
-            CliTag::UAC_REJECT_FAILED,
-            "no active staged promotion awaiting human UAC approval",
+            CliTag::ELEVATION_REJECT_FAILED,
+            "no active staged promotion awaiting human elevation approval",
         ),
     };
     let target_id = req_id_opt.unwrap_or(active_req.request_id);
 
-    match ledger.reject_uac_promotion(&target_id, operator, feedback, current_time_ms) {
+    match ledger.reject_elevation_promotion(&target_id, operator, feedback, current_time_ms) {
         Ok(()) => {
             if ctx.json_mode {
                 let rejection_payload = serde_json::json!({
@@ -377,17 +377,17 @@ fn handle_uac_rejection(
             } else {
                 println!(
                     "{} Request '{}' rejected.",
-                    CliTag::UAC_PROMOTION_REJECTED,
+                    CliTag::PROMOTION_REJECTED,
                     target_id
                 );
             }
         }
-        Err(reject_err) => reject(CliTag::UAC_REJECT_FAILED, reject_err),
+        Err(reject_err) => reject(CliTag::ELEVATION_REJECT_FAILED, reject_err),
     }
 }
 
-/// Lists active staged promotion candidates awaiting human UAC authorization.
-fn handle_uac_list(
+/// Lists active staged promotion candidates awaiting human elevation authorization.
+fn handle_elevation_list(
     ctx: &CliContext,
     ledger: &mut PromotionStagingLedger,
     policy: &TaxisPolicy,
@@ -397,40 +397,40 @@ fn handle_uac_list(
     if ctx.json_mode {
         let status_payload = serde_json::json!({
             "engine": "taxis",
-            "subsystem": "uac_staged_promotion",
+            "subsystem": "elevation_staged_promotion",
             "active_candidate": active,
             "policy": {
                 "ttl_seconds": policy.staged_promotion_ttl_seconds,
                 "score_ratchet_delta": policy.replacement_score_baseline_delta,
                 "min_score": policy.minimum_promotion_score,
-                "uac_required": policy.uac_required_for_system_trunk
+                "elevation_required": policy.elevation_required_for_system_trunk
             }
         });
         print_json(&status_payload);
     } else {
-        println!("=== Staged Promotion Queue (Human GUI UAC) ===");
+        println!("=== Staged Promotion Queue (Human Elevation) ===");
         println!("Policy Guardrails:");
         println!(
-            "  Human UAC Required : {}",
-            policy.uac_required_for_system_trunk
+            "  Human Elevation Required : {}",
+            policy.elevation_required_for_system_trunk
         );
         println!(
-            "  Staged Lease TTL   : {}s (1 Hour)",
+            "  Staged Lease TTL         : {}s (1 Hour)",
             policy.staged_promotion_ttl_seconds
         );
         println!(
-            "  Score Ratchet Δ    : +{:.1} points",
+            "  Score Ratchet Δ          : +{:.1} points",
             policy.replacement_score_baseline_delta
         );
         println!(
-            "  Minimum Auto Score : {:.1}/100",
+            "  Minimum Auto Score       : {:.1}/100",
             policy.minimum_promotion_score
         );
 
         match active {
             Some(cand) => {
                 let remaining_sec = (cand.expires_at_ms - current_time_ms).max(0) / 1000;
-                println!("Active Candidate Awaiting Human UAC:");
+                println!("Active Candidate Awaiting Human Elevation:");
                 println!("  Request ID     : {}", cand.request_id);
                 println!("  Candidate OID  : {}", cand.candidate_commit_oid.to_hex());
                 println!("  Proposing Agent: {}", cand.agent_uid);
@@ -454,7 +454,7 @@ fn handle_uac_list(
                 println!("  Status         : {:?}", cand.status);
             }
             None => {
-                println!("No active candidate currently awaiting human UAC approval.");
+                println!("No active candidate currently awaiting human elevation approval.");
             }
         }
     }

@@ -64,8 +64,8 @@ pub fn is_recognized_ref_prefix(ref_path: &str) -> bool {
         || ref_path == REF_HEAD
 }
 
-/// Formats a standardized UAC proposal summary report string.
-pub fn format_uac_proposal_summary(card_id: &str, task_desc: &str) -> String {
+/// Formats a standardized elevation proposal summary report string.
+pub fn format_elevation_proposal_summary(card_id: &str, task_desc: &str) -> String {
     format!(
         "Auto-Refactor Quality Gate: zero debt verification for task card [{}] - {}.",
         card_id, task_desc

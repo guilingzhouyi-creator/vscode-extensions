@@ -1,6 +1,6 @@
-//! Module: fg-core — Unified Elastic Quarantine Ledger & Isolation Stash
+//! Module: fg-core — Unified Elastic Quarantine Registry & Isolation Stash
 //! File Path: crates/fg-core/src/models/quarantine.rs
-//! Architecture Role: Single-source domain model and crash-safe persistence ledger for isolated
+//! Architecture Role: Single-source domain model and crash-safe persistence registry for isolated
 //!   agent mutations across `fg-index` (MutationBudget / SliceAuthorization breaches) and
 //!   `fg-gate` (`BLOCK_GAMING_DETECTED` Bayesian credit circuit breaker).
 //! Dependencies & Triggers: Consumed by `fg-index::quarantine`, `fg-gate::credit`, and Taxis CLI
@@ -9,10 +9,10 @@
 //!   `.taxis/quarantine/`, assign collision-free quarantine identifiers, and track lifecycle
 //!   transitions (`Isolated` -> `Restored` / `Discarded`).
 //! Exit Semantics & Design Rationale:
-//!   - Eliminates the split-brain `QuarantineLedger` definition that previously diverged between
-//!     `fg-index` and `fg-gate`.
+//!   - Single-source `QuarantineRegistry` definition shared across subsystems.
 //!   - Uses [`crate::fs_atomic::write_file_atomic`] and a monotonic fallback nonce so two
 //!     circuit-breaker triggers within the same Unix second never overwrite one another.
+//!   - Automatically migrates prior `quarantine_index.json` to `quarantine_registry.json`.
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
@@ -66,9 +66,9 @@ pub struct QuarantineRecord {
     pub status: QuarantineStatus,
 }
 
-/// Quarantine ledger index stored in `.taxis/quarantine/quarantine_index.json`.
+/// Quarantine registry index stored in `.taxis/quarantine/quarantine_registry.json`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct QuarantineLedger {
+pub struct QuarantineRegistry {
     /// Recorded quarantine entries.
     pub records: Vec<QuarantineRecord>,
 }
@@ -88,28 +88,40 @@ pub struct IsolateMutationRequest<'a> {
     pub nonce: u64,
 }
 
-impl QuarantineLedger {
-    /// Index filename under the quarantine root.
-    pub const INDEX_FILENAME: &'static str = "quarantine_index.json";
+impl QuarantineRegistry {
+    /// Registry filename under the quarantine root.
+    pub const REGISTRY_FILENAME: &'static str = "quarantine_registry.json";
+    /// Prior index filename supported for automatic migration.
+    pub const HISTORICAL_INDEX_FILENAME: &'static str = "quarantine_index.json";
 
-    /// Loads the quarantine ledger from a given directory.
+    /// Loads the quarantine registry from a given directory, automatically migrating prior files.
     pub fn load_from_dir(quarantine_dir: &Path) -> FractalResult<Self> {
-        let index_file = quarantine_dir.join(Self::INDEX_FILENAME);
-        if !index_file.exists() {
+        let registry_file = quarantine_dir.join(Self::REGISTRY_FILENAME);
+        let prior_file = quarantine_dir.join(Self::HISTORICAL_INDEX_FILENAME);
+        let target_file = if registry_file.exists() {
+            registry_file
+        } else if prior_file.exists() {
+            prior_file
+        } else {
             return Ok(Self::default());
-        }
+        };
 
-        let index_bytes = fs::read(&index_file)?;
-        let ledger: Self = serde_json::from_slice(&index_bytes)?;
-        Ok(ledger)
+        let index_bytes = fs::read(&target_file)?;
+        let registry: Self = serde_json::from_slice(&index_bytes)?;
+        Ok(registry)
     }
 
-    /// Atomically persists the quarantine ledger into `quarantine_dir`.
+    /// Atomically persists the quarantine registry into `quarantine_dir` and purges prior file if present.
     pub fn save_to_dir(&self, quarantine_dir: &Path) -> FractalResult<()> {
         fs::create_dir_all(quarantine_dir)?;
-        let index_file = quarantine_dir.join(Self::INDEX_FILENAME);
+        let registry_file = quarantine_dir.join(Self::REGISTRY_FILENAME);
         let serialized_bytes = serde_json::to_vec_pretty(self)?;
-        write_file_atomic(&index_file, &serialized_bytes, true)?;
+        write_file_atomic(&registry_file, &serialized_bytes, true)?;
+
+        let prior_file = quarantine_dir.join(Self::HISTORICAL_INDEX_FILENAME);
+        if prior_file.exists() {
+            let _ = fs::remove_file(prior_file);
+        }
         Ok(())
     }
 
@@ -246,7 +258,7 @@ mod tests {
         let test_dir = test_temp_dir("fg_core_quarantine");
         let _ = fs::remove_dir_all(&test_dir);
 
-        let first = QuarantineLedger::isolate_mutation(IsolateMutationRequest {
+        let first = QuarantineRegistry::isolate_mutation(IsolateMutationRequest {
             quarantine_dir: &test_dir,
             project_id: "proj",
             agent_id: "a1",
@@ -259,7 +271,7 @@ mod tests {
         })
         .expect("first isolate");
 
-        let second = QuarantineLedger::isolate_mutation(IsolateMutationRequest {
+        let second = QuarantineRegistry::isolate_mutation(IsolateMutationRequest {
             quarantine_dir: &test_dir,
             project_id: "proj",
             agent_id: "a2",
@@ -273,7 +285,7 @@ mod tests {
         .expect("second isolate");
 
         assert_ne!(first.quarantine_id, second.quarantine_id);
-        let active = QuarantineLedger::list_active_isolated(&test_dir).expect("list");
+        let active = QuarantineRegistry::list_active_isolated(&test_dir).expect("list");
         assert_eq!(active.len(), 2);
 
         let _ = fs::remove_dir_all(&test_dir);

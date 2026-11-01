@@ -19,7 +19,7 @@ pub mod operation;
 pub mod project_store;
 pub mod promotion_ledger;
 pub mod provenance;
-pub mod pyramid_folding;
+pub mod history_rollup;
 pub mod refs;
 pub mod state_machine;
 pub mod submodule;
@@ -27,7 +27,7 @@ pub mod telemetry;
 pub mod verifier;
 pub mod worktree;
 
-pub use authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
+pub use authorizer::{ElevationAuthorizer, StandardNonceAuthorizer};
 pub use bisect::{BisectEngine, BisectState, BisectStep};
 pub use blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
 pub use conflict_tree::{AgentConflictSliceReport, ConflictSlice, ConflictTreeManager};
@@ -36,7 +36,10 @@ pub use operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapsh
 pub use project_store::{DiskProjectStore, PROJECTS_CACHE_FILE, PROJECTS_DIR};
 pub use promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use provenance::{DiskProvenanceStore, PROVENANCE_FILE};
-pub use pyramid_folding::{CardMilestoneRecord, HierarchicalRollupFolder, PyramidFolder};
+pub use history_rollup::{
+    CardMilestoneRecord, HierarchicalHistoryRollup, HierarchicalRollupFolder, MilestoneRollupEntry,
+    PyramidFolder,
+};
 pub use refs::{DiskRefStore, FractalRef, HeadState};
 pub use state_machine::{FractalWorkspaceNode, WorktreeState};
 pub use submodule::{SubmoduleController, SubmoduleStatus};

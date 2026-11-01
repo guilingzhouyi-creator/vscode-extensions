@@ -38,7 +38,7 @@ pub use git_hook::{
 };
 pub use hook::{
     CommitGovernanceHook, FractalHook, HookContext, HookPipeline, HookTier, HookVerdict,
-    HygieneConflictHook, UacPromotionGateHook,
+    HygieneConflictHook, ElevationPromotionGateHook,
 };
 pub use pre_receive::{ActorIdentity, AgentPushContext, PreReceiveGuard};
 pub use quota_governor::{

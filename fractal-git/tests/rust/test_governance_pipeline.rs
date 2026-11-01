@@ -36,7 +36,7 @@ use fractal_git::{
     BlockProvenanceParams, BlockThreeWayMerge, CommitGovernanceHook, CommitMaterializationRequest,
     CommitMessageGuard, DiskBlackboardStore, DiskProvenanceStore, DiskRefStore, FractalRef,
     GitSignature, HookContext, HookPipeline, HookTier, HygieneConflictHook, LooseOdb, Oid,
-    PreReceiveGuard, RefStore, TaxisPolicy, UacPromotionGateHook,
+    PreReceiveGuard, RefStore, TaxisPolicy, ElevationPromotionGateHook,
 };
 
 #[test]
@@ -230,7 +230,7 @@ fn test_fractal_hook_pipeline() {
     let mut pipeline = HookPipeline::new();
     pipeline.register(Arc::new(HygieneConflictHook));
     pipeline.register(Arc::new(CommitGovernanceHook));
-    pipeline.register(Arc::new(UacPromotionGateHook));
+    pipeline.register(Arc::new(ElevationPromotionGateHook));
 
     let secret = match AuthoritySecret::from_bytes(&[7u8; 32]) {
         Ok(secret) => secret,

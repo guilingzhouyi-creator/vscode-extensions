@@ -23,7 +23,7 @@ use std::path::Path;
 
 use fg_core::error::{FractalError, FractalResult};
 pub use fg_core::models::quarantine::{
-    IsolateMutationRequest, QuarantineLedger, QuarantineRecord, QuarantineStatus,
+    IsolateMutationRequest, QuarantineRecord, QuarantineRegistry, QuarantineStatus,
 };
 use serde::{Deserialize, Serialize};
 
@@ -113,7 +113,7 @@ impl AgentCreditController {
         if params.credit.gaming_detected {
             let reason = "BLOCK_GAMING_DETECTED: Deceptive test evasion or tautological assertion intercepted";
 
-            QuarantineLedger::isolate_mutation(IsolateMutationRequest {
+            QuarantineRegistry::isolate_mutation(IsolateMutationRequest {
                 quarantine_dir: params.quarantine_dir,
                 project_id: params.project_id,
                 agent_id: params.agent_id,
@@ -187,10 +187,10 @@ mod tests {
 
         assert!(quarantine_result.is_err());
         let index_payload =
-            std::fs::read(quarantine_scratch_dir.join("quarantine_index.json")).unwrap();
-        let ledger: QuarantineLedger = serde_json::from_slice(&index_payload).unwrap();
-        assert_eq!(ledger.records.len(), 1);
-        assert_eq!(ledger.records[0].agent_id, "subagent-test-1");
-        assert!(ledger.records[0].reason.contains("BLOCK_GAMING_DETECTED"));
+            std::fs::read(quarantine_scratch_dir.join(QuarantineRegistry::REGISTRY_FILENAME)).unwrap();
+        let registry: QuarantineRegistry = serde_json::from_slice(&index_payload).unwrap();
+        assert_eq!(registry.records.len(), 1);
+        assert_eq!(registry.records[0].agent_id, "subagent-test-1");
+        assert!(registry.records[0].reason.contains("BLOCK_GAMING_DETECTED"));
     }
 }

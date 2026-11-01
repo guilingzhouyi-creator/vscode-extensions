@@ -425,7 +425,7 @@ Native Fractal Commands (with Git Alias Mappings):
   archive            Package tree-ish object states into streaming Tar, Tar.gz, or Zip archives
   unarchive, extract Extract Zip, Tar, Tar.gz, or Bundle in-place with SpacePlan preflight (--dry-run, --to-odb)
   bundle             Create, verify, list-heads, or unbundle Git bundle v2 packages in-place
-  reclaim,  gc       Trigger zero-allocation worktree & sandbox reclamation
+  reclaim            Trigger worktree & sandbox reclamation (or 'worktree prune')
   repack             Consolidate loose objects into Git packfiles and index v2 (--async, --low-disk, --window)
   remote             Manage set of tracked repositories (list, add, remove, get-url)
   fetch              Download objects and refs from another repository
@@ -435,7 +435,7 @@ Native Fractal Commands (with Git Alias Mappings):
   quarantine, quar   Manage elastic quarantine stash for unauthorized changes (list, show, restore, discard)
   worktree, wt       Display or allocate scoped projection worktree (--scope / --full)
   blackboard, bb     Manage concurrent SubAgent intent leases (claim, check, release, list)
-  promotion, pm      Manage staged promotions to System Trunk with Human GUI UAC gate
+  promotion, pm      Manage staged promotions to System Trunk with Human Elevation gate
   bench,    benchmark Run performance benchmarks (--level <1|2|3|all>, -m <mult>)
   daemon,   serve    Display protocol daemon status & IPC endpoints
   version,  -v       Display version and domain rules SSOT

@@ -1,6 +1,6 @@
-//! Module: fg-core — Human GUI UAC Elevation & Staged Promotion Models
-//! File Path: crates/fg-core/src/models/uac.rs
-//! Architecture Role: Strongly-typed models for human GUI UAC authorization,
+//! Module: fg-core — Human Elevation & Staged Promotion Models
+//! File Path: crates/fg-core/src/models/elevation.rs
+//! Architecture Role: Strongly-typed models for human elevation authorization,
 //!   Auto quality scoring integration, 1-hour lease lifecycle, and score ratchet baselines.
 
 use crate::models::Oid;
@@ -43,8 +43,8 @@ impl Default for AutoQualityScoreEnvelope {
 /// Lifecycle state machine for a staged promotion request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StagedPromotionStatus {
-    /// Actively awaiting human physical click in GUI UAC modal (within 1-hour TTL).
-    PendingHumanUac,
+    /// Actively awaiting human physical click in approval interface (within 1-hour TTL).
+    PendingHumanApproval,
     /// Superseded by a higher-scoring candidate meeting the score ratchet baseline.
     SupersededByHigherScore {
         superseded_by_id: String,
@@ -52,12 +52,12 @@ pub enum StagedPromotionStatus {
     },
     /// Expired after 1-hour lease timeout without human action.
     Expired { expired_at_ms: i64 },
-    /// Approved by human physical click in GUI and atomically merged into System Trunk.
+    /// Approved by human physical click and atomically merged into System Trunk.
     ApprovedAndPromoted {
         promoted_at_ms: i64,
         human_operator: String,
     },
-    /// Rejected by human in GUI with constructive feedback injected back to agent.
+    /// Rejected by human with constructive feedback injected back to agent.
     RejectedByHuman {
         rejected_at_ms: i64,
         human_operator: String,
@@ -65,7 +65,7 @@ pub enum StagedPromotionStatus {
     },
 }
 
-/// Staged promotion entity awaiting human UAC approval.
+/// Staged promotion entity awaiting human approval.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StagedPromotionRequest {
     pub request_id: String,
@@ -87,19 +87,19 @@ impl StagedPromotionRequest {
         current_time_ms > self.expires_at_ms
     }
 
-    /// Checks if this request is actively pending human UAC approval.
+    /// Checks if this request is actively pending human approval.
     pub fn is_active_pending(&self, current_time_ms: i64) -> bool {
-        self.status == StagedPromotionStatus::PendingHumanUac && !self.is_expired(current_time_ms)
+        self.status == StagedPromotionStatus::PendingHumanApproval && !self.is_expired(current_time_ms)
     }
 }
 
-/// Non-forgeable cryptographic UAC approval proof signed via GUI interface.
+/// Non-forgeable cryptographic elevation approval proof signed via operator interface.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct HumanUacProof {
+pub struct ElevationAttestation {
     pub request_id: String,
     pub signed_nonce: [u8; 32],
     pub operator_name: String,
     pub operator_email: String,
-    pub gui_session_token: String,
+    pub approval_session_token: String,
     pub timestamp_ms: i64,
 }

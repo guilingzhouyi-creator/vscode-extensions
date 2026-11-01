@@ -12,8 +12,8 @@ pub const ERR_COMMIT_GOVERNANCE_FAIL_PREFIX: &str = "COMMIT_GOVERNANCE_FAIL";
 /// Error diagnostic prefix for TopologyVerifier illegal merges.
 pub const ERR_TOPOLOGY_VERIFY_FAIL_PREFIX: &str = "VERIFY_FAIL";
 
-/// Error diagnostic prefix for UAC authorization failures.
-pub const ERR_UAC_APPROVAL_FAILED_PREFIX: &str = "UAC_APPROVAL_FAILED";
+/// Error diagnostic prefix for elevation authorization failures.
+pub const ERR_ELEVATION_FAILED_PREFIX: &str = "ELEVATION_FAILED";
 
 /// Diagnostic message when commit message body is empty.
 pub const MSG_COMMIT_MESSAGE_CANNOT_BE_EMPTY: &str = "Commit message cannot be empty";

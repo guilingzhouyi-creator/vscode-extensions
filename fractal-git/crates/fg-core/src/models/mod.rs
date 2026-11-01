@@ -17,6 +17,7 @@ pub mod file_uid;
 pub mod generation;
 pub mod git_object_id;
 pub mod hex;
+pub mod elevation;
 pub mod identity;
 pub mod index_stage;
 pub mod interactive;
@@ -29,7 +30,6 @@ pub mod repo_path;
 pub mod signature;
 pub mod slice_auth;
 pub mod submodule;
-pub mod uac;
 
 pub use audit_chain::{
     AuditHashChain, AuditIkceVerdict, AuditRecord, AuditScore, AuditTkcvVerdict,
@@ -59,14 +59,14 @@ pub use project::{
     DEFAULT_PROJECT_MASTER_TTL_SECONDS, DEFAULT_SUBAGENT_TTL_SECONDS,
 };
 pub use provenance::{BlockProvenanceEntry, BlockProvenanceParams, ProvenanceLedger};
+pub use elevation::{
+    AutoQualityScoreEnvelope, ElevationAttestation, StagedPromotionRequest, StagedPromotionStatus,
+};
 pub use quarantine::{
-    default_quarantine_dir, IsolateMutationRequest, QuarantineLedger, QuarantineRecord,
+    default_quarantine_dir, IsolateMutationRequest, QuarantineRecord, QuarantineRegistry,
     QuarantineStatus,
 };
 pub use repo_path::{path_matches_scope, safe_join, validate_repo_relative_path, RepoPath};
 pub use signature::GitSignature;
 pub use slice_auth::{MutationBudget, ReservationStatus, ReservedFileToken, SliceAuthorization};
 pub use submodule::{SubmoduleEntry, SubmoduleUpdateStrategy};
-pub use uac::{
-    AutoQualityScoreEnvelope, HumanUacProof, StagedPromotionRequest, StagedPromotionStatus,
-};

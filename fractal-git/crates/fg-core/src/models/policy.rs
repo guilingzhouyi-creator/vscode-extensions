@@ -133,8 +133,9 @@ pub struct TaxisPolicy {
     pub human_controlled_trunks: bool,
     /// Dual-Trunk mode active: official commit count only counts system/integration merges.
     pub dual_trunk_enabled: bool,
-    /// Whether promotions to System Trunk strictly require GUI UAC click authorization.
-    pub uac_required_for_system_trunk: bool,
+    /// Whether promotions to System Trunk strictly require human elevation authorization.
+    #[serde(default, alias = "uac_required_for_system_trunk")]
+    pub elevation_required_for_system_trunk: bool,
     /// Staged promotion lease time-to-live in seconds (default: 3600 = 1 hour).
     pub staged_promotion_ttl_seconds: u64,
     /// Required score delta to supersede an active staged promotion (default: 5.0).
@@ -257,7 +258,7 @@ impl TaxisPolicy {
             require_falsifiable_verification: true,
             human_controlled_trunks: true,
             dual_trunk_enabled: true,
-            uac_required_for_system_trunk: true,
+            elevation_required_for_system_trunk: true,
             staged_promotion_ttl_seconds: 3600,
             replacement_score_baseline_delta: 5.0,
             minimum_promotion_score: 80.0,
@@ -326,7 +327,7 @@ impl TaxisPolicy {
             require_falsifiable_verification: true,
             human_controlled_trunks: true,
             dual_trunk_enabled: true,
-            uac_required_for_system_trunk: true,
+            elevation_required_for_system_trunk: true,
             staged_promotion_ttl_seconds: 3600,
             replacement_score_baseline_delta: 5.0,
             minimum_promotion_score: 80.0,
@@ -373,7 +374,7 @@ impl TaxisPolicy {
             require_falsifiable_verification: false,
             human_controlled_trunks: true,
             dual_trunk_enabled: false,
-            uac_required_for_system_trunk: true,
+            elevation_required_for_system_trunk: true,
             staged_promotion_ttl_seconds: 3600,
             replacement_score_baseline_delta: 5.0,
             minimum_promotion_score: 70.0,
@@ -407,7 +408,7 @@ impl TaxisPolicy {
             require_falsifiable_verification: false,
             human_controlled_trunks: false,
             dual_trunk_enabled: false,
-            uac_required_for_system_trunk: false,
+            elevation_required_for_system_trunk: false,
             staged_promotion_ttl_seconds: 3600,
             replacement_score_baseline_delta: 0.0,
             minimum_promotion_score: 0.0,

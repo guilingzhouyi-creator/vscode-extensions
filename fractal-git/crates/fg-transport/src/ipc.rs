@@ -9,7 +9,7 @@
 //! Domain Governance Rules: FGT-TRN-001 (transport protocol), FGT-COR-001.
 
 use fg_core::error::FractalResult;
-use fg_core::models::{HumanUacProof, StagedPromotionRequest};
+use fg_core::models::{ElevationAttestation, StagedPromotionRequest};
 use serde::{Deserialize, Serialize};
 
 /// High-speed local IPC command envelope.
@@ -44,11 +44,11 @@ pub enum IpcMessage {
     ResponseActivePromotion {
         active: Option<StagedPromotionRequest>,
     },
-    SubmitHumanUacApproval {
+    SubmitElevationApproval {
         request_id: String,
-        proof: HumanUacProof,
+        proof: ElevationAttestation,
     },
-    SubmitHumanUacRejection {
+    SubmitElevationRejection {
         request_id: String,
         reason: String,
     },

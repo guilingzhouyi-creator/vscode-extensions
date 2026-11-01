@@ -1,6 +1,6 @@
 //! Module: fg-storage — In-Place Storage Engine Subsystem
 //! File Path: crates/fg-storage/src/in_place/mod.rs
-//! Architecture Role: Core primitives for TIPSE (Taxis In-Place Storage Engine), providing
+//! Architecture Role: Core primitives for In-Place ODB Engine, providing
 //!   safe tail truncation, forward hole punching, reverse ZIP/TAR decompression,
 //!   in-place bundle consumption, and crash-resilient write-ahead logging.
 //!
@@ -16,7 +16,10 @@ pub mod zip_extractor;
 
 pub use bundle_consumer::{BundleConsumeOptions, BundleConsumeReport, InPlaceBundleConsumer};
 pub use hole_puncher::HolePuncher;
-pub use journal::{InPlaceJournal, InPlaceLogEntry, InPlaceResumeState, TIPSE_WAL_MAGIC};
+pub use journal::{
+    InPlaceJournal, InPlaceLogEntry, InPlaceResumeState, HISTORICAL_TIPSE_WAL_MAGIC,
+    INPLACE_ODB_WAL_MAGIC,
+};
 pub use restorer::ArchiveRestorer;
 pub use tail_truncator::TailTruncator;
 pub use tar_extractor::{

@@ -35,7 +35,7 @@ pub use conflict_stage::ConflictStageSlot;
 pub use dirty_guard::{DirtyCollision, DirtyCollisionKind, DirtyWorktreeGuard};
 pub use entry::StagingEntry;
 pub use fg_core::models::quarantine::{
-    self, default_quarantine_dir, IsolateMutationRequest, QuarantineLedger, QuarantineRecord,
+    self, default_quarantine_dir, IsolateMutationRequest, QuarantineRecord, QuarantineRegistry,
     QuarantineStatus,
 };
 pub use ignore::{IgnoreMatch, IgnoreMatcher, IgnorePattern};

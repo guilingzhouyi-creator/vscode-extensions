@@ -59,12 +59,12 @@ pub use fg_core::models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuditHashChain, AuditIkceVerdict,
     AuditRecord, AuditScore, AuditTkcvVerdict, AuthorityTier, AutoQualityScoreEnvelope,
     BlackboardCollision, BlockProvenanceEntry, BlockProvenanceParams, CardBlackboard, ChangeId,
-    ConflictPresentationMode, DiffCoherenceMode, FileMode, FileUid, FractalSubLease, GitSignature,
-    HumanUacProof, IndexStage, IntentLease, LeaseStatus, MutationBudget, Oid, PraxisCardContext,
-    ProjectLease, ProjectLeaseCache, ProvenanceLedger, RegistrationOrigin, ReservationStatus,
-    ReservedFileToken, SliceAuthorization, StagedPromotionRequest, StagedPromotionStatus,
-    SubAuthorizationZone, TaxisPolicy, UnsignedAuditRecordParams, ValidatedCommitWitness,
-    AUDIT_RECORD_BYTE_BUDGET, GENESIS_PREV_HASH,
+    ConflictPresentationMode, DiffCoherenceMode, ElevationAttestation, FileMode, FileUid,
+    FractalSubLease, GitSignature, IndexStage, IntentLease, LeaseStatus, MutationBudget, Oid,
+    PraxisCardContext, ProjectLease, ProjectLeaseCache, ProvenanceLedger, QuarantineRegistry,
+    RegistrationOrigin, ReservationStatus, ReservedFileToken, SliceAuthorization,
+    StagedPromotionRequest, StagedPromotionStatus, SubAuthorizationZone, TaxisPolicy,
+    UnsignedAuditRecordParams, ValidatedCommitWitness, AUDIT_RECORD_BYTE_BUDGET, GENESIS_PREV_HASH,
 };
 pub use fg_core::traits::{
     AgentWorktreeHandle, GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore,
@@ -129,7 +129,7 @@ pub use fg_storage::repack::{scan_loose_objects, RepackEngine, RepackOptions, Re
 pub use fg_storage::wal_journal::{WalJournal, WalRecord};
 
 // Topology exports
-pub use fg_topology::authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
+pub use fg_topology::authorizer::{ElevationAuthorizer, StandardNonceAuthorizer};
 pub use fg_topology::blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
 pub use fg_topology::conflict_tree::{
     AgentConflictSliceReport, ConflictSlice, ConflictTreeManager,
@@ -138,8 +138,9 @@ pub use fg_topology::operation::{Operation, OperationGraph, OperationMetadata, R
 pub use fg_topology::project_store::{DiskProjectStore, PROJECTS_CACHE_FILE, PROJECTS_DIR};
 pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use fg_topology::provenance::{DiskProvenanceStore, PROVENANCE_FILE};
-pub use fg_topology::pyramid_folding::{
-    CardMilestoneRecord, HierarchicalRollupFolder, PyramidFolder,
+pub use fg_topology::history_rollup::{
+    CardMilestoneRecord, HierarchicalHistoryRollup, HierarchicalRollupFolder, MilestoneRollupEntry,
+    PyramidFolder,
 };
 pub use fg_topology::refs::{
     apply_os_telemetry_protection, reset_file_write_permission, DiskRefStore, FractalRef, HeadState,
@@ -165,15 +166,15 @@ pub use fg_gate::canary::{
 pub use fg_gate::commit_guard::CommitMessageGuard;
 pub use fg_gate::conflict_guard::ConflictGuard;
 pub use fg_gate::credit::{
-    AgentCreditController, AgentCreditScore, QuarantineLedger, QuarantineRecord,
-    QuarantineRequestParams, QuarantineStatus,
+    AgentCreditController, AgentCreditScore, QuarantineRecord, QuarantineRequestParams,
+    QuarantineStatus,
 };
 pub use fg_gate::git_hook::{
     hook_argument_path, GitHookOutcome, GitHookRunner, GitHookStatus, HookConfig,
 };
 pub use fg_gate::hook::{
-    CommitGovernanceHook, FractalHook, HookContext, HookPipeline, HookTier, HookVerdict,
-    HygieneConflictHook, UacPromotionGateHook,
+    CommitGovernanceHook, ElevationPromotionGateHook, FractalHook, HookContext, HookPipeline,
+    HookTier, HookVerdict, HygieneConflictHook,
 };
 pub use fg_gate::pre_receive::PreReceiveGuard;
 pub use fg_gate::quota_governor::QuotaGovernor;

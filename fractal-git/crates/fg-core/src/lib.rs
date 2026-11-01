@@ -19,7 +19,7 @@ pub mod models;
 pub mod traits;
 
 pub use constants::{
-    format_uac_proposal_summary, is_recognized_ref_prefix, is_registered_fgt_rule,
+    format_elevation_proposal_summary, is_recognized_ref_prefix, is_registered_fgt_rule,
     is_valid_benchmark_metric,
 };
 
@@ -34,11 +34,12 @@ pub use models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityClaims, AuthoritySecret,
     AuthorityTier, AutoQualityScoreEnvelope, BlackboardCollision, BlockProvenanceEntry,
     BlockProvenanceParams, CardBlackboard, ConflictPresentationMode, DiffCoherenceMode,
-    FastOidHasher, FastOidMap, FastOidSet, FileMode, FileUid, GitSignature, HumanUacProof,
+    ElevationAttestation, FastOidHasher, FastOidMap, FastOidSet, FileMode, FileUid, GitSignature,
     IndexStage, IntentLease, MutationBudget, Oid, PatchHunkChoice, PatchPlan, PraxisCardContext,
-    ProvenanceLedger, RebaseAction, RebaseItem, RebasePlan, RepoPath, ReservationStatus,
-    ReservedFileToken, SliceAuthorization, StagedPromotionRequest, StagedPromotionStatus,
-    SubmoduleEntry, SubmoduleUpdateStrategy, SymbolClaim, TaxisPolicy, ValidatedCommitWitness,
+    ProvenanceLedger, QuarantineRegistry, RebaseAction, RebaseItem, RebasePlan, RepoPath,
+    ReservationStatus, ReservedFileToken, SliceAuthorization, StagedPromotionRequest,
+    StagedPromotionStatus, SubmoduleEntry, SubmoduleUpdateStrategy, SymbolClaim, TaxisPolicy,
+    ValidatedCommitWitness,
 };
 pub use traits::{
     AgentWorktreeHandle, GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore,

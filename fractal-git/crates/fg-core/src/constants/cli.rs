@@ -18,16 +18,14 @@ impl CliTag {
     pub const VERIFY_PASS: &'static str = "[VERIFY_PASS]";
     /// Badge emitted when branch governance verification fails.
     pub const VERIFY_FAIL: &'static str = "[VERIFY_FAIL]";
-    /// Badge emitted when a human operator verifies UAC credentials.
-    pub const HUMAN_UAC_VERIFIED: &'static str = "[HUMAN_UAC_VERIFIED]";
-    /// Badge emitted when a promotion request is staged for human review.
-    pub const UAC_PROMOTION_STAGED: &'static str = "[UAC_PROMOTION_STAGED]";
-    /// Badge emitted when a staged promotion is rejected by human or gate.
-    pub const UAC_PROMOTION_REJECTED: &'static str = "[UAC_PROMOTION_REJECTED]";
-    /// Badge emitted when UAC approval processing encounters an error.
-    pub const UAC_APPROVAL_FAILED: &'static str = "[UAC_APPROVAL_FAILED]";
-    /// Badge emitted when UAC rejection processing encounters an error.
-    pub const UAC_REJECT_FAILED: &'static str = "[UAC_REJECT_FAILED]";
+    /// Badge emitted when an authorized operator verifies elevation credentials.
+    pub const HUMAN_APPROVAL_VERIFIED: &'static str = "[HUMAN_APPROVAL_VERIFIED]";
+    /// Badge emitted when a promotion request is staged for operator review.
+    pub const PROMOTION_STAGED: &'static str = "[PROMOTION_STAGED]";
+    /// Badge emitted when promotion approval processing encounters an error.
+    pub const ELEVATION_APPROVAL_FAILED: &'static str = "[ELEVATION_APPROVAL_FAILED]";
+    /// Badge emitted when promotion rejection processing encounters an error.
+    pub const ELEVATION_REJECT_FAILED: &'static str = "[ELEVATION_REJECT_FAILED]";
     /// Badge emitted when an automated promotion is rejected by policy.
     pub const PROMOTION_REJECTED: &'static str = "[PROMOTION_REJECTED]";
     /// Badge emitted when an authority breach or boundary violation occurs.
