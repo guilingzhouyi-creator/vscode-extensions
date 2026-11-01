@@ -2,7 +2,7 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-01T08:40:04.508Z",
+  "timestamp": "2026-11-01T08:46:10.021Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
@@ -16,12 +16,12 @@
       "averagePor": 0.082,
       "averageColumnDensity": 0.868,
       "averageSpatialDensity": 0.454,
-      "averageMahalanobisDistance": 4.493,
+      "averageMahalanobisDistance": 4.492,
       "averageFisherSimplexDistance": 0.093
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 30027,
+      "remediationMinutes": 30067,
       "grade": "A"
     },
     "polyglot": {
@@ -44,37 +44,37 @@
       "performance": 99.84,
       "data": 98.42,
       "testing": 99.78,
-      "reliability": 99.73,
+      "reliability": 99.72,
       "security": 99.88,
       "extensibility": 97.72
     },
     "counts": {
       "files": 814,
-      "total": 4335,
+      "total": 4339,
       "errors": 0,
-      "warns": 3723,
+      "warns": 3727,
       "info": 612,
       "suppressed": 113
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1696,
-    "advisory": 2639,
+    "patchable": 1697,
+    "advisory": 2642,
     "uncalibrated": 165,
     "needsHuman": 1
   },
   "defaultVerify": "npm test",
   "dimensions": {
     "architectureConsistency": 99.53,
-    "semanticPurity": 99.47,
+    "semanticPurity": 99.46,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.84,
     "standardization": 95.79,
     "modernity": 99.78,
     "maintainability": 98.04,
     "commentQuality": 99.99,
-    "duplication": 97.38,
+    "duplication": 97.37,
     "techDebtRisk": 99.98
   },
   "dimensionDetails": {
@@ -94,7 +94,7 @@
       ]
     },
     "semanticPurity": {
-      "score": 98.18,
+      "score": 98.17,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -115,7 +115,7 @@
       "confidence": 1
     },
     "standardization": {
-      "score": 83.88,
+      "score": 83.87,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
@@ -175,8 +175,8 @@
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3430,
-      "count": 238
+      "loss": 3445,
+      "count": 239
     },
     {
       "rule": "NAM-DEC-001",
@@ -211,12 +211,13 @@
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 2046,
-      "count": 682
+      "loss": 2049,
+      "count": 683
     }
   ],
   "topology": {
     "L1_CONTRACT": [
+      "src/cli/trajectory-cmd.ts",
       "src/core/ast/ast-prefix-radix-cache.ts",
       "src/core/reporting/quality-printer.ts",
       "src/core/cfg/types.ts",
@@ -235,7 +236,6 @@
       "src/core/types.ts"
     ],
     "L2_OPERATOR": [
-      "src/cli/trajectory-cmd.ts",
       "src/core/cfg/def-use-chain.ts",
       "src/cli/selfTestCmd.ts",
       "src/core/evolution/code-evolution-analyzer.ts",
@@ -276,11 +276,283 @@
       "src/core/intelligence/token-entropy.ts",
       "src/core/memory/memory-governor.ts",
       "src/core/praxis/diff-dual-faced.ts",
-      "src/core/praxis/mcts/dspark-confidence-scheduler.ts",
-      "src/core/praxis/mcts/mcts-explorer.ts"
+      "src/core/praxis/mcts/dspark-confidence-scheduler.ts"
     ]
   },
   "files": {
+    "src/cli/trajectory-cmd.ts": [
+      {
+        "line": 146,
+        "col": 48,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 170,
+        "col": 18,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 197,
+        "col": 49,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 72 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 200,
+        "col": 53,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 20 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 200,
+        "col": 66,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 20 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 201,
+        "col": 65,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 5 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 202,
+        "col": 56,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 1000 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 202,
+              "startCol": 56,
+              "endLine": 202,
+              "endCol": 60
+            },
+            "replacementText": "DURATION_1S"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.94,
+        "moreLines": [
+          202,
+          205,
+          207,
+          208,
+          209,
+          317,
+          328
+        ]
+      },
+      {
+        "line": 222,
+        "col": 16,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 222,
+              "startCol": 16,
+              "endLine": 222,
+              "endCol": 97
+            },
+            "replacementText": "EXTRACTED_STRING"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 234,
+        "col": 41,
+        "rule": "duplicate-literal",
+        "sev": "WARN",
+        "msg": "Literal 75 is repeated 9 times in this file; extract it into a shared constant",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.92
+      },
+      {
+        "line": 251,
+        "col": 16,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 251,
+              "startCol": 16,
+              "endLine": 251,
+              "endCol": 97
+            },
+            "replacementText": "EXTRACTED_STRING"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 314,
+        "col": 16,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 314,
+              "startCol": 16,
+              "endLine": 314,
+              "endCol": 97
+            },
+            "replacementText": "EXTRACTED_STRING"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.94,
+        "moreLines": [
+          316,
+          336,
+          386
+        ]
+      },
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "file lines 434 >= 400 (split)",
+        "fix": {
+          "action": "split_file"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 6,
+        "rule": "CMT-WID-001",
+        "sev": "WARN",
+        "msg": "Comment/docstring line exceeds 100 columns (found 105)",
+        "fix": {
+          "action": "refactor"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 84,
+        "col": 16,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'pathExists' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 270,
+        "col": 38,
+        "rule": "NUM-PREC-001",
+        "sev": "WARN",
+        "msg": "Lossy precision rounding `(...activeScores).toFixed(1)` detected. Calculation path truncates to 0.1 precision or exhibits mismatched scaling",
+        "fix": {
+          "action": "align_numeric_precision",
+          "template": "Math.round(val * 100) / 100 + 0",
+          "safeToAutomate": false
+        },
+        "verify": "node scripts/validate-dual-faced-presentation.js",
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 271,
+        "col": 38,
+        "rule": "NUM-PREC-001",
+        "sev": "WARN",
+        "msg": "Lossy precision rounding `(...activeScores).toFixed(1)` detected. Calculation path truncates to 0.1 precision or exhibits mismatched scaling",
+        "fix": {
+          "action": "align_numeric_precision",
+          "template": "Math.round(val * 100) / 100 + 0",
+          "safeToAutomate": false
+        },
+        "verify": "node scripts/validate-dual-faced-presentation.js",
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 396,
+        "col": 23,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'trajectoryCommand' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      }
+    ],
     "src/core/ast/ast-prefix-radix-cache.ts": [
       {
         "line": 150,
@@ -1045,246 +1317,6 @@
         },
         "tier": "T3",
         "conf": 1
-      }
-    ],
-    "src/cli/trajectory-cmd.ts": [
-      {
-        "line": 118,
-        "col": 48,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 147,
-        "col": 49,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 72 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 150,
-        "col": 53,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 20 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 150,
-        "col": 66,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 20 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 151,
-        "col": 65,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 5 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 152,
-        "col": 56,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 1000 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 152,
-              "startCol": 56,
-              "endLine": 152,
-              "endCol": 60
-            },
-            "replacementText": "DURATION_1S"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.94,
-        "moreLines": [
-          152,
-          155,
-          157,
-          158,
-          159,
-          243,
-          254
-        ]
-      },
-      {
-        "line": 172,
-        "col": 16,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 172,
-              "startCol": 16,
-              "endLine": 172,
-              "endCol": 97
-            },
-            "replacementText": "EXTRACTED_STRING"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 184,
-        "col": 41,
-        "rule": "duplicate-literal",
-        "sev": "WARN",
-        "msg": "Literal 75 is repeated 8 times in this file; extract it into a shared constant",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.92
-      },
-      {
-        "line": 198,
-        "col": 16,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 198,
-              "startCol": 16,
-              "endLine": 198,
-              "endCol": 97
-            },
-            "replacementText": "EXTRACTED_STRING"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 240,
-        "col": 16,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 240,
-              "startCol": 16,
-              "endLine": 240,
-              "endCol": 97
-            },
-            "replacementText": "EXTRACTED_STRING"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 242,
-        "col": 16,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 242,
-              "startCol": 16,
-              "endLine": 242,
-              "endCol": 97
-            },
-            "replacementText": "EXTRACTED_STRING"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.94,
-        "moreLines": [
-          262,
-          312
-        ]
-      },
-      {
-        "line": 6,
-        "rule": "CMT-WID-001",
-        "sev": "WARN",
-        "msg": "Comment/docstring line exceeds 100 columns (found 105)",
-        "fix": {
-          "action": "refactor"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 56,
-        "col": 16,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'pathExists' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 322,
-        "col": 23,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'trajectoryCommand' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T3",
-        "conf": 0.89
       }
     ],
     "src/core/cfg/def-use-chain.ts": [
@@ -7273,52 +7305,8 @@
         },
         "tier": "T3",
         "conf": 0.89
-      },
-      {
-        "line": 359,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 267",
-        "fix": {
-          "action": "sanitize_hygiene"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      }
-    ],
-    "src/core/praxis/mcts/mcts-explorer.ts": [
-      {
-        "line": 61,
-        "col": 18,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'explore' has too few word segments (1 < 2); lacks semantic description",
-        "fix": {
-          "action": "replace_token",
-          "template": "explorationVerdict",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.93
-      },
-      {
-        "line": 61,
-        "col": 5,
-        "rule": "SIM-LONG-001",
-        "sev": "WARN",
-        "msg": "Function \"MctsExplorer.explore\" spans 92 lines (limit 60)",
-        "fix": {
-          "action": "split_function",
-          "template": "// Extracted helper:",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.94
       }
     ]
   },
-  "truncated": 3213,
-  "notes": [
-    "dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph"
-  ]
+  "truncated": 3217
 }

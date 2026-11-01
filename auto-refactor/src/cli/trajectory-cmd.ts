@@ -3,8 +3,8 @@
  * File Path: src/cli/trajectory-cmd.ts
  * Architecture Role: Dispatches and renders trajectory queries, unified lifetime summaries,
  *   rolling statistical moments, and multi-scale virtual timeline projections.
- * Dependencies & Triggers: Consumes timeline-projector, compact-ledger-store, rolling-sampling-governor,
- *   and changeTrajectory; called by CLI main entry point.
+ * Dependencies & Triggers: Consumes timeline-projector, compact-ledger-store,
+ *   rolling-sampling-governor, and changeTrajectory; called by CLI main entry point.
  * Responsibilities: Parse trajectory CLI arguments, resolve repository root, render ANSI-formatted
  *   integrated dashboards or JSON streams, and handle file-specific change trajectories.
  * Exit Semantics & Design Rationale: Decouples command presentation from main index.ts facade,
@@ -38,6 +38,38 @@ const REVISION_DISPLAY_LENGTH = 8;
 /** Default LOC-to-equivalent ratio for display. */
 const LOC_TO_EQUIV_RATIO = 1.37;
 const MILLION_DIVISOR = 1000000;
+const LINE_CONTENT_WIDTH = 75;
+const IDLE_LINE_WIDTH = 72;
+const BUCKET_ID_COL_WIDTH = 20;
+const RUNS_COL_WIDTH = 5;
+const NUM_THOUSAND = 1000;
+
+/** Sparkline level characters from min to max. */
+const SPARKLINE_CHARS: readonly string[] = [' ', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+/**
+ * Renders an array of numeric values into a visual sparkline string.
+ *
+ * @param values - Array of numeric samples.
+ * @returns Sparkline string representing relative heights.
+ */
+export function renderSparkline(values: readonly number[]): string {
+    if (values.length === 0) return '';
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    if (max === min) {
+        return SPARKLINE_CHARS[SPARKLINE_CHARS.length - 1].repeat(values.length);
+    }
+    const range = max - min;
+    const steps = SPARKLINE_CHARS.length - 1;
+    return values
+        .map((val) => {
+            const normalized = Math.max(0, Math.min(1, (val - min) / range));
+            const charIndex = Math.round(normalized * steps);
+            return SPARKLINE_CHARS[charIndex];
+        })
+        .join('');
+}
 
 /** Parsed options for trajectory command execution. */
 interface TrajectoryCommandOptions {
@@ -48,6 +80,7 @@ interface TrajectoryCommandOptions {
     since?: string;
     bucket?: TimelineBucketType;
     outputFilePath?: string;
+    withSparkline?: boolean;
 }
 
 /**
@@ -131,12 +164,34 @@ function parseTrajectoryArgs(args: string[]): TrajectoryCommandOptions {
     const formatOption = findOptionValue(args, '--format');
     const isJson = args.includes('--json') || formatOption?.toLowerCase() === 'json';
     const isSummaryOnly = args.includes('--summary') || args.includes('-s');
-    const since = findOptionValue(args, '--since');
-    const bucket = parseBucketType(findOptionValue(args, '--bucket'));
+    const withSparkline = args.includes('--sparkline') || args.includes('--spark');
+    const isHourly = args.includes('--hourly');
+    const isDaily = args.includes('--daily');
+
+    let bucket = parseBucketType(findOptionValue(args, '--bucket'));
+    let since = findOptionValue(args, '--since');
+
+    if (isHourly && !bucket) {
+        bucket = 'hour';
+        if (!since) since = '24h';
+    } else if (isDaily && !bucket) {
+        bucket = 'day';
+        if (!since) since = '14d';
+    }
+
     const outputFilePath = findOptionValue(args, '--out');
     const targetFile = findTargetFile(args);
 
-    return { rootDir, targetFile, isSummaryOnly, isJson, since, bucket, outputFilePath };
+    return {
+        rootDir,
+        targetFile,
+        isSummaryOnly,
+        isJson,
+        since,
+        bucket,
+        outputFilePath,
+        withSparkline,
+    };
 }
 
 /**
@@ -144,12 +199,12 @@ function parseTrajectoryArgs(args: string[]): TrajectoryCommandOptions {
  */
 function formatBucketRow(snapshot: TimelineBucketSnapshot): string {
     if (snapshot.isIdleFold) {
-        return `│ ── ${snapshot.bucketId.padEnd(72, '·')} 0 runs │`;
+        return `│ ── ${snapshot.bucketId.padEnd(IDLE_LINE_WIDTH, '·')} 0 runs │`;
     }
 
-    const bucketIdColumn = snapshot.bucketId.padEnd(20).slice(0, 20);
-    const runsCountColumn = String(snapshot.runsCount).padStart(5);
-    const semanticColumn = `${(snapshot.semanticEloc / 1000).toFixed(1)}k`.padStart(9);
+    const bucketIdColumn = snapshot.bucketId.padEnd(BUCKET_ID_COL_WIDTH).slice(0, BUCKET_ID_COL_WIDTH);
+    const runsCountColumn = String(snapshot.runsCount).padStart(RUNS_COL_WIDTH);
+    const semanticColumn = `${(snapshot.semanticEloc / NUM_THOUSAND).toFixed(1)}k`.padStart(9);
     const netSign = snapshot.debtResolved >= snapshot.debtAdded ? '-' : '+';
     const debtDeltaValue = Math.abs(snapshot.debtResolved - snapshot.debtAdded);
     const debtDeltaColumn = `${netSign}${debtDeltaValue} pts`.padStart(11);
@@ -181,10 +236,10 @@ function renderRollingMomentsSection(rootDir: string): string[] {
         const shiftTag = telemetry.isRegimeShift ? 'TRUE (Shift)' : 'FALSE (Stable)';
         const statusLine = `• Regime Shift: ${shiftTag} | Z-Score: ${telemetry.studentizedZScore.toFixed(2)} | Stability Factor: ${telemetry.stabilityFactor.toFixed(2)}`;
 
-        lines.push(`│ ${fastLine.padEnd(75)} │`);
-        lines.push(`│ ${mesoLine.padEnd(75)} │`);
-        lines.push(`│ ${macroLine.padEnd(75)} │`);
-        lines.push(`│ ${statusLine.padEnd(75)} │`);
+        lines.push(`│ ${fastLine.padEnd(LINE_CONTENT_WIDTH)} │`);
+        lines.push(`│ ${mesoLine.padEnd(LINE_CONTENT_WIDTH)} │`);
+        lines.push(`│ ${macroLine.padEnd(LINE_CONTENT_WIDTH)} │`);
+        lines.push(`│ ${statusLine.padEnd(LINE_CONTENT_WIDTH)} │`);
     }
 
     return lines;
@@ -193,11 +248,14 @@ function renderRollingMomentsSection(rootDir: string): string[] {
 /**
  * Builds formatted ASCII table for timeline projection.
  */
-function renderTimelineTableSection(report: TimelineProjectionReport): string[] {
+function renderTimelineTableSection(
+    report: TimelineProjectionReport,
+    withSparkline = false,
+): string[] {
     const lines: string[] = [];
     lines.push(`├─────────────────────────────────────────────────────────────────────────────┤`);
     const headerTitle = `⏱️  VIRTUAL TIMELINE PROJECTION (Bucket: ${report.bucketType}, Adaptive Folded)`;
-    lines.push(`│ ${headerTitle.padEnd(75)} │`);
+    lines.push(`│ ${headerTitle.padEnd(LINE_CONTENT_WIDTH)} │`);
     lines.push(`│ RELATIVE WINDOW      RUNS  SEM_ELOC    DEBT(Δ)     LATEST [RANGE]   W_MEAN    GATE │`);
     lines.push(`│ ──────────────────  ─────  ────────  ───────────  ─────────────────  ──────  ───── │`);
 
@@ -206,6 +264,19 @@ function renderTimelineTableSection(report: TimelineProjectionReport): string[] 
     } else {
         for (const bucket of report.buckets) {
             lines.push(formatBucketRow(bucket));
+        }
+
+        const activeScores = report.buckets
+            .filter((b) => !b.isIdleFold && b.runsCount > 0)
+            .map((b) => b.weightedMeanScore);
+        if (withSparkline && activeScores.length > 0) {
+            const spark = renderSparkline(activeScores);
+            const trend = activeScores[activeScores.length - 1] >= activeScores[0] ? '↗' : '↘';
+            const minScore = Math.min(...activeScores).toFixed(2);
+            const maxScore = Math.max(...activeScores).toFixed(2);
+            lines.push(`│ ──────────────────  ─────  ────────  ───────────  ─────────────────  ──────  ───── │`);
+            const sparkLine = `📈 Trend Sparkline: [${spark}] (Range: ${minScore}~${maxScore}, Dir: ${trend})`;
+            lines.push(`│ ${sparkLine.padEnd(LINE_CONTENT_WIDTH)} │`);
         }
     }
 
@@ -230,10 +301,18 @@ async function buildUnifiedDashboard(
     if (options.isJson) {
         const governor = new RollingSamplingGovernor({ workspaceRoot: rootDir });
         const telemetry = governor.getDashboardTelemetry();
+        const activeScores = timelineReport.buckets
+            .filter((b) => !b.isIdleFold && b.runsCount > 0)
+            .map((b) => b.weightedMeanScore);
+        const sparkline = renderSparkline(activeScores);
         if (options.isSummaryOnly) {
             return JSON.stringify({ lifetime, rolling: telemetry }, null, 2);
         }
-        return JSON.stringify({ lifetime, rolling: telemetry, timeline: timelineReport }, null, 2);
+        return JSON.stringify(
+            { lifetime, rolling: telemetry, timeline: { ...timelineReport, sparkline } },
+            null,
+            2,
+        );
     }
 
     const lines: string[] = [];
@@ -247,16 +326,16 @@ async function buildUnifiedDashboard(
         const lifetimeLine = `Lifetime Totals: ${lifetime.totalRuns} runs | ${lifetime.eloc.processedTotal.toLocaleString()} ELOC (~${equivalentLocMillions}M eqLOC) | Net: +${lifetime.debt.totalResolved - lifetime.debt.totalAdded} pts`;
         const floorScore = lifetime.stability?.scoreFloor ?? lifetime.meanCompositeScore;
         const scoreLine = `Quality Baseline: Mean ${lifetime.meanCompositeScore} / 100 | Floor ${floorScore} | Pass Rate: ${lifetime.gatePassRate}%`;
-        lines.push(`│ ${lifetimeLine.padEnd(75)} │`);
-        lines.push(`│ ${scoreLine.padEnd(75)} │`);
+        lines.push(`│ ${lifetimeLine.padEnd(LINE_CONTENT_WIDTH)} │`);
+        lines.push(`│ ${scoreLine.padEnd(LINE_CONTENT_WIDTH)} │`);
     }
 
-    const sampleSummary = `Recent Interval: ${timelineReport.totalSampledRuns} sampled runs | Semantic ELOC: ${(timelineReport.totalSemanticEloc / 1000).toFixed(1)}k | Net: ${timelineReport.netDebtCleared >= 0 ? '+' : ''}${timelineReport.netDebtCleared} pts`;
-    lines.push(`│ ${sampleSummary.padEnd(75)} │`);
+    const sampleSummary = `Recent Interval: ${timelineReport.totalSampledRuns} sampled runs | Semantic ELOC: ${(timelineReport.totalSemanticEloc / NUM_THOUSAND).toFixed(1)}k | Net: ${timelineReport.netDebtCleared >= 0 ? '+' : ''}${timelineReport.netDebtCleared} pts`;
+    lines.push(`│ ${sampleSummary.padEnd(LINE_CONTENT_WIDTH)} │`);
 
     lines.push(...renderRollingMomentsSection(rootDir));
     if (!options.isSummaryOnly) {
-        lines.push(...renderTimelineTableSection(timelineReport));
+        lines.push(...renderTimelineTableSection(timelineReport, options.withSparkline));
     }
 
     lines.push(`└─────────────────────────────────────────────────────────────────────────────┘`);
