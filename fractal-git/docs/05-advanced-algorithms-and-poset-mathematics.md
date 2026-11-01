@@ -156,9 +156,9 @@ $$F_{\text{trough}} = \min_{1 \le i \le N} F_i$$
 
 $$\boxed{F_{\text{trough}} \ge H_{\text{safe}}}$$
 
-若 $F_{\text{trough}} < H_{\text{safe}}$，则系统计算精确亏空缺口 $\Delta_{\text{deficit}} = H_{\text{safe}} - F_{\text{trough}}$，在触碰任何物理磁盘字节前抛出 `FractalError::InsufficientDiskSpace`，彻底避免中途 `ENOSPC` 导致的数据撕裂。
+若 $F_{\text{trough}} < H_{\text{safe}}$，则系统计算精确亏空缺口 $\Delta_{\text{deficit}} = H_{\text{safe}} - F_{\text{trough}}$，在触碰任何物理磁盘字节前抛出 `FractalError::InsufficientDiskSpace`，在执行前规避中途 `ENOSPC` 导致的数据撕裂。
 
-在 [`../crates/fg-algorithms/src/space_plan/mod.rs`](../crates/fg-algorithms/src/space_plan/mod.rs) 中，推演全量采用 128 位有符号整型（`i128`），即使 $F_0 < \sum E_i$ 也保证绝对算术闭包与零溢出 panic。
+在 [`../crates/fg-algorithms/src/space_plan/mod.rs`](../crates/fg-algorithms/src/space_plan/mod.rs) 中，推演全量采用 128 位有符号整型（`i128`），即使 $F_0 < \sum E_i$ 也确保严格算术闭包与零溢出 panic。
 
 ---
 

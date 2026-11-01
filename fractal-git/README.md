@@ -46,7 +46,6 @@ fractal-git/
 │   ├── 04-lockless-in-memory-engine.md
 │   ├── 05-advanced-algorithms-and-poset-mathematics.md
 │   ├── 06-anthropic-scion-benchmark-and-parity-spec.md
-│   ├── 07-taxis-construction-progress.md
 │   ├── 08-taxis-in-place-storage-engine.md
 │   └── 09-test-cache-and-telemetry-audit-spec.md
 │

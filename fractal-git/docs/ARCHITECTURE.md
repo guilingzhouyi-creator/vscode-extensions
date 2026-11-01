@@ -121,7 +121,7 @@ stateDiagram-v2
   2. *Symbol Reachability & Liveness*: Detection of dead functions and hollow stub exports;
   3. *Pure Function Equivalence*: Zero undeclared side-effects in critical paths;
   4. *Memory Lifecycle Unidirectionality*: Paired handle allocations and zero orphan descriptors;
-  5. *Type & Error Exhaustiveness*: 100% pattern matching and absence of swallow-all catch blocks.
+  5. *Type & Error Exhaustiveness*: Exhaustive pattern matching and absence of swallow-all catch blocks.
 
 ### 4.2 IKCE (In-Kernel Canary Engine)
 - **Blind Mutation Killing**: Injects micro-mutations (operator flipping, boundary shifts, statement elimination);
@@ -146,7 +146,7 @@ stateDiagram-v2
 Traditional Git serializes concurrent access via `.git/index.lock`. Fractal Git eliminates this bottleneck:
 - Each agent receives an isolated in-memory index builder;
 - Staged entries are compiled in memory and flushed directly as loose objects (`blob` and `tree`);
-- Achieves **0% file lock contention** and `<3ms` commit tree assembly across 100+ concurrent worker subagents.
+- Eliminates file lock contention and provides `<3ms` commit tree assembly across 100+ concurrent worker subagents.
 
 ---
 
@@ -172,18 +172,18 @@ Traditional Git serializes concurrent access via `.git/index.lock`. Fractal Git 
 
 ---
 
-## 7. In-Place Storage Engine & Reversibility (TIPSE)
+## 7. In-Place Storage Engine & Reversibility (In-Place ODB Engine)
 
 ```
 PeakDiskUsage = max(S_archive, S_extracted) + Delta_batch
 ```
 
-TIPSE eliminates the classic $S_{\text{archive}} + S_{\text{extracted}}$ 2x disk space bottleneck during large archive imports and git unbundling:
+The In-Place ODB Engine eliminates the classic $S_{\text{archive}} + S_{\text{extracted}}$ 2x disk space bottleneck during large archive imports and git unbundling:
 - **Discrete Event SpacePlan**: Simulates minimum trough water-level using `i128` wide arithmetic before touching disk;
 - **Reverse Tail-Truncation**: Extracts archive members from high to low physical offsets and commits batched file truncations (`SetEndOfFile` / `ftruncate`);
 - **Forward Hole-Punching**: Sparse file punch hole (`FSCTL_SET_SPARSE` / `FALLOC_FL_PUNCH_HOLE`) for streaming `.tar.gz`;
-- **Micro-Pack Progressive Repack**: Slices large repository repacks into 64MB~256MB micro-packs, immediately verifying each slice and pruning redundant loose objects;
-- **Crash Recovery & Restorer**: Write-Ahead Logging (`InPlaceJournal`) guarantees crash consistency; `ArchiveRestorer` synthesizes valid Central Directory & EOCD headers upon abortion.
+- **Pack Slicing Progressive Repack**: Slices large repository repacks into 64MB~256MB pack slices (`--max-pack-size`), immediately verifying each slice and pruning redundant loose objects;
+- **Crash Recovery & Restorer**: Write-Ahead Logging (`InPlaceJournal` with `INPLACE-ODB-WAL-v1`) guarantees crash consistency; `ArchiveRestorer` synthesizes valid Central Directory & EOCD headers upon abortion.
 
 Detailed specification: [`08-taxis-in-place-storage-engine.md`](08-taxis-in-place-storage-engine.md).
 
@@ -191,45 +191,52 @@ Detailed specification: [`08-taxis-in-place-storage-engine.md`](08-taxis-in-plac
 
 ## 8. Crate Topology & Architectural Dependency Matrix
 
-Fractal Git is strictly architected as 10 focused kernel subsystems with a unidirectional acyclic dependency graph:
+Fractal Git is strictly architected as 10 focused kernel subsystems with a unidirectional acyclic dependency graph (DAG):
 
 ```
-[Layer 5: Presentation & CLI]
-       fg-cli
-         │
-[Layer 4: Verification & Gating]
-       fg-gate ◄────────────────────────┐
-         │                              │
-[Layer 3: Worktrees & Topology]         │
-       fg-worktree                      │
-         │                              │
-       fg-topology ─────────────────────┤
-         │                              │
-[Layer 2: Protocols, Packs & Pools]     │
-   ┌─────┴──────────────┐               │
-fg-protocol          fg-pack         fg-pools
-   │                    │               │
-   └──────────┬─────────┴───────────────┘
-              │
-[Layer 1: Storage & In-Place Engine]
-          fg-storage ◄──── fg-tipse
-              │
-[Layer 0: Core Primitives]
-           fg-core
+[Presentation & Application Layer]
+       src/bin/taxis.rs / ts/
+               │
+[Root Facade]
+         src/lib.rs
+         ┌─────┴──────────────┐
+         ▼                    ▼
+[L3: Protocols, Gates & Topology]
+       fg-gate            fg-transport
+         │                    │
+         └─────────┬──────────┘
+                   ▼
+              fg-topology
+                   │
+[L2: Storage, Native Sections & Resource Pools]
+       ┌───────────┼───────────┐
+       ▼           ▼           ▼
+   fg-storage  fg-native    fg-pools
+       │           │           │
+       └───────────┼───────────┘
+                   ▼
+[L1: Leaf Plumbing & Kernel Core]
+       ┌───────────┼───────────┐
+       ▼           ▼           ▼
+   fg-index  fg-algorithms  fg-object
+       │           │           │
+       └───────────┼───────────┘
+                   ▼
+                fg-core
 ```
 
 | Crate | Responsibilities | Key Types / Modules |
 | :--- | :--- | :--- |
-| **`fg-core`** | OID, ObjectType, Error, Hash, Zero-Alloc slices | `ObjectId`, `ObjectType`, `Span`, `TaxisError` |
-| **`fg-storage`** | Loose objects, Packfile read, Memory ODB | `LooseStorage`, `MemoryOdb`, `ObjectHeader` |
-| **`fg-tipse`** | In-place storage extraction, Sparse puncture | `SpacePlanner`, `ReverseTruncator`, `HolePuncher` |
-| **`fg-pack`** | Pack delta decoding, Pack index v2, Micro-pack | `PackResolver`, `DeltaEngine`, `PackIndexV2` |
-| **`fg-protocol`** | Git wire protocol, Smart HTTP, Framing | `PktLineReader`, `UploadPackHandler`, `Capabilities` |
-| **`fg-pools`** | Reusable byte buffers, Fast caches, Recyclers | `BytePool`, `ObjectPool`, `DirectBypassPool` |
-| **`fg-topology`** | DAG traversal, Reference management, Telemetry | `RefDatabase`, `AuditHashChain`, `TelemetryEntry` |
-| **`fg-worktree`** | LayerVFS, Virtual Index, Quarantine | `WorktreeManager`, `LayerVfs`, `QuarantineBox` |
-| **`fg-gate`** | TKCV AST verifier, IKCE canary engine, Credit | `KernelAstVerifier`, `CanaryEngine`, `AgentCredit` |
-| **`fg-cli`** | Unified user & agent CLI entry point | Subcommands: `init`, `commit`, `quality`, `quarantine` |
+| **`fg-core`** | OID, ObjectType, Error, Hash, ElevationAttestation, Trait Contracts | `Oid`, `ObjectType`, `ElevationAttestation`, `FractalError` |
+| **`fg-object`** | Git object binary serialization (Blob / Tree / Commit / Tag) | `GitBlob`, `GitTree`, `GitCommit`, `FileMode` |
+| **`fg-index`** | Lockless virtual tree index, ignores, attributes | `InMemoryIndexTree`, `ConflictStageSlot`, `IgnoreMatcher` |
+| **`fg-algorithms`** | CCD v2 poset pruning, SWAR diff, FastCDC, SpacePlan, 3-Way Merge | `CcdEngine`, `FastCdc`, `SpacePlanner`, `ThreeWayMerge` |
+| **`fg-pools`** | FreeList buffer pools, Direct-Bypass test memory caches, LRU cache | `BufferPool`, `WorktreePool`, `ByteLruCache` |
+| **`fg-storage`** | CAS ODB, Loose ODB, In-Place ODB Engine, Pack Slicing, WAL | `LooseOdb`, `InPlaceOdbEngine`, `RepackEngine` |
+| **`fg-native`** | TAXC sectioned container, 7 native sections, repo layout | `Container`, `RepoDocument`, `SectionTag`, `RepoLayout` |
+| **`fg-topology`** | Fractal refs, HierarchicalHistoryRollup, QuarantineRegistry | `HierarchicalHistoryRollup`, `QuarantineRegistry`, `AuditRecord` |
+| **`fg-transport`** | Smart Protocol v2 (Packet-line), Agent local IPC | `PacketLineReader`, `IpcChannel`, `SmartProtocolHandler` |
+| **`fg-gate`** | TKCV 5D invariants, IKCE mutation canary, ElevationPromotionGateHook | `ElevationPromotionGateHook`, `CanaryEngine`, `AgentCredit` |
 
 ---
 

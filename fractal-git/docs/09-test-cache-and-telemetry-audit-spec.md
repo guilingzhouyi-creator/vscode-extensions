@@ -41,7 +41,7 @@ flowchart TD
 ## 二、 区域一：Direct-Bypass 独占测试与编译缓存空间
 
 ### 2.1 物理 SSD 直通机制 (Native SSD Bypass)
-针对测试数据与编译缓存，彻底绕开虚拟文件系统（LayerVFS）与 Git 内存索引（`InMemoryIndexTree`）的封装抽象，直接开辟宿主物理 SSD 槽位：
+针对测试数据与编译缓存，绕开虚拟文件系统（LayerVFS）与 Git 内存索引（`InMemoryIndexTree`）的封装抽象，直接开辟宿主物理 SSD 槽位：
 
 ```
 .taxis/worktrees/{slot_id}/
@@ -49,17 +49,17 @@ flowchart TD
 └── test-store/             # Direct-Bypass 独占大型测试夹具与金样快照空间
 ```
 
-- **零损耗性能**：直接享有宿主操作系统物理 NVMe SSD 原生读写吞吐（$4000\text{MB/s}+$ 与百万 IOPS），消除任何虚拟文件层系统调用代理开销；
-- **槽位物理隔离**：每个并发 SubAgent 或私有 Card 分配独占槽位（`slot_000` $\sim$ `slot_063`），槽位间严格无交集，杜绝并发竞争；
-- **零 DAG 污染**：两个目录在文件系统层面被物理划定于 Taxis 提交索引之外，无论产生多少百兆缓存，**绝对不会进入 Git Commit Tree 与对象数据库**。
+- **读写性能**：直接利用宿主操作系统 NVMe SSD 原生读写能力，避免虚拟文件层系统调用代理开销；
+- **槽位物理隔离**：每个并发 SubAgent 或私有 Card 分配独占槽位（`slot_000` $\sim$ `slot_063`），槽位间严格无交集，避免并发竞争；
+- **提交树隔离**：两个目录在文件系统层面被划定于提交索引之外，不纳入提交索引与对象库存储。
 
 ### 2.2 `<20ms` 物理回收与安全防误删污点追踪 (`FGT-POL-001`)
 在工作树生命周期完结（SubAgent 合入父级工作树或评估未采纳废弃）时，宿主内核调度器接管物理回收：
 - **极速清空**：单槽位清空耗时实测控制在 **$< 20\text{ms}$** 内；
 - **防误删安全断言**：在执行物理递归清理前，必须强制调用 `WorktreePool::assert_safe_scratch_path`：
-  - 绝对拒绝根目录（`/`、`C:\`、`\\`）；
-  - 绝对拒绝宿主主目录（`~`、`/home/*`、`C:\Users\*`）；
-  - 严格限制操作数路径必须显式包含 `.taxis-worktrees` 或 `slot_` 隔离命名空间，杜绝变量空置或路径逃逸引发的灾难性删除。
+  - 阻断系统根目录（POSIX 根路径与 Windows 盘符根）；
+  - 阻断宿主主目录（如用户家目录与个人文档目录）；
+  - 严格限制操作数路径必须显式包含 `.taxis-worktrees` 或 `slot_` 隔离命名空间，防范变量空置或路径逃逸引发的非预期删除。
 
 ---
 
@@ -79,7 +79,7 @@ flowchart TD
 | **宿主反破坏性删除** | `FGT-STO-001` | 静态阻断代码中向 `fs::remove_dir_all` 传入系统根路径或未清洗动态变量 | **Block** |
 
 ### 3.2 IKCE：实时隐藏探针与微变异击杀率验证
-为了彻底攻破大语言模型的假测试刷分陷阱，`crates/fg-gate/src/canary/mod.rs` 引入隐藏探针机制：
+为防范测试用例退化与规避行为，`crates/fg-gate/src/canary/mod.rs` 引入隐藏探针机制：
 1. **反向内存微变异（Canary Mutation）**：
    无需将变异代码落盘，在内存中动态合成三类微突变体：
    - **算子翻转**：`>` $\leftrightarrow$ `<=`, `==` $\leftrightarrow$ `!=`, `<` $\leftrightarrow$ `>=`；
@@ -97,14 +97,14 @@ flowchart TD
 $$\hat{\mu} = \frac{\alpha_0 + s}{\alpha_0 + \beta_0 + n}, \quad \alpha_0 = 0.5, \;\beta_0 = 0.5$$
 
 - **阻断违规并隔离**：一旦触发规避违规或后验均值低于阈值（$0.65$），立即触发 `BLOCK_GAMING_DETECTED` 熔断；
-- **现场保留零丢失**：拒绝代码合入代码树，但**绝对不直接丢失智能体劳动成果**。通过 `assert_credit_or_quarantine` 将未批准代码打包为原子 Patch 存放至 `.taxis/quarantine/`，由主管 Agent 或人类工程师通过 `taxis quarantine` 审计复核。
+- **现场保留零丢失**：拒绝代码合入代码树，但完整保留未采纳变更。通过 `assert_credit_or_quarantine` 将未批准代码打包为原子 Patch 存放至 `.taxis/quarantine/`，由主管 Agent 或人类工程师通过 `taxis quarantine` 审计复核。
 
 ---
 
 ## 四、 密码学防篡改独立遥测审计账本 (`refs/fractal/telemetry/*`)
 
 ### 4.1 引用命名空间与拓扑隔离
-审计遥测数据被完全移出常规源码提交 DAG，收归专属独立遥测命名空间：
+审计遥测数据被移出常规源码提交 DAG，收归专属独立遥测命名空间：
 
 ```text
 refs/fractal/
@@ -119,15 +119,15 @@ refs/fractal/
     └── commit/{commit_oid}                             # 单次提交不可变审查验证收据
 ```
 
-- **标准 Git 绝对真空**：`git log`、`git status`、`git diff` 均感知不到该引用的存在；
+- **标准 Git 指针不感知**：`git log`、`git status`、`git diff` 均感知不到该引用的存在；
 - **只增防回退策略**：在 `crates/fg-topology/src/refs.rs` 中通过 `verify_telemetry_update_policy` 物理阻断一切 `--force` 覆写与 `delete_ref` 删除操作。
 
 ### 4.2 密码学“四重防御纵深”阻断外部篡改
 
 ```mermaid
 flowchart LR
-    L1["第一重：HMAC-SHA1 密码哈希链<br/>绑定 prev 指纹，篡改单字节即全链断裂"]
-    L2["第二重：内核独占内存密钥<br/>K_kernel 驻留保护内存，外部沙箱绝无可能伪造签名"]
+    L1["第一重：HMAC-SHA1 密码哈希链<br/>绑定 prev 指纹，篡改单字节即链条断裂"]
+    L2["第二重：内核独占内存密钥<br/>K_kernel 驻留保护内存，外部沙箱无法伪造签名"]
     L3["第三重：Git 引用单调只增<br/>verify_telemetry_update_policy 物理拒绝对其回退与删除"]
     L4["第四重：OS 物理权限互锁<br/>Windows 只读物理锁 + Linux chattr +a 仅追加属性锁"]
 
@@ -137,7 +137,7 @@ flowchart LR
 1. **HMAC 单向 Merkle-Audit-Chain**：
    每条记录强制绑定前序哈希指纹：
    $$\text{RecordHash}_n = \text{HMAC}_{K_{\text{kernel}}}\Big(\text{prev\_hash}_{n-1} \parallel \text{clk} \parallel \text{rev} \parallel \text{actor} \parallel \text{score} \parallel \text{payload}\Big)$$
-   任何外部进程哪怕修改了历史中的一个字符（例如篡改信用分），整条哈希链彻底断裂，内核在启动时自动判定篡改并拒绝服务；
+   任何外部进程若篡改历史记录中的字段，哈希链校验即告失败，内核在启动时判定篡改并拒绝服务；
 2. **内核独占内存签名密钥**：
    签名私钥仅在 Taxis 内核启动时派生并常驻保护内存中，沙箱进程中的 Agent 无法窃取或伪造；
 3. **Git 引用单调只增**：引用指针只能快进推进；
@@ -159,18 +159,18 @@ flowchart LR
 
 ## 五、 分层历史归约台账与三位一体演化流形度量
 
-### 5.1 分层历史归约压缩器 (`PyramidFolder`)
-为了彻底防止海量 SubAgent 高频微提交导致 Git 遥测引用膨胀，`crates/fg-topology/src/pyramid_folding.rs` 实现了分层树状归约：
+### 5.1 分层历史归约器 (`HierarchicalHistoryRollup`)
+为防范海量 SubAgent 高频微提交导致 Git 遥测引用膨胀，`crates/fg-topology/src/history_rollup.rs` 实现了分层树状归约：
 - **$O(N) \to O(1)$ 压缩**：将一次任务卡（Card）周期内数十次 SubAgent 微演化记录，折叠压缩为 1 条 Card 里程碑总结记录；
 - **密码链完整性继承**：里程碑记录继承创世指纹（`genesis_record.prev`）与末端指纹（`tip_record.rev`），累加净质量增量并计算综合贝叶斯信用，重新签署内核 HMAC 印记，体积依然保持 $<350$ 字节。
 
 ### 5.2 三位一体复合流形度量模型
 在 `crates/fg-topology/src/manifold.rs` 中，系统综合三维柱石度量代码库演化质量：
-1. **密码学完整性（Pillar 1）**：HMAC-SHA1 链条从创世到末端 100% 未受篡改；
-2. **不变式与变异金丝雀（Pillar 2）**：变异平均击杀率 $K \ge 60\%$，热路径瞬态分配为 0，Jeffreys Beta 信用均值与 95% 置信可信区间；
+1. **密码学完整性（Pillar 1）**：HMAC-SHA1 链条从创世到末端完整未篡改；
+2. **不变式与变异金丝雀（Pillar 2）**：变异平均击杀率 $K \ge 60\%$，热路径瞬态分配为 0，Jeffreys Beta 信用均值与 95% 置信区间；
 3. **5D 黎曼相空间与技术债（Pillar 3）**：相空间张量 $[D_{\text{line}}, D_{\text{col}}, D_{\text{reuse}}, D_{\text{shared}}, D_{\text{payload}}]$ 引力偏离度与净技术债消除点数（$\Delta\text{Debt}$）。
 
-### 5.3 生产级 CLI 命令面
+### 5.3 CLI 命令面
 Taxis 原生暴露全套命令，支持文本与机器 JSON 输出：
 
 ```bash
@@ -192,8 +192,8 @@ taxis quarantine discard <quarantine_id>
 ## 六、 架构指标与落地验证总览
 
 全套机制已在 `fractal-git` 10 大内核子系统中完整实现并通过工规级验收：
-- **内核子系统单向无环拓扑**：`validate-crate-topology.js` 100% 达标；
-- **零瞬态堆分配与安全契约**：`check-zero-alloc-boundary.js` 246 个生产文件 100% 达标；
-- **全量单元与集成测试回归**：911 项测试 100% 通过（0 failed, 0 ignored）；
+- **内核子系统单向无环拓扑**：`validate-crate-topology.js` 验证通过；
+- **零瞬态堆分配与安全契约**：`check-zero-alloc-boundary.js` 255 个生产源码文件验证通过；
+- **全量单元与集成测试回归**：930+ 项测试验证通过（0 failed, 0 ignored）；
 - **Clippy 终审**：`-D warnings` 零警告、零错误；
-- **全工作区物理卫生八维**：3739 个物理文件 100.0/100.0 分。
+- **全工作区物理卫生八维**：物理卫生各项规范验证通过。

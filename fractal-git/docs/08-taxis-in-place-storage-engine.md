@@ -62,7 +62,7 @@ flowchart TD
 - **[`InPlaceBundleConsumer`](../crates/fg-storage/src/in_place/bundle_consumer.rs#L29-L133)**：
   - 吞噬 Git Bundle v2 并生成 `.pack` 与 `.idx`：默认完整保留源 Bundle，仅在 `--in-place` 显式要求下校验尾部 SHA-1 后才截断。
 - **`RepackEngine::repack_repository_low_disk`**：
-  - 微分型包递进轮转（Micro-Pack Slicing，切片上限默认 64MB（`RepackOptions::micro_pack_bytes`），`--micro-pack` 可调、下限 1M），每生成并验证一个微包即刻物理删除对应的 Loose Objects，根治低磁盘 GC 死锁。
+  - 分片包递进轮转（Pack Slicing，切片上限默认 64MB（`RepackOptions::max_pack_bytes`），主参数 `--max-pack-size` 可调、`--micro-pack` 为兼容别名，下限 1M），每生成并验证一个包切片即刻物理删除对应的 Loose Objects，消除低磁盘 GC 死锁。
   - 报告口径：`artifacts` 依发布顺序列出全部 pack/idx 对；`total_pack_bytes` 为全部已发布包的累计字节；标量 `pack_oid`/`idx_oid`/`pack_bytes` 指向首个已发布包并与 `artifacts[0]` 严格一致（单包时二者等价）。
 
 ---
@@ -121,10 +121,10 @@ taxis bundle unbundle repo.bundle --in-place
 
 ### 3. `taxis repack --low-disk`
 ```bash
-# 在剩余磁盘紧张时启用微包递进轮转重打包
-taxis repack --low-disk --micro-pack 64M
+# 在剩余磁盘紧张时启用分片包递进轮转重打包
+taxis repack --low-disk --max-pack-size 64M
 ```
 
-`--micro-pack` 接受 `64M` / `512K` / 裸字节数三种写法，下限 1M，默认 64M；未知选项按用法错误（退出码 129）拒绝，不再静默忽略。
+`--max-pack-size`（及兼容别名 `--micro-pack`）接受 `64M` / `512K` / 裸字节数三种写法，下限 1M，默认 64M；未知选项按用法错误（退出码 129）拒绝，不再静默忽略。
 
-`--low-disk` 报告与 `fg-storage::repack::RepackReport` 同口径：JSON 的 `pack_count` 为已发布包数，`artifacts` 逐包列出 `pack_oid`/`idx_oid`/`objects_packed`/`pack_bytes`，`total_pack_bytes` 为全部包累计字节；顶层 `pack_oid`/`idx_oid`/`pack_bytes` 始终描述首个包。多包时文本报告额外输出 `Micro-Packs` 行。
+`--low-disk` 报告与 `fg-storage::repack::RepackReport` 同口径：JSON 的 `pack_count` 为已发布包数，`artifacts` 逐包列出 `pack_oid`/`idx_oid`/`objects_packed`/`pack_bytes`，`total_pack_bytes` 为全部包累计字节；顶层 `pack_oid`/`idx_oid`/`pack_bytes` 始终描述首个包。多包时文本报告输出 `Pack Slices` 行。
