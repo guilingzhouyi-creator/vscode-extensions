@@ -110,12 +110,13 @@
 
 ## 💻 4. 生产级 CLI 命令全景 (CLI Commands Reference)
 
-`auto-refactor` 提供九大核心 CLI 子命令，全量集成于统一参数解析与运行时分发引擎：
+`auto-refactor` 提供十大核心 CLI 子命令，全量集成于统一参数解析与运行时分发引擎：
 
 | 子命令 | 命令语法与参数示例 | 核心职责与交付输出 |
 | :--- | :--- | :--- |
-| `scan` | `auto-refactor scan --format <json\|sarif\|text\|agent> [options]` | 全仓/局部静态扫描与质量评估，支持双轨流水线、L1/L2 缓存与自动修复 (`--fix`) |
+| `scan` | `auto-refactor scan --format <json\|sarif\|text\|aas\|agent> [options]` | 全仓/局部静态扫描与质量评估，支持双轨流水线、L1/L2 缓存与自动修复 (`--fix`) |
 | `gate` | `auto-refactor gate [--stage pre-commit\|pre-push\|ci] [--root <dir>]` | 评估 `composite-quality-gate` 复合质量门禁阈值，生成多维结构化门禁裁定报告 |
+| `review` | `auto-refactor review --verdict <true-positive\|false-positive> [--rule <id>] [--root <dir>]` | 裁定待复核队列告警（真阳/误报），幂等落盘 `review-verdicts.json` 并重算贝叶斯置信校准语料 |
 | `self-test` | `auto-refactor self-test` | 运行内置已知违规 Corpus 固件测试，校验 32 专精分析器全量触发语义 |
 | `daemon` | `auto-refactor daemon start\|stop\|status [--root <dir>]` | 管理跨平台后台常驻守护进程（Named Pipe / UDS），提供毫秒级热扫描加速 |
 | `symbols` | `auto-refactor symbols <name> [--root <dir>]` | 查询 AST 符号定义、跨文件引用拓扑与调用链索引深度 |
