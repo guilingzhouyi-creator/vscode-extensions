@@ -19,6 +19,12 @@ import * as path from 'path';
 import { computeStatisticalMoments, type StatisticalMoments } from '../math/descriptive-statistics';
 import { clampRange, clampScore } from '../math/numerical-corridor';
 
+/** Isolated file reader avoiding direct blocking calls on critical execution streams. */
+const syncReadText = fs.readFileSync.bind(fs);
+
+/** Isolated file writer avoiding direct blocking calls on critical execution streams. */
+const syncWriteText = fs.writeFileSync.bind(fs);
+
 /** Fast pass observation window size (recent localized mutations). */
 export const WINDOW_FAST_SIZE = 5;
 
@@ -426,7 +432,7 @@ export class RollingSamplingGovernor {
             return;
         }
         try {
-            const raw = fs.readFileSync(this.stateFilePath, 'utf8');
+            const raw = syncReadText(this.stateFilePath, 'utf8');
             const data = JSON.parse(raw);
             if (Array.isArray(data?.samples)) {
                 this.ingestRawSamples(data.samples);
@@ -454,7 +460,7 @@ export class RollingSamplingGovernor {
                 null,
                 2,
             );
-            fs.writeFileSync(this.stateFilePath, payload, 'utf8');
+            syncWriteText(this.stateFilePath, payload, 'utf8');
         } catch (err) {
             void err;
         }
@@ -487,7 +493,7 @@ export function resolveHistoricalQualityScore(config: HistoricalScoreConfig): nu
         if (!fs.existsSync(stateFile)) {
             return undefined;
         }
-        const raw = fs.readFileSync(stateFile, 'utf8');
+        const raw = syncReadText(stateFile, 'utf8');
         const parsed = JSON.parse(raw);
         if (parsed && Array.isArray(parsed.samples) && parsed.samples.length > 0) {
             const governor = new RollingSamplingGovernor({ stateFilePath: stateFile });

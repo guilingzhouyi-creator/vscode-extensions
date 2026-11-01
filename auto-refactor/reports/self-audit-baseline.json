@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1793519786317",
-  "timestamp": "2026-11-01T07:56:31.117Z",
+  "snapshotId": "snapshot-v0.4.0-1793521555083",
+  "timestamp": "2026-11-01T08:26:00.469Z",
   "cai": 88.21,
   "autonomy": {
     "compositeAutonomyIndex": 88.21,
@@ -10,7 +10,7 @@
       "effectiveLocAutonomy": 97.77,
       "symbolCallAutonomy": 98.05,
       "domainKernelDensity": 63.31,
-      "codeOriginality": 90.32,
+      "codeOriginality": 90.33,
       "supplyChainResilience": 77.27,
       "criticalPathAutonomy": 95
     },
@@ -64,8 +64,8 @@
       "proprietaryFiles": 807,
       "vendorFiles": 0,
       "generatedFiles": 7,
-      "totalEffectiveLoc": 250081,
-      "proprietaryEffectiveLoc": 244514,
+      "totalEffectiveLoc": 250194,
+      "proprietaryEffectiveLoc": 244627,
       "vendorEffectiveLoc": 0,
       "generatedEffectiveLoc": 5567,
       "internalSymbolCalls": 2410,
@@ -95,15 +95,15 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 814,
-    "durationMs": 3761
+    "durationMs": 4604
   },
   "metrics": {
     "compositeScore": 99.14,
     "grade": "A+",
     "autonomyRate": 88.21,
     "sqale": {
-      "tdr": 0.0041,
-      "remediationMinutes": 30466,
+      "tdr": 0.004,
+      "remediationMinutes": 30240,
       "grade": "A"
     },
     "polyglotGeneralization": {
@@ -119,35 +119,35 @@
       "averageTspr": 0.918,
       "averagePor": 0.082,
       "averageColumnDensity": 0.867,
-      "averageSpatialDensity": 0.453,
-      "averageMahalanobisDistance": 4.501,
+      "averageSpatialDensity": 0.454,
+      "averageMahalanobisDistance": 4.493,
       "averageFisherSimplexDistance": 0.093
     },
-    "totalIssues": 4353,
+    "totalIssues": 4348,
     "suppressedIssues": 113,
-    "unsuppressedIssues": 4240,
+    "unsuppressedIssues": 4235,
     "bySeverity": {
-      "info": 614,
-      "warning": 3749,
+      "info": 621,
+      "warning": 3737,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 12,
-      "medium": 696,
-      "low": 3645
+      "high": 0,
+      "medium": 699,
+      "low": 3649
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 99.53,
       "maintainability": 98.01,
-      "performance": 99.79,
+      "performance": 99.84,
       "data": 98.42,
       "testing": 99.78,
-      "reliability": 99.71,
+      "reliability": 99.73,
       "security": 99.88,
-      "extensibility": 97.72
+      "extensibility": 97.71
     },
     "compositeScore": 99.14,
     "weights": {
@@ -166,13 +166,13 @@
     "architectureConsistency": 99.53,
     "semanticPurity": 99.47,
     "codeSecurity": 99.88,
-    "performanceEfficiency": 99.79,
+    "performanceEfficiency": 99.84,
     "standardization": 95.79,
     "modernity": 99.78,
     "maintainability": 98.01,
     "commentQuality": 99.99,
     "duplication": 97.37,
-    "techDebtRisk": 99.95
+    "techDebtRisk": 99.98
   },
   "topHotspots": [
     {
@@ -248,15 +248,6 @@
       "effectiveDensity": 0.9
     },
     {
-      "filePath": "src/core/scoring/rolling-sampling-governor.ts",
-      "domain": "scoring",
-      "totalIssues": 23,
-      "criticalCount": 0,
-      "highCount": 3,
-      "compositeScore": 96.2,
-      "effectiveDensity": 0.94
-    },
-    {
       "filePath": "src/core/ast/scope-graph.ts",
       "domain": "ast",
       "totalIssues": 22,
@@ -264,139 +255,39 @@
       "highCount": 0,
       "compositeScore": 97.07,
       "effectiveDensity": 0.92
+    },
+    {
+      "filePath": "scripts/validate-diff.js",
+      "domain": "scripts",
+      "totalIssues": 21,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 98.55,
+      "effectiveDensity": 0.96
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 12,
-      "medium": 696,
-      "low": 3645
+      "high": 0,
+      "medium": 699,
+      "low": 3649
     },
     "criticalItems": [],
-    "highItems": [
-      {
-        "id": "concurrency:PRF-LEAK-001:scripts/test-parallel.js:512",
-        "rule": "PRF-LEAK-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/test-parallel.js",
-        "line": 512,
-        "message": "Event listener or subscription registered without matching teardown/dispose cleanup logic."
-      },
-      {
-        "id": "concurrency:PRF-LEAK-001:scripts/validate-asymmetric-routing.js:281",
-        "rule": "PRF-LEAK-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-asymmetric-routing.js",
-        "line": 281,
-        "message": "Event listener or subscription registered without matching teardown/dispose cleanup logic."
-      },
-      {
-        "id": "concurrency:PRF-LEAK-001:scripts/validate-consumer-runner.js:60",
-        "rule": "PRF-LEAK-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-consumer-runner.js",
-        "line": 60,
-        "message": "Event listener or subscription registered without matching teardown/dispose cleanup logic."
-      },
-      {
-        "id": "concurrency:PRF-LEAK-001:scripts/validate-frontend-exposure.js:398",
-        "rule": "PRF-LEAK-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-frontend-exposure.js",
-        "line": 398,
-        "message": "Event listener or subscription registered without matching teardown/dispose cleanup logic."
-      },
-      {
-        "id": "concurrency:PRF-LEAK-001:scripts/validate-sparse-scheduler.js:127",
-        "rule": "PRF-LEAK-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "scripts/validate-sparse-scheduler.js",
-        "line": 127,
-        "message": "Event listener or subscription registered without matching teardown/dispose cleanup logic."
-      },
-      {
-        "id": "concurrency:PRF-LEAK-001:src/core/praxis/vfs/projection/sandbox-runner.ts:57",
-        "rule": "PRF-LEAK-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/praxis/vfs/projection/sandbox-runner.ts",
-        "line": 57,
-        "message": "Event listener or subscription registered without matching teardown/dispose cleanup logic."
-      },
-      {
-        "id": "performance:PRF-IO-001:src/core/scoring/rolling-sampling-governor.ts:429",
-        "rule": "PRF-IO-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/rolling-sampling-governor.ts",
-        "line": 429,
-        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
-      },
-      {
-        "id": "performance:PRF-IO-001:src/core/scoring/rolling-sampling-governor.ts:457",
-        "rule": "PRF-IO-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/rolling-sampling-governor.ts",
-        "line": 457,
-        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
-      },
-      {
-        "id": "performance:PRF-IO-001:src/core/scoring/rolling-sampling-governor.ts:490",
-        "rule": "PRF-IO-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/rolling-sampling-governor.ts",
-        "line": 490,
-        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
-      },
-      {
-        "id": "concurrency:PRF-LEAK-001:src/core/worker.ts:800",
-        "rule": "PRF-LEAK-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/worker.ts",
-        "line": 800,
-        "message": "Event listener or subscription registered without matching teardown/dispose cleanup logic."
-      },
-      {
-        "id": "concurrency:PRF-LEAK-001:src/daemon/client.ts:165",
-        "rule": "PRF-LEAK-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/daemon/client.ts",
-        "line": 165,
-        "message": "Event listener or subscription registered without matching teardown/dispose cleanup logic."
-      },
-      {
-        "id": "concurrency:PRF-LEAK-001:src/daemon/server.ts:553",
-        "rule": "PRF-LEAK-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/daemon/server.ts",
-        "line": 553,
-        "message": "Event listener or subscription registered without matching teardown/dispose cleanup logic."
-      }
-    ]
+    "highItems": []
   },
   "hierarchicalBreakdown": {
     "domains": [
       {
         "domainName": "scripts",
-        "compositeScore": 99.3,
+        "compositeScore": 99.31,
         "pillars": {
           "architecture": 99.2,
           "maintainability": 98.54,
-          "performance": 99.86,
+          "performance": 99.93,
           "data": 99.36,
           "testing": 99.99,
-          "reliability": 99.79,
+          "reliability": 99.83,
           "security": 99.89,
           "extensibility": 97.67
         },
@@ -464,14 +355,14 @@
       },
       {
         "domainName": "core",
-        "compositeScore": 98.88,
+        "compositeScore": 98.92,
         "pillars": {
           "architecture": 99.62,
           "maintainability": 97.52,
-          "performance": 99.2,
+          "performance": 99.36,
           "data": 98.14,
           "testing": 99.49,
-          "reliability": 99.68,
+          "reliability": 99.76,
           "security": 99.85,
           "extensibility": 97.53
         },
@@ -854,15 +745,15 @@
       },
       {
         "domainName": "pipeline",
-        "compositeScore": 99.25,
+        "compositeScore": 99.23,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.59,
+          "maintainability": 97.51,
           "performance": 100,
-          "data": 98.9,
+          "data": 98.86,
           "testing": 99.88,
-          "reliability": 99.75,
-          "security": 99.88,
+          "reliability": 99.71,
+          "security": 99.87,
           "extensibility": 97.81
         },
         "moduleCount": 1
@@ -989,16 +880,16 @@
       },
       {
         "domainName": "projection",
-        "compositeScore": 99.58,
+        "compositeScore": 99.72,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.25,
-          "performance": 99.25,
+          "performance": 100,
           "data": 99.25,
           "testing": 100,
-          "reliability": 99.63,
-          "security": 99.94,
-          "extensibility": 99.25
+          "reliability": 100,
+          "security": 99.93,
+          "extensibility": 99.15
         },
         "moduleCount": 1
       },
@@ -1124,14 +1015,14 @@
       },
       {
         "domainName": "scheduler",
-        "compositeScore": 98.94,
+        "compositeScore": 98.93,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.74,
+          "maintainability": 98.69,
           "performance": 99.65,
-          "data": 96.62,
+          "data": 96.6,
           "testing": 99.33,
-          "reliability": 99.5,
+          "reliability": 99.48,
           "security": 99.9,
           "extensibility": 97.01
         },
@@ -1154,11 +1045,11 @@
       },
       {
         "domainName": "scoring",
-        "compositeScore": 99.2,
+        "compositeScore": 99.23,
         "pillars": {
           "architecture": 99.77,
           "maintainability": 97.62,
-          "performance": 99.51,
+          "performance": 99.68,
           "data": 99.12,
           "testing": 99.91,
           "reliability": 99.81,
@@ -1244,14 +1135,14 @@
       },
       {
         "domainName": "daemon",
-        "compositeScore": 98.7,
+        "compositeScore": 98.78,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.33,
-          "performance": 97.78,
-          "data": 97.74,
+          "maintainability": 97.63,
+          "performance": 98.78,
+          "data": 97.7,
           "testing": 100,
-          "reliability": 99.5,
+          "reliability": 99.96,
           "security": 99.86,
           "extensibility": 95.95
         },
@@ -1306,27 +1197,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 194479,
-      "unique": 153839,
-      "changed": 16663,
-      "semantic": 7952,
+      "processed": 194574,
+      "unique": 153932,
+      "changed": 1069,
+      "semantic": 415,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 8495,
-      "deleted": 8168,
-      "modified": 8168
+      "added": 569,
+      "deleted": 500,
+      "modified": 500
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1793519786306,
+      "endMs": 1793521555081,
       "totalRuns": 454,
       "eloc": {
-        "processedTotal": 68889932,
-        "uniqueTotal": 153839,
-        "changedTotal": 1501985,
-        "semanticTotal": 1155590
+        "processedTotal": 68932042,
+        "uniqueTotal": 153932,
+        "changedTotal": 1503716,
+        "semanticTotal": 1156217
       },
       "qed": {
         "mean": -0.045879,
@@ -1335,14 +1226,14 @@
         "kMean": -45.879
       },
       "debt": {
-        "totalAdded": 3422,
-        "totalResolved": 9739,
-        "totalRegressions": 74,
-        "netYield": 5.47,
-        "densityYield": 41.06
+        "totalAdded": 3428,
+        "totalResolved": 9778,
+        "totalRegressions": 75,
+        "netYield": 5.49,
+        "densityYield": 41.25
       },
       "meanCompositeScore": 98.92,
-      "gatePassRate": 93.18
+      "gatePassRate": 92.96
     },
     "isFirstBaseline": false
   }

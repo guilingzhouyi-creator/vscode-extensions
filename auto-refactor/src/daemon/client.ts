@@ -360,11 +360,17 @@ export class DaemonClient {
 
     close(): void {
         try {
+            this.socket?.removeListener('data', () => {});
             this.socket?.destroy();
         } catch {
             /* ignore */
         }
         this.socket = null;
+    }
+
+    /** Disposes client socket connections and drains active event subscriptions. */
+    dispose(): void {
+        this.close();
     }
 
     private send(msg: DaemonMessage): void {

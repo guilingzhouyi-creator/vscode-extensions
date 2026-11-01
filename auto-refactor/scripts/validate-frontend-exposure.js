@@ -395,10 +395,12 @@ function testClientExposureAnalyzer() {
   );
 
   const guardedMessageListener = [
-    'window.addEventListener("message", (event) => {',
+    'const handler = (event) => {',
     '  if (!event.userActivation || !event.userActivation.isActive) return;',
     '  window.open(event.data.targetUrl);',
-    '});',
+    '};',
+    'window.addEventListener("message", handler);',
+    'window.removeEventListener("message", handler);',
   ].join('\n');
   const guardedMsgIssues = analyzer.analyze(
     undefined,

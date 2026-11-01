@@ -278,7 +278,7 @@ async function main() {
   const channel = new EscalationChannel();
   let escalationReceived = false;
 
-  channel.subscribe((event) => {
+  const unsubscribe = channel.subscribe((event) => {
     console.log(`[ESCALATION EVENT RECEIVED] Type: ${event.type}, Message: ${event.message}`);
     escalationReceived = true;
   });
@@ -316,6 +316,8 @@ async function main() {
   assert(deepVerdict.status === 'ESCALATED', 'DeepTrack must escalate on circular dependency');
   assert(escalationReceived, 'EscalationChannel listener must be invoked');
   assert(channel.hasBreaches(), 'EscalationChannel must report breaches');
+  unsubscribe();
+  channel.drain();
 
   // Verify detectDependencyCyclesAsync works identically to synchronous version
   const asyncCycles = await detectDependencyCyclesAsync(graph, ['src/modA.ts']);

@@ -57,6 +57,17 @@ function attachProcessListeners(
     child.on('close', onClose);
 }
 
+function detachProcessListeners(
+    child: ReturnType<typeof spawn>,
+    onError: (err: Error) => void,
+    onClose: (code: number | null) => void,
+): void {
+    child.stdout?.removeAllListeners();
+    child.stderr?.removeAllListeners();
+    child.off('error', onError);
+    child.off('close', onClose);
+}
+
 /**
  * Spawns an external command confined to a sandbox directory and captures its execution outcome.
  *
@@ -104,8 +115,18 @@ export function runInSandbox(options: RunInSandboxOptions): Promise<SandboxExecu
             return;
         }
 
+        const onError = (err: Error): void => {
+            detachProcessListeners(child, onError, onClose);
+            settle(DEFAULT_FAILURE_EXIT_CODE, `Child process error: ${err.message}`);
+        };
+        const onClose = (code: number | null): void => {
+            detachProcessListeners(child, onError, onClose);
+            settle(code ?? (isTimedOut ? TIMEOUT_EXIT_CODE : DEFAULT_FAILURE_EXIT_CODE));
+        };
+
         timeoutTimer = setTimeout(() => {
             isTimedOut = true;
+            detachProcessListeners(child, onError, onClose);
             if (!child.killed) {
                 try {
                     child.kill(SIGKILL_SIGNAL);
@@ -124,8 +145,8 @@ export function runInSandbox(options: RunInSandboxOptions): Promise<SandboxExecu
             (chunk) => {
                 stderrAcc += chunk;
             },
-            (err) => settle(DEFAULT_FAILURE_EXIT_CODE, `Child process error: ${err.message}`),
-            (code) => settle(code ?? (isTimedOut ? TIMEOUT_EXIT_CODE : DEFAULT_FAILURE_EXIT_CODE)),
+            onError,
+            onClose,
         );
     });
 }

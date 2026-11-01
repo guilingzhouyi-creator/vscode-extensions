@@ -1,13 +1,13 @@
 {
   "weekId": "2026-W44",
-  "startMs": 1793114957634,
-  "endMs": 1793519786306,
+  "startMs": 1793115153627,
+  "endMs": 1793521555081,
   "totalRuns": 101,
   "eloc": {
-    "processedTotal": 17722018,
-    "uniqueTotal": 153839,
-    "changedTotal": 345025,
-    "semanticTotal": 230041
+    "processedTotal": 17764128,
+    "uniqueTotal": 153932,
+    "changedTotal": 346756,
+    "semanticTotal": 230668
   },
   "qed": {
     "mean": -0.206534,
@@ -16,18 +16,18 @@
     "kMean": -206.534
   },
   "debt": {
-    "totalAdded": 377,
-    "totalResolved": 4648,
-    "totalRegressions": 74,
-    "netYield": 18.57,
-    "densityYield": 27.76
+    "totalAdded": 383,
+    "totalResolved": 4687,
+    "totalRegressions": 75,
+    "netYield": 18.66,
+    "densityYield": 27.96
   },
   "meanCompositeScore": 98.94,
-  "gatePassRate": 84.16,
+  "gatePassRate": 83.17,
   "stability": {
-    "zeroRegressionRuns": 85,
-    "zeroRegressionStreak": 6,
-    "semanticPurityRatio": 0.6667,
+    "zeroRegressionRuns": 84,
+    "zeroRegressionStreak": 1,
+    "semanticPurityRatio": 0.6652,
     "uniqueCoverageRatio": 0.0087,
     "scoreFloor": 95.47,
     "scoreCeiling": 99.18

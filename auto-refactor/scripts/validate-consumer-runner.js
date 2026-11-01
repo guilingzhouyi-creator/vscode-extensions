@@ -56,8 +56,24 @@ function runRunner(projectDir, extraArgs = []) {
     let stderr = '';
     child.stdout.on('data', (d) => (stdout += d));
     child.stderr.on('data', (d) => (stderr += d));
-    child.on('close', (status) => resolve({ status, stdout, stderr }));
-    child.on('error', (err) => resolve({ status: 1, stdout, stderr: String(err) }));
+    const cleanup = () => {
+      child.stdout?.removeAllListeners();
+      child.stderr?.removeAllListeners();
+      child.off('close', onClose);
+      child.off('error', onError);
+    };
+
+    const onClose = (status) => {
+      cleanup();
+      resolve({ status, stdout, stderr });
+    };
+    const onError = (err) => {
+      cleanup();
+      resolve({ status: 1, stdout, stderr: String(err) });
+    };
+
+    child.on('close', onClose);
+    child.on('error', onError);
   });
 }
 

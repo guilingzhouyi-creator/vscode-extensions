@@ -797,8 +797,9 @@ function sendWorkerResults(
 }
 
 if (parentPort) {
-    parentPort.on(EVENT_MESSAGE, async (msg: WorkerTaskMessage) => {
+    const handleWorkerMessage = async (msg: WorkerTaskMessage): Promise<void> => {
         if (msg && msg.exit) {
+            parentPort!.off(EVENT_MESSAGE, handleWorkerMessage);
             parentPort!.close();
             return;
         }
@@ -827,5 +828,6 @@ if (parentPort) {
         const tRun1 = AR_TIMING ? nowMs() : 0;
         recordBatchTiming(tMsg, tDecode0, tDecode1, tRun1);
         sendWorkerResults(parentPort!, results);
-    });
+    };
+    parentPort.on(EVENT_MESSAGE, handleWorkerMessage);
 }

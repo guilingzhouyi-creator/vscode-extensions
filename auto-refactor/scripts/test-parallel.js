@@ -499,7 +499,15 @@ function runScriptAsync(scriptRel) {
     child.stdout.on('data', (d) => (stdout += d));
     child.stderr.on('data', (d) => (stderr += d));
 
-    child.on('close', (code) => {
+    const cleanup = () => {
+      child.stdout?.removeAllListeners();
+      child.stderr?.removeAllListeners();
+      child.off('close', onClose);
+      child.off('error', onError);
+    };
+
+    const onClose = (code) => {
+      cleanup();
       resolve({
         ok: code === 0,
         code,
@@ -507,9 +515,10 @@ function runScriptAsync(scriptRel) {
         stderr,
         durationMs: Date.now() - start,
       });
-    });
+    };
 
-    child.on('error', (err) => {
+    const onError = (err) => {
+      cleanup();
       resolve({
         ok: false,
         code: 1,
@@ -517,7 +526,10 @@ function runScriptAsync(scriptRel) {
         stderr: stderr + '\n' + err.message,
         durationMs: Date.now() - start,
       });
-    });
+    };
+
+    child.on('close', onClose);
+    child.on('error', onError);
   });
 }
 

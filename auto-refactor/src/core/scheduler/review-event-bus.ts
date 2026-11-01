@@ -102,6 +102,20 @@ export class ReviewEventBus {
         this.listeners.clear();
         this.dispatchedEvents.length = 0;
     }
+
+    /**
+     * Drains all subscribers and purges dispatched event history.
+     */
+    public drain(): void {
+        this.reset();
+    }
+
+    /**
+     * Disposes the event bus by draining subscribers and events.
+     */
+    public dispose(): void {
+        this.drain();
+    }
 }
 
 /** Default singleton instance of ReviewEventBus */

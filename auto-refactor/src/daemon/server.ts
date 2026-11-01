@@ -169,6 +169,8 @@ export class DaemonServer {
     private idleTimer: NodeJS.Timeout | null = null;
     private pending: Map<string, PendingScan> = new Map();
     private nextId = 0;
+    private onSigTerm?: () => void;
+    private onSigInt?: () => void;
 
     constructor(root: string, opts: { stdio?: boolean; logFile?: string } = {}) {
         this.root = path.resolve(root);
@@ -478,11 +480,7 @@ export class DaemonServer {
         if (this.idleTimer.unref) this.idleTimer.unref();
     }
 
-    /** Graceful exit: stop accepting, release pools, remove registry, exit(0). */
-    shutdown(reason = REASON_UNKNOWN): void {
-        if (this.shuttingDown) return;
-        this.shuttingDown = true;
-        if (this.idleTimer) clearTimeout(this.idleTimer);
+    private abortPendingScans(): void {
         for (const scan of this.pending.values()) {
             try {
                 scan.abortController.abort();
@@ -491,6 +489,9 @@ export class DaemonServer {
             }
         }
         this.pending.clear();
+    }
+
+    private releaseDaemonResources(): void {
         try {
             this.ctx.pools.shutdown();
         } catch {
@@ -504,6 +505,25 @@ export class DaemonServer {
                 /* ignore */
             }
         }
+    }
+
+    private detachSignalHandlers(): void {
+        try {
+            if (this.onSigTerm) process.off(SIGNAL_SIGTERM, this.onSigTerm);
+            if (this.onSigInt) process.off(SIGNAL_SIGINT, this.onSigInt);
+        } catch {
+            /* ignore */
+        }
+    }
+
+    /** Graceful exit: stop accepting, release pools, remove registry, exit(0). */
+    shutdown(reason = REASON_UNKNOWN): void {
+        if (this.shuttingDown) return;
+        this.shuttingDown = true;
+        if (this.idleTimer) clearTimeout(this.idleTimer);
+        this.abortPendingScans();
+        this.releaseDaemonResources();
+        this.detachSignalHandlers();
         this.logger.info(`daemon exiting (${reason})`);
         try {
             this.logger.close();
@@ -511,6 +531,17 @@ export class DaemonServer {
             /* ignore */
         }
         setImmediate(() => process.exit(0));
+    }
+
+    /** Registers signal handlers so they can be detached during shutdown. */
+    public setSignalHandlers(sigTerm: () => void, sigInt: () => void): void {
+        this.onSigTerm = sigTerm;
+        this.onSigInt = sigInt;
+    }
+
+    /** Disposes server resources and detaches active listeners. */
+    dispose(): void {
+        this.shutdown(REASON_CLIENT_REQUEST);
     }
 }
 
@@ -542,8 +573,11 @@ export async function runDaemonMain(argv: string[]): Promise<void> {
         );
         process.exit(1);
     }
-    process.on(SIGNAL_SIGTERM, () => server.shutdown(REASON_SIGTERM));
-    process.on(SIGNAL_SIGINT, () => server.shutdown(REASON_SIGINT));
+    const onSigTerm = (): void => server.shutdown(REASON_SIGTERM);
+    const onSigInt = (): void => server.shutdown(REASON_SIGINT);
+    server.setSignalHandlers(onSigTerm, onSigInt);
+    process.on(SIGNAL_SIGTERM, onSigTerm);
+    process.on(SIGNAL_SIGINT, onSigInt);
     process.on(EVENT_UNCAUGHT_EXCEPTION, (error) => {
         process.stderr.write(
             `[auto-refactor daemon] uncaught: ${error && (error as Error).stack ? (error as Error).stack : error}\n`,

@@ -204,4 +204,19 @@ export class EscalationChannel {
     clear(): void {
         this.events.length = 0;
     }
+
+    /**
+     * Drains all recorded events and unregisters all active listeners.
+     */
+    drain(): void {
+        this.listeners.clear();
+        this.events.length = 0;
+    }
+
+    /**
+     * Disposes the channel by draining all listeners and events.
+     */
+    dispose(): void {
+        this.drain();
+    }
 }

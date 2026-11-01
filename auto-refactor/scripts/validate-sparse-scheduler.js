@@ -156,6 +156,7 @@ async function testReviewEventBus() {
     1,
     'Unsubscribed listener should not receive second event',
   );
+  bus.drain();
   console.log('  ✔ ReviewEventBus coordinates cross-reviewer domain event dispatching smoothly');
 }
 
