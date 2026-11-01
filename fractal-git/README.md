@@ -51,12 +51,12 @@ fractal-git/
 │   └── 09-test-cache-and-telemetry-audit-spec.md
 │
 ├── crates/                          // 【10 大分层内核子系统矩阵 (L1~L3 分层解耦)】
-│   ├── fg-core/                     // L1: 基础对象模型、OID 哈希、UAC 权限与 Trait 抽象
+│   ├── fg-core/                     // L1: 基础对象模型、OID 哈希、提权权限与 Trait 抽象
 │   ├── fg-object/                   // L1: Git 底层对象二进制序列化 (Blob / Tree / Commit)
 │   ├── fg-index/                    // L1: 无锁内存虚拟树索引 (消融 index.lock 锁争用)
 │   ├── fg-algorithms/               // L1: 核心数学算法库 (CCD v2, SWAR Diff, FastCDC, SpacePlan, 3-Way Merge)
 │   ├── fg-pools/                    // L2: 高承压资源池 (BufferPool, WorktreePool, LRU 缓存)
-│   ├── fg-storage/                  // L2: CAS 内容寻址存储、Loose ODB、TIPSE 原位存储与 WAL
+│   ├── fg-storage/                  // L2: CAS 内容寻址存储、Loose ODB、In-Place 原位对象库与 WAL
 │   ├── fg-native/                   // L2: TAXC 分节容器、七类原生节与仓库布局
 │   ├── fg-topology/                 // L3: 分形引用拓扑 (refs/fractal/...)、状态机与提拔账本
 │   ├── fg-transport/                // L3: Smart Protocol v2 (Packet-line) 与 Agent 本地 IPC
@@ -91,12 +91,12 @@ fractal-git/
 
 | 目录/模块 | 负责什么 | 严禁做什么 |
 | :--- | :--- | :--- |
-| `crates/fg-core/` | 基础 OID、身份凭证、UAC 权限模型与核心 Trait 契约 | 严禁包含复杂 I/O 操作或网络通信 |
+| `crates/fg-core/` | 基础 OID、身份凭证、提权授权模型与核心 Trait 契约 | 严禁包含复杂 I/O 操作或网络通信 |
 | `crates/fg-object/` | Git 对象二进制序列化、zlib 压缩与解压 | 严禁包含拓扑状态机或业务门禁规则 |
 | `crates/fg-index/` | 内存树递归组装与虚拟索引，消融 `.git/index.lock` | 严禁依赖上层服务或物理工作区阻塞 I/O |
 | `crates/fg-algorithms/` | 算法层：CCD v2 偏序剪枝、SWAR 文本差分、FastCDC 分块、SpacePlan 水位模拟、分层树状归约与三方合并 | 严禁在密集循环体内触发瞬态堆分配 |
 | `crates/fg-pools/` | 线程本地 FreeList 缓冲池、Direct-Bypass 内存测试缓存池（`<20ms` 回收）与 LRU 缓存 | 严禁无限膨胀无上限占用内存 |
-| `crates/fg-storage/` | CAS 内容寻址存储、Loose ODB、TIPSE 原位存储与微分型包重打包 | 严禁非原子直接覆盖写对象 |
+| `crates/fg-storage/` | CAS 内容寻址存储、Loose ODB、In-Place 原位对象库与分片包重打包 | 严禁非原子直接覆盖写对象 |
 | `crates/fg-native/` | TAXC 分节容器、七类原生节（`META`/`HEAD`/`REFS`/`INDX`/`OPLG`/`PROM`/`WKTR`）与仓库布局 | 严禁持有 git 格式知识，格式解析归兼容投影层 |
 | `crates/fg-topology/` | 四层拓扑断言、工作树状态机（含检疫隔离）、`refs/fractal/telemetry/*` 密码学遥测审计哈希链与 OS 级文件加固 | 严禁越级跨层直接合入 |
 | `crates/fg-transport/` | Git Smart Protocol v2 与 Agent 本地 IPC | 严禁绕过 `pre-receive` 门禁写引用 |

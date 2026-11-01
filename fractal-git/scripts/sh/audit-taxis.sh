@@ -178,10 +178,14 @@ else
         write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "晋级演练仓库初始化失败，无法验证暂存链路"
         exit 1
     fi
+    CANDIDATE_OID="$(git -C "${PROJECT_ROOT}" rev-parse HEAD 2>/dev/null || true)"
+    if [[ ! "${CANDIDATE_OID}" =~ ^[0-9a-f]{40}$ ]]; then
+        CANDIDATE_OID="0000000000000000000000000000000000000000"
+    fi
     PROMO_STATUS=0
     "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- promotion request \
         --git-dir "${PROMO_ROOT}/.taxis" \
-        --candidate "1111111111111111111111111111111111111111" \
+        --candidate "${CANDIDATE_OID}" \
         --agent "taxis-auditor" \
         --score "${COMPOSITE_SCORE}" \
         --cai "${CAI_SCORE}" \
@@ -197,7 +201,7 @@ else
         write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "晋级暂存请求未落盘，仓库容器缺失"
         exit 1
     fi
-    write_step_verdict "PROMOTION-BRIDGE-05" PASS "晋级暂存请求已受理，候选保留于 UAC 暂存账本"
+    write_step_verdict "PROMOTION-BRIDGE-05" PASS "晋级暂存请求已受理，候选保留于提权审批暂存账本"
 fi
 
 echo ""

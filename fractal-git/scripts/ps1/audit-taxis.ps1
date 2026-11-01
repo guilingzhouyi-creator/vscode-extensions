@@ -312,10 +312,14 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
         Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "晋级演练仓库初始化失败，无法验证暂存链路"
         $failures.Add("PROMOTION-BRIDGE-05")
     } else {
+        $candidateOid = (git -C $ProjectRoot rev-parse HEAD 2>$null | Out-String).Trim()
+        if ($candidateOid -notmatch '^[0-9a-f]{40}$') {
+            $candidateOid = "0000000000000000000000000000000000000000"
+        }
         $promoArgs = @(
         "run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "promotion", "request",
         "--git-dir", (Join-Path $promoLedgerRoot ".taxis"),
-        "--candidate", "1111111111111111111111111111111111111111",
+        "--candidate", $candidateOid,
         "--agent", "taxis-auditor",
         "--score", $compositeScore.ToString("F1"),
         "--cai", $caiScore.ToString("F1"),
@@ -335,7 +339,7 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
         $failures.Add("PROMOTION-BRIDGE-05")
     } else {
         $statusPromotion = "PASS"
-        Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "PASS" -Detail "晋级暂存请求已受理并落盘，候选保留于 UAC 暂存账本"
+        Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "PASS" -Detail "晋级暂存请求已受理并落盘，候选保留于提权审批暂存账本"
     }
     }
 }

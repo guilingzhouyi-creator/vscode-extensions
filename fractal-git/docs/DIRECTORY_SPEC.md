@@ -64,7 +64,7 @@ flowchart TD
 
   subgraph LAYER_LEAF["L1: 内存索引、纯算法、对象模型与领域核心 (Plumbing)"]
     INDEX["fg-index (InMemoryIndexTree / ConflictStageSlot)"]
-    ALGO["fg-algorithms (FastCDC / ThreeWayMerge / TreeDiff / PyramidFolder)"]
+    ALGO["fg-algorithms (FastCDC / ThreeWayMerge / TreeDiff / Math)"]
     OBJECT["fg-object (Blob / Tree / Commit / FileMode)"]
     CORE["fg-core (Oid / Signatures / TelemetryEntry / Context / Traits)"]
   end

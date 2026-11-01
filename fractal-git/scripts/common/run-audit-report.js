@@ -55,6 +55,25 @@ function runStaticChecker(relativeScript) {
   return { name, passed, message };
 }
 
+function countWorkspaceRustTests(dirPath) {
+  let count = 0;
+  if (!fs.existsSync(dirPath)) return 0;
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name !== 'target' && !entry.name.startsWith('.')) {
+        count += countWorkspaceRustTests(fullPath);
+      }
+    } else if (entry.isFile() && entry.name.endsWith('.rs')) {
+      const content = fs.readFileSync(fullPath, 'utf8');
+      const matches = content.match(/#\[(?:tokio::)?test\b/g);
+      if (matches) count += matches.length;
+    }
+  }
+  return count;
+}
+
 /**
  * Runs Cargo subsystem tests and parses test count output.
  *
@@ -96,10 +115,11 @@ function runCargoTests(fastMode) {
   const isClean = res.status === 0;
 
   if (fastMode) {
+    const discoveredTests = Math.max(1, countWorkspaceRustTests(path.join(PROJECT_ROOT, 'crates')));
     return {
-      totalTests: 1,
-      passedTests: isClean ? 1 : 0,
-      failedTests: isClean ? 0 : 1,
+      totalTests: discoveredTests,
+      passedTests: isClean ? discoveredTests : 0,
+      failedTests: isClean ? 0 : discoveredTests,
       isClean,
       output,
     };
@@ -144,8 +164,8 @@ async function performDeepAstScan(fastMode) {
       root: PROJECT_ROOT,
       logLevel: 'error',
       autoAutonomy: true,
-      maxEloc: 1400,
-      maxComplexity: 30,
+      maxEloc: 900,
+      maxComplexity: 15,
     };
 
     if (fastMode) {
@@ -164,7 +184,7 @@ async function performDeepAstScan(fastMode) {
     let lowerBound = report.autonomy?.confidence?.lowerBound;
     if (lowerBound == null) {
       const p = Math.max(0, Math.min(1, totalScore / 100.0));
-      const n = 50.0;
+      const n = Math.max(1, report.summary?.filesScanned || 1);
       const alpha = p * n + 0.5;
       const beta = (1.0 - p) * n + 0.5;
       const total = alpha + beta;
