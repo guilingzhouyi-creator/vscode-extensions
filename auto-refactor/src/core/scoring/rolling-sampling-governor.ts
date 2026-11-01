@@ -53,10 +53,10 @@ const PRECISION_HUNDRED = 100;
 const PRECISION_TEN_THOUSAND = 10000;
 
 /** Default relative directory path for auto-refactor cache. */
-const DEFAULT_CACHE_DIR = '.auto-refactor-cache';
+export const DEFAULT_CACHE_DIR = '.auto-refactor-cache';
 
 /** Default filename for rolling sampling persistent state. */
-const DEFAULT_STATE_FILENAME = 'rolling-sampling-state.json';
+export const DEFAULT_STATE_FILENAME = 'rolling-sampling-state.json';
 
 /** Numerical safety epsilon preventing zero-division in variance calculations. */
 const EPSILON_VARIANCE = 1e-6;

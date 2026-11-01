@@ -32,11 +32,12 @@ export interface StatisticalMoments {
 }
 
 const DEFAULT_PRECISION_DIGITS = 4;
+const BASE_TEN_SCALE = 10;
 
-function roundPrecision(val: number, digits: number = DEFAULT_PRECISION_DIGITS): number {
-    if (!Number.isFinite(val)) return 0;
-    const factor = Math.pow(10, digits);
-    return Math.round(val * factor) / factor;
+function roundPrecision(numericValue: number, digits: number = DEFAULT_PRECISION_DIGITS): number {
+    if (!Number.isFinite(numericValue)) return 0;
+    const factor = Math.pow(BASE_TEN_SCALE, digits);
+    return Math.round(numericValue * factor) / factor;
 }
 
 /**
@@ -50,14 +51,13 @@ export function computeMean(values: readonly number[]): number {
     let sum = 0;
     let validCount = 0;
     for (let i = 0; i < values.length; i++) {
-        const val = values[i];
-        if (Number.isFinite(val)) {
-            sum += val;
+        const currentValue = values[i];
+        if (Number.isFinite(currentValue)) {
+            sum += currentValue;
             validCount++;
         }
     }
-    if (validCount === 0) return 0;
-    return roundPrecision(safeDivide(sum, validCount));
+    return validCount === 0 ? 0 : roundPrecision(safeDivide(sum, validCount));
 }
 
 /**
@@ -69,23 +69,21 @@ export function computeMean(values: readonly number[]): number {
  */
 export function computeVariance(values: readonly number[], precomputedMean?: number): number {
     if (!values || values.length === 0) return 0;
-    const mean =
-        precomputedMean !== undefined && Number.isFinite(precomputedMean)
-            ? precomputedMean
-            : computeMean(values);
+    const mean = Number.isFinite(precomputedMean)
+        ? (precomputedMean as number)
+        : computeMean(values);
 
     let squaredSum = 0;
     let validCount = 0;
     for (let i = 0; i < values.length; i++) {
-        const val = values[i];
-        if (Number.isFinite(val)) {
-            const diff = val - mean;
-            squaredSum += diff * diff;
+        const currentValue = values[i];
+        if (Number.isFinite(currentValue)) {
+            const deviation = currentValue - mean;
+            squaredSum += deviation * deviation;
             validCount++;
         }
     }
-    if (validCount === 0) return 0;
-    return roundPrecision(safeDivide(squaredSum, validCount));
+    return validCount === 0 ? 0 : roundPrecision(safeDivide(squaredSum, validCount));
 }
 
 /**
@@ -114,33 +112,33 @@ export function computeStatisticalMoments(values: readonly number[]): Statistica
         return Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
     }
 
-    let count = 0;
-    let mean = 0;
-    let m2 = 0;
+    let validCount = 0;
+    let runningMean = 0;
+    let secondMomentSum = 0;
 
     for (let i = 0; i < values.length; i++) {
-        const val = values[i];
-        if (Number.isFinite(val)) {
-            count++;
-            const delta = val - mean;
-            mean += delta / count;
-            const delta2 = val - mean;
-            m2 += delta * delta2;
+        const currentValue = values[i];
+        if (Number.isFinite(currentValue)) {
+            validCount++;
+            const delta = currentValue - runningMean;
+            runningMean += delta / validCount;
+            const deltaAfter = currentValue - runningMean;
+            secondMomentSum += delta * deltaAfter;
         }
     }
 
-    if (count === 0) {
+    if (validCount === 0) {
         return Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
     }
 
-    const variance = safeDivide(m2, count);
+    const variance = safeDivide(secondMomentSum, validCount);
     const standardDeviation = Math.sqrt(Math.max(0, variance));
 
     return Object.freeze({
-        mean: roundPrecision(mean),
+        mean: roundPrecision(runningMean),
         variance: roundPrecision(variance),
         standardDeviation: roundPrecision(standardDeviation),
-        count,
+        count: validCount,
     });
 }
 
@@ -148,40 +146,41 @@ export function computeStatisticalMoments(values: readonly number[]): Statistica
  * Merges two precomputed statistical moment records using Chan-Golub-LeVeque
  * pairwise algorithm.
  *
- * @param a - First statistical moments record.
- * @param b - Second statistical moments record.
+ * @param firstMoments - First statistical moments record.
+ * @param secondMoments - Second statistical moments record.
  * @returns Merged statistical moments.
  */
 export function mergeStatisticalMoments(
-    a: StatisticalMoments,
-    b: StatisticalMoments,
+    firstMoments: StatisticalMoments,
+    secondMoments: StatisticalMoments,
 ): StatisticalMoments {
-    if (!a || a.count === 0) {
-        return b || Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
+    if (!firstMoments || firstMoments.count === 0) {
+        return secondMoments || Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
     }
-    if (!b || b.count === 0) {
-        return a;
+    if (!secondMoments || secondMoments.count === 0) {
+        return firstMoments;
     }
 
-    const nA = a.count;
-    const nB = b.count;
-    const n = nA + nB;
+    const countFirst = firstMoments.count;
+    const countSecond = secondMoments.count;
+    const totalCount = countFirst + countSecond;
 
-    const delta = b.mean - a.mean;
-    const mean = a.mean + delta * (nB / n);
+    const delta = secondMoments.mean - firstMoments.mean;
+    const mergedMean = firstMoments.mean + delta * (countSecond / totalCount);
 
-    const m2A = a.variance * nA;
-    const m2B = b.variance * nB;
-    const m2 = m2A + m2B + delta * delta * ((nA * nB) / n);
+    const momentSumFirst = firstMoments.variance * countFirst;
+    const momentSumSecond = secondMoments.variance * countSecond;
+    const mergedMomentSum =
+        momentSumFirst + momentSumSecond + delta * delta * ((countFirst * countSecond) / totalCount);
 
-    const variance = safeDivide(m2, n);
+    const variance = safeDivide(mergedMomentSum, totalCount);
     const standardDeviation = Math.sqrt(Math.max(0, variance));
 
     return Object.freeze({
-        mean: roundPrecision(mean),
+        mean: roundPrecision(mergedMean),
         variance: roundPrecision(variance),
         standardDeviation: roundPrecision(standardDeviation),
-        count: n,
+        count: totalCount,
     });
 }
 
@@ -189,81 +188,98 @@ export function mergeStatisticalMoments(
  * Online accumulator for statistical moments maintaining unrounded second central moments.
  */
 export class OnlineWelfordAccumulator {
-    private count = 0;
-    private mean = 0;
-    private m2 = 0;
+    private sampleCount = 0;
+    private runningMean = 0;
+    private secondMomentSum = 0;
 
     /**
      * Appends an observation to the accumulator.
      */
-    update(value: number): void {
-        if (!Number.isFinite(value)) return;
-        this.count++;
-        const delta = value - this.mean;
-        this.mean += delta / this.count;
-        const delta2 = value - this.mean;
-        this.m2 += delta * delta2;
+    updateSample(sampleValue: number): void {
+        if (!Number.isFinite(sampleValue)) return;
+        this.sampleCount++;
+        const delta = sampleValue - this.runningMean;
+        this.runningMean += delta / this.sampleCount;
+        const deltaAfter = sampleValue - this.runningMean;
+        this.secondMomentSum += delta * deltaAfter;
+    }
+
+    /** Compatibility alias for updateSample */
+    update(sampleValue: number): void {
+        this.updateSample(sampleValue);
     }
 
     /**
      * Merges another accumulator into this one using Chan-Golub-LeVeque formula.
      */
-    merge(other: OnlineWelfordAccumulator): void {
-        if (!other || other.count === 0) return;
-        if (this.count === 0) {
-            this.count = other.count;
-            this.mean = other.mean;
-            this.m2 = other.m2;
+    mergeAccumulator(otherAccumulator: OnlineWelfordAccumulator): void {
+        if (!otherAccumulator || otherAccumulator.sampleCount === 0) return;
+        if (this.sampleCount === 0) {
+            this.sampleCount = otherAccumulator.sampleCount;
+            this.runningMean = otherAccumulator.runningMean;
+            this.secondMomentSum = otherAccumulator.secondMomentSum;
             return;
         }
-        const nA = this.count;
-        const nB = other.count;
-        const n = nA + nB;
-        const delta = other.mean - this.mean;
-        this.mean += delta * (nB / n);
-        this.m2 += other.m2 + delta * delta * ((nA * nB) / n);
-        this.count = n;
+        const countFirst = this.sampleCount;
+        const countSecond = otherAccumulator.sampleCount;
+        const totalCount = countFirst + countSecond;
+        const delta = otherAccumulator.runningMean - this.runningMean;
+        this.runningMean += delta * (countSecond / totalCount);
+        this.secondMomentSum +=
+            otherAccumulator.secondMomentSum + delta * delta * ((countFirst * countSecond) / totalCount);
+        this.sampleCount = totalCount;
+    }
+
+    /** Compatibility alias for mergeAccumulator */
+    merge(otherAccumulator: OnlineWelfordAccumulator): void {
+        this.mergeAccumulator(otherAccumulator);
     }
 
     /**
      * Finalizes and produces frozen statistical moments.
      */
-    finish(): StatisticalMoments {
-        if (this.count === 0) {
+    produceMoments(): StatisticalMoments {
+        if (this.sampleCount === 0) {
             return Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
         }
-        const variance = safeDivide(this.m2, this.count);
+        const variance = safeDivide(this.secondMomentSum, this.sampleCount);
         const standardDeviation = Math.sqrt(Math.max(0, variance));
         return Object.freeze({
-            mean: roundPrecision(this.mean),
+            mean: roundPrecision(this.runningMean),
             variance: roundPrecision(variance),
             standardDeviation: roundPrecision(standardDeviation),
-            count: this.count,
+            count: this.sampleCount,
         });
+    }
+
+    /** Compatibility alias for produceMoments */
+    finish(): StatisticalMoments {
+        return this.produceMoments();
     }
 }
 
 /**
- * Computes empirical quantile q in [0.0, 1.0] using linear interpolation.
+ * Computes empirical quantile target in [0.0, 1.0] using linear interpolation.
  *
  * @param values - Input sequence of numbers.
- * @param quantile - Quantile target in [0.0, 1.0].
+ * @param targetQuantile - Quantile target in [0.0, 1.0].
  * @returns Interpolated quantile value.
  */
-export function computeQuantile(values: readonly number[], quantile: number): number {
+export function computeQuantile(values: readonly number[], targetQuantile: number): number {
     if (!values || values.length === 0) return 0;
-    const boundedQ = clampRange(quantile, 0.0, 1.0);
+    const boundedQuantile = clampRange(targetQuantile, 0.0, 1.0);
 
-    const sorted = values.filter(Number.isFinite).sort((valA, valB) => valA - valB);
-    if (sorted.length === 0) return 0;
-    if (sorted.length === 1) return sorted[0];
+    const sortedValues = values.filter(Number.isFinite).sort((valA, valB) => valA - valB);
+    if (sortedValues.length === 0) return 0;
+    if (sortedValues.length === 1) return sortedValues[0];
 
-    const position = (sorted.length - 1) * boundedQ;
+    const position = (sortedValues.length - 1) * boundedQuantile;
     const lowerIndex = Math.floor(position);
     const upperIndex = Math.ceil(position);
     const weight = position - lowerIndex;
 
-    const interpolated = sorted[lowerIndex] + weight * (sorted[upperIndex] - sorted[lowerIndex]);
+    const interpolated =
+        sortedValues[lowerIndex] + weight * (sortedValues[upperIndex] - sortedValues[lowerIndex]);
     return roundPrecision(interpolated);
 }
 

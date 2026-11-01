@@ -12,12 +12,14 @@
  */
 
 import * as fs from 'fs';
+import * as path from 'path';
 import type {
     ScanConfig,
     ScanReport,
     ScanSummary,
     Issue,
     SuppressionRule,
+    FileMetric,
 } from '../types';
 import type { Scanner } from '../analyzer';
 import { summarizeUncertainty } from './canonical-issue-builder';
@@ -60,7 +62,18 @@ import { buildReviewQueue, countNeedsHuman, writeReviewQueue } from './review-qu
 import {
     recordHistoricalQualitySample,
     resolveHistoricalQualityScore,
+    RollingSamplingGovernor,
+    DEFAULT_STATE_FILENAME,
+    DEFAULT_CACHE_DIR,
 } from '../scoring/rolling-sampling-governor';
+import type {
+    FileDebtItem,
+    QuantitativeRiskAssessment,
+} from '../scoring/quantitative-risk-model';
+import {
+    DEFAULT_RISK_WINDOW_SIZE,
+    evaluateQuantitativeRiskModel,
+} from '../scoring/quantitative-risk-model';
 import {
     applyAnalyzerSeverityCaps,
     enrichEvolutionAndCoverage,
@@ -804,6 +817,12 @@ async function refreshQualityScores(params: RefreshQualityScoresParams): Promise
         0,
     );
     recordHistoricalQualitySample(config, projectQualityScore.compositeScore, totalEffectiveLines);
+    projectQualityScore.quant = synthesizeProjectQuant(
+        config,
+        projectQualityScore,
+        fileMetrics,
+        report.issues,
+    );
     report.autonomy = evaluateProjectAutonomy(
         fileMetrics,
         report.issues,
@@ -817,6 +836,97 @@ async function refreshQualityScores(params: RefreshQualityScoresParams): Promise
         report,
         config,
         scope,
+    });
+}
+
+/**
+ * Loads empirical rolling quality scores from persistent cache.
+ */
+function loadRollingHistoryScores(config: ScanConfig, fallbackScore: number): number[] {
+    try {
+        const cacheDir = path.join(config.root || '.', DEFAULT_CACHE_DIR);
+        const stateFile = path.join(cacheDir, DEFAULT_STATE_FILENAME);
+        if (!fs.existsSync(stateFile)) {
+            return [fallbackScore];
+        }
+        const governor = new RollingSamplingGovernor({ stateFilePath: stateFile });
+        const samples = governor.getSamples();
+        return samples.length > 0 ? samples.map((sample) => sample.compositeScore) : [fallbackScore];
+    } catch (error) {
+        void error;
+        return [fallbackScore];
+    }
+}
+
+interface IssueDebtAggregates {
+    readonly fileDebtsMap: Map<string, number>;
+    readonly ruleCategoryCounts: Record<string, number>;
+}
+
+/**
+ * Aggregates issue counts and rule categories for spatial dispersion analysis.
+ */
+function aggregateIssueDebts(issues: Issue[]): IssueDebtAggregates {
+    const fileDebtsMap = new Map<string, number>();
+    const ruleCategoryCounts: Record<string, number> = {};
+
+    for (const issue of issues) {
+        const filePath = issue.location?.file || 'unknown';
+        fileDebtsMap.set(filePath, (fileDebtsMap.get(filePath) || 0) + 1);
+
+        const rulePrefix = (issue.rule || '').match(/^([A-Z]{2,4})-/)?.[1] || 'OTHER';
+        ruleCategoryCounts[rulePrefix] = (ruleCategoryCounts[rulePrefix] || 0) + 1;
+    }
+
+    return { fileDebtsMap, ruleCategoryCounts };
+}
+
+/**
+ * Synthesizes architecture dynamics and resilience quantitative indicators (ADR-Q)
+ * from empirical continuous rolling sampling and file-level defect distribution.
+ */
+function synthesizeProjectQuant(
+    config: ScanConfig,
+    projectQualityScore: QualityScoreBreakdown,
+    fileMetrics: FileMetric[],
+    issues: Issue[],
+): QuantitativeRiskAssessment {
+    const historyScores = loadRollingHistoryScores(config, projectQualityScore.compositeScore);
+    const { fileDebtsMap, ruleCategoryCounts } = aggregateIssueDebts(issues);
+
+    const fileDebtItems: FileDebtItem[] = fileMetrics.map((fm) => ({
+        filePath: fm.file,
+        remediationMinutes: (fileDebtsMap.get(fm.file) || 0) * 15,
+        churn30d: 1.0,
+        fanIn: fm.functions || 1.0,
+    }));
+    const fileDebtValues = fileMetrics.map((fm) => (fileDebtsMap.get(fm.file) || 0) * 15);
+
+    const complexityValues = fileMetrics
+        .map((fm) => fm.maxNestingDepth)
+        .filter((compVal): compVal is number => typeof compVal === 'number' && Number.isFinite(compVal));
+
+    const totalMinutes =
+        projectQualityScore.technicalDebt?.totalRemediationMinutes ??
+        issues.length * 15;
+
+    return evaluateQuantitativeRiskModel({
+        financial: {
+            totalRemediationMinutes: totalMinutes,
+            fileDebts: fileDebtItems,
+        },
+        risk: {
+            historyScores,
+            windowSize: DEFAULT_RISK_WINDOW_SIZE,
+        },
+        inequality: {
+            fileDebts: fileDebtValues,
+            ruleCategoryCounts,
+        },
+        stochastic: {
+            historyScores,
+            complexityValues,
+        },
     });
 }
 

@@ -33,6 +33,9 @@ export const RATIO_SATURATION_CEILING = 999.0;
 /** Normal distribution critical value for single-tailed 95% confidence interval. */
 export const GAUSSIAN_Z_95 = 1.645;
 
+/** Standard regularized risk resolution epsilon when empirical deviation is zero. */
+export const MIN_RISK_DEV_EPSILON = 0.05;
+
 /** Drag friction calibration factor mapping churn and fan-in to interest drag. */
 export const DEFAULT_DRAG_FRICTION_COEFFICIENT = 0.08;
 
@@ -176,6 +179,16 @@ export interface StochasticMetrics {
     readonly reversionRateTheta: number;
     readonly kurtosisCc: number;
     readonly isFatTailed: boolean;
+}
+
+/**
+ * Consolidated parameter object for evaluating unified quantitative risk assessment.
+ */
+export interface QuantitativeRiskModelParams {
+    readonly financial: FinancialDebtInput;
+    readonly risk: QualityRiskInput;
+    readonly inequality: InequalityInput;
+    readonly stochastic: StochasticInput;
 }
 
 /**
@@ -458,14 +471,14 @@ export function computeQualityRiskRatios(input: QualityRiskInput): QualityRiskMe
     const excessScore = meanScore - baseline;
     let qsr: number;
     if (stdDev < EPSILON_FLOAT) {
-        qsr = excessScore > 0 ? roundTwoDecimals(excessScore / 0.05) : 0.0;
+        qsr = excessScore > 0 ? roundTwoDecimals(excessScore / MIN_RISK_DEV_EPSILON) : 0.0;
     } else {
         qsr = Math.min(RATIO_SATURATION_CEILING, Math.max(0.0, excessScore / stdDev));
     }
 
     let sortino: number;
     if (downsideDev < EPSILON_FLOAT) {
-        sortino = excessScore > 0 ? roundTwoDecimals(excessScore / 0.05) : 0.0;
+        sortino = excessScore > 0 ? roundTwoDecimals(excessScore / MIN_RISK_DEV_EPSILON) : 0.0;
     } else {
         sortino = Math.min(RATIO_SATURATION_CEILING, Math.max(0.0, excessScore / downsideDev));
     }
@@ -656,23 +669,54 @@ export function computeStochasticDynamics(input: StochasticInput): StochasticMet
 
 /**
  * Evaluates comprehensive quantitative risk assessment across all four mathematical domains.
+ * Supports consolidated parameter object (SIM-ARGS-001) as well as legacy 4-tuple arguments.
  *
- * @param financialInput - Financial debt parameters.
- * @param riskInput - Historical score time-series.
- * @param inequalityInput - File debts and category counts.
- * @param stochasticInput - Trajectory and CC values.
+ * @param params - Consolidated QuantitativeRiskModelParams or financial input.
+ * @param riskInput - Optional historical score time-series for legacy calls.
+ * @param inequalityInput - Optional file debts and category counts for legacy calls.
+ * @param stochasticInput - Optional trajectory and CC values for legacy calls.
  * @returns Unified quantitative risk assessment.
  */
+export function evaluateQuantitativeRiskModel(
+    params: QuantitativeRiskModelParams,
+): QuantitativeRiskAssessment;
 export function evaluateQuantitativeRiskModel(
     financialInput: FinancialDebtInput,
     riskInput: QualityRiskInput,
     inequalityInput: InequalityInput,
     stochasticInput: StochasticInput,
+): QuantitativeRiskAssessment;
+export function evaluateQuantitativeRiskModel(
+    paramsOrFinancial: QuantitativeRiskModelParams | FinancialDebtInput,
+    riskInput?: QualityRiskInput,
+    inequalityInput?: InequalityInput,
+    stochasticInput?: StochasticInput,
 ): QuantitativeRiskAssessment {
-    const financial = computeFinancialDebtLedger(financialInput);
-    const riskRatios = computeQualityRiskRatios(riskInput);
-    const inequality = computeDebtInequality(inequalityInput);
-    const stochastic = computeStochasticDynamics(stochasticInput);
+    const isSingleObject =
+        paramsOrFinancial &&
+        typeof paramsOrFinancial === 'object' &&
+        'financial' in paramsOrFinancial &&
+        'risk' in paramsOrFinancial &&
+        'inequality' in paramsOrFinancial &&
+        'stochastic' in paramsOrFinancial;
+
+    const financialInputResolved = isSingleObject
+        ? (paramsOrFinancial as QuantitativeRiskModelParams).financial
+        : (paramsOrFinancial as FinancialDebtInput);
+    const riskInputResolved = isSingleObject
+        ? (paramsOrFinancial as QuantitativeRiskModelParams).risk
+        : (riskInput as QualityRiskInput);
+    const inequalityInputResolved = isSingleObject
+        ? (paramsOrFinancial as QuantitativeRiskModelParams).inequality
+        : (inequalityInput as InequalityInput);
+    const stochasticInputResolved = isSingleObject
+        ? (paramsOrFinancial as QuantitativeRiskModelParams).stochastic
+        : (stochasticInput as StochasticInput);
+
+    const financial = computeFinancialDebtLedger(financialInputResolved);
+    const riskRatios = computeQualityRiskRatios(riskInputResolved);
+    const inequality = computeDebtInequality(inequalityInputResolved);
+    const stochastic = computeStochasticDynamics(stochasticInputResolved);
     return {
         financial,
         riskRatios,

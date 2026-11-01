@@ -283,5 +283,20 @@ describe('Quantitative Risk Model Engine', () => {
             expect(assessment.temporalResilience).toBe(assessment.riskRatios);
             expect(assessment.spatialDispersion).toBe(assessment.inequality);
         });
+
+        it('should evaluate full aggregate model via consolidated parameter object (SIM-ARGS-001)', () => {
+            const assessment = evaluateQuantitativeRiskModel({
+                financial: { totalRemediationMinutes: 240, refactoringYieldMinutes: 60, debtAccrualMinutes: 30 },
+                risk: { historyScores: [95, 96, 94, 95, 97, 96] },
+                inequality: { fileDebts: [2, 5, 1, 10], ruleCategoryCounts: { CPX: 5, SEC: 3 } },
+                stochastic: { historyScores: [95, 96, 94, 95, 97, 96], complexityValues: [4, 5, 3, 6, 4] },
+            });
+
+            expect(assessment.financial.status).toBe('de-leveraging');
+            expect(assessment.financial.rcr).toBe(assessment.financial.interestCoverageRatio);
+            expect(assessment.financial.clearanceStatus).toBe('active-clearing');
+            expect(assessment.riskRatios.isSampleSufficient).toBe(true);
+            expect(assessment.stochastic.ehl).toBe(assessment.stochastic.halfLifeCommits);
+        });
     });
 });
