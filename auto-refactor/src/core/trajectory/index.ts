@@ -27,3 +27,4 @@ export * from './quality-efficiency-engine';
 export * from './compact-ledger-store';
 export * from './trajectory-compactor';
 export * from './trajectory-accumulator';
+export * from './timeline-projector';

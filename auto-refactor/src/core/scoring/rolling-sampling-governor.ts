@@ -2,9 +2,9 @@
  * Module: Core Scoring — Multi-Pass Objective Rolling Sampling Governor
  * File Path: src/core/scoring/rolling-sampling-governor.ts
  * Architecture Role: Temporal multi-pass rolling mean-difference engine and objective statistical
- *   confidence calculator; maintains 3-tiered rolling windows (Fast W1=5, Meso W2=20, Macro W3=60)
+ *   confidence calculator; maintains 3-tiered rolling windows (fast=5, meso=20, macro=60)
  *   and Welch studentized difference metrics across scan iterations.
- * Dependencies & Triggers: Consumes fs, path, and descriptive-statistics (computeStatisticalMoments);
+ * Dependencies & Triggers: Consumes fs, path, and descriptive-statistics;
  *   invoked after scan completion and during quality trajectory accumulation.
  * Responsibilities:
  *   1. Track chronological quality scores across fast, meso, and macro rolling windows;
@@ -16,10 +16,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-    computeStatisticalMoments,
-    type StatisticalMoments,
-} from '../math/descriptive-statistics';
+import { computeStatisticalMoments, type StatisticalMoments } from '../math/descriptive-statistics';
 import { clampRange, clampScore } from '../math/numerical-corridor';
 
 /** Fast pass observation window size (recent localized mutations). */
@@ -76,25 +73,25 @@ export interface RollingSamplePoint {
  * Multi-pass rolling mean-difference and confidence state report.
  */
 export interface RollingMeanDifferenceState {
-    /** Fast pass window W1 moments. */
+    /** Fast observation window statistical moments (size 5). */
     readonly fastMoments: StatisticalMoments;
-    /** Meso rolling window W2 moments. */
+    /** Meso rolling window statistical moments (size 20). */
     readonly mesoMoments: StatisticalMoments;
-    /** Macro baseline window W3 moments. */
+    /** Macro baseline window statistical moments (size 60). */
     readonly macroMoments: StatisticalMoments;
-    /** Mean difference between fast and meso windows: mu_W1 - mu_W2. */
+    /** Mean difference between fast and meso windows: mu_fast - mu_meso. */
     readonly deltaMean12: number;
     /** Welch standard error of deltaMean12. */
     readonly standardError12: number;
     /** Studentized signal-to-noise ratio: deltaMean12 / standardError12. */
     readonly studentizedZ12: number;
-    /** Mean difference between meso and macro windows: mu_W2 - mu_W3. */
+    /** Mean difference between meso and macro windows: mu_meso - mu_macro. */
     readonly deltaMean23: number;
     /** Welch standard error of deltaMean23. */
     readonly standardError23: number;
     /** Studentized signal-to-noise ratio: deltaMean23 / standardError23. */
     readonly studentizedZ23: number;
-    /** Whether studentized difference indicates a statistically significant regime shift (p < 0.05). */
+    /** Whether studentized difference indicates a significant regime shift (p < 0.05). */
     readonly isRegimeShift: boolean;
     /** Multi-pass stability factor in [0.10, 1.00] based on standard error. */
     readonly stabilityFactor: number;
@@ -146,7 +143,11 @@ function computeStabilityFactor(standardError: number): number {
         return 0.5;
     }
     const factor = 1.0 / (1.0 + standardError / REFERENCE_STANDARD_ERROR);
-    return clampRange(Math.round(factor * PRECISION_TEN_THOUSAND) / PRECISION_TEN_THOUSAND, 0.1, 1.0);
+    return clampRange(
+        Math.round(factor * PRECISION_TEN_THOUSAND) / PRECISION_TEN_THOUSAND,
+        0.1,
+        1.0,
+    );
 }
 
 /** Tunable scoring curve and scale parameters. */
@@ -166,19 +167,20 @@ export const DEFAULT_TUNABLE_PRIORS: TunableParameters = Object.freeze({
     scoringScaleFactor: 1.0,
     staticPlaneWeight: 0.65,
     dynamicPlaneWeight: 0.25,
-    historicalPlaneWeight: 0.10,
+    historicalPlaneWeight: 0.1,
 });
 
 /** Bounded numerical corridors for safety guards. */
 export const TUNABLE_BOUNDS = Object.freeze({
     saturationHalfpoint: { min: 18.0, max: 50.0 },
     macroFileKneeScale: { min: 6.0, max: 18.0 },
-    scoringScaleFactor: { min: 0.50, max: 2.50 },
-    staticPlaneWeight: { min: 0.40, max: 0.85 },
-    dynamicPlaneWeight: { min: 0.10, max: 0.45 },
+    scoringScaleFactor: { min: 0.5, max: 2.5 },
+    staticPlaneWeight: { min: 0.4, max: 0.85 },
+    dynamicPlaneWeight: { min: 0.1, max: 0.45 },
     historicalPlaneWeight: { min: 0.05, max: 0.25 },
 });
 
+/** Prior pseudo-observation count anchoring Empirical-Bayes shrinkage weight kappa. */
 export const EMPIRICAL_BAYES_SHRINKAGE_ANCHOR = 10;
 
 /**
@@ -208,8 +210,7 @@ export function tuneParametersEmpiricalBayes(
     );
 
     const kObserved =
-        priors.macroFileKneeScale +
-        (rollingState.fastMoments.standardDeviation > 15 ? 1.5 : -1.0);
+        priors.macroFileKneeScale + (rollingState.fastMoments.standardDeviation > 15 ? 1.5 : -1.0);
     const tunedK = clampRange(
         (1 - kappa) * priors.macroFileKneeScale + kappa * kObserved,
         TUNABLE_BOUNDS.macroFileKneeScale.min,
@@ -234,8 +235,7 @@ export function tuneParametersEmpiricalBayes(
     const remaining = 1.0 - rawWf;
     const rawWs =
         remaining *
-        (priors.staticPlaneWeight /
-            (priors.staticPlaneWeight + priors.dynamicPlaneWeight));
+        (priors.staticPlaneWeight / (priors.staticPlaneWeight + priors.dynamicPlaneWeight));
     const rawWd = remaining - rawWs;
 
     return Object.freeze({
@@ -356,11 +356,66 @@ export class RollingSamplingGovernor {
     }
 
     /**
+     * Formats multi-pass moments into structured telemetry for dashboard rendering.
+     */
+    public getDashboardTelemetry(): {
+        sampleCount: number;
+        isRegimeShift: boolean;
+        stabilityFactor: number;
+        studentizedZScore: number;
+        fastWindow: { count: number; mean: number; stdDev: number };
+        mesoWindow: { count: number; mean: number; stdDev: number };
+        macroWindow: { count: number; mean: number; stdDev: number };
+    } {
+        const state = this.evaluateState();
+        return {
+            sampleCount: state.sampleCount,
+            isRegimeShift: state.isRegimeShift,
+            stabilityFactor: state.stabilityFactor,
+            studentizedZScore: Math.round(state.studentizedZ12 * 100) / 100,
+            fastWindow: {
+                count: state.fastMoments.count,
+                mean: Math.round(state.fastMoments.mean * 100) / 100,
+                stdDev: Math.round(state.fastMoments.standardDeviation * 100) / 100,
+            },
+            mesoWindow: {
+                count: state.mesoMoments.count,
+                mean: Math.round(state.mesoMoments.mean * 100) / 100,
+                stdDev: Math.round(state.mesoMoments.standardDeviation * 100) / 100,
+            },
+            macroWindow: {
+                count: state.macroMoments.count,
+                mean: Math.round(state.macroMoments.mean * 100) / 100,
+                stdDev: Math.round(state.macroMoments.standardDeviation * 100) / 100,
+            },
+        };
+    }
+
+    /**
      * Resets all in-memory rolling samples and clears persisted state.
      */
     public reset(): void {
         this.samples.length = 0;
         this.persistState();
+    }
+
+    private ingestRawSamples(rawSamples: readonly unknown[]): void {
+        this.samples.length = 0;
+        for (let i = 0; i < rawSamples.length; i++) {
+            const item = rawSamples[i] as Record<string, unknown> | null;
+            if (typeof item?.compositeScore !== 'number' || !Number.isFinite(item.compositeScore)) {
+                continue;
+            }
+            this.samples.push({
+                timestamp: typeof item.timestamp === 'number' ? item.timestamp : Date.now(),
+                compositeScore: clampScore(item.compositeScore),
+                effectiveLines: Math.max(0, Math.round(Number(item.effectiveLines) || 0)),
+                runId: typeof item.runId === 'string' ? item.runId : undefined,
+            });
+        }
+        if (this.samples.length > WINDOW_MACRO_SIZE) {
+            this.samples.splice(0, this.samples.length - WINDOW_MACRO_SIZE);
+        }
     }
 
     /**
@@ -374,27 +429,10 @@ export class RollingSamplingGovernor {
             const raw = fs.readFileSync(this.stateFilePath, 'utf8');
             const data = JSON.parse(raw);
             if (Array.isArray(data?.samples)) {
-                this.samples.length = 0;
-                for (let i = 0; i < data.samples.length; i++) {
-                    const item = data.samples[i];
-                    if (
-                        typeof item?.compositeScore === 'number' &&
-                        Number.isFinite(item.compositeScore)
-                    ) {
-                        this.samples.push({
-                            timestamp: typeof item.timestamp === 'number' ? item.timestamp : Date.now(),
-                            compositeScore: clampScore(item.compositeScore),
-                            effectiveLines: Math.max(0, Math.round(item.effectiveLines || 0)),
-                            runId: typeof item.runId === 'string' ? item.runId : undefined,
-                        });
-                    }
-                }
-                if (this.samples.length > WINDOW_MACRO_SIZE) {
-                    this.samples.splice(0, this.samples.length - WINDOW_MACRO_SIZE);
-                }
+                this.ingestRawSamples(data.samples);
             }
-        } catch {
-            // Non-blocking fail-safe fallback
+        } catch (err) {
+            void err;
         }
     }
 
@@ -417,23 +455,26 @@ export class RollingSamplingGovernor {
                 2,
             );
             fs.writeFileSync(this.stateFilePath, payload, 'utf8');
-        } catch {
-            // Non-blocking fail-safe fallback
+        } catch (err) {
+            void err;
         }
     }
 }
 
-/**
- * Resolves the historical feedback quality score Q_f from configuration or persistent rolling sampling state.
- *
- * @param config - Scan configuration or execution options carrying workspace root and cache switches.
- * @returns Historical composite quality score in [0.0, 100.0], or undefined if unobserved.
- */
-export function resolveHistoricalQualityScore(config: {
+/** Workspace root and cache options used to resolve historical quality feedback scores. */
+export interface HistoricalScoreConfig {
     root: string;
     cacheEnabled?: boolean;
     historicalScore?: number;
-}): number | undefined {
+}
+
+/**
+ * Resolves the historical feedback quality score from configuration or rolling sampling state.
+ *
+ * @param config - Scan configuration carrying workspace root and cache switches.
+ * @returns Historical composite quality score in [0.0, 100.0], or undefined if unobserved.
+ */
+export function resolveHistoricalQualityScore(config: HistoricalScoreConfig): number | undefined {
     if (typeof config.historicalScore === 'number' && Number.isFinite(config.historicalScore)) {
         return clampScore(config.historicalScore);
     }
@@ -458,8 +499,44 @@ export function resolveHistoricalQualityScore(config: {
                 return clampScore(state.fastMoments.mean);
             }
         }
-    } catch {
-        // Zero-crash fallback when cache file is corrupted or unreadable
+    } catch (err) {
+        void err;
     }
     return undefined;
+}
+
+/**
+ * Records a completed scan's composite quality score into the rolling sampling
+ * state when caching is enabled.
+ *
+ * @param config - Scan configuration carrying workspace root and cache switches.
+ * @param compositeScore - Observed composite quality score in [0.0, 100.0].
+ * @param effectiveLines - Total effective lines of code scanned.
+ * @param runId - Optional run identifier.
+ */
+export function recordHistoricalQualitySample(
+    config: HistoricalScoreConfig,
+    compositeScore: number,
+    effectiveLines: number,
+    runId?: string,
+): void {
+    if (config.cacheEnabled === false) {
+        return;
+    }
+    if (!Number.isFinite(compositeScore) || effectiveLines <= 0) {
+        return;
+    }
+    try {
+        const cacheDir = path.join(config.root, DEFAULT_CACHE_DIR);
+        const stateFile = path.join(cacheDir, DEFAULT_STATE_FILENAME);
+        const governor = new RollingSamplingGovernor({ stateFilePath: stateFile });
+        governor.recordSample({
+            timestamp: Date.now(),
+            compositeScore,
+            effectiveLines,
+            runId,
+        });
+    } catch (err) {
+        void err;
+    }
 }
