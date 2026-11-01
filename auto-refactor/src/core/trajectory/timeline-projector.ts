@@ -270,7 +270,7 @@ async function readArchiveChunksReverse(
             if (!outcome.isValid) malformedCount++;
         }
     } catch {
-        // Tolerant on archive I/O failure
+        // Ignored: tolerate archive I/O failure on non-critical read
     } finally {
         if (fileHandle) {
             await fileHandle.close().catch(() => {});
@@ -320,7 +320,7 @@ async function readActiveLedgerReverse(
             }
         }
     } catch {
-        // Tolerant on active read error
+        // Ignored: tolerate active ledger read error on non-critical scan
     }
 
     return { reachedCutoff: false, earliestTimestamp, malformedCount };
