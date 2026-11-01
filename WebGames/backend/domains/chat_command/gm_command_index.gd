@@ -58,11 +58,11 @@ func record_usage(command_name: String) -> void:
 
 ## 最近命令窗口条目数（facade: 供测试断言与状态自检读取）
 func recent_count() -> int:
-	return _recent_commands.size()
+	return maxi(0, _recent_commands.size())
 
 ## 页缓冲池已用容量（facade: 供池化健康度监控与测试断言读取）
 func page_pool_size() -> int:
-	return _page_pool.size()
+	return maxi(0, _page_pool.size())
 
 ## 查询补全页：前缀过滤「最近窗口」，窗口为空时回退默认命令目录；
 ## 返回的 entries 来自回收页缓冲池（同一次查询内的数组对象会被后续查询复用）。

@@ -131,26 +131,27 @@ static func _populate_dict_array(raw_val: Variant, target: Array[Dictionary]) ->
     target.clear()
     if not (raw_val is Array):
         return
-    var arr: Array = raw_val
-    for item in arr:
+    var cloned_arr: Array = (raw_val as Array).duplicate(true)
+    for item in cloned_arr:
         if item is Dictionary:
-            target.append((item as Dictionary).duplicate(true))
+            target.append(item as Dictionary)
 
 static func _populate_origins_array(raw_val: Variant, target: Array[Dictionary]) -> void:
     target.clear()
     if raw_val is Array:
-        for item in (raw_val as Array):
+        var cloned_arr: Array = (raw_val as Array).duplicate(true)
+        for item in cloned_arr:
             if item is Dictionary:
-                var entry: Dictionary = (item as Dictionary).duplicate(true)
+                var entry: Dictionary = item as Dictionary
                 _normalize_origin_entry(entry)
                 target.append(entry)
         return
     if raw_val is Dictionary:
-        var dict_val: Dictionary = raw_val
-        for orig_key in dict_val.keys():
-            var raw_entry: Variant = dict_val[orig_key]
+        var cloned_dict: Dictionary = (raw_val as Dictionary).duplicate(true)
+        for orig_key in cloned_dict.keys():
+            var raw_entry: Variant = cloned_dict[orig_key]
             if raw_entry is Dictionary:
-                var entry: Dictionary = (raw_entry as Dictionary).duplicate(true)
+                var entry: Dictionary = raw_entry as Dictionary
                 _normalize_origin_entry(entry, str(orig_key))
                 target.append(entry)
 
@@ -169,19 +170,20 @@ static func _normalize_origin_entry(entry: Dictionary, default_id: String = "") 
 static func _populate_traits_dict(raw_val: Variant, target: Dictionary) -> void:
     target.clear()
     if raw_val is Array:
-        for item in (raw_val as Array):
+        var cloned_arr: Array = (raw_val as Array).duplicate(true)
+        for item in cloned_arr:
             if item is Dictionary:
-                var d_item: Dictionary = (item as Dictionary).duplicate(true)
+                var d_item: Dictionary = item as Dictionary
                 var tid: String = str(d_item.get("trait_id", "")).strip_edges()
                 if not tid.is_empty():
                     _normalize_trait_dict(d_item)
                     target[tid] = d_item
     elif raw_val is Dictionary:
-        var dict_val: Dictionary = raw_val
-        for k in dict_val.keys():
-            var entry: Variant = dict_val[k]
+        var cloned_dict: Dictionary = (raw_val as Dictionary).duplicate(true)
+        for k in cloned_dict.keys():
+            var entry: Variant = cloned_dict[k]
             if entry is Dictionary:
-                var d_entry: Dictionary = (entry as Dictionary).duplicate(true)
+                var d_entry: Dictionary = entry as Dictionary
                 if not d_entry.has("trait_id"):
                     d_entry["trait_id"] = str(k)
                 _normalize_trait_dict(d_entry)
@@ -202,19 +204,20 @@ static func _normalize_trait_dict(d: Dictionary) -> void:
 static func _populate_starter_kits_dict(raw_val: Variant, target: Dictionary) -> void:
     target.clear()
     if raw_val is Array:
-        for item in (raw_val as Array):
+        var cloned_arr: Array = (raw_val as Array).duplicate(true)
+        for item in cloned_arr:
             if item is Dictionary:
-                var d_item: Dictionary = (item as Dictionary).duplicate(true)
+                var d_item: Dictionary = item as Dictionary
                 var kid: String = str(d_item.get("kit_id", "")).strip_edges()
                 if not kid.is_empty():
                     _normalize_kit_dict(d_item)
                     target[kid] = d_item
     elif raw_val is Dictionary:
-        var dict_val: Dictionary = raw_val
-        for k in dict_val.keys():
-            var entry: Variant = dict_val[k]
+        var cloned_dict: Dictionary = (raw_val as Dictionary).duplicate(true)
+        for k in cloned_dict.keys():
+            var entry: Variant = cloned_dict[k]
             if entry is Dictionary:
-                var d_entry: Dictionary = (entry as Dictionary).duplicate(true)
+                var d_entry: Dictionary = entry as Dictionary
                 if not d_entry.has("kit_id"):
                     d_entry["kit_id"] = str(k)
                 _normalize_kit_dict(d_entry)

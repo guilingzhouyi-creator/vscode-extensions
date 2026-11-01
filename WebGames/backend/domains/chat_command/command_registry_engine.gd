@@ -46,7 +46,7 @@ static func has_command(cmd_name: String) -> bool:
 
 ## 已注册指令总数（facade: 供测试断言与状态自检读取）
 static func registered_count() -> int:
-	return registered_commands.size()
+	return maxi(0, registered_commands.size())
 
 ## 指令分发：非指令/未知/权限不足逐级拦截后调用处理器
 static func dispatch_command(ast: ChatCommandParser.CommandAST, admin: AdminPermissionAggregate, context: Dictionary) -> Dictionary:

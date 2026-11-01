@@ -41,9 +41,7 @@ func reset_state() -> void:
 # 三、序列化与工厂方法
 # ==============================================================================
 func to_dto() -> Dictionary:
-	var choices_copy: Array[Dictionary] = []
-	for c in available_choices:
-		choices_copy.append(c.duplicate(true))
+	var choices_copy: Array[Dictionary] = available_choices.duplicate(true)
 	return {
 		"session_id": session_id,
 		"step_index": step_index,
@@ -66,9 +64,10 @@ static func from_dto(raw: Dictionary) -> AgentObservationPacketDTO:
 	dto.hydrated_text = str(raw.get("hydrated_text", ""))
 	var raw_choices: Variant = raw.get("available_choices", [])
 	if raw_choices is Array:
-		for c in (raw_choices as Array):
+		var cloned_choices: Array = (raw_choices as Array).duplicate(true)
+		for c in cloned_choices:
 			if c is Dictionary:
-				dto.available_choices.append((c as Dictionary).duplicate(true))
+				dto.available_choices.append(c as Dictionary)
 	var raw_snap: Variant = raw.get("character_snapshot", {})
 	if raw_snap is Dictionary:
 		dto.character_snapshot = (raw_snap as Dictionary).duplicate(true)

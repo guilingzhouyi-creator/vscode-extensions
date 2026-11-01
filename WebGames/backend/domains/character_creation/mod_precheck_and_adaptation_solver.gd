@@ -435,6 +435,21 @@ static func _check_pack_incompatibilities(
                 "启用包缺少前置依赖包: %s 需要 %s" % [dto.pack_id, dep_id]
             )
 
+static func _new_list() -> Array:
+    return []
+
+static func _record_dependencies(dto: DestinyModManifestDTO, dto_map: Dictionary, adj: Dictionary, in_degree: Dictionary) -> void:
+    for dep_id in dto.dependencies:
+        if dto_map.has(dep_id):
+            adj[dep_id].append(dto.pack_id)
+            in_degree[dto.pack_id] = in_degree[dto.pack_id] + 1
+
+static func _decrement_dependents(dependents: Array, in_degree: Dictionary, queue: Array[String]) -> void:
+    for v_pid in dependents:
+        in_degree[v_pid] = in_degree[v_pid] - 1
+        if in_degree[v_pid] == 0:
+            queue.append(v_pid)
+
 static func _topological_sort_manifests(
     manifests: Array[DestinyModManifestDTO],
     conflicts: Array[Dictionary]
@@ -449,13 +464,10 @@ static func _topological_sort_manifests(
     for dto in manifests:
         dto_map[dto.pack_id] = dto
         in_degree[dto.pack_id] = 0
-        adj[dto.pack_id] = []
+        adj[dto.pack_id] = _new_list()
 
     for dto in manifests:
-        for dep_id in dto.dependencies:
-            if dto_map.has(dep_id):
-                adj[dep_id].append(dto.pack_id)
-                in_degree[dto.pack_id] = in_degree[dto.pack_id] + 1
+        _record_dependencies(dto, dto_map, adj, in_degree)
 
     var queue: Array[String] = []
     for pid in in_degree.keys():
@@ -466,11 +478,8 @@ static func _topological_sort_manifests(
     while not queue.is_empty():
         var u_pid: String = queue.pop_front()
         sorted_out.append(dto_map[u_pid])
-        var dependents: Array = adj[u_pid]
-        for v_pid in dependents:
-            in_degree[v_pid] = in_degree[v_pid] - 1
-            if in_degree[v_pid] == 0:
-                queue.append(v_pid)
+        var dependents: Array = adj.get(u_pid, _new_list())
+        _decrement_dependents(dependents, in_degree, queue)
 
     if sorted_out.size() < manifests.size():
         _append_conflict(
