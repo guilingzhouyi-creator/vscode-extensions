@@ -39,8 +39,22 @@ const MAX_PREVIEW_ISSUES = 5;
 const PERCENT_MULTIPLIER = 100;
 const DEFAULT_PREVIEW_PRECISION = 1;
 
-const SEVERITY_WEIGHT_MAP = Object.freeze({ info: 0, warning: 1, error: 2 });
+const SEVERITY_INFO = 'info';
+const SEVERITY_WARNING = 'warning';
+const SEVERITY_ERROR = 'error';
+
+const SEVERITY_WEIGHT_MAP = Object.freeze({
+  [SEVERITY_INFO]: 0,
+  [SEVERITY_WARNING]: 1,
+  [SEVERITY_ERROR]: 2,
+});
 const DEFAULT_SEVERITY_WEIGHT = 2;
+
+const SMOKE_TARGET_SLICE = 'src/core/router/sparseMoEGate.ts';
+const SMOKE_MODE_MESSAGE = '--smoke mode: targeting default slice';
+const CLEAN_TREE_MESSAGE = 'clean working tree: 0 changed files, 100% bypass → PASS';
+const NO_SLICES_MESSAGE = 'no AST slices extracted from changes; 100% bypass → PASS';
+const ZERO_ANALYZERS_MESSAGE = '0 active analyzers required: 100% bypass → PASS';
 
 /**
  * Formats and writes standard output messages prefixed by gate name.
@@ -67,11 +81,11 @@ function logGateError(message) {
  */
 function getGitPrefix() {
   try {
-    const res = spawnSync('git', ['rev-parse', '--show-prefix'], {
+    const prefixResult = spawnSync('git', ['rev-parse', '--show-prefix'], {
       cwd: ROOT,
       encoding: 'utf8',
     });
-    return (res.stdout || '').trim().replace(/\\/g, '/');
+    return (prefixResult.stdout || '').trim().replace(/\\/g, '/');
   } catch {
     // best-effort: fallback to empty prefix when git rev-parse fails
     return '';
@@ -197,11 +211,11 @@ function getChangedLineNumbers(relPath, currentContent) {
 function getHeadContent(relPath) {
   try {
     const gitTarget = `${GIT_PREFIX}${relPath}`;
-    const res = spawnSync('git', ['show', `HEAD:${gitTarget}`], {
+    const showResult = spawnSync('git', ['show', `HEAD:${gitTarget}`], {
       cwd: ROOT,
       encoding: 'utf8',
     });
-    return res.status === 0 ? res.stdout : '';
+    return showResult.status === 0 ? showResult.stdout : '';
   } catch {
     // best-effort: fallback to empty content when git show fails
     return '';
@@ -241,12 +255,10 @@ function extractAllSlices(targetFiles, extractor) {
 function resolveTargetFiles(explicitFiles, isSmoke) {
   if (explicitFiles && explicitFiles.length > 0) return explicitFiles;
   if (isSmoke) {
-    logGate('--smoke mode: targeting default slice');
-    return ['src/core/router/sparseMoEGate.ts'];
+    logGate(SMOKE_MODE_MESSAGE);
+    return [SMOKE_TARGET_SLICE];
   }
-  const changed = getGitChangedFiles();
-  if (changed.length > 0) return changed;
-  return [];
+  return getGitChangedFiles();
 }
 
 function isIssueWithinSlices(issue, allSlices) {
@@ -338,12 +350,12 @@ function executeTargetedScan({ targetFiles, activeAnalyzers, severity, allSlices
     'warn',
   ];
 
-  const result = spawnSync(process.execPath, cliArgs, { cwd: ROOT, stdio: 'inherit' });
-  if (result.error) {
-    logGateError(`failed to launch CLI: ${result.error.message}`);
+  const scanProcessResult = spawnSync(process.execPath, cliArgs, { cwd: ROOT, stdio: 'inherit' });
+  if (scanProcessResult.error) {
+    logGateError(`failed to launch CLI: ${scanProcessResult.error.message}`);
     return EXIT_USAGE_ERROR;
   }
-  const exitCode = result.status === null ? EXIT_USAGE_ERROR : result.status;
+  const exitCode = scanProcessResult.status === null ? EXIT_USAGE_ERROR : scanProcessResult.status;
   reportBlockingSummary({ fileCount: targetFiles.length, severity, exitCode, allSlices });
   return exitCode;
 }
@@ -354,12 +366,12 @@ function executeTargetedScan({ targetFiles, activeAnalyzers, severity, allSlices
 async function main() {
   const cliArguments = process.argv.slice(2);
   const severityIndex = cliArguments.indexOf('--severity');
-  const severity = severityIndex >= 0 ? cliArguments[severityIndex + 1] : 'error';
+  const severity = severityIndex >= 0 ? cliArguments[severityIndex + 1] : SEVERITY_ERROR;
   const filesIndex = cliArguments.indexOf('--files');
   const explicitFiles = filesIndex >= 0 ? cliArguments[filesIndex + 1].split(',') : null;
   const isSmoke = cliArguments.includes('--smoke');
 
-  if (!['info', 'warning', 'error'].includes(severity)) {
+  if (![SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR].includes(severity)) {
     logGateError(`invalid --severity: ${severity}`);
     process.exit(EXIT_USAGE_ERROR);
   }
@@ -370,7 +382,7 @@ async function main() {
 
   const targetFiles = resolveTargetFiles(explicitFiles, isSmoke);
   if (targetFiles.length === 0) {
-    logGate('clean working tree: 0 changed files, 100% bypass → PASS');
+    logGate(CLEAN_TREE_MESSAGE);
     process.exit(EXIT_PASS);
   }
 
@@ -379,7 +391,7 @@ async function main() {
   const allSlices = extractAllSlices(targetFiles, new ASTSliceExtractor());
 
   if (allSlices.length === 0) {
-    logGate('no AST slices extracted from changes; 100% bypass → PASS');
+    logGate(NO_SLICES_MESSAGE);
     process.exit(EXIT_PASS);
   }
 
@@ -395,7 +407,7 @@ async function main() {
   );
 
   if (activeAnalyzers.length === 0) {
-    logGate('0 active analyzers required: 100% bypass → PASS');
+    logGate(ZERO_ANALYZERS_MESSAGE);
     process.exit(EXIT_PASS);
   }
 

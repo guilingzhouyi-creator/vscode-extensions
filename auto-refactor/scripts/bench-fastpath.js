@@ -28,48 +28,51 @@ process.env.NODE_PATH = path.join(ROOT, 'node_modules');
 require('module').Module._initPaths();
 
 const BENCH_ROOT = path.join(os.tmpdir(), 'ar-fp-bench');
-const LIGHT = path.join(BENCH_ROOT, 'light');
-const HEAVY = path.join(BENCH_ROOT, 'heavy');
+const LIGHT_CORPUS_DIR = path.join(BENCH_ROOT, 'light');
+const HEAVY_CORPUS_DIR = path.join(BENCH_ROOT, 'heavy');
 
 const ARGS = process.argv.slice(2);
-const CHECK = ARGS.includes('--check');
-const OXC = ARGS.includes('--oxc');
-const ITERS = parseInt(ARGS.find((a) => a.startsWith('--iters='))?.split('=')[1] || '5', 10);
-const CORPUS_ONLY = ARGS.find((a) => a.startsWith('--corpus='))?.split('=')[1] || 'both';
-const PARSER = OXC ? 'oxc' : 'typescript';
-const ADAPTER_MODULE = OXC ? 'oxcAdapter' : 'typescriptAdapter';
-const ADAPTER_CLASS = OXC ? 'OxcAdapter' : 'TypeScriptAdapter';
+const CHECK_MODE = ARGS.includes('--check');
+const USE_OXC = ARGS.includes('--oxc');
+const ITERATION_COUNT = parseInt(
+  ARGS.find((arg) => arg.startsWith('--iters='))?.split('=')[1] || '5',
+  10,
+);
+const CORPUS_SELECTION = ARGS.find((arg) => arg.startsWith('--corpus='))?.split('=')[1] || 'both';
+const PARSER_NAME = USE_OXC ? 'oxc' : 'typescript';
+const ADAPTER_MODULE = USE_OXC ? 'oxcAdapter' : 'typescriptAdapter';
+const ADAPTER_CLASS = USE_OXC ? 'OxcAdapter' : 'TypeScriptAdapter';
 
-function median(arr) {
-  const a = [...arr].sort((x, y) => x - y);
-  return a[Math.floor(a.length / 2)];
+function computeMedianTime(durationList) {
+  const sortedDurations = [...durationList].sort((itemA, itemB) => itemA - itemB);
+  return sortedDurations[Math.floor(sortedDurations.length / 2)];
 }
 
 // ---------------------------------------------------------------------------
 // --check: fixture equivalence gate
 // ---------------------------------------------------------------------------
 
-function normalize(r) {
-  const issues = r.issues
-    .map((x) => ({
-      id: x.id,
-      analyzer: x.analyzer,
-      rule: x.rule,
-      severity: x.severity,
-      message: x.message,
-      location: x.location,
-      detail: x.detail,
+function normalizeScanReport(rawReport) {
+  const issues = rawReport.issues
+    .map((issueItem) => ({
+      id: issueItem.id,
+      analyzer: issueItem.analyzer,
+      rule: issueItem.rule,
+      severity: issueItem.severity,
+      message: issueItem.message,
+      location: issueItem.location,
+      detail: issueItem.detail,
     }))
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const fileMetrics = r.fileMetrics
-    .map((m) => ({ ...m }))
-    .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
+    .sort((issueA, issueB) => (issueA.id < issueB.id ? -1 : issueA.id > issueB.id ? 1 : 0));
+  const fileMetrics = rawReport.fileMetrics
+    .map((metricItem) => ({ ...metricItem }))
+    .sort((metricA, metricB) => (metricA.file < metricB.file ? -1 : metricA.file > metricB.file ? 1 : 0));
   return JSON.stringify(
     {
-      filesScanned: r.summary.filesScanned,
-      issuesTotal: r.summary.issuesTotal,
-      byAnalyzer: r.summary.byAnalyzer,
-      bySeverity: r.summary.bySeverity,
+      filesScanned: rawReport.summary.filesScanned,
+      issuesTotal: rawReport.summary.issuesTotal,
+      byAnalyzer: rawReport.summary.byAnalyzer,
+      bySeverity: rawReport.summary.bySeverity,
       issues,
       fileMetrics,
     },
@@ -85,46 +88,46 @@ async function checkFixtures() {
     ['ModeA', path.join(fixturesDir, 'config-mode-a.json')],
     ['ModeB', path.join(fixturesDir, 'config-mode-b.json')],
   ];
-  let failed = 0;
-  for (const [label, cfg] of configs) {
-    const fullLabel = `${label}${OXC ? '-oxc' : ''}`;
-    const out0 = await scanOnce(scan, fixturesDir, cfg, '0');
-    const out1 = await scanOnce(scan, fixturesDir, cfg, '1');
-    const ok = out0 === out1;
-    if (!ok) failed++;
-    const n0 = JSON.parse(out0).issuesTotal;
-    const n1 = JSON.parse(out1).issuesTotal;
+  let failedCount = 0;
+  for (const [label, configPath] of configs) {
+    const fullLabel = `${label}${USE_OXC ? '-oxc' : ''}`;
+    const outputFastpathOff = await scanOnce(scan, fixturesDir, configPath, '0');
+    const outputFastpathOn = await scanOnce(scan, fixturesDir, configPath, '1');
+    const isEquivalent = outputFastpathOff === outputFastpathOn;
+    if (!isEquivalent) failedCount++;
+    const issuesTotalOff = JSON.parse(outputFastpathOff).issuesTotal;
+    const issuesTotalOn = JSON.parse(outputFastpathOn).issuesTotal;
     console.log(
-      `${ok ? '✔ PASS' : '✖ BLOCK'}  fixtures ${fullLabel}: fast=0 issues=${n0}  fast=1 issues=${n1}  byteIdentical=${ok}`,
+      `${isEquivalent ? '✔ PASS' : '✖ BLOCK'}  fixtures ${fullLabel}: fast=0 issues=${issuesTotalOff}  fast=1 issues=${issuesTotalOn}  byteIdentical=${isEquivalent}`,
     );
   }
   console.log(
-    failed === 0
-      ? `\nfastpath-check (${PARSER}): ALL FIXTURE CLASSES EQUIVALENT`
-      : `\nfastpath-check (${PARSER}): ${failed} FAILED`,
+    failedCount === 0
+      ? `\nfastpath-check (${PARSER_NAME}): ALL FIXTURE CLASSES EQUIVALENT`
+      : `\nfastpath-check (${PARSER_NAME}): ${failedCount} FAILED`,
   );
-  return failed === 0;
+  return failedCount === 0;
 }
 
-async function scanOnce(scan, root, configFile, fast) {
-  process.env.AR_FASTPATH = fast;
-  const r = await scan({
-    root,
-    configFile,
+async function scanOnce(scanFunction, targetRoot, configFilePath, fastpathFlag) {
+  process.env.AR_FASTPATH = fastpathFlag;
+  const scanReport = await scanFunction({
+    root: targetRoot,
+    configFile: configFilePath,
     workers: 1,
     format: 'json',
     logLevel: 'silent',
-    parser: PARSER,
+    parser: PARSER_NAME,
   });
-  return normalize(r);
+  return normalizeScanReport(scanReport);
 }
 
 // ---------------------------------------------------------------------------
 // default: dual-corpus multi-worker A/B benchmark
 // ---------------------------------------------------------------------------
 
-function writeBenchConfig(dir) {
-  const cfg = {
+function writeBenchConfig(targetDir) {
+  const benchmarkConfig = {
     format: 'json',
     failOnIssue: false,
     include: ['**/*.ts'],
@@ -156,210 +159,255 @@ function writeBenchConfig(dir) {
     respectGitignore: false,
     failOnAnalyzerError: false,
   };
-  fs.writeFileSync(path.join(dir, 'auto-refactor.config.json'), JSON.stringify(cfg, null, 2));
+  fs.writeFileSync(
+    path.join(targetDir, 'auto-refactor.config.json'),
+    JSON.stringify(benchmarkConfig, null, 2),
+  );
 }
 
-function lightFile(i) {
-  const seed = i % 7;
-  const parts = [
-    `import { foo } from './dep${i % 13}';`,
-    `export interface Opts${i} { mode: string; limit: number; flag?: boolean }`,
+function generateLightFileContent(fileIndex) {
+  const seedValue = fileIndex % 7;
+  const contentParts = [
+    `import { foo } from './dep${fileIndex % 13}';`,
+    `export interface Opts${fileIndex} { mode: string; limit: number; flag?: boolean }`,
   ];
-  for (let k = 0; k < 8; k++) {
-    parts.push(`export function fn${i}_${k}(x: number, y: string): number {`);
-    parts.push(`  let acc = ${seed};`);
-    parts.push(`  if (x > ${k}) { for (let j = 0; j < 4; j++) { acc += x * j ? 0 : 0; } }`);
-    parts.push(`  switch (x) { case 1: acc++; break; case 2: acc--; break; default: acc += 2; }`);
-    parts.push(`  const msg = "token ${seed}"; if (y === msg) acc += 1;`);
-    parts.push(`  return acc > 0 ? acc : -acc;`);
-    parts.push(`}`);
-  }
-  return parts.join('\n') + '\n';
-}
-
-function heavyFile(i) {
-  const parts = [`import { helper } from './dep${i % 17}';`];
-  const seed = i * 31 + 7;
-  for (let k = 0; k < 14; k++) {
-    const a = (k * 7 + seed) % 1000;
-    const b = (k * 13 + seed * 3) % 1000;
-    const c = (k * 17 + seed * 5) % 1000;
-    const s = `"str token ${k} of ${i}"`;
-    parts.push(`export function fn${i}_${k}(x: number, y: string): number {`);
-    parts.push(`  let acc = ${seed % 1000};`);
-    parts.push(`  if (x > ${a}) {`);
-    parts.push(`    acc += ${a};`);
-    parts.push(`    if (x > ${b}) { acc -= ${b}; } else { acc += ${b}; }`);
-    parts.push(`  }`);
-    parts.push(`  for (let j = 0; j < ${(k % 5) + 2}; j++) {`);
-    parts.push(`    acc += j * ${c};`);
-    parts.push(`    if (j > 2 && y === ${s}) { acc -= ${c}; }`);
-    parts.push(`  }`);
-    parts.push(`  while (acc > 100000) { acc -= 1000; }`);
-    parts.push(`  const msg = ${s};`);
-    parts.push(
-      `  switch (acc % 4) { case 0: acc += ${a}; break; case 1: acc -= ${b}; break; default: acc += 1; }`,
+  for (let stepIndex = 0; stepIndex < 8; stepIndex++) {
+    contentParts.push(
+      `export function fn${fileIndex}_${stepIndex}(paramX: number, paramY: string): number {`,
     );
-    parts.push(`  return acc > 0 ? acc : -acc;`);
-    parts.push(`}`);
+    contentParts.push(`  let accumulator = ${seedValue};`);
+    contentParts.push(
+      `  if (paramX > ${stepIndex}) { for (let loopIdx = 0; loopIdx < 4; loopIdx++) { accumulator += paramX * loopIdx ? 0 : 0; } }`,
+    );
+    contentParts.push(
+      `  switch (paramX) { case 1: accumulator++; break; case 2: accumulator--; break; default: accumulator += 2; }`,
+    );
+    contentParts.push(
+      `  const tokenMessage = "token ${seedValue}"; if (paramY === tokenMessage) accumulator += 1;`,
+    );
+    contentParts.push(`  return accumulator > 0 ? accumulator : -accumulator;`);
+    contentParts.push(`}`);
   }
-  return parts.join('\n') + '\n';
+  return contentParts.join('\n') + '\n';
 }
 
-function buildCorpus(dir, gen, count) {
+function generateHeavyFileContent(fileIndex) {
+  const contentParts = [`import { helper } from './dep${fileIndex % 17}';`];
+  const seedValue = fileIndex * 31 + 7;
+  for (let stepIndex = 0; stepIndex < 14; stepIndex++) {
+    const coeffA = (stepIndex * 7 + seedValue) % 1000;
+    const coeffB = (stepIndex * 13 + seedValue * 3) % 1000;
+    const coeffC = (stepIndex * 17 + seedValue * 5) % 1000;
+    const stringLiteral = `"str token ${stepIndex} of ${fileIndex}"`;
+    contentParts.push(
+      `export function fn${fileIndex}_${stepIndex}(paramX: number, paramY: string): number {`,
+    );
+    contentParts.push(`  let accumulator = ${seedValue % 1000};`);
+    contentParts.push(`  if (paramX > ${coeffA}) {`);
+    contentParts.push(`    accumulator += ${coeffA};`);
+    contentParts.push(
+      `    if (paramX > ${coeffB}) { accumulator -= ${coeffB}; } else { accumulator += ${coeffB}; }`,
+    );
+    contentParts.push(`  }`);
+    contentParts.push(`  for (let loopIdx = 0; loopIdx < ${(stepIndex % 5) + 2}; loopIdx++) {`);
+    contentParts.push(`    accumulator += loopIdx * ${coeffC};`);
+    contentParts.push(`    if (loopIdx > 2 && paramY === ${stringLiteral}) { accumulator -= ${coeffC}; }`);
+    contentParts.push(`  }`);
+    contentParts.push(`  while (accumulator > 100000) { accumulator -= 1000; }`);
+    contentParts.push(`  const tokenMessage = ${stringLiteral};`);
+    contentParts.push(
+      `  switch (accumulator % 4) { case 0: accumulator += ${coeffA}; break; case 1: accumulator -= ${coeffB}; break; default: accumulator += 1; }`,
+    );
+    contentParts.push(`  return accumulator > 0 ? accumulator : -accumulator;`);
+    contentParts.push(`}`);
+  }
+  return contentParts.join('\n') + '\n';
+}
+
+function buildCorpus(targetDir, fileGenerator, targetCount) {
   try {
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(targetDir, { recursive: true, force: true });
   } catch {
     try {
-      fs.renameSync(dir, path.join(os.tmpdir(), `ar-stale-${path.basename(dir)}-${Date.now()}`));
+      fs.renameSync(
+        targetDir,
+        path.join(os.tmpdir(), `ar-stale-${path.basename(targetDir)}-${Date.now()}`),
+      );
     } catch {
       /* ignore */
     }
   }
-  fs.mkdirSync(dir, { recursive: true });
-  for (let i = 0; i < count; i++) fs.writeFileSync(path.join(dir, `f${i}.ts`), gen(i));
-  writeBenchConfig(dir);
-  let total = 0;
-  let n = 0;
-  for (let i = 0; i < count; i += 25) {
-    total += fs.statSync(path.join(dir, `f${i}.ts`)).size;
-    n++;
+  fs.mkdirSync(targetDir, { recursive: true });
+  for (let fileIdx = 0; fileIdx < targetCount; fileIdx++) {
+    fs.writeFileSync(path.join(targetDir, `f${fileIdx}.ts`), fileGenerator(fileIdx));
   }
-  return Math.round(total / n);
+  writeBenchConfig(targetDir);
+  let totalBytes = 0;
+  let sampleCount = 0;
+  for (let fileIdx = 0; fileIdx < targetCount; fileIdx += 25) {
+    totalBytes += fs.statSync(path.join(targetDir, `f${fileIdx}.ts`)).size;
+    sampleCount++;
+  }
+  return Math.round(totalBytes / sampleCount);
 }
 
-function runScan(dir, fast) {
-  const t0 = performance.now();
-  const r = spawnSync(
+function runScan(targetDir, fastpathMode) {
+  const startTime = performance.now();
+  const processResult = spawnSync(
     process.execPath,
     [
       '-e',
       `
     const { scan } = require(${JSON.stringify(path.join(ROOT, 'dist', 'api'))});
-    scan({ root: ${JSON.stringify(dir)}, configFile: ${JSON.stringify(path.join(dir, 'auto-refactor.config.json'))}, workers: 4, format: 'json', logLevel: 'silent', parser: ${JSON.stringify(PARSER)} })
+    scan({ root: ${JSON.stringify(targetDir)}, configFile: ${JSON.stringify(path.join(targetDir, 'auto-refactor.config.json'))}, workers: 4, format: 'json', logLevel: 'silent', parser: ${JSON.stringify(PARSER_NAME)} })
       .then((rep) => process.stdout.write(JSON.stringify({ files: rep.summary.filesScanned, issues: rep.summary.issuesTotal })))
       .catch((e) => { console.error(e); process.exit(1); });
   `,
     ],
-    { env: { ...process.env, AR_FASTPATH: fast }, cwd: ROOT, encoding: 'utf8' },
+    { env: { ...process.env, AR_FASTPATH: fastpathMode }, cwd: ROOT, encoding: 'utf8' },
   );
-  if (r.status !== 0) throw new Error(`scan failed (AR_FASTPATH=${fast}): ${r.stderr}`);
-  return { wall: performance.now() - t0, summary: r.stdout.trim() };
+  if (processResult.status !== 0) {
+    throw new Error(`scan failed (AR_FASTPATH=${fastpathMode}): ${processResult.stderr}`);
+  }
+  return { wall: performance.now() - startTime, summary: processResult.stdout.trim() };
 }
 
-/** In-process per-file table: parse+runStreaming vs project+runStreamingProjected. */
-function perFileTable(dir, label) {
-  const content = fs.readFileSync(path.join(dir, 'f0.ts'), 'utf8');
-  const { [ADAPTER_CLASS]: AdapterCls } = require(path.join(ROOT, 'dist', 'core', ADAPTER_MODULE));
-  const { runStreaming, runStreamingProjected, FileMetricCollector, tryCreateProjector } = require(
-    path.join(ROOT, 'dist', 'core', 'traverse'),
-  );
+function buildStreamingEntries(contextHelper) {
   const { ConstantsAnalyzer } = require(path.join(ROOT, 'dist', 'analyzers', 'constants'));
   const { LargeFileAnalyzer } = require(path.join(ROOT, 'dist', 'analyzers', 'largeFile'));
   const { ComplexityAnalyzer } = require(path.join(ROOT, 'dist', 'analyzers', 'complexity'));
-  const { countLineStats } = require(path.join(ROOT, 'dist', 'utils', 'linestats'));
+  const { FileMetricCollector } = require(path.join(ROOT, 'dist', 'core', 'traverse'));
 
-  const adapter = new AdapterCls();
-  const cfg = { failOnAnalyzerError: false };
-  const lineStats = countLineStats(content);
-  const mkCtx = (o) => ({
-    filePath: 'f0.ts',
-    content,
-    root: null,
-    adapter,
-    config: cfg,
-    options: o,
-    lineStats,
-  });
-  // Fresh analyzer instances PER iteration — streaming analyzers accumulate visit state
-  // (constants' literals, complexity's issues), so sharing instances across iterations
-  // would inflate later iterations and skew the per-file numbers.
-  const buildEntries = () => [
+  return [
     {
       analyzer: new ConstantsAnalyzer(),
-      ctx: mkCtx({ magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 }),
+      ctx: contextHelper({
+        magicNumberMin: 2,
+        duplicateLiteralThreshold: 3,
+        hardcodedStringMinLength: 3,
+      }),
     },
     {
       analyzer: new LargeFileAnalyzer(),
-      ctx: mkCtx({ fileLinesWarn: 50, fileLinesFail: 100, fileFunctionsWarn: 5 }),
+      ctx: contextHelper({ fileLinesWarn: 50, fileLinesFail: 100, fileFunctionsWarn: 5 }),
     },
-    { analyzer: new ComplexityAnalyzer(), ctx: mkCtx({ complexityWarn: 5, complexityFail: 10 }) },
-    { analyzer: new FileMetricCollector(), ctx: mkCtx({}) },
+    {
+      analyzer: new ComplexityAnalyzer(),
+      ctx: contextHelper({ complexityWarn: 5, complexityFail: 10 }),
+    },
+    { analyzer: new FileMetricCollector(), ctx: contextHelper({}) },
   ];
-  const names = ['constants', 'large-file', 'complexity'];
-  process.env.AR_FASTPATH = '1';
-  const N = 60;
-  for (let k = 0; k < 3; k++) {
-    const ast = adapter.parse(content, 'f0.ts');
-    runStreaming(adapter, ast.root, buildEntries());
-  }
-  for (let k = 0; k < 3; k++) {
-    const p = tryCreateProjector(adapter, content, 'f0.ts', names, 0);
-    runStreamingProjected(p, buildEntries());
-  }
-  const t0 = performance.now();
-  for (let k = 0; k < N; k++) {
-    const ast = adapter.parse(content, 'f0.ts');
-    runStreaming(adapter, ast.root, buildEntries());
-  }
-  const mat = (performance.now() - t0) / N;
-  const t1 = performance.now();
-  for (let k = 0; k < N; k++) {
-    const p = tryCreateProjector(adapter, content, 'f0.ts', names, 0);
-    runStreamingProjected(p, buildEntries());
-  }
-  const proj = (performance.now() - t1) / N;
-  const delta = ((proj - mat) / mat) * 100;
-  console.log(
-    `  ${label.padEnd(8)} ${String(content.length).padStart(6)}B  mat=${mat.toFixed(3)}ms  proj=${proj.toFixed(3)}ms  Δ=${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`,
-  );
-  return { mat, proj, delta };
 }
-async function benchCorpus(dir, label, count) {
-  const times = { 0: [], 1: [] };
-  for (let k = 0; k < ITERS; k++) {
-    for (const mode of [k % 2 === 0 ? '0' : '1', k % 2 === 0 ? '1' : '0']) {
-      const { wall, summary } = runScan(dir, mode);
-      times[mode].push(wall);
+
+/** In-process per-file table: parse+runStreaming vs project+runStreamingProjected. */
+function perFileTable(targetDir, corpusLabel) {
+  const fileContent = fs.readFileSync(path.join(targetDir, 'f0.ts'), 'utf8');
+  const { [ADAPTER_CLASS]: AdapterCls } = require(path.join(ROOT, 'dist', 'core', ADAPTER_MODULE));
+  const { runStreaming, runStreamingProjected, tryCreateProjector } = require(
+    path.join(ROOT, 'dist', 'core', 'traverse'),
+  );
+  const { countLineStats } = require(path.join(ROOT, 'dist', 'utils', 'linestats'));
+
+  const adapterInstance = new AdapterCls();
+  const scanConfig = { failOnAnalyzerError: false };
+  const lineStats = countLineStats(fileContent);
+  const makeContext = (options) => ({
+    filePath: 'f0.ts',
+    content: fileContent,
+    root: null,
+    adapter: adapterInstance,
+    config: scanConfig,
+    options,
+    lineStats,
+  });
+
+  const analyzerNames = ['constants', 'large-file', 'complexity'];
+  process.env.AR_FASTPATH = '1';
+  const sampleIterations = 60;
+
+  for (let warmupIdx = 0; warmupIdx < 3; warmupIdx++) {
+    const ast = adapterInstance.parse(fileContent, 'f0.ts');
+    runStreaming(adapterInstance, ast.root, buildStreamingEntries(makeContext));
+    const projector = tryCreateProjector(adapterInstance, fileContent, 'f0.ts', analyzerNames, 0);
+    runStreamingProjected(projector, buildStreamingEntries(makeContext));
+  }
+
+  const startTimeMaterialized = performance.now();
+  for (let runIdx = 0; runIdx < sampleIterations; runIdx++) {
+    const ast = adapterInstance.parse(fileContent, 'f0.ts');
+    runStreaming(adapterInstance, ast.root, buildStreamingEntries(makeContext));
+  }
+  const meanMaterializedMs = (performance.now() - startTimeMaterialized) / sampleIterations;
+
+  const startTimeProjected = performance.now();
+  for (let runIdx = 0; runIdx < sampleIterations; runIdx++) {
+    const projector = tryCreateProjector(adapterInstance, fileContent, 'f0.ts', analyzerNames, 0);
+    runStreamingProjected(projector, buildStreamingEntries(makeContext));
+  }
+  const meanProjectedMs = (performance.now() - startTimeProjected) / sampleIterations;
+  const deltaPercent = ((meanProjectedMs - meanMaterializedMs) / meanMaterializedMs) * 100;
+
+  console.log(
+    `  ${corpusLabel.padEnd(8)} ${String(fileContent.length).padStart(6)}B  mat=${meanMaterializedMs.toFixed(3)}ms  proj=${meanProjectedMs.toFixed(3)}ms  Δ=${deltaPercent >= 0 ? '+' : ''}${deltaPercent.toFixed(1)}%`,
+  );
+  return { mat: meanMaterializedMs, proj: meanProjectedMs, delta: deltaPercent };
+}
+
+async function benchCorpus(targetDir, corpusLabel, fileCount) {
+  const collectedTimes = { 0: [], 1: [] };
+  for (let iterIdx = 0; iterIdx < ITERATION_COUNT; iterIdx++) {
+    for (const mode of [iterIdx % 2 === 0 ? '0' : '1', iterIdx % 2 === 0 ? '1' : '0']) {
+      const { wall, summary } = runScan(targetDir, mode);
+      collectedTimes[mode].push(wall);
       process.stderr.write(
-        `  [${label}] round ${k + 1} AR_FASTPATH=${mode}: ${wall.toFixed(1)}ms (${summary})\n`,
+        `  [${corpusLabel}] round ${iterIdx + 1} AR_FASTPATH=${mode}: ${wall.toFixed(1)}ms (${summary})\n`,
       );
     }
   }
-  const m0 = median(times['0']);
-  const m1 = median(times['1']);
-  const delta = ((m1 - m0) / m0) * 100;
-  console.log(`\n[bench-fastpath] ${label} (${count} files, w4, ${ITERS} interleaved runs):`);
+  const medianFastpathOff = computeMedianTime(collectedTimes['0']);
+  const medianFastpathOn = computeMedianTime(collectedTimes['1']);
+  const deltaPercent = ((medianFastpathOn - medianFastpathOff) / medianFastpathOff) * 100;
   console.log(
-    `  AR_FASTPATH=0 median: ${m0.toFixed(1)}ms   AR_FASTPATH=1 median: ${m1.toFixed(1)}ms   Δ=${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`,
+    `\n[bench-fastpath] ${corpusLabel} (${fileCount} files, w4, ${ITERATION_COUNT} interleaved runs):`,
   );
-  return { m0, m1, delta };
+  console.log(
+    `  AR_FASTPATH=0 median: ${medianFastpathOff.toFixed(1)}ms   AR_FASTPATH=1 median: ${medianFastpathOn.toFixed(1)}ms   Δ=${deltaPercent >= 0 ? '+' : ''}${deltaPercent.toFixed(1)}%`,
+  );
+  return { m0: medianFastpathOff, m1: medianFastpathOn, delta: deltaPercent };
 }
 
 async function main() {
-  if (CHECK) {
-    const ok = await checkFixtures();
-    process.exit(ok ? 0 : 1);
+  if (CHECK_MODE) {
+    const isSuccess = await checkFixtures();
+    process.exit(isSuccess ? 0 : 1);
   }
 
-  const lightAvg = CORPUS_ONLY !== 'heavy' ? buildCorpus(LIGHT, lightFile, 1001) : null;
-  const heavyAvg = CORPUS_ONLY !== 'light' ? buildCorpus(HEAVY, heavyFile, 1001) : null;
-  if (lightAvg)
-    console.log(`[bench-fastpath] corpus light (${PARSER}): 1001 files, avg ~${lightAvg}B`);
-  if (heavyAvg)
-    console.log(`[bench-fastpath] corpus heavy (${PARSER}): 1001 files, avg ~${heavyAvg}B`);
+  const lightAvgBytes =
+    CORPUS_SELECTION !== 'heavy' ? buildCorpus(LIGHT_CORPUS_DIR, generateLightFileContent, 1001) : null;
+  const heavyAvgBytes =
+    CORPUS_SELECTION !== 'light' ? buildCorpus(HEAVY_CORPUS_DIR, generateHeavyFileContent, 1001) : null;
+  if (lightAvgBytes) {
+    console.log(`[bench-fastpath] corpus light (${PARSER_NAME}): 1001 files, avg ~${lightAvgBytes}B`);
+  }
+  if (heavyAvgBytes) {
+    console.log(`[bench-fastpath] corpus heavy (${PARSER_NAME}): 1001 files, avg ~${heavyAvgBytes}B`);
+  }
 
-  console.log(`\n[bench-fastpath] per-file (in-process, Mode B, ${PARSER}):`);
-  if (lightAvg) perFileTable(LIGHT, 'light');
-  if (heavyAvg) perFileTable(HEAVY, 'heavy');
+  console.log(`\n[bench-fastpath] per-file (in-process, Mode B, ${PARSER_NAME}):`);
+  if (lightAvgBytes) perFileTable(LIGHT_CORPUS_DIR, 'light');
+  if (heavyAvgBytes) perFileTable(HEAVY_CORPUS_DIR, 'heavy');
 
-  const out = {};
-  if (CORPUS_ONLY !== 'heavy') out.light = await benchCorpus(LIGHT, 'light', 1001);
-  if (CORPUS_ONLY !== 'light') out.heavy = await benchCorpus(HEAVY, 'heavy', 1001);
+  const benchmarkSummary = {};
+  if (CORPUS_SELECTION !== 'heavy') {
+    benchmarkSummary.light = await benchCorpus(LIGHT_CORPUS_DIR, 'light', 1001);
+  }
+  if (CORPUS_SELECTION !== 'light') {
+    benchmarkSummary.heavy = await benchCorpus(HEAVY_CORPUS_DIR, 'heavy', 1001);
+  }
   console.log('\n[bench-fastpath] DONE');
 }
 
-main().catch((e) => {
-  console.error(e);
+main().catch((errorInstance) => {
+  console.error(errorInstance);
   process.exit(1);
 });
