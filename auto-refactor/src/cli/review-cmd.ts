@@ -1,6 +1,6 @@
 /**
  * Module: CLI — Review Verdict Command
- * File Path: src/cli/reviewCmd.ts
+ * File Path: src/cli/review-cmd.ts
  * Architecture Role: The only sanctioned write path into the calibration corpus. Without it the
  *   corpus had a reader and no writer, so evidenced calibration was unreachable outside hand
  *   editing, and a reviewer's answer to a queued finding went nowhere. This command takes those
@@ -15,8 +15,8 @@
  *   3. Append the new verdicts, then rewrite the corpus from the complete ledger.
  * Exit Semantics & Design Rationale: Resolves to `{ code, text }` rather than calling process.exit,
  *   matching the other commands: 0 when verdicts were recorded or the queue held nothing pending, 1
- *   when the queue or ledger could not be read, 2 on a usage error. The corpus is NOT incremented in
- *   place — it is recomputed from the ledger every time, which is what makes the writer idempotent.
+ *   when the queue or ledger could not be read, 2 on a usage error. The corpus is NOT incremented
+ *   in place — it is recomputed from the ledger every time, making the writer idempotent.
  *   A caller who runs the same review twice gets the same posterior, not twice the evidence.
  *
  * The ledger is the source of truth and the corpus is a projection of it. The reverse arrangement
@@ -75,6 +75,9 @@ const FLAG_FILE = '--file';
 /** Flag name narrowing the answer to one line. */
 const FLAG_LINE = '--line';
 
+/** Flag name for the project root directory used to resolve default review paths. */
+const FLAG_ROOT = '--root';
+
 /** Flag that permits one answer to cover several distinct rules. */
 const FLAG_ANY_RULE = '--any-rule';
 
@@ -84,19 +87,32 @@ const FLAG_DRY_RUN = '--dry-run';
 /** Marker printed when the invocation answers the whole queue rather than one occurrence. */
 const ALL_PENDING = 'all';
 
-/** Default ledger file name, relative to the corpus directory. */
+/** Default trajectory directory relative to the project root. */
+const DIR_TRAJECTORY = '.refactor-trajectory';
+
+/** Default baselines directory relative to the project root. */
+const DIR_BASELINES = 'baselines';
+
+/** Default review queue file name inside the trajectory directory. */
+const DEFAULT_QUEUE_NAME = 'review-queue.ndjson';
+
+/** Default calibration corpus file name inside the baselines directory. */
+const DEFAULT_CORPUS_NAME = 'confidence-calibration.json';
+
+/** Default ledger file name, relative to the trajectory or corpus directory. */
 const DEFAULT_LEDGER_NAME = 'review-verdicts.json';
 
 /** Usage text shown for a malformed invocation. */
 const USAGE = [
-    'Usage: auto-refactor review --queue <queue.ndjson> --corpus <corpus.json> --verdict <true-positive|false-positive>',
+    'Usage: auto-refactor review --verdict <true-positive|false-positive> [--rule <id>] [options]',
     '',
     'Answers queued review findings and rewrites the calibration corpus from the verdict ledger.',
     '',
-    '  --queue <path>     NDJSON written by --review-queue',
-    '  --corpus <path>    Calibration corpus to rewrite (read by --confidence-corpus)',
-    '  --verdict <kind>   true-positive or false-positive',
-    '  --ledger <path>    Verdict ledger; defaults to review-verdicts.json beside the corpus',
+    '  --verdict <kind>   true-positive or false-positive (required)',
+    '  --root <dir>       Project root for default queue/ledger/corpus paths (defaults to cwd)',
+    '  --queue <path>     NDJSON written by --review-queue (defaults to <root>/.refactor-trajectory/review-queue.ndjson)',
+    '  --corpus <path>    Calibration corpus to rewrite (defaults to <root>/baselines/confidence-calibration.json)',
+    '  --ledger <path>    Verdict ledger (defaults to <root>/.refactor-trajectory/review-verdicts.json, or beside --corpus)',
     '  --rule <id>        Answer only this rule',
     '  --file <path>      Answer only this file',
     '  --line <n>         Answer only this line',
@@ -168,12 +184,21 @@ function readLineFlag(raw: string | undefined): number | undefined {
  * @returns The invocation, or a usage error string.
  */
 function resolveInvocation(args: readonly string[]): ReviewInvocation | string {
-    const queue = readFlag(args, FLAG_QUEUE);
-    const corpus = readFlag(args, FLAG_CORPUS);
     const verdict = readVerdict(readFlag(args, FLAG_VERDICT));
-    if (!queue) return 'missing --queue';
-    if (!corpus) return 'missing --corpus';
     if (!verdict) return 'missing or unrecognized --verdict';
+
+    const rootDir = readFlag(args, FLAG_ROOT) ?? process.cwd();
+    const explicitQueue = readFlag(args, FLAG_QUEUE);
+    const explicitCorpus = readFlag(args, FLAG_CORPUS);
+    const explicitLedger = readFlag(args, FLAG_LEDGER);
+    const queue = explicitQueue ?? path.join(rootDir, DIR_TRAJECTORY, DEFAULT_QUEUE_NAME);
+    const corpus = explicitCorpus ?? path.join(rootDir, DIR_BASELINES, DEFAULT_CORPUS_NAME);
+    const ledger =
+        explicitLedger ??
+        (explicitCorpus
+            ? path.join(path.dirname(explicitCorpus), DEFAULT_LEDGER_NAME)
+            : path.join(rootDir, DIR_TRAJECTORY, DEFAULT_LEDGER_NAME));
+
     const line = readLineFlag(readFlag(args, FLAG_LINE));
     if (readFlag(args, FLAG_LINE) !== undefined && line === undefined) {
         return '--line must be a positive integer';
@@ -181,7 +206,7 @@ function resolveInvocation(args: readonly string[]): ReviewInvocation | string {
     return {
         queue,
         corpus,
-        ledger: readFlag(args, FLAG_LEDGER),
+        ledger,
         verdict,
         rule: readFlag(args, FLAG_RULE),
         file: readFlag(args, FLAG_FILE)?.replace(/\\/g, '/'),

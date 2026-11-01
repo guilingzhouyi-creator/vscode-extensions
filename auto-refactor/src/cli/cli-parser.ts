@@ -82,7 +82,9 @@ auto-tune:autoTuneScale
 profile:showProfile
 score:showScore
 memory:memory
-record-trajectory:recordTrajectory`;
+record-trajectory:recordTrajectory
+fast:fastMode
+fast-mode:fastMode`;
 
 /** Compact definition table for standalone flags mapping to [property, booleanValue]. */
 const STANDALONE_FLAG_MAP_DEF = `no-cache:cache:false
@@ -499,63 +501,63 @@ export function parseArgs(argv: string[]): CliOptions {
 const CLI_USAGE_HELP_TEXT = `auto-refactor — automated code-refactoring analyzer (declarative, pluggable)
 
 Usage:
-  auto-refactor scan [options]       Run static analysis and quality review on source files
-  auto-refactor self-test            Run known-violation fixture corpus to verify all analyzers
-  auto-refactor review --queue <f> --corpus <f> --verdict <tp|fp>  Answer queued findings
-  auto-refactor daemon start|stop|status [--root <dir>]  Manage background acceleration daemon
-  auto-refactor symbols <name> [--root <dir>]            Inspect definitions, calls and cross-file usages
-  auto-refactor guide <file> [--domain <d>] [--line <l>] Query agent guardrails and active rule guidance
-  auto-refactor trajectory [<file>|--summary]            Inspect global review ledger or file revision history
-  auto-refactor memory                                  Inspect active review memory and cache capacity
-  auto-refactor stats [--root <dir>]                     Compute code volume, LOC, ELOC and density dashboard
-  auto-refactor gate [--stage <stage>] [--root <dir>]    Evaluate composite quality gate thresholds
+    auto-refactor scan [options]       Run static analysis and quality review on source files
+    auto-refactor self-test            Run known-violation fixture corpus to verify all analyzers
+    auto-refactor review --queue <f> --corpus <f> --verdict <tp|fp>  Answer queued findings
+    auto-refactor daemon start|stop|status [--root <dir>]  Manage background acceleration daemon
+    auto-refactor symbols <name> [--root <dir>]            Inspect definitions, calls and cross-file usages
+    auto-refactor guide <file> [--domain <d>] [--line <l>] Query agent guardrails and active rule guidance
+    auto-refactor trajectory [<file>|--summary] [--since <dur>] [--bucket <h|d|commit|agent>] Inspect multi-scale review ledger & timeline
+    auto-refactor memory                                  Inspect active review memory and cache capacity
+    auto-refactor stats [--root <dir>]                     Compute code volume, LOC, ELOC and density dashboard
+    auto-refactor gate [--stage <stage>] [--root <dir>]    Evaluate composite quality gate thresholds
 
 Options:
-  --root <dir>                 Root directory to scan (default: cwd)
-  --include <glob>            Include glob (repeatable / comma-separated)
-  --exclude <glob|dir>        Exclude glob or directory name (repeatable)
-  --analyzers <a,b,c>         Allow-list by name (built-in or custom). Declared but
-                              unlisted analyzers are disabled for this run.
-  --format <json|sarif|text|agent|capp|compact|praxis|aas>  Output format (default: text)
-  --out <file>                Write report to a file instead of stdout
-  --fail-on-issue             Exit non-zero if any 'error' issue (CI gate)
-  --fail-on-severity <lvl>    Exit non-zero if any issue >= lvl (info|warning|error); with a
-                              baseline, applies to NEW issues only (generalizes --fail-on-issue)
-  --baseline-granularity <g>  Baseline ratchet comparison: id (exact issue id) | grouped
-                              (analyzer|rule|file counts — tolerant to line shifts)
-  --review-queue <file>       Write the human review queue as NDJSON: only the findings no
-                              automated tier could settle (runtime-dependent or uncalibrated)
-  --confidence-corpus <file>  Per-rule outcome counts that turn confidence into a calibrated
-                              posterior; omitted, every score stays the analyzer's self-report
-  --fail-on-analyzer-error    Treat analyzer crashes as 'error' (can fail CI)
-  --config <file>             Path to auto-refactor.config.json (declarative registry)
-  --log-level <lvl>           silent|error|warn|info|debug (default: info; stderr)
-  --log-file <file>           Also append logs to this file
-  --concurrency <n>           Max files analyzed in parallel (single-process mode; default: min(4, cpus))
-  --workers <n>               Worker threads for parse+analyze (0=auto default: scales with file count, 1=in-process, N=threads)
-  --parser <typescript|oxc>   TS/JS-family parser: typescript (default) or oxc (Rust oxc-parser, byte-equivalent output)
-  --respect-gitignore         Honor a root .gitignore when discovering files (default: on)
-  --no-respect-gitignore      Ignore .gitignore and only apply --exclude
-  --cache / --no-cache        Two-level incremental cache (default: on for CLI; validate/benchmark use --no-cache)
-  --cache-dir <dir>           Cache directory (default: <root>/.auto-refactor-cache)
-  --cache-clear               Delete the project cache directory before scanning
-  --cache-custom              Enable L2 caching even with custom analyzers (hashes module content)
-  --daemon                    Auto-start the daemon if missing, then warm-scan (watch/CI warm-up)
-  --no-daemon                 Never connect to the daemon (pure cold scan)
-  --comment-level <level>      Leveled comment audit: off | basic | standard | strict (default: standard)
-  --security-level <level>     Leveled security audit: off | basic | full (default: basic)
-  --effective-loc <size>      Effective Code Lines (ECL) budget (e.g. 800, 1k, 2.5k, 50k; default: 800)
-  --file-lines-warn <size>    Physical line warning threshold (supports 800, 1k, 2k, etc.)
-  --auto-tune                 Enable scale-adaptive dynamic threshold and option tuning
-  --profile [<profile>]       Display stack profile, or select review profile (frontend|backend|composite)
-  --review-profile <profile>  Explicit quality review profile: frontend | backend | composite
-  --score                     Output multi-dimensional quality assessment and Tri-Plane vectors
-  --record-trajectory         Persist review score and ELOC counters into .refactor-trajectory ledger
-  --telemetry <file>          Ingest dynamic runtime telemetry profile (DynamicEvidenceDTO JSON)
-  --fix                       Automatically apply guaranteed codemod fixes in-place
-  --fix-dry-run               Compute and display unified diffs without modifying files
-  --fix-rules <rules>         Comma-separated list of rule IDs to restrict auto-fixing
-  --help, -h                  Show this help
+    --root <dir>                 Root directory to scan (default: cwd)
+    --include <glob>            Include glob (repeatable / comma-separated)
+    --exclude <glob|dir>        Exclude glob or directory name (repeatable)
+    --analyzers <a,b,c>         Allow-list by name (built-in or custom). Declared but
+                                unlisted analyzers are disabled for this run.
+    --format <json|sarif|text|agent|capp|compact|praxis|aas>  Output format (default: text)
+    --out <file>                Write report to a file instead of stdout
+    --fail-on-issue             Exit non-zero if any 'error' issue (CI gate)
+    --fail-on-severity <lvl>    Exit non-zero if any issue >= lvl (info|warning|error); with a
+                                baseline, applies to NEW issues only (generalizes --fail-on-issue)
+    --baseline-granularity <g>  Baseline ratchet comparison: id (exact issue id) | grouped
+                                (analyzer|rule|file counts — tolerant to line shifts)
+    --review-queue <file>       Write the human review queue as NDJSON: only the findings no
+                                automated tier could settle (runtime-dependent or uncalibrated)
+    --confidence-corpus <file>  Per-rule outcome counts that turn confidence into a calibrated
+                                posterior; omitted, every score stays the analyzer's self-report
+    --fail-on-analyzer-error    Treat analyzer crashes as 'error' (can fail CI)
+    --config <file>             Path to auto-refactor.config.json (declarative registry)
+    --log-level <lvl>           silent|error|warn|info|debug (default: info; stderr)
+    --log-file <file>           Also append logs to this file
+    --concurrency <n>           Max files analyzed in parallel (single-process mode; default: min(4, cpus))
+    --workers <n>               Worker threads for parse+analyze (0=auto default: scales with file count, 1=in-process, N=threads)
+    --parser <typescript|oxc>   TS/JS-family parser: typescript (default) or oxc (Rust oxc-parser, byte-equivalent output)
+    --respect-gitignore         Honor a root .gitignore when discovering files (default: on)
+    --no-respect-gitignore      Ignore .gitignore and only apply --exclude
+    --cache / --no-cache        Two-level incremental cache (default: on for CLI; validate/benchmark use --no-cache)
+    --cache-dir <dir>           Cache directory (default: <root>/.auto-refactor-cache)
+    --cache-clear               Delete the project cache directory before scanning
+    --cache-custom              Enable L2 caching even with custom analyzers (hashes module content)
+    --daemon                    Auto-start the daemon if missing, then warm-scan (watch/CI warm-up)
+    --no-daemon                 Never connect to the daemon (pure cold scan)
+    --comment-level <level>      Leveled comment audit: off | basic | standard | strict (default: standard)
+    --security-level <level>     Leveled security audit: off | basic | full (default: basic)
+    --effective-loc <size>      Effective Code Lines (ECL) budget (e.g. 800, 1k, 2.5k, 50k; default: 800)
+    --file-lines-warn <size>    Physical line warning threshold (supports 800, 1k, 2k, etc.)
+    --auto-tune                 Enable scale-adaptive dynamic threshold and option tuning
+    --profile [<profile>]       Display stack profile, or select review profile (frontend|backend|composite)
+    --review-profile <profile>  Explicit quality review profile: frontend | backend | composite
+    --score                     Output multi-dimensional quality assessment and Tri-Plane vectors
+    --record-trajectory         Persist review score and ELOC counters into .refactor-trajectory ledger
+    --telemetry <file>          Ingest dynamic runtime telemetry profile (DynamicEvidenceDTO JSON)
+    --fix                       Automatically apply guaranteed codemod fixes in-place
+    --fix-dry-run               Compute and display unified diffs without modifying files
+    --fix-rules <rules>         Comma-separated list of rule IDs to restrict auto-fixing
+    --help, -h                  Show this help
 `;
 
 /** Print the CLI usage banner and available flags to stdout. */

@@ -33,25 +33,25 @@ import {
     scanAndRender,
     querySymbols,
     queryAgentConstraints,
-    getChangeTrajectory,
     getReviewMemory,
     scan,
     type ScanReport,
 } from './api';
 import { resolveConfig } from './core/config/config';
-import { DAEMON_SUBCOMMAND, parseArgs, printUsage, type CliOptions } from './cli/cli-parser';
-import { defaultPatchEngine, PatchEngine, type FixDescriptor } from './core/codemod';
+import { DAEMON_SUBCOMMAND, parseArgs, printUsage } from './cli/cli-parser';
 import {
-    TrajectoryAccumulator,
     readLifetimeSummary,
     recordToVector,
     computeTrajectoryQualityMetrics,
 } from './core/trajectory';
+import { ALL_QUALITY_DIMENSIONS } from './core/scoring/scoringTypes';
 import { evaluateCompositeGate, type GateStage } from './core/praxis/composite-quality-gate';
 import { CacheStore } from './core/cache';
 import { daemonCommand } from './cli/daemonCmd';
 import { selfTestCommand } from './cli/selfTestCmd';
 import { reviewCommand } from './cli/review-cmd';
+import { handleFixWorkflow } from './cli/fix-cmd';
+import { trajectoryCommand } from './cli/trajectory-cmd';
 import { analyzeCodeDensity } from './core/intelligence/code-density-analyzer';
 import {
     buildDebtLedger,
@@ -80,35 +80,19 @@ const FLAG_ROOT = '--root';
 const FLAG_DOMAIN = '--domain';
 const FLAG_LINE = '--line';
 const FLAG_STAGE = '--stage';
-const FLAG_SUMMARY = '--summary';
-const FLAG_SUMMARY_SHORT = '-s';
 
 /** Scoring, threshold and weight constants */
 const SCORE_MAX = 100.0;
 const SCORE_GATE_FAIL = 80.0;
-const SCORE_INITIAL_FIX_BASELINE = 98.0;
-const SCORE_FIX_INCREMENT_PER_APPLIED = 0.1;
-const RECENT_RUNS_WINDOW = 3;
-const RESOLVED_POINTS_PER_APPLIED = 2;
-const RESOLVED_POINTS_STATIC_PASS = 10;
-const ADDED_POINTS_PER_REGRESSION = 5;
-const LOC_TO_EQUIV_RATIO = 1.37;
-const MILLION_DIVISOR = 1000000;
+const DYNAMIC_GATE_FLOOR = 80.0;
 
 /** String literals and operational constants */
-const LOG_LEVEL_SILENT = 'silent';
 const LOG_LEVEL_WARN = 'warn';
+const LOG_LEVEL_SILENT = 'silent';
 const KIND_PAD_WIDTH = 9;
 const PERCENTAGE_FACTOR = 100;
 const DEFAULT_DILUTION_RATIO = '1.00';
 const TRAJECTORY_DIR_NAME = '.refactor-trajectory';
-const LIFETIME_SUMMARY_FILE = 'lifetime.summary.json';
-const ACTIVE_RUNS_FILE = 'active-runs.ndjson';
-const MODE_DRY_RUN = 'DRY-RUN';
-const MODE_IN_PLACE = 'IN-PLACE';
-const DEFAULT_AGENT_REVISION = 'codemod';
-const DEFAULT_AGENT_NAME = 'codemod-fix';
-const DIFF_CHANGED_MULTIPLIER = 3;
 const STATUS_OK = 'ok';
 const STATUS_FAILED = 'FAILED';
 const DEFAULT_GATE_STAGE: GateStage = 'pre-commit';
@@ -116,7 +100,6 @@ const DEFAULT_STATIC_ERROR_ID = 'STATIC_ERROR';
 const CONFIG_FILE_NAME = 'auto-refactor.config.json';
 const PROJECT_SUBDIR_NAME = 'auto-refactor';
 const SEVERITY_ERROR = 'error';
-const SCORE_VECTOR_LENGTH = 10;
 
 /**
  * Asynchronously checks if a path exists without blocking the event loop.
@@ -231,140 +214,16 @@ function handleGuideCommand(args: string[]): void {
 }
 
 /**
- * Prints recent active run trajectory records from persistent ndjson log.
- *
- * @param activeRunsFile Path to active-runs.ndjson log file.
- */
-async function printRecentActiveRuns(activeRunsFile: string): Promise<void> {
-    if (!(await checkPathExists(activeRunsFile))) return;
-    const rawContent = await fs.promises.readFile(activeRunsFile, 'utf8');
-    const raw = rawContent.trim().split('\n').filter(Boolean);
-    const recent = raw.slice(-RECENT_RUNS_WINDOW);
-    if (recent.length === 0) return;
-    process.stdout.write(`\nRecent Active Runs (last ${recent.length}):\n`);
-    for (const line of recent) {
-        try {
-            const runRecord = JSON.parse(line);
-            const dateStr = new Date(runRecord.t).toISOString();
-            process.stdout.write(
-                `  • [${dateStr}] Rev ${runRecord.rev} (${runRecord.mod}): Score ${runRecord.score.aft} | QED ${runRecord.score.qed} | Proc ${runRecord.eloc.proc} ELOC [Gate: ${runRecord.gate.code}]\n`,
-            );
-        } catch {
-            /* ignored: malformed ndjson log entry */
-        }
-    }
-}
-
-/**
- * Reads and prints lifetime refactoring trajectory summary metrics.
- *
- * @param customRoot Optional custom repository root path override.
- */
-async function printLedgerSummary(customRoot?: string): Promise<void> {
-    const baseDir = customRoot ? path.resolve(customRoot) : process.cwd();
-    let ledgerDir = path.join(baseDir, TRAJECTORY_DIR_NAME);
-    if (!(await checkPathExists(ledgerDir))) {
-        const sub = path.join(baseDir, PROJECT_SUBDIR_NAME, TRAJECTORY_DIR_NAME);
-        if (await checkPathExists(sub)) {
-            ledgerDir = sub;
-        }
-    }
-    const lifetimeFile = path.join(ledgerDir, LIFETIME_SUMMARY_FILE);
-    const activeRunsFile = path.join(ledgerDir, ACTIVE_RUNS_FILE);
-
-    if (!(await checkPathExists(lifetimeFile))) {
-        process.stdout.write(`\nNo persistent refactoring ledger found at ${ledgerDir}\n`);
-        process.exit(0);
-    }
-
-    try {
-        const lifetimeContent = await fs.promises.readFile(lifetimeFile, 'utf8');
-        const lifetime = JSON.parse(lifetimeContent);
-        const equivLoc = (
-            (lifetime.eloc.processedTotal * LOC_TO_EQUIV_RATIO) /
-            MILLION_DIVISOR
-        ).toFixed(2);
-        process.stdout.write(`\n=== Workspace Refactoring Trajectory & Review Ledger ===\n`);
-        process.stdout.write(`Total Audit Runs       : ${lifetime.totalRuns}\n`);
-        process.stdout.write(
-            `Processed Code (ELOC)  : ${lifetime.eloc.processedTotal.toLocaleString()} lines (~${equivLoc}M equivalent LOC)\n`,
-        );
-        process.stdout.write(
-            `Unique Code Baseline   : ${lifetime.eloc.uniqueTotal.toLocaleString()} ELOC\n`,
-        );
-        process.stdout.write(
-            `Changed Code Audited   : ${lifetime.eloc.changedTotal.toLocaleString()} ELOC (Semantic: ${lifetime.eloc.semanticTotal.toLocaleString()})\n`,
-        );
-        process.stdout.write(
-            `Quality Efficiency QED : ${lifetime.qed.mean} [min: ${lifetime.qed.min}, max: ${lifetime.qed.max}]\n`,
-        );
-        process.stdout.write(
-            `Technical Debt Balance : Added ${lifetime.debt.totalAdded} | Resolved ${lifetime.debt.totalResolved} (Net Yield: ${lifetime.debt.netYield} pts/kELOC)\n`,
-        );
-        process.stdout.write(
-            `Mean Composite Score   : ${lifetime.meanCompositeScore} / 100 [Gate Pass Rate: ${lifetime.gatePassRate}%]\n`,
-        );
-
-        await printRecentActiveRuns(activeRunsFile);
-        process.stdout.write(`========================================================\n\n`);
-        process.exit(0);
-    } catch (err: unknown) {
-        process.stderr.write(`Failed to read trajectory summary: ${String(err)}\n`);
-        process.exit(1);
-    }
-}
-
-/**
- * Prints historical refactoring trajectory entries for an individual target file.
- *
- * @param targetFile Relative path to the target file.
- */
-function printFileTrajectory(targetFile: string): void {
-    const traj = getChangeTrajectory(targetFile);
-    if (!traj || traj.revisions.length === 0) {
-        process.stdout.write(`No historical trajectory recorded for ${targetFile}\n`);
-        process.exit(0);
-    }
-    process.stdout.write(`\n=== Change Trajectory: ${targetFile} ===\n`);
-    process.stdout.write(
-        `Total Revisions: ${traj.totalRevisions} | Agents: ${traj.participatingAgents.join(', ')}\n`,
-    );
-    for (const revision of traj.revisions) {
-        const score = revision.qualityScore?.compositeScore;
-        const scoreText = typeof score === 'number' && Number.isFinite(score) ? score : 'N/A';
-        process.stdout.write(
-            `  • [${new Date(revision.timestamp).toISOString()}] Rev ${revision.revisionId.slice(0, REVISION_ID_DISPLAY_LENGTH)} by Agent: ${revision.agentUid} | Score: ${scoreText}\n`,
-        );
-    }
-    if (traj.activeAnomalies.length > 0) {
-        process.stdout.write(`Active Anomalies:\n`);
-        for (const anomaly of traj.activeAnomalies) {
-            process.stdout.write(`  ⚠️ [${anomaly.kind}] ${anomaly.message}\n`);
-        }
-    }
-    process.stdout.write(`========================================\n\n`);
-    process.exit(0);
-}
-
-/**
  * Dispatches the `trajectory` subcommand to query ledger or file history.
  *
  * @param args CLI arguments array.
  */
 async function handleTrajectoryCommand(args: string[]): Promise<void> {
-    const rawTarget = args[args.indexOf(CMD_TRAJECTORY) + 1];
-    const isSummary =
-        !rawTarget ||
-        rawTarget === FLAG_SUMMARY ||
-        rawTarget === FLAG_SUMMARY_SHORT ||
-        rawTarget.startsWith('--');
-    if (isSummary) {
-        const rootIdx = args.indexOf(FLAG_ROOT);
-        const customRoot = rootIdx !== -1 && args[rootIdx + 1] ? args[rootIdx + 1] : undefined;
-        await printLedgerSummary(customRoot);
-        return;
+    const result = await trajectoryCommand(args);
+    if (result.text) {
+        process.stdout.write(result.text + '\n');
     }
-    printFileTrajectory(rawTarget);
+    process.exit(result.code);
 }
 
 /**
@@ -499,133 +358,6 @@ function handleMemoryCommand(args: string[] = []): void {
     process.stdout.write(`Max In-Memory Capacity: ${stats.maxFiles}\n`);
     process.stdout.write(`============================\n\n`);
     process.exit(0);
-}
-
-function getOrCreateFixList(
-    fixesByFile: Map<string, FixDescriptor[]>,
-    file: string,
-): FixDescriptor[] {
-    let existing = fixesByFile.get(file);
-    if (!existing) {
-        existing = [];
-        fixesByFile.set(file, existing);
-    }
-    return existing;
-}
-
-/**
- * Executes automated AST codemod repairs for actionable scan findings.
- *
- * @param cli - Parsed command-line options including fix flags.
- * @returns Exit code 0 on successful repair completion.
- */
-async function handleFixWorkflow(cli: CliOptions): Promise<number> {
-    const report = await scan(cli);
-    const fixesByFile = new Map<string, FixDescriptor[]>();
-
-    for (const issue of report.issues) {
-        const fix = PatchEngine.issueToFix(issue);
-        if (fix) {
-            getOrCreateFixList(fixesByFile, issue.location.file).push(fix);
-        }
-    }
-
-    if (fixesByFile.size === 0) {
-        process.stdout.write(
-            '[auto-refactor] No automated codemod fixes available for detected issues.\n',
-        );
-        return 0;
-    }
-
-    const rootDir = cli.root || process.cwd();
-    let totalApplied = 0;
-    let totalSkipped = 0;
-
-    process.stdout.write(
-        `\n=== Automated Codemod Repair (${cli.fixDryRun ? MODE_DRY_RUN : MODE_IN_PLACE}) ===\n`,
-    );
-
-    for (const [relPath, fixes] of fixesByFile.entries()) {
-        const fullPath = path.resolve(rootDir, relPath);
-        if (!(await checkPathExists(fullPath))) continue;
-
-        const content = await fs.promises.readFile(fullPath, 'utf8');
-        const patchApplyResult = defaultPatchEngine.applyFixes(fullPath, content, fixes, {
-            dryRun: cli.fixDryRun,
-            rules: cli.fixRules,
-        });
-
-        if (patchApplyResult.appliedFixCount > 0) {
-            totalApplied += patchApplyResult.appliedFixCount;
-            totalSkipped += patchApplyResult.skippedConflictCount;
-            if (patchApplyResult.unifiedDiff) {
-                process.stdout.write(patchApplyResult.unifiedDiff + '\n');
-            }
-        }
-    }
-
-    process.stdout.write(
-        `[auto-refactor] Fix summary: ${totalApplied} applied, ${totalSkipped} conflicts skipped across ${fixesByFile.size} files.\n\n`,
-    );
-
-    await recordCodemodTrajectory(rootDir, fixesByFile, totalApplied, cli);
-
-    return 0;
-}
-
-/**
- * Records an automated codemod repair run into the persistent trajectory ledger.
- */
-async function recordCodemodTrajectory(
-    rootDir: string,
-    fixesByFile: Map<string, FixDescriptor[]>,
-    totalApplied: number,
-    cli: CliOptions,
-): Promise<void> {
-    if (cli.fixDryRun || totalApplied === 0) return;
-    try {
-        const trajectoryDir = path.join(rootDir, TRAJECTORY_DIR_NAME);
-        if (!(await checkPathExists(trajectoryDir))) return;
-
-        const accumulator = new TrajectoryAccumulator(trajectoryDir);
-        const modifiedFilesList = [];
-        for (const relPath of fixesByFile.keys()) {
-            const fullPath = path.resolve(rootDir, relPath);
-            if (await checkPathExists(fullPath)) {
-                modifiedFilesList.push({
-                    filePath: relPath,
-                    content: await fs.promises.readFile(fullPath, 'utf8'),
-                });
-            }
-        }
-        const resolvedPoints = totalApplied * RESOLVED_POINTS_PER_APPLIED;
-        const maybeRevision = (cli as Record<string, unknown>).revision;
-        await accumulator.recordAuditRun({
-            runId: `fix-${Date.now()}`,
-            revision: maybeRevision
-                ? String(maybeRevision).slice(0, REVISION_ID_DISPLAY_LENGTH)
-                : DEFAULT_AGENT_REVISION,
-            module: path.basename(rootDir),
-            agent: DEFAULT_AGENT_NAME,
-            timestamp: Date.now(),
-            scannedFiles: modifiedFilesList,
-            beforeScore: SCORE_INITIAL_FIX_BASELINE,
-            afterScore: Math.min(
-                SCORE_MAX,
-                SCORE_INITIAL_FIX_BASELINE + totalApplied * SCORE_FIX_INCREMENT_PER_APPLIED,
-            ),
-            resolvedDebtPoints: resolvedPoints,
-            addedDebtPoints: 0,
-            regressionFindingsCount: 0,
-            diffCounters: {
-                changed: totalApplied * DIFF_CHANGED_MULTIPLIER,
-                semantic: totalApplied * 2,
-                modified: totalApplied,
-            },
-        });
-    } catch (err: unknown) {
-        void err;
-    }
 }
 
 async function handleScanCommand(args: string[]): Promise<number> {
@@ -772,7 +504,10 @@ function resolveGateScores(
         currentScore = scanResult.qualityScore.compositeScore;
     }
     const beforeScore = historicalBeforeScore ?? currentScore;
-    let scoreVector = Array(SCORE_VECTOR_LENGTH).fill(currentScore);
+    // The vector length comes from the canonical dimension list rather than a local literal: a
+    // second copy of the number would keep producing ten-element vectors after the model grew an
+    // eleventh axis, and the shortfall would read as an unmeasured dimension instead of a bug.
+    let scoreVector = Array(ALL_QUALITY_DIMENSIONS.length).fill(currentScore);
     if (scanResult.qualityScore?.indices) {
         scoreVector = recordToVector(scanResult.qualityScore.indices);
     }
@@ -794,8 +529,6 @@ async function executeGateScan(root: string): Promise<{
 async function resolveGateDebtDelta(
     root: string,
     issues: ScanReport['issues'],
-    staticPass: boolean,
-    regressionCount: number,
 ): Promise<{ resolvedDebtPoints: number; addedDebtPoints: number }> {
     const sigPath = path.join(root, TRAJECTORY_DIR_NAME, 'baseline-signatures.json');
     if (await checkPathExists(sigPath)) {
@@ -803,10 +536,11 @@ async function resolveGateDebtDelta(
             const raw = await fs.promises.readFile(sigPath, 'utf8');
             const parsed = JSON.parse(raw) as { files?: Record<string, unknown> };
             if (parsed && typeof parsed.files === 'object') {
-                const { debtByTier } = buildDebtLedger(issues || []);
+                const activeIssues = (issues || []).filter((issueItem) => !issueItem.clusteredInto);
+                const { debtByTier } = buildDebtLedger(activeIssues);
                 const delta = calculateStructuralDebtDelta({
                     prevFilesMap: parsed.files,
-                    currentIssues: issues || [],
+                    currentIssues: activeIssues,
                     currentDebtByTier: debtByTier,
                 });
                 return {
@@ -815,16 +549,20 @@ async function resolveGateDebtDelta(
                 };
             }
         } catch {
-            return {
-                resolvedDebtPoints: staticPass ? RESOLVED_POINTS_STATIC_PASS : 0,
-                addedDebtPoints: regressionCount * ADDED_POINTS_PER_REGRESSION,
-            };
+            return { resolvedDebtPoints: 0, addedDebtPoints: 0 };
         }
     }
-    return {
-        resolvedDebtPoints: staticPass ? RESOLVED_POINTS_STATIC_PASS : 0,
-        addedDebtPoints: regressionCount * ADDED_POINTS_PER_REGRESSION,
-    };
+    return { resolvedDebtPoints: 0, addedDebtPoints: 0 };
+}
+
+function resolveDynamicGatePass(scanResult: ScanReport, staticPass: boolean): boolean {
+    const dynamicScore = (
+        scanResult.qualityScore as { dynamic?: { compositeDynamicScore?: number } } | undefined
+    )?.dynamic?.compositeDynamicScore;
+    if (typeof dynamicScore === 'number' && Number.isFinite(dynamicScore)) {
+        return dynamicScore >= DYNAMIC_GATE_FLOOR;
+    }
+    return staticPass;
 }
 
 async function getGateEvaluationData(
@@ -836,6 +574,7 @@ async function getGateEvaluationData(
     },
 ): Promise<{
     staticPass: boolean;
+    dynamicPass: boolean;
     counters: ReturnType<typeof buildTrajectoryCounters>;
     metrics: ReturnType<typeof buildGateMetrics>;
 }> {
@@ -857,8 +596,6 @@ async function getGateEvaluationData(
     const { resolvedDebtPoints, addedDebtPoints } = await resolveGateDebtDelta(
         root,
         scanResult.issues,
-        staticPass,
-        regressionCount,
     );
 
     const counters = buildTrajectoryCounters(processedEloc, density, ratio);
@@ -872,13 +609,15 @@ async function getGateEvaluationData(
         regressionCount,
         unsuppressedErrors,
     });
-    return { staticPass, counters, metrics };
+    const dynamicPass = resolveDynamicGatePass(scanResult, staticPass);
+    return { staticPass, dynamicPass, counters, metrics };
 }
 
 function evaluateGateStatus(
     stage: GateStage,
     evalData: {
         staticPass: boolean;
+        dynamicPass: boolean;
         counters: ReturnType<typeof buildTrajectoryCounters>;
         metrics: ReturnType<typeof buildGateMetrics>;
     },
@@ -886,7 +625,7 @@ function evaluateGateStatus(
     return evaluateCompositeGate({
         stage,
         staticPass: evalData.staticPass,
-        dynamicPass: true,
+        dynamicPass: evalData.dynamicPass,
         counters: evalData.counters,
         metrics: evalData.metrics,
     });
