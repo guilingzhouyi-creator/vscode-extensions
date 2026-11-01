@@ -2,13 +2,13 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-01T11:13:57.762Z",
+  "timestamp": "2026-11-01T12:18:43.801Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.18,
+    "score": 99.19,
     "grade": "A+",
-    "cai": 88.24,
+    "cai": 88.27,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
@@ -21,12 +21,12 @@
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 28691,
+      "remediationMinutes": 28558,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.5,
-      "meanScore": 96.5,
+      "index": 96.51,
+      "meanScore": 96.51,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
@@ -39,47 +39,47 @@
       "lowestScore": 95.88
     },
     "pillars": {
-      "architecture": 99.57,
-      "maintainability": 98.14,
+      "architecture": 99.58,
+      "maintainability": 98.15,
       "performance": 99.84,
       "data": 98.47,
-      "testing": 99.78,
+      "testing": 99.79,
       "reliability": 99.73,
       "security": 99.88,
-      "extensibility": 97.77
+      "extensibility": 97.78
     },
     "counts": {
       "files": 815,
-      "total": 4163,
+      "total": 4148,
       "errors": 0,
-      "warns": 3577,
-      "info": 586,
+      "warns": 3566,
+      "info": 582,
       "suppressed": 113
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1734,
-    "advisory": 2429,
-    "uncalibrated": 165,
+    "patchable": 1709,
+    "advisory": 2439,
+    "uncalibrated": 112,
     "needsHuman": 1
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 99.57,
+    "architectureConsistency": 99.58,
     "semanticPurity": 99.48,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.84,
     "standardization": 95.88,
-    "modernity": 99.78,
-    "maintainability": 98.14,
+    "modernity": 99.79,
+    "maintainability": 98.15,
     "commentQuality": 99.99,
-    "duplication": 97.46,
+    "duplication": 97.47,
     "techDebtRisk": 99.98
   },
   "dimensionDetails": {
     "architectureConsistency": {
-      "score": 97.56,
+      "score": 97.58,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
@@ -115,7 +115,7 @@
       "confidence": 1
     },
     "standardization": {
-      "score": 84.4,
+      "score": 84.46,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
@@ -130,14 +130,14 @@
       ]
     },
     "modernity": {
-      "score": 97.97,
+      "score": 98.01,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.074,
       "confidence": 1
     },
     "maintainability": {
-      "score": 93.48,
+      "score": 93.51,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
@@ -151,7 +151,7 @@
       "confidence": 1
     },
     "duplication": {
-      "score": 95.07,
+      "score": 95.09,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -175,8 +175,8 @@
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 3220,
-      "count": 322
+      "loss": 3160,
+      "count": 316
     },
     {
       "rule": "SIM-TRN-001",
@@ -205,8 +205,8 @@
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2100,
-      "count": 210
+      "loss": 2070,
+      "count": 207
     },
     {
       "rule": "hardcoded-string",
@@ -246,10 +246,8 @@
       "src/core/ast/fallback-chain-matcher.ts",
       "src/core/policy/source-mask.ts",
       "src/core/scanner/text-scanner-utils.ts",
-      "src/core/ast/adapters.ts",
       "src/core/intelligence/semantic-domain-detector.ts",
       "src/core/praxis/composite-quality-gate.ts",
-      "src/core/ast/python-adapter.ts",
       "src/core/ast/sparse-ast-hopper.ts",
       "src/core/evolution/git-changeset-miner.ts",
       "src/core/intelligence/semantic-vector.ts",
@@ -257,7 +255,6 @@
       "src/core/scoring/hierarchicalScorer.ts",
       "src/core/trajectory/trajectory-accumulator.ts",
       "src/core/ast-pattern/structural-pattern-engine.ts",
-      "src/core/ast/rust-adapter.ts",
       "src/core/ast/scope-graph.ts",
       "src/core/ast/ts-projector.ts",
       "src/core/data-structures/regex-pool.ts",
@@ -272,6 +269,7 @@
       "src/core/scoring/rolling-sampling-governor.ts",
       "src/analyzers/hygiene-file-helper.ts",
       "src/core/architecture/metaArchitectureEvaluator.ts",
+      "src/core/ast/python-adapter.ts",
       "src/core/comments/comment-auditor.ts",
       "src/core/domain-matcher/pattern-matcher.ts",
       "src/core/evolution/code-survival-model.ts",
@@ -282,7 +280,9 @@
       "src/core/scheduler/persistent-fact-store.ts",
       "src/core/trajectory/patchArbiter.ts",
       "src/analyzers/concurrency.ts",
-      "src/analyzers/rust-modern.ts"
+      "src/analyzers/rust-modern.ts",
+      "src/analyzers/stdlib.ts",
+      "src/analyzers/vscode-extension.ts"
     ]
   },
   "files": {
@@ -954,7 +954,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 161,
@@ -1134,7 +1134,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 162,
@@ -1327,14 +1327,14 @@
         "tier": "T2",
         "conf": 0.95,
         "moreLines": [
-          460,
-          464,
-          552,
-          711
+          458,
+          462,
+          555,
+          723
         ]
       },
       {
-        "line": 377,
+        "line": 376,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -1343,9 +1343,9 @@
           "action": "replace_token",
           "patch": {
             "range": {
-              "startLine": 377,
+              "startLine": 376,
               "startCol": 10,
-              "endLine": 377,
+              "endLine": 376,
               "endCol": 26
             },
             "replacementText": "timelineBucketSnapshot"
@@ -1357,20 +1357,20 @@
         "conf": 0.94
       },
       {
-        "line": 377,
+        "line": 376,
         "rule": "SIM-LONG-001",
         "sev": "WARN",
-        "msg": "Function \"foldSingleBucket\" spans 113 lines (limit 60)",
+        "msg": "Function \"foldSingleBucket\" spans 112 lines (limit 60)",
         "fix": {
           "action": "split_function",
           "template": "// Extracted helper:",
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
-        "line": 602,
+        "line": 612,
         "col": 10,
         "rule": "NAM-LEN-002",
         "sev": "WARN",
@@ -1379,9 +1379,9 @@
           "action": "replace_token",
           "patch": {
             "range": {
-              "startLine": 602,
+              "startLine": 612,
               "startCol": 10,
-              "endLine": 602,
+              "endLine": 612,
               "endCol": 27
             },
             "replacementText": "timelineBucketSnapshots"
@@ -1393,7 +1393,7 @@
         "conf": 0.94
       },
       {
-        "line": 711,
+        "line": 723,
         "col": 55,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -1406,7 +1406,7 @@
         "conf": 0.95
       },
       {
-        "line": 721,
+        "line": 733,
         "col": 51,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -1419,7 +1419,7 @@
         "conf": 0.95
       },
       {
-        "line": 723,
+        "line": 735,
         "col": 31,
         "rule": "hardcoded-string",
         "sev": "WARN",
@@ -1435,7 +1435,7 @@
         "line": 1,
         "rule": "large-file",
         "sev": "WARN",
-        "msg": "file lines 759 >= 400 (split)",
+        "msg": "file lines 771 >= 400 (split)",
         "fix": {
           "action": "split_file"
         },
@@ -1443,7 +1443,7 @@
         "conf": 0.89
       },
       {
-        "line": 295,
+        "line": 298,
         "col": 13,
         "rule": "GOV-PRF-004",
         "sev": "WARN",
@@ -1455,10 +1455,10 @@
         "conf": 0.89
       },
       {
-        "line": 304,
+        "line": 307,
         "rule": "HYG-CLN-001",
         "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 212",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 224",
         "fix": {
           "action": "sanitize_hygiene"
         },
@@ -1466,7 +1466,7 @@
         "conf": 0.89
       },
       {
-        "line": 361,
+        "line": 365,
         "col": 62,
         "rule": "GOV-PRF-004",
         "sev": "WARN",
@@ -1840,7 +1840,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 165,
@@ -1984,7 +1984,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       }
     ],
     "src/core/scheduler/sparse-orchestrator.ts": [
@@ -2092,7 +2092,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 345,
@@ -2585,117 +2585,6 @@
         ]
       }
     ],
-    "src/core/ast/adapters.ts": [
-      {
-        "line": 105,
-        "rule": "TSM-REQUIRE-001",
-        "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax",
-        "fix": {
-          "action": "replace_token",
-          "template": "import $1 from $2;",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9
-      },
-      {
-        "line": 106,
-        "rule": "TSM-REQUIRE-001",
-        "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax",
-        "fix": {
-          "action": "replace_token",
-          "template": "import $1 from $2;",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9
-      },
-      {
-        "line": 107,
-        "rule": "TSM-REQUIRE-001",
-        "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax",
-        "fix": {
-          "action": "replace_token",
-          "template": "import $1 from $2;",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9
-      },
-      {
-        "line": 108,
-        "rule": "TSM-REQUIRE-001",
-        "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax",
-        "fix": {
-          "action": "replace_token",
-          "template": "import $1 from $2;",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9
-      },
-      {
-        "line": 109,
-        "rule": "TSM-REQUIRE-001",
-        "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax",
-        "fix": {
-          "action": "replace_token",
-          "template": "import $1 from $2;",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9,
-        "moreLines": [
-          110,
-          111,
-          112,
-          113
-        ]
-      },
-      {
-        "line": 170,
-        "col": 17,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'adapterFor' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "template": "languageAdapter",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 1,
-        "rule": "NAM-FIL-001",
-        "sev": "WARN",
-        "msg": "File name 'adapters.ts' has too few word segments (1 < 2); lacks domain specificity",
-        "fix": {
-          "action": "rename_identifier"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 125,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'adapterSupportsExtension' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T3",
-        "conf": 0.89
-      }
-    ],
     "src/core/intelligence/semantic-domain-detector.ts": [
       {
         "line": 114,
@@ -3001,178 +2890,6 @@
         "conf": 0.89
       }
     ],
-    "src/core/ast/python-adapter.ts": [
-      {
-        "line": 48,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'pythonParser' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 48,
-              "startCol": 10,
-              "endLine": 48,
-              "endCol": 22
-            },
-            "replacementText": "treeSitterParser"
-          },
-          "template": "treeSitterParser",
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 50,
-        "col": 32,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 50,
-        "rule": "TSM-REQUIRE-001",
-        "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax",
-        "fix": {
-          "action": "replace_token",
-          "template": "import $1 from $2;",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9
-      },
-      {
-        "line": 51,
-        "col": 32,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 51,
-        "rule": "TSM-REQUIRE-001",
-        "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax",
-        "fix": {
-          "action": "replace_token",
-          "template": "import $1 from $2;",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9
-      },
-      {
-        "line": 84,
-        "col": 29,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 95,
-        "col": 40,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 115,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'extractTypedOrDefaultPythonParam' has too many word segments (6 > 5); consider decomposing responsibilities",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 115,
-              "startCol": 10,
-              "endLine": 115,
-              "endCol": 42
-            },
-            "replacementText": "extractTypedOrDefaultPythonParameter"
-          },
-          "template": "extractTypedOrDefaultPythonParameter",
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 117,
-        "col": 35,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 40,
-        "rule": "NAM-GLB-002",
-        "sev": "WARN",
-        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state",
-        "fix": {
-          "action": "rename_identifier"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 50,
-        "rule": "DEP-LAZ-001",
-        "sev": "WARN",
-        "msg": "Unjustified in-function import 'tree-sitter': hoist or declare exemption",
-        "fix": {
-          "action": "resolve_dependency"
-        },
-        "tier": "T3",
-        "conf": 0.95
-      },
-      {
-        "line": 51,
-        "rule": "DEP-LAZ-001",
-        "sev": "WARN",
-        "msg": "Unjustified in-function import 'tree-sitter-python': hoist or declare exemption",
-        "fix": {
-          "action": "resolve_dependency"
-        },
-        "tier": "T3",
-        "conf": 0.95
-      }
-    ],
     "src/core/ast/sparse-ast-hopper.ts": [
       {
         "line": 62,
@@ -3378,7 +3095,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 332,
@@ -3713,7 +3430,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 938,
@@ -3726,7 +3443,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 1,
@@ -3872,7 +3589,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 466,
@@ -4072,146 +3789,6 @@
         "msg": "File is large; consider splitting (lines 822 >= warn threshold 400; functions 34 >= warn threshold 20)",
         "fix": {
           "action": "split_file"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      }
-    ],
-    "src/core/ast/rust-adapter.ts": [
-      {
-        "line": 71,
-        "rule": "TSM-REQUIRE-001",
-        "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax",
-        "fix": {
-          "action": "replace_token",
-          "template": "import $1 from $2;",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9
-      },
-      {
-        "line": 72,
-        "rule": "TSM-REQUIRE-001",
-        "sev": "WARN",
-        "msg": "CommonJS `require` in a module that already uses ESM syntax",
-        "fix": {
-          "action": "replace_token",
-          "template": "import $1 from $2;",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9
-      },
-      {
-        "line": 481,
-        "col": 32,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 496,
-        "col": 32,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 8 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 497,
-        "col": 48,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 536,
-        "col": 67,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 551,
-        "col": 24,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 552,
-        "col": 16,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 1,
-        "rule": "large-file",
-        "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 575 >= warn threshold 400; functions 22 >= warn threshold 20)",
-        "fix": {
-          "action": "split_file"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 30,
-        "rule": "NAM-GLB-002",
-        "sev": "WARN",
-        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state",
-        "fix": {
-          "action": "rename_identifier"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 35,
-        "col": 7,
-        "rule": "NAM-GLB-001",
-        "sev": "WARN",
-        "msg": "Top-level constant '_ADAPTER_ID_RUST' should follow UPPER_SNAKE_CASE naming convention",
-        "fix": {
-          "action": "rename_identifier"
         },
         "tier": "T3",
         "conf": 0.89
@@ -5178,7 +4755,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 113,
@@ -5390,7 +4967,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 172,
@@ -5417,7 +4994,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 321,
@@ -6157,6 +5734,178 @@
         "conf": 0.89
       }
     ],
+    "src/core/ast/python-adapter.ts": [
+      {
+        "line": 48,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'pythonParser' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "patch": {
+            "range": {
+              "startLine": 48,
+              "startCol": 10,
+              "endLine": 48,
+              "endCol": 22
+            },
+            "replacementText": "treeSitterParser"
+          },
+          "template": "treeSitterParser",
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 50,
+        "col": 32,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 51,
+        "col": 32,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 84,
+        "col": 29,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 95,
+        "col": 40,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 115,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'extractTypedOrDefaultPythonParam' has too many word segments (6 > 5); consider decomposing responsibilities",
+        "fix": {
+          "action": "replace_token",
+          "patch": {
+            "range": {
+              "startLine": 115,
+              "startCol": 10,
+              "endLine": 115,
+              "endCol": 42
+            },
+            "replacementText": "extractTypedOrDefaultPythonParameter"
+          },
+          "template": "extractTypedOrDefaultPythonParameter",
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 117,
+        "col": 35,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 40,
+        "rule": "NAM-GLB-002",
+        "sev": "WARN",
+        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state",
+        "fix": {
+          "action": "rename_identifier"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 50,
+        "rule": "DEP-LAZ-001",
+        "sev": "WARN",
+        "msg": "Unjustified in-function import 'tree-sitter': hoist or declare exemption",
+        "fix": {
+          "action": "resolve_dependency"
+        },
+        "tier": "T3",
+        "conf": 0.95
+      },
+      {
+        "line": 50,
+        "rule": "TSM-REQUIRE-001",
+        "sev": "WARN",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
+        "fix": {
+          "action": "replace_token",
+          "template": "import $1 from $2;",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 51,
+        "rule": "DEP-LAZ-001",
+        "sev": "WARN",
+        "msg": "Unjustified in-function import 'tree-sitter-python': hoist or declare exemption",
+        "fix": {
+          "action": "resolve_dependency"
+        },
+        "tier": "T3",
+        "conf": 0.95
+      },
+      {
+        "line": 51,
+        "rule": "TSM-REQUIRE-001",
+        "sev": "WARN",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
+        "fix": {
+          "action": "replace_token",
+          "template": "import $1 from $2;",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      }
+    ],
     "src/core/comments/comment-auditor.ts": [
       {
         "line": 58,
@@ -6601,7 +6350,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 109,
@@ -6771,7 +6520,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 290,
@@ -7394,8 +7143,270 @@
         },
         "tier": "T2",
         "conf": 0.95
+      },
+      {
+        "line": 391,
+        "col": 30,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 405,
+        "col": 30,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 420,
+        "col": 30,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 574 >= warn threshold 400; functions 23 >= warn threshold 20)",
+        "fix": {
+          "action": "split_file"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 262,
+        "col": 11,
+        "rule": "NAM-DEC-001",
+        "sev": "WARN",
+        "msg": "symbol 'RustMultiLineScanContext' len=24 segs=5",
+        "fix": {
+          "action": "rename_identifier"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 356,
+        "col": 5,
+        "rule": "SIM-LONG-001",
+        "sev": "WARN",
+        "msg": "Function \"RustModernAnalyzer.<anonymous>\" spans 203 lines (limit 60)",
+        "fix": {
+          "action": "split_function",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      }
+    ],
+    "src/analyzers/stdlib.ts": [
+      {
+        "line": 96,
+        "col": 13,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 212,
+        "rule": "SIM-LONG-001",
+        "sev": "WARN",
+        "msg": "Function \"collectRecursionSites\" spans 79 lines (limit 60)",
+        "fix": {
+          "action": "split_function",
+          "template": "// Extracted helper:",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 297,
+        "col": 43,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 4 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 381,
+        "col": 25,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 386,
+        "col": 25,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 564,
+        "col": 71,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 1000 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 564,
+              "startCol": 71,
+              "endLine": 564,
+              "endCol": 75
+            },
+            "replacementText": "DURATION_1S"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 640 >= warn threshold 400; functions 23 >= warn threshold 20)",
+        "fix": {
+          "action": "split_file"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 1,
+        "rule": "NAM-FIL-001",
+        "sev": "WARN",
+        "msg": "File name 'stdlib.ts' has too few word segments (1 < 2); lacks domain specificity",
+        "fix": {
+          "action": "rename_identifier"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 124,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'braceDelta' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 293,
+        "col": 5,
+        "rule": "CMP-DEN-001",
+        "sev": "WARN",
+        "msg": "High cognitive token density (30% operators) exceeds maintainability lower bounds",
+        "fix": {
+          "action": "refactor"
+        },
+        "tier": "T3",
+        "conf": 0.8
+      },
+      {
+        "line": 340,
+        "col": 15,
+        "rule": "NAM-LEN-001",
+        "sev": "WARN",
+        "msg": "symbol 'ms' too short (<= 2 characters)",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      }
+    ],
+    "src/analyzers/vscode-extension.ts": [
+      {
+        "line": 153,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'makeVscIssue' contains segment 'Vsc' with invalid morpheme phonetics (missing vowel or unapproved acronym)",
+        "fix": {
+          "action": "replace_token",
+          "patch": {
+            "range": {
+              "startLine": 153,
+              "startCol": 10,
+              "endLine": 153,
+              "endCol": 22
+            },
+            "replacementText": "issue"
+          },
+          "template": "issue",
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.94
+      },
+      {
+        "line": 196,
+        "col": 23,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
       }
     ]
   },
-  "truncated": 3067
+  "truncated": 3056
 }

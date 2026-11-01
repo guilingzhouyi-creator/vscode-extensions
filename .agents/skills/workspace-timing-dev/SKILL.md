@@ -25,7 +25,7 @@ description: >-
 
 依赖严格自顶向下单向流动：`UI 表现层 (Webview/StatusBar) -> Engine 核心引擎 (TimerEngine/TimeAggregator) -> Storage 存储协调 (StorageCoordinator/RingBuffer/Journal/HistoryFolder) -> Analytics 遥测层 -> Shared 通用契约 (i18n/DTO)`。
 - **零反向依赖 (`LAY-IMPORT` / `LAY-CYCLE`)**：Storage / Engine / Analytics / Shared 严禁反向引用 UI 层或 `vscode.window` API；
-- **纯逻辑脱机单测**：核心计时与聚合算法 100% 支持脱离 VS Code 宿主在 Mock Clock 下运行单测（<!-- METRICS:BEGIN ws-test-case-count -->**207 项**<!-- METRICS:END ws-test-case-count -->用例）。
+- **纯逻辑脱机单测**：核心计时与聚合算法 100% 支持脱离 VS Code 宿主在 Mock Clock 下运行单测（<!-- METRICS:BEGIN ws-test-case-count -->**225 项**<!-- METRICS:END ws-test-case-count -->用例）。
 
 ---
 

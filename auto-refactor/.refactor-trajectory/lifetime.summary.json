@@ -1,13 +1,13 @@
 {
   "weekId": "LIFETIME",
   "startMs": 1791102755050,
-  "endMs": 1793531636555,
+  "endMs": 1793535522404,
   "totalRuns": 453,
   "eloc": {
-    "processedTotal": 68878266,
-    "uniqueTotal": 154000,
-    "changedTotal": 1525262,
-    "semanticTotal": 1163209
+    "processedTotal": 68920819,
+    "uniqueTotal": 154075,
+    "changedTotal": 1529644,
+    "semanticTotal": 1165489
   },
   "qed": {
     "mean": -0.045936,
@@ -17,19 +17,19 @@
   },
   "debt": {
     "totalAdded": 3436,
-    "totalResolved": 9839,
+    "totalResolved": 9845,
     "totalRegressions": 77,
     "netYield": 5.5,
-    "densityYield": 41.58
+    "densityYield": 41.6
   },
   "meanCompositeScore": 98.92,
   "gatePassRate": 92.72,
   "stability": {
     "zeroRegressionRuns": 435,
-    "zeroRegressionStreak": 8,
-    "semanticPurityRatio": 0.7626,
+    "zeroRegressionStreak": 11,
+    "semanticPurityRatio": 0.7619,
     "uniqueCoverageRatio": 0.0022,
     "scoreFloor": 95.47,
-    "scoreCeiling": 99.18
+    "scoreCeiling": 99.19
   }
 }
