@@ -64,6 +64,7 @@ import {
     type ExpertTelemetrySnapshot,
 } from './router/adaptive-bias-router';
 import { ANALYZER_NAME_TO_BIT } from './constants/analyzer-bitmask';
+import { defaultContinuousRuleSampler } from './telemetry/continuous-rule-sampler';
 import { ChangeTrajectoryManager } from './trajectory/changeTrajectory';
 import { detectProjectArchetype } from './profiler/projectProfiler';
 import { ALL_BUILTIN_ANALYZERS, routeArchetypeToAnalyzers } from './router/sparseRuleRouter';
@@ -106,6 +107,12 @@ export {
     BUILTIN_MODULE_PATHS,
 } from './analyzer-registry';
 export { WorkerPoolManager, WorkerPoolEntry } from './worker-pool';
+
+const DIR_AUTO_REFACTOR_CACHE = '.auto-refactor-cache';
+const FILE_ROUTER_BIAS = 'router-bias.json';
+const FILE_RULE_SAMPLING_LEDGER = 'rule-sampling-ledger.json';
+const ENCODING_UTF8 = 'utf8';
+const MICROSECONDS_PER_MILLISECOND = 1000;
 
 export { WarmSession, createWarmSession } from './scanner/cache-key-helper';
 export type { ScanWithCacheOptions } from './scanner/cache-scanner';
@@ -201,6 +208,7 @@ export class Scanner implements ScannerContext {
             `resolved ${this.plan.length} analyzer(s): ${this.plan.map((planItem) => planItem.name).join(', ') || '(none)'}`,
         );
         this.loadRouterBiasState();
+        this.loadRuleSamplingLedger();
     }
 
     /**
@@ -217,7 +225,7 @@ export class Scanner implements ScannerContext {
      */
     private reviewMemoryDir(config: ScanConfig): string | undefined {
         if (config.cacheEnabled === false) return undefined;
-        return path.join(config.root, '.auto-refactor-cache');
+        return path.join(config.root, DIR_AUTO_REFACTOR_CACHE);
     }
 
     /**
@@ -486,17 +494,16 @@ export class Scanner implements ScannerContext {
      * @param content - Raw file content already read by the caller; no second disk read happens.
      * @param seed - Previous incremental state for this file; when present it forces the
      *     materialized parse path so unchanged subtrees can be reused.
-     * @param activeAnalyzers - Optional allow-list of analyzer names; omitted means the full
-     *     resolved plan runs.
+     * @param executionScope - Remaining execution arguments (activeAnalyzers and lineBounds).
      * @returns The file's issues and its per-file metric summary.
      */
     public async runAnalyzers(
         rel: string,
         content: string,
         seed?: IncrementalFileState,
-        activeAnalyzers?: Set<string>,
-        lineBounds?: readonly [number, number],
+        ...executionScope: [activeAnalyzers?: Set<string>, lineBounds?: readonly [number, number]]
     ): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
+        const [activeAnalyzers, lineBounds] = executionScope;
         return runFileAnalyzers(
             {
                 config: this.config,
@@ -558,9 +565,9 @@ export class Scanner implements ScannerContext {
 
     private loadRouterBiasState(): void {
         if (this.config.cacheEnabled === false) return;
-        const stateFile = path.join(this.config.root, '.auto-refactor-cache', 'router-bias.json');
+        const stateFile = path.join(this.config.root, DIR_AUTO_REFACTOR_CACHE, FILE_ROUTER_BIAS);
         void fs.promises
-            .readFile(stateFile, 'utf8')
+            .readFile(stateFile, ENCODING_UTF8)
             .then((content) => {
                 const snapshot = JSON.parse(content);
                 defaultAdaptiveExpertBiasRouter.importSnapshot(snapshot);
@@ -573,11 +580,7 @@ export class Scanner implements ScannerContext {
     private saveRouterBiasState(issues: Issue[], filesScanned: number, durationMs: number): void {
         if (this.config.cacheEnabled === false) return;
         try {
-            const cacheDir = path.join(this.config.root, '.auto-refactor-cache');
-            if (!fs.existsSync(cacheDir)) {
-                fs.mkdirSync(cacheDir, { recursive: true });
-            }
-
+            const cacheDir = path.join(this.config.root, DIR_AUTO_REFACTOR_CACHE);
             const findingsByAnalyzer: Record<string, number> = {};
             for (let i = 0; i < issues.length; i++) {
                 const issue = issues[i];
@@ -590,7 +593,7 @@ export class Scanner implements ScannerContext {
             const activeCount = Math.max(1, entries.length);
             const avgLatencyUs = Math.max(
                 1,
-                Math.round(((durationMs || 1) * 1000) / Math.max(1, filesScanned * activeCount)),
+                Math.round(((durationMs || 1) * MICROSECONDS_PER_MILLISECOND) / Math.max(1, filesScanned * activeCount)),
             );
 
             const telemetry: ExpertTelemetrySnapshot[] = [];
@@ -607,18 +610,29 @@ export class Scanner implements ScannerContext {
 
             defaultAdaptiveExpertBiasRouter.calibrateBiases(telemetry);
             const snapshot = defaultAdaptiveExpertBiasRouter.exportSnapshot();
+            const targetFile = path.join(cacheDir, FILE_ROUTER_BIAS);
             void fs.promises
-                .writeFile(
-                    path.join(cacheDir, 'router-bias.json'),
-                    JSON.stringify(snapshot, null, 2),
-                    'utf8',
-                )
+                .mkdir(cacheDir, { recursive: true })
+                .then(() => fs.promises.writeFile(targetFile, JSON.stringify(snapshot, null, 2), ENCODING_UTF8))
                 .catch((err) => {
                     void err;
                 });
         } catch (err) {
             void err;
         }
+    }
+
+    private loadRuleSamplingLedger(): void {
+        if (this.config.cacheEnabled === false) return;
+        const ledgerFile = path.join(this.config.root, DIR_AUTO_REFACTOR_CACHE, FILE_RULE_SAMPLING_LEDGER);
+        void defaultContinuousRuleSampler.loadLedgerFromFile(ledgerFile);
+    }
+
+    private saveRuleSamplingLedger(issues: Issue[], filesScanned: number): void {
+        if (this.config.cacheEnabled === false) return;
+        defaultContinuousRuleSampler.recordScan({ filesScanned, issues });
+        const ledgerFile = path.join(this.config.root, DIR_AUTO_REFACTOR_CACHE, FILE_RULE_SAMPLING_LEDGER);
+        void defaultContinuousRuleSampler.saveLedgerToFile(ledgerFile);
     }
 
     /**
@@ -637,6 +651,7 @@ export class Scanner implements ScannerContext {
         durationMs: number,
     ): ScanReport {
         this.saveRouterBiasState(issues, filesScanned, durationMs);
+        this.saveRuleSamplingLedger(issues, filesScanned);
         return buildScanReport({
             host: {
                 config: this.config,

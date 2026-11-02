@@ -15,6 +15,9 @@
 import type { CoverageDampingResult, FileCoverageProfile } from './lcov-ingester';
 
 export * from './lcov-ingester';
+export * from './continuous-rule-sampler';
+
+const RATIO_DECIMAL_PLACES = 3;
 
 /**
  * Aggregated telemetry snapshot representation across inspected repository files.
@@ -95,8 +98,8 @@ export function createTelemetrySnapshot(
         count++;
     }
 
-    const avgLine = count > 0 ? +(totalLineRatio / count).toFixed(3) : 1.0;
-    const avgBranch = count > 0 ? +(totalBranchRatio / count).toFixed(3) : 1.0;
+    const avgLine = count > 0 ? +(totalLineRatio / count).toFixed(RATIO_DECIMAL_PLACES) : 1.0;
+    const avgBranch = count > 0 ? +(totalBranchRatio / count).toFixed(RATIO_DECIMAL_PLACES) : 1.0;
 
     const snapshot: TelemetrySnapshot = {
         timestamp: Date.now(),

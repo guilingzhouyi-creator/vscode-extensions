@@ -166,6 +166,78 @@ const FIXTURES: FixtureMap = {
         '    return result + b;',
         '}',
     ].join('\n'),
+
+    // SIM-EMPTY-001 fixture
+    'empty_function.ts': [
+        'export function doNothing(): void {}',
+    ].join('\n'),
+
+    // SIM-LONG-001 fixture
+    'long_function.ts': [
+        'export function computeLongSequence(x: number): number {',
+        '    let a = x + 1;',
+        '    let b = a + 2;',
+        '    let c = b + 3;',
+        '    let d = c + 4;',
+        '    let e = d + 5;',
+        '    let f = e + 6;',
+        '    let g = f + 7;',
+        '    let h = g + 8;',
+        '    let i = h + 9;',
+        '    return a + b + c + d + e + f + g + h + i;',
+        '}',
+    ].join('\n'),
+
+    // SIM-FLAT-002 fixture
+    'deep_nested.ts': [
+        'export function evaluateDeep(a: boolean, b: boolean, c: boolean, d: boolean): number {',
+        '    if (a) {',
+        '        if (b) {',
+        '            if (c) {',
+        '                if (d) {',
+        '                    return 1;',
+        '                }',
+        '            }',
+        '        }',
+        '    }',
+        '    return 0;',
+        '}',
+    ].join('\n'),
+
+    // SIM-ARGS-001 fixture
+    'excess_args.ts': [
+        'export function configureService(',
+        '    host: string,',
+        '    port: number,',
+        '    retries: number,',
+        '    timeoutMs: number,',
+        '): void {',
+        '    // configure service',
+        '}',
+    ].join('\n'),
+
+    // SIM-COMC-001 fixture
+    'commented_code.ts': [
+        'export function computeTotal(): number {',
+        '    // const legacyRate = 10;',
+        '    // const legacyTax = 20;',
+        '    // const legacyFee = 30;',
+        '    return 100;',
+        '}',
+    ].join('\n'),
+
+    // SIM-IMM-001 and SIM-TRN-001 fixture
+    'immutable_ternary.ts': [
+        'export function selectMode(flag: boolean): string {',
+        '    let mode: string;',
+        '    if (flag) {',
+        '        mode = "production";',
+        '    } else {',
+        '        mode = "development";',
+        '    }',
+        '    return mode;',
+        '}',
+    ].join('\n'),
 };
 
 let testRoot: string;
@@ -192,14 +264,20 @@ describe('Simplify Analyzer Rules', () => {
             fs.writeFileSync(abs, content);
         }
 
-        // Write config with guard clause options enabled
+        // Write config with guard clause and extended simplify options enabled
         const configPath = path.join(testRoot, 'ar.config.json');
         fs.writeFileSync(
             configPath,
             JSON.stringify({
                 analyzers: {
                     simplify: {
-                        options: { checkGuardClauses: true, maxGuardClauseNesting: 3 },
+                        options: {
+                            checkGuardClauses: true,
+                            maxGuardClauseNesting: 3,
+                            checkTernarySimplification: true,
+                            maxFunctionLines: 8,
+                            maxFunctionParameters: 3,
+                        },
                     },
                 },
             }),
@@ -308,6 +386,43 @@ describe('Simplify Analyzer Rules', () => {
             const ruleIssues = byRule('SIM-GUARD-001');
             expect(ruleIssues.length).toBeGreaterThan(0);
             expect(ruleIssues.every((i) => i.severity === 'info')).toBe(true);
+        });
+    });
+
+    describe('SIM-EMPTY-001 (empty-implementation)', () => {
+        it('flags single-line empty brace functions', () => {
+            expect(filesForRule('SIM-EMPTY-001')).toContain('empty_function.ts');
+        });
+    });
+
+    describe('SIM-LONG-001 (long-function)', () => {
+        it('flags function exceeding configured line limit', () => {
+            expect(filesForRule('SIM-LONG-001')).toContain('long_function.ts');
+        });
+    });
+
+    describe('SIM-FLAT-002 (flatten-nested-control-flow)', () => {
+        it('flags deeply nested conditional control flow', () => {
+            expect(filesForRule('SIM-FLAT-002')).toContain('deep_nested.ts');
+        });
+    });
+
+    describe('SIM-ARGS-001 (excessive-function-parameters)', () => {
+        it('flags function exceeding parameter count limit', () => {
+            expect(filesForRule('SIM-ARGS-001')).toContain('excess_args.ts');
+        });
+    });
+
+    describe('SIM-COMC-001 (commented-out-code)', () => {
+        it('flags three or more consecutive code-shaped comment lines', () => {
+            expect(filesForRule('SIM-COMC-001')).toContain('commented_code.ts');
+        });
+    });
+
+    describe('SIM-IMM-001 & SIM-TRN-001 (immutable-const-and-ternary)', () => {
+        it('flags mutable variable with conditional assignment that can be immutable ternary const', () => {
+            expect(filesForRule('SIM-IMM-001')).toContain('immutable_ternary.ts');
+            expect(filesForRule('SIM-TRN-001')).toContain('immutable_ternary.ts');
         });
     });
 });
