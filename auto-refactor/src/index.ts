@@ -48,7 +48,7 @@ import { ALL_QUALITY_DIMENSIONS } from './core/scoring/scoringTypes';
 import { evaluateCompositeGate, type GateStage } from './core/praxis/composite-quality-gate';
 import { CacheStore } from './core/cache';
 import { daemonCommand } from './cli/daemonCmd';
-import { selfTestCommand } from './cli/selfTestCmd';
+import { runSelfTestCommand } from './cli/selfTestCmd';
 import { reviewCommand } from './cli/review-cmd';
 import { handleFixWorkflow } from './cli/fix-cmd';
 import { trajectoryCommand } from './cli/trajectory-cmd';
@@ -660,7 +660,7 @@ async function main(): Promise<void> {
     }
     if (subcommand === CMD_SELF_TEST) {
         const testArgs = args.slice(args.indexOf(CMD_SELF_TEST) + 1);
-        const selfTestResult = await selfTestCommand(testArgs);
+        const selfTestResult = await runSelfTestCommand(testArgs);
         process.stderr.write(selfTestResult.text + '\n');
         process.exit(selfTestResult.code);
     }

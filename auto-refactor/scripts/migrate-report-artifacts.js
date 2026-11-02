@@ -15,8 +15,10 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
-const { buildAasReport } = require('../dist/api');
+const path = require('node:path');
+
+const DIST_API_MODULE = '../dist/api';
+const { buildAasReport } = require(DIST_API_MODULE);
 
 const ARG_PREFIX = '--';
 const FLAG_WRITE = '--write';
@@ -25,6 +27,23 @@ const JSON_SUFFIX = '.json';
 const AAS_SUFFIX = '.aas.json';
 const CAS_SUFFIX = '.cas.json';
 const SKIP_DIRECTORIES = new Set(['node_modules', '.git', 'dist', 'target']);
+
+const SCHEMA_AAS_V1 = 'aas-v1';
+const DEFAULT_TOOL_NAME = 'auto-refactor';
+const DEFAULT_ENGINE_VERSION = '0.4.0';
+const DEFAULT_VERIFY_CMD = 'npm test';
+const DEFAULT_HEALTH_SCORE = 100;
+const GRADE_THRESHOLD_APLUS = 95;
+const GRADE_THRESHOLD_A = 85;
+const GRADE_APLUS = 'A+';
+const GRADE_A = 'A';
+const GRADE_B = 'B';
+
+const STATUS_MIGRATED = 'migrated';
+const STATUS_SKIPPED = 'skipped';
+const STATUS_FAILED = 'failed';
+const VERDICT_WARN = 'WARN';
+const VERDICT_PASS = 'PASS';
 
 /**
  * Parse CLI arguments into a target list plus output switches.
@@ -84,31 +103,38 @@ function collectArtifacts(target) {
  * @param sourcePath - Verbose artifact path.
  * @returns Path ending in `.aas.json`.
  */
-function sidecarPath(sourcePath) {
+function computeSidecarPath(sourcePath) {
   return sourcePath.slice(0, -JSON_SUFFIX.length) + AAS_SUFFIX;
 }
 
 function extractScore(payload) {
-  if (Number.isFinite(payload?.health?.score)) return payload.health.score;
-  if (Number.isFinite(payload?.baselineMetrics?.compositeScore))
+  if (Number.isFinite(payload?.health?.score)) {
+    return payload.health.score;
+  }
+  if (Number.isFinite(payload?.baselineMetrics?.compositeScore)) {
     return payload.baselineMetrics.compositeScore;
-  if (Number.isFinite(payload?.cai)) return payload.cai;
-  return 100;
+  }
+  return Number.isFinite(payload?.cai) ? payload.cai : DEFAULT_HEALTH_SCORE;
 }
 
 function extractTotal(payload) {
-  if (Number.isFinite(payload?.baselineMetrics?.issuesTotal))
+  if (Number.isFinite(payload?.baselineMetrics?.issuesTotal)) {
     return payload.baselineMetrics.issuesTotal;
-  if (Number.isFinite(payload?.summary?.issuesTotal)) return payload.summary.issuesTotal;
-  if (Array.isArray(payload?.issues)) return payload.issues.length;
-  return 0;
+  }
+  if (Number.isFinite(payload?.summary?.issuesTotal)) {
+    return payload.summary.issuesTotal;
+  }
+  return Array.isArray(payload?.issues) ? payload.issues.length : 0;
 }
 
 function extractGrade(payload, score) {
-  if (payload?.health?.grade) return payload.health.grade;
-  if (score >= 95) return 'A+';
-  if (score >= 85) return 'A';
-  return 'B';
+  if (payload?.health?.grade) {
+    return payload.health.grade;
+  }
+  if (score >= GRADE_THRESHOLD_APLUS) {
+    return GRADE_APLUS;
+  }
+  return score >= GRADE_THRESHOLD_A ? GRADE_A : GRADE_B;
 }
 
 /**
@@ -118,7 +144,7 @@ function extractGrade(payload, score) {
  * @returns AAS v1.0 AgentAuditReport object.
  */
 function projectToAas(payload) {
-  if (payload && payload.schema === 'aas-v1') {
+  if (payload && payload.schema === SCHEMA_AAS_V1) {
     return payload;
   }
   if (payload && payload.summary && Array.isArray(payload.issues)) {
@@ -130,12 +156,12 @@ function projectToAas(payload) {
   const grade = extractGrade(payload, score);
 
   return {
-    schema: 'aas-v1',
-    tool: payload?.tool || 'auto-refactor',
-    version: payload?.version || '0.4.0',
+    schema: SCHEMA_AAS_V1,
+    tool: payload?.tool || DEFAULT_TOOL_NAME,
+    version: payload?.version || DEFAULT_ENGINE_VERSION,
     timestamp: payload?.timestamp || payload?.generatedAt || new Date().toISOString(),
     root: payload?.root || '',
-    verdict: total > 0 ? 'WARN' : 'PASS',
+    verdict: total > 0 ? VERDICT_WARN : VERDICT_PASS,
     health: {
       score,
       grade,
@@ -147,7 +173,7 @@ function projectToAas(payload) {
         info: payload?.baselineMetrics?.infoTotal || 0,
       },
     },
-    defaultVerify: 'npm test',
+    defaultVerify: DEFAULT_VERIFY_CMD,
     dimensions: payload?.dimensions || {},
     bottlenecks: [],
     topology: {
@@ -169,39 +195,43 @@ function projectToAas(payload) {
  * @param options - CLI options.
  * @returns Result status and detail.
  */
-function migrateOne(sourcePath, options) {
+function runSingleArtifactMigration(sourcePath, options) {
   const relative = path.relative(process.cwd(), sourcePath);
   let payload;
   try {
     payload = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
   } catch (readError) {
-    return { status: 'failed', detail: `${relative}: unreadable JSON (${readError.message})` };
+    return { status: STATUS_FAILED, detail: `${relative}: unreadable JSON (${readError.message})` };
   }
 
   let aas;
   try {
     aas = projectToAas(payload);
   } catch (err) {
-    return { status: 'skipped', detail: `${relative}: not a report artifact (${err.message})` };
+    return { status: STATUS_SKIPPED, detail: `${relative}: not a report artifact (${err.message})` };
   }
 
-  const destination = sidecarPath(sourcePath);
+  const destination = computeSidecarPath(sourcePath);
   const summary = `${relative}: verdict=${aas.verdict} score=${aas.health.score ?? 'N/A'} files=${Object.keys(aas.files || {}).length}`;
 
   if (!options.write) {
-    return { status: 'migrated', detail: `${summary} (dry run -> ${path.basename(destination)})` };
+    return { status: STATUS_MIGRATED, detail: `${summary} (dry run -> ${path.basename(destination)})` };
   }
 
   const serialized = JSON.stringify(aas, null, options.pretty ? 2 : 0);
   try {
     fs.writeFileSync(destination, `${serialized}\n`, 'utf8');
   } catch (writeError) {
-    return { status: 'failed', detail: `${relative}: unwritable (${writeError.message})` };
+    return { status: STATUS_FAILED, detail: `${relative}: unwritable (${writeError.message})` };
   }
-  return { status: 'migrated', detail: `${summary} -> ${path.basename(destination)}` };
+  return { status: STATUS_MIGRATED, detail: `${summary} -> ${path.basename(destination)}` };
 }
 
-const OUTCOME_MARK = { migrated: '✔', skipped: '·', failed: '✖' };
+const OUTCOME_MARK = {
+  [STATUS_MIGRATED]: '✔',
+  [STATUS_SKIPPED]: '·',
+  [STATUS_FAILED]: '✖',
+};
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
@@ -218,17 +248,17 @@ function main() {
     process.exit(1);
   }
 
-  const tally = { migrated: 0, skipped: 0, failed: 0 };
+  const tally = { [STATUS_MIGRATED]: 0, [STATUS_SKIPPED]: 0, [STATUS_FAILED]: 0 };
   for (const artifact of artifacts) {
-    const outcome = migrateOne(artifact, options);
+    const outcome = runSingleArtifactMigration(artifact, options);
     tally[outcome.status] += 1;
     console.log(`  ${OUTCOME_MARK[outcome.status]} ${outcome.detail}`);
   }
 
   console.log(
-    `\n${tally.migrated} migrated into AAS v1.0, ${tally.skipped} skipped, ${tally.failed} failed.`,
+    `\n${tally[STATUS_MIGRATED]} migrated into AAS v1.0, ${tally[STATUS_SKIPPED]} skipped, ${tally[STATUS_FAILED]} failed.`,
   );
-  process.exit(tally.failed === 0 && tally.migrated > 0 ? 0 : 1);
+  process.exit(tally[STATUS_FAILED] === 0 && tally[STATUS_MIGRATED] > 0 ? 0 : 1);
 }
 
 main();

@@ -31,9 +31,27 @@
 
 import * as fs from 'fs';
 import * as os from 'os';
-import * as path from 'path';
+import * as path from 'node:path';
 import { scanAndRender } from '../api';
 import type { ScanReport } from '../core/types';
+
+const LINES_PER_OVERSIZED_FUNCTION = 5;
+const FAIL_THRESHOLD_LARGE_FILE = 800;
+const SYNTHETIC_SECRET_TOKEN_BODY = 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4';
+
+const RULE_PAIR_MAGIC_NUMBER = 'constants:magic-number';
+const RULE_PAIR_HIGH_COMPLEXITY = 'complexity:high-complexity';
+const RULE_PAIR_LARGE_FILE = 'large-file:large-file';
+const RULE_PAIR_GOV_EXC_001 = 'governance:GOV-EXC-001';
+const RULE_PAIR_GOV_PRF_003 = 'governance:GOV-PRF-003';
+const RULE_PAIR_GOV_PRF_004 = 'governance:GOV-PRF-004';
+const RULE_PAIR_SECRET_DETECTED = 'secrets:secret-detected';
+const RULE_PAIR_IMPORT_CYCLE = 'dependency-graph:import-cycle';
+const RULE_PAIR_UNUSED_MODULE = 'dependency-graph:unused-module';
+
+const SELFTEST_DIR_PREFIX = 'auto-refactor-selftest-';
+const CONFIG_FILE_NAME = 'auto-refactor.config.json';
+const REPORT_FILE_NAME = 'self-test-report.json';
 
 /**
  * Number of synthetic `if` branches in the complexity fixture; exceeds the complexity-fail
@@ -117,23 +135,10 @@ function buildCleanFixtureSource(): string {
 }
 
 /**
- * Build the temporary fixture project files and the configuration enabling their analyzers.
- *
- * Each sample intentionally violates one analyzer contract, and the generated oversized module
- * crosses the volume envelope through dense branching code rather than a constant catalog.
- *
- * @returns Fixture files with the reason each exists, plus the configuration that enables
- *          the analyzers expected to fire on them.
+ * Creates the collection of fixture files containing deliberate rule violations.
  */
-function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown> } {
-    const ifs = Array.from(
-        { length: FIXTURE_BRANCH_COUNT },
-        (_, i) => `  if (x > ${i}) { x = x - 1; }`,
-    ).join('\n');
-    const oversized = Array.from({ length: FIXTURE_OVERSIZED_FUNCTIONS }, (_, i) =>
-        FIXTURE_OVERSIZED_BODY(i),
-    ).join('');
-    const files: FixtureFile[] = [
+function createFixtureViolationFiles(ifs: string, oversized: string): FixtureFile[] {
+    return [
         {
             rel: 'src/syncio.ts',
             content:
@@ -158,7 +163,7 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
         {
             rel: 'src/toolarge.ts',
             content: `${oversized}export const end = 1;\n`,
-            why: `large-file:large-file (${FIXTURE_OVERSIZED_FUNCTIONS * 5} dense lines >= fail threshold 800)`,
+            why: `large-file:large-file (${FIXTURE_OVERSIZED_FUNCTIONS * LINES_PER_OVERSIZED_FUNCTION} dense lines >= fail threshold ${FAIL_THRESHOLD_LARGE_FILE})`,
         },
         {
             rel: 'src/clean-compact.ts',
@@ -172,7 +177,7 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
         },
         {
             rel: 'src/creds.ts',
-            content: `export const token = "${['ghp', 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4'].join('_')}";\n`,
+            content: `export const token = "${['ghp', SYNTHETIC_SECRET_TOKEN_BODY].join('_')}";\n`,
             why: 'secrets:secret-detected (GitHub token signature)',
         },
         {
@@ -186,7 +191,13 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
             why: 'dependency-graph:import-cycle (same as above, cycle closing edge)',
         },
     ];
-    const config = {
+}
+
+/**
+ * Creates scanner configuration tailored for executing self-test assertion suite.
+ */
+function createFixtureScanConfig(): Record<string, unknown> {
+    return {
         include: ['src/**/*.ts'],
         analyzers: {
             constants: { enabled: true },
@@ -194,8 +205,8 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
             'large-file': {
                 enabled: true,
                 options: {
-                    fileLinesFail: 800,
-                    effectiveLocFail: 800,
+                    fileLinesFail: FAIL_THRESHOLD_LARGE_FILE,
+                    effectiveLocFail: FAIL_THRESHOLD_LARGE_FILE,
                 },
             },
             governance: { enabled: true },
@@ -206,22 +217,44 @@ function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown
             },
         },
     };
-    return { files, config };
+}
+
+/**
+ * Build the temporary fixture project files and the configuration enabling their analyzers.
+ *
+ * Each sample intentionally violates one analyzer contract, and the generated oversized module
+ * crosses the volume envelope through dense branching code rather than a constant catalog.
+ *
+ * @returns Fixture files with the reason each exists, plus the configuration that enables
+ *          the analyzers expected to fire on them.
+ */
+function buildFixtures(): { files: FixtureFile[]; config: Record<string, unknown> } {
+    const ifs = Array.from(
+        { length: FIXTURE_BRANCH_COUNT },
+        (_, i) => `  if (x > ${i}) { x = x - 1; }`,
+    ).join('\n');
+    const oversized = Array.from({ length: FIXTURE_OVERSIZED_FUNCTIONS }, (_, i) =>
+        FIXTURE_OVERSIZED_BODY(i),
+    ).join('');
+    return {
+        files: createFixtureViolationFiles(ifs, oversized),
+        config: createFixtureScanConfig(),
+    };
 }
 
 /**
  * Stable `analyzer:rule` pairs every analyzer family must hit; a miss means the engine regressed.
  */
 export const EXPECTED_PAIRS: Array<{ pair: string; why: string }> = [
-    { pair: 'constants:magic-number', why: 'Magic number detection' },
-    { pair: 'complexity:high-complexity', why: 'Cyclomatic complexity fail threshold' },
-    { pair: 'large-file:large-file', why: 'Large file fail threshold' },
-    { pair: 'governance:GOV-EXC-001', why: 'Empty catch block governance rule' },
-    { pair: 'governance:GOV-PRF-003', why: 'Timer literal (unclamped)' },
-    { pair: 'governance:GOV-PRF-004', why: 'Synchronous I/O blocks host' },
-    { pair: 'secrets:secret-detected', why: 'Secret pattern detection' },
-    { pair: 'dependency-graph:import-cycle', why: 'Circular dependency post-scan detection' },
-    { pair: 'dependency-graph:unused-module', why: 'Unused module post-scan detection' },
+    { pair: RULE_PAIR_MAGIC_NUMBER, why: 'Magic number detection' },
+    { pair: RULE_PAIR_HIGH_COMPLEXITY, why: 'Cyclomatic complexity fail threshold' },
+    { pair: RULE_PAIR_LARGE_FILE, why: 'Large file fail threshold' },
+    { pair: RULE_PAIR_GOV_EXC_001, why: 'Empty catch block governance rule' },
+    { pair: RULE_PAIR_GOV_PRF_003, why: 'Timer literal (unclamped)' },
+    { pair: RULE_PAIR_GOV_PRF_004, why: 'Synchronous I/O blocks host' },
+    { pair: RULE_PAIR_SECRET_DETECTED, why: 'Secret pattern detection' },
+    { pair: RULE_PAIR_IMPORT_CYCLE, why: 'Circular dependency post-scan detection' },
+    { pair: RULE_PAIR_UNUSED_MODULE, why: 'Unused module post-scan detection' },
 ];
 
 /**
@@ -296,23 +329,23 @@ function collectFalsePositives(issues: readonly ScanReport['issues'][number][]):
  * @param _args - Command-line arguments.
  * @returns Resulting exit code and text output report.
  */
-export async function selfTestCommand(_args: string[]): Promise<{ code: number; text: string }> {
+export async function runSelfTestCommand(_args: string[]): Promise<{ code: number; text: string }> {
     const lines: string[] = [];
-    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-refactor-selftest-'));
+    const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), SELFTEST_DIR_PREFIX));
     try {
         const { files, config } = buildFixtures();
         materializeFixtureFiles(fixtureRoot, files);
         fs.writeFileSync(
-            path.join(fixtureRoot, 'auto-refactor.config.json'),
+            path.join(fixtureRoot, CONFIG_FILE_NAME),
             JSON.stringify(config, null, 2),
             UTF8,
         );
 
         // Use the real scanAndRender pipeline (exemption, dependency-graph and baseline phases);
         // assert on the report written to the temporary file.
-        const reportPath = path.join(fixtureRoot, 'self-test-report.json');
+        const reportPath = path.join(fixtureRoot, REPORT_FILE_NAME);
         await scanAndRender({ root: fixtureRoot, format: 'json', cache: false, out: reportPath });
-        const report: ScanReport = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+        const report: ScanReport = JSON.parse(fs.readFileSync(reportPath, UTF8));
         const fired = new Set(report.issues.map((i) => `${i.analyzer}:${i.rule}`));
 
         let missedCount = 0;
@@ -357,3 +390,8 @@ export async function selfTestCommand(_args: string[]): Promise<{ code: number; 
         fs.rmSync(fixtureRoot, { recursive: true, force: true });
     }
 }
+
+/**
+ * Backward compatibility alias for runSelfTestCommand.
+ */
+export const selfTestCommand = runSelfTestCommand;
