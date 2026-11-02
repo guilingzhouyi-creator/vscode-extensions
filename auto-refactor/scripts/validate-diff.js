@@ -19,26 +19,26 @@
  *   oracle comparison is the contractual guarantee.
  */
 
-const { scan, scanDiff, scanDiffDelta } = require('../dist/api');
-const { computeEditRanges } = require('../dist/core/diff/edit-diff');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { scan, scanDiff, scanDiffDelta } = require('../dist/api');
+const { computeEditRanges } = require('../dist/core/diff/edit-diff');
 
 const ROOT = path.join(__dirname, '..');
 const CORPUS = path.join(__dirname, '.diff-corpus');
 const BIG = path.join(CORPUS, 'src', 'big.ts');
 
-const DEFAULT_TMP_DIR = process.env.AUTO_REFACTOR_TMPDIR || path.join(os.tmpdir(), 'ar-temp');
+const DEFAULT_SCRATCH_DIR = process.env.AUTO_REFACTOR_TMPDIR || path.join(os.tmpdir(), 'ar-temp');
 try {
-  fs.mkdirSync(DEFAULT_TMP_DIR, { recursive: true });
+  fs.mkdirSync(DEFAULT_SCRATCH_DIR, { recursive: true });
 } catch {
   // best-effort: ignore directory creation failure if it already exists
 }
 
-const CACHE_DIR = path.join(DEFAULT_TMP_DIR, 'ar-diff-validate-cache');
-process.env.AUTO_REFACTOR_REGISTRY_DIR ||= path.join(DEFAULT_TMP_DIR, 'ar-diff-registry');
+const CACHE_DIR = path.join(DEFAULT_SCRATCH_DIR, 'ar-diff-validate-cache');
+process.env.AUTO_REFACTOR_REGISTRY_DIR ||= path.join(DEFAULT_SCRATCH_DIR, 'ar-diff-registry');
 try {
   fs.mkdirSync(process.env.AUTO_REFACTOR_REGISTRY_DIR, { recursive: true });
 } catch {
@@ -105,7 +105,7 @@ const DEFAULT_CONFIG = Object.freeze({
  * @param lineCount - Number of function blocks to synthesize.
  * @returns Synthesized TypeScript code.
  */
-function baselineBig(lineCount) {
+function computeBigBaselineContent(lineCount) {
   const codeBlocks = [];
   for (let index = 0; index < lineCount; index++) {
     const limitOffset = BASE_LIMIT_OFFSET + (index % MODULO_DIVISOR);
@@ -177,7 +177,7 @@ function normalize(scanReport) {
  *
  * @param targetPath - Path to remove.
  */
-function rmRetry(targetPath) {
+function removeDirectoryWithRetry(targetPath) {
   try {
     fs.rmSync(targetPath, { recursive: true, force: true });
   } catch {
@@ -188,7 +188,7 @@ function rmRetry(targetPath) {
         .slice(RANDOM_STRING_START, RANDOM_STRING_END);
       fs.renameSync(
         targetPath,
-        path.join(DEFAULT_TMP_DIR, `ar-diff-stale-${Date.now()}-${randomSuffix}`),
+        path.join(DEFAULT_SCRATCH_DIR, `ar-diff-stale-${Date.now()}-${randomSuffix}`),
       );
     } catch {
       // ignore: secondary rename failure during teardown is non-fatal
@@ -199,7 +199,7 @@ function rmRetry(targetPath) {
 /**
  * Signals running background daemon to stop.
  */
-function daemonStop() {
+function stopDaemonService() {
   try {
     spawnSync(
       process.execPath,
@@ -216,7 +216,7 @@ function daemonStop() {
  *
  * @returns True if daemon started successfully.
  */
-function daemonStart() {
+function startDaemonService() {
   try {
     const spawnResult = spawnSync(
       process.execPath,
@@ -238,7 +238,7 @@ function daemonStart() {
  * @param smallContent - Initial content for small.ts.
  */
 function setupCorpus(corpusDir, baseContent, smallContent) {
-  rmRetry(corpusDir);
+  removeDirectoryWithRetry(corpusDir);
   fs.mkdirSync(path.join(corpusDir, 'src'), { recursive: true });
   writeConfig(path.join(corpusDir, CONFIG_FILE_NAME));
   fs.writeFileSync(path.join(corpusDir, FILE_BIG), baseContent);
@@ -286,9 +286,9 @@ function getColdScanOptions(corpusDir) {
  * @param baseContent - Original big.ts content.
  * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
-async function runD1(corpusDir, baseContent) {
+async function runDiffCaseSingleLine(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
-  const editedContent = baseContent.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 777;');
+  const editedContent = baseContent.replaceAll('  const LIMIT0 = 100;', '  const LIMIT0 = 777;');
   fs.writeFileSync(bigPath, editedContent);
 
   const coldScanReport = await scan(getColdScanOptions(corpusDir));
@@ -313,9 +313,9 @@ async function runD1(corpusDir, baseContent) {
  * @param baseContent - Original big.ts content.
  * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
-async function runD2(corpusDir, baseContent) {
+async function runDiffCaseRangesLine(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
-  const editedContent = baseContent.replace(
+  const editedContent = baseContent.replaceAll(
     '  if (x < -50) return -100;',
     '  if (x < -50) return -999;',
   );
@@ -345,10 +345,10 @@ async function runD2(corpusDir, baseContent) {
  * @param smallContent - Original small.ts content.
  * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
-async function runD3(corpusDir, baseContent, smallContent) {
+async function runDiffCaseMultiFile(corpusDir, baseContent, smallContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
   const smallPath = path.join(corpusDir, FILE_SMALL);
-  const bigEdited = baseContent.replace('  return x + 100;', '  return x + 424242;');
+  const bigEdited = baseContent.replaceAll('  return x + 100;', '  return x + 424242;');
   const smallEdited = "export const A = 42;\nexport const B = 'changed exported string';\n";
 
   fs.writeFileSync(bigPath, bigEdited);
@@ -379,9 +379,9 @@ async function runD3(corpusDir, baseContent, smallContent) {
  * @param baseContent - Original big.ts content.
  * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
-async function runD4(corpusDir, baseContent) {
+async function runDiffExceededBounds(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
-  const editedContent = baseContent.replace('  const LIMIT1 = 101;', '  const LIMIT1 = 555;');
+  const editedContent = baseContent.replaceAll('  const LIMIT1 = 101;', '  const LIMIT1 = 555;');
   fs.writeFileSync(bigPath, editedContent);
 
   const coldScanReport = await scan(getColdScanOptions(corpusDir));
@@ -417,9 +417,9 @@ async function runD4(corpusDir, baseContent) {
  * @param baseContent - Original big.ts content.
  * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
-async function runD5(corpusDir, baseContent) {
+async function runDiffCaseDiskMismatch(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
-  const editedContent = baseContent.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 888;');
+  const editedContent = baseContent.replaceAll('  const LIMIT0 = 100;', '  const LIMIT0 = 888;');
   fs.writeFileSync(bigPath, editedContent);
 
   const coldScanReport = await scan(getColdScanOptions(corpusDir));
@@ -444,9 +444,9 @@ async function runD5(corpusDir, baseContent) {
  * @param baseContent - Original big.ts content.
  * @returns Scenario outcome carrying its label, the equivalence verdict, and the observed counters.
  */
-async function runD6(corpusDir, baseContent) {
+async function runDiffCaseDeltaSubset(corpusDir, baseContent) {
   const bigPath = path.join(corpusDir, FILE_BIG);
-  const editedContent = baseContent.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 777;');
+  const editedContent = baseContent.replaceAll('  const LIMIT0 = 100;', '  const LIMIT0 = 777;');
   fs.writeFileSync(bigPath, editedContent);
 
   const fullResult = await scanDiff(
@@ -504,6 +504,94 @@ function formatTestResult(scenarioName, passed, extraDetails = '') {
   return `${statusPrefix} ${scenarioName}${suffix}`;
 }
 
+/**
+ * Runs independent standalone diff scenarios in parallel.
+ *
+ * @param baseContent - Original big.ts content.
+ * @param smallContent - Original small.ts content.
+ * @param recordResult - Result collector callback.
+ */
+async function runStandaloneScenarios(baseContent, smallContent, recordResult) {
+  const corpusDirs = Array.from({ length: CORPUS_INSTANCE_COUNT }, (_, index) =>
+    path.join(DEFAULT_SCRATCH_DIR, `ar-diff-corpus-${index + 1}`),
+  );
+  for (let index = 0; index < CORPUS_INSTANCE_COUNT; index++) {
+    setupCorpus(corpusDirs[index], baseContent, smallContent);
+  }
+
+  const results = await Promise.all([
+    runDiffCaseSingleLine(corpusDirs[0], baseContent),
+    runDiffCaseRangesLine(corpusDirs[1], baseContent),
+    runDiffCaseMultiFile(corpusDirs[2], baseContent, smallContent),
+    runDiffExceededBounds(corpusDirs[3], baseContent),
+    runDiffCaseDiskMismatch(corpusDirs[4], baseContent),
+    runDiffCaseDeltaSubset(corpusDirs[5], baseContent),
+  ]);
+
+  for (const result of results) {
+    recordResult(result.name, result.ok, result.extra);
+  }
+
+  for (const dirPath of corpusDirs) {
+    removeDirectoryWithRetry(dirPath);
+  }
+}
+
+/**
+ * Runs best-effort background daemon roundtrip verification.
+ *
+ * @param baseContent - Original big.ts content.
+ * @param smallContent - Original small.ts content.
+ * @param recordResult - Result collector callback.
+ */
+async function runDaemonRoundtripScenario(baseContent, smallContent, recordResult) {
+  setupCorpus(CORPUS, baseContent, smallContent);
+  removeDirectoryWithRetry(CACHE_DIR);
+  stopDaemonService();
+
+  const isDaemonStarted = startDaemonService();
+  if (!isDaemonStarted) {
+    console.log('SKIP D7 daemon-roundtrip (daemon did not start)');
+    return;
+  }
+
+  const daemonScanOptions = {
+    root: CORPUS,
+    configFile: CFG,
+    format: FORMAT_JSON,
+    logLevel: LOG_SILENT,
+    daemon: DAEMON_ON,
+    cache: true,
+    cacheDir: CACHE_DIR,
+  };
+
+  try {
+    // Prime daemon L2 + incremental state with a warm scan.
+    await scanDiff([], daemonScanOptions);
+
+    const editedContent = baseContent.replaceAll('  const LIMIT0 = 100;', '  const LIMIT0 = 999;');
+    fs.writeFileSync(BIG, editedContent);
+
+    const coldScanReport = await scan(getColdScanOptions(CORPUS));
+    const diffScanResult = await scanDiff(
+      [{ kind: 'full', filePath: FILE_BIG, oldContent: baseContent, newContent: editedContent }],
+      daemonScanOptions,
+    );
+
+    const isEquivalent =
+      JSON.stringify(normalize(coldScanReport)) ===
+      JSON.stringify(normalize(diffScanResult.report));
+    const isDaemonUsed = diffScanResult.stats.daemonUsed === true;
+    recordResult(
+      'D7 daemon-roundtrip',
+      isEquivalent && isDaemonUsed,
+      `daemonUsed=${diffScanResult.stats.daemonUsed} diffIncremental=${diffScanResult.stats.diffIncremental} diffFull=${diffScanResult.stats.diffFull}`,
+    );
+  } finally {
+    stopDaemonService();
+  }
+}
+
 async function main() {
   const previousIncremental = process.env.AR_INCREMENTAL;
   const previousMinLines = process.env.AR_INCREMENTAL_MIN_LINES;
@@ -522,88 +610,15 @@ async function main() {
     }
   };
 
-  const baseContent = baselineBig(BASELINE_LINE_COUNT);
+  const baseContent = computeBigBaselineContent(BASELINE_LINE_COUNT);
   const smallContent = "export const A = 42;\nexport const B = 'hello world exported';\n";
 
-  const corpusDirs = Array.from({ length: CORPUS_INSTANCE_COUNT }, (_, index) =>
-    path.join(DEFAULT_TMP_DIR, `ar-diff-corpus-${index + 1}`),
-  );
-  for (let index = 0; index < CORPUS_INSTANCE_COUNT; index++) {
-    setupCorpus(corpusDirs[index], baseContent, smallContent);
-  }
+  await runStandaloneScenarios(baseContent, smallContent, recordResult);
+  await runDaemonRoundtripScenario(baseContent, smallContent, recordResult);
 
-  const results = await Promise.all([
-    runD1(corpusDirs[0], baseContent),
-    runD2(corpusDirs[1], baseContent),
-    runD3(corpusDirs[2], baseContent, smallContent),
-    runD4(corpusDirs[3], baseContent),
-    runD5(corpusDirs[4], baseContent),
-    runD6(corpusDirs[5], baseContent),
-  ]);
-
-  for (const result of results) {
-    recordResult(result.name, result.ok, result.extra);
-  }
-
-  for (const dirPath of corpusDirs) {
-    rmRetry(dirPath);
-  }
-
-  // ---- D7: daemon round-trip (best-effort) ----
-  setupCorpus(CORPUS, baseContent, smallContent);
-  rmRetry(CACHE_DIR);
-  daemonStop();
-
-  const isDaemonStarted = daemonStart();
-  if (!isDaemonStarted) {
-    console.log('SKIP D7 daemon-roundtrip (daemon did not start)');
-  } else {
-    try {
-      // Prime daemon L2 + incremental state with a warm scan.
-      await scanDiff([], {
-        root: CORPUS,
-        configFile: CFG,
-        format: FORMAT_JSON,
-        logLevel: LOG_SILENT,
-        daemon: DAEMON_ON,
-        cache: true,
-        cacheDir: CACHE_DIR,
-      });
-
-      const editedContent = baseContent.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 999;');
-      fs.writeFileSync(BIG, editedContent);
-
-      const coldScanReport = await scan(getColdScanOptions(CORPUS));
-      const diffScanResult = await scanDiff(
-        [{ kind: 'full', filePath: FILE_BIG, oldContent: baseContent, newContent: editedContent }],
-        {
-          root: CORPUS,
-          configFile: CFG,
-          format: FORMAT_JSON,
-          logLevel: LOG_SILENT,
-          daemon: DAEMON_ON,
-          cache: true,
-          cacheDir: CACHE_DIR,
-        },
-      );
-
-      const isEquivalent =
-        JSON.stringify(normalize(coldScanReport)) ===
-        JSON.stringify(normalize(diffScanResult.report));
-      const isDaemonUsed = diffScanResult.stats.daemonUsed === true;
-      recordResult(
-        'D7 daemon-roundtrip',
-        isEquivalent && isDaemonUsed,
-        `daemonUsed=${diffScanResult.stats.daemonUsed} diffIncremental=${diffScanResult.stats.diffIncremental} diffFull=${diffScanResult.stats.diffFull}`,
-      );
-    } finally {
-      daemonStop();
-    }
-  }
-
-  daemonStop();
-  rmRetry(CORPUS);
-  rmRetry(CACHE_DIR);
+  stopDaemonService();
+  removeDirectoryWithRetry(CORPUS);
+  removeDirectoryWithRetry(CACHE_DIR);
 
   if (previousIncremental === undefined) {
     delete process.env.AR_INCREMENTAL;
@@ -625,6 +640,6 @@ async function main() {
 
 main().catch((err) => {
   console.error(err);
-  daemonStop();
+  stopDaemonService();
   process.exit(1);
 });
