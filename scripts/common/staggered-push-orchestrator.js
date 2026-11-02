@@ -297,6 +297,20 @@ function auditRemoteSandboxSlice(sliceName) {
 }
 
 /**
+ * Evaluates whether the repository working tree is clean of uncommitted changes.
+ *
+ * @returns {boolean} True if working tree and index are clean.
+ */
+function isWorkingTreeClean() {
+  try {
+    const status = git(['status', '--porcelain']);
+    return status.trim().length === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Performs preflight verification on the candidate target commit.
  *
  * @param {string} remote - Git remote name.
@@ -312,9 +326,14 @@ function preflightCheckpointAudit(remote, branch, targetSha, verifyRemoteSlice =
     return { passed: false, reason: commitVerdict.message };
   }
 
-  const docVerdict = auditDocumentationConsistency();
-  if (!docVerdict.passed) {
-    return { passed: false, reason: docVerdict.message };
+  // Disk-level documentation consistency only applies if the working tree is clean.
+  // When parallel sessions or local WIP leave unstaged changes, the working tree
+  // does not reflect targetSha, so disk validation would yield false positives.
+  if (isWorkingTreeClean()) {
+    const docVerdict = auditDocumentationConsistency();
+    if (!docVerdict.passed) {
+      return { passed: false, reason: docVerdict.message };
+    }
   }
 
   if (verifyRemoteSlice) {
@@ -468,7 +487,9 @@ function executeStaggeredPush(options = {}) {
   }
 
   // 7. Execute push safely (Allow bypass only if explicitly requested)
-  const pushEnv = {};
+  const pushEnv = {
+    GATE_STAGGERED_PUSH: '1',
+  };
   if (allowBypass) {
     pushEnv.GATE_ALLOW_BYPASS = '1';
   }

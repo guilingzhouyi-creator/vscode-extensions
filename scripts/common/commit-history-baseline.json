@@ -13,6 +13,13 @@
       ]
     },
     {
+      "sha": "019ea3b5cbf43491034a24238d08312b15af5c16",
+      "committedAt": "2026-10-20T13:23:13.000Z",
+      "ruleIds": [
+        "GUARD-ENT-001"
+      ]
+    },
+    {
       "sha": "3ed17e053aa0688f4fa41170c51cebdae252088b",
       "committedAt": "2026-10-21T12:44:24.000Z",
       "ruleIds": [

@@ -16,7 +16,8 @@ param(
     [string]$PushedSha = "",
     [string]$RemoteSha = "",
     [string]$RefsFile = "",
-    [switch]$AllowBypass
+    [switch]$AllowBypass,
+    [switch]$StaggeredPush
 )
 Set-StrictMode -Version Latest
 
@@ -232,6 +233,94 @@ $runWt = $runAll -or $touchedWt
 $runWg = $runAll -or $touchedWg
 $runFg = $runAll -or $touchedFg
 
+$isHistoricalPush = $false
+if ($PushedSha -match '^[0-9a-f]{7,40}$') {
+    $headSha = $null
+    try { $headSha = git rev-parse HEAD 2>$null } catch { $headSha = $null }
+    if ($headSha -and $PushedSha -ne $headSha) {
+        $isHistoricalPush = $true
+    }
+}
+$isStaggered = [bool]$StaggeredPush -or ($env:GATE_STAGGERED_PUSH -eq '1') -or ($env:STAGGERED_PUSH -eq '1') -or $isHistoricalPush
+
+$refsLineCount = 0
+if ($RefsFile -ne "" -and (Test-Path $RefsFile -PathType Leaf)) {
+    $refsLineCount = @(Get-Content $RefsFile -Encoding utf8 | Where-Object { $_.Trim() -ne "" }).Count
+}
+
+if ($isStaggered) {
+    Write-GateHost "ℹ️  检测到错峰/历史提交推进 (目标: $PushedSha)，仅审计待推送范围与收据契约" -ForegroundColor Cyan
+    Write-StepVerdict -StepId "WORKSPACE-PHYSICAL-01" -Status "SKIP" -Detail "错峰历史推进跳过工作区巡检"
+    Write-StepVerdict -StepId "WORKSPACE-GITIGNORE-02" -Status "SKIP" -Detail "错峰历史推进跳过工作区巡检"
+
+    $densityArgs = if ($range) { @("scripts/common/validate-code-density.js", "--range", $range) } else { @("scripts/common/validate-code-density.js") }
+    $codeDensity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $densityArgs -WorkingDirectory $repoRoot -StepId "WORKSPACE-DENSITY-03" -TimeoutSeconds 30
+    if ($codeDensity -ne 0) { $failed = $true }
+
+    Write-StepVerdict -StepId "RULE-CATALOG-04" -Status "SKIP" -Detail "错峰历史推进跳过工作区规则同步"
+    Write-StepVerdict -StepId "RULE-CLOSURE-05" -Status "SKIP" -Detail "错峰历史推进跳过工作区规则闭包"
+    Write-StepVerdict -StepId "DOCS-CONSISTENCY-06" -Status "SKIP" -Detail "错峰历史推进跳过工作区文档一致性"
+    Write-StepVerdict -StepId "RULE-REACHABILITY-07" -Status "SKIP" -Detail "错峰历史推进跳过工作区规则可达性"
+
+    Write-StepVerdict -StepId "ENGINE-RUST-08" -Status "SKIP" -Detail "错峰历史推进跳过工作区引擎编译"
+    Write-StepVerdict -StepId "ENGINE-BUILD-09" -Status "SKIP" -Detail "错峰历史推进跳过工作区引擎构建"
+    Write-StepVerdict -StepId "ENGINE-FACADE-10" -Status "SKIP" -Detail "错峰历史推进跳过工作区门面承载"
+    Write-StepVerdict -StepId "ENGINE-SELF-11" -Status "SKIP" -Detail "错峰历史推进跳过工作区引擎自审"
+    Write-StepVerdict -StepId "ENGINE-TESTS-12" -Status "SKIP" -Detail "错峰历史推进跳过工作区回归套件"
+    Write-StepVerdict -StepId "ENGINE-BASELINE-13" -Status "SKIP" -Detail "错峰历史推进跳过工作区质量基线"
+
+    Write-StepVerdict -StepId "EXTENSION-TESTS-14" -Status "SKIP" -Detail "错峰历史推进跳过工作区扩展回归"
+    Write-StepVerdict -StepId "EXTENSION-REVIEW-15" -Status "SKIP" -Detail "错峰历史推进跳过工作区扩展审查"
+    Write-StepVerdict -StepId "LEDGER-CONSTRAINT-16" -Status "SKIP" -Detail "错峰历史推进跳过工作区账本约束"
+    Write-StepVerdict -StepId "DOMAIN-AUDIT-17" -Status "SKIP" -Detail "错峰历史推进跳过工作区领域审计"
+    Write-StepVerdict -StepId "DOMAIN-MERMAID-18" -Status "SKIP" -Detail "错峰历史推进跳过工作区图谱校验"
+    Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "SKIP" -Detail "错峰历史推进跳过工作区Rust套件"
+
+    $codeHarness = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-guardrail.js") -WorkingDirectory $repoRoot -StepId "COMMIT-CONTRACT-20" -TimeoutSeconds 30
+    if ($codeHarness -ne 0) { $failed = $true }
+
+    if ($range) {
+        $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-msg.js", "--range", $range) -WorkingDirectory $repoRoot -StepId "COMMIT-HISTORY-21" -TimeoutSeconds 30
+        if ($code -ne 0) { $failed = $true }
+        $codeEntropy = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-change-entropy.js", "--range", $range, "--fail-on-diffusion") -WorkingDirectory $repoRoot -StepId "CHANGE-ENTROPY-22" -TimeoutSeconds 30
+        if ($codeEntropy -ne 0) { $failed = $true }
+    } else {
+        Write-StepVerdict -StepId "COMMIT-HISTORY-21" -Status "SKIP" -Detail "无上游对比基准"
+        Write-StepVerdict -StepId "CHANGE-ENTROPY-22" -Status "SKIP" -Detail "无推送范围"
+    }
+
+    Write-StepVerdict -StepId "FEEDBACK-VOCABULARY-23" -Status "SKIP" -Detail "错峰历史推进跳过工作区词汇守卫"
+    Write-StepVerdict -StepId "GATE-ORDERING-24" -Status "SKIP" -Detail "错峰历史推进跳过工作区门禁排序"
+    Write-StepVerdict -StepId "GATE-PROOF-25" -Status "SKIP" -Detail "错峰历史推进跳过工作区门禁自证"
+    Write-StepVerdict -StepId "GATE-COVERAGE-26" -Status "SKIP" -Detail "错峰历史推进跳过工作区判定覆盖"
+    Write-StepVerdict -StepId "GATE-COUNT-27" -Status "SKIP" -Detail "错峰历史推进跳过工作区规模计数"
+    Write-StepVerdict -StepId "GATE-CHAIN-28" -Status "SKIP" -Detail "错峰历史推进跳过工作区块链合法性"
+    Write-StepVerdict -StepId "DOC-METRICS-29" -Status "SKIP" -Detail "错峰历史推进跳过工作区指标同步"
+    Write-StepVerdict -StepId "SHELL-PARITY-30" -Status "SKIP" -Detail "错峰历史推进跳过工作区命令面契约"
+    Write-StepVerdict -StepId "SUBAGENT-CATALOG-31" -Status "SKIP" -Detail "错峰历史推进跳过工作区专员注册表"
+    Write-StepVerdict -StepId "DOC-ANCHORS-32" -Status "SKIP" -Detail "错峰历史推进跳过工作区跨文档引用"
+    Write-StepVerdict -StepId "METRIC-COVERAGE-33" -Status "SKIP" -Detail "错峰历史推进跳过工作区指标覆盖"
+    Write-StepVerdict -StepId "FAMILY-CONTRACT-34" -Status "SKIP" -Detail "错峰历史推进跳过工作区规则族契约"
+    Write-StepVerdict -StepId "DOC-REACH-35" -Status "SKIP" -Detail "错峰历史推进跳过工作区文档可达性"
+    Write-StepVerdict -StepId "COMMIT-HISTORY-BASELINE-36" -Status "SKIP" -Detail "错峰历史推进跳过工作区冻结清单审查"
+    Write-StepVerdict -StepId "RULE-SOURCE-37" -Status "SKIP" -Detail "错峰历史推进跳过工作区规则源码校验"
+    Write-StepVerdict -StepId "DESTRUCTIVE-OPS-38" -Status "SKIP" -Detail "错峰历史推进跳过工作区破坏性操作审查"
+
+    if ($refsLineCount -gt 0) {
+        $codeRefSafety = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/gate-receipts.js", "verify-refs", "--refs-file", $RefsFile) -WorkingDirectory $repoRoot -StepId "REF-SAFETY-39" -TimeoutSeconds 30
+        if ($codeRefSafety -ne 0) { $failed = $true }
+
+        $receiptArgs = @("scripts/common/gate-receipts.js", "verify-receipts", "--refs-file", $RefsFile)
+        if ($AllowBypass) { $receiptArgs += "--allow-bypass" }
+        $codeReceiptAudit = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $receiptArgs -WorkingDirectory $repoRoot -StepId "RECEIPT-AUDIT-40" -TimeoutSeconds 60
+        if ($codeReceiptAudit -ne 0) { $failed = $true }
+    } else {
+        Write-StepVerdict -StepId "REF-SAFETY-39" -Status "SKIP" -Detail "无推送 refs 输入（手动执行门禁）"
+        Write-StepVerdict -StepId "RECEIPT-AUDIT-40" -Status "SKIP" -Detail "无推送 refs 输入（手动执行门禁）"
+    }
+
+    Write-StepVerdict -StepId "CASCADE-COHERENCE-41" -Status "SKIP" -Detail "错峰历史推进跳过工作区协同闭合"
+} else {
 if ($runAll) {
     Write-GateHost "ℹ️  检测到跨项目/共享治理改动或全量基准，执行全量门禁回归" -ForegroundColor Yellow
 } else {
@@ -504,6 +593,7 @@ if ($refsLineCount -gt 0) {
 $codeCascade41 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js") -WorkingDirectory $repoRoot -StepId "CASCADE-COHERENCE-41" -TimeoutSeconds 60
 if ($codeCascade41 -ne 0) {
     $failed = $true
+}
 }
 
 

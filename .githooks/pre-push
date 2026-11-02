@@ -34,6 +34,9 @@ if command -v pwsh >/dev/null 2>&1 && [[ -f "$ROOT_DIR/scripts/ps1/pre-push-gate
     if [[ "${GATE_ALLOW_BYPASS:-0}" == "1" ]]; then
         GATE_ARGS+=(-AllowBypass)
     fi
+    if [[ "${GATE_STAGGERED_PUSH:-0}" == "1" || "${STAGGERED_PUSH:-0}" == "1" ]]; then
+        GATE_ARGS+=(-StaggeredPush)
+    fi
     pwsh "${GATE_ARGS[@]}"
 else
     GATE_ARGS=(--pushed-sha "$PUSHED_SHA" --remote-sha "$REMOTE_SHA")
@@ -42,6 +45,9 @@ else
     fi
     if [[ "${GATE_ALLOW_BYPASS:-0}" == "1" ]]; then
         GATE_ARGS+=(--allow-bypass)
+    fi
+    if [[ "${GATE_STAGGERED_PUSH:-0}" == "1" || "${STAGGERED_PUSH:-0}" == "1" ]]; then
+        GATE_ARGS+=(--staggered-push)
     fi
     bash "$ROOT_DIR/scripts/sh/pre-push-gate.sh" "${GATE_ARGS[@]}"
 fi

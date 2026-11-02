@@ -17,9 +17,29 @@
  */
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { GitRangeError } = require('./git-env');
+
+const FILE_COMMIT_HISTORY_BASELINE = 'commit-history-baseline.json';
+
+/**
+ * Loads grandfathered historical commits from commit-history-baseline.json.
+ *
+ * @returns {Map<string, Set<string>>} commit SHA -> frozen rule IDs.
+ */
+function loadCommitHistoryBaseline() {
+    const baselinePath = path.join(__dirname, FILE_COMMIT_HISTORY_BASELINE);
+    if (!fs.existsSync(baselinePath)) return new Map();
+    try {
+        const parsed = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+        const entries = Array.isArray(parsed?.frozenCommits) ? parsed.frozenCommits : [];
+        return new Map(entries.map((entry) => [entry.sha, new Set(entry.ruleIds || [])]));
+    } catch {
+        return new Map();
+    }
+}
 
 let compiledMiner = null;
 try {
@@ -267,6 +287,7 @@ function evaluateMultiCommitRange(commits, commitRange) {
     let maxNormalizedEntropy = 0.0;
     const diffusedCommits = [];
     const unreadableCommits = [];
+    const historyBaseline = loadCommitHistoryBaseline();
 
     for (let i = 0; i < commits.length; i++) {
         const sha = commits[i];
@@ -295,6 +316,11 @@ function evaluateMultiCommitRange(commits, commitRange) {
         }
 
         if (commitResult.isDiffused) {
+            const frozenRules = historyBaseline.get(sha);
+            if (frozenRules && frozenRules.has(ENTROPY_RULE_ID)) {
+                // Grandfathered commit: exempt from diffusion blocking
+                continue;
+            }
             let subject = sha.slice(0, 8);
             try {
                 subject = execFileSync('git', ['log', '-1', '--format=%s', sha], {

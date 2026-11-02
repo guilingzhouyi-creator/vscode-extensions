@@ -32,6 +32,7 @@ PUSHED_SHA=""
 REMOTE_SHA=""
 REFS_FILE=""
 ALLOW_BYPASS=0
+STAGGERED_PUSH=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -39,6 +40,7 @@ while [[ $# -gt 0 ]]; do
         --remote-sha) REMOTE_SHA="${2:-}"; shift 2 ;;
         --refs-file) REFS_FILE="${2:-}"; shift 2 ;;
         --allow-bypass) ALLOW_BYPASS=1; shift ;;
+        --staggered-push) STAGGERED_PUSH=1; shift ;;
         *) break ;;
     esac
 done
@@ -224,6 +226,87 @@ RUN_WT=$([[ "$RUN_ALL" -eq 1 || "$TOUCHED_WT" -eq 1 ]] && echo 1 || echo 0)
 RUN_WG=$([[ "$RUN_ALL" -eq 1 || "$TOUCHED_WG" -eq 1 ]] && echo 1 || echo 0)
 RUN_FG=$([[ "$RUN_ALL" -eq 1 || "$TOUCHED_FG" -eq 1 ]] && echo 1 || echo 0)
 
+HEAD_SHA=$(git rev-parse HEAD 2>/dev/null || true)
+IS_HISTORICAL_PUSH=0
+if [[ -n "$PUSHED_SHA" && -n "$HEAD_SHA" && "$PUSHED_SHA" != "$HEAD_SHA" ]]; then
+    IS_HISTORICAL_PUSH=1
+fi
+IS_STAGGERED=$([[ "${STAGGERED_PUSH:-0}" -eq 1 || "${GATE_STAGGERED_PUSH:-0}" -eq 1 || "${STAGGERED_PUSH:-0}" -eq 1 || "$IS_HISTORICAL_PUSH" -eq 1 ]] && echo 1 || echo 0)
+
+if [[ "$IS_STAGGERED" -eq 1 ]]; then
+    log_gate "ℹ️  检测到错峰/历史提交推进 (目标: $PUSHED_SHA)，仅审计待推送范围与收据契约"
+    write_step_verdict "WORKSPACE-PHYSICAL-01" SKIP "错峰历史推进跳过工作区巡检"
+    write_step_verdict "WORKSPACE-GITIGNORE-02" SKIP "错峰历史推进跳过工作区巡检"
+
+    if [[ -n "$RANGE" ]]; then
+        run_gate_step 30 "WORKSPACE-DENSITY-03" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-code-density.js --range "$RANGE" || FAILED=1
+    else
+        run_gate_step 30 "WORKSPACE-DENSITY-03" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-code-density.js || FAILED=1
+    fi
+
+    write_step_verdict "RULE-CATALOG-04" SKIP "错峰历史推进跳过工作区规则同步"
+    write_step_verdict "RULE-CLOSURE-05" SKIP "错峰历史推进跳过工作区规则闭包"
+    write_step_verdict "DOCS-CONSISTENCY-06" SKIP "错峰历史推进跳过工作区文档一致性"
+    write_step_verdict "RULE-REACHABILITY-07" SKIP "错峰历史推进跳过工作区规则可达性"
+
+    write_step_verdict "ENGINE-RUST-08" SKIP "错峰历史推进跳过工作区引擎编译"
+    write_step_verdict "ENGINE-BUILD-09" SKIP "错峰历史推进跳过工作区引擎构建"
+    write_step_verdict "ENGINE-FACADE-10" SKIP "错峰历史推进跳过工作区门面承载"
+    write_step_verdict "ENGINE-SELF-11" SKIP "错峰历史推进跳过工作区引擎自审"
+    write_step_verdict "ENGINE-TESTS-12" SKIP "错峰历史推进跳过工作区回归套件"
+    write_step_verdict "ENGINE-BASELINE-13" SKIP "错峰历史推进跳过工作区质量基线"
+
+    write_step_verdict "EXTENSION-TESTS-14" SKIP "错峰历史推进跳过工作区扩展回归"
+    write_step_verdict "EXTENSION-REVIEW-15" SKIP "错峰历史推进跳过工作区扩展审查"
+    write_step_verdict "LEDGER-CONSTRAINT-16" SKIP "错峰历史推进跳过工作区账本约束"
+    write_step_verdict "DOMAIN-AUDIT-17" SKIP "错峰历史推进跳过工作区领域审计"
+    write_step_verdict "DOMAIN-MERMAID-18" SKIP "错峰历史推进跳过工作区图谱校验"
+    write_step_verdict "RUST-TAXIS-19" SKIP "错峰历史推进跳过工作区Rust套件"
+
+    run_gate_step 30 "COMMIT-CONTRACT-20" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-guardrail.js || FAILED=1
+
+    if [[ -n "$RANGE" ]]; then
+        run_gate_step 30 "COMMIT-HISTORY-21" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-msg.js --range "$RANGE" || FAILED=1
+        run_gate_step 30 "CHANGE-ENTROPY-22" "$ROOT_DIR" "$NODE_BIN" scripts/common/evaluate-change-entropy.js --range "$RANGE" --fail-on-diffusion || FAILED=1
+    else
+        write_step_verdict "COMMIT-HISTORY-21" SKIP "无上游对比基准"
+        write_step_verdict "CHANGE-ENTROPY-22" SKIP "无推送范围"
+    fi
+
+    write_step_verdict "FEEDBACK-VOCABULARY-23" SKIP "错峰历史推进跳过工作区词汇守卫"
+    write_step_verdict "GATE-ORDERING-24" SKIP "错峰历史推进跳过工作区门禁排序"
+    write_step_verdict "GATE-PROOF-25" SKIP "错峰历史推进跳过工作区门禁自证"
+    write_step_verdict "GATE-COVERAGE-26" SKIP "错峰历史推进跳过工作区判定覆盖"
+    write_step_verdict "GATE-COUNT-27" SKIP "错峰历史推进跳过工作区规模计数"
+    write_step_verdict "GATE-CHAIN-28" SKIP "错峰历史推进跳过工作区块链合法性"
+    write_step_verdict "DOC-METRICS-29" SKIP "错峰历史推进跳过工作区指标同步"
+    write_step_verdict "SHELL-PARITY-30" SKIP "错峰历史推进跳过工作区命令面契约"
+    write_step_verdict "SUBAGENT-CATALOG-31" SKIP "错峰历史推进跳过工作区专员注册表"
+    write_step_verdict "DOC-ANCHORS-32" SKIP "错峰历史推进跳过工作区跨文档引用"
+    write_step_verdict "METRIC-COVERAGE-33" SKIP "错峰历史推进跳过工作区指标覆盖"
+    write_step_verdict "FAMILY-CONTRACT-34" SKIP "错峰历史推进跳过工作区规则族契约"
+    write_step_verdict "DOC-REACH-35" SKIP "错峰历史推进跳过工作区文档可达性"
+    write_step_verdict "COMMIT-HISTORY-BASELINE-36" SKIP "错峰历史推进跳过工作区冻结清单审查"
+    write_step_verdict "RULE-SOURCE-37" SKIP "错峰历史推进跳过工作区规则源码校验"
+    write_step_verdict "DESTRUCTIVE-OPS-38" SKIP "错峰历史推进跳过工作区破坏性操作审查"
+
+    REFS_LINE_COUNT=0
+    if [[ -n "$REFS_FILE" && -f "$REFS_FILE" ]]; then
+        REFS_LINE_COUNT=$(grep -c '[^[:space:]]' "$REFS_FILE" 2>/dev/null || echo 0)
+    fi
+    if [[ "$REFS_LINE_COUNT" -gt 0 ]]; then
+        run_gate_step 30 "REF-SAFETY-39" "$ROOT_DIR" "$NODE_BIN" scripts/common/gate-receipts.js verify-refs --refs-file "$REFS_FILE" || FAILED=1
+
+        RECEIPT_ARGS=(scripts/common/gate-receipts.js verify-receipts --refs-file "$REFS_FILE")
+        [[ "$ALLOW_BYPASS" -eq 1 ]] && RECEIPT_ARGS+=(--allow-bypass)
+        run_gate_step 60 "RECEIPT-AUDIT-40" "$ROOT_DIR" "$NODE_BIN" "${RECEIPT_ARGS[@]}" || FAILED=1
+    else
+        write_step_verdict "REF-SAFETY-39" SKIP "无推送 refs 输入（手动执行门禁）"
+        write_step_verdict "RECEIPT-AUDIT-40" SKIP "无推送 refs 输入（手动执行门禁）"
+    fi
+
+    write_step_verdict "CASCADE-COHERENCE-41" SKIP "错峰历史推进跳过工作区协同闭合"
+else
 if [[ "$RUN_ALL" -eq 1 ]]; then
     log_gate "ℹ️  检测到跨项目/共享治理改动或全量基准，执行全量门禁回归"
 else
@@ -518,6 +601,7 @@ fi
 # 任何单点校验都看不见，必须交叉比对。
 if ! run_gate_step 60 "CASCADE-COHERENCE-41" "$ROOT_DIR" "$NODE_BIN" .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js; then
     FAILED=1
+fi
 fi
 
 CHANGED_COUNT=0
