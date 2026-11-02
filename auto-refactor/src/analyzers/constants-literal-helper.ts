@@ -666,13 +666,13 @@ export function buildDuplicateIssue(
             lines: records.map((rec) => rec.node.start?.line ?? 1),
             suggestedName: suggested,
         },
-        suggestion: formatConstantDeclarationSuggestion(
-            ctx.filePath,
-            suggested,
-            first.value,
-            first.numeric,
-            `used ${records.length}x`,
-        ),
+        suggestion: formatConstantDeclarationSuggestion({
+            filePath: ctx.filePath,
+            name: suggested,
+            literalValue: first.value,
+            isNumeric: first.numeric,
+            comment: `used ${records.length}x`,
+        }),
         actionable: {
             action: ACTION_EXTRACT_CONSTANT,
             code: CODE_CONST_DUPLICATE_LITERAL,

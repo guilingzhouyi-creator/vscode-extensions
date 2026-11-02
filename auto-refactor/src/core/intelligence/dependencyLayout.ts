@@ -19,7 +19,7 @@
 
 import * as path from 'path';
 import type { Issue, SemanticEvidenceStep } from '../types';
-import type { ImportStatementInfo } from './dependencyLayoutHelpers';
+import type { ImportStatementInfo } from './dependency-layout-helpers';
 import {
     auditFileLayoutOrder,
     auditImportHorizon,
@@ -28,7 +28,7 @@ import {
     findAncestorPackageManifest,
     readJsonSafely,
     extractLicenseFromManifest,
-} from './dependencyLayoutHelpers';
+} from './dependency-layout-helpers';
 import {
     checkKnownPackageVulnerability,
     parsePackageSpecifier,
@@ -38,8 +38,8 @@ import { checkDeprecatedPackage } from './deprecated-dependencies';
 import type { ProjectManifestInventory } from './dependency-provenance';
 import { isDevOnlyDependency, isUnpinnedVersion } from './dependency-provenance';
 
-export { categorizeImport, extractExemptionReason } from './dependencyLayoutHelpers';
-export type { ImportCategory, ImportStatementInfo } from './dependencyLayoutHelpers';
+export { categorizeImport, extractExemptionReason } from './dependency-layout-helpers';
+export type { ImportCategory, ImportStatementInfo } from './dependency-layout-helpers';
 
 const SEVERITY_WARNING = 'warning';
 const SEVERITY_ERROR = 'error';

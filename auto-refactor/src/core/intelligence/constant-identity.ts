@@ -40,26 +40,6 @@ export const DOMAIN_BLOCK_LOCAL = 'block_local';
 /** Unknown code domain token. */
 export const DOMAIN_UNKNOWN = 'unknown';
 
-/** Number inferred constant type token. */
-export const INFERRED_TYPE_NUMBER = 'number';
-/** String inferred constant type token. */
-export const INFERRED_TYPE_STRING = 'string';
-/** Boolean inferred constant type token. */
-export const INFERRED_TYPE_BOOLEAN = 'boolean';
-/** Array inferred constant type token. */
-export const INFERRED_TYPE_ARRAY = 'array';
-/** Object inferred constant type token. */
-export const INFERRED_TYPE_OBJECT = 'object';
-/** Regular expression inferred constant type token. */
-export const INFERRED_TYPE_REGEX = 'regex';
-/** Unknown inferred constant type token. */
-export const INFERRED_TYPE_UNKNOWN = 'unknown';
-
-const DEFAULT_SEMANTIC_KIND = 'general';
-const HASH_ALGO_SHA256 = 'sha256';
-const ENCODING_UTF8 = 'utf8';
-const DIGEST_HEX = 'hex';
-
 /**
  * Standard intra-file code domain hierarchy representing structural zones.
  */
@@ -73,6 +53,37 @@ export type CodeDomainKind =
     | typeof DOMAIN_FUNCTION_LOCAL
     | typeof DOMAIN_BLOCK_LOCAL
     | typeof DOMAIN_UNKNOWN;
+
+/**
+ * Encapsulated frozen dictionary of inferred constant types.
+ */
+export const INFERRED_TYPES = Object.freeze({
+    NUMBER: 'number',
+    STRING: 'string',
+    BOOLEAN: 'boolean',
+    ARRAY: 'array',
+    OBJECT: 'object',
+    REGEX: 'regex',
+    UNKNOWN: 'unknown',
+} as const);
+
+/**
+ * Inferred data type of the constant value derived from canonical type dictionary.
+ */
+export type ConstantInferredType =
+    (typeof INFERRED_TYPES)[keyof typeof INFERRED_TYPES];
+
+const DEFAULT_SEMANTIC_KIND = 'general';
+const HASH_ALGO_SHA256 = 'sha256';
+const ENCODING_UTF8 = 'utf8';
+const DIGEST_HEX = 'hex';
+
+const MIN_CONTENT_LENGTH = 20;
+const MIN_EXPORT_CONST_THRESHOLD = 3;
+
+const RUST_TYPE_F64 = ': f64';
+const RUST_TYPE_I64 = ': i64';
+const RUST_TYPE_STR = ': &str';
 
 /**
  * Stable symbol identity descriptor identifying a constant entity across physical line shifts.
@@ -93,18 +104,6 @@ export interface ConstantSymbolIdentity {
     /** Source column number where declared, or null when unknown. */
     column?: number | null;
 }
-
-/**
- * Inferred data type of the constant value.
- */
-export type ConstantInferredType =
-    | typeof INFERRED_TYPE_NUMBER
-    | typeof INFERRED_TYPE_STRING
-    | typeof INFERRED_TYPE_BOOLEAN
-    | typeof INFERRED_TYPE_ARRAY
-    | typeof INFERRED_TYPE_OBJECT
-    | typeof INFERRED_TYPE_REGEX
-    | typeof INFERRED_TYPE_UNKNOWN;
 
 /**
  * Content- and semantic-derived fingerprint of a constant's value and immutability.
@@ -165,10 +164,7 @@ export function normalizeLiteralValue(raw: string, isNumeric: boolean): string {
         return stripLiteralQuotes(trimmed);
     }
     const num = Number(trimmed);
-    if (!Number.isNaN(num) && Number.isFinite(num)) {
-        return String(num);
-    }
-    return trimmed;
+    return !Number.isNaN(num) && Number.isFinite(num) ? String(num) : trimmed;
 }
 
 /**
@@ -195,11 +191,10 @@ export function computeConstantFingerprint(
     const isImmutable = params.isImmutable ?? true;
     const normalizedValue = normalizeLiteralValue(params.value, params.isNumeric);
     const inferredType: ConstantInferredType =
-        params.inferredType ?? (params.isNumeric ? INFERRED_TYPE_NUMBER : INFERRED_TYPE_STRING);
+        params.inferredType ?? (params.isNumeric ? INFERRED_TYPES.NUMBER : INFERRED_TYPES.STRING);
     const semanticKind = params.semanticKind ?? DEFAULT_SEMANTIC_KIND;
     const unit = params.unit;
 
-    // Construct deterministic serialization string
     const payload = `${inferredType}:${semanticKind}:${unit ?? ''}:${isImmutable ? '1' : '0'}:${normalizedValue}`;
     const semanticHash = crypto
         .createHash(HASH_ALGO_SHA256)
@@ -223,7 +218,7 @@ export function computeConstantFingerprint(
  * @param secondFingerprint - Second constant fingerprint.
  * @returns True if both fingerprints are semantically equivalent.
  */
-export function areSemanticallyEqual(
+export function compareSemanticEquality(
     firstFingerprint: ConstantSemanticFingerprint,
     secondFingerprint: ConstantSemanticFingerprint,
 ): boolean {
@@ -235,6 +230,9 @@ export function areSemanticallyEqual(
     );
 }
 
+/** Backward compatibility alias for compareSemanticEquality. */
+export const areSemanticallyEqual = compareSemanticEquality;
+
 /** Directory pattern matching constant, token, or dictionary directories. */
 const RE_CONSTANT_DIR = /(?:^|[\\/])(?:constants?|tokens?|dictionary|dictionaries)[\\/]/;
 
@@ -245,10 +243,7 @@ const RE_CONSTANT_FILE =
 /** File pattern matching rule, status, or error code file names. */
 const RE_CODE_FILE = /(?:^|[\\/]|[-_.])(?:[a-z0-9-_]*[-_.])?codes?\.[a-z0-9]+$/;
 
-/**
- * File pattern matching metadata catalog, recipe catalog, archetype, terminology,
- * or rule tables.
- */
+/** File pattern matching metadata catalog or table files. */
 const RE_METADATA_CATALOG_FILE =
     /(?:^|[\\/])(?:[a-z0-9-_.]*?)(?:catalog|recipe|archetype|terminology|shim|table|ruletable|dimension)[a-z0-9-_.]*\.[a-z0-9]+$/i;
 
@@ -261,31 +256,16 @@ const RE_FN_LIKE = /\bfunction\s+\w+|=>\s*\{/g;
 /** Matches top-level export const declarations. */
 const RE_EXPORT_CONST = /\bexport\s+const\s+[A-Za-z0-9_$]+\s*[:=]/g;
 
-/**
- * Checks if a file path belongs to a recognized constant directory or filename pattern.
- *
- * @param filePath - File path to inspect.
- * @returns True if path matches constant catalog conventions.
- */
 function isConstantPath(filePath: string): boolean {
     const norm = filePath.replace(/\\/g, '/').toLowerCase();
-    if (RE_CONSTANT_DIR.test(norm)) {
-        return true;
-    }
     return (
+        RE_CONSTANT_DIR.test(norm) ||
         RE_CONSTANT_FILE.test(norm) ||
         RE_CODE_FILE.test(norm) ||
         RE_METADATA_CATALOG_FILE.test(norm)
     );
 }
 
-/**
- * Counts non-overlapping regex matches in a given text.
- *
- * @param text - Input string to search.
- * @param regex - Regular expression with global flag.
- * @returns Total match occurrences.
- */
 function countRegexMatches(text: string, regex: RegExp): number {
     const matches = text.match(regex);
     return matches ? matches.length : 0;
@@ -311,21 +291,13 @@ export const CONSTANT_STATEMENT_PREFIXES: readonly string[] = [
 const RE_KEY_VAL_CONSTANT = /^[A-Za-z0-9_$]+(?::\s*|\s*=\s*)['"`0-9]/;
 
 function isConstantStatement(line: string): boolean {
-    if (CONSTANT_STATEMENT_PREFIXES.some((prefix) => line.startsWith(prefix))) {
-        return true;
-    }
-    if (line.includes('as const')) {
-        return true;
-    }
-    return RE_KEY_VAL_CONSTANT.test(line);
+    return (
+        CONSTANT_STATEMENT_PREFIXES.some((prefix) => line.startsWith(prefix)) ||
+        line.includes('as const') ||
+        RE_KEY_VAL_CONSTANT.test(line)
+    );
 }
 
-/**
- * Checks whether content lines are predominantly constant or enum definitions.
- *
- * @param lines - Non-empty, non-import lines.
- * @returns True if constant definitions make up at least half of the content lines.
- */
 function isConstantContentDominant(lines: string[]): boolean {
     if (lines.length === 0) return false;
     let constLineCount = 0;
@@ -337,32 +309,21 @@ function isConstantContentDominant(lines: string[]): boolean {
     return constLineCount / lines.length >= 0.5;
 }
 
-/**
- * Determines whether file content exhibits high-cohesion constant table characteristics.
- *
- * @param content - Source code text to analyze.
- * @returns True if content is a dedicated constant catalog.
- */
 function hasConstantTableCharacteristics(content: string): boolean {
-    if (!content || content.length < 20) return false;
+    if (!content || content.length < MIN_CONTENT_LENGTH) return false;
     const stripped = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
     if (/\bclass\s+\w+/.test(stripped)) return false;
 
-    const fnCount = countRegexMatches(stripped, RE_FN_LIKE);
-    if (fnCount > 2) return false;
-
-    const cfCount = countRegexMatches(stripped, RE_CONTROL_FLOW);
-    if (cfCount > 2) return false;
+    if (countRegexMatches(stripped, RE_FN_LIKE) > 2) return false;
+    if (countRegexMatches(stripped, RE_CONTROL_FLOW) > 2) return false;
 
     const hasEnum = /\b(?:export\s+)?enum\s+[A-Za-z0-9_$]+/.test(stripped);
     const hasAsConst = /\bas\s+const\b/.test(stripped);
     const exportConstCount = countRegexMatches(stripped, RE_EXPORT_CONST);
 
     const hasSufficientConstants =
-        exportConstCount >= 3 || hasEnum || (hasAsConst && exportConstCount >= 1);
-    if (!hasSufficientConstants) {
-        return false;
-    }
+        exportConstCount >= MIN_EXPORT_CONST_THRESHOLD || hasEnum || (hasAsConst && exportConstCount >= 1);
+    if (!hasSufficientConstants) return false;
 
     const lines = stripped
         .split('\n')
@@ -391,38 +352,46 @@ export function isConstantDefinitionFile(filePath: string, content?: string): bo
 }
 
 /**
+ * Configuration options for formatting a constant declaration suggestion.
+ */
+export interface ConstantProposalOptions {
+    filePath: string;
+    name: string;
+    literalValue: string;
+    isNumeric: boolean;
+    comment?: string;
+}
+
+/**
  * Format language-aware constant declaration proposal for analyzer suggestions.
  *
- * @param filePath - Target file path for language dialect determination.
- * @param name - Proposed constant identifier.
- * @param value - Literal string representation.
- * @param numeric - Whether literal is numeric.
- * @param comment - Optional diagnostic explanation comment.
+ * @param options - Configuration parameters for the declaration proposal.
  * @returns Idiomatic declaration string tailored for Python, GDScript, Rust, or TS/JS.
  */
 export function formatConstantDeclarationSuggestion(
-    filePath: string,
-    name: string,
-    value: string,
-    numeric: boolean,
-    comment?: string,
+    options: ConstantProposalOptions,
 ): string {
+    const { filePath, name, literalValue, isNumeric, comment } = options;
     const norm = filePath.replace(/\\/g, '/').toLowerCase();
     const commentText = comment ? comment.trim() : '';
 
     if (norm.endsWith('.py')) {
         const commentSuffix = commentText ? `  # ${commentText.replace(/^\/\/\s*/, '')}` : '';
-        return `${name} = ${value}${commentSuffix}`;
+        return `${name} = ${literalValue}${commentSuffix}`;
     }
     if (norm.endsWith('.gd')) {
         const commentSuffix = commentText ? ` # ${commentText.replace(/^\/\/\s*/, '')}` : '';
-        return `const ${name} = ${value}${commentSuffix}`;
+        return `const ${name} = ${literalValue}${commentSuffix}`;
     }
     if (norm.endsWith('.rs')) {
-        const typeAnnotation = numeric ? (value.includes('.') ? ': f64' : ': i64') : ': &str';
+        const typeAnnotation = isNumeric
+            ? literalValue.includes('.')
+                ? RUST_TYPE_F64
+                : RUST_TYPE_I64
+            : RUST_TYPE_STR;
         const commentSuffix = commentText ? ` // ${commentText.replace(/^\/\/\s*/, '')}` : '';
-        return `const ${name}${typeAnnotation} = ${value};${commentSuffix}`;
+        return `const ${name}${typeAnnotation} = ${literalValue};${commentSuffix}`;
     }
     const commentSuffix = commentText ? ` // ${commentText.replace(/^\/\/\s*/, '')}` : '';
-    return `const ${name} = ${value};${commentSuffix}`;
+    return `const ${name} = ${literalValue};${commentSuffix}`;
 }

@@ -15,7 +15,7 @@
  */
 
 import type { ConstantEntity } from '../intelligence/constant-identity';
-import { areSemanticallyEqual } from '../intelligence/constant-identity';
+import { compareSemanticEquality } from '../intelligence/constant-identity';
 import { extractConstantEntities } from './constant-entity-extractor';
 
 export { extractConstantEntities };
@@ -85,13 +85,13 @@ function matchesKind(
     if (kind === MATCH_KIND_IDENTICAL) {
         return (
             beforeEntity.identity.name === afterEntity.identity.name &&
-            areSemanticallyEqual(beforeEntity.fingerprint, afterEntity.fingerprint)
+            compareSemanticEquality(beforeEntity.fingerprint, afterEntity.fingerprint)
         );
     }
     if (kind === MATCH_KIND_RENAMED) {
         return (
             beforeEntity.identity.enclosingScope === afterEntity.identity.enclosingScope &&
-            areSemanticallyEqual(beforeEntity.fingerprint, afterEntity.fingerprint)
+            compareSemanticEquality(beforeEntity.fingerprint, afterEntity.fingerprint)
         );
     }
     return (

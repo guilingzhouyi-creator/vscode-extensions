@@ -3,7 +3,7 @@
  * File Path: src/core/intelligence/python-stdlib.ts
  * Architecture Role: Provides standard library module definitions to prevent false positives
  *   in dependency-graph cycle detection and layout checks.
- * Dependencies & Triggers: Consumed by dependency-graph and dependencyLayoutHelpers.
+ * Dependencies & Triggers: Consumed by dependency-graph and dependency-layout-helpers.
  * Responsibilities: Maintain immutable set of CPython standard library module names.
  * Exit Semantics & Design Rationale: Pure constant set, zero runtime side effects.
  */

@@ -367,12 +367,12 @@ export class ConstantsAnalyzer implements Analyzer {
             severity: SEVERITY_WARNING,
             message: res.message,
             detail: res.detail,
-            suggestion: formatConstantDeclarationSuggestion(
-                ctx.filePath,
-                res.suggested,
-                lit.value,
-                true,
-            ),
+            suggestion: formatConstantDeclarationSuggestion({
+                filePath: ctx.filePath,
+                name: res.suggested,
+                literalValue: lit.value,
+                isNumeric: true,
+            }),
         });
         issue.location = locN(lit.node, ctx.filePath);
         issue.actionable = {
@@ -527,12 +527,12 @@ export class ConstantsAnalyzer implements Analyzer {
                 ...(driftedRules.length > 0 ? { driftedRules } : {}),
                 ...(isBadge ? { terminalBadge: inner } : {}),
             },
-            suggestion: formatConstantDeclarationSuggestion(
-                ctx.filePath,
-                res.suggested,
-                text,
-                false,
-            ),
+            suggestion: formatConstantDeclarationSuggestion({
+                filePath: ctx.filePath,
+                name: res.suggested,
+                literalValue: text,
+                isNumeric: false,
+            }),
         });
         issue.location = locN(lit.node, ctx.filePath);
         issue.actionable = {
