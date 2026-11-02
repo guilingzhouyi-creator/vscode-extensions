@@ -23,7 +23,7 @@ import { evaluateEffectiveCommentDensity } from '../comments/comment-density-mod
 import { calculateShannonEntropy } from '../math';
 import { AntiGamingMessages } from '../messages';
 import { DEFAULT_SCORING_CONFIG, type AntiGamingScoringConfig } from './scoring-parameters';
-import type { DifferentialBoundsVerdict } from './diff-bounds-governor';
+import { type DifferentialBoundsVerdict, PERCENTAGE_SCALE_FACTOR } from './diff-bounds-governor';
 
 /**
  * Rule identifier for anti-gaming detection.
@@ -526,12 +526,14 @@ function checkSemanticRatioGaming(
     const netDebt = Number.isFinite(input.netDebtEliminated) ? input.netDebtEliminated : 0;
 
     if (semanticRatio <= threshold && netDebt <= 0) {
+        const ratioPercent = (semanticRatio * PERCENTAGE_SCALE_FACTOR).toFixed(2);
+        const thresholdPercent = (threshold * PERCENTAGE_SCALE_FACTOR).toFixed(2);
         return {
             isGaming: true,
             verdictCode: VERDICT_BLOCK_GAMING_DETECTED,
             reason:
-                `Semantic change ratio ${(semanticRatio * 100).toFixed(2)}% is at or below ` +
-                `${(threshold * 100).toFixed(2)}% with no net debt eliminated ` +
+                `Semantic change ratio ${ratioPercent}% is at or below ` +
+                `${thresholdPercent}% with no net debt eliminated ` +
                 `(${netDebt.toFixed(2)} points) while claiming a score gain.`,
         };
     }
@@ -560,13 +562,14 @@ function checkAdmissionTurnoverGaming(
         input.claimsScoreGain &&
         (input.netSemanticTurnover as number) < (input.admissionThreshold as number)
     ) {
+        const turnoverValue = (input.netSemanticTurnover as number).toFixed(2);
+        const thresholdValue = (input.admissionThreshold as number).toFixed(2);
         return {
             isGaming: true,
             verdictCode: VERDICT_BLOCK_GAMING_DETECTED,
             reason:
-                `Net semantic turnover ${(input.netSemanticTurnover as number).toFixed(2)} ` +
-                `is below empirical admission threshold ${(input.admissionThreshold as number).toFixed(2)} ` +
-                `while claiming a score gain.`,
+                `Net semantic turnover ${turnoverValue} is below empirical admission threshold ` +
+                `${thresholdValue} while claiming a score gain.`,
         };
     }
     return null;

@@ -60,6 +60,7 @@ const GIT_STATUS_PREFIX_LENGTH = 3;
 const MAX_PREVIEW_ISSUES = 5;
 const PERCENT_MULTIPLIER = 100;
 const DEFAULT_PREVIEW_PRECISION = 1;
+const DEFAULT_SLICE_COMPLEXITY_ESTIMATE = 10;
 
 const SEVERITY_INFO = 'info';
 const SEVERITY_WARNING = 'warning';
@@ -305,12 +306,12 @@ function parseTrajectoryLine(line) {
   try {
     const item = JSON.parse(line);
     if (!item || !item.eloc) return null;
-    const sem = Number(item.eloc.sem) || 0;
-    const reloc = Number(item.eloc.reloc) || 0;
-    const cosm = Number(item.eloc.cosm) || 0;
+    const semanticCount = Number(item.eloc.sem) || 0;
+    const relocatedCount = Number(item.eloc.reloc) || 0;
+    const cosmeticCount = Number(item.eloc.cosm) || 0;
     return {
       timestamp: item.t || Date.now(),
-      netSemanticTurnover: Math.max(0, sem - reloc - cosm),
+      netSemanticTurnover: Math.max(0, semanticCount - relocatedCount - cosmeticCount),
       gatePassed: Boolean(item.gate?.pass),
       effectiveLoc: Number(item.eloc.proc) || 0,
     };
@@ -348,15 +349,15 @@ function extractFileDiffLines(oldContent, newContent) {
   const { DIFF_OP_INSERT, DIFF_OP_DELETE } = require(MODULE_MYERS_ALGO);
   const oldLines = oldContent.split(/\r?\n/);
   const newLines = newContent.split(/\r?\n/);
-  const ops = fastDiff(oldLines, newLines);
+  const diffOperations = fastDiff(oldLines, newLines);
   const addedLines = [];
   const deletedLines = [];
 
-  for (const op of ops) {
-    if (op.type === DIFF_OP_INSERT) {
-      addedLines.push(newLines[op.bIdx] ?? '');
-    } else if (op.type === DIFF_OP_DELETE) {
-      deletedLines.push(oldLines[op.aIdx] ?? '');
+  for (const operation of diffOperations) {
+    if (operation.type === DIFF_OP_INSERT) {
+      addedLines.push(newLines[operation.bIdx] ?? '');
+    } else if (operation.type === DIFF_OP_DELETE) {
+      deletedLines.push(oldLines[operation.aIdx] ?? '');
     }
   }
 
@@ -375,15 +376,18 @@ function evaluateAdmissionTurnover(targetFiles) {
     evaluateDifferentialBounds,
     calculateEmpiricalAdmissionThreshold,
     appendAdmissionAuditRecord,
+    DEFAULT_TRAJECTORY_WINDOW_SIZE,
+    VERDICT_ADMITTED,
+    VERDICT_BLOCKED_INSUFFICIENT_TURNOVER,
   } = require(MODULE_DIFF_BOUNDS_GOVERNOR);
   const { classifySemanticDelta } = require(MODULE_SEMANTIC_CLASSIFIER);
 
-  let semanticAdded = 0;
-  let semanticDeleted = 0;
-  let relocated = 0;
-  let cosmetic = 0;
-  let physicalAdded = 0;
-  let physicalDeleted = 0;
+  let accumulatedSemanticAdded = 0;
+  let accumulatedSemanticDeleted = 0;
+  let accumulatedRelocated = 0;
+  let accumulatedCosmetic = 0;
+  let accumulatedPhysicalAdded = 0;
+  let accumulatedPhysicalDeleted = 0;
 
   for (const relPath of targetFiles) {
     const absPath = path.join(ROOT, relPath);
@@ -410,40 +414,40 @@ function evaluateAdmissionTurnover(targetFiles) {
     }
 
     const delta = classifySemanticDelta(relPath, oldContent, currentContent);
-    semanticAdded += delta.counters.added;
-    semanticDeleted += delta.counters.deleted;
-    relocated += delta.counters.relocated;
-    cosmetic += delta.counters.cosmetic;
-    physicalAdded += addedLines.length;
-    physicalDeleted += deletedLines.length;
+    accumulatedSemanticAdded += delta.counters.added;
+    accumulatedSemanticDeleted += delta.counters.deleted;
+    accumulatedRelocated += delta.counters.relocated;
+    accumulatedCosmetic += delta.counters.cosmetic;
+    accumulatedPhysicalAdded += addedLines.length;
+    accumulatedPhysicalDeleted += deletedLines.length;
   }
 
   const turnover = computeNetSemanticTurnover({
-    semanticAddedEloc: semanticAdded,
-    semanticDeletedEloc: semanticDeleted,
-    relocatedEloc: relocated,
-    cosmeticEloc: cosmetic,
-    physicalAddedLines: physicalAdded,
-    physicalDeletedLines: physicalDeleted,
+    semanticAddedEloc: accumulatedSemanticAdded,
+    semanticDeletedEloc: accumulatedSemanticDeleted,
+    relocatedEloc: accumulatedRelocated,
+    cosmeticEloc: accumulatedCosmetic,
+    physicalAddedLines: accumulatedPhysicalAdded,
+    physicalDeletedLines: accumulatedPhysicalDeleted,
   });
 
-  const recentRuns = loadRecentTrajectoryRuns(20);
+  const recentRuns = loadRecentTrajectoryRuns(DEFAULT_TRAJECTORY_WINDOW_SIZE);
   const admission = calculateEmpiricalAdmissionThreshold({
     recentRuns,
-    currentComplexity: 10,
-    currentEloc: Math.max(1, semanticAdded + semanticDeleted),
+    currentComplexity: DEFAULT_SLICE_COMPLEXITY_ESTIMATE,
+    currentEloc: Math.max(1, accumulatedSemanticAdded + accumulatedSemanticDeleted),
   });
 
   const passed = turnover.netSemanticTurnover >= admission.threshold;
-  const verdictCode = passed ? 'ADMITTED' : 'BLOCKED_INSUFFICIENT_TURNOVER';
+  const verdictCode = passed ? VERDICT_ADMITTED : VERDICT_BLOCKED_INSUFFICIENT_TURNOVER;
 
   // Asynchronously record audit ledger entry
   void appendAdmissionAuditRecord(
     {
       timestamp: Date.now(),
       commitStagingDigest: `scan-${process.pid}`,
-      lAdd: physicalAdded,
-      lDel: physicalDeleted,
+      lAdd: accumulatedPhysicalAdded,
+      lDel: accumulatedPhysicalDeleted,
       netSemanticTurnover: turnover.netSemanticTurnover,
       admissionThreshold: admission.threshold,
       turnoverRatio: turnover.turnoverRatio,

@@ -35,6 +35,9 @@ export const INFLATION_SAMPLE_LINE_THRESHOLD = 15;
 /** Maximum fraction of an existing file's LOC that may be deleted without equivalent compensation. */
 export const MAX_DELETION_FRACTION_EROSION = 0.40;
 
+/** Minimum deletion line allowance floor below which small file deletions are exempt from erosion checks. */
+export const MIN_DELETION_ALLOWANCE_LOC = 10;
+
 /** Absolute default ceiling for effective LOC budget per single file. */
 export const DEFAULT_FILE_LOC_BUDGET = 900;
 
@@ -52,6 +55,33 @@ export const MAX_NOISE_CEILING = 4.0;
 
 /** Default sliding window size for historical trajectory sampling. */
 export const DEFAULT_TRAJECTORY_WINDOW_SIZE = 20;
+
+/** Default language identifier for differential code analysis. */
+export const DEFAULT_DIFF_LANGUAGE = 'typescript';
+
+/** Bayesian prior alpha parameter for Jeffreys Beta(0.5, 0.5) distribution. */
+export const JEFFREYS_PRIOR_ALPHA = 0.5;
+
+/** Bayesian prior beta parameter for Jeffreys Beta(0.5, 0.5) distribution. */
+export const JEFFREYS_PRIOR_BETA = 0.5;
+
+/** Fallback posterior confidence value when sample size is zero. */
+export const JEFFREYS_DEFAULT_POSTERIOR = 0.5;
+
+/** Discount factor applied to trajectory standard deviation in empirical threshold derivation. */
+export const STANDARD_DEVIATION_DISCOUNT_FACTOR = 0.5;
+
+/** Percentage calculation scaling multiplier. */
+export const PERCENTAGE_SCALE_FACTOR = 100;
+
+/** Decimal rounding scaling factor for tenth precision (1 decimal place). */
+export const DECIMAL_ROUNDING_FACTOR_TENTH = 10;
+
+/** Decimal rounding scaling factor for hundredth precision (2 decimal places). */
+export const DECIMAL_ROUNDING_FACTOR_HUNDREDTH = 100;
+
+/** Decimal rounding scaling factor for thousandth precision (3 decimal places). */
+export const DECIMAL_ROUNDING_FACTOR_THOUSANDTH = 1000;
 
 /** Relative directory name for local auto-refactor cache. */
 export const CACHE_DIRECTORY_NAME = '.auto-refactor-cache';
@@ -197,7 +227,10 @@ export interface AdmissionAuditRecord {
  * @param language - Optional language identifier.
  * @returns TSPR in [0.0, 1.0].
  */
-export function computeAddedLinesTspr(addedLines: readonly string[], language = 'typescript'): number {
+export function computeAddedLinesTspr(
+    addedLines: readonly string[],
+    language: string = DEFAULT_DIFF_LANGUAGE,
+): number {
     if (!addedLines || addedLines.length === 0) {
         return 1.0;
     }
@@ -211,21 +244,21 @@ export function computeAddedLinesTspr(addedLines: readonly string[], language = 
 }
 
 /**
- * Counts useful lines among additions by excluding cosmetic comments, blanks, and boilerplate.
+ * Counts substantive lines among additions by excluding cosmetic comments, blanks, and boilerplate.
  *
  * @param addedLines - Newly added line strings.
- * @returns Count of useful substantive lines.
+ * @returns Count of substantive useful lines.
  */
 export function countUsefulAddedLines(addedLines: readonly string[]): number {
-    let useful = 0;
-    for (let i = 0; i < addedLines.length; i++) {
-        const line = addedLines[i];
-        if (isCosmeticDiffLine(line) || isBoilerplateDiffLine(line)) {
+    let substantiveLineCount = 0;
+    for (let lineIndex = 0; lineIndex < addedLines.length; lineIndex++) {
+        const lineContent = addedLines[lineIndex];
+        if (isCosmeticDiffLine(lineContent) || isBoilerplateDiffLine(lineContent)) {
             continue;
         }
-        useful++;
+        substantiveLineCount++;
     }
-    return useful;
+    return substantiveLineCount;
 }
 
 /**
@@ -235,32 +268,46 @@ export function countUsefulAddedLines(addedLines: readonly string[]): number {
  * @returns Derived envelope limits and measured payload attributes.
  */
 export function computeEnvelopeBounds(params: DifferentialBoundsParams): DifferentialEnvelopeBounds {
-    const oldLoc = params.oldContent.split(/\r?\n/).filter((line) => line.trim().length > 0).length;
-    const locBudget = params.fileLocBudget ?? DEFAULT_FILE_LOC_BUDGET;
+    const originalLineCount = params.oldContent
+        .split(/\r?\n/)
+        .filter((line) => line.trim().length > 0)
+        .length;
+    const fileLocBudget = params.fileLocBudget ?? DEFAULT_FILE_LOC_BUDGET;
+    const isNewFile = originalLineCount === 0;
 
     // 1. Addition envelope bounds
-    const maxExpansionByRatio = Math.max(MIN_EXPANSION_ALLOWANCE_LOC, Math.floor(oldLoc * MAX_EXPANSION_LOC_RATIO));
-    const maxExpansionByBudget = Math.max(0, locBudget - oldLoc);
-    const addMax = Math.max(MIN_EXPANSION_ALLOWANCE_LOC, Math.min(maxExpansionByBudget, maxExpansionByRatio));
-    const addMin = 0;
+    const maxExpansionByRatio = Math.max(
+        MIN_EXPANSION_ALLOWANCE_LOC,
+        Math.floor(originalLineCount * MAX_EXPANSION_LOC_RATIO),
+    );
+    const remainingBudget = Math.max(0, fileLocBudget - originalLineCount);
+    const additionUpperBound = isNewFile
+        ? fileLocBudget
+        : Math.max(
+            Math.min(MIN_EXPANSION_ALLOWANCE_LOC, remainingBudget),
+            Math.min(remainingBudget, maxExpansionByRatio),
+        );
+    const additionLowerBound = 0;
 
     // 2. Addition payload density measurements
-    const usefulAdded = countUsefulAddedLines(params.addedLines);
+    const usefulAddedLines = countUsefulAddedLines(params.addedLines);
     const tsprAdded = computeAddedLinesTspr(params.addedLines, params.language);
     const semanticDensity = params.addedLines.length > 0
-        ? safeDivide(usefulAdded, params.addedLines.length)
+        ? safeDivide(usefulAddedLines, params.addedLines.length)
         : 1.0;
 
     // 3. Deletion envelope bounds
-    const delMin = 0;
-    const delMax = Math.max(10, Math.floor(oldLoc * MAX_DELETION_FRACTION_EROSION));
+    const deletionLowerBound = 0;
+    const deletionUpperBound = isNewFile
+        ? 0
+        : Math.max(MIN_DELETION_ALLOWANCE_LOC, Math.floor(originalLineCount * MAX_DELETION_FRACTION_EROSION));
 
     return {
-        addMin,
-        addMax,
-        delMin,
-        delMax,
-        usefulAddedLines: usefulAdded,
+        addMin: additionLowerBound,
+        addMax: additionUpperBound,
+        delMin: deletionLowerBound,
+        delMax: deletionUpperBound,
+        usefulAddedLines,
         tsprAdded,
         semanticDensity,
     };
@@ -269,30 +316,33 @@ export function computeEnvelopeBounds(params: DifferentialBoundsParams): Differe
 /**
  * Checks for addition inflation violations.
  *
- * @param lAdd - Count of added lines.
+ * @param addedLineCount - Count of added lines.
  * @param bounds - Computed envelope bounds.
  * @returns Violation reason if inflation detected, undefined otherwise.
  */
-function checkAdditionInflation(lAdd: number, bounds: DifferentialEnvelopeBounds): string | undefined {
-    if (lAdd <= INFLATION_SAMPLE_LINE_THRESHOLD) {
+function checkAdditionInflation(
+    addedLineCount: number,
+    bounds: DifferentialEnvelopeBounds,
+): string | undefined {
+    if (addedLineCount <= INFLATION_SAMPLE_LINE_THRESHOLD) {
         return undefined;
     }
     if (bounds.tsprAdded < MIN_TSPR_ADDED_THRESHOLD) {
         return (
-            `Addition semantic payload ratio TSPR (${bounds.tsprAdded.toFixed(3)}) is below ` +
-            `required minimum (${MIN_TSPR_ADDED_THRESHOLD}) across ${lAdd} added lines.`
+            `Addition token semantic payload ratio TSPR (${bounds.tsprAdded.toFixed(3)}) is below ` +
+            `the required minimum threshold (${MIN_TSPR_ADDED_THRESHOLD.toFixed(3)}) across ${addedLineCount} added lines.`
         );
     }
     if (bounds.semanticDensity < MIN_SEMANTIC_LINE_DENSITY) {
         return (
-            `Addition semantic line density (${bounds.semanticDensity.toFixed(3)}) is below ` +
-            `required minimum (${MIN_SEMANTIC_LINE_DENSITY}) with ${bounds.usefulAddedLines}/${lAdd} useful lines.`
+            `Addition substantive line density (${bounds.semanticDensity.toFixed(3)}) is below ` +
+            `the required minimum threshold (${MIN_SEMANTIC_LINE_DENSITY.toFixed(3)}) with ${bounds.usefulAddedLines}/${addedLineCount} substantive lines.`
         );
     }
-    if (lAdd > bounds.addMax) {
+    if (addedLineCount > bounds.addMax) {
         return (
-            `Addition volume (${lAdd} lines) exceeds maximum single-module expansion envelope ` +
-            `(${bounds.addMax} lines). Extract independent sub-modules first.`
+            `Addition volume (${addedLineCount} lines) exceeds the single-file expansion envelope ` +
+            `(${bounds.addMax} lines). Modularize into smaller decoupled components before integrating.`
         );
     }
     return undefined;
@@ -301,24 +351,24 @@ function checkAdditionInflation(lAdd: number, bounds: DifferentialEnvelopeBounds
 /**
  * Checks for capability erosion deletion violations.
  *
- * @param lDel - Count of deleted lines.
+ * @param deletedLineCount - Count of deleted lines.
  * @param bounds - Computed envelope bounds.
  * @param params - Differential bounds evaluation parameters.
  * @returns Violation reason if erosion detected, undefined otherwise.
  */
 function checkCapabilityErosion(
-    lDel: number,
+    deletedLineCount: number,
     bounds: DifferentialEnvelopeBounds,
     params: DifferentialBoundsParams,
 ): string | undefined {
-    if (lDel <= bounds.delMax) {
+    if (deletedLineCount <= bounds.delMax) {
         return undefined;
     }
     if (params.hasEquivalentExtraction || params.isFormalRetirement) {
         return undefined;
     }
     return (
-        `Deletion volume (${lDel} lines) exceeds safe single-file erosion ceiling ` +
+        `Deletion volume (${deletedLineCount} lines) exceeds safe single-file erosion ceiling ` +
         `(${bounds.delMax} lines) without verified equivalent module extraction or formal retirement.`
     );
 }
@@ -331,10 +381,10 @@ function checkCapabilityErosion(
  */
 export function evaluateDifferentialBounds(params: DifferentialBoundsParams): DifferentialBoundsVerdict {
     const bounds = computeEnvelopeBounds(params);
-    const lAdd = params.addedLines.length;
-    const lDel = params.deletedLines.length;
+    const addedLineCount = params.addedLines.length;
+    const deletedLineCount = params.deletedLines.length;
 
-    const inflationReason = checkAdditionInflation(lAdd, bounds);
+    const inflationReason = checkAdditionInflation(addedLineCount, bounds);
     if (inflationReason) {
         return {
             isAllowed: false,
@@ -344,7 +394,7 @@ export function evaluateDifferentialBounds(params: DifferentialBoundsParams): Di
         };
     }
 
-    const erosionReason = checkCapabilityErosion(lDel, bounds, params);
+    const erosionReason = checkCapabilityErosion(deletedLineCount, bounds, params);
     if (erosionReason) {
         return {
             isAllowed: false,
@@ -377,15 +427,21 @@ export function computeNetSemanticTurnover(params: NetTurnoverParams): NetTurnov
         physicalDeletedLines,
     } = params;
 
-    const rawNet = semanticAddedEloc + semanticDeletedEloc - relocatedEloc - cosmeticEloc;
-    const netSemanticTurnover = Math.max(0, Math.round(rawNet * 100) / 100);
+    const rawNetTurnover = semanticAddedEloc + semanticDeletedEloc - relocatedEloc - cosmeticEloc;
+    const netSemanticTurnover = Math.max(
+        0,
+        Math.round(rawNetTurnover * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH,
+    );
 
-    const totalPhysical = physicalAddedLines + physicalDeletedLines;
-    const turnoverRatio = totalPhysical > 0
-        ? Math.round(safeDivide(netSemanticTurnover, totalPhysical) * 1000) / 1000
+    const totalPhysicalLines = physicalAddedLines + physicalDeletedLines;
+    const turnoverRatio = totalPhysicalLines > 0
+        ? Math.round(safeDivide(netSemanticTurnover, totalPhysicalLines) * DECIMAL_ROUNDING_FACTOR_THOUSANDTH) /
+            DECIMAL_ROUNDING_FACTOR_THOUSANDTH
         : 1.0;
 
-    const effectiveTurnoverScore = Math.round(netSemanticTurnover * turnoverRatio * 100) / 100;
+    const effectiveTurnoverScore =
+        Math.round(netSemanticTurnover * turnoverRatio * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
+        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
 
     return {
         netSemanticTurnover,
@@ -420,23 +476,21 @@ export function calculateEmpiricalAdmissionThreshold(
         };
     }
 
-    const turnoverValues = sliceRuns.map((r) => r.netSemanticTurnover);
+    const turnoverValues = sliceRuns.map((runPoint) => runPoint.netSemanticTurnover);
     const moments: StatisticalMoments = computeStatisticalMoments(turnoverValues);
 
     let passCount = 0;
-    for (let i = 0; i < sliceRuns.length; i++) {
-        if (sliceRuns[i].gatePassed) {
+    for (let runIndex = 0; runIndex < sliceRuns.length; runIndex++) {
+        if (sliceRuns[runIndex].gatePassed) {
             passCount++;
         }
     }
 
     // Bayesian Jeffreys Beta(0.5, 0.5) posterior success rate
-    const alpha0 = 0.5;
-    const beta0 = 0.5;
     const posteriorConfidence = safeDivide(
-        passCount + alpha0,
-        sliceRuns.length + alpha0 + beta0,
-        0.5,
+        passCount + JEFFREYS_PRIOR_ALPHA,
+        sliceRuns.length + JEFFREYS_PRIOR_ALPHA + JEFFREYS_PRIOR_BETA,
+        JEFFREYS_DEFAULT_POSTERIOR,
     );
 
     // Code noise penalty: Noise = CC / max(1, ELOC)
@@ -445,16 +499,20 @@ export function calculateEmpiricalAdmissionThreshold(
     const noiseFactor = safeDivide(boundedNoise, MAX_NOISE_CEILING);
 
     // Dynamic threshold derivation
-    const statisticalCenter = Math.max(0, moments.mean - 0.5 * moments.standardDeviation);
-    const calibratedValue = statisticalCenter * (1.0 - noiseFactor) * posteriorConfidence;
-    const threshold = Math.round(Math.max(ADMISSION_TURNOVER_FLOOR, calibratedValue) * 100) / 100;
+    const discountStandardDeviation = STANDARD_DEVIATION_DISCOUNT_FACTOR * moments.standardDeviation;
+    const statisticalCenter = Math.max(0, moments.mean - discountStandardDeviation);
+    const calibratedThreshold = statisticalCenter * (1.0 - noiseFactor) * posteriorConfidence;
+    const threshold =
+        Math.round(Math.max(ADMISSION_TURNOVER_FLOOR, calibratedThreshold) * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
+        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
 
     return {
         threshold,
         rollingMean: moments.mean,
         rollingStdDev: moments.standardDeviation,
-        noiseFactor: Math.round(noiseFactor * 1000) / 1000,
-        posteriorConfidence: Math.round(posteriorConfidence * 1000) / 1000,
+        noiseFactor: Math.round(noiseFactor * DECIMAL_ROUNDING_FACTOR_THOUSANDTH) / DECIMAL_ROUNDING_FACTOR_THOUSANDTH,
+        posteriorConfidence:
+            Math.round(posteriorConfidence * DECIMAL_ROUNDING_FACTOR_THOUSANDTH) / DECIMAL_ROUNDING_FACTOR_THOUSANDTH,
         sampleCount: sliceRuns.length,
     };
 }

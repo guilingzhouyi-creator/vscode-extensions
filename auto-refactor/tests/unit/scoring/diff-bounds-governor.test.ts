@@ -44,6 +44,22 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
     });
 
     describe('computeEnvelopeBounds & Line Metrics', () => {
+        it('allows full budget expansion for brand new file creation', () => {
+            const bounds = computeEnvelopeBounds({
+                filePath: 'src/new-feature.ts',
+                oldContent: '',
+                newContent: 'export const initial = 1;',
+                addedLines: ['export const initial = 1;'],
+                deletedLines: [],
+                fileLocBudget: 900,
+            });
+
+            expect(bounds.addMax).toBe(900);
+            expect(bounds.delMax).toBe(0);
+            expect(bounds.usefulAddedLines).toBe(1);
+            expect(bounds.semanticDensity).toBe(1.0);
+        });
+
         it('assigns minimum expansion allowance to small baseline files', () => {
             const oldContent = 'const a = 1;\nconst b = 2;\n';
             const bounds = computeEnvelopeBounds({
@@ -159,7 +175,7 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
 
             expect(verdict.isAllowed).toBe(false);
             expect(verdict.verdictCode).toBe(VERDICT_BLOCK_GAMING_INFLATION);
-            expect(verdict.reason).toContain('Addition semantic line density');
+            expect(verdict.reason).toContain('Addition substantive line density');
         });
 
         it('intercepts addition volume exceeding maximum expansion envelope', () => {
@@ -181,7 +197,7 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
 
             expect(verdict.isAllowed).toBe(false);
             expect(verdict.verdictCode).toBe(VERDICT_BLOCK_GAMING_INFLATION);
-            expect(verdict.reason).toContain('exceeds maximum single-module expansion envelope');
+            expect(verdict.reason).toContain('exceeds the single-file expansion envelope');
         });
 
         it('intercepts capability erosion when excessive deletions lack compensation', () => {
