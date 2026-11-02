@@ -81,7 +81,7 @@ import type { ScanWithCacheOptions } from './scanner/cache-scanner';
 import { executeScanWithCache } from './scanner/cache-scanner';
 import type { ScanWithDiffOptions } from './scanner/diff-scanner';
 import { executeScanWithDiff } from './scanner/diff-scanner';
-import type { ScannerContext } from './scanner/scanner-context';
+import type { RunAnalyzersExecutionOptions, ScannerContext } from './scanner/scanner-context';
 
 /**
  * Optional analyzer capability consumed by the semantic-complexity post-scan pass.
@@ -501,9 +501,25 @@ export class Scanner implements ScannerContext {
         rel: string,
         content: string,
         seed?: IncrementalFileState,
-        ...executionScope: [activeAnalyzers?: Set<string>, lineBounds?: readonly [number, number]]
+        ...executionScope: [
+            scopeOrOptions?: Set<string> | RunAnalyzersExecutionOptions,
+            lineBounds?: readonly [number, number],
+        ]
     ): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
-        const [activeAnalyzers, lineBounds] = executionScope;
+        const [scopeOrOptions, positionalBounds] = executionScope;
+        let activeAnalyzers: Set<string> | undefined;
+        let lineBounds: readonly [number, number] | undefined;
+
+        if (scopeOrOptions instanceof Set) {
+            activeAnalyzers = scopeOrOptions;
+            lineBounds = positionalBounds;
+        } else if (scopeOrOptions && typeof scopeOrOptions === 'object') {
+            activeAnalyzers = scopeOrOptions.activeAnalyzers;
+            lineBounds = scopeOrOptions.lineBounds ?? positionalBounds;
+        } else {
+            lineBounds = positionalBounds;
+        }
+
         return runFileAnalyzers(
             {
                 config: this.config,

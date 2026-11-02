@@ -506,7 +506,7 @@ function validateVectorConsistency(baselineDimensions, trajectoryVec) {
     const dim = REQUIRED_TEN_DIMENSIONS[i];
     const baseScore = baselineDimensions[dim];
     const trajScore = trajectoryVec[i];
-    if (Math.abs(baseScore - trajScore) > 0.05) {
+    if (Math.abs(baseScore - trajScore) > 0.05 + 1e-6) {
       return {
         consistent: false,
         reason: `Dimension '${dim}' mismatch: baseline=${baseScore}, trajectory=${trajScore}`,

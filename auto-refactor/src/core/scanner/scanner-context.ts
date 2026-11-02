@@ -19,6 +19,12 @@ export {
     shouldExecuteAnalyzer,
 } from './trigger-catalog';
 
+/** Options parameter object for ScannerContext.runAnalyzers. */
+export interface RunAnalyzersExecutionOptions {
+    activeAnalyzers?: Set<string>;
+    lineBounds?: readonly [number, number];
+}
+
 /** Execution context exposing Scanner state and execution primitives to sub-pipelines. */
 export interface ScannerContext {
     config: ScanConfig;
@@ -28,7 +34,7 @@ export interface ScannerContext {
         rel: string,
         content: string,
         seed?: IncrementalFileState,
-        activeAnalyzers?: Set<string>,
+        options?: Set<string> | RunAnalyzersExecutionOptions,
     ): Promise<{ issues: Issue[]; metric: FileMetric | null }>;
     runInProcess(
         files: string[],

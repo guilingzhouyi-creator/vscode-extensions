@@ -31,6 +31,10 @@ const BASELINE_FILENAME = 'self-scan.baseline.json';
 
 const MODULE_SLICE_EXTRACTOR = '../dist/core/router/sliceExtractor';
 const MODULE_SPARSE_MOE_GATE = '../dist/core/router/sparseMoEGate';
+const MODULE_DIFF_BOUNDS_GOVERNOR = '../dist/core/scoring/diff-bounds-governor';
+const MODULE_SEMANTIC_CLASSIFIER = '../dist/core/diff/semantic-delta-classifier';
+const MODULE_EDIT_DIFF = '../dist/core/diff/edit-diff';
+const MODULE_MYERS_ALGO = '../dist/core/diff/myers-algorithm';
 
 const CLI = path.join(ROOT, DIR_DIST, 'index.js');
 const CONFIG = path.join(ROOT, CONFIG_FILENAME);
@@ -292,6 +296,181 @@ function isIssueWithinSlices(issue, allSlices) {
 }
 
 /**
+ * Loads recent trajectory run points from active runs ledger.
+ *
+ * @param maxCount - Maximum runs to inspect.
+ * @returns Array of parsed trajectory points.
+ */
+function parseTrajectoryLine(line) {
+  try {
+    const item = JSON.parse(line);
+    if (!item || !item.eloc) return null;
+    const sem = Number(item.eloc.sem) || 0;
+    const reloc = Number(item.eloc.reloc) || 0;
+    const cosm = Number(item.eloc.cosm) || 0;
+    return {
+      timestamp: item.t || Date.now(),
+      netSemanticTurnover: Math.max(0, sem - reloc - cosm),
+      gatePassed: Boolean(item.gate?.pass),
+      effectiveLoc: Number(item.eloc.proc) || 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function loadRecentTrajectoryRuns(maxCount = 20) {
+  const trajFile = path.join(ROOT, '.refactor-trajectory', 'active-runs.ndjson');
+  if (!fs.existsSync(trajFile)) return [];
+  try {
+    const raw = fs.readFileSync(trajFile, 'utf8').trim();
+    if (!raw) return [];
+    return raw
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .slice(-maxCount)
+      .map(parseTrajectoryLine)
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Extracts line diff operations into arrays of added and deleted lines.
+ *
+ * @param oldContent - Content before modification.
+ * @param newContent - Content after modification.
+ * @returns Split added and deleted line arrays.
+ */
+function extractFileDiffLines(oldContent, newContent) {
+  const { fastDiff } = require(MODULE_EDIT_DIFF);
+  const { DIFF_OP_INSERT, DIFF_OP_DELETE } = require(MODULE_MYERS_ALGO);
+  const oldLines = oldContent.split(/\r?\n/);
+  const newLines = newContent.split(/\r?\n/);
+  const ops = fastDiff(oldLines, newLines);
+  const addedLines = [];
+  const deletedLines = [];
+
+  for (const op of ops) {
+    if (op.type === DIFF_OP_INSERT) {
+      addedLines.push(newLines[op.bIdx] ?? '');
+    } else if (op.type === DIFF_OP_DELETE) {
+      deletedLines.push(oldLines[op.aIdx] ?? '');
+    }
+  }
+
+  return { addedLines, deletedLines };
+}
+
+/**
+ * Evaluates net turnover and differential bounds across all target files.
+ *
+ * @param targetFiles - Array of relative file paths.
+ * @returns Structured admission evaluation verdict.
+ */
+function evaluateAdmissionTurnover(targetFiles) {
+  const {
+    computeNetSemanticTurnover,
+    evaluateDifferentialBounds,
+    calculateEmpiricalAdmissionThreshold,
+    appendAdmissionAuditRecord,
+  } = require(MODULE_DIFF_BOUNDS_GOVERNOR);
+  const { classifySemanticDelta } = require(MODULE_SEMANTIC_CLASSIFIER);
+
+  let semanticAdded = 0;
+  let semanticDeleted = 0;
+  let relocated = 0;
+  let cosmetic = 0;
+  let physicalAdded = 0;
+  let physicalDeleted = 0;
+
+  for (const relPath of targetFiles) {
+    const absPath = path.join(ROOT, relPath);
+    if (!fs.existsSync(absPath)) continue;
+    const currentContent = readTextFile(absPath);
+    const oldContent = getHeadContent(relPath);
+    if (currentContent === oldContent) continue;
+
+    const { addedLines, deletedLines } = extractFileDiffLines(oldContent, currentContent);
+    const boundsVerdict = evaluateDifferentialBounds({
+      filePath: relPath,
+      oldContent,
+      newContent: currentContent,
+      addedLines,
+      deletedLines,
+    });
+
+    if (!boundsVerdict.isAllowed) {
+      return {
+        passed: false,
+        verdictCode: boundsVerdict.verdictCode,
+        reason: `[${relPath}] ${boundsVerdict.reason || 'differential bounds violated'}`,
+      };
+    }
+
+    const delta = classifySemanticDelta(relPath, oldContent, currentContent);
+    semanticAdded += delta.counters.added;
+    semanticDeleted += delta.counters.deleted;
+    relocated += delta.counters.relocated;
+    cosmetic += delta.counters.cosmetic;
+    physicalAdded += addedLines.length;
+    physicalDeleted += deletedLines.length;
+  }
+
+  const turnover = computeNetSemanticTurnover({
+    semanticAddedEloc: semanticAdded,
+    semanticDeletedEloc: semanticDeleted,
+    relocatedEloc: relocated,
+    cosmeticEloc: cosmetic,
+    physicalAddedLines: physicalAdded,
+    physicalDeletedLines: physicalDeleted,
+  });
+
+  const recentRuns = loadRecentTrajectoryRuns(20);
+  const admission = calculateEmpiricalAdmissionThreshold({
+    recentRuns,
+    currentComplexity: 10,
+    currentEloc: Math.max(1, semanticAdded + semanticDeleted),
+  });
+
+  const passed = turnover.netSemanticTurnover >= admission.threshold;
+  const verdictCode = passed ? 'ADMITTED' : 'BLOCKED_INSUFFICIENT_TURNOVER';
+
+  // Asynchronously record audit ledger entry
+  void appendAdmissionAuditRecord(
+    {
+      timestamp: Date.now(),
+      commitStagingDigest: `scan-${process.pid}`,
+      lAdd: physicalAdded,
+      lDel: physicalDeleted,
+      netSemanticTurnover: turnover.netSemanticTurnover,
+      admissionThreshold: admission.threshold,
+      turnoverRatio: turnover.turnoverRatio,
+      verdict: verdictCode,
+      factors: {
+        rollingMean: admission.rollingMean,
+        rollingStdDev: admission.rollingStdDev,
+        noisePenalty: admission.noiseFactor,
+        confidence: admission.posteriorConfidence,
+      },
+    },
+    ROOT,
+  );
+
+  return {
+    passed,
+    verdictCode,
+    netSemanticTurnover: turnover.netSemanticTurnover,
+    admissionThreshold: admission.threshold,
+    turnoverRatio: turnover.turnoverRatio,
+    reason: passed
+      ? undefined
+      : `Net semantic turnover (${turnover.netSemanticTurnover.toFixed(1)}) is below empirical admission threshold (${admission.threshold.toFixed(1)})`,
+  };
+}
+
+/**
  * Read and print blocking summary from temporary report file.
  *
  * @param summaryParams - Summary report parameters.
@@ -402,6 +581,20 @@ async function main() {
   if (targetFiles.length === 0) {
     logGate(CLEAN_TREE_MESSAGE);
     process.exit(EXIT_PASS);
+  }
+
+  if (!isSmoke && !cliArguments.includes('--no-turnover-check')) {
+    const admissionVerdict = evaluateAdmissionTurnover(targetFiles);
+    if (!admissionVerdict.passed) {
+      logGateError(
+        `✖ ${admissionVerdict.verdictCode}: ${admissionVerdict.reason || 'failed minimum admission criteria'}`,
+      );
+      process.exit(1);
+    }
+    logGate(
+      `admission-turnover: net=${admissionVerdict.netSemanticTurnover.toFixed(1)} ` +
+        `threshold=${admissionVerdict.admissionThreshold.toFixed(1)} ratio=${admissionVerdict.turnoverRatio.toFixed(3)} → ADMITTED`,
+    );
   }
 
   // @lazy: Deferred import until dist/ is verified and files are discovered

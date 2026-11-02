@@ -852,8 +852,10 @@ async function runConfidenceRework(
         input.filePath,
         input.newContent,
         undefined,
-        new Set(analyzers),
-        widerBounds,
+        {
+            activeAnalyzers: new Set(analyzers),
+            lineBounds: widerBounds,
+        },
     );
 
     const outcomes = reconcileRework(candidates, widerResult.issues);
@@ -886,8 +888,10 @@ async function auditSingleFileInput(context: AuditFileInputContext): Promise<voi
         inputTarget.filePath,
         inputTarget.newContent,
         undefined,
-        activeAnalyzers,
-        lineBounds,
+        {
+            activeAnalyzers,
+            lineBounds,
+        },
     );
 
     const boundedIssues =

@@ -23,6 +23,7 @@ import { evaluateEffectiveCommentDensity } from '../comments/comment-density-mod
 import { calculateShannonEntropy } from '../math';
 import { AntiGamingMessages } from '../messages';
 import { DEFAULT_SCORING_CONFIG, type AntiGamingScoringConfig } from './scoring-parameters';
+import type { DifferentialBoundsVerdict } from './diff-bounds-governor';
 
 /**
  * Rule identifier for anti-gaming detection.
@@ -468,6 +469,12 @@ export interface AntiGamingConjunctionInput {
      * fix, which never claims a score gain and must not be frozen as gaming.
      */
     readonly claimsScoreGain: boolean;
+    /** Optional differential envelope verdict from diff-bounds-governor. */
+    readonly differentialVerdict?: DifferentialBoundsVerdict;
+    /** Optional Net Semantic Turnover (Δ_net) value. */
+    readonly netSemanticTurnover?: number;
+    /** Optional empirical admission threshold (Θ_admission). */
+    readonly admissionThreshold?: number;
 }
 
 /**
@@ -503,21 +510,22 @@ export interface AntiGamingConjunctionVerdict {
  * @param config - Anti-gaming parameters; defaults to the scoring SSOT.
  * @returns Verdict indicating whether the change must be frozen.
  */
-export function evaluateAntiGamingConjunction(
+function checkSemanticRatioGaming(
     input: AntiGamingConjunctionInput,
-    config: AntiGamingScoringConfig = DEFAULT_SCORING_CONFIG.antiGaming,
-): AntiGamingConjunctionVerdict {
-    // A missing measurement is not evidence of gaming: coercing NaN to zero would make every
-    // unmeasured change look like a trivial one and freeze it. The ratio branch therefore
-    // requires both operands to be real numbers.
+    config: AntiGamingScoringConfig,
+): AntiGamingConjunctionVerdict | null {
     const ratioMeasurable = Number.isFinite(input.changedEloc) && Number.isFinite(input.totalEloc);
-    const changed = ratioMeasurable ? Math.max(0, input.changedEloc) : 0;
-    const total = ratioMeasurable ? Math.max(1, input.totalEloc) : 1;
+    if (!ratioMeasurable || !input.claimsScoreGain) {
+        return null;
+    }
+
+    const changed = Math.max(0, input.changedEloc);
+    const total = Math.max(1, input.totalEloc);
     const semanticRatio = changed / total;
     const threshold = config.semanticChangeRatioThreshold;
     const netDebt = Number.isFinite(input.netDebtEliminated) ? input.netDebtEliminated : 0;
 
-    if (ratioMeasurable && input.claimsScoreGain && semanticRatio <= threshold && netDebt <= 0) {
+    if (semanticRatio <= threshold && netDebt <= 0) {
         return {
             isGaming: true,
             verdictCode: VERDICT_BLOCK_GAMING_DETECTED,
@@ -527,14 +535,71 @@ export function evaluateAntiGamingConjunction(
                 `(${netDebt.toFixed(2)} points) while claiming a score gain.`,
         };
     }
+    return null;
+}
 
-    if (Number.isFinite(input.gamingPenalty) && input.gamingPenalty > 0) {
+function checkDifferentialBoundsGaming(
+    input: AntiGamingConjunctionInput,
+): AntiGamingConjunctionVerdict | null {
+    if (input.differentialVerdict && !input.differentialVerdict.isAllowed) {
+        return {
+            isGaming: true,
+            verdictCode: VERDICT_BLOCK_GAMING_DETECTED,
+            reason: input.differentialVerdict.reason ?? 'Differential bounds envelope violated.',
+        };
+    }
+    return null;
+}
+
+function checkAdmissionTurnoverGaming(
+    input: AntiGamingConjunctionInput,
+): AntiGamingConjunctionVerdict | null {
+    if (
+        Number.isFinite(input.netSemanticTurnover) &&
+        Number.isFinite(input.admissionThreshold) &&
+        input.claimsScoreGain &&
+        (input.netSemanticTurnover as number) < (input.admissionThreshold as number)
+    ) {
+        return {
+            isGaming: true,
+            verdictCode: VERDICT_BLOCK_GAMING_DETECTED,
+            reason:
+                `Net semantic turnover ${(input.netSemanticTurnover as number).toFixed(2)} ` +
+                `is below empirical admission threshold ${(input.admissionThreshold as number).toFixed(2)} ` +
+                `while claiming a score gain.`,
+        };
+    }
+    return null;
+}
+
+function checkPatternPenaltyGaming(
+    input: AntiGamingConjunctionInput,
+): AntiGamingConjunctionVerdict | null {
+    if (Number.isFinite(input.gamingPenalty) && (input.gamingPenalty as number) > 0) {
         return {
             isGaming: true,
             verdictCode: VERDICT_BLOCK_GAMING_DETECTED,
             reason: `Gaming pattern penalty of ${input.gamingPenalty} points was raised.`,
         };
     }
+    return null;
+}
+
+export function evaluateAntiGamingConjunction(
+    input: AntiGamingConjunctionInput,
+    config: AntiGamingScoringConfig = DEFAULT_SCORING_CONFIG.antiGaming,
+): AntiGamingConjunctionVerdict {
+    const ratioVerdict = checkSemanticRatioGaming(input, config);
+    if (ratioVerdict) return ratioVerdict;
+
+    const diffVerdict = checkDifferentialBoundsGaming(input);
+    if (diffVerdict) return diffVerdict;
+
+    const turnoverVerdict = checkAdmissionTurnoverGaming(input);
+    if (turnoverVerdict) return turnoverVerdict;
+
+    const patternVerdict = checkPatternPenaltyGaming(input);
+    if (patternVerdict) return patternVerdict;
 
     return { isGaming: false };
 }

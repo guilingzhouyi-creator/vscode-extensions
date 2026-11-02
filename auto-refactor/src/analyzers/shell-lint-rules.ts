@@ -555,7 +555,14 @@ export function checkShellResourceCleanup(
     lines: string[],
     maskedLines: string[],
     emit: ShellEmitter,
+    filePath?: string,
 ): void {
+    if (
+        filePath &&
+        (filePath.includes('/lib/') || filePath.includes('\\lib\\') || filePath.endsWith('.lib.sh'))
+    ) {
+        return;
+    }
     let hasResource = false;
     let resourceLine = 0;
     let hasTrap = false;

@@ -29,10 +29,14 @@ import { DIFF_OP_INSERT, DIFF_OP_DELETE, type DiffOp } from './myers-algorithm';
 /**
  * Checks if a trimmed line is empty or purely a comment.
  *
+ * Exported because the differential-bounds governor must classify the two sides of a hunk
+ * independently: re-implementing the predicate there would let the comment syntax accepted by
+ * the run-level and slice-level accounting drift apart.
+ *
  * @param line - Text line to check.
  * @returns True when line is whitespace-only or a comment.
  */
-function isCommentOrBlankLine(line: string): boolean {
+export function isCosmeticDiffLine(line: string): boolean {
     const trimmed = line.trim();
     return (
         trimmed.length === 0 ||
@@ -46,8 +50,11 @@ function isCommentOrBlankLine(line: string): boolean {
 
 /**
  * Checks if a trimmed line is a trivial forwarder, pass, or return-only wrapper.
+ *
+ * @param line - Text line to check.
+ * @returns True when the line carries no independent logic.
  */
-function isBoilerplateLine(line: string): boolean {
+export function isBoilerplateDiffLine(line: string): boolean {
     const trimmed = line.trim();
     return (
         trimmed === 'pass' ||
@@ -123,10 +130,10 @@ interface LineDiffMetrics {
  * Classifies an individual line as cosmetic, boilerplate, or normal logic.
  */
 function classifySingleLine(line: string): { isCosmetic: boolean; isBoilerplate: boolean } {
-    if (isCommentOrBlankLine(line)) {
+    if (isCosmeticDiffLine(line)) {
         return { isCosmetic: true, isBoilerplate: false };
     }
-    if (isBoilerplateLine(line)) {
+    if (isBoilerplateDiffLine(line)) {
         return { isCosmetic: false, isBoilerplate: true };
     }
     return { isCosmetic: false, isBoilerplate: false };

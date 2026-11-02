@@ -186,11 +186,11 @@ export class ShellLintAnalyzer implements Analyzer {
             const mapped = SHELL_ACTIONABLE_MAP[rule];
             const actionable = mapped
                 ? {
-                      action: mapped.action,
-                      code: mapped.code,
-                      safeToAutomate: mapped.safeToAutomate,
-                      templateSnippet: mapped.templateSnippet,
-                  }
+                    action: mapped.action,
+                    code: mapped.code,
+                    safeToAutomate: mapped.safeToAutomate,
+                    templateSnippet: mapped.templateSnippet,
+                }
                 : undefined;
             const issue = createLineIssue(this.name, file, {
                 lineIdx,
@@ -221,7 +221,7 @@ export class ShellLintAnalyzer implements Analyzer {
         this.checkShebang(lines, file, emit);
         this.checkSetEuoPipefail(lines, maskedLines, emit);
         checkShellDocContract(lines, file, emit);
-        checkShellResourceCleanup(lines, maskedLines, emit);
+        checkShellResourceCleanup(lines, maskedLines, emit, file);
 
         const { hasE } = scanStrictErrorFlags(maskedLines);
         const hasTtyGuard = maskedLines.some((line) => REGEX.SHELL.SH_TTY_GUARD.test(line));

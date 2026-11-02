@@ -171,6 +171,11 @@ export class ScopeGraph {
         };
     }
 
+    /** Compatibility alias for lookupBinding. */
+    lookup(name: string, fromScope?: Scope | null): LookupResult {
+        return this.lookupBinding(name, fromScope);
+    }
+
     /**
      * Check if a name is shadowed — i.e., an inner scope declares the same name
      * as an outer scope, hiding the outer one.
@@ -202,8 +207,8 @@ export class ScopeGraph {
                 scopeItem.kind === SCOPE_KINDS.FUNCTION
                     ? NATIVE_SCOPES.FUNCTION
                     : scopeItem.kind === SCOPE_KINDS.CLASS
-                      ? NATIVE_SCOPES.CLASS
-                      : NATIVE_SCOPES.MODULE;
+                        ? NATIVE_SCOPES.CLASS
+                        : NATIVE_SCOPES.MODULE;
             scopes.push({
                 parent: parentIdx,
                 kind: kindCode,
@@ -219,14 +224,14 @@ export class ScopeGraph {
                     binding.kind === BINDING_KINDS.CONSTANT
                         ? NATIVE_BINDINGS.CONSTANT
                         : binding.kind === BINDING_KINDS.FUNCTION
-                          ? NATIVE_BINDINGS.FUNCTION
-                          : binding.kind === BINDING_KINDS.CLASS
-                            ? NATIVE_BINDINGS.CLASS
-                            : binding.kind === BINDING_KINDS.PARAMETER
-                              ? NATIVE_BINDINGS.PARAMETER
-                              : binding.kind === BINDING_KINDS.IMPORT
-                                ? NATIVE_BINDINGS.IMPORT
-                                : NATIVE_BINDINGS.VARIABLE;
+                            ? NATIVE_BINDINGS.FUNCTION
+                            : binding.kind === BINDING_KINDS.CLASS
+                                ? NATIVE_BINDINGS.CLASS
+                                : binding.kind === BINDING_KINDS.PARAMETER
+                                    ? NATIVE_BINDINGS.PARAMETER
+                                    : binding.kind === BINDING_KINDS.IMPORT
+                                        ? NATIVE_BINDINGS.IMPORT
+                                        : NATIVE_BINDINGS.VARIABLE;
                 bindings.push({
                     scopeId: i,
                     name: binding.name,

@@ -236,8 +236,10 @@ export class DisaggregatedAuditPipeline {
             slice.filePath,
             slice.content,
             undefined,
-            activeSet,
-            slice.lineBounds,
+            {
+                activeAnalyzers: activeSet,
+                lineBounds: slice.lineBounds,
+            },
         );
 
         return {

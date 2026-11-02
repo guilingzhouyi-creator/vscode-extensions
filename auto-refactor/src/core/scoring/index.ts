@@ -36,3 +36,4 @@ export * from './quantitative-risk-model';
 export * from './confidence-calibration';
 export * from './finding-confidence-arbiter';
 export * from './rolling-sampling-governor';
+export * from './diff-bounds-governor';
