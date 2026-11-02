@@ -25,6 +25,38 @@ import type {
     NativeShadowingResult,
 } from '../native/native-types';
 
+const SCOPE_KINDS = {
+    MODULE: 'module',
+    FUNCTION: 'function',
+    CLASS: 'class',
+} as const;
+
+const BINDING_KINDS = {
+    CONSTANT: 'constant',
+    VARIABLE: 'variable',
+    FUNCTION: 'function',
+    CLASS: 'class',
+    PARAMETER: 'parameter',
+    IMPORT: 'import',
+} as const;
+
+const STREAMER_ANALYZER_NAME = '__scope_graph__';
+
+const NATIVE_BINDINGS = {
+    VARIABLE: 0,
+    CONSTANT: 1,
+    FUNCTION: 2,
+    CLASS: 3,
+    PARAMETER: 4,
+    IMPORT: 5,
+} as const;
+
+const NATIVE_SCOPES = {
+    MODULE: 0,
+    FUNCTION: 1,
+    CLASS: 2,
+} as const;
+
 /** Kinds of scope boundaries. */
 export type ScopeKind = 'module' | 'function' | 'class';
 
@@ -75,11 +107,10 @@ export interface LookupResult {
  * @param node - Normalized node to test.
  * @returns The scope kind or null if the node does not introduce a scope.
  */
-function scopeKindForNode(node: NormalizedNode): ScopeKind | null {
-    if (node.kind === NodeKind.SourceFile) return 'module';
-    if (node.functionLike) return 'function';
-    if (node.isClassDefining) return 'class';
-    return null;
+function resolveScopeKindForNode(node: NormalizedNode): ScopeKind | null {
+    if (node.kind === NodeKind.SourceFile) return SCOPE_KINDS.MODULE;
+    if (node.functionLike) return SCOPE_KINDS.FUNCTION;
+    return node.isClassDefining ? SCOPE_KINDS.CLASS : null;
 }
 
 /**
@@ -89,15 +120,14 @@ function scopeKindForNode(node: NormalizedNode): ScopeKind | null {
  * @param node - Normalized node to inspect.
  * @returns [name, kind] tuple, or null if no binding is introduced.
  */
-function bindingOf(node: NormalizedNode): [string, BindingKind] | null {
+function resolveBindingOfNode(node: NormalizedNode): [string, BindingKind] | null {
     const name = node.name ?? node.bindingName;
     if (!name) return null;
 
-    if (node.kind === NodeKind.Constant) return [name, 'constant'];
-    if (node.kind === NodeKind.Variable) return [name, 'variable'];
-    if (node.functionLike) return [name, 'function'];
-    if (node.isClassDefining) return [name, 'class'];
-    return null;
+    if (node.kind === NodeKind.Constant) return [name, BINDING_KINDS.CONSTANT];
+    if (node.kind === NodeKind.Variable) return [name, BINDING_KINDS.VARIABLE];
+    if (node.functionLike) return [name, BINDING_KINDS.FUNCTION];
+    return node.isClassDefining ? [name, BINDING_KINDS.CLASS] : null;
 }
 
 /**
@@ -126,7 +156,7 @@ export class ScopeGraph {
      * @param fromScope - The scope to start from (innermost); defaults to root if omitted.
      * @returns LookupResult with the closest binding, all matches, and shadow status.
      */
-    lookup(name: string, fromScope?: Scope | null): LookupResult {
+    lookupBinding(name: string, fromScope?: Scope | null): LookupResult {
         const all: BindingInfo[] = [];
         let scope: Scope | null = fromScope ?? this._root;
         while (scope) {
@@ -150,7 +180,7 @@ export class ScopeGraph {
      * @returns True if the name has multiple declarations across the scope chain.
      */
     isShadowed(name: string, fromScope?: Scope | null): boolean {
-        return this.lookup(name, fromScope).shadowed;
+        return this.lookupBinding(name, fromScope).shadowed;
     }
 
     /**
@@ -161,14 +191,19 @@ export class ScopeGraph {
      */
     detectAllShadowing(): NativeShadowingResult[] {
         const scopes: NativeScopeInput[] = [];
-        const scopeIndices = new Map<Scope, number>();
+        const scopeIndexByScope = new Map<Scope, number>();
         for (let i = 0; i < this._allScopes.length; i++) {
-            scopeIndices.set(this._allScopes[i], i);
+            scopeIndexByScope.set(this._allScopes[i], i);
         }
         for (let i = 0; i < this._allScopes.length; i++) {
             const scopeItem = this._allScopes[i];
-            const parentIdx = scopeItem.parent ? (scopeIndices.get(scopeItem.parent) ?? -1) : -1;
-            const kindCode = scopeItem.kind === 'function' ? 1 : scopeItem.kind === 'class' ? 2 : 0;
+            const parentIdx = scopeItem.parent ? (scopeIndexByScope.get(scopeItem.parent) ?? -1) : -1;
+            const kindCode =
+                scopeItem.kind === SCOPE_KINDS.FUNCTION
+                    ? NATIVE_SCOPES.FUNCTION
+                    : scopeItem.kind === SCOPE_KINDS.CLASS
+                      ? NATIVE_SCOPES.CLASS
+                      : NATIVE_SCOPES.MODULE;
             scopes.push({
                 parent: parentIdx,
                 kind: kindCode,
@@ -181,17 +216,17 @@ export class ScopeGraph {
             const scopeItem = this._allScopes[i];
             for (const binding of scopeItem.bindings.values()) {
                 const bKindCode =
-                    binding.kind === 'constant'
-                        ? 1
-                        : binding.kind === 'function'
-                          ? 2
-                          : binding.kind === 'class'
-                            ? 3
-                            : binding.kind === 'parameter'
-                              ? 4
-                              : binding.kind === 'import'
-                                ? 5
-                                : 0;
+                    binding.kind === BINDING_KINDS.CONSTANT
+                        ? NATIVE_BINDINGS.CONSTANT
+                        : binding.kind === BINDING_KINDS.FUNCTION
+                          ? NATIVE_BINDINGS.FUNCTION
+                          : binding.kind === BINDING_KINDS.CLASS
+                            ? NATIVE_BINDINGS.CLASS
+                            : binding.kind === BINDING_KINDS.PARAMETER
+                              ? NATIVE_BINDINGS.PARAMETER
+                              : binding.kind === BINDING_KINDS.IMPORT
+                                ? NATIVE_BINDINGS.IMPORT
+                                : NATIVE_BINDINGS.VARIABLE;
                 bindings.push({
                     scopeId: i,
                     name: binding.name,
@@ -211,8 +246,7 @@ export class ScopeGraph {
      * @returns The innermost scope containing line, or null if no scope matches.
      */
     getScopeAtLine(line: number): Scope | null {
-        if (!this._root) return null;
-        return this.findInnermostScope(this._root, line);
+        return !this._root ? null : this.findInnermostScope(this._root, line);
     }
 
     private findInnermostScope(scope: Scope, line: number): Scope | null {
@@ -247,10 +281,43 @@ export class ScopeGraph {
      * @internal — finalize end lines for scopes whose node lacked an end position.
      * Called by both buildScopeGraph() and ScopeGraphStreamer after traversal completes.
      */
-    _finalize(): void {
+    _finalizeScopes(): void {
         if (this._root && this._root.endLine === 0) {
             finalizeEndLines(this._root, this._root.startLine);
         }
+    }
+}
+
+/** Creates and links a new Scope node. */
+function createScopeNode(kind: ScopeKind, parent: Scope | null, node: NormalizedNode): Scope {
+    const scope: Scope = {
+        kind,
+        parent,
+        children: [],
+        bindings: new Map(),
+        node,
+        startLine: node.start?.line ?? 0,
+        endLine: node.end?.line ?? 0,
+    };
+    if (parent) {
+        parent.children.push(scope);
+    }
+    return scope;
+}
+
+/** Record a binding in the given scope, if the node introduces one. */
+function recordScopeBinding(targetScope: Scope | null, node: NormalizedNode): void {
+    if (!targetScope) return;
+    const bindingInfo = resolveBindingOfNode(node);
+    if (!bindingInfo) return;
+    const [name, kind] = bindingInfo;
+    if (!targetScope.bindings.has(name)) {
+        targetScope.bindings.set(name, {
+            name,
+            kind,
+            node,
+            scope: targetScope,
+        });
     }
 }
 
@@ -280,59 +347,23 @@ export function buildScopeGraph(adapter: LanguageAdapter, root: NormalizedNode):
     const scopeStack: Scope[] = [];
     let currentScope: Scope | null = null;
 
-    /** Record a binding in the current scope, if the node introduces one. */
-    function recordBinding(node: NormalizedNode): void {
-        if (!currentScope) return;
-        const bindingInfo = bindingOf(node);
-        if (!bindingInfo) return;
-        const [name, kind] = bindingInfo;
-        // First declaration wins (defensive: same name declared twice in one scope
-        // is a language-level error, not a scope-graph concern).
-        if (!currentScope.bindings.has(name)) {
-            currentScope.bindings.set(name, {
-                name,
-                kind,
-                node,
-                scope: currentScope,
-            });
-        }
-    }
-
     function walk(node: NormalizedNode): void {
-        const kind = scopeKindForNode(node);
+        const kind = resolveScopeKindForNode(node);
         const isScopeBoundary = kind !== null;
 
-        // 1. Record any binding this node introduces into the CURRENT (parent) scope.
-        //    For function/class declarations, the name belongs to the enclosing scope,
-        //    not the scope introduced by the function/class itself.
-        recordBinding(node);
+        recordScopeBinding(currentScope, node);
 
-        // 2. If this node introduces a scope, create it and push it onto the stack.
         if (isScopeBoundary) {
-            const parentScope = currentScope;
-            const scope: Scope = {
-                kind: kind!,
-                parent: parentScope,
-                children: [],
-                bindings: new Map(),
-                node,
-                startLine: node.start?.line ?? 0,
-                endLine: node.end?.line ?? 0,
-            };
-            if (parentScope) {
-                parentScope.children.push(scope);
-            }
+            const scope = createScopeNode(kind, currentScope, node);
             graph._addScope(scope);
             scopeStack.push(scope);
             currentScope = scope;
         }
 
-        // 3. Recurse into children.
         for (const child of adapter.children(node)) {
             walk(child);
         }
 
-        // 4. If this node introduced a scope, pop it from the stack.
         if (isScopeBoundary) {
             scopeStack.pop();
             currentScope = scopeStack[scopeStack.length - 1] ?? null;
@@ -341,9 +372,6 @@ export function buildScopeGraph(adapter: LanguageAdapter, root: NormalizedNode):
 
     walk(root);
 
-    // Finalize end lines for scopes whose node lacked an end position.
-    // The root (module) scope gets its start line as a fallback — consumers
-    // that need accurate end lines should rely on nodes with known end positions.
     if (graph.getRoot() && graph.getRoot()!.endLine === 0) {
         finalizeEndLines(graph.getRoot()!, graph.getRoot()!.startLine);
     }
@@ -388,7 +416,7 @@ function finalizeEndLines(scope: Scope, parentEnd: number): void {
  */
 export class ScopeGraphStreamer {
     /** Analyzer name for registration / error reporting. */
-    readonly name = '__scope_graph__';
+    readonly name = STREAMER_ANALYZER_NAME;
 
     /** The built scope graph, available after finalize(). */
     readonly graph: ScopeGraph = new ScopeGraph();
@@ -402,19 +430,9 @@ export class ScopeGraphStreamer {
      * @param root - Normalized SourceFile root node (the same root passed to runStreaming).
      */
     constructor(root: NormalizedNode) {
-        // Initialize the module scope from the root SourceFile.
-        // runStreaming never dispatches the root to visit(), so we bootstrap here.
-        const kind = scopeKindForNode(root);
+        const kind = resolveScopeKindForNode(root);
         if (kind !== null) {
-            const scope: Scope = {
-                kind,
-                parent: null,
-                children: [],
-                bindings: new Map(),
-                node: root,
-                startLine: root.start?.line ?? 0,
-                endLine: root.end?.line ?? 0,
-            };
+            const scope = createScopeNode(kind, null, root);
             this.graph._addScope(scope);
             this.scopeStack.push(scope);
             this.currentScope = scope;
@@ -426,27 +444,11 @@ export class ScopeGraphStreamer {
      * Called by runStreaming for each node (excluding the root).
      */
     visit(node: NormalizedNode): void {
-        // 1. Record any binding this node introduces into the CURRENT (parent) scope.
-        //    For function/class declarations, the name belongs to the enclosing scope,
-        //    not the scope introduced by the function/class itself.
-        this.recordBinding(node);
+        recordScopeBinding(this.currentScope, node);
 
-        // 2. If this node introduces a scope, create it and push it onto the stack.
-        const kind = scopeKindForNode(node);
+        const kind = resolveScopeKindForNode(node);
         if (kind !== null) {
-            const parentScope = this.currentScope;
-            const scope: Scope = {
-                kind,
-                parent: parentScope,
-                children: [],
-                bindings: new Map(),
-                node,
-                startLine: node.start?.line ?? 0,
-                endLine: node.end?.line ?? 0,
-            };
-            if (parentScope) {
-                parentScope.children.push(scope);
-            }
+            const scope = createScopeNode(kind, this.currentScope, node);
             this.graph._addScope(scope);
             this.scopeStack.push(scope);
             this.currentScope = scope;
@@ -458,7 +460,7 @@ export class ScopeGraphStreamer {
      * Called by runStreaming after recursing into children.
      */
     leave(node: NormalizedNode): void {
-        if (scopeKindForNode(node) !== null) {
+        if (resolveScopeKindForNode(node) !== null) {
             this.scopeStack.pop();
             this.currentScope = this.scopeStack[this.scopeStack.length - 1] ?? null;
         }
@@ -469,7 +471,7 @@ export class ScopeGraphStreamer {
      * @returns Empty issue array (streamer produces no issues).
      */
     finalize(_ctx: AnalyzerContext): Issue[] {
-        this.graph._finalize();
+        this.graph._finalizeScopes();
         return [];
     }
 
@@ -480,23 +482,5 @@ export class ScopeGraphStreamer {
      */
     asEntry(ctx: AnalyzerContext): StreamingEntry {
         return { analyzer: this, ctx };
-    }
-
-    /** Record a binding in the current scope, if the node introduces one. */
-    private recordBinding(node: NormalizedNode): void {
-        if (!this.currentScope) return;
-        const bindingInfo = bindingOf(node);
-        if (!bindingInfo) return;
-        const [name, kind] = bindingInfo;
-        // First declaration wins (defensive: same name declared twice in one scope
-        // is a language-level error, not a scope-graph concern).
-        if (!this.currentScope.bindings.has(name)) {
-            this.currentScope.bindings.set(name, {
-                name,
-                kind,
-                node,
-                scope: this.currentScope,
-            });
-        }
     }
 }

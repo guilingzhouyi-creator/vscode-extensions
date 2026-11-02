@@ -117,7 +117,7 @@ describe('ScopeGraph', () => {
             const root = graph.getRoot()!;
             const fnScope = root.children[0];
 
-            const innerResult = graph.lookup('inner', fnScope);
+            const innerResult = graph.lookupBinding('inner', fnScope);
             expect(innerResult.binding).toBeDefined();
             expect(innerResult.binding!.name).toBe('inner');
             expect(innerResult.binding!.kind).toBe('variable');
@@ -138,7 +138,7 @@ describe('ScopeGraph', () => {
             const root = graph.getRoot()!;
             const fnScope = root.children[0];
 
-            const topResult = graph.lookup('top', fnScope);
+            const topResult = graph.lookupBinding('top', fnScope);
             expect(topResult.binding).toBeDefined();
             expect(topResult.binding!.name).toBe('top');
             expect(topResult.binding!.scope).toBe(root);
@@ -151,7 +151,7 @@ describe('ScopeGraph', () => {
             const graph = buildTS(source);
             const root = graph.getRoot()!;
 
-            const result = graph.lookup('nonexistent', root);
+            const result = graph.lookupBinding('nonexistent', root);
             expect(result.binding).toBeNull();
             expect(result.all).toEqual([]);
             expect(result.shadowed).toBe(false);
@@ -170,7 +170,7 @@ describe('ScopeGraph', () => {
             // From function scope, "x" is shadowed
             expect(graph.isShadowed('x', fnScope)).toBe(true);
 
-            const result = graph.lookup('x', fnScope);
+            const result = graph.lookupBinding('x', fnScope);
             expect(result.all.length).toBe(2);
             expect(result.all[0].scope).toBe(fnScope);
             expect(result.all[1].scope).toBe(root);
@@ -277,7 +277,7 @@ describe('ScopeGraph', () => {
             expect(root.bindings.size).toBeGreaterThan(0);
 
             // Lookup "outer" (function) from module scope
-            const outerResult = graph.lookup('outer', root);
+            const outerResult = graph.lookupBinding('outer', root);
             expect(outerResult.binding).toBeDefined();
         });
 
@@ -291,7 +291,7 @@ describe('ScopeGraph', () => {
 
             expect(graph.isShadowed('x', fnScope!)).toBe(true);
 
-            const result = graph.lookup('x', fnScope!);
+            const result = graph.lookupBinding('x', fnScope!);
             expect(result.all.length).toBe(2);
         });
     });
@@ -317,7 +317,7 @@ describe('ScopeGraph', () => {
             const scopeB = scopeA.children[0];
             const scopeC = scopeB.children[0];
 
-            const result = graph.lookup('x', scopeC);
+            const result = graph.lookupBinding('x', scopeC);
             expect(result.all.length).toBe(4);
             expect(result.shadowed).toBe(true);
             expect(result.binding!.scope).toBe(scopeC);
