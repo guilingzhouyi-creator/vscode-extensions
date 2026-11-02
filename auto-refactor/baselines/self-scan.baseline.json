@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-31T13:09:55.317Z",
+  "timestamp": "2026-11-02T04:58:30.185Z",
   "groups": [
     {
       "key": "comments|CMT-HDR-001|crates/auto-refactor-core/build.rs",
@@ -214,17 +214,10 @@
       }
     },
     {
-      "key": "complexity|high-complexity|crates/ops-graph/src/lib.rs",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
       "key": "comments|CMT-DOC-001|crates/ops-graph/src/lib.rs",
-      "count": 3,
+      "count": 2,
       "severities": {
-        "info": 3
+        "info": 2
       }
     },
     {
@@ -410,13 +403,6 @@
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|scripts/bench-fastpath.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/bench-quant.js",
       "count": 1,
       "severities": {
@@ -456,20 +442,6 @@
       "count": 7,
       "severities": {
         "warning": 7
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|scripts/gate-self-slice.js",
-      "count": 17,
-      "severities": {
-        "warning": 17
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|scripts/gate-self-slice.js",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -684,20 +656,6 @@
     },
     {
       "key": "large-file|large-file|scripts/validate-diff.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|scripts/validate-diff.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|scripts/validate-diff.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -1170,41 +1128,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-001|scripts/validate-rule-generalization.js",
-      "count": 4,
-      "severities": {
-        "info": 4
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|scripts/validate-rule-generalization.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "hygiene|HYG-WRAP-001|scripts/validate-rule-generalization.js",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "hygiene|HYG-DED-001|scripts/validate-rule-generalization.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "hygiene|HYG-WRAP-002|scripts/validate-rule-generalization.js",
-      "count": 3,
-      "severities": {
-        "info": 3
       }
     },
     {
@@ -1782,13 +1705,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-CLN-001|src/analyzers/stdlib.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "large-file|large-file|src/analyzers/test-modernity.ts",
       "count": 1,
       "severities": {
@@ -1835,20 +1751,6 @@
       "count": 6,
       "severities": {
         "warning": 6
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/cli/selfTestCmd.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/cli/selfTestCmd.ts",
-      "count": 13,
-      "severities": {
-        "warning": 13
       }
     },
     {
@@ -1964,13 +1866,6 @@
       }
     },
     {
-      "key": "governance|GOV-DAT-001|src/core/ast/go-adapter-parser.ts",
-      "count": 7,
-      "severities": {
-        "info": 7
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/ast/go-adapter-parser.ts",
       "count": 2,
       "severities": {
@@ -2006,13 +1901,6 @@
       }
     },
     {
-      "key": "governance|GOV-DAT-001|src/core/ast/python-adapter.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/ast/rust-adapter.ts",
       "count": 5,
       "severities": {
@@ -2028,34 +1916,6 @@
     },
     {
       "key": "large-file|large-file|src/core/ast/scope-graph.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/ast/scope-graph.ts",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
-      "key": "simplify|SIM-GUARD-001|src/core/ast/scope-graph.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/ast/scope-graph.ts",
-      "count": 3,
-      "severities": {
-        "info": 3
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/ast/scope-graph.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -2136,13 +1996,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/cfg/def-use-chain.ts",
-      "count": 5,
-      "severities": {
-        "warning": 5
       }
     },
     {
@@ -2315,34 +2168,6 @@
     },
     {
       "key": "governance|GOV-DAT-001|src/core/diff/diff.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "large-file|large-file|src/core/diff/edit-diff.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-WRAP-001|src/core/diff/edit-diff.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-GUARD-001|src/core/diff/edit-diff.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/diff/edit-diff.ts",
       "count": 2,
       "severities": {
         "info": 2
@@ -2552,13 +2377,6 @@
       }
     },
     {
-      "key": "governance|GOV-DAT-001|src/core/intelligence/boundary-discipline-engine.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "constants|magic-number|src/core/intelligence/boundary-discipline-engine.ts",
       "count": 4,
       "severities": {
@@ -2615,27 +2433,6 @@
       }
     },
     {
-      "key": "simplify|SIM-TRN-001|src/core/intelligence/constant-identity.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/intelligence/constant-identity.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/intelligence/constant-identity.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/intelligence/contextSlice.ts",
       "count": 12,
       "severities": {
@@ -2685,27 +2482,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/intelligence/dependencyLayoutHelpers.ts",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/intelligence/dependencyLayoutHelpers.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "hygiene|HYG-DED-001|src/core/intelligence/dependencyLayoutHelpers.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|magic-number|src/core/intelligence/elastic-complexity-budget.ts",
       "count": 3,
       "severities": {
@@ -2724,13 +2500,6 @@
       "count": 10,
       "severities": {
         "warning": 10
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/intelligence/elastic-complexity-budget.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -2766,13 +2535,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/intelligence/function-cohesion-skeleton.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
       }
     },
     {
@@ -2843,13 +2605,6 @@
       "count": 3,
       "severities": {
         "warning": 3
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/intelligence/resource-pooling-auditor.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -2927,13 +2682,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/intelligence/zone-partitioner.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
       }
     },
     {
@@ -3242,13 +2990,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/profiler/projectProfiler.ts",
-      "count": 4,
-      "severities": {
-        "info": 4
       }
     },
     {
@@ -3896,13 +3637,6 @@
       }
     },
     {
-      "key": "constants|duplicate-literal|src/core/trajectory/agentAttribution.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "governance|GOV-DAT-001|src/core/trajectory/agentCollisionDetector.ts",
       "count": 1,
       "severities": {
@@ -3967,9 +3701,9 @@
     },
     {
       "key": "constants|magic-number|src/core/trajectory/patchArbiter.ts",
-      "count": 5,
+      "count": 3,
       "severities": {
-        "warning": 5
+        "warning": 3
       }
     },
     {
@@ -4016,27 +3750,6 @@
     },
     {
       "key": "large-file|large-file|src/daemon/client.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/daemon/client.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/daemon/client.ts",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/daemon/client.ts",
       "count": 1,
       "severities": {
         "warning": 1
