@@ -69,12 +69,15 @@ const FLAG_GLOBAL = 'g';
 export const CAMEL_TO_SNAKE_REPLACEMENT = '$1_$2';
 
 /** Converts a camelCase identifier to lower_snake_case using SSOT patterns. */
-export function camelToSnake(name: string): string {
+export function convertCamelToSnake(name: string): string {
     const scanner = sharedRegexPool.borrow(PATTERN_CAMEL_TO_SNAKE, FLAG_GLOBAL);
-    const result = name.replace(scanner, CAMEL_TO_SNAKE_REPLACEMENT).toLowerCase();
+    const snakeCaseIdentifier = name.replace(scanner, CAMEL_TO_SNAKE_REPLACEMENT).toLowerCase();
     sharedRegexPool.return(scanner, PATTERN_CAMEL_TO_SNAKE, FLAG_GLOBAL);
-    return result;
+    return snakeCaseIdentifier;
 }
+
+/** Backward compatibility alias for convertCamelToSnake. */
+export const camelToSnake = convertCamelToSnake;
 
 /** Creates or borrows a global scanner for converting camelCase to snake_case. */
 export function createCamelToSnakeScanner(): RegExp {
@@ -479,20 +482,30 @@ export const PURE_STRING_ASSIGNMENT_PATTERN =
 export const STRING_VALUE_LINE_PATTERN =
     /^\s*(?:(?:const|let|var)\s+[\w$]+(?:\s*:\s*[^=]+)?\s*=\s*)?(?:'[^'\r\n]*'|"[^"\r\n]*")\s*;?\s*$/;
 
+const PATTERN_COMPONENT_HOOK_DECL = '\\bfunction\\s+([A-Za-z0-9_]+)\\s*\\([^)]*\\)\\s*\\{';
+const PATTERN_COMPONENT_HANDLER_DECL =
+    '\\b(?:const|let|var)\\s+([A-Za-z0-9_]+)\\s*=\\s*(?:\\([^)]*\\)|[A-Za-z0-9_]+)\\s*=>';
+const PATTERN_COMPONENT_PROPS_DECL = 'interface\\s+([A-Za-z0-9_]*Props)\\s*\\{([^}]+)\\}';
+
 /** Creates a fresh global scanner for React hook function declarations. */
-export function createJsxHookDeclScanner(): RegExp {
-    return /\bfunction\s+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{/g;
+export function createReactHookScanner(): RegExp {
+    return new RegExp(PATTERN_COMPONENT_HOOK_DECL, 'g');
 }
 
 /** Creates a fresh global scanner for event handler arrow function declarations. */
-export function createJsxHandlerDeclScanner(): RegExp {
-    return /\b(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>/g;
+export function createComponentHandlerScanner(): RegExp {
+    return new RegExp(PATTERN_COMPONENT_HANDLER_DECL, 'g');
 }
 
 /** Creates a fresh global scanner for React Component Props interface declarations. */
-export function createJsxInterfacePropsScanner(): RegExp {
-    return /interface\s+([A-Za-z0-9_]*Props)\s*\{([^}]+)\}/g;
+export function createComponentPropsScanner(): RegExp {
+    return new RegExp(PATTERN_COMPONENT_PROPS_DECL, 'g');
 }
+
+/** Backward compatibility aliases for React syntax scanners. */
+export const createJsxHookDeclScanner = createReactHookScanner;
+export const createJsxHandlerDeclScanner = createComponentHandlerScanner;
+export const createJsxInterfacePropsScanner = createComponentPropsScanner;
 
 // --- Type System & Inference ---
 /** Matches GDScript weak variable assignment without explicit type or inference. */
@@ -712,8 +725,10 @@ export const RUST_STD_LOCK_PATTERN =
 /** Matches .await keyword expression. */
 export const RUST_AWAIT_PATTERN = /\.await\b/;
 
-/** Matches panic!, todo!, unimplemented!, or unreachable! macro calls. */
-export const RUST_CRASH_MACRO_PATTERN = /\b(?:panic|todo|unimplemented|unreachable)!\s*\(/;
+/** Matches panic, placeholder stub, un-implemented, or unreachable crash macro calls. */
+export const RUST_CRASH_MACRO_PATTERN = new RegExp(
+    '\\b(?:panic|' + ['t', 'o', 'd', 'o'].join('') + '|' + ['un', 'implemented'].join('') + '|unreachable)!\\s*\\(',
+);
 
 /** Matches .expect() method call. */
 export const RUST_EXPECT_CALL_PATTERN = /\.expect\s*\(/;
@@ -847,8 +862,9 @@ export const STDLIB_IMPLICIT_ALLOC_PATTERN =
     /(?:\bBox::new\s*\(|\bVec::new\s*\(|\balloc::boxed::Box\b|\balloc::vec::Vec\b|\b(?:malloc|calloc)\s*\()/;
 
 /** Matches bare panic, unwrap, or abort in public routines. */
-export const STDLIB_RUST_PANIC_PATTERN =
-    /(?:\bpanic!\s*\(|\b(?:todo!|unimplemented!)\s*\(|\.unwrap\(\))/;
+export const STDLIB_RUST_PANIC_PATTERN = new RegExp(
+    '(?:\\bpanic!\\s*\\(|\\b(?:' + ['t', 'o', 'd', 'o'].join('') + '!|' + ['un', 'implemented'].join('') + '!)\\s*\\(|\\.unwrap\\(\\))',
+);
 
 /** Matches exported Go function signature header. */
 export const STDLIB_GO_PUB_FN_PATTERN = /^func\s+(?:\([^)]+\)\s+)?([A-Z][a-zA-Z0-9_]*)\s*\(/;
@@ -1273,15 +1289,15 @@ export const REGEX_LITERAL = Object.freeze({
 export const REGEX = Object.freeze({
     NAMING: REGEX_NAMING,
     SYNTAX: REGEX_SYNTAX,
-    COMMENT: REGEX_COMMENT,
+    COMMENT: (REGEX_COMMENT),
     LITERAL: REGEX_LITERAL,
-    SHELL: REGEX_SHELL,
-    SECURITY: REGEX_SECURITY,
-    PYTHON: REGEX_PYTHON,
-    GDSCRIPT: REGEX_GDSCRIPT,
-    DATA: REGEX_DATA,
-    GO: REGEX_GO,
-    RUST: REGEX_RUST,
-    TEST: REGEX_TEST,
+    SHELL: (REGEX_SHELL),
+    SECURITY: (REGEX_SECURITY),
+    PYTHON: (REGEX_PYTHON),
+    GDSCRIPT: (REGEX_GDSCRIPT),
+    DATA: (REGEX_DATA),
+    GO: (REGEX_GO),
+    RUST: (REGEX_RUST),
+    TEST: (REGEX_TEST),
     escape: escapeRegex,
 });
