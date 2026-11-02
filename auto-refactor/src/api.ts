@@ -726,6 +726,8 @@ export {
     computeEditRangesWithOps,
     computeLineStarts,
     linesOf,
+    extractLinesOf,
+    countChangedLines,
     getLine,
     countLines,
 } from './core/diff/edit-diff';

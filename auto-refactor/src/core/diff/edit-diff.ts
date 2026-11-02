@@ -17,13 +17,12 @@ import type { ReviewDiffHunk } from '../praxis/contracts';
 import { histogramDiff } from './histogram-diff';
 import {
     DiffOp,
-    DIFF_OP_EQUAL,
-    DIFF_OP_DELETE,
-    DIFF_OP_INSERT,
     DIFF_OP_EQUAL_SPAN,
     myersDiff,
     myersDiffCore,
     trimPrefixSuffix,
+    DIFF_OP_DELETE,
+    DIFF_OP_INSERT,
 } from './myers-algorithm';
 import {
     DEFAULT_CONTEXT_LINES,
@@ -33,19 +32,35 @@ import {
 } from './hunk-builder';
 import { nativeCore } from '../native';
 import type { NativeDiffHunk } from '../native';
+import { FNV1A_32_PRIME, FNV1A_32_OFFSET_BASIS, fnv1a32, hashLines } from '../algorithms/hash';
+import {
+    acquireLineBuffers,
+    expandWorkingBuffers,
+    releaseLineBuffers,
+} from './line-buffer-pool';
+import {
+    type EditRange,
+    type EditRangeExtractionParams,
+    extractEditRanges,
+    validateEditRanges,
+    validateSingleEditRange,
+} from './edit-range-validator';
 
-export { histogramDiff, myersDiff, DiffOp, DIFF_OP_EQUAL_SPAN, getLine, formatUnifiedDiff };
-
-/**
- * Computes line-level histogram diff hunks using the high-performance native Rust operator.
- *
- * @param oldContent - Original text content before modifications.
- * @param newContent - Updated text content after modifications.
- * @returns Array of native diff hunks describing line changes.
- */
-export function fastNativeDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
-    return nativeCore.computeHistogramDiff(oldContent, newContent);
-}
+export {
+    histogramDiff,
+    myersDiff,
+    DiffOp,
+    DIFF_OP_EQUAL_SPAN,
+    getLine,
+    formatUnifiedDiff,
+    fnv1a32,
+    hashLines,
+    type EditRange,
+    type EditRangeExtractionParams,
+    extractEditRanges,
+    validateEditRanges,
+    validateSingleEditRange,
+};
 
 /** UTF-16 code unit of LINE FEED (`\n`), the only character that starts a new line. */
 const LINE_FEED_CODE = 10;
@@ -56,29 +71,16 @@ const MIN_LINE_CAPACITY = 16;
 /** Estimated source code units per line when sizing the initial line-table capacity. */
 const SOURCE_CHARS_PER_LINE_SLOT = 32;
 
-import { FNV1A_32_PRIME, FNV1A_32_OFFSET_BASIS, fnv1a32, hashLines } from '../algorithms/hash';
-export { fnv1a32, hashLines };
-
-/** `typeof` tag for numeric edit-range fields; non-numeric input is rejected. */
-const TYPEOF_NUMBER = 'number';
-
 /**
- * One contiguous edit (a run of adjacent line insertions/deletions, i.e. a "replace"
- * block). Line numbers are 1-based; byte offsets are UTF-16 code-unit offsets.
+ * Computes line-level histogram diff hunks using the high-performance native Rust operator.
+ *
+ * @param oldContent - Original text content before modifications.
+ * @param newContent - Updated text content after modifications.
+ * @returns Array of native diff hunks describing line changes.
  */
-export interface EditRange {
-    /** 1-based first affected line (the same index in old and new content). */
-    startLine: number;
-    /** 1-based last OLD line consumed by this edit (inclusive). */
-    oldEndLine: number;
-    /** 1-based last NEW line produced by this edit (inclusive). */
-    newEndLine: number;
-    /** Byte offset where the edit starts (identical in old and new content). */
-    startByte: number;
-    /** Byte offset immediately AFTER the old (deleted) span. */
-    oldEndByte: number;
-    /** Byte offset immediately AFTER the new (inserted) span. */
-    newEndByte: number;
+export function fastNativeDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
+    if (oldContent === newContent) return [];
+    return nativeCore.computeHistogramDiff(oldContent, newContent);
 }
 
 /**
@@ -90,8 +92,10 @@ export interface EditRange {
  */
 export function computeLineStarts(content: string): number[] {
     const starts: number[] = [0];
-    for (let i = 0; i < content.length; i++) {
-        if (content.charCodeAt(i) === LINE_FEED_CODE) starts.push(i + 1);
+    for (let charIndex = 0; charIndex < content.length; charIndex++) {
+        if (content.charCodeAt(charIndex) === LINE_FEED_CODE) {
+            starts.push(charIndex + 1);
+        }
     }
     return starts;
 }
@@ -104,8 +108,10 @@ export function computeLineStarts(content: string): number[] {
  */
 export function countLines(content: string): number {
     let totalLines = 1;
-    for (let i = 0; i < content.length; i++) {
-        if (content.charCodeAt(i) === LINE_FEED_CODE) totalLines++;
+    for (let charIndex = 0; charIndex < content.length; charIndex++) {
+        if (content.charCodeAt(charIndex) === LINE_FEED_CODE) {
+            totalLines++;
+        }
     }
     return totalLines;
 }
@@ -117,15 +123,18 @@ export function countLines(content: string): number {
  * @param starts - Line-start offsets from `computeLineStarts` or `computeLineStartsAndHashes`.
  * @returns One string per line start.
  */
-export function linesOf(content: string, starts: number[]): string[] {
-    const out: string[] = new Array(starts.length);
-    for (let i = 0; i < starts.length; i++) {
-        const startOffset = starts[i];
-        const endOffset = i + 1 < starts.length ? starts[i + 1] - 1 : content.length;
-        out[i] = content.slice(startOffset, endOffset);
+export function extractLinesOf(content: string, starts: number[]): string[] {
+    const out: string[] = [];
+    for (let lineIndex = 0; lineIndex < starts.length; lineIndex++) {
+        const startOffset = starts[lineIndex];
+        const endOffset = lineIndex + 1 < starts.length ? starts[lineIndex + 1] - 1 : content.length;
+        out.push(content.slice(startOffset, endOffset));
     }
     return out;
 }
+
+/** Backward compatibility alias for extractLinesOf. */
+export const linesOf = extractLinesOf;
 
 /**
  * Precomputed line table returned by `computeLineStartsAndHashes`.
@@ -133,65 +142,6 @@ export function linesOf(content: string, starts: number[]): string[] {
 export interface LineIndex {
     starts: number[];
     hashes: Uint32Array;
-}
-
-function reallocateLineBuffers(
-    startsBuf: Int32Array,
-    hashesBuf: Uint32Array,
-    capacity: number,
-): { starts: Int32Array; hashes: Uint32Array; capacity: number } {
-    const nextCapacity = capacity << 1;
-    const nextStarts = new Int32Array(nextCapacity);
-    nextStarts.set(startsBuf);
-    const nextHashes = new Uint32Array(nextCapacity);
-    nextHashes.set(hashesBuf);
-    return { starts: nextStarts, hashes: nextHashes, capacity: nextCapacity };
-}
-
-const INITIAL_SCRATCH_CAPACITY = 16384;
-let scratchStarts: Int32Array = new Int32Array(INITIAL_SCRATCH_CAPACITY);
-let scratchHashes: Uint32Array = new Uint32Array(INITIAL_SCRATCH_CAPACITY);
-let scratchInUse = false;
-
-interface WorkingBuffers {
-    starts: Int32Array;
-    hashes: Uint32Array;
-    capacity: number;
-    isScratch: boolean;
-}
-
-function acquireLineBuffers(capacity: number): WorkingBuffers {
-    if (!scratchInUse) {
-        scratchInUse = true;
-        if (scratchStarts.length < capacity) {
-            const nextCap = Math.max(capacity, scratchStarts.length << 1);
-            scratchStarts = new Int32Array(nextCap);
-            scratchHashes = new Uint32Array(nextCap);
-        }
-        return {
-            starts: scratchStarts,
-            hashes: scratchHashes,
-            capacity: scratchStarts.length,
-            isScratch: true,
-        };
-    }
-    return {
-        starts: new Int32Array(capacity),
-        hashes: new Uint32Array(capacity),
-        capacity,
-        isScratch: false,
-    };
-}
-
-function growWorkingBuffers(buffers: WorkingBuffers): void {
-    const resized = reallocateLineBuffers(buffers.starts, buffers.hashes, buffers.capacity);
-    buffers.starts = resized.starts;
-    buffers.hashes = resized.hashes;
-    buffers.capacity = resized.capacity;
-    if (buffers.isScratch) {
-        scratchStarts = resized.starts as Int32Array;
-        scratchHashes = resized.hashes as Uint32Array;
-    }
 }
 
 /**
@@ -210,32 +160,32 @@ export function computeLineStartsAndHashes(content: string): LineIndex {
         let lineCount = 1;
         let hash = FNV1A_32_OFFSET_BASIS;
 
-        for (let i = 0; i < len; i++) {
-            const code = content.charCodeAt(i);
+        for (let charIndex = 0; charIndex < len; charIndex++) {
+            const code = content.charCodeAt(charIndex);
             if (code !== LINE_FEED_CODE) {
                 hash ^= code;
                 hash = Math.imul(hash, FNV1A_32_PRIME);
                 continue;
             }
             if (lineCount >= buffers.capacity) {
-                growWorkingBuffers(buffers);
+                expandWorkingBuffers(buffers);
             }
             buffers.hashes[lineCount - 1] = hash >>> 0;
-            buffers.starts[lineCount] = i + 1;
+            buffers.starts[lineCount] = charIndex + 1;
             lineCount++;
             hash = FNV1A_32_OFFSET_BASIS;
         }
         buffers.hashes[lineCount - 1] = hash >>> 0;
 
-        const starts: number[] = new Array(lineCount);
-        for (let i = 0; i < lineCount; i++) starts[i] = buffers.starts[i];
+        const starts: number[] = [];
+        for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
+            starts.push(buffers.starts[lineIndex]);
+        }
         const hashes = buffers.hashes.slice(0, lineCount);
 
         return { starts, hashes };
     } finally {
-        if (buffers.isScratch) {
-            scratchInUse = false;
-        }
+        releaseLineBuffers(buffers);
     }
 }
 
@@ -249,15 +199,15 @@ export function computeLineStartsAndHashes(content: string): LineIndex {
 export function hashLinesDirect(content: string, starts: number[]): Uint32Array {
     const lineCount = starts.length;
     const hashes = new Uint32Array(lineCount);
-    for (let i = 0; i < lineCount; i++) {
-        const startOffset = starts[i];
-        const endOffset = i + 1 < lineCount ? starts[i + 1] - 1 : content.length;
+    for (let lineIndex = 0; lineIndex < lineCount; lineIndex++) {
+        const startOffset = starts[lineIndex];
+        const endOffset = lineIndex + 1 < lineCount ? starts[lineIndex + 1] - 1 : content.length;
         let hash = FNV1A_32_OFFSET_BASIS;
-        for (let j = startOffset; j < endOffset; j++) {
-            hash ^= content.charCodeAt(j);
+        for (let charIndex = startOffset; charIndex < endOffset; charIndex++) {
+            hash ^= content.charCodeAt(charIndex);
             hash = Math.imul(hash, FNV1A_32_PRIME);
         }
-        hashes[i] = hash >>> 0;
+        hashes[lineIndex] = hash >>> 0;
     }
     return hashes;
 }
@@ -268,26 +218,15 @@ export function hashLinesDirect(content: string, starts: number[]): Uint32Array 
  *
  * Preconditions:
  *   - When precomputed line hash buffers (`oldLineHashes`, `newLineHashes`) are provided,
- *     they MUST be strictly equal in length to their corresponding line arrays
- *     (`oldLineHashes.length === oldLines.length` and
- *     `newLineHashes.length === newLines.length`). Mismatched lengths violate slice
- *     indexing assumptions and cause out-of-bounds access or false matching during
- *     prefix/suffix trimming.
+ *     they MUST be strictly equal in length to their corresponding line arrays.
  *
  * Degradation & Fallback Strategy:
- *   - The middle modified section is inspected against Myers complexity thresholds.
- *   - If either middle section exceeds `MYERS_MAX_MID_LINES` (1500 lines, `midN > 1500` or
- *     `midM > 1500`) or if the search grid exceeds 2,000,000 cells
- *     (`(midN + midM + 1) * (2 * (midN + midM) + 1) > 2_000_000`), the algorithm
- *     automatically degrades and falls back to `histogramDiff` to prevent quadratic
- *     O(ND) trace buffer explosion and eliminate the risk of out-of-memory (OOM) failures.
+ *   - Falls back to `histogramDiff` if the search grid exceeds complexity bounds.
  *
  * @param oldLines - Array of lines from the original/old content.
  * @param newLines - Array of lines from the modified/new content.
  * @param oldLineHashes - Optional precomputed 32-bit FNV-1a hashes for `oldLines`.
- *   Precondition: must equal `oldLines.length`.
  * @param newLineHashes - Optional precomputed 32-bit FNV-1a hashes for `newLines`.
- *   Precondition: must equal `newLines.length`.
  * @returns Ordered edit script (`DiffOp[]`) expressing changes required to transform
  *   `oldLines` into `newLines`.
  */
@@ -325,76 +264,13 @@ export function fastDiff(
     });
 }
 
-function hasInvalidCoordinates(editRange: EditRange): boolean {
-    const coords = [
-        editRange.startLine,
-        editRange.oldEndLine,
-        editRange.newEndLine,
-        editRange.startByte,
-        editRange.oldEndByte,
-        editRange.newEndByte,
-    ];
-    for (let i = 0; i < coords.length; i++) {
-        if (typeof coords[i] !== TYPEOF_NUMBER || !Number.isFinite(coords[i])) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function validateEditLineBounds(editRange: EditRange): void {
-    if (editRange.startLine < 1) {
-        throw new Error('invalid edit range: startLine < 1');
-    }
-    if (editRange.oldEndLine < editRange.startLine || editRange.newEndLine < editRange.startLine) {
-        throw new Error('invalid edit range: end line before start line');
-    }
-}
-
-function validateEditByteBounds(editRange: EditRange, maxByte?: number): void {
-    if (editRange.startByte < 0) {
-        throw new Error('invalid edit range: negative byte offset');
-    }
-    if (editRange.oldEndByte < editRange.startByte || editRange.newEndByte < editRange.startByte) {
-        throw new Error('invalid edit range: end byte before start byte');
-    }
-    if (maxByte === undefined) return;
-    if (
-        editRange.startByte > maxByte ||
-        editRange.oldEndByte > maxByte ||
-        editRange.newEndByte > maxByte
-    ) {
-        throw new Error('invalid edit range: byte offset out of bounds');
-    }
-}
-
-function validateSingleEditRange(editRange: EditRange, maxByte?: number): void {
-    if (!editRange || hasInvalidCoordinates(editRange)) {
-        throw new Error('invalid edit range: non-numeric field');
-    }
-    validateEditLineBounds(editRange);
-    validateEditByteBounds(editRange, maxByte);
-}
-
-/**
- * Validate a set of edit ranges, throwing on the first invalid range.
- *
- * @param edits - Candidate ranges validated in order.
- * @param maxByte - Optional inclusive byte bound.
- */
-export function validateEditRanges(edits: EditRange[], maxByte?: number): void {
-    for (const edit of edits) {
-        validateSingleEditRange(edit, maxByte);
-    }
-}
-
 /**
  * Count every line touched by a set of edits.
  *
  * @param edits - Validated edit ranges.
  * @returns Total deleted + inserted line count.
  */
-export function changedLineCount(edits: EditRange[]): number {
+export function countChangedLines(edits: EditRange[]): number {
     let totalChanged = 0;
     for (const edit of edits) {
         totalChanged +=
@@ -402,6 +278,9 @@ export function changedLineCount(edits: EditRange[]): number {
     }
     return totalChanged;
 }
+
+/** Backward compatibility alias for countChangedLines. */
+export const changedLineCount = countChangedLines;
 
 /**
  * Coordinated result of one line diff.
@@ -411,64 +290,6 @@ export interface DetailedDiffResult {
     ops: DiffOp[];
     oldIndex: LineIndex;
     newIndex: LineIndex;
-}
-
-/**
- * Count deleted and inserted lines in a contiguous changed block.
- */
-function scanContiguousEdits(
-    ops: DiffOp[],
-    startIndex: number,
-): { delCount: number; insCount: number; nextIndex: number } {
-    let delCount = 0;
-    let insCount = 0;
-    let i = startIndex;
-    while (i < ops.length && ops[i].type !== DIFF_OP_EQUAL && ops[i].type !== DIFF_OP_EQUAL_SPAN) {
-        if (ops[i].type === DIFF_OP_DELETE) delCount++;
-        else insCount++;
-        i++;
-    }
-    return { delCount, insCount, nextIndex: i };
-}
-
-/**
- * Extract contiguous edit ranges from diff operations.
- */
-function extractEditRanges(
-    ops: DiffOp[],
-    oldStarts: number[],
-    newStarts: number[],
-    oldLen: number,
-    newLen: number,
-): EditRange[] {
-    const edits: EditRange[] = [];
-    let i = 0;
-    while (i < ops.length) {
-        if (ops[i].type === DIFF_OP_EQUAL || ops[i].type === DIFF_OP_EQUAL_SPAN) {
-            i++;
-            continue;
-        }
-        const startIdx = ops[i].aIdx;
-        const scan = scanContiguousEdits(ops, i);
-        const delCount = scan.delCount;
-        const insCount = scan.insCount;
-        i = scan.nextIndex;
-
-        const startByte = startIdx < oldStarts.length ? oldStarts[startIdx] : oldLen;
-        const oldEndIdx = startIdx + delCount;
-        const newEndIdx = startIdx + insCount;
-        const oldEndByte = oldEndIdx < oldStarts.length ? oldStarts[oldEndIdx] : oldLen;
-        const newEndByte = newEndIdx < newStarts.length ? newStarts[newEndIdx] : newLen;
-        edits.push({
-            startLine: startIdx + 1,
-            oldEndLine: startIdx + delCount,
-            newEndLine: startIdx + insCount,
-            startByte,
-            oldEndByte,
-            newEndByte,
-        });
-    }
-    return edits;
 }
 
 /**
@@ -489,16 +310,16 @@ export function computeEditRangesWithOps(
 
     const oldIndex = computeLineStartsAndHashes(oldContent);
     const newIndex = computeLineStartsAndHashes(newContent);
-    const oldLines = linesOf(oldContent, oldIndex.starts);
-    const newLines = linesOf(newContent, newIndex.starts);
+    const oldLines = extractLinesOf(oldContent, oldIndex.starts);
+    const newLines = extractLinesOf(newContent, newIndex.starts);
     const ops = fastDiff(oldLines, newLines, oldIndex.hashes, newIndex.hashes);
-    const edits = extractEditRanges(
+    const edits = extractEditRanges({
         ops,
-        oldIndex.starts,
-        newIndex.starts,
-        oldContent.length,
-        newContent.length,
-    );
+        oldStarts: oldIndex.starts,
+        newStarts: newIndex.starts,
+        oldLen: oldContent.length,
+        newLen: newContent.length,
+    });
 
     return { edits, ops, oldIndex, newIndex };
 }
@@ -531,7 +352,17 @@ export function shouldUseIncremental(
 ): boolean {
     const { edits, newIndex } = computeEditRangesWithOps(oldContent, newContent);
     if (newIndex.starts.length < minLines) return false;
-    return changedLineCount(edits) <= maxChangedLines;
+    return countChangedLines(edits) <= maxChangedLines;
+}
+
+/**
+ * Options configuring review-level hunk synthesis.
+ */
+export interface DetailedHunkOptions {
+    contextLines?: number;
+    precomputedOps?: DiffOp[];
+    precomputedStartsOld?: number[];
+    precomputedStartsNew?: number[];
 }
 
 /**
@@ -539,29 +370,24 @@ export function shouldUseIncremental(
  *
  * @param oldContent - Previous file content.
  * @param newContent - Current file content.
- * @param contextLines - Equal lines of context.
- * @param precomputedOps - Optional precomputed ops.
- * @param precomputedStartsOld - Optional line starts.
- * @param precomputedStartsNew - Optional line starts.
+ * @param options - Configuration options or context line limit.
  * @returns Review hunks in ascending order.
  */
 export function computeDetailedHunks(
     oldContent: string,
     newContent: string,
-    contextLines: number = DEFAULT_CONTEXT_LINES,
-    precomputedOps?: DiffOp[],
-    precomputedStartsOld?: number[],
-    precomputedStartsNew?: number[],
+    options: DetailedHunkOptions = {},
 ): ReviewDiffHunk[] {
     if (oldContent === newContent) return [];
-    const oldStarts = precomputedStartsOld || computeLineStarts(oldContent);
-    const newStarts = precomputedStartsNew || computeLineStarts(newContent);
-    let ops = precomputedOps;
+    const contextLines = options.contextLines ?? DEFAULT_CONTEXT_LINES;
+    const oldStarts = options.precomputedStartsOld || computeLineStarts(oldContent);
+    const newStarts = options.precomputedStartsNew || computeLineStarts(newContent);
+    let ops = options.precomputedOps;
     if (!ops) {
         const oldIndex = computeLineStartsAndHashes(oldContent);
         const newIndex = computeLineStartsAndHashes(newContent);
-        const oldLines = linesOf(oldContent, oldIndex.starts);
-        const newLines = linesOf(newContent, newIndex.starts);
+        const oldLines = extractLinesOf(oldContent, oldIndex.starts);
+        const newLines = extractLinesOf(newContent, newIndex.starts);
         ops = fastDiff(oldLines, newLines, oldIndex.hashes, newIndex.hashes);
     }
     return buildReviewHunksFromOps(oldContent, newContent, ops, oldStarts, newStarts, contextLines);

@@ -262,14 +262,12 @@ function resolvePraxisVerdict(
     startsNew?: number[],
 ): { hunks?: ReviewDiffHunk[]; praxisVerdict?: PraxisVerdict } {
     if (!opts.praxisHooks) return {};
-    const hunks = computeDetailedHunks(
-        oldContent,
-        newContent,
-        DIFF_CONTEXT_LINES,
-        diffOps,
-        startsOld,
-        startsNew,
-    );
+    const hunks = computeDetailedHunks(oldContent, newContent, {
+        contextLines: DIFF_CONTEXT_LINES,
+        precomputedOps: diffOps,
+        precomputedStartsOld: startsOld,
+        precomputedStartsNew: startsNew,
+    });
     let praxisVerdict: PraxisVerdict | undefined;
     if (opts.praxisHooks.thresholdPolicy && hunks.length > 0) {
         const enriched: PraxisEnrichedContext = opts.praxisHooks.contextEnricher
