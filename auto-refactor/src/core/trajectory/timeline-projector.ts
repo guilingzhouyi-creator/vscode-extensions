@@ -15,7 +15,9 @@ import * as path from 'path';
 import type { CompactTrajectoryRecord } from './eloc-types';
 
 /** Standard reverse read chunk size in bytes (64KB). */
-const REVERSE_CHUNK_SIZE = 64 * 1024;
+const CHUNK_SIZE_KB = 64;
+const BYTES_PER_KB = 1024;
+const REVERSE_CHUNK_SIZE = CHUNK_SIZE_KB * BYTES_PER_KB;
 
 /** Active ledger filename. */
 const FILE_ACTIVE_RUNS = 'active-runs.ndjson';
@@ -25,6 +27,19 @@ const FILE_ARCHIVE_RUNS = 'archive-runs.ndjson';
 
 /** Multiplier factor for standard two-decimal rounding. */
 const ROUNDING_FACTOR_TWO_DECIMALS = 100;
+const PERCENT_MULTIPLIER = 100;
+const ELOC_KILO_SCALE = 1000;
+const QED_PRECISION_SCALE = 1000000;
+const IDLE_HOURS_SCALE = 10;
+const DAYS_PER_WEEK = 7;
+const DEFAULT_AUTO_HOUR_WINDOW = 12;
+
+const BUCKET_TYPE_HOUR = 'hour';
+const BUCKET_TYPE_DAY = 'day';
+const BUCKET_TYPE_COMMIT = 'commit';
+const BUCKET_TYPE_AGENT = 'agent';
+const BUCKET_PREFIX_HOUR = 'h';
+const BUCKET_PREFIX_DAY = 'd';
 
 /** Milliseconds in standard units. */
 const MS_PER_SECOND = 1000;
@@ -63,9 +78,9 @@ const DURATION_MULTIPLIERS: Record<string, number> = {
     d: MS_PER_DAY,
     day: MS_PER_DAY,
     days: MS_PER_DAY,
-    w: MS_PER_DAY * 7,
-    week: MS_PER_DAY * 7,
-    weeks: MS_PER_DAY * 7,
+    w: MS_PER_DAY * DAYS_PER_WEEK,
+    week: MS_PER_DAY * DAYS_PER_WEEK,
+    weeks: MS_PER_DAY * DAYS_PER_WEEK,
 };
 
 /**
@@ -210,17 +225,28 @@ export interface TimelineBucketBoundary {
 }
 
 /**
- * Parses reverse chunk lines in a single buffer segment.
+ * Asynchronously checks if a file exists without blocking the event loop.
  */
-function processChunkTextLines(
-    chunkText: string,
-    query: TrajectoryReverseQuery,
-): { reachedCutoff: boolean; malformedCount: number; leftover: string } {
-    let malformedCount = 0;
-    const lines = chunkText.split('\n');
-    const leftover = lines[0];
+async function checkFileExistsAsync(targetPath: string): Promise<boolean> {
+    try {
+        await fs.promises.access(targetPath, fs.constants.F_OK);
+        return true;
+    } catch {
+        return false;
+    }
+}
 
-    for (let i = lines.length - 1; i >= 1; i--) {
+/**
+ * Parses reverse line slice into accumulator with cutoff checks.
+ */
+function parseLineBufferReverse(
+    lines: string[],
+    query: TrajectoryReverseQuery,
+    startIndex: number,
+    minLineIndex: number = 0,
+): { reachedCutoff: boolean; malformedCount: number } {
+    let malformedCount = 0;
+    for (let i = startIndex; i >= minLineIndex; i--) {
         const line = lines[i].trim();
         if (!line) continue;
 
@@ -230,11 +256,23 @@ function processChunkTextLines(
             continue;
         }
         if (outcome.reachedCutoff || query.accumulator.length >= query.maxRecords) {
-            return { reachedCutoff: true, malformedCount, leftover };
+            return { reachedCutoff: true, malformedCount };
         }
     }
+    return { reachedCutoff: false, malformedCount };
+}
 
-    return { reachedCutoff: false, malformedCount, leftover };
+/**
+ * Parses reverse chunk lines in a single buffer segment.
+ */
+function processChunkTextLines(
+    chunkText: string,
+    query: TrajectoryReverseQuery,
+): { reachedCutoff: boolean; malformedCount: number; leftover: string } {
+    const lines = chunkText.split('\n');
+    const leftover = lines[0];
+    const { reachedCutoff, malformedCount } = parseLineBufferReverse(lines, query, lines.length - 1, 1);
+    return { reachedCutoff, malformedCount, leftover };
 }
 
 /**
@@ -295,32 +333,22 @@ async function readActiveLedgerReverse(
     let malformedCount = 0;
     let earliestTimestamp = Infinity;
 
-    if (!fs.existsSync(activePath)) {
+    if (!(await checkFileExistsAsync(activePath))) {
         return { reachedCutoff: false, earliestTimestamp, malformedCount };
     }
 
     try {
         const activeContent = await fs.promises.readFile(activePath, 'utf8');
         const lines = activeContent.trim().split('\n');
+        const parseResult = parseLineBufferReverse(lines, query, lines.length - 1, 0);
+        malformedCount += parseResult.malformedCount;
 
-        for (let i = lines.length - 1; i >= 0; i--) {
-            const line = lines[i].trim();
-            if (!line) continue;
+        for (let i = 0; i < query.accumulator.length; i++) {
+            earliestTimestamp = Math.min(earliestTimestamp, query.accumulator[i].t);
+        }
 
-            const outcome = tryParseRecordLine(line, query.cutoffTimeMs, query.accumulator);
-            if (!outcome.isValid) {
-                malformedCount++;
-                continue;
-            }
-
-            const latestInserted = query.accumulator[query.accumulator.length - 1];
-            if (latestInserted) {
-                earliestTimestamp = Math.min(earliestTimestamp, latestInserted.t);
-            }
-
-            if (outcome.reachedCutoff || query.accumulator.length >= query.maxRecords) {
-                return { reachedCutoff: true, earliestTimestamp, malformedCount };
-            }
+        if (parseResult.reachedCutoff || query.accumulator.length >= query.maxRecords) {
+            return { reachedCutoff: true, earliestTimestamp, malformedCount };
         }
     } catch {
         // Ignored: tolerate active ledger read error on non-critical scan
@@ -362,7 +390,7 @@ export async function readRecordsTieredReverse(
     }
 
     const archivePath = path.join(ledgerDir, FILE_ARCHIVE_RUNS);
-    if (activeOutcome.earliestTimestamp > cutoffTimeMs && fs.existsSync(archivePath)) {
+    if (activeOutcome.earliestTimestamp > cutoffTimeMs && (await checkFileExistsAsync(archivePath))) {
         const archiveMalformedCount = await readArchiveChunksReverse(archivePath, query);
         malformedCount += archiveMalformedCount;
     }
@@ -370,37 +398,24 @@ export async function readRecordsTieredReverse(
     return { records: rawReverseList.reverse(), malformedCount };
 }
 
-/**
- * Accumulates single bucket metrics with hybrid latest and semantic-weighted score.
- */
-function foldSingleBucket(
-    boundary: TimelineBucketBoundary,
-    records: CompactTrajectoryRecord[],
-): TimelineBucketSnapshot {
-    const { bucketId, startTimeMs, endTimeMs } = boundary;
-    if (records.length === 0) {
-        return {
-            bucketId,
-            startTimeMs,
-            endTimeMs,
-            isIdleFold: false,
-            runsCount: 0,
-            processedEloc: 0,
-            changedEloc: 0,
-            semanticEloc: 0,
-            debtAdded: 0,
-            debtResolved: 0,
-            debtRegressions: 0,
-            netDebtYield: 0,
-            latestScore: 0,
-            weightedMeanScore: 0,
-            scoreFloor: 0,
-            scoreCeiling: 0,
-            gatePassRate: 0,
-            meanQed: 0,
-        };
-    }
+/** Intermediate bucket aggregation accumulator. */
+interface BucketMetricsAccumulator {
+    processedEloc: number;
+    changedEloc: number;
+    semanticEloc: number;
+    debtAdded: number;
+    debtResolved: number;
+    debtRegressions: number;
+    gatePassedCount: number;
+    scoreFloor: number;
+    scoreCeiling: number;
+    qedSum: number;
+    weightedScoreSum: number;
+    unweightedScoreSum: number;
+    latestScore: number;
+}
 
+function computeBucketMetricsAccumulator(records: CompactTrajectoryRecord[]): BucketMetricsAccumulator {
     let processedEloc = 0;
     let changedEloc = 0;
     let semanticEloc = 0;
@@ -446,41 +461,110 @@ function foldSingleBucket(
         }
     }
 
-    const runsCount = records.length;
-    const weightedMeanScore =
-        semanticEloc > 0
-            ? Math.round((weightedScoreSum / semanticEloc) * ROUNDING_FACTOR_TWO_DECIMALS) / ROUNDING_FACTOR_TWO_DECIMALS
-            : Math.round((unweightedScoreSum / runsCount) * ROUNDING_FACTOR_TWO_DECIMALS) / ROUNDING_FACTOR_TWO_DECIMALS;
-
-    const netDebtPoints = debtResolved - debtAdded;
-    const netDebtYield =
-        semanticEloc > 0
-            ? Math.round((netDebtPoints / (semanticEloc / 1000)) * ROUNDING_FACTOR_TWO_DECIMALS) / ROUNDING_FACTOR_TWO_DECIMALS
-            : netDebtPoints;
-
-    const gatePassRate =
-        Math.round((gatePassedCount / runsCount) * 100 * ROUNDING_FACTOR_TWO_DECIMALS) /
-        ROUNDING_FACTOR_TWO_DECIMALS;
-
-    const meanQed = Math.round((qedSum / runsCount) * 1000000) / 1000000;
-
     return {
-        bucketId,
-        startTimeMs,
-        endTimeMs,
-        isIdleFold: false,
-        runsCount,
         processedEloc,
         changedEloc,
         semanticEloc,
         debtAdded,
         debtResolved,
         debtRegressions,
-        netDebtYield,
-        latestScore,
-        weightedMeanScore,
+        gatePassedCount,
         scoreFloor,
         scoreCeiling,
+        qedSum,
+        weightedScoreSum,
+        unweightedScoreSum,
+        latestScore,
+    };
+}
+
+function createZeroBucketSnapshot(options: {
+    bucketId: string;
+    startTimeMs: number;
+    endTimeMs: number;
+    isIdleFold: boolean;
+}): TimelineBucketSnapshot {
+    return {
+        bucketId: options.bucketId,
+        startTimeMs: options.startTimeMs,
+        endTimeMs: options.endTimeMs,
+        isIdleFold: options.isIdleFold,
+        runsCount: 0,
+        processedEloc: 0,
+        changedEloc: 0,
+        semanticEloc: 0,
+        debtAdded: 0,
+        debtResolved: 0,
+        debtRegressions: 0,
+        netDebtYield: 0,
+        latestScore: 0,
+        weightedMeanScore: 0,
+        scoreFloor: 0,
+        scoreCeiling: 0,
+        gatePassRate: 0,
+        meanQed: 0,
+    };
+}
+
+function createEmptyBucketSnapshot(boundary: TimelineBucketBoundary): TimelineBucketSnapshot {
+    return createZeroBucketSnapshot({
+        bucketId: boundary.bucketId,
+        startTimeMs: boundary.startTimeMs,
+        endTimeMs: boundary.endTimeMs,
+        isIdleFold: false,
+    });
+}
+
+/**
+ * Accumulates single bucket metrics with hybrid latest and semantic-weighted score.
+ */
+function aggregateSingleBucket(
+    boundary: TimelineBucketBoundary,
+    records: CompactTrajectoryRecord[],
+): TimelineBucketSnapshot {
+    if (records.length === 0) {
+        return createEmptyBucketSnapshot(boundary);
+    }
+
+    const acc = computeBucketMetricsAccumulator(records);
+    const runsCount = records.length;
+    const weightedMeanScore =
+        acc.semanticEloc > 0
+            ? Math.round((acc.weightedScoreSum / acc.semanticEloc) * ROUNDING_FACTOR_TWO_DECIMALS) /
+              ROUNDING_FACTOR_TWO_DECIMALS
+            : Math.round((acc.unweightedScoreSum / runsCount) * ROUNDING_FACTOR_TWO_DECIMALS) /
+              ROUNDING_FACTOR_TWO_DECIMALS;
+
+    const netDebtPoints = acc.debtResolved - acc.debtAdded;
+    const netDebtYield =
+        acc.semanticEloc > 0
+            ? Math.round((netDebtPoints / (acc.semanticEloc / ELOC_KILO_SCALE)) * ROUNDING_FACTOR_TWO_DECIMALS) /
+              ROUNDING_FACTOR_TWO_DECIMALS
+            : netDebtPoints;
+
+    const gatePassRate =
+        Math.round((acc.gatePassedCount / runsCount) * PERCENT_MULTIPLIER * ROUNDING_FACTOR_TWO_DECIMALS) /
+        ROUNDING_FACTOR_TWO_DECIMALS;
+
+    const meanQed = Math.round((acc.qedSum / runsCount) * QED_PRECISION_SCALE) / QED_PRECISION_SCALE;
+
+    return {
+        bucketId: boundary.bucketId,
+        startTimeMs: boundary.startTimeMs,
+        endTimeMs: boundary.endTimeMs,
+        isIdleFold: false,
+        runsCount,
+        processedEloc: acc.processedEloc,
+        changedEloc: acc.changedEloc,
+        semanticEloc: acc.semanticEloc,
+        debtAdded: acc.debtAdded,
+        debtResolved: acc.debtResolved,
+        debtRegressions: acc.debtRegressions,
+        netDebtYield,
+        latestScore: acc.latestScore,
+        weightedMeanScore,
+        scoreFloor: acc.scoreFloor,
+        scoreCeiling: acc.scoreCeiling,
         gatePassRate,
         meanQed,
     };
@@ -526,7 +610,7 @@ function aggregateSemanticBuckets(
     const snapshots: TimelineBucketSnapshot[] = [];
     for (const group of groupMap.values()) {
         snapshots.push(
-            foldSingleBucket(
+            aggregateSingleBucket(
                 { bucketId: group.key, startTimeMs: group.startMs, endTimeMs: group.endMs },
                 group.records,
             ),
@@ -552,27 +636,14 @@ interface RawStepBucket {
  * Creates folded idle gap placeholder snapshot.
  */
 function createIdleFoldSnapshot(startTimeMs: number, endTimeMs: number): TimelineBucketSnapshot {
-    const idleDurationHours = Math.round(((endTimeMs - startTimeMs) / MS_PER_HOUR) * 10) / 10;
-    return {
+    const idleDurationHours =
+        Math.round(((endTimeMs - startTimeMs) / MS_PER_HOUR) * IDLE_HOURS_SCALE) / IDLE_HOURS_SCALE;
+    return createZeroBucketSnapshot({
         bucketId: `[ ${idleDurationHours}h idle gap ]`,
         startTimeMs,
         endTimeMs,
         isIdleFold: true,
-        runsCount: 0,
-        processedEloc: 0,
-        changedEloc: 0,
-        semanticEloc: 0,
-        debtAdded: 0,
-        debtResolved: 0,
-        debtRegressions: 0,
-        netDebtYield: 0,
-        latestScore: 0,
-        weightedMeanScore: 0,
-        scoreFloor: 0,
-        scoreCeiling: 0,
-        gatePassRate: 0,
-        meanQed: 0,
-    };
+    });
 }
 
 interface IdleFlushOptions {
@@ -594,7 +665,7 @@ function flushPendingIdle(options: IdleFlushOptions): void {
     }
     if (idleCount === 1 && prevBucket) {
         destinationBuckets.push(
-            foldSingleBucket(
+            aggregateSingleBucket(
                 {
                     bucketId: prevBucket.bucketId,
                     startTimeMs: prevBucket.startTimeMs,
@@ -609,7 +680,7 @@ function flushPendingIdle(options: IdleFlushOptions): void {
 /**
  * Folds idle bucket sequences into compact gap summaries.
  */
-function foldIdleIntervals(rawStepBuckets: RawStepBucket[]): TimelineBucketSnapshot[] {
+function aggregateIdleIntervals(rawStepBuckets: RawStepBucket[]): TimelineBucketSnapshot[] {
     const foldedSnapshots: TimelineBucketSnapshot[] = [];
     let idleRunCount = 0;
     let idleStartTimeMs = 0;
@@ -635,7 +706,7 @@ function foldIdleIntervals(rawStepBuckets: RawStepBucket[]): TimelineBucketSnaps
         });
         idleRunCount = 0;
         foldedSnapshots.push(
-            foldSingleBucket(
+            aggregateSingleBucket(
                 {
                     bucketId: stepBucket.bucketId,
                     startTimeMs: stepBucket.startTimeMs,
@@ -701,7 +772,7 @@ function aggregateRelativeTimeBuckets(
         }
     }
 
-    return foldIdleIntervals(rawStepBuckets);
+    return aggregateIdleIntervals(rawStepBuckets);
 }
 
 /**
@@ -720,7 +791,8 @@ export async function projectTimelineReport(
 
     let bucketType = options.bucket;
     if (!bucketType) {
-        bucketType = durationMs <= MS_PER_HOUR * 12 ? 'hour' : 'day';
+        bucketType =
+            durationMs <= MS_PER_HOUR * DEFAULT_AUTO_HOUR_WINDOW ? BUCKET_TYPE_HOUR : BUCKET_TYPE_DAY;
     }
 
     const { records, malformedCount } = await readRecordsTieredReverse(
@@ -730,15 +802,15 @@ export async function projectTimelineReport(
     );
 
     let buckets: TimelineBucketSnapshot[] = [];
-    if (bucketType === 'commit' || bucketType === 'agent') {
+    if (bucketType === BUCKET_TYPE_COMMIT || bucketType === BUCKET_TYPE_AGENT) {
         buckets = aggregateSemanticBuckets(records, bucketType, referenceNowMs);
-    } else if (bucketType === 'hour') {
+    } else if (bucketType === BUCKET_TYPE_HOUR) {
         buckets = aggregateRelativeTimeBuckets({
             records,
             referenceNowMs,
             cutoffTimeMs,
             bucketStepMs: MS_PER_HOUR,
-            bucketLabelPrefix: 'h',
+            bucketLabelPrefix: BUCKET_PREFIX_HOUR,
         });
     } else {
         buckets = aggregateRelativeTimeBuckets({
@@ -746,7 +818,7 @@ export async function projectTimelineReport(
             referenceNowMs,
             cutoffTimeMs,
             bucketStepMs: MS_PER_DAY,
-            bucketLabelPrefix: 'd',
+            bucketLabelPrefix: BUCKET_PREFIX_DAY,
         });
     }
 
