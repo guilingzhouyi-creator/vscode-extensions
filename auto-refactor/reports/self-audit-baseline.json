@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1793594393287",
-  "timestamp": "2026-11-02T04:39:57.863Z",
+  "snapshotId": "snapshot-v0.4.0-1793594837822",
+  "timestamp": "2026-11-02T04:47:22.343Z",
   "cai": 88.33,
   "autonomy": {
     "compositeAutonomyIndex": 88.33,
@@ -9,7 +9,7 @@
     "dimensions": {
       "effectiveLocAutonomy": 97.78,
       "symbolCallAutonomy": 98.05,
-      "domainKernelDensity": 63.38,
+      "domainKernelDensity": 63.37,
       "codeOriginality": 91.02,
       "supplyChainResilience": 77.27,
       "criticalPathAutonomy": 95
@@ -64,8 +64,8 @@
       "proprietaryFiles": 810,
       "vendorFiles": 0,
       "generatedFiles": 7,
-      "totalEffectiveLoc": 250803,
-      "proprietaryEffectiveLoc": 245236,
+      "totalEffectiveLoc": 250816,
+      "proprietaryEffectiveLoc": 245249,
       "vendorEffectiveLoc": 0,
       "generatedEffectiveLoc": 5567,
       "internalSymbolCalls": 2414,
@@ -95,15 +95,15 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 817,
-    "durationMs": 3717
+    "durationMs": 3603
   },
   "metrics": {
-    "compositeScore": 99.21,
+    "compositeScore": 99.22,
     "grade": "A+",
     "autonomyRate": 88.33,
     "sqale": {
       "tdr": 0.0036,
-      "remediationMinutes": 27115,
+      "remediationMinutes": 27057,
       "grade": "A"
     },
     "polyglotGeneralization": {
@@ -123,19 +123,19 @@
       "averageMahalanobisDistance": 4.5,
       "averageFisherSimplexDistance": 0.093
     },
-    "totalIssues": 3920,
+    "totalIssues": 3902,
     "suppressedIssues": 72,
-    "unsuppressedIssues": 3848,
+    "unsuppressedIssues": 3830,
     "bySeverity": {
-      "info": 555,
-      "warning": 3375,
+      "info": 543,
+      "warning": 3369,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
       "medium": 626,
-      "low": 3294
+      "low": 3276
     }
   },
   "eightPillars": {
@@ -147,9 +147,9 @@
       "testing": 99.8,
       "reliability": 99.74,
       "security": 99.88,
-      "extensibility": 97.89
+      "extensibility": 97.9
     },
-    "compositeScore": 99.21,
+    "compositeScore": 99.22,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -167,23 +167,14 @@
     "semanticPurity": 99.5,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.84,
-    "standardization": 96.08,
+    "standardization": 96.09,
     "modernity": 99.8,
     "maintainability": 98.18,
     "commentQuality": 99.99,
     "duplication": 97.61,
-    "techDebtRisk": 99.98
+    "techDebtRisk": 99.99
   },
   "topHotspots": [
-    {
-      "filePath": "src/core/constants/regex-patterns.ts",
-      "domain": "constants",
-      "totalIssues": 19,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 98.44,
-      "effectiveDensity": 0.98
-    },
     {
       "filePath": "src/core/intelligence/constant-identity.ts",
       "domain": "intelligence",
@@ -264,6 +255,15 @@
       "highCount": 0,
       "compositeScore": 97.28,
       "effectiveDensity": 0.95
+    },
+    {
+      "filePath": "src/analyzers/governance.ts",
+      "domain": "analyzers",
+      "totalIssues": 17,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 96.72,
+      "effectiveDensity": 0.95
     }
   ],
   "technicalDebtLedger": {
@@ -271,7 +271,7 @@
       "critical": 0,
       "high": 0,
       "medium": 626,
-      "low": 3294
+      "low": 3276
     },
     "criticalItems": [],
     "highItems": []
@@ -490,16 +490,16 @@
       },
       {
         "domainName": "constants",
-        "compositeScore": 99.67,
+        "compositeScore": 99.72,
         "pillars": {
           "architecture": 99.75,
-          "maintainability": 99.32,
-          "performance": 99.8,
+          "maintainability": 99.35,
+          "performance": 99.9,
           "data": 99.63,
-          "testing": 99.94,
-          "reliability": 99.95,
+          "testing": 100,
+          "reliability": 99.98,
           "security": 99.9,
-          "extensibility": 99.04
+          "extensibility": 99.17
         },
         "moduleCount": 1
       },
@@ -1197,43 +1197,43 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 195129,
+      "processed": 195140,
       "unique": 154234,
-      "changed": 1120,
-      "semantic": 583,
+      "changed": 1098,
+      "semantic": 802,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 739,
-      "deleted": 381,
-      "modified": 381
+      "added": 791,
+      "deleted": 307,
+      "modified": 307
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1793594393284,
-      "totalRuns": 459,
+      "endMs": 1793594837819,
+      "totalRuns": 461,
       "eloc": {
-        "processedTotal": 70185289,
+        "processedTotal": 70575569,
         "uniqueTotal": 154234,
-        "changedTotal": 1521148,
-        "semanticTotal": 1156708
+        "changedTotal": 1523082,
+        "semanticTotal": 1158191
       },
       "qed": {
-        "mean": -0.045335,
+        "mean": -0.045139,
         "min": -3.5,
         "max": 0.18,
-        "kMean": -45.335
+        "kMean": -45.139
       },
       "debt": {
         "totalAdded": 3429,
         "totalResolved": 9858,
         "totalRegressions": 77,
-        "netYield": 5.56,
+        "netYield": 5.55,
         "densityYield": 41.68
       },
       "meanCompositeScore": 98.92,
-      "gatePassRate": 92.82
+      "gatePassRate": 92.85
     },
     "isFirstBaseline": false
   }

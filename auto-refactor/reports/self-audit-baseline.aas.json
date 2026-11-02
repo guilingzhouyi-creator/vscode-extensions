@@ -2,11 +2,11 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-02T04:39:54.704Z",
+  "timestamp": "2026-11-02T04:47:19.191Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.21,
+    "score": 99.22,
     "grade": "A+",
     "cai": 88.33,
     "density": 0.95,
@@ -21,7 +21,7 @@
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 27115,
+      "remediationMinutes": 27057,
       "grade": "A"
     },
     "polyglot": {
@@ -33,10 +33,10 @@
     },
     "quant": {
       "rcr": 0,
-      "erq": 1.39,
-      "ddr": 2.51,
-      "edb95": 17.53,
-      "ptd": 36.09,
+      "erq": 1.4,
+      "ddr": 2.53,
+      "edb95": 17.56,
+      "ptd": 35.86,
       "dsi": 0.51,
       "rcd": 0.67,
       "ehl": 1,
@@ -47,7 +47,7 @@
       "warningCount": 0,
       "failingCount": 0,
       "lowestDimension": "standardization",
-      "lowestScore": 96.08
+      "lowestScore": 96.09
     },
     "pillars": {
       "architecture": 99.59,
@@ -57,21 +57,21 @@
       "testing": 99.8,
       "reliability": 99.74,
       "security": 99.88,
-      "extensibility": 97.89
+      "extensibility": 97.9
     },
     "counts": {
       "files": 817,
-      "total": 3930,
+      "total": 3912,
       "errors": 0,
-      "warns": 3375,
-      "info": 555,
+      "warns": 3369,
+      "info": 543,
       "suppressed": 72
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1606,
-    "advisory": 2324,
+    "patchable": 1594,
+    "advisory": 2318,
     "uncalibrated": 51,
     "needsHuman": 1
   },
@@ -81,12 +81,12 @@
     "semanticPurity": 99.5,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.84,
-    "standardization": 96.08,
+    "standardization": 96.09,
     "modernity": 99.8,
     "maintainability": 98.18,
     "commentQuality": 99.99,
     "duplication": 97.61,
-    "techDebtRisk": 99.98
+    "techDebtRisk": 99.99
   },
   "dimensionDetails": {
     "architectureConsistency": {
@@ -126,7 +126,7 @@
       "confidence": 1
     },
     "standardization": {
-      "score": 84.96,
+      "score": 84.99,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
@@ -141,7 +141,7 @@
       ]
     },
     "modernity": {
-      "score": 98.09,
+      "score": 98.19,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.074,
@@ -210,8 +210,8 @@
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2050,
-      "count": 410
+      "loss": 2030,
+      "count": 406
     },
     {
       "rule": "SIM-LONG-001",
@@ -7393,5 +7393,5 @@
       }
     ]
   },
-  "truncated": 2865
+  "truncated": 2859
 }
