@@ -2,11 +2,11 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-02T03:53:20.589Z",
+  "timestamp": "2026-11-02T04:05:33.372Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.2,
+    "score": 99.21,
     "grade": "A+",
     "cai": 88.31,
     "density": 0.95,
@@ -21,22 +21,22 @@
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 27663,
+      "remediationMinutes": 27342,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.56,
-      "meanScore": 96.56,
+      "index": 96.58,
+      "meanScore": 96.58,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "quant": {
       "rcr": 0,
-      "erq": 2.11,
-      "ddr": 5.43,
-      "edb95": 17.95,
-      "ptd": 36.72,
+      "erq": 1.16,
+      "ddr": 1.75,
+      "edb95": 16.69,
+      "ptd": 36.28,
       "dsi": 0.51,
       "rcd": 0.67,
       "ehl": 1,
@@ -47,31 +47,31 @@
       "warningCount": 0,
       "failingCount": 0,
       "lowestDimension": "standardization",
-      "lowestScore": 96.02
+      "lowestScore": 96.04
     },
     "pillars": {
       "architecture": 99.59,
       "maintainability": 98.16,
       "performance": 99.84,
-      "data": 98.52,
+      "data": 98.54,
       "testing": 99.79,
       "reliability": 99.74,
       "security": 99.88,
-      "extensibility": 97.85
+      "extensibility": 97.87
     },
     "counts": {
       "files": 815,
-      "total": 4004,
+      "total": 3967,
       "errors": 0,
-      "warns": 3437,
-      "info": 567,
-      "suppressed": 83
+      "warns": 3404,
+      "info": 563,
+      "suppressed": 72
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1653,
-    "advisory": 2351,
+    "patchable": 1625,
+    "advisory": 2342,
     "uncalibrated": 60,
     "needsHuman": 1
   },
@@ -81,11 +81,11 @@
     "semanticPurity": 99.49,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.84,
-    "standardization": 96.02,
+    "standardization": 96.04,
     "modernity": 99.79,
     "maintainability": 98.16,
     "commentQuality": 99.99,
-    "duplication": 97.54,
+    "duplication": 97.58,
     "techDebtRisk": 99.98
   },
   "dimensionDetails": {
@@ -105,7 +105,7 @@
       ]
     },
     "semanticPurity": {
-      "score": 98.28,
+      "score": 98.3,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -126,7 +126,7 @@
       "confidence": 1
     },
     "standardization": {
-      "score": 84.77,
+      "score": 84.82,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
@@ -148,7 +148,7 @@
       "confidence": 1
     },
     "maintainability": {
-      "score": 93.56,
+      "score": 93.59,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
@@ -162,7 +162,7 @@
       "confidence": 1
     },
     "duplication": {
-      "score": 95.27,
+      "score": 95.35,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -198,8 +198,8 @@
     {
       "rule": "SIM-TRN-001",
       "dim": "standardization",
-      "loss": 2300,
-      "count": 230
+      "loss": 2240,
+      "count": 224
     },
     {
       "rule": "NAM-DEC-001",
@@ -210,20 +210,20 @@
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2105,
-      "count": 421
+      "loss": 2090,
+      "count": 418
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 1980,
-      "count": 198
+      "loss": 1970,
+      "count": 197
     },
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 1893,
-      "count": 631
+      "loss": 1830,
+      "count": 610
     }
   ],
   "topology": {
@@ -245,7 +245,6 @@
       "src/core/types.ts"
     ],
     "L2_OPERATOR": [
-      "src/cli/selfTestCmd.ts",
       "src/core/evolution/code-evolution-analyzer.ts",
       "src/core/intelligence/boundary-discipline-engine.ts",
       "src/core/intelligence/elastic-complexity-budget.ts",
@@ -293,7 +292,8 @@
       "src/analyzers/rust-modern.ts",
       "src/analyzers/stdlib.ts",
       "src/analyzers/vscode-extension.ts",
-      "src/core/ast/gdscript-adapter.ts"
+      "src/core/ast/gdscript-adapter.ts",
+      "src/core/ast/rust-adapter.ts"
     ]
   },
   "files": {
@@ -951,159 +951,6 @@
         },
         "tier": "T3",
         "conf": 1
-      }
-    ],
-    "src/cli/selfTestCmd.ts": [
-      {
-        "line": 128,
-        "rule": "SIM-LONG-001",
-        "sev": "WARN",
-        "msg": "Function \"buildFixtures\" spans 83 lines (limit 60)",
-        "fix": {
-          "action": "split_function",
-          "template": "// Extracted helper:",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 161,
-        "col": 74,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 5 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 175,
-        "col": 55,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 197,
-        "col": 36,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 800 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 198,
-        "col": 39,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 800 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 216,
-        "col": 13,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 217,
-        "col": 13,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 218,
-        "col": 13,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 219,
-        "col": 13,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95,
-        "moreLines": [
-          220,
-          221,
-          222,
-          223,
-          224,
-          301,
-          306,
-          313
-        ]
-      },
-      {
-        "line": 1,
-        "rule": "NAM-FIL-001",
-        "sev": "WARN",
-        "msg": "File name 'selfTestCmd.ts' violates strict kebab-case naming convention for TypeScript/JavaScript",
-        "fix": {
-          "action": "rename_identifier"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 299,
-        "col": 23,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'selfTestCommand' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T3",
-        "conf": 0.89
       }
     ],
     "src/core/evolution/code-evolution-analyzer.ts": [
@@ -7394,8 +7241,150 @@
         },
         "tier": "T2",
         "conf": 0.95
+      },
+      {
+        "line": 442,
+        "col": 5,
+        "rule": "SIM-LONG-001",
+        "sev": "WARN",
+        "msg": "Function \"GDScriptAdapter.extractLiterals\" spans 77 lines (limit 60)",
+        "fix": {
+          "action": "split_function",
+          "template": "// Extracted helper:",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "file lines 530 >= 400 (split)",
+        "fix": {
+          "action": "split_file"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 289,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'tryParseControlStmt' contains segment 'Stmt' with invalid morpheme phonetics (missing vowel or unapproved acronym)",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 290,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 258",
+        "fix": {
+          "action": "sanitize_hygiene"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 317,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "Function or method name 'tryParseStructureStmt' contains segment 'Stmt' with invalid morpheme phonetics (missing vowel or unapproved acronym)",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      }
+    ],
+    "src/core/ast/rust-adapter.ts": [
+      {
+        "line": 481,
+        "col": 32,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 496,
+        "col": 32,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 8 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 497,
+        "col": 48,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 536,
+        "col": 67,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 551,
+        "col": 24,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 552,
+        "col": 16,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
       }
     ]
   },
-  "truncated": 2927
+  "truncated": 2894
 }
