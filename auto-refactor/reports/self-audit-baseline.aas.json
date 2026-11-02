@@ -2,13 +2,13 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-02T03:38:53.105Z",
+  "timestamp": "2026-11-02T03:53:20.589Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
     "score": 99.2,
     "grade": "A+",
-    "cai": 88.3,
+    "cai": 88.31,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
@@ -21,21 +21,21 @@
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 28026,
+      "remediationMinutes": 27663,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.54,
-      "meanScore": 96.54,
+      "index": 96.56,
+      "meanScore": 96.56,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "quant": {
       "rcr": 0,
-      "erq": 2.93,
-      "ddr": 629.36,
-      "edb95": 26.88,
+      "erq": 2.11,
+      "ddr": 5.43,
+      "edb95": 17.95,
       "ptd": 36.72,
       "dsi": 0.51,
       "rcd": 0.67,
@@ -47,60 +47,60 @@
       "warningCount": 0,
       "failingCount": 0,
       "lowestDimension": "standardization",
-      "lowestScore": 96.01
+      "lowestScore": 96.02
     },
     "pillars": {
-      "architecture": 99.58,
+      "architecture": 99.59,
       "maintainability": 98.16,
       "performance": 99.84,
-      "data": 98.5,
+      "data": 98.52,
       "testing": 99.79,
       "reliability": 99.74,
       "security": 99.88,
-      "extensibility": 97.83
+      "extensibility": 97.85
     },
     "counts": {
       "files": 815,
-      "total": 4042,
+      "total": 4004,
       "errors": 0,
-      "warns": 3475,
+      "warns": 3437,
       "info": 567,
-      "suppressed": 112
+      "suppressed": 83
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1683,
-    "advisory": 2359,
-    "uncalibrated": 102,
+    "patchable": 1653,
+    "advisory": 2351,
+    "uncalibrated": 60,
     "needsHuman": 1
   },
   "defaultVerify": "npm test",
   "dimensions": {
-    "architectureConsistency": 99.58,
+    "architectureConsistency": 99.59,
     "semanticPurity": 99.49,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.84,
-    "standardization": 96.01,
+    "standardization": 96.02,
     "modernity": 99.79,
     "maintainability": 98.16,
     "commentQuality": 99.99,
-    "duplication": 97.5,
+    "duplication": 97.54,
     "techDebtRisk": 99.98
   },
   "dimensionDetails": {
     "architectureConsistency": {
-      "score": 97.57,
+      "score": 97.62,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
       "confidence": 1,
-      "totalLoss": 90,
+      "totalLoss": 60,
       "topBottlenecks": [
         {
           "rule": "DEP-LAZ-001",
-          "loss": 90,
-          "count": 6
+          "loss": 60,
+          "count": 4
         }
       ]
     },
@@ -126,17 +126,17 @@
       "confidence": 1
     },
     "standardization": {
-      "score": 84.74,
+      "score": 84.77,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
       "confidence": 1,
-      "totalLoss": 60,
+      "totalLoss": 90,
       "topBottlenecks": [
         {
           "rule": "large-file",
-          "loss": 60,
-          "count": 4
+          "loss": 90,
+          "count": 6
         }
       ]
     },
@@ -162,7 +162,7 @@
       "confidence": 1
     },
     "duplication": {
-      "score": 95.17,
+      "score": 95.27,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -216,14 +216,14 @@
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 1990,
-      "count": 199
+      "loss": 1980,
+      "count": 198
     },
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 1956,
-      "count": 652
+      "loss": 1893,
+      "count": 631
     }
   ],
   "topology": {
@@ -3991,7 +3991,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.92
+        "conf": 0.93
       },
       {
         "line": 108,
@@ -4005,7 +4005,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.92
+        "conf": 0.93
       },
       {
         "line": 137,
@@ -4019,7 +4019,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.92
+        "conf": 0.93
       },
       {
         "line": 137,
@@ -7397,5 +7397,5 @@
       }
     ]
   },
-  "truncated": 2965
+  "truncated": 2927
 }
