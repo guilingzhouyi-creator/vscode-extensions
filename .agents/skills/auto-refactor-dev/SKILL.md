@@ -53,7 +53,8 @@ description: >-
 
 1. **Praxis SDK 与一体两面三层拓扑 Diff**：`createPraxisClient` 提供 `reviewWorkspace` / `reviewFile` / `reviewDiff` / `evaluateMergeGate`，生成机器面（`DiffAgentFace`）与人类面（`DiffHumanFace`）对称的三层 Diff（L1 构建单元 $\to$ L2 反向依赖闭包 $\to$ L3 冲突/破坏风险 `shouldEscalateToL3A`），并在 `semantic-correlation.ts` 中基于并查集对 11 组重叠规则聚类选举主卡片（`electPrimaryCard`）；
 2. **守护进程与暂存落盘契约**：常驻守护进程严禁阻塞 `*Sync` I/O（`PRF-IO-001`），同步 I/O 经 `*IoBarrier` 封装且同步方法物理排在 `async` 之前；IPC 指令顶部常量聚类（`NAM-LEN-002`）；时间戳统一以 `*Ms` 结尾并采用 `Brand<T, B>` 名义烙印；落盘区分 `stagingPath` 与 `compactStagingPath` 并执行原子 `rename`；
-3. **热路径与避免重复开销**：通过 MoE 稀疏路由、三级拓扑缓存、Worker 双缓冲 + Transferable `ArrayBuffer` 零拷贝、单趟 AST 磁带融合及 12 项内存范式（单指针队列 `queue[head++]`、显式栈三色 DFS、`nodesByFile` 倒排索引、`cachedLines`、`charCodeAt` 首字符 $O(1)$ 分发、紧凑 `ActiveHook[]`）消除冗余计算。
+3. **热路径与避免重复开销**：通过 MoE 稀疏路由、三级拓扑缓存、Worker 双缓冲 + Transferable `ArrayBuffer` 零拷贝、单趟 AST 磁带融合及 12 项内存范式（单指针队列 `queue[head++]`、显式栈三色 DFS、`nodesByFile` 倒排索引、`cachedLines`、`charCodeAt` 首字符 $O(1)$ 分发、紧凑 `ActiveHook[]`）消除冗余计算；
+4. **两层 5D ELOC 差分双向钳制与经验准入 (`differential-bounds.ts`)**：提取 5D 黎曼相空间坐标，施加单文件微观形变包络（新增 $\le 120/180$，删除 $\le 100$）与批次宏观形变包络（总新增 $\le 360$，总删除 $\le 280$），联动 Jeffreys Beta 动态准入门槛 $\Theta_{\text{admission}} \in [3.0, 25.0]$ 5D ELOC，坚决拦截纯注释、跳板与代码稀释（$\text{TSPR} \ge 0.40$）。
 
 ---
 

@@ -81,6 +81,12 @@ git add path/to/contract.ts path/to/storage.ts
    - **绝对禁止执行全局性破坏性还原命令**：严禁运行 `git checkout -- .`、`git restore .`、`git clean -fd` 或 `git reset --hard`，防止彻底销毁并行会话中尚未落盘或暂存的工作成果；
    - 严禁自作主张对并行会话的文件执行格式化、语法“修复”或将其杂糅进当前提交。
 
+3. **两层 5D ELOC 差分双向钳制与准入更替审查 (`FGT-GAT-001`)**：
+   - **单文件微观形变包络**：新建文件 $E_{\text{add}} \le 180.0$ 5D ELOC，已有文件 $E_{\text{add}} \le 120.0$ 5D ELOC；单文件删除 $E_{\text{del}} \le 100.0$ 5D ELOC（超限须有重构见证）；实质行比率 $\ge 0.60$、$\text{TSPR} \ge 0.40$；
+   - **批次宏观聚合包络**：单批总新增 $\sum E_{\text{add}} \le 360.0$ 5D ELOC，总删除 $\sum E_{\text{del}} \le 280.0$ 5D ELOC；
+   - **最低经验自适应净更替量门槛**：$\sum E_{\text{add}} + 0.8 \times \sum E_{\text{del}} \ge \Theta_{\text{admission}}$（Jeffreys Beta 后验动态钳位在 $[3.0, 25.0]$ 5D ELOC，杜绝纯注释与跳板伪更替）；
+   - **双轨交错提交节拍**：生产/业务代码（Code Beat）先行提交，自审周报与遥测存证（Telemetry Beat）接续提交，严禁混杂提交扩大爆炸半径。详见 [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md)。
+
 ### Step 2: 编写结构化提交信息与离线预审 (`commit-msg-gate`)
 在本地临时目录中创建提交信息文件 `commit_batch_N.txt`。必须满足以下刚性规范：
 
@@ -174,4 +180,5 @@ git commit -F "$dir\commit_batch_N.txt"
 ## 五、 关联模板与参考指南
 
 - [commit-template-standard.txt](templates/commit-template-standard.txt)：标准结构化提交信息模板；
-- [forbidden-terms-guide.md](references/forbidden-terms-guide.md)：风格禁词拦截与质性断言编写指引。
+- [forbidden-terms-guide.md](references/forbidden-terms-guide.md)：风格禁词拦截与质性断言编写指引；
+- [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md)：两层 5D ELOC 差分双向钳制模型与最低更替量准入判定规约。

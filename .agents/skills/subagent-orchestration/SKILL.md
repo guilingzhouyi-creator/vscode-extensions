@@ -58,7 +58,8 @@ description: >-
 1. **两两完全正交公理 ($\forall i \ne j,\ \text{Jail}_i \cap \text{Jail}_j = \emptyset$)**：并行派发多个写入专员（`construct`/`refactor`）时，必须在 Task Scope 中列出精确到具名文件的独占列表，严禁整目录宽泛授权或重叠文件授权；跨顶级项目并行时可使用 `Workspace: "branch"`；
 2. **读写协同与可重入章节检查点 (`mark_chapter`)**：复杂任务遵循 `Explore/Review 只读勘测 -> Construct/Refactor 定点施工 -> Guardian 复核`；长程跨层任务必须在关键拓扑节点输出章节检查点（已完成文件基线、已通过自检断言、下一原子任务契约），支持随时无损交接或单章回滚；
 3. **后台 Agent 焦点防抢占守卫**：后台或只读 SubAgent 严禁弹出系统模态框、强制激活窗口或滥用 `element.focus()` 抢夺人类前台光标；
-4. **多会话与外部并行感知公理 (Session Isolation & Parallel Mutex)**：运行中的会话必须识别共享工作树下的外部并行会话活动；当 `git status` 中检测到不属于本任务的文件变动时，严格保持零触碰、零清理、零顺带修复，严禁运行全局破坏性还原命令（`git restore .`、`git clean -fd`），并坚持显式白名单暂存。
+4. **多会话与外部并行感知公理 (Session Isolation & Parallel Mutex)**：运行中的会话必须识别共享工作树下的外部并行会话活动；当 `git status` 中检测到不属于本任务的文件变动时，严格保持零触碰、零清理、零顺带修复，严禁运行全局破坏性还原命令（`git restore .`、`git clean -fd`），并坚持显式白名单暂存；
+5. **两层 5D ELOC 差分钳制与双轨交错节拍**：专员交付代码强制遵从单文件微观包络（新增 $\le 120/180$，删除 $\le 100$）与批次净更替准入门槛（$\ge \Theta_{\text{admission}}$）；提交推进遵循生产代码先行（Code Beat）、自审周报存证随后（Telemetry Beat）的双轨交错节拍，严禁混杂提交扩大回滚风险。
 
 ---
 
@@ -80,7 +81,7 @@ node .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js
 **意图路由**：不确定该派哪个专员时，可直接传 `--intent "自然语言描述"`。解析不靠任何独立词表，而是在 `scripts/common/skill-registry.json` 的 `domains[].scenarios[]` 里按字符二元组 Dice 相似度匹配（阈值 0.3），命中的场景同时给出原型与作业姿态；相似度不足时报错并列出可用场景，绝不猜测。场景表想新增一条可路由意图，加 `intent` + `skills` + `posture` 三项即可，闭合守卫会同时校验该 (原型 × 姿态) 是否有预置专员支撑。
 
 SubAgent 返回后，主 Agent **严禁盲信其文字汇报**，必须独立执行 **8 步交叉复审**：
-① **沙箱越界审计**（`git status` / `git diff --name-only` 比对独占列表）$\to$ ② **领域编译自检** $\to$ ③ **体积与复杂度预算**（`evaluate-eloc-budget.js` / `validate-code-density.js`）$\to$ ④ **规则目录零漂移**（`validate-rule-id-closure.js`）$\to$ ⑤ **领域专属架构守卫** $\to$ ⑥ **自审棘轮与零 High/Critical 债务防反弹** $\to$ ⑦ **领域回归测试**（`auto-refactor` <!-- METRICS:BEGIN test-suite-count -->**190 套**<!-- METRICS:END test-suite-count -->、`workspace-timing` <!-- METRICS:BEGIN ws-test-case-count -->**225 项**<!-- METRICS:END ws-test-case-count -->）$\to$ ⑧ **全仓 <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->统一审查**（`audit-all.ps1 -Fast`）。
+① **沙箱越界审计**（`git status` / `git diff --name-only` 比对独占列表）$\to$ ② **领域编译自检** $\to$ ③ **体积与复杂度预算**（`evaluate-eloc-budget.js` / `validate-code-density.js`）$\to$ ④ **规则目录零漂移**（`validate-rule-id-closure.js`）$\to$ ⑤ **领域专属架构守卫** $\to$ ⑥ **自审棘轮与零 High/Critical 债务防反弹** $\to$ ⑦ **领域回归测试**（`auto-refactor` <!-- METRICS:BEGIN test-suite-count -->**190 套**<!-- METRICS:END test-suite-count -->、`workspace-timing` <!-- METRICS:BEGIN ws-test-case-count -->**246 项**<!-- METRICS:END ws-test-case-count -->）$\to$ ⑧ **全仓 <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->统一审查**（`audit-all.ps1 -Fast`）。
 
 ---
 

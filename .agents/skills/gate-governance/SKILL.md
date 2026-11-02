@@ -37,12 +37,20 @@ description: >-
 - **`commit-msg`（单进程统一提交信息流式检验）**：
   由 `validate-commit-msg.js` 驱动，毫秒级流式完成提交说明各项合规校验：
   1. **Conventional Commits 格式**：`<type>(<scope>): <祈使句中文摘要标题>`（长度 5~80 字符，结尾不加句号）；
-  2. **受控四大项目归属 (`CMG-PRJ-001`)**：正文首行/首区块必须显式声明 `[Project]`，枚举严格限定于：`workspace-timing | auto-refactor | WebGames | governance`；
+  2. **受控五大项目归属 (`CMG-PRJ-001`)**：正文首行/首区块必须显式声明 `[Project]`，枚举严格限定于：`workspace-timing | auto-refactor | WebGames | fractal-git | governance`；
   3. **结构化必填区块**：必须包含 `[Why]`、`[Added]`、`[Changed]`、`[Fixed]`（如有修复缺陷）、`[Verification]`，正文非空白字数 $\ge 30$；
   4. **6 类禁词风格与零黑话拦截**：严格拦截临时敷衍（`CMG-STY-001`）、过度夸大（`CMG-STY-002`）、过度贬损（`CMG-STY-003`）、风格元叙事（`CMG-STY-004`）、程序化流水账（`CMG-STY-005`）与执行数字量词（`CMG-STY-006`）；拦截任何施工批次代号；
   5. **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：提交信息中引用的所有规则 ID 必须在 `scripts/common/rule-catalog.json` 中真实登记。
 - **`pre-push`（全域双重回归与基线看守）**：
   结合智能分流调度执行受影响项目的全量单元测试、跨模块静态审查、零高危技术债务防线与质量基线 Ratchet（`GUARD-BASE-001`：多维自审的体量预算、逆向层耦合与前后端标准化均衡不得跌破冻结基线）。
+- **门禁运行遥测记录与诊断快照规范 (`gate-telemetry-logger.js`)**：
+  - **快照与账本持久化**：门禁完成时自动持久化单例快照 `.audit-logs/<gate>-latest.json` 与 FIFO 历史账本 `.audit-logs/<gate>-history.jsonl`，记录耗时、文件数、Git 版本与通过/阻断步骤；
+  - **ANSI 脱水与盘符脱敏**：诊断日志 `last-<gate>.log` 强制注入 8 项标头、自动剥离 ANSI 颜色控制字符并脱敏 Windows 盘符；
+  - **结构化失败信封 (`AgentFailureEnvelope`)**：门禁阻断时输出 `last-failure.json`，提供 `rule_id`、`severity`、`remediation` 修复动作与上下文详情；
+  - **软失败语义 (Soft-fail)**：遥测与日志记录自身故障时捕获降级，严禁干扰门禁核心裁决。
+- **两层 5D ELOC 差分切片门禁 (`taxis gate-slice` / `FGT-GAT-001`)**：
+  - 原生 Rust 零堆分配流式判定单文件微观形变包络（新增 $\le 120/180$，删除 $\le 100$）与批次宏观形变包络（总新增 $\le 360$，总删除 $\le 280$）；
+  - 联动 Jeffreys Beta 经验自适应准入门槛 $\Theta_{\text{admission}} \in [3.0, 25.0]$ 5D ELOC，阻断伪更替与代码稀释（$\text{TSPR} < 0.40$）。
 
 ### 2. 第 1.5 层：云端预测试机预演 (Tier 1.5 Remote Linux Sandbox Gate - Instabox)
 - **架构定位**：消解 Windows 本地开发机与 GitHub Actions Ubuntu CI 之间的跨平台环境断层，在真正向远端推进提交前，由与 GitHub Actions 1:1 等价的 Linux 原生沙箱进行先行拦截。

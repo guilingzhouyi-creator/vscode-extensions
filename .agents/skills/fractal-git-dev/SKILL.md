@@ -73,6 +73,11 @@ description: >-
 ### 5. 双专属自动化区域、内核形式化验证与密码学独立审计链 (`FGT-GAT-001`)
 - **双自动化区域与检疫隔离 (`FGT-BYP-001` / `FGT-QRN-001`)**：高频测试走 Direct-Bypass SSD 内存测试缓存区，`<20ms` 物理回收，绝不向 Git ODB 写入未验证碎片；触发高危违规的快照强制打入 `refs/fractal/quarantine/*` 物理隔离区，提交走预审区（Pre-Review Zone）；
 - **TKCV 形式化推导验证 (`FGT-VRF-001`)**：在内核层执行 5 维代码不变式静态抽象推导（单次 $<5\text{ms}$），刚性拦截虚构代码；
+- **商密原语与两层 5D ELOC 差分准入总督 (`FGT-COR-001` / `FGT-GAT-001`)**：
+  - `fg-core::crypto` 原生实现 GB/T 32918.4 SM3 256 位哈希与 RFC 2104 标准 `hmac_sm3`；
+  - `fg-algorithms::diff::eloc_5d` 提供纯 Rust 零瞬态堆分配 5D 黎曼有效代码评估与 `FloatPrecisionExt` 确定性截断；
+  - `fg-gate::diff_bounds` 部署两层解耦双向钳制总督（`SingleFile5dBounds`、`CommitBatchTotals`、`DiffBoundsGovernor`），联动 `admission.rs` 贝叶斯 Jeffreys 后验动态准入门槛；
+  - `taxis gate-slice` 子命令实现毫秒级暂存切片审查与结构化 JSON 违规信封输出。
 - **IKCE 隐藏微变异盲测评估 (`FGT-MUT-001` / `FGT-TAU-001`)**：纯内存注入微变异体，强制要求测试击杀率 $K \ge 60\%$，刚性粉碎空断言与恒真式；
 - **防篡改独立审计链与四级时间折叠 (`FGT-AUD-001` / `FGT-PYR-001`)**：独立维护 `refs/fractal/telemetry/*` HMAC 单向哈希链与四级时间折叠汇总，施加 OS 底层防护（Win32 只读锁 + Linux `chattr +a` 仅追加属性）。
 
