@@ -21,13 +21,31 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
-const path = require('path');
+const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
-const CLI = path.join(ROOT, 'dist', 'index.js');
-const CONFIG = path.join(ROOT, 'auto-refactor.config.json');
-const BASELINE = path.join(ROOT, 'baselines', 'self-scan.baseline.json');
+const DIR_DIST = 'dist';
+const DIR_BASELINES = 'baselines';
+const CONFIG_FILENAME = 'auto-refactor.config.json';
+const BASELINE_FILENAME = 'self-scan.baseline.json';
+
+const MODULE_SLICE_EXTRACTOR = '../dist/core/router/sliceExtractor';
+const MODULE_SPARSE_MOE_GATE = '../dist/core/router/sparseMoEGate';
+
+const CLI = path.join(ROOT, DIR_DIST, 'index.js');
+const CONFIG = path.join(ROOT, CONFIG_FILENAME);
+const BASELINE = path.join(ROOT, DIR_BASELINES, BASELINE_FILENAME);
 const REPORT = path.join(os.tmpdir(), `auto-refactor-slice-scan-${process.pid}.json`);
+
+const CMD_REV_PARSE = 'rev-parse';
+const CMD_DIFF = 'diff';
+const CMD_STATUS = 'status';
+const CMD_SHOW = 'show';
+const CMD_SCAN = 'scan';
+const LOG_LEVEL_WARN = 'warn';
+const BASELINE_GROUPED = 'grouped';
+const STATUS_PASS_LABEL = '✔ PASS';
+const STATUS_BLOCK_LABEL = '✖ BLOCK';
 
 const EXIT_PASS = 0;
 const EXIT_USAGE_ERROR = 2;
@@ -81,7 +99,7 @@ function logGateError(message) {
  */
 function getGitPrefix() {
   try {
-    const prefixResult = spawnSync('git', ['rev-parse', '--show-prefix'], {
+    const prefixResult = spawnSync('git', [CMD_REV_PARSE, '--show-prefix'], {
       cwd: ROOT,
       encoding: 'utf8',
     });
@@ -125,11 +143,11 @@ function stripGitPrefix(gitFilePath) {
  */
 function getGitChangedFiles() {
   try {
-    const diffOut = spawnSync('git', ['diff', '--name-only', 'HEAD'], {
+    const diffOut = spawnSync('git', [CMD_DIFF, '--name-only', 'HEAD'], {
       cwd: ROOT,
       encoding: 'utf8',
     });
-    const statusOut = spawnSync('git', ['status', '--porcelain'], {
+    const statusOut = spawnSync('git', [CMD_STATUS, '--porcelain'], {
       cwd: ROOT,
       encoding: 'utf8',
     });
@@ -184,7 +202,7 @@ function getChangedLineNumbers(relPath, currentContent) {
   const lineCount = currentContent.split(/\r?\n/).length;
   try {
     const gitTarget = `${GIT_PREFIX}${relPath}`;
-    const diff = spawnSync('git', ['diff', '-U0', 'HEAD', '--', gitTarget], {
+    const diff = spawnSync('git', [CMD_DIFF, '-U0', 'HEAD', '--', gitTarget], {
       cwd: ROOT,
       encoding: 'utf8',
     });
@@ -211,7 +229,7 @@ function getChangedLineNumbers(relPath, currentContent) {
 function getHeadContent(relPath) {
   try {
     const gitTarget = `${GIT_PREFIX}${relPath}`;
-    const showResult = spawnSync('git', ['show', `HEAD:${gitTarget}`], {
+    const showResult = spawnSync('git', [CMD_SHOW, `HEAD:${gitTarget}`], {
       cwd: ROOT,
       encoding: 'utf8',
     });
@@ -306,7 +324,7 @@ function reportBlockingSummary({ fileCount, severity, exitCode, allSlices }) {
     // ignore: non-fatal if report file is missing or unreadable
   }
   fs.rmSync(REPORT, { force: true });
-  const verdict = exitCode === EXIT_PASS ? '✔ PASS' : '✖ BLOCK';
+  const verdict = exitCode === EXIT_PASS ? STATUS_PASS_LABEL : STATUS_BLOCK_LABEL;
   logGate(
     `targeted-scan (files=${fileCount} newBlocking(${severity})=${blockingCount}) → ${verdict}`,
   );
@@ -325,7 +343,7 @@ function reportBlockingSummary({ fileCount, severity, exitCode, allSlices }) {
 function executeTargetedScan({ targetFiles, activeAnalyzers, severity, allSlices }) {
   const cliArgs = [
     CLI,
-    'scan',
+    CMD_SCAN,
     '--root',
     ROOT,
     '--config',
@@ -339,7 +357,7 @@ function executeTargetedScan({ targetFiles, activeAnalyzers, severity, allSlices
     '--out',
     REPORT,
     '--baseline-granularity',
-    'grouped',
+    BASELINE_GROUPED,
     '--baseline',
     BASELINE,
     '--fail-on-severity',
@@ -347,7 +365,7 @@ function executeTargetedScan({ targetFiles, activeAnalyzers, severity, allSlices
     '--no-cache',
     '--no-daemon',
     '--log-level',
-    'warn',
+    LOG_LEVEL_WARN,
   ];
 
   const scanProcessResult = spawnSync(process.execPath, cliArgs, { cwd: ROOT, stdio: 'inherit' });
@@ -386,8 +404,10 @@ async function main() {
     process.exit(EXIT_PASS);
   }
 
-  const { ASTSliceExtractor } = require('../dist/core/router/sliceExtractor');
-  const { SparseMoEGateRouter } = require('../dist/core/router/sparseMoEGate');
+  // @lazy: Deferred import until dist/ is verified and files are discovered
+  const { ASTSliceExtractor } = require(MODULE_SLICE_EXTRACTOR);
+  // @lazy: Deferred import until dist/ is verified and files are discovered
+  const { SparseMoEGateRouter } = require(MODULE_SPARSE_MOE_GATE);
   const allSlices = extractAllSlices(targetFiles, new ASTSliceExtractor());
 
   if (allSlices.length === 0) {

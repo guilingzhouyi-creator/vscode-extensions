@@ -12,21 +12,12 @@
 
 'use strict';
 
-const MODULE_PATH = 'path';
-const MODULE_CHILD_PROCESS = 'child_process';
-const MODULE_API = '../dist/api';
-const DIR_REPORTS = 'reports';
-const FILE_BASELINE = 'self-audit-baseline.json';
-/** Token-frugal, topologically-grouped AAS v1.0 report. */
-const FILE_BASELINE_AAS = 'self-audit-baseline.aas.json';
-const STDIO_MODE_PIPE = 'pipe';
-const PILLAR_LABEL_WIDTH = 16;
-const DIMENSION_LABEL_WIDTH = 24;
-
 const fs = require('fs');
 const os = require('os');
-const path = require(MODULE_PATH);
-const { execSync } = require(MODULE_CHILD_PROCESS);
+const path = require('node:path');
+const { execSync } = require('child_process');
+
+const DIST_API_MODULE = '../dist/api';
 const {
   scan,
   createAuditSnapshot,
@@ -39,7 +30,18 @@ const {
   serializeBaselineSignatures,
   calculateStructuralDebtDelta,
   estimateChangedElocFromNumstat,
-} = require(MODULE_API);
+} = require(DIST_API_MODULE);
+
+const DIR_REPORTS = 'reports';
+const FILE_BASELINE = 'self-audit-baseline.json';
+/** Token-frugal, topologically-grouped AAS v1.0 report. */
+const FILE_BASELINE_AAS = 'self-audit-baseline.aas.json';
+const FILE_BASELINE_SIGNATURES = 'baseline-signatures.json';
+const DIR_SELF_AUDIT_CACHE = 'self-audit';
+
+const STDIO_MODE_PIPE = 'pipe';
+const PILLAR_LABEL_WIDTH = 16;
+const DIMENSION_LABEL_WIDTH = 24;
 
 const ROOT = path.join(__dirname, '..');
 const REPORTS_DIR = path.join(ROOT, DIR_REPORTS);
@@ -47,12 +49,18 @@ const BASELINE_OUTPUT = path.join(REPORTS_DIR, FILE_BASELINE);
 /** Agent Audit Schema (AAS v1.0) report artifact. */
 const BASELINE_AAS_OUTPUT = path.join(REPORTS_DIR, FILE_BASELINE_AAS);
 const TRAJECTORY_DIR = path.join(ROOT, '.refactor-trajectory');
-const BASELINE_SIGNATURES_FILE = path.join(TRAJECTORY_DIR, 'baseline-signatures.json');
+const BASELINE_SIGNATURES_FILE = path.join(TRAJECTORY_DIR, FILE_BASELINE_SIGNATURES);
 
 const MODULE_NAME_AUTO_ENGINE = 'auto-refactor-engine';
 const AGENT_NAME_SELF_AUDIT = 'self-audit-engine';
 const DEFAULT_MAX_SCORE = 100.0;
 const DIGEST_REVISION_LENGTH = 8;
+const MIN_GIT_SHA_LENGTH = 7;
+const GIT_REF_PREFIX = 'ref: ';
+const GIT_REF_PREFIX_LENGTH = GIT_REF_PREFIX.length;
+const DEFAULT_FALLBACK_CPUS = 4;
+const MAX_PARALLEL_WORKERS = 16;
+const MINUTES_PER_HOUR = 60;
 const PROGRESS_BAR_SEGMENTS = 20;
 const PROGRESS_BAR_MAX = 100;
 const HOTSPOTS_DISPLAY_LIMIT = 5;
@@ -144,7 +152,7 @@ function writeBaselineSignatures(filesMap, revision, trajectoryDir = TRAJECTORY_
       revision: revision || 'unknown',
       files: filesMap,
     };
-    const signaturesPath = path.join(trajectoryDir, 'baseline-signatures.json');
+    const signaturesPath = path.join(trajectoryDir, FILE_BASELINE_SIGNATURES);
     fs.writeFileSync(signaturesPath, JSON.stringify(payload) + '\n', 'utf8');
   } catch {
     // Best-effort
@@ -190,13 +198,12 @@ function estimateChangedEloc() {
 
 function getGitRevision(root) {
   try {
-    const { execSync } = require('child_process');
     const out = execSync('git rev-parse --short HEAD', {
       cwd: root,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
-    if (out.length > 0) return out.slice(0, 8);
+    if (out.length > 0) return out.slice(0, DIGEST_REVISION_LENGTH);
   } catch {
     // Best-effort fallback to disk
   }
@@ -206,10 +213,14 @@ function getGitRevision(root) {
     const headPath = path.join(gitDir, 'HEAD');
     if (!fs.existsSync(headPath)) return null;
     const head = fs.readFileSync(headPath, 'utf8').trim();
-    if (!head.startsWith('ref: ')) return head.length >= 7 ? head.slice(0, 8) : null;
-    const refName = head.slice(5);
+    if (!head.startsWith(GIT_REF_PREFIX)) {
+      return head.length >= MIN_GIT_SHA_LENGTH ? head.slice(0, DIGEST_REVISION_LENGTH) : null;
+    }
+    const refName = head.slice(GIT_REF_PREFIX_LENGTH);
     const refPath = path.join(gitDir, refName);
-    if (fs.existsSync(refPath)) return fs.readFileSync(refPath, 'utf8').trim().slice(0, 8);
+    if (fs.existsSync(refPath)) {
+      return fs.readFileSync(refPath, 'utf8').trim().slice(0, DIGEST_REVISION_LENGTH);
+    }
   } catch {
     // Ignore read errors
   }
@@ -370,8 +381,8 @@ function buildBaselineReport(params) {
  */
 function resolveAuditScanConfig(options) {
   const cpus = os.cpus();
-  const cpusLen = Array.isArray(cpus) ? cpus.length : 4;
-  const workers = Math.max(1, Math.min(16, cpusLen));
+  const cpusLen = Array.isArray(cpus) ? cpus.length : DEFAULT_FALLBACK_CPUS;
+  const workers = Math.max(1, Math.min(MAX_PARALLEL_WORKERS, cpusLen));
   return {
     root: ROOT,
     include: ['src/**/*.ts', 'scripts/*.js'],
@@ -379,7 +390,7 @@ function resolveAuditScanConfig(options) {
     autoTune: false,
     workers,
     cache: true,
-    cacheDir: path.join(ROOT, '.auto-refactor-cache', 'self-audit'),
+    cacheDir: path.join(ROOT, '.auto-refactor-cache', DIR_SELF_AUDIT_CACHE),
     logLevel: RUN_LOG_LEVEL_WARN,
     ...options.scanOptions,
   };
@@ -403,24 +414,19 @@ function buildFileContentLookup(scannedFilesList) {
 /**
  * Persists baseline report, AAS stream, and defect signatures to disk.
  *
- * @param params - Persistence configuration and reports.
+ * @param auditContext - Audit execution context holding scan findings and configurations.
+ * @param baselineReport - Generated baseline report.
+ * @param options - Audit runner options.
  */
-function writeAuditOutputs(params) {
-  const {
-    baselineOutput,
-    aasOutput,
-    trajectoryDir,
-    snapshot,
-    scanReport,
-    baselineReport,
-    issues,
-    scannedFilesList,
-    skipTrajectoryWrite,
-  } = params;
+function writeAuditOutputs(auditContext, baselineReport, options = {}) {
+  const baselineOutput = options.baselineOutput ?? BASELINE_OUTPUT;
+  const aasOutput = options.aasOutput ?? BASELINE_AAS_OUTPUT;
+  const trajectoryDir = auditContext.trajectoryDir ?? TRAJECTORY_DIR;
+
   fs.writeFileSync(baselineOutput, JSON.stringify(baselineReport, null, 2) + '\n', 'utf8');
 
-  const fileContentMap = buildFileContentLookup(scannedFilesList);
-  const aasContent = toAasJson(scanReport, {
+  const fileContentMap = buildFileContentLookup(auditContext.scannedFilesList);
+  const aasContent = toAasJson(auditContext.scanReport, {
     baseDir: ROOT,
     includeDimensionDetails: true,
     fileReader: (relativeFilePath) =>
@@ -428,11 +434,29 @@ function writeAuditOutputs(params) {
   });
   fs.writeFileSync(aasOutput, aasContent + '\n', 'utf8');
 
-  if (!skipTrajectoryWrite) {
-    const newSignaturesMap = serializeBaselineSignatures(issues);
-    const rev = snapshot.rulesDigest.slice(0, DIGEST_REVISION_LENGTH);
+  if (!auditContext.skipTrajectoryWrite) {
+    const newSignaturesMap = serializeBaselineSignatures(auditContext.issues);
+    const rev = auditContext.snapshot.rulesDigest.slice(0, DIGEST_REVISION_LENGTH);
     writeBaselineSignatures(newSignaturesMap, rev, trajectoryDir);
   }
+}
+
+/**
+ * Extracts and maps project score structure from scanner governance report.
+ */
+function extractGovernanceProjectScore(governance) {
+  if (!governance) {
+    throw new Error('ScanReport is missing native governance breakdown.');
+  }
+  return {
+    compositeScore: governance.hierarchicalCompositeScore,
+    grade: governance.grade,
+    eightPillars: governance.eightPillars,
+    tenDimensions: governance.tenDimensions,
+    effectiveCodeDensity: governance.effectiveCodeDensity,
+    densityTensorSummary: governance.densityTensorSummary,
+    domains: governance.domains,
+  };
 }
 
 /**
@@ -456,20 +480,8 @@ async function runSelfAudit(options = {}) {
   const filesScanned = scanReport.summary?.filesScanned ?? 0;
 
   const { debtByTier, criticalItems, highItems } = buildDebtLedger(issues);
-  const governance = scanReport.governance;
-  if (!governance) {
-    throw new Error('ScanReport is missing native governance breakdown.');
-  }
-  const projectScore = {
-    compositeScore: governance.hierarchicalCompositeScore,
-    grade: governance.grade,
-    eightPillars: governance.eightPillars,
-    tenDimensions: governance.tenDimensions,
-    effectiveCodeDensity: governance.effectiveCodeDensity,
-    densityTensorSummary: governance.densityTensorSummary,
-    domains: governance.domains,
-  };
-  const topHotspots = governance.topHotspots;
+  const projectScore = extractGovernanceProjectScore(scanReport.governance);
+  const topHotspots = scanReport.governance.topHotspots;
 
   const persist = options.persist !== false;
   const skipTrajectoryWrite = Boolean(options.skipTrajectoryWrite);
@@ -505,17 +517,15 @@ async function runSelfAudit(options = {}) {
   });
 
   if (persist) {
-    writeAuditOutputs({
-      baselineOutput: options.baselineOutput ?? BASELINE_OUTPUT,
-      aasOutput: options.aasOutput ?? BASELINE_AAS_OUTPUT,
-      trajectoryDir: trajectoryDir ?? TRAJECTORY_DIR,
+    const auditContext = {
       snapshot,
       scanReport,
-      baselineReport,
       issues,
       scannedFilesList,
+      trajectoryDir,
       skipTrajectoryWrite,
-    });
+    };
+    writeAuditOutputs(auditContext, baselineReport, options);
   }
 
   return baselineReport;
@@ -642,19 +652,19 @@ function printTerminalDashboard(report, isCheckMode = false) {
     `Code Density   : ${(report.metrics.effectiveCodeDensity * PERCENT_MULTIPLIER).toFixed(1)}%`,
   );
   if (report.metrics.sqale) {
-    const sq = report.metrics.sqale;
+    const sqaleSummary = report.metrics.sqale;
     console.log(
-      `SQALE TDR      : ${sq.tdr.toFixed(1)}% [Grade: ${sq.grade}] (Remediation: ${(sq.remediationMinutes / 60).toFixed(1)}h / ${sq.remediationMinutes}min)`,
+      `SQALE TDR      : ${sqaleSummary.tdr.toFixed(1)}% [Grade: ${sqaleSummary.grade}] (Remediation: ${(sqaleSummary.remediationMinutes / MINUTES_PER_HOUR).toFixed(1)}h / ${sqaleSummary.remediationMinutes}min)`,
     );
   }
   if (report.metrics.densityTensorSummary) {
-    const ts = report.metrics.densityTensorSummary;
+    const tensorSummary = report.metrics.densityTensorSummary;
     const mDist =
-      ts.averageMahalanobisDistance !== undefined
-        ? ` | Mahalanobis: ${ts.averageMahalanobisDistance.toFixed(2)}`
+      tensorSummary.averageMahalanobisDistance !== undefined
+        ? ` | Mahalanobis: ${tensorSummary.averageMahalanobisDistance.toFixed(2)}`
         : '';
     console.log(
-      `5D Tensor      : TSPR ${(ts.averageTspr * PERCENT_MULTIPLIER).toFixed(0)}% | POR ${(ts.averagePor * PERCENT_MULTIPLIER).toFixed(0)}% | ColDensity ${(ts.averageColumnDensity * PERCENT_MULTIPLIER).toFixed(0)}%${mDist}`,
+      `5D Tensor      : TSPR ${(tensorSummary.averageTspr * PERCENT_MULTIPLIER).toFixed(0)}% | POR ${(tensorSummary.averagePor * PERCENT_MULTIPLIER).toFixed(0)}% | ColDensity ${(tensorSummary.averageColumnDensity * PERCENT_MULTIPLIER).toFixed(0)}%${mDist}`,
     );
   }
   console.log('');
