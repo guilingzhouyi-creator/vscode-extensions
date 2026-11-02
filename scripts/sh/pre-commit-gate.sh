@@ -537,6 +537,8 @@ if [[ -n "$TOUCHED_AUDITABLE" ]]; then
             write_step_verdict "STAGED-DENSITY-12" PASS "暂存区代码密度与接线载荷合规"
         fi
     fi
+elif [[ "$AGENT_MODE" -eq 0 ]]; then
+    write_step_verdict "STAGED-DENSITY-12" SKIP "无暂存可审计代码"
 fi
 
 if [[ -n "$TOUCHED_AUDITABLE" ]]; then
@@ -560,6 +562,27 @@ if [[ -n "$TOUCHED_AUDITABLE" ]]; then
             write_step_verdict "STAGED-VOLUME-13" PASS "暂存区双轨体积与动态包络合规"
         fi
     fi
+elif [[ "$AGENT_MODE" -eq 0 ]]; then
+    write_step_verdict "STAGED-VOLUME-13" SKIP "无暂存可审计代码"
+fi
+
+if [[ -n "$TOUCHED_AUDITABLE" ]]; then
+    if [[ "$AGENT_MODE" -eq 1 ]]; then
+        if ! (cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/gate-differential-bounds.js --agent) >"$STEP_LOG" 2>&1; then
+            cat "$ROOT_DIR/.audit-logs/last-failure.json" 2>/dev/null || cat "$STEP_LOG"
+            exit 1
+        fi
+    else
+        write_step_banner "STAGED-DIFF-14"
+        if ! "$NODE_BIN" scripts/common/gate-differential-bounds.js; then
+            write_step_verdict "STAGED-DIFF-14" BLOCK "暂存区五维微分边界或准入周转未达标"
+            FAILED=1
+        else
+            write_step_verdict "STAGED-DIFF-14" PASS "暂存区五维微分边界与准入周转合规"
+        fi
+    fi
+elif [[ "$AGENT_MODE" -eq 0 ]]; then
+    write_step_verdict "STAGED-DIFF-14" SKIP "无暂存可审计代码"
 fi
 
 STAGED_COUNT=$(echo "$STAGED_FILES" | grep -c . || echo 0)

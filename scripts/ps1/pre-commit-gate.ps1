@@ -799,6 +799,8 @@ if ($touchedAuditable) {
             Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status "PASS" -Detail "暂存区代码密度与接线载荷合规"
         }
     }
+} elseif (-not $Agent) {
+    Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status "SKIP" -Detail "无暂存可审计代码"
 }
 
 if ($touchedAuditable) {
@@ -826,6 +828,35 @@ if ($touchedAuditable) {
             Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status "PASS" -Detail "暂存区双轨体积与动态包络合规"
         }
     }
+} elseif (-not $Agent) {
+    Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status "SKIP" -Detail "无暂存可审计代码"
+}
+
+# --- 暂存区五维有效代码微分边界与准入周转审查 ---
+if ($touchedAuditable) {
+    if (-not $Agent) { Write-StepBanner -StepId "STAGED-DIFF-14" }
+    if ($Agent) {
+        $outDiff = & $nodeCmd (Join-Path $repoRoot "scripts/common/gate-differential-bounds.js") --agent 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $failJsonPath = Join-Path $repoRoot ".audit-logs/last-failure.json"
+            if (Test-Path $failJsonPath) {
+                Get-Content $failJsonPath -Raw
+            } else {
+                Write-Output ($outDiff -join "`n")
+            }
+            exit 1
+        }
+    } else {
+        $resDiff = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/gate-differential-bounds.js" -WorkingDirectory $repoRoot
+        if ($resDiff.ExitCode -ne 0) {
+            Write-StepVerdict -StepId "STAGED-DIFF-14" -Status "BLOCK" -Detail "暂存区五维微分边界或准入周转未达标"
+            $failed = $true
+        } else {
+            Write-StepVerdict -StepId "STAGED-DIFF-14" -Status "PASS" -Detail "暂存区五维微分边界与准入周转合规"
+        }
+    }
+} elseif (-not $Agent) {
+    Write-StepVerdict -StepId "STAGED-DIFF-14" -Status "SKIP" -Detail "无暂存可审计代码"
 }
 
 if ($Agent) {
