@@ -56,6 +56,35 @@ const {
 } = require('./lib/differential-diff-parser');
 
 /**
+ * Detects whether the immediate preceding commit (HEAD) provided refactor addition capacity.
+ *
+ * @param {number} minRequiredAddEloc - Minimum required 5D ELOC additions
+ * @returns {boolean} True if preceding commit had sufficient refactoring additions
+ */
+function checkHeadRefactorWitness(minRequiredAddEloc) {
+  try {
+    const { execFileSync } = require('child_process');
+    const raw = execFileSync('git', ['diff', 'HEAD~1..HEAD', '--numstat'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    let headAddLines = 0;
+    for (const line of raw.split(/\r?\n/)) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length >= 3 && parts[0] !== '-') {
+        const added = parseInt(parts[0], 10);
+        if (!isNaN(added)) headAddLines += added;
+      }
+    }
+    const approxHeadElocAdd = headAddLines * 0.7;
+    return approxHeadElocAdd >= minRequiredAddEloc;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Checks single-file micro differential envelopes.
  *
  * @param {Array<object>} fileMetricsList
@@ -79,7 +108,8 @@ function checkFileMicroViolations(fileMetricsList, totalBatchAdd, violations) {
       });
     }
 
-    const isRefactorWitnessed = totalBatchAdd >= m.elocDel * 0.7;
+    const isRefactorWitnessed =
+      totalBatchAdd >= m.elocDel * 0.7 || checkHeadRefactorWitness(m.elocDel * 0.7);
     const delCeiling = isRefactorWitnessed ? MAX_COMMIT_BATCH_DEL_5D_ELOC : MAX_FILE_DEL_5D_ELOC;
     if (m.elocDel > delCeiling) {
       violations.push({

@@ -45,11 +45,25 @@ const ALL_TYPES = Object.freeze([
   "chore",
   "style",
   "perf",
+  "ci",
+  "build",
 ]);
 const MIN_BODY_SUBSTANTIVE = 30;
 const NON_CRITICAL_MIN_BODY_SUBSTANTIVE = 15;
-const HEADER_MIN = 4;
-const HEADER_MAX = 80;
+const HEADER_LINE_MIN = 15;
+const HEADER_LINE_MAX = 80;
+const HEADER_SUBJECT_MIN = 10;
+const HEADER_SUBJECT_MAX = 70;
+
+const {
+  ZERO_WIDTH_REGEX,
+  EMOJI_REGEX,
+  FULLWIDTH_COLON_REGEX,
+  MISSING_COLON_SPACE_REGEX,
+  MULTI_COLON_SPACE_REGEX,
+  checkTypographyAndPunctuation: validateTypography,
+  checkSectionDensityBounds: validateSectionDensity,
+} = require("./lib/commit-typography-validator");
 
 /**
  * Step identifiers this module can report, exactly as registered in `gate-step-registry.json`.
@@ -76,7 +90,7 @@ const STEP = Object.freeze({
  * real contract violation, not a localization difference.
  */
 const HEADER = new RegExp(
-  `^(${ALL_TYPES.join("|")})\\(([\\w\\-/,@.\\u4e00-\\u9fff]+(?:,\\s*[\\w\\-/,@.\\u4e00-\\u9fff]+)*)\\): ([\\s\\S]{${HEADER_MIN},${HEADER_MAX}})$`,
+  `^(${ALL_TYPES.join("|")})(!)?\\(([\\w\\-/,@.\\u4e00-\\u9fff]+(?:,\\s*[\\w\\-/,@.\\u4e00-\\u9fff]+)*)\\)(!)?: ([\\s\\S]{${HEADER_SUBJECT_MIN},${HEADER_SUBJECT_MAX}})$`,
   "u",
 );
 
@@ -258,12 +272,70 @@ const HEDGE_PHRASE =
  */
 function checkHeaderShape(parsed, add) {
   const { lines, header } = parsed;
+
+  if (ZERO_WIDTH_REGEX.test(header)) {
+    add(
+      STEP.header,
+      "GUARD-MSG-001",
+      "提交标题包含非法零宽或隐藏控制字符",
+      "remove zero-width and invisible control characters; ensure UTF-8 without BOM",
+    );
+  }
+
+  if (EMOJI_REGEX.test(header)) {
+    add(
+      STEP.header,
+      "GUARD-MSG-001",
+      "提交标题包含装饰性 Emoji 表情符号，严禁使用 Emoji 污染提交历史",
+      "remove decorative emojis from the header subject",
+    );
+  }
+
+  if (FULLWIDTH_COLON_REGEX.test(header)) {
+    add(
+      STEP.header,
+      "GUARD-MSG-001",
+      "提交标题作用域后使用了全角冒号 ('：')，必须使用半角冒号加单空格 (': ')",
+      "replace '：' with ': ' after the scope parenthesis",
+    );
+  } else if (MISSING_COLON_SPACE_REGEX.test(header)) {
+    add(
+      STEP.header,
+      "GUARD-MSG-001",
+      "提交标题半角冒号后缺少空格分隔符，必须使用半角冒号加单个空格 (': ')",
+      "insert a single space after the colon (': ')",
+    );
+  } else if (MULTI_COLON_SPACE_REGEX.test(header)) {
+    add(
+      STEP.header,
+      "GUARD-MSG-001",
+      "提交标题半角冒号后包含多余连续空格，仅允许单个空格分隔符 (': ')",
+      "use single space after colon",
+    );
+  }
+
+  if (header.length < HEADER_LINE_MIN) {
+    add(
+      STEP.header,
+      "GUARD-MSG-001",
+      `提交标题整行过短 (${header.length} < ${HEADER_LINE_MIN} 字符): ${header}`,
+      `header must be between ${HEADER_LINE_MIN} and ${HEADER_LINE_MAX} characters`,
+    );
+  } else if (header.length > HEADER_LINE_MAX) {
+    add(
+      STEP.header,
+      "GUARD-MSG-001",
+      `提交标题整行超长 (${header.length} > ${HEADER_LINE_MAX} 字符): ${header}`,
+      `header must be between ${HEADER_LINE_MIN} and ${HEADER_LINE_MAX} characters`,
+    );
+  }
+
   if (!HEADER.test(header)) {
     add(
       STEP.header,
       "GUARD-MSG-001",
       `提交标题不符合格式契约: ${header}`,
-      `expected <type>(<scope>): <summary>, ${HEADER_MIN}~${HEADER_MAX} characters, type in ${ALL_TYPES.join("/")}, scope is required`,
+      `expected <type>(<scope>): <summary>, subject length ${HEADER_SUBJECT_MIN}~${HEADER_SUBJECT_MAX} characters, type in ${ALL_TYPES.join("/")}, scope is required`,
     );
   }
   if (TRAILING_PERIOD.test(header)) {
@@ -287,11 +359,11 @@ function checkHeaderShape(parsed, add) {
 /**
  * Checks body density and the presence of the required sections.
  *
- * @param {{lines: string[], body: string, type: string}} parsed - Parsed message parts.
+ * @param {{lines: string[], body: string, type: string, header: string}} parsed - Parsed message parts.
  * @param add - Finding sink.
  */
 function checkBodySections(parsed, add) {
-  const { lines, body, type } = parsed;
+  const { lines, body, type, header } = parsed;
   const isCritical = CRITICAL_TYPES.includes(type);
   const minSubstantive = isCritical
     ? MIN_BODY_SUBSTANTIVE
@@ -326,6 +398,30 @@ function checkBodySections(parsed, add) {
       "GUARD-MSG-001",
       "fix 提交缺少 [Fixed] 区块",
       "state the defect and its root cause",
+    );
+  }
+  if (type === "feat" && !/^\s*\[(?:Added|新增)/im.test(body)) {
+    add(
+      STEP.sections,
+      "GUARD-MSG-001",
+      "feat 提交缺少 [Added / 新增功能] 清单区块",
+      "declare added modules, features or APIs under [Added]",
+    );
+  }
+  if ((type === "refactor" || type === "perf") && !/^\s*\[(?:Changed|变更|修改|重构)/im.test(body)) {
+    add(
+      STEP.sections,
+      "GUARD-MSG-001",
+      `${type} 提交缺少 [Changed / 变更重构] 清单区块`,
+      "declare changed or optimized modules under [Changed]",
+    );
+  }
+  if (header && header.includes("!") && !/^\s*\[(?:Breaking\s*Changes|破坏性变更)/im.test(body)) {
+    add(
+      STEP.sections,
+      "GUARD-MSG-001",
+      "破坏性提交 (题头含 '!') 缺少 [Breaking Changes / 破坏性变更] 区块",
+      "provide migration guide and breaking changes details under [Breaking Changes]",
     );
   }
 }
@@ -626,6 +722,27 @@ function checkUnresolvedMarkers(parsed, add) {
 }
 
 /**
+ * Verifies typography, character encoding, hidden control characters, and punctuation.
+ *
+ * @param {string} content - Full raw commit message.
+ * @param {{body: string}} parsed - Parsed message parts.
+ * @param {Function} add - Finding sink.
+ */
+function checkTypographyAndPunctuation(content, parsed, add) {
+  validateTypography(content, parsed, STEP, add);
+}
+
+/**
+ * Checks density and substantive bounds of individual declared sections.
+ *
+ * @param {string} body - Commit body.
+ * @param {Function} add - Finding sink.
+ */
+function checkSectionDensityBounds(body, add) {
+  validateSectionDensity(body, countSubstantive, STEP, add);
+}
+
+/**
  * Runs the seven structural checks.
  *
  * @param {string} content - Raw commit message.
@@ -644,10 +761,12 @@ function verifyStructure(content, options = {}) {
   }
 
   checkHeaderShape(parsed, add);
+  checkTypographyAndPunctuation(content, parsed, add);
   checkTemplatePlaceholders(parsed, add);
   checkUnresolvedMarkers(parsed, add);
   checkProjectScope(parsed.body, options, add);
   checkBodySections(parsed, add);
+  checkSectionDensityBounds(parsed.body, add);
   checkEmptySections(parsed.body, add);
   checkSectionOrderAndDuplication(parsed.body, add);
   checkVerificationAssertion(parsed.body, add);
@@ -661,261 +780,8 @@ function verifyStructure(content, options = {}) {
  * @returns {string[]} Probe failures.
  */
 function runSelfProbes() {
-  const failures = [];
-  const expect = (label, actual, wanted) => {
-    if (actual !== wanted)
-      failures.push(`probe "${label}": expected ${wanted}, got ${actual}`);
-  };
-  const project = "[Project / 项目归属]\n- governance";
-  const why =
-    "[Why / 动机背景]\n- 现有判定在空指针分支上缺少保护，构造边界输入时会抛出异常并中断门禁流程。";
-  const fixed =
-    "[Fixed / 修复缺陷]\n- 修复空指针分支缺少保护导致异常穿透到调用方的缺陷，根因是判定顺序先解引用后判空。";
-  const verify =
-    "[Verification / 验证结论]\n- 以空输入复核，门禁给出结构化阻断而非异常中断。";
-  const build = (header, body) => [header, "", body, ""].join("\n");
-  const clean = build(
-    "fix(gate): 修复空指针分支的判定顺序",
-    [project, why, fixed, verify].join("\n\n"),
-  );
-  const steps = (msg) => verifyStructure(msg).map((f) => f.step);
-
-  expect("compliant-message-passes", steps(clean).length, 0);
-  expect(
-    "chinese-scope-accepted",
-    steps(
-      build(
-        "fix(门禁): 修复空指针分支的判定顺序",
-        [project, why, fixed, verify].join("\n\n"),
-      ),
-    ).length,
-    0,
-  );
-  expect(
-    "short-header-rejected",
-    steps(
-      build("fix(gate): abc", [project, why, fixed, verify].join("\n\n")),
-    ).includes(STEP.header),
-    true,
-  );
-  expect(
-    "missing-scope-rejected",
-    steps(
-      build(
-        "fix: 修复空指针分支的判定顺序",
-        [project, why, fixed, verify].join("\n\n"),
-      ),
-    ).includes(STEP.header),
-    true,
-  );
-  expect(
-    "empty-scope-rejected",
-    steps(
-      build(
-        "fix(): 修复空指针分支的判定顺序",
-        [project, why, fixed, verify].join("\n\n"),
-      ),
-    ).includes(STEP.header),
-    true,
-  );
-  expect(
-    "trailing-period-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序。",
-        [project, why, fixed, verify].join("\n\n"),
-      ),
-    ).includes(STEP.header),
-    true,
-  );
-  expect(
-    "unknown-type-rejected",
-    steps(
-      build(
-        "update(gate): 修复空指针分支的判定顺序",
-        [project, why, fixed, verify].join("\n\n"),
-      ),
-    ).includes(STEP.header),
-    true,
-  );
-  expect(
-    "missing-blank-line-rejected",
-    steps(
-      [
-        "fix(gate): 修复空指针分支的判定顺序",
-        project,
-        why,
-        fixed,
-        verify,
-        "",
-      ].join("\n"),
-    ).includes(STEP.split),
-    true,
-  );
-  expect(
-    "thin-body-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [
-          project,
-          "[Why]\n- 短",
-          "[Fixed]\n- 短",
-          "[Verification]\n- 短断言结果合格通过",
-        ].join("\n\n"),
-      ),
-    ).includes(STEP.density),
-    true,
-  );
-  expect(
-    "missing-verification-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [project, why, fixed].join("\n\n"),
-      ),
-    ).includes(STEP.sections),
-    true,
-  );
-  expect(
-    "fix-without-fixed-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [
-          project,
-          why,
-          "[Changed]\n- 补充显式判空与早返回，避免异常穿透到调用方。",
-          verify,
-        ].join("\n\n"),
-      ),
-    ).includes(STEP.sections),
-    true,
-  );
-  expect(
-    "missing-project-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [why, fixed, verify].join("\n\n"),
-      ),
-    ).includes(STEP.project),
-    true,
-  );
-  expect(
-    "invalid-project-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        ["[Project / 项目归属]\n- unknown", why, fixed, verify].join("\n\n"),
-      ),
-    ).includes(STEP.project),
-    true,
-  );
-  expect(
-    "batch-codename-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [
-          project,
-          "[Why]\n- 本 Sprint 3 内补齐判定顺序保护，构造边界输入时会抛出异常并中断门禁流程。",
-          fixed,
-          verify,
-        ].join("\n\n"),
-      ),
-    ).includes(STEP.batch),
-    true,
-  );
-  expect(
-    "duplicate-section-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [project, why, why, fixed, verify].join("\n\n"),
-      ),
-    ).includes(STEP.sections),
-    true,
-  );
-  expect(
-    "out-of-order-section-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [project, verify, why, fixed].join("\n\n"),
-      ),
-    ).includes(STEP.sections),
-    true,
-  );
-  expect(
-    "bare-cmd-verification-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [project, why, fixed, "[Verification]\n- npm test"].join("\n\n"),
-      ),
-    ).includes(STEP.sections),
-    true,
-  );
-  expect(
-    "hedge-verification-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [project, why, fixed, "[Verification]\n- 应该没问题了"].join("\n\n"),
-      ),
-    ).includes(STEP.sections),
-    true,
-  );
-  expect(
-    "template-placeholder-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [project, why, fixed, "[Verification]\n- <在此处补充技术断言>"].join(
-          "\n\n",
-        ),
-      ),
-    ).includes(STEP.density),
-    true,
-  );
-  expect(
-    "empty-section-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [project, "[Why]", fixed, verify].join("\n\n"),
-      ),
-    ).includes(STEP.sections),
-    true,
-  );
-  expect(
-    "unresolved-marker-rejected",
-    steps(
-      build(
-        "fix(gate): 修复空指针分支的判定顺序",
-        [project, why, fixed, "[Verification]\n- 待补充验证用例与断言"].join(
-          "\n\n",
-        ),
-      ),
-    ).includes(STEP.density),
-    true,
-  );
-  // Compliant non-critical message (docs) passes with Why and Verification
-  const docsClean = build(
-    "docs(gate): 补充判定顺序说明与契约设计",
-    [project, why, verify].join("\n\n"),
-  );
-  expect("compliant-docs-message-passes", steps(docsClean).length, 0);
-  // Non-critical type without body or sections rejected
-  expect(
-    "docs-without-body-rejected",
-    steps(build("docs(gate): 补充判定顺序说明", "简短说明")).includes(
-      STEP.sections,
-    ),
-    true,
-  );
-  return failures;
+  const { runSelfProbes: executeProbes } = require("./lib/commit-structure-probes");
+  return executeProbes(verifyStructure, STEP);
 }
 
 module.exports = Object.freeze({
