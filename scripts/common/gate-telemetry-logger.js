@@ -19,6 +19,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execSync } = require('child_process');
+const crypto = require('crypto');
+const { withFileLock } = require('./lib/file-lock');
 const {
   stripAnsi,
   sanitizePath,
@@ -30,11 +32,12 @@ const UTF8 = 'utf8';
 const PROTOCOL_VERSION = '1.0.0';
 const DEFAULT_LOG_DIR = path.resolve(__dirname, '..', '..', '.audit-logs');
 const FAILURE_SNAPSHOT_NAME = 'last-failure.json';
+const RESOLVED_FAILURES_SUBDIR = 'resolved-failures';
 
 const STATUS_PASS = 'PASS';
 const STATUS_BLOCK = 'BLOCK';
 const STATUS_SKIP = 'SKIP';
-const VALID_GATES = Object.freeze(['pre-commit', 'pre-push']);
+const VALID_GATES = Object.freeze(['pre-commit', 'commit-msg', 'pre-push', 'audit-all']);
 
 const MAX_HISTORY_LINES = 2000;
 const RETAIN_HISTORY_LINES = 1500;
@@ -139,11 +142,18 @@ function buildGateDiagnosticLog(payload) {
   const rev = payload.gitRevision || DEFAULT_GIT_REV;
   const elapsed = Number(payload.durationMs || 0);
 
+  const pillarId = gate === 'pre-commit' ? 'hygiene-01' : gate === 'commit-msg' ? 'rules-02' : 'governance';
+  const defaultCmd = gate === 'commit-msg'
+    ? 'pwsh -File scripts/ps1/commit-msg-gate.ps1'
+    : gate === 'audit-all'
+    ? 'pwsh -File scripts/ps1/audit-all.ps1'
+    : `pwsh -File scripts/ps1/${gate}-gate.ps1`;
+
   const header = buildFailureLogHeader({
-    pillarId: gate === 'pre-commit' ? 'hygiene-01' : 'governance',
+    pillarId,
     stepId: payload.failures?.[0]?.stepId || `${gate}-runner`,
     ruleId: payload.failures?.[0]?.ruleId || (isBlock ? 'GUARD-SYS-001' : 'RULE-PASS'),
-    command: payload.failures?.[0]?.command || `pwsh -File scripts/ps1/${gate}-gate.ps1`,
+    command: payload.failures?.[0]?.command || defaultCmd,
     workingDir: payload.failures?.[0]?.targetFiles?.[0] || '.',
     exitCode: isBlock ? 1 : 0,
     elapsedMs: elapsed,
@@ -206,9 +216,19 @@ function buildAgentFailureEnvelope(payload) {
     verificationCommand: f.verificationCommand || f.command || '',
   }));
 
-  const verificationCommand = primaryFailure.verificationCommand || failedCommand || `pwsh -File scripts/ps1/${gate}-gate.ps1`;
+  const verificationCommand = primaryFailure.verificationCommand || failedCommand || (
+    gate === 'commit-msg'
+      ? 'pwsh -File scripts/ps1/commit-msg-gate.ps1'
+      : gate === 'audit-all'
+      ? 'pwsh -File scripts/ps1/audit-all.ps1'
+      : `pwsh -File scripts/ps1/${gate}-gate.ps1`
+  );
   const fastRecheckCommand = gate === 'pre-commit'
     ? 'pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent'
+    : gate === 'commit-msg'
+    ? 'pwsh -File scripts/ps1/commit-msg-gate.ps1 -Agent <msg-file>'
+    : gate === 'audit-all'
+    ? 'pwsh -File scripts/ps1/audit-all.ps1 -Fast'
     : 'pwsh -File scripts/ps1/pre-push-gate.ps1 -Agent';
 
   return {
@@ -293,9 +313,74 @@ function normalizeGatePayload(raw) {
   };
 }
 
+const {
+  GENESIS_PREV_HASH,
+  computeAuditHash,
+  readLatestHistoryLink,
+  verifyHistoryChainFile,
+} = require('./lib/audit-hash-chain');
+
+/**
+ * Verifies cryptographic integrity of a gate history jsonl ledger.
+ *
+ * @param {string} gate - Target gate name
+ * @param {string} [logDir] - Custom audit log directory
+ * @returns {{ valid: boolean, totalEntries: number, error?: string, brokenLine?: number }}
+ */
+function verifyHistoryChain(gate, logDir = DEFAULT_LOG_DIR) {
+  const historyPath = path.join(logDir, `${gate}-history.jsonl`);
+  return verifyHistoryChainFile(historyPath);
+}
+
+/**
+ * Archives prior failure and transitions last-failure.json to self-healed RESOLVED state.
+ *
+ * @param {string} logDir - Audit log directory
+ * @param {string} gate - Resolving gate identifier
+ * @param {string} gitRevision - Current git commit revision
+ * @param {string} timestamp - Resolution timestamp
+ */
+function archiveAndResolveFailureSnapshot(logDir, gate, gitRevision, timestamp) {
+  const failurePath = path.join(logDir, FAILURE_SNAPSHOT_NAME);
+  if (!fs.existsSync(failurePath)) return;
+
+  try {
+    const raw = fs.readFileSync(failurePath, UTF8);
+    const parsed = JSON.parse(raw);
+    if (parsed.status === STATUS_BLOCK) {
+      const resolvedDir = path.join(logDir, RESOLVED_FAILURES_SUBDIR);
+      if (!fs.existsSync(resolvedDir)) {
+        fs.mkdirSync(resolvedDir, { recursive: true });
+      }
+      const runId = parsed.runId || `${Date.now().toString(36)}`;
+      const archivePath = path.join(resolvedDir, `resolved-${runId}.json`);
+      writeAtomicFileSync(archivePath, ensureLf(JSON.stringify(parsed, null, 2)));
+
+      const resolvedEnvelope = {
+        protocolVersion: PROTOCOL_VERSION,
+        runId: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+        recordedAt: timestamp,
+        status: 'RESOLVED',
+        gate,
+        summary: `Prior gate failure has been successfully resolved by ${gate} at git revision ${gitRevision}.`,
+        resolvedBy: {
+          gate,
+          gitRevision,
+          timestamp,
+        },
+        violations: [],
+      };
+      writeAtomicFileSync(failurePath, ensureLf(JSON.stringify(resolvedEnvelope, null, 2)));
+    }
+  } catch {
+    // Fail soft without throwing
+  }
+}
+
 /**
  * Records gate run telemetry, writes singleton snapshot, appends to ledger,
- * and updates failure diagnostics when blocked.
+ * and updates failure diagnostics when blocked or resolves when passed.
+ * Protected by cross-process advisory lock.
  *
  * @param {object} rawPayload - Raw telemetry data
  * @param {string} [logDir] - Custom audit log directory
@@ -306,49 +391,79 @@ function recordGateTelemetry(rawPayload, logDir = DEFAULT_LOG_DIR) {
     return false;
   }
 
-  try {
-    ensureLogDirectory(logDir);
-    const normalized = normalizeGatePayload(rawPayload);
-    const gate = normalized.gate;
+  return withFileLock(
+    'gate-telemetry',
+    () => {
+      try {
+        ensureLogDirectory(logDir);
+        const normalized = normalizeGatePayload(rawPayload);
+        const gate = normalized.gate;
 
-    // 1. Persist singleton snapshot: <gate>-latest.json
-    const snapshotPath = path.join(logDir, `${gate}-latest.json`);
-    const snapshotContent = ensureLf(JSON.stringify(normalized, null, 2));
-    writeAtomicFileSync(snapshotPath, snapshotContent);
+        // 1. Persist singleton snapshot: <gate>-latest.json
+        const snapshotPath = path.join(logDir, `${gate}-latest.json`);
+        const snapshotContent = ensureLf(JSON.stringify(normalized, null, 2));
+        writeAtomicFileSync(snapshotPath, snapshotContent);
 
-    // 2. Append compact chronological ledger entry: <gate>-history.jsonl
-    const historyPath = path.join(logDir, `${gate}-history.jsonl`);
-    const compactEntry = JSON.stringify({
-      ts: normalized.timestamp,
-      rev: normalized.gitRevision,
-      gate,
-      status: normalized.status,
-      ms: normalized.durationMs,
-      files: normalized.filesCount,
-      passed: normalized.passedSteps.length,
-      failed: normalized.failedSteps.length,
-      skipped: normalized.skippedSteps.length,
-    });
-    fs.appendFileSync(historyPath, compactEntry + '\n', UTF8);
-    rotateHistoryLedgerIfNeeded(historyPath);
+        // 2. Append Merkle-chained chronological ledger entry: <gate>-history.jsonl
+        const historyPath = path.join(logDir, `${gate}-history.jsonl`);
+        const link = readLatestHistoryLink(historyPath);
+        const seq = link.seq + 1;
+        const prev_hash = link.prev_hash;
 
-    // 3. Persist diagnostic log: last-<gate>.log
-    const logPath = path.join(logDir, `last-${gate}.log`);
-    const diagnosticContent = buildGateDiagnosticLog(normalized);
-    writeAtomicFileSync(logPath, diagnosticContent);
+        const restPayload = {
+          ts: normalized.timestamp,
+          rev: normalized.gitRevision,
+          gate,
+          status: normalized.status,
+          ms: normalized.durationMs,
+          files: normalized.filesCount,
+          passed: normalized.passedSteps.length,
+          failed: normalized.failedSteps.length,
+          skipped: normalized.skippedSteps.length,
+        };
 
-    // 4. If status is BLOCK, update last-failure.json
-    if (normalized.status === STATUS_BLOCK) {
-      const failureEnvelope = buildAgentFailureEnvelope(normalized);
-      const failurePath = path.join(logDir, FAILURE_SNAPSHOT_NAME);
-      writeAtomicFileSync(failurePath, ensureLf(JSON.stringify(failureEnvelope, null, 2)));
-    }
+        const { hash: entry_hash, algo } = computeAuditHash(
+          `${prev_hash}:${seq}:${JSON.stringify(restPayload)}`
+        );
 
-    return true;
-  } catch (err) {
-    process.stderr.write(`WARN [Gate-Telemetry] 写入门禁遥测日志失败: ${err.message}\n`);
-    return false;
-  }
+        const compactEntry = JSON.stringify({
+          seq,
+          prev_hash,
+          entry_hash,
+          algo,
+          ...restPayload,
+        });
+
+        fs.appendFileSync(historyPath, compactEntry + '\n', UTF8);
+        rotateHistoryLedgerIfNeeded(historyPath);
+
+        // 3. Persist diagnostic log: last-<gate>.log
+        const logPath = path.join(logDir, `last-${gate}.log`);
+        const diagnosticContent = buildGateDiagnosticLog(normalized);
+        writeAtomicFileSync(logPath, diagnosticContent);
+
+        // 4. Update failure snapshot or self-heal on pass
+        if (normalized.status === STATUS_BLOCK) {
+          const failureEnvelope = buildAgentFailureEnvelope(normalized);
+          const failurePath = path.join(logDir, FAILURE_SNAPSHOT_NAME);
+          writeAtomicFileSync(failurePath, ensureLf(JSON.stringify(failureEnvelope, null, 2)));
+        } else if (normalized.status === STATUS_PASS) {
+          archiveAndResolveFailureSnapshot(
+            logDir,
+            gate,
+            normalized.gitRevision,
+            normalized.timestamp
+          );
+        }
+
+        return true;
+      } catch (err) {
+        process.stderr.write(`WARN [Gate-Telemetry] 写入门禁遥测日志失败: ${err.message}\n`);
+        return false;
+      }
+    },
+    { lockDir: logDir }
+  );
 }
 
 /**
@@ -532,7 +647,20 @@ function handleDisplayCli(args, gateArg) {
  */
 function main() {
   const args = process.argv.slice(2);
-  const gateArg = args.find((a) => a === 'pre-commit' || a === 'pre-push') || 'pre-commit';
+  const gateArg = args.find((a) => VALID_GATES.includes(a)) || 'pre-commit';
+
+  if (args.includes('--verify-chain')) {
+    const idx = args.indexOf('--verify-chain');
+    const targetGate = args[idx + 1] && VALID_GATES.includes(args[idx + 1]) ? args[idx + 1] : gateArg;
+    const res = verifyHistoryChain(targetGate);
+    if (res.valid) {
+      console.log(`✔ [Gate-Telemetry] ${targetGate} 历史哈希链完整性验证通过 (${res.totalEntries} 条记录)`);
+      process.exit(0);
+    } else {
+      console.error(`✖ [Gate-Telemetry] ${targetGate} 历史哈希链断链或被篡改: ${res.error} (行号: ${res.brokenLine ?? 'N/A'})`);
+      process.exit(1);
+    }
+  }
 
   if (handleRecordFileCli(args)) return;
   if (handleRecordCli(args)) return;
@@ -556,4 +684,6 @@ module.exports = {
   buildGateDiagnosticLog,
   buildAgentFailureEnvelope,
   rotateHistoryLedgerIfNeeded,
+  computeAuditHash,
+  verifyHistoryChain,
 };

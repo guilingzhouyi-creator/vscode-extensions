@@ -193,7 +193,7 @@ function collectAuditLogEntries(targetDir) {
     try {
       const fileNames = fs.readdirSync(dir);
       for (const name of fileNames) {
-        if (PROTECTED_SNAPSHOT_FILES.has(name)) {
+        if (PROTECTED_SNAPSHOT_FILES.has(name) || name === 'resolved-failures') {
           continue;
         }
         const fullPath = path.join(dir, name);
@@ -203,6 +203,10 @@ function collectAuditLogEntries(targetDir) {
         }
         if (stat.size === 0) {
           removeZeroByteFileSafely(fullPath);
+          continue;
+        }
+        if (name.endsWith('.tmp') && Date.now() - stat.mtimeMs > 600000) {
+          safeUnlinkTmp(fullPath);
           continue;
         }
         entries.push({

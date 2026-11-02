@@ -188,6 +188,7 @@ if [[ "$IS_AGENT" -eq 1 ]]; then
     NODE_OUT=$(cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/validate-commit-msg.js "${VALIDATE_ARGS[@]}" 2>&1) || NODE_STATUS=$?
 
     if [[ $NODE_STATUS -ne 0 ]]; then
+        complete_gate_telemetry BLOCK 1 "$NODE_OUT" commit-msg
         if [[ "$NODE_OUT" =~ ^[[:space:]]*\{ ]]; then
             echo "$NODE_OUT"
         elif [[ -f "$ROOT_DIR/.audit-logs/last-failure.json" ]]; then
@@ -198,6 +199,7 @@ if [[ "$IS_AGENT" -eq 1 ]]; then
         exit 1
     fi
 
+    complete_gate_telemetry PASS 1 "" commit-msg
     if [[ "$NODE_OUT" =~ ^[[:space:]]*\{ ]]; then
         echo "$NODE_OUT"
         exit 0
@@ -214,6 +216,7 @@ EOF
     exit 0
 else
     if ! (cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/validate-commit-msg.js "${VALIDATE_ARGS[@]}"); then
+        complete_gate_telemetry BLOCK 1 "" commit-msg
         print_template_guide
         exit 1
     fi
@@ -237,6 +240,7 @@ write_step_banner "RULE-TRUTH-08"
 write_step_verdict "RULE-TRUTH-08" PASS "规则标识反虚构"
 write_step_banner "TEXT-TRUTH-09"
 write_step_verdict "TEXT-TRUTH-09" PASS "文本求真务实与禁词合规"
+complete_gate_telemetry PASS 1 "" commit-msg
 echo "✔ Commit-Msg 检查通过"
 echo "================================================================="
 exit 0

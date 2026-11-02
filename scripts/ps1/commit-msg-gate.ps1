@@ -182,6 +182,7 @@ if ($Agent) {
     $nodeOutputText = ($outNode -join "`n").Trim()
 
     if ($nodeExit -ne 0) {
+        Complete-GateTelemetry -Gate "commit-msg" -Status "BLOCK" -FilesCount 1 -RawLogOutput $nodeOutputText
         if ($nodeOutputText -match '^\s*\{') {
             Write-Output $nodeOutputText
         } else {
@@ -195,6 +196,7 @@ if ($Agent) {
         exit 1
     }
 
+    Complete-GateTelemetry -Gate "commit-msg" -Status "PASS" -FilesCount 1
     if ($nodeOutputText -match '^\s*\{') {
         Write-Output $nodeOutputText
         exit 0
@@ -211,6 +213,7 @@ if ($Agent) {
     $nodeArgs = @("scripts/common/validate-commit-msg.js", $resolvedMsgFile)
     $process = Start-Process -FilePath $nodeCmd -ArgumentList $nodeArgs -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
     if ($process.ExitCode -ne 0) {
+        Complete-GateTelemetry -Gate "commit-msg" -Status "BLOCK" -FilesCount 1
         Show-CommitTemplateGuide
         exit $process.ExitCode
     }
@@ -225,6 +228,7 @@ Write-StepVerdict -StepId "PROJECT-SCOPE-06" -Status "PASS" -Detail "项目归�
 Write-StepVerdict -StepId "BATCH-CODE-07" -Status "PASS" -Detail "正文零批次代号"
 Write-StepVerdict -StepId "RULE-TRUTH-08" -Status "PASS" -Detail "规则标识反虚构与文本求真通过"
 Write-StepVerdict -StepId "TEXT-TRUTH-09" -Status "PASS" -Detail "文本求真通过"
+Complete-GateTelemetry -Gate "commit-msg" -Status "PASS" -FilesCount 1
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "✔ Commit-Msg 检查通过" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan
