@@ -33,6 +33,10 @@ const fn is_zero_u32(val: &u32) -> bool {
     *val == 0
 }
 
+const fn is_zero_f32(val: &f32) -> bool {
+    *val == 0.0
+}
+
 const fn is_false(val: &bool) -> bool {
     !*val
 }
@@ -77,6 +81,9 @@ pub struct AuditScore {
     /// Whether the candidate triggered quarantine isolation (`FGT-QRN-001`).
     #[serde(default, skip_serializing_if = "is_false")]
     pub quar: bool,
+    /// Net 5D ELOC turnover evaluated for this commit beat.
+    #[serde(default, skip_serializing_if = "is_zero_f32")]
+    pub turn: f32,
 }
 
 /// A compact, cryptographically tamper-evident single audit record.
@@ -162,7 +169,7 @@ impl AuditRecord {
     #[must_use]
     pub fn canonical_payload(&self) -> String {
         format!(
-            "{}:{}:{}:{}:{}:{}:{}:{}:{}:{:.2}:{}:{}:{:.2}:{:.1}:{:.4}:{:.4}:{}",
+            "{}:{}:{}:{}:{}:{}:{}:{}:{}:{:.2}:{}:{}:{:.2}:{:.1}:{:.4}:{:.4}:{}:{:.1}",
             self.t,
             self.clk,
             self.rev,
@@ -179,7 +186,8 @@ impl AuditRecord {
             self.score.cred,
             self.score.ci_lo,
             self.score.d_norm,
-            self.score.quar
+            self.score.quar,
+            self.score.turn,
         )
     }
 
@@ -434,6 +442,7 @@ mod tests {
                 ci_lo: 0.91,
                 d_norm: 0.14,
                 quar: false,
+                turn: 0.0,
             },
         })
     }

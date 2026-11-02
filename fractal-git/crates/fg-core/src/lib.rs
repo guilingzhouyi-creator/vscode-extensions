@@ -12,6 +12,7 @@
 //! Domain Governance Rules: FGT-COR-001 (core domain foundation), FGT-LCK-001, FGT-PRF-001.
 
 pub mod constants;
+pub mod crypto;
 pub mod error;
 pub mod fs_atomic;
 pub mod math;
@@ -23,6 +24,7 @@ pub use constants::{
     is_valid_benchmark_metric,
 };
 
+pub use crypto::{hmac_sm3, sm3_hash, Sm3Hasher};
 pub use error::{FractalError, FractalResult};
 pub use fs_atomic::write_file_atomic;
 pub use math::{
@@ -35,11 +37,11 @@ pub use models::{
     AuthorityTier, AutoQualityScoreEnvelope, BlackboardCollision, BlockProvenanceEntry,
     BlockProvenanceParams, CardBlackboard, ConflictPresentationMode, DiffCoherenceMode,
     ElevationAttestation, FastOidHasher, FastOidMap, FastOidSet, FileMode, FileUid, GitSignature,
-    IndexStage, IntentLease, MutationBudget, Oid, PatchHunkChoice, PatchPlan, PraxisCardContext,
-    ProvenanceLedger, QuarantineRegistry, RebaseAction, RebaseItem, RebasePlan, RepoPath,
-    ReservationStatus, ReservedFileToken, SliceAuthorization, StagedPromotionRequest,
+    HashAlgorithm, IndexStage, IntentLease, MutationBudget, Oid, PatchHunkChoice, PatchPlan,
+    PraxisCardContext, ProvenanceLedger, QuarantineRegistry, RebaseAction, RebaseItem, RebasePlan,
+    RepoPath, ReservationStatus, ReservedFileToken, SliceAuthorization, StagedPromotionRequest,
     StagedPromotionStatus, SubmoduleEntry, SubmoduleUpdateStrategy, SymbolClaim, TaxisPolicy,
-    ValidatedCommitWitness,
+    TypedOid, ValidatedCommitWitness,
 };
 pub use traits::{
     AgentWorktreeHandle, GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore,

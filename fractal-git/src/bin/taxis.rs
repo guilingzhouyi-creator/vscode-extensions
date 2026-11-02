@@ -19,10 +19,10 @@ mod taxis_cmd;
 use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
     archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, clone,
-    commit, config, daemon, diff, doctor, hash_object, index_plumbing, init, log, maintenance,
-    merge, operation, project, projection, promotion, quality, quarantine, read, rebase, reclaim,
-    relocate, remote, repack, reset, rev_list, revert, stage, stash, status, submodule, tag,
-    unarchive, undo, verify, worktree,
+    commit, config, daemon, diff, doctor, gate_slice, hash_object, index_plumbing, init, log,
+    maintenance, merge, operation, project, projection, promotion, quality, quarantine, read,
+    rebase, reclaim, relocate, remote, repack, reset, rev_list, revert, stage, stash, status,
+    submodule, tag, unarchive, undo, verify, worktree,
 };
 
 use fg_core::models::current_unix_seconds;
@@ -246,6 +246,11 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         canonical: "verify",
         aliases: &["gate", "check", "verify"],
         handler: verify::handle_verify,
+    },
+    CommandSpec {
+        canonical: "gate-slice",
+        aliases: &["gate-slice", "slice-gate"],
+        handler: gate_slice::handle_gate_slice,
     },
     CommandSpec {
         canonical: "authority",

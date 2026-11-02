@@ -124,6 +124,8 @@ impl HierarchicalHistoryRollup {
         let credit_posterior_mean = posterior.mean * 100.0;
         let mean_d_norm = d_norm_sum / (records.len() as f32);
 
+        let total_turn: f32 = records.iter().map(|r| r.score.turn).sum();
+
         let mut milestone_record = AuditRecord::new_unsigned(UnsignedAuditRecordParams {
             t: tip_record.t,
             clk: tip_record.clk,
@@ -151,6 +153,7 @@ impl HierarchicalHistoryRollup {
                 ci_lo: if min_ci_lo <= 1.0 { min_ci_lo } else { 0.90 },
                 d_norm: mean_d_norm,
                 quar: any_quarantined,
+                turn: total_turn,
             },
         });
 
@@ -205,6 +208,7 @@ mod tests {
                 ci_lo: 0.88,
                 d_norm: 0.12,
                 quar: false,
+                turn: 0.0,
             },
         })
     }

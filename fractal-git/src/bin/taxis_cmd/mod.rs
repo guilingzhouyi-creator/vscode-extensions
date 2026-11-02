@@ -29,6 +29,7 @@ pub mod daemon;
 pub mod diff;
 pub mod diff_render;
 pub mod doctor;
+pub mod gate_slice;
 pub mod git_hooks;
 pub mod hash_object;
 pub mod index_plumbing;

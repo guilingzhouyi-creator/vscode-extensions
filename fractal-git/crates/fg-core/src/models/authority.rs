@@ -165,6 +165,12 @@ impl AuthoritySecret {
     pub fn sign_payload(&self, payload: &[u8]) -> [u8; 20] {
         hmac_sha1(&self.0, payload)
     }
+
+    /// Signs an arbitrary binary payload with HMAC-SM3 (GB/T 32918) using this secret.
+    #[must_use]
+    pub fn sign_payload_sm3(&self, payload: &[u8]) -> [u8; 32] {
+        crate::crypto::hmac_sm3(&self.0, payload)
+    }
 }
 
 /// Returns the current Unix time in seconds, clamped at zero.

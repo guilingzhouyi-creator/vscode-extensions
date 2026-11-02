@@ -26,6 +26,11 @@ const FIXTURE_SECRET_BYTES: [u8; 32] = [7u8; 32];
 
 /// Runs multi-tier gate verification across authority, message, conflict, and quota checks.
 pub fn handle_verify(ctx: &CliContext) {
+    if ctx.args.first().map(|s| s.as_str()) == Some("slice") {
+        super::gate_slice::handle_gate_slice(ctx);
+        return;
+    }
+
     let agent_ctx = AgentPushContext {
         agent_uid: "agent-verifier".into(),
         cell_id: "cell-core".into(),

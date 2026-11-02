@@ -51,7 +51,7 @@ pub use git_object_id::{compute_object_oid, parse_loose_header, raw_object, Obje
 pub use identity::{ActorIdentity, AgentPushContext, AuthorityTier};
 pub use index_stage::IndexStage;
 pub use interactive::{PatchHunkChoice, PatchPlan, RebaseAction, RebaseItem, RebasePlan};
-pub use oid::{FastOidHasher, FastOidMap, FastOidSet, Oid};
+pub use oid::{FastOidHasher, FastOidMap, FastOidSet, HashAlgorithm, Oid, TypedOid};
 pub use policy::{ConflictPresentationMode, DiffCoherenceMode, TaxisPolicy};
 pub use project::{
     FractalSubLease, LeaseStatus, ProjectLease, ProjectLeaseCache, RegistrationOrigin,

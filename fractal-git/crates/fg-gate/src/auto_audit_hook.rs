@@ -180,6 +180,7 @@ impl AutoAuditHook {
                 ci_lo: credit.credible_interval_lower as f32,
                 d_norm: 0.0,
                 quar: false,
+                turn: 0.0,
             },
         });
 

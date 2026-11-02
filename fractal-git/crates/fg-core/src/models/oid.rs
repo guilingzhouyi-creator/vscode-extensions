@@ -58,6 +58,90 @@ impl Oid {
     pub fn to_hex(&self) -> String {
         encode_hex(&self.0)
     }
+
+    /// Derives an Oid from an SM3 32-byte digest by prefix projection.
+    pub fn from_sm3(digest: [u8; 32]) -> Self {
+        let mut bytes = [0u8; 20];
+        bytes.copy_from_slice(&digest[..20]);
+        Self(bytes)
+    }
+}
+
+/// Cryptographic hash algorithm families for object identification and audit chains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HashAlgorithm {
+    /// Git standard SHA-1 (160 bits / 20 bytes).
+    Sha1,
+    /// Modern Git SHA-256 (256 bits / 32 bytes).
+    Sha256,
+    /// Chinese National Standard SM3 (GB/T 32918.4 / GM/T 0004-2012, 256 bits / 32 bytes).
+    Sm3,
+}
+
+impl HashAlgorithm {
+    /// Returns the canonical lowercase string identifier of this hash algorithm.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Sha1 => "sha1",
+            Self::Sha256 => "sha256",
+            Self::Sm3 => "sm3",
+        }
+    }
+
+    /// Returns the digest byte length produced by this algorithm.
+    pub const fn digest_len(&self) -> usize {
+        match self {
+            Self::Sha1 => 20,
+            Self::Sha256 | Self::Sm3 => 32,
+        }
+    }
+}
+
+/// Multi-algorithm cryptographic object identifier for sovereign and standard Git trees.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
+pub enum TypedOid {
+    Sha1([u8; 20]),
+    Sha256([u8; 32]),
+    Sm3([u8; 32]),
+}
+
+impl TypedOid {
+    /// Returns the underlying hash algorithm family of this typed OID.
+    pub const fn algorithm(&self) -> HashAlgorithm {
+        match self {
+            Self::Sha1(_) => HashAlgorithm::Sha1,
+            Self::Sha256(_) => HashAlgorithm::Sha256,
+            Self::Sm3(_) => HashAlgorithm::Sm3,
+        }
+    }
+
+    /// Renders the full hexadecimal representation of the digest.
+    pub fn to_hex(&self) -> String {
+        match self {
+            Self::Sha1(bytes) => encode_hex(bytes),
+            Self::Sha256(bytes) | Self::Sm3(bytes) => encode_hex(bytes),
+        }
+    }
+
+    /// Borrows the raw digest byte slice.
+    pub fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Sha1(bytes) => bytes,
+            Self::Sha256(bytes) | Self::Sm3(bytes) => bytes,
+        }
+    }
+
+    /// Projects this typed OID onto a canonical 20-byte Git plumbing OID.
+    pub fn to_standard_oid(&self) -> Oid {
+        match self {
+            Self::Sha1(bytes) => Oid::from_bytes(*bytes),
+            Self::Sha256(bytes) | Self::Sm3(bytes) => {
+                let mut truncated = [0u8; 20];
+                truncated.copy_from_slice(&bytes[..20]);
+                Oid::from_bytes(truncated)
+            }
+        }
+    }
 }
 
 impl fmt::Debug for Oid {
@@ -171,3 +255,20 @@ pub type FastOidSet = HashSet<Oid, BuildHasherDefault<FastOidHasher>>;
 
 /// Zero-allocation, high-throughput HashMap specialized for 20-byte Oids.
 pub type FastOidMap<V> = HashMap<Oid, V, BuildHasherDefault<FastOidHasher>>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_typed_oid_and_sm3_projection() {
+        let sm3_bytes = [0x5au8; 32];
+        let typed = TypedOid::Sm3(sm3_bytes);
+        assert_eq!(typed.algorithm(), HashAlgorithm::Sm3);
+        assert_eq!(typed.as_slice().len(), 32);
+        let standard = typed.to_standard_oid();
+        assert_eq!(standard.as_bytes(), &sm3_bytes[..20]);
+        let direct = Oid::from_sm3(sm3_bytes);
+        assert_eq!(standard, direct);
+    }
+}

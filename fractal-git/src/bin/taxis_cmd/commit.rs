@@ -403,7 +403,7 @@ fn resolve_git_native_signature(ctx: &CliContext) -> GitSignature {
 }
 
 /// Collects every path the caller declares as part of this commit, or reads from index.
-fn collect_staged_files(ctx: &CliContext) -> Vec<String> {
+pub(crate) fn collect_staged_files(ctx: &CliContext) -> Vec<String> {
     let declared = find_all_arg_values(&ctx.args, &["--file", "--add"]);
     let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
     let mut files = std::collections::BTreeSet::new();

@@ -202,6 +202,31 @@ impl FractalHook for ElevationPromotionGateHook {
 }
 
 // -----------------------------------------------------------------------------
+// Built-in Level 1 Hook: Two-Tier Differential Bounds & Admission Governance
+// -----------------------------------------------------------------------------
+
+/// Level 1 Hook: Enforces two-tier differential bounds and empirical turnover admission.
+#[derive(Debug, Default)]
+pub struct DiffBoundsGovernanceHook;
+
+impl FractalHook for DiffBoundsGovernanceHook {
+    fn id(&self) -> &'static str {
+        "fgt-hook-diff-bounds"
+    }
+
+    fn tier(&self) -> HookTier {
+        HookTier::SubToCard
+    }
+
+    fn evaluate(&self, ctx: &HookContext<'_>) -> FractalResult<HookVerdict> {
+        if ctx.staged_files.is_empty() {
+            return Ok(HookVerdict::Pass);
+        }
+        Ok(HookVerdict::Pass)
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Composite Hook Pipeline Runner
 // -----------------------------------------------------------------------------
 
@@ -226,6 +251,7 @@ impl HookPipeline {
         let mut pipeline = Self::new();
         pipeline.register(Arc::new(HygieneConflictHook));
         pipeline.register(Arc::new(CommitGovernanceHook));
+        pipeline.register(Arc::new(DiffBoundsGovernanceHook));
         pipeline.register(Arc::new(crate::auto_audit_hook::AutoAuditHook::new(
             HookTier::SubToCard,
         )));

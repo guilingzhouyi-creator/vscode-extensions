@@ -15,6 +15,7 @@ pub mod canary;
 pub mod commit_guard;
 pub mod conflict_guard;
 pub mod credit;
+pub mod diff_bounds;
 pub mod git_hook;
 pub mod hook;
 pub mod pre_receive;
@@ -32,13 +33,16 @@ pub use canary::{
 pub use commit_guard::CommitMessageGuard;
 pub use conflict_guard::ConflictGuard;
 pub use credit::{AgentCreditController, AgentCreditScore, QuarantineRequestParams};
+pub use diff_bounds::{
+    CommitBatchTotals, DiffBoundsGovernor, DiffBoundsVerdict, SingleFile5dBounds,
+};
 pub use git_hook::{
     hook_argument_path, read_core_authority_secret, GitHookOutcome, GitHookRunner, GitHookStatus,
     HookConfig,
 };
 pub use hook::{
-    CommitGovernanceHook, FractalHook, HookContext, HookPipeline, HookTier, HookVerdict,
-    HygieneConflictHook, ElevationPromotionGateHook,
+    CommitGovernanceHook, DiffBoundsGovernanceHook, ElevationPromotionGateHook, FractalHook,
+    HookContext, HookPipeline, HookTier, HookVerdict, HygieneConflictHook,
 };
 pub use pre_receive::{ActorIdentity, AgentPushContext, PreReceiveGuard};
 pub use quota_governor::{

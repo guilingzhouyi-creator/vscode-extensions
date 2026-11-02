@@ -253,6 +253,7 @@ mod tests {
                 ci_lo: 0.90,
                 d_norm: 0.12,
                 quar: false,
+                turn: 12.0,
             },
         });
         r1.sign(&secret);
@@ -281,6 +282,7 @@ mod tests {
                 ci_lo: 0.89,
                 d_norm: 0.15,
                 quar: false,
+                turn: 8.5,
             },
         });
         r2.sign(&secret);
