@@ -2,41 +2,41 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-02T05:27:24.733Z",
+  "timestamp": "2026-11-02T06:21:55.387Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.23,
+    "score": 99.22,
     "grade": "A+",
-    "cai": 88.37,
+    "cai": 88.39,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.918,
       "averagePor": 0.082,
       "averageColumnDensity": 0.869,
-      "averageSpatialDensity": 0.453,
-      "averageMahalanobisDistance": 4.517,
+      "averageSpatialDensity": 0.452,
+      "averageMahalanobisDistance": 4.523,
       "averageFisherSimplexDistance": 0.094
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 26745,
+      "remediationMinutes": 26914,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.65,
-      "meanScore": 96.65,
+      "index": 96.64,
+      "meanScore": 96.64,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "quant": {
       "rcr": 0,
-      "erq": 1.14,
-      "ddr": 1.75,
-      "edb95": 16.5,
-      "ptd": 35.86,
+      "erq": 1.96,
+      "ddr": 4.49,
+      "edb95": 22.26,
+      "ptd": 36.72,
       "dsi": 0.51,
       "rcd": 0.67,
       "ehl": 1,
@@ -47,31 +47,31 @@
       "warningCount": 0,
       "failingCount": 0,
       "lowestDimension": "standardization",
-      "lowestScore": 96.11
+      "lowestScore": 96.1
     },
     "pillars": {
       "architecture": 99.6,
       "maintainability": 98.2,
       "performance": 99.85,
-      "data": 98.58,
+      "data": 98.57,
       "testing": 99.8,
       "reliability": 99.75,
       "security": 99.88,
-      "extensibility": 97.92
+      "extensibility": 97.9
     },
     "counts": {
-      "files": 820,
-      "total": 3877,
+      "files": 821,
+      "total": 3897,
       "errors": 0,
-      "warns": 3340,
-      "info": 537,
-      "suppressed": 72
+      "warns": 3358,
+      "info": 539,
+      "suppressed": 76
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1573,
-    "advisory": 2304,
+    "patchable": 1584,
+    "advisory": 2313,
     "uncalibrated": 51,
     "needsHuman": 1
   },
@@ -81,16 +81,16 @@
     "semanticPurity": 99.51,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.85,
-    "standardization": 96.11,
+    "standardization": 96.1,
     "modernity": 99.8,
     "maintainability": 98.2,
-    "commentQuality": 99.99,
-    "duplication": 97.65,
+    "commentQuality": 99.98,
+    "duplication": 97.63,
     "techDebtRisk": 99.99
   },
   "dimensionDetails": {
     "architectureConsistency": {
-      "score": 97.7,
+      "score": 97.69,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
@@ -105,7 +105,7 @@
       ]
     },
     "semanticPurity": {
-      "score": 98.33,
+      "score": 98.34,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -126,7 +126,7 @@
       "confidence": 1
     },
     "standardization": {
-      "score": 85.1,
+      "score": 85.08,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
@@ -148,21 +148,21 @@
       "confidence": 1
     },
     "maintainability": {
-      "score": 93.75,
+      "score": 93.74,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
       "confidence": 1
     },
     "commentQuality": {
-      "score": 99.96,
+      "score": 99.93,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.074,
       "confidence": 1
     },
     "duplication": {
-      "score": 95.47,
+      "score": 95.43,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -180,8 +180,8 @@
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3410,
-      "count": 236
+      "loss": 3425,
+      "count": 237
     },
     {
       "rule": "SIM-ARGS-001",
@@ -192,8 +192,14 @@
     {
       "rule": "CPX-NEST-001",
       "dim": "maintainability",
-      "loss": 2330,
-      "count": 233
+      "loss": 2340,
+      "count": 234
+    },
+    {
+      "rule": "SIM-TRN-001",
+      "dim": "standardization",
+      "loss": 2100,
+      "count": 210
     },
     {
       "rule": "NAM-DEC-001",
@@ -202,22 +208,16 @@
       "count": 208
     },
     {
-      "rule": "SIM-TRN-001",
-      "dim": "standardization",
-      "loss": 2080,
-      "count": 208
-    },
-    {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2050,
-      "count": 410
+      "loss": 2060,
+      "count": 412
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 1970,
-      "count": 197
+      "loss": 1980,
+      "count": 198
     },
     {
       "rule": "hardcoded-string",
@@ -7393,5 +7393,5 @@
       }
     ]
   },
-  "truncated": 2830
+  "truncated": 2848
 }
