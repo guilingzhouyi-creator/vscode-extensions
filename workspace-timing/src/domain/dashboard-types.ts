@@ -7,6 +7,11 @@
  * Exit Semantics & Design Rationale: 纯 TypeScript 类型定义与重导出，无运行时开销；通过单向分层依赖保障展示层与应用层解耦。
  */
 
+import type { DailyDetail } from './aggregator/daily-aggregator';
+import type { WeeklySummary } from './aggregator/weekly-aggregator';
+
+export type { DailyDetail, WeeklySummary };
+
 /**
  * 契约模型：柱状图每日工时渲染条目 (DailyChartEntry)
  * 不变量契约：所有工时字段均以物理量纲非负毫秒 (*Ms) 表达，保证数值守恒与时间确定性。
@@ -44,11 +49,6 @@ export interface WeeklyTrendEntry {
     /** 契约计数：本周有效会话总数 */
     sessionCount: number;
 }
-
-import type { DailyDetail } from './aggregator/daily-aggregator';
-import type { WeeklySummary } from './aggregator/weekly-aggregator';
-
-export type { DailyDetail, WeeklySummary };
 
 /**
  * 契约模型：活动时间线热力图矩阵单元格 (HeatmapDay)

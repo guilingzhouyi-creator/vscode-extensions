@@ -7,6 +7,12 @@
  * Exit Semantics & Design Rationale: State machine arbitrating viewport dominance between automated streaming and human physical inputs; guarantees human priority while preventing layout reflow jitter
  */
 
+import {
+    DEFAULT_PIN_TOLERANCE_PX,
+    DEFAULT_CAPSULE_THRESHOLD_PX,
+    DEFAULT_VIEWPORT_COOLDOWN_MS,
+} from '../domain/models';
+
 export interface ScrollContainerLike {
     scrollTop: number;
     scrollHeight: number;
@@ -30,12 +36,6 @@ export interface ScrollPinningOptions {
     /** 图钉吸附状态变更监听器 */
     onPinnedStateChange?: (pinned: boolean) => void;
 }
-
-import {
-    DEFAULT_PIN_TOLERANCE_PX,
-    DEFAULT_CAPSULE_THRESHOLD_PX,
-    DEFAULT_VIEWPORT_COOLDOWN_MS,
-} from '../domain/models';
 
 export class ScrollPinningController {
     public static readonly DEFAULT_PIN_TOLERANCE = DEFAULT_PIN_TOLERANCE_PX;
