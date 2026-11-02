@@ -8,10 +8,10 @@
  * Contract Invariant & Boundary Fallback: Temporal conservation invariant (7 daily totals sum to weekly totalMs); boundary guards for rolling 7-day windows against partial week bounds.
  */
 
-import { DailyTotalsMap, TimeSession } from '../models';
+import { type DailyTotalsMap, type TimeSession, MS_PER_MINUTE } from '../models';
 import { DAYS_PER_WEEK, DEFAULT_TREND_WEEKS, ISO_DATE_MD_START } from '../constants-chart';
-import { eachDaySegment, localDateStr, parseLocalDate, weekKeyOf, weekStartStr } from './date-utils';
-import { DailyStats, dailyStats } from './daily-aggregator';
+import { eachDaySegment, localDateStr, parseLocalDate, weekKeyOf, weekStartStr, formatTzDateStr } from './date-utils';
+import { type DailyStats, dailyStats } from './daily-aggregator';
 
 const DAYS_TO_SUNDAY = 6;
 const PERCENT_BASE = 100;
@@ -63,6 +63,7 @@ function overlayOngoingSession(
     dayMap: Map<string, { totalMs: number; sessionCount: number }>,
     windowDates: Set<string>,
     bounds: OngoingSessionBounds,
+    offsetMinutes?: number,
 ): void {
     const { currentSessionStartMs, earliestStartMs, latestEndMs } = bounds;
     if (currentSessionStartMs <= 0 || currentSessionStartMs >= latestEndMs) return;
@@ -79,32 +80,34 @@ function overlayOngoingSession(
             counted = true;
             dayMap.set(date, entry);
         }
-    });
+    }, offsetMinutes);
 }
 
 /**
- * 按周聚合会话列表（跨午夜/跨周日界的会话按切分后的片段归属）
+ * 按周聚合会话列表（跨午夜/跨周日界的会话按切分后的片段归属，支持指定时区偏移）
  */
-export function weeklyStats(sessions: readonly TimeSession[]): WeeklyStats[] {
+export function weeklyStats(sessions: readonly TimeSession[], offsetMinutes?: number): WeeklyStats[] {
     const map = new Map<string, { totalMs: number; count: number }>();
 
     for (const s of sessions) {
         let counted = false;
         eachDaySegment(s.startMs, s.endMs, (_date, segStart, segEnd) => {
-            const weekStart = weekKeyOf(segStart);
+            const weekStart = weekKeyOf(segStart, offsetMinutes);
             const entry = map.get(weekStart) ?? { totalMs: 0, count: 0 };
             entry.totalMs += segEnd - segStart;
             if (!counted) entry.count++;
             counted = true;
             map.set(weekStart, entry);
-        });
+        }, offsetMinutes);
     }
 
     return Array.from(map.entries())
         .map(([weekStart, v]) => {
             const [y, m, d] = weekStart.split('-').map(Number);
-            const endDt = new Date(y, m - 1, d + DAYS_TO_SUNDAY);
-            const weekEnd = localDateStr(endDt.getTime());
+            const endDtMs = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes)
+                ? Date.UTC(y, m - 1, d + DAYS_TO_SUNDAY) - offsetMinutes * MS_PER_MINUTE
+                : new Date(y, m - 1, d + DAYS_TO_SUNDAY).getTime();
+            const weekEnd = localDateStr(endDtMs, offsetMinutes);
             return { weekStart, weekEnd, totalMs: v.totalMs, sessionCount: v.count };
         })
         .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
@@ -118,6 +121,7 @@ export function last7Days(
     currentSessionStartMs = 0,
     locale: 'zh-CN' | 'en' = 'zh-CN',
     currentActivityMode: 'manual' | 'ai' = 'manual',
+    offsetMinutes?: number,
 ): {
     label: string;
     weekday: string;
@@ -130,7 +134,11 @@ export function last7Days(
     const weekdayNames = locale === 'en'
         ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
         : ['日', '一', '二', '三', '四', '五', '六'];
-    const today = new Date();
+    const nowMs = Date.now();
+    const effOffset = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes)
+        ? offsetMinutes
+        : -new Date(nowMs).getTimezoneOffset();
+    const shiftedNow = new Date(nowMs + effOffset * MS_PER_MINUTE);
 
     const dayMap = new Map<string, {
         label: string;
@@ -140,18 +148,24 @@ export function last7Days(
         aiMs: number;
     }>();
     for (let i = DAYS_TO_SUNDAY; i >= 0; i--) {
-        const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-        const dateStr = localDateStr(d.getTime());
+        const shiftedTarget = new Date(Date.UTC(
+            shiftedNow.getUTCFullYear(),
+            shiftedNow.getUTCMonth(),
+            shiftedNow.getUTCDate() - i,
+        ));
+        const physicalMs = shiftedTarget.getTime() - effOffset * MS_PER_MINUTE;
+        const dateStr = formatTzDateStr(physicalMs, offsetMinutes);
         dayMap.set(dateStr, {
             label: dateStr.slice(ISO_DATE_MD_START),
-            weekday: weekdayNames[d.getDay()],
+            weekday: weekdayNames[shiftedTarget.getUTCDay()],
             totalMs: 0,
             manualMs: 0,
             aiMs: 0,
         });
     }
 
-    const firstDayStartMs = parseLocalDate(dayMap.keys().next().value as string);
+    const firstDayKey = dayMap.keys().next().value as string;
+    const firstDayStartMs = parseLocalDate(firstDayKey, offsetMinutes);
     for (const s of sessions) {
         if (s.endMs <= firstDayStartMs) continue;
         const totalSessionDuration = s.endMs - s.startMs;
@@ -177,7 +191,7 @@ export function last7Days(
                 bucket.manualMs += segManual;
                 bucket.aiMs += segAi;
             }
-        });
+        }, offsetMinutes);
     }
 
     if (currentSessionStartMs > 0) {
@@ -194,7 +208,7 @@ export function last7Days(
                 } else {
                     bucket.manualMs += segDuration;
                 }
-            });
+            }, offsetMinutes);
         }
     }
 
@@ -219,18 +233,19 @@ export function last7Days(
 }
 
 /**
- * 全历史按日聚合序列（用于聚合导出）
+ * 全历史按日聚合序列（用于聚合导出，支持指定时区偏移）
  */
 export function fullDailySeries(
     sessions: readonly TimeSession[],
     currentSessionStartMs = 0,
     dailyTotals?: DailyTotalsMap,
+    offsetMinutes?: number,
 ): DailyStats[] {
     const map = new Map<string, { totalMs: number; sessionCount: number }>();
     for (const [date, v] of Object.entries(dailyTotals ?? {})) {
         map.set(date, { totalMs: v.totalMs, sessionCount: v.sessionCount });
     }
-    for (const d of dailyStats(sessions)) {
+    for (const d of dailyStats(sessions, offsetMinutes)) {
         map.set(d.date, { totalMs: d.totalMs, sessionCount: d.sessionCount });
     }
     if (currentSessionStartMs > 0) {
@@ -239,143 +254,44 @@ export function fullDailySeries(
             const b = map.get(date) ?? { totalMs: 0, sessionCount: 0 };
             b.totalMs += segEnd - segStart;
             map.set(date, b);
-        });
+        }, offsetMinutes);
     }
     return Array.from(map.entries())
         .map(([date, v]) => ({ date, totalMs: v.totalMs, sessionCount: v.sessionCount }))
         .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/**
- * 近 N 周按周聚合趋势（含当前周，降序，窗口化 O(weeks*7) 算法）
- */
-export function weeklyTrend(
-    sessions: readonly TimeSession[],
-    weeks = DEFAULT_TREND_WEEKS,
-    currentSessionStartMs = 0,
-    dailyTotals?: DailyTotalsMap,
-): WeeklyStats[] {
-    const result: WeeklyStats[] = [];
-    const currentWeek = weekStartStr(new Date());
-
-    const weekMap = new Map<string, { weekEnd: string; totalMs: number; count: number }>();
-    const windowDates = new Set<string>();
-    let earliestStartMs = 0;
-    let latestEndMs = 0;
-
-    const base = parseLocalDate(currentWeek);
-    const bd = new Date(base);
-    for (let i = weeks - 1; i >= 0; i--) {
-        const dt = new Date(bd.getFullYear(), bd.getMonth(), bd.getDate() - DAYS_PER_WEEK * i);
-        const weekStart = localDateStr(dt.getTime());
-        const endDt = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + DAYS_TO_SUNDAY);
-        const weekEnd = localDateStr(endDt.getTime());
-        weekMap.set(weekStart, { weekEnd, totalMs: 0, count: 0 });
-
-        if (i === weeks - 1) earliestStartMs = dt.getTime();
-        if (i === 0) latestEndMs = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + DAYS_PER_WEEK).getTime();
-
-        for (let d = 0; d < DAYS_PER_WEEK; d++) {
-            const day = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + d);
-            windowDates.add(localDateStr(day.getTime()));
-        }
-    }
-
-    const dayMap = initDayMapFromDailyTotals(windowDates, dailyTotals);
-
-    const rawDayMap = new Map<string, { totalMs: number; sessionCount: number }>();
-    for (const s of sessions) {
-        if (s.endMs <= earliestStartMs || s.startMs >= latestEndMs) continue;
-        let counted = false;
-        eachDaySegment(
-            Math.max(s.startMs, earliestStartMs),
-            Math.min(s.endMs, latestEndMs),
-            (date, segStart, segEnd) => {
-                if (windowDates.has(date)) {
-                    const entry = rawDayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
-                    entry.totalMs += segEnd - segStart;
-                    if (!counted) entry.sessionCount++;
-                    counted = true;
-                    rawDayMap.set(date, entry);
-                }
-            },
-        );
-    }
-    for (const [date, v] of rawDayMap) {
-        dayMap.set(date, v);
-    }
-
-    overlayOngoingSession(dayMap, windowDates, { currentSessionStartMs, earliestStartMs, latestEndMs });
-
-    for (const [date, v] of dayMap) {
-        const dMs = parseLocalDate(date);
-        const weekKey = weekKeyOf(dMs);
-        const bucket = weekMap.get(weekKey);
-        if (bucket) {
-            bucket.totalMs += v.totalMs;
-            bucket.count += v.sessionCount;
-        }
-    }
-
-    for (const [weekStart, v] of weekMap.entries()) {
-        result.push({ weekStart, weekEnd: v.weekEnd, totalMs: v.totalMs, sessionCount: v.count });
-    }
-    result.sort((a, b) => b.weekStart.localeCompare(a.weekStart));
-    return result;
+function accumulateSessionSegments(
+    rawDayMap: Map<string, { totalMs: number; sessionCount: number }>,
+    targetDates: ReadonlySet<string>,
+    startMs: number,
+    endMs: number,
+    offsetMinutes?: number,
+): void {
+    let counted = false;
+    eachDaySegment(
+        startMs,
+        endMs,
+        (date, segStart, segEnd) => {
+            if (targetDates.has(date)) {
+                const entry = rawDayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
+                entry.totalMs += segEnd - segStart;
+                if (!counted) entry.sessionCount++;
+                counted = true;
+                rawDayMap.set(date, entry);
+            }
+        },
+        offsetMinutes,
+    );
 }
 
-/**
- * 周报文字摘要（窗口化 O(1) 本周聚合，按自然日严格切分，含 dailyTotals 折叠层与进行中会话）
- */
-export function weeklySummary(
-    sessions: readonly TimeSession[],
-    currentSessionStartMs = 0,
-    dailyTotals?: DailyTotalsMap,
-): WeeklySummary {
-    const now = Date.now();
-    const weekStart = weekStartStr(new Date(now));
-    const weekStartMs = parseLocalDate(weekStart);
-    const wsDate = new Date(weekStartMs);
-    const weekEndMs = new Date(wsDate.getFullYear(), wsDate.getMonth(), wsDate.getDate() + DAYS_PER_WEEK).getTime();
-
-    const weekDates = new Set<string>();
-    for (let i = 0; i < DAYS_PER_WEEK; i++) {
-        const d = new Date(wsDate.getFullYear(), wsDate.getMonth(), wsDate.getDate() + i);
-        weekDates.add(localDateStr(d.getTime()));
-    }
-
-    const dayMap = initDayMapFromDailyTotals(weekDates, dailyTotals);
-
-    const rawDayMap = new Map<string, { totalMs: number; sessionCount: number }>();
-    for (let i = sessions.length - 1; i >= 0; i--) {
-        const s = sessions[i];
-        if (s.endMs <= weekStartMs) break;
-        if (s.startMs >= weekEndMs) continue;
-        let counted = false;
-        eachDaySegment(
-            Math.max(s.startMs, weekStartMs),
-            Math.min(s.endMs, weekEndMs),
-            (date, segStart, segEnd) => {
-                if (weekDates.has(date)) {
-                    const entry = rawDayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
-                    entry.totalMs += segEnd - segStart;
-                    if (!counted) entry.sessionCount++;
-                    counted = true;
-                    rawDayMap.set(date, entry);
-                }
-            },
-        );
-    }
-    for (const [date, v] of rawDayMap) {
-        dayMap.set(date, v);
-    }
-
-    overlayOngoingSession(dayMap, weekDates, {
-        currentSessionStartMs,
-        earliestStartMs: weekStartMs,
-        latestEndMs: weekEndMs,
-    });
-
+function summarizeWeekDayMap(dayMap: ReadonlyMap<string, { totalMs: number; sessionCount: number }>): {
+    totalMs: number;
+    sessionCount: number;
+    activeDays: number;
+    peakDate: string;
+    peakDateMs: number;
+} {
     let totalMs = 0;
     let sessionCount = 0;
     let activeDays = 0;
@@ -393,18 +309,172 @@ export function weeklySummary(
             }
         }
     }
+    return { totalMs, sessionCount, activeDays, peakDate, peakDateMs };
+}
 
-    const todayIndex = (new Date(now).getDay() + DAYS_TO_SUNDAY) % DAYS_PER_WEEK;
+function computeAvgDailyMs(totalMs: number, now: number, offsetMinutes?: number): number {
+    const effOffset = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes)
+        ? offsetMinutes
+        : -new Date(now).getTimezoneOffset();
+    const shiftedNow = new Date(now + effOffset * MS_PER_MINUTE);
+    const todayIndex = (shiftedNow.getUTCDay() + DAYS_TO_SUNDAY) % DAYS_PER_WEEK;
     const daysElapsed = Math.max(todayIndex + 1, 1);
-    const avgDailyMs = Math.round(totalMs / daysElapsed);
+    return Math.round(totalMs / daysElapsed);
+}
+
+interface TrendWindows {
+    weekMap: Map<string, { weekEnd: string; totalMs: number; count: number }>;
+    windowDates: Set<string>;
+    earliestStartMs: number;
+    latestEndMs: number;
+}
+
+function buildTrendWindows(currentWeek: string, weeks: number, offsetMinutes?: number): TrendWindows {
+    const weekMap = new Map<string, { weekEnd: string; totalMs: number; count: number }>();
+    const windowDates = new Set<string>();
+    let earliestStartMs = 0;
+    let latestEndMs = 0;
+
+    const [by, bm, bd] = currentWeek.split('-').map(Number);
+    for (let i = weeks - 1; i >= 0; i--) {
+        const isCustom = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes);
+        const dtMs = isCustom
+            ? Date.UTC(by, bm - 1, bd - DAYS_PER_WEEK * i) - offsetMinutes * MS_PER_MINUTE
+            : new Date(by, bm - 1, bd - DAYS_PER_WEEK * i).getTime();
+        const weekStart = localDateStr(dtMs, offsetMinutes);
+        const endDtMs = isCustom
+            ? Date.UTC(by, bm - 1, bd - DAYS_PER_WEEK * i + DAYS_TO_SUNDAY) - offsetMinutes * MS_PER_MINUTE
+            : new Date(by, bm - 1, bd - DAYS_PER_WEEK * i + DAYS_TO_SUNDAY).getTime();
+        const weekEnd = localDateStr(endDtMs, offsetMinutes);
+        weekMap.set(weekStart, { weekEnd, totalMs: 0, count: 0 });
+
+        if (i === weeks - 1) earliestStartMs = dtMs;
+        if (i === 0) {
+            latestEndMs = isCustom
+                ? Date.UTC(by, bm - 1, bd - DAYS_PER_WEEK * i + DAYS_PER_WEEK) - offsetMinutes * MS_PER_MINUTE
+                : new Date(by, bm - 1, bd - DAYS_PER_WEEK * i + DAYS_PER_WEEK).getTime();
+        }
+
+        for (let dayOffset = 0; dayOffset < DAYS_PER_WEEK; dayOffset++) {
+            const dayMs = isCustom
+                ? Date.UTC(by, bm - 1, bd - DAYS_PER_WEEK * i + dayOffset) - offsetMinutes * MS_PER_MINUTE
+                : new Date(by, bm - 1, bd - DAYS_PER_WEEK * i + dayOffset).getTime();
+            windowDates.add(localDateStr(dayMs, offsetMinutes));
+        }
+    }
+
+    return { weekMap, windowDates, earliestStartMs, latestEndMs };
+}
+
+/**
+ * 近 N 周按周聚合趋势（含当前周，降序，窗口化 O(weeks*7) 算法，支持指定时区偏移）
+ */
+export function weeklyTrend(
+    sessions: readonly TimeSession[],
+    weeks = DEFAULT_TREND_WEEKS,
+    currentSessionStartMs = 0,
+    dailyTotals?: DailyTotalsMap,
+    offsetMinutes?: number,
+): WeeklyStats[] {
+    const currentWeek = weekStartStr(new Date(), offsetMinutes);
+    const { weekMap, windowDates, earliestStartMs, latestEndMs } = buildTrendWindows(currentWeek, weeks, offsetMinutes);
+
+    const dayMap = initDayMapFromDailyTotals(windowDates, dailyTotals);
+    const rawDayMap = new Map<string, { totalMs: number; sessionCount: number }>();
+    for (const sessionItem of sessions) {
+        if (sessionItem.endMs <= earliestStartMs || sessionItem.startMs >= latestEndMs) continue;
+        accumulateSessionSegments(
+            rawDayMap,
+            windowDates,
+            Math.max(sessionItem.startMs, earliestStartMs),
+            Math.min(sessionItem.endMs, latestEndMs),
+            offsetMinutes,
+        );
+    }
+    for (const [date, val] of rawDayMap) {
+        dayMap.set(date, val);
+    }
+
+    overlayOngoingSession(dayMap, windowDates, { currentSessionStartMs, earliestStartMs, latestEndMs }, offsetMinutes);
+
+    for (const [date, val] of dayMap) {
+        const dMs = parseLocalDate(date, offsetMinutes);
+        const weekKey = weekKeyOf(dMs, offsetMinutes);
+        const bucket = weekMap.get(weekKey);
+        if (bucket) {
+            bucket.totalMs += val.totalMs;
+            bucket.count += val.sessionCount;
+        }
+    }
+
+    const result: WeeklyStats[] = [];
+    for (const [weekStart, val] of weekMap.entries()) {
+        result.push({ weekStart, weekEnd: val.weekEnd, totalMs: val.totalMs, sessionCount: val.count });
+    }
+    result.sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+    return result;
+}
+
+/**
+ * 周报文字摘要（窗口化 O(1) 本周聚合，按自然日严格切分，含 dailyTotals 折叠层与进行中会话，支持指定时区偏移）
+ */
+export function weeklySummary(
+    sessions: readonly TimeSession[],
+    currentSessionStartMs = 0,
+    dailyTotals?: DailyTotalsMap,
+    offsetMinutes?: number,
+): WeeklySummary {
+    const now = Date.now();
+    const weekStart = weekStartStr(new Date(now), offsetMinutes);
+    const weekStartMs = parseLocalDate(weekStart, offsetMinutes);
+    const [wsY, wsM, wsD] = weekStart.split('-').map(Number);
+    const weekEndMs = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes)
+        ? Date.UTC(wsY, wsM - 1, wsD + DAYS_PER_WEEK) - offsetMinutes * MS_PER_MINUTE
+        : new Date(wsY, wsM - 1, wsD + DAYS_PER_WEEK).getTime();
+
+    const weekDates = new Set<string>();
+    for (let i = 0; i < DAYS_PER_WEEK; i++) {
+        const dayMs = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes)
+            ? Date.UTC(wsY, wsM - 1, wsD + i) - offsetMinutes * MS_PER_MINUTE
+            : new Date(wsY, wsM - 1, wsD + i).getTime();
+        weekDates.add(localDateStr(dayMs, offsetMinutes));
+    }
+
+    const dayMap = initDayMapFromDailyTotals(weekDates, dailyTotals);
+
+    const rawDayMap = new Map<string, { totalMs: number; sessionCount: number }>();
+    for (let i = sessions.length - 1; i >= 0; i--) {
+        const s = sessions[i];
+        if (s.endMs <= weekStartMs) break;
+        if (s.startMs >= weekEndMs) continue;
+        accumulateSessionSegments(
+            rawDayMap,
+            weekDates,
+            Math.max(s.startMs, weekStartMs),
+            Math.min(s.endMs, weekEndMs),
+            offsetMinutes,
+        );
+    }
+    for (const [date, v] of rawDayMap) {
+        dayMap.set(date, v);
+    }
+
+    overlayOngoingSession(dayMap, weekDates, {
+        currentSessionStartMs,
+        earliestStartMs: weekStartMs,
+        latestEndMs: weekEndMs,
+    }, offsetMinutes);
+
+    const metrics = summarizeWeekDayMap(dayMap);
+    const avgDailyMs = computeAvgDailyMs(metrics.totalMs, now, offsetMinutes);
 
     return {
         weekStart,
-        totalMs,
-        sessionCount,
+        totalMs: metrics.totalMs,
+        sessionCount: metrics.sessionCount,
         avgDailyMs,
-        peakDate,
-        peakDateMs,
-        activeDays,
+        peakDate: metrics.peakDate,
+        peakDateMs: metrics.peakDateMs,
+        activeDays: metrics.activeDays,
     };
 }

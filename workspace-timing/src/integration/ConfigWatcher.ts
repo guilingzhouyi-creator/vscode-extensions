@@ -7,10 +7,10 @@
  * Exit Semantics & Design Rationale: Pure configuration observer with no domain business logic; sanitizes user inputs at boundary to prevent state corruption; safely disposes listeners on stop
  */
 
-import * as vscode from 'vscode';
+import { workspace, ConfigurationTarget, type Disposable } from 'vscode';
 import {
-    TimingConfig,
-    StatusBarMode,
+    type TimingConfig,
+    type StatusBarMode,
     DEFAULT_CONFIG,
     TIMING_CONFIG_KEYS,
     sanitizeWeeklyLimitHours,
@@ -26,9 +26,10 @@ import {
     sanitizeAiDetectionEnabled,
     sanitizeAiCooldownSeconds,
     sanitizeChartDualTrackDisplay,
+    sanitizeTimeDisplayMode,
     TIMING_CONFIG_FIELDS,
 } from '../domain/models';
-import { DashboardData } from '../domain/dashboard-types';
+import type { DashboardData } from '../domain/dashboard-types';
 import { LogLevel, log } from './logger';
 import { setLocale, resolveLocale } from '../i18n/index';
 
@@ -42,7 +43,7 @@ const LOG_CONFIG_WATCHER_STARTED = 'ConfigWatcher: started';
  * 供 ConfigWatcher 与 extension.ts 初始化共用，保证初始化/运行期配置同源。
  */
 export function readTimingConfig(): TimingConfig {
-    const cfg = vscode.workspace.getConfiguration(TIMING_CONFIG_KEYS.SECTION);
+    const cfg = workspace.getConfiguration(TIMING_CONFIG_KEYS.SECTION);
 
     return {
         enabled: cfg.get<boolean>(TIMING_CONFIG_KEYS.ENABLED, DEFAULT_CONFIG.enabled),
@@ -70,6 +71,8 @@ export function readTimingConfig(): TimingConfig {
         aiCooldownSeconds: sanitizeAiCooldownSeconds(cfg.get(TIMING_CONFIG_KEYS.AI_COOLDOWN_SECONDS, DEFAULT_CONFIG.aiCooldownSeconds)),
         chartDualTrackDisplay: sanitizeChartDualTrackDisplay(
             cfg.get<boolean>(TIMING_CONFIG_KEYS.CHART_DUAL_TRACK_DISPLAY, DEFAULT_CONFIG.chartDualTrackDisplay)),
+        timeDisplayMode: sanitizeTimeDisplayMode(
+            cfg.get<string>(TIMING_CONFIG_KEYS.TIME_DISPLAY_MODE, DEFAULT_CONFIG.timeDisplayMode)),
     };
 }
 
@@ -100,6 +103,7 @@ const PERSIST_FIELDS: ReadonlyArray<{
     { field: TIMING_CONFIG_FIELDS.AI_DETECTION_ENABLED, key: TIMING_CONFIG_KEYS.AI_DETECTION_ENABLED, sanitize: sanitizeAiDetectionEnabled },
     { field: TIMING_CONFIG_FIELDS.AI_COOLDOWN_SECONDS, key: TIMING_CONFIG_KEYS.AI_COOLDOWN_SECONDS, sanitize: sanitizeAiCooldownSeconds },
     { field: TIMING_CONFIG_FIELDS.CHART_DUAL_TRACK_DISPLAY, key: TIMING_CONFIG_KEYS.CHART_DUAL_TRACK_DISPLAY, sanitize: sanitizeChartDualTrackDisplay },
+    { field: TIMING_CONFIG_FIELDS.TIME_DISPLAY_MODE, key: TIMING_CONFIG_KEYS.TIME_DISPLAY_MODE, sanitize: sanitizeTimeDisplayMode },
 ];
 
 /**
@@ -107,9 +111,9 @@ const PERSIST_FIELDS: ReadonlyArray<{
  */
 export async function persistTimingConfig(
     partial: Partial<DashboardData> | Partial<TimingConfig>,
-    target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global,
+    target: ConfigurationTarget = ConfigurationTarget.Global,
 ): Promise<void> {
-    const config = vscode.workspace.getConfiguration(TIMING_CONFIG_KEYS.SECTION);
+    const config = workspace.getConfiguration(TIMING_CONFIG_KEYS.SECTION);
     const rawRecord = partial as Record<string, unknown>;
     const record: Record<string, unknown> = {
         ...rawRecord,
@@ -156,8 +160,8 @@ export interface ActivityWatcherLike {
     }): void;
 }
 
-export class ConfigWatcher implements vscode.Disposable {
-    private readonly subscriptions: vscode.Disposable[] = [];
+export class ConfigWatcher implements Disposable {
+    private readonly subscriptions: Disposable[] = [];
     private readonly orchestrator: RuntimeConfigPort;
     private readonly statusBar: StatusBarLike;
     /** 面板按新语言重建策略（由组合根注入，无面板打开时静默跳过） */
@@ -181,11 +185,11 @@ export class ConfigWatcher implements vscode.Disposable {
     /** 开始监听配置变更 */
     start(): void {
         this.subscriptions.push(
-            vscode.workspace.onDidChangeConfiguration(e => {
-                if (!e.affectsConfiguration(TIMING_CONFIG_KEYS.SECTION)) return;
+            workspace.onDidChangeConfiguration(event => {
+                if (!event.affectsConfiguration(TIMING_CONFIG_KEYS.SECTION)) return;
 
                 try {
-                    const config = this.readConfig();
+                    const config = readTimingConfig();
                     this.applyConfig(config);
                 } catch (err) {
                     log(LogLevel.Error, LOG_APPLY_CONFIG_FAILED, err as Error);
@@ -193,15 +197,10 @@ export class ConfigWatcher implements vscode.Disposable {
             }),
         );
 
-        const config = this.readConfig();
+        const config = readTimingConfig();
         this.applyConfig(config);
 
         log(LogLevel.Info, LOG_CONFIG_WATCHER_STARTED);
-    }
-
-    /** 读取当前配置 */
-    private readConfig(): TimingConfig {
-        return readTimingConfig();
     }
 
     /** 应用配置到各模块 */
@@ -235,16 +234,16 @@ export class ConfigWatcher implements vscode.Disposable {
             `ConfigWatcher: config applied (enabled=${config.enabled}, globalDisabled=${config.globalDisabled})`);
     }
 
-    /** 停止监听并释放资源 */
-    stop(): void {
-        for (const d of this.subscriptions) {
-            d.dispose();
+    /** 停止监听并释放资源（vscode.Disposable 契约接口实现） */
+    dispose(): void {
+        for (const subscription of this.subscriptions) {
+            subscription.dispose();
         }
         this.subscriptions.length = 0;
     }
 
-    /** vscode.Disposable 契约接口实现 */
-    dispose(): void {
-        this.stop();
+    /** 停止监听别名 */
+    stop(): void {
+        this.dispose();
     }
 }

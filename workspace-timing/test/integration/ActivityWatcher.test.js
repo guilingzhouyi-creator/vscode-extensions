@@ -296,4 +296,102 @@ describe('ActivityWatcher（AI 自主协作与双轨工时智能感知）', func
         mockEmitters.docSave.forEach(fn => fn(claudeDoc));
         assert.strictEqual(watcher.getCurrentMode(), 'ai', '保存 CLAUDE.md 必须激活 AI 模式');
     });
+
+    it('大规模写入自适应动态冷却：修改多文件触发自适应扩展（16 文件 -> 240s）', function () {
+        assert.strictEqual(watcher.getCurrentMode(), 'manual');
+
+        // 模拟批量写入 16 个代码文件载荷
+        watcher.handleExternalSignal({
+            uri: { scheme: 'file', fsPath: 'C:\\workspace\\src\\f1.ts' },
+            fileCount: 16,
+            isPulse: false,
+            isAgentSignature: false,
+            isGitSuppressed: false,
+            timestampMs: Date.now(),
+        });
+
+        assert.strictEqual(watcher.getCurrentMode(), 'ai');
+        assert.strictEqual(watcher.getLastBatchFileCount(), 16);
+        // 基础 10s + 4*30s = 130s
+        assert.strictEqual(watcher.getCurrentAiCooldownSeconds(), 130);
+    });
+
+    it('Git 事务屏蔽防护：在 Git 分支切换窗口期，外部常规代码批量写入被拦截，不误触发 AI 模式', function () {
+        assert.strictEqual(watcher.getCurrentMode(), 'manual');
+
+        // 模拟外部普通代码改动但在 Git 抑制期内
+        watcher.handleExternalSignal({
+            uri: { scheme: 'file', fsPath: 'C:\\workspace\\src\\checkout-file.ts' },
+            fileCount: 50,
+            isPulse: false,
+            isAgentSignature: false,
+            isGitSuppressed: true,
+            timestampMs: Date.now(),
+        });
+
+        assert.strictEqual(watcher.getCurrentMode(), 'manual', 'Git 抑制期内的普通代码改动严禁误切 AI 模式');
+    });
+
+    it('Git 事务例外放行：即便在 Git 抑制期，Agent 专属脉搏文件依然放行并切入 AI 模式', function () {
+        assert.strictEqual(watcher.getCurrentMode(), 'manual');
+
+        watcher.handleExternalSignal({
+            uri: { scheme: 'file', fsPath: 'C:\\workspace\\.system_generated\\logs\\transcript.jsonl' },
+            fileCount: 1,
+            isPulse: true,
+            isAgentSignature: true,
+            isGitSuppressed: false,
+            timestampMs: Date.now(),
+        });
+
+        assert.strictEqual(watcher.getCurrentMode(), 'ai', 'Agent 伴生脉搏文件即便在 Git 活跃期也必须放行');
+        assert.ok(watcher.getLastPulseMs() > 0, '记录了最新的脉搏时间戳');
+    });
+
+    it('Agent 突发感知与广播：多文件批量信号、Agent 脉搏或显式 AI 突发触发 onAgentBurst 闭环', function () {
+        const bursts = [];
+        watcher.setListener({
+            onActivity: () => {},
+            onIdle: () => {},
+            onAgentBurst: (ts, count) => bursts.push({ ts, count }),
+        });
+
+        // 1. 单个普通文件（非脉搏、非批次、非签名）不触发 AgentBurst
+        watcher.handleExternalSignal({
+            uri: { scheme: 'file', fsPath: 'C:\\workspace\\src\\normal.ts' },
+            fileCount: 1,
+            isPulse: false,
+            isAgentSignature: false,
+            isGitSuppressed: false,
+            timestampMs: Date.now(),
+        });
+        assert.strictEqual(bursts.length, 0, '普通单文件变更不误判为 Agent 突发');
+
+        // 2. 批量多文件写入（例如 3 个文件）触发 AgentBurst
+        watcher.handleExternalSignal({
+            uri: { scheme: 'file', fsPath: 'C:\\workspace\\src\\batch1.ts' },
+            fileCount: 3,
+            isPulse: false,
+            isAgentSignature: false,
+            isGitSuppressed: false,
+            timestampMs: Date.now(),
+        });
+        assert.strictEqual(bursts.length, 1);
+        assert.strictEqual(bursts[0].count, 3);
+
+        // 3. 伴生脉搏文件（即使 1 个文件）触发 AgentBurst
+        watcher.handleExternalSignal({
+            uri: { scheme: 'file', fsPath: 'C:\\workspace\\.system_generated\\logs\\transcript.jsonl' },
+            fileCount: 1,
+            isPulse: true,
+            isAgentSignature: true,
+            isGitSuppressed: false,
+            timestampMs: Date.now(),
+        });
+        assert.strictEqual(bursts.length, 2);
+
+        // 4. 显式命令 triggerAiActivity 触发 AgentBurst
+        watcher.triggerAiActivity('command');
+        assert.strictEqual(bursts.length, 3);
+    });
 });

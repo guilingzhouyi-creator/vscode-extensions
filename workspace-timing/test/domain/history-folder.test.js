@@ -18,6 +18,7 @@ const {
 } = require('../../out/domain/history-folder.js');
 const { TimeAggregator } = require('../../out/domain/TimeAggregator.js');
 const { setLogLevel, LogLevel } = require('../../out/integration/logger.js');
+const { withFixedNow } = require('../fixtures/fakes.js');
 
 setLogLevel(LogLevel.None);
 
@@ -49,28 +50,32 @@ describe('HistoryFolder（历史折叠引擎）', () => {
   });
 
   it('过期会话按自然日拆段入桶；跨午夜会话两段各归其日；计数记起始日', () => {
-    // 昨天 23:30 → 今天 00:30：endMs >= cutoff → 保留（未整条过期）
-    const crossing = session(t0 - 1800000, t0 + 1800000);
-    // 前天 10:00 → 11:00：整条过期 → 入桶
-    const old1 = session(t0 - 2 * 86400000 + 36000000, t0 - 2 * 86400000 + 39600000);
-    // 大前天 22:00 → 昨天 02:00（4 小时）：整条过期，跨午夜 → 两桶
-    const old2Start = t0 - 3 * 86400000 + 79200000;
-    const old2 = session(old2Start, old2Start + 4 * 3600000);
+    withFixedNow('2026-10-15T12:00:00', () => {
+      const anchor = todayStart();
+      const cut = anchor;
+      // 昨天 23:30 → 今天 00:30：endMs >= cut → 保留（未整条过期）
+      const crossing = session(anchor - 1800000, anchor + 1800000);
+      // 前天 10:00 → 11:00：整条过期 → 入桶
+      const old1 = session(anchor - 2 * 86400000 + 36000000, anchor - 2 * 86400000 + 39600000);
+      // 大前天 22:00 → 昨天 02:00（4 小时）：整条过期，跨午夜 → 两桶
+      const old2Start = anchor - 3 * 86400000 + 79200000;
+      const old2 = session(old2Start, old2Start + 4 * 3600000);
 
-    const res = foldExpiredSessions([crossing, old1, old2], undefined, cutoff);
-    assert.deepStrictEqual(res.keptSessions, [crossing]);
-    assert.strictEqual(res.foldedSessionCount, 2);
+      const res = foldExpiredSessions([crossing, old1, old2], undefined, cut);
+      assert.deepStrictEqual(res.keptSessions, [crossing]);
+      assert.strictEqual(res.foldedSessionCount, 2);
 
-    const dMinus2 = localDateStr(t0 - 2 * 86400000);
-    const dMinus3 = localDateStr(t0 - 3 * 86400000);
-    // old1：前天 1 小时；old2 跨午夜的后半段（00:00-02:00 = 2 小时）也落在前天
-    assert.strictEqual(res.updatedDailyTotals[dMinus2].totalMs, 10800000);
-    // 计数归各会话【起始日】：old1 → 前天 +1；old2 → 大前天 +1（后半段不重复计数）
-    assert.strictEqual(res.updatedDailyTotals[dMinus2].sessionCount, 1);
-    assert.strictEqual(res.updatedDailyTotals[dMinus3].sessionCount, 1);
-    // old2 的前半段（22:00-24:00 = 2 小时）落在大前天
-    assert.strictEqual(res.updatedDailyTotals[dMinus3].totalMs, 7200000);
-    assert.strictEqual(res.updatedDailyTotals[dMinus3].sessionCount, 1);
+      const dMinus2 = localDateStr(anchor - 2 * 86400000);
+      const dMinus3 = localDateStr(anchor - 3 * 86400000);
+      // old1：前天 1 小时；old2 跨午夜的后半段（00:00-02:00 = 2 小时）也落在前天
+      assert.strictEqual(res.updatedDailyTotals[dMinus2].totalMs, 10800000);
+      // 计数归各会话【起始日】：old1 → 前天 +1；old2 → 大前天 +1（后半段不重复计数）
+      assert.strictEqual(res.updatedDailyTotals[dMinus2].sessionCount, 1);
+      assert.strictEqual(res.updatedDailyTotals[dMinus3].sessionCount, 1);
+      // old2 的前半段（22:00-24:00 = 2 小时）落在大前天
+      assert.strictEqual(res.updatedDailyTotals[dMinus3].totalMs, 7200000);
+      assert.strictEqual(res.updatedDailyTotals[dMinus3].sessionCount, 1);
+    });
   });
 
   it('核心不变量：折叠后 kept∪buckets 的日聚合 ≡ 原始全量聚合', () => {

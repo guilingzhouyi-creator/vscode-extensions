@@ -8,8 +8,8 @@
  * Contract Invariant & Boundary Fallback: Conservation invariant across daily buckets (sum of 24 hourly buckets == daily totalMs); boundary clamping ensures sessions never project into negative or future time bounds.
  */
 
-import { TimeSession, MS_PER_HOUR } from '../models';
-import { eachDaySegment, localDateStr, parseLocalDate } from './date-utils';
+import { type TimeSession, MS_PER_HOUR, MS_PER_MINUTE } from '../models';
+import { eachDaySegment, localDateStr, parseLocalDate, toUtcIsoString } from './date-utils';
 import { formatTime } from './duration-formatter';
 
 const PERCENT_BASE = 100;
@@ -36,6 +36,8 @@ export interface DailySessionEntry {
     durationMs: number;
     startLabel: string;
     endLabel: string;
+    startUtcIso?: string;
+    endUtcIso?: string;
     manualMs?: number;
     aiMs?: number;
     /** 是否为当前正在进行中的活动尾部会话 */
@@ -68,32 +70,36 @@ export interface DailyDetail {
  * 计算今日累计时长 (ms)
  * = 今日会话片段的总和（跨午夜会话按自然日切分）+ 当前活跃会话今日已历时
  */
-export function todayMs(sessions: readonly TimeSession[], currentSessionStartMs = 0): number {
-    const today = localDateStr(Date.now());
-    const todayStartMs = parseLocalDate(today);
+export function todayMs(
+    sessions: readonly TimeSession[],
+    currentSessionStartMs = 0,
+    offsetMinutes?: number,
+): number {
+    const today = localDateStr(Date.now(), offsetMinutes);
+    const todayStartMs = parseLocalDate(today, offsetMinutes);
     let total = 0;
 
     for (const s of sessions) {
         if (s.endMs <= todayStartMs) continue;
         eachDaySegment(s.startMs, s.endMs, (date, segStart, segEnd) => {
             if (date === today) total += segEnd - segStart;
-        });
+        }, offsetMinutes);
     }
 
     if (currentSessionStartMs > 0) {
         const now = Date.now();
         eachDaySegment(currentSessionStartMs, now, (date, segStart, segEnd) => {
             if (date === today) total += segEnd - segStart;
-        });
+        }, offsetMinutes);
     }
 
     return total;
 }
 
 /**
- * 按日聚合会话列表（跨午夜会话按自然日切分归桶）
+ * 按日聚合会话列表（跨午夜会话按自然日切分归桶，支持指定时区偏移）
  */
-export function dailyStats(sessions: readonly TimeSession[]): DailyStats[] {
+export function dailyStats(sessions: readonly TimeSession[], offsetMinutes?: number): DailyStats[] {
     const map = new Map<string, { totalMs: number; count: number }>();
 
     for (const s of sessions) {
@@ -104,7 +110,7 @@ export function dailyStats(sessions: readonly TimeSession[]): DailyStats[] {
             if (!counted) entry.count++;
             counted = true;
             map.set(date, entry);
-        });
+        }, offsetMinutes);
     }
 
     return Array.from(map.entries())
@@ -114,10 +120,12 @@ export function dailyStats(sessions: readonly TimeSession[]): DailyStats[] {
 
 /**
  * 将区间 [startMs, endMs) 按小时切分并累加到 hourMap，支持 manualMs 与 aiMs 等比守恒分配。
+ * 基于指定时区偏移或宿主时区步进，严格保证 24 个小时桶总和等于当日总时长。
  */
 function addToHourly(
     hourMap: Map<number, { totalMs: number; manualMs: number; aiMs: number; count: number }>,
     slice: SessionDurationSlice,
+    offsetMinutes?: number,
 ): void {
     const { startMs, endMs } = slice;
     const totalDuration = endMs - startMs;
@@ -134,10 +142,16 @@ function addToHourly(
     let cursor = startMs;
     let first = true;
     while (cursor < endMs) {
-        const d = new Date(cursor);
-        const nextHourStart =
-            new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours() + 1).getTime();
-        let segEnd = Math.min(endMs, nextHourStart);
+        const effOffset = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes)
+            ? offsetMinutes
+            : -new Date(cursor).getTimezoneOffset();
+        const shiftedMs = cursor + effOffset * MS_PER_MINUTE;
+        const hour = new Date(shiftedMs).getUTCHours();
+        const currentHourStartShifted = Math.floor(shiftedMs / MS_PER_HOUR) * MS_PER_HOUR;
+        const nextHourStartShifted = currentHourStartShifted + MS_PER_HOUR;
+        const nextHourStartPhysical = nextHourStartShifted - effOffset * MS_PER_MINUTE;
+
+        let segEnd = Math.min(endMs, nextHourStartPhysical);
         // 时钟突变或夏令时/闰秒防御：确保 segEnd 严格单调前进，防止死循环
         if (segEnd <= cursor) {
             segEnd = Math.min(endMs, cursor + MS_PER_HOUR);
@@ -159,13 +173,13 @@ function addToHourly(
             remainingAi -= segAi;
         }
 
-        const entry = hourMap.get(d.getHours()) ?? { totalMs: 0, manualMs: 0, aiMs: 0, count: 0 };
+        const entry = hourMap.get(hour) ?? { totalMs: 0, manualMs: 0, aiMs: 0, count: 0 };
         entry.totalMs += segDuration;
         entry.manualMs += segManual;
         entry.aiMs += segAi;
         if (first) entry.count++;
         first = false;
-        hourMap.set(d.getHours(), entry);
+        hourMap.set(hour, entry);
         cursor = segEnd;
     }
 }
@@ -221,72 +235,134 @@ function allocateSessionManualAi(
     return { manualMs: scaledManual, aiMs: durationMs - scaledManual };
 }
 
-/**
- * 获取指定日期的会话明细（支持双轨时长与活动模式透传）
- */
-export function dailyDetail(
+export interface DailyDetailOptions {
+    currentSessionStartMs?: number;
+    currentActivityMode?: 'manual' | 'ai';
+    offsetMinutes?: number;
+}
+
+interface NormalizedDailyDetailOptions {
+    currentSessionStartMs: number;
+    currentActivityMode: 'manual' | 'ai';
+    offsetMinutes?: number;
+}
+
+function parseDailyDetailOptions(
+    optsOrStartMs?: DailyDetailOptions | number,
+    ...rest: (string | number | undefined)[]
+): NormalizedDailyDetailOptions {
+    if (typeof optsOrStartMs === 'object' && optsOrStartMs !== null) {
+        return {
+            currentSessionStartMs: optsOrStartMs.currentSessionStartMs ?? 0,
+            currentActivityMode: optsOrStartMs.currentActivityMode ?? 'manual',
+            offsetMinutes: optsOrStartMs.offsetMinutes,
+        };
+    }
+    return {
+        currentSessionStartMs: (optsOrStartMs as number) ?? 0,
+        currentActivityMode: (rest[0] as 'manual' | 'ai') ?? 'manual',
+        offsetMinutes: rest[1] as number | undefined,
+    };
+}
+
+function computeDayEndMs(dateStr: string, offsetMinutes?: number): number {
+    const [y, m, d] = dateStr.replace(/Z$/i, '').split('-').map(Number);
+    if (typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes)) {
+        return Date.UTC(y, m - 1, d + 1) - offsetMinutes * MS_PER_MINUTE;
+    }
+    return new Date(y, m - 1, d + 1).getTime();
+}
+
+interface DailySessionEntryContext {
+    dayStartMs: number;
+    dayEndMs: number;
+    running?: boolean;
+    offsetMinutes?: number;
+}
+
+function createDailySessionEntry(
+    target: SessionDurationSlice,
+    ctx: DailySessionEntryContext,
+): DailySessionEntry | null {
+    const { startMs, endMs } = target;
+    const { dayStartMs, dayEndMs, running = false, offsetMinutes } = ctx;
+    if (startMs >= dayEndMs || endMs <= dayStartMs) return null;
+    const visStart = Math.max(startMs, dayStartMs);
+    const visEnd = Math.min(endMs, dayEndMs);
+    const durationMs = visEnd - visStart;
+    if (durationMs <= 0) return null;
+
+    const isRunningTail = running && visEnd >= Date.now();
+    const totalSessionDuration = endMs - startMs;
+    const { manualMs, aiMs } = allocateSessionManualAi(target, durationMs, totalSessionDuration);
+
+    return {
+        startMs: visStart,
+        endMs: visEnd,
+        durationMs,
+        startLabel: formatTime(visStart, offsetMinutes),
+        endLabel: formatTime(visEnd, offsetMinutes),
+        startUtcIso: toUtcIsoString(visStart),
+        endUtcIso: toUtcIsoString(visEnd),
+        manualMs,
+        aiMs,
+        isRunningTail,
+    };
+}
+
+function collectDailyEntries(
     sessions: readonly TimeSession[],
-    dateStr: string,
-    currentSessionStartMs = 0,
-    currentActivityMode: 'manual' | 'ai' = 'manual',
-): DailyDetail {
-    const dayStartMs = parseLocalDate(dateStr);
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const dayEndMs = new Date(y, m - 1, d + 1).getTime();
-
+    dayStartMs: number,
+    dayEndMs: number,
+    opts: NormalizedDailyDetailOptions,
+): DailySessionEntry[] {
     const entries: DailySessionEntry[] = [];
-
-    const clipToDay = (
-        target: SessionDurationSlice,
-        running: boolean,
-    ): void => {
-        const { startMs, endMs } = target;
-        if (startMs >= dayEndMs || endMs <= dayStartMs) return;
-        const visStart = Math.max(startMs, dayStartMs);
-        const visEnd = Math.min(endMs, dayEndMs);
-        const durationMs = visEnd - visStart;
-        if (durationMs <= 0) return;
-
-        const isRunningTail = running && visEnd >= Date.now();
-        const totalSessionDuration = endMs - startMs;
-        const { manualMs: entryManualMs, aiMs: entryAiMs } = allocateSessionManualAi(
-            target,
-            durationMs,
-            totalSessionDuration,
-        );
-
-        entries.push({
-            startMs: visStart,
-            endMs: visEnd,
-            durationMs,
-            startLabel: formatTime(visStart),
-            endLabel: formatTime(visEnd),
-            manualMs: entryManualMs,
-            aiMs: entryAiMs,
-            isRunningTail,
-        });
+    const entryCtx: DailySessionEntryContext = {
+        dayStartMs,
+        dayEndMs,
+        running: false,
+        offsetMinutes: opts.offsetMinutes,
     };
 
-    for (const s of sessions) {
-        if (s.endMs <= dayStartMs || s.startMs >= dayEndMs) continue;
-        clipToDay(s, false);
+    for (const sessionItem of sessions) {
+        if (sessionItem.endMs <= dayStartMs || sessionItem.startMs >= dayEndMs) continue;
+        const entry = createDailySessionEntry(sessionItem, entryCtx);
+        if (entry) entries.push(entry);
     }
-    if (currentSessionStartMs > 0) {
+    if (opts.currentSessionStartMs > 0) {
         const now = Date.now();
-        const isAi = currentActivityMode === 'ai';
-        const runningDur = Math.max(0, now - currentSessionStartMs);
+        const isAi = opts.currentActivityMode === 'ai';
+        const runningDur = Math.max(0, now - opts.currentSessionStartMs);
         const curManual = isAi ? 0 : runningDur;
         const curAi = isAi ? runningDur : 0;
-        clipToDay({ startMs: currentSessionStartMs, endMs: now, manualMs: curManual, aiMs: curAi }, true);
+        const runningSlice: SessionDurationSlice = {
+            startMs: opts.currentSessionStartMs,
+            endMs: now,
+            manualMs: curManual,
+            aiMs: curAi,
+        };
+        const runningCtx: DailySessionEntryContext = {
+            dayStartMs,
+            dayEndMs,
+            running: true,
+            offsetMinutes: opts.offsetMinutes,
+        };
+        const entry = createDailySessionEntry(runningSlice, runningCtx);
+        if (entry) entries.push(entry);
     }
-
     entries.sort((a, b) => a.startMs - b.startMs);
+    return entries;
+}
 
+function buildHourlyBuckets(
+    entries: readonly DailySessionEntry[],
+    offsetMinutes?: number,
+): HourlyBucket[] {
     const hourMap = new Map<number, { totalMs: number; manualMs: number; aiMs: number; count: number }>();
-    for (const e of entries) {
-        addToHourly(hourMap, e);
+    for (const entry of entries) {
+        addToHourly(hourMap, entry, offsetMinutes);
     }
-    const hourly: HourlyBucket[] = Array.from(hourMap.entries())
+    return Array.from(hourMap.entries())
         .map(([hour, v]) => {
             let manualRatio = 0;
             let aiRatio = 0;
@@ -306,12 +382,26 @@ export function dailyDetail(
             };
         })
         .sort((a, b) => a.hour - b.hour);
+}
 
+/**
+ * 获取指定日期的会话明细（支持双轨时长、活动模式透传与指定时区偏移）
+ */
+export function dailyDetail(
+    sessions: readonly TimeSession[],
+    dateStr: string,
+    optsOrStartMs?: DailyDetailOptions | number,
+    ...rest: (string | number | undefined)[]
+): DailyDetail {
+    const opts = parseDailyDetailOptions(optsOrStartMs, ...rest);
+    const dayStartMs = parseLocalDate(dateStr, opts.offsetMinutes);
+    const dayEndMs = computeDayEndMs(dateStr, opts.offsetMinutes);
+    const entries = collectDailyEntries(sessions, dayStartMs, dayEndMs, opts);
+    const hourly = buildHourlyBuckets(entries, opts.offsetMinutes);
     const totalMs = entries.reduce((sum, e) => sum + e.durationMs, 0);
     const peakHour = hourly.length > 0
         ? hourly.reduce((max, h) => (h.totalMs > max.totalMs ? h : max), hourly[0]).hour
         : -1;
-
     const activeWindow = computeActiveWindow(hourly);
 
     return {

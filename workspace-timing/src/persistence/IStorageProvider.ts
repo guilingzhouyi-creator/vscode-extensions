@@ -7,7 +7,7 @@
  * Exit Semantics & Design Rationale: 采用异步 Promise 接口，解耦具体存储实现（内存、键值、文件系统）；允许策略性插拔与多介质容灾。
  */
 
-import { WorkspaceTimingData } from '../domain/models';
+import type { WorkspaceTimingData } from '../domain/models';
 
 export interface IStorageProvider {
     /** 提供者唯一标识 */

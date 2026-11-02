@@ -10,13 +10,13 @@
  *   SessionManager; enforces serialized execution queue to prevent concurrent state corruption
  */
 
-import { TimerEngine } from '../domain/TimerEngine';
-import { StorageCoordinator } from '../persistence/StorageCoordinator';
-import { JournalWriter } from '../cache/JournalWriter';
-import { SessionManager, SessionResult } from './SessionManager';
+import type { TimerEngine } from '../domain/TimerEngine';
+import type { StorageCoordinator } from '../persistence/StorageCoordinator';
+import type { JournalWriter } from '../cache/JournalWriter';
+import type { SessionManager, SessionResult } from './SessionManager';
 import {
-    WorkspaceTimingData,
-    TimingConfig,
+    type WorkspaceTimingData,
+    type TimingConfig,
     MS_PER_HOUR,
     MIN_WEEKLY_LIMIT_HOURS,
     MAX_WEEKLY_LIMIT_HOURS,
@@ -24,17 +24,17 @@ import {
     sanitizeWeeklyLimitEnabled,
     LATEST_VERSION,
     ORCHESTRATOR_STATES,
-    OrchestratorState,
-    ActivityMode,
+    type OrchestratorState,
+    type ActivityMode,
 } from '../domain/models';
 import { validateTimingData } from '../persistence/data-validator';
 import { migrateToFolded } from '../domain/history-folder';
 import { TimeAggregator } from '../domain/TimeAggregator';
-import { DashboardData } from '../domain/dashboard-types';
-import { GlobalAggregator } from './GlobalAggregator';
-import { DisableManager, DisableState } from './DisableManager';
-import { Scheduler, StatusBarDisplayData } from './Scheduler';
-import { exportCSV, exportAggregatedCSV, exportReport, ReportKind } from './exporters/index';
+import type { DashboardData } from '../domain/dashboard-types';
+import type { GlobalAggregator } from './GlobalAggregator';
+import type { DisableManager, DisableState } from './DisableManager';
+import type { Scheduler, StatusBarDisplayData } from './Scheduler';
+import { exportCSV, exportAggregatedCSV, exportReport, type ReportKind } from './exporters/index';
 import { buildDashboardData } from './dashboard-data-assembler';
 import { LogLevel, log } from '../integration/logger';
 import { t, format } from '../i18n/index';
@@ -206,6 +206,20 @@ export class TimerOrchestrator {
             log(LogLevel.Info, `TimerOrchestrator: pausing for idle (idleStartMs=${idleStartMs})`);
             await this.sessionManager.handleIdlePause(idleStartMs);
             this._state = ORCHESTRATOR_STATES.PAUSED_IDLE;
+            this._onStateChange?.(this._state);
+        }
+    }
+
+    async handleAgentBurst(burstTimeMs?: number, fileCount?: number): Promise<void> {
+        if (this._state !== ORCHESTRATOR_STATES.RUNNING && this._state !== ORCHESTRATOR_STATES.PAUSED_IDLE) {
+            return;
+        }
+        const wasPaused = this._state === ORCHESTRATOR_STATES.PAUSED_IDLE;
+        const result = await this.sessionManager.handleAgentBurst(burstTimeMs);
+        if (wasPaused && this.timer.isRunning) {
+            const count = fileCount ?? 1;
+            log(LogLevel.Info, `TimerOrchestrator: revived from idle via Agent burst (${result.revivedIdleMs}ms, files=${count})`);
+            this._state = ORCHESTRATOR_STATES.RUNNING;
             this._onStateChange?.(this._state);
         }
     }

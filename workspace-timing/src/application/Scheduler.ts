@@ -7,8 +7,8 @@
  * Exit Semantics & Design Rationale: Provides non-overlapping re-entrancy locks (_saving, _flushing) and in-flight Promise tracking to prevent concurrent disk writes and corruption on shutdown
  */
 
-import { JournalWriter } from '../cache/JournalWriter';
-import { SessionManager } from './SessionManager';
+import type { JournalWriter } from '../cache/JournalWriter';
+import type { SessionManager } from './SessionManager';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/logger';
 import {
@@ -18,7 +18,7 @@ import {
     SLEEP_DETECT_GAP_MS,
     sanitizeJournalFlushIntervalMs,
     sanitizeFullSaveIntervalMs,
-    ActivityMode,
+    type ActivityMode,
 } from '../domain/models';
 
 const LOG_JOURNAL_FLUSH_FAILED = 'Scheduler: journal flush failed';
@@ -163,9 +163,8 @@ export class Scheduler {
     }
 
     /** 状态栏与切片心跳驱动单次步进 */
-    private onHeartbeat(): void {
+    private onHeartbeat(now: number = Date.now()): void {
         try {
-            const now = Date.now();
             const deltaMs = now - this._lastTickMs;
             this._lastTickMs = now;
 
@@ -174,7 +173,7 @@ export class Scheduler {
             }
             this.checkMidnightRotation();
             this.pushSliceAndFlush(now);
-            this.notifyStatusBar();
+            this.notifyStatusBar(now);
         } catch (err) {
             log(LogLevel.Error, MSG_STATUS_BAR_UPDATE_FAILED, err as Error);
         }
@@ -212,19 +211,27 @@ export class Scheduler {
         }
     }
 
-    /** 驱动状态栏更新 */
-    private notifyStatusBar(): void {
+    /** 驱动状态栏更新（复用心跳时间戳，单次获取今日指标） */
+    private notifyStatusBar(now: number = Date.now()): void {
         if (!this.statusBarCallback) {
             return;
         }
         const snap = this.sessionManager.snapshot;
         const mode = this.sessionManager.isPausedIdle ? 'paused_idle' : snap?.currentMode;
+        const metrics = typeof this.sessionManager.getTodayMetrics === 'function'
+            ? this.sessionManager.getTodayMetrics(now)
+            : {
+                todayMs: this.sessionManager.getTodayMs(),
+                todayManualMs: this.sessionManager.getTodayManualMs?.() ?? 0,
+                todayAiMs: this.sessionManager.getTodayAiMs?.() ?? 0,
+                todayIdleMs: this.sessionManager.getTodayIdleMs?.() ?? 0,
+            };
         this.statusBarCallback({
             totalMs: snap?.currentTotalMs ?? 0,
-            todayMs: this.sessionManager.getTodayMs(),
-            todayManualMs: this.sessionManager.getTodayManualMs?.() ?? 0,
-            todayAiMs: this.sessionManager.getTodayAiMs?.() ?? 0,
-            todayIdleMs: this.sessionManager.getTodayIdleMs?.() ?? 0,
+            todayMs: metrics.todayMs,
+            todayManualMs: metrics.todayManualMs,
+            todayAiMs: metrics.todayAiMs,
+            todayIdleMs: metrics.todayIdleMs,
             activityMode: mode,
         });
     }

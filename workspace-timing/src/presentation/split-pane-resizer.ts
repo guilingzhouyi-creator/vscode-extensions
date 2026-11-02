@@ -130,7 +130,7 @@ export class SplitPaneResizer {
 
     /** 双击手柄触发 50/50 居中吸附 */
     public snapToCenter(): void {
-        this.setRatio(0.5);
+        this.setRatio(DEFAULT_INITIAL_RATIO);
     }
 
     /** 销毁实例并解绑事件 */
@@ -226,14 +226,12 @@ export class SplitPaneResizer {
         }
     }
 
-    private calculateRatioFromEvent(e: PointerEvent): number {
+    private calculateRatioFromEvent(event: PointerEvent): number {
         const rect = this.container.getBoundingClientRect();
         if (this.direction === DIRECTION_HORIZONTAL) {
-            if (rect.width <= 0) return 0.5;
-            return (e.clientX - rect.left) / rect.width;
+            return rect.width <= 0 ? DEFAULT_INITIAL_RATIO : (event.clientX - rect.left) / rect.width;
         }
-        if (rect.height <= 0) return 0.5;
-        return (e.clientY - rect.top) / rect.height;
+        return rect.height <= 0 ? DEFAULT_INITIAL_RATIO : (event.clientY - rect.top) / rect.height;
     }
 
     private applyRatio(ratio: number): void {

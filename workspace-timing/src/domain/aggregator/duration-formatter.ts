@@ -7,7 +7,15 @@
  * Exit Semantics & Design Rationale: 纯函数零副作用；整除取模保证单位进位严格正确；高位优先渲染消除无效单位冗余。
  */
 
-import { MS_PER_SECOND, SECONDS_PER_HOUR, SECONDS_PER_MINUTE } from '../models';
+import {
+    MS_PER_SECOND,
+    MS_PER_MINUTE,
+    SECONDS_PER_HOUR,
+    SECONDS_PER_MINUTE,
+} from '../models';
+
+const PAD_ZERO = '0';
+const PAD_WIDTH = 2;
 
 /**
  * 格式化毫秒为人类可读字符串
@@ -38,15 +46,19 @@ export function formatDurationCompact(ms: number): string {
     const minutes = Math.floor((totalSeconds % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
     const seconds = totalSeconds % SECONDS_PER_MINUTE;
 
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    if (minutes > 0) return `${minutes}m ${seconds}s`;
-    return `${seconds}s`;
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    }
+    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 }
 
-/** 格式化时间戳为 HH:mm（本地时区） */
-export function formatTime(ms: number): string {
-    const d = new Date(ms);
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${hh}:${mm}`;
+/** 格式化时间戳为 HH:mm（支持指定时区偏移，缺省为本地时区） */
+export function formatTime(ms: number, offsetMinutes?: number): string {
+    const isCustomOffset = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes);
+    const date = isCustomOffset ? new Date(ms + offsetMinutes * MS_PER_MINUTE) : new Date(ms);
+    const hours = isCustomOffset ? date.getUTCHours() : date.getHours();
+    const minutes = isCustomOffset ? date.getUTCMinutes() : date.getMinutes();
+    const hoursStr = String(hours).padStart(PAD_WIDTH, PAD_ZERO);
+    const minutesStr = String(minutes).padStart(PAD_WIDTH, PAD_ZERO);
+    return `${hoursStr}:${minutesStr}`;
 }

@@ -7,8 +7,8 @@
  * Exit Semantics & Design Rationale: 内部捕获解析异常并安全回退空数据，避免损坏的全局键破坏单工作区会话；更新前自动打标 lastUpdatedAt 时间戳。
  */
 
-import * as vscode from 'vscode';
-import { GlobalTimingData, createEmptyGlobalData } from '../domain/global-types';
+import type { ExtensionContext } from 'vscode';
+import { type GlobalTimingData, createEmptyGlobalData } from '../domain/global-types';
 import { LogLevel, log } from '../integration/logger';
 
 const LOG_GLOBAL_LOAD_FAILED = 'GlobalStorage: load failed';
@@ -18,10 +18,10 @@ const LOG_GLOBAL_DELETE_FAILED = 'GlobalStorage: delete failed';
 const STORAGE_KEY = 'workspaceTiming:global';
 
 export class GlobalStorageProvider {
-    private readonly context: vscode.ExtensionContext;
+    private readonly context: ExtensionContext;
     private _available: boolean = true;
 
-    constructor(context: vscode.ExtensionContext) {
+    constructor(context: ExtensionContext) {
         this.context = context;
     }
 
@@ -36,10 +36,7 @@ export class GlobalStorageProvider {
             if (!raw) return createEmptyGlobalData();
 
             const data: GlobalTimingData = JSON.parse(raw);
-            if (typeof data.version !== 'number') {
-                return createEmptyGlobalData();
-            }
-            return data;
+            return typeof data.version !== 'number' ? createEmptyGlobalData() : data;
         } catch (err) {
             log(LogLevel.Warn, LOG_GLOBAL_LOAD_FAILED, err as Error);
             this._available = false;

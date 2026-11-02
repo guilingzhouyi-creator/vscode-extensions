@@ -7,7 +7,13 @@
  * Exit Semantics & Design Rationale: Follows strict bottom-up bootstrap (Logger -> Storage -> Cache -> Domain -> Application -> Presentation); ensures zero data loss on deactivation via orchestrator.stop() synchronous flushing and subscription disposal
  */
 
-import * as vscode from 'vscode';
+import {
+    window,
+    workspace,
+    env,
+    ExtensionMode,
+    type ExtensionContext,
+} from 'vscode';
 
 // Domain
 import { TimerEngine } from './domain/TimerEngine';
@@ -39,7 +45,7 @@ import { TimeBasedCacheStrategy } from './cache/ICacheStrategy';
 import { normalizeWorkspaceId } from './domain/global-types';
 import {
     createDashboardMessageHandler,
-    MessageRouterContext,
+    type MessageRouterContext,
 } from './presentation/dashboardMessages';
 import { init as initI18n } from './i18n/index';
 
@@ -83,19 +89,19 @@ async function updateDashboardIfVisible(targetOrchestrator: TimerOrchestrator): 
     }
 }
 
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(context: ExtensionContext): void {
     const startTime = Date.now();
 
     // 初始化 i18n（先按 VS Code 语言；进入完整模式后按用户 locale 配置覆盖）
-    initI18n(undefined, vscode.env.language);
+    initI18n(undefined, env.language);
 
     // 设置日志等级
-    setLogLevel(context.extensionMode === vscode.ExtensionMode.Development
+    setLogLevel(context.extensionMode === ExtensionMode.Development
         ? LogLevel.Debug
         : LogLevel.Info);
 
     // 建立 VS Code 原生 OutputChannel 并挂载为双轨日志汇流接收器
-    const outputChannel = vscode.window.createOutputChannel('Workspace Timing');
+    const outputChannel = window.createOutputChannel('Workspace Timing');
     context.subscriptions.push(outputChannel);
     const unsubscribeSink = addLogSink((entry) => {
         const errorDetail = entry.detail ? `\n${entry.detail}` : '';
@@ -107,7 +113,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     try {
         // ─── 获取工作区根目录 ───
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+        const workspaceRoot = workspace.workspaceFolders?.[0]?.uri;
 
         if (workspaceRoot) {
             // ═══ 有工作区：完整模式（计时 + 存储 + 状态栏）═══
@@ -116,7 +122,7 @@ export function activate(context: vscode.ExtensionContext): void {
             // 读取用户配置（复用 ConfigWatcher 的 readTimingConfig，保证初始化/运行期配置同源）
             const cfg = readTimingConfig();
             // 按配置覆盖语言（auto=跟随 VS Code 显示语言）
-            initI18n(cfg.locale, vscode.env.language);
+            initI18n(cfg.locale, env.language);
 
             // Persistence 层
             const workspaceStateProvider = new WorkspaceStateProvider(context);
@@ -147,7 +153,7 @@ export function activate(context: vscode.ExtensionContext): void {
             const globalStorage = new GlobalStorageProvider(context);
             // 工作区信息经解析器注入（依赖倒置）：GlobalAggregator 不再直连 vscode API
             const globalAggregator = new GlobalAggregator(globalStorage, () => {
-                const root = vscode.workspace.workspaceFolders?.[0];
+                const root = workspace.workspaceFolders?.[0];
                 if (!root) return undefined;
                 return {
                     id: normalizeWorkspaceId(root.uri.toString()),
@@ -185,7 +191,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 }
             });
             orchestrator.onWeeklyLimitExceeded((msg) => {
-                void vscode.window.showWarningMessage(msg);
+                void window.showWarningMessage(msg);
             });
 
             // Dashboard 面板消息路由（分发逻辑见 presentation/dashboardMessages.ts）
@@ -209,6 +215,9 @@ export function activate(context: vscode.ExtensionContext): void {
                         if (mode !== 'idle') {
                             orchestrator?.handleModeChange(mode);
                         }
+                    },
+                    onAgentBurst: (ts, fileCount) => {
+                        void orchestrator?.handleAgentBurst(ts, fileCount);
                     },
                 },
             );

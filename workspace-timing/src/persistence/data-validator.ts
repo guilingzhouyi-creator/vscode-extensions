@@ -17,6 +17,7 @@ import {
     IdleSession,
     MS_PER_DAY,
     TimingMetadata,
+    resolveDefaultTimezone,
 } from '../domain/models';
 import { sanitizeOverlappingDailyTotals } from '../domain/history-folder';
 
@@ -53,10 +54,7 @@ function validateTopLevelFields(o: Record<string, unknown>): string | null {
     if (!isFiniteNumber(o.currentSessionStartMs) || o.currentSessionStartMs < 0) {
         return ERROR_INVALID_CURRENT_SESSION;
     }
-    if (!Array.isArray(o.sessions)) {
-        return ERROR_MISSING_SESSIONS;
-    }
-    return null;
+    return !Array.isArray(o.sessions) ? ERROR_MISSING_SESSIONS : null;
 }
 
 function sanitizeManualAndAi(manualMs: unknown, aiMs: unknown, cleanDuration: number): { manual: number; ai: number } {
@@ -156,6 +154,9 @@ function sanitizeDailyEntry(v: unknown): DailyTotal | null {
     if (idleTotalMs !== undefined) entry.idleTotalMs = idleTotalMs;
     const idleCount = getNonNegativeNumber(v.idleSessionCount);
     if (idleCount !== undefined) entry.idleSessionCount = Math.floor(idleCount);
+    if (typeof v.recordedOffsetMinutes === 'number' && Number.isFinite(v.recordedOffsetMinutes)) {
+        entry.recordedOffsetMinutes = Math.round(v.recordedOffsetMinutes);
+    }
     return entry;
 }
 
@@ -256,6 +257,14 @@ export function validateTimingData(raw: unknown): ValidationResult {
     const { manualTotalMs, aiTotalMs } = resolveTotalsDistribution(totalMs, raw.manualTotalMs, raw.aiTotalMs);
     const idleTotalMs = resolveIdleTotalMs(raw.idleTotalMs);
 
+    const defaultTzMeta = resolveDefaultTimezone();
+    const timezone = typeof raw.timezone === 'string' && raw.timezone.trim() !== ''
+        ? raw.timezone.trim()
+        : defaultTzMeta.timezone;
+    const utcOffsetMinutes = typeof raw.utcOffsetMinutes === 'number' && Number.isFinite(raw.utcOffsetMinutes)
+        ? Math.round(raw.utcOffsetMinutes)
+        : defaultTzMeta.utcOffsetMinutes;
+
     const data: WorkspaceTimingData = {
         version: LATEST_VERSION,
         totalMs,
@@ -269,6 +278,8 @@ export function validateTimingData(raw: unknown): ValidationResult {
         idleSessions,
         ...(dailyTotals ? { dailyTotals } : {}),
         ...(metadata ? { metadata } : {}),
+        timezone,
+        utcOffsetMinutes,
     };
 
     return { ok: true, data };

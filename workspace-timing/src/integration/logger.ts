@@ -96,16 +96,24 @@ export function addLogSink(sink: LogSink): () => void {
  * 注销指定的日志接收器。
  *
  * @param sink - 已注册的接收器回调
+ * @returns 是否成功注销（未注册时返回 false）
  */
-export function removeLogSink(sink: LogSink): void {
-  _sinks.delete(sink);
+export function removeLogSink(sink: LogSink): boolean {
+  if (typeof sink !== 'function') {
+    return false;
+  }
+  return _sinks.delete(sink);
 }
 
 /**
  * 清空所有注册的日志接收器。
+ *
+ * @returns 被清除的接收器数量
  */
-export function clearLogSinks(): void {
+export function clearLogSinks(): number {
+  const previousCount = _sinks.size;
   _sinks.clear();
+  return previousCount;
 }
 
 /**

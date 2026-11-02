@@ -19,10 +19,10 @@ import {
     DEFAULT_WEEKLY_LIMIT_HOURS,
     DEFAULT_RAW_RETENTION_DAYS,
 } from '../domain/models';
-import { TimeAggregator, WeeklySummary } from '../domain/TimeAggregator';
-import { DashboardData, DailyDetail, WeeklyTrendEntry } from '../domain/dashboard-types';
+import { TimeAggregator, type WeeklySummary } from '../domain/TimeAggregator';
+import type { DashboardData, DailyDetail, WeeklyTrendEntry } from '../domain/dashboard-types';
 import { DEFAULT_HEATMAP_WEEKS, DEFAULT_TREND_WEEKS, ISO_DATE_MD_START } from '../domain/constants-chart';
-import { GlobalSnapshot } from './GlobalAggregator';
+import type { GlobalSnapshot } from './GlobalAggregator';
 
 /** 入参聚合上下文：隔离外部对象直接传入，显式声明依赖字段 */
 export interface AssembleContext {
@@ -66,10 +66,7 @@ function buildTodayDetail(data: ReadonlyTimingData): DailyDetail | null {
         TimeAggregator.todayStr(),
         data.currentSessionStartMs,
     );
-    if (detail.sessions.length === 0) {
-        return null;
-    }
-    return detail;
+    return detail.sessions.length === 0 ? null : detail;
 }
 
 interface ResolvedDashboardConfig {
@@ -91,6 +88,7 @@ interface ResolvedDashboardConfig {
     readonly aiDetectionEnabled: boolean;
     readonly aiCooldownSeconds: number;
     readonly chartDualTrackDisplay: boolean;
+    readonly timeDisplayMode: 'local' | 'utc';
 }
 
 const DEFAULT_CONFIG_FALLBACKS: Readonly<{
@@ -106,6 +104,7 @@ const DEFAULT_CONFIG_FALLBACKS: Readonly<{
     weeklyLimitEnabled: boolean;
     weeklyLimitHours: number;
     chartDualTrackDisplay: boolean;
+    timeDisplayMode: 'local' | 'utc';
 }> = Object.freeze({
     locale: 'auto',
     journalEnabled: true,
@@ -119,6 +118,7 @@ const DEFAULT_CONFIG_FALLBACKS: Readonly<{
     weeklyLimitEnabled: false,
     weeklyLimitHours: DEFAULT_WEEKLY_LIMIT_HOURS,
     chartDualTrackDisplay: true,
+    timeDisplayMode: 'local',
 });
 
 function applyConfigDefaults(config: TimingConfig): ResolvedDashboardConfig {
@@ -142,6 +142,7 @@ function applyConfigDefaults(config: TimingConfig): ResolvedDashboardConfig {
         aiDetectionEnabled: config.aiDetectionEnabled,
         aiCooldownSeconds: config.aiCooldownSeconds,
         chartDualTrackDisplay: fallbacks.chartDualTrackDisplay,
+        timeDisplayMode: fallbacks.timeDisplayMode,
     };
 
     const keys = Object.keys(fallbacks) as (keyof typeof fallbacks)[];
@@ -152,10 +153,6 @@ function applyConfigDefaults(config: TimingConfig): ResolvedDashboardConfig {
         }
     }
     return base;
-}
-
-function resolveDashboardConfig(config: TimingConfig): ResolvedDashboardConfig {
-    return applyConfigDefaults(config);
 }
 
 /**
@@ -188,7 +185,7 @@ export function buildDashboardData(ctx: AssembleContext): DashboardData {
 
     // 面板会话数与当期有效会话严格对齐（已结束条目 + 进行中会话）
     const effectiveSessions = data.sessions.length + (data.currentSessionStartMs > 0 ? 1 : 0);
-    const resolvedConfig = resolveDashboardConfig(config);
+    const resolvedConfig = applyConfigDefaults(config);
 
     return {
         totalMs: currentTotalMs,
@@ -213,6 +210,8 @@ export function buildDashboardData(ctx: AssembleContext): DashboardData {
         globalTotalMs: global.totalMs,
         workspaceCount: global.workspaceCount,
         workspaceList: global.workspaces,
+        timezone: data.timezone,
+        utcOffsetMinutes: data.utcOffsetMinutes,
         ...resolvedConfig,
     };
 }

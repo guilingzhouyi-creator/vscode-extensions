@@ -35,6 +35,12 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         sessionManager = new SessionManager(timer, storage, journal, recovery, 1000, 45);
     });
 
+    afterEach(async () => {
+        if (sessionManager && sessionManager.isSessionActive) {
+            await sessionManager.endSession();
+        }
+    });
+
     it('startSession / endSession 正常生命周期', async () => {
         await sessionManager.startSession();
         assert.strictEqual(sessionManager.isSessionActive, true);
@@ -181,5 +187,38 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         const recovered = await realRecovery.recover(45, 1000);
         assert.strictEqual(recovered.totalMs, 3600000 + 1800000,
             '封存段只计一次，仅追加今日 30 分钟增量');
+    });
+
+    it('handleAgentBurst：运行中手动会话被纠偏为 AI 模式并自动推进水位线与保存检查点', async () => {
+        await sessionManager.startSession();
+        const start = Date.now();
+        storage.saved.length = 0;
+
+        const burstTime = start + 120000;
+        const res = await sessionManager.handleAgentBurst(burstTime, 300000);
+
+        assert.strictEqual(res.reclassifiedMs, 120000);
+        assert.strictEqual(res.revivedIdleMs, 0);
+        assert.strictEqual(sessionManager.currentMode, 'ai');
+        assert.ok(storage.saved.length > 0, '纠偏后触发了状态快照落盘');
+        assert.strictEqual(timer.data.metadata?.lastJournalTs, burstTime);
+    });
+
+    it('handleAgentBurst：空闲暂停态被唤醒复活为活动 AI 会话并记录检查点', async () => {
+        await sessionManager.startSession();
+        const start = Date.now();
+        await sessionManager.handleIdlePause(start);
+        assert.strictEqual(sessionManager.isPausedIdle, true);
+        storage.saved.length = 0;
+
+        const burstTime = start + 180000;
+        const res = await sessionManager.handleAgentBurst(burstTime, 300000);
+
+        assert.strictEqual(res.reclassifiedMs, 0);
+        assert.strictEqual(res.revivedIdleMs, 180000);
+        assert.strictEqual(sessionManager.isPausedIdle, false);
+        assert.strictEqual(timer.isRunning, true);
+        assert.strictEqual(sessionManager.currentMode, 'ai');
+        assert.ok(storage.saved.length > 0, '复活后触发了检查点落盘');
     });
 });

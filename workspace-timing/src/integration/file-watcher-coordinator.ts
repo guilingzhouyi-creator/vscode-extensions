@@ -15,7 +15,15 @@ import {
     type Disposable,
     type Uri,
 } from 'vscode';
-import { isPathIgnored, isAgentSignaturePath } from './agent-signature-catalog';
+import {
+    isPathIgnored,
+    isAgentSignaturePath,
+    isAgentPulsePath,
+} from './agent-signature-catalog';
+import {
+    DEFAULT_BATCH_HARVEST_WINDOW_MS,
+    DEFAULT_GIT_SUPPRESSION_WINDOW_MS,
+} from '../domain/models';
 import { LogLevel, log } from './logger';
 
 /** VS Code 内置 Git 扩展结构声明 */
@@ -41,14 +49,40 @@ const MSG_GIT_BIND_FAILED = 'FileWatcherCoordinator: failed to bind git extensio
 const MSG_GIT_READ_API_FAILED = 'FileWatcherCoordinator: failed to read git api';
 const MSG_REPO_BIND_FAILED = 'FileWatcherCoordinator: failed to bind repo';
 
+/** 外部文件系统变动批量信号载荷 */
+export interface ExternalSignalPayload {
+    /** 代表性文件 URI（单文件事件或批处理触发文件） */
+    readonly uri?: Uri;
+    /** 滑动窗口内聚合变动的项目文件总数 */
+    readonly fileCount: number;
+    /** 是否包含 Agent 伴生实时脉搏流（transcript/scratch 等） */
+    readonly isPulse: boolean;
+    /** 是否包含已知 Agent 签名或规则目录 */
+    readonly isAgentSignature: boolean;
+    /** 是否正处于 Git 版本控制事务屏蔽窗口内（分支切换/合并） */
+    readonly isGitSuppressed: boolean;
+    /** 是否为显式单文件大块编辑或强制突发信号 */
+    readonly isBurst?: boolean;
+    /** 信号产生时间戳 (ms) */
+    readonly timestampMs: number;
+}
+
+export type ExternalSignalCallback = (signal: ExternalSignalPayload) => void;
+
 /**
  * 架构契约：文件系统与 Git 监视协调器 (FileWatcherCoordinator)
- * 职责：统一管理底层文件系统事件、VS Code 显式事务与 Git 状态变更，将过滤后的信号回传给 ActivityWatcher。
+ * 职责：统一管理底层文件系统事件、VS Code 显式事务与 Git 状态变更，通过滑动微批聚合消除事件风暴，将载荷回传给 ActivityWatcher。
  */
 export class FileWatcherCoordinator implements Disposable {
     private readonly subscriptions: Disposable[] = [];
+    private _lastGitOperationMs: number = 0;
+    private readonly _batchFilePaths: Set<string> = new Set();
+    private _batchTimer: ReturnType<typeof setTimeout> | null = null;
+    private _hasPulseInBatch: boolean = false;
+    private _hasSignatureInBatch: boolean = false;
+    private _representativeUri?: Uri;
 
-    constructor(private readonly onSignal: (uri?: Uri) => void) {}
+    constructor(private readonly onSignal: ExternalSignalCallback) {}
 
     /** 启动所有文件系统、显式事务与 Git 监听 */
     public start(): void {
@@ -58,9 +92,57 @@ export class FileWatcherCoordinator implements Disposable {
     }
 
     private handleUri(uri: Uri): void {
-        if (!isPathIgnored(uri.fsPath)) {
-            this.onSignal(uri);
+        if (isPathIgnored(uri.fsPath)) {
+            return;
         }
+
+        const isPulse = isAgentPulsePath(uri.fsPath);
+        const isSignature = isAgentSignaturePath(uri.fsPath);
+        const isGitSuppressed = !isSignature &&
+            (Date.now() - this._lastGitOperationMs < DEFAULT_GIT_SUPPRESSION_WINDOW_MS);
+
+        this._batchFilePaths.add(uri.fsPath);
+        if (isPulse) this._hasPulseInBatch = true;
+        if (isSignature) this._hasSignatureInBatch = true;
+        if (!this._representativeUri) this._representativeUri = uri;
+
+        const currentCount = this._batchFilePaths.size;
+
+        this.onSignal({
+            uri,
+            fileCount: currentCount,
+            isPulse: this._hasPulseInBatch,
+            isAgentSignature: this._hasSignatureInBatch,
+            isGitSuppressed,
+            timestampMs: Date.now(),
+        });
+
+        if (this._batchTimer !== null) {
+            clearTimeout(this._batchTimer);
+        }
+        this._batchTimer = setTimeout(() => {
+            this.closeBatch();
+        }, DEFAULT_BATCH_HARVEST_WINDOW_MS);
+    }
+
+    private closeBatch(): void {
+        if (this._batchTimer !== null) {
+            clearTimeout(this._batchTimer);
+            this._batchTimer = null;
+        }
+        this._batchFilePaths.clear();
+        this._hasPulseInBatch = false;
+        this._hasSignatureInBatch = false;
+        this._representativeUri = undefined;
+    }
+
+    /** 模拟或记录 Git 版本控制操作（供单测与内部状态机调用） */
+    public recordGitOperation(timestampMs: number = Date.now()): void {
+        this._lastGitOperationMs = timestampMs;
+    }
+
+    public getLastGitOperationMs(): number {
+        return this._lastGitOperationMs;
     }
 
     private initFileSystemWatcher(): void {
@@ -150,7 +232,8 @@ export class FileWatcherCoordinator implements Disposable {
             if (repo?.state?.onDidChange) {
                 this.subscriptions.push(
                     repo.state.onDidChange(() => {
-                        this.onSignal();
+                        this.recordGitOperation(Date.now());
+                        log(LogLevel.Debug, 'FileWatcherCoordinator: git repository state changed, active suppression window');
                     }),
                 );
             }
@@ -160,6 +243,7 @@ export class FileWatcherCoordinator implements Disposable {
     }
 
     public dispose(): void {
+        this.closeBatch();
         for (const d of this.subscriptions) {
             d.dispose();
         }
@@ -169,7 +253,7 @@ export class FileWatcherCoordinator implements Disposable {
 
 /** 工厂函数创建并返回协调器 Disposable */
 export function createFileWatcherCoordinator(
-    onSignal: (uri?: Uri) => void,
+    onSignal: ExternalSignalCallback,
 ): FileWatcherCoordinator {
     const coordinator = new FileWatcherCoordinator(onSignal);
     coordinator.start();

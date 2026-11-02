@@ -255,4 +255,148 @@ describe('TimerEngine（计时核心）', () => {
       assert.strictEqual(eng.getTodayMs(), 3600000, '今日会话重叠时严格去重不翻倍');
     });
   });
+
+  describe('reclassifyOrReviveToAi（有界追溯纠偏与空闲复活引擎）', () => {
+    it('进行中手动会话在追溯窗口内全额转移至 AI，总历时完全守恒', () => {
+      withFixedNow('2026-10-04T10:00:00', () => {
+        const eng = new TimerEngine();
+        eng.start();
+        const start = Date.now();
+
+        // 经过 3 分钟（手动模式）
+        const burstTime = start + 180000;
+        const res = eng.reclassifyOrReviveToAi(burstTime, 300000);
+
+        assert.strictEqual(res.reclassifiedMs, 180000);
+        assert.strictEqual(res.revivedIdleMs, 0);
+        assert.strictEqual(eng.currentMode, 'ai');
+
+        // 在 burstTime 时的快照：总历时 3 分钟全部归为 AI
+        const segs = eng['computeCurrentSegments'](burstTime);
+        assert.strictEqual(segs.manual, 0);
+        assert.strictEqual(segs.ai, 180000);
+
+        // 推进到 10:05:00（再以 AI 模式运行 2 分钟后停止会话）
+        withFixedNow('2026-10-04T10:05:00', () => {
+          const total = eng.stop();
+          assert.strictEqual(total, 300000);
+          assert.strictEqual(eng.data.aiTotalMs, 300000);
+          assert.strictEqual(eng.data.manualTotalMs, 0);
+        });
+      });
+    });
+
+    it('手动历时超过追溯上限时，保留早期手动工时，仅将上限部分划归 AI', () => {
+      withFixedNow('2026-10-04T10:00:00', () => {
+        const eng = new TimerEngine();
+        eng.start();
+        const start = Date.now();
+
+        // 经过 15 分钟手动编写
+        const burstTime = start + 900000;
+        const res = eng.reclassifyOrReviveToAi(burstTime, 300000); // 上限 5 分钟
+
+        assert.strictEqual(res.reclassifiedMs, 300000);
+        assert.strictEqual(res.revivedIdleMs, 0);
+        assert.strictEqual(eng.currentMode, 'ai');
+
+        const segs = eng['computeCurrentSegments'](burstTime);
+        assert.strictEqual(segs.manual, 600000, '前 10 分钟保留为手动工时');
+        assert.strictEqual(segs.ai, 300000, '后 5 分钟被纠偏重分类为 AI 工时');
+        assert.strictEqual(segs.manual + segs.ai, 900000, '总历时 15 分钟严格守恒');
+      });
+    });
+
+    it('空闲超时复活（离开时长 ≤ 追溯上限）：全额转为 AI 并不留下 idleSession', () => {
+      withFixedNow('2026-10-04T10:00:00', () => {
+        const eng = new TimerEngine();
+        eng.start();
+        const start = Date.now();
+
+        // 10:00 离开，10:05 触发空闲超时截断
+        eng.pauseForIdle(start);
+        assert.strictEqual(eng.isPausedIdle, true);
+
+        // 10:03 时 Agent 突发写入（实际思考 3 分钟）
+        const burstTime = start + 180000;
+        const res = eng.reclassifyOrReviveToAi(burstTime, 300000);
+
+        assert.strictEqual(res.reclassifiedMs, 0);
+        assert.strictEqual(res.revivedIdleMs, 180000);
+        assert.strictEqual(eng.isRunning, true);
+        assert.strictEqual(eng.isPausedIdle, false);
+        assert.strictEqual(eng.currentMode, 'ai');
+        assert.strictEqual(eng.data.idleSessions.length, 0, '未产生空闲断段');
+
+        const segs = eng['computeCurrentSegments'](burstTime);
+        assert.strictEqual(segs.ai, 180000);
+        assert.strictEqual(segs.manual, 0);
+      });
+    });
+
+    it('空闲超时复活（离开时长 > 追溯上限）：拆解为真实 idleSession + 复活 AI 会话', () => {
+      withFixedNow('2026-10-04T10:00:00', () => {
+        const eng = new TimerEngine();
+        eng.start();
+        const start = Date.now();
+
+        // 10:00 离开
+        eng.pauseForIdle(start);
+
+        // 10:25 (25分钟后) Agent 突发写入；上限 5 分钟
+        const burstTime = start + 1500000;
+        const res = eng.reclassifyOrReviveToAi(burstTime, 300000);
+
+        assert.strictEqual(res.reclassifiedMs, 0);
+        assert.strictEqual(res.revivedIdleMs, 300000);
+        assert.strictEqual(eng.isRunning, true);
+        assert.strictEqual(eng.isPausedIdle, false);
+
+        // 前 20 分钟确定性落盘为真实空闲
+        assert.strictEqual(eng.data.idleSessions.length, 1);
+        const idle = eng.data.idleSessions[0];
+        assert.strictEqual(idle.startMs, start);
+        assert.strictEqual(idle.endMs, burstTime - 300000);
+        assert.strictEqual(idle.durationMs, 1200000);
+        assert.strictEqual(eng.data.idleTotalMs, 1200000);
+
+        // 后 5 分钟复活为活动 AI 会话
+        const segs = eng['computeCurrentSegments'](burstTime);
+        assert.strictEqual(segs.ai, 300000);
+        assert.strictEqual(segs.manual, 0);
+        assert.strictEqual(idle.durationMs + segs.ai, 1500000, '20m 空闲 + 5m AI = 25m 总时长物理守恒');
+      });
+    });
+
+    it('跨午夜零点闭界受控：追溯不越界进入前一日', () => {
+      withFixedNow('2026-10-10T00:02:00', () => {
+        const eng = new TimerEngine();
+        const midnight = new Date('2026-10-10T00:00:00').getTime();
+        const yesterdayStart = midnight - 300000; // 昨晚 23:55
+        eng.start();
+        eng['_segmentStartMs'] = yesterdayStart;
+        eng['_sessionStartMs'] = yesterdayStart;
+        eng['_currentMode'] = 'manual';
+
+        const now = midnight + 120000; // 今日 00:02
+        const res = eng.reclassifyOrReviveToAi(now, 600000);
+
+        // 尽管 lookbackLimit 是 10 分钟，但受今日零点截断，仅允许重分类今日的 2 分钟 (120000ms)
+        assert.strictEqual(res.reclassifiedMs, 120000);
+        assert.strictEqual(eng['_sessionAiAccMs'], 120000);
+        assert.strictEqual(eng['_sessionManualAccMs'], 300000);
+      });
+    });
+
+    it('已在 AI 模式下幂等空转返回 0', () => {
+      withFixedNow('2026-10-04T10:00:00', () => {
+        const eng = new TimerEngine();
+        eng.start();
+        eng.switchMode('ai');
+        const res = eng.reclassifyOrReviveToAi(Date.now() + 60000, 300000);
+        assert.strictEqual(res.reclassifiedMs, 0);
+        assert.strictEqual(res.revivedIdleMs, 0);
+      });
+    });
+  });
 });

@@ -15,8 +15,8 @@ import {
     MIN_JOURNAL_FLUSH_MS,
 } from '../domain/models';
 import { RingBuffer } from './RingBuffer';
-import { ICacheStrategy, TimeBasedCacheStrategy } from './ICacheStrategy';
-import { IJournalStore } from './IJournalStore';
+import { type ICacheStrategy, TimeBasedCacheStrategy } from './ICacheStrategy';
+import type { IJournalStore } from './IJournalStore';
 import { LogLevel, log } from '../integration/logger';
 
 const LOG_JOURNAL_TRUNCATED_AND_CLEARED = 'JournalWriter: journal truncated and memory buffer cleared';
@@ -38,8 +38,9 @@ export class JournalWriter {
         this.strategy = strategy ?? new TimeBasedCacheStrategy(DEFAULT_JOURNAL_FLUSH_MS);
     }
 
-    /** 写入一条时间片 */
+    /** 写入一条时间片（含结构校验与防御性守卫） */
     push(slice: TimeSlice): void {
+        if (!slice || typeof slice.timestamp !== 'number') return;
         this.ringBuffer.push(slice);
     }
 
@@ -65,11 +66,25 @@ export class JournalWriter {
             elapsedSinceLastFlushMs: Date.now() - this.lastFlushTime,
         };
 
-        if (!this.strategy.shouldFlush(context)) {
-            return 0;
+        return !this.strategy.shouldFlush(context) ? 0 : this.flushNow();
+    }
+
+    private async withMutex<T>(action: () => Promise<T>): Promise<T> {
+        while (this._flushingMutex) {
+            await this._flushingMutex;
         }
 
-        return this.flushNow();
+        let releaseMutex: () => void = () => {};
+        this._flushingMutex = new Promise<void>((resolve) => {
+            releaseMutex = resolve;
+        });
+
+        try {
+            return await action();
+        } finally {
+            this._flushingMutex = null;
+            releaseMutex();
+        }
     }
 
     /**
@@ -77,39 +92,29 @@ export class JournalWriter {
      * 失败时缓冲未动、时序不乱并向上抛出异常。
      */
     private async flushNow(): Promise<number> {
-        while (this._flushingMutex) {
-            await this._flushingMutex;
-        }
+        return this.withMutex(async () => {
+            try {
+                const slices = this.ringBuffer.peekAll();
+                if (slices.length === 0) {
+                    return 0;
+                }
 
-        let releaseMutex: () => void = () => {};
-        this._flushingMutex = new Promise<void>((resolve) => {
-            releaseMutex = resolve;
-        });
+                await this.storage.appendBatch(slices);
+                this.ringBuffer.advance(slices.length);
 
-        try {
-            const slices = this.ringBuffer.peekAll();
-            if (slices.length === 0) {
-                return 0;
+                this.lastFlushTime = Date.now();
+                this.strategy.onFlushComplete(slices.length);
+
+                log(LogLevel.Debug, `JournalWriter: flushed ${slices.length} slices`);
+                return slices.length;
+            } catch (err) {
+                log(
+                    LogLevel.Error,
+                    `JournalWriter: append failed, ${this.ringBuffer.count} slices retained in buffer for retry: ${err}`,
+                );
+                throw err;
             }
-
-            await this.storage.appendBatch(slices);
-            this.ringBuffer.advance(slices.length);
-
-            this.lastFlushTime = Date.now();
-            this.strategy.onFlushComplete(slices.length);
-
-            log(LogLevel.Debug, `JournalWriter: flushed ${slices.length} slices`);
-            return slices.length;
-        } catch (err) {
-            log(
-                LogLevel.Error,
-                `JournalWriter: append failed, ${this.ringBuffer.count} slices retained in buffer for retry: ${err}`,
-            );
-            throw err;
-        } finally {
-            this._flushingMutex = null;
-            releaseMutex();
-        }
+        });
     }
 
     /**
@@ -117,23 +122,11 @@ export class JournalWriter {
      * 同步清除 ringBuffer，防止截断前未落盘切片在下次心跳被重复写入导致数据复活。
      */
     async truncate(): Promise<void> {
-        while (this._flushingMutex) {
-            await this._flushingMutex;
-        }
-
-        let releaseMutex: () => void = () => {};
-        this._flushingMutex = new Promise<void>((resolve) => {
-            releaseMutex = resolve;
-        });
-
-        try {
+        return this.withMutex(async () => {
             this.ringBuffer.clear();
             await this.storage.truncate();
             log(LogLevel.Debug, LOG_JOURNAL_TRUNCATED_AND_CLEARED);
-        } finally {
-            this._flushingMutex = null;
-            releaseMutex();
-        }
+        });
     }
 
     /** 强制 flush 所有未写入数据 */

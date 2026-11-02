@@ -12,7 +12,16 @@ export interface AffinePoint {
     readonly y: number;
 }
 
-export interface AffineViewportParams {
+export interface ViewportBoxDimensions {
+    /** 视口可视尺寸 */
+    viewportWidth: number;
+    viewportHeight: number;
+    /** 缩放主体内容原始物理尺寸 */
+    contentWidth: number;
+    contentHeight: number;
+}
+
+export interface AffineViewportParams extends ViewportBoxDimensions {
     /** 当前缩放比例 S_current */
     currentScale: number;
     /** 目标缩放比例 S_target */
@@ -21,12 +30,6 @@ export interface AffineViewportParams {
     currentTranslate: AffinePoint;
     /** 光标/指针锚定物理不动点 Ox, Oy（视口局部坐标系） */
     origin: AffinePoint;
-    /** 视口可视尺寸 */
-    viewportWidth: number;
-    viewportHeight: number;
-    /** 缩放主体内容原始物理尺寸 */
-    contentWidth: number;
-    contentHeight: number;
     /** 边界溢出阻尼系数（默认 0.7） */
     damping?: number;
     /** 缩放比例安全边界，默认 [0.1, 10.0] */
@@ -44,19 +47,13 @@ export interface AffineTransformResult {
     readonly maxTy: number;
 }
 
-export interface AffinePanParams {
+export interface AffinePanParams extends ViewportBoxDimensions {
     /** 当前平移向量 */
     currentTranslate: AffinePoint;
     /** 手势拖拽位移向量 dx, dy */
     delta: AffinePoint;
     /** 当前缩放比例 */
     scale: number;
-    /** 视口可视尺寸 */
-    viewportWidth: number;
-    viewportHeight: number;
-    /** 缩放主体内容原始物理尺寸 */
-    contentWidth: number;
-    contentHeight: number;
     /** 移动死区门限（单位：像素，默认 4px） */
     deadzone?: number;
     /** 边界溢出阻尼系数（默认 0.7） */
@@ -108,12 +105,35 @@ function applyAxisDamping(
     return { value: ideal, isDamped: false };
 }
 
+interface DampedAxisBoundsResult {
+    maxTx: number;
+    maxTy: number;
+    dampedX: { value: number; isDamped: boolean };
+    dampedY: { value: number; isDamped: boolean };
+}
+
+interface DampedAxisBoundsParams {
+    dimensions: ViewportBoxDimensions;
+    scale: number;
+    idealTranslate: AffinePoint;
+    damping: number;
+}
+
+function resolveDampedAxisBounds(params: DampedAxisBoundsParams): DampedAxisBoundsResult {
+    const { dimensions, scale, idealTranslate, damping } = params;
+    const maxTx = Math.max(0, (dimensions.contentWidth * scale - dimensions.viewportWidth) / 2);
+    const maxTy = Math.max(0, (dimensions.contentHeight * scale - dimensions.viewportHeight) / 2);
+    const dampedX = applyAxisDamping(idealTranslate.x, maxTx, damping);
+    const dampedY = applyAxisDamping(idealTranslate.y, maxTy, damping);
+    return { maxTx, maxTy, dampedX, dampedY };
+}
+
 /**
  * 以指针 (Ox, Oy) 为物理不动点的轻量仿射缩放计算纯函数。
  * 核心几何方程：
- * c = S_target / S_current
- * idealTx = Ox - (Ox - tx) * c
- * idealTy = Oy - (Oy - ty) * c
+ *   ratio: S_target / S_current
+ *   idealTx: Ox - (Ox - tx) * ratio
+ *   idealTy: Oy - (Oy - ty) * ratio
  */
 export function computeAffineScaleTransform(params: AffineViewportParams): AffineTransformResult {
     const minS = params.minScale ?? DEFAULT_MIN_SCALE;
@@ -125,12 +145,13 @@ export function computeAffineScaleTransform(params: AffineViewportParams): Affin
     const idealTx = params.origin.x - (params.origin.x - params.currentTranslate.x) * c;
     const idealTy = params.origin.y - (params.origin.y - params.currentTranslate.y) * c;
 
-    const maxTx = Math.max(0, (params.contentWidth * effectiveTargetScale - params.viewportWidth) / 2);
-    const maxTy = Math.max(0, (params.contentHeight * effectiveTargetScale - params.viewportHeight) / 2);
-
     const damping = params.damping ?? DEFAULT_AFFINE_DAMPING;
-    const dampedX = applyAxisDamping(idealTx, maxTx, damping);
-    const dampedY = applyAxisDamping(idealTy, maxTy, damping);
+    const { maxTx, maxTy, dampedX, dampedY } = resolveDampedAxisBounds({
+        dimensions: params,
+        scale: effectiveTargetScale,
+        idealTranslate: { x: idealTx, y: idealTy },
+        damping,
+    });
 
     return {
         scale: effectiveTargetScale,
@@ -161,12 +182,13 @@ export function computeAffinePan(params: AffinePanParams): AffinePanResult {
     const idealTx = params.currentTranslate.x + params.delta.x;
     const idealTy = params.currentTranslate.y + params.delta.y;
 
-    const maxTx = Math.max(0, (params.contentWidth * params.scale - params.viewportWidth) / 2);
-    const maxTy = Math.max(0, (params.contentHeight * params.scale - params.viewportHeight) / 2);
-
     const damping = params.damping ?? DEFAULT_AFFINE_DAMPING;
-    const dampedX = applyAxisDamping(idealTx, maxTx, damping);
-    const dampedY = applyAxisDamping(idealTy, maxTy, damping);
+    const { dampedX, dampedY } = resolveDampedAxisBounds({
+        dimensions: params,
+        scale: params.scale,
+        idealTranslate: { x: idealTx, y: idealTy },
+        damping,
+    });
 
     return {
         tx: dampedX.value,

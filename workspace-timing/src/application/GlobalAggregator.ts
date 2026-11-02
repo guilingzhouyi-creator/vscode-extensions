@@ -7,7 +7,7 @@
  * Exit Semantics & Design Rationale: Injected workspace identity port eliminates direct VS Code API coupling; re-entrancy lock and delta-check prevent redundant disk I/O
  */
 
-import { GlobalTimingData, WorkspaceRecord } from '../domain/global-types';
+import type { GlobalTimingData, WorkspaceRecord } from '../domain/global-types';
 import { GLOBAL_STALE_TTL_MS, MS_PER_HOUR } from '../domain/models';
 import { LogLevel, log } from '../integration/logger';
 

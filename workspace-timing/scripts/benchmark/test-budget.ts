@@ -50,7 +50,7 @@ let durationMs: number;
 if (consuming) {
     durationMs = consumeMs;
 } else {
-    const result = await run([process.execPath, mochaBin, '--reporter', 'dot', 'test/**/*.test.js'], {
+    const result = await run([process.execPath, mochaBin, '--exit', '--reporter', 'dot', 'test/**/*.test.js'], {
         cwd: root,
         timeoutMs: 300000,
     });

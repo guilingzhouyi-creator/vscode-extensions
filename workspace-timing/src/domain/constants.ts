@@ -32,6 +32,7 @@ export const TIMING_CONFIG_KEYS = Object.freeze({
     WEEKLY_LIMIT_ENABLED: 'weeklyLimit.enabled',
     WEEKLY_LIMIT_HOURS: 'weeklyLimit.hours',
     CHART_DUAL_TRACK_DISPLAY: 'chartDualTrackDisplay',
+    TIME_DISPLAY_MODE: 'timeDisplayMode',
 } as const);
 
 /**
@@ -58,6 +59,7 @@ export const TIMING_CONFIG_FIELDS = Object.freeze({
     AI_DETECTION_ENABLED: 'aiDetectionEnabled',
     AI_COOLDOWN_SECONDS: 'aiCooldownSeconds',
     CHART_DUAL_TRACK_DISPLAY: 'chartDualTrackDisplay',
+    TIME_DISPLAY_MODE: 'timeDisplayMode',
 } as const);
 
 /**
@@ -98,6 +100,12 @@ export const LOCALE_EN = 'en';
 export const STATUS_BAR_MODE_TODAY_TOTAL = 'today-total';
 export const STATUS_BAR_MODE_TOTAL_TODAY = 'total-today';
 export const STATUS_BAR_MODE_COMPACT = 'compact';
+
+/**
+ * 时间显示模式常量 (SSOT: local 本地时区 vs utc 标准世界时)
+ */
+export const TIME_DISPLAY_MODE_LOCAL = 'local';
+export const TIME_DISPLAY_MODE_UTC = 'utc';
 
 /**
  * 原生类型与字面量常量 (消灭散落硬编码与重复字面量)

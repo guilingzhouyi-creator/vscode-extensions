@@ -7,9 +7,15 @@
  * Exit Semantics & Design Rationale: Implements idempotent disposal to break cyclic cleanup references; retains context when hidden while throttling background render ticks (isVisible check)
  */
 
-import * as vscode from 'vscode';
+import {
+    window,
+    ViewColumn,
+    Uri,
+    Disposable,
+    type WebviewPanel,
+} from 'vscode';
 
-import { DashboardData, DashboardMessage } from '../domain/dashboard-types';
+import type { DashboardData, DashboardMessage } from '../domain/dashboard-types';
 import { CSP_NONCE_LENGTH } from '../domain/models';
 import { buildDashboardHtml } from './dashboardTemplate';
 import { labelsWithPrefix, t, currentLocale } from '../i18n/index';
@@ -91,13 +97,13 @@ export class DashboardPanel {
     return text;
   }
 
-  private readonly _panel: vscode.WebviewPanel;
-  private readonly _extensionUri: vscode.Uri;
-  private _disposables: vscode.Disposable[] = [];
+  private readonly _panel: WebviewPanel;
+  private readonly _extensionUri: Uri;
+  private _disposables: Disposable[] = [];
   private _onMessage: ((msg: DashboardMessage) => void) | null = null;
   private _disposed: boolean = false;
 
-  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+  private constructor(panel: WebviewPanel, extensionUri: Uri) {
     this._panel = panel;
     this._extensionUri = extensionUri;
 
@@ -115,14 +121,14 @@ export class DashboardPanel {
   }
 
   /** 注册实例消息处理器（附加在全局之后） */
-  onMessage(cb: (msg: DashboardMessage) => void): void {
-    this._onMessage = cb;
+  onMessage(callback: (msg: DashboardMessage) => void): void {
+    this._onMessage = callback;
   }
 
   /** 创建或聚焦面板 */
-  static createOrShow(extensionUri: vscode.Uri, viewColumn?: vscode.ViewColumn): DashboardPanel {
-    const column = viewColumn ?? (vscode.window.activeTextEditor
-      ? vscode.window.activeTextEditor.viewColumn
+  static createOrShow(extensionUri: Uri, viewColumn?: ViewColumn): DashboardPanel {
+    const column = viewColumn ?? (window.activeTextEditor
+      ? window.activeTextEditor.viewColumn
       : undefined);
 
     if (DashboardPanel.currentPanel) {
@@ -130,14 +136,14 @@ export class DashboardPanel {
       return DashboardPanel.currentPanel;
     }
 
-    const panel = vscode.window.createWebviewPanel(
+    const panel = window.createWebviewPanel(
       DASHBOARD_PANEL_VIEW_TYPE,
       t()['panel.title'],
-      column ?? vscode.ViewColumn.One,
+      column ?? ViewColumn.One,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out')],
+        localResourceRoots: [Uri.joinPath(extensionUri, 'out')],
       },
     );
 
@@ -170,7 +176,7 @@ export class DashboardPanel {
 
     DashboardPanel.currentPanel = undefined;
     this._panel.dispose();
-    vscode.Disposable.from(...this._disposables).dispose();
+    Disposable.from(...this._disposables).dispose();
     this._disposables.length = 0;
   }
 

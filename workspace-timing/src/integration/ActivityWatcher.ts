@@ -8,14 +8,22 @@
  * Contract Invariant & Boundary: Event debounce invariant: debounced heartbeats clamp high-frequency keyboard/fs bursts to minimum intervals; lifecycle ownership: 100% of VS Code Disposables are registered to subscriptions and cleared on dispose.
  */
 
-import * as vscode from 'vscode';
 import {
-    ActivityMode,
+    window,
+    workspace,
+    type Disposable,
+    type TextDocumentChangeEvent,
+    type Uri,
+} from 'vscode';
+import {
+    type ActivityMode,
     MS_PER_SECOND,
     MS_PER_MINUTE,
     DEFAULT_IDLE_TIMEOUT_MINUTES,
     DEFAULT_AI_COOLDOWN_SECONDS,
     DEFAULT_AI_DETECTION_ENABLED,
+    ADAPTIVE_COOLDOWN_STEP_SECONDS,
+    MAX_ADAPTIVE_AI_COOLDOWN_SECONDS,
 } from '../domain/models';
 import { LogLevel, log } from './logger';
 import {
@@ -24,8 +32,11 @@ import {
     CLASSIFY_UNDO_REDO,
     CLASSIFY_EMPTY,
 } from './edit-dynamics';
-import { isPathIgnored } from './agent-signature-catalog';
-import { createFileWatcherCoordinator } from './file-watcher-coordinator';
+import { isPathIgnored, isAgentPulsePath, isAgentSignaturePath } from './agent-signature-catalog';
+import {
+    createFileWatcherCoordinator,
+    type ExternalSignalPayload,
+} from './file-watcher-coordinator';
 
 /** 监测器状态枚举（包含工作模式与内部空闲态） */
 export type WatcherMode = ActivityMode | 'idle';
@@ -35,11 +46,33 @@ const WATCHER_MODE_MANUAL: ActivityMode = 'manual';
 const WATCHER_MODE_AI: ActivityMode = 'ai';
 const WATCHER_MODE_IDLE: WatcherMode = 'idle';
 
+/** 自适应对数加权最高步阶 */
+const MAX_ADAPTIVE_SCALE_STEP = 4;
+
 /** 静态日志文案常量 */
 const MSG_WATCHER_STARTED = 'ActivityWatcher: started';
 const MSG_WATCHER_DISPOSED = 'ActivityWatcher: disposed';
 const MSG_MODE_OVERRIDE_CLEARED = 'ActivityWatcher: mode override cleared, restored to auto sensing';
 const MSG_EXTERNAL_AI_TRIGGERED = 'ActivityWatcher: external AI activity triggered';
+
+function normalizeSignalPayload(signal?: Uri | ExternalSignalPayload): ExternalSignalPayload {
+    if (signal && typeof signal === 'object' && 'fileCount' in signal) {
+        return signal;
+    }
+    const uri = signal as Uri | undefined;
+    return {
+        uri,
+        fileCount: 1,
+        isPulse: uri ? isAgentPulsePath(uri.fsPath) : false,
+        isAgentSignature: uri ? isAgentSignaturePath(uri.fsPath) : false,
+        isGitSuppressed: false,
+        timestampMs: Date.now(),
+    };
+}
+
+function isAgentBurstPayload(payload: ExternalSignalPayload): boolean {
+    return payload.fileCount >= 2 || payload.isAgentSignature || payload.isPulse || Boolean(payload.isBurst);
+}
 
 /**
  * 架构契约：活动监听观察者回调端口 (ActivityWatcherListener)
@@ -48,6 +81,7 @@ export interface ActivityWatcherListener {
     onActivity(mode: ActivityMode, timestampMs: number): void;
     onIdle(timestampMs: number): void;
     onModeChange?(mode: WatcherMode, previousMode: WatcherMode, timestampMs: number): void;
+    onAgentBurst?(burstTimeMs: number, fileCount: number): void;
 }
 
 /**
@@ -69,8 +103,8 @@ export const DEFAULT_ACTIVITY_OPTIONS: Readonly<ActivityWatcherOptions> = {
  * 架构契约：活动监测器 (ActivityWatcher)
  * 职责：监听 VS Code 编辑器操作与 FileWatcherCoordinator 外部信号，判定工作区处于 manual/ai/idle 状态。
  */
-export class ActivityWatcher implements vscode.Disposable {
-    private readonly subscriptions: vscode.Disposable[] = [];
+export class ActivityWatcher implements Disposable {
+    private readonly subscriptions: Disposable[] = [];
     private _listener: ActivityWatcherListener | null = null;
     private _options: ActivityWatcherOptions;
 
@@ -87,7 +121,10 @@ export class ActivityWatcher implements vscode.Disposable {
     private _isStarted: boolean = false;
     private _modeOverride: ActivityMode | null = null;
     private _lastExternalSignalMs: number = 0;
-    private _fileCoordinator: vscode.Disposable | null = null;
+    private _fileCoordinator: Disposable | null = null;
+    private _currentAiCooldownSeconds: number = 0;
+    private _lastPulseMs: number = 0;
+    private _lastBatchFileCount: number = 0;
 
     constructor(
         options?: Partial<ActivityWatcherOptions>,
@@ -97,6 +134,7 @@ export class ActivityWatcher implements vscode.Disposable {
             ...DEFAULT_ACTIVITY_OPTIONS,
             ...(options ?? {}),
         };
+        this._currentAiCooldownSeconds = this._options.aiCooldownSeconds;
         if (listener) {
             this._listener = listener;
         }
@@ -168,6 +206,7 @@ export class ActivityWatcher implements vscode.Disposable {
         }
         log(LogLevel.Debug, MSG_EXTERNAL_AI_TRIGGERED);
         this.notifyActivity(WATCHER_MODE_AI, now);
+        this._listener?.onAgentBurst?.(now, 1);
     }
 
     public updateConfig(options: Partial<ActivityWatcherOptions>): void {
@@ -175,6 +214,9 @@ export class ActivityWatcher implements vscode.Disposable {
             ...this._options,
             ...options,
         };
+        if (options.aiCooldownSeconds !== undefined) {
+            this._currentAiCooldownSeconds = options.aiCooldownSeconds;
+        }
         log(LogLevel.Debug, `ActivityWatcher: config updated (idleTimeout=${this._options.idleTimeoutMinutes}m, aiEnabled=${this._options.aiDetectionEnabled}, cooldown=${this._options.aiCooldownSeconds}s)`);
     }
 
@@ -186,8 +228,8 @@ export class ActivityWatcher implements vscode.Disposable {
 
         this.initEditorListeners();
 
-        this._fileCoordinator = createFileWatcherCoordinator(uri => {
-            this.handleExternalSignal(uri);
+        this._fileCoordinator = createFileWatcherCoordinator(signal => {
+            this.handleExternalSignal(signal);
         });
         this.subscriptions.push(this._fileCoordinator);
 
@@ -200,53 +242,61 @@ export class ActivityWatcher implements vscode.Disposable {
 
     private initEditorListeners(): void {
         this.subscriptions.push(
-            vscode.workspace.onDidChangeTextDocument(e => this.handleDocumentChange(e)),
+            workspace.onDidChangeTextDocument(event => this.handleDocumentChange(event)),
         );
         this.subscriptions.push(
-            vscode.window.onDidChangeTextEditorSelection(() => this.handlePassiveInteraction()),
+            window.onDidChangeTextEditorSelection(() => this.handlePassiveInteraction()),
         );
         this.subscriptions.push(
-            vscode.window.onDidChangeTextEditorVisibleRanges(() => this.handlePassiveInteraction()),
+            window.onDidChangeTextEditorVisibleRanges(() => this.handlePassiveInteraction()),
         );
         this.subscriptions.push(
-            vscode.window.onDidChangeWindowState(e => {
-                if (e.focused) this.handlePassiveInteraction();
+            window.onDidChangeWindowState(windowState => {
+                if (windowState.focused) this.handlePassiveInteraction();
             }),
         );
     }
 
-    private handleDocumentChange(e: vscode.TextDocumentChangeEvent): void {
-        if (e.contentChanges.length === 0) return;
-        if (e.document.uri.scheme !== 'file' && e.document.uri.scheme !== 'untitled') return;
-        if (isPathIgnored(e.document.uri.fsPath)) return;
+    private handleDocumentChange(changeEvent: TextDocumentChangeEvent): void {
+        if (changeEvent.contentChanges.length === 0) return;
+        if (changeEvent.document.uri.scheme !== 'file' && changeEvent.document.uri.scheme !== 'untitled') return;
+        if (isPathIgnored(changeEvent.document.uri.fsPath)) return;
 
-        const activeDoc = vscode.window.activeTextEditor?.document;
-        const isForeground = activeDoc !== undefined && activeDoc.uri.toString() === e.document.uri.toString();
+        const activeDoc = window.activeTextEditor?.document;
+        const isForeground = activeDoc !== undefined && activeDoc.uri.toString() === changeEvent.document.uri.toString();
         const now = Date.now();
         const gapMs = now - this._lastExternalSignalMs;
 
         const classification = classifyTextDocumentChange(
             {
-                contentChanges: e.contentChanges,
-                isDocumentDirty: e.document.isDirty,
+                contentChanges: changeEvent.contentChanges,
+                isDocumentDirty: changeEvent.document.isDirty,
                 isForeground,
-                reason: e.reason,
+                reason: changeEvent.reason,
             },
             gapMs,
         );
 
         if (classification === CLASSIFY_AI_BURST) {
-            this.handleExternalSignal(e.document.uri);
+            this.handleExternalSignal({
+                uri: changeEvent.document.uri,
+                fileCount: 1,
+                isPulse: isAgentPulsePath(changeEvent.document.uri.fsPath),
+                isAgentSignature: isAgentSignaturePath(changeEvent.document.uri.fsPath),
+                isGitSuppressed: false,
+                isBurst: true,
+                timestampMs: now,
+            });
             return;
         }
         if (classification === CLASSIFY_UNDO_REDO || classification === CLASSIFY_EMPTY) {
             return;
         }
-        this.recordManualActivity();
+        this.recordManualActivity(now);
     }
 
-    private handlePassiveInteraction(): void {
-        const now = Date.now();
+    private handlePassiveInteraction(timestampMs: number = Date.now()): void {
+        const now = timestampMs;
         const cooldownMs = this._options.aiCooldownSeconds * MS_PER_SECOND;
 
         if (this._mode === WATCHER_MODE_AI && (now - this._lastAiActivityMs < cooldownMs)) {
@@ -257,16 +307,16 @@ export class ActivityWatcher implements vscode.Disposable {
             this._lastActivityMs = now;
             return;
         }
-        this.recordManualActivity();
+        this.recordManualActivity(now);
     }
 
-    private recordManualActivity(): void {
+    private recordManualActivity(timestampMs: number = Date.now()): void {
         if (this._modeOverride === WATCHER_MODE_AI) {
-            this._lastActivityMs = Date.now();
+            this._lastActivityMs = timestampMs;
             return;
         }
 
-        const now = Date.now();
+        const now = timestampMs;
         this._lastManualActivityMs = now;
         this._lastActivityMs = now;
 
@@ -290,11 +340,34 @@ export class ActivityWatcher implements vscode.Disposable {
         }, MS_PER_SECOND);
     }
 
-    private handleExternalSignal(_uri?: vscode.Uri): void {
-        const now = Date.now();
+    public handleExternalSignal(signal?: Uri | ExternalSignalPayload): void {
+        const payload = normalizeSignalPayload(signal);
+        if (payload.isGitSuppressed) {
+            log(LogLevel.Debug, `ActivityWatcher: bulk write suppressed by active Git transaction (${payload.fileCount} files)`);
+            return;
+        }
+
+        const now = payload.timestampMs || Date.now();
         if (!this.activateAiState(now)) {
             return;
         }
+
+        this._lastBatchFileCount = payload.fileCount;
+        if (payload.isPulse) {
+            this._lastPulseMs = now;
+        }
+        if (payload.fileCount > 1) {
+            this.applyAdaptiveCooldown(payload.fileCount);
+        }
+
+        if (isAgentBurstPayload(payload)) {
+            this._listener?.onAgentBurst?.(now, payload.fileCount);
+        }
+
+        this.scheduleAiHeartbeat(now);
+    }
+
+    private scheduleAiHeartbeat(now: number): void {
         if (this._aiDebounceTimer !== null) {
             return;
         }
@@ -310,6 +383,35 @@ export class ActivityWatcher implements vscode.Disposable {
             this._lastAiHeartbeatMs = flushNow;
             this.notifyActivity(WATCHER_MODE_AI, flushNow);
         }, MS_PER_SECOND);
+    }
+
+    /**
+     * 自适应动态冷却时间计算：
+     * 基础冷却窗口 (默认 120s) 叠加规模对数加权，最大钳制到 300s (5 分钟)。
+     */
+    public applyAdaptiveCooldown(fileCount: number): number {
+        const baseSeconds = this._options.aiCooldownSeconds;
+        const scaleStep = Math.min(MAX_ADAPTIVE_SCALE_STEP, Math.floor(Math.log2(Math.max(1, fileCount))));
+        const bonusSeconds = scaleStep * ADAPTIVE_COOLDOWN_STEP_SECONDS;
+        const totalSeconds = Math.min(
+            MAX_ADAPTIVE_AI_COOLDOWN_SECONDS,
+            Math.max(baseSeconds, baseSeconds + bonusSeconds),
+        );
+        this._currentAiCooldownSeconds = totalSeconds;
+        log(LogLevel.Debug, `ActivityWatcher: adaptive cooldown applied (${fileCount} files -> ${totalSeconds}s)`);
+        return totalSeconds;
+    }
+
+    public getCurrentAiCooldownSeconds(): number {
+        return this._currentAiCooldownSeconds || this._options.aiCooldownSeconds;
+    }
+
+    public getLastPulseMs(): number {
+        return this._lastPulseMs;
+    }
+
+    public getLastBatchFileCount(): number {
+        return this._lastBatchFileCount;
     }
 
     private tick(): void {
@@ -338,12 +440,16 @@ export class ActivityWatcher implements vscode.Disposable {
     }
 
     private checkAiCooldown(now: number): void {
-        const cooldownMs = this._options.aiCooldownSeconds * MS_PER_SECOND;
-        if (now - this._lastAiActivityMs < cooldownMs) {
+        const cooldownSeconds = this._currentAiCooldownSeconds || this._options.aiCooldownSeconds;
+        const cooldownMs = cooldownSeconds * MS_PER_SECOND;
+        const isPulseActive = (now - this._lastPulseMs) < MS_PER_MINUTE;
+
+        if ((now - this._lastAiActivityMs < cooldownMs) || isPulseActive) {
             this._lastActivityMs = now;
             this.notifyActivity(WATCHER_MODE_AI, now);
         } else {
             const idleStartMs = this._lastActivityMs;
+            this._currentAiCooldownSeconds = this._options.aiCooldownSeconds;
             this.setMode(WATCHER_MODE_IDLE, now);
             this._listener?.onIdle(idleStartMs);
         }
@@ -374,8 +480,8 @@ export class ActivityWatcher implements vscode.Disposable {
             clearInterval(this._tickInterval);
             this._tickInterval = null;
         }
-        for (const d of this.subscriptions) {
-            d.dispose();
+        for (const subscription of this.subscriptions) {
+            subscription.dispose();
         }
         this.subscriptions.length = 0;
         this._listener = null;

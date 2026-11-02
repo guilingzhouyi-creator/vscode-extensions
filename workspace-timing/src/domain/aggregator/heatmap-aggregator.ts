@@ -7,10 +7,10 @@
  * Exit Semantics & Design Rationale: 网格向左自然周对齐（周一开始）；未来日期与无记录格子标记清晰；纯计算无副作用。
  */
 
-import { DailyTotalsMap, MS_PER_DAY, MS_PER_HOUR, TimeSession } from '../models';
-import { HeatmapDay } from '../dashboard-types';
+import { type DailyTotalsMap, MS_PER_DAY, MS_PER_HOUR, type TimeSession } from '../models';
+import type { HeatmapDay } from '../dashboard-types';
 import { DAYS_PER_WEEK, DAYS_TO_SUNDAY, DEFAULT_HEATMAP_WEEKS } from '../constants-chart';
-import { eachDaySegment, localDateStr } from './date-utils';
+import { eachDaySegment, formatTzDateStr } from './date-utils';
 
 const MAX_HEATMAP_LEVEL = 4;
 const HIGH_ACTIVITY_HOURS = 4;
@@ -21,8 +21,7 @@ export function heatmapLevel(ms: number): 0 | 1 | 2 | 3 | 4 {
     if (ms <= 0) return 0;
     if (ms < MS_PER_HOUR) return 1; // < 1h
     if (ms < MID_ACTIVITY_HOURS * MS_PER_HOUR) return 2; // 1h ~ 2h
-    if (ms < HIGH_ACTIVITY_HOURS * MS_PER_HOUR) return 3; // 2h ~ 4h
-    return MAX_HEATMAP_LEVEL; // ≥ 4h
+    return ms < HIGH_ACTIVITY_HOURS * MS_PER_HOUR ? 3 : MAX_HEATMAP_LEVEL;
 }
 
 interface HeatmapWindow {
@@ -32,18 +31,22 @@ interface HeatmapWindow {
     windowEndMs: number;
 }
 
-/** 构建热力图窗口格子序列 */
-function buildHeatmapWindow(weeks: number): HeatmapWindow {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayStart = today.getTime();
-    const todayDow = (now.getDay() + DAYS_TO_SUNDAY) % DAYS_PER_WEEK;
-    const lastColMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - todayDow);
-    const firstMonday = new Date(
-        lastColMonday.getFullYear(),
-        lastColMonday.getMonth(),
-        lastColMonday.getDate() - (weeks - 1) * DAYS_PER_WEEK,
+/** 构建热力图窗口格子序列（支持指定时区偏移） */
+function buildHeatmapWindow(weeks: number, offsetMinutes?: number): HeatmapWindow {
+    const nowMs = Date.now();
+    const effOffset = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes)
+        ? offsetMinutes
+        : -new Date(nowMs).getTimezoneOffset();
+    const shiftedNow = new Date(nowMs + effOffset * 60_000);
+    const todayStartShifted = Date.UTC(
+        shiftedNow.getUTCFullYear(),
+        shiftedNow.getUTCMonth(),
+        shiftedNow.getUTCDate(),
     );
+    const todayStart = todayStartShifted - effOffset * 60_000;
+    const todayDow = (shiftedNow.getUTCDay() + DAYS_TO_SUNDAY) % DAYS_PER_WEEK;
+    const lastColMondayShifted = todayStartShifted - todayDow * MS_PER_DAY;
+    const firstMondayShifted = lastColMondayShifted - (weeks - 1) * DAYS_PER_WEEK * MS_PER_DAY;
     const total = weeks * DAYS_PER_WEEK;
 
     const windowDates = new Set<string>();
@@ -52,13 +55,15 @@ function buildHeatmapWindow(weeks: number): HeatmapWindow {
     let windowEndMs = 0;
 
     for (let i = 0; i < total; i++) {
-        const d = new Date(firstMonday.getFullYear(), firstMonday.getMonth(), firstMonday.getDate() + i);
-        const dateStr = localDateStr(d.getTime());
-        const ms = d.getTime();
-        if (i === 0) windowStartMs = ms;
-        windowEndMs = ms;
+        const cellShifted = firstMondayShifted + i * MS_PER_DAY;
+        const cellPhysicalMs = cellShifted - effOffset * 60_000;
+        const dateStr = formatTzDateStr(cellPhysicalMs, offsetMinutes);
+        if (i === 0) windowStartMs = cellPhysicalMs;
+        windowEndMs = cellPhysicalMs;
         windowDates.add(dateStr);
-        cells.push({ dateStr, weekday: (d.getDay() + DAYS_TO_SUNDAY) % DAYS_PER_WEEK, future: ms > todayStart });
+        const cellShiftedDt = new Date(cellShifted);
+        const weekday = (cellShiftedDt.getUTCDay() + DAYS_TO_SUNDAY) % DAYS_PER_WEEK;
+        cells.push({ dateStr, weekday, future: cellPhysicalMs > todayStart });
     }
     windowEndMs += MS_PER_DAY;
 
@@ -88,6 +93,7 @@ function accumulateRawSessions(
     window: HeatmapWindow,
     sessions: readonly TimeSession[],
     byDate: Map<string, number>,
+    offsetMinutes?: number,
 ): void {
     const rawByDate = new Map<string, number>();
     for (const s of sessions) {
@@ -98,7 +104,7 @@ function accumulateRawSessions(
             if (window.windowDates.has(date)) {
                 rawByDate.set(date, (rawByDate.get(date) ?? 0) + (segEnd - segStart));
             }
-        });
+        }, offsetMinutes);
     }
     for (const [date, ms] of rawByDate) {
         byDate.set(date, ms);
@@ -110,6 +116,7 @@ function accumulateCurrentSession(
     windowDates: ReadonlySet<string>,
     currentSessionStartMs: number,
     byDate: Map<string, number>,
+    offsetMinutes?: number,
 ): void {
     if (currentSessionStartMs <= 0) {
         return;
@@ -118,33 +125,63 @@ function accumulateCurrentSession(
         if (windowDates.has(date)) {
             byDate.set(date, (byDate.get(date) ?? 0) + (segEnd - segStart));
         }
-    });
+    }, offsetMinutes);
+}
+
+interface AggregateWindowOptions {
+    window: HeatmapWindow;
+    sessions: readonly TimeSession[];
+    currentSessionStartMs: number;
+    dailyTotals?: DailyTotalsMap;
+    offsetMinutes?: number;
 }
 
 /** 聚合折叠桶与原始会话时长到日期字典 */
-function aggregateWindowSessions(
-    window: HeatmapWindow,
-    sessions: readonly TimeSession[],
-    currentSessionStartMs: number,
-    dailyTotals?: DailyTotalsMap,
-): Map<string, number> {
+function aggregateWindowSessions(opts: AggregateWindowOptions): Map<string, number> {
+    const { window, sessions, currentSessionStartMs, dailyTotals, offsetMinutes } = opts;
     const byDate = seedFromDailyTotals(window.windowDates, dailyTotals);
-    accumulateRawSessions(window, sessions, byDate);
-    accumulateCurrentSession(window.windowDates, currentSessionStartMs, byDate);
+    accumulateRawSessions(window, sessions, byDate, offsetMinutes);
+    accumulateCurrentSession(window.windowDates, currentSessionStartMs, byDate, offsetMinutes);
     return byDate;
 }
 
+export interface HeatmapDaysOptions {
+    currentSessionStartMs?: number;
+    dailyTotals?: DailyTotalsMap;
+    weeks?: number;
+    offsetMinutes?: number;
+}
+
 /**
- * 活动时间线热力图：返回以「今日所在周」结尾的 weeks 个完整自然周（含本周）的按日格子。
+ * 活动时间线热力图：返回以「今日所在周」结尾的 weeks 个完整自然周（含本周）的按日格子（支持指定时区偏移）。
  */
 export function heatmapDays(
     sessions: readonly TimeSession[],
-    currentSessionStartMs = 0,
-    dailyTotals?: DailyTotalsMap,
-    weeks = DEFAULT_HEATMAP_WEEKS,
+    optsOrStartMs?: HeatmapDaysOptions | number,
+    ...rest: (DailyTotalsMap | number | undefined)[]
 ): HeatmapDay[] {
-    const window = buildHeatmapWindow(weeks);
-    const byDate = aggregateWindowSessions(window, sessions, currentSessionStartMs, dailyTotals);
+    const isOpts = typeof optsOrStartMs === 'object' && optsOrStartMs !== null;
+    const currentSessionStartMs = isOpts
+        ? (optsOrStartMs.currentSessionStartMs ?? 0)
+        : ((optsOrStartMs as number) ?? 0);
+    const dailyTotals = isOpts
+        ? optsOrStartMs.dailyTotals
+        : (rest[0] as DailyTotalsMap | undefined);
+    const weeks = isOpts
+        ? (optsOrStartMs.weeks ?? DEFAULT_HEATMAP_WEEKS)
+        : ((rest[1] as number) ?? DEFAULT_HEATMAP_WEEKS);
+    const offsetMinutes = isOpts
+        ? optsOrStartMs.offsetMinutes
+        : (rest[2] as number | undefined);
+
+    const window = buildHeatmapWindow(weeks, offsetMinutes);
+    const byDate = aggregateWindowSessions({
+        window,
+        sessions,
+        currentSessionStartMs,
+        dailyTotals,
+        offsetMinutes,
+    });
 
     return window.cells.map((c) => {
         const totalMs = c.future ? 0 : (byDate.get(c.dateStr) ?? 0);

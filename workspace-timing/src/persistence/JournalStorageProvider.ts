@@ -7,11 +7,11 @@
  * Exit Semantics & Design Rationale: 采用 Node 原生 fs.promises 避免 VS Code 文件系统句柄死锁；逐行校验过滤损坏记录，单行崩溃不影响整体解析。
  */
 
-import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { TimeSlice } from '../domain/models';
-import { IJournalStore } from '../cache/IJournalStore';
+import type { Uri } from 'vscode';
+import type { TimeSlice } from '../domain/models';
+import type { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/logger';
 
 const LOG_APPEND_BATCH_FAILED = 'JournalStorageProvider: appendBatch failed';
@@ -25,7 +25,7 @@ export class JournalStorageProvider implements IJournalStore {
 
     private readonly filePath: string;
 
-    constructor(workspaceRoot: vscode.Uri) {
+    constructor(workspaceRoot: Uri) {
         const dotVscodePath = path.join(workspaceRoot.fsPath, '.vscode');
         this.filePath = path.join(dotVscodePath, JOURNAL_FILE);
     }

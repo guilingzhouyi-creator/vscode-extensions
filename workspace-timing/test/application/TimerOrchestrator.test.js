@@ -67,6 +67,15 @@ describe('TimerOrchestrator（周工作上限模块）', () => {
         );
     });
 
+    afterEach(async () => {
+        if (orchestrator && orchestrator.state !== 'stopped' && orchestrator.state !== 'idle') {
+            await orchestrator.stop();
+        }
+        if (scheduler) {
+            scheduler.stop();
+        }
+    });
+
     it('默认配置：周上限默认不开启（weeklyLimitEnabled = false）', async () => {
         const data = await orchestrator.getDashboardData();
         assert.strictEqual(data.weeklyLimitEnabled, false);
@@ -237,5 +246,22 @@ describe('TimerOrchestrator（周工作上限模块）', () => {
         const data = await orchestrator.getDashboardData();
         // 2 (当期保留有效) + 1 (进行中) = 3
         assert.strictEqual(data.sessionsCount, 3, '会话数应为当期保留的有效会话数与进行中会话之和');
+    });
+
+    it('handleAgentBurst：PAUSED_IDLE 状态下接收到 Agent 突发时无缝复活并切换回 RUNNING 态', async () => {
+        await orchestrator.start();
+        const start = Date.now();
+        await orchestrator.handleIdleTimeout(start);
+        assert.strictEqual(orchestrator.state, 'paused_idle');
+
+        let stateEmitted = null;
+        orchestrator.onStateChange((s) => { stateEmitted = s; });
+
+        await orchestrator.handleAgentBurst(start + 180000, 5);
+        assert.strictEqual(orchestrator.state, 'running', 'Agent 突发导致从空闲暂停态复活为 running 态');
+        assert.strictEqual(stateEmitted, 'running');
+        assert.strictEqual(timer.isRunning, true);
+
+        await orchestrator.stop();
     });
 });

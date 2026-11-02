@@ -7,7 +7,7 @@
  * Exit Semantics & Design Rationale: Deterministic priority rule (globalDisabled strictly overrides workspace enabled); provides atomic state snapshots with zero I/O side effects
  */
 
-import { TimingConfig, DEFAULT_CONFIG } from '../domain/models';
+import { type TimingConfig, DEFAULT_CONFIG } from '../domain/models';
 
 export type DisableState = 'enabled' | 'workspace-disabled' | 'globally-disabled';
 
@@ -40,15 +40,14 @@ export class DisableManager {
 
     /** 综合判定：是否应该计时 */
     shouldCount(): boolean {
-        if (this._config.globalDisabled) return false;
-        return this._config.enabled;
+        return this._config.globalDisabled ? false : this._config.enabled;
     }
 
-    /** 解析当前禁用状态 */
-    resolveState(): DisableState {
-        if (this._config.globalDisabled) return 'globally-disabled';
-        if (!this._config.enabled) return 'workspace-disabled';
-        return 'enabled';
+    /** 解析当前禁用状态（支持传入临时覆盖配置） */
+    resolveState(overrideConfig?: Partial<TimingConfig>): DisableState {
+        const config = overrideConfig ? { ...this._config, ...overrideConfig } : this._config;
+        if (config.globalDisabled) return 'globally-disabled';
+        return !config.enabled ? 'workspace-disabled' : 'enabled';
     }
 
     /** 重置为默认配置 */

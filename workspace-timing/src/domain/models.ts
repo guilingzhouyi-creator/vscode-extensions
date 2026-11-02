@@ -15,14 +15,16 @@ import {
     STATUS_BAR_MODE_TODAY_TOTAL,
     STATUS_BAR_MODE_TOTAL_TODAY,
     STATUS_BAR_MODE_COMPACT,
+    TIME_DISPLAY_MODE_LOCAL,
+    TIME_DISPLAY_MODE_UTC,
     TYPEOF_BOOLEAN,
     TYPEOF_STRING,
     TYPEOF_NUMBER,
     STRING_LITERAL_TRUE,
 } from './constants';
 
-/** 契约版本：数据存储格式版本 3（双轨模式 manual/ai、idleSessions 与沉淀层，满足向前兼容） */
-export const LATEST_VERSION = 3;
+/** 契约版本：数据存储格式版本 4（支持时区元数据、UTC(Z) 规范化日桶与跨时区自愈） */
+export const LATEST_VERSION = 4;
 
 /** 计时活动模式枚举：手动编码 vs AI 辅助协作 */
 export type ActivityMode = 'manual' | 'ai';
@@ -117,6 +119,15 @@ export const SHORT_MULTILINE_CHAR_THRESHOLD = 10;
 export const DEFAULT_PIN_TOLERANCE_PX = 40;
 export const DEFAULT_CAPSULE_THRESHOLD_PX = 120;
 export const DEFAULT_VIEWPORT_COOLDOWN_MS = 150;
+
+/** 大规模写入微批聚合滑动窗口时间 (500ms) */
+export const DEFAULT_BATCH_HARVEST_WINDOW_MS = 500;
+/** Git 版本控制事务屏蔽窗口 (2000ms) */
+export const DEFAULT_GIT_SUPPRESSION_WINDOW_MS = 2000;
+/** 自适应动态冷却扩展上限 (300s = 5分钟) */
+export const MAX_ADAPTIVE_AI_COOLDOWN_SECONDS = 300;
+/** 自适应动态冷却单步加权秒数 (30s) */
+export const ADAPTIVE_COOLDOWN_STEP_SECONDS = 30;
 
 // ─── 配置边界单一真源 ────────────────────────────────
 // 以下上下界是配置合法域的【唯一权威】，与 package.json contributes 的
@@ -230,6 +241,17 @@ export function sanitizeLocale(val: unknown): Locale {
     return DEFAULT_CONFIG.locale;
 }
 
+const TIME_DISPLAY_MODES: ReadonlySet<string> = new Set([
+    TIME_DISPLAY_MODE_LOCAL,
+    TIME_DISPLAY_MODE_UTC,
+]);
+
+/** 时间显示模式净化：非枚举值（手写配置漂移）回退 local */
+export function sanitizeTimeDisplayMode(val: unknown): TimeDisplayMode {
+    if (isString(val) && TIME_DISPLAY_MODES.has(val)) return val as TimeDisplayMode;
+    return DEFAULT_CONFIG.timeDisplayMode;
+}
+
 /** 字符串类型守卫（复用避免字面量 'string' 散布） */
 function isString(val: unknown): val is string {
     return typeof val === TYPEOF_STRING;
@@ -274,6 +296,8 @@ export interface DailyTotal {
     idleTotalMs?: number;
     /** 契约计数：该日空闲段总次数 */
     idleSessionCount?: number;
+    /** 契约时区：折叠发生时的本地时区偏移量 (分钟，例如 UTC+8 为 480，UTC-5 为 -300) */
+    recordedOffsetMinutes?: number;
 }
 
 /** 架构契约：日桶表映射，key 必须为规范的本地日期格式 "YYYY-MM-DD" */
@@ -369,6 +393,12 @@ export interface WorkspaceTimingData {
 
     /** 扩展元数据容器 — 供插件/第三方使用 */
     metadata?: TimingMetadata;
+
+    /** 工作区工时记录的主时区 IANA 标识（如 "Asia/Shanghai" 或 "UTC"） */
+    timezone?: string;
+
+    /** 工作区基准 UTC 偏移分钟数（例如 UTC+8 为 480，UTC-5 为 -300） */
+    utcOffsetMinutes?: number;
 }
 
 /** 扩展元数据结构 */
@@ -379,8 +409,20 @@ export interface TimingMetadata {
     [key: string]: unknown;
 }
 
+/** 安全解析系统默认时区及 UTC 分钟偏移（异常时确定性回退至 UTC 0 偏移） */
+export function resolveDefaultTimezone(fallbackTimezone: string = 'UTC'): { timezone: string; utcOffsetMinutes: number } {
+    try {
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || fallbackTimezone;
+        const utcOffsetMinutes = -new Date().getTimezoneOffset();
+        return { timezone, utcOffsetMinutes };
+    } catch (_err) {
+        return { timezone: fallbackTimezone, utcOffsetMinutes: 0 };
+    }
+}
+
 /** 创建一个空的 WorkspaceTimingData */
 export function createEmptyTimingData(): WorkspaceTimingData {
+    const { timezone, utcOffsetMinutes } = resolveDefaultTimezone();
     return {
         version: LATEST_VERSION,
         totalMs: 0,
@@ -392,6 +434,8 @@ export function createEmptyTimingData(): WorkspaceTimingData {
         sessions: [],
         idleSessions: [],
         dailyTotals: {},
+        timezone,
+        utcOffsetMinutes,
     };
 }
 
@@ -406,6 +450,9 @@ export type ReadonlyTimingData = Readonly<Omit<WorkspaceTimingData, 'sessions' |
 };
 
 export type Locale = 'auto' | 'zh-CN' | 'en';
+
+/** 时间显示模式（local 本地时区优先 / utc 统一协调世界时优先） */
+export type TimeDisplayMode = 'local' | 'utc';
 
 /** 状态栏显示模式（今日优先 / 累计优先 / 紧凑；点击状态栏循环切换） */
 export type StatusBarMode = 'today-total' | 'total-today' | 'compact';
@@ -450,6 +497,8 @@ export interface TimingConfig {
     aiCooldownSeconds: number;
     /** 是否在图表中启用双轨（人工与 AI）堆叠与曲线对比展示 */
     chartDualTrackDisplay: boolean;
+    /** 时间显示基准：跟随本地时区 (local) 还是统一世界协调时 (utc) */
+    timeDisplayMode: TimeDisplayMode;
 }
 
 /** 默认配置 */
@@ -473,6 +522,7 @@ export const DEFAULT_CONFIG: TimingConfig = {
     aiDetectionEnabled: DEFAULT_AI_DETECTION_ENABLED,
     aiCooldownSeconds: DEFAULT_AI_COOLDOWN_SECONDS,
     chartDualTrackDisplay: DEFAULT_CHART_DUAL_TRACK_DISPLAY,
+    timeDisplayMode: TIME_DISPLAY_MODE_LOCAL,
 };
 
 export * from './constants';

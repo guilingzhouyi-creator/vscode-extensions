@@ -7,7 +7,7 @@
  * Exit Semantics & Design Rationale: 异步 Promise 契约保证非阻塞 I/O；消除缓存层对持久层具体实现的依赖，提升单测可测试性。
  */
 
-import { TimeSlice } from '../domain/models';
+import type { TimeSlice } from '../domain/models';
 
 export interface IJournalStore {
     /** 批量追加时间片 */

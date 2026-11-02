@@ -8,10 +8,10 @@
  * Contract Invariant & Boundary: Lifecycle guarantee: endSession enforces two-phase commit — in-memory buffer commit followed by storage sync before journal truncation; crash invariant: journal replay recovers uncheckpointed deltas on restart without double counting.
  */
 
-import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
+import type { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
 import {
-    WorkspaceTimingData,
-    ActivityMode,
+    type WorkspaceTimingData,
+    type ActivityMode,
     DEFAULT_RAW_RETENTION_DAYS,
     DEFAULT_SESSION_CAP,
     MAX_SESSIONS_PER_DAY,
@@ -19,9 +19,9 @@ import {
 } from '../domain/models';
 import { TimeAggregator, parseLocalDate } from '../domain/TimeAggregator';
 import { migrateToFolded } from '../domain/history-folder';
-import { StorageCoordinator } from '../persistence/StorageCoordinator';
-import { JournalWriter } from '../cache/JournalWriter';
-import { RecoveryService } from './RecoveryService';
+import type { StorageCoordinator } from '../persistence/StorageCoordinator';
+import type { JournalWriter } from '../cache/JournalWriter';
+import type { RecoveryService } from './RecoveryService';
 import { LogLevel, log } from '../integration/logger';
 
 const LOG_STARTING_SESSION = 'SessionManager: starting session';
@@ -232,12 +232,36 @@ export class SessionManager {
     }
 
     /**
+     * 获取今日全量工时指标快照（单次由 TimerEngine 统一计算，避免心跳重复开销）
+     */
+    getTodayMetrics(now: number = Date.now()): {
+        todayMs: number;
+        todayManualMs: number;
+        todayAiMs: number;
+        todayIdleMs: number;
+    } {
+        return this.timer.getTodayMetrics(now);
+    }
+
+    /**
+     * 持久化当前状态快照至三级存储协调器
+     */
+    private async persistSnapshot(lastSavedAtMs: number = Date.now()): Promise<void> {
+        const snap = this.timer.snapshot();
+        const data: WorkspaceTimingData = {
+            ...this.timer.data,
+            totalMs: snap.totalMs,
+            lastSavedAtMs,
+            sessions: [...this.timer.data.sessions],
+        };
+        await this.storage.save(data);
+    }
+
+    /**
      * 仅保存当前状态（不结束会话）
      * 由 Scheduler 周期性调用。
      */
     async saveCheckpoint(): Promise<void> {
-        const snap = this.timer.snapshot();
-
         if (
             (this.maxSessions > 0 && this.timer.data.sessions.length > this.maxSessions) ||
             ++this._checkpointCount % FOLD_CHECKPOINT_MOD === 0
@@ -245,15 +269,8 @@ export class SessionManager {
             this.foldIfNeeded();
         }
 
-        const data: WorkspaceTimingData = {
-            ...this.timer.data,
-            totalMs: snap.totalMs,
-            lastSavedAtMs: Date.now(),
-            sessions: [...this.timer.data.sessions],
-        };
-
-        await this.storage.save(data);
-        log(LogLevel.Debug, `SessionManager: checkpoint saved, totalMs=${snap.totalMs}`);
+        await this.persistSnapshot();
+        log(LogLevel.Debug, `SessionManager: checkpoint saved, totalMs=${this.timer.data.totalMs}`);
     }
 
     /**
@@ -270,15 +287,7 @@ export class SessionManager {
         this.foldIfNeeded();
 
         this.advanceJournalWatermark(todayZeroMs);
-
-        const snap = this.timer.snapshot();
-        const data: WorkspaceTimingData = {
-            ...this.timer.data,
-            totalMs: snap.totalMs,
-            lastSavedAtMs: Date.now(),
-            sessions: [...this.timer.data.sessions],
-        };
-        await this.storage.save(data);
+        await this.persistSnapshot();
     }
 
     /**
@@ -292,15 +301,7 @@ export class SessionManager {
         this.foldIfNeeded();
 
         this.advanceJournalWatermark(resumeMs);
-
-        const snap = this.timer.snapshot();
-        const data: WorkspaceTimingData = {
-            ...this.timer.data,
-            totalMs: snap.totalMs,
-            lastSavedAtMs: resumeMs,
-            sessions: [...this.timer.data.sessions],
-        };
-        await this.storage.save(data);
+        await this.persistSnapshot(resumeMs);
     }
 
     /**
@@ -326,7 +327,9 @@ export class SessionManager {
 
     /** 切换活动模式 */
     switchMode(mode: ActivityMode): void {
+        if (this.timer.currentMode === mode) return;
         this.timer.switchMode(mode);
+        log(LogLevel.Debug, `SessionManager: activity mode switched to ${mode}`);
     }
 
     /**
@@ -354,6 +357,30 @@ export class SessionManager {
         this.timer.resumeFromIdle(resumeMs, idleStartMs);
         this.advanceJournalWatermark(resumeMs);
         await this.saveCheckpoint();
+    }
+
+    /**
+     * 处理 Agent 突发大规模操作：对进行中会话或空闲超时进行有界追溯纠偏与空闲复活
+     */
+    async handleAgentBurst(
+        burstTimeMs?: number,
+        maxLookbackMs?: number,
+    ): Promise<{ reclassifiedMs: number; revivedIdleMs: number }> {
+        if (!this._sessionActive) {
+            return { reclassifiedMs: 0, revivedIdleMs: 0 };
+        }
+        const result = this.timer.reclassifyOrReviveToAi(burstTimeMs, maxLookbackMs);
+        if (result.reclassifiedMs > 0 || result.revivedIdleMs > 0) {
+            log(
+                LogLevel.Info,
+                `SessionManager: Agent burst applied (reclassified=${result.reclassifiedMs}ms, revivedIdle=${result.revivedIdleMs}ms)`,
+            );
+            this.foldIfNeeded();
+            const now = burstTimeMs ?? Date.now();
+            this.advanceJournalWatermark(now);
+            await this.saveCheckpoint();
+        }
+        return result;
     }
 
     /** 获取今日手动工时 */

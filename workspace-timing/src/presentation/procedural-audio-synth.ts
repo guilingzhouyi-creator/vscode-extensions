@@ -31,6 +31,40 @@ const EXPONENTIAL_MIN_GAIN = 0.0001;
 const HARMONIC_GAIN_SCALE = 0.35;
 const OVERTONE_GAIN_SCALE = 0.4;
 
+interface SoundHarmonicConfig {
+    readonly totalDuration: number;
+    readonly attackDuration: number;
+    readonly primaryType: OscillatorType;
+    readonly primaryStartFreq: number;
+    readonly primaryEndFreq?: number;
+    readonly primaryRampRatio?: number;
+    readonly secondaryType: OscillatorType;
+    readonly secondaryFreq: number;
+    readonly secondaryGainScale: number;
+}
+
+const TIMER_COMPLETED_CONFIG: SoundHarmonicConfig = {
+    totalDuration: 0.65,
+    attackDuration: 0.02,
+    primaryType: 'sine',
+    primaryStartFreq: FREQ_A4_HZ,
+    primaryEndFreq: FREQ_A5_HZ,
+    primaryRampRatio: 0.7,
+    secondaryType: 'triangle',
+    secondaryFreq: FREQ_A5_HZ,
+    secondaryGainScale: HARMONIC_GAIN_SCALE,
+};
+
+const BREAK_ENDED_CONFIG: SoundHarmonicConfig = {
+    totalDuration: 0.5,
+    attackDuration: 0.012,
+    primaryType: 'triangle',
+    primaryStartFreq: FREQ_E4_HZ,
+    secondaryType: 'sine',
+    secondaryFreq: FREQ_E5_HZ,
+    secondaryGainScale: OVERTONE_GAIN_SCALE,
+};
+
 export class ProceduralAudioSynth {
     private context: AudioContext | null = null;
     private readonly contextFactory?: () => AudioContext;
@@ -59,7 +93,7 @@ export class ProceduralAudioSynth {
         if (this.isDisposed) {
             return false;
         }
-        const ctx = await this.resolveAudioContext();
+        const ctx = await this.getOrCreateAudioContext();
         if (!ctx) {
             return false;
         }
@@ -74,92 +108,56 @@ export class ProceduralAudioSynth {
         return ctx.state === 'running';
     }
 
-    /** 播放计时器完成提示音（双音阶柔和上扬泛音 440Hz -> 880Hz） */
-    public async playTimerCompleted(): Promise<boolean> {
+    private async renderHarmonicSound(cfg: SoundHarmonicConfig): Promise<boolean> {
         if (this.isDisposed) return false;
-        const ctx = await this.resolveAudioContext();
+        const ctx = await this.getOrCreateAudioContext();
         if (!ctx) return false;
 
         await this.ensureContextRunning();
         const now = ctx.currentTime;
-        const totalDuration = 0.65;
-        const attackDuration = 0.02;
-        const stopTime = now + totalDuration;
+        const stopTime = now + cfg.totalDuration;
 
         const masterGain = ctx.createGain();
         masterGain.gain.setValueAtTime(EXPONENTIAL_MIN_GAIN, now);
-        masterGain.gain.exponentialRampToValueAtTime(this.lockedVolume, now + attackDuration);
+        masterGain.gain.exponentialRampToValueAtTime(this.lockedVolume, now + cfg.attackDuration);
         masterGain.gain.exponentialRampToValueAtTime(EXPONENTIAL_MIN_GAIN, stopTime);
         masterGain.connect(ctx.destination);
 
-        // 主振荡器：基频 440Hz 柔和上扬过渡至 880Hz
-        const carrierOsc = ctx.createOscillator();
-        carrierOsc.type = 'sine';
-        carrierOsc.frequency.setValueAtTime(FREQ_A4_HZ, now);
-        carrierOsc.frequency.exponentialRampToValueAtTime(FREQ_A5_HZ, now + totalDuration * 0.7);
+        const primaryOsc = ctx.createOscillator();
+        primaryOsc.type = cfg.primaryType;
+        primaryOsc.frequency.setValueAtTime(cfg.primaryStartFreq, now);
+        if (cfg.primaryEndFreq !== undefined && cfg.primaryRampRatio !== undefined) {
+            primaryOsc.frequency.exponentialRampToValueAtTime(cfg.primaryEndFreq, now + cfg.totalDuration * cfg.primaryRampRatio);
+        }
 
-        // 谐波振荡器：880Hz 闪耀泛音
-        const harmonicOsc = ctx.createOscillator();
-        harmonicOsc.type = 'triangle';
-        harmonicOsc.frequency.setValueAtTime(FREQ_A5_HZ, now);
+        const secondaryOsc = ctx.createOscillator();
+        secondaryOsc.type = cfg.secondaryType;
+        secondaryOsc.frequency.setValueAtTime(cfg.secondaryFreq, now);
 
-        const harmonicGain = ctx.createGain();
-        harmonicGain.gain.setValueAtTime(HARMONIC_GAIN_SCALE, now);
+        const secondaryGain = ctx.createGain();
+        secondaryGain.gain.setValueAtTime(cfg.secondaryGainScale, now);
 
-        carrierOsc.connect(masterGain);
-        harmonicOsc.connect(harmonicGain);
-        harmonicGain.connect(masterGain);
+        primaryOsc.connect(masterGain);
+        secondaryOsc.connect(secondaryGain);
+        secondaryGain.connect(masterGain);
 
-        carrierOsc.start(now);
-        harmonicOsc.start(now);
-        carrierOsc.stop(stopTime);
-        harmonicOsc.stop(stopTime);
+        primaryOsc.start(now);
+        secondaryOsc.start(now);
+        primaryOsc.stop(stopTime);
+        secondaryOsc.stop(stopTime);
 
-        this.scheduleCleanup([carrierOsc, harmonicOsc, harmonicGain, masterGain], totalDuration);
+        this.scheduleCleanup([primaryOsc, secondaryOsc, secondaryGain, masterGain], cfg.totalDuration);
         return true;
+    }
+
+    /** 播放计时器完成提示音（双音阶柔和上扬泛音 440Hz -> 880Hz） */
+    public async playTimerCompleted(): Promise<boolean> {
+        return this.renderHarmonicSound(TIMER_COMPLETED_CONFIG);
     }
 
     /** 播放休息结束提示音（温暖木质双谐振 330Hz / 660Hz） */
     public async playBreakEnded(): Promise<boolean> {
-        if (this.isDisposed) return false;
-        const ctx = await this.resolveAudioContext();
-        if (!ctx) return false;
-
-        await this.ensureContextRunning();
-        const now = ctx.currentTime;
-        const totalDuration = 0.5;
-        const attackDuration = 0.012;
-        const stopTime = now + totalDuration;
-
-        const masterGain = ctx.createGain();
-        masterGain.gain.setValueAtTime(EXPONENTIAL_MIN_GAIN, now);
-        masterGain.gain.exponentialRampToValueAtTime(this.lockedVolume, now + attackDuration);
-        masterGain.gain.exponentialRampToValueAtTime(EXPONENTIAL_MIN_GAIN, stopTime);
-        masterGain.connect(ctx.destination);
-
-        // 木质共鸣双谐波：330Hz (E4) 与 660Hz (E5)
-        const fundamentalOsc = ctx.createOscillator();
-        fundamentalOsc.type = 'triangle';
-        fundamentalOsc.frequency.setValueAtTime(FREQ_E4_HZ, now);
-
-        const overtoneOsc = ctx.createOscillator();
-        overtoneOsc.type = 'sine';
-        overtoneOsc.frequency.setValueAtTime(FREQ_E5_HZ, now);
-
-        const overtoneGain = ctx.createGain();
-        overtoneGain.gain.setValueAtTime(OVERTONE_GAIN_SCALE, now);
-
-        fundamentalOsc.connect(masterGain);
-        overtoneOsc.connect(overtoneGain);
-        overtoneGain.connect(masterGain);
-
-        fundamentalOsc.start(now);
-        overtoneOsc.start(now);
-        fundamentalOsc.stop(stopTime);
-        overtoneOsc.stop(stopTime);
-
-        this.scheduleCleanup([fundamentalOsc, overtoneOsc, overtoneGain, masterGain], totalDuration);
-        return true;
+        return this.renderHarmonicSound(BREAK_ENDED_CONFIG);
     }
 
     /** 统一分发接口 */
@@ -187,7 +185,7 @@ export class ProceduralAudioSynth {
     }
 
     /** 获取或惰性初始化 AudioContext */
-    private async resolveAudioContext(): Promise<AudioContext | null> {
+    private async getOrCreateAudioContext(): Promise<AudioContext | null> {
         if (this.context) {
             return this.context;
         }

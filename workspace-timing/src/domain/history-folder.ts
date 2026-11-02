@@ -12,6 +12,7 @@ import {
     TimeSession,
     IdleSession,
     DailyTotalsMap,
+    DailyTotal,
     MAX_SESSIONS_PER_DAY,
     DEFAULT_MAX_SESSIONS,
     MS_PER_DAY,
@@ -33,6 +34,8 @@ export interface HistoryFoldOptions {
     pruneWeekly?: boolean;
     /** 边界基准：当前时间戳，默认 Date.now() */
     now?: number;
+    /** 契约时区：折叠与自然日切分所依据的时区偏移分钟数 */
+    utcOffsetMinutes?: number;
 }
 
 /**
@@ -59,13 +62,13 @@ export interface IdleFoldResult {
 }
 
 /**
- * 计算折叠截止点：今天本地零点 - retentionDays 天。
+ * 计算折叠截止点：今天零点 - retentionDays 天（支持指定时区偏移）。
  * @returns 0 表示不折叠（retentionDays <= 0）
  */
-export function foldCutoffStartMs(retentionDays: number, now = Date.now()): number {
+export function foldCutoffStartMs(retentionDays: number, now = Date.now(), offsetMinutes?: number): number {
     if (retentionDays <= 0) return 0;
-    const d = new Date(now);
-    const todayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const today = localDateStr(now, offsetMinutes);
+    const todayStart = parseLocalDate(today, offsetMinutes);
     return todayStart - retentionDays * MS_PER_DAY;
 }
 
@@ -78,6 +81,7 @@ function cloneDailyEntry(entry: DailyTotalsMap[string]): DailyTotalsMap[string] 
         aiMs: entry.aiMs,
         idleTotalMs: entry.idleTotalMs,
         idleSessionCount: entry.idleSessionCount,
+        recordedOffsetMinutes: entry.recordedOffsetMinutes,
     };
 }
 
@@ -143,6 +147,7 @@ function getOrCreateBucket<T>(groups: Map<string, T[]>, key: string): T[] {
 function partitionByDailyLimit<T extends { startMs: number; endMs: number }>(
     items: readonly T[],
     maxPerDay: number,
+    offsetMinutes?: number,
 ): { kept: T[]; toFold: T[] } {
     if (maxPerDay <= 0 || items.length <= maxPerDay) {
         return { kept: [...items], toFold: [] };
@@ -150,7 +155,7 @@ function partitionByDailyLimit<T extends { startMs: number; endMs: number }>(
     const dayGroups = new Map<string, T[]>();
     for (const item of items) {
         if (!(item.endMs > item.startMs) || item.startMs <= 0) continue;
-        const key = localDateStr(item.startMs);
+        const key = localDateStr(item.startMs, offsetMinutes);
         getOrCreateBucket(dayGroups, key).push(item);
     }
     const kept: T[] = [];
@@ -169,64 +174,105 @@ function partitionByDailyLimit<T extends { startMs: number; endMs: number }>(
     return { kept, toFold };
 }
 
+/** 获取或按需初始化指定日期的日汇总桶（并记录时区偏移） */
+function getOrCreateDailyBucket(
+    totals: DailyTotalsMap,
+    startMs: number,
+    offsetMinutes?: number,
+): DailyTotal {
+    const key = localDateStr(startMs, offsetMinutes);
+    const bucket = totals[key] ?? { totalMs: 0, sessionCount: 0 };
+    if (bucket.recordedOffsetMinutes === undefined) {
+        bucket.recordedOffsetMinutes = typeof offsetMinutes === 'number' && Number.isFinite(offsetMinutes)
+            ? offsetMinutes
+            : -new Date(startMs).getTimezoneOffset();
+    }
+    totals[key] = bucket;
+    return bucket;
+}
+
 /** 累加单个自然日工作切段到日桶表 */
 function accumulateDaySegment(
     seg: { startMs: number; durationMs: number; manualMs?: number; aiMs?: number },
     isFirstSegment: boolean,
     totals: DailyTotalsMap,
+    offsetMinutes?: number,
 ): void {
-    const key = localDateStr(seg.startMs);
-    const bucket = totals[key] ?? { totalMs: 0, sessionCount: 0 };
+    const bucket = getOrCreateDailyBucket(totals, seg.startMs, offsetMinutes);
     bucket.totalMs += seg.durationMs;
     bucket.manualMs = (bucket.manualMs ?? 0) + (typeof seg.manualMs === 'number' ? seg.manualMs : seg.durationMs);
     bucket.aiMs = (bucket.aiMs ?? 0) + (typeof seg.aiMs === 'number' ? seg.aiMs : 0);
     if (isFirstSegment) {
         bucket.sessionCount += 1;
     }
-    totals[key] = bucket;
 }
 
 /** 将一组工作会话按自然日拆分累加进日桶表，返回成功折叠条数 */
-function foldSessionsIntoTotals(sessions: readonly TimeSession[], totals: DailyTotalsMap): number {
+function foldSessionsIntoTotals(
+    sessions: readonly TimeSession[],
+    totals: DailyTotalsMap,
+    offsetMinutes?: number,
+): number {
     let count = 0;
     for (const s of sessions) {
         if (!(s.endMs > s.startMs) || s.startMs <= 0) continue;
-        const segs = TimeAggregator.splitByNaturalDay(s.startMs, s.endMs, s.manualMs, s.aiMs);
+        const segs = TimeAggregator.splitByNaturalDay(s.startMs, s.endMs, s.manualMs, s.aiMs, offsetMinutes);
         for (let i = 0; i < segs.length; i++) {
-            accumulateDaySegment(segs[i], i === 0, totals);
+            accumulateDaySegment(segs[i], i === 0, totals, offsetMinutes);
         }
         count++;
     }
     return count;
+}
+
+/** 累加单个自然日空闲切段到日桶表 */
+function accumulateIdleDaySegment(
+    seg: { startMs: number; durationMs: number },
+    isFirstSegment: boolean,
+    totals: DailyTotalsMap,
+    offsetMinutes?: number,
+): void {
+    const bucket = getOrCreateDailyBucket(totals, seg.startMs, offsetMinutes);
+    bucket.idleTotalMs = (bucket.idleTotalMs ?? 0) + seg.durationMs;
+    if (isFirstSegment) {
+        bucket.idleSessionCount = (bucket.idleSessionCount ?? 0) + 1;
+    }
 }
 
 /** 将一组空闲段按自然日拆分累加进日桶表，返回成功折叠条数 */
-function foldIdleSessionsIntoTotals(idleSessions: readonly IdleSession[], totals: DailyTotalsMap): number {
+function foldIdleSessionsIntoTotals(
+    idleSessions: readonly IdleSession[],
+    totals: DailyTotalsMap,
+    offsetMinutes?: number,
+): number {
     let count = 0;
     for (const is of idleSessions) {
         if (!(is.endMs > is.startMs) || is.startMs <= 0) continue;
-        const segs = TimeAggregator.splitByNaturalDay(is.startMs, is.endMs);
+        const segs = TimeAggregator.splitByNaturalDay(is.startMs, is.endMs, undefined, undefined, offsetMinutes);
         for (let i = 0; i < segs.length; i++) {
-            const key = localDateStr(segs[i].startMs);
-            const bucket = totals[key] ?? { totalMs: 0, sessionCount: 0 };
-            bucket.idleTotalMs = (bucket.idleTotalMs ?? 0) + segs[i].durationMs;
-            if (i === 0) {
-                bucket.idleSessionCount = (bucket.idleSessionCount ?? 0) + 1;
-            }
-            totals[key] = bucket;
+            accumulateIdleDaySegment(segs[i], i === 0, totals, offsetMinutes);
         }
         count++;
     }
     return count;
 }
 
-/** 将过期及超容量工作会话折叠进日桶 */
+export interface FoldExpiredOptions {
+    maxSessions?: number;
+    offsetMinutes?: number;
+}
+
+/** 将过期及超容量工作会话折叠进日桶（支持指定时区偏移） */
 export function foldExpiredSessions(
     sessions: readonly TimeSession[],
     existingTotals: DailyTotalsMap | undefined,
     cutoffStartMs: number,
-    maxSessions: number = 0,
+    optsOrMaxSessions: FoldExpiredOptions | number = 0,
+    ...rest: (number | undefined)[]
 ): FoldResult {
+    const isOpts = typeof optsOrMaxSessions === 'object' && optsOrMaxSessions !== null;
+    const maxSessions = isOpts ? (optsOrMaxSessions.maxSessions ?? 0) : optsOrMaxSessions;
+    const offsetMinutes = isOpts ? optsOrMaxSessions.offsetMinutes : rest[0];
     const totals = cloneTotals(existingTotals);
     if (sessions.length === 0) {
         return { keptSessions: [], updatedDailyTotals: totals, foldedSessionCount: 0 };
@@ -234,40 +280,62 @@ export function foldExpiredSessions(
 
     const { kept: timeFilteredKept, toFold } = filterByCutoff(sessions, cutoffStartMs);
     let kept = timeFilteredKept;
-    let foldedCount = foldSessionsIntoTotals(toFold, totals);
+    let foldedCount = foldSessionsIntoTotals(toFold, totals, offsetMinutes);
 
     if (maxSessions > 0 && kept.length > maxSessions) {
         const excessCount = kept.length - maxSessions;
         const excessSessions = kept.slice(0, excessCount);
         kept = kept.slice(excessCount);
-        foldedCount += foldSessionsIntoTotals(excessSessions, totals);
+        foldedCount += foldSessionsIntoTotals(excessSessions, totals, offsetMinutes);
     }
 
     return { keptSessions: kept, updatedDailyTotals: totals, foldedSessionCount: foldedCount };
 }
 
-/** 跨周工作会话归零清理 */
+/** 跨周工作会话归零清理（支持指定时区偏移） */
 export function prunePriorWeekSessions(
     sessions: readonly TimeSession[],
     totals: DailyTotalsMap,
     now: number,
+    offsetMinutes?: number,
 ): { kept: TimeSession[]; foldedCount: number } {
-    const weekStart = TimeAggregator.weekStartStr(new Date(now));
-    const weekStartMs = parseLocalDate(weekStart);
+    const weekStart = TimeAggregator.weekStartStr(new Date(now), offsetMinutes);
+    const weekStartMs = parseLocalDate(weekStart, offsetMinutes);
     const { kept, toFold } = filterByWeekStart(sessions, weekStartMs);
-    const foldedCount = foldSessionsIntoTotals(toFold, totals);
+    const foldedCount = foldSessionsIntoTotals(toFold, totals, offsetMinutes);
     return { kept, foldedCount };
 }
 
-/** 单日工作会话上限截断（每日最高 maxPerDay 条） */
+/** 单日工作会话上限截断（每日最高 maxPerDay 条，支持指定时区偏移） */
 export function pruneDailyOverflowSessions(
     sessions: readonly TimeSession[],
     totals: DailyTotalsMap,
     maxPerDay: number,
+    offsetMinutes?: number,
 ): { kept: TimeSession[]; foldedCount: number } {
-    const { kept, toFold } = partitionByDailyLimit(sessions, maxPerDay);
-    const foldedCount = foldSessionsIntoTotals(toFold, totals);
+    const { kept, toFold } = partitionByDailyLimit(sessions, maxPerDay, offsetMinutes);
+    const foldedCount = foldSessionsIntoTotals(toFold, totals, offsetMinutes);
     return { kept, foldedCount };
+}
+
+interface ResolvedFoldConfig {
+    now: number;
+    pruneWeekly: boolean;
+    maxPerDay: number;
+    maxSessions: number;
+    retentionDays: number;
+    offsetMinutes?: number;
+}
+
+function resolveFoldConfig(options?: HistoryFoldOptions): ResolvedFoldConfig {
+    return {
+        now: options?.now ?? Date.now(),
+        pruneWeekly: options?.pruneWeekly ?? true,
+        maxPerDay: options?.maxPerDay ?? MAX_SESSIONS_PER_DAY,
+        maxSessions: options?.maxSessions ?? DEFAULT_MAX_SESSIONS,
+        retentionDays: options?.retentionDays ?? 0,
+        offsetMinutes: options?.utcOffsetMinutes,
+    };
 }
 
 /** 完整工作会话自动回收引擎 */
@@ -281,29 +349,27 @@ export function recycleSessions(
         return { keptSessions: [], updatedDailyTotals: totals, foldedSessionCount: 0 };
     }
 
-    const now = options?.now ?? Date.now();
-    const pruneWeekly = options?.pruneWeekly ?? true;
-    const maxPerDay = options?.maxPerDay ?? MAX_SESSIONS_PER_DAY;
-    const maxSessions = options?.maxSessions ?? DEFAULT_MAX_SESSIONS;
-    const retentionDays = options?.retentionDays ?? 0;
-
+    const cfg = resolveFoldConfig(options);
     let currentSessions = sessions;
     let totalFolded = 0;
 
-    if (pruneWeekly) {
-        const weekRes = prunePriorWeekSessions(currentSessions, totals, now);
+    if (cfg.pruneWeekly) {
+        const weekRes = prunePriorWeekSessions(currentSessions, totals, cfg.now, cfg.offsetMinutes);
         currentSessions = weekRes.kept;
         totalFolded += weekRes.foldedCount;
     }
 
-    if (maxPerDay > 0) {
-        const dailyRes = pruneDailyOverflowSessions(currentSessions, totals, maxPerDay);
+    if (cfg.maxPerDay > 0) {
+        const dailyRes = pruneDailyOverflowSessions(currentSessions, totals, cfg.maxPerDay, cfg.offsetMinutes);
         currentSessions = dailyRes.kept;
         totalFolded += dailyRes.foldedCount;
     }
 
-    const cutoff = foldCutoffStartMs(retentionDays, now);
-    const foldRes = foldExpiredSessions(currentSessions, totals, cutoff, maxSessions);
+    const cutoff = foldCutoffStartMs(cfg.retentionDays, cfg.now, cfg.offsetMinutes);
+    const foldRes = foldExpiredSessions(currentSessions, totals, cutoff, {
+        maxSessions: cfg.maxSessions,
+        offsetMinutes: cfg.offsetMinutes,
+    });
     totalFolded += foldRes.foldedSessionCount;
 
     return {
@@ -313,50 +379,56 @@ export function recycleSessions(
     };
 }
 
-/** 将过期及超容量空闲段折叠进日桶 */
+/** 将过期及超容量空闲段折叠进日桶（支持指定时区偏移） */
 export function foldExpiredIdleSessions(
     idleSessions: readonly IdleSession[],
     existingTotals: DailyTotalsMap | undefined,
     cutoffStartMs: number,
-    maxSessions: number = 0,
+    optsOrMaxSessions: FoldExpiredOptions | number = 0,
+    ...rest: (number | undefined)[]
 ): { kept: IdleSession[]; updatedDailyTotals: DailyTotalsMap; foldedCount: number } {
+    const isOpts = typeof optsOrMaxSessions === 'object' && optsOrMaxSessions !== null;
+    const maxSessions = isOpts ? (optsOrMaxSessions.maxSessions ?? 0) : optsOrMaxSessions;
+    const offsetMinutes = isOpts ? optsOrMaxSessions.offsetMinutes : rest[0];
     const totals = cloneTotals(existingTotals);
     if (idleSessions.length === 0) {
         return { kept: [], updatedDailyTotals: totals, foldedCount: 0 };
     }
     const { kept: timeFiltered, toFold } = filterByCutoff(idleSessions, cutoffStartMs);
     let kept = timeFiltered;
-    let foldedCount = foldIdleSessionsIntoTotals(toFold, totals);
+    let foldedCount = foldIdleSessionsIntoTotals(toFold, totals, offsetMinutes);
     if (maxSessions > 0 && kept.length > maxSessions) {
         const excessCount = kept.length - maxSessions;
         const excess = kept.slice(0, excessCount);
         kept = kept.slice(excessCount);
-        foldedCount += foldIdleSessionsIntoTotals(excess, totals);
+        foldedCount += foldIdleSessionsIntoTotals(excess, totals, offsetMinutes);
     }
     return { kept, updatedDailyTotals: totals, foldedCount };
 }
 
-/** 跨周空闲段归零清理 */
+/** 跨周空闲段归零清理（支持指定时区偏移） */
 export function prunePriorWeekIdleSessions(
     idleSessions: readonly IdleSession[],
     totals: DailyTotalsMap,
     now: number,
+    offsetMinutes?: number,
 ): { kept: IdleSession[]; foldedCount: number } {
-    const weekStart = TimeAggregator.weekStartStr(new Date(now));
-    const weekStartMs = parseLocalDate(weekStart);
+    const weekStart = TimeAggregator.weekStartStr(new Date(now), offsetMinutes);
+    const weekStartMs = parseLocalDate(weekStart, offsetMinutes);
     const { kept, toFold } = filterByWeekStart(idleSessions, weekStartMs);
-    const foldedCount = foldIdleSessionsIntoTotals(toFold, totals);
+    const foldedCount = foldIdleSessionsIntoTotals(toFold, totals, offsetMinutes);
     return { kept, foldedCount };
 }
 
-/** 单日空闲段上限截断 */
+/** 单日空闲段上限截断（支持指定时区偏移） */
 export function pruneDailyOverflowIdleSessions(
     idleSessions: readonly IdleSession[],
     totals: DailyTotalsMap,
     maxPerDay: number,
+    offsetMinutes?: number,
 ): { kept: IdleSession[]; foldedCount: number } {
-    const { kept, toFold } = partitionByDailyLimit(idleSessions, maxPerDay);
-    const foldedCount = foldIdleSessionsIntoTotals(toFold, totals);
+    const { kept, toFold } = partitionByDailyLimit(idleSessions, maxPerDay, offsetMinutes);
+    const foldedCount = foldIdleSessionsIntoTotals(toFold, totals, offsetMinutes);
     return { kept, foldedCount };
 }
 
@@ -370,29 +442,27 @@ export function recycleIdleSessions(
     if (idleSessions.length === 0) {
         return { keptIdleSessions: [], updatedDailyTotals: totals, foldedIdleCount: 0 };
     }
-    const now = options?.now ?? Date.now();
-    const pruneWeekly = options?.pruneWeekly ?? true;
-    const maxPerDay = options?.maxPerDay ?? MAX_SESSIONS_PER_DAY;
-    const maxSessions = options?.maxSessions ?? DEFAULT_MAX_SESSIONS;
-    const retentionDays = options?.retentionDays ?? 0;
-
+    const cfg = resolveFoldConfig(options);
     let current = idleSessions;
     let totalFolded = 0;
 
-    if (pruneWeekly) {
-        const weekRes = prunePriorWeekIdleSessions(current, totals, now);
+    if (cfg.pruneWeekly) {
+        const weekRes = prunePriorWeekIdleSessions(current, totals, cfg.now, cfg.offsetMinutes);
         current = weekRes.kept;
         totalFolded += weekRes.foldedCount;
     }
 
-    if (maxPerDay > 0) {
-        const dailyRes = pruneDailyOverflowIdleSessions(current, totals, maxPerDay);
+    if (cfg.maxPerDay > 0) {
+        const dailyRes = pruneDailyOverflowIdleSessions(current, totals, cfg.maxPerDay, cfg.offsetMinutes);
         current = dailyRes.kept;
         totalFolded += dailyRes.foldedCount;
     }
 
-    const cutoff = foldCutoffStartMs(retentionDays, now);
-    const foldRes = foldExpiredIdleSessions(current, totals, cutoff, maxSessions);
+    const cutoff = foldCutoffStartMs(cfg.retentionDays, cfg.now, cfg.offsetMinutes);
+    const foldRes = foldExpiredIdleSessions(current, totals, cutoff, {
+        maxSessions: cfg.maxSessions,
+        offsetMinutes: cfg.offsetMinutes,
+    });
     totalFolded += foldRes.foldedCount;
 
     return {
@@ -410,16 +480,18 @@ function parseFoldOptions(options: HistoryFoldOptions, defaultNow: number): Hist
         maxPerDay: options.maxPerDay || 0,
         pruneWeekly: options.pruneWeekly ?? false,
         now: options.now ?? defaultNow,
+        utcOffsetMinutes: options.utcOffsetMinutes,
     };
 }
 
-/** 按本地自然日聚合原始有效会话历时 */
-function aggregateRawDayTotals(sessions: readonly TimeSession[]): Map<string, number> {
+/** 按自然日聚合原始有效会话历时（支持指定时区偏移） */
+function aggregateRawDayTotals(sessions: readonly TimeSession[], offsetMinutes?: number): Map<string, number> {
     const dayTotals = new Map<string, number>();
     for (const s of sessions) {
         if (s.startMs > 0 && s.endMs > s.startMs) {
-            const date = localDateStr(s.startMs);
-            dayTotals.set(date, (dayTotals.get(date) ?? 0) + s.durationMs);
+            TimeAggregator.eachDaySegment(s.startMs, s.endMs, (date, segStart, segEnd) => {
+                dayTotals.set(date, (dayTotals.get(date) ?? 0) + (segEnd - segStart));
+            }, offsetMinutes);
         }
     }
     return dayTotals;
@@ -441,11 +513,12 @@ function isRedundantDailyBucket(bucketTotal: number, rawTotal?: number): boolean
 export function sanitizeOverlappingDailyTotals(
     dailyTotals: DailyTotalsMap | undefined,
     sessions: readonly TimeSession[],
+    offsetMinutes?: number,
 ): DailyTotalsMap | undefined {
     if (!dailyTotals || sessions.length === 0) {
         return dailyTotals;
     }
-    const dayTotals = aggregateRawDayTotals(sessions);
+    const dayTotals = aggregateRawDayTotals(sessions, offsetMinutes);
     const cleaned: DailyTotalsMap = {};
     let pruned = false;
 
@@ -484,7 +557,7 @@ export function migrateToFolded(
     foldedIdleCount: number;
 } {
     const opt = parseFoldOptions(options, now);
-    const sanitizedTotals = sanitizeOverlappingDailyTotals(data.dailyTotals, data.sessions ?? []);
+    const sanitizedTotals = sanitizeOverlappingDailyTotals(data.dailyTotals, data.sessions ?? [], opt.utcOffsetMinutes);
     const recycleResult = recycleSessions(data.sessions ?? [], sanitizedTotals, opt);
     const idleResult = recycleIdleSessions(data.idleSessions ?? [], recycleResult.updatedDailyTotals, opt);
     return {

@@ -30,7 +30,7 @@ try {
     process.exit(2);
 }
 
-const result = await run([process.execPath, mochaBin, '--reporter', 'min', 'test/**/*.test.js'], {
+const result = await run([process.execPath, mochaBin, '--exit', '--reporter', 'min', 'test/**/*.test.js'], {
     cwd: root,
     timeoutMs: 300000,
 });

@@ -7,10 +7,10 @@
  * Exit Semantics & Design Rationale: 两步原子写入保障崩溃一致性；异常捕获降级标记可用性状态，防止二级备份故障阻塞主扩展生命周期。
  */
 
-import * as vscode from 'vscode';
 import * as path from 'path';
-import { WorkspaceTimingData } from '../domain/models';
-import { IStorageProvider } from './IStorageProvider';
+import { Uri, workspace } from 'vscode';
+import type { WorkspaceTimingData } from '../domain/models';
+import type { IStorageProvider } from './IStorageProvider';
 import { LogLevel, log } from '../integration/logger';
 
 const LOG_INVALID_DATA_FORMAT = 'FileStorageProvider: invalid data format, ignoring';
@@ -23,12 +23,12 @@ const FILE_NAME = 'workspace-timing.json';
 export class FileStorageProvider implements IStorageProvider {
     readonly id = 'file-storage';
 
-    private readonly fileUri: vscode.Uri;
+    private readonly fileUri: Uri;
     private _available: boolean = true;
 
-    constructor(workspaceRoot: vscode.Uri) {
-        const dotVscode = vscode.Uri.joinPath(workspaceRoot, '.vscode');
-        this.fileUri = vscode.Uri.joinPath(dotVscode, FILE_NAME);
+    constructor(workspaceRoot: Uri) {
+        const dotVscode = Uri.joinPath(workspaceRoot, '.vscode');
+        this.fileUri = Uri.joinPath(dotVscode, FILE_NAME);
     }
 
     isAvailable(): boolean {
@@ -38,13 +38,13 @@ export class FileStorageProvider implements IStorageProvider {
     async load(): Promise<WorkspaceTimingData | null> {
         try {
             try {
-                await vscode.workspace.fs.stat(this.fileUri);
+                await workspace.fs.stat(this.fileUri);
             } catch {
                 // 文件不存在
                 return null;
             }
 
-            const bytes = await vscode.workspace.fs.readFile(this.fileUri);
+            const bytes = await workspace.fs.readFile(this.fileUri);
             const text = Buffer.from(bytes).toString('utf-8');
             const data: WorkspaceTimingData = JSON.parse(text);
 
@@ -71,21 +71,21 @@ export class FileStorageProvider implements IStorageProvider {
      * 与 save 同格式（pretty JSON），不改变主备份文件。
      */
     async saveAs(data: WorkspaceTimingData, fileName: string): Promise<void> {
-        const dotVscode = vscode.Uri.file(path.dirname(this.fileUri.fsPath));
-        const target = vscode.Uri.joinPath(dotVscode, fileName);
+        const dotVscode = Uri.file(path.dirname(this.fileUri.fsPath));
+        const target = Uri.joinPath(dotVscode, fileName);
         await this.writeTo(target, data);
     }
 
-    private async writeTo(target: vscode.Uri, data: WorkspaceTimingData): Promise<void> {
+    private async writeTo(target: Uri, data: WorkspaceTimingData): Promise<void> {
         try {
             const text = JSON.stringify(data, null, 2);
             const bytes = Buffer.from(text, 'utf-8');
 
             // 确保 .vscode 目录存在（用 fsPath + path.dirname 正确解析父目录，
             // 而非 joinPath(uri,'..')——后者不解析 `..` 而是追加字面路径段）
-            const dotVscode = vscode.Uri.file(path.dirname(target.fsPath));
+            const dotVscode = Uri.file(path.dirname(target.fsPath));
             try {
-                await vscode.workspace.fs.createDirectory(dotVscode);
+                await workspace.fs.createDirectory(dotVscode);
             } catch {
                 // ignore: 目录已存在无需重新创建
             }
@@ -93,8 +93,8 @@ export class FileStorageProvider implements IStorageProvider {
             // 原子落盘：先写入同目录中转文件（stagingUri）再 rename 覆盖，避免断电留下半截残缺 JSON
             // 契约不变量：若直接覆盖目标文件，写入中断将破坏完整性；原子 rename 确保文件状态在磁盘上全有或全无
             const stagingUri = target.with({ path: `${target.path}.tmp` });
-            await vscode.workspace.fs.writeFile(stagingUri, bytes);
-            await vscode.workspace.fs.rename(stagingUri, target, { overwrite: true });
+            await workspace.fs.writeFile(stagingUri, bytes);
+            await workspace.fs.rename(stagingUri, target, { overwrite: true });
         } catch (err) {
             log(LogLevel.Error, LOG_WRITE_FAILED, err as Error);
             throw err;
@@ -104,11 +104,11 @@ export class FileStorageProvider implements IStorageProvider {
     async delete(): Promise<void> {
         try {
             try {
-                await vscode.workspace.fs.stat(this.fileUri);
+                await workspace.fs.stat(this.fileUri);
             } catch {
                 return; // 文件不存在，无需删除
             }
-            await vscode.workspace.fs.delete(this.fileUri);
+            await workspace.fs.delete(this.fileUri);
         } catch (err) {
             log(LogLevel.Error, LOG_DELETE_FAILED, err as Error);
             throw err;

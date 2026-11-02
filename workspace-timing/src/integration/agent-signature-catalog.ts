@@ -20,12 +20,28 @@ const AGENT_PATH_REGEX =
     /[/\\](\.agents|\.gemini|\.claude|\.cursor|\.cline|\.roomodes|\.continue|\.codeium|scratch|\.refactor-trajectory)($|[/\\])|(\.cursorrules|\.cursorignore|\.clinerules|CLAUDE\.md|transcript.*\.jsonl|\.aider.*|\.github[/\\]copilot-instructions\.md|\.(patch|diff))$/i;
 
 /**
+ * 智能体实时思考、会话转录与任务脉搏轨迹流特征路径正则
+ * 涵盖：Antigravity transcript.jsonl / tasks / scratch, Claude Code 会话流, auto-refactor 轨迹等
+ */
+const AGENT_PULSE_PATH_REGEX =
+    /[/\\](\.system_generated[/\\](logs|tasks)|scratch[/\\]|\.refactor-trajectory)($|[/\\])|(transcript.*\.jsonl|task-.*\.log)$/i;
+
+/**
+ * 判定指定的文件路径是否属于智能体运行期实时伴生脉搏流
+ * @param fsPath 文件绝对或相对路径
+ * @returns 命中特征返回 true
+ */
+export function isAgentPulsePath(fsPath: string): boolean {
+    return !fsPath ? false : AGENT_PULSE_PATH_REGEX.test(fsPath);
+}
+
+/**
  * 判定指定的文件路径是否包含已知 AI Agent 签名或伴生痕迹
  * @param fsPath 文件绝对或相对路径
  * @returns 命中特征返回 true
  */
 export function isAgentSignaturePath(fsPath: string): boolean {
-    return !fsPath ? false : AGENT_PATH_REGEX.test(fsPath);
+    return !fsPath ? false : (AGENT_PATH_REGEX.test(fsPath) || AGENT_PULSE_PATH_REGEX.test(fsPath));
 }
 
 /**

@@ -7,7 +7,7 @@
  * Exit Semantics & Design Rationale: Pure deterministic text formatter with zero disk I/O; operates on immutable series slices sorted chronologically
  */
 
-import { TimeAggregator, DailyStats } from '../../domain/TimeAggregator';
+import { TimeAggregator, type DailyStats } from '../../domain/TimeAggregator';
 
 const CSV_HEADER_DATE_TOTAL_SESSIONS = 'Date,Total (ms),Sessions';
 
@@ -15,18 +15,18 @@ export class AggregatedCsvExporter {
     readonly formatName = 'aggregated-csv';
 
     build(series: DailyStats[], workspaceName: string): string {
-        const lines: string[] = [];
+        const csvLines: string[] = [];
 
-        lines.push(`# Workspace Timing Aggregated Export: ${workspaceName}`);
-        lines.push(`# Generated: ${TimeAggregator.todayStr()} (local date)`);
-        lines.push(`# Days: ${series.length}`);
-        lines.push('');
+        csvLines.push(`# Workspace Timing Aggregated Export: ${workspaceName}`);
+        csvLines.push(`# Generated: ${TimeAggregator.todayStr()} (local date)`);
+        csvLines.push(`# Days: ${series.length}`);
+        csvLines.push('');
 
-        lines.push(CSV_HEADER_DATE_TOTAL_SESSIONS);
-        for (const d of series) {
-            lines.push(`${d.date},${d.totalMs},${d.sessionCount}`);
+        csvLines.push(CSV_HEADER_DATE_TOTAL_SESSIONS);
+        for (const dayStat of series) {
+            csvLines.push(`${dayStat.date},${dayStat.totalMs},${dayStat.sessionCount}`);
         }
 
-        return lines.join('\n');
+        return csvLines.join('\n');
     }
 }

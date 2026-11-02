@@ -7,9 +7,9 @@
  * Exit Semantics & Design Rationale: 利用 VS Code 原生工作区存储实现自然的数据隔离与快速存取；遇脏数据或解析异常时安全熔断，返回 null。
  */
 
-import * as vscode from 'vscode';
-import { WorkspaceTimingData } from '../domain/models';
-import { IStorageProvider } from './IStorageProvider';
+import type { ExtensionContext } from 'vscode';
+import type { WorkspaceTimingData } from '../domain/models';
+import type { IStorageProvider } from './IStorageProvider';
 import { LogLevel, log } from '../integration/logger';
 
 const LOG_INVALID_FORMAT = 'WorkspaceStateProvider: invalid data format, ignoring';
@@ -22,10 +22,10 @@ const STORAGE_KEY = 'workspaceTiming:data';
 export class WorkspaceStateProvider implements IStorageProvider {
     readonly id = 'workspace-state';
 
-    private readonly context: vscode.ExtensionContext;
+    private readonly context: ExtensionContext;
     private _available: boolean = true;
 
-    constructor(context: vscode.ExtensionContext) {
+    constructor(context: ExtensionContext) {
         this.context = context;
     }
 

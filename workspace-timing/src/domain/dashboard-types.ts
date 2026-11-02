@@ -132,6 +132,12 @@ export interface DashboardData {
     aiCooldownSeconds?: number;
     /** 是否启用图表双轨堆叠与对比显示 */
     chartDualTrackDisplay?: boolean;
+    /** 时间显示基准：跟随本地时区 (local) 还是统一世界协调时 (utc) */
+    timeDisplayMode?: 'local' | 'utc';
+    /** 当前工作区工时记录的主时区标识 */
+    timezone?: string;
+    /** 当前工作区基准 UTC 偏移分钟数 */
+    utcOffsetMinutes?: number;
 }
 
 /**

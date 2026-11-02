@@ -7,9 +7,9 @@
  * Exit Semantics & Design Rationale: 读操作主存优先、备存兜底；主存写失败时触发紧急降级全量落备；深复制盖戳保障调用方原数据无副作用。
  */
 
-import { WorkspaceTimingData } from '../domain/models';
-import { IStorageProvider } from './IStorageProvider';
-import { IJournalStore } from '../cache/IJournalStore';
+import type { WorkspaceTimingData } from '../domain/models';
+import type { IStorageProvider } from './IStorageProvider';
+import type { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/logger';
 
 const LOG_JOURNAL_TRUNCATE_AFTER_RESTORE_FAILED = 'StorageCoordinator: journal truncate after restore failed';

@@ -7,11 +7,11 @@
  * Exit Semantics & Design Rationale: Complies with ARCH-FAC-001 by aggregating 3 sub-domain exporters with substantive input validation and logging, eliminating pass-through springboard overhead
  */
 
-import { ReadonlyTimingData, WorkspaceTimingData } from '../../domain/models';
+import type { ReadonlyTimingData, WorkspaceTimingData } from '../../domain/models';
 import { TimeAggregator } from '../../domain/TimeAggregator';
 import { CsvExporter } from './CsvExporter';
 import { AggregatedCsvExporter } from './AggregatedCsvExporter';
-import { ReportExporter, ReportKind } from './ReportExporter';
+import { ReportExporter, type ReportKind } from './ReportExporter';
 import { buildWeeklyTrendEntries } from '../dashboard-data-assembler';
 import { log, LogLevel } from '../../integration/logger';
 

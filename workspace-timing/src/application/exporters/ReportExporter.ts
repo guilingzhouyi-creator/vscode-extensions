@@ -7,44 +7,59 @@
  * Exit Semantics & Design Rationale: Pure presentation formatting with zero external disk I/O; integrates i18n dictionaries to ensure complete bilingual report generation
  */
 
-import { TimeAggregator, DailyDetail, WeeklySummary } from '../../domain/TimeAggregator';
-import { WeeklyTrendEntry } from '../../domain/dashboard-types';
+import { TimeAggregator, type DailyDetail, type WeeklySummary } from '../../domain/TimeAggregator';
+import { MINUTES_PER_HOUR } from '../../domain/models';
+import type { WeeklyTrendEntry } from '../../domain/dashboard-types';
 import { t, format } from '../../i18n/index';
 
 const MARKDOWN_TREND_TABLE_SEPARATOR = '|-----------------------|------|--------|';
+const PAD_ZERO = '0';
+const PAD_LEN = 2;
 
 export type ReportKind = 'daily' | 'weekly';
+
+function formatReportTimestamp(): string {
+    const nowDate = new Date();
+    const utcIsoString = nowDate.toISOString();
+    const timeZoneId = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const offsetMinutes = -nowDate.getTimezoneOffset();
+    const signPrefix = offsetMinutes >= 0 ? '+' : '-';
+    const absMinutes = Math.abs(offsetMinutes);
+    const hoursStr = String(Math.floor(absMinutes / MINUTES_PER_HOUR)).padStart(PAD_LEN, PAD_ZERO);
+    const minutesStr = String(absMinutes % MINUTES_PER_HOUR).padStart(PAD_LEN, PAD_ZERO);
+    return `${nowDate.toLocaleString()} (UTC${signPrefix}${hoursStr}:${minutesStr}, ${timeZoneId}) | UTC: ${utcIsoString}`;
+}
 
 export class ReportExporter {
     /** 生成日报 Markdown */
     static buildDailyReport(detail: DailyDetail): string {
-        const dict = t();
-        const lines: string[] = [];
-        lines.push(`# ${format(dict['report.daily.title'], detail.date)}`);
-        lines.push('');
-        lines.push(`- **${dict['report.daily.todayDuration']}**：${TimeAggregator.formatDuration(detail.totalMs)}`);
-        lines.push(`- **${dict['report.daily.sessionCount']}**：${detail.sessionCount}`);
+        const i18nDict = t();
+        const reportLines: string[] = [];
+        reportLines.push(`# ${format(i18nDict['report.daily.title'], detail.date)}`);
+        reportLines.push('');
+        reportLines.push(`- **${i18nDict['report.daily.todayDuration']}**：${TimeAggregator.formatDuration(detail.totalMs)}`);
+        reportLines.push(`- **${i18nDict['report.daily.sessionCount']}**：${detail.sessionCount}`);
         if (detail.activeWindow) {
-            lines.push(`- **${dict['report.daily.activeWindow']}**：${detail.activeWindow}`);
+            reportLines.push(`- **${i18nDict['report.daily.activeWindow']}**：${detail.activeWindow}`);
         }
-        lines.push('');
+        reportLines.push('');
 
         // 会话明细表
         if (detail.sessions.length > 0) {
-            lines.push(`## ${dict['report.table.sessions']}`);
-            lines.push('');
-            lines.push(`| ${dict['report.table.start']} | ${dict['report.table.end']} | ${dict['report.table.duration']} |`);
-            lines.push('|------|------|------|');
-            for (const s of detail.sessions) {
-                lines.push(
-                    `| ${s.startLabel} | ${s.endLabel} | ${TimeAggregator.formatDuration(s.durationMs)} |`,
+            reportLines.push(`## ${i18nDict['report.table.sessions']}`);
+            reportLines.push('');
+            reportLines.push(`| ${i18nDict['report.table.start']} | ${i18nDict['report.table.end']} | ${i18nDict['report.table.duration']} |`);
+            reportLines.push('|------|------|------|');
+            for (const sessionEntry of detail.sessions) {
+                reportLines.push(
+                    `| ${sessionEntry.startLabel} | ${sessionEntry.endLabel} | ${TimeAggregator.formatDuration(sessionEntry.durationMs)} |`,
                 );
             }
-            lines.push('');
+            reportLines.push('');
         }
 
-        lines.push(`*${format(dict['report.generatedAt'], new Date().toLocaleString())}*`);
-        return lines.join('\n');
+        reportLines.push(`*${format(i18nDict['report.generatedAt'], formatReportTimestamp())}*`);
+        return reportLines.join('\n');
     }
 
     /** 生成周报 Markdown */
@@ -53,48 +68,48 @@ export class ReportExporter {
         trend: WeeklyTrendEntry[],
         dailyStats: { label: string; weekday: string; totalMs: number }[],
     ): string {
-        const dict = t();
-        const lines: string[] = [];
-        lines.push(`# ${format(dict['report.weekly.title'], summary.weekStart)}`);
-        lines.push('');
-        lines.push(`## ${dict['report.weekly.summary']}`);
-        lines.push('');
-        lines.push(`- **${dict['report.weekly.totalDuration']}**：${TimeAggregator.formatDuration(summary.totalMs)}`);
-        lines.push(`- **${dict['report.weekly.avgDaily']}**：${TimeAggregator.formatDuration(summary.avgDailyMs)}`);
-        lines.push(`- **${dict['report.weekly.activeDays']}**：${format(dict['report.weekly.activeDaysFmt'], summary.activeDays)}`);
-        lines.push(`- **${dict['report.weekly.peakDate']}**：${summary.peakDate}（${TimeAggregator.formatDuration(summary.peakDateMs)}）`);
-        lines.push(`- **${dict['report.weekly.sessionCount']}**：${summary.sessionCount}`);
-        lines.push('');
+        const i18nDict = t();
+        const reportLines: string[] = [];
+        reportLines.push(`# ${format(i18nDict['report.weekly.title'], summary.weekStart)}`);
+        reportLines.push('');
+        reportLines.push(`## ${i18nDict['report.weekly.summary']}`);
+        reportLines.push('');
+        reportLines.push(`- **${i18nDict['report.weekly.totalDuration']}**：${TimeAggregator.formatDuration(summary.totalMs)}`);
+        reportLines.push(`- **${i18nDict['report.weekly.avgDaily']}**：${TimeAggregator.formatDuration(summary.avgDailyMs)}`);
+        reportLines.push(`- **${i18nDict['report.weekly.activeDays']}**：${format(i18nDict['report.weekly.activeDaysFmt'], summary.activeDays)}`);
+        reportLines.push(`- **${i18nDict['report.weekly.peakDate']}**：${summary.peakDate}（${TimeAggregator.formatDuration(summary.peakDateMs)}）`);
+        reportLines.push(`- **${i18nDict['report.weekly.sessionCount']}**：${summary.sessionCount}`);
+        reportLines.push('');
 
         // 每日分布
         if (dailyStats.length > 0) {
-            lines.push(`## ${dict['report.weekly.distribution']}`);
-            lines.push('');
-            lines.push(`| ${dict['report.table.date']} | ${dict['report.table.weekday']} | ${dict['report.table.duration']} |`);
-            lines.push('|------|------|------|');
-            for (const d of dailyStats) {
-                const weekdayDisplay = /^[一二三四五六日]$/.test(d.weekday) ? `周${d.weekday}` : d.weekday;
-                lines.push(`| ${d.label} | ${weekdayDisplay} | ${TimeAggregator.formatDuration(d.totalMs)} |`);
+            reportLines.push(`## ${i18nDict['report.weekly.distribution']}`);
+            reportLines.push('');
+            reportLines.push(`| ${i18nDict['report.table.date']} | ${i18nDict['report.table.weekday']} | ${i18nDict['report.table.duration']} |`);
+            reportLines.push('|------|------|------|');
+            for (const dayStat of dailyStats) {
+                const weekdayDisplay = /^[一二三四五六日]$/.test(dayStat.weekday) ? `周${dayStat.weekday}` : dayStat.weekday;
+                reportLines.push(`| ${dayStat.label} | ${weekdayDisplay} | ${TimeAggregator.formatDuration(dayStat.totalMs)} |`);
             }
-            lines.push('');
+            reportLines.push('');
         }
 
         // 多周趋势
         if (trend.length > 0) {
-            lines.push(`## ${dict['report.weekly.trend']}`);
-            lines.push('');
-            lines.push(`| ${dict['report.table.weekRange']} | ${dict['report.table.duration']} | ${dict['report.table.sessionCount']} |`);
-            lines.push(MARKDOWN_TREND_TABLE_SEPARATOR);
-            for (const w of trend) {
-                const rangeLabel = w.weekEnd ? `${w.weekStart} ~ ${w.weekEnd}` : w.weekStart;
-                lines.push(
-                    `| ${rangeLabel} | ${TimeAggregator.formatDuration(w.totalMs)} | ${w.sessionCount} |`,
+            reportLines.push(`## ${i18nDict['report.weekly.trend']}`);
+            reportLines.push('');
+            reportLines.push(`| ${i18nDict['report.table.weekRange']} | ${i18nDict['report.table.duration']} | ${i18nDict['report.table.sessionCount']} |`);
+            reportLines.push(MARKDOWN_TREND_TABLE_SEPARATOR);
+            for (const trendEntry of trend) {
+                const rangeLabel = trendEntry.weekEnd ? `${trendEntry.weekStart} ~ ${trendEntry.weekEnd}` : trendEntry.weekStart;
+                reportLines.push(
+                    `| ${rangeLabel} | ${TimeAggregator.formatDuration(trendEntry.totalMs)} | ${trendEntry.sessionCount} |`,
                 );
             }
-            lines.push('');
+            reportLines.push('');
         }
 
-        lines.push(`*${format(dict['report.generatedAt'], new Date().toLocaleString())}*`);
-        return lines.join('\n');
+        reportLines.push(`*${format(i18nDict['report.generatedAt'], formatReportTimestamp())}*`);
+        return reportLines.join('\n');
     }
 }

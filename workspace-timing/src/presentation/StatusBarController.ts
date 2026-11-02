@@ -7,9 +7,13 @@
  * Exit Semantics & Design Rationale: Compares against cached _lastText to prevent high-frequency DOM jitter and CPU thrashing; guarantees proper resource disposal on extension shutdown
  */
 
-import * as vscode from 'vscode';
 import {
-    StatusBarMode,
+    window,
+    StatusBarAlignment,
+    type StatusBarItem,
+} from 'vscode';
+import {
+    type StatusBarMode,
     STATUS_BAR_PRIORITY,
     TIMING_COMMAND_IDS,
     STATUS_BAR_MODE_TODAY_TOTAL,
@@ -59,7 +63,7 @@ export interface StatusBarConfig {
 }
 
 export class StatusBarController {
-    private readonly statusBarItem: vscode.StatusBarItem;
+    private readonly statusBarItem: StatusBarItem;
     private _enabled: boolean = true;
     private _mode: StatusBarMode = STATUS_BAR_MODE_TODAY_TOTAL;
     private _todayMs: number = 0;
@@ -73,10 +77,12 @@ export class StatusBarController {
     private _todayAiMs: number = 0;
     private _todayIdleMs: number = 0;
     private _activityMode: string = ACTIVITY_MODE_MANUAL;
+    private _lastModeForTooltip: StatusBarMode | null = null;
+    private _lastActivityModeForTooltip: string | null = null;
 
     constructor() {
-        this.statusBarItem = vscode.window.createStatusBarItem(
-            vscode.StatusBarAlignment.Right,
+        this.statusBarItem = window.createStatusBarItem(
+            StatusBarAlignment.Right,
             STATUS_BAR_PRIORITY,
         );
         this.statusBarItem.name = t()['panel.title'];
@@ -113,27 +119,30 @@ export class StatusBarController {
 
     /** 同步更新 Tooltip、Name 与无障碍信息，确保语言热切换与模式切换即时生效 */
     private updateTooltipAndA11y(rawText: string): void {
-        let activityLabel = '';
-        if (this._activityMode === STATE_PAUSED_IDLE) {
-            activityLabel = t()['statusBar.idle'];
-        } else if (this._activityMode === ACTIVITY_MODE_AI) {
-            activityLabel = t()['statusBar.ai'];
-        }
+        if (this._lastModeForTooltip !== this._mode || this._lastActivityModeForTooltip !== this._activityMode) {
+            this._lastModeForTooltip = this._mode;
+            this._lastActivityModeForTooltip = this._activityMode;
 
-        const nextTooltip = activityLabel
-            ? format(
-                t()['statusBar.tooltipWithActivity'],
-                t()['statusBar.tooltip'],
-                statusBarModeLabel(this._mode),
-                activityLabel,
-            )
-            : format(
-                t()['statusBar.tooltipWithMode'],
-                t()['statusBar.tooltip'],
-                statusBarModeLabel(this._mode),
-            );
+            let activityLabel = '';
+            if (this._activityMode === STATE_PAUSED_IDLE) {
+                activityLabel = t()['statusBar.idle'];
+            } else if (this._activityMode === ACTIVITY_MODE_AI) {
+                activityLabel = t()['statusBar.ai'];
+            }
 
-        if (this.statusBarItem.tooltip !== nextTooltip) {
+            const nextTooltip = activityLabel
+                ? format(
+                    t()['statusBar.tooltipWithActivity'],
+                    t()['statusBar.tooltip'],
+                    statusBarModeLabel(this._mode),
+                    activityLabel,
+                )
+                : format(
+                    t()['statusBar.tooltipWithMode'],
+                    t()['statusBar.tooltip'],
+                    statusBarModeLabel(this._mode),
+                );
+
             this.statusBarItem.tooltip = nextTooltip;
         }
 
@@ -214,8 +223,9 @@ export class StatusBarController {
         return this._mode;
     }
 
-    /** 初始化显示 */
+    /** 初始化并激活状态栏显示 */
     show(): void {
+        this._enabled = true;
         this.refresh();
     }
 
@@ -233,8 +243,9 @@ export class StatusBarController {
         return this._mode;
     }
 
-    /** 释放资源 */
+    /** 释放资源并清除显示状态 */
     dispose(): void {
+        this.hide();
         this.statusBarItem.dispose();
     }
 }

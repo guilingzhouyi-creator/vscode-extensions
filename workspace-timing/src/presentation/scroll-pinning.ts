@@ -65,8 +65,8 @@ export class ScrollPinningController {
         this.onCapsuleVisibilityChange = options.onCapsuleVisibilityChange;
         this.onPinnedStateChange = options.onPinnedStateChange;
 
-        this.boundOnScroll = () => this.handleContainerScroll();
-        this.boundOnUserInput = () => this.recordUserInput();
+        this.boundOnScroll = (event: unknown) => this.handleContainerScroll(event);
+        this.boundOnUserInput = (event: unknown) => this.recordUserInput(undefined, event);
 
         this.bindEvents();
         this.evaluateState(false);
@@ -108,8 +108,9 @@ export class ScrollPinningController {
      * 记录用户主动物理交互（滚轮、拖拽、触控、按键）。
      *
      * @param timestamp 交互发生时间戳
+     * @param _event 交互源事件对象
      */
-    public recordUserInput(timestamp?: number): void {
+    public recordUserInput(timestamp?: number, _event?: unknown): void {
         if (this.isDisposed) return;
         this.lastUserInputAt = timestamp ?? (typeof performance !== 'undefined' ? performance.now() : Date.now());
         this.evaluateState(true);
@@ -151,7 +152,7 @@ export class ScrollPinningController {
     }
 
     /** 容器滚动事件监听回调 */
-    private handleContainerScroll(): void {
+    private handleContainerScroll(_event?: unknown): void {
         if (this.isDisposed) return;
         this.evaluateState(false);
     }

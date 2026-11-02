@@ -74,7 +74,8 @@ export class RingBuffer<T> {
             return [];
         }
 
-        const items: T[] = new Array(this._count);
+        const items: T[] = [];
+        items.length = this._count;
         let srcIdx = this.tail;
         for (let i = 0; i < this._count; i++) {
             items[i] = this.buffer[srcIdx] as T;
@@ -114,21 +115,14 @@ export class RingBuffer<T> {
      * 读取最旧的一条（不取出），O(1)。空缓冲区返回 undefined。
      */
     peekOldest(): T | undefined {
-        if (this._count === 0) {
-            return undefined;
-        }
-        return this.buffer[this.tail];
+        return this._count === 0 ? undefined : this.buffer[this.tail];
     }
 
     /**
      * 读取最新的一条（不取出），O(1)。空缓冲区返回 undefined。
      */
     peekNewest(): T | undefined {
-        if (this._count === 0) {
-            return undefined;
-        }
-        const idx = (this.head - 1 + this._capacity) % this._capacity;
-        return this.buffer[idx];
+        return this._count === 0 ? undefined : this.buffer[(this.head - 1 + this._capacity) % this._capacity];
     }
 
     /**
@@ -139,7 +133,8 @@ export class RingBuffer<T> {
         if (n <= 0 || this._count === 0) return [];
 
         const take = Math.min(n, this._count);
-        const result: T[] = new Array(take);
+        const result: T[] = [];
+        result.length = take;
         let srcIdx = (this.tail + this._count - take) % this._capacity;
 
         for (let i = 0; i < take; i++) {

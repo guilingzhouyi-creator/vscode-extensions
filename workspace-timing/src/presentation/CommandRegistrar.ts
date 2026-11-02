@@ -7,10 +7,17 @@
  * Exit Semantics & Design Rationale: Encapsulates user interactions and confirmation modals while delegating actual state mutations to TimerOrchestrator; manages subscriptions for clean disposal
  */
 
-import * as vscode from 'vscode';
-import { TimerOrchestrator } from '../application/TimerOrchestrator';
-import { GlobalAggregator } from '../application/GlobalAggregator';
-import { StatusBarController, statusBarModeLabel } from './StatusBarController';
+import {
+    window,
+    commands,
+    workspace,
+    Uri,
+    type Disposable,
+    type ExtensionContext,
+} from 'vscode';
+import type { TimerOrchestrator } from '../application/TimerOrchestrator';
+import type { GlobalAggregator } from '../application/GlobalAggregator';
+import { type StatusBarController, statusBarModeLabel } from './StatusBarController';
 import { DashboardPanel } from './DashboardPanel';
 import { LogLevel, log } from '../integration/logger';
 import { persistTimingConfig } from '../integration/ConfigWatcher';
@@ -40,10 +47,10 @@ const LOG_RESTORE_FAILED = 'restore failed';
 const LOG_COMMAND_REGISTRAR_DISPOSED = 'CommandRegistrar: disposed';
 
 export class CommandRegistrar {
-    private readonly subscriptions: vscode.Disposable[] = [];
+    private readonly subscriptions: Disposable[] = [];
 
     register(
-        context: vscode.ExtensionContext,
+        context: ExtensionContext,
         orchestrator: TimerOrchestrator | null,
         statusBar: StatusBarController | null,
         globalAggregator: GlobalAggregator | null,
@@ -53,8 +60,8 @@ export class CommandRegistrar {
         this.registerDataControlCommands(orchestrator, statusBar, globalAggregator);
         this.registerViewAndExportCommands(context, orchestrator, statusBar);
 
-        for (const d of this.subscriptions) {
-            context.subscriptions.push(d);
+        for (const disposable of this.subscriptions) {
+            context.subscriptions.push(disposable);
         }
 
         log(LogLevel.Info, LOG_COMMANDS_REGISTERED);
@@ -73,7 +80,7 @@ export class CommandRegistrar {
             persistTimingConfig({ enabled: true, globalDisabled: false }).catch(err =>
                 log(LogLevel.Error, LOG_ENABLE_PERSIST_FAILED, err as Error)
             );
-            vscode.window.showInformationMessage(t()['cmd.enabled']);
+            window.showInformationMessage(t()['cmd.enabled']);
         });
 
         /** 注册工作区禁用计时命令契约：暂挂活动采集并持久化停用状态 */
@@ -84,7 +91,7 @@ export class CommandRegistrar {
             persistTimingConfig({ enabled: false }).catch(err =>
                 log(LogLevel.Error, LOG_DISABLE_PERSIST_FAILED, err as Error)
             );
-            vscode.window.showInformationMessage(t()['cmd.disabled']);
+            window.showInformationMessage(t()['cmd.disabled']);
         });
 
         /** 注册跨工作区全局禁用开关契约：在所有打开的窗口中全局屏蔽计时采集 */
@@ -97,7 +104,7 @@ export class CommandRegistrar {
                 log(LogLevel.Error, LOG_TOGGLE_GLOBAL_PERSIST_FAILED, err as Error)
             );
 
-            vscode.window.showInformationMessage(
+            window.showInformationMessage(
                 !current ? t()['cmd.globalDisabled'] : t()['cmd.globalEnabled']);
         });
 
@@ -108,7 +115,7 @@ export class CommandRegistrar {
             persistTimingConfig({ statusBarMode: nextMode }).catch(err =>
                 log(LogLevel.Error, LOG_SHOW_STATUS_PERSIST_FAILED, err as Error)
             );
-            vscode.window.showInformationMessage(
+            window.showInformationMessage(
                 format(t()['cmd.modeSwitched'], statusBarModeLabel(nextMode))
             );
         });
@@ -123,28 +130,28 @@ export class CommandRegistrar {
             } else if (nextOverride === ACTIVITY_MODE_MANUAL) {
                 label = t()['mode.label.manual'];
             }
-            vscode.window.showInformationMessage(format(t()['cmd.activityModeSwitched'], label));
+            window.showInformationMessage(format(t()['cmd.activityModeSwitched'], label));
         });
 
         /** 注册强制锁定为 AI 协作模式命令 */
         this.registerCommand(TIMING_COMMAND_IDS.SET_MODE_AI, () => {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
             activityWatcher.setModeOverride(ACTIVITY_MODE_AI);
-            vscode.window.showInformationMessage(t()['cmd.activityModeAi']);
+            window.showInformationMessage(t()['cmd.activityModeAi']);
         });
 
         /** 注册强制锁定为人工开发模式命令 */
         this.registerCommand(TIMING_COMMAND_IDS.SET_MODE_MANUAL, () => {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
             activityWatcher.setModeOverride(ACTIVITY_MODE_MANUAL);
-            vscode.window.showInformationMessage(t()['cmd.activityModeManual']);
+            window.showInformationMessage(t()['cmd.activityModeManual']);
         });
 
         /** 注册恢复自动智能感知模式命令 */
         this.registerCommand(TIMING_COMMAND_IDS.SET_MODE_AUTO, () => {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
             activityWatcher.setModeOverride(null);
-            vscode.window.showInformationMessage(t()['cmd.activityModeAuto']);
+            window.showInformationMessage(t()['cmd.activityModeAuto']);
         });
 
         /** 注册主动触发 AI 活跃心跳命令契约（供外部脚本、CLI Agent 调用） */
@@ -164,7 +171,7 @@ export class CommandRegistrar {
         this.registerCommand(TIMING_COMMAND_IDS.DEBUG_SAVE, async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             await orchestrator.saveNow();
-            vscode.window.showInformationMessage(format(t()['cmd.debugSaved'], 'OK'));
+            window.showInformationMessage(format(t()['cmd.debugSaved'], 'OK'));
         });
 
         /** 注册新建周期命令契约：弹出破坏性模态确认框后重置累计工时并保留历史切片 */
@@ -172,10 +179,10 @@ export class CommandRegistrar {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.newPeriod'];
             const title = t()['confirm.newPeriod.title'];
-            const confirm = await vscode.window.showWarningMessage(msg, { modal: true }, title);
+            const confirm = await window.showWarningMessage(msg, { modal: true }, title);
             if (confirm === title) {
                 await orchestrator.newPeriod();
-                vscode.window.showInformationMessage(t()['toast.newPeriod']);
+                window.showInformationMessage(t()['toast.newPeriod']);
             }
         });
 
@@ -184,12 +191,12 @@ export class CommandRegistrar {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.reset'];
             const title = t()['confirm.reset.title'];
-            const confirm = await vscode.window.showWarningMessage(msg, { modal: true }, title);
+            const confirm = await window.showWarningMessage(msg, { modal: true }, title);
 
             if (confirm === title) {
                 await orchestrator.resetAllData();
                 statusBar.updateTime(0, 0);
-                vscode.window.showInformationMessage(t()['toast.reset']);
+                window.showInformationMessage(t()['toast.reset']);
             }
         });
 
@@ -198,10 +205,10 @@ export class CommandRegistrar {
             if (!globalAggregator) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.clearGlobal'];
             const title = t()['confirm.clearGlobal.title'];
-            const confirm = await vscode.window.showWarningMessage(msg, { modal: true }, title);
+            const confirm = await window.showWarningMessage(msg, { modal: true }, title);
             if (confirm === title) {
                 await globalAggregator.reset();
-                vscode.window.showInformationMessage(t()['toast.clearGlobal']);
+                window.showInformationMessage(t()['toast.clearGlobal']);
             }
         });
 
@@ -210,11 +217,11 @@ export class CommandRegistrar {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.clearHistory'];
             const title = t()['confirm.clearHistory.title'];
-            const confirm = await vscode.window.showWarningMessage(msg, { modal: true }, title);
+            const confirm = await window.showWarningMessage(msg, { modal: true }, title);
             if (confirm === title) {
                 const data = await orchestrator.clearHistory();
                 statusBar.updateTime(data.todayMs, data.totalMs);
-                vscode.window.showInformationMessage(t()['toast.clearHistoryDone']);
+                window.showInformationMessage(t()['toast.clearHistoryDone']);
             }
         });
 
@@ -226,7 +233,7 @@ export class CommandRegistrar {
     }
 
     private registerViewAndExportCommands(
-        context: vscode.ExtensionContext,
+        context: ExtensionContext,
         orchestrator: TimerOrchestrator | null,
         statusBar: StatusBarController | null,
     ): void {
@@ -255,13 +262,13 @@ export class CommandRegistrar {
     }
 
     private registerCommand(id: string, handler: (...args: unknown[]) => unknown): void {
-        const disposable = vscode.commands.registerCommand(id, handler);
+        const disposable = commands.registerCommand(id, handler);
         this.subscriptions.push(disposable);
     }
 
     /** 降级模式提示：当前未打开工作区 */
     private noWorkspaceMsg(): void {
-        vscode.window.showWarningMessage(t()['cmd.noWorkspace']);
+        window.showWarningMessage(t()['cmd.noWorkspace']);
     }
 
     /**
@@ -275,11 +282,11 @@ export class CommandRegistrar {
         orchestrator: TimerOrchestrator,
         statusBar: StatusBarController,
     ): Promise<void> {
-        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+        const workspaceRoot = workspace.workspaceFolders?.[0]?.uri;
         if (!workspaceRoot) { this.noWorkspaceMsg(); return; }
 
-        const defaultUri = vscode.Uri.joinPath(workspaceRoot, DIR_DOT_VSCODE, FILE_TIMING_JSON);
-        const picked = await vscode.window.showOpenDialog({
+        const defaultUri = Uri.joinPath(workspaceRoot, DIR_DOT_VSCODE, FILE_TIMING_JSON);
+        const picked = await window.showOpenDialog({
             defaultUri,
             canSelectMany: false,
             filters: { [t()['export.filter.json']]: [EXT_JSON], [t()['export.filter.all']]: [WILDCARD_STAR] },
@@ -289,10 +296,10 @@ export class CommandRegistrar {
 
         let raw: unknown;
         try {
-            const bytes = await vscode.workspace.fs.readFile(picked[0]);
+            const bytes = await workspace.fs.readFile(picked[0]);
             raw = JSON.parse(Buffer.from(bytes).toString(ENCODING_UTF8));
         } catch (err) {
-            vscode.window.showErrorMessage(format(t()['toast.restoreFailed'], (err as Error).message));
+            window.showErrorMessage(format(t()['toast.restoreFailed'], (err as Error).message));
             return;
         }
 
@@ -306,23 +313,23 @@ export class CommandRegistrar {
             TimeAggregator.formatDurationCompact(dash.totalMs), String(dash.sessionsCount),
             TimeAggregator.formatDurationCompact(fileTotal), String(fileSessions));
         const title = t()['confirm.restore.title'];
-        const confirm = await vscode.window.showWarningMessage(summary, { modal: true }, title);
+        const confirm = await window.showWarningMessage(summary, { modal: true }, title);
         if (confirm !== title) return;
 
         try {
             const data = await orchestrator.restoreFrom(raw);
             statusBar.updateTime(data.todayMs, data.totalMs);
-            vscode.window.showInformationMessage(format(t()['toast.restored'], picked[0].fsPath));
+            window.showInformationMessage(format(t()['toast.restored'], picked[0].fsPath));
         } catch (err) {
             log(LogLevel.Error, LOG_RESTORE_FAILED, err as Error);
-            vscode.window.showErrorMessage(
+            window.showErrorMessage(
                 format(t()['toast.restoreFailed'], (err as Error).message));
         }
     }
 
     dispose(): void {
-        for (const d of this.subscriptions) {
-            d.dispose();
+        for (const disposable of this.subscriptions) {
+            disposable.dispose();
         }
         this.subscriptions.length = 0;
         log(LogLevel.Debug, LOG_COMMAND_REGISTRAR_DISPOSED);

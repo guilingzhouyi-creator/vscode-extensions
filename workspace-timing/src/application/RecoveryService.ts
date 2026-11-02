@@ -8,7 +8,7 @@
  */
 
 import {
-    WorkspaceTimingData,
+    type WorkspaceTimingData,
     createEmptyTimingData,
     LATEST_VERSION,
     MS_PER_DAY,
@@ -16,11 +16,11 @@ import {
     MS_PER_SECOND,
     DEFAULT_RAW_RETENTION_DAYS,
     DEFAULT_SESSION_CAP,
-    TimeSlice,
+    type TimeSlice,
 } from '../domain/models';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { migrateToFolded } from '../domain/history-folder';
-import { IJournalStore } from '../cache/IJournalStore';
+import type { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/logger';
 
 const LOG_RECOVERY_STARTED = 'RecoveryService: crash recovery started';

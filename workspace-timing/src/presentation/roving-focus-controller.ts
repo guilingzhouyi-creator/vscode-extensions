@@ -194,10 +194,10 @@ export class RovingFocusController {
     }
 
     private isItemInteractive(item: HTMLElement): boolean {
-        if (!item) return false;
-        if (item.hasAttribute(ATTR_DISABLED)) return false;
-        if (item.getAttribute(ATTR_ARIA_DISABLED) === ATTR_VAL_TRUE) return false;
-        return true;
+        if (!item || item.hasAttribute(ATTR_DISABLED)) {
+            return false;
+        }
+        return item.getAttribute(ATTR_ARIA_DISABLED) !== ATTR_VAL_TRUE;
     }
 
     private findNextIndex(items: HTMLElement[], step: number): number {

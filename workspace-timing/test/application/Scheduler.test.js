@@ -38,6 +38,9 @@ function makeSessionFake() {
         getTodayManualMs() { return 500; },
         getTodayAiMs() { return 0; },
         getTodayIdleMs() { return 0; },
+        getTodayMetrics() {
+            return { todayMs: 500, todayManualMs: 500, todayAiMs: 0, todayIdleMs: 0 };
+        },
         async saveCheckpoint() { calls.checkpoints++; },
         async handleSystemResume(sleepStartMs, resumeMs) {
             calls.resumes.push({ sleepStartMs, resumeMs });
