@@ -14,15 +14,27 @@ import {
     computeEnvelopeBounds,
     countUsefulAddedLines,
     computeAddedLinesTspr,
+    compute5dElocDelta,
     evaluateDifferentialBounds,
+    evaluateCommitBatchBounds,
     computeNetSemanticTurnover,
     calculateEmpiricalAdmissionThreshold,
     appendAdmissionAuditRecord,
     VERDICT_ADMITTED,
+    VERDICT_BLOCKED_INSUFFICIENT_TURNOVER,
     VERDICT_BLOCK_GAMING_INFLATION,
     VERDICT_BLOCK_CAPABILITY_EROSION,
+    VERDICT_BLOCK_FILE_ADD_OVERFLOW,
+    VERDICT_BLOCK_FILE_DEL_OVERFLOW,
+    VERDICT_BLOCK_BATCH_ADD_OVERFLOW,
+    VERDICT_BLOCK_BATCH_DEL_OVERFLOW,
     ADMISSION_TURNOVER_FLOOR,
     MIN_EXPANSION_ALLOWANCE_LOC,
+    MAX_COMMIT_FILE_ADD_NEW_5D_ELOC,
+    MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC,
+    MAX_COMMIT_FILE_DEL_5D_ELOC,
+    MAX_COMMIT_BATCH_ADD_5D_ELOC,
+    MAX_COMMIT_BATCH_DEL_5D_ELOC,
     CACHE_DIRECTORY_NAME,
     ADMISSION_LEDGER_FILENAME,
     type TrajectoryRunPoint,
@@ -43,8 +55,16 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
         }
     });
 
+    /**
+     * Test Suite: computeEnvelopeBounds & Line Metrics
+     * Invariants Verified:
+     * - Brand new files clamped to MAX_COMMIT_FILE_ADD_NEW_5D_ELOC (180 lines) rather than raw static budget;
+     * - Small baseline files receive MIN_EXPANSION_ALLOWANCE_LOC (60 lines) buffer;
+     * - Large baseline files clamped to MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC (120) and MAX_COMMIT_FILE_DEL_5D_ELOC (100);
+     * - Substantive line count accurately excludes cosmetic comments and pass/return boilerplate.
+     */
     describe('computeEnvelopeBounds & Line Metrics', () => {
-        it('allows full budget expansion for brand new file creation', () => {
+        it('clamps brand new file addition to atomic commit ceiling (180 5D ELOC)', () => {
             const bounds = computeEnvelopeBounds({
                 filePath: 'src/new-feature.ts',
                 oldContent: '',
@@ -54,7 +74,7 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
                 fileLocBudget: 900,
             });
 
-            expect(bounds.addMax).toBe(900);
+            expect(bounds.addMax).toBe(MAX_COMMIT_FILE_ADD_NEW_5D_ELOC);
             expect(bounds.delMax).toBe(0);
             expect(bounds.usefulAddedLines).toBe(1);
             expect(bounds.semanticDensity).toBe(1.0);
@@ -76,7 +96,7 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             expect(bounds.semanticDensity).toBe(1.0);
         });
 
-        it('bounds large files by 35% expansion ratio and remaining LOC budget', () => {
+        it('bounds large files capped at single-file commit ceilings (120 added, 100 deleted)', () => {
             const largeLines = Array.from({ length: 600 }, (_, i) => `const x${i} = ${i};`);
             const oldContent = largeLines.join('\n');
             const bounds = computeEnvelopeBounds({
@@ -88,10 +108,10 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
                 fileLocBudget: 900,
             });
 
-            // 35% of 600 = 210, remaining budget = 900 - 600 = 300, min is 210
-            expect(bounds.addMax).toBe(210);
-            // 40% of 600 = 240
-            expect(bounds.delMax).toBe(240);
+            // 35% of 600 = 210, but clamped to MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC = 120
+            expect(bounds.addMax).toBe(MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC);
+            // 40% of 600 = 240, but clamped to MAX_COMMIT_FILE_DEL_5D_ELOC = 100
+            expect(bounds.delMax).toBe(MAX_COMMIT_FILE_DEL_5D_ELOC);
         });
 
         it('accurately identifies cosmetic comments and boilerplate forwarders', () => {
@@ -114,6 +134,54 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
         });
     });
 
+    /**
+     * Test Suite: compute5dElocDelta
+     * Invariants Verified:
+     * - Decomposes changes into pure 5D ELOC additions and deletions;
+     * - Multiplies substantive added lines by token semantic payload ratio (TSPR);
+     * - Accurately strips deleted comments and boilerplate passes from deletion metrics;
+     * - Produces net turnover equal to sum of 5D addition and deletion ELOC.
+     */
+    describe('compute5dElocDelta', () => {
+        it('decomposes additions and deletions into pure 5D ELOC metrics', () => {
+            const addedLines = [
+                '// Comment header',
+                'export function processItem(item: string): number {',
+                '    const trimmed = item.trim();',
+                '    return trimmed.length;',
+                '}',
+                'pass',
+            ];
+            const deletedLines = [
+                '// Old comment',
+                'const oldLegacy = 42;',
+            ];
+
+            const delta = compute5dElocDelta({
+                filePath: 'src/service.ts',
+                oldContent: 'const oldLegacy = 42;\n',
+                newContent: addedLines.join('\n'),
+                addedLines,
+                deletedLines,
+            });
+
+            expect(delta.usefulAdded).toBe(4);
+            expect(delta.usefulDeleted).toBe(1);
+            expect(delta.eloc5dAdd).toBeGreaterThan(0);
+            expect(delta.eloc5dDel).toBe(1);
+            expect(delta.net5dTurnover).toBeCloseTo(delta.eloc5dAdd + delta.eloc5dDel, 2);
+        });
+    });
+
+    /**
+     * Test Suite: evaluateDifferentialBounds
+     * Invariants Verified:
+     * - Allows balanced substantive additions and deletions within single-file envelopes;
+     * - Intercepts gaming attempts via low TSPR or low substantive line density;
+     * - Intercepts addition volume exceeding single-file envelopes (180 for new, 120 for existing);
+     * - Intercepts deletion volume exceeding single-file erosion ceilings (100 lines);
+     * - Exempts verified refactorings with equivalent extraction or formal module retirement.
+     */
     describe('evaluateDifferentialBounds', () => {
         it('allows well-balanced substantive additions and deletions', () => {
             const oldContent = Array.from({ length: 100 }, (_, i) => `const val${i} = ${i};`).join('\n');
@@ -196,7 +264,27 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             });
 
             expect(verdict.isAllowed).toBe(false);
-            expect(verdict.verdictCode).toBe(VERDICT_BLOCK_GAMING_INFLATION);
+            expect(verdict.verdictCode).toBe(VERDICT_BLOCK_FILE_ADD_OVERFLOW);
+            expect(verdict.reason).toContain('exceeds the single-file expansion envelope');
+        });
+
+        it('intercepts brand new file exceeding atomic addition ceiling (180 lines)', () => {
+            const addedLines = Array.from(
+                { length: 200 },
+                (_, i) => `export const newEntity${i} = ${i};`,
+            );
+
+            const verdict = evaluateDifferentialBounds({
+                filePath: 'src/monolith.ts',
+                oldContent: '',
+                newContent: addedLines.join('\n'),
+                addedLines,
+                deletedLines: [],
+                fileLocBudget: 900,
+            });
+
+            expect(verdict.isAllowed).toBe(false);
+            expect(verdict.verdictCode).toBe(VERDICT_BLOCK_FILE_ADD_OVERFLOW);
             expect(verdict.reason).toContain('exceeds the single-file expansion envelope');
         });
 
@@ -215,7 +303,7 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             });
 
             expect(verdict.isAllowed).toBe(false);
-            expect(verdict.verdictCode).toBe(VERDICT_BLOCK_CAPABILITY_EROSION);
+            expect(verdict.verdictCode).toBe(VERDICT_BLOCK_FILE_DEL_OVERFLOW);
             expect(verdict.reason).toContain('exceeds safe single-file erosion ceiling');
         });
 
@@ -238,6 +326,262 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
         });
     });
 
+    /**
+     * Test Suite: evaluateCommitBatchBounds
+     * Invariants Verified:
+     * - Admits atomic commit batches within total 5D addition (<= 360) and deletion (<= 280) ceilings;
+     * - Intercepts commit batches exceeding total aggregate 5D addition ceiling (BLOCK_BATCH_ADD_OVERFLOW);
+     * - Intercepts commit batches exceeding total aggregate 5D deletion ceiling (BLOCK_BATCH_DEL_OVERFLOW);
+     * - Rejects hollow or cosmetic-only commits failing empirical admission turnover (BLOCKED_INSUFFICIENT_TURNOVER).
+     */
+    describe('evaluateCommitBatchBounds', () => {
+        const dummyRuns: TrajectoryRunPoint[] = [
+            { timestamp: 1000, netSemanticTurnover: 15.0, gatePassed: true },
+            { timestamp: 2000, netSemanticTurnover: 20.0, gatePassed: true },
+        ];
+
+        it('admits commit batch within 5D addition, deletion, and turnover limits', () => {
+            const validStagedFiles = [
+                {
+                    filePath: 'src/mod1.ts',
+                    eloc5dAdd: 40,
+                    eloc5dDel: 10,
+                    net5dTurnover: 50,
+                    rawAdd: 45,
+                    rawDel: 12,
+                    boundsVerdict: {
+                        isAllowed: true,
+                        verdictCode: VERDICT_ADMITTED,
+                        bounds: {
+                            addMin: 0,
+                            addMax: 120,
+                            delMin: 0,
+                            delMax: 100,
+                            usefulAddedLines: 40,
+                            tsprAdded: 0.9,
+                            semanticDensity: 0.95,
+                        },
+                    },
+                },
+            ];
+
+            const batchVerdict = evaluateCommitBatchBounds({
+                stagedFiles: validStagedFiles,
+                recentRuns: dummyRuns,
+                currentComplexity: 5,
+                currentEloc: 100,
+            });
+
+            expect(batchVerdict.passed).toBe(true);
+            expect(batchVerdict.verdictCode).toBe(VERDICT_ADMITTED);
+            expect(batchVerdict.total5dAdd).toBe(40);
+            expect(batchVerdict.total5dDel).toBe(10);
+            expect(batchVerdict.total5dTurnover).toBe(50);
+        });
+
+        it('intercepts commit batch exceeding aggregate 5D addition ceiling (360 lines)', () => {
+            const oversizedBatch = [
+                {
+                    filePath: 'src/part1.ts',
+                    eloc5dAdd: 170,
+                    eloc5dDel: 0,
+                    net5dTurnover: 170,
+                    rawAdd: 175,
+                    rawDel: 0,
+                    boundsVerdict: {
+                        isAllowed: true,
+                        verdictCode: VERDICT_ADMITTED,
+                        bounds: {
+                            addMin: 0,
+                            addMax: 180,
+                            delMin: 0,
+                            delMax: 100,
+                            usefulAddedLines: 170,
+                            tsprAdded: 0.95,
+                            semanticDensity: 0.98,
+                        },
+                    },
+                },
+                {
+                    filePath: 'src/part2.ts',
+                    eloc5dAdd: 150,
+                    eloc5dDel: 0,
+                    net5dTurnover: 150,
+                    rawAdd: 155,
+                    rawDel: 0,
+                    boundsVerdict: {
+                        isAllowed: true,
+                        verdictCode: VERDICT_ADMITTED,
+                        bounds: {
+                            addMin: 0,
+                            addMax: 180,
+                            delMin: 0,
+                            delMax: 100,
+                            usefulAddedLines: 150,
+                            tsprAdded: 0.95,
+                            semanticDensity: 0.98,
+                        },
+                    },
+                },
+                {
+                    filePath: 'src/part3.ts',
+                    eloc5dAdd: 80,
+                    eloc5dDel: 0,
+                    net5dTurnover: 80,
+                    rawAdd: 85,
+                    rawDel: 0,
+                    boundsVerdict: {
+                        isAllowed: true,
+                        verdictCode: VERDICT_ADMITTED,
+                        bounds: {
+                            addMin: 0,
+                            addMax: 180,
+                            delMin: 0,
+                            delMax: 100,
+                            usefulAddedLines: 80,
+                            tsprAdded: 0.95,
+                            semanticDensity: 0.98,
+                        },
+                    },
+                },
+            ];
+
+            const batchVerdict = evaluateCommitBatchBounds({
+                stagedFiles: oversizedBatch,
+                recentRuns: dummyRuns,
+                currentComplexity: 5,
+                currentEloc: 100,
+            });
+
+            expect(batchVerdict.passed).toBe(false);
+            expect(batchVerdict.verdictCode).toBe(VERDICT_BLOCK_BATCH_ADD_OVERFLOW);
+            expect(batchVerdict.reason).toContain('exceeds atomic batch ceiling (360)');
+        });
+
+        it('intercepts commit batch exceeding aggregate 5D deletion ceiling (280 lines)', () => {
+            const destructiveBatch = [
+                {
+                    filePath: 'src/del1.ts',
+                    eloc5dAdd: 0,
+                    eloc5dDel: 100,
+                    net5dTurnover: 100,
+                    rawAdd: 0,
+                    rawDel: 100,
+                    boundsVerdict: {
+                        isAllowed: true,
+                        verdictCode: VERDICT_ADMITTED,
+                        bounds: {
+                            addMin: 0,
+                            addMax: 180,
+                            delMin: 0,
+                            delMax: 100,
+                            usefulAddedLines: 0,
+                            tsprAdded: 1.0,
+                            semanticDensity: 1.0,
+                        },
+                    },
+                },
+                {
+                    filePath: 'src/del2.ts',
+                    eloc5dAdd: 0,
+                    eloc5dDel: 100,
+                    net5dTurnover: 100,
+                    rawAdd: 0,
+                    rawDel: 100,
+                    boundsVerdict: {
+                        isAllowed: true,
+                        verdictCode: VERDICT_ADMITTED,
+                        bounds: {
+                            addMin: 0,
+                            addMax: 180,
+                            delMin: 0,
+                            delMax: 100,
+                            usefulAddedLines: 0,
+                            tsprAdded: 1.0,
+                            semanticDensity: 1.0,
+                        },
+                    },
+                },
+                {
+                    filePath: 'src/del3.ts',
+                    eloc5dAdd: 0,
+                    eloc5dDel: 90,
+                    net5dTurnover: 90,
+                    rawAdd: 0,
+                    rawDel: 90,
+                    boundsVerdict: {
+                        isAllowed: true,
+                        verdictCode: VERDICT_ADMITTED,
+                        bounds: {
+                            addMin: 0,
+                            addMax: 180,
+                            delMin: 0,
+                            delMax: 100,
+                            usefulAddedLines: 0,
+                            tsprAdded: 1.0,
+                            semanticDensity: 1.0,
+                        },
+                    },
+                },
+            ];
+
+            const batchVerdict = evaluateCommitBatchBounds({
+                stagedFiles: destructiveBatch,
+                recentRuns: dummyRuns,
+                currentComplexity: 5,
+                currentEloc: 100,
+            });
+
+            expect(batchVerdict.passed).toBe(false);
+            expect(batchVerdict.verdictCode).toBe(VERDICT_BLOCK_BATCH_DEL_OVERFLOW);
+            expect(batchVerdict.reason).toContain('exceeds safe deletion ceiling (280)');
+        });
+
+        it('rejects hollow commit batch failing empirical admission turnover', () => {
+            const hollowBatch = [
+                {
+                    filePath: 'src/hollow.ts',
+                    eloc5dAdd: 0.5,
+                    eloc5dDel: 0,
+                    net5dTurnover: 0.5,
+                    rawAdd: 5,
+                    rawDel: 0,
+                    boundsVerdict: {
+                        isAllowed: true,
+                        verdictCode: VERDICT_ADMITTED,
+                        bounds: {
+                            addMin: 0,
+                            addMax: 120,
+                            delMin: 0,
+                            delMax: 100,
+                            usefulAddedLines: 1,
+                            tsprAdded: 0.5,
+                            semanticDensity: 0.2,
+                        },
+                    },
+                },
+            ];
+
+            const batchVerdict = evaluateCommitBatchBounds({
+                stagedFiles: hollowBatch,
+                recentRuns: dummyRuns,
+                currentComplexity: 5,
+                currentEloc: 100,
+            });
+
+            expect(batchVerdict.passed).toBe(false);
+            expect(batchVerdict.verdictCode).toBe(VERDICT_BLOCKED_INSUFFICIENT_TURNOVER);
+            expect(batchVerdict.reason).toContain('below empirical admission threshold');
+        });
+    });
+
+    /**
+     * Test Suite: computeNetSemanticTurnover
+     * Invariants Verified:
+     * - Subtracts relocated and cosmetic churn from raw additions and deletions;
+     * - Accurately bounds net turnover >= 0 with deterministic round-off precision;
+     * - Yields unit turnover ratio for zero-change edge case without divide-by-zero anomaly.
+     */
     describe('computeNetSemanticTurnover', () => {
         it('calculates net turnover subtracting relocated and cosmetic churn', () => {
             const turnover = computeNetSemanticTurnover({
@@ -272,6 +616,13 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
         });
     });
 
+    /**
+     * Test Suite: calculateEmpiricalAdmissionThreshold
+     * Invariants Verified:
+     * - Returns ADMISSION_TURNOVER_FLOOR (3.0) on empty trajectory history;
+     * - Dynamically calibrates admission threshold using Jeffreys Beta posterior confidence;
+     * - Damps admission threshold when cyclomatic noise index is elevated.
+     */
     describe('calculateEmpiricalAdmissionThreshold', () => {
         it('defaults to mathematical floor on empty trajectory history', () => {
             const result = calculateEmpiricalAdmissionThreshold({
@@ -329,6 +680,13 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
         });
     });
 
+    /**
+     * Test Suite: appendAdmissionAuditRecord
+     * Invariants Verified:
+     * - Appends structured audit record asynchronously to local cache NDJSON file;
+     * - Appends structured audit record synchronously without throwing on process exit;
+     * - Accurately serializes staging digest, turnover metrics, and Bayesian factor diagnostics.
+     */
     describe('appendAdmissionAuditRecord', () => {
         it('appends structured audit record to cache ledger file', async () => {
             const record = {

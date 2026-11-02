@@ -47,6 +47,18 @@ export const MIN_EXPANSION_ALLOWANCE_LOC = 60;
 /** Maximum expansion fraction of current LOC allowed in a single un-decoupled atomic change. */
 export const MAX_EXPANSION_LOC_RATIO = 0.35;
 
+/** Maximum single-file added 5D ELOC allowed in a single commit for a brand new file. */
+export const MAX_COMMIT_FILE_ADD_NEW_5D_ELOC = 180;
+
+/** Maximum single-file added 5D ELOC allowed in a single commit for an existing file. */
+export const MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC = 120;
+
+/** Maximum single-file deleted 5D ELOC allowed in a single commit without formal retirement. */
+export const MAX_COMMIT_FILE_DEL_5D_ELOC = 100;
+
+/** Minimum substantive useful 5D turnover required for admission. */
+export const MIN_SUBSTANTIVE_TURNOVER_FLOOR = 1.0;
+
 /** Mathematical floor for minimum admission turnover (based on AST block minimum depth). */
 export const ADMISSION_TURNOVER_FLOOR = 3.0;
 
@@ -101,12 +113,28 @@ export const VERDICT_BLOCK_GAMING_INFLATION = 'BLOCK_GAMING_INFLATION';
 /** Verdict code when deletions erode defensive capability or integrity checks. */
 export const VERDICT_BLOCK_CAPABILITY_EROSION = 'CAPABILITY_EROSION_GUARD';
 
+/** Verdict code when single-file addition volume exceeds the atomic commit batch ceiling. */
+export const VERDICT_BLOCK_FILE_ADD_OVERFLOW = 'BLOCK_FILE_ADD_OVERFLOW';
+
+/** Verdict code when single-file deletion volume exceeds the atomic commit batch ceiling. */
+export const VERDICT_BLOCK_FILE_DEL_OVERFLOW = 'BLOCK_FILE_DEL_OVERFLOW';
+
+/** Verdict code when aggregated commit batch additions exceed the atomic batch ceiling. */
+export const VERDICT_BLOCK_BATCH_ADD_OVERFLOW = 'BLOCK_BATCH_ADD_OVERFLOW';
+
+/** Verdict code when aggregated commit batch deletions exceed the atomic batch ceiling. */
+export const VERDICT_BLOCK_BATCH_DEL_OVERFLOW = 'BLOCK_BATCH_DEL_OVERFLOW';
+
 /** Canonical verdict status for differential bounds checks. */
 export type DifferentialVerdictCode =
     | typeof VERDICT_ADMITTED
     | typeof VERDICT_BLOCKED_INSUFFICIENT_TURNOVER
     | typeof VERDICT_BLOCK_GAMING_INFLATION
-    | typeof VERDICT_BLOCK_CAPABILITY_EROSION;
+    | typeof VERDICT_BLOCK_CAPABILITY_EROSION
+    | typeof VERDICT_BLOCK_FILE_ADD_OVERFLOW
+    | typeof VERDICT_BLOCK_FILE_DEL_OVERFLOW
+    | typeof VERDICT_BLOCK_BATCH_ADD_OVERFLOW
+    | typeof VERDICT_BLOCK_BATCH_DEL_OVERFLOW;
 
 /**
  * Parameters for evaluating differential bounds on a single file change.
@@ -132,6 +160,9 @@ export interface DifferentialEnvelopeBounds {
     readonly delMin: number;
     readonly delMax: number;
     readonly usefulAddedLines: number;
+    readonly usefulDeletedLines: number;
+    readonly eloc5dAdd: number;
+    readonly eloc5dDel: number;
     readonly tsprAdded: number;
     readonly semanticDensity: number;
 }
@@ -144,6 +175,22 @@ export interface DifferentialBoundsVerdict {
     readonly verdictCode: DifferentialVerdictCode;
     readonly bounds: DifferentialEnvelopeBounds;
     readonly reason?: string;
+}
+
+/**
+ * Decomposed 5D ELOC differential metrics for a single file.
+ */
+export interface File5dElocDelta {
+    readonly filePath: string;
+    readonly eloc5dAdd: number;
+    readonly eloc5dDel: number;
+    readonly net5dTurnover: number;
+    readonly rawAdd: number;
+    readonly rawDel: number;
+    readonly usefulAdded: number;
+    readonly usefulDeleted: number;
+    readonly tsprAdded: number;
+    readonly semanticDensity: number;
 }
 
 /**
@@ -275,32 +322,39 @@ export function computeEnvelopeBounds(params: DifferentialBoundsParams): Differe
     const fileLocBudget = params.fileLocBudget ?? DEFAULT_FILE_LOC_BUDGET;
     const isNewFile = originalLineCount === 0;
 
-    // 1. Addition envelope bounds
+    // 1. Addition envelope bounds (decoupled from static budget, clamped to atomic batch ceiling)
     const maxExpansionByRatio = Math.max(
         MIN_EXPANSION_ALLOWANCE_LOC,
         Math.floor(originalLineCount * MAX_EXPANSION_LOC_RATIO),
     );
     const remainingBudget = Math.max(0, fileLocBudget - originalLineCount);
     const additionUpperBound = isNewFile
-        ? fileLocBudget
-        : Math.max(
-            Math.min(MIN_EXPANSION_ALLOWANCE_LOC, remainingBudget),
+        ? Math.min(fileLocBudget, MAX_COMMIT_FILE_ADD_NEW_5D_ELOC)
+        : Math.min(
+            MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC,
             Math.min(remainingBudget, maxExpansionByRatio),
         );
     const additionLowerBound = 0;
 
     // 2. Addition payload density measurements
     const usefulAddedLines = countUsefulAddedLines(params.addedLines);
+    const usefulDeletedLines = countUsefulAddedLines(params.deletedLines);
     const tsprAdded = computeAddedLinesTspr(params.addedLines, params.language);
     const semanticDensity = params.addedLines.length > 0
         ? safeDivide(usefulAddedLines, params.addedLines.length)
         : 1.0;
+    const raw5dAdd = usefulAddedLines * tsprAdded;
+    const eloc5dAdd = Math.round(raw5dAdd * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+    const eloc5dDel = usefulDeletedLines;
 
-    // 3. Deletion envelope bounds
+    // 3. Deletion envelope bounds (clamped to atomic batch ceiling)
     const deletionLowerBound = 0;
     const deletionUpperBound = isNewFile
         ? 0
-        : Math.max(MIN_DELETION_ALLOWANCE_LOC, Math.floor(originalLineCount * MAX_DELETION_FRACTION_EROSION));
+        : Math.min(
+            MAX_COMMIT_FILE_DEL_5D_ELOC,
+            Math.max(MIN_DELETION_ALLOWANCE_LOC, Math.floor(originalLineCount * MAX_DELETION_FRACTION_EROSION)),
+        );
 
     return {
         addMin: additionLowerBound,
@@ -308,9 +362,45 @@ export function computeEnvelopeBounds(params: DifferentialBoundsParams): Differe
         delMin: deletionLowerBound,
         delMax: deletionUpperBound,
         usefulAddedLines,
+        usefulDeletedLines,
+        eloc5dAdd,
+        eloc5dDel,
         tsprAdded,
         semanticDensity,
     };
+}
+
+/**
+ * Computes pure 5D ELOC additions, deletions, and net turnover for a file change.
+ *
+ * Excludes cosmetic comments, blanks, boilerplate passes, and relocated lines,
+ * scaling additions by token semantic payload ratio (TSPR).
+ *
+ * @param params - File differential parameters.
+ * @returns Decomposed 5D ELOC delta metrics.
+ */
+export function compute5dElocDelta(params: DifferentialBoundsParams): File5dElocDelta {
+    const bounds = computeEnvelopeBounds(params);
+    const rawTurnover = bounds.eloc5dAdd + bounds.eloc5dDel;
+    const net5dTurnover = Math.round(rawTurnover * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+
+    return {
+        filePath: params.filePath,
+        eloc5dAdd: bounds.eloc5dAdd,
+        eloc5dDel: bounds.eloc5dDel,
+        net5dTurnover,
+        rawAdd: params.addedLines.length,
+        rawDel: params.deletedLines.length,
+        usefulAdded: bounds.usefulAddedLines,
+        usefulDeleted: bounds.usefulDeletedLines,
+        tsprAdded: bounds.tsprAdded,
+        semanticDensity: bounds.semanticDensity,
+    };
+}
+
+interface ViolationCheckResult {
+    readonly verdictCode: DifferentialVerdictCode;
+    readonly reason: string;
 }
 
 /**
@@ -318,32 +408,38 @@ export function computeEnvelopeBounds(params: DifferentialBoundsParams): Differe
  *
  * @param addedLineCount - Count of added lines.
  * @param bounds - Computed envelope bounds.
- * @returns Violation reason if inflation detected, undefined otherwise.
+ * @returns Violation detail if inflation detected, undefined otherwise.
  */
 function checkAdditionInflation(
     addedLineCount: number,
     bounds: DifferentialEnvelopeBounds,
-): string | undefined {
+): ViolationCheckResult | undefined {
     if (addedLineCount <= INFLATION_SAMPLE_LINE_THRESHOLD) {
         return undefined;
     }
     if (bounds.tsprAdded < MIN_TSPR_ADDED_THRESHOLD) {
-        return (
-            `Addition token semantic payload ratio TSPR (${bounds.tsprAdded.toFixed(3)}) is below ` +
-            `the required minimum threshold (${MIN_TSPR_ADDED_THRESHOLD.toFixed(3)}) across ${addedLineCount} added lines.`
-        );
+        return {
+            verdictCode: VERDICT_BLOCK_GAMING_INFLATION,
+            reason:
+                `Addition token semantic payload ratio TSPR (${bounds.tsprAdded.toFixed(3)}) is below ` +
+                `the required minimum threshold (${MIN_TSPR_ADDED_THRESHOLD.toFixed(3)}) across ${addedLineCount} added lines.`,
+        };
     }
     if (bounds.semanticDensity < MIN_SEMANTIC_LINE_DENSITY) {
-        return (
-            `Addition substantive line density (${bounds.semanticDensity.toFixed(3)}) is below ` +
-            `the required minimum threshold (${MIN_SEMANTIC_LINE_DENSITY.toFixed(3)}) with ${bounds.usefulAddedLines}/${addedLineCount} substantive lines.`
-        );
+        return {
+            verdictCode: VERDICT_BLOCK_GAMING_INFLATION,
+            reason:
+                `Addition substantive line density (${bounds.semanticDensity.toFixed(3)}) is below ` +
+                `the required minimum threshold (${MIN_SEMANTIC_LINE_DENSITY.toFixed(3)}) with ${bounds.usefulAddedLines}/${addedLineCount} substantive lines.`,
+        };
     }
-    if (addedLineCount > bounds.addMax) {
-        return (
-            `Addition volume (${addedLineCount} lines) exceeds the single-file expansion envelope ` +
-            `(${bounds.addMax} lines). Modularize into smaller decoupled components before integrating.`
-        );
+    if (bounds.eloc5dAdd > bounds.addMax) {
+        return {
+            verdictCode: VERDICT_BLOCK_FILE_ADD_OVERFLOW,
+            reason:
+                `Addition 5D ELOC volume (${bounds.eloc5dAdd.toFixed(1)} lines) exceeds the single-file expansion envelope ` +
+                `(${bounds.addMax} lines). Modularize into smaller decoupled components before integrating.`,
+        };
     }
     return undefined;
 }
@@ -354,23 +450,25 @@ function checkAdditionInflation(
  * @param deletedLineCount - Count of deleted lines.
  * @param bounds - Computed envelope bounds.
  * @param params - Differential bounds evaluation parameters.
- * @returns Violation reason if erosion detected, undefined otherwise.
+ * @returns Violation detail if erosion detected, undefined otherwise.
  */
 function checkCapabilityErosion(
     deletedLineCount: number,
     bounds: DifferentialEnvelopeBounds,
     params: DifferentialBoundsParams,
-): string | undefined {
-    if (deletedLineCount <= bounds.delMax) {
+): ViolationCheckResult | undefined {
+    if (bounds.eloc5dDel <= bounds.delMax) {
         return undefined;
     }
     if (params.hasEquivalentExtraction || params.isFormalRetirement) {
         return undefined;
     }
-    return (
-        `Deletion volume (${deletedLineCount} lines) exceeds safe single-file erosion ceiling ` +
-        `(${bounds.delMax} lines) without verified equivalent module extraction or formal retirement.`
-    );
+    return {
+        verdictCode: VERDICT_BLOCK_FILE_DEL_OVERFLOW,
+        reason:
+            `Deletion 5D ELOC volume (${bounds.eloc5dDel} lines) exceeds safe single-file erosion ceiling ` +
+            `(${bounds.delMax} lines) without verified equivalent module extraction or formal retirement.`,
+    };
 }
 
 /**
@@ -384,23 +482,23 @@ export function evaluateDifferentialBounds(params: DifferentialBoundsParams): Di
     const addedLineCount = params.addedLines.length;
     const deletedLineCount = params.deletedLines.length;
 
-    const inflationReason = checkAdditionInflation(addedLineCount, bounds);
-    if (inflationReason) {
+    const inflationViolation = checkAdditionInflation(addedLineCount, bounds);
+    if (inflationViolation) {
         return {
             isAllowed: false,
-            verdictCode: VERDICT_BLOCK_GAMING_INFLATION,
+            verdictCode: inflationViolation.verdictCode,
             bounds,
-            reason: inflationReason,
+            reason: inflationViolation.reason,
         };
     }
 
-    const erosionReason = checkCapabilityErosion(deletedLineCount, bounds, params);
-    if (erosionReason) {
+    const erosionViolation = checkCapabilityErosion(deletedLineCount, bounds, params);
+    if (erosionViolation) {
         return {
             isAllowed: false,
-            verdictCode: VERDICT_BLOCK_CAPABILITY_EROSION,
+            verdictCode: erosionViolation.verdictCode,
             bounds,
-            reason: erosionReason,
+            reason: erosionViolation.reason,
         };
     }
 
@@ -540,3 +638,5 @@ export async function appendAdmissionAuditRecord(
         void appendError;
     }
 }
+
+export * from './diff-bounds-batch';

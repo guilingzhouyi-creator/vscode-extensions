@@ -305,15 +305,11 @@ function isIssueWithinSlices(issue, allSlices) {
 function parseTrajectoryLine(line) {
   try {
     const item = JSON.parse(line);
-    if (!item || !item.eloc) return null;
-    const semanticCount = Number(item.eloc.sem) || 0;
-    const relocatedCount = Number(item.eloc.reloc) || 0;
-    const cosmeticCount = Number(item.eloc.cosm) || 0;
+    if (!item) return null;
     return {
-      timestamp: item.t || Date.now(),
-      netSemanticTurnover: Math.max(0, semanticCount - relocatedCount - cosmeticCount),
-      gatePassed: Boolean(item.gate?.pass),
-      effectiveLoc: Number(item.eloc.proc) || 0,
+      timestamp: item.timestamp || item.t || Date.now(),
+      netSemanticTurnover: Number(item.netSemanticTurnover) || 0,
+      gatePassed: item.verdict === 'ADMITTED' || Boolean(item.gate?.pass),
     };
   } catch {
     return null;
@@ -321,20 +317,26 @@ function parseTrajectoryLine(line) {
 }
 
 function loadRecentTrajectoryRuns(maxCount = 20) {
-  const trajFile = path.join(ROOT, '.refactor-trajectory', 'active-runs.ndjson');
-  if (!fs.existsSync(trajFile)) return [];
-  try {
-    const raw = fs.readFileSync(trajFile, 'utf8').trim();
-    if (!raw) return [];
-    return raw
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .slice(-maxCount)
-      .map(parseTrajectoryLine)
-      .filter(Boolean);
-  } catch {
-    return [];
+  const ledgerFile = path.join(ROOT, '.auto-refactor-cache', 'admission-turnover-ledger.ndjson');
+  if (fs.existsSync(ledgerFile)) {
+    try {
+      const raw = fs.readFileSync(ledgerFile, 'utf8').trim();
+      if (raw) {
+        const records = raw
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .slice(-maxCount)
+          .map(parseTrajectoryLine)
+          .filter(Boolean);
+        if (records.length > 0) {
+          return records;
+        }
+      }
+    } catch {
+      // ignore read failure
+    }
   }
+  return [];
 }
 
 /**
@@ -370,18 +372,19 @@ function extractFileDiffLines(oldContent, newContent) {
  * @param targetFiles - Array of relative file paths.
  * @returns Structured admission evaluation verdict.
  */
-function evaluateAdmissionTurnover(targetFiles) {
+async function evaluateAdmissionTurnover(targetFiles) {
   const {
     computeNetSemanticTurnover,
     evaluateDifferentialBounds,
+    compute5dElocDelta,
+    evaluateCommitBatchBounds,
     calculateEmpiricalAdmissionThreshold,
     appendAdmissionAuditRecord,
     DEFAULT_TRAJECTORY_WINDOW_SIZE,
-    VERDICT_ADMITTED,
-    VERDICT_BLOCKED_INSUFFICIENT_TURNOVER,
   } = require(MODULE_DIFF_BOUNDS_GOVERNOR);
   const { classifySemanticDelta } = require(MODULE_SEMANTIC_CLASSIFIER);
 
+  const stagedFiles = [];
   let accumulatedSemanticAdded = 0;
   let accumulatedSemanticDeleted = 0;
   let accumulatedRelocated = 0;
@@ -413,6 +416,24 @@ function evaluateAdmissionTurnover(targetFiles) {
       };
     }
 
+    const file5dDelta = compute5dElocDelta({
+      filePath: relPath,
+      oldContent,
+      newContent: currentContent,
+      addedLines,
+      deletedLines,
+    });
+
+    stagedFiles.push({
+      filePath: relPath,
+      eloc5dAdd: file5dDelta.eloc5dAdd,
+      eloc5dDel: file5dDelta.eloc5dDel,
+      net5dTurnover: file5dDelta.net5dTurnover,
+      rawAdd: addedLines.length,
+      rawDel: deletedLines.length,
+      boundsVerdict,
+    });
+
     const delta = classifySemanticDelta(relPath, oldContent, currentContent);
     accumulatedSemanticAdded += delta.counters.added;
     accumulatedSemanticDeleted += delta.counters.deleted;
@@ -432,26 +453,30 @@ function evaluateAdmissionTurnover(targetFiles) {
   });
 
   const recentRuns = loadRecentTrajectoryRuns(DEFAULT_TRAJECTORY_WINDOW_SIZE);
+  const batchVerdict = evaluateCommitBatchBounds({
+    stagedFiles,
+    recentRuns,
+    currentComplexity: DEFAULT_SLICE_COMPLEXITY_ESTIMATE,
+    currentEloc: Math.max(1, accumulatedSemanticAdded + accumulatedSemanticDeleted),
+  });
+
   const admission = calculateEmpiricalAdmissionThreshold({
     recentRuns,
     currentComplexity: DEFAULT_SLICE_COMPLEXITY_ESTIMATE,
     currentEloc: Math.max(1, accumulatedSemanticAdded + accumulatedSemanticDeleted),
   });
 
-  const passed = turnover.netSemanticTurnover >= admission.threshold;
-  const verdictCode = passed ? VERDICT_ADMITTED : VERDICT_BLOCKED_INSUFFICIENT_TURNOVER;
-
-  // Asynchronously record audit ledger entry
-  void appendAdmissionAuditRecord(
+  // Record audit ledger entry
+  await appendAdmissionAuditRecord(
     {
       timestamp: Date.now(),
       commitStagingDigest: `scan-${process.pid}`,
-      lAdd: accumulatedPhysicalAdded,
-      lDel: accumulatedPhysicalDeleted,
-      netSemanticTurnover: turnover.netSemanticTurnover,
-      admissionThreshold: admission.threshold,
+      lAdd: batchVerdict.total5dAdd,
+      lDel: batchVerdict.total5dDel,
+      netSemanticTurnover: batchVerdict.total5dTurnover,
+      admissionThreshold: batchVerdict.admissionThreshold,
       turnoverRatio: turnover.turnoverRatio,
-      verdict: verdictCode,
+      verdict: batchVerdict.verdictCode,
       factors: {
         rollingMean: admission.rollingMean,
         rollingStdDev: admission.rollingStdDev,
@@ -463,14 +488,12 @@ function evaluateAdmissionTurnover(targetFiles) {
   );
 
   return {
-    passed,
-    verdictCode,
-    netSemanticTurnover: turnover.netSemanticTurnover,
-    admissionThreshold: admission.threshold,
+    passed: batchVerdict.passed,
+    verdictCode: batchVerdict.verdictCode,
+    netSemanticTurnover: batchVerdict.total5dTurnover,
+    admissionThreshold: batchVerdict.admissionThreshold,
     turnoverRatio: turnover.turnoverRatio,
-    reason: passed
-      ? undefined
-      : `Net semantic turnover (${turnover.netSemanticTurnover.toFixed(1)}) is below empirical admission threshold (${admission.threshold.toFixed(1)})`,
+    reason: batchVerdict.passed ? undefined : batchVerdict.reason,
   };
 }
 
@@ -588,7 +611,7 @@ async function main() {
   }
 
   if (!isSmoke && !cliArguments.includes('--no-turnover-check')) {
-    const admissionVerdict = evaluateAdmissionTurnover(targetFiles);
+    const admissionVerdict = await evaluateAdmissionTurnover(targetFiles);
     if (!admissionVerdict.passed) {
       logGateError(
         `✖ ${admissionVerdict.verdictCode}: ${admissionVerdict.reason || 'failed minimum admission criteria'}`,
