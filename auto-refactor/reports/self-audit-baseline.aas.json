@@ -2,41 +2,41 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-02T04:14:35.016Z",
+  "timestamp": "2026-11-02T04:39:54.704Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
     "score": 99.21,
     "grade": "A+",
-    "cai": 88.32,
+    "cai": 88.33,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
       "averageTspr": 0.918,
       "averagePor": 0.082,
       "averageColumnDensity": 0.868,
-      "averageSpatialDensity": 0.455,
-      "averageMahalanobisDistance": 4.489,
+      "averageSpatialDensity": 0.454,
+      "averageMahalanobisDistance": 4.5,
       "averageFisherSimplexDistance": 0.093
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 27228,
+      "remediationMinutes": 27115,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.59,
-      "meanScore": 96.59,
+      "index": 96.61,
+      "meanScore": 96.61,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "quant": {
       "rcr": 0,
-      "erq": 1.45,
-      "ddr": 2.58,
-      "edb95": 17.31,
-      "ptd": 36.28,
+      "erq": 1.39,
+      "ddr": 2.51,
+      "edb95": 17.53,
+      "ptd": 36.09,
       "dsi": 0.51,
       "rcd": 0.67,
       "ehl": 1,
@@ -47,32 +47,32 @@
       "warningCount": 0,
       "failingCount": 0,
       "lowestDimension": "standardization",
-      "lowestScore": 96.05
+      "lowestScore": 96.08
     },
     "pillars": {
       "architecture": 99.59,
-      "maintainability": 98.16,
+      "maintainability": 98.18,
       "performance": 99.84,
       "data": 98.55,
-      "testing": 99.79,
+      "testing": 99.8,
       "reliability": 99.74,
       "security": 99.88,
-      "extensibility": 97.88
+      "extensibility": 97.89
     },
     "counts": {
-      "files": 815,
-      "total": 3949,
+      "files": 817,
+      "total": 3930,
       "errors": 0,
-      "warns": 3391,
-      "info": 558,
+      "warns": 3375,
+      "info": 555,
       "suppressed": 72
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1617,
-    "advisory": 2332,
-    "uncalibrated": 60,
+    "patchable": 1606,
+    "advisory": 2324,
+    "uncalibrated": 51,
     "needsHuman": 1
   },
   "defaultVerify": "npm test",
@@ -81,11 +81,11 @@
     "semanticPurity": 99.5,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.84,
-    "standardization": 96.05,
-    "modernity": 99.79,
-    "maintainability": 98.16,
+    "standardization": 96.08,
+    "modernity": 99.8,
+    "maintainability": 98.18,
     "commentQuality": 99.99,
-    "duplication": 97.6,
+    "duplication": 97.61,
     "techDebtRisk": 99.98
   },
   "dimensionDetails": {
@@ -105,7 +105,7 @@
       ]
     },
     "semanticPurity": {
-      "score": 98.31,
+      "score": 98.32,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -126,7 +126,7 @@
       "confidence": 1
     },
     "standardization": {
-      "score": 84.87,
+      "score": 84.96,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
@@ -141,14 +141,14 @@
       ]
     },
     "modernity": {
-      "score": 98.07,
+      "score": 98.09,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.074,
       "confidence": 1
     },
     "maintainability": {
-      "score": 93.64,
+      "score": 93.67,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
@@ -162,7 +162,7 @@
       "confidence": 1
     },
     "duplication": {
-      "score": 95.38,
+      "score": 95.39,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -180,14 +180,14 @@
     {
       "rule": "large-file",
       "dim": "standardization",
-      "loss": 3440,
-      "count": 238
+      "loss": 3425,
+      "count": 237
     },
     {
       "rule": "SIM-ARGS-001",
       "dim": "standardization",
-      "loss": 3140,
-      "count": 314
+      "loss": 3100,
+      "count": 310
     },
     {
       "rule": "CPX-NEST-001",
@@ -210,8 +210,8 @@
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2070,
-      "count": 414
+      "loss": 2050,
+      "count": 410
     },
     {
       "rule": "SIM-LONG-001",
@@ -264,7 +264,6 @@
       "src/core/scoring/hierarchicalScorer.ts",
       "src/core/trajectory/trajectory-accumulator.ts",
       "src/core/ast-pattern/structural-pattern-engine.ts",
-      "src/core/ast/ts-projector.ts",
       "src/core/data-structures/regex-pool.ts",
       "src/core/intelligence/token-entropy.ts",
       "src/core/memory/memory-governor.ts",
@@ -278,6 +277,7 @@
       "src/analyzers/hygiene-file-helper.ts",
       "src/core/architecture/metaArchitectureEvaluator.ts",
       "src/core/ast/python-adapter.ts",
+      "src/core/ast/ts-projector.ts",
       "src/core/comments/comment-auditor.ts",
       "src/core/domain-matcher/pattern-matcher.ts",
       "src/core/evolution/code-survival-model.ts",
@@ -3426,176 +3426,6 @@
         "conf": 0.89
       }
     ],
-    "src/core/ast/ts-projector.ts": [
-      {
-        "line": 133,
-        "rule": "TSM-CTOR-001",
-        "sev": "WARN",
-        "msg": "Wrapper constructor called with `new`; a literal or the primitive is equivalent",
-        "fix": {
-          "action": "replace_token",
-          "template": "[]",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9
-      },
-      {
-        "line": 140,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'kindInfoFor' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 140,
-              "startCol": 10,
-              "endLine": 140,
-              "endCol": 21
-            },
-            "replacementText": "tsKindInfo"
-          },
-          "template": "tsKindInfo",
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 177,
-        "col": 22,
-        "rule": "NAM-ABR-001",
-        "sev": "WARN",
-        "msg": "identifier 'sf' unapproved abbr 'sf'",
-        "fix": {
-          "action": "replace_token",
-          "template": "sourceFile",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.9
-      },
-      {
-        "line": 287,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "fn 'resolveProjectedPositions' params 5 > 4",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface ResolveProjectedPositionsOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 402,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "fn 'applyProjectedMetadata' params 5 > 4",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface ApplyProjectedMetadataOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 444,
-        "col": 5,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'forEachChild' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "template": "iterable",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 567,
-        "col": 5,
-        "rule": "SIM-ARGS-001",
-        "sev": "WARN",
-        "msg": "fn 'applyCheapNonFunctionProps' params 5 > 4",
-        "fix": {
-          "action": "introduce_parameter_object",
-          "template": "export interface ApplyCheapNonFunctionPropsOptions {",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 578,
-        "col": 13,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'cheapProject' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "template": "normalizedNode",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 1,
-        "rule": "large-file",
-        "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 607 >= warn threshold 400; functions 34 >= warn threshold 20)",
-        "fix": {
-          "action": "split_file"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 54,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'maxSyntaxKind' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 434,
-        "col": 13,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'greatGrandparentOf' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 519,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 410",
-        "fix": {
-          "action": "sanitize_hygiene"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      }
-    ],
     "src/core/data-structures/regex-pool.ts": [
       {
         "line": 44,
@@ -5353,6 +5183,176 @@
           "action": "replace_token",
           "template": "import $1 from $2;",
           "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      }
+    ],
+    "src/core/ast/ts-projector.ts": [
+      {
+        "line": 140,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'kindInfoFor' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "patch": {
+            "range": {
+              "startLine": 140,
+              "startCol": 10,
+              "endLine": 140,
+              "endCol": 21
+            },
+            "replacementText": "tsKindInfo"
+          },
+          "template": "tsKindInfo",
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 177,
+        "col": 22,
+        "rule": "NAM-ABR-001",
+        "sev": "WARN",
+        "msg": "identifier 'sf' unapproved abbr 'sf'",
+        "fix": {
+          "action": "replace_token",
+          "template": "sourceFile",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.9
+      },
+      {
+        "line": 287,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "fn 'resolveProjectedPositions' params 5 > 4",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ResolveProjectedPositionsOptions {",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 402,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "fn 'applyProjectedMetadata' params 5 > 4",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ApplyProjectedMetadataOptions {",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 444,
+        "col": 5,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'forEachChild' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "template": "iterable",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 567,
+        "col": 5,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "fn 'applyCheapNonFunctionProps' params 5 > 4",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface ApplyCheapNonFunctionPropsOptions {",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 578,
+        "col": 13,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'cheapProject' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "template": "normalizedNode",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 607 >= warn threshold 400; functions 34 >= warn threshold 20)",
+        "fix": {
+          "action": "split_file"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 54,
+        "col": 10,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'maxSyntaxKind' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 133,
+        "rule": "TSM-CTOR-001",
+        "sev": "WARN",
+        "msg": "Wrapper constructor called with `new`; a literal or the primitive is equivalent",
+        "fix": {
+          "action": "replace_token",
+          "template": "[]",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 434,
+        "col": 13,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'greatGrandparentOf' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 519,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 410",
+        "fix": {
+          "action": "sanitize_hygiene"
         },
         "tier": "T3",
         "conf": 0.89
@@ -7393,8 +7393,5 @@
       }
     ]
   },
-  "truncated": 2881,
-  "notes": [
-    "dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph"
-  ]
+  "truncated": 2865
 }
