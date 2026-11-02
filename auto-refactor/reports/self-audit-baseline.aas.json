@@ -2,13 +2,13 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-01T13:11:03.274Z",
+  "timestamp": "2026-11-02T03:38:53.105Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.19,
+    "score": 99.2,
     "grade": "A+",
-    "cai": 88.28,
+    "cai": 88.3,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
@@ -16,27 +16,27 @@
       "averagePor": 0.082,
       "averageColumnDensity": 0.868,
       "averageSpatialDensity": 0.455,
-      "averageMahalanobisDistance": 4.489,
+      "averageMahalanobisDistance": 4.488,
       "averageFisherSimplexDistance": 0.093
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 28374,
+      "remediationMinutes": 28026,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.53,
-      "meanScore": 96.53,
+      "index": 96.54,
+      "meanScore": 96.54,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "quant": {
       "rcr": 0,
-      "erq": 0.65,
-      "ddr": 0.8,
-      "edb95": 15.5,
-      "ptd": 36.2,
+      "erq": 2.93,
+      "ddr": 629.36,
+      "edb95": 26.88,
+      "ptd": 36.72,
       "dsi": 0.51,
       "rcd": 0.67,
       "ehl": 1,
@@ -47,45 +47,45 @@
       "warningCount": 0,
       "failingCount": 0,
       "lowestDimension": "standardization",
-      "lowestScore": 95.95
+      "lowestScore": 96.01
     },
     "pillars": {
       "architecture": 99.58,
       "maintainability": 98.16,
-      "performance": 99.83,
-      "data": 98.47,
+      "performance": 99.84,
+      "data": 98.5,
       "testing": 99.79,
-      "reliability": 99.73,
+      "reliability": 99.74,
       "security": 99.88,
-      "extensibility": 97.8
+      "extensibility": 97.83
     },
     "counts": {
       "files": 815,
-      "total": 4104,
+      "total": 4042,
       "errors": 0,
-      "warns": 3523,
-      "info": 581,
+      "warns": 3475,
+      "info": 567,
       "suppressed": 112
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1702,
-    "advisory": 2402,
-    "uncalibrated": 112,
+    "patchable": 1683,
+    "advisory": 2359,
+    "uncalibrated": 102,
     "needsHuman": 1
   },
   "defaultVerify": "npm test",
   "dimensions": {
     "architectureConsistency": 99.58,
-    "semanticPurity": 99.47,
+    "semanticPurity": 99.49,
     "codeSecurity": 99.88,
-    "performanceEfficiency": 99.83,
-    "standardization": 95.95,
+    "performanceEfficiency": 99.84,
+    "standardization": 96.01,
     "modernity": 99.79,
     "maintainability": 98.16,
     "commentQuality": 99.99,
-    "duplication": 97.47,
+    "duplication": 97.5,
     "techDebtRisk": 99.98
   },
   "dimensionDetails": {
@@ -105,7 +105,7 @@
       ]
     },
     "semanticPurity": {
-      "score": 98.2,
+      "score": 98.28,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -119,14 +119,14 @@
       "confidence": 1
     },
     "performanceEfficiency": {
-      "score": 99.6,
+      "score": 99.62,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.102,
       "confidence": 1
     },
     "standardization": {
-      "score": 84.6,
+      "score": 84.74,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
@@ -141,7 +141,7 @@
       ]
     },
     "modernity": {
-      "score": 98.01,
+      "score": 98.07,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.074,
@@ -162,7 +162,7 @@
       "confidence": 1
     },
     "duplication": {
-      "score": 95.1,
+      "score": 95.17,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -210,20 +210,20 @@
     {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2175,
-      "count": 435
+      "loss": 2105,
+      "count": 421
     },
     {
       "rule": "SIM-LONG-001",
       "dim": "standardization",
-      "loss": 2030,
-      "count": 203
+      "loss": 1990,
+      "count": 199
     },
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 1965,
-      "count": 655
+      "loss": 1956,
+      "count": 652
     }
   ],
   "topology": {
@@ -247,7 +247,6 @@
     "L2_OPERATOR": [
       "src/cli/selfTestCmd.ts",
       "src/core/evolution/code-evolution-analyzer.ts",
-      "src/core/trajectory/timeline-projector.ts",
       "src/core/intelligence/boundary-discipline-engine.ts",
       "src/core/intelligence/elastic-complexity-budget.ts",
       "src/core/preflight/scope-decision.ts",
@@ -293,7 +292,8 @@
       "src/analyzers/concurrency.ts",
       "src/analyzers/rust-modern.ts",
       "src/analyzers/stdlib.ts",
-      "src/analyzers/vscode-extension.ts"
+      "src/analyzers/vscode-extension.ts",
+      "src/core/ast/gdscript-adapter.ts"
     ]
   },
   "files": {
@@ -1263,232 +1263,6 @@
         ]
       }
     ],
-    "src/core/trajectory/timeline-projector.ts": [
-      {
-        "line": 18,
-        "col": 28,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 64 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 18,
-        "col": 33,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 1024 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "patch": {
-            "range": {
-              "startLine": 18,
-              "startCol": 33,
-              "endLine": 18,
-              "endCol": 37
-            },
-            "replacementText": "PORT_1024"
-          },
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 66,
-        "col": 21,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 7 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 67,
-        "col": 24,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 7 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 68,
-        "col": 25,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 7 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95,
-        "moreLines": [
-          458,
-          462,
-          555,
-          723
-        ]
-      },
-      {
-        "line": 376,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'foldSingleBucket' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 376,
-              "startCol": 10,
-              "endLine": 376,
-              "endCol": 26
-            },
-            "replacementText": "timelineBucketSnapshot"
-          },
-          "template": "timelineBucketSnapshot",
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 376,
-        "rule": "SIM-LONG-001",
-        "sev": "WARN",
-        "msg": "Function \"foldSingleBucket\" spans 112 lines (limit 60)",
-        "fix": {
-          "action": "split_function",
-          "template": "// Extracted helper:",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 612,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'foldIdleIntervals' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "patch": {
-            "range": {
-              "startLine": 612,
-              "startCol": 10,
-              "endLine": 612,
-              "endCol": 27
-            },
-            "replacementText": "timelineBucketSnapshots"
-          },
-          "template": "timelineBucketSnapshots",
-          "safeToAutomate": true
-        },
-        "tier": "T2",
-        "conf": 0.94
-      },
-      {
-        "line": 723,
-        "col": 55,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 733,
-        "col": 51,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 735,
-        "col": 31,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 1,
-        "rule": "large-file",
-        "sev": "WARN",
-        "msg": "file lines 771 >= 400 (split)",
-        "fix": {
-          "action": "split_file"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 298,
-        "col": 13,
-        "rule": "GOV-PRF-004",
-        "sev": "WARN",
-        "msg": "Synchronous fs call blocks the host event loop (UI jank / request stall source)",
-        "fix": {
-          "action": "refactor"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 307,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 224",
-        "fix": {
-          "action": "sanitize_hygiene"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 365,
-        "col": 62,
-        "rule": "GOV-PRF-004",
-        "sev": "WARN",
-        "msg": "Synchronous fs call blocks the host event loop (UI jank / request stall source)",
-        "fix": {
-          "action": "refactor"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      }
-    ],
     "src/core/intelligence/boundary-discipline-engine.ts": [
       {
         "line": 99,
@@ -2089,7 +1863,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 291,
@@ -2678,7 +2452,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 224,
@@ -3304,7 +3078,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 1,
@@ -3340,7 +3114,7 @@
           "safeToAutomate": true
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 339,
@@ -3428,7 +3202,7 @@
           "safeToAutomate": true
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 802,
@@ -3844,7 +3618,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 184,
@@ -4020,7 +3794,7 @@
           "safeToAutomate": true
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 177,
@@ -4076,7 +3850,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 567,
@@ -4104,7 +3878,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 1,
@@ -4203,7 +3977,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 94,
@@ -4259,7 +4033,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 170,
@@ -4480,7 +4254,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 163,
@@ -4507,7 +4281,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 226,
@@ -4752,7 +4526,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 61,
@@ -4964,7 +4738,7 @@
           "safeToAutomate": false
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 163,
@@ -5078,7 +4852,7 @@
           "safeToAutomate": true
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 103,
@@ -5767,7 +5541,7 @@
           "safeToAutomate": true
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 50,
@@ -5842,7 +5616,7 @@
           "safeToAutomate": true
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 117,
@@ -7402,7 +7176,7 @@
           "safeToAutomate": true
         },
         "tier": "T2",
-        "conf": 0.94
+        "conf": 0.95
       },
       {
         "line": 196,
@@ -7416,8 +7190,212 @@
         },
         "tier": "T2",
         "conf": 0.95
+      },
+      {
+        "line": 197,
+        "col": 23,
+        "rule": "hardcoded-string",
+        "sev": "WARN",
+        "msg": "hardcoded string -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 201,
+        "col": 39,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 10 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 201,
+              "startCol": 39,
+              "endLine": 201,
+              "endCol": 41
+            },
+            "replacementText": "DURATION_10MS"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 202,
+        "col": 51,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 10 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 202,
+              "startCol": 51,
+              "endLine": 202,
+              "endCol": 53
+            },
+            "replacementText": "DURATION_10MS"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 240,
+        "col": 5,
+        "rule": "SIM-LONG-001",
+        "sev": "WARN",
+        "msg": "Function \"VscodeExtensionAnalyzer.analyze\" spans 164 lines (limit 60)",
+        "fix": {
+          "action": "split_function",
+          "template": "// Extracted helper:",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "file lines 504 >= 400 (split)",
+        "fix": {
+          "action": "split_file"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 169,
+        "rule": "HYG-STB-002",
+        "sev": "WARN",
+        "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'w3'",
+        "fix": {
+          "action": "sanitize_hygiene"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 196,
+        "rule": "DEP-RES-001",
+        "sev": "WARN",
+        "msg": "Unmanaged external URL 'http://www.w3.org/2000/svg' hardcoded in 'inline-url': move to config",
+        "fix": {
+          "action": "resolve_dependency"
+        },
+        "tier": "T3",
+        "conf": 0.95
+      },
+      {
+        "line": 196,
+        "rule": "HYG-STB-002",
+        "sev": "WARN",
+        "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'w3'",
+        "fix": {
+          "action": "sanitize_hygiene"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 197,
+        "rule": "DEP-RES-001",
+        "sev": "WARN",
+        "msg": "Unmanaged external URL 'http://www.w3.org/2000/svg' hardcoded in 'inline-url': move to config",
+        "fix": {
+          "action": "resolve_dependency"
+        },
+        "tier": "T3",
+        "conf": 0.95
+      },
+      {
+        "line": 197,
+        "rule": "HYG-STB-002",
+        "sev": "WARN",
+        "msg": "Ephemeral project jargon or task batch marker leaked: Comment or symbol contains 'w3'",
+        "fix": {
+          "action": "sanitize_hygiene"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      }
+    ],
+    "src/core/ast/gdscript-adapter.ts": [
+      {
+        "line": 192,
+        "col": 78,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "Magic number 0x28 should be extracted into a named constant",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 215,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "fn 'tryParseClassDecl' params 5 > 4",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface TryParseClassDeclOptions {",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 257,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "fn 'tryParseFuncDecl' params 6 > 4",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface TryParseFuncDeclOptions {",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 289,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "fn 'tryParseControlStmt' params 6 > 4",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface TryParseControlStmtOptions {",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 317,
+        "rule": "SIM-ARGS-001",
+        "sev": "WARN",
+        "msg": "fn 'tryParseStructureStmt' params 6 > 4",
+        "fix": {
+          "action": "introduce_parameter_object",
+          "template": "export interface TryParseStructureStmtOptions {",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
       }
     ]
   },
-  "truncated": 3013
+  "truncated": 2965
 }
