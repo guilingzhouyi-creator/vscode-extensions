@@ -90,26 +90,40 @@ git add path/to/contract.ts path/to/storage.ts
 ### Step 2: 编写结构化提交信息与离线预审 (`commit-msg-gate`)
 在本地临时目录中创建提交信息文件 `commit_batch_N.txt`。必须满足以下刚性规范：
 
-#### 1. 标题契约
-- **格式**：`<type>(<scope>): <祈使句中文摘要标题>`；
-- **长度约束**：5~80 字符，结尾严禁带句号；
-- **`<type>` 严格受限**：`feat` | `fix` | `refactor` | `docs` | `test` | `chore` | `style` | `perf`。
+#### 1. 标题排版与全要素契约
+- **格式**：`<type>(<scope>): <祈使句中文摘要标题>`（若含破坏性变更允许 `<type>!(<scope>): ...`）；
+- **全要素长度上下界**：标题总长严格限定在 15~80 字符（$15 \le L_{\text{header}} \le 80$），摘要描述部分 10~70 字符（$10 \le L_{\text{subject}} \le 70$）；
+- **`<type>` 严格受限**：`feat` | `fix` | `refactor` | `docs` | `test` | `chore` | `style` | `perf` | `ci` | `build`；
+- **标点排版硬性契约**：
+  - 必须使用标准半角英文冒号且后跟单一空格（`): `），严禁全角冒号（`）：`）、缺失空格（`):`）或多重连续空格（`):  `）；
+  - 作用域括号必须为半角 `(` 和 `)`，严禁全角括号；
+  - 标题结尾严禁带句号（包括半角 `.` 与全角 `。`）；
+  - 严禁包含零宽字符与字节顺序标记（BOM，如 `\u200B`~`\u200D`、`\uFEFF`）；
+  - 标题严禁包含 Emoji 表情符号（如 🚀, 🐛, ✨ 等）。
 
-#### 2. 正文首区块：受控四大项目显式归属 (`CMG-PRJ-001`)
-关键生产级提交（feat/fix/refactor）正文首个结构化区块必须显式声明项目归属，枚举严格受限四大项目：
+#### 2. 正文首区块：受控五大项目显式归属 (`CMG-PRJ-001`)
+关键生产级提交（feat/fix/refactor/perf/docs/test/chore）正文首个结构化区块必须显式声明项目归属，枚举严格受限五大项目：
 ```markdown
 [Project]
 - <workspace-timing | auto-refactor | WebGames | fractal-git | governance>
 ```
 *若遗漏或填写未受控名称，强制触发 `CMG-PRJ-001` 一票否决。*
 
-#### 3. 结构化必填区块
-- `[Why]`：阐明技术背景、驱动因素或解决的核心痛点，解释为何做此变更；
-- `[Added]`：列举新增的模块、接口、类型定义或测试用例；
-- `[Changed]`：列举重构的方法、算法实现替换、依赖调整或参数变更；
-- `[Fixed]`：若包含缺陷修复必须提供，详述修复的异常场景与根本原因；
-- `[Verification]`：详述本地运行的验证手段与质性技术断言；
-- **正文字数门槛**：非轻量提交正文非空白字数 $\ge 30$。
+#### 3. 结构化区块、排版与清单强力联动契约
+- **区块标签排版**：必须使用半角方括号（如 `[Why]`、`[Added]`、`[Changed]`、`[Fixed]`、`[Verification]`、`[Breaking Changes]`），严禁全角方括号（`【` `】`）；
+- **列表项排版**：列表项必须使用统一半角破折号加单一空格前缀 `- `（严禁使用 `* `、`+ ` 或有序数字列表 `1. `）；
+- **空行分割契约**：标题与正文之间、各区块之间必须保留且仅保留单一空行（严禁连续 2 个及以上空行）；
+- **实质内容字数上下界**：
+  - 单条列表项非空白实质字符数 $\ge 8$；
+  - `[Why]` 区块阐明改动的技术动因与核心痛点，非空白实质内容 $\ge 15$ 字符；
+  - `[Fixed]` 区块详述修复的异常场景与根因，非空白实质内容 $\ge 12$ 字符；
+  - `[Verification]` 区块详述本地运行的验证命令与质性技术断言，非空白实质内容 $\ge 12$ 字符；
+  - 正文总体非空白实质字数 $\ge 30$；
+- **类型与区块强力清单联动 (Mandatory Manifest Linkage)**：
+  - `feat` 提交必须包含 `[Added]` 区块；
+  - `fix` 提交必须包含 `[Fixed]` 区块；
+  - `refactor` 与 `perf` 提交必须包含 `[Changed]` 区块；
+  - 标题含有破坏性变更标识 `!`（如 `feat!:`）时必须包含 `[Breaking Changes]` 区块。
 
 #### 4. 纯客观技术事实质性断言与 6 类禁词风格拦截
 提交说明是永久技术档案，受 `commit-msg-forbidden-terms.json` 刚性管束：
@@ -130,14 +144,14 @@ git add path/to/contract.ts path/to/storage.ts
 ```powershell
 pwsh -File scripts/ps1/commit-msg-gate.ps1 "$dir\commit_batch_N.txt"
 ```
-*必须获得 `Commit-Msg 生产级格式与结构化内容校验全部 PASS！` 方可进入下一步。*
+*必须获得 `Commit-Msg 检查通过` 且通过历史遥测审计链验证（`--verify-chain commit-msg`）方可进入下一步。*
 
 ### Step 3: 暂存区物理卫生预审 (`pre-commit-gate`)
 在实际调用 `git commit` 前，手动触发 Pre-Commit 门禁脚本执行离线流式预审：
 ```powershell
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 ```
-*检查项目：零空文件、换行契约（ps1 CRLF，其余 LF）、TypeScript 4 空格缩进/其余 2 空格、敏感信息防泄漏、单文件双轨体积预算（ELOC<=900, LOC<=1400）、1:3 动态反推包络、高负荷注释密度 >= 8% 及 AST 切片局部复杂度（CC<=15, Depth<=4, Noise<=4.0）。*
+*检查项目：零空文件、换行契约（ps1 CRLF，其余 LF）、TypeScript 4 空格缩进/其余 2 空格、敏感信息防泄漏、单文件双轨体积预算（ELOC<=900, LOC<=1400）、1:3 动态反推包络、高负荷注释密度 >= 8%、AST 切片局部复杂度（CC<=15, Depth<=4, Noise<=4.0）及暂存区五维有效代码微分边界与准入周转审查（`STAGED-DIFF-14` / `FGT-GAT-001`）。*
 
 #### 暂存区 AST 切片复杂度阻断自愈指引 (AST Complexity Remediation)
 若预审触发 `GUARD-AST-001`（`CC > 15`）或控制流嵌套超标（`Depth > 4`）：

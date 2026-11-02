@@ -33,21 +33,26 @@ description: >-
   3. **缩进契约守卫**：TypeScript 源码保持 4 空格缩进，其余源码与配置文件保持 2 空格缩进；
   4. **密钥与敏感信息守卫**：拦截硬编码 Token、API 密钥与绝对路径；
   5. **单文件双轨体积与 1:3 动态包络**：看守有效代码行 $\text{ELOC} \le 900$ 与物理行 $\text{LOC} \le 1400$ 预算、1:3 动态反推包络及 $\text{ELOC} \ge 600$ 高负荷契约注释密度 $\ge 8\%$；
-  6. **AST 切片局部复杂度守卫 (`GUARD-AST-001`)**：暂存区生产代码切片受单函数圈复杂度 $\text{CC} \le 15$（分发器与探针弹性包络 20~25）、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$ 刚性约束。
+  6. **AST 切片局部复杂度守卫 (`GUARD-AST-001`)**：暂存区生产代码切片受单函数圈复杂度 $\text{CC} \le 15$（分发器与探针弹性包络 20~25）、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$ 刚性约束；
+  7. **五维有效代码微分边界与准入周转守卫 (`STAGED-DIFF-14` / `FGT-GAT-001`)**：暂存区生产代码必须满足单文件微观形变包络（新增 $\le 120/180$，删除 $\le 100$）、批次宏观聚合包络（总新增 $\le 360$，总删除 $\le 280$）以及最低有效更替量准入门槛 $\Theta_{\text{admission}} \in [3.0, 25.0]$ 5D ELOC，拦截伪更替与空转代码。
 - **`commit-msg`（单进程统一提交信息流式检验）**：
   由 `validate-commit-msg.js` 驱动，毫秒级流式完成提交说明各项合规校验：
-  1. **Conventional Commits 格式**：`<type>(<scope>): <祈使句中文摘要标题>`（长度 5~80 字符，结尾不加句号）；
+  1. **Conventional Commits 格式与全要素排版**：`<type>(<scope>): <祈使句中文摘要标题>`（总长 15~80 字符，摘要 10~70 字符，半角冒号加空格 `): `，半角括号，结尾严禁句号，零宽字符与 BOM 一票否决，标题严禁 Emoji）；
   2. **受控五大项目归属 (`CMG-PRJ-001`)**：正文首行/首区块必须显式声明 `[Project]`，枚举严格限定于：`workspace-timing | auto-refactor | WebGames | fractal-git | governance`；
-  3. **结构化必填区块**：必须包含 `[Why]`、`[Added]`、`[Changed]`、`[Fixed]`（如有修复缺陷）、`[Verification]`，正文非空白字数 $\ge 30$；
+  3. **结构化必填区块与清单强力联动**：必须包含 `[Why]`（$\ge 15$ 字符）、`[Verification]`（$\ge 12$ 字符）；`feat` 必填 `[Added]`；`fix` 必填 `[Fixed]`（$\ge 12$ 字符）；`refactor`/`perf` 必填 `[Changed]`；破坏性变更必填 `[Breaking Changes]`；列表项以 `- ` 开头（每项 $\ge 8$ 字符）；正文非空白字数 $\ge 30$；区块间仅允许单空行分隔；
   4. **6 类禁词风格与零黑话拦截**：严格拦截临时敷衍（`CMG-STY-001`）、过度夸大（`CMG-STY-002`）、过度贬损（`CMG-STY-003`）、风格元叙事（`CMG-STY-004`）、程序化流水账（`CMG-STY-005`）与执行数字量词（`CMG-STY-006`）；拦截任何施工批次代号；
   5. **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：提交信息中引用的所有规则 ID 必须在 `scripts/common/rule-catalog.json` 中真实登记。
 - **`pre-push`（全域双重回归与基线看守）**：
   结合智能分流调度执行受影响项目的全量单元测试、跨模块静态审查、零高危技术债务防线与质量基线 Ratchet（`GUARD-BASE-001`：多维自审的体量预算、逆向层耦合与前后端标准化均衡不得跌破冻结基线）。
 - **门禁运行遥测记录与诊断快照规范 (`gate-telemetry-logger.js`)**：
-  - **快照与账本持久化**：门禁完成时自动持久化单例快照 `.audit-logs/<gate>-latest.json` 与 FIFO 历史账本 `.audit-logs/<gate>-history.jsonl`，记录耗时、文件数、Git 版本与通过/阻断步骤；
+  - **快照与账本持久化**：四项门禁（`pre-commit`, `commit-msg`, `pre-push`, `audit-all`）完成时自动持久化单例快照 `.audit-logs/<gate>-latest.json` 与历史账本 `.audit-logs/<gate>-history.jsonl`，记录耗时、文件数、Git 版本与通过/阻断步骤；
+  - **建议文件锁与并发安全 (`lib/file-lock.js`)**：多进程或并发门禁执行时，通过原子性目录排他锁串行化落盘，内置 30 秒 TTL 超时自愈与零 CPU 占用的 `Atomics.wait` 指数退避；
+  - **国密 SM3 / SHA-256 审计哈希链**：每次门禁执行记录自动与上一记录构建 Merkle 链式哈希签名（包含 `seq`、`prev_hash`、`entry_hash`、`algo`），提供 `node scripts/common/gate-telemetry-logger.js --verify-chain [gate]` 完整性防篡改自检；
+  - **失败状态机自愈与归档**：门禁由 `BLOCK` 成功恢复至 `PASS` 时，自动将前次失败快照归档至 `.audit-logs/resolved-failures/resolved-<runId>.json`，并将 `last-failure.json` 状态置为 `status: "RESOLVED"`；
   - **ANSI 脱水与盘符脱敏**：诊断日志 `last-<gate>.log` 强制注入 8 项标头、自动剥离 ANSI 颜色控制字符并脱敏 Windows 盘符；
   - **结构化失败信封 (`AgentFailureEnvelope`)**：门禁阻断时输出 `last-failure.json`，提供 `rule_id`、`severity`、`remediation` 修复动作与上下文详情；
-  - **软失败语义 (Soft-fail)**：遥测与日志记录自身故障时捕获降级，严禁干扰门禁核心裁决。
+  - **软失败语义 (Soft-fail)**：遥测与日志记录自身故障时捕获降级，严禁干扰门禁核心裁决；
+  - **临时产物自动回收**：`log-rotator.js --prune` 自动扫描清理超过 10 分钟的孤儿 `.tmp` 临时文件。
 - **两层 5D ELOC 差分切片门禁 (`taxis gate-slice` / `FGT-GAT-001`)**：
   - 原生 Rust 零堆分配流式判定单文件微观形变包络（新增 $\le 120/180$，删除 $\le 100$）与批次宏观形变包络（总新增 $\le 360$，总删除 $\le 280$）；
   - 联动 Jeffreys Beta 经验自适应准入门槛 $\Theta_{\text{admission}} \in [3.0, 25.0]$ 5D ELOC，阻断伪更替与代码稀释（$\text{TSPR} < 0.40$）。

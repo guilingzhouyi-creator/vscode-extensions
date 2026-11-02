@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**100 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**101 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -34,6 +34,7 @@
 | `common/` | Node.js | `validate-code-density.js` | gate / density（多维代码密度、接线率 POR<=60% 与列密度审查器） | `pre-commit-gate`、`pre-push-gate`、CI |
 | `common/` | Node.js | `validate-gitignore-governance.js` | audit / hygiene（全仓 .gitignore 换行、安全底线守卫与防误伤断言门禁） | `pre-push-gate`、`audit-all` |
 | `common/` | Node.js | `evaluate-eloc-budget.js` | audit / complexity（双轨体积 ELOC<=900/LOC<=1400 与 1:3 动态包络；`--all` 全仓扫描 + `eloc-budget-baseline.json` grow-only 棘轮；未识别参数直接 exit 2） | `pre-commit-gate`、`pre-push-gate`、CI |
+| `common/` | Node.js | `gate-differential-bounds.js` | gate / diff（暂存区五维有效代码 5D ELOC 差分双向钳制与准入更替量评估器，联动 Taxis 原生与纯 JS 差分双轨） | `pre-commit-gate` STAGED-DIFF-14、CI |
 | `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区规则单源目录聚合与零漂移核验器；默认只读，`--write` 显式重生成） | 本地 CLI、`pre-push` 门禁、CI |
 | `common/` | Node.js | `generate-rule-catalog-types.js` | tooling / ssot（从 rule-catalog.json SSOT 自动生成 auto-refactor 强类型常量库与领域子模块） | 本地 CLI、CI |
 | `common/` | Node.js | `validate-rule-id-closure.js` | audit / ssot（门禁引用规则 ID 与目录登记的双向闭包守卫） | `pre-push-gate`、CI |
@@ -267,7 +268,7 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 | **推送前置门禁** | `pwsh scripts/ps1/pre-push-gate.ps1` | `pwsh scripts/ps1/pre-push-gate.ps1 -Agent` | `pwsh scripts/ps1/pre-push-gate.ps1 -ViewLog` |
 | **失败快照轮转器** | `node scripts/common/log-rotator.js --view` | `node scripts/common/log-rotator.js --agent` | 自动保留最近一次失败至 `.audit-logs/last-failure.json` |
 
-> 各入口的语义步骤数均由 `scripts/common/gate-step-registry.json` 单源登记：提交前置 <!-- METRICS:BEGIN step-pre-commit -->**13 个语义步骤**<!-- METRICS:END step-pre-commit -->、提交信息 <!-- METRICS:BEGIN step-commit-msg -->**10 个语义步骤**<!-- METRICS:END step-commit-msg -->、推送前置 <!-- METRICS:BEGIN step-pre-push -->**41 个语义步骤**<!-- METRICS:END step-pre-push -->、全工作区审查 <!-- METRICS:BEGIN step-audit-all -->**6 个语义步骤**<!-- METRICS:END step-audit-all -->、fractal-git 审查 <!-- METRICS:BEGIN step-audit-taxis -->**5 个语义步骤**<!-- METRICS:END step-audit-taxis -->，合计 <!-- METRICS:BEGIN step-total -->**75 个语义步骤**<!-- METRICS:END step-total -->。
+> 各入口的语义步骤数均由 `scripts/common/gate-step-registry.json` 单源登记：提交前置 <!-- METRICS:BEGIN step-pre-commit -->**14 个语义步骤**<!-- METRICS:END step-pre-commit -->、提交信息 <!-- METRICS:BEGIN step-commit-msg -->**10 个语义步骤**<!-- METRICS:END step-commit-msg -->、推送前置 <!-- METRICS:BEGIN step-pre-push -->**41 个语义步骤**<!-- METRICS:END step-pre-push -->、全工作区审查 <!-- METRICS:BEGIN step-audit-all -->**6 个语义步骤**<!-- METRICS:END step-audit-all -->、fractal-git 审查 <!-- METRICS:BEGIN step-audit-taxis -->**5 个语义步骤**<!-- METRICS:END step-audit-taxis -->，合计 <!-- METRICS:BEGIN step-total -->**76 个语义步骤**<!-- METRICS:END step-total -->。
 >
 > 推送门禁的输出形如
 > `✔  <步骤标识>  <详情>`（通过态只留勾号，异常态才写出 `✖ BLOCK` / `↷ SKIP` / `▲ WARN` 大写词），

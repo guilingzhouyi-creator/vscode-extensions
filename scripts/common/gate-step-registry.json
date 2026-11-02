@@ -79,6 +79,11 @@
           "id": "STAGED-VOLUME-13",
           "title": "暂存区双轨体积与动态包络审查",
           "ruleId": "VOL-ELOC-001"
+        },
+        {
+          "id": "STAGED-DIFF-14",
+          "title": "暂存区五维有效代码微分边界与准入周转审查",
+          "ruleId": "FGT-GAT-001"
         }
       ]
     },
