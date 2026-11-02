@@ -2,13 +2,13 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-02T06:21:55.387Z",
+  "timestamp": "2026-11-02T07:06:57.653Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
-    "score": 99.22,
+    "score": 99.23,
     "grade": "A+",
-    "cai": 88.39,
+    "cai": 88.4,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
@@ -21,21 +21,21 @@
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 26914,
+      "remediationMinutes": 26844,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.64,
-      "meanScore": 96.64,
+      "index": 96.65,
+      "meanScore": 96.65,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "quant": {
       "rcr": 0,
-      "erq": 1.96,
-      "ddr": 4.49,
-      "edb95": 22.26,
+      "erq": 2.5,
+      "ddr": 610.54,
+      "edb95": 31.29,
       "ptd": 36.72,
       "dsi": 0.51,
       "rcd": 0.67,
@@ -53,25 +53,25 @@
       "architecture": 99.6,
       "maintainability": 98.2,
       "performance": 99.85,
-      "data": 98.57,
+      "data": 98.58,
       "testing": 99.8,
       "reliability": 99.75,
       "security": 99.88,
-      "extensibility": 97.9
+      "extensibility": 97.91
     },
     "counts": {
       "files": 821,
-      "total": 3897,
+      "total": 3890,
       "errors": 0,
-      "warns": 3358,
+      "warns": 3351,
       "info": 539,
-      "suppressed": 76
+      "suppressed": 74
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1584,
-    "advisory": 2313,
+    "patchable": 1576,
+    "advisory": 2314,
     "uncalibrated": 51,
     "needsHuman": 1
   },
@@ -85,7 +85,7 @@
     "modernity": 99.8,
     "maintainability": 98.2,
     "commentQuality": 99.98,
-    "duplication": 97.63,
+    "duplication": 97.65,
     "techDebtRisk": 99.99
   },
   "dimensionDetails": {
@@ -126,7 +126,7 @@
       "confidence": 1
     },
     "standardization": {
-      "score": 85.08,
+      "score": 85.09,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
@@ -148,21 +148,21 @@
       "confidence": 1
     },
     "maintainability": {
-      "score": 93.74,
+      "score": 93.75,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
       "confidence": 1
     },
     "commentQuality": {
-      "score": 99.93,
+      "score": 99.92,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.074,
       "confidence": 1
     },
     "duplication": {
-      "score": 95.43,
+      "score": 95.47,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -7393,5 +7393,5 @@
       }
     ]
   },
-  "truncated": 2848
+  "truncated": 2841
 }
