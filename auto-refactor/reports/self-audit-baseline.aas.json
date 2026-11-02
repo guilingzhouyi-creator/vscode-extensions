@@ -2,13 +2,13 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-02T04:05:33.372Z",
+  "timestamp": "2026-11-02T04:14:35.016Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
     "score": 99.21,
     "grade": "A+",
-    "cai": 88.31,
+    "cai": 88.32,
     "density": 0.95,
     "tensorSummary": {
       "compositeDensity": 0.8,
@@ -16,26 +16,26 @@
       "averagePor": 0.082,
       "averageColumnDensity": 0.868,
       "averageSpatialDensity": 0.455,
-      "averageMahalanobisDistance": 4.488,
+      "averageMahalanobisDistance": 4.489,
       "averageFisherSimplexDistance": 0.093
     },
     "sqale": {
       "tdr": 0,
-      "remediationMinutes": 27342,
+      "remediationMinutes": 27228,
       "grade": "A"
     },
     "polyglot": {
-      "index": 96.58,
-      "meanScore": 96.58,
+      "index": 96.59,
+      "meanScore": 96.59,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "quant": {
       "rcr": 0,
-      "erq": 1.16,
-      "ddr": 1.75,
-      "edb95": 16.69,
+      "erq": 1.45,
+      "ddr": 2.58,
+      "edb95": 17.31,
       "ptd": 36.28,
       "dsi": 0.51,
       "rcd": 0.67,
@@ -47,45 +47,45 @@
       "warningCount": 0,
       "failingCount": 0,
       "lowestDimension": "standardization",
-      "lowestScore": 96.04
+      "lowestScore": 96.05
     },
     "pillars": {
       "architecture": 99.59,
       "maintainability": 98.16,
       "performance": 99.84,
-      "data": 98.54,
+      "data": 98.55,
       "testing": 99.79,
       "reliability": 99.74,
       "security": 99.88,
-      "extensibility": 97.87
+      "extensibility": 97.88
     },
     "counts": {
       "files": 815,
-      "total": 3967,
+      "total": 3949,
       "errors": 0,
-      "warns": 3404,
-      "info": 563,
+      "warns": 3391,
+      "info": 558,
       "suppressed": 72
     }
   },
   "usability": {
     "proven": 0,
-    "patchable": 1625,
-    "advisory": 2342,
+    "patchable": 1617,
+    "advisory": 2332,
     "uncalibrated": 60,
     "needsHuman": 1
   },
   "defaultVerify": "npm test",
   "dimensions": {
     "architectureConsistency": 99.59,
-    "semanticPurity": 99.49,
+    "semanticPurity": 99.5,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.84,
-    "standardization": 96.04,
+    "standardization": 96.05,
     "modernity": 99.79,
     "maintainability": 98.16,
     "commentQuality": 99.99,
-    "duplication": 97.58,
+    "duplication": 97.6,
     "techDebtRisk": 99.98
   },
   "dimensionDetails": {
@@ -105,7 +105,7 @@
       ]
     },
     "semanticPurity": {
-      "score": 98.3,
+      "score": 98.31,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -126,7 +126,7 @@
       "confidence": 1
     },
     "standardization": {
-      "score": 84.82,
+      "score": 84.87,
       "grade": "A",
       "evaluated": true,
       "weight": 0.083,
@@ -148,7 +148,7 @@
       "confidence": 1
     },
     "maintainability": {
-      "score": 93.59,
+      "score": 93.64,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.111,
@@ -162,7 +162,7 @@
       "confidence": 1
     },
     "duplication": {
-      "score": 95.35,
+      "score": 95.38,
       "grade": "A+",
       "evaluated": true,
       "weight": 0.093,
@@ -192,14 +192,8 @@
     {
       "rule": "CPX-NEST-001",
       "dim": "maintainability",
-      "loss": 2330,
-      "count": 233
-    },
-    {
-      "rule": "SIM-TRN-001",
-      "dim": "standardization",
-      "loss": 2240,
-      "count": 224
+      "loss": 2320,
+      "count": 232
     },
     {
       "rule": "NAM-DEC-001",
@@ -208,10 +202,16 @@
       "count": 222
     },
     {
+      "rule": "SIM-TRN-001",
+      "dim": "standardization",
+      "loss": 2180,
+      "count": 218
+    },
+    {
       "rule": "NAM-LEN-002",
       "dim": "standardization",
-      "loss": 2090,
-      "count": 418
+      "loss": 2070,
+      "count": 414
     },
     {
       "rule": "SIM-LONG-001",
@@ -222,8 +222,8 @@
     {
       "rule": "hardcoded-string",
       "dim": "duplication",
-      "loss": 1830,
-      "count": 610
+      "loss": 1818,
+      "count": 606
     }
   ],
   "topology": {
@@ -264,7 +264,6 @@
       "src/core/scoring/hierarchicalScorer.ts",
       "src/core/trajectory/trajectory-accumulator.ts",
       "src/core/ast-pattern/structural-pattern-engine.ts",
-      "src/core/ast/scope-graph.ts",
       "src/core/ast/ts-projector.ts",
       "src/core/data-structures/regex-pool.ts",
       "src/core/intelligence/token-entropy.ts",
@@ -293,7 +292,8 @@
       "src/analyzers/stdlib.ts",
       "src/analyzers/vscode-extension.ts",
       "src/core/ast/gdscript-adapter.ts",
-      "src/core/ast/rust-adapter.ts"
+      "src/core/ast/rust-adapter.ts",
+      "src/core/evolution/behavioral-hotspot-evaluator.ts"
     ]
   },
   "files": {
@@ -3421,186 +3421,6 @@
         "msg": "File is large; consider splitting (lines 822 >= warn threshold 400; functions 34 >= warn threshold 20)",
         "fix": {
           "action": "split_file"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      }
-    ],
-    "src/core/ast/scope-graph.ts": [
-      {
-        "line": 96,
-        "col": 56,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 97,
-        "col": 56,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 129,
-        "col": 5,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name 'lookup' has too few word segments (1 < 2); lacks semantic description",
-        "fix": {
-          "action": "replace_token",
-          "template": "lookupResult",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 184,
-        "col": 38,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 189,
-        "col": 31,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 3 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 191,
-        "col": 33,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 4 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 193,
-        "col": 35,
-        "rule": "magic-number",
-        "sev": "WARN",
-        "msg": "magic num 5 -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 391,
-        "col": 21,
-        "rule": "hardcoded-string",
-        "sev": "WARN",
-        "msg": "hardcoded string -> const",
-        "fix": {
-          "action": "extract_constant",
-          "safeToAutomate": false
-        },
-        "tier": "T2",
-        "conf": 0.95
-      },
-      {
-        "line": 1,
-        "rule": "large-file",
-        "sev": "WARN",
-        "msg": "File is large; consider splitting (lines 503 >= warn threshold 400; functions 22 >= warn threshold 20)",
-        "fix": {
-          "action": "split_file"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 78,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'scopeKindForNode' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 92,
-        "col": 10,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "fn 'bindingOf' lacks verb prefix",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 250,
-        "col": 5,
-        "rule": "NAM-LEN-002",
-        "sev": "WARN",
-        "msg": "Function or method name '_finalize' has too few word segments (1 < 2); lacks semantic description",
-        "fix": {
-          "action": "replace_token",
-          "safeToAutomate": false
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 428,
-        "col": 5,
-        "rule": "HYG-WRAP-001",
-        "sev": "WARN",
-        "msg": "Function `visit` is a vacuous passthrough wrapper directly forwarding arguments to `recordBinding`",
-        "fix": {
-          "action": "sanitize_hygiene"
-        },
-        "tier": "T3",
-        "conf": 0.89
-      },
-      {
-        "line": 440,
-        "rule": "HYG-CLN-001",
-        "sev": "WARN",
-        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 315",
-        "fix": {
-          "action": "sanitize_hygiene"
         },
         "tier": "T3",
         "conf": 0.89
@@ -7383,8 +7203,198 @@
         },
         "tier": "T2",
         "conf": 0.95
+      },
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 575 >= warn threshold 400; functions 22 >= warn threshold 20)",
+        "fix": {
+          "action": "split_file"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 30,
+        "rule": "NAM-GLB-002",
+        "sev": "WARN",
+        "msg": "Module-level mutable variable declaration (`let`/`var`) introduces implicit global state",
+        "fix": {
+          "action": "rename_identifier"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 35,
+        "col": 7,
+        "rule": "NAM-GLB-001",
+        "sev": "WARN",
+        "msg": "Top-level constant '_ADAPTER_ID_RUST' should follow UPPER_SNAKE_CASE naming convention",
+        "fix": {
+          "action": "rename_identifier"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 71,
+        "rule": "TSM-REQUIRE-001",
+        "sev": "WARN",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
+        "fix": {
+          "action": "replace_token",
+          "template": "import $1 from $2;",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 72,
+        "rule": "TSM-REQUIRE-001",
+        "sev": "WARN",
+        "msg": "CommonJS `require` in a module that already uses ESM syntax",
+        "fix": {
+          "action": "replace_token",
+          "template": "import $1 from $2;",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      }
+    ],
+    "src/core/evolution/behavioral-hotspot-evaluator.ts": [
+      {
+        "line": 154,
+        "col": 24,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 24 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 154,
+        "col": 29,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 60 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 154,
+        "col": 34,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 60 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 154,
+        "col": 39,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 1000 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "patch": {
+            "range": {
+              "startLine": 154,
+              "startCol": 39,
+              "endLine": 154,
+              "endCol": 43
+            },
+            "replacementText": "DURATION_1S"
+          },
+          "safeToAutomate": true
+        },
+        "tier": "T2",
+        "conf": 0.95
+      },
+      {
+        "line": 155,
+        "col": 27,
+        "rule": "magic-number",
+        "sev": "WARN",
+        "msg": "magic num 30 -> const",
+        "fix": {
+          "action": "extract_constant",
+          "safeToAutomate": false
+        },
+        "tier": "T2",
+        "conf": 0.95,
+        "moreLines": [
+          156
+        ]
+      },
+      {
+        "line": 1,
+        "rule": "large-file",
+        "sev": "WARN",
+        "msg": "File is large; consider splitting (lines 1082 >= warn threshold 400; functions 25 >= warn threshold 20)",
+        "fix": {
+          "action": "split_file"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 373,
+        "rule": "HYG-CLN-001",
+        "sev": "WARN",
+        "msg": "Code clone detected: Block of 6 consecutive statements is highly duplicated with line 97",
+        "fix": {
+          "action": "sanitize_hygiene"
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 969,
+        "col": 12,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'extract30DayCommitsFromProfile' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
+      },
+      {
+        "line": 990,
+        "col": 12,
+        "rule": "NAM-LEN-002",
+        "sev": "WARN",
+        "msg": "fn 'extract7DayCommitsFromProfile' lacks verb prefix",
+        "fix": {
+          "action": "replace_token",
+          "safeToAutomate": false
+        },
+        "tier": "T3",
+        "conf": 0.89
       }
     ]
   },
-  "truncated": 2894
+  "truncated": 2881,
+  "notes": [
+    "dependency-graph: dependency graph coverage incomplete (cache-hit paths); falling back to re-reading graph"
+  ]
 }
