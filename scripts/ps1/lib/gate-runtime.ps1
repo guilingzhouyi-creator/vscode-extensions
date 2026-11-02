@@ -30,6 +30,8 @@ $script:GateStepFile = $null
 $script:GateStepDocument = $null
 $script:GateStepIndex = @{}
 $script:GateStepTotal = @{}
+$script:GateStartTime = [System.Diagnostics.Stopwatch]::StartNew()
+$script:GateStepOutcomes = [System.Collections.Generic.List[hashtable]]::new()
 
 # Agent 与 JSON 模式承诺在标准输出给出单一机器可读文档，
 # 任何人类可读行都会破坏该文档，故宿主输出统一受此开关抑制。
@@ -218,6 +220,14 @@ function Write-StepVerdict {
         [string]$Detail = ""
     )
     $meta = Resolve-StepMeta -EntryId $EntryId -StepId $StepId
+    if ($null -ne $script:GateStepOutcomes) {
+        $script:GateStepOutcomes.Add(@{
+            StepId = $StepId
+            Status = $Status
+            RuleId = $meta.Rule
+            Detail = $Detail
+        })
+    }
     # 四态投影（一体两面）：协议层状态词恒为 PASS/BLOCK/SKIP/WARN，调用点入参不得改写；
     # 呈现层只在 PASS 时隐去大写词，因为绿色勾号已完整表达「通过」，
     # 再叠一个 PASS 会让连续 30 余步的通过流退化成机械打卡。
@@ -316,4 +326,76 @@ function Wait-ProcessWithTimeout {
     }
 
     return $false
+}
+
+<#
+.SYNOPSIS
+    向中央遥测记录器提交门禁执行快照与指标。
+.DESCRIPTION
+    在门禁退出点统一调度 gate-telemetry-logger.js，落盘单例快照与流水账，
+    若存在阻断失败，同步保证 last-<gate>.log 与 last-failure.json 处于最新状态。
+.PARAMETER Gate
+    门禁标识 (pre-commit 或 pre-push)。
+.PARAMETER Status
+    终态判定 (PASS、BLOCK 或 SKIP)。
+.PARAMETER FilesCount
+    受影响或暂存文件数。
+.PARAMETER Failures
+    失败步骤详情列表。
+.PARAMETER RawLogOutput
+    原始错误堆栈或输出日志。
+#>
+function Complete-GateTelemetry {
+    [CmdletBinding()]
+    param(
+        [string]$Gate = $script:GateEntryId,
+        [Parameter(Mandatory = $true)][ValidateSet('PASS', 'BLOCK', 'SKIP')][string]$Status,
+        [int]$FilesCount = 0,
+        [hashtable[]]$Failures = @(),
+        [string]$RawLogOutput = ""
+    )
+
+    try {
+        $elapsedMs = if ($script:GateStartTime) { [Math]::Round($script:GateStartTime.Elapsed.TotalMilliseconds) } else { 0 }
+        $passed = [System.Collections.Generic.List[string]]::new()
+        $failed = [System.Collections.Generic.List[string]]::new()
+        $skipped = [System.Collections.Generic.List[string]]::new()
+
+        if ($null -ne $script:GateStepOutcomes) {
+            foreach ($o in $script:GateStepOutcomes) {
+                switch ($o.Status) {
+                    'PASS' { $passed.Add($o.StepId) }
+                    'BLOCK' { $failed.Add($o.StepId) }
+                    'SKIP' { $skipped.Add($o.StepId) }
+                }
+            }
+        }
+
+        $payload = [ordered]@{
+            gate = $Gate
+            status = $Status
+            durationMs = $elapsedMs
+            filesCount = $FilesCount
+            stepsSummary = [ordered]@{
+                total = if ($null -ne $script:GateStepOutcomes) { $script:GateStepOutcomes.Count } else { 0 }
+                passed = @($passed)
+                failed = @($failed)
+                skipped = @($skipped)
+            }
+            failures = @($Failures)
+            rawLogOutput = $RawLogOutput
+        }
+
+        $json = $payload | ConvertTo-Json -Depth 5 -Compress
+        $tmpJson = Join-Path ([System.IO.Path]::GetTempPath()) ("gate-telemetry-" + [guid]::NewGuid().ToString('N') + ".json")
+        [System.IO.File]::WriteAllText($tmpJson, $json, [System.Text.UTF8Encoding]::new($false))
+
+        $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
+        $loggerScript = Join-Path $script:GateRepoRoot "scripts/common/gate-telemetry-logger.js"
+        if (Test-Path -LiteralPath $loggerScript) {
+            Start-Process -FilePath $nodeCmd -ArgumentList $loggerScript, "--record-file", $tmpJson -WorkingDirectory $script:GateRepoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
+        }
+    } catch {
+        # 遥测记录软失败，不阻断门禁主流程
+    }
 }

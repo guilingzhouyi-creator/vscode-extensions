@@ -520,6 +520,11 @@ if ! run_gate_step 60 "CASCADE-COHERENCE-41" "$ROOT_DIR" "$NODE_BIN" .agents/ski
     FAILED=1
 fi
 
+CHANGED_COUNT=0
+if [[ -n "${CHANGED_FILES:-}" ]]; then
+    CHANGED_COUNT=$(echo "$CHANGED_FILES" | grep -c . || echo 0)
+fi
+
 if [[ "$AGENT_MODE" -eq 1 ]]; then
     if [[ "$FAILED" -ne 0 ]]; then
         if [[ -f "$AUDIT_LOG_DIR/last-failure.json" ]]; then
@@ -527,6 +532,7 @@ if [[ "$AGENT_MODE" -eq 1 ]]; then
         fi
         exit 1
     else
+        complete_gate_telemetry PASS "$CHANGED_COUNT" "" pre-push
         echo '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-push","summary":"All pre-push quality gates passed."}'
         exit 0
     fi
@@ -534,6 +540,11 @@ fi
 
 echo "================================================================="
 if [[ "$FAILED" -ne 0 ]]; then
+    LAST_LOG="$AUDIT_LOG_DIR/last-pre-push.log"
+    RAW_LOG=""
+    [[ -f "$LAST_LOG" ]] && RAW_LOG=$(cat "$LAST_LOG" 2>/dev/null || true)
+    complete_gate_telemetry BLOCK "$CHANGED_COUNT" "$RAW_LOG" pre-push
+
     echo "✖ Pre-Push 检查未通过，已阻止推送至远程分支"
     echo "   请在本地修复上述失败项后重试推送。"
     echo "💡 失败诊断快照已保留至: .audit-logs/last-pre-push.log"
@@ -542,6 +553,7 @@ if [[ "$FAILED" -ne 0 ]]; then
     echo "================================================================="
     exit 1
 else
+    complete_gate_telemetry PASS "$CHANGED_COUNT" "" pre-push
     echo "✔ Pre-Push 检查通过，允许推送至远程"
     echo "================================================================="
     exit 0

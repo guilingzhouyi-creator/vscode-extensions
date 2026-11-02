@@ -507,6 +507,7 @@ if ($codeCascade41 -ne 0) {
 }
 
 
+$changedCount = if ($changedFiles) { $changedFiles.Count } else { 0 }
 if ($Agent) {
     if ($failed) {
         $lastFailurePath = Join-Path $repoRoot ".audit-logs/last-failure.json"
@@ -515,6 +516,7 @@ if ($Agent) {
         }
         exit 1
     } else {
+        Complete-GateTelemetry -Gate "pre-push" -Status "PASS" -FilesCount $changedCount
         Write-Output '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-push","summary":"All pre-push quality gates passed."}'
         exit 0
     }
@@ -522,6 +524,10 @@ if ($Agent) {
 
 Write-GateHost "=================================================================" -ForegroundColor Cyan
 if ($failed) {
+    $failLog = Join-Path $repoRoot ".audit-logs/last-pre-push.log"
+    $rawLog = if (Test-Path $failLog) { Get-Content -Path $failLog -Raw -ErrorAction SilentlyContinue } else { "" }
+    Complete-GateTelemetry -Gate "pre-push" -Status "BLOCK" -FilesCount $changedCount -RawLogOutput $rawLog
+
     Write-GateHost "✖ Pre-Push 检查未通过，已阻止推送至远程分支" -ForegroundColor Red
     Write-GateHost "   请在本地修复上述失败项后重试推送。" -ForegroundColor Red
     Write-GateHost "💡 失败诊断快照已保留至: .audit-logs/last-pre-push.log" -ForegroundColor Yellow
@@ -530,6 +536,7 @@ if ($failed) {
     Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 1
 } else {
+    Complete-GateTelemetry -Gate "pre-push" -Status "PASS" -FilesCount $changedCount
     Write-GateHost "✔ Pre-Push 检查通过，允许推送至远程" -ForegroundColor Green
     Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 0

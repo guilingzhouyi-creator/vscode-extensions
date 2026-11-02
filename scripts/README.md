@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**98 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**100 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -74,6 +74,8 @@
 | `common/` | Node.js | `analyze-commit-terminology.js` | audit / terminology（历史提交术语频次与新兴黑话风险诊断，落盘 `.audit-logs/`） | 本地 CLI（诊断报告，不参与门禁裁决） |
 | `common/` | Node.js | `log-rotator.js` | tooling / hygiene（门禁失败快照保留、尾部截断 <=100KB 与 FIFO <=2MB 轮转清理管理器） | `pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`audit-all` |
 | `common/` | Node.js | `gate-failure-contract.js` | gate / failure（门禁失败命名拓扑学与格式物理卫生契约：规范四段式命名、8 项 Header 注入、ANSI 脱水与 GateFailureEnvelope 模式校验） | `audit-all`、`log-rotator`、CI |
+| `common/` | Node.js | `gate-telemetry-logger.js` | telemetry / gate（门禁运行遥测与单例快照记录器：原子持久化 `<gate>-latest.json`、FIFO 历史账本 `<gate>-history.jsonl`、ANSI 脱水诊断日志 `last-<gate>.log` 与失败信封） | `pre-commit-gate`、`pre-push-gate`、本地 CLI |
+| `common/` | Node.js | `test-gate-telemetry.js` | validate / telemetry（门禁遥测记录器与诊断日志套件自测：验证快照落盘、ANSI 脱水、路径脱敏、FIFO 轮转与软失败语义） | CI、本地自测 |
 | `common/` | Node.js | `workspace-walker.js` | tooling / traversal（全工作区目录迭代遍历、物理黑名单过滤与文件收集 SSOT 工具） | 门禁与体积审查脚本集 |
 | `common/` | JSON | `commit-msg-forbidden-terms.json` | data / ssot（提交信息四维禁词与白名单单源字典） | `validate-commit-msg-style` |
 | `common/` | JSON | `doc-metrics.json` | data / ssot（治理文档规模指标的真源映射、渲染模板与脚本库语义登记表） | `sync-doc-metrics` |

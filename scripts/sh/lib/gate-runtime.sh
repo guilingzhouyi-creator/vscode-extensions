@@ -33,6 +33,8 @@ GATE_SUPPRESS="${GATE_SUPPRESS:-0}"
 GATE_ENTRY_ID="${GATE_ENTRY_ID:-}"
 GATE_ROOT_DIR="${GATE_ROOT_DIR:-}"
 GATE_NODE_BIN="${GATE_NODE_BIN:-node}"
+GATE_START_TIME="$(date +%s 2>/dev/null || echo 0)"
+GATE_STEP_RESULTS=""
 
 # 抑制模式承诺在标准输出给出单一机器可读文档，
 # 任何人类可读行都会破坏该文档，故宿主输出统一受此开关抑制。
@@ -115,11 +117,80 @@ write_step_verdict() {
             ;;
     esac
     get_step_meta "${step_id}" >/dev/null || return 1
+    if [[ -n "${GATE_STEP_RESULTS}" ]]; then
+        GATE_STEP_RESULTS="${GATE_STEP_RESULTS},${step_id}:${status}"
+    else
+        GATE_STEP_RESULTS="${step_id}:${status}"
+    fi
     if [[ -n "${detail}" ]]; then
         gate_log "  ${glyph}${label} ${step_id}  ${detail}"
     else
         gate_log "  ${glyph}${label} ${step_id}"
     fi
+}
+
+complete_gate_telemetry() {
+    local status="${1:-PASS}"
+    local files_count="${2:-0}"
+    local raw_log="${3:-}"
+    local gate="${4:-${GATE_ENTRY_ID:-pre-commit}}"
+    local logger_js="${GATE_ROOT_DIR}/scripts/common/gate-telemetry-logger.js"
+    if [[ ! -f "${logger_js}" ]]; then
+        return 0
+    fi
+
+    local now elapsed_ms=0
+    now=$(date +%s 2>/dev/null || echo 0)
+    if [[ -n "${GATE_START_TIME:-}" && "${GATE_START_TIME}" -gt 0 ]]; then
+        elapsed_ms=$(( (now - GATE_START_TIME) * 1000 ))
+        [[ "$elapsed_ms" -lt 0 ]] && elapsed_ms=0
+    fi
+
+    local tmp_payload
+    tmp_payload=$(mktemp 2>/dev/null || echo "/tmp/gate-telemetry-$$.json")
+    "${GATE_NODE_BIN}" -e '
+const fs = require("fs");
+const gate = process.argv[1];
+const status = process.argv[2];
+const elapsed = Number(process.argv[3]) || 0;
+const filesCount = Number(process.argv[4]) || 0;
+const outcomesStr = process.argv[5] || "";
+const rawLog = process.argv[6] || "";
+const dest = process.argv[7];
+
+const passed = [];
+const failed = [];
+const skipped = [];
+const items = outcomesStr.split(",").filter(Boolean);
+for (const item of items) {
+  const parts = item.split(":");
+  const id = parts[0];
+  const s = parts[1];
+  if (s === "PASS") passed.push(id);
+  else if (s === "BLOCK") failed.push(id);
+  else if (s === "SKIP") skipped.push(id);
+}
+
+const payload = {
+  gate,
+  status,
+  durationMs: elapsed,
+  filesCount,
+  stepsSummary: {
+    total: items.length,
+    passed,
+    failed,
+    skipped
+  },
+  failures: [],
+  rawLogOutput: rawLog
+};
+fs.writeFileSync(dest, JSON.stringify(payload));
+' "$gate" "$status" "$elapsed_ms" "$files_count" "${GATE_STEP_RESULTS}" "$raw_log" "$tmp_payload" 2>/dev/null || true
+
+    "${GATE_NODE_BIN}" "${logger_js}" --record-file "$tmp_payload" >/dev/null 2>&1 || true
+    rm -f "$tmp_payload" 2>/dev/null || true
+    return 0
 }
 
 # 等待后台进程结束，超时则级联终止并落盘诊断快照。

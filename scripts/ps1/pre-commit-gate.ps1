@@ -829,25 +829,16 @@ if ($touchedAuditable) {
 }
 
 if ($Agent) {
+    Complete-GateTelemetry -Gate "pre-commit" -Status "PASS" -FilesCount $stagedFiles.Count
     Write-Output '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"All pre-commit hygiene and quality gates passed."}'
     exit 0
 }
 
 Write-GateHost "=================================================================" -ForegroundColor Cyan
 if ($failed) {
-    try {
-        $diagDir = Join-Path $repoRoot ".audit-logs"
-        if (-not (Test-Path $diagDir)) { [void](New-Item -ItemType Directory -Path $diagDir -Force) }
-        $failLog = Join-Path $diagDir "last-pre-commit.log"
-        $diagLines = [System.Collections.Generic.List[string]]::new()
-        $diagLines.Add("=================================================================")
-        $diagLines.Add("❌ Pre-Commit 门禁拦截现场快照")
-        $diagLines.Add("时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
-        $diagLines.Add("暂存文件数: $($stagedFiles.Count)")
-        foreach ($f in $stagedFiles) { $diagLines.Add("  - $f") }
-        $diagLines.Add("=================================================================")
-        [System.IO.File]::WriteAllLines($failLog, $diagLines, [System.Text.UTF8Encoding]::new($false))
-    } catch {}
+    $failLog = Join-Path $repoRoot ".audit-logs/last-pre-commit.log"
+    $rawLog = if (Test-Path $failLog) { Get-Content -Path $failLog -Raw -ErrorAction SilentlyContinue } else { "" }
+    Complete-GateTelemetry -Gate "pre-commit" -Status "BLOCK" -FilesCount $stagedFiles.Count -RawLogOutput $rawLog
 
     Write-GateHost "✖ 【门禁结论】Pre-Commit 检查未通过，已阻断提交！请根据上方提示修复后重试。" -ForegroundColor Red
     Write-GateHost "💡 失败诊断快照已保留至: .audit-logs/last-pre-commit.log" -ForegroundColor Yellow
@@ -856,6 +847,7 @@ if ($failed) {
     Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 1
 } else {
+    Complete-GateTelemetry -Gate "pre-commit" -Status "PASS" -FilesCount $stagedFiles.Count
     Write-GateHost "✔ Pre-Commit 检查通过" -ForegroundColor Green
     Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 0

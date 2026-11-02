@@ -49,6 +49,10 @@ const PROTECTED_SNAPSHOT_FILES = new Set([
   'audit-history.jsonl',
   'commit-guardrail-latest.json',
   'commit-guardrail-history.jsonl',
+  'pre-commit-latest.json',
+  'pre-commit-history.jsonl',
+  'pre-push-latest.json',
+  'pre-push-history.jsonl',
   'tech-debt-ledger.json',
 ]);
 
@@ -507,16 +511,26 @@ function renderSnapshotLogTail(targetDir, logFile) {
 
 function displayLatestAuditFallback(targetDir) {
   const latestAuditPath = path.join(targetDir, 'audit-latest.json');
-  if (!fs.existsSync(latestAuditPath)) {
-    return;
+  if (fs.existsSync(latestAuditPath)) {
+    try {
+      const audit = JSON.parse(fs.readFileSync(latestAuditPath, UTF8));
+      console.log(`💡 最近一次全工作区审查综合健康分为: ${audit.workspaceHealthScore} (${audit.grade || 'A+'}) | 状态: ${audit.status}`);
+      console.log('   查看全景看板: node scripts/common/record-workspace-audit.js --latest');
+    } catch {
+      // Best-effort audit inspection
+    }
   }
-  try {
-    const audit = JSON.parse(fs.readFileSync(latestAuditPath, UTF8));
-    console.log(`💡 最近一次全工作区审查综合健康分为: ${audit.workspaceHealthScore} (${audit.grade || 'A+'}) | 状态: ${audit.status}`);
-    console.log('   查看全景看板: node scripts/common/record-workspace-audit.js --latest');
-  } catch (readErr) {
-    // Best-effort audit inspection: ignore read failure to preserve view output
-    void readErr;
+
+  for (const gate of ['pre-commit', 'pre-push']) {
+    const gateLatestPath = path.join(targetDir, `${gate}-latest.json`);
+    if (fs.existsSync(gateLatestPath)) {
+      try {
+        const snap = JSON.parse(fs.readFileSync(gateLatestPath, UTF8));
+        console.log(`💡 最近一次 ${gate} 状态: ${snap.status} (耗时: ${snap.durationMs}ms, 提交: ${snap.gitRevision})`);
+      } catch {
+        // Best-effort inspection
+      }
+    }
   }
 }
 

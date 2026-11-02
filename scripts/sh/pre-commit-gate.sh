@@ -562,7 +562,9 @@ if [[ -n "$TOUCHED_AUDITABLE" ]]; then
     fi
 fi
 
+STAGED_COUNT=$(echo "$STAGED_FILES" | grep -c . || echo 0)
 if [[ "$AGENT_MODE" -eq 1 ]]; then
+    complete_gate_telemetry PASS "$STAGED_COUNT" "" pre-commit
     echo '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"All pre-commit hygiene and quality gates passed."}'
     exit 0
 fi
@@ -570,16 +572,10 @@ fi
 echo "================================================================="
 if [[ "$FAILED" -ne 0 ]]; then
     DIAG_DIR="$ROOT_DIR/.audit-logs"
-    mkdir -p "$DIAG_DIR" 2>/dev/null || true
     FAIL_LOG="$DIAG_DIR/last-pre-commit.log"
-    {
-        echo "================================================================="
-        echo "❌ Pre-Commit 门禁拦截现场快照"
-        echo "时间: $(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'unknown')"
-        echo "暂存文件列表:"
-        echo "$STAGED_FILES" | sed 's/^/  - /'
-        echo "================================================================="
-    } > "$FAIL_LOG" 2>/dev/null || true
+    RAW_LOG=""
+    [[ -f "$FAIL_LOG" ]] && RAW_LOG=$(cat "$FAIL_LOG" 2>/dev/null || true)
+    complete_gate_telemetry BLOCK "$STAGED_COUNT" "$RAW_LOG" pre-commit
 
     echo "✖ 【门禁结论】Pre-Commit 检查未通过，已阻断提交！请根据上方提示修复后重试。"
     echo "💡 失败诊断快照已保留至: .audit-logs/last-pre-commit.log"
@@ -588,6 +584,7 @@ if [[ "$FAILED" -ne 0 ]]; then
     echo "================================================================="
     exit 1
 else
+    complete_gate_telemetry PASS "$STAGED_COUNT" "" pre-commit
     echo "✔ Pre-Commit 检查通过"
     echo "================================================================="
     exit 0
