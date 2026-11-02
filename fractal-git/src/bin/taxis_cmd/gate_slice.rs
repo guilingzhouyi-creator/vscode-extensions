@@ -15,14 +15,14 @@ use super::common::{find_all_arg_values, print_json, CliContext};
 
 /// Dispatches the `taxis gate-slice` command.
 pub fn handle_gate_slice(ctx: &CliContext) {
-    let raw_files = find_all_arg_values(&ctx.args, &["--file", "-f"]);
-    let files_to_audit: Vec<String> = if raw_files.is_empty() {
+    let cli_file_arguments = find_all_arg_values(&ctx.args, &["--file", "-f"]);
+    let candidate_file_paths: Vec<String> = if cli_file_arguments.is_empty() {
         super::commit::collect_staged_files(ctx)
     } else {
-        raw_files.into_iter().map(String::from).collect()
+        cli_file_arguments.into_iter().map(String::from).collect()
     };
 
-    if files_to_audit.is_empty() {
+    if candidate_file_paths.is_empty() {
         if ctx.json_mode {
             let empty_payload = serde_json::json!({
                 "engine": "taxis",
@@ -31,11 +31,11 @@ pub fn handle_gate_slice(ctx: &CliContext) {
                 "admitted_threshold": 3.0,
                 "staged_files_count": 0,
                 "batch_totals": {
-                    "total_phys_add": 0,
-                    "total_phys_del": 0,
-                    "total_eloc_5d_add": 0.0,
-                    "total_eloc_5d_del": 0.0,
-                    "total_net_5d_turnover": 0.0
+                    "total_physical_lines_added": 0,
+                    "total_physical_lines_deleted": 0,
+                    "total_effective_lines_added": 0.0,
+                    "total_effective_lines_deleted": 0.0,
+                    "total_net_turnover": 0.0
                 },
                 "violations": []
             });
@@ -48,126 +48,133 @@ pub fn handle_gate_slice(ctx: &CliContext) {
 
     let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
     let mut evaluated_files = Vec::new();
-    let mut bounds_list = Vec::new();
+    let mut file_envelopes = Vec::new();
 
-    let mut total_phys_add = 0usize;
-    let mut total_phys_del = 0usize;
-    let mut total_eloc_5d_add = 0.0f64;
-    let mut total_eloc_5d_del = 0.0f64;
+    let mut total_physical_lines_added = 0usize;
+    let mut total_physical_lines_deleted = 0usize;
+    let mut total_effective_lines_added = 0.0f64;
+    let mut total_effective_lines_deleted = 0.0f64;
 
-    for path_str in &files_to_audit {
-        let full_path = work_root.join(path_str);
-        let content = fs::read_to_string(&full_path).unwrap_or_default();
-        let metrics: File5dElocMetrics = evaluate_file_5d_eloc(&content);
+    for relative_path in &candidate_file_paths {
+        let absolute_file_path = work_root.join(relative_path);
+        let file_content = fs::read_to_string(&absolute_file_path).unwrap_or_default();
+        let file_metrics: File5dElocMetrics = evaluate_file_5d_eloc(&file_content);
 
-        let is_new = is_file_new_in_repo(&ctx.git_dir, path_str);
-        let bounds = SingleFile5dBounds {
-            is_new_file: is_new,
-            phys_add: metrics.physical_lines,
-            phys_del: 0,
-            eloc_5d_add: metrics.eloc_5d,
-            eloc_5d_del: 0.0,
-            substantive_ratio_add: metrics.substantive_line_ratio,
-            tspr_add: metrics.tspr,
-        };
+        let is_newly_created = is_file_untracked_in_repo(&ctx.git_dir, relative_path);
+        let single_file_envelope = SingleFile5dBounds::new(
+            is_newly_created,
+            file_metrics.physical_lines,
+            0,
+            file_metrics.effective_lines_of_code,
+            0.0,
+            file_metrics.substantive_line_ratio,
+            file_metrics.substance_preservation_ratio,
+        );
 
-        total_phys_add += bounds.phys_add;
-        total_phys_del += bounds.phys_del;
-        total_eloc_5d_add += bounds.eloc_5d_add;
-        total_eloc_5d_del += bounds.eloc_5d_del;
+        total_physical_lines_added += single_file_envelope.physical_lines_added;
+        total_physical_lines_deleted += single_file_envelope.physical_lines_deleted;
+        total_effective_lines_added += single_file_envelope.effective_lines_added;
+        total_effective_lines_deleted += single_file_envelope.effective_lines_deleted;
 
-        bounds_list.push(bounds);
+        file_envelopes.push(single_file_envelope);
     }
 
-    for (i, path_str) in files_to_audit.iter().enumerate() {
-        evaluated_files.push((path_str.as_str(), bounds_list[i]));
+    for (index, file_path) in candidate_file_paths.iter().enumerate() {
+        evaluated_files.push((file_path.as_str(), file_envelopes[index]));
     }
 
-    let batch_totals = CommitBatchTotals {
-        total_phys_add,
-        total_phys_del,
-        total_eloc_5d_add,
-        total_eloc_5d_del,
-        total_net_5d_turnover: total_eloc_5d_add + total_eloc_5d_del * 0.8,
-    };
+    let total_net_turnover =
+        total_effective_lines_added + total_effective_lines_deleted * 0.8;
+    let batch_totals = CommitBatchTotals::new(
+        total_physical_lines_added,
+        total_physical_lines_deleted,
+        total_effective_lines_added,
+        total_effective_lines_deleted,
+        total_net_turnover,
+    );
 
-    let recent_turnovers = load_recent_turnovers(&ctx.git_dir);
-    let verdict: DiffBoundsVerdict = DiffBoundsGovernor::evaluate(
+    let historical_turnovers = load_recent_turnover_records(&ctx.git_dir);
+    let governance_verdict: DiffBoundsVerdict = DiffBoundsGovernor::evaluate(
         &evaluated_files,
         &batch_totals,
-        &recent_turnovers,
+        &historical_turnovers,
         false,
     );
 
-    report_slice_verdict(ctx, &verdict, &batch_totals, files_to_audit.len());
+    report_slice_verdict(
+        ctx,
+        &governance_verdict,
+        &batch_totals,
+        candidate_file_paths.len(),
+    );
 
-    if !verdict.is_passed {
+    if !governance_verdict.is_admitted {
         std::process::exit(1);
     }
 }
 
-fn load_recent_turnovers(git_dir: &Path) -> Vec<f64> {
+fn load_recent_turnover_records(git_dir: &Path) -> Vec<f64> {
     let ledger_path = git_dir.join("telemetry/admission_ledger.ndjson");
     if !ledger_path.is_file() {
         return Vec::new();
     }
     let content = match fs::read_to_string(&ledger_path) {
-        Ok(c) => c,
+        Ok(read_content) => read_content,
         Err(_) => return Vec::new(),
     };
-    let mut turnovers = Vec::new();
-    for line in content.lines() {
-        if let Ok(val) = serde_json::from_str::<serde_json::Value>(line.trim()) {
-            if let Some(turn) = val.get("turnover").and_then(|t| t.as_f64()) {
-                turnovers.push(turn);
+    let mut historical_turnovers = Vec::new();
+    for ledger_line in content.lines() {
+        if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(ledger_line.trim()) {
+            if let Some(turnover_num) = json_value.get("turnover").and_then(|t| t.as_f64()) {
+                historical_turnovers.push(turnover_num);
             }
         }
     }
-    turnovers
+    historical_turnovers
 }
 
 fn report_slice_verdict(
     ctx: &CliContext,
-    verdict: &DiffBoundsVerdict,
-    totals: &CommitBatchTotals,
-    file_count: usize,
+    governance_verdict: &DiffBoundsVerdict,
+    batch_totals: &CommitBatchTotals,
+    audited_file_count: usize,
 ) {
     if ctx.json_mode {
         let mut violations = Vec::new();
-        for v in &verdict.micro_violations {
+        for single_violation in &governance_verdict.file_violations {
             violations.push(serde_json::json!({
-                "rule_id": v.rule_id,
-                "file": v.file_path,
-                "message": v.message
+                "rule_id": single_violation.rule_id,
+                "file": single_violation.file_path,
+                "message": single_violation.message
             }));
         }
-        if let Some(ref b) = verdict.batch_violation {
+        if let Some(ref batch_violation) = governance_verdict.batch_violation {
             violations.push(serde_json::json!({
-                "rule_id": b.rule_id,
-                "message": b.message
+                "rule_id": batch_violation.rule_id,
+                "message": batch_violation.message
             }));
         }
-        if let Some(ref a) = verdict.admission_violation {
+        if let Some(ref admission_violation) = governance_verdict.admission_violation {
             violations.push(serde_json::json!({
-                "rule_id": a.rule_id,
-                "turnover": a.turnover,
-                "threshold": a.threshold,
-                "message": a.message
+                "rule_id": admission_violation.rule_id,
+                "actual_turnover": admission_violation.actual_turnover,
+                "required_threshold": admission_violation.required_threshold,
+                "message": admission_violation.message
             }));
         }
 
         let payload = serde_json::json!({
             "engine": "taxis",
             "operation": "gate_slice",
-            "passed": verdict.is_passed,
-            "admitted_threshold": verdict.admitted_threshold,
-            "staged_files_count": file_count,
+            "passed": governance_verdict.is_admitted,
+            "admitted_threshold": governance_verdict.admission_threshold,
+            "staged_files_count": audited_file_count,
             "batch_totals": {
-                "total_phys_add": totals.total_phys_add,
-                "total_phys_del": totals.total_phys_del,
-                "total_eloc_5d_add": totals.total_eloc_5d_add,
-                "total_eloc_5d_del": totals.total_eloc_5d_del,
-                "total_net_5d_turnover": totals.total_net_5d_turnover
+                "total_physical_lines_added": batch_totals.total_physical_lines_added,
+                "total_physical_lines_deleted": batch_totals.total_physical_lines_deleted,
+                "total_effective_lines_added": batch_totals.total_effective_lines_added,
+                "total_effective_lines_deleted": batch_totals.total_effective_lines_deleted,
+                "total_net_turnover": batch_totals.total_net_turnover
             },
             "violations": violations
         });
@@ -178,28 +185,42 @@ fn report_slice_verdict(
     println!("=== Taxis 5D Slice Gate Verification ===");
     println!(
         "Files Audited: {} | Net 5D Turnover: {:.1} (Threshold: {:.1})",
-        file_count, totals.total_net_5d_turnover, verdict.admitted_threshold
+        audited_file_count,
+        batch_totals.total_net_turnover,
+        governance_verdict.admission_threshold
     );
-    if verdict.is_passed {
+    if governance_verdict.is_admitted {
         println!("Result: PASS (Within two-tier 5D bounds)");
     } else {
         println!("Result: REJECT (Violations detected):");
-        for v in &verdict.micro_violations {
-            println!("  [MICRO BLOCK] {}: {} ({})", v.rule_id, v.message, v.file_path);
+        for single_violation in &governance_verdict.file_violations {
+            println!(
+                "  [MICRO BLOCK] {}: {} ({})",
+                single_violation.rule_id, single_violation.message, single_violation.file_path
+            );
         }
-        if let Some(ref b) = verdict.batch_violation {
-            println!("  [BATCH BLOCK] {}: {}", b.rule_id, b.message);
+        if let Some(ref batch_violation) = governance_verdict.batch_violation {
+            println!(
+                "  [BATCH BLOCK] {}: {}",
+                batch_violation.rule_id, batch_violation.message
+            );
         }
-        if let Some(ref a) = verdict.admission_violation {
-            println!("  [ADMISSION BLOCK] {}: {}", a.rule_id, a.message);
+        if let Some(ref admission_violation) = governance_verdict.admission_violation {
+            println!(
+                "  [ADMISSION BLOCK] {}: {}",
+                admission_violation.rule_id, admission_violation.message
+            );
         }
     }
 }
 
-fn is_file_new_in_repo(git_dir: &Path, rel_path: &str) -> bool {
+fn is_file_untracked_in_repo(git_dir: &Path, relative_file_path: &str) -> bool {
     let index_file = git_dir.join("index");
     if let Ok(git_index) = fg_index::GitIndex::load(&index_file) {
-        !git_index.entries().iter().any(|e| e.path == rel_path)
+        !git_index
+            .entries()
+            .iter()
+            .any(|entry| entry.path == relative_file_path)
     } else {
         true
     }

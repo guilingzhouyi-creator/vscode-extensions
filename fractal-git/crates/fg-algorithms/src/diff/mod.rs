@@ -11,7 +11,7 @@
 
 pub mod bit_parallel;
 pub mod compact;
-pub mod eloc_manifold;
+pub mod eloc_5d;
 pub mod engine;
 pub mod patch;
 pub mod rename;
@@ -22,9 +22,9 @@ pub mod xdiff_prepare;
 
 pub use bit_parallel::{bit_parallel_diff, BIT_PARALLEL_MAX_LINES};
 pub use compact::{Compaction, Side};
-pub use eloc_manifold::{
+pub use eloc_5d::{
     classify_line, evaluate_diff_5d_eloc, evaluate_file_5d_eloc, Diff5dElocDelta,
-    File5dElocMetrics, LineSemanticKind,
+    File5dElocMetrics, FloatPrecisionExt, LineSemanticKind,
 };
 pub use engine::{compute_xdiff_change_flags, DiffAlgorithm, DiffEngine};
 pub use patch::{

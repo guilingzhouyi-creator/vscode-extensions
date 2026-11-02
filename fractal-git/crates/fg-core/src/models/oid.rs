@@ -89,11 +89,16 @@ impl HashAlgorithm {
     }
 
     /// Returns the digest byte length produced by this algorithm.
-    pub const fn digest_len(&self) -> usize {
+    pub const fn digest_length(&self) -> usize {
         match self {
             Self::Sha1 => 20,
             Self::Sha256 | Self::Sm3 => 32,
         }
+    }
+
+    /// Backward-compatible alias for `digest_length`.
+    pub const fn digest_len(&self) -> usize {
+        self.digest_length()
     }
 }
 
@@ -124,15 +129,20 @@ impl TypedOid {
     }
 
     /// Borrows the raw digest byte slice.
-    pub fn as_slice(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Sha1(bytes) => bytes,
             Self::Sha256(bytes) | Self::Sm3(bytes) => bytes,
         }
     }
 
+    /// Backward-compatible alias for `as_bytes`.
+    pub fn as_slice(&self) -> &[u8] {
+        self.as_bytes()
+    }
+
     /// Projects this typed OID onto a canonical 20-byte Git plumbing OID.
-    pub fn to_standard_oid(&self) -> Oid {
+    pub fn to_canonical_oid(&self) -> Oid {
         match self {
             Self::Sha1(bytes) => Oid::from_bytes(*bytes),
             Self::Sha256(bytes) | Self::Sm3(bytes) => {
@@ -141,6 +151,11 @@ impl TypedOid {
                 Oid::from_bytes(truncated)
             }
         }
+    }
+
+    /// Backward-compatible alias for `to_canonical_oid`.
+    pub fn to_standard_oid(&self) -> Oid {
+        self.to_canonical_oid()
     }
 }
 

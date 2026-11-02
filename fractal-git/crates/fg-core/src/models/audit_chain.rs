@@ -86,6 +86,13 @@ pub struct AuditScore {
     pub turn: f32,
 }
 
+impl AuditScore {
+    /// Returns the net 5D ELOC turnover evaluated for this commit beat.
+    pub const fn net_turnover(&self) -> f32 {
+        self.turn
+    }
+}
+
 /// A compact, cryptographically tamper-evident single audit record.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AuditRecord {
