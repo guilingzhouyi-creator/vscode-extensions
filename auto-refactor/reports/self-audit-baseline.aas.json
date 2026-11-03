@@ -2,7 +2,7 @@
   "schema": "aas-v1",
   "tool": "auto-refactor",
   "version": "0.4.0",
-  "timestamp": "2026-11-02T07:39:33.624Z",
+  "timestamp": "2026-11-02T13:31:34.312Z",
   "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
   "verdict": "WARN",
   "health": {
@@ -34,8 +34,8 @@
     "quant": {
       "rcr": 0,
       "erq": 2.93,
-      "ddr": 632.39,
-      "edb95": 27.21,
+      "ddr": 632.93,
+      "edb95": 27.13,
       "ptd": 36.72,
       "dsi": 0.51,
       "rcd": 0.67,

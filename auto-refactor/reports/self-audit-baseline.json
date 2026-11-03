@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1793605171604",
-  "timestamp": "2026-11-02T07:39:37.045Z",
+  "snapshotId": "snapshot-v0.4.0-1793626292879",
+  "timestamp": "2026-11-02T13:31:37.280Z",
   "cai": 88.4,
   "autonomy": {
     "compositeAutonomyIndex": 88.4,
@@ -95,7 +95,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 822,
-    "durationMs": 4475
+    "durationMs": 3665
   },
   "metrics": {
     "compositeScore": 99.22,
@@ -1199,31 +1199,31 @@
     "runEloc": {
       "processed": 196296,
       "unique": 155289,
-      "changed": 3091,
-      "semantic": 2584,
+      "changed": 694,
+      "semantic": 518,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 2028,
-      "deleted": 1063,
-      "modified": 1063
+      "added": 638,
+      "deleted": 56,
+      "modified": 56
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1793605171601,
-      "totalRuns": 468,
+      "endMs": 1793626292877,
+      "totalRuns": 469,
       "eloc": {
-        "processedTotal": 71946973,
+        "processedTotal": 72143269,
         "uniqueTotal": 155289,
-        "changedTotal": 1541265,
-        "semanticTotal": 1173423
+        "changedTotal": 1541959,
+        "semanticTotal": 1173941
       },
       "qed": {
-        "mean": -0.044464,
+        "mean": -0.044368,
         "min": -3.5,
         "max": 0.18,
-        "kMean": -44.464
+        "kMean": -44.368
       },
       "debt": {
         "totalAdded": 3447,
@@ -1233,7 +1233,7 @@
         "densityYield": 41.39
       },
       "meanCompositeScore": 98.93,
-      "gatePassRate": 92.53
+      "gatePassRate": 92.54
     },
     "isFirstBaseline": false
   }
