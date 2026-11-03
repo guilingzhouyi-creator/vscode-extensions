@@ -12,6 +12,10 @@ mod test_commit_header_metrics;
 mod test_commit_message_contract;
 #[path = "rust/test_commit_typography_contract.rs"]
 mod test_commit_typography_contract;
+#[path = "rust/test_declaration_anchor.rs"]
+mod test_declaration_anchor;
+#[path = "rust/test_diagnostics.rs"]
+mod test_diagnostics;
 
 #[path = "rust/test_governance_pipeline.rs"]
 mod test_governance_pipeline;

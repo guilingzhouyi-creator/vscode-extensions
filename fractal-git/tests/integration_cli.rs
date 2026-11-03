@@ -45,3 +45,7 @@ mod test_ref_commands;
 mod test_inspect_commands;
 #[path = "rust/test_patch_commands.rs"]
 mod test_patch_commands;
+#[path = "rust/test_lineage_commands.rs"]
+mod test_lineage_commands;
+#[path = "rust/test_plumbing_tree_commands.rs"]
+mod test_plumbing_tree_commands;
