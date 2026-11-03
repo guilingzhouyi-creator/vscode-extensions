@@ -18,11 +18,12 @@ use std::path::PathBuf;
 mod taxis_cmd;
 use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
-    archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick, clone,
-    commit, config, daemon, diff, doctor, gate_slice, hash_object, index_plumbing, init, log,
-    maintenance, merge, operation, project, projection, promotion, quality, quarantine, read,
-    rebase, reclaim, relocate, remote, repack, reset, rev_list, revert, stage, stash, status,
-    submodule, tag, unarchive, undo, verify, worktree,
+    am, apply, archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick,
+    clone, commit, config, daemon, diff, doctor, format_patch, gate_slice, hash_object,
+    index_plumbing, init, inspect, lineage, log, maintenance, merge, operation, plumbing_tree,
+    project, projection, promotion, quality, quarantine, read, rebase, reclaim, refs, relocate,
+    remote, repack, reset, rev_list, revert, stage, stash, status, submodule, tag, unarchive,
+    undo, verify, worktree,
 };
 
 use fg_core::models::current_unix_seconds;
@@ -153,6 +154,56 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         handler: read::handle_for_each_ref,
     },
     CommandSpec {
+        canonical: "update-ref",
+        aliases: &["update-ref"],
+        handler: refs::handle_update_ref,
+    },
+    CommandSpec {
+        canonical: "symbolic-ref",
+        aliases: &["symbolic-ref"],
+        handler: refs::handle_symbolic_ref,
+    },
+    CommandSpec {
+        canonical: "merge-base",
+        aliases: &["merge-base"],
+        handler: refs::handle_merge_base,
+    },
+    CommandSpec {
+        canonical: "reflog",
+        aliases: &["reflog"],
+        handler: refs::handle_reflog,
+    },
+    CommandSpec {
+        canonical: "grep",
+        aliases: &["grep"],
+        handler: inspect::handle_grep,
+    },
+    CommandSpec {
+        canonical: "shortlog",
+        aliases: &["shortlog"],
+        handler: inspect::handle_shortlog,
+    },
+    CommandSpec {
+        canonical: "describe",
+        aliases: &["describe"],
+        handler: inspect::handle_describe,
+    },
+    CommandSpec {
+        canonical: "count-objects",
+        aliases: &["count-objects"],
+        handler: inspect::handle_count_objects,
+    },
+    CommandSpec {
+        canonical: "check-attr",
+        aliases: &["check-attr"],
+        handler: inspect::handle_check_attr,
+    },
+    CommandSpec {
+        canonical: "var",
+        aliases: &["var"],
+        handler: inspect::handle_var,
+    },
+    CommandSpec {
         canonical: "check-ignore",
         aliases: &["check-ignore"],
         handler: read::handle_check_ignore,
@@ -196,6 +247,61 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         canonical: "revert",
         aliases: &["revert"],
         handler: revert::handle_revert,
+    },
+    CommandSpec {
+        canonical: "format-patch",
+        aliases: &["format-patch"],
+        handler: format_patch::handle_format_patch,
+    },
+    CommandSpec {
+        canonical: "apply",
+        aliases: &["apply"],
+        handler: apply::handle_apply,
+    },
+    CommandSpec {
+        canonical: "am",
+        aliases: &["am"],
+        handler: am::handle_am,
+    },
+    CommandSpec {
+        canonical: "range-diff",
+        aliases: &["range-diff"],
+        handler: lineage::handle_range_diff,
+    },
+    CommandSpec {
+        canonical: "cherry",
+        aliases: &["cherry"],
+        handler: lineage::handle_cherry,
+    },
+    CommandSpec {
+        canonical: "mktree",
+        aliases: &["mktree"],
+        handler: plumbing_tree::handle_mktree,
+    },
+    CommandSpec {
+        canonical: "read-tree",
+        aliases: &["read-tree"],
+        handler: plumbing_tree::handle_read_tree,
+    },
+    CommandSpec {
+        canonical: "mktag",
+        aliases: &["mktag"],
+        handler: plumbing_tree::handle_mktag,
+    },
+    CommandSpec {
+        canonical: "name-rev",
+        aliases: &["name-rev"],
+        handler: plumbing_tree::handle_name_rev,
+    },
+    CommandSpec {
+        canonical: "verify-commit",
+        aliases: &["verify-commit"],
+        handler: plumbing_tree::handle_verify_commit,
+    },
+    CommandSpec {
+        canonical: "verify-tag",
+        aliases: &["verify-tag"],
+        handler: plumbing_tree::handle_verify_tag,
     },
     CommandSpec {
         canonical: "stash",
@@ -376,7 +482,27 @@ const COMMAND_TABLE: &[CommandSpec] = &[
 
 fn handle_version(_ctx: &CliContext) {
     print_banner();
+    let edition = fg_core::constants::Edition::CURRENT;
+    let capabilities = edition.capabilities();
     println!("Version: 0.1.0 (Rust Stable, 10 Kernel Subsystems)");
+    println!("Edition: {}", edition.as_str());
+    println!("  {}", edition.description());
+    // Capabilities are printed unconditionally, including the disabled ones. A reader asking "can
+    // this push to a remote?" must find a definite no rather than the absence of a mention.
+    println!(
+        "  capabilities: network_transport={} multi_repo_coordination={} local_git_parity={}",
+        capabilities.network_transport,
+        capabilities.multi_repo_coordination,
+        capabilities.local_git_parity
+    );
+    // Listing where the disabled capabilities will land is what separates "not built yet" from
+    // "forgotten". It is also the honest answer to "can I expect this later?".
+    for planned in fg_core::constants::PLANNED_CAPABILITIES {
+        if capabilities.allows(planned.name) {
+            continue;
+        }
+        println!("  planned {}: {}", planned.name, planned.landing_point);
+    }
 }
 
 fn handle_help(_ctx: &CliContext) {
@@ -393,10 +519,14 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
 }
 
 fn print_banner() {
+    // The edition is part of the banner rather than a footnote because the single most damaging
+    // misunderstanding today is assuming this build can reach a remote. A reader who sees the
+    // banner at all has already been told which capability tier they are holding.
     print!(
-        "=== Taxis (Fractal Git) Engine v0.1.0 ===\n\
+        "=== Taxis (Fractal Git) Engine v0.1.0 [{} edition] ===\n\
          Agent-Native In-Memory CAS & Fractal Version Matrix\n\
-         SSOT Rules: FGT-COR-001 through FGT-CAS-001\n\n"
+         SSOT Rules: FGT-COR-001 through FGT-CAS-001\n\n",
+        fg_core::constants::Edition::CURRENT.as_str()
     );
 }
 
@@ -414,6 +544,10 @@ Native Fractal Commands (with Git Alias Mappings):
   status,   st       Display fractal ref topology, staged index & quota status
   branch,   br       List, create, delete, or verify branches (Trunk/Cell/Card/Sub)
   commit,   ci       Create atomic commit with agent metadata
+  update-ref         Update, read or delete a reference (CAS guard supported)
+  symbolic-ref       Read or set HEAD's symbolic target
+  merge-base         Find the best common ancestor; --is-ancestor for a predicate
+  reflog             Show reference update history from the operation ledger
   diff,     di       Show tree diff or pass through to git diff
   checkout, co       Switch fractal worktree or git reference (-b to create branch)
   merge,    mg       3-Way hierarchical branch merge with fast-forward and conflict markers
@@ -421,6 +555,17 @@ Native Fractal Commands (with Git Alias Mappings):
   tag                Create, list, or delete lightweight and annotated Git tags
   cherry-pick, cp    Apply commit delta onto current HEAD branch
   revert             Create inverse commit delta reverting a past commit
+  format-patch       Prepare each commit for email submission by creating a patch file
+  apply              Apply a patch to files and/or to the index (--stat, --check, --cached)
+  am                 Apply a series of patches from a mailbox (--abort, --skip, --resolved)
+  range-diff         Compare two commit ranges
+  cherry             Find commits yet to be applied to upstream (-v)
+  mktree             Build a tree-object from ls-tree formatted text
+  read-tree          Read tree information into the index (-u, --prefix)
+  mktag              Creates a tag object with extra validation
+  name-rev           Find symbolic names for given revs (--tags)
+  verify-commit      Check cryptographic signature of commits (--raw, --verbose)
+  verify-tag         Check the cryptographic signature of tags (--raw, --verbose)
   stash              Shelve and restore uncommitted changes (push, pop, apply, list, drop)
   rebase,   rb       Replay branch commits linearly onto an upstream tip
   undo               Revert repository state to predecessor operation (Jujutsu-style)
@@ -433,9 +578,9 @@ Native Fractal Commands (with Git Alias Mappings):
   reclaim            Trigger worktree & sandbox reclamation (or 'worktree prune')
   repack             Consolidate loose objects into Git packfiles and index v2 (--async, --low-disk, --window)
   remote             Manage set of tracked repositories (list, add, remove, get-url)
-  fetch              Download objects and refs from another repository
-  push               Update remote refs along with associated objects
-  pull               Fetch from and integrate with another repository
+  fetch              Local transports only; network is disabled in this edition
+  push               Local transports only; network is disabled in this edition
+  pull               Local transports only; network is disabled in this edition
   project,  pj       Manage controlled project leases and hierarchical TTL (list, register, renew, evict)
   quarantine, quar   Manage elastic quarantine stash for unauthorized changes (list, show, restore, discard)
   worktree, wt       Display or allocate scoped projection worktree (--scope / --full)
@@ -445,13 +590,17 @@ Native Fractal Commands (with Git Alias Mappings):
   daemon,   serve    Display protocol daemon status & IPC endpoints
   version,  -v       Display version and domain rules SSOT
 
-Transparent Git Command Aliases & Passthrough:
+Transparent Git Command Aliases:
   sw/switch, lg/log, sh/show, rb/rebase, mg/merge, cp/cherry-pick
-  Any standard git command runs seamlessly with CAS acceleration.
+  Only commands listed above are dispatched natively. Anything else is refused by name rather
+  than silently forwarded, so an unimplemented command can never look like it succeeded.
+
+Edition: engineering (network disabled). Run `taxis version` for the capability set.
 
 Flags:
   --json             Output machine-readable JSON format
   --git-dir <path>   Override .git or .taxis directory location
+  --log-level <lvl>  trace | debug | info | warn | error | off (also TAXIS_LOG)
 "#
     );
 }
@@ -509,6 +658,10 @@ fn parse_cli_args(raw_args: &[String]) -> (PathBuf, bool, Vec<String>) {
             arg_cursor += 1;
         } else if raw_args[arg_cursor] == "--git-dir" && arg_cursor + 1 < raw_args.len() {
             explicit_git_dir = Some(PathBuf::from(&raw_args[arg_cursor + 1]));
+            arg_cursor += 2;
+        } else if raw_args[arg_cursor] == "--log-level" && arg_cursor + 1 < raw_args.len() {
+            // Consumed by diagnostic configuration in `main`; it is a process-level switch, not a
+            // subcommand argument, so it must not reach subcommand dispatch.
             arg_cursor += 2;
         } else {
             filtered_args.push(raw_args[arg_cursor].clone());
@@ -653,7 +806,9 @@ fn reject_unimplemented(subcommand: &str) -> ! {
         format!(
             "'{subcommand}' has no native implementation in this build. \
              Implemented: init, doctor, relocate, git-export, git-import, status, branch, commit, diff, hash-object, cat-file, ls-tree, \
-             ls-files, show-ref, for-each-ref, check-ignore, log, show, checkout, merge, reset, tag, cherry-pick, revert, \
+             ls-files, show-ref, for-each-ref, update-ref, symbolic-ref, merge-base, reflog, grep, shortlog, describe, count-objects, check-attr, var, \
+             check-ignore, log, show, checkout, merge, reset, tag, cherry-pick, revert, format-patch, apply, am, range-diff, cherry, \
+             mktree, read-tree, mktag, name-rev, verify-commit, verify-tag, \
              stash, rebase, repack, project, worktree, blackboard, promotion, bench, undo, operation, rev-list, verify, authority, reclaim, daemon, version, help."
         ),
     )
@@ -666,6 +821,13 @@ fn main() {
         return;
     }
 
+    // Logging is configured before any command runs so a failure during start-up is itself
+    // diagnosable. `--log-level` wins over `TAXIS_LOG` so one invocation can raise detail without
+    // changing the environment.
+    let level_flag = find_arg_value(&raw_args, &["--log-level"]);
+    fg_core::diagnostics::configure(level_flag);
+    fg_core::diag_debug!("taxis", "diagnostics configured at level {}", fg_core::diagnostics::level());
+
     let (git_dir, json_mode, filtered_args) = parse_cli_args(&raw_args);
     if filtered_args.is_empty() {
         print_help();
@@ -673,6 +835,13 @@ fn main() {
     }
 
     let (effective_subcommand, sub_args) = extract_effective_subcommand(&filtered_args);
+    fg_core::diag_debug!(
+        "taxis",
+        "dispatching '{}' with {} argument(s), json={}",
+        effective_subcommand,
+        sub_args.len(),
+        json_mode
+    );
     let ctx = CliContext {
         git_dir,
         json_mode,
