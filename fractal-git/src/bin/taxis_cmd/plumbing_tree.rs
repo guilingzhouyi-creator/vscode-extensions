@@ -157,8 +157,8 @@ pub fn handle_read_tree(ctx: &CliContext) {
             if let Some(parent) = target_file.parent() {
                 let _ = fs::create_dir_all(parent);
             }
-            if let Ok(obj) = view.object(&entry.oid) {
-                let _ = fs::write(&target_file, &obj.payload);
+            if let Ok(blob_obj) = view.object(&entry.oid) {
+                let _ = fs::write(&target_file, &blob_obj.payload);
             }
         }
     }

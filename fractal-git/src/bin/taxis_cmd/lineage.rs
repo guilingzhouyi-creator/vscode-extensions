@@ -130,8 +130,8 @@ pub fn handle_range_diff(ctx: &CliContext) {
             (Vec::new(), Vec::new())
         } else {
             let mut get_node = |oid: &Oid| -> Option<(CorrectedCommitDate, Vec<Oid>)> {
-                let obj = view.object(oid).ok()?;
-                let rec = parse_commit_record(*oid, &obj.payload).ok()?;
+                let commit_object = view.object(oid).ok()?;
+                let rec = parse_commit_record(*oid, &commit_object.payload).ok()?;
                 Some((
                     CorrectedCommitDate(rec.committer_time.max(0) as u64),
                     rec.parents,

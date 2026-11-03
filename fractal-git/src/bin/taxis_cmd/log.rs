@@ -84,7 +84,9 @@ pub fn handle_log(ctx: &CliContext) {
             Err(walk_err) => reject(CliTag::ERROR, walk_err),
         }
     } else if request.revision.contains("..") {
-        let (from_str, to_str) = request.revision.split_once("..").unwrap();
+        let Some((from_str, to_str)) = request.revision.split_once("..") else {
+            return;
+        };
         let from_rev = if from_str.is_empty() { "HEAD" } else { from_str };
         let to_rev = if to_str.is_empty() { "HEAD" } else { to_str };
         let to_oid = match view.resolve(to_rev) {
@@ -533,7 +535,7 @@ pub fn handle_show(ctx: &CliContext) {
             Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
         };
         let object = match view.object(&oid) {
-            Ok(obj) => obj,
+            Ok(loaded_obj) => loaded_obj,
             Err(obj_err) => reject(CliTag::ERROR, obj_err),
         };
         if object.kind == ObjectKind::Blob {

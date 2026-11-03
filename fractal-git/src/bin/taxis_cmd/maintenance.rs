@@ -545,10 +545,10 @@ fn collect_reachable_objects(view: &RepoView, root_oids: &[Oid], reachable: &mut
         if !reachable.insert(oid) {
             continue;
         }
-        if let Ok(obj) = view.object(&oid) {
-            match obj.kind {
+        if let Ok(loaded_obj) = view.object(&oid) {
+            match loaded_obj.kind {
                 ObjectKind::Commit => {
-                    if let Ok(commit_ref) = GitCommitRef::parse(&obj.payload) {
+                    if let Ok(commit_ref) = GitCommitRef::parse(&loaded_obj.payload) {
                         stack.push(*commit_ref.tree_oid());
                         for parent in commit_ref.parents() {
                             stack.push(parent);
@@ -556,13 +556,13 @@ fn collect_reachable_objects(view: &RepoView, root_oids: &[Oid], reachable: &mut
                     }
                 }
                 ObjectKind::Tree => {
-                    let tree_ref = GitTreeRef::from_bytes(&obj.payload);
+                    let tree_ref = GitTreeRef::from_bytes(&loaded_obj.payload);
                     for entry in tree_ref.iter().flatten() {
                         stack.push(entry.oid);
                     }
                 }
                 ObjectKind::Tag => {
-                    if let Ok(tag) = fg_object::tag::GitTag::parse(&obj.payload) {
+                    if let Ok(tag) = fg_object::tag::GitTag::parse(&loaded_obj.payload) {
                         stack.push(tag.target_oid);
                     }
                 }
