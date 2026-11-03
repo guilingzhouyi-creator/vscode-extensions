@@ -3,9 +3,8 @@
 //! Architecture Role: Automated regression tests ensuring core operators (TreeDiff, Myers Diff,
 //!   DAG Cutoff, BufferPool, ByteLruCache) satisfy nanosecond/microsecond budgets.
 
-use fractal_git::bench::{BenchmarkMetric, BenchmarkProfile, TaxisBenchmarkSuite};
+use fractal_git::bench::{BenchmarkMetric, TaxisBenchmarkSuite};
 use fractal_git::constants::metrics::*;
-use fractal_git::BenchmarkLevel;
 
 #[test]
 fn test_benchmark_suite_execution_and_timings() {

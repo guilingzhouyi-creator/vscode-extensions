@@ -176,6 +176,7 @@ pub use fg_gate::hook::{
     CommitGovernanceHook, ElevationPromotionGateHook, FractalHook, HookContext, HookPipeline,
     HookTier, HookVerdict, HygieneConflictHook,
 };
+pub use fg_gate::policy_floor::PolicyFloor;
 pub use fg_gate::pre_receive::PreReceiveGuard;
 pub use fg_gate::quota_governor::QuotaGovernor;
 pub use fg_gate::verifier::{
@@ -184,4 +185,5 @@ pub use fg_gate::verifier::{
 
 // Benchmark & Performance Ratchet exports
 pub mod bench;
+pub mod pathspec;
 pub use bench::{BaselineComparisonVerdict, BenchmarkLevel, BenchmarkMetric, TaxisBenchmarkSuite};
