@@ -63,17 +63,19 @@ pub fn handle_checkout(ctx: &CliContext) {
 
     let effective_branch = resolve_effective_branch(&view, &opts);
 
-    let current_files = view
+    let head_oid_opt = view
         .head_commit()
         .ok()
         .flatten()
-        .and_then(|head_oid| flatten_commit_tree(&view, &head_oid).ok())
+        .or_else(|| view.resolve("HEAD").ok());
+
+    let current_files = head_oid_opt
+        .as_ref()
+        .and_then(|head_oid| flatten_commit_tree(&view, head_oid).ok())
         .unwrap_or_default();
 
-    let previous_head = view
-        .head_commit()
-        .ok()
-        .flatten()
+    let previous_head = head_oid_opt
+        .as_ref()
         .map(|head_oid| head_oid.to_hex())
         .unwrap_or_else(|| "0".repeat(40));
 

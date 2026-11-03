@@ -166,9 +166,14 @@ fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &C
                 format!("fatal: Cannot resolve '{rev}': {err}"),
             ),
         },
-        None => match view.head_commit() {
-            Ok(Some(oid)) => oid,
-            _ => reject(CliTag::ERROR, "fatal: Not a valid object name: 'HEAD'."),
+        None => match view
+            .head_commit()
+            .ok()
+            .flatten()
+            .or_else(|| view.resolve("HEAD").ok())
+        {
+            Some(oid) => oid,
+            None => reject(CliTag::ERROR, "fatal: Not a valid object name: 'HEAD'."),
         },
     };
 

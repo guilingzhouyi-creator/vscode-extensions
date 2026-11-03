@@ -19,6 +19,12 @@ use fg_core::models::{current_unix_seconds, AUTHORITY_REMEDIATION};
 pub use fg_core::models::{ActorIdentity, AgentPushContext, TaxisPolicy};
 use fg_topology::refs::FractalRef;
 
+/// Returns true if the branch name designates a protected system trunk (`main`, `master`, `trunk`).
+#[inline]
+pub fn is_protected_trunk_branch(branch: &str) -> bool {
+    branch == "main" || branch == "master" || branch == "trunk"
+}
+
 /// Pre-receive protocol-level authorization guard.
 pub struct PreReceiveGuard;
 
@@ -74,7 +80,7 @@ impl PreReceiveGuard {
         policy: &TaxisPolicy,
     ) -> FractalResult<bool> {
         let (target_display, agent_reason) = match target_ref {
-            FractalRef::SystemTrunk { branch } => (
+            FractalRef::SystemTrunk { branch } if is_protected_trunk_branch(branch) => (
                 format!("{}{}", fg_core::constants::git::REF_HEADS_PREFIX, branch),
                 "Human Control Breach: System Trunk is strictly human-controlled; agent direct promotion is forbidden",
             ),
@@ -105,7 +111,17 @@ impl PreReceiveGuard {
     ) -> FractalResult<()> {
         let source_ref = format!("{}:{}", push_context.cell_id, push_context.agent_uid);
         let (target_cell, tier_label) = match target_ref {
-            FractalRef::SystemTrunk { .. } | FractalRef::Trunk => {
+            FractalRef::SystemTrunk { branch } if is_protected_trunk_branch(branch) => {
+                return Err(FractalError::TopologyBreach {
+                    source_ref,
+                    target_ref: target_ref.to_git_ref(),
+                    reason: "Direct agent push to trunk hierarchy is forbidden".into(),
+                });
+            }
+            FractalRef::SystemTrunk { .. } => {
+                return Ok(());
+            }
+            FractalRef::Trunk => {
                 return Err(FractalError::TopologyBreach {
                     source_ref,
                     target_ref: target_ref.to_git_ref(),
@@ -143,8 +159,15 @@ impl PreReceiveGuard {
         actor: &ActorIdentity,
     ) -> FractalResult<()> {
         match target_ref {
-            FractalRef::SystemTrunk { .. }
-            | FractalRef::Trunk
+            FractalRef::SystemTrunk { branch } if is_protected_trunk_branch(branch) => {
+                Err(FractalError::TopologyBreach {
+                    source_ref: actor.display_name(),
+                    target_ref: target_ref.to_git_ref(),
+                    reason: "Force push (--force) is categorically forbidden on trunk, cell-main, and protected telemetry references; use 'revert' instead"
+                        .into(),
+                })
+            }
+            FractalRef::Trunk
             | FractalRef::CellMain { .. }
             | FractalRef::TelemetryCommit { .. }
             | FractalRef::CellTelemetryLedger { .. }
@@ -156,12 +179,23 @@ impl PreReceiveGuard {
                         .into(),
                 })
             }
+            FractalRef::SystemTrunk { .. } => {
+                if actor.is_agent() {
+                    Err(FractalError::TopologyBreach {
+                        source_ref: actor.display_name(),
+                        target_ref: target_ref.to_git_ref(),
+                        reason: "Force push (--force) on feature branches is forbidden for autonomous agents".into(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
             FractalRef::SubAgentWorktree { .. } | FractalRef::CardWorktree { .. } => {
                 if actor.is_agent() {
                     Err(FractalError::TopologyBreach {
                         source_ref: actor.display_name(),
                         target_ref: target_ref.to_git_ref(),
-                        reason: "Force push (--force) is categorically forbidden for autonomous agents".into(),
+                        reason: "Force push (--force) on worktree branches is forbidden for autonomous agents".into(),
                     })
                 } else {
                     Ok(())

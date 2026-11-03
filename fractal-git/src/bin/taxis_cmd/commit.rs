@@ -69,6 +69,7 @@ pub fn handle_commit(ctx: &CliContext) {
         "workspace-strict"
     });
     let explicit_target = find_arg_value(&ctx.args, &["--target"]);
+    let active_head = resolve_active_head_ref(&ctx.git_dir);
     // Where an untargeted commit lands.
     //
     // Following HEAD is what Git does, but in a Taxis repository HEAD points at the protected trunk,
@@ -84,7 +85,8 @@ pub fn handle_commit(ctx: &CliContext) {
     let target_ref_str = match explicit_target {
         Some(t) => t.to_string(),
         None => {
-            let head_ref = resolve_active_head_ref(&ctx.git_dir)
+            let head_ref = active_head
+                .clone()
                 .unwrap_or_else(|| "refs/fractal/cell/cell-default/main".to_string());
             engineering_default_target(head_ref, cell_id, !git_native_default)
         }
@@ -340,6 +342,13 @@ pub fn handle_commit(ctx: &CliContext) {
     );
 }
 
+/// Returns true if the reference designates a protected system trunk (`main`, `master`, `trunk`).
+#[inline]
+pub(crate) fn is_protected_trunk(ref_name: &str) -> bool {
+    let clean = ref_name.strip_prefix("refs/heads/").unwrap_or(ref_name);
+    clean == "main" || clean == "master" || clean == "trunk"
+}
+
 /// Chooses the destination for a commit that named no `--target`.
 ///
 /// Only two situations get the sandbox treatment, and both are deliberate: the engineering edition,
@@ -354,9 +363,9 @@ pub fn handle_commit(ctx: &CliContext) {
 /// the work afterwards.
 fn engineering_default_target(head_ref: String, cell_id: &str, taxis_governed: bool) -> String {
     let edition = fg_core::constants::Edition::CURRENT;
-    let is_protected_trunk = head_ref.starts_with("refs/heads/");
+    let is_trunk = is_protected_trunk(&head_ref);
     if !taxis_governed
-        || !is_protected_trunk
+        || !is_trunk
         || edition != fg_core::constants::Edition::Engineering
     {
         return head_ref;
