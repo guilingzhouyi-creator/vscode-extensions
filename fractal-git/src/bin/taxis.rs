@@ -204,6 +204,11 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         handler: inspect::handle_var,
     },
     CommandSpec {
+        canonical: "stripspace",
+        aliases: &["stripspace"],
+        handler: inspect::handle_stripspace,
+    },
+    CommandSpec {
         canonical: "check-ignore",
         aliases: &["check-ignore"],
         handler: read::handle_check_ignore,
@@ -272,6 +277,16 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         canonical: "cherry",
         aliases: &["cherry"],
         handler: lineage::handle_cherry,
+    },
+    CommandSpec {
+        canonical: "patch-id",
+        aliases: &["patch-id"],
+        handler: lineage::handle_patch_id,
+    },
+    CommandSpec {
+        canonical: "merge-tree",
+        aliases: &["merge-tree"],
+        handler: plumbing_tree::handle_merge_tree,
     },
     CommandSpec {
         canonical: "mktree",
@@ -377,6 +392,11 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         canonical: "clean",
         aliases: &["clean"],
         handler: maintenance::handle_clean,
+    },
+    CommandSpec {
+        canonical: "prune",
+        aliases: &["prune"],
+        handler: maintenance::handle_prune,
     },
     CommandSpec {
         canonical: "fsck",
@@ -560,6 +580,9 @@ Native Fractal Commands (with Git Alias Mappings):
   am                 Apply a series of patches from a mailbox (--abort, --skip, --resolved)
   range-diff         Compare two commit ranges
   cherry             Find commits yet to be applied to upstream (-v)
+  patch-id           Compute unique ID for a patch from stdin
+  merge-tree         Perform 3-way tree merge without touching index or worktree
+  stripspace         Remove unnecessary whitespace and comment lines from stdin
   mktree             Build a tree-object from ls-tree formatted text
   read-tree          Read tree information into the index (-u, --prefix)
   mktag              Creates a tag object with extra validation
@@ -576,6 +599,7 @@ Native Fractal Commands (with Git Alias Mappings):
   unarchive, extract Extract Zip, Tar, Tar.gz, or Bundle in-place with SpacePlan preflight (--dry-run, --to-odb)
   bundle             Create, verify, list-heads, or unbundle Git bundle v2 packages in-place
   reclaim            Trigger worktree & sandbox reclamation (or 'worktree prune')
+  prune              Prune all unreachable loose objects from the object database
   repack             Consolidate loose objects into Git packfiles and index v2 (--async, --low-disk, --window)
   remote             Manage set of tracked repositories (list, add, remove, get-url)
   fetch              Local transports only; network is disabled in this edition
@@ -808,6 +832,7 @@ fn reject_unimplemented(subcommand: &str) -> ! {
              Implemented: init, doctor, relocate, git-export, git-import, status, branch, commit, diff, hash-object, cat-file, ls-tree, \
              ls-files, show-ref, for-each-ref, update-ref, symbolic-ref, merge-base, reflog, grep, shortlog, describe, count-objects, check-attr, var, \
              check-ignore, log, show, checkout, merge, reset, tag, cherry-pick, revert, format-patch, apply, am, range-diff, cherry, \
+             patch-id, merge-tree, stripspace, prune, \
              mktree, read-tree, mktag, name-rev, verify-commit, verify-tag, \
              stash, rebase, repack, project, worktree, blackboard, promotion, bench, undo, operation, rev-list, verify, authority, reclaim, daemon, version, help."
         ),

@@ -93,7 +93,7 @@ pub fn handle_hash_object(ctx: &CliContext) {
             Ok(opened) => opened,
             Err(open_err) => fail_fatal(open_err),
         };
-        Some(LooseOdb::new(view.git_dir().join("objects")))
+        Some(LooseOdb::new(view.git_dir()))
     } else {
         None
     };

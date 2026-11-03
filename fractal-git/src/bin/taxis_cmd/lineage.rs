@@ -352,3 +352,60 @@ fn render_diff_of_diffs(d1: &str, d2: &str) {
         }
     }
 }
+
+/// Dispatches `taxis patch-id`.
+pub fn handle_patch_id(_ctx: &CliContext) {
+    let mut input = String::new();
+    if let Err(err) = std::io::Read::read_to_string(&mut std::io::stdin(), &mut input) {
+        fail_fatal(format!("reading patch-id input: {err}"));
+    }
+
+    let mut current_commit = Oid::ZERO;
+    let mut current_hasher: Option<Sha1> = None;
+    let mut has_hunks = false;
+
+    let flush_patch = |hasher: &mut Option<Sha1>, commit: Oid, has_hunks: &mut bool| {
+        if *has_hunks {
+            if let Some(h) = hasher.take() {
+                let digest = h.finalize();
+                let patch_id = Oid::from_bytes(digest.into());
+                println!("{} {}", patch_id.to_hex(), commit.to_hex());
+            }
+            *has_hunks = false;
+        }
+    };
+
+    for line in input.lines() {
+        if line.starts_with("commit ") || line.starts_with("From ") {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                if let Ok(oid) = Oid::from_hex(parts[1]) {
+                    flush_patch(&mut current_hasher, current_commit, &mut has_hunks);
+                    current_commit = oid;
+                }
+            }
+            continue;
+        }
+
+        if line.starts_with("diff --git ") {
+            if current_hasher.is_none() {
+                current_hasher = Some(Sha1::new());
+            }
+            continue;
+        }
+
+        if (line.starts_with('+') && !line.starts_with("+++"))
+            || (line.starts_with('-') && !line.starts_with("---"))
+        {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() {
+                let h = current_hasher.get_or_insert_with(Sha1::new);
+                h.update(trimmed.as_bytes());
+                h.update(b"\n");
+                has_hunks = true;
+            }
+        }
+    }
+
+    flush_patch(&mut current_hasher, current_commit, &mut has_hunks);
+}

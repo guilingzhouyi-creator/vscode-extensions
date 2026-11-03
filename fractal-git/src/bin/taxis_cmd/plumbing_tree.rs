@@ -28,7 +28,7 @@ use fg_object::tag::GitTag;
 use fg_object::tree::{GitTree, GitTreeEntry};
 use fractal_git::LooseOdb;
 
-use super::commit_walk::walk_commits;
+use super::commit_walk::{parse_commit_record, walk_commits};
 use super::common::{fail_fatal, fail_usage, CliContext};
 use super::repo_view::RepoView;
 use super::tree_view::{flatten_tree, TreeEntry};
@@ -467,5 +467,99 @@ pub fn handle_verify_tag(ctx: &CliContext) {
 
     if !all_signed {
         std::process::exit(1);
+    }
+}
+
+/// Dispatches `taxis merge-tree`.
+pub fn handle_merge_tree(ctx: &CliContext) {
+    let mut positional = Vec::new();
+
+    for arg in &ctx.args {
+        match arg.as_str() {
+            "--write-tree" | "--trivial-merge" | "--allow-unrelated-histories" => {}
+            other if other.starts_with('-') => {
+                fail_usage(format!("merge-tree: unsupported option '{other}'"));
+            }
+            _ => positional.push(arg.as_str()),
+        }
+    }
+
+    if positional.len() < 2 || positional.len() > 3 {
+        fail_usage("merge-tree [--write-tree] <branch1> <branch2> or <base-tree> <branch1> <branch2>");
+    }
+
+    let view = RepoView::open_or_exit(ctx);
+
+    let (base_tree_oid, ours_tree_oid, theirs_tree_oid) = if positional.len() == 3 {
+        let (_, b) = view.resolve_tree(positional[0]).unwrap_or_else(|e| fail_fatal(e));
+        let (_, o) = view.resolve_tree(positional[1]).unwrap_or_else(|e| fail_fatal(e));
+        let (_, t) = view.resolve_tree(positional[2]).unwrap_or_else(|e| fail_fatal(e));
+        (b, o, t)
+    } else {
+        let (o_res, o_tree) = view.resolve_tree(positional[0]).unwrap_or_else(|e| fail_fatal(e));
+        let (t_res, t_tree) = view.resolve_tree(positional[1]).unwrap_or_else(|e| fail_fatal(e));
+
+        let mut get_node = |oid: &Oid| -> Option<(fg_algorithms::traverse::dag_walk::CorrectedCommitDate, Vec<Oid>)> {
+            let commit_obj = view.object(oid).ok()?;
+            let record = parse_commit_record(*oid, &commit_obj.payload).ok()?;
+            Some((
+                fg_algorithms::traverse::dag_walk::CorrectedCommitDate(record.committer_time.max(0) as u64),
+                record.parents,
+            ))
+        };
+
+        let bases = fg_algorithms::traverse::dag_walk::DagWalker::find_merge_bases_with_ccd(&o_res, &t_res, &mut get_node);
+        let base_tree = if let Some(base_oid) = bases.first() {
+            view.resolve_tree(&base_oid.to_hex()).map(|(_, t)| t).unwrap_or(Oid::ZERO)
+        } else {
+            Oid::ZERO
+        };
+        (base_tree, o_tree, t_tree)
+    };
+
+    let mut base_files: BTreeMap<String, TreeEntry> = BTreeMap::new();
+    let mut ours_files: BTreeMap<String, TreeEntry> = BTreeMap::new();
+    let mut theirs_files: BTreeMap<String, TreeEntry> = BTreeMap::new();
+
+    if base_tree_oid != Oid::ZERO {
+        let _ = flatten_tree(&view, &base_tree_oid, "", &mut base_files);
+    }
+    let _ = flatten_tree(&view, &ours_tree_oid, "", &mut ours_files);
+    let _ = flatten_tree(&view, &theirs_tree_oid, "", &mut theirs_files);
+
+    let base_map: BTreeMap<String, Oid> = base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let ours_map: BTreeMap<String, Oid> = ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let theirs_map: BTreeMap<String, Oid> = theirs_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+
+    let merge_res = fg_algorithms::merge::ThreeWayMerge::merge(&base_map, &ours_map, &theirs_map);
+
+    match merge_res {
+        fg_algorithms::merge::ThreeWayMergeResult::FastForward => {
+            println!("{}", theirs_tree_oid.to_hex());
+        }
+        fg_algorithms::merge::ThreeWayMergeResult::Clean { merged_tree } => {
+            let mut index_tree = fg_index::InMemoryIndexTree::new();
+            for (path, oid) in &merged_tree {
+                let mode = theirs_files
+                    .get(path)
+                    .or_else(|| ours_files.get(path))
+                    .map(|e| e.mode)
+                    .unwrap_or(FileMode::RegularFile);
+                if let Err(err) = index_tree.stage_oid(path, mode, *oid) {
+                    fail_fatal(format!("staging tree entry: {err}"));
+                }
+            }
+            let odb = LooseOdb::new(view.git_dir());
+            match fg_storage::commit_materializer::persist_index_tree(&index_tree, &odb) {
+                Ok(tree_oid) => println!("{}", tree_oid.to_hex()),
+                Err(err) => fail_fatal(format!("persisting merged tree: {err}")),
+            }
+        }
+        fg_algorithms::merge::ThreeWayMergeResult::Conflicted { conflicts, .. } => {
+            for conflict in &conflicts {
+                println!("CONFLICT (content): Merge conflict in {}", conflict.path);
+            }
+            std::process::exit(1);
+        }
     }
 }

@@ -501,3 +501,59 @@ pub fn handle_var(ctx: &CliContext) {
         None => std::process::exit(EXIT_NO_MATCH),
     }
 }
+
+/// Dispatches `taxis stripspace`.
+pub fn handle_stripspace(ctx: &CliContext) {
+    let mut strip_comments = false;
+    let mut comment_lines = false;
+
+    for arg in &ctx.args {
+        match arg.as_str() {
+            "-s" | "--strip-comments" => strip_comments = true,
+            "-c" | "--comment-lines" => comment_lines = true,
+            _ => {}
+        }
+    }
+
+    let mut input = String::new();
+    if let Err(err) = std::io::Read::read_to_string(&mut std::io::stdin(), &mut input) {
+        fail_fatal(format!("reading stripspace input: {err}"));
+    }
+
+    if comment_lines {
+        for line in input.lines() {
+            if line.is_empty() {
+                println!("#");
+            } else {
+                println!("# {line}");
+            }
+        }
+        return;
+    }
+
+    let mut cleaned_lines = Vec::new();
+    let mut empty_pending = false;
+
+    for line in input.lines() {
+        let trimmed_end = line.trim_end();
+        if strip_comments && trimmed_end.trim_start().starts_with('#') {
+            continue;
+        }
+
+        if trimmed_end.is_empty() {
+            if !cleaned_lines.is_empty() {
+                empty_pending = true;
+            }
+        } else {
+            if empty_pending {
+                cleaned_lines.push(String::new());
+                empty_pending = false;
+            }
+            cleaned_lines.push(trimmed_end.to_string());
+        }
+    }
+
+    for line in &cleaned_lines {
+        println!("{line}");
+    }
+}

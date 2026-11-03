@@ -537,3 +537,111 @@ pub fn handle_gc(ctx: &CliContext) {
         }
     }
 }
+
+/// Traverses all objects reachable from `root_oids` and inserts their OIDs into `reachable`.
+fn collect_reachable_objects(view: &RepoView, root_oids: &[Oid], reachable: &mut BTreeSet<Oid>) {
+    let mut stack = root_oids.to_vec();
+    while let Some(oid) = stack.pop() {
+        if !reachable.insert(oid) {
+            continue;
+        }
+        if let Ok(obj) = view.object(&oid) {
+            match obj.kind {
+                ObjectKind::Commit => {
+                    if let Ok(commit_ref) = GitCommitRef::parse(&obj.payload) {
+                        stack.push(*commit_ref.tree_oid());
+                        for parent in commit_ref.parents() {
+                            stack.push(parent);
+                        }
+                    }
+                }
+                ObjectKind::Tree => {
+                    let tree_ref = GitTreeRef::from_bytes(&obj.payload);
+                    for entry in tree_ref.iter().flatten() {
+                        stack.push(entry.oid);
+                    }
+                }
+                ObjectKind::Tag => {
+                    if let Ok(tag) = fg_object::tag::GitTag::parse(&obj.payload) {
+                        stack.push(tag.target_oid);
+                    }
+                }
+                ObjectKind::Blob => {}
+            }
+        }
+    }
+}
+
+/// Dispatches `taxis prune`.
+pub fn handle_prune(ctx: &CliContext) {
+    let mut dry_run = false;
+    let mut verbose = false;
+
+    for arg in &ctx.args {
+        match arg.as_str() {
+            "-n" | "--dry-run" => dry_run = true,
+            "-v" | "--verbose" => verbose = true,
+            "--progress" => {}
+            other if other.starts_with("--expire") => {}
+            other if other.starts_with('-') => {
+                fail_usage(format!("prune: unknown option '{other}'"));
+            }
+            _ => {}
+        }
+    }
+
+    let view = RepoView::open_or_exit(ctx);
+    let mut reachable = BTreeSet::new();
+
+    // 1. Collect from references
+    let ref_store = DiskRefStore::new(view.git_dir());
+    let all_refs = ref_store.list_all().unwrap_or_default();
+    let mut root_oids: Vec<Oid> = all_refs.into_iter().map(|(_, oid)| oid).collect();
+
+    // 2. Collect from HEAD if present
+    if let Ok(Some(head)) = view.head_commit() {
+        root_oids.push(head);
+    }
+
+    // Traverse reachable graph
+    collect_reachable_objects(&view, &root_oids, &mut reachable);
+
+    // 3. Collect from index entries
+    let index_entries = load_index_entries(view.git_dir());
+    for entry in index_entries.values() {
+        reachable.insert(entry.oid);
+    }
+
+    // 4. Scan loose objects
+    let loose = scan_loose_objects(view.git_dir()).unwrap_or_default();
+    let mut pruned_count = 0usize;
+
+    for (oid, _kind, _payload) in loose {
+        if !reachable.contains(&oid) {
+            pruned_count += 1;
+            if verbose {
+                println!("{}", oid.to_hex());
+            }
+            if !dry_run {
+                let hex = oid.to_hex();
+                let parent_dir = view.git_dir().join("objects").join(&hex[..2]);
+                let obj_path = parent_dir.join(&hex[2..]);
+                let _ = fs::remove_file(&obj_path);
+                if let Ok(mut entries) = fs::read_dir(&parent_dir) {
+                    if entries.next().is_none() {
+                        let _ = fs::remove_dir(&parent_dir);
+                    }
+                }
+            }
+        }
+    }
+
+    if ctx.json_mode {
+        print_json(&serde_json::json!({
+            "engine": "taxis",
+            "operation": "prune",
+            "dry_run": dry_run,
+            "pruned_count": pruned_count,
+        }));
+    }
+}
