@@ -39,3 +39,9 @@ mod test_edition_capability;
 mod test_pathspec_resolution;
 #[path = "rust/test_engineering_default_target.rs"]
 mod test_engineering_default_target;
+#[path = "rust/test_ref_commands.rs"]
+mod test_ref_commands;
+#[path = "rust/test_inspect_commands.rs"]
+mod test_inspect_commands;
+#[path = "rust/test_patch_commands.rs"]
+mod test_patch_commands;
