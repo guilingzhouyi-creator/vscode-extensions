@@ -27,19 +27,10 @@ use fg_pools::buffer_pool::{BufferSizeClass, PageBufferPool};
 use fg_pools::lru_cache::ByteLruCache;
 use fg_topology::PromotionStagingLedger;
 
-/// Target benchmark suite level.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum BenchmarkLevel {
-    /// Level 1: Micro-benchmarks for core data structures & operators (< 15 µs).
-    Level1Micro,
-    /// Level 2: Poset DAG scale & dense history Bloom pruning (2,000 nodes, 500 commits).
-    Level2Scale,
-    /// Level 3: Monorepo macro & concurrent agent transactions
-    /// (10,000 files, 8 concurrent agents).
-    Level3Macro,
-    /// All levels combined (complete industrial parity verification).
-    All,
-}
+pub mod guard;
+pub mod profile;
+
+pub use profile::{BenchmarkLevel, BenchmarkProfile};
 
 /// Single benchmark metric record.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -57,6 +48,9 @@ pub struct TaxisBenchmarkSuite {
     pub engine: String,
     pub version: String,
     pub timestamp_ms: u64,
+    /// Build profile the numbers were measured in; defaults to `unspecified` for older files.
+    #[serde(default)]
+    pub profile: BenchmarkProfile,
     pub metrics: Vec<BenchmarkMetric>,
 }
 
@@ -66,6 +60,16 @@ pub struct BaselineComparisonVerdict {
     pub passed: bool,
     pub regressions: Vec<String>,
     pub improvements: Vec<String>,
+    /// Metrics measured by this run that the baseline says nothing about.
+    ///
+    /// A missing entry used to be skipped, which meant a benchmark added after the baseline was
+    /// frozen stayed unguarded forever while the gate reported a pass. Silence is the failure mode
+    /// a ratchet must not have, so absence is now a violation.
+    #[serde(default)]
+    pub unbaselined: Vec<String>,
+    /// Set when the baseline was recorded in a different build profile than this run.
+    #[serde(default)]
+    pub profile_mismatch: Option<String>,
 }
 
 impl TaxisBenchmarkSuite {
@@ -75,37 +79,106 @@ impl TaxisBenchmarkSuite {
         let mut metrics = Vec::new();
 
         if matches!(level, BenchmarkLevel::Level1Micro | BenchmarkLevel::All) {
-            metrics.push(Self::bench_canonical_tree_diff(100 * mult));
-            metrics.push(Self::bench_myers_diff(100 * mult));
-            metrics.push(Self::bench_dag_generation_cutoff(500 * mult));
-            metrics.push(Self::bench_corrected_commit_date_cutoff(500 * mult));
-            metrics.push(Self::bench_bloom_filter_path_query(1000 * mult));
-            metrics.push(Self::bench_buffer_pool_freelists(1000 * mult));
-            metrics.push(Self::bench_byte_lru_cache(500 * mult));
-            metrics.push(Self::bench_bit_parallel_myers(1000 * mult));
-            metrics.push(Self::bench_fossil_rolling_hash(100 * mult));
-            metrics.push(Self::bench_fast_cdc_streaming(100 * mult));
-            metrics.push(Self::bench_roaring_bitmap_ops(500 * mult));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_canonical_tree_diff(100 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_myers_diff(100 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_dag_generation_cutoff(500 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_corrected_commit_date_cutoff(500 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_bloom_filter_path_query(1000 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_buffer_pool_freelists(1000 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_byte_lru_cache(500 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_bit_parallel_myers(1000 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_fossil_rolling_hash(100 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_fast_cdc_streaming(100 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_roaring_bitmap_ops(500 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_commit_message_guard(2000 * mult)
+            }));
         }
 
         if matches!(level, BenchmarkLevel::Level2Scale | BenchmarkLevel::All) {
-            metrics.push(Self::bench_dag_poset_scale_traversal(100 * mult));
-            metrics.push(Self::bench_bloom_filter_dense_history_pruning(5 * mult));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_dag_poset_scale_traversal(100 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_bloom_filter_dense_history_pruning(5 * mult)
+            }));
         }
 
         if matches!(level, BenchmarkLevel::Level3Macro | BenchmarkLevel::All) {
-            metrics.push(Self::bench_monorepo_10k_sparse_tree_diff(50 * mult));
-            metrics.push(Self::bench_concurrent_agent_worktree_transactions(
-                100 * mult,
-            ));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_monorepo_10k_sparse_tree_diff(50 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_concurrent_agent_worktree_transactions(100 * mult)
+            }));
         }
 
         Self {
             engine: "taxis".to_string(),
             version: "0.1.0".to_string(),
             timestamp_ms: 1700000000000,
+            profile: BenchmarkProfile::current(),
             metrics,
         }
+    }
+
+    /// Number of independent timed runs folded into one reported metric.
+    ///
+    /// A single timed run occasionally absorbs a scheduler preemption or a cache eviction caused by
+    /// an unrelated process, and when that run is also the one that froze the baseline the reference
+    /// itself is inflated — which then hides that much real regression. Repeating the measurement and
+    /// keeping the fastest sample removes the outlier without touching the tolerance, because
+    /// widening the tolerance to cover noise would equally cover genuine slowdowns.
+    const METRIC_SAMPLES: usize = 3;
+
+    /// Measures `measure` several times and reports the fastest sample.
+    ///
+    /// Interference is one-directional: contention, migration and eviction only ever add time, so the
+    /// minimum is the least-biased estimator of what the code actually costs. Both the frozen
+    /// baseline and the verifying run are produced this way, which keeps the comparison like for
+    /// like; a median would instead freeze whichever load happened to be present at freeze time.
+    ///
+    /// The whole record is returned rather than recombined, so iterations, duration and throughput
+    /// stay mutually consistent instead of pairing one run's latency with another run's duration.
+    fn fastest_of_samples<F>(mut measure: F) -> BenchmarkMetric
+    where
+        F: FnMut() -> BenchmarkMetric,
+    {
+        let mut best: Option<BenchmarkMetric> = None;
+        for _ in 0..Self::METRIC_SAMPLES {
+            let sample = measure();
+            if best
+                .as_ref()
+                .is_none_or(|current| sample.avg_latency_ns < current.avg_latency_ns)
+            {
+                best = Some(sample);
+            }
+        }
+        // `METRIC_SAMPLES` is a non-zero constant, so `best` is always populated; the fallback only
+        // exists to keep the signature total without an unwrap that could never fire.
+        best.unwrap_or_else(&mut measure)
     }
 
     /// Executes all seven micro-benchmarks with a given multiplier (1 = fast test, 10 = standard).
@@ -297,11 +370,18 @@ impl TaxisBenchmarkSuite {
         ];
 
         let start = Instant::now();
+        let mut confirmed = 0usize;
         for i in 0..iterations {
             let path = test_paths[i % test_paths.len()];
-            let _ = bloom.may_contain(path);
+            // The result must reach an observable sink. Discarding it lets the optimiser delete the
+            // whole call, which is how this metric previously recorded 0 ns for 5,000 iterations:
+            // a frozen baseline of zero can never be exceeded, so the ratchet was decorative.
+            if std::hint::black_box(bloom.may_contain(path)) {
+                confirmed += 1;
+            }
         }
         let elapsed = start.elapsed();
+        std::hint::black_box(confirmed);
 
         Self::calculate_metric(METRIC_BLOOM_PATH_QUERY, iterations, elapsed)
     }
@@ -413,6 +493,11 @@ impl TaxisBenchmarkSuite {
         Self::calculate_metric(METRIC_ROARING_BITMAP_OPS, iterations, elapsed)
     }
 
+    /// Benchmarks the commit-message governance guard on a fully populated workspace message.
+    pub fn bench_commit_message_guard(iterations: usize) -> BenchmarkMetric {
+        guard::bench_commit_message_guard(iterations)
+    }
+
     /// Benchmarks Poset DAG Reachability and Cutoff across a 2,000-node commit DAG (Level 2 Scale).
     pub fn bench_dag_poset_scale_traversal(iterations: usize) -> BenchmarkMetric {
         let dag = generate_diamond_dag(500);
@@ -471,13 +556,15 @@ impl TaxisBenchmarkSuite {
         for i in 0..iterations {
             let path = chain.query_paths[i % chain.query_paths.len()];
             for filter in &chain.filters {
-                if filter.may_contain(path) {
+                // Observed sink, for the same reason as the single-filter query: an unused result
+                // measures the loop overhead and reports a latency of zero.
+                if std::hint::black_box(filter.may_contain(path)) {
                     hits += 1;
                 }
             }
         }
         let elapsed = start.elapsed();
-        let _ = hits;
+        std::hint::black_box(hits);
 
         Self::calculate_metric(
             METRIC_BLOOM_DENSE_HISTORY,
@@ -559,6 +646,12 @@ impl TaxisBenchmarkSuite {
 
     /// Compares this benchmark suite against a baseline, returning violations
     /// if regression > tolerance_pct.
+    ///
+    /// Three ways to fail, and all three are reported rather than short-circuited so one run tells
+    /// the whole story:
+    /// 1. a metric is slower than the baseline beyond tolerance *and* beyond the 3 µs noise floor;
+    /// 2. a metric has no baseline entry at all, so the ratchet cannot speak about it;
+    /// 3. the baseline came from a different build profile, which makes every ratio meaningless.
     pub fn compare_with_baseline(
         &self,
         baseline: &TaxisBenchmarkSuite,
@@ -567,38 +660,47 @@ impl TaxisBenchmarkSuite {
         let mut passed = true;
         let mut regressions = Vec::new();
         let mut improvements = Vec::new();
+        let mut unbaselined = Vec::new();
+        let profile_mismatch = Self::describe_profile_mismatch(self.profile, baseline.profile);
+        if profile_mismatch.is_some() {
+            passed = false;
+        }
 
         for current in &self.metrics {
-            if let Some(base) = baseline
+            let Some(base) = baseline
                 .metrics
                 .iter()
                 .find(|metric| metric.name == current.name)
+            else {
+                passed = false;
+                unbaselined.push(current.name.clone());
+                continue;
+            };
+
+            let max_allowed_ns =
+                (base.avg_latency_ns as f64 * (1.0 + tolerance_pct / 100.0)) as u64;
+            // Only flag if exceeds relative tolerance AND absolute difference >= 3000 ns (3 us)
+            // to avoid OS scheduling noise in debug profile
+            if current.avg_latency_ns > max_allowed_ns
+                && current.avg_latency_ns.saturating_sub(base.avg_latency_ns) >= 3000
             {
-                let max_allowed_ns =
-                    (base.avg_latency_ns as f64 * (1.0 + tolerance_pct / 100.0)) as u64;
-                // Only flag if exceeds relative tolerance AND absolute difference >= 3000 ns (3 us)
-                // to avoid OS scheduling noise in debug profile
-                if current.avg_latency_ns > max_allowed_ns
-                    && current.avg_latency_ns.saturating_sub(base.avg_latency_ns) >= 3000
-                {
-                    passed = false;
-                    regressions.push(format!(
-                        "{}: current {} ns > baseline {} ns (max allowed: {} ns, +{:.1}%)",
-                        current.name,
-                        current.avg_latency_ns,
-                        base.avg_latency_ns,
-                        max_allowed_ns,
-                        tolerance_pct
-                    ));
-                } else if (current.avg_latency_ns as f64) < (base.avg_latency_ns as f64 * 0.8) {
-                    improvements.push(format!(
-                        "{}: current {} ns improved vs baseline {} ns (-{:.1}%)",
-                        current.name,
-                        current.avg_latency_ns,
-                        base.avg_latency_ns,
-                        (1.0 - current.avg_latency_ns as f64 / base.avg_latency_ns as f64) * 100.0
-                    ));
-                }
+                passed = false;
+                regressions.push(format!(
+                    "{}: current {} ns > baseline {} ns (max allowed: {} ns, +{:.1}%)",
+                    current.name,
+                    current.avg_latency_ns,
+                    base.avg_latency_ns,
+                    max_allowed_ns,
+                    tolerance_pct
+                ));
+            } else if (current.avg_latency_ns as f64) < (base.avg_latency_ns as f64 * 0.8) {
+                improvements.push(format!(
+                    "{}: current {} ns improved vs baseline {} ns (-{:.1}%)",
+                    current.name,
+                    current.avg_latency_ns,
+                    base.avg_latency_ns,
+                    (1.0 - current.avg_latency_ns as f64 / base.avg_latency_ns as f64) * 100.0
+                ));
             }
         }
 
@@ -606,7 +708,29 @@ impl TaxisBenchmarkSuite {
             passed,
             regressions,
             improvements,
+            unbaselined,
+            profile_mismatch,
         }
+    }
+
+    /// Explains why two profiles cannot be compared, or `None` when they can.
+    ///
+    /// An `unspecified` baseline is not treated as a mismatch: it is the format written before the
+    /// profile was recorded, and rejecting it would invalidate every existing frozen file without
+    /// proving anything. The two concrete profiles, however, are never interchangeable.
+    fn describe_profile_mismatch(
+        measured: BenchmarkProfile,
+        recorded: BenchmarkProfile,
+    ) -> Option<String> {
+        if recorded == BenchmarkProfile::Unspecified || measured == recorded {
+            return None;
+        }
+        Some(format!(
+            "baseline recorded in '{}' profile but this run is '{}'; re-freeze with \
+             `taxis bench --save-baseline` in the same profile before comparing",
+            recorded.as_str(),
+            measured.as_str()
+        ))
     }
 
     fn calculate_metric(

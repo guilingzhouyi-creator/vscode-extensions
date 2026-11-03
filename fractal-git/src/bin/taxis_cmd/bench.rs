@@ -3,8 +3,11 @@
 //! Architecture Role: Executes Taxis performance micro/macro benchmark suites,
 //!   persists results, and validates regression ratchets against frozen baselines.
 //! Dependencies & Triggers: Invoked when `taxis bench` is dispatched.
-//! Responsibilities: Benchmark execution, ratchet comparison, baseline persistence.
-//! Exit Semantics & Design Rationale: Exits 0 on passing ratchet, exits 1 on regression.
+//! Responsibilities: Benchmark execution, profile-scoped ratchet comparison, baseline persistence.
+//! Exit Semantics & Design Rationale: Exits 0 on passing ratchet, exits 1 on regression. A baseline
+//!   measured in the other build profile is a hard failure rather than a warning: debug and release
+//!   differ by roughly an order of magnitude, so comparing across them reports a regression on every
+//!   metric and trains the reader to ignore the gate.
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
@@ -13,11 +16,14 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-use fractal_git::bench::TaxisBenchmarkSuite;
+use fractal_git::bench::{BenchmarkProfile, TaxisBenchmarkSuite};
 use fractal_git::constants::cli::CliTag;
 use fractal_git::BenchmarkLevel;
 
 use super::common::{fail_io, find_arg_value, print_json, CliContext};
+
+/// Directory holding the frozen baselines, relative to the crate root.
+const BASELINE_DIR: &str = "baselines";
 
 /// Dispatches benchmark suite execution, baseline persistence, and regression verification.
 pub fn handle_bench(ctx: &CliContext) {
@@ -30,6 +36,12 @@ pub fn handle_bench(ctx: &CliContext) {
     let verify_path = find_arg_value(&ctx.args, &["--verify-baseline"]).map(PathBuf::from);
 
     let suite = TaxisBenchmarkSuite::run_suite(level, multiplier);
+    fg_core::diag_info!(
+        "bench",
+        "measured {} metric(s) in '{}' profile",
+        suite.metrics.len(),
+        suite.profile.as_str()
+    );
 
     if let Some(save_file) = save_path {
         save_bench_baseline(&save_file, &suite);
@@ -75,16 +87,35 @@ fn save_bench_baseline(save_file: &Path, suite: &TaxisBenchmarkSuite) {
             write_err,
         );
     }
-    println!("Saved performance baseline to {}", save_file.display());
+    println!(
+        "Saved '{}' profile performance baseline to {}",
+        suite.profile.as_str(),
+        save_file.display()
+    );
+}
+
+/// File name a baseline of `profile` is expected to live under.
+fn profile_baseline_name(profile: BenchmarkProfile) -> String {
+    format!("taxis-perf.{}.baseline.json", profile.as_str())
 }
 
 /// Resolves baseline file path with fallback to workspace root paths.
+///
+/// The literal `auto` expands to the baseline matching this build profile, so one gate invocation
+/// serves both `cargo test` and the release audit without the caller having to know which profile
+/// it is running in.
 fn resolve_baseline_file(verify_arg: &Path) -> Option<PathBuf> {
     let verify_str = verify_arg.to_string_lossy().to_string();
     let trimmed = verify_str
         .trim_matches(|c: char| c == '"' || c == '\'' || c.is_whitespace())
         .to_string();
     let normalized = trimmed.replace('/', std::path::MAIN_SEPARATOR_STR);
+
+    if trimmed.eq_ignore_ascii_case("auto") {
+        let current = BenchmarkProfile::current();
+        return Some(PathBuf::from(BASELINE_DIR).join(profile_baseline_name(current)));
+    }
+
     let final_path = PathBuf::from(&trimmed);
 
     if final_path.exists() {
@@ -113,7 +144,7 @@ fn resolve_baseline_file(verify_arg: &Path) -> Option<PathBuf> {
     None
 }
 
-/// Loads a baseline suite from disk or falls back to the embedded compile-time frozen baseline.
+/// Loads a baseline suite from disk or falls back to the embedded freeze for this profile.
 fn load_baseline(final_path: Option<&Path>) -> TaxisBenchmarkSuite {
     if let Some(path) = final_path {
         let content = match std::fs::read_to_string(path) {
@@ -125,12 +156,24 @@ fn load_baseline(final_path: Option<&Path>) -> TaxisBenchmarkSuite {
             Err(parse_err) => fail_io(format!("parse baseline '{}'", path.display()), parse_err),
         }
     } else {
-        const EMBEDDED_BASELINE: &str = include_str!("../../../baselines/taxis-perf.baseline.json");
-        match serde_json::from_str(EMBEDDED_BASELINE) {
+        // Two freezes rather than one: a single table cannot be correct for both profiles, and
+        // comparing a release freeze against a debug binary is the false regression this module
+        // now refuses to report silently.
+        const EMBEDDED_RELEASE: &str =
+            include_str!("../../../baselines/taxis-perf.release.baseline.json");
+        const EMBEDDED_DEBUG: &str =
+            include_str!("../../../baselines/taxis-perf.debug.baseline.json");
+        let profile = BenchmarkProfile::current();
+        let embedded = match profile {
+            BenchmarkProfile::Debug => EMBEDDED_DEBUG,
+            _ => EMBEDDED_RELEASE,
+        };
+        match serde_json::from_str(embedded) {
             Ok(parsed_baseline) => {
                 println!(
-                    "{} Resolved benchmark baseline via embedded compile-time freeze.",
-                    CliTag::HERMETIC_BASELINE
+                    "{} Resolved embedded '{}' benchmark baseline via compile-time freeze.",
+                    CliTag::HERMETIC_BASELINE,
+                    profile.as_str()
                 );
                 parsed_baseline
             }
@@ -140,23 +183,65 @@ fn load_baseline(final_path: Option<&Path>) -> TaxisBenchmarkSuite {
 }
 
 /// Verifies benchmark suite metrics against baseline within the 15% hardware tolerance allowance.
+///
+/// Every failure mode is printed before exiting so one run explains the whole verdict; stopping at
+/// the first problem would send the reader back for a second run to find the rest.
 fn verify_bench_baseline(verify_arg: &Path, suite: &TaxisBenchmarkSuite) {
     let resolved = resolve_baseline_file(verify_arg);
     let baseline = load_baseline(resolved.as_deref());
+    fg_core::diag_debug!(
+        "bench",
+        "comparing against '{}' baseline holding {} metric(s)",
+        baseline.profile.as_str(),
+        baseline.metrics.len()
+    );
 
-    let verdict = suite.compare_with_baseline(&baseline, 15.0);
-    if !verdict.passed {
-        eprintln!("TB-REGRESSION: Performance benchmark regressed beyond 15% tolerance!");
-        for reg in verdict.regressions {
+    let verdict = suite.compare_with_baseline(&baseline, suite.profile.tolerance_pct());
+    if verdict.passed {
+        println!(
+            "TB-REGRESSION: Performance ratchet passed (within {:.0}% tolerance for '{}' profile).",
+            suite.profile.tolerance_pct(),
+            suite.profile.as_str()
+        );
+        for imp in &verdict.improvements {
+            println!("  {} {}", CliTag::OPTIMIZED, imp);
+        }
+        return;
+    }
+
+    if let Some(detail) = &verdict.profile_mismatch {
+        eprintln!("TB-REGRESSION: Baseline profile mismatch — {detail}");
+    }
+    if !verdict.regressions.is_empty() {
+        eprintln!(
+            "TB-REGRESSION: Performance benchmark regressed beyond {:.0}% tolerance!",
+            suite.profile.tolerance_pct()
+        );
+        for reg in &verdict.regressions {
             eprintln!("  {} {}", CliTag::FAIL, reg);
         }
-        std::process::exit(1);
     }
-
-    println!("TB-REGRESSION: Performance ratchet passed (within 15% tolerance).");
-    for imp in verdict.improvements {
-        println!("  {} {}", CliTag::OPTIMIZED, imp);
+    if !verdict.unbaselined.is_empty() {
+        eprintln!(
+            "TB-REGRESSION: {} metric(s) have no baseline entry and cannot be ratcheted:",
+            verdict.unbaselined.len()
+        );
+        for name in &verdict.unbaselined {
+            let latency = suite
+                .metrics
+                .iter()
+                .find(|metric| &metric.name == name)
+                .map(|metric| metric.avg_latency_ns)
+                .unwrap_or(0);
+            eprintln!(
+                "  {} {}: measured {} ns but the frozen baseline omits it",
+                CliTag::FAIL,
+                name,
+                latency
+            );
+        }
     }
+    std::process::exit(1);
 }
 
 /// Formats benchmark execution results as text table or JSON.
