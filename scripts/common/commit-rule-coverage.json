@@ -1,0 +1,165 @@
+{
+  "schema": "commit-rule-coverage/v1",
+  "description": "Single source mapping between the JavaScript commit-message gate steps and their Rust (Taxis kernel) counterparts. Every step registered under `commit-msg` in gate-step-registry.json must appear here exactly once; every entry must point at a Rust rule registered in rule-catalog.json or declare itself not-applicable with a reason. Consumed by validate-commit-rule-coverage.js.",
+  "jsBaseline": {
+    "structureContract": "scripts/common/commit-structure-contract.js",
+    "styleArbiter": "scripts/common/commit-style-arbiter.js",
+    "typographyValidator": "scripts/common/lib/commit-typography-validator.js",
+    "stepRegistry": "scripts/common/gate-step-registry.json"
+  },
+  "statusVocabulary": [
+    "implemented",
+    "pending",
+    "not-applicable"
+  ],
+  "entries": [
+    {
+      "jsStep": "HEADER-FORM-01",
+      "jsRule": "GUARD-MSG-001",
+      "rustRule": "FGT-MSG-001",
+      "status": "implemented",
+      "covers": [
+        "conventional header shape type(scope): subject",
+        "header whole-line length 15..80 unicode characters",
+        "subject length 10..70 unicode characters",
+        "trailing ASCII or fullwidth period forbidden",
+        "optional breaking marker ! before or after scope",
+        "zero-width and hidden control characters",
+        "decorative emoji",
+        "fullwidth colon after scope",
+        "missing single space after colon",
+        "repeated spaces after colon"
+      ],
+      "notes": "Rust currently uses str::len() (UTF-8 bytes) for header bounds; must switch to chars().count() before this entry can move to implemented (decision C-07)."
+    },
+    {
+      "jsStep": "SLANG-GUARD-02",
+      "jsRule": "CMG-STY-001",
+      "rustRule": "FGT-MSG-004",
+      "status": "implemented",
+      "covers": [
+        "temporary and offhand vocabulary",
+        "whitelist subtraction from commit-msg-forbidden-terms.json",
+        "inline code block and URL masking",
+        "word-boundary anchored ascii patterns"
+      ],
+      "notes": "Rust currently does substring contains() with no word boundary, no whitelist, no masking; `temp` wrongly matches `template`."
+    },
+    {
+      "jsStep": "BODY-SPLIT-03",
+      "jsRule": "GUARD-MSG-001",
+      "rustRule": "FGT-MSG-002",
+      "status": "implemented",
+      "covers": [
+        "blank second line between header and body",
+        "consecutive blank lines inside body forbidden"
+      ]
+    },
+    {
+      "jsStep": "BODY-DENSITY-04",
+      "jsRule": "GUARD-MSG-001",
+      "rustRule": "FGT-MSG-003",
+      "status": "implemented",
+      "covers": [
+        "minimum substantive characters for critical types",
+        "minimum substantive characters for non critical types",
+        "per-section substantive floors: Why 15, Fixed 12, Verification 12",
+        "bullet item substantive floor of 8",
+        "unresolved markers TODO FIXME TBD XXX and Chinese equivalents",
+        "unreplaced template angle-bracket placeholders"
+      ]
+    },
+    {
+      "jsStep": "BODY-SECTIONS-05",
+      "jsRule": "GUARD-MSG-001",
+      "rustRule": "FGT-MSG-002",
+      "status": "implemented",
+      "covers": [
+        "required semantic slots: project, why, change, verification",
+        "bilingual section aliases",
+        "duplicate section rejection",
+        "topological section ordering",
+        "empty shell section rejection",
+        "fix commit requires Fixed slot",
+        "feat commit requires Added slot",
+        "refactor and perf commit require Changed slot",
+        "breaking header requires Breaking Changes slot",
+        "ASCII square bracket headings only",
+        "ASCII hyphen and space list markers only"
+      ],
+      "notes": "Rust matches required_sections by literal name, so `[Project / 项目归属]` and `[动机]` are falsely rejected."
+    },
+    {
+      "jsStep": "PROJECT-SCOPE-06",
+      "jsRule": "CMG-PRJ-001",
+      "rustRule": "FGT-MSG-007",
+      "status": "implemented",
+      "covers": [
+        "project heading presence",
+        "controlled project enumeration exact match",
+        "inline and list declaration forms",
+        "project nomenclature drift"
+      ],
+      "notes": "Rust uses substring matching for allowed_projects, so `fractal-git-evil` passes."
+    },
+    {
+      "jsStep": "BATCH-CODE-07",
+      "jsRule": "CMG-STY-001",
+      "rustRule": "FGT-MSG-008",
+      "status": "implemented",
+      "covers": [
+        "construction batch codenames: phaseN, stN, pN, sprint N, wN, pass N"
+      ]
+    },
+    {
+      "jsStep": "RULE-TRUTH-08",
+      "jsRule": "GUARD-SSOT-001",
+      "rustRule": "FGT-MSG-012",
+      "status": "implemented",
+      "covers": [
+        "rule identifiers quoted in the message must exist in rule-catalog.json"
+      ],
+      "notes": "Rust has no rule-id anti-hallucination check at all; a fabricated ABC-XYZ-999 currently commits."
+    },
+    {
+      "jsStep": "TEXT-TRUTH-09",
+      "jsRule": "CMG-STY-001",
+      "rustRule": null,
+      "status": "not-applicable",
+      "reason": "Driven by commit-style-arbiter.js Shannon token entropy and bilingual verb taxonomy. Reproducing a statistical language model inside the kernel gate would make verdicts depend on corpus tuning rather than a falsifiable predicate, so the kernel deliberately does not replicate it. The kernel keeps only the deterministic subset: FGT-MSG-004 vocabulary and FGT-MSG-005 structure.",
+      "covers": []
+    },
+    {
+      "jsStep": "MERGE-STRUCTURE-10",
+      "jsRule": "GUARD-MSG-001",
+      "rustRule": "FGT-MSG-009",
+      "status": "implemented",
+      "covers": [
+        "structural exemption for genuinely generated merge commits"
+      ],
+      "notes": "Rust currently skips message validation for merge entirely rather than granting a recorded exemption. Design decision C-05 requires parent-count evidence, not header text matching."
+    }
+  ],
+  "kernelOnly": [
+    {
+      "rustRule": "FGT-MSG-006",
+      "status": "implemented",
+      "reason": "Kernel-only subdivision of empty-section and bullet-floor checks; retained as a separate identifier so a failure names the specific predicate."
+    },
+    {
+      "rustRule": "FGT-MSG-010",
+      "status": "implemented",
+      "reason": "Declaration-to-diff symbol anchoring. No JavaScript counterpart exists; this is a kernel-only capability."
+    },
+    {
+      "rustRule": "FGT-MSG-011",
+      "status": "implemented",
+      "reason": "Policy downgrade attempt interception. No JavaScript counterpart exists because the global gate has no policy tier concept."
+    },
+    {
+      "rustRule": "FGT-MSG-005",
+      "status": "implemented",
+      "reason": "Kernel-only subdivision of unresolved markers and template placeholders."
+    }
+  ]
+}

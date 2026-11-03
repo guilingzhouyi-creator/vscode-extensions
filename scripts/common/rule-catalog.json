@@ -1,12 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-11-01T05:08:28.502Z",
-  "totalRules": 516,
+  "generatedAt": "2026-11-02T14:48:48.172Z",
+  "totalRules": 528,
   "counts": {
     "autoRefactor": 375,
     "workspaceTiming": 49,
     "webGames": 50,
-    "fractalGit": 24,
+    "fractalGit": 36,
     "globalTooling": 18
   },
   "rules": [
@@ -1539,6 +1539,114 @@
       "canonical": true
     },
     {
+      "id": "FGT-MSG-001",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit header form guard: conventional type(scope) shape, unicode-character length bounds, trailing period, breaking marker, zero-width and hidden control characters, decorative emoji, and colon separator spacing",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-002",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit section topology guard: semantic slot resolution with bilingual aliases, blank-line separation, duplicate rejection, topological ordering, and ASCII bracket and hyphen list markers",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-003",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit body density guard: substantive character floors for production and non-critical types plus per-section floors for rationale, fix, and verification slots",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-004",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit vocabulary guard: temporary and offhand wording rejected with word-boundary anchoring, inline code and URL masking, and the shared whitelist subtracted before the verdict",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-005",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit unresolved marker guard: TODO, FIXME, TBD, XXX and Chinese deferred markers rejected together with unreplaced template angle-bracket placeholders",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-006",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit empty section guard: a declared section carrying only a heading is rejected, and each change-list bullet must carry substantive content",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-007",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit project scope guard: the project slot must exist, every declared name must match the controlled enumeration exactly, and non-standard project nomenclature is rejected",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-008",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit batch codename guard: construction batch identifiers such as phase numbers, sprint numbers, pass numbers and week tokens are rejected as schedule vocabulary",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-009",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Merge structure exemption guard: a generated merge message is exempted only when the commit object has two or more parents, never on header text alone",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-010",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit declaration anchor guard: the verification slot must cite a symbol or test name that exists in the added lines of the staged diff",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-011",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit policy tier guard: a command-line policy selector may tighten but never relax the tier declared by the versioned policy manifest",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-MSG-012",
+      "project": "fractal-git",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit rule identifier guard: every rule identifier quoted in a commit message must be registered in the single-source rule catalog",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
       "id": "FGT-MUT-001",
       "project": "fractal-git",
       "family": "MUT",
@@ -1811,7 +1919,7 @@
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Bare tool keyword detected.",
+      "summary": "The bare tool keyword is used instead of the @tool annotation, so the script does not run inside the editor and its exported properties stay unavailable in the inspector.",
       "canonical": true
     },
     {

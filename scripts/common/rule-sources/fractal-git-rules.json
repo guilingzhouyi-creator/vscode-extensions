@@ -1,7 +1,7 @@
 {
   "schema": "fractal-git-rules/v1",
   "generatedAt": "2026-10-24T08:32:58.507Z",
-  "totalRules": 24,
+  "totalRules": 36,
   "rules": [
     {
       "id": "FGT-COR-001",
@@ -146,6 +146,78 @@
       "family": "PYR",
       "severity": "error",
       "summary": "Four-tier hierarchical audit rollup guard: Milestone card compression and periodic rollup must preserve Merkle root integrity and deterministic summary aggregation"
+    },
+    {
+      "id": "FGT-MSG-001",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit header form guard: conventional type(scope) shape, unicode-character length bounds, trailing period, breaking marker, zero-width and hidden control characters, decorative emoji, and colon separator spacing"
+    },
+    {
+      "id": "FGT-MSG-002",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit section topology guard: semantic slot resolution with bilingual aliases, blank-line separation, duplicate rejection, topological ordering, and ASCII bracket and hyphen list markers"
+    },
+    {
+      "id": "FGT-MSG-003",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit body density guard: substantive character floors for production and non-critical types plus per-section floors for rationale, fix, and verification slots"
+    },
+    {
+      "id": "FGT-MSG-004",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit vocabulary guard: temporary and offhand wording rejected with word-boundary anchoring, inline code and URL masking, and the shared whitelist subtracted before the verdict"
+    },
+    {
+      "id": "FGT-MSG-005",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit unresolved marker guard: TODO, FIXME, TBD, XXX and Chinese deferred markers rejected together with unreplaced template angle-bracket placeholders"
+    },
+    {
+      "id": "FGT-MSG-006",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit empty section guard: a declared section carrying only a heading is rejected, and each change-list bullet must carry substantive content"
+    },
+    {
+      "id": "FGT-MSG-007",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit project scope guard: the project slot must exist, every declared name must match the controlled enumeration exactly, and non-standard project nomenclature is rejected"
+    },
+    {
+      "id": "FGT-MSG-008",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit batch codename guard: construction batch identifiers such as phase numbers, sprint numbers, pass numbers and week tokens are rejected as schedule vocabulary"
+    },
+    {
+      "id": "FGT-MSG-009",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Merge structure exemption guard: a generated merge message is exempted only when the commit object has two or more parents, never on header text alone"
+    },
+    {
+      "id": "FGT-MSG-010",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit declaration anchor guard: the verification slot must cite a symbol or test name that exists in the added lines of the staged diff"
+    },
+    {
+      "id": "FGT-MSG-011",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit policy tier guard: a command-line policy selector may tighten but never relax the tier declared by the versioned policy manifest"
+    },
+    {
+      "id": "FGT-MSG-012",
+      "family": "MSG",
+      "severity": "error",
+      "summary": "Commit rule identifier guard: every rule identifier quoted in a commit message must be registered in the single-source rule catalog"
     }
   ]
 }

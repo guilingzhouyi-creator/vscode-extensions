@@ -485,6 +485,14 @@ if ($touchesSkills) {
             $failed = $true
         } else {
             Write-StepVerdict -StepId "SKILLS-SPEC-03" -Status "PASS" -Detail "技能集规范与插件同构合规"
+        # 提交信息规则覆盖清单双向闭包：内核规则族与外部真源之间不允许静默遗漏。
+        $resCoverage = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-rule-coverage.js" -WorkingDirectory $repoRoot
+        if ($resCoverage.ExitCode -ne 0) {
+            Write-StepVerdict -StepId "COMMIT-MSG-COVERAGE-15" -Status "BLOCK" -Detail "提交信息规则覆盖清单双向闭包不成立"
+            $failed = $true
+        } else {
+            Write-StepVerdict -StepId "COMMIT-MSG-COVERAGE-15" -Status "PASS" -Detail "覆盖清单双向闭包成立"
+        }
         }
     }
 }

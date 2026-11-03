@@ -84,6 +84,11 @@
           "id": "STAGED-DIFF-14",
           "title": "暂存区五维有效代码微分边界与准入周转审查",
           "ruleId": "FGT-GAT-001"
+        },
+        {
+          "id": "COMMIT-MSG-COVERAGE-15",
+          "title": "提交信息规则覆盖清单双向闭包",
+          "ruleId": "FGT-MSG-002"
         }
       ]
     },
