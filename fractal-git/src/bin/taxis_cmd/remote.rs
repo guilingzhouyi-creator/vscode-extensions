@@ -23,7 +23,7 @@ use fg_transport::remote::{LoopbackTransport, RemoteTransport};
 use fractal_git::constants::cli::CliTag;
 use serde_json::json;
 
-use super::common::{print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_unavailable, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 
 /// A configured remote repository entry.
@@ -83,11 +83,8 @@ pub fn handle_fetch(ctx: &CliContext) {
     let config_path = ctx.git_dir.join("config");
     let target_url = resolve_remote_url(&config_path, remote_target);
 
-    if is_local_or_loopback(&target_url) {
-        execute_loopback_fetch(ctx, remote_target, &target_url);
-    } else {
-        emit_unmounted_network_guidance(ctx, "fetch", remote_target, &target_url);
-    }
+    let scheme = require_transport("fetch", remote_target, &target_url);
+    execute_loopback_fetch(ctx, scheme, remote_target, &target_url);
 }
 
 /// Dispatches the `taxis push` command.
@@ -96,11 +93,8 @@ pub fn handle_push(ctx: &CliContext) {
     let config_path = ctx.git_dir.join("config");
     let target_url = resolve_remote_url(&config_path, remote_target);
 
-    if is_local_or_loopback(&target_url) {
-        execute_loopback_push(ctx, remote_target, &target_url);
-    } else {
-        emit_unmounted_network_guidance(ctx, "push", remote_target, &target_url);
-    }
+    let scheme = require_transport("push", remote_target, &target_url);
+    execute_loopback_push(ctx, scheme, remote_target, &target_url);
 }
 
 /// Dispatches the `taxis pull` command.
@@ -109,11 +103,8 @@ pub fn handle_pull(ctx: &CliContext) {
     let config_path = ctx.git_dir.join("config");
     let target_url = resolve_remote_url(&config_path, remote_target);
 
-    if is_local_or_loopback(&target_url) {
-        execute_loopback_pull(ctx, remote_target, &target_url);
-    } else {
-        emit_unmounted_network_guidance(ctx, "pull", remote_target, &target_url);
-    }
+    let scheme = require_transport("pull", remote_target, &target_url);
+    execute_loopback_pull(ctx, scheme, remote_target, &target_url);
 }
 
 /// Loads all configured remotes from the repository configuration file.
@@ -267,7 +258,15 @@ fn get_remote_url(ctx: &CliContext, config_path: &Path, args: &[String]) {
     }
 }
 
-/// Resolves the URL for a remote identifier or direct target.
+/// Resolves a remote reference to a URL, or terminates when the name is unknown.
+///
+/// The previous version fell back to returning the input unchanged, so a mistyped remote name was
+/// silently reinterpreted as a URL. That is how `push ghost` reached the transport layer and
+/// reported "not mounted" instead of "no such remote", and it is why a typo could not be
+/// distinguished from an unsupported scheme.
+///
+/// A value that is *visibly* a URL or path (it carries a scheme or a separator) is still accepted
+/// verbatim, because Git allows `git push <url>` without configuring a remote first.
 fn resolve_remote_url(config_path: &Path, remote_target: &str) -> String {
     let remotes = load_configured_remotes(config_path);
     if let Some(matching_remote) = remotes
@@ -276,21 +275,142 @@ fn resolve_remote_url(config_path: &Path, remote_target: &str) -> String {
     {
         return matching_remote.url.clone();
     }
-    remote_target.to_string()
+
+    if looks_like_url_or_path(remote_target) {
+        return remote_target.to_string();
+    }
+
+    fail_fatal(format!(
+        "'{remote_target}' does not appear to be a git repository\n\
+         no such remote is configured; use `taxis remote add <name> <url>` or pass a URL directly"
+    ))
 }
 
-/// Evaluates whether a given URL points to a local directory or loopback transport.
-fn is_local_or_loopback(url_spec: &str) -> bool {
-    url_spec.starts_with("loopback:")
-        || url_spec.starts_with("file://")
-        || url_spec.starts_with("./")
-        || url_spec.starts_with("../")
-        || Path::new(url_spec).is_dir()
-        || Path::new(url_spec).is_file()
+/// Whether a remote argument is self-evidently a URL or a path rather than a configured name.
+///
+/// Deliberately narrow: a bare word is a remote *name*, and treating it as a path is exactly the
+/// silent reinterpretation this function exists to prevent.
+fn looks_like_url_or_path(value: &str) -> bool {
+    let lowered = value.to_ascii_lowercase();
+    let has_scheme = lowered.starts_with("https://")
+        || lowered.starts_with("http://")
+        || lowered.starts_with("ssh://")
+        || lowered.starts_with("git://")
+        || lowered.starts_with("file://")
+        || lowered.starts_with("loopback:");
+    has_scheme
+        || value.contains('/')
+        || value.contains('\\')
+        || value.starts_with('.')
+        || Path::new(value).is_absolute()
+}
+
+/// A transport scheme this build can actually reach.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TransportScheme {
+    /// In-process loopback, addressed as `loopback:<id>`.
+    Loopback,
+    /// A path on this machine, either a `file://` URL or a bare filesystem path.
+    LocalFile,
+}
+
+impl TransportScheme {
+    /// Human name reported in output and diagnostics.
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Loopback => "loopback",
+            Self::LocalFile => "local_file",
+        }
+    }
+}
+
+/// How a remote URL was classified.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ResolvedTransport {
+    /// The build can reach this URL through the named scheme.
+    Available(TransportScheme),
+    /// A network scheme was requested; this edition cannot serve it.
+    NetworkDisabled {
+        /// Scheme name, so the refusal can name what was asked for.
+        scheme: String,
+    },
+    /// A local-looking path that does not exist.
+    MissingPath {
+        /// The path that could not be found.
+        path: String,
+    },
+}
+
+/// Classifies a remote URL by scheme instead of by substring sniffing.
+///
+/// The previous implementation tested `starts_with("file://")`, `starts_with("./")` and
+/// `Path::is_dir()` and then fell through to "network". That silently treated any unrecognised
+/// spelling as a network URL, so a caller could not tell a typo from an unsupported scheme, and a
+/// local path that merely did not exist yet landed in the network bucket. Naming the scheme first
+/// makes every branch explicit and lets the refusal name the capability that is missing.
+///
+/// `http`/`https`/`ssh`/`git` are recognised as network *on purpose even though unusable here*: the
+/// point is to answer "yes I know what that is, and I cannot do it" rather than "unknown".
+fn resolve_transport(url: &str) -> ResolvedTransport {
+    let trimmed = url.trim();
+    let lowered = trimmed.to_ascii_lowercase();
+
+    if lowered.starts_with("loopback:") {
+        return ResolvedTransport::Available(TransportScheme::Loopback);
+    }
+
+    for network_scheme in ["https://", "http://", "ssh://", "git://"] {
+        if lowered.starts_with(network_scheme) {
+            return ResolvedTransport::NetworkDisabled {
+                scheme: network_scheme.trim_end_matches("://").to_string(),
+            };
+        }
+    }
+
+    // A bare or explicit local path. `file://` is stripped before the existence test because
+    // `Path::new("file:///x")` is not a filesystem path on any platform.
+    let local_path = lowered
+        .strip_prefix("file://")
+        .unwrap_or(trimmed)
+        .to_string();
+    if Path::new(&local_path).exists() {
+        return ResolvedTransport::Available(TransportScheme::LocalFile);
+    }
+    ResolvedTransport::MissingPath { path: local_path }
+}
+
+/// Obtains a usable transport for `url`, or terminates with an honest refusal.
+///
+/// Every failure path exits non-zero. Returning success while printing "not mounted" was the defect
+/// this replaces: `push` is the release path, and a `push && deploy` pipeline read that zero as
+/// confirmation that the commit had reached the remote.
+fn require_transport(operation: &str, remote_target: &str, url: &str) -> TransportScheme {
+    match resolve_transport(url) {
+        ResolvedTransport::Available(scheme) => scheme,
+        ResolvedTransport::NetworkDisabled { scheme } => {
+            if !fg_core::constants::Capabilities::current().allows(
+                fg_core::constants::CAPABILITY_NETWORK,
+            ) {
+                fail_unavailable(
+                    fg_core::constants::CAPABILITY_NETWORK,
+                    &format!("{operation} over '{scheme}://' to '{remote_target}'"),
+                );
+            }
+            // A general edition answers this scheme, but no implementation is linked into this
+            // build yet. Refusing beats pretending, and the message must not claim it succeeded.
+            fail_unavailable(
+                fg_core::constants::CAPABILITY_NETWORK,
+                &format!("{operation} over '{scheme}://' to '{remote_target}' (no adapter linked)"),
+            )
+        }
+        ResolvedTransport::MissingPath { path } => fail_fatal(format!(
+            "'{remote_target}' does not appear to be a git repository (no such path: {path})"
+        )),
+    }
 }
 
 /// Executes local loopback fetch without network sockets.
-fn execute_loopback_fetch(ctx: &CliContext, remote_target: &str, target_url: &str) {
+fn execute_loopback_fetch(ctx: &CliContext, scheme: TransportScheme, remote_target: &str, target_url: &str) {
     let loopback = LoopbackTransport::new(target_url);
     let advertised_refs = loopback.list_refs().unwrap_or_default();
 
@@ -307,13 +427,16 @@ fn execute_loopback_fetch(ctx: &CliContext, remote_target: &str, target_url: &st
 
         print_json(&json!({
             "status": "ok",
-            "transport": "loopback",
+            "transport": scheme.as_str(),
             "remote": remote_target,
             "url": target_url,
             "refs": refs_json
         }));
     } else {
-        println!("Fetching from loopback endpoint '{remote_target}' ({target_url})...");
+        println!(
+            "Fetching from {} endpoint '{remote_target}' ({target_url})...",
+            scheme.as_str()
+        );
         if advertised_refs.is_empty() {
             println!("No remote references advertised.");
         } else {
@@ -329,7 +452,12 @@ fn execute_loopback_fetch(ctx: &CliContext, remote_target: &str, target_url: &st
 }
 
 /// Executes local loopback push without network sockets.
-fn execute_loopback_push(ctx: &CliContext, remote_target: &str, target_url: &str) {
+fn execute_loopback_push(
+    ctx: &CliContext,
+    scheme: TransportScheme,
+    remote_target: &str,
+    target_url: &str,
+) {
     let mut loopback = LoopbackTransport::new(target_url);
     let repo_view = match RepoView::open(ctx) {
         Ok(opened_view) => opened_view,
@@ -351,6 +479,15 @@ fn execute_loopback_push(ctx: &CliContext, remote_target: &str, target_url: &str
         Err(push_error) => reject(CliTag::ERROR, format!("loopback push error: {push_error}")),
     };
 
+    // A transport that accepted the connection can still reject an individual ref. Reporting the
+    // overall command as success in that case is the same dishonesty as the unmounted path, so any
+    // rejected ref fails the command after every result has been printed.
+    let rejected_refs: Vec<&String> = push_results
+        .iter()
+        .filter(|(_, status)| status.is_err())
+        .map(|(name, _)| name)
+        .collect();
+
     if ctx.json_mode {
         let reports_json: Vec<serde_json::Value> = push_results
             .iter()
@@ -364,59 +501,42 @@ fn execute_loopback_push(ctx: &CliContext, remote_target: &str, target_url: &str
             .collect();
 
         print_json(&json!({
-            "status": "ok",
-            "transport": "loopback",
+            "status": if rejected_refs.is_empty() { "ok" } else { "rejected" },
+            "transport": scheme.as_str(),
             "remote": remote_target,
             "url": target_url,
             "reports": reports_json
         }));
     } else {
-        println!("Pushing to loopback endpoint '{remote_target}' ({target_url})...");
-        for (ref_name, result_status) in push_results {
+        println!(
+            "Pushing to {} endpoint '{remote_target}' ({target_url})...",
+            scheme.as_str()
+        );
+        for (ref_name, result_status) in &push_results {
             match result_status {
                 Ok(_) => println!("  * [pushed] {ref_name} -> {}", head_oid.to_hex()),
                 Err(err_msg) => println!("  ! [rejected] {ref_name} ({err_msg})"),
             }
         }
     }
-}
 
-/// Executes local loopback pull (fetch + status confirmation).
-fn execute_loopback_pull(ctx: &CliContext, remote_target: &str, target_url: &str) {
-    execute_loopback_fetch(ctx, remote_target, target_url);
-    if !ctx.json_mode {
-        println!("Already up to date.");
+    if !rejected_refs.is_empty() {
+        reject(
+            CliTag::ERROR,
+            format!("{} reference(s) were rejected by the remote", rejected_refs.len()),
+        );
     }
 }
 
-/// Emits structured diagnostic guidance for unmounted external network endpoints.
-fn emit_unmounted_network_guidance(
+/// Executes local loopback pull (fetch + status confirmation).
+fn execute_loopback_pull(
     ctx: &CliContext,
-    operation_name: &str,
+    scheme: TransportScheme,
     remote_target: &str,
     target_url: &str,
 ) {
-    if ctx.json_mode {
-        print_json(&json!({
-            "status": "network_transport_unmounted",
-            "operation": operation_name,
-            "remote": remote_target,
-            "url": target_url,
-            "message": "Network transport for external URLs requires an active transport plugin or Praxis mesh adapter.",
-            "supported_local_transports": ["loopback", "local_file", "in_memory"]
-        }));
-    } else {
-        println!("=== Taxis Network Transport Adapter (Unmounted) ===");
-        println!("  Operation : {operation_name}");
-        println!("  Remote    : {remote_target}");
-        println!("  Target    : {target_url}");
-        println!("  Status    : Network transport protocol adapter not mounted.");
-        println!(
-            "  Guidance  : External network sync across distributed nodes requires plugging in"
-        );
-        println!("              the Praxis mesh adapter. Local loopback and in-memory multi-agent");
-        println!(
-            "              transports are active and available via file:// or loopback: paths."
-        );
+    execute_loopback_fetch(ctx, scheme, remote_target, target_url);
+    if !ctx.json_mode {
+        println!("Already up to date.");
     }
 }
