@@ -27,7 +27,7 @@
 * [04-sparse-reference-replay.md](./03-incremental-and-diff/04-sparse-reference-replay.md)：稀疏参考滑动窗口重算 —— 复合锚点合并、签名变更的调用点桥接、三条退化边界、参考集排序规则、树级剪枝配合与流式符号视图边界。
 
 ### 🔍 L4. 四层规则分层体系与内置分析器矩阵 (`04-analyzers-and-rules/`)
-* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：四层规则分层体系、<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器包、机读英文 + 人读中文双轨文案契约，以及 **<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->全量内置规则权威字典（门禁覆盖率达标，全工作区 SSOT 单源收录 <!-- METRICS:BEGIN rule-total -->**516 条规则**<!-- METRICS:END rule-total -->）**。
+* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：四层规则分层体系、<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器包、机读英文 + 人读中文双轨文案契约，以及 **<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->全量内置规则权威字典（门禁覆盖率达标，全工作区 SSOT 单源收录 <!-- METRICS:BEGIN rule-total -->**528 条规则**<!-- METRICS:END rule-total -->）**。
 * [02-custom-analyzer-plugin.md](./04-analyzers-and-rules/02-custom-analyzer-plugin.md)：声明式 `PatternKernel` 与编程式 `Analyzer` 插件开发规范、`cacheCustom` 安全隔离及评分表接入流程。
 
 ### 📊 L5. 配置契约、三平面质量度量与性能基准 (`05-specs-and-benchmarks/`)
