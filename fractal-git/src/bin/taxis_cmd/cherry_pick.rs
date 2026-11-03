@@ -67,6 +67,16 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
 /// Executes a commit delta transplant (`cherry-pick` when `invert_delta == false`, `revert` when `true`).
 pub(crate) fn execute_commit_delta_transplant(ctx: &CliContext, spec: &DeltaTransplantSpec) {
     let op = spec.operation;
+    if ctx.args.iter().any(|a| a == "--abort") {
+        let view = RepoView::open_or_exit(ctx);
+        let cherry_head_path = view.git_dir().join("CHERRY_PICK_HEAD");
+        if !cherry_head_path.is_file() {
+            eprintln!("{} fatal: no cherry-pick in progress", CliTag::ERROR);
+            std::process::exit(1);
+        }
+        let _ = std::fs::remove_file(cherry_head_path);
+        return;
+    }
     if ctx.args.is_empty() {
         reject(CliTag::ERROR, format!("{op} expects a commit revision"));
     }

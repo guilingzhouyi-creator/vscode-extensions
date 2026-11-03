@@ -59,11 +59,26 @@ fn parse_repack_options(args: &[String]) -> (RepackOptions, bool, bool) {
                 }
                 cursor += 2;
             }
-            "--max-depth" | "-d" if cursor + 1 < args.len() => {
+            "--max-depth" if cursor + 1 < args.len() => {
                 if let Ok(d) = args[cursor + 1].parse::<usize>() {
                     options.max_depth = d;
                 }
                 cursor += 2;
+            }
+            "-d" if cursor + 1 < args.len() && args[cursor + 1].chars().all(|c| c.is_ascii_digit()) => {
+                if let Ok(d) = args[cursor + 1].parse::<usize>() {
+                    options.max_depth = d;
+                }
+                cursor += 2;
+            }
+            "-d" => {
+                // In git repack, -d removes redundant loose objects/packfiles
+                options.keep_loose = false;
+                cursor += 1;
+            }
+            "-a" | "-A" => {
+                // In git repack, -a packs all objects into packfile
+                cursor += 1;
             }
             "--threshold" if cursor + 1 < args.len() => {
                 if let Ok(t) = args[cursor + 1].parse::<usize>() {

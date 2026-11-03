@@ -364,6 +364,66 @@ pub fn handle_check_attr(ctx: &CliContext) {
     }
 }
 
+/// Resolves standard Git logical variables (GIT_AUTHOR_IDENT, GIT_EDITOR, etc.).
+fn resolve_git_var(
+    var_name: &str,
+    entries: &[fg_index::config::ConfigEntry],
+) -> Option<String> {
+    match var_name {
+        "GIT_AUTHOR_IDENT" | "GIT_COMMITTER_IDENT" => {
+            let name = entries
+                .iter()
+                .find(|e| e.key().to_dotted() == "user.name")
+                .and_then(|e| e.value())
+                .map(String::from)
+                .or_else(|| std::env::var("GIT_AUTHOR_NAME").ok())
+                .unwrap_or_else(|| "Tester".to_string());
+            let email = entries
+                .iter()
+                .find(|e| e.key().to_dotted() == "user.email")
+                .and_then(|e| e.value())
+                .map(String::from)
+                .or_else(|| std::env::var("GIT_AUTHOR_EMAIL").ok())
+                .unwrap_or_else(|| "test@example.com".to_string());
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            Some(format!("{name} <{email}> {now} +0000"))
+        }
+        "GIT_EDITOR" => {
+            let editor = entries
+                .iter()
+                .find(|e| e.key().to_dotted() == "core.editor")
+                .and_then(|e| e.value().map(String::from))
+                .or_else(|| std::env::var("GIT_EDITOR").ok())
+                .or_else(|| std::env::var("VISUAL").ok())
+                .or_else(|| std::env::var("EDITOR").ok())
+                .unwrap_or_else(|| if cfg!(windows) { "notepad".into() } else { "vi".into() });
+            Some(editor)
+        }
+        "GIT_PAGER" => {
+            let pager = entries
+                .iter()
+                .find(|e| e.key().to_dotted() == "core.pager")
+                .and_then(|e| e.value().map(String::from))
+                .or_else(|| std::env::var("GIT_PAGER").ok())
+                .or_else(|| std::env::var("PAGER").ok())
+                .unwrap_or_else(|| if cfg!(windows) { "cat".into() } else { "less".into() });
+            Some(pager)
+        }
+        "GIT_DEFAULT_BRANCH" => {
+            let branch = entries
+                .iter()
+                .find(|e| e.key().to_dotted() == "init.defaultbranch")
+                .and_then(|e| e.value().map(String::from))
+                .unwrap_or_else(|| "main".into());
+            Some(branch)
+        }
+        _ => None,
+    }
+}
+
 /// Dispatches `taxis var`.
 pub fn handle_var(ctx: &CliContext) {
     let mut list_all = false;
@@ -390,6 +450,21 @@ pub fn handle_var(ctx: &CliContext) {
     };
 
     if list_all || name.is_none() {
+        for standard in &[
+            "GIT_AUTHOR_IDENT",
+            "GIT_COMMITTER_IDENT",
+            "GIT_EDITOR",
+            "GIT_PAGER",
+            "GIT_DEFAULT_BRANCH",
+        ] {
+            if let Some(val) = resolve_git_var(standard, &entries) {
+                if ctx.json_mode {
+                    print_json(&serde_json::json!({ "key": standard, "value": val }));
+                } else {
+                    println!("{standard}={val}");
+                }
+            }
+        }
         for entry in &entries {
             let key = entry.key().to_dotted();
             let value = entry.value().unwrap_or("");
@@ -403,6 +478,15 @@ pub fn handle_var(ctx: &CliContext) {
     }
 
     let wanted = name.unwrap_or_default();
+    if let Some(val) = resolve_git_var(&wanted, &entries) {
+        if ctx.json_mode {
+            print_json(&serde_json::json!({ "key": wanted, "value": val }));
+        } else {
+            println!("{val}");
+        }
+        return;
+    }
+
     match entries.iter().find(|entry| entry.key().to_dotted() == wanted) {
         Some(entry) => {
             let value = entry.value().unwrap_or("");

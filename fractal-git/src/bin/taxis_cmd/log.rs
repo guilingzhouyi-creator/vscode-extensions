@@ -20,6 +20,7 @@
 //!     `--stat` request prints the summary instead; printing both would double-count the change.
 
 use std::collections::HashSet;
+use std::io::Write;
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{ObjectKind, Oid};
@@ -82,6 +83,34 @@ pub fn handle_log(ctx: &CliContext) {
             Ok(walked) => walked,
             Err(walk_err) => reject(CliTag::ERROR, walk_err),
         }
+    } else if request.revision.contains("..") {
+        let (from_str, to_str) = request.revision.split_once("..").unwrap();
+        let from_rev = if from_str.is_empty() { "HEAD" } else { from_str };
+        let to_rev = if to_str.is_empty() { "HEAD" } else { to_str };
+        let to_oid = match view.resolve(to_rev) {
+            Ok(oid) => oid,
+            Err(resolve_err) => {
+                eprintln!("{} {}", CliTag::ERROR, resolve_err);
+                std::process::exit(EXIT_NO_MATCH);
+            }
+        };
+        let from_oid = match view.resolve(from_rev) {
+            Ok(oid) => oid,
+            Err(resolve_err) => {
+                eprintln!("{} {}", CliTag::ERROR, resolve_err);
+                std::process::exit(EXIT_NO_MATCH);
+            }
+        };
+        let walked = match walk_commits(&view, &[to_oid]) {
+            Ok(w) => w,
+            Err(walk_err) => reject(CliTag::ERROR, walk_err),
+        };
+        let excluded: HashSet<Oid> = walk_commits(&view, &[from_oid])
+            .unwrap_or_default()
+            .into_iter()
+            .map(|c| c.oid)
+            .collect();
+        walked.into_iter().filter(|c| !excluded.contains(&c.oid)).collect()
     } else if !request.revision_explicit {
         // HEAD is unborn here whenever the first commit landed on a sandbox ref instead of the
         // checked-out trunk, which the engineering edition now does by default. Reporting "HEAD is
@@ -234,6 +263,21 @@ impl LogRequest {
                         .ok_or_else(|| format!("{argument} requires a format string"))?;
                     request.format = Some(value.clone());
                     cursor += 1;
+                }
+                "-n" | "--max-count" => {
+                    let value = args
+                        .get(cursor)
+                        .ok_or_else(|| format!("{argument} requires a count"))?;
+                    request.limit = value
+                        .parse()
+                        .map_err(|parse_err| format!("{argument} requires a count: {parse_err}"))?;
+                    cursor += 1;
+                }
+                other if other.starts_with("-n=") || other.starts_with("--max-count=") => {
+                    let val = other.split_once('=').map(|(_, v)| v).unwrap_or("");
+                    request.limit = val
+                        .parse()
+                        .map_err(|parse_err| format!("{other} requires a count: {parse_err}"))?;
                 }
                 other if other.starts_with("--format=") => {
                     request.format = Some(other["--format=".len()..].to_string());
@@ -482,6 +526,22 @@ pub fn handle_show(ctx: &CliContext) {
         Ok(opened) => opened,
         Err(open_err) => fail_fatal(open_err),
     };
+
+    if revision.contains(':') {
+        let oid = match view.resolve_object_spec(&revision) {
+            Ok(oid) => oid,
+            Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
+        };
+        let object = match view.object(&oid) {
+            Ok(obj) => obj,
+            Err(obj_err) => reject(CliTag::ERROR, obj_err),
+        };
+        if object.kind == ObjectKind::Blob {
+            let _ = std::io::stdout().write_all(&object.payload);
+            return;
+        }
+    }
+
     let commit = match view.resolve(&revision) {
         Ok(oid) => oid,
         Err(resolve_err) => reject(CliTag::ERROR, resolve_err),

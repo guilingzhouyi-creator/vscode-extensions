@@ -15,12 +15,13 @@
 
 use std::collections::HashSet;
 
+use fg_algorithms::traverse::dag_walk::{CorrectedCommitDate, DagWalker};
 use fg_algorithms::PatchGenerator;
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;
 use sha1::{Digest, Sha1};
 
-use super::commit_walk::{walk_commits, CommitRecord};
+use super::commit_walk::{parse_commit_record, walk_commits, CommitRecord};
 use super::common::{fail_fatal, fail_usage, CliContext};
 use super::diff::{collect_comparisons, DiffRequest, DiffScope, EMPTY_TREE_MARKER};
 use super::diff_render::render_text_to_writer;
@@ -113,22 +114,51 @@ pub fn handle_range_diff(ctx: &CliContext) {
     }
 
     let view = RepoView::open_or_exit(ctx);
-    let (range1_str, range2_str) = if positional.len() == 1 && positional[0].contains("...") {
-        let parts: Vec<&str> = positional[0].split("...").collect();
-        (parts[0], parts[1])
+    let (list1, list2) = if positional.len() == 1 && positional[0].contains("...") {
+        let (left_str, right_str) = positional[0]
+            .split_once("...")
+            .unwrap_or(("", ""));
+        let left_oid = match view.resolve(left_str) {
+            Ok(oid) => oid,
+            Err(err) => fail_fatal(format!("cannot resolve '{left_str}': {err}")),
+        };
+        let right_oid = match view.resolve(right_str) {
+            Ok(oid) => oid,
+            Err(err) => fail_fatal(format!("cannot resolve '{right_str}': {err}")),
+        };
+        if left_oid == right_oid {
+            (Vec::new(), Vec::new())
+        } else {
+            let mut get_node = |oid: &Oid| -> Option<(CorrectedCommitDate, Vec<Oid>)> {
+                let obj = view.object(oid).ok()?;
+                let rec = parse_commit_record(*oid, &obj.payload).ok()?;
+                Some((
+                    CorrectedCommitDate(rec.committer_time.max(0) as u64),
+                    rec.parents,
+                ))
+            };
+            let bases = DagWalker::find_merge_bases_with_ccd(
+                &left_oid,
+                &right_oid,
+                &mut get_node,
+            );
+            let base_oid = bases.first().copied().unwrap_or(left_oid);
+            let l1 = resolve_commits_between(&view, base_oid, left_oid).unwrap_or_default();
+            let l2 = resolve_commits_between(&view, base_oid, right_oid).unwrap_or_default();
+            (l1, l2)
+        }
     } else if positional.len() >= 2 {
-        (positional[0], positional[1])
+        let l1 = match resolve_range_commits(&view, positional[0]) {
+            Ok(c) => c,
+            Err(err) => fail_fatal(format!("range 1 error: {err}")),
+        };
+        let l2 = match resolve_range_commits(&view, positional[1]) {
+            Ok(c) => c,
+            Err(err) => fail_fatal(format!("range 2 error: {err}")),
+        };
+        (l1, l2)
     } else {
-        fail_usage("usage: taxis range-diff <range1> <range2>");
-    };
-
-    let list1 = match resolve_range_commits(&view, range1_str) {
-        Ok(c) => c,
-        Err(err) => fail_fatal(format!("range 1 error: {err}")),
-    };
-    let list2 = match resolve_range_commits(&view, range2_str) {
-        Ok(c) => c,
-        Err(err) => fail_fatal(format!("range 2 error: {err}")),
+        fail_usage("usage: taxis range-diff <range1> <range2> or <rev1>...<rev2>");
     };
 
     let items1 = build_lineage_items(&view, list1);
@@ -137,17 +167,14 @@ pub fn handle_range_diff(ctx: &CliContext) {
     render_range_diff(&items1, &items2);
 }
 
-/// Resolves commits in a range string `A..B` (oldest first).
-fn resolve_range_commits(view: &RepoView, range_str: &str) -> FractalResult<Vec<CommitRecord>> {
-    let (left, right) = range_str
-        .split_once("..")
-        .ok_or_else(|| FractalError::ObjectCodec(format!("expected range format A..B, got '{range_str}'")))?;
-
-    let left_oid = view.resolve(left)?;
-    let right_oid = view.resolve(right)?;
-
-    let walked = walk_commits(view, &[right_oid])?;
-    let excluded: HashSet<Oid> = walk_commits(view, &[left_oid])?
+/// Resolves commits between base and tip (exclusive base, inclusive tip, oldest first).
+fn resolve_commits_between(
+    view: &RepoView,
+    base_oid: Oid,
+    tip_oid: Oid,
+) -> FractalResult<Vec<CommitRecord>> {
+    let walked = walk_commits(view, &[tip_oid])?;
+    let excluded: HashSet<Oid> = walk_commits(view, &[base_oid])?
         .into_iter()
         .map(|c| c.oid)
         .collect();
@@ -159,6 +186,17 @@ fn resolve_range_commits(view: &RepoView, range_str: &str) -> FractalResult<Vec<
 
     filtered.reverse();
     Ok(filtered)
+}
+
+/// Resolves commits in a range string `A..B` (oldest first).
+fn resolve_range_commits(view: &RepoView, range_str: &str) -> FractalResult<Vec<CommitRecord>> {
+    let (left, right) = range_str
+        .split_once("..")
+        .ok_or_else(|| FractalError::ObjectCodec(format!("expected range format A..B, got '{range_str}'")))?;
+
+    let left_oid = view.resolve(left)?;
+    let right_oid = view.resolve(right)?;
+    resolve_commits_between(view, left_oid, right_oid)
 }
 
 /// Builds LineageCommit records with patch IDs and diff strings.
