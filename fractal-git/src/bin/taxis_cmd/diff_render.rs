@@ -46,13 +46,17 @@ const STAT_CONTEXT: usize = 3;
 /// generated line cannot make one hunk header thousands of bytes long.
 pub(crate) const MAX_HEADING_LEN: usize = 80;
 
-/// Renders the text patch.
-pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison], width: usize) {
-    let mut sink = std::io::stdout();
+/// Renders the text patch to an arbitrary writer.
+pub(crate) fn render_text_to_writer<W: std::io::Write>(
+    sink: &mut W,
+    request: &DiffRequest,
+    comparisons: &[FileComparison],
+    width: usize,
+) {
     let layout = measure_stat_layout(comparisons, terminal_columns());
     for comparison in comparisons {
         if request.name_only {
-            let _ = write_record(&mut sink, comparison.path(), request.nul_terminated);
+            let _ = write_record(sink, comparison.path(), request.nul_terminated);
             continue;
         }
 
@@ -60,7 +64,7 @@ pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison],
         let new_text = comparison.side_text(false);
 
         if request.stat_only {
-            write_stat_line(&mut sink, comparison, layout, false);
+            write_stat_line(sink, comparison, layout, false);
             continue;
         }
 
@@ -74,29 +78,21 @@ pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison],
         };
         // -z terminates path lists with NUL for --name-only and --name-status only. Git keeps
         // newlines in the patch body, so a patch consumer can still read it line by line.
-        let _ = write_record(&mut sink, &header, false);
+        let _ = write_record(sink, &header, false);
 
-        // A pure mode change has no content difference, so Git prints the metadata and stops. The
-        // `index` line is part of that metadata only when the ids differ; for a mode-only change they
-        // are equal and Git's `oideq` guard suppresses the line, leaving `old mode` / `new mode`
-        // alone. Emitting an `index` line there would claim an object change that did not happen.
-        //
-        // The fast path is restricted to a comparison whose two sides share a path. A rename with a
-        // mode change is *also* content-identical, but Git still prints `similarity index` and the
-        // `rename from`/`rename to` pair before the mode lines, so taking the short path there drops
-        // the only lines that say the file moved.
+        // A pure mode change has no content difference, so Git prints the metadata and stops.
         if comparison.mode_changed()
             && comparison.old_text == comparison.new_text
             && comparison.score.is_none()
         {
-            write_mode_only_header(&mut sink, comparison, false);
+            write_mode_only_header(sink, comparison, false);
             continue;
         }
 
         if comparison.is_binary() {
-            write_file_header(&mut sink, comparison, width, request.nul_terminated);
+            write_file_header(sink, comparison, width, request.nul_terminated);
             let _ = write_record(
-                &mut sink,
+                sink,
                 &format!(
                     "Binary files {} and {} differ",
                     side_label(comparison, true, request.no_prefix),
@@ -114,27 +110,27 @@ pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison],
             request.context,
         );
         if patch.hunks.is_empty() {
-            // An absent side has no lines, so creating or deleting an empty file yields no hunks.
-            // Git still prints the metadata that explains the change — that is the only record a
-            // reader gets — while `---`/`+++` stay out because they introduce hunks that do not
-            // exist here. Suppressing the whole entry would drop the file from the output entirely.
-            // A rename is the other header-only case: the ids are equal, so there is nothing to
-            // patch, yet the header is the whole report.
             if comparison.old_text.is_none()
                 || comparison.new_text.is_none()
                 || comparison.score.is_some()
             {
-                write_file_header(&mut sink, comparison, width, false);
+                write_file_header(sink, comparison, width, false);
             }
             continue;
         }
-        write_file_header(&mut sink, comparison, width, false);
-        write_path_lines(&mut sink, comparison, request.no_prefix);
-        render_patch(&mut sink, &patch, &old_text, &new_text, false);
+        write_file_header(sink, comparison, width, false);
+        write_path_lines(sink, comparison, request.no_prefix);
+        render_patch(sink, &patch, &old_text, &new_text, false);
     }
     if request.stat_only && !comparisons.is_empty() {
-        write_stat_summary(&mut sink, comparisons, false);
+        write_stat_summary(sink, comparisons, false);
     }
+}
+
+/// Renders the text patch to standard output.
+pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison], width: usize) {
+    let mut sink = std::io::stdout();
+    render_text_to_writer(&mut sink, request, comparisons, width);
 }
 /// Writes the metadata of a comparison whose only change is the recorded mode.
 fn write_mode_only_header(

@@ -280,6 +280,39 @@ fn create_transplant_commit(
     let commit_message =
         super::git_hooks::run_prepare_chain(&hook_runner, view.git_dir(), &raw_message, "message");
 
+    // Cherry-pick copies a message that already satisfied a gate, so it faces the light contract;
+    // revert synthesizes a notice, which faces the marker check only. Re-validating inherited text
+    // against the current strict contract would reject legitimate history whenever a rule changes.
+    let rewrite_origin = if spec.invert_delta {
+        fg_gate::commit_guard::rewrite::MessageOrigin::Synthesized
+    } else {
+        fg_gate::commit_guard::rewrite::MessageOrigin::Inherited
+    };
+    let rewrite_floor = fg_gate::PolicyFloor::resolve(view.git_dir());
+    let rewrite_policy =
+        fg_gate::policy_floor::preset_for_tier(rewrite_floor.tier);
+    if let Err(guard_error) = fg_gate::commit_guard::rewrite::verify_rewrite_message(
+        &rewrite_policy,
+        &rewrite_floor,
+        &commit_message,
+        rewrite_origin,
+        None,
+    ) {
+        reject(
+            CliTag::COMMIT_GOVERNANCE_FAIL,
+            format!("{} message rejected: {guard_error}", spec.operation),
+        );
+    }
+    // Origin decides how much of the contract applies, so it is the single most useful field when
+    // asking why a rewrite was accepted: inherited text is exempt from the authoring vocabulary,
+    // synthesized text is not.
+    fg_core::diag_debug!(
+        "cherry-pick",
+        "operation={} origin={:?}",
+        spec.operation,
+        rewrite_origin
+    );
+
     let new_commit = GitCommit::new(
         merged_root_tree,
         vec![ours_commit],

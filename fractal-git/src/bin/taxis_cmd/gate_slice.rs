@@ -16,6 +16,7 @@ use super::common::{find_all_arg_values, print_json, CliContext};
 /// Dispatches the `taxis gate-slice` command.
 pub fn handle_gate_slice(ctx: &CliContext) {
     let cli_file_arguments = find_all_arg_values(&ctx.args, &["--file", "-f"]);
+    let source_is_cli = !cli_file_arguments.is_empty();
     let candidate_file_paths: Vec<String> = if cli_file_arguments.is_empty() {
         super::commit::collect_staged_files(ctx)
     } else {
@@ -47,6 +48,16 @@ pub fn handle_gate_slice(ctx: &CliContext) {
     }
 
     let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
+    fg_core::diag_info!(
+        "gate_slice",
+        "evaluating {} file(s) from {}",
+        candidate_file_paths.len(),
+        if source_is_cli {
+            "cli"
+        } else {
+            "index"
+        }
+    );
     let mut evaluated_files = Vec::new();
     let mut file_envelopes = Vec::new();
 

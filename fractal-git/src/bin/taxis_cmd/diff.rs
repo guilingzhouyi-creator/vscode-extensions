@@ -138,6 +138,7 @@ impl FileComparison {
 }
 
 /// Parses the argument list into a scope, context width, and optional revision pair.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DiffRequest {
     pub(crate) scope: DiffScope,
     pub(crate) context: usize,
@@ -300,7 +301,7 @@ fn parse_context(text: &str) -> Result<usize, String> {
 /// # Errors
 ///
 /// Propagates object reads, worktree I/O, and revision resolution.
-fn collect_comparisons(
+pub(crate) fn collect_comparisons(
     view: &RepoView,
     request: &DiffRequest,
 ) -> FractalResult<Vec<FileComparison>> {

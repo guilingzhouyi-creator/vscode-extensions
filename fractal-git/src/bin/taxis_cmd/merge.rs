@@ -122,6 +122,17 @@ pub fn handle_merge(ctx: &CliContext) {
     };
 
     let bases = DagWalker::find_merge_bases_with_ccd(&ours_commit, &theirs_commit, &mut get_node);
+    // The base set decides everything downstream: empty means unrelated histories, containing
+    // `theirs` means nothing to do, containing `ours` means a fast-forward is possible. Recording it
+    // once explains the branch taken without logging from inside each branch.
+    fg_core::diag_debug!(
+        "merge",
+        "merge bases={} target={} no_ff={} ff_only={}",
+        bases.len(),
+        opts.target,
+        opts.no_ff,
+        opts.ff_only
+    );
     if bases.is_empty() {
         reject(
             CliTag::ERROR,
@@ -148,6 +159,12 @@ pub fn handle_merge(ctx: &CliContext) {
 
     // Check Fast-Forward (ours is an ancestor of theirs)
     if bases.contains(&ours_commit) && !opts.no_ff {
+        fg_core::diag_info!(
+            "merge",
+            "fast-forward {} -> {}",
+            ours_commit.to_hex(),
+            theirs_commit.to_hex()
+        );
         execute_fast_forward(
             &view,
             &opts,
@@ -514,7 +531,31 @@ fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<Stri
         .unwrap_or_else(|err| fail_io("persist merged tree", err));
 
     let default_msg = format!("Merge branch '{}'", m_ctx.opts.target);
+    let user_authored = m_ctx.opts.message.is_some();
     let commit_msg = m_ctx.opts.message.as_deref().unwrap_or(&default_msg);
+    // A merge produces two parents by construction, so the structural exemption always applies to
+    // the generated subject. A user-supplied message is authored text and faces the full contract.
+    let origin = if user_authored {
+        fg_gate::commit_guard::rewrite::MessageOrigin::Authored
+    } else {
+        fg_gate::commit_guard::rewrite::MessageOrigin::Synthesized
+    };
+    let merge_policy = fg_gate::policy_floor::preset_for_tier(
+        fg_gate::PolicyFloor::resolve(m_ctx.view.git_dir()).tier,
+    );
+    let merge_floor = fg_gate::PolicyFloor::resolve(m_ctx.view.git_dir());
+    if let Err(guard_error) = fg_gate::commit_guard::rewrite::verify_rewrite_message(
+        &merge_policy,
+        &merge_floor,
+        commit_msg,
+        origin,
+        None,
+    ) {
+        reject(
+            CliTag::COMMIT_GOVERNANCE_FAIL,
+            format!("Merge message rejected: {guard_error}"),
+        );
+    }
     let hook_runner = super::git_hooks::discover(m_ctx.view.git_dir(), m_ctx.view.work_root());
     let final_msg =
         super::git_hooks::run_merge_chain(&hook_runner, m_ctx.view.git_dir(), commit_msg);

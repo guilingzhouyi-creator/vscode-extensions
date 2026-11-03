@@ -82,6 +82,43 @@ pub fn handle_log(ctx: &CliContext) {
             Ok(walked) => walked,
             Err(walk_err) => reject(CliTag::ERROR, walk_err),
         }
+    } else if !request.revision_explicit {
+        // HEAD is unborn here whenever the first commit landed on a sandbox ref instead of the
+        // checked-out trunk, which the engineering edition now does by default. Reporting "HEAD is
+        // unborn" would be technically true and practically useless: the work exists, and the reader
+        // asked to see history. Falling back to every ref, with a notice, keeps `log` answering the
+        // question that was actually asked.
+        match view.head_commit() {
+            Ok(None) => {
+                let starts = match collect_all_starts(&view) {
+                    Ok(found) => found,
+                    Err(collect_err) => reject(CliTag::ERROR, collect_err),
+                };
+                if !ctx.json_mode {
+                    eprintln!(
+                        "note: HEAD is unborn (no commit on the checked-out branch); showing all refs.\n\
+                         Use `taxis checkout <ref>` or name a revision to inspect one lineage."
+                    );
+                }
+                match walk_commits(&view, &starts) {
+                    Ok(walked) => walked,
+                    Err(walk_err) => reject(CliTag::ERROR, walk_err),
+                }
+            }
+            _ => {
+                let start = match view.resolve(&request.revision) {
+                    Ok(oid) => oid,
+                    Err(resolve_err) => {
+                        eprintln!("{} {}", CliTag::ERROR, resolve_err);
+                        std::process::exit(EXIT_NO_MATCH);
+                    }
+                };
+                match walk_commits(&view, &[start]) {
+                    Ok(walked) => walked,
+                    Err(walk_err) => reject(CliTag::ERROR, walk_err),
+                }
+            }
+        }
     } else {
         let start = match view.resolve(&request.revision) {
             Ok(oid) => oid,
@@ -155,6 +192,12 @@ pub(crate) fn collect_all_starts(view: &RepoView) -> FractalResult<Vec<Oid>> {
 /// One parsed `log` invocation.
 struct LogRequest {
     revision: String,
+    /// Whether the caller named a revision, as opposed to defaulting to `HEAD`.
+    ///
+    /// Tracked because the two cases need different answers when `HEAD` is unborn: an explicit
+    /// revision must fail loudly (the name was wrong), while a bare `log` should fall back to the
+    /// refs that do hold commits.
+    revision_explicit: bool,
     limit: usize,
     all: bool,
     oneline: bool,
@@ -166,6 +209,7 @@ impl LogRequest {
     fn parse(args: &[String]) -> Result<Self, String> {
         let mut request = Self {
             revision: "HEAD".to_string(),
+            revision_explicit: false,
             limit: DEFAULT_LOG_LIMIT,
             all: false,
             oneline: false,
@@ -211,7 +255,10 @@ impl LogRequest {
                 other if other.starts_with('-') => {
                     return Err(format!("log does not support the flag '{other}'"));
                 }
-                other => request.revision = other.to_string(),
+                other => {
+                    request.revision = other.to_string();
+                    request.revision_explicit = true;
+                }
             }
         }
         Ok(request)

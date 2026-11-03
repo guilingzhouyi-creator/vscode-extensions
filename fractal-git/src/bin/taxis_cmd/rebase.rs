@@ -166,8 +166,17 @@ impl<'a> ReplaySession<'a> {
         mut queue: Vec<RebaseItem>,
     ) -> (ReplayOutcome, Vec<RebaseItem>, Vec<RebaseItem>) {
         let mut done = Vec::new();
+        fg_core::diag_info!("rebase", "replaying {} planned step(s)", queue.len());
         while !queue.is_empty() {
             let rebase_step = queue.remove(0);
+            // Per-step record: a rebase that stops half way is the hard case to reconstruct, and the
+            // action taken for each step is the only thing that explains where it stopped.
+            fg_core::diag_debug!(
+                "rebase",
+                "step action={:?} remaining={}",
+                rebase_step.action,
+                queue.len()
+            );
             match self.apply(&rebase_step) {
                 StepOutcome::Applied => done.push(rebase_step),
                 StepOutcome::Stopped {
@@ -176,6 +185,14 @@ impl<'a> ReplaySession<'a> {
                     kind,
                     consumed,
                 } => {
+                    fg_core::diag_info!(
+                        "rebase",
+                        "stopped at {} kind={:?} consumed={} applied={}",
+                        stopped_sha.to_hex(),
+                        kind,
+                        consumed,
+                        done.len()
+                    );
                     if consumed {
                         done.push(rebase_step);
                     } else {
@@ -235,6 +252,29 @@ impl<'a> ReplaySession<'a> {
             ),
             _ => (vec![self.current_tip], record.message.clone()),
         };
+
+        // `reword` is the only action that writes text nobody has written before, so it is the
+        // only one that faces the full contract. Pick, squash and fixup replay text that already
+        // passed a gate; re-judging it against today's rules would reject valid history.
+        let rewrite_origin = if item.action == RebaseAction::Reword && item.new_message.is_some() {
+            fg_gate::commit_guard::rewrite::MessageOrigin::Authored
+        } else {
+            fg_gate::commit_guard::rewrite::MessageOrigin::Inherited
+        };
+        let rebase_floor = fg_gate::PolicyFloor::resolve(self.view.git_dir());
+        let rebase_policy = fg_gate::policy_floor::preset_for_tier(rebase_floor.tier);
+        if let Err(guard_error) = fg_gate::commit_guard::rewrite::verify_rewrite_message(
+            &rebase_policy,
+            &rebase_floor,
+            &message,
+            rewrite_origin,
+            None,
+        ) {
+            reject(
+                CliTag::COMMIT_GOVERNANCE_FAIL,
+                format!("Rebase message rejected for {}: {guard_error}", record.oid.to_hex()),
+            );
+        }
 
         let author = author_signature(&record);
         let new_oid = self.write_commit(tree_oid, parents.clone(), &message, author);

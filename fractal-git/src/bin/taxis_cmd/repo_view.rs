@@ -362,12 +362,18 @@ impl RepoView {
     /// Resolves the part of a revision that names an object, without ancestry suffixes.
     fn resolve_base(&self, revision: &str) -> FractalResult<Oid> {
         if revision == "HEAD" || revision == "@" {
-            return self.head_commit()?.ok_or_else(|| {
-                FractalError::ObjectCodec(format!(
-                    "HEAD is unborn in '{}'; there is no commit to resolve",
-                    self.git_dir.display()
-                ))
-            });
+            if let Some(oid) = self.head_commit()? {
+                return Ok(oid);
+            }
+            if fg_core::constants::Edition::CURRENT == fg_core::constants::Edition::Engineering {
+                if let Ok(Some(oid)) = self.lookup_reference("refs/fractal/cell/cell-default/main") {
+                    return Ok(oid);
+                }
+            }
+            return Err(FractalError::ObjectCodec(format!(
+                "HEAD is unborn in '{}'; there is no commit to resolve",
+                self.git_dir.display()
+            )));
         }
         if let Ok(oid) = Oid::from_hex(revision) {
             if self.odb.read(&oid)?.is_some() {

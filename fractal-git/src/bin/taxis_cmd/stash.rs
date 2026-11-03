@@ -144,6 +144,24 @@ fn handle_stash_push(view: &RepoView, ctx: &CliContext) {
         head_summary
     );
 
+    // A stash subject is synthesized by the tool in Git's own `WIP on` format, so it is checked
+    // only for an unfinished thought. Applying the authoring vocabulary contract here would reject
+    // every stash because Git itself spells the subject with "WIP".
+    let stash_floor = fg_gate::PolicyFloor::resolve(view.git_dir());
+    let stash_policy = fg_gate::policy_floor::preset_for_tier(stash_floor.tier);
+    if let Err(guard_error) = fg_gate::commit_guard::rewrite::verify_rewrite_message(
+        &stash_policy,
+        &stash_floor,
+        &stash_msg,
+        fg_gate::commit_guard::rewrite::MessageOrigin::Synthesized,
+        None,
+    ) {
+        super::common::reject(
+            fractal_git::constants::cli::CliTag::COMMIT_GOVERNANCE_FAIL,
+            format!("Stash subject rejected: {guard_error}"),
+        );
+    }
+
     let stash_commit = GitCommit::new(
         stash_tree_oid,
         vec![head_oid],
@@ -155,10 +173,18 @@ fn handle_stash_push(view: &RepoView, ctx: &CliContext) {
 
     let stash_commit_oid = persist_commit_object(&stash_commit, &odb)
         .unwrap_or_else(|err| fail_io("persist stash commit", err));
+    fg_core::diag_info!(
+        "stash",
+        "created {} on {} subject={:?}",
+        stash_commit_oid.to_hex(),
+        head_oid.to_hex(),
+        stash_msg
+    );
 
     // Update refs/stash
     let ref_store = DiskRefStore::new(view.git_dir());
     let _ = ref_store.update_ref("refs/stash", &stash_commit_oid, None);
+    fg_core::diag_debug!("stash", "advanced refs/stash to {}", stash_commit_oid.to_hex());
 
     // Hard reset worktree to HEAD
     let mut target_files = BTreeMap::new();

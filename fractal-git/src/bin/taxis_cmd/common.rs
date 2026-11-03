@@ -30,6 +30,9 @@ pub const EXIT_FATAL: i32 = 128;
 /// both a refusal (1) and a repository failure (128), and wrapper scripts branch on it.
 pub const EXIT_USAGE: i32 = 129;
 
+/// Process exit status for an operation this edition cannot perform at all.
+pub const EXIT_UNAVAILABLE: i32 = 69;
+
 /// Execution context holding common flags, repository path, and subcommand arguments.
 #[derive(Debug, Clone)]
 pub struct CliContext {
@@ -96,6 +99,7 @@ pub fn parse_byte_size(input_size_str: &str) -> Option<u64> {
 /// Centralizing this prevents the historical failure mode where a rejected command
 /// printed an error but still returned status 0, hiding the rejection from callers.
 pub fn reject(tag: &str, detail: impl Display) -> ! {
+    fg_core::diag_debug!("gate", "rejection tag={} exit={}", tag, EXIT_REJECTED);
     eprintln!("{} {}", tag, detail);
     std::process::exit(EXIT_REJECTED)
 }
@@ -123,6 +127,29 @@ pub fn fail_fatal(detail: impl Display) -> ! {
 pub fn fail_usage(detail: impl Display) -> ! {
     eprintln!("usage: {}", detail);
     std::process::exit(EXIT_USAGE)
+}
+
+/// Reports that this edition cannot perform an operation at all, then terminates.
+pub fn fail_unavailable(capability: &str, operation: &str) -> ! {
+    let edition = fg_core::constants::Edition::CURRENT;
+    fg_core::diag_debug!(
+        "capability",
+        "refused '{}' because '{}' is disabled in the {} edition",
+        operation,
+        capability,
+        edition.as_str()
+    );
+    eprintln!(
+        "[UNAVAILABLE] '{}' requires the '{}' capability, which the {} edition does not provide.",
+        operation,
+        capability,
+        edition.as_str()
+    );
+    eprintln!(
+        "  This is not a permission denial; repeating the command will not change the outcome."
+    );
+    eprintln!("  Run `taxis version` to see the full capability set.");
+    std::process::exit(EXIT_UNAVAILABLE)
 }
 
 /// Reports Git's "ambiguous argument" fatal for a revision that does not resolve.
