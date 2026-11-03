@@ -35,8 +35,8 @@ use fractal_git::RefStore;
 use fractal_git::{
     ActorIdentity, AgentPushContext, BlockProvenanceEntry, BlockProvenanceParams,
     CommitMaterializationRequest, CommitMessageGuard, DiskProvenanceStore, DiskRefStore,
-    FractalRef, GitSignature, LooseOdb, PreReceiveGuard, TaxisPolicy, ValidatedCommitWitness,
-    WalJournal, WalRecord,
+    FractalRef, GitSignature, LooseOdb, PolicyFloor, PreReceiveGuard, TaxisPolicy,
+    ValidatedCommitWitness, WalJournal, WalRecord,
 };
 
 use super::checkout::worktree_stat;
@@ -69,13 +69,39 @@ pub fn handle_commit(ctx: &CliContext) {
         "workspace-strict"
     });
     let explicit_target = find_arg_value(&ctx.args, &["--target"]);
+    // Where an untargeted commit lands.
+    //
+    // Following HEAD is what Git does, but in a Taxis repository HEAD points at the protected trunk,
+    // so `init && add && commit` collided with the human-control boundary on the very first commit:
+    // an agent cannot advance `refs/heads/main` without a minted human token, and the floor forbids
+    // relaxing the policy instead. The result was a repository in which the ordinary commit command
+    // never worked unattended.
+    //
+    // The engineering edition therefore defaults to the agent-writable cell sandbox, which already
+    // existed for exactly this purpose. Trunk protection is untouched: naming `refs/heads/main`
+    // explicitly still demands a human token, so promotion remains a deliberate act rather than
+    // something a default can slip past.
     let target_ref_str = match explicit_target {
         Some(t) => t.to_string(),
-        None => resolve_active_head_ref(&ctx.git_dir)
-            .unwrap_or_else(|| "refs/fractal/cell/cell-default/main".to_string()),
+        None => {
+            let head_ref = resolve_active_head_ref(&ctx.git_dir)
+                .unwrap_or_else(|| "refs/fractal/cell/cell-default/main".to_string());
+            engineering_default_target(head_ref, cell_id, !git_native_default)
+        }
     };
 
     let mut policy = resolve_commit_policy(policy_name);
+    // A caller may tighten the contract but never relax it. The floor comes from the versioned
+    // manifest, so switching the gate off requires an explicit recorded bypass rather than one
+    // flag. Ungoverned repositories (no native container, no Taxis flags) keep native behaviour
+    // because they carry no Taxis-managed history to protect.
+    if !git_native_default {
+        let floor = PolicyFloor::resolve(&ctx.git_dir);
+        if let Err(floor_error) = floor.assert_permits(&policy) {
+            reject(CliTag::COMMIT_GOVERNANCE_FAIL, format!("{floor_error}"));
+        }
+        reject_bypass_without_reason(&ctx.args);
+    }
     let authority_secret = human_author.as_deref().map(|_| {
         resolve_authority_secret(&ctx.git_dir)
             .unwrap_or_else(|secret_err| reject(CliTag::AUTHORITY_BREACH, format!("{secret_err}")))
@@ -120,13 +146,31 @@ pub fn handle_commit(ctx: &CliContext) {
             ),
         );
     }
+    fg_core::diag_debug!(
+        "pre_receive",
+        "authorized actor={} target={}",
+        actor.display_name(),
+        target_ref.to_git_ref()
+    );
 
     let message = resolve_commit_message(&ctx.args, card_id);
     let staged_files = collect_staged_files(ctx);
-    let witness = verify_commit_governance(&message, &policy, &staged_files);
+    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
+    // One record covering the decision inputs. When a commit is refused, the useful question is
+    // "which policy was in force and what did it see", and neither is recoverable afterwards.
+    fg_core::diag_debug!(
+        "commit",
+        "policy={} tier={} staged={} target={} native={}",
+        policy_name,
+        policy.enforcement_tier(),
+        staged_files.len(),
+        target_ref_str,
+        git_native_default
+    );
+    let witness = verify_commit_governance(&message, &policy, &staged_files, &work_root);
+    fg_core::diag_debug!("commit", "governance witness={:?}", witness);
     verify_project_lease_authorization(&ctx.git_dir, &staged_files);
 
-    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
     let hook_runner = super::git_hooks::discover(&ctx.git_dir, &work_root);
     let source_ref =
         resolve_active_head_ref(&ctx.git_dir).unwrap_or_else(|| target_ref.to_git_ref());
@@ -138,9 +182,9 @@ pub fn handle_commit(ctx: &CliContext) {
         &staged_files,
         &message,
     );
-    let _ = verify_commit_governance(&message, &policy, &staged_files);
+    let _ = verify_commit_governance(&message, &policy, &staged_files, &work_root);
     let final_message = super::git_hooks::run_commit_chain(&hook_runner, &ctx.git_dir, &message);
-    let _ = verify_commit_governance(&final_message, &policy, &staged_files);
+    let _ = verify_commit_governance(&final_message, &policy, &staged_files, &work_root);
 
     let tx_id = format!("tx-{}-{}", agent_id, current_unix_seconds());
     let wal = WalJournal::open(ctx.git_dir.join("journal/commit.wal")).ok();
@@ -296,6 +340,48 @@ pub fn handle_commit(ctx: &CliContext) {
     );
 }
 
+/// Chooses the destination for a commit that named no `--target`.
+///
+/// Only two situations get the sandbox treatment, and both are deliberate: the engineering edition,
+/// where the product's stated purpose is unattended local work, and a Taxis-governed repository
+/// whose HEAD points at a protected trunk.
+///
+/// A `git-native` repository (no native container) is left alone, because it is not a Taxis
+/// governance scenario and redirecting it would be surprising.
+///
+/// The redirection is *announced* rather than silent. A commit that landed somewhere other than HEAD
+/// without saying so would be its own kind of dishonesty, and the reader needs the ref name to find
+/// the work afterwards.
+fn engineering_default_target(head_ref: String, cell_id: &str, taxis_governed: bool) -> String {
+    let edition = fg_core::constants::Edition::CURRENT;
+    let is_protected_trunk = head_ref.starts_with("refs/heads/");
+    if !taxis_governed
+        || !is_protected_trunk
+        || edition != fg_core::constants::Edition::Engineering
+    {
+        return head_ref;
+    }
+
+    let sandbox_ref = format!("refs/fractal/cell/{cell_id}/main");
+    fg_core::diag_info!(
+        "commit",
+        "HEAD '{}' is a protected trunk; landing on sandbox '{}' in the {} edition",
+        head_ref,
+        sandbox_ref,
+        edition.as_str()
+    );
+    eprintln!(
+        "note: HEAD points at the protected trunk '{head_ref}', which requires a human authority token."
+    );
+    eprintln!(
+        "      Committing to sandbox '{sandbox_ref}' instead (engineering edition default)."
+    );
+    eprintln!(
+        "      Pass --target {head_ref} with --human/--token to advance the trunk deliberately."
+    );
+    sandbox_ref
+}
+
 /// Resolves commit governance policy based on requested policy name.
 fn resolve_commit_policy(policy_name: &str) -> TaxisPolicy {
     match policy_name {
@@ -362,19 +448,51 @@ fn human_email(human_name: &str) -> String {
     )
 }
 
-/// Extracts commit message or generates conventional semantic default.
+/// Rejects a bypass request that carries no reason.
+///
+/// A bypass is legitimate when it is deliberate and recorded. Without a reason the call is
+/// indistinguishable from an accident, so it is refused rather than honoured.
+fn reject_bypass_without_reason(args: &[String]) {
+    if !args.iter().any(|arg| arg == "--bypass-message-guard") {
+        return;
+    }
+    let reason = find_arg_value(args, &["--reason"])
+        .map(str::trim)
+        .unwrap_or_default();
+    if reason.chars().count() < 10 {
+        reject(
+            CliTag::COMMIT_GOVERNANCE_FAIL,
+            concat!(
+                "--bypass-message-guard requires --reason with at least 10 characters. ",
+                "A message guard exception must state why the contract cannot be met."
+            ),
+        );
+    }
+}
+
+/// Extracts commit message or generates a conventional default.
+///
+/// The generated default must itself satisfy the policy that will validate it, because a fallback
+/// that always fails the gate pushes authors towards disabling the gate. It therefore carries the
+/// project declaration the workspace contract demands.
 fn resolve_commit_message(args: &[String], card_id: &str) -> String {
+    let declared_project = find_arg_value(args, &["--project"]).unwrap_or("governance");
     find_arg_value(args, &["-m", "-am", "--message"])
         .map(String::from)
         .unwrap_or_else(|| {
             format!(
                 concat!(
-                    "feat(core): taxis atomic commit\n\n",
-                    "[Why]\nRoutine checkpoint for task {}.\n\n",
-                    "[Changed]\n- Updated working tree state\n\n",
-                    "[Verification]\nAssert state consistency."
+                    "feat(core): record atomic commit checkpoint for {card}\n\n",
+                    "[Project / 项目归属]\n- {project}\n\n",
+                    "[Why / 动机背景]\n- Capture the current working tree as a recoverable checkpoint ",
+                    "before further mutation begins.\n\n",
+                    "[Changed / 变更调整]\n- Persisted the staged working tree state as an immutable ",
+                    "commit object.\n\n",
+                    "[Verification / 验证结论]\n- Assert the recorded tree matches the staged content ",
+                    "and the target reference advances atomically."
                 ),
-                card_id
+                card = card_id,
+                project = declared_project
             )
         })
 }
@@ -460,8 +578,17 @@ fn verify_commit_governance(
     message: &str,
     policy: &TaxisPolicy,
     staged_files: &[String],
+    work_root: &Path,
 ) -> ValidatedCommitWitness {
-    match CommitMessageGuard::parse_and_verify(message, policy, Some(staged_files)) {
+    // Declaration anchoring compares the verification text against the symbols the staged files
+    // actually declare, so the candidates are collected here where the working tree is reachable.
+    let candidates = collect_staged_symbols(staged_files, work_root);
+    match CommitMessageGuard::parse_and_verify_with_symbols(
+        message,
+        policy,
+        Some(staged_files),
+        &candidates,
+    ) {
         Ok(commit_witness) => commit_witness,
         Err(gov_err) => reject(
             CliTag::COMMIT_GOVERNANCE_FAIL,
@@ -471,6 +598,43 @@ fn verify_commit_governance(
             ),
         ),
     }
+}
+
+/// Collects declaration symbols from the staged files that are readable as text.
+///
+/// A binary or unreadable file simply contributes nothing; the anchor check then sees whatever the
+/// rest of the change introduced. It never fails on a read: a message complaint is the actionable
+/// signal, an I/O error mid-gate is not.
+fn collect_staged_symbols(
+    staged_files: &[String],
+    work_root: &Path,
+) -> Vec<fg_gate::commit_guard::declaration::CandidateSymbol> {
+    let mut candidates = Vec::new();
+    for path in staged_files {
+        let lower = path.to_lowercase();
+        let is_source = [".rs", ".ts", ".gd", ".js"]
+            .iter()
+            .any(|extension| lower.ends_with(extension));
+        if !is_source {
+            continue;
+        }
+        let Ok(content) = fs::read_to_string(work_root.join(path)) else {
+            continue;
+        };
+        let lines: Vec<&str> = content.lines().collect();
+        for symbol in fg_gate::commit_guard::declaration::extract_candidate_symbols_from_lines(&lines)
+        {
+            if !candidates
+                .iter()
+                .any(|existing: &fg_gate::commit_guard::declaration::CandidateSymbol| {
+                    existing.name == symbol.name
+                })
+            {
+                candidates.push(symbol);
+            }
+        }
+    }
+    candidates
 }
 
 /// Materializes blobs, trees, the commit object, and the advanced reference.

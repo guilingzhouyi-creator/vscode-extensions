@@ -66,6 +66,13 @@ pub fn handle_add(ctx: &CliContext) {
     }
 
     let view = RepoView::open_or_exit(ctx);
+    // Pathspecs arrive relative to the caller's working directory, while every candidate path in
+    // this module is relative to the work root. Rebasing them here, once, keeps each downstream
+    // matcher unchanged and makes `add` behave the same in the root and in a subdirectory.
+    let options = match rebase_pathspecs_to_root(&view, options) {
+        Ok(rebased) => rebased,
+        Err(reason) => fail_fatal(reason),
+    };
     let mut index_map = load_index_entries(view.git_dir());
     let matcher = match view.ignore_matcher() {
         Ok(loaded) => loaded,
@@ -419,6 +426,12 @@ pub fn handle_rm(ctx: &CliContext) {
     }
 
     let view = RepoView::open_or_exit(ctx);
+    // Same working-directory rule as `add`: a pathspec typed one level down names a root-relative
+    // path only after the caller's prefix is applied, so rebase before matching.
+    let pathspecs = match rebase_specs_to_root(&view, &pathspecs) {
+        Ok(rebased) => rebased,
+        Err(reason) => fail_fatal(reason),
+    };
     let mut index_map = load_index_entries(view.git_dir());
     let to_remove = resolve_rm_targets(&index_map, &pathspecs, (recursive, ignore_unmatch));
 
@@ -502,13 +515,19 @@ pub fn handle_mv(ctx: &CliContext) {
     let source = &positional[0];
     let raw_dest = &positional[1];
     let view = RepoView::open_or_exit(ctx);
+    // Source and destination are both typed relative to the caller's directory.
+    let (source, dest) = match rebase_specs_to_root(&view, &[source.clone(), raw_dest.to_string()]) {
+        Ok(rebased) if rebased.len() == 2 => (rebased[0].clone(), rebased[1].clone()),
+        Ok(_) => fail_fatal("mv: expected exactly two paths"),
+        Err(reason) => fail_fatal(reason),
+    };
     let mut index_map = load_index_entries(view.git_dir());
-    let dest = resolve_mv_destination(view.work_root(), source, raw_dest);
+    let dest = resolve_mv_destination(view.work_root(), &source, &dest);
 
-    let Some(mut entry) = index_map.remove(source) else {
+    let Some(mut entry) = index_map.remove(&source) else {
         fail_fatal(format!("bad source, source={source}, destination={dest}"));
     };
-    let src_full = match plan_worktree_path(view.work_root(), source) {
+    let src_full = match plan_worktree_path(view.work_root(), &source) {
         Ok(planned) => planned,
         Err(detail) => fail_fatal(detail),
     };
@@ -609,6 +628,11 @@ pub fn handle_restore(ctx: &CliContext) {
     }
 
     let view = RepoView::open_or_exit(ctx);
+    // `restore` takes the same pathspecs as `add`, so it needs the same working-directory rule.
+    let pathspecs = match rebase_specs_to_root(&view, &pathspecs) {
+        Ok(rebased) => rebased,
+        Err(reason) => fail_fatal(reason),
+    };
     let mut index_map = load_index_entries(view.git_dir());
 
     if staged {
@@ -830,6 +854,37 @@ pub(crate) fn normalize_rel_spec(raw: &str) -> String {
     } else {
         stripped.trim_matches('/').to_string()
     }
+}
+
+/// Rewrites every pathspec in `options` to be work-root relative.
+fn rebase_pathspecs_to_root(
+    view: &RepoView,
+    mut options: AddOptions,
+) -> Result<AddOptions, String> {
+    options.pathspecs = rebase_specs_to_root(view, &options.pathspecs)?;
+    Ok(options)
+}
+
+/// Rewrites a list of command-line paths to be work-root relative.
+///
+/// Applied uniformly by `add`, `rm`, `mv` and `restore` because all four resolve their arguments the
+/// same way Git does: against the caller's directory. Doing it in one place keeps the four commands
+/// from drifting apart, which is how the subdirectory defect survived in three of them after the
+/// first was fixed.
+fn rebase_specs_to_root(view: &RepoView, specs: &[String]) -> Result<Vec<String>, String> {
+    specs
+        .iter()
+        .map(|spec| rebase_spec_against_work_root(view, spec))
+        .collect()
+}
+
+/// Rewrites a command-line path into a path relative to the repository root.
+///
+/// Delegates to the library implementation so the arithmetic has exactly one definition and the
+/// unit tests exercise the code the commands actually run.
+fn rebase_spec_against_work_root(view: &RepoView, raw: &str) -> Result<String, String> {
+    let cwd = std::env::current_dir().map_err(|err| format!("resolve working directory: {err}"))?;
+    fractal_git::pathspec::spec_relative_to_root(view.work_root(), &cwd, raw)
 }
 
 /// Reports whether `rel_path` matches any pathspec in `specs` (empty `specs` matches everything).
