@@ -31,6 +31,13 @@ pub const METRIC_DAG_POSET_SCALE: &str = "dag_poset_scale_traversal_2000_nodes";
 /// Path-Bloom negative history pruning across dense commit chains.
 pub const METRIC_BLOOM_DENSE_HISTORY: &str = "bloom_filter_dense_history_500_commits";
 
+/// Commit-message governance guard throughput on a fully populated workspace message.
+///
+/// Every `taxis commit`, `merge --message` and `rebase reword` runs this guard, so it sits directly
+/// on the interactive latency path. The metric exists to make a regression visible rather than
+/// discoverable only when commits feel slow.
+pub const METRIC_COMMIT_GUARD: &str = "commit_message_guard_full";
+
 /// Monorepo 10,000 files sparse tree diff across simulated agent touches.
 pub const METRIC_MONOREPO_SPARSE_DIFF: &str = "monorepo_10k_sparse_tree_diff";
 

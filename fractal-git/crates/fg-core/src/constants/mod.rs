@@ -9,6 +9,7 @@
 //! - `RCFG-RULE-DRIFT`: Full adherence to single source of truth rule catalog
 
 pub mod cli;
+pub mod edition;
 pub mod errors;
 pub mod git;
 pub mod metrics;
@@ -17,6 +18,7 @@ pub mod refs;
 pub mod rules;
 
 pub use cli::*;
+pub use edition::*;
 pub use errors::*;
 pub use git::*;
 pub use metrics::*;
@@ -26,7 +28,7 @@ pub use rules::*;
 
 /// Validates whether a given rule identifier is a registered Fractal Git rule.
 ///
-/// Ensures compliance with `RCFG-RULE-DRIFT` by verifying against the 24 authoritative rules.
+/// Ensures compliance with `RCFG-RULE-DRIFT` by verifying against the 36 authoritative rules.
 #[inline]
 pub fn is_registered_fgt_rule(rule_id: &str) -> bool {
     ALL_FGT_RULES.contains(&rule_id)
@@ -47,6 +49,7 @@ pub fn is_valid_benchmark_metric(metric_name: &str) -> bool {
             | METRIC_BYTE_LRU_CACHE
             | METRIC_DAG_POSET_SCALE
             | METRIC_BLOOM_DENSE_HISTORY
+            | METRIC_COMMIT_GUARD
             | METRIC_MONOREPO_SPARSE_DIFF
             | METRIC_CONCURRENT_TRANSACTIONS
             | METRIC_BIT_PARALLEL_MYERS

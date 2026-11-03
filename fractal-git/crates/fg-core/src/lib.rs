@@ -12,6 +12,7 @@
 //! Domain Governance Rules: FGT-COR-001 (core domain foundation), FGT-LCK-001, FGT-PRF-001.
 
 pub mod constants;
+pub mod diagnostics;
 pub mod crypto;
 pub mod error;
 pub mod fs_atomic;
@@ -36,7 +37,7 @@ pub use models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityClaims, AuthoritySecret,
     AuthorityTier, AutoQualityScoreEnvelope, BlackboardCollision, BlockProvenanceEntry,
     BlockProvenanceParams, CardBlackboard, ConflictPresentationMode, DiffCoherenceMode,
-    ElevationAttestation, FastOidHasher, FastOidMap, FastOidSet, FileMode, FileUid, GitSignature,
+    ElevationAttestation, EnforcementTier, FastOidHasher, FastOidMap, FastOidSet, FileMode, FileUid, GitSignature,
     HashAlgorithm, IndexStage, IntentLease, MutationBudget, Oid, PatchHunkChoice, PatchPlan,
     PraxisCardContext, ProvenanceLedger, QuarantineRegistry, RebaseAction, RebaseItem, RebasePlan,
     RepoPath, ReservationStatus, ReservedFileToken, SliceAuthorization, StagedPromotionRequest,
