@@ -3,14 +3,15 @@
 //! Architecture Role: Automated regression tests ensuring core operators (TreeDiff, Myers Diff,
 //!   DAG Cutoff, BufferPool, ByteLruCache) satisfy nanosecond/microsecond budgets.
 
-use fractal_git::bench::{BenchmarkMetric, TaxisBenchmarkSuite};
+use fractal_git::bench::{BenchmarkMetric, BenchmarkProfile, TaxisBenchmarkSuite};
 use fractal_git::constants::metrics::*;
+use fractal_git::BenchmarkLevel;
 
 #[test]
 fn test_benchmark_suite_execution_and_timings() {
     let suite = TaxisBenchmarkSuite::run_default(1);
     assert_eq!(suite.engine, "taxis");
-    assert_eq!(suite.metrics.len(), 11);
+    assert_eq!(suite.metrics.len(), 12);
 
     for m in &suite.metrics {
         assert!(
@@ -100,6 +101,7 @@ fn test_benchmark_baseline_comparison_and_tolerance() {
         engine: "taxis".to_string(),
         version: "0.1.0".to_string(),
         timestamp_ms: 1700000000000,
+        profile: fractal_git::bench::BenchmarkProfile::Release,
         metrics: vec![base_metric],
     };
 
@@ -138,6 +140,10 @@ fn test_benchmark_json_serialization_roundtrip() {
         serde_json::from_str(&json_str).expect("Deserialize benchmark suite");
     assert_eq!(parsed.engine, suite.engine);
     assert_eq!(parsed.metrics.len(), suite.metrics.len());
+    assert_eq!(
+        parsed.profile, suite.profile,
+        "the profile must survive a round trip; losing it silently downgrades to unspecified"
+    );
 }
 
 #[test]
@@ -168,9 +174,9 @@ fn test_benchmark_suite_level2_and_level3() {
         .iter()
         .any(|m| m.name == METRIC_CONCURRENT_TRANSACTIONS));
 
-    // All levels combined: 11 (L1) + 2 (L2) + 2 (L3) = 15 metrics
+    // All levels combined: 12 (L1) + 2 (L2) + 2 (L3) = 16 metrics
     let suite_all = TaxisBenchmarkSuite::run_suite(BenchmarkLevel::All, 1);
-    assert_eq!(suite_all.metrics.len(), 15);
+    assert_eq!(suite_all.metrics.len(), 16);
     for m in &suite_all.metrics {
         assert!(m.iterations > 0);
         assert!(m.ops_per_sec > 0.0);

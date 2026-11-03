@@ -1,0 +1,155 @@
+{
+  "engine": "taxis",
+  "version": "0.1.0",
+  "timestamp_ms": 1793682693248,
+  "profile": "debug",
+  "sample_count": 5,
+  "level": "all",
+  "multiplier": 5,
+  "metrics": [
+    {
+      "name": "canonical_tree_diff_streaming",
+      "iterations": 500,
+      "total_duration_us": 4742,
+      "avg_latency_ns": 9484,
+      "ops_per_sec": 105440.7423028258,
+      "observed_min_ns": 9367,
+      "observed_max_ns": 11611
+    },
+    {
+      "name": "myers_diff_swar_tokens",
+      "iterations": 500,
+      "total_duration_us": 13634,
+      "avg_latency_ns": 27267,
+      "ops_per_sec": 36674.368284006305,
+      "observed_min_ns": 26809,
+      "observed_max_ns": 35979
+    },
+    {
+      "name": "dag_generation_cutoff_o1",
+      "iterations": 2500,
+      "total_duration_us": 30,
+      "avg_latency_ns": 12,
+      "ops_per_sec": 83333333.33333333,
+      "observed_min_ns": 12,
+      "observed_max_ns": 12
+    },
+    {
+      "name": "corrected_commit_date_cutoff_o1",
+      "iterations": 2500,
+      "total_duration_us": 30,
+      "avg_latency_ns": 12,
+      "ops_per_sec": 83333333.33333333,
+      "observed_min_ns": 11,
+      "observed_max_ns": 12
+    },
+    {
+      "name": "bloom_filter_path_query",
+      "iterations": 5000,
+      "total_duration_us": 720,
+      "avg_latency_ns": 144,
+      "ops_per_sec": 6944444.444444444,
+      "observed_min_ns": 135,
+      "observed_max_ns": 153
+    },
+    {
+      "name": "buffer_pool_thread_local_freelist",
+      "iterations": 10000,
+      "total_duration_us": 900,
+      "avg_latency_ns": 90,
+      "ops_per_sec": 11111111.111111112,
+      "observed_min_ns": 84,
+      "observed_max_ns": 100
+    },
+    {
+      "name": "byte_lru_cache_budget_eviction",
+      "iterations": 5000,
+      "total_duration_us": 3295,
+      "avg_latency_ns": 659,
+      "ops_per_sec": 1517450.6828528072,
+      "observed_min_ns": 632,
+      "observed_max_ns": 774
+    },
+    {
+      "name": "bit_parallel_myers_64_lines",
+      "iterations": 5000,
+      "total_duration_us": 155510,
+      "avg_latency_ns": 31102,
+      "ops_per_sec": 32152.273165712817,
+      "observed_min_ns": 31034,
+      "observed_max_ns": 31131
+    },
+    {
+      "name": "fossil_rolling_hash_window",
+      "iterations": 500,
+      "total_duration_us": 10900,
+      "avg_latency_ns": 21800,
+      "ops_per_sec": 45871.55963302752,
+      "observed_min_ns": 21624,
+      "observed_max_ns": 24072
+    },
+    {
+      "name": "fast_cdc_streaming_chunking",
+      "iterations": 500,
+      "total_duration_us": 100341,
+      "avg_latency_ns": 200681,
+      "ops_per_sec": 4983.03277340655,
+      "observed_min_ns": 197580,
+      "observed_max_ns": 255621
+    },
+    {
+      "name": "roaring_bitmap_set_ops",
+      "iterations": 2500,
+      "total_duration_us": 282650,
+      "avg_latency_ns": 113060,
+      "ops_per_sec": 8844.86113568017,
+      "observed_min_ns": 111420,
+      "observed_max_ns": 118169
+    },
+    {
+      "name": "commit_message_guard_full",
+      "iterations": 10000,
+      "total_duration_us": 2699370,
+      "avg_latency_ns": 269937,
+      "ops_per_sec": 3704.5681029277202,
+      "observed_min_ns": 265492,
+      "observed_max_ns": 305543
+    },
+    {
+      "name": "dag_poset_scale_traversal_2000_nodes",
+      "iterations": 500,
+      "total_duration_us": 273955,
+      "avg_latency_ns": 547909,
+      "ops_per_sec": 1825.1205948433042,
+      "observed_min_ns": 546248,
+      "observed_max_ns": 711501
+    },
+    {
+      "name": "bloom_filter_dense_history_500_commits",
+      "iterations": 12500,
+      "total_duration_us": 1875,
+      "avg_latency_ns": 150,
+      "ops_per_sec": 6666666.666666667,
+      "observed_min_ns": 121,
+      "observed_max_ns": 217
+    },
+    {
+      "name": "monorepo_10k_sparse_tree_diff",
+      "iterations": 250,
+      "total_duration_us": 11798,
+      "avg_latency_ns": 47191,
+      "ops_per_sec": 21190.481235828865,
+      "observed_min_ns": 46494,
+      "observed_max_ns": 67834
+    },
+    {
+      "name": "concurrent_agent_worktree_transactions",
+      "iterations": 500,
+      "total_duration_us": 1964,
+      "avg_latency_ns": 3927,
+      "ops_per_sec": 254647.31347084287,
+      "observed_min_ns": 3904,
+      "observed_max_ns": 5416
+    }
+  ]
+}

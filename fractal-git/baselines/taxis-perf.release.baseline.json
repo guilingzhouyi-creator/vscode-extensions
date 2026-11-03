@@ -1,0 +1,155 @@
+{
+  "engine": "taxis",
+  "version": "0.1.0",
+  "timestamp_ms": 1793682711093,
+  "profile": "release",
+  "sample_count": 5,
+  "level": "all",
+  "multiplier": 5,
+  "metrics": [
+    {
+      "name": "canonical_tree_diff_streaming",
+      "iterations": 500,
+      "total_duration_us": 1869,
+      "avg_latency_ns": 3738,
+      "ops_per_sec": 267522.7394328518,
+      "observed_min_ns": 3626,
+      "observed_max_ns": 4189
+    },
+    {
+      "name": "myers_diff_swar_tokens",
+      "iterations": 500,
+      "total_duration_us": 2355,
+      "avg_latency_ns": 4709,
+      "ops_per_sec": 212359.31195582927,
+      "observed_min_ns": 4560,
+      "observed_max_ns": 5531
+    },
+    {
+      "name": "dag_generation_cutoff_o1",
+      "iterations": 2500,
+      "total_duration_us": 5,
+      "avg_latency_ns": 2,
+      "ops_per_sec": 500000000,
+      "observed_min_ns": 2,
+      "observed_max_ns": 2
+    },
+    {
+      "name": "corrected_commit_date_cutoff_o1",
+      "iterations": 2500,
+      "total_duration_us": 5,
+      "avg_latency_ns": 2,
+      "ops_per_sec": 500000000,
+      "observed_min_ns": 2,
+      "observed_max_ns": 2
+    },
+    {
+      "name": "bloom_filter_path_query",
+      "iterations": 5000,
+      "total_duration_us": 80,
+      "avg_latency_ns": 16,
+      "ops_per_sec": 62500000,
+      "observed_min_ns": 16,
+      "observed_max_ns": 21
+    },
+    {
+      "name": "buffer_pool_thread_local_freelist",
+      "iterations": 10000,
+      "total_duration_us": 220,
+      "avg_latency_ns": 22,
+      "ops_per_sec": 45454545.45454545,
+      "observed_min_ns": 22,
+      "observed_max_ns": 27
+    },
+    {
+      "name": "byte_lru_cache_budget_eviction",
+      "iterations": 5000,
+      "total_duration_us": 625,
+      "avg_latency_ns": 125,
+      "ops_per_sec": 8000000,
+      "observed_min_ns": 117,
+      "observed_max_ns": 134
+    },
+    {
+      "name": "bit_parallel_myers_64_lines",
+      "iterations": 5000,
+      "total_duration_us": 7145,
+      "avg_latency_ns": 1429,
+      "ops_per_sec": 699790.0629811056,
+      "observed_min_ns": 1413,
+      "observed_max_ns": 1570
+    },
+    {
+      "name": "fossil_rolling_hash_window",
+      "iterations": 500,
+      "total_duration_us": 825,
+      "avg_latency_ns": 1649,
+      "ops_per_sec": 606428.1382656156,
+      "observed_min_ns": 1633,
+      "observed_max_ns": 1830
+    },
+    {
+      "name": "fast_cdc_streaming_chunking",
+      "iterations": 500,
+      "total_duration_us": 6550,
+      "avg_latency_ns": 13099,
+      "ops_per_sec": 76341.70547370028,
+      "observed_min_ns": 13017,
+      "observed_max_ns": 15879
+    },
+    {
+      "name": "roaring_bitmap_set_ops",
+      "iterations": 2500,
+      "total_duration_us": 15108,
+      "avg_latency_ns": 6043,
+      "ops_per_sec": 165480.72149594573,
+      "observed_min_ns": 6020,
+      "observed_max_ns": 6917
+    },
+    {
+      "name": "commit_message_guard_full",
+      "iterations": 10000,
+      "total_duration_us": 320560,
+      "avg_latency_ns": 32056,
+      "ops_per_sec": 31195.40803593711,
+      "observed_min_ns": 31982,
+      "observed_max_ns": 33729
+    },
+    {
+      "name": "dag_poset_scale_traversal_2000_nodes",
+      "iterations": 500,
+      "total_duration_us": 25839,
+      "avg_latency_ns": 51678,
+      "ops_per_sec": 19350.594063237742,
+      "observed_min_ns": 51327,
+      "observed_max_ns": 65506
+    },
+    {
+      "name": "bloom_filter_dense_history_500_commits",
+      "iterations": 12500,
+      "total_duration_us": 163,
+      "avg_latency_ns": 13,
+      "ops_per_sec": 76923076.92307693,
+      "observed_min_ns": 13,
+      "observed_max_ns": 13
+    },
+    {
+      "name": "monorepo_10k_sparse_tree_diff",
+      "iterations": 250,
+      "total_duration_us": 3896,
+      "avg_latency_ns": 15585,
+      "ops_per_sec": 64164.260506897655,
+      "observed_min_ns": 15457,
+      "observed_max_ns": 20057
+    },
+    {
+      "name": "concurrent_agent_worktree_transactions",
+      "iterations": 500,
+      "total_duration_us": 577,
+      "avg_latency_ns": 1154,
+      "ops_per_sec": 866551.1265164645,
+      "observed_min_ns": 1122,
+      "observed_max_ns": 1322
+    }
+  ]
+}

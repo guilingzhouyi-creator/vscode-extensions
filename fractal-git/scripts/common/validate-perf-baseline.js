@@ -1,5 +1,5 @@
 /**
- * Module: Fractal Git — Performance Baseline Ratchet Validator
+ * Module: Fractal Git — Performance Baseline Validator
  * File Path: fractal-git/scripts/common/validate-perf-baseline.js
  * Architecture Role: Single source of truth for the micro-benchmark invocation. Normalizes
  *   manifest path, baseline path and sample count so the two platform runners cannot drift,
@@ -8,7 +8,7 @@
  *   and by `npm run gate:perf` for single-point verification. Requires the cargo toolchain; the
  *   baseline envelope is resolved from this file's own location, never from the caller's cwd.
  * Responsibilities:
- *   1. Execute `taxis bench -m 5 --verify-baseline <baseline-path>` across core hot paths;
+ *   1. Execute `taxis bench -m 5 --verify-baseline auto` across core hot paths;
  *   2. Assert zero regressions beyond the 15% tolerance threshold;
  *   3. Propagate child process exit codes and display benchmark output.
  * Exit Semantics & Design Rationale: Exits 0 on ratchet passing, 1 on TB-REGRESSION violation.
@@ -22,12 +22,18 @@ const path = require('path');
 const { prepareCargo } = require('./resolve-cargo');
 
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
-const BASELINE_PATH = path.join(PROJECT_ROOT, 'baselines', 'taxis-perf.baseline.json');
+const BASELINE_DIR = path.join(PROJECT_ROOT, 'baselines');
 const MANIFEST_PATH = path.join(PROJECT_ROOT, 'Cargo.toml');
 
-if (!fs.existsSync(BASELINE_PATH)) {
-  process.stderr.write(`[TB-REGRESSION] Baseline file not found: ${BASELINE_PATH}\n`);
-  process.exit(1);
+for (const profile of ['release', 'debug']) {
+  const candidate = path.join(BASELINE_DIR, `taxis-perf.${profile}.baseline.json`);
+  if (!fs.existsSync(candidate)) {
+    process.stderr.write(
+      `[TB-REGRESSION] ${profile} baseline missing: ${candidate}\n` +
+        `Regenerate: taxis bench --level all -m 5 --save-baseline ${candidate}\n`,
+    );
+    process.exit(1);
+  }
 }
 
 const cargoResolution = prepareCargo();
@@ -50,7 +56,7 @@ const args = [
   '-m',
   '5',
   '--verify-baseline',
-  BASELINE_PATH,
+  'auto',
 ];
 
 const res = spawnSync(cargoCmd, args, {

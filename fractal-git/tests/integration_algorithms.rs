@@ -9,6 +9,9 @@ mod test_algorithms;
 #[path = "rust/test_benchmarks.rs"]
 mod test_benchmarks;
 
+#[path = "rust/test_benchmark_profile.rs"]
+mod test_benchmark_profile;
+
 #[path = "rust/test_algebraic_conflicts.rs"]
 mod test_algebraic_conflicts;
 
