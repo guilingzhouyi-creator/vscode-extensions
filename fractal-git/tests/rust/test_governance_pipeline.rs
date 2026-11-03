@@ -109,8 +109,8 @@ Assert no panic occurs on boundary test suite."#;
     assert!(res_forbidden.is_err());
     let err_forbidden = format!("{:?}", res_forbidden.err().unwrap());
     assert!(
-        err_forbidden.contains("Forbidden term") || err_forbidden.contains("CMG-STY"),
-        "Should trigger forbidden term guard: {}",
+        err_forbidden.contains("FGT-MSG-004") || err_forbidden.contains("FGT-MSG-003"),
+        "Should trigger the kernel vocabulary or density guard: {}",
         err_forbidden
     );
 }

@@ -104,7 +104,10 @@ Valid qualitative assertion."#;
     let res_forbidden = CommitMessageGuard::parse_and_verify(forbidden_msg, &policy, None);
     assert!(res_forbidden.is_err());
     let err_forbidden = format!("{:?}", res_forbidden.err().unwrap());
-    assert!(err_forbidden.contains("CMG-STY-001"));
+    assert!(
+        err_forbidden.contains("FGT-MSG-004"),
+        "forbidden vocabulary must be attributed to the kernel rule family: {err_forbidden}"
+    );
 }
 
 #[test]
