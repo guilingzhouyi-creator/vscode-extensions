@@ -25,8 +25,9 @@ use fractal_git::constants::cli::CliTag;
 use fractal_git::DiskRefStore;
 
 use super::checkout::{
-    materialize_files, plan_worktree_path, preflight_worktree_paths, remove_stale_files,
-    update_dirc_index, update_references, worktree_stat,
+    build_native_index_section, load_index_entries, materialize_files, plan_worktree_path,
+    preflight_worktree_paths, remove_stale_files, update_dirc_index, update_references,
+    worktree_stat,
 };
 use super::common::{fail_fatal, print_json, reject, CliContext};
 use super::operation::{record_head_operation, HeadOperationSpec};
@@ -54,11 +55,44 @@ struct ResetOptions {
 
 /// Dispatches the `reset` command.
 pub fn handle_reset(ctx: &CliContext) {
-    let opts = parse_reset_options(&ctx.args);
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
         Err(open_err) => fail_fatal(open_err),
     };
+
+    // Detect path-based unstage reset: `reset <path>`, `reset -- <path>`, `reset HEAD <path>`
+    let mut commit_spec: Option<String> = None;
+    let mut path_specs: Vec<String> = Vec::new();
+    let mut after_dash_dash = false;
+
+    for arg in &ctx.args {
+        if arg == "--" {
+            after_dash_dash = true;
+            continue;
+        }
+        if after_dash_dash {
+            path_specs.push(arg.clone());
+            continue;
+        }
+        if arg.starts_with("--") {
+            continue;
+        }
+        if commit_spec.is_none()
+            && (arg == "HEAD" || view.resolve(arg).is_ok())
+            && !view.work_root().join(arg).is_file()
+        {
+            commit_spec = Some(arg.clone());
+        } else {
+            path_specs.push(arg.clone());
+        }
+    }
+
+    if !path_specs.is_empty() {
+        handle_path_reset(&view, commit_spec.as_deref().unwrap_or("HEAD"), &path_specs);
+        return;
+    }
+
+    let opts = parse_reset_options(&ctx.args);
 
     let (target_commit, tree_oid) = match view.resolve_tree(&opts.target) {
         Ok(resolved) => resolved,
@@ -328,6 +362,63 @@ fn print_reset_feedback(
                 &target_commit.to_hex()[..8],
                 branch_name.unwrap_or("detached")
             );
+        }
+    }
+}
+
+/// Unstages paths from the index to match the specified commit (or HEAD).
+fn handle_path_reset(view: &RepoView, commit_rev: &str, paths: &[String]) {
+    let head_oid_opt = view.resolve(commit_rev).ok();
+    let head_files: BTreeMap<String, TreeEntry> = head_oid_opt
+        .and_then(|oid| flatten_commit_tree(view, &oid).ok())
+        .unwrap_or_default();
+
+    let mut index_entries = load_index_entries(view.git_dir());
+    let mut unstaged_files = Vec::new();
+
+    for path in paths {
+        if let Some(tree_entry) = head_files.get(path) {
+            let full_path = match plan_worktree_path(view.work_root(), path) {
+                Ok(fp) => fp,
+                Err(err) => reject(CliTag::ERROR, err),
+            };
+            let (size, mtime_sec, mtime_nano) = worktree_stat(&full_path, 0);
+            index_entries.insert(
+                path.clone(),
+                IndexEntry {
+                    path: path.clone(),
+                    mode: tree_entry.mode,
+                    oid: tree_entry.oid,
+                    stage: IndexStage::Normal,
+                    size,
+                    mtime_seconds: mtime_sec,
+                    mtime_nanos: mtime_nano,
+                    assume_valid: false,
+                    skip_worktree: false,
+                    intent_to_add: false,
+                },
+            );
+            unstaged_files.push(path.clone());
+        } else if index_entries.remove(path).is_some() {
+            unstaged_files.push(path.clone());
+        }
+    }
+
+    let final_entries: Vec<IndexEntry> = index_entries.into_values().collect();
+    update_dirc_index(view.git_dir(), &final_entries);
+
+    let container_path = fg_native::container_path(view.git_dir());
+    if container_path.is_file() {
+        if let Ok(mut doc) = fg_native::RepoDocument::load(&container_path) {
+            doc.indx = build_native_index_section(&final_entries);
+            let _ = doc.save_atomic(&container_path);
+        }
+    }
+
+    if !unstaged_files.is_empty() {
+        println!("Unstaged changes after reset:");
+        for f in unstaged_files {
+            println!("M\t{f}");
         }
     }
 }

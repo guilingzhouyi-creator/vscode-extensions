@@ -53,8 +53,33 @@ pub fn handle_checkout(ctx: &CliContext) {
         );
     }
 
-    let opts = parse_checkout_options(&ctx.args);
+    // Check if path restoration mode: e.g. `checkout -- <paths>` or `checkout <tree-ish> -- <paths>`
+    if let Some(dash_idx) = ctx.args.iter().position(|a| a == "--") {
+        let paths: Vec<&str> = ctx.args[dash_idx + 1..].iter().map(|s| s.as_str()).collect();
+        if !paths.is_empty() {
+            let view = RepoView::open_or_exit(ctx);
+            let tree_spec = if dash_idx > 0 && !ctx.args[dash_idx - 1].starts_with('-') {
+                Some(ctx.args[dash_idx - 1].as_str())
+            } else {
+                None
+            };
+            handle_path_restore(&view, tree_spec, &paths);
+            return;
+        }
+    }
+
+    let mut opts = parse_checkout_options(&ctx.args);
     let view = RepoView::open_or_exit(ctx);
+
+    if opts.target == "-" || opts.target == "@{-1}" {
+        let prev_path = view.git_dir().join("PREV_HEAD");
+        if let Ok(prev_str) = std::fs::read_to_string(&prev_path) {
+            let target_str = prev_str.trim().to_string();
+            if !target_str.is_empty() {
+                opts.target = target_str;
+            }
+        }
+    }
 
     let (target_commit, tree_oid) = match view.resolve_tree(&opts.target) {
         Ok(resolved) => resolved,
@@ -548,6 +573,63 @@ fn write_references(
     None
 }
 
+/// Restores paths in the working tree from the specified tree or the index.
+fn handle_path_restore(view: &RepoView, tree_spec: Option<&str>, paths: &[&str]) {
+    let source_files: BTreeMap<String, TreeEntry> = if let Some(spec) = tree_spec {
+        let (_, tree_oid) = match view.resolve_tree(spec) {
+            Ok(resolved) => resolved,
+            Err(err) => reject(CliTag::ERROR, err),
+        };
+        let mut files = BTreeMap::new();
+        if let Err(err) = flatten_tree_for_diff(view, &tree_oid, "", &mut files) {
+            reject(CliTag::ERROR, err);
+        }
+        files
+    } else {
+        BTreeMap::new()
+    };
+
+    let index = load_index_entries(view.git_dir());
+
+    for path in paths {
+        let oid = if tree_spec.is_some() {
+            let entry = source_files.get(*path).ok_or_else(|| {
+                format!("error: pathspec '{path}' did not match any file(s) known to git")
+            });
+            match entry {
+                Ok(e) => e.oid,
+                Err(err) => reject(CliTag::ERROR, err),
+            }
+        } else {
+            let entry = index.get(*path).ok_or_else(|| {
+                format!("error: pathspec '{path}' did not match any file(s) known to git")
+            });
+            match entry {
+                Ok(e) => e.oid,
+                Err(err) => reject(CliTag::ERROR, err),
+            }
+        };
+
+        let bytes = match view.blob_payload(&oid) {
+            Ok(b) => b,
+            Err(err) => reject(CliTag::ERROR, format!("read blob: {err}")),
+        };
+
+        let full_path = match plan_worktree_path(view.work_root(), path) {
+            Ok(fp) => fp,
+            Err(err) => reject(CliTag::ERROR, err),
+        };
+
+        if let Some(parent) = full_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+
+        if let Err(write_err) = std::fs::write(&full_path, &bytes) {
+            reject(CliTag::ERROR, format!("write file '{path}': {write_err}"));
+        }
+    }
+}
+
 /// Updates HEAD and branch references on disk and within the native container if present.
 ///
 /// A reference-transaction hook may veto the update, so the preparing and prepared
@@ -560,6 +642,18 @@ pub(crate) fn update_references(
     branch_name: Option<&str>,
 ) {
     let ref_store = DiskRefStore::new(git_dir);
+    if let Ok(head_state) = ref_store.head() {
+        let prev_name = match head_state {
+            fg_topology::refs::HeadState::Symbolic { name, .. } => {
+                name.strip_prefix("refs/heads/").unwrap_or(&name).to_string()
+            }
+            fg_topology::refs::HeadState::Detached(oid) => oid.to_hex(),
+            fg_topology::refs::HeadState::Absent => String::new(),
+        };
+        if !prev_name.is_empty() {
+            let _ = std::fs::write(git_dir.join("PREV_HEAD"), format!("{prev_name}\n"));
+        }
+    }
     let hook_runner = super::git_hooks::discover(git_dir, work_root);
     let previous_head = ref_store.get_ref("HEAD").ok().flatten();
     let branch_update = branch_name.map(|branch| {
