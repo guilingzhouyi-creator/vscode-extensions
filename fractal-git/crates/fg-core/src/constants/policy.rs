@@ -5,6 +5,12 @@
 /// Rust-grade strict governance policy preset name.
 pub const POLICY_RUST_STRICT: &str = "rust-strict";
 
+/// Workspace-wide strict governance policy preset name (the default floor).
+///
+/// Distinct from [`POLICY_RUST_STRICT`] only in that it additionally demands a project scope
+/// declaration; both resolve to the same enforcement tier.
+pub const POLICY_WORKSPACE_STRICT: &str = "workspace-strict";
+
 /// Conventional commits semantic policy preset name.
 pub const POLICY_CONVENTIONAL: &str = "conventional-semantic";
 

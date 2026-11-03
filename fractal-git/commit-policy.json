@@ -1,0 +1,29 @@
+{
+  "schema": "commit-policy-manifest/v1",
+  "description": "Versioned enforcement floor for taxis commit-message governance. This file is tracked in the repository, so raising the floor is a reviewable change. The command-line --policy selector may adopt a stricter preset than `floor` but must never adopt a looser one; a downgrade attempt is rejected with FGT-MSG-011 instead of being silently applied.",
+  "floor": "workspace-strict",
+  "allowedTiers": [
+    "conventional",
+    "rust-strict",
+    "workspace-strict"
+  ],
+  "deniedTiers": [
+    {
+      "tier": "git-native",
+      "reason": "git-native disables every workspace obligation, including project scope, declaration anchors and vocabulary checks. It exists only for reading foreign repositories and must never author a commit in a governed repository."
+    }
+  ],
+  "headerMetrics": {
+    "unit": "unicode-character",
+    "minChars": 5,
+    "maxChars": 80,
+    "rationale": "Character counting keeps a 30-character Chinese subject legal; byte counting rejected it at 90 bytes. The reference implementation in scripts/common/commit-structure-contract.js also counts characters."
+  },
+  "bypass": {
+    "flag": "--bypass-message-guard",
+    "requiresReason": true,
+    "minReasonChars": 10,
+    "auditRef": "refs/fractal/telemetry/commit-bypass",
+    "rationale": "A real exception must be an explicit act that leaves a record. Letting --policy switch the gate off made the guard advisory while looking binding."
+  }
+}

@@ -139,6 +139,37 @@ impl AttributeSet {
         self.rules.len()
     }
 
+    /// Looks up one attribute for `relative_path`.
+    ///
+    /// Returns `None` when no matching rule mentions the attribute, which `check-attr` reports as
+    /// `unspecified`. Git distinguishes four outcomes and so does this: `set` (bare name), `unset`
+    /// (`-name`), `unspecified` (`!name`), and a literal value (`name=value`). Collapsing them into a
+    /// single string would make `!name` indistinguishable from "no rule matched", which is exactly
+    /// the distinction `git check-attr` exists to expose.
+    ///
+    /// Later matching rules win, consistent with [`Self::crlf_action`] and with Git's precedence: a
+    /// deeper attribute file overrides a shallower one, and `info/attributes` overrides both.
+    pub fn lookup(&self, relative_path: &str, attribute: &str) -> Option<String> {
+        let mut found: Option<String> = None;
+        for rule in &self.rules {
+            if !pattern_matches(&rule.segments, rule.anchored, &rule.base, relative_path) {
+                continue;
+            }
+            for assignment in &rule.assignments {
+                if assignment.name != attribute {
+                    continue;
+                }
+                found = Some(match &assignment.value {
+                    AttributeValue::Set => "set".to_string(),
+                    AttributeValue::Unset => "unset".to_string(),
+                    AttributeValue::Unspecified => "unspecified".to_string(),
+                    AttributeValue::Value(text) => text.clone(),
+                });
+            }
+        }
+        found
+    }
+
     /// Resolves the conversion action for `relative_path`.
     ///
     /// `relative_path` must use `/` separators and be relative to the worktree root. `auto_crlf` is

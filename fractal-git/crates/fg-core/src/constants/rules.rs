@@ -42,6 +42,31 @@ pub const RULE_FGT_LCK_001: &str = "FGT-LCK-001";
 /// FGT-MUT-001: In-Kernel Canary Engine (IKCE) blind mutation kill rate guard.
 pub const RULE_FGT_MUT_001: &str = "FGT-MUT-001";
 
+/// FGT-MSG-001: Commit header form guard (shape, character bounds, typography).
+pub const RULE_FGT_MSG_001: &str = "FGT-MSG-001";
+/// FGT-MSG-002: Commit section topology guard (slots, ordering, duplicates, markers).
+pub const RULE_FGT_MSG_002: &str = "FGT-MSG-002";
+/// FGT-MSG-003: Commit body density guard (substantive character floors).
+pub const RULE_FGT_MSG_003: &str = "FGT-MSG-003";
+/// FGT-MSG-004: Commit vocabulary guard (word-boundary matching with whitelist).
+pub const RULE_FGT_MSG_004: &str = "FGT-MSG-004";
+/// FGT-MSG-005: Commit unresolved marker and template placeholder guard.
+pub const RULE_FGT_MSG_005: &str = "FGT-MSG-005";
+/// FGT-MSG-006: Commit empty section and bullet content guard.
+pub const RULE_FGT_MSG_006: &str = "FGT-MSG-006";
+/// FGT-MSG-007: Commit project scope and nomenclature guard.
+pub const RULE_FGT_MSG_007: &str = "FGT-MSG-007";
+/// FGT-MSG-008: Commit construction batch codename guard.
+pub const RULE_FGT_MSG_008: &str = "FGT-MSG-008";
+/// FGT-MSG-009: Merge structure exemption guard (parent-count evidence).
+pub const RULE_FGT_MSG_009: &str = "FGT-MSG-009";
+/// FGT-MSG-010: Commit declaration anchor guard (verification cites a changed symbol).
+pub const RULE_FGT_MSG_010: &str = "FGT-MSG-010";
+/// FGT-MSG-011: Commit policy tier guard (selector may tighten, never relax).
+pub const RULE_FGT_MSG_011: &str = "FGT-MSG-011";
+/// FGT-MSG-012: Commit rule identifier anti-hallucination guard.
+pub const RULE_FGT_MSG_012: &str = "FGT-MSG-012";
+
 /// FGT-OBJ-001: Git object model serialization guard.
 pub const RULE_FGT_OBJ_001: &str = "FGT-OBJ-001";
 
@@ -75,7 +100,7 @@ pub const RULE_FGT_TRN_001: &str = "FGT-TRN-001";
 /// FGT-VRF-001: Taxis Kernel Code Verifier (TKCV) formal AST invariant guard.
 pub const RULE_FGT_VRF_001: &str = "FGT-VRF-001";
 
-/// Complete array of all 24 registered FGT domain rule identifiers.
+/// Complete sorted array of all 36 registered FGT domain rule identifiers.
 pub const ALL_FGT_RULES: &[&str] = &[
     RULE_FGT_ALG_001,
     RULE_FGT_AUD_001,
@@ -89,6 +114,18 @@ pub const ALL_FGT_RULES: &[&str] = &[
     RULE_FGT_GAT_001,
     RULE_FGT_IDX_001,
     RULE_FGT_LCK_001,
+    RULE_FGT_MSG_001,
+    RULE_FGT_MSG_002,
+    RULE_FGT_MSG_003,
+    RULE_FGT_MSG_004,
+    RULE_FGT_MSG_005,
+    RULE_FGT_MSG_006,
+    RULE_FGT_MSG_007,
+    RULE_FGT_MSG_008,
+    RULE_FGT_MSG_009,
+    RULE_FGT_MSG_010,
+    RULE_FGT_MSG_011,
+    RULE_FGT_MSG_012,
     RULE_FGT_MUT_001,
     RULE_FGT_OBJ_001,
     RULE_FGT_POL_001,

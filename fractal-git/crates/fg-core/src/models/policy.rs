@@ -18,6 +18,49 @@ pub enum DiffCoherenceMode {
     Strict,
 }
 
+/// Enforcement strictness a policy preset represents.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum EnforcementTier {
+    /// No governance obligations; used only for reading foreign repositories.
+    Native = 0,
+    /// Conventional shape only, without workspace obligations.
+    Conventional = 1,
+    /// Full workspace contract including project scope and declaration anchors.
+    Strict = 2,
+}
+
+impl EnforcementTier {
+    /// Numeric rank used for monotonic tier comparison.
+    pub const fn rank(self) -> u8 {
+        self as u8
+    }
+
+    /// Returns the canonical CLI spelling.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Native => "native",
+            Self::Conventional => "conventional",
+            Self::Strict => "strict",
+        }
+    }
+
+    /// Parses a case-insensitive tier name.
+    pub fn parse_str(text: &str) -> Option<Self> {
+        match text.trim().to_ascii_lowercase().as_str() {
+            "native" | "git-native" => Some(Self::Native),
+            "conventional" | "conventional-semantic" => Some(Self::Conventional),
+            "strict" | "rust-strict" | "workspace-strict" => Some(Self::Strict),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for EnforcementTier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 /// Conflict presentation mode for unmerged paths.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ConflictPresentationMode {
@@ -129,6 +172,9 @@ pub struct TaxisPolicy {
     /// Whether verification section must contain a falsifiable technical assertion.
     #[serde(default)]
     pub require_falsifiable_verification: bool,
+    /// Whether the verification section must cite a changed symbol or test.
+    #[serde(default)]
+    pub require_declaration_anchor: bool,
     /// Enforce exclusive human control on System Trunk & Integration Trunk.
     pub human_controlled_trunks: bool,
     /// Dual-Trunk mode active: official commit count only counts system/integration merges.
@@ -158,12 +204,22 @@ impl Default for TaxisPolicy {
 }
 
 impl TaxisPolicy {
+    /// Enforcement tier this preset represents.
+    pub fn enforcement_tier(&self) -> EnforcementTier {
+        EnforcementTier::parse_str(&self.name).unwrap_or(EnforcementTier::Strict)
+    }
+
+    /// Returns `true` when adopting `self` would not weaken `floor`.
+    pub fn satisfies_floor(&self, floor: &TaxisPolicy) -> bool {
+        self.enforcement_tier().rank() >= floor.enforcement_tier().rank()
+    }
+
     /// Workspace Strict Policy: Aligned with AGENTS.md, requiring [Project] tag in
     /// ["fractal-git", "auto-refactor", "workspace-timing", "WebGames"], bilingual forbidden
     /// terms from commit-msg-forbidden-terms.json, qualitative verification only, and Human UAC gate.
     pub fn workspace_strict() -> Self {
         Self {
-            name: "workspace-strict".into(),
+            name: crate::constants::policy::POLICY_WORKSPACE_STRICT.into(),
             allowed_types: vec![
                 "feat".into(),
                 "fix".into(),
@@ -256,6 +312,7 @@ impl TaxisPolicy {
             diff_coherence: DiffCoherenceMode::Strict,
             qualitative_verification_only: true,
             require_falsifiable_verification: true,
+            require_declaration_anchor: true,
             human_controlled_trunks: true,
             dual_trunk_enabled: true,
             elevation_required_for_system_trunk: true,
@@ -271,7 +328,7 @@ impl TaxisPolicy {
     /// qualitative verification only, diff-to-scope coherence checking, and human-only dual trunks.
     pub fn rust_strict() -> Self {
         Self {
-            name: "rust-strict".into(),
+            name: crate::constants::policy::POLICY_RUST_STRICT.into(),
             allowed_types: vec![
                 "feat".into(),
                 "fix".into(),
@@ -325,6 +382,7 @@ impl TaxisPolicy {
             diff_coherence: DiffCoherenceMode::Strict,
             qualitative_verification_only: true,
             require_falsifiable_verification: true,
+            require_declaration_anchor: true,
             human_controlled_trunks: true,
             dual_trunk_enabled: true,
             elevation_required_for_system_trunk: true,
@@ -340,7 +398,7 @@ impl TaxisPolicy {
     /// project or diff bounds.
     pub fn conventional_semantic() -> Self {
         Self {
-            name: "conventional-semantic".into(),
+            name: crate::constants::policy::POLICY_CONVENTIONAL.into(),
             allowed_types: vec![
                 "feat".into(),
                 "fix".into(),
@@ -372,6 +430,7 @@ impl TaxisPolicy {
             diff_coherence: DiffCoherenceMode::Permissive,
             qualitative_verification_only: false,
             require_falsifiable_verification: false,
+            require_declaration_anchor: false,
             human_controlled_trunks: true,
             dual_trunk_enabled: false,
             elevation_required_for_system_trunk: true,
@@ -386,7 +445,7 @@ impl TaxisPolicy {
     /// Native Git Policy: fully permissive fallback, accepting any commit message.
     pub fn git_native() -> Self {
         Self {
-            name: "git-native".into(),
+            name: crate::constants::policy::POLICY_GIT_NATIVE.into(),
             allowed_types: Vec::new(),
             min_header_chars: 1,
             max_header_chars: 1000,
@@ -406,6 +465,7 @@ impl TaxisPolicy {
             diff_coherence: DiffCoherenceMode::Disabled,
             qualitative_verification_only: false,
             require_falsifiable_verification: false,
+            require_declaration_anchor: false,
             human_controlled_trunks: false,
             dual_trunk_enabled: false,
             elevation_required_for_system_trunk: false,
