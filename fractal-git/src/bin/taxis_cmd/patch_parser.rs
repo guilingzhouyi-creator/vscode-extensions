@@ -22,6 +22,7 @@ pub struct FilePatch {
 }
 
 impl FilePatch {
+    /// Creates an empty file patch with optional old and new file paths.
     pub fn new_empty(old_path: Option<String>, new_path: Option<String>) -> Self {
         Self {
             old_path,
@@ -245,13 +246,41 @@ fn parse_range_part(part: &str) -> Option<(usize, usize)> {
     }
 }
 
+/// Strips leading path components from a relative path string up to the specified count.
 pub fn strip_path_prefix(path_str: &str, count: usize) -> String {
     let clean = path_str.trim().trim_matches('"');
+    if count == 0 || clean.is_empty() {
+        return clean.to_string();
+    }
     let mut parts: Vec<&str> = clean.split('/').collect();
     if parts.len() > count {
         parts.drain(0..count);
         parts.join("/")
     } else {
         clean.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_patch_new_empty() {
+        let patch = FilePatch::new_empty(Some("a/foo.rs".into()), Some("b/foo.rs".into()));
+        assert_eq!(patch.old_path.as_deref(), Some("a/foo.rs"));
+        assert_eq!(patch.new_path.as_deref(), Some("b/foo.rs"));
+        assert!(!patch.is_new);
+        assert!(!patch.is_deleted);
+        assert!(patch.hunks.is_empty());
+    }
+
+    #[test]
+    fn test_strip_path_prefix() {
+        assert_eq!(strip_path_prefix("a/b/c.txt", 0), "a/b/c.txt");
+        assert_eq!(strip_path_prefix("a/b/c.txt", 1), "b/c.txt");
+        assert_eq!(strip_path_prefix("a/b/c.txt", 2), "c.txt");
+        assert_eq!(strip_path_prefix("a/b/c.txt", 5), "a/b/c.txt");
+        assert_eq!(strip_path_prefix("", 1), "");
     }
 }
