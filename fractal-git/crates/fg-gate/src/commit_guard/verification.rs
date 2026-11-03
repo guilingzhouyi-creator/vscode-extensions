@@ -150,3 +150,14 @@ fn substantive_char_count(text: &str) -> usize {
         })
         .count()
 }
+
+/// Checks for common execution telemetry stream patterns in text.
+pub fn contains_execution_telemetry_numbers(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    lower.contains("exit code 0")
+        || lower.contains("100% pass")
+        || lower.contains("all tests pass")
+        || lower.contains("tests passed")
+        || lower.contains("suites passed")
+        || (lower.contains("tests") && lower.chars().any(|char_val| char_val.is_ascii_digit()))
+}

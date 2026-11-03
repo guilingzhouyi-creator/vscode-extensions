@@ -425,3 +425,33 @@ fn find_template_placeholder(line: &str) -> Option<String> {
     }
     None
 }
+
+/// Whether `haystack` contains `needle` as a whole word rather than as a substring.
+pub fn contains_whole_term(haystack: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return false;
+    }
+    let has_cjk = needle.chars().any(|character| {
+        let code = character as u32;
+        (0x3400..=0x9FFF).contains(&code)
+    });
+    if has_cjk {
+        return haystack.contains(needle);
+    }
+    let mut search_from = 0;
+    while let Some(offset) = haystack[search_from..].find(needle) {
+        let start = search_from + offset;
+        let end = start + needle.len();
+        let bytes = haystack.as_bytes();
+        let before_ok = start == 0 || !bytes[start - 1].is_ascii_alphanumeric();
+        let after_ok = end == bytes.len() || !bytes[end].is_ascii_alphanumeric();
+        if before_ok && after_ok {
+            return true;
+        }
+        search_from = end;
+        if search_from >= haystack.len() {
+            break;
+        }
+    }
+    false
+}

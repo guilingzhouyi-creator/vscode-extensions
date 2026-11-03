@@ -320,3 +320,90 @@ fn resolve_slot(heading: &str) -> Option<SectionSlot> {
     }
     matched
 }
+
+/// Checks that every section meets its substantive character floor.
+pub fn check_section_floors(scan: &SectionScan, violations: &mut Vec<String>) {
+    for section in &scan.declared {
+        let Some(slot) = section.slot else {
+            continue;
+        };
+        let floor = match slot {
+            SectionSlot::Why => 15,
+            SectionSlot::Fixed => 12,
+            SectionSlot::Verification => 12,
+            SectionSlot::Project => 3,
+            _ => 0,
+        };
+        if floor == 0 {
+            if slot.is_change_group() {
+                reject_short_bullets(section, violations);
+            }
+            continue;
+        }
+        let substantive = section.substantive_chars();
+        if substantive > 0 && substantive < floor {
+            violations.push(format!(
+                "{}: Section [{}] carries {} substantive characters; at least {} are needed to state a fact",
+                fg_core::constants::rules::RULE_FGT_MSG_003,
+                section.heading,
+                substantive,
+                floor
+            ));
+        }
+        if slot.is_change_group() {
+            reject_short_bullets(section, violations);
+        }
+    }
+}
+
+fn reject_short_bullets(section: &DeclaredSection, violations: &mut Vec<String>) {
+    for line in &section.lines {
+        let Some(item) = line.trim().strip_prefix('-') else {
+            continue;
+        };
+        let substantive = item
+            .chars()
+            .filter(|character| {
+                !character.is_whitespace() && !"`'\"()（）".contains(*character)
+            })
+            .count();
+        if substantive > 0 && substantive < 8 {
+            violations.push(format!(
+                "{}: Bullet '{}' in section [{}] carries {} substantive characters; state what changed",
+                fg_core::constants::rules::RULE_FGT_MSG_003,
+                item.trim(),
+                section.heading,
+                substantive
+            ));
+        }
+    }
+}
+
+/// Checks that no section is an empty shell.
+pub fn check_empty_sections(scan: &SectionScan, violations: &mut Vec<String>) {
+    for section in &scan.declared {
+        if section.is_empty_shell() {
+            violations.push(format!(
+                "{}: Structured section [{}] is an empty shell; add substantive facts or remove it",
+                fg_core::constants::rules::RULE_FGT_MSG_006,
+                section.heading
+            ));
+        }
+    }
+    for (slot, heading) in scan.duplicate_slots() {
+        violations.push(format!(
+            "{}: Duplicate structured section [{}] declared more than once",
+            fg_core::constants::rules::RULE_FGT_MSG_002,
+            heading
+        ));
+        let _ = slot;
+    }
+    if let Some((out_of_place, must_follow)) = scan.first_ordering_violation() {
+        violations.push(format!(
+            "{}: Section [{}] is out of order; it must appear after [{}]",
+            fg_core::constants::rules::RULE_FGT_MSG_002,
+            out_of_place,
+            must_follow
+        ));
+    }
+}

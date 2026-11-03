@@ -112,3 +112,14 @@ pub const WORKSPACE_RULE_IDS: &[&str] = &[
     "high-entropy-token", "import-cycle", "large-file", "loop-transient-allocation", "nested-constant",
     "secret-detected", "unused-export", "unused-module",
 ];
+
+/// Whether an identifier names a registered workspace rule.
+pub fn is_registered(rule_id: &str) -> bool {
+    let clean = rule_id.trim();
+    if clean.starts_with("FGT-") {
+        return fg_core::constants::rules::ALL_FGT_RULES
+            .binary_search(&clean)
+            .is_ok();
+    }
+    WORKSPACE_RULE_IDS.binary_search(&clean).is_ok()
+}
