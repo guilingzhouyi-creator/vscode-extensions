@@ -32,3 +32,10 @@ mod test_offline_workflow_parity;
 
 #[path = "rust/test_operations.rs"]
 mod test_operations;
+
+#[path = "rust/test_edition_capability.rs"]
+mod test_edition_capability;
+#[path = "rust/test_pathspec_resolution.rs"]
+mod test_pathspec_resolution;
+#[path = "rust/test_engineering_default_target.rs"]
+mod test_engineering_default_target;
