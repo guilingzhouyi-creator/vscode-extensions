@@ -30,7 +30,7 @@ description: >-
 2. **实现或优化 Git Plumbing 协议与存储算子**（Loose Object、DIRC 索引、Packfile、Tree Diff、Commit Graph）；
 3. **开发多智能体 Cell 虚拟工作树、并发暂存区或偏序集同态冲突检测（CCD v2）**；
 4. **维护 `fractal-git/src/bin/` 原生命令层（`taxis` CLI）或 `fractal-git/ts/` TypeScript 门面层**；
-5. **排查 `fractal-git` 专属门禁（<!-- METRICS:BEGIN rule-fractal-git -->**24 条规则**<!-- METRICS:END rule-fractal-git -->，`FGT-*`）与 Scion 对标基准回归**。
+5. **排查 `fractal-git` 专属门禁（<!-- METRICS:BEGIN rule-fractal-git -->**36 条规则**<!-- METRICS:END rule-fractal-git -->，`FGT-*`）与 Scion 对标基准回归**。
 
 ---
 
@@ -80,6 +80,36 @@ description: >-
   - `taxis gate-slice` 子命令实现毫秒级暂存切片审查与结构化 JSON 违规信封输出。
 - **IKCE 隐藏微变异盲测评估 (`FGT-MUT-001` / `FGT-TAU-001`)**：纯内存注入微变异体，强制要求测试击杀率 $K \ge 60\%$，刚性粉碎空断言与恒真式；
 - **防篡改独立审计链与四级时间折叠 (`FGT-AUD-001` / `FGT-PYR-001`)**：独立维护 `refs/fractal/telemetry/*` HMAC 单向哈希链与四级时间折叠汇总，施加 OS 底层防护（Win32 只读锁 + Linux `chattr +a` 仅追加属性）。
+
+---
+
+## 三·B、 内核提交信息契约规则族 (`FGT-MSG-*`)
+
+`fg-gate::commit_guard` 拥有自己的规则族，不再引用 `auto-refactor` 或 `global-tooling` 的
+`GUARD-MSG-*` / `CMG-*`，避免跨项目规则归属漂移。
+
+| 规则 | 守护目标 |
+| :--- | :--- |
+| `FGT-MSG-001` | 标题形状、字数（Unicode 字符口径）、句号、`!` 破坏标记、零宽字符、Emoji、冒号分隔 |
+| `FGT-MSG-002` | 语义区块槽位与双语别名、空行分割、重复区块、拓扑序、ASCII 括号与连字符列表 |
+| `FGT-MSG-003` | 正文与逐区块实质字数（Why 15 / Fixed 12 / Verification 12、条目 8） |
+| `FGT-MSG-004` | 词汇契约：词边界匹配、代码块与 URL 掩码、白名单消减、祈使语气与零人称 |
+| `FGT-MSG-005` | 未决标记（TODO/FIXME/TBD/待补充）与模板尖括号残留 |
+| `FGT-MSG-006` | 空壳区块与清单条目下限 |
+| `FGT-MSG-007` | 项目归属槽位存在性、精确枚举匹配、项目专名漂移 |
+| `FGT-MSG-008` | 批次代号（phaseN / sprint N / wN / pass N） |
+| `FGT-MSG-009` | 合并提交结构豁免：以提交对象父数为证据，不以首行文本为依据 |
+| `FGT-MSG-010` | 声明锚点：`[Verification]` 必须引用 diff 新增行中的符号名或测试名 |
+| `FGT-MSG-011` | 策略档位守卫：命令行选择器只能收紧，永不放宽仓库声明下限 |
+| `FGT-MSG-012` | 规则标识反虚构：消息引用的规则 ID 必须已登记 |
+
+**策略下限单源**：`fractal-git/commit-policy.json` 声明仓库级 `floor`，其变更随版本控制评审；
+`.git/config` 只允许把档位调高。真正的例外必须走 `--bypass-message-guard --reason "<理由>"`
+并落入遥测审计链，禁止用 `--policy` 隐式旁路。
+
+**覆盖面契约**：`commit` 与 `merge --message` 走全量校验；`rebase reword` 走全量（唯一凭空写入
+新消息的路径）；`cherry-pick` / `revert` / `stash` 的继承或合成消息只查未决标记，避免历史重写被
+新规则误杀。
 
 ---
 

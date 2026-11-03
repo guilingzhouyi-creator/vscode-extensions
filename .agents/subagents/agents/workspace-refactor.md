@@ -22,7 +22,7 @@ model: inherit
 - **禁止直接改动**：业务子项目私有业务逻辑
 
 ## 核心重构契约与刚性红线
-1. **单源目录唯一权威**：规则变更必须同步维护 `rule-catalog.json`（516 条规则）与三项目登记；
+1. **单源目录唯一权威**：规则变更必须同步维护 `rule-catalog.json`（528 条规则）与三项目登记；
 2. **零空文件与物理卫生**：严禁创建 0 字节文件，PowerShell 严格 CRLF，其余严格 LF；
 3. **技能集与插件同构**：`.agents/skills/` 与 `.agents/plugins/workspace-governance/skills/` 严格镜像同步；
 4. **验证命令自检**：重构后执行规则目录生成与技能集全量自验。

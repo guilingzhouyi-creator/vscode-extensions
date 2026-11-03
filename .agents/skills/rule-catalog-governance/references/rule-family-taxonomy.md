@@ -6,7 +6,7 @@
 
 ## 一、 核心规则家族前缀矩阵
 
-本表按主题族编排，分组与 [rule-family-map.md](../../coding-craft/references/rule-family-map.md) 逐组对应，共收录 <!-- METRICS:BEGIN rule-family-count-all -->**68 个规则族**<!-- METRICS:END rule-family-count-all -->。族名即 ID 的主题段：规范形取第一段，带项目命名空间的形式（如 `FGT-ALG-001`）取第二段，单段历史 ID 的族由目录生成器显式声明。族名全局唯一，同一族名可以跨项目复用。
+本表按主题族编排，分组与 [rule-family-map.md](../../coding-craft/references/rule-family-map.md) 逐组对应，共收录 <!-- METRICS:BEGIN rule-family-count-all -->**69 个规则族**<!-- METRICS:END rule-family-count-all -->。族名即 ID 的主题段：规范形取第一段，带项目命名空间的形式（如 `FGT-ALG-001`）取第二段，单段历史 ID 的族由目录生成器显式声明。族名全局唯一，同一族名可以跨项目复用。
 
 ### 命名、注释与文档（5 族）
 

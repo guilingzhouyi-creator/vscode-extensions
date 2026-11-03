@@ -71,7 +71,7 @@ flowchart LR
 
 ### 1. 规则总量单源分布矩阵
 
-全工作区单源目录收录规则严格闭环为 <!-- METRICS:BEGIN rule-total -->**516 条规则**<!-- METRICS:END rule-total -->，分布于四大子系统：
+全工作区单源目录收录规则严格闭环为 <!-- METRICS:BEGIN rule-total -->**528 条规则**<!-- METRICS:END rule-total -->，分布于四大子系统：
 
 | 子系统领域 | 规则承载模块 | 规则收录范围 | 核心审查职责 |
 | :--- | :--- | :--- | :--- |
