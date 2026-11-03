@@ -11,8 +11,14 @@
 //!
 //! Domain Governance Rules: FGT-GAT-001 (gate governance), FGT-COR-001.
 
+pub mod coherence; pub mod declaration; pub mod lexicon; pub mod project;
+pub mod rewrite; pub mod rule_ids; pub mod sections; pub mod style;
+pub mod typography; pub mod verification;
+
+pub(crate) use rule_ids::is_registered as is_registered_workspace_rule;
+
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::{DiffCoherenceMode, TaxisPolicy, ValidatedCommitWitness};
+use fg_core::models::{TaxisPolicy, ValidatedCommitWitness};
 use std::collections::HashMap;
 
 /// Parsed sections and metrics extracted from the commit body lines.
@@ -33,10 +39,36 @@ impl CommitMessageGuard {
     /// Parses a raw commit message against a generalized `TaxisPolicy`
     /// and optional tree diff paths, returning a typed `ValidatedCommitWitness` on success
     /// or a `FractalError::GateRejection` on failure.
+    ///
+    /// This entry point has no access to the changed source, so it cannot check declaration
+    /// anchoring. Call [`Self::parse_and_verify_with_symbols`] when the staged content is available
+    /// and the policy asks for anchors.
     pub fn parse_and_verify(
         raw_message: &str,
         policy: &TaxisPolicy,
         touched_paths: Option<&[String]>,
+    ) -> FractalResult<ValidatedCommitWitness> {
+        Self::verify_message(raw_message, policy, touched_paths, &[])
+    }
+
+    /// Parses and verifies a commit message with the symbols the diff actually introduced.
+    ///
+    /// Declaration anchoring is only meaningful when the candidate set is known, so the strictest
+    /// policy tier requires this entry point rather than the path-only one.
+    pub fn parse_and_verify_with_symbols(
+        raw_message: &str,
+        policy: &TaxisPolicy,
+        touched_paths: Option<&[String]>,
+        candidates: &[declaration::CandidateSymbol],
+    ) -> FractalResult<ValidatedCommitWitness> {
+        Self::verify_message(raw_message, policy, touched_paths, candidates)
+    }
+
+    fn verify_message(
+        raw_message: &str,
+        policy: &TaxisPolicy,
+        touched_paths: Option<&[String]>,
+        candidates: &[declaration::CandidateSymbol],
     ) -> FractalResult<ValidatedCommitWitness> {
         let trimmed = raw_message.trim();
         if trimmed.is_empty() {
@@ -55,11 +87,15 @@ impl CommitMessageGuard {
 
         // Native Git Permissive bypass
         if policy.allowed_types.is_empty() && policy.min_header_chars <= 1 {
+            // The witness records a character count so every witness field means the same thing
+            // regardless of which policy produced it; a byte count here would make two witnesses
+            // incomparable whenever the message contains non-ASCII text.
+            let trimmed_chars = trimmed.chars().count();
             return Ok(ValidatedCommitWitness::new(
                 "custom",
                 None,
                 header,
-                trimmed.len(),
+                trimmed_chars,
                 HashMap::new(),
                 raw_message,
             ));
@@ -73,8 +109,17 @@ impl CommitMessageGuard {
         // 2. Conventional Commit header structure parsing
         let (commit_type, scope, summary) = Self::parse_header(header, &mut violations, policy);
 
+        // 2b. Imperative subject contract: a version history reads as a list of actions.
+        if let Some(finding) = style::check_imperative_subject(&summary) {
+            violations.push(format!(
+                "{}: {} (token '{}')",
+                finding.rule_id, finding.message, finding.token
+            ));
+        }
+
         // 3. Body sections & substantive character count
         let parsed_sections = Self::parse_sections(&lines[1..]);
+        let section_scan = sections::SectionScan::parse(&lines[1..]);
         let is_production = policy
             .production_types
             .iter()
@@ -87,19 +132,61 @@ impl CommitMessageGuard {
             is_production,
             &commit_type,
             &parsed_sections,
+            &section_scan,
             &mut violations,
         );
 
         // 5. Anti-inflation forbidden terms and verification telemetry check
         Self::validate_anti_inflation_telemetry(
             raw_message,
+            &lines,
             policy,
             &parsed_sections.sections,
             &mut violations,
         );
 
+        // 5b. Typography and rule-citation integrity.
+        for finding in typography::scan(raw_message) {
+            violations.push(format!(
+                "{}: {} (line {}, token '{}')",
+                finding.rule_id, finding.message, finding.line, finding.token
+            ));
+        }
+
+        // 5c. Declaration anchoring: what the verification section claims must be traceable to
+        // something the diff introduced. Only the strict tier demands it, and only when the caller
+        // supplied the candidate set, because a check with no evidence to compare would fail every
+        // commit regardless of its content.
+        if policy.require_declaration_anchor && is_production && !candidates.is_empty() {
+            if let Some(verification_section) = section_scan
+                .find(sections::SectionSlot::Verification)
+                .map(|section| section.lines.join("\n"))
+            {
+                if !declaration::has_anchor(&verification_section, candidates) {
+                    violations.push(format!(
+                        "{}: The verification section cites no symbol or test name that the diff introduced; \
+                         name what was actually demonstrated",
+                        fg_core::constants::rules::RULE_FGT_MSG_010
+                    ));
+                }
+            }
+        }
+
+        fg_core::diag_trace!(
+            "commit_guard",
+            "policy={} type={} production={} candidates={} violations={}",
+            policy.name,
+            commit_type,
+            is_production,
+            candidates.len(),
+            violations.len()
+        );
+        for violation in &violations {
+            fg_core::diag_debug!("commit_guard", "violation: {violation}");
+        }
+
         // 6. Semantic Diff Borrow Check (Diff-to-Scope coherence)
-        Self::validate_diff_coherence(
+        coherence::validate_diff_coherence(
             policy,
             touched_paths,
             is_production,
@@ -125,12 +212,17 @@ impl CommitMessageGuard {
     }
 
     fn validate_header_bounds(header: &str, policy: &TaxisPolicy, violations: &mut Vec<String>) {
-        if header.len() < policy.min_header_chars || header.len() > policy.max_header_chars {
+        // Length bounds are expressed in characters, not bytes.
+        //
+        // `str::len()` reports UTF-8 bytes, so a 30-character Chinese header measured 90 and was
+        // rejected by a bound that always meant 90 characters. The reference implementation in
+        // `scripts/common/commit-structure-contract.js` counts characters too, so byte counting
+        // made the two sides disagree on every non-ASCII subject.
+        let header_chars = header.chars().count();
+        if header_chars < policy.min_header_chars || header_chars > policy.max_header_chars {
             violations.push(format!(
-                "GUARD-MSG-001: Header length {} is outside bounds [{}..{}]",
-                header.len(),
-                policy.min_header_chars,
-                policy.max_header_chars
+                "GUARD-MSG-001: Header length {} is outside bounds [{}..{}] characters",
+                header_chars, policy.min_header_chars, policy.max_header_chars
             ));
         }
         if policy.disallow_header_period && (header.ends_with('.') || header.ends_with('。')) {
@@ -380,33 +472,48 @@ impl CommitMessageGuard {
         commit_type: &str,
         is_production: bool,
         parsed: &SectionParseResult,
+        scan: &sections::SectionScan,
         policy: &TaxisPolicy,
         violations: &mut Vec<String>,
     ) {
         if is_production {
             if parsed.substantive_chars < policy.min_body_chars {
                 violations.push(format!(
-                    "GUARD-MSG-001: Production commit '{}' has only {} substantive chars; minimum required is {}",
-                    commit_type, parsed.substantive_chars, policy.min_body_chars
+                    "{}: Production commit '{}' has only {} substantive chars; minimum required is {}",
+                    fg_core::constants::rules::RULE_FGT_MSG_003,
+                    commit_type,
+                    parsed.substantive_chars,
+                    policy.min_body_chars
                 ));
             }
 
-            for required_sec in &policy.required_sections {
-                let found = parsed.sections.keys().any(|sec_key| {
-                    if required_sec.eq_ignore_ascii_case("changed")
-                        && commit_type.eq_ignore_ascii_case("fix")
-                    {
-                        sec_key.eq_ignore_ascii_case("fixed")
-                            || sec_key.contains("修复")
-                            || sec_key.eq_ignore_ascii_case("changed")
-                    } else {
-                        sec_key.eq_ignore_ascii_case(required_sec)
+            // Required sections are matched by semantic slot, so `[动机]`, `[Project / 项目归属]`
+            // and `[Added]` all satisfy the obligation the template asks for. Matching literal
+            // heading text rejected the very spelling the authoring guide recommends.
+            for required in &policy.required_sections {
+                if let Some(slot) = sections::resolve_required_slot(required) {
+                    if scan.has_slot(slot) {
+                        continue;
                     }
+                    if slot.is_change_group() && scan.has_change_slot() {
+                        continue;
+                    }
+                    violations.push(format!(
+                        "{}: Missing required structured section [{}] for production commit",
+                        fg_core::constants::rules::RULE_FGT_MSG_002,
+                        slot.canonical_name()
+                    ));
+                    continue;
+                }
+                let found = parsed.sections.keys().any(|section_key| {
+                    section_key.eq_ignore_ascii_case(required)
+                        || section_key.contains(required.as_str())
                 });
                 if !found {
                     violations.push(format!(
-                        "GUARD-MSG-001: Missing required structured section [{}] for production commit",
-                        required_sec
+                        "{}: Missing required structured section [{}] for production commit",
+                        fg_core::constants::rules::RULE_FGT_MSG_002,
+                        required
                     ));
                 }
             }
@@ -415,50 +522,39 @@ impl CommitMessageGuard {
                 && parsed.substantive_chars < policy.min_non_critical_body_chars
             {
                 violations.push(format!(
-                    "GUARD-MSG-001: Non-critical commit '{}' has only {} substantive chars; minimum required is {}",
-                    commit_type, parsed.substantive_chars, policy.min_non_critical_body_chars
+                    "{}: Non-critical commit '{}' has only {} substantive chars; minimum required is {}",
+                    fg_core::constants::rules::RULE_FGT_MSG_003,
+                    commit_type,
+                    parsed.substantive_chars,
+                    policy.min_non_critical_body_chars
                 ));
             }
 
-            for required_sec in &policy.non_critical_required_sections {
-                let found = parsed
+            for required in &policy.non_critical_required_sections {
+                if let Some(slot) = sections::resolve_required_slot(required) {
+                    if scan.has_slot(slot) {
+                        continue;
+                    }
+                    if slot.is_change_group() && scan.has_change_slot() {
+                        continue;
+                    }
+                    violations.push(format!(
+                        "{}: Missing required structured section [{}] for non-critical commit",
+                        fg_core::constants::rules::RULE_FGT_MSG_002,
+                        slot.canonical_name()
+                    ));
+                    continue;
+                }
+                if !parsed
                     .sections
                     .keys()
-                    .any(|sec_key| sec_key.eq_ignore_ascii_case(required_sec));
-                if !found {
+                    .any(|section_key| section_key.eq_ignore_ascii_case(required))
+                {
                     violations.push(format!(
-                        "GUARD-MSG-001: Missing required structured section [{}] for non-critical commit",
-                        required_sec
+                        "{}: Missing required structured section [{}] for non-critical commit",
+                        fg_core::constants::rules::RULE_FGT_MSG_002,
+                        required
                     ));
-                }
-            }
-        }
-    }
-
-    fn check_project_tag(
-        sections: &HashMap<String, String>,
-        policy: &TaxisPolicy,
-        violations: &mut Vec<String>,
-    ) {
-        if !policy.require_project_tag {
-            return;
-        }
-        let found_project = sections.iter().find(|(sec_key, _)| {
-            sec_key.to_lowercase().contains("project") || sec_key.contains("项目")
-        });
-        match found_project {
-            None => violations.push("CMG-PRJ-001: Missing mandatory [Project] section".into()),
-            Some((_, project_tag)) => {
-                if !policy.allowed_projects.is_empty() {
-                    let matches_allowed = policy.allowed_projects.iter().any(|allowed| {
-                        project_tag.to_lowercase().contains(&allowed.to_lowercase())
-                    });
-                    if !matches_allowed {
-                        violations.push(format!(
-                            "CMG-PRJ-001: Project '{}' not in allowed list: {:?}",
-                            project_tag, policy.allowed_projects
-                        ));
-                    }
                 }
             }
         }
@@ -470,6 +566,7 @@ impl CommitMessageGuard {
         is_production: bool,
         commit_type: &str,
         parsed: &SectionParseResult,
+        scan: &sections::SectionScan,
         violations: &mut Vec<String>,
     ) {
         Self::check_blank_line(lines, policy.require_blank_line, violations);
@@ -484,16 +581,83 @@ impl CommitMessageGuard {
             violations,
         );
         Self::check_fix_commit_section(commit_type, &parsed.sections, violations);
+        sections::check_empty_sections(scan, violations);
+        sections::check_section_floors(scan, violations);
         Self::check_body_volume_and_required_sections(
             commit_type,
             is_production,
             parsed,
+            scan,
             policy,
             violations,
         );
-        Self::check_project_tag(&parsed.sections, policy, violations);
+        project::check_project_tag(&parsed.sections, scan, policy, violations);
     }
 
+    /// Checks vocabulary, style, and verification quality.
+    ///
+    /// Lexical and stylistic findings come from the dedicated guards, which mask code spans and
+    /// subtract the shared whitelist. The policy's own term list is still consulted so a caller can
+    /// add repository-specific words without editing the shared tables.
+    fn validate_anti_inflation_telemetry(
+        raw_message: &str,
+        lines: &[&str],
+        policy: &TaxisPolicy,
+        sections: &HashMap<String, String>,
+        violations: &mut Vec<String>,
+    ) {
+        // The lexical pass also returns the masked, whitelist-subtracted text, so the
+        // policy-specific term check below reuses it instead of redoing the whole scan.
+        let (lexicon_findings, prepared) = lexicon::scan(raw_message);
+        for finding in lexicon_findings {
+            violations.push(format!(
+                "{}: {} (line {}, token '{}')",
+                finding.rule_id, finding.message, finding.line, finding.token
+            ));
+        }
+
+        for finding in style::scan_body_lines(lines) {
+            violations.push(format!(
+                "{}: {} (token '{}')",
+                finding.rule_id, finding.message, finding.token
+            ));
+        }
+
+        for forbidden in &policy.forbidden_terms {
+            if lexicon::contains_whole_term(&prepared, &forbidden.to_lowercase()) {
+                violations.push(format!(
+                    "{}: Commit message contains forbidden term '{}'",
+                    fg_core::constants::rules::RULE_FGT_MSG_004,
+                    forbidden
+                ));
+            }
+        }
+
+        let ver_entry = sections.iter().find(|(key, _)| {
+            let lower = key.to_lowercase();
+            lower.contains("verification") || key.contains("验证")
+        });
+
+        let Some((_, ver_content)) = ver_entry else {
+            return;
+        };
+        if policy.qualitative_verification_only
+            && verification::contains_execution_telemetry_numbers(ver_content)
+        {
+            violations.push(
+                "CMG-STY-006: [Verification] must contain qualitative logic assertions; raw execution telemetry numbers/percentages are forbidden".into(),
+            );
+        }
+        if policy.require_falsifiable_verification
+            && !verification::has_falsifiable_assertion(ver_content)
+        {
+            violations.push(
+                "CMG-STY-006: [Verification] must contain at least one substantive falsifiable technical assertion (not a raw shell command or placeholder)".into(),
+            );
+        }
+    }
+
+    #[allow(dead_code)]
     fn strip_backticks(input: &str) -> String {
         let mut out = String::with_capacity(input.len());
         let mut in_backtick = false;
@@ -507,6 +671,7 @@ impl CommitMessageGuard {
         out
     }
 
+    #[allow(dead_code)]
     fn is_falsifiable_assertion(assertion_text: &str) -> bool {
         let plain_owned = Self::strip_backticks(assertion_text);
         let plain = plain_owned.trim();
@@ -597,6 +762,7 @@ impl CommitMessageGuard {
         substantive_count >= 8
     }
 
+    #[allow(dead_code)]
     fn extract_verification_assertions(ver_content: &str) -> Vec<String> {
         let mut assertion_entries = Vec::new();
         let mut prose_lines = Vec::new();
@@ -620,104 +786,5 @@ impl CommitMessageGuard {
             assertion_entries.push(prose_lines.join(" "));
         }
         assertion_entries
-    }
-
-    fn validate_anti_inflation_telemetry(
-        raw_message: &str,
-        policy: &TaxisPolicy,
-        sections: &HashMap<String, String>,
-        violations: &mut Vec<String>,
-    ) {
-        let lower_msg = raw_message.to_lowercase();
-        for forbidden in &policy.forbidden_terms {
-            let lower_term = forbidden.to_lowercase();
-            if lower_msg.contains(&lower_term) {
-                violations.push(format!(
-                    "CMG-STY-001: Commit message contains forbidden term '{}'",
-                    forbidden
-                ));
-            }
-        }
-
-        let ver_entry = sections.iter().find(|(sec_key, _)| {
-            let lower = sec_key.to_lowercase();
-            lower.contains("verification") || sec_key.contains("验证")
-        });
-
-        if let Some((_, ver_content)) = ver_entry {
-            if policy.qualitative_verification_only
-                && Self::contains_execution_telemetry_numbers(ver_content)
-            {
-                violations.push(
-                    "CMG-STY-006: [Verification] must contain qualitative logic assertions; raw execution telemetry numbers/percentages are forbidden".into(),
-                );
-            }
-
-            if policy.require_falsifiable_verification {
-                let assertions = Self::extract_verification_assertions(ver_content);
-                let has_falsifiable = assertions
-                    .iter()
-                    .any(|entry| Self::is_falsifiable_assertion(entry));
-                if !has_falsifiable {
-                    violations.push(
-                        "CMG-STY-006: [Verification] must contain at least one substantive falsifiable technical assertion (not a raw shell command or placeholder)".into(),
-                    );
-                }
-            }
-        }
-    }
-
-    fn validate_diff_coherence(
-        policy: &TaxisPolicy,
-        touched_paths: Option<&[String]>,
-        is_production: bool,
-        scope: Option<&str>,
-        violations: &mut Vec<String>,
-    ) {
-        if policy.diff_coherence != DiffCoherenceMode::Strict {
-            return;
-        }
-        let Some(paths) = touched_paths else {
-            return;
-        };
-
-        if is_production && paths.is_empty() {
-            violations.push(
-                concat!(
-                    "FGT-GAT-001: Semantic dangling pointer; ",
-                    "production commit touches zero files"
-                )
-                .into(),
-            );
-        }
-
-        if let Some(declared_scope) = scope {
-            let norm_scope = declared_scope.to_lowercase();
-            let is_broad_scope = norm_scope.contains("root")
-                || norm_scope.contains("all")
-                || norm_scope.contains("core");
-            for path in paths {
-                let norm_path = path.to_lowercase();
-                if !norm_path.contains(&norm_scope) && !is_broad_scope {
-                    violations.push(format!(
-                        "FGT-GAT-001: Out-of-scope mutation: path '{}' does not match declared scope '{}'",
-                        path, declared_scope
-                    ));
-                    break;
-                }
-            }
-        }
-    }
-
-    fn contains_execution_telemetry_numbers(text: &str) -> bool {
-        let lower = text.to_lowercase();
-        // Check for common telemetry stream patterns like "100%", "exit code 0",
-        // "15 tests passed", "0.04s"
-        lower.contains("exit code 0")
-            || lower.contains("100% pass")
-            || lower.contains("all tests pass")
-            || lower.contains("tests passed")
-            || lower.contains("suites passed")
-            || (lower.contains("tests") && lower.chars().any(|char_val| char_val.is_ascii_digit()))
     }
 }

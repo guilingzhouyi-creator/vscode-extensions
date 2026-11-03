@@ -18,6 +18,7 @@ pub mod credit;
 pub mod diff_bounds;
 pub mod git_hook;
 pub mod hook;
+pub mod policy_floor;
 pub mod pre_receive;
 pub mod quota_governor;
 pub mod verifier;
@@ -44,6 +45,7 @@ pub use hook::{
     CommitGovernanceHook, DiffBoundsGovernanceHook, ElevationPromotionGateHook, FractalHook,
     HookContext, HookPipeline, HookTier, HookVerdict, HygieneConflictHook,
 };
+pub use policy_floor::{preset_for_tier, PolicyFloor};
 pub use pre_receive::{ActorIdentity, AgentPushContext, PreReceiveGuard};
 pub use quota_governor::{
     QuotaGovernor, DEFAULT_MAX_CONCURRENT_WORKTREES, DEFAULT_MAX_WORKSPACE_DISK_BYTES,
