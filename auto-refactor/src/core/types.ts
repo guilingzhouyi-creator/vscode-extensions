@@ -683,6 +683,14 @@ export interface ScanConfig {
     customAnalyzers?: CustomAnalyzerDeclaration[];
     thresholds: Thresholds;
     format: OutputFormat;
+    /**
+     * Whether JSON-shaped formats are indented for human reading.
+     *
+     * Defaults to false: AAS and compact payloads exist to fit agent context windows, and
+     * indentation was measured at +49.6% bytes on a 500-defect report. `--pretty` opts back in for
+     * a human inspecting `--out`.
+     */
+    pretty?: boolean;
     /** When true, process exits non-zero if any 'error' issue is found (CI gate). */
     failOnIssue: boolean;
     /**

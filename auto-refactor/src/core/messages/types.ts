@@ -25,11 +25,19 @@
  * their absence. `risk` is deliberately narrowed to four literals, which validates severity
  * through the compiler instead of informal runtime checks.
  */
+/** Canonical risk tiers shared by every diagnostic and governance rule. */
+export const RISK_TIERS = ['Low', 'Medium', 'High', 'Critical'] as const;
+export type RiskTier = (typeof RISK_TIERS)[number];
+export const RISK_LOW: RiskTier = 'Low';
+export const RISK_MEDIUM: RiskTier = 'Medium';
+export const RISK_HIGH: RiskTier = 'High';
+export const RISK_CRITICAL: RiskTier = 'Critical';
+
 export interface DiagnosticDescriptor {
     readonly message: string;
     readonly suggestion?: string;
     readonly rationale?: string;
-    readonly risk?: 'Low' | 'Medium' | 'High' | 'Critical';
+    readonly risk?: RiskTier;
 }
 
 /**

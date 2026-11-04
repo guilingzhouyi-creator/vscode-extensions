@@ -44,6 +44,10 @@ export const RULE_REGISTRY: readonly RuleDefinition[] = [
     ...VOLUME_DENSITY_RULES,
 ].sort((ruleA, ruleB) => ruleA.id.localeCompare(ruleB.id));
 
+const RULE_BY_ID: ReadonlyMap<string, RuleDefinition> = new Map(
+    RULE_REGISTRY.map((rule) => [rule.id, rule]),
+);
+
 /**
  * Look up one rule definition.
  *
@@ -51,7 +55,7 @@ export const RULE_REGISTRY: readonly RuleDefinition[] = [
  * @returns The definition, or undefined when the ruleId is not registered.
  */
 export function getRule(ruleId: string): RuleDefinition | undefined {
-    return RULE_REGISTRY.find((rule) => rule.id === ruleId);
+    return RULE_BY_ID.get(ruleId);
 }
 
 /**
