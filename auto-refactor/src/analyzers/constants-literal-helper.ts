@@ -26,6 +26,7 @@ import {
 } from '../core/constants';
 import { isTestFilePath, isFixtureOrMockPath } from '../core/path';
 import { stripQuotes } from '../core/scanner/text-scanner-utils';
+import { isContentlessName } from '../utils/placeholder-names';
 
 export { stripQuotes };
 
@@ -286,16 +287,8 @@ export const CHAR_CODE_SINGLE_QUOTE = 39;
 export const CHAR_CODE_DOUBLE_QUOTE = 34;
 /** Character code for ASCII backtick. */
 export const CHAR_CODE_BACKTICK = 96;
-/** Upper bound for integer literal suggested names. */
-export const SUGGESTED_NAME_INTEGER_LIMIT = 1000;
-/** Maximum word count in suggested constant names. */
-export const SUGGESTED_NAME_MAX_WORDS = 4;
 /** Identifier for general literal kind. */
 export const LITERAL_KIND_GENERAL = 'general';
-/** Identifier for numeric literal kind. */
-export const NUM_KIND = 'number';
-/** Identifier for string literal kind. */
-export const STR_KIND = 'string';
 
 const PREFIX_CONST = 'CONST';
 const PREFIX_CONST_STR = 'CONST_STR';
@@ -679,7 +672,8 @@ export function buildDuplicateIssue(
             targetScope: TARGET_SCOPE_MODULE_TOP_LEVEL,
             targetSymbol: suggested,
             insertAnchor: { position: ANCHOR_POSITION_AFTER_IMPORTS },
-            safeToAutomate: true,
+            // A separator literal repeats because it is punctuation, not because it deserves a name.
+            safeToAutomate: !isContentlessName(suggested),
         },
     };
 }

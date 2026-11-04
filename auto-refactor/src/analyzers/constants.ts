@@ -52,9 +52,6 @@ import {
     CODE_CONST_NESTED_CONSTANT,
     SEVERITY_WARNING,
     REGEX,
-    createOuterQuotesScanner,
-    createNonAlphanumericScanner,
-    createWhitespaceGlobalScanner,
 } from '../core/constants';
 
 import {
@@ -63,10 +60,6 @@ import {
     AST_PARSER_BENIGN_TOKENS,
     SCHEMA_PROPERTY_TOKENS,
     WEB_AND_DOM_BENIGN_TOKENS,
-    SUGGESTED_NAME_INTEGER_LIMIT,
-    SUGGESTED_NAME_MAX_WORDS,
-    NUM_KIND,
-    STR_KIND,
     computePositionDelta,
     stripQuotes,
     resolveLiteralIssueData,
@@ -78,6 +71,8 @@ import {
     collectDuplicateGroups,
     buildDuplicateIssue,
 } from './constants-literal-helper';
+import { NUM_KIND, STR_KIND, suggestConstantName } from './suggested-name';
+import { isContentlessName } from '../utils/placeholder-names';
 
 function isAlgorithmContext(role: string, filePath: string): boolean {
     if (role === 'algorithm_computation') return true;
@@ -284,7 +279,8 @@ export class ConstantsAnalyzer implements Analyzer {
     ): void {
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
         if (isExemptFromConstantScan(roleInference.role, ctx.filePath)) return;
-        if (ctx.filePath.includes('-styles.') || REGEX.LITERAL.STYLE_FILE_EXT.test(ctx.filePath)) return;
+        if (ctx.filePath.includes('-styles.') || REGEX.LITERAL.STYLE_FILE_EXT.test(ctx.filePath))
+            return;
 
         const isConstLib = isConstantDefinitionFile(ctx.filePath, ctx.content);
         const isDataOrConfig = isDataOrConfigFile(roleInference.role, ctx.filePath, ctx.content);
@@ -357,7 +353,7 @@ export class ConstantsAnalyzer implements Analyzer {
             numeric: true,
             classification,
             granular,
-            suggestedNameFallback: this.suggestName(lit.value, NUM_KIND),
+            suggestedNameFallback: suggestConstantName(lit.value, NUM_KIND),
         });
 
         const startLine = lit.node.start?.line ?? 1;
@@ -375,22 +371,29 @@ export class ConstantsAnalyzer implements Analyzer {
             }),
         });
         issue.location = locN(lit.node, ctx.filePath);
+        const magicNameIsUsable = !isContentlessName(res.suggested);
         issue.actionable = {
             action: 'extract_constant',
             code: CODE_CONST_MAGIC_NUMBER,
             targetScope: 'module_top_level',
             targetSymbol: res.suggested,
             insertAnchor: { position: 'after_imports' },
-            patch: {
-                range: {
-                    startLine: lit.node.start?.line ?? 1,
-                    startCol: lit.node.start?.column ?? 1,
-                    endLine: lit.node.end?.line ?? 1,
-                    endCol: lit.node.end?.column ?? 1,
-                },
-                replacementText: res.suggested,
-            },
-            safeToAutomate: true,
+            // The suggested name is only written when it names something: replacing a literal with
+            // `EXTRACTED_NUMBER` would be a mechanical rewrite that hides the original value.
+            ...(magicNameIsUsable
+                ? {
+                      patch: {
+                          range: {
+                              startLine: lit.node.start?.line ?? 1,
+                              startCol: lit.node.start?.column ?? 1,
+                              endLine: lit.node.end?.line ?? 1,
+                              endCol: lit.node.end?.column ?? 1,
+                          },
+                          replacementText: res.suggested,
+                      },
+                  }
+                : {}),
+            safeToAutomate: magicNameIsUsable,
         };
         return issue;
     }
@@ -445,8 +448,8 @@ export class ConstantsAnalyzer implements Analyzer {
         const parentText = lit.parent?.text?.toLowerCase();
         return Boolean(
             parentText &&
-                (REGEX.SYNTAX.DIAGNOSTIC_CALL_PARENT.test(parentText) ||
-                    REGEX.SYNTAX.DIAGNOSTIC_SINK_PARENT.test(parentText)),
+            (REGEX.SYNTAX.DIAGNOSTIC_CALL_PARENT.test(parentText) ||
+                REGEX.SYNTAX.DIAGNOSTIC_SINK_PARENT.test(parentText)),
         );
     }
 
@@ -509,7 +512,7 @@ export class ConstantsAnalyzer implements Analyzer {
             numeric: false,
             classification,
             granular,
-            suggestedNameFallback: this.suggestName(inner, STR_KIND),
+            suggestedNameFallback: suggestConstantName(inner, STR_KIND),
         });
 
         const driftedRules = findUnregisteredRuleDrift(inner);
@@ -535,22 +538,29 @@ export class ConstantsAnalyzer implements Analyzer {
             }),
         });
         issue.location = locN(lit.node, ctx.filePath);
+        const stringNameIsUsable = !isContentlessName(res.suggested);
         issue.actionable = {
             action: 'extract_constant',
             code: CODE_CONST_HARDCODED_STRING,
             targetScope: 'module_top_level',
             targetSymbol: res.suggested,
             insertAnchor: { position: 'after_imports' },
-            patch: {
-                range: {
-                    startLine: lit.node.start?.line ?? 1,
-                    startCol: lit.node.start?.column ?? 1,
-                    endLine: lit.node.end?.line ?? 1,
-                    endCol: lit.node.end?.column ?? 1,
-                },
-                replacementText: res.suggested,
-            },
-            safeToAutomate: true,
+            // Same rule as magic numbers: a patch may only exist when the target name means
+            // something. `const EXTRACTED_STRING = '/'` would be worse than the inline literal.
+            ...(stringNameIsUsable
+                ? {
+                      patch: {
+                          range: {
+                              startLine: lit.node.start?.line ?? 1,
+                              startCol: lit.node.start?.column ?? 1,
+                              endLine: lit.node.end?.line ?? 1,
+                              endCol: lit.node.end?.column ?? 1,
+                          },
+                          replacementText: res.suggested,
+                      },
+                  }
+                : {}),
+            safeToAutomate: stringNameIsUsable,
         };
         return issue;
     }
@@ -583,7 +593,7 @@ export class ConstantsAnalyzer implements Analyzer {
         if (!first.numeric && valText.length === 0) return;
 
         const kind = first.numeric ? NUM_KIND : STR_KIND;
-        const suggested = this.suggestName(first.value, kind);
+        const suggested = suggestConstantName(first.value, kind);
         out.push(buildDuplicateIssue(ctx, arr, suggested));
     }
 
@@ -623,25 +633,6 @@ export class ConstantsAnalyzer implements Analyzer {
         });
 
         this.emitDuplicateIssues(ctx, groups, threshold, suppress, out);
-    }
-
-    private suggestName(value: string, kind: typeof NUM_KIND | typeof STR_KIND): string {
-        if (kind === NUM_KIND) {
-            const numValue = Number(value);
-            if (Number.isInteger(numValue) && Math.abs(numValue) < SUGGESTED_NAME_INTEGER_LIMIT)
-                return `CONST_${numValue}`;
-            return 'EXTRACTED_NUMBER';
-        }
-        const cleaned = value
-            .replace(createOuterQuotesScanner(), '')
-            .replace(createNonAlphanumericScanner(), ' ')
-            .trim()
-            .split(createWhitespaceGlobalScanner())
-            .slice(0, SUGGESTED_NAME_MAX_WORDS)
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join('');
-        const name = cleaned ? `${cleaned.toUpperCase()}_TEXT` : 'EXTRACTED_STRING';
-        return REGEX.NAMING.LEADING_DIGIT.test(name) ? `CONST_${name}` : name;
     }
 
     private detectNestedConstants(ctx: AnalyzerContext, out: Issue[]): void {
