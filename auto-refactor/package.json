@@ -70,6 +70,7 @@
     "validate-topology-cache": "node scripts/validate-topology-cache.js",
     "validate-native-bridge": "node scripts/validate-native-bridge.js",
     "validate-native-benchmark": "node scripts/validate-native-benchmark.js",
+    "validate-native-admission": "node scripts/validate-native-admission.js",
     "validate-tensor-partitions": "node scripts/validate-tensor-partitions.js",
     "validate-agent-quota-gateway": "node scripts/validate-agent-quota-gateway.js",
     "validate-scalable-e2e": "node scripts/validate-scalable-e2e.js",

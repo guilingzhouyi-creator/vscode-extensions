@@ -190,6 +190,7 @@ flowchart TD
    - `computeHistogramDiffShim` / `assembleHunksShim`: 直方图差分与统一 Hunk 装配；
    - `analyzeDependencyGraphShim`: Tarjan 强连通分量与 Kahn 拓扑排序；
    - `fastPatternMatchShim`: 多子串行内扫描，输出按行列确定性排序；
+   - `hasAnyPatternShim`: 存在性判定，命中即返回，不构造任何匹配记录；
    - `analyzeScopeShadowingShim`: 词法作用域链与变量遮蔽检测。
 3. **[`src/core/native/native-shims-metrics.ts`](../../src/core/native/native-shims-metrics.ts)**：标量度量族，文件头同样保留 crate 映射表：
    - `computeShannonEntropyShim` / `computeStatisticalMomentsShim` / `calculatePopoviciuPenaltyShim`: 信息熵、Welford 矩估计与 Popoviciu 离散折扣；
