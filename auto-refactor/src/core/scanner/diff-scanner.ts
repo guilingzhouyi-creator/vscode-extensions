@@ -551,7 +551,7 @@ interface DiffRoutingPassContext {
 }
 
 async function runDiffRoutingPass(ctx: DiffRoutingPassContext): Promise<void> {
-    const statResults = collectStatFingerprints(ctx.absRoot, ctx.files);
+    const statResults = await collectStatFingerprints(ctx.absRoot, ctx.files);
     for (const statEntry of statResults) {
         const fileIdx = statEntry.idx;
         const relPath = statEntry.rel;

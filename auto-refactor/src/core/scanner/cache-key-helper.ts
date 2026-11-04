@@ -23,7 +23,7 @@ import {
     buildPoolFingerprint,
 } from '../cache-key';
 import type { CachedResult, Fingerprint } from '../cache';
-import { SyncIoBarrier } from '../cache-persistence';
+import * as fs from 'fs';
 import type { IncrementalFileState } from '../diff/incremental-state';
 
 /** TypeScript declaration-file suffix, keyed separately from a plain `.ts` extension. */
@@ -189,27 +189,45 @@ export interface StatResultEntry {
     idx: number;
 }
 
+/** Stat probes kept in flight at once; matches the scanner's own hybrid concurrency budget. */
+const STAT_CONCURRENCY = 16;
+
 /**
- * Collect filesystem stat fingerprints synchronously across discovered files.
+ * Collect filesystem stat fingerprints across discovered files.
+ *
+ * Runs concurrently because every caller sits in an async pipeline stage; the previous synchronous
+ * loop serialised one blocking `stat` per file, so a 600-file scan paid 600 blocking syscalls on the
+ * event loop. Concurrency is bounded so a whole repository cannot exhaust file descriptors.
  *
  * @param absRoot - Absolute project root.
  * @param files - Discovered relative paths.
- * @returns Array of stat results with timestamps, sizes, and inodes.
+ * @returns Stat results with timestamps, sizes, and inodes, indexed to `files`.
  */
-export function collectStatFingerprints(absRoot: string, files: string[]): StatResultEntry[] {
-    const statResults: StatResultEntry[] = [];
-    for (let i = 0; i < files.length; i++) {
-        const rel = files[i];
-        try {
-            const fileStat = SyncIoBarrier.queryStat(path.join(absRoot, rel));
-            statResults.push({
-                rel,
-                fp: { mtimeMs: fileStat.mtimeMs, size: fileStat.size, ino: fileStat.ino },
-                idx: i,
-            });
-        } catch {
-            statResults.push({ rel, fp: null, idx: i });
+export async function collectStatFingerprints(
+    absRoot: string,
+    files: string[],
+): Promise<StatResultEntry[]> {
+    const statResults: StatResultEntry[] = new Array(files.length);
+    let nextIndex = 0;
+
+    const probeNext = async (): Promise<void> => {
+        while (nextIndex < files.length) {
+            const idx = nextIndex++;
+            const rel = files[idx];
+            try {
+                const fileStat = await fs.promises.stat(path.join(absRoot, rel));
+                statResults[idx] = {
+                    rel,
+                    fp: { mtimeMs: fileStat.mtimeMs, size: fileStat.size, ino: fileStat.ino },
+                    idx,
+                };
+            } catch {
+                statResults[idx] = { rel, fp: null, idx };
+            }
         }
-    }
+    };
+
+    const laneCount = Math.max(1, Math.min(STAT_CONCURRENCY, files.length));
+    await Promise.all(Array.from({ length: laneCount }, probeNext));
     return statResults;
 }

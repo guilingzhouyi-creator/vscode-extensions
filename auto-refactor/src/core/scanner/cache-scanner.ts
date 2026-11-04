@@ -85,7 +85,7 @@ export async function executeScanWithCache(
         l2Hit: 0,
     };
 
-    const statResults = collectStatFingerprints(absRoot, files);
+    const statResults = await collectStatFingerprints(absRoot, files);
     for (const statEntry of statResults) {
         await probeSingleFileCache({
             statEntry,
