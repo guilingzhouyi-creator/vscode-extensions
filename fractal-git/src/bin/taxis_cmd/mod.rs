@@ -41,6 +41,7 @@ pub mod init;
 pub mod inspect;
 pub mod inspect_grep;
 pub mod lineage;
+pub mod list_files;
 pub mod log;
 pub mod maintenance;
 pub mod merge;

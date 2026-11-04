@@ -51,3 +51,7 @@ mod test_lineage_commands;
 mod test_plumbing_tree_commands;
 #[path = "rust/test_cli_diagnostics_privacy.rs"]
 mod test_cli_diagnostics_privacy;
+#[path = "rust/test_list_files_parity.rs"]
+mod test_list_files_parity;
+#[path = "rust/test_worktree_checkout_parity.rs"]
+mod test_worktree_checkout_parity;

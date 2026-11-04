@@ -347,94 +347,9 @@ fn tree_order_key(row: &TreeRow) -> Vec<u8> {
 /// Dispatches `ls-files`.
 ///
 /// Supports `-s` (mode, id, stage), `-z`, `-c` (cached, the default), and `--stage`. The worktree-side
-/// selectors (`-d`, `-m`, `-o`, `-u`) are not implemented; they are rejected rather than silently
-/// mapped onto cached output, which would answer a different question than the caller asked.
+/// Dispatches `ls-files` via the dedicated `ls_files` handler module.
 pub fn handle_ls_files(ctx: &CliContext) {
-    let view = match RepoView::open(ctx) {
-        Ok(opened) => opened,
-        Err(open_err) => fail_fatal(open_err),
-    };
-    let mut show_stage = false;
-    let mut nul_terminated = false;
-    let mut path_filters: Vec<String> = Vec::new();
-
-    for argument in &ctx.args {
-        match argument.as_str() {
-            "-s" | "--stage" => show_stage = true,
-            "-z" => nul_terminated = true,
-            "-c" | "--cached" => {}
-            other if other.starts_with('-') => reject(
-                CliTag::ERROR,
-                format!("ls-files does not support the flag '{other}'"),
-            ),
-            other => path_filters.push(other.trim_end_matches('/').to_string()),
-        }
-    }
-
-    // Git lists nothing and exits 0 when the index is missing; that is the state of a freshly
-    // initialised repository, and callers run `ls-files` there routinely. Reporting an error turns
-    // an empty answer into a broken pipeline.
-    let index = match view.index() {
-        Ok(loaded) => loaded,
-        Err(load_err) => reject(CliTag::ERROR, load_err),
-    };
-    let staged: &[fg_index::IndexEntry] = match &index {
-        Some(loaded) => loaded.entries(),
-        None => &[],
-    };
-
-    let mut entries: Vec<&fg_index::IndexEntry> = staged
-        .iter()
-        .filter(|entry| {
-            path_filters.is_empty()
-                || path_filters.iter().any(|filter| {
-                    entry.path == *filter || entry.path.starts_with(&format!("{filter}/"))
-                })
-        })
-        .collect();
-    entries.sort_by(|left, right| {
-        left.path
-            .cmp(&right.path)
-            .then(left.stage.to_u8().cmp(&right.stage.to_u8()))
-    });
-
-    if ctx.json_mode {
-        let rendered: Vec<serde_json::Value> = entries
-            .iter()
-            .map(|entry| {
-                serde_json::json!({
-                    "path": entry.path,
-                    "mode": format!("{:06o}", entry.mode.to_u32()),
-                    "oid": entry.oid.to_hex(),
-                    "stage": entry.stage.to_u8(),
-                })
-            })
-            .collect();
-        let payload = serde_json::json!({
-            "engine": "taxis",
-            "operation": "ls-files",
-            "entry_count": rendered.len(),
-            "entries": rendered,
-        });
-        print_json(&payload);
-        return;
-    }
-
-    let mut sink = std::io::stdout();
-    for entry in entries {
-        let line = if show_stage {
-            format!(
-                "{:06o} {} {}\t{}",
-                entry.mode.to_u32(),
-                entry.oid.to_hex(),
-                entry.stage.to_u8(),
-                entry.path
-            )
-        } else {
-            entry.path.clone()
-        };
-        let _ = write_record(&mut sink, &line, nul_terminated);
-    }
+    super::list_files::handle_ls_files(ctx);
 }
 
 /// Dispatches `show-ref` and `for-each-ref`.
