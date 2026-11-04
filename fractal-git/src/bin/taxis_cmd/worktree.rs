@@ -63,6 +63,31 @@ fn handle_worktree_list(ctx: &CliContext) {
     let quota = QuotaGovernor::default();
     let registered = list_registered_worktrees(&ctx.git_dir);
 
+    if ctx.args.iter().any(|arg| arg == "--porcelain") {
+        let work_root = ctx
+            .git_dir
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .to_string_lossy()
+            .replace('\\', "/");
+        let head_ref = std::fs::read_to_string(ctx.git_dir.join("HEAD"))
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        println!("worktree {work_root}");
+        if let Some(sym_target) = head_ref.strip_prefix("ref: ") {
+            println!("branch {sym_target}");
+        } else if !head_ref.is_empty() {
+            println!("HEAD {head_ref}");
+            println!("detached");
+        }
+        for record in &registered {
+            let p = record.path.replace('\\', "/");
+            println!("\nworktree {p}");
+        }
+        return;
+    }
+
     if ctx.json_mode {
         let active_projections: Vec<serde_json::Value> = registered
             .iter()

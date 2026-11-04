@@ -83,7 +83,29 @@ pub fn handle_checkout(ctx: &CliContext) {
 
     let (target_commit, tree_oid) = match view.resolve_tree(&opts.target) {
         Ok(resolved) => resolved,
-        Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
+        Err(resolve_err) => {
+            if let Some(ref new_b) = opts.new_branch {
+                if view.head_commit().ok().flatten().is_none() {
+                    let head_path = view.git_dir().join("HEAD");
+                    let sym_target = format!("refs/heads/{new_b}");
+                    if let Err(io_err) = fs::write(&head_path, format!("ref: {sym_target}\n")) {
+                        fail_io("update HEAD reference", io_err);
+                    }
+                    let container_path = fg_native::container_path(view.git_dir());
+                    if container_path.is_file() {
+                        if let Ok(mut doc) = RepoDocument::load(&container_path) {
+                            doc.head = NativeHeadState::Symbolic {
+                                target: sym_target,
+                            };
+                            let _ = doc.save_atomic(&container_path);
+                        }
+                    }
+                    eprintln!("Switched to a new branch '{new_b}'");
+                    return;
+                }
+            }
+            reject(CliTag::ERROR, resolve_err)
+        }
     };
 
     let effective_branch = resolve_effective_branch(&view, &opts);
