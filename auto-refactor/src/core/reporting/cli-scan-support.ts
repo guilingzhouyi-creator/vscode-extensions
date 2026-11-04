@@ -22,17 +22,11 @@ import { promisify } from 'util';
 import type { ScanConfig, ScanReport, WarmStats } from '../types';
 import { TOOL_VERSION } from '../config/config';
 import { Scanner } from '../analyzer';
+import { pMap } from '../scanner/worker-scheduler';
 import { render } from '../reporters';
 import { toAasJson } from './aas-reporter';
-import {
-    TrajectoryAccumulator,
-    readLifetimeSummary,
-    recordToVector,
-} from '../trajectory';
-import {
-    buildDebtLedger,
-    calculateStructuralDebtDelta,
-} from '../intelligence/elastic-debt-budget';
+import { TrajectoryAccumulator, readLifetimeSummary, recordToVector } from '../trajectory';
+import { buildDebtLedger, calculateStructuralDebtDelta } from '../intelligence/elastic-debt-budget';
 import { AutoRefactorError, type Logger } from '../logger';
 
 const execFileAsync = promisify(cp.execFile);
@@ -43,6 +37,10 @@ const DEFAULT_CLI_SCAN_AGENT = 'cli-scan';
 const DIR_TRAJECTORY = '.refactor-trajectory';
 const FILE_BASELINE_SIGNATURES = 'baseline-signatures.json';
 const FORMAT_AAS = 'aas';
+/** Anchor source reads kept in flight at once, bounded to avoid descriptor exhaustion. */
+const ANCHOR_READ_CONCURRENCY = 16;
+/** Source reads kept in flight when a trajectory record needs every scanned file's text. */
+const FILE_READ_CONCURRENCY = 16;
 const SEVERITY_ERROR = 'error';
 const MSG_REPORT_WRITTEN_PREFIX = 'report written to ';
 const DEFAULT_ERROR_CODE_SCAN_FAILED = 'SCAN_FAILED';
@@ -87,9 +85,7 @@ function parseGitPorcelainLine(line: string): string | null {
     if (!trimmed) return null;
     const parts = trimmed.split(/\s+/);
     const raw = parts.slice(1).join(' ').replace(/^"|"$/g, '');
-    const arrowIndex = isGitRenameStatus(parts[0])
-        ? raw.indexOf(GIT_RENAME_ARROW_SEPARATOR)
-        : -1;
+    const arrowIndex = isGitRenameStatus(parts[0]) ? raw.indexOf(GIT_RENAME_ARROW_SEPARATOR) : -1;
     const target = (
         arrowIndex !== -1 ? raw.slice(arrowIndex + GIT_RENAME_ARROW_LENGTH) : raw
     ).trim();
@@ -143,7 +139,6 @@ function createEmptyDiffReport(config: ScanConfig): ScanReport {
         fileMetrics: [],
     };
 }
-
 /**
  * Executes an incremental Git working-tree diff scan (`--diff`) scoped to modified/untracked files.
  * Concurrency: Reentrant and read-only across working-tree status inspection and file scanning.
@@ -165,6 +160,30 @@ export async function executeDiffScanMode(
     const report = await scanner.scan();
     return { report, stats: null, scanner };
 }
+/**
+ * Selects the files whose source text an anchor slice can actually quote.
+ *
+ * Anchor slices are reserved for blocking and T1 findings, so preloading every file that owns any
+ * finding reads far more than the payload can consume.
+ *
+ * @param report - Finalized scan report.
+ * @param includeWarningAnchors - Whether warning-level anchors were requested.
+ * @returns Repository-relative paths eligible for anchor extraction.
+ */
+function selectAnchorCandidateFiles(report: ScanReport, includeWarningAnchors: boolean): string[] {
+    const candidates = new Set<string>();
+    for (const issueItem of report.issues) {
+        if (issueItem.clusteredInto) continue;
+        const relFile = issueItem.location?.file;
+        if (!relFile) continue;
+        const isBlocking = issueItem.severity === 'error';
+        const isTopTier = issueItem.adjudicatedTier === 'T1';
+        if (isBlocking || isTopTier || includeWarningAnchors) {
+            candidates.add(relFile);
+        }
+    }
+    return [...candidates];
+}
 
 async function tryReadUtf8Async(filePath: string): Promise<string | undefined> {
     try {
@@ -173,28 +192,41 @@ async function tryReadUtf8Async(filePath: string): Promise<string | undefined> {
         return undefined;
     }
 }
-
+/**
+ * Preloads the source text of files that can actually appear in the AAS payload.
+ *
+ * Only files that survive emission reach an anchor slice, so reading every file that merely owns a
+ * finding wasted 3.5x the bytes on a real scan (401 files read vs 81 emitted).
+ *
+ * @param filePaths - Repository-relative files selected for emission.
+ * @param rootDir - Scan root used to confine reads.
+ * @returns Map of normalized relative path to file content.
+ */
 async function buildAasAnchorFileMap(
-    report: ScanReport,
+    filePaths: readonly string[],
     rootDir: string,
 ): Promise<Map<string, string>> {
-    const fileContentMap = new Map<string, string>();
     const resolvedRoot = path.resolve(rootDir);
     const rootPrefix = resolvedRoot.endsWith(path.sep) ? resolvedRoot : resolvedRoot + path.sep;
-    const uniqueFiles = new Set<string>();
-    for (const issueItem of report.issues) {
-        if (issueItem.clusteredInto) continue;
-        const relFile = issueItem.location?.file;
-        if (relFile) uniqueFiles.add(relFile);
-    }
-    for (const relFile of uniqueFiles) {
-        const normalizedRel = relFile.replaceAll('\\', '/');
-        const fullPath = path.resolve(resolvedRoot, relFile);
-        if (fullPath !== resolvedRoot && !fullPath.startsWith(rootPrefix)) continue;
-        const content = await tryReadUtf8Async(fullPath);
-        if (content !== undefined) {
-            fileContentMap.set(normalizedRel, content);
-        }
+    const uniquePaths = [...new Set(filePaths)];
+    // Bounded fan-out: anchors cover most files on a T1-heavy scan, so an unbounded `Promise.all`
+    // would open one handle per file and exhaust descriptors on a large repository.
+    const contents = await mapWithBoundedConcurrency(
+        uniquePaths,
+        ANCHOR_READ_CONCURRENCY,
+        async (relFile) => {
+            const fullPath = path.resolve(resolvedRoot, relFile);
+            if (fullPath !== resolvedRoot && !fullPath.startsWith(rootPrefix)) return undefined;
+            const content = await tryReadUtf8Async(fullPath);
+            return content === undefined
+                ? undefined
+                : { rel: relFile.replaceAll('\\', '/'), content };
+        },
+    );
+
+    const fileContentMap = new Map<string, string>();
+    for (const entry of contents) {
+        if (entry) fileContentMap.set(entry.rel, entry.content);
     }
     return fileContentMap;
 }
@@ -203,17 +235,43 @@ async function collectTrajectoryScannedFiles(
     fileMetrics: readonly NonNullable<ScanReport['fileMetrics']>[number][],
     resolvedRoot: string,
 ): Promise<Array<{ filePath: string; content: string }>> {
-    const scannedFiles: Array<{ filePath: string; content: string }> = [];
     const rootPrefix = resolvedRoot.endsWith(path.sep) ? resolvedRoot : resolvedRoot + path.sep;
-    for (const metric of fileMetrics) {
-        const fullPath = path.resolve(resolvedRoot, metric.file);
-        if (fullPath !== resolvedRoot && !fullPath.startsWith(rootPrefix)) continue;
-        const content = await tryReadUtf8Async(fullPath);
-        if (content !== undefined) {
-            scannedFiles.push({ filePath: metric.file, content });
-        }
+    const confined = fileMetrics
+        .map((metric) => metric.file)
+        .filter((relFile) => {
+            const fullPath = path.resolve(resolvedRoot, relFile);
+            return fullPath === resolvedRoot || fullPath.startsWith(rootPrefix);
+        });
+    // A trajectory run reports every scanned file, so a 600-file repository issued 600 sequential
+    // reads and paid one round-trip each. The reads are independent, so they run with bounded
+    // fan-out rather than an unbounded `Promise.all` that would exhaust handles on a large repo.
+    const contents = await mapWithBoundedConcurrency(confined, FILE_READ_CONCURRENCY, (relFile) =>
+        tryReadUtf8Async(path.resolve(resolvedRoot, relFile)),
+    );
+    const scannedFiles: Array<{ filePath: string; content: string }> = [];
+    for (let index = 0; index < confined.length; index++) {
+        const content = contents[index];
+        if (content !== undefined) scannedFiles.push({ filePath: confined[index], content });
     }
     return scannedFiles;
+}
+/**
+ * Maps an array through an async transform with a fixed ceiling on in-flight operations.
+ *
+ * Delegates to the scheduler's `pMap` so this module shares one concurrency contract with the
+ * analyzer loop instead of maintaining a second implementation of the same bounded fan-out.
+ *
+ * @param items - Inputs to transform.
+ * @param limit - Maximum concurrent operations.
+ * @param transform - Async work applied to each item.
+ * @returns Results in the same order as `items`.
+ */
+function mapWithBoundedConcurrency<T, R>(
+    items: readonly T[],
+    limit: number,
+    transform: (item: T) => Promise<R>,
+): Promise<R[]> {
+    return pMap([...items], limit, (item) => transform(item));
 }
 
 async function resolveTrajectoryDebtDelta(options: {
@@ -243,7 +301,6 @@ async function resolveTrajectoryDebtDelta(options: {
     }
     return { resolvedDebtPoints: 0, addedDebtPoints: 0 };
 }
-
 /**
  * Persists a CLI scan run (`--record-trajectory`) into `.refactor-trajectory`.
  * Concurrency: Requires external synchronization per workspace trajectory directory.
@@ -298,7 +355,6 @@ export async function persistCliScanTrajectory(
     });
     logger.info(`trajectory recorded to ${trajectoryDir}`);
 }
-
 /**
  * Renders a finalized ScanReport (preloading root-confined anchors for AAS format) to `--out` or
  * stdout.
@@ -315,10 +371,12 @@ export async function writeRenderedReport(
 ): Promise<void> {
     let text: string;
     if (config.format === FORMAT_AAS) {
-        const anchorFileMap = await buildAasAnchorFileMap(report, config.root);
+        const anchorCandidates = selectAnchorCandidateFiles(report, false);
+        const anchorFileMap = await buildAasAnchorFileMap(anchorCandidates, config.root);
         text = toAasJson(report, {
             baseDir: config.root,
             includeDimensionDetails: true,
+            pretty: config.pretty === true,
             fileReader: (relativeFilePath) =>
                 anchorFileMap.get(relativeFilePath.replaceAll('\\', '/')),
         });
@@ -338,7 +396,6 @@ function resolveGateThreshold(config: ScanConfig): number | null {
     if (config.failOnIssue) return SEVERITY_GATE_RANK.error;
     return null;
 }
-
 /**
  * Decides the CI exit code from the configured severity threshold, honoring suppressions and
  * baseline ratchets.
@@ -357,7 +414,6 @@ export function evaluateGateExitCode(report: ScanReport, config: ScanConfig): nu
     }
     return 0;
 }
-
 /**
  * Emits warm scan cache/daemon statistics to the active logger when present.
  *
@@ -372,7 +428,6 @@ export function logWarmStats(logger: Logger, stats?: WarmStats | null): void {
             `poolWarm=${stats.poolWarm} daemonMs=${stats.daemonMs}`,
     );
 }
-
 /**
  * Maps uncaught scan exceptions to formatted stderr output and exit code 2.
  *

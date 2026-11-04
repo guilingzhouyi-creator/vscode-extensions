@@ -37,6 +37,7 @@ import type { ResolvedAnalyzer } from './analyzer-registry';
 import { resolveAnalyzers } from './analyzer-registry';
 import { ModuleDependencyGraph } from './dependency-graph';
 import { Logger } from './logger';
+import { RetainedSourceStore } from './scanner/retained-source';
 import { loadGitignore } from './policy/gitignore';
 import { globToRegExp, collectFiles } from './file-discovery';
 import type { IncrementalFileState } from './diff/incremental-state';
@@ -149,6 +150,12 @@ export class Scanner implements ScannerContext {
     private readonly scorer: QualityScorer;
     private readonly archetype: ProjectArchetype;
     private readonly activatedReviewersSummary: ActivatedReviewersSummary;
+    /**
+     * Source text of the files this scan read in-process, kept for the post-scan scoring pass.
+     *
+     * Bounded and self-sealing; see {@link RetainedSourceStore} for why retention is all-or-nothing.
+     */
+    private readonly retainedSource = new RetainedSourceStore();
 
     constructor(
         public config: ScanConfig,
@@ -573,10 +580,23 @@ export class Scanner implements ScannerContext {
                     this.logger.warn(`skip unreadable file ${rel}: ${String(readError)}`);
                     return { issues: [] as Issue[], metric: null as FileMetric | null };
                 }
+                this.retainedSource.retain(rel, content);
                 return this.runAnalyzers(rel, content);
             },
             cfg.signal,
         );
+    }
+
+    /**
+     * Source text this scan already read, for the post-scan scoring pass to reuse.
+     *
+     * Returns an empty map once retention sealed itself, which tells the caller to read from disk
+     * instead of assuming the file was retained.
+     *
+     * @returns Repository-relative path to file text.
+     */
+    public retainedSourceText(): ReadonlyMap<string, string> {
+        return this.retainedSource.snapshot();
     }
 
     private loadRouterBiasState(): void {
@@ -609,7 +629,10 @@ export class Scanner implements ScannerContext {
             const activeCount = Math.max(1, entries.length);
             const avgLatencyUs = Math.max(
                 1,
-                Math.round(((durationMs || 1) * MICROSECONDS_PER_MILLISECOND) / Math.max(1, filesScanned * activeCount)),
+                Math.round(
+                    ((durationMs || 1) * MICROSECONDS_PER_MILLISECOND) /
+                        Math.max(1, filesScanned * activeCount),
+                ),
             );
 
             const telemetry: ExpertTelemetrySnapshot[] = [];
@@ -629,7 +652,13 @@ export class Scanner implements ScannerContext {
             const targetFile = path.join(cacheDir, FILE_ROUTER_BIAS);
             void fs.promises
                 .mkdir(cacheDir, { recursive: true })
-                .then(() => fs.promises.writeFile(targetFile, JSON.stringify(snapshot, null, 2), ENCODING_UTF8))
+                .then(() =>
+                    fs.promises.writeFile(
+                        targetFile,
+                        JSON.stringify(snapshot, null, 2),
+                        ENCODING_UTF8,
+                    ),
+                )
                 .catch((err) => {
                     void err;
                 });
@@ -640,14 +669,22 @@ export class Scanner implements ScannerContext {
 
     private loadRuleSamplingLedger(): void {
         if (this.config.cacheEnabled === false) return;
-        const ledgerFile = path.join(this.config.root, DIR_AUTO_REFACTOR_CACHE, FILE_RULE_SAMPLING_LEDGER);
+        const ledgerFile = path.join(
+            this.config.root,
+            DIR_AUTO_REFACTOR_CACHE,
+            FILE_RULE_SAMPLING_LEDGER,
+        );
         void defaultContinuousRuleSampler.loadLedgerFromFile(ledgerFile);
     }
 
     private saveRuleSamplingLedger(issues: Issue[], filesScanned: number): void {
         if (this.config.cacheEnabled === false) return;
         defaultContinuousRuleSampler.recordScan({ filesScanned, issues });
-        const ledgerFile = path.join(this.config.root, DIR_AUTO_REFACTOR_CACHE, FILE_RULE_SAMPLING_LEDGER);
+        const ledgerFile = path.join(
+            this.config.root,
+            DIR_AUTO_REFACTOR_CACHE,
+            FILE_RULE_SAMPLING_LEDGER,
+        );
         void defaultContinuousRuleSampler.saveLedgerToFile(ledgerFile);
     }
 

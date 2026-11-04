@@ -66,10 +66,7 @@ import {
     DEFAULT_STATE_FILENAME,
     DEFAULT_CACHE_DIR,
 } from '../scoring/rolling-sampling-governor';
-import type {
-    FileDebtItem,
-    QuantitativeRiskAssessment,
-} from '../scoring/quantitative-risk-model';
+import type { FileDebtItem, QuantitativeRiskAssessment } from '../scoring/quantitative-risk-model';
 import {
     DEFAULT_RISK_WINDOW_SIZE,
     evaluateQuantitativeRiskModel,
@@ -529,8 +526,8 @@ function matchSuppression(issue: Issue, index: SuppressionIndex): SuppressionRul
         typeof issue.detail?.function === 'string'
             ? issue.detail.function
             : typeof issue.detail?.name === 'string'
-                ? issue.detail.name
-                : EMPTY_STRING;
+              ? issue.detail.name
+              : EMPTY_STRING;
     const candidates = index.candidateRulesByAnalyzer.get(issue.analyzer) ?? index.generalRules;
     const normalizedFilePath = issue.location.file.replace(/\\/g, '/');
 
@@ -741,7 +738,38 @@ interface RefreshQualityScoresParams {
     readonly config: ScanConfig;
     readonly reportScanner: Scanner | null;
     readonly scope: PostScanScope;
+    readonly logger: Logger;
     readonly initialIssueCount?: number;
+}
+
+/**
+ * Ensures the report carries an autonomy evaluation, reusing the one the scan already produced.
+ *
+ * `buildScanReport` scores autonomy with the scanner's symbol index, which is the same index this
+ * pass would pass and yields the same result. Recomputing it read every file a second time — the
+ * autonomy pass reads each file's import preamble — so the existing value stands unless a slice
+ * scan never produced one. Extracted from `refreshQualityScores` so that adding the guard there did
+ * not raise that function's cyclomatic complexity.
+ *
+ * @param report - Report to enrich in place.
+ * @param config - Resolved scan configuration.
+ * @param reportScanner - Scanner that produced the report, when it is this process's own.
+ */
+function applyAutonomyScore(
+    report: ScanReport,
+    config: ScanConfig,
+    reportScanner: Scanner | null,
+): void {
+    if (report.autonomy) return;
+    report.autonomy = evaluateProjectAutonomy(
+        report.fileMetrics ?? [],
+        report.issues,
+        config,
+        reportScanner?.retainedSourceText() as Map<string, string> | undefined,
+        reportScanner && typeof reportScanner.getSymbolIndex === 'function'
+            ? reportScanner.getSymbolIndex()
+            : undefined,
+    );
 }
 
 /**
@@ -750,7 +778,7 @@ interface RefreshQualityScoresParams {
  * @param params - Context carrying report, resolved config, scanner, scope, and initial count.
  */
 async function refreshQualityScores(params: RefreshQualityScoresParams): Promise<void> {
-    const { report, config, reportScanner, scope, initialIssueCount = 0 } = params;
+    const { report, config, reportScanner, scope, logger, initialIssueCount = 0 } = params;
     const effectiveScorerArchetype = config.reviewProfile ?? config.archetype;
     const scorer =
         reportScanner && typeof reportScanner.getQualityScorer === 'function'
@@ -823,19 +851,15 @@ async function refreshQualityScores(params: RefreshQualityScoresParams): Promise
         fileMetrics,
         report.issues,
     );
-    report.autonomy = evaluateProjectAutonomy(
-        fileMetrics,
-        report.issues,
-        config,
-        undefined,
-        reportScanner && typeof reportScanner.getSymbolIndex === 'function'
-            ? reportScanner.getSymbolIndex()
-            : undefined,
-    );
+    applyAutonomyScore(report, config, reportScanner);
     report.governance = await synthesizeNativeGovernance({
         report,
         config,
         scope,
+        // Reuse the text this scan already read; empty when retention sealed, or when the report
+        // came from a warm/daemon scan, in which case governance reads from disk instead.
+        contentByPath: reportScanner?.retainedSourceText(),
+        logger,
     });
 }
 
@@ -851,7 +875,9 @@ function loadRollingHistoryScores(config: ScanConfig, fallbackScore: number): nu
         }
         const governor = new RollingSamplingGovernor({ stateFilePath: stateFile });
         const samples = governor.getSamples();
-        return samples.length > 0 ? samples.map((sample) => sample.compositeScore) : [fallbackScore];
+        return samples.length > 0
+            ? samples.map((sample) => sample.compositeScore)
+            : [fallbackScore];
     } catch (error) {
         void error;
         return [fallbackScore];
@@ -904,11 +930,12 @@ function synthesizeProjectQuant(
 
     const complexityValues = fileMetrics
         .map((fm) => fm.maxNestingDepth)
-        .filter((compVal): compVal is number => typeof compVal === 'number' && Number.isFinite(compVal));
+        .filter(
+            (compVal): compVal is number => typeof compVal === 'number' && Number.isFinite(compVal),
+        );
 
     const totalMinutes =
-        projectQualityScore.technicalDebt?.totalRemediationMinutes ??
-        issues.length * 15;
+        projectQualityScore.technicalDebt?.totalRemediationMinutes ?? issues.length * 15;
 
     return evaluateQuantitativeRiskModel({
         financial: {
@@ -1065,13 +1092,13 @@ export async function finalizeReport(
     ...finalizeArguments:
         | [context: FinalizeReportContext]
         | [
-            report: ScanReport,
-            config: ScanConfig,
-            options: FinalizeBaselineOptions,
-            logger: Logger,
-            reportScanner?: Scanner | null,
-            scope?: PostScanScope,
-        ]
+              report: ScanReport,
+              config: ScanConfig,
+              options: FinalizeBaselineOptions,
+              logger: Logger,
+              reportScanner?: Scanner | null,
+              scope?: PostScanScope,
+          ]
 ): Promise<void> {
     const firstArg = finalizeArguments[0];
     const isContextObject =
@@ -1084,13 +1111,13 @@ export async function finalizeReport(
     const context: FinalizeReportContext = isContextObject
         ? (firstArg as FinalizeReportContext)
         : {
-            report: finalizeArguments[0] as ScanReport,
-            config: finalizeArguments[1] as ScanConfig,
-            options: finalizeArguments[2] as FinalizeBaselineOptions,
-            logger: finalizeArguments[3] as Logger,
-            reportScanner: finalizeArguments[4] ?? null,
-            scope: finalizeArguments[5] ?? POST_SCAN_SCOPE_FULL,
-        };
+              report: finalizeArguments[0] as ScanReport,
+              config: finalizeArguments[1] as ScanConfig,
+              options: finalizeArguments[2] as FinalizeBaselineOptions,
+              logger: finalizeArguments[3] as Logger,
+              reportScanner: finalizeArguments[4] ?? null,
+              scope: finalizeArguments[5] ?? POST_SCAN_SCOPE_FULL,
+          };
 
     const { report, config, options, logger } = context;
     const reportScanner = context.reportScanner ?? null;
@@ -1145,6 +1172,7 @@ export async function finalizeReport(
             config,
             reportScanner,
             scope,
+            logger,
             initialIssueCount,
         });
     }
