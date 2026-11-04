@@ -110,7 +110,14 @@ const PARALLEL_SUITES = [
   { name: 'validate-postscan-parity', script: 'scripts/validate-postscan-parity.js' },
   { name: 'validate-capp-protocol', script: 'scripts/validate-capp-protocol.js' },
   { name: 'validate-sidecar-coverage', script: 'scripts/validate-sidecar-coverage.js' },
-  { name: 'validate-aas-reporter', script: 'scripts/validate-aas-reporter.js' },
+  {
+      name: 'validate-aas-reporter',
+      script: 'scripts/validate-aas-reporter.js',
+    },
+    {
+      name: 'validate-aas-placeholder-patches',
+      script: 'scripts/validate-aas-placeholder-patches.js',
+    },
   { name: 'validate-praxis-presentation', script: 'scripts/validate-praxis-presentation.js' },
   {
     name: 'validate-dual-faced-presentation',
@@ -433,6 +440,9 @@ const SELF_AUDIT_SUITES = [
     name: 'validate-self-multidimensional-audit',
     script: 'scripts/validate-self-multidimensional-audit.js',
   },
+  // Runs one production scan with the fs read recorder attached, so a second full read of the
+  // working set fails here instead of returning unnoticed as a slower scan.
+  { name: 'validate-redundant-reads', script: 'scripts/validate-redundant-reads.js' },
 ];
 
 const SEQUENTIAL_SUITES = [...DAEMON_SUITES, ...SELF_AUDIT_SUITES];
@@ -639,32 +649,16 @@ async function runSequentialSuites(suites, bail, passed, failed) {
  * @param failed - Array to record failed suite results.
  */
 async function runSelfAuditLane(bail, passed, failed) {
-  const auditSuite = { name: 'validate-self-audit', script: 'scripts/validate-self-audit.js' };
-  const auditRes = await executeSuite(auditSuite);
-  recordResult(auditSuite, auditRes, passed, failed);
-  if (!auditRes.ok && bail) {
-    return;
+  // Iterates SELF_AUDIT_SUITES rather than repeating entries inline, so adding a suite to the
+  // declaration actually runs it. Order matters: self-audit writes the fresh baseline, the
+  // multidimensional audit reads it, and self-refactor mutates active-runs.ndjson.
+  for (const suite of SELF_AUDIT_SUITES) {
+    const result = await executeSuite(suite);
+    recordResult(suite, result, passed, failed);
+    if (!result.ok && bail) {
+      return;
+    }
   }
-
-  // validate-self-multidimensional-audit verifies the fresh baseline against trajectory.
-  // validate-self-refactor simulates post-refactor mutations to active-runs.ndjson.
-  // Sequential execution in this lane prevents state collision.
-  const multiDimSuite = {
-    name: 'validate-self-multidimensional-audit',
-    script: 'scripts/validate-self-multidimensional-audit.js',
-  };
-  const multiDimRes = await executeSuite(multiDimSuite);
-  recordResult(multiDimSuite, multiDimRes, passed, failed);
-  if (!multiDimRes.ok && bail) {
-    return;
-  }
-
-  const refactorSuite = {
-    name: 'validate-self-refactor',
-    script: 'scripts/validate-self-refactor.js',
-  };
-  const refactorRes = await executeSuite(refactorSuite);
-  recordResult(refactorSuite, refactorRes, passed, failed);
 }
 
 async function runFilteredSuites(parallelList, sequentialList, vitestPromise, passed, failed) {

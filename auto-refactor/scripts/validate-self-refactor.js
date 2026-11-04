@@ -18,6 +18,7 @@
 
 const assert = require('assert');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { runSelfAudit, BASELINE_OUTPUT } = require('./run-self-audit');
 const {
@@ -143,6 +144,17 @@ function loadReusableBaseline(baselinePath, maxAgeMs = MAX_BASELINE_AGE_MS) {
   }
 }
 
+// A verification run must never rewrite the repository's own evidence: `runSelfAudit()` defaults
+// to the committed baseline and trajectory, so calling it bare replaced that baseline and appended
+// a gate-rejected run whose score vector was a coarse projection of the real one, which the
+// multidimensional audit then read as authoritative and blocked the lane on.
+const AUDIT_SANDBOX_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'self-refactor-audit-'));
+const SANDBOX_AUDIT_OPTIONS = Object.freeze({
+  baselineOutput: path.join(AUDIT_SANDBOX_DIR, 'self-audit-baseline.json'),
+  aasOutput: path.join(AUDIT_SANDBOX_DIR, 'self-audit-baseline.aas.json'),
+  trajectoryDir: path.join(AUDIT_SANDBOX_DIR, 'trajectory'),
+});
+
 /**
  * Main verification routine for Self-Refactor self-refactoring closure.
  */
@@ -159,8 +171,8 @@ async function main() {
     reused = true;
     console.log('1. Reusing Valid Self-Audit Baseline Report...');
   } else {
-    console.log('1. Executing Full Self-Audit on Refactored Engine...');
-    report = await runSelfAudit();
+    console.log('1. Executing Full Self-Audit on Refactored Engine (sandboxed output)...');
+    report = await runSelfAudit(SANDBOX_AUDIT_OPTIONS);
   }
   const elapsedSec = (Date.now() - start) / 1000;
 

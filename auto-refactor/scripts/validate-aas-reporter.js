@@ -306,9 +306,13 @@ async function runTests() {
   assert.strictEqual(aasDoc.bottlenecks[0].loss, 10);
   console.log('✔  Test 4: Quality deduction bottlenecks verified');
 
-  // Test 5: Token economy & compression comparison
+  // Test 5: Token economy — every saving must be attributable to a named mechanism
   const verboseJson = JSON.stringify(report, null, 2);
-  const aasJson = toAasJson(report, {
+  const aasDefaultJson = toAasJson(report, {
+    baseDir: '/workspace',
+    fileReader: (rel) => fileMock[rel],
+  });
+  const aasPrettyJson = toAasJson(report, {
     baseDir: '/workspace',
     fileReader: (rel) => fileMock[rel],
     pretty: true,
@@ -320,19 +324,30 @@ async function runTests() {
   });
 
   const verboseBytes = Buffer.byteLength(verboseJson, 'utf8');
-  const aasBytes = Buffer.byteLength(aasJson, 'utf8');
+  const defaultBytes = Buffer.byteLength(aasDefaultJson, 'utf8');
+  const prettyBytes = Buffer.byteLength(aasPrettyJson, 'utf8');
   const aasCompactBytes = Buffer.byteLength(aasCompactJson, 'utf8');
   const savingsPercent = Math.round((1 - aasCompactBytes / verboseBytes) * 100);
 
   console.log(
-    `   Verbose JSON: ${verboseBytes}B | AAS: ${aasBytes}B | AAS Minified: ${aasCompactBytes}B`,
+    `   Verbose JSON: ${verboseBytes}B | AAS default: ${defaultBytes}B | AAS pretty: ${prettyBytes}B | AAS Minified: ${aasCompactBytes}B`,
   );
-  console.log(`   Byte savings: ${savingsPercent}%`);
+  console.log(`   Field-projection savings: ${savingsPercent}%`);
   assert.ok(
     savingsPercent >= 30,
-    `AAS format should save significant bytes vs verbose (got ${savingsPercent}%)`,
+    `Field projection should save significant bytes vs verbose (got ${savingsPercent}%)`,
   );
-  console.log('✔  Test 5: Token economy and compression bounds verified');
+  // Default serialization must be the frugal one; pretty is opt-in.
+  assert.strictEqual(
+    defaultBytes,
+    aasCompactBytes,
+    'toAasJson must emit compact JSON unless pretty:true is requested',
+  );
+  assert.ok(
+    prettyBytes > aasCompactBytes,
+    'pretty:true must remain available for human-readable output',
+  );
+  console.log('✔  Test 5: Token economy, compact default, and pretty opt-in verified');
 
   // Test 6: Reporter registry & CLI render integration
   const plugin = getReporter('aas');
@@ -340,9 +355,15 @@ async function runTests() {
   assert.strictEqual(plugin.name, 'aas');
 
   const renderedFromApi = render(report, 'aas');
-  assert.ok(
-    renderedFromApi.includes('"schema": "aas-v1"'),
+  const renderedAasDoc = JSON.parse(renderedFromApi);
+  assert.strictEqual(
+    renderedAasDoc.schema,
+    'aas-v1',
     'render(report, "aas") must emit valid AAS JSON',
+  );
+  assert.ok(
+    !renderedFromApi.includes('\n  "'),
+    'render(report, "aas") must emit compact JSON so the CLI path stays frugal',
   );
   console.log('✔  Test 6: Registry and render dispatch integration verified');
 
@@ -452,7 +473,47 @@ async function runTests() {
     ),
     'CommonJS require() in ESM',
   );
-  console.log('✔  Test 9: High-efficiency Token sentence compression engine verified (22 rules)');
+
+  // Coverage ratchet: every rule that emits prose must have a compression path. Pathologically
+  // long messages used to escape silently (9.8% of a real scan) because no pattern described them.
+  // Each pair below is a real message shape taken from a full `--root src` scan.
+  const uncompressibleShapes = [
+    [
+      'File is large; consider splitting (lines 1001 >= warn threshold 400; functions 31 >= warn threshold 15).',
+      'file 1001 >= 400 lines, fns 31 >= 15 (split)',
+    ],
+    [
+      'Function "auditImportShadowing" has cyclomatic complexity 11 (threshold 10).',
+      'CC 11 > 10 in auditImportShadowing',
+    ],
+    [
+      "Literal 'High' is repeated 3 times in this file; extract it into a shared constant.",
+      "dup literal 'High' x3",
+    ],
+    [
+      'Token density floor breached: tau = 2.16 tokens per effective line, below the 2.5 floor across 299.9 ELOC.',
+      'tau 2.16 < 2.5 over 299.9 ELOC',
+    ],
+    [
+      'Dynamic dilution imbalance (ratio 1:3.99 > 1:3): dynamic physical envelope for 140.4 ELOC is 422 LOC, actual is 560 LOC.',
+      'dilution 1:3.99 > 1:3 at 140.4 ELOC: 422 vs 560 LOC',
+    ],
+    [
+      "Tautological loop traversal detected in 'printAutonomyAssessment': iteration exhibits zero or negligible state mutation entropy delta (deltaEntropy: 0.00).",
+      'tautological loop in printAutonomyAssessment (dH=0.00)',
+    ],
+  ];
+  for (const [rawShape, expected] of uncompressibleShapes) {
+    const compressed = compressDiagnosticSentence(rawShape);
+    assert.strictEqual(compressed, expected, `Compression mismatch for: ${rawShape}`);
+    assert.ok(
+      compressed.length < rawShape.length,
+      `Compression must shorten this message (was ${rawShape.length}c, got ${compressed.length}c)`,
+    );
+  }
+  console.log(
+    '✔  Test 9: High-efficiency Token sentence compression engine verified (including coverage shapes)',
+  );
 
   // Test 10: Scale report >= 70% token savings ratchet
   const scaleIssues = [];
@@ -488,16 +549,23 @@ async function runTests() {
   }
   const scaleReport = createMockScanReport({ issues: scaleIssues });
   const scaleVerbose = JSON.stringify(scaleReport, null, 2);
-  const scaleAas = toAasJson(scaleReport, { baseDir: '/workspace', pretty: false });
+  const scaleAas = toAasJson(scaleReport, { baseDir: '/workspace' });
   const scaleVerboseBytes = Buffer.byteLength(scaleVerbose, 'utf8');
   const scaleAasBytes = Buffer.byteLength(scaleAas, 'utf8');
   const scaleSavings = Math.round((1 - scaleAasBytes / scaleVerboseBytes) * 100);
   console.log(
-    `   Scale report: Verbose ${scaleVerboseBytes}B | AAS ${scaleAasBytes}B | Savings: ${scaleSavings}%`,
+    `   Scale report: Verbose ${scaleVerboseBytes}B | AAS compact ${scaleAasBytes}B | Savings: ${scaleSavings}%`,
+  );
+  // The 70% envelope is validated against the *compact* default (the form agents receive) rather
+  // than a hand-picked pretty/minified mix, so the number cannot be met by the serializer alone.
+  assert.strictEqual(
+    scaleAasBytes,
+    Buffer.byteLength(JSON.stringify(JSON.parse(scaleAas)), 'utf8'),
+    'Default AAS output must already be compact JSON',
   );
   assert.ok(
     scaleSavings >= 70,
-    `Scale report must achieve >= 70% token/byte savings per AGENTS.md (got ${scaleSavings}%)`,
+    `Scale report must achieve >= 70% byte savings in its default compact form (got ${scaleSavings}%)`,
   );
   console.log('✔  Test 10: Scale report >= 70% Token savings ratchet verified');
 

@@ -46,6 +46,27 @@ async function main() {
   assert.ok(magicIssue.actionable.patch, 'Must provide patch range');
   console.log('✔  ConstantsAnalyzer emits actionable payload for magic numbers');
 
+  // Invariant across the whole report: a fallback-named extraction must never advertise a patch or
+  // automation. The suggestion is still emitted (it points at the literal), but a consumer that
+  // applies `patch` would inject `EXTRACTED_STRING` into real source.
+  const fallbackNamed = report.issues.filter(
+    (i) =>
+      i.actionable &&
+      i.actionable.action === 'extract_constant' &&
+      /EXTRACTED_(?:STRING|NUMBER)/.test(String(i.actionable.targetSymbol ?? '')),
+  );
+  const violating = fallbackNamed.filter(
+    (i) => i.actionable.patch || i.actionable.safeToAutomate === true,
+  );
+  assert.strictEqual(
+    violating.length,
+    0,
+    `Fallback-named extraction must not carry a patch or automation flag (got ${violating.length})`,
+  );
+  console.log(
+    `✔  Fallback-named extraction invariant holds (${fallbackNamed.length} advisory-only findings)`,
+  );
+
   const stringIssue = report.issues.find((i) => i.rule === 'hardcoded-string' && i.actionable);
   assert.ok(stringIssue, 'Must find hardcoded-string issue with actionable payload');
   assert.strictEqual(stringIssue.actionable.action, 'extract_constant');

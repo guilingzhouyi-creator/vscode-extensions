@@ -121,7 +121,15 @@ async function testToPresentation() {
   assert.strictEqual(payloadZh.metrics.blockCount, 1);
   assert.strictEqual(payloadZh.metrics.warnCount, 1);
   assert.strictEqual(payloadZh.metrics.infoCount, 0);
-  assert.ok(payloadZh.metrics.tokenSavingsRatio >= 0.7);
+  assert.strictEqual(
+    payloadZh.metrics.tokenSavingsRatio,
+    agentPrompt.tokenSavingsRatio,
+    'Presentation metrics must forward the measured CAPP ratio verbatim',
+  );
+  assert.ok(
+    payloadZh.metrics.tokenSavingsRatio > 0,
+    'Presentation must surface a positive, measured token saving',
+  );
 
   // Cards verification
   assert.strictEqual(payloadZh.cards.length, 2);

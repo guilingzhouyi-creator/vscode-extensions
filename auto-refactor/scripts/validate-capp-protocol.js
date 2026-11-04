@@ -43,7 +43,12 @@ async function testDirectiveFormatting() {
   assert.strictEqual(directive.line, 243);
   assert.strictEqual(
     directive.renderedDirective,
-    "[GUARD|BLOCK|PRF-IO-001] cache.ts:243 -> Synchronous 'fs.readFileSync' blocks event loop.. Fix: await fs.promises.readFile(path, 'utf8')",
+    "[GUARD|BLOCK|PRF-IO-001] cache.ts:243 -> Synchronous 'fs.readFileSync' blocks event loop. Fix: await fs.promises.readFile(path, 'utf8').",
+    'Directive must carry exactly one sentence terminator per clause',
+  );
+  assert.ok(
+    !directive.renderedDirective.includes('..'),
+    'A summary that already ends with a period must not produce a doubled terminator',
   );
   console.log('  ✔ formatCompactGuardDirective correctly formats actionable single-line directive');
 }
@@ -75,19 +80,33 @@ async function testPromptSynthesis() {
   assert.strictEqual(prompt.protocolVersion, '1.0');
   assert.strictEqual(prompt.verdict, 'BLOCK');
   assert.strictEqual(prompt.directives.length, 2);
+  // The ratio must be reproducible from the two payloads, not from a calibrated constant.
+  const measuredChars = prompt.compactPromptText.length;
+  const baselineChars = JSON.stringify(issues).length;
+  const expectedRatio = Number((1 - measuredChars / baselineChars).toFixed(2));
+  assert.strictEqual(
+    prompt.tokenSavingsRatio,
+    expectedRatio,
+    `tokenSavingsRatio must equal 1 - prompt/JSON (${expectedRatio}), got ${prompt.tokenSavingsRatio}`,
+  );
   assert.ok(
-    prompt.tokenSavingsRatio >= 0.7,
-    `Expected token savings >= 0.70, got ${prompt.tokenSavingsRatio}`,
+    prompt.tokenSavingsRatio > 0,
+    `Compact prompt must be smaller than the JSON it replaces (got ${prompt.tokenSavingsRatio})`,
   );
   assert.ok(prompt.compactPromptText.includes('[CAPP:v1.0] src/core/cache.ts#L240-245 -> BLOCK'));
   console.log(
-    `  ✔ formatCompactAgentPrompt achieved ${Math.round(prompt.tokenSavingsRatio * 100)}% token savings`,
+    `  ✔ formatCompactAgentPrompt reports a reproducible ${Math.round(prompt.tokenSavingsRatio * 100)}% token saving`,
   );
 
   // Test empty issues
   const clearPrompt = formatCompactAgentPrompt('src/core/cache.ts#L240-245', []);
   assert.strictEqual(clearPrompt.verdict, 'PASS');
   assert.strictEqual(clearPrompt.directives.length, 0);
+  assert.strictEqual(
+    clearPrompt.tokenSavingsRatio,
+    0,
+    'An empty slice replaces nothing, so it must not claim a saving',
+  );
   assert.ok(clearPrompt.compactPromptText.includes('(all clear)'));
   console.log('  ✔ formatCompactAgentPrompt correctly emits PASS on clear slice');
 }
