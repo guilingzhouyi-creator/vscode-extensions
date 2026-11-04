@@ -443,6 +443,9 @@ const SELF_AUDIT_SUITES = [
   // Runs one production scan with the fs read recorder attached, so a second full read of the
   // working set fails here instead of returning unnoticed as a slower scan.
   { name: 'validate-redundant-reads', script: 'scripts/validate-redundant-reads.js' },
+  // The exemption mechanism is a gate that can admit a violation, so its refusal paths are tested
+  // as hard as its grant path: a policy that granted everything must fail this suite too.
+  { name: 'validate-diff-exemption', script: 'scripts/validate-diff-exemption.js' },
 ];
 
 const SEQUENTIAL_SUITES = [...DAEMON_SUITES, ...SELF_AUDIT_SUITES];

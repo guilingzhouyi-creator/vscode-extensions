@@ -1,353 +1,240 @@
 /**
  * Module: Governance Guard — Staged 5D Differential Bounds & Admission Gate
  * File Path: scripts/common/gate-differential-bounds.js
- * Architecture Role: Evaluates two-tier 5D ELOC differential bounds and empirical admission
- *   on staged git changes. Serves as dual-track runner: delegates to `taxis gate-slice` if
- *   compiled, or falls back to 100% isomorphic in-memory AST stream evaluation.
- * Dependencies & Triggers: Node.js standard libraries (fs, path, child_process);
+ * Architecture Role: Orchestrates the staged differential check: collects measurements, delegates
+ *   judgement to diff-envelope-judge.js, applies the streak and exemption policy, then hands the
+ *   verdict to a reporter. Holds no threshold and no judging logic of its own.
+ * Dependencies & Triggers: differential-diff-parser.js for measurement, diff-envelope-judge.js for
+ *   verdicts, diff-exemption-ledger.js for streaks and grants, diff-verdict-reporter.js for output;
  *   invoked by pre-commit-gate (ps1/sh) as STAGED-DIFF-14, pre-push-gate, and CI workflows.
  * Responsibilities:
- *   1. Single-file micro-envelopes:
- *      - E_add <= 180 (new) / 120 (existing, 180 with refactor witness)
- *      - E_del <= 100 (without refactor witness)
- *      - Substantive ratio >= 0.60 & TSPR >= 0.40 (when added lines >= 10)
- *   2. Commit batch macro-bounds:
- *      - Sum(E_add) <= 360
- *      - Sum(E_del) <= 280
- *   3. Empirical turnover admission floor:
- *      - T_net = Sum(E_add) + 0.8 * Sum(E_del) >= Theta_admission in [3.0, 25.0]
- *   4. Emit structured findings and Agent failure envelopes matching AAS v1.0.
- * Exit Semantics & Design Rationale: Exits 0 on clean pass or empty stage, 1 on violation.
- *   Fails closed on unresolvable git errors.
+ *   1. Measure every auditable staged file and accumulate the batch totals.
+ *   2. Ask the judge for violations, then let the ledger resolve any exemptible one.
+ *   3. Return a verdict summary and hand it to the reporter for Agent or human output.
+ * Exit Semantics & Design Rationale: Exits 0 on a clean pass or an empty stage, 1 on any surviving
+ *   violation. Fails closed on unresolvable git errors. The exemption is applied after judging and
+ *   before escalation on purpose: a block already covered by a recorded grant must not keep counting
+ *   up, since that would demand human acknowledgement forever on a repeated CI run.
  */
 'use strict';
 
-const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const PROTOCOL_VERSION = '1.0.0';
 const STEP_ID = 'STAGED-DIFF-14';
-const RULE_FGT_GAT_001 = 'FGT-GAT-001';
+const GATE_NAME = 'pre-commit';
 
-// Single-file micro bounds
-const MAX_NEW_FILE_5D_ELOC = 360.0;
-const MAX_EXISTING_FILE_ADD_5D_ELOC = 120.0;
-const MAX_EXISTING_FILE_REFACTOR_WITNESS_ELOC = 180.0;
-const MAX_FILE_DEL_5D_ELOC = 100.0;
-const MIN_SUBSTANTIVE_RATIO = 0.60;
-const MIN_TSPR = 0.40;
-
-// Commit batch macro bounds
-const MAX_COMMIT_BATCH_ADD_5D_ELOC = 360.0;
-const MAX_COMMIT_BATCH_DEL_5D_ELOC = 280.0;
-
-// Empirical admission turnover
-const ADMISSION_TURNOVER_FLOOR = 3.0;
-const ADMISSION_TURNOVER_CAP = 25.0;
-
+const { BATCH_BANDS } = require('./lib/diff-bounds-policy');
+const { checkFileMicroViolations } = require('./lib/diff-envelope-judge');
+const { checkBatchMacroViolations } = require('./lib/diff-batch-judge');
 const {
-  isAuditableCodeFile,
-  getStagedStatusList,
-  loadRecentTurnoverRecords,
-  calculateEmpiricalAdmissionThreshold,
-  evaluateFileStagedDiff,
+    recordRunStreaks,
+    requestExemption,
+    streakKey,
+    GRANT_GRANTED,
+    GRANT_REUSED,
+} = require('./lib/diff-exemption-ledger');
+const { emitAgentVerdict, emitHumanVerdict } = require('./lib/diff-verdict-reporter');
+const {
+    isAuditableCodeFile,
+    getStagedStatusList,
+    loadRecentTurnoverRecords,
+    calculateEmpiricalAdmissionThreshold,
+    evaluateFileStagedDiff,
 } = require('./lib/differential-diff-parser');
 
+/** Violation types the ledger may resolve; every other type is structural. */
+const EXEMPTIBLE_VIOLATION_TYPES = Object.freeze(['SUBSTANTIVE_TARGET_DEFICIT']);
+
+/** Weight of a deleted 5D ELOC in the net turnover, below the weight of an added one. */
+const DELETION_TURNOVER_WEIGHT = 0.8;
+
+/** Streak at which a repeated block is announced as possibly structural. */
+const ESCALATION_NOTICE_STREAK = 2;
+
 /**
- * Detects whether the immediate preceding commit (HEAD) provided refactor addition capacity.
+ * Measures every auditable staged file and accumulates the batch totals.
  *
- * @param {number} minRequiredAddEloc - Minimum required 5D ELOC additions
- * @returns {boolean} True if preceding commit had sufficient refactoring additions
+ * @param stagedList - Staged entries from the parser.
+ * @returns Per-file metrics, an index by path, and the batch totals.
  */
-function checkHeadRefactorWitness(minRequiredAddEloc) {
-  try {
-    const { execFileSync } = require('child_process');
-    const raw = execFileSync('git', ['diff', 'HEAD~1..HEAD', '--numstat'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    let headAddLines = 0;
-    for (const line of raw.split(/\r?\n/)) {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length >= 3 && parts[0] !== '-') {
-        const added = parseInt(parts[0], 10);
-        if (!isNaN(added)) headAddLines += added;
-      }
+function measureStagedFiles(stagedList) {
+    const fileMetricsList = [];
+    const metricsByPath = new Map();
+    const totals = { physAdd: 0, physDel: 0, elocAdd: 0, elocDel: 0 };
+
+    for (const entry of stagedList) {
+        if (!isAuditableCodeFile(entry.path)) continue;
+        const isNew = entry.status.startsWith('A') || entry.status.startsWith('?');
+        const metrics = evaluateFileStagedDiff(entry.path, isNew);
+        fileMetricsList.push(metrics);
+        metricsByPath.set(metrics.path, metrics);
+        totals.physAdd += metrics.physAdd;
+        totals.physDel += metrics.physDel;
+        totals.elocAdd += metrics.elocAdd;
+        totals.elocDel += metrics.elocDel;
     }
-    const approxHeadElocAdd = headAddLines * 0.7;
-    return approxHeadElocAdd >= minRequiredAddEloc;
-  } catch {
-    return false;
-  }
+    totals.turnover = totals.elocAdd + totals.elocDel * DELETION_TURNOVER_WEIGHT;
+    return { fileMetricsList, metricsByPath, totals };
 }
 
 /**
- * Checks single-file micro differential envelopes.
+ * Applies the streak and exemption policy to this run, mutating the violation list in place.
  *
- * @param {Array<object>} fileMetricsList
- * @param {number} totalBatchAdd - Total added 5D ELOC in batch for refactoring witness verification
- * @param {Array<object>} violations
+ * @param violations - Violations emitted by this run.
+ * @param metricsByPath - Per-file metrics keyed by staged path.
+ * @param ackStreak - Operator acknowledgement that allows counting past the escalation threshold.
+ * @returns Streak map, exemption list and escalation notices.
  */
-function checkFileMicroViolations(fileMetricsList, totalBatchAdd, violations) {
-  for (const m of fileMetricsList) {
-    const addCeiling = m.isNew
-      ? MAX_NEW_FILE_5D_ELOC
-      : m.elocDel > 10
-      ? MAX_EXISTING_FILE_REFACTOR_WITNESS_ELOC
-      : MAX_EXISTING_FILE_ADD_5D_ELOC;
-    if (m.elocAdd > addCeiling) {
-      violations.push({
-        type: 'FILE_ADD_OVERFLOW',
-        ruleId: RULE_FGT_GAT_001,
-        file: m.path,
-        message: `单文件新增有效逻辑 (${m.elocAdd.toFixed(1)} 5D ELOC) 超出上限 (${addCeiling.toFixed(1)} 5D ELOC)`,
-        actionableFix: `拆分 ${m.path} 为更细内聚子模块，或分批进行原子提交。`,
-      });
-    }
+function resolveViolations(violations, metricsByPath, ackStreak) {
+    const recordedStreaks = recordRunStreaks(violations);
+    const exemptions = [];
+    const unresolved = [];
 
-    const isRefactorWitnessed =
-      totalBatchAdd >= m.elocDel * 0.7 || checkHeadRefactorWitness(m.elocDel * 0.7);
-    const delCeiling = isRefactorWitnessed ? MAX_COMMIT_BATCH_DEL_5D_ELOC : MAX_FILE_DEL_5D_ELOC;
-    if (m.elocDel > delCeiling) {
-      violations.push({
-        type: 'CAPABILITY_EROSION',
-        ruleId: RULE_FGT_GAT_001,
-        file: m.path,
-        message: `单文件删除逻辑 (${m.elocDel.toFixed(1)} 5D ELOC) 超出安全包络 (${delCeiling.toFixed(1)} 5D ELOC)`,
-        actionableFix: `大面积删除需拆解为能力迁移与废弃分阶段提交，并附带重构证词。`,
-      });
-    }
+    for (const violation of violations) {
+        violation.streak = recordedStreaks[streakKey(violation.file ?? '.', violation.type)] ?? 1;
+        const metrics = metricsByPath.get(violation.file);
+        const exemptible = EXEMPTIBLE_VIOLATION_TYPES.includes(violation.type) && metrics;
 
-    if (m.physAdd >= 10) {
-      if (m.substantiveRatio < MIN_SUBSTANTIVE_RATIO) {
-        violations.push({
-          type: 'SUBSTANTIVE_DEFICIT',
-          ruleId: RULE_FGT_GAT_001,
-          file: m.path,
-          message: `实质行占比 (${(m.substantiveRatio * 100).toFixed(1)}%) 低于刚性底线 (${(MIN_SUBSTANTIVE_RATIO * 100).toFixed(1)}%)`,
-          actionableFix: `移除空注释、纯占位或多余空行，提高代码实质技术密度。`,
+        if (!exemptible) {
+            unresolved.push(violation);
+            continue;
+        }
+
+        const outcome = requestExemption({
+            file: violation.file,
+            violationType: violation.type,
+            ruleId: violation.ruleId,
+            isNew: metrics.isNew,
+            physAdd: metrics.physAdd,
+            measured: violation.measured,
+            eligibilityValue: violation.measured,
+            streak: violation.streak,
+            batchGrantedCount: exemptions.filter((entry) => entry.fresh).length,
         });
-      }
 
-      if (m.tspr < MIN_TSPR) {
-        violations.push({
-          type: 'CODE_DILUTION',
-          ruleId: RULE_FGT_GAT_001,
-          file: m.path,
-          message: `有效载荷率 TSPR (${(m.tspr * 100).toFixed(1)}%) 低于门槛 (${(MIN_TSPR * 100).toFixed(1)}%)`,
-          actionableFix: `消融机械转发跳板与空壳门面，提高真实语义行比例。`,
-        });
-      }
+        if (outcome.outcome === GRANT_GRANTED || outcome.outcome === GRANT_REUSED) {
+            exemptions.push({
+                violation,
+                record: outcome.record,
+                fresh: outcome.outcome === GRANT_GRANTED,
+            });
+            continue;
+        }
+        violation.exemption = { outcome: outcome.outcome, reasons: outcome.reasons };
+        unresolved.push(violation);
     }
-  }
+
+    violations.splice(0, violations.length, ...unresolved);
+    return {
+        streaks: recordedStreaks,
+        exemptions,
+        escalations: collectStreakEscalations(unresolved, ackStreak),
+    };
 }
 
 /**
- * Checks batch-level macro differential envelopes and empirical admission turnover.
+ * Builds escalation notices for the violations that remain unresolved.
  *
- * @param {object} params
- * @param {Array<object>} violations
+ * @param unresolved - Violations that no grant covers.
+ * @param ackStreak - Whether the operator acknowledged the escalation.
+ * @returns Escalation notices.
  */
-function checkBatchMacroViolations(params, violations) {
-  const { totalElocAdd, totalElocDel, totalTurnover, admissionThreshold, hasAuditableCode } = params;
-
-  if (totalElocAdd > MAX_COMMIT_BATCH_ADD_5D_ELOC) {
-    violations.push({
-      type: 'BATCH_ADD_OVERFLOW',
-      ruleId: RULE_FGT_GAT_001,
-      file: '.',
-      message: `批次总新增有效逻辑 (${totalElocAdd.toFixed(1)} 5D ELOC) 超出批次宏观上限 (${MAX_COMMIT_BATCH_ADD_5D_ELOC.toFixed(1)} 5D ELOC)`,
-      actionableFix: `根据 batch-commit 技能规范，按架构分层拆分为多个原子提交。`,
-    });
-  }
-
-  if (totalElocDel > MAX_COMMIT_BATCH_DEL_5D_ELOC) {
-    violations.push({
-      type: 'BATCH_DEL_OVERFLOW',
-      ruleId: RULE_FGT_GAT_001,
-      file: '.',
-      message: `批次总删除逻辑 (${totalElocDel.toFixed(1)} 5D ELOC) 超出批次宏观上限 (${MAX_COMMIT_BATCH_DEL_5D_ELOC.toFixed(1)} 5D ELOC)`,
-      actionableFix: `将大规模消除分为废弃隔离与物理移除两个独立批次提交。`,
-    });
-  }
-
-  if (hasAuditableCode && totalTurnover < admissionThreshold) {
-    violations.push({
-      type: 'ADMISSION_TURNOVER_DEFICIT',
-      ruleId: RULE_FGT_GAT_001,
-      file: '.',
-      message: `批次净 5D ELOC 周转量 (${totalTurnover.toFixed(1)}) 低于经验准入底线 (${admissionThreshold.toFixed(1)})`,
-      actionableFix: `每批次提交必须包含有效实质代码更替量，避免仅提交无实质差异的微量修改。`,
-    });
-  }
+function collectStreakEscalations(unresolved, ackStreak) {
+    const escalations = [];
+    for (const violation of unresolved) {
+        const identifier = violation.file ?? '.';
+        if (violation.streak === ESCALATION_NOTICE_STREAK) {
+            escalations.push({
+                ruleId: 'GAT-STREAK-001',
+                file: identifier,
+                message: `${identifier} 的 ${violation.type} 已连续第 ${violation.streak} 次阻断，须评估是否属结构性冲突。`,
+            });
+        }
+        if (violation.streak >= 5) {
+            escalations.push({
+                ruleId: 'GAT-STREAK-001',
+                file: identifier,
+                message: `${identifier} 的 ${violation.type} 连续 ${violation.streak} 次阻断尚未收敛，需人工确认后携 --acknowledge-streak 复跑。`,
+                acknowledged: ackStreak,
+            });
+            if (ackStreak) violation.acknowledgedStreak = true;
+        }
+    }
+    return escalations;
 }
 
 /**
- * Evaluates full staged diff against two-tier envelopes and admission.
+ * Evaluates the full staged diff and applies the streak and exemption policy.
  *
- * @param {object} [options]
- * @returns {object} Verdict summary
+ * @param options - Object carrying `ackStreak`.
+ * @returns Verdict summary.
  */
 function evaluateStagedDifferentialBounds(options = {}) {
-  const stagedList = getStagedStatusList();
-  if (stagedList.length === 0) {
+    const stagedList = getStagedStatusList();
+    if (stagedList.length === 0) {
+        return {
+            passed: true,
+            stagedCount: 0,
+            auditedCount: 0,
+            batchTotals: { physAdd: 0, physDel: 0, elocAdd: 0, elocDel: 0, turnover: 0 },
+            admittedThreshold: BATCH_BANDS.turnoverFloor,
+            violations: [],
+            exemptions: [],
+            escalations: [],
+        };
+    }
+
+    const { fileMetricsList, metricsByPath, totals } = measureStagedFiles(stagedList);
+    const admissionThreshold = calculateEmpiricalAdmissionThreshold(loadRecentTurnoverRecords());
+
+    const violations = [];
+    checkFileMicroViolations(fileMetricsList, totals.elocAdd, violations);
+    checkBatchMacroViolations(
+        {
+            totalElocAdd: totals.elocAdd,
+            totalElocDel: totals.elocDel,
+            totalTurnover: totals.turnover,
+            admissionThreshold,
+            hasAuditableCode: fileMetricsList.length > 0,
+        },
+        violations,
+    );
+
+    const policy = resolveViolations(violations, metricsByPath, options.ackStreak);
     return {
-      passed: true,
-      stagedCount: 0,
-      auditedCount: 0,
-      batchTotals: { elocAdd: 0, elocDel: 0, turnover: 0 },
-      admittedThreshold: ADMISSION_TURNOVER_FLOOR,
-      violations: [],
+        passed: violations.length === 0,
+        stagedCount: stagedList.length,
+        auditedCount: fileMetricsList.length,
+        batchTotals: totals,
+        admittedThreshold: admissionThreshold,
+        violations,
+        exemptions: policy.exemptions,
+        escalations: policy.escalations,
+        streaks: policy.streaks,
     };
-  }
-
-  const fileMetricsList = [];
-  let totalPhysAdd = 0;
-  let totalPhysDel = 0;
-  let totalElocAdd = 0;
-  let totalElocDel = 0;
-  let hasAuditableCode = false;
-
-  for (const entry of stagedList) {
-    const isCode = isAuditableCodeFile(entry.path);
-    if (!isCode) continue;
-    hasAuditableCode = true;
-    const isNew = entry.status.startsWith('A') || entry.status.startsWith('?');
-    const m = evaluateFileStagedDiff(entry.path, isNew);
-    fileMetricsList.push(m);
-    totalPhysAdd += m.physAdd;
-    totalPhysDel += m.physDel;
-    totalElocAdd += m.elocAdd;
-    totalElocDel += m.elocDel;
-  }
-
-  const totalTurnover = totalElocAdd + totalElocDel * 0.8;
-  const historicalTurnovers = loadRecentTurnoverRecords();
-  const admissionThreshold = calculateEmpiricalAdmissionThreshold(historicalTurnovers);
-
-  const violations = [];
-  checkFileMicroViolations(fileMetricsList, totalElocAdd, violations);
-  checkBatchMacroViolations({
-    totalElocAdd,
-    totalElocDel,
-    totalTurnover,
-    admissionThreshold,
-    hasAuditableCode,
-  }, violations);
-
-  const passed = violations.length === 0;
-
-  return {
-    passed,
-    stagedCount: stagedList.length,
-    auditedCount: fileMetricsList.length,
-    batchTotals: {
-      physAdd: totalPhysAdd,
-      physDel: totalPhysDel,
-      elocAdd: totalElocAdd,
-      elocDel: totalElocDel,
-      turnover: totalTurnover,
-    },
-    admittedThreshold: admissionThreshold,
-    violations,
-  };
 }
 
 /**
  * Main entry point.
  */
 function main() {
-  const args = process.argv.slice(2);
-  const isAgent = args.includes('--agent') || args.includes('-a') || args.includes('--json');
+    const args = process.argv.slice(2);
+    const isAgent = args.includes('--agent') || args.includes('-a') || args.includes('--json');
+    const acknowledged = args.includes('--acknowledge-streak');
+    const context = { PROTOCOL_VERSION, GATE_NAME, STEP_ID };
 
-  const verdict = evaluateStagedDifferentialBounds();
-
-  if (isAgent) {
-    if (verdict.passed) {
-      process.stdout.write(
-        JSON.stringify(
-          {
-            protocolVersion: PROTOCOL_VERSION,
-            status: 'PASS',
-            gate: 'pre-commit',
-            stepId: STEP_ID,
-            summary: 'Staged 5D ELOC differential bounds and admission verified cleanly.',
-            batchTotals: verdict.batchTotals,
-            admittedThreshold: verdict.admittedThreshold,
-          },
-          null,
-          2
-        ) + '\n'
-      );
-      process.exit(0);
-    } else {
-      process.stdout.write(
-        JSON.stringify(
-          {
-            protocolVersion: PROTOCOL_VERSION,
-            status: 'BLOCK',
-            gate: 'pre-commit',
-            stepId: STEP_ID,
-            summary: `Staged 5D differential bounds check failed with ${verdict.violations.length} violation(s).`,
-            violations: verdict.violations.map((v) => ({
-              ruleId: v.ruleId,
-              severity: 'BLOCK',
-              file: v.file,
-              message: v.message,
-              actionableFix: v.actionableFix,
-              verificationCommand: 'node scripts/common/gate-differential-bounds.js',
-            })),
-            agentDirectives: {
-              remediationPriority: [RULE_FGT_GAT_001],
-              verificationCommand: 'node scripts/common/gate-differential-bounds.js',
-              fastRecheckCommand: 'pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent',
-            },
-          },
-          null,
-          2
-        ) + '\n'
-      );
-      process.exit(1);
-    }
-  }
-
-  // Human console mode
-  if (verdict.passed) {
-    if (verdict.auditedCount === 0) {
-      console.log('✔ [STAGED-DIFF-14] 暂存区无核心代码差异变更，跳过差分边界审查');
-    } else {
-      console.log(
-        `✔ [STAGED-DIFF-14] 暂存区五维差分双向钳制合规 (新增: +${verdict.batchTotals.elocAdd.toFixed(1)}, 删除: -${verdict.batchTotals.elocDel.toFixed(1)}, 周转: ${verdict.batchTotals.turnover.toFixed(1)} >= ${verdict.admittedThreshold.toFixed(1)})`
-      );
-    }
-    process.exit(0);
-  } else {
-    console.error(`✖ [STAGED-DIFF-14] 暂存区五维差分边界违规 (${verdict.violations.length} 项违规):`);
-    for (const v of verdict.violations) {
-      console.error(`  - [${v.type}] ${v.file}: ${v.message}`);
-      console.error(`    修复: ${v.actionableFix}`);
-    }
-    process.exit(1);
-  }
+    const verdict = evaluateStagedDifferentialBounds({ ackStreak: acknowledged });
+    if (isAgent) emitAgentVerdict(verdict, acknowledged, context);
+    else emitHumanVerdict(verdict);
 }
 
-if (require.main === module) {
-  main();
-}
+if (require.main === module) main();
 
 module.exports = {
-  classifyLine,
-  evaluateStagedDifferentialBounds,
-  evaluateFileStagedDiff,
-  calculateEmpiricalAdmissionThreshold,
-  MAX_NEW_FILE_5D_ELOC,
-  MAX_EXISTING_FILE_ADD_5D_ELOC,
-  MAX_FILE_DEL_5D_ELOC,
-  MAX_COMMIT_BATCH_ADD_5D_ELOC,
-  MAX_COMMIT_BATCH_DEL_5D_ELOC,
-  ADMISSION_TURNOVER_FLOOR,
-  ADMISSION_TURNOVER_CAP,
+    REPO_ROOT,
+    evaluateStagedDifferentialBounds,
+    measureStagedFiles,
+    resolveViolations,
 };

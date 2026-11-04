@@ -125,6 +125,7 @@
     "validate-self-audit": "node scripts/validate-self-audit.js",
     "validate-self-refactor": "node scripts/validate-self-refactor.js",
     "validate-redundant-reads": "node scripts/validate-redundant-reads.js",
+    "validate-diff-exemption": "node scripts/validate-diff-exemption.js",
     "self:audit": "node scripts/run-self-audit.js",
     "bench-asymmetric": "node scripts/bench-asymmetric.js",
     "validate-review-memory": "node scripts/validate-review-memory.js",
