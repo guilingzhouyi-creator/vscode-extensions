@@ -518,7 +518,7 @@ export function assembleReportingOptions(
     overrides: ConfigOverrides,
 ): Pick<
     ScanConfig,
-    'format' | 'logLevel' | 'logFile' | 'suppressions' | 'baselineGranularity' | 'out'
+    'format' | 'pretty' | 'logLevel' | 'logFile' | 'suppressions' | 'baselineGranularity' | 'out'
 > {
     const rawLogLevel =
         (overrides.logLevel as LogLevel) ||
@@ -530,6 +530,7 @@ export function assembleReportingOptions(
 
     return {
         format: overrides.format || fileCfg.format || base.format,
+        pretty: overrides.pretty ?? fileCfg.pretty ?? base.pretty,
         logLevel: rawLogLevel,
         logFile: resolveLogFilePath(base.root, rawLogFile),
         suppressions: fileCfg.suppressions ?? base.suppressions,

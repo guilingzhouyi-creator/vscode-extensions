@@ -332,6 +332,11 @@ function isExemptRuleFamily(candidateId: string): boolean {
 let cachedRegistryLength = 0;
 let registeredCanonicalFormsCache: Set<string> | null = null;
 
+/** Cap on remembered unresolved candidates, keeping the miss cache bounded per process. */
+const UNRESOLVED_CACHE_LIMIT = 512;
+/** Candidates that exhausted every registry lookup, so repeats in one file skip the rescan. */
+const unresolvedRuleIds = new Set<string>();
+
 /**
  * Returns the set of canonical 3-letter forms of registered rules, refreshing
  * if registry size changed.
@@ -353,6 +358,7 @@ function getRegisteredCanonicalForms(): Set<string> {
  * through canonical 3-letter alias equivalence, or in the workspace-wide SSOT catalog.
  */
 function isRegisteredOrAliasRule(candidateId: string): boolean {
+    if (unresolvedRuleIds.has(candidateId)) return false;
     if (getRule(candidateId)) return true;
 
     const legacyResolved = canonicalRuleId(candidateId);
@@ -372,6 +378,9 @@ function isRegisteredOrAliasRule(candidateId: string): boolean {
         return true;
     }
 
+    if (unresolvedRuleIds.size < UNRESOLVED_CACHE_LIMIT) {
+        unresolvedRuleIds.add(candidateId);
+    }
     return false;
 }
 

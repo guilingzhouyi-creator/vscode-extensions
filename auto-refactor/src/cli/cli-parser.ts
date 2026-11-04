@@ -84,7 +84,8 @@ score:showScore
 memory:memory
 record-trajectory:recordTrajectory
 fast:fastMode
-fast-mode:fastMode`;
+fast-mode:fastMode
+pretty:pretty`;
 
 /** Compact definition table for standalone flags mapping to [property, booleanValue]. */
 const STANDALONE_FLAG_MAP_DEF = `no-cache:cache:false
@@ -519,6 +520,8 @@ Options:
     --analyzers <a,b,c>         Allow-list by name (built-in or custom). Declared but
                                 unlisted analyzers are disabled for this run.
     --format <json|sarif|text|agent|capp|compact|praxis|aas>  Output format (default: text)
+    --pretty                    Indent JSON-shaped output for human reading (default: off;
+                                AAS/compact stay single-line to conserve agent tokens)
     --out <file>                Write report to a file instead of stdout
     --fail-on-issue             Exit non-zero if any 'error' issue (CI gate)
     --fail-on-severity <lvl>    Exit non-zero if any issue >= lvl (info|warning|error); with a

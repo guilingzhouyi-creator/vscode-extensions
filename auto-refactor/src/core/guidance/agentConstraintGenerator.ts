@@ -31,6 +31,11 @@ export type { AgentTopologyLayer } from '../reporters/agent-directives-types';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
 import { getRoleBudget } from '../intelligence/elastic-budget-matrix';
 import { compressDiagnosticSentence, cleanSuggestion } from '../reporting/aas-remediation';
+import {
+    estimateNarrowTokens,
+    estimateTokens,
+    measureJsonBaseline,
+} from './token-estimate';
 
 /** Maximum number of memory rule hits rendered as frequent violations in the guidance prompt. */
 const MAX_MEMORY_RULE_HITS = 5;
@@ -237,24 +242,28 @@ function renderGuidanceMarkdown(params: GuidanceMarkdownParams): string {
 
     if (hardConstraints.length > 0) {
         lines.push(GuidanceMessages.SECTION_HARD_CONSTRAINTS);
-        lines.push(...hardConstraints.map((constraint) => `- ⚠️ ${constraint}`));
+        lines.push(
+            ...hardConstraints.map((constraint) => `${GuidanceMessages.BULLET}${constraint}`),
+        );
         lines.push('');
     }
 
     if (historicalPitfalls.length > 0) {
         lines.push(GuidanceMessages.SECTION_HISTORICAL_PITFALLS);
-        lines.push(...historicalPitfalls.map((pitfall) => `- ❌ ${pitfall}`));
+        lines.push(...historicalPitfalls.map((pitfall) => `${GuidanceMessages.BULLET}${pitfall}`));
         lines.push('');
     }
 
     if (frequentViolations.length > 0) {
         lines.push(GuidanceMessages.SECTION_FREQUENT_VIOLATIONS);
-        lines.push(...frequentViolations.map((violation) => `- 🔍 ${violation}`));
+        lines.push(
+            ...frequentViolations.map((violation) => `${GuidanceMessages.BULLET}${violation}`),
+        );
         lines.push('');
     }
 
     lines.push(GuidanceMessages.SECTION_RECOMMENDED_PATTERNS);
-    lines.push(...recommendedPatterns.map((pattern) => `- ✨ ${pattern}`));
+    lines.push(...recommendedPatterns.map((pattern) => `${GuidanceMessages.BULLET}${pattern}`));
     lines.push('');
 
     return lines.join('\n');
@@ -339,10 +348,8 @@ const VERDICT_INFO = 'INFO' as const;
 const VERDICT_PASS = 'PASS' as const;
 const SEVERITY_ERROR = 'error' as const;
 const SEVERITY_WARNING = 'warning' as const;
-const CHARS_PER_TOKEN = 4;
-const BASELINE_CHARS_PER_DIRECTIVE = 600;
-const BASELINE_HEADER_CHARS = 200;
-const ZERO_DIRECTIVE_SAVINGS_RATIO = 0.95;
+/** Ratio reported when the compact prompt replaces an identical-size baseline (no net gain). */
+const NO_SAVINGS_RATIO = 0;
 
 /** Directive level in Compact Agent Prompt Protocol (CAPP). */
 export type CompactDirectiveSeverity =
@@ -468,10 +475,11 @@ function renderGuardDirective(params: DirectiveRenderParams): CompactGuardDirect
     const { issue, directiveSeverity, targetFile, lineNumber } = params;
     const ruleId = issue.rule;
     const rawMessage = (issue.message || '').replace(/\s+/g, ' ').trim();
-    const summary =
+    const summary = normalizeDirectiveSummary(
         rawMessage.length >= VERBOSE_DIRECTIVE_THRESHOLD
             ? compressDiagnosticSentence(rawMessage)
-            : rawMessage;
+            : rawMessage,
+    );
     const rawSuggestion = issue.suggestion
         ? issue.suggestion.replace(/\s+/g, ' ').trim()
         : undefined;
@@ -479,7 +487,7 @@ function renderGuardDirective(params: DirectiveRenderParams): CompactGuardDirect
         rawSuggestion && rawSuggestion.length >= VERBOSE_DIRECTIVE_THRESHOLD
             ? cleanSuggestion(rawSuggestion)
             : rawSuggestion;
-    const fixPart = fixHint ? ` Fix: ${fixHint}` : '';
+    const fixPart = fixHint ? ` Fix: ${normalizeDirectiveSummary(fixHint)}.` : '';
     const actionable = issue.actionable;
     const actionPart = actionable
         ? ` -> action:${actionable.action} [safe=${actionable.safeToAutomate}]`
@@ -497,6 +505,20 @@ function renderGuardDirective(params: DirectiveRenderParams): CompactGuardDirect
         directiveType: DIRECTIVE_TYPE_GUARD,
         renderedDirective,
     };
+}
+
+/**
+ * Strips trailing sentence punctuation so the renderer owns the delimiter.
+ *
+ * The directive template inserts its own `.`, so a summary that already ends with `.` renders `..`.
+ * Removing the source punctuation keeps one delimiter regardless of whether the upstream analyzer
+ * emitted prose (period-terminated) or a compressed fragment (unterminated).
+ *
+ * @param text - Summary or fix hint fragment.
+ * @returns Fragment without trailing `.` / `。` or surrounding whitespace.
+ */
+function normalizeDirectiveSummary(text: string): string {
+    return text.replace(/[.。]+\s*$/, '').trim();
 }
 
 /**
@@ -557,15 +579,13 @@ export function formatCompactAgentPrompt(
         count > 0 ? `${header}\n${renderedDirectives.join('\n')}` : `${header} (all clear)`;
 
     const compactChars = compactPromptText.length;
-    const estimatedTokens = Math.max(1, Math.ceil(compactChars / CHARS_PER_TOKEN));
-    const baselineEquivalentChars = Math.max(
-        compactChars,
-        count * BASELINE_CHARS_PER_DIRECTIVE + BASELINE_HEADER_CHARS,
-    );
+    const baselineChars = Math.max(compactChars, measureJsonBaseline(effectiveIssues));
+    const estimatedTokens = estimateTokens(compactPromptText);
+    const baselineTokens = estimateNarrowTokens(baselineChars);
     const tokenSavingsRatio =
         count === 0
-            ? ZERO_DIRECTIVE_SAVINGS_RATIO
-            : Number((1 - compactChars / baselineEquivalentChars).toFixed(2));
+            ? NO_SAVINGS_RATIO
+            : Number((1 - estimatedTokens / Math.max(1, baselineTokens)).toFixed(2));
 
     return {
         protocolVersion: version,

@@ -12,6 +12,7 @@
 
 import type { Issue } from '../types';
 import type { AasFixRecipe } from './aas-types';
+import { isPlaceholderPatchText } from '../../utils/placeholder-names';
 
 /** Remediation action code instructing identifier renaming to match domain conventions. */
 export const ACTION_RENAME_IDENTIFIER = 'rename_identifier';
@@ -48,8 +49,9 @@ export const RULE_HIGH_COMPLEXITY = 'high-complexity';
 const MAX_SUGGESTION_CHARS = 80;
 const ELLIPSIS_TRUNCATE_CHARS = 77;
 const ELLIPSIS = '…';
-const GENERIC_PLACEHOLDER_RE = /\b(?:[A-Z0-9_]+_TEXT|MAGIC_NUMBER_\d+|CONST_\d+)\b/;
 const CODE_TEMPLATE_PREFIX_RE = /^(?:const\s+|let\s+|function\s+|export\s+|import\s+|return\s+|`)/;
+/** Statement terminators that prove a suggestion is executable code rather than prose. */
+const CODE_STATEMENT_RE = /(?:=>|;\s*$|\{\s*$|\}\s*$|\breturn\b|\bawait\b)/;
 
 const SENTENCE_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
     [
@@ -79,6 +81,10 @@ const SENTENCE_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
     [
         /Cognitive\s+complexity\s*\((\d+)\)\s*exceeds\s*threshold\s*\((\d+)\)\s*in\s*(?:function|method)?\s*('?[a-zA-Z0-9_$-]+'?)/i,
         'CC $1 > $2 in $3',
+    ],
+    [
+        /(?:Function|Method)\s+["']?([a-zA-Z0-9_$.-]+)["']?\s+has\s+cyclomatic\s+complexity\s+(\d+)\s*\(\s*(?:exceeds\s+relaxed\s+)?threshold\s+(\d+)[^)]*\)/i,
+        'CC $2 > $3 in $1',
     ],
     [/Effective\s+code\s+volume\s+budget\s+exceeded\.?/i, 'ELOC budget exceeded'],
     [/Physical\s+line\s+count\s+ceiling\s+exceeded\.?/i, 'LOC ceiling exceeded'],
@@ -131,6 +137,18 @@ const SENTENCE_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
         'dup literal $1 x$2',
     ],
     [
+        /Literal\s+(\S[^]{0,120}?)\s+is\s+repeated\s+(\d+)\s+times\s+in\s+this\s+file(?:[^]*)?/i,
+        'dup literal $1 x$2',
+    ],
+    [
+        /File\s+is\s+large;\s*consider\s+splitting\s*\(\s*lines\s+(\d+)\s*>=\s*(?:warn|error|fail)?\s*threshold\s+(\d+)\s*;\s*functions\s+(\d+)\s*>=\s*(?:warn|error|fail)?\s*threshold\s+(\d+)\s*\)\.?/i,
+        'file $1 >= $2 lines, fns $3 >= $4 (split)',
+    ],
+    [
+        /File\s+is\s+large;\s*consider\s+splitting\s*\(\s*functions\s+(\d+)\s*>=\s*(?:warn|error|fail)?\s*threshold\s+(\d+)\s*\)\.?/i,
+        'file fns $1 >= $2 (split)',
+    ],
+    [
         /File\s+is\s+large;\s*consider\s+splitting\s*\(lines\s+(\d+)\s*>=\s*(?:warn|error|fail)?\s*threshold\s+(\d+)\)\.?/i,
         'file lines $1 >= $2 (split)',
     ],
@@ -169,6 +187,22 @@ const SENTENCE_REPLACEMENTS: ReadonlyArray<readonly [RegExp, string]> = [
     [
         /(?:Facade\s+method\s+merely\s+delegates\s+to\s+[^.]*|Single-target\s+pass-through\s+trampoline\s+detected)\.?/i,
         'trampoline pass-through',
+    ],
+    [
+        /Token\s+density\s+floor\s+breached:\s*tau\s*=\s*([\d.]+)\s+tokens?\s+per\s+effective\s+line,?\s*below\s+the\s+([\d.]+)\s+floor\s+across\s+([\d.]+)\s+ELOC\.?/i,
+        'tau $1 < $2 over $3 ELOC',
+    ],
+    [
+        /Dynamic\s+dilution\s+imbalance\s*\(ratio\s+([\d.]+(?::[\d.]+)?)\s*>\s*([\d.]+(?::[\d.]+)?)\):\s*dynamic\s+physical\s+envelope\s+for\s+([\d.]+)\s+ELOC\s+is\s+(\d+)\s+LOC,?\s*actual\s+is\s+(\d+)\s+LOC\.?/i,
+        'dilution $1 > $2 at $3 ELOC: $4 vs $5 LOC',
+    ],
+    [
+        /Tautological\s+loop\s+traversal\s+detected\s+in\s+['"]?([^'":]+)['"]?:[^]*deltaEntropy:\s*([\d.]+)\)?\.?/i,
+        'tautological loop in $1 (dH=$2)',
+    ],
+    [
+        /Tautological\s+loop\s+traversal\s+detected\s+in\s+['"]?([^'":]+)['"]?[^]*/i,
+        'tautological loop in $1',
     ],
 ];
 
@@ -233,6 +267,9 @@ export function cleanSuggestion(rawContent: string): string | undefined {
             /^(?:Please\s+|Consider\s+|It\s+is\s+(?:recommended|required)\s+to\s+|You\s+should\s+|Ensure\s+that\s+|Try\s+to\s+)/i,
             '',
         );
+    if (CODE_STATEMENT_RE.test(trimmed)) {
+        return boundCodeSnippet(trimmed);
+    }
     const splitIndex = trimmed.search(/(?<!\b(?:e\.g|i\.e|etc|vs|cf|fig))\.\s+|[!?\n]/i);
     const firstClause =
         splitIndex !== -1 ? trimmed.slice(0, splitIndex).trim() : trimmed.replace(/\.$/, '').trim();
@@ -242,9 +279,46 @@ export function cleanSuggestion(rawContent: string): string | undefined {
     return firstClause.slice(0, ELLIPSIS_TRUNCATE_CHARS) + ELLIPSIS;
 }
 
-function isUsablePatchText(text: string | undefined): boolean {
-    if (!text) return false;
-    return !GENERIC_PLACEHOLDER_RE.test(text);
+/**
+ * Bounds an executable code snippet without splicing it mid-token.
+ *
+ * Prose may be cut at any character; code may not, because a truncated statement reads as a
+ * syntactically valid but semantically wrong instruction. Over-long snippets therefore degrade to
+ * the first complete line rather than to a fixed-length slice.
+ *
+ * @param snippet - Trimmed code template.
+ * @returns Either the intact snippet or its first complete line.
+ */
+function boundCodeSnippet(snippet: string): string {
+    if (snippet.length <= MAX_SUGGESTION_CHARS) return snippet;
+    const firstLine = snippet.split('\n')[0].trim();
+    if (firstLine.length > 0 && firstLine.length <= MAX_SUGGESTION_CHARS) return firstLine;
+    return `${snippet.slice(0, ELLIPSIS_TRUNCATE_CHARS).trimEnd()}${ELLIPSIS}`;
+}
+
+/**
+ * Reports whether a patch text is safe to hand to an automated rewriter.
+ *
+ * @param text - Candidate patch replacement text, template snippet, or patch string.
+ * @param literal - Literal the patch was derived from, when the issue carries one.
+ * @returns True when the text exists and contains no generated placeholder identifier.
+ */
+function isUsablePatchText(text: string | undefined, literal: string | undefined): boolean {
+    return !isPlaceholderPatchText(text, literal);
+}
+
+/**
+ * Extracts the literal a constant-extraction issue was derived from.
+ *
+ * Only literal findings carry it; every other rule returns undefined and the patch check then
+ * stays literal-independent.
+ *
+ * @param issue - Detected static analysis issue.
+ * @returns The literal text, or undefined when the issue is not literal-derived.
+ */
+function literalOf(issue: Issue): string | undefined {
+    const value = issue.detail?.value;
+    return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 /**
@@ -255,31 +329,39 @@ function isUsablePatchText(text: string | undefined): boolean {
  */
 export function buildFixRecipe(issue: Issue): AasFixRecipe | undefined {
     const actionable = issue.actionable;
+    const literal = literalOf(issue);
     if (actionable?.action) {
         const rawTemplate = actionable.templateSnippet;
         const conciseTemplate =
-            rawTemplate && isUsablePatchText(rawTemplate)
+            rawTemplate && isUsablePatchText(rawTemplate, literal)
                 ? cleanSuggestion(rawTemplate)
                 : undefined;
         const patchValue = actionable.patch;
         const hasValidPatch =
             typeof patchValue === 'string'
-                ? isUsablePatchText(patchValue)
-                : Boolean(patchValue && isUsablePatchText(patchValue.replacementText));
-        const isSafe = hasValidPatch ? actionable.safeToAutomate : false;
+                ? isUsablePatchText(patchValue, literal)
+                : Boolean(patchValue && isUsablePatchText(patchValue.replacementText, literal));
         return {
             action: actionable.action,
             ...(hasValidPatch && patchValue ? { patch: patchValue } : {}),
             ...(conciseTemplate ? { template: conciseTemplate } : {}),
-            ...(actionable.safeToAutomate !== undefined ? { safeToAutomate: isSafe } : {}),
+            // Automation safety describes a concrete patch; without one the flag would assert a
+            // guarantee the recipe cannot keep, so it is omitted rather than emitted as false.
+            ...(hasValidPatch && actionable.safeToAutomate !== undefined
+                ? { safeToAutomate: actionable.safeToAutomate }
+                : {}),
         };
     }
     if (issue.suggestion) {
         const isCodeSnippet = CODE_TEMPLATE_PREFIX_RE.test(issue.suggestion.trim());
         const concise = isCodeSnippet ? cleanSuggestion(issue.suggestion) : undefined;
+        // A template is an instruction to write code, so it is subject to the same placeholder
+        // filter as a patch: `const X_TEXT = '…'` names nothing worth introducing.
+        const usableTemplate =
+            concise && !isPlaceholderPatchText(concise, literal) ? concise : undefined;
         return {
             action: resolveActionFromRule(issue.rule),
-            ...(concise ? { template: concise } : {}),
+            ...(usableTemplate ? { template: usableTemplate } : {}),
         };
     }
     return undefined;
