@@ -15,13 +15,7 @@
  *   API, and reporting consumers instead of duplicating architecture prose.
  */
 
-import type { DiagnosticDescriptor } from './types';
-
-/** Risk tier for architecture boundary breaches that must render as High severity. */
-const RISK_HIGH = 'High';
-
-/** Risk tier for architecture boundary breaches that render as Medium severity. */
-const RISK_MEDIUM = 'Medium';
+import { RISK_HIGH, RISK_MEDIUM, type DiagnosticDescriptor } from './types';
 
 /**
  * Architecture-rule diagnostic descriptor catalog.

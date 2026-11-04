@@ -16,14 +16,7 @@
  *   while analyzer code remains limited to detection and location reporting.
  */
 
-import type { DiagnosticDescriptor } from './types';
-
-/** Risk tier for hygiene findings that render as Medium severity. */
-const RISK_MEDIUM = 'Medium';
-/** Risk tier for hygiene findings that render as High severity. */
-const RISK_HIGH = 'High';
-/** Risk tier for hygiene findings that render as Low severity. */
-const RISK_LOW = 'Low';
+import { RISK_HIGH, RISK_LOW, RISK_MEDIUM, type DiagnosticDescriptor } from './types';
 
 /**
  * Hygiene-rule diagnostic descriptor catalog.

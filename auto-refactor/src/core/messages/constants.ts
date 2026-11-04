@@ -10,11 +10,7 @@
  * Exit Semantics & Design Rationale: Deterministic pure descriptor builders with zero I/O or state.
  */
 
-import type { DiagnosticDescriptor } from './types';
-
-const RISK_LOW = 'Low';
-const RISK_MEDIUM = 'Medium';
-const RISK_HIGH = 'High';
+import { RISK_HIGH, RISK_LOW, RISK_MEDIUM, type DiagnosticDescriptor } from './types';
 
 /**
  * Constant governance diagnostic descriptor catalog.

@@ -53,14 +53,9 @@ export const GuidanceMessages = {
         'All public symbols must provide concise, intent-revealing documentation comments free from transient ticket jargon.',
 
     // Prompt Rendering Section Titles
-    /**
-     * Render the H3 heading that introduces per-file local guardrails.
-     *
-     * @param filePath - File path interpolated into the heading exactly as supplied.
-     * @returns Markdown H3 heading naming the guardrail scope.
-     */
-    TITLE_LOCAL_GUARDRAILS: (filePath: string) =>
-        `### 🛡️ [Agent Local Engineering Guardrails: ${filePath}]`,
+    /** Render the guardrail prompt title. ASCII-only because pictograms survive tokenizers and
+     *  terminals inconsistently; the bracketed label carries the section role instead. */
+    TITLE_LOCAL_GUARDRAILS: (filePath: string) => `### [Agent Local Engineering Guardrails: ${filePath}]`,
     /**
      * Render the blockquote that identifies the target scope and optional architecture layer.
      *
@@ -70,14 +65,13 @@ export const GuidanceMessages = {
      */
     TARGET_SCOPE_LABEL: (scope: string, layer?: string) =>
         `> **Target Scope**: ${scope}${layer ? ` | **Architectural Layer**: \`${layer}\`` : ''}`,
-    /** Fixed H4 heading for the hard architectural and engineering contract section. */
-    SECTION_HARD_CONSTRAINTS: '#### 1. Hard Architectural & Engineering Contracts',
-    /** Fixed H4 heading for the historical regression and pitfall section. */
-    SECTION_HISTORICAL_PITFALLS: '#### 2. Historical Regressions & Pitfalls to Avoid',
-    /** Fixed H4 heading for active review violations found in the target scope. */
-    SECTION_FREQUENT_VIOLATIONS: '#### 3. Known Active Review Violations in this Scope',
-    /** Fixed H4 heading for recommended implementation patterns. */
-    SECTION_RECOMMENDED_PATTERNS: '#### 4. Recommended Implementation Patterns',
+    /** Fixed H4 section headings, unnumbered so inserted sections never renumber the prompt. */
+    SECTION_HARD_CONSTRAINTS: '#### Hard Architectural & Engineering Contracts',
+    SECTION_HISTORICAL_PITFALLS: '#### Historical Regressions & Pitfalls to Avoid',
+    SECTION_FREQUENT_VIOLATIONS: '#### Known Active Review Violations in this Scope',
+    SECTION_RECOMMENDED_PATTERNS: '#### Recommended Implementation Patterns',
+    /** Bullet prefix for every prompt list line. */
+    BULLET: '- ',
 
     /**
      * Render one active review violation as a single prompt bullet line.

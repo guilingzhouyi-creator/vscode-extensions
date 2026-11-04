@@ -14,10 +14,7 @@
  *   field into a compile error instead of a runtime report defect
  */
 
-import type { DiagnosticDescriptor } from './types';
-
-/** Risk tier for Medium-severity security findings such as weak crypto or leaked logs. */
-const RISK_MEDIUM = 'Medium';
+import { RISK_MEDIUM, type DiagnosticDescriptor } from './types';
 
 /**
  * Frozen registry of OWASP/CWE-aligned user-facing text for the security analyzer.

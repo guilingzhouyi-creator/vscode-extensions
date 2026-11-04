@@ -12,10 +12,7 @@
  *     apart; the Chinese labels exist only for cross-repository compatibility.
  */
 
-import type { DiagnosticDescriptor } from './types';
-
-/** Risk tier for comment-contract gaps that render as Low severity. */
-const RISK_LOW = 'Low';
+import { RISK_LOW, type DiagnosticDescriptor } from './types';
 
 /**
  * Chinese labels for the six mandatory file-header fields, in contract order.

@@ -16,14 +16,11 @@
  *   and makes severity decisions reviewable in one leaf module.
  */
 
-import type { DiagnosticDescriptor } from './types';
+import { RISK_HIGH, RISK_LOW, RISK_MEDIUM, type DiagnosticDescriptor } from './types';
 
 /** Loop-nesting depth at or above which PRF-ALG-001 escalates risk to High. */
 const HIGH_RISK_NESTING_DEPTH = 4;
 
-const RISK_HIGH = 'High';
-const RISK_MEDIUM = 'Medium';
-const RISK_LOW = 'Low';
 
 /**
  * Performance-rule diagnostic descriptor catalog.
