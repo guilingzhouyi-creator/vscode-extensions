@@ -424,6 +424,41 @@ function validatePatternMatchParity() {
     assert.strictEqual(matchesRust[i].matchText, matchesShim[i].matchText);
   }
   console.log('  ✓ Multi-pattern matching 100% equivalent.');
+
+  // The existence check must agree with the record scan on the same corpus and the same pattern sets.
+  // Comparing against the record scan rather than against a hand-written expectation is what makes
+  // this a parity assertion: a divergence between the two native paths is the defect being hunted,
+  // and any change to either matcher surfaces here instead of as a silently lost security prefilter.
+  const presenceProbes = [
+    searchPatterns,
+    ['not_found'],
+    ['secret', 'not_found'],
+    ['API_KEY', 'TOKEN_XYZ'],
+    ['zzz_absent_declaration'],
+    [],
+  ];
+  for (const patterns of presenceProbes) {
+    const recordsRust = nativeCore.fastPatternMatch(patternCorpus, patterns);
+    const recordsShim = shim.fastPatternMatch(patternCorpus, patterns);
+    const presenceRust = nativeCore.hasAnyPattern(patternCorpus, patterns);
+    const presenceShim = shim.hasAnyPattern(patternCorpus, patterns);
+    assert.strictEqual(
+      presenceRust,
+      recordsRust.length > 0,
+      `Rust existence check disagreed with its own record scan for [${patterns.join(', ')}]`,
+    );
+    assert.strictEqual(
+      presenceShim,
+      recordsShim.length > 0,
+      `Shim existence check disagreed with its own record scan for [${patterns.join(', ')}]`,
+    );
+    assert.strictEqual(
+      presenceRust,
+      presenceShim,
+      `Rust and shim disagreed on existence for [${patterns.join(', ')}]`,
+    );
+  }
+  console.log('  ✓ Pattern existence check agrees with the record scan on every probe.');
 }
 
 let seed = 123456789;

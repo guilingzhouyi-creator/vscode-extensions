@@ -73,6 +73,20 @@ fn match_single_pattern(source_text: &str, pattern: &str, results: &mut Vec<Patt
     }
 }
 
+/// Reports whether any of `patterns` occurs in `source_text`.
+///
+/// Answers the existence question without building a match record, so a gate that only branches on
+/// "did anything match" does not pay two heap allocations per hit. Delegated to `str::contains`:
+/// a hand-written byte loop pays a branch per offset and measured slower than the record path.
+pub fn has_any_pattern(source_text: &str, patterns: &[String]) -> bool {
+    if source_text.is_empty() || patterns.is_empty() {
+        return false;
+    }
+    patterns
+        .iter()
+        .any(|pattern| !pattern.is_empty() && source_text.contains(pattern.as_str()))
+}
+
 struct PatternCandidate<'a> {
     pattern: &'a String,
     bytes: &'a [u8],

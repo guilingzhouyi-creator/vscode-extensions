@@ -391,8 +391,10 @@ export class SecurityAnalyzer implements Analyzer {
 
     private shouldSkipByFastFilter(content: string): boolean {
         if (content.length <= FAST_FILTER_MIN_LENGTH) return false;
-        const hits = nativeCore.fastPatternMatch(content, SECURITY_FAST_FILTER_TOKENS as string[]);
-        return hits.length === 0;
+        // Only the existence of a token matters here, so the existence check is used rather than the
+        // record scan: building one record per hit costs two allocations each, and a file with a
+        // dense token match would spend them all to answer a single boolean.
+        return !nativeCore.hasAnyPattern(content, SECURITY_FAST_FILTER_TOKENS as string[]);
     }
 
     private scanLines(content: string, session: ScanSession): void {

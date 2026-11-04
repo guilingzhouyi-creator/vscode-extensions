@@ -151,6 +151,52 @@ fn pattern_match_reports_position_and_text() {
 }
 
 #[test]
+fn has_any_pattern_agrees_with_record_scan_presence() {
+    let source = "const alpha = 1;\nlet beta = 2;\n";
+    for pattern in ["alpha", "beta", "const", "missing", "alpha = 1"] {
+        let records = fast_pattern_match(source.to_string(), vec![pattern.to_string()]);
+        let presence = has_any_pattern(source.to_string(), vec![pattern.to_string()]);
+        assert_eq!(
+            presence,
+            !records.is_empty(),
+            "existence check disagreed with the record scan for {pattern}"
+        );
+    }
+}
+
+#[test]
+fn has_any_pattern_matches_any_member_of_the_set() {
+    let source = "value = compute(x);\n";
+    assert!(has_any_pattern(
+        source.to_string(),
+        vec!["zzz".to_string(), "compute".to_string()]
+    ));
+    assert!(!has_any_pattern(
+        source.to_string(),
+        vec!["zzz".to_string(), "yyy".to_string()]
+    ));
+}
+
+#[test]
+fn has_any_pattern_handles_empty_and_boundary_inputs() {
+    assert!(!has_any_pattern(String::new(), vec!["a".to_string()]));
+    assert!(!has_any_pattern("abc".to_string(), Vec::new()));
+    assert!(!has_any_pattern("abc".to_string(), vec![String::new()]));
+    assert!(has_any_pattern("abc".to_string(), vec!["abc".to_string()]));
+    assert!(!has_any_pattern("ab".to_string(), vec!["abc".to_string()]));
+    assert!(has_any_pattern(
+        "xabcx".to_string(),
+        vec!["abc".to_string()]
+    ));
+}
+
+#[test]
+fn has_any_pattern_reports_a_match_that_starts_at_the_final_position() {
+    let source = "aaaaab";
+    assert!(has_any_pattern(source.to_string(), vec!["ab".to_string()]));
+}
+
+#[test]
 fn dataflow_defaults_to_forward_when_unspecified() {
     let nodes = vec!["a".to_string(), "b".to_string()];
     let edges = vec![vec!["a".to_string(), "b".to_string()]];

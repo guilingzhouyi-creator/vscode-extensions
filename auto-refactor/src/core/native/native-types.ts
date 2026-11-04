@@ -252,6 +252,14 @@ export interface INativeCore {
     fastPatternMatch(sourceText: string, patterns: string[]): NativePatternMatch[];
 
     /**
+     * Reports whether any pattern occurs, without materialising match records.
+     *
+     * Use this where only the existence of a match matters: each record costs two allocations for
+     * its pattern and match text, so a caller that discards the records pays for them anyway.
+     */
+    hasAnyPattern(sourceText: string, patterns: string[]): boolean;
+
+    /**
      * Masks comment and literal regions using the native lexer state machine when the assembly
      * layer selects it; the assembly layer currently always routes this operator to the pure JS
      * implementation, so the compiled function is exported but never read.

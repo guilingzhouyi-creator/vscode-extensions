@@ -137,6 +137,15 @@ pub fn fast_pattern_match(source_text: String, patterns: Vec<String>) -> Vec<Nat
         .collect()
 }
 
+/// Existence check over a pattern set, without materialising match records.
+///
+/// Separate from `fast_pattern_match` because a gate that only needs "did anything match" should not
+/// pay for the record vector, where each record costs two heap allocations.
+#[napi(js_name = "hasAnyPattern")]
+pub fn has_any_pattern(source_text: String, patterns: Vec<String>) -> bool {
+    ops_pattern::has_any_pattern(&source_text, &patterns)
+}
+
 #[napi]
 pub fn mask_source_code(content: String, config: NativeMaskConfig) -> NativeMaskedSource {
     let mask_config: ops_mask::MaskConfig = config.into();

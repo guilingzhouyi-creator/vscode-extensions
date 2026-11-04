@@ -44,6 +44,7 @@ import {
     computeDominatorTreeShim,
     computeHistogramDiffShim,
     fastPatternMatchShim,
+    hasAnyPatternShim,
     solveDataflowShim,
 } from './native-shims-structural';
 import { scanSecretsShim } from './native-shims-metrics';
@@ -122,6 +123,7 @@ const CAPABILITY_HISTOGRAM_DIFF = 'histogram-diff';
 const CAPABILITY_TARJAN_SCC = 'tarjan-scc';
 const CAPABILITY_TOPOLOGICAL_SORT = 'topological-sort';
 const CAPABILITY_FAST_PATTERN_MATCH = 'fast-pattern-match';
+const CAPABILITY_PATTERN_PRESENCE = 'pattern-presence';
 const CAPABILITY_SOURCE_MASK = 'source-mask';
 const CAPABILITY_SOURCE_MASK_COMPACT = 'source-mask-compact';
 const CAPABILITY_CLONE_DETECTION = 'clone-detection';
@@ -147,6 +149,7 @@ const SHIM_CAPABILITIES: readonly string[] = Object.freeze([
     CAPABILITY_TARJAN_SCC,
     CAPABILITY_TOPOLOGICAL_SORT,
     CAPABILITY_FAST_PATTERN_MATCH,
+    CAPABILITY_PATTERN_PRESENCE,
     CAPABILITY_SOURCE_MASK,
     CAPABILITY_SOURCE_MASK_COMPACT,
     CAPABILITY_CLONE_DETECTION,
@@ -237,6 +240,17 @@ export class PureJsNativeShim implements INativeCore {
             return [];
         }
         return fastPatternMatchShim(sourceText, patterns);
+    }
+
+    /**
+     * @override interface implementation
+     * Existence check over a pattern set, without building match records.
+     */
+    public hasAnyPattern(sourceText: string, patterns: string[]): boolean {
+        if (!sourceText || !patterns || patterns.length === 0) {
+            return false;
+        }
+        return hasAnyPatternShim(sourceText, patterns);
     }
 
     /**
@@ -514,6 +528,7 @@ interface RawNativeBinding {
     readonly computeHistogramDiff: (oldContent: string, newContent: string) => NativeDiffHunk[];
     readonly analyzeDependencyGraph: (edges: [string, string][]) => NativeGraphAnalysis;
     readonly fastPatternMatch?: (sourceText: string, patterns: string[]) => NativePatternMatch[];
+    readonly hasAnyPattern?: (sourceText: string, patterns: string[]) => boolean;
     /**
      * Present in the compiled addon but never dereferenced by this module: masking always routes to
      * the shim because returning structured line arrays across N-API costs more than the masking
@@ -614,6 +629,7 @@ function assembleDiffAndGraphOps(
     | 'computeHistogramDiff'
     | 'analyzeDependencyGraph'
     | 'fastPatternMatch'
+    | 'hasAnyPattern'
     | 'computeDominatorTree'
     | 'solveDataflow'
     | 'analyzeScopeShadowing'
@@ -633,6 +649,11 @@ function assembleDiffAndGraphOps(
         },
         fastPatternMatch: selectBinding(binding.fastPatternMatch, (sourceText, patterns) =>
             jsShim.fastPatternMatch(sourceText, patterns),
+        ),
+        // No size gate: the existence check is cheaper than the record scan on every payload, so a
+        // threshold would only add a branch that can never pay for itself.
+        hasAnyPattern: selectBinding(binding.hasAnyPattern, (sourceText, patterns) =>
+            jsShim.hasAnyPattern(sourceText, patterns),
         ),
         computeDominatorTree: selectBinding(binding.computeDominatorTree, (entry, nodes, edges) =>
             jsShim.computeDominatorTree(entry, nodes, edges),
@@ -955,6 +976,21 @@ export function nativeFastPatternMatch(
 ): NativePatternMatch[] {
     if (!sourceText || !patterns || patterns.length === 0) return [];
     return nativeCore.fastPatternMatch(sourceText, patterns);
+}
+
+/**
+ * Reports whether any pattern occurs in the source text.
+ *
+ * Answers the same question as `nativeFastPatternMatch` without materialising the match records,
+ * which is what a gate that only branches on "did anything match" needs.
+ *
+ * @param sourceText - Target text to search.
+ * @param patterns - Pattern strings to probe.
+ * @returns True when at least one pattern occurs.
+ */
+export function nativeHasAnyPattern(sourceText: string, patterns: string[]): boolean {
+    if (!sourceText || !patterns || patterns.length === 0) return false;
+    return nativeCore.hasAnyPattern(sourceText, patterns);
 }
 
 /**

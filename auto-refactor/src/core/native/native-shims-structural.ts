@@ -1028,6 +1028,28 @@ export function fastPatternMatchShim(sourceText: string, patterns: string[]): Na
     return results;
 }
 
+/**
+ * Reports whether any pattern occurs, without building a single match record.
+ *
+ * Mirrors the native existence check so the fallback agrees with the compiled path. The scan walks
+ * the buffer with `indexOf` and stops at the first hit; it deliberately does not split into lines,
+ * because the caller only needs one bit and the split would cost an array of line slices.
+ *
+ * @param sourceText - Target source code to search.
+ * @param patterns - Pattern strings to probe.
+ * @returns True when at least one pattern occurs.
+ */
+export function hasAnyPatternShim(sourceText: string, patterns: string[]): boolean {
+    if (!sourceText || patterns.length === 0) {
+        return false;
+    }
+    for (const pattern of patterns) {
+        if (pattern.length === 0) continue;
+        if (sourceText.indexOf(pattern) !== -1) return true;
+    }
+    return false;
+}
+
 // ---------------------------------------------------------------------------
 // Section: native-scope-shim
 // ---------------------------------------------------------------------------
