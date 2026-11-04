@@ -1,13 +1,13 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-11-02T14:48:48.172Z",
-  "totalRules": 528,
+  "generatedAt": "2026-11-04T14:29:05.059Z",
+  "totalRules": 533,
   "counts": {
     "autoRefactor": 375,
     "workspaceTiming": 49,
     "webGames": 50,
     "fractalGit": 36,
-    "globalTooling": 18
+    "globalTooling": 23
   },
   "rules": [
     {
@@ -1752,6 +1752,46 @@
       "severity": "error",
       "summary": "Taxis Kernel Code Verifier (TKCV) formal AST invariant guard: Enforce CFG soundness, handle lifecycle symmetry, parameter arity, and zero transient loop allocations",
       "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "GAT-BATCH-001",
+      "project": "global-tooling",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Staged commit batch envelope guard: one commit must stay inside a two-sided macro envelope of added and deleted logic and clear an empirical admission floor, because a batch too small carries no reviewable intent and a batch too large cannot be reviewed atomically",
+      "canonical": true
+    },
+    {
+      "id": "GAT-BOUND-001",
+      "project": "global-tooling",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Staged single-file logic envelope guard: added and deleted effective logic per file must stay inside a two-sided envelope, because an unbounded add splits reviewable intent while an unbounded delete erases capability that no later gate can restore",
+      "canonical": true
+    },
+    {
+      "id": "GAT-DENS-001",
+      "project": "global-tooling",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Staged substantive density guard: the share of added physical lines that carry real logic, and the effective payload ratio of those same lines, must both sit inside a band with a floor and a ceiling, because a comment-heavy commit and a one-line stub are the same defect read from opposite ends",
+      "canonical": true
+    },
+    {
+      "id": "GAT-EXMP-001",
+      "project": "global-tooling",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Staged differential exemption guard: an exemption may be granted only to a newly added short module whose mandatory module header cannot satisfy the density floor, only after a recorded streak of three blocks, only once per file, and never for batch overflow, capability erosion, or a payload ratio below its floor",
+      "canonical": true
+    },
+    {
+      "id": "GAT-STREAK-001",
+      "project": "global-tooling",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Staged differential streak guard: repeated blocks of the same identifier must converge by recording the streak, announcing the pattern at the second failure, evaluating exemption at the third, and demanding explicit human acknowledgement at the fifth, because an undifferentiated block loop cannot be told apart from progress",
       "canonical": true
     },
     {

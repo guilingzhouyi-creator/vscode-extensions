@@ -1,8 +1,38 @@
 {
   "schema": "global-tooling-rules/v1",
-  "generatedAt": "2026-10-22T11:27:31.751Z",
-  "totalRules": 18,
+  "generatedAt": "2026-11-04T14:28:45.235Z",
+  "totalRules": 23,
   "rules": [
+    {
+      "id": "GAT-BATCH-001",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Staged commit batch envelope guard: one commit must stay inside a two-sided macro envelope of added and deleted logic and clear an empirical admission floor, because a batch too small carries no reviewable intent and a batch too large cannot be reviewed atomically"
+    },
+    {
+      "id": "GAT-BOUND-001",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Staged single-file logic envelope guard: added and deleted effective logic per file must stay inside a two-sided envelope, because an unbounded add splits reviewable intent while an unbounded delete erases capability that no later gate can restore"
+    },
+    {
+      "id": "GAT-DENS-001",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Staged substantive density guard: the share of added physical lines that carry real logic, and the effective payload ratio of those same lines, must both sit inside a band with a floor and a ceiling, because a comment-heavy commit and a one-line stub are the same defect read from opposite ends"
+    },
+    {
+      "id": "GAT-EXMP-001",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Staged differential exemption guard: an exemption may be granted only to a newly added short module whose mandatory module header cannot satisfy the density floor, only after a recorded streak of three blocks, only once per file, and never for batch overflow, capability erosion, or a payload ratio below its floor"
+    },
+    {
+      "id": "GAT-STREAK-001",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Staged differential streak guard: repeated blocks of the same identifier must converge by recording the streak, announcing the pattern at the second failure, evaluating exemption at the third, and demanding explicit human acknowledgement at the fifth, because an undifferentiated block loop cannot be told apart from progress"
+    },
     {
       "id": "GUARD-CHAIN-001",
       "family": "GUARD",
@@ -14,6 +44,18 @@
       "family": "GUARD",
       "severity": "error",
       "summary": "Hardcoded scale count guard: an operator-facing success message must render its count from the measured data rather than embedding a literal, because a literal is a second source of truth that expires silently while the check keeps passing"
+    },
+    {
+      "id": "GUARD-DESTR-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Destructive operand provenance guard: a recursive delete may not name a filesystem root, an ancestor directory, a home or profile directory, or an operand derived from any of those through assignments or loop aliases, because the source then never states which path is being destroyed."
+    },
+    {
+      "id": "GUARD-DOC-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Governance documentation scale figures must be rendered from their single source of truth; a hand-written count that no live source produces is rejected."
     },
     {
       "id": "GUARD-ENT-001",
@@ -28,16 +70,34 @@
       "summary": "Gate feedback vocabulary guard: operator-facing feedback must carry semantic step identifiers from the single-source registry and a closed four-state status vocabulary, never positional labels"
     },
     {
+      "id": "GUARD-JAIL-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Zero-Intersection Path Jail confinement guard: candidate file paths and subagent write scopes must not contain '..' traversal segments, drive or root escapes, or unauthorized cross-session paths."
+    },
+    {
       "id": "GUARD-ORD-001",
       "family": "GUARD",
       "severity": "error",
       "summary": "Gate entry-point ordering guard: every helper a gate runner calls must be defined above the call site, because Bash and PowerShell resolve commands at execution time and an earlier call aborts the runner with a resolution error"
     },
     {
+      "id": "GUARD-SHELL-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Linux command surface parity guard: every command promised by AGENTS.md must resolve to a working GNU binary or a declared PowerShell fallback on the current host."
+    },
+    {
       "id": "GUARD-STEP-001",
       "family": "GUARD",
       "severity": "error",
       "summary": "Gate step registry binding guard: every step identifier referenced by a gate script must be declared in the single-source registry with a registered rule attribution"
+    },
+    {
+      "id": "GUARD-VAR-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Read-only automatic variable shadowing guard: assigning to $HOME, $PSHOME, $PID, $Host, $Error, $ExecutionContext, $ShellId, $PSVersionTable, $IsWindows, $IsLinux, $IsMacOS, $PSCulture, $PSUICulture or $PSEdition throws, so the name keeps its previous value and every later read silently addresses a different object than the author intended."
     },
     {
       "id": "HYG-DIR-001",
@@ -80,36 +140,6 @@
       "family": "VOL",
       "severity": "warning",
       "summary": "Dynamic dilution envelope guard: physical line count must not exceed dynamic ratio 1:3 envelope"
-    },
-    {
-      "id": "GUARD-DOC-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Governance documentation scale figures must be rendered from their single source of truth; a hand-written count that no live source produces is rejected."
-    },
-    {
-      "id": "GUARD-SHELL-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Linux command surface parity guard: every command promised by AGENTS.md must resolve to a working GNU binary or a declared PowerShell fallback on the current host."
-    },
-    {
-      "id": "GUARD-DESTR-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Destructive operand provenance guard: a recursive delete may not name a filesystem root, an ancestor directory, a home or profile directory, or an operand derived from any of those through assignments or loop aliases, because the source then never states which path is being destroyed."
-    },
-    {
-      "id": "GUARD-VAR-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Read-only automatic variable shadowing guard: assigning to $HOME, $PSHOME, $PID, $Host, $Error, $ExecutionContext, $ShellId, $PSVersionTable, $IsWindows, $IsLinux, $IsMacOS, $PSCulture, $PSUICulture or $PSEdition throws, so the name keeps its previous value and every later read silently addresses a different object than the author intended."
-    },
-    {
-      "id": "GUARD-JAIL-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Zero-Intersection Path Jail confinement guard: candidate file paths and subagent write scopes must not contain '..' traversal segments, drive or root escapes, or unauthorized cross-session paths."
     }
   ]
 }
