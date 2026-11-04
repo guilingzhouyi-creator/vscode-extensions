@@ -15,6 +15,8 @@
 use std::fmt::Display;
 use std::path::PathBuf;
 
+use fractal_git::constants::cli::CliTag;
+
 /// Process exit status reserved for policy refusals that are not repository failures.
 pub const EXIT_REJECTED: i32 = 1;
 
@@ -96,17 +98,43 @@ pub fn parse_byte_size(input_size_str: &str) -> Option<u64> {
 
 /// Reports a rejection on stderr and terminates the process with [`EXIT_REJECTED`].
 ///
-/// Centralizing this prevents the historical failure mode where a rejected command
-/// printed an error but still returned status 0, hiding the rejection from callers.
+/// Under commercial production mode, internal bracket badges (e.g. `[ERROR]`, `[COMMIT_GOVERNANCE_FAIL]`)
+/// are normalized to standard porcelain `error:` prefixes, keeping user messages clean and professional.
+/// When diagnostic mode is activated, raw engineering tags are preserved for automated triage.
 pub fn reject(tag: &str, detail: impl Display) -> ! {
     fg_core::diag_debug!("gate", "rejection tag={} exit={}", tag, EXIT_REJECTED);
-    eprintln!("{} {}", tag, detail);
+    let is_diag = fg_core::diagnostics::is_diagnostic_mode();
+    if is_diag {
+        eprintln!("{} {}", tag, detail);
+    } else {
+        let text = detail.to_string();
+        let prefix = match tag {
+            CliTag::COMMIT_GOVERNANCE_FAIL | CliTag::ERROR | CliTag::FAIL => "error:",
+            CliTag::AUTHORITY_BREACH => "error: [AUTHORITY_BREACH]",
+            _ => {
+                if tag.starts_with('[') && tag.ends_with(']') {
+                    "error:"
+                } else {
+                    tag
+                }
+            }
+        };
+        if prefix.is_empty()
+            || text.starts_with("error:")
+            || text.starts_with("fatal:")
+            || text.starts_with("usage:")
+        {
+            eprintln!("{}", text);
+        } else {
+            eprintln!("{} {}", prefix, text);
+        }
+    }
     std::process::exit(EXIT_REJECTED)
 }
 
 /// Reports an I/O or side-effect failure on stderr and terminates with [`EXIT_FATAL`].
 pub fn fail_io(action: impl Display, detail: impl Display) -> ! {
-    eprintln!("[ERROR] Failed to {}: {}", action, detail);
+    eprintln!("fatal: failed to {}: {}", action, detail);
     std::process::exit(EXIT_FATAL)
 }
 

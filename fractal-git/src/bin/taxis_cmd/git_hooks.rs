@@ -213,10 +213,24 @@ pub fn assert_pipeline_approved(
     if let Err(pipeline_error) =
         HookPipeline::with_defaults().assert_tier_approved(HookTier::SubToCard, &context)
     {
-        reject(
-            CliTag::COMMIT_GOVERNANCE_FAIL,
-            format!("Fractal hook pipeline rejected the commit: {pipeline_error}"),
+        fg_core::diag_debug!(
+            "governance",
+            "pipeline hook rejected commit: {:?}",
+            pipeline_error
         );
+        let is_diag = fg_core::diagnostics::is_diagnostic_mode();
+        let display_msg = pipeline_error.user_display(is_diag);
+        if is_diag {
+            reject(
+                CliTag::COMMIT_GOVERNANCE_FAIL,
+                format!("Fractal hook pipeline rejected the commit: {display_msg}"),
+            );
+        } else {
+            reject(
+                CliTag::ERROR,
+                format!("hook pipeline rejected the commit: {display_msg}"),
+            );
+        }
     }
 }
 

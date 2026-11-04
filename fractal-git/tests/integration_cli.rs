@@ -49,3 +49,5 @@ mod test_patch_commands;
 mod test_lineage_commands;
 #[path = "rust/test_plumbing_tree_commands.rs"]
 mod test_plumbing_tree_commands;
+#[path = "rust/test_cli_diagnostics_privacy.rs"]
+mod test_cli_diagnostics_privacy;

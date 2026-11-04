@@ -551,10 +551,24 @@ fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<Stri
         origin,
         None,
     ) {
-        reject(
-            CliTag::COMMIT_GOVERNANCE_FAIL,
-            format!("Merge message rejected: {guard_error}"),
+        fg_core::diag_debug!(
+            "governance",
+            "merge message rejected: {:?}",
+            guard_error
         );
+        let is_diag = fg_core::diagnostics::is_diagnostic_mode();
+        let display_msg = guard_error.user_display(is_diag);
+        if is_diag {
+            reject(
+                CliTag::COMMIT_GOVERNANCE_FAIL,
+                format!("Merge message rejected:\n{display_msg}"),
+            );
+        } else {
+            reject(
+                CliTag::ERROR,
+                format!("merge message rejected:\n{display_msg}"),
+            );
+        }
     }
     let hook_runner = super::git_hooks::discover(m_ctx.view.git_dir(), m_ctx.view.work_root());
     let final_msg =

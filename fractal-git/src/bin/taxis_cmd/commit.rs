@@ -100,7 +100,15 @@ pub fn handle_commit(ctx: &CliContext) {
     if !git_native_default {
         let floor = PolicyFloor::resolve(&ctx.git_dir);
         if let Err(floor_error) = floor.assert_permits(&policy) {
-            reject(CliTag::COMMIT_GOVERNANCE_FAIL, format!("{floor_error}"));
+            fg_core::diag_debug!(
+                "governance",
+                "policy floor refusal under policy '{}': {:?}",
+                policy.name,
+                floor_error
+            );
+            let is_diag = fg_core::diagnostics::is_diagnostic_mode();
+            let display_msg = floor_error.user_display(is_diag);
+            reject(CliTag::COMMIT_GOVERNANCE_FAIL, display_msg);
         }
         reject_bypass_without_reason(&ctx.args);
     }
@@ -599,13 +607,30 @@ fn verify_commit_governance(
         &candidates,
     ) {
         Ok(commit_witness) => commit_witness,
-        Err(gov_err) => reject(
-            CliTag::COMMIT_GOVERNANCE_FAIL,
-            format!(
-                "Commit message rejected by Taxis policy '{}': {}",
-                policy.name, gov_err
-            ),
-        ),
+        Err(gov_err) => {
+            fg_core::diag_debug!(
+                "governance",
+                "commit governance rejection under policy '{}': {:?}",
+                policy.name,
+                gov_err
+            );
+            let is_diag = fg_core::diagnostics::is_diagnostic_mode();
+            let display_msg = gov_err.user_display(is_diag);
+            if is_diag {
+                reject(
+                    CliTag::COMMIT_GOVERNANCE_FAIL,
+                    format!(
+                        "Commit message rejected by Taxis policy '{}':\n{}",
+                        policy.name, display_msg
+                    ),
+                );
+            } else {
+                reject(
+                    CliTag::ERROR,
+                    format!("commit message rejected:\n{display_msg}"),
+                );
+            }
+        }
     }
 }
 

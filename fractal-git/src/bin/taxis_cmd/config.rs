@@ -259,7 +259,12 @@ fn run_unset(ctx: &CliContext, config_path: &std::path::Path, spec: &str, litera
 fn report_config_error(action: &str, error: ConfigError) -> ! {
     match error {
         ConfigError::Verify(detail) => {
-            eprintln!("[CONFIG_WRITE_INVALID] {detail}");
+            let is_diag = fg_core::diagnostics::is_diagnostic_mode();
+            if is_diag {
+                eprintln!("[CONFIG_WRITE_INVALID] {detail}");
+            } else {
+                eprintln!("error: configuration verification failed: {detail}");
+            }
             exit(EXIT_REJECTED)
         }
         ConfigError::InvalidKey(detail) => reject(CliTag::ERROR, detail),

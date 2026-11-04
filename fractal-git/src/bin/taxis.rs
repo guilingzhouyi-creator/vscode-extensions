@@ -687,6 +687,12 @@ fn parse_cli_args(raw_args: &[String]) -> (PathBuf, bool, Vec<String>) {
             // Consumed by diagnostic configuration in `main`; it is a process-level switch, not a
             // subcommand argument, so it must not reach subcommand dispatch.
             arg_cursor += 2;
+        } else if raw_args[arg_cursor] == "--debug"
+            || raw_args[arg_cursor] == "--verbose"
+            || raw_args[arg_cursor] == "--diagnostic"
+        {
+            // Process-level diagnostic toggles; consumed before subcommand dispatch.
+            arg_cursor += 1;
         } else {
             filtered_args.push(raw_args[arg_cursor].clone());
             arg_cursor += 1;
@@ -851,6 +857,12 @@ fn main() {
     // changing the environment.
     let level_flag = find_arg_value(&raw_args, &["--log-level"]);
     fg_core::diagnostics::configure(level_flag);
+    if raw_args
+        .iter()
+        .any(|arg| arg == "--debug" || arg == "--verbose" || arg == "--diagnostic")
+    {
+        fg_core::diagnostics::set_level(fg_core::diagnostics::LogLevel::Debug);
+    }
     fg_core::diag_debug!("taxis", "diagnostics configured at level {}", fg_core::diagnostics::level());
 
     let (git_dir, json_mode, filtered_args) = parse_cli_args(&raw_args);
