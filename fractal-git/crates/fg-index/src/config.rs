@@ -265,6 +265,18 @@ impl RepoConfig {
                     }
                 }
             }
+            ("merge", None, "conflictstyle") => {
+                if let Some(text) = value {
+                    let mode = match text {
+                        "merge" => Some(ConflictPresentationMode::GitCompat),
+                        "diff3" | "zdiff3" => Some(ConflictPresentationMode::Diff3),
+                        _ => ConflictPresentationMode::parse_str(text),
+                    };
+                    if let Some(m) = mode {
+                        self.conflict_mode = m;
+                    }
+                }
+            }
             _ => {}
         }
     }

@@ -325,13 +325,16 @@ pub fn handle_commit(ctx: &CliContext) {
         let _ = w.checkpoint();
     }
 
-    // Ensure HEAD exists on disk
-    let head_path = ctx.git_dir.join("HEAD");
-    if !head_path.is_file() {
-        let ref_store = DiskRefStore::new(&ctx.git_dir);
-        if let Err(err) = ref_store.update_head_symbolic(&target_ref.to_git_ref()) {
-            reject(CliTag::ERROR, format!("write symbolic HEAD: {err}"));
+    // Ensure HEAD advances properly: follows target ref when unborn, or advances commit OID when detached
+    let ref_store = DiskRefStore::new(&ctx.git_dir);
+    match ref_store.head() {
+        Ok(fg_topology::HeadState::Absent | fg_topology::HeadState::Symbolic { target: None, .. }) => {
+            let _ = ref_store.update_head_symbolic(&target_ref.to_git_ref());
         }
+        Ok(fg_topology::HeadState::Detached(_)) => {
+            let _ = ref_store.update_head_detached(&materialized.commit_oid);
+        }
+        _ => {}
     }
 
     super::git_hooks::run_post_hook(&hook_runner, "post-commit", &[]);

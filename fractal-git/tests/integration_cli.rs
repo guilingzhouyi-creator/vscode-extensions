@@ -57,3 +57,5 @@ mod test_list_files_parity;
 mod test_worktree_checkout_parity;
 #[path = "rust/test_log_options_parity.rs"]
 mod test_log_options_parity;
+#[path = "rust/test_conflict_state_parity.rs"]
+mod test_conflict_state_parity;

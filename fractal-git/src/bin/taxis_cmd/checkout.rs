@@ -297,8 +297,8 @@ pub(crate) fn load_index_entries(git_dir: &Path) -> BTreeMap<String, IndexEntry>
         .unwrap_or_default()
 }
 
-/// Asserts that no unstaged or staged changes exist before checkout proceeds unless force is set.
-pub(crate) fn assert_worktree_cleanliness(view: &RepoView, force: bool) {
+/// Asserts that no unstaged or staged changes exist before operation proceeds unless force is set.
+pub(crate) fn assert_worktree_cleanliness_for(view: &RepoView, force: bool, op: &str) {
     if force {
         return;
     }
@@ -318,10 +318,14 @@ pub(crate) fn assert_worktree_cleanliness(view: &RepoView, force: bool) {
             }
         }
         if !collisions.is_empty() {
-            let msg = DirtyWorktreeGuard::format_rejection(&collisions, "checkout");
+            let msg = DirtyWorktreeGuard::format_rejection(&collisions, op);
             reject(CliTag::ERROR, msg);
         }
     }
+}
+
+pub(crate) fn assert_worktree_cleanliness(view: &RepoView, force: bool) {
+    assert_worktree_cleanliness_for(view, force, "checkout");
 }
 
 /// Determines the effective branch name (if switching to a branch).

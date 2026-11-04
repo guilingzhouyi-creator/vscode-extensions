@@ -39,7 +39,7 @@ use fg_storage::LooseOdb;
 use fractal_git::constants::cli::CliTag;
 
 use super::checkout::{
-    assert_worktree_cleanliness, materialize_files, remove_stale_files, update_dirc_index,
+    assert_worktree_cleanliness_for, materialize_files, remove_stale_files, update_dirc_index,
     update_references,
 };
 use super::commit_walk::{parse_commit_record, walk_commits, CommitRecord};
@@ -433,7 +433,7 @@ pub fn handle_rebase(ctx: &CliContext) {
         );
     }
 
-    assert_worktree_cleanliness(&view, false);
+    assert_worktree_cleanliness_for(&view, false, "rebase");
 
     let upstream_commit = match view.resolve(&upstream_arg) {
         Ok(oid) => oid,

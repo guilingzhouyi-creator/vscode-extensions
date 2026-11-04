@@ -37,7 +37,7 @@ use fg_topology::conflict_tree::{ConflictSlice, ConflictTreeManager};
 use fractal_git::constants::cli::CliTag;
 
 use super::checkout::{
-    assert_worktree_cleanliness, materialize_files, remove_stale_files, update_dirc_index,
+    assert_worktree_cleanliness_for, materialize_files, remove_stale_files, update_dirc_index,
     update_references,
 };
 use super::commit_walk::parse_commit_record;
@@ -75,7 +75,7 @@ pub fn handle_merge(ctx: &CliContext) {
         );
     }
 
-    assert_worktree_cleanliness(&view, false);
+    assert_worktree_cleanliness_for(&view, false, "merge");
 
     let theirs_commit = match view.resolve(&opts.target) {
         Ok(oid) => oid,
@@ -211,8 +211,16 @@ fn parse_merge_options(args: &[String]) -> MergeOptions {
             "--no-ff" => no_ff = true,
             "--ff-only" => ff_only = true,
             "--abort" => abort = true,
-            "--conflict-mode" | "--conflict.mode" if cursor + 1 < args.len() => {
-                if let Some(parsed) = ConflictPresentationMode::parse_str(&args[cursor + 1]) {
+            "--conflict-mode" | "--conflict.mode" | "--conflict-style" | "--conflictstyle"
+                if cursor + 1 < args.len() =>
+            {
+                let text = &args[cursor + 1];
+                let mode = match text.as_str() {
+                    "merge" => Some(ConflictPresentationMode::GitCompat),
+                    "diff3" | "zdiff3" => Some(ConflictPresentationMode::Diff3),
+                    _ => ConflictPresentationMode::parse_str(text),
+                };
+                if let Some(parsed) = mode {
                     conflict_mode = Some(parsed);
                 }
                 cursor += 1;
