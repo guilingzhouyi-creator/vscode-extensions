@@ -60,6 +60,12 @@ pub(crate) fn render_text_to_writer<W: std::io::Write>(
             continue;
         }
 
+        if request.name_status {
+            let line = format!("{}\t{}", comparison.status_code(), comparison.path());
+            let _ = write_record(sink, &line, request.nul_terminated);
+            continue;
+        }
+
         let old_text = comparison.side_text(true);
         let new_text = comparison.side_text(false);
 

@@ -264,6 +264,7 @@ fn format_single_patch(
         revisions: vec![parent_rev, record.oid.to_hex()],
         nul_terminated: false,
         name_only: false,
+        name_status: false,
         stat_only: false,
         no_prefix: false,
         exit_code: false,

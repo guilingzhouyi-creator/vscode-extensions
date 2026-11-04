@@ -90,6 +90,19 @@ pub(crate) struct FileComparison {
 }
 
 impl FileComparison {
+    /// Returns the single-letter Git status code ('A', 'M', 'D', 'R').
+    pub(crate) fn status_code(&self) -> &'static str {
+        if self.score.is_some() {
+            "R"
+        } else if self.old_text.is_none() {
+            "A"
+        } else if self.new_text.is_none() {
+            "D"
+        } else {
+            "M"
+        }
+    }
+
     /// Returns the path a single-path output uses: the new one when the file exists, else the old.
     ///
     /// `--name-only`, `--stat`, and the JSON report name one path per entry, and Git names the
@@ -145,6 +158,7 @@ pub(crate) struct DiffRequest {
     pub(crate) revisions: Vec<String>,
     pub(crate) nul_terminated: bool,
     pub(crate) name_only: bool,
+    pub(crate) name_status: bool,
     pub(crate) stat_only: bool,
     /// Whether patch headers print bare paths instead of the a/ and b/ prefixed forms.
     pub(crate) no_prefix: bool,
@@ -157,6 +171,23 @@ pub(crate) struct DiffRequest {
     pub(crate) exit_code: bool,
     /// Whether to suppress the report entirely; `--quiet` implies it.
     pub(crate) quiet: bool,
+}
+
+impl Default for DiffRequest {
+    fn default() -> Self {
+        Self {
+            scope: DiffScope::Worktree,
+            context: DEFAULT_CONTEXT,
+            revisions: Vec::new(),
+            nul_terminated: false,
+            name_only: false,
+            name_status: false,
+            stat_only: false,
+            no_prefix: false,
+            exit_code: false,
+            quiet: false,
+        }
+    }
 }
 
 /// Dispatches `taxis diff`.
@@ -221,6 +252,7 @@ fn parse_request(args: &[String]) -> Result<DiffRequest, String> {
         revisions: Vec::new(),
         nul_terminated: false,
         name_only: false,
+        name_status: false,
         stat_only: false,
         no_prefix: false,
         exit_code: false,
@@ -232,6 +264,7 @@ fn parse_request(args: &[String]) -> Result<DiffRequest, String> {
             "--cached" | "--staged" => request.scope = DiffScope::Staged,
             "-z" => request.nul_terminated = true,
             "--name-only" => request.name_only = true,
+            "--name-status" => request.name_status = true,
             "--stat" => request.stat_only = true,
             // `--exit-code` and `--quiet` are the only two flags that make a difference a status.
             // `--quiet` also suppresses the report, so it implies both.

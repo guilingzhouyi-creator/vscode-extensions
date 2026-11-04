@@ -55,3 +55,5 @@ mod test_cli_diagnostics_privacy;
 mod test_list_files_parity;
 #[path = "rust/test_worktree_checkout_parity.rs"]
 mod test_worktree_checkout_parity;
+#[path = "rust/test_log_options_parity.rs"]
+mod test_log_options_parity;

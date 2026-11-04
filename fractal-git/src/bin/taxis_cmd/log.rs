@@ -173,25 +173,44 @@ pub fn handle_log(ctx: &CliContext) {
         report_log_json(shown, &request);
         return;
     }
+    let mut graph_renderer = if request.graph {
+        Some(GraphRenderer::new())
+    } else {
+        None
+    };
+
     for (index, record) in shown.iter().enumerate() {
+        let (glyph, cont) = match &mut graph_renderer {
+            Some(gr) => gr.next_prefix(record),
+            None => (String::new(), String::new()),
+        };
+
         match request.format.as_deref() {
             Some(template) => match render_format(template, record, width) {
-                Ok(text) => println!("{text}"),
+                Ok(text) => println!("{glyph}{text}"),
                 Err(format_err) => reject(CliTag::ERROR, format_err),
             },
             None if request.oneline => {
-                println!("{} {}", short_oid(&record.oid, width), record.subject())
+                println!("{glyph}{} {}", short_oid(&record.oid, width), record.subject())
             }
             None => {
-                // Git's separator is a blank line *between* entries, not after each one: the output
-                // ends on the last line of the message. Printing a trailing blank after every entry
-                // adds one newline to the whole command, which is invisible in a terminal but makes
-                // the output differ from `git log` by a byte.
-                if index > 0 {
+                if index > 0 && !request.graph {
                     println!();
                 }
-                print_full_entry(record, width);
+                print_full_entry_with_prefix(record, width, &glyph, &cont);
             }
+        }
+
+        if let Some(diff_mode) = request.diff_mode {
+            let parent = record.parents.first().map(|oid| oid.to_hex());
+            let left = parent.unwrap_or_else(|| diff::EMPTY_TREE_MARKER.to_string());
+            let mut diff_args = Vec::new();
+            match diff_mode {
+                LogDiffMode::Stat => diff_args.push("--stat".to_string()),
+                LogDiffMode::NameOnly => diff_args.push("--name-only".to_string()),
+                LogDiffMode::NameStatus => diff_args.push("--name-status".to_string()),
+            }
+            let _ = diff::run_revision_diff(&view, &left, &record.oid.to_hex(), &diff_args);
         }
     }
 }
@@ -220,6 +239,14 @@ pub(crate) fn collect_all_starts(view: &RepoView) -> FractalResult<Vec<Oid>> {
     Ok(starts)
 }
 
+/// Output mode for inline commit diffs in `log`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LogDiffMode {
+    Stat,
+    NameOnly,
+    NameStatus,
+}
+
 /// One parsed `log` invocation.
 struct LogRequest {
     revision: String,
@@ -233,6 +260,8 @@ struct LogRequest {
     all: bool,
     oneline: bool,
     format: Option<String>,
+    graph: bool,
+    diff_mode: Option<LogDiffMode>,
 }
 
 impl LogRequest {
@@ -245,12 +274,18 @@ impl LogRequest {
             all: false,
             oneline: false,
             format: None,
+            graph: false,
+            diff_mode: None,
         };
         let mut cursor = 0usize;
         while cursor < args.len() {
             let argument = args[cursor].as_str();
             cursor += 1;
             match argument {
+                "--graph" => request.graph = true,
+                "--stat" => request.diff_mode = Some(LogDiffMode::Stat),
+                "--name-only" => request.diff_mode = Some(LogDiffMode::NameOnly),
+                "--name-status" => request.diff_mode = Some(LogDiffMode::NameStatus),
                 "--oneline" => request.oneline = true,
                 "--all" => {
                     // Git walks every ref here; it also lifts the interactive cap this
@@ -311,12 +346,70 @@ impl LogRequest {
     }
 }
 
-/// Prints one commit in Git's default multi-line form.
-fn print_full_entry(record: &CommitRecord, width: usize) {
-    println!("commit {}", record.oid.to_hex());
+/// Lightweight ASCII DAG renderer for `log --graph`.
+struct GraphRenderer {
+    active_columns: Vec<Oid>,
+}
+
+impl GraphRenderer {
+    fn new() -> Self {
+        Self {
+            active_columns: Vec::new(),
+        }
+    }
+
+    fn next_prefix(&mut self, record: &CommitRecord) -> (String, String) {
+        let col_idx = match self.active_columns.iter().position(|&id| id == record.oid) {
+            Some(idx) => idx,
+            None => {
+                self.active_columns.push(record.oid);
+                self.active_columns.len() - 1
+            }
+        };
+
+        let mut glyph = String::new();
+        for (i, _) in self.active_columns.iter().enumerate() {
+            if i == col_idx {
+                glyph.push_str("* ");
+            } else {
+                glyph.push_str("| ");
+            }
+        }
+
+        let mut cont = String::new();
+        for _ in 0..self.active_columns.len() {
+            cont.push_str("| ");
+        }
+
+        let mut new_columns = Vec::new();
+        for (i, &col_oid) in self.active_columns.iter().enumerate() {
+            if i == col_idx {
+                for &parent in &record.parents {
+                    if !new_columns.contains(&parent) {
+                        new_columns.push(parent);
+                    }
+                }
+            } else if !new_columns.contains(&col_oid) {
+                new_columns.push(col_oid);
+            }
+        }
+        self.active_columns = new_columns;
+
+        (glyph, cont)
+    }
+}
+
+/// Prints one commit in Git's default multi-line form with optional graph prefix.
+fn print_full_entry_with_prefix(
+    record: &CommitRecord,
+    width: usize,
+    glyph: &str,
+    cont: &str,
+) {
+    println!("{glyph}commit {}", record.oid.to_hex());
     if record.parents.len() >= 2 {
         println!(
-            "Merge: {}",
+            "{cont}Merge: {}",
             record
                 .parents
                 .iter()
@@ -325,14 +418,14 @@ fn print_full_entry(record: &CommitRecord, width: usize) {
                 .join(" ")
         );
     }
-    println!("Author: {} <{}>", record.author_name, record.author_mailbox);
+    println!("{cont}Author: {} <{}>", record.author_name, record.author_mailbox);
     println!(
-        "Date:   {}",
+        "{cont}Date:   {}",
         format_date(record.author_time, record.author_offset_minutes)
     );
-    println!();
+    println!("{cont}");
     for line in record.message.trim_end().lines() {
-        println!("    {line}");
+        println!("{cont}    {line}");
     }
 }
 
