@@ -138,3 +138,118 @@ pub enum FractalError {
     #[error("Access denied: {0}")]
     AccessDenied(String),
 }
+
+impl FractalError {
+    /// Formats the error for end-user terminal display.
+    ///
+    /// # Architecture Rationale & Commercial Surface Contract:
+    /// - In commercial production mode (`diagnostic == false`), internal rule names (e.g. `FGT-MSG-001`,
+    ///   `GUARD-MSG-001`, `FGT-GAT-001`) and internal telemetry scores (`score=...`) are completely
+    ///   sanitized and omitted from user output. Clean, actionable, and human-friendly guidance is
+    ///   emitted instead.
+    /// - In diagnostic / debug mode (`diagnostic == true`), rule identifiers and triage metadata
+    ///   are preserved to aid developer inspection.
+    pub fn user_display(&self, diagnostic: bool) -> String {
+        match self {
+            Self::GateRejection { score, violations } => {
+                if violations.is_empty() {
+                    return if diagnostic {
+                        format!("gate rejection (score={score:.2})")
+                    } else {
+                        "operation rejected by governance policy".to_string()
+                    };
+                }
+
+                if diagnostic {
+                    if violations.len() == 1 {
+                        crate::sanitizer::format_violation_diagnostic(&violations[0])
+                    } else {
+                        let items = violations
+                            .iter()
+                            .map(|v| {
+                                format!(
+                                    "  - {}",
+                                    crate::sanitizer::format_violation_diagnostic(v)
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        format!("governance policy violations (score={score:.2}):\n{items}")
+                    }
+                } else {
+                    let sanitized: Vec<String> = violations
+                        .iter()
+                        .map(|v| crate::sanitizer::sanitize_violation_for_user(v))
+                        .collect();
+                    if sanitized.len() == 1 {
+                        sanitized[0].clone()
+                    } else {
+                        let items = sanitized
+                            .iter()
+                            .map(|v| format!("  - {v}"))
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        format!("commit message does not meet repository conventions:\n{items}")
+                    }
+                }
+            }
+            Self::AuthProofInvalid(detail) => {
+                if diagnostic {
+                    format!("authority proof invalid: {detail}")
+                } else {
+                    format!(
+                        "authority proof invalid: {}",
+                        crate::sanitizer::sanitize_violation_for_user(detail)
+                    )
+                }
+            }
+            Self::PolicyViolation(detail) => {
+                if diagnostic {
+                    format!("policy violation: {detail}")
+                } else {
+                    format!(
+                        "policy violation: {}",
+                        crate::sanitizer::sanitize_violation_for_user(detail)
+                    )
+                }
+            }
+            other => {
+                let text = other.to_string();
+                if diagnostic {
+                    text
+                } else {
+                    crate::sanitizer::sanitize_violation_for_user(&text)
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_user_display_modes() {
+        let err = FractalError::GateRejection {
+            score: 0.0,
+            violations: vec![
+                "FGT-MSG-001: Header length too short".to_string(),
+                "FGT-MSG-002: Missing required section '[Why]'".to_string(),
+            ],
+        };
+
+        // Commercial mode: no rule codes, clean list
+        let user_view = err.user_display(false);
+        assert!(!user_view.contains("FGT-MSG"));
+        assert!(!user_view.contains("score="));
+        assert!(user_view.contains("Header length too short"));
+        assert!(user_view.contains("Missing required section '[Why]'"));
+
+        // Diagnostic mode: includes rule codes and score
+        let diag_view = err.user_display(true);
+        assert!(diag_view.contains("[FGT-MSG-001]"));
+        assert!(diag_view.contains("[FGT-MSG-002]"));
+        assert!(diag_view.contains("score="));
+    }
+}

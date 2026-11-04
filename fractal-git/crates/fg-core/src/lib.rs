@@ -18,6 +18,7 @@ pub mod error;
 pub mod fs_atomic;
 pub mod math;
 pub mod models;
+pub mod sanitizer;
 pub mod traits;
 
 pub use constants::{
@@ -28,6 +29,9 @@ pub use constants::{
 pub use crypto::{hmac_sm3, sm3_hash, Sm3Hasher};
 pub use error::{FractalError, FractalResult};
 pub use fs_atomic::write_file_atomic;
+pub use sanitizer::{
+    format_violation_diagnostic, is_rule_id_candidate, sanitize_violation_for_user, split_rule_id,
+};
 pub use math::{
     decode_git_offset_varint, encode_git_offset_varint, jeffreys_beta_from_counts,
     jeffreys_beta_trials, JeffreysPosterior,

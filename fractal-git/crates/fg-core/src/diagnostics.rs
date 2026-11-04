@@ -108,14 +108,39 @@ impl LogLevel {
 /// The flag wins so a single invocation can raise detail without changing the environment, which is
 /// what a developer debugging one command actually wants.
 pub fn configure(flag: Option<&str>) {
-    let selected = flag.and_then(LogLevel::parse_str).or_else(|| {
-        std::env::var("TAXIS_LOG")
-            .ok()
-            .and_then(|value| LogLevel::parse_str(&value))
-    });
+    let selected = flag
+        .and_then(LogLevel::parse_str)
+        .or_else(|| {
+            std::env::var("TAXIS_LOG")
+                .ok()
+                .and_then(|value| LogLevel::parse_str(&value))
+        })
+        .or_else(|| {
+            if std::env::var_os("TAXIS_DIAGNOSTIC")
+                .is_some_and(|val| val == "1" || val == "true")
+                || std::env::var_os("TAXIS_DEV_MODE")
+                    .is_some_and(|val| val == "1" || val == "true")
+            {
+                Some(LogLevel::Debug)
+            } else {
+                None
+            }
+        });
     if let Some(chosen) = selected {
         set_level(chosen);
     }
+}
+
+/// Whether diagnostic / debug output is active.
+///
+/// Under commercial production mode, this returns `false` by default, keeping terminal reporting
+/// clean and passenger-friendly. When raised via `--log-level debug`, `TAXIS_LOG=debug`,
+/// `--debug`, `--verbose`, or `TAXIS_DIAGNOSTIC=1`, detailed diagnostic markers and rule identifiers
+/// are exposed on the terminal surface.
+pub fn is_diagnostic_mode() -> bool {
+    enabled(LogLevel::Debug)
+        || std::env::var_os("TAXIS_DIAGNOSTIC").is_some_and(|val| val == "1" || val == "true")
+        || std::env::var_os("TAXIS_DEV_MODE").is_some_and(|val| val == "1" || val == "true")
 }
 
 /// Whether a record at `level` would be emitted, checked before any formatting happens.
