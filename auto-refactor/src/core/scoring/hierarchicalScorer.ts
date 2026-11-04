@@ -392,8 +392,10 @@ function evaluateFileQuality(opt: ScoreFileQualityOptions): FileQualityScore {
     const moduleName = opt.moduleName ?? DEFAULT_MODULE_NAME;
 
     // 1. Density and anti-gaming
+    // Density is evaluated once and shared: it tokenizes the whole file, and the anti-gaming pass
+    // needs the same numbers, so recomputing it there doubled the per-file tokenization cost.
     const densityResult = computeEffectiveCodeDensity(content);
-    const gamingResult = detectScoreGaming(filePath, content);
+    const gamingResult = detectScoreGaming(filePath, content, densityResult);
     const allIssues = [...issues, ...gamingResult.issues];
 
     // 2. Risk penalty and ceilings

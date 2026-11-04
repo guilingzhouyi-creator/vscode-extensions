@@ -612,21 +612,28 @@ export function evaluateAntiGamingConjunction(
  *
  * @param filePath - Physical path to the source file under evaluation.
  * @param content - Text content of the source file.
+ * @param density - Effective-density result already computed for `content`, when the caller has it.
+ *   Density evaluation tokenizes the whole file, and `evaluateFileQuality` needs the same result for
+ *   its own indices, so passing it in avoids the second full-file tokenization per file.
  * @returns Anti-gaming analysis result including penalty and identified issues.
  */
-export function detectScoreGaming(filePath: string, content: string): AntiGamingResult {
+export function detectScoreGaming(
+    filePath: string,
+    content: string,
+    density?: EffectiveDensityResult,
+): AntiGamingResult {
     const issues: Issue[] = [];
     const gamingKinds: GamingPatternKind[] = [];
-    const density = computeEffectiveCodeDensity(content);
+    const densityResult = density ?? computeEffectiveCodeDensity(content);
 
-    const splitPenalty = checkArtificialSplitting(filePath, density, issues, gamingKinds);
+    const splitPenalty = checkArtificialSplitting(filePath, densityResult, issues, gamingKinds);
     const testPenalty = checkTautologicalTestPadding(filePath, content, issues, gamingKinds);
     const commentPenalty = checkTautologicalCommentPadding(filePath, content, issues, gamingKinds);
     const entropyPenalty = checkNamingEntropyAnomaly(filePath, content, issues, gamingKinds);
     const traversalPenalty = checkTautologicalPadding(filePath, content, issues, gamingKinds);
     const lowEntropyTokenPenalty = checkLowEntropyTokenPadding(
         filePath,
-        density,
+        densityResult,
         issues,
         gamingKinds,
     );
