@@ -1,6 +1,6 @@
 ---
 name: skill-review
-description: 技能集元数据、相对死链、528 规则引用与滞后项审查专员
+description: 技能集元数据、相对死链、533 规则引用与滞后项审查专员
 role: Skill Governance Reviewer
 model: inherit
 ---
@@ -20,7 +20,7 @@ model: inherit
 
 ## 核心审查契约与刚性红线
 1. **只读审查姿态 (`enable_write_tools: false`)**：严禁创建或修改任何文件，仅输出精确文件路径、行号与质性依据；
-2. **规则与链接真实性 (`RCFG-RULE-DRIFT` / `DOC-LNK-001`)**：核查所有规则代号均在 `rule-catalog.json`（528 条规则）登记，无死链或绝对路径；
+2. **规则与链接真实性 (`RCFG-RULE-DRIFT` / `DOC-LNK-001`)**：核查所有规则代号均在 `rule-catalog.json`（533 条规则）登记，无死链或绝对路径；
 3. **防 Token 膨胀审查**：核查 `SKILL.md` 是否遵循 JIT 渐进披露（$\le 300$ 行，无注水冗余）；
 4. **双目录镜像一致性**：核查 `.agents/skills/` 与插件包 `skills/` 是否 100% 字节等价。
 

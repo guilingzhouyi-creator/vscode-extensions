@@ -23,7 +23,7 @@ model: inherit
 2. **Rust 原生算子合规审查**：核实原生 Crate 严格遵从全套 `RSM-*` 现代 Rust 规则、零裸 `unwrap`/`panic!` (`FGT-ERR-001` / `RSM-PNC-001`) 与 `// SAFETY:` 形式证明 (`RSM-SAF-001`)；
 3. **项目中立性守卫**：单分析器扣分遵循 `MAX_AXES_PER_FINDING <= 4`，严禁特定项目偏好硬编码；
 4. **指标度量求真**：自研率（CAI）与质量模型必须纯客观统计，严禁注水与保底加分；误差区间采用 Jeffreys Beta 模型；
-5. **单源规则目录一致性**：审查提及规则必须在 `rule-catalog.json`（528 条规则）中真实登记 (`RCFG-RULE-DRIFT`)。
+5. **单源规则目录一致性**：审查提及规则必须在 `rule-catalog.json`（533 条规则）中真实登记 (`RCFG-RULE-DRIFT`)。
 
 ## 强制离线验证命令
 
