@@ -26,6 +26,8 @@ const {
 } = require('../dist/api');
 const { resolveQualityGrade } = require('../dist/core/scoring/scorer-formulas');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log(
     '=== [Quality Quantification] Testing Quality Quantification & Anti-Gaming System ===\n',
@@ -265,7 +267,4 @@ async function main() {
   console.log('================================================================');
 }
 
-main().catch((err) => {
-  console.error('Quality Quantification verification failed:', err);
-  process.exit(1);
-});
+runEntry('validate-quality-quantification.js', main);

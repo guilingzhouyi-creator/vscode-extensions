@@ -24,6 +24,8 @@ const {
   analyzerNameToBit,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('=== [1/5] Testing AdaptiveExpertBiasRouter Load Balancing & Yield Feedback ===');
 
@@ -285,7 +287,4 @@ async function main() {
   console.log('================================================================');
 }
 
-main().catch((err) => {
-  console.error('Validation failed with error:', err);
-  process.exit(1);
-});
+runEntry('validate-grouped-moe-dispatch.js', main);

@@ -15,6 +15,8 @@ const assert = require('assert');
 const { scan } = require('../dist/api');
 const { StdlibAnalyzer } = require('../dist/analyzers/stdlib');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('--- Checking Agent-Actionable Diagnostic Contracts ---');
 
@@ -258,7 +260,4 @@ echo $UNQUOTED_VAR
   console.log('✔  All Agent-Actionable diagnostic contracts verified successfully.');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+runEntry('validate-agent-actionable.js', main);

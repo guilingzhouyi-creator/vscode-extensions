@@ -22,6 +22,8 @@ const {
   SparseOrchestrator,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testDynamicPartitioner() {
   console.log('1. Testing DynamicPartitioner module clustering and workload balancing...');
 
@@ -221,7 +223,4 @@ async function runAll() {
   console.log('\n=== All Sparse Scheduler tests passed successfully! ===');
 }
 
-runAll().catch((err) => {
-  console.error('\n❌ Verification failed with error:', err);
-  process.exit(1);
-});
+runEntry('validate-sparse-scheduler.js', runAll);

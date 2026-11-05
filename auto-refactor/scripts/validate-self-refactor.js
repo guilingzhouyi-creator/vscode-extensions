@@ -28,6 +28,8 @@ const {
   ALL_QUALITY_DIMENSIONS,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 // Baseline reference metrics from Self-Audit pre-refactor snapshot
 const INITIAL_SELF_AUDIT_BASELINE = {
   criticalDebt: 5,
@@ -329,7 +331,4 @@ async function main() {
   console.log('================================================================');
 }
 
-main().catch((err) => {
-  console.error('Self-Refactor verification failed:', err);
-  process.exit(1);
-});
+runEntry('validate-self-refactor.js', main);

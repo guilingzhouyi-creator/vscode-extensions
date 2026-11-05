@@ -23,6 +23,8 @@ const {
   defaultPraxisGovernanceService,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('=== [Test Modernity] Testing Test Modernity & Contract Coverage Governance ===\n');
 
@@ -332,7 +334,4 @@ describe('UserProfile Tests', () => {
   console.log('\n=== All Test Modernity Test Modernity & Contract Governance Tests PASSED ===');
 }
 
-main().catch((err) => {
-  console.error('Test Modernity verification failed:', err);
-  process.exit(1);
-});
+runEntry('validate-test-modernity.js', main);

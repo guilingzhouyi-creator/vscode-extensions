@@ -21,6 +21,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const ROOT = path.join(__dirname, '..');
 const RUNNER = path.join(ROOT, 'templates', 'consumer', 'run.mjs');
 
@@ -245,7 +247,4 @@ async function main() {
   console.log('\n ALL CONSUMER RUNNER KEY POINTS PASSED SUCCESSFULLY!');
 }
 
-main().catch((error) => {
-  console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-  process.exit(1);
-});
+runEntry('validate-consumer-runner.js', main);

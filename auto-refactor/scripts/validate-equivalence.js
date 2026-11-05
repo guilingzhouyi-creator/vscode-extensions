@@ -32,6 +32,8 @@ const { scan } = require('../dist/api');
 const fs = require('fs');
 const path = require('path');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const ROOT = path.join(__dirname, '..');
 const CORPUS = path.join(__dirname, '.equivalence-corpus');
 const BASELINES = path.join(__dirname, 'baselines');
@@ -457,7 +459,4 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+runEntry('validate-equivalence.js', main);

@@ -50,15 +50,68 @@ function findTail(lines) {
         const candidate = lines.slice(start, end + 1).join('\n');
         const match = TAIL_PATTERN.exec(`${candidate}\n`);
         if (!match) continue;
-        // Reject a match that swallowed a brace-only line: that means a block boundary was crossed.
-        const body = lines.slice(start, end + 1);
-        if (body.some((line, index) => index > 0 && /^\s*(\}|if\s*\(|module\.exports)/.test(line))) {
+        // Reject a match that swallowed a brace-only line between its ends: that means a block
+        // boundary was crossed. The first and last lines are excluded because they are the call
+        // itself and the catch's own closing sequence, which always contains a brace.
+        const body = lines.slice(start, end + 1).slice(1, -1);
+        if (body.some((line) => /^\s*(\}|if\s*\(|module\.exports)/.test(line))) {
             return null;
         }
         return { start, end, match };
     }
     return null;
 }
+
+/**
+ * Finds the offset just past the leading import block.
+ *
+ * Walks top-level statements only, so a `require` embedded in a fixture template string is
+ * invisible here. A statement is assumed to run from a column-zero line until a line ending in a
+ * semicolon; that is enough for the import blocks these validators use, including multi-line
+ * destructuring. Returns null when the file has no import block at all, which means the caller must
+ * refuse rather than guess where the import belongs.
+ *
+ * @param source - Whole file contents after the tail was replaced.
+ * @returns Offset after the final import's newline, or null.
+ */
+function findImportInsertAt(source) {
+    const lines = source.split('\n');
+    let offset = 0;
+    let lastEnd = null;
+    let seenImport = false;
+    let buffer = '';
+
+    for (const line of lines) {
+        const length = line.length + 1;
+        if (buffer === '' && line.trim() === '') {
+            offset += length;
+            continue;
+        }
+        if (buffer === '' && /^[ \t]/.test(line)) {
+            offset += length;
+            continue;
+        }
+
+        buffer += `${line}\n`;
+        offset += length;
+        if (!/;\s*$/.test(line)) continue;
+
+        // An import is a statement whose final call is the `require` itself. Requiring something and
+        // then calling a method on it (`require('fs').readFileSync(...)`) is ordinary code, and a
+        // fixture string may contain either shape, so the anchored test keeps both out.
+        const statement = buffer;
+        buffer = '';
+        if (/require\((['"])[^'"\n]+\1\)\s*;\s*$/m.test(statement)) {
+            seenImport = true;
+            lastEnd = offset;
+        } else if (seenImport) {
+            break;
+        }
+    }
+
+    return lastEnd;
+}
+
 
 /**
  * Migrates one file in place.
@@ -85,15 +138,17 @@ function migrateFile(filePath) {
     const head = lines.slice(0, tail.start).join('\n').replace(/\s*$/, '');
     const migrated = `${head}\n\n${replacement}\n`;
 
-    // Insert the import after the last existing require statement, and keep a blank line between the
-    // import block and whatever follows: a declaration jammed against the import reads as part of it
-    // and defeats the file's own spacing contract.
-    const requireLines = [...migrated.matchAll(/^const [\s\S]*?require\([^)]*\);\s*$/gm)];
-    if (requireLines.length === 0) {
+    // Insert the import after the leading require block, and keep a blank line between the import
+    // block and whatever follows: a declaration jammed against the import reads as part of it and
+    // defeats the file's own spacing contract.
+    //
+    // The block is walked line by line instead of regex-matched, because a lazy multi-line pattern
+    // happily matches a `require` written inside a fixture template string and inserts the import
+    // hundreds of lines below the real imports. Only column-zero declarations count.
+    const insertAt = findImportInsertAt(migrated);
+    if (insertAt === null) {
         return { name, status: 'skipped', reason: 'no require block to extend' };
     }
-    const lastRequire = requireLines[requireLines.length - 1];
-    const insertAt = lastRequire.index + lastRequire[0].length;
     const withImport = `${migrated.slice(0, insertAt)}\nconst { runEntry } = require('./common/test-runner-harness');\n${migrated.slice(
         insertAt,
     )}`;

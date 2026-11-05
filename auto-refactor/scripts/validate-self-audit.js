@@ -21,6 +21,8 @@ const path = require('path');
 const { runSelfAudit, BASELINE_OUTPUT, BASELINE_AAS_OUTPUT } = require('./run-self-audit');
 const { evaluateElasticDebtBudget } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const EXPECTED_PILLARS = [
   'architecture',
   'maintainability',
@@ -410,7 +412,4 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('Self-Audit verification failed:', err);
-  process.exit(1);
-});
+runEntry('validate-self-audit.js', main);

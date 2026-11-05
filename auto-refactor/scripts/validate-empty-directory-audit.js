@@ -30,6 +30,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const { scan } = require('../dist/api');
 const {
   auditEmptyDirectories,
@@ -325,7 +327,4 @@ async function main() {
   console.log('\n ALL EMPTY DIRECTORY AUDIT CHECKS PASSED SUCCESSFULLY!');
 }
 
-main().catch((error) => {
-  console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-  process.exit(1);
-});
+runEntry('validate-empty-directory-audit.js', main);

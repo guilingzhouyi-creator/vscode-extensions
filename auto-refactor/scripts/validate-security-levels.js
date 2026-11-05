@@ -34,6 +34,8 @@ const { Scanner } = require('../dist/api');
 const { resolveConfig } = require('../dist/core/config/config');
 const { QualityScorer } = require('../dist/core/scoring/qualityScorer');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const TEST_DIR = path.join(__dirname, '../.test_security_workspace');
 
 function setupWorkspace() {
@@ -317,7 +319,4 @@ async function runTests() {
   }
 }
 
-runTests().catch((err) => {
-  console.error('Validation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-security-levels.js', runTests);

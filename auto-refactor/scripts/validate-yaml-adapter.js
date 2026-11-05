@@ -32,6 +32,7 @@ const { DEFAULT_EXT } = require('../dist/core/file-discovery');
 const { EXTENSION_ADAPTER_IDS } = require('../dist/core/ast/adapters');
 const { DataAdapter } = require('../dist/core/ast/data-adapter');
 const { NodeKind } = require('../dist/core/ast/multilang');
+const { runEntry } = require('./common/test-runner-harness');
 
 const RULE_UNSUPPORTED = 'LANG-UNSUPPORTED';
 
@@ -182,10 +183,7 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch((error) => {
-    console.error(`✖ BLOCK yaml adapter: ${error.message}`);
-    process.exit(1);
-  });
+  runEntry('validate-yaml-adapter.js', main);
 }
 
 module.exports = Object.freeze({ main });

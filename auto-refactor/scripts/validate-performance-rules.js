@@ -21,6 +21,8 @@ const {
 } = require('../dist/api');
 const { PerformanceAnalyzer } = require('../dist/analyzers/performance');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 function indexIssuesByRule(issues) {
   const map = new Map();
   for (const issue of issues || []) {
@@ -359,7 +361,4 @@ async function main() {
   console.log('\n=== All Performance Rules Performance & Algorithmic Auditing Tests PASSED ===');
 }
 
-main().catch((err) => {
-  console.error('Performance Rules verification failed:', err);
-  process.exit(1);
-});
+runEntry('validate-performance-rules.js', main);

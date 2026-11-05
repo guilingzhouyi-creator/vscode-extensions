@@ -23,6 +23,8 @@ const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const { parseGitignoreLines } = require('../dist/core/policy/gitignore');
 const { inferFineGrainedFileRole } = require('../dist/core/intelligence/file-role-inference');
 const { ConstantsAnalyzer } = require('../dist/analyzers/constants');
@@ -300,7 +302,4 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('Fatal validation error:', err);
-  process.exit(1);
-});
+runEntry('validate-mit-corpus.js', main);

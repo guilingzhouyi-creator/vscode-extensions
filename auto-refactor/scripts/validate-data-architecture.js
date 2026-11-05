@@ -21,6 +21,8 @@ const {
   defaultPraxisGovernanceService,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log(
     '=== [Data Architecture] Testing Data Architecture & Persistence Access Governance ===\n',
@@ -240,7 +242,4 @@ export class AssetRegistry {
   console.log('\n=== All Data Architecture Data Architecture & Query Governance Tests PASSED ===');
 }
 
-main().catch((err) => {
-  console.error('Data Architecture verification failed:', err);
-  process.exit(1);
-});
+runEntry('validate-data-architecture.js', main);

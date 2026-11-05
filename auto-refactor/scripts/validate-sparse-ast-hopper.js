@@ -32,6 +32,8 @@ const {
 const { SymbolIndex, collectSymbols } = require('../dist/core/intelligence/symbolIndex');
 const { NodeKind } = require('../dist/core/ast/multilang');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 /** Build one normalized node with an explicit line extent. */
 function node(startLine, endLine, kind = NodeKind.Function) {
   return {
@@ -448,7 +450,4 @@ async function main() {
   console.log('=== ALL SPARSE HOPPER VALIDATION TESTS PASSED (11/11) ===');
 }
 
-main().catch((error) => {
-  console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-  process.exit(1);
-});
+runEntry('validate-sparse-ast-hopper.js', main);

@@ -22,6 +22,8 @@ const {
   defaultPraxisGovernanceService,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('=== [Meta-Architecture] Testing Semantic Architecture Graph & Meta-Rules ===\n');
 
@@ -255,7 +257,4 @@ export class TradingEngine {
   console.log('================================================================\n');
 }
 
-main().catch((err) => {
-  console.error('Meta-Architecture verification failed:', err);
-  process.exit(1);
-});
+runEntry('validate-meta-architecture.js', main);

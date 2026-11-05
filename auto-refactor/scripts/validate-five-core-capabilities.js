@@ -19,6 +19,8 @@ const os = require('os');
 const path = require('path');
 const { scan } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 // Shield keyword to prevent comment analyzer from misinterpreting fixture code as public API
 const EXP = 'export';
 
@@ -220,7 +222,4 @@ ${EXP} let mutableGlobalOrders: any[] = []; // ARCH-GLB-001 (mutable global stat
   }
 }
 
-runHarness().catch((err) => {
-  console.error('Validation harness failed:', err);
-  process.exit(1);
-});
+runEntry('validate-five-core-capabilities.js', runHarness);

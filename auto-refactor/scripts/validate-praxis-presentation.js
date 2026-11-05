@@ -28,6 +28,8 @@ const {
   rulesShareCluster,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testI18nProvider() {
   console.log('1. Testing defaultPraxisI18nProvider...');
 
@@ -347,7 +349,4 @@ async function runAll() {
   console.log('\n=== All Praxis Presentation & i18n tests passed successfully! ===');
 }
 
-runAll().catch((err) => {
-  console.error('\n❌ Verification failed with error:', err);
-  process.exit(1);
-});
+runEntry('validate-praxis-presentation.js', runAll);

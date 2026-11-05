@@ -21,6 +21,8 @@
 
 const assert = require('node:assert');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const {
   myersDiff,
   fnv1a32,
@@ -235,7 +237,4 @@ async function main() {
   console.log('\n🎉 ALL PRAXIS FOUNDATION & HIGH-PERFORMANCE DIFF TESTS PASSED!\n');
 }
 
-main().catch((err) => {
-  console.error('\n❌ TEST FAILED:', err);
-  process.exit(1);
-});
+runEntry('validate-praxis-foundation.js', main);

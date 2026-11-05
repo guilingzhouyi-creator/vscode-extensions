@@ -23,6 +23,8 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const {
   scan,
   synthesizeStaticQualityVector,
@@ -550,7 +552,4 @@ async function main() {
   console.log('🎉 ALL THREE PROJECTS SUCCESSFULLY VALIDATED UNDER TRI-PLANE GOVERNANCE!');
 }
 
-main().catch((err) => {
-  console.error('Tri-plane evaluation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-triplane-cross-project.js', main);

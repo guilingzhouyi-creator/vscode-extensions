@@ -21,6 +21,8 @@
 const assert = require('assert');
 const { buildAasReport, toAasJson, AAS_SCHEMA_ID, render, getReporter } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 function createMockScanReport(overrides = {}) {
   return {
     tool: 'auto-refactor',
@@ -969,7 +971,4 @@ async function runTests() {
   console.log('\n--- All Agent Audit Schema (AAS v1.0 / v1.1) Tests Passed! ---');
 }
 
-runTests().catch((executionError) => {
-  console.error('FAIL: validate-aas-reporter.js encountered an error:', executionError);
-  process.exit(1);
-});
+runEntry('validate-aas-reporter.js', runTests);

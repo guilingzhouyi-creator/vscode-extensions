@@ -25,6 +25,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const {
   loadProjectManifestDependencies,
   classifyFileProvenance,
@@ -440,7 +442,4 @@ async function main() {
   console.log('\n✔ All autonomy scorer tests passed successfully.\n');
 }
 
-main().catch((err) => {
-  console.error('\n✖ BLOCK Autonomy scorer test failed:\n', err);
-  process.exit(1);
-});
+runEntry('validate-autonomy-scorer.js', main);

@@ -22,6 +22,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const ROOT = path.join(__dirname, '..');
 process.env.NODE_PATH = path.join(ROOT, 'node_modules');
 require('module').Module._initPaths();
@@ -312,8 +314,4 @@ function cleanup() {
   }
 }
 
-main().catch((executionError) => {
-  console.error(executionError);
-  cleanup();
-  process.exit(1);
-});
+runEntry('validate-oxc-keypoints.js', main);

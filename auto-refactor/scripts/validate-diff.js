@@ -26,6 +26,8 @@ const path = require('path');
 const { scan, scanDiff, scanDiffDelta } = require('../dist/api');
 const { computeEditRanges } = require('../dist/core/diff/edit-diff');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const ROOT = path.join(__dirname, '..');
 const CORPUS = path.join(__dirname, '.diff-corpus');
 const BIG = path.join(CORPUS, 'src', 'big.ts');
@@ -638,8 +640,4 @@ async function main() {
   process.exit(failureCount > 0 ? 1 : 0);
 }
 
-main().catch((err) => {
-  console.error(err);
-  stopDaemonService();
-  process.exit(1);
-});
+runEntry('validate-diff.js', main);

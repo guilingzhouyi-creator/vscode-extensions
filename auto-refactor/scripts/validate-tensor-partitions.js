@@ -25,6 +25,8 @@ const {
   DEFAULT_TENSOR_RULE_FAMILIES,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testTensorWorkloadPartitioning() {
   console.log('1. Testing 3D tensor-parallel workload partitioning...');
   const partitioner = new TensorPartitioner(10);
@@ -231,7 +233,4 @@ async function runAll() {
   console.log('\n=== All Tensor Partitioning & All-Reduce tests passed successfully! ===');
 }
 
-runAll().catch((err) => {
-  console.error('\n❌ Verification failed with error:', err);
-  process.exit(1);
-});
+runEntry('validate-tensor-partitions.js', runAll);

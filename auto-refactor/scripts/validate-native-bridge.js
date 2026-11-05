@@ -29,6 +29,8 @@ const {
   PureJsNativeShim,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testEngineStatusAndCapabilities() {
   console.log('1. Testing native core status and declared capabilities...');
   const status = getNativeCoreStatus();
@@ -288,7 +290,4 @@ async function runAll() {
   console.log('\n=== All Native Acceleration Bridge tests passed successfully! ===');
 }
 
-runAll().catch((err) => {
-  console.error('\n❌ Verification failed with error:', err);
-  process.exit(1);
-});
+runEntry('validate-native-bridge.js', runAll);

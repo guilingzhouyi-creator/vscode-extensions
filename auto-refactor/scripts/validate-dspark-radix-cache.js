@@ -19,6 +19,8 @@ const assert = require('assert');
 const { DSparkConfidenceScheduler, AstPrefixRadixCache } = require('../dist/api');
 const { NodeKind } = require('../dist/core/ast/multilang');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('=== [1/5] Testing DSparkConfidenceScheduler Micro-Edit Step Scoring ===');
 
@@ -248,7 +250,4 @@ async function main() {
   console.log('=== ALL PHASE 3 VALIDATION TESTS PASSED (5/5) ===');
 }
 
-main().catch((validationError) => {
-  console.error('Phase 3 validation failed:', validationError);
-  process.exit(1);
-});
+runEntry('validate-dspark-radix-cache.js', main);

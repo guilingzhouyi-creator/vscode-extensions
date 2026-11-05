@@ -24,6 +24,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const { StdlibAnalyzer } = require('../dist/analyzers/stdlib');
 const { detectProjectProfile } = require('../dist/core/profiler/projectProfiler');
 const { evaluateProjectAutonomy } = require('../dist/core/scoring/autonomy-scorer');
@@ -246,7 +248,4 @@ async function main() {
   console.log('\n✔ All standard library & systems runtime tests passed successfully.\n');
 }
 
-main().catch((err) => {
-  console.error('\n✖ BLOCK Standard library verification failed:\n', err);
-  process.exit(1);
-});
+runEntry('validate-stdlib-profile.js', main);

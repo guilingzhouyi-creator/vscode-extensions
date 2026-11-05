@@ -25,6 +25,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const {
   readAuditedBaseline,
   updateAuditedBaseline,
@@ -616,8 +618,4 @@ async function runAllTests() {
   console.log('\n✔ All 9 preflight audit index architecture test suites passed successfully.');
 }
 
-runAllTests().catch((err) => {
-  console.error('\n✖ Test suite execution failed:');
-  console.error(err);
-  process.exit(1);
-});
+runEntry('validate-preflight-audit-index.js', runAllTests);

@@ -27,6 +27,8 @@ const {
   pillarToStaticAxis,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log(
     '=== [Static Analysis Plane] Testing Static Quality Model & S_i = P_i * C_i * I_i ===\n',
@@ -260,7 +262,4 @@ async function main() {
   console.log('\n🎉 ALL STATIC ANALYSIS PLANE QUANTIFICATION TESTS PASSED!');
 }
 
-main().catch((err) => {
-  console.error('❌ Validation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-static-quality-model.js', main);

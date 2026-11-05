@@ -32,6 +32,8 @@ const {
 const { SymbolIndex } = require('../dist/core/intelligence/symbolIndex');
 const { CallGraph } = require('../dist/core/intelligence/callGraph');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 /**
  * Verifies the rule registry pyramid actually has populated layers.
  *
@@ -419,7 +421,4 @@ async function main() {
   console.log('================================================================');
 }
 
-main().catch((err) => {
-  console.error('\n❌ Closed-loop stress governance validation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-e2e-stress.js', main);

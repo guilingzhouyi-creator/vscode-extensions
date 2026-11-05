@@ -22,6 +22,8 @@ const {
 const { SymbolIndex } = require('../dist/core/intelligence/symbolIndex');
 const { CallGraph } = require('../dist/core/intelligence/callGraph');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('================================================================');
   console.log('Slice Audit: Incremental Slice Audit Engine & Sparse MoE Harness');
@@ -272,7 +274,4 @@ async function main() {
   console.log('================================================================\n');
 }
 
-main().catch((err) => {
-  console.error('Slice Audit verification failed:', err);
-  process.exit(1);
-});
+runEntry('validate-slice-audit.js', main);

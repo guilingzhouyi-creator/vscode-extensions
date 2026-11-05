@@ -14,6 +14,8 @@
 
 const assert = require('assert');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const {
   AgentAttributionTracker,
   AgentCollisionDetector,
@@ -423,7 +425,4 @@ async function main() {
   console.log('================================================================');
 }
 
-main().catch((err) => {
-  console.error('\n❌ Multi-Agent validation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-multi-agent.js', main);

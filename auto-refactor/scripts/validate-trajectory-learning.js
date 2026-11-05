@@ -38,6 +38,8 @@ const {
   calculateModernConstructAdoptionRate,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('================================================================');
   console.log('🧪 Verifying Trajectory Learning & Architecture Modernization (16 cases)');
@@ -654,7 +656,4 @@ function evaluateContext(rawInput: TypedContextView): any {
   console.log('================================================================');
 }
 
-main().catch((err) => {
-  console.error('\n❌ Trajectory Learning validation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-trajectory-learning.js', main);

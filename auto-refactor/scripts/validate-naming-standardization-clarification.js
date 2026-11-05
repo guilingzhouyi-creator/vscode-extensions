@@ -24,6 +24,8 @@ const { scan } = require('../dist/api');
 const { toStructuredAgentDirectives } = require('../dist/core/reporters/agent-review-reporter');
 const { formatCompactAgentPrompt } = require('../dist/core/guidance/agentConstraintGenerator');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function run() {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-std-clarify-'));
 
@@ -218,7 +220,4 @@ async function run() {
   }
 }
 
-run().catch((err) => {
-  console.error('Test failed:', err);
-  process.exit(1);
-});
+runEntry('validate-naming-standardization-clarification.js', run);

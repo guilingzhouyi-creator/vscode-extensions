@@ -24,6 +24,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const { scan } = require('../dist/api');
 const {
   ratchetDownGroups,
@@ -352,7 +354,4 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error('[validate-baseline-ratchet] FAILED:', error && error.message);
-  process.exit(1);
-});
+runEntry('validate-baseline-ratchet.js', main);
