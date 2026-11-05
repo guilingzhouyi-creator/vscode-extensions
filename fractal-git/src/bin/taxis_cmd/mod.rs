@@ -29,6 +29,7 @@ pub mod commit_walk;
 pub mod common;
 pub mod config;
 pub mod daemon;
+pub mod diagnostics_tool;
 pub mod diff;
 pub mod diff_render;
 pub mod doctor;

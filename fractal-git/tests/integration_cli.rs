@@ -63,3 +63,5 @@ mod test_conflict_state_parity;
 mod test_notes_replace_parity;
 #[path = "rust/test_maintenance_ops_parity.rs"]
 mod test_maintenance_ops_parity;
+#[path = "rust/test_commercial_diagnostics_parity.rs"]
+mod test_commercial_diagnostics_parity;

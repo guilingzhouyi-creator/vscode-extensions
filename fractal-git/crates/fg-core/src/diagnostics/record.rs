@@ -26,7 +26,7 @@ pub struct DiagnosticRecord {
     /// Operating system process identifier.
     pub pid: u32,
     /// Product edition.
-    pub edition: &'static str,
+    pub edition: String,
     /// Active CLI subcommand if registered.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subcommand: Option<String>,
@@ -77,7 +77,7 @@ mod tests {
             event: Some("policy_rejection".to_string()),
             trace_id: "tx-test-123".to_string(),
             pid: 1234,
-            edition: "engineering",
+            edition: "engineering".to_string(),
             subcommand: Some("commit".to_string()),
             message: "Header length must be at least 15 characters".to_string(),
             rule_id: Some("FGT-MSG-001".to_string()),

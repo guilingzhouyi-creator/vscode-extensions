@@ -102,12 +102,19 @@ pub fn parse_byte_size(input_size_str: &str) -> Option<u64> {
 /// are normalized to standard porcelain `error:` prefixes, keeping user messages clean and professional.
 /// When diagnostic mode is activated, raw engineering tags are preserved for automated triage.
 pub fn reject(tag: &str, detail: impl Display) -> ! {
-    fg_core::diag_debug!("gate", "rejection tag={} exit={}", tag, EXIT_REJECTED);
+    let detail_str = detail.to_string();
+    fg_core::diagnostics::record_event(
+        fg_core::diagnostics::LogLevel::Warn,
+        "taxis::gate",
+        "rejection",
+        &detail_str,
+        Some(tag),
+        Some(serde_json::json!({ "exit_code": EXIT_REJECTED, "tag": tag })),
+    );
     let is_diag = fg_core::diagnostics::is_diagnostic_mode();
     if is_diag {
-        eprintln!("{} {}", tag, detail);
+        eprintln!("{} {}", tag, detail_str);
     } else {
-        let text = detail.to_string();
         let prefix = match tag {
             CliTag::COMMIT_GOVERNANCE_FAIL | CliTag::ERROR | CliTag::FAIL => "error:",
             CliTag::AUTHORITY_BREACH => "error: [AUTHORITY_BREACH]",
@@ -120,13 +127,13 @@ pub fn reject(tag: &str, detail: impl Display) -> ! {
             }
         };
         if prefix.is_empty()
-            || text.starts_with("error:")
-            || text.starts_with("fatal:")
-            || text.starts_with("usage:")
+            || detail_str.starts_with("error:")
+            || detail_str.starts_with("fatal:")
+            || detail_str.starts_with("usage:")
         {
-            eprintln!("{}", text);
+            eprintln!("{}", detail_str);
         } else {
-            eprintln!("{} {}", prefix, text);
+            eprintln!("{} {}", prefix, detail_str);
         }
     }
     std::process::exit(EXIT_REJECTED)
@@ -134,7 +141,16 @@ pub fn reject(tag: &str, detail: impl Display) -> ! {
 
 /// Reports an I/O or side-effect failure on stderr and terminates with [`EXIT_FATAL`].
 pub fn fail_io(action: impl Display, detail: impl Display) -> ! {
-    eprintln!("fatal: failed to {}: {}", action, detail);
+    let msg = format!("failed to {action}: {detail}");
+    fg_core::diagnostics::record_event(
+        fg_core::diagnostics::LogLevel::Error,
+        "taxis::io",
+        "io_failure",
+        &msg,
+        None,
+        Some(serde_json::json!({ "exit_code": EXIT_FATAL })),
+    );
+    eprintln!("fatal: {}", msg);
     std::process::exit(EXIT_FATAL)
 }
 
@@ -143,7 +159,16 @@ pub fn fail_io(action: impl Display, detail: impl Display) -> ! {
 /// Opening a repository that does not exist, or reading an object that is missing, is fatal in
 /// Git rather than a policy refusal; callers rely on the 128 status to separate the two.
 pub fn fail_fatal(detail: impl Display) -> ! {
-    eprintln!("fatal: {}", detail);
+    let detail_str = detail.to_string();
+    fg_core::diagnostics::record_event(
+        fg_core::diagnostics::LogLevel::Error,
+        "taxis::kernel",
+        "fatal_failure",
+        &detail_str,
+        None,
+        Some(serde_json::json!({ "exit_code": EXIT_FATAL })),
+    );
+    eprintln!("fatal: {}", detail_str);
     std::process::exit(EXIT_FATAL)
 }
 

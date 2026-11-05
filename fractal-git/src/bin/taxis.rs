@@ -19,11 +19,11 @@ mod taxis_cmd;
 use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
     am, apply, archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick,
-    clone, commit, config, daemon, diff, doctor, format_patch, gate_slice, hash_object,
-    index_plumbing, init, inspect, lineage, log, maintenance, maintenance_ops, merge, notes_replace,
-    operation, pack_plumbing, plumbing_tree, project, projection, promotion, quality, quarantine,
-    read, rebase, reclaim, refs, relocate, remote, repack, reset, rev_list, revert, stage, stash,
-    status, submodule, tag, unarchive, undo, verify, worktree,
+    clone, commit, config, daemon, diagnostics_tool, diff, doctor, format_patch, gate_slice,
+    hash_object, index_plumbing, init, inspect, lineage, log, maintenance, maintenance_ops, merge,
+    notes_replace, operation, pack_plumbing, plumbing_tree, project, projection, promotion,
+    quality, quarantine, read, rebase, reclaim, refs, relocate, remote, repack, reset, rev_list,
+    revert, stage, stash, status, submodule, tag, unarchive, undo, verify, worktree,
 };
 
 use fg_core::models::current_unix_seconds;
@@ -524,6 +524,11 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         handler: pack_plumbing::handle_index_pack,
     },
     CommandSpec {
+        canonical: "diagnostics",
+        aliases: &["diagnostics", "diag"],
+        handler: diagnostics_tool::handle_diagnostics,
+    },
+    CommandSpec {
         canonical: "version",
         aliases: &["version", "-v", "--version"],
         handler: handle_version,
@@ -907,6 +912,21 @@ fn main() {
     }
 
     let (effective_subcommand, sub_args) = extract_effective_subcommand(&filtered_args);
+    let log_file_arg = find_arg_value(&raw_args, &["--log-file"]);
+    let log_path = log_file_arg
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var("TAXIS_LOG_FILE").ok().map(std::path::PathBuf::from))
+        .or_else(|| {
+            if git_dir.is_dir() {
+                Some(git_dir.join("diagnostics/taxis.jsonl"))
+            } else {
+                None
+            }
+        });
+    if let Some(path) = log_path {
+        let _ = fg_core::diagnostics::set_file_sink(path, None, None);
+    }
+    fg_core::diagnostics::set_active_subcommand(effective_subcommand);
     fg_core::diag_debug!(
         "taxis",
         "dispatching '{}' with {} argument(s), json={}",
@@ -914,6 +934,24 @@ fn main() {
         sub_args.len(),
         json_mode
     );
+    let invocation_summary = if sub_args.is_empty() {
+        format!("Dispatching '{effective_subcommand}'")
+    } else {
+        format!("Dispatching '{effective_subcommand} {}'", sub_args.join(" "))
+    };
+    fg_core::diagnostics::record_event(
+        fg_core::diagnostics::LogLevel::Info,
+        "taxis::cli",
+        "command_dispatch",
+        &invocation_summary,
+        None,
+        Some(serde_json::json!({
+            "subcommand": effective_subcommand,
+            "args_count": sub_args.len(),
+            "json_mode": json_mode
+        })),
+    );
+
     let ctx = CliContext {
         git_dir,
         json_mode,
