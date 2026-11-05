@@ -27,10 +27,23 @@ const BASELINE_DIR: &str = "baselines";
 
 /// Dispatches benchmark suite execution, baseline persistence, and regression verification.
 pub fn handle_bench(ctx: &CliContext) {
+    let level = parse_bench_level(&ctx.args);
+    let is_e2e = level == BenchmarkLevel::Level4E2E
+        || ctx.args.iter().any(|arg| {
+            arg == "--e2e"
+                || arg == "--clone"
+                || arg == "bench-clone"
+                || arg == "--bench-clone"
+        });
+
+    if is_e2e {
+        super::bench_e2e::handle_e2e_bench(ctx);
+        return;
+    }
+
     let multiplier = find_arg_value(&ctx.args, &["-m", "--multiplier"])
         .and_then(|val| val.parse::<usize>().ok())
         .unwrap_or(1);
-    let level = parse_bench_level(&ctx.args);
 
     let save_path = find_arg_value(&ctx.args, &["--save-baseline"]).map(PathBuf::from);
     let verify_path = find_arg_value(&ctx.args, &["--verify-baseline"]).map(PathBuf::from);
@@ -59,10 +72,20 @@ fn parse_bench_level(args: &[String]) -> BenchmarkLevel {
     if args.iter().any(|arg| arg == "--scion-parity") {
         return BenchmarkLevel::All;
     }
+    if args.iter().any(|arg| {
+        arg == "--e2e"
+            || arg == "--clone"
+            || arg == "bench-clone"
+            || arg == "--bench-clone"
+    }) {
+        return BenchmarkLevel::Level4E2E;
+    }
     match find_arg_value(args, &["--level"]) {
         Some("2" | "scale" | "poset") => BenchmarkLevel::Level2Scale,
         Some("3" | "macro" | "monorepo") => BenchmarkLevel::Level3Macro,
+        Some("4" | "e2e" | "clone") => BenchmarkLevel::Level4E2E,
         Some("all" | "full") => BenchmarkLevel::All,
+        Some("all-e2e") => BenchmarkLevel::AllWithE2E,
         _ => BenchmarkLevel::Level1Micro,
     }
 }
@@ -104,7 +127,7 @@ fn profile_baseline_name(profile: BenchmarkProfile) -> String {
 /// The literal `auto` expands to the baseline matching this build profile, so one gate invocation
 /// serves both `cargo test` and the release audit without the caller having to know which profile
 /// it is running in.
-fn resolve_baseline_file(verify_arg: &Path) -> Option<PathBuf> {
+pub(crate) fn resolve_baseline_file(verify_arg: &Path) -> Option<PathBuf> {
     let verify_str = verify_arg.to_string_lossy().to_string();
     let trimmed = verify_str
         .trim_matches(|c: char| c == '"' || c == '\'' || c.is_whitespace())
