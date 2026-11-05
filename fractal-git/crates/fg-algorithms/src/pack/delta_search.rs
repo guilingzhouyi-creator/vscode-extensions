@@ -203,6 +203,7 @@ pub fn find_pack_deltas(
     let count = items.len();
     let mut depths = vec![0usize; count];
     let mut chosen_deltas: Vec<Option<(usize, Oid, Vec<u8>)>> = Vec::with_capacity(count);
+    let mut fossil_state = crate::pack::fossil_matcher::FossilDeltaState::new();
 
     for item_index in 0..count {
         let target = &items[item_index];
@@ -217,10 +218,16 @@ pub fn find_pack_deltas(
             }
 
             let delta_fossil = if candidate.payload.len() >= 16 && target.payload.len() >= 16 {
-                crate::pack::fossil_matcher::encode_fossil_git_delta(
+                if crate::pack::fossil_matcher::encode_fossil_git_delta_into(
                     &candidate.payload,
                     &target.payload,
-                )
+                    &mut fossil_state,
+                ) && fossil_state.out.len() < best_size
+                {
+                    Some(fossil_state.out.clone())
+                } else {
+                    None
+                }
             } else {
                 None
             };

@@ -111,21 +111,22 @@ impl FastCdcChunker {
         self.iter(input_bytes).collect()
     }
 
-    /// Computes the next content-defined chunk from `input_bytes` starting at `*offset`.
-    /// Advances `*offset` by the chunk length.
-    pub fn next_chunk(&self, input_bytes: &[u8], offset: &mut usize) -> ChunkDescriptor {
+    /// Computes the next content-defined boundary without calculating the SHA-1 digest.
+    /// Returns `(chunk_offset, chunk_length)` and advances `*offset`.
+    #[inline]
+    pub fn next_boundary(&self, input_bytes: &[u8], offset: &mut usize) -> (usize, usize) {
         let len = input_bytes.len();
-        let remaining = len - *offset;
+        let current_offset = *offset;
+        let remaining = len - current_offset;
         if remaining <= self.min_size {
-            let chunk = Self::make_chunk(input_bytes, *offset, remaining);
             *offset = len;
-            return chunk;
+            return (current_offset, remaining);
         }
 
         let max_cut = remaining.min(self.max_size);
         let mut cut_offset = self.min_size;
         let midpoint = self.min_size + (max_cut - self.min_size) / 2;
-        let slice = &input_bytes[*offset..*offset + max_cut];
+        let slice = &input_bytes[current_offset..current_offset + max_cut];
 
         let mut fingerprint: u64 = 0;
         let mut found = false;
@@ -158,9 +159,25 @@ impl FastCdcChunker {
             cut_offset = max_cut;
         }
 
-        let chunk = Self::make_chunk(input_bytes, *offset, cut_offset);
-        *offset += cut_offset;
-        chunk
+        *offset = current_offset + cut_offset;
+        (current_offset, cut_offset)
+    }
+
+    /// Computes the next content-defined chunk from `input_bytes` starting at `*offset`.
+    /// Advances `*offset` by the chunk length.
+    pub fn next_chunk(&self, input_bytes: &[u8], offset: &mut usize) -> ChunkDescriptor {
+        let (chunk_offset, chunk_len) = self.next_boundary(input_bytes, offset);
+        Self::make_chunk(input_bytes, chunk_offset, chunk_len)
+    }
+
+    /// Creates an iterator over content-defined chunk boundaries (offset, length) without SHA-1 hashing.
+    #[inline]
+    pub fn iter_boundaries<'a>(&'a self, input_bytes: &'a [u8]) -> FastCdcBoundaryIter<'a> {
+        FastCdcBoundaryIter {
+            chunker: self,
+            input_bytes,
+            offset: 0,
+        }
     }
 
     pub(crate) fn make_chunk_from_slice(slice: &[u8], offset: usize) -> ChunkDescriptor {
@@ -193,6 +210,38 @@ impl<'a> Iterator for FastCdcIter<'a> {
             return None;
         }
         Some(self.chunker.next_chunk(self.input_bytes, &mut self.offset))
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.input_bytes.len().saturating_sub(self.offset);
+        if remaining == 0 {
+            (0, Some(0))
+        } else {
+            let min_chunks = remaining.div_ceil(self.chunker.max_size);
+            let max_chunks = remaining.div_ceil(self.chunker.min_size);
+            (min_chunks, Some(max_chunks))
+        }
+    }
+}
+
+/// Zero-allocation streaming iterator over content-defined chunk boundaries (offset, length).
+#[derive(Debug, Clone)]
+pub struct FastCdcBoundaryIter<'a> {
+    chunker: &'a FastCdcChunker,
+    input_bytes: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> Iterator for FastCdcBoundaryIter<'a> {
+    type Item = (usize, usize);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.offset >= self.input_bytes.len() {
+            return None;
+        }
+        Some(self.chunker.next_boundary(self.input_bytes, &mut self.offset))
     }
 
     #[inline]

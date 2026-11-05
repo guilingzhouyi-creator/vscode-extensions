@@ -122,37 +122,71 @@ fn find_best_landmark_match(
     (best_base_offset, best_match_len, best_target_start)
 }
 
-/// Encodes a Git-compatible delta stream using Fossil 16B rolling hash and bidirectional match expansion.
-pub fn encode_fossil_git_delta(base: &[u8], target: &[u8]) -> Option<Vec<u8>> {
-    let mut out = Vec::with_capacity(target.len().min(1024));
-    write_varint(base.len(), &mut out);
-    write_varint(target.len(), &mut out);
+/// Reusable scratch buffers for Fossil delta encoding, eliminating per-call allocations.
+#[derive(Debug, Default, Clone)]
+pub struct FossilDeltaState {
+    pub landmark_table: Vec<u32>,
+    pub collision_chain: Vec<u32>,
+    pub out: Vec<u8>,
+}
+
+impl FossilDeltaState {
+    /// Constructs a reusable delta buffer state with pre-allocated landmark and output tables.
+    pub fn new() -> Self {
+        Self {
+            landmark_table: Vec::with_capacity(1024),
+            collision_chain: Vec::with_capacity(1024),
+            out: Vec::with_capacity(4096),
+        }
+    }
+
+    /// Resets internal scratch tables and reallocates slot capacities for the given base chunk geometry.
+    pub fn prepare(&mut self, slot_count: usize, landmark_count: usize, target_len: usize) {
+        self.landmark_table.clear();
+        self.landmark_table.resize(slot_count, u32::MAX);
+        self.collision_chain.clear();
+        self.collision_chain.resize(landmark_count, u32::MAX);
+        self.out.clear();
+        self.out.reserve(target_len.min(1024) + 32);
+    }
+}
+
+/// Encodes a Git-compatible delta stream using Fossil 16B rolling hash into reusable state buffers.
+pub fn encode_fossil_git_delta_into(
+    base: &[u8],
+    target: &[u8],
+    state: &mut FossilDeltaState,
+) -> bool {
+    state.out.clear();
+    write_varint(base.len(), &mut state.out);
+    write_varint(target.len(), &mut state.out);
 
     if target.is_empty() {
-        return Some(out);
+        return true;
     }
     if base.len() < FOSSIL_WINDOW_SIZE
         || target.len() < FOSSIL_WINDOW_SIZE
         || base.len() > u32::MAX as usize
     {
-        emit_insert_ops(target, &mut out);
-        return Some(out);
+        emit_insert_ops(target, &mut state.out);
+        return true;
     }
 
     let landmark_count = base.len() / FOSSIL_WINDOW_SIZE;
     let slot_count = landmark_count.next_power_of_two().max(16);
     let slot_mask = (slot_count - 1) as u32;
 
-    let mut landmark_table = vec![u32::MAX; slot_count];
-    let mut collision_chain = vec![u32::MAX; landmark_count];
+    state.prepare(slot_count, landmark_count, target.len());
+    write_varint(base.len(), &mut state.out);
+    write_varint(target.len(), &mut state.out);
 
-    for (base_chunk_idx, chain_slot) in collision_chain.iter_mut().enumerate() {
+    for (base_chunk_idx, chain_slot) in state.collision_chain.iter_mut().enumerate() {
         let offset = base_chunk_idx * FOSSIL_WINDOW_SIZE;
         let mut window = [0u8; 16];
         window.copy_from_slice(&base[offset..offset + 16]);
         let slot = (FossilRollingHash::new(&window).value() & slot_mask) as usize;
-        *chain_slot = landmark_table[slot];
-        landmark_table[slot] = base_chunk_idx as u32;
+        *chain_slot = state.landmark_table[slot];
+        state.landmark_table[slot] = base_chunk_idx as u32;
     }
 
     let mut target_cursor = 0;
@@ -168,15 +202,18 @@ pub fn encode_fossil_git_delta(base: &[u8], target: &[u8]) -> Option<Vec<u8>> {
             target,
             target_cursor,
             pending_insert_start,
-            landmark_table[slot],
-            &collision_chain,
+            state.landmark_table[slot],
+            &state.collision_chain,
         );
 
         if best_match_len >= FOSSIL_WINDOW_SIZE {
             if pending_insert_start < best_target_start {
-                emit_insert_ops(&target[pending_insert_start..best_target_start], &mut out);
+                emit_insert_ops(
+                    &target[pending_insert_start..best_target_start],
+                    &mut state.out,
+                );
             }
-            emit_match_copies(best_base_offset, best_match_len, &mut out);
+            emit_match_copies(best_base_offset, best_match_len, &mut state.out);
             target_cursor = best_target_start + best_match_len;
             pending_insert_start = target_cursor;
 
@@ -196,10 +233,20 @@ pub fn encode_fossil_git_delta(base: &[u8], target: &[u8]) -> Option<Vec<u8>> {
     }
 
     if pending_insert_start < target.len() {
-        emit_insert_ops(&target[pending_insert_start..], &mut out);
+        emit_insert_ops(&target[pending_insert_start..], &mut state.out);
     }
 
-    Some(out)
+    true
+}
+
+/// Encodes a Git-compatible delta stream using Fossil 16B rolling hash and bidirectional match expansion.
+pub fn encode_fossil_git_delta(base: &[u8], target: &[u8]) -> Option<Vec<u8>> {
+    let mut state = FossilDeltaState::new();
+    if encode_fossil_git_delta_into(base, target, &mut state) {
+        Some(state.out)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

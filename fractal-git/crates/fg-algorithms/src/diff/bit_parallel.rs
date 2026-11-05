@@ -82,6 +82,7 @@ pub struct BitParallelDiffState {
 }
 
 impl BitParallelDiffState {
+    /// Creates a new scratch buffer with pre-allocated capacity for bit-parallel diffing.
     pub fn new() -> Self {
         Self {
             old_changed: Vec::with_capacity(BIT_PARALLEL_MAX_LINES),
@@ -89,6 +90,7 @@ impl BitParallelDiffState {
         }
     }
 
+    /// Resets internal scratch buffers for new input lengths without dropping allocated capacity.
     pub fn reset(&mut self, old_count: usize, new_count: usize) {
         self.old_changed.clear();
         self.old_changed.resize(old_count, false);

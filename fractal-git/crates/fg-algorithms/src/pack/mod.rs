@@ -16,4 +16,7 @@ pub use delta_search::{
     compute_basename_hash, encode_git_delta, find_pack_deltas, write_varint, DeltaResolution,
     PackDeltaChain, PackDeltaItem, DEFAULT_DELTA_WINDOW, MAX_DELTA_DEPTH,
 };
-pub use fossil_matcher::{encode_fossil_git_delta, FossilRollingHash, FOSSIL_WINDOW_SIZE};
+pub use fossil_matcher::{
+    encode_fossil_git_delta, encode_fossil_git_delta_into, FossilDeltaState, FossilRollingHash,
+    FOSSIL_WINDOW_SIZE,
+};

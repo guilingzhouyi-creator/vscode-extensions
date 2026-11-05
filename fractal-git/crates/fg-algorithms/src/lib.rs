@@ -26,8 +26,8 @@ pub mod traverse;
 pub use blame::{BlameEngine, BlameHunk, BlameLine};
 pub use bloom::PathBloomFilter;
 pub use cdc::{
-    apply_edits, ChunkDescriptor, EditOp, FastCdcChunker, FastCdcIter, StreamingFastCdc,
-    GEAR_TABLE, STREAMING_BUFFER_CAPACITY,
+    apply_edits, ChunkDescriptor, EditOp, FastCdcBoundaryIter, FastCdcChunker, FastCdcIter,
+    StreamingFastCdc, GEAR_TABLE, STREAMING_BUFFER_CAPACITY,
 };
 pub use diff::{
     bit_parallel_diff, bit_parallel_diff_with_state, classify_line, decimal_width, detect_renames,
@@ -47,9 +47,9 @@ pub use merge::{
     VirtualMergeBaseSynthesizer,
 };
 pub use pack::{
-    encode_fossil_git_delta, encode_git_delta, find_pack_deltas, DeltaResolution,
-    FossilRollingHash, PackDeltaChain, PackDeltaItem, DEFAULT_DELTA_WINDOW, FOSSIL_WINDOW_SIZE,
-    MAX_DELTA_DEPTH,
+    encode_fossil_git_delta, encode_fossil_git_delta_into, encode_git_delta, find_pack_deltas,
+    DeltaResolution, FossilDeltaState, FossilRollingHash, PackDeltaChain, PackDeltaItem,
+    DEFAULT_DELTA_WINDOW, FOSSIL_WINDOW_SIZE, MAX_DELTA_DEPTH,
 };
 pub use poset::CorrectedCommitDate;
 pub use roaring::RoaringBitmap;

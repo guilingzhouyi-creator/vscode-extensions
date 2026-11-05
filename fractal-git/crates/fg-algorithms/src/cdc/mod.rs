@@ -7,7 +7,7 @@ pub mod streaming;
 
 pub use apply_edits::{apply_edits, EditOp};
 pub use fast_cdc::{
-    ChunkDescriptor, FastCdcChunker, FastCdcIter, DEFAULT_AVG_CHUNK, DEFAULT_MAX_CHUNK,
-    DEFAULT_MIN_CHUNK, GEAR_TABLE,
+    ChunkDescriptor, FastCdcBoundaryIter, FastCdcChunker, FastCdcIter, DEFAULT_AVG_CHUNK,
+    DEFAULT_MAX_CHUNK, DEFAULT_MIN_CHUNK, GEAR_TABLE,
 };
 pub use streaming::{StreamingFastCdc, STREAMING_BUFFER_CAPACITY};
