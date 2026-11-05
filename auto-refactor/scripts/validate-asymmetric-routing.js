@@ -25,6 +25,7 @@ const {
   createTempTestDir,
   cleanupTempDir,
   deployFixtures,
+  runEntry,
 } = require('./common/test-runner-harness');
 
 const {
@@ -512,7 +513,4 @@ async function main() {
   console.log('🎉 ALL ASYMMETRIC AUDIT SCANNING ENGINE CHECKS PASSED (7/7)!');
 }
 
-main().catch((validationError) => {
-  console.error('Validation failed:', validationError);
-  process.exit(1);
-});
+runEntry('validate-asymmetric-routing.js', main);

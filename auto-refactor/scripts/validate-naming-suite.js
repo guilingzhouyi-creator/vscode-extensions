@@ -6,7 +6,8 @@
  * Dependencies & Triggers: `npm run validate-naming-suite`; imports ../dist/api and assert.
  * Responsibilities: Assert file/dir naming conventions, global constants, mutable state,
  *   type/member casing, vague blacklist, single-letter guard, and collection semantics.
- * Exit Semantics & Design Rationale: Exits 0 on complete pass, 1 on failure.
+ * Exit Semantics & Design Rationale: Exits 0 on complete pass, 1 on failure. The failure tail comes
+ *   from the shared harness entry rather than a local catch, so the exit contract lives in one place.
  */
 'use strict';
 
@@ -15,6 +16,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { scan } = require('../dist/api');
+const { runEntry } = require('./common/test-runner-harness');
 
 const JARGON_TEST_NAME = Buffer.from('d2lwLXRhc2stZmlsZS50cw==', 'base64').toString('utf8');
 
@@ -659,7 +661,4 @@ async function run() {
   }
 }
 
-run().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+runEntry('validate-naming-suite.js', run);

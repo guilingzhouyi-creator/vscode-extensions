@@ -26,6 +26,7 @@
 
 const assert = require('assert');
 const path = require('path');
+const { runEntry } = require('./common/test-runner-harness');
 
 const ROOT = path.join(__dirname, '..');
 const corpusModule = require(path.join(ROOT, 'dist/core/scoring/calibration-corpus'));
@@ -430,7 +431,4 @@ async function main() {
   console.log('\nConclusion: corpus intake, human queue, fix outcomes and gated rework all hold ✔');
 }
 
-main().catch((error) => {
-  console.error(`\n✖ Closed-loop violation: ${error.message}`);
-  process.exit(1);
-});
+runEntry('validate-closed-loop.js (closed-loop)', main);

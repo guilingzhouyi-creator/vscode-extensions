@@ -101,9 +101,30 @@ async function runValidationSuite(options) {
     }
 }
 
+/**
+ * Runs a bare entry function and terminates the process with the verdict.
+ *
+ * `runValidationSuite` rethrows failure, so every caller had to write its own catch plus exit — the
+ * boilerplate that kept validators from adopting this harness. Suite name and stack are both
+ * reported, since a failure from a shared helper otherwise arrives without naming the suite.
+ * @param name - Suite name used in the failure banner.
+ * @param entry - Zero-argument async function performing the verification.
+ * @returns Promise that resolves only on a clean pass; the process exits 1 on failure.
+ */
+async function runEntry(name, entry) {
+    try {
+        await entry();
+    } catch (error) {
+        console.error(`✖ ${name} failed`);
+        console.error(error && error.stack ? error.stack : error);
+        process.exit(1);
+    }
+}
+
 module.exports = {
     createTempTestDir,
     cleanupTempDir,
     deployFixtures,
     runValidationSuite,
+    runEntry,
 };
