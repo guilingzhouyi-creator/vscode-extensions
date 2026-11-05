@@ -70,9 +70,93 @@ pub fn format_violation_diagnostic(violation: &str) -> String {
     }
 }
 
+/// Redaction sentinel replacing confidential credentials in diagnostic records.
+pub const REDACTED_SENTINEL: &str = "***REDACTED***";
+
+/// Scans a diagnostic message or argument list and masks sensitive tokens
+/// such as authentication tokens, authority secrets, bearer credentials, and passwords.
+pub fn sanitize_sensitive_tokens(input: &str) -> String {
+    let lower = input.to_ascii_lowercase();
+    if !lower.contains("token")
+        && !lower.contains("secret")
+        && !lower.contains("bearer")
+        && !lower.contains("password")
+    {
+        return input.to_string();
+    }
+
+    let mut result = String::with_capacity(input.len());
+    let words: Vec<&str> = input.split_whitespace().collect();
+    let mut i = 0;
+    while i < words.len() {
+        let word = words[i];
+        let word_lower = word.to_ascii_lowercase();
+
+        if (word_lower == "--token" || word_lower == "--secret" || word_lower == "--password")
+            && i + 1 < words.len()
+        {
+            result.push_str(word);
+            result.push(' ');
+            result.push_str(REDACTED_SENTINEL);
+            i += 2;
+        } else if word_lower.starts_with("--token=")
+            || word_lower.starts_with("--secret=")
+            || word_lower.starts_with("--password=")
+            || word_lower.starts_with("token=")
+            || word_lower.starts_with("secret=")
+            || word_lower.starts_with("password=")
+            || word_lower.starts_with("authority_secret=")
+        {
+            if let Some((k, _)) = word.split_once('=') {
+                result.push_str(k);
+                result.push('=');
+                result.push_str(REDACTED_SENTINEL);
+            } else {
+                result.push_str(REDACTED_SENTINEL);
+            }
+            i += 1;
+        } else if word_lower == "bearer" && i + 1 < words.len() {
+            result.push_str(word);
+            result.push(' ');
+            result.push_str(REDACTED_SENTINEL);
+            i += 2;
+        } else {
+            result.push_str(word);
+            i += 1;
+        }
+
+        if i < words.len() {
+            result.push(' ');
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sanitize_sensitive_tokens() {
+        let cmd = "commit -m feat --token secret_key_12345";
+        let cleaned = sanitize_sensitive_tokens(cmd);
+        assert_eq!(cleaned, "commit -m feat --token ***REDACTED***");
+
+        let eq_arg = "run --secret=super_secret_val --cell=main";
+        assert_eq!(
+            sanitize_sensitive_tokens(eq_arg),
+            "run --secret=***REDACTED*** --cell=main"
+        );
+
+        let bearer = "Authorization: Bearer my-jwt-token-xyz";
+        assert_eq!(
+            sanitize_sensitive_tokens(bearer),
+            "Authorization: Bearer ***REDACTED***"
+        );
+
+        let harmless = "commit -m ordinary commit message";
+        assert_eq!(sanitize_sensitive_tokens(harmless), harmless);
+    }
 
     #[test]
     fn test_split_rule_id_recognition() {

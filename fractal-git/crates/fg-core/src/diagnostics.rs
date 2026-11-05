@@ -2,11 +2,11 @@
 //! File Path: crates/fg-core/src/diagnostics.rs
 //! Architecture Role: Emits structured, level-filtered diagnostics to stderr without adding a
 //!   logging dependency to the kernel's lowest layer.
-//! Dependencies \u0026 Triggers: Used by any subsystem that needs to explain what it decided. Configured
+//! Dependencies & Triggers: Used by any subsystem that needs to explain what it decided. Configured
 //!   once at CLI start-up from `--log-level` or `TAXIS_LOG`.
 //! Responsibilities: Hold the process-wide severity threshold, format one record per event, and stay
 //!   allocation-free when the event is filtered out.
-//! Exit Semantics \u0026 Design Rationale: Diagnostics go to stderr and never to stdout, because stdout
+//! Exit Semantics & Design Rationale: Diagnostics go to stderr and never to stdout, because stdout
 //!   carries machine-readable command output and a stray log line would corrupt a JSON consumer.
 //!   A disabled level costs one atomic load and no formatting, so a hot path can call `trace!`
 //!   freely; formatting a message that is then discarded is the usual reason logging becomes the
@@ -15,7 +15,18 @@
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::Mutex;
+
+use crate::constants::Edition;
+use crate::sanitizer::{sanitize_sensitive_tokens, split_rule_id};
+
+pub mod record;
+pub mod sink;
+
+pub use record::*;
+pub use sink::*;
 
 /// Severity of a diagnostic record, ordered from most to least verbose.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -73,9 +84,6 @@ impl std::fmt::Display for LogLevel {
 }
 
 /// Process-wide severity threshold.
-///
-/// Defaults to `Warn` so a normal command stays quiet, and so enabling detail is a deliberate act
-/// rather than an accident.
 static THRESHOLD: AtomicU8 = AtomicU8::new(LogLevel::Warn as u8);
 
 /// Sets the process-wide threshold, returning the previous value.
@@ -104,9 +112,6 @@ impl LogLevel {
 }
 
 /// Configures logging from an explicit flag, then the environment, then the default.
-///
-/// The flag wins so a single invocation can raise detail without changing the environment, which is
-/// what a developer debugging one command actually wants.
 pub fn configure(flag: Option<&str>) {
     let selected = flag
         .and_then(LogLevel::parse_str)
@@ -132,11 +137,6 @@ pub fn configure(flag: Option<&str>) {
 }
 
 /// Whether diagnostic / debug output is active.
-///
-/// Under commercial production mode, this returns `false` by default, keeping terminal reporting
-/// clean and passenger-friendly. When raised via `--log-level debug`, `TAXIS_LOG=debug`,
-/// `--debug`, `--verbose`, or `TAXIS_DIAGNOSTIC=1`, detailed diagnostic markers and rule identifiers
-/// are exposed on the terminal surface.
 pub fn is_diagnostic_mode() -> bool {
     enabled(LogLevel::Debug)
         || std::env::var_os("TAXIS_DIAGNOSTIC").is_some_and(|val| val == "1" || val == "true")
@@ -148,17 +148,109 @@ pub fn enabled(level: LogLevel) -> bool {
     level.rank() >= THRESHOLD.load(Ordering::Relaxed)
 }
 
-/// Writes one diagnostic record to stderr.
-///
-/// Kept as a free function taking a pre-rendered message so the macros below can guard the
-/// formatting call behind [`enabled`].
+static FILE_SINK: Mutex<Option<RotatingLogSink>> = Mutex::new(None);
+static ACTIVE_SUBCOMMAND: Mutex<Option<String>> = Mutex::new(None);
+
+/// Initializes the passive rotating file logger.
+pub fn set_file_sink(
+    path: PathBuf,
+    max_bytes: Option<u64>,
+    max_backups: Option<usize>,
+) -> Result<(), std::io::Error> {
+    let sink = RotatingLogSink::open(path, max_bytes, max_backups)?;
+    if let Ok(mut guard) = FILE_SINK.lock() {
+        *guard = Some(sink);
+    }
+    Ok(())
+}
+
+/// Sets the active subcommand name for correlation in subsequent records.
+pub fn set_active_subcommand(subcommand: &str) {
+    if let Ok(mut guard) = ACTIVE_SUBCOMMAND.lock() {
+        *guard = Some(subcommand.to_string());
+    }
+}
+
+/// Retrieves the active subcommand name if registered.
+pub fn active_subcommand() -> Option<String> {
+    ACTIVE_SUBCOMMAND.lock().ok().and_then(|guard| guard.clone())
+}
+
+/// Writes one diagnostic record to the passive file sink and to stderr if appropriate.
 pub fn emit(level: LogLevel, target: &str, message: &str) {
-    eprintln!(
-        "taxis[{}] {target}: {message}",
-        level.as_str(),
-        target = target,
-        message = message
-    );
+    if !enabled(level) {
+        return;
+    }
+
+    let clean = sanitize_sensitive_tokens(message);
+    let (rule_id, _) = split_rule_id(&clean);
+
+    if let Ok(mut guard) = FILE_SINK.lock() {
+        if let Some(ref mut sink) = *guard {
+            let record = DiagnosticRecord {
+                timestamp: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
+                level: level.as_str().to_ascii_uppercase(),
+                target: target.to_string(),
+                event: None,
+                trace_id: trace_id().to_string(),
+                pid: std::process::id(),
+                edition: Edition::CURRENT.as_str(),
+                subcommand: active_subcommand(),
+                message: clean.clone(),
+                rule_id: rule_id.map(str::to_string),
+                attributes: None,
+            };
+            if let Ok(json_line) = serde_json::to_string(&record) {
+                let _ = sink.append_line(&json_line);
+            }
+        }
+    }
+
+    if is_diagnostic_mode() || level >= LogLevel::Warn {
+        eprintln!("taxis[{}] {target}: {clean}", level.as_str());
+    }
+}
+
+/// Records an explicit structured audit event to the file sink and terminal (if diagnostic mode is active).
+pub fn record_event(
+    level: LogLevel,
+    target: &str,
+    event: &str,
+    message: &str,
+    rule_id: Option<&str>,
+    attributes: Option<serde_json::Value>,
+) {
+    let clean = sanitize_sensitive_tokens(message);
+    let effective_rule = rule_id.or_else(|| split_rule_id(&clean).0);
+
+    if let Ok(mut guard) = FILE_SINK.lock() {
+        if let Some(ref mut sink) = *guard {
+            let record = DiagnosticRecord {
+                timestamp: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Micros, true),
+                level: level.as_str().to_ascii_uppercase(),
+                target: target.to_string(),
+                event: Some(event.to_string()),
+                trace_id: trace_id().to_string(),
+                pid: std::process::id(),
+                edition: Edition::CURRENT.as_str(),
+                subcommand: active_subcommand(),
+                message: clean.clone(),
+                rule_id: effective_rule.map(str::to_string),
+                attributes,
+            };
+            if let Ok(json_line) = serde_json::to_string(&record) {
+                let _ = sink.append_line(&json_line);
+            }
+        }
+    }
+
+    if is_diagnostic_mode() {
+        if let Some(r) = effective_rule {
+            eprintln!("taxis[{}] {target} [{event}] [{r}]: {clean}", level.as_str());
+        } else {
+            eprintln!("taxis[{}] {target} [{event}]: {clean}", level.as_str());
+        }
+    }
 }
 
 /// Emits a trace record when the threshold allows it.
