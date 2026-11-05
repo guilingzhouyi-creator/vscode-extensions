@@ -26,6 +26,7 @@ const {
   createTempTestDir,
   cleanupTempDir,
   deployFixtures,
+  reportFailure,
 } = require('./common/test-runner-harness');
 
 /** One diagnostic shape per Rust rule; the fixture must produce exactly this id set. */
@@ -207,7 +208,4 @@ main()
   .then(() => {
     console.log('\n ALL MODERN PACK CHECKS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-modern-packs.js'));

@@ -27,6 +27,7 @@ const {
   createTempTestDir,
   cleanupTempDir,
   deployFixtures,
+  reportFailure,
 } = require('./common/test-runner-harness');
 
 /**
@@ -235,7 +236,4 @@ main()
   .then(() => {
     console.log('\n ALL DIFF INTERFACE CHECKS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-diff-interface.js'));

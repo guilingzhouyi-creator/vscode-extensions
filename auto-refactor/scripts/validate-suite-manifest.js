@@ -44,6 +44,10 @@ const EXEMPT = new Map([
     'migrate-trajectory-summaries.js',
     'offline maintenance utility that migrates historical trajectory summaries; not an assertion suite',
   ],
+  [
+    'migrate-validator-exit-tail.js',
+    'offline migration utility that rewrites validator exit tails; not an assertion suite',
+  ],
   // Gate entry points already wired into `npm run gate`; running them again inside
   // `npm test` would apply the severity ratchet twice.
   ['gate-comments.js', 'invoked by the gate chain as gate:comments'],

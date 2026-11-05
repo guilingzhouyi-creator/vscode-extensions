@@ -24,6 +24,8 @@ const path = require('path');
 
 const { scan, scanAndRender } = require('../dist/api');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 /**
  * Write a set of fixture files into a directory tree.
  *
@@ -225,7 +227,4 @@ main()
   .then(() => {
     console.log('\n ALL POST-SCAN PARITY CHECKS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-postscan-parity.js'));

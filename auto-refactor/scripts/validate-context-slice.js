@@ -27,6 +27,8 @@ const { CallGraph } = require('../dist/core/intelligence/callGraph.js');
 const { buildContextSlice } = require('../dist/core/intelligence/contextSlice.js');
 const { queryContextSlice } = require('../dist/api.js');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 /** Fixture: entry -> alpha -> beta -> gamma, one cross-file hop each. */
 const FIXTURE = {
   'src/main.ts': [
@@ -168,7 +170,4 @@ async function scanAndSlice(root) {
   }
 
   console.log('\n ALL CONTEXT SLICE CHECKS PASSED SUCCESSFULLY!\n');
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+})().catch(reportFailure('validate-context-slice.js'));

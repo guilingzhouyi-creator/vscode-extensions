@@ -23,6 +23,8 @@ const path = require('path');
 
 const { scan } = require('../dist/api.js');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 const PLUGIN = path.join(__dirname, '..', 'samples', 'analyzers', 'noConsole.js');
 
 /** chain b -> c -> d raises ERR_TIMEOUT twice (b and d); a is the static entry boundary. */
@@ -136,7 +138,4 @@ function errorFindings(report) {
   }
 
   console.log('\n ALL ERROR FLOW CHECKS PASSED SUCCESSFULLY!\n');
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+})().catch(reportFailure('validate-error-flow.js'));

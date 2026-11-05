@@ -23,6 +23,8 @@ const os = require('os');
 const path = require('path');
 const { scan } = require('../dist/api');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 const LONG_BODY = Array.from({ length: 65 }, (_, i) => `    const value${i} = ${i};`);
 const MEDIUM_BODY = Array.from({ length: 45 }, (_, i) => `    const value${i} = ${i};`);
 
@@ -532,7 +534,4 @@ run()
   .then(() => {
     console.log('\n ALL SIMPLIFICATION KEY POINTS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-simplify.js'));

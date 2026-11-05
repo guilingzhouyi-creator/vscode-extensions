@@ -35,6 +35,8 @@ const { GoAdapter } = require('../dist/core/ast/go-adapter');
 const { DataAdapter } = require('../dist/core/ast/data-adapter');
 const { ShellAdapter } = require('../dist/core/ast/shell-adapter');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 const RULE = 'LANG-UNSUPPORTED';
 
 /**
@@ -335,7 +337,4 @@ run()
   .then(() => {
     console.log('\n ALL UNSUPPORTED-LANGUAGE FAIL-CLOSED CHECKS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-language-support.js'));

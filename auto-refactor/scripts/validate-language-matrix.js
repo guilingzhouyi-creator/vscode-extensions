@@ -32,6 +32,8 @@ const { EXTENSION_ADAPTER_IDS } = require('../dist/core/ast/adapters');
 const { unsupportedLanguageDiagnostic } = require('../dist/core/ast/language-support');
 const { DEFAULT_EXT } = require('../dist/core/file-discovery');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 /**
  * Language-agnostic probe: a marker every content-oriented analyzer can see, whatever
  * the syntax.
@@ -234,7 +236,4 @@ main()
   .then(() => {
     console.log('\n ALL LANGUAGE MATRIX CHECKS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-language-matrix.js'));

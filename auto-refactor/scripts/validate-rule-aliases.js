@@ -34,6 +34,8 @@ const {
 } = require('../dist/core/rules/topic-catalog');
 const { RULE_ID_PATTERN } = require('../dist/core/rules/registry');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 async function main() {
   // ── 1. The table mirrors the registry's legacy set exactly ──
   const audit = auditAliasWindow();
@@ -165,7 +167,4 @@ main()
   .then(() => {
     console.log('\n ALL RULE ALIAS CHECKS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-rule-aliases.js'));

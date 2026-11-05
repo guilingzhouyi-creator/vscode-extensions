@@ -25,6 +25,8 @@ const { SymbolIndex, collectSymbols } = require('../dist/core/intelligence/symbo
 const { CallGraph } = require('../dist/core/intelligence/callGraph.js');
 const { scan } = require('../dist/api.js');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 const PLUGIN = path.join(__dirname, '..', 'samples', 'analyzers', 'noConsole.js');
 
 /** Plug-in analyzer config: forces the materialized traversal. */
@@ -204,7 +206,4 @@ const SYNTHETIC = {
   }
 
   console.log('\n ALL CALL GRAPH CHECKS PASSED SUCCESSFULLY!\n');
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+})().catch(reportFailure('validate-call-graph.js'));

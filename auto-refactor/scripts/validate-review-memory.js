@@ -45,6 +45,8 @@ const {
   matchDomains,
 } = require('../dist/api');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 console.log('🧪 Running Comprehensive Review Memory & Quality System Validation...');
 
 let passed = 0;
@@ -694,7 +696,4 @@ cacheDisabledLeavesNoLog()
   .then(() => {
     console.log(`\n All ${passed}/${total} Review Memory & Quality System tests PASSED!\n`);
   })
-  .catch((error) => {
-    console.error('  x ✖ BLOCK cache:false check:', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-review-memory.js'));

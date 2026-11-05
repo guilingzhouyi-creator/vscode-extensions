@@ -28,6 +28,7 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { reportFailure } = require('./common/test-runner-harness');
 
 const ROOT = path.join(__dirname, '..');
 const CORPUS = path.join(__dirname, '.corpus');
@@ -629,12 +630,4 @@ function cleanupAllCorpora() {
   removeDirectoryWithRetry(CACHE_DIR_RUST);
 }
 
-main().catch((executionError) => {
-  console.error(executionError);
-  try {
-    cleanupAllCorpora();
-  } catch {
-    /* ignore */
-  }
-  process.exit(1);
-});
+main().catch(reportFailure('validate-warm.js', cleanupAllCorpora));

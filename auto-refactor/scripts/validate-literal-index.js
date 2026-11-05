@@ -29,6 +29,8 @@ const {
 } = require('../dist/core/intelligence/literalIndex.js');
 const { scan } = require('../dist/api.js');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 const PLUGIN = path.join(__dirname, '..', 'samples', 'analyzers', 'noConsole.js');
 
 /** Config that declares a plug-in analyzer, which forces the materialized traversal. */
@@ -246,7 +248,4 @@ async function scanFixture(root, files, config) {
   }
 
   console.log('\n ALL LITERAL INDEX CHECKS PASSED SUCCESSFULLY!\n');
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+})().catch(reportFailure('validate-literal-index.js'));

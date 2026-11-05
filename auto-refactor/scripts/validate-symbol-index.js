@@ -24,6 +24,8 @@ const path = require('path');
 
 const { scan, querySymbols } = require('../dist/api');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 /** TypeScript fixture: `helper.ts` defines, `main.ts` calls it across the file boundary. */
 const TS_FILES = {
   'src/helper.ts': [
@@ -271,7 +273,4 @@ main()
   .then(() => {
     console.log('\n ALL SYMBOL INDEX CHECKS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-symbol-index.js'));

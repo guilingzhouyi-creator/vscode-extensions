@@ -26,6 +26,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 const TMP_DIR = path.join(os.tmpdir(), `ar-gov-validate-${Date.now()}`);
 fs.mkdirSync(TMP_DIR, { recursive: true });
 
@@ -621,7 +623,4 @@ run()
       // best-effort cleanup
     }
   })
-  .catch((executionError) => {
-    console.error('Fatal error in validate-governance:', executionError);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-governance.js'));

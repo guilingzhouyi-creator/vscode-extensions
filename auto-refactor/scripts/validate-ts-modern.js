@@ -26,6 +26,7 @@ const {
   createTempTestDir,
   cleanupTempDir,
   deployFixtures,
+  reportFailure,
 } = require('./common/test-runner-harness');
 
 /** One diagnostic shape per rule: the pack must report every id in this list exactly once. */
@@ -179,7 +180,4 @@ main()
   .then(() => {
     console.log('\n ALL TS-MODERN CHECKS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-ts-modern.js'));

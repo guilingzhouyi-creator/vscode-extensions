@@ -102,6 +102,35 @@ async function runValidationSuite(options) {
 }
 
 /**
+ * Builds the failure handler shared by every verification entry point.
+ *
+ * Callers that keep their own success path — a `.then()` banner, or an inline async body — still
+ * need the same failure semantics. Returning the handler lets them attach it to their existing chain
+ * instead of restating the banner and the exit code, so the contract stays in one place.
+ *
+ * An optional cleanup runs before the exit. It is guarded, because a failing suite must still exit
+ * with the failure verdict even when its own cleanup throws: reporting a teardown problem instead of
+ * the real assertion would hide the reason the suite failed.
+ * @param name - Suite name used in the failure banner.
+ * @param cleanup - Optional teardown to attempt before terminating.
+ * @returns Handler that reports the error with the suite name and exits 1.
+ */
+function reportFailure(name, cleanup) {
+    return (error) => {
+        console.error(`✖ ${name} failed`);
+        console.error(error && error.stack ? error.stack : error);
+        if (cleanup) {
+            try {
+                cleanup();
+            } catch {
+                // Teardown is best-effort; the failure verdict above is what matters.
+            }
+        }
+        process.exit(1);
+    };
+}
+
+/**
  * Runs a bare entry function and terminates the process with the verdict.
  *
  * `runValidationSuite` rethrows failure, so every caller had to write its own catch plus exit — the
@@ -115,9 +144,7 @@ async function runEntry(name, entry) {
     try {
         await entry();
     } catch (error) {
-        console.error(`✖ ${name} failed`);
-        console.error(error && error.stack ? error.stack : error);
-        process.exit(1);
+        reportFailure(name)(error);
     }
 }
 
@@ -126,5 +153,6 @@ module.exports = {
     cleanupTempDir,
     deployFixtures,
     runValidationSuite,
+    reportFailure,
     runEntry,
 };

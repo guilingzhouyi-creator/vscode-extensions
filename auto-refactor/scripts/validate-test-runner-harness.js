@@ -16,7 +16,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { runValidationSuite } = require('./common/test-runner-harness');
+const { runValidationSuite, reportFailure, runEntry } = require('./common/test-runner-harness');
 
 async function main() {
   let observedTempDir = '';
@@ -53,6 +53,17 @@ async function main() {
   // observed from inside the same process without replacing the global and losing the real code path.
   const exitProbes = [
     { name: 'probe-runEntry', call: "runEntry('probe-runEntry', async () => { throw new Error('probe'); })" },
+    {
+      name: 'probe-reportFailure',
+      call: [
+        "const cleaned = [];",
+        "reportFailure('probe-reportFailure', () => { cleaned.push('cleanup'); })(new Error('probe'))",
+      ].join('\n'),
+    },
+    {
+      name: 'probe-cleanup-throws',
+      call: "reportFailure('probe-cleanup-throws', () => { throw new Error('teardown'); })(new Error('probe'))",
+    },
   ];
   for (const probe of exitProbes) {
     const probePath = path.join(os.tmpdir(), `${probe.name}-${process.pid}.cjs`);
@@ -61,7 +72,7 @@ async function main() {
       probePath,
       [
         "'use strict';",
-        `const { runEntry } = require('${harnessPath}');`,
+        `const { runEntry, reportFailure } = require('${harnessPath}');`,
         probe.call + ';',
       ].join('\n'),
     );
@@ -72,12 +83,17 @@ async function main() {
       `${outcome.stdout}${outcome.stderr}`.includes(probe.name),
       `${probe.name} failure must name the suite that broke`,
     );
+    if (probe.name === 'probe-cleanup-throws') {
+      // A teardown failure must not replace the verdict: the probe still has to exit 1 and still
+      // report the suite name, otherwise the reason the suite failed would be hidden by its cleanup.
+      assert.ok(
+        `${outcome.stdout}${outcome.stderr}`.includes('probe'),
+        `${probe.name} must still report the original failure`,
+      );
+    }
   }
 
   console.log('ALL TEST RUNNER HARNESS CHECKS PASSED SUCCESSFULLY!');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main().catch(reportFailure('validate-test-runner-harness.js'));

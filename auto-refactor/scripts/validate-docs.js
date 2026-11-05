@@ -22,6 +22,8 @@ const os = require('os');
 const path = require('path');
 const { scan } = require('../dist/api');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 const CLEAN = [
   '# Clean guide',
   '',
@@ -123,7 +125,4 @@ run()
   .then(() => {
     console.log('\n ALL DOCUMENTATION KEY POINTS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-docs.js'));

@@ -23,6 +23,8 @@ const os = require('os');
 const path = require('path');
 const { scan } = require('../dist/api');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -410,7 +412,4 @@ run()
   .then(() => {
     console.log('\n ALL SHADOWING DETECTION TESTS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-shadowing.js'));

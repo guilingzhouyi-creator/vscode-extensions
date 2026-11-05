@@ -29,6 +29,8 @@ const {
 } = require('../dist/core/scoring/scoringTypes.js');
 const { dimensionDeductionSources } = require('../dist/core/scoring/dimensionDeductions.js');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 /** All built-in analyzers, so the control scan leaves no dimension unmeasured. */
 const ALL_ANALYZERS = {
   governance: { enabled: true },
@@ -455,7 +457,4 @@ function checkCoverageModel() {
   }
 
   console.log('\n ALL SCORING COVERAGE CHECKS PASSED SUCCESSFULLY!\n');
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+})().catch(reportFailure('validate-scoring-coverage.js'));

@@ -27,6 +27,8 @@ const path = require('path');
 const { scan } = require('../dist/api');
 const { classifyLiteral } = require('../dist/core/governance/semanticLiterals');
 
+const { reportFailure } = require('./common/test-runner-harness');
+
 /**
  * Fixture source: two literals repeated three times each inside a function body, which is the
  * smallest shape that the duplicate-literal pass considers (const-bound and tolerated contexts
@@ -200,7 +202,4 @@ main()
   .then(() => {
     console.log('\n ALL LITERAL POLICY CHECKS PASSED SUCCESSFULLY!');
   })
-  .catch((error) => {
-    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
-    process.exit(1);
-  });
+  .catch(reportFailure('validate-literal-policy.js'));
