@@ -178,6 +178,12 @@ pub fn handle_log(ctx: &CliContext) {
     } else {
         None
     };
+    let diff_args: Vec<String> = match request.diff_mode {
+        Some(LogDiffMode::Stat) => vec!["--stat".into()],
+        Some(LogDiffMode::NameOnly) => vec!["--name-only".into()],
+        Some(LogDiffMode::NameStatus) => vec!["--name-status".into()],
+        None => Vec::new(),
+    };
 
     for (index, record) in shown.iter().enumerate() {
         let (glyph, cont) = match &mut graph_renderer {
@@ -201,16 +207,17 @@ pub fn handle_log(ctx: &CliContext) {
             }
         }
 
-        if let Some(diff_mode) = request.diff_mode {
-            let parent = record.parents.first().map(|oid| oid.to_hex());
-            let left = parent.unwrap_or_else(|| diff::EMPTY_TREE_MARKER.to_string());
-            let mut diff_args = Vec::new();
-            match diff_mode {
-                LogDiffMode::Stat => diff_args.push("--stat".to_string()),
-                LogDiffMode::NameOnly => diff_args.push("--name-only".to_string()),
-                LogDiffMode::NameStatus => diff_args.push("--name-status".to_string()),
-            }
-            let _ = diff::run_revision_diff(&view, &left, &record.oid.to_hex(), &diff_args);
+        if request.diff_mode.is_some() {
+            let left_holder;
+            let left = match record.parents.first() {
+                Some(p_oid) => {
+                    left_holder = p_oid.to_hex();
+                    left_holder.as_str()
+                }
+                None => diff::EMPTY_TREE_MARKER,
+            };
+            let right = record.oid.to_hex();
+            let _ = diff::run_revision_diff(&view, left, &right, &diff_args);
         }
     }
 }
@@ -823,7 +830,13 @@ mod tests {
 
     #[test]
     fn an_unknown_flag_is_rejected() {
-        assert!(LogRequest::parse(&["--graph".to_string()]).is_err());
+        assert!(LogRequest::parse(&["--unknown-log-flag".to_string()]).is_err());
+    }
+
+    #[test]
+    fn a_graph_flag_sets_graph_mode() {
+        let request = LogRequest::parse(&["--graph".to_string()]).expect("parse");
+        assert!(request.graph);
     }
 
     #[test]

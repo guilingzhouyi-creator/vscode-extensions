@@ -59,3 +59,5 @@ mod test_worktree_checkout_parity;
 mod test_log_options_parity;
 #[path = "rust/test_conflict_state_parity.rs"]
 mod test_conflict_state_parity;
+#[path = "rust/test_notes_replace_parity.rs"]
+mod test_notes_replace_parity;

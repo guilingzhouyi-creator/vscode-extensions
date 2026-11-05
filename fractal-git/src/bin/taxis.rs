@@ -20,10 +20,10 @@ use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
     am, apply, archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick,
     clone, commit, config, daemon, diff, doctor, format_patch, gate_slice, hash_object,
-    index_plumbing, init, inspect, lineage, log, maintenance, merge, operation, plumbing_tree,
-    project, projection, promotion, quality, quarantine, read, rebase, reclaim, refs, relocate,
-    remote, repack, reset, rev_list, revert, stage, stash, status, submodule, tag, unarchive,
-    undo, verify, worktree,
+    index_plumbing, init, inspect, lineage, log, maintenance, merge, notes_replace, operation,
+    pack_plumbing, plumbing_tree, project, projection, promotion, quality, quarantine, read,
+    rebase, reclaim, refs, relocate, remote, repack, reset, rev_list, revert, stage, stash, status,
+    submodule, tag, unarchive, undo, verify, worktree,
 };
 
 use fg_core::models::current_unix_seconds;
@@ -487,6 +487,26 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         canonical: "daemon",
         aliases: &["serve", "daemon"],
         handler: daemon::handle_daemon,
+    },
+    CommandSpec {
+        canonical: "notes",
+        aliases: &["notes"],
+        handler: notes_replace::handle_notes,
+    },
+    CommandSpec {
+        canonical: "replace",
+        aliases: &["replace"],
+        handler: notes_replace::handle_replace,
+    },
+    CommandSpec {
+        canonical: "unpack-objects",
+        aliases: &["unpack-objects"],
+        handler: pack_plumbing::handle_unpack_objects,
+    },
+    CommandSpec {
+        canonical: "index-pack",
+        aliases: &["index-pack"],
+        handler: pack_plumbing::handle_index_pack,
     },
     CommandSpec {
         canonical: "version",

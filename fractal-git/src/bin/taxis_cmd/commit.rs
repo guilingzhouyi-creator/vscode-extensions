@@ -325,10 +325,10 @@ pub fn handle_commit(ctx: &CliContext) {
         let _ = w.checkpoint();
     }
 
-    // Ensure HEAD advances properly: follows target ref when unborn, or advances commit OID when detached
+    // Ensure HEAD exists on disk if absent, or advances commit OID when detached
     let ref_store = DiskRefStore::new(&ctx.git_dir);
     match ref_store.head() {
-        Ok(fg_topology::HeadState::Absent | fg_topology::HeadState::Symbolic { target: None, .. }) => {
+        Ok(fg_topology::HeadState::Absent) => {
             let _ = ref_store.update_head_symbolic(&target_ref.to_git_ref());
         }
         Ok(fg_topology::HeadState::Detached(_)) => {

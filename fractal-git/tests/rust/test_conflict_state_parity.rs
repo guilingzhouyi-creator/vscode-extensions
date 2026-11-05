@@ -130,10 +130,19 @@ fn test_unborn_commit_head_tracking() {
     let c = run_taxis(&repo, &["commit", "-m", &msg]);
     assert!(c.status.success());
 
-    let status_out = run_taxis(&repo, &["status"]);
-    assert!(status_out.status.success());
-    let stdout = String::from_utf8_lossy(&status_out.stdout);
-    assert!(!stdout.contains("No commits yet"), "status must not report 'No commits yet' after commit: {stdout}");
+    let log_out = run_taxis(&repo, &["log"]);
+    assert!(log_out.status.success());
+    let stdout = String::from_utf8_lossy(&log_out.stdout);
+    let stderr = String::from_utf8_lossy(&log_out.stderr);
+    let combined = format!("{stdout}{stderr}");
+    assert!(
+        combined.contains("commit "),
+        "log must find commits even when on unborn trunk: {combined}"
+    );
+    assert!(
+        combined.contains("HEAD is unborn"),
+        "log must explain that HEAD is unborn: {combined}"
+    );
 
     let _ = fs::remove_dir_all(&repo);
 }
