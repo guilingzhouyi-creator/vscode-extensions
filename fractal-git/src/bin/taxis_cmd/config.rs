@@ -13,6 +13,7 @@
 //!     rewrite, and a failed rewrite reports [CONFIG_WRITE_INVALID] instead of leaving a
 //!     half-written config behind.
 
+use std::path::PathBuf;
 use std::process::exit;
 
 use fg_core::models::ConflictPresentationMode;
@@ -49,10 +50,29 @@ enum ConfigAction {
 /// Git's status for --unset matching no entry.
 const EXIT_NO_MATCH: i32 = 5;
 
+/// Resolves the effective target configuration file path.
+fn resolve_config_target(
+    ctx: &CliContext,
+    is_global: bool,
+    explicit_file: Option<PathBuf>,
+) -> PathBuf {
+    if let Some(file) = explicit_file {
+        return file;
+    }
+    if is_global {
+        let home = std::env::var_os("HOME")
+            .or_else(|| std::env::var_os("USERPROFILE"))
+            .map(PathBuf::from);
+        return home
+            .map(|h| h.join(".gitconfig"))
+            .unwrap_or_else(|| PathBuf::from(".gitconfig"));
+    }
+    ctx.git_dir.join("config")
+}
+
 /// Dispatches the 'taxis config' command.
 pub fn handle_config(ctx: &CliContext) {
-    let action = parse_action(&ctx.args);
-    let config_path = ctx.git_dir.join("config");
+    let (action, config_path) = parse_action(ctx);
     match action {
         ConfigAction::List => run_list(ctx, &config_path),
         ConfigAction::Get(spec) => run_get(&config_path, &spec),
@@ -64,24 +84,62 @@ pub fn handle_config(ctx: &CliContext) {
     }
 }
 
-/// Parses the argument vector into one [ConfigAction], refusing unknown flags.
-fn parse_action(args: &[String]) -> ConfigAction {
+/// Prints usage and options help for `taxis config`.
+pub fn print_config_help() {
+    println!(
+        "Usage: taxis config [options] [<key> [<value>]]\n\n\
+         Get and set repository or global options.\n\n\
+         Options:\n\
+           --global            Use global config file (~/.gitconfig)\n\
+           --local             Use repository config file (.git/config, default)\n\
+           -f, --file <file>   Use given config file\n\
+           -l, --list          List all variables set in config file\n\
+           --get <key>         Get value for given key\n\
+           --get-all <key>     Get all values for a multi-valued key\n\
+           --add <key> <val>   Add a new line without altering existing values\n\
+           --unset <key>       Remove a variable\n\
+           -h, --help          Show this help message"
+    );
+}
+
+/// Parses the argument vector into one [ConfigAction] and target path.
+fn parse_action(ctx: &CliContext) -> (ConfigAction, PathBuf) {
+    let args = &ctx.args;
     let mut list = false;
     let mut wants_get = false;
     let mut wants_get_all = false;
     let mut wants_add = false;
     let mut wants_unset = false;
+    let mut is_global = false;
+    let mut explicit_file: Option<PathBuf> = None;
     let mut positional: Vec<&str> = Vec::new();
     let mut index = 0;
     while index < args.len() {
         let arg = args[index].as_str();
         match arg {
+            "-h" | "--help" => {
+                print_config_help();
+                exit(0);
+            }
             "--list" | "-l" => list = true,
             "--get" => wants_get = true,
             "--get-all" => wants_get_all = true,
             "--add" => wants_add = true,
             "--unset" => wants_unset = true,
             "--replace-all" => {}
+            "--global" => is_global = true,
+            "--local" => {}
+            "-f" if index + 1 < args.len() => {
+                explicit_file = Some(PathBuf::from(&args[index + 1]));
+                index += 1;
+            }
+            "--file" if index + 1 < args.len() => {
+                explicit_file = Some(PathBuf::from(&args[index + 1]));
+                index += 1;
+            }
+            other if other.starts_with("--file=") => {
+                explicit_file = Some(PathBuf::from(&other["--file=".len()..]));
+            }
             other if other.starts_with('-') => {
                 reject(CliTag::ERROR, format!("unknown config flag '{other}'"));
             }
@@ -90,49 +148,52 @@ fn parse_action(args: &[String]) -> ConfigAction {
         index += 1;
     }
 
-    if list {
-        return ConfigAction::List;
-    }
-    if wants_get {
-        return match positional.first() {
+    let config_path = resolve_config_target(ctx, is_global, explicit_file);
+
+    let action = if list {
+        ConfigAction::List
+    } else if wants_get {
+        match positional.first() {
             Some(spec) => ConfigAction::Get((*spec).to_string()),
             None => fail_usage("taxis config --get <key>"),
-        };
-    }
-    if wants_get_all {
-        return match positional.first() {
+        }
+    } else if wants_get_all {
+        match positional.first() {
             Some(spec) => ConfigAction::GetAll((*spec).to_string()),
             None => fail_usage("taxis config --get-all <key>"),
-        };
-    }
-    if wants_unset {
-        return match positional.first() {
+        }
+    } else if wants_unset {
+        match positional.first() {
             Some(spec) => ConfigAction::Unset {
                 spec: (*spec).to_string(),
                 literal: positional.get(1).map(|value| (*value).to_string()),
             },
             None => fail_usage("taxis config --unset <key> [<value>]"),
-        };
-    }
-    if wants_add {
-        return match (positional.first(), positional.get(1)) {
+        }
+    } else if wants_add {
+        match (positional.first(), positional.get(1)) {
             (Some(spec), Some(value)) => ConfigAction::Set {
                 spec: (*spec).to_string(),
                 value: (*value).to_string(),
                 mode: ConfigWriteMode::Add,
             },
             _ => fail_usage("taxis config --add <key> <value>"),
-        };
-    }
-    match (positional.first(), positional.get(1)) {
-        (Some(spec), Some(value)) => ConfigAction::Set {
-            spec: (*spec).to_string(),
-            value: (*value).to_string(),
-            mode: ConfigWriteMode::Replace,
-        },
-        (Some(spec), None) => ConfigAction::Get((*spec).to_string()),
-        _ => fail_usage("taxis config [--list] [--get <key>] [--add] [--unset] [<key> [<value>]]"),
-    }
+        }
+    } else {
+        match (positional.first(), positional.get(1)) {
+            (Some(spec), Some(value)) => ConfigAction::Set {
+                spec: (*spec).to_string(),
+                value: (*value).to_string(),
+                mode: ConfigWriteMode::Replace,
+            },
+            (Some(spec), None) => ConfigAction::Get((*spec).to_string()),
+            _ => fail_usage(
+                "taxis config [--global] [--local] [-f <file>] [--list] [--get <key>] [--add] [--unset] [<key> [<value>]]",
+            ),
+        }
+    };
+
+    (action, config_path)
 }
 
 /// Parses a key specification or terminates with the same status git uses for a bad key.
@@ -224,6 +285,9 @@ fn run_set(
 ) {
     let key = resolve_key(spec);
     validate_conflict_mode(&key, value);
+    if let Some(parent) = config_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     if let Err(error) = set_value(config_path, &key, value, mode) {
         report_config_error("write configuration", error);
     }
@@ -239,6 +303,9 @@ fn run_set(
 /// Removes matching entries; nothing removed exits 5 so callers see git's --unset contract.
 fn run_unset(ctx: &CliContext, config_path: &std::path::Path, spec: &str, literal: Option<&str>) {
     let key = resolve_key(spec);
+    if let Some(parent) = config_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     let removed = match unset_value(config_path, &key, literal) {
         Ok(removed) => removed,
         Err(error) => report_config_error("write configuration", error),

@@ -12,7 +12,7 @@
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
-//! - `FGT-CLI-001`: Subcommand alias dispatch and CLI surface guard
+//! - `FGT-GAT-001`: Subcommand gate and CLI surface guard
 
 use std::collections::BTreeSet;
 use std::fs;

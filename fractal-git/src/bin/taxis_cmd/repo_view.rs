@@ -23,6 +23,7 @@ use std::path::{Path, PathBuf};
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{FileMode, ObjectKind, Oid};
+use fg_core::traits::RefStore;
 use fg_index::{AttributeSet, GitIndex, IgnoreMatcher};
 use fg_object::GitTreeRef;
 use fg_storage::{OdbRouter, PackedObject};
@@ -108,13 +109,26 @@ impl RepoView {
         self.odb.approximate_object_count()
     }
 
+    /// Resolves an object id, transparently substituting `refs/replace/<oid>` if present unless disabled.
+    pub fn resolve_replace_oid(&self, oid: &Oid) -> Oid {
+        if std::env::var("GIT_NO_REPLACE_OBJECTS").is_ok() {
+            return *oid;
+        }
+        let replace_ref = format!("refs/replace/{}", oid.to_hex());
+        match self.refs.get_ref(&replace_ref) {
+            Ok(Some(replacement)) => replacement,
+            _ => *oid,
+        }
+    }
+
     /// Reads an object, requiring it to exist.
     ///
     /// # Errors
     ///
     /// Returns [`FractalError::ObjectCodec`] when the id is absent.
     pub fn object(&self, oid: &Oid) -> FractalResult<PackedObject> {
-        self.odb.read_required(oid)
+        let effective_oid = self.resolve_replace_oid(oid);
+        self.odb.read_required(&effective_oid)
     }
 
     /// Reads the payload of a blob, requiring the object to actually be a blob.

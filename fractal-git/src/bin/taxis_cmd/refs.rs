@@ -26,7 +26,7 @@
 use std::collections::HashSet;
 
 use fg_core::models::{ObjectKind, Oid};
-use fg_topology::{DiskRefStore, HeadState};
+use fg_topology::DiskRefStore;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::RefStore;
 
@@ -53,10 +53,12 @@ pub fn print_update_ref_help() {
 /// Prints usage for `taxis symbolic-ref`.
 pub fn print_symbolic_ref_help() {
     println!(
-        "Usage: taxis symbolic-ref [-q] <name> [<ref>]\n\n\
+        "Usage: taxis symbolic-ref [-q] [--short] [-d] <name> [<ref>]\n\n\
          Read or set the symbolic reference <name>.\n\n\
          Options:\n\
            -q, --quiet         Suppress the error when <name> is not symbolic\n\
+           --short             Format symbolic target as short branch/ref name\n\
+           -d, --delete        Delete the symbolic reference\n\
            -h, --help          Show this help message"
     );
 }
@@ -189,57 +191,75 @@ fn write_ref(
 /// by name is honest; a silent write that the resolver ignores would not be.
 pub fn handle_symbolic_ref(ctx: &CliContext) {
     let mut quiet = false;
+    let mut short = false;
+    let mut delete = false;
     let mut positional: Vec<String> = Vec::new();
-    for argument in &ctx.args {
+    let mut cursor = 0;
+    while cursor < ctx.args.len() {
+        let argument = &ctx.args[cursor];
         match argument.as_str() {
             "-h" | "--help" => {
                 print_symbolic_ref_help();
                 return;
             }
             "-q" | "--quiet" => quiet = true,
+            "--short" => short = true,
+            "-d" | "--delete" => delete = true,
+            "-m" if cursor + 1 < ctx.args.len() => {
+                cursor += 1;
+            }
             other if other.starts_with('-') && other.len() > 1 => {
                 fail_usage(format!("symbolic-ref: unknown option '{other}'"));
             }
             other => positional.push(other.to_string()),
         }
+        cursor += 1;
     }
 
     let Some(name) = positional.first() else {
         fail_usage("symbolic-ref requires a reference name");
     };
-    if name != "HEAD" {
-        reject(
-            CliTag::ERROR,
-            format!(
-                "symbolic-ref: only 'HEAD' can be set as a symbolic reference in this edition; \
-                 '{name}' is not supported"
-            ),
-        );
-    }
 
     let view = RepoView::open_or_exit(ctx);
     let ref_store = DiskRefStore::new(view.git_dir());
 
-    if let Some(target) = positional.get(1) {
-        match ref_store.update_head_symbolic(target) {
-            Ok(()) => {
-                fg_core::diag_info!("refs", "pointed HEAD at {target}");
-                return;
-            }
-            Err(set_err) => fail_fatal(format!("set HEAD: {set_err}")),
+    if delete {
+        match ref_store.delete_ref(name) {
+            Ok(true) => return,
+            Ok(false) if quiet => return,
+            Ok(false) => reject(CliTag::ERROR, format!("fatal: Cannot delete {name}")),
+            Err(err) => fail_fatal(format!("delete {name}: {err}")),
         }
     }
 
-    match ref_store.head() {
-        Ok(HeadState::Symbolic { name, .. }) => println!("{name}"),
-        Ok(HeadState::Detached(_)) if quiet => std::process::exit(EXIT_NO_MATCH),
-        Ok(HeadState::Detached(_)) => {
-            reject(CliTag::ERROR, "fatal: ref HEAD is not a symbolic ref")
+    if let Some(target) = positional.get(1) {
+        match ref_store.write_symbolic_ref(name, target) {
+            Ok(()) => {
+                fg_core::diag_info!("refs", "pointed {name} at {target}");
+                return;
+            }
+            Err(set_err) => fail_fatal(format!("set {name}: {set_err}")),
         }
-        Ok(HeadState::Absent) => {
-            reject(CliTag::ERROR, "fatal: not a git repository (HEAD is absent)")
+    }
+
+    match ref_store.read_symbolic_ref(name) {
+        Ok(Some(target)) => {
+            if short {
+                let stripped = target
+                    .strip_prefix("refs/heads/")
+                    .or_else(|| target.strip_prefix("refs/remotes/"))
+                    .or_else(|| target.strip_prefix("refs/tags/"))
+                    .unwrap_or(&target);
+                println!("{stripped}");
+            } else {
+                println!("{target}");
+            }
         }
-        Err(head_err) => fail_fatal(format!("read HEAD: {head_err}")),
+        Ok(None) if quiet => std::process::exit(EXIT_NO_MATCH),
+        Ok(None) => {
+            reject(CliTag::ERROR, format!("fatal: ref {name} is not a symbolic ref"))
+        }
+        Err(err) => fail_fatal(format!("read {name}: {err}")),
     }
 }
 

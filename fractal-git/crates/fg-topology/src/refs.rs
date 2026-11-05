@@ -838,6 +838,45 @@ impl DiskRefStore {
         self.write_head_body(format!("ref: {ref_name}\n"))
     }
 
+    /// Reads the raw symbolic target if `ref_name` is a symbolic reference.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::Io`] if reading the reference file fails, or
+    /// [`FractalError::RefConflict`] if the reference name contains illegal characters.
+    pub fn read_symbolic_ref(&self, ref_name: &str) -> FractalResult<Option<String>> {
+        if ref_name == HEAD_NAME {
+            let path = self.git_dir.join(REF_HEAD);
+            let Some(body) = Self::read_body(&path)? else {
+                return Ok(None);
+            };
+            return Ok(Self::parse_symbolic(&body).map(str::to_string));
+        }
+        match self.lookup_body(ref_name)? {
+            Some(LooseBody::Symbolic(target)) => Ok(Some(target)),
+            _ => Ok(None),
+        }
+    }
+
+    /// Points an arbitrary reference symbolically at another reference target.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::RefConflict`] if either `ref_name` or `target` fails naming
+    /// validation, or if the target file cannot be atomically committed to disk.
+    pub fn write_symbolic_ref(&self, ref_name: &str, target: &str) -> FractalResult<()> {
+        validate_ref_name(ref_name)?;
+        validate_ref_name(target)?;
+        if ref_name == HEAD_NAME {
+            return self.update_head_symbolic(target);
+        }
+        let ref_path = self.ref_path(ref_name)?;
+        if let Some(parent) = ref_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        self.write_atomic(&ref_path, format!("ref: {target}\n"))
+    }
+
     /// Points HEAD directly at one commit object, producing a detached head.
     pub fn update_head_detached(&self, oid: &Oid) -> FractalResult<()> {
         self.write_head_body(format!("{}\n", oid.to_hex()))
