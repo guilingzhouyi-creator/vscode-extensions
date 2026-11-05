@@ -203,6 +203,23 @@ impl ThreeWayMerge {
         }
     }
 
+    /// Evaluates a 3-way tree merge incorporating similarity-based rename detection.
+    ///
+    /// Detects file renames between `base` and `ours`, as well as between `base` and `theirs`.
+    /// When a file is renamed on one branch and edited on the other, the modifications are
+    /// reconciled onto the renamed target path, avoiding false delete-modify conflicts.
+    pub fn merge_with_renames<F>(
+        base: &BTreeMap<String, Oid>,
+        ours: &BTreeMap<String, Oid>,
+        theirs: &BTreeMap<String, Oid>,
+        get_payload: F,
+    ) -> ThreeWayMergeResult
+    where
+        F: FnMut(&Oid) -> Option<Vec<u8>>,
+    {
+        super::rename_merge::RenameMergeEngine::merge_with_renames(base, ours, theirs, get_payload)
+    }
+
     /// Synthesizes an in-memory virtual merge base tree from multiple common ancestors.
     /// In criss-cross branch histories where two branches diverge from multiple common ancestors,
     /// this merges ancestor trees in memory (following Git's merge-ort virtual base strategy).

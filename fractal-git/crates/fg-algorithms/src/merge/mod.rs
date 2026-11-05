@@ -7,12 +7,14 @@
 
 pub mod algebraic;
 pub mod block_merge;
+pub mod rename_merge;
 pub mod text_merge;
 pub mod three_way;
 pub mod virtual_base;
 
 pub use algebraic::AlgebraicMerge;
 pub use block_merge::{BlockMergeResult, BlockThreeWayMerge};
+pub use rename_merge::RenameMergeEngine;
 pub use text_merge::{TextMergeResult, TextThreeWayMerge};
 pub use three_way::{
     CanonicalConflictEntry, CanonicalMergeResult, ConflictEntry, FastPathMerge, ThreeWayMerge,

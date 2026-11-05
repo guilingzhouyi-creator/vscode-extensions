@@ -386,7 +386,13 @@ fn execute_three_way_merge(
         .map(|(p, e)| (p.clone(), e.oid))
         .collect();
 
-    match ThreeWayMerge::merge(&base_map, &ours_map, &theirs_map) {
+    let merge_res = ThreeWayMerge::merge_with_renames(
+        &base_map,
+        &ours_map,
+        &theirs_map,
+        |oid| view.blob_payload(oid).ok(),
+    );
+    match merge_res {
         ThreeWayMergeResult::FastForward => {
             execute_fast_forward(view, opts, ours_commit, theirs_commit, branch_name, ctx);
         }
