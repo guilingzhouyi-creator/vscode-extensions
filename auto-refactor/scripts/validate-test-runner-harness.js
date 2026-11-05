@@ -56,13 +56,17 @@ async function main() {
     {
       name: 'probe-reportFailure',
       call: [
-        "const cleaned = [];",
-        "reportFailure('probe-reportFailure', () => { cleaned.push('cleanup'); })(new Error('probe'))",
+        "reportFailure('probe-reportFailure', () => console.log('cleanup-ran'))(new Error('probe'))",
       ].join('\n'),
+      expects: ['cleanup-ran'],
     },
     {
       name: 'probe-cleanup-throws',
       call: "reportFailure('probe-cleanup-throws', () => { throw new Error('teardown'); })(new Error('probe'))",
+      // The original failure must survive a broken teardown: reporting `teardown` instead would
+      // hide why the suite actually failed.
+      expects: ['probe'],
+      rejects: ['teardown'],
     },
   ];
   for (const probe of exitProbes) {
@@ -79,17 +83,13 @@ async function main() {
     const outcome = spawnSync(process.execPath, [probePath], { encoding: 'utf8' });
     fs.rmSync(probePath, { force: true });
     assert.strictEqual(outcome.status, 1, `${probe.name} must exit 1 on failure`);
-    assert.ok(
-      `${outcome.stdout}${outcome.stderr}`.includes(probe.name),
-      `${probe.name} failure must name the suite that broke`,
-    );
-    if (probe.name === 'probe-cleanup-throws') {
-      // A teardown failure must not replace the verdict: the probe still has to exit 1 and still
-      // report the suite name, otherwise the reason the suite failed would be hidden by its cleanup.
-      assert.ok(
-        `${outcome.stdout}${outcome.stderr}`.includes('probe'),
-        `${probe.name} must still report the original failure`,
-      );
+    const seen = `${outcome.stdout}${outcome.stderr}`;
+    assert.ok(seen.includes(probe.name), `${probe.name} failure must name the suite that broke`);
+    for (const token of probe.expects ?? []) {
+      assert.ok(seen.includes(token), `${probe.name} must report ${token}`);
+    }
+    for (const token of probe.rejects ?? []) {
+      assert.ok(!seen.includes(token), `${probe.name} must not report ${token} instead of the failure`);
     }
   }
 
