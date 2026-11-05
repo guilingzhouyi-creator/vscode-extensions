@@ -18,56 +18,143 @@
 /// Maximum line count supported by the single-word 64-bit parallel register engine.
 pub const BIT_PARALLEL_MAX_LINES: usize = 64;
 
+/// Stack-allocated open-addressing lookup table for 64-bit pattern equality bitmasks (Peq).
+/// Stores up to 64 distinct symbol hashes with at most 50% load factor in 128 slots.
+#[derive(Debug)]
+struct PeqTable {
+    keys: [u32; 128],
+    masks: [u64; 128],
+    occupied: [u64; 2],
+}
+
+impl PeqTable {
+    #[inline(always)]
+    fn new() -> Self {
+        Self {
+            keys: [0u32; 128],
+            masks: [0u64; 128],
+            occupied: [0u64; 2],
+        }
+    }
+
+    #[inline(always)]
+    fn insert(&mut self, hash: u32, row_bit: u64) {
+        let mut slot = (hash as usize) & 127;
+        loop {
+            let word_idx = slot / 64;
+            let bit = 1u64 << (slot % 64);
+            if (self.occupied[word_idx] & bit) == 0 {
+                self.occupied[word_idx] |= bit;
+                self.keys[slot] = hash;
+                self.masks[slot] = row_bit;
+                return;
+            }
+            if self.keys[slot] == hash {
+                self.masks[slot] |= row_bit;
+                return;
+            }
+            slot = (slot + 1) & 127;
+        }
+    }
+
+    #[inline(always)]
+    fn get(&self, hash: u32) -> u64 {
+        let mut slot = (hash as usize) & 127;
+        loop {
+            let word_idx = slot / 64;
+            let bit = 1u64 << (slot % 64);
+            if (self.occupied[word_idx] & bit) == 0 {
+                return 0;
+            }
+            if self.keys[slot] == hash {
+                return self.masks[slot];
+            }
+            slot = (slot + 1) & 127;
+        }
+    }
+}
+
+/// Reusable scratch state for bit-parallel diff, avoiding per-invocation heap allocations.
+#[derive(Debug, Default, Clone)]
+pub struct BitParallelDiffState {
+    pub old_changed: Vec<bool>,
+    pub new_changed: Vec<bool>,
+}
+
+impl BitParallelDiffState {
+    pub fn new() -> Self {
+        Self {
+            old_changed: Vec::with_capacity(BIT_PARALLEL_MAX_LINES),
+            new_changed: Vec::with_capacity(BIT_PARALLEL_MAX_LINES),
+        }
+    }
+
+    pub fn reset(&mut self, old_count: usize, new_count: usize) {
+        self.old_changed.clear();
+        self.old_changed.resize(old_count, false);
+        self.new_changed.clear();
+        self.new_changed.resize(new_count, false);
+    }
+}
+
+/// Computes the longest common subsequence alignment into reusable buffers.
+pub fn bit_parallel_diff_with_state(
+    old_hashes: &[u32],
+    new_hashes: &[u32],
+    state: &mut BitParallelDiffState,
+) {
+    let old_count = old_hashes.len();
+    let new_count = new_hashes.len();
+
+    if old_count == 0
+        || new_count == 0
+        || old_count > BIT_PARALLEL_MAX_LINES
+        || new_count > BIT_PARALLEL_MAX_LINES
+    {
+        state.old_changed.clear();
+        state.old_changed.resize(old_count, true);
+        state.new_changed.clear();
+        state.new_changed.resize(new_count, true);
+        return;
+    }
+
+    let column_bitmasks = compute_column_bitmasks(old_hashes, new_hashes);
+    state.reset(old_count, new_count);
+
+    backtrack_alignment_path(
+        &column_bitmasks,
+        old_hashes,
+        new_hashes,
+        &mut state.old_changed,
+        &mut state.new_changed,
+    );
+}
+
 /// Computes the longest common subsequence alignment between `old_hashes` and `new_hashes`
 /// using 64-bit register-level bit-parallel recurrence.
 ///
 /// Both input sequences must have length <= 64.
 /// Returns `(old_changed, new_changed)` where true denotes a changed (unmatched) line.
 pub fn bit_parallel_diff(old_hashes: &[u32], new_hashes: &[u32]) -> (Vec<bool>, Vec<bool>) {
-    let old_count = old_hashes.len();
-    let new_count = new_hashes.len();
-
-    if old_count == 0 {
-        return (Vec::new(), vec![true; new_count]);
-    }
-    if new_count == 0 {
-        return (vec![true; old_count], Vec::new());
-    }
-
-    if old_count > BIT_PARALLEL_MAX_LINES || new_count > BIT_PARALLEL_MAX_LINES {
-        return (vec![true; old_count], vec![true; new_count]);
-    }
-
-    let column_bitmasks = compute_column_bitmasks(old_hashes, new_hashes);
-    let mut old_changed = vec![false; old_count];
-    let mut new_changed = vec![false; new_count];
-
-    backtrack_alignment_path(
-        &column_bitmasks,
-        old_hashes,
-        new_hashes,
-        &mut old_changed,
-        &mut new_changed,
-    );
-
-    (old_changed, new_changed)
+    let mut state = BitParallelDiffState::new();
+    bit_parallel_diff_with_state(old_hashes, new_hashes, &mut state);
+    (state.old_changed, state.new_changed)
 }
 
 fn compute_column_bitmasks(
     old_hashes: &[u32],
     new_hashes: &[u32],
 ) -> [u64; BIT_PARALLEL_MAX_LINES] {
+    let mut peq = PeqTable::new();
+    for (row_index, &old_hash) in old_hashes.iter().enumerate() {
+        peq.insert(old_hash, 1u64 << row_index);
+    }
+
     let mut column_bitmasks = [0u64; BIT_PARALLEL_MAX_LINES];
     let mut vertical_vector = 0u64;
 
     for (column_index, &new_hash) in new_hashes.iter().enumerate() {
-        let mut pattern_match_mask = 0u64;
-        for (row_index, &old_hash) in old_hashes.iter().enumerate() {
-            if old_hash == new_hash {
-                pattern_match_mask |= 1u64 << row_index;
-            }
-        }
-
+        let pattern_match_mask = peq.get(new_hash);
         let equality_or_vertical = pattern_match_mask | vertical_vector;
         let borrow_diff =
             (equality_or_vertical.wrapping_sub((vertical_vector << 1) | 1)) ^ equality_or_vertical;

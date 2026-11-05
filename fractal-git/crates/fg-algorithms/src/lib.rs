@@ -30,13 +30,14 @@ pub use cdc::{
     GEAR_TABLE, STREAMING_BUFFER_CAPACITY,
 };
 pub use diff::{
-    bit_parallel_diff, classify_line, decimal_width, detect_renames, evaluate_diff_5d_eloc,
-    evaluate_file_5d_eloc, pprint_rename, scale_linear, shared_suffix_len, split_lines, stat_graph,
-    text_ends_with_newline, truncate_stat_name, BlobRef, ChangeKind, Compaction, Diff5dElocDelta,
-    DiffAlgorithm, DiffEngine, DiffEntry, File5dElocMetrics, LineSemanticKind, PatchGenerator,
-    PatchHunk, PatchHunkRef, PatchLine, PatchLineRef, RenameHit, Side, StatLayout, TreeDiff,
-    TreeDiffState, UnifiedPatch, UnifiedPatchRef, BIT_PARALLEL_MAX_LINES, DEFAULT_HUNK_CONTEXT,
-    DEFAULT_RENAME_SCORE, MAX_RENAME_SCORE,
+    bit_parallel_diff, bit_parallel_diff_with_state, classify_line, decimal_width, detect_renames,
+    evaluate_diff_5d_eloc, evaluate_file_5d_eloc, pprint_rename, scale_linear, shared_suffix_len,
+    split_lines, stat_graph, text_ends_with_newline, truncate_stat_name, BitParallelDiffState,
+    BlobRef, ChangeKind, Compaction, Diff5dElocDelta, DiffAlgorithm, DiffEngine, DiffEntry,
+    File5dElocMetrics, LineSemanticKind, PatchGenerator, PatchHunk, PatchHunkRef, PatchLine,
+    PatchLineRef, RenameHit, Side, StatLayout, TreeDiff, TreeDiffState, UnifiedPatch,
+    UnifiedPatchRef, BIT_PARALLEL_MAX_LINES, DEFAULT_HUNK_CONTEXT, DEFAULT_RENAME_SCORE,
+    MAX_RENAME_SCORE,
 };
 pub use math::{compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate};
 pub use merge::{

@@ -18,6 +18,40 @@
 //!     small file or nothing at all in a large one.
 
 use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
+
+/// High-throughput non-cryptographic byte hasher (FxHash) for line equivalence class grouping.
+#[derive(Default, Clone, Copy)]
+pub struct FastByteHasher(u64);
+
+impl Hasher for FastByteHasher {
+    #[inline(always)]
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    #[inline(always)]
+    fn write(&mut self, bytes: &[u8]) {
+        const K: u64 = 0x517cc1b727220a95;
+        let mut hash = self.0;
+        let mut chunks = bytes.chunks_exact(8);
+        for chunk in &mut chunks {
+            let mut word = [0u8; 8];
+            word.copy_from_slice(chunk);
+            let val = u64::from_le_bytes(word);
+            hash = (hash.rotate_left(5) ^ val).wrapping_mul(K);
+        }
+        let remainder = chunks.remainder();
+        if !remainder.is_empty() {
+            let mut last = 0u64;
+            for (i, &b) in remainder.iter().enumerate() {
+                last |= (b as u64) << (i * 8);
+            }
+            hash = (hash.rotate_left(5) ^ last).wrapping_mul(K);
+        }
+        self.0 = hash;
+    }
+}
 
 /// Equivalence class of one record, shared between both sides.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,8 +205,10 @@ fn should_discard(actions: &[Action], position: usize) -> bool {
 /// The two sides share one class table so a class id means the same line on both sides, which is
 /// what lets the search compare integers.
 pub fn prepare(old_records: &[&[u8]], new_records: &[&[u8]]) -> (PreparedSide, PreparedSide) {
-    let mut classes: HashMap<&[u8], u32> = HashMap::new();
-    let mut table: Vec<LineClass> = Vec::new();
+    let cap = old_records.len() + new_records.len();
+    let mut classes: HashMap<&[u8], u32, BuildHasherDefault<FastByteHasher>> =
+        HashMap::with_capacity_and_hasher(cap, BuildHasherDefault::default());
+    let mut table: Vec<LineClass> = Vec::with_capacity(cap);
 
     let mut old_classes = Vec::with_capacity(old_records.len());
     let mut new_classes = Vec::with_capacity(new_records.len());

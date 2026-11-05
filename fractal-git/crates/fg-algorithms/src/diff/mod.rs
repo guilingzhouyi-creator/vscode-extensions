@@ -20,7 +20,9 @@ pub mod tree_diff;
 pub mod xdiff;
 pub mod xdiff_prepare;
 
-pub use bit_parallel::{bit_parallel_diff, BIT_PARALLEL_MAX_LINES};
+pub use bit_parallel::{
+    bit_parallel_diff, bit_parallel_diff_with_state, BitParallelDiffState, BIT_PARALLEL_MAX_LINES,
+};
 pub use compact::{Compaction, Side};
 pub use eloc_5d::{
     classify_line, evaluate_diff_5d_eloc, evaluate_file_5d_eloc, Diff5dElocDelta,
