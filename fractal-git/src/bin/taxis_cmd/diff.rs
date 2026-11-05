@@ -156,6 +156,7 @@ pub(crate) struct DiffRequest {
     pub(crate) scope: DiffScope,
     pub(crate) context: usize,
     pub(crate) revisions: Vec<String>,
+    pub(crate) pathspecs: Vec<String>,
     pub(crate) nul_terminated: bool,
     pub(crate) name_only: bool,
     pub(crate) name_status: bool,
@@ -179,6 +180,7 @@ impl Default for DiffRequest {
             scope: DiffScope::Worktree,
             context: DEFAULT_CONTEXT,
             revisions: Vec::new(),
+            pathspecs: Vec::new(),
             nul_terminated: false,
             name_only: false,
             name_status: false,
@@ -246,10 +248,12 @@ pub fn run_revision_diff(
 
 /// Parses flags and revisions.
 fn parse_request(args: &[String]) -> Result<DiffRequest, String> {
+    let (options, mut pathspecs) = super::path_filter::split_args_at_dashdash(args);
     let mut request = DiffRequest {
         scope: DiffScope::Worktree,
         context: DEFAULT_CONTEXT,
         revisions: Vec::new(),
+        pathspecs: Vec::new(),
         nul_terminated: false,
         name_only: false,
         name_status: false,
@@ -259,7 +263,7 @@ fn parse_request(args: &[String]) -> Result<DiffRequest, String> {
         quiet: false,
     };
 
-    for argument in args {
+    for argument in &options {
         match argument.as_str() {
             "--cached" | "--staged" => request.scope = DiffScope::Staged,
             "-z" => request.nul_terminated = true,
@@ -286,9 +290,16 @@ fn parse_request(args: &[String]) -> Result<DiffRequest, String> {
             other if other.starts_with('-') && other.len() > 1 => {
                 return Err(format!("diff does not support the flag '{other}'"));
             }
-            other => request.revisions.push(other.to_string()),
+            other => {
+                if request.revisions.len() >= 2 {
+                    pathspecs.push(other.to_string());
+                } else {
+                    request.revisions.push(other.to_string());
+                }
+            }
         }
     }
+    request.pathspecs = pathspecs;
 
     if request.revisions.len() >= 2 {
         request.scope = DiffScope::Revisions;
@@ -376,7 +387,14 @@ pub(crate) fn collect_comparisons(
             )
         }
     };
-    compare_snapshots(&old, &new)
+    let mut comparisons = compare_snapshots(&old, &new)?;
+    if !request.pathspecs.is_empty() {
+        comparisons.retain(|comparison| {
+            super::path_filter::matches_any_pathspec(&comparison.new_path, &request.pathspecs)
+                || super::path_filter::matches_any_pathspec(&comparison.old_path, &request.pathspecs)
+        });
+    }
+    Ok(comparisons)
 }
 
 /// One side of a comparison: the paths it holds, and where their bytes come from.

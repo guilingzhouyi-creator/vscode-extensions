@@ -262,6 +262,7 @@ fn format_single_patch(
         scope: DiffScope::Revisions,
         context: 3,
         revisions: vec![parent_rev, record.oid.to_hex()],
+        pathspecs: Vec::new(),
         nul_terminated: false,
         name_only: false,
         name_status: false,

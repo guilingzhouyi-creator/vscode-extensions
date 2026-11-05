@@ -36,6 +36,7 @@ struct RevListArgs {
     includes: Vec<String>,
     excludes: Vec<String>,
     all_polarities: Vec<bool>,
+    pathspecs: Vec<String>,
 }
 
 /// Computes official commit counts using anti-inflation telemetry filters or prints commit OIDs.
@@ -76,6 +77,7 @@ pub fn handle_rev_list(ctx: &CliContext) {
 
 /// Parses command-line flags and revision arguments for `taxis rev-list`.
 fn parse_rev_list_args(args: &[String]) -> RevListArgs {
+    let (options, pathspecs) = super::path_filter::split_args_at_dashdash(args);
     let mut parsed = RevListArgs {
         count_only: false,
         all_transient: false,
@@ -84,12 +86,13 @@ fn parse_rev_list_args(args: &[String]) -> RevListArgs {
         includes: Vec::new(),
         excludes: Vec::new(),
         all_polarities: Vec::new(),
+        pathspecs,
     };
     let mut negate_following = false;
     let mut cursor = 0usize;
 
-    while cursor < args.len() {
-        let arg = args[cursor].as_str();
+    while cursor < options.len() {
+        let arg = options[cursor].as_str();
         cursor += 1;
         match arg {
             "--count" => parsed.count_only = true,
@@ -98,7 +101,7 @@ fn parse_rev_list_args(args: &[String]) -> RevListArgs {
             "--all" => parsed.all_polarities.push(negate_following),
             "--not" => negate_following = !negate_following,
             "-n" | "--max-count" => {
-                let Some(text) = args.get(cursor) else {
+                let Some(text) = options.get(cursor) else {
                     reject(CliTag::ERROR, format!("rev-list {arg} requires a count"));
                 };
                 parsed.limit = Some(parse_limit_value(arg, text));
@@ -166,10 +169,21 @@ fn collect_filtered_records(view: &RepoView, parsed: &RevListArgs) -> Vec<Commit
             .map(|record| record.oid)
             .collect()
     };
-    walked
+    let unconstrained: Vec<CommitRecord> = walked
         .into_iter()
         .filter(|record| !excluded_oids.contains(&record.oid))
-        .collect()
+        .collect();
+    if parsed.pathspecs.is_empty() {
+        unconstrained
+    } else {
+        unconstrained
+            .into_iter()
+            .filter(|record| {
+                super::path_filter::commit_modifies_pathspecs(view, record, &parsed.pathspecs)
+                    .unwrap_or(true)
+            })
+            .collect()
+    }
 }
 
 /// Renders `rev-list` output in `--count`, `--telemetry`, or standard OID list format.

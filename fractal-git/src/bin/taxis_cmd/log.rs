@@ -57,7 +57,7 @@ enum ShowPart {
 
 /// Dispatches `taxis log`.
 pub fn handle_log(ctx: &CliContext) {
-    let request = match LogRequest::parse(&ctx.args) {
+    let mut request = match LogRequest::parse(&ctx.args) {
         Ok(parsed) => parsed,
         Err(reason) => reject(CliTag::ERROR, reason),
     };
@@ -65,6 +65,15 @@ pub fn handle_log(ctx: &CliContext) {
         Ok(opened) => opened,
         Err(open_err) => fail_fatal(open_err),
     };
+
+    if request.revision_explicit && !request.revision.contains("..") {
+        if view.resolve(&request.revision).is_err() && view.work_root().join(&request.revision).exists() {
+            let path_candidate = request.revision.clone();
+            request.pathspecs.push(path_candidate);
+            request.revision = "HEAD".to_string();
+            request.revision_explicit = false;
+        }
+    }
 
     let records = if request.all {
         let starts = match collect_all_starts(&view) {
@@ -163,7 +172,18 @@ pub fn handle_log(ctx: &CliContext) {
             Err(walk_err) => reject(CliTag::ERROR, walk_err),
         }
     };
-    let shown = &records[..records.len().min(request.limit)];
+    let filtered_records: Vec<CommitRecord> = if request.pathspecs.is_empty() {
+        records
+    } else {
+        records
+            .into_iter()
+            .filter(|record| {
+                super::path_filter::commit_modifies_pathspecs(&view, record, &request.pathspecs)
+                    .unwrap_or(true)
+            })
+            .collect()
+    };
+    let shown = &filtered_records[..filtered_records.len().min(request.limit)];
     // The width is a property of the repository, not of the request, so it is resolved once and
     // threaded to every renderer. Recomputing it per record would be correct but would also let one
     // renderer forget it.
@@ -269,11 +289,13 @@ struct LogRequest {
     format: Option<String>,
     graph: bool,
     diff_mode: Option<LogDiffMode>,
+    pathspecs: Vec<String>,
 }
 
 impl LogRequest {
     /// Parses flags and the optional revision.
     fn parse(args: &[String]) -> Result<Self, String> {
+        let (options, mut pathspecs) = super::path_filter::split_args_at_dashdash(args);
         let mut request = Self {
             revision: "HEAD".to_string(),
             revision_explicit: false,
@@ -283,10 +305,11 @@ impl LogRequest {
             format: None,
             graph: false,
             diff_mode: None,
+            pathspecs: Vec::new(),
         };
         let mut cursor = 0usize;
-        while cursor < args.len() {
-            let argument = args[cursor].as_str();
+        while cursor < options.len() {
+            let argument = options[cursor].as_str();
             cursor += 1;
             match argument {
                 "--graph" => request.graph = true,
@@ -295,21 +318,18 @@ impl LogRequest {
                 "--name-status" => request.diff_mode = Some(LogDiffMode::NameStatus),
                 "--oneline" => request.oneline = true,
                 "--all" => {
-                    // Git walks every ref here; it also lifts the interactive cap this
-                    // command applies to a bare log, because a history-wide request must
-                    // not truncate.
                     request.all = true;
                     request.limit = usize::MAX;
                 }
                 "--format" | "--pretty" => {
-                    let value = args
+                    let value = options
                         .get(cursor)
                         .ok_or_else(|| format!("{argument} requires a format string"))?;
                     request.format = Some(value.clone());
                     cursor += 1;
                 }
                 "-n" | "--max-count" => {
-                    let value = args
+                    let value = options
                         .get(cursor)
                         .ok_or_else(|| format!("{argument} requires a count"))?;
                     request.limit = value
@@ -344,11 +364,16 @@ impl LogRequest {
                     return Err(format!("log does not support the flag '{other}'"));
                 }
                 other => {
-                    request.revision = other.to_string();
-                    request.revision_explicit = true;
+                    if request.revision_explicit {
+                        pathspecs.push(other.to_string());
+                    } else {
+                        request.revision = other.to_string();
+                        request.revision_explicit = true;
+                    }
                 }
             }
         }
+        request.pathspecs = pathspecs;
         Ok(request)
     }
 }

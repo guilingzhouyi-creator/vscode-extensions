@@ -785,7 +785,7 @@ fn parse_tag_target(payload: &[u8]) -> FractalResult<Oid> {
 }
 
 /// Reads the `tree` header out of a commit payload.
-fn parse_commit_tree(payload: &[u8]) -> FractalResult<Oid> {
+pub(crate) fn parse_commit_tree(payload: &[u8]) -> FractalResult<Oid> {
     let text = std::str::from_utf8(payload).map_err(|utf_err| {
         FractalError::ObjectCodec(format!("commit payload is not UTF-8: {utf_err}"))
     })?;

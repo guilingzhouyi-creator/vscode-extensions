@@ -51,6 +51,7 @@ pub mod notes_replace;
 pub mod operation;
 pub mod pack_plumbing;
 pub mod patch_parser;
+pub mod path_filter;
 pub mod plumbing_tree;
 pub mod project;
 pub mod projection;
