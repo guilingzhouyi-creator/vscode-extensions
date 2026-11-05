@@ -5,7 +5,7 @@
 //! Dependencies & Triggers: Dispatched by `taxis notes` and `taxis replace`.
 //! Responsibilities: CRUD operations on note blobs and object replacement references.
 //!
-//! Domain Governance Rules: FGT-COR-001, FGT-CLI-001.
+//! Domain Governance Rules: FGT-COR-001, FGT-GAT-001.
 
 use std::io::Write;
 

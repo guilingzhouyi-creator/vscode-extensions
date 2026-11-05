@@ -5,18 +5,34 @@
 //! Dependencies & Triggers: Dispatched by `taxis index-pack` and `taxis unpack-objects`.
 //! Responsibilities: Verify pack checksums, write v2 idx files, and unpack loose objects into ODB.
 //!
-//! Domain Governance Rules: FGT-COR-001, FGT-STO-001, FGT-CLI-001.
+//! Domain Governance Rules: FGT-COR-001, FGT-STO-001, FGT-GAT-001.
 
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 
-use fg_core::models::Oid;
+use fg_core::error::FractalResult;
+use fg_core::models::{ObjectKind, Oid};
+use fg_core::traits::OdbStore;
 use fg_storage::backends::idx_writer::IdxWriter;
+use fg_storage::backends::pack_file::{DeltaBaseSource, PackFile};
+use fg_storage::{LooseOdb, OdbRouter};
 use fractal_git::constants::cli::CliTag;
 
-use super::common::{fail_fatal, reject, CliContext};
+use super::common::{fail_fatal, print_json, reject, CliContext};
 use super::repo_view::RepoView;
+
+/// Fallback resolver when operating on packs without a local repository context.
+struct EmptyDeltaSource;
+
+impl DeltaBaseSource for EmptyDeltaSource {
+    fn read_base(&self, oid: &Oid) -> FractalResult<(ObjectKind, Vec<u8>)> {
+        Err(fg_core::error::FractalError::ObjectCodec(format!(
+            "external base {} not available in standalone mode",
+            oid.to_hex()
+        )))
+    }
+}
 
 /// Dispatches `taxis index-pack`.
 pub fn handle_index_pack(ctx: &CliContext) {
@@ -48,34 +64,40 @@ pub fn handle_index_pack(ctx: &CliContext) {
         );
     }
 
-    let Ok(bytes) = fs::read(&pack_file) else {
-        reject(
-            CliTag::ERROR,
-            format!("cannot read '{}'", pack_file.display()),
-        );
+    let pack = match PackFile::load(&pack_file) {
+        Ok(p) => p,
+        Err(e) => reject(CliTag::ERROR, format!("load packfile: {e}")),
     };
-    if bytes.len() < 32 || &bytes[..4] != b"PACK" {
-        reject(CliTag::ERROR, "invalid packfile: bad signature or too short");
-    }
 
-    let pack_checksum =
-        Oid::from_bytes(bytes[bytes.len() - 20..].try_into().unwrap_or([0u8; 20]));
+    let router = RepoView::open(ctx)
+        .ok()
+        .and_then(|v| OdbRouter::open(v.git_dir().join("objects")).ok());
+    let (pack_checksum, entries) = if let Some(ref r) = router {
+        match pack.index_objects(r) {
+            Ok(res) => res,
+            Err(e) => reject(CliTag::ERROR, format!("index pack objects: {e}")),
+        }
+    } else {
+        match pack.index_objects(&EmptyDeltaSource) {
+            Ok(res) => res,
+            Err(e) => reject(CliTag::ERROR, format!("index pack objects: {e}")),
+        }
+    };
+
     let target_idx = out_path.unwrap_or_else(|| pack_file.with_extension("idx"));
-
-    if !target_idx.is_file() {
-        let entries = Vec::new();
-        let file = match fs::File::create(&target_idx) {
-            Ok(f) => f,
-            Err(e) => reject(CliTag::ERROR, format!("create idx file: {e}")),
-        };
-        let _ = IdxWriter::write_idx(entries, &pack_checksum, file);
+    let file = match fs::File::create(&target_idx) {
+        Ok(f) => f,
+        Err(e) => reject(CliTag::ERROR, format!("create idx file: {e}")),
+    };
+    if let Err(e) = IdxWriter::write_idx(entries, &pack_checksum, file) {
+        reject(CliTag::ERROR, format!("write idx file: {e}"));
     }
     println!("{}", pack_checksum.to_hex());
 }
 
 /// Dispatches `taxis unpack-objects`.
 pub fn handle_unpack_objects(ctx: &CliContext) {
-    let _view = match RepoView::open(ctx) {
+    let view = match RepoView::open(ctx) {
         Ok(v) => v,
         Err(err) => fail_fatal(err),
     };
@@ -89,6 +111,49 @@ pub fn handle_unpack_objects(ctx: &CliContext) {
         reject(CliTag::ERROR, "unpack-objects: invalid pack signature");
     }
 
-    let count = u32::from_be_bytes(buffer[8..12].try_into().unwrap_or([0u8; 4]));
-    println!("Unpacking {count} objects");
+    let pack = match PackFile::parse(PathBuf::from("stdin.pack"), buffer) {
+        Ok(p) => p,
+        Err(e) => reject(CliTag::ERROR, format!("unpack-objects: {e}")),
+    };
+
+    let router = match OdbRouter::open(view.git_dir().join("objects")) {
+        Ok(r) => r,
+        Err(e) => reject(CliTag::ERROR, format!("open object store: {e}")),
+    };
+
+    let (_pack_oid, entries) = match pack.index_objects(&router) {
+        Ok(res) => res,
+        Err(e) => reject(CliTag::ERROR, format!("decode pack objects: {e}")),
+    };
+
+    let loose_odb = LooseOdb::new(view.git_dir());
+    let mut unpacked_count = 0usize;
+    for entry in &entries {
+        match pack.read_at(entry.offset, &router) {
+            Ok(packed) => {
+                if let Err(e) = loose_odb.write_object(packed.kind.as_str(), &packed.payload) {
+                    reject(
+                        CliTag::ERROR,
+                        format!("write unpacked object {}: {e}", entry.oid.to_hex()),
+                    );
+                }
+                unpacked_count += 1;
+            }
+            Err(e) => {
+                reject(
+                    CliTag::ERROR,
+                    format!("read packed object at {}: {e}", entry.offset),
+                );
+            }
+        }
+    }
+
+    if ctx.json_mode {
+        print_json(&serde_json::json!({
+            "operation": "unpack-objects",
+            "unpacked_count": unpacked_count
+        }));
+    } else {
+        println!("Unpacked {unpacked_count} object(s)");
+    }
 }

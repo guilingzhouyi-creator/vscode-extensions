@@ -499,6 +499,11 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         handler: notes_replace::handle_replace,
     },
     CommandSpec {
+        canonical: "commit-graph",
+        aliases: &["commit-graph"],
+        handler: maintenance_ops::handle_commit_graph,
+    },
+    CommandSpec {
         canonical: "sparse-checkout",
         aliases: &["sparse-checkout"],
         handler: maintenance_ops::handle_sparse_checkout,
@@ -640,11 +645,16 @@ Native Fractal Commands (with Git Alias Mappings):
   bundle             Create, verify, list-heads, or unbundle Git bundle v2 packages in-place
   reclaim            Trigger worktree & sandbox reclamation (or 'worktree prune')
   prune              Prune all unreachable loose objects from the object database
+  clean              Remove untracked files from the working tree (-f, -d, -n)
+  gc                 Cleanup unnecessary files and optimize the local repository
+  fsck               Verify the connectivity and validity of objects in the database
   repack             Consolidate loose objects into Git packfiles and index v2 (--async, --low-disk, --window)
   remote             Manage set of tracked repositories (list, add, remove, get-url)
   fetch              Local transports only; network is disabled in this edition
   push               Local transports only; network is disabled in this edition
   pull               Local transports only; network is disabled in this edition
+  config,   cfg      Get and set repository or global options (--global, --local, -f)
+  submodule, sub     Initialize, update, inspect, or sync submodules (status, init, sync, add)
   project,  pj       Manage controlled project leases and hierarchical TTL (list, register, renew, evict)
   quarantine, quar   Manage elastic quarantine stash for unauthorized changes (list, show, restore, discard)
   worktree, wt       Display or allocate scoped projection worktree (--scope / --full)
@@ -652,6 +662,15 @@ Native Fractal Commands (with Git Alias Mappings):
   promotion, pm      Manage staged promotions to System Trunk with Human Elevation gate
   bench,    benchmark Run performance benchmarks (--level <1|2|3|all>, -m <mult>)
   daemon,   serve    Display protocol daemon status & IPC endpoints
+  notes              Add, inspect, or remove commit notes (list, show, add, remove)
+  replace            Create, list, or delete replace refs for objects (-l, -d)
+  commit-graph       Write or verify Git Commit-Graph (CGPH) generation indices
+  sparse-checkout    Initialize, set, list, or disable sparse-checkout patterns
+  maintenance        Run periodic repository optimization tasks (commit-graph, repack)
+  rerere             Reuse recorded resolution of conflicted merges (status, clear, diff)
+  unpack-objects     Unpack objects from a packed archive on stdin into loose store
+  index-pack         Build pack index file for an existing packed archive (-o)
+  diagnostics, diag  Passive commercial JSONL logging inspector and stats report
   version,  -v       Display version and domain rules SSOT
 
 Transparent Git Command Aliases:
@@ -875,12 +894,14 @@ fn reject_unimplemented(subcommand: &str) -> ! {
         CliTag::ERROR,
         format!(
             "'{subcommand}' has no native implementation in this build. \
-             Implemented: init, doctor, relocate, git-export, git-import, status, branch, commit, diff, hash-object, cat-file, ls-tree, \
-             ls-files, show-ref, for-each-ref, update-ref, symbolic-ref, merge-base, reflog, grep, shortlog, describe, count-objects, check-attr, var, \
-             check-ignore, log, show, checkout, merge, reset, tag, cherry-pick, revert, format-patch, apply, am, range-diff, cherry, \
-             patch-id, merge-tree, stripspace, prune, \
-             mktree, read-tree, mktag, name-rev, verify-commit, verify-tag, \
-             stash, rebase, repack, project, worktree, blackboard, promotion, bench, undo, operation, rev-list, verify, authority, reclaim, daemon, version, help."
+             Implemented: init, doctor, relocate, git-export, git-import, status, add, rm, mv, restore, branch, commit, diff, hash-object, \
+             write-tree, commit-tree, update-index, rev-parse, cat-file, ls-tree, ls-files, show-ref, for-each-ref, update-ref, symbolic-ref, \
+             merge-base, reflog, grep, shortlog, describe, count-objects, check-attr, var, check-ignore, log, show, checkout, merge, reset, \
+             tag, cherry-pick, revert, format-patch, apply, am, range-diff, cherry, patch-id, merge-tree, stripspace, mktree, read-tree, \
+             mktag, name-rev, verify-commit, verify-tag, stash, rebase, worktree, blackboard, promotion, bench, undo, operation, rev-list, \
+             verify, gate-slice, authority, reclaim, gc, clean, prune, fsck, clone, repack, remote, fetch, push, pull, config, submodule, \
+             project, quality, quarantine, archive, unarchive, bundle, blame, bisect, daemon, notes, replace, commit-graph, sparse-checkout, \
+             maintenance, rerere, unpack-objects, index-pack, diagnostics, version, help."
         ),
     )
 }
