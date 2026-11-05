@@ -411,6 +411,12 @@ fn require_transport(operation: &str, remote_target: &str, url: &str) -> Transpo
 
 /// Executes local loopback fetch without network sockets.
 fn execute_loopback_fetch(ctx: &CliContext, scheme: TransportScheme, remote_target: &str, target_url: &str) {
+    if scheme == TransportScheme::LocalFile {
+        if let Some(src_git) = super::remote_sync::resolve_source_git_dir(target_url) {
+            super::remote_sync::sync_local_repository_fetch(ctx, &src_git, remote_target, target_url);
+            return;
+        }
+    }
     let loopback = LoopbackTransport::new(target_url);
     let advertised_refs = loopback.list_refs().unwrap_or_default();
 
@@ -536,6 +542,21 @@ fn execute_loopback_pull(
     target_url: &str,
 ) {
     execute_loopback_fetch(ctx, scheme, remote_target, target_url);
+    if scheme == TransportScheme::LocalFile {
+        let fetch_head = ctx.git_dir.join("FETCH_HEAD");
+        if fetch_head.is_file() {
+            let mut merge_args = ctx.args.clone();
+            merge_args.clear();
+            merge_args.push("FETCH_HEAD".to_string());
+            let merge_ctx = CliContext {
+                git_dir: ctx.git_dir.clone(),
+                args: merge_args,
+                json_mode: ctx.json_mode,
+            };
+            super::merge::handle_merge(&merge_ctx);
+            return;
+        }
+    }
     if !ctx.json_mode {
         println!("Already up to date.");
     }

@@ -66,6 +66,7 @@ pub mod reflog;
 pub mod refs;
 pub mod relocate;
 pub mod remote;
+pub mod remote_sync;
 pub mod repack;
 pub mod repo_view;
 pub mod reset;

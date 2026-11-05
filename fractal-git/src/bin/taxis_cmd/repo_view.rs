@@ -474,7 +474,8 @@ impl RepoView {
             if let Some(target) = trimmed.strip_prefix(SYMBOLIC_PREFIX) {
                 return self.lookup_reference(target.trim());
             }
-            if let Ok(oid) = Oid::from_hex(trimmed) {
+            let first_token = trimmed.split_whitespace().next().unwrap_or(trimmed);
+            if let Ok(oid) = Oid::from_hex(first_token) {
                 return Ok(Some(oid));
             }
         }

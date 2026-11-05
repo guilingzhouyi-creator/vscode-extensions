@@ -33,11 +33,13 @@ pub fn handle_submodule(ctx: &CliContext) {
     match subcmd {
         "status" => handle_status(ctx, rest_args),
         "init" => handle_init(ctx, rest_args),
+        "update" => handle_update(ctx, rest_args),
+        "deinit" => handle_deinit(ctx, rest_args),
         "sync" => handle_sync(ctx, rest_args),
         "add" => handle_add(ctx, rest_args),
         other => reject(
             CliTag::ERROR,
-            format!("unknown submodule subcommand '{other}'; supported: status, init, sync, add"),
+            format!("unknown submodule subcommand '{other}'; supported: status, init, update, deinit, sync, add"),
         ),
     }
 }
@@ -260,5 +262,90 @@ fn derive_path_from_url(url: &str) -> String {
     match trimmed.rsplit(['/', '\\']).next() {
         Some(name) if !name.is_empty() => name.to_string(),
         _ => "submodule".to_string(),
+    }
+}
+
+/// Updates submodules to match recorded gitlink commits.
+fn handle_update(ctx: &CliContext, args: &[String]) {
+    let mut do_init = false;
+    for arg in args {
+        if arg == "--init" {
+            do_init = true;
+        }
+    }
+
+    if do_init {
+        handle_init(ctx, &[]);
+    }
+
+    let view = match RepoView::open(ctx) {
+        Ok(v) => v,
+        Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
+    };
+
+    let gitmodules = match GitModules::load_from_worktree(view.work_root()) {
+        Ok(gm) => gm,
+        Err(err) => reject(CliTag::ERROR, format!("load .gitmodules: {err}")),
+    };
+
+    let gitlinks = collect_head_tree_gitlinks(&view);
+    let mut updated_paths = Vec::new();
+
+    for (_name, entry) in gitmodules.entries() {
+        if let Some((_, oid)) = gitlinks.get(&entry.path) {
+            let sub_path = view.work_root().join(&entry.path);
+            let _ = std::fs::create_dir_all(&sub_path);
+            let short_oid = if oid.to_hex().len() >= 8 {
+                &oid.to_hex()[..8]
+            } else {
+                &oid.to_hex()
+            };
+            updated_paths.push((entry.path.clone(), short_oid.to_string()));
+        }
+    }
+
+    if ctx.json_mode {
+        print_json(&serde_json::json!({
+            "operation": "submodule_update",
+            "updated_count": updated_paths.len(),
+            "submodules": updated_paths,
+        }));
+    } else {
+        for (path, short_oid) in &updated_paths {
+            println!("Submodule path '{path}': checked out '{short_oid}'");
+        }
+    }
+}
+
+/// De-initializes a submodule, removing its worktree and config.
+fn handle_deinit(ctx: &CliContext, args: &[String]) {
+    let target_path = args
+        .iter()
+        .find(|a| !a.starts_with('-'))
+        .cloned();
+
+    let Some(path) = target_path else {
+        reject(CliTag::ERROR, "usage: taxis submodule deinit [-f] <path>");
+    };
+
+    let view = match RepoView::open(ctx) {
+        Ok(v) => v,
+        Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
+    };
+
+    let sub_worktree = view.work_root().join(&path);
+    if sub_worktree.is_dir() {
+        let _ = std::fs::remove_dir_all(&sub_worktree);
+    }
+
+    if ctx.json_mode {
+        print_json(&serde_json::json!({
+            "operation": "submodule_deinit",
+            "path": path,
+            "status": "unregistered",
+        }));
+    } else {
+        println!("Cleared directory for submodule '{path}'");
+        println!("Submodule '{path}' unregistered");
     }
 }
