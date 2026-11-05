@@ -81,7 +81,7 @@ impl DagWalker {
 
     /// Shared monotonic-cutoff max-heap ancestor search powering both generation-number and CCD v2
     /// reachability checks (`D9`).
-    fn is_ancestor_by_cutoff<F>(
+    fn is_ancestor_by_cutoff<F, P>(
         ancestor: &Oid,
         descendant: &Oid,
         ancestor_cutoff: u64,
@@ -89,7 +89,8 @@ impl DagWalker {
         mut get_node: F,
     ) -> bool
     where
-        F: FnMut(&Oid) -> Option<(u64, Vec<Oid>)>,
+        F: FnMut(&Oid) -> Option<(u64, P)>,
+        P: Into<SmallParentList>,
     {
         if ancestor == descendant {
             return true;
@@ -100,7 +101,7 @@ impl DagWalker {
 
         let mut visited: FastOidSet = FastOidSet::default();
         let mut heap: BinaryHeap<QueueItem> = BinaryHeap::new();
-        let mut node_cache: FastOidMap<Vec<Oid>> = FastOidMap::default();
+        let mut node_cache: FastOidMap<SmallParentList> = FastOidMap::default();
 
         heap.push(QueueItem {
             gen: descendant_cutoff,
@@ -118,12 +119,12 @@ impl DagWalker {
 
             let Some(parents) = node_cache
                 .remove(&item.oid)
-                .or_else(|| get_node(&item.oid).map(|(_, parents)| parents))
+                .or_else(|| get_node(&item.oid).map(|(_, parents)| parents.into()))
             else {
                 continue;
             };
 
-            for parent in parents {
+            for &parent in parents.as_slice() {
                 if &parent == ancestor {
                     return true;
                 }
@@ -138,7 +139,7 @@ impl DagWalker {
                         gen: p_cutoff,
                         oid: parent,
                     });
-                    node_cache.insert(parent, p_parents);
+                    node_cache.insert(parent, p_parents.into());
                 }
             }
         }
@@ -164,6 +165,20 @@ impl DagWalker {
         Self::is_ancestor_by_cutoff(ancestor, descendant, ancestor_gen, descendant_gen, get_node)
     }
 
+    /// Generation-number accelerated ancestor evaluation accepting zero-allocation [`SmallParentList`].
+    pub fn is_ancestor_with_generation_small<F>(
+        ancestor: &Oid,
+        descendant: &Oid,
+        ancestor_gen: u64,
+        descendant_gen: u64,
+        get_node: F,
+    ) -> bool
+    where
+        F: FnMut(&Oid) -> Option<(u64, SmallParentList)>,
+    {
+        Self::is_ancestor_by_cutoff(ancestor, descendant, ancestor_gen, descendant_gen, get_node)
+    }
+
     /// Corrected Commit Date (CCD v2) accelerated ancestor evaluation.
     /// Fast-path invariant: If ancestor_ccd >= descendant_ccd and ancestor != descendant,
     /// returns false in O(1) time.
@@ -177,6 +192,32 @@ impl DagWalker {
     ) -> bool
     where
         F: FnMut(&Oid) -> Option<(CorrectedCommitDate, Vec<Oid>)>,
+    {
+        if ancestor == descendant {
+            return true;
+        }
+        if !ancestor_ccd.can_be_ancestor_of(&descendant_ccd) {
+            return false;
+        }
+        Self::is_ancestor_by_cutoff(
+            ancestor,
+            descendant,
+            ancestor_ccd.0,
+            descendant_ccd.0,
+            |oid| get_node(oid).map(|(ccd, parents)| (ccd.0, parents)),
+        )
+    }
+
+    /// CCD v2 accelerated ancestor evaluation accepting zero-allocation [`SmallParentList`].
+    pub fn is_ancestor_with_ccd_small<F>(
+        ancestor: &Oid,
+        descendant: &Oid,
+        ancestor_ccd: CorrectedCommitDate,
+        descendant_ccd: CorrectedCommitDate,
+        mut get_node: F,
+    ) -> bool
+    where
+        F: FnMut(&Oid) -> Option<(CorrectedCommitDate, SmallParentList)>,
     {
         if ancestor == descendant {
             return true;
