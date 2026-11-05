@@ -13,7 +13,9 @@ pub enum BenchmarkLevel {
     Level1Micro,
     Level2Scale,
     Level3Macro,
+    Level4E2E,
     All,
+    AllWithE2E,
 }
 
 /// Build profile a measurement was taken in.

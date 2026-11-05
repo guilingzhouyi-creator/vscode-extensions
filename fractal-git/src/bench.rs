@@ -27,9 +27,11 @@ use fg_pools::buffer_pool::{BufferSizeClass, PageBufferPool};
 use fg_pools::lru_cache::ByteLruCache;
 use fg_topology::PromotionStagingLedger;
 
+pub mod e2e;
 pub mod guard;
 pub mod profile;
 
+pub use e2e::{E2eBenchmarkOptions, E2eBenchmarkReport, E2eBenchmarkRunner, E2eWorkload};
 pub use profile::{BenchmarkLevel, BenchmarkProfile};
 
 /// Single benchmark metric record.
@@ -78,7 +80,10 @@ impl TaxisBenchmarkSuite {
         let mult = if multiplier == 0 { 1 } else { multiplier };
         let mut metrics = Vec::new();
 
-        if matches!(level, BenchmarkLevel::Level1Micro | BenchmarkLevel::All) {
+        if matches!(
+            level,
+            BenchmarkLevel::Level1Micro | BenchmarkLevel::All | BenchmarkLevel::AllWithE2E
+        ) {
             metrics.push(Self::fastest_of_samples(|| {
                 Self::bench_canonical_tree_diff(100 * mult)
             }));
@@ -117,7 +122,10 @@ impl TaxisBenchmarkSuite {
             }));
         }
 
-        if matches!(level, BenchmarkLevel::Level2Scale | BenchmarkLevel::All) {
+        if matches!(
+            level,
+            BenchmarkLevel::Level2Scale | BenchmarkLevel::All | BenchmarkLevel::AllWithE2E
+        ) {
             metrics.push(Self::fastest_of_samples(|| {
                 Self::bench_dag_poset_scale_traversal(100 * mult)
             }));
@@ -126,7 +134,10 @@ impl TaxisBenchmarkSuite {
             }));
         }
 
-        if matches!(level, BenchmarkLevel::Level3Macro | BenchmarkLevel::All) {
+        if matches!(
+            level,
+            BenchmarkLevel::Level3Macro | BenchmarkLevel::All | BenchmarkLevel::AllWithE2E
+        ) {
             metrics.push(Self::fastest_of_samples(|| {
                 Self::bench_monorepo_10k_sparse_tree_diff(50 * mult)
             }));
@@ -142,6 +153,16 @@ impl TaxisBenchmarkSuite {
             profile: BenchmarkProfile::current(),
             metrics,
         }
+    }
+
+    /// Executes the single-threaded End-to-End clone & progressive projection benchmark.
+    ///
+    /// # Errors
+    /// Returns `fg_core::error::FractalError` if benchmark trial fails.
+    pub fn run_e2e_suite(
+        options: &e2e::E2eBenchmarkOptions,
+    ) -> fg_core::error::FractalResult<e2e::E2eBenchmarkReport> {
+        e2e::E2eBenchmarkRunner::run_benchmark(options)
     }
 
     /// Number of independent timed runs folded into one reported metric.
