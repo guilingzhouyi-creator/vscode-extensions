@@ -21,6 +21,8 @@
 const assert = require('assert');
 const { RingBufferBus } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testCapacityAndFifoOrdering() {
   console.log('1. Testing capacity normalization and basic FIFO ordering...');
   // Request capacity 20 -> should normalize to 32 (next power of 2)
@@ -162,7 +164,4 @@ async function runAll() {
   console.log('\n=== All Ring Buffer Bus tests passed successfully! ===');
 }
 
-runAll().catch((err) => {
-  console.error('\n❌ Verification failed with error:', err);
-  process.exit(1);
-});
+runEntry('validate-ring-buffer-bus.js', runAll);

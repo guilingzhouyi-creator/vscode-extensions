@@ -22,6 +22,8 @@ const {
   getRoleBudget,
 } = require('../dist/core/intelligence/elastic-budget-matrix');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testLineSpectrumClassification() {
   console.log('1. Testing analyzeCodeDensity line spectrum classification...');
 
@@ -201,7 +203,4 @@ async function runAll() {
   console.log('\n=== All Code Density & Elastic Budget tests passed successfully! ===');
 }
 
-runAll().catch((err) => {
-  console.error('\n❌ Verification failed:', err);
-  process.exit(1);
-});
+runEntry('validate-code-density.js', runAll);

@@ -18,6 +18,8 @@
 const assert = require('assert');
 const { evaluateChangeQuality } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('=== [Change Quality Arbiter] Testing ChangeScore & Anti-Gaming Guard ===\n');
 
@@ -169,7 +171,4 @@ export class HeavyService {
   console.log('\n🎉 ALL CHANGE QUALITY ARBITER & ANTI-GAMING TESTS PASSED!');
 }
 
-main().catch((err) => {
-  console.error('❌ Validation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-change-quality-arbiter.js', main);

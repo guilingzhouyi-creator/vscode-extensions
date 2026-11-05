@@ -16,6 +16,8 @@
  */
 
 const assert = require('assert');
+const { runEntry } = require('./common/test-runner-harness');
+
 const {
   BidirectionalAuditScheduler,
   SwaBoundedReplayManager,
@@ -331,7 +333,4 @@ async function main() {
   console.log('=== ALL PHASE 2 VALIDATION TESTS PASSED (5/5) ===');
 }
 
-main().catch((validationError) => {
-  console.error('Phase 2 validation failed:', validationError);
-  process.exit(1);
-});
+runEntry('validate-bidirectional-swa.js', main);

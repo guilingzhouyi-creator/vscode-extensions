@@ -21,6 +21,8 @@
 const assert = require('assert');
 const { TopologyCacheManager, computeContentHash } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testBasicHitAndL2Promotion() {
   console.log('1. Testing L1 hit and L2 promotion...');
   const cache = new TopologyCacheManager(10);
@@ -184,7 +186,4 @@ async function runAll() {
   console.log('\n=== All Topology Cache tests passed successfully! ===');
 }
 
-runAll().catch((err) => {
-  console.error('\n❌ Verification failed with error:', err);
-  process.exit(1);
-});
+runEntry('validate-topology-cache.js', runAll);

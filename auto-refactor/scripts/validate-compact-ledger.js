@@ -25,6 +25,8 @@ const {
 } = require('../dist/core/trajectory/compact-ledger-store');
 const { getIsoWeekId, compactLedger } = require('../dist/core/trajectory/trajectory-compactor');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function runTests() {
   console.log('🧪 Running Compact Ledger & Trajectory Compaction Validation Suite...');
 
@@ -179,7 +181,4 @@ async function runTests() {
   }
 }
 
-runTests().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+runEntry('validate-compact-ledger.js', runTests);

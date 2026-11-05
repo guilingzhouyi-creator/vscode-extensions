@@ -23,6 +23,8 @@ const {
   defaultPraxisGovernanceService,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('=== [Universal Rules] Testing Universal Rule Pyramid & Praxis Diff Subsystem ===\n');
 
@@ -209,7 +211,4 @@ export function login(user: string): boolean {
   console.log('================================================================\n');
 }
 
-main().catch((err) => {
-  console.error('✖ BLOCK validate-universal-rules failed:', err);
-  process.exit(1);
-});
+runEntry('validate-universal-rules.js', main);

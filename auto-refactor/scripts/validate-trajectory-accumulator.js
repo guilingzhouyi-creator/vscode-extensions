@@ -15,6 +15,8 @@ const fs = require('fs');
 const path = require('path');
 const { TrajectoryAccumulator, readLifetimeSummary, readRecentRecords } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const TEST_LEDGER_DIR = path.join(__dirname, '..', 'tmp', 'test-trajectory-accumulator');
 
 async function cleanTestDir() {
@@ -171,7 +173,4 @@ async function runValidation() {
   console.log('✅ ALL TRAJECTORY ACCUMULATOR VALIDATION CHECKS PASSED');
 }
 
-runValidation().catch((err) => {
-  console.error('❌ Validation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-trajectory-accumulator.js', runValidation);

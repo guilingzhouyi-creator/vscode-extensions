@@ -16,6 +16,8 @@
 const assert = require('assert');
 const { SemanticGraph } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('=== [Semantic IR] Testing Unified Semantic IR & Graph Engine ===\n');
 
@@ -175,7 +177,4 @@ async function main() {
   console.log('================================================================\n');
 }
 
-main().catch((err) => {
-  console.error('✖ BLOCK validate-semantic-ir failed:', err);
-  process.exit(1);
-});
+runEntry('validate-semantic-ir.js', main);

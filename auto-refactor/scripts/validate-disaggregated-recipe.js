@@ -30,6 +30,8 @@ const {
   RECIPE_VERSION,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('=== [1/5] Testing PersistentReviewFactStore 72h Sliding Window & Pruning ===');
 
@@ -215,7 +217,4 @@ async function main() {
   console.log('=== ALL PHASE 4 VALIDATION TESTS PASSED (5/5) ===');
 }
 
-main().catch((err) => {
-  console.error('Phase 4 validation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-disaggregated-recipe.js', main);

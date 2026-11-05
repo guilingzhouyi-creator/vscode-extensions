@@ -28,6 +28,8 @@ const {
   TaskPriority,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testEndToEndScalablePipeline() {
   console.log('1. Testing End-to-End Scalable Pipeline with Agent OS and Tensor Convergence...');
 
@@ -183,7 +185,4 @@ async function runAll() {
   console.log('\n=== All Scalable Architecture End-to-End tests passed successfully! ===');
 }
 
-runAll().catch((err) => {
-  console.error('\n❌ Verification failed with error:', err);
-  process.exit(1);
-});
+runEntry('validate-scalable-e2e.js', runAll);

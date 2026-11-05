@@ -28,6 +28,8 @@ const {
   computeDynamicHotspotRisk,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log(
     '=== [Dynamic Analysis Plane] Testing Dynamic Quality Model & D_i = B_i * F_i * R_i * V_i ===\n',
@@ -185,7 +187,4 @@ async function main() {
   console.log('\n🎉 ALL DYNAMIC ANALYSIS PLANE TESTS PASSED!');
 }
 
-main().catch((err) => {
-  console.error('❌ Validation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-dynamic-quality-model.js', main);

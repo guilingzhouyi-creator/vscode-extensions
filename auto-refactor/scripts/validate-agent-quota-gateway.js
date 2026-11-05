@@ -21,6 +21,8 @@
 const assert = require('assert');
 const { AgentQuotaGateway, TaskPriority, DEFAULT_TIER_QUOTAS } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testTierRegistrationAndBasicLease() {
   console.log('1. Testing agent tier registration and lease lifecycle...');
   assert.ok(DEFAULT_TIER_QUOTAS.interactive, 'DEFAULT_TIER_QUOTAS should define interactive tier');
@@ -148,7 +150,4 @@ async function runAll() {
   console.log('\n=== All Agent Quota Gateway tests passed successfully! ===');
 }
 
-runAll().catch((err) => {
-  console.error('\n❌ Verification failed with error:', err);
-  process.exit(1);
-});
+runEntry('validate-agent-quota-gateway.js', runAll);

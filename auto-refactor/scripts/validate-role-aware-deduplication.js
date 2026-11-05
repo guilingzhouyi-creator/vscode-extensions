@@ -17,6 +17,8 @@ const path = require('path');
 
 const { scan } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testRoleAwareDeduplication() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-role-dedup-'));
   try {
@@ -100,7 +102,4 @@ async function testRoleAwareDeduplication() {
   }
 }
 
-testRoleAwareDeduplication().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+runEntry('validate-role-aware-deduplication.js', testRoleAwareDeduplication);

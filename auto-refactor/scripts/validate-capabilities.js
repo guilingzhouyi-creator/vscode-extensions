@@ -37,6 +37,8 @@ const {
 const { ModuleDependencyGraph } = require('../dist/core/dependency-graph');
 const { SecretsAnalyzer } = require('../dist/analyzers/secrets');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 /**
  * Run all seven capability-validation groups in order and reject on the first failed
  * assertion.
@@ -277,7 +279,4 @@ export class PaymentController {
   console.log('================================================================');
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+runEntry('validate-capabilities.js', main);

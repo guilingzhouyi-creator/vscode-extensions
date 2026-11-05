@@ -21,6 +21,8 @@ const {
   buildCanonicalSymbolId,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log(
     '=== [Language Adapters] Testing Multi-Language Semantic Adapters & AST Bridge ===\n',
@@ -186,7 +188,4 @@ def standalone_helper(x, y, z):
   console.log('================================================================\n');
 }
 
-main().catch((err) => {
-  console.error('✖ BLOCK validate-language-adapters failed:', err);
-  process.exit(1);
-});
+runEntry('validate-language-adapters.js', main);

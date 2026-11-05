@@ -32,6 +32,8 @@ const {
   RULE_REGISTRY,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 /**
  * Policy floor for registered rules.
  *
@@ -182,7 +184,4 @@ async function main() {
   console.log('================================================================');
 }
 
-main().catch((err) => {
-  console.error('Baseline Freeze verification failed:', err);
-  process.exit(1);
-});
+runEntry('validate-baseline-freeze.js', main);

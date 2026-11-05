@@ -25,6 +25,8 @@ const path = require('path');
 
 const { scan, scanAndRender } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 /** Config shared by both fixtures; only the suppression list differs between them. */
 const BASE_CONFIG = {
   include: ['src/**/*.ts'],
@@ -139,7 +141,4 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error('[validate-suppression-gate] FAILED:', error && error.message);
-  process.exit(1);
-});
+runEntry('validate-suppression-gate.js', main);

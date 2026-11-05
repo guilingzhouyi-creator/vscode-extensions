@@ -20,6 +20,8 @@
 const assert = require('assert');
 const { FeedbackIncidentLedger, FeedbackAdaptiveSupervisor } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('=== [Feedback Adaptive Supervisor] Testing Closed-Loop Governance ===\n');
 
@@ -203,7 +205,4 @@ async function main() {
   console.log('\n✔ ALL FEEDBACK ADAPTIVE SUPERVISION TESTS PASSED!');
 }
 
-main().catch((err) => {
-  console.error('\n✖ [FEEDBACK ADAPTIVE SUPERVISOR TEST FAILED]:', err);
-  process.exit(1);
-});
+runEntry('validate-feedback-adaptive-supervisor.js', main);

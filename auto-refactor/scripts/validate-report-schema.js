@@ -24,6 +24,8 @@ const path = require('path');
 
 const Ajv = require('ajv');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 const ROOT = path.join(__dirname, '..');
 const SCHEMA_PATH = path.join(ROOT, 'report.schema.json');
 
@@ -140,7 +142,4 @@ async function run() {
   console.log('\nALL REPORT SCHEMA CHECKS PASSED SUCCESSFULLY!');
 }
 
-run().catch((err) => {
-  console.error('\n✖ BLOCK', err && err.message ? err.message : err);
-  process.exit(1);
-});
+runEntry('validate-report-schema.js', run);

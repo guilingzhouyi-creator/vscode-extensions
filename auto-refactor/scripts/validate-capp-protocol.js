@@ -20,6 +20,8 @@ const {
   defaultPraxisSliceAuditService,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function testDirectiveFormatting() {
   console.log('1. Testing formatCompactGuardDirective...');
   const mockIssue = {
@@ -143,7 +145,4 @@ async function main() {
   console.log('================================================================');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+runEntry('validate-capp-protocol.js', main);

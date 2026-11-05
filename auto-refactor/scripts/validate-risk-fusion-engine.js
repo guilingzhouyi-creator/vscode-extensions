@@ -25,6 +25,8 @@ const {
   computeDynamicHotspotRisk,
 } = require('../dist/api');
 
+const { runEntry } = require('./common/test-runner-harness');
+
 async function main() {
   console.log('=== [Feedback Fusion Layer] Testing Risk Fusion Engine & Unified Scoring ===\n');
 
@@ -193,7 +195,4 @@ async function main() {
   console.log('\n🎉 ALL FEEDBACK FUSION LAYER TESTS PASSED!');
 }
 
-main().catch((err) => {
-  console.error('❌ Validation failed:', err);
-  process.exit(1);
-});
+runEntry('validate-risk-fusion-engine.js', main);
