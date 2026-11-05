@@ -44,6 +44,7 @@ pub mod lineage;
 pub mod list_files;
 pub mod log;
 pub mod maintenance;
+pub mod maintenance_ops;
 pub mod merge;
 pub mod notes_replace;
 pub mod operation;

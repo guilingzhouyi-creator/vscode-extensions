@@ -20,10 +20,10 @@ use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
     am, apply, archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick,
     clone, commit, config, daemon, diff, doctor, format_patch, gate_slice, hash_object,
-    index_plumbing, init, inspect, lineage, log, maintenance, merge, notes_replace, operation,
-    pack_plumbing, plumbing_tree, project, projection, promotion, quality, quarantine, read,
-    rebase, reclaim, refs, relocate, remote, repack, reset, rev_list, revert, stage, stash, status,
-    submodule, tag, unarchive, undo, verify, worktree,
+    index_plumbing, init, inspect, lineage, log, maintenance, maintenance_ops, merge, notes_replace,
+    operation, pack_plumbing, plumbing_tree, project, projection, promotion, quality, quarantine,
+    read, rebase, reclaim, refs, relocate, remote, repack, reset, rev_list, revert, stage, stash,
+    status, submodule, tag, unarchive, undo, verify, worktree,
 };
 
 use fg_core::models::current_unix_seconds;
@@ -497,6 +497,21 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         canonical: "replace",
         aliases: &["replace"],
         handler: notes_replace::handle_replace,
+    },
+    CommandSpec {
+        canonical: "sparse-checkout",
+        aliases: &["sparse-checkout"],
+        handler: maintenance_ops::handle_sparse_checkout,
+    },
+    CommandSpec {
+        canonical: "maintenance",
+        aliases: &["maintenance"],
+        handler: maintenance_ops::handle_maintenance,
+    },
+    CommandSpec {
+        canonical: "rerere",
+        aliases: &["rerere"],
+        handler: maintenance_ops::handle_rerere,
     },
     CommandSpec {
         canonical: "unpack-objects",
