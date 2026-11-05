@@ -66,3 +66,15 @@ path = "tests/integration_cli.rs"
 [[test]]
 name = "integration_governance"
 path = "tests/integration_governance.rs"
+
+[[test]]
+name = "test_e2e_clone_benchmark"
+path = "tests/rust/test_e2e_clone_benchmark.rs"
+
+[[test]]
+name = "test_adversarial_projection"
+path = "tests/rust/test_adversarial_projection.rs"
+
+[[test]]
+name = "test_adversarial_durability"
+path = "tests/rust/test_adversarial_durability.rs"
