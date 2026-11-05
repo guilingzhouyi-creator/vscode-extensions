@@ -248,7 +248,7 @@ pub fn run_revision_diff(
 
 /// Parses flags and revisions.
 fn parse_request(args: &[String]) -> Result<DiffRequest, String> {
-    let (options, mut pathspecs) = super::path_filter::split_args_at_dashdash(args);
+    let (options, pathspecs) = super::path_filter::split_args_at_dashdash(args);
     let mut request = DiffRequest {
         scope: DiffScope::Worktree,
         context: DEFAULT_CONTEXT,
@@ -290,13 +290,7 @@ fn parse_request(args: &[String]) -> Result<DiffRequest, String> {
             other if other.starts_with('-') && other.len() > 1 => {
                 return Err(format!("diff does not support the flag '{other}'"));
             }
-            other => {
-                if request.revisions.len() >= 2 {
-                    pathspecs.push(other.to_string());
-                } else {
-                    request.revisions.push(other.to_string());
-                }
-            }
+            other => request.revisions.push(other.to_string()),
         }
     }
     request.pathspecs = pathspecs;
