@@ -529,6 +529,11 @@ const COMMAND_TABLE: &[CommandSpec] = &[
         handler: pack_plumbing::handle_index_pack,
     },
     CommandSpec {
+        canonical: "multi-pack-index",
+        aliases: &["multi-pack-index", "midx"],
+        handler: pack_plumbing::handle_multi_pack_index,
+    },
+    CommandSpec {
         canonical: "diagnostics",
         aliases: &["diagnostics", "diag"],
         handler: diagnostics_tool::handle_diagnostics,
@@ -670,6 +675,7 @@ Native Fractal Commands (with Git Alias Mappings):
   rerere             Reuse recorded resolution of conflicted merges (status, clear, diff)
   unpack-objects     Unpack objects from a packed archive on stdin into loose store
   index-pack         Build pack index file for an existing packed archive (-o)
+  multi-pack-index   Write or verify Multi-Pack Index (MIDX) files for object packs (write, verify)
   diagnostics, diag  Passive commercial JSONL logging inspector and stats report
   version,  -v       Display version and domain rules SSOT
 
@@ -901,7 +907,7 @@ fn reject_unimplemented(subcommand: &str) -> ! {
              mktag, name-rev, verify-commit, verify-tag, stash, rebase, worktree, blackboard, promotion, bench, undo, operation, rev-list, \
              verify, gate-slice, authority, reclaim, gc, clean, prune, fsck, clone, repack, remote, fetch, push, pull, config, submodule, \
              project, quality, quarantine, archive, unarchive, bundle, blame, bisect, daemon, notes, replace, commit-graph, sparse-checkout, \
-             maintenance, rerere, unpack-objects, index-pack, diagnostics, version, help."
+             maintenance, rerere, unpack-objects, index-pack, multi-pack-index, diagnostics, version, help."
         ),
     )
 }

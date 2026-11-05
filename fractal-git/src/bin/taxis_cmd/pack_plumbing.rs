@@ -157,3 +157,65 @@ pub fn handle_unpack_objects(ctx: &CliContext) {
         println!("Unpacked {unpacked_count} object(s)");
     }
 }
+
+/// Dispatches `taxis multi-pack-index`.
+pub fn handle_multi_pack_index(ctx: &CliContext) {
+    let view = RepoView::open_or_exit(ctx);
+    let pack_dir = view.git_dir().join("objects/pack");
+    let action = ctx.args.first().map(String::as_str).unwrap_or("write");
+    match action {
+        "write" => {
+            match fg_storage::MultiPackIndex::write_midx(&pack_dir) {
+                Ok(path) => {
+                    if let Ok(midx) = fg_storage::MultiPackIndex::load(&path) {
+                        if ctx.json_mode {
+                            print_json(&serde_json::json!({
+                                "status": "ok",
+                                "objects": midx.object_count(),
+                                "packs": midx.pack_names().len(),
+                                "path": path.display().to_string(),
+                            }));
+                        } else {
+                            println!(
+                                "Wrote multi-pack-index with {} objects across {} pack(s)",
+                                midx.object_count(),
+                                midx.pack_names().len()
+                            );
+                        }
+                    } else {
+                        println!("Wrote multi-pack-index at {}", path.display());
+                    }
+                }
+                Err(err) => reject(CliTag::ERROR, format!("write multi-pack-index failed: {err}")),
+            }
+        }
+        "verify" => {
+            let midx_path = pack_dir.join("multi-pack-index");
+            if !midx_path.is_file() {
+                reject(CliTag::ERROR, "no multi-pack-index found to verify");
+            }
+            match fg_storage::MultiPackIndex::load(&midx_path) {
+                Ok(midx) => {
+                    if ctx.json_mode {
+                        print_json(&serde_json::json!({
+                            "status": "ok",
+                            "objects": midx.object_count(),
+                            "packs": midx.pack_names().len(),
+                        }));
+                    } else {
+                        println!(
+                            "Verifying multi-pack-index: {} object(s) across {} pack(s) verified OK",
+                            midx.object_count(),
+                            midx.pack_names().len()
+                        );
+                    }
+                }
+                Err(err) => reject(CliTag::ERROR, format!("verify multi-pack-index failed: {err}")),
+            }
+        }
+        _ => reject(
+            CliTag::ERROR,
+            format!("unknown multi-pack-index action '{action}'; supported: write, verify"),
+        ),
+    }
+}

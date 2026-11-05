@@ -235,6 +235,11 @@ impl MultiPackIndex {
         raw.copy_from_slice(slice);
         Some(Oid::from_bytes(raw))
     }
+
+    /// Generates and writes a multi-pack index file from all `pack-*.idx` files in `pack_dir`.
+    pub fn write_midx(pack_dir: &Path) -> FractalResult<std::path::PathBuf> {
+        super::midx_writer::MidxWriter::write_midx(pack_dir)
+    }
 }
 
 /// Byte length of the trailing hash after the last chunk.

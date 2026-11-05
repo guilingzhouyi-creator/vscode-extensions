@@ -210,6 +210,8 @@ pub fn handle_maintenance(ctx: &CliContext) {
                 ..Default::default()
             };
             let _ = fg_storage::RepackEngine::repack_repository(view.git_dir(), &repack_opts);
+            let pack_dir = view.git_dir().join("objects/pack");
+            let _ = fg_storage::MultiPackIndex::write_midx(&pack_dir);
             if ctx.json_mode {
                 print_json(&serde_json::json!({
                     "status": "ok",
