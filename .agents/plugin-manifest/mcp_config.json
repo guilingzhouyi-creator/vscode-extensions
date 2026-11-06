@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "workspace-context7": {
+    "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"]
     },
-    "workspace-github": {
+    "github": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"]
     }

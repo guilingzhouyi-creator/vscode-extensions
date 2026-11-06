@@ -88,8 +88,8 @@
 
 ### 4. 外部工具服务 (`mcp_config.json`)
 提供前缀隔离的 MCP 服务：
-- `workspace-context7`：高效文档与上下文检索服务；
-- `workspace-github`：GitHub 仓库交互与协作工具。
+- `context7`：高效文档与上下文检索服务；
+- `github`：GitHub 仓库交互与协作工具。
 
 ### 5. DSH 治理模式族 (Agent Preset Family)
 在工作区内把 AGENTS.md 的治理公理从**提示词层**下沉到**运行时层**：四个 DSH 模式
