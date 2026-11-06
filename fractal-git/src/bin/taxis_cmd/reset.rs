@@ -27,7 +27,6 @@ use fractal_git::DiskRefStore;
 use super::checkout::{
     build_native_index_section, load_index_entries, materialize_files, plan_worktree_path,
     preflight_worktree_paths, remove_stale_files, update_dirc_index, update_references,
-    worktree_stat,
 };
 use super::common::{fail_fatal, print_json, reject, CliContext};
 use super::operation::{record_head_operation, HeadOperationSpec};
@@ -60,12 +59,74 @@ pub fn handle_reset(ctx: &CliContext) {
         Err(open_err) => fail_fatal(open_err),
     };
 
-    // Detect path-based unstage reset: `reset <path>`, `reset -- <path>`, `reset HEAD <path>`
+    let (commit_spec, path_specs) = split_reset_pathspecs(&view, &ctx.args);
+    if !path_specs.is_empty() {
+        handle_path_reset(&view, commit_spec.as_deref().unwrap_or("HEAD"), &path_specs);
+        return;
+    }
+
+    let opts = parse_reset_options(&ctx.args);
+    let (target_commit, tree_oid) = match view.resolve_tree(&opts.target) {
+        Ok(resolved) => resolved,
+        Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
+    };
+
+    let (target_files, current_files) = prepare_reset_trees(&view, opts.mode, &tree_oid);
+    let effective_branch = view
+        .head_branch()
+        .ok()
+        .flatten()
+        .map(|(branch_name, _)| branch_name);
+
+    assert_reset_trunk_allowed(
+        &view,
+        effective_branch.as_deref(),
+        (target_commit, opts.force),
+    );
+
+    // Git records the position it is leaving in ORIG_HEAD before it moves HEAD.
+    let previous_head = view
+        .effective_head_commit()
+        .ok()
+        .flatten()
+        .map(|(_, oid)| oid);
+    if let Some(previous) = previous_head.as_ref() {
+        if let Err(err) = DiskRefStore::new(view.git_dir()).write_orig_head(previous) {
+            fail_fatal(format!("write ORIG_HEAD: {err}"));
+        }
+    }
+
+    // Record snapshot to OperationGraph BEFORE state mutation for 100% reliable undo
+    record_reset_operation(
+        &view,
+        previous_head,
+        target_commit,
+        &opts,
+        effective_branch.as_deref(),
+    );
+
+    apply_reset_mode(
+        &view,
+        (opts.mode, target_commit, effective_branch.as_deref()),
+        (&current_files, &target_files),
+    );
+
+    // The branch update logs the branch it rewrote; Git keeps the matching entry on HEAD too.
+    if let Some(previous) = previous_head.as_ref() {
+        let message = format!("reset: moving to {}", opts.target);
+        DiskRefStore::new(view.git_dir()).record_head_move(previous, &target_commit, &message);
+    }
+
+    print_reset_feedback(ctx, &opts, target_commit, effective_branch.as_deref());
+}
+
+/// Splits `reset` arguments into an optional commit spec and pathspecs when unstaging paths.
+fn split_reset_pathspecs(view: &RepoView, args: &[String]) -> (Option<String>, Vec<String>) {
     let mut commit_spec: Option<String> = None;
     let mut path_specs: Vec<String> = Vec::new();
     let mut after_dash_dash = false;
 
-    for arg in &ctx.args {
+    for arg in args {
         if arg == "--" {
             after_dash_dash = true;
             continue;
@@ -86,79 +147,82 @@ pub fn handle_reset(ctx: &CliContext) {
             path_specs.push(arg.clone());
         }
     }
+    (commit_spec, path_specs)
+}
 
-    if !path_specs.is_empty() {
-        handle_path_reset(&view, commit_spec.as_deref().unwrap_or("HEAD"), &path_specs);
-        return;
-    }
-
-    let opts = parse_reset_options(&ctx.args);
-
-    let (target_commit, tree_oid) = match view.resolve_tree(&opts.target) {
-        Ok(resolved) => resolved,
-        Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
-    };
-
-    // Flatten and validate every path the reset would touch before the first state change: a
-    // hostile tree must fail while HEAD, the index, and the worktree still agree. `--soft` never
-    // touches a path, so it keeps Git's tolerance for a tree it will only point HEAD at.
+/// Flattens and validates trees for non-soft resets before any state change.
+fn prepare_reset_trees(
+    view: &RepoView,
+    mode: ResetMode,
+    tree_oid: &Oid,
+) -> (BTreeMap<String, TreeEntry>, BTreeMap<String, TreeEntry>) {
     let mut target_files = BTreeMap::new();
     let mut current_files = BTreeMap::new();
-    if opts.mode != ResetMode::Soft {
-        if let Err(diff_err) = flatten_tree_for_diff(&view, &tree_oid, "", &mut target_files) {
-            reject(CliTag::ERROR, diff_err);
-        }
-        if opts.mode == ResetMode::Hard {
-            current_files = view
-                .head_commit()
-                .ok()
-                .flatten()
-                .and_then(|head_oid| flatten_commit_tree(&view, &head_oid).ok())
-                .unwrap_or_default();
-        }
-        preflight_reset_paths(&view, &target_files, &current_files);
+    if mode == ResetMode::Soft {
+        return (target_files, current_files);
     }
-
-    let effective_branch = view
-        .head_branch()
-        .ok()
-        .flatten()
-        .map(|(branch_name, _)| branch_name);
-
-    // Guard 1: Protect System Trunk & Trunk from non-HEAD history rewriting
-    if let Some(ref br) = effective_branch {
-        if br == "main" || br == "trunk" || br == "refs/heads/main" || br == "refs/heads/trunk" {
-            let current_head = view.head_commit().ok().flatten();
-            if current_head != Some(target_commit) && !opts.force {
-                reject(
-                    CliTag::AUTHORITY_BREACH,
-                    format!(
-                        "Resetting protected trunk branch '{br}' backwards to {target_commit} is forbidden. \
-                         Trunk history is append-only; use 'taxis revert' instead."
-                    ),
-                );
-            }
-        }
+    if let Err(diff_err) = flatten_tree_for_diff(view, tree_oid, "", &mut target_files) {
+        reject(CliTag::ERROR, diff_err);
     }
-
-    // Record snapshot to OperationGraph BEFORE state mutation for 100% reliable undo
-    record_reset_operation(&view, target_commit, &opts, effective_branch.as_deref());
-
-    // Git records the position it is leaving in ORIG_HEAD before it moves HEAD.
-    let previous_head = view.head_commit().ok().flatten();
-    if let Some(previous) = previous_head.as_ref() {
-        if let Err(err) = DiskRefStore::new(view.git_dir()).write_orig_head(previous) {
-            fail_fatal(format!("write ORIG_HEAD: {err}"));
-        }
+    if mode == ResetMode::Hard {
+        current_files = view
+            .effective_head_commit()
+            .ok()
+            .flatten()
+            .and_then(|(_, head_oid)| flatten_commit_tree(view, &head_oid).ok())
+            .unwrap_or_default();
     }
+    preflight_reset_paths(view, &target_files, &current_files);
+    (target_files, current_files)
+}
 
-    match opts.mode {
+/// Protects trunk branches from non-forced history rewrites in Taxis-governed repositories.
+fn assert_reset_trunk_allowed(
+    view: &RepoView,
+    effective_branch: Option<&str>,
+    target_and_force: (Oid, bool),
+) {
+    if !fg_native::container_path(view.git_dir()).is_file() {
+        return;
+    }
+    let Some(br) = effective_branch else {
+        return;
+    };
+    let is_trunk =
+        br == "main" || br == "trunk" || br == "refs/heads/main" || br == "refs/heads/trunk";
+    if !is_trunk {
+        return;
+    }
+    let (target_commit, force) = target_and_force;
+    let Some(current_head) = view.head_commit().ok().flatten() else {
+        return;
+    };
+    if current_head != target_commit && !force {
+        reject(
+            CliTag::AUTHORITY_BREACH,
+            format!(
+                "Resetting protected trunk branch '{br}' backwards to {target_commit} is forbidden. \
+                 Trunk history is append-only; use 'taxis revert' instead."
+            ),
+        );
+    }
+}
+
+/// Executes reference, index, and worktree mutations for the selected reset mode.
+fn apply_reset_mode(
+    view: &RepoView,
+    spec: (ResetMode, Oid, Option<&str>),
+    trees: (&BTreeMap<String, TreeEntry>, &BTreeMap<String, TreeEntry>),
+) {
+    let (mode, target_commit, effective_branch) = spec;
+    let (current_files, target_files) = trees;
+    match mode {
         ResetMode::Soft => {
             update_references(
                 view.git_dir(),
                 view.work_root(),
                 target_commit,
-                effective_branch.as_deref(),
+                effective_branch,
             );
         }
         ResetMode::Mixed => {
@@ -166,31 +230,23 @@ pub fn handle_reset(ctx: &CliContext) {
                 view.git_dir(),
                 view.work_root(),
                 target_commit,
-                effective_branch.as_deref(),
+                effective_branch,
             );
-            rebuild_mixed_dirc_index(&view, &target_files);
+            rebuild_mixed_dirc_index(view, target_files);
         }
         ResetMode::Hard => {
-            remove_stale_files(view.work_root(), &current_files, &target_files);
-            remove_index_only_files(&view, &target_files);
-            let index_entries = materialize_files(&view, &target_files);
+            remove_stale_files(view.work_root(), current_files, target_files);
+            remove_index_only_files(view, target_files);
+            let index_entries = materialize_files(view, target_files);
             update_dirc_index(view.git_dir(), &index_entries);
             update_references(
                 view.git_dir(),
                 view.work_root(),
                 target_commit,
-                effective_branch.as_deref(),
+                effective_branch,
             );
         }
     }
-
-    // The branch update logs the branch it rewrote; Git keeps the matching entry on HEAD too.
-    if let Some(previous) = previous_head.as_ref() {
-        let message = format!("reset: moving to {}", opts.target);
-        DiskRefStore::new(view.git_dir()).record_head_move(previous, &target_commit, &message);
-    }
-
-    print_reset_feedback(ctx, &opts, target_commit, effective_branch.as_deref());
 }
 
 /// Parses command line flags into structured reset options.
@@ -283,20 +339,18 @@ fn rebuild_mixed_dirc_index(view: &RepoView, target_files: &BTreeMap<String, Tre
     let mut index_entries = Vec::with_capacity(target_files.len());
 
     for (path, tree_entry) in target_files {
-        let full_path = match plan_worktree_path(view.work_root(), path) {
-            Ok(full_path) => full_path,
-            Err(detail) => reject(CliTag::ERROR, detail),
-        };
-        let (size, mtime_sec, mtime_nano) = worktree_stat(&full_path, 0);
+        if let Err(detail) = plan_worktree_path(view.work_root(), path) {
+            reject(CliTag::ERROR, detail);
+        }
 
         index_entries.push(IndexEntry {
             path: path.clone(),
             mode: tree_entry.mode,
             oid: tree_entry.oid,
             stage: IndexStage::Normal,
-            size,
-            mtime_seconds: mtime_sec,
-            mtime_nanos: mtime_nano,
+            size: 0,
+            mtime_seconds: 0,
+            mtime_nanos: 0,
             assume_valid: false,
             skip_worktree: false,
             intent_to_add: false,
@@ -309,10 +363,28 @@ fn rebuild_mixed_dirc_index(view: &RepoView, target_files: &BTreeMap<String, Tre
 /// Records the reset operation in the OperationGraph for `undo` capability.
 fn record_reset_operation(
     view: &RepoView,
+    previous_head: Option<Oid>,
     target_commit: Oid,
     opts: &ResetOptions,
     branch_name: Option<&str>,
 ) {
+    if let Some(prev_oid) = previous_head {
+        if prev_oid != target_commit {
+            let needs_baseline = fractal_git::OperationGraph::load_or_init(view.git_dir())
+                .map(|g| g.current_head.is_none())
+                .unwrap_or(false);
+            if needs_baseline {
+                record_head_operation(HeadOperationSpec {
+                    git_dir: view.git_dir(),
+                    head_oid: prev_oid,
+                    branch_or_ref: branch_name,
+                    actor: "operator",
+                    command: "commit",
+                    description: format!("baseline before reset: {}", prev_oid.to_hex()),
+                });
+            }
+        }
+    }
     record_head_operation(HeadOperationSpec {
         git_dir: view.git_dir(),
         head_oid: target_commit,
@@ -378,11 +450,9 @@ fn handle_path_reset(view: &RepoView, commit_rev: &str, paths: &[String]) {
 
     for path in paths {
         if let Some(tree_entry) = head_files.get(path) {
-            let full_path = match plan_worktree_path(view.work_root(), path) {
-                Ok(fp) => fp,
-                Err(err) => reject(CliTag::ERROR, err),
-            };
-            let (size, mtime_sec, mtime_nano) = worktree_stat(&full_path, 0);
+            if let Err(err) = plan_worktree_path(view.work_root(), path) {
+                reject(CliTag::ERROR, err);
+            }
             index_entries.insert(
                 path.clone(),
                 IndexEntry {
@@ -390,9 +460,9 @@ fn handle_path_reset(view: &RepoView, commit_rev: &str, paths: &[String]) {
                     mode: tree_entry.mode,
                     oid: tree_entry.oid,
                     stage: IndexStage::Normal,
-                    size,
-                    mtime_seconds: mtime_sec,
-                    mtime_nanos: mtime_nano,
+                    size: 0,
+                    mtime_seconds: 0,
+                    mtime_nanos: 0,
                     assume_valid: false,
                     skip_worktree: false,
                     intent_to_add: false,
