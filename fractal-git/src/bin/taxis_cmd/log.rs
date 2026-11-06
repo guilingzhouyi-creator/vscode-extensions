@@ -28,7 +28,7 @@ use fg_topology::DiskRefStore;
 use fractal_git::constants::cli::CliTag;
 
 use super::commit_walk::{walk_commits, CommitRecord};
-use super::common::{fail_fatal, print_json, reject, CliContext};
+use super::common::{fail_fatal, reject, CliContext};
 use super::log_render::*;
 use super::repo_view::RepoView;
 
@@ -411,72 +411,6 @@ impl GraphRenderer {
     }
 }
 
-/// Renders `seconds` in the recorded zone as `Thu Oct 22 21:33:52 2026 +0800`.
-///
-/// The conversion is pure integer arithmetic on the recorded offset. A timezone database would be
-/// needed to name a zone, but the offset is what the commit actually stores, and inventing a zone
-/// name from an offset is wrong for every zone that observes daylight saving.
-fn format_date(seconds: i64, offset_minutes: i32) -> String {
-    let (year, month, day, hour, minute, second, weekday) =
-        civil_from_unix(seconds + i64::from(offset_minutes) * 60);
-    const MONTHS: [&str; 12] = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-    ];
-    const WEEKDAYS: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
-    let month_name = MONTHS.get((month - 1) as usize).copied().unwrap_or("---");
-    let weekday_name = WEEKDAYS.get(weekday as usize).copied().unwrap_or("---");
-    format!(
-        "{weekday_name} {month_name} {day} {hour:02}:{minute:02}:{second:02} {year} {}",
-        offset_text(offset_minutes)
-    )
-}
-
-/// Renders `seconds` in the recorded zone as ISO 8601: `2026-10-22T21:33:52+08:00`.
-fn format_iso(seconds: i64, offset_minutes: i32) -> String {
-    let (year, month, day, hour, minute, second, _) =
-        civil_from_unix(seconds + i64::from(offset_minutes) * 60);
-    let offset = offset_text(offset_minutes);
-    let colon = format!("{}:{}", &offset[..3], &offset[3..]);
-    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}{colon}")
-}
-
-/// Renders an offset in minutes as `±HHMM`.
-fn offset_text(offset_minutes: i32) -> String {
-    let sign = if offset_minutes < 0 { '-' } else { '+' };
-    let total = offset_minutes.abs();
-    format!("{sign}{:02}{:02}", total / 60, total % 60)
-}
-
-/// Converts a Unix timestamp to `(year, month, day, hour, minute, second, weekday)` in UTC.
-///
-/// This is Howard Hinnant's civil-from-days algorithm. It is used instead of a calendar crate
-/// because the workspace dependency set does not include one for this crate, and the algorithm is
-/// exact for every representable timestamp: it has no leap-second branch, which is deliberate —
-/// Unix time does not count leap seconds either.
-fn civil_from_unix(seconds: i64) -> (i64, u32, u32, u32, u32, u32, u32) {
-    let days = seconds.div_euclid(86_400);
-    let seconds_of_day = seconds.rem_euclid(86_400);
-    let hour = (seconds_of_day / 3600) as u32;
-    let minute = ((seconds_of_day % 3600) / 60) as u32;
-    let second = (seconds_of_day % 60) as u32;
-
-    // 1970-01-01 was a Thursday, which is index 0 in a week starting at Thursday.
-    let weekday = days.rem_euclid(7) as u32;
-
-    let shifted = days + 719_468;
-    let era = shifted.div_euclid(146_097);
-    let day_of_era = shifted.rem_euclid(146_097);
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let year = year_of_era + era * 400;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let mp = (5 * day_of_year + 2) / 153;
-    let day = (day_of_year - (153 * mp + 2) / 5 + 1) as u32;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    let year = if month <= 2 { year + 1 } else { year };
-    (year, month, day, hour, minute, second, weekday)
-}
-
 pub(crate) struct ShowRequest {
     pub(crate) revision: String,
     pub(crate) part: ShowPart,
@@ -568,43 +502,6 @@ fn try_show_blob_spec(view: &RepoView, revision: &str) -> bool {
         return true;
     }
     false
-}
-
-/// Renders `log` output as JSON.
-fn report_log_json(records: &[CommitRecord], request: &LogRequest) {
-    let entries: Vec<serde_json::Value> = records
-        .iter()
-        .map(|record| {
-            serde_json::json!({
-                "oid": record.oid.to_hex(),
-                "tree": record.tree.to_hex(),
-                "parents": record.parents.iter().map(|oid| oid.to_hex()).collect::<Vec<String>>(),
-                "author": {
-                    "name": record.author_name,
-                    "email": record.author_mailbox,
-                    "time": record.author_time,
-                    "offset": offset_text(record.author_offset_minutes),
-                },
-                "committer": {
-                    "name": record.committer_name,
-                    "email": record.committer_mailbox,
-                    "time": record.committer_time,
-                    "offset": offset_text(record.committer_offset_minutes),
-                },
-                "subject": record.subject(),
-                "message": record.message,
-                "agent_authored": record.is_agent_authored(),
-            })
-        })
-        .collect();
-    let payload = serde_json::json!({
-        "engine": "taxis",
-        "operation": "log",
-        "revision": request.revision,
-        "entry_count": entries.len(),
-        "commits": entries,
-    });
-    print_json(&payload);
 }
 
 #[cfg(test)]
