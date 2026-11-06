@@ -8,36 +8,12 @@
 //! Domain Governance Rules: FGT-COR-001, FGT-CLI-001.
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::PathBuf;
 
-static SCRATCH_COUNTER: AtomicUsize = AtomicUsize::new(0);
+use crate::cli_harness::run_taxis;
 
 fn scratch_repo(label: &str) -> PathBuf {
-    let count = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = fs::create_dir_all(&base);
-    let path = base.join(format!(
-        "taxis_maint_{}_{}_{}",
-        std::process::id(),
-        count,
-        label
-    ));
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(&path).expect("scratch repository");
-    path
-}
-
-fn run_taxis(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_taxis"))
-        .args(args)
-        .current_dir(repo)
-        .output()
-        .expect("the built taxis binary must be runnable")
+    crate::cli_harness::scratch_repo("taxis_maint", label)
 }
 
 #[test]

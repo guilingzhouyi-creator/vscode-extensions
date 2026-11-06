@@ -8,36 +8,12 @@
 //! Domain Governance Rules: FGT-COR-001, FGT-CLI-001.
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::PathBuf;
 
-static SCRATCH_COUNTER: AtomicUsize = AtomicUsize::new(0);
+use crate::cli_harness::run_taxis;
 
 fn scratch_repo(label: &str) -> PathBuf {
-    let count = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = fs::create_dir_all(&base);
-    let path = base.join(format!(
-        "taxis_wt_co_{}_{}_{}",
-        std::process::id(),
-        count,
-        label
-    ));
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(&path).expect("scratch repository");
-    path
-}
-
-fn run_taxis(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_taxis"))
-        .args(args)
-        .current_dir(repo)
-        .output()
-        .expect("the built taxis binary must be runnable")
+    crate::cli_harness::scratch_repo("taxis_wt_co", label)
 }
 
 #[test]
@@ -48,7 +24,10 @@ fn test_checkout_new_branch_on_unborn_head() {
 
     // Switch to new branch when HEAD is unborn
     let co_out = run_taxis(&repo, &["checkout", "-b", "feature/unborn-test"]);
-    assert!(co_out.status.success(), "checkout -b on unborn HEAD must succeed");
+    assert!(
+        co_out.status.success(),
+        "checkout -b on unborn HEAD must succeed"
+    );
     let stderr = String::from_utf8_lossy(&co_out.stderr);
     assert!(stderr.contains("Switched to a new branch 'feature/unborn-test'"));
 

@@ -9,36 +9,10 @@
 //! and the absence of output rather than through text, which is how a shell conditional consumes it.
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
-/// Creates a temporary directory inside the crate's `target/` tree.
-fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = std::fs::create_dir_all(&base);
-    tempfile::Builder::new()
-        .prefix(prefix)
-        .tempdir_in(&base)
-        .or_else(|_| tempfile::tempdir())
-        .expect("create test tempdir")
-}
-
-/// Runs taxis in `dir`, returning (exit code, stdout, stderr).
-fn run_in(dir: &Path, args: &[&str]) -> (i32, String, String) {
-    let output = Command::new(env!("CARGO_BIN_EXE_taxis"))
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .expect("taxis must run");
-    (
-        output.status.code().unwrap_or(-1),
-        String::from_utf8_lossy(&output.stdout).to_string(),
-        String::from_utf8_lossy(&output.stderr).to_string(),
-    )
-}
+use crate::cli_harness::{run_in, test_temp_dir};
 
 /// Initializes a repository and creates one commit, returning its object id.
 fn repo_with_commit(dir: &Path) -> String {
@@ -135,7 +109,11 @@ fn update_ref_compare_and_swap_mismatch_aborts() {
 
     // And the ref must be untouched.
     let (_, stdout, _) = run_in(dir.path(), &["update-ref", "refs/heads/side"]);
-    assert_eq!(stdout.trim(), oid, "a rejected update must not move the ref");
+    assert_eq!(
+        stdout.trim(),
+        oid,
+        "a rejected update must not move the ref"
+    );
 }
 
 #[test]
@@ -201,10 +179,7 @@ fn reflog_honours_a_limit() {
 
     let (code, stdout, _) = run_in(dir.path(), &["reflog", "-n", "1"]);
     assert_eq!(code, 0);
-    let entry_lines = stdout
-        .lines()
-        .filter(|line| line.contains("@{") )
-        .count();
+    let entry_lines = stdout.lines().filter(|line| line.contains("@{")).count();
     assert!(
         entry_lines <= 1,
         "an explicit limit must be honoured, saw {entry_lines} entries:\n{stdout}"

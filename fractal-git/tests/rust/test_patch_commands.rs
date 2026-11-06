@@ -5,36 +5,9 @@
 //! and mbox patch sequencing and commit reconstruction.
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 
-/// Creates a temporary directory inside `target/test_tmp/`.
-fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = fs::create_dir_all(&base);
-    tempfile::Builder::new()
-        .prefix(prefix)
-        .tempdir_in(&base)
-        .or_else(|_| tempfile::tempdir())
-        .expect("create test tempdir")
-}
-
-/// Runs taxis in `dir`, returning (exit_code, stdout, stderr).
-fn run_in(dir: &Path, args: &[&str]) -> (i32, String, String) {
-    let output = Command::new(env!("CARGO_BIN_EXE_taxis"))
-        .args(args)
-        .current_dir(dir)
-        .output()
-        .expect("taxis must run");
-    (
-        output.status.code().unwrap_or(-1),
-        String::from_utf8_lossy(&output.stdout).to_string(),
-        String::from_utf8_lossy(&output.stderr).to_string(),
-    )
-}
+use crate::cli_harness::{run_in, test_temp_dir};
 
 /// Initializes a dev repository with an initial commit.
 fn init_repo_with_commit(dir: &Path) {
