@@ -240,8 +240,8 @@ pub(crate) fn handle_rebase_continue(ctx: &CliContext) {
 
     // HEAD carries an amended stop commit when the operator rewrote it; the recorded tip only covers
     // the case where the reference was not advanced.
-    let tip = match view.head_commit() {
-        Ok(Some(oid)) => oid,
+    let tip = match view.effective_head_commit() {
+        Ok(Some((_, oid))) => oid,
         _ => state.current_tip,
     };
 
@@ -295,8 +295,8 @@ pub(crate) fn handle_rebase_abort(ctx: &CliContext) {
         Err(detail) => fail_io("read rebase state", detail),
     };
 
-    let from_commit = match view.head_commit() {
-        Ok(Some(oid)) => oid,
+    let from_commit = match view.effective_head_commit() {
+        Ok(Some((_, oid))) => oid,
         _ => state.current_tip,
     };
     project_worktree(

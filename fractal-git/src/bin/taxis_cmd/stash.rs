@@ -80,8 +80,8 @@ fn handle_stash_push(view: &RepoView, ctx: &CliContext) {
         return;
     }
 
-    let head_oid = match view.head_commit() {
-        Ok(Some(oid)) => oid,
+    let head_oid = match view.effective_head_commit() {
+        Ok(Some((_, oid))) => oid,
         _ => reject(CliTag::ERROR, "cannot stash on unborn HEAD"),
     };
 
@@ -184,7 +184,11 @@ fn handle_stash_push(view: &RepoView, ctx: &CliContext) {
     // Update refs/stash
     let ref_store = DiskRefStore::new(view.git_dir());
     let _ = ref_store.update_ref("refs/stash", &stash_commit_oid, None);
-    fg_core::diag_debug!("stash", "advanced refs/stash to {}", stash_commit_oid.to_hex());
+    fg_core::diag_debug!(
+        "stash",
+        "advanced refs/stash to {}",
+        stash_commit_oid.to_hex()
+    );
 
     // Hard reset worktree to HEAD
     let mut target_files = BTreeMap::new();

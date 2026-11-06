@@ -291,7 +291,7 @@ fn handle_update(ctx: &CliContext, args: &[String]) {
     let gitlinks = collect_head_tree_gitlinks(&view);
     let mut updated_paths = Vec::new();
 
-    for (_name, entry) in gitmodules.entries() {
+    for entry in gitmodules.entries().values() {
         if let Some((_, oid)) = gitlinks.get(&entry.path) {
             let sub_path = view.work_root().join(&entry.path);
             let _ = std::fs::create_dir_all(&sub_path);
@@ -319,10 +319,7 @@ fn handle_update(ctx: &CliContext, args: &[String]) {
 
 /// De-initializes a submodule, removing its worktree and config.
 fn handle_deinit(ctx: &CliContext, args: &[String]) {
-    let target_path = args
-        .iter()
-        .find(|a| !a.starts_with('-'))
-        .cloned();
+    let target_path = args.iter().find(|a| !a.starts_with('-')).cloned();
 
     let Some(path) = target_path else {
         reject(CliTag::ERROR, "usage: taxis submodule deinit [-f] <path>");

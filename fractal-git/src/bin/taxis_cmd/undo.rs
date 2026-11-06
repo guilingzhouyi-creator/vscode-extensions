@@ -37,21 +37,37 @@ pub fn handle_undo(ctx: &CliContext) {
 
     match op_graph.undo() {
         Ok(Some(restored_op)) => {
+            let current_files = RepoView::open(ctx)
+                .ok()
+                .and_then(|view| {
+                    view.effective_head_commit()
+                        .ok()
+                        .flatten()
+                        .and_then(|(_, oid)| flatten_commit_tree(&view, &oid).ok())
+                })
+                .unwrap_or_default();
+
             let ref_store = DiskRefStore::new(&ctx.git_dir);
             for (ref_name, ref_oid) in &restored_op.view.branches {
                 let _ = ref_store.update_ref(ref_name, ref_oid, None);
+            }
+            let container_path = fg_native::container_path(&ctx.git_dir);
+            if container_path.is_file() {
+                if let Ok(mut doc) = fg_native::RepoDocument::load(&container_path) {
+                    for (ref_name, ref_oid) in &restored_op.view.branches {
+                        let _ = doc.refs.upsert(fg_native::sections::refs::RefRecord {
+                            name: ref_name.clone(),
+                            oid: *ref_oid,
+                            peeled: None,
+                        });
+                    }
+                    let _ = doc.save_atomic(&container_path);
+                }
             }
 
             // Synchronize worktree and index if head commit is present
             if let Some(head_oid) = restored_op.view.head_oid {
                 if let Ok(view) = RepoView::open(ctx) {
-                    let current_files = view
-                        .head_commit()
-                        .ok()
-                        .flatten()
-                        .and_then(|oid| flatten_commit_tree(&view, &oid).ok())
-                        .unwrap_or_default();
-
                     let target_files = flatten_commit_tree(&view, &head_oid).unwrap_or_default();
                     remove_stale_files(view.work_root(), &current_files, &target_files);
                     let index_entries = materialize_files(&view, &target_files);

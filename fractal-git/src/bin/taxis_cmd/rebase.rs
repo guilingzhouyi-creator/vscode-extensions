@@ -272,7 +272,10 @@ impl<'a> ReplaySession<'a> {
         ) {
             reject(
                 CliTag::COMMIT_GOVERNANCE_FAIL,
-                format!("Rebase message rejected for {}: {guard_error}", record.oid.to_hex()),
+                format!(
+                    "Rebase message rejected for {}: {guard_error}",
+                    record.oid.to_hex()
+                ),
             );
         }
 
@@ -443,8 +446,8 @@ pub fn handle_rebase(ctx: &CliContext) {
         ),
     };
 
-    let ours_commit = match view.head_commit() {
-        Ok(Some(oid)) => oid,
+    let ours_commit = match view.effective_head_commit() {
+        Ok(Some((_, oid))) => oid,
         _ => reject(CliTag::ERROR, "HEAD has no commit; cannot rebase"),
     };
 

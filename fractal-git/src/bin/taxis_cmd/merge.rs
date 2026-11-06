@@ -88,8 +88,8 @@ pub fn handle_merge(ctx: &CliContext) {
         ),
     };
 
-    let ours_commit = match view.head_commit() {
-        Ok(Some(oid)) => oid,
+    let ours_commit = match view.effective_head_commit() {
+        Ok(Some((_, oid))) => oid,
         _ => reject(CliTag::ERROR, "HEAD has no commit; cannot merge"),
     };
 
@@ -260,7 +260,7 @@ fn handle_merge_abort(view: &RepoView) {
     let _ = fs::remove_file(&merge_head_file);
     let _ = fs::remove_file(view.git_dir().join("MERGE_MSG"));
 
-    if let Ok(Some(head_commit)) = view.head_commit() {
+    if let Ok(Some((_, head_commit))) = view.effective_head_commit() {
         let current_files = flatten_commit_tree(view, &head_commit).unwrap_or_default();
         let index_entries = materialize_files(view, &current_files);
         update_dirc_index(view.git_dir(), &index_entries);
@@ -284,10 +284,10 @@ fn execute_fast_forward(
     };
 
     let current_files = view
-        .head_commit()
+        .effective_head_commit()
         .ok()
         .flatten()
-        .and_then(|oid| flatten_commit_tree(view, &oid).ok())
+        .and_then(|(_, oid)| flatten_commit_tree(view, &oid).ok())
         .unwrap_or_default();
 
     let mut new_files = BTreeMap::new();
@@ -386,12 +386,9 @@ fn execute_three_way_merge(
         .map(|(p, e)| (p.clone(), e.oid))
         .collect();
 
-    let merge_res = ThreeWayMerge::merge_with_renames(
-        &base_map,
-        &ours_map,
-        &theirs_map,
-        |oid| view.blob_payload(oid).ok(),
-    );
+    let merge_res = ThreeWayMerge::merge_with_renames(&base_map, &ours_map, &theirs_map, |oid| {
+        view.blob_payload(oid).ok()
+    });
     match merge_res {
         ThreeWayMergeResult::FastForward => {
             execute_fast_forward(view, opts, ours_commit, theirs_commit, branch_name, ctx);
@@ -565,11 +562,7 @@ fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<Stri
         origin,
         None,
     ) {
-        fg_core::diag_debug!(
-            "governance",
-            "merge message rejected: {:?}",
-            guard_error
-        );
+        fg_core::diag_debug!("governance", "merge message rejected: {:?}", guard_error);
         let is_diag = fg_core::diagnostics::is_diagnostic_mode();
         let display_msg = guard_error.user_display(is_diag);
         if is_diag {

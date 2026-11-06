@@ -599,7 +599,7 @@ pub fn handle_prune(ctx: &CliContext) {
     let mut root_oids: Vec<Oid> = all_refs.into_iter().map(|(_, oid)| oid).collect();
 
     // 2. Collect from HEAD if present
-    if let Ok(Some(head)) = view.head_commit() {
+    if let Ok(Some((_, head))) = view.effective_head_commit() {
         root_oids.push(head);
     }
 

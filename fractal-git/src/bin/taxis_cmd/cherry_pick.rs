@@ -86,8 +86,8 @@ pub(crate) fn execute_commit_delta_transplant(ctx: &CliContext, spec: &DeltaTran
     assert_worktree_cleanliness(&view, false);
 
     let (target_oid, target_record, parent_oid) = resolve_transplant_target(&view, target_rev, op);
-    let ours_commit = match view.head_commit() {
-        Ok(Some(oid)) => oid,
+    let ours_commit = match view.effective_head_commit() {
+        Ok(Some((_, oid))) => oid,
         _ => reject(CliTag::ERROR, format!("HEAD has no commit; cannot {op}")),
     };
     let effective_branch = view
@@ -299,8 +299,7 @@ fn create_transplant_commit(
         fg_gate::commit_guard::rewrite::MessageOrigin::Inherited
     };
     let rewrite_floor = fg_gate::PolicyFloor::resolve(view.git_dir());
-    let rewrite_policy =
-        fg_gate::policy_floor::preset_for_tier(rewrite_floor.tier);
+    let rewrite_policy = fg_gate::policy_floor::preset_for_tier(rewrite_floor.tier);
     if let Err(guard_error) = fg_gate::commit_guard::rewrite::verify_rewrite_message(
         &rewrite_policy,
         &rewrite_floor,

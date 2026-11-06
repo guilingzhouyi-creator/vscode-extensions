@@ -22,13 +22,20 @@ use super::repo_view::RepoView;
 /// Compiles reachable commits into an official Git Commit-Graph (`CGPH`) file.
 pub(crate) fn write_commit_graph_for_repo(view: &RepoView, graph_path: &Path) -> usize {
     let mut tips = Vec::new();
-    if let Ok(Some(head_commit)) = view.head_commit() {
+    if let Ok(Some((_, head_commit))) = view.effective_head_commit() {
         tips.push(head_commit);
     }
     let ref_store = DiskRefStore::new(view.git_dir());
     if let Ok(all_refs) = ref_store.list_all() {
         for (_, oid) in all_refs {
-            tips.push(oid);
+            if let Ok(peeled) = view.peel(&oid) {
+                if view
+                    .object(&peeled)
+                    .is_ok_and(|obj| obj.kind == fg_core::models::ObjectKind::Commit)
+                {
+                    tips.push(peeled);
+                }
+            }
         }
     }
     let Ok(commits) = walk_commits(view, &tips) else {
