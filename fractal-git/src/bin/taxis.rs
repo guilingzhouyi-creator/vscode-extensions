@@ -20,109 +20,54 @@ use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
 use taxis_cmd::{
     am, apply, archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick,
     clone, commit, config, daemon, diagnostics_tool, diff, doctor, format_patch, gate_slice,
-    hash_object, index_plumbing, init, inspect, lineage, log, maintenance, maintenance_ops, merge,
-    notes_replace, operation, pack_plumbing, plumbing_tree, project, projection, promotion,
-    quality, quarantine, read, rebase, reclaim, refs, relocate, remote, repack, reset, rev_list,
-    revert, stage, stash, status, submodule, tag, unarchive, undo, verify, worktree,
+    hash_object, index_plumbing, init, inspect, lineage, list_files, log, maintenance,
+    maintenance_ops, merge, notes_replace, operation, pack_plumbing, plumbing_tree, project,
+    projection, promotion, quality, quarantine, read, rebase, reclaim, refs, relocate, remote,
+    repack, reset, rev_list, revert, stage, stash, status, submodule, tag, unarchive, undo, verify,
+    worktree,
 };
 
 use fg_core::models::current_unix_seconds;
 use fg_gate::authority::resolve_authority_secret;
 use fractal_git::constants::cli::CliTag;
 
-/// Specification for one Taxis CLI subcommand and its accepted aliases.
+/// Specification for one Taxis CLI subcommand and its accepted shorthand aliases.
 struct CommandSpec {
     canonical: &'static str,
     aliases: &'static [&'static str],
     handler: fn(&CliContext),
 }
 
+const fn cmd(
+    canonical: &'static str,
+    aliases: &'static [&'static str],
+    handler: fn(&CliContext),
+) -> CommandSpec {
+    CommandSpec {
+        canonical,
+        aliases,
+        handler,
+    }
+}
+
 const COMMAND_TABLE: &[CommandSpec] = &[
-    CommandSpec {
-        canonical: "init",
-        aliases: &["init"],
-        handler: init::handle_init,
-    },
-    CommandSpec {
-        canonical: "doctor",
-        aliases: &["doctor"],
-        handler: doctor::handle_doctor,
-    },
-    CommandSpec {
-        canonical: "relocate",
-        aliases: &["relocate"],
-        handler: relocate::handle_relocate,
-    },
-    CommandSpec {
-        canonical: "git-export",
-        aliases: &["git-export", "export"],
-        handler: projection::handle_git_export,
-    },
-    CommandSpec {
-        canonical: "git-import",
-        aliases: &["git-import", "import"],
-        handler: projection::handle_git_import,
-    },
-    CommandSpec {
-        canonical: "status",
-        aliases: &["st", "status"],
-        handler: status::handle_status,
-    },
-    CommandSpec {
-        canonical: "add",
-        aliases: &["add"],
-        handler: stage::handle_add,
-    },
-    CommandSpec {
-        canonical: "rm",
-        aliases: &["rm"],
-        handler: stage::handle_rm,
-    },
-    CommandSpec {
-        canonical: "mv",
-        aliases: &["mv"],
-        handler: stage::handle_mv,
-    },
-    CommandSpec {
-        canonical: "restore",
-        aliases: &["restore"],
-        handler: stage::handle_restore,
-    },
-    CommandSpec {
-        canonical: "branch",
-        aliases: &["br", "branch"],
-        handler: branch::handle_branch,
-    },
-    CommandSpec {
-        canonical: "commit",
-        aliases: &["ci", "commit"],
-        handler: commit::handle_commit,
-    },
-    CommandSpec {
-        canonical: "diff",
-        aliases: &["di", "diff"],
-        handler: diff::handle_diff,
-    },
-    CommandSpec {
-        canonical: "hash-object",
-        aliases: &["hash-object"],
-        handler: hash_object::handle_hash_object,
-    },
-    CommandSpec {
-        canonical: "write-tree",
-        aliases: &["write-tree"],
-        handler: index_plumbing::handle_write_tree,
-    },
-    CommandSpec {
-        canonical: "commit-tree",
-        aliases: &["commit-tree"],
-        handler: index_plumbing::handle_commit_tree,
-    },
-    CommandSpec {
-        canonical: "update-index",
-        aliases: &["update-index"],
-        handler: index_plumbing::handle_update_index,
-    },
+    cmd("init", &[], init::handle_init),
+    cmd("doctor", &[], doctor::handle_doctor),
+    cmd("relocate", &[], relocate::handle_relocate),
+    cmd("git-export", &["export"], projection::handle_git_export),
+    cmd("git-import", &["import"], projection::handle_git_import),
+    cmd("status", &["st"], status::handle_status),
+    cmd("add", &[], stage::handle_add),
+    cmd("rm", &[], stage::handle_rm),
+    cmd("mv", &[], stage::handle_mv),
+    cmd("restore", &[], stage::handle_restore),
+    cmd("branch", &["br"], branch::handle_branch),
+    cmd("commit", &["ci"], commit::handle_commit),
+    cmd("diff", &["di"], diff::handle_diff),
+    cmd("hash-object", &[], hash_object::handle_hash_object),
+    cmd("write-tree", &[], index_plumbing::handle_write_tree),
+    cmd("commit-tree", &[], index_plumbing::handle_commit_tree),
+    cmd("update-index", &[], index_plumbing::handle_update_index),
     CommandSpec {
         canonical: "rev-parse",
         aliases: &["rev-parse"],
@@ -141,7 +86,7 @@ const COMMAND_TABLE: &[CommandSpec] = &[
     CommandSpec {
         canonical: "ls-files",
         aliases: &["ls-files"],
-        handler: read::handle_ls_files,
+        handler: list_files::handle_ls_files,
     },
     CommandSpec {
         canonical: "show-ref",
@@ -581,7 +526,7 @@ fn handle_help(_ctx: &CliContext) {
 
 fn resolve_canonical_subcommand(raw: &str) -> &str {
     for spec in COMMAND_TABLE {
-        if spec.aliases.contains(&raw) {
+        if spec.canonical == raw || spec.aliases.contains(&raw) {
             return spec.canonical;
         }
     }
@@ -930,7 +875,11 @@ fn main() {
     {
         fg_core::diagnostics::set_level(fg_core::diagnostics::LogLevel::Debug);
     }
-    fg_core::diag_debug!("taxis", "diagnostics configured at level {}", fg_core::diagnostics::level());
+    fg_core::diag_debug!(
+        "taxis",
+        "diagnostics configured at level {}",
+        fg_core::diagnostics::level()
+    );
 
     let (git_dir, json_mode, filtered_args) = parse_cli_args(&raw_args);
     if filtered_args.is_empty() {
@@ -942,7 +891,11 @@ fn main() {
     let log_file_arg = find_arg_value(&raw_args, &["--log-file"]);
     let log_path = log_file_arg
         .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var("TAXIS_LOG_FILE").ok().map(std::path::PathBuf::from))
+        .or_else(|| {
+            std::env::var("TAXIS_LOG_FILE")
+                .ok()
+                .map(std::path::PathBuf::from)
+        })
         .or_else(|| {
             if git_dir.is_dir() {
                 Some(git_dir.join("diagnostics/taxis.jsonl"))
@@ -964,7 +917,10 @@ fn main() {
     let invocation_summary = if sub_args.is_empty() {
         format!("Dispatching '{effective_subcommand}'")
     } else {
-        format!("Dispatching '{effective_subcommand} {}'", sub_args.join(" "))
+        format!(
+            "Dispatching '{effective_subcommand} {}'",
+            sub_args.join(" ")
+        )
     };
     fg_core::diagnostics::record_event(
         fg_core::diagnostics::LogLevel::Info,
