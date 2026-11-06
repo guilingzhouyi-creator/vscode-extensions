@@ -84,6 +84,22 @@ function buildCompliantMsg(subject, symbolOrFile) {
   ].join('\n');
 }
 
+/**
+ * Runs a seeding command whose failure must abort the run.
+ *
+ * A silently ignored seeding failure is the one way this suite can report a false parity: if a tag
+ * never gets created on either side, the later `describe` comparison finds two equally absent tags
+ * and agrees — so a broken fixture reads as a passing check. Aborting on the seeding step keeps a
+ * fixture fault distinguishable from an engine mismatch.
+ */
+function runRequired(bin, cwd, args) {
+  const res = runCmd(bin, cwd, args);
+  if (res.status !== 0) {
+    throw new Error(`seeding step failed: ${bin} ${args.join(' ')}: ${res.stderr || res.stdout}`);
+  }
+  return res;
+}
+
 function seedSmallProject(bin, repoDir, isTaxis) {
   fs.mkdirSync(path.join(repoDir, 'src'), { recursive: true });
   fs.writeFileSync(
@@ -91,7 +107,7 @@ function seedSmallProject(bin, repoDir, isTaxis) {
     'pub fn compute_sum(a: i32, b: i32) -> i32 { a + b }\n',
     'utf8',
   );
-  runCmd(bin, repoDir, ['add', 'src/calc.rs']);
+  runRequired(bin, repoDir, ['add', 'src/calc.rs']);
   const m1 = isTaxis
     ? buildCompliantMsg('feat(calc): add integer addition operator', 'compute_sum')
     : 'feat(calc): add integer addition operator';
@@ -100,8 +116,8 @@ function seedSmallProject(bin, repoDir, isTaxis) {
     throw new Error(`${bin} commit 1 failed: ${c1.stderr || c1.stdout}`);
   }
 
-  runCmd(bin, repoDir, ['tag', '-a', 'v0.1.0', '-m', 'Initial release']);
-  runCmd(bin, repoDir, ['mv', 'src/calc.rs', 'src/math.rs']);
+  runRequired(bin, repoDir, ['tag', '-a', 'v0.1.0', '-m', 'Initial release']);
+  runRequired(bin, repoDir, ['mv', 'src/calc.rs', 'src/math.rs']);
   const m2 = isTaxis
     ? buildCompliantMsg('refactor(math): rename calc.rs to math.rs', 'compute_sum')
     : 'refactor(math): rename calc.rs to math.rs';
@@ -109,7 +125,7 @@ function seedSmallProject(bin, repoDir, isTaxis) {
   if (c2.status !== 0) {
     throw new Error(`${bin} commit 2 failed: ${c2.stderr || c2.stdout}`);
   }
-  runCmd(bin, repoDir, ['tag', 'v0.2.0']);
+  runRequired(bin, repoDir, ['tag', 'v0.2.0']);
 }
 
 function assertCheck(results, name, passed, detail) {
@@ -379,8 +395,20 @@ function main() {
   if (externalRepo) {
     runExternalRepoParity(taxisBin, externalRepo, checks);
   }
+  const failed = checks.filter((item) => !item.passed);
+  for (const item of failed) {
+    process.stderr.write(`  ✖  ${item.name} (${item.detail})\n`);
+  }
+  if (failed.length > 0) {
+    // The success banner below must never print for a partial run, so the check happens first.
+    process.stderr.write(
+      `[HOSTED-PARITY-FAILED] ${failed.length} of ${checks.length} parity checks mismatched.\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
   for (const item of checks) {
-    process.stdout.write(`[PASS] ${item.name} (${item.detail})\n`);
+    process.stdout.write(`  ✔  ${item.name} (${item.detail})\n`);
   }
   process.stdout.write(
     `[HOSTED-PARITY-OK] All ${checks.length} hosted small-repo Git parity checks passed.\n`,
