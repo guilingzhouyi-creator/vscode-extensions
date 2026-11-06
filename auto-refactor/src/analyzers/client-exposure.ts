@@ -20,6 +20,7 @@ import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ExposureMessages } from '../core/messages/exposure';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { REGEX, normalizePathSeparators } from '../core/constants';
+import { isTestFilePath, isFixtureOrMockPath, isScriptOrGatePath } from '../core/path';
 
 /** Canonical analyzer identifier for client-side exposure and credential security audits. */
 export const ANALYZER_CLIENT_EXPOSURE_ID = 'client-exposure';
@@ -31,7 +32,9 @@ const INTERNAL_ENDPOINT_PATTERNS: readonly RegExp[] = Object.freeze([
 
 const MAX_LISTENER_SCAN_WINDOW = 40;
 
-const EXEMPT_PATH_SUBSTRINGS = Object.freeze(['/tests/', '/test/', '/scripts/', '/fixtures/']);
+function isExemptExposurePath(file: string): boolean {
+    return isTestFilePath(file) || isFixtureOrMockPath(file) || isScriptOrGatePath(file);
+}
 
 interface ExposureIssueParams {
     readonly file: string;
@@ -57,9 +60,10 @@ function makeExposureIssue(params: ExposureIssueParams): Issue {
 /**
  * Audits client code for internal administrative endpoint exposure (SEC-EXP-001).
  */
-function auditInternalApiEndpoints(file: string, rawLines: string[], issues: Issue[]): void {
+function auditInternalApiEndpoints(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
+        if (!line.includes('/')) continue;
         for (const pattern of INTERNAL_ENDPOINT_PATTERNS) {
             if (pattern.test(line)) {
                 issues.push(
@@ -82,9 +86,10 @@ function auditInternalApiEndpoints(file: string, rawLines: string[], issues: Iss
 /**
  * Audits client markup for CSS visual hiding in lieu of server auth (SEC-EXP-002).
  */
-function auditCssAuthorizationBypass(file: string, rawLines: string[], issues: Issue[]): void {
+function auditCssAuthorizationBypass(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
+        if (!line.includes('style') && !line.includes('hidden')) continue;
         if (REGEX.SECURITY.CSS_AUTH_BYPASS.test(line)) {
             issues.push(
                 makeExposureIssue({
@@ -104,9 +109,10 @@ function auditCssAuthorizationBypass(file: string, rawLines: string[], issues: I
 /**
  * Audits feature flag usage for full implementation code delivery (SEC-EXP-003).
  */
-function auditFeatureFlagCodeSplitting(file: string, rawLines: string[], issues: Issue[]): void {
+function auditFeatureFlagCodeSplitting(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
+        if (!line.includes('if')) continue;
         if (REGEX.SECURITY.FEATURE_FLAG_DEAD_GATE.test(line)) {
             issues.push(
                 makeExposureIssue({
@@ -126,9 +132,10 @@ function auditFeatureFlagCodeSplitting(file: string, rawLines: string[], issues:
 /**
  * Audits router definitions for unreleased and debug routes (SEC-EXP-004).
  */
-function auditUnreleasedRoutes(file: string, rawLines: string[], issues: Issue[]): void {
+function auditUnreleasedRoutes(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
+        if (!line.includes('/')) continue;
         if (REGEX.SECURITY.CLIENT_DEBUG_ROUTE.test(line)) {
             issues.push(
                 makeExposureIssue({
@@ -145,7 +152,7 @@ function auditUnreleasedRoutes(file: string, rawLines: string[], issues: Issue[]
     }
 }
 
-function hasGuardedActivationOrOrigin(lines: string[], start: number, end: number): boolean {
+function hasGuardedActivationOrOrigin(lines: readonly string[], start: number, end: number): boolean {
     for (let i = start; i < end; i++) {
         if (REGEX.SECURITY.USER_ACTIVATION_OR_ORIGIN.test(lines[i])) {
             return true;
@@ -154,7 +161,7 @@ function hasGuardedActivationOrOrigin(lines: string[], start: number, end: numbe
     return false;
 }
 
-function findSensitiveActionLine(lines: string[], start: number, end: number): number {
+function findSensitiveActionLine(lines: readonly string[], start: number, end: number): number {
     for (let i = start; i < end; i++) {
         if (REGEX.SECURITY.SENSITIVE_ACTION_TRIGGER.test(lines[i])) {
             return i + 1;
@@ -163,10 +170,10 @@ function findSensitiveActionLine(lines: string[], start: number, end: number): n
     return -1;
 }
 
-function auditIframeUserActivation(file: string, rawLines: string[], issues: Issue[]): void {
+function auditIframeUserActivation(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (!REGEX.SECURITY.MESSAGE_LISTENER.test(line)) {
+        if (!line.includes('message') || !REGEX.SECURITY.MESSAGE_LISTENER.test(line)) {
             continue;
         }
         const windowEnd = Math.min(rawLines.length, i + MAX_LISTENER_SCAN_WINDOW);
@@ -197,15 +204,18 @@ function auditIframeUserActivation(file: string, rawLines: string[], issues: Iss
 export class ClientExposureAnalyzer implements Analyzer {
     readonly name = ANALYZER_CLIENT_EXPOSURE_ID;
 
+    public resetState(): void {
+        // Stateless per-file analyzer — safe for pool reuse
+    }
+
     analyze(_sourceFile: unknown, context: AnalyzerContext): Issue[] {
         const file = normalizePathSeparators(context.filePath);
-        const norm = ('/' + file).toLowerCase();
-        if (EXEMPT_PATH_SUBSTRINGS.some((sub) => norm.includes(sub))) {
+        if (isExemptExposurePath(file)) {
             return [];
         }
 
         const issues: Issue[] = [];
-        const rawLines = context.content.split('\n');
+        const rawLines = context.lines ?? context.content.split('\n');
 
         auditInternalApiEndpoints(file, rawLines, issues);
         auditCssAuthorizationBypass(file, rawLines, issues);

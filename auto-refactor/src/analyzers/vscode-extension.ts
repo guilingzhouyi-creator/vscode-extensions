@@ -20,6 +20,7 @@ import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { ANALYZER_VSCODE_EXTENSION } from '../core/scoring/dimensionLiterals';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
+import { isTestFilePath, isFixtureOrMockPath, isScriptOrGatePath } from '../core/path';
 import {
     matchResourceLifecycle,
     matchBlockingCalls,
@@ -98,9 +99,6 @@ const MONOCHROME_COLORS: ReadonlySet<string> = new Set([
     'white',
 ]);
 
-// ── Regular Expression for Exempt Path Matching ──
-const EXEMPT_PATH_RE = /(?:^|\/)(?:tests?|fixtures|scripts)\/|\.(?:test|spec)\./;
-
 // ── Diagnostic Messages & Suggestions (SSOT) ──
 const MSG_MEM_UNREGISTERED =
     'VS Code Disposable resource created without subscription registration.';
@@ -163,7 +161,7 @@ function makeVscIssue(params: VscIssueParams): Issue {
 }
 
 function isExemptPath(file: string): boolean {
-    return EXEMPT_PATH_RE.test(file.toLowerCase());
+    return isTestFilePath(file) || isFixtureOrMockPath(file) || isScriptOrGatePath(file);
 }
 
 const XMLNS_SVG_RE = /xmlns=['"]http:\/\/www\.w3\.org\/2000\/svg['"]/;
@@ -240,16 +238,25 @@ export class VscodeExtensionAnalyzer implements Analyzer {
     analyze(_sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
         const file = ctx.filePath.replace(/\\/g, '/');
         const hasValidExt = ACCEPTED_EXTENSIONS.some((ext) => file.endsWith(ext));
-        if (!hasValidExt) return [];
-        if (isExemptPath(file)) return [];
+        if (!hasValidExt || isExemptPath(file)) return [];
 
         const content = ctx.content || '';
         if (content.length === 0) return [];
 
-        const { raw, masked } = maskSourceText(content, TS_JS_MASK);
+        const { raw, masked } =
+            ctx.lines && ctx.maskedLines
+                ? { raw: ctx.lines as string[], masked: ctx.maskedLines as string[] }
+                : maskSourceText(content, TS_JS_MASK);
         const issues: Issue[] = [];
 
-        // 1. VSC-MEM-001 via generalized lifecycle matcher
+        this.collectLifecycleIssues(masked, file, issues);
+        this.collectBlockingAndI18nIssues(raw, masked, file, issues);
+        this.collectWebviewIssues(raw, masked, file, issues);
+
+        return issues;
+    }
+
+    private collectLifecycleIssues(masked: string[], file: string, issues: Issue[]): void {
         const lifecycleViolations = matchResourceLifecycle(masked, VSC_LIFECYCLE_PATTERN);
         for (const violation of lifecycleViolations) {
             const isUnregistered = violation.reason === REASON_UNREGISTERED;
@@ -273,8 +280,14 @@ export class VscodeExtensionAnalyzer implements Analyzer {
                 }),
             );
         }
+    }
 
-        // 2. VSC-PERF-001 via generalized blocking matcher
+    private collectBlockingAndI18nIssues(
+        raw: string[],
+        masked: string[],
+        file: string,
+        issues: Issue[],
+    ): void {
         const blockingViolations = matchBlockingCalls(masked, VSC_BLOCKING_PATTERN);
         for (const blockingViolation of blockingViolations) {
             issues.push(
@@ -290,7 +303,6 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             );
         }
 
-        // 3. VSC-I18N-001 via generalized presentation literal matcher
         const i18nViolations = matchPresentationLiterals(raw, VSC_I18N_PATTERN);
         for (const lit of i18nViolations) {
             issues.push(
@@ -305,10 +317,15 @@ export class VscodeExtensionAnalyzer implements Analyzer {
                 }),
             );
         }
+    }
 
-        // 4. VSC-UI-001: Webview dynamic collection rendering bounded density & folding
-        const uiFoldingViolations = this.detectUnboundedCollectionRendering(raw, masked);
-        for (const foldingViolation of uiFoldingViolations) {
+    private collectWebviewIssues(
+        raw: string[],
+        masked: string[],
+        file: string,
+        issues: Issue[],
+    ): void {
+        for (const foldingViolation of this.detectUnboundedCollectionRendering(raw, masked)) {
             issues.push(
                 makeVscIssue({
                     file,
@@ -322,9 +339,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             );
         }
 
-        // 5. VSC-UI-002: Webview CSS theme variable completeness & high-contrast guard
-        const colorViolations = this.detectHardcodedThemeColors(raw);
-        for (const colorViolation of colorViolations) {
+        for (const colorViolation of this.detectHardcodedThemeColors(raw)) {
             issues.push(
                 makeVscIssue({
                     file,
@@ -342,9 +357,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             );
         }
 
-        // 6. VSC-PERF-002: Webview CSS transition on geometry layout properties causing reflow
-        const layoutTransitionViolations = this.detectLayoutTransitions(raw);
-        for (const transitionViolation of layoutTransitionViolations) {
+        for (const transitionViolation of this.detectLayoutTransitions(raw)) {
             issues.push(
                 makeVscIssue({
                     file,
@@ -362,10 +375,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             );
         }
 
-        // 7. VSC-UI-003: Webview interactive form controls missing accessible labels
-        //    conforming to WCAG 4.1.2 requirements.
-        const a11yViolations = this.detectInaccessibleFormControls(raw);
-        for (const a11yViolation of a11yViolations) {
+        for (const a11yViolation of this.detectInaccessibleFormControls(raw)) {
             issues.push(
                 makeVscIssue({
                     file,
@@ -383,9 +393,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             );
         }
 
-        // 8. VSC-UI-004: Webview interactive dynamic border jitter guard
-        const borderJitterViolations = this.detectDynamicBorderJitter(raw);
-        for (const jitterViolation of borderJitterViolations) {
+        for (const jitterViolation of this.detectDynamicBorderJitter(raw)) {
             issues.push(
                 makeVscIssue({
                     file,
@@ -398,8 +406,6 @@ export class VscodeExtensionAnalyzer implements Analyzer {
                 }),
             );
         }
-
-        return issues;
     }
 
     private detectUnboundedCollectionRendering(
@@ -409,6 +415,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const raw = rawLines[i];
+            if (!raw.includes('.map')) continue;
             const masked = maskedLines[i];
             const isMapping =
                 MAPPING_TEMPLATE_RAW_RE.test(raw) ||
@@ -435,7 +442,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string; color: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            if (!HTML_TAG_PRECHECK_RE.test(line)) {
+            if (!line.includes('<') || !HTML_TAG_PRECHECK_RE.test(line)) {
                 continue;
             }
             if (isStandaloneSvgLine(line, rawLines, i)) {
@@ -458,6 +465,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string; prop: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
+            if (!line.includes('transition')) continue;
             const matchResult = TRANSITION_PROP_RE.exec(line);
             if (matchResult) {
                 violations.push({ line: i + 1, text: line.trim(), prop: matchResult[1] });
@@ -472,7 +480,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string; tag: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            if (!FORM_CONTROL_RE.test(line)) continue;
+            if (!line.includes('<') || !FORM_CONTROL_RE.test(line)) continue;
             if (FORM_HIDDEN_RE.test(line)) continue;
 
             const hasA11y = FORM_A11Y_RE.test(line) || FORM_LABEL_FOR_RE.test(line);
@@ -494,6 +502,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
+            if (!line.includes(':') || !line.includes('border')) continue;
             if (JITTER_BORDER_RE.test(line)) {
                 violations.push({ line: i + 1, text: line.trim() });
             }

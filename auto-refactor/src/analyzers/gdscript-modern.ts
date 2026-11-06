@@ -19,7 +19,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
 import { ANALYZER_GDSCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import { REGEX } from '../core/constants';
-import type { SourceMaskConfig } from '../core/policy/source-mask';
+import { LINE_FLAG_HAS_CALL_PAREN, type SourceMaskConfig } from '../core/policy/source-mask';
 import { DeclarativeModernAnalyzer, type DeclarativeLineRule } from './declarative-modern-pack';
 
 const SEV_WARN: Severity = 'warning';
@@ -166,12 +166,16 @@ function scanMultiLineResetState(
     issues: Issue[],
     rule: DeclarativeLineRule,
 ): void {
-    const hasExtends = masked.some((line) => REGEX.SYNTAX.GDSCRIPT_EXTENDS.test(line));
+    const hasExtends = masked.some(
+        (line) => line.includes('extends') && REGEX.SYNTAX.GDSCRIPT_EXTENDS.test(line),
+    );
     if (!hasExtends) return;
 
     for (let index = 0; index < masked.length; index += 1) {
         const code = masked[index];
-        if (!REGEX.SYNTAX.GDSCRIPT_RESET_STATE_FUNC.test(code)) continue;
+        if (!code.includes('reset_state') || !REGEX.SYNTAX.GDSCRIPT_RESET_STATE_FUNC.test(code)) {
+            continue;
+        }
 
         const funcIndent = code.search(/\S/);
         let hasSuper = false;
@@ -246,6 +250,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_YIELD_001,
                 severity: SEV_WARN,
+                fastTrigger: 'yield',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 pattern: REGEX.SYNTAX.GDSCRIPT_YIELD,
                 message:
                     '`yield` was removed in Godot 4: coroutines are plain `await` expressions.',
@@ -259,6 +265,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_EXPORT_001,
                 severity: SEV_WARN,
+                fastTrigger: 'export',
                 pattern: REGEX.SYNTAX.GDSCRIPT_EXPORT_STMT,
                 message: 'The `export` statement syntax is gone; Godot 4 uses annotations.',
                 suggestion:
@@ -272,6 +279,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_ONREADY_001,
                 severity: SEV_WARN,
+                fastTrigger: 'onready',
                 pattern: REGEX.SYNTAX.GDSCRIPT_ONREADY,
                 message: '`onready` became the `@onready` annotation in Godot 4.',
                 suggestion: 'Write `@onready var node = $Path`.',
@@ -284,6 +292,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_TOOL_001,
                 severity: SEV_WARN,
+                fastTrigger: 'tool',
                 pattern: REGEX.SYNTAX.GDSCRIPT_TOOL,
                 message: 'The `tool` keyword became the `@tool` annotation in Godot 4.',
                 suggestion: 'Put `@tool` on the first line of the script.',
@@ -296,6 +305,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_POOL_001,
                 severity: SEV_WARN,
+                fastTrigger: 'Pool',
                 pattern: REGEX.SYNTAX.GDSCRIPT_POOL_ARRAY,
                 message: '`Pool*Array` types were renamed to `Packed*Array` in Godot 4.',
                 suggestion: 'Use the `PackedByteArray` / `PackedVector2Array` family of names.',
@@ -308,6 +318,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_RPC_001,
                 severity: SEV_WARN,
+                fastTrigger: 'func',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 pattern: REGEX.GDSCRIPT.RPC_MODIFIER,
                 message: 'RPC keywords before `func` were replaced by the `@rpc` annotation.',
                 suggestion:
@@ -321,6 +333,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_CONNECT_001,
                 severity: SEV_WARN,
+                fastTrigger: TOKEN_DOT_CONNECT,
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 message:
                     'String-based `connect("signal", target, "method")` is deprecated in Godot 4.',
                 suggestion:
@@ -337,6 +351,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_DEB_001,
                 severity: SEV_INFO,
+                fastTrigger: ['pressed', '_pressed'],
                 message: 'Button press event connected without debounce protection.',
                 suggestion:
                     'Connect through debounce gate or use DebouncedButton to prevent rapid click spam.',
@@ -353,6 +368,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_FSM_001,
                 severity: SEV_WARN,
+                fastTrigger: 'current_state',
                 message: 'Direct state mutation bypassing state machine transition control.',
                 suggestion:
                     'Route state changes through state_machine.transition_to(State) to preserve lifecycle hooks.',
@@ -368,6 +384,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_WEAK_001,
                 severity: SEV_WARN,
+                fastTrigger: '.append',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 message:
                     'Observer/listener collection retains direct object reference without weakref.',
                 suggestion:
@@ -387,6 +405,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_RES_001,
                 severity: SEV_INFO,
+                fastTrigger: 'Vector2',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 message: 'Absolute positioning used in responsive view script.',
                 suggestion:
                     'Anchor nodes using Container layouts or apply responsive scale factors.',
@@ -401,6 +421,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_UNI_001,
                 severity: SEV_WARN,
+                fastTrigger: ['AppState.', 'GameStore.', 'PlayerData.'],
                 message: 'View performs direct state store mutation.',
                 suggestion:
                     'Dispatch actions through the unidirectional flow dispatcher instead of direct mutation.',
@@ -415,6 +436,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_EXT_001,
                 severity: SEV_WARN,
+                fastTrigger: 'extends',
                 message: 'View script does not inherit from BaseScreen.',
                 suggestion:
                     'Inherit from BaseScreen to participate in screen lifecycle and transition protocols.',
@@ -429,6 +451,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_TOK_001,
                 severity: SEV_INFO,
+                fastTrigger: 'Color',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 message: 'Hardcoded color or theme override bypassing design token constants.',
                 suggestion: 'Reference ThemeTokens color constants or use design token overrides.',
                 condition: (ctx) =>
@@ -442,6 +466,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_BAR_001,
                 severity: SEV_INFO,
+                fastTrigger: ['ProgressBar', '_ready'],
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 message: 'Screen ready handler missing status bar registration.',
                 suggestion:
                     'Register screen with the status bar coordinator during _ready() setup.',
@@ -456,6 +482,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_VRT_001,
                 severity: SEV_INFO,
+                fastTrigger: 'add_child',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 message: 'Unbounded loop child instantiation without virtual recycling.',
                 suggestion:
                     'Use VirtualListContainer recycling to maintain bounded node allocations.',
@@ -470,6 +498,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_I18N_001,
                 severity: SEV_INFO,
+                fastTrigger: ['text', 'title', 'heading', 'subtitle'],
                 message: 'Static UI text string bound without tr() translation wrapper.',
                 suggestion: 'Wrap user-facing strings with tr("KEY") for localization.',
                 condition: (ctx) =>
@@ -483,6 +512,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_NOD_001,
                 severity: SEV_INFO,
+                fastTrigger: ['../', 'get_parent', 'find_child'],
                 message: 'Brittle relative node path navigation (../) in view.',
                 suggestion: 'Mark target nodes as unique (%NodeName) and access via %Name syntax.',
                 condition: (ctx) =>
@@ -496,6 +526,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
             {
                 rule: RULE_GDM_BND_001,
                 severity: SEV_WARN,
+                fastTrigger: 'GameState.',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 message: 'View script directly binds to mutable GameState methods.',
                 suggestion:
                     'Bind through ViewBinding layer or dispatch structured presentation actions.',

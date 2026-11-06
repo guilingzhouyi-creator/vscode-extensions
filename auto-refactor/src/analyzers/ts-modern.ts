@@ -72,6 +72,17 @@ function isTypedPath(file: string): boolean {
     return TYPED_EXTENSIONS.some((extension) => file.endsWith(extension));
 }
 
+const esmSyntaxByLinesCache = new WeakMap<readonly string[], boolean>();
+
+function hasEsmSyntaxInMaskedLines(maskedLines: readonly string[]): boolean {
+    let cached = esmSyntaxByLinesCache.get(maskedLines);
+    if (cached === undefined) {
+        cached = REGEX.SYNTAX.TS_ESM_SYNTAX.test(maskedLines.join('\n'));
+        esmSyntaxByLinesCache.set(maskedLines, cached);
+    }
+    return cached;
+}
+
 /** Declarative line-level rules for TypeScript/JavaScript modernization. */
 const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
     {
@@ -160,8 +171,7 @@ const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
         severity: SEVERITY_WARNING,
         fastTrigger: 'require',
         pattern: REGEX.SYNTAX.TS_REQUIRE_CALL,
-        condition: (ctx: LineScanContext) =>
-            REGEX.SYNTAX.TS_ESM_SYNTAX.test(ctx.allMaskedLines.join('\n')),
+        condition: (ctx: LineScanContext) => hasEsmSyntaxInMaskedLines(ctx.allMaskedLines),
         message: 'CommonJS `require` in a module that already uses ESM syntax.',
         suggestion: 'Import the binding (`import x from "m"` / `import { y } from "m"`) instead.',
         actionable: {

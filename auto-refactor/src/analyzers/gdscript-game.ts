@@ -17,6 +17,7 @@ import { ANALYZER_GDSCRIPT_GAME } from '../core/scoring/dimensionLiterals';
 import { REGEX } from '../core/constants';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
+import { isTestFilePath, isFixtureOrMockPath, isScriptOrGatePath } from '../core/path';
 import {
     matchHotPathAllocations,
     matchBoundaryIsolation,
@@ -88,10 +89,8 @@ const GAME_ISOLATION_PATTERN: BoundaryIsolationPattern = Object.freeze({
     reason: ISOLATION_REASON,
 });
 
-const EXEMPT_PATH_RE = /(?:^|\/)(?:tests?|fixtures|scripts)\//i;
-
 function isExemptPath(file: string): boolean {
-    return EXEMPT_PATH_RE.test(file);
+    return isTestFilePath(file) || isFixtureOrMockPath(file) || isScriptOrGatePath(file);
 }
 
 const KEYWORD_POOL = 'pool';
@@ -201,8 +200,12 @@ function auditSignalConnections(file: string, masked: readonly string[], issues:
     let disconnectCount = 0;
 
     for (const line of masked) {
-        if (REGEX.SYNTAX.GDSCRIPT_SIGNAL_CONNECT.test(line)) connectCount++;
-        if (REGEX.SYNTAX.GDSCRIPT_SIGNAL_DISCONNECT.test(line)) disconnectCount++;
+        if (line.includes('.connect') && REGEX.SYNTAX.GDSCRIPT_SIGNAL_CONNECT.test(line)) {
+            connectCount++;
+        }
+        if (line.includes('.disconnect') && REGEX.SYNTAX.GDSCRIPT_SIGNAL_DISCONNECT.test(line)) {
+            disconnectCount++;
+        }
     }
 
     if (connectCount > disconnectCount + 2) {
@@ -226,6 +229,10 @@ function auditSignalConnections(file: string, masked: readonly string[], issues:
  */
 export class GdscriptGameAnalyzer implements Analyzer {
     readonly name = ANALYZER_GDSCRIPT_GAME;
+
+    public resetState(): void {
+        // Stateless per-file analyzer — safe for pool reuse
+    }
 
     /**
      * Streaming finalization hook invoked per file.
@@ -254,7 +261,10 @@ export class GdscriptGameAnalyzer implements Analyzer {
         const content = ctx.content || '';
         if (content.length === 0) return [];
 
-        const { raw, masked } = maskSourceText(content, GD_MASK);
+        const { raw, masked } =
+            ctx.lines && ctx.maskedLines
+                ? { raw: ctx.lines, masked: ctx.maskedLines }
+                : maskSourceText(content, GD_MASK);
         const issues: Issue[] = [];
 
         // 1. GDM-PRF-001 via generalized hot path matcher

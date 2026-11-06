@@ -59,9 +59,6 @@ import { analyzeFunctionCohesionAndSkeleton } from '../core/intelligence/functio
 import { evaluateDistributedRedundancy } from '../core/intelligence/semantic-domain-detector';
 import { evaluateResourcePooling } from '../core/intelligence/resource-pooling-auditor';
 
-/** Regular expression matching parser/AST related file path components. */
-const MODULE_TYPESCRIPT_ADAPTER = '../core/ast/typescript-adapter';
-
 const RE_PARSER_FILE_CONTEXT = REGEX.NAMING.PARSER_FILE_CONTEXT;
 const RE_PARSER_FUNCTION_NAME = REGEX.NAMING.PARSER_FUNCTION_NAME;
 const RE_SWITCH_OR_DISPATCH_LINE = REGEX.SYNTAX.SWITCH_OR_MATCH;
@@ -323,6 +320,8 @@ export class ComplexityAnalyzer implements Analyzer {
 
     private issues: Issue[] = [];
     private loopSites: Map<string, LoopSite[]> = new Map();
+    private accumulatedLoopSites: Map<string, LoopSite[]> = new Map();
+    private seenLoopSiteKeys: Set<string> = new Set();
     /** Masked view of the current file, so loop-body braces can be matched without string noise. */
     private maskedLines: string[] = [];
     /** Cached split lines of the current file to prevent repeated full-file splits. */
@@ -346,6 +345,11 @@ export class ComplexityAnalyzer implements Analyzer {
         this.maskedLines = [];
         this.cachedLines = [];
         this.maskedFor = '';
+    }
+
+    public clearAccumulatedLoopSites(): void {
+        this.accumulatedLoopSites.clear();
+        this.seenLoopSiteKeys.clear();
     }
 
     analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
@@ -799,12 +803,12 @@ export class ComplexityAnalyzer implements Analyzer {
         );
 
         if (flagElasticBudget) {
-            const lineCount =
-                this.cachedLines.length > 0
-                    ? this.cachedLines.length
-                    : ctx.content
-                      ? ctx.content.split('\n').length
-                      : 1;
+            let lineCount = 1;
+            if (this.cachedLines.length > 0) {
+                lineCount = this.cachedLines.length;
+            } else if (ctx.content) {
+                lineCount = ctx.content.split('\n').length;
+            }
             const fileBudgetIssue = evaluateFileCumulativeBudget(
                 ctx.filePath,
                 lineCount,
@@ -835,12 +839,12 @@ export class ComplexityAnalyzer implements Analyzer {
         if (!flagRedundancy || this.fileFunctions.length < MIN_FUNCTIONS_FOR_COHESION) return;
 
         const descriptors = createRoutineDescriptors(this.fileFunctions, ctx.filePath);
-        const lineCount =
-            this.cachedLines.length > 0
-                ? this.cachedLines.length
-                : ctx.content
-                  ? ctx.content.split('\n').length
-                  : DEFAULT_CONTENT_LINE_COUNT;
+        let lineCount = DEFAULT_CONTENT_LINE_COUNT;
+        if (this.cachedLines.length > 0) {
+            lineCount = this.cachedLines.length;
+        } else if (ctx.content) {
+            lineCount = ctx.content.split('\n').length;
+        }
         const redundancyResult = evaluateDistributedRedundancy(descriptors, lineCount);
         this.issues.push(...redundancyResult.issues);
     }
@@ -870,10 +874,39 @@ export class ComplexityAnalyzer implements Analyzer {
         this.finalizeRedundancy(ctx, opts, thresh);
         this.finalizePooling(opts, thresh);
 
+        for (const [, sites] of this.loopSites) {
+            this.recordLoopSites(sites);
+        }
+
         return this.issues;
     }
 
+    public recordLoopSites(sites: readonly LoopSite[]): void {
+        for (let i = 0; i < sites.length; i++) {
+            const site = sites[i];
+            const key = `${site.file}|${site.line}|${site.symbol}`;
+            if (this.seenLoopSiteKeys.has(key)) continue;
+            this.seenLoopSiteKeys.add(key);
+            const bucket = this.accumulatedLoopSites.get(site.symbol);
+            if (bucket) {
+                bucket.push(site);
+            } else {
+                this.accumulatedLoopSites.set(site.symbol, [site]);
+            }
+        }
+    }
+
+    public getCurrentFileLoopSites(): LoopSite[] {
+        const out: LoopSite[] = [];
+        for (const [, sites] of this.loopSites) {
+            for (let i = 0; i < sites.length; i++) {
+                out.push(sites[i]);
+            }
+        }
+        return out;
+    }
+
     getLoopSites(): Map<string, LoopSite[]> {
-        return this.loopSites;
+        return this.accumulatedLoopSites.size > 0 ? this.accumulatedLoopSites : this.loopSites;
     }
 }

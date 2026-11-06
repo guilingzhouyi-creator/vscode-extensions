@@ -239,7 +239,7 @@ export class TestModernityAnalyzer implements Analyzer {
         const zoneProfile = this.resolveZoneProfile(ctx, isExplicitTest, ext);
         const issues: Issue[] = this.collectDualTrackIssues(ctx, zoneProfile);
 
-        if (!isTestFilePath(ctx.filePath)) {
+        if (!isExplicitTest) {
             return issues;
         }
 
@@ -278,6 +278,10 @@ export class TestModernityAnalyzer implements Analyzer {
         }
 
         return issues;
+    }
+
+    public resetState(): void {
+        // Stateless per-file analyzer — safe for pool reuse
     }
 
     /**
@@ -694,7 +698,7 @@ export class TestModernityAnalyzer implements Analyzer {
         sites: TestSite[],
         caseRecords: CaseRecord[],
     ): void {
-        const lines = ctx.content.split('\n');
+        const lines = ctx.lines ?? ctx.content.split('\n');
         let currentTestName = UNKNOWN_TEST_NAME;
         let currentCase: CaseRecord | null = null;
 

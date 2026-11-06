@@ -21,7 +21,7 @@ import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_GO_MODERN } from '../core/scoring/dimensionLiterals';
 import { REGEX } from '../core/constants';
-import type { SourceMaskConfig } from '../core/policy/source-mask';
+import { LINE_FLAG_HAS_CALL_PAREN, type SourceMaskConfig } from '../core/policy/source-mask';
 import {
     DeclarativeModernAnalyzer,
     type DeclarativeLineRule,
@@ -160,6 +160,7 @@ const GO_MODERN_RULES: readonly DeclarativeLineRule[] = [
         rule: 'GOM-ERR-001',
         severity: SEVERITY_WARNING,
         fastTrigger: '_',
+        requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
         message: 'Error return value is discarded with `_`, silently hiding potential failures.',
         suggestion:
             'Check the error explicitly (`if err != nil { return err }`) or document why it is safe to ignore.',
@@ -174,6 +175,7 @@ const GO_MODERN_RULES: readonly DeclarativeLineRule[] = [
         rule: 'GOM-CTX-001',
         severity: SEVERITY_WARNING,
         fastTrigger: 'context.Context',
+        requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
         message: '`context.Context` should be the first parameter of a function.',
         suggestion:
             'Move `ctx context.Context` to be the first parameter — this is the Go convention and matches `ctx`-first APIs like `net/http` and database drivers.',
@@ -188,6 +190,7 @@ const GO_MODERN_RULES: readonly DeclarativeLineRule[] = [
         rule: 'GOM-STYLE-001',
         severity: SEVERITY_INFO,
         fastTrigger: 'func',
+        requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
         message: 'Receiver name does not follow Go naming conventions.',
         suggestion:
             'Use a short (1-2 letter) abbreviation of the type name (e.g. `s` for `Server`, `c` for `Client`), and keep it consistent across all methods of the type.',

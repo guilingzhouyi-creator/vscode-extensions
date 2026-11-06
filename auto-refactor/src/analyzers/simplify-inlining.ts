@@ -23,6 +23,7 @@ import {
     calculateInliningUtility,
 } from '../core/intelligence/semantic-vector';
 import type { SimplifyOptions } from './simplify';
+import { isTestFilePath, isFixtureOrMockPath } from '../core/path';
 
 const RULE_SIM_INL_001 = 'SIM-INL-001';
 const CODE_AR_SIM_007 = 'AR:SIM:007';
@@ -219,11 +220,8 @@ function findSingleCallSite(
 
 function isTestOrFixturePath(filePath: string): boolean {
     return (
-        filePath.includes('/test/') ||
-        filePath.includes('/tests/') ||
-        filePath.includes('/fixtures/') ||
-        filePath.endsWith('.test.ts') ||
-        filePath.endsWith('.spec.ts') ||
+        isTestFilePath(filePath) ||
+        isFixtureOrMockPath(filePath) ||
         filePath.endsWith('.d.ts')
     );
 }

@@ -27,7 +27,7 @@ import { SEVERITY_WARNING, SEVERITY_INFO, SEVERITY_ERROR } from '../core/types';
 import { ANALYZER_RUST_MODERN } from '../core/scoring/dimensionLiterals';
 import { REGEX } from '../core/constants';
 import { findMatchingBraceInText } from '../core/ast/block-scope-utils';
-import type { SourceMaskConfig } from '../core/policy/source-mask';
+import { LINE_FLAG_HAS_CALL_PAREN, type SourceMaskConfig } from '../core/policy/source-mask';
 import {
     DeclarativeModernAnalyzer,
     type DeclarativeLineRule,
@@ -273,7 +273,7 @@ interface RustMultiLineScanContext {
 function scanAsyncLockIssues(context: RustMultiLineScanContext): void {
     const { file, raw, masked, delegate, issues } = context;
     for (let i = 0; i < masked.length; i += 1) {
-        if (!REGEX.SYNTAX.RUST_ASYNC_FN.test(masked[i])) {
+        if (!masked[i].includes('async') || !REGEX.SYNTAX.RUST_ASYNC_FN.test(masked[i])) {
             continue;
         }
         const scope = resolveAsyncFnScope(masked, i);
@@ -322,7 +322,7 @@ function scanUnsafeSafetyProofs(context: RustMultiLineScanContext): void {
         return;
     }
     for (let i = 0; i < masked.length; i += 1) {
-        if (!UNSAFE_KEYWORD_RE.test(masked[i])) {
+        if (!masked[i].includes('unsafe') || !UNSAFE_KEYWORD_RE.test(masked[i])) {
             continue;
         }
         let hasProof = false;
@@ -359,6 +359,7 @@ export class RustModernAnalyzer implements Analyzer {
                 rule: 'RSM-TRY-001',
                 severity: SEVERITY_WARNING,
                 fastTrigger: 'try!',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 pattern: REGEX.SYNTAX.RUST_TRY_MACRO,
                 message: '`try!` predates the `?` operator and obscures the error path.',
                 suggestion:
@@ -403,6 +404,7 @@ export class RustModernAnalyzer implements Analyzer {
                 rule: 'RSM-CLONE-001',
                 severity: SEVERITY_INFO,
                 fastTrigger: '.clone()',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 pattern: REGEX.SYNTAX.RUST_NEEDLESS_CLONE,
                 message:
                     '`.clone()` result is only compared or measured, so the copy is invisible work.',
@@ -418,6 +420,7 @@ export class RustModernAnalyzer implements Analyzer {
                 rule: 'RSM-UNWRAP-001',
                 severity: SEVERITY_INFO,
                 fastTrigger: '.unwrap()',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 pattern: REGEX.SYNTAX.RUST_UNWRAP,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message:
@@ -462,6 +465,7 @@ export class RustModernAnalyzer implements Analyzer {
                 rule: 'RSM-FORMAT-001',
                 severity: SEVERITY_WARNING,
                 fastTrigger: '!',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 message: 'Positional `{}` captures drift out of sync with the argument list.',
                 suggestion: 'Inline the binding (`format!("{value}")`) so the compiler checks it.',
                 condition: (ctx) =>
@@ -506,6 +510,7 @@ export class RustModernAnalyzer implements Analyzer {
                 rule: 'RSM-EXP-001',
                 severity: SEVERITY_INFO,
                 fastTrigger: '.expect',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 pattern: REGEX.SYNTAX.RUST_EXPECT_CALL,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message:
@@ -522,6 +527,7 @@ export class RustModernAnalyzer implements Analyzer {
                 rule: 'RSM-PNC-001',
                 severity: SEVERITY_ERROR,
                 fastTrigger: '!',
+                requiredLineFlags: LINE_FLAG_HAS_CALL_PAREN,
                 pattern: REGEX.SYNTAX.RUST_CRASH_MACRO,
                 condition: (ctx) => !isTestScopeOrFile(ctx),
                 message:
