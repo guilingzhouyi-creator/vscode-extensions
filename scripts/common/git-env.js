@@ -288,6 +288,32 @@ function readStagedBuffersBatch(repoRoot, relPaths) {
 }
 
 /**
+ * Checks whether HEAD commit is exempted by a trusted baseline receipt.
+ *
+ * @param {string} root - Repository root path.
+ * @param {string} headSha - HEAD commit SHA.
+ * @returns {boolean} True if exempt by baseline.
+ */
+function isHeadCoveredByBaseline(root, headSha) {
+  const baselinePath = path.join(root, '.git', 'gate-receipts', 'baseline.json');
+  if (!fs.existsSync(baselinePath)) return false;
+
+  try {
+    const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+    const { verifyRecordSignature } = require('./gate-receipts');
+    if (!verifyRecordSignature(baseline).ok || typeof baseline.commitSha !== 'string') {
+      return false;
+    }
+    const bSha = baseline.commitSha.trim();
+    if (bSha === headSha) return true;
+    runGit(['merge-base', '--is-ancestor', headSha, bSha], { cwd: root });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Head Receipt Ratchet Guard (Anti-Bypass).
  * Verifies that the current HEAD commit carries an authentically verified gate receipt.
  * Prevents stacking new changes on top of an unverified (--no-verify) commit.
@@ -309,6 +335,7 @@ function checkHeadReceipt(repoRoot) {
 
   const receiptPath = path.join(root, '.git', 'gate-receipts', `${headSha}.json`);
   if (!fs.existsSync(receiptPath)) return violations;
+  if (isHeadCoveredByBaseline(root, headSha)) return violations;
 
   try {
     const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));

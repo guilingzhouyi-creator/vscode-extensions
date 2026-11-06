@@ -11,6 +11,7 @@
 #   bash scripts/sh/run-daily-staggered-push.sh --dry-run
 #   bash scripts/sh/run-daily-staggered-push.sh
 #   bash scripts/sh/run-daily-staggered-push.sh --count 4 --force
+#   bash scripts/sh/run-daily-staggered-push.sh --impact --dry-run
 # ==============================================================================
 set -euo pipefail
 

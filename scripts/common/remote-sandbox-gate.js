@@ -19,6 +19,7 @@
 const { spawnSync, execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
@@ -242,6 +243,82 @@ function executeRemoteSsh(remoteScript) {
 }
 
 /**
+ * Synchronizes local workspace source files to the remote sandbox using tar over SSH.
+ *
+ * @returns {number} Process exit code (0 on success).
+ */
+function syncLocalToRemote() {
+  const host = process.env.INSTABOX_SSH_HOST || DEFAULT_SSH_HOST;
+  const port = process.env.INSTABOX_SSH_PORT || DEFAULT_SSH_PORT;
+  const user = process.env.INSTABOX_SSH_USER || DEFAULT_SSH_USER;
+  const remoteRoot = process.env.INSTABOX_WORKSPACE || DEFAULT_REMOTE_WORKSPACE;
+
+  const tempTarPath = path.join(
+    os.tmpdir(),
+    `vsc-sync-${Date.now()}-${process.pid}.tar.gz`
+  );
+
+  console.log('📦 [Tier 1.5] 正在打包本地源码增量归档...');
+  const tarArgs = [
+    '-czf',
+    tempTarPath,
+    '--exclude=.git',
+    '--exclude=node_modules',
+    '--exclude=*/node_modules',
+    '--exclude=target',
+    '--exclude=*/target',
+    '--exclude=.audit-logs',
+    '--exclude=dist',
+    '-C',
+    REPO_ROOT,
+    '.'
+  ];
+
+  const tarResult = spawnSync('tar', tarArgs, { stdio: 'inherit' });
+  if (tarResult.status !== 0 || !fs.existsSync(tempTarPath)) {
+    console.error('✖ BLOCK [Tier 1.5] 本地 tar 归档打包失败');
+    return 1;
+  }
+
+  const tarSize = (fs.statSync(tempTarPath).size / 1024 / 1024).toFixed(2);
+  console.log(`📡 [Tier 1.5] 正在同步源码包 (${tarSize} MB) 到预测试机 ${host}:${port}...`);
+
+  try {
+    const remoteMkdirAndExtract = `mkdir -p "${remoteRoot}" && tar -xzf - -C "${remoteRoot}"`;
+    const sshArgs = [
+      '-p', port,
+      '-o', 'BatchMode=yes',
+      '-o', 'StrictHostKeyChecking=accept-new',
+      `${user}@${host}`,
+      `bash -c ${JSON.stringify(remoteMkdirAndExtract)}`
+    ];
+
+    const sshProc = spawnSync('ssh', sshArgs, {
+      input: fs.readFileSync(tempTarPath),
+      stdio: ['pipe', 'inherit', 'inherit']
+    });
+
+    if (sshProc.status !== 0) {
+      console.error(`✖ BLOCK [Tier 1.5] 同步源码至预测试机失败 (Exit: ${sshProc.status})`);
+      return sshProc.status !== null ? sshProc.status : 1;
+    }
+    console.log(`✔ [Tier 1.5] 源码增量同步成功到达 ${remoteRoot}`);
+    return 0;
+  } catch (err) {
+    console.error(`✖ BLOCK [Tier 1.5] 远端同步异常: ${err.message}`);
+    return 1;
+  } finally {
+    try {
+      if (fs.existsSync(tempTarPath)) {
+        fs.unlinkSync(tempTarPath);
+      }
+    } catch {
+      // Best-effort cleanup
+    }
+  }
+}
+
+/**
  * Executes the slice commands locally.
  *
  * @param {string[]} sliceKeys - Array of slice keys.
@@ -291,6 +368,7 @@ function printHelp() {
                         默认: staged (根据当前改动智能推断)
   --remote, -r          在预测试机 (Linux Sandbox) 上执行 [默认]
   --local, -l           在当前本地环境中执行
+  --sync                同步本地工作区源码至预测试机 (通过 tar 管道传输)
   --deep, -d            深度全量审查模式 (audit-all 包含全部深层用例)
   --quiet, -q           静默模式
   --help, -h            显示本帮助信息
@@ -308,6 +386,99 @@ function printHelp() {
 }
 
 /**
+ * Handles source code synchronization if requested.
+ *
+ * @param {object} options - CLI options.
+ */
+function prepareSync(options) {
+  if (!options.sync) return;
+  if (options.mode === 'remote') {
+    const syncStatus = syncLocalToRemote();
+    if (syncStatus !== 0) {
+      process.exit(syncStatus);
+    }
+  } else {
+    console.log('ℹ [Tier 1.5] 本地模式无需同步源码');
+  }
+}
+
+/**
+ * Resolves target slices and optional impact command for the given slice name.
+ *
+ * @param {string} slice - Slice name.
+ * @returns {{ targetSlices: string[], impactCommand: string|null }} Target plan.
+ */
+function resolveExecutionTarget(slice) {
+  if (slice === 'impact') {
+    const fractalPaths = detectChangedFiles().filter(
+      file => file.replace(/\\/g, '/').includes('fractal-git/')
+    );
+    const { targets, unknown } = resolveImpactTargets(fractalPaths);
+    const impactCommand = buildImpactTestCommand(targets);
+    console.log(
+      `🔍 [Tier 1.5] 影响面切片: ${fractalPaths.length} 个 fractal-git 变更 -> ` +
+      `目标 [${targets.join(', ') || '无'}]`
+    );
+    if (unknown.length > 0) {
+      console.log(`⚠  未登记规则的 crate 路径 ${unknown.length} 处，已放宽到全部目标`);
+    }
+    return { targetSlices: ['impact'], impactCommand };
+  }
+
+  if (slice === 'staged' || slice === 'diff') {
+    const changed = detectChangedFiles();
+    const targetSlices = resolveDynamicSlices(changed);
+    console.log(
+      `🔍 [Tier 1.5] 变更集检测: 触及 ${changed.length} 个文件 -> ` +
+      `命中切片 [${targetSlices.join(', ')}]`
+    );
+    return { targetSlices, impactCommand: null };
+  }
+
+  if (SLICE_DEFINITIONS[slice]) {
+    return { targetSlices: [slice], impactCommand: null };
+  }
+
+  console.error(
+    `✖ 错误: 未知切片名称 "${slice}"。` +
+    `可选值: ${Object.keys(SLICE_DEFINITIONS).join(', ')}, impact, staged`
+  );
+  process.exit(2);
+}
+
+/**
+ * Dispatches test commands either locally or over SSH.
+ *
+ * @param {object} options - CLI options.
+ * @param {string[]} targetSlices - Slices to run.
+ * @param {string|null} impactCommand - Optional impact command.
+ * @returns {number} Process exit code.
+ */
+function dispatchCommands(options, targetSlices, impactCommand) {
+  if (impactCommand) {
+    if (options.mode === 'remote') {
+      const remoteRoot = process.env.INSTABOX_WORKSPACE || DEFAULT_REMOTE_WORKSPACE;
+      return executeRemoteSsh(`cd "${remoteRoot}" && ${impactCommand}`);
+    }
+    const shellCmd = process.platform === 'win32' ? 'pwsh' : 'bash';
+    const shellArg = process.platform === 'win32' ? '-Command' : '-c';
+    console.log(`  $ ${impactCommand}`);
+    const res = spawnSync(shellCmd, [shellArg, impactCommand], {
+      cwd: REPO_ROOT,
+      stdio: 'inherit'
+    });
+    return res.status === null ? 1 : res.status;
+  }
+
+  if (options.mode === 'remote') {
+    const remoteScript = buildRemoteScript(targetSlices, options.deep);
+    return executeRemoteSsh(remoteScript);
+  }
+
+  return executeLocalCommands(targetSlices, options.deep);
+}
+
+/**
  * Main entry point.
  */
 function main() {
@@ -318,60 +489,15 @@ function main() {
     process.exit(0);
   }
 
-  let targetSlices = [];
-  let impactCommand = null;
+  prepareSync(options);
 
-  if (options.slice === 'impact') {
-    // Impact mode exists so an ordinary change does not pay for the whole suite. It maps the
-    // changed paths to the test targets that can actually observe them; anything unrecognised
-    // widens to every target rather than assuming nothing is affected.
-    const fractalPaths = detectChangedFiles().filter(
-      file => file.replace(/\\/g, '/').includes('fractal-git/')
-    );
-    const { targets, unknown } = resolveImpactTargets(fractalPaths);
-    impactCommand = buildImpactTestCommand(targets);
-    console.log(
-      `🔍 [Tier 1.5] 影响面切片: ${fractalPaths.length} 个 fractal-git 变更 -> 目标 [${targets.join(', ') || '无'}]`
-    );
-    if (unknown.length > 0) {
-      console.log(`⚠  未登记规则的 crate 路径 ${unknown.length} 处，已放宽到全部目标`);
-    }
-    targetSlices = ['impact'];
-  } else if (options.slice === 'staged' || options.slice === 'diff') {
-    const changed = detectChangedFiles();
-    targetSlices = resolveDynamicSlices(changed);
-    console.log(`🔍 [Tier 1.5] 变更集检测: 触及 ${changed.length} 个文件 -> 命中切片 [${targetSlices.join(', ')}]`);
-  } else if (SLICE_DEFINITIONS[options.slice]) {
-    targetSlices = [options.slice];
-  } else {
-    console.error(`✖ 错误: 未知切片名称 "${options.slice}"。可选值: ${Object.keys(SLICE_DEFINITIONS).join(', ')}, staged`);
-    process.exit(2);
-  }
-
-  let exitCode = 0;
-  if (impactCommand) {
-    if (options.mode === 'remote') {
-      const remoteRoot = process.env.INSTABOX_WORKSPACE || DEFAULT_REMOTE_WORKSPACE;
-      exitCode = executeRemoteSsh(`cd "${remoteRoot}" && ${impactCommand}`);
-    } else {
-      const shellCmd = process.platform === 'win32' ? 'pwsh' : 'bash';
-      const shellArg = process.platform === 'win32' ? '-Command' : '-c';
-      console.log(`  $ ${impactCommand}`);
-      const res = spawnSync(shellCmd, [shellArg, impactCommand], {
-        cwd: REPO_ROOT,
-        stdio: 'inherit'
-      });
-      exitCode = res.status === null ? 1 : res.status;
-    }
-  } else if (options.mode === 'remote') {
-    const remoteScript = buildRemoteScript(targetSlices, options.deep);
-    exitCode = executeRemoteSsh(remoteScript);
-  } else {
-    exitCode = executeLocalCommands(targetSlices, options.deep);
-  }
+  const { targetSlices, impactCommand } = resolveExecutionTarget(options.slice);
+  const exitCode = dispatchCommands(options, targetSlices, impactCommand);
 
   if (exitCode === 0) {
-    console.log(`\n✔ PASS [Tier 1.5 预测试机] 所选切片 [${targetSlices.join(', ')}] 100% 验证通过！`);
+    console.log(
+      `\n✔ PASS [Tier 1.5 预测试机] 所选切片 [${targetSlices.join(', ')}] 100% 验证通过！`
+    );
   } else {
     console.error(`\n✖ BLOCK [Tier 1.5 预测试机] 切片审查未通过 (ExitCode: ${exitCode})`);
   }
@@ -387,5 +513,6 @@ module.exports = {
   SLICE_DEFINITIONS,
   parseArgs,
   resolveDynamicSlices,
-  buildRemoteScript
+  buildRemoteScript,
+  syncLocalToRemote
 };

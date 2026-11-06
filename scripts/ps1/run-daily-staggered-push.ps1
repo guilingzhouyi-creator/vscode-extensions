@@ -10,6 +10,7 @@
 #   pwsh -File scripts/ps1/run-daily-staggered-push.ps1 -DryRun
 #   pwsh -File scripts/ps1/run-daily-staggered-push.ps1
 #   pwsh -File scripts/ps1/run-daily-staggered-push.ps1 -Count 4 -Force
+#   pwsh -File scripts/ps1/run-daily-staggered-push.ps1 -Impact -DryRun
 # ==============================================================================
 [CmdletBinding()]
 param(
@@ -21,6 +22,8 @@ param(
     [switch]$AllowBypass,
     [switch]$VerifyRemote,
     [string]$RemoteSlice,
+    [switch]$Impact,
+    [switch]$Sync,
     [switch]$Status
 )
 
@@ -68,6 +71,12 @@ if ($RemoteSlice) {
     $nodeArgs += @("--verify-remote", $RemoteSlice)
 } elseif ($VerifyRemote) {
     $nodeArgs += "--verify-remote"
+}
+if ($Impact) {
+    $nodeArgs += "--impact"
+}
+if ($Sync) {
+    $nodeArgs += "--sync"
 }
 
 & $nodeCmd $nodeArgs

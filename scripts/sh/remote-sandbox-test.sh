@@ -10,9 +10,11 @@
 # 用法示例:
 #   bash scripts/sh/remote-sandbox-test.sh --slice hygiene
 #   bash scripts/sh/remote-sandbox-test.sh --slice rust
+#   bash scripts/sh/remote-sandbox-test.sh --slice impact
 #   bash scripts/sh/remote-sandbox-test.sh --slice staged
 #   bash scripts/sh/remote-sandbox-test.sh --slice all
 #   bash scripts/sh/remote-sandbox-test.sh --local
+#   bash scripts/sh/remote-sandbox-test.sh --sync
 # ==============================================================================
 set -euo pipefail
 

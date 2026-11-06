@@ -9,15 +9,18 @@
 # 用法示例:
 #   pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Slice hygiene
 #   pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Slice rust
+#   pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Slice impact
 #   pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Slice staged
 #   pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Slice all
 #   pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Local
+#   pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Sync
 # ==============================================================================
 [CmdletBinding()]
 param(
     [string]$Slice = "staged",
     [switch]$Local,
     [switch]$Remote,
+    [switch]$Sync,
     [switch]$Deep,
     [switch]$Quiet
 )
@@ -49,6 +52,9 @@ if ($Local) {
 }
 if ($Remote) {
     $nodeArgs += "--remote"
+}
+if ($Sync) {
+    $nodeArgs += "--sync"
 }
 if ($Deep) {
     $nodeArgs += "--deep"

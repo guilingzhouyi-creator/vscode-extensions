@@ -108,7 +108,7 @@
 | `sh/` | Bash | `version-bump.sh` | release（全工作区版本号一致性递增工具） | 本地 CLI |
 | `ps1/` | PowerShell | `version-bump.ps1` | release（version-bump.sh 同构双实现） | 本地 CLI（Windows） |
 | `common/` | Node.js | `project-registry-resolver.js` | tooling / registry（全工作区受控项目单源动态发现与路径解析器） | 本地 CLI、CI |
-| `common/` | Node.js | `remote-sandbox-gate.js` | tooling / gate（云端 Linux 预测试机切片调度中枢，把改动集路由到 hygiene、rust、timing、auto-refactor、webgames 与 all 六类预演） | `remote-sandbox-test.ps1`、`remote-sandbox-test.sh`、CI |
+| `common/` | Node.js | `remote-sandbox-gate.js` | tooling / gate（云端 Linux 预测试机切片调度中枢，把改动集路由到 hygiene、rust、timing、auto-refactor、webgames、impact 与 all 预演切片，支持 --sync 源码增量同步） | `remote-sandbox-test.ps1`、`remote-sandbox-test.sh`、CI |
 | `common/` | Node.js | `render-skill-catalog.js` | tooling / skills（将技能注册表渲染为面向人类的技能调用全景清单） | 本地 CLI |
 | `common/` | Node.js | `skill-registry-resolver.js` | tooling / skills（技能注册表单源读取与路径解析引擎） | `render-skill-catalog`、CI |
 | `common/` | JSON | `skill-registry.json` | data / ssot（全工作区技能单一真源元数据与触发词拓扑注册表） | `skill-registry-resolver` |

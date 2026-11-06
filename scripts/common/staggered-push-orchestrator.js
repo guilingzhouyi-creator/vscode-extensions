@@ -276,23 +276,34 @@ function auditDocumentationConsistency() {
  * Executes a targeted slice verification on the Tier 1.5 remote sandbox machine.
  *
  * @param {string} sliceName - Targeted slice name.
+ * @param {boolean} [syncRemote=false] - Whether to sync local files first.
  * @returns {{ passed: boolean, message: string }} Verification verdict.
  */
-function auditRemoteSandboxSlice(sliceName) {
+function auditRemoteSandboxSlice(sliceName, syncRemote = false) {
   const sandboxGateJs = path.join(__dirname, 'remote-sandbox-gate.js');
   if (!fs.existsSync(sandboxGateJs)) {
     return { passed: true, message: 'Remote sandbox validator script omitted' };
   }
   try {
-    execFileSync(process.execPath, [sandboxGateJs, '--slice', sliceName, '--remote'], {
+    const gateArgs = [sandboxGateJs, '--slice', sliceName, '--remote'];
+    if (syncRemote) {
+      gateArgs.push('--sync');
+    }
+    execFileSync(process.execPath, gateArgs, {
       cwd: REPO_ROOT,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    return { passed: true, message: `Tier 1.5 remote sandbox slice '${sliceName}' passed` };
+    return {
+      passed: true,
+      message: `Tier 1.5 remote sandbox slice '${sliceName}' passed`,
+    };
   } catch (err) {
     const detail = (err.stderr || err.stdout || err.message || '').trim();
-    return { passed: false, message: `Tier 1.5 remote sandbox slice '${sliceName}' failure: ${detail}` };
+    return {
+      passed: false,
+      message: `Tier 1.5 remote sandbox slice '${sliceName}' failure: ${detail}`,
+    };
   }
 }
 
@@ -317,9 +328,16 @@ function isWorkingTreeClean() {
  * @param {string} branch - Target branch name.
  * @param {string} targetSha - Target commit SHA.
  * @param {string|null} [verifyRemoteSlice=null] - Optional remote sandbox slice to audit.
+ * @param {boolean} [syncRemote=false] - Whether to sync files to remote before audit.
  * @returns {{ passed: boolean, reason?: string }} Verification verdict.
  */
-function preflightCheckpointAudit(remote, branch, targetSha, verifyRemoteSlice = null) {
+function preflightCheckpointAudit(
+  remote,
+  branch,
+  targetSha,
+  verifyRemoteSlice = null,
+  syncRemote = false
+) {
   const range = `${remote}/${branch}..${targetSha}`;
   const commitVerdict = auditCommitRange(range);
   if (!commitVerdict.passed) {
@@ -337,7 +355,7 @@ function preflightCheckpointAudit(remote, branch, targetSha, verifyRemoteSlice =
   }
 
   if (verifyRemoteSlice) {
-    const remoteVerdict = auditRemoteSandboxSlice(verifyRemoteSlice);
+    const remoteVerdict = auditRemoteSandboxSlice(verifyRemoteSlice, syncRemote);
     if (!remoteVerdict.passed) {
       return { passed: false, reason: remoteVerdict.message };
     }
@@ -369,10 +387,11 @@ function resolveBatchCount(explicitCount, totalBacklog) {
  * @param {number} [options.count=0] - Explicit count override, 0 for random 3-6.
  * @param {boolean} [options.force=false] - Ignore today's idempotency check.
  * @param {boolean} [options.preflight=false] - If true, execute preflight check without pushing.
- * @param {boolean} [options.allowBypass=false] - If true, forward allow-bypass flag to git pre-push.
+ * @param {boolean} [options.allowBypass=false] - Forward allow-bypass flag to git pre-push.
  * @param {string} [options.remote=DEFAULT_REMOTE] - Git remote name.
  * @param {string} [options.branch=DEFAULT_BRANCH] - Target branch name.
- * @param {string|null} [options.verifyRemoteSlice=null] - Optional Tier 1.5 remote sandbox slice to audit.
+ * @param {string|null} [options.verifyRemoteSlice=null] - Tier 1.5 remote sandbox slice.
+ * @param {boolean} [options.syncRemote=false] - Whether to sync local files to remote first.
  * @returns {object} Execution summary.
  */
 function executeStaggeredPush(options = {}) {
@@ -385,6 +404,7 @@ function executeStaggeredPush(options = {}) {
     remote = DEFAULT_REMOTE,
     branch = DEFAULT_BRANCH,
     verifyRemoteSlice = null,
+    syncRemote = false,
   } = options;
 
   const todayStr = getUtcDateString();
@@ -435,7 +455,13 @@ function executeStaggeredPush(options = {}) {
   const startSha = unpushedCommits[0];
 
   // 5. Preflight check on candidate target commit
-  const preflightVerdict = preflightCheckpointAudit(remote, branch, targetSha, verifyRemoteSlice);
+  const preflightVerdict = preflightCheckpointAudit(
+    remote,
+    branch,
+    targetSha,
+    verifyRemoteSlice,
+    syncRemote
+  );
   if (!preflightVerdict.passed) {
     return {
       status: 'BLOCK',
@@ -546,14 +572,19 @@ if (require.main === module) {
     remote = args[remoteIdx + 1];
   }
 
+  const syncRemote = args.includes('--sync');
   let verifyRemoteSlice = null;
-  const vrsIdx = args.findIndex((a) => a === '--verify-remote' || a === '--remote-slice');
-  if (vrsIdx !== -1) {
-    const nextArg = args[vrsIdx + 1];
-    if (nextArg && !nextArg.startsWith('-')) {
-      verifyRemoteSlice = nextArg;
-    } else {
-      verifyRemoteSlice = 'hygiene';
+  if (args.includes('--impact')) {
+    verifyRemoteSlice = 'impact';
+  } else {
+    const vrsIdx = args.findIndex((a) => a === '--verify-remote' || a === '--remote-slice');
+    if (vrsIdx !== -1) {
+      const nextArg = args[vrsIdx + 1];
+      if (nextArg && !nextArg.startsWith('-')) {
+        verifyRemoteSlice = nextArg;
+      } else {
+        verifyRemoteSlice = 'hygiene';
+      }
     }
   }
 
@@ -586,6 +617,7 @@ if (require.main === module) {
     branch,
     remote,
     verifyRemoteSlice,
+    syncRemote,
   });
 
   if (jsonOutput) {
