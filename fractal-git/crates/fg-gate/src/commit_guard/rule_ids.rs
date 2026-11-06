@@ -4,6 +4,7 @@
 /// real registry rather than against a hand-maintained subset. Regenerate with
 /// `node scripts/common/generate-rule-catalog.js --write` followed by this emitter when the
 /// catalog changes.
+#[rustfmt::skip]
 pub const WORKSPACE_RULE_IDS: &[&str] = &[
     "ADV-BND-001", "ADV-CFG-001", "ADV-CFG-002", "ADV-DEC-001", "ADV-EVT-001",
     "ADV-EVT-002", "ADV-EVT-003", "ADV-EVT-004", "ADV-LAM-001", "ADV-NAM-001",

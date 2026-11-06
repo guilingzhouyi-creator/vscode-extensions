@@ -187,7 +187,8 @@ mod tests {
 
         assert!(quarantine_result.is_err());
         let index_payload =
-            std::fs::read(quarantine_scratch_dir.join(QuarantineRegistry::REGISTRY_FILENAME)).unwrap();
+            std::fs::read(quarantine_scratch_dir.join(QuarantineRegistry::REGISTRY_FILENAME))
+                .unwrap();
         let registry: QuarantineRegistry = serde_json::from_slice(&index_payload).unwrap();
         assert_eq!(registry.records.len(), 1);
         assert_eq!(registry.records[0].agent_id, "subagent-test-1");

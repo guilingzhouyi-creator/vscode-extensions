@@ -40,7 +40,8 @@ pub fn scan(message: &str) -> Vec<TypographyFinding> {
                     rule_id: fg_core::constants::rules::RULE_FGT_MSG_001,
                     token: invisible,
                     line: line_number,
-                    message: "Commit message contains an invisible formatting character".to_string(),
+                    message: "Commit message contains an invisible formatting character"
+                        .to_string(),
                 });
             }
             if let Some(emoji) = find_decorative_emoji(line) {
@@ -58,7 +59,8 @@ pub fn scan(message: &str) -> Vec<TypographyFinding> {
                     rule_id: fg_core::constants::rules::RULE_FGT_MSG_001,
                     token: separator,
                     line: line_number,
-                    message: "Header must use an ASCII colon followed by exactly one space".to_string(),
+                    message: "Header must use an ASCII colon followed by exactly one space"
+                        .to_string(),
                 });
             }
         }

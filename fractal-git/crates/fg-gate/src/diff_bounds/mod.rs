@@ -66,8 +66,7 @@ impl DiffBoundsGovernor {
             match verify_admission_turnover(batch_totals.total_net_turnover, recent_turnovers) {
                 Ok(threshold_value) => (None, threshold_value),
                 Err(violation) => {
-                    let threshold_value =
-                        calculate_empirical_admission_threshold(recent_turnovers);
+                    let threshold_value = calculate_empirical_admission_threshold(recent_turnovers);
                     (Some(violation), threshold_value)
                 }
             };

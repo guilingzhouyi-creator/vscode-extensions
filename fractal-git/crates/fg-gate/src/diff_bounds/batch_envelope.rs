@@ -56,7 +56,9 @@ pub struct BatchEnvelopeViolation {
 }
 
 /// Audits a commit batch aggregate totals against macro envelope bounds.
-pub fn audit_commit_batch_envelope(batch_totals: &CommitBatchTotals) -> Result<(), BatchEnvelopeViolation> {
+pub fn audit_commit_batch_envelope(
+    batch_totals: &CommitBatchTotals,
+) -> Result<(), BatchEnvelopeViolation> {
     if batch_totals.total_effective_lines_added > MAX_COMMIT_BATCH_ADD_5D_ELOC {
         return Err(BatchEnvelopeViolation {
             rule_id: "BLOCK_BATCH_ADD_OVERFLOW",

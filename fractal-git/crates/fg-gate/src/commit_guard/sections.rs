@@ -363,9 +363,7 @@ fn reject_short_bullets(section: &DeclaredSection, violations: &mut Vec<String>)
         };
         let substantive = item
             .chars()
-            .filter(|character| {
-                !character.is_whitespace() && !"`'\"()（）".contains(*character)
-            })
+            .filter(|character| !character.is_whitespace() && !"`'\"()（）".contains(*character))
             .count();
         if substantive > 0 && substantive < 8 {
             violations.push(format!(

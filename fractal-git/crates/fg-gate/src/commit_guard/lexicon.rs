@@ -30,43 +30,112 @@ pub struct LexiconFinding {
 
 /// Provisional or offhand wording that must not stand in for a technical statement.
 const PROVISIONAL_TERMS: &[&str] = &[
-    "wip", "temp", "tmp", "hack", "hacky",
-    "placeholder", "bandaid", "stopgap", "tentative", "provisional",
-    "临时", "暂存", "暂时", "凑合", "随便",
-    "粗略", "先这样", "待处理", "后续再看", "占位",
-    "打补丁", "草率",
+    "wip",
+    "temp",
+    "tmp",
+    "hack",
+    "hacky",
+    "placeholder",
+    "bandaid",
+    "stopgap",
+    "tentative",
+    "provisional",
+    "临时",
+    "暂存",
+    "暂时",
+    "凑合",
+    "随便",
+    "粗略",
+    "先这样",
+    "待处理",
+    "后续再看",
+    "占位",
+    "打补丁",
+    "草率",
 ];
 
 /// Stylistic hyperbole that asserts quality instead of describing behaviour.
 const HYPERBOLE_TERMS: &[&str] = &[
-    "perfect", "flawless", "ultimate", "bulletproof", "unbeatable",
-    "invincible", "industrialgrade", "stateoftheart", "bestinclass", "绝对",
-    "彻底", "完美", "极致", "终极", "史无前例",
-    "彻底解决", "完全消除", "永不", "绝不", "绝无",
-    "神喻", "神谕",
+    "perfect",
+    "flawless",
+    "ultimate",
+    "bulletproof",
+    "unbeatable",
+    "invincible",
+    "industrialgrade",
+    "stateoftheart",
+    "bestinclass",
+    "绝对",
+    "彻底",
+    "完美",
+    "极致",
+    "终极",
+    "史无前例",
+    "彻底解决",
+    "完全消除",
+    "永不",
+    "绝不",
+    "绝无",
+    "神喻",
+    "神谕",
 ];
 
 /// Peerless and dismissive wording that carries no technical meaning.
 const DISMISSIVE_TERMS: &[&str] = &[
-    "garbage", "rubbish", "trash", "horrible", "terrible",
-    "worthless", "disaster", "useless", "垃圾", "一团糟",
-    "稀烂", "毫无意义", "彻底失败", "毫无价值", "烂代码",
+    "garbage",
+    "rubbish",
+    "trash",
+    "horrible",
+    "terrible",
+    "worthless",
+    "disaster",
+    "useless",
+    "垃圾",
+    "一团糟",
+    "稀烂",
+    "毫无意义",
+    "彻底失败",
+    "毫无价值",
+    "烂代码",
     "废物",
 ];
 
 /// Promotional and meta narrative vocabulary.
 const PROMOTIONAL_TERMS: &[&str] = &[
-    "gamechanger", "groundbreaking", "paradigmshift", "revolutionary", "monumental",
-    "milestone", "标杆", "跨时代", "划时代", "重磅",
-    "里程碑式", "突破性", "颠覆性", "重塑", "飞跃",
-    "震撼", "史诗级", "跨越式",
+    "gamechanger",
+    "groundbreaking",
+    "paradigmshift",
+    "revolutionary",
+    "monumental",
+    "milestone",
+    "标杆",
+    "跨时代",
+    "划时代",
+    "重磅",
+    "里程碑式",
+    "突破性",
+    "颠覆性",
+    "重塑",
+    "飞跃",
+    "震撼",
+    "史诗级",
+    "跨越式",
 ];
 
 /// Subset of provisional terms in CJK script that require containment matching.
 const CJK_PROVISIONAL_TERMS: &[&str] = &[
-    "临时", "暂存", "暂时", "凑合", "随便",
-    "粗略", "先这样", "待处理", "后续再看", "占位",
-    "打补丁", "草率",
+    "临时",
+    "暂存",
+    "暂时",
+    "凑合",
+    "随便",
+    "粗略",
+    "先这样",
+    "待处理",
+    "后续再看",
+    "占位",
+    "打补丁",
+    "草率",
 ];
 
 /// Vocabulary that is legitimate engineering terminology and must survive the scan.
@@ -74,18 +143,46 @@ const CJK_PROVISIONAL_TERMS: &[&str] = &[
 /// Kept in one place so a new compound only has to be added here rather than special-cased at each
 /// call site.
 const WHITELIST_PHRASES: &[&str] = &[
-    "临时文件", "临时目录", "临时表", "临时对象", "临时缓冲区",
-    "临时变量", "临时存储", "暂存区", "暂存切片", "占位符",
-    "格式占位符", "模板占位符", "参数占位符", "占位内容", "占位参数",
-    "占位节点", "空占位", "占位字符", "绝对路径", "绝对地址",
-    "绝对值", "绝对坐标", "绝对定位", "垃圾回收", "测试神谕",
-    "断言神谕", "差分神谕", "测试预言机",
+    "临时文件",
+    "临时目录",
+    "临时表",
+    "临时对象",
+    "临时缓冲区",
+    "临时变量",
+    "临时存储",
+    "暂存区",
+    "暂存切片",
+    "占位符",
+    "格式占位符",
+    "模板占位符",
+    "参数占位符",
+    "占位内容",
+    "占位参数",
+    "占位节点",
+    "空占位",
+    "占位字符",
+    "绝对路径",
+    "绝对地址",
+    "绝对值",
+    "绝对坐标",
+    "绝对定位",
+    "垃圾回收",
+    "测试神谕",
+    "断言神谕",
+    "差分神谕",
+    "测试预言机",
 ];
 
 /// Unresolved markers that defer a decision instead of stating one.
 const UNRESOLVED_MARKERS: &[&str] = &[
-    "todo", "fixme", "tbd", "xxx", "待补充",
-    "待确认", "待办", "未完待续",
+    "todo",
+    "fixme",
+    "tbd",
+    "xxx",
+    "待补充",
+    "待确认",
+    "待办",
+    "未完待续",
 ];
 
 /// Scans a full commit message for lexical violations.
@@ -314,7 +411,10 @@ fn classify_token(token: &str) -> Option<&'static str> {
         return None;
     }
 
-    if CJK_PROVISIONAL_TERMS.iter().any(|term| token.contains(term)) {
+    if CJK_PROVISIONAL_TERMS
+        .iter()
+        .any(|term| token.contains(term))
+    {
         return Some(fg_core::constants::rules::RULE_FGT_MSG_004);
     }
     if sorted_all_forbidden_table().binary_search(&token).is_ok() {

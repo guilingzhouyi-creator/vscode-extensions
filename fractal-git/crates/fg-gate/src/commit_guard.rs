@@ -11,9 +11,16 @@
 //!
 //! Domain Governance Rules: FGT-GAT-001 (gate governance), FGT-COR-001.
 
-pub mod coherence; pub mod declaration; pub mod lexicon; pub mod project;
-pub mod rewrite; pub mod rule_ids; pub mod sections; pub mod style;
-pub mod typography; pub mod verification;
+pub mod coherence;
+pub mod declaration;
+pub mod lexicon;
+pub mod project;
+pub mod rewrite;
+pub mod rule_ids;
+pub mod sections;
+pub mod style;
+pub mod typography;
+pub mod verification;
 
 pub(crate) use rule_ids::is_registered as is_registered_workspace_rule;
 
