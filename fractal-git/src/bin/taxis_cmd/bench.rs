@@ -30,10 +30,7 @@ pub fn handle_bench(ctx: &CliContext) {
     let level = parse_bench_level(&ctx.args);
     let is_e2e = level == BenchmarkLevel::Level4E2E
         || ctx.args.iter().any(|arg| {
-            arg == "--e2e"
-                || arg == "--clone"
-                || arg == "bench-clone"
-                || arg == "--bench-clone"
+            arg == "--e2e" || arg == "--clone" || arg == "bench-clone" || arg == "--bench-clone"
         });
 
     if is_e2e {
@@ -73,10 +70,7 @@ fn parse_bench_level(args: &[String]) -> BenchmarkLevel {
         return BenchmarkLevel::All;
     }
     if args.iter().any(|arg| {
-        arg == "--e2e"
-            || arg == "--clone"
-            || arg == "bench-clone"
-            || arg == "--bench-clone"
+        arg == "--e2e" || arg == "--clone" || arg == "bench-clone" || arg == "--bench-clone"
     }) {
         return BenchmarkLevel::Level4E2E;
     }

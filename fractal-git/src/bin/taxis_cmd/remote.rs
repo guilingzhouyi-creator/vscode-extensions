@@ -89,17 +89,54 @@ pub fn handle_fetch(ctx: &CliContext) {
 
 /// Dispatches the `taxis push` command.
 pub fn handle_push(ctx: &CliContext) {
-    let remote_target = ctx.args.first().map(String::as_str).unwrap_or("origin");
+    let mut dry_run = false;
+    let mut force = false;
+    let mut positional: Vec<String> = Vec::new();
+    for arg in &ctx.args {
+        match arg.as_str() {
+            "-n" | "--dry-run" => dry_run = true,
+            "-f" | "--force" => force = true,
+            "-u" | "--set-upstream" => {}
+            other if other.starts_with('-') => {
+                reject(CliTag::ERROR, format!("push: unknown option '{other}'"));
+            }
+            other => positional.push(other.to_string()),
+        }
+    }
+    let remote_target = positional.first().map(String::as_str).unwrap_or("origin");
+    let refspecs: &[String] = if positional.len() > 1 {
+        &positional[1..]
+    } else {
+        &[]
+    };
     let config_path = ctx.git_dir.join("config");
     let target_url = resolve_remote_url(&config_path, remote_target);
 
     let scheme = require_transport("push", remote_target, &target_url);
-    execute_loopback_push(ctx, scheme, remote_target, &target_url);
+    if scheme == TransportScheme::LocalFile && !dry_run {
+        if let Some(dest_git_dir) = super::remote_sync::resolve_source_git_dir(&target_url) {
+            super::remote_sync::sync_local_repository_push(&super::remote_sync::LocalPushParams {
+                ctx,
+                dest_git_dir: &dest_git_dir,
+                remote_target,
+                target_url: &target_url,
+                refspecs,
+                force,
+            });
+            return;
+        }
+    }
+    execute_loopback_push(ctx, scheme, remote_target, &target_url, refspecs, dry_run);
 }
 
 /// Dispatches the `taxis pull` command.
 pub fn handle_pull(ctx: &CliContext) {
-    let remote_target = ctx.args.first().map(String::as_str).unwrap_or("origin");
+    let remote_target = ctx
+        .args
+        .iter()
+        .find(|arg| !arg.starts_with('-'))
+        .map(String::as_str)
+        .unwrap_or("origin");
     let config_path = ctx.git_dir.join("config");
     let target_url = resolve_remote_url(&config_path, remote_target);
 
@@ -388,9 +425,9 @@ fn require_transport(operation: &str, remote_target: &str, url: &str) -> Transpo
     match resolve_transport(url) {
         ResolvedTransport::Available(scheme) => scheme,
         ResolvedTransport::NetworkDisabled { scheme } => {
-            if !fg_core::constants::Capabilities::current().allows(
-                fg_core::constants::CAPABILITY_NETWORK,
-            ) {
+            if !fg_core::constants::Capabilities::current()
+                .allows(fg_core::constants::CAPABILITY_NETWORK)
+            {
                 fail_unavailable(
                     fg_core::constants::CAPABILITY_NETWORK,
                     &format!("{operation} over '{scheme}://' to '{remote_target}'"),
@@ -410,10 +447,20 @@ fn require_transport(operation: &str, remote_target: &str, url: &str) -> Transpo
 }
 
 /// Executes local loopback fetch without network sockets.
-fn execute_loopback_fetch(ctx: &CliContext, scheme: TransportScheme, remote_target: &str, target_url: &str) {
+fn execute_loopback_fetch(
+    ctx: &CliContext,
+    scheme: TransportScheme,
+    remote_target: &str,
+    target_url: &str,
+) {
     if scheme == TransportScheme::LocalFile {
         if let Some(src_git) = super::remote_sync::resolve_source_git_dir(target_url) {
-            super::remote_sync::sync_local_repository_fetch(ctx, &src_git, remote_target, target_url);
+            super::remote_sync::sync_local_repository_fetch(
+                ctx,
+                &src_git,
+                remote_target,
+                target_url,
+            );
             return;
         }
     }
@@ -463,6 +510,8 @@ fn execute_loopback_push(
     scheme: TransportScheme,
     remote_target: &str,
     target_url: &str,
+    refspecs: &[String],
+    dry_run: bool,
 ) {
     let mut loopback = LoopbackTransport::new(target_url);
     let repo_view = match RepoView::open(ctx) {
@@ -470,8 +519,8 @@ fn execute_loopback_push(
         Err(open_error) => reject(CliTag::ERROR, format!("open repository view: {open_error}")),
     };
 
-    let head_oid = match repo_view.head_commit() {
-        Ok(Some(commit_oid)) => commit_oid,
+    let (effective_ref, head_oid) = match repo_view.effective_head_commit() {
+        Ok(Some(resolved)) => resolved,
         Ok(None) => reject(
             CliTag::ERROR,
             "fatal: HEAD is unborn or repository is empty",
@@ -479,15 +528,30 @@ fn execute_loopback_push(
         Err(head_error) => reject(CliTag::ERROR, format!("read HEAD: {head_error}")),
     };
 
-    let push_updates = vec![("refs/heads/main".to_string(), head_oid, None)];
+    let mut push_updates = Vec::new();
+    if refspecs.is_empty() {
+        push_updates.push(("refs/heads/main".to_string(), head_oid, None));
+        if effective_ref != "refs/heads/main" && effective_ref != "HEAD" {
+            push_updates.push((effective_ref, head_oid, None));
+        }
+    } else {
+        for spec in refspecs {
+            let clean = spec.strip_prefix('+').unwrap_or(spec.as_str());
+            let dst = clean.split_once(':').map(|(_, d)| d).unwrap_or(clean);
+            let full_dst = if dst.starts_with("refs/") {
+                dst.to_string()
+            } else {
+                format!("refs/heads/{dst}")
+            };
+            push_updates.push((full_dst, head_oid, None));
+        }
+    }
+
     let push_results = match loopback.push(&push_updates, None) {
         Ok(report_list) => report_list,
         Err(push_error) => reject(CliTag::ERROR, format!("loopback push error: {push_error}")),
     };
 
-    // A transport that accepted the connection can still reject an individual ref. Reporting the
-    // overall command as success in that case is the same dishonesty as the unmounted path, so any
-    // rejected ref fails the command after every result has been printed.
     let rejected_refs: Vec<&String> = push_results
         .iter()
         .filter(|(_, status)| status.is_err())
@@ -511,16 +575,19 @@ fn execute_loopback_push(
             "transport": scheme.as_str(),
             "remote": remote_target,
             "url": target_url,
+            "dry_run": dry_run,
             "reports": reports_json
         }));
     } else {
+        let prefix = if dry_run { "[dry-run] " } else { "" };
         println!(
-            "Pushing to {} endpoint '{remote_target}' ({target_url})...",
+            "{prefix}Pushing to {} endpoint '{remote_target}' ({target_url})...",
             scheme.as_str()
         );
+        let tag = if dry_run { "[dry-run]" } else { "[pushed]" };
         for (ref_name, result_status) in &push_results {
             match result_status {
-                Ok(_) => println!("  * [pushed] {ref_name} -> {}", head_oid.to_hex()),
+                Ok(_) => println!("  * {tag} {ref_name} -> {}", head_oid.to_hex()),
                 Err(err_msg) => println!("  ! [rejected] {ref_name} ({err_msg})"),
             }
         }
@@ -529,12 +596,15 @@ fn execute_loopback_push(
     if !rejected_refs.is_empty() {
         reject(
             CliTag::ERROR,
-            format!("{} reference(s) were rejected by the remote", rejected_refs.len()),
+            format!(
+                "{} reference(s) were rejected by the remote",
+                rejected_refs.len()
+            ),
         );
     }
 }
 
-/// Executes local loopback pull (fetch + status confirmation).
+/// Executes local loopback pull (fetch + status confirmation or fast-forward).
 fn execute_loopback_pull(
     ctx: &CliContext,
     scheme: TransportScheme,
@@ -545,12 +615,12 @@ fn execute_loopback_pull(
     if scheme == TransportScheme::LocalFile {
         let fetch_head = ctx.git_dir.join("FETCH_HEAD");
         if fetch_head.is_file() {
-            let mut merge_args = ctx.args.clone();
-            merge_args.clear();
-            merge_args.push("FETCH_HEAD".to_string());
+            if try_pull_into_unborn_head(ctx, &fetch_head) {
+                return;
+            }
             let merge_ctx = CliContext {
                 git_dir: ctx.git_dir.clone(),
-                args: merge_args,
+                args: vec!["FETCH_HEAD".to_string()],
                 json_mode: ctx.json_mode,
             };
             super::merge::handle_merge(&merge_ctx);
@@ -560,4 +630,66 @@ fn execute_loopback_pull(
     if !ctx.json_mode {
         println!("Already up to date.");
     }
+}
+
+/// Fast-forwards an unborn repository directly to the first commit listed in `FETCH_HEAD`.
+fn try_pull_into_unborn_head(ctx: &CliContext, fetch_head_path: &Path) -> bool {
+    let Ok(view) = RepoView::open(ctx) else {
+        return false;
+    };
+    if view.head_commit().ok().flatten().is_some() {
+        return false;
+    }
+    if let Ok(Some((_, eff_oid))) = view.effective_head_commit() {
+        let branch = view
+            .head_branch()
+            .ok()
+            .flatten()
+            .map(|(n, _)| n)
+            .unwrap_or_else(|| "main".to_string());
+        super::checkout::update_references(
+            view.git_dir(),
+            view.work_root(),
+            eff_oid,
+            Some(&branch),
+        );
+        return false;
+    }
+    let Ok(content) = std::fs::read_to_string(fetch_head_path) else {
+        return false;
+    };
+    let Some(first_hex) = content.split_whitespace().next() else {
+        return false;
+    };
+    let Ok(target_oid) = fg_core::models::Oid::from_hex(first_hex) else {
+        return false;
+    };
+    let Ok(files) = super::tree_view::flatten_commit_tree(&view, &target_oid) else {
+        return false;
+    };
+    let index_entries = super::checkout::materialize_files(&view, &files);
+    super::checkout::update_dirc_index(view.git_dir(), &index_entries);
+    let branch = view
+        .head_branch()
+        .ok()
+        .flatten()
+        .map(|(n, _)| n)
+        .unwrap_or_else(|| "main".to_string());
+    super::checkout::update_references(view.git_dir(), view.work_root(), target_oid, Some(&branch));
+    let cell_ref = view
+        .git_dir()
+        .join("refs/fractal/cell/cell-default")
+        .join(&branch);
+    if let Some(parent) = cell_ref.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let _ = std::fs::write(cell_ref, format!("{}\n", target_oid.to_hex()));
+
+    if !ctx.json_mode {
+        println!(
+            "Fast-forward (initial pull -> {})",
+            &target_oid.to_hex()[..8]
+        );
+    }
+    true
 }

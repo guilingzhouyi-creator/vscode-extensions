@@ -74,7 +74,7 @@ pub fn save_e2e_baseline(save_file: &Path, report: &E2eBenchmarkReport) {
         save_file.to_path_buf()
     } else if let Ok(cwd) = env::current_dir() {
         let fg_path = cwd.join("fractal-git").join(save_file);
-        if fg_path.exists() || fg_path.parent().map_or(false, |p| p.is_dir()) {
+        if fg_path.exists() || fg_path.parent().is_some_and(|p| p.is_dir()) {
             fg_path
         } else {
             save_file.to_path_buf()
@@ -120,16 +120,22 @@ pub fn resolve_e2e_baseline_file(verify_arg: &Path) -> Option<PathBuf> {
 
     if trimmed.eq_ignore_ascii_case("auto") {
         let current = BenchmarkProfile::current();
-        let candidate = PathBuf::from(BASELINE_DIR).join(format!("taxis-e2e.{}.baseline.json", current.as_str()));
+        let candidate = PathBuf::from(BASELINE_DIR)
+            .join(format!("taxis-e2e.{}.baseline.json", current.as_str()));
         if candidate.exists() {
             return Some(candidate);
         }
         if let Ok(cwd) = env::current_dir() {
-            let direct = cwd.join(BASELINE_DIR).join(format!("taxis-e2e.{}.baseline.json", current.as_str()));
+            let direct = cwd
+                .join(BASELINE_DIR)
+                .join(format!("taxis-e2e.{}.baseline.json", current.as_str()));
             if direct.exists() {
                 return Some(direct);
             }
-            let fg_dir = cwd.join("fractal-git").join(BASELINE_DIR).join(format!("taxis-e2e.{}.baseline.json", current.as_str()));
+            let fg_dir = cwd
+                .join("fractal-git")
+                .join(BASELINE_DIR)
+                .join(format!("taxis-e2e.{}.baseline.json", current.as_str()));
             if fg_dir.exists() {
                 return Some(fg_dir);
             }

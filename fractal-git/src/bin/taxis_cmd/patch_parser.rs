@@ -64,151 +64,160 @@ pub fn parse_unified_diff(
     let mut current_patch: Option<FilePatch> = None;
     let mut current_hunk: Option<DiffHunk> = None;
 
-    let lines: Vec<&str> = text.lines().collect();
-    let mut idx = 0;
-
-    while idx < lines.len() {
-        let line = lines[idx];
-
-        if let Some(rest) = line.strip_prefix("diff --git ") {
-            if let Some(hunk) = current_hunk.take() {
-                if let Some(p) = &mut current_patch {
-                    p.hunks.push(hunk);
-                }
-            }
-            if let Some(p) = current_patch.take() {
-                patches.push(p);
-            }
-
-            let parts: Vec<&str> = rest.split_whitespace().collect();
-            let old_p = parts.first().map(|s| strip_path_prefix(s, strip_prefix));
-            let new_p = parts.get(1).map(|s| strip_path_prefix(s, strip_prefix));
-
-            current_patch = Some(FilePatch::new_empty(old_p, new_p));
-            idx += 1;
+    for line in text.lines() {
+        if apply_patch_header_line(
+            line,
+            strip_prefix,
+            &mut patches,
+            &mut current_patch,
+            &mut current_hunk,
+        ) {
             continue;
         }
-
-        if let Some(rest) = line.strip_prefix("--- ") {
-            let path_str = rest.trim();
-            if path_str == "/dev/null" {
-                if let Some(p) = &mut current_patch {
-                    p.is_new = true;
-                    p.old_path = None;
-                }
-            } else if current_patch.is_none() {
-                current_patch = Some(FilePatch::new_empty(
-                    Some(strip_path_prefix(path_str, strip_prefix)),
-                    None,
-                ));
-            } else if let Some(p) = &mut current_patch {
-                p.old_path = Some(strip_path_prefix(path_str, strip_prefix));
-            }
-            idx += 1;
-            continue;
-        }
-
-        if let Some(rest) = line.strip_prefix("+++ ") {
-            let path_str = rest.trim();
-            if path_str == "/dev/null" {
-                if let Some(p) = &mut current_patch {
-                    p.is_deleted = true;
-                    p.new_path = None;
-                }
-            } else if let Some(p) = &mut current_patch {
-                p.new_path = Some(strip_path_prefix(path_str, strip_prefix));
-            }
-            idx += 1;
-            continue;
-        }
-
-        if line.starts_with("@@ ") {
-            if let Some(hunk) = current_hunk.take() {
-                if let Some(p) = &mut current_patch {
-                    p.hunks.push(hunk);
-                }
-            }
-            if let Some(parsed_hunk) = parse_hunk_header(line) {
-                current_hunk = Some(parsed_hunk);
-            }
-            idx += 1;
-            continue;
-        }
-
-        if line == "-- " || line == "--" {
-            if let Some(hunk) = current_hunk.take() {
-                if let Some(p) = &mut current_patch {
-                    p.hunks.push(hunk);
-                }
-            }
-            if let Some(p) = current_patch.take() {
-                patches.push(p);
-            }
-            idx += 1;
-            continue;
-        }
-
         if let Some(hunk) = &mut current_hunk {
-            if let Some(first_char) = line.chars().next() {
-                match first_char {
-                    ' ' => hunk.lines.push(HunkLine::Context(line[1..].to_string())),
-                    '+' => {
-                        let content = line[1..].to_string();
-                        if reverse {
-                            hunk.lines.push(HunkLine::Deletion(content));
-                        } else {
-                            hunk.lines.push(HunkLine::Addition(content));
-                        }
-                    }
-                    '-' => {
-                        let content = line[1..].to_string();
-                        if reverse {
-                            hunk.lines.push(HunkLine::Addition(content));
-                        } else {
-                            hunk.lines.push(HunkLine::Deletion(content));
-                        }
-                    }
-                    '\\' => {
-                        // "\ No newline at end of file"
-                    }
-                    _ => {}
-                }
-            }
-
-            let mut old_seen = 0;
-            let mut new_seen = 0;
-            for hl in &hunk.lines {
-                match hl {
-                    HunkLine::Context(_) => {
-                        old_seen += 1;
-                        new_seen += 1;
-                    }
-                    HunkLine::Deletion(_) => old_seen += 1,
-                    HunkLine::Addition(_) => new_seen += 1,
-                }
-            }
-            if old_seen >= hunk.old_count && new_seen >= hunk.new_count {
-                if let Some(finished_hunk) = current_hunk.take() {
-                    if let Some(p) = &mut current_patch {
-                        p.hunks.push(finished_hunk);
-                    }
-                }
+            append_hunk_line(hunk, line, reverse);
+            if is_hunk_complete(hunk) {
+                flush_hunk(&mut current_patch, &mut current_hunk);
             }
         }
-
-        idx += 1;
     }
 
-    if let Some(hunk) = current_hunk.take() {
-        if let Some(p) = &mut current_patch {
-            p.hunks.push(hunk);
-        }
-    }
-    if let Some(p) = current_patch.take() {
-        patches.push(p);
-    }
-
+    flush_patch(&mut patches, &mut current_patch, &mut current_hunk);
     Ok(patches)
+}
+
+fn flush_hunk(current_patch: &mut Option<FilePatch>, current_hunk: &mut Option<DiffHunk>) {
+    if let Some(hunk) = current_hunk.take() {
+        if let Some(patch) = current_patch {
+            patch.hunks.push(hunk);
+        }
+    }
+}
+
+fn flush_patch(
+    patches: &mut Vec<FilePatch>,
+    current_patch: &mut Option<FilePatch>,
+    current_hunk: &mut Option<DiffHunk>,
+) {
+    flush_hunk(current_patch, current_hunk);
+    if let Some(patch) = current_patch.take() {
+        patches.push(patch);
+    }
+}
+
+fn apply_patch_header_line(
+    line: &str,
+    strip_prefix: usize,
+    patches: &mut Vec<FilePatch>,
+    current_patch: &mut Option<FilePatch>,
+    current_hunk: &mut Option<DiffHunk>,
+) -> bool {
+    if let Some(rest) = line.strip_prefix("diff --git ") {
+        flush_patch(patches, current_patch, current_hunk);
+        let parts: Vec<&str> = rest.split_whitespace().collect();
+        let old_p = parts.first().map(|s| strip_path_prefix(s, strip_prefix));
+        let new_p = parts.get(1).map(|s| strip_path_prefix(s, strip_prefix));
+        *current_patch = Some(FilePatch::new_empty(old_p, new_p));
+        return true;
+    }
+    if let Some(rest) = line.strip_prefix("--- ") {
+        apply_old_file_header(rest.trim(), strip_prefix, current_patch);
+        return true;
+    }
+    if let Some(rest) = line.strip_prefix("+++ ") {
+        apply_new_file_header(rest.trim(), strip_prefix, current_patch);
+        return true;
+    }
+    if line.starts_with("@@ ") {
+        flush_hunk(current_patch, current_hunk);
+        *current_hunk = parse_hunk_header(line);
+        return true;
+    }
+    if line == "-- " || line == "--" {
+        flush_patch(patches, current_patch, current_hunk);
+        return true;
+    }
+    false
+}
+
+fn apply_old_file_header(
+    path_str: &str,
+    strip_prefix: usize,
+    current_patch: &mut Option<FilePatch>,
+) {
+    if path_str == "/dev/null" {
+        if let Some(p) = current_patch {
+            p.is_new = true;
+            p.old_path = None;
+        }
+    } else if let Some(p) = current_patch {
+        p.old_path = Some(strip_path_prefix(path_str, strip_prefix));
+    } else {
+        *current_patch = Some(FilePatch::new_empty(
+            Some(strip_path_prefix(path_str, strip_prefix)),
+            None,
+        ));
+    }
+}
+
+fn apply_new_file_header(
+    path_str: &str,
+    strip_prefix: usize,
+    current_patch: &mut Option<FilePatch>,
+) {
+    let Some(p) = current_patch else {
+        return;
+    };
+    if path_str == "/dev/null" {
+        p.is_deleted = true;
+        p.new_path = None;
+    } else {
+        p.new_path = Some(strip_path_prefix(path_str, strip_prefix));
+    }
+}
+
+fn append_hunk_line(hunk: &mut DiffHunk, line: &str, reverse: bool) {
+    let Some(first_char) = line.chars().next() else {
+        return;
+    };
+    match first_char {
+        ' ' => hunk.lines.push(HunkLine::Context(line[1..].to_string())),
+        '+' => {
+            let content = line[1..].to_string();
+            let entry = if reverse {
+                HunkLine::Deletion(content)
+            } else {
+                HunkLine::Addition(content)
+            };
+            hunk.lines.push(entry);
+        }
+        '-' => {
+            let content = line[1..].to_string();
+            let entry = if reverse {
+                HunkLine::Addition(content)
+            } else {
+                HunkLine::Deletion(content)
+            };
+            hunk.lines.push(entry);
+        }
+        _ => {}
+    }
+}
+
+fn is_hunk_complete(hunk: &DiffHunk) -> bool {
+    let mut old_seen = 0;
+    let mut new_seen = 0;
+    for hl in &hunk.lines {
+        match hl {
+            HunkLine::Context(_) => {
+                old_seen += 1;
+                new_seen += 1;
+            }
+            HunkLine::Deletion(_) => old_seen += 1,
+            HunkLine::Addition(_) => new_seen += 1,
+        }
+    }
+    old_seen >= hunk.old_count && new_seen >= hunk.new_count
 }
 
 /// Parses `@@ -old_start,old_count +new_start,new_count @@`.

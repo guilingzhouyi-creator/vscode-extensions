@@ -108,7 +108,10 @@ fn resolve_oid_or_reject(view: &RepoView, rev: &str, label: &str) -> Oid {
 fn load_state_or_reject(view: &RepoView) -> BisectState {
     match BisectState::load(view.git_dir()) {
         Ok(Some(s)) => s,
-        Ok(None) => reject(CliTag::ERROR, "no bisection in progress (use 'taxis bisect start')"),
+        Ok(None) => reject(
+            CliTag::ERROR,
+            "no bisection in progress (use 'taxis bisect start')",
+        ),
         Err(err) => reject(CliTag::ERROR, format!("read bisect state: {err}")),
     }
 }
@@ -146,7 +149,10 @@ fn handle_bisect_start(ctx: &CliContext, args: &[String]) {
             "orig_head": state.orig_head.to_hex(),
         }));
     } else {
-        println!("Bisecting: started at bad={}", &state.bad.to_hex()[..HEX_SHORT_LEN]);
+        println!(
+            "Bisecting: started at bad={}",
+            &state.bad.to_hex()[..HEX_SHORT_LEN]
+        );
     }
 
     if !state.good.is_empty() {
