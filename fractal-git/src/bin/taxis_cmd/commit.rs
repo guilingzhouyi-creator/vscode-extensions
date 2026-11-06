@@ -17,7 +17,7 @@ use std::fs;
 use std::path::Path;
 
 use fg_core::models::{
-    current_unix_seconds, AuthoritySecret, FileMode, IndexStage, LeaseStatus, Oid,
+    current_unix_seconds, AuthoritySecret, FileMode, IndexStage, Oid,
 };
 use fg_gate::authority::resolve_authority_secret;
 use fg_native::sections::head::HeadState as NativeHeadState;
@@ -26,22 +26,17 @@ use fg_object::borrowed::GitCommitRef;
 use fg_storage::commit_materializer::{
     write_commit_objects_with_parents, write_index_commit_objects_with_parents, IndexCommitRequest,
 };
-use fg_topology::project_store::DiskProjectStore;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::RefStore;
 use fractal_git::{
-    ActorIdentity, AgentPushContext, BlockProvenanceEntry, BlockProvenanceParams,
-    CommitMaterializationRequest, CommitMessageGuard, DiskProvenanceStore, DiskRefStore,
-    FractalRef, GitSignature, LooseOdb, PolicyFloor, PreReceiveGuard, TaxisPolicy,
-    ValidatedCommitWitness,
+    ActorIdentity, AgentPushContext, CommitMaterializationRequest, CommitMessageGuard,
+    DiskRefStore, FractalRef, GitSignature, LooseOdb, PolicyFloor, PreReceiveGuard,
+    TaxisPolicy, ValidatedCommitWitness,
 };
 
-use super::commit_ops::{
-    advance_head_after_commit, open_and_begin_commit_wal, sync_committed_index_and_container,
-    DEFAULT_COMMIT_FILE,
-};
-use super::common::{fail_io, find_all_arg_values, find_arg_value, print_json, reject, CliContext};
-use super::operation::{record_head_operation, HeadOperationSpec};
+pub(crate) use super::commit_ops::verify_project_lease_authorization;
+use super::commit_ops::*;
+use super::common::{fail_io, find_all_arg_values, find_arg_value, reject, CliContext};
 
 /// Dispatches atomic commit creation with governance and identity checks.
 pub fn handle_commit(ctx: &CliContext) {
@@ -793,200 +788,10 @@ fn is_unchanged_commit(
 
 /// Reads every pending `MERGE_HEAD` parent recorded by the three-way merge path.
 fn read_merge_heads(git_dir: &Path) -> Vec<Oid> {
-    let contents = match fs::read_to_string(git_dir.join("MERGE_HEAD")) {
-        Ok(contents) => contents,
-        Err(_) => return Vec::new(),
-    };
-    let mut heads = Vec::new();
-    for line in contents
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-    {
-        match Oid::from_hex(line) {
-            Ok(oid) => heads.push(oid),
-            Err(_) => reject(
-                CliTag::ERROR,
-                format!("MERGE_HEAD contains an invalid object id '{line}'"),
-            ),
-        }
-    }
-    heads
+    super::commit_ops::read_merge_heads(git_dir)
 }
 
 /// Removes the merge bookkeeping files once a merge commit is final.
 fn clear_merge_state(git_dir: &Path, had_merge_head: bool) {
-    if !had_merge_head {
-        return;
-    }
-    let _ = fs::remove_file(git_dir.join("MERGE_HEAD"));
-    let _ = fs::remove_file(git_dir.join("MERGE_MSG"));
-}
-
-/// Outputs commit creation results as JSON or human-readable text.
-fn output_commit_result(
-    ctx: &CliContext,
-    commit_oid: &fractal_git::Oid,
-    tree_oid: &fractal_git::Oid,
-    policy: &TaxisPolicy,
-    actor: &ActorIdentity,
-    witness: &ValidatedCommitWitness,
-    staged_files: &[String],
-) {
-    if ctx.json_mode {
-        let commit_payload = serde_json::json!({
-            "status": "committed",
-            "commit_oid": commit_oid.to_hex(),
-            "tree_oid": tree_oid.to_hex(),
-            "files": staged_files,
-            "policy": policy.name,
-            "commit_type": witness.commit_type,
-            "scope": witness.scope,
-            "is_human": actor.is_human(),
-            "actor": actor.display_name(),
-        });
-        print_json(&commit_payload);
-    } else {
-        println!(
-            "{} Created atomic commit {}",
-            CliTag::COMMIT_OK,
-            commit_oid.to_hex()
-        );
-        println!("  Tree   : {}", tree_oid.to_hex());
-        println!("  Files  : {:?}", staged_files);
-        println!("  Policy : {} (Rust-Grade Strict)", policy.name);
-        println!(
-            "  Actor  : {} (Human: {})",
-            actor.display_name(),
-            actor.is_human()
-        );
-        println!(
-            "  Type   : {}{}",
-            witness.commit_type,
-            witness
-                .scope
-                .as_ref()
-                .map(|scope_val| format!("({})", scope_val))
-                .unwrap_or_default()
-        );
-    }
-}
-
-/// Records the commit operation snapshot into the operation graph.
-fn record_commit_in_operation_graph(
-    ctx: &CliContext,
-    commit_oid: &fractal_git::Oid,
-    target_ref: &FractalRef,
-    actor: &ActorIdentity,
-    witness: &ValidatedCommitWitness,
-) {
-    let git_ref = target_ref.to_git_ref();
-    let actor_name = actor.display_name();
-    record_head_operation(HeadOperationSpec {
-        git_dir: &ctx.git_dir,
-        head_oid: *commit_oid,
-        branch_or_ref: Some(&git_ref),
-        actor: &actor_name,
-        command: "commit",
-        description: format!("commit: {}", witness.commit_type),
-    });
-}
-
-/// Records mechanical block-level provenance with host nanosecond physical timestamps.
-fn record_block_provenance(
-    ctx: &CliContext,
-    materialized: &fractal_git::MaterializedCommit,
-    staged_files: &[String],
-    agent_id: &str,
-    cell_id: &str,
-) {
-    let physical_timestamp_ns = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|dur| dur.as_nanos() as u64)
-        .unwrap_or(0);
-
-    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
-    let mut entries = Vec::with_capacity(staged_files.len());
-    let base_commit = materialized.parent_oid.unwrap_or(Oid::ZERO);
-
-    for (i, file_path) in staged_files.iter().enumerate() {
-        let blob_oid = materialized.blob_oids.get(i).copied().unwrap_or(Oid::ZERO);
-        let full_path = work_root.join(file_path);
-        let line_count = if let Ok(content) = fs::read_to_string(&full_path) {
-            content.lines().count().max(1) as u32
-        } else {
-            1
-        };
-
-        entries.push(BlockProvenanceEntry::new(BlockProvenanceParams {
-            file_path: file_path.clone(),
-            block_id: format!("{file_path}:root"),
-            line_span: (1, line_count),
-            block_hash: blob_oid,
-            physical_timestamp_ns,
-            ccd_generation: 1,
-            agent_uid: agent_id.to_string(),
-            cell_id: cell_id.to_string(),
-            base_commit,
-        }));
-    }
-
-    let store = DiskProvenanceStore::new(&ctx.git_dir);
-    let _ = store.record_batch(entries);
-}
-
-/// Asserts that all staged files belong to active controlled projects and no TTL lease has expired.
-pub(crate) fn verify_project_lease_authorization(git_dir: &Path, staged_files: &[String]) {
-    let now_secs = current_unix_seconds() as u64;
-    let store = DiskProjectStore::new(git_dir);
-    let work_root = git_dir.parent().unwrap_or_else(|| Path::new("."));
-
-    let cache = match store.load_or_discover(Some(work_root), now_secs) {
-        Ok(loaded_cache) => loaded_cache,
-        Err(_) => return,
-    };
-
-    let files_to_check: Vec<&str> = if staged_files.is_empty() {
-        vec![DEFAULT_COMMIT_FILE]
-    } else {
-        staged_files.iter().map(|path| path.as_str()).collect()
-    };
-
-    let affected_projects = store.resolve_affected_projects(&cache, &files_to_check);
-    for project_id in &affected_projects {
-        if let Some(lease) = cache.get(project_id) {
-            if lease.status == LeaseStatus::Frozen || lease.is_expired(now_secs) {
-                reject(
-                    CliTag::AUTHORITY_BREACH,
-                    format!(
-                        "Commit authorization locked: TTL lease expired for project '{}'. All human and agent commits are frozen. Run 'taxis project renew {}' to unfreeze.",
-                        project_id, project_id
-                    ),
-                );
-            }
-        }
-    }
-}
-
-/// Touches affected project leases to record commit activity and reset dormant counter.
-fn touch_affected_project_leases(git_dir: &Path, staged_files: &[String]) {
-    let now_secs = current_unix_seconds() as u64;
-    let store = DiskProjectStore::new(git_dir);
-    let work_root = git_dir.parent().unwrap_or_else(|| Path::new("."));
-
-    let cache = match store.load_or_discover(Some(work_root), now_secs) {
-        Ok(loaded_cache) => loaded_cache,
-        Err(_) => return,
-    };
-
-    let files_to_check: Vec<&str> = if staged_files.is_empty() {
-        vec![DEFAULT_COMMIT_FILE]
-    } else {
-        staged_files.iter().map(|path| path.as_str()).collect()
-    };
-
-    let affected_projects = store.resolve_affected_projects(&cache, &files_to_check);
-    for project_id in affected_projects {
-        let _ = store.touch_project(&project_id, now_secs);
-    }
+    super::commit_ops::clear_merge_state(git_dir, had_merge_head);
 }
