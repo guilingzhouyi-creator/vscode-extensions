@@ -15,9 +15,7 @@
 use std::fs;
 use std::path::Path;
 
-use fg_core::models::{
-    current_unix_seconds, FileMode, IndexStage, LeaseStatus, Oid,
-};
+use fg_core::models::{current_unix_seconds, FileMode, IndexStage, LeaseStatus, Oid};
 use fg_index::{write_dirc_v2, IndexEntry};
 use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
 use fg_native::sections::refs::RefRecord;
@@ -25,8 +23,8 @@ use fg_native::RepoDocument;
 use fg_topology::project_store::DiskProjectStore;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
-    ActorIdentity, BlockProvenanceEntry, BlockProvenanceParams, DiskProvenanceStore,
-    DiskRefStore, FractalRef, TaxisPolicy, ValidatedCommitWitness, WalJournal, WalRecord,
+    ActorIdentity, BlockProvenanceEntry, BlockProvenanceParams, DiskProvenanceStore, DiskRefStore,
+    FractalRef, TaxisPolicy, ValidatedCommitWitness, WalJournal, WalRecord,
 };
 
 use super::checkout::worktree_stat;

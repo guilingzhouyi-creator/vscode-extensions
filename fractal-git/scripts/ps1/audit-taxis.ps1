@@ -158,6 +158,9 @@ if (-not $nodeCmd) {
     # node 是可安装的运行时，不是可选投票项；缺失即无法完成该级审查。
     Write-StepVerdict -StepId "CRATE-TOPOLOGY-01" -Status "BLOCK" -Detail "node 运行时缺失，静态拓扑与零分配审查无法执行"
     $failures.Add("CRATE-TOPOLOGY-01")
+} elseif (-not $cargoCmd) {
+    Write-StepVerdict -StepId "CRATE-TOPOLOGY-01" -Status "BLOCK" -Detail "cargo 工具链缺失，静态格式与 Clippy 审查无法执行"
+    $failures.Add("CRATE-TOPOLOGY-01")
 } else {
     $staticFailures = 0
     foreach ($scriptName in @("validate-crate-topology.js", "check-zero-alloc-boundary.js", "validate-git-parity.js")) {
@@ -168,12 +171,20 @@ if (-not $nodeCmd) {
         $proc = Invoke-AuditChild -FilePath $nodeCmd -ArgumentList $scriptArgs -Label $scriptName
         if ($proc.ExitCode -ne 0) { $staticFailures++ }
     }
+    $fmtArgs = @("fmt", "--manifest-path", $ManifestPath, "--all", "--", "--check")
+    $procFmt = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $fmtArgs -Label "cargo-fmt"
+    if ($procFmt.ExitCode -ne 0) { $staticFailures++ }
+
+    $clippyArgs = @("clippy", "--workspace", "--manifest-path", $ManifestPath, "--all-targets", "--", "-D", "warnings")
+    $procClippy = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $clippyArgs -Label "cargo-clippy"
+    if ($procClippy.ExitCode -ne 0) { $staticFailures++ }
+
     if ($staticFailures -gt 0) {
-        Write-StepVerdict -StepId "CRATE-TOPOLOGY-01" -Status "BLOCK" -Detail "$staticFailures 项拓扑、零分配或 Git 对等校验未通过"
+        Write-StepVerdict -StepId "CRATE-TOPOLOGY-01" -Status "BLOCK" -Detail "$staticFailures 项拓扑、零分配、Git 对等、格式或 Clippy 校验未通过"
         $failures.Add("CRATE-TOPOLOGY-01")
     } else {
         $statusTopology = "PASS"
-        Write-StepVerdict -StepId "CRATE-TOPOLOGY-01" -Status "PASS" -Detail "拓扑、零分配边界与 Git 对等校验通过"
+        Write-StepVerdict -StepId "CRATE-TOPOLOGY-01" -Status "PASS" -Detail "拓扑、零分配边界、Git 对等、rustfmt 与 Clippy 校验通过"
     }
 }
 
@@ -302,6 +313,9 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
         }
     }
     $promoLedgerRoot = Join-Path $promoBaseRoot "taxis-promotion-ledger-$PID"
+    if (Test-Path -LiteralPath $promoLedgerRoot) {
+        Remove-Item -LiteralPath $promoLedgerRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
     New-Item -ItemType Directory -Path $promoLedgerRoot -Force | Out-Null
     # A promotion is staged into the repository container, so the ledger refuses to run in a
     # directory that has none. Creating the container through `taxis init` keeps this probe on

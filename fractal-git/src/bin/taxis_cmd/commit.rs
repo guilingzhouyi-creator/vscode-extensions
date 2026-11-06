@@ -16,9 +16,7 @@
 use std::fs;
 use std::path::Path;
 
-use fg_core::models::{
-    current_unix_seconds, AuthoritySecret, FileMode, IndexStage, Oid,
-};
+use fg_core::models::{current_unix_seconds, AuthoritySecret, FileMode, IndexStage, Oid};
 use fg_gate::authority::resolve_authority_secret;
 use fg_native::sections::head::HeadState as NativeHeadState;
 use fg_native::RepoDocument;
@@ -30,8 +28,8 @@ use fractal_git::constants::cli::CliTag;
 use fractal_git::RefStore;
 use fractal_git::{
     ActorIdentity, AgentPushContext, CommitMaterializationRequest, CommitMessageGuard,
-    DiskRefStore, FractalRef, GitSignature, LooseOdb, PolicyFloor, PreReceiveGuard,
-    TaxisPolicy, ValidatedCommitWitness,
+    DiskRefStore, FractalRef, GitSignature, LooseOdb, PolicyFloor, PreReceiveGuard, TaxisPolicy,
+    ValidatedCommitWitness,
 };
 
 pub(crate) use super::commit_ops::verify_project_lease_authorization;

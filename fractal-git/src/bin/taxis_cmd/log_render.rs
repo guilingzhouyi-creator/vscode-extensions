@@ -14,8 +14,8 @@
 use fg_core::error::{FractalError, FractalResult};
 use fractal_git::constants::cli::CliTag;
 
-use super::common::{print_json, reject};
 use super::commit_walk::CommitRecord;
+use super::common::{print_json, reject};
 use super::diff;
 use super::log::{GraphRenderer, LogDiffMode, LogRequest, ShowPart, ShowRequest};
 use super::repo_view::RepoView;

@@ -296,7 +296,7 @@ impl LogRequest {
                 "--name-only" => request.diff_mode = Some(LogDiffMode::NameOnly),
                 "--name-status" => request.diff_mode = Some(LogDiffMode::NameStatus),
                 "--oneline" => request.oneline = true,
-            "--follow" => request.follow = true,
+                "--follow" => request.follow = true,
                 "--all" => {
                     request.all = true;
                     request.limit = usize::MAX;

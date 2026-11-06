@@ -59,11 +59,13 @@ if command -v node &>/dev/null; then
     node "${PROJECT_ROOT}/scripts/common/validate-crate-topology.js" || TOPO_STATUS=$?
     node "${PROJECT_ROOT}/scripts/common/check-zero-alloc-boundary.js" || TOPO_STATUS=$?
     node "${PROJECT_ROOT}/scripts/common/validate-git-parity.js" --require-git || TOPO_STATUS=$?
+    "${CARGO_CMD}" fmt --manifest-path "${MANIFEST_PATH}" --all -- --check || TOPO_STATUS=$?
+    "${CARGO_CMD}" clippy --workspace --manifest-path "${MANIFEST_PATH}" --all-targets -- -D warnings || TOPO_STATUS=$?
     if [[ "${TOPO_STATUS}" -ne 0 ]]; then
-        write_step_verdict "CRATE-TOPOLOGY-01" BLOCK "内核子系统拓扑、零分配边界或 Git 对等校验未通过"
+        write_step_verdict "CRATE-TOPOLOGY-01" BLOCK "内核子系统拓扑、零分配边界、Git 对等、格式或 Clippy 校验未通过"
         exit 1
     fi
-    write_step_verdict "CRATE-TOPOLOGY-01" PASS "内核子系统拓扑、零分配边界与 Git 对等校验通过"
+    write_step_verdict "CRATE-TOPOLOGY-01" PASS "内核子系统拓扑、零分配边界、Git 对等、rustfmt 与 Clippy 校验通过"
 else
     # node 是可安装的运行时，不是可选投票项；缺失即无法完成该级审查。
     write_step_verdict "CRATE-TOPOLOGY-01" BLOCK "未检测到 node 运行时，静态拓扑与零分配审查无法执行"

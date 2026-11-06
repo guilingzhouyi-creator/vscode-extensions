@@ -35,14 +35,17 @@ function resolveTypeScriptCompiler() {
     path.join(REPO_ROOT, 'workspace-timing/node_modules/typescript'),
     'typescript',
   ];
+  const probeErrors = [];
   for (const candidate of candidates) {
     try {
       return require(candidate);
-    } catch {
-      // Try next workspace candidate
+    } catch (err) {
+      probeErrors.push(`${candidate}: ${err && err.code ? err.code : 'LOAD_ERR'}`);
     }
   }
-  throw new Error('TypeScript compiler unavailable in workspace node_modules (Fail-Closed).');
+  throw new Error(
+    `TypeScript compiler unavailable in workspace node_modules (Fail-Closed): ${probeErrors.join(', ')}`,
+  );
 }
 
 /**

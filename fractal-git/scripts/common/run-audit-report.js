@@ -150,6 +150,45 @@ function runCargoTests(fastMode) {
 
 
 /**
+ * Summarizes raw AST issues by severity and analyzer.
+ *
+ * @param {Array<object>} rawIssues - Issue list from auto-refactor report.
+ * @returns {object} Aggregated issue counts.
+ */
+function summarizeAstIssues(rawIssues) {
+  if (!Array.isArray(rawIssues) || rawIssues.length === 0) {
+    return { issuesTotal: 0, bySeverity: {}, byAnalyzer: {} };
+  }
+  const bySeverity = {};
+  const byAnalyzer = {};
+  for (const issue of rawIssues) {
+    const sev = issue.severity || 'unknown';
+    const ana = issue.analyzer || issue.category || 'unknown';
+    bySeverity[sev] = (bySeverity[sev] || 0) + 1;
+    byAnalyzer[ana] = (byAnalyzer[ana] || 0) + 1;
+  }
+  return { issuesTotal: rawIssues.length, bySeverity, byAnalyzer };
+}
+
+/**
+ * Computes fallback credible lower bound under Jeffreys prior.
+ *
+ * @param {number} totalScore - Composite score.
+ * @param {number|undefined} filesScanned - Total files scanned.
+ * @returns {number} Lower bound percentage.
+ */
+function computeFallbackLowerBound(totalScore, filesScanned) {
+  const p = Math.max(0, Math.min(1, totalScore / 100.0));
+  const n = Math.max(1, filesScanned || 1);
+  const alpha = p * n + 0.5;
+  const beta = (1.0 - p) * n + 0.5;
+  const total = alpha + beta;
+  const variance = (alpha * beta) / (total * total * (total + 1.0));
+  const stdDev = Math.sqrt(variance);
+  return Math.max(0, Number(((alpha / total - 1.96 * stdDev) * 100.0).toFixed(2)));
+}
+
+/**
  * Performs genuine deep AST scanning through auto-refactor programmatic API.
  *
  * @param {boolean} fastMode - Skip heavy AST rules if in fast mode.
@@ -183,18 +222,9 @@ async function performDeepAstScan(fastMode) {
     // literal would publish a measurement that never happened, so absence is carried through as
     // null and the consumers below decide how to report an unmeasured plane.
     const caiIndex = report.autonomy?.compositeAutonomyIndex ?? null;
-    let lowerBound = report.autonomy?.confidence?.lowerBound;
-    if (lowerBound == null) {
-      const p = Math.max(0, Math.min(1, totalScore / 100.0));
-      const n = Math.max(1, report.summary?.filesScanned || 1);
-      const alpha = p * n + 0.5;
-      const beta = (1.0 - p) * n + 0.5;
-      const total = alpha + beta;
-      const variance = (alpha * beta) / (total * total * (total + 1.0));
-      const stdDev = Math.sqrt(variance);
-      lowerBound = Math.max(0, Number(((alpha / total - 1.96 * stdDev) * 100.0).toFixed(2)));
-    }
+    const lowerBound = report.autonomy?.confidence?.lowerBound ?? computeFallbackLowerBound(totalScore, report.summary?.filesScanned);
     const isAntiGamingPassed = !report.isGamingDetected;
+    const astIssues = summarizeAstIssues(report.issues);
 
     return {
       compositeScore: Number(totalScore.toFixed(2)),
@@ -203,6 +233,7 @@ async function performDeepAstScan(fastMode) {
       antiGamingPassed: isAntiGamingPassed,
       triPlaneQuality: report.triPlaneQuality || null,
       autonomy: report.autonomy || null,
+      astIssues,
     };
   } catch (err) {
     process.stderr.write(`[auto-refactor scan warning] ${err.message}\n`);
@@ -356,6 +387,7 @@ async function main() {
         warning: warnings.length,
         error: violations.length,
       },
+      astIssues: astScan ? astScan.astIssues : null,
       gateScore: computeGateScore(isOverallPass, finalCompositeScore, recordedPass, recordedTotal),
       compositeScore: finalCompositeScore,
       caiIndex: finalCaiIndex,
