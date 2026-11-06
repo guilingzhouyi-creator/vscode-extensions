@@ -13,7 +13,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { CacheStore, type Fingerprint, type CachedResult } from '../../src/core/cache';
-import { readLinesSafe, appendLinesSafe } from '../../src/core/cache-persistence';
 import type { Issue } from '../../src/core/types';
 
 describe('CacheStore WAL Append-Only & Compaction Engine', () => {
@@ -61,18 +60,19 @@ describe('CacheStore WAL Append-Only & Compaction Engine', () => {
         store.writeL2('hash1', 'content1', 'src/alpha.ts', sampleResult1, sampleFp1);
         store.flush();
 
-        const resultsPath = path.join(store.dir, 'results.jsonl');
-        expect(fs.existsSync(resultsPath)).toBe(true);
-        const linesAfterFirstFlush = readLinesSafe(resultsPath).filter(Boolean);
-        expect(linesAfterFirstFlush.length).toBe(1);
+        const l1IndexPath = path.join(store.dir, 'l1-index.aridx');
+        const l2StorePath = path.join(store.dir, 'l2-store.arc');
+        const l2WalPath = path.join(store.dir, 'l2-delta.arwal');
+        expect(fs.existsSync(l1IndexPath)).toBe(true);
+        expect(fs.existsSync(l2StorePath)).toBe(true);
+        expect(fs.existsSync(l2WalPath)).toBe(false);
 
         // Secondary write in WAL mode: appends dirty entry without full rewrite
         store.writeL1('src/beta.ts', sampleFp2);
         store.writeL2('hash2', 'content2', 'src/beta.ts', sampleResult2, sampleFp2);
         store.flush();
 
-        const linesAfterSecondFlush = readLinesSafe(resultsPath).filter(Boolean);
-        expect(linesAfterSecondFlush.length).toBe(2);
+        expect(fs.existsSync(l2WalPath)).toBe(true);
 
         const metrics = store.getCacheMetrics();
         expect(metrics.l1).toBe(2);
@@ -111,16 +111,14 @@ describe('CacheStore WAL Append-Only & Compaction Engine', () => {
         store.writeL2('hash1', 'content1', 'src/file.ts', updatedResult, sampleFp1);
         store.flush();
 
-        const resultsPath = path.join(store.dir, 'results.jsonl');
-        const rawLines = readLinesSafe(resultsPath).filter(Boolean);
-        // There are 2 lines in WAL
-        expect(rawLines.length).toBe(2);
+        const l2WalPath = path.join(store.dir, 'l2-delta.arwal');
+        expect(fs.existsSync(l2WalPath)).toBe(true);
 
-        // When reloaded, later line naturally wins
+        // When reloaded, later frame in WAL naturally overrides store snapshot
         const reloadedStore = new CacheStore(tempDir);
         const hit = reloadedStore.lookupL2('hash1', 'content1');
         expect(hit).not.toBeNull();
-        expect(hit?.issues[0]?.ruleId).toBe('SEC-002');
+        expect((hit?.issues[0] as unknown as { ruleId?: string })?.ruleId).toBe('SEC-002');
     });
 
     it('compaction rewrites snapshots cleanly and resets WAL appended count', () => {
@@ -132,15 +130,15 @@ describe('CacheStore WAL Append-Only & Compaction Engine', () => {
         store.writeL2('hash1', 'content1', 'src/file.ts', sampleResult2, sampleFp1);
         store.flush();
 
-        const resultsPath = path.join(store.dir, 'results.jsonl');
-        expect(readLinesSafe(resultsPath).filter(Boolean).length).toBe(2);
+        const l2WalPath = path.join(store.dir, 'l2-delta.arwal');
+        expect(fs.existsSync(l2WalPath)).toBe(true);
 
         // Trigger compaction
         store.compact();
 
-        // After compaction, duplicates are merged into a single clean snapshot
-        const linesAfterCompact = readLinesSafe(resultsPath).filter(Boolean);
-        expect(linesAfterCompact.length).toBe(1);
+        // After compaction, WAL delta is removed and consolidated into l2-store.arc
+        expect(fs.existsSync(l2WalPath)).toBe(false);
+        expect(fs.existsSync(path.join(store.dir, 'l2-store.arc'))).toBe(true);
 
         const metrics = store.getCacheMetrics();
         expect(metrics.appendedL1).toBe(0);
@@ -154,35 +152,26 @@ describe('CacheStore WAL Append-Only & Compaction Engine', () => {
 
         await store.flushAsync();
 
-        const resultsPath = path.join(store.dir, 'results.jsonl');
-        expect(fs.existsSync(resultsPath)).toBe(true);
+        const l2StorePath = path.join(store.dir, 'l2-store.arc');
+        expect(fs.existsSync(l2StorePath)).toBe(true);
 
         const store2 = new CacheStore(tempDir);
         expect(store2.lookupL1('src/async.ts')).not.toBeNull();
         expect(store2.lookupL2('hashAsync', 'contentAsync')).not.toBeNull();
     });
 
-    it('recovers from corrupt or truncated lines in results.jsonl gracefully', () => {
+    it('recovers from corrupt tail in ARC2 WAL and legacy results.jsonl fallback gracefully', () => {
         const store = new CacheStore(tempDir);
         store.writeL2('hashValid1', 'contentValid1', 'src/valid1.ts', sampleResult1, sampleFp1);
         store.flush();
+        store.writeL2('hashValid2', 'contentValid2', 'src/valid2.ts', sampleResult2, sampleFp2);
+        store.flush();
 
-        const resultsPath = path.join(store.dir, 'results.jsonl');
-        // Inject a corrupt truncated line into WAL
-        appendLinesSafe(resultsPath, '{"t":"r","k":"corrupt-entry-broken-json\n');
-        appendLinesSafe(
-            resultsPath,
-            JSON.stringify({
-                t: 'r',
-                k: 'v1:hashValid2:contentValid2',
-                p: 'src/valid2.ts',
-                issues: [],
-                metric: null,
-                ts: Date.now(),
-            }) + '\n',
-        );
+        const l2WalPath = path.join(store.dir, 'l2-delta.arwal');
+        // Inject a corrupt truncated frame tail into ARC2 WAL
+        fs.appendFileSync(l2WalPath, Buffer.from([0xde, 0xad, 0xbe, 0xef, 0x01, 0x02]));
 
-        // Reload should skip the corrupt line and load the two valid entries
+        // Reload should stop cleanly at the corrupt tail and preserve both valid entries
         const reloadedStore = new CacheStore(tempDir);
         expect(reloadedStore.lookupL2('hashValid1', 'contentValid1')).not.toBeNull();
         expect(reloadedStore.lookupL2('hashValid2', 'contentValid2')).not.toBeNull();

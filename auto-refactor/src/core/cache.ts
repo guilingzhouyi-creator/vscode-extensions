@@ -32,8 +32,12 @@ import {
     readLinesSafe,
     writeFileAtomic,
     writeFileAtomicAsync,
+    writeBytesAtomic,
+    writeBytesAtomicAsync,
     appendLinesSafe,
     appendLinesSafeAsync,
+    appendBytesSafe,
+    appendBytesSafeAsync,
     probeWritable,
     parseL1Line,
     isValidL2,
@@ -45,6 +49,18 @@ import {
     computePathKey,
     removeCacheDir,
 } from './cache-persistence';
+import {
+    ensureL2EntryDecoded,
+    tryLoadArc2L1Index,
+    tryLoadArc2L2Container,
+    writeArc2L1SnapshotSync,
+    writeArc2L2SnapshotSync,
+    appendArc2L2WalSync,
+    flushArc2L1Async,
+    flushArc2L2Async,
+    type Arc2SyncPaths,
+    type Arc2SyncOptions,
+} from './cache-arc2-io';
 
 /** File metadata fingerprint used for L1 freshness checks. */
 export interface Fingerprint {
@@ -62,6 +78,17 @@ export interface CachedResult {
     issues: Issue[];
     /** Aggregate file metric, or null when metrics were not computed for this scan. */
     metric: FileMetric | null;
+    /** Cross-file symbol definitions and references for this file. */
+    symbols?: {
+        definitions: import('./intelligence/symbolIndex').SymbolDefinition[];
+        references: import('./intelligence/symbolIndex').SymbolReference[];
+    };
+    /** Cross-file literal occurrences for this file. */
+    literals?: import('./intelligence/literalIndex').LiteralOccurrence[];
+    /** Loop sites collected for cross-function polynomial complexity checks. */
+    loopSites?: import('./intelligence/semanticComplexity').LoopSite[];
+    /** Module dependency graph summary for this file. */
+    graphEdges?: import('./dependency-graph').ModuleGraphFileSummary;
 }
 
 type L2Entry = L2EntryRecord;
@@ -100,6 +127,9 @@ const FILE_MANIFEST_JSON = 'manifest.json';
 const FILE_FINGERPRINTS_JSONL = 'fingerprints.jsonl';
 const FILE_RESULTS_JSONL = 'results.jsonl';
 const FILE_PATHS_JSONL = 'paths.jsonl';
+const FILE_L1_INDEX_ARC = 'l1-index.aridx';
+const FILE_L2_STORE_ARC = 'l2-store.arc';
+const FILE_L2_DELTA_WAL = 'l2-delta.arwal';
 const DEFAULT_CACHE_DIR_NAME = '.auto-refactor-cache';
 
 const CACHE_LOAD_LEVEL_FULL = 'full';
@@ -144,6 +174,9 @@ export class CacheStore {
     private readonly fingerprintsPath: string;
     private readonly resultsPath: string;
     private readonly pathsPath: string;
+    private readonly l1IndexArcPath: string;
+    private readonly l2StoreArcPath: string;
+    private readonly l2DeltaWalPath: string;
     private loaded = false;
     private l2LoadLevel: 'full' | 'hot' | 'metadata' | 'disabled' = CACHE_LOAD_LEVEL_FULL;
     private readonly logger?: Logger;
@@ -165,6 +198,9 @@ export class CacheStore {
         this.fingerprintsPath = path.join(this.dir, FILE_FINGERPRINTS_JSONL);
         this.resultsPath = path.join(this.dir, FILE_RESULTS_JSONL);
         this.pathsPath = path.join(this.dir, FILE_PATHS_JSONL);
+        this.l1IndexArcPath = path.join(this.dir, FILE_L1_INDEX_ARC);
+        this.l2StoreArcPath = path.join(this.dir, FILE_L2_STORE_ARC);
+        this.l2DeltaWalPath = path.join(this.dir, FILE_L2_DELTA_WAL);
         if (opts.disabled === true) {
             this.enabled = false;
             return;
@@ -173,6 +209,11 @@ export class CacheStore {
         if (this.enabled) this.loadCacheFromDisk();
     }
 
+    /**
+     * Ensures the cache directory exists and probes write permissions before adopting the manifest.
+     *
+     * @returns True when the directory is writable and the manifest is valid or rebuilt.
+     */
     private initializeCache(): boolean {
         try {
             SyncIoBarrier.mkdir(this.dir);
@@ -182,6 +223,11 @@ export class CacheStore {
         return probeWritable(this.dir) ? this.runAdoptOrRebuildManifest() : false;
     }
 
+    /**
+     * Validates an existing `manifest.json` against the current format version or rebuilds it.
+     *
+     * @returns True once a valid manifest is present on disk.
+     */
     private runAdoptOrRebuildManifest(): boolean {
         try {
             const raw = readTextFileSync(this.manifestPath);
@@ -203,6 +249,9 @@ export class CacheStore {
         }
     }
 
+    /**
+     * Writes a fresh `manifest.json` atomically with current retention parameters.
+     */
     private runRebuildCacheManifest(): void {
         const manifest = {
             formatVersion: CACHE_FORMAT_VERSION,
@@ -217,9 +266,39 @@ export class CacheStore {
     private loadCacheFromDisk(): void {
         if (this.loaded) return;
         this.loaded = true;
-        this.loadFingerprints();
-        this.loadResults();
-        this.loadPaths();
+        if (!this.tryLoadBinaryL1()) {
+            this.loadFingerprints();
+        }
+        if (!this.tryLoadBinaryL2()) {
+            this.loadResults();
+            this.loadPaths();
+        }
+    }
+
+    private tryLoadBinaryL1(): boolean {
+        return tryLoadArc2L1Index(this.l1IndexArcPath, this.fingerprintsPath, this.l1, () => {
+            this.loadFingerprints();
+        });
+    }
+
+    private tryLoadBinaryL2(): boolean {
+        const ok = tryLoadArc2L2Container(
+            this.l2StoreArcPath,
+            this.l2DeltaWalPath,
+            this.resultsPath,
+            this.maxL2LoadBytes,
+            (entry) => {
+                this.l2.set(entry.k, entry);
+                this.indexSecondaryCacheByPath(entry);
+            },
+            () => {
+                this.loadResultsFull();
+            },
+        );
+        if (ok) {
+            this.l2LoadLevel = CACHE_LOAD_LEVEL_FULL;
+        }
+        return ok;
     }
 
     private loadFingerprints(): void {
@@ -283,7 +362,7 @@ export class CacheStore {
 
     private parseL2Record(line: string, metadataOnly = false): L2Entry | null {
         try {
-            const rawObject = JSON.parse(line);
+            const rawObject = JSON.parse(line) as Record<string, unknown>;
             if (!isValidL2(rawObject)) return null;
             return {
                 k: rawObject.k,
@@ -293,6 +372,19 @@ export class CacheStore {
                 ts: typeof rawObject.ts === TYPEOF_NUMBER ? (rawObject.ts as number) : 0,
                 fm: typeof rawObject.fm === TYPEOF_NUMBER ? (rawObject.fm as number) : undefined,
                 fs: typeof rawObject.fs === TYPEOF_NUMBER ? (rawObject.fs as number) : undefined,
+                ...(rawObject.symbols && !metadataOnly
+                    ? { symbols: rawObject.symbols as L2Entry['symbols'] }
+                    : {}),
+                ...(rawObject.literals && !metadataOnly
+                    ? { literals: rawObject.literals as L2Entry['literals'] }
+                    : {}),
+                ...(rawObject.loopSites && !metadataOnly
+                    ? { loopSites: rawObject.loopSites as L2Entry['loopSites'] }
+                    : {}),
+                ...(rawObject.graphEdges && !metadataOnly
+                    ? { graphEdges: rawObject.graphEdges as L2Entry['graphEdges'] }
+                    : {}),
+                decoded: true,
             };
         } catch {
             return null;
@@ -369,6 +461,19 @@ export class CacheStore {
         );
     }
 
+    private materializeCachedResult(entryRecord: L2Entry): CachedResult & { p: string } {
+        ensureL2EntryDecoded(entryRecord);
+        return {
+            issues: entryRecord.issues,
+            metric: entryRecord.metric,
+            p: entryRecord.p,
+            ...(entryRecord.symbols ? { symbols: entryRecord.symbols } : {}),
+            ...(entryRecord.literals ? { literals: entryRecord.literals } : {}),
+            ...(entryRecord.loopSites ? { loopSites: entryRecord.loopSites } : {}),
+            ...(entryRecord.graphEdges ? { graphEdges: entryRecord.graphEdges } : {}),
+        };
+    }
+
     lookupSecondaryCache(
         fpHashValue: string,
         contentHash: string,
@@ -382,15 +487,17 @@ export class CacheStore {
             entryRecord.ts = nowMs;
             this.dirtyL2.set(keyString, entryRecord);
         }
-        return { issues: entryRecord.issues, metric: entryRecord.metric, p: entryRecord.p };
+        return this.materializeCachedResult(entryRecord);
     }
 
     lookupL2(fpHashValue: string, contentHash: string): (CachedResult & { p: string }) | null {
         if (!this.enabled || !fpHashValue || !contentHash) return null;
         const cached = this.lookupSecondaryCache(fpHashValue, contentHash);
-        return cached
-            ? { issues: cached.issues.slice(), metric: cached.metric, p: cached.p }
-            : null;
+        if (!cached) return null;
+        return {
+            ...cached,
+            issues: cached.issues.slice(),
+        };
     }
 
     writePrimaryCache(relPath: string, fileFingerprint: Fingerprint): void {
@@ -420,6 +527,11 @@ export class CacheStore {
             ts: Date.now(),
             fm: options.fileFingerprint ? options.fileFingerprint.mtimeMs : undefined,
             fs: options.fileFingerprint ? options.fileFingerprint.size : undefined,
+            ...(options.scanResult.symbols ? { symbols: options.scanResult.symbols } : {}),
+            ...(options.scanResult.literals ? { literals: options.scanResult.literals } : {}),
+            ...(options.scanResult.loopSites ? { loopSites: options.scanResult.loopSites } : {}),
+            ...(options.scanResult.graphEdges ? { graphEdges: options.scanResult.graphEdges } : {}),
+            decoded: true,
         };
         this.l2.set(keyString, entryRecord);
         this.dirtyL2.set(keyString, entryRecord);
@@ -483,7 +595,7 @@ export class CacheStore {
         const lookupPathKey = `${fpHashValue}\u0000${relPath}\u0000${mtimeMs}\u0000${size}`;
         const entryRecord = this.l2ByPath.get(lookupPathKey);
         if (!entryRecord || this.isMetadataOnlyStale(entryRecord)) return null;
-        return { issues: entryRecord.issues, metric: entryRecord.metric, p: entryRecord.p };
+        return this.materializeCachedResult(entryRecord);
     }
 
     lookupL2ByPath(
@@ -494,9 +606,40 @@ export class CacheStore {
     ): (CachedResult & { p: string }) | null {
         if (!this.enabled || !fpHashValue || !relPath) return null;
         const cached = this.lookupSecondaryCacheByPath(fpHashValue, relPath, mtimeMs, size);
-        return cached
-            ? { issues: cached.issues.slice(), metric: cached.metric, p: cached.p }
-            : null;
+        if (!cached) return null;
+        return {
+            ...cached,
+            issues: cached.issues.slice(),
+        };
+    }
+
+    private get arc2Paths(): Arc2SyncPaths {
+        return {
+            l1IndexArcPath: this.l1IndexArcPath,
+            l2StoreArcPath: this.l2StoreArcPath,
+            l2DeltaWalPath: this.l2DeltaWalPath,
+            fingerprintsPath: this.fingerprintsPath,
+            resultsPath: this.resultsPath,
+        };
+    }
+
+    private get arc2Opts(): Arc2SyncOptions {
+        return {
+            maxEntries: this.maxEntries,
+            maxAgeDays: this.maxAgeDays,
+        };
+    }
+
+    private writeArc2L1SnapshotSync(): void {
+        writeArc2L1SnapshotSync(this.arc2Paths, this.l1, this.arc2Opts);
+    }
+
+    private writeArc2L2SnapshotSync(): void {
+        writeArc2L2SnapshotSync(this.arc2Paths, this.l2.values(), this.arc2Opts);
+    }
+
+    private appendArc2L2WalSync(): void {
+        appendArc2L2WalSync(this.arc2Paths, this.dirtyL2.values(), this.arc2Opts);
     }
 
     /**
@@ -506,9 +649,14 @@ export class CacheStore {
     runCompactCache(): void {
         if (!this.enabled) return;
         try {
+            for (const entry of this.l2.values()) {
+                ensureL2EntryDecoded(entry);
+            }
             writeFileAtomic(this.fingerprintsPath, serializeL1(this.l1));
             writeFileAtomic(this.resultsPath, serializeL2(this.l2));
             writeFileAtomic(this.pathsPath, serializePaths(this.l2ByPath));
+            this.writeArc2L1SnapshotSync();
+            this.writeArc2L2SnapshotSync();
             this.appendedL1Count = 0;
             this.appendedL2Count = 0;
             this.dirtyL1.clear();
@@ -564,16 +712,22 @@ export class CacheStore {
                     appendLinesSafe(this.fingerprintsPath, serializeL1(this.dirtyL1));
                     this.appendedL1Count += this.dirtyL1.size;
                 }
+                this.writeArc2L1SnapshotSync();
                 this.dirtyL1.clear();
             }
             if (this.dirtyL2.size > 0) {
                 if (this.shouldRewriteL2Snapshot()) {
+                    for (const entry of this.l2.values()) {
+                        ensureL2EntryDecoded(entry);
+                    }
                     writeFileAtomic(this.resultsPath, serializeL2(this.l2));
                     writeFileAtomic(this.pathsPath, serializePaths(this.l2ByPath));
+                    this.writeArc2L2SnapshotSync();
                     this.appendedL2Count = 0;
                 } else {
                     appendLinesSafe(this.resultsPath, serializeL2(this.dirtyL2));
                     appendLinesSafe(this.pathsPath, serializeDirtyPaths(this.dirtyL2.values()));
+                    this.appendArc2L2WalSync();
                     this.appendedL2Count += this.dirtyL2.size;
                 }
                 this.dirtyL2.clear();
@@ -588,37 +742,49 @@ export class CacheStore {
         this.flushCacheToDisk();
     }
 
+    private async flushL1Async(): Promise<void> {
+        if (this.dirtyL1.size === 0) return;
+        if (this.shouldRewriteL1Snapshot()) {
+            await writeFileAtomicAsync(this.fingerprintsPath, serializeL1(this.l1));
+            this.appendedL1Count = 0;
+        } else {
+            await appendLinesSafeAsync(this.fingerprintsPath, serializeL1(this.dirtyL1));
+            this.appendedL1Count += this.dirtyL1.size;
+        }
+        await flushArc2L1Async(this.arc2Paths, this.l1, this.arc2Opts);
+        this.dirtyL1.clear();
+    }
+
+    private async flushL2Async(): Promise<void> {
+        if (this.dirtyL2.size === 0) return;
+        const isRewrite = this.shouldRewriteL2Snapshot();
+        if (isRewrite) {
+            await writeFileAtomicAsync(this.resultsPath, serializeL2(this.l2));
+            await writeFileAtomicAsync(this.pathsPath, serializePaths(this.l2ByPath));
+            this.appendedL2Count = 0;
+        } else {
+            await appendLinesSafeAsync(this.resultsPath, serializeL2(this.dirtyL2));
+            await appendLinesSafeAsync(this.pathsPath, serializeDirtyPaths(this.dirtyL2.values()));
+            this.appendedL2Count += this.dirtyL2.size;
+        }
+        await flushArc2L2Async(
+            this.arc2Paths,
+            this.l2.values(),
+            this.dirtyL2.values(),
+            isRewrite,
+            this.arc2Opts,
+        );
+        this.dirtyL2.clear();
+    }
+
     /**
      * Flushes dirty entries asynchronously using Append-Only WAL or periodic compaction snapshot.
      */
     async flushCacheToDiskAsync(): Promise<void> {
         if (!this.executeFlushPreparation()) return;
         try {
-            if (this.dirtyL1.size > 0) {
-                if (this.shouldRewriteL1Snapshot()) {
-                    await writeFileAtomicAsync(this.fingerprintsPath, serializeL1(this.l1));
-                    this.appendedL1Count = 0;
-                } else {
-                    await appendLinesSafeAsync(this.fingerprintsPath, serializeL1(this.dirtyL1));
-                    this.appendedL1Count += this.dirtyL1.size;
-                }
-                this.dirtyL1.clear();
-            }
-            if (this.dirtyL2.size > 0) {
-                if (this.shouldRewriteL2Snapshot()) {
-                    await writeFileAtomicAsync(this.resultsPath, serializeL2(this.l2));
-                    await writeFileAtomicAsync(this.pathsPath, serializePaths(this.l2ByPath));
-                    this.appendedL2Count = 0;
-                } else {
-                    await appendLinesSafeAsync(this.resultsPath, serializeL2(this.dirtyL2));
-                    await appendLinesSafeAsync(
-                        this.pathsPath,
-                        serializeDirtyPaths(this.dirtyL2.values()),
-                    );
-                    this.appendedL2Count += this.dirtyL2.size;
-                }
-                this.dirtyL2.clear();
-            }
+            await this.flushL1Async();
+            await this.flushL2Async();
         } catch {
             /* Best-effort */
         }
