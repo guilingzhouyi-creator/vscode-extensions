@@ -79,7 +79,8 @@ impl ElevationAuthorizer for StandardNonceAuthorizer {
         // 2. Constant-time cryptographic nonce equality check
         if !ct_eq_bytes(&proof.signed_nonce, &request.challenge_nonce) {
             return Err(FractalError::AuthProofInvalid(
-                "Elevation challenge nonce mismatch: proof contains invalid cryptographic nonce".into(),
+                "Elevation challenge nonce mismatch: proof contains invalid cryptographic nonce"
+                    .into(),
             ));
         }
 

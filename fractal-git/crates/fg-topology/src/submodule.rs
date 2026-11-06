@@ -210,13 +210,19 @@ mod tests {
         modules.insert(TEST_SUB_PATH.to_string(), entry);
 
         let mut tree_gitlinks = BTreeMap::new();
-        tree_gitlinks.insert(TEST_SUB_PATH.to_string(), (FileMode::Gitlink, dummy_oid(SEED_OID_1)));
+        tree_gitlinks.insert(
+            TEST_SUB_PATH.to_string(),
+            (FileMode::Gitlink, dummy_oid(SEED_OID_1)),
+        );
 
         let statuses = SubmoduleController::compute_status(&temp_dir, &modules, &tree_gitlinks);
         assert_eq!(statuses.len(), 1);
         assert_eq!(statuses[0].status_symbol, '-');
         assert!(!statuses[0].is_initialized);
-        assert_eq!(statuses[0].gitlink_oid, Some(dummy_oid(SEED_OID_1).to_hex()));
+        assert_eq!(
+            statuses[0].gitlink_oid,
+            Some(dummy_oid(SEED_OID_1).to_hex())
+        );
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
@@ -231,14 +237,20 @@ mod tests {
         let temp_dir = base.join(format!("taxis_sub_match_{}", std::process::id()));
         let sub_git = temp_dir.join("vendor/sub/.git");
         let _ = fs::create_dir_all(&sub_git);
-        let _ = fs::write(sub_git.join("HEAD"), format!("{}\n", dummy_oid(SEED_OID_5).to_hex()));
+        let _ = fs::write(
+            sub_git.join("HEAD"),
+            format!("{}\n", dummy_oid(SEED_OID_5).to_hex()),
+        );
 
         let mut modules = BTreeMap::new();
         let entry = SubmoduleEntry::new(TEST_SUB_NAME, TEST_SUB_PATH, TEST_SUB_URL).unwrap();
         modules.insert(TEST_SUB_PATH.to_string(), entry);
 
         let mut tree_gitlinks = BTreeMap::new();
-        tree_gitlinks.insert(TEST_SUB_PATH.to_string(), (FileMode::Gitlink, dummy_oid(SEED_OID_5)));
+        tree_gitlinks.insert(
+            TEST_SUB_PATH.to_string(),
+            (FileMode::Gitlink, dummy_oid(SEED_OID_5)),
+        );
 
         let statuses = SubmoduleController::compute_status(&temp_dir, &modules, &tree_gitlinks);
         assert_eq!(statuses.len(), 1);

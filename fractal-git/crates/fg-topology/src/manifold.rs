@@ -106,11 +106,11 @@ impl TrinityManifoldEvaluator {
             return TrinityManifoldSnapshot {
                 chain_verified: true,
                 chain_length: 0,
-                avg_mutant_kill_rate: 1.0,
+                avg_mutant_kill_rate: 0.0,
                 total_transient_allocs: 0,
-                bayesian_credit: 50.0,
+                bayesian_credit: 0.0,
                 credit_lower_bound: 0.0,
-                credit_upper_bound: 100.0,
+                credit_upper_bound: 0.0,
                 riemann_vector: riemann_vec,
                 riemann_deviation,
                 net_quality_delta: 0.0,
@@ -175,21 +175,33 @@ impl TrinityManifoldEvaluator {
 
     /// Renders an ASCII visualization of the evolution quality trace for terminal inspection.
     pub fn render_ascii_trace(snapshot: &TrinityManifoldSnapshot) -> String {
-        let chain_status = if snapshot.chain_verified {
-            "VALID (HMAC-SHA1 SEAL INTACT)"
-        } else {
+        let chain_status = if !snapshot.chain_verified {
             "TAMPERED / INVALID CHAIN"
+        } else if snapshot.chain_length == 0 {
+            "UNMEASURED (0 VERIFIED RECORDS)"
+        } else {
+            "VALID (HMAC-SHA1 SEAL INTACT)"
         };
 
-        let bar_len = ((snapshot.bayesian_credit / 100.0) * 20.0).round() as usize;
-        let credit_bar = format!(
-            "[{}{}] {:.1}% (95% CI: [{:.1}%, {:.1}%])",
-            "=".repeat(bar_len),
-            " ".repeat(20usize.saturating_sub(bar_len)),
-            snapshot.bayesian_credit,
-            snapshot.credit_lower_bound,
-            snapshot.credit_upper_bound
-        );
+        let (kill_rate_str, credit_bar) = if snapshot.chain_length == 0 {
+            (
+                "UNMEASURED (0 verified records)".to_string(),
+                "UNMEASURED (0 verified records)".to_string(),
+            )
+        } else {
+            let bar_len = ((snapshot.bayesian_credit / 100.0) * 20.0).round() as usize;
+            (
+                format!("{:.1}%", snapshot.avg_mutant_kill_rate * 100.0),
+                format!(
+                    "[{}{}] {:.1}% (95% CI: [{:.1}%, {:.1}%])",
+                    "=".repeat(bar_len),
+                    " ".repeat(20usize.saturating_sub(bar_len)),
+                    snapshot.bayesian_credit,
+                    snapshot.credit_lower_bound,
+                    snapshot.credit_upper_bound
+                ),
+            )
+        };
 
         format!(
             "================================================================================\n\
@@ -199,7 +211,7 @@ impl TrinityManifoldEvaluator {
                Audit Chain Status     : {}\n\
                Verified Record Count  : {}\n\n\
              [Pillar 2: Invariants & Blind Mutation Canary]\n\
-               Mutant Kill Rate (K)   : {:.1}%\n\
+               Mutant Kill Rate (K)   : {}\n\
                Transient Allocations  : {} in hot paths (Target: 0)\n\
                Bayesian Credit Rating : {}\n\n\
              [Pillar 3: 5D Riemann Phase Space & Technical Debt]\n\
@@ -209,7 +221,7 @@ impl TrinityManifoldEvaluator {
              ================================================================================\n",
             chain_status,
             snapshot.chain_length,
-            snapshot.avg_mutant_kill_rate * 100.0,
+            kill_rate_str,
             snapshot.total_transient_allocs,
             credit_bar,
             snapshot.riemann_deviation,

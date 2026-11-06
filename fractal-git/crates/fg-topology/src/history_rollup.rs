@@ -224,7 +224,9 @@ mod tests {
             make_dummy_record(3, "e5f60718", 0.5, 0),
         ];
 
-        let folded = folder.rollup_records(&records, "CARD-042", &secret).unwrap();
+        let folded = folder
+            .rollup_records(&records, "CARD-042", &secret)
+            .unwrap();
 
         assert_eq!(folded.folded_records_count, 3);
         assert_eq!(folded.record.actor, "card-CARD-042");

@@ -240,6 +240,7 @@ impl OperationGraph {
             }
         };
 
+        self.operations.remove(&active_head);
         self.current_head = Some(previous_head);
         self.persist_to_disk()?;
         Ok(Some(previous_op))
