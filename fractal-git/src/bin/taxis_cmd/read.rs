@@ -344,14 +344,6 @@ fn tree_order_key(row: &TreeRow) -> Vec<u8> {
     key
 }
 
-/// Dispatches `ls-files`.
-///
-/// Supports `-s` (mode, id, stage), `-z`, `-c` (cached, the default), and `--stage`. The worktree-side
-/// Dispatches `ls-files` via the dedicated `ls_files` handler module.
-pub fn handle_ls_files(ctx: &CliContext) {
-    super::list_files::handle_ls_files(ctx);
-}
-
 /// Dispatches `show-ref` and `for-each-ref`.
 ///
 /// Both read the reference store directly. `show-ref` prints `<oid> <refname>`; `for-each-ref`
@@ -604,6 +596,13 @@ fn resolve_ref_field(key: &str, ref_data: (&str, &Oid, &str)) -> Result<String, 
     Ok(value)
 }
 
+/// Parsed options for `taxis check-ignore`.
+struct CheckIgnoreOptions {
+    verbose: bool,
+    no_index: bool,
+    paths: Vec<String>,
+}
+
 /// Dispatches `check-ignore`.
 ///
 /// Reads paths from arguments or from `--stdin`. With `-v`, prints the deciding rule as
@@ -617,12 +616,34 @@ pub fn handle_check_ignore(ctx: &CliContext) {
         Ok(opened) => opened,
         Err(open_err) => fail_fatal(open_err),
     };
+    let opts = parse_check_ignore_args(&ctx.args);
+    let matcher = match view.ignore_matcher() {
+        Ok(loaded) => loaded,
+        Err(load_err) => reject(CliTag::ERROR, load_err),
+    };
+    let repo_root = view.work_root().to_path_buf();
+    let report_negations = opts.verbose || opts.no_index;
+    let (matches, matched_count) = evaluate_ignore_paths(&matcher, &repo_root, &opts);
+
+    if ctx.json_mode {
+        report_check_ignore_json(&matcher, &repo_root, (&matches, matched_count));
+    } else {
+        render_check_ignore_text(&repo_root, &matches, (opts.verbose, report_negations));
+    }
+
+    if matched_count == 0 {
+        std::process::exit(1);
+    }
+}
+
+/// Parses command-line options and optional stdin paths for `check-ignore`.
+fn parse_check_ignore_args(args: &[String]) -> CheckIgnoreOptions {
     let mut verbose = false;
     let mut stdin_mode = false;
     let mut no_index = false;
     let mut paths: Vec<String> = Vec::new();
 
-    for argument in &ctx.args {
+    for argument in args {
         match argument.as_str() {
             "-v" | "--verbose" => verbose = true,
             "--stdin" => stdin_mode = true,
@@ -653,16 +674,23 @@ pub fn handle_check_ignore(ctx: &CliContext) {
         fail_fatal("no path specified");
     }
 
-    let matcher = match view.ignore_matcher() {
-        Ok(loaded) => loaded,
-        Err(load_err) => reject(CliTag::ERROR, load_err),
-    };
-    let repo_root = view.work_root().to_path_buf();
-    let report_negations = verbose || no_index;
+    CheckIgnoreOptions {
+        verbose,
+        no_index,
+        paths,
+    }
+}
 
+/// Evaluates ignore rules for each candidate path.
+fn evaluate_ignore_paths(
+    matcher: &fg_index::IgnoreMatcher,
+    repo_root: &Path,
+    opts: &CheckIgnoreOptions,
+) -> (Vec<(String, Option<fg_index::IgnoreMatch>)>, usize) {
+    let report_negations = opts.verbose || opts.no_index;
     let mut matches: Vec<(String, Option<fg_index::IgnoreMatch>)> = Vec::new();
     let mut matched_count = 0usize;
-    for path in &paths {
+    for path in &opts.paths {
         let normalized = path.replace('\\', "/");
         let is_directory = repo_root.join(&normalized).is_dir();
         let decided = matcher.decide(&normalized, is_directory);
@@ -673,16 +701,17 @@ pub fn handle_check_ignore(ctx: &CliContext) {
         }
         matches.push((normalized, decided));
     }
+    (matches, matched_count)
+}
 
-    if ctx.json_mode {
-        report_check_ignore_json(&matcher, &repo_root, (&matches, matched_count));
-        if matched_count == 0 {
-            std::process::exit(1);
-        }
-        return;
-    }
-
-    for (path, decided) in &matches {
+/// Renders text output for `check-ignore`.
+fn render_check_ignore_text(
+    repo_root: &Path,
+    matches: &[(String, Option<fg_index::IgnoreMatch>)],
+    flags: (bool, bool),
+) {
+    let (verbose, report_negations) = flags;
+    for (path, decided) in matches {
         let Some(hit) = decided.as_ref() else {
             continue;
         };
@@ -692,7 +721,7 @@ pub fn handle_check_ignore(ctx: &CliContext) {
         if verbose {
             println!(
                 "{}:{}:{}\t{}",
-                display_rule_source(&repo_root, &hit.pattern.source),
+                display_rule_source(repo_root, &hit.pattern.source),
                 hit.pattern.line,
                 hit.pattern.raw,
                 path
@@ -700,10 +729,6 @@ pub fn handle_check_ignore(ctx: &CliContext) {
         } else {
             println!("{path}");
         }
-    }
-
-    if matched_count == 0 {
-        std::process::exit(1);
     }
 }
 

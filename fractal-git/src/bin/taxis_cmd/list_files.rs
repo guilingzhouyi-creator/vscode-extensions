@@ -80,7 +80,8 @@ impl LsFilesOptions {
                     return Err(format!("ls-files does not support the flag '{other}'"));
                 }
                 other => {
-                    opts.path_filters.push(other.trim_end_matches('/').to_string());
+                    opts.path_filters
+                        .push(other.trim_end_matches('/').to_string());
                 }
             }
         }
@@ -109,7 +110,10 @@ impl OutputEntry {
     }
 
     fn from_path(path: String) -> Self {
-        Self { path, stage_info: None }
+        Self {
+            path,
+            stage_info: None,
+        }
     }
 }
 
@@ -119,75 +123,43 @@ pub fn handle_ls_files(ctx: &CliContext) {
         Ok(parsed) => parsed,
         Err(err) => reject(CliTag::ERROR, err),
     };
-
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
         Err(open_err) => fail_fatal(open_err),
     };
-
     let index = match view.index() {
         Ok(loaded) => loaded,
         Err(load_err) => reject(CliTag::ERROR, load_err),
     };
-
     let staged_entries: &[IndexEntry] = match &index {
         Some(loaded) => loaded.entries(),
         None => &[],
     };
 
-    let mut results: Vec<OutputEntry> = Vec::new();
+    let mut results = collect_ls_files_entries(&view, staged_entries, &opts);
+    sort_ls_files_entries(&mut results);
 
-    // 1. Unmerged entries (-u)
-    if opts.show_unmerged {
-        for entry in staged_entries {
-            if entry.stage != IndexStage::Normal && matches_filters(&entry.path, &opts.path_filters) {
-                results.push(OutputEntry::from_index(entry));
-            }
-        }
+    if ctx.json_mode {
+        render_ls_files_json(&results);
+    } else {
+        render_ls_files_text(&results, &opts);
     }
+}
 
-    // 2. Cached entries (-c)
-    if opts.show_cached {
-        for entry in staged_entries {
-            if matches_filters(&entry.path, &opts.path_filters) {
-                results.push(OutputEntry::from_index(entry));
-            }
-        }
-    }
+fn collect_ls_files_entries(
+    view: &RepoView,
+    staged_entries: &[IndexEntry],
+    opts: &LsFilesOptions,
+) -> Vec<OutputEntry> {
+    let mut results = Vec::new();
+    collect_index_based_entries(view.work_root(), staged_entries, opts, &mut results);
 
-    // 3. Deleted entries (-d)
-    if opts.show_deleted {
-        for entry in staged_entries {
-            if entry.stage == IndexStage::Normal
-                && matches_filters(&entry.path, &opts.path_filters)
-                && !view.work_root().join(&entry.path).exists()
-            {
-                results.push(OutputEntry::from_path(entry.path.clone()));
-            }
-        }
-    }
-
-    // 4. Modified entries (-m)
-    if opts.show_modified {
-        for entry in staged_entries {
-            if entry.stage == IndexStage::Normal
-                && matches_filters(&entry.path, &opts.path_filters)
-                && is_file_modified(view.work_root(), entry)
-            {
-                results.push(OutputEntry::from_path(entry.path.clone()));
-            }
-        }
-    }
-
-    // 5. Other untracked entries (-o)
     if opts.show_others {
-        let tracked_paths: BTreeSet<&str> = staged_entries.iter().map(|e| e.path.as_str()).collect();
-        let matcher = if opts.exclude_standard || opts.show_ignored {
-            view.ignore_matcher().ok()
-        } else {
-            None
-        };
-
+        let tracked_paths: BTreeSet<&str> =
+            staged_entries.iter().map(|e| e.path.as_str()).collect();
+        let matcher = (opts.exclude_standard || opts.show_ignored)
+            .then(|| view.ignore_matcher().ok())
+            .flatten();
         collect_others(
             view.work_root(),
             view.work_root(),
@@ -198,8 +170,38 @@ pub fn handle_ls_files(ctx: &CliContext) {
             &mut results,
         );
     }
+    results
+}
 
-    // Sort entries stably: path first, then stage if present
+fn collect_index_based_entries(
+    work_root: &Path,
+    staged_entries: &[IndexEntry],
+    opts: &LsFilesOptions,
+    results: &mut Vec<OutputEntry>,
+) {
+    for entry in staged_entries {
+        if !matches_filters(&entry.path, &opts.path_filters) {
+            continue;
+        }
+        if opts.show_unmerged && entry.stage != IndexStage::Normal {
+            results.push(OutputEntry::from_index(entry));
+        }
+        if opts.show_cached {
+            results.push(OutputEntry::from_index(entry));
+        }
+        if entry.stage != IndexStage::Normal {
+            continue;
+        }
+        if opts.show_deleted && !work_root.join(&entry.path).exists() {
+            results.push(OutputEntry::from_path(entry.path.clone()));
+        }
+        if opts.show_modified && is_file_modified(work_root, entry) {
+            results.push(OutputEntry::from_path(entry.path.clone()));
+        }
+    }
+}
+
+fn sort_ls_files_entries(results: &mut [OutputEntry]) {
     results.sort_by(|a, b| {
         let path_cmp = a.path.cmp(&b.path);
         if path_cmp != std::cmp::Ordering::Equal {
@@ -209,39 +211,37 @@ pub fn handle_ls_files(ctx: &CliContext) {
         let b_stage = b.stage_info.as_ref().map(|(_, _, s)| *s).unwrap_or(0);
         a_stage.cmp(&b_stage)
     });
+}
 
-    if ctx.json_mode {
-        let rendered: Vec<serde_json::Value> = results
-            .iter()
-            .map(|entry| {
-                if let Some((mode, oid, stage)) = &entry.stage_info {
-                    serde_json::json!({
-                        "path": entry.path,
-                        "mode": format!("{:06o}", mode),
-                        "oid": oid,
-                        "stage": stage,
-                    })
-                } else {
-                    serde_json::json!({ "path": entry.path })
-                }
-            })
-            .collect();
-        print_json(&serde_json::json!({
-            "engine": "taxis",
-            "operation": "ls-files",
-            "count": rendered.len(),
-            "entries": rendered,
-        }));
-        return;
-    }
+fn render_ls_files_json(results: &[OutputEntry]) {
+    let rendered: Vec<serde_json::Value> = results
+        .iter()
+        .map(|entry| match &entry.stage_info {
+            Some((mode, oid, stage)) => serde_json::json!({
+                "path": entry.path,
+                "mode": format!("{:06o}", mode),
+                "oid": oid,
+                "stage": stage,
+            }),
+            None => serde_json::json!({ "path": entry.path }),
+        })
+        .collect();
+    print_json(&serde_json::json!({
+        "engine": "taxis",
+        "operation": "ls-files",
+        "count": rendered.len(),
+        "entries": rendered,
+    }));
+}
 
+fn render_ls_files_text(results: &[OutputEntry], opts: &LsFilesOptions) {
     let mut sink = std::io::stdout();
     for entry in results {
         let line = match &entry.stage_info {
             Some((mode, oid, stage)) if opts.show_stage || opts.show_unmerged => {
                 format!("{:06o} {} {}\t{}", mode, oid, stage, entry.path)
             }
-            _ => entry.path,
+            _ => entry.path.clone(),
         };
         let _ = write_record(&mut sink, &line, opts.nul_terminated);
     }

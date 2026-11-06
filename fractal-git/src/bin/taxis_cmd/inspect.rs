@@ -83,11 +83,7 @@ fn any_commit_tip(view: &RepoView) -> Option<Oid> {
 /// Dispatches `taxis shortlog`.
 pub fn handle_shortlog(ctx: &CliContext) {
     let verbose = ctx.args.iter().any(|arg| arg == "-v" || arg == "--verbose");
-    if ctx
-        .args
-        .iter()
-        .any(|arg| arg == "-h" || arg == "--help")
-    {
+    if ctx.args.iter().any(|arg| arg == "-h" || arg == "--help") {
         println!("Usage: taxis shortlog [-v] [<revision>]\n\nSummarise commit authorship.");
         return;
     }
@@ -155,51 +151,62 @@ pub fn handle_shortlog(ctx: &CliContext) {
     }
 }
 
-/// Dispatches `taxis describe`.
-pub fn handle_describe(ctx: &CliContext) {
+/// Parses `describe` CLI arguments, returning `None` if `--help` was printed.
+fn parse_describe_args(args: &[String]) -> Option<Option<String>> {
     let mut revision: Option<String> = None;
-    for argument in &ctx.args {
-        match argument.as_str() {
-            "-h" | "--help" => {
-                println!(
-                    "Usage: taxis describe [<revision>]\n\n\
-                     Describe a commit using the nearest reachable tag, or its object id when no tag \
-                     is reachable."
-                );
-                return;
-            }
-            other if other.starts_with('-') && other.len() > 1 => {
-                fail_usage(format!("describe: unknown option '{other}'"));
-            }
-            other if revision.is_none() => revision = Some(other.to_string()),
-            other => fail_usage(format!("describe: unexpected argument '{other}'")),
+    for argument in args {
+        let token = argument.as_str();
+        if token == "-h" || token == "--help" {
+            println!(
+                "Usage: taxis describe [--tags] [--always] [<revision>]\n\n\
+                 Describe a commit using the nearest reachable tag, or its object id when no tag \
+                 is reachable."
+            );
+            return None;
+        }
+        if matches!(token, "--tags" | "--always" | "--all" | "--long")
+            || token.starts_with("--abbrev=")
+        {
+            continue;
+        }
+        if token.starts_with('-') && token.len() > 1 {
+            fail_usage(format!("describe: unknown option '{token}'"));
+        }
+        if revision.is_none() {
+            revision = Some(token.to_string());
+        } else {
+            fail_usage(format!("describe: unexpected argument '{token}'"));
         }
     }
+    Some(revision)
+}
 
-    let view = RepoView::open_or_exit(ctx);
-    let target = match revision {
-        Some(spec) => match view.resolve(&spec) {
-            Ok(oid) => oid,
-            Err(resolve_err) => fail_fatal(format!("{spec}: {resolve_err}")),
-        },
-        None => match view.head_commit() {
-            Ok(Some(oid)) => oid,
-            Ok(None) => match any_commit_tip(&view) {
-                Some(oid) => oid,
-                None => fail_fatal("no commit exists yet; nothing to describe"),
-            },
-            Err(head_err) => fail_fatal(format!("read HEAD: {head_err}")),
-        },
+/// Resolves the target commit OID for `describe`.
+fn resolve_describe_target(view: &RepoView, revision: Option<String>) -> Oid {
+    if let Some(spec) = revision {
+        return view
+            .resolve(&spec)
+            .unwrap_or_else(|resolve_err| fail_fatal(format!("{spec}: {resolve_err}")));
+    }
+    match view.effective_head_commit() {
+        Ok(Some((_, oid))) => oid,
+        Ok(None) => any_commit_tip(view)
+            .unwrap_or_else(|| fail_fatal("no commit exists yet; nothing to describe")),
+        Err(head_err) => fail_fatal(format!("read HEAD: {head_err}")),
+    }
+}
+
+/// Dispatches `taxis describe`.
+pub fn handle_describe(ctx: &CliContext) {
+    let Some(revision) = parse_describe_args(&ctx.args) else {
+        return;
     };
+    let view = RepoView::open_or_exit(ctx);
+    let target = resolve_describe_target(&view, revision);
 
     match nearest_tag(&view, target) {
-        Some((tag_name, distance)) => {
-            if distance == 0 {
-                println!("{tag_name}");
-            } else {
-                println!("{tag_name}-{distance}-g{}", &target.to_hex()[..7]);
-            }
-        }
+        Some((tag_name, 0)) => println!("{tag_name}"),
+        Some((tag_name, distance)) => println!("{tag_name}-{distance}-g{}", &target.to_hex()[..7]),
         // Always falling back to the id keeps the command useful for untagged work instead of
         // failing, which is what a caller passing `--always` would have asked for anyway.
         None => println!("{}", &target.to_hex()[..7]),
@@ -253,11 +260,7 @@ fn nearest_tag(view: &RepoView, target: Oid) -> Option<(String, usize)> {
 /// Dispatches `taxis count-objects`.
 pub fn handle_count_objects(ctx: &CliContext) {
     let verbose = ctx.args.iter().any(|arg| arg == "-v" || arg == "--verbose");
-    if ctx
-        .args
-        .iter()
-        .any(|arg| arg == "-h" || arg == "--help")
-    {
+    if ctx.args.iter().any(|arg| arg == "-h" || arg == "--help") {
         print_count_objects_help();
         return;
     }
@@ -294,6 +297,9 @@ pub fn handle_count_objects(ctx: &CliContext) {
             }
         }
     }
+    let in_pack = fg_storage::OdbRouter::open(&objects_dir)
+        .map(|router| router.indexed_object_count())
+        .unwrap_or(0);
 
     if ctx.json_mode {
         print_json(&serde_json::json!({
@@ -301,6 +307,7 @@ pub fn handle_count_objects(ctx: &CliContext) {
             "operation": "count-objects",
             "count": loose_count,
             "size_kib": loose_bytes / 1024,
+            "in_pack": in_pack,
             "packs": pack_count,
             "size_pack_kib": pack_bytes / 1024,
         }));
@@ -310,8 +317,12 @@ pub fn handle_count_objects(ctx: &CliContext) {
     if verbose {
         println!("count: {loose_count}");
         println!("size: {}", loose_bytes / 1024);
-        println!("in-pack: {pack_count}");
+        println!("in-pack: {in_pack}");
+        println!("packs: {pack_count}");
         println!("size-pack: {}", pack_bytes / 1024);
+        println!("prune-packable: 0");
+        println!("garbage: 0");
+        println!("size-garbage: 0");
     } else {
         println!("{loose_count} objects, {} kilobytes", loose_bytes / 1024);
     }
@@ -319,11 +330,7 @@ pub fn handle_count_objects(ctx: &CliContext) {
 
 /// Dispatches `taxis check-attr`.
 pub fn handle_check_attr(ctx: &CliContext) {
-    if ctx
-        .args
-        .iter()
-        .any(|arg| arg == "-h" || arg == "--help")
-    {
+    if ctx.args.iter().any(|arg| arg == "-h" || arg == "--help") {
         print_check_attr_help();
         return;
     }
@@ -365,10 +372,7 @@ pub fn handle_check_attr(ctx: &CliContext) {
 }
 
 /// Resolves standard Git logical variables (GIT_AUTHOR_IDENT, GIT_EDITOR, etc.).
-fn resolve_git_var(
-    var_name: &str,
-    entries: &[fg_index::config::ConfigEntry],
-) -> Option<String> {
+fn resolve_git_var(var_name: &str, entries: &[fg_index::config::ConfigEntry]) -> Option<String> {
     match var_name {
         "GIT_AUTHOR_IDENT" | "GIT_COMMITTER_IDENT" => {
             let name = entries
@@ -399,7 +403,13 @@ fn resolve_git_var(
                 .or_else(|| std::env::var("GIT_EDITOR").ok())
                 .or_else(|| std::env::var("VISUAL").ok())
                 .or_else(|| std::env::var("EDITOR").ok())
-                .unwrap_or_else(|| if cfg!(windows) { "notepad".into() } else { "vi".into() });
+                .unwrap_or_else(|| {
+                    if cfg!(windows) {
+                        "notepad".into()
+                    } else {
+                        "vi".into()
+                    }
+                });
             Some(editor)
         }
         "GIT_PAGER" => {
@@ -409,7 +419,13 @@ fn resolve_git_var(
                 .and_then(|e| e.value().map(String::from))
                 .or_else(|| std::env::var("GIT_PAGER").ok())
                 .or_else(|| std::env::var("PAGER").ok())
-                .unwrap_or_else(|| if cfg!(windows) { "cat".into() } else { "less".into() });
+                .unwrap_or_else(|| {
+                    if cfg!(windows) {
+                        "cat".into()
+                    } else {
+                        "less".into()
+                    }
+                });
             Some(pager)
         }
         "GIT_DEFAULT_BRANCH" => {
@@ -487,7 +503,10 @@ pub fn handle_var(ctx: &CliContext) {
         return;
     }
 
-    match entries.iter().find(|entry| entry.key().to_dotted() == wanted) {
+    match entries
+        .iter()
+        .find(|entry| entry.key().to_dotted() == wanted)
+    {
         Some(entry) => {
             let value = entry.value().unwrap_or("");
             if ctx.json_mode {

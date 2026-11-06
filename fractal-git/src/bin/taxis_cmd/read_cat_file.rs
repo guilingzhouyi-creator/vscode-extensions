@@ -18,89 +18,111 @@ use fractal_git::constants::cli::CliTag;
 use super::common::{fail_fatal, fail_usage, print_json, reject, CliContext, EXIT_REJECTED};
 use super::repo_view::RepoView;
 
+struct CatFileArgs {
+    mode: CatFileMode,
+    mode_selected: bool,
+    expect_type: Option<String>,
+    revision: Option<String>,
+    batch: Option<BatchMode>,
+}
+
 /// Dispatches `cat-file`.
-///
-/// Accepted forms: `cat-file -t <rev>`, `cat-file -s <rev>`, `cat-file -p <rev>`,
-/// `cat-file -e <rev>`, `cat-file <type> <rev>`, and the streaming forms `cat-file --batch` and
-/// `cat-file --batch-check`. A custom `--batch=<format>` is rejected rather than approximated: the
-/// placeholder language is broad, and a wrong column is worse than a clear refusal.
 pub fn handle_cat_file(ctx: &CliContext) {
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
         Err(open_err) => fail_fatal(open_err),
     };
-
-    let mut mode = CatFileMode::Pretty;
-    let mut mode_selected = false;
-    let mut expect_type: Option<String> = None;
-    let mut revision: Option<String> = None;
-    let mut batch: Option<BatchMode> = None;
-    for argument in &ctx.args {
-        match argument.as_str() {
-            "-t" => {
-                mode = CatFileMode::Type;
-                mode_selected = true;
-            }
-            "-s" => {
-                mode = CatFileMode::Size;
-                mode_selected = true;
-            }
-            "-p" => {
-                mode = CatFileMode::Pretty;
-                mode_selected = true;
-            }
-            "-e" => {
-                mode = CatFileMode::Exists;
-                mode_selected = true;
-            }
-            "--batch" => batch = Some(BatchMode::Contents),
-            "--batch-check" => batch = Some(BatchMode::Check),
-            other if other.starts_with("--batch=") => reject(
-                CliTag::ERROR,
-                format!("cat-file does not implement the custom batch format in '{other}'"),
-            ),
-            other if other.starts_with('-') => {
-                fail_usage(format!("taxis cat-file: unknown option '{other}'"))
-            }
-            other => {
-                if revision.is_none() && is_object_type_name(other) {
-                    expect_type = Some(other.to_string());
-                } else if revision.is_none() {
-                    revision = Some(other.to_string());
-                } else {
-                    fail_usage("taxis cat-file <type> <object>");
-                }
-            }
-        }
-    }
-
-    if let Some(batch_mode) = batch {
+    let parsed = parse_cat_file_args(&ctx.args);
+    if let Some(batch_mode) = parsed.batch {
         run_batch(&view, batch_mode);
     }
 
-    let Some(revision) = revision else {
+    let Some(revision) = parsed.revision else {
         fail_usage("taxis cat-file <type> <object>");
     };
-    // Git has no `cat-file <object>` form: without one of -t/-s/-p/-e the first positional is the
-    // object type. A bare revision is therefore a malformed command line (129), not a pretty print.
-    if !mode_selected && expect_type.is_none() {
+    if !parsed.mode_selected && parsed.expect_type.is_none() {
         fail_usage("taxis cat-file <type> <object>");
     }
     let resolved = match view.resolve_object_spec(&revision) {
         Ok(oid) => oid,
-        Err(_) => cat_file_resolution_failure(&view, &revision, mode, expect_type.as_deref()),
+        Err(_) => cat_file_resolution_failure(
+            &view,
+            &revision,
+            parsed.mode,
+            parsed.expect_type.as_deref(),
+        ),
     };
     let object = match view.object(&resolved) {
         Ok(found) => found,
-        Err(_) => cat_file_read_failure(&revision, mode),
+        Err(_) => cat_file_read_failure(&revision, parsed.mode),
     };
 
-    if let Some(expected) = expect_type {
+    if let Some(expected) = parsed.expect_type {
         if expected != object.kind.as_str() {
             fail_fatal(format!("git cat-file {revision}: bad file"));
         }
     }
 
+    render_cat_file_object(ctx, resolved, &object, parsed.mode);
+}
+
+fn parse_cat_file_args(args: &[String]) -> CatFileArgs {
+    let mut parsed = CatFileArgs {
+        mode: CatFileMode::Pretty,
+        mode_selected: false,
+        expect_type: None,
+        revision: None,
+        batch: None,
+    };
+    for argument in args {
+        apply_cat_file_arg(&mut parsed, argument.as_str());
+    }
+    parsed
+}
+
+fn apply_cat_file_arg(parsed: &mut CatFileArgs, arg: &str) {
+    match arg {
+        "-t" => {
+            parsed.mode = CatFileMode::Type;
+            parsed.mode_selected = true;
+        }
+        "-s" => {
+            parsed.mode = CatFileMode::Size;
+            parsed.mode_selected = true;
+        }
+        "-p" => {
+            parsed.mode = CatFileMode::Pretty;
+            parsed.mode_selected = true;
+        }
+        "-e" => {
+            parsed.mode = CatFileMode::Exists;
+            parsed.mode_selected = true;
+        }
+        "--batch" => parsed.batch = Some(BatchMode::Contents),
+        "--batch-check" => parsed.batch = Some(BatchMode::Check),
+        other if other.starts_with("--batch=") => reject(
+            CliTag::ERROR,
+            format!("cat-file does not implement the custom batch format in '{other}'"),
+        ),
+        other if other.starts_with('-') => {
+            fail_usage(format!("taxis cat-file: unknown option '{other}'"))
+        }
+        other if parsed.revision.is_none() && is_object_type_name(other) => {
+            parsed.expect_type = Some(other.to_string());
+        }
+        other if parsed.revision.is_none() => {
+            parsed.revision = Some(other.to_string());
+        }
+        _ => fail_usage("taxis cat-file <type> <object>"),
+    }
+}
+
+fn render_cat_file_object(
+    ctx: &CliContext,
+    resolved: fg_core::models::Oid,
+    object: &fg_storage::PackedObject,
+    mode: CatFileMode,
+) {
     if ctx.json_mode {
         let payload = serde_json::json!({
             "engine": "taxis",

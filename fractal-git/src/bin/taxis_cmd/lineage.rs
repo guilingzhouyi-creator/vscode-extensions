@@ -115,9 +115,7 @@ pub fn handle_range_diff(ctx: &CliContext) {
 
     let view = RepoView::open_or_exit(ctx);
     let (list1, list2) = if positional.len() == 1 && positional[0].contains("...") {
-        let (left_str, right_str) = positional[0]
-            .split_once("...")
-            .unwrap_or(("", ""));
+        let (left_str, right_str) = positional[0].split_once("...").unwrap_or(("", ""));
         let left_oid = match view.resolve(left_str) {
             Ok(oid) => oid,
             Err(err) => fail_fatal(format!("cannot resolve '{left_str}': {err}")),
@@ -137,11 +135,7 @@ pub fn handle_range_diff(ctx: &CliContext) {
                     rec.parents,
                 ))
             };
-            let bases = DagWalker::find_merge_bases_with_ccd(
-                &left_oid,
-                &right_oid,
-                &mut get_node,
-            );
+            let bases = DagWalker::find_merge_bases_with_ccd(&left_oid, &right_oid, &mut get_node);
             let base_oid = bases.first().copied().unwrap_or(left_oid);
             let l1 = resolve_commits_between(&view, base_oid, left_oid).unwrap_or_default();
             let l2 = resolve_commits_between(&view, base_oid, right_oid).unwrap_or_default();
@@ -190,9 +184,9 @@ fn resolve_commits_between(
 
 /// Resolves commits in a range string `A..B` (oldest first).
 fn resolve_range_commits(view: &RepoView, range_str: &str) -> FractalResult<Vec<CommitRecord>> {
-    let (left, right) = range_str
-        .split_once("..")
-        .ok_or_else(|| FractalError::ObjectCodec(format!("expected range format A..B, got '{range_str}'")))?;
+    let (left, right) = range_str.split_once("..").ok_or_else(|| {
+        FractalError::ObjectCodec(format!("expected range format A..B, got '{range_str}'"))
+    })?;
 
     let left_oid = view.resolve(left)?;
     let right_oid = view.resolve(right)?;
@@ -204,7 +198,8 @@ fn build_lineage_items(view: &RepoView, commits: Vec<CommitRecord>) -> Vec<Linea
     commits
         .into_iter()
         .map(|record| {
-            let (patch_id, diff_text) = compute_commit_diff(view, &record).unwrap_or((Oid::ZERO, String::new()));
+            let (patch_id, diff_text) =
+                compute_commit_diff(view, &record).unwrap_or((Oid::ZERO, String::new()));
             LineageCommit {
                 record,
                 patch_id,
