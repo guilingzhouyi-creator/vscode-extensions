@@ -33,6 +33,9 @@ const MAX_TERNARY_BRANCHES = 3;
 /** Logical operator count at which a boolean chain is considered unreadable. */
 const MAX_LOGICAL_OPERATORS = 5;
 
+/** Minimum line length to contain a candidate boolean operator chain reaching the threshold. */
+const MIN_LOGICAL_CANDIDATE_LINE_LENGTH = 14;
+
 /** Callback nesting depth at which the chain is reported. */
 const MAX_CALLBACK_DEPTH = 3;
 
@@ -47,9 +50,6 @@ const DENSITY_THRESHOLD = 0.22;
 
 /** Operator count below which density is not considered. */
 const DENSITY_MIN_OPERATORS = 8;
-
-/** Strong bitwise operator characters counted toward density pre-gating. */
-const STRONG_BITWISE_RE = /<<|>>|\^|~/;
 
 /** Any operator character or digraph counted toward cognitive density. */
 const OPERATOR_RE = /[&|^~]|<<|>>|\+|-|\*|\/|%|\?|:/g;
@@ -148,11 +148,17 @@ function countLogicalOperatorChars(line: string): number {
  * Checks whether a line has enough logical operator characters to reach `MAX_LOGICAL_OPERATORS`.
  */
 function hasLineLogicalCandidate(line: string, hasAnd: boolean, hasOr: boolean): boolean {
-    const andIdx = hasAnd ? line.indexOf(TOKEN_LOGICAL_AND) : -1;
-    const orIdx = hasOr ? line.indexOf(TOKEN_LOGICAL_OR) : -1;
-    if (andIdx === -1 && orIdx === -1) return false;
-    if (orIdx === -1 && line.indexOf(TOKEN_LOGICAL_AND, andIdx + 2) === -1) return false;
-    if (andIdx === -1 && line.indexOf(TOKEN_LOGICAL_OR, orIdx + 2) === -1) return false;
+    if (line.length < MIN_LOGICAL_CANDIDATE_LINE_LENGTH) return false;
+    if (hasAnd) {
+        const andIdx = line.indexOf(TOKEN_LOGICAL_AND);
+        if (andIdx !== -1) {
+            if (!hasOr && line.indexOf(TOKEN_LOGICAL_AND, andIdx + 2) === -1) return false;
+            return countLogicalOperatorChars(line) >= MAX_LOGICAL_OPERATORS * 2;
+        }
+    }
+    if (!hasOr) return false;
+    const orIdx = line.indexOf(TOKEN_LOGICAL_OR);
+    if (orIdx === -1 || line.indexOf(TOKEN_LOGICAL_OR, orIdx + 2) === -1) return false;
     return countLogicalOperatorChars(line) >= MAX_LOGICAL_OPERATORS * 2;
 }
 
@@ -165,6 +171,7 @@ function hasCandidateOperatorCounts(
     hasAnd: boolean,
     hasOr: boolean,
 ): boolean {
+    if (line.length < 9) return false;
     if (hasTernary && hasLineTernaryCandidate(line)) return true;
     return (hasAnd || hasOr) && hasLineLogicalCandidate(line, hasAnd, hasOr);
 }
@@ -373,10 +380,11 @@ function evaluateSingleLineStatement(
  */
 function hasPackedSemicolonCandidate(line: string): boolean {
     const len = line.length;
+    if (len < 4) return false;
     const firstSemi = line.indexOf(TOKEN_SEMICOLON);
     if (firstSemi === -1 || firstSemi === len - 1) return false;
     if (line.charCodeAt(len - 1) > CHAR_SPACE) return true;
-    for (let i = firstSemi + 1; i < len - 1; i++) {
+    for (let i = len - 2; i > firstSemi; i--) {
         if (line.charCodeAt(i) > CHAR_SPACE) return true;
     }
     return false;
@@ -422,7 +430,18 @@ export const SingleLineMultiSemanticRule: GovernanceRule = {
  */
 function opensCallbackClosure(code: string): boolean {
     if (!code.includes(TOKEN_OPEN_BRACE)) return false;
-    if (!code.includes(TOKEN_ARROW) && !code.includes(TOKEN_FUNCTION)) return false;
+    const hasArrow = code.includes(TOKEN_ARROW);
+    if (!hasArrow) {
+        if (!code.includes(TOKEN_FUNCTION)) return false;
+        if (
+            code.startsWith('function ') ||
+            code.startsWith('export function ') ||
+            code.startsWith('async function ') ||
+            code.startsWith('export async function ')
+        ) {
+            return false;
+        }
+    }
     if (!CALLBACK_KEYWORD_RE.test(code)) return false;
     if (DECLARED_FUNCTION_RE.test(code)) return false;
     return CALLBACK_OPEN_RE.test(code);
@@ -432,6 +451,7 @@ function opensCallbackClosure(code: string): boolean {
  * Calculates net indentation and scope balance adjustments from braces.
  */
 function calculateNetBraceDepth(code: string, currentDepth: number): number {
+    if (currentDepth <= 0) return 0;
     let opens = 0;
     let closes = 0;
     for (let j = 0; j < code.length; j++) {
@@ -439,7 +459,7 @@ function calculateNetBraceDepth(code: string, currentDepth: number): number {
         if (charCode === CHAR_CLOSE_BRACE) closes++;
         else if (charCode === CHAR_OPEN_BRACE) opens++;
     }
-    if (closes > opens && currentDepth > 0) {
+    if (closes > opens) {
         return Math.max(0, currentDepth - (closes - opens));
     }
     return currentDepth;
@@ -497,14 +517,13 @@ function shouldSkipCallbackLine(
     hasArrow: boolean,
     hasFn: boolean,
 ): boolean {
-    const hasOpenBrace = line.includes(TOKEN_OPEN_BRACE);
     if (callbackDepth === 0) {
-        if (!hasOpenBrace) return true;
+        if (line.length < 6 || !line.includes(TOKEN_OPEN_BRACE)) return true;
         return (
             !(hasArrow && line.includes(TOKEN_ARROW)) && !(hasFn && line.includes(TOKEN_FUNCTION))
         );
     }
-    return !hasOpenBrace && !line.includes(TOKEN_CLOSE_BRACE);
+    return !line.includes(TOKEN_CLOSE_BRACE) && !line.includes(TOKEN_OPEN_BRACE);
 }
 
 /**
@@ -606,7 +625,6 @@ function checkDensityLine(
     lineIndex: number,
 ): GovernanceViolation | null {
     if (!code || code.length < DENSITY_MIN_LENGTH) return null;
-    if (!STRONG_BITWISE_RE.test(code)) return null;
     if (DECLARATION_PREFIX_RE.test(code)) return null;
 
     const nonWsLen = countNonWhitespace(code);

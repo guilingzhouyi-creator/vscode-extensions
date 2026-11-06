@@ -46,8 +46,8 @@ const KEYWORD_EXTENDS = 'extends';
 const TOKEN_OPEN_PAREN = '(';
 const KEYWORD_FUNCTION = 'function';
 const KEYWORD_CONST = 'const';
-const KEYWORD_DEF = 'def';
-const KEYWORD_FUNC = 'func';
+const KEYWORD_DEF = 'def ';
+const KEYWORD_FUNC = 'func ';
 
 const SUBCLASS_HEURISTIC_RE = /(?:Sub|Derived|Child)/;
 const UI_NODES_SET = new Set(['Control', 'Node2D', 'Node3D', 'CanvasItem']);
@@ -208,12 +208,20 @@ function extractParameterText(
 
 function hasFunctionStartToken(line: string): boolean {
     if (!line.includes(TOKEN_OPEN_PAREN)) return false;
-    return (
-        line.includes(KEYWORD_FUNCTION) ||
-        line.includes(KEYWORD_CONST) ||
-        line.includes(KEYWORD_DEF) ||
-        line.includes(KEYWORD_FUNC)
-    );
+    if (line.includes(KEYWORD_FUNCTION)) return true;
+    if (line.includes(KEYWORD_CONST) && line.includes('=')) return true;
+    return line.includes(KEYWORD_DEF) || line.includes(KEYWORD_FUNC);
+}
+
+function matchFunctionDeclaration(line: string): RegExpMatchArray | null {
+    if (line.includes(KEYWORD_FUNCTION) || line.includes(KEYWORD_CONST)) {
+        const tsMatch = line.match(FUNC_START_RE);
+        if (tsMatch) return tsMatch;
+    }
+    if (line.includes(KEYWORD_DEF) || line.includes(KEYWORD_FUNC)) {
+        return line.match(PY_GD_FUNC_RE);
+    }
+    return null;
 }
 
 function inspectFunctionAtLine(
@@ -223,8 +231,7 @@ function inspectFunctionAtLine(
     threshold: number,
     violations: GovernanceViolation[],
 ): void {
-    if (!hasFunctionStartToken(line)) return;
-    const matchResult = line.match(FUNC_START_RE) || line.match(PY_GD_FUNC_RE);
+    const matchResult = matchFunctionDeclaration(line);
     if (!matchResult) return;
 
     const funcName = matchResult[1] || matchResult[2];
@@ -232,6 +239,11 @@ function inspectFunctionAtLine(
 
     const openIdx = line.indexOf('(', matchResult.index ?? 0);
     if (openIdx === -1) return;
+
+    const closeOnSameLine = line.indexOf(')', openIdx + 1);
+    if (closeOnSameLine !== -1 && line.indexOf(',', openIdx + 1) === -1 && threshold > 1) {
+        return;
+    }
 
     const paramText = extractParameterText(lines, lineIndex, openIdx);
     if (!paramText) return;

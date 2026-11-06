@@ -219,10 +219,8 @@ function isExemptDossierPath(filePath: string): boolean {
  * Evaluates a single source line for historical dossier nomenclature violations.
  */
 function checkDossierLine(line: string, lineIndex: number): GovernanceViolation | null {
-    if (isDossierSelfReference(line)) return null;
-
     const match = DOSSIER_JARGON_RE.exec(line);
-    if (!match) return null;
+    if (!match || isDossierSelfReference(line)) return null;
 
     return {
         ruleId: 'GOV-ARC-001',
@@ -290,19 +288,19 @@ export const ProseTerminologySanitizationRule: GovernanceRule = {
             return null;
         }
 
-        const commentLines: string[] = [];
+        const candidateComments: string[] = [];
+        const candidateLineNumbers: number[] = [];
         for (let i = 0; i < ctx.lines.length; i++) {
             const line = ctx.lines[i];
-            if (isCommentLine(line)) {
-                commentLines.push(line);
-            } else {
-                commentLines.push('');
+            if (isCommentLine(line) && DEFAULT_RULES_FAST_CANDIDATE_RE.test(line)) {
+                candidateComments.push(line);
+                candidateLineNumbers.push(i + 1);
             }
         }
 
-        const commentContent = commentLines.join('\n');
-        if (!commentContent.trim()) return null;
+        if (candidateComments.length === 0) return null;
 
+        const commentContent = candidateComments.join('\n');
         const findings = auditTerminologyProse(commentContent, {
             allowedCategories: [
                 'temporary',
@@ -317,7 +315,7 @@ export const ProseTerminologySanitizationRule: GovernanceRule = {
         return findings.map((finding) => ({
             ruleId: 'GOV-SAN-002',
             message: finding.message,
-            line: finding.line,
+            line: candidateLineNumbers[finding.line - 1] ?? finding.line,
             column: finding.column,
             suggestion: finding.guidance,
             fixable: false,

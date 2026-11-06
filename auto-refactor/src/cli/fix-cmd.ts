@@ -26,6 +26,7 @@ import { MctsExplorer } from '../core/praxis/mcts/mcts-explorer';
 import type { CandidateStrategy } from '../core/praxis/mcts/mcts-contracts';
 import { TrajectoryAccumulator, recordToVector } from '../core/trajectory';
 import { buildDebtLedger } from '../core/intelligence/elastic-debt-budget';
+import { sha256Hex } from '../core/cache-key';
 
 const ENCODING_UTF8 = 'utf8';
 const LOG_LEVEL_SILENT = 'silent';
@@ -48,12 +49,20 @@ interface CodemodChangeMetrics {
     modifiedFiles: number;
 }
 
+interface PreFixSnapshot {
+    readonly relPath: string;
+    readonly fullPath: string;
+    readonly content: string;
+    readonly sha256: string;
+}
+
 interface CodemodTrajectoryInput {
     readonly rootDir: string;
     readonly fixesByFile: ReadonlyMap<string, readonly FixDescriptor[]>;
     readonly totalApplied: number;
     readonly cli: CliOptions;
     readonly beforeReport: ScanReport;
+    readonly postReport: ScanReport;
     readonly changeMetrics: CodemodChangeMetrics;
 }
 
@@ -180,6 +189,7 @@ async function applyFixesToTargetFile(
     target: { relPath: string; fixes: readonly FixDescriptor[]; rootDir: string },
     cli: CliOptions,
     changeMetrics: CodemodChangeMetrics,
+    snapshots: PreFixSnapshot[],
 ): Promise<{ applied: number; skipped: number }> {
     const fullPath = path.resolve(target.rootDir, target.relPath);
     if (!(await pathExistsAsync(fullPath))) {
@@ -187,6 +197,7 @@ async function applyFixesToTargetFile(
     }
 
     const content = await fs.promises.readFile(fullPath, ENCODING_UTF8);
+    const snapshotSha = sha256Hex(content);
     const dryProbe = defaultPatchEngine.applyFixes(fullPath, content, target.fixes, {
         dryRun: true,
         rules: cli.fixRules,
@@ -199,6 +210,13 @@ async function applyFixesToTargetFile(
                   cli,
               )
             : target.fixes;
+
+    if (!cli.fixDryRun) {
+        const currentContent = await fs.promises.readFile(fullPath, ENCODING_UTF8);
+        if (sha256Hex(currentContent) !== snapshotSha) {
+            return { applied: 0, skipped: orderedFixes.length };
+        }
+    }
 
     const patchApplyResult = await defaultPatchEngine.applyFixesAsync(
         fullPath,
@@ -213,6 +231,14 @@ async function applyFixesToTargetFile(
         return { applied: 0, skipped: 0 };
     }
 
+    if (!cli.fixDryRun) {
+        snapshots.push({
+            relPath: target.relPath,
+            fullPath,
+            content,
+            sha256: snapshotSha,
+        });
+    }
     const lineDelta = countChangedAndSemanticLines(content, patchApplyResult.patchedContent);
     changeMetrics.changedLines += lineDelta.changed;
     changeMetrics.semanticLines += lineDelta.semantic;
@@ -252,23 +278,48 @@ async function readModifiedFilesSnapshot(
     return modifiedFilesList;
 }
 
+function countActiveErrorIssues(report: ScanReport): number {
+    return report.issues.filter(
+        (issueItem) => issueItem.severity === SEVERITY_ERROR && !issueItem.suppression,
+    ).length;
+}
+
+async function verifyAndRollbackIfRegressed(
+    cli: CliOptions,
+    beforeReport: ScanReport,
+    snapshots: readonly PreFixSnapshot[],
+): Promise<{ postReport: ScanReport; rolledBack: boolean }> {
+    const postReport = await scan({ ...cli, logLevel: LOG_LEVEL_SILENT });
+    const beforeErrors = countActiveErrorIssues(beforeReport);
+    const afterErrors = countActiveErrorIssues(postReport);
+    if (afterErrors > beforeErrors && snapshots.length > 0) {
+        for (const snap of snapshots) {
+            await fs.promises.writeFile(snap.fullPath, snap.content, ENCODING_UTF8);
+        }
+        process.stderr.write(
+            `[auto-refactor] Codemod introduced ${afterErrors - beforeErrors} new error(s); ` +
+                `rolled back ${snapshots.length} file(s) to pre-fix snapshot.\n`,
+        );
+        return { postReport, rolledBack: true };
+    }
+    return { postReport, rolledBack: false };
+}
+
 async function recordCodemodTrajectory(input: CodemodTrajectoryInput): Promise<void> {
-    const { rootDir, fixesByFile, totalApplied, cli, beforeReport, changeMetrics } = input;
+    const { rootDir, fixesByFile, totalApplied, cli, beforeReport, postReport, changeMetrics } =
+        input;
     if (cli.fixDryRun || totalApplied === 0) return;
     try {
         const trajectoryDir = path.join(rootDir, TRAJECTORY_DIR_NAME);
         if (!(await pathExistsAsync(trajectoryDir))) return;
 
         const beforeScore = beforeReport.qualityScore?.compositeScore;
-        const postReport = await scan({ ...cli, logLevel: LOG_LEVEL_SILENT });
         const afterScore = postReport.qualityScore?.compositeScore;
         if (typeof beforeScore !== 'number' || typeof afterScore !== 'number') return;
 
         const beforeDebt = countWeightedDebtPoints(beforeReport.issues);
         const afterDebt = countWeightedDebtPoints(postReport.issues);
-        const regressionCount = postReport.issues.filter(
-            (issueItem) => issueItem.severity === SEVERITY_ERROR && !issueItem.suppression,
-        ).length;
+        const regressionCount = countActiveErrorIssues(postReport);
         const modifiedFilesList = await readModifiedFilesSnapshot(rootDir, fixesByFile);
         const maybeRevision = (cli as Record<string, unknown>).revision;
         const accumulator = new TrajectoryAccumulator(trajectoryDir, rootDir);
@@ -339,6 +390,8 @@ export async function handleFixWorkflow(cli: CliOptions): Promise<number> {
         modifiedFiles: 0,
     };
 
+    const snapshots: PreFixSnapshot[] = [];
+
     process.stdout.write(
         `\n=== Automated Codemod Repair (${cli.fixDryRun ? MODE_DRY_RUN : MODE_IN_PLACE}) ===\n`,
     );
@@ -348,6 +401,7 @@ export async function handleFixWorkflow(cli: CliOptions): Promise<number> {
             { relPath, fixes, rootDir },
             cli,
             changeMetrics,
+            snapshots,
         );
         totalApplied += outcome.applied;
         totalSkipped += outcome.skipped;
@@ -358,14 +412,25 @@ export async function handleFixWorkflow(cli: CliOptions): Promise<number> {
             `${totalSkipped} conflicts skipped across ${fixesByFile.size} files.\n\n`,
     );
 
-    await recordCodemodTrajectory({
-        rootDir,
-        fixesByFile,
-        totalApplied,
-        cli,
-        beforeReport: report,
-        changeMetrics,
-    });
+    if (!cli.fixDryRun && totalApplied > 0) {
+        const { postReport, rolledBack } = await verifyAndRollbackIfRegressed(
+            cli,
+            report,
+            snapshots,
+        );
+        if (rolledBack) {
+            return 1;
+        }
+        await recordCodemodTrajectory({
+            rootDir,
+            fixesByFile,
+            totalApplied,
+            cli,
+            beforeReport: report,
+            postReport,
+            changeMetrics,
+        });
+    }
 
     return 0;
 }

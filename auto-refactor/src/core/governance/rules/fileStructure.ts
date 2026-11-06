@@ -294,7 +294,7 @@ const TOKEN_LOAD = 'load';
 const BLAST_RADIUS_TRIGGERS: readonly string[] = [TOKEN_IMPORT, TOKEN_REQUIRE, TOKEN_LOAD];
 
 function hasImportOrRequireToken(line: string): boolean {
-    return line.includes(TOKEN_IMPORT) || line.includes(TOKEN_REQUIRE) || line.includes(TOKEN_LOAD);
+    return line.includes(TOKEN_IMPORT) || line.includes('require(') || line.includes('load(');
 }
 
 /**

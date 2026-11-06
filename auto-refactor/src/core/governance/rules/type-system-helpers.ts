@@ -49,6 +49,7 @@ function containsOpenParen(part: string): boolean {
  * Evaluates whether a line contains an export keyword token using Set lookup.
  */
 function lineHasExportKeyword(line: string): boolean {
+    if (!line.includes('export')) return false;
     const tokens = line.split(/[^a-zA-Z0-9_$]+/);
     for (let i = 0; i < tokens.length; i++) {
         if (EXPORT_KEYWORDS.has(tokens[i])) return true;
@@ -211,7 +212,7 @@ export function checkGdFunctionSignature(
 export function checkUnsafeAny(masked: string[], violations: GovernanceViolation[]): void {
     for (let i = 0; i < masked.length; i++) {
         const line = masked[i];
-        if (!REGEX.SYNTAX.TS_ANY_KEYWORD.test(line)) continue;
+        if (!line.includes('any') || !REGEX.SYNTAX.TS_ANY_KEYWORD.test(line)) continue;
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
         if (REGEX.SYNTAX.TS_ANY_TYPE.test(line) && !REGEX.COMMENT.ESLINT_DISABLE.test(line)) {
@@ -347,29 +348,36 @@ export function checkExportedFunctionReturnTypes(
     for (let i = 0; i < masked.length; i++) {
         const line = masked[i];
         if (!lineHasExportKeyword(line)) continue;
+        const hasFn = line.includes('function');
+        const hasConst = line.includes('const');
+        if (!hasFn && !hasConst) continue;
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
         if (REGEX.COMMENT.ESLINT_DISABLE.test(line)) continue;
 
-        inspectExportedDeclaration(
-            line,
-            i,
-            masked,
-            violations,
-            REGEX.SYNTAX.TS_EXPORT_FN,
-            REGEX.SYNTAX.BLOCK_OR_SEMI,
-            REGEX.SYNTAX.TS_FN_RETURN_TYPE_SUFFIX,
-            false,
-        );
-        inspectExportedDeclaration(
-            line,
-            i,
-            masked,
-            violations,
-            REGEX.SYNTAX.TS_EXPORT_CONST_ARROW,
-            REGEX.SYNTAX.ARROW_BODY,
-            REGEX.SYNTAX.TS_ARROW_RETURN_TYPE_SUFFIX,
-            true,
-        );
+        if (hasFn) {
+            inspectExportedDeclaration(
+                line,
+                i,
+                masked,
+                violations,
+                REGEX.SYNTAX.TS_EXPORT_FN,
+                REGEX.SYNTAX.BLOCK_OR_SEMI,
+                REGEX.SYNTAX.TS_FN_RETURN_TYPE_SUFFIX,
+                false,
+            );
+        }
+        if (hasConst) {
+            inspectExportedDeclaration(
+                line,
+                i,
+                masked,
+                violations,
+                REGEX.SYNTAX.TS_EXPORT_CONST_ARROW,
+                REGEX.SYNTAX.ARROW_BODY,
+                REGEX.SYNTAX.TS_ARROW_RETURN_TYPE_SUFFIX,
+                true,
+            );
+        }
     }
 }
