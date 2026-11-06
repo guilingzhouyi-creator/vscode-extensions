@@ -10,6 +10,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use crate::cli_harness::test_temp_dir;
 use fg_algorithms::space_plan::{
     check_headroom, simulate_space_plan, ExtractionUnit, SpacePlanConfig,
 };
@@ -22,19 +23,6 @@ use fg_storage::in_place::{
 };
 use fg_storage::loose::LooseOdb;
 use fg_storage::repack::{scan_loose_objects, RepackEngine, RepackOptions};
-
-fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = fs::create_dir_all(&base);
-    tempfile::Builder::new()
-        .prefix(prefix)
-        .tempdir_in(&base)
-        .or_else(|_| tempfile::tempdir())
-        .expect("create test tempdir")
-}
 
 #[test]
 fn test_tipse_space_plan_simulation() {

@@ -8,36 +8,12 @@
 //! Domain Governance Rules: FGT-COR-001, FGT-CLI-001.
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::PathBuf;
 
-static SCRATCH_COUNTER: AtomicUsize = AtomicUsize::new(0);
+use crate::cli_harness::run_taxis;
 
 fn scratch_repo(label: &str) -> PathBuf {
-    let count = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = fs::create_dir_all(&base);
-    let path = base.join(format!(
-        "taxis_cfl_st_{}_{}_{}",
-        std::process::id(),
-        count,
-        label
-    ));
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(&path).expect("scratch repository");
-    path
-}
-
-fn run_taxis(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_taxis"))
-        .args(args)
-        .current_dir(repo)
-        .output()
-        .expect("the built taxis binary must be runnable")
+    crate::cli_harness::scratch_repo("taxis_cfl_st", label)
 }
 
 fn valid_msg(summary: &str) -> String {
@@ -61,7 +37,11 @@ fn test_merge_conflict_markers_git_compat() {
     run_taxis(&repo, &["add", "file.txt"]);
     let msg_base = valid_msg("基础提交");
     let c_base = run_taxis(&repo, &["commit", "-m", &msg_base]);
-    assert!(c_base.status.success(), "base commit failed: {}", String::from_utf8_lossy(&c_base.stderr));
+    assert!(
+        c_base.status.success(),
+        "base commit failed: {}",
+        String::from_utf8_lossy(&c_base.stderr)
+    );
 
     // Branch feature
     let b_feat = run_taxis(&repo, &["checkout", "-b", "feature"]);
@@ -85,11 +65,23 @@ fn test_merge_conflict_markers_git_compat() {
 
     // Merge with --conflictstyle merge
     let m_out = run_taxis(&repo, &["merge", "feature", "--conflictstyle", "merge"]);
-    assert!(!m_out.status.success(), "merge with conflicts must exit non-zero");
+    assert!(
+        !m_out.status.success(),
+        "merge with conflicts must exit non-zero"
+    );
     let content = fs::read_to_string(repo.join("file.txt")).unwrap();
-    assert!(content.contains("<<<<<<< HEAD"), "file must contain merge conflict marker start");
-    assert!(content.contains("======="), "file must contain merge conflict marker separator");
-    assert!(content.contains(">>>>>>> feature"), "file must contain merge conflict marker end");
+    assert!(
+        content.contains("<<<<<<< HEAD"),
+        "file must contain merge conflict marker start"
+    );
+    assert!(
+        content.contains("======="),
+        "file must contain merge conflict marker separator"
+    );
+    assert!(
+        content.contains(">>>>>>> feature"),
+        "file must contain merge conflict marker end"
+    );
 
     let _ = fs::remove_dir_all(&repo);
 }
@@ -112,8 +104,14 @@ fn test_rebase_cleanliness_rejection_text() {
     let reb_out = run_taxis(&repo, &["rebase", "HEAD"]);
     assert!(!reb_out.status.success());
     let stderr = String::from_utf8_lossy(&reb_out.stderr);
-    assert!(stderr.contains("rebase"), "rejection message must reference 'rebase': {stderr}");
-    assert!(!stderr.contains("checkout:"), "rejection message must not mistakenly say 'checkout:'");
+    assert!(
+        stderr.contains("rebase"),
+        "rejection message must reference 'rebase': {stderr}"
+    );
+    assert!(
+        !stderr.contains("checkout:"),
+        "rejection message must not mistakenly say 'checkout:'"
+    );
 
     let _ = fs::remove_dir_all(&repo);
 }

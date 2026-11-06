@@ -10,22 +10,9 @@
 //! rule is actually *wired into* `add`, which a unit test cannot show.
 
 use std::io::Write;
-use std::path::PathBuf;
 use std::process::Command;
 
-/// Creates a temporary directory inside the crate's `target/` tree.
-fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = std::fs::create_dir_all(&base);
-    tempfile::Builder::new()
-        .prefix(prefix)
-        .tempdir_in(&base)
-        .or_else(|_| tempfile::tempdir())
-        .expect("create test tempdir")
-}
+use crate::cli_harness::test_temp_dir;
 
 #[test]
 fn add_works_from_a_subdirectory_and_records_a_root_relative_path() {

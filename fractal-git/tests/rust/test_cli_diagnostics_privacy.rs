@@ -7,22 +7,10 @@
 //! while remaining fully accessible when diagnostic / debug mode is explicitly invoked.
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
-/// Creates a temporary directory inside the crate's `target/` tree.
-fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = std::fs::create_dir_all(&base);
-    tempfile::Builder::new()
-        .prefix(prefix)
-        .tempdir_in(&base)
-        .or_else(|_| tempfile::tempdir())
-        .expect("create test tempdir")
-}
+use crate::cli_harness::test_temp_dir;
 
 /// Initializes a repository and stages one file; returns the repository root.
 fn prepared_repo(dir: &Path) {

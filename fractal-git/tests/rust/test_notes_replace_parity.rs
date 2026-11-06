@@ -8,36 +8,12 @@
 //! Domain Governance Rules: FGT-COR-001, FGT-CLI-001.
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::PathBuf;
 
-static SCRATCH_COUNTER: AtomicUsize = AtomicUsize::new(0);
+use crate::cli_harness::run_taxis;
 
 fn scratch_repo(label: &str) -> PathBuf {
-    let count = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = fs::create_dir_all(&base);
-    let path = base.join(format!(
-        "taxis_notes_{}_{}_{}",
-        std::process::id(),
-        count,
-        label
-    ));
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(&path).expect("scratch repository");
-    path
-}
-
-fn run_taxis(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_taxis"))
-        .args(args)
-        .current_dir(repo)
-        .output()
-        .expect("the built taxis binary must be runnable")
+    crate::cli_harness::scratch_repo("taxis_notes", label)
 }
 
 fn valid_msg(summary: &str) -> String {
@@ -63,8 +39,15 @@ fn test_notes_crud_lifecycle() {
     assert!(c.status.success());
 
     // 1. Add note
-    let note_add = run_taxis(&repo, &["notes", "add", "-m", "Sample note body text", "HEAD"]);
-    assert!(note_add.status.success(), "notes add failed: {}", String::from_utf8_lossy(&note_add.stderr));
+    let note_add = run_taxis(
+        &repo,
+        &["notes", "add", "-m", "Sample note body text", "HEAD"],
+    );
+    assert!(
+        note_add.status.success(),
+        "notes add failed: {}",
+        String::from_utf8_lossy(&note_add.stderr)
+    );
 
     // 2. Show note
     let note_show = run_taxis(&repo, &["notes", "show", "HEAD"]);
@@ -89,7 +72,6 @@ fn test_notes_crud_lifecycle() {
     let _ = fs::remove_dir_all(&repo);
 }
 
-
 #[test]
 fn test_replace_lifecycle() {
     let repo = scratch_repo("replace");
@@ -110,7 +92,11 @@ fn test_replace_lifecycle() {
 
     // 1. Create replace ref
     let rep_out = run_taxis(&repo, &["replace", "HEAD~1", "HEAD"]);
-    assert!(rep_out.status.success(), "replace failed: {}", String::from_utf8_lossy(&rep_out.stderr));
+    assert!(
+        rep_out.status.success(),
+        "replace failed: {}",
+        String::from_utf8_lossy(&rep_out.stderr)
+    );
 
     // 2. List replace refs
     let rep_list = run_taxis(&repo, &["replace", "--list"]);

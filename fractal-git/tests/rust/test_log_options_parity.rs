@@ -8,36 +8,12 @@
 //! Domain Governance Rules: FGT-COR-001, FGT-CLI-001.
 
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::path::PathBuf;
 
-static SCRATCH_COUNTER: AtomicUsize = AtomicUsize::new(0);
+use crate::cli_harness::run_taxis;
 
 fn scratch_repo(label: &str) -> PathBuf {
-    let count = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = fs::create_dir_all(&base);
-    let path = base.join(format!(
-        "taxis_log_opts_{}_{}_{}",
-        std::process::id(),
-        count,
-        label
-    ));
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(&path).expect("scratch repository");
-    path
-}
-
-fn run_taxis(repo: &Path, args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_taxis"))
-        .args(args)
-        .current_dir(repo)
-        .output()
-        .expect("the built taxis binary must be runnable")
+    crate::cli_harness::scratch_repo("taxis_log_opts", label)
 }
 
 fn valid_msg(summary: &str) -> String {
@@ -62,7 +38,11 @@ fn test_log_graph_and_diff_options() {
     assert!(add1.status.success());
     let msg1 = valid_msg("初次测试基准提交建立");
     let commit1 = run_taxis(&repo, &["commit", "-m", &msg1]);
-    assert!(commit1.status.success(), "commit1 failed: {}", String::from_utf8_lossy(&commit1.stderr));
+    assert!(
+        commit1.status.success(),
+        "commit1 failed: {}",
+        String::from_utf8_lossy(&commit1.stderr)
+    );
 
     // Commit 2: second.txt
     fs::write(repo.join("second.txt"), "another file\n").unwrap();
@@ -70,7 +50,11 @@ fn test_log_graph_and_diff_options() {
     assert!(add2.status.success());
     let msg2 = valid_msg("第二次测试用例提交建立");
     let commit2 = run_taxis(&repo, &["commit", "-m", &msg2]);
-    assert!(commit2.status.success(), "commit2 failed: {}", String::from_utf8_lossy(&commit2.stderr));
+    assert!(
+        commit2.status.success(),
+        "commit2 failed: {}",
+        String::from_utf8_lossy(&commit2.stderr)
+    );
 
     // 1. Verify log --graph --oneline
     let graph_out = run_taxis(&repo, &["log", "--graph", "--oneline"]);

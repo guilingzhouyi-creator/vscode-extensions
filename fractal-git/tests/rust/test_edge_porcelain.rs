@@ -15,25 +15,13 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+use crate::cli_harness::test_temp_dir;
 use fg_algorithms::blame::{BlameEngine, BlameLine};
 use fg_algorithms::pack::PackDeltaItem;
 use fg_core::models::{ObjectKind, Oid};
 use fg_storage::archive::{ArchiveEntry, ArchiveFormat, ArchiveGenerator};
 use fg_storage::bundle::BundleEngine;
 use fg_topology::bisect::{BisectEngine, BisectState, BisectStep};
-
-fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = std::fs::create_dir_all(&base);
-    tempfile::Builder::new()
-        .prefix(prefix)
-        .tempdir_in(&base)
-        .or_else(|_| tempfile::tempdir())
-        .expect("create test tempdir")
-}
 
 #[test]
 fn test_blame_line_mapping_and_hunks() {

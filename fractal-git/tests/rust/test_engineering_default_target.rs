@@ -10,22 +10,10 @@
 //! Naming the trunk explicitly still demands a token, so promotion stays deliberate.
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
-/// Creates a temporary directory inside the crate's `target/` tree.
-fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = std::fs::create_dir_all(&base);
-    tempfile::Builder::new()
-        .prefix(prefix)
-        .tempdir_in(&base)
-        .or_else(|_| tempfile::tempdir())
-        .expect("create test tempdir")
-}
+use crate::cli_harness::test_temp_dir;
 
 /// A message that satisfies the workspace-strict contract, including bilingual sections.
 fn compliant_message(subject: &str) -> String {
@@ -77,7 +65,14 @@ fn first_commit_succeeds_without_a_token_or_flags() {
     let dir = test_temp_dir("eng-default-");
     prepared_repo(dir.path());
 
-    let (code, text) = run_in(dir.path(), &["commit", "-m", &compliant_message("feat(core): 验证无令牌首次提交")]);
+    let (code, text) = run_in(
+        dir.path(),
+        &[
+            "commit",
+            "-m",
+            &compliant_message("feat(core): 验证无令牌首次提交"),
+        ],
+    );
     assert_eq!(
         code, 0,
         "the ordinary commit command must work unattended, got:\n{text}"
@@ -93,7 +88,14 @@ fn the_redirect_to_sandbox_is_announced_not_silent() {
     let dir = test_temp_dir("eng-announce-");
     prepared_repo(dir.path());
 
-    let (_, text) = run_in(dir.path(), &["commit", "-m", &compliant_message("feat(core): 验证默认目标提示")]);
+    let (_, text) = run_in(
+        dir.path(),
+        &[
+            "commit",
+            "-m",
+            &compliant_message("feat(core): 验证默认目标提示"),
+        ],
+    );
     assert!(
         text.contains("sandbox"),
         "a commit that lands somewhere other than HEAD must say where:\n{text}"
@@ -133,8 +135,14 @@ fn naming_the_trunk_still_requires_a_human_token() {
 fn log_finds_the_commit_even_though_head_is_unborn() {
     let dir = test_temp_dir("eng-log-");
     prepared_repo(dir.path());
-    let (commit_code, _) =
-        run_in(dir.path(), &["commit", "-m", &compliant_message("feat(core): 验证日志可见性")]);
+    let (commit_code, _) = run_in(
+        dir.path(),
+        &[
+            "commit",
+            "-m",
+            &compliant_message("feat(core): 验证日志可见性"),
+        ],
+    );
     assert_eq!(commit_code, 0);
 
     // HEAD still names the unborn trunk, so a bare `log` must fall back rather than report nothing.
@@ -159,7 +167,14 @@ fn an_explicit_bad_revision_still_fails_loudly() {
     // mistake and must not be papered over by showing unrelated history.
     let dir = test_temp_dir("eng-badrev-");
     prepared_repo(dir.path());
-    run_in(dir.path(), &["commit", "-m", &compliant_message("feat(core): 验证显式版本解析")]);
+    run_in(
+        dir.path(),
+        &[
+            "commit",
+            "-m",
+            &compliant_message("feat(core): 验证显式版本解析"),
+        ],
+    );
 
     let (code, text) = run_in(dir.path(), &["log", "no-such-revision"]);
     assert_ne!(code, 0, "an unknown revision must fail:\n{text}");

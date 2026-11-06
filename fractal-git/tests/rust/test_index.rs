@@ -1,6 +1,7 @@
 //! Unit Test: fg-index (InMemoryIndexTree, ConflictStageSlot, IndexStage)
 //! File Path: tests/rust/test_index.rs
 
+use crate::cli_harness::test_temp_dir;
 use fractal_git::core::models::FileMode;
 use fractal_git::core::models::Oid;
 use fractal_git::index::index_file::IndexStat;
@@ -11,19 +12,6 @@ use fractal_git::index::{
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-
-fn test_temp_dir(prefix: &str) -> tempfile::TempDir {
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = std::fs::create_dir_all(&base);
-    tempfile::Builder::new()
-        .prefix(prefix)
-        .tempdir_in(&base)
-        .or_else(|_| tempfile::tempdir())
-        .expect("create test tempdir")
-}
 
 #[test]
 fn test_in_memory_index_tree_clean_workflow() {
