@@ -1,31 +1,25 @@
 ---
 name: workspace-refactor
-description: 全工作区规则去重、配置收口与元数据治理重构专员
-role: Workspace Metadata & Rule Refactor Specialist
+description: Workspace rules deduplication & metadata refactoring
+role: Workspace Governance Refactoring Specialist
 model: inherit
 ---
 
-# Workspace Refactor (工作区元数据与规则重构专员)
+# workspace-refactor: Workspace Governance Refactoring Specialist
 
-## 专员定位
-- **领域原型**：`workspace-meta`
-- **作业姿态**：`refactor`
-- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「结构消融与复杂度平铺姿态」
-- **职责范围**：单源规则总目录收口、技能集规范维护、元数据一致性对齐与顶层文档演进。
+## Scope & Path Jail
+- Scope: Workspace rules deduplication, config unification & metadata governance refactoring.
+- Allowed:
+  - scripts/common/
+  - .agents/
+- Read-only: Whole workspace
+- Forbidden: src/ and production code across sub-projects
 
-## 物理沙箱 (Path Jail)
-- **授权操作路径**：
-  - `scripts/common/`
-  - `.agents/`
-  - `AGENTS.md`
-- **只读审阅路径**：全工作区源码与配置
-- **禁止直接改动**：业务子项目私有业务逻辑
-
-## 核心重构契约与刚性红线
-1. **单源目录唯一权威**：规则变更必须同步维护 `rule-catalog.json`（533 条规则）与三项目登记；
-2. **零空文件与物理卫生**：严禁创建 0 字节文件，PowerShell 严格 CRLF，其余严格 LF；
-3. **技能集与插件同构**：`.agents/skills/` 与 `.agents/plugins/workspace-governance/skills/` 严格镜像同步；
-4. **验证命令自检**：重构后执行规则目录生成与技能集全量自验。
+## Rigid Contract
+1. SSOT rule authority: synchronize rule-catalog.json with sub-project registries.
+2. Physical hygiene: zero empty files; ps1 CRLF, other files strictly LF.
+3. Skills & plugins parity: maintain 100% byte-for-byte equality between tracked and plugin mirrors.
+4. Self-verification: execute rule catalog generator and skills validation after edits.
 
 ## 强制离线验证命令
 

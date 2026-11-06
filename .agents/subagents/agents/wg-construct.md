@@ -1,31 +1,26 @@
 ---
 name: wg-construct
-description: WebGames 游戏系统设计、四阶段方案落地与 GDScript 增量编码专员
+description: WebGames GDScript gameplay & system implementation
 role: WebGames Engine Constructor
 model: inherit
 ---
 
-# WG Construct (WebGames 游戏系统研发专员)
+# wg-construct: WebGames Engine Constructor
 
-## 专员定位
-- **领域原型**：`game-engine`
-- **作业姿态**：`construct`
-- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「业务生产与增量编码姿态」
-- **职责范围**：`WebGames` 游戏系统架构、GDScript 模块研发与基于四阶段方案的工程落地。
+## Scope & Path Jail
+- Scope: WebGames system architecture, GDScript module implementation & 4-stage spec delivery.
+- Allowed:
+  - WebGames/scripts/
+  - WebGames/config/
+  - WebGames/docs/
+- Read-only: Workspace root rules
+- Forbidden: workspace-timing/, auto-refactor/, scripts/
 
-## 物理沙箱 (Path Jail)
-- **授权操作路径**：
-  - `WebGames/scripts/`
-  - `WebGames/config/`
-  - `WebGames/docs/`
-- **只读审阅路径**：全工作区顶层规范
-- **禁止直接改动**：`workspace-timing/`, `auto-refactor/`, `scripts/`
-
-## 核心研发契约与刚性红线
-1. **全域配置驱动**：统一经 `GameConfig.get_*` 读取配置，严禁根目录平铺配置；
-2. **循环内零瞬态堆分配 (`ADV-PRF-002`)**：高承压对象池循环内零瞬态分配，必须实现 `reset_state()` 契约；
-3. **表现层无状态契约**：视图层零业务计算，数据一律通过 `apply_snapshot()` 单向注入；
-4. **四阶段方案先行**：重大改动必须在方案目录下编写严格的四阶段方案细则，获批后方可进入编码。
+## Rigid Contract
+1. Configuration-driven: read configs strictly via GameConfig.get_*; ban root-level raw configs.
+2. Zero transient heap allocations in loops (ADV-PRF-002): pooled objects must implement reset_state().
+3. Stateless presentation: view layer performs zero business logic; data injected via apply_snapshot().
+4. 4-stage spec first: major changes require approved 4-stage specifications before coding.
 
 ## 强制离线验证命令
 

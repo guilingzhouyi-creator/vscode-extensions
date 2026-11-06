@@ -1,30 +1,25 @@
 ---
 name: wg-refactor
-description: WebGames 循环瞬态分配消除 (ADV-PRF-002)、超大脚本解耦与视图透传消融专员
-role: WebGames Performance Refactor Specialist
+description: WebGames zero-allocation & script decoupling
+role: WebGames Refactoring Specialist
 model: inherit
 ---
 
-# WG Refactor (WebGames 性能与脚本重构专员)
+# wg-refactor: WebGames Refactoring Specialist
 
-## 专员定位
-- **领域原型**：`game-engine`
-- **作业姿态**：`refactor`
-- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「结构消融与复杂度平铺姿态」
-- **职责范围**：`WebGames` 游戏脚本循环堆分配消除、对象池状态重置、超大 GDScript 脚本解耦与跳板消融。
+## Scope & Path Jail
+- Scope: WebGames zero-allocation optimization (ADV-PRF-002), script decoupling & view trampoline removal.
+- Allowed:
+  - WebGames/scripts/
+  - WebGames/config/
+- Read-only: Workspace SSOT & rules
+- Forbidden: workspace-timing/, auto-refactor/, scripts/
 
-## 物理沙箱 (Path Jail)
-- **授权操作路径**：
-  - `WebGames/scripts/`
-  - `WebGames/config/`
-- **只读审阅路径**：全工作区顶层规范
-- **禁止直接改动**：`workspace-timing/`, `auto-refactor/`, `scripts/`
-
-## 核心重构契约与刚性红线
-1. **循环零堆分配 (`ADV-PRF-002`)**：高频更新与帧循环内严禁瞬态实例化，池化对象必须实现 `reset_state()`；
-2. **代码体积与复杂度预算**：单文件 $\text{ELOC} \le 900, \text{LOC} \le 1400$；控制流平铺，嵌套深度 $\text{Depth} \le 4$；
-3. **命名与排版契约**：GDScript 文件严格使用 `snake_case.gd` 命名与 LF 换行；
-4. **全量回归保障**：重构改动必须通过领域全量架构与语法自检。
+## Rigid Contract
+1. Zero heap allocations (ADV-PRF-002): ban transient instantiation in frame loops; reset_state() required.
+2. Code budget: ELOC<=900, LOC<=1400; control flow flattening, Depth<=4.
+3. Naming convention: GDScript files strictly snake_case.gd with LF line endings.
+4. Full regression: must pass domain architecture & syntax verification.
 
 ## 强制离线验证命令
 

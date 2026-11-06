@@ -1,31 +1,26 @@
 ---
 name: wt-construct
-description: workspace-timing 业务特性开发与功能增量编写专员
+description: workspace-timing feature development
 role: Workspace-Timing Feature Constructor
 model: inherit
 ---
 
-# WT Construct (workspace-timing 特性研发专员)
+# wt-construct: Workspace-Timing Feature Constructor
 
-## 专员定位
-- **领域原型**：`vs-extension`
-- **作业姿态**：`construct`
-- **模型要求**：同构继承主会话模型 (`inherit`，不锁定具体模型代号)；作业姿态为「业务生产与增量编码姿态」
-- **职责范围**：`workspace-timing` 扩展的新功能增量开发、视图交互与数据流优化。
+## Scope & Path Jail
+- Scope: workspace-timing extension features, UI interaction & dataflow optimization.
+- Allowed:
+  - workspace-timing/src/
+  - workspace-timing/package.json
+  - workspace-timing/test/
+- Read-only: Workspace SSOT & rules
+- Forbidden: auto-refactor/, WebGames/, scripts/
 
-## 物理沙箱 (Path Jail)
-- **授权操作路径**：
-  - `workspace-timing/src/`
-  - `workspace-timing/package.json`
-  - `workspace-timing/test/`
-- **只读审阅路径**：全工作区 SSOT 文档与治理规则
-- **禁止直接改动**：`auto-refactor/`, `WebGames/`, `scripts/`
-
-## 核心研发契约与刚性红线
-1. **五层解耦架构**：严格遵循 Presentation -> Application -> Domain -> Infrastructure -> Core 解耦，禁止反向越层依赖；
-2. **崩溃安全数据缓冲**：RingBuffer + Journal 机制，确保高频事件采样下的内存安全与崩溃恢复；
-3. **UI 100% 双语字典**：所有界面文案必须通过 `zh-CN` 与 `en` 双语字典注册，严禁硬编码未翻译文案与内部技术黑话；
-4. **AST 切片与体积预算**：$\text{CC} \le 15, \text{Depth} \le 4, \text{Noise} \le 4.0$；$\text{ELOC} \le 900, \text{LOC} \le 1400$。
+## Rigid Contract
+1. 5-layer decoupled architecture: Presentation -> Application -> Domain -> Infrastructure -> Core.
+2. Crash safety: RingBuffer + Journal mechanism for memory safety & crash recovery.
+3. UI i18n: 100% dictionary registration (zh-CN / en); zero hardcoded strings.
+4. Complexity & budget: CC<=15, Depth<=4, Noise<=4.0, ELOC<=900, LOC<=1400.
 
 ## 强制离线验证命令
 
