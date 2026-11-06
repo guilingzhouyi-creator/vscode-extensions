@@ -17,6 +17,7 @@ use fg_core::models::Oid;
 use serde_json::json;
 
 use super::common::{print_json, CliContext};
+pub use super::remote_sync_push::{sync_local_repository_push, LocalPushParams};
 
 /// Resolves the Git metadata directory for a local file URL or path.
 pub fn resolve_source_git_dir(target_url: &str) -> Option<PathBuf> {
@@ -40,85 +41,131 @@ pub fn sync_local_repository_fetch(
     remote_target: &str,
     target_url: &str,
 ) {
+    let discovered_refs = discover_local_remote_refs(source_git_dir);
+    copy_object_store_contents(
+        &source_git_dir.join("objects"),
+        &ctx.git_dir.join("objects"),
+    );
+    let report_refs =
+        record_fetched_tracking_refs(&ctx.git_dir, remote_target, target_url, &discovered_refs);
+    report_fetch_outcome(ctx, remote_target, target_url, &report_refs);
+}
+
+fn discover_local_remote_refs(source_git_dir: &Path) -> Vec<(String, Oid)> {
     let mut discovered_refs: Vec<(String, Oid)> = Vec::new();
-    let heads_dir = source_git_dir.join("refs/heads");
-    if let Ok(entries) = std::fs::read_dir(&heads_dir) {
-        for entry in entries.flatten() {
-            let branch_name = entry.file_name().to_string_lossy().to_string();
-            if let Ok(content) = std::fs::read_to_string(entry.path()) {
-                let trimmed = content.trim();
-                if let Ok(oid) = Oid::from_hex(trimmed) {
-                    discovered_refs.push((branch_name, oid));
-                }
+    collect_loose_heads_refs(&source_git_dir.join("refs/heads"), &mut discovered_refs);
+    collect_packed_heads_refs(&source_git_dir.join("packed-refs"), &mut discovered_refs);
+    if discovered_refs.is_empty() {
+        let default_cell = source_git_dir.join("refs/fractal/cell/cell-default/main");
+        if let Ok(content) = std::fs::read_to_string(default_cell) {
+            if let Ok(oid) = Oid::from_hex(content.trim()) {
+                discovered_refs.push(("main".to_string(), oid));
             }
         }
     }
+    discovered_refs
+}
 
-    if let Ok(content) = std::fs::read_to_string(source_git_dir.join("packed-refs")) {
-        for line in content.lines() {
-            let trimmed = line.trim();
-            if trimmed.starts_with('#') || trimmed.starts_with('^') || trimmed.is_empty() {
-                continue;
-            }
-            if let Some((oid_hex, ref_name)) = trimmed.split_once(' ') {
-                if let Some(branch) = ref_name.strip_prefix("refs/heads/") {
-                    if !discovered_refs.iter().any(|(existing_branch, _)| existing_branch == branch) {
-                        if let Ok(oid) = Oid::from_hex(oid_hex) {
-                            discovered_refs.push((branch.to_string(), oid));
-                        }
-                    }
-                }
-            }
+fn collect_loose_heads_refs(heads_dir: &Path, discovered_refs: &mut Vec<(String, Oid)>) {
+    let Ok(entries) = std::fs::read_dir(heads_dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let branch_name = entry.file_name().to_string_lossy().to_string();
+        let Ok(content) = std::fs::read_to_string(entry.path()) else {
+            continue;
+        };
+        if let Ok(oid) = Oid::from_hex(content.trim()) {
+            discovered_refs.push((branch_name, oid));
         }
     }
+}
 
-    let src_objects = source_git_dir.join("objects");
-    let dst_objects = ctx.git_dir.join("objects");
-    let _ = std::fs::create_dir_all(&dst_objects);
-
-    if let Ok(entries) = std::fs::read_dir(&src_objects) {
-        for entry in entries.flatten() {
-            let entry_name = entry.file_name();
-            let entry_name_str = entry_name.to_string_lossy();
-            if entry_name_str.len() == 2 && entry.path().is_dir() {
-                let dst_bucket = dst_objects.join(&*entry_name_str);
-                let _ = std::fs::create_dir_all(&dst_bucket);
-                if let Ok(obj_entries) = std::fs::read_dir(entry.path()) {
-                    for obj in obj_entries.flatten() {
-                        let dst_file = dst_bucket.join(obj.file_name());
-                        if !dst_file.is_file() {
-                            let _ = std::fs::copy(obj.path(), &dst_file);
-                        }
-                    }
-                }
-            } else if entry_name_str == "pack" && entry.path().is_dir() {
-                let dst_pack = dst_objects.join("pack");
-                let _ = std::fs::create_dir_all(&dst_pack);
-                if let Ok(pack_entries) = std::fs::read_dir(entry.path()) {
-                    for pack_file in pack_entries.flatten() {
-                        let dst_file = dst_pack.join(pack_file.file_name());
-                        if !dst_file.is_file() {
-                            let _ = std::fs::copy(pack_file.path(), &dst_file);
-                        }
-                    }
-                }
-            }
+fn collect_packed_heads_refs(packed_refs_path: &Path, discovered_refs: &mut Vec<(String, Oid)>) {
+    let Ok(content) = std::fs::read_to_string(packed_refs_path) else {
+        return;
+    };
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with('^') {
+            continue;
+        }
+        let Some((oid_hex, ref_name)) = trimmed.split_once(' ') else {
+            continue;
+        };
+        let Some(branch) = ref_name.strip_prefix("refs/heads/") else {
+            continue;
+        };
+        if discovered_refs
+            .iter()
+            .any(|(existing, _)| existing == branch)
+        {
+            continue;
+        }
+        if let Ok(oid) = Oid::from_hex(oid_hex) {
+            discovered_refs.push((branch.to_string(), oid));
         }
     }
+}
 
-    let remotes_dir = ctx.git_dir.join("refs/remotes").join(remote_target);
+pub(crate) fn copy_object_store_contents(src_objects: &Path, dst_objects: &Path) {
+    let _ = std::fs::create_dir_all(dst_objects);
+    let Ok(entries) = std::fs::read_dir(src_objects) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let entry_name = entry.file_name();
+        let entry_name_str = entry_name.to_string_lossy();
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        if entry_name_str.len() == 2 {
+            copy_directory_files(&path, &dst_objects.join(&*entry_name_str));
+        } else if entry_name_str == "pack" {
+            copy_directory_files(&path, &dst_objects.join("pack"));
+        }
+    }
+}
+
+fn copy_directory_files(src_dir: &Path, dst_dir: &Path) {
+    let _ = std::fs::create_dir_all(dst_dir);
+    let Ok(entries) = std::fs::read_dir(src_dir) else {
+        return;
+    };
+    for item in entries.flatten() {
+        if item.file_name() == "multi-pack-index" {
+            continue;
+        }
+        let dst_file = dst_dir.join(item.file_name());
+        if !dst_file.is_file() {
+            let _ = std::fs::copy(item.path(), &dst_file);
+        }
+    }
+}
+
+fn record_fetched_tracking_refs(
+    git_dir: &Path,
+    remote_target: &str,
+    target_url: &str,
+    discovered_refs: &[(String, Oid)],
+) -> Vec<(String, String, &'static str)> {
+    let remotes_dir = git_dir.join("refs/remotes").join(remote_target);
     let _ = std::fs::create_dir_all(&remotes_dir);
     let mut fetch_head_lines = Vec::new();
     let mut report_refs = Vec::new();
 
-    for (branch, oid) in &discovered_refs {
+    for (branch, oid) in discovered_refs {
         let tracking_ref_file = remotes_dir.join(branch);
         let was_old = std::fs::read_to_string(&tracking_ref_file)
             .ok()
             .and_then(|s| Oid::from_hex(s.trim()).ok());
 
         let _ = std::fs::write(&tracking_ref_file, format!("{}\n", oid.to_hex()));
-        fetch_head_lines.push(format!("{}\t\tbranch '{branch}' of {target_url}\n", oid.to_hex()));
+        fetch_head_lines.push(format!(
+            "{}\t\tbranch '{branch}' of {target_url}\n",
+            oid.to_hex()
+        ));
 
         let status_desc = match was_old {
             None => "[new branch]",
@@ -128,8 +175,16 @@ pub fn sync_local_repository_fetch(
         report_refs.push((branch.clone(), oid.to_hex(), status_desc));
     }
 
-    let _ = std::fs::write(ctx.git_dir.join("FETCH_HEAD"), fetch_head_lines.join(""));
+    let _ = std::fs::write(git_dir.join("FETCH_HEAD"), fetch_head_lines.join(""));
+    report_refs
+}
 
+fn report_fetch_outcome(
+    ctx: &CliContext,
+    remote_target: &str,
+    target_url: &str,
+    report_refs: &[(String, String, &'static str)],
+) {
     if ctx.json_mode {
         let refs_json: Vec<serde_json::Value> = report_refs
             .iter()
@@ -148,15 +203,18 @@ pub fn sync_local_repository_fetch(
             "url": target_url,
             "refs": refs_json,
         }));
-    } else {
-        println!("Fetching from local_file endpoint '{remote_target}' ({target_url})...");
-        if report_refs.is_empty() {
-            println!("No remote references advertised.");
-        } else {
-            for (branch_item, target_item, status_item) in &report_refs {
-                let short_target = if target_item.len() >= 8 { &target_item[..8] } else { target_item };
-                println!("  * {status_item:14} {branch_item:12} -> {remote_target}/{branch_item} ({short_target})");
-            }
-        }
+        return;
+    }
+
+    println!("Fetching from local_file endpoint '{remote_target}' ({target_url})...");
+    if report_refs.is_empty() {
+        println!("No remote references advertised.");
+        return;
+    }
+    for (branch_item, target_item, status_item) in report_refs {
+        let short_target = &target_item[..target_item.len().min(8)];
+        println!(
+            "  * {status_item:14} {branch_item:12} -> {remote_target}/{branch_item} ({short_target})"
+        );
     }
 }
