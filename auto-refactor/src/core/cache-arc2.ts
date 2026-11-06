@@ -1,0 +1,493 @@
+/**
+ * Module: Core Engine — ARC2 Binary Disk Cache Codec & Lazy Frame Store
+ * File Path: src/core/cache-arc2.ts
+ * Architecture Role: Custom Little-Endian binary persistence engine for L1 (`l1-index.aridx`),
+ *   L2 compacted store (`l2-store.arc`), and L2 append-only WAL (`l2-delta.arwal`).
+ * Dependencies & Triggers: crypto, ./types, ./cache, ./cache-persistence, ./result-codec;
+ *   invoked by CacheStore during binary load, incremental WAL flush, and zero-reencode compaction.
+ * Responsibilities: Encode and validate 64-byte ARC2 headers, serialize/parse 80-byte fixed-stride
+ *   L1 index slots with string pool, frame L2 records with 24-byte FRM2 headers + PR50 payloads,
+ *   and lazily decode L2 payload slices on cache hits.
+ * Exit Semantics & Design Rationale: Corrupt headers, truncated frames, or checksum mismatches
+ *   return null/skip cleanly without throwing so CacheStore degrades gracefully to cold scan.
+ */
+
+import * as crypto from 'crypto';
+import type { Fingerprint } from './cache';
+import type { L2EntryRecord } from './cache-persistence';
+import {
+    encodeSingleFileResult,
+    decodeSingleFileResultBuffer,
+    type FileResult,
+} from './result-codec';
+
+/** Little-endian u32 magic for "ARC2" (0x41 0x52 0x43 0x32). */
+export const ARC2_MAGIC = 0x32435241;
+/** Current ARC2 binary container specification version. */
+export const ARC2_VERSION = 2;
+/** Little-endian u32 magic for "FRM2" L2 record frames (0x46 0x52 0x4d 0x32). */
+export const ARC2_FRAME_MAGIC = 0x324d5246;
+
+/** Container kind identifier for the L1 path-to-fingerprint index (`l1-index.aridx`). */
+export const ARC2_KIND_INDEX = 1;
+/** Container kind identifier for the compacted L2 result store (`l2-store.arc`). */
+export const ARC2_KIND_STORE = 2;
+/** Container kind identifier for the append-only L2 delta log (`l2-delta.arwal`). */
+export const ARC2_KIND_WAL = 3;
+
+/** Fixed byte size of the unified ARC2 container header. */
+export const ARC2_HEADER_BYTES = 64;
+/** Fixed byte size of each L1 index slot entry. */
+export const ARC2_SLOT_BYTES = 80;
+/** Fixed byte size of each L2 FRM2 frame header. */
+export const ARC2_FRAME_HEADER_BYTES = 24;
+
+/** Section bitmask flag indicating the frame carries an issues list. */
+export const SECTION_MASK_ISSUES = 1 << 0;
+/** Section bitmask flag indicating the frame carries a non-null FileMetric. */
+export const SECTION_MASK_METRIC = 1 << 1;
+/** Section bitmask flag indicating the frame carries cross-file symbol entries. */
+export const SECTION_MASK_SYMBOLS = 1 << 2;
+/** Section bitmask flag indicating the frame carries cross-file literal occurrences. */
+export const SECTION_MASK_LITERALS = 1 << 3;
+/** Section bitmask flag indicating the frame carries loop site complexity descriptors. */
+export const SECTION_MASK_LOOP_SITES = 1 << 4;
+/** Section bitmask flag indicating the frame carries module dependency graph edges. */
+export const SECTION_MASK_GRAPH_EDGES = 1 << 5;
+
+const HASH_PREFIX_BYTES = 16;
+const FNV_OFFSET_BASIS = 0x811c9dc5;
+const FNV_PRIME = 0x01000193;
+
+/** Parsed 64-byte ARC2 container header. */
+export interface Arc2Header {
+    magic: number;
+    version: number;
+    kind: number;
+    recordCount: number;
+    stringPoolOffset: number;
+    legacyJsonlBytes: number;
+    createdAtMs: number;
+    maxEntries: number;
+    maxAgeDays: number;
+    headerChecksum: number;
+}
+
+/** Input parameters for building a 64-byte ARC2 header. */
+export interface Arc2HeaderInit {
+    kind: number;
+    recordCount: number;
+    stringPoolOffset?: number;
+    legacyJsonlBytes?: number;
+    createdAtMs?: number;
+    maxEntries?: number;
+    maxAgeDays?: number;
+}
+
+/** Optional metadata parameters when serializing ARC2 containers. */
+export interface Arc2ContainerMeta {
+    maxEntries?: number;
+    maxAgeDays?: number;
+    legacyJsonlBytes?: number;
+}
+
+/**
+ * Compute fast deterministic 32-bit FNV-1a checksum over a byte range.
+ *
+ * @param buf - Source binary buffer.
+ * @param start - Inclusive start byte offset.
+ * @param end - Exclusive end byte offset.
+ * @returns Unsigned 32-bit FNV-1a hash value.
+ */
+export function computeBufferChecksum(buf: Buffer, start = 0, end = buf.length): number {
+    let hash = FNV_OFFSET_BASIS;
+    for (let i = start; i < end; i++) {
+        hash ^= buf[i];
+        hash = Math.imul(hash, FNV_PRIME) >>> 0;
+    }
+    return hash >>> 0;
+}
+
+/**
+ * Encode a 64-byte Little-Endian ARC2 header.
+ *
+ * @param init - Header initialization fields.
+ * @returns 64-byte Buffer containing the serialized ARC2 header.
+ */
+export function encodeArc2Header(init: Arc2HeaderInit): Buffer {
+    const header = Buffer.alloc(ARC2_HEADER_BYTES);
+    header.writeUInt32LE(ARC2_MAGIC, 0);
+    header.writeUInt16LE(ARC2_VERSION, 4);
+    header.writeUInt16LE(init.kind & 0xffff, 6);
+    header.writeUInt32LE(init.recordCount >>> 0, 8);
+    header.writeUInt32LE((init.stringPoolOffset ?? 0) >>> 0, 12);
+    header.writeUInt32LE((init.legacyJsonlBytes ?? 0) >>> 0, 16);
+    header.writeDoubleLE(init.createdAtMs ?? Date.now(), 24);
+    header.writeUInt32LE((init.maxEntries ?? 100_000) >>> 0, 32);
+    header.writeUInt32LE((init.maxAgeDays ?? 30) >>> 0, 36);
+    const checksum = computeBufferChecksum(header, 0, 40);
+    header.writeUInt32LE(checksum, 40);
+    return header;
+}
+
+/**
+ * Validate and decode a 64-byte Little-Endian ARC2 header in O(1).
+ *
+ * @param buf - Buffer containing the candidate ARC2 container.
+ * @param expectedKind - Optional container kind identifier to enforce.
+ * @returns Decoded Arc2Header or null if magic, version, kind, or checksum fails.
+ */
+export function decodeArc2Header(buf: Buffer, expectedKind?: number): Arc2Header | null {
+    if (buf.length < ARC2_HEADER_BYTES) return null;
+    const magic = buf.readUInt32LE(0);
+    const version = buf.readUInt16LE(4);
+    const kind = buf.readUInt16LE(6);
+    if (magic !== ARC2_MAGIC || version !== ARC2_VERSION) return null;
+    if (expectedKind !== undefined && kind !== expectedKind) return null;
+    const expectedChecksum = computeBufferChecksum(buf, 0, 40);
+    const headerChecksum = buf.readUInt32LE(40);
+    if (expectedChecksum !== headerChecksum) return null;
+    return {
+        magic,
+        version,
+        kind,
+        recordCount: buf.readUInt32LE(8),
+        stringPoolOffset: buf.readUInt32LE(12),
+        legacyJsonlBytes: buf.readUInt32LE(16),
+        createdAtMs: buf.readDoubleLE(24),
+        maxEntries: buf.readUInt32LE(32),
+        maxAgeDays: buf.readUInt32LE(36),
+        headerChecksum,
+    };
+}
+
+function writeHashPrefix16(target: Buffer, offset: number, text: string): void {
+    const digest = crypto.createHash('sha256').update(text).digest();
+    digest.copy(target, offset, 0, HASH_PREFIX_BYTES);
+}
+
+/**
+ * Serialize L1 fingerprint map into `l1-index.aridx` binary format (64B header + 80B slots).
+ *
+ * @param l1Cache - Map of normalized relative paths to L1 fingerprints.
+ * @param meta - Optional container metadata overrides.
+ * @returns Complete binary buffer for `l1-index.aridx`.
+ */
+export function serializeArc2L1Index(
+    l1Cache: Map<string, Fingerprint>,
+    meta: Arc2ContainerMeta = {},
+): Buffer {
+    const entries = [...l1Cache.entries()];
+    const recordCount = entries.length;
+    const slotsBytes = recordCount * ARC2_SLOT_BYTES;
+    const stringPoolOffset = ARC2_HEADER_BYTES + slotsBytes;
+
+    const stringBuffers: Buffer[] = [];
+    let currentStrOffset = 0;
+    const slots = Buffer.alloc(slotsBytes);
+
+    for (let i = 0; i < recordCount; i++) {
+        const [relPath, fp] = entries[i];
+        const pathBuf = Buffer.from(relPath, 'utf8');
+        stringBuffers.push(pathBuf);
+
+        const slotOffset = i * ARC2_SLOT_BYTES;
+        writeHashPrefix16(slots, slotOffset, relPath);
+        writeHashPrefix16(slots, slotOffset + 16, `${relPath}:${fp.mtimeMs}:${fp.size}`);
+        slots.writeBigUInt64LE(0n, slotOffset + 32);
+        slots.writeDoubleLE(fp.mtimeMs, slotOffset + 40);
+        slots.writeDoubleLE(fp.size, slotOffset + 48);
+        slots.writeDoubleLE(fp.ino !== undefined ? fp.ino : -1, slotOffset + 56);
+        slots.writeBigUInt64LE(0n, slotOffset + 64);
+        slots.writeUInt32LE(0, slotOffset + 72);
+        slots.writeUInt32LE(currentStrOffset >>> 0, slotOffset + 76);
+        currentStrOffset += pathBuf.length;
+    }
+
+    const header = encodeArc2Header({
+        kind: ARC2_KIND_INDEX,
+        recordCount,
+        stringPoolOffset,
+        legacyJsonlBytes: meta.legacyJsonlBytes ?? 0,
+        maxEntries: meta.maxEntries,
+        maxAgeDays: meta.maxAgeDays,
+    });
+
+    return Buffer.concat([header, slots, ...stringBuffers]);
+}
+
+/**
+ * Load L1 fingerprints from an `l1-index.aridx` buffer into `targetMap`.
+ *
+ * @param buf - Raw buffer read from `l1-index.aridx`.
+ * @param targetMap - Destination map populated with decoded path fingerprints.
+ * @returns Validated Arc2Header or null if the buffer is invalid/corrupted.
+ */
+export function loadArc2L1Index(
+    buf: Buffer,
+    targetMap: Map<string, Fingerprint>,
+): Arc2Header | null {
+    const header = decodeArc2Header(buf, ARC2_KIND_INDEX);
+    if (!header) return null;
+    const expectedSlotsEnd = ARC2_HEADER_BYTES + header.recordCount * ARC2_SLOT_BYTES;
+    if (buf.length < expectedSlotsEnd || header.stringPoolOffset < expectedSlotsEnd) {
+        return null;
+    }
+
+    for (let i = 0; i < header.recordCount; i++) {
+        const slotOffset = ARC2_HEADER_BYTES + i * ARC2_SLOT_BYTES;
+        const mtimeMs = buf.readDoubleLE(slotOffset + 40);
+        const size = buf.readDoubleLE(slotOffset + 48);
+        const inoVal = buf.readDoubleLE(slotOffset + 56);
+        const strStart = header.stringPoolOffset + buf.readUInt32LE(slotOffset + 76);
+        const nextStrStart =
+            i + 1 < header.recordCount
+                ? header.stringPoolOffset + buf.readUInt32LE(slotOffset + ARC2_SLOT_BYTES + 76)
+                : buf.length;
+        if (strStart > buf.length || nextStrStart > buf.length || nextStrStart < strStart) {
+            return null;
+        }
+        const relPath = buf.toString('utf8', strStart, nextStrStart);
+        targetMap.set(relPath, {
+            mtimeMs,
+            size,
+            ...(inoVal >= 0 ? { ino: inoVal } : {}),
+        });
+    }
+    return header;
+}
+
+function computeSectionMask(entry: L2EntryRecord): number {
+    let mask = SECTION_MASK_ISSUES;
+    if (entry.metric !== null && entry.metric !== undefined) mask |= SECTION_MASK_METRIC;
+    if (entry.symbols !== undefined) mask |= SECTION_MASK_SYMBOLS;
+    if (entry.literals !== undefined) mask |= SECTION_MASK_LITERALS;
+    if (entry.loopSites !== undefined) mask |= SECTION_MASK_LOOP_SITES;
+    if (entry.graphEdges !== undefined) mask |= SECTION_MASK_GRAPH_EDGES;
+    return mask >>> 0;
+}
+
+/**
+ * Ensure an L2EntryRecord whose payload was lazily mapped from disk is decoded in memory.
+ *
+ * @param entry - L2 cache record to materialize in place.
+ */
+export function ensureL2EntryDecoded(entry: L2EntryRecord): void {
+    if (entry.decoded !== false || !entry.rawPr50Slice) return;
+    try {
+        const decoded: FileResult = decodeSingleFileResultBuffer(entry.rawPr50Slice);
+        entry.issues = decoded.issues;
+        entry.metric = decoded.metric;
+        if (decoded.symbols !== undefined) {
+            entry.symbols = decoded.symbols as L2EntryRecord['symbols'];
+        }
+        if (decoded.literals !== undefined) {
+            entry.literals = decoded.literals as L2EntryRecord['literals'];
+        }
+        if (decoded.loopSites !== undefined) {
+            entry.loopSites = decoded.loopSites as L2EntryRecord['loopSites'];
+        }
+        if (decoded.graphEdges !== undefined) {
+            entry.graphEdges = decoded.graphEdges as L2EntryRecord['graphEdges'];
+        }
+        entry.decoded = true;
+    } catch {
+        entry.issues = [];
+        entry.metric = null;
+        entry.decoded = true;
+    }
+}
+
+/**
+ * Build a single framed binary record (24B FRM2 header + envelope + PR50 slice) for an L2 entry.
+ * Reuses `entry.rawPr50Slice` via zero-reencode copy when the entry was never mutated.
+ *
+ * @param entry - L2 cache record to frame.
+ * @returns Framed binary buffer ready for `.arc` or `.arwal` persistence.
+ */
+export function encodeArc2L2Frame(entry: L2EntryRecord): Buffer {
+    const pr50Slice =
+        entry.rawPr50Slice ??
+        encodeSingleFileResult({
+            file: entry.p,
+            issues: entry.issues,
+            metric: entry.metric,
+            symbols: entry.symbols,
+            literals: entry.literals,
+            loopSites: entry.loopSites,
+            graphEdges: entry.graphEdges,
+        });
+    entry.rawPr50Slice = pr50Slice;
+
+    const keyBuf = Buffer.from(entry.k, 'utf8');
+    const pathBuf = Buffer.from(entry.p, 'utf8');
+    const metaBytes = 4 + keyBuf.length + 4 + pathBuf.length + 18;
+    const payloadByteLen = metaBytes + pr50Slice.length;
+
+    const frame = Buffer.allocUnsafe(ARC2_FRAME_HEADER_BYTES + payloadByteLen);
+    let pos = ARC2_FRAME_HEADER_BYTES;
+
+    frame.writeUInt32LE(keyBuf.length, pos);
+    pos += 4;
+    keyBuf.copy(frame, pos);
+    pos += keyBuf.length;
+
+    frame.writeUInt32LE(pathBuf.length, pos);
+    pos += 4;
+    pathBuf.copy(frame, pos);
+    pos += pathBuf.length;
+
+    const hasFm = typeof entry.fm === 'number';
+    const hasFs = typeof entry.fs === 'number';
+    frame[pos++] = (hasFm ? 1 : 0) | (hasFs ? 2 : 0);
+    frame[pos++] = 0;
+    frame.writeDoubleLE(hasFm ? (entry.fm as number) : 0, pos);
+    pos += 8;
+    frame.writeDoubleLE(hasFs ? (entry.fs as number) : 0, pos);
+    pos += 8;
+
+    pr50Slice.copy(frame, pos);
+
+    const crc = computeBufferChecksum(
+        frame,
+        ARC2_FRAME_HEADER_BYTES,
+        ARC2_FRAME_HEADER_BYTES + payloadByteLen,
+    );
+    frame.writeUInt32LE(ARC2_FRAME_MAGIC, 0);
+    frame.writeUInt32LE(payloadByteLen >>> 0, 4);
+    frame.writeUInt32LE(crc >>> 0, 8);
+    frame.writeUInt32LE(computeSectionMask(entry), 12);
+    frame.writeDoubleLE(entry.ts || Date.now(), 16);
+
+    return frame;
+}
+
+/**
+ * Serialize a collection of L2 entries into a complete `.arc` or `.arwal` container buffer.
+ *
+ * @param entries - Iterable collection of L2 cache records.
+ * @param kind - Container kind (`ARC2_KIND_STORE` or `ARC2_KIND_WAL`).
+ * @param meta - Optional container metadata overrides.
+ * @returns Complete binary container buffer with 64-byte ARC2 header and framed records.
+ */
+export function serializeArc2L2Container(
+    entries: Iterable<L2EntryRecord>,
+    kind: typeof ARC2_KIND_STORE | typeof ARC2_KIND_WAL,
+    meta: Arc2ContainerMeta = {},
+): Buffer {
+    const frames: Buffer[] = [];
+    let count = 0;
+    for (const entry of entries) {
+        frames.push(encodeArc2L2Frame(entry));
+        count++;
+    }
+    const header = encodeArc2Header({
+        kind,
+        recordCount: count,
+        legacyJsonlBytes: meta.legacyJsonlBytes ?? 0,
+        maxEntries: meta.maxEntries,
+        maxAgeDays: meta.maxAgeDays,
+    });
+    return Buffer.concat([header, ...frames]);
+}
+
+/**
+ * Serialize dirty L2 entries as raw FRM2 frames suitable for appending to `l2-delta.arwal`.
+ *
+ * @param entries - Dirty L2 records to encode as appendable frames.
+ * @returns Concatenated FRM2 frame buffer without container header.
+ */
+export function serializeArc2L2FramesOnly(entries: Iterable<L2EntryRecord>): Buffer {
+    const frames: Buffer[] = [];
+    for (const entry of entries) {
+        frames.push(encodeArc2L2Frame(entry));
+    }
+    return Buffer.concat(frames);
+}
+
+function parseSingleFrame(
+    buf: Buffer,
+    offset: number,
+    lazyDecode: boolean,
+): { entry: L2EntryRecord; nextOffset: number } | null {
+    if (offset + ARC2_FRAME_HEADER_BYTES > buf.length) return null;
+    const frameMagic = buf.readUInt32LE(offset);
+    if (frameMagic !== ARC2_FRAME_MAGIC) return null;
+    const payloadByteLen = buf.readUInt32LE(offset + 4);
+    const expectedCrc = buf.readUInt32LE(offset + 8);
+    const ts = buf.readDoubleLE(offset + 16);
+    const frameEnd = offset + ARC2_FRAME_HEADER_BYTES + payloadByteLen;
+    if (frameEnd > buf.length) return null;
+
+    const actualCrc = computeBufferChecksum(buf, offset + ARC2_FRAME_HEADER_BYTES, frameEnd);
+    if (actualCrc !== expectedCrc) return null;
+
+    let pos = offset + ARC2_FRAME_HEADER_BYTES;
+    if (pos + 4 > frameEnd) return null;
+    const keyLen = buf.readUInt32LE(pos);
+    pos += 4;
+    if (pos + keyLen + 4 > frameEnd) return null;
+    const k = buf.toString('utf8', pos, pos + keyLen);
+    pos += keyLen;
+
+    const pathLen = buf.readUInt32LE(pos);
+    pos += 4;
+    if (pos + pathLen + 18 > frameEnd) return null;
+    const p = buf.toString('utf8', pos, pos + pathLen);
+    pos += pathLen;
+
+    const metaFlags = buf[pos++];
+    pos += 1;
+    const fmVal = buf.readDoubleLE(pos);
+    pos += 8;
+    const fsVal = buf.readDoubleLE(pos);
+    pos += 8;
+
+    const rawPr50Slice = buf.subarray(pos, frameEnd);
+    const entry: L2EntryRecord = {
+        k,
+        p,
+        issues: [],
+        metric: null,
+        ts,
+        ...(metaFlags & 1 ? { fm: fmVal } : {}),
+        ...(metaFlags & 2 ? { fs: fsVal } : {}),
+        rawPr50Slice,
+        decoded: false,
+    };
+
+    if (!lazyDecode) {
+        ensureL2EntryDecoded(entry);
+    }
+
+    return { entry, nextOffset: frameEnd };
+}
+
+/**
+ * Scan an `l2-store.arc` or `l2-delta.arwal` binary container, indexing all valid frames.
+ * By default (`lazyDecode = true`), PR50 payloads are kept as zero-copy Buffer slices and
+ * decoded only when a cache hit accesses the entry.
+ *
+ * @param buf - Raw container buffer read from disk.
+ * @param onEntry - Callback invoked for each validated L2 entry frame in sequential order.
+ * @param lazyDecode - Whether to defer PR50 payload decoding until a cache hit occurs.
+ * @returns Validated Arc2Header or null if the container header is invalid.
+ */
+export function loadArc2L2Container(
+    buf: Buffer,
+    onEntry: (entry: L2EntryRecord) => void,
+    lazyDecode = true,
+): Arc2Header | null {
+    const header = decodeArc2Header(buf);
+    if (!header || (header.kind !== ARC2_KIND_STORE && header.kind !== ARC2_KIND_WAL)) {
+        return null;
+    }
+    let offset = ARC2_HEADER_BYTES;
+    while (offset < buf.length) {
+        const parsed = parseSingleFrame(buf, offset, lazyDecode);
+        if (!parsed) break;
+        onEntry(parsed.entry);
+        offset = parsed.nextOffset;
+    }
+    return header;
+}
