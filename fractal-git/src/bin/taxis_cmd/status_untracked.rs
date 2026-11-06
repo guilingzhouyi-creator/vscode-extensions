@@ -137,7 +137,9 @@ fn filter_untracked_children(
     for (absolute, path) in child_dirs.drain(..) {
         let prefix_with_slash = format!("{path}/");
         let holds_tracked = tracked_prefixes.contains(&path)
-            || tracked.iter().any(|staged| staged.starts_with(&prefix_with_slash));
+            || tracked
+                .iter()
+                .any(|staged| staged.starts_with(&prefix_with_slash));
 
         if holds_tracked {
             pending.push((absolute, path));

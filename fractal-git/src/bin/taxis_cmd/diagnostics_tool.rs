@@ -50,9 +50,15 @@ pub fn handle_diagnostics(ctx: &CliContext) {
             } else {
                 println!("=== Taxis Commercial Diagnostics System ===");
                 println!("Active Trace ID     : {}", trace_id());
-                println!("Active Subcommand   : {}", active_subcommand().as_deref().unwrap_or("none"));
+                println!(
+                    "Active Subcommand   : {}",
+                    active_subcommand().as_deref().unwrap_or("none")
+                );
                 println!("Diagnostic Log File : {}", log_path.display());
-                println!("File Status         : {}", if exists { "present" } else { "absent" });
+                println!(
+                    "File Status         : {}",
+                    if exists { "present" } else { "absent" }
+                );
                 println!("Current Size        : {} bytes", size);
             }
         }

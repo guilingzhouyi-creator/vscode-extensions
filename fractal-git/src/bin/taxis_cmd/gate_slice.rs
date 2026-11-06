@@ -52,11 +52,7 @@ pub fn handle_gate_slice(ctx: &CliContext) {
         "gate_slice",
         "evaluating {} file(s) from {}",
         candidate_file_paths.len(),
-        if source_is_cli {
-            "cli"
-        } else {
-            "index"
-        }
+        if source_is_cli { "cli" } else { "index" }
     );
     let mut evaluated_files = Vec::new();
     let mut file_envelopes = Vec::new();
@@ -94,8 +90,7 @@ pub fn handle_gate_slice(ctx: &CliContext) {
         evaluated_files.push((file_path.as_str(), file_envelopes[index]));
     }
 
-    let total_net_turnover =
-        total_effective_lines_added + total_effective_lines_deleted * 0.8;
+    let total_net_turnover = total_effective_lines_added + total_effective_lines_deleted * 0.8;
     let batch_totals = CommitBatchTotals::new(
         total_physical_lines_added,
         total_physical_lines_deleted,
@@ -196,9 +191,7 @@ fn report_slice_verdict(
     println!("=== Taxis 5D Slice Gate Verification ===");
     println!(
         "Files Audited: {} | Net 5D Turnover: {:.1} (Threshold: {:.1})",
-        audited_file_count,
-        batch_totals.total_net_turnover,
-        governance_verdict.admission_threshold
+        audited_file_count, batch_totals.total_net_turnover, governance_verdict.admission_threshold
     );
     if governance_verdict.is_admitted {
         println!("Result: PASS (Within two-tier 5D bounds)");

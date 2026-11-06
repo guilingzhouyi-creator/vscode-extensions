@@ -5,9 +5,7 @@ use super::super::status_collect::{
     classify_staged, conflict_code, empty_index_bytes, merge_side, stage_zero_map,
 };
 use super::super::tree_view::TreeEntry;
-use super::{
-    StatusEntry, CODE_ADDED, CODE_DELETED, CODE_MODIFIED, CODE_RENAMED, CODE_UNCHANGED,
-};
+use super::{StatusEntry, CODE_ADDED, CODE_DELETED, CODE_MODIFIED, CODE_RENAMED, CODE_UNCHANGED};
 use fg_core::models::{FileMode, Oid};
 use fg_index::GitIndex;
 use std::collections::{BTreeMap, BTreeSet};
@@ -57,15 +55,13 @@ fn an_empty_index_and_empty_tree_report_nothing() {
 
 #[test]
 fn a_rename_record_names_both_paths_in_the_line_form() {
-    let entry =
-        StatusEntry::with_rename(CODE_RENAMED, CODE_UNCHANGED, PATH_NEW, PATH_OLD, 60_000);
+    let entry = StatusEntry::with_rename(CODE_RENAMED, CODE_UNCHANGED, PATH_NEW, PATH_OLD, 60_000);
     assert_eq!(entry.record_text(false), "R  old.txt -> new.txt");
 }
 
 #[test]
 fn a_rename_record_names_only_the_new_path_in_the_nul_form() {
-    let entry =
-        StatusEntry::with_rename(CODE_RENAMED, CODE_UNCHANGED, PATH_NEW, PATH_OLD, 60_000);
+    let entry = StatusEntry::with_rename(CODE_RENAMED, CODE_UNCHANGED, PATH_NEW, PATH_OLD, 60_000);
     assert_eq!(entry.record_text(true), "R  new.txt");
 }
 
@@ -78,8 +74,7 @@ fn a_non_rename_record_is_identical_in_both_forms() {
 
 #[test]
 fn a_rename_is_staged_because_its_index_side_changed() {
-    let entry =
-        StatusEntry::with_rename(CODE_RENAMED, CODE_UNCHANGED, PATH_NEW, PATH_OLD, 30_000);
+    let entry = StatusEntry::with_rename(CODE_RENAMED, CODE_UNCHANGED, PATH_NEW, PATH_OLD, 30_000);
     assert!(entry.is_staged());
     assert!(!entry.is_unstaged());
     assert!(!entry.is_untracked());

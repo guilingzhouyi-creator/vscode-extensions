@@ -46,6 +46,7 @@ const OPT_SHORT: &str = "--short";
 const OPT_SHORT_FLAG: &str = "-s";
 const OPT_PORCELAIN: &str = "--porcelain";
 const OPT_PORCELAIN_V1: &str = "--porcelain=v1";
+const OPT_PORCELAIN_V2: &str = "--porcelain=v2";
 const OPT_BRANCH: &str = "--branch";
 const OPT_BRANCH_SHORT: &str = "-b";
 
@@ -140,6 +141,8 @@ enum StatusFormat {
     Short,
     /// Porcelain v1, the stable machine form.
     Porcelain,
+    /// Porcelain v2, structured machine form with mode/oid columns and optional branch headers.
+    PorcelainV2,
 }
 
 struct ParsedStatusFlags {
@@ -161,6 +164,7 @@ fn parse_status_flags(args: &[String]) -> Result<ParsedStatusFlags, String> {
             OPT_LONG | OPT_VERBOSE_SHORT | OPT_VERBOSE_LONG => flags.format = StatusFormat::Long,
             OPT_SHORT | OPT_SHORT_FLAG => flags.format = StatusFormat::Short,
             OPT_PORCELAIN | OPT_PORCELAIN_V1 => flags.format = StatusFormat::Porcelain,
+            OPT_PORCELAIN_V2 => flags.format = StatusFormat::PorcelainV2,
             OPT_BRANCH_SHORT | OPT_BRANCH => flags.show_branch = true,
             other if other.starts_with('-') => return Err(other.to_string()),
             _ => {}
@@ -169,15 +173,14 @@ fn parse_status_flags(args: &[String]) -> Result<ParsedStatusFlags, String> {
     Ok(flags)
 }
 
-fn render_status_by_format(
-    view: &RepoView,
-    entries: &[StatusEntry],
-    flags: &ParsedStatusFlags,
-) {
+fn render_status_by_format(view: &RepoView, entries: &[StatusEntry], flags: &ParsedStatusFlags) {
     match flags.format {
         StatusFormat::Long => render_long(view, entries),
         StatusFormat::Short | StatusFormat::Porcelain => {
             render_records(view, entries, flags.nul_terminated, flags.show_branch);
+        }
+        StatusFormat::PorcelainV2 => {
+            render_porcelain_v2(view, entries, flags.nul_terminated, flags.show_branch);
         }
     }
 }
@@ -232,6 +235,121 @@ fn render_records(
                 let _ = write_record(&mut sink, from, true);
             }
         }
+    }
+}
+
+/// Renders Porcelain v2 records (`# branch.*`, `1 <XY> ...`, `2 <XY> ...`, `? <path>`).
+fn render_porcelain_v2(
+    view: &RepoView,
+    entries: &[StatusEntry],
+    nul_terminated: bool,
+    show_branch: bool,
+) {
+    let mut sink = std::io::stdout();
+    let effective = view.effective_head_commit().ok().flatten();
+    if show_branch {
+        render_porcelain_v2_branch_headers(view, effective.as_ref(), nul_terminated, &mut sink);
+    }
+
+    let head_tree = effective
+        .as_ref()
+        .and_then(|(_, oid)| super::tree_view::flatten_commit_tree(view, oid).ok())
+        .unwrap_or_default();
+    let index_map = view
+        .index()
+        .ok()
+        .flatten()
+        .map(|idx| super::status_collect::stage_zero_map(&idx))
+        .unwrap_or_default();
+
+    for entry in entries {
+        render_porcelain_v2_entry(entry, &head_tree, &index_map, nul_terminated, &mut sink);
+    }
+}
+
+fn render_porcelain_v2_branch_headers(
+    view: &RepoView,
+    effective: Option<&(String, fg_core::models::Oid)>,
+    nul_terminated: bool,
+    sink: &mut impl std::io::Write,
+) {
+    let oid_str = effective
+        .map(|(_, oid)| oid.to_hex())
+        .unwrap_or_else(|| "(initial)".to_string());
+    let head_str = view
+        .head_branch()
+        .ok()
+        .flatten()
+        .map(|(name, _)| name)
+        .unwrap_or_else(|| "(detached)".to_string());
+    let _ = write_record(sink, &format!("# branch.oid {oid_str}"), nul_terminated);
+    let _ = write_record(sink, &format!("# branch.head {head_str}"), nul_terminated);
+}
+
+fn render_porcelain_v2_entry(
+    entry: &StatusEntry,
+    head_tree: &std::collections::BTreeMap<String, super::tree_view::TreeEntry>,
+    index_map: &std::collections::BTreeMap<String, fg_index::IndexEntry>,
+    nul_terminated: bool,
+    sink: &mut impl std::io::Write,
+) {
+    if entry.is_untracked() {
+        let _ = write_record(sink, &format!("? {}", entry.path), nul_terminated);
+        return;
+    }
+    let x = if entry.index_code == CODE_UNCHANGED {
+        '.'
+    } else {
+        entry.index_code
+    };
+    let y = if entry.worktree_code == CODE_UNCHANGED {
+        '.'
+    } else {
+        entry.worktree_code
+    };
+    let head_lookup_path = entry.rename_from.as_deref().unwrap_or(&entry.path);
+    let head_entry = head_tree.get(head_lookup_path);
+    let idx_entry = index_map.get(&entry.path);
+    let zero_hex = fg_core::models::Oid::ZERO.to_hex();
+
+    let m_h = head_entry
+        .map(|e| format!("{:06o}", e.mode.to_u32()))
+        .unwrap_or_else(|| "000000".to_string());
+    let m_i = idx_entry
+        .map(|e| format!("{:06o}", e.mode.to_u32()))
+        .unwrap_or_else(|| "000000".to_string());
+    let m_w = if entry.worktree_code == CODE_DELETED || idx_entry.is_none() {
+        "000000".to_string()
+    } else {
+        m_i.clone()
+    };
+    let h_h = head_entry
+        .map(|e| e.oid.to_hex())
+        .unwrap_or_else(|| zero_hex.clone());
+    let h_i = idx_entry.map(|e| e.oid.to_hex()).unwrap_or(zero_hex);
+
+    let Some(orig) = &entry.rename_from else {
+        let line = format!("1 {x}{y} N... {m_h} {m_i} {m_w} {h_h} {h_i} {}", entry.path);
+        let _ = write_record(sink, &line, nul_terminated);
+        return;
+    };
+    let pct = entry
+        .score
+        .map(|s| (s * 100 + 30_000) / 60_000)
+        .unwrap_or(100);
+    if nul_terminated {
+        let line = format!(
+            "2 {x}{y} N... {m_h} {m_i} {m_w} {h_h} {h_i} R{pct} {}",
+            entry.path
+        );
+        let _ = write_record(sink, &line, true);
+        let _ = write_record(sink, orig, true);
+    } else {
+        let line = format!(
+            "2 {x}{y} N... {m_h} {m_i} {m_w} {h_h} {h_i} R{pct} {}\t{orig}",
+            entry.path
+        );
+        let _ = write_record(sink, &line, false);
     }
 }
 

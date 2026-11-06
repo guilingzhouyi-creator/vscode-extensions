@@ -23,8 +23,8 @@ use super::status::{
 };
 use super::status_untracked::find_untracked;
 use super::tree_view::{
-    entry_is_racy, flatten_commit_tree, mtime_matches, stat_cache_trusted, worktree_mode,
-    SideBlob, TreeEntry,
+    entry_is_racy, flatten_commit_tree, mtime_matches, stat_cache_trusted, worktree_mode, SideBlob,
+    TreeEntry,
 };
 
 const ABSENT_PATH: &str = "<absent>";
@@ -43,10 +43,10 @@ fn resolve_status_index(view: &RepoView) -> FractalResult<GitIndex> {
     }
 }
 
-/// Resolves and flattens the commit tree at HEAD.
+/// Resolves and flattens the commit tree at HEAD (falling back to effective cell HEAD).
 fn resolve_head_tree(view: &RepoView) -> FractalResult<BTreeMap<String, TreeEntry>> {
-    match view.head_commit()? {
-        Some(commit) => flatten_commit_tree(view, &commit),
+    match view.effective_head_commit()? {
+        Some((_, commit)) => flatten_commit_tree(view, &commit),
         None => Ok(BTreeMap::new()),
     }
 }
@@ -313,11 +313,7 @@ fn inspect_worktree_entry(
             if matcher.is_ignored(path, false) {
                 return Ok(None);
             }
-            return Ok(Some(StatusEntry::new(
-                CODE_UNCHANGED,
-                CODE_DELETED,
-                path,
-            )));
+            return Ok(Some(StatusEntry::new(CODE_UNCHANGED, CODE_DELETED, path)));
         }
         Err(io_err) => return Err(FractalError::Io(io_err)),
     };
@@ -328,11 +324,7 @@ fn inspect_worktree_entry(
         worktree_content_changed(view, staged, &metadata, attributes, index_timestamp)?;
 
     if mode_changed || content_changed {
-        Ok(Some(StatusEntry::new(
-            CODE_UNCHANGED,
-            CODE_MODIFIED,
-            path,
-        )))
+        Ok(Some(StatusEntry::new(CODE_UNCHANGED, CODE_MODIFIED, path)))
     } else {
         Ok(None)
     }
@@ -349,14 +341,7 @@ fn compare_worktree_to_index(
     let items: Vec<(String, StatusEntry)> = index_map
         .iter()
         .filter_map(|(path, staged)| {
-            match inspect_worktree_entry(
-                view,
-                path,
-                staged,
-                matcher,
-                attributes,
-                index_timestamp,
-            ) {
+            match inspect_worktree_entry(view, path, staged, matcher, attributes, index_timestamp) {
                 Ok(Some(entry)) => Some(Ok((path.clone(), entry))),
                 Ok(None) => None,
                 Err(err) => Some(Err(err)),

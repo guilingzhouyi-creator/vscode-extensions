@@ -132,13 +132,17 @@ fn print_clean_long(view: &RepoView) {
 /// An unborn branch is the state every repository starts in, and Git words several messages
 /// differently there; this is the single predicate those wordings branch on.
 fn is_unborn(view: &RepoView) -> bool {
-    view.head_commit().ok().flatten().is_none()
+    view.effective_head_commit().ok().flatten().is_none()
 }
 
 /// Renders the first line of the long form: the branch, or how `HEAD` is detached.
 fn long_branch_line(view: &RepoView) -> String {
     let branch = view.head_branch().ok().flatten().map(|(name, _)| name);
-    let detached = view.head_commit().ok().flatten();
+    let detached = view
+        .effective_head_commit()
+        .ok()
+        .flatten()
+        .map(|(_, oid)| oid);
     match (branch, detached) {
         (Some(name), Some(_)) => format!("On branch {name}"),
         (Some(name), None) => format!("On branch {name}\n\nNo commits yet"),
@@ -155,7 +159,11 @@ fn long_branch_line(view: &RepoView) -> String {
 /// Renders the `## <branch>` header the short and porcelain forms print under `--branch`.
 pub(super) fn branch_header(view: &RepoView) -> String {
     let branch = view.head_branch().ok().flatten().map(|(name, _)| name);
-    let detached = view.head_commit().ok().flatten();
+    let detached = view
+        .effective_head_commit()
+        .ok()
+        .flatten()
+        .map(|(_, oid)| oid);
     match (branch, detached) {
         (Some(name), Some(_)) => format!("## {name}"),
         (Some(name), None) => format!("## No commits yet on {name}"),
