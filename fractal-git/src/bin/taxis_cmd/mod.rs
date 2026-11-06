@@ -26,6 +26,7 @@ pub mod checkout;
 pub mod cherry_pick;
 pub mod clone;
 pub mod commit;
+pub mod commit_ops;
 pub mod commit_walk;
 pub mod common;
 pub mod config;
