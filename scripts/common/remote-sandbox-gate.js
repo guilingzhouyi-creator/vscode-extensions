@@ -22,6 +22,9 @@ const path = require('path');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
+const { resolveImpactTargets, buildImpactTestCommand } =
+  require('./impact-slice-map.js');
+
 const DEFAULT_SSH_HOST = 'ssh.instabox.sh';
 const DEFAULT_SSH_PORT = '2222';
 const DEFAULT_SSH_USER = 'ibssh_jgzat7ocfg4cmtio5kha7mkj2m';
@@ -283,7 +286,7 @@ function printHelp() {
   在提交推送到 GitHub Actions (Tier 2 二测试机) 前进行确定性 Linux 原生预审。
 
 选项:
-  --slice, -s <name>    切片名称 (hygiene|rust|timing|auto-refactor|webgames|staged|all)
+  --slice, -s <name>    切片名称 (hygiene|rust|timing|auto-refactor|webgames|impact|staged|all)
                         默认: staged (根据当前改动智能推断)
   --remote, -r          在预测试机 (Linux Sandbox) 上执行 [默认]
   --local, -l           在当前本地环境中执行
@@ -297,6 +300,7 @@ function printHelp() {
   timing         workspace-timing 编译与轻量单元测试
   auto-refactor  auto-refactor 静态引擎与 AST 单元测试
   webgames       WebGames 游戏配置与文档架构审查
+  impact         影响面切片：按改动路径定向运行受影响的测试目标，不跑全量
   staged         动态切片：自动扫描改动集并定向触发受影响领域的切片
   all            全工作区统一质量审查 (audit-all.sh)
 `);
@@ -314,7 +318,25 @@ function main() {
   }
 
   let targetSlices = [];
-  if (options.slice === 'staged' || options.slice === 'diff') {
+  let impactCommand = null;
+
+  if (options.slice === 'impact') {
+    // Impact mode exists so an ordinary change does not pay for the whole suite. It maps the
+    // changed paths to the test targets that can actually observe them; anything unrecognised
+    // widens to every target rather than assuming nothing is affected.
+    const fractalPaths = detectChangedFiles().filter(
+      file => file.replace(/\\/g, '/').includes('fractal-git/')
+    );
+    const { targets, unknown } = resolveImpactTargets(fractalPaths);
+    impactCommand = buildImpactTestCommand(targets);
+    console.log(
+      `🔍 [Tier 1.5] 影响面切片: ${fractalPaths.length} 个 fractal-git 变更 -> 目标 [${targets.join(', ') || '无'}]`
+    );
+    if (unknown.length > 0) {
+      console.log(`⚠  未登记规则的 crate 路径 ${unknown.length} 处，已放宽到全部目标`);
+    }
+    targetSlices = ['impact'];
+  } else if (options.slice === 'staged' || options.slice === 'diff') {
     const changed = detectChangedFiles();
     targetSlices = resolveDynamicSlices(changed);
     console.log(`🔍 [Tier 1.5] 变更集检测: 触及 ${changed.length} 个文件 -> 命中切片 [${targetSlices.join(', ')}]`);
@@ -326,7 +348,21 @@ function main() {
   }
 
   let exitCode = 0;
-  if (options.mode === 'remote') {
+  if (impactCommand) {
+    if (options.mode === 'remote') {
+      const remoteRoot = process.env.INSTABOX_WORKSPACE || DEFAULT_REMOTE_WORKSPACE;
+      exitCode = executeRemoteSsh(`cd "${remoteRoot}" && ${impactCommand}`);
+    } else {
+      const shellCmd = process.platform === 'win32' ? 'pwsh' : 'bash';
+      const shellArg = process.platform === 'win32' ? '-Command' : '-c';
+      console.log(`  $ ${impactCommand}`);
+      const res = spawnSync(shellCmd, [shellArg, impactCommand], {
+        cwd: REPO_ROOT,
+        stdio: 'inherit'
+      });
+      exitCode = res.status === null ? 1 : res.status;
+    }
+  } else if (options.mode === 'remote') {
     const remoteScript = buildRemoteScript(targetSlices, options.deep);
     exitCode = executeRemoteSsh(remoteScript);
   } else {
