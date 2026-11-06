@@ -48,89 +48,102 @@ fn parse_repack_options(args: &[String]) -> (RepackOptions, bool, bool) {
 
     let mut cursor = 0;
     while cursor < args.len() {
-        match args[cursor].as_str() {
-            "-h" | "--help" | "help" => {
-                print_repack_help();
-                std::process::exit(0);
-            }
-            "--window" | "-w" if cursor + 1 < args.len() => {
-                if let Ok(w) = args[cursor + 1].parse::<usize>() {
-                    options.window_size = w;
-                }
-                cursor += 2;
-            }
-            "--max-depth" if cursor + 1 < args.len() => {
-                if let Ok(d) = args[cursor + 1].parse::<usize>() {
-                    options.max_depth = d;
-                }
-                cursor += 2;
-            }
-            "-d" if cursor + 1 < args.len() && args[cursor + 1].chars().all(|c| c.is_ascii_digit()) => {
-                if let Ok(d) = args[cursor + 1].parse::<usize>() {
-                    options.max_depth = d;
-                }
-                cursor += 2;
-            }
-            "-d" => {
-                // In git repack, -d removes redundant loose objects/packfiles
-                options.keep_loose = false;
-                cursor += 1;
-            }
-            "-a" | "-A" => {
-                // In git repack, -a packs all objects into packfile
-                cursor += 1;
-            }
-            "--threshold" if cursor + 1 < args.len() => {
-                if let Ok(t) = args[cursor + 1].parse::<usize>() {
-                    options.auto_repack_threshold = t;
-                }
-                cursor += 2;
-            }
-            "--keep-loose" | "-k" => {
-                options.keep_loose = true;
-                cursor += 1;
-            }
-            "--low-disk" => {
-                options.low_disk = true;
-                cursor += 1;
-            }
-            "--max-pack-size" | "--micro-pack" => {
-                let flag = args[cursor].as_str();
-                let raw = match args.get(cursor + 1) {
-                    Some(value) => value.as_str(),
-                    None => fail_usage(format!("{flag} requires a size value (e.g. {flag} 64M)")),
-                };
-                match parse_byte_size(raw) {
-                    Some(bytes) if bytes >= 1024 * 1024 => options.max_pack_bytes = bytes,
-                    Some(_) => fail_usage(format!(
-                        "{flag} {raw} is below the 1M floor required for slice verification"
-                    )),
-                    None => fail_usage(format!(
-                        "{flag} {raw} is not a byte size (expected e.g. 64M, 512K, 1048576)"
-                    )),
-                }
-                cursor += 2;
-            }
-            "--async" => {
-                is_async = true;
-                cursor += 1;
-            }
-            "--auto" => {
-                auto_check_only = true;
-                cursor += 1;
-            }
-            unknown if unknown.starts_with('-') => {
-                fail_usage(format!(
-                    "unknown repack option '{unknown}' (see --help for the supported flags)"
-                ));
-            }
-            _ => {
-                cursor += 1;
-            }
-        }
+        cursor += apply_repack_option_token(
+            args,
+            cursor,
+            (&mut options, &mut is_async, &mut auto_check_only),
+        );
     }
 
     (options, is_async, auto_check_only)
+}
+
+/// Applies one option token for `taxis repack`, returning how many tokens were consumed.
+fn apply_repack_option_token(
+    args: &[String],
+    cursor: usize,
+    state: (&mut RepackOptions, &mut bool, &mut bool),
+) -> usize {
+    let (options, is_async, auto_check_only) = state;
+    match args[cursor].as_str() {
+        "-h" | "--help" | "help" => {
+            print_repack_help();
+            std::process::exit(0);
+        }
+        "--window" | "-w" if cursor + 1 < args.len() => {
+            if let Ok(w) = args[cursor + 1].parse::<usize>() {
+                options.window_size = w;
+            }
+            2
+        }
+        "--max-depth" if cursor + 1 < args.len() => {
+            if let Ok(d) = args[cursor + 1].parse::<usize>() {
+                options.max_depth = d;
+            }
+            2
+        }
+        "-d" if cursor + 1 < args.len() && args[cursor + 1].chars().all(|c| c.is_ascii_digit()) => {
+            if let Ok(d) = args[cursor + 1].parse::<usize>() {
+                options.max_depth = d;
+            }
+            2
+        }
+        "-d" => {
+            options.keep_loose = false;
+            1
+        }
+        "-a" | "-A" => 1,
+        "--threshold" if cursor + 1 < args.len() => {
+            if let Ok(t) = args[cursor + 1].parse::<usize>() {
+                options.auto_repack_threshold = t;
+            }
+            2
+        }
+        "--keep-loose" | "-k" => {
+            options.keep_loose = true;
+            1
+        }
+        "--low-disk" => {
+            options.low_disk = true;
+            1
+        }
+        "--max-pack-size" | "--micro-pack" => {
+            options.max_pack_bytes = parse_repack_pack_size(args, cursor);
+            2
+        }
+        "--async" => {
+            *is_async = true;
+            1
+        }
+        "--auto" => {
+            *auto_check_only = true;
+            1
+        }
+        unknown if unknown.starts_with('-') => {
+            fail_usage(format!(
+                "unknown repack option '{unknown}' (see --help for the supported flags)"
+            ));
+        }
+        _ => 1,
+    }
+}
+
+/// Parses `--max-pack-size` / `--micro-pack` byte size argument.
+fn parse_repack_pack_size(args: &[String], cursor: usize) -> u64 {
+    let flag = args[cursor].as_str();
+    let raw = match args.get(cursor + 1) {
+        Some(value) => value.as_str(),
+        None => fail_usage(format!("{flag} requires a size value (e.g. {flag} 64M)")),
+    };
+    match parse_byte_size(raw) {
+        Some(bytes) if bytes >= 1024 * 1024 => bytes,
+        Some(_) => fail_usage(format!(
+            "{flag} {raw} is below the 1M floor required for slice verification"
+        )),
+        None => fail_usage(format!(
+            "{flag} {raw} is not a byte size (expected e.g. 64M, 512K, 1048576)"
+        )),
+    }
 }
 
 /// Resolves the Git directory where objects reside.

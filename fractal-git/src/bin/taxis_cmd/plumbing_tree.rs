@@ -373,10 +373,14 @@ pub fn handle_verify_commit(ctx: &CliContext) {
         };
 
         let text = String::from_utf8_lossy(&commit_obj.payload);
-        let has_signature = text.contains("gpgsig ") || text.contains("-----BEGIN PGP SIGNATURE-----");
+        let has_signature =
+            text.contains("gpgsig ") || text.contains("-----BEGIN PGP SIGNATURE-----");
 
         if !has_signature {
-            eprintln!("error: commit {} does not have a signature", commit_oid.to_hex());
+            eprintln!(
+                "error: commit {} does not have a signature",
+                commit_oid.to_hex()
+            );
             all_signed = false;
             continue;
         }
@@ -437,7 +441,11 @@ pub fn handle_verify_tag(ctx: &CliContext) {
         };
 
         if tag_obj.kind != ObjectKind::Tag {
-            eprintln!("error: object {} is a {}, not a tag", tag_oid.to_hex(), tag_obj.kind.as_str());
+            eprintln!(
+                "error: object {} is a {}, not a tag",
+                tag_oid.to_hex(),
+                tag_obj.kind.as_str()
+            );
             all_signed = false;
             continue;
         }
@@ -485,32 +493,55 @@ pub fn handle_merge_tree(ctx: &CliContext) {
     }
 
     if positional.len() < 2 || positional.len() > 3 {
-        fail_usage("merge-tree [--write-tree] <branch1> <branch2> or <base-tree> <branch1> <branch2>");
+        fail_usage(
+            "merge-tree [--write-tree] <branch1> <branch2> or <base-tree> <branch1> <branch2>",
+        );
     }
 
     let view = RepoView::open_or_exit(ctx);
 
     let (base_tree_oid, ours_tree_oid, theirs_tree_oid) = if positional.len() == 3 {
-        let (_, b) = view.resolve_tree(positional[0]).unwrap_or_else(|e| fail_fatal(e));
-        let (_, o) = view.resolve_tree(positional[1]).unwrap_or_else(|e| fail_fatal(e));
-        let (_, t) = view.resolve_tree(positional[2]).unwrap_or_else(|e| fail_fatal(e));
+        let (_, b) = view
+            .resolve_tree(positional[0])
+            .unwrap_or_else(|e| fail_fatal(e));
+        let (_, o) = view
+            .resolve_tree(positional[1])
+            .unwrap_or_else(|e| fail_fatal(e));
+        let (_, t) = view
+            .resolve_tree(positional[2])
+            .unwrap_or_else(|e| fail_fatal(e));
         (b, o, t)
     } else {
-        let (o_res, o_tree) = view.resolve_tree(positional[0]).unwrap_or_else(|e| fail_fatal(e));
-        let (t_res, t_tree) = view.resolve_tree(positional[1]).unwrap_or_else(|e| fail_fatal(e));
+        let (o_res, o_tree) = view
+            .resolve_tree(positional[0])
+            .unwrap_or_else(|e| fail_fatal(e));
+        let (t_res, t_tree) = view
+            .resolve_tree(positional[1])
+            .unwrap_or_else(|e| fail_fatal(e));
 
-        let mut get_node = |oid: &Oid| -> Option<(fg_algorithms::traverse::dag_walk::CorrectedCommitDate, Vec<Oid>)> {
+        let mut get_node = |oid: &Oid| -> Option<(
+            fg_algorithms::traverse::dag_walk::CorrectedCommitDate,
+            Vec<Oid>,
+        )> {
             let commit_obj = view.object(oid).ok()?;
             let record = parse_commit_record(*oid, &commit_obj.payload).ok()?;
             Some((
-                fg_algorithms::traverse::dag_walk::CorrectedCommitDate(record.committer_time.max(0) as u64),
+                fg_algorithms::traverse::dag_walk::CorrectedCommitDate(
+                    record.committer_time.max(0) as u64,
+                ),
                 record.parents,
             ))
         };
 
-        let bases = fg_algorithms::traverse::dag_walk::DagWalker::find_merge_bases_with_ccd(&o_res, &t_res, &mut get_node);
+        let bases = fg_algorithms::traverse::dag_walk::DagWalker::find_merge_bases_with_ccd(
+            &o_res,
+            &t_res,
+            &mut get_node,
+        );
         let base_tree = if let Some(base_oid) = bases.first() {
-            view.resolve_tree(&base_oid.to_hex()).map(|(_, t)| t).unwrap_or(Oid::ZERO)
+            view.resolve_tree(&base_oid.to_hex())
+                .map(|(_, t)| t)
+                .unwrap_or(Oid::ZERO)
         } else {
             Oid::ZERO
         };
@@ -527,9 +558,14 @@ pub fn handle_merge_tree(ctx: &CliContext) {
     let _ = flatten_tree(&view, &ours_tree_oid, "", &mut ours_files);
     let _ = flatten_tree(&view, &theirs_tree_oid, "", &mut theirs_files);
 
-    let base_map: BTreeMap<String, Oid> = base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
-    let ours_map: BTreeMap<String, Oid> = ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
-    let theirs_map: BTreeMap<String, Oid> = theirs_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let base_map: BTreeMap<String, Oid> =
+        base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let ours_map: BTreeMap<String, Oid> =
+        ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let theirs_map: BTreeMap<String, Oid> = theirs_files
+        .iter()
+        .map(|(p, e)| (p.clone(), e.oid))
+        .collect();
 
     let merge_res = fg_algorithms::merge::ThreeWayMerge::merge(&base_map, &ours_map, &theirs_map);
 

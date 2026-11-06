@@ -193,6 +193,74 @@ impl RepoView {
         }
     }
 
+    /// Resolves the effective HEAD reference name and commit OID, falling back to the active
+    /// cell sandbox branch (`refs/fractal/cell/<cell>/main`) when `HEAD` itself is unborn.
+    pub fn effective_head_commit(&self) -> FractalResult<Option<(String, Oid)>> {
+        match self.refs.head()? {
+            HeadState::Detached(oid) => return Ok(Some(("HEAD".to_string(), oid))),
+            HeadState::Symbolic {
+                name,
+                target: Some(oid),
+            } => {
+                if fg_native::container_path(&self.git_dir).is_file()
+                    && (name == "refs/heads/main" || name == "refs/heads/trunk")
+                {
+                    let default_cell_ref = "refs/fractal/cell/cell-default/main";
+                    if let Ok(Some(cell_oid)) = self.lookup_reference(default_cell_ref) {
+                        if cell_oid != oid
+                            && self
+                                .commit_parents(&cell_oid)
+                                .is_ok_and(|p| p.contains(&oid))
+                        {
+                            return Ok(Some((default_cell_ref.to_string(), cell_oid)));
+                        }
+                    }
+                }
+                return Ok(Some((name, oid)));
+            }
+            HeadState::Absent => {
+                let container_path = fg_native::container_path(&self.git_dir);
+                if container_path.is_file() {
+                    if let Ok(doc) = fg_native::RepoDocument::load(&container_path) {
+                        match doc.head {
+                            fg_native::HeadState::Symbolic { ref target } => {
+                                if let Some(oid) = self.lookup_reference(target)? {
+                                    return Ok(Some((target.clone(), oid)));
+                                }
+                            }
+                            fg_native::HeadState::Detached { oid } => {
+                                return Ok(Some(("HEAD".to_string(), oid)));
+                            }
+                        }
+                    }
+                }
+            }
+            HeadState::Symbolic { target: None, .. } => {}
+        }
+
+        let default_cell_ref = "refs/fractal/cell/cell-default/main";
+        if let Some(oid) = self.lookup_reference(default_cell_ref)? {
+            return Ok(Some((default_cell_ref.to_string(), oid)));
+        }
+
+        let mut cell_refs: Vec<(String, Oid)> = self
+            .refs
+            .list_all()?
+            .into_iter()
+            .filter(|(name, _)| name.starts_with("refs/fractal/cell/"))
+            .collect();
+        cell_refs.sort_by(|left, right| left.0.cmp(&right.0));
+        for (name, oid) in cell_refs {
+            let peeled = self.peel(&oid).unwrap_or(oid);
+            if let Ok(obj) = self.object(&peeled) {
+                if obj.kind == ObjectKind::Commit {
+                    return Ok(Some((name, peeled)));
+                }
+            }
+        }
+        Ok(None)
+    }
+
     /// Lists local branches as `(short name, commit)`, sorted by short name.
     ///
     /// `refs/original/*` backups are excluded: `git filter-branch` writes them there, and they are
@@ -204,17 +272,35 @@ impl RepoView {
     /// Propagates reference-store failures.
     pub fn branches(&self) -> FractalResult<Vec<(String, Oid)>> {
         let prefix = "refs/heads/";
-        let mut listed: Vec<(String, Oid)> = self
-            .refs
-            .list_all()?
-            .into_iter()
-            .filter_map(|(name, oid)| {
-                name.strip_prefix(prefix)
-                    .map(|short| (short.to_string(), oid))
-            })
-            .collect();
-        listed.sort_by(|left, right| left.0.cmp(&right.0));
-        Ok(listed)
+        let cell_prefix = "refs/fractal/cell/cell-default/";
+        let has_native_container = fg_native::container_path(&self.git_dir).is_file();
+        let all_refs = self.refs.list_all()?;
+        let mut by_name: std::collections::BTreeMap<String, Oid> =
+            std::collections::BTreeMap::new();
+        if has_native_container {
+            for (name, oid) in &all_refs {
+                if let Some(short) = name.strip_prefix(cell_prefix) {
+                    by_name.insert(short.to_string(), *oid);
+                }
+            }
+        }
+        for (name, oid) in all_refs {
+            if let Some(short) = name.strip_prefix(prefix) {
+                if has_native_container {
+                    if let Some(cell_oid) = by_name.get(short).copied() {
+                        if cell_oid != oid
+                            && self
+                                .commit_parents(&cell_oid)
+                                .is_ok_and(|p| p.contains(&oid))
+                        {
+                            continue;
+                        }
+                    }
+                }
+                by_name.insert(short.to_string(), oid);
+            }
+        }
+        Ok(by_name.into_iter().collect())
     }
 
     /// Name of the branch `HEAD` points at, and the commit it resolves to.
@@ -376,13 +462,13 @@ impl RepoView {
     /// Resolves the part of a revision that names an object, without ancestry suffixes.
     fn resolve_base(&self, revision: &str) -> FractalResult<Oid> {
         if revision == "HEAD" || revision == "@" {
-            if let Some(oid) = self.head_commit()? {
-                return Ok(oid);
-            }
             if fg_core::constants::Edition::CURRENT == fg_core::constants::Edition::Engineering {
-                if let Ok(Some(oid)) = self.lookup_reference("refs/fractal/cell/cell-default/main") {
+                if let Some((_, oid)) = self.effective_head_commit()? {
                     return Ok(oid);
                 }
+            }
+            if let Some(oid) = self.head_commit()? {
+                return Ok(oid);
             }
             return Err(FractalError::ObjectCodec(format!(
                 "HEAD is unborn in '{}'; there is no commit to resolve",
@@ -401,6 +487,22 @@ impl RepoView {
         for candidate in reference_candidates(revision) {
             if let Some(found) = self.lookup_reference(&candidate)? {
                 return Ok(found);
+            }
+        }
+        if revision.len() >= 4
+            && revision.len() < 40
+            && revision.bytes().all(|b| b.is_ascii_hexdigit())
+        {
+            let matches = self.odb.find_by_hex_prefix(revision)?;
+            match matches.as_slice() {
+                [single] => return Ok(*single),
+                [] => {}
+                many => {
+                    return Err(FractalError::ObjectCodec(format!(
+                        "short object name '{revision}' is ambiguous ({} candidates)",
+                        many.len()
+                    )));
+                }
             }
         }
         Err(FractalError::ObjectCodec(format!(
@@ -670,6 +772,7 @@ fn reference_candidates(revision: &str) -> Vec<String> {
         format!("refs/heads/{revision}"),
         format!("refs/remotes/{revision}"),
         format!("refs/remotes/{revision}/HEAD"),
+        format!("refs/fractal/cell/cell-default/{revision}"),
     ]
 }
 
