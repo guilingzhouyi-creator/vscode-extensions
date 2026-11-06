@@ -30,7 +30,7 @@ description: >-
 2. **实现或优化 Git Plumbing 协议与存储算子**（Loose Object、DIRC 索引、Packfile、Tree Diff、Commit Graph）；
 3. **开发多智能体 Cell 虚拟工作树、并发暂存区或偏序集同态冲突检测（CCD v2）**；
 4. **维护 `fractal-git/src/bin/` 原生命令层（`taxis` CLI）或 `fractal-git/ts/` TypeScript 门面层**；
-5. **排查 `fractal-git` 专属门禁（<!-- METRICS:BEGIN rule-fractal-git -->**36 条规则**<!-- METRICS:END rule-fractal-git -->，`FGT-*`）与 Scion 对标基准回归**。
+5. **排查 `fractal-git` 专属门禁（<!-- METRICS:BEGIN rule-fractal-git -->**37 条规则**<!-- METRICS:END rule-fractal-git -->，`FGT-*`）与 Scion 对标基准回归**。
 
 ---
 
@@ -78,6 +78,7 @@ description: >-
   - `fg-algorithms::diff::eloc_5d` 提供纯 Rust 零瞬态堆分配 5D 黎曼有效代码评估与 `FloatPrecisionExt` 确定性截断；
   - `fg-gate::diff_bounds` 部署两层解耦双向钳制总督（`SingleFile5dBounds`、`CommitBatchTotals`、`DiffBoundsGovernor`），联动 `admission.rs` 贝叶斯 Jeffreys 后验动态准入门槛；
   - `taxis gate-slice` 子命令实现毫秒级暂存切片审查与结构化 JSON 违规信封输出。
+- **预测试影响面切片守卫 (`FGT-IMPACT-001`)**：改动路径到预测试目标的映射单一登记于 `scripts/common/impact-slice-map.js`，切片只允许收窄被触发的目标集合、严禁把已识别路径放宽到登记集之外；未识别的 crate 路径必须回落到全量目标，杜绝以「未匹配」为名漏测；
 - **IKCE 隐藏微变异盲测评估 (`FGT-MUT-001` / `FGT-TAU-001`)**：纯内存注入微变异体，强制要求测试击杀率 $K \ge 60\%$，刚性粉碎空断言与恒真式；
 - **防篡改独立审计链与四级时间折叠 (`FGT-AUD-001` / `FGT-PYR-001`)**：独立维护 `refs/fractal/telemetry/*` HMAC 单向哈希链与四级时间折叠汇总，施加 OS 底层防护（Win32 只读锁 + Linux `chattr +a` 仅追加属性）。
 

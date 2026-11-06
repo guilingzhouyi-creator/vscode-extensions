@@ -1,12 +1,12 @@
 ---
 name: coding-craft
 description: >-
-  【触发：写代码/重构/命名/错误处理/类型设计/SSOT/空捕获】编写、生成或审查任何代码时必须遵循。坚持命名即契约、显式失败语义、类型穷尽、最小接口暴露与单向依赖，对接 516 条 SSOT 规则。
+  【触发：写代码/重构/命名/错误处理/类型设计/SSOT/空捕获】编写、生成或审查任何代码时必须遵循。坚持命名即契约、显式失败语义、类型穷尽、最小接口暴露与单向依赖，对接 534 条 SSOT 规则。
 ---
 
 # coding-craft — 通用编程工艺、多语言惯用法与六大规范性思维约束
 
-本技能回答**动手写一个函数时，除体积与复杂度预算外必须守住的工艺底线與元认知防线**。规则真源位于 `scripts/common/rule-catalog.json`（<!-- METRICS:BEGIN rule-family-count-all -->**69 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**533 条规则**<!-- METRICS:END rule-total -->）。
+本技能回答**动手写一个函数时，除体积与复杂度预算外必须守住的工艺底线與元认知防线**。规则真源位于 `scripts/common/rule-catalog.json`（<!-- METRICS:BEGIN rule-family-count-all -->**70 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->）。
 
 ---
 
@@ -73,7 +73,7 @@ node scripts/common/evaluate-eloc-budget.js && node scripts/common/validate-code
 
 | 资源 | 用途 |
 | :--- | :--- |
-| [rule-family-map.md](references/rule-family-map.md) | <!-- METRICS:BEGIN rule-family-count-all -->**69 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**533 条规则**<!-- METRICS:END rule-total -->的「一句话准则 + 全量 ID」权威映射表 |
+| [rule-family-map.md](references/rule-family-map.md) | <!-- METRICS:BEGIN rule-family-count-all -->**70 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->的「一句话准则 + 全量 ID」权威映射表 |
 | [normative-thinking-constraints.md](references/normative-thinking-constraints.md) | Agent 六大高级编程规范性思维约束（状态闭合、双向闭包、反机械应付、负空间、零分配、自证探针） |
 | [python-idioms.md](references/python-idioms.md) | 七域编程工艺改写范例与 `PYM` 族现代 Python 惯用法完整指南 |
 | [code-review-checklist.md](templates/code-review-checklist.md) | 可直接用于评审与自检的七域工艺检查清单 |

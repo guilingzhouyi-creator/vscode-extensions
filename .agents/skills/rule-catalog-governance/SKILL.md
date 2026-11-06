@@ -37,7 +37,7 @@ description: >-
 工作区维护全局唯一的规则真源注册表，任何规则必须在注册表中登记后方可在代码、配置、分析报告或提交说明中生效：
 - **SSOT 文件路径**：`scripts/common/rule-catalog.json`
 - **生成与聚合脚本**：`scripts/common/generate-rule-catalog.js`
-- **纳管规模与形态**：跨五大规则域聚合 <!-- METRICS:BEGIN rule-total -->**533 条规则**<!-- METRICS:END rule-total -->（计数以 `scripts/common/rule-catalog.json` 为准），结构元数据如下：
+- **纳管规模与形态**：跨五大规则域聚合 <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->（计数以 `scripts/common/rule-catalog.json` 为准），结构元数据如下：
   ```json
   {
     "schema": "workspace-rule-catalog/v1",
@@ -46,8 +46,8 @@ description: >-
       "autoRefactor": 375,
       "workspaceTiming": 49,
       "webGames": 50,
-      "fractalGit": 24,
-      "globalTooling": 18
+      "fractalGit": 37,
+      "globalTooling": 23
     },
     "rules": [
       {
@@ -81,7 +81,7 @@ description: >-
 1. **`autoRefactor` (<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->)**：涵盖 <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子、双轨体积预算（`VOL-`）、物理卫生（`HYG-`）与架构质量模型；
 2. **`workspaceTiming` (<!-- METRICS:BEGIN rule-workspace-timing -->**49 条规则**<!-- METRICS:END rule-workspace-timing -->)**：11 个主题族分治 VS Code 扩展审查（编译、测试、lint、分层依赖、硬编码、脚本库、文档发布、审查配置、资源拓扑、测试预算、重构门槛），每条规则另带 `layer` 字段标注其所属的 `L0`~`L5` 执行层；
 3. **`webGames` (<!-- METRICS:BEGIN rule-webgames -->**50 条规则**<!-- METRICS:END rule-webgames -->)**：涵盖 Godot 游戏工程的资产与艺术工单规格（`ART-`）、运行时治理（`GOV-`）、高性能脚本契约（`ADV-`）与资源配置审查规则（`RES-`）；
-4. **`fractalGit` (<!-- METRICS:BEGIN rule-fractal-git -->**36 条规则**<!-- METRICS:END rule-fractal-git -->)**：涵盖 10 大内核子系统分层拓扑、无锁 CAS、循环零堆分配、类型状态机与 `// SAFETY:` 证明契约（`FGT-*`）；
+4. **`fractalGit` (<!-- METRICS:BEGIN rule-fractal-git -->**37 条规则**<!-- METRICS:END rule-fractal-git -->)**：涵盖 10 大内核子系统分层拓扑、无锁 CAS、循环零堆分配、类型状态机与 `// SAFETY:` 证明契约（`FGT-*`）；
 5. **`globalTooling` (<!-- METRICS:BEGIN rule-global-tooling -->**23 条规则**<!-- METRICS:END rule-global-tooling -->)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`008`, `CMG-PRJ-001`）、单源规则计数闭包（`RCFG-COUNTS-001`）以及跨平台脚本工程化、沙箱边界、门禁步骤状态闭包与文档数字同步守卫（`GUARD-BASE-001`, `GUARD-CHAIN-001`, `GUARD-DOC-001`, `GUARD-ISO-001`, `GUARD-JAIL-001`, `GUARD-ORD-001`, `GUARD-SHELL-001`, `GUARD-STEP-001`）；
 
 ---
@@ -134,7 +134,7 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 | **`workspace-timing`** | 49 条 | 11 个主题族：`ARF`, `BLD`, `DOC`, `HC`, `LAY`, `LINT`, `RCFG`, `RES`, `SCR`, `TB`, `TST`；执行层由每条规则的 `layer` 字段（`L0`~`L5`）表达，不作族名前缀 | VS Code 扩展生命周期、分层存储安全、i18n 对齐、时间守恒与状态栏治理 |
 | **`WebGames`** | 50 条 | Godot 专属契约：`ADV-`（高性能脚本与引擎约束）、`ART-`（艺术工单与资产规格）、`GOV-`、`PRF-`、`RES-`、`UUID-`、`SIM-` | Godot 4 游戏逻辑、节点树信号契约、文档双语归档与配置单源治理 |
 | **`global-tooling`** | <!-- METRICS:BEGIN rule-global-tooling -->**23 条规则**<!-- METRICS:END rule-global-tooling --> | 通用门禁与治理族：`CMG-`（提交说明规范）、`GUARD-`（平台脚本、门禁步骤与文档数字守卫）、`RCFG-`（单源规则计数闭包） | 跨平台工作区门禁、提交说明防虚构、沙箱隔离与文档规模指标同步 |
-| **`fractal-git`** | <!-- METRICS:BEGIN rule-fractal-git -->**36 条规则**<!-- METRICS:END rule-fractal-git --> | `FGT-` 项目命名空间下的主题族（ID 第二段即族名）：`ALG`, `AUD`, `BRG`, `BYP`, `CAS`, `COR`, `DEP`, `ERR`, `FAC`, `GAT`, `IDX`, `LCK`, `MUT`, `OBJ`, `POL`, `PRF`, `PYR`, `QRN`, `SAF`, `STO`, `TAU`, `TOP`, `TRN`, `VRF` | 10 大内核子系统拓扑、锁纪律与 CAS 正确性、内核形式化验证、微变异盲测评估、隔离检疫与独立审计链 |
+| **`fractal-git`** | <!-- METRICS:BEGIN rule-fractal-git -->**37 条规则**<!-- METRICS:END rule-fractal-git --> | `FGT-` 项目命名空间下的主题族（ID 第二段即族名）：`ALG`, `AUD`, `BRG`, `BYP`, `CAS`, `COR`, `DEP`, `ERR`, `FAC`, `GAT`, `IDX`, `LCK`, `MUT`, `OBJ`, `POL`, `PRF`, `PYR`, `QRN`, `SAF`, `STO`, `TAU`, `TOP`, `TRN`, `VRF` | 10 大内核子系统拓扑、锁纪律与 CAS 正确性、内核形式化验证、微变异盲测评估、隔离检疫与独立审计链 |
 
 ---
 
@@ -144,7 +144,7 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 1. **`auto-refactor` (375 规则体系)**：在 `src/core/rules/entries/` 定义规则对象；在 `dimensionRuleTable.ts` 绑定权重（遵守 `MAX_AXES_PER_FINDING <= 4`）；在 `tests/rules/` 编写专属测试；若涉原生算子保证 Rust 与 TS 100% 等价；
 2. **`workspace-timing` (49 规则体系)**：在 `scripts/config/review-rules.json` 中为每个 checker 声明 `family`（主题族）与 `layer`（`L0`~`L5` 执行层）两个字段，二者都必须存在：`generate-rule-catalog.js` 缺 `family` 即抛错，杜绝以层号冒充族名；同一 checker 下的每条规则还必须在 `ruleTitles` 中给出专属英文短语，键集须与 `ruleIds` 完全相等；
 3. **`WebGames` (50 规则体系)**：在 `scripts/common/rule-sources/webgames-rules.json` 规则源中登记，每条必须给出英文 `title`（≤ 60 字符）与 `summary`（判据 + 理由），并以 `enforced` 布尔标注是否已落地强制；`sourceRef` 单独承载真实来源路径；
-4. **`fractal-git` (24 规则体系) 与 `global-tooling` (18 规则体系)**：分别在 `scripts/common/rule-sources/fractal-git-rules.json` 与 `scripts/common/rule-sources/global-rules.json` 规则源中登记；
+4. **`fractal-git` (37 规则体系) 与 `global-tooling` (23 规则体系)**：分别在 `scripts/common/rule-sources/fractal-git-rules.json` 与 `scripts/common/rule-sources/global-rules.json` 规则源中登记；
 5. **全仓同步触发与 `--check-only` 零漂移断言**：新增或修改规则后必须运行 `node scripts/common/generate-rule-catalog.js` 同步真源；在门禁与 CI 中运行 `node scripts/common/generate-rule-catalog.js --check-only` 阻断规则漂移。
 
 ---
@@ -164,7 +164,7 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 
 1. **真源声明**：`scripts/common/doc-metrics.json` 为每个指标声明求值来源与渲染模板，指标 id 与求值器一一对应，未声明的指标直接失败而非跳过；
 2. **区域渲染**：文档中形如 `<!-- METRICS:BEGIN rule-total -->…<!-- METRICS:END rule-total -->` 的区域由 `sync-doc-metrics.js --write` 就地重写，区域外文本永不被改动；
-3. **口径强制**：每个模板自带口径前缀（`全工作区 SSOT 单源收录 …` / `auto-refactor 项目 …`），避免「auto-refactor 375 条规则」与「全仓 516 条规则」被读成互相矛盾；
+3. **口径强制**：每个模板自带口径前缀（`全工作区 SSOT 单源收录 …` / `auto-refactor 项目 …`），避免「auto-refactor 375 条规则」与「全仓 534 条规则」被读成互相矛盾；
 4. **历史快照豁免**：记录某一提交时点结论的段落须加 `<!-- METRICS:IGNORE-HISTORICAL commit=<hash> -->`，缺提交号的豁免一律拒绝；
 5. **计划态豁免**：记录尚未落地的目标规格（如 preset 扩张计划）须加 `<!-- METRICS:IGNORE-PLAN reason=<理由> -->`，与历史豁免并列但语义相反——前者是「还没到」，后者是「已经过去」，混用会让前瞻设计被误判为过期事实；
 6. **块外裸数字**：`validate-docs-consistency.js` 从目录实时推导合法取值集合，块外出现的任何其他规模数字即阻断——判据是真源差量而非历史黑名单。
