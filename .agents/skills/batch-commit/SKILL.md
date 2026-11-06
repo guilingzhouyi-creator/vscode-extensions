@@ -82,9 +82,13 @@ git add path/to/contract.ts path/to/storage.ts
    - 严禁自作主张对并行会话的文件执行格式化、语法“修复”或将其杂糅进当前提交。
 
 3. **两层 5D ELOC 差分双向钳制与准入更替审查 (`FGT-GAT-001`)**：
-   - **单文件微观形变包络**：新建文件 $E_{\text{add}} \le 180.0$ 5D ELOC，已有文件 $E_{\text{add}} \le 120.0$ 5D ELOC；单文件删除 $E_{\text{del}} \le 100.0$ 5D ELOC（超限须有重构见证）；实质行比率 $\ge 0.60$、$\text{TSPR} \ge 0.40$；
+   - **单文件微观形变包络**：新建文件 $E_{\text{add}} \le 360.0$ 5D ELOC，已有文件 $E_{\text{add}} \le 120.0$ 5D ELOC（若存在 $\ge 10$ 行重构删除见证放宽至 $180.0$）；单文件删除 $E_{\text{del}} \le 100.0$ 5D ELOC（超限至最高 $280.0$ 须有重构见证）；实质行比率 $\ge 0.60$、$\text{TSPR} \ge 0.40$；
    - **批次宏观聚合包络**：单批总新增 $\sum E_{\text{add}} \le 360.0$ 5D ELOC，总删除 $\sum E_{\text{del}} \le 280.0$ 5D ELOC；
    - **最低经验自适应净更替量门槛**：$\sum E_{\text{add}} + 0.8 \times \sum E_{\text{del}} \ge \Theta_{\text{admission}}$（Jeffreys Beta 后验动态钳位在 $[3.0, 25.0]$ 5D ELOC，杜绝纯注释与跳板伪更替）；
+   - **模块化拆解消解微分溢出协议 (Module Deconstruction Protocol)**：
+     - 当遇 `FILE_ADD_OVERFLOW` 或 `BATCH_ADD_OVERFLOW` 时，严禁强制合并或私改门禁阈值；
+     - 必须将大文件中自洽的复杂算法（如位集求解器、磁盘协同器）提取为新子模块；新文件独立享受 $360.0$ 配额，同时使母文件编辑行数收敛；
+     - 重构已有文件须保留核心接口，单文件删除严禁超过 $280.0$，防止触发 `CAPABILITY_EROSION`；
    - **双轨交错提交节拍**：生产/业务代码（Code Beat）先行提交，自审周报与遥测存证（Telemetry Beat）接续提交，严禁混杂提交扩大爆炸半径。详见 [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md)。
 
 ### Step 2: 编写结构化提交信息与离线预审 (`commit-msg-gate`)
@@ -138,7 +142,9 @@ git add path/to/contract.ts path/to/storage.ts
 | **`CMG-STY-006`** | **执行标签零执行数字** | `通过146套测试`, `耗时50.8s`, `419个文件`, `覆盖率98%` | 执行标签区域严禁堆砌数字量词，必须提炼为纯逻辑质性断言（例如“断言边界输入下算法正确回退；断言全量源码文件合规且无空文件”） |
 
 - **严禁敏捷冲刺期过程性代号**：正文中绝对严禁出现 `W1~W9`、`Pass 1..6`、`Sprint 3`、`phase\d+`、`st\d+` 等短期过程代号，所有描述必须转换为恒定技术事实；
-- **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：正文中引用的所有规则 ID（如 `GUARD-AST-001`、`ARCH-FAC-001`）必须在 `scripts/common/rule-catalog.json` 中真实存在，严禁凭空捏造。
+- **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：正文中引用的所有规则 ID（如 `GUARD-AST-001`、`ARCH-FAC-001`）必须在 `scripts/common/rule-catalog.json` 中真实存在，严禁凭空捏造；
+- **第一人称代词与专业术语误杀规避 (`CMG-STY-008`)**：严禁第一人称代词（`I`、`we`、`my`、`our`）；正文英文缩写 `I/O` 会被正则 `\bI\b` 拦截，必须统一替代为中文“磁盘读写”或“输入输出”；
+- **质性验证结论铁律 (`CMG-STY-006`)**：`[Verification]` 区块内**严禁包含任何阿拉伯数字、统计量词或百分比**，必须纯粹以质性技术事实陈述门禁与断言通过。
 
 #### 5. 离线预审验证
 ```powershell
@@ -170,6 +176,13 @@ pwsh -File scripts/ps1/pre-commit-gate.ps1
 git commit -F "$dir\commit_batch_N.txt"
 ```
 提交完成后执行 `git status -s` 核查工作树剩余文件，继续推进下一批。
+
+#### 批次间质量遥测闭环 (Inter-Batch Telemetry Cadence)
+在连续原子分批提交期间，每批提交完成后建议执行静态质量基准扫描：
+```powershell
+node auto-refactor/dist/index.js scan --root <target-project> --score
+```
+记录并跟踪复合质量指数 (CQI)、Tri-Plane 治理向量 ($Q_{\text{tot}}$) 与自研度指数 (CAI 2.0)，确保分批演进过程中质量棘轮单调不滑坡。
 
 > [!CAUTION] 产品发布更新日志防污染隔离
 > Git 提交说明陈述的是对代码库的**内部工程技术事实**；**严禁**直接将包含工程重构黑话的提交说明复制给用户端的 `CHANGELOG.md` 或 Release Notes。用户交付文档必须保持纯粹的用户功能与价值导向。
