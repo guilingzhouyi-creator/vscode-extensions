@@ -74,3 +74,5 @@ mod test_hosted_git_parity;
 mod test_hosted_git_remote_parity;
 #[path = "rust/test_hosted_git_workflow_parity.rs"]
 mod test_hosted_git_workflow_parity;
+#[path = "rust/test_hosted_git_archive_parity.rs"]
+mod test_hosted_git_archive_parity;
