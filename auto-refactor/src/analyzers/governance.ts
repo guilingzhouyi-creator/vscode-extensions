@@ -144,6 +144,8 @@ function buildGovernanceIssue(
     return issue;
 }
 
+const SHARED_TS_ADAPTER = new TypeScriptAdapter();
+
 /**
  * Static governance analyzer enforcing architectural boundaries,
  * language profiles, and safety rules.
@@ -238,12 +240,22 @@ export class GovernanceAnalyzer implements Analyzer {
 
     analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         this.resetState();
-        // Standalone contract fallback
+        this.ensureInitialized(ctx);
 
-        const adapter = new TypeScriptAdapter();
-        const ast = adapter.parse(sourceFile.text, ctx.filePath);
-        return runStreaming(adapter, ast.root, [
-            { analyzer: this, ctx: { ...ctx, sourceFile, root: ast.root, adapter } },
+        const adapter = SHARED_TS_ADAPTER;
+        if (this.nodeRules.length === 0) {
+            return this.finalize({ ...ctx, sourceFile, adapter });
+        }
+
+        const isDefaultRegistry = this.registry === getDefaultGovernanceRegistry();
+        const root =
+            ctx.root ??
+            (isDefaultRegistry
+                ? adapter.parseGovernanceRoot(sourceFile)
+                : adapter.fromSourceFile(sourceFile).root);
+
+        return runStreaming(adapter, root, [
+            { analyzer: this, ctx: { ...ctx, sourceFile, root, adapter } },
         ]);
     }
 

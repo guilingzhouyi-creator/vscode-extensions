@@ -100,6 +100,10 @@ export class GateArchitectureAnalyzer implements Analyzer {
         GateArchitectureAnalyzer.auditCache.clear();
     }
 
+    public resetState(): void {
+        // Stateless per-file analyzer — safe for pool reuse
+    }
+
     analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         void sourceFile;
         return this.finalize(ctx);

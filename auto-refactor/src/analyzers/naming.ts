@@ -192,6 +192,9 @@ export class NamingAnalyzer implements Analyzer {
     }
 
     private resolveSourceFile(ctx: AnalyzerContext): ts.SourceFile | undefined {
+        if (ctx.sourceFile) {
+            return ctx.sourceFile;
+        }
         if (!ctx.content) return undefined;
         return ts.createSourceFile(ctx.filePath, ctx.content, ts.ScriptTarget.Latest, true);
     }
@@ -233,7 +236,7 @@ export class NamingAnalyzer implements Analyzer {
      * Finalizes analysis pass across source file.
      */
     finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(ctx.sourceFile, ctx);
+        return this.analyze(undefined, ctx);
     }
 
     /**
@@ -545,11 +548,12 @@ export class NamingAnalyzer implements Analyzer {
         if (aCtx.opts.checkJargon !== false) {
             checkSymbolJargonHelper(typeName, pos, aCtx);
         }
-        const declarationKind: SymbolDeclarationKind = ts.isClassDeclaration(node)
-            ? 'class'
-            : ts.isInterfaceDeclaration(node)
-              ? 'interface'
-              : KIND_TYPE;
+        let declarationKind: SymbolDeclarationKind = KIND_TYPE;
+        if (ts.isClassDeclaration(node)) {
+            declarationKind = 'class';
+        } else if (ts.isInterfaceDeclaration(node)) {
+            declarationKind = 'interface';
+        }
         this.checkDecouplingSymbol(
             typeName,
             declarationKind,

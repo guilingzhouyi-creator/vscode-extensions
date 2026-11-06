@@ -412,6 +412,10 @@ function matchDirectorySemantics(
 export class ArchitectureAnalyzer implements Analyzer {
     readonly name = ANALYZER_NAME;
 
+    public resetState(): void {
+        // Stateless per-file analyzer — safe for pool reuse
+    }
+
     analyze(sourceFile: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
         void sourceFile;
         const opts = (ctx.options || {}) as ArchitectureOptions;

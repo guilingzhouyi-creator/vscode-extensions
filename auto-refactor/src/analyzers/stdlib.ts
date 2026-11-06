@@ -33,6 +33,7 @@ import {
 } from '../core/constants';
 import { calculateBraceDelta } from '../core/ast/block-scope-utils';
 import { LeasedRegexPool, sharedRegexPool } from '../core/data-structures/regex-pool';
+import { isTestFilePath } from '../core/path';
 import { getMaskedSourceOfPath } from '../core/policy/source-mask';
 
 /** Relevant source extensions for standard library and systems runtime analysis */
@@ -336,7 +337,7 @@ export class StdlibAnalyzer implements Analyzer {
         if (!STDLIB_EXTS.has(ext)) return [];
 
         const issues: Issue[] = [];
-        const isTest = REGEX.LITERAL.TEST_PATH.test(file);
+        const isTest = isTestFilePath(file) || REGEX.LITERAL.TEST_PATH.test(file);
         const ms =
             ctx.lines && ctx.maskedLines
                 ? { raw: ctx.lines, masked: ctx.maskedLines }

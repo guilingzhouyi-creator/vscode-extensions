@@ -65,7 +65,11 @@ function isProductionArtifact(filePath: string): boolean {
 /**
  * Audits production build artifacts for debug leftovers, TODOs, and absolute paths (PROD-HYG-001).
  */
-function auditDebugResidueAndPaths(file: string, rawLines: string[], issues: Issue[]): void {
+function auditDebugResidueAndPaths(
+    file: string,
+    rawLines: readonly string[],
+    issues: Issue[],
+): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (REGEX.SECURITY.CONSOLE_DEBUG_TRACE.test(line)) {
@@ -117,7 +121,7 @@ function auditDebugResidueAndPaths(file: string, rawLines: string[], issues: Iss
 /**
  * Audits production output for public Source Map leakage (PROD-HYG-002).
  */
-function auditSourceMapLeakage(file: string, rawLines: string[], issues: Issue[]): void {
+function auditSourceMapLeakage(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (SOURCE_MAP_PUBLIC_DIRECTIVE_RE.test(line)) {
@@ -140,7 +144,7 @@ function auditSourceMapLeakage(file: string, rawLines: string[], issues: Issue[]
 /**
  * Audits client-facing files for backend environment secret leakage (PROD-HYG-003).
  */
-function auditBackendEnvSecrets(file: string, rawLines: string[], issues: Issue[]): void {
+function auditBackendEnvSecrets(file: string, rawLines: readonly string[], issues: Issue[]): void {
     const isClientFacing =
         file.includes('/src/presentation/') ||
         file.includes('/src/client/') ||
@@ -182,7 +186,7 @@ export class ProductionHygieneAnalyzer implements Analyzer {
     analyze(_sourceFile: unknown, context: AnalyzerContext): Issue[] {
         const file = context.filePath;
         const issues: Issue[] = [];
-        const rawLines = context.content.split('\n');
+        const rawLines = context.lines ?? context.content.split('\n');
 
         if (isProductionArtifact(file)) {
             auditDebugResidueAndPaths(file, rawLines, issues);

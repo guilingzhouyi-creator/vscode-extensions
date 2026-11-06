@@ -163,6 +163,10 @@ function checkAndPushSite(trimmed: string, meta: SiteMeta, sites: DataAccessSite
 export class DataArchitectureAnalyzer implements Analyzer {
     name = 'data-architecture' as const;
 
+    public resetState(): void {
+        // Stateless per-file analyzer — safe for pool reuse
+    }
+
     analyze(sourceFile: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         void sourceFile;
         if (isToolOrTestScript(ctx.filePath)) {
@@ -171,7 +175,7 @@ export class DataArchitectureAnalyzer implements Analyzer {
         const options = (ctx.config.analyzers['data-architecture']?.options ||
             {}) as DataArchitectureOptions;
         const content = ctx.content;
-        const lines = content.split('\n');
+        const lines = ctx.lines ?? content.split('\n');
         const sites: DataAccessSite[] = [];
         const isOnline = isOnlineExecutionContext(ctx.filePath, content, options);
 
@@ -223,6 +227,6 @@ export class DataArchitectureAnalyzer implements Analyzer {
      * requiring an explicit SourceFile AST instance.
      */
     finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(ctx.sourceFile, ctx);
+        return this.analyze(undefined, ctx);
     }
 }

@@ -190,8 +190,11 @@ function resolveSourceFile(
     ctx: AnalyzerContext,
     language: string,
 ): ts.SourceFile | undefined {
+    if (language !== 'typescript') {
+        return sourceFile;
+    }
     const existing = sourceFile || (ctx as { sourceFile?: ts.SourceFile }).sourceFile;
-    if (existing || language !== 'typescript' || !ctx.content) {
+    if (existing || !ctx.content) {
         return existing;
     }
     try {
@@ -209,6 +212,10 @@ export class DependencyLayoutAnalyzer implements Analyzer {
 
     /** Cached split lines of current file under analysis to eliminate repeated full-file splits. */
     private fileLines: readonly string[] = [];
+
+    public resetState(): void {
+        this.fileLines = [];
+    }
 
     analyze(sourceFile: ts.SourceFile, ctx: AnalyzerContext): Issue[] {
         const options = (ctx.config.analyzers['dependency-layout']?.options ||
@@ -256,7 +263,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
      * Streaming lifecycle finalization hook; allows single-pass scanning without SourceFile AST.
      */
     finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze((ctx as { sourceFile?: ts.SourceFile }).sourceFile!, ctx);
+        return this.analyze(undefined as unknown as ts.SourceFile, ctx);
     }
 
     private resolveFirstDeclarationLine(

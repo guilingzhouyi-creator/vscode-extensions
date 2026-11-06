@@ -75,6 +75,10 @@ function checkLockBoundary(
 export class ConcurrencyAnalyzer implements Analyzer {
     public readonly name = ANALYZER_CONCURRENCY;
 
+    public resetState(): void {
+        // Stateless per-file analyzer — safe for pool reuse
+    }
+
     /**
      * Inspect file content for concurrency and resource lifecycle hazards.
      *
@@ -95,7 +99,7 @@ export class ConcurrencyAnalyzer implements Analyzer {
      */
     public finalize(context: AnalyzerContext): Issue[] {
         const issues: Issue[] = [];
-        const lines = context.content.split('\n');
+        const lines = context.lines ?? context.content.split('\n');
 
         let hasListenerAttach = false;
         let hasTeardown = false;

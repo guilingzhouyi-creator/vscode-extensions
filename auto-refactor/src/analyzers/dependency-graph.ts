@@ -66,7 +66,14 @@ function compileGroupRegexes(globs?: string[]): RegExp[] {
     return globs.map(globToRegExp);
 }
 
+const compiledGroupsCache = new WeakMap<Record<string, string[]>, CompiledGroup[]>();
+const compiledConstraintsCache = new WeakMap<GroupRules, Map<string, RuleConstraints>>();
+
 function compileGroups(groups: Record<string, string[]>): CompiledGroup[] {
+    const cached = compiledGroupsCache.get(groups);
+    if (cached) {
+        return cached;
+    }
     const compiled: CompiledGroup[] = [];
     for (const [group, globs] of Object.entries(groups)) {
         compiled.push({
@@ -74,6 +81,7 @@ function compileGroups(groups: Record<string, string[]>): CompiledGroup[] {
             regexes: compileGroupRegexes(globs),
         });
     }
+    compiledGroupsCache.set(groups, compiled);
     return compiled;
 }
 
@@ -102,6 +110,13 @@ function classifyAllowedExternal(
 }
 
 function compileRuleConstraints(fromGroup: string, rule: GroupRules): RuleConstraints {
+    let byGroup = compiledConstraintsCache.get(rule);
+    if (byGroup) {
+        const cached = byGroup.get(fromGroup);
+        if (cached) {
+            return cached;
+        }
+    }
     const allowGroups = new Set([fromGroup, ...(rule.allowGroups ?? [])]);
     const compiledExceptionRegexes = (rule.allowImportGlobs ?? []).map((globPattern) => {
         return globToRegExp(globPattern.includes('/') ? globPattern : `**/${globPattern}`);
@@ -114,13 +129,19 @@ function compileRuleConstraints(fromGroup: string, rule: GroupRules): RuleConstr
         }
     }
 
-    return {
+    const constraints: RuleConstraints = {
         allowGroups,
         compiledExceptionRegexes,
         allowAllExternal: target.allowAll,
         allowExternalExact: target.exact,
         allowExternalPrefixes: target.prefixes,
     };
+    if (!byGroup) {
+        byGroup = new Map<string, RuleConstraints>();
+        compiledConstraintsCache.set(rule, byGroup);
+    }
+    byGroup.set(fromGroup, constraints);
+    return constraints;
 }
 
 const IMPORT_SPEC_RE =
@@ -151,6 +172,10 @@ const CARRIAGE_RETURN_CHAR_CODE = 13;
  */
 export class DependencyGraphAnalyzer implements Analyzer {
     name = 'dependency-graph' as const;
+
+    public resetState(): void {
+        // Stateless per-file analyzer — safe for pool reuse
+    }
 
     analyze(
         sourceFile: import('typescript').SourceFile | undefined,
