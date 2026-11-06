@@ -6,13 +6,14 @@
 use memchr::memchr;
 
 /// Configuration flags for source code comment and literal masking.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MaskConfig {
     pub line_comment: String,
     pub block_comment: Option<(String, String)>,
     pub quote_chars: String,
     pub multiline_templates: bool,
     pub regex_literals: bool,
+    pub html_comment: bool,
 }
 
 /// Result of source code masking containing raw/masked line buffers and metrics.
@@ -27,6 +28,7 @@ pub struct MaskResult {
 #[derive(Debug, Clone, Default)]
 struct MaskState {
     in_block_comment: bool,
+    in_html_comment: bool,
     quote: Option<char>,
     raw_string: Option<usize>,
 }
@@ -132,10 +134,29 @@ fn mask_line_into(
     // Fast path: no open quote or block comment, no raw string, and no trigger chars present
     if state.quote.is_none()
         && !state.in_block_comment
+        && !state.in_html_comment
         && state.raw_string.is_none()
         && !has_trigger_char(line, config)
     {
         target.output.push_str(line);
+        return;
+    }
+
+    // Fast path: wholly inside an HTML comment and contains no closing delimiter
+    if config.html_comment
+        && state.in_html_comment
+        && state.quote.is_none()
+        && state.raw_string.is_none()
+        && !line.contains("-->")
+    {
+        let space_count = if line.is_ascii() {
+            line.len()
+        } else {
+            line.encode_utf16().count()
+        };
+        for _ in 0..space_count {
+            target.output.push(' ');
+        }
         return;
     }
 
@@ -215,6 +236,10 @@ fn has_trigger_char(line: &str, config: &MaskConfig) -> bool {
     }
 
     if config.regex_literals && memchr(b'/', b).is_some() {
+        return true;
+    }
+
+    if config.html_comment && memchr(b'<', b).is_some() {
         return true;
     }
 
@@ -398,6 +423,22 @@ fn step_block_comment_ascii(
 }
 
 #[inline]
+fn step_html_comment_ascii(
+    line: &[u8],
+    out: &mut [u8],
+    state: &mut MaskState,
+    index: usize,
+) -> usize {
+    if line[index..].starts_with(b"-->") {
+        out[index..index + 3].fill(b' ');
+        state.in_html_comment = false;
+        return index + 3;
+    }
+    out[index] = b' ';
+    index + 1
+}
+
+#[inline]
 fn step_open_quote_ascii(
     out: &mut [u8],
     state: &mut MaskState,
@@ -449,6 +490,11 @@ fn mask_line_ascii_into(
             continue;
         }
 
+        if state.in_html_comment {
+            index = step_html_comment_ascii(line, out, state, index);
+            continue;
+        }
+
         // Code mode: check comments
         if !lc_bytes.is_empty() && line[index..].starts_with(lc_bytes) {
             out[index..len].fill(b' ');
@@ -464,6 +510,13 @@ fn mask_line_ascii_into(
                 index += open.len();
                 continue;
             }
+        }
+
+        if config.html_comment && line[index..].starts_with(b"<!--") {
+            out[index..index + 4].fill(b' ');
+            state.in_html_comment = true;
+            index += 4;
+            continue;
         }
 
         let b = line[index];
@@ -675,6 +728,22 @@ fn step_block_comment_u16(
 }
 
 #[inline]
+fn step_html_comment_u16(
+    units: &[u16],
+    out: &mut [u16],
+    state: &mut MaskState,
+    index: usize,
+) -> usize {
+    if units[index..].starts_with(&[b'-' as u16, b'-' as u16, b'>' as u16]) {
+        out[index..index + 3].fill(0x20);
+        state.in_html_comment = false;
+        return index + 3;
+    }
+    out[index] = 0x20;
+    index + 1
+}
+
+#[inline]
 fn step_open_quote_u16(
     out: &mut [u16],
     state: &mut MaskState,
@@ -726,6 +795,11 @@ fn mask_line_utf16(line: &str, state: &mut MaskState, config: &MaskConfig) -> St
             continue;
         }
 
+        if state.in_html_comment {
+            index = step_html_comment_u16(&units, &mut out, state, index);
+            continue;
+        }
+
         if !lc_units.is_empty() && units[index..].starts_with(&lc_units) {
             out[index..len].fill(0x20);
             return String::from_utf16_lossy(&out);
@@ -740,6 +814,15 @@ fn mask_line_utf16(line: &str, state: &mut MaskState, config: &MaskConfig) -> St
                 index += open.len();
                 continue;
             }
+        }
+
+        if config.html_comment
+            && units[index..].starts_with(&[b'<' as u16, b'!' as u16, b'-' as u16, b'-' as u16])
+        {
+            out[index..index + 4].fill(0x20);
+            state.in_html_comment = true;
+            index += 4;
+            continue;
         }
 
         let u = units[index];
@@ -777,6 +860,7 @@ mod tests {
             quote_chars: "'\"`".to_string(),
             multiline_templates: true,
             regex_literals: true,
+            html_comment: true,
         }
     }
 
@@ -840,6 +924,7 @@ mod tests {
             quote_chars: "'\"".to_string(),
             multiline_templates: false,
             regex_literals: false,
+            html_comment: false,
         };
         let code =
             "# Header\ndef foo():\n    \"\"\"Docstring\n    line 2\"\"\"\n    return 42 # end";
@@ -857,6 +942,7 @@ mod tests {
             quote_chars: "'\"".to_string(),
             multiline_templates: false,
             regex_literals: false,
+            html_comment: false,
         };
         let code = "<# Block comment\n multi-line #>\nWrite-Host 'Hello'";
         let res = mask_source_code(code, &ps_config);
@@ -907,6 +993,7 @@ mod tests {
             quote_chars: "\"".to_string(),
             multiline_templates: false,
             regex_literals: false,
+            html_comment: false,
         }
     }
 
@@ -959,5 +1046,16 @@ mod tests {
         let res = mask_source_code(code, &config);
         let compact = mask_source_code_compact(code, &config);
         assert_eq!(compact, res.masked.join("\n"));
+    }
+
+    #[test]
+    fn test_html_comment_masking() {
+        let code = "const a = 1; <!-- METRICS:BEGIN -->\ninner <!-- comment\nend --> const b = 2;";
+        let config = c_family_config();
+        let res = mask_source_code(code, &config);
+        assert_eq!(res.lines, 3);
+        assert_eq!(res.masked[0], "const a = 1;                       ");
+        assert_eq!(res.masked[1], "inner             ");
+        assert_eq!(res.masked[2], "        const b = 2;");
     }
 }

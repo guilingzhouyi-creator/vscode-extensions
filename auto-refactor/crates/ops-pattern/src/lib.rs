@@ -31,6 +31,29 @@ pub fn run_fast_pattern_match(source_text: &str, patterns: &[String]) -> Vec<Pat
         return results;
     }
 
+    if source_text.len() >= 512 && patterns.len() > 1 {
+        let active_patterns: Vec<String> = patterns
+            .iter()
+            .filter(|p| !p.is_empty() && source_text.contains(p.as_str()))
+            .cloned()
+            .collect();
+        if active_patterns.is_empty() {
+            return results;
+        }
+        if active_patterns.len() == 1 {
+            match_single_pattern(source_text, &active_patterns[0], &mut results);
+            return results;
+        }
+        match_multi_patterns(source_text, &active_patterns, &mut results);
+        results.sort_by(|a, b| {
+            a.line
+                .cmp(&b.line)
+                .then_with(|| a.column.cmp(&b.column))
+                .then_with(|| a.pattern.cmp(&b.pattern))
+        });
+        return results;
+    }
+
     if patterns.len() == 1 {
         match_single_pattern(source_text, &patterns[0], &mut results);
     } else {
@@ -50,7 +73,7 @@ pub fn run_fast_pattern_match(source_text: &str, patterns: &[String]) -> Vec<Pat
 }
 
 fn match_single_pattern(source_text: &str, pattern: &str, results: &mut Vec<PatternMatch>) {
-    if pattern.is_empty() {
+    if pattern.is_empty() || (source_text.len() >= 512 && !source_text.contains(pattern)) {
         return;
     }
     let pat_len = pattern.len().max(1);
@@ -177,6 +200,79 @@ fn match_multi_patterns(source_text: &str, patterns: &[String], results: &mut Ve
         return;
     }
 
+    if candidates.len() <= 64 {
+        let mut needle_bitmask = [0u64; 256];
+        let mut min_pat_len = usize::MAX;
+        for (idx, cand) in candidates.iter().enumerate() {
+            needle_bitmask[cand.needle_byte as usize] |= 1u64 << idx;
+            if cand.min_len < min_pat_len {
+                min_pat_len = cand.min_len;
+            }
+        }
+
+        // Stores (last_matched_line_num, next_allowed_col) so no per-line fill(0) is required
+        let mut next_allowed = vec![(0u32, 0usize); candidates.len()];
+
+        for (line_idx, line) in source_text.lines().enumerate() {
+            let line_len = line.len();
+            if line_len < min_pat_len {
+                continue;
+            }
+
+            let line_bytes = line.as_bytes();
+            let line_num = (line_idx + 1) as u32;
+            let mut col = 0;
+
+            while col < line_len {
+                if col + 8 <= line_len
+                    && (needle_bitmask[line_bytes[col] as usize]
+                        | needle_bitmask[line_bytes[col + 1] as usize]
+                        | needle_bitmask[line_bytes[col + 2] as usize]
+                        | needle_bitmask[line_bytes[col + 3] as usize]
+                        | needle_bitmask[line_bytes[col + 4] as usize]
+                        | needle_bitmask[line_bytes[col + 5] as usize]
+                        | needle_bitmask[line_bytes[col + 6] as usize]
+                        | needle_bitmask[line_bytes[col + 7] as usize])
+                        == 0
+                {
+                    col += 8;
+                    continue;
+                }
+
+                let mut bits = needle_bitmask[line_bytes[col] as usize];
+                while bits != 0 {
+                    let idx = bits.trailing_zeros() as usize;
+                    bits &= bits - 1;
+                    let cand = &candidates[idx];
+                    if col >= cand.needle_offset {
+                        let start_col = col - cand.needle_offset;
+                        let (last_line, allowed_col) = next_allowed[idx];
+                        let min_col = if last_line == line_num {
+                            allowed_col
+                        } else {
+                            0
+                        };
+                        if start_col >= min_col
+                            && line_len - start_col >= cand.min_len
+                            && &line_bytes[start_col..start_col + cand.min_len] == cand.bytes
+                        {
+                            results.push(PatternMatch {
+                                pattern: cand.pattern.clone(),
+                                line: line_num,
+                                column: (start_col + 1) as u32,
+                                match_text: cand.pattern.clone(),
+                            });
+                            next_allowed[idx] = (line_num, start_col + cand.min_len.max(1));
+                        }
+                    }
+                }
+
+                col += 1;
+            }
+        }
+        return;
+    }
+
     let mut needle_mask = [false; 256];
     let mut min_pat_len = usize::MAX;
     for cand in &candidates {
@@ -195,34 +291,15 @@ fn match_multi_patterns(source_text: &str, patterns: &[String], results: &mut Ve
         }
 
         let line_bytes = line.as_bytes();
-
-        // Fast candidate presence probe with rarest-byte mask
         if !has_any_candidate_byte(line_bytes, &needle_mask) {
             continue;
         }
 
         let line_num = (line_idx + 1) as u32;
         next_allowed.fill(0);
-
         let mut col = 0;
 
         while col < line_len {
-            // ripgrep SWAR 8-byte block skip: fast forward if next 8 bytes contain
-            // zero candidate needle-bytes
-            if col + 8 <= line_len
-                && !needle_mask[line_bytes[col] as usize]
-                && !needle_mask[line_bytes[col + 1] as usize]
-                && !needle_mask[line_bytes[col + 2] as usize]
-                && !needle_mask[line_bytes[col + 3] as usize]
-                && !needle_mask[line_bytes[col + 4] as usize]
-                && !needle_mask[line_bytes[col + 5] as usize]
-                && !needle_mask[line_bytes[col + 6] as usize]
-                && !needle_mask[line_bytes[col + 7] as usize]
-            {
-                col += 8;
-                continue;
-            }
-
             let b = line_bytes[col];
             if !needle_mask[b as usize] {
                 col += 1;
@@ -360,11 +437,8 @@ pub fn count_braces_detailed(line: &str) -> BraceBalance {
     let mut opens = 0u32;
     let mut closes = 0u32;
     for &b in line.as_bytes() {
-        if b == b'{' {
-            opens += 1;
-        } else if b == b'}' {
-            closes += 1;
-        }
+        opens += u32::from(b == b'{');
+        closes += u32::from(b == b'}');
     }
     BraceBalance {
         opens,
@@ -471,7 +545,8 @@ pub fn evaluate_bumpy_road(lines: &[String], start_line: u32, end_line: u32) -> 
 
 /// Fast vectorized batch probe testing multiple trigger groups against target content.
 ///
-/// Uses a 256-LUT initial-byte table for fast filtering, followed by substring probing.
+/// Builds a single 256-byte presence table over `content` once, then rejects triggers
+/// whose bytes are absent in O(|trigger|) before calling `content.contains`.
 /// Empty trigger groups return true (safe fallback contract).
 /// Empty content returns false when groups have non-empty triggers.
 pub fn batch_probe_triggers(content: &str, trigger_groups: &[Vec<String>]) -> Vec<bool> {
@@ -480,6 +555,24 @@ pub fn batch_probe_triggers(content: &str, trigger_groups: &[Vec<String>]) -> Ve
     }
 
     let content_bytes = content.as_bytes();
+    let mut content_present = [false; 256];
+    let mut i = 0;
+    while i + 8 <= content_bytes.len() {
+        content_present[content_bytes[i] as usize] = true;
+        content_present[content_bytes[i + 1] as usize] = true;
+        content_present[content_bytes[i + 2] as usize] = true;
+        content_present[content_bytes[i + 3] as usize] = true;
+        content_present[content_bytes[i + 4] as usize] = true;
+        content_present[content_bytes[i + 5] as usize] = true;
+        content_present[content_bytes[i + 6] as usize] = true;
+        content_present[content_bytes[i + 7] as usize] = true;
+        i += 8;
+    }
+    while i < content_bytes.len() {
+        content_present[content_bytes[i] as usize] = true;
+        i += 1;
+    }
+
     let mut results = Vec::with_capacity(trigger_groups.len());
 
     for group in trigger_groups {
@@ -488,44 +581,23 @@ pub fn batch_probe_triggers(content: &str, trigger_groups: &[Vec<String>]) -> Ve
             continue;
         }
 
-        // Build 256-LUT for the first byte of non-empty triggers
-        let mut lut = [0u8; 256];
         let mut has_valid_trigger = false;
-        for trigger in group {
-            if let Some(&first_byte) = trigger.as_bytes().first() {
-                lut[first_byte as usize] = 1;
-                has_valid_trigger = true;
-            }
-        }
-
-        if !has_valid_trigger {
-            results.push(true);
-            continue;
-        }
-
-        // Fast screen: probe if any initial byte exists in content
-        let mut initial_byte_found = false;
-        for &b in content_bytes {
-            if lut[b as usize] == 1 {
-                initial_byte_found = true;
-                break;
-            }
-        }
-
-        if !initial_byte_found {
-            results.push(false);
-            continue;
-        }
-
-        // Substring probe: check if any trigger occurs in content
         let mut matched = false;
         for trigger in group {
-            if !trigger.is_empty() && content.contains(trigger.as_str()) {
+            let t_bytes = trigger.as_bytes();
+            if t_bytes.is_empty() {
+                continue;
+            }
+            has_valid_trigger = true;
+            if t_bytes.iter().all(|&b| content_present[b as usize])
+                && content.contains(trigger.as_str())
+            {
                 matched = true;
                 break;
             }
         }
-        results.push(matched);
+
+        results.push(if !has_valid_trigger { true } else { matched });
     }
 
     results

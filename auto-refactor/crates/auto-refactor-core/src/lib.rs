@@ -75,6 +75,7 @@ pub struct NativeMaskConfig {
     pub quote_chars: String,
     pub multiline_templates: Option<bool>,
     pub regex_literals: Option<bool>,
+    pub html_comment: Option<bool>,
 }
 
 #[napi(object)]
@@ -101,6 +102,7 @@ impl From<NativeMaskConfig> for ops_mask::MaskConfig {
             quote_chars: config.quote_chars,
             multiline_templates: config.multiline_templates.unwrap_or(false),
             regex_literals: config.regex_literals.unwrap_or(false),
+            html_comment: config.html_comment.unwrap_or(false),
         }
     }
 }

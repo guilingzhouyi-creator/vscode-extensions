@@ -24,6 +24,7 @@ fn create_ts_config() -> NativeMaskConfig {
         quote_chars: "\"'`".to_string(),
         multiline_templates: Some(true),
         regex_literals: Some(false),
+        html_comment: Some(false),
     }
 }
 
